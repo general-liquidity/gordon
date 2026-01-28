@@ -217,3 +217,75 @@ export interface ExchangePermissions {
   spotTrade: boolean;
   withdraw: boolean;
 }
+
+// Trade history response
+export interface BinanceTrade {
+  symbol: string;
+  id: number;
+  orderId: number;
+  orderListId: number;
+  price: string;
+  qty: string;
+  quoteQty: string;
+  commission: string;
+  commissionAsset: string;
+  time: number;
+  isBuyer: boolean;
+  isMaker: boolean;
+  isBestMatch: boolean;
+}
+
+// Deposit history response
+export interface BinanceDeposit {
+  id: string;
+  amount: string;
+  coin: string;
+  network: string;
+  status: number; // 0:pending, 6:credited, 1:success
+  address: string;
+  txId: string;
+  insertTime: number;
+  confirmTimes: string;
+  unlockConfirm: number;
+}
+
+// Withdrawal history response
+export interface BinanceWithdrawal {
+  id: string;
+  amount: string;
+  transactionFee: string;
+  coin: string;
+  status: number; // 0:Email Sent, 1:Cancelled, 2:Awaiting Approval, 3:Rejected, 4:Processing, 5:Failure, 6:Completed
+  address: string;
+  txId: string;
+  applyTime: string;
+  network: string;
+  completeTime?: string;
+}
+
+// Earn positions response
+export interface BinanceEarnPosition {
+  asset: string;
+  totalAmount: string;
+  freeAmount: string;
+  lockedAmount: string;
+  rewardAsset: string;
+  apy: string;
+  productId: string;
+  productName: string;
+}
+
+// API restrictions response
+export interface BinanceAPIRestrictions {
+  ipRestrict: boolean;
+  createTime: number;
+  enableWithdrawals: boolean;
+  enableInternalTransfer: boolean;
+  permitsUniversalTransfer: boolean;
+  enableVanillaOptions: boolean;
+  enableReading: boolean;
+  enableFutures: boolean;
+  enableMargin: boolean;
+  enableSpotAndMarginTrading: boolean;
+  tradingAuthorityExpirationTime?: number;
+}

@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef } from "react";
 import { Box, Text, useInput } from "ink";
-import TextInput from "ink-text-input";
+import { ChatInput } from "./ChatInput.tsx";
 
 import { StatusBar } from "./StatusBar.tsx";
 import { WelcomeBanner } from "./WelcomeBanner.tsx";
@@ -11,8 +11,11 @@ import { SetupWizard } from "./SetupWizard.tsx";
 import { processMessage } from "../infra/agents/orchestrator.ts";
 import { createLLMClientFromEnv, type LLMClient } from "../infra/llm/index.ts";
 import { BinanceClient } from "../infra/binance/index.ts";
+import { runMonitorCycle } from "../core/monitor.ts";
+import { scan } from "../core/scanner.ts";
 import { loadConfig, saveConfig } from "../infra/storage/config.ts";
 import { loadEnvFile, checkEnvStatus, type EnvStatus } from "../infra/storage/env.ts";
+import { initDatabase } from "../infra/storage/index.ts";
 import type { GordonContext } from "../infra/agents/types.ts";
 import type { Mode, GordonConfig } from "../types/index.ts";
 
@@ -36,9 +39,9 @@ interface AppState {
   view: AppView;
   mode: Mode;
   portfolioValue: number | undefined;
+  availableCash: number;
   connectionStatus: "connected" | "disconnected" | "connecting";
   messages: ChatMessage[];
-  inputValue: string;
   isLoading: boolean;
   conversationHistory: ConversationMessage[];
 }
@@ -70,9 +73,9 @@ export function App(): React.ReactElement {
     view: "loading",
     mode: "SAFE",
     portfolioValue: undefined,
+    availableCash: 0,
     connectionStatus: "disconnected",
     messages: [],
-    inputValue: "",
     isLoading: false,
     conversationHistory: [],
   });
@@ -84,7 +87,10 @@ export function App(): React.ReactElement {
   // Initialize config and LLM client on mount
   useEffect(() => {
     async function initialize(): Promise<void> {
-      // Load .env file first (if it exists)
+      // Initialize database first
+      await initDatabase();
+
+      // Load .env file (if it exists)
       await loadEnvFile();
 
       // Check environment status
@@ -121,8 +127,8 @@ export function App(): React.ReactElement {
       // Initialize LLM client
       try {
         llmClientRef.current = createLLMClientFromEnv();
-      } catch {
-        // LLM client not configured - will show error when user tries to chat
+      } catch (error) {
+        console.error("Failed to initialize LLM client:", error);
       }
 
       // Initialize Binance client if keys are available
@@ -132,8 +138,8 @@ export function App(): React.ReactElement {
             envStatus.keys.BINANCE_API_KEY,
             envStatus.keys.BINANCE_API_SECRET
           );
-        } catch {
-          // Binance client failed to initialize
+        } catch (error) {
+          console.error("Failed to initialize Binance client:", error);
         }
       }
 
@@ -148,9 +154,41 @@ export function App(): React.ReactElement {
     initialize();
   }, []);
 
-  function handleInputChange(value: string): void {
-    setState((prev) => ({ ...prev, inputValue: value }));
-  }
+  // Automatic monitor cycle - runs every 15 minutes to check open positions
+  useEffect(() => {
+    const MONITOR_INTERVAL_MS = 900000; // 15 minutes
+
+    const intervalId = setInterval(() => {
+      if (!binanceClientRef.current) {
+        return;
+      }
+
+      runMonitorCycle(binanceClientRef.current)
+        .then((result) => {
+          if (result.alerts.length === 0) {
+            return;
+          }
+
+          const alertMessages: ChatMessage[] = result.alerts.map((alert) => ({
+            role: "gordon" as const,
+            content: `[Monitor Alert] ${alert.message}`,
+            timestamp: formatTimestamp(),
+          }));
+
+          setState((prev) => ({
+            ...prev,
+            messages: [...prev.messages, ...alertMessages],
+          }));
+        })
+        .catch((error) => {
+          console.error("Monitor cycle error:", error);
+        });
+    }, MONITOR_INTERVAL_MS);
+
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, []);
 
   const handleSubmit = useCallback(async (value: string): Promise<void> => {
     if (!value.trim()) return;
@@ -162,11 +200,10 @@ export function App(): React.ReactElement {
       timestamp: formatTimestamp(),
     };
 
-    // Add user message, clear input, and set loading state
+    // Add user message and set loading state
     setState((prev) => ({
       ...prev,
       messages: [...prev.messages, userMessage],
-      inputValue: "",
       isLoading: true,
     }));
 
@@ -193,7 +230,7 @@ export function App(): React.ReactElement {
       llm: llmClientRef.current,
       config: configRef.current,
       portfolioValue: state.portfolioValue ?? 0,
-      availableCash: 0, // Will be updated when Binance is connected
+      availableCash: state.availableCash,
     };
 
     try {
@@ -236,7 +273,7 @@ export function App(): React.ReactElement {
         isLoading: false,
       }));
     }
-  }, [state.isLoading, state.conversationHistory, state.portfolioValue]);
+  }, [state.isLoading, state.conversationHistory, state.portfolioValue, state.availableCash]);
 
   // Handle menu selection
   const handleMenuSelect = useCallback((option: MenuOption): void => {
@@ -245,19 +282,97 @@ export function App(): React.ReactElement {
         setState((prev) => ({ ...prev, view: "chat" }));
         break;
       case "scan":
-        setState((prev) => ({
-          ...prev,
-          view: "chat",
-          messages: [
-            ...prev.messages,
-            {
-              role: "gordon",
-              content:
-                "Starting market scan... I'll analyze the top coins for support bounce setups.",
-              timestamp: formatTimestamp(),
-            },
-          ],
-        }));
+        if (!binanceClientRef.current) {
+          setState((prev) => ({
+            ...prev,
+            view: "chat",
+            messages: [
+              ...prev.messages,
+              {
+                role: "gordon",
+                content:
+                  "Binance API not connected. Add your API keys to the .env file:\n\nBINANCE_API_KEY=your-key\nBINANCE_API_SECRET=your-secret\n\nThen restart Gordon.",
+                timestamp: formatTimestamp(),
+              },
+            ],
+          }));
+        } else {
+          setState((prev) => ({
+            ...prev,
+            view: "chat",
+            messages: [
+              ...prev.messages,
+              {
+                role: "gordon",
+                content: "Scanning market...",
+                timestamp: formatTimestamp(),
+              },
+            ],
+          }));
+
+          (async () => {
+            try {
+              const scanResult = await scan(binanceClientRef.current!, {
+                topN: configRef.current.preferences.topNCoins,
+                timeframes: configRef.current.preferences.defaultTimeframes,
+              });
+
+              const coinsWithSetup = scanResult.coins.filter((c) => c.setupDetected);
+              const lines: string[] = [];
+
+              if (coinsWithSetup.length === 0) {
+                lines.push("**No support bounce setups detected at this time.**\n");
+                lines.push(`Scanned ${scanResult.coins.length} coins across ${scanResult.timeframes.join(", ")} timeframes.`);
+                lines.push("\nTry again later or ask me to analyze a specific coin.");
+              } else {
+                lines.push(`**Found ${coinsWithSetup.length} potential setup(s):**\n`);
+                lines.push("| Symbol | Price | 24h Change | Confidence | Bias | Risk |");
+                lines.push("|--------|-------|------------|------------|------|------|");
+
+                for (const coin of coinsWithSetup.slice(0, 10)) {
+                  const changeStr = coin.change24h >= 0
+                    ? `+${coin.change24h.toFixed(2)}%`
+                    : `${coin.change24h.toFixed(2)}%`;
+                  const confidenceStr = `${(coin.setupConfidence * 100).toFixed(0)}%`;
+
+                  lines.push(
+                    `| ${coin.symbol} | $${coin.price.toFixed(4)} | ${changeStr} | ${confidenceStr} | ${coin.bias} | ${coin.risk} |`
+                  );
+                }
+
+                if (coinsWithSetup.length > 10) {
+                  lines.push(`\n_...and ${coinsWithSetup.length - 10} more setups_`);
+                }
+
+                lines.push("\nAsk me about any of these coins for a detailed analysis and trade plan.");
+              }
+
+              setState((prev) => ({
+                ...prev,
+                messages: [
+                  ...prev.messages,
+                  {
+                    role: "gordon",
+                    content: lines.join("\n"),
+                    timestamp: formatTimestamp(),
+                  },
+                ],
+              }));
+            } catch (error) {
+              setState((prev) => ({
+                ...prev,
+                messages: [
+                  ...prev.messages,
+                  {
+                    role: "gordon",
+                    content: `Failed to scan market: ${error instanceof Error ? error.message : "Unknown error"}`,
+                    timestamp: formatTimestamp(),
+                  },
+                ],
+              }));
+            }
+          })();
+        }
         break;
       case "portfolio":
         if (!binanceClientRef.current) {
@@ -289,37 +404,50 @@ export function App(): React.ReactElement {
             ],
           }));
 
-          // Async fetch portfolio
+          // Async fetch portfolio from both spot and funding wallets
           (async () => {
             try {
-              const accountInfo = await binanceClientRef.current!.getAccountInfo();
-              const balances = accountInfo.balances.filter(
-                (b) => parseFloat(b.free) > 0 || parseFloat(b.locked) > 0
-              );
+              const allBalances = await binanceClientRef.current!.getAllBalances();
 
-              // Calculate total value
+              // Calculate total value and extract USDT balance
               let totalValue = 0;
-              const holdings: Array<{ asset: string; amount: number; usdtValue: number }> = [];
+              let usdtBalance = 0;
+              const holdings: Array<{ asset: string; amount: number; usdtValue: number; wallet: string; note?: string }> = [];
 
-              for (const balance of balances) {
-                const amount = parseFloat(balance.free) + parseFloat(balance.locked);
+              // USD-pegged stablecoins
+              const stablecoins = ["USDT", "USD", "USDC", "BUSD", "TUSD", "USDP", "FDUSD"];
+
+              for (const balance of allBalances) {
+                const amount = balance.free + balance.locked;
                 let usdtValue = 0;
 
-                if (balance.asset === "USDT") {
+                if (stablecoins.includes(balance.asset)) {
+                  // Stablecoins are 1:1 with USD
                   usdtValue = amount;
-                } else if (balance.asset === "USDC" || balance.asset === "BUSD") {
-                  usdtValue = amount; // Stablecoins ~= USDT
+                  if (balance.asset === "USDT" || balance.asset === "USD") {
+                    usdtBalance += amount;
+                  }
                 } else {
+                  // Try to get price from Binance (works for crypto and some fiat like EUR)
                   try {
                     const price = await binanceClientRef.current!.getPrice(`${balance.asset}USDT`);
                     usdtValue = amount * price;
-                  } catch {
-                    continue; // Skip assets without USDT pair
+                  } catch (error) {
+                    console.error(`No USDT pair for ${balance.asset}:`, error);
+                    // Show raw amount without USD value
+                    holdings.push({
+                      asset: balance.asset,
+                      amount,
+                      usdtValue: 0,
+                      wallet: balance.wallet,
+                      note: "No USD rate"
+                    });
+                    continue;
                   }
                 }
 
-                if (usdtValue > 1) {
-                  holdings.push({ asset: balance.asset, amount, usdtValue });
+                if (usdtValue > 0.01) {
+                  holdings.push({ asset: balance.asset, amount, usdtValue, wallet: balance.wallet });
                   totalValue += usdtValue;
                 }
               }
@@ -329,24 +457,26 @@ export function App(): React.ReactElement {
 
               // Format message
               const lines = [
-                `**Portfolio Value: $${totalValue.toFixed(2)} USDT**\n`,
-                "| Asset | Amount | Value (USDT) |",
-                "|-------|--------|--------------|",
+                `**Portfolio Value: $${totalValue.toFixed(2)} USD**\n`,
+                "| Asset | Amount | Value (USD) | Wallet |",
+                "|-------|--------|-------------|--------|",
               ];
 
-              for (const h of holdings.slice(0, 10)) {
+              for (const h of holdings.slice(0, 15)) {
+                const valueStr = h.usdtValue > 0 ? `$${h.usdtValue.toFixed(2)}` : (h.note || "N/A");
                 lines.push(
-                  `| ${h.asset} | ${h.amount.toFixed(4)} | $${h.usdtValue.toFixed(2)} |`
+                  `| ${h.asset} | ${h.amount.toFixed(4)} | ${valueStr} | ${h.wallet} |`
                 );
               }
 
-              if (holdings.length > 10) {
-                lines.push(`\n_...and ${holdings.length - 10} more assets_`);
+              if (holdings.length > 15) {
+                lines.push(`\n_...and ${holdings.length - 15} more assets_`);
               }
 
               setState((prev) => ({
                 ...prev,
                 portfolioValue: totalValue,
+                availableCash: usdtBalance,
                 messages: [
                   ...prev.messages,
                   {
@@ -373,19 +503,7 @@ export function App(): React.ReactElement {
         }
         break;
       case "setup":
-        setState((prev) => ({
-          ...prev,
-          view: "chat",
-          messages: [
-            ...prev.messages,
-            {
-              role: "gordon",
-              content:
-                "Setup wizard coming soon. You'll be able to configure your Binance API keys here.",
-              timestamp: formatTimestamp(),
-            },
-          ],
-        }));
+        setState((prev) => ({ ...prev, view: "setup" }));
         break;
       case "help":
         setState((prev) => ({
@@ -476,7 +594,8 @@ Try saying: "What's the market looking like today?" or "Find me a good BTC setup
           },
         ],
       }));
-    } catch {
+    } catch (error) {
+      console.error("Failed to initialize LLM client after setup:", error);
       setState((prev) => ({
         ...prev,
         view: "chat",
@@ -561,25 +680,14 @@ Please check your API keys in the .env file and restart Gordon.`,
               </Box>
             )}
 
-            {/* Input area */}
-            <Box
-              borderStyle="single"
-              borderColor={state.isLoading ? COLORS.DIM : COLORS.TAN_DIM}
-              paddingX={1}
-              marginX={1}
-            >
-              <Text color={state.isLoading ? COLORS.DIM : COLORS.TAN}>
-                {">"}{" "}
-              </Text>
-              <TextInput
-                value={state.inputValue}
-                onChange={handleInputChange}
-                onSubmit={handleSubmit}
-                placeholder={
-                  state.isLoading ? "Waiting for response..." : "Ask Gordon anything..."
-                }
-              />
-            </Box>
+            {/* Input area - isolated component to prevent re-render issues */}
+            <ChatInput
+              onSubmit={handleSubmit}
+              disabled={state.isLoading}
+              placeholder={
+                state.isLoading ? "Waiting for response..." : "Ask Gordon anything..."
+              }
+            />
 
             {/* Help hint */}
             <Box paddingX={2} paddingY={0}>

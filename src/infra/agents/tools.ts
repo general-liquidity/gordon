@@ -416,7 +416,7 @@ export const armSystemTool = tool({
 export const getPortfolioTool = tool({
   name: "get_portfolio",
   description:
-    "Get the current portfolio value and balances from Binance. " +
+    "Get the current portfolio value and balances from Binance (both Spot and Funding wallets). " +
     "Use when user asks 'what's my balance?' or 'how much do I have?'",
   parameters: z.object({}),
   async execute(_: Record<string, never>, runContext: RunContext<GordonContext> | undefined) {
@@ -425,40 +425,51 @@ export const getPortfolioTool = tool({
       return { error: "Binance client not connected. Please configure API keys." };
     }
 
-    const accountInfo = await ctx.binance.getAccountInfo();
-    const balances = accountInfo.balances;
+    // Get all balances from both spot and funding wallets
+    const allBalances = await ctx.binance.getAllBalances();
 
     // Calculate total value in USDT
     let totalValue = 0;
-    const holdings: Array<{ asset: string; free: number; locked: number; usdtValue: number }> = [];
+    const holdings: Array<{ asset: string; free: number; locked: number; usdtValue: number; wallet: string; note?: string }> = [];
 
-    for (const balance of balances) {
-      const free = parseFloat(balance.free);
-      const locked = parseFloat(balance.locked);
-      const total = free + locked;
+    // USD-pegged stablecoins (treat as 1:1 with USDT)
+    const stablecoins = ["USDT", "USD", "USDC", "BUSD", "TUSD", "USDP", "FDUSD"];
+
+    for (const balance of allBalances) {
+      const total = balance.free + balance.locked;
 
       if (total > 0) {
         let usdtValue = 0;
 
-        if (balance.asset === "USDT") {
+        if (stablecoins.includes(balance.asset)) {
+          // Stablecoins are 1:1 with USD
           usdtValue = total;
         } else {
+          // Try to get price from Binance (works for crypto and some fiat like EUR)
           try {
             const price = await ctx.binance.getPrice(`${balance.asset}USDT`);
             usdtValue = total * price;
           } catch {
-            // Skip assets without USDT pair
+            // No USDT pair - show raw amount without USD value
+            holdings.push({
+              asset: balance.asset,
+              free: balance.free,
+              locked: balance.locked,
+              usdtValue: 0,
+              wallet: balance.wallet,
+              note: "No USD price available",
+            });
             continue;
           }
         }
 
-        if (usdtValue > 1) {
-          // Only include assets worth more than $1
+        if (usdtValue > 0.01) {
           holdings.push({
             asset: balance.asset,
-            free,
-            locked,
+            free: balance.free,
+            locked: balance.locked,
             usdtValue,
+            wallet: balance.wallet,
           });
           totalValue += usdtValue;
         }
@@ -470,7 +481,7 @@ export const getPortfolioTool = tool({
 
     return {
       totalValue,
-      holdings: holdings.slice(0, 10), // Top 10 holdings
+      holdings: holdings.slice(0, 15), // Top 15 holdings
       openTrades: getActiveTrades().length,
     };
   },
@@ -551,6 +562,432 @@ export const approvePlanTool = tool({
 });
 
 // ============================================================================
+// Connection Test Tool
+// ============================================================================
+
+export const testConnectionTool = tool({
+  name: "test_connection",
+  description:
+    "Test the connection to Binance and verify API key permissions. " +
+    "Use when user asks 'test connection', 'check API', 'are my keys working?'",
+  parameters: z.object({}),
+  async execute(_: Record<string, never>, runContext: RunContext<GordonContext> | undefined) {
+    const ctx = runContext?.context;
+    const results: Record<string, unknown> = {
+      llmConnected: !!ctx?.llm,
+      binanceConnected: false,
+      binancePermissions: null,
+      accountType: null,
+      error: null,
+    };
+
+    if (!ctx?.binance) {
+      results.error = "Binance client not initialized. Check BINANCE_API_KEY and BINANCE_API_SECRET in .env";
+      return results;
+    }
+
+    try {
+      // Test connection
+      const connected = await ctx.binance.testConnection();
+      results.binanceConnected = connected;
+
+      if (connected) {
+        // Get account info to check permissions
+        const accountInfo = await ctx.binance.getAccountInfo();
+        results.accountType = accountInfo.accountType;
+        results.canTrade = accountInfo.canTrade;
+        results.canWithdraw = accountInfo.canWithdraw;
+        results.canDeposit = accountInfo.canDeposit;
+
+        // Count balances
+        const nonZeroBalances = accountInfo.balances.filter(
+          (b) => parseFloat(b.free) > 0 || parseFloat(b.locked) > 0
+        );
+        results.assetsWithBalance = nonZeroBalances.length;
+        results.assetList = nonZeroBalances.map((b) => ({
+          asset: b.asset,
+          free: parseFloat(b.free),
+          locked: parseFloat(b.locked),
+        }));
+      }
+    } catch (error) {
+      results.error = error instanceof Error ? error.message : "Unknown error";
+    }
+
+    return results;
+  },
+});
+
+// ============================================================================
+// Full Account Details Tool
+// ============================================================================
+
+export const getAccountDetailsTool = tool({
+  name: "get_account_details",
+  description:
+    "Get comprehensive account details including commission rates, permissions, trade history, " +
+    "deposit/withdrawal history, earn positions, and API restrictions. " +
+    "Use when user asks 'show all my details', 'account history', 'full account info'",
+  parameters: z.object({
+    includeTradeHistory: z
+      .boolean()
+      .default(true)
+      .describe("Include recent trade history"),
+    includeDepositHistory: z
+      .boolean()
+      .default(true)
+      .describe("Include deposit history"),
+    includeWithdrawalHistory: z
+      .boolean()
+      .default(true)
+      .describe("Include withdrawal history"),
+    includeEarnPositions: z
+      .boolean()
+      .default(true)
+      .describe("Include Simple Earn positions"),
+  }),
+  async execute(
+    { includeTradeHistory, includeDepositHistory, includeWithdrawalHistory, includeEarnPositions },
+    runContext: RunContext<GordonContext> | undefined
+  ) {
+    const ctx = runContext?.context;
+    if (!ctx?.binance) {
+      return { error: "Binance client not connected. Please configure API keys." };
+    }
+
+    try {
+      const fullDetails = await ctx.binance.getFullAccountDetails();
+      const { account, apiRestrictions, recentTrades, deposits, withdrawals, earnPositions } = fullDetails;
+
+      // Build response object
+      const response: Record<string, unknown> = {
+        // Account Info
+        accountType: account.accountType,
+        uid: account.uid,
+
+        // Commission Rates
+        commissionRates: {
+          maker: `${(parseFloat(account.commissionRates.maker) * 100).toFixed(3)}%`,
+          taker: `${(parseFloat(account.commissionRates.taker) * 100).toFixed(3)}%`,
+        },
+
+        // Permissions
+        permissions: {
+          canTrade: account.canTrade,
+          canWithdraw: account.canWithdraw,
+          canDeposit: account.canDeposit,
+          accountPermissions: account.permissions,
+        },
+      };
+
+      // API Restrictions
+      if (apiRestrictions) {
+        response.apiKeyPermissions = {
+          ipRestrict: apiRestrictions.ipRestrict,
+          enableReading: apiRestrictions.enableReading,
+          enableSpotTrading: apiRestrictions.enableSpotAndMarginTrading,
+          enableWithdrawals: apiRestrictions.enableWithdrawals,
+          enableFutures: apiRestrictions.enableFutures,
+          enableMargin: apiRestrictions.enableMargin,
+          createdAt: new Date(apiRestrictions.createTime).toISOString(),
+        };
+      }
+
+      // Trade History
+      if (includeTradeHistory && recentTrades.length > 0) {
+        response.recentTrades = recentTrades.slice(0, 10).map((t) => ({
+          symbol: t.symbol,
+          side: t.isBuyer ? "BUY" : "SELL",
+          price: parseFloat(t.price),
+          quantity: parseFloat(t.qty),
+          quoteQty: parseFloat(t.quoteQty),
+          commission: `${parseFloat(t.commission)} ${t.commissionAsset}`,
+          time: new Date(t.time).toISOString(),
+          isMaker: t.isMaker,
+        }));
+        response.totalTradesReturned = recentTrades.length;
+      }
+
+      // Deposit History
+      if (includeDepositHistory && deposits.length > 0) {
+        const statusMap: Record<number, string> = {
+          0: "pending",
+          1: "success",
+          6: "credited",
+        };
+        response.deposits = deposits.slice(0, 10).map((d) => ({
+          coin: d.coin,
+          amount: parseFloat(d.amount),
+          network: d.network,
+          status: statusMap[d.status] || `status_${d.status}`,
+          txId: d.txId ? `${d.txId.slice(0, 10)}...` : null,
+          time: new Date(d.insertTime).toISOString(),
+        }));
+      }
+
+      // Withdrawal History
+      if (includeWithdrawalHistory && withdrawals.length > 0) {
+        const wStatusMap: Record<number, string> = {
+          0: "email_sent",
+          1: "cancelled",
+          2: "awaiting_approval",
+          3: "rejected",
+          4: "processing",
+          5: "failure",
+          6: "completed",
+        };
+        response.withdrawals = withdrawals.slice(0, 10).map((w) => ({
+          coin: w.coin,
+          amount: parseFloat(w.amount),
+          fee: parseFloat(w.transactionFee),
+          network: w.network,
+          status: wStatusMap[w.status] || `status_${w.status}`,
+          address: `${w.address.slice(0, 10)}...${w.address.slice(-6)}`,
+          applyTime: w.applyTime,
+          completeTime: w.completeTime || null,
+        }));
+      }
+
+      // Earn Positions
+      if (includeEarnPositions && earnPositions.length > 0) {
+        response.earnPositions = earnPositions.map((e) => ({
+          asset: e.asset,
+          totalAmount: parseFloat(e.totalAmount),
+          freeAmount: parseFloat(e.freeAmount),
+          lockedAmount: parseFloat(e.lockedAmount),
+          apy: `${parseFloat(e.apy)}%`,
+          productName: e.productName,
+        }));
+      }
+
+      // Summary counts
+      response.summary = {
+        totalDeposits: deposits.length,
+        totalWithdrawals: withdrawals.length,
+        totalRecentTrades: recentTrades.length,
+        earnPositionsCount: earnPositions.length,
+      };
+
+      return response;
+    } catch (error) {
+      return {
+        error: error instanceof Error ? error.message : "Failed to fetch account details",
+      };
+    }
+  },
+});
+
+// ============================================================================
+// Trade History Tool
+// ============================================================================
+
+export const getTradeHistoryTool = tool({
+  name: "get_trade_history",
+  description:
+    "Get trade history for a specific symbol or all recent trades. " +
+    "Use when user asks 'show my trades', 'trade history for BTC', 'what did I trade?'",
+  parameters: z.object({
+    symbol: z
+      .string()
+      .default("")
+      .describe("Trading pair symbol (e.g., 'BTCUSDT'). Leave empty for all recent trades."),
+    limit: z.number().min(1).max(100).default(20).describe("Max trades to return"),
+  }),
+  async execute({ symbol, limit }, runContext: RunContext<GordonContext> | undefined) {
+    const ctx = runContext?.context;
+    if (!ctx?.binance) {
+      return { error: "Binance client not connected. Please configure API keys." };
+    }
+
+    try {
+      let trades;
+      if (symbol && symbol.trim() !== "") {
+        const normalizedSymbol = symbol.toUpperCase().endsWith("USDT")
+          ? symbol.toUpperCase()
+          : `${symbol.toUpperCase()}USDT`;
+        trades = await ctx.binance.getTradeHistory(normalizedSymbol, limit);
+      } else {
+        trades = await ctx.binance.getAllTradeHistory(limit);
+      }
+
+      if (trades.length === 0) {
+        return { message: "No trade history found", trades: [] };
+      }
+
+      // Calculate some stats
+      let totalBuyVolume = 0;
+      let totalSellVolume = 0;
+      let totalCommission = 0;
+
+      const formattedTrades = trades.map((t) => {
+        const quoteQty = parseFloat(t.quoteQty);
+        if (t.isBuyer) {
+          totalBuyVolume += quoteQty;
+        } else {
+          totalSellVolume += quoteQty;
+        }
+        totalCommission += parseFloat(t.commission);
+
+        return {
+          symbol: t.symbol,
+          side: t.isBuyer ? "BUY" : "SELL",
+          price: parseFloat(t.price),
+          quantity: parseFloat(t.qty),
+          quoteQty,
+          commission: `${parseFloat(t.commission).toFixed(6)} ${t.commissionAsset}`,
+          time: new Date(t.time).toISOString(),
+          isMaker: t.isMaker,
+        };
+      });
+
+      return {
+        trades: formattedTrades,
+        stats: {
+          totalTrades: trades.length,
+          totalBuyVolume: totalBuyVolume.toFixed(2),
+          totalSellVolume: totalSellVolume.toFixed(2),
+          avgTradeSize: ((totalBuyVolume + totalSellVolume) / trades.length).toFixed(2),
+        },
+      };
+    } catch (error) {
+      return {
+        error: error instanceof Error ? error.message : "Failed to fetch trade history",
+      };
+    }
+  },
+});
+
+// ============================================================================
+// Deposit/Withdrawal History Tool
+// ============================================================================
+
+export const getTransferHistoryTool = tool({
+  name: "get_transfer_history",
+  description:
+    "Get deposit and withdrawal history. " +
+    "Use when user asks 'show deposits', 'withdrawal history', 'transfer history'",
+  parameters: z.object({
+    type: z
+      .enum(["deposits", "withdrawals", "both"])
+      .default("both")
+      .describe("Type of transfers to show"),
+    limit: z.number().min(1).max(50).default(10).describe("Max records to return per type"),
+  }),
+  async execute({ type, limit }, runContext: RunContext<GordonContext> | undefined) {
+    const ctx = runContext?.context;
+    if (!ctx?.binance) {
+      return { error: "Binance client not connected. Please configure API keys." };
+    }
+
+    try {
+      const response: Record<string, unknown> = {};
+
+      if (type === "deposits" || type === "both") {
+        const deposits = await ctx.binance.getDepositHistory(limit);
+        const statusMap: Record<number, string> = {
+          0: "pending",
+          1: "success",
+          6: "credited",
+        };
+        response.deposits = deposits.map((d) => ({
+          coin: d.coin,
+          amount: parseFloat(d.amount),
+          network: d.network,
+          status: statusMap[d.status] || `status_${d.status}`,
+          txId: d.txId ? `${d.txId.slice(0, 16)}...` : null,
+          time: new Date(d.insertTime).toISOString(),
+        }));
+        response.totalDeposits = deposits.length;
+      }
+
+      if (type === "withdrawals" || type === "both") {
+        const withdrawals = await ctx.binance.getWithdrawalHistory(limit);
+        const wStatusMap: Record<number, string> = {
+          0: "email_sent",
+          1: "cancelled",
+          2: "awaiting_approval",
+          3: "rejected",
+          4: "processing",
+          5: "failure",
+          6: "completed",
+        };
+        response.withdrawals = withdrawals.map((w) => ({
+          coin: w.coin,
+          amount: parseFloat(w.amount),
+          fee: parseFloat(w.transactionFee),
+          network: w.network,
+          status: wStatusMap[w.status] || `status_${w.status}`,
+          address: `${w.address.slice(0, 10)}...${w.address.slice(-6)}`,
+          applyTime: w.applyTime,
+          completeTime: w.completeTime || null,
+        }));
+        response.totalWithdrawals = withdrawals.length;
+      }
+
+      return response;
+    } catch (error) {
+      return {
+        error: error instanceof Error ? error.message : "Failed to fetch transfer history",
+      };
+    }
+  },
+});
+
+// ============================================================================
+// Earn Positions Tool
+// ============================================================================
+
+export const getEarnPositionsTool = tool({
+  name: "get_earn_positions",
+  description:
+    "Get Simple Earn (flexible savings) positions and yields. " +
+    "Use when user asks 'show my earn', 'staking positions', 'what am I earning?'",
+  parameters: z.object({}),
+  async execute(_: Record<string, never>, runContext: RunContext<GordonContext> | undefined) {
+    const ctx = runContext?.context;
+    if (!ctx?.binance) {
+      return { error: "Binance client not connected. Please configure API keys." };
+    }
+
+    try {
+      const positions = await ctx.binance.getEarnPositions();
+
+      if (positions.length === 0) {
+        return {
+          message: "No earn positions found. You can earn interest on your crypto through Binance Simple Earn.",
+          positions: [],
+        };
+      }
+
+      let totalValue = 0;
+      const formattedPositions = positions.map((p) => {
+        const total = parseFloat(p.totalAmount);
+        totalValue += total;
+        return {
+          asset: p.asset,
+          totalAmount: total,
+          freeAmount: parseFloat(p.freeAmount),
+          lockedAmount: parseFloat(p.lockedAmount),
+          apy: `${(parseFloat(p.apy) * 100).toFixed(2)}%`,
+          rewardAsset: p.rewardAsset,
+          productName: p.productName,
+        };
+      });
+
+      return {
+        positions: formattedPositions,
+        totalPositions: positions.length,
+        summary: `You have ${positions.length} earn position(s) active.`,
+      };
+    } catch (error) {
+      return {
+        error: error instanceof Error ? error.message : "Failed to fetch earn positions",
+      };
+    }
+  },
+});
+
+// ============================================================================
 // Export all tools
 // ============================================================================
 
@@ -566,4 +1003,9 @@ export const allTools = [
   getPortfolioTool,
   listPlansTool,
   approvePlanTool,
+  testConnectionTool,
+  getAccountDetailsTool,
+  getTradeHistoryTool,
+  getTransferHistoryTool,
+  getEarnPositionsTool,
 ];

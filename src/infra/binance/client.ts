@@ -13,6 +13,11 @@ import type {
   BinanceTicker24hr,
   BinancePriceTicker,
   OrderParams,
+  BinanceTrade,
+  BinanceDeposit,
+  BinanceWithdrawal,
+  BinanceEarnPosition,
+  BinanceAPIRestrictions,
 } from "./types.ts";
 
 // Binance API base URL
@@ -320,5 +325,207 @@ export class BinanceClient {
     }
 
     return this.signedRequest<BinanceOrder[]>("GET", "/api/v3/openOrders", params);
+  }
+
+  /**
+   * Get funding wallet balances (fiat and crypto in funding wallet)
+   * This is separate from spot wallet
+   */
+  async getFundingWallet(): Promise<Array<{ asset: string; free: string; locked: string; freeze: string; withdrawing: string }>> {
+    try {
+      const result = await this.signedRequest<Array<{
+        asset: string;
+        free: string;
+        locked: string;
+        freeze: string;
+        withdrawing: string;
+      }>>("POST", "/sapi/v1/asset/get-funding-asset", {});
+      return result;
+    } catch {
+      // Return empty array if funding wallet API is not available
+      return [];
+    }
+  }
+
+  /**
+   * Get all wallet balances (spot + funding combined)
+   */
+  async getAllBalances(): Promise<Array<{ asset: string; free: number; locked: number; wallet: "spot" | "funding" }>> {
+    const balances: Array<{ asset: string; free: number; locked: number; wallet: "spot" | "funding" }> = [];
+
+    // Get spot wallet
+    try {
+      const spotAccount = await this.getAccountInfo();
+      for (const b of spotAccount.balances) {
+        const free = parseFloat(b.free);
+        const locked = parseFloat(b.locked);
+        if (free > 0 || locked > 0) {
+          balances.push({ asset: b.asset, free, locked, wallet: "spot" });
+        }
+      }
+    } catch (error) {
+      console.error("Failed to get spot balances:", error);
+    }
+
+    // Get funding wallet
+    try {
+      const fundingBalances = await this.getFundingWallet();
+      for (const b of fundingBalances) {
+        const free = parseFloat(b.free);
+        const locked = parseFloat(b.locked);
+        if (free > 0 || locked > 0) {
+          balances.push({ asset: b.asset, free, locked, wallet: "funding" });
+        }
+      }
+    } catch (error) {
+      console.error("Failed to get funding balances:", error);
+    }
+
+    return balances;
+  }
+
+  /**
+   * Get trade history for a symbol
+   */
+  async getTradeHistory(symbol: string, limit: number = 50): Promise<BinanceTrade[]> {
+    try {
+      return await this.signedRequest<BinanceTrade[]>("GET", "/api/v3/myTrades", {
+        symbol: symbol.toUpperCase(),
+        limit,
+      });
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * Get all trade history across all symbols (recent trades)
+   */
+  async getAllTradeHistory(limit: number = 100): Promise<BinanceTrade[]> {
+    try {
+      // Get top traded symbols first
+      const topSymbols = await this.getTopSymbols(10);
+      const allTrades: BinanceTrade[] = [];
+
+      // Fetch trades for each symbol in parallel
+      const tradePromises = topSymbols.map((symbol) =>
+        this.getTradeHistory(symbol, Math.ceil(limit / 10))
+      );
+      const results = await Promise.all(tradePromises);
+
+      for (const trades of results) {
+        allTrades.push(...trades);
+      }
+
+      // Sort by time (newest first) and limit
+      return allTrades
+        .sort((a, b) => b.time - a.time)
+        .slice(0, limit);
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * Get order history for a symbol
+   */
+  async getOrderHistory(symbol: string, limit: number = 50): Promise<BinanceOrder[]> {
+    try {
+      return await this.signedRequest<BinanceOrder[]>("GET", "/api/v3/allOrders", {
+        symbol: symbol.toUpperCase(),
+        limit,
+      });
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * Get deposit history
+   */
+  async getDepositHistory(limit: number = 50): Promise<BinanceDeposit[]> {
+    try {
+      return await this.signedRequest<BinanceDeposit[]>("GET", "/sapi/v1/capital/deposit/hisrec", {
+        limit,
+      });
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * Get withdrawal history
+   */
+  async getWithdrawalHistory(limit: number = 50): Promise<BinanceWithdrawal[]> {
+    try {
+      return await this.signedRequest<BinanceWithdrawal[]>("GET", "/sapi/v1/capital/withdraw/history", {
+        limit,
+      });
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * Get Simple Earn flexible positions
+   */
+  async getEarnPositions(): Promise<BinanceEarnPosition[]> {
+    try {
+      const response = await this.signedRequest<{ rows: BinanceEarnPosition[] }>(
+        "GET",
+        "/sapi/v1/simple-earn/flexible/position",
+        {}
+      );
+      return response.rows || [];
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * Get API key restrictions/permissions
+   */
+  async getAPIRestrictions(): Promise<BinanceAPIRestrictions | null> {
+    try {
+      return await this.signedRequest<BinanceAPIRestrictions>(
+        "GET",
+        "/sapi/v1/account/apiRestrictions",
+        {}
+      );
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Get comprehensive account details including all available information
+   */
+  async getFullAccountDetails(): Promise<{
+    account: BinanceAccountInfo;
+    apiRestrictions: BinanceAPIRestrictions | null;
+    recentTrades: BinanceTrade[];
+    deposits: BinanceDeposit[];
+    withdrawals: BinanceWithdrawal[];
+    earnPositions: BinanceEarnPosition[];
+  }> {
+    // Fetch all data in parallel for speed
+    const [account, apiRestrictions, recentTrades, deposits, withdrawals, earnPositions] =
+      await Promise.all([
+        this.getAccountInfo(),
+        this.getAPIRestrictions(),
+        this.getAllTradeHistory(20),
+        this.getDepositHistory(10),
+        this.getWithdrawalHistory(10),
+        this.getEarnPositions(),
+      ]);
+
+    return {
+      account,
+      apiRestrictions,
+      recentTrades,
+      deposits,
+      withdrawals,
+      earnPositions,
+    };
   }
 }
