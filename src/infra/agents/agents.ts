@@ -17,7 +17,7 @@ import {
   getPortfolioTool,
   listPlansTool,
   approvePlanTool,
-} from "./tools.ts";
+} from "./tools/index.ts";
 
 // ============================================================================
 // Scanner Agent

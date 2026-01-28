@@ -27,8 +27,14 @@ export {
   getPortfolioTool,
   listPlansTool,
   approvePlanTool,
+  testConnectionTool,
+  getAccountDetailsTool,
+  getTradeHistoryTool,
+  getTransferHistoryTool,
+  getEarnPositionsTool,
   allTools,
-} from "./tools.ts";
+  toolCounts,
+} from "./tools/index.ts";
 
 // Specialized Agents
 export {

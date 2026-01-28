@@ -13,7 +13,7 @@ import {
   monitorAgent,
   teacherAgent,
 } from "./agents.ts";
-import { allTools } from "./tools.ts";
+import { allTools } from "./tools/index.ts";
 import type { GordonContext } from "./types.ts";
 
 // ============================================================================
