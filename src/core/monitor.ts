@@ -11,7 +11,11 @@ import { BinanceClient } from "../infra/binance/index.ts";
 import { listTrades, updateTrade } from "../infra/storage/trades.ts";
 import { logEvent } from "../infra/storage/events.ts";
 import { getPlan } from "../infra/storage/plans.ts";
+import { createModuleLogger } from "../infra/logger/index.ts";
+import { emitEvent } from "../events/index.ts";
 import type { Trade, Plan, ExitFill } from "../types/index.ts";
+
+const logger = createModuleLogger("monitor");
 
 // ============================================================================
 // Types
@@ -32,7 +36,7 @@ export interface Alert {
   tradeId?: string;
   message: string;
   severity: "info" | "warning" | "critical";
-  data: Record<string, any>;
+  data: Record<string, unknown>;
 }
 
 export interface MonitorResult {
@@ -45,18 +49,11 @@ export interface MonitorResult {
 // Constants
 // ============================================================================
 
-// Health status thresholds (distance to stop loss)
-const CRITICAL_THRESHOLD_PERCENT = 1;  // Within 1% of stop = critical
-const WARNING_THRESHOLD_PERCENT = 3;   // Within 3% of stop = warning
-
-// TP approach threshold for alerts
-const TP_APPROACH_THRESHOLD_PERCENT = 2;  // Within 2% of TP = generate info alert
-
-// Anomaly detection thresholds
-const VOLUME_SPIKE_MULTIPLIER = 3;       // Current volume > 3x average = spike
-const FLASH_CRASH_THRESHOLD_PERCENT = 5; // Price dropped > 5% in last candle = crash
-
-// Candle settings for anomaly detection
+const CRITICAL_THRESHOLD_PERCENT = 1;
+const WARNING_THRESHOLD_PERCENT = 3;
+const TP_APPROACH_THRESHOLD_PERCENT = 2;
+const VOLUME_SPIKE_MULTIPLIER = 3;
+const FLASH_CRASH_THRESHOLD_PERCENT = 5;
 const VOLUME_AVERAGE_PERIODS = 20;
 
 // ============================================================================
@@ -65,15 +62,6 @@ const VOLUME_AVERAGE_PERIODS = 20;
 
 /**
  * Run a complete monitor cycle
- *
- * 1. Get all open trades from storage
- * 2. For each trade: fetch price, check fills, calculate PnL, determine health
- * 3. Check for market anomalies (volume spikes, flash crashes)
- * 4. Generate alerts for significant events
- * 5. Log events and return results
- *
- * @param client - BinanceClient instance for fetching market data
- * @returns MonitorResult with updates and alerts
  */
 export async function runMonitorCycle(
   client: BinanceClient
@@ -82,12 +70,15 @@ export async function runMonitorCycle(
   const updates: MonitorUpdate[] = [];
   const alerts: Alert[] = [];
 
-  // 1. Get all open trades (OPEN or PARTIAL status)
+  logger.debug("Starting monitor cycle");
+
+  // 1. Get all open trades
   const openTrades = listTrades({ status: "OPEN" });
   const partialTrades = listTrades({ status: "PARTIAL" });
   const allActiveTrades = [...openTrades, ...partialTrades];
 
-  // Track unique symbols for anomaly checking
+  logger.debug("Active trades found", { count: allActiveTrades.length });
+
   const symbolsToCheck = new Set<string>();
 
   // 2. Process each active trade
@@ -99,8 +90,7 @@ export async function runMonitorCycle(
         symbolsToCheck.add(trade.symbol);
       }
     } catch (error) {
-      console.error(`Monitor error for trade ${trade.id}:`, error);
-      // Log error event but continue with other trades
+      logger.error("Monitor error for trade", error as Error, { tradeId: trade.id });
       logEvent({
         type: "ERROR",
         data: {
@@ -113,15 +103,20 @@ export async function runMonitorCycle(
     }
   }
 
-  // 3. Check for market anomalies on all symbols with active trades
+  // 3. Check for market anomalies
   for (const symbol of symbolsToCheck) {
     try {
       const anomalyAlerts = await checkMarketAnomalies(client, symbol);
       alerts.push(...anomalyAlerts);
     } catch (error) {
-      console.error(`Anomaly check error for ${symbol}:`, error);
+      logger.error("Anomaly check error", error as Error, { symbol });
     }
   }
+
+  logger.debug("Monitor cycle complete", {
+    updates: updates.length,
+    alerts: alerts.length,
+  });
 
   return {
     updates,
@@ -134,44 +129,34 @@ export async function runMonitorCycle(
 // Trade Processing
 // ============================================================================
 
-/**
- * Process a single trade and generate its update
- */
 async function processTradeUpdate(
   client: BinanceClient,
   trade: Trade,
   alerts: Alert[]
 ): Promise<MonitorUpdate | null> {
-  // Get the associated plan for stop loss and take profit levels
   const plan = getPlan(trade.planId);
   if (!plan) {
-    console.error(`Plan not found for trade ${trade.id}`);
+    logger.error("Plan not found for trade", undefined, { tradeId: trade.id, planId: trade.planId });
     return null;
   }
 
-  // a. Fetch current price from Binance
   const currentPrice = await client.getPrice(trade.symbol);
 
-  // b. Check if any orders have filled
   const fillAlerts = await checkOrderFills(client, trade, plan);
   alerts.push(...fillAlerts);
 
-  // c. Calculate unrealized PnL
   const { unrealizedPnl, unrealizedPnlPercent } = calculateUnrealizedPnl(
     trade,
     currentPrice
   );
 
-  // d. Calculate distances to stop and next TP
   const distanceToStop = calculateDistanceToStop(currentPrice, plan);
   const distanceToNextTP = calculateDistanceToNextTP(trade, currentPrice, plan);
-
-  // e. Determine health status based on distance to stop
   const status = determineHealthStatus(distanceToStop);
 
   // Generate alerts for approaching stop or TP
   if (status === "warning" || status === "critical") {
-    alerts.push({
+    const alert: Alert = {
       type: "price_near_stop",
       tradeId: trade.id,
       message: `${trade.symbol}: Price approaching stop loss (${distanceToStop.toFixed(2)}% away)`,
@@ -182,9 +167,18 @@ async function processTradeUpdate(
         stopPrice: plan.stopLoss.price,
         distancePercent: distanceToStop,
       },
+    };
+    alerts.push(alert);
+
+    // Emit event
+    await emitEvent("alert:stop_approaching", {
+      tradeId: trade.id,
+      symbol: trade.symbol,
+      currentPrice,
+      stopPrice: plan.stopLoss.price,
+      distance: distanceToStop,
     });
 
-    // Log event for price approaching stop
     logEvent({
       type: "ALERT",
       data: {
@@ -199,7 +193,6 @@ async function processTradeUpdate(
     });
   }
 
-  // Alert if approaching TP
   if (distanceToNextTP <= TP_APPROACH_THRESHOLD_PERCENT && distanceToNextTP > 0) {
     alerts.push({
       type: "price_near_tp",
@@ -225,9 +218,6 @@ async function processTradeUpdate(
   };
 }
 
-/**
- * Check if any orders have filled on Binance
- */
 async function checkOrderFills(
   client: BinanceClient,
   trade: Trade,
@@ -236,23 +226,16 @@ async function checkOrderFills(
   const alerts: Alert[] = [];
 
   try {
-    // Get all open orders for this symbol
     const openOrders = await client.getOpenOrders(trade.symbol);
     const openOrderIds = new Set(openOrders.map((o) => String(o.orderId)));
 
-    // Track if we need to update the trade
     let tradeUpdated = false;
     const updatedTrade = { ...trade };
 
-    // Check entry orders - if they were open but no longer are, they may have filled
-    // Note: In a real implementation, we would query specific order status
-    // For now, we detect fills by checking if previously known orders are no longer open
-
-    // Check stop loss fill
     const stopPrice = plan.stopLoss.price;
     const currentPrice = await client.getPrice(trade.symbol);
 
-    // If price has crossed below stop loss, the stop was likely triggered
+    // If price has crossed below stop loss
     if (currentPrice <= stopPrice && trade.status !== "CLOSED") {
       const stopFill: ExitFill = {
         orderId: `stop_${trade.id}`,
@@ -266,7 +249,6 @@ async function checkOrderFills(
       updatedTrade.status = "CLOSED";
       updatedTrade.closedAt = new Date().toISOString();
 
-      // Calculate realized PnL
       const { realizedPnl, realizedPnlPercent } = calculateRealizedPnl(updatedTrade);
       updatedTrade.realizedPnl = realizedPnl;
       updatedTrade.realizedPnlPercent = realizedPnlPercent;
@@ -286,7 +268,13 @@ async function checkOrderFills(
         },
       });
 
-      // Log the fill event
+      logger.warn("Stop loss triggered", {
+        tradeId: trade.id,
+        symbol: trade.symbol,
+        stopPrice,
+        pnl: realizedPnl,
+      });
+
       logEvent({
         type: "ORDER_FILLED",
         data: {
@@ -308,13 +296,11 @@ async function checkOrderFills(
       }
       const tpLabel = `TP${i + 1}` as "TP1" | "TP2" | "TP3";
 
-      // Check if this TP level has already been filled
       const alreadyFilled = trade.exits.some((exit) => exit.reason === tpLabel);
       if (alreadyFilled) {
         continue;
       }
 
-      // If price has crossed above TP level, it may have been triggered
       if (currentPrice >= tp.price && trade.status !== "CLOSED") {
         const remainingQty = calculateRemainingQuantity(updatedTrade);
         const tpQuantity = remainingQty * tp.percentToSell;
@@ -329,7 +315,6 @@ async function checkOrderFills(
 
         updatedTrade.exits = [...updatedTrade.exits, tpFill];
 
-        // Check if all TPs have been filled (100% sold)
         const totalExitPercent = calculateTotalExitPercent(updatedTrade);
         if (totalExitPercent >= 0.99) {
           updatedTrade.status = "CLOSED";
@@ -338,7 +323,6 @@ async function checkOrderFills(
           updatedTrade.status = "PARTIAL";
         }
 
-        // Calculate realized PnL
         const { realizedPnl, realizedPnlPercent } = calculateRealizedPnl(updatedTrade);
         updatedTrade.realizedPnl = realizedPnl;
         updatedTrade.realizedPnlPercent = realizedPnlPercent;
@@ -358,7 +342,21 @@ async function checkOrderFills(
           },
         });
 
-        // Log the fill event
+        // Emit TP hit event
+        await emitEvent("alert:tp_hit", {
+          tradeId: trade.id,
+          symbol: trade.symbol,
+          level: (i + 1) as 1 | 2 | 3,
+          price: tp.price,
+        });
+
+        logger.info("Take profit triggered", {
+          tradeId: trade.id,
+          symbol: trade.symbol,
+          level: tpLabel,
+          price: tp.price,
+        });
+
         logEvent({
           type: "ORDER_FILLED",
           data: {
@@ -373,12 +371,11 @@ async function checkOrderFills(
       }
     }
 
-    // f. Update trade record if fills detected
     if (tradeUpdated) {
       updateTrade(trade.id, updatedTrade);
     }
   } catch (error) {
-    console.error(`Error checking order fills for ${trade.symbol}:`, error);
+    logger.error("Error checking order fills", error as Error, { symbol: trade.symbol });
   }
 
   return alerts;
@@ -388,9 +385,6 @@ async function checkOrderFills(
 // PnL Calculations
 // ============================================================================
 
-/**
- * Calculate unrealized PnL for an open trade
- */
 function calculateUnrealizedPnl(
   trade: Trade,
   currentPrice: number
@@ -402,16 +396,12 @@ function calculateUnrealizedPnl(
     return { unrealizedPnl: 0, unrealizedPnlPercent: 0 };
   }
 
-  // Unrealized PnL = (current price - average entry) * remaining quantity
   const unrealizedPnl = (currentPrice - avgEntry) * remainingQty;
   const unrealizedPnlPercent = ((currentPrice - avgEntry) / avgEntry) * 100;
 
   return { unrealizedPnl, unrealizedPnlPercent };
 }
 
-/**
- * Calculate realized PnL from closed exits
- */
 function calculateRealizedPnl(
   trade: Trade
 ): { realizedPnl: number; realizedPnlPercent: number } {
@@ -422,13 +412,11 @@ function calculateRealizedPnl(
   }
 
   let totalRealizedPnl = 0;
-  let totalExitValue = 0;
   let totalExitQty = 0;
 
   for (const exit of trade.exits) {
     const exitPnl = (exit.price - avgEntry) * exit.quantity;
     totalRealizedPnl += exitPnl;
-    totalExitValue += exit.price * exit.quantity;
     totalExitQty += exit.quantity;
   }
 
@@ -440,18 +428,12 @@ function calculateRealizedPnl(
   return { realizedPnl: totalRealizedPnl, realizedPnlPercent };
 }
 
-/**
- * Calculate the remaining quantity that hasn't been sold yet
- */
 function calculateRemainingQuantity(trade: Trade): number {
   const totalEntryQty = trade.entries.reduce((sum, e) => sum + e.quantity, 0);
   const totalExitQty = trade.exits.reduce((sum, e) => sum + e.quantity, 0);
   return totalEntryQty - totalExitQty;
 }
 
-/**
- * Calculate total exit percentage
- */
 function calculateTotalExitPercent(trade: Trade): number {
   const totalEntryQty = trade.entries.reduce((sum, e) => sum + e.quantity, 0);
   const totalExitQty = trade.exits.reduce((sum, e) => sum + e.quantity, 0);
@@ -462,34 +444,19 @@ function calculateTotalExitPercent(trade: Trade): number {
 // Distance Calculations
 // ============================================================================
 
-/**
- * Calculate distance to stop loss as a percentage
- */
 function calculateDistanceToStop(currentPrice: number, plan: Plan): number {
   const stopPrice = plan.stopLoss.price;
-
-  if (currentPrice === 0) {
-    return 0;
-  }
-
-  // Distance = how far price is above stop (for long positions)
-  // Positive = safe, Negative = below stop (already triggered)
+  if (currentPrice === 0) return 0;
   return ((currentPrice - stopPrice) / currentPrice) * 100;
 }
 
-/**
- * Calculate distance to the next unfilled take profit level
- */
 function calculateDistanceToNextTP(
   trade: Trade,
   currentPrice: number,
   plan: Plan
 ): number {
-  if (currentPrice === 0) {
-    return 0;
-  }
+  if (currentPrice === 0) return 0;
 
-  // Find the next TP that hasn't been filled yet
   const filledTPs = new Set(
     trade.exits
       .filter((e) => e.reason.startsWith("TP"))
@@ -501,13 +468,10 @@ function calculateDistanceToNextTP(
     const tp = plan.takeProfit[i];
     if (!filledTPs.has(tpLabel) && tp) {
       const tpPrice = tp.price;
-      // Distance = how far price needs to go to reach TP
-      // Positive = price is below TP (hasn't reached)
       return ((tpPrice - currentPrice) / currentPrice) * 100;
     }
   }
 
-  // All TPs filled
   return 0;
 }
 
@@ -515,9 +479,6 @@ function calculateDistanceToNextTP(
 // Health Status
 // ============================================================================
 
-/**
- * Determine health status based on distance to stop loss
- */
 function determineHealthStatus(distanceToStop: number): "healthy" | "warning" | "critical" {
   if (distanceToStop <= CRITICAL_THRESHOLD_PERCENT) {
     return "critical";
@@ -531,9 +492,6 @@ function determineHealthStatus(distanceToStop: number): "healthy" | "warning" | 
 // Anomaly Detection
 // ============================================================================
 
-/**
- * Check for market anomalies on a symbol
- */
 async function checkMarketAnomalies(
   client: BinanceClient,
   symbol: string
@@ -541,7 +499,6 @@ async function checkMarketAnomalies(
   const alerts: Alert[] = [];
 
   try {
-    // Fetch recent candles for anomaly detection (15-minute timeframe)
     const candles = await client.getCandles(symbol, "15m", VOLUME_AVERAGE_PERIODS + 1);
 
     if (candles.length < 2) {
@@ -555,10 +512,10 @@ async function checkMarketAnomalies(
       return alerts;
     }
 
-    // a. Check for volume spike
     const volumeSpikeAlert = checkVolumeSpike(symbol, currentCandle, previousCandles);
     if (volumeSpikeAlert) {
       alerts.push(volumeSpikeAlert);
+      logger.warn("Volume spike detected", { symbol, ratio: volumeSpikeAlert.data.ratio });
       logEvent({
         type: "ALERT",
         data: {
@@ -571,10 +528,10 @@ async function checkMarketAnomalies(
       });
     }
 
-    // b. Check for flash crash
     const flashCrashAlert = checkFlashCrash(symbol, currentCandle);
     if (flashCrashAlert) {
       alerts.push(flashCrashAlert);
+      logger.warn("Flash crash detected", { symbol, dropPercent: flashCrashAlert.data.dropPercent });
       logEvent({
         type: "ALERT",
         data: {
@@ -587,30 +544,23 @@ async function checkMarketAnomalies(
       });
     }
   } catch (error) {
-    console.error(`Error checking anomalies for ${symbol}:`, error);
+    logger.error("Error checking anomalies", error as Error, { symbol });
   }
 
   return alerts;
 }
 
-/**
- * Check if current volume is a spike (> 3x average)
- */
 function checkVolumeSpike(
   symbol: string,
   currentCandle: { volume: number },
   previousCandles: { volume: number }[]
 ): Alert | null {
-  if (previousCandles.length === 0) {
-    return null;
-  }
+  if (previousCandles.length === 0) return null;
 
   const averageVolume =
     previousCandles.reduce((sum, c) => sum + c.volume, 0) / previousCandles.length;
 
-  if (averageVolume === 0) {
-    return null;
-  }
+  if (averageVolume === 0) return null;
 
   const ratio = currentCandle.volume / averageVolume;
 
@@ -631,21 +581,13 @@ function checkVolumeSpike(
   return null;
 }
 
-/**
- * Check if current candle represents a flash crash (> 5% drop)
- */
 function checkFlashCrash(
   symbol: string,
   currentCandle: { open: number; close: number; low: number }
 ): Alert | null {
-  if (currentCandle.open === 0) {
-    return null;
-  }
+  if (currentCandle.open === 0) return null;
 
-  // Check if price dropped more than threshold from open to close
   const dropPercent = ((currentCandle.open - currentCandle.close) / currentCandle.open) * 100;
-
-  // Also check the low - if the wick went much lower
   const maxDropPercent = ((currentCandle.open - currentCandle.low) / currentCandle.open) * 100;
 
   if (dropPercent >= FLASH_CRASH_THRESHOLD_PERCENT || maxDropPercent >= FLASH_CRASH_THRESHOLD_PERCENT) {
@@ -670,25 +612,16 @@ function checkFlashCrash(
 // Formatting
 // ============================================================================
 
-/**
- * Format a trade status update as a human-readable string
- *
- * @param update - The MonitorUpdate to format
- * @returns A formatted string summarizing the trade status
- */
 export function formatTradeStatus(update: MonitorUpdate): string {
   const { trade, currentPrice, unrealizedPnl, unrealizedPnlPercent, distanceToStop, distanceToNextTP, status } = update;
 
-  // Status emoji/indicator
   const statusIndicator = status === "critical" ? "[!!!]" :
                           status === "warning" ? "[!]" :
                           "[OK]";
 
-  // PnL formatting with sign
   const pnlSign = unrealizedPnl >= 0 ? "+" : "";
   const pnlFormatted = `${pnlSign}$${unrealizedPnl.toFixed(2)} (${pnlSign}${unrealizedPnlPercent.toFixed(2)}%)`;
 
-  // Build the status string
   const lines = [
     `${statusIndicator} ${trade.symbol}`,
     `  Status: ${trade.status}`,
@@ -699,7 +632,6 @@ export function formatTradeStatus(update: MonitorUpdate): string {
     `  Distance to Next TP: ${distanceToNextTP.toFixed(2)}%`,
   ];
 
-  // Add realized PnL if there are any exits
   if (trade.exits.length > 0) {
     const realizedSign = trade.realizedPnl >= 0 ? "+" : "";
     lines.push(`  Realized PnL: ${realizedSign}$${trade.realizedPnl.toFixed(2)} (${realizedSign}${trade.realizedPnlPercent.toFixed(2)}%)`);

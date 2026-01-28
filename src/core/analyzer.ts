@@ -8,6 +8,9 @@
 import { BinanceClient } from "../infra/binance/index.ts";
 import { calculateIndicators, detectLevels } from "../indicators/index.ts";
 import type { CoinAnalysis, Level, Candle, Indicators, Trend, Bias, Risk } from "../types/index.ts";
+import { createModuleLogger } from "../infra/logger/index.ts";
+
+const logger = createModuleLogger("analyzer");
 
 // ============================================================================
 // Types
@@ -72,6 +75,8 @@ export async function analyze(
   const timeframes = options?.timeframes ?? DEFAULT_TIMEFRAMES;
   const candleLimit = options?.candleLimit ?? DEFAULT_CANDLE_LIMIT;
 
+  logger.debug("Starting analysis", { symbol, timeframes, candleLimit });
+
   try {
     // Fetch candles for the primary timeframe (first in list)
     const primaryTimeframe = timeframes[0] ?? "1h";
@@ -128,7 +133,7 @@ export async function analyze(
     const setupDetected = setupDetails.setupValid;
     const setupConfidence = calculateSetupConfidence(setupDetails, volumeTrend, rsiState);
 
-    return {
+    const result: DetailedAnalysis = {
       // Base CoinAnalysis fields
       symbol,
       price: currentPrice,
@@ -150,9 +155,19 @@ export async function analyze(
       rsiState,
       setupDetails,
     };
+
+    logger.debug("Analysis complete", {
+      symbol,
+      trend,
+      bias,
+      setupDetected,
+      setupConfidence: setupConfidence.toFixed(2)
+    });
+
+    return result;
   } catch (error) {
     // On error, return sensible defaults
-    console.error(`Analysis failed for ${symbol}:`, error);
+    logger.error("Analysis failed", error instanceof Error ? error : undefined, { symbol });
     return createEmptyAnalysis(symbol);
   }
 }

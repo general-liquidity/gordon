@@ -27,7 +27,10 @@ export type {
 } from "./types.ts";
 
 // Client
-export { BinanceClient, BinanceError } from "./client.ts";
+export { BinanceClient } from "./client.ts";
+
+// Re-export errors for backward compatibility
+export { BinanceError, RateLimitError, BinanceAuthError, InsufficientBalanceError, InvalidSymbolError } from "../../errors/index.ts";
 
 // Permissions
 export {

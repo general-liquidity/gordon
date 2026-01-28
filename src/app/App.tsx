@@ -16,6 +16,7 @@ import { scan } from "../core/scanner.ts";
 import { loadConfig, saveConfig } from "../infra/storage/config.ts";
 import { loadEnvFile, checkEnvStatus, type EnvStatus } from "../infra/storage/env.ts";
 import { initDatabase } from "../infra/storage/index.ts";
+import { initializeContainer } from "../services/container.ts";
 import type { GordonContext } from "../infra/agents/types.ts";
 import type { Mode, GordonConfig } from "../types/index.ts";
 
@@ -93,8 +94,29 @@ export function App(): React.ReactElement {
       // Load .env file (if it exists)
       await loadEnvFile();
 
-      // Check environment status
-      const envStatus = await checkEnvStatus();
+      // Check environment status early to get keys
+      const envStatusEarly = await checkEnvStatus();
+
+      // Initialize service container with available credentials
+      try {
+        await initializeContainer({
+          binance: envStatusEarly.hasBinanceKeys && envStatusEarly.keys.BINANCE_API_KEY && envStatusEarly.keys.BINANCE_API_SECRET
+            ? {
+                apiKey: envStatusEarly.keys.BINANCE_API_KEY,
+                apiSecret: envStatusEarly.keys.BINANCE_API_SECRET,
+              }
+            : undefined,
+          openai: envStatusEarly.hasLLMKey && envStatusEarly.keys.OPENAI_API_KEY
+            ? { apiKey: envStatusEarly.keys.OPENAI_API_KEY }
+            : undefined,
+          logLevel: "info",
+        });
+      } catch (error) {
+        console.error("Failed to initialize service container:", error);
+      }
+
+      // Use the already fetched env status
+      const envStatus = envStatusEarly;
 
       // Load config and check onboarding status
       const config = await loadConfig();

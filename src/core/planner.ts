@@ -8,6 +8,10 @@
 import { LLMClient, loadPrompt, buildMessages } from "../infra/llm/index.ts";
 import { PlanSchema, type Plan, type GordonConfig } from "../types/index.ts";
 import type { DetailedAnalysis } from "./analyzer.ts";
+import { createModuleLogger } from "../infra/logger/index.ts";
+import { emitEvent } from "../events/index.ts";
+
+const logger = createModuleLogger("planner");
 
 // ============================================================================
 // Types
@@ -302,6 +306,8 @@ export async function generatePlan(
   client: LLMClient,
   input: PlannerInput
 ): Promise<Plan> {
+  logger.info("Generating plan", { symbol: input.analysis.symbol, riskLevel: input.preferences.riskLevel });
+
   // Step 1: Load the planner prompt
   const systemPrompt = await loadPrompt("planner");
 
@@ -357,8 +363,12 @@ Respond with a JSON object containing the plan. Follow all the rules in the syst
     const errorMessages = parseResult.error.issues
       .map((e) => `${String(e.path.join("."))}: ${e.message}`)
       .join(", ");
+    logger.error("Plan validation failed", undefined, { planId: id, errors: errorMessages });
     throw new Error(`Final plan validation failed: ${errorMessages}`);
   }
+
+  logger.info("Plan generated successfully", { planId: parseResult.data.id, symbol: parseResult.data.symbol });
+  await emitEvent("plan:created", { plan: parseResult.data });
 
   return parseResult.data;
 }

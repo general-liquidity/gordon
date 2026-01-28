@@ -19,6 +19,10 @@ import type {
   BinanceEarnPosition,
   BinanceAPIRestrictions,
 } from "./types.ts";
+import { BinanceError, RateLimitError } from "../../errors/index.ts";
+import { createModuleLogger } from "../logger/index.ts";
+
+const logger = createModuleLogger("binance");
 
 // Binance API base URL
 const BASE_URL = "https://api.binance.com";
@@ -28,19 +32,6 @@ interface RateLimitState {
   requestWeight: number;
   orderCount: number;
   lastReset: number;
-}
-
-// Custom error class for Binance API errors
-export class BinanceError extends Error {
-  public code: number;
-  public isRateLimit: boolean;
-
-  constructor(error: BinanceAPIError) {
-    super(error.msg);
-    this.name = "BinanceError";
-    this.code = error.code;
-    this.isRateLimit = error.code === -1015 || error.code === -1003;
-  }
 }
 
 /**
@@ -96,7 +87,7 @@ export class BinanceClient {
 
     // Binance limit is 1200 weight per minute, warn at 80%
     if (this.rateLimitState.requestWeight > 960) {
-      console.warn("Warning: Approaching Binance rate limit");
+      logger.warn("Approaching Binance rate limit", { weight: this.rateLimitState.requestWeight });
     }
   }
 
@@ -133,7 +124,11 @@ export class BinanceClient {
 
     if (!response.ok) {
       const error = (await response.json()) as BinanceAPIError;
-      throw new BinanceError(error);
+      logger.error("Public API request failed", undefined, { endpoint, code: String(error.code), msg: error.msg });
+      if (error.code === -1015 || error.code === -1003) {
+        throw new RateLimitError(60);
+      }
+      throw new BinanceError(error.msg, error.code);
     }
 
     return response.json() as Promise<T>;
@@ -175,7 +170,11 @@ export class BinanceClient {
 
     if (!response.ok) {
       const error = (await response.json()) as BinanceAPIError;
-      throw new BinanceError(error);
+      logger.error("Signed API request failed", undefined, { endpoint, method, code: String(error.code), msg: error.msg });
+      if (error.code === -1015 || error.code === -1003) {
+        throw new RateLimitError(60);
+      }
+      throw new BinanceError(error.msg, error.code);
     }
 
     // Handle empty response (e.g., for DELETE requests)
@@ -364,7 +363,7 @@ export class BinanceClient {
         }
       }
     } catch (error) {
-      console.error("Failed to get spot balances:", error);
+      logger.error("Failed to get spot balances", error instanceof Error ? error : undefined);
     }
 
     // Get funding wallet
@@ -378,7 +377,7 @@ export class BinanceClient {
         }
       }
     } catch (error) {
-      console.error("Failed to get funding balances:", error);
+      logger.error("Failed to get funding balances", error instanceof Error ? error : undefined);
     }
 
     return balances;

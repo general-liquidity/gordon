@@ -6,12 +6,20 @@
  * It is defensive by design - trading is critical and errors can be costly.
  */
 
-import { BinanceClient, BinanceError } from "../infra/binance/index.ts";
+import { BinanceClient } from "../infra/binance/index.ts";
 import type { BinanceOrder, OrderParams } from "../infra/binance/index.ts";
 import { validatePlan } from "./validator.ts";
 import { createTrade, updateTrade } from "../infra/storage/trades.ts";
 import { updatePlan } from "../infra/storage/plans.ts";
 import { logEvent } from "../infra/storage/events.ts";
+import { createModuleLogger } from "../infra/logger/index.ts";
+import { emitEvent } from "../events/index.ts";
+import {
+  TradingModeError,
+  InvalidPlanError,
+  BinanceError as BinanceErrorType,
+  isGordonError,
+} from "../errors/index.ts";
 import type {
   Plan,
   Trade,
@@ -19,6 +27,8 @@ import type {
   EntryFill,
   ExitFill,
 } from "../types/index.ts";
+
+const logger = createModuleLogger("executor");
 
 /**
  * Order placed during execution
@@ -108,6 +118,7 @@ async function safelyCancelOrder(
 ): Promise<boolean> {
   try {
     await client.cancelOrder(symbol, orderId);
+    logger.debug("Order cancelled", { symbol, orderId, reason: "ROLLBACK" });
     logEvent({
       type: "ORDER_PLACED",
       data: {
@@ -122,6 +133,7 @@ async function safelyCancelOrder(
   } catch (error) {
     const errorMessage =
       error instanceof Error ? error.message : "Unknown error";
+    logger.error("Failed to cancel order", error as Error, { symbol, orderId });
     logEvent({
       type: "ERROR",
       data: {
@@ -145,6 +157,7 @@ async function rollbackOrders(
   orders: PlacedOrder[],
   planId: string
 ): Promise<void> {
+  logger.warn("Rolling back orders", { symbol, orderCount: orders.length });
   for (const order of orders) {
     await safelyCancelOrder(client, symbol, order.orderId, planId);
   }
@@ -167,8 +180,11 @@ export async function executePlan(
 ): Promise<ExecutionResult> {
   const placedOrders: PlacedOrder[] = [];
 
+  logger.info("Executing plan", { planId: plan.id, symbol: plan.symbol });
+
   // Step 1: Check mode is ARMED
   if (config.mode !== "ARMED") {
+    logger.warn("Execution blocked - system not armed");
     return {
       success: false,
       error: "Cannot execute: System is not in ARMED mode. Use '/arm' to enable trading.",
@@ -189,6 +205,7 @@ export async function executePlan(
   const now = new Date();
 
   if (armedUntilDate <= now) {
+    logger.warn("Execution blocked - armed mode expired", { armedUntil: config.armedUntil });
     return {
       success: false,
       error: `Cannot execute: ARMED mode expired at ${config.armedUntil}. Please re-arm the system.`,
@@ -200,6 +217,7 @@ export async function executePlan(
   const validationResult = validatePlan(plan, config, portfolio);
 
   if (!validationResult.valid) {
+    logger.warn("Plan validation failed", { errors: validationResult.errors });
     return {
       success: false,
       error: `Validation failed: ${validationResult.errors.join("; ")}`,
@@ -209,6 +227,7 @@ export async function executePlan(
 
   // Log warnings but don't block execution
   if (validationResult.warnings.length > 0) {
+    logger.warn("Plan has warnings", { warnings: validationResult.warnings });
     logEvent({
       type: "ALERT",
       data: {
@@ -223,9 +242,11 @@ export async function executePlan(
   let currentPrice: number;
   try {
     currentPrice = await client.getPrice(plan.symbol);
+    logger.debug("Got current price", { symbol: plan.symbol, price: currentPrice });
   } catch (error) {
     const errorMessage =
       error instanceof Error ? error.message : "Unknown error";
+    logger.error("Failed to get price", error as Error, { symbol: plan.symbol });
     return {
       success: false,
       error: `Failed to get current price for ${plan.symbol}: ${errorMessage}`,
@@ -234,7 +255,6 @@ export async function executePlan(
   }
 
   // Step 5: Calculate quantity based on allocation and current price
-  // Use entry price for limit orders, current price for market orders
   const priceForCalculation =
     plan.entry.type === "market" || plan.entry.price === null
       ? currentPrice
@@ -271,14 +291,19 @@ export async function executePlan(
     let entryOrder: BinanceOrder;
     try {
       entryOrder = await client.placeOrder(entryOrderParams);
+      logger.info("Entry order placed", {
+        orderId: entryOrder.orderId,
+        symbol: plan.symbol,
+        type: entryOrderParams.type,
+      });
     } catch (error) {
-      const errorMessage =
-        error instanceof BinanceError
-          ? `Binance error ${error.code}: ${error.message}`
-          : error instanceof Error
-            ? error.message
-            : "Unknown error";
+      const errorMessage = isGordonError(error)
+        ? error.message
+        : error instanceof Error
+          ? error.message
+          : "Unknown error";
 
+      logger.error("Entry order failed", error as Error, { params: entryOrderParams });
       logEvent({
         type: "ERROR",
         data: {
@@ -329,7 +354,7 @@ export async function executePlan(
       side: "SELL",
       type: "STOP_LOSS_LIMIT",
       quantity: totalQuantity,
-      price: roundPrice(plan.stopLoss.price * 0.995), // Limit price slightly below stop
+      price: roundPrice(plan.stopLoss.price * 0.995),
       stopPrice: roundPrice(plan.stopLoss.price),
       timeInForce: "GTC",
       newClientOrderId: generateClientOrderId(plan.id, "stop"),
@@ -338,17 +363,20 @@ export async function executePlan(
     let stopOrder: BinanceOrder;
     try {
       stopOrder = await client.placeOrder(stopOrderParams);
+      logger.info("Stop order placed", {
+        orderId: stopOrder.orderId,
+        stopPrice: plan.stopLoss.price,
+      });
     } catch (error) {
-      // Rollback entry order
       await rollbackOrders(client, plan.symbol, placedOrders, plan.id);
 
-      const errorMessage =
-        error instanceof BinanceError
-          ? `Binance error ${error.code}: ${error.message}`
-          : error instanceof Error
-            ? error.message
-            : "Unknown error";
+      const errorMessage = isGordonError(error)
+        ? error.message
+        : error instanceof Error
+          ? error.message
+          : "Unknown error";
 
+      logger.error("Stop order failed", error as Error, { params: stopOrderParams });
       logEvent({
         type: "ERROR",
         data: {
@@ -396,7 +424,6 @@ export async function executePlan(
       }
       const isLastTP = i === plan.takeProfit.length - 1;
 
-      // For the last TP, use remaining quantity to avoid rounding issues
       const tpQuantity = isLastTP
         ? remainingQuantity
         : roundQuantity(totalQuantity * tp.percentToSell);
@@ -420,17 +447,21 @@ export async function executePlan(
       let tpOrder: BinanceOrder;
       try {
         tpOrder = await client.placeOrder(tpOrderParams);
+        logger.info("Take profit order placed", {
+          level: i + 1,
+          orderId: tpOrder.orderId,
+          price: tp.price,
+        });
       } catch (error) {
-        // Rollback all previous orders
         await rollbackOrders(client, plan.symbol, placedOrders, plan.id);
 
-        const errorMessage =
-          error instanceof BinanceError
-            ? `Binance error ${error.code}: ${error.message}`
-            : error instanceof Error
-              ? error.message
-              : "Unknown error";
+        const errorMessage = isGordonError(error)
+          ? error.message
+          : error instanceof Error
+            ? error.message
+            : "Unknown error";
 
+        logger.error("TP order failed", error as Error, { level: i + 1, params: tpOrderParams });
         logEvent({
           type: "ERROR",
           data: {
@@ -493,7 +524,16 @@ export async function executePlan(
       status: plan.entry.type === "market" ? "OPEN" : "PARTIAL",
     });
 
+    // Emit trade opened event
+    await emitEvent("trade:opened", { trade, planId: plan.id });
+
     // Step 8: Log events for trade creation
+    logger.info("Trade created", {
+      tradeId: trade.id,
+      symbol: plan.symbol,
+      orderCount: placedOrders.length,
+    });
+
     logEvent({
       type: "ORDER_PLACED",
       data: {
@@ -528,6 +568,7 @@ export async function executePlan(
     const errorMessage =
       error instanceof Error ? error.message : "Unknown error";
 
+    logger.error("Unexpected execution error", error as Error, { planId: plan.id });
     logEvent({
       type: "ERROR",
       data: {
@@ -557,7 +598,8 @@ export async function cancelTrade(
   client: BinanceClient,
   trade: Trade
 ): Promise<CancelResult> {
-  // Verify trade exists and is cancellable
+  logger.info("Cancelling trade", { tradeId: trade.id, symbol: trade.symbol });
+
   if (trade.status === "CLOSED") {
     return {
       success: false,
@@ -566,17 +608,12 @@ export async function cancelTrade(
   }
 
   try {
-    // Get all open orders for this symbol
     const openOrders = await client.getOpenOrders(trade.symbol);
 
-    // Filter to orders that belong to this trade (by order ID from entries)
-    const tradeOrderIds = new Set(trade.entries.map((e) => e.orderId));
-
-    // Cancel all open orders for this symbol
-    // Note: We cancel all orders since stop and TP orders are linked to this trade
     const cancelPromises = openOrders.map(async (order) => {
       try {
         await client.cancelOrder(trade.symbol, order.orderId.toString());
+        logger.debug("Order cancelled", { orderId: order.orderId, symbol: trade.symbol });
         logEvent({
           type: "ORDER_PLACED",
           data: {
@@ -604,6 +641,7 @@ export async function cancelTrade(
     const failures = results.filter((r) => !r.success);
 
     if (failures.length > 0) {
+      logger.warn("Partial cancellation", { failures });
       logEvent({
         type: "ERROR",
         data: {
@@ -623,12 +661,12 @@ export async function cancelTrade(
       };
     }
 
-    // Update trade status
     updateTrade(trade.id, { status: "CLOSED", closedAt: new Date().toISOString() });
-
-    // Update plan status
     updatePlan(trade.planId, { status: "CANCELLED" });
 
+    await emitEvent("plan:cancelled", { planId: trade.planId, reason: "User cancelled" });
+
+    logger.info("Trade cancelled", { tradeId: trade.id, cancelledOrders: results.length });
     logEvent({
       type: "ORDER_PLACED",
       data: {
@@ -644,6 +682,7 @@ export async function cancelTrade(
     const errorMessage =
       error instanceof Error ? error.message : "Unknown error";
 
+    logger.error("Failed to cancel trade", error as Error, { tradeId: trade.id });
     logEvent({
       type: "ERROR",
       data: {
@@ -674,7 +713,8 @@ export async function closeTrade(
   trade: Trade,
   reason: CloseReason
 ): Promise<CloseResult> {
-  // Verify trade exists and is closeable
+  logger.info("Closing trade", { tradeId: trade.id, symbol: trade.symbol, reason });
+
   if (trade.status === "CLOSED") {
     return {
       success: false,
@@ -708,12 +748,18 @@ export async function closeTrade(
     );
 
     if (remainingQuantity <= 0) {
-      // No remaining position - just update status
       updateTrade(trade.id, {
         status: "CLOSED",
         closedAt: new Date().toISOString(),
       });
       updatePlan(trade.planId, { status: "CLOSED" });
+
+      await emitEvent("trade:closed", {
+        trade,
+        reason,
+        pnl: trade.realizedPnl,
+        pnlPercent: trade.realizedPnlPercent,
+      });
 
       return {
         success: true,
@@ -733,14 +779,15 @@ export async function closeTrade(
     let sellOrder: BinanceOrder;
     try {
       sellOrder = await client.placeOrder(sellOrderParams);
+      logger.info("Close order placed", { orderId: sellOrder.orderId, quantity: remainingQuantity });
     } catch (error) {
-      const errorMessage =
-        error instanceof BinanceError
-          ? `Binance error ${error.code}: ${error.message}`
-          : error instanceof Error
-            ? error.message
-            : "Unknown error";
+      const errorMessage = isGordonError(error)
+        ? error.message
+        : error instanceof Error
+          ? error.message
+          : "Unknown error";
 
+      logger.error("Close order failed", error as Error, { params: sellOrderParams });
       logEvent({
         type: "ERROR",
         data: {
@@ -779,7 +826,6 @@ export async function closeTrade(
     const pnlFromThisExit = exitValue - entryValue;
     const totalRealizedPnl = trade.realizedPnl + pnlFromThisExit;
 
-    // Calculate total invested for percentage
     const totalInvested = trade.averageEntry * totalEntryQuantity;
     const realizedPnlPercent =
       totalInvested > 0 ? (totalRealizedPnl / totalInvested) * 100 : 0;
@@ -796,6 +842,21 @@ export async function closeTrade(
 
     // Update plan status
     updatePlan(trade.planId, { status: "CLOSED" });
+
+    // Emit trade closed event
+    await emitEvent("trade:closed", {
+      trade: { ...trade, exits: updatedExits, realizedPnl: totalRealizedPnl, realizedPnlPercent, status: "CLOSED" },
+      reason,
+      pnl: totalRealizedPnl,
+      pnlPercent: realizedPnlPercent,
+    });
+
+    logger.info("Trade closed", {
+      tradeId: trade.id,
+      reason,
+      pnl: totalRealizedPnl,
+      pnlPercent: realizedPnlPercent,
+    });
 
     logEvent({
       type: "ORDER_FILLED",
@@ -820,6 +881,7 @@ export async function closeTrade(
     const errorMessage =
       error instanceof Error ? error.message : "Unknown error";
 
+    logger.error("Failed to close trade", error as Error, { tradeId: trade.id, reason });
     logEvent({
       type: "ERROR",
       data: {

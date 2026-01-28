@@ -7,6 +7,9 @@
 
 import { LLMClient, loadPrompt, buildMessages } from "../infra/llm/index.ts";
 import type { Plan, Trade, CoinAnalysis } from "../types/index.ts";
+import { createModuleLogger } from "../infra/logger/index.ts";
+
+const logger = createModuleLogger("explainer");
 
 // ============================================================================
 // Types
@@ -396,9 +399,15 @@ export async function explain(
   question: string,
   context: ExplainContext
 ): Promise<string> {
+  logger.debug("Processing explanation request", {
+    question: question.substring(0, 50),
+    hasContext: !!context.plan || !!context.trade || !!context.analysis
+  });
+
   // Check if this is a question about a preset topic
   const presetAnswer = detectAndGetPreset(question, context);
   if (presetAnswer) {
+    logger.debug("Returning preset explanation");
     return presetAnswer;
   }
 
