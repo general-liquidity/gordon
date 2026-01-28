@@ -1,0 +1,61 @@
+{
+  "name": "@general-liquidity/gordon-cli",
+  "version": "0.1.0",
+  "description": "Claude Code for Vibe Trading",
+  "author": "General Liquidity, Inc.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/general-liquidity/gordon-cli.git"
+  },
+  "homepage": "https://github.com/general-liquidity/gordon-cli#readme",
+  "bugs": "https://github.com/general-liquidity/gordon-cli/issues",
+  "keywords": [
+    "trading",
+    "crypto",
+    "ai",
+    "cli",
+    "binance",
+    "cryptocurrency",
+    "vibe-trading"
+  ],
+  "module": "src/index.tsx",
+  "type": "module",
+  "bin": {
+    "gordon": "./dist/gordon.js"
+  },
+  "files": [
+    "dist",
+    "prompts",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18",
+    "bun": ">=1.0"
+  },
+  "scripts": {
+    "start": "bun run src/index.tsx",
+    "dev": "bun --watch run src/index.tsx",
+    "build": "bun build src/index.tsx --outdir dist --target bun",
+    "build:binary": "bun build src/index.tsx --compile --outfile gordon",
+    "prepublishOnly": "bun run build",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/node": "^25.1.0"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "@openai/agents": "^0.4.0",
+    "@types/react": "^19.2.10",
+    "ink": "^6.6.0",
+    "ink-text-input": "^6.0.0",
+    "react": "^19.2.4",
+    "zod": "^4.3.6"
+  }
+}
