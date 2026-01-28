@@ -9,6 +9,7 @@ import TextInput from "ink-text-input";
 
 import { BinanceClient, checkAndValidatePermissions } from "../infra/binance/index.ts";
 import { loadConfig, saveConfig } from "../infra/storage/config.ts";
+import { saveEnvKeys, createEnvFile, checkEnvStatus } from "../infra/storage/env.ts";
 import type { GordonConfig, ExchangePermissions, Preferences } from "../types/index.ts";
 
 // Color palette
@@ -126,7 +127,31 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
     }
 
     await saveConfig(newConfig);
-  }, [state.binanceApiKey, state.binanceApiSecret, state.binancePermissions, state.preferences]);
+
+    // Save API keys to .env file
+    const envStatus = await checkEnvStatus();
+    const envKeys: Record<string, string> = {};
+
+    if (state.openaiApiKey) {
+      envKeys.OPENAI_API_KEY = state.openaiApiKey;
+    }
+    if (state.dedalusApiKey) {
+      envKeys.DEDALUS_API_KEY = state.dedalusApiKey;
+    }
+    if (state.binanceApiKey) {
+      envKeys.BINANCE_API_KEY = state.binanceApiKey;
+    }
+    if (state.binanceApiSecret) {
+      envKeys.BINANCE_API_SECRET = state.binanceApiSecret;
+    }
+
+    // Create or update .env file
+    if (envStatus.fileExists) {
+      await saveEnvKeys(envKeys);
+    } else {
+      await createEnvFile(envKeys);
+    }
+  }, [state.binanceApiKey, state.binanceApiSecret, state.binancePermissions, state.preferences, state.openaiApiKey, state.dedalusApiKey]);
 
   const handleInputSubmit = useCallback(
     async (value: string) => {

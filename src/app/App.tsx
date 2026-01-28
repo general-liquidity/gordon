@@ -7,9 +7,11 @@ import { WelcomeBanner } from "./WelcomeBanner.tsx";
 import { QuickStartMenu, type MenuOption } from "./QuickStartMenu.tsx";
 import { ChatView, type ChatMessage } from "./ChatView.tsx";
 import { Onboarding } from "./Onboarding.tsx";
+import { SetupWizard } from "./SetupWizard.tsx";
 import { processMessage } from "../infra/agents/orchestrator.ts";
 import { createLLMClientFromEnv, type LLMClient } from "../infra/llm/index.ts";
 import { loadConfig, saveConfig } from "../infra/storage/config.ts";
+import { loadEnvFile, checkEnvStatus, type EnvStatus } from "../infra/storage/env.ts";
 import type { GordonContext } from "../infra/agents/types.ts";
 import type { Mode, GordonConfig } from "../types/index.ts";
 
@@ -22,7 +24,7 @@ const COLORS = {
   ERROR: "#ff6b6b",
 } as const;
 
-type AppView = "loading" | "onboarding" | "welcome" | "menu" | "chat";
+type AppView = "loading" | "onboarding" | "setup" | "welcome" | "menu" | "chat";
 
 interface ConversationMessage {
   role: "user" | "assistant";
@@ -80,12 +82,39 @@ export function App(): React.ReactElement {
   // Initialize config and LLM client on mount
   useEffect(() => {
     async function initialize(): Promise<void> {
+      // Load .env file first (if it exists)
+      await loadEnvFile();
+
+      // Check environment status
+      const envStatus = await checkEnvStatus();
+
       // Load config and check onboarding status
       const config = await loadConfig();
       configRef.current = config;
 
-      // Determine initial view based on onboarding status
-      const initialView = config.onboardingComplete ? "welcome" : "onboarding";
+      // Determine initial view:
+      // - If keys are configured (either in .env or env vars), skip onboarding
+      // - If onboarding was completed before, show welcome
+      // - Otherwise show onboarding
+      let initialView: AppView;
+
+      if (envStatus.hasLLMKey) {
+        // Keys are already configured - skip onboarding entirely
+        initialView = "welcome";
+
+        // Mark onboarding as complete if it wasn't
+        if (!config.onboardingComplete) {
+          const updatedConfig = { ...config, onboardingComplete: true };
+          configRef.current = updatedConfig;
+          await saveConfig(updatedConfig);
+        }
+      } else if (config.onboardingComplete) {
+        // Onboarding was done but no keys - show welcome anyway
+        initialView = "welcome";
+      } else {
+        // New user without keys - show onboarding
+        initialView = "onboarding";
+      }
 
       // Initialize LLM client
       try {
@@ -289,30 +318,10 @@ Remember: I'm in SAFE mode by default. Your funds are protected.`,
 
       // Navigate based on user choice
       if (options.setupApiKeys) {
+        // Go to setup wizard to collect API keys
         setState((prev) => ({
           ...prev,
-          view: "chat",
-          messages: [
-            {
-              role: "gordon",
-              content: `Great choice! Let's get you set up with Binance.
-
-To connect your account, I'll need your API credentials:
-
-1. Log into Binance and go to API Management
-2. Create a new API key with "Spot Trading" permissions
-3. Copy your API Key and Secret Key
-
-You can set these as environment variables:
-  export BINANCE_API_KEY="your-key"
-  export BINANCE_API_SECRET="your-secret"
-
-Or run the setup wizard from the menu when you're ready.
-
-For now, feel free to ask me anything about trading strategies!`,
-              timestamp: formatTimestamp(),
-            },
-          ],
+          view: "setup",
         }));
       } else {
         // Demo mode
@@ -338,6 +347,45 @@ Try saying: "What's the market looking like today?"`,
     },
     []
   );
+
+  // Handle setup wizard completion
+  const handleSetupComplete = useCallback(async (): Promise<void> => {
+    // Try to initialize LLM client with new keys
+    try {
+      llmClientRef.current = createLLMClientFromEnv();
+      setState((prev) => ({
+        ...prev,
+        view: "chat",
+        connectionStatus: "connected",
+        messages: [
+          {
+            role: "gordon",
+            content: `Setup complete! I'm ready to help you trade.
+
+Your API keys have been saved to the .env file in your project directory.
+
+Try saying: "What's the market looking like today?" or "Find me a good BTC setup"`,
+            timestamp: formatTimestamp(),
+          },
+        ],
+      }));
+    } catch {
+      setState((prev) => ({
+        ...prev,
+        view: "chat",
+        connectionStatus: "disconnected",
+        messages: [
+          {
+            role: "gordon",
+            content: `Setup complete, but I couldn't connect to the LLM provider.
+
+Please check your API keys in the .env file and restart Gordon.`,
+            timestamp: formatTimestamp(),
+          },
+        ],
+      }));
+    }
+  }, []);
 
   // Handle global keyboard shortcuts
   useInput((input, key) => {
@@ -376,6 +424,10 @@ Try saying: "What's the market looking like today?"`,
 
         {state.view === "onboarding" && (
           <Onboarding onComplete={handleOnboardingComplete} />
+        )}
+
+        {state.view === "setup" && (
+          <SetupWizard onComplete={handleSetupComplete} />
         )}
 
         {state.view === "welcome" && (

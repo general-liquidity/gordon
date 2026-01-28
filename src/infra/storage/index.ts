@@ -1,6 +1,17 @@
 // Configuration management
 export { CONFIG_PATH, loadConfig, saveConfig } from "./config.ts";
 
+// Environment file management
+export {
+  ENV_FILE_PATH,
+  loadEnvFile,
+  checkEnvStatus,
+  saveEnvKeys,
+  createEnvFile,
+  type EnvKeys,
+  type EnvStatus,
+} from "./env.ts";
+
 // Database management
 export { DB_PATH, initDatabase, getDatabase, closeDatabase } from "./database.ts";
 

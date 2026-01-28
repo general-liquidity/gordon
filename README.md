@@ -99,7 +99,7 @@ export DEDALUS_API_KEY="dd-..."
 
 # Exchange (Binance for now)
 export BINANCE_API_KEY="..."
-export BINANCE_SECRET_KEY="..."
+export BINANCE_API_SECRET="..."
 ```
 
 ### 3. Start Talking
@@ -247,7 +247,7 @@ Gordon stores config at `~/.gordon/config.json`:
 | `OPENAI_API_KEY` | One of these | OpenAI API key |
 | `DEDALUS_API_KEY` | required | Dedalus Labs API key |
 | `BINANCE_API_KEY` | For trading | Binance API key |
-| `BINANCE_SECRET_KEY` | For trading | Binance secret |
+| `BINANCE_API_SECRET` | For trading | Binance secret |
 
 ---
 
