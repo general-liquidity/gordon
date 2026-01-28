@@ -1,11 +1,13 @@
-```
+<p align="center">
+<pre>
  ██████╗  ██████╗ ██████╗ ██████╗  ██████╗ ███╗   ██╗
 ██╔════╝ ██╔═══██╗██╔══██╗██╔══██╗██╔═══██╗████╗  ██║
 ██║  ███╗██║   ██║██████╔╝██║  ██║██║   ██║██╔██╗ ██║
 ██║   ██║██║   ██║██╔══██╗██║  ██║██║   ██║██║╚██╗██║
 ╚██████╔╝╚██████╔╝██║  ██║██████╔╝╚██████╔╝██║ ╚████║
  ╚═════╝  ╚═════╝ ╚═╝  ╚═╝╚═════╝  ╚═════╝ ╚═╝  ╚═══╝
-```
+</pre>
+</p>
 
 <h1 align="center">📈 AI-Powered Vibe Trading for Crypto</h1>
 
@@ -320,7 +322,7 @@ bun test
 
 ## License
 
-MIT © [General Liquidity, Inc.](https://general-liquidity.com)
+MIT © [General Liquidity, Inc.](https://generalliquidity.com)
 
 ---
 
