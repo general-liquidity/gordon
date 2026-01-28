@@ -10,6 +10,7 @@ import { Onboarding } from "./Onboarding.tsx";
 import { SetupWizard } from "./SetupWizard.tsx";
 import { processMessage } from "../infra/agents/orchestrator.ts";
 import { createLLMClientFromEnv, type LLMClient } from "../infra/llm/index.ts";
+import { BinanceClient } from "../infra/binance/index.ts";
 import { loadConfig, saveConfig } from "../infra/storage/config.ts";
 import { loadEnvFile, checkEnvStatus, type EnvStatus } from "../infra/storage/env.ts";
 import type { GordonContext } from "../infra/agents/types.ts";
@@ -77,6 +78,7 @@ export function App(): React.ReactElement {
   });
 
   const llmClientRef = useRef<LLMClient | null>(null);
+  const binanceClientRef = useRef<BinanceClient | null>(null);
   const configRef = useRef<GordonConfig>(getDefaultConfig());
 
   // Initialize config and LLM client on mount
@@ -119,21 +121,28 @@ export function App(): React.ReactElement {
       // Initialize LLM client
       try {
         llmClientRef.current = createLLMClientFromEnv();
-        setState((prev) => ({
-          ...prev,
-          view: initialView,
-          mode: config.mode,
-          connectionStatus: "connected",
-        }));
       } catch {
         // LLM client not configured - will show error when user tries to chat
-        setState((prev) => ({
-          ...prev,
-          view: initialView,
-          mode: config.mode,
-          connectionStatus: "disconnected",
-        }));
       }
+
+      // Initialize Binance client if keys are available
+      if (envStatus.hasBinanceKeys && envStatus.keys.BINANCE_API_KEY && envStatus.keys.BINANCE_API_SECRET) {
+        try {
+          binanceClientRef.current = new BinanceClient(
+            envStatus.keys.BINANCE_API_KEY,
+            envStatus.keys.BINANCE_API_SECRET
+          );
+        } catch {
+          // Binance client failed to initialize
+        }
+      }
+
+      setState((prev) => ({
+        ...prev,
+        view: initialView,
+        mode: config.mode,
+        connectionStatus: llmClientRef.current ? "connected" : "disconnected",
+      }));
     }
 
     initialize();
@@ -180,7 +189,7 @@ export function App(): React.ReactElement {
 
     // Build the context for Gordon
     const context: GordonContext = {
-      binance: null, // Will be configured via setup
+      binance: binanceClientRef.current,
       llm: llmClientRef.current,
       config: configRef.current,
       portfolioValue: state.portfolioValue ?? 0,
@@ -251,19 +260,117 @@ export function App(): React.ReactElement {
         }));
         break;
       case "portfolio":
-        setState((prev) => ({
-          ...prev,
-          view: "chat",
-          messages: [
-            ...prev.messages,
-            {
-              role: "gordon",
-              content:
-                "Portfolio view coming soon. Connect your exchange API in setup to see your positions.",
-              timestamp: formatTimestamp(),
-            },
-          ],
-        }));
+        if (!binanceClientRef.current) {
+          setState((prev) => ({
+            ...prev,
+            view: "chat",
+            messages: [
+              ...prev.messages,
+              {
+                role: "gordon",
+                content:
+                  "Binance API not connected. Add your API keys to the .env file:\n\nBINANCE_API_KEY=your-key\nBINANCE_API_SECRET=your-secret\n\nThen restart Gordon.",
+                timestamp: formatTimestamp(),
+              },
+            ],
+          }));
+        } else {
+          // Fetch portfolio data
+          setState((prev) => ({
+            ...prev,
+            view: "chat",
+            messages: [
+              ...prev.messages,
+              {
+                role: "gordon",
+                content: "Fetching your portfolio from Binance...",
+                timestamp: formatTimestamp(),
+              },
+            ],
+          }));
+
+          // Async fetch portfolio
+          (async () => {
+            try {
+              const accountInfo = await binanceClientRef.current!.getAccountInfo();
+              const balances = accountInfo.balances.filter(
+                (b) => parseFloat(b.free) > 0 || parseFloat(b.locked) > 0
+              );
+
+              // Calculate total value
+              let totalValue = 0;
+              const holdings: Array<{ asset: string; amount: number; usdtValue: number }> = [];
+
+              for (const balance of balances) {
+                const amount = parseFloat(balance.free) + parseFloat(balance.locked);
+                let usdtValue = 0;
+
+                if (balance.asset === "USDT") {
+                  usdtValue = amount;
+                } else if (balance.asset === "USDC" || balance.asset === "BUSD") {
+                  usdtValue = amount; // Stablecoins ~= USDT
+                } else {
+                  try {
+                    const price = await binanceClientRef.current!.getPrice(`${balance.asset}USDT`);
+                    usdtValue = amount * price;
+                  } catch {
+                    continue; // Skip assets without USDT pair
+                  }
+                }
+
+                if (usdtValue > 1) {
+                  holdings.push({ asset: balance.asset, amount, usdtValue });
+                  totalValue += usdtValue;
+                }
+              }
+
+              // Sort by value
+              holdings.sort((a, b) => b.usdtValue - a.usdtValue);
+
+              // Format message
+              const lines = [
+                `**Portfolio Value: $${totalValue.toFixed(2)} USDT**\n`,
+                "| Asset | Amount | Value (USDT) |",
+                "|-------|--------|--------------|",
+              ];
+
+              for (const h of holdings.slice(0, 10)) {
+                lines.push(
+                  `| ${h.asset} | ${h.amount.toFixed(4)} | $${h.usdtValue.toFixed(2)} |`
+                );
+              }
+
+              if (holdings.length > 10) {
+                lines.push(`\n_...and ${holdings.length - 10} more assets_`);
+              }
+
+              setState((prev) => ({
+                ...prev,
+                portfolioValue: totalValue,
+                messages: [
+                  ...prev.messages,
+                  {
+                    role: "gordon",
+                    content: lines.join("\n"),
+                    timestamp: formatTimestamp(),
+                  },
+                ],
+              }));
+            } catch (error) {
+              setState((prev) => ({
+                ...prev,
+                messages: [
+                  ...prev.messages,
+                  {
+                    role: "gordon",
+                    content: `Failed to fetch portfolio: ${error instanceof Error ? error.message : "Unknown error"}`,
+                    timestamp: formatTimestamp(),
+                  },
+                ],
+              }));
+            }
+          })();
+        }
         break;
       case "setup":
         setState((prev) => ({

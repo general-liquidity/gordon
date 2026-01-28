@@ -40,12 +40,12 @@ export const scanMarketTool = tool({
       .number()
       .min(10)
       .max(200)
-      .optional()
-      .describe("Number of top coins by volume to scan (default: 50)"),
+      .default(50)
+      .describe("Number of top coins by volume to scan"),
     timeframes: z
       .array(z.string())
-      .optional()
-      .describe("Timeframes to analyze (default: ['1h', '4h'])"),
+      .default(["1h", "4h"])
+      .describe("Timeframes to analyze"),
   }),
   async execute({ topN, timeframes }, runContext: RunContext<GordonContext> | undefined) {
     const ctx = runContext?.context;
@@ -89,8 +89,8 @@ export const analyzeCoinTool = tool({
       .describe("Trading pair symbol (e.g., 'BTCUSDT', 'ETHUSDT')"),
     timeframes: z
       .array(z.string())
-      .optional()
-      .describe("Timeframes to analyze (default: ['1h', '4h', '1d'])"),
+      .default(["1h", "4h", "1d"])
+      .describe("Timeframes to analyze"),
   }),
   async execute({ symbol, timeframes }, runContext: RunContext<GordonContext> | undefined) {
     const ctx = runContext?.context;
@@ -149,14 +149,14 @@ export const createPlanTool = tool({
     symbol: z.string().describe("Trading pair symbol (e.g., 'BTCUSDT')"),
     riskLevel: z
       .enum(["low", "medium", "high"])
-      .optional()
-      .describe("Risk tolerance (default: from user preferences)"),
+      .default("medium")
+      .describe("Risk tolerance"),
     allocationPercent: z
       .number()
       .min(0.01)
       .max(0.5)
-      .optional()
-      .describe("Percent of portfolio to allocate (default: from user preferences)"),
+      .default(0.1)
+      .describe("Percent of portfolio to allocate"),
   }),
   async execute(
     { symbol, riskLevel, allocationPercent },
@@ -304,8 +304,8 @@ export const closeTradeTool = tool({
     tradeId: z.string().describe("The ID of the trade to close"),
     reason: z
       .enum(["MANUAL", "STOP", "TP1", "TP2", "TP3"])
-      .optional()
-      .describe("Reason for closing (default: MANUAL)"),
+      .default("MANUAL")
+      .describe("Reason for closing"),
   }),
   needsApproval: true,
   async execute({ tradeId, reason }, runContext: RunContext<GordonContext> | undefined) {
@@ -342,7 +342,7 @@ export const explainTool = tool({
     topic: z.string().describe("The topic to explain"),
     additionalContext: z
       .string()
-      .optional()
+      .default("")
       .describe("Additional context for the explanation"),
   }),
   async execute({ topic, additionalContext }, runContext: RunContext<GordonContext> | undefined) {
@@ -358,7 +358,7 @@ export const explainTool = tool({
     }
 
     // Custom explanation using AI
-    const explanation = await explain(ctx.llm, topic, { topic: additionalContext });
+    const explanation = await explain(ctx.llm, topic, { topic: additionalContext || undefined });
     return { explanation, topic };
   },
 });
@@ -378,8 +378,8 @@ export const armSystemTool = tool({
       .number()
       .min(1)
       .max(24)
-      .optional()
-      .describe("Hours to stay armed (default: 24, max: 24)"),
+      .default(24)
+      .describe("Hours to stay armed (max: 24)"),
   }),
   needsApproval: true,
   async execute({ action, hours }) {
@@ -487,15 +487,15 @@ export const listPlansTool = tool({
     "Use when user asks 'show my plans' or 'what plans do I have?'",
   parameters: z.object({
     status: z
-      .enum(["DRAFT", "APPROVED", "EXECUTING", "CLOSED", "CANCELLED"])
-      .optional()
-      .describe("Filter by status"),
-    limit: z.number().min(1).max(50).optional().describe("Max plans to return (default: 10)"),
+      .enum(["DRAFT", "APPROVED", "EXECUTING", "CLOSED", "CANCELLED", "ALL"])
+      .default("ALL")
+      .describe("Filter by status (ALL for no filter)"),
+    limit: z.number().min(1).max(50).default(10).describe("Max plans to return"),
   }),
   async execute({ status, limit }) {
     let plans = getAllPlans();
 
-    if (status) {
+    if (status && status !== "ALL") {
       plans = plans.filter((p) => p.status === status);
     }
 
