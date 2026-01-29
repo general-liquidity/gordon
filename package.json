@@ -44,6 +44,7 @@
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
+    "@types/asciichart": "^1.5.8",
     "@types/bun": "latest",
     "@types/node": "^25.1.0",
     "react-devtools-core": "^6.1.5"
@@ -54,6 +55,7 @@
   "dependencies": {
     "@openai/agents": "^0.4.0",
     "@types/react": "^19.2.10",
+    "asciichart": "^1.5.25",
     "ink": "^6.6.0",
     "ink-text-input": "^6.0.0",
     "react": "^19.2.4",
