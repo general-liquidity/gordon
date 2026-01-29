@@ -66,7 +66,7 @@ export async function processMessage(
 
   try {
     // Use agent.network() for complex tasks requiring multi-agent coordination
-    const result = await gordonAgent.network(userMessage, {
+    const result = await gordonAgent().network(userMessage, {
       requestContext,
       memory: threadId ? { threadId } : undefined,
       maxSteps: 20,
@@ -116,7 +116,7 @@ export async function processSimpleMessage(
 ): Promise<string> {
   const requestContext = createRequestContext(context);
 
-  const result = await gordonAgent.generate({
+  const result = await gordonAgent().generate({
     messages: [{ role: "user", content: userMessage }] as CoreMessage[],
     requestContext,
   });
@@ -153,7 +153,7 @@ export async function* processMessageStream(
   const requestContext = createRequestContext(context);
 
   try {
-    const result = await gordonAgent.network(userMessage, {
+    const result = await gordonAgent().network(userMessage, {
       requestContext,
       memory: threadId ? { threadId } : undefined,
       maxSteps: 20,

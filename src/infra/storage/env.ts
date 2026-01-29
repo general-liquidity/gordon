@@ -1,12 +1,25 @@
 /**
  * Environment file detection and management
  * Handles .env file reading, writing, and key detection
+ *
+ * Keys are stored in ~/.gordon/.env for distributed CLI usage.
+ * Also checks process.cwd()/.env for development convenience.
  */
 
 import { existsSync } from "node:fs";
+import { mkdir } from "node:fs/promises";
+import { homedir } from "node:os";
 import { join } from "node:path";
 
-const ENV_FILE_PATH = join(process.cwd(), ".env");
+// Primary location: user's Gordon config directory
+const GORDON_DIR = join(homedir(), ".gordon");
+const GORDON_ENV_PATH = join(GORDON_DIR, ".env");
+
+// Secondary location: current working directory (for development)
+const CWD_ENV_PATH = join(process.cwd(), ".env");
+
+// We write to GORDON_ENV_PATH but read from both
+const ENV_FILE_PATH = GORDON_ENV_PATH;
 
 export interface EnvKeys {
   OPENAI_API_KEY?: string;
@@ -58,10 +71,26 @@ function parseEnvContent(content: string): Record<string, string> {
 }
 
 /**
+ * Find the first existing .env file path
+ * Checks ~/.gordon/.env first, then cwd/.env for development
+ */
+function findEnvFilePath(): string | null {
+  if (existsSync(GORDON_ENV_PATH)) {
+    return GORDON_ENV_PATH;
+  }
+  if (existsSync(CWD_ENV_PATH)) {
+    return CWD_ENV_PATH;
+  }
+  return null;
+}
+
+/**
  * Check if .env file exists and what keys are configured
+ * Checks both ~/.gordon/.env and cwd/.env
  */
 export async function checkEnvStatus(): Promise<EnvStatus> {
-  const fileExists = existsSync(ENV_FILE_PATH);
+  const envPath = findEnvFilePath();
+  const fileExists = envPath !== null;
 
   if (!fileExists) {
     // Check environment variables directly
@@ -81,7 +110,7 @@ export async function checkEnvStatus(): Promise<EnvStatus> {
   }
 
   // Read and parse .env file
-  const file = Bun.file(ENV_FILE_PATH);
+  const file = Bun.file(envPath);
   const content = await file.text();
   const parsed = parseEnvContent(content);
 
@@ -102,13 +131,15 @@ export async function checkEnvStatus(): Promise<EnvStatus> {
 
 /**
  * Load environment variables from .env file into process.env
+ * Checks ~/.gordon/.env first, then cwd/.env
  */
 export async function loadEnvFile(): Promise<void> {
-  if (!existsSync(ENV_FILE_PATH)) {
+  const envPath = findEnvFilePath();
+  if (!envPath) {
     return;
   }
 
-  const file = Bun.file(ENV_FILE_PATH);
+  const file = Bun.file(envPath);
   const content = await file.text();
   const parsed = parseEnvContent(content);
 
@@ -121,15 +152,26 @@ export async function loadEnvFile(): Promise<void> {
 }
 
 /**
+ * Ensure ~/.gordon directory exists
+ */
+async function ensureGordonDir(): Promise<void> {
+  await mkdir(GORDON_DIR, { recursive: true });
+}
+
+/**
  * Save or update keys in .env file
+ * Always writes to ~/.gordon/.env for distributed CLI usage
  */
 export async function saveEnvKeys(newKeys: Partial<EnvKeys>): Promise<void> {
+  await ensureGordonDir();
+
   let existingContent = "";
   const existingKeys: Record<string, string> = {};
 
-  // Read existing .env if it exists
-  if (existsSync(ENV_FILE_PATH)) {
-    const file = Bun.file(ENV_FILE_PATH);
+  // Read existing .env if it exists (from either location)
+  const envPath = findEnvFilePath();
+  if (envPath) {
+    const file = Bun.file(envPath);
     existingContent = await file.text();
 
     // Parse existing keys to preserve order and comments
@@ -189,16 +231,20 @@ export async function saveEnvKeys(newKeys: Partial<EnvKeys>): Promise<void> {
     }
   }
 
-  // Write updated content
-  await Bun.write(ENV_FILE_PATH, lines.join("\n") + "\n");
+  // Always write to ~/.gordon/.env
+  await Bun.write(GORDON_ENV_PATH, lines.join("\n") + "\n");
 }
 
 /**
  * Create a new .env file with the given keys
+ * Always creates in ~/.gordon/.env for distributed CLI usage
  */
 export async function createEnvFile(keys: Partial<EnvKeys>): Promise<void> {
+  await ensureGordonDir();
+
   const lines: string[] = [
     "# Gordon CLI Environment Variables",
+    "# Stored in ~/.gordon/.env",
     "",
     "# LLM Provider (pick one)",
   ];
@@ -230,7 +276,8 @@ export async function createEnvFile(keys: Partial<EnvKeys>): Promise<void> {
     lines.push("# BINANCE_API_SECRET=");
   }
 
-  await Bun.write(ENV_FILE_PATH, lines.join("\n") + "\n");
+  // Always write to ~/.gordon/.env
+  await Bun.write(GORDON_ENV_PATH, lines.join("\n") + "\n");
 
   // Also set in process.env for immediate use
   for (const [key, value] of Object.entries(keys)) {
@@ -240,4 +287,5 @@ export async function createEnvFile(keys: Partial<EnvKeys>): Promise<void> {
   }
 }
 
-export { ENV_FILE_PATH };
+// Export paths for external use
+export { GORDON_ENV_PATH as ENV_FILE_PATH, GORDON_DIR };

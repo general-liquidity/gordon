@@ -8,6 +8,9 @@
  * - Tools as objects: { tool_id: toolInstance }
  * - .network() method for multi-agent orchestration
  * - Memory integration with LibSQL for task tracking
+ *
+ * IMPORTANT: Agents are lazily initialized to ensure environment
+ * variables are loaded before the provider registry is accessed.
  */
 
 import { Agent } from "@mastra/core/agent";
@@ -154,163 +157,231 @@ The network will automatically route to the appropriate agent based on the user'
 4. Remind users about risk appropriately`;
 
 // ============================================================================
-// Sub-Agents (Specialists)
+// Lazy Agent Initialization
 // ============================================================================
 
 /**
- * Scanner Agent - Finds trading opportunities
+ * Cache for lazily initialized agents
+ * Agents are created on first access to ensure environment is loaded
  */
-export const scannerAgent = new Agent({
-  id: "scanner",
-  name: "Scanner",
-  description:
-    "Specialist in scanning the market and finding trading opportunities. " +
-    "Use when the user wants to find coins to trade, asks 'what should I buy?', " +
-    "or needs market overview.",
-  instructions: SCANNER_INSTRUCTIONS,
-  model: getModel(process.env.GORDON_PROVIDER, process.env.GORDON_MODEL),
-  tools: {
-    // TODO: Add scan_market, analyze_coin after migration
-    get_technical_signals: indicatorTools.get_technical_signals,
-    get_rsi: indicatorTools.get_rsi,
-    get_vwap: indicatorTools.get_vwap,
-    get_stochastic_rsi: indicatorTools.get_stochastic_rsi,
-  },
-});
+let _agents: {
+  scanner?: Agent;
+  analyst?: Agent;
+  planner?: Agent;
+  executor?: Agent;
+  monitor?: Agent;
+  teacher?: Agent;
+  gordon?: Agent;
+} = {};
 
 /**
- * Analyst Agent - Deep technical analysis
+ * Get or create the Scanner Agent
  */
-export const analystAgent = new Agent({
-  id: "analyst",
-  name: "Analyst",
-  description:
-    "Specialist in deep coin analysis and technical indicators. " +
-    "Use when user asks about a specific coin, wants detailed analysis, " +
-    "or needs to understand support/resistance levels.",
-  instructions: ANALYST_INSTRUCTIONS,
-  model: getModel(process.env.GORDON_PROVIDER, process.env.GORDON_MODEL),
-  tools: {
-    // TODO: Add analyze_coin, explain after migration
-    get_technical_analysis: indicatorTools.get_technical_analysis,
-    get_rsi: indicatorTools.get_rsi,
-    get_vwap: indicatorTools.get_vwap,
-    get_stochastic_rsi: indicatorTools.get_stochastic_rsi,
-  },
-});
+function getScannerAgent(): Agent {
+  if (!_agents.scanner) {
+    _agents.scanner = new Agent({
+      id: "scanner",
+      name: "Scanner",
+      description:
+        "Specialist in scanning the market and finding trading opportunities. " +
+        "Use when the user wants to find coins to trade, asks 'what should I buy?', " +
+        "or needs market overview.",
+      instructions: SCANNER_INSTRUCTIONS,
+      model: getModel(process.env.GORDON_PROVIDER, process.env.GORDON_MODEL),
+      tools: {
+        get_technical_signals: indicatorTools.get_technical_signals,
+        get_rsi: indicatorTools.get_rsi,
+        get_vwap: indicatorTools.get_vwap,
+        get_stochastic_rsi: indicatorTools.get_stochastic_rsi,
+      },
+    });
+  }
+  return _agents.scanner;
+}
 
 /**
- * Planner Agent - Creates trading plans
+ * Get or create the Analyst Agent
  */
-export const plannerAgent = new Agent({
-  id: "planner",
-  name: "Planner",
-  description:
-    "Specialist in creating trading plans with entry, stop-loss, and take-profit levels. " +
-    "Use when user wants to create a trade plan, buy a coin, or needs help with position sizing.",
-  instructions: PLANNER_INSTRUCTIONS,
-  model: getModel(process.env.GORDON_PROVIDER, process.env.GORDON_MODEL),
-  tools: {
-    // TODO: Add create_plan, list_plans, approve_plan after migration
-    get_stop_loss_levels: indicatorTools.get_stop_loss_levels,
-    get_position_size: indicatorTools.get_position_size,
-  },
-});
+function getAnalystAgent(): Agent {
+  if (!_agents.analyst) {
+    _agents.analyst = new Agent({
+      id: "analyst",
+      name: "Analyst",
+      description:
+        "Specialist in deep coin analysis and technical indicators. " +
+        "Use when user asks about a specific coin, wants detailed analysis, " +
+        "or needs to understand support/resistance levels.",
+      instructions: ANALYST_INSTRUCTIONS,
+      model: getModel(process.env.GORDON_PROVIDER, process.env.GORDON_MODEL),
+      tools: {
+        get_technical_analysis: indicatorTools.get_technical_analysis,
+        get_rsi: indicatorTools.get_rsi,
+        get_vwap: indicatorTools.get_vwap,
+        get_stochastic_rsi: indicatorTools.get_stochastic_rsi,
+      },
+    });
+  }
+  return _agents.analyst;
+}
 
 /**
- * Executor Agent - Executes trades (requires ARMED mode)
+ * Get or create the Planner Agent
  */
-export const executorAgent = new Agent({
-  id: "executor",
-  name: "Executor",
-  description:
-    "Specialist in executing trading plans and managing orders. " +
-    "Use when user wants to execute an approved plan or needs to arm the system.",
-  instructions: EXECUTOR_INSTRUCTIONS,
-  model: getModel(process.env.GORDON_PROVIDER, process.env.GORDON_MODEL),
-  tools: {
-    // TODO: Add execute_plan, arm_system, list_plans after migration
-  },
-});
+function getPlannerAgent(): Agent {
+  if (!_agents.planner) {
+    _agents.planner = new Agent({
+      id: "planner",
+      name: "Planner",
+      description:
+        "Specialist in creating trading plans with entry, stop-loss, and take-profit levels. " +
+        "Use when user wants to create a trade plan, buy a coin, or needs help with position sizing.",
+      instructions: PLANNER_INSTRUCTIONS,
+      model: getModel(process.env.GORDON_PROVIDER, process.env.GORDON_MODEL),
+      tools: {
+        get_stop_loss_levels: indicatorTools.get_stop_loss_levels,
+        get_position_size: indicatorTools.get_position_size,
+      },
+    });
+  }
+  return _agents.planner;
+}
 
 /**
- * Monitor Agent - Watches positions
+ * Get or create the Executor Agent
  */
-export const monitorAgent = new Agent({
-  id: "monitor",
-  name: "Monitor",
-  description:
-    "Specialist in monitoring open positions and detecting issues. " +
-    "Use when user asks about their trades, positions, or portfolio status.",
-  instructions: MONITOR_INSTRUCTIONS,
-  model: getModel(process.env.GORDON_PROVIDER, process.env.GORDON_MODEL),
-  tools: {
-    // TODO: Add check_positions, close_trade, get_portfolio after migration
-  },
-});
+function getExecutorAgent(): Agent {
+  if (!_agents.executor) {
+    _agents.executor = new Agent({
+      id: "executor",
+      name: "Executor",
+      description:
+        "Specialist in executing trading plans and managing orders. " +
+        "Use when user wants to execute an approved plan or needs to arm the system.",
+      instructions: EXECUTOR_INSTRUCTIONS,
+      model: getModel(process.env.GORDON_PROVIDER, process.env.GORDON_MODEL),
+      tools: {
+        // TODO: Add execute_plan, arm_system, list_plans after migration
+      },
+    });
+  }
+  return _agents.executor;
+}
 
 /**
- * Teacher Agent - Explains concepts
+ * Get or create the Monitor Agent
  */
-export const teacherAgent = new Agent({
-  id: "teacher",
-  name: "Teacher",
-  description:
-    "Specialist in explaining trading concepts in simple terms. " +
-    "Use when user asks 'what is X?', needs help understanding something, " +
-    "or is confused about trading terms.",
-  instructions: TEACHER_INSTRUCTIONS,
-  model: getModel(process.env.GORDON_PROVIDER, process.env.GORDON_MODEL),
-  tools: {
-    // TODO: Add explain after migration
-  },
-});
+function getMonitorAgent(): Agent {
+  if (!_agents.monitor) {
+    _agents.monitor = new Agent({
+      id: "monitor",
+      name: "Monitor",
+      description:
+        "Specialist in monitoring open positions and detecting issues. " +
+        "Use when user asks about their trades, positions, or portfolio status.",
+      instructions: MONITOR_INSTRUCTIONS,
+      model: getModel(process.env.GORDON_PROVIDER, process.env.GORDON_MODEL),
+      tools: {
+        // TODO: Add check_positions, close_trade, get_portfolio after migration
+      },
+    });
+  }
+  return _agents.monitor;
+}
+
+/**
+ * Get or create the Teacher Agent
+ */
+function getTeacherAgent(): Agent {
+  if (!_agents.teacher) {
+    _agents.teacher = new Agent({
+      id: "teacher",
+      name: "Teacher",
+      description:
+        "Specialist in explaining trading concepts in simple terms. " +
+        "Use when user asks 'what is X?', needs help understanding something, " +
+        "or is confused about trading terms.",
+      instructions: TEACHER_INSTRUCTIONS,
+      model: getModel(process.env.GORDON_PROVIDER, process.env.GORDON_MODEL),
+      tools: {
+        // TODO: Add explain after migration
+      },
+    });
+  }
+  return _agents.teacher;
+}
+
+/**
+ * Get or create the main Gordon Agent
+ */
+function getGordonAgent(): Agent {
+  if (!_agents.gordon) {
+    _agents.gordon = new Agent({
+      id: "gordon",
+      name: "Gordon",
+      description: "Main AI trading assistant for cryptocurrency. Coordinates specialized agents.",
+      instructions: GORDON_INSTRUCTIONS,
+      model: getModel(process.env.GORDON_PROVIDER, process.env.GORDON_MODEL),
+
+      // Sub-agents for network routing (replaces handoffs)
+      agents: {
+        scanner: getScannerAgent(),
+        analyst: getAnalystAgent(),
+        planner: getPlannerAgent(),
+        executor: getExecutorAgent(),
+        monitor: getMonitorAgent(),
+        teacher: getTeacherAgent(),
+      },
+
+      // Direct tools for simple operations
+      tools: {
+        ...indicatorTools,
+        // TODO: Add other tool categories after migration
+      },
+
+      // Memory for network orchestration
+      memory: createMemory(),
+    });
+  }
+  return _agents.gordon;
+}
 
 // ============================================================================
-// Gordon - Main Orchestrator Agent with Network
+// Exported Agent Accessors
 // ============================================================================
 
 /**
- * Gordon - The main orchestrator agent
- * Uses Agent Network for multi-agent coordination
+ * Lazy-loaded agents - accessed via getters to ensure env is loaded first
  */
-export const gordonAgent = new Agent({
-  id: "gordon",
-  name: "Gordon",
-  description: "Main AI trading assistant for cryptocurrency. Coordinates specialized agents.",
-  instructions: GORDON_INSTRUCTIONS,
-  model: getModel(process.env.GORDON_PROVIDER, process.env.GORDON_MODEL),
+export const scannerAgent = { get agent() { return getScannerAgent(); } };
+export const analystAgent = { get agent() { return getAnalystAgent(); } };
+export const plannerAgent = { get agent() { return getPlannerAgent(); } };
+export const executorAgent = { get agent() { return getExecutorAgent(); } };
+export const monitorAgent = { get agent() { return getMonitorAgent(); } };
+export const teacherAgent = { get agent() { return getTeacherAgent(); } };
 
-  // Sub-agents for network routing (replaces handoffs)
-  agents: {
-    scanner: scannerAgent,
-    analyst: analystAgent,
-    planner: plannerAgent,
-    executor: executorAgent,
-    monitor: monitorAgent,
-    teacher: teacherAgent,
-  },
+/**
+ * Main Gordon agent - use this for all interactions
+ */
+export const gordonAgent = getGordonAgent;
 
-  // Direct tools for simple operations
-  tools: {
-    ...indicatorTools,
-    // TODO: Add other tool categories after migration
-  },
+/**
+ * Get all agents (lazily initialized)
+ */
+export function getAllAgents() {
+  return {
+    gordon: getGordonAgent(),
+    scanner: getScannerAgent(),
+    analyst: getAnalystAgent(),
+    planner: getPlannerAgent(),
+    executor: getExecutorAgent(),
+    monitor: getMonitorAgent(),
+    teacher: getTeacherAgent(),
+  };
+}
 
-  // Memory for network orchestration
-  memory: createMemory(),
-});
-
-// ============================================================================
-// Export all agents
-// ============================================================================
-
-export const allAgents = {
-  gordon: gordonAgent,
-  scanner: scannerAgent,
-  analyst: analystAgent,
-  planner: plannerAgent,
-  executor: executorAgent,
-  monitor: monitorAgent,
-  teacher: teacherAgent,
-};
+/**
+ * Reset agent cache (useful for testing or reinitializing)
+ */
+export function resetAgents(): void {
+  _agents = {};
+}

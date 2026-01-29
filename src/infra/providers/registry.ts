@@ -3,7 +3,9 @@
  * Multi-provider support for Gordon - supports direct providers and Dedalus gateway
  */
 
-import { createOpenAI } from "@ai-sdk/openai";
+import { createOpenAI, openai } from "@ai-sdk/openai";
+import { anthropic } from "@ai-sdk/anthropic";
+import { google } from "@ai-sdk/google";
 import type { LanguageModelV1 } from "ai";
 
 // ============================================================================
@@ -88,45 +90,27 @@ export class ProviderRegistry {
   private initializeFromEnv(): void {
     if (this.initialized) return;
 
-    // Anthropic - direct provider
+    // Anthropic - direct provider (statically imported)
     if (process.env.ANTHROPIC_API_KEY) {
-      // Dynamic import to avoid bundling if not used
-      try {
-        const { anthropic } = require("@ai-sdk/anthropic");
-        this.providers.set("anthropic", anthropic as ProviderFactory);
-      } catch {
-        // @ai-sdk/anthropic not installed
-      }
+      this.providers.set("anthropic", anthropic as ProviderFactory);
     }
 
-    // OpenAI - direct provider
+    // OpenAI - direct provider (statically imported)
     if (process.env.OPENAI_API_KEY) {
-      try {
-        const { openai } = require("@ai-sdk/openai");
-        this.providers.set("openai", openai as ProviderFactory);
-      } catch {
-        // @ai-sdk/openai not installed
-      }
+      this.providers.set("openai", openai as ProviderFactory);
     }
 
-    // Google - direct provider
+    // Google - direct provider (statically imported)
     if (process.env.GOOGLE_GENERATIVE_AI_API_KEY) {
-      try {
-        const { google } = require("@ai-sdk/google");
-        this.providers.set("google", google as ProviderFactory);
-      } catch {
-        // @ai-sdk/google not installed
-      }
+      this.providers.set("google", google as ProviderFactory);
     }
 
-    // Mistral - direct provider
+    // Mistral - uses OpenAI-compatible endpoint
     if (process.env.MISTRAL_API_KEY) {
-      try {
-        const { mistral } = require("@ai-sdk/mistral");
-        this.providers.set("mistral", mistral as ProviderFactory);
-      } catch {
-        // @ai-sdk/mistral not installed
-      }
+      this.providers.set("mistral", createOpenAI({
+        apiKey: process.env.MISTRAL_API_KEY,
+        baseURL: "https://api.mistral.ai/v1",
+      }));
     }
 
     // Groq - fast inference
@@ -166,9 +150,28 @@ export class ProviderRegistry {
 
   /**
    * Get the default model based on environment config
+   * Falls back to first available provider if GORDON_PROVIDER not set
    */
   getDefaultModel(): LanguageModelV1 {
-    const provider = (process.env.GORDON_PROVIDER || "anthropic") as ProviderName;
+    let provider = process.env.GORDON_PROVIDER as ProviderName | undefined;
+
+    if (!provider) {
+      // Auto-detect first available provider (preference order)
+      const preferredOrder: ProviderName[] = ["openai", "anthropic", "dedalus", "google", "groq", "mistral", "ollama"];
+      const available = this.getAvailableProviders();
+      provider = preferredOrder.find(p => available.includes(p)) || available[0];
+
+      if (!provider) {
+        throw new Error(
+          "No LLM provider configured. Set one of these API keys in your .env file:\n" +
+          "  OPENAI_API_KEY    - OpenAI (recommended)\n" +
+          "  DEDALUS_API_KEY   - Dedalus Labs (multi-model gateway)\n" +
+          "  ANTHROPIC_API_KEY - Anthropic Claude\n" +
+          "  GOOGLE_GENERATIVE_AI_API_KEY - Google Gemini"
+        );
+      }
+    }
+
     const model = process.env.GORDON_MODEL || this.getDefaultModelId(provider);
     return this.getModel(provider, model);
   }
@@ -177,9 +180,20 @@ export class ProviderRegistry {
    * Get a fast/cheap model for simple tasks
    */
   getFastModel(): LanguageModelV1 {
-    const provider = (process.env.GORDON_FAST_PROVIDER ||
-      process.env.GORDON_PROVIDER ||
-      "anthropic") as ProviderName;
+    let provider = (process.env.GORDON_FAST_PROVIDER || process.env.GORDON_PROVIDER) as ProviderName | undefined;
+
+    if (!provider) {
+      // Auto-detect first available provider (preference order for fast models)
+      const preferredOrder: ProviderName[] = ["groq", "openai", "dedalus", "anthropic", "google", "mistral", "ollama"];
+      const available = this.getAvailableProviders();
+      provider = preferredOrder.find(p => available.includes(p)) || available[0];
+
+      if (!provider) {
+        // Fall back to default model if no fast provider available
+        return this.getDefaultModel();
+      }
+    }
+
     const model = process.env.GORDON_FAST_MODEL || this.getFastModelId(provider);
     return this.getModel(provider, model);
   }
