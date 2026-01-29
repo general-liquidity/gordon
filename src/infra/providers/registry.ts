@@ -2,10 +2,10 @@
  * Provider Registry
  * Multi-provider support for Gordon via Mastra
  *
- * Supported providers (January 2026):
- * - Anthropic: Claude Opus 4.5, Sonnet 4.5, Haiku 4.5
- * - OpenAI: GPT-5.2 Pro, Thinking, Instant
- * - Google: Gemini 3 Pro, Flash
+ * Supported providers:
+ * - OpenAI: GPT-4o, GPT-4o-mini
+ * - Anthropic: Claude 3.5 Sonnet, Claude 3 Haiku
+ * - Google: Gemini 1.5 Pro, Gemini 1.5 Flash
  *
  * Returns model strings in "provider/model" format for Mastra compatibility.
  */
@@ -29,27 +29,28 @@ export interface ProviderConfig {
 export type ModelString = `${string}/${string}`;
 
 // ============================================================================
-// Model Definitions (January 2026)
+// Model Definitions (Mastra-compatible IDs)
 // ============================================================================
 
 /**
- * Latest models per provider
+ * Latest models per provider - using exact Mastra model IDs
+ * See: https://mastra.ai/models/providers/
  */
 const MODELS = {
   anthropic: {
-    flagship: "claude-opus-4-5-20250514",      // Most capable
-    balanced: "claude-sonnet-4-5-20250514",    // Good balance
-    fast: "claude-haiku-4-5-20250514",         // Fast & cheap
+    flagship: "claude-opus-4-5",               // Most capable
+    balanced: "claude-sonnet-4-5",             // Good balance
+    fast: "claude-haiku-4-5",                  // Fast & cheap
   },
   openai: {
     flagship: "gpt-5.2-pro",                   // Most capable
-    balanced: "gpt-5.2",                       // Thinking model
-    fast: "gpt-5.2-instant",                   // Fast & cheap
+    balanced: "gpt-5.2",                       // Standard model
+    fast: "gpt-5-mini",                        // Fast & cheap
   },
   google: {
-    flagship: "gemini-3-pro",                  // Most capable
-    balanced: "gemini-3-pro",                  // Same as flagship
-    fast: "gemini-3-flash",                    // Fast & cheap
+    flagship: "gemini-3-pro-preview",          // Most capable
+    balanced: "gemini-3-pro-preview",          // Same as flagship
+    fast: "gemini-3-flash-preview",            // Fast & cheap
   },
 } as const;
 

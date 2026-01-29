@@ -20,6 +20,13 @@ export const PreferencesSchema = z.object({
   topNCoins: z.number().min(1).max(500).default(50),
 });
 
+export const ProviderSchema = z.enum(["openai", "anthropic", "google"]);
+
+export const ModelConfigSchema = z.object({
+  provider: ProviderSchema.default("openai"),
+  model: z.string().optional(), // If not set, uses provider's flagship model
+});
+
 export const GordonConfigSchema = z.object({
   version: z.string().default("1.0.0"),
   exchange: ExchangeConfigSchema.optional(),
@@ -29,6 +36,7 @@ export const GordonConfigSchema = z.object({
     defaultTimeframes: ["1h", "4h"],
     topNCoins: 50,
   }),
+  modelConfig: ModelConfigSchema.optional(),
   mode: z.enum(["SAFE", "ARMED"]).default("SAFE"),
   armedUntil: z.string().nullable().default(null),
   onboardingComplete: z.boolean().default(false),
@@ -37,5 +45,7 @@ export const GordonConfigSchema = z.object({
 export type ExchangePermissions = z.infer<typeof ExchangePermissionsSchema>;
 export type ExchangeConfig = z.infer<typeof ExchangeConfigSchema>;
 export type Preferences = z.infer<typeof PreferencesSchema>;
+export type ProviderName = z.infer<typeof ProviderSchema>;
+export type ModelConfig = z.infer<typeof ModelConfigSchema>;
 export type GordonConfig = z.infer<typeof GordonConfigSchema>;
 export type Mode = GordonConfig["mode"];

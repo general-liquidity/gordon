@@ -157,6 +157,15 @@ export const SLASH_COMMANDS: SlashCommand[] = [
     action: "menu",
     target: "setup",
   },
+  {
+    name: "model",
+    aliases: ["m", "provider"],
+    description: "Select AI model and provider",
+    usage: "/model",
+    category: "system",
+    action: "menu",
+    target: "model",
+  },
 ];
 
 /**
@@ -281,6 +290,8 @@ export function commandToPrompt(command: SlashCommand, args: string): string {
       return "Check system status and connection";
     case "setup":
       return "I want to configure my settings";
+    case "model":
+      return "Show me the current AI model and available providers";
     default:
       return args || command.description;
   }

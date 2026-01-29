@@ -7,7 +7,7 @@ import React, { useState, useCallback, useMemo } from "react";
 import { Box, Text, useInput } from "ink";
 import { TextInput } from "@inkjs/ui";
 import { COLORS } from "./theme.ts";
-import { getSlashCommandSuggestions, SLASH_COMMANDS } from "./slashCommands.ts";
+import { getSlashCommandSuggestions } from "./slashCommands.ts";
 import { CommandAutocomplete } from "./components/CommandAutocomplete.tsx";
 
 interface ChatInputProps {
@@ -31,23 +31,28 @@ export function ChatInput({ onSubmit, disabled = false, placeholder }: ChatInput
     return getSlashCommandSuggestions(value);
   }, [value]);
 
-  // Build autocomplete suggestions for ink-ui TextInput
-  const commandSuggestions = useMemo(() => {
-    if (!value.startsWith("/")) return [];
-    return SLASH_COMMANDS.map((cmd) => `/${cmd.name}`);
-  }, [value]);
-
   // Show autocomplete when typing a command
   const shouldShowAutocomplete = showAutocomplete && suggestions.length > 0 && value.startsWith("/");
 
   const handleSubmit = useCallback((submitValue: string) => {
     if (!submitValue.trim()) return;
-    onSubmit(submitValue.trim());
+
+    // If autocomplete is showing and user presses Enter, use the selected command
+    let finalValue = submitValue.trim();
+    if (showAutocomplete && suggestions.length > 0 && suggestions[autocompleteIndex]) {
+      const selectedCmd = suggestions[autocompleteIndex];
+      // Extract any args after the partial command (e.g., "/ana btc" -> "btc")
+      const parts = submitValue.trim().split(/\s+/);
+      const args = parts.slice(1).join(" ");
+      finalValue = args ? `/${selectedCmd.name} ${args}` : `/${selectedCmd.name}`;
+    }
+
+    onSubmit(finalValue);
     setValue(""); // Clear local state
     setShowAutocomplete(false);
     setAutocompleteIndex(0);
     setInputKey((k) => k + 1); // Force TextInput remount to clear its internal state
-  }, [onSubmit]);
+  }, [onSubmit, showAutocomplete, suggestions, autocompleteIndex]);
 
   const handleChange = useCallback((newValue: string) => {
     setValue(newValue);
@@ -118,7 +123,6 @@ export function ChatInput({ onSubmit, disabled = false, placeholder }: ChatInput
           key={inputKey}
           isDisabled={disabled}
           placeholder={placeholder || "Ask Gordon anything... (try /help)"}
-          suggestions={commandSuggestions}
           onChange={handleChange}
           onSubmit={handleSubmit}
         />

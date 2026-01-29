@@ -9,6 +9,7 @@ import { QuickStartMenu, type MenuOption } from "./QuickStartMenu.tsx";
 import { ChatView, type ChatMessage } from "./ChatView.tsx";
 import { Onboarding } from "./Onboarding.tsx";
 import { SetupWizard } from "./SetupWizard.tsx";
+import { ModelSelector } from "./ModelSelector.tsx";
 import { processMessage, initializeTracing } from "../infra/agents/orchestrator.ts";
 import { createLLMClientFromEnv, type LLMClient } from "../infra/llm/index.ts";
 import { BinanceClient } from "../infra/binance/index.ts";
@@ -23,7 +24,7 @@ import type { Mode, GordonConfig } from "../types/index.ts";
 import { COLORS } from "./theme.ts";
 import { parseSlashCommand, commandToPrompt, formatCommandHelp } from "./slashCommands.ts";
 
-type AppView = "loading" | "onboarding" | "setup" | "welcome" | "menu" | "chat";
+type AppView = "loading" | "onboarding" | "setup" | "model" | "welcome" | "menu" | "chat";
 
 interface ConversationMessage {
   role: "user" | "assistant";
@@ -249,6 +250,11 @@ export function App(): React.ReactElement {
       // Handle menu-type commands - just convert to prompts, let agent handle
       if (command.action === "menu" && command.target === "setup") {
         setState((prev) => ({ ...prev, view: "setup" }));
+        return;
+      }
+
+      if (command.action === "menu" && command.target === "model") {
+        setState((prev) => ({ ...prev, view: "model" }));
         return;
       }
 
@@ -752,10 +758,38 @@ Please check your API keys in the .env file and restart Gordon.`,
     }
   }, []);
 
+  // Handle model selector completion
+  const handleModelComplete = useCallback((changed: boolean): void => {
+    if (changed) {
+      // Reinitialize LLM client with new model
+      try {
+        llmClientRef.current = createLLMClientFromEnv();
+      } catch (error) {
+        console.error("Failed to reinitialize LLM client:", error);
+      }
+
+      setState((prev) => ({
+        ...prev,
+        view: "chat",
+        messages: [
+          ...prev.messages,
+          {
+            role: "gordon",
+            content: "Model updated! I'm now using the new AI model. How can I help you?",
+            timestamp: formatTimestamp(),
+          },
+        ],
+      }));
+    } else {
+      // User cancelled
+      setState((prev) => ({ ...prev, view: "menu" }));
+    }
+  }, []);
+
   // Handle global keyboard shortcuts
   useInput((input, key) => {
     // Don't process input during loading or onboarding (onboarding has its own handler)
-    if (state.view === "loading" || state.view === "onboarding") {
+    if (state.view === "loading" || state.view === "onboarding" || state.view === "model") {
       return;
     }
 
@@ -794,6 +828,10 @@ Please check your API keys in the .env file and restart Gordon.`,
 
         {state.view === "setup" && (
           <SetupWizard onComplete={handleSetupComplete} />
+        )}
+
+        {state.view === "model" && (
+          <ModelSelector onComplete={handleModelComplete} />
         )}
 
         {state.view === "welcome" && (

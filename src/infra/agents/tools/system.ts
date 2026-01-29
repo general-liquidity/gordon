@@ -14,6 +14,7 @@ import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
 import { getGordonContext, MastraExecutionContext } from "./types.ts";
+import { providerRegistry, type ProviderName } from "../../providers/registry.ts";
 
 // ============================================================================
 // Connection Test Tool
@@ -102,6 +103,70 @@ export const testConnectionTool = createTool({
 });
 
 // ============================================================================
+// Model Info Tool
+// ============================================================================
+
+const MODEL_TIERS: Record<ProviderName, { flagship: string; balanced: string; fast: string }> = {
+  anthropic: {
+    flagship: "claude-opus-4-5",
+    balanced: "claude-sonnet-4-5",
+    fast: "claude-haiku-4-5",
+  },
+  openai: {
+    flagship: "gpt-5.2-pro",
+    balanced: "gpt-5.2",
+    fast: "gpt-5-mini",
+  },
+  google: {
+    flagship: "gemini-3-pro-preview",
+    balanced: "gemini-3-pro-preview",
+    fast: "gemini-3-flash-preview",
+  },
+};
+
+export const getModelInfoTool = createTool({
+  id: "get_model_info",
+  description:
+    "Get information about the current AI model and available providers. " +
+    "Use when user asks 'what model am I using?', '/model', 'change model', 'show providers'",
+  inputSchema: z.object({}),
+  outputSchema: z.object({
+    currentProvider: z.string(),
+    currentModel: z.string(),
+    availableProviders: z.array(z.object({
+      name: z.string(),
+      configured: z.boolean(),
+      models: z.object({
+        flagship: z.string(),
+        balanced: z.string(),
+        fast: z.string(),
+      }),
+    })),
+    configuredVia: z.string(),
+    tip: z.string(),
+  }),
+  execute: async () => {
+    const currentProvider = (process.env.GORDON_PROVIDER || "auto-detected") as string;
+    const currentModel = process.env.GORDON_MODEL || "default (flagship)";
+    const availableProviders = providerRegistry.getAvailableProviders();
+
+    const providerInfo = (["openai", "anthropic", "google"] as ProviderName[]).map((name) => ({
+      name,
+      configured: availableProviders.includes(name),
+      models: MODEL_TIERS[name],
+    }));
+
+    return {
+      currentProvider,
+      currentModel,
+      availableProviders: providerInfo,
+      configuredVia: "Environment variables (GORDON_PROVIDER, GORDON_MODEL)",
+      tip: "To change models, update your .env file with GORDON_PROVIDER and GORDON_MODEL",
+    };
+  },
+});
+
+// ============================================================================
 // Export as Object (Mastra format)
 // ============================================================================
 
@@ -111,4 +176,5 @@ export const testConnectionTool = createTool({
  */
 export const systemTools = {
   test_connection: testConnectionTool,
+  get_model_info: getModelInfoTool,
 };
