@@ -21,6 +21,7 @@ export function ChatInput({ onSubmit, disabled = false, placeholder }: ChatInput
   const [value, setValue] = useState("");
   const [autocompleteIndex, setAutocompleteIndex] = useState(0);
   const [showAutocomplete, setShowAutocomplete] = useState(false);
+  const [inputKey, setInputKey] = useState(0); // Key to force TextInput remount
 
   // Get suggestions based on current input
   const suggestions = useMemo(() => {
@@ -42,9 +43,10 @@ export function ChatInput({ onSubmit, disabled = false, placeholder }: ChatInput
   const handleSubmit = useCallback((submitValue: string) => {
     if (!submitValue.trim()) return;
     onSubmit(submitValue.trim());
-    setValue(""); // Clear after submit
+    setValue(""); // Clear local state
     setShowAutocomplete(false);
     setAutocompleteIndex(0);
+    setInputKey((k) => k + 1); // Force TextInput remount to clear its internal state
   }, [onSubmit]);
 
   const handleChange = useCallback((newValue: string) => {
@@ -113,6 +115,7 @@ export function ChatInput({ onSubmit, disabled = false, placeholder }: ChatInput
           {">"}{" "}
         </Text>
         <TextInput
+          key={inputKey}
           isDisabled={disabled}
           placeholder={placeholder || "Ask Gordon anything... (try /help)"}
           suggestions={commandSuggestions}

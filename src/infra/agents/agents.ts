@@ -47,7 +47,10 @@ import {
 const createMemory = () => {
   const dbUrl = process.env.DATABASE_URL || "file:gordon.db";
   return new Memory({
-    storage: new LibSQLStore({ url: dbUrl }),
+    storage: new LibSQLStore({
+      id: "gordon-memory",
+      url: dbUrl,
+    }),
   });
 };
 
