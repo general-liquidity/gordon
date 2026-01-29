@@ -1,24 +1,39 @@
 /**
- * Market Discovery Tools
+ * Market Discovery Tools (Mastra Format)
  * Tools for finding trading opportunities, trending tokens, and market analysis
+ *
+ * Migrated from OpenAI Agents SDK format to Mastra format.
+ * Key differences:
+ * - tool() -> createTool()
+ * - name -> id
+ * - parameters -> inputSchema
+ * - Added outputSchema for better LLM routing
+ * - Context access via first parameter destructuring
  */
 
-import { tool } from "@openai/agents";
+import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
-import type { ToolRunContext } from "./types.ts";
-import { errors } from "./types.ts";
+import type { GordonContext } from "../types.ts";
+
+// ============================================================================
+// Error Messages
+// ============================================================================
+
+const errors = {
+  noBinance: { error: "Binance client not connected. Please run setup first." },
+};
 
 // ============================================================================
 // Trending Tokens Tool
 // ============================================================================
 
-export const getTrendingTokensTool = tool({
-  name: "get_trending_tokens",
+export const getTrendingTokensTool = createTool({
+  id: "get_trending_tokens",
   description:
     "Find tokens with the highest price changes in the last 24 hours. " +
     "Use when user asks 'what's trending', 'biggest movers', 'what's pumping', 'hot coins'.",
-  parameters: z.object({
+  inputSchema: z.object({
     minVolume: z
       .number()
       .min(0)
@@ -40,8 +55,27 @@ export const getTrendingTokensTool = tool({
       .default("gainers")
       .describe("Filter by price direction"),
   }),
-  async execute({ minVolume, minPriceChange, limit, direction }, runContext: ToolRunContext) {
-    const ctx = runContext?.context;
+  outputSchema: z.object({
+    direction: z.string().optional(),
+    filters: z.object({
+      minVolume: z.number(),
+      minPriceChange: z.number(),
+    }).optional(),
+    count: z.number().optional(),
+    tokens: z.array(z.object({
+      rank: z.number(),
+      symbol: z.string(),
+      price: z.string(),
+      change24h: z.string(),
+      volume24h: z.string(),
+      high24h: z.number(),
+      low24h: z.number(),
+    })).optional(),
+    message: z.string().optional(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ context, minVolume, minPriceChange, limit, direction }) => {
+    const ctx = context as GordonContext;
     if (!ctx?.binance) {
       return errors.noBinance;
     }
@@ -123,12 +157,12 @@ export const getTrendingTokensTool = tool({
 // High Volume Tokens Tool
 // ============================================================================
 
-export const getHighVolumeTokensTool = tool({
-  name: "get_high_volume_tokens",
+export const getHighVolumeTokensTool = createTool({
+  id: "get_high_volume_tokens",
   description:
     "Find the most liquid tokens by 24h trading volume. " +
     "Use when user asks 'most traded', 'highest volume', 'liquid markets', 'active pairs'.",
-  parameters: z.object({
+  inputSchema: z.object({
     minVolume: z
       .number()
       .min(0)
@@ -141,8 +175,22 @@ export const getHighVolumeTokensTool = tool({
       .default(20)
       .describe("Max results to return"),
   }),
-  async execute({ minVolume, limit }, runContext: ToolRunContext) {
-    const ctx = runContext?.context;
+  outputSchema: z.object({
+    minVolume: z.string().optional(),
+    count: z.number().optional(),
+    tokens: z.array(z.object({
+      rank: z.number(),
+      symbol: z.string(),
+      price: z.string(),
+      volume24h: z.string(),
+      change24h: z.string(),
+      trades24h: z.string(),
+    })).optional(),
+    message: z.string().optional(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ context, minVolume, limit }) => {
+    const ctx = context as GordonContext;
     if (!ctx?.binance) {
       return errors.noBinance;
     }
@@ -203,12 +251,12 @@ export const getHighVolumeTokensTool = tool({
 // Available Markets Tool
 // ============================================================================
 
-export const getAvailableMarketsTool = tool({
-  name: "get_available_markets",
+export const getAvailableMarketsTool = createTool({
+  id: "get_available_markets",
   description:
     "List available trading pairs on Binance with optional filters. " +
     "Use when user asks 'what pairs are available', 'can I trade X', 'list markets for ETH'.",
-  parameters: z.object({
+  inputSchema: z.object({
     baseAsset: z
       .string()
       .default("")
@@ -224,8 +272,27 @@ export const getAvailableMarketsTool = tool({
       .default(50)
       .describe("Max results to return"),
   }),
-  async execute({ baseAsset, quoteAsset, limit }, runContext: ToolRunContext) {
-    const ctx = runContext?.context;
+  outputSchema: z.object({
+    filters: z.object({
+      baseAsset: z.string(),
+      quoteAsset: z.string(),
+    }).optional(),
+    totalAvailable: z.number().optional(),
+    showing: z.number().optional(),
+    markets: z.array(z.object({
+      symbol: z.string(),
+      baseAsset: z.string(),
+      quoteAsset: z.string(),
+      tickSize: z.string(),
+      minQty: z.string(),
+      stepSize: z.string(),
+      minNotional: z.string(),
+    })).optional(),
+    message: z.string().optional(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ context, baseAsset, quoteAsset, limit }) => {
+    const ctx = context as GordonContext;
     if (!ctx?.binance) {
       return errors.noBinance;
     }
@@ -286,21 +353,47 @@ export const getAvailableMarketsTool = tool({
 // Bracket Order Tool
 // ============================================================================
 
-export const placeBracketOrderTool = tool({
-  name: "place_bracket_order",
+export const placeBracketOrderTool = createTool({
+  id: "place_bracket_order",
   description:
     "Place a bracket order: market entry with automatic stop-loss and take-profit. " +
     "Use when user says 'buy BTC with stop loss and take profit', 'bracket order', 'entry with SL and TP'. " +
     "Requires ARMED mode. Places market order then OCO for exits.",
-  parameters: z.object({
+  inputSchema: z.object({
     symbol: z.string().describe("Trading pair (e.g., 'BTCUSDT')"),
     side: z.enum(["BUY", "SELL"]).describe("Entry side"),
     quantity: z.number().positive().describe("Quantity to trade"),
     stopLossPrice: z.number().positive().describe("Stop loss price"),
     takeProfitPrice: z.number().positive().describe("Take profit price"),
   }),
-  async execute({ symbol, side, quantity, stopLossPrice, takeProfitPrice }, runContext: ToolRunContext) {
-    const ctx = runContext?.context;
+  outputSchema: z.object({
+    success: z.boolean().optional(),
+    message: z.string().optional(),
+    entry: z.object({
+      orderId: z.number(),
+      status: z.string(),
+      filledQty: z.number(),
+      avgPrice: z.number(),
+    }).optional(),
+    exits: z.object({
+      ocoOrderListId: z.number(),
+      status: z.string(),
+      takeProfit: z.number(),
+      stopLoss: z.number(),
+      orders: z.array(z.object({
+        orderId: z.number(),
+      })),
+    }).optional(),
+    symbol: z.string().optional(),
+    side: z.string().optional(),
+    quantity: z.number().optional(),
+    stopLossPrice: z.number().optional(),
+    takeProfitPrice: z.number().optional(),
+    error: z.string().optional(),
+    entryOrder: z.any().optional(),
+  }),
+  execute: async ({ context, symbol, side, quantity, stopLossPrice, takeProfitPrice }) => {
+    const ctx = context as GordonContext;
     if (!ctx?.binance) {
       return errors.noBinance;
     }
@@ -395,9 +488,17 @@ export const placeBracketOrderTool = tool({
   },
 });
 
-export const discoveryTools = [
-  getTrendingTokensTool,
-  getHighVolumeTokensTool,
-  getAvailableMarketsTool,
-  placeBracketOrderTool,
-];
+// ============================================================================
+// Export as Object (Mastra format)
+// ============================================================================
+
+/**
+ * Discovery tools exported as an object for Mastra Agent
+ * This is the format expected by Mastra's Agent class
+ */
+export const discoveryTools = {
+  get_trending_tokens: getTrendingTokensTool,
+  get_high_volume_tokens: getHighVolumeTokensTool,
+  get_available_markets: getAvailableMarketsTool,
+  place_bracket_order: placeBracketOrderTool,
+};

@@ -1,83 +1,96 @@
 /**
- * Agent Tools Index
- * Exports all tools organized by domain
+ * Gordon Tools Index
+ * All tools for Mastra agents (object-based format)
+ *
+ * Tools are organized by category:
+ * - indicators: Technical analysis (RSI, MACD, Bollinger Bands, etc.)
+ * - explain: Educational explanations
+ * - market: Market scanning and analysis
+ * - positions: Position monitoring
+ * - scheduler: Task scheduling
+ * - system: System control (arm/disarm)
+ * - earn: Staking and savings
+ * - charts: Price visualization
+ * - orderbook: Order book and liquidity
+ * - wallet: Wallet management
+ * - discovery: Coin discovery
+ * - history: Trade/transfer history
+ * - account: Account information
+ * - trading: Plan creation and execution
  */
 
-// Domain-specific tool exports
-export { marketTools, scanMarketTool, analyzeCoinTool, getHistoricalOpportunitiesTool } from "./market.ts";
-export { tradingTools, createPlanTool, executePlanTool, closeTradeTool, listPlansTool, approvePlanTool, armSystemTool } from "./trading.ts";
-export { accountTools, getPortfolioTool, getAccountDetailsTool, getEarnPositionsTool } from "./account.ts";
-export { historyTools, getTradeHistoryTool, getTransferHistoryTool } from "./history.ts";
-export { positionTools, checkPositionsTool } from "./positions.ts";
-export { explainTools, explainTool } from "./explain.ts";
-export { systemTools, testConnectionTool } from "./system.ts";
-export { schedulerTools, startSchedulerTool, stopSchedulerTool, getSchedulerStatusTool } from "./scheduler.ts";
+// Migrated tools
+export { indicatorTools } from "./indicators.ts";
+export { explainTools } from "./explain.ts";
+export { marketTools } from "./market.ts";
+export { positionTools } from "./positions.ts";
+export { schedulerTools } from "./scheduler.ts";
+export { systemTools } from "./system.ts";
+export { earnTools } from "./earn.ts";
+export { chartTools } from "./charts.ts";
+export { orderbookTools } from "./orderbook.ts";
+export { walletTools } from "./wallet.ts";
+export { discoveryTools } from "./discovery.ts";
+export { historyTools } from "./history.ts";
+export { accountTools } from "./account.ts";
+export { tradingTools } from "./trading.ts";
 
-// New tool exports
-export { walletTools, getDustableAssetsTool, convertDustTool, transferFundsTool, getCoinInfoTool, getTradeFeesTool, getAssetDividendsTool, getDepositAddressTool } from "./wallet.ts";
-export { earnTools, getFlexibleProductsTool, getLockedProductsTool, getAllEarnPositionsTool, subscribeFlexibleTool, redeemFlexibleTool, subscribeLockedTool } from "./earn.ts";
-export { orderbookTools, getOrderBookTool, getSpreadTool, getRecentTradesTool, placeOCOOrderTool, cancelAllOrdersTool, getOrderStatusTool, testOrderTool } from "./orderbook.ts";
-export { discoveryTools, getTrendingTokensTool, getHighVolumeTokensTool, getAvailableMarketsTool, placeBracketOrderTool } from "./discovery.ts";
-export { chartTools, displayPriceChartTool, displayCandlestickChartTool, displayComparisonChartTool, displayVolumeChartTool } from "./charts.ts";
-export { indicatorTools, getTechnicalAnalysisTool, getTechnicalSignalsTool, getStopLossLevelsTool, getPositionSizeTool, getRSITool, getVWAPTool, getStochasticRSITool } from "./indicators.ts";
+// ============================================================================
+// Combined Tools Object
+// ============================================================================
 
-// Type exports
-export type { ToolRunContext } from "./types.ts";
-export { errors } from "./types.ts";
-
-// Import all tool arrays
-import { marketTools } from "./market.ts";
-import { tradingTools } from "./trading.ts";
-import { accountTools } from "./account.ts";
-import { historyTools } from "./history.ts";
-import { positionTools } from "./positions.ts";
-import { explainTools } from "./explain.ts";
-import { systemTools } from "./system.ts";
-import { schedulerTools } from "./scheduler.ts";
-import { walletTools } from "./wallet.ts";
-import { earnTools } from "./earn.ts";
-import { orderbookTools } from "./orderbook.ts";
-import { discoveryTools } from "./discovery.ts";
-import { chartTools } from "./charts.ts";
 import { indicatorTools } from "./indicators.ts";
+import { explainTools } from "./explain.ts";
+import { marketTools } from "./market.ts";
+import { positionTools } from "./positions.ts";
+import { schedulerTools } from "./scheduler.ts";
+import { systemTools } from "./system.ts";
+import { earnTools } from "./earn.ts";
+import { chartTools } from "./charts.ts";
+import { orderbookTools } from "./orderbook.ts";
+import { walletTools } from "./wallet.ts";
+import { discoveryTools } from "./discovery.ts";
+import { historyTools } from "./history.ts";
+import { accountTools } from "./account.ts";
+import { tradingTools } from "./trading.ts";
 
 /**
- * All tools combined - use this for the agent
+ * All tools combined as a single object for Mastra Agent
  */
-export const allTools = [
-  ...marketTools,
-  ...tradingTools,
-  ...accountTools,
-  ...historyTools,
-  ...positionTools,
-  ...explainTools,
-  ...systemTools,
-  ...schedulerTools,
-  ...walletTools,
-  ...earnTools,
-  ...orderbookTools,
-  ...discoveryTools,
-  ...chartTools,
+export const allTools = {
   ...indicatorTools,
-];
+  ...explainTools,
+  ...marketTools,
+  ...positionTools,
+  ...schedulerTools,
+  ...systemTools,
+  ...earnTools,
+  ...chartTools,
+  ...orderbookTools,
+  ...walletTools,
+  ...discoveryTools,
+  ...historyTools,
+  ...accountTools,
+  ...tradingTools,
+};
 
 /**
  * Tool counts by category (useful for debugging)
  */
 export const toolCounts = {
-  market: marketTools.length,
-  trading: tradingTools.length,
-  account: accountTools.length,
-  history: historyTools.length,
-  positions: positionTools.length,
-  explain: explainTools.length,
-  system: systemTools.length,
-  scheduler: schedulerTools.length,
-  wallet: walletTools.length,
-  earn: earnTools.length,
-  orderbook: orderbookTools.length,
-  discovery: discoveryTools.length,
-  charts: chartTools.length,
-  indicators: indicatorTools.length,
-  total: allTools.length,
+  indicators: Object.keys(indicatorTools).length,
+  explain: Object.keys(explainTools).length,
+  market: Object.keys(marketTools).length,
+  positions: Object.keys(positionTools).length,
+  scheduler: Object.keys(schedulerTools).length,
+  system: Object.keys(systemTools).length,
+  earn: Object.keys(earnTools).length,
+  charts: Object.keys(chartTools).length,
+  orderbook: Object.keys(orderbookTools).length,
+  wallet: Object.keys(walletTools).length,
+  discovery: Object.keys(discoveryTools).length,
+  history: Object.keys(historyTools).length,
+  account: Object.keys(accountTools).length,
+  trading: Object.keys(tradingTools).length,
+  total: Object.keys(allTools).length,
 };

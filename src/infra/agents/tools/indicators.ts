@@ -1,35 +1,48 @@
 /**
- * Technical Indicator Tools
+ * Technical Indicator Tools (Mastra Format)
  * Agent-facing tools for technical analysis
+ *
+ * This file demonstrates the Mastra tool format for migration from OpenAI Agents SDK.
+ * Key differences:
+ * - tool() → createTool()
+ * - name → id
+ * - parameters → inputSchema
+ * - Added outputSchema for better LLM routing
+ * - Context access via first parameter destructuring
  */
 
-import { tool } from "@openai/agents";
+import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
-import type { ToolRunContext } from "./types.ts";
-import { errors } from "./types.ts";
+import type { GordonContext } from "../types.ts";
 import {
   calculateTechnicalAnalysis,
   calculateTechnicalSignals,
   calculateRSI,
   calculateATR,
-  calculateMultiEMA,
-  calculateMACD,
-  calculateBollingerBands,
   calculatePositionSize,
 } from "../../../core/indicators/index.ts";
+
+// ============================================================================
+// Error Messages
+// ============================================================================
+
+const errors = {
+  noBinance: { error: "Binance client not connected. Please run setup first." },
+  insufficientData: (symbol: string) => ({ error: `Insufficient data for ${symbol}. Need at least 50 candles.` }),
+};
 
 // ============================================================================
 // Full Technical Analysis Tool
 // ============================================================================
 
-export const getTechnicalAnalysisTool = tool({
-  name: "get_technical_analysis",
+export const getTechnicalAnalysisTool = createTool({
+  id: "get_technical_analysis",
   description:
     "Get comprehensive technical analysis for a symbol including RSI, MACD, EMAs, Bollinger Bands, and ATR. " +
     "Use when user asks for 'analysis', 'technicals', 'indicators', or wants to understand a coin's setup. " +
     "Returns actionable bias (bullish/bearish) with confidence level.",
-  parameters: z.object({
+  inputSchema: z.object({
     symbol: z.string().describe("Trading pair (e.g., 'BTCUSDT', 'ETHUSDT')"),
     interval: z
       .enum(["1h", "4h", "1d"])
@@ -42,8 +55,55 @@ export const getTechnicalAnalysisTool = tool({
       .default(1.5)
       .describe("ATR multiplier for stop-loss calculation"),
   }),
-  async execute({ symbol, interval, atrMultiplier }, runContext: ToolRunContext) {
-    const ctx = runContext?.context;
+  outputSchema: z.object({
+    symbol: z.string(),
+    interval: z.string(),
+    currentPrice: z.number().optional(),
+    bias: z.enum(["bullish", "bearish", "neutral"]),
+    confidence: z.number().min(0).max(100),
+    summary: z.string(),
+    rsi: z.object({
+      value: z.string().optional(),
+      signal: z.string(),
+      action: z.string(),
+    }),
+    ema: z.object({
+      ema9: z.string().optional(),
+      ema20: z.string().optional(),
+      ema50: z.string().optional(),
+      ema200: z.string().optional(),
+      alignment: z.string(),
+      interpretation: z.string(),
+    }),
+    macd: z.object({
+      value: z.string().optional(),
+      signal: z.string().optional(),
+      histogram: z.string().optional(),
+      trend: z.string(),
+      crossover: z.string().optional(),
+      interpretation: z.string(),
+    }),
+    atr: z.object({
+      value: z.string().optional(),
+      stopLossLong: z.string(),
+      stopLossShort: z.string(),
+      stopDistance: z.string(),
+      interpretation: z.string(),
+    }),
+    bollinger: z.object({
+      upper: z.string().optional(),
+      middle: z.string().optional(),
+      lower: z.string().optional(),
+      position: z.string(),
+      squeeze: z.boolean(),
+      interpretation: z.string(),
+    }),
+    signals: z.array(z.string()),
+    error: z.string().optional(),
+  }),
+  execute: async ({ context, symbol, interval, atrMultiplier }) => {
+    // Context is injected via Mastra's RuntimeContext
+    const ctx = context as GordonContext;
     if (!ctx?.binance) {
       return errors.noBinance;
     }
@@ -58,7 +118,7 @@ export const getTechnicalAnalysisTool = tool({
       const candles = await ctx.binance.getCandles(normalizedSymbol, interval, 250);
 
       if (!candles || candles.length < 50) {
-        return { error: `Insufficient data for ${normalizedSymbol}. Need at least 50 candles.` };
+        return errors.insufficientData(normalizedSymbol);
       }
 
       const analysis = calculateTechnicalAnalysis(candles, normalizedSymbol, interval, atrMultiplier);
@@ -133,21 +193,33 @@ export const getTechnicalAnalysisTool = tool({
 // Quick Technical Signals Tool (for Scanner)
 // ============================================================================
 
-export const getTechnicalSignalsTool = tool({
-  name: "get_technical_signals",
+export const getTechnicalSignalsTool = createTool({
+  id: "get_technical_signals",
   description:
     "Get quick technical signals for a symbol. Lighter than full analysis. " +
     "Use for scanning multiple coins or quick momentum/trend checks. " +
     "Returns score from -100 (bearish) to +100 (bullish).",
-  parameters: z.object({
+  inputSchema: z.object({
     symbol: z.string().describe("Trading pair"),
     interval: z
       .enum(["1h", "4h", "1d"])
       .default("4h")
       .describe("Timeframe"),
   }),
-  async execute({ symbol, interval }, runContext: ToolRunContext) {
-    const ctx = runContext?.context;
+  outputSchema: z.object({
+    symbol: z.string(),
+    rsi: z.string().optional(),
+    rsiSignal: z.string(),
+    trend: z.string(),
+    macd: z.string(),
+    priceVsEma200: z.string(),
+    bollingerPosition: z.string(),
+    bias: z.string(),
+    score: z.number().min(-100).max(100),
+    error: z.string().optional(),
+  }),
+  execute: async ({ context, symbol, interval }) => {
+    const ctx = context as GordonContext;
     if (!ctx?.binance) {
       return errors.noBinance;
     }
@@ -160,7 +232,7 @@ export const getTechnicalSignalsTool = tool({
       const candles = await ctx.binance.getCandles(normalizedSymbol, interval, 250);
 
       if (!candles || candles.length < 50) {
-        return { error: `Insufficient data for ${normalizedSymbol}` };
+        return errors.insufficientData(normalizedSymbol);
       }
 
       const signals = calculateTechnicalSignals(candles, normalizedSymbol);
@@ -183,16 +255,80 @@ export const getTechnicalSignalsTool = tool({
 });
 
 // ============================================================================
+// RSI Tool (standalone)
+// ============================================================================
+
+export const getRSITool = createTool({
+  id: "get_rsi",
+  description:
+    "Get RSI (Relative Strength Index) for a symbol. " +
+    "RSI < 30 = oversold (potential buy), RSI > 70 = overbought (potential sell).",
+  inputSchema: z.object({
+    symbol: z.string().describe("Trading pair"),
+    interval: z.enum(["1h", "4h", "1d"]).default("4h"),
+    period: z.number().min(7).max(21).default(14),
+  }),
+  outputSchema: z.object({
+    symbol: z.string(),
+    rsi: z.string().optional(),
+    signal: z.enum(["oversold", "overbought", "neutral"]),
+    action: z.string(),
+    interpretation: z.string(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ context, symbol, interval, period }) => {
+    const ctx = context as GordonContext;
+    if (!ctx?.binance) {
+      return errors.noBinance;
+    }
+
+    const normalizedSymbol = symbol.toUpperCase().endsWith("USDT")
+      ? symbol.toUpperCase()
+      : `${symbol.toUpperCase()}USDT`;
+
+    try {
+      const candles = await ctx.binance.getCandles(normalizedSymbol, interval, 50);
+
+      if (!candles || candles.length < period + 1) {
+        return { error: "Insufficient data for RSI" };
+      }
+
+      const closes = candles.map(c => c.close);
+      const rsi = calculateRSI(closes, period);
+
+      return {
+        symbol: normalizedSymbol,
+        rsi: rsi.current?.toFixed(1),
+        signal: rsi.signal,
+        action: rsi.action,
+        interpretation:
+          rsi.current === null
+            ? "Insufficient data"
+            : rsi.current < 30
+            ? "Oversold - potential buying opportunity"
+            : rsi.current > 70
+            ? "Overbought - potential selling pressure"
+            : rsi.current < 50
+            ? "Below midline - slight bearish bias"
+            : "Above midline - slight bullish bias",
+      };
+    } catch (error) {
+      return { error: `Failed to get RSI: ${(error as Error).message}` };
+    }
+  },
+});
+
+// ============================================================================
 // ATR Stop-Loss Tool (for Planner)
 // ============================================================================
 
-export const getStopLossLevelsTool = tool({
-  name: "get_stop_loss_levels",
+export const getStopLossLevelsTool = createTool({
+  id: "get_stop_loss_levels",
   description:
     "Calculate ATR-based stop-loss levels for a trade. " +
     "Use when creating trade plans to set proper stop-loss based on volatility. " +
     "Returns stop-loss price for both long and short positions.",
-  parameters: z.object({
+  inputSchema: z.object({
     symbol: z.string().describe("Trading pair"),
     interval: z
       .enum(["1h", "4h", "1d"])
@@ -215,8 +351,34 @@ export const getStopLossLevelsTool = tool({
       .default(14)
       .describe("ATR period"),
   }),
-  async execute({ symbol, interval, entryPrice, atrMultiplier, atrPeriod }, runContext: ToolRunContext) {
-    const ctx = runContext?.context;
+  outputSchema: z.object({
+    symbol: z.string(),
+    interval: z.string(),
+    currentPrice: z.string(),
+    atr: z.object({
+      value: z.string(),
+      period: z.number(),
+      multiplier: z.number(),
+      asPercent: z.string(),
+    }),
+    stopLoss: z.object({
+      long: z.string(),
+      short: z.string(),
+      distance: z.string(),
+      distancePercent: z.string(),
+    }),
+    takeProfit: z.object({
+      long: z.string(),
+      short: z.string(),
+      distance: z.string(),
+      riskReward: z.string(),
+    }),
+    interpretation: z.string(),
+    recommendation: z.string(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ context, symbol, interval, entryPrice, atrMultiplier, atrPeriod }) => {
+    const ctx = context as GordonContext;
     if (!ctx?.binance) {
       return errors.noBinance;
     }
@@ -288,19 +450,34 @@ export const getStopLossLevelsTool = tool({
 // Position Size Calculator Tool
 // ============================================================================
 
-export const getPositionSizeTool = tool({
-  name: "get_position_size",
+export const getPositionSizeTool = createTool({
+  id: "get_position_size",
   description:
     "Calculate optimal position size based on risk amount and ATR. " +
     "Use when determining how much to buy/sell based on account risk tolerance.",
-  parameters: z.object({
+  inputSchema: z.object({
     symbol: z.string().describe("Trading pair"),
     riskAmount: z.number().describe("Amount willing to risk in USD (e.g., 100)"),
     interval: z.enum(["1h", "4h", "1d"]).default("4h"),
     atrMultiplier: z.number().min(1).max(4).default(1.5),
   }),
-  async execute({ symbol, riskAmount, interval, atrMultiplier }, runContext: ToolRunContext) {
-    const ctx = runContext?.context;
+  outputSchema: z.object({
+    symbol: z.string(),
+    currentPrice: z.string(),
+    risk: z.object({
+      amount: z.string(),
+      stopDistance: z.string(),
+      riskPerUnit: z.string(),
+    }),
+    position: z.object({
+      units: z.string(),
+      value: z.string(),
+    }),
+    note: z.string(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ context, symbol, riskAmount, interval, atrMultiplier }) => {
+    const ctx = context as GordonContext;
     if (!ctx?.binance) {
       return errors.noBinance;
     }
@@ -349,72 +526,16 @@ export const getPositionSizeTool = tool({
 });
 
 // ============================================================================
-// RSI Tool (standalone)
-// ============================================================================
-
-export const getRSITool = tool({
-  name: "get_rsi",
-  description:
-    "Get RSI (Relative Strength Index) for a symbol. " +
-    "RSI < 30 = oversold (potential buy), RSI > 70 = overbought (potential sell).",
-  parameters: z.object({
-    symbol: z.string().describe("Trading pair"),
-    interval: z.enum(["1h", "4h", "1d"]).default("4h"),
-    period: z.number().min(7).max(21).default(14),
-  }),
-  async execute({ symbol, interval, period }, runContext: ToolRunContext) {
-    const ctx = runContext?.context;
-    if (!ctx?.binance) {
-      return errors.noBinance;
-    }
-
-    const normalizedSymbol = symbol.toUpperCase().endsWith("USDT")
-      ? symbol.toUpperCase()
-      : `${symbol.toUpperCase()}USDT`;
-
-    try {
-      const candles = await ctx.binance.getCandles(normalizedSymbol, interval, 50);
-
-      if (!candles || candles.length < period + 1) {
-        return { error: "Insufficient data for RSI" };
-      }
-
-      const closes = candles.map(c => c.close);
-      const rsi = calculateRSI(closes, period);
-
-      return {
-        symbol: normalizedSymbol,
-        rsi: rsi.current?.toFixed(1),
-        signal: rsi.signal,
-        action: rsi.action,
-        interpretation:
-          rsi.current === null
-            ? "Insufficient data"
-            : rsi.current < 30
-            ? "Oversold - potential buying opportunity"
-            : rsi.current > 70
-            ? "Overbought - potential selling pressure"
-            : rsi.current < 50
-            ? "Below midline - slight bearish bias"
-            : "Above midline - slight bullish bias",
-      };
-    } catch (error) {
-      return { error: `Failed to get RSI: ${(error as Error).message}` };
-    }
-  },
-});
-
-// ============================================================================
 // VWAP Tool
 // ============================================================================
 
-export const getVWAPTool = tool({
-  name: "get_vwap",
+export const getVWAPTool = createTool({
+  id: "get_vwap",
   description:
     "Get VWAP (Volume Weighted Average Price) for a symbol. " +
     "Shows fair value based on volume - essential for intraday trading. " +
     "Price above VWAP = bullish, below = bearish.",
-  parameters: z.object({
+  inputSchema: z.object({
     symbol: z.string().describe("Trading pair (e.g., 'BTCUSDT')"),
     interval: z
       .enum(["1m", "5m", "15m", "1h", "4h"])
@@ -427,8 +548,19 @@ export const getVWAPTool = tool({
       .default(100)
       .describe("Number of candles to include"),
   }),
-  async execute({ symbol, interval, limit }, runContext: ToolRunContext) {
-    const ctx = runContext?.context;
+  outputSchema: z.object({
+    symbol: z.string(),
+    interval: z.string(),
+    currentPrice: z.string(),
+    vwap: z.string().optional(),
+    pricePosition: z.enum(["above", "below", "at"]),
+    deviation: z.string().optional(),
+    interpretation: z.string(),
+    tradingImplication: z.string(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ context, symbol, interval, limit }) => {
+    const ctx = context as GordonContext;
     if (!ctx?.binance) {
       return errors.noBinance;
     }
@@ -441,7 +573,7 @@ export const getVWAPTool = tool({
       const candles = await ctx.binance.getCandles(normalizedSymbol, interval, limit);
 
       if (!candles || candles.length < 10) {
-        return { error: `Insufficient data for ${normalizedSymbol}` };
+        return errors.insufficientData(normalizedSymbol);
       }
 
       const { calculateVWAP } = await import("../../../core/indicators/index.ts");
@@ -474,13 +606,13 @@ export const getVWAPTool = tool({
 // Stochastic RSI Tool
 // ============================================================================
 
-export const getStochasticRSITool = tool({
-  name: "get_stochastic_rsi",
+export const getStochasticRSITool = createTool({
+  id: "get_stochastic_rsi",
   description:
     "Get Stochastic RSI for a symbol. More sensitive than regular RSI for overbought/oversold. " +
     "Combines RSI with Stochastic for better entry/exit timing. " +
     "%K < 20 = oversold (buy), %K > 80 = overbought (sell).",
-  parameters: z.object({
+  inputSchema: z.object({
     symbol: z.string().describe("Trading pair"),
     interval: z.enum(["1h", "4h", "1d"]).default("4h"),
     rsiPeriod: z.number().min(7).max(21).default(14).describe("RSI period"),
@@ -488,8 +620,22 @@ export const getStochasticRSITool = tool({
     smoothK: z.number().min(1).max(5).default(3).describe("%K smoothing"),
     smoothD: z.number().min(1).max(5).default(3).describe("%D smoothing"),
   }),
-  async execute({ symbol, interval, rsiPeriod, stochPeriod, smoothK, smoothD }, runContext: ToolRunContext) {
-    const ctx = runContext?.context;
+  outputSchema: z.object({
+    symbol: z.string(),
+    interval: z.string(),
+    currentPrice: z.string(),
+    stochRSI: z.object({
+      k: z.string().optional(),
+      d: z.string().optional(),
+    }),
+    signal: z.enum(["oversold", "overbought", "neutral"]),
+    crossover: z.string().optional(),
+    action: z.string(),
+    interpretation: z.string(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ context, symbol, interval, rsiPeriod, stochPeriod, smoothK, smoothD }) => {
+    const ctx = context as GordonContext;
     if (!ctx?.binance) {
       return errors.noBinance;
     }
@@ -502,7 +648,7 @@ export const getStochasticRSITool = tool({
       const candles = await ctx.binance.getCandles(normalizedSymbol, interval, 100);
 
       if (!candles || candles.length < 50) {
-        return { error: `Insufficient data for ${normalizedSymbol}` };
+        return errors.insufficientData(normalizedSymbol);
       }
 
       const closes = candles.map(c => c.close);
@@ -529,15 +675,19 @@ export const getStochasticRSITool = tool({
 });
 
 // ============================================================================
-// Export
+// Export as Object (Mastra format)
 // ============================================================================
 
-export const indicatorTools = [
-  getTechnicalAnalysisTool,
-  getTechnicalSignalsTool,
-  getStopLossLevelsTool,
-  getPositionSizeTool,
-  getRSITool,
-  getVWAPTool,
-  getStochasticRSITool,
-];
+/**
+ * Indicator tools exported as an object for Mastra Agent
+ * This is the format expected by Mastra's Agent class
+ */
+export const indicatorTools = {
+  get_technical_analysis: getTechnicalAnalysisTool,
+  get_technical_signals: getTechnicalSignalsTool,
+  get_rsi: getRSITool,
+  get_stop_loss_levels: getStopLossLevelsTool,
+  get_position_size: getPositionSizeTool,
+  get_vwap: getVWAPTool,
+  get_stochastic_rsi: getStochasticRSITool,
+};

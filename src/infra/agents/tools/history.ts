@@ -1,32 +1,69 @@
 /**
- * History Tools
+ * History Tools (Mastra Format)
  * Tools for viewing trade history, deposits, and withdrawals
+ *
+ * Migrated from OpenAI Agents SDK format to Mastra format.
+ * Key differences:
+ * - tool() -> createTool()
+ * - name -> id
+ * - parameters -> inputSchema
+ * - Added outputSchema for better LLM routing
+ * - Context access via first parameter destructuring
  */
 
-import { tool } from "@openai/agents";
+import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
-import type { ToolRunContext } from "./types.ts";
-import { errors } from "./types.ts";
+import type { GordonContext } from "../types.ts";
+
+// ============================================================================
+// Error Messages
+// ============================================================================
+
+const errors = {
+  noBinance: { error: "Binance client not connected. Please run setup first." },
+};
 
 // ============================================================================
 // Trade History Tool
 // ============================================================================
 
-export const getTradeHistoryTool = tool({
-  name: "get_trade_history",
+export const getTradeHistoryTool = createTool({
+  id: "get_trade_history",
   description:
     "Get trade history for a specific symbol or all recent trades. " +
     "Use when user asks 'show my trades', 'trade history for BTC', 'what did I trade?'",
-  parameters: z.object({
+  inputSchema: z.object({
     symbol: z
       .string()
       .default("")
       .describe("Trading pair symbol (e.g., 'BTCUSDT'). Leave empty for all recent trades."),
     limit: z.number().min(1).max(100).default(20).describe("Max trades to return"),
   }),
-  async execute({ symbol, limit }, runContext: ToolRunContext) {
-    const ctx = runContext?.context;
+  outputSchema: z.object({
+    message: z.string().optional(),
+    trades: z.array(
+      z.object({
+        symbol: z.string(),
+        side: z.enum(["BUY", "SELL"]),
+        price: z.number(),
+        quantity: z.number(),
+        quoteQty: z.number(),
+        commission: z.string(),
+        time: z.string(),
+        isMaker: z.boolean(),
+      })
+    ).optional(),
+    stats: z.object({
+      totalTrades: z.number(),
+      totalBuyVolume: z.string(),
+      totalSellVolume: z.string(),
+      avgTradeSize: z.string(),
+    }).optional(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ context, symbol, limit }) => {
+    const ctx = context as GordonContext;
     if (!ctx?.binance) {
       return errors.noBinance;
     }
@@ -61,7 +98,7 @@ export const getTradeHistoryTool = tool({
 
         return {
           symbol: t.symbol,
-          side: t.isBuyer ? "BUY" : "SELL",
+          side: t.isBuyer ? "BUY" as const : "SELL" as const,
           price: parseFloat(t.price),
           quantity: parseFloat(t.qty),
           quoteQty,
@@ -92,20 +129,47 @@ export const getTradeHistoryTool = tool({
 // Deposit/Withdrawal History Tool
 // ============================================================================
 
-export const getTransferHistoryTool = tool({
-  name: "get_transfer_history",
+export const getTransferHistoryTool = createTool({
+  id: "get_transfer_history",
   description:
     "Get deposit and withdrawal history. " +
     "Use when user asks 'show deposits', 'withdrawal history', 'transfer history'",
-  parameters: z.object({
+  inputSchema: z.object({
     type: z
       .enum(["deposits", "withdrawals", "both"])
       .default("both")
       .describe("Type of transfers to show"),
     limit: z.number().min(1).max(50).default(10).describe("Max records to return per type"),
   }),
-  async execute({ type, limit }, runContext: ToolRunContext) {
-    const ctx = runContext?.context;
+  outputSchema: z.object({
+    deposits: z.array(
+      z.object({
+        coin: z.string(),
+        amount: z.number(),
+        network: z.string(),
+        status: z.string(),
+        txId: z.string().nullable(),
+        time: z.string(),
+      })
+    ).optional(),
+    totalDeposits: z.number().optional(),
+    withdrawals: z.array(
+      z.object({
+        coin: z.string(),
+        amount: z.number(),
+        fee: z.number(),
+        network: z.string(),
+        status: z.string(),
+        address: z.string(),
+        applyTime: z.string(),
+        completeTime: z.string().nullable(),
+      })
+    ).optional(),
+    totalWithdrawals: z.number().optional(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ context, type, limit }) => {
+    const ctx = context as GordonContext;
     if (!ctx?.binance) {
       return errors.noBinance;
     }
@@ -155,4 +219,15 @@ export const getTransferHistoryTool = tool({
   },
 });
 
-export const historyTools = [getTradeHistoryTool, getTransferHistoryTool];
+// ============================================================================
+// Export as Object (Mastra format)
+// ============================================================================
+
+/**
+ * History tools exported as an object for Mastra Agent
+ * This is the format expected by Mastra's Agent class
+ */
+export const historyTools = {
+  get_trade_history: getTradeHistoryTool,
+  get_transfer_history: getTransferHistoryTool,
+};

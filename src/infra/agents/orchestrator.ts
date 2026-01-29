@@ -1,22 +1,18 @@
 /**
  * Gordon Orchestrator
- * Main agent that coordinates all specialized agents via handoffs
+ * Main agent that coordinates all specialized agents via Mastra Agent Networks
+ *
+ * Uses Mastra's Agent class with .network() for multi-agent coordination:
+ * - agent.generate() for simple single-turn responses
+ * - agent.network() for complex tasks requiring multi-agent orchestration
+ * - RequestContext for dependency injection
+ * - Memory-aware orchestration with LibSQL storage
  */
 
-import { Agent, run, setTracingExportApiKey, withTrace } from "@openai/agents";
-import type { AgentInputItem } from "@openai/agents";
+import { RequestContext } from "@mastra/core/request-context";
+import type { CoreMessage } from "ai";
 
-import {
-  scannerAgent,
-  analystAgent,
-  plannerAgent,
-  executorAgent,
-  monitorAgent,
-  teacherAgent,
-  setupAgentHooks,
-} from "./agents.ts";
-import { allTools } from "./tools/index.ts";
-import { inputGuardrails, outputGuardrails } from "./guardrails.ts";
+import { gordonAgent } from "./agents.ts";
 import { createModuleLogger } from "../logger/index.ts";
 import { emitEvent } from "../../events/index.ts";
 import type { GordonContext } from "./types.ts";
@@ -24,321 +20,108 @@ import type { GordonContext } from "./types.ts";
 const logger = createModuleLogger("orchestrator");
 
 // ============================================================================
-// Tracing Setup
+// Request Context Helper
 // ============================================================================
 
 /**
- * Initialize tracing for the OpenAI Agents SDK
- * This enables visualization in the OpenAI dashboard
+ * Create a RequestContext with Gordon's dependencies
+ * This is how we inject context into tools in Mastra
  */
-export function initializeTracing(apiKey?: string): void {
-  const key = apiKey || process.env.OPENAI_API_KEY;
-  if (key) {
-    setTracingExportApiKey(key);
-    logger.info("Tracing enabled - view runs at platform.openai.com");
-  } else {
-    logger.warn("Tracing not enabled - no API key provided");
-  }
+function createRequestContext(context: GordonContext): RequestContext {
+  const requestContext = new RequestContext();
+  requestContext.set("binance", context.binance);
+  requestContext.set("config", context.config);
+  requestContext.set("llm", context.llm);
+  requestContext.set("userId", context.userId || "default");
+  return requestContext;
 }
 
 // ============================================================================
-// Gordon - The Main Orchestrator
-// ============================================================================
-
-export const gordonAgent = new Agent<GordonContext>({
-  name: "Gordon",
-  instructions: `You are Gordon, an AI trading assistant for cryptocurrency.
-
-## Your Personality
-- Friendly and approachable, like a knowledgeable friend
-- Occasionally reference Gordon Gekko from Wall Street (but as a joke - you're the good guy)
-- Keep responses concise but informative
-- Use trading slang naturally when appropriate
-
-## How You Work
-You can do everything yourself OR delegate to specialized agents:
-- **Scanner**: Finding trading opportunities
-- **Analyst**: Deep technical analysis
-- **Planner**: Creating trading plans
-- **Executor**: Executing trades (when armed)
-- **Monitor**: Checking positions
-- **Teacher**: Explaining concepts
-
-## Conversation Flow
-1. Understand what the user wants
-2. Choose the right tool or delegate to an agent
-3. Present results clearly
-4. Suggest logical next steps
-
-## Intent Recognition
-
-### Core Trading (delegate to sub-agents)
-- "scan", "find", "opportunities", "what to buy" → Use Scanner
-- "analyze X", "what about X", "how's X doing" → Use Analyst
-- "buy X", "trade X", "create plan" → Use Planner
-- "execute", "do it", "place orders" → Use Executor
-- "check", "positions", "how are my trades" → Use Monitor
-- "what is", "explain", "help me understand" → Use Teacher
-- "arm", "enable trading" → Arm the system
-- "disarm", "safe mode" → Disarm the system
-
-### Market Data (use tools directly)
-- "order book", "liquidity", "buy/sell walls" → get_order_book
-- "spread", "slippage" → get_spread
-- "trade flow", "who's buying" → get_recent_trades (market trades, NOT user's trades)
-
-### Market Discovery (use tools directly)
-- "what's trending", "biggest movers", "pumping" → get_trending_tokens
-- "highest volume", "most traded", "liquid markets" → get_high_volume_tokens
-- "available pairs", "can I trade X", "list markets" → get_available_markets
-- "bracket order", "entry with SL and TP" → place_bracket_order
-
-### Charts & Visualization (use tools directly)
-- "chart", "graph", "visual", "show price", "price trend" → display_price_chart (colored line chart)
-- "candlestick", "candles", "OHLC", "professional chart" → display_candlestick_chart (red/green candles)
-- "compare BTC and ETH", "which performed better" → display_comparison_chart
-- "volume chart", "trading activity" → display_volume_chart
-Note: Charts are ASCII-based for terminal display. Use display_candlestick_chart for proper trading visualization with red/green candles.
-
-### Technical Indicators (use tools directly)
-- "RSI", "relative strength", "overbought", "oversold" → get_rsi
-- "technical analysis", "TA", "full analysis", "technicals", "indicators" → get_technical_analysis (comprehensive: RSI, MACD, EMAs, Bollinger, ATR)
-- "signals", "quick scan", "momentum check", "bias" → get_technical_signals (lightweight score -100 to +100)
-- "stop loss", "ATR stop", "volatility stop", "where to place stop" → get_stop_loss_levels
-- "position size", "how much to buy", "risk sizing", "risk X dollars" → get_position_size
-- "MACD", "EMA", "Bollinger Bands", "bands" → get_technical_analysis (includes all these)
-- "VWAP", "volume weighted", "fair value", "intraday value" → get_vwap (shows if price is above/below fair value)
-- "stochastic RSI", "stoch RSI", "stochRSI", "better RSI" → get_stochastic_rsi (more sensitive than RSI)
-Note: Indicators are calculated natively. Use get_technical_analysis for full picture, get_technical_signals for quick scans of multiple coins, get_stop_loss_levels when creating trade plans. VWAP is best for intraday (1h or less), Stochastic RSI for entry timing.
-
-### Advanced Orders (use tools directly)
-- "OCO", "stop loss and take profit" → place_oco_order
-- "cancel all orders", "emergency cancel" → cancel_all_orders
-- "order status", "is my order filled" → get_order_status
-- "test order", "validate order" → test_order
-
-### Wallet Management (use tools directly)
-- "convert dust", "clean up small balances" → get_dustable_assets, then convert_dust
-- "transfer to funding", "move to spot" → transfer_funds
-- "deposit address", "where to send" → get_deposit_address
-- "withdrawal fee", "network info" → get_coin_info
-- "trading fees", "maker taker" → get_trade_fees
-- "airdrops", "dividends", "rewards" → get_asset_dividends
-
-### Simple Earn (use tools directly)
-- "earn APY", "savings rates", "flexible products" → get_flexible_earn_products
-- "locked staking", "higher APY" → get_locked_earn_products
-- "my earn positions", "what am I earning" → get_all_earn_positions
-- "start earning", "subscribe" → subscribe_flexible_earn or subscribe_locked_earn
-- "redeem", "stop earning" → redeem_flexible_earn
-
-### History
-- "my trades", "trade history" → get_trade_history (user's executed trades)
-- "transfer history" → get_transfer_history
-- "missed opportunities", "past signals" → get_historical_opportunities
-
-## Safety Rules
-1. NEVER execute trades without explicit user approval
-2. ALWAYS show plan details before execution
-3. In SAFE mode, you can analyze and plan but NOT execute
-4. Remind users about risk appropriately
-
-## Error Handling
-When a tool returns an error or fails:
-1. Report the EXACT error message to the user - don't hide it
-2. NEVER use vague terms like "glitch", "hiccup", or "technical issue"
-3. Explain what went wrong in plain language
-4. Suggest a specific fix or next step
-5. If the error is unclear, ask the user to try again with different parameters
-
-Example good responses:
-- "The create_plan tool returned: 'No support levels found for XYZUSDT'. This coin doesn't have clear support - try a different one."
-- "Connection to Binance failed. Please check your API keys in setup."
-
-Example BAD responses (never do this):
-- "There was a technical hiccup" ❌
-- "Something glitched out" ❌
-- "Let me try that again" (without explaining what failed) ❌
-
-## Response Efficiency
-- Don't repeat information you just provided in the last message
-- If the user asks for the same thing again, give a shorter response or ask if they need different details
-- Track context: if you just said "no opportunities found", don't repeat the full explanation
-- Be concise - long explanations should only come when the user asks for detail
-
-## Response Format
-- Be conversational, not robotic
-- Use markdown for clarity when showing data
-- Keep summaries brief, details on request
-- End with a suggested next action when appropriate
-
-## Important Limitations
-NEVER promise capabilities you don't have. If you can't do something, say so clearly.
-
-What you CAN do:
-- Display ASCII candlestick charts with red/green colors using display_candlestick_chart
-- Display line charts using display_price_chart (green for uptrend, red for downtrend)
-- Compare multiple assets with display_comparison_chart
-- Show volume trends with display_volume_chart
-- Calculate technical indicators: RSI, MACD, EMAs (9/20/50/200), Bollinger Bands, ATR
-- Provide full technical analysis with bias scoring and confidence levels
-- Calculate ATR-based stop-loss levels for trade planning
-- Calculate position sizes based on risk amount and volatility
-- Analyze market data with numbers and text
-- Execute trades (when armed)
-- Access Binance market and account data
-
-What you CANNOT do:
-- Display graphical images, PNG/JPG charts, or TradingView-style visuals (only ASCII terminal charts)
-- Access external websites or APIs beyond Binance
-- Remember conversations after they end
-
-When users ask for "charts" or "graphs", ALWAYS use the chart tools to generate ASCII visualizations.
-Never describe a visual you cannot actually produce.`,
-
-  // All specialized agents as handoff targets
-  handoffs: [
-    scannerAgent,
-    analystAgent,
-    plannerAgent,
-    executorAgent,
-    monitorAgent,
-    teacherAgent,
-  ],
-
-  // Gordon has access to all tools directly too
-  tools: allTools,
-
-  // Guardrails for input/output validation
-  inputGuardrails,
-  outputGuardrails,
-});
-
-// Setup lifecycle hooks for Gordon
-setupAgentHooks(gordonAgent, "Gordon");
-
-// ============================================================================
-// Run Gordon
+// Message Processing
 // ============================================================================
 
 /**
- * Convert legacy history format to SDK AgentInputItem format
- */
-function legacyToAgentHistory(
-  history: Array<{ role: "user" | "assistant"; content: string }>
-): AgentInputItem[] {
-  return history.map((m) => ({
-    role: m.role === "user" ? "user" : "assistant",
-    content: m.content,
-  })) as AgentInputItem[];
-}
-
-/**
- * Convert SDK history back to legacy format for storage
- */
-function agentToLegacyHistory(
-  history: AgentInputItem[]
-): Array<{ role: "user" | "assistant"; content: string }> {
-  const result: Array<{ role: "user" | "assistant"; content: string }> = [];
-
-  for (const item of history) {
-    // Check if item has role and content properties (user/assistant messages)
-    if (
-      typeof item === "object" &&
-      item !== null &&
-      "role" in item &&
-      "content" in item &&
-      (item.role === "user" || item.role === "assistant") &&
-      typeof item.content === "string"
-    ) {
-      result.push({
-        role: item.role,
-        content: item.content,
-      });
-    }
-  }
-
-  return result;
-}
-
-/**
- * Process a user message through Gordon
+ * Process a user message through Gordon using Mastra Agent Network
  *
  * @param userMessage - The user's input message
  * @param context - Gordon's context (binance, llm, config, etc.)
- * @param conversationHistory - Previous messages in the conversation
- * @returns The agent's response and updated history
+ * @param threadId - Thread ID for conversation persistence
+ * @returns The agent's response and usage stats
  */
 export async function processMessage(
   userMessage: string,
   context: GordonContext,
-  conversationHistory: Array<{ role: "user" | "assistant"; content: string }> = []
+  threadId?: string
 ): Promise<{
   response: string;
-  history: Array<{ role: "user" | "assistant"; content: string }>;
-  agentHistory: AgentInputItem[];
-  pendingApproval?: {
-    toolName: string;
-    args: unknown;
+  usage: {
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
   };
 }> {
-  logger.debug("Processing message", { messageLength: userMessage.length, historyLength: conversationHistory.length });
+  logger.debug("Processing message with Mastra", { messageLength: userMessage.length });
 
-  // Convert legacy history to SDK format and add new user message
-  const agentHistory = legacyToAgentHistory(conversationHistory);
-  const input: AgentInputItem[] = [
-    ...agentHistory,
-    { role: "user", content: userMessage } as AgentInputItem,
-  ];
+  const requestContext = createRequestContext(context);
 
-  // Run the agent with structured history inside a trace
-  const result = await withTrace("gordon-conversation", async () => {
-    return run(gordonAgent, input, {
-      context,
-      maxTurns: 10,
+  try {
+    // Use agent.network() for complex tasks requiring multi-agent coordination
+    const result = await gordonAgent.network(userMessage, {
+      requestContext,
+      memory: threadId ? { threadId } : undefined,
+      maxSteps: 20,
     });
-  });
 
-  // Extract the final output
-  const response = result.finalOutput ?? "I'm not sure how to help with that. Could you rephrase?";
+    // Collect response from stream
+    let response = "";
+    for await (const chunk of result.stream) {
+      if (chunk.type === "text-delta") {
+        response += chunk.textDelta;
+      }
+    }
 
-  // Get the full structured history from the SDK
-  const newAgentHistory = result.history;
+    // Get final result and usage
+    const finalResult = await result.result;
+    const usage = await result.usage;
 
-  // Convert back to legacy format for backward compatibility
-  const newLegacyHistory = agentToLegacyHistory(newAgentHistory);
+    // Emit event for tracking
+    await emitEvent("agent:message_processed", {
+      userMessage: userMessage.substring(0, 100),
+      responseLength: response.length,
+    });
 
-  // Emit event for conversation tracking
-  await emitEvent("agent:message_processed", {
-    userMessage: userMessage.substring(0, 100),
-    responseLength: response.length,
-    historyLength: newAgentHistory.length,
-  });
+    logger.debug("Message processed", { responseLength: response.length });
 
-  logger.debug("Message processed", { responseLength: response.length });
-
-  // Check for pending approvals
-  const pendingApproval = extractPendingApproval(result);
-
-  return {
-    response,
-    history: newLegacyHistory,
-    agentHistory: newAgentHistory,
-    pendingApproval,
-  };
+    return {
+      response: response || finalResult?.text || "I'm not sure how to help with that.",
+      usage: {
+        promptTokens: usage?.promptTokens || 0,
+        completionTokens: usage?.completionTokens || 0,
+        totalTokens: usage?.totalTokens || 0,
+      },
+    };
+  } catch (error) {
+    logger.error("Failed to process message", { error });
+    throw error;
+  }
 }
 
 /**
- * Extract any pending approval request from the result
- * (This is a simplified implementation)
+ * Process a simple message without multi-agent orchestration
+ * Use this for quick single-turn responses
  */
-function extractPendingApproval(
-  result: { finalOutput?: string }
-): { toolName: string; args: unknown } | undefined {
-  // The OpenAI Agents SDK handles approvals internally
-  // This function is a placeholder for custom approval handling
-  // In a real implementation, you'd check result.pendingApprovals or similar
-  return undefined;
+export async function processSimpleMessage(
+  userMessage: string,
+  context: GordonContext
+): Promise<string> {
+  const requestContext = createRequestContext(context);
+
+  const result = await gordonAgent.generate({
+    messages: [{ role: "user", content: userMessage }] as CoreMessage[],
+    requestContext,
+  });
+
+  return result.text;
 }
 
 // ============================================================================
@@ -349,7 +132,7 @@ function extractPendingApproval(
  * Stream event types emitted during processing
  */
 export interface StreamEvent {
-  type: "text_delta" | "tool_call" | "agent_switch" | "done" | "error";
+  type: "text_delta" | "tool_call" | "agent_switch" | "step_complete" | "done" | "error";
   content?: string;
   toolName?: string;
   agentName?: string;
@@ -357,73 +140,67 @@ export interface StreamEvent {
 }
 
 /**
- * Process a message with real streaming support
- * Yields events as they come in from the SDK
+ * Process a message with streaming support
+ * Yields events as they come in from the Mastra Agent Network
  */
 export async function* processMessageStream(
   userMessage: string,
   context: GordonContext,
-  conversationHistory: Array<{ role: "user" | "assistant"; content: string }> = []
-): AsyncGenerator<StreamEvent, { history: Array<{ role: "user" | "assistant"; content: string }>; agentHistory: AgentInputItem[] }> {
+  threadId?: string
+): AsyncGenerator<StreamEvent, void> {
   logger.debug("Starting streaming message processing");
 
-  // Convert legacy history to SDK format
-  const agentHistory = legacyToAgentHistory(conversationHistory);
-  const input: AgentInputItem[] = [
-    ...agentHistory,
-    { role: "user", content: userMessage } as AgentInputItem,
-  ];
+  const requestContext = createRequestContext(context);
 
-  // Run with streaming enabled
-  const result = await run(gordonAgent, input, {
-    context,
-    maxTurns: 10,
-    stream: true,
-  });
+  try {
+    const result = await gordonAgent.network(userMessage, {
+      requestContext,
+      memory: threadId ? { threadId } : undefined,
+      maxSteps: 20,
+    });
 
-  let fullResponse = "";
+    let fullResponse = "";
 
-  // Iterate over streaming events
-  for await (const event of result) {
-    // Raw model stream events (text deltas)
-    if (event.type === "raw_model_stream_event") {
-      const data = event.data as { type?: string; event?: { type?: string; delta?: string } };
-      if (data.event?.type === "response.output_text.delta" && data.event.delta) {
-        fullResponse += data.event.delta;
-        yield { type: "text_delta", content: data.event.delta };
+    // Iterate over streaming events
+    for await (const chunk of result.stream) {
+      switch (chunk.type) {
+        case "text-delta":
+          fullResponse += chunk.textDelta;
+          yield { type: "text_delta", content: chunk.textDelta };
+          break;
+
+        case "tool-call":
+          yield { type: "tool_call", toolName: chunk.toolName };
+          break;
+
+        case "network-execution-event-step-start":
+          yield {
+            type: "agent_switch",
+            agentName: chunk.payload?.primitiveId,
+          };
+          break;
+
+        case "network-execution-event-step-finish":
+          yield {
+            type: "step_complete",
+            content: JSON.stringify(chunk.payload?.result),
+          };
+          break;
       }
     }
 
-    // Agent switch events
-    if (event.type === "agent_updated_stream_event") {
-      const agentEvent = event as { agent?: { name?: string } };
-      yield { type: "agent_switch", agentName: agentEvent.agent?.name };
-    }
+    // Signal completion
+    yield { type: "done", content: fullResponse };
 
-    // Run item events (tool calls, etc.)
-    if (event.type === "run_item_stream_event") {
-      const itemEvent = event as { item?: { type?: string; name?: string } };
-      if (itemEvent.item?.type === "tool_call") {
-        yield { type: "tool_call", toolName: itemEvent.item.name };
-      }
-    }
+    await emitEvent("agent:stream_completed", {
+      responseLength: fullResponse.length,
+    });
+  } catch (error) {
+    yield {
+      type: "error",
+      error: error instanceof Error ? error.message : "Unknown error",
+    };
   }
-
-  // Signal completion
-  yield { type: "done", content: fullResponse || result.finalOutput };
-
-  // Get final history
-  const newAgentHistory = result.history;
-  const newLegacyHistory = agentToLegacyHistory(newAgentHistory);
-
-  await emitEvent("agent:stream_completed", {
-    responseLength: fullResponse.length,
-  });
-
-  return {
-    history: newLegacyHistory,
-    agentHistory: newAgentHistory,
-  };
 }
 
 // ============================================================================
@@ -440,7 +217,6 @@ export async function quickScan(context: GordonContext) {
     throw new Error("Binance client not connected");
   }
 
-  // Import scan directly for quick access
   const { scan } = await import("../../core/scanner.ts");
   return scan(binance, {
     topN: config.preferences.topNCoins,
@@ -460,4 +236,16 @@ export async function quickCheckPositions(context: GordonContext) {
 
   const { runMonitorCycle } = await import("../../core/monitor.ts");
   return runMonitorCycle(binance);
+}
+
+// ============================================================================
+// Tracing Initialization
+// ============================================================================
+
+/**
+ * Initialize tracing for agent operations
+ * Mastra uses its own tracing via the Agent class
+ */
+export function initializeTracing(): void {
+  logger.debug("Tracing initialized via Mastra Agent class");
 }

@@ -1,6 +1,6 @@
 /**
  * Gordon Agent Infrastructure
- * OpenAI Agents SDK integration for agentic trading
+ * Mastra-based multi-agent system for agentic trading
  */
 
 // Types
@@ -14,24 +14,22 @@ export type {
   ExplainToolResult,
 } from "./types.ts";
 
-// Tools
+// Tools (Mastra format - exported as objects)
 export {
-  scanMarketTool,
-  analyzeCoinTool,
-  createPlanTool,
-  executePlanTool,
-  checkPositionsTool,
-  closeTradeTool,
-  explainTool,
-  armSystemTool,
-  getPortfolioTool,
-  listPlansTool,
-  approvePlanTool,
-  testConnectionTool,
-  getAccountDetailsTool,
-  getTradeHistoryTool,
-  getTransferHistoryTool,
-  getEarnPositionsTool,
+  indicatorTools,
+  explainTools,
+  marketTools,
+  positionTools,
+  schedulerTools,
+  systemTools,
+  earnTools,
+  chartTools,
+  orderbookTools,
+  walletTools,
+  discoveryTools,
+  historyTools,
+  accountTools,
+  tradingTools,
   allTools,
   toolCounts,
 } from "./tools/index.ts";
@@ -51,6 +49,7 @@ export {
 export {
   gordonAgent,
   processMessage,
+  processSimpleMessage,
   processMessageStream,
   quickScan,
   quickCheckPositions,
@@ -58,8 +57,20 @@ export {
 } from "./orchestrator.ts";
 export type { StreamEvent } from "./orchestrator.ts";
 
-// Guardrails
-export { inputGuardrails, outputGuardrails } from "./guardrails.ts";
+// Guardrails Middleware
+export {
+  checkInputGuardrails,
+  checkOutputGuardrails,
+  validateTrade,
+  validateRiskReward,
+  withGuardrails,
+} from "./middleware/index.ts";
 
-// Agent Hooks
-export { setupAgentHooks } from "./agents.ts";
+// Memory
+export {
+  createMemoryStore,
+  createMemoryOptions,
+  generateThreadId,
+  getMemory,
+  resetMemory,
+} from "./memory.ts";

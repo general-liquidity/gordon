@@ -1,28 +1,60 @@
 /**
- * Simple Earn Tools
+ * Simple Earn Tools (Mastra Format)
  * Tools for managing Binance Simple Earn products (Flexible & Locked)
+ *
+ * Migrated from OpenAI Agents SDK format to Mastra format.
+ * Key differences:
+ * - tool() -> createTool()
+ * - name -> id
+ * - parameters -> inputSchema
+ * - Context access via first parameter destructuring
  */
 
-import { tool } from "@openai/agents";
+import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
-import type { ToolRunContext } from "./types.ts";
-import { errors } from "./types.ts";
+import type { GordonContext } from "../types.ts";
+
+// ============================================================================
+// Error Messages
+// ============================================================================
+
+const errors = {
+  noBinance: { error: "Binance client not connected. Please run setup first." },
+};
 
 // ============================================================================
 // Product Discovery
 // ============================================================================
 
-export const getFlexibleProductsTool = tool({
-  name: "get_flexible_earn_products",
+export const getFlexibleProductsTool = createTool({
+  id: "get_flexible_earn_products",
   description:
     "Get list of available flexible earn products with APY rates. " +
     "Use when user asks 'what can I earn on', 'flexible savings rates', 'earn APY'.",
-  parameters: z.object({
+  inputSchema: z.object({
     asset: z.string().default("").describe("Filter by asset (e.g., 'USDT', 'BTC'). Empty for all."),
   }),
-  async execute({ asset }, runContext: ToolRunContext) {
-    const ctx = runContext?.context;
+  outputSchema: z.object({
+    total: z.number().optional(),
+    products: z
+      .array(
+        z.object({
+          asset: z.string(),
+          productId: z.string(),
+          apy: z.string(),
+          minPurchase: z.string(),
+          canRedeem: z.boolean(),
+          isSoldOut: z.boolean(),
+          hot: z.boolean(),
+        })
+      )
+      .optional(),
+    message: z.string().optional(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ context, asset }) => {
+    const ctx = context as GordonContext;
     if (!ctx?.binance) {
       return errors.noBinance;
     }
@@ -55,16 +87,34 @@ export const getFlexibleProductsTool = tool({
   },
 });
 
-export const getLockedProductsTool = tool({
-  name: "get_locked_earn_products",
+export const getLockedProductsTool = createTool({
+  id: "get_locked_earn_products",
   description:
     "Get list of available locked earn products with higher APY rates. " +
     "Use when user asks 'locked staking options', 'higher APY', 'lock my crypto'.",
-  parameters: z.object({
+  inputSchema: z.object({
     asset: z.string().default("").describe("Filter by asset (e.g., 'BNB', 'ETH'). Empty for all."),
   }),
-  async execute({ asset }, runContext: ToolRunContext) {
-    const ctx = runContext?.context;
+  outputSchema: z.object({
+    total: z.number().optional(),
+    products: z
+      .array(
+        z.object({
+          asset: z.string(),
+          projectId: z.string(),
+          duration: z.string(),
+          apy: z.string(),
+          minAmount: z.string(),
+          maxAmount: z.string(),
+          renewable: z.boolean(),
+        })
+      )
+      .optional(),
+    message: z.string().optional(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ context, asset }) => {
+    const ctx = context as GordonContext;
     if (!ctx?.binance) {
       return errors.noBinance;
     }
@@ -101,15 +151,49 @@ export const getLockedProductsTool = tool({
 // Position Management
 // ============================================================================
 
-export const getAllEarnPositionsTool = tool({
-  name: "get_all_earn_positions",
+export const getAllEarnPositionsTool = createTool({
+  id: "get_all_earn_positions",
   description:
     "Get ALL Simple Earn positions - both flexible AND locked, with total value summary. " +
     "This is the comprehensive view. Use when user asks 'my earn positions', 'what am I earning on', " +
     "'staking balance', 'all my earn', 'how much am I earning'.",
-  parameters: z.object({}),
-  async execute(_, runContext: ToolRunContext) {
-    const ctx = runContext?.context;
+  inputSchema: z.object({}),
+  outputSchema: z.object({
+    flexible: z
+      .array(
+        z.object({
+          asset: z.string(),
+          amount: z.string(),
+          apy: z.string(),
+          productName: z.string(),
+        })
+      )
+      .optional(),
+    locked: z
+      .array(
+        z.object({
+          asset: z.string(),
+          amount: z.string(),
+          apy: z.string(),
+          duration: z.string(),
+          daysRemaining: z.number(),
+          redeemDate: z.string(),
+          autoRenew: z.boolean(),
+        })
+      )
+      .optional(),
+    totalValue: z
+      .object({
+        flexible: z.string().optional(),
+        locked: z.string().optional(),
+        total: z.string().optional(),
+      })
+      .optional(),
+    message: z.string().optional(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ context }) => {
+    const ctx = context as GordonContext;
     if (!ctx?.binance) {
       return errors.noBinance;
     }
@@ -155,19 +239,27 @@ export const getAllEarnPositionsTool = tool({
 // Subscribe/Redeem
 // ============================================================================
 
-export const subscribeFlexibleTool = tool({
-  name: "subscribe_flexible_earn",
+export const subscribeFlexibleTool = createTool({
+  id: "subscribe_flexible_earn",
   description:
     "Subscribe to a flexible earn product to start earning. " +
     "Use when user says 'start earning on USDT', 'put my BTC in earn', 'subscribe to flexible'. " +
     "Requires ARMED mode.",
-  parameters: z.object({
+  inputSchema: z.object({
     productId: z.string().describe("Product ID from get_flexible_earn_products"),
     amount: z.number().positive().describe("Amount to subscribe"),
     sourceAccount: z.enum(["SPOT", "FUND"]).default("SPOT").describe("Source wallet"),
   }),
-  async execute({ productId, amount, sourceAccount }, runContext: ToolRunContext) {
-    const ctx = runContext?.context;
+  outputSchema: z.object({
+    success: z.boolean().optional(),
+    message: z.string().optional(),
+    purchaseId: z.number().optional(),
+    productId: z.string().optional(),
+    amount: z.number().optional(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ context, productId, amount, sourceAccount }) => {
+    const ctx = context as GordonContext;
     if (!ctx?.binance) {
       return errors.noBinance;
     }
@@ -194,20 +286,27 @@ export const subscribeFlexibleTool = tool({
   },
 });
 
-export const redeemFlexibleTool = tool({
-  name: "redeem_flexible_earn",
+export const redeemFlexibleTool = createTool({
+  id: "redeem_flexible_earn",
   description:
     "Redeem from a flexible earn product back to wallet. " +
     "Use when user says 'redeem my USDT', 'stop earning', 'withdraw from flexible'. " +
     "Requires ARMED mode.",
-  parameters: z.object({
+  inputSchema: z.object({
     productId: z.string().describe("Product ID from get_all_earn_positions"),
     amount: z.number().default(0).describe("Amount to redeem. Use 0 with redeemAll=true to redeem all."),
     redeemAll: z.boolean().default(false).describe("Redeem entire position"),
     destAccount: z.enum(["SPOT", "FUND"]).default("SPOT").describe("Destination wallet"),
   }),
-  async execute({ productId, amount, redeemAll, destAccount }, runContext: ToolRunContext) {
-    const ctx = runContext?.context;
+  outputSchema: z.object({
+    success: z.boolean().optional(),
+    message: z.string().optional(),
+    redeemId: z.number().optional(),
+    productId: z.string().optional(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ context, productId, amount, redeemAll, destAccount }) => {
+    const ctx = context as GordonContext;
     if (!ctx?.binance) {
       return errors.noBinance;
     }
@@ -235,19 +334,28 @@ export const redeemFlexibleTool = tool({
   },
 });
 
-export const subscribeLockedTool = tool({
-  name: "subscribe_locked_earn",
+export const subscribeLockedTool = createTool({
+  id: "subscribe_locked_earn",
   description:
     "Subscribe to a locked earn product for higher APY. " +
     "Use when user says 'lock my BNB', 'stake for 90 days', 'subscribe to locked'. " +
     "Requires ARMED mode. Funds are locked for the duration.",
-  parameters: z.object({
+  inputSchema: z.object({
     projectId: z.string().describe("Project ID from get_locked_earn_products"),
     amount: z.number().positive().describe("Amount to lock"),
     sourceAccount: z.enum(["SPOT", "FUND"]).default("SPOT").describe("Source wallet"),
   }),
-  async execute({ projectId, amount, sourceAccount }, runContext: ToolRunContext) {
-    const ctx = runContext?.context;
+  outputSchema: z.object({
+    success: z.boolean().optional(),
+    message: z.string().optional(),
+    purchaseId: z.number().optional(),
+    warning: z.string().optional(),
+    projectId: z.string().optional(),
+    amount: z.number().optional(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ context, projectId, amount, sourceAccount }) => {
+    const ctx = context as GordonContext;
     if (!ctx?.binance) {
       return errors.noBinance;
     }
@@ -275,11 +383,19 @@ export const subscribeLockedTool = tool({
   },
 });
 
-export const earnTools = [
-  getFlexibleProductsTool,
-  getLockedProductsTool,
-  getAllEarnPositionsTool,
-  subscribeFlexibleTool,
-  redeemFlexibleTool,
-  subscribeLockedTool,
-];
+// ============================================================================
+// Export as Object (Mastra format)
+// ============================================================================
+
+/**
+ * Earn tools exported as an object for Mastra Agent
+ * This is the format expected by Mastra's Agent class
+ */
+export const earnTools = {
+  get_flexible_earn_products: getFlexibleProductsTool,
+  get_locked_earn_products: getLockedProductsTool,
+  get_all_earn_positions: getAllEarnPositionsTool,
+  subscribe_flexible_earn: subscribeFlexibleTool,
+  redeem_flexible_earn: redeemFlexibleTool,
+  subscribe_locked_earn: subscribeLockedTool,
+};

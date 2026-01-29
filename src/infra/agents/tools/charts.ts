@@ -1,14 +1,28 @@
 /**
- * Chart Tools
+ * Chart Tools (Mastra Format)
  * ASCII chart visualization for terminal display
+ *
+ * This file is the Mastra-format version of the chart tools.
+ * Key differences from OpenAI Agents SDK format:
+ * - tool() -> createTool()
+ * - name -> id
+ * - parameters -> inputSchema
+ * - Context access via first parameter destructuring
  */
 
-import { tool } from "@openai/agents";
+import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 import asciichart from "asciichart";
 
-import type { ToolRunContext } from "./types.ts";
-import { errors } from "./types.ts";
+import type { GordonContext } from "../types.ts";
+
+// ============================================================================
+// Error Messages
+// ============================================================================
+
+const errors = {
+  noBinance: { error: "Binance client not connected. Please run setup first." },
+};
 
 // ============================================================================
 // ANSI Color Codes for Terminal
@@ -187,14 +201,14 @@ function formatPrice(price: number): string {
 // ASCII Price Chart Tool
 // ============================================================================
 
-export const displayPriceChartTool = tool({
-  name: "display_price_chart",
+export const displayPriceChartTool = createTool({
+  id: "display_price_chart",
   description:
     "Display an ASCII price chart in the terminal. " +
     "Use when user asks for 'chart', 'graph', 'visual', 'price trend', or 'show me the price'. " +
     "Shows closing prices over time as a line chart.",
-  parameters: z.object({
-    symbol: z.string().describe("Trading pair (e.g., 'BTCUSDT', 'LINKUSDT')"),
+  inputSchema: z.object({
+    symbol: z.string().describe("Trading pair (e.g., 'BTCUSDT', 'ETHUSDT')"),
     interval: z
       .enum(["1h", "4h", "1d"])
       .default("1d")
@@ -206,8 +220,8 @@ export const displayPriceChartTool = tool({
       .default(14)
       .describe("Number of periods to show (default: 14)"),
   }),
-  async execute({ symbol, interval, periods }, runContext: ToolRunContext) {
-    const ctx = runContext?.context;
+  execute: async ({ context, symbol, interval, periods }) => {
+    const ctx = context as GordonContext;
     if (!ctx?.binance) {
       return errors.noBinance;
     }
@@ -277,16 +291,108 @@ export const displayPriceChartTool = tool({
 });
 
 // ============================================================================
+// Candlestick Chart Tool (with red/green colors)
+// ============================================================================
+
+export const displayCandlestickChartTool = createTool({
+  id: "display_candlestick_chart",
+  description:
+    "Display a professional candlestick chart with red/green colors. " +
+    "Use when user asks for 'candlestick', 'candles', 'OHLC', or wants a professional trading chart. " +
+    "Shows open, high, low, close with bullish (green) and bearish (red) candles.",
+  inputSchema: z.object({
+    symbol: z.string().describe("Trading pair (e.g., 'BTCUSDT', 'ETHUSDT')"),
+    interval: z
+      .enum(["1h", "4h", "1d"])
+      .default("1d")
+      .describe("Candle interval"),
+    periods: z
+      .number()
+      .min(10)
+      .max(50)
+      .default(20)
+      .describe("Number of candles to show (default: 20)"),
+    showVolume: z
+      .boolean()
+      .default(true)
+      .describe("Show volume bars below chart"),
+  }),
+  execute: async ({ context, symbol, interval, periods, showVolume }) => {
+    const ctx = context as GordonContext;
+    if (!ctx?.binance) {
+      return errors.noBinance;
+    }
+
+    // Normalize symbol
+    const normalizedSymbol = symbol.toUpperCase().endsWith("USDT")
+      ? symbol.toUpperCase()
+      : `${symbol.toUpperCase()}USDT`;
+
+    try {
+      const candles = await ctx.binance.getCandles(normalizedSymbol, interval, periods);
+
+      if (!candles || candles.length === 0) {
+        return { error: `No candle data found for ${normalizedSymbol}` };
+      }
+
+      // Generate the candlestick chart using our custom renderer
+      const chartOutput = renderCandlestickChart(candles, {
+        height: 16,
+        showVolume,
+      });
+
+      // Calculate stats
+      const currentPrice = candles[candles.length - 1]?.close ?? 0;
+      const startPrice = candles[0]?.open ?? 0;
+      const highPrice = Math.max(...candles.map((c) => c.high));
+      const lowPrice = Math.min(...candles.map((c) => c.low));
+      const priceChange = currentPrice - startPrice;
+      const priceChangePercent = startPrice > 0 ? (priceChange / startPrice) * 100 : 0;
+
+      // Count bullish/bearish candles
+      const bullishCount = candles.filter((c) => c.close >= c.open).length;
+      const bearishCount = candles.length - bullishCount;
+
+      const intervalLabel = interval === "1h" ? "hours" : interval === "4h" ? "4-hour periods" : "days";
+
+      return {
+        symbol: normalizedSymbol,
+        interval,
+        periods: candles.length,
+        chart: `\n${normalizedSymbol} - ${interval.toUpperCase()}\n${chartOutput}\n`,
+        timeRange: `Last ${candles.length} ${intervalLabel}`,
+        stats: {
+          current: currentPrice,
+          open: startPrice,
+          high: highPrice,
+          low: lowPrice,
+          change: priceChange,
+          changePercent: `${priceChangePercent >= 0 ? "+" : ""}${priceChangePercent.toFixed(2)}%`,
+        },
+        sentiment: {
+          bullishCandles: bullishCount,
+          bearishCandles: bearishCount,
+          ratio: `${((bullishCount / candles.length) * 100).toFixed(0)}% bullish`,
+        },
+        legend: `${COLORS.green}███ Green${COLORS.reset} = Bullish (close > open) | ${COLORS.red}░░░ Red${COLORS.reset} = Bearish (close < open)`,
+      };
+    } catch (error) {
+      return { error: `Failed to generate candlestick chart: ${(error as Error).message}` };
+    }
+  },
+});
+
+// ============================================================================
 // Multi-Asset Comparison Chart
 // ============================================================================
 
-export const displayComparisonChartTool = tool({
-  name: "display_comparison_chart",
+export const displayComparisonChartTool = createTool({
+  id: "display_comparison_chart",
   description:
     "Display multiple assets on the same chart for comparison. " +
     "Use when user wants to compare prices of multiple coins. " +
     "Normalizes prices to percentage change from start for fair comparison.",
-  parameters: z.object({
+  inputSchema: z.object({
     symbols: z
       .array(z.string())
       .min(2)
@@ -303,8 +409,8 @@ export const displayComparisonChartTool = tool({
       .default(14)
       .describe("Number of periods"),
   }),
-  async execute({ symbols, interval, periods }, runContext: ToolRunContext) {
-    const ctx = runContext?.context;
+  execute: async ({ context, symbols, interval, periods }) => {
+    const ctx = context as GordonContext;
     if (!ctx?.binance) {
       return errors.noBinance;
     }
@@ -377,12 +483,12 @@ export const displayComparisonChartTool = tool({
 // Volume Chart Tool
 // ============================================================================
 
-export const displayVolumeChartTool = tool({
-  name: "display_volume_chart",
+export const displayVolumeChartTool = createTool({
+  id: "display_volume_chart",
   description:
     "Display a volume chart alongside price. " +
     "Use when user asks about volume trends or trading activity.",
-  parameters: z.object({
+  inputSchema: z.object({
     symbol: z.string().describe("Trading pair"),
     interval: z
       .enum(["1h", "4h", "1d"])
@@ -395,8 +501,8 @@ export const displayVolumeChartTool = tool({
       .default(14)
       .describe("Number of periods"),
   }),
-  async execute({ symbol, interval, periods }, runContext: ToolRunContext) {
-    const ctx = runContext?.context;
+  execute: async ({ context, symbol, interval, periods }) => {
+    const ctx = context as GordonContext;
     if (!ctx?.binance) {
       return errors.noBinance;
     }
@@ -454,104 +560,16 @@ export const displayVolumeChartTool = tool({
 });
 
 // ============================================================================
-// Candlestick Chart Tool (with red/green colors)
+// Export as Object (Mastra format)
 // ============================================================================
 
-export const displayCandlestickChartTool = tool({
-  name: "display_candlestick_chart",
-  description:
-    "Display a professional candlestick chart with red/green colors. " +
-    "Use when user asks for 'candlestick', 'candles', 'OHLC', or wants a professional trading chart. " +
-    "Shows open, high, low, close with bullish (green) and bearish (red) candles.",
-  parameters: z.object({
-    symbol: z.string().describe("Trading pair (e.g., 'BTCUSDT', 'ETHUSDT')"),
-    interval: z
-      .enum(["1h", "4h", "1d"])
-      .default("1d")
-      .describe("Candle interval"),
-    periods: z
-      .number()
-      .min(10)
-      .max(50)
-      .default(20)
-      .describe("Number of candles to show (default: 20)"),
-    showVolume: z
-      .boolean()
-      .default(true)
-      .describe("Show volume bars below chart"),
-  }),
-  async execute({ symbol, interval, periods, showVolume }, runContext: ToolRunContext) {
-    const ctx = runContext?.context;
-    if (!ctx?.binance) {
-      return errors.noBinance;
-    }
-
-    // Normalize symbol
-    const normalizedSymbol = symbol.toUpperCase().endsWith("USDT")
-      ? symbol.toUpperCase()
-      : `${symbol.toUpperCase()}USDT`;
-
-    try {
-      const candles = await ctx.binance.getCandles(normalizedSymbol, interval, periods);
-
-      if (!candles || candles.length === 0) {
-        return { error: `No candle data found for ${normalizedSymbol}` };
-      }
-
-      // Generate the candlestick chart using our custom renderer
-      const chartOutput = renderCandlestickChart(candles, {
-        height: 16,
-        showVolume,
-      });
-
-      // Calculate stats
-      const currentPrice = candles[candles.length - 1]?.close ?? 0;
-      const startPrice = candles[0]?.open ?? 0;
-      const highPrice = Math.max(...candles.map((c) => c.high));
-      const lowPrice = Math.min(...candles.map((c) => c.low));
-      const priceChange = currentPrice - startPrice;
-      const priceChangePercent = startPrice > 0 ? (priceChange / startPrice) * 100 : 0;
-
-      // Count bullish/bearish candles
-      const bullishCount = candles.filter((c) => c.close >= c.open).length;
-      const bearishCount = candles.length - bullishCount;
-
-      const intervalLabel = interval === "1h" ? "hours" : interval === "4h" ? "4-hour periods" : "days";
-
-      return {
-        symbol: normalizedSymbol,
-        interval,
-        periods: candles.length,
-        chart: `\n${normalizedSymbol} - ${interval.toUpperCase()}\n${chartOutput}\n`,
-        timeRange: `Last ${candles.length} ${intervalLabel}`,
-        stats: {
-          current: currentPrice,
-          open: startPrice,
-          high: highPrice,
-          low: lowPrice,
-          change: priceChange,
-          changePercent: `${priceChangePercent >= 0 ? "+" : ""}${priceChangePercent.toFixed(2)}%`,
-        },
-        sentiment: {
-          bullishCandles: bullishCount,
-          bearishCandles: bearishCount,
-          ratio: `${((bullishCount / candles.length) * 100).toFixed(0)}% bullish`,
-        },
-        legend: `${COLORS.green}███ Green${COLORS.reset} = Bullish (close > open) | ${COLORS.red}░░░ Red${COLORS.reset} = Bearish (close < open)`,
-      };
-    } catch (error) {
-      return { error: `Failed to generate candlestick chart: ${(error as Error).message}` };
-    }
-  },
-});
-
-// ============================================================================
-// Export
-// ============================================================================
-
-export const chartTools = [
-  displayPriceChartTool,
-  displayCandlestickChartTool,
-  displayComparisonChartTool,
-  displayVolumeChartTool,
-];
+/**
+ * Chart tools exported as an object for Mastra Agent
+ * This is the format expected by Mastra's Agent class
+ */
+export const chartTools = {
+  display_price_chart: displayPriceChartTool,
+  display_candlestick_chart: displayCandlestickChartTool,
+  display_comparison_chart: displayComparisonChartTool,
+  display_volume_chart: displayVolumeChartTool,
+};

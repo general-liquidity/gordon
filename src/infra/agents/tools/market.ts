@@ -1,27 +1,40 @@
 /**
- * Market Tools
+ * Market Tools (Mastra Format)
  * Tools for scanning and analyzing the market
+ *
+ * Migrated from OpenAI Agents SDK format to Mastra format:
+ * - tool() -> createTool()
+ * - name -> id
+ * - parameters -> inputSchema
+ * - Context access via first parameter destructuring
  */
 
-import { tool } from "@openai/agents";
+import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
 import { scan } from "../../../core/scanner.ts";
 import { analyze } from "../../../core/analyzer.ts";
 import { getHistoricalOpportunities, getOpportunitySummary } from "../../storage/events.ts";
-import type { ToolRunContext } from "./types.ts";
-import { errors } from "./types.ts";
+import type { GordonContext } from "../types.ts";
+
+// ============================================================================
+// Error Messages
+// ============================================================================
+
+const errors = {
+  noBinance: { error: "Binance client not connected. Please run setup first." },
+};
 
 // ============================================================================
 // Market Scanning Tool
 // ============================================================================
 
-export const scanMarketTool = tool({
-  name: "scan_market",
+export const scanMarketTool = createTool({
+  id: "scan_market",
   description:
     "Scan the market for trading opportunities. Finds coins near support with bullish signals. " +
     "Use this when the user wants to find trading opportunities or asks 'what should I buy?'",
-  parameters: z.object({
+  inputSchema: z.object({
     topN: z
       .number()
       .min(10)
@@ -33,8 +46,21 @@ export const scanMarketTool = tool({
       .default(["1h", "4h"])
       .describe("Timeframes to analyze"),
   }),
-  async execute({ topN, timeframes }, runContext: ToolRunContext) {
-    const ctx = runContext?.context;
+  outputSchema: z.object({
+    timestamp: z.string().optional(),
+    coinsScanned: z.number().optional(),
+    opportunities: z.array(z.object({
+      symbol: z.string(),
+      price: z.number(),
+      change24h: z.number(),
+      setupConfidence: z.number(),
+      bias: z.string(),
+      risk: z.string(),
+    })).optional(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ context, topN, timeframes }) => {
+    const ctx = context as GordonContext;
     if (!ctx?.binance) {
       return errors.noBinance;
     }
@@ -63,12 +89,12 @@ export const scanMarketTool = tool({
 // Coin Analysis Tool
 // ============================================================================
 
-export const analyzeCoinTool = tool({
-  name: "analyze_coin",
+export const analyzeCoinTool = createTool({
+  id: "analyze_coin",
   description:
     "Perform deep analysis on a specific coin/trading pair. " +
     "Use this when the user asks about a specific coin like 'analyze BTC' or 'what about ETH?'",
-  parameters: z.object({
+  inputSchema: z.object({
     symbol: z
       .string()
       .describe("Trading pair symbol (e.g., 'BTCUSDT', 'ETHUSDT')"),
@@ -77,8 +103,30 @@ export const analyzeCoinTool = tool({
       .default(["1h", "4h", "1d"])
       .describe("Timeframes to analyze"),
   }),
-  async execute({ symbol, timeframes }, runContext: ToolRunContext) {
-    const ctx = runContext?.context;
+  outputSchema: z.object({
+    symbol: z.string().optional(),
+    price: z.number().optional(),
+    trend: z.string().optional(),
+    setupDetected: z.boolean().optional(),
+    setupConfidence: z.number().optional(),
+    supports: z.array(z.object({
+      price: z.number(),
+      strength: z.number(),
+    })).optional(),
+    resistances: z.array(z.object({
+      price: z.number(),
+      strength: z.number(),
+    })).optional(),
+    indicators: z.object({
+      rsi: z.number().nullable().optional(),
+      macdState: z.string().optional(),
+      volumeTrend: z.string().optional(),
+    }).optional(),
+    recommendation: z.string().optional(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ context, symbol, timeframes }) => {
+    const ctx = context as GordonContext;
     if (!ctx?.binance) {
       return errors.noBinance;
     }
@@ -125,12 +173,12 @@ export const analyzeCoinTool = tool({
 // Historical Opportunities Tool
 // ============================================================================
 
-export const getHistoricalOpportunitiesTool = tool({
-  name: "get_historical_opportunities",
+export const getHistoricalOpportunitiesTool = createTool({
+  id: "get_historical_opportunities",
   description:
     "Query past trading opportunities that were detected by scans. " +
     "Use this to answer questions like 'did we miss any opportunities?' or 'what setups were found recently?'",
-  parameters: z.object({
+  inputSchema: z.object({
     daysBack: z
       .number()
       .min(1)
@@ -148,7 +196,21 @@ export const getHistoricalOpportunitiesTool = tool({
       .default(0)
       .describe("Minimum confidence threshold (0-1). 0 for no filter."),
   }),
-  async execute({ daysBack, symbol, minConfidence }) {
+  outputSchema: z.object({
+    message: z.string(),
+    totalOpportunities: z.number(),
+    opportunities: z.array(z.object({
+      symbol: z.string(),
+      timestamp: z.string(),
+      price: z.number(),
+      confidence: z.string(),
+      bias: z.string(),
+      risk: z.string(),
+    })),
+    dailySummary: z.record(z.string(), z.number()),
+  }),
+  execute: async ({ context, daysBack, symbol, minConfidence }) => {
+    // This tool doesn't require Binance client - it reads from local storage
     const opportunities = getHistoricalOpportunities({
       daysBack,
       symbol: symbol || undefined,
@@ -183,4 +245,16 @@ export const getHistoricalOpportunitiesTool = tool({
   },
 });
 
-export const marketTools = [scanMarketTool, analyzeCoinTool, getHistoricalOpportunitiesTool];
+// ============================================================================
+// Export as Object (Mastra format)
+// ============================================================================
+
+/**
+ * Market tools exported as an object for Mastra Agent
+ * This is the format expected by Mastra's Agent class
+ */
+export const marketTools = {
+  scan_market: scanMarketTool,
+  analyze_coin: analyzeCoinTool,
+  get_historical_opportunities: getHistoricalOpportunitiesTool,
+};

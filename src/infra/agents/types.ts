@@ -16,6 +16,10 @@ export interface GordonContext {
   config: GordonConfig;
   portfolioValue: number;
   availableCash: number;
+  /** User ID for Mastra memory tracking */
+  userId?: string;
+  /** Thread ID for conversation persistence */
+  threadId?: string;
 }
 
 /**

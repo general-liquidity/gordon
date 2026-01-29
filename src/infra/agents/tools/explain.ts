@@ -1,35 +1,55 @@
 /**
- * Explain Tools
+ * Explain Tools (Mastra Format)
  * Tools for explaining trading concepts and terminology
+ *
+ * This file demonstrates the Mastra tool format for migration from OpenAI Agents SDK.
+ * Key differences:
+ * - tool() -> createTool()
+ * - name -> id
+ * - parameters -> inputSchema
+ * - Context access via first parameter destructuring
  */
 
-import { tool } from "@openai/agents";
+import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
+import type { GordonContext } from "../types.ts";
 import { explain, getPresetExplanation } from "../../../core/explainer.ts";
-import type { ToolRunContext } from "./types.ts";
-import { errors } from "./types.ts";
+
+// ============================================================================
+// Error Messages
+// ============================================================================
+
+const errors = {
+  noLLM: { error: "LLM client not connected. Please run setup first." },
+};
 
 // ============================================================================
 // Explain Tool
 // ============================================================================
 
-export const explainTool = tool({
-  name: "explain",
+export const explainTool = createTool({
+  id: "explain",
   description:
     "Explain a trading concept, term, or strategy in simple terms. " +
     "Use when the user asks 'what is X?' or 'explain Y' or needs help understanding something",
-  parameters: z.object({
+  inputSchema: z.object({
     topic: z.string().describe("The topic to explain"),
     additionalContext: z
       .string()
       .default("")
       .describe("Additional context for the explanation"),
   }),
-  async execute({ topic, additionalContext }, runContext: ToolRunContext) {
-    const ctx = runContext?.context;
+  outputSchema: z.object({
+    explanation: z.string().optional(),
+    topic: z.string(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ context, topic, additionalContext }) => {
+    // Context is injected via Mastra's RuntimeContext
+    const ctx = context as GordonContext;
     if (!ctx?.llm) {
-      return errors.noLLM;
+      return { ...errors.noLLM, topic };
     }
 
     // Check if it's a preset topic
@@ -39,9 +59,23 @@ export const explainTool = tool({
     }
 
     // Custom explanation using AI
-    const explanation = await explain(ctx.llm, topic, { topic: additionalContext || undefined });
-    return { explanation, topic };
+    try {
+      const explanation = await explain(ctx.llm, topic, { topic: additionalContext || undefined });
+      return { explanation, topic };
+    } catch (error) {
+      return { error: `Failed to explain topic: ${(error as Error).message}`, topic };
+    }
   },
 });
 
-export const explainTools = [explainTool];
+// ============================================================================
+// Export as Object (Mastra format)
+// ============================================================================
+
+/**
+ * Explain tools exported as an object for Mastra Agent
+ * This is the format expected by Mastra's Agent class
+ */
+export const explainTools = {
+  explain: explainTool,
+};

@@ -1,31 +1,43 @@
 /**
- * Scheduler Tools
+ * Scheduler Tools (Mastra Format)
  * Tools for controlling background market scanning
+ *
+ * Migrated from OpenAI Agents SDK format to Mastra format.
+ * Key differences:
+ * - tool() -> createTool()
+ * - name -> id
+ * - parameters -> inputSchema
+ * - Context access via first parameter destructuring
  */
 
-import { tool } from "@openai/agents";
+import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
 import {
   startScheduler,
   stopScheduler,
   getSchedulerStatus,
-  updateSchedulerConfig,
-  triggerImmediateScan,
 } from "../../../core/scheduler.ts";
-import type { ToolRunContext } from "./types.ts";
-import { errors } from "./types.ts";
+import type { GordonContext } from "../types.ts";
+
+// ============================================================================
+// Error Messages
+// ============================================================================
+
+const errors = {
+  noBinance: { error: "Binance client not connected. Please run setup first." },
+};
 
 // ============================================================================
 // Start Scheduler Tool
 // ============================================================================
 
-export const startSchedulerTool = tool({
-  name: "start_background_scanning",
+export const startSchedulerTool = createTool({
+  id: "start_background_scanning",
   description:
     "Start automatic background market scanning at regular intervals. " +
     "Use when the user says 'keep scanning', 'monitor the market', or 'alert me when there's an opportunity'.",
-  parameters: z.object({
+  inputSchema: z.object({
     intervalMinutes: z
       .number()
       .min(15)
@@ -45,8 +57,21 @@ export const startSchedulerTool = tool({
       .default(0.5)
       .describe("Minimum confidence to report opportunities (0.3-0.9)"),
   }),
-  async execute({ intervalMinutes, topN, minConfidence }, runContext: ToolRunContext) {
-    const ctx = runContext?.context;
+  outputSchema: z.object({
+    success: z.boolean(),
+    message: z.string(),
+    status: z.object({
+      isRunning: z.boolean(),
+      intervalMs: z.number().optional(),
+      lastScanTime: z.string().nullable().optional(),
+      nextScanTime: z.string().nullable().optional(),
+      scanCount: z.number().optional(),
+      opportunitiesFound: z.number().optional(),
+    }).optional(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ context, intervalMinutes, topN, minConfidence }) => {
+    const ctx = context as GordonContext;
     if (!ctx?.binance) {
       return errors.noBinance;
     }
@@ -81,13 +106,22 @@ export const startSchedulerTool = tool({
 // Stop Scheduler Tool
 // ============================================================================
 
-export const stopSchedulerTool = tool({
-  name: "stop_background_scanning",
+export const stopSchedulerTool = createTool({
+  id: "stop_background_scanning",
   description:
     "Stop automatic background market scanning. " +
     "Use when the user says 'stop scanning', 'stop monitoring', or 'cancel alerts'.",
-  parameters: z.object({}),
-  async execute() {
+  inputSchema: z.object({}),
+  outputSchema: z.object({
+    success: z.boolean(),
+    message: z.string(),
+    finalStats: z.object({
+      scanCount: z.number(),
+      opportunitiesFound: z.number(),
+    }).optional(),
+    error: z.string().optional(),
+  }),
+  execute: async () => {
     const status = getSchedulerStatus();
     if (!status.isRunning) {
       return {
@@ -113,13 +147,24 @@ export const stopSchedulerTool = tool({
 // Get Scheduler Status Tool
 // ============================================================================
 
-export const getSchedulerStatusTool = tool({
-  name: "get_scanning_status",
+export const getSchedulerStatusTool = createTool({
+  id: "get_scanning_status",
   description:
     "Check the status of background market scanning. " +
     "Use when the user asks 'is scanning running?', 'when is the next scan?', or 'scanning status'.",
-  parameters: z.object({}),
-  async execute() {
+  inputSchema: z.object({}),
+  outputSchema: z.object({
+    isRunning: z.boolean(),
+    message: z.string(),
+    lastScan: z.string().nullable().optional(),
+    nextScan: z.string().nullable().optional(),
+    stats: z.object({
+      totalScans: z.number(),
+      opportunitiesFound: z.number(),
+    }).optional(),
+    error: z.string().optional(),
+  }),
+  execute: async () => {
     const status = getSchedulerStatus();
 
     if (!status.isRunning) {
@@ -144,8 +189,16 @@ export const getSchedulerStatusTool = tool({
   },
 });
 
-export const schedulerTools = [
-  startSchedulerTool,
-  stopSchedulerTool,
-  getSchedulerStatusTool,
-];
+// ============================================================================
+// Export as Object (Mastra format)
+// ============================================================================
+
+/**
+ * Scheduler tools exported as an object for Mastra Agent
+ * This is the format expected by Mastra's Agent class
+ */
+export const schedulerTools = {
+  start_background_scanning: startSchedulerTool,
+  stop_background_scanning: stopSchedulerTool,
+  get_scanning_status: getSchedulerStatusTool,
+};

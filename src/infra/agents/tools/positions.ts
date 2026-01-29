@@ -1,27 +1,56 @@
 /**
- * Position Tools
+ * Position Tools (Mastra Format)
  * Tools for monitoring and managing open positions
+ *
+ * Migrated from OpenAI Agents SDK to Mastra format.
+ * Key differences:
+ * - tool() -> createTool()
+ * - name -> id
+ * - parameters -> inputSchema
+ * - Context access via first parameter destructuring
  */
 
-import { tool } from "@openai/agents";
+import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
 import { runMonitorCycle, type MonitorResult } from "../../../core/monitor.ts";
-import type { ToolRunContext } from "./types.ts";
-import { errors } from "./types.ts";
+import type { GordonContext } from "../types.ts";
+
+// ============================================================================
+// Error Messages
+// ============================================================================
+
+const errors = {
+  noBinance: { error: "Binance client not connected. Please run setup first." },
+};
 
 // ============================================================================
 // Position Monitor Tool
 // ============================================================================
 
-export const checkPositionsTool = tool({
-  name: "check_positions",
+export const checkPositionsTool = createTool({
+  id: "check_positions",
   description:
     "Check the status of all open positions and detect any alerts or anomalies. " +
     "Use this when the user asks 'how are my trades?' or 'check positions'",
-  parameters: z.object({}),
-  async execute(_: Record<string, never>, runContext: ToolRunContext) {
-    const ctx = runContext?.context;
+  inputSchema: z.object({}),
+  outputSchema: z.object({
+    openTrades: z.number(),
+    totalUnrealizedPnl: z.number(),
+    totalUnrealizedPnlPercent: z.number(),
+    positions: z.array(
+      z.object({
+        symbol: z.string(),
+        status: z.string(),
+        unrealizedPnl: z.number(),
+        unrealizedPnlPercent: z.number(),
+      })
+    ),
+    alerts: z.array(z.string()),
+    error: z.string().optional(),
+  }),
+  execute: async ({ context }) => {
+    const ctx = context as GordonContext;
     if (!ctx?.binance) {
       return errors.noBinance;
     }
@@ -46,4 +75,14 @@ export const checkPositionsTool = tool({
   },
 });
 
-export const positionTools = [checkPositionsTool];
+// ============================================================================
+// Export as Object (Mastra format)
+// ============================================================================
+
+/**
+ * Position tools exported as an object for Mastra Agent
+ * This is the format expected by Mastra's Agent class
+ */
+export const positionTools = {
+  check_positions: checkPositionsTool,
+};

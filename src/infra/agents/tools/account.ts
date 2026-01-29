@@ -1,14 +1,28 @@
 /**
- * Account Tools
+ * Account Tools (Mastra Format)
  * Tools for viewing portfolio, balances, and account details
+ *
+ * Migrated from OpenAI Agents SDK format to Mastra format.
+ * Key changes:
+ * - tool() -> createTool()
+ * - name -> id
+ * - parameters -> inputSchema
+ * - Context access via first parameter destructuring
  */
 
-import { tool } from "@openai/agents";
+import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
 import { listTrades } from "../../storage/trades.ts";
-import type { ToolRunContext } from "./types.ts";
-import { errors } from "./types.ts";
+import type { GordonContext } from "../types.ts";
+
+// ============================================================================
+// Error Messages
+// ============================================================================
+
+const errors = {
+  noBinance: { error: "Binance client not connected. Please run setup first." },
+};
 
 // Helper
 const getActiveTrades = () => listTrades({ status: "OPEN" });
@@ -17,14 +31,27 @@ const getActiveTrades = () => listTrades({ status: "OPEN" });
 // Get Portfolio Tool
 // ============================================================================
 
-export const getPortfolioTool = tool({
-  name: "get_portfolio",
+export const getPortfolioTool = createTool({
+  id: "get_portfolio",
   description:
     "Get the current portfolio value and balances from Binance (both Spot and Funding wallets). " +
     "Use when user asks 'what's my balance?' or 'how much do I have?'",
-  parameters: z.object({}),
-  async execute(_: Record<string, never>, runContext: ToolRunContext) {
-    const ctx = runContext?.context;
+  inputSchema: z.object({}),
+  outputSchema: z.object({
+    totalValue: z.number().optional(),
+    holdings: z.array(z.object({
+      asset: z.string(),
+      free: z.number(),
+      locked: z.number(),
+      usdtValue: z.number(),
+      wallet: z.string(),
+      note: z.string().optional(),
+    })).optional(),
+    openTrades: z.number().optional(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ context }) => {
+    const ctx = context as GordonContext;
     if (!ctx?.binance) {
       return errors.noBinance;
     }
@@ -88,13 +115,13 @@ export const getPortfolioTool = tool({
 // Full Account Details Tool
 // ============================================================================
 
-export const getAccountDetailsTool = tool({
-  name: "get_account_details",
+export const getAccountDetailsTool = createTool({
+  id: "get_account_details",
   description:
     "Get comprehensive account details including commission rates, permissions, trade history, " +
     "deposit/withdrawal history, earn positions, and API restrictions. " +
     "Use when user asks 'show all my details', 'account history', 'full account info'",
-  parameters: z.object({
+  inputSchema: z.object({
     includeTradeHistory: z
       .boolean()
       .default(true)
@@ -112,11 +139,81 @@ export const getAccountDetailsTool = tool({
       .default(true)
       .describe("Include Simple Earn positions"),
   }),
-  async execute(
-    { includeTradeHistory, includeDepositHistory, includeWithdrawalHistory, includeEarnPositions },
-    runContext: ToolRunContext
-  ) {
-    const ctx = runContext?.context;
+  outputSchema: z.object({
+    accountType: z.string().optional(),
+    uid: z.number().optional(),
+    commissionRates: z.object({
+      maker: z.string(),
+      taker: z.string(),
+    }).optional(),
+    permissions: z.object({
+      canTrade: z.boolean(),
+      canWithdraw: z.boolean(),
+      canDeposit: z.boolean(),
+      accountPermissions: z.array(z.string()),
+    }).optional(),
+    apiKeyPermissions: z.object({
+      ipRestrict: z.boolean(),
+      enableReading: z.boolean(),
+      enableSpotTrading: z.boolean(),
+      enableWithdrawals: z.boolean(),
+      enableFutures: z.boolean(),
+      enableMargin: z.boolean(),
+      createdAt: z.string(),
+    }).optional(),
+    recentTrades: z.array(z.object({
+      symbol: z.string(),
+      side: z.string(),
+      price: z.number(),
+      quantity: z.number(),
+      quoteQty: z.number(),
+      commission: z.string(),
+      time: z.string(),
+      isMaker: z.boolean(),
+    })).optional(),
+    totalTradesReturned: z.number().optional(),
+    deposits: z.array(z.object({
+      coin: z.string(),
+      amount: z.number(),
+      network: z.string(),
+      status: z.string(),
+      txId: z.string().nullable(),
+      time: z.string(),
+    })).optional(),
+    withdrawals: z.array(z.object({
+      coin: z.string(),
+      amount: z.number(),
+      fee: z.number(),
+      network: z.string(),
+      status: z.string(),
+      address: z.string(),
+      applyTime: z.string(),
+      completeTime: z.string().nullable(),
+    })).optional(),
+    earnPositions: z.array(z.object({
+      asset: z.string(),
+      totalAmount: z.number(),
+      freeAmount: z.number(),
+      lockedAmount: z.number(),
+      apy: z.string(),
+      productName: z.string(),
+    })).optional(),
+    summary: z.object({
+      totalDeposits: z.number(),
+      totalWithdrawals: z.number(),
+      totalRecentTrades: z.number(),
+      earnPositionsCount: z.number(),
+    }).optional(),
+    error: z.string().optional(),
+  }),
+  execute: async ({
+    context,
+    includeTradeHistory,
+    includeDepositHistory,
+    includeWithdrawalHistory,
+    includeEarnPositions,
+  }) => {
+    const ctx = context as GordonContext;
     if (!ctx?.binance) {
       return errors.noBinance;
     }
@@ -226,15 +323,30 @@ export const getAccountDetailsTool = tool({
 // Earn Positions Tool
 // ============================================================================
 
-export const getEarnPositionsTool = tool({
-  name: "get_flexible_positions",
+export const getEarnPositionsTool = createTool({
+  id: "get_flexible_positions",
   description:
     "Get Simple Earn FLEXIBLE positions only (quick access). " +
     "For comprehensive earn info including LOCKED positions, use get_all_earn_positions instead. " +
     "Use for quick check: 'flexible savings balance', 'quick earn check'.",
-  parameters: z.object({}),
-  async execute(_: Record<string, never>, runContext: ToolRunContext) {
-    const ctx = runContext?.context;
+  inputSchema: z.object({}),
+  outputSchema: z.object({
+    message: z.string().optional(),
+    positions: z.array(z.object({
+      asset: z.string(),
+      totalAmount: z.number(),
+      freeAmount: z.number(),
+      lockedAmount: z.number(),
+      apy: z.string(),
+      rewardAsset: z.string(),
+      productName: z.string(),
+    })),
+    totalPositions: z.number().optional(),
+    summary: z.string().optional(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ context }) => {
+    const ctx = context as GordonContext;
     if (!ctx?.binance) {
       return errors.noBinance;
     }
@@ -272,13 +384,22 @@ export const getEarnPositionsTool = tool({
     } catch (error) {
       return {
         error: error instanceof Error ? error.message : "Failed to fetch earn positions",
+        positions: [],
       };
     }
   },
 });
 
-export const accountTools = [
-  getPortfolioTool,
-  getAccountDetailsTool,
-  getEarnPositionsTool,
-];
+// ============================================================================
+// Export as Object (Mastra format)
+// ============================================================================
+
+/**
+ * Account tools exported as an object for Mastra Agent
+ * This is the format expected by Mastra's Agent class
+ */
+export const accountTools = {
+  get_portfolio: getPortfolioTool,
+  get_account_details: getAccountDetailsTool,
+  get_flexible_positions: getEarnPositionsTool,
+};

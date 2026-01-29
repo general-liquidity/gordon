@@ -1,9 +1,17 @@
 /**
- * Trading Tools
+ * Trading Tools (Mastra Format)
  * Tools for creating, managing, and executing trading plans
+ *
+ * Migrated from OpenAI Agents SDK format to Mastra format.
+ * Key changes:
+ * - tool() -> createTool()
+ * - name -> id
+ * - parameters -> inputSchema
+ * - Context access via first parameter destructuring
+ * - needsApproval removed (handle via guardrails in Mastra)
  */
 
-import { tool } from "@openai/agents";
+import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
 import { generatePlan } from "../../../core/planner.ts";
@@ -12,22 +20,34 @@ import { analyze } from "../../../core/analyzer.ts";
 import { loadConfig, saveConfig } from "../../storage/config.ts";
 import { listPlans, getPlan, updatePlan } from "../../storage/plans.ts";
 import { listTrades, getTrade } from "../../storage/trades.ts";
-import type { ToolRunContext } from "./types.ts";
-import { errors } from "./types.ts";
+import type { GordonContext } from "../types.ts";
 
-// Helper functions
+// ============================================================================
+// Error Messages
+// ============================================================================
+
+const errors = {
+  noBinance: { error: "Binance client not connected. Please configure API keys." },
+  noLLM: { error: "LLM client not connected." },
+  noContext: { error: "Context not available." },
+} as const;
+
+// ============================================================================
+// Helper Functions
+// ============================================================================
+
 const getActiveTrades = () => listTrades({ status: "OPEN" });
 
 // ============================================================================
 // Plan Generation Tool
 // ============================================================================
 
-export const createPlanTool = tool({
-  name: "create_plan",
+export const createPlanTool = createTool({
+  id: "create_plan",
   description:
     "Create a trading plan for a specific coin based on analysis. " +
     "Use this when the user wants to trade a coin, e.g., 'buy BTC' or 'create plan for ETH'",
-  parameters: z.object({
+  inputSchema: z.object({
     symbol: z.string().describe("Trading pair symbol (e.g., 'BTCUSDT')"),
     riskLevel: z
       .enum(["low", "medium", "high"])
@@ -40,11 +60,14 @@ export const createPlanTool = tool({
       .default(0.1)
       .describe("Percent of portfolio to allocate"),
   }),
-  async execute(
-    { symbol, riskLevel, allocationPercent },
-    runContext: ToolRunContext
-  ) {
-    const ctx = runContext?.context;
+  outputSchema: z.object({
+    success: z.boolean().optional(),
+    plan: z.any().optional(),
+    summary: z.string().optional(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ context, symbol, riskLevel, allocationPercent }) => {
+    const ctx = context as GordonContext;
     if (!ctx?.binance || !ctx?.llm) {
       return { error: "Binance or LLM client not connected." };
     }
@@ -83,31 +106,38 @@ export const createPlanTool = tool({
 });
 
 // ============================================================================
-// Plan Execution Tool (Requires Approval)
+// Plan Execution Tool
+// Note: needsApproval removed - handle via guardrails in Mastra
 // ============================================================================
 
-export const executePlanTool = tool({
-  name: "execute_plan",
+export const executePlanTool = createTool({
+  id: "execute_plan",
   description:
     "Execute an approved trading plan by placing orders on Binance. " +
     "IMPORTANT: This places real orders with real money. Only use after user confirms the plan.",
-  parameters: z.object({
+  inputSchema: z.object({
     planId: z.string().describe("The ID of the plan to execute"),
   }),
-  needsApproval: true,
-  async execute({ planId }, runContext: ToolRunContext) {
-    const ctx = runContext?.context;
+  outputSchema: z.object({
+    success: z.boolean(),
+    trade: z.any().optional(),
+    orderCount: z.number().optional(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ context, planId }) => {
+    const ctx = context as GordonContext;
     if (!ctx?.binance) {
       return errors.noBinance;
     }
 
     const plan = getPlan(planId);
     if (!plan) {
-      return { error: `Plan not found: ${planId}` };
+      return { success: false, error: `Plan not found: ${planId}` };
     }
 
     if (ctx.config.mode !== "ARMED") {
       return {
+        success: false,
         error: "Cannot execute: System is in SAFE mode. User must arm the system first.",
       };
     }
@@ -134,31 +164,36 @@ export const executePlanTool = tool({
 });
 
 // ============================================================================
-// Close Trade Tool (Requires Approval)
+// Close Trade Tool
+// Note: needsApproval removed - handle via guardrails in Mastra
 // ============================================================================
 
-export const closeTradeTool = tool({
-  name: "close_trade",
+export const closeTradeTool = createTool({
+  id: "close_trade",
   description:
     "Close an open trade by selling all remaining position. " +
     "Use when user wants to exit a trade early, e.g., 'close my BTC trade'",
-  parameters: z.object({
+  inputSchema: z.object({
     tradeId: z.string().describe("The ID of the trade to close"),
     reason: z
       .enum(["MANUAL", "STOP", "TP1", "TP2", "TP3"])
       .default("MANUAL")
       .describe("Reason for closing"),
   }),
-  needsApproval: true,
-  async execute({ tradeId, reason }, runContext: ToolRunContext) {
-    const ctx = runContext?.context;
+  outputSchema: z.object({
+    success: z.boolean(),
+    pnl: z.number().optional(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ context, tradeId, reason }) => {
+    const ctx = context as GordonContext;
     if (!ctx?.binance) {
       return errors.noBinance;
     }
 
     const trade = getTrade(tradeId);
     if (!trade) {
-      return { error: `Trade not found: ${tradeId}` };
+      return { success: false, error: `Trade not found: ${tradeId}` };
     }
 
     const result = await closeTrade(ctx.binance, trade, reason ?? "MANUAL");
@@ -175,19 +210,32 @@ export const closeTradeTool = tool({
 // List Plans Tool
 // ============================================================================
 
-export const listPlansTool = tool({
-  name: "list_plans",
+export const listPlansTool = createTool({
+  id: "list_plans",
   description:
     "List all trading plans, optionally filtered by status. " +
     "Use when user asks 'show my plans' or 'what plans do I have?'",
-  parameters: z.object({
+  inputSchema: z.object({
     status: z
       .enum(["DRAFT", "APPROVED", "EXECUTING", "CLOSED", "CANCELLED", "ALL"])
       .default("ALL")
       .describe("Filter by status (ALL for no filter)"),
     limit: z.number().min(1).max(50).default(10).describe("Max plans to return"),
   }),
-  async execute({ status, limit }) {
+  outputSchema: z.object({
+    count: z.number(),
+    plans: z.array(z.object({
+      id: z.string(),
+      symbol: z.string(),
+      strategy: z.string(),
+      status: z.string(),
+      allocation: z.number(),
+      entry: z.union([z.number(), z.string()]),
+      stopLoss: z.number(),
+      createdAt: z.string(),
+    })),
+  }),
+  execute: async ({ status, limit }) => {
     let plans = listPlans();
 
     if (status && status !== "ALL") {
@@ -216,22 +264,28 @@ export const listPlansTool = tool({
 // Approve Plan Tool
 // ============================================================================
 
-export const approvePlanTool = tool({
-  name: "approve_plan",
+export const approvePlanTool = createTool({
+  id: "approve_plan",
   description:
     "Approve a draft plan, marking it ready for execution. " +
     "Use when user says 'approve this plan' or 'looks good, approve it'",
-  parameters: z.object({
+  inputSchema: z.object({
     planId: z.string().describe("The ID of the plan to approve"),
   }),
-  async execute({ planId }) {
+  outputSchema: z.object({
+    success: z.boolean(),
+    planId: z.string().optional(),
+    message: z.string().optional(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ planId }) => {
     const plan = getPlan(planId);
     if (!plan) {
-      return { error: `Plan not found: ${planId}` };
+      return { success: false, error: `Plan not found: ${planId}` };
     }
 
     if (plan.status !== "DRAFT") {
-      return { error: `Plan is not in DRAFT status, current status: ${plan.status}` };
+      return { success: false, error: `Plan is not in DRAFT status, current status: ${plan.status}` };
     }
 
     updatePlan(planId, { status: "APPROVED" });
@@ -246,14 +300,15 @@ export const approvePlanTool = tool({
 
 // ============================================================================
 // Arm/Disarm System Tool
+// Note: needsApproval removed - handle via guardrails in Mastra
 // ============================================================================
 
-export const armSystemTool = tool({
-  name: "arm_system",
+export const armSystemTool = createTool({
+  id: "arm_system",
   description:
     "Arm or disarm the trading system. When armed, Gordon can execute trades. " +
     "Use when user says 'arm' or 'enable trading' or 'disarm' or 'disable trading'",
-  parameters: z.object({
+  inputSchema: z.object({
     action: z.enum(["arm", "disarm"]).describe("Whether to arm or disarm"),
     hours: z
       .number()
@@ -262,8 +317,14 @@ export const armSystemTool = tool({
       .default(24)
       .describe("Hours to stay armed (max: 24)"),
   }),
-  needsApproval: true,
-  async execute({ action, hours }) {
+  outputSchema: z.object({
+    success: z.boolean(),
+    mode: z.enum(["ARMED", "SAFE"]).optional(),
+    armedUntil: z.string().optional().nullable(),
+    message: z.string(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ action, hours }) => {
     const config = await loadConfig();
 
     if (action === "arm") {
@@ -274,7 +335,7 @@ export const armSystemTool = tool({
 
       return {
         success: true,
-        mode: "ARMED",
+        mode: "ARMED" as const,
         armedUntil,
         message: `System armed for ${armHours} hours. Trading enabled.`,
       };
@@ -283,18 +344,27 @@ export const armSystemTool = tool({
 
       return {
         success: true,
-        mode: "SAFE",
+        mode: "SAFE" as const,
+        armedUntil: null,
         message: "System disarmed. Trading disabled.",
       };
     }
   },
 });
 
-export const tradingTools = [
-  createPlanTool,
-  executePlanTool,
-  closeTradeTool,
-  listPlansTool,
-  approvePlanTool,
-  armSystemTool,
-];
+// ============================================================================
+// Export as Object (Mastra format)
+// ============================================================================
+
+/**
+ * Trading tools exported as an object for Mastra Agent
+ * This is the format expected by Mastra's Agent class
+ */
+export const tradingTools = {
+  create_plan: createPlanTool,
+  execute_plan: executePlanTool,
+  close_trade: closeTradeTool,
+  list_plans: listPlansTool,
+  approve_plan: approvePlanTool,
+  arm_system: armSystemTool,
+};

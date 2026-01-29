@@ -1,29 +1,83 @@
 /**
- * Order Book & Advanced Trading Tools
+ * Order Book & Advanced Trading Tools (Mastra Format)
  * Tools for liquidity analysis, OCO orders, and order management
+ *
+ * Migrated from OpenAI Agents SDK format to Mastra format.
+ * Key differences:
+ * - tool() → createTool()
+ * - name → id
+ * - parameters → inputSchema
+ * - Added outputSchema for better LLM routing
+ * - Context access via first parameter destructuring
  */
 
-import { tool } from "@openai/agents";
+import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
-import type { ToolRunContext } from "./types.ts";
-import { errors } from "./types.ts";
+import type { GordonContext } from "../types.ts";
+
+// ============================================================================
+// Error Messages
+// ============================================================================
+
+const errors = {
+  noBinance: { error: "Binance client not connected. Please run setup first." },
+  notArmed: (action: string) => ({
+    error: `System must be ARMED to ${action}. Use 'arm' command first.`,
+  }),
+};
 
 // ============================================================================
 // Order Book / Liquidity Analysis
 // ============================================================================
 
-export const getOrderBookTool = tool({
-  name: "get_order_book",
+export const getOrderBookTool = createTool({
+  id: "get_order_book",
   description:
     "Get order book depth showing buy/sell walls and liquidity. " +
     "Use when user asks 'show order book', 'liquidity for BTC', 'buy/sell walls', 'market depth'.",
-  parameters: z.object({
+  inputSchema: z.object({
     symbol: z.string().describe("Trading pair (e.g., 'BTCUSDT')"),
     limit: z.number().min(5).max(100).default(20).describe("Number of price levels to show"),
   }),
-  async execute({ symbol, limit }, runContext: ToolRunContext) {
-    const ctx = runContext?.context;
+  outputSchema: z.object({
+    symbol: z.string(),
+    spread: z.object({
+      value: z.string(),
+      percent: z.string(),
+      bestBid: z.number(),
+      bestAsk: z.number(),
+    }),
+    liquidity: z.object({
+      bidDepth: z.string(),
+      askDepth: z.string(),
+      ratio: z.string(),
+      imbalance: z.string(),
+    }),
+    walls: z.object({
+      largestBid: z.object({
+        price: z.number().optional(),
+        quantity: z.number().optional(),
+      }),
+      largestAsk: z.object({
+        price: z.number().optional(),
+        quantity: z.number().optional(),
+      }),
+    }),
+    topBids: z.array(z.object({
+      price: z.number(),
+      quantity: z.number(),
+      total: z.number(),
+    })),
+    topAsks: z.array(z.object({
+      price: z.number(),
+      quantity: z.number(),
+      total: z.number(),
+    })),
+    error: z.string().optional(),
+  }),
+  execute: async ({ context, symbol, limit }) => {
+    const ctx = context as GordonContext;
     if (!ctx?.binance) {
       return errors.noBinance;
     }
@@ -87,16 +141,25 @@ export const getOrderBookTool = tool({
   },
 });
 
-export const getSpreadTool = tool({
-  name: "get_spread",
+export const getSpreadTool = createTool({
+  id: "get_spread",
   description:
     "Get the bid-ask spread for a trading pair. " +
     "Use when user asks 'what's the spread', 'slippage check', 'is liquidity good'.",
-  parameters: z.object({
+  inputSchema: z.object({
     symbol: z.string().describe("Trading pair (e.g., 'BTCUSDT')"),
   }),
-  async execute({ symbol }, runContext: ToolRunContext) {
-    const ctx = runContext?.context;
+  outputSchema: z.object({
+    symbol: z.string(),
+    bidPrice: z.number(),
+    askPrice: z.number(),
+    spread: z.string(),
+    spreadPercent: z.string(),
+    assessment: z.string(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ context, symbol }) => {
+    const ctx = context as GordonContext;
     if (!ctx?.binance) {
       return errors.noBinance;
     }
@@ -130,19 +193,36 @@ export const getSpreadTool = tool({
   },
 });
 
-export const getRecentTradesTool = tool({
-  name: "get_market_trades",
+export const getRecentTradesTool = createTool({
+  id: "get_market_trades",
   description:
     "Get recent MARKET trades for a symbol (all traders, not just user's trades). " +
     "Shows real-time buy/sell activity and trade flow. " +
     "Use when user asks 'trade flow', 'who's buying/selling', 'market activity'. " +
     "NOTE: For USER's own trade history, use get_trade_history instead.",
-  parameters: z.object({
+  inputSchema: z.object({
     symbol: z.string().describe("Trading pair (e.g., 'BTCUSDT')"),
     limit: z.number().min(1).max(100).default(20).describe("Number of trades to show"),
   }),
-  async execute({ symbol, limit }, runContext: ToolRunContext) {
-    const ctx = runContext?.context;
+  outputSchema: z.object({
+    symbol: z.string(),
+    analysis: z.object({
+      buyVolume: z.string(),
+      sellVolume: z.string(),
+      ratio: z.string(),
+      dominance: z.string(),
+    }),
+    trades: z.array(z.object({
+      price: z.string(),
+      quantity: z.string(),
+      value: z.string(),
+      side: z.enum(["BUY", "SELL"]),
+      time: z.string(),
+    })),
+    error: z.string().optional(),
+  }),
+  execute: async ({ context, symbol, limit }) => {
+    const ctx = context as GordonContext;
     if (!ctx?.binance) {
       return errors.noBinance;
     }
@@ -179,7 +259,7 @@ export const getRecentTradesTool = tool({
           price: t.price,
           quantity: t.qty,
           value: (parseFloat(t.price) * parseFloat(t.qty)).toFixed(2) + " USDT",
-          side: t.isBuyerMaker ? "SELL" : "BUY",
+          side: t.isBuyerMaker ? "SELL" as const : "BUY" as const,
           time: new Date(t.time).toISOString(),
         })),
       };
@@ -193,14 +273,14 @@ export const getRecentTradesTool = tool({
 // OCO Orders
 // ============================================================================
 
-export const placeOCOOrderTool = tool({
-  name: "place_oco_order",
+export const placeOCOOrderTool = createTool({
+  id: "place_oco_order",
   description:
     "Place an OCO (One-Cancels-Other) order combining a limit order with a stop-loss. " +
     "When one triggers, the other is automatically cancelled. " +
     "Use for 'set stop loss and take profit', 'OCO order', 'bracket order'. " +
     "Requires ARMED mode.",
-  parameters: z.object({
+  inputSchema: z.object({
     symbol: z.string().describe("Trading pair (e.g., 'BTCUSDT')"),
     side: z.enum(["BUY", "SELL"]).describe("Order side"),
     quantity: z.number().positive().describe("Quantity to trade"),
@@ -208,8 +288,25 @@ export const placeOCOOrderTool = tool({
     stopPrice: z.number().positive().describe("Stop trigger price"),
     stopLimitPrice: z.number().default(0).describe("Stop limit price. Use 0 to default to stopPrice."),
   }),
-  async execute({ symbol, side, quantity, price, stopPrice, stopLimitPrice }, runContext: ToolRunContext) {
-    const ctx = runContext?.context;
+  outputSchema: z.object({
+    success: z.boolean().optional(),
+    message: z.string().optional(),
+    orderListId: z.number().optional(),
+    status: z.string().optional(),
+    orders: z.array(z.object({
+      orderId: z.number(),
+      type: z.string(),
+      price: z.string(),
+      status: z.string(),
+    })).optional(),
+    symbol: z.string().optional(),
+    side: z.enum(["BUY", "SELL"]).optional(),
+    quantity: z.number().optional(),
+    stopPrice: z.number().optional(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ context, symbol, side, quantity, price, stopPrice, stopLimitPrice }) => {
+    const ctx = context as GordonContext;
     if (!ctx?.binance) {
       return errors.noBinance;
     }
@@ -261,17 +358,30 @@ export const placeOCOOrderTool = tool({
 // Order Management
 // ============================================================================
 
-export const cancelAllOrdersTool = tool({
-  name: "cancel_all_orders",
+export const cancelAllOrdersTool = createTool({
+  id: "cancel_all_orders",
   description:
     "Cancel all open orders on a symbol. Emergency function. " +
     "Use when user says 'cancel all orders', 'cancel everything on BTC', 'emergency cancel'. " +
     "Requires ARMED mode.",
-  parameters: z.object({
+  inputSchema: z.object({
     symbol: z.string().describe("Trading pair (e.g., 'BTCUSDT')"),
   }),
-  async execute({ symbol }, runContext: ToolRunContext) {
-    const ctx = runContext?.context;
+  outputSchema: z.object({
+    success: z.boolean().optional(),
+    message: z.string().optional(),
+    cancelledOrders: z.array(z.object({
+      orderId: z.number(),
+      type: z.string(),
+      side: z.string(),
+      price: z.string(),
+      quantity: z.string(),
+    })).optional(),
+    symbol: z.string().optional(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ context, symbol }) => {
+    const ctx = context as GordonContext;
     if (!ctx?.binance) {
       return errors.noBinance;
     }
@@ -307,17 +417,31 @@ export const cancelAllOrdersTool = tool({
   },
 });
 
-export const getOrderStatusTool = tool({
-  name: "get_order_status",
+export const getOrderStatusTool = createTool({
+  id: "get_order_status",
   description:
     "Check the status of a specific order. " +
     "Use when user asks 'check order status', 'is my order filled', 'order #123'.",
-  parameters: z.object({
+  inputSchema: z.object({
     symbol: z.string().describe("Trading pair (e.g., 'BTCUSDT')"),
     orderId: z.number().describe("Order ID to check"),
   }),
-  async execute({ symbol, orderId }, runContext: ToolRunContext) {
-    const ctx = runContext?.context;
+  outputSchema: z.object({
+    orderId: z.number().optional(),
+    symbol: z.string().optional(),
+    status: z.string().optional(),
+    type: z.string().optional(),
+    side: z.string().optional(),
+    price: z.string().optional(),
+    quantity: z.string().optional(),
+    filled: z.string().optional(),
+    remaining: z.string().optional(),
+    fillPercent: z.string().optional(),
+    time: z.string().optional(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ context, symbol, orderId }) => {
+    const ctx = context as GordonContext;
     if (!ctx?.binance) {
       return errors.noBinance;
     }
@@ -348,20 +472,32 @@ export const getOrderStatusTool = tool({
   },
 });
 
-export const testOrderTool = tool({
-  name: "test_order",
+export const testOrderTool = createTool({
+  id: "test_order",
   description:
     "Test if an order would be valid without actually placing it. " +
     "Use when user wants to 'validate order', 'test if order works', 'dry run'.",
-  parameters: z.object({
+  inputSchema: z.object({
     symbol: z.string().describe("Trading pair (e.g., 'BTCUSDT')"),
     side: z.enum(["BUY", "SELL"]).describe("Order side"),
     type: z.enum(["LIMIT", "MARKET"]).describe("Order type"),
     quantity: z.number().positive().describe("Quantity to trade"),
     price: z.number().default(0).describe("Price (required for LIMIT orders, use 0 for MARKET)"),
   }),
-  async execute({ symbol, side, type, quantity, price }, runContext: ToolRunContext) {
-    const ctx = runContext?.context;
+  outputSchema: z.object({
+    valid: z.boolean(),
+    message: z.string().optional(),
+    orderDetails: z.object({
+      symbol: z.string(),
+      side: z.enum(["BUY", "SELL"]),
+      type: z.enum(["LIMIT", "MARKET"]),
+      quantity: z.number(),
+      price: z.number(),
+    }).optional(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ context, symbol, side, type, quantity, price }) => {
+    const ctx = context as GordonContext;
     if (!ctx?.binance) {
       return errors.noBinance;
     }
@@ -401,14 +537,23 @@ export const testOrderTool = tool({
   },
 });
 
-export const getMarketTradesTool = getRecentTradesTool; // Alias for clarity
+// Alias for clarity
+export const getMarketTradesTool = getRecentTradesTool;
 
-export const orderbookTools = [
-  getOrderBookTool,
-  getSpreadTool,
-  getRecentTradesTool,
-  placeOCOOrderTool,
-  cancelAllOrdersTool,
-  getOrderStatusTool,
-  testOrderTool,
-];
+// ============================================================================
+// Export as Object (Mastra format)
+// ============================================================================
+
+/**
+ * Orderbook tools exported as an object for Mastra Agent
+ * This is the format expected by Mastra's Agent class
+ */
+export const orderbookTools = {
+  get_order_book: getOrderBookTool,
+  get_spread: getSpreadTool,
+  get_market_trades: getRecentTradesTool,
+  place_oco_order: placeOCOOrderTool,
+  cancel_all_orders: cancelAllOrdersTool,
+  get_order_status: getOrderStatusTool,
+  test_order: testOrderTool,
+};

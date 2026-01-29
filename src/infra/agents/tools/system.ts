@@ -1,26 +1,61 @@
 /**
- * System Tools
+ * System Tools (Mastra Format)
  * Tools for testing connections and system diagnostics
+ *
+ * Migrated from OpenAI Agents SDK format to Mastra format.
+ * Key differences:
+ * - tool() -> createTool()
+ * - name -> id
+ * - parameters -> inputSchema
+ * - Context access via first parameter destructuring
  */
 
-import { tool } from "@openai/agents";
+import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
-import type { ToolRunContext } from "./types.ts";
+import type { GordonContext } from "../types.ts";
 
 // ============================================================================
 // Connection Test Tool
 // ============================================================================
 
-export const testConnectionTool = tool({
-  name: "test_connection",
+export const testConnectionTool = createTool({
+  id: "test_connection",
   description:
     "Test the connection to Binance and verify API key permissions. " +
     "Use when user asks 'test connection', 'check API', 'are my keys working?'",
-  parameters: z.object({}),
-  async execute(_: Record<string, never>, runContext: ToolRunContext) {
-    const ctx = runContext?.context;
-    const results: Record<string, unknown> = {
+  inputSchema: z.object({}),
+  outputSchema: z.object({
+    llmConnected: z.boolean(),
+    binanceConnected: z.boolean(),
+    binancePermissions: z.unknown().nullable(),
+    accountType: z.string().nullable(),
+    canTrade: z.boolean().optional(),
+    canWithdraw: z.boolean().optional(),
+    canDeposit: z.boolean().optional(),
+    assetsWithBalance: z.number().optional(),
+    assetList: z.array(z.object({
+      asset: z.string(),
+      free: z.number(),
+      locked: z.number(),
+    })).optional(),
+    error: z.string().nullable(),
+  }),
+  execute: async ({ context }) => {
+    // Context is injected via Mastra's RuntimeContext
+    const ctx = context as GordonContext;
+    const results: {
+      llmConnected: boolean;
+      binanceConnected: boolean;
+      binancePermissions: unknown | null;
+      accountType: string | null;
+      canTrade?: boolean;
+      canWithdraw?: boolean;
+      canDeposit?: boolean;
+      assetsWithBalance?: number;
+      assetList?: Array<{ asset: string; free: number; locked: number }>;
+      error: string | null;
+    } = {
       llmConnected: !!ctx?.llm,
       binanceConnected: false,
       binancePermissions: null,
@@ -62,4 +97,14 @@ export const testConnectionTool = tool({
   },
 });
 
-export const systemTools = [testConnectionTool];
+// ============================================================================
+// Export as Object (Mastra format)
+// ============================================================================
+
+/**
+ * System tools exported as an object for Mastra Agent
+ * This is the format expected by Mastra's Agent class
+ */
+export const systemTools = {
+  test_connection: testConnectionTool,
+};
