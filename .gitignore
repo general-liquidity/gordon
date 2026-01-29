@@ -36,5 +36,10 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 .claude
 
 gordon-cli-website/
-# Local database
-gordon.db*
+# Local databases
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
