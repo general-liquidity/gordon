@@ -139,20 +139,20 @@ export const getHistoricalOpportunitiesTool = tool({
       .describe("Number of days to look back"),
     symbol: z
       .string()
-      .optional()
-      .describe("Filter by specific symbol (e.g., 'BTCUSDT')"),
+      .default("")
+      .describe("Filter by specific symbol (e.g., 'BTCUSDT'). Empty string for all symbols."),
     minConfidence: z
       .number()
       .min(0)
       .max(1)
-      .optional()
-      .describe("Minimum confidence threshold (0-1)"),
+      .default(0)
+      .describe("Minimum confidence threshold (0-1). 0 for no filter."),
   }),
   async execute({ daysBack, symbol, minConfidence }) {
     const opportunities = getHistoricalOpportunities({
       daysBack,
-      symbol,
-      minConfidence,
+      symbol: symbol || undefined,
+      minConfidence: minConfidence || undefined,
       limit: 50,
     });
 

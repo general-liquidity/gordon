@@ -208,8 +208,8 @@ export const getTradeFeesTool = tool({
   parameters: z.object({
     symbol: z
       .string()
-      .optional()
-      .describe("Trading pair (e.g., 'BTCUSDT'). Omit for all symbols."),
+      .default("")
+      .describe("Trading pair (e.g., 'BTCUSDT'). Empty string for all symbols."),
   }),
   async execute({ symbol }, runContext: ToolRunContext) {
     const ctx = runContext?.context;
@@ -253,7 +253,7 @@ export const getAssetDividendsTool = tool({
     "Get history of asset dividends, airdrops, and staking rewards. " +
     "Use when user asks 'did I receive any airdrops', 'staking rewards', 'dividend history'.",
   parameters: z.object({
-    asset: z.string().optional().describe("Filter by asset (e.g., 'BNB')"),
+    asset: z.string().default("").describe("Filter by asset (e.g., 'BNB'). Empty for all."),
     limit: z.number().min(1).max(500).default(20).describe("Number of records to return"),
   }),
   async execute({ asset, limit }, runContext: ToolRunContext) {
@@ -291,7 +291,7 @@ export const getDepositAddressTool = tool({
     "Use when user asks 'deposit address for BTC', 'where to send ETH'.",
   parameters: z.object({
     coin: z.string().describe("Coin symbol (e.g., 'BTC', 'ETH')"),
-    network: z.string().optional().describe("Network (e.g., 'BTC', 'ETH', 'TRX'). Uses default if not specified."),
+    network: z.string().default("").describe("Network (e.g., 'BTC', 'ETH', 'TRX'). Empty for default network."),
   }),
   async execute({ coin, network }, runContext: ToolRunContext) {
     const ctx = runContext?.context;

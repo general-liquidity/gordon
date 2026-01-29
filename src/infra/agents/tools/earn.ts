@@ -19,7 +19,7 @@ export const getFlexibleProductsTool = tool({
     "Get list of available flexible earn products with APY rates. " +
     "Use when user asks 'what can I earn on', 'flexible savings rates', 'earn APY'.",
   parameters: z.object({
-    asset: z.string().optional().describe("Filter by asset (e.g., 'USDT', 'BTC')"),
+    asset: z.string().default("").describe("Filter by asset (e.g., 'USDT', 'BTC'). Empty for all."),
   }),
   async execute({ asset }, runContext: ToolRunContext) {
     const ctx = runContext?.context;
@@ -28,7 +28,7 @@ export const getFlexibleProductsTool = tool({
     }
 
     try {
-      const result = await ctx.binance.getFlexibleProducts({ asset, size: 50 });
+      const result = await ctx.binance.getFlexibleProducts({ asset: asset || undefined, size: 50 });
 
       if (result.rows.length === 0) {
         return { message: asset ? `No flexible products found for ${asset}.` : "No flexible products available." };
@@ -61,7 +61,7 @@ export const getLockedProductsTool = tool({
     "Get list of available locked earn products with higher APY rates. " +
     "Use when user asks 'locked staking options', 'higher APY', 'lock my crypto'.",
   parameters: z.object({
-    asset: z.string().optional().describe("Filter by asset (e.g., 'BNB', 'ETH')"),
+    asset: z.string().default("").describe("Filter by asset (e.g., 'BNB', 'ETH'). Empty for all."),
   }),
   async execute({ asset }, runContext: ToolRunContext) {
     const ctx = runContext?.context;
@@ -70,7 +70,7 @@ export const getLockedProductsTool = tool({
     }
 
     try {
-      const result = await ctx.binance.getLockedProducts({ asset, size: 50 });
+      const result = await ctx.binance.getLockedProducts({ asset: asset || undefined, size: 50 });
 
       if (result.rows.length === 0) {
         return { message: asset ? `No locked products found for ${asset}.` : "No locked products available." };
@@ -202,7 +202,7 @@ export const redeemFlexibleTool = tool({
     "Requires ARMED mode.",
   parameters: z.object({
     productId: z.string().describe("Product ID from get_all_earn_positions"),
-    amount: z.number().positive().optional().describe("Amount to redeem (omit to redeem all)"),
+    amount: z.number().default(0).describe("Amount to redeem. Use 0 with redeemAll=true to redeem all."),
     redeemAll: z.boolean().default(false).describe("Redeem entire position"),
     destAccount: z.enum(["SPOT", "FUND"]).default("SPOT").describe("Destination wallet"),
   }),

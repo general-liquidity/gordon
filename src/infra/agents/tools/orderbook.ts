@@ -206,7 +206,7 @@ export const placeOCOOrderTool = tool({
     quantity: z.number().positive().describe("Quantity to trade"),
     price: z.number().positive().describe("Limit price (take profit)"),
     stopPrice: z.number().positive().describe("Stop trigger price"),
-    stopLimitPrice: z.number().positive().optional().describe("Stop limit price (defaults to stopPrice)"),
+    stopLimitPrice: z.number().default(0).describe("Stop limit price. Use 0 to default to stopPrice."),
   }),
   async execute({ symbol, side, quantity, price, stopPrice, stopLimitPrice }, runContext: ToolRunContext) {
     const ctx = runContext?.context;
@@ -358,7 +358,7 @@ export const testOrderTool = tool({
     side: z.enum(["BUY", "SELL"]).describe("Order side"),
     type: z.enum(["LIMIT", "MARKET"]).describe("Order type"),
     quantity: z.number().positive().describe("Quantity to trade"),
-    price: z.number().positive().optional().describe("Price (required for LIMIT orders)"),
+    price: z.number().default(0).describe("Price (required for LIMIT orders, use 0 for MARKET)"),
   }),
   async execute({ symbol, side, type, quantity, price }, runContext: ToolRunContext) {
     const ctx = runContext?.context;
