@@ -1,0 +1,403 @@
+/**
+ * Market Discovery Tools
+ * Tools for finding trading opportunities, trending tokens, and market analysis
+ */
+
+import { tool } from "@openai/agents";
+import { z } from "zod";
+
+import type { ToolRunContext } from "./types.ts";
+import { errors } from "./types.ts";
+
+// ============================================================================
+// Trending Tokens Tool
+// ============================================================================
+
+export const getTrendingTokensTool = tool({
+  name: "get_trending_tokens",
+  description:
+    "Find tokens with the highest price changes in the last 24 hours. " +
+    "Use when user asks 'what's trending', 'biggest movers', 'what's pumping', 'hot coins'.",
+  parameters: z.object({
+    minVolume: z
+      .number()
+      .min(0)
+      .default(1000000)
+      .describe("Minimum 24h volume in USDT (default: 1M)"),
+    minPriceChange: z
+      .number()
+      .min(0)
+      .default(5)
+      .describe("Minimum absolute price change % (default: 5%)"),
+    limit: z
+      .number()
+      .min(1)
+      .max(50)
+      .default(20)
+      .describe("Max results to return"),
+    direction: z
+      .enum(["gainers", "losers", "both"])
+      .default("gainers")
+      .describe("Filter by price direction"),
+  }),
+  async execute({ minVolume, minPriceChange, limit, direction }, runContext: ToolRunContext) {
+    const ctx = runContext?.context;
+    if (!ctx?.binance) {
+      return errors.noBinance;
+    }
+
+    try {
+      const tickers = await ctx.binance.get24hrTickers();
+
+      // Skip leveraged tokens and stablecoins
+      const skipPatterns = ["UP", "DOWN", "BEAR", "BULL", "USDC", "BUSD", "TUSD", "USDP", "FDUSD", "DAI"];
+
+      const filtered = tickers
+        .filter((t) => {
+          // Only USDT pairs
+          if (!t.symbol.endsWith("USDT")) return false;
+
+          // Skip leveraged tokens and stablecoins
+          const base = t.symbol.replace("USDT", "");
+          if (skipPatterns.some((p) => base.includes(p))) return false;
+
+          const volume = parseFloat(t.quoteVolume);
+          const priceChange = parseFloat(t.priceChangePercent);
+
+          // Volume filter
+          if (volume < minVolume) return false;
+
+          // Price change filter based on direction
+          if (direction === "gainers" && priceChange < minPriceChange) return false;
+          if (direction === "losers" && priceChange > -minPriceChange) return false;
+          if (direction === "both" && Math.abs(priceChange) < minPriceChange) return false;
+
+          return true;
+        })
+        .map((t) => ({
+          symbol: t.symbol,
+          price: parseFloat(t.lastPrice),
+          priceChange24h: parseFloat(t.priceChange),
+          priceChangePercent: parseFloat(t.priceChangePercent),
+          volume24h: parseFloat(t.quoteVolume),
+          high24h: parseFloat(t.highPrice),
+          low24h: parseFloat(t.lowPrice),
+          trades24h: t.count,
+        }))
+        .sort((a, b) => {
+          if (direction === "losers") {
+            return a.priceChangePercent - b.priceChangePercent;
+          }
+          return b.priceChangePercent - a.priceChangePercent;
+        })
+        .slice(0, limit);
+
+      if (filtered.length === 0) {
+        return {
+          message: `No tokens found matching criteria (min volume: ${minVolume}, min change: ${minPriceChange}%)`,
+          tokens: [],
+        };
+      }
+
+      return {
+        direction,
+        filters: { minVolume, minPriceChange },
+        count: filtered.length,
+        tokens: filtered.map((t, i) => ({
+          rank: i + 1,
+          symbol: t.symbol,
+          price: t.price.toFixed(8).replace(/\.?0+$/, ""),
+          change24h: `${t.priceChangePercent >= 0 ? "+" : ""}${t.priceChangePercent.toFixed(2)}%`,
+          volume24h: `$${(t.volume24h / 1000000).toFixed(2)}M`,
+          high24h: t.high24h,
+          low24h: t.low24h,
+        })),
+      };
+    } catch (error) {
+      return { error: `Failed to get trending tokens: ${(error as Error).message}` };
+    }
+  },
+});
+
+// ============================================================================
+// High Volume Tokens Tool
+// ============================================================================
+
+export const getHighVolumeTokensTool = tool({
+  name: "get_high_volume_tokens",
+  description:
+    "Find the most liquid tokens by 24h trading volume. " +
+    "Use when user asks 'most traded', 'highest volume', 'liquid markets', 'active pairs'.",
+  parameters: z.object({
+    minVolume: z
+      .number()
+      .min(0)
+      .default(10000000)
+      .describe("Minimum 24h volume in USDT (default: 10M)"),
+    limit: z
+      .number()
+      .min(1)
+      .max(50)
+      .default(20)
+      .describe("Max results to return"),
+  }),
+  async execute({ minVolume, limit }, runContext: ToolRunContext) {
+    const ctx = runContext?.context;
+    if (!ctx?.binance) {
+      return errors.noBinance;
+    }
+
+    try {
+      const tickers = await ctx.binance.get24hrTickers();
+
+      // Skip leveraged tokens
+      const skipPatterns = ["UP", "DOWN", "BEAR", "BULL"];
+
+      const filtered = tickers
+        .filter((t) => {
+          if (!t.symbol.endsWith("USDT")) return false;
+          const base = t.symbol.replace("USDT", "");
+          if (skipPatterns.some((p) => base.includes(p))) return false;
+
+          const volume = parseFloat(t.quoteVolume);
+          return volume >= minVolume;
+        })
+        .map((t) => ({
+          symbol: t.symbol,
+          price: parseFloat(t.lastPrice),
+          priceChangePercent: parseFloat(t.priceChangePercent),
+          volume24h: parseFloat(t.quoteVolume),
+          trades24h: t.count,
+          high24h: parseFloat(t.highPrice),
+          low24h: parseFloat(t.lowPrice),
+        }))
+        .sort((a, b) => b.volume24h - a.volume24h)
+        .slice(0, limit);
+
+      if (filtered.length === 0) {
+        return {
+          message: `No tokens found with volume above $${(minVolume / 1000000).toFixed(1)}M`,
+          tokens: [],
+        };
+      }
+
+      return {
+        minVolume: `$${(minVolume / 1000000).toFixed(1)}M`,
+        count: filtered.length,
+        tokens: filtered.map((t, i) => ({
+          rank: i + 1,
+          symbol: t.symbol,
+          price: t.price.toFixed(8).replace(/\.?0+$/, ""),
+          volume24h: `$${(t.volume24h / 1000000).toFixed(2)}M`,
+          change24h: `${t.priceChangePercent >= 0 ? "+" : ""}${t.priceChangePercent.toFixed(2)}%`,
+          trades24h: t.trades24h.toLocaleString(),
+        })),
+      };
+    } catch (error) {
+      return { error: `Failed to get high volume tokens: ${(error as Error).message}` };
+    }
+  },
+});
+
+// ============================================================================
+// Available Markets Tool
+// ============================================================================
+
+export const getAvailableMarketsTool = tool({
+  name: "get_available_markets",
+  description:
+    "List available trading pairs on Binance with optional filters. " +
+    "Use when user asks 'what pairs are available', 'can I trade X', 'list markets for ETH'.",
+  parameters: z.object({
+    baseAsset: z
+      .string()
+      .default("")
+      .describe("Filter by base asset (e.g., 'BTC', 'ETH'). Empty for all."),
+    quoteAsset: z
+      .string()
+      .default("")
+      .describe("Filter by quote asset (e.g., 'USDT', 'BTC'). Empty for all."),
+    limit: z
+      .number()
+      .min(1)
+      .max(100)
+      .default(50)
+      .describe("Max results to return"),
+  }),
+  async execute({ baseAsset, quoteAsset, limit }, runContext: ToolRunContext) {
+    const ctx = runContext?.context;
+    if (!ctx?.binance) {
+      return errors.noBinance;
+    }
+
+    try {
+      const exchangeInfo = await ctx.binance.getExchangeInfo();
+
+      let symbols = exchangeInfo.symbols.filter((s) => s.status === "TRADING" && s.isSpotTradingAllowed);
+
+      // Apply filters
+      if (baseAsset) {
+        const base = baseAsset.toUpperCase();
+        symbols = symbols.filter((s) => s.baseAsset === base);
+      }
+      if (quoteAsset) {
+        const quote = quoteAsset.toUpperCase();
+        symbols = symbols.filter((s) => s.quoteAsset === quote);
+      }
+
+      // Get price filter info for each symbol
+      const markets = symbols.slice(0, limit).map((s) => {
+        const priceFilter = s.filters.find((f) => f.filterType === "PRICE_FILTER") as { tickSize?: string } | undefined;
+        const lotFilter = s.filters.find((f) => f.filterType === "LOT_SIZE") as { minQty?: string; stepSize?: string } | undefined;
+        const notionalFilter = s.filters.find((f) => f.filterType === "NOTIONAL" || f.filterType === "MIN_NOTIONAL") as { minNotional?: string; notional?: string } | undefined;
+
+        return {
+          symbol: s.symbol,
+          baseAsset: s.baseAsset,
+          quoteAsset: s.quoteAsset,
+          tickSize: priceFilter?.tickSize ?? "N/A",
+          minQty: lotFilter?.minQty ?? "N/A",
+          stepSize: lotFilter?.stepSize ?? "N/A",
+          minNotional: notionalFilter?.minNotional ?? notionalFilter?.notional ?? "N/A",
+        };
+      });
+
+      if (markets.length === 0) {
+        return {
+          message: "No trading pairs found matching the criteria.",
+          filters: { baseAsset: baseAsset || "any", quoteAsset: quoteAsset || "any" },
+          markets: [],
+        };
+      }
+
+      return {
+        filters: { baseAsset: baseAsset || "any", quoteAsset: quoteAsset || "any" },
+        totalAvailable: symbols.length,
+        showing: markets.length,
+        markets,
+      };
+    } catch (error) {
+      return { error: `Failed to get available markets: ${(error as Error).message}` };
+    }
+  },
+});
+
+// ============================================================================
+// Bracket Order Tool
+// ============================================================================
+
+export const placeBracketOrderTool = tool({
+  name: "place_bracket_order",
+  description:
+    "Place a bracket order: market entry with automatic stop-loss and take-profit. " +
+    "Use when user says 'buy BTC with stop loss and take profit', 'bracket order', 'entry with SL and TP'. " +
+    "Requires ARMED mode. Places market order then OCO for exits.",
+  parameters: z.object({
+    symbol: z.string().describe("Trading pair (e.g., 'BTCUSDT')"),
+    side: z.enum(["BUY", "SELL"]).describe("Entry side"),
+    quantity: z.number().positive().describe("Quantity to trade"),
+    stopLossPrice: z.number().positive().describe("Stop loss price"),
+    takeProfitPrice: z.number().positive().describe("Take profit price"),
+  }),
+  async execute({ symbol, side, quantity, stopLossPrice, takeProfitPrice }, runContext: ToolRunContext) {
+    const ctx = runContext?.context;
+    if (!ctx?.binance) {
+      return errors.noBinance;
+    }
+
+    if (!ctx.config?.tradingMode?.armed) {
+      return {
+        error: "System must be ARMED to place bracket orders. Use 'arm' command first.",
+        symbol,
+        side,
+        quantity,
+        stopLossPrice,
+        takeProfitPrice,
+      };
+    }
+
+    const normalizedSymbol = symbol.toUpperCase().endsWith("USDT")
+      ? symbol.toUpperCase()
+      : `${symbol.toUpperCase()}USDT`;
+
+    try {
+      // Validate prices make sense
+      if (side === "BUY") {
+        if (takeProfitPrice <= stopLossPrice) {
+          return { error: "For BUY orders, take profit must be higher than stop loss." };
+        }
+      } else {
+        if (takeProfitPrice >= stopLossPrice) {
+          return { error: "For SELL orders, take profit must be lower than stop loss." };
+        }
+      }
+
+      // Step 1: Place market entry order
+      const entryOrder = await ctx.binance.placeOrder({
+        symbol: normalizedSymbol,
+        side,
+        type: "MARKET",
+        quantity,
+      });
+
+      if (!entryOrder || entryOrder.status === "REJECTED") {
+        return {
+          error: "Entry order was rejected",
+          entryOrder,
+        };
+      }
+
+      // Step 2: Place OCO order for stop-loss and take-profit
+      const exitSide = side === "BUY" ? "SELL" : "BUY";
+      const filledQty = parseFloat(entryOrder.executedQty);
+
+      if (filledQty <= 0) {
+        return {
+          error: "Entry order did not fill",
+          entryOrder,
+        };
+      }
+
+      // For OCO: price = limit/take-profit, stopPrice = stop trigger, stopLimitPrice = stop limit
+      const ocoOrder = await ctx.binance.placeOCOOrder({
+        symbol: normalizedSymbol,
+        side: exitSide,
+        quantity: filledQty,
+        price: takeProfitPrice, // Take profit limit price
+        stopPrice: stopLossPrice, // Stop loss trigger price
+        stopLimitPrice: stopLossPrice, // Stop loss limit price (same as trigger for immediate fill)
+      });
+
+      const avgFillPrice = parseFloat(entryOrder.cummulativeQuoteQty) / filledQty;
+
+      return {
+        success: true,
+        message: `Bracket order placed: ${side} ${filledQty} ${normalizedSymbol} @ ${avgFillPrice.toFixed(8)}`,
+        entry: {
+          orderId: entryOrder.orderId,
+          status: entryOrder.status,
+          filledQty,
+          avgPrice: avgFillPrice,
+        },
+        exits: {
+          ocoOrderListId: ocoOrder.orderListId,
+          status: ocoOrder.listOrderStatus,
+          takeProfit: takeProfitPrice,
+          stopLoss: stopLossPrice,
+          orders: ocoOrder.orders.map((o) => ({
+            orderId: o.orderId,
+          })),
+        },
+      };
+    } catch (error) {
+      return { error: `Failed to place bracket order: ${(error as Error).message}` };
+    }
+  },
+});
+
+export const discoveryTools = [
+  getTrendingTokensTool,
+  getHighVolumeTokensTool,
+  getAvailableMarketsTool,
+  placeBracketOrderTool,
+];

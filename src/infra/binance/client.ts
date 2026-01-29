@@ -49,6 +49,7 @@ import type {
   BinanceEarnRedemption,
   BinanceEarnSubscriptionRecord,
   BinanceEarnRedemptionRecord,
+  BinanceExchangeInfo,
 } from "./types.ts";
 import { BinanceError, RateLimitError } from "../../errors/index.ts";
 import { createModuleLogger } from "../logger/index.ts";
@@ -309,6 +310,20 @@ export class BinanceClient {
       .sort((a, b) => parseFloat(b.quoteVolume) - parseFloat(a.quoteVolume));
 
     return usdtPairs.slice(0, n).map((t) => t.symbol);
+  }
+
+  /**
+   * Get all 24hr tickers (useful for market scanning)
+   */
+  async get24hrTickers(): Promise<BinanceTicker24hr[]> {
+    return this.publicRequest<BinanceTicker24hr[]>("/api/v3/ticker/24hr");
+  }
+
+  /**
+   * Get exchange information (trading rules, available symbols)
+   */
+  async getExchangeInfo(): Promise<BinanceExchangeInfo> {
+    return this.publicRequest<BinanceExchangeInfo>("/api/v3/exchangeInfo");
   }
 
   /**

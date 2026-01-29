@@ -680,3 +680,24 @@ export interface BinanceEarnRedemptionRecord {
   destAccount: string;
   status: string;
 }
+
+// ============================================================================
+// Exchange Info Types
+// ============================================================================
+
+// Rate limit info
+export interface BinanceRateLimit {
+  rateLimitType: "REQUEST_WEIGHT" | "ORDERS" | "RAW_REQUESTS";
+  interval: "SECOND" | "MINUTE" | "DAY";
+  intervalNum: number;
+  limit: number;
+}
+
+// Exchange info response
+export interface BinanceExchangeInfo {
+  timezone: string;
+  serverTime: number;
+  rateLimits: BinanceRateLimit[];
+  exchangeFilters: GenericFilter[];
+  symbols: BinanceSymbolInfo[];
+}

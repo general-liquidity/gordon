@@ -17,6 +17,7 @@ export { schedulerTools, startSchedulerTool, stopSchedulerTool, getSchedulerStat
 export { walletTools, getDustableAssetsTool, convertDustTool, transferFundsTool, getCoinInfoTool, getTradeFeesTool, getAssetDividendsTool, getDepositAddressTool } from "./wallet.ts";
 export { earnTools, getFlexibleProductsTool, getLockedProductsTool, getAllEarnPositionsTool, subscribeFlexibleTool, redeemFlexibleTool, subscribeLockedTool } from "./earn.ts";
 export { orderbookTools, getOrderBookTool, getSpreadTool, getRecentTradesTool, placeOCOOrderTool, cancelAllOrdersTool, getOrderStatusTool, testOrderTool } from "./orderbook.ts";
+export { discoveryTools, getTrendingTokensTool, getHighVolumeTokensTool, getAvailableMarketsTool, placeBracketOrderTool } from "./discovery.ts";
 
 // Type exports
 export type { ToolRunContext } from "./types.ts";
@@ -34,6 +35,7 @@ import { schedulerTools } from "./scheduler.ts";
 import { walletTools } from "./wallet.ts";
 import { earnTools } from "./earn.ts";
 import { orderbookTools } from "./orderbook.ts";
+import { discoveryTools } from "./discovery.ts";
 
 /**
  * All tools combined - use this for the agent
@@ -50,6 +52,7 @@ export const allTools = [
   ...walletTools,
   ...earnTools,
   ...orderbookTools,
+  ...discoveryTools,
 ];
 
 /**
@@ -67,5 +70,6 @@ export const toolCounts = {
   wallet: walletTools.length,
   earn: earnTools.length,
   orderbook: orderbookTools.length,
+  discovery: discoveryTools.length,
   total: allTools.length,
 };

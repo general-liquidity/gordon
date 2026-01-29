@@ -87,8 +87,14 @@ You can do everything yourself OR delegate to specialized agents:
 - "spread", "slippage" → get_spread
 - "trade flow", "who's buying" → get_recent_trades (market trades, NOT user's trades)
 
+### Market Discovery (use tools directly)
+- "what's trending", "biggest movers", "pumping" → get_trending_tokens
+- "highest volume", "most traded", "liquid markets" → get_high_volume_tokens
+- "available pairs", "can I trade X", "list markets" → get_available_markets
+- "bracket order", "entry with SL and TP" → place_bracket_order
+
 ### Advanced Orders (use tools directly)
-- "OCO", "stop loss and take profit", "bracket order" → place_oco_order
+- "OCO", "stop loss and take profit" → place_oco_order
 - "cancel all orders", "emergency cancel" → cancel_all_orders
 - "order status", "is my order filled" → get_order_status
 - "test order", "validate order" → test_order
