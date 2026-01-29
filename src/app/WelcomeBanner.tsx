@@ -2,6 +2,9 @@ import React, { useMemo } from "react";
 import { Box, Text } from "ink";
 import { COLORS } from "./theme.ts";
 
+// Import version from package.json
+import packageJson from "../../package.json";
+
 // Gordon Gekko quotes
 const GEKKO_QUOTES = [
   "The most valuable commodity I know of is information.",
@@ -73,7 +76,7 @@ export const WelcomeBanner: React.FC<WelcomeBannerProps> = ({
 
       {/* Version */}
       <Box>
-        <Text color={COLORS.DIM}>v1.0.0</Text>
+        <Text color={COLORS.DIM}>v{packageJson.version}</Text>
       </Box>
 
       {/* Gekko Quote */}
