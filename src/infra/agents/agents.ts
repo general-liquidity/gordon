@@ -338,7 +338,7 @@ function getTeacherAgent(): Agent {
 function getGordonAgent(): Agent {
   if (!_agents.gordon) {
     const model = getModel(process.env.GORDON_PROVIDER, process.env.GORDON_MODEL);
-    console.log(`[Gordon] Initializing agent with model: ${model.modelId} (${model.provider})`);
+    console.log(`[Gordon] Initializing agent with model: ${model}`);
 
     _agents.gordon = new Agent({
       id: "gordon",

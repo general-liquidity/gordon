@@ -1,7 +1,14 @@
-import { createOpenAI, openai } from "@ai-sdk/openai";
-import { anthropic } from "@ai-sdk/anthropic";
-import { google } from "@ai-sdk/google";
-import type { LanguageModelV1 } from "ai";
+/**
+ * Provider Registry
+ * Multi-provider support for Gordon via Mastra
+ *
+ * Supported providers (January 2026):
+ * - Anthropic: Claude Opus 4.5, Sonnet 4.5, Haiku 4.5
+ * - OpenAI: GPT-5.2 Pro, Thinking, Instant
+ * - Google: Gemini 3 Pro, Flash
+ *
+ * Returns model strings in "provider/model" format for Mastra compatibility.
+ */
 
 // ============================================================================
 // Types
@@ -14,6 +21,12 @@ export interface ProviderConfig {
   apiKey?: string;
   model: string;
 }
+
+/**
+ * Model string type for Mastra compatibility
+ * Format: "provider/model" (e.g., "openai/gpt-5.2")
+ */
+export type ModelString = `${string}/${string}`;
 
 // ============================================================================
 // Model Definitions (January 2026)
@@ -47,19 +60,23 @@ const MODELS = {
 /**
  * Provider Registry - manages available LLM providers
  *
- * Returns LanguageModelV1 objects for direct use in Mastra Agents.
+ * Returns model strings in "provider/model" format that Mastra handles internally.
  */
 export class ProviderRegistry {
   private availableProviders: Set<ProviderName> = new Set();
   private initialized = false;
 
   constructor() {
-    // Lazy initialization
+    // Lazy initialization - don't check env until first use
   }
 
+  /**
+   * Initialize available providers from environment variables
+   */
   private initializeFromEnv(): void {
     if (this.initialized) return;
 
+    // Check which providers have API keys configured
     if (process.env.OPENAI_API_KEY) {
       this.availableProviders.add("openai");
     }
@@ -76,42 +93,45 @@ export class ProviderRegistry {
   }
 
   /**
-   * Get a LanguageModelV1 instance
+   * Get a model string in "provider/model" format
+   * Mastra handles the actual model instantiation
    */
-  getModel(provider: ProviderName, modelId: string): LanguageModelV1 {
+  getModel(provider: ProviderName, modelId: string): ModelString {
     this.initializeFromEnv();
 
     if (!this.availableProviders.has(provider)) {
-      throw new Error(`Provider "${provider}" not configured.`);
+      throw new Error(
+        `Provider "${provider}" not configured. ` +
+          `Set the appropriate API key in your .env file.\n` +
+          `Available providers: ${this.getAvailableProviders().join(", ") || "none"}`
+      );
     }
 
-    switch (provider) {
-      case "openai":
-        return openai(modelId);
-      case "anthropic":
-        return anthropic(modelId);
-      case "google":
-        return google(modelId);
-      default:
-        throw new Error(`Unknown provider: ${provider}`);
-    }
+    return `${provider}/${modelId}` as ModelString;
   }
 
   /**
-   * Get the default (flagship) model
+   * Get the default (flagship) model based on environment config
+   * Falls back to first available provider if GORDON_PROVIDER not set
    */
-  getDefaultModel(): LanguageModelV1 {
+  getDefaultModel(): ModelString {
     this.initializeFromEnv();
 
     let provider = process.env.GORDON_PROVIDER as ProviderName | undefined;
 
     if (!provider) {
+      // Auto-detect first available provider (preference order)
       const preferredOrder: ProviderName[] = ["openai", "anthropic", "google"];
       const available = this.getAvailableProviders();
       provider = preferredOrder.find(p => available.includes(p)) || available[0];
 
       if (!provider) {
-        throw new Error("No LLM provider configured.");
+        throw new Error(
+          "No LLM provider configured. Set one of these API keys in your .env file:\n" +
+          "  OPENAI_API_KEY    - OpenAI GPT-5.2 (recommended)\n" +
+          "  ANTHROPIC_API_KEY - Anthropic Claude Opus 4.5\n" +
+          "  GOOGLE_GENERATIVE_AI_API_KEY - Google Gemini 3 Pro"
+        );
       }
     }
 
@@ -120,14 +140,15 @@ export class ProviderRegistry {
   }
 
   /**
-   * Get a fast/cheap model
+   * Get a fast/cheap model for simple tasks
    */
-  getFastModel(): LanguageModelV1 {
+  getFastModel(): ModelString {
     this.initializeFromEnv();
 
     let provider = (process.env.GORDON_FAST_PROVIDER || process.env.GORDON_PROVIDER) as ProviderName | undefined;
 
     if (!provider) {
+      // Auto-detect first available provider
       const preferredOrder: ProviderName[] = ["openai", "google", "anthropic"];
       const available = this.getAvailableProviders();
       provider = preferredOrder.find(p => available.includes(p)) || available[0];
@@ -142,9 +163,9 @@ export class ProviderRegistry {
   }
 
   /**
-   * Get a balanced model
+   * Get a balanced model (good performance/cost ratio)
    */
-  getBalancedModel(): LanguageModelV1 {
+  getBalancedModel(): ModelString {
     this.initializeFromEnv();
 
     let provider = process.env.GORDON_PROVIDER as ProviderName | undefined;
@@ -163,37 +184,62 @@ export class ProviderRegistry {
     return this.getModel(provider, model);
   }
 
+  /**
+   * List available providers
+   */
   getAvailableProviders(): ProviderName[] {
     this.initializeFromEnv();
     return Array.from(this.availableProviders);
   }
 
+  /**
+   * Check if a provider is available
+   */
+  hasProvider(provider: ProviderName): boolean {
+    this.initializeFromEnv();
+    return this.availableProviders.has(provider);
+  }
+
+  /**
+   * Reset initialized state (for testing or after env changes)
+   */
   reset(): void {
     this.availableProviders.clear();
     this.initialized = false;
   }
 }
 
+// Singleton instance
 export const providerRegistry = new ProviderRegistry();
 
 // ============================================================================
 // Convenience Functions
 // ============================================================================
 
+/**
+ * Get a model string using the configured provider
+ * Returns format: "provider/model" (e.g., "openai/gpt-5.2-pro")
+ */
 export function getModel(
   provider?: ProviderName | string,
   modelId?: string
-): LanguageModelV1 {
+): ModelString {
   if (!provider || !modelId) {
     return providerRegistry.getDefaultModel();
   }
   return providerRegistry.getModel(provider as ProviderName, modelId);
 }
 
-export function getFastModel(): LanguageModelV1 {
+/**
+ * Get a fast model string for simple tasks
+ */
+export function getFastModel(): ModelString {
   return providerRegistry.getFastModel();
 }
 
-export function getBalancedModel(): LanguageModelV1 {
+/**
+ * Get a balanced model string
+ */
+export function getBalancedModel(): ModelString {
   return providerRegistry.getBalancedModel();
 }
