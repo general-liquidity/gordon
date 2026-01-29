@@ -8,13 +8,13 @@
  * - name → id
  * - parameters → inputSchema
  * - Added outputSchema for better LLM routing
- * - Context access via first parameter destructuring
+ * - Context access via second parameter (MastraExecutionContext)
  */
 
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
-import type { GordonContext } from "../types.ts";
+import { getGordonContext, type MastraExecutionContext } from "./types.ts";
 
 // ============================================================================
 // Error Messages
@@ -76,8 +76,8 @@ export const getOrderBookTool = createTool({
     })),
     error: z.string().optional(),
   }),
-  execute: async ({ context, symbol, limit }) => {
-    const ctx = context as GordonContext;
+  execute: async ({ symbol, limit }, execContext: MastraExecutionContext) => {
+    const ctx = getGordonContext(execContext);
     if (!ctx?.binance) {
       return errors.noBinance;
     }
@@ -158,8 +158,8 @@ export const getSpreadTool = createTool({
     assessment: z.string(),
     error: z.string().optional(),
   }),
-  execute: async ({ context, symbol }) => {
-    const ctx = context as GordonContext;
+  execute: async ({ symbol }, execContext: MastraExecutionContext) => {
+    const ctx = getGordonContext(execContext);
     if (!ctx?.binance) {
       return errors.noBinance;
     }
@@ -221,8 +221,8 @@ export const getRecentTradesTool = createTool({
     })),
     error: z.string().optional(),
   }),
-  execute: async ({ context, symbol, limit }) => {
-    const ctx = context as GordonContext;
+  execute: async ({ symbol, limit }, execContext: MastraExecutionContext) => {
+    const ctx = getGordonContext(execContext);
     if (!ctx?.binance) {
       return errors.noBinance;
     }
@@ -305,8 +305,8 @@ export const placeOCOOrderTool = createTool({
     stopPrice: z.number().optional(),
     error: z.string().optional(),
   }),
-  execute: async ({ context, symbol, side, quantity, price, stopPrice, stopLimitPrice }) => {
-    const ctx = context as GordonContext;
+  execute: async ({ symbol, side, quantity, price, stopPrice, stopLimitPrice }, execContext: MastraExecutionContext) => {
+    const ctx = getGordonContext(execContext);
     if (!ctx?.binance) {
       return errors.noBinance;
     }
@@ -380,8 +380,8 @@ export const cancelAllOrdersTool = createTool({
     symbol: z.string().optional(),
     error: z.string().optional(),
   }),
-  execute: async ({ context, symbol }) => {
-    const ctx = context as GordonContext;
+  execute: async ({ symbol }, execContext: MastraExecutionContext) => {
+    const ctx = getGordonContext(execContext);
     if (!ctx?.binance) {
       return errors.noBinance;
     }
@@ -440,8 +440,8 @@ export const getOrderStatusTool = createTool({
     time: z.string().optional(),
     error: z.string().optional(),
   }),
-  execute: async ({ context, symbol, orderId }) => {
-    const ctx = context as GordonContext;
+  execute: async ({ symbol, orderId }, execContext: MastraExecutionContext) => {
+    const ctx = getGordonContext(execContext);
     if (!ctx?.binance) {
       return errors.noBinance;
     }
@@ -496,8 +496,8 @@ export const testOrderTool = createTool({
     }).optional(),
     error: z.string().optional(),
   }),
-  execute: async ({ context, symbol, side, type, quantity, price }) => {
-    const ctx = context as GordonContext;
+  execute: async ({ symbol, side, type, quantity, price }, execContext: MastraExecutionContext) => {
+    const ctx = getGordonContext(execContext);
     if (!ctx?.binance) {
       return errors.noBinance;
     }

@@ -14,7 +14,7 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
-import type { GordonContext } from "../types.ts";
+import { getGordonContext, MastraExecutionContext } from "./types.ts";
 import {
   calculateTechnicalAnalysis,
   calculateTechnicalSignals,
@@ -101,9 +101,9 @@ export const getTechnicalAnalysisTool = createTool({
     signals: z.array(z.string()),
     error: z.string().optional(),
   }),
-  execute: async ({ context, symbol, interval, atrMultiplier }) => {
+  execute: async ({ symbol, interval, atrMultiplier }, execContext: MastraExecutionContext) => {
     // Context is injected via Mastra's RuntimeContext
-    const ctx = context as GordonContext;
+    const ctx = getGordonContext(execContext);
     if (!ctx?.binance) {
       return errors.noBinance;
     }
@@ -218,8 +218,8 @@ export const getTechnicalSignalsTool = createTool({
     score: z.number().min(-100).max(100),
     error: z.string().optional(),
   }),
-  execute: async ({ context, symbol, interval }) => {
-    const ctx = context as GordonContext;
+  execute: async ({ symbol, interval }, execContext: MastraExecutionContext) => {
+    const ctx = getGordonContext(execContext);
     if (!ctx?.binance) {
       return errors.noBinance;
     }
@@ -276,8 +276,8 @@ export const getRSITool = createTool({
     interpretation: z.string(),
     error: z.string().optional(),
   }),
-  execute: async ({ context, symbol, interval, period }) => {
-    const ctx = context as GordonContext;
+  execute: async ({ symbol, interval, period }, execContext: MastraExecutionContext) => {
+    const ctx = getGordonContext(execContext);
     if (!ctx?.binance) {
       return errors.noBinance;
     }
@@ -377,8 +377,8 @@ export const getStopLossLevelsTool = createTool({
     recommendation: z.string(),
     error: z.string().optional(),
   }),
-  execute: async ({ context, symbol, interval, entryPrice, atrMultiplier, atrPeriod }) => {
-    const ctx = context as GordonContext;
+  execute: async ({ symbol, interval, entryPrice, atrMultiplier, atrPeriod }, execContext: MastraExecutionContext) => {
+    const ctx = getGordonContext(execContext);
     if (!ctx?.binance) {
       return errors.noBinance;
     }
@@ -476,8 +476,8 @@ export const getPositionSizeTool = createTool({
     note: z.string(),
     error: z.string().optional(),
   }),
-  execute: async ({ context, symbol, riskAmount, interval, atrMultiplier }) => {
-    const ctx = context as GordonContext;
+  execute: async ({ symbol, riskAmount, interval, atrMultiplier }, execContext: MastraExecutionContext) => {
+    const ctx = getGordonContext(execContext);
     if (!ctx?.binance) {
       return errors.noBinance;
     }
@@ -559,8 +559,8 @@ export const getVWAPTool = createTool({
     tradingImplication: z.string(),
     error: z.string().optional(),
   }),
-  execute: async ({ context, symbol, interval, limit }) => {
-    const ctx = context as GordonContext;
+  execute: async ({ symbol, interval, limit }, execContext: MastraExecutionContext) => {
+    const ctx = getGordonContext(execContext);
     if (!ctx?.binance) {
       return errors.noBinance;
     }
@@ -634,8 +634,8 @@ export const getStochasticRSITool = createTool({
     interpretation: z.string(),
     error: z.string().optional(),
   }),
-  execute: async ({ context, symbol, interval, rsiPeriod, stochPeriod, smoothK, smoothD }) => {
-    const ctx = context as GordonContext;
+  execute: async ({ symbol, interval, rsiPeriod, stochPeriod, smoothK, smoothD }, execContext: MastraExecutionContext) => {
+    const ctx = getGordonContext(execContext);
     if (!ctx?.binance) {
       return errors.noBinance;
     }

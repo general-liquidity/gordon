@@ -7,13 +7,13 @@
  * - tool() -> createTool()
  * - name -> id
  * - parameters -> inputSchema
- * - Context access via first parameter destructuring
+ * - Context access via execContext.requestContext.get("key")
  */
 
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
-import type { GordonContext } from "../types.ts";
+import { getGordonContext, MastraExecutionContext } from "./types.ts";
 
 // ============================================================================
 // Connection Test Tool
@@ -45,9 +45,9 @@ export const testConnectionTool = createTool({
     })).optional(),
     error: z.string().nullable(),
   }),
-  execute: async ({ context }) => {
-    // Context is injected via Mastra's RuntimeContext
-    const ctx = context as GordonContext;
+  execute: async (_input, execContext: MastraExecutionContext) => {
+    // Context is extracted from Mastra's RequestContext
+    const ctx = getGordonContext(execContext);
     const results: {
       llmConnected: boolean;
       binanceConnected: boolean;

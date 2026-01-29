@@ -14,7 +14,7 @@ import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
 import { runMonitorCycle, type MonitorResult } from "../../../core/monitor.ts";
-import type { GordonContext } from "../types.ts";
+import { getGordonContext, MastraExecutionContext } from "./types.ts";
 
 // ============================================================================
 // Error Messages
@@ -49,8 +49,8 @@ export const checkPositionsTool = createTool({
     alerts: z.array(z.string()),
     error: z.string().optional(),
   }),
-  execute: async ({ context }) => {
-    const ctx = context as GordonContext;
+  execute: async (_input, execContext: MastraExecutionContext) => {
+    const ctx = getGordonContext(execContext);
     if (!ctx?.binance) {
       return errors.noBinance;
     }

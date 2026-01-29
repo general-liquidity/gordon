@@ -15,7 +15,7 @@ import { z } from "zod";
 import { scan } from "../../../core/scanner.ts";
 import { analyze } from "../../../core/analyzer.ts";
 import { getHistoricalOpportunities, getOpportunitySummary } from "../../storage/events.ts";
-import type { GordonContext } from "../types.ts";
+import { getGordonContext, MastraExecutionContext } from "./types.ts";
 
 // ============================================================================
 // Error Messages
@@ -59,8 +59,8 @@ export const scanMarketTool = createTool({
     })).optional(),
     error: z.string().optional(),
   }),
-  execute: async ({ context, topN, timeframes }) => {
-    const ctx = context as GordonContext;
+  execute: async ({ topN, timeframes }, execContext: MastraExecutionContext) => {
+    const ctx = getGordonContext(execContext);
     if (!ctx?.binance) {
       return errors.noBinance;
     }
@@ -125,8 +125,8 @@ export const analyzeCoinTool = createTool({
     recommendation: z.string().optional(),
     error: z.string().optional(),
   }),
-  execute: async ({ context, symbol, timeframes }) => {
-    const ctx = context as GordonContext;
+  execute: async ({ symbol, timeframes }, execContext: MastraExecutionContext) => {
+    const ctx = getGordonContext(execContext);
     if (!ctx?.binance) {
       return errors.noBinance;
     }
@@ -209,7 +209,7 @@ export const getHistoricalOpportunitiesTool = createTool({
     })),
     dailySummary: z.record(z.string(), z.number()),
   }),
-  execute: async ({ context, daysBack, symbol, minConfidence }) => {
+  execute: async ({ daysBack, symbol, minConfidence }, execContext: MastraExecutionContext) => {
     // This tool doesn't require Binance client - it reads from local storage
     const opportunities = getHistoricalOpportunities({
       daysBack,

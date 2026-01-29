@@ -7,14 +7,14 @@
  * - tool() -> createTool()
  * - name -> id
  * - parameters -> inputSchema
- * - Context access via first parameter destructuring
+ * - Context access via (input, execContext) -> getGordonContext(execContext)
  */
 
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
 import { listTrades } from "../../storage/trades.ts";
-import type { GordonContext } from "../types.ts";
+import { getGordonContext, MastraExecutionContext } from "./types.ts";
 
 // ============================================================================
 // Error Messages
@@ -50,8 +50,8 @@ export const getPortfolioTool = createTool({
     openTrades: z.number().optional(),
     error: z.string().optional(),
   }),
-  execute: async ({ context }) => {
-    const ctx = context as GordonContext;
+  execute: async (_input, execContext: MastraExecutionContext) => {
+    const ctx = getGordonContext(execContext);
     if (!ctx?.binance) {
       return errors.noBinance;
     }
@@ -206,14 +206,11 @@ export const getAccountDetailsTool = createTool({
     }).optional(),
     error: z.string().optional(),
   }),
-  execute: async ({
-    context,
-    includeTradeHistory,
-    includeDepositHistory,
-    includeWithdrawalHistory,
-    includeEarnPositions,
-  }) => {
-    const ctx = context as GordonContext;
+  execute: async (
+    { includeTradeHistory, includeDepositHistory, includeWithdrawalHistory, includeEarnPositions },
+    execContext: MastraExecutionContext
+  ) => {
+    const ctx = getGordonContext(execContext);
     if (!ctx?.binance) {
       return errors.noBinance;
     }
@@ -345,8 +342,8 @@ export const getEarnPositionsTool = createTool({
     summary: z.string().optional(),
     error: z.string().optional(),
   }),
-  execute: async ({ context }) => {
-    const ctx = context as GordonContext;
+  execute: async (_input, execContext: MastraExecutionContext) => {
+    const ctx = getGordonContext(execContext);
     if (!ctx?.binance) {
       return errors.noBinance;
     }

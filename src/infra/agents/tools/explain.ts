@@ -13,7 +13,7 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
-import type { GordonContext } from "../types.ts";
+import { getGordonContext, MastraExecutionContext } from "./types.ts";
 import { explain, getPresetExplanation } from "../../../core/explainer.ts";
 
 // ============================================================================
@@ -45,9 +45,9 @@ export const explainTool = createTool({
     topic: z.string(),
     error: z.string().optional(),
   }),
-  execute: async ({ context, topic, additionalContext }) => {
+  execute: async ({ topic, additionalContext }, execContext: MastraExecutionContext) => {
     // Context is injected via Mastra's RuntimeContext
-    const ctx = context as GordonContext;
+    const ctx = getGordonContext(execContext);
     if (!ctx?.llm) {
       return { ...errors.noLLM, topic };
     }

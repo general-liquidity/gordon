@@ -7,7 +7,7 @@
  * - tool() -> createTool()
  * - name -> id
  * - parameters -> inputSchema
- * - Context access via first parameter destructuring
+ * - Context access via execContext.requestContext.get() using getGordonContext helper
  * - needsApproval removed (handle via guardrails in Mastra)
  */
 
@@ -22,7 +22,7 @@ import { TradeSchema } from "../../../types/trade.ts";
 import { loadConfig, saveConfig } from "../../storage/config.ts";
 import { listPlans, getPlan, updatePlan } from "../../storage/plans.ts";
 import { listTrades, getTrade } from "../../storage/trades.ts";
-import type { GordonContext } from "../types.ts";
+import { getGordonContext, MastraExecutionContext } from "./types.ts";
 
 // ============================================================================
 // Error Messages
@@ -68,8 +68,8 @@ export const createPlanTool = createTool({
     summary: z.string().optional(),
     error: z.string().optional(),
   }),
-  execute: async ({ context, symbol, riskLevel, allocationPercent }) => {
-    const ctx = context as GordonContext;
+  execute: async ({ symbol, riskLevel, allocationPercent }, execContext: MastraExecutionContext) => {
+    const ctx = getGordonContext(execContext);
     if (!ctx?.binance || !ctx?.llm) {
       return { error: "Binance or LLM client not connected." };
     }
@@ -126,8 +126,8 @@ export const executePlanTool = createTool({
     orderCount: z.number().optional(),
     error: z.string().optional(),
   }),
-  execute: async ({ context, planId }) => {
-    const ctx = context as GordonContext;
+  execute: async ({ planId }, execContext: MastraExecutionContext) => {
+    const ctx = getGordonContext(execContext);
     if (!ctx?.binance) {
       return errors.noBinance;
     }
@@ -187,8 +187,8 @@ export const closeTradeTool = createTool({
     pnl: z.number().optional(),
     error: z.string().optional(),
   }),
-  execute: async ({ context, tradeId, reason }) => {
-    const ctx = context as GordonContext;
+  execute: async ({ tradeId, reason }, execContext: MastraExecutionContext) => {
+    const ctx = getGordonContext(execContext);
     if (!ctx?.binance) {
       return errors.noBinance;
     }

@@ -14,7 +14,7 @@ import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 import asciichart from "asciichart";
 
-import type { GordonContext } from "../types.ts";
+import { getGordonContext, MastraExecutionContext } from "./types.ts";
 
 // ============================================================================
 // Error Messages
@@ -220,8 +220,8 @@ export const displayPriceChartTool = createTool({
       .default(14)
       .describe("Number of periods to show (default: 14)"),
   }),
-  execute: async ({ context, symbol, interval, periods }) => {
-    const ctx = context as GordonContext;
+  execute: async ({ symbol, interval, periods }, execContext: MastraExecutionContext) => {
+    const ctx = getGordonContext(execContext);
     if (!ctx?.binance) {
       return errors.noBinance;
     }
@@ -317,8 +317,8 @@ export const displayCandlestickChartTool = createTool({
       .default(true)
       .describe("Show volume bars below chart"),
   }),
-  execute: async ({ context, symbol, interval, periods, showVolume }) => {
-    const ctx = context as GordonContext;
+  execute: async ({ symbol, interval, periods, showVolume }, execContext: MastraExecutionContext) => {
+    const ctx = getGordonContext(execContext);
     if (!ctx?.binance) {
       return errors.noBinance;
     }
@@ -409,8 +409,8 @@ export const displayComparisonChartTool = createTool({
       .default(14)
       .describe("Number of periods"),
   }),
-  execute: async ({ context, symbols, interval, periods }) => {
-    const ctx = context as GordonContext;
+  execute: async ({ symbols, interval, periods }, execContext: MastraExecutionContext) => {
+    const ctx = getGordonContext(execContext);
     if (!ctx?.binance) {
       return errors.noBinance;
     }
@@ -501,8 +501,8 @@ export const displayVolumeChartTool = createTool({
       .default(14)
       .describe("Number of periods"),
   }),
-  execute: async ({ context, symbol, interval, periods }) => {
-    const ctx = context as GordonContext;
+  execute: async ({ symbol, interval, periods }, execContext: MastraExecutionContext) => {
+    const ctx = getGordonContext(execContext);
     if (!ctx?.binance) {
       return errors.noBinance;
     }

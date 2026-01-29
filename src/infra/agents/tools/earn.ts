@@ -13,7 +13,7 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
-import type { GordonContext } from "../types.ts";
+import { getGordonContext, MastraExecutionContext } from "./types.ts";
 
 // ============================================================================
 // Error Messages
@@ -53,8 +53,8 @@ export const getFlexibleProductsTool = createTool({
     message: z.string().optional(),
     error: z.string().optional(),
   }),
-  execute: async ({ context, asset }) => {
-    const ctx = context as GordonContext;
+  execute: async ({ asset }, execContext: MastraExecutionContext) => {
+    const ctx = getGordonContext(execContext);
     if (!ctx?.binance) {
       return errors.noBinance;
     }
@@ -113,8 +113,8 @@ export const getLockedProductsTool = createTool({
     message: z.string().optional(),
     error: z.string().optional(),
   }),
-  execute: async ({ context, asset }) => {
-    const ctx = context as GordonContext;
+  execute: async ({ asset }, execContext: MastraExecutionContext) => {
+    const ctx = getGordonContext(execContext);
     if (!ctx?.binance) {
       return errors.noBinance;
     }
@@ -192,8 +192,8 @@ export const getAllEarnPositionsTool = createTool({
     message: z.string().optional(),
     error: z.string().optional(),
   }),
-  execute: async ({ context }) => {
-    const ctx = context as GordonContext;
+  execute: async (_input, execContext: MastraExecutionContext) => {
+    const ctx = getGordonContext(execContext);
     if (!ctx?.binance) {
       return errors.noBinance;
     }
@@ -258,8 +258,8 @@ export const subscribeFlexibleTool = createTool({
     amount: z.number().optional(),
     error: z.string().optional(),
   }),
-  execute: async ({ context, productId, amount, sourceAccount }) => {
-    const ctx = context as GordonContext;
+  execute: async ({ productId, amount, sourceAccount }, execContext: MastraExecutionContext) => {
+    const ctx = getGordonContext(execContext);
     if (!ctx?.binance) {
       return errors.noBinance;
     }
@@ -305,8 +305,8 @@ export const redeemFlexibleTool = createTool({
     productId: z.string().optional(),
     error: z.string().optional(),
   }),
-  execute: async ({ context, productId, amount, redeemAll, destAccount }) => {
-    const ctx = context as GordonContext;
+  execute: async ({ productId, amount, redeemAll, destAccount }, execContext: MastraExecutionContext) => {
+    const ctx = getGordonContext(execContext);
     if (!ctx?.binance) {
       return errors.noBinance;
     }
@@ -354,8 +354,8 @@ export const subscribeLockedTool = createTool({
     amount: z.number().optional(),
     error: z.string().optional(),
   }),
-  execute: async ({ context, projectId, amount, sourceAccount }) => {
-    const ctx = context as GordonContext;
+  execute: async ({ projectId, amount, sourceAccount }, execContext: MastraExecutionContext) => {
+    const ctx = getGordonContext(execContext);
     if (!ctx?.binance) {
       return errors.noBinance;
     }

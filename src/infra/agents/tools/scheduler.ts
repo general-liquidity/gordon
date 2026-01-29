@@ -18,7 +18,7 @@ import {
   stopScheduler,
   getSchedulerStatus,
 } from "../../../core/scheduler.ts";
-import type { GordonContext } from "../types.ts";
+import { getGordonContext, MastraExecutionContext } from "./types.ts";
 
 // ============================================================================
 // Error Messages
@@ -70,8 +70,8 @@ export const startSchedulerTool = createTool({
     }).optional(),
     error: z.string().optional(),
   }),
-  execute: async ({ context, intervalMinutes, topN, minConfidence }) => {
-    const ctx = context as GordonContext;
+  execute: async ({ intervalMinutes, topN, minConfidence }, execContext: MastraExecutionContext) => {
+    const ctx = getGordonContext(execContext);
     if (!ctx?.binance) {
       return errors.noBinance;
     }

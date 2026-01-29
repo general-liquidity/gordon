@@ -14,7 +14,7 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
-import type { GordonContext } from "../types.ts";
+import { getGordonContext, MastraExecutionContext } from "./types.ts";
 
 // ============================================================================
 // Error Messages
@@ -62,8 +62,8 @@ export const getTradeHistoryTool = createTool({
     }).optional(),
     error: z.string().optional(),
   }),
-  execute: async ({ context, symbol, limit }) => {
-    const ctx = context as GordonContext;
+  execute: async ({ symbol, limit }, execContext: MastraExecutionContext) => {
+    const ctx = getGordonContext(execContext);
     if (!ctx?.binance) {
       return errors.noBinance;
     }
@@ -168,8 +168,8 @@ export const getTransferHistoryTool = createTool({
     totalWithdrawals: z.number().optional(),
     error: z.string().optional(),
   }),
-  execute: async ({ context, type, limit }) => {
-    const ctx = context as GordonContext;
+  execute: async ({ type, limit }, execContext: MastraExecutionContext) => {
+    const ctx = getGordonContext(execContext);
     if (!ctx?.binance) {
       return errors.noBinance;
     }
