@@ -42,12 +42,13 @@ export {
   executorAgent,
   monitorAgent,
   teacherAgent,
-  allAgents,
+  gordonAgent,
+  getAllAgents,
+  resetAgents,
 } from "./agents.ts";
 
 // Main Orchestrator
 export {
-  gordonAgent,
   processMessage,
   processSimpleMessage,
   processMessageStream,

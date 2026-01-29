@@ -17,6 +17,8 @@ import { z } from "zod";
 import { generatePlan } from "../../../core/planner.ts";
 import { executePlan, closeTrade } from "../../../core/executor.ts";
 import { analyze } from "../../../core/analyzer.ts";
+import { PlanSchema } from "../../../types/plan.ts";
+import { TradeSchema } from "../../../types/trade.ts";
 import { loadConfig, saveConfig } from "../../storage/config.ts";
 import { listPlans, getPlan, updatePlan } from "../../storage/plans.ts";
 import { listTrades, getTrade } from "../../storage/trades.ts";
@@ -62,7 +64,7 @@ export const createPlanTool = createTool({
   }),
   outputSchema: z.object({
     success: z.boolean().optional(),
-    plan: z.any().optional(),
+    plan: PlanSchema.optional(),
     summary: z.string().optional(),
     error: z.string().optional(),
   }),
@@ -120,7 +122,7 @@ export const executePlanTool = createTool({
   }),
   outputSchema: z.object({
     success: z.boolean(),
-    trade: z.any().optional(),
+    trade: TradeSchema.optional(),
     orderCount: z.number().optional(),
     error: z.string().optional(),
   }),

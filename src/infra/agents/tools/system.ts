@@ -28,7 +28,11 @@ export const testConnectionTool = createTool({
   outputSchema: z.object({
     llmConnected: z.boolean(),
     binanceConnected: z.boolean(),
-    binancePermissions: z.unknown().nullable(),
+    binancePermissions: z.object({
+      read: z.boolean(),
+      spotTrade: z.boolean(),
+      withdraw: z.boolean(),
+    }).nullable().optional(),
     accountType: z.string().nullable(),
     canTrade: z.boolean().optional(),
     canWithdraw: z.boolean().optional(),
@@ -47,7 +51,7 @@ export const testConnectionTool = createTool({
     const results: {
       llmConnected: boolean;
       binanceConnected: boolean;
-      binancePermissions: unknown | null;
+      binancePermissions?: { read: boolean; spotTrade: boolean; withdraw: boolean } | null;
       accountType: string | null;
       canTrade?: boolean;
       canWithdraw?: boolean;

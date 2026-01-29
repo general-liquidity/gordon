@@ -18,8 +18,23 @@ import { Memory } from "@mastra/memory";
 import { LibSQLStore } from "@mastra/libsql";
 
 import { getModel } from "../providers/registry.ts";
-import { indicatorTools } from "./tools/indicators.ts";
-// TODO: Import other tool modules after migration
+import {
+  indicatorTools,
+  explainTools,
+  marketTools,
+  positionTools,
+  schedulerTools,
+  systemTools,
+  earnTools,
+  chartTools,
+  orderbookTools,
+  walletTools,
+  discoveryTools,
+  historyTools,
+  accountTools,
+  tradingTools,
+  allTools,
+} from "./tools/index.ts";
 
 // ============================================================================
 // Memory Configuration (Required for Agent Networks)
@@ -189,10 +204,9 @@ function getScannerAgent(): Agent {
       instructions: SCANNER_INSTRUCTIONS,
       model: getModel(process.env.GORDON_PROVIDER, process.env.GORDON_MODEL),
       tools: {
-        get_technical_signals: indicatorTools.get_technical_signals,
-        get_rsi: indicatorTools.get_rsi,
-        get_vwap: indicatorTools.get_vwap,
-        get_stochastic_rsi: indicatorTools.get_stochastic_rsi,
+        ...indicatorTools,
+        scan_market: marketTools.scan_market,
+        analyze_coin: marketTools.analyze_coin,
       },
     });
   }
@@ -214,10 +228,9 @@ function getAnalystAgent(): Agent {
       instructions: ANALYST_INSTRUCTIONS,
       model: getModel(process.env.GORDON_PROVIDER, process.env.GORDON_MODEL),
       tools: {
-        get_technical_analysis: indicatorTools.get_technical_analysis,
-        get_rsi: indicatorTools.get_rsi,
-        get_vwap: indicatorTools.get_vwap,
-        get_stochastic_rsi: indicatorTools.get_stochastic_rsi,
+        ...indicatorTools,
+        ...chartTools,
+        analyze_coin: marketTools.analyze_coin,
       },
     });
   }
@@ -238,8 +251,9 @@ function getPlannerAgent(): Agent {
       instructions: PLANNER_INSTRUCTIONS,
       model: getModel(process.env.GORDON_PROVIDER, process.env.GORDON_MODEL),
       tools: {
-        get_stop_loss_levels: indicatorTools.get_stop_loss_levels,
-        get_position_size: indicatorTools.get_position_size,
+        ...indicatorTools,
+        create_plan: tradingTools.create_plan,
+        list_plans: tradingTools.list_plans,
       },
     });
   }
@@ -260,7 +274,11 @@ function getExecutorAgent(): Agent {
       instructions: EXECUTOR_INSTRUCTIONS,
       model: getModel(process.env.GORDON_PROVIDER, process.env.GORDON_MODEL),
       tools: {
-        // TODO: Add execute_plan, arm_system, list_plans after migration
+        execute_plan: tradingTools.execute_plan,
+        close_trade: tradingTools.close_trade,
+        arm_system: tradingTools.arm_system,
+        list_plans: tradingTools.list_plans,
+        approve_plan: tradingTools.approve_plan,
       },
     });
   }
@@ -281,7 +299,8 @@ function getMonitorAgent(): Agent {
       instructions: MONITOR_INSTRUCTIONS,
       model: getModel(process.env.GORDON_PROVIDER, process.env.GORDON_MODEL),
       tools: {
-        // TODO: Add check_positions, close_trade, get_portfolio after migration
+        check_positions: positionTools.check_positions,
+        ...accountTools,
       },
     });
   }
@@ -303,7 +322,7 @@ function getTeacherAgent(): Agent {
       instructions: TEACHER_INSTRUCTIONS,
       model: getModel(process.env.GORDON_PROVIDER, process.env.GORDON_MODEL),
       tools: {
-        // TODO: Add explain after migration
+        explain: explainTools.explain,
       },
     });
   }
@@ -334,8 +353,7 @@ function getGordonAgent(): Agent {
 
       // Direct tools for simple operations
       tools: {
-        ...indicatorTools,
-        // TODO: Add other tool categories after migration
+        ...allTools,
       },
 
       // Memory for network orchestration

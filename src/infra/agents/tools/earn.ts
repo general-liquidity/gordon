@@ -264,7 +264,7 @@ export const subscribeFlexibleTool = createTool({
       return errors.noBinance;
     }
 
-    if (!ctx.config?.tradingMode?.armed) {
+    if (ctx.config?.mode !== "ARMED") {
       return {
         error: "System must be ARMED to subscribe to earn products. Use 'arm' command first.",
         productId,
@@ -311,7 +311,7 @@ export const redeemFlexibleTool = createTool({
       return errors.noBinance;
     }
 
-    if (!ctx.config?.tradingMode?.armed) {
+    if (ctx.config?.mode !== "ARMED") {
       return {
         error: "System must be ARMED to redeem from earn. Use 'arm' command first.",
         productId,
@@ -360,7 +360,7 @@ export const subscribeLockedTool = createTool({
       return errors.noBinance;
     }
 
-    if (!ctx.config?.tradingMode?.armed) {
+    if (ctx.config?.mode !== "ARMED") {
       return {
         error: "System must be ARMED to subscribe to locked products. Use 'arm' command first.",
         projectId,

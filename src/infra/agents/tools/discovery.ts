@@ -390,7 +390,13 @@ export const placeBracketOrderTool = createTool({
     stopLossPrice: z.number().optional(),
     takeProfitPrice: z.number().optional(),
     error: z.string().optional(),
-    entryOrder: z.any().optional(),
+    entryOrder: z.object({
+      orderId: z.number(),
+      symbol: z.string(),
+      status: z.string(),
+      executedQty: z.string(),
+      cummulativeQuoteQty: z.string(),
+    }).passthrough().optional(),
   }),
   execute: async ({ context, symbol, side, quantity, stopLossPrice, takeProfitPrice }) => {
     const ctx = context as GordonContext;
@@ -398,7 +404,7 @@ export const placeBracketOrderTool = createTool({
       return errors.noBinance;
     }
 
-    if (!ctx.config?.tradingMode?.armed) {
+    if (ctx.config?.mode !== "ARMED") {
       return {
         error: "System must be ARMED to place bracket orders. Use 'arm' command first.",
         symbol,

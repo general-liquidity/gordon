@@ -7,6 +7,7 @@ import React, { useState, useCallback } from "react";
 import { Box, Text, useInput } from "ink";
 import TextInput from "ink-text-input";
 
+import { resetAgents } from "../infra/agents/index.ts";
 import { BinanceClient, checkAndValidatePermissions } from "../infra/binance/index.ts";
 import { loadConfig, saveConfig } from "../infra/storage/config.ts";
 import { saveEnvKeys, createEnvFile, checkEnvStatus } from "../infra/storage/env.ts";
@@ -144,6 +145,9 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
     } else {
       await createEnvFile(envKeys);
     }
+
+    // Reset agent cache so next access reinitializes with fresh env variables
+    resetAgents();
   }, [state.binanceApiKey, state.binanceApiSecret, state.binancePermissions, state.preferences, state.openaiApiKey, state.dedalusApiKey]);
 
   const handleInputSubmit = useCallback(

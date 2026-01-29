@@ -112,7 +112,7 @@ export const convertDustTool = createTool({
       return errors.noBinance;
     }
 
-    if (!ctx.config?.tradingMode?.armed) {
+    if (ctx.config?.mode !== "ARMED") {
       return {
         ...errors.notArmed("convert dust"),
         assets: assets,
@@ -179,7 +179,7 @@ export const transferFundsTool = createTool({
       return errors.noBinance;
     }
 
-    if (!ctx.config?.tradingMode?.armed) {
+    if (ctx.config?.mode !== "ARMED") {
       return {
         ...errors.notArmed("transfer funds"),
         type,

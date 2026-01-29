@@ -311,7 +311,7 @@ export const placeOCOOrderTool = createTool({
       return errors.noBinance;
     }
 
-    if (!ctx.config?.tradingMode?.armed) {
+    if (ctx.config?.mode !== "ARMED") {
       return {
         error: "System must be ARMED to place OCO orders. Use 'arm' command first.",
         symbol,
@@ -386,7 +386,7 @@ export const cancelAllOrdersTool = createTool({
       return errors.noBinance;
     }
 
-    if (!ctx.config?.tradingMode?.armed) {
+    if (ctx.config?.mode !== "ARMED") {
       return {
         error: "System must be ARMED to cancel orders. Use 'arm' command first.",
         symbol,

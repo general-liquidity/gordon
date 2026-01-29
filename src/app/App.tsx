@@ -146,9 +146,9 @@ export function App(): React.ReactElement {
       try {
         llmClientRef.current = createLLMClientFromEnv();
 
-        // Initialize tracing for OpenAI Agents SDK
+        // Initialize tracing for Mastra Agent
         if (envStatus.keys.OPENAI_API_KEY) {
-          initializeTracing(envStatus.keys.OPENAI_API_KEY);
+          initializeTracing();
         }
       } catch (error) {
         console.error("Failed to initialize LLM client:", error);
@@ -317,7 +317,7 @@ export function App(): React.ReactElement {
       const result = await processMessage(
         messageToSend,
         context,
-        state.conversationHistory
+        undefined
       );
 
       const gordonMessage: ChatMessage = {
@@ -329,7 +329,6 @@ export function App(): React.ReactElement {
       setState((prev) => ({
         ...prev,
         messages: [...prev.messages, gordonMessage],
-        conversationHistory: result.history,
         isLoading: false,
       }));
     } catch (error) {
@@ -631,7 +630,7 @@ export function App(): React.ReactElement {
             const result = await processMessage(
               "Show me what's trending and pumping today",
               context,
-              state.conversationHistory
+              undefined
             );
             setState((prev) => ({
               ...prev,
@@ -640,7 +639,6 @@ export function App(): React.ReactElement {
                 content: result.response,
                 timestamp: formatTimestamp(),
               }],
-              conversationHistory: result.history,
             }));
           } catch (error) {
             setState((prev) => ({

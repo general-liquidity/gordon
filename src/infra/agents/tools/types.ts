@@ -35,5 +35,5 @@ export function normalizeSymbol(symbol: string): string {
  * Helper to check if system is armed
  */
 export function isArmed(ctx: GordonContext): boolean {
-  return ctx.config?.tradingMode?.armed === true || ctx.config?.mode === "ARMED";
+  return ctx.config?.mode === "ARMED";
 }
