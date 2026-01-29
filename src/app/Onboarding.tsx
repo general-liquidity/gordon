@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Box, Text, useInput } from "ink";
+import { Select } from "@inkjs/ui";
 import { COLORS } from "./theme.ts";
 
 type OnboardingStep = "welcome" | "how-it-works" | "safety" | "get-started";
@@ -190,18 +191,18 @@ function SafetyStep(): React.ReactElement {
 }
 
 interface GetStartedStepProps {
-  selectedOption: number;
+  onSelect: (option: "setup" | "demo") => void;
 }
 
-function GetStartedStep({ selectedOption }: GetStartedStepProps): React.ReactElement {
+function GetStartedStep({ onSelect }: GetStartedStepProps): React.ReactElement {
   const options = [
     {
-      label: "Set up API keys now",
-      description: "Connect to Binance and start trading",
+      label: "Set up API keys now - Connect to Binance and start trading",
+      value: "setup" as const,
     },
     {
-      label: "Explore in demo mode",
-      description: "Read-only, no real trades - perfect for kicking the tires",
+      label: "Explore in demo mode - Read-only, perfect for kicking the tires",
+      value: "demo" as const,
     },
   ];
 
@@ -219,29 +220,11 @@ function GetStartedStep({ selectedOption }: GetStartedStepProps): React.ReactEle
         </Text>
       </Box>
 
-      <Box flexDirection="column" marginTop={1}>
-        {options.map((option, index) => {
-          const isSelected = index === selectedOption;
-
-          return (
-            <Box key={option.label} marginBottom={1} flexDirection="column">
-              <Box>
-                <Text color={isSelected ? COLORS.HIGHLIGHT : COLORS.DIM}>
-                  {isSelected ? ">" : " "}
-                </Text>
-                <Text
-                  color={isSelected ? COLORS.HIGHLIGHT : COLORS.WHITE}
-                  bold={isSelected}
-                >
-                  {" "}{option.label}
-                </Text>
-              </Box>
-              <Box paddingLeft={3}>
-                <Text color={COLORS.DIM}>{option.description}</Text>
-              </Box>
-            </Box>
-          );
-        })}
+      <Box marginTop={1}>
+        <Select
+          options={options}
+          onChange={(value) => onSelect(value)}
+        />
       </Box>
 
       <Box marginTop={2} flexDirection="column">
@@ -258,20 +241,20 @@ function GetStartedStep({ selectedOption }: GetStartedStepProps): React.ReactEle
 
 export function Onboarding({ onComplete }: OnboardingProps): React.ReactElement {
   const [currentStep, setCurrentStep] = useState<OnboardingStep>("welcome");
-  const [selectedOption, setSelectedOption] = useState(0);
 
   const currentIndex = STEPS.indexOf(currentStep);
   const isLastStep = currentStep === "get-started";
 
+  const handleFinalSelect = (option: "setup" | "demo") => {
+    onComplete({
+      setupApiKeys: option === "setup",
+      demoMode: option === "demo",
+    });
+  };
+
   useInput((input, key) => {
-    // Navigation with j/k or arrow keys
-    if (isLastStep) {
-      if (key.upArrow || input === "k") {
-        setSelectedOption((prev) => (prev > 0 ? prev - 1 : 1));
-      } else if (key.downArrow || input === "j") {
-        setSelectedOption((prev) => (prev < 1 ? prev + 1 : 0));
-      }
-    }
+    // Don't handle input on last step - Select component handles it
+    if (isLastStep) return;
 
     // Navigate between steps
     if (key.leftArrow && currentIndex > 0) {
@@ -280,18 +263,11 @@ export function Onboarding({ onComplete }: OnboardingProps): React.ReactElement 
       setCurrentStep(STEPS[currentIndex + 1] ?? "get-started");
     }
 
-    // Enter to continue or select
+    // Enter to continue
     if (key.return) {
-      if (isLastStep) {
-        onComplete({
-          setupApiKeys: selectedOption === 0,
-          demoMode: selectedOption === 1,
-        });
-      } else {
-        const nextStep = STEPS[currentIndex + 1];
-        if (nextStep) {
-          setCurrentStep(nextStep);
-        }
+      const nextStep = STEPS[currentIndex + 1];
+      if (nextStep) {
+        setCurrentStep(nextStep);
       }
     }
   });
@@ -305,7 +281,7 @@ export function Onboarding({ onComplete }: OnboardingProps): React.ReactElement 
       case "safety":
         return <SafetyStep />;
       case "get-started":
-        return <GetStartedStep selectedOption={selectedOption} />;
+        return <GetStartedStep onSelect={handleFinalSelect} />;
     }
   }
 

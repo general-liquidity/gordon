@@ -1,13 +1,13 @@
 /**
  * Chat Input Component with Slash Command Support
- * Manages its own state to prevent re-render issues from parent updates
+ * Uses ink-ui TextInput with built-in features
  */
 
 import React, { useState, useCallback, useMemo } from "react";
 import { Box, Text, useInput } from "ink";
-import TextInput from "ink-text-input";
+import { TextInput } from "@inkjs/ui";
 import { COLORS } from "./theme.ts";
-import { getSlashCommandSuggestions, type SlashCommand } from "./slashCommands.ts";
+import { getSlashCommandSuggestions, SLASH_COMMANDS } from "./slashCommands.ts";
 import { CommandAutocomplete } from "./components/CommandAutocomplete.tsx";
 
 interface ChatInputProps {
@@ -28,6 +28,12 @@ export function ChatInput({ onSubmit, disabled = false, placeholder }: ChatInput
       return [];
     }
     return getSlashCommandSuggestions(value);
+  }, [value]);
+
+  // Build autocomplete suggestions for ink-ui TextInput
+  const commandSuggestions = useMemo(() => {
+    if (!value.startsWith("/")) return [];
+    return SLASH_COMMANDS.map((cmd) => `/${cmd.name}`);
   }, [value]);
 
   // Show autocomplete when typing a command
@@ -107,10 +113,11 @@ export function ChatInput({ onSubmit, disabled = false, placeholder }: ChatInput
           {">"}{" "}
         </Text>
         <TextInput
-          value={value}
+          isDisabled={disabled}
+          placeholder={placeholder || "Ask Gordon anything... (try /help)"}
+          suggestions={commandSuggestions}
           onChange={handleChange}
           onSubmit={handleSubmit}
-          placeholder={placeholder || "Ask Gordon anything... (try /help)"}
         />
       </Box>
     </Box>

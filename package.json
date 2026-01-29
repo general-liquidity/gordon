@@ -53,6 +53,7 @@
     "typescript": "^5"
   },
   "dependencies": {
+    "@inkjs/ui": "^2.0.0",
     "@openai/agents": "^0.4.0",
     "@types/react": "^19.2.10",
     "asciichart": "^1.5.25",

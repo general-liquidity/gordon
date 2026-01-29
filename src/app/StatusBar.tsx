@@ -1,5 +1,6 @@
 import React from "react";
 import { Box, Text } from "ink";
+import { Badge, Spinner } from "@inkjs/ui";
 import type { Mode } from "../types/index.ts";
 import { COLORS } from "./theme.ts";
 
@@ -20,33 +21,6 @@ export const StatusBar: React.FC<StatusBarProps> = ({
   currency = "USDT",
   btcPrice,
 }) => {
-  // Mode styling
-  const modeColor = mode === "ARMED" ? COLORS.RED : COLORS.GREEN;
-  const modeLabel = mode === "ARMED" ? "[ARMED]" : "[SAFE]";
-
-  // Connection status styling
-  const getConnectionColor = (status: ConnectionStatus) => {
-    switch (status) {
-      case "connected":
-        return COLORS.GREEN;
-      case "connecting":
-        return COLORS.YELLOW;
-      case "disconnected":
-        return COLORS.RED;
-    }
-  };
-
-  const getConnectionIcon = (status: ConnectionStatus) => {
-    switch (status) {
-      case "connected":
-        return "●";
-      case "connecting":
-        return "◐";
-      case "disconnected":
-        return "○";
-    }
-  };
-
   // Format portfolio value
   const formatValue = (value: number | undefined): string => {
     if (value === undefined) return "---";
@@ -73,36 +47,39 @@ export const StatusBar: React.FC<StatusBarProps> = ({
       justifyContent="space-between"
       width="100%"
     >
-      {/* Left section: Mode */}
-      <Box>
-        <Text color={COLORS.DIM}>Mode: </Text>
-        <Text color={modeColor} bold>
-          {modeLabel}
-        </Text>
+      {/* Left section: Mode Badge */}
+      <Box gap={1}>
+        <Text color={COLORS.DIM}>Mode:</Text>
+        <Badge color={mode === "ARMED" ? "red" : "green"}>
+          {mode === "ARMED" ? "ARMED" : "SAFE"}
+        </Badge>
       </Box>
 
       {/* BTC Price */}
-      <Box>
-        <Text color={COLORS.DIM}>BTC: </Text>
+      <Box gap={1}>
+        <Text color={COLORS.DIM}>BTC:</Text>
         <Text color={COLORS.HIGHLIGHT} bold>
           ${formatBtcPrice(btcPrice)}
         </Text>
       </Box>
 
       {/* Portfolio */}
-      <Box>
-        <Text color={COLORS.DIM}>Portfolio: </Text>
+      <Box gap={1}>
+        <Text color={COLORS.DIM}>Portfolio:</Text>
         <Text color={COLORS.WHITE} bold>
           ${formatValue(portfolioValue)}
         </Text>
       </Box>
 
-      {/* Right section: Connection */}
-      <Box>
-        <Text color={getConnectionColor(connectionStatus)}>
-          {getConnectionIcon(connectionStatus)}
-        </Text>
-        <Text color={COLORS.DIM}> {connectionStatus}</Text>
+      {/* Right section: Connection Badge */}
+      <Box gap={1}>
+        {connectionStatus === "connecting" ? (
+          <Spinner label="connecting" />
+        ) : (
+          <Badge color={connectionStatus === "connected" ? "green" : "red"}>
+            {connectionStatus}
+          </Badge>
+        )}
       </Box>
     </Box>
   );

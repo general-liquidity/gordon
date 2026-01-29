@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef } from "react";
 import { Box, Text, useInput } from "ink";
+import { Spinner, Alert, StatusMessage } from "@inkjs/ui";
 import { ChatInput } from "./ChatInput.tsx";
 
 import { StatusBar } from "./StatusBar.tsx";
@@ -785,7 +786,7 @@ Please check your API keys in the .env file and restart Gordon.`,
       <Box flexDirection="column" flexGrow={1}>
         {state.view === "loading" && (
           <Box flexDirection="column" paddingX={2} paddingY={1}>
-            <Text color={COLORS.TAN}>Loading Gordon...</Text>
+            <Spinner label="Loading Gordon..." />
           </Box>
         )}
 
@@ -817,7 +818,7 @@ Please check your API keys in the .env file and restart Gordon.`,
             {/* Loading indicator */}
             {state.isLoading && (
               <Box paddingX={2}>
-                <Text color={COLORS.TAN}>Gordon is thinking...</Text>
+                <Spinner label="Gordon is thinking..." />
               </Box>
             )}
 
