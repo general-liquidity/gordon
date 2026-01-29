@@ -21,6 +21,14 @@ import {
   startSchedulerTool,
   stopSchedulerTool,
   getSchedulerStatusTool,
+  // Indicator tools
+  getTechnicalAnalysisTool,
+  getTechnicalSignalsTool,
+  getStopLossLevelsTool,
+  getPositionSizeTool,
+  getRSITool,
+  getVWAPTool,
+  getStochasticRSITool,
 } from "./tools/index.ts";
 import { createModuleLogger } from "../logger/index.ts";
 import { emitEvent } from "../../events/index.ts";
@@ -72,6 +80,7 @@ Your role is to scan the cryptocurrency market and identify trading opportunitie
 - Scan the top coins by volume for trading setups
 - Analyze individual coins for detailed technical analysis
 - Identify coins near support with bullish signals
+- Quick technical signals check (RSI, trend, MACD) using get_technical_signals
 
 ## When Presenting Opportunities
 1. List the top opportunities by setup confidence
@@ -96,7 +105,7 @@ Your role is to scan the cryptocurrency market and identify trading opportunitie
 - Use start_background_scanning when user wants continuous monitoring
 - Use stop_background_scanning to cancel
 - Use get_scanning_status to check if scanning is active`,
-  tools: [scanMarketTool, analyzeCoinTool, getHistoricalOpportunitiesTool, startSchedulerTool, stopSchedulerTool, getSchedulerStatusTool],
+  tools: [scanMarketTool, analyzeCoinTool, getHistoricalOpportunitiesTool, startSchedulerTool, stopSchedulerTool, getSchedulerStatusTool, getTechnicalSignalsTool, getRSITool, getVWAPTool, getStochasticRSITool],
 });
 
 // Setup hooks for scanner
@@ -122,6 +131,10 @@ Your role is to provide deep analysis of specific cryptocurrencies.
 - Identify support and resistance levels
 - Interpret technical indicators (RSI, MACD, Volume)
 - Determine trend direction and momentum
+- Full technical analysis with bias scoring using get_technical_analysis
+- RSI checks for overbought/oversold conditions using get_rsi
+- VWAP for intraday fair value analysis using get_vwap
+- Stochastic RSI for precise entry/exit timing using get_stochastic_rsi
 
 ## When Presenting Analysis
 1. Start with current price and trend
@@ -143,7 +156,7 @@ Your role is to provide deep analysis of specific cryptocurrencies.
 - Always explain indicators in simple terms
 - Mention both bullish and bearish scenarios
 - Be honest about uncertainty`,
-  tools: [analyzeCoinTool, explainTool],
+  tools: [analyzeCoinTool, explainTool, getTechnicalAnalysisTool, getRSITool, getVWAPTool, getStochasticRSITool],
 });
 
 // Setup hooks for analyst
@@ -167,6 +180,8 @@ Your role is to create well-structured trading plans based on analysis.
 - Create trading plans with entry, stop-loss, and take-profit levels
 - Calculate appropriate position sizing based on risk tolerance
 - Validate plans against user preferences and portfolio constraints
+- Calculate ATR-based stop-loss levels using get_stop_loss_levels (more precise than fixed %)
+- Calculate optimal position size using get_position_size (based on risk amount and ATR)
 
 ## When Creating Plans
 1. First analyze the coin if not already done
@@ -181,8 +196,9 @@ Your role is to create well-structured trading plans based on analysis.
 
 ## Plan Components
 - Entry: Limit order near support or market order
-- Stop-Loss: Below support (3-5% for low risk, 5-8% for medium, 8-12% for high)
+- Stop-Loss: Use get_stop_loss_levels for ATR-based stops (better than fixed %). 1.5x ATR = normal, 2x = wide, 3x = very wide
 - Take-Profits: At resistance levels, scaled out (e.g., 50% at TP1, 30% at TP2, 20% at TP3)
+- Position Size: Use get_position_size to calculate based on risk amount (e.g., "$100 risk")
 - DCA: Optional additional entries if price drops further
 
 ## Important Rules
@@ -196,7 +212,7 @@ If the create_plan tool fails:
 1. Report the EXACT error message (e.g., "No support levels found", "Invalid symbol")
 2. Don't say "glitch" or "hiccup" - explain what actually failed
 3. Suggest a fix: different symbol, wait for better setup, or check the analysis first`,
-  tools: [analyzeCoinTool, createPlanTool, listPlansTool, approvePlanTool],
+  tools: [analyzeCoinTool, createPlanTool, listPlansTool, approvePlanTool, getStopLossLevelsTool, getPositionSizeTool],
 });
 
 // Setup hooks for planner

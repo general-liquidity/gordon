@@ -144,7 +144,7 @@ export function createMockPlan(overrides: Partial<Plan> = {}): Plan {
       price: 48000,
     },
     takeProfit: [
-      { price: 52000, percentToSell: 0.5 },
+      { price: 52500, percentToSell: 0.5 },  // R:R = 2500/2000 = 1.25:1 (above min 1.2)
       { price: 55000, percentToSell: 0.5 },
     ],
     reasoning: "Support bounce setup detected with strong confluence.",

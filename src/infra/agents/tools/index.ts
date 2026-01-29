@@ -19,6 +19,7 @@ export { earnTools, getFlexibleProductsTool, getLockedProductsTool, getAllEarnPo
 export { orderbookTools, getOrderBookTool, getSpreadTool, getRecentTradesTool, placeOCOOrderTool, cancelAllOrdersTool, getOrderStatusTool, testOrderTool } from "./orderbook.ts";
 export { discoveryTools, getTrendingTokensTool, getHighVolumeTokensTool, getAvailableMarketsTool, placeBracketOrderTool } from "./discovery.ts";
 export { chartTools, displayPriceChartTool, displayCandlestickChartTool, displayComparisonChartTool, displayVolumeChartTool } from "./charts.ts";
+export { indicatorTools, getTechnicalAnalysisTool, getTechnicalSignalsTool, getStopLossLevelsTool, getPositionSizeTool, getRSITool, getVWAPTool, getStochasticRSITool } from "./indicators.ts";
 
 // Type exports
 export type { ToolRunContext } from "./types.ts";
@@ -38,6 +39,7 @@ import { earnTools } from "./earn.ts";
 import { orderbookTools } from "./orderbook.ts";
 import { discoveryTools } from "./discovery.ts";
 import { chartTools } from "./charts.ts";
+import { indicatorTools } from "./indicators.ts";
 
 /**
  * All tools combined - use this for the agent
@@ -56,6 +58,7 @@ export const allTools = [
   ...orderbookTools,
   ...discoveryTools,
   ...chartTools,
+  ...indicatorTools,
 ];
 
 /**
@@ -75,5 +78,6 @@ export const toolCounts = {
   orderbook: orderbookTools.length,
   discovery: discoveryTools.length,
   charts: chartTools.length,
+  indicators: indicatorTools.length,
   total: allTools.length,
 };
