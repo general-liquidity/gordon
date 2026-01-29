@@ -1,6 +1,7 @@
 import React from "react";
 import { Box, Text } from "ink";
 import { COLORS } from "./theme.ts";
+import { MarkdownText } from "./components/MarkdownText.tsx";
 
 export interface ChatMessage {
   role: "user" | "gordon";
@@ -44,10 +45,15 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
         paddingX={1}
         marginLeft={isUser ? 4 : 0}
         marginRight={isUser ? 0 : 4}
+        flexDirection="column"
       >
-        <Text color={isUser ? COLORS.WHITE : COLORS.WHITE} wrap="wrap">
-          {message.content}
-        </Text>
+        {isUser ? (
+          <Text color={COLORS.WHITE} wrap="wrap">
+            {message.content}
+          </Text>
+        ) : (
+          <MarkdownText>{message.content}</MarkdownText>
+        )}
       </Box>
     </Box>
   );

@@ -19,3 +19,6 @@ export {
   RiskWarning,
   ConnectionAlert
 } from "./StatusMessages.tsx";
+
+// Markdown rendering
+export { MarkdownText } from "./MarkdownText.tsx";
