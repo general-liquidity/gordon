@@ -54,4 +54,12 @@ export {
   processMessageStream,
   quickScan,
   quickCheckPositions,
+  initializeTracing,
 } from "./orchestrator.ts";
+export type { StreamEvent } from "./orchestrator.ts";
+
+// Guardrails
+export { inputGuardrails, outputGuardrails } from "./guardrails.ts";
+
+// Agent Hooks
+export { setupAgentHooks } from "./agents.ts";

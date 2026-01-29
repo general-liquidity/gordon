@@ -8,7 +8,7 @@ import { QuickStartMenu, type MenuOption } from "./QuickStartMenu.tsx";
 import { ChatView, type ChatMessage } from "./ChatView.tsx";
 import { Onboarding } from "./Onboarding.tsx";
 import { SetupWizard } from "./SetupWizard.tsx";
-import { processMessage } from "../infra/agents/orchestrator.ts";
+import { processMessage, initializeTracing } from "../infra/agents/orchestrator.ts";
 import { createLLMClientFromEnv, type LLMClient } from "../infra/llm/index.ts";
 import { BinanceClient } from "../infra/binance/index.ts";
 import { runMonitorCycle } from "../core/monitor.ts";
@@ -149,6 +149,11 @@ export function App(): React.ReactElement {
       // Initialize LLM client
       try {
         llmClientRef.current = createLLMClientFromEnv();
+
+        // Initialize tracing for OpenAI Agents SDK
+        if (envStatus.keys.OPENAI_API_KEY) {
+          initializeTracing(envStatus.keys.OPENAI_API_KEY);
+        }
       } catch (error) {
         console.error("Failed to initialize LLM client:", error);
       }

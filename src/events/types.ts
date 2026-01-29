@@ -158,6 +158,65 @@ export interface OpportunityFoundEvent extends BaseEvent {
 }
 
 /**
+ * Agent lifecycle events
+ */
+export interface AgentStartedEvent extends BaseEvent {
+  type: "agent:started";
+  agent: string;
+  parent?: string;
+}
+
+export interface AgentCompletedEvent extends BaseEvent {
+  type: "agent:completed";
+  agent: string;
+  outputLength: number;
+}
+
+export interface AgentHandoffEvent extends BaseEvent {
+  type: "agent:handoff";
+  from: string;
+  to: string;
+}
+
+export interface AgentMessageProcessedEvent extends BaseEvent {
+  type: "agent:message_processed";
+  userMessage: string;
+  responseLength: number;
+  historyLength: number;
+}
+
+export interface AgentStreamCompletedEvent extends BaseEvent {
+  type: "agent:stream_completed";
+  responseLength: number;
+}
+
+/**
+ * Tool lifecycle events
+ */
+export interface ToolStartedEvent extends BaseEvent {
+  type: "tool:started";
+  tool: string;
+  agent: string;
+}
+
+export interface ToolCompletedEvent extends BaseEvent {
+  type: "tool:completed";
+  tool: string;
+  agent: string;
+}
+
+/**
+ * Guardrail events
+ */
+export interface GuardrailBlockedEvent extends BaseEvent {
+  type: "guardrail:blocked";
+  guardrailType: "input" | "output";
+  reason: string;
+  pattern?: string;
+  length?: number;
+}
+
+/**
  * Union type of all events
  */
 export type GordonEvent =
@@ -180,7 +239,15 @@ export type GordonEvent =
   | TakeProfitHitEvent
   | ScanStartedEvent
   | ScanCompletedEvent
-  | OpportunityFoundEvent;
+  | OpportunityFoundEvent
+  | AgentStartedEvent
+  | AgentCompletedEvent
+  | AgentHandoffEvent
+  | AgentMessageProcessedEvent
+  | AgentStreamCompletedEvent
+  | ToolStartedEvent
+  | ToolCompletedEvent
+  | GuardrailBlockedEvent;
 
 /**
  * Extract event type string

@@ -18,13 +18,43 @@ import {
   listPlansTool,
   approvePlanTool,
 } from "./tools/index.ts";
+import { createModuleLogger } from "../logger/index.ts";
+import { emitEvent } from "../../events/index.ts";
+import type { GordonContext } from "./types.ts";
+
+const logger = createModuleLogger("agents");
+
+// ============================================================================
+// Lifecycle Hooks Setup
+// ============================================================================
+
+/**
+ * Setup lifecycle hooks for an agent
+ * Provides logging and event emission for agent lifecycle events
+ */
+export function setupAgentHooks<T>(agent: Agent<T>, agentName: string): void {
+  // Agent start/end hooks
+  agent.on("agent_start", (_ctx, startedAgent) => {
+    const name = typeof startedAgent === "object" && "name" in startedAgent ? startedAgent.name : agentName;
+    logger.debug(`Agent started: ${name}`, { agent: agentName });
+    emitEvent("agent:started", { agent: String(name), parent: agentName }).catch(() => {});
+  });
+
+  agent.on("agent_end", (_ctx, output) => {
+    const outputPreview = typeof output === "string"
+      ? output.substring(0, 100)
+      : JSON.stringify(output).substring(0, 100);
+    logger.debug(`Agent completed: ${agentName}`, { outputPreview });
+    emitEvent("agent:completed", { agent: agentName, outputLength: String(output).length }).catch(() => {});
+  });
+}
 
 // ============================================================================
 // Scanner Agent
 // Finds trading opportunities in the market
 // ============================================================================
 
-export const scannerAgent = new Agent({
+export const scannerAgent = new Agent<GordonContext>({
   name: "Scanner",
   handoffDescription:
     "Specialist in scanning the market and finding trading opportunities. " +
@@ -55,12 +85,15 @@ Your role is to scan the cryptocurrency market and identify trading opportunitie
   tools: [scanMarketTool, analyzeCoinTool],
 });
 
+// Setup hooks for scanner
+setupAgentHooks(scannerAgent, "Scanner");
+
 // ============================================================================
 // Analyst Agent
 // Provides deep analysis of specific coins
 // ============================================================================
 
-export const analystAgent = new Agent({
+export const analystAgent = new Agent<GordonContext>({
   name: "Analyst",
   handoffDescription:
     "Specialist in deep coin analysis and technical indicators. " +
@@ -99,12 +132,15 @@ Your role is to provide deep analysis of specific cryptocurrencies.
   tools: [analyzeCoinTool, explainTool],
 });
 
+// Setup hooks for analyst
+setupAgentHooks(analystAgent, "Analyst");
+
 // ============================================================================
 // Planner Agent
 // Creates and manages trading plans
 // ============================================================================
 
-export const plannerAgent = new Agent({
+export const plannerAgent = new Agent<GordonContext>({
   name: "Planner",
   handoffDescription:
     "Specialist in creating trading plans with entry, stop-loss, and take-profit levels. " +
@@ -143,12 +179,15 @@ Your role is to create well-structured trading plans based on analysis.
   tools: [analyzeCoinTool, createPlanTool, listPlansTool, approvePlanTool],
 });
 
+// Setup hooks for planner
+setupAgentHooks(plannerAgent, "Planner");
+
 // ============================================================================
 // Executor Agent
 // Handles trade execution (requires ARMED mode)
 // ============================================================================
 
-export const executorAgent = new Agent({
+export const executorAgent = new Agent<GordonContext>({
   name: "Executor",
   handoffDescription:
     "Specialist in executing trading plans and managing orders. " +
@@ -183,12 +222,15 @@ Your role is to safely execute trading plans on Binance.
   tools: [executePlanTool, armSystemTool, listPlansTool],
 });
 
+// Setup hooks for executor
+setupAgentHooks(executorAgent, "Executor");
+
 // ============================================================================
 // Monitor Agent
 // Watches open positions and alerts on issues
 // ============================================================================
 
-export const monitorAgent = new Agent({
+export const monitorAgent = new Agent<GordonContext>({
   name: "Monitor",
   handoffDescription:
     "Specialist in monitoring open positions and detecting issues. " +
@@ -228,12 +270,15 @@ Your role is to watch open positions and keep the user informed.
   tools: [checkPositionsTool, closeTradeTool, getPortfolioTool],
 });
 
+// Setup hooks for monitor
+setupAgentHooks(monitorAgent, "Monitor");
+
 // ============================================================================
 // Teacher Agent
 // Explains concepts and educates the user
 // ============================================================================
 
-export const teacherAgent = new Agent({
+export const teacherAgent = new Agent<GordonContext>({
   name: "Teacher",
   handoffDescription:
     "Specialist in explaining trading concepts in simple terms. " +
@@ -271,6 +316,9 @@ Your role is to explain trading concepts in simple, friendly terms.
 - Always relate explanations back to their trading context`,
   tools: [explainTool],
 });
+
+// Setup hooks for teacher
+setupAgentHooks(teacherAgent, "Teacher");
 
 // ============================================================================
 // Export all agents

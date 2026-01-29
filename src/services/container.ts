@@ -96,6 +96,7 @@ export class ServiceContainer {
       this.services.llm = new LLMClient({
         openaiApiKey: config.openai.apiKey,
         defaultModel: config.openai.model,
+        defaultProvider: "openai",
       });
       this.services.logger.info("LLM client initialized");
     } else {

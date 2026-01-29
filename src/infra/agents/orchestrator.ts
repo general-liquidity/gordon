@@ -3,7 +3,8 @@
  * Main agent that coordinates all specialized agents via handoffs
  */
 
-import { Agent, run } from "@openai/agents";
+import { Agent, run, setTracingExportApiKey, withTrace } from "@openai/agents";
+import type { AgentInputItem } from "@openai/agents";
 
 import {
   scannerAgent,
@@ -12,15 +13,39 @@ import {
   executorAgent,
   monitorAgent,
   teacherAgent,
+  setupAgentHooks,
 } from "./agents.ts";
 import { allTools } from "./tools/index.ts";
+import { inputGuardrails, outputGuardrails } from "./guardrails.ts";
+import { createModuleLogger } from "../logger/index.ts";
+import { emitEvent } from "../../events/index.ts";
 import type { GordonContext } from "./types.ts";
+
+const logger = createModuleLogger("orchestrator");
+
+// ============================================================================
+// Tracing Setup
+// ============================================================================
+
+/**
+ * Initialize tracing for the OpenAI Agents SDK
+ * This enables visualization in the OpenAI dashboard
+ */
+export function initializeTracing(apiKey?: string): void {
+  const key = apiKey || process.env.OPENAI_API_KEY;
+  if (key) {
+    setTracingExportApiKey(key);
+    logger.info("Tracing enabled - view runs at platform.openai.com");
+  } else {
+    logger.warn("Tracing not enabled - no API key provided");
+  }
+}
 
 // ============================================================================
 // Gordon - The Main Orchestrator
 // ============================================================================
 
-export const gordonAgent = new Agent({
+export const gordonAgent = new Agent<GordonContext>({
   name: "Gordon",
   instructions: `You are Gordon, an AI trading assistant for cryptocurrency.
 
@@ -79,11 +104,58 @@ You can do everything yourself OR delegate to specialized agents:
 
   // Gordon has access to all tools directly too
   tools: allTools,
+
+  // Guardrails for input/output validation
+  inputGuardrails,
+  outputGuardrails,
 });
+
+// Setup lifecycle hooks for Gordon
+setupAgentHooks(gordonAgent, "Gordon");
 
 // ============================================================================
 // Run Gordon
 // ============================================================================
+
+/**
+ * Convert legacy history format to SDK AgentInputItem format
+ */
+function legacyToAgentHistory(
+  history: Array<{ role: "user" | "assistant"; content: string }>
+): AgentInputItem[] {
+  return history.map((m) => ({
+    role: m.role === "user" ? "user" : "assistant",
+    content: m.content,
+  })) as AgentInputItem[];
+}
+
+/**
+ * Convert SDK history back to legacy format for storage
+ */
+function agentToLegacyHistory(
+  history: AgentInputItem[]
+): Array<{ role: "user" | "assistant"; content: string }> {
+  const result: Array<{ role: "user" | "assistant"; content: string }> = [];
+
+  for (const item of history) {
+    // Check if item has role and content properties (user/assistant messages)
+    if (
+      typeof item === "object" &&
+      item !== null &&
+      "role" in item &&
+      "content" in item &&
+      (item.role === "user" || item.role === "assistant") &&
+      typeof item.content === "string"
+    ) {
+      result.push({
+        role: item.role,
+        content: item.content,
+      });
+    }
+  }
+
+  return result;
+}
 
 /**
  * Process a user message through Gordon
@@ -100,43 +172,54 @@ export async function processMessage(
 ): Promise<{
   response: string;
   history: Array<{ role: "user" | "assistant"; content: string }>;
+  agentHistory: AgentInputItem[];
   pendingApproval?: {
     toolName: string;
     args: unknown;
   };
 }> {
-  // Build input with conversation history
-  const historyText = conversationHistory
-    .map((m) => `${m.role === "user" ? "User" : "Gordon"}: ${m.content}`)
-    .join("\n");
+  logger.debug("Processing message", { messageLength: userMessage.length, historyLength: conversationHistory.length });
 
-  const input = historyText
-    ? `Previous conversation:\n${historyText}\n\nUser: ${userMessage}`
-    : userMessage;
+  // Convert legacy history to SDK format and add new user message
+  const agentHistory = legacyToAgentHistory(conversationHistory);
+  const input: AgentInputItem[] = [
+    ...agentHistory,
+    { role: "user", content: userMessage } as AgentInputItem,
+  ];
 
-  // Run the agent
-  const result = await run(gordonAgent, input, {
-    context,
-    maxTurns: 10, // Limit agent loop iterations
+  // Run the agent with structured history inside a trace
+  const result = await withTrace("gordon-conversation", async () => {
+    return run(gordonAgent, input, {
+      context,
+      maxTurns: 10,
+    });
   });
 
   // Extract the final output
   const response = result.finalOutput ?? "I'm not sure how to help with that. Could you rephrase?";
 
-  // Update conversation history
-  const newHistory = [
-    ...conversationHistory,
-    { role: "user" as const, content: userMessage },
-    { role: "assistant" as const, content: response },
-  ];
+  // Get the full structured history from the SDK
+  const newAgentHistory = result.history;
 
-  // Check for pending approvals (tools with needsApproval)
-  // This is a simplified check - in production you'd handle this more robustly
+  // Convert back to legacy format for backward compatibility
+  const newLegacyHistory = agentToLegacyHistory(newAgentHistory);
+
+  // Emit event for conversation tracking
+  await emitEvent("agent:message_processed", {
+    userMessage: userMessage.substring(0, 100),
+    responseLength: response.length,
+    historyLength: newAgentHistory.length,
+  });
+
+  logger.debug("Message processed", { responseLength: response.length });
+
+  // Check for pending approvals
   const pendingApproval = extractPendingApproval(result);
 
   return {
     response,
-    history: newHistory,
+    history: newLegacyHistory,
+    agentHistory: newAgentHistory,
     pendingApproval,
   };
 }
@@ -159,42 +242,83 @@ function extractPendingApproval(
 // ============================================================================
 
 /**
- * Process a message with streaming support
- * Yields partial responses as they come in
+ * Stream event types emitted during processing
+ */
+export interface StreamEvent {
+  type: "text_delta" | "tool_call" | "agent_switch" | "done" | "error";
+  content?: string;
+  toolName?: string;
+  agentName?: string;
+  error?: string;
+}
+
+/**
+ * Process a message with real streaming support
+ * Yields events as they come in from the SDK
  */
 export async function* processMessageStream(
   userMessage: string,
   context: GordonContext,
   conversationHistory: Array<{ role: "user" | "assistant"; content: string }> = []
-): AsyncGenerator<string, { history: Array<{ role: "user" | "assistant"; content: string }> }> {
-  // Build input with conversation history
-  const historyText = conversationHistory
-    .map((m) => `${m.role === "user" ? "User" : "Gordon"}: ${m.content}`)
-    .join("\n");
+): AsyncGenerator<StreamEvent, { history: Array<{ role: "user" | "assistant"; content: string }>; agentHistory: AgentInputItem[] }> {
+  logger.debug("Starting streaming message processing");
 
-  const input = historyText
-    ? `Previous conversation:\n${historyText}\n\nUser: ${userMessage}`
-    : userMessage;
+  // Convert legacy history to SDK format
+  const agentHistory = legacyToAgentHistory(conversationHistory);
+  const input: AgentInputItem[] = [
+    ...agentHistory,
+    { role: "user", content: userMessage } as AgentInputItem,
+  ];
 
-  // For streaming, we'd use the SDK's streaming API
-  // This is a simplified non-streaming fallback
+  // Run with streaming enabled
   const result = await run(gordonAgent, input, {
     context,
     maxTurns: 10,
+    stream: true,
   });
 
-  const response = result.finalOutput ?? "I'm not sure how to help with that.";
+  let fullResponse = "";
 
-  // Yield the response (in production, this would yield chunks)
-  yield response;
+  // Iterate over streaming events
+  for await (const event of result) {
+    // Raw model stream events (text deltas)
+    if (event.type === "raw_model_stream_event") {
+      const data = event.data as { type?: string; event?: { type?: string; delta?: string } };
+      if (data.event?.type === "response.output_text.delta" && data.event.delta) {
+        fullResponse += data.event.delta;
+        yield { type: "text_delta", content: data.event.delta };
+      }
+    }
 
-  // Return updated history
+    // Agent switch events
+    if (event.type === "agent_updated_stream_event") {
+      const agentEvent = event as { agent?: { name?: string } };
+      yield { type: "agent_switch", agentName: agentEvent.agent?.name };
+    }
+
+    // Run item events (tool calls, etc.)
+    if (event.type === "run_item_stream_event") {
+      const itemEvent = event as { item?: { type?: string; name?: string } };
+      if (itemEvent.item?.type === "tool_call") {
+        yield { type: "tool_call", toolName: itemEvent.item.name };
+      }
+    }
+  }
+
+  // Signal completion
+  yield { type: "done", content: fullResponse || result.finalOutput };
+
+  // Get final history
+  const newAgentHistory = result.history;
+  const newLegacyHistory = agentToLegacyHistory(newAgentHistory);
+
+  await emitEvent("agent:stream_completed", {
+    responseLength: fullResponse.length,
+  });
+
   return {
-    history: [
-      ...conversationHistory,
-      { role: "user" as const, content: userMessage },
-      { role: "assistant" as const, content: response },
-    ],
+    history: newLegacyHistory,
+    agentHistory: newAgentHistory,
   };
 }
 
