@@ -18,13 +18,13 @@ function StepIndicator({ currentStep }: { currentStep: OnboardingStep }): React.
       {STEPS.map((step, index) => {
         const isActive = index === currentIndex;
         const isPast = index < currentIndex;
-        const color = isActive ? COLORS.TAN : isPast ? COLORS.GREEN : COLORS.DIM;
-        const symbol = isPast ? "●" : isActive ? "◉" : "○";
+        const color = isActive ? COLORS.ACCENT : isPast ? COLORS.GREEN : COLORS.DIM;
+        const symbol = isPast ? "o" : isActive ? "@" : "o";
 
         return (
           <Box key={step}>
             <Text color={color}>{symbol}</Text>
-            {index < STEPS.length - 1 && <Text color={COLORS.DIM}> — </Text>}
+            {index < STEPS.length - 1 && <Text color={COLORS.DIM}> - </Text>}
           </Box>
         );
       })}
@@ -36,14 +36,14 @@ function WelcomeStep(): React.ReactElement {
   return (
     <Box flexDirection="column">
       <Box marginBottom={1}>
-        <Text color={COLORS.TAN} bold>
+        <Text color={COLORS.ACCENT} bold>
           "Greed is good... but so is risk management."
         </Text>
       </Box>
 
       <Box marginBottom={1}>
         <Text color={COLORS.WHITE}>
-          Hey there. I'm <Text bold color={COLORS.TAN}>Gordon</Text>, your AI trading assistant.
+          Hey there. I'm <Text bold color={COLORS.ACCENT}>Gordon</Text>, your AI trading assistant.
         </Text>
       </Box>
 
@@ -69,54 +69,64 @@ function WelcomeStep(): React.ReactElement {
 }
 
 function HowItWorksStep(): React.ReactElement {
-  const flowSteps = [
-    { icon: "💬", label: "Chat", desc: "Tell me what you're thinking" },
-    { icon: "🔍", label: "Scan", desc: "I search for opportunities" },
-    { icon: "📊", label: "Analyze", desc: "I crunch the numbers" },
-    { icon: "📋", label: "Plan", desc: "I create a detailed trade plan" },
-    { icon: "✓", label: "Approve", desc: "You review and approve" },
-    { icon: "⚡", label: "Execute", desc: "I place the orders" },
-  ];
-
   return (
     <Box flexDirection="column">
       <Box marginBottom={1}>
-        <Text color={COLORS.TAN} bold>
+        <Text color={COLORS.ACCENT} bold>
           How It Works
         </Text>
       </Box>
 
       <Box marginBottom={1}>
         <Text color={COLORS.WHITE}>
-          Just talk to me naturally. Say things like:
+          Chat naturally or use <Text color={COLORS.HIGHLIGHT}>/commands</Text> for quick actions:
         </Text>
       </Box>
 
       <Box flexDirection="column" marginBottom={1} paddingLeft={2}>
-        <Text color={COLORS.TAN_DIM} italic>"Find me a good BTC setup"</Text>
-        <Text color={COLORS.TAN_DIM} italic>"What's the market looking like?"</Text>
-        <Text color={COLORS.TAN_DIM} italic>"I want to buy ETH with 10% of my portfolio"</Text>
+        <Text color={COLORS.ACCENT_DIM} italic>"Find me a good BTC setup"</Text>
+        <Text color={COLORS.ACCENT_DIM} italic>"What's the market looking like?"</Text>
+        <Text color={COLORS.ACCENT_DIM}>
+          <Text color={COLORS.HIGHLIGHT}>/trending</Text>
+          <Text color={COLORS.ACCENT_DIM} italic> - see what's pumping</Text>
+        </Text>
+        <Text color={COLORS.ACCENT_DIM}>
+          <Text color={COLORS.HIGHLIGHT}>/scan</Text>
+          <Text color={COLORS.ACCENT_DIM} italic> - find trading opportunities</Text>
+        </Text>
       </Box>
 
       <Box marginBottom={1}>
         <Text color={COLORS.WHITE}>
-          I handle all the technical stuff:
+          I have <Text color={COLORS.HIGHLIGHT} bold>50+ tools</Text> and <Text color={COLORS.HIGHLIGHT} bold>6 specialized agents</Text>:
         </Text>
       </Box>
 
-      <Box flexDirection="column">
-        {flowSteps.map((step, index) => (
-          <Box key={step.label}>
-            <Text color={COLORS.DIM}>{step.icon} </Text>
-            <Box width={10}>
-              <Text color={COLORS.WHITE} bold>{step.label}</Text>
-            </Box>
-            <Text color={COLORS.DIM}>→ {step.desc}</Text>
-            {index < flowSteps.length - 1 && (
-              <Text color={COLORS.DIM}></Text>
-            )}
-          </Box>
-        ))}
+      <Box flexDirection="column" paddingLeft={2}>
+        <Box>
+          <Box width={12}><Text color={COLORS.WHITE} bold>Scanner</Text></Box>
+          <Text color={COLORS.DIM}>Find setups across the market</Text>
+        </Box>
+        <Box>
+          <Box width={12}><Text color={COLORS.WHITE} bold>Analyst</Text></Box>
+          <Text color={COLORS.DIM}>Deep technical analysis</Text>
+        </Box>
+        <Box>
+          <Box width={12}><Text color={COLORS.WHITE} bold>Planner</Text></Box>
+          <Text color={COLORS.DIM}>Create detailed trade plans</Text>
+        </Box>
+        <Box>
+          <Box width={12}><Text color={COLORS.WHITE} bold>Executor</Text></Box>
+          <Text color={COLORS.DIM}>Place orders when armed</Text>
+        </Box>
+        <Box>
+          <Box width={12}><Text color={COLORS.WHITE} bold>Monitor</Text></Box>
+          <Text color={COLORS.DIM}>Track your positions</Text>
+        </Box>
+        <Box>
+          <Box width={12}><Text color={COLORS.WHITE} bold>Teacher</Text></Box>
+          <Text color={COLORS.DIM}>Explain trading concepts</Text>
+        </Box>
       </Box>
     </Box>
   );
@@ -126,48 +136,52 @@ function SafetyStep(): React.ReactElement {
   return (
     <Box flexDirection="column">
       <Box marginBottom={1}>
-        <Text color={COLORS.TAN} bold>
+        <Text color={COLORS.ACCENT} bold>
           Safety First
         </Text>
       </Box>
 
       <Box marginBottom={1}>
         <Text color={COLORS.WHITE}>
-          I have two modes:
+          I have two modes to keep your funds safe:
         </Text>
       </Box>
 
       <Box flexDirection="column" marginBottom={1}>
-        <Box marginBottom={1}>
-          <Text color={COLORS.GREEN} bold>[SAFE]</Text>
-          <Text color={COLORS.DIM}> — Read-only. I can scan, analyze, and plan,</Text>
-        </Box>
-        <Box paddingLeft={7} marginBottom={1}>
-          <Text color={COLORS.DIM}>but I won't touch your funds. Perfect for learning.</Text>
+        <Box marginBottom={1} flexDirection="column">
+          <Box>
+            <Text color={COLORS.GREEN} bold>[o] SAFE</Text>
+            <Text color={COLORS.DIM}> - Read-only mode (default)</Text>
+          </Box>
+          <Box paddingLeft={4}>
+            <Text color={COLORS.DIM}>I can scan, analyze, and plan but won't touch your funds.</Text>
+          </Box>
         </Box>
 
-        <Box marginBottom={1}>
-          <Text color={COLORS.RED} bold>[ARMED]</Text>
-          <Text color={COLORS.DIM}> — I can place orders on your behalf,</Text>
-        </Box>
-        <Box paddingLeft={7}>
-          <Text color={COLORS.DIM}>but only after you explicitly approve each trade.</Text>
+        <Box marginBottom={1} flexDirection="column">
+          <Box>
+            <Text color={COLORS.RED} bold>[!] ARMED</Text>
+            <Text color={COLORS.DIM}> - Live trading enabled</Text>
+          </Box>
+          <Box paddingLeft={4}>
+            <Text color={COLORS.DIM}>I can place orders, but only after you approve each trade.</Text>
+          </Box>
         </Box>
       </Box>
 
       <Box flexDirection="column" marginTop={1} paddingLeft={2}>
         <Box>
-          <Text color={COLORS.HIGHLIGHT}>⚠</Text>
+          <Text color={COLORS.HIGHLIGHT}>!</Text>
           <Text color={COLORS.WHITE} bold> I never trade without your explicit approval.</Text>
         </Box>
         <Box marginTop={1}>
           <Text color={COLORS.DIM}>
-            ARMED mode auto-disarms after 24 hours for extra safety.
+            Type <Text color={COLORS.HIGHLIGHT}>/arm</Text> to enable trading, <Text color={COLORS.HIGHLIGHT}>/disarm</Text> to return to safe mode.
           </Text>
         </Box>
-        <Box>
+        <Box marginTop={1}>
           <Text color={COLORS.DIM}>
-            You start in SAFE mode by default. Always.
+            ARMED mode auto-disarms after 24 hours for extra safety.
           </Text>
         </Box>
       </Box>
@@ -187,14 +201,14 @@ function GetStartedStep({ selectedOption }: GetStartedStepProps): React.ReactEle
     },
     {
       label: "Explore in demo mode",
-      description: "Read-only, no real trades — perfect for kicking the tires",
+      description: "Read-only, no real trades - perfect for kicking the tires",
     },
   ];
 
   return (
     <Box flexDirection="column">
       <Box marginBottom={1}>
-        <Text color={COLORS.TAN} bold>
+        <Text color={COLORS.ACCENT} bold>
           Ready to Get Started?
         </Text>
       </Box>
@@ -228,6 +242,15 @@ function GetStartedStep({ selectedOption }: GetStartedStepProps): React.ReactEle
             </Box>
           );
         })}
+      </Box>
+
+      <Box marginTop={2} flexDirection="column">
+        <Text color={COLORS.DIM}>
+          First time? Try <Text color={COLORS.HIGHLIGHT}>/trending</Text> to see what's moving,
+        </Text>
+        <Text color={COLORS.DIM}>
+          or just ask: "What should I trade today?"
+        </Text>
       </Box>
     </Box>
   );
@@ -293,7 +316,7 @@ export function Onboarding({ onComplete }: OnboardingProps): React.ReactElement 
       <Box
         flexDirection="column"
         borderStyle="single"
-        borderColor={COLORS.TAN_DIM}
+        borderColor={COLORS.ACCENT_DIM}
         paddingX={2}
         paddingY={1}
         minHeight={16}
@@ -303,19 +326,19 @@ export function Onboarding({ onComplete }: OnboardingProps): React.ReactElement 
 
       <Box marginTop={1} justifyContent="space-between">
         <Text color={COLORS.DIM}>
-          {currentIndex > 0 ? "← Back" : ""}
+          {currentIndex > 0 ? "Back" : ""}
         </Text>
         <Text color={COLORS.DIM}>
           Step {currentIndex + 1} of {STEPS.length}
         </Text>
         <Text color={COLORS.DIM}>
-          {isLastStep ? "Enter to select →" : "Enter to continue →"}
+          {isLastStep ? "Enter to select" : "Enter to continue"}
         </Text>
       </Box>
 
       <Box marginTop={1}>
         <Text color={COLORS.DIM}>
-          Navigate: ←/→ arrows | {isLastStep ? "Select: ↑/↓ or j/k | " : ""}Confirm: Enter
+          Navigate: left/right arrows | {isLastStep ? "Select: up/down or j/k | " : ""}Confirm: Enter
         </Text>
       </Box>
     </Box>

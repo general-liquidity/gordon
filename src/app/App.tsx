@@ -20,6 +20,7 @@ import { initializeContainer } from "../services/container.ts";
 import type { GordonContext } from "../infra/agents/types.ts";
 import type { Mode, GordonConfig } from "../types/index.ts";
 import { COLORS } from "./theme.ts";
+import { parseSlashCommand, commandToPrompt, formatCommandHelp } from "./slashCommands.ts";
 
 type AppView = "loading" | "onboarding" | "setup" | "welcome" | "menu" | "chat";
 
@@ -37,6 +38,7 @@ interface AppState {
   messages: ChatMessage[];
   isLoading: boolean;
   conversationHistory: ConversationMessage[];
+  btcPrice: number | undefined;
 }
 
 function getDefaultConfig(): GordonConfig {
@@ -71,6 +73,7 @@ export function App(): React.ReactElement {
     messages: [],
     isLoading: false,
     conversationHistory: [],
+    btcPrice: undefined,
   });
 
   const llmClientRef = useRef<LLMClient | null>(null);
@@ -209,13 +212,70 @@ export function App(): React.ReactElement {
     };
   }, []);
 
+  // Fetch BTC price periodically
+  useEffect(() => {
+    const fetchBtcPrice = async () => {
+      if (!binanceClientRef.current) return;
+      try {
+        const price = await binanceClientRef.current.getPrice("BTCUSDT");
+        setState((prev) => ({ ...prev, btcPrice: price }));
+      } catch (error) {
+        console.error("Failed to fetch BTC price:", error);
+      }
+    };
+
+    // Fetch immediately
+    fetchBtcPrice();
+
+    // Then every 30 seconds
+    const intervalId = setInterval(fetchBtcPrice, 30000);
+
+    return () => clearInterval(intervalId);
+  }, []);
+
   const handleSubmit = useCallback(async (value: string): Promise<void> => {
     if (!value.trim()) return;
     if (state.isLoading) return;
 
+    // Check for slash commands
+    const parsedCommand = parseSlashCommand(value);
+    let messageToSend = value.trim();
+    let displayMessage = value.trim();
+
+    if (parsedCommand) {
+      const { command, args } = parsedCommand;
+
+      // Handle menu-type commands - just convert to prompts, let agent handle
+      if (command.action === "menu" && command.target === "setup") {
+        setState((prev) => ({ ...prev, view: "setup" }));
+        return;
+      }
+
+      // Handle special /help with no args - show command list
+      if (command.name === "help" && !args) {
+        const helpMessage: ChatMessage = {
+          role: "gordon",
+          content: formatCommandHelp(),
+          timestamp: formatTimestamp(),
+        };
+        setState((prev) => ({
+          ...prev,
+          messages: [...prev.messages,
+            { role: "user", content: value.trim(), timestamp: formatTimestamp() },
+            helpMessage
+          ],
+        }));
+        return;
+      }
+
+      // Convert command to natural language for the agent
+      messageToSend = commandToPrompt(command, args);
+      displayMessage = value.trim(); // Still show the command to user
+    }
+
     const userMessage: ChatMessage = {
       role: "user",
-      content: value.trim(),
+      content: displayMessage,
       timestamp: formatTimestamp(),
     };
 
@@ -254,7 +314,7 @@ export function App(): React.ReactElement {
 
     try {
       const result = await processMessage(
-        value.trim(),
+        messageToSend,
         context,
         state.conversationHistory
       );
@@ -287,7 +347,7 @@ export function App(): React.ReactElement {
         messages: [...prev.messages, errorMessage],
         conversationHistory: [
           ...prev.conversationHistory,
-          { role: "user", content: value.trim() },
+          { role: "user", content: messageToSend },
         ],
         isLoading: false,
       }));
@@ -532,22 +592,83 @@ export function App(): React.ReactElement {
             ...prev.messages,
             {
               role: "gordon",
-              content: `Welcome to Gordon! Here's how I work:
-
-1. Tell me what you're looking for (e.g., "find me a good BTC setup")
-2. I'll scan the market and show you potential trades
-3. For each opportunity, I'll create a detailed plan with entry, DCA, stops, and targets
-4. You review and approve - nothing executes without your say-so
-5. In ARMED mode, I can place orders on your behalf
-
-Remember: I'm in SAFE mode by default. Your funds are protected.`,
+              content: formatCommandHelp(),
+              timestamp: formatTimestamp(),
+            },
+          ],
+        }));
+        break;
+      case "trending":
+        setState((prev) => ({
+          ...prev,
+          view: "chat",
+          messages: [
+            ...prev.messages,
+            {
+              role: "user",
+              content: "/trending",
+              timestamp: formatTimestamp(),
+            },
+            {
+              role: "gordon",
+              content: "Finding today's trending tokens...",
+              timestamp: formatTimestamp(),
+            },
+          ],
+        }));
+        // Trigger the trending request through the agent
+        (async () => {
+          if (!llmClientRef.current) return;
+          const context: GordonContext = {
+            binance: binanceClientRef.current,
+            llm: llmClientRef.current,
+            config: configRef.current,
+            portfolioValue: state.portfolioValue ?? 0,
+            availableCash: state.availableCash,
+          };
+          try {
+            const result = await processMessage(
+              "Show me what's trending and pumping today",
+              context,
+              state.conversationHistory
+            );
+            setState((prev) => ({
+              ...prev,
+              messages: [...prev.messages, {
+                role: "gordon",
+                content: result.response,
+                timestamp: formatTimestamp(),
+              }],
+              conversationHistory: result.history,
+            }));
+          } catch (error) {
+            setState((prev) => ({
+              ...prev,
+              messages: [...prev.messages, {
+                role: "gordon",
+                content: `Failed to get trending: ${error instanceof Error ? error.message : "Unknown error"}`,
+                timestamp: formatTimestamp(),
+              }],
+            }));
+          }
+        })();
+        break;
+      case "analyze":
+        setState((prev) => ({
+          ...prev,
+          view: "chat",
+          messages: [
+            ...prev.messages,
+            {
+              role: "gordon",
+              content: "What coin would you like me to analyze? Just type the symbol (e.g., BTC, ETH, SOL)",
               timestamp: formatTimestamp(),
             },
           ],
         }));
         break;
     }
-  }, []);
+  }, [state.portfolioValue, state.availableCash, state.conversationHistory]);
 
   // Handle onboarding completion
   const handleOnboardingComplete = useCallback(
@@ -657,6 +778,7 @@ Please check your API keys in the .env file and restart Gordon.`,
         mode={state.mode}
         portfolioValue={state.portfolioValue}
         connectionStatus={state.connectionStatus}
+        btcPrice={state.btcPrice}
       />
 
       {/* Main content area */}
@@ -685,7 +807,7 @@ Please check your API keys in the .env file and restart Gordon.`,
         )}
 
         {state.view === "menu" && (
-          <QuickStartMenu onSelect={handleMenuSelect} />
+          <QuickStartMenu onSelect={handleMenuSelect} mode={state.mode} />
         )}
 
         {state.view === "chat" && (
@@ -711,7 +833,7 @@ Please check your API keys in the .env file and restart Gordon.`,
             {/* Help hint */}
             <Box paddingX={2} paddingY={0}>
               <Text color={COLORS.DIM}>
-                Press ESC to return to menu | Enter to send
+                ESC: menu | /help: commands | Tab: autocomplete
               </Text>
             </Box>
           </Box>

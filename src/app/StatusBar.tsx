@@ -10,6 +10,7 @@ interface StatusBarProps {
   portfolioValue?: number;
   connectionStatus?: ConnectionStatus;
   currency?: string;
+  btcPrice?: number;
 }
 
 export const StatusBar: React.FC<StatusBarProps> = ({
@@ -17,6 +18,7 @@ export const StatusBar: React.FC<StatusBarProps> = ({
   portfolioValue,
   connectionStatus = "disconnected",
   currency = "USDT",
+  btcPrice,
 }) => {
   // Mode styling
   const modeColor = mode === "ARMED" ? COLORS.RED : COLORS.GREEN;
@@ -54,6 +56,15 @@ export const StatusBar: React.FC<StatusBarProps> = ({
     });
   };
 
+  // Format BTC price
+  const formatBtcPrice = (price: number | undefined): string => {
+    if (price === undefined) return "---";
+    return price.toLocaleString("en-US", {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    });
+  };
+
   return (
     <Box
       borderStyle="single"
@@ -70,13 +81,20 @@ export const StatusBar: React.FC<StatusBarProps> = ({
         </Text>
       </Box>
 
-      {/* Center section: Portfolio */}
+      {/* BTC Price */}
+      <Box>
+        <Text color={COLORS.DIM}>BTC: </Text>
+        <Text color={COLORS.HIGHLIGHT} bold>
+          ${formatBtcPrice(btcPrice)}
+        </Text>
+      </Box>
+
+      {/* Portfolio */}
       <Box>
         <Text color={COLORS.DIM}>Portfolio: </Text>
         <Text color={COLORS.WHITE} bold>
-          {formatValue(portfolioValue)}
+          ${formatValue(portfolioValue)}
         </Text>
-        <Text color={COLORS.DIM}> {currency}</Text>
       </Box>
 
       {/* Right section: Connection */}

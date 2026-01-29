@@ -1,11 +1,14 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { Box, Text, useInput } from "ink";
 import { COLORS } from "./theme.ts";
+import type { Mode } from "../types/index.ts";
 
 export type MenuOption =
   | "chat"
   | "scan"
   | "portfolio"
+  | "trending"
+  | "analyze"
   | "setup"
   | "help";
 
@@ -16,52 +19,64 @@ interface MenuItem {
   value: MenuOption;
 }
 
-const MENU_ITEMS: MenuItem[] = [
+const QUICK_ACTIONS: MenuItem[] = [
   {
-    key: "1",
-    label: "Start chatting",
-    description: "Talk to Gordon about trades",
-    value: "chat",
-  },
-  {
-    key: "2",
-    label: "Scan market",
-    description: "Find trading opportunities",
+    key: "S",
+    label: "Scan",
+    description: "Find opportunities",
     value: "scan",
   },
   {
-    key: "3",
-    label: "Check portfolio",
-    description: "View positions & P/L",
+    key: "P",
+    label: "Portfolio",
+    description: "View balances",
     value: "portfolio",
   },
   {
-    key: "4",
-    label: "Run setup",
-    description: "Configure exchange API",
-    value: "setup",
+    key: "T",
+    label: "Trending",
+    description: "Hot movers",
+    value: "trending",
   },
   {
-    key: "5",
+    key: "A",
+    label: "Analyze",
+    description: "Deep analysis",
+    value: "analyze",
+  },
+  {
+    key: "H",
     label: "Help",
-    description: "Learn how to use Gordon",
+    description: "Learn trading",
     value: "help",
   },
 ];
 
 interface QuickStartMenuProps {
   onSelect: (option: MenuOption) => void;
+  mode?: Mode;
 }
 
-export const QuickStartMenu: React.FC<QuickStartMenuProps> = ({ onSelect }) => {
+export const QuickStartMenu: React.FC<QuickStartMenuProps> = ({
+  onSelect,
+  mode = "SAFE",
+}) => {
   const [selectedIndex, setSelectedIndex] = useState(0);
 
   // Handle keyboard input
   useInput((input, key) => {
-    // Number key selection
+    // Letter key selection (case-insensitive)
+    const upperInput = input.toUpperCase();
+    const matchedItem = QUICK_ACTIONS.find((item) => item.key === upperInput);
+    if (matchedItem) {
+      onSelect(matchedItem.value);
+      return;
+    }
+
+    // Number key selection (legacy support)
     const numKey = parseInt(input, 10);
-    if (numKey >= 1 && numKey <= MENU_ITEMS.length) {
-      const item = MENU_ITEMS[numKey - 1];
+    if (numKey >= 1 && numKey <= QUICK_ACTIONS.length) {
+      const item = QUICK_ACTIONS[numKey - 1];
       if (item) {
         onSelect(item.value);
       }
@@ -69,72 +84,139 @@ export const QuickStartMenu: React.FC<QuickStartMenuProps> = ({ onSelect }) => {
     }
 
     // Arrow key navigation
-    if (key.upArrow) {
+    if (key.leftArrow) {
       setSelectedIndex((prev) =>
-        prev > 0 ? prev - 1 : MENU_ITEMS.length - 1
+        prev > 0 ? prev - 1 : QUICK_ACTIONS.length - 1
       );
-    } else if (key.downArrow) {
+    } else if (key.rightArrow) {
       setSelectedIndex((prev) =>
-        prev < MENU_ITEMS.length - 1 ? prev + 1 : 0
+        prev < QUICK_ACTIONS.length - 1 ? prev + 1 : 0
       );
+    } else if (key.upArrow || key.downArrow) {
+      // Up/down also navigate in case user expects vertical
+      if (key.upArrow) {
+        setSelectedIndex((prev) =>
+          prev > 0 ? prev - 1 : QUICK_ACTIONS.length - 1
+        );
+      } else {
+        setSelectedIndex((prev) =>
+          prev < QUICK_ACTIONS.length - 1 ? prev + 1 : 0
+        );
+      }
     }
 
     // Enter to select
     if (key.return) {
-      const item = MENU_ITEMS[selectedIndex];
+      const item = QUICK_ACTIONS[selectedIndex];
       if (item) {
         onSelect(item.value);
       }
     }
+
+    // C to start chatting
+    if (upperInput === "C") {
+      onSelect("chat");
+    }
   });
+
+  const modeColor = mode === "ARMED" ? COLORS.RED : COLORS.GREEN;
+  const modeIcon = mode === "ARMED" ? "!" : "o";
+  const modeLabel = mode === "ARMED" ? "ARMED" : "SAFE";
 
   return (
     <Box flexDirection="column" paddingX={2} paddingY={1}>
-      {/* Header */}
+      {/* Quick Actions Header */}
       <Box marginBottom={1}>
-        <Text color={COLORS.TAN} bold>
-          Quick Start
+        <Text color={COLORS.ACCENT} bold>
+          Quick Actions
         </Text>
       </Box>
 
-      {/* Menu items */}
-      <Box flexDirection="column">
-        {MENU_ITEMS.map((item, index) => {
+      {/* Action buttons in a row */}
+      <Box flexDirection="row" marginBottom={1}>
+        {QUICK_ACTIONS.map((item, index) => {
           const isSelected = index === selectedIndex;
-
           return (
-            <Box key={item.key} paddingY={0}>
-              {/* Selection indicator */}
-              <Text color={isSelected ? COLORS.HIGHLIGHT : COLORS.DIM}>
-                {isSelected ? ">" : " "}
+            <Box key={item.key} marginRight={2}>
+              <Text
+                color={isSelected ? COLORS.HIGHLIGHT : COLORS.ACCENT_DIM}
+                bold={isSelected}
+              >
+                [{item.key}]
               </Text>
-
-              {/* Key shortcut */}
-              <Box width={4}>
-                <Text color={COLORS.TAN_DIM}>[{item.key}]</Text>
-              </Box>
-
-              {/* Label */}
-              <Box width={18}>
-                <Text
-                  color={isSelected ? COLORS.HIGHLIGHT : COLORS.WHITE}
-                  bold={isSelected}
-                >
-                  {item.label}
-                </Text>
-              </Box>
-
-              {/* Description */}
-              <Text color={COLORS.DIM}>{item.description}</Text>
+              <Text color={isSelected ? COLORS.WHITE : COLORS.DIM}>
+                {" "}{item.label}
+              </Text>
             </Box>
           );
         })}
       </Box>
 
+      {/* Selected item description */}
+      <Box marginBottom={2}>
+        <Text color={COLORS.DIM}>
+          {QUICK_ACTIONS[selectedIndex]?.description ?? ""}
+        </Text>
+      </Box>
+
+      {/* Trading Mode Section */}
+      <Box
+        borderStyle="single"
+        borderColor={modeColor}
+        paddingX={2}
+        paddingY={1}
+        marginBottom={1}
+      >
+        <Box flexDirection="column">
+          <Box>
+            <Text color={COLORS.DIM}>Trading Mode: </Text>
+            <Text color={modeColor} bold>
+              [{modeIcon}] {modeLabel}
+            </Text>
+          </Box>
+          <Box marginTop={1}>
+            <Text color={COLORS.DIM}>
+              {mode === "SAFE"
+                ? "Analysis only - no trades will execute"
+                : "Live trading enabled - trades will execute on approval"}
+            </Text>
+          </Box>
+          <Box marginTop={1}>
+            <Text color={COLORS.DIM}>
+              Type{" "}
+              <Text color={COLORS.ACCENT}>/arm</Text>
+              {" "}to enable trading or{" "}
+              <Text color={COLORS.ACCENT}>/disarm</Text>
+              {" "}for safe mode
+            </Text>
+          </Box>
+        </Box>
+      </Box>
+
+      {/* Tip */}
+      <Box
+        borderStyle="round"
+        borderColor={COLORS.DIM}
+        paddingX={2}
+        paddingY={1}
+      >
+        <Box flexDirection="column">
+          <Text color={COLORS.WHITE}>
+            Chat naturally or use <Text color={COLORS.ACCENT}>/commands</Text> for quick access
+          </Text>
+          <Box marginTop={1}>
+            <Text color={COLORS.DIM}>
+              Try: "What's pumping today?" or{" "}
+              <Text color={COLORS.ACCENT}>/trending</Text>
+            </Text>
+          </Box>
+        </Box>
+      </Box>
+
       {/* Footer hint */}
       <Box marginTop={1}>
         <Text color={COLORS.DIM}>
-          Use [1-5] or arrow keys + Enter to select
+          Press [C] to start chatting | Arrow keys + Enter to select | [S/P/T/A/H] for quick actions
         </Text>
       </Box>
     </Box>
