@@ -289,3 +289,394 @@ export interface BinanceAPIRestrictions {
   enableSpotAndMarginTrading: boolean;
   tradingAuthorityExpirationTime?: number;
 }
+
+// ============================================================================
+// Market Data Types
+// ============================================================================
+
+// Order book depth entry
+export interface OrderBookEntry {
+  price: string;
+  quantity: string;
+}
+
+// Order book response
+export interface BinanceOrderBook {
+  lastUpdateId: number;
+  bids: [string, string][]; // [price, quantity]
+  asks: [string, string][]; // [price, quantity]
+}
+
+// Recent trade
+export interface BinanceRecentTrade {
+  id: number;
+  price: string;
+  qty: string;
+  quoteQty: string;
+  time: number;
+  isBuyerMaker: boolean;
+  isBestMatch: boolean;
+}
+
+// Aggregate trade
+export interface BinanceAggTrade {
+  a: number; // Aggregate trade ID
+  p: string; // Price
+  q: string; // Quantity
+  f: number; // First trade ID
+  l: number; // Last trade ID
+  T: number; // Timestamp
+  m: boolean; // Was the buyer the maker?
+  M: boolean; // Was the trade the best price match?
+}
+
+// Average price
+export interface BinanceAvgPrice {
+  mins: number;
+  price: string;
+  closeTime: number;
+}
+
+// Book ticker (best bid/ask)
+export interface BinanceBookTicker {
+  symbol: string;
+  bidPrice: string;
+  bidQty: string;
+  askPrice: string;
+  askQty: string;
+}
+
+// ============================================================================
+// Trading Types
+// ============================================================================
+
+// OCO order parameters
+export interface OCOOrderParams {
+  symbol: string;
+  side: OrderSide;
+  quantity: number;
+  price: number; // Limit price
+  stopPrice: number; // Stop trigger price
+  stopLimitPrice?: number; // Stop limit price (if using STOP_LOSS_LIMIT)
+  stopLimitTimeInForce?: TimeInForce;
+  listClientOrderId?: string;
+  limitClientOrderId?: string;
+  stopClientOrderId?: string;
+}
+
+// OCO order response
+export interface BinanceOCOOrder {
+  orderListId: number;
+  contingencyType: string;
+  listStatusType: string;
+  listOrderStatus: string;
+  listClientOrderId: string;
+  transactionTime: number;
+  symbol: string;
+  orders: Array<{
+    symbol: string;
+    orderId: number;
+    clientOrderId: string;
+  }>;
+  orderReports: BinanceOrder[];
+}
+
+// Order list (for OCO, OTO, etc.)
+export interface BinanceOrderList {
+  orderListId: number;
+  contingencyType: string;
+  listStatusType: string;
+  listOrderStatus: string;
+  listClientOrderId: string;
+  transactionTime: number;
+  symbol: string;
+  orders: Array<{
+    symbol: string;
+    orderId: number;
+    clientOrderId: string;
+  }>;
+}
+
+// Cancel replace response
+export interface BinanceCancelReplaceResult {
+  cancelResult: string;
+  newOrderResult: string;
+  cancelResponse?: BinanceOrder;
+  newOrderResponse?: BinanceOrder;
+}
+
+// ============================================================================
+// Wallet Types
+// ============================================================================
+
+// Coin info (networks, fees)
+export interface BinanceCoinInfo {
+  coin: string;
+  depositAllEnable: boolean;
+  free: string;
+  freeze: string;
+  ipoable: string;
+  ipoing: string;
+  isLegalMoney: boolean;
+  locked: string;
+  name: string;
+  networkList: BinanceNetwork[];
+  storage: string;
+  trading: boolean;
+  withdrawAllEnable: boolean;
+  withdrawing: string;
+}
+
+export interface BinanceNetwork {
+  addressRegex: string;
+  coin: string;
+  depositDesc?: string;
+  depositEnable: boolean;
+  isDefault: boolean;
+  memoRegex: string;
+  minConfirm: number;
+  name: string;
+  network: string;
+  resetAddressStatus: boolean;
+  specialTips?: string;
+  unLockConfirm: number;
+  withdrawDesc?: string;
+  withdrawEnable: boolean;
+  withdrawFee: string;
+  withdrawIntegerMultiple: string;
+  withdrawMax: string;
+  withdrawMin: string;
+  sameAddress: boolean;
+  estimatedArrivalTime: number;
+  busy: boolean;
+}
+
+// Account snapshot
+export interface BinanceAccountSnapshot {
+  code: number;
+  msg: string;
+  snapshotVos: Array<{
+    data: {
+      balances: BinanceBalance[];
+      totalAssetOfBtc: string;
+    };
+    type: string;
+    updateTime: number;
+  }>;
+}
+
+// Universal transfer types
+export type TransferType =
+  | "MAIN_FUNDING" | "FUNDING_MAIN"
+  | "MAIN_UMFUTURE" | "UMFUTURE_MAIN"
+  | "MAIN_CMFUTURE" | "CMFUTURE_MAIN"
+  | "MAIN_MARGIN" | "MARGIN_MAIN"
+  | "FUNDING_UMFUTURE" | "UMFUTURE_FUNDING"
+  | "FUNDING_CMFUTURE" | "CMFUTURE_FUNDING"
+  | "MARGIN_FUNDING" | "FUNDING_MARGIN";
+
+// Transfer response
+export interface BinanceTransferResponse {
+  tranId: number;
+}
+
+// Transfer history entry
+export interface BinanceTransferHistory {
+  asset: string;
+  amount: string;
+  type: TransferType;
+  status: string;
+  tranId: number;
+  timestamp: number;
+}
+
+// Dust transfer response
+export interface BinanceDustTransfer {
+  totalServiceCharge: string;
+  totalTransfered: string;
+  transferResult: Array<{
+    amount: string;
+    fromAsset: string;
+    operateTime: number;
+    serviceChargeAmount: string;
+    tranId: number;
+    transferedAmount: string;
+  }>;
+}
+
+// Dust log entry
+export interface BinanceDustLog {
+  total: number;
+  userAssetDribblets: Array<{
+    operateTime: number;
+    totalTransferedAmount: string;
+    totalServiceChargeAmount: string;
+    transId: number;
+    userAssetDribbletDetails: Array<{
+      transId: number;
+      serviceChargeAmount: string;
+      amount: string;
+      operateTime: number;
+      transferedAmount: string;
+      fromAsset: string;
+    }>;
+  }>;
+}
+
+// Asset dividend record
+export interface BinanceAssetDividend {
+  id: number;
+  amount: string;
+  asset: string;
+  divTime: number;
+  enInfo: string;
+  tranId: number;
+}
+
+// Asset detail
+export interface BinanceAssetDetail {
+  [asset: string]: {
+    minWithdrawAmount: string;
+    depositStatus: boolean;
+    withdrawFee: number;
+    withdrawStatus: boolean;
+    depositTip?: string;
+  };
+}
+
+// Trade fee
+export interface BinanceTradeFee {
+  symbol: string;
+  makerCommission: string;
+  takerCommission: string;
+}
+
+// User asset
+export interface BinanceUserAsset {
+  asset: string;
+  free: string;
+  locked: string;
+  freeze: string;
+  withdrawing: string;
+  ipoable: string;
+  btcValuation: string;
+}
+
+// Deposit address
+export interface BinanceDepositAddress {
+  address: string;
+  coin: string;
+  tag: string;
+  url: string;
+}
+
+// Dustable assets (can convert to BNB)
+export interface BinanceDustableAsset {
+  asset: string;
+  assetFullName: string;
+  amountFree: string;
+  toBTC: string;
+  toBNB: string;
+  toBNBOffExchange: string;
+  exchange: string;
+}
+
+// Wallet balance
+export interface BinanceWalletBalance {
+  activate: boolean;
+  balance: string;
+  walletName: string;
+}
+
+// ============================================================================
+// Simple Earn Types
+// ============================================================================
+
+// Flexible product
+export interface BinanceFlexibleProduct {
+  asset: string;
+  latestAnnualPercentageRate: string;
+  tierAnnualPercentageRate: Record<string, string>;
+  airDropPercentageRate: string;
+  canPurchase: boolean;
+  canRedeem: boolean;
+  isSoldOut: boolean;
+  hot: boolean;
+  minPurchaseAmount: string;
+  productId: string;
+  subscriptionStartTime: number;
+  status: string;
+}
+
+// Locked product
+export interface BinanceLockedProduct {
+  projectId: string;
+  detail: {
+    asset: string;
+    rewardAsset: string;
+    duration: number;
+    renewable: boolean;
+    isSoldOut: boolean;
+    apr: string;
+    status: string;
+    subscriptionStartTime: string;
+    extraRewardAsset: string;
+    extraRewardAPR: string;
+  };
+  quota: {
+    totalPersonalQuota: string;
+    minimum: string;
+  };
+}
+
+// Locked position
+export interface BinanceLockedPosition {
+  positionId: string;
+  projectId: string;
+  asset: string;
+  amount: string;
+  purchaseTime: number;
+  duration: number;
+  accrualDays: number;
+  rewardAsset: string;
+  APY: string;
+  isRenewable: boolean;
+  isAutoRenew: boolean;
+  redeemDate: string;
+}
+
+// Earn subscription response
+export interface BinanceEarnSubscription {
+  purchaseId: number;
+  success: boolean;
+}
+
+// Earn redemption response
+export interface BinanceEarnRedemption {
+  redeemId: number;
+  success: boolean;
+}
+
+// Earn subscription record
+export interface BinanceEarnSubscriptionRecord {
+  amount: string;
+  asset: string;
+  time: number;
+  purchaseId: number;
+  type: string;
+  sourceAccount: string;
+  amtFromSpot: string;
+  amtFromFunding: string;
+  status: string;
+}
+
+// Earn redemption record
+export interface BinanceEarnRedemptionRecord {
+  amount: string;
+  asset: string;
+  time: number;
+  projectId: string;
+  redeemId: number;
+  destAccount: string;
+  status: string;
+}

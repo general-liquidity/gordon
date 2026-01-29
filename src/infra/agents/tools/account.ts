@@ -227,10 +227,11 @@ export const getAccountDetailsTool = tool({
 // ============================================================================
 
 export const getEarnPositionsTool = tool({
-  name: "get_earn_positions",
+  name: "get_flexible_positions",
   description:
-    "Get Simple Earn (flexible savings) positions and yields. " +
-    "Use when user asks 'show my earn', 'staking positions', 'what am I earning?'",
+    "Get Simple Earn FLEXIBLE positions only (quick access). " +
+    "For comprehensive earn info including LOCKED positions, use get_all_earn_positions instead. " +
+    "Use for quick check: 'flexible savings balance', 'quick earn check'.",
   parameters: z.object({}),
   async execute(_: Record<string, never>, runContext: ToolRunContext) {
     const ctx = runContext?.context;

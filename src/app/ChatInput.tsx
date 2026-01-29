@@ -6,12 +6,7 @@
 import React, { useState, useCallback } from "react";
 import { Box, Text } from "ink";
 import TextInput from "ink-text-input";
-
-const COLORS = {
-  TAN: "#d4a27f",
-  TAN_DIM: "#b8896a",
-  DIM: "#a39e93",
-} as const;
+import { COLORS } from "./theme.ts";
 
 interface ChatInputProps {
   onSubmit: (value: string) => void;

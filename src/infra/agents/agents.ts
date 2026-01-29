@@ -17,6 +17,10 @@ import {
   getPortfolioTool,
   listPlansTool,
   approvePlanTool,
+  getHistoricalOpportunitiesTool,
+  startSchedulerTool,
+  stopSchedulerTool,
+  getSchedulerStatusTool,
 } from "./tools/index.ts";
 import { createModuleLogger } from "../logger/index.ts";
 import { emitEvent } from "../../events/index.ts";
@@ -81,8 +85,18 @@ Your role is to scan the cryptocurrency market and identify trading opportunitie
 - Only present coins with detected setups (setupDetected: true)
 - Higher confidence scores (>0.6) indicate stronger setups
 - Always mention the risk level
-- If no good setups found, tell the user to wait`,
-  tools: [scanMarketTool, analyzeCoinTool],
+- If no good setups found, tell the user to wait
+
+## Historical Data
+- Use get_historical_opportunities tool to answer questions about past opportunities
+- Don't make up answers about what was missed - check the database first
+- Be honest if no historical data exists for a time period
+
+## Background Scanning
+- Use start_background_scanning when user wants continuous monitoring
+- Use stop_background_scanning to cancel
+- Use get_scanning_status to check if scanning is active`,
+  tools: [scanMarketTool, analyzeCoinTool, getHistoricalOpportunitiesTool, startSchedulerTool, stopSchedulerTool, getSchedulerStatusTool],
 });
 
 // Setup hooks for scanner
@@ -175,7 +189,13 @@ Your role is to create well-structured trading plans based on analysis.
 - Never suggest risking more than user's max allocation
 - Always maintain cash reserve
 - Risk/reward ratio should be at least 1.2:1
-- Explain the reasoning behind each level`,
+- Explain the reasoning behind each level
+
+## Error Handling
+If the create_plan tool fails:
+1. Report the EXACT error message (e.g., "No support levels found", "Invalid symbol")
+2. Don't say "glitch" or "hiccup" - explain what actually failed
+3. Suggest a fix: different symbol, wait for better setup, or check the analysis first`,
   tools: [analyzeCoinTool, createPlanTool, listPlansTool, approvePlanTool],
 });
 

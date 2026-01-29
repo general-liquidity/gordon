@@ -5,6 +5,7 @@
 
 // Types
 export type {
+  // Core types
   BinanceAccountInfo,
   BinanceBalance,
   BinanceKline,
@@ -24,6 +25,46 @@ export type {
   LotSizeFilter,
   MinNotionalFilter,
   GenericFilter,
+  // Market data types
+  BinanceOrderBook,
+  BinanceRecentTrade,
+  BinanceAggTrade,
+  BinanceAvgPrice,
+  BinanceBookTicker,
+  // Trading types
+  OCOOrderParams,
+  BinanceOCOOrder,
+  BinanceOrderList,
+  BinanceCancelReplaceResult,
+  // Wallet types
+  BinanceCoinInfo,
+  BinanceNetwork,
+  BinanceAccountSnapshot,
+  TransferType,
+  BinanceTransferResponse,
+  BinanceTransferHistory,
+  BinanceDustTransfer,
+  BinanceDustLog,
+  BinanceAssetDividend,
+  BinanceAssetDetail,
+  BinanceTradeFee,
+  BinanceUserAsset,
+  BinanceDepositAddress,
+  BinanceDustableAsset,
+  BinanceWalletBalance,
+  // Simple Earn types
+  BinanceFlexibleProduct,
+  BinanceLockedProduct,
+  BinanceLockedPosition,
+  BinanceEarnSubscription,
+  BinanceEarnRedemption,
+  BinanceEarnSubscriptionRecord,
+  BinanceEarnRedemptionRecord,
+  BinanceTrade,
+  BinanceDeposit,
+  BinanceWithdrawal,
+  BinanceEarnPosition,
+  BinanceAPIRestrictions,
 } from "./types.ts";
 
 // Client

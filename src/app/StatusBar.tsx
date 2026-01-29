@@ -1,17 +1,7 @@
 import React from "react";
 import { Box, Text } from "ink";
 import type { Mode } from "../types/index.ts";
-
-// Color palette
-const COLORS = {
-  TAN: "#d4a27f",
-  TAN_DIM: "#b8896a",
-  WHITE: "#e8e4de",
-  DIM: "#a39e93",
-  GREEN: "#4ade80",
-  RED: "#ef4444",
-  YELLOW: "#facc15",
-} as const;
+import { COLORS } from "./theme.ts";
 
 type ConnectionStatus = "connected" | "disconnected" | "connecting";
 

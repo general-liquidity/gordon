@@ -2,6 +2,20 @@ import { getDatabase } from "./database.ts";
 import type { Event, EventType } from "../../types/index.ts";
 
 /**
+ * Stored opportunity from a scan
+ */
+export interface StoredOpportunity {
+  id: string;
+  timestamp: string;
+  symbol: string;
+  price: number;
+  confidence: number;
+  bias: string;
+  risk: string;
+  change24h: number;
+}
+
+/**
  * Generates a unique event ID
  */
 function generateEventId(): string {
@@ -102,4 +116,101 @@ export function getEvents(filter?: {
   const rows = (params.length > 0 ? stmt.all(...params) : stmt.all()) as Record<string, unknown>[];
 
   return rows.map(rowToEvent);
+}
+
+/**
+ * Log a scan opportunity to the database
+ */
+export function logScanOpportunity(opportunity: {
+  symbol: string;
+  price: number;
+  confidence: number;
+  bias: string;
+  risk: string;
+  change24h: number;
+}): void {
+  logEvent({
+    type: "scan:opportunity" as EventType,
+    data: opportunity,
+  });
+}
+
+/**
+ * Get historical scan opportunities with optional filters
+ */
+export function getHistoricalOpportunities(options?: {
+  daysBack?: number;
+  symbol?: string;
+  minConfidence?: number;
+  limit?: number;
+}): StoredOpportunity[] {
+  const db = getDatabase();
+  const daysBack = options?.daysBack ?? 7;
+  const limit = options?.limit ?? 100;
+
+  let query = `
+    SELECT id, timestamp, data
+    FROM events
+    WHERE type = 'scan:opportunity'
+    AND timestamp > datetime('now', '-${daysBack} days')
+  `;
+
+  if (options?.symbol) {
+    query += ` AND json_extract(data, '$.symbol') = '${options.symbol}'`;
+  }
+
+  if (options?.minConfidence) {
+    query += ` AND CAST(json_extract(data, '$.confidence') AS REAL) >= ${options.minConfidence}`;
+  }
+
+  query += ` ORDER BY timestamp DESC LIMIT ${limit}`;
+
+  const stmt = db.prepare(query);
+  const rows = stmt.all() as Array<{ id: string; timestamp: string; data: string }>;
+
+  return rows.map((row) => {
+    const data = JSON.parse(row.data);
+    return {
+      id: row.id,
+      timestamp: row.timestamp,
+      symbol: data.symbol,
+      price: data.price,
+      confidence: data.confidence,
+      bias: data.bias,
+      risk: data.risk,
+      change24h: data.change24h,
+    };
+  });
+}
+
+/**
+ * Get count of opportunities by day for the last N days
+ */
+export function getOpportunitySummary(daysBack: number = 7): Array<{
+  date: string;
+  count: number;
+  symbols: string[];
+}> {
+  const db = getDatabase();
+
+  const query = `
+    SELECT
+      date(timestamp) as date,
+      COUNT(*) as count,
+      GROUP_CONCAT(DISTINCT json_extract(data, '$.symbol')) as symbols
+    FROM events
+    WHERE type = 'scan:opportunity'
+    AND timestamp > datetime('now', '-${daysBack} days')
+    GROUP BY date(timestamp)
+    ORDER BY date DESC
+  `;
+
+  const stmt = db.prepare(query);
+  const rows = stmt.all() as Array<{ date: string; count: number; symbols: string }>;
+
+  return rows.map((row) => ({
+    date: row.date,
+    count: row.count,
+    symbols: row.symbols ? row.symbols.split(",") : [],
+  }));
 }

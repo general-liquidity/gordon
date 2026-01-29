@@ -1,14 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Box, Text, useInput } from "ink";
-
-// Color palette
-const COLORS = {
-  TAN: "#d4a27f",
-  TAN_DIM: "#b8896a",
-  WHITE: "#e8e4de",
-  DIM: "#a39e93",
-  HIGHLIGHT: "#fbbf24",
-} as const;
+import { COLORS } from "./theme.ts";
 
 export type MenuOption =
   | "chat"

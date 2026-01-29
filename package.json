@@ -45,7 +45,8 @@
   },
   "devDependencies": {
     "@types/bun": "latest",
-    "@types/node": "^25.1.0"
+    "@types/node": "^25.1.0",
+    "react-devtools-core": "^6.1.5"
   },
   "peerDependencies": {
     "typescript": "^5"

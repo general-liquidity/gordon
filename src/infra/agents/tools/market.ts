@@ -8,6 +8,7 @@ import { z } from "zod";
 
 import { scan } from "../../../core/scanner.ts";
 import { analyze } from "../../../core/analyzer.ts";
+import { getHistoricalOpportunities, getOpportunitySummary } from "../../storage/events.ts";
 import type { ToolRunContext } from "./types.ts";
 import { errors } from "./types.ts";
 
@@ -120,4 +121,66 @@ export const analyzeCoinTool = tool({
   },
 });
 
-export const marketTools = [scanMarketTool, analyzeCoinTool];
+// ============================================================================
+// Historical Opportunities Tool
+// ============================================================================
+
+export const getHistoricalOpportunitiesTool = tool({
+  name: "get_historical_opportunities",
+  description:
+    "Query past trading opportunities that were detected by scans. " +
+    "Use this to answer questions like 'did we miss any opportunities?' or 'what setups were found recently?'",
+  parameters: z.object({
+    daysBack: z
+      .number()
+      .min(1)
+      .max(30)
+      .default(7)
+      .describe("Number of days to look back"),
+    symbol: z
+      .string()
+      .optional()
+      .describe("Filter by specific symbol (e.g., 'BTCUSDT')"),
+    minConfidence: z
+      .number()
+      .min(0)
+      .max(1)
+      .optional()
+      .describe("Minimum confidence threshold (0-1)"),
+  }),
+  async execute({ daysBack, symbol, minConfidence }) {
+    const opportunities = getHistoricalOpportunities({
+      daysBack,
+      symbol,
+      minConfidence,
+      limit: 50,
+    });
+
+    const summary = getOpportunitySummary(daysBack);
+
+    if (opportunities.length === 0) {
+      return {
+        message: `No opportunities were detected in the last ${daysBack} days.`,
+        totalOpportunities: 0,
+        opportunities: [],
+        dailySummary: summary,
+      };
+    }
+
+    return {
+      message: `Found ${opportunities.length} opportunities in the last ${daysBack} days.`,
+      totalOpportunities: opportunities.length,
+      opportunities: opportunities.slice(0, 20).map((o) => ({
+        symbol: o.symbol,
+        timestamp: o.timestamp,
+        price: o.price,
+        confidence: Math.round(o.confidence * 100) + "%",
+        bias: o.bias,
+        risk: o.risk,
+      })),
+      dailySummary: summary,
+    };
+  },
+});
+
+export const marketTools = [scanMarketTool, analyzeCoinTool, getHistoricalOpportunitiesTool];

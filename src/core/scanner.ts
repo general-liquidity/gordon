@@ -9,6 +9,7 @@ import { BinanceClient } from "../infra/binance/index.ts";
 import { calculateIndicators, detectLevels } from "../indicators/index.ts";
 import { createModuleLogger } from "../infra/logger/index.ts";
 import { emitEvent } from "../events/index.ts";
+import { logScanOpportunity } from "../infra/storage/events.ts";
 import type {
   CoinAnalysis,
   ScanResult,
@@ -390,13 +391,27 @@ export async function scan(
     duration,
   });
 
-  // Emit opportunity events for top setups
+  // Emit opportunity events for top setups AND persist to database
   for (const coin of coins.filter((c) => c.setupDetected).slice(0, 5)) {
     await emitEvent("scan:opportunity", {
       symbol: coin.symbol,
       confidence: coin.setupConfidence,
       bias: coin.bias,
     });
+
+    // Persist opportunity to database for historical queries
+    try {
+      logScanOpportunity({
+        symbol: coin.symbol,
+        price: coin.price,
+        confidence: coin.setupConfidence,
+        bias: coin.bias,
+        risk: coin.risk,
+        change24h: coin.change24h,
+      });
+    } catch (error) {
+      logger.warn("Failed to persist opportunity", { symbol: coin.symbol, error });
+    }
   }
 
   return {

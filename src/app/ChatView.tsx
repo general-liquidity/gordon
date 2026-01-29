@@ -1,15 +1,6 @@
 import React from "react";
 import { Box, Text } from "ink";
-
-// Color palette
-const COLORS = {
-  TAN: "#d4a27f",
-  TAN_DIM: "#b8896a",
-  WHITE: "#e8e4de",
-  DIM: "#a39e93",
-  USER_BG: "#3b3b3b",
-  GORDON_BG: "#2d2a26",
-} as const;
+import { COLORS } from "./theme.ts";
 
 export interface ChatMessage {
   role: "user" | "gordon";

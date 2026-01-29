@@ -1,15 +1,6 @@
 import React, { useState } from "react";
 import { Box, Text, useInput } from "ink";
-
-const COLORS = {
-  TAN: "#d4a27f",
-  TAN_DIM: "#b8896a",
-  WHITE: "#e8e4de",
-  DIM: "#a39e93",
-  GREEN: "#4ade80",
-  RED: "#ef4444",
-  HIGHLIGHT: "#fbbf24",
-} as const;
+import { COLORS } from "./theme.ts";
 
 type OnboardingStep = "welcome" | "how-it-works" | "safety" | "get-started";
 

@@ -11,14 +11,7 @@ import { BinanceClient, checkAndValidatePermissions } from "../infra/binance/ind
 import { loadConfig, saveConfig } from "../infra/storage/config.ts";
 import { saveEnvKeys, createEnvFile, checkEnvStatus } from "../infra/storage/env.ts";
 import type { GordonConfig, ExchangePermissions, Preferences } from "../types/index.ts";
-
-// Color palette
-const COLORS = {
-  TAN: "#d4a27f",
-  TAN_DIM: "#b8896a",
-  WHITE: "#e8e4de",
-  DIM: "#a39e93",
-} as const;
+import { COLORS } from "./theme.ts";
 
 type WizardStep = "welcome" | "binance-key" | "binance-secret" | "binance-validating" | "llm" | "preferences" | "done";
 
