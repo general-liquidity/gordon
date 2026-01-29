@@ -14,7 +14,7 @@ import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
 import { getGordonContext, MastraExecutionContext } from "./types.ts";
-import { providerRegistry, type ProviderName } from "../../providers/registry.ts";
+import { providerRegistry, DEDALUS_MODELS, type DirectProviderName } from "../../providers/registry.ts";
 
 // ============================================================================
 // Connection Test Tool
@@ -106,7 +106,7 @@ export const testConnectionTool = createTool({
 // Model Info Tool
 // ============================================================================
 
-const MODEL_TIERS: Record<ProviderName, { flagship: string; balanced: string; fast: string }> = {
+const DIRECT_MODEL_TIERS: Record<DirectProviderName, { flagship: string; balanced: string; fast: string }> = {
   anthropic: {
     flagship: "claude-opus-4-5",
     balanced: "claude-sonnet-4-5",
@@ -133,7 +133,8 @@ export const getModelInfoTool = createTool({
   outputSchema: z.object({
     currentProvider: z.string(),
     currentModel: z.string(),
-    availableProviders: z.array(z.object({
+    hasDedalus: z.boolean(),
+    directProviders: z.array(z.object({
       name: z.string(),
       configured: z.boolean(),
       models: z.object({
@@ -142,26 +143,42 @@ export const getModelInfoTool = createTool({
         fast: z.string(),
       }),
     })),
-    configuredVia: z.string(),
+    dedalusModels: z.array(z.object({
+      id: z.string(),
+      name: z.string(),
+      provider: z.string(),
+    })).optional(),
     tip: z.string(),
   }),
   execute: async () => {
     const currentProvider = (process.env.GORDON_PROVIDER || "auto-detected") as string;
     const currentModel = process.env.GORDON_MODEL || "default (flagship)";
     const availableProviders = providerRegistry.getAvailableProviders();
+    const hasDedalus = providerRegistry.hasDedalus();
 
-    const providerInfo = (["openai", "anthropic", "google"] as ProviderName[]).map((name) => ({
+    const directProviders = (["openai", "anthropic", "google"] as DirectProviderName[]).map((name) => ({
       name,
       configured: availableProviders.includes(name),
-      models: MODEL_TIERS[name],
+      models: DIRECT_MODEL_TIERS[name],
     }));
+
+    const dedalusModels = hasDedalus
+      ? DEDALUS_MODELS.map((m) => ({
+          id: m.id,
+          name: m.name,
+          provider: m.provider,
+        }))
+      : undefined;
 
     return {
       currentProvider,
       currentModel,
-      availableProviders: providerInfo,
-      configuredVia: "Environment variables (GORDON_PROVIDER, GORDON_MODEL)",
-      tip: "To change models, update your .env file with GORDON_PROVIDER and GORDON_MODEL",
+      hasDedalus,
+      directProviders,
+      dedalusModels,
+      tip: hasDedalus
+        ? "Use /model to select from direct providers or Dedalus models (xAI, Moonshot, etc.)"
+        : "Set DEDALUS_API_KEY to access models from multiple providers with one key",
     };
   },
 });

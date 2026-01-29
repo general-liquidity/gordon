@@ -20,7 +20,7 @@ export const PreferencesSchema = z.object({
   topNCoins: z.number().min(1).max(500).default(50),
 });
 
-export const ProviderSchema = z.enum(["openai", "anthropic", "google"]);
+export const ProviderSchema = z.enum(["openai", "anthropic", "google", "dedalus"]);
 
 export const ModelConfigSchema = z.object({
   provider: ProviderSchema.default("openai"),
