@@ -3,7 +3,6 @@
  * Main agent that coordinates all specialized agents via Mastra Agent Networks
  *
  * Uses Mastra's Agent class with .network() for multi-agent coordination:
- * - agent.generate() for simple single-turn responses
  * - agent.network() for complex tasks requiring multi-agent orchestration
  * - RequestContext for dependency injection
  * - Memory-aware orchestration with LibSQL storage
@@ -60,17 +59,21 @@ export async function processMessage(
     totalTokens: number;
   };
 }> {
-  logger.debug("Processing message with Mastra", { messageLength: userMessage.length });
+  logger.debug("Processing message with Mastra Network", { messageLength: userMessage.length });
 
   const requestContext = createRequestContext(context);
 
   try {
-    // Use agent.network() for complex tasks requiring multi-agent coordination
+    // Use agent.network() for multi-agent coordination
     const result = await gordonAgent().network(userMessage, {
       requestContext,
       memory: threadId ? { threadId } : undefined,
-      maxSteps: 20,
+      maxSteps: 30,
     });
+
+    if (!result || !result.stream) {
+      throw new Error("Agent network failed to initialize stream. Check model compatibility.");
+    }
 
     // Collect response from stream
     let response = "";
@@ -80,20 +83,22 @@ export async function processMessage(
       }
     }
 
-    // Get final result and usage
+    // Get final result and usage (these are promises in NetworkResult)
     const finalResult = await result.result;
     const usage = await result.usage;
+
+    const finalResponse = response || finalResult?.text || "I'm not sure how to help with that.";
 
     // Emit event for tracking
     await emitEvent("agent:message_processed", {
       userMessage: userMessage.substring(0, 100),
-      responseLength: response.length,
+      responseLength: finalResponse.length,
     });
 
-    logger.debug("Message processed", { responseLength: response.length });
+    logger.debug("Message processed", { responseLength: finalResponse.length });
 
     return {
-      response: response || finalResult?.text || "I'm not sure how to help with that.",
+      response: finalResponse,
       usage: {
         promptTokens: usage?.promptTokens || 0,
         completionTokens: usage?.completionTokens || 0,
@@ -101,14 +106,18 @@ export async function processMessage(
       },
     };
   } catch (error) {
-    logger.error("Failed to process message", { error });
+    const errorDetails = {
+      name: error instanceof Error ? error.name : "Unknown",
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack?.split("\n").slice(0, 3).join("\n") : undefined,
+    };
+    logger.error("Failed to process message", { error: errorDetails });
     throw error;
   }
 }
 
 /**
  * Process a simple message without multi-agent orchestration
- * Use this for quick single-turn responses
  */
 export async function processSimpleMessage(
   userMessage: string,
@@ -116,12 +125,11 @@ export async function processSimpleMessage(
 ): Promise<string> {
   const requestContext = createRequestContext(context);
 
-  const result = await gordonAgent().generate({
-    messages: [{ role: "user", content: userMessage }] as CoreMessage[],
+  const result = await gordonAgent().generate(userMessage, {
     requestContext,
   });
 
-  return result.text;
+  return result.text || "I'm not sure how to help with that.";
 }
 
 // ============================================================================
@@ -148,7 +156,7 @@ export async function* processMessageStream(
   context: GordonContext,
   threadId?: string
 ): AsyncGenerator<StreamEvent, void> {
-  logger.debug("Starting streaming message processing");
+  logger.debug("Starting streaming network processing");
 
   const requestContext = createRequestContext(context);
 
@@ -156,8 +164,12 @@ export async function* processMessageStream(
     const result = await gordonAgent().network(userMessage, {
       requestContext,
       memory: threadId ? { threadId } : undefined,
-      maxSteps: 20,
+      maxSteps: 30,
     });
+
+    if (!result || !result.stream) {
+      throw new Error("Network stream not available");
+    }
 
     let fullResponse = "";
 
@@ -196,6 +208,7 @@ export async function* processMessageStream(
       responseLength: fullResponse.length,
     });
   } catch (error) {
+    logger.error("Streaming error", { error });
     yield {
       type: "error",
       error: error instanceof Error ? error.message : "Unknown error",

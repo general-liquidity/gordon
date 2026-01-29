@@ -337,12 +337,15 @@ function getTeacherAgent(): Agent {
  */
 function getGordonAgent(): Agent {
   if (!_agents.gordon) {
+    const model = getModel(process.env.GORDON_PROVIDER, process.env.GORDON_MODEL);
+    console.log(`[Gordon] Initializing agent with model: ${model.modelId} (${model.provider})`);
+
     _agents.gordon = new Agent({
       id: "gordon",
       name: "Gordon",
       description: "Main AI trading assistant for cryptocurrency. Coordinates specialized agents.",
       instructions: GORDON_INSTRUCTIONS,
-      model: getModel(process.env.GORDON_PROVIDER, process.env.GORDON_MODEL),
+      model,
 
       // Sub-agents for network routing (replaces handoffs)
       agents: {

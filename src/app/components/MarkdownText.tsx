@@ -36,7 +36,7 @@ export const MarkdownText: React.FC<MarkdownTextProps> = ({
         // End code block
         elements.push(
           <Box
-            key={`code-${i}`}
+            key={`code-block-${i}`}
             flexDirection="column"
             borderStyle="single"
             borderColor={COLORS.DIM}
@@ -44,7 +44,7 @@ export const MarkdownText: React.FC<MarkdownTextProps> = ({
             marginY={1}
           >
             {codeBlockContent.map((codeLine, j) => (
-              <Text key={j} color={COLORS.ACCENT}>
+              <Text key={`code-line-${i}-${j}`} color={COLORS.ACCENT}>
                 {codeLine}
               </Text>
             ))}
@@ -91,7 +91,7 @@ export const MarkdownText: React.FC<MarkdownTextProps> = ({
     // Headers
     if (line.startsWith("### ")) {
       elements.push(
-        <Text key={i} color={COLORS.ACCENT} bold>
+        <Text key={`h3-${i}`} color={COLORS.ACCENT} bold>
           {line.slice(4)}
         </Text>
       );
@@ -99,7 +99,7 @@ export const MarkdownText: React.FC<MarkdownTextProps> = ({
     }
     if (line.startsWith("## ")) {
       elements.push(
-        <Text key={i} color={COLORS.ACCENT} bold>
+        <Text key={`h2-${i}`} color={COLORS.ACCENT} bold>
           {line.slice(3)}
         </Text>
       );
@@ -107,7 +107,7 @@ export const MarkdownText: React.FC<MarkdownTextProps> = ({
     }
     if (line.startsWith("# ")) {
       elements.push(
-        <Text key={i} color={COLORS.HIGHLIGHT} bold>
+        <Text key={`h1-${i}`} color={COLORS.HIGHLIGHT} bold>
           {line.slice(2)}
         </Text>
       );
@@ -117,7 +117,7 @@ export const MarkdownText: React.FC<MarkdownTextProps> = ({
     // Bullet points
     if (line.startsWith("- ") || line.startsWith("* ")) {
       elements.push(
-        <Box key={i}>
+        <Box key={`bullet-${i}`}>
           <Text color={COLORS.ACCENT}>  • </Text>
           {renderInlineMarkdown(line.slice(2), color)}
         </Box>
@@ -129,7 +129,7 @@ export const MarkdownText: React.FC<MarkdownTextProps> = ({
     const numberedMatch = line.match(/^(\d+)\.\s+(.*)$/);
     if (numberedMatch) {
       elements.push(
-        <Box key={i}>
+        <Box key={`num-${i}`}>
           <Text color={COLORS.ACCENT}>  {numberedMatch[1]}. </Text>
           {renderInlineMarkdown(numberedMatch[2] ?? "", color)}
         </Box>
@@ -139,13 +139,13 @@ export const MarkdownText: React.FC<MarkdownTextProps> = ({
 
     // Empty lines
     if (line.trim() === "") {
-      elements.push(<Text key={i}> </Text>);
+      elements.push(<Text key={`empty-${i}`}> </Text>);
       continue;
     }
 
     // Regular text with inline markdown
     elements.push(
-      <Box key={i}>
+      <Box key={`text-${i}`}>
         {renderInlineMarkdown(line, color)}
       </Box>
     );
@@ -294,7 +294,7 @@ function renderTable(rows: string[][], keyPrefix: number): React.ReactNode {
       {/* Header */}
       <Box>
         {headers.map((header, i) => (
-          <Box key={i} width={colWidths[i]! + 2}>
+          <Box key={`th-${keyPrefix}-${i}`} width={colWidths[i]! + 2}>
             <Text color={COLORS.ACCENT} bold>
               {header.padEnd(colWidths[i]!)}
             </Text>
@@ -304,16 +304,16 @@ function renderTable(rows: string[][], keyPrefix: number): React.ReactNode {
       {/* Separator */}
       <Box>
         {colWidths.map((width, i) => (
-          <Box key={i} width={width + 2}>
+          <Box key={`sep-${keyPrefix}-${i}`} width={width + 2}>
             <Text color={COLORS.DIM}>{"─".repeat(width)}</Text>
           </Box>
         ))}
       </Box>
       {/* Data rows */}
       {dataRows.map((row, rowIndex) => (
-        <Box key={rowIndex}>
+        <Box key={`tr-${keyPrefix}-${rowIndex}`}>
           {row.map((cell, cellIndex) => (
-            <Box key={cellIndex} width={colWidths[cellIndex]! + 2}>
+            <Box key={`td-${keyPrefix}-${rowIndex}-${cellIndex}`} width={colWidths[cellIndex]! + 2}>
               {renderInlineMarkdown(cell.padEnd(colWidths[cellIndex]!), COLORS.WHITE)}
             </Box>
           ))}

@@ -58,6 +58,7 @@
     "@ai-sdk/openai": "^1.0.0",
     "@inkjs/ui": "^2.0.0",
     "@libsql/client": "^0.6.0",
+    "@libsql/linux-x64-gnu": "^0.5.22",
     "@mastra/core": "^1.0.0",
     "@mastra/libsql": "^1.0.0",
     "@mastra/memory": "^1.0.0",

@@ -61,7 +61,7 @@ export const WelcomeBanner: React.FC<WelcomeBannerProps> = ({
       {/* ASCII Art Banner */}
       <Box flexDirection="column">
         {banner.split("\n").map((line, i) => (
-          <Text key={i} color={COLORS.TAN}>
+          <Text key={`banner-line-${i}`} color={COLORS.TAN}>
             {line}
           </Text>
         ))}
@@ -89,7 +89,7 @@ export const WelcomeBanner: React.FC<WelcomeBannerProps> = ({
       {/* Feature bullets */}
       <Box flexDirection="column" marginTop={1}>
         {FEATURES.map((feature, i) => (
-          <Box key={i}>
+          <Box key={`feature-${i}`}>
             <Text color={COLORS.DIM}>  - </Text>
             <Text color={COLORS.WHITE}>{feature}</Text>
           </Box>

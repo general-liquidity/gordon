@@ -89,7 +89,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
         </Box>
       ) : (
         visibleMessages.map((msg, index) => (
-          <MessageBubble key={index} message={msg} />
+          <MessageBubble key={`${msg.role}-${index}-${msg.content.slice(0, 20)}`} message={msg} />
         ))
       )}
     </Box>
