@@ -17,6 +17,7 @@ import { z } from "zod";
 import { generatePlan } from "../../../core/planner.ts";
 import { executePlan, closeTrade } from "../../../core/executor.ts";
 import { analyze } from "../../../core/analyzer.ts";
+import { calculateGridLevels } from "../../../core/grid-calculator.ts";
 import { PlanSchema } from "../../../types/plan.ts";
 import { TradeSchema } from "../../../types/trade.ts";
 import { loadConfig, saveConfig } from "../../storage/config.ts";
@@ -355,6 +356,122 @@ export const armSystemTool = createTool({
 });
 
 // ============================================================================
+// Create Grid Plan Tool
+// ============================================================================
+
+export const createGridPlanTool = createTool({
+  id: "create_grid_plan",
+  description: `Create a grid entry plan for a symbol. Grid entry places multiple buy orders at descending price levels across support zones.
+
+Use grid entry when:
+- Market is ranging or uncertain
+- User wants to accumulate over a price range
+- Multiple support levels are identified
+- User says "grid", "layered entry", "spread buys"
+
+Returns a grid plan for user approval.`,
+  inputSchema: z.object({
+    symbol: z.string().describe("Trading pair symbol, e.g., ETHUSDT"),
+    allocation: z.number().optional().describe("Amount in USDT to allocate (uses default if not specified)"),
+    numLevels: z.number().min(3).max(7).optional().describe("Number of grid levels (default: 5)"),
+    distribution: z.enum(["pyramid", "equal"]).optional().describe("Allocation distribution (default: pyramid)"),
+  }),
+  outputSchema: z.object({
+    success: z.boolean().optional(),
+    planPreview: z.object({
+      symbol: z.string(),
+      strategy: z.string(),
+      grid: z.object({
+        levels: z.array(z.object({
+          price: z.number(),
+          percentOfAllocation: z.number(),
+        })),
+        distribution: z.enum(["pyramid", "equal"]),
+        priceRange: z.object({
+          high: z.number(),
+          low: z.number(),
+        }),
+      }),
+      stopLoss: z.number(),
+      takeProfits: z.array(z.number()),
+      allocation: z.object({
+        amount: z.number(),
+        percentOfPortfolio: z.number(),
+      }),
+      weightedEntry: z.number(),
+    }).optional(),
+    message: z.string().optional(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ symbol, allocation, numLevels, distribution }, execContext: MastraExecutionContext) => {
+    const ctx = getGordonContext(execContext);
+    if (!ctx?.binance) {
+      return { error: "Binance client not connected. Please configure API keys." };
+    }
+
+    // Normalize symbol
+    const normalizedSymbol = symbol.toUpperCase().endsWith("USDT")
+      ? symbol.toUpperCase()
+      : `${symbol.toUpperCase()}USDT`;
+
+    // Analyze the symbol to get support/resistance levels
+    const analysis = await analyze(ctx.binance, normalizedSymbol, {
+      timeframes: ["1h", "4h"],
+    });
+
+    if (analysis.supports.length === 0) {
+      return {
+        success: false,
+        error: `No support levels found for ${normalizedSymbol}. Cannot create grid plan.`,
+      };
+    }
+
+    // Calculate allocation amount
+    const defaultAllocationPercent = ctx.config.preferences.maxAllocationPerTrade;
+    const allocationAmount = allocation ?? ctx.portfolioValue * defaultAllocationPercent;
+    const percentOfPortfolio = allocationAmount / ctx.portfolioValue;
+
+    // Calculate grid levels using grid-calculator
+    const gridResult = calculateGridLevels({
+      supports: analysis.supports,
+      currentPrice: analysis.price,
+      numLevels: numLevels ?? 5,
+      distribution: distribution ?? "pyramid",
+      allocation: allocationAmount,
+    });
+
+    // Extract take profits from resistance levels (first 2)
+    const takeProfits = analysis.resistances
+      .slice(0, 2)
+      .map(r => r.price);
+
+    // Build plan preview
+    const planPreview = {
+      symbol: normalizedSymbol,
+      strategy: "grid_entry",
+      grid: gridResult.config,
+      stopLoss: gridResult.stopLossPrice,
+      takeProfits,
+      allocation: {
+        amount: allocationAmount,
+        percentOfPortfolio,
+      },
+      weightedEntry: gridResult.weightedEntryIfAllFill,
+    };
+
+    const levelsSummary = gridResult.levels
+      .map((l, i) => `L${i + 1}: $${l.price.toFixed(2)} (${(l.percentOfAllocation * 100).toFixed(1)}%)`)
+      .join(", ");
+
+    return {
+      success: true,
+      planPreview,
+      message: `Grid plan for ${normalizedSymbol}: ${gridResult.levels.length} levels from $${gridResult.config.priceRange.high.toFixed(2)} to $${gridResult.config.priceRange.low.toFixed(2)}. ${levelsSummary}. Stop loss at $${gridResult.stopLossPrice.toFixed(2)}. Allocation: $${allocationAmount.toFixed(2)} (${(percentOfPortfolio * 100).toFixed(1)}% of portfolio).`,
+    };
+  },
+});
+
+// ============================================================================
 // Export as Object (Mastra format)
 // ============================================================================
 
@@ -369,4 +486,5 @@ export const tradingTools = {
   list_plans: listPlansTool,
   approve_plan: approvePlanTool,
   arm_system: armSystemTool,
+  create_grid_plan: createGridPlanTool,
 };
