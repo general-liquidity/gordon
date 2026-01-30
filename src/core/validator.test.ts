@@ -395,3 +395,115 @@ describe("validatePlan - Warnings", () => {
     expect(result.warnings).toHaveLength(0);
   });
 });
+
+describe("validatePlan - grid_entry", () => {
+  const mockConfig = createMockConfig({
+    preferences: {
+      maxAllocationPerTrade: 0.15, // Allow 15% allocation
+      cashReservePercent: 0.1,
+      defaultTimeframes: ["1h", "4h"],
+      topNCoins: 50,
+    },
+  });
+  const mockPortfolio = createMockPortfolio();
+
+  // Grid plan with valid risk/reward: entry 3400, stop 3230 (risk=170, 5%), TP1 3650 (reward=250)
+  // R:R = 250/170 = 1.47 (above 1.2 minimum)
+  const baseGridPlan: Plan = {
+    id: "pln_test123",
+    createdAt: new Date().toISOString(),
+    symbol: "ETHUSDT",
+    direction: "long",
+    strategy: "grid_entry",
+    allocation: {
+      currency: "USDT",
+      amount: 500,
+      percentOfPortfolio: 0.05,
+    },
+    entry: {
+      type: "limit",
+      price: 3400,
+    },
+    dca: null,
+    grid: {
+      levels: [
+        { price: 3400, percentOfAllocation: 0.1 },
+        { price: 3360, percentOfAllocation: 0.15 },
+        { price: 3320, percentOfAllocation: 0.2 },
+        { price: 3280, percentOfAllocation: 0.25 },
+        { price: 3240, percentOfAllocation: 0.3 },
+      ],
+      distribution: "pyramid",
+      priceRange: { high: 3400, low: 3240 },
+    },
+    stopLoss: { price: 3230 },
+    takeProfit: [
+      { price: 3650, percentToSell: 0.5 },
+      { price: 3900, percentToSell: 0.5 },
+    ],
+    reasoning: "Test grid plan",
+    status: "DRAFT",
+  };
+
+  test("should validate a correct grid plan", () => {
+    const result = validatePlan(baseGridPlan, mockConfig, mockPortfolio);
+    expect(result.valid).toBe(true);
+    expect(result.errors).toHaveLength(0);
+  });
+
+  test("should error if grid percentages don't sum to 1", () => {
+    const badPlan = {
+      ...baseGridPlan,
+      grid: {
+        ...baseGridPlan.grid!,
+        levels: [
+          { price: 3400, percentOfAllocation: 0.1 },
+          { price: 3340, percentOfAllocation: 0.1 },
+          { price: 3280, percentOfAllocation: 0.1 },
+        ],
+      },
+    };
+    const result = validatePlan(badPlan, mockConfig, mockPortfolio);
+    expect(result.valid).toBe(false);
+    expect(result.errors.some(e => e.includes("sum to 100%"))).toBe(true);
+  });
+
+  test("should error if grid levels are not descending", () => {
+    const badPlan = {
+      ...baseGridPlan,
+      grid: {
+        ...baseGridPlan.grid!,
+        levels: [
+          { price: 3200, percentOfAllocation: 0.33 },
+          { price: 3400, percentOfAllocation: 0.33 },
+          { price: 3300, percentOfAllocation: 0.34 },
+        ],
+      },
+    };
+    const result = validatePlan(badPlan, mockConfig, mockPortfolio);
+    expect(result.valid).toBe(false);
+    expect(result.errors.some(e => e.includes("descending"))).toBe(true);
+  });
+
+  test("should error if stop loss is above lowest grid level", () => {
+    const badPlan = {
+      ...baseGridPlan,
+      stopLoss: { price: 3250 }, // Above lowest grid level (3240)
+    };
+    const result = validatePlan(badPlan, mockConfig, mockPortfolio);
+    expect(result.valid).toBe(false);
+    expect(result.errors.some(e => e.includes("below lowest grid level"))).toBe(true);
+  });
+
+  test("should warn if grid range is too wide", () => {
+    const widePlan = {
+      ...baseGridPlan,
+      grid: {
+        ...baseGridPlan.grid!,
+        priceRange: { high: 3400, low: 2700 },
+      },
+    };
+    const result = validatePlan(widePlan, mockConfig, mockPortfolio);
+    expect(result.warnings.some(w => w.includes("range"))).toBe(true);
+  });
+});

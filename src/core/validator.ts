@@ -260,6 +260,68 @@ function generateWarnings(
 }
 
 /**
+ * Validate grid-specific rules
+ */
+function validateGrid(
+  plan: Plan,
+  errors: string[],
+  warnings: string[]
+): void {
+  if (plan.strategy !== "grid_entry" || !plan.grid) {
+    return;
+  }
+
+  const { grid } = plan;
+
+  // Level count validation
+  if (grid.levels.length < 3 || grid.levels.length > 7) {
+    errors.push(
+      `Grid must have 3-7 levels. Current: ${grid.levels.length} levels.`
+    );
+  }
+
+  // Percentages must sum to 1
+  const totalPercent = grid.levels.reduce(
+    (sum, level) => sum + level.percentOfAllocation,
+    0
+  );
+  if (Math.abs(totalPercent - 1.0) > 0.01) {
+    errors.push(
+      `Grid level percentages must sum to 100%. Current sum: ${(totalPercent * 100).toFixed(1)}%.`
+    );
+  }
+
+  // Prices must be in descending order
+  for (let i = 1; i < grid.levels.length; i++) {
+    const current = grid.levels[i];
+    const previous = grid.levels[i - 1];
+    if (current && previous && current.price >= previous.price) {
+      errors.push(
+        `Grid levels must be in descending price order. Level ${i + 1} (${current.price}) >= Level ${i} (${previous.price}).`
+      );
+      break;
+    }
+  }
+
+  // Stop loss must be below lowest grid level
+  const lowestLevel = grid.levels[grid.levels.length - 1];
+  if (lowestLevel && plan.stopLoss.price >= lowestLevel.price) {
+    errors.push(
+      `Stop loss (${plan.stopLoss.price}) must be below lowest grid level (${lowestLevel.price}).`
+    );
+  }
+
+  // Warning: Grid range too wide (>20%)
+  const rangePercent =
+    (grid.priceRange.high - grid.priceRange.low) / grid.priceRange.high;
+  if (rangePercent > 0.20) {
+    warnings.push(
+      `Grid range is ${(rangePercent * 100).toFixed(1)}% - consider a tighter range for better capital efficiency.`
+    );
+  }
+}
+
+/**
  * Validate a trading plan against configuration and portfolio state
  *
  * @param plan - The trading plan to validate
@@ -279,6 +341,7 @@ export function validatePlan(
   validateStructure(plan, errors);
   validateRisk(plan, config, portfolio, errors);
   generateWarnings(plan, portfolio, warnings);
+  validateGrid(plan, errors, warnings);
 
   return {
     valid: errors.length === 0,
