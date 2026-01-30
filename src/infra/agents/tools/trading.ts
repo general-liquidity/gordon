@@ -23,7 +23,7 @@ import { TradeSchema } from "../../../types/trade.ts";
 import { loadConfig, saveConfig } from "../../storage/config.ts";
 import { listPlans, getPlan, updatePlan, createPlan } from "../../storage/plans.ts";
 import { listTrades, getTrade } from "../../storage/trades.ts";
-import { getGordonContext, type MastraExecutionContext } from "./types.ts";
+import { getGordonContext, validateToolOutput, type MastraExecutionContext } from "./types.ts";
 
 // ============================================================================
 // Error Messages
@@ -40,6 +40,87 @@ const errors = {
 // ============================================================================
 
 const getActiveTrades = () => listTrades({ status: "OPEN" });
+
+// ============================================================================
+// Output Schemas (extracted for validation reuse)
+// ============================================================================
+
+const createPlanOutputSchema = z.object({
+  success: z.boolean().optional(),
+  plan: PlanSchema.optional(),
+  summary: z.string().optional(),
+  error: z.string().optional(),
+});
+
+const executePlanOutputSchema = z.object({
+  success: z.boolean(),
+  trade: TradeSchema.optional(),
+  orderCount: z.number().optional(),
+  error: z.string().optional(),
+});
+
+const closeTradeOutputSchema = z.object({
+  success: z.boolean(),
+  pnl: z.number().optional(),
+  error: z.string().optional(),
+});
+
+const listPlansOutputSchema = z.object({
+  count: z.number(),
+  plans: z.array(z.object({
+    id: z.string(),
+    symbol: z.string(),
+    strategy: z.string(),
+    status: z.string(),
+    allocation: z.number(),
+    entry: z.union([z.number(), z.string()]),
+    stopLoss: z.number(),
+    createdAt: z.string(),
+  })),
+});
+
+const approvePlanOutputSchema = z.object({
+  success: z.boolean(),
+  planId: z.string().optional(),
+  message: z.string().optional(),
+  error: z.string().optional(),
+});
+
+const armSystemOutputSchema = z.object({
+  success: z.boolean(),
+  mode: z.enum(["ARMED", "SAFE"]).optional(),
+  armedUntil: z.string().optional().nullable(),
+  message: z.string(),
+  error: z.string().optional(),
+});
+
+const createGridPlanOutputSchema = z.object({
+  success: z.boolean().optional(),
+  planPreview: z.object({
+    symbol: z.string(),
+    strategy: z.string(),
+    grid: z.object({
+      levels: z.array(z.object({
+        price: z.number(),
+        percentOfAllocation: z.number(),
+      })),
+      distribution: z.enum(["pyramid", "equal"]),
+      priceRange: z.object({
+        high: z.number(),
+        low: z.number(),
+      }),
+    }),
+    stopLoss: z.number(),
+    takeProfits: z.array(z.number()),
+    allocation: z.object({
+      amount: z.number(),
+      percentOfPortfolio: z.number(),
+    }),
+    weightedEntry: z.number(),
+  }).optional(),
+  message: z.string().optional(),
+  error: z.string().optional(),
+});
 
 // ============================================================================
 // Plan Generation Tool
@@ -78,16 +159,11 @@ export const createPlanTool = createTool({
       .optional()
       .describe("Specific strategy to use (auto-detected if not specified)"),
   }),
-  outputSchema: z.object({
-    success: z.boolean().optional(),
-    plan: PlanSchema.optional(),
-    summary: z.string().optional(),
-    error: z.string().optional(),
-  }),
+  outputSchema: createPlanOutputSchema,
   execute: async ({ symbol, riskLevel, allocationPercent, strategyId }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
     if (!ctx?.binance || !ctx?.llm) {
-      return { error: "Binance or LLM client not connected." };
+      return validateToolOutput(createPlanOutputSchema, { error: "Binance or LLM client not connected." }, { toolName: "create_plan" });
     }
 
     // Normalize symbol
@@ -115,11 +191,13 @@ export const createPlanTool = createTool({
       portfolioValue: ctx.portfolioValue,
     });
 
-    return {
+    const result = {
       success: true,
       plan,
       summary: `Created ${plan.strategy} plan for ${plan.symbol}: Entry at ${plan.entry.price ?? "market"}, Stop at ${plan.stopLoss.price}, ${plan.takeProfit.length} TP levels. Allocation: ${plan.allocation.amount} USDT (${(plan.allocation.percentOfPortfolio * 100).toFixed(1)}%)`,
     };
+
+    return validateToolOutput(createPlanOutputSchema, result, { toolName: "create_plan" });
   },
 });
 
@@ -136,28 +214,23 @@ export const executePlanTool = createTool({
   inputSchema: z.object({
     planId: z.string().describe("The ID of the plan to execute"),
   }),
-  outputSchema: z.object({
-    success: z.boolean(),
-    trade: TradeSchema.optional(),
-    orderCount: z.number().optional(),
-    error: z.string().optional(),
-  }),
+  outputSchema: executePlanOutputSchema,
   execute: async ({ planId }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
     if (!ctx?.binance) {
-      return errors.noBinance;
+      return validateToolOutput(executePlanOutputSchema, { ...errors.noBinance, success: false }, { toolName: "execute_plan" });
     }
 
     const plan = getPlan(planId);
     if (!plan) {
-      return { success: false, error: `Plan not found: ${planId}` };
+      return validateToolOutput(executePlanOutputSchema, { success: false, error: `Plan not found: ${planId}` }, { toolName: "execute_plan" });
     }
 
     if (ctx.config.mode !== "ARMED") {
-      return {
+      return validateToolOutput(executePlanOutputSchema, {
         success: false,
         error: "Cannot execute: System is in SAFE mode. User must arm the system first.",
-      };
+      }, { toolName: "execute_plan" });
     }
 
     const result = await executePlan(ctx.binance, plan, ctx.config, {
@@ -167,17 +240,17 @@ export const executePlanTool = createTool({
     });
 
     if (result.success && result.trade) {
-      return {
+      return validateToolOutput(executePlanOutputSchema, {
         success: true,
         trade: result.trade,
         orderCount: result.orders.length,
-      };
+      }, { toolName: "execute_plan" });
     }
 
-    return {
+    return validateToolOutput(executePlanOutputSchema, {
       success: false,
       error: result.error,
-    };
+    }, { toolName: "execute_plan" });
   },
 });
 
@@ -198,29 +271,25 @@ export const closeTradeTool = createTool({
       .default("MANUAL")
       .describe("Reason for closing"),
   }),
-  outputSchema: z.object({
-    success: z.boolean(),
-    pnl: z.number().optional(),
-    error: z.string().optional(),
-  }),
+  outputSchema: closeTradeOutputSchema,
   execute: async ({ tradeId, reason }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
     if (!ctx?.binance) {
-      return errors.noBinance;
+      return validateToolOutput(closeTradeOutputSchema, { ...errors.noBinance, success: false }, { toolName: "close_trade" });
     }
 
     const trade = getTrade(tradeId);
     if (!trade) {
-      return { success: false, error: `Trade not found: ${tradeId}` };
+      return validateToolOutput(closeTradeOutputSchema, { success: false, error: `Trade not found: ${tradeId}` }, { toolName: "close_trade" });
     }
 
     const result = await closeTrade(ctx.binance, trade, reason ?? "MANUAL");
 
-    return {
+    return validateToolOutput(closeTradeOutputSchema, {
       success: result.success,
       pnl: result.pnl,
       error: result.error,
-    };
+    }, { toolName: "close_trade" });
   },
 });
 
@@ -240,19 +309,7 @@ export const listPlansTool = createTool({
       .describe("Filter by status (ALL for no filter)"),
     limit: z.number().min(1).max(50).default(10).describe("Max plans to return"),
   }),
-  outputSchema: z.object({
-    count: z.number(),
-    plans: z.array(z.object({
-      id: z.string(),
-      symbol: z.string(),
-      strategy: z.string(),
-      status: z.string(),
-      allocation: z.number(),
-      entry: z.union([z.number(), z.string()]),
-      stopLoss: z.number(),
-      createdAt: z.string(),
-    })),
-  }),
+  outputSchema: listPlansOutputSchema,
   execute: async ({ status, limit }) => {
     let plans = listPlans();
 
@@ -262,7 +319,7 @@ export const listPlansTool = createTool({
 
     plans.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
-    return {
+    const result = {
       count: plans.length,
       plans: plans.slice(0, limit ?? 10).map((p) => ({
         id: p.id,
@@ -275,6 +332,8 @@ export const listPlansTool = createTool({
         createdAt: p.createdAt,
       })),
     };
+
+    return validateToolOutput(listPlansOutputSchema, result, { toolName: "list_plans" });
   },
 });
 
@@ -290,29 +349,24 @@ export const approvePlanTool = createTool({
   inputSchema: z.object({
     planId: z.string().describe("The ID of the plan to approve"),
   }),
-  outputSchema: z.object({
-    success: z.boolean(),
-    planId: z.string().optional(),
-    message: z.string().optional(),
-    error: z.string().optional(),
-  }),
+  outputSchema: approvePlanOutputSchema,
   execute: async ({ planId }) => {
     const plan = getPlan(planId);
     if (!plan) {
-      return { success: false, error: `Plan not found: ${planId}` };
+      return validateToolOutput(approvePlanOutputSchema, { success: false, error: `Plan not found: ${planId}` }, { toolName: "approve_plan" });
     }
 
     if (plan.status !== "DRAFT") {
-      return { success: false, error: `Plan is not in DRAFT status, current status: ${plan.status}` };
+      return validateToolOutput(approvePlanOutputSchema, { success: false, error: `Plan is not in DRAFT status, current status: ${plan.status}` }, { toolName: "approve_plan" });
     }
 
     updatePlan(planId, { status: "APPROVED" });
 
-    return {
+    return validateToolOutput(approvePlanOutputSchema, {
       success: true,
       planId,
       message: "Plan approved. Ready for execution when system is armed.",
-    };
+    }, { toolName: "approve_plan" });
   },
 });
 
@@ -335,13 +389,7 @@ export const armSystemTool = createTool({
       .default(24)
       .describe("Hours to stay armed (max: 24)"),
   }),
-  outputSchema: z.object({
-    success: z.boolean(),
-    mode: z.enum(["ARMED", "SAFE"]).optional(),
-    armedUntil: z.string().optional().nullable(),
-    message: z.string(),
-    error: z.string().optional(),
-  }),
+  outputSchema: armSystemOutputSchema,
   execute: async ({ action, hours }) => {
     const config = await loadConfig();
 
@@ -351,21 +399,21 @@ export const armSystemTool = createTool({
 
       await saveConfig({ ...config, mode: "ARMED", armedUntil });
 
-      return {
+      return validateToolOutput(armSystemOutputSchema, {
         success: true,
         mode: "ARMED" as const,
         armedUntil,
         message: `System armed for ${armHours} hours. Trading enabled.`,
-      };
+      }, { toolName: "arm_system" });
     } else {
       await saveConfig({ ...config, mode: "SAFE", armedUntil: null });
 
-      return {
+      return validateToolOutput(armSystemOutputSchema, {
         success: true,
         mode: "SAFE" as const,
         armedUntil: null,
         message: "System disarmed. Trading disabled.",
-      };
+      }, { toolName: "arm_system" });
     }
   },
 });
@@ -391,37 +439,11 @@ Returns a grid plan for user approval.`,
     numLevels: z.number().min(3).max(7).optional().describe("Number of grid levels (default: 5)"),
     distribution: z.enum(["pyramid", "equal"]).optional().describe("Allocation distribution (default: pyramid)"),
   }),
-  outputSchema: z.object({
-    success: z.boolean().optional(),
-    planPreview: z.object({
-      symbol: z.string(),
-      strategy: z.string(),
-      grid: z.object({
-        levels: z.array(z.object({
-          price: z.number(),
-          percentOfAllocation: z.number(),
-        })),
-        distribution: z.enum(["pyramid", "equal"]),
-        priceRange: z.object({
-          high: z.number(),
-          low: z.number(),
-        }),
-      }),
-      stopLoss: z.number(),
-      takeProfits: z.array(z.number()),
-      allocation: z.object({
-        amount: z.number(),
-        percentOfPortfolio: z.number(),
-      }),
-      weightedEntry: z.number(),
-    }).optional(),
-    message: z.string().optional(),
-    error: z.string().optional(),
-  }),
+  outputSchema: createGridPlanOutputSchema,
   execute: async ({ symbol, allocation, numLevels, distribution }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
     if (!ctx?.binance) {
-      return { error: "Binance client not connected. Please configure API keys." };
+      return validateToolOutput(createGridPlanOutputSchema, { error: "Binance client not connected. Please configure API keys." }, { toolName: "create_grid_plan" });
     }
 
     // Normalize symbol
@@ -435,10 +457,10 @@ Returns a grid plan for user approval.`,
     });
 
     if (analysis.supports.length === 0) {
-      return {
+      return validateToolOutput(createGridPlanOutputSchema, {
         success: false,
         error: `No support levels found for ${normalizedSymbol}. Cannot create grid plan.`,
-      };
+      }, { toolName: "create_grid_plan" });
     }
 
     // Calculate allocation amount
@@ -510,11 +532,13 @@ Returns a grid plan for user approval.`,
       .map((l, i) => `L${i + 1}: $${l.price.toFixed(2)} (${(l.percentOfAllocation * 100).toFixed(1)}%)`)
       .join(", ");
 
-    return {
+    const result = {
       success: true,
       planPreview,
       message: `Grid plan created (ID: ${savedPlan.id}) for ${normalizedSymbol}: ${gridResult.levels.length} levels from $${gridResult.config.priceRange.high.toFixed(2)} to $${gridResult.config.priceRange.low.toFixed(2)}. ${levelsSummary}. Stop loss at $${gridResult.stopLossPrice.toFixed(2)}. Allocation: $${allocationAmount.toFixed(2)} (${(percentOfPortfolio * 100).toFixed(1)}% of portfolio). Use 'approve_plan' with ID ${savedPlan.id} to approve.`,
     };
+
+    return validateToolOutput(createGridPlanOutputSchema, result, { toolName: "create_grid_plan" });
   },
 });
 

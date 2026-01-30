@@ -13,6 +13,16 @@ import { RequestContext } from "@mastra/core/request-context";
 import { gordonAgent } from "./agents.ts";
 import { createModuleLogger } from "../logger/index.ts";
 import { emitEvent } from "../../events/index.ts";
+import { checkInputGuardrails, checkOutputGuardrails } from "./middleware/guardrails.ts";
+import {
+  initializeTracing as initTracingModule,
+  buildTracingOptions,
+  isTracingEnabled,
+  getTracingConfig,
+  recordRequest,
+  recordError,
+  type SpanContext,
+} from "../observability/index.ts";
 import type { GordonContext } from "./types.ts";
 
 const logger = createModuleLogger("orchestrator");
@@ -74,7 +84,18 @@ export async function* processMessageStream(
   context: GordonContext,
   threadId?: string
 ): AsyncGenerator<StreamEvent, void> {
+  const startTime = Date.now();
   logger.debug("Starting streaming message processing", { messageLength: userMessage.length });
+
+  // INPUT GUARDRAIL: Check for dangerous patterns before processing
+  const inputCheck = await checkInputGuardrails(userMessage);
+  if (!inputCheck.allowed) {
+    logger.warn("Input blocked by guardrail", { reason: inputCheck.reason });
+    recordRequest(Date.now() - startTime, false);
+    recordError("InputGuardrailBlock");
+    yield { type: "error", error: inputCheck.reason };
+    return;
+  }
 
   const requestContext = createRequestContext(context);
 
@@ -82,12 +103,16 @@ export async function* processMessageStream(
     // Emit agent started event
     await emitEvent("agent:started", { agent: "gordon" });
 
+    // Build tracing options if tracing is enabled
+    const tracingOptions = createAgentTracingOptions();
+
     // Use Mastra's stream() method for real-time responses
     // Type assertion needed as Mastra's types don't fully expose all options
     const streamResult = await gordonAgent().stream(userMessage, {
       requestContext,
       threadId,
       maxSteps: 20,
+      ...(tracingOptions && { tracingOptions }),
     } as Record<string, unknown>);
 
     let fullText = "";
@@ -102,22 +127,30 @@ export async function* processMessageStream(
 
     if (streamObj.textStream && typeof streamObj.textStream[Symbol.asyncIterator] === 'function') {
       // Stream text chunks as they arrive
+      // OUTPUT GUARDRAIL: Sanitize each chunk for sensitive data
       for await (const chunk of streamObj.textStream) {
-        fullText += chunk;
+        const outputCheck = await checkOutputGuardrails(chunk);
+        const sanitizedChunk = outputCheck.sanitized;
+        fullText += sanitizedChunk;
         yield {
           type: "text_delta",
-          content: chunk,
+          content: sanitizedChunk,
         };
       }
     } else if (typeof streamObj.text === 'function') {
       // text is a promise function
-      fullText = await streamObj.text();
+      const rawText = await streamObj.text();
+      // OUTPUT GUARDRAIL: Sanitize the response
+      const outputCheck = await checkOutputGuardrails(rawText);
+      fullText = outputCheck.sanitized;
       yield {
         type: "text_delta",
         content: fullText,
       };
     } else if (typeof streamObj.text === 'string') {
-      fullText = streamObj.text;
+      // OUTPUT GUARDRAIL: Sanitize the response
+      const outputCheck = await checkOutputGuardrails(streamObj.text);
+      fullText = outputCheck.sanitized;
       yield {
         type: "text_delta",
         content: fullText,
@@ -140,6 +173,9 @@ export async function* processMessageStream(
       responseLength: fullText.length,
     });
 
+    // Record successful request metrics
+    recordRequest(Date.now() - startTime, true);
+
     yield {
       type: "done",
       content: fullText,
@@ -149,6 +185,10 @@ export async function* processMessageStream(
   } catch (err) {
     const error = err instanceof Error ? err : new Error(String(err));
     logger.error("Streaming error", error);
+
+    // Record failed request metrics
+    recordRequest(Date.now() - startTime, false);
+    recordError(error.name || "UnknownError");
 
     await emitEvent("system:error", {
       error: {
@@ -179,12 +219,26 @@ export async function* processWithNetwork(
   context: GordonContext,
   threadId?: string
 ): AsyncGenerator<StreamEvent, void> {
+  const startTime = Date.now();
   logger.debug("Starting network processing", { messageLength: userMessage.length });
+
+  // INPUT GUARDRAIL: Check for dangerous patterns before processing
+  const inputCheck = await checkInputGuardrails(userMessage);
+  if (!inputCheck.allowed) {
+    logger.warn("Input blocked by guardrail", { reason: inputCheck.reason });
+    recordRequest(Date.now() - startTime, false);
+    recordError("InputGuardrailBlock");
+    yield { type: "error", error: inputCheck.reason };
+    return;
+  }
 
   const requestContext = createRequestContext(context);
 
   try {
     await emitEvent("agent:started", { agent: "gordon-network" });
+
+    // Build tracing options if tracing is enabled
+    const tracingOptions = createAgentTracingOptions();
 
     // Use Agent Network for automatic routing between sub-agents
     // Type assertion needed as Mastra's types don't fully expose all options
@@ -192,6 +246,7 @@ export async function* processWithNetwork(
       requestContext,
       threadId,
       maxSteps: 30,
+      ...(tracingOptions && { tracingOptions }),
     } as Record<string, unknown>);
 
     // Stream the network result
@@ -209,6 +264,10 @@ export async function* processWithNetwork(
     } else if (typeof resultObj.text === 'string') {
       fullText = resultObj.text;
     }
+
+    // OUTPUT GUARDRAIL: Sanitize the response for sensitive data
+    const outputCheck = await checkOutputGuardrails(fullText);
+    fullText = outputCheck.sanitized;
 
     yield {
       type: "text_delta",
@@ -230,6 +289,9 @@ export async function* processWithNetwork(
       };
     }
 
+    // Record successful request metrics
+    recordRequest(Date.now() - startTime, true);
+
     yield {
       type: "done",
       content: fullText,
@@ -239,6 +301,11 @@ export async function* processWithNetwork(
   } catch (err) {
     const error = err instanceof Error ? err : new Error(String(err));
     logger.error("Network processing error", error);
+
+    // Record failed request metrics
+    recordRequest(Date.now() - startTime, false);
+    recordError(error.name || "UnknownError");
+
     yield {
       type: "error",
       error: error.message,
@@ -273,17 +340,34 @@ export async function processMessage(
     totalTokens: number;
   };
 }> {
+  const startTime = Date.now();
   logger.debug("Processing message with Mastra", { messageLength: userMessage.length });
+
+  // INPUT GUARDRAIL: Check for dangerous patterns before processing
+  const inputCheck = await checkInputGuardrails(userMessage);
+  if (!inputCheck.allowed) {
+    logger.warn("Input blocked by guardrail", { reason: inputCheck.reason });
+    recordRequest(Date.now() - startTime, false);
+    recordError("InputGuardrailBlock");
+    return {
+      response: inputCheck.reason || "Input blocked by safety guardrail.",
+      usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
+    };
+  }
 
   const requestContext = createRequestContext(context);
 
   try {
+    // Build tracing options if tracing is enabled
+    const tracingOptions = createAgentTracingOptions();
+
     // Use generate() for non-streaming responses
     // Type assertion needed for threadId support with Memory
     const result = await gordonAgent().generate(userMessage, {
       requestContext,
       threadId,
       maxSteps: 20,
+      ...(tracingOptions && { tracingOptions }),
     } as Record<string, unknown>);
 
     // Extract text from result - Mastra returns { text, usage, ... }
@@ -292,7 +376,11 @@ export async function processMessage(
       usage?: { inputTokens?: number; outputTokens?: number; totalTokens?: number };
     };
 
-    const response = resultObj.text || "I'm not sure how to help with that.";
+    const rawResponse = resultObj.text || "I'm not sure how to help with that.";
+
+    // OUTPUT GUARDRAIL: Sanitize response for sensitive data
+    const outputCheck = await checkOutputGuardrails(rawResponse);
+    const response = outputCheck.sanitized;
 
     // Emit event for tracking
     await emitEvent("agent:message_processed", {
@@ -302,6 +390,9 @@ export async function processMessage(
     });
 
     logger.debug("Message processed", { responseLength: response.length });
+
+    // Record successful request metrics
+    recordRequest(Date.now() - startTime, true);
 
     return {
       response,
@@ -314,6 +405,11 @@ export async function processMessage(
   } catch (err) {
     const error = err instanceof Error ? err : new Error(String(err));
     logger.error("Failed to process message", error);
+
+    // Record failed request metrics
+    recordRequest(Date.now() - startTime, false);
+    recordError(error.name || "UnknownError");
+
     throw error;
   }
 }
@@ -326,15 +422,48 @@ export async function processSimpleMessage(
   userMessage: string,
   context: GordonContext
 ): Promise<string> {
+  const startTime = Date.now();
+
+  // INPUT GUARDRAIL: Check for dangerous patterns before processing
+  const inputCheck = await checkInputGuardrails(userMessage);
+  if (!inputCheck.allowed) {
+    logger.warn("Input blocked by guardrail", { reason: inputCheck.reason });
+    recordRequest(Date.now() - startTime, false);
+    recordError("InputGuardrailBlock");
+    return inputCheck.reason || "Input blocked by safety guardrail.";
+  }
+
   const requestContext = createRequestContext(context);
 
-  const result = await gordonAgent().generate(userMessage, {
-    requestContext,
-    maxSteps: 5, // Limit steps for simple queries
-  });
+  try {
+    // Build tracing options if tracing is enabled
+    const tracingOptions = createAgentTracingOptions();
 
-  const resultObj = result as unknown as { text?: string };
-  return resultObj.text || "I'm not sure how to help with that.";
+    const result = await gordonAgent().generate(userMessage, {
+      requestContext,
+      maxSteps: 5, // Limit steps for simple queries
+      ...(tracingOptions && { tracingOptions }),
+    });
+
+    const resultObj = result as unknown as { text?: string };
+    const rawResponse = resultObj.text || "I'm not sure how to help with that.";
+
+    // OUTPUT GUARDRAIL: Sanitize response for sensitive data
+    const outputCheck = await checkOutputGuardrails(rawResponse);
+
+    // Record successful request metrics
+    recordRequest(Date.now() - startTime, true);
+
+    return outputCheck.sanitized;
+  } catch (err) {
+    const error = err instanceof Error ? err : new Error(String(err));
+
+    // Record failed request metrics
+    recordRequest(Date.now() - startTime, false);
+    recordError(error.name || "UnknownError");
+
+    throw error;
+  }
 }
 
 // ============================================================================
@@ -378,20 +507,54 @@ export async function quickCheckPositions(context: GordonContext) {
 
 /**
  * Initialize OpenTelemetry tracing for agent operations
- * Mastra supports built-in tracing when configured
+ *
+ * This initializes the tracing infrastructure and logs configuration.
+ * When OTEL_TRACING_ENABLED=true, traces will be exported to the
+ * configured OTLP endpoint.
+ *
+ * Environment variables:
+ * - OTEL_TRACING_ENABLED: Enable tracing (default: false)
+ * - OTEL_EXPORTER_OTLP_ENDPOINT: OTLP endpoint URL
+ * - OTEL_SERVICE_NAME: Service name for traces
  */
 export function initializeTracing(): void {
-  // Mastra uses OpenTelemetry under the hood
-  // Tracing is enabled via environment variables:
-  // - OTEL_EXPORTER_OTLP_ENDPOINT
-  // - OTEL_SERVICE_NAME
-  logger.debug("Tracing initialized via Mastra Agent class");
+  // Initialize the tracing module
+  initTracingModule();
 
-  // Log tracing configuration
-  const otlpEndpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
-  if (otlpEndpoint) {
-    logger.info("OpenTelemetry tracing enabled", { endpoint: otlpEndpoint });
+  // Log configuration status
+  const config = getTracingConfig();
+  if (config.enabled) {
+    logger.info("OpenTelemetry tracing enabled", {
+      serviceName: config.serviceName,
+      endpoint: config.endpoint,
+    });
+  } else {
+    logger.debug("Tracing disabled (set OTEL_TRACING_ENABLED=true to enable)");
   }
+}
+
+/**
+ * Create tracing options for agent calls
+ *
+ * This builds the tracingOptions object that can be passed to
+ * agent.generate() or agent.stream() calls for distributed tracing.
+ */
+function createAgentTracingOptions(parentContext?: SpanContext): Record<string, unknown> | undefined {
+  if (!isTracingEnabled()) {
+    return undefined;
+  }
+
+  const tracingOpts = buildTracingOptions({
+    parentContext,
+    metadata: {
+      agent: "gordon",
+      timestamp: new Date().toISOString(),
+    },
+    tags: ["gordon-agent"],
+  });
+
+  // Cast to Record<string, unknown> to match Mastra's expected type
+  return tracingOpts as Record<string, unknown>;
 }
 
 // ============================================================================

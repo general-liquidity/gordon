@@ -31,3 +31,34 @@ export {
   type SystemMetrics,
   type GordonMetrics,
 } from "./metrics.ts";
+
+export {
+  // Initialization
+  initializeTracing,
+  shutdownTracing,
+
+  // Configuration
+  getTracingConfig,
+  isTracingEnabled,
+  getTracingStatus,
+
+  // Span context management
+  createSpanContext,
+  storeSpanContext,
+  getSpanContext,
+  removeSpanContext,
+  getCurrentSpanContext,
+
+  // ID generation
+  generateTraceId,
+  generateSpanId,
+
+  // Tracing utilities
+  buildTracingOptions,
+  withTracing,
+
+  // Types
+  type TracingConfig,
+  type SpanContext,
+  type TracingOptions,
+} from "./tracing.ts";

@@ -15,7 +15,7 @@
 
 import { Agent } from "@mastra/core/agent";
 import { Memory } from "@mastra/memory";
-import { LibSQLStore } from "@mastra/libsql";
+import { LibSQLStore, LibSQLVector } from "@mastra/libsql";
 
 import { getModel } from "../providers/registry.ts";
 import {
@@ -37,25 +37,110 @@ import {
   riskManagementTools,
   strategyTools,
   metricsTools,
+  withToolsMetrics,
 } from "./tools/index.ts";
+
+// ============================================================================
+// Instrumented Tools (with metrics recording)
+// ============================================================================
+
+/**
+ * Wrap all tools with metrics recording to track:
+ * - Tool invocation count
+ * - Success/failure rates per tool
+ */
+const instrumentedIndicatorTools = withToolsMetrics(indicatorTools);
+const instrumentedExplainTools = withToolsMetrics(explainTools);
+const instrumentedMarketTools = withToolsMetrics(marketTools);
+const instrumentedPositionTools = withToolsMetrics(positionTools);
+const instrumentedSchedulerTools = withToolsMetrics(schedulerTools);
+const instrumentedSystemTools = withToolsMetrics(systemTools);
+const instrumentedEarnTools = withToolsMetrics(earnTools);
+const instrumentedChartTools = withToolsMetrics(chartTools);
+const instrumentedOrderbookTools = withToolsMetrics(orderbookTools);
+const instrumentedWalletTools = withToolsMetrics(walletTools);
+const instrumentedDiscoveryTools = withToolsMetrics(discoveryTools);
+const instrumentedHistoryTools = withToolsMetrics(historyTools);
+const instrumentedAccountTools = withToolsMetrics(accountTools);
+const instrumentedTradingTools = withToolsMetrics(tradingTools);
+const instrumentedMarketAnalysisTools = withToolsMetrics(marketAnalysisTools);
+const instrumentedRiskManagementTools = withToolsMetrics(riskManagementTools);
+const instrumentedStrategyTools = withToolsMetrics(strategyTools);
+const instrumentedMetricsTools = withToolsMetrics(metricsTools);
 
 // ============================================================================
 // Memory Configuration (Required for Agent Networks)
 // ============================================================================
 
 /**
- * Memory store for conversation persistence and task tracking
- * Required when using .network() for multi-agent orchestration
+ * Working memory template for trading context
+ * Maintains persistent state across conversations
  */
-const createMemory = () => {
+const WORKING_MEMORY_TEMPLATE = `
+# Trading Context
+
+## Portfolio State
+- Total Value: <unknown>
+- Available Cash: <unknown>
+- Open Positions: <none>
+
+## Recent Activity
+- Last Trade: <none>
+- Last Analysis: <none>
+- Active Plans: <none>
+
+## User Preferences
+- Risk Tolerance: <unknown>
+- Max Position Size: <unknown>
+- Preferred Strategies: <unknown>
+
+## Market Context
+- Current Watchlist: <none>
+- Recent Signals: <none>
+- Market Sentiment: <unknown>
+`;
+
+/**
+ * Memory store for conversation persistence, task tracking, and semantic recall
+ * Required when using .network() for multi-agent orchestration
+ *
+ * Features:
+ * - LibSQLStore: Persistent storage for conversation history
+ * - LibSQLVector: Vector database for semantic search (RAG)
+ * - semanticRecall: Find similar past trades and analyses
+ * - workingMemory: Maintain trading context across conversations
+ */
+function createMemory(): Memory {
   const dbUrl = process.env.DATABASE_URL || "file:gordon.db";
+  const vectorDbUrl = process.env.VECTOR_DATABASE_URL || "file:gordon-vector.db";
+
   return new Memory({
     storage: new LibSQLStore({
       id: "gordon-memory",
       url: dbUrl,
     }),
+    vector: new LibSQLVector({
+      id: "gordon-vector",
+      url: vectorDbUrl,
+    }),
+    embedder: "openai/text-embedding-3-small",
+    options: {
+      lastMessages: 20,
+      semanticRecall: {
+        topK: 5,
+        messageRange: {
+          before: 3,
+          after: 2,
+        },
+      },
+      workingMemory: {
+        enabled: true,
+        template: WORKING_MEMORY_TEMPLATE,
+      },
+      generateTitle: true,
+    },
   });
-};
+}
 
 // ============================================================================
 // Instructions (unchanged from OpenAI SDK)
@@ -210,11 +295,11 @@ function getScannerAgent(): Agent {
       instructions: SCANNER_INSTRUCTIONS,
       model: getModel(process.env.GORDON_PROVIDER, process.env.GORDON_MODEL),
       tools: {
-        ...indicatorTools,
-        ...discoveryTools,  // Coin discovery tools
-        ...strategyTools,   // Strategy library tools
-        scan_market: marketTools.scan_market,
-        analyze_coin: marketTools.analyze_coin,
+        ...instrumentedIndicatorTools,
+        ...instrumentedDiscoveryTools,  // Coin discovery tools
+        ...instrumentedStrategyTools,   // Strategy library tools
+        scan_market: instrumentedMarketTools.scan_market,
+        analyze_coin: instrumentedMarketTools.analyze_coin,
       },
     });
   }
@@ -237,11 +322,11 @@ function getAnalystAgent(): Agent {
       instructions: ANALYST_INSTRUCTIONS,
       model: getModel(process.env.GORDON_PROVIDER, process.env.GORDON_MODEL),
       tools: {
-        ...indicatorTools,
-        ...chartTools,
-        ...orderbookTools,         // Order book depth and liquidity analysis
-        ...marketAnalysisTools,    // Whale detection, breakouts, consolidation, scoring
-        analyze_coin: marketTools.analyze_coin,
+        ...instrumentedIndicatorTools,
+        ...instrumentedChartTools,
+        ...instrumentedOrderbookTools,         // Order book depth and liquidity analysis
+        ...instrumentedMarketAnalysisTools,    // Whale detection, breakouts, consolidation, scoring
+        analyze_coin: instrumentedMarketTools.analyze_coin,
       },
     });
   }
@@ -263,15 +348,15 @@ function getPlannerAgent(): Agent {
       instructions: PLANNER_INSTRUCTIONS,
       model: getModel(process.env.GORDON_PROVIDER, process.env.GORDON_MODEL),
       tools: {
-        ...indicatorTools,
-        ...strategyTools,  // Strategy library tools for plan creation
-        create_plan: tradingTools.create_plan,
-        create_grid_plan: tradingTools.create_grid_plan,
-        list_plans: tradingTools.list_plans,
+        ...instrumentedIndicatorTools,
+        ...instrumentedStrategyTools,  // Strategy library tools for plan creation
+        create_plan: instrumentedTradingTools.create_plan,
+        create_grid_plan: instrumentedTradingTools.create_grid_plan,
+        list_plans: instrumentedTradingTools.list_plans,
         // Risk-based position sizing tools
-        calculate_kelly_size: riskManagementTools.calculate_kelly_size,
-        calculate_volatility_adjusted_size: riskManagementTools.calculate_volatility_adjusted_size,
-        assess_trade_risk: riskManagementTools.assess_trade_risk,
+        calculate_kelly_size: instrumentedRiskManagementTools.calculate_kelly_size,
+        calculate_volatility_adjusted_size: instrumentedRiskManagementTools.calculate_volatility_adjusted_size,
+        assess_trade_risk: instrumentedRiskManagementTools.assess_trade_risk,
       },
     });
   }
@@ -292,11 +377,11 @@ function getExecutorAgent(): Agent {
       instructions: EXECUTOR_INSTRUCTIONS,
       model: getModel(process.env.GORDON_PROVIDER, process.env.GORDON_MODEL),
       tools: {
-        execute_plan: tradingTools.execute_plan,
-        close_trade: tradingTools.close_trade,
-        arm_system: tradingTools.arm_system,
-        list_plans: tradingTools.list_plans,
-        approve_plan: tradingTools.approve_plan,
+        execute_plan: instrumentedTradingTools.execute_plan,
+        close_trade: instrumentedTradingTools.close_trade,
+        arm_system: instrumentedTradingTools.arm_system,
+        list_plans: instrumentedTradingTools.list_plans,
+        approve_plan: instrumentedTradingTools.approve_plan,
       },
     });
   }
@@ -318,16 +403,16 @@ function getMonitorAgent(): Agent {
       instructions: MONITOR_INSTRUCTIONS,
       model: getModel(process.env.GORDON_PROVIDER, process.env.GORDON_MODEL),
       tools: {
-        check_positions: positionTools.check_positions,
-        ...accountTools,
-        ...walletTools,    // Wallet management and transfers
-        ...earnTools,      // Staking/savings positions
-        ...historyTools,   // Trade and transfer history
-        ...metricsTools,   // Performance metrics and statistics
+        check_positions: instrumentedPositionTools.check_positions,
+        ...instrumentedAccountTools,
+        ...instrumentedWalletTools,    // Wallet management and transfers
+        ...instrumentedEarnTools,      // Staking/savings positions
+        ...instrumentedHistoryTools,   // Trade and transfer history
+        ...instrumentedMetricsTools,   // Performance metrics and statistics
         // Risk monitoring tools
-        check_exit_conditions: riskManagementTools.check_exit_conditions,
-        check_drawdown_status: riskManagementTools.check_drawdown_status,
-        check_daily_limit: riskManagementTools.check_daily_limit,
+        check_exit_conditions: instrumentedRiskManagementTools.check_exit_conditions,
+        check_drawdown_status: instrumentedRiskManagementTools.check_drawdown_status,
+        check_daily_limit: instrumentedRiskManagementTools.check_daily_limit,
       },
     });
   }
@@ -349,7 +434,7 @@ function getTeacherAgent(): Agent {
       instructions: TEACHER_INSTRUCTIONS,
       model: getModel(process.env.GORDON_PROVIDER, process.env.GORDON_MODEL),
       tools: {
-        explain: explainTools.explain,
+        explain: instrumentedExplainTools.explain,
       },
     });
   }
@@ -385,8 +470,8 @@ function getGordonAgent(): Agent {
       // Specialized tools are delegated to sub-agents to avoid confusion
       // This improves tool selection accuracy by keeping Gordon focused on orchestration
       tools: {
-        ...systemTools,       // arm/disarm system control
-        ...schedulerTools,    // task scheduling (cross-cutting concern)
+        ...instrumentedSystemTools,       // arm/disarm system control
+        ...instrumentedSchedulerTools,    // task scheduling (cross-cutting concern)
       },
 
       // Memory for network orchestration

@@ -10,7 +10,7 @@ import { ChatView, type ChatMessage } from "./ChatView.tsx";
 import { Onboarding } from "./Onboarding.tsx";
 import { SetupWizard } from "./SetupWizard.tsx";
 import { ModelSelector } from "./ModelSelector.tsx";
-import { processMessage, processMessageStream, initializeTracing, type StreamEvent } from "../infra/agents/orchestrator.ts";
+import { processMessageStream, initializeTracing } from "../infra/agents/orchestrator.ts";
 import { createLLMClientFromEnv, type LLMClient } from "../infra/llm/index.ts";
 import { BinanceClient } from "../infra/binance/index.ts";
 import { runMonitorCycle } from "../core/monitor.ts";
@@ -40,6 +40,8 @@ interface AppState {
   connectionStatus: "connected" | "disconnected" | "connecting";
   messages: ChatMessage[];
   isLoading: boolean;
+  isStreaming: boolean;
+  activeToolCall: string | null;
   conversationHistory: ConversationMessage[];
   btcPrice: number | undefined;
 }
@@ -75,6 +77,8 @@ export function App(): React.ReactElement {
     connectionStatus: "disconnected",
     messages: [],
     isLoading: false,
+    isStreaming: false,
+    activeToolCall: null,
     conversationHistory: [],
     btcPrice: undefined,
   });
@@ -256,7 +260,7 @@ export function App(): React.ReactElement {
 
   const handleSubmit = useCallback(async (value: string): Promise<void> => {
     if (!value.trim()) return;
-    if (state.isLoading) return;
+    if (state.isLoading || state.isStreaming) return;
 
     // Check for slash commands
     const parsedCommand = parseSlashCommand(value);
@@ -338,46 +342,120 @@ export function App(): React.ReactElement {
       availableCash: state.availableCash,
     };
 
-    try {
-      const result = await processMessage(
-        messageToSend,
-        context,
-        undefined
-      );
+    // Create initial empty assistant message for streaming
+    const streamingTimestamp = formatTimestamp();
+    const initialGordonMessage: ChatMessage = {
+      role: "gordon",
+      content: "",
+      timestamp: streamingTimestamp,
+    };
 
-      const gordonMessage: ChatMessage = {
-        role: "gordon",
-        content: result.response,
-        timestamp: formatTimestamp(),
+    // Add empty Gordon message and switch to streaming state
+    setState((prev) => ({
+      ...prev,
+      messages: [...prev.messages, initialGordonMessage],
+      isLoading: false,
+      isStreaming: true,
+      activeToolCall: null,
+    }));
+
+    try {
+      // Use streaming API
+      const stream = processMessageStream(messageToSend, context, undefined);
+      let fullContent = "";
+
+      // Helper to update the streaming message
+      const updateStreamingMessage = (content: string): void => {
+        setState((prev) => {
+          const newMessages = [...prev.messages];
+          // Find the last Gordon message with matching timestamp (the streaming one)
+          for (let i = newMessages.length - 1; i >= 0; i--) {
+            const msg = newMessages[i];
+            if (msg && msg.role === "gordon" && msg.timestamp === streamingTimestamp) {
+              newMessages[i] = { role: "gordon", content, timestamp: streamingTimestamp };
+              break;
+            }
+          }
+          return { ...prev, messages: newMessages };
+        });
       };
 
-      setState((prev) => ({
-        ...prev,
-        messages: [...prev.messages, gordonMessage],
-        isLoading: false,
-      }));
+      for await (const event of stream) {
+        switch (event.type) {
+          case "text_delta":
+            if (event.content) {
+              fullContent += event.content;
+              updateStreamingMessage(fullContent);
+            }
+            break;
+
+          case "tool_call_start":
+            setState((prev) => ({
+              ...prev,
+              activeToolCall: event.toolName || "tool",
+            }));
+            break;
+
+          case "tool_call_end":
+            setState((prev) => ({
+              ...prev,
+              activeToolCall: null,
+            }));
+            break;
+
+          case "done":
+            setState((prev) => ({
+              ...prev,
+              isStreaming: false,
+              activeToolCall: null,
+            }));
+            break;
+
+          case "error":
+            updateStreamingMessage(
+              fullContent || `Sorry, I encountered an error: ${event.error}. Please try again.`
+            );
+            setState((prev) => ({
+              ...prev,
+              isStreaming: false,
+              activeToolCall: null,
+            }));
+            break;
+        }
+      }
     } catch (error) {
       const errorContent =
         error instanceof Error ? error.message : "An unexpected error occurred";
 
-      const errorMessage: ChatMessage = {
-        role: "gordon",
-        content: `Sorry, I encountered an error: ${errorContent}. Please try again.`,
-        timestamp: formatTimestamp(),
-      };
-
-      // Still update history with the user message even on error
-      setState((prev) => ({
-        ...prev,
-        messages: [...prev.messages, errorMessage],
-        conversationHistory: [
-          ...prev.conversationHistory,
-          { role: "user", content: messageToSend },
-        ],
-        isLoading: false,
-      }));
+      // Update the streaming message with error
+      setState((prev) => {
+        const newMessages = [...prev.messages];
+        // Find the streaming Gordon message
+        for (let i = newMessages.length - 1; i >= 0; i--) {
+          const msg = newMessages[i];
+          if (msg && msg.role === "gordon" && msg.timestamp === streamingTimestamp) {
+            newMessages[i] = {
+              role: "gordon",
+              content: `Sorry, I encountered an error: ${errorContent}. Please try again.`,
+              timestamp: streamingTimestamp,
+            };
+            break;
+          }
+        }
+        return {
+          ...prev,
+          messages: newMessages,
+          conversationHistory: [
+            ...prev.conversationHistory,
+            { role: "user", content: messageToSend },
+          ],
+          isStreaming: false,
+          isLoading: false,
+          activeToolCall: null,
+        };
+      });
     }
-  }, [state.isLoading, state.conversationHistory, state.portfolioValue, state.availableCash]);
+  }, [state.isLoading, state.isStreaming, state.conversationHistory, state.portfolioValue, state.availableCash]);
 
   // Handle menu selection
   const handleMenuSelect = useCallback((option: MenuOption): void => {
@@ -641,7 +719,7 @@ export function App(): React.ReactElement {
             },
           ],
         }));
-        // Trigger the trending request through the agent
+        // Trigger the trending request through the agent with streaming
         (async () => {
           if (!llmClientRef.current) return;
           const context: GordonContext = {
@@ -651,29 +729,81 @@ export function App(): React.ReactElement {
             portfolioValue: state.portfolioValue ?? 0,
             availableCash: state.availableCash,
           };
+
+          // Create initial empty message for streaming
+          const trendingTimestamp = formatTimestamp();
+          setState((prev) => ({
+            ...prev,
+            messages: [...prev.messages, {
+              role: "gordon",
+              content: "",
+              timestamp: trendingTimestamp,
+            }],
+            isStreaming: true,
+          }));
+
           try {
-            const result = await processMessage(
+            const stream = processMessageStream(
               "Show me what's trending and pumping today",
               context,
               undefined
             );
-            setState((prev) => ({
-              ...prev,
-              messages: [...prev.messages, {
-                role: "gordon",
-                content: result.response,
-                timestamp: formatTimestamp(),
-              }],
-            }));
+            let fullContent = "";
+
+            for await (const event of stream) {
+              if (event.type === "text_delta" && event.content) {
+                fullContent += event.content;
+                setState((prev) => {
+                  const newMessages = [...prev.messages];
+                  for (let i = newMessages.length - 1; i >= 0; i--) {
+                    const msg = newMessages[i];
+                    if (msg && msg.role === "gordon" && msg.timestamp === trendingTimestamp) {
+                      newMessages[i] = { role: "gordon", content: fullContent, timestamp: trendingTimestamp };
+                      break;
+                    }
+                  }
+                  return { ...prev, messages: newMessages };
+                });
+              } else if (event.type === "tool_call_start") {
+                setState((prev) => ({ ...prev, activeToolCall: event.toolName || "tool" }));
+              } else if (event.type === "tool_call_end") {
+                setState((prev) => ({ ...prev, activeToolCall: null }));
+              } else if (event.type === "done") {
+                setState((prev) => ({ ...prev, isStreaming: false, activeToolCall: null }));
+              } else if (event.type === "error") {
+                setState((prev) => {
+                  const newMessages = [...prev.messages];
+                  for (let i = newMessages.length - 1; i >= 0; i--) {
+                    const msg = newMessages[i];
+                    if (msg && msg.role === "gordon" && msg.timestamp === trendingTimestamp) {
+                      newMessages[i] = {
+                        role: "gordon",
+                        content: fullContent || `Failed to get trending: ${event.error}`,
+                        timestamp: trendingTimestamp,
+                      };
+                      break;
+                    }
+                  }
+                  return { ...prev, messages: newMessages, isStreaming: false, activeToolCall: null };
+                });
+              }
+            }
           } catch (error) {
-            setState((prev) => ({
-              ...prev,
-              messages: [...prev.messages, {
-                role: "gordon",
-                content: `Failed to get trending: ${error instanceof Error ? error.message : "Unknown error"}`,
-                timestamp: formatTimestamp(),
-              }],
-            }));
+            setState((prev) => {
+              const newMessages = [...prev.messages];
+              for (let i = newMessages.length - 1; i >= 0; i--) {
+                const msg = newMessages[i];
+                if (msg && msg.role === "gordon" && msg.timestamp === trendingTimestamp) {
+                  newMessages[i] = {
+                    role: "gordon",
+                    content: `Failed to get trending: ${error instanceof Error ? error.message : "Unknown error"}`,
+                    timestamp: trendingTimestamp,
+                  };
+                  break;
+                }
+              }
+              return { ...prev, messages: newMessages, isStreaming: false, activeToolCall: null };
+            });
           }
         })();
         break;
@@ -870,19 +1000,26 @@ Please check your API keys in the .env file and restart Gordon.`,
           <Box flexDirection="column" flexGrow={1}>
             <ChatView messages={state.messages} />
 
-            {/* Loading indicator */}
+            {/* Loading/Streaming indicator */}
             {state.isLoading && (
               <Box paddingX={2}>
                 <Spinner label="Gordon is thinking..." />
+              </Box>
+            )}
+            {state.isStreaming && state.activeToolCall && (
+              <Box paddingX={2}>
+                <Spinner label={`Running ${state.activeToolCall}...`} />
               </Box>
             )}
 
             {/* Input area - isolated component to prevent re-render issues */}
             <ChatInput
               onSubmit={handleSubmit}
-              disabled={state.isLoading}
+              disabled={state.isLoading || state.isStreaming}
               placeholder={
-                state.isLoading ? "Waiting for response..." : "Ask Gordon anything..."
+                state.isLoading || state.isStreaming
+                  ? "Waiting for response..."
+                  : "Ask Gordon anything..."
               }
             />
 

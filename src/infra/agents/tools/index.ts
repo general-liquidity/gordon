@@ -21,6 +21,8 @@
  * - riskManagement: Risk management (Kelly sizing, daily limits, exit conditions, drawdown)
  * - strategies: Strategy library (list, detect, scan, suggest)
  * - metrics: Performance metrics and statistics
+ *
+ * All tools are automatically wrapped with metrics recording via withToolsMetrics.
  */
 
 // Migrated tools
@@ -42,6 +44,9 @@ export { marketAnalysisTools } from "./market-analysis.ts";
 export { riskManagementTools } from "./risk-management.ts";
 export { strategyTools } from "./strategies.ts";
 export { metricsTools } from "./metrics.ts";
+
+// Tool metrics wrapper
+export { withToolMetrics, withToolsMetrics } from "./withMetrics.ts";
 
 // ============================================================================
 // Combined Tools Object

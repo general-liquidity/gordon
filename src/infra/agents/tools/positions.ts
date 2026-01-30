@@ -14,7 +14,7 @@ import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
 import { runMonitorCycle, type MonitorResult } from "../../../core/monitor.ts";
-import { getGordonContext, MastraExecutionContext } from "./types.ts";
+import { getGordonContext, validateToolOutput, MastraExecutionContext } from "./types.ts";
 
 // ============================================================================
 // Error Messages
@@ -23,6 +23,26 @@ import { getGordonContext, MastraExecutionContext } from "./types.ts";
 const errors = {
   noBinance: { error: "Binance client not connected. Please run setup first." },
 };
+
+// ============================================================================
+// Output Schemas (extracted for validation reuse)
+// ============================================================================
+
+const checkPositionsOutputSchema = z.object({
+  openTrades: z.number(),
+  totalUnrealizedPnl: z.number(),
+  totalUnrealizedPnlPercent: z.number(),
+  positions: z.array(
+    z.object({
+      symbol: z.string(),
+      status: z.string(),
+      unrealizedPnl: z.number(),
+      unrealizedPnlPercent: z.number(),
+    })
+  ),
+  alerts: z.array(z.string()),
+  error: z.string().optional(),
+});
 
 // ============================================================================
 // Position Monitor Tool
@@ -34,25 +54,18 @@ export const checkPositionsTool = createTool({
     "Check the status of all open positions and detect any alerts or anomalies. " +
     "Use this when the user asks 'how are my trades?' or 'check positions'",
   inputSchema: z.object({}),
-  outputSchema: z.object({
-    openTrades: z.number(),
-    totalUnrealizedPnl: z.number(),
-    totalUnrealizedPnlPercent: z.number(),
-    positions: z.array(
-      z.object({
-        symbol: z.string(),
-        status: z.string(),
-        unrealizedPnl: z.number(),
-        unrealizedPnlPercent: z.number(),
-      })
-    ),
-    alerts: z.array(z.string()),
-    error: z.string().optional(),
-  }),
+  outputSchema: checkPositionsOutputSchema,
   execute: async (_input, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
     if (!ctx?.binance) {
-      return errors.noBinance;
+      return validateToolOutput(checkPositionsOutputSchema, {
+        ...errors.noBinance,
+        openTrades: 0,
+        totalUnrealizedPnl: 0,
+        totalUnrealizedPnlPercent: 0,
+        positions: [],
+        alerts: [],
+      }, { toolName: "check_positions" });
     }
 
     const result: MonitorResult = await runMonitorCycle(ctx.binance);
@@ -65,13 +78,15 @@ export const checkPositionsTool = createTool({
       unrealizedPnlPercent: p.unrealizedPnlPercent,
     }));
 
-    return {
+    const output = {
       openTrades: result.updates.length,
       totalUnrealizedPnl,
       totalUnrealizedPnlPercent: ctx.portfolioValue > 0 ? (totalUnrealizedPnl / ctx.portfolioValue) * 100 : 0,
       positions,
       alerts: result.alerts.map((a) => a.message),
     };
+
+    return validateToolOutput(checkPositionsOutputSchema, output, { toolName: "check_positions" });
   },
 });
 
