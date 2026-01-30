@@ -15,7 +15,13 @@ import { ThemeProvider, useTheme } from "./components/ThemeProvider.tsx";
 import { processMessageStream, initializeTracing } from "../infra/agents/orchestrator.ts";
 import { createLLMClientFromEnv, type LLMClient } from "../infra/llm/index.ts";
 import { BinanceClient } from "../infra/binance/index.ts";
-import { runMonitorCycle } from "../core/monitor.ts";
+import {
+  runMonitorCycle,
+  initializeRealtimeMonitor,
+  shutdownRealtimeMonitor,
+} from "../core/monitor.ts";
+import { runOrderRecovery } from "../core/order-recovery.ts";
+import { listTrades } from "../infra/storage/trades.ts";
 import { scan } from "../core/scanner.ts";
 import { loadConfig, saveConfig } from "../infra/storage/config.ts";
 import { loadEnvFile, checkEnvStatus, type EnvStatus } from "../infra/storage/env.ts";
@@ -193,6 +199,36 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
             .catch((error) => {
               console.error("Reconciliation failed:", error);
             });
+
+          // Run order recovery only if there are active trades
+          const allTrades = listTrades({});
+          const activeTrades = allTrades.filter(
+            (t) => t.status === "OPEN" || t.status === "PARTIAL"
+          );
+
+          if (activeTrades.length > 0) {
+            const knownTradeIds = new Set(
+              allTrades.map((t) => t.id.replace("trade_", ""))
+            );
+            runOrderRecovery(binanceClientRef.current, knownTradeIds, {
+              logResults: true,
+            })
+              .then((recoveryResult) => {
+                if (recoveryResult.orphaned.length > 0) {
+                  console.warn(
+                    `Found ${recoveryResult.orphaned.length} orphaned orders on Binance`
+                  );
+                }
+              })
+              .catch(() => {
+                // Silently ignore - not critical for startup
+              });
+          }
+
+          // Initialize real-time WebSocket monitoring (optional enhancement)
+          initializeRealtimeMonitor().catch((error) => {
+            console.warn("Real-time monitoring unavailable:", error);
+          });
         } catch (error) {
           console.error("Failed to initialize Binance client:", error);
         }

@@ -12,56 +12,38 @@ import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
 import { strategyRegistry, type StrategyId } from "../../../strategies/index.ts";
+import type { Strategy } from "../../../strategies/types.ts";
+import { DEFAULT_BACKTEST_CONFIG } from "../../../backtest/types.ts";
+import type {
+  BacktestConfig,
+  BacktestMetrics,
+  BacktestResult,
+  BacktestTrade,
+} from "../../../backtest/types.ts";
+import { runBacktest } from "../../../backtest/engine.ts";
+import { formatBacktestSummary } from "../../../backtest/reporting/formatter.ts";
+import { fetchHistoricalData, fetchHistoricalDataRange } from "../../../backtest/data/historical.ts";
+import {
+  analyzeBacktestResult,
+  compareBacktestResults,
+  findBestStrategy,
+  rankStrategiesByMetric,
+} from "../../../backtest/analysis.ts";
+import {
+  exportResultsJson,
+  exportResultsCsv,
+  generateHtmlReport,
+} from "../../../backtest/reporting/export.ts";
+import { filterExcludeMonths, filterMarketHours, filterFirstLastHour } from "../../../backtest/filters.ts";
+import { analyzeAlphaDecay } from "../../../backtest/alpha-decay.ts";
+import { generateBacktestChart } from "../../../backtest/plotting.ts";
 import { getGordonContext, normalizeSymbol, type MastraExecutionContext } from "./types.ts";
-import type { Candle } from "../../../core/indicators/types.ts";
 
 // ============================================================================
 // Helper Functions
 // ============================================================================
 
-/**
- * Calculate number of candles needed for a given number of days and timeframe
- */
-function calculateCandleCount(days: number, timeframe: string): number {
-  const hoursPerDay = 24;
-  const timeframeHours: Record<string, number> = {
-    "1m": 1 / 60,
-    "5m": 5 / 60,
-    "15m": 15 / 60,
-    "30m": 30 / 60,
-    "1h": 1,
-    "2h": 2,
-    "4h": 4,
-    "6h": 6,
-    "8h": 8,
-    "12h": 12,
-    "1d": 24,
-    "3d": 72,
-    "1w": 168,
-  };
-
-  const tfHours = timeframeHours[timeframe] ?? 4;
-  return Math.ceil((days * hoursPerDay) / tfHours);
-}
-
-/**
- * Calculate Sharpe Ratio from trade returns
- */
-function calculateSharpeRatio(returns: number[], riskFreeRate: number = 0.02): number {
-  if (returns.length < 2) return 0;
-
-  const avgReturn = returns.reduce((sum, r) => sum + r, 0) / returns.length;
-  const variance = returns.reduce((sum, r) => sum + Math.pow(r - avgReturn, 2), 0) / (returns.length - 1);
-  const stdDev = Math.sqrt(variance);
-
-  if (stdDev === 0) return 0;
-
-  // Annualize assuming ~252 trading days
-  const annualizedReturn = avgReturn * 252;
-  const annualizedStdDev = stdDev * Math.sqrt(252);
-
-  return (annualizedReturn - riskFreeRate) / annualizedStdDev;
-}
+// Helper functions are defined below in this file.
 
 // ============================================================================
 // Error Messages
@@ -77,43 +59,167 @@ const errors = {
   }),
 };
 
+function mapExitReason(reason: string): BacktestTrade["exitReason"] {
+  const upper = reason.toUpperCase();
+  if (upper.includes("STOP")) return "STOP";
+  if (upper.includes("TAKE_PROFIT") || upper.includes("TP")) return "TP1";
+  if (upper.includes("END")) return "END_OF_TEST";
+  return "SIGNAL";
+}
+
+function buildBacktestConfig(
+  strategyId: string,
+  symbol: string,
+  timeframe: string,
+  days: number,
+  initialCapital: number,
+  commissionRate: number
+): BacktestConfig {
+  return {
+    strategyId,
+    symbol,
+    timeframe,
+    days,
+    initialCapital,
+    positionSizePercent: (DEFAULT_BACKTEST_CONFIG.positionSizePercent ?? 10),
+    compounding: DEFAULT_BACKTEST_CONFIG.compounding ?? false,
+    feePercent: commissionRate * 100,
+    slippagePercent: DEFAULT_BACKTEST_CONFIG.slippagePercent ?? 0.05,
+  };
+}
+
+function buildBacktestResult(
+  strategy: Strategy,
+  config: BacktestConfig,
+  engineResult: ReturnType<typeof runBacktest>,
+  executionTime: number
+): BacktestResult {
+  const trades: BacktestTrade[] = engineResult.trades.map((trade) => ({
+    id: trade.id,
+    entryTime: new Date(trade.entryTime).toISOString(),
+    exitTime: new Date(trade.exitTime).toISOString(),
+    entryPrice: trade.entryPrice,
+    exitPrice: trade.exitPrice,
+    quantity: trade.quantity,
+    positionValue: trade.entryPrice * trade.quantity,
+    side: trade.side,
+    pnl: trade.netPnL,
+    pnlPercent: trade.returnPct,
+    fees: trade.commission,
+    exitReason: mapExitReason(trade.exitReason),
+  }));
+
+  return {
+    id: `bt_${Date.now()}`,
+    strategyName: strategy.name,
+    config,
+    metrics: engineResult.metrics,
+    trades,
+    equityCurve: engineResult.equityCurve.map((point) => ({
+      timestamp: point.timestamp,
+      equity: point.equity,
+    })),
+    drawdownCurve: engineResult.equityCurve.map((point) => ({
+      timestamp: point.timestamp,
+      drawdown: point.drawdownPct,
+    })),
+    startDate: new Date(engineResult.startDate).toISOString(),
+    endDate: new Date(engineResult.endDate).toISOString(),
+    executionTime,
+    createdAt: new Date().toISOString(),
+    warnings: [],
+  };
+}
+
 // ============================================================================
 // Backtest Result Schema
 // ============================================================================
 
-const backtestResultSchema = z.object({
-  symbol: z.string(),
-  strategyId: z.string(),
-  strategyName: z.string(),
-  timeframe: z.string(),
-  startDate: z.string(),
-  endDate: z.string(),
-  initialCapital: z.number(),
-  finalCapital: z.number(),
+const backtestMetricsSchema = z.object({
   totalReturn: z.number(),
-  totalReturnPercent: z.number(),
+  annualizedReturn: z.number(),
+  cagr: z.number(),
+  maxDrawdown: z.number(),
+  sharpeRatio: z.number(),
+  sortinoRatio: z.number(),
+  volatility: z.number(),
+  calmarRatio: z.number(),
   totalTrades: z.number(),
   winningTrades: z.number(),
   losingTrades: z.number(),
   winRate: z.number(),
   profitFactor: z.number(),
-  maxDrawdown: z.number(),
-  maxDrawdownPercent: z.number(),
-  sharpeRatio: z.number(),
+  averageTrade: z.number(),
   averageWin: z.number(),
   averageLoss: z.number(),
-  averageHoldingPeriod: z.number(),
-  trades: z.array(z.object({
-    entryTime: z.number(),
-    entryPrice: z.number(),
-    exitTime: z.number(),
-    exitPrice: z.number(),
-    side: z.enum(["long", "short"]),
-    quantity: z.number(),
-    pnl: z.number(),
-    pnlPercent: z.number(),
-    commission: z.number(),
+  expectancy: z.number(),
+  maxConsecutiveWins: z.number(),
+  maxConsecutiveLosses: z.number(),
+  initialValue: z.number(),
+  finalValue: z.number(),
+  totalPnl: z.number(),
+  netProfit: z.number(),
+  totalFees: z.number(),
+  avgTradeDuration: z.number(),
+  maxDrawdownDuration: z.number(),
+});
+
+const backtestTradeSchema = z.object({
+  id: z.string(),
+  entryTime: z.string(),
+  exitTime: z.string(),
+  entryPrice: z.number(),
+  exitPrice: z.number(),
+  quantity: z.number(),
+  positionValue: z.number(),
+  side: z.enum(["LONG", "SHORT"]),
+  pnl: z.number(),
+  pnlPercent: z.number(),
+  fees: z.number(),
+  exitReason: z.enum(["TP1", "TP2", "TP3", "STOP", "SIGNAL", "END_OF_TEST"]),
+  entrySignals: z.record(z.string(), z.unknown()).optional(),
+});
+
+const backtestConfigSchema = z.object({
+  strategyId: z.string(),
+  symbol: z.string(),
+  timeframe: z.string(),
+  days: z.number(),
+  initialCapital: z.number(),
+  positionSizePercent: z.number(),
+  compounding: z.boolean(),
+  feePercent: z.number(),
+  slippagePercent: z.number(),
+});
+
+const backtestResultSchema = z.object({
+  id: z.string(),
+  strategyName: z.string(),
+  config: backtestConfigSchema,
+  metrics: backtestMetricsSchema,
+  trades: z.array(backtestTradeSchema),
+  equityCurve: z.array(z.object({
+    timestamp: z.number(),
+    equity: z.number(),
   })),
+  drawdownCurve: z.array(z.object({
+    timestamp: z.number(),
+    drawdown: z.number(),
+  })),
+  startDate: z.string(),
+  endDate: z.string(),
+  executionTime: z.number(),
+  createdAt: z.string(),
+  warnings: z.array(z.string()),
+});
+
+const ohlcSchema = z.object({
+  timestamp: z.number(),
+  open: z.number(),
+  high: z.number(),
+  low: z.number(),
+  close: z.number(),
+  volume: z.number(),
 });
 
 // ============================================================================
@@ -157,176 +263,38 @@ export const runBacktestTool = createTool({
     const normalizedSymbol = normalizeSymbol(symbol);
 
     try {
-      // Fetch historical data
-      const candleCount = calculateCandleCount(days, timeframe);
-      const candles = await ctx.binance.getCandles(normalizedSymbol, timeframe, Math.min(candleCount, 1000));
+      const executionStart = Date.now();
 
-      if (candles.length < 100) {
+      const ohlcData = await fetchHistoricalData(
+        ctx.binance,
+        normalizedSymbol,
+        timeframe,
+        days
+      );
+
+      if (ohlcData.length < 100) {
         return errors.insufficientData(normalizedSymbol);
       }
 
-      // Run backtest simulation
-      const trades: Array<{
-        entryTime: number;
-        entryPrice: number;
-        exitTime: number;
-        exitPrice: number;
-        side: "long" | "short";
-        quantity: number;
-        pnl: number;
-        pnlPercent: number;
-        commission: number;
-      }> = [];
-
-      let capital = initialCapital;
-      let peakCapital = initialCapital;
-      let maxDrawdown = 0;
-      let inPosition = false;
-      let entryCandle: Candle | null = null;
-      let entryPrice = 0;
-      let quantity = 0;
-
-      // Sliding window for strategy detection
-      const windowSize = Math.min(100, Math.floor(candles.length / 2));
-
-      for (let i = windowSize; i < candles.length - 1; i++) {
-        const windowCandles = candles.slice(i - windowSize, i + 1);
-        const currentCandle = candles[i]!;
-        const nextCandle = candles[i + 1]!;
-
-        if (!inPosition) {
-          // Check for entry signal
-          try {
-            const detection = await strategy.detect(normalizedSymbol, timeframe, {
-              binance: ctx.binance,
-              candles: windowCandles,
-              currentPrice: currentCandle.close,
-            });
-
-            if (detection.detected && detection.confidence >= 0.6) {
-              // Enter position at next candle open
-              inPosition = true;
-              entryCandle = currentCandle;
-              entryPrice = nextCandle.open;
-              quantity = (capital * 0.95) / entryPrice; // Use 95% of capital
-
-              const entryCommission = entryPrice * quantity * commission;
-              capital -= entryCommission;
-            }
-          } catch {
-            // Detection failed, skip this candle
-          }
-        } else if (entryCandle) {
-          // Check for exit conditions
-          const holdingBars = i - candles.indexOf(entryCandle);
-          const pnlPercent = ((currentCandle.close - entryPrice) / entryPrice) * 100;
-
-          // Exit conditions: take profit at 5%, stop loss at -3%, or max 20 bars
-          const takeProfit = pnlPercent >= 5;
-          const stopLoss = pnlPercent <= -3;
-          const maxHold = holdingBars >= 20;
-
-          if (takeProfit || stopLoss || maxHold) {
-            // Exit position
-            const exitPrice = nextCandle.open;
-            const exitCommission = exitPrice * quantity * commission;
-            const pnl = (exitPrice - entryPrice) * quantity - exitCommission;
-            const finalPnlPercent = ((exitPrice - entryPrice) / entryPrice) * 100;
-
-            trades.push({
-              entryTime: entryCandle.openTime ?? 0,
-              entryPrice,
-              exitTime: nextCandle.openTime ?? 0,
-              exitPrice,
-              side: "long",
-              quantity,
-              pnl,
-              pnlPercent: finalPnlPercent,
-              commission: exitCommission,
-            });
-
-            capital += pnl + (entryPrice * quantity);
-
-            // Track max drawdown
-            if (capital > peakCapital) {
-              peakCapital = capital;
-            }
-            const drawdown = peakCapital - capital;
-            if (drawdown > maxDrawdown) {
-              maxDrawdown = drawdown;
-            }
-
-            // Reset position
-            inPosition = false;
-            entryCandle = null;
-            entryPrice = 0;
-            quantity = 0;
-          }
-        }
-      }
-
-      // Calculate statistics
-      const winningTrades = trades.filter((t) => t.pnl > 0);
-      const losingTrades = trades.filter((t) => t.pnl <= 0);
-
-      const totalWins = winningTrades.reduce((sum, t) => sum + t.pnl, 0);
-      const totalLosses = Math.abs(losingTrades.reduce((sum, t) => sum + t.pnl, 0));
-
-      const returns = trades.map((t) => t.pnlPercent / 100);
-      const sharpeRatio = calculateSharpeRatio(returns);
-
-      const avgHoldingPeriod = trades.length > 0
-        ? trades.reduce((sum, t) => sum + (t.exitTime - t.entryTime), 0) / trades.length / (1000 * 60 * 60)
-        : 0;
-
-      const result = {
-        symbol: normalizedSymbol,
+      const backtestConfig = buildBacktestConfig(
         strategyId,
-        strategyName: strategy.name,
+        normalizedSymbol,
         timeframe,
-        startDate: new Date(candles[0]?.openTime ?? 0).toISOString(),
-        endDate: new Date(candles[candles.length - 1]?.openTime ?? 0).toISOString(),
+        days,
         initialCapital,
-        finalCapital: capital,
-        totalReturn: capital - initialCapital,
-        totalReturnPercent: ((capital - initialCapital) / initialCapital) * 100,
-        totalTrades: trades.length,
-        winningTrades: winningTrades.length,
-        losingTrades: losingTrades.length,
-        winRate: trades.length > 0 ? (winningTrades.length / trades.length) * 100 : 0,
-        profitFactor: totalLosses > 0 ? totalWins / totalLosses : totalWins > 0 ? Infinity : 0,
-        maxDrawdown,
-        maxDrawdownPercent: peakCapital > 0 ? (maxDrawdown / peakCapital) * 100 : 0,
-        sharpeRatio,
-        averageWin: winningTrades.length > 0 ? totalWins / winningTrades.length : 0,
-        averageLoss: losingTrades.length > 0 ? totalLosses / losingTrades.length : 0,
-        averageHoldingPeriod: avgHoldingPeriod,
-        trades,
+        commission
+      );
+
+      const engineParams = {
+        initialCapital,
+        commissionRate: commission,
       };
 
-      // Generate summary
-      const summary = [
-        `Backtest Results for ${strategy.name} on ${normalizedSymbol}`,
-        `Period: ${result.startDate.split("T")[0]} to ${result.endDate.split("T")[0]}`,
-        ``,
-        `Performance:`,
-        `  Total Return: $${result.totalReturn.toFixed(2)} (${result.totalReturnPercent.toFixed(2)}%)`,
-        `  Final Capital: $${result.finalCapital.toFixed(2)}`,
-        ``,
-        `Trade Statistics:`,
-        `  Total Trades: ${result.totalTrades}`,
-        `  Win Rate: ${result.winRate.toFixed(1)}%`,
-        `  Profit Factor: ${result.profitFactor === Infinity ? "Inf" : result.profitFactor.toFixed(2)}`,
-        ``,
-        `Risk Metrics:`,
-        `  Max Drawdown: $${result.maxDrawdown.toFixed(2)} (${result.maxDrawdownPercent.toFixed(2)}%)`,
-        `  Sharpe Ratio: ${result.sharpeRatio.toFixed(2)}`,
-        ``,
-        `Trade Details:`,
-        `  Average Win: $${result.averageWin.toFixed(2)}`,
-        `  Average Loss: $${result.averageLoss.toFixed(2)}`,
-        `  Avg Holding Period: ${result.averageHoldingPeriod.toFixed(1)} hours`,
-      ].join("\n");
+      const engineResult = runBacktest(strategy, ohlcData, engineParams);
+      const executionTime = Date.now() - executionStart;
+
+      const result = buildBacktestResult(strategy, backtestConfig, engineResult, executionTime);
+      const summary = formatBacktestSummary(result);
 
       return { result, summary };
     } catch (error) {
@@ -402,6 +370,26 @@ export const optimizeStrategyTool = createTool({
     const normalizedSymbol = normalizeSymbol(symbol);
     const warnings: string[] = [];
 
+    const ohlcData = await fetchHistoricalData(
+      ctx.binance,
+      normalizedSymbol,
+      timeframe,
+      90
+    );
+
+    if (ohlcData.length < 100) {
+      return { error: errors.insufficientData(normalizedSymbol).error };
+    }
+
+    const metricKeyMap: Record<string, keyof BacktestMetrics> = {
+      sharpe: "sharpeRatio",
+      return: "totalReturn",
+      winRate: "winRate",
+      drawdown: "maxDrawdown",
+    };
+
+    const metricKey = metricKeyMap[optimizeFor] ?? "sharpeRatio";
+
     // Generate parameter combinations
     const paramNames = Object.keys(parameterRanges);
     const combinations: Array<Record<string, number>> = [];
@@ -411,8 +399,8 @@ export const optimizeStrategyTool = createTool({
         combinations.push({ ...current });
         return;
       }
-      const paramName = paramNames[index];
-      for (const value of parameterRanges[paramName]) {
+      const paramName = paramNames[index]!;
+      for (const value of parameterRanges[paramName]!) {
         current[paramName] = value;
         generateCombinations(index + 1, current);
       }
@@ -420,33 +408,46 @@ export const optimizeStrategyTool = createTool({
 
     generateCombinations(0, {});
 
-    // Limit iterations
     const testCombinations = combinations.slice(0, maxIterations);
     if (combinations.length > maxIterations) {
       warnings.push(`Testing ${maxIterations} of ${combinations.length} possible combinations.`);
     }
 
-    // Note: This is a placeholder implementation
-    // In production, this would call the MCP backtesting server for actual optimization
-    warnings.push("Note: This is a simplified optimization. For full parameter optimization, use the backtesting MCP server.");
+    const allResults: Array<{
+      parameters: Record<string, number>;
+      metrics: BacktestMetrics;
+      score: number;
+    }> = [];
 
-    // Return placeholder result structure
+    const engineParams = {
+      initialCapital: DEFAULT_BACKTEST_CONFIG.initialCapital,
+      commissionRate: 0.001,
+    };
+
+    for (const params of testCombinations) {
+      const result = runBacktest(strategy, ohlcData, engineParams, params);
+      const metricValue = (result.metrics[metricKey] as number) ?? 0;
+      const score = metricKey === "maxDrawdown" ? -metricValue : metricValue;
+
+      allResults.push({
+        parameters: params,
+        metrics: result.metrics,
+        score,
+      });
+    }
+
+    allResults.sort((a, b) => b.score - a.score);
+
+    const best = allResults[0];
+
     return {
       symbol: normalizedSymbol,
       strategy: strategy.name,
       optimizedFor: optimizeFor,
-      bestParameters: testCombinations[0] || {},
-      bestMetrics: {
-        totalReturn: 0,
-        sharpeRatio: null,
-        maxDrawdown: 0,
-        winRate: null,
-        numTrades: 0,
-        avgTradeReturn: null,
-        profitFactor: null,
-      },
+      bestParameters: best?.parameters ?? {},
+      bestMetrics: best?.metrics,
       iterationsTested: testCombinations.length,
-      allResults: [],
+      allResults,
       warnings,
     };
   },
@@ -521,12 +522,21 @@ export const compareBacktestsTool = createTool({
     const normalizedSymbol = normalizeSymbol(symbol);
     const warnings: string[] = [];
 
+    const metricKeyMap: Record<string, keyof BacktestMetrics> = {
+      sharpe: "sharpeRatio",
+      return: "totalReturn",
+      winRate: "winRate",
+      drawdown: "maxDrawdown",
+    };
+
+    const metricKey = metricKeyMap[rankBy] ?? "sharpeRatio";
+
     // Validate strategies
-    const validStrategies: Array<{ id: string; name: string }> = [];
+    const validStrategies: Strategy[] = [];
     for (const id of strategyIds) {
-      const strategy = strategyRegistry.get(id as StrategyId);
-      if (strategy) {
-        validStrategies.push({ id: strategy.id, name: strategy.name });
+      const found = strategyRegistry.get(id as StrategyId);
+      if (found) {
+        validStrategies.push(found);
       } else {
         warnings.push(`Strategy '${id}' not found and will be skipped.`);
       }
@@ -536,13 +546,84 @@ export const compareBacktestsTool = createTool({
       return { error: "No valid strategies to compare." };
     }
 
-    // Calculate date range
     const end = endDate ? new Date(endDate) : new Date();
     const start = startDate ? new Date(startDate) : new Date(end.getTime() - 90 * 24 * 60 * 60 * 1000);
-    const periodDays = Math.round((end.getTime() - start.getTime()) / (24 * 60 * 60 * 1000));
+    const periodDays = Math.max(
+      1,
+      Math.round((end.getTime() - start.getTime()) / (24 * 60 * 60 * 1000))
+    );
 
-    // Note: This is a placeholder - in production, run actual backtests
-    warnings.push("Note: This is a comparison stub. Connect to the backtesting MCP server for actual comparison.");
+    const ohlcData = startDate || endDate
+      ? await fetchHistoricalDataRange(
+          ctx.binance,
+          normalizedSymbol,
+          timeframe,
+          start.getTime(),
+          end.getTime()
+        )
+      : await fetchHistoricalData(ctx.binance, normalizedSymbol, timeframe, periodDays);
+
+    if (ohlcData.length < 100) {
+      return { error: errors.insufficientData(normalizedSymbol).error };
+    }
+
+    const engineParams = {
+      initialCapital: DEFAULT_BACKTEST_CONFIG.initialCapital,
+      commissionRate: 0.001,
+    };
+
+    const results: BacktestResult[] = [];
+    for (const strat of validStrategies) {
+      const execStart = Date.now();
+      const config = buildBacktestConfig(
+        strat.id,
+        normalizedSymbol,
+        timeframe,
+        periodDays,
+        engineParams.initialCapital,
+        engineParams.commissionRate
+      );
+      const engineResult = runBacktest(strat, ohlcData, engineParams);
+      const backtestResult = buildBacktestResult(
+        strat,
+        config,
+        engineResult,
+        Date.now() - execStart
+      );
+      results.push(backtestResult);
+    }
+
+    const comparison = compareBacktestResults(results, metricKey);
+
+    const rankings = comparison.comparisonTable.map((row, index) => ({
+      rank: index + 1,
+      strategy: row.strategy as string,
+      strategyId: (row.result as BacktestResult)?.config.strategyId ?? "unknown",
+      metrics: row.metrics as BacktestMetrics,
+      score: (() => {
+        const metrics = row.metrics as BacktestMetrics;
+        if (!metrics) return 0;
+        const value = metrics[metricKey] as number;
+        return metricKey === "maxDrawdown" ? -value : value;
+      })(),
+    }));
+
+    // Simple buy-and-hold benchmark
+    const firstClose = ohlcData[0]?.close ?? 0;
+    const lastClose = ohlcData[ohlcData.length - 1]?.close ?? 0;
+    let buyHoldReturn = 0;
+    let buyHoldMaxDrawdown = 0;
+    if (firstClose > 0) {
+      buyHoldReturn = ((lastClose - firstClose) / firstClose) * 100;
+      let peak = firstClose;
+      for (const bar of ohlcData) {
+        if (bar.close > peak) {
+          peak = bar.close;
+        }
+        const drawdown = ((peak - bar.close) / peak) * 100;
+        buyHoldMaxDrawdown = Math.max(buyHoldMaxDrawdown, drawdown);
+      }
+    }
 
     return {
       symbol: normalizedSymbol,
@@ -553,24 +634,10 @@ export const compareBacktestsTool = createTool({
         days: periodDays,
       },
       rankedBy: rankBy,
-      rankings: validStrategies.map((s, i) => ({
-        rank: i + 1,
-        strategy: s.name,
-        strategyId: s.id,
-        metrics: {
-          totalReturn: 0,
-          sharpeRatio: null,
-          maxDrawdown: 0,
-          winRate: null,
-          numTrades: 0,
-          avgTradeReturn: null,
-          profitFactor: null,
-        },
-        score: 0,
-      })),
+      rankings,
       buyAndHold: {
-        totalReturn: 0,
-        maxDrawdown: 0,
+        totalReturn: buyHoldReturn,
+        maxDrawdown: buyHoldMaxDrawdown,
       },
       warnings,
     };
@@ -598,10 +665,6 @@ export const getBacktestSummaryTool = createTool({
     error: z.string().optional(),
   }),
   execute: async ({ backtestResult }) => {
-    if (backtestResult.error) {
-      return { error: backtestResult.error };
-    }
-
     const metrics = backtestResult.metrics;
     const strengths: string[] = [];
     const weaknesses: string[] = [];
@@ -646,8 +709,8 @@ export const getBacktestSummaryTool = createTool({
     }
 
     // Analyze trade count
-    if (metrics.numTrades < 10) {
-      weaknesses.push(`Very few trades (${metrics.numTrades}) - results may not be statistically significant`);
+    if (metrics.totalTrades < 10) {
+      weaknesses.push(`Very few trades (${metrics.totalTrades}) - results may not be statistically significant`);
       recommendations.push("Run backtest over a longer period for more trades");
     }
 
@@ -665,16 +728,16 @@ export const getBacktestSummaryTool = createTool({
     else verdict = "avoid";
 
     // Generate summary
-    const summary = `${backtestResult.strategy} on ${backtestResult.symbol} (${backtestResult.timeframe}): ` +
-      `${metrics.totalReturn}% return over ${backtestResult.periodDays} days with ` +
-      `${metrics.numTrades} trades. ` +
-      (metrics.sharpeRatio ? `Sharpe ratio: ${metrics.sharpeRatio}. ` : "") +
-      `Max drawdown: ${metrics.maxDrawdown}%. ` +
-      (metrics.winRate ? `Win rate: ${metrics.winRate}%.` : "");
+    const summary = `${backtestResult.strategyName} on ${backtestResult.config.symbol} (${backtestResult.config.timeframe}): ` +
+      `${metrics.totalReturn.toFixed(2)}% return over ${backtestResult.config.days} days with ` +
+      `${metrics.totalTrades} trades. ` +
+      `Sharpe ratio: ${metrics.sharpeRatio.toFixed(2)}. ` +
+      `Max drawdown: ${metrics.maxDrawdown.toFixed(2)}%. ` +
+      `Win rate: ${metrics.winRate.toFixed(2)}%.`;
 
     // Add disclaimer
     recommendations.push("Past performance does not guarantee future results");
-    if (backtestResult.periodDays < 90) {
+    if (backtestResult.config.days < 90) {
       recommendations.push("Consider testing over a longer period (90+ days)");
     }
 
@@ -684,6 +747,423 @@ export const getBacktestSummaryTool = createTool({
       strengths: strengths.length > 0 ? strengths : undefined,
       weaknesses: weaknesses.length > 0 ? weaknesses : undefined,
       recommendations,
+    };
+  },
+});
+
+// ============================================================================
+// Analysis & Utility Tools (MCP parity)
+// ============================================================================
+
+export const analyzeBacktestResultsTool = createTool({
+  id: "analyze_backtest_results",
+  description: "Analyze a single backtest result comprehensively.",
+  inputSchema: z.object({
+    result: backtestResultSchema,
+  }),
+  outputSchema: z.object({
+    analysis: z.record(z.string(), z.unknown()).optional(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ result }) => {
+    return { analysis: analyzeBacktestResult(result) as unknown as Record<string, unknown> };
+  },
+});
+
+export const compareBacktestResultsTool = createTool({
+  id: "compare_backtest_results",
+  description: "Compare multiple backtest results and rank them.",
+  inputSchema: z.object({
+    results: z.array(backtestResultSchema),
+    sortBy: z.string().default("totalReturn"),
+  }),
+  outputSchema: z.object({
+    comparison: z.record(z.string(), z.unknown()).optional(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ results, sortBy }) => {
+    if (results.length === 0) {
+      return { error: "No results provided." };
+    }
+
+    const metricKey = (sortBy in results[0]!.metrics ? sortBy : "totalReturn") as keyof BacktestMetrics;
+    return { comparison: compareBacktestResults(results, metricKey) };
+  },
+});
+
+export const rankStrategiesByMetricTool = createTool({
+  id: "rank_strategies_by_metric",
+  description: "Rank strategies by a specific metric.",
+  inputSchema: z.object({
+    results: z.array(backtestResultSchema),
+    metric: z.string().default("totalReturn"),
+  }),
+  outputSchema: z.object({
+    rankings: z.array(z.object({
+      strategy: z.string(),
+      value: z.number(),
+      rank: z.number(),
+    })).optional(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ results, metric }) => {
+    if (results.length === 0) {
+      return { error: "No results provided." };
+    }
+    const metricKey = (metric in results[0]!.metrics ? metric : "totalReturn") as keyof BacktestMetrics;
+    return { rankings: rankStrategiesByMetric(results, metricKey) };
+  },
+});
+
+export const findBestStrategyTool = createTool({
+  id: "find_best_strategy",
+  description: "Find the best performing strategy by a specific metric.",
+  inputSchema: z.object({
+    results: z.array(backtestResultSchema),
+    metric: z.string().default("totalReturn"),
+  }),
+  outputSchema: z.object({
+    best: z.record(z.string(), z.unknown()).optional(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ results, metric }) => {
+    if (results.length === 0) {
+      return { error: "No results provided." };
+    }
+    const metricKey = (metric in results[0]!.metrics ? metric : "totalReturn") as keyof BacktestMetrics;
+    return { best: findBestStrategy(results, metricKey) };
+  },
+});
+
+// ============================================================================
+// Reporting & Export Tools
+// ============================================================================
+
+export const exportResultsJsonTool = createTool({
+  id: "export_results_json",
+  description: "Export backtest results to a JSON file.",
+  inputSchema: z.object({
+    results: z.array(backtestResultSchema),
+    filepath: z.string(),
+  }),
+  outputSchema: z.object({
+    status: z.string().optional(),
+    filepath: z.string().optional(),
+    numResults: z.number().optional(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ results, filepath }) => exportResultsJson(results, filepath),
+});
+
+export const exportResultsCsvTool = createTool({
+  id: "export_results_csv",
+  description: "Export backtest results to a CSV file.",
+  inputSchema: z.object({
+    results: z.array(backtestResultSchema),
+    filepath: z.string(),
+  }),
+  outputSchema: z.object({
+    status: z.string().optional(),
+    filepath: z.string().optional(),
+    numResults: z.number().optional(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ results, filepath }) => exportResultsCsv(results, filepath),
+});
+
+export const generateHtmlReportTool = createTool({
+  id: "generate_html_report",
+  description: "Generate an HTML report for backtest results.",
+  inputSchema: z.object({
+    results: z.array(backtestResultSchema),
+    filepath: z.string(),
+  }),
+  outputSchema: z.object({
+    status: z.string().optional(),
+    filepath: z.string().optional(),
+    numResults: z.number().optional(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ results, filepath }) => generateHtmlReport(results, filepath),
+});
+
+// ============================================================================
+// Data Filtering Tools
+// ============================================================================
+
+export const filterExcludeMonthsTool = createTool({
+  id: "filter_exclude_months",
+  description: "Filter OHLC data to exclude a range of months.",
+  inputSchema: z.object({
+    ohlcData: z.array(ohlcSchema),
+    startMonth: z.number().default(5),
+    endMonth: z.number().default(9),
+  }),
+  outputSchema: z.object({
+    status: z.string().optional(),
+    filteredData: z.array(ohlcSchema).optional(),
+    originalRows: z.number().optional(),
+    filteredRows: z.number().optional(),
+    rowsRemoved: z.number().optional(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ ohlcData, startMonth, endMonth }) => {
+    return filterExcludeMonths(ohlcData, startMonth, endMonth);
+  },
+});
+
+export const filterMarketHoursTool = createTool({
+  id: "filter_market_hours",
+  description: "Filter OHLC data into market hours and non-market hours (weekdays only, UTC).",
+  inputSchema: z.object({
+    ohlcData: z.array(ohlcSchema),
+    openTimeStr: z.string().default("13:30"),
+    closeTimeStr: z.string().default("20:00"),
+  }),
+  outputSchema: z.object({
+    status: z.string().optional(),
+    marketHoursData: z.array(ohlcSchema).optional(),
+    nonMarketHoursData: z.array(ohlcSchema).optional(),
+    marketHoursRows: z.number().optional(),
+    nonMarketHoursRows: z.number().optional(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ ohlcData, openTimeStr, closeTimeStr }) => {
+    return filterMarketHours(ohlcData, openTimeStr, closeTimeStr);
+  },
+});
+
+export const filterFirstLastHourTool = createTool({
+  id: "filter_first_last_hour",
+  description: "Filter OHLC data for first and last hour of trading (weekdays only, UTC).",
+  inputSchema: z.object({
+    ohlcData: z.array(ohlcSchema),
+    marketOpenStr: z.string().default("13:30"),
+    oneHourAfterOpenStr: z.string().default("14:30"),
+    oneHourBeforeCloseStr: z.string().default("19:00"),
+    marketCloseStr: z.string().default("20:00"),
+  }),
+  outputSchema: z.object({
+    status: z.string().optional(),
+    filteredData: z.array(ohlcSchema).optional(),
+    originalRows: z.number().optional(),
+    filteredRows: z.number().optional(),
+    rowsRemoved: z.number().optional(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ ohlcData, marketOpenStr, oneHourAfterOpenStr, oneHourBeforeCloseStr, marketCloseStr }) => {
+    return filterFirstLastHour(ohlcData, marketOpenStr, oneHourAfterOpenStr, oneHourBeforeCloseStr, marketCloseStr);
+  },
+});
+
+// ============================================================================
+// Alpha Decay Tool
+// ============================================================================
+
+export const analyzeAlphaDecayTool = createTool({
+  id: "analyze_alpha_decay",
+  description: "Analyze how performance degrades with entry delays.",
+  inputSchema: z.object({
+    results: z.record(z.string(), z.record(z.string(), z.unknown())),
+    metric: z.string().default("return_pct"),
+  }),
+  outputSchema: z.object({
+    analysis: z.record(z.string(), z.unknown()).optional(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ results, metric }) => {
+    const parsed: Record<number, Record<string, unknown>> = {};
+    for (const [key, value] of Object.entries(results)) {
+      const delay = Number(key);
+      if (!Number.isNaN(delay) && value && typeof value === "object") {
+        parsed[delay] = value as Record<string, unknown>;
+      }
+    }
+
+    const analysis = analyzeAlphaDecay(parsed, metric);
+    if ("error" in analysis) {
+      return { error: analysis.error };
+    }
+    return { analysis: analysis as unknown as Record<string, unknown> };
+  },
+});
+
+// ============================================================================
+// Plotting Tool
+// ============================================================================
+
+export const generateBacktestChartTool = createTool({
+  id: "generate_backtest_chart",
+  description: "Generate an ASCII chart for backtest visualization.",
+  inputSchema: z.object({
+    ohlcData: z.array(ohlcSchema),
+    stats: z.object({
+      equityCurve: z.array(z.number()).optional(),
+    }).optional(),
+    title: z.string().default("Backtest Result"),
+  }),
+  outputSchema: z.object({
+    status: z.string().optional(),
+    chart: z.string().optional(),
+    title: z.string().optional(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ ohlcData, stats, title }) => {
+    return generateBacktestChart(ohlcData, stats ?? {}, title);
+  },
+});
+
+// ============================================================================
+// Optimization Utilities (MCP parity)
+// ============================================================================
+
+export const gridSearchOptimizationTool = createTool({
+  id: "grid_search_optimization",
+  description: "Perform grid search optimization on precomputed backtest results.",
+  inputSchema: z.object({
+    param_grid: z.record(z.string(), z.array(z.unknown())),
+    backtest_results: z.array(z.object({
+      params: z.record(z.string(), z.unknown()),
+      stats: z.record(z.string(), z.unknown()),
+    })),
+    metric: z.string().default("sharpe_ratio"),
+    constraint_func_code: z.string().optional(),
+  }),
+  outputSchema: z.object({
+    best_params: z.record(z.string(), z.unknown()).optional(),
+    best_metric: z.number().optional(),
+    best_stats: z.record(z.string(), z.unknown()).optional(),
+    rank: z.number().optional(),
+    total_combinations_tested: z.number().optional(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ param_grid, backtest_results, metric, constraint_func_code }) => {
+    if (constraint_func_code) {
+      return { error: "constraint_func_code is not supported in TS implementation." };
+    }
+
+    const paramNames = Object.keys(param_grid);
+    const combinations: Array<Record<string, unknown>> = [];
+
+    function generateCombinations(index: number, current: Record<string, unknown>) {
+      if (index === paramNames.length) {
+        combinations.push({ ...current });
+        return;
+      }
+      const paramName = paramNames[index]!;
+      const values = param_grid[paramName]!;
+      for (const value of values) {
+        current[paramName] = value;
+        generateCombinations(index + 1, current);
+      }
+    }
+
+    generateCombinations(0, {});
+
+    let bestParams: Record<string, unknown> | null = null;
+    let bestMetric = -Infinity;
+    let bestStats: Record<string, unknown> | null = null;
+    let rank = 0;
+
+    for (const params of combinations) {
+      const match = backtest_results.find((result) => {
+        const resultParams = result.params ?? {};
+        return Object.entries(params).every(([key, value]) => resultParams[key] === value);
+      });
+      const stats = match?.stats ?? {};
+      const value = typeof stats[metric] === "number" ? (stats[metric] as number) : -Infinity;
+
+      if (value > bestMetric) {
+        bestMetric = value;
+        bestParams = params;
+        bestStats = stats;
+      }
+    }
+
+    if (!bestParams || !bestStats || bestMetric === -Infinity) {
+      return { error: "No valid results found." };
+    }
+
+    rank = 1;
+
+    return {
+      best_params: bestParams,
+      best_metric: bestMetric,
+      best_stats: bestStats,
+      rank,
+      total_combinations_tested: combinations.length,
+    };
+  },
+});
+
+export const randomSearchOptimizationTool = createTool({
+  id: "random_search_optimization",
+  description: "Perform random search optimization on precomputed backtest results.",
+  inputSchema: z.object({
+    param_distributions: z.record(z.string(), z.unknown()),
+    backtest_results: z.array(z.object({
+      params: z.record(z.string(), z.unknown()),
+      stats: z.record(z.string(), z.unknown()),
+    })),
+    n_iter: z.number().default(50),
+    metric: z.string().default("sharpe_ratio"),
+  }),
+  outputSchema: z.object({
+    best_params: z.record(z.string(), z.unknown()).optional(),
+    best_metric: z.number().optional(),
+    best_stats: z.record(z.string(), z.unknown()).optional(),
+    rank: z.number().optional(),
+    total_iterations: z.number().optional(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ param_distributions, backtest_results, n_iter, metric }) => {
+    const sampleParam = (dist: unknown): unknown => {
+      if (Array.isArray(dist)) {
+        if (dist.length === 2 && typeof dist[0] === "number" && typeof dist[1] === "number") {
+          const min = dist[0];
+          const max = dist[1];
+          return min + Math.random() * (max - min);
+        }
+        return dist[Math.floor(Math.random() * dist.length)];
+      }
+      return dist;
+    };
+
+    let bestParams: Record<string, unknown> | null = null;
+    let bestMetric = -Infinity;
+    let bestStats: Record<string, unknown> | null = null;
+
+    for (let i = 0; i < n_iter; i++) {
+      const params: Record<string, unknown> = {};
+      for (const [key, dist] of Object.entries(param_distributions)) {
+        params[key] = sampleParam(dist);
+      }
+
+      const match = backtest_results.find((result) => {
+        const resultParams = result.params ?? {};
+        return Object.entries(params).every(([key, value]) => resultParams[key] === value);
+      });
+
+      const stats = match?.stats ?? {};
+      const value = typeof stats[metric] === "number" ? (stats[metric] as number) : -Infinity;
+
+      if (value > bestMetric) {
+        bestMetric = value;
+        bestParams = params;
+        bestStats = stats;
+      }
+    }
+
+    if (!bestParams || !bestStats || bestMetric === -Infinity) {
+      return { error: "No valid results found." };
+    }
+
+    return {
+      best_params: bestParams,
+      best_metric: bestMetric,
+      best_stats: bestStats,
+      rank: 1,
+      total_iterations: n_iter,
     };
   },
 });
@@ -700,4 +1180,18 @@ export const backtestTools = {
   optimize_strategy: optimizeStrategyTool,
   compare_backtests: compareBacktestsTool,
   get_backtest_summary: getBacktestSummaryTool,
+  analyze_backtest_results: analyzeBacktestResultsTool,
+  compare_backtest_results: compareBacktestResultsTool,
+  rank_strategies_by_metric: rankStrategiesByMetricTool,
+  find_best_strategy: findBestStrategyTool,
+  export_results_json: exportResultsJsonTool,
+  export_results_csv: exportResultsCsvTool,
+  generate_html_report: generateHtmlReportTool,
+  filter_exclude_months: filterExcludeMonthsTool,
+  filter_market_hours: filterMarketHoursTool,
+  filter_first_last_hour: filterFirstLastHourTool,
+  analyze_alpha_decay: analyzeAlphaDecayTool,
+  generate_backtest_chart: generateBacktestChartTool,
+  grid_search_optimization: gridSearchOptimizationTool,
+  random_search_optimization: randomSearchOptimizationTool,
 };

@@ -53,8 +53,26 @@ import type {
 } from "./types.ts";
 import { BinanceError, RateLimitError } from "../../errors/index.ts";
 import { createModuleLogger } from "../logger/index.ts";
+import {
+  withRetry,
+  CircuitBreaker,
+  type RetryConfig,
+} from "../retry.ts";
 
 const logger = createModuleLogger("binance");
+
+// Default retry config for Binance API calls
+const BINANCE_RETRY_CONFIG: Partial<RetryConfig> = {
+  maxRetries: 3,
+  baseDelayMs: 200,
+  maxDelayMs: 5000,
+};
+
+// Circuit breaker for API protection
+const apiCircuitBreaker = new CircuitBreaker({
+  failureThreshold: 5,
+  resetTimeoutMs: 30000,
+});
 
 // Binance API base URL
 const BASE_URL = "https://api.binance.com";
@@ -135,87 +153,136 @@ export class BinanceClient {
 
   /**
    * Make a public API request (no authentication required)
+   * Includes automatic retry with exponential backoff
    */
   private async publicRequest<T>(
     endpoint: string,
     params: Record<string, string | number | undefined> = {}
   ): Promise<T> {
-    this.checkRateLimit();
+    return withRetry(async () => {
+      this.checkRateLimit();
 
-    const queryString = this.buildQueryString(params);
-    const url = `${BASE_URL}${endpoint}${queryString ? `?${queryString}` : ""}`;
+      const queryString = this.buildQueryString(params);
+      const url = `${BASE_URL}${endpoint}${queryString ? `?${queryString}` : ""}`;
 
-    const response = await fetch(url, {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
 
-    this.updateRateLimitFromHeaders(response.headers);
+      try {
+        const response = await fetch(url, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          signal: controller.signal,
+        });
 
-    if (!response.ok) {
-      const error = (await response.json()) as BinanceAPIError;
-      logger.error("Public API request failed", undefined, { endpoint, code: String(error.code), msg: error.msg });
-      if (error.code === -1015 || error.code === -1003) {
-        throw new RateLimitError(60);
+        this.updateRateLimitFromHeaders(response.headers);
+
+        if (!response.ok) {
+          const error = (await response.json()) as BinanceAPIError;
+          logger.error("Public API request failed", undefined, { endpoint, code: String(error.code), msg: error.msg });
+          if (error.code === -1015 || error.code === -1003) {
+            throw new RateLimitError(60);
+          }
+          throw new BinanceError(error.msg, error.code);
+        }
+
+        return response.json() as Promise<T>;
+      } finally {
+        clearTimeout(timeoutId);
       }
-      throw new BinanceError(error.msg, error.code);
-    }
-
-    return response.json() as Promise<T>;
+    }, BINANCE_RETRY_CONFIG);
   }
 
   /**
    * Make a signed API request (authentication required)
+   * Includes automatic retry with exponential backoff and circuit breaker
    */
   private async signedRequest<T>(
     method: "GET" | "POST" | "DELETE",
     endpoint: string,
     params: Record<string, string | number | undefined> = {}
   ): Promise<T> {
-    this.checkRateLimit();
-
-    // Add timestamp and recvWindow
-    const timestamp = Date.now();
-    const allParams = {
-      ...params,
-      timestamp,
-      recvWindow: 5000,
-    };
-
-    const queryString = this.buildQueryString(allParams);
-    const signature = this.sign(queryString);
-    const signedQueryString = `${queryString}&signature=${signature}`;
-
-    const url = `${BASE_URL}${endpoint}?${signedQueryString}`;
-
-    const response = await fetch(url, {
-      method,
-      headers: {
-        "Content-Type": "application/json",
-        "X-MBX-APIKEY": this.apiKey,
-      },
-    });
-
-    this.updateRateLimitFromHeaders(response.headers);
-
-    if (!response.ok) {
-      const error = (await response.json()) as BinanceAPIError;
-      logger.error("Signed API request failed", undefined, { endpoint, method, code: String(error.code), msg: error.msg });
-      if (error.code === -1015 || error.code === -1003) {
-        throw new RateLimitError(60);
-      }
-      throw new BinanceError(error.msg, error.code);
+    // Check circuit breaker before making request
+    if (!apiCircuitBreaker.canExecute()) {
+      throw new BinanceError("API circuit breaker is open - too many recent failures", -1);
     }
 
-    // Handle empty response (e.g., for DELETE requests)
-    const text = await response.text();
-    if (!text) {
-      return {} as T;
-    }
+    try {
+      const result = await withRetry(async () => {
+        this.checkRateLimit();
 
-    return JSON.parse(text) as T;
+        // Add timestamp and recvWindow
+        const timestamp = Date.now();
+        const allParams = {
+          ...params,
+          timestamp,
+          recvWindow: 5000,
+        };
+
+        const queryString = this.buildQueryString(allParams);
+        const signature = this.sign(queryString);
+        const signedQueryString = `${queryString}&signature=${signature}`;
+
+        const url = `${BASE_URL}${endpoint}?${signedQueryString}`;
+
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+
+        try {
+          const response = await fetch(url, {
+            method,
+            headers: {
+              "Content-Type": "application/json",
+              "X-MBX-APIKEY": this.apiKey,
+            },
+            signal: controller.signal,
+          });
+
+          this.updateRateLimitFromHeaders(response.headers);
+
+          if (!response.ok) {
+            const error = (await response.json()) as BinanceAPIError;
+            logger.error("Signed API request failed", undefined, { endpoint, method, code: String(error.code), msg: error.msg });
+            if (error.code === -1015 || error.code === -1003) {
+              throw new RateLimitError(60);
+            }
+            throw new BinanceError(error.msg, error.code);
+          }
+
+          // Handle empty response (e.g., for DELETE requests)
+          const text = await response.text();
+          if (!text) {
+            return {} as T;
+          }
+
+          return JSON.parse(text) as T;
+        } finally {
+          clearTimeout(timeoutId);
+        }
+      }, BINANCE_RETRY_CONFIG);
+
+      apiCircuitBreaker.recordSuccess();
+      return result;
+    } catch (error) {
+      apiCircuitBreaker.recordFailure();
+      throw error;
+    }
+  }
+
+  /**
+   * Get circuit breaker state for monitoring
+   */
+  getCircuitBreakerState(): string {
+    return apiCircuitBreaker.getState();
+  }
+
+  /**
+   * Reset circuit breaker (use with caution)
+   */
+  resetCircuitBreaker(): void {
+    apiCircuitBreaker.reset();
   }
 
   /**

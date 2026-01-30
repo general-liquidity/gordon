@@ -10,6 +10,13 @@ import { existsSync } from "node:fs";
 import { mkdir } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import {
+  validateEnvKeys,
+  sanitizeKeyValue,
+  isPlaceholderKey,
+  formatValidationResult,
+  type ValidationResult,
+} from "./env-validation.ts";
 
 // Primary location: user's Gordon config directory
 const GORDON_DIR = join(homedir(), ".gordon");
@@ -287,5 +294,61 @@ export async function createEnvFile(keys: Partial<EnvKeys>): Promise<void> {
   }
 }
 
+/**
+ * Validate environment keys and return detailed validation result
+ */
+export async function validateEnv(): Promise<ValidationResult> {
+  const status = await checkEnvStatus();
+  return validateEnvKeys(status.keys as Record<string, string | undefined>);
+}
+
+/**
+ * Check if environment is properly configured for trading
+ */
+export async function isReadyForTrading(): Promise<{ ready: boolean; reason?: string }> {
+  const validation = await validateEnv();
+
+  if (!validation.valid) {
+    return {
+      ready: false,
+      reason: formatValidationResult(validation),
+    };
+  }
+
+  if (!validation.keys.BINANCE_API_KEY || !validation.keys.BINANCE_API_SECRET) {
+    return {
+      ready: false,
+      reason: "Binance API credentials not configured",
+    };
+  }
+
+  return { ready: true };
+}
+
+/**
+ * Check if environment is properly configured for LLM
+ */
+export async function isReadyForLLM(): Promise<{ ready: boolean; reason?: string }> {
+  const validation = await validateEnv();
+
+  if (!validation.keys.OPENAI_API_KEY && !validation.keys.DEDALUS_API_KEY) {
+    return {
+      ready: false,
+      reason: "No LLM API key configured. Set OPENAI_API_KEY or DEDALUS_API_KEY.",
+    };
+  }
+
+  return { ready: true };
+}
+
 // Export paths for external use
 export { GORDON_ENV_PATH as ENV_FILE_PATH, GORDON_DIR };
+
+// Re-export validation utilities
+export {
+  validateEnvKeys,
+  sanitizeKeyValue,
+  isPlaceholderKey,
+  formatValidationResult,
+  type ValidationResult,
+} from "./env-validation.ts";

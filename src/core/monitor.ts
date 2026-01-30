@@ -5,6 +5,7 @@
  * Fully deterministic (no AI involved).
  *
  * The monitor runs every 15 minutes while the CLI is open.
+ * Optionally supports real-time WebSocket updates for faster detection.
  */
 
 import { BinanceClient } from "../infra/binance/index.ts";
@@ -15,8 +16,18 @@ import { getPlan } from "../infra/storage/plans.ts";
 import { createModuleLogger } from "../infra/logger/index.ts";
 import { emitEvent } from "../events/index.ts";
 import type { Trade, Plan, ExitFill, EntryFill } from "../types/index.ts";
+import {
+  BinanceWebSocket,
+  type TickerUpdate,
+} from "../infra/binance/websocket.ts";
 
 const logger = createModuleLogger("monitor");
+
+// Real-time price cache updated by WebSocket
+const realtimePriceCache: Map<string, { price: number; timestamp: number }> = new Map();
+
+// WebSocket instance for real-time monitoring
+let wsClient: BinanceWebSocket | null = null;
 
 // ============================================================================
 // Types
@@ -1014,6 +1025,192 @@ function checkFlashCrash(
   }
 
   return null;
+}
+
+// ============================================================================
+// Real-Time WebSocket Integration
+// ============================================================================
+
+/**
+ * Initialize WebSocket for real-time price monitoring
+ * This enables faster detection of stop-loss and take-profit triggers
+ * Only connects if there are active trades to monitor
+ */
+export async function initializeRealtimeMonitor(): Promise<void> {
+  if (wsClient) {
+    logger.debug("WebSocket already initialized");
+    return;
+  }
+
+  // Check if there are any trades to monitor BEFORE connecting
+  const openTrades = listTrades({ status: "OPEN" });
+  const partialTrades = listTrades({ status: "PARTIAL" });
+  const symbols = new Set([...openTrades, ...partialTrades].map((t) => t.symbol));
+
+  if (symbols.size === 0) {
+    logger.debug("No active trades to monitor - skipping WebSocket initialization");
+    return;
+  }
+
+  wsClient = new BinanceWebSocket();
+
+  wsClient.on("ticker", (update: TickerUpdate) => {
+    // Update real-time price cache
+    realtimePriceCache.set(update.symbol, {
+      price: update.price,
+      timestamp: update.timestamp,
+    });
+
+    // Check for critical price movements on open trades
+    checkRealtimePriceAlert(update.symbol, update.price);
+  });
+
+  wsClient.on("connected", () => {
+    logger.info("WebSocket connected for real-time monitoring");
+  });
+
+  wsClient.on("disconnected", (reason) => {
+    logger.warn("WebSocket disconnected", { reason });
+  });
+
+  wsClient.on("error", (error) => {
+    logger.error("WebSocket error", error);
+  });
+
+  // Pre-register subscriptions before connecting
+  for (const symbol of symbols) {
+    wsClient.subscribeTicker(symbol);
+  }
+
+  try {
+    await wsClient.connect();
+    logger.debug("Subscribed to real-time tickers", { symbols: Array.from(symbols) });
+  } catch (error) {
+    logger.error("Failed to initialize WebSocket", error instanceof Error ? error : undefined);
+    wsClient = null;
+  }
+}
+
+/**
+ * Add a symbol to real-time monitoring (call when opening a new trade)
+ */
+export function subscribeSymbolRealtime(symbol: string): void {
+  if (wsClient?.isConnected()) {
+    wsClient.subscribeTicker(symbol);
+    logger.debug("Added real-time subscription", { symbol });
+  }
+}
+
+/**
+ * Remove a symbol from real-time monitoring (call when closing a trade)
+ */
+export function unsubscribeSymbolRealtime(symbol: string): void {
+  if (wsClient?.isConnected()) {
+    // Only unsubscribe if no other trades use this symbol
+    const openTrades = listTrades({ status: "OPEN" });
+    const partialTrades = listTrades({ status: "PARTIAL" });
+    const stillUsed = [...openTrades, ...partialTrades].some((t) => t.symbol === symbol);
+
+    if (!stillUsed) {
+      wsClient.unsubscribe("ticker", symbol);
+      realtimePriceCache.delete(symbol);
+      logger.debug("Removed real-time subscription", { symbol });
+    }
+  }
+}
+
+/**
+ * Shutdown WebSocket connection
+ */
+export function shutdownRealtimeMonitor(): void {
+  if (wsClient) {
+    wsClient.disconnect();
+    wsClient = null;
+    realtimePriceCache.clear();
+    logger.info("Real-time monitor shutdown");
+  }
+}
+
+/**
+ * Check if a price update triggers critical alerts
+ * This runs on every WebSocket price update for subscribed symbols
+ */
+function checkRealtimePriceAlert(symbol: string, price: number): void {
+  const openTrades = listTrades({ status: "OPEN" });
+  const partialTrades = listTrades({ status: "PARTIAL" });
+  const tradesForSymbol = [...openTrades, ...partialTrades].filter((t) => t.symbol === symbol);
+
+  for (const trade of tradesForSymbol) {
+    const plan = getPlan(trade.planId);
+    if (!plan) continue;
+
+    const stopPrice = plan.stopLoss.price;
+    const distanceToStop = ((price - stopPrice) / price) * 100;
+
+    // Emit critical alert if price is within 1% of stop
+    if (distanceToStop <= CRITICAL_THRESHOLD_PERCENT && distanceToStop > 0) {
+      emitEvent("alert:stop_approaching", {
+        tradeId: trade.id,
+        symbol,
+        currentPrice: price,
+        stopPrice,
+        distance: distanceToStop,
+        realtime: true,
+      });
+
+      logger.warn("CRITICAL: Price near stop loss (real-time)", {
+        tradeId: trade.id,
+        symbol,
+        price,
+        stopPrice,
+        distance: distanceToStop.toFixed(2),
+      });
+    }
+
+    // Check if stop-loss was breached
+    if (price <= stopPrice) {
+      emitEvent("alert:stop_triggered", {
+        tradeId: trade.id,
+        symbol,
+        currentPrice: price,
+        stopPrice,
+        realtime: true,
+      });
+
+      logger.error("STOP LOSS BREACHED (real-time)", {
+        tradeId: trade.id,
+        symbol,
+        price,
+        stopPrice,
+      });
+    }
+  }
+}
+
+/**
+ * Get cached real-time price (faster than API call)
+ * Falls back to API if no cached price available
+ */
+export async function getRealtimePrice(
+  client: BinanceClient,
+  symbol: string
+): Promise<number> {
+  const cached = realtimePriceCache.get(symbol);
+
+  // Use cache if fresh (within 5 seconds)
+  if (cached && Date.now() - cached.timestamp < 5000) {
+    return cached.price;
+  }
+
+  // Fallback to REST API
+  return client.getPrice(symbol);
+}
+
+/**
+ * Check if real-time monitoring is active
+ */
+export function isRealtimeMonitorActive(): boolean {
+  return wsClient?.isConnected() ?? false;
 }
 
 // ============================================================================

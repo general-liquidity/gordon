@@ -102,6 +102,15 @@ export * from "./optimization/index.ts";
 export * from "./data/historical.ts";
 
 // ============================================================================
+// Analysis & Utilities
+// ============================================================================
+
+export * from "./analysis.ts";
+export * from "./filters.ts";
+export * from "./alpha-decay.ts";
+export * from "./plotting.ts";
+
+// ============================================================================
 // Reporting Exports
 // ============================================================================
 
@@ -112,3 +121,9 @@ export {
   formatParameters,
   formatBacktestSummary,
 } from "./reporting/formatter.ts";
+
+export {
+  exportResultsJson,
+  exportResultsCsv,
+  generateHtmlReport,
+} from "./reporting/export.ts";

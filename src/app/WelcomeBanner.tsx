@@ -14,7 +14,7 @@ const GEKKO_QUOTES = [
   "What's worth doing is worth doing for money.",
 ] as const;
 
-// ASCII art banner (block letters)
+// ASCII art banner (ANSI Shadow style)
 const ASCII_BANNER = `
  ██████╗  ██████╗ ██████╗ ██████╗  ██████╗ ███╗   ██╗
 ██╔════╝ ██╔═══██╗██╔══██╗██╔══██╗██╔═══██╗████╗  ██║
@@ -22,15 +22,6 @@ const ASCII_BANNER = `
 ██║   ██║██║   ██║██╔══██╗██║  ██║██║   ██║██║╚██╗██║
 ╚██████╔╝╚██████╔╝██║  ██║██████╔╝╚██████╔╝██║ ╚████║
  ╚═════╝  ╚═════╝ ╚═╝  ╚═╝╚═════╝  ╚═════╝ ╚═╝  ╚═══╝
-`.trim();
-
-// Unicode fallback (simpler ASCII if terminal doesn't support box-drawing)
-const UNICODE_FALLBACK = `
-  ____  ___  ____  ____   ___  _   _
- / ___|/ _ \\|  _ \\|  _ \\ / _ \\| \\ | |
-| |  _| | | | |_) | | | | | | |  \\| |
-| |_| | |_| |  _ <| |_| | |_| | |\\  |
- \\____|\\___/|_| \\_\\____/ \\___/|_| \\_|
 `.trim();
 
 // Feature bullets
@@ -41,26 +32,18 @@ const FEATURES = [
   "Human-in-the-loop execution",
 ] as const;
 
-interface WelcomeBannerProps {
-  useUnicodeFallback?: boolean;
-}
-
-export const WelcomeBanner: React.FC<WelcomeBannerProps> = ({
-  useUnicodeFallback = false,
-}) => {
+export const WelcomeBanner: React.FC = () => {
   // Select random quote on mount
   const randomQuote = useMemo(() => {
     const index = Math.floor(Math.random() * GEKKO_QUOTES.length);
     return GEKKO_QUOTES[index];
   }, []);
 
-  const banner = useUnicodeFallback ? UNICODE_FALLBACK : ASCII_BANNER;
-
   return (
     <Box flexDirection="column" paddingX={2} paddingY={1}>
       {/* ASCII Art Banner */}
       <Box flexDirection="column">
-        {banner.split("\n").map((line, i) => (
+        {ASCII_BANNER.split("\n").map((line, i) => (
           <Text key={`banner-line-${i}`} color={COLORS.TAN}>
             {line}
           </Text>

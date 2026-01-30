@@ -16,6 +16,7 @@ import type {
   Trade,
   EquityPointExtended,
   BacktestMetrics,
+  ParameterSet,
 } from "./types.ts";
 import { DEFAULT_BACKTEST_PARAMS } from "./types.ts";
 import { calculateMetricsFromTrades } from "./metrics.ts";
@@ -67,7 +68,7 @@ interface BacktestableStrategy {
     bar: OHLC,
     indicators: IndicatorState,
     position: Position | null
-  ): Signal;
+  ): Signal | null;
   kellyParams?: {
     winRate: number;
     avgWin: number;
@@ -113,7 +114,12 @@ export class BacktestEngine {
    * @param data - Array of OHLC bars
    * @returns Complete backtest result with metrics
    */
-  run(strategy: BacktestableStrategy | Strategy, data: OHLC[]): BacktestEngineResult {
+  run(
+    strategy: BacktestableStrategy | Strategy,
+    data: OHLC[],
+    strategyParams?: ParameterSet
+  ): BacktestEngineResult {
+    const adjustedStrategy = this.applyStrategyParams(strategy, strategyParams);
     // Reset state for fresh run
     this.reset();
 
@@ -138,7 +144,7 @@ export class BacktestEngine {
       // If position was closed by stop/TP, continue to next bar
       if (!this.position || this.position) {
         // Get signal from strategy
-        const signal = this.getStrategySignal(strategy, bar, indicatorState);
+        const signal = this.getStrategySignal(adjustedStrategy, bar, i, data, indicatorState);
 
         // Execute signal
         if (signal.type !== "HOLD") {
@@ -176,19 +182,30 @@ export class BacktestEngine {
   private getStrategySignal(
     strategy: BacktestableStrategy | Strategy,
     bar: OHLC,
+    index: number,
+    data: OHLC[],
     indicators: IndicatorState
   ): Signal {
-    // Check if strategy has generateSignal method (backtest interface)
     if ("generateSignal" in strategy && typeof strategy.generateSignal === "function") {
-      return strategy.generateSignal(bar, indicators, this.position);
+      const generator = strategy.generateSignal as (...args: unknown[]) => Signal | null;
+      let signal: Signal | null;
+
+      if (generator.length >= 4) {
+        signal = generator(bar, index, data, indicators);
+      } else {
+        signal = generator(bar, indicators, this.position);
+      }
+
+      if (signal) {
+        return signal;
+      }
     }
 
-    // Fallback: no signal
     return {
       type: "HOLD",
       price: bar.close,
       timestamp: bar.timestamp,
-      reason: "Strategy does not implement generateSignal",
+      reason: "No signal",
     };
   }
 
@@ -648,6 +665,39 @@ export class BacktestEngine {
   }
 
   /**
+   * Apply optional strategy parameters before running.
+   */
+  private applyStrategyParams(
+    strategy: BacktestableStrategy | Strategy,
+    params?: ParameterSet
+  ): BacktestableStrategy | Strategy {
+    if (!params || Object.keys(params).length === 0) {
+      return strategy;
+    }
+
+    const paramStrategy = strategy as Strategy & {
+      withParams?: (values: ParameterSet) => Strategy;
+      setParams?: (values: ParameterSet) => void;
+      params?: ParameterSet;
+    };
+
+    if (typeof paramStrategy.withParams === "function") {
+      return paramStrategy.withParams(params);
+    }
+
+    if (typeof paramStrategy.setParams === "function") {
+      paramStrategy.setParams(params);
+      return paramStrategy;
+    }
+
+    if ("params" in paramStrategy) {
+      paramStrategy.params = { ...(paramStrategy.params ?? {}), ...params };
+    }
+
+    return paramStrategy;
+  }
+
+  /**
    * Build the final backtest result.
    */
   private buildResult(
@@ -708,7 +758,8 @@ export class BacktestEngine {
 export function runBacktest(
   strategy: BacktestableStrategy | Strategy,
   data: OHLC[],
-  params?: Partial<BacktestParams>
+  params?: Partial<BacktestParams>,
+  strategyParams?: ParameterSet
 ): BacktestEngineResult {
   const fullParams: BacktestParams = {
     ...DEFAULT_BACKTEST_PARAMS,
@@ -716,5 +767,5 @@ export function runBacktest(
   };
 
   const engine = new BacktestEngine(fullParams);
-  return engine.run(strategy, data);
+  return engine.run(strategy, data, strategyParams);
 }
