@@ -81,6 +81,11 @@ const TOOL_AGENT_MAP: Record<string, string> = {
   get_trending: "Scanner",
   get_new_listings: "Scanner",
   get_top_movers: "Scanner",
+  // Backtester tools
+  run_backtest: "Backtester",
+  optimize_strategy: "Backtester",
+  compare_backtests: "Backtester",
+  get_backtest_summary: "Backtester",
 };
 
 /**

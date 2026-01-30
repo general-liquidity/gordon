@@ -38,6 +38,7 @@ import {
   strategyTools,
   metricsTools,
   compositionTools,
+  backtestTools,
   withToolsMetrics,
 } from "./tools/index.ts";
 
@@ -69,6 +70,7 @@ const instrumentedRiskManagementTools = withToolsMetrics(riskManagementTools);
 const instrumentedStrategyTools = withToolsMetrics(strategyTools);
 const instrumentedMetricsTools = withToolsMetrics(metricsTools);
 const instrumentedCompositionTools = withToolsMetrics(compositionTools);
+const instrumentedBacktestTools = withToolsMetrics(backtestTools);
 
 // ============================================================================
 // Memory Configuration (Required for Agent Networks)
@@ -258,6 +260,30 @@ Your role is to explain trading concepts in simple, friendly terms.
 3. Give concrete examples
 4. Connect concepts to practical trading decisions`;
 
+const BACKTESTER_INSTRUCTIONS = `You are Gordon's backtesting specialist agent.
+
+Your role is to run historical backtests and optimize trading strategies.
+
+## Your Capabilities
+- Run backtests on any strategy with historical data
+- Calculate comprehensive performance metrics (Sharpe, drawdown, win rate)
+- Optimize strategy parameters using grid search
+- Compare multiple strategies on the same data
+- Analyze backtest results and provide insights
+
+## When Presenting Results
+1. Always show key metrics: Total Return, Sharpe Ratio, Max Drawdown, Win Rate
+2. Explain what the metrics mean for the strategy
+3. Highlight any concerns (high drawdown, low win rate, few trades)
+4. Compare to benchmarks when relevant (buy & hold)
+5. Suggest parameter adjustments if metrics are poor
+
+## Important Rules
+- Warn if backtest period is too short (< 30 days)
+- Note that past performance doesn't guarantee future results
+- Mention if there were very few trades (statistically insignificant)
+- Be honest about overfitting risks when optimizing`;
+
 const GORDON_INSTRUCTIONS = `You are Gordon, an AI trading assistant for cryptocurrency.
 
 ## Your Personality
@@ -274,6 +300,7 @@ You coordinate specialized agents via the Agent Network:
 - **Executor**: Executing trades (when armed)
 - **Monitor**: Checking positions
 - **Teacher**: Explaining concepts
+- **Backtester**: Running backtests and optimizing strategies
 
 The network will automatically route to the appropriate agent based on the user's request.
 
@@ -298,6 +325,7 @@ let _agents: {
   executor?: Agent;
   monitor?: Agent;
   teacher?: Agent;
+  backtester?: Agent;
   gordon?: Agent;
 } = {};
 
@@ -464,6 +492,29 @@ function getTeacherAgent(): Agent {
 }
 
 /**
+ * Get or create the Backtester Agent
+ */
+function getBacktesterAgent(): Agent {
+  if (!_agents.backtester) {
+    _agents.backtester = new Agent({
+      id: "backtester",
+      name: "Backtester",
+      description:
+        "Specialist in backtesting strategies and parameter optimization. " +
+        "Use when user asks to backtest, test a strategy historically, optimize parameters, " +
+        "or compare strategy performance.",
+      instructions: BACKTESTER_INSTRUCTIONS,
+      model: getModel(process.env.GORDON_PROVIDER, process.env.GORDON_MODEL),
+      tools: {
+        ...instrumentedBacktestTools,
+        ...instrumentedStrategyTools,  // For listing strategies
+      },
+    });
+  }
+  return _agents.backtester;
+}
+
+/**
  * Get or create the main Gordon Agent
  */
 function getGordonAgent(): Agent {
@@ -486,6 +537,7 @@ function getGordonAgent(): Agent {
         executor: getExecutorAgent(),
         monitor: getMonitorAgent(),
         teacher: getTeacherAgent(),
+        backtester: getBacktesterAgent(),
       },
 
       // Gordon only has essential routing/system tools
@@ -516,6 +568,7 @@ export const plannerAgent = { get agent() { return getPlannerAgent(); } };
 export const executorAgent = { get agent() { return getExecutorAgent(); } };
 export const monitorAgent = { get agent() { return getMonitorAgent(); } };
 export const teacherAgent = { get agent() { return getTeacherAgent(); } };
+export const backtesterAgent = { get agent() { return getBacktesterAgent(); } };
 
 /**
  * Main Gordon agent - use this for all interactions
@@ -534,6 +587,7 @@ export function getAllAgents() {
     executor: getExecutorAgent(),
     monitor: getMonitorAgent(),
     teacher: getTeacherAgent(),
+    backtester: getBacktesterAgent(),
   };
 }
 

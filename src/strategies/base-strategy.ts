@@ -15,6 +15,7 @@ import type {
   StrategyPlanParams,
   TakeProfitLevel,
 } from "./types.ts";
+import type { OHLC, Signal, IndicatorState } from "../backtest/types.ts";
 import {
   calculateRSI,
   calculateEMA,
@@ -72,6 +73,33 @@ export abstract class BaseStrategy implements Strategy {
   ): Promise<StrategyPlanParams>;
 
   abstract getPromptFragment(): string;
+
+  // ============================================================================
+  // Backtesting Methods (Default Implementations)
+  // ============================================================================
+
+  /**
+   * Generate a trading signal for backtesting.
+   * Default implementation returns null (no signal).
+   * Strategies should override this to implement their specific logic.
+   */
+  generateSignal(
+    _bar: OHLC,
+    _index: number,
+    _data: OHLC[],
+    _indicators: IndicatorState
+  ): Signal | null {
+    return null;
+  }
+
+  /**
+   * Get the list of indicators required by this strategy.
+   * Default implementation returns common indicators.
+   * Strategies can override this to specify their specific needs.
+   */
+  getRequiredIndicators(): string[] {
+    return ["sma20", "sma50", "rsi14", "atr14"];
+  }
 
   // ============================================================================
   // Helper Methods for Subclasses

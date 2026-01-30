@@ -7,6 +7,7 @@
 
 import type { Candle } from "../core/indicators/types.ts";
 import type { BinanceClient } from "../infra/binance/index.ts";
+import type { OHLC, Signal, IndicatorState } from "../backtest/types.ts";
 
 // ============================================================================
 // Strategy Definition (Static Metadata)
@@ -163,6 +164,31 @@ export interface Strategy extends StrategyDefinition {
    * @returns Markdown-formatted instructions for the planner
    */
   getPromptFragment(): string;
+
+  /**
+   * Generate a trading signal for backtesting.
+   * This method is called for each bar with pre-calculated indicators.
+   *
+   * @param bar - Current OHLC bar
+   * @param index - Index of the bar in the data array
+   * @param data - Full OHLC data array
+   * @param indicators - Pre-calculated indicator values for this bar
+   * @returns Signal if conditions are met, null otherwise
+   */
+  generateSignal(
+    bar: OHLC,
+    index: number,
+    data: OHLC[],
+    indicators: IndicatorState
+  ): Signal | null;
+
+  /**
+   * Get the list of indicators required by this strategy.
+   * Used by the backtester to pre-calculate indicators before running.
+   *
+   * @returns Array of indicator names (e.g., ['sma20', 'rsi14', 'atr14'])
+   */
+  getRequiredIndicators(): string[];
 }
 
 // ============================================================================

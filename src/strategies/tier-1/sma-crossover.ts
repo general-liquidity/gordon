@@ -22,6 +22,7 @@ import type {
   StrategyPlanParams,
   StrategyId,
 } from "../types.ts";
+import type { OHLC, Signal, IndicatorState } from "../../backtest/types.ts";
 
 // ============================================================================
 // Constants
@@ -235,6 +236,93 @@ export class SMACrossoverStrategy extends BaseStrategy {
       notes: `Golden Cross trend trade. Stop below SMA200 at $${stopLoss.toFixed(2)}. ` +
         `Trailing stops recommended. R:R ${riskRewardRatio.toFixed(1)}:1`,
     };
+  }
+
+  // ============================================================================
+  // Backtesting Methods
+  // ============================================================================
+
+  /**
+   * Generate trading signal for backtesting.
+   *
+   * For this strategy, we use RSI crossovers as proxy signals:
+   * BUY signal when: RSI crosses above 30 from below
+   * SELL signal when: RSI crosses below 70 from above
+   *
+   * Additionally checks SMA alignment for trend confirmation.
+   */
+  generateSignal(
+    bar: OHLC,
+    _index: number,
+    _data: OHLC[],
+    indicators: IndicatorState
+  ): Signal | null {
+    const price = bar.close;
+    const {
+      rsi14,
+      rsi14Prev,
+      sma50,
+      sma200,
+    } = indicators;
+
+    // Need RSI values for crossover detection
+    if (
+      rsi14 === null ||
+      rsi14 === undefined ||
+      rsi14Prev === null ||
+      rsi14Prev === undefined
+    ) {
+      return null;
+    }
+
+    // Check for SELL signal: RSI crosses below 70 from above
+    if (rsi14Prev > 70 && rsi14 <= 70) {
+      return {
+        type: "SELL",
+        price,
+        timestamp: bar.timestamp,
+        reason: `RSI crossed below 70 (${rsi14Prev.toFixed(1)} -> ${rsi14.toFixed(1)})`,
+      };
+    }
+
+    // Check for BUY signal: RSI crosses above 30 from below
+    if (rsi14Prev < 30 && rsi14 >= 30) {
+      // Check SMA alignment for additional confidence
+      const hasSmaAlignment =
+        sma50 !== null &&
+        sma50 !== undefined &&
+        sma200 !== null &&
+        sma200 !== undefined &&
+        sma50 > sma200;
+
+      const reason = hasSmaAlignment
+        ? `RSI crossed above 30 (${rsi14Prev.toFixed(1)} -> ${rsi14.toFixed(1)}) with Golden Cross confirmation`
+        : `RSI crossed above 30 (${rsi14Prev.toFixed(1)} -> ${rsi14.toFixed(1)})`;
+
+      return {
+        type: "BUY",
+        price,
+        timestamp: bar.timestamp,
+        reason,
+      };
+    }
+
+    return null;
+  }
+
+  /**
+   * Get required indicators for backtesting.
+   */
+  getRequiredIndicators(): string[] {
+    return [
+      "sma50",
+      "sma200",
+      "rsi14",
+      "rsi14Prev",
+      "atr14",
+      "volumeRatio",
+      "volumeAvg20",
+    ];
   }
 
   getPromptFragment(): string {

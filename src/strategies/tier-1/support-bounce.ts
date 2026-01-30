@@ -24,6 +24,7 @@ import type {
   StrategyPlanParams,
   StrategyId,
 } from "../types.ts";
+import type { OHLC, Signal, IndicatorState } from "../../backtest/types.ts";
 
 // ============================================================================
 // Constants
@@ -280,6 +281,90 @@ export class SupportBounceStrategy extends BaseStrategy {
 
     // Fallback to R:R-based targets
     return this.createTakeProfitLevels(entryPrice, stopLoss, [1.5, 2.5, 4.0]);
+  }
+
+  // ============================================================================
+  // Backtesting Methods
+  // ============================================================================
+
+  /**
+   * Generate trading signal for backtesting.
+   *
+   * BUY signal when:
+   * - Price near support (within 2%)
+   * - RSI < 40 (approaching oversold)
+   * - Volume surge (volume ratio > 1.5)
+   *
+   * SELL signal when:
+   * - Price hits resistance
+   * - RSI > 70 (overbought)
+   */
+  generateSignal(
+    bar: OHLC,
+    _index: number,
+    _data: OHLC[],
+    indicators: IndicatorState
+  ): Signal | null {
+    const price = bar.close;
+    const {
+      rsi14,
+      nearestSupport,
+      nearestResistance,
+      volumeRatio,
+    } = indicators;
+
+    // Check for SELL signal first (exit conditions)
+    if (nearestResistance && price >= nearestResistance) {
+      return {
+        type: "SELL",
+        price,
+        timestamp: bar.timestamp,
+        reason: `Price hit resistance at $${nearestResistance.toFixed(2)}`,
+      };
+    }
+
+    if (rsi14 !== null && rsi14 !== undefined && rsi14 > 70) {
+      return {
+        type: "SELL",
+        price,
+        timestamp: bar.timestamp,
+        reason: `RSI overbought at ${rsi14.toFixed(1)}`,
+      };
+    }
+
+    // Check for BUY signal
+    if (nearestSupport) {
+      const distanceToSupport = ((price - nearestSupport) / nearestSupport) * 100;
+      const isNearSupport = distanceToSupport >= 0 && distanceToSupport <= 2;
+      const isOversoldApproaching = rsi14 !== null && rsi14 !== undefined && rsi14 < 40;
+      const hasVolumeSurge = volumeRatio !== null && volumeRatio !== undefined && volumeRatio > 1.5;
+
+      if (isNearSupport && isOversoldApproaching && hasVolumeSurge) {
+        return {
+          type: "BUY",
+          price,
+          timestamp: bar.timestamp,
+          reason: `Support bounce: price ${distanceToSupport.toFixed(1)}% above support ($${nearestSupport.toFixed(2)}), RSI ${rsi14?.toFixed(1)}, volume surge ${volumeRatio?.toFixed(1)}x`,
+        };
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Get required indicators for backtesting.
+   */
+  getRequiredIndicators(): string[] {
+    return [
+      "rsi14",
+      "atr14",
+      "nearestSupport",
+      "nearestResistance",
+      "supportStrength",
+      "volumeRatio",
+      "volumeAvg20",
+    ];
   }
 
   /**

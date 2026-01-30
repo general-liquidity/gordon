@@ -23,6 +23,7 @@ import type {
   StrategyPlanParams,
   StrategyId,
 } from "../types.ts";
+import type { OHLC, Signal, IndicatorState } from "../../backtest/types.ts";
 
 // ============================================================================
 // Constants
@@ -193,6 +194,99 @@ export class BollingerBounceStrategy extends BaseStrategy {
       notes: `Bollinger Bounce setup. Target middle band at $${(bb.current.middle ?? 0).toFixed(2)}. ` +
         `R:R ${riskRewardRatio.toFixed(1)}:1`,
     };
+  }
+
+  // ============================================================================
+  // Backtesting Methods
+  // ============================================================================
+
+  /**
+   * Generate trading signal for backtesting.
+   *
+   * BUY signal when:
+   * - Price touches or crosses below lower Bollinger Band
+   * - RSI < 35 (oversold)
+   *
+   * SELL signal when:
+   * - Price touches upper band
+   * - Price crosses above middle band (take profit)
+   */
+  generateSignal(
+    bar: OHLC,
+    _index: number,
+    _data: OHLC[],
+    indicators: IndicatorState
+  ): Signal | null {
+    const price = bar.close;
+    const {
+      rsi14,
+      bbUpper,
+      bbMiddle,
+      bbLower,
+    } = indicators;
+
+    // Need Bollinger Bands to generate signals
+    if (
+      bbLower === null ||
+      bbLower === undefined ||
+      bbMiddle === null ||
+      bbMiddle === undefined ||
+      bbUpper === null ||
+      bbUpper === undefined
+    ) {
+      return null;
+    }
+
+    // Check for SELL signal first (exit conditions)
+    if (price >= bbUpper) {
+      return {
+        type: "SELL",
+        price,
+        timestamp: bar.timestamp,
+        reason: `Price touched upper Bollinger Band at $${bbUpper.toFixed(2)}`,
+      };
+    }
+
+    // SELL when price crosses above middle band (take profit for mean reversion)
+    if (price > bbMiddle && bar.open <= bbMiddle) {
+      return {
+        type: "SELL",
+        price,
+        timestamp: bar.timestamp,
+        reason: `Price crossed above middle Bollinger Band at $${bbMiddle.toFixed(2)}`,
+      };
+    }
+
+    // Check for BUY signal
+    const touchesLowerBand = price <= bbLower || bar.low <= bbLower;
+    const isOversold = rsi14 !== null && rsi14 !== undefined && rsi14 < 35;
+
+    if (touchesLowerBand && isOversold) {
+      return {
+        type: "BUY",
+        price,
+        timestamp: bar.timestamp,
+        reason: `Bollinger bounce: price at lower band ($${bbLower.toFixed(2)}), RSI ${rsi14?.toFixed(1)} (oversold)`,
+      };
+    }
+
+    return null;
+  }
+
+  /**
+   * Get required indicators for backtesting.
+   */
+  getRequiredIndicators(): string[] {
+    return [
+      "rsi14",
+      "atr14",
+      "bbUpper",
+      "bbMiddle",
+      "bbLower",
+      "bbWidth",
+      "ema50",
+      "volumeRatio",
+    ];
   }
 
   getPromptFragment(): string {

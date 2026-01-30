@@ -22,6 +22,7 @@
  * - strategies: Strategy library (list, detect, scan, suggest)
  * - metrics: Performance metrics and statistics
  * - composition: Tool chaining and composition utilities (sequential, parallel, conditional)
+ * - backtest: Backtesting and strategy optimization
  *
  * All tools are automatically wrapped with metrics recording via withToolsMetrics.
  */
@@ -46,6 +47,7 @@ export { riskManagementTools } from "./risk-management.ts";
 export { strategyTools } from "./strategies.ts";
 export { metricsTools } from "./metrics.ts";
 export { compositionTools } from "./composition.ts";
+export { backtestTools } from "./backtest.ts";
 
 // Tool metrics wrapper
 export { withToolMetrics, withToolsMetrics } from "./withMetrics.ts";
@@ -107,6 +109,7 @@ import { riskManagementTools } from "./risk-management.ts";
 import { strategyTools } from "./strategies.ts";
 import { metricsTools } from "./metrics.ts";
 import { compositionTools } from "./composition.ts";
+import { backtestTools } from "./backtest.ts";
 
 /**
  * All tools combined as a single object for Mastra Agent
@@ -131,6 +134,7 @@ export const allTools = {
   ...strategyTools,
   ...metricsTools,
   ...compositionTools,
+  ...backtestTools,
 };
 
 /**
@@ -156,5 +160,6 @@ export const toolCounts = {
   strategies: Object.keys(strategyTools).length,
   metrics: Object.keys(metricsTools).length,
   composition: Object.keys(compositionTools).length,
+  backtest: Object.keys(backtestTools).length,
   total: Object.keys(allTools).length,
 };

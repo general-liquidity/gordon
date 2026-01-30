@@ -165,6 +165,35 @@ export const SLASH_COMMANDS: SlashCommand[] = [
     target: "get_trade_history",
   },
 
+  // Backtesting
+  {
+    name: "backtest",
+    aliases: ["bt", "test"],
+    description: "Backtest a strategy on historical data",
+    usage: "/backtest <strategy> <symbol> [timeframe] [days]",
+    category: "trading",
+    action: "agent",
+    target: "backtester",
+  },
+  {
+    name: "optimize",
+    aliases: ["opt"],
+    description: "Optimize strategy parameters",
+    usage: "/optimize <strategy> <symbol> [timeframe]",
+    category: "trading",
+    action: "tool",
+    target: "optimize_strategy",
+  },
+  {
+    name: "compare",
+    aliases: ["cmp"],
+    description: "Compare multiple strategy backtests",
+    usage: "/compare <symbol> [strategies...]",
+    category: "trading",
+    action: "tool",
+    target: "compare_backtests",
+  },
+
   // Strategies
   {
     name: "strategies",
@@ -421,6 +450,28 @@ export function commandToPrompt(command: SlashCommand, args: string): string {
       return "I want to configure my settings";
     case "model":
       return "Show me the current AI model and available providers";
+    case "backtest":
+      if (args) {
+        const parts = args.split(/\s+/);
+        const strategy = parts[0];
+        const symbol = parts[1] || "BTCUSDT";
+        const timeframe = parts[2] || "4h";
+        const days = parts[3] || "90";
+        return `Run a backtest for the ${strategy} strategy on ${symbol} using ${timeframe} candles for the last ${days} days`;
+      }
+      return "What strategy and symbol should I backtest?";
+    case "optimize":
+      if (args) {
+        const parts = args.split(/\s+/);
+        const strategy = parts[0];
+        const symbol = parts[1] || "BTCUSDT";
+        return `Optimize the ${strategy} strategy parameters on ${symbol}`;
+      }
+      return "What strategy should I optimize?";
+    case "compare":
+      return args
+        ? `Compare backtest results for strategies on ${args}`
+        : "What strategies and symbol should I compare?";
     case "strategies":
       return "Show me all available trading strategies";
     case "strategy":

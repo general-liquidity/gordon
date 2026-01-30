@@ -1,0 +1,720 @@
+/**
+ * Backtest Engine
+ *
+ * Core backtesting engine that runs strategies against historical OHLC data.
+ * Handles position management, commission/slippage, and equity tracking.
+ */
+
+import type { Strategy } from "../../strategies/types.ts";
+import type {
+  OHLC,
+  Signal,
+  IndicatorState,
+  BacktestParams,
+  BacktestEngineResult,
+  Position,
+  Trade,
+  EquityPointExtended,
+  BacktestMetrics,
+} from "./types.ts";
+import { DEFAULT_BACKTEST_PARAMS } from "./types.ts";
+import { calculateMetricsFromTrades } from "./metrics.ts";
+
+// Import indicator calculation functions
+import {
+  calculateSMA,
+  calculateEMA,
+  calculateRSI,
+  calculateBollingerBands,
+  calculateATR,
+  calculateMACD,
+} from "../core/indicators/index.ts";
+import type { Candle } from "../core/indicators/types.ts";
+
+// ============================================================================
+// Indicator Arrays Interface
+// ============================================================================
+
+interface IndicatorArrays {
+  sma20: (number | null)[];
+  sma50: (number | null)[];
+  sma200: (number | null)[];
+  ema9: (number | null)[];
+  ema21: (number | null)[];
+  rsi14: (number | null)[];
+  bbUpper: (number | null)[];
+  bbMiddle: (number | null)[];
+  bbLower: (number | null)[];
+  bbWidth: (number | null)[];
+  atr14: (number | null)[];
+  macdLine: (number | null)[];
+  macdSignal: (number | null)[];
+  macdHistogram: (number | null)[];
+}
+
+// ============================================================================
+// Backtest Strategy Adapter
+// ============================================================================
+
+/**
+ * Adapter interface for strategies used in backtesting.
+ * Allows both full Strategy interface and simplified backtest-only strategies.
+ */
+interface BacktestableStrategy {
+  id: string;
+  name: string;
+  generateSignal(
+    bar: OHLC,
+    indicators: IndicatorState,
+    position: Position | null
+  ): Signal;
+  kellyParams?: {
+    winRate: number;
+    avgWin: number;
+    avgLoss: number;
+  };
+}
+
+// ============================================================================
+// BacktestEngine Class
+// ============================================================================
+
+/**
+ * Core backtesting engine.
+ *
+ * Features:
+ * - Pre-calculates common indicators for entire dataset
+ * - Handles position sizing (fixed amount, fixed percent, Kelly, all-in)
+ * - Applies realistic slippage and commission
+ * - Tracks equity curve with drawdown
+ * - Supports long and short positions
+ */
+export class BacktestEngine {
+  private params: BacktestParams;
+  private capital: number;
+  private position: Position | null = null;
+  private trades: Trade[] = [];
+  private equityCurve: EquityPointExtended[] = [];
+  private tradeCounter: number = 0;
+  private peakEquity: number;
+  private currentBarIndex: number = 0;
+  private indicators: IndicatorArrays | null = null;
+
+  constructor(params: BacktestParams) {
+    this.params = { ...DEFAULT_BACKTEST_PARAMS, ...params };
+    this.capital = this.params.initialCapital;
+    this.peakEquity = this.capital;
+  }
+
+  /**
+   * Run the backtest with a strategy against OHLC data.
+   *
+   * @param strategy - Strategy to test (can be full Strategy or BacktestableStrategy)
+   * @param data - Array of OHLC bars
+   * @returns Complete backtest result with metrics
+   */
+  run(strategy: BacktestableStrategy | Strategy, data: OHLC[]): BacktestEngineResult {
+    // Reset state for fresh run
+    this.reset();
+
+    if (data.length === 0) {
+      return this.buildResult(strategy.id, data);
+    }
+
+    // Pre-calculate all indicators
+    this.indicators = this.precalculateIndicators(data);
+
+    // Process each bar
+    for (let i = 0; i < data.length; i++) {
+      this.currentBarIndex = i;
+      const bar = data[i];
+      const indicatorState = this.getIndicatorState(i);
+
+      // Check for stop loss / take profit hits first (using high/low)
+      if (this.position) {
+        this.checkStopTakeProfit(bar);
+      }
+
+      // If position was closed by stop/TP, continue to next bar
+      if (!this.position || this.position) {
+        // Get signal from strategy
+        const signal = this.getStrategySignal(strategy, bar, indicatorState);
+
+        // Execute signal
+        if (signal.type !== "HOLD") {
+          this.executeSignal(signal, bar);
+        }
+      }
+
+      // Update unrealized P&L if we have a position
+      if (this.position) {
+        this.updateUnrealizedPnL(bar.close);
+      }
+
+      // Update equity curve
+      this.updateEquityCurve(bar);
+    }
+
+    // Close any remaining position at end of backtest
+    let finalPositionClosed = false;
+    if (this.position && data.length > 0) {
+      const lastBar = data[data.length - 1];
+      this.closePosition(lastBar.close, lastBar, "END_OF_BACKTEST");
+      finalPositionClosed = true;
+    }
+
+    return this.buildResult(strategy.id, data, finalPositionClosed);
+  }
+
+  // ============================================================================
+  // Private Methods - Signal Processing
+  // ============================================================================
+
+  /**
+   * Get signal from strategy, adapting for different strategy interfaces.
+   */
+  private getStrategySignal(
+    strategy: BacktestableStrategy | Strategy,
+    bar: OHLC,
+    indicators: IndicatorState
+  ): Signal {
+    // Check if strategy has generateSignal method (backtest interface)
+    if ("generateSignal" in strategy && typeof strategy.generateSignal === "function") {
+      return strategy.generateSignal(bar, indicators, this.position);
+    }
+
+    // Fallback: no signal
+    return {
+      type: "HOLD",
+      price: bar.close,
+      timestamp: bar.timestamp,
+      reason: "Strategy does not implement generateSignal",
+    };
+  }
+
+  /**
+   * Process a bar and generate/execute signals.
+   */
+  private processBar(bar: OHLC, index: number, indicators: IndicatorState): void {
+    this.currentBarIndex = index;
+
+    // Check stops first
+    if (this.position) {
+      this.checkStopTakeProfit(bar);
+    }
+
+    // Get and execute signal
+    // Note: This is called from run() which handles signal generation
+  }
+
+  /**
+   * Execute a trading signal.
+   */
+  private executeSignal(signal: Signal, bar: OHLC): void {
+    const signalType = signal.type;
+
+    if (signalType === "BUY") {
+      // If we have a short position, close it first
+      if (this.position && this.position.side === "SHORT") {
+        this.closePosition(signal.price || bar.close, bar, "SIGNAL_REVERSAL");
+      }
+
+      // Open long if no position
+      if (!this.position) {
+        this.openPosition("LONG", signal.price || bar.close, bar);
+      }
+    } else if (signalType === "SELL") {
+      // If we have a long position, close it
+      if (this.position && this.position.side === "LONG") {
+        this.closePosition(signal.price || bar.close, bar, "SIGNAL_EXIT");
+      }
+
+      // Open short if allowed and no position
+      if (!this.position && this.params.allowShorts) {
+        this.openPosition("SHORT", signal.price || bar.close, bar);
+      }
+    }
+  }
+
+  // ============================================================================
+  // Private Methods - Position Management
+  // ============================================================================
+
+  /**
+   * Open a new position.
+   */
+  private openPosition(side: "LONG" | "SHORT", price: number, bar: OHLC): void {
+    // Apply slippage
+    const slippedPrice = this.applySlippage(price, side === "LONG" ? "BUY" : "SELL");
+
+    // Calculate position size
+    const positionValue = this.calculatePositionSize(slippedPrice);
+
+    if (positionValue <= 0) {
+      return; // Insufficient capital
+    }
+
+    const quantity = positionValue / slippedPrice;
+
+    // Apply entry commission
+    const commission = this.applyCommission(positionValue);
+
+    // Deduct from capital (position value + commission)
+    if (positionValue + commission > this.capital) {
+      // Reduce position to fit available capital
+      const availableForPosition = this.capital - commission;
+      if (availableForPosition <= 0) {
+        return; // Can't afford even commission
+      }
+      // Recalculate with reduced position
+      const adjustedQuantity = availableForPosition / slippedPrice;
+      const adjustedValue = adjustedQuantity * slippedPrice;
+      const adjustedCommission = this.applyCommission(adjustedValue);
+
+      this.capital -= adjustedValue + adjustedCommission;
+
+      this.position = {
+        id: `trade_${++this.tradeCounter}`,
+        side,
+        entryPrice: slippedPrice,
+        entryTime: bar.timestamp,
+        entryBarIndex: this.currentBarIndex,
+        quantity: adjustedQuantity,
+        entryCommission: adjustedCommission,
+        unrealizedPnL: 0,
+      };
+    } else {
+      this.capital -= positionValue + commission;
+
+      this.position = {
+        id: `trade_${++this.tradeCounter}`,
+        side,
+        entryPrice: slippedPrice,
+        entryTime: bar.timestamp,
+        entryBarIndex: this.currentBarIndex,
+        quantity,
+        entryCommission: commission,
+        unrealizedPnL: 0,
+      };
+    }
+  }
+
+  /**
+   * Close the current position.
+   */
+  private closePosition(price: number, bar: OHLC, reason: string): void {
+    if (!this.position) {
+      return;
+    }
+
+    // Apply slippage (opposite direction)
+    const slippedPrice = this.applySlippage(
+      price,
+      this.position.side === "LONG" ? "SELL" : "BUY"
+    );
+
+    // Calculate P&L
+    const positionValue = this.position.quantity * slippedPrice;
+    const entryValue = this.position.quantity * this.position.entryPrice;
+
+    let grossPnL: number;
+    if (this.position.side === "LONG") {
+      grossPnL = positionValue - entryValue;
+    } else {
+      grossPnL = entryValue - positionValue;
+    }
+
+    // Apply exit commission
+    const exitCommission = this.applyCommission(positionValue);
+    const totalCommission = this.position.entryCommission + exitCommission;
+    const netPnL = grossPnL - exitCommission;
+
+    // Add proceeds back to capital
+    if (this.position.side === "LONG") {
+      this.capital += positionValue - exitCommission;
+    } else {
+      // For shorts, we get back our entry value plus/minus PnL
+      this.capital += entryValue + grossPnL - exitCommission;
+    }
+
+    // Calculate return percentage
+    const returnPct = (netPnL / entryValue) * 100;
+
+    // Create trade record
+    const trade: Trade = {
+      id: this.position.id,
+      side: this.position.side,
+      entryPrice: this.position.entryPrice,
+      entryTime: this.position.entryTime,
+      exitPrice: slippedPrice,
+      exitTime: bar.timestamp,
+      quantity: this.position.quantity,
+      grossPnL,
+      commission: totalCommission,
+      netPnL,
+      returnPct,
+      holdingPeriod: this.currentBarIndex - this.position.entryBarIndex,
+      exitReason: reason,
+    };
+
+    this.trades.push(trade);
+    this.position = null;
+  }
+
+  /**
+   * Check if stop loss or take profit has been hit.
+   */
+  private checkStopTakeProfit(bar: OHLC): void {
+    if (!this.position) {
+      return;
+    }
+
+    if (this.position.side === "LONG") {
+      // Check stop loss (price went below stop)
+      if (this.position.stopLoss && bar.low <= this.position.stopLoss) {
+        this.closePosition(this.position.stopLoss, bar, "STOP_LOSS");
+        return;
+      }
+
+      // Check take profit (price went above target)
+      if (this.position.takeProfit && bar.high >= this.position.takeProfit) {
+        this.closePosition(this.position.takeProfit, bar, "TAKE_PROFIT");
+        return;
+      }
+    } else {
+      // SHORT position
+      // Check stop loss (price went above stop)
+      if (this.position.stopLoss && bar.high >= this.position.stopLoss) {
+        this.closePosition(this.position.stopLoss, bar, "STOP_LOSS");
+        return;
+      }
+
+      // Check take profit (price went below target)
+      if (this.position.takeProfit && bar.low <= this.position.takeProfit) {
+        this.closePosition(this.position.takeProfit, bar, "TAKE_PROFIT");
+        return;
+      }
+    }
+  }
+
+  /**
+   * Update unrealized P&L for current position.
+   */
+  private updateUnrealizedPnL(currentPrice: number): void {
+    if (!this.position) {
+      return;
+    }
+
+    const currentValue = this.position.quantity * currentPrice;
+    const entryValue = this.position.quantity * this.position.entryPrice;
+
+    if (this.position.side === "LONG") {
+      this.position.unrealizedPnL = currentValue - entryValue;
+    } else {
+      this.position.unrealizedPnL = entryValue - currentValue;
+    }
+  }
+
+  // ============================================================================
+  // Private Methods - Position Sizing
+  // ============================================================================
+
+  /**
+   * Calculate position size based on sizing mode.
+   */
+  private calculatePositionSize(price: number): number {
+    switch (this.params.positionSizing) {
+      case "FIXED_AMOUNT":
+        return Math.min(
+          this.params.fixedAmount || 1000,
+          this.capital * 0.95 // Never use more than 95%
+        );
+
+      case "FIXED_PERCENT":
+        const percent = this.params.fixedPercent || 0.1;
+        return this.capital * percent;
+
+      case "KELLY":
+        return this.calculateKellySize();
+
+      case "ALL_IN":
+        return this.capital * 0.95;
+
+      default:
+        return this.capital * 0.1;
+    }
+  }
+
+  /**
+   * Calculate Kelly criterion position size.
+   */
+  private calculateKellySize(): number {
+    const kelly = this.params.kelly;
+    if (!kelly) {
+      // Fallback to 10% if no Kelly params
+      return this.capital * 0.1;
+    }
+
+    const { winRate, avgWin, avgLoss, fractionMultiplier = 0.5 } = kelly;
+
+    if (avgLoss === 0) {
+      return this.capital * 0.1;
+    }
+
+    // Kelly formula: f = (bp - q) / b
+    // where b = avgWin/avgLoss, p = winRate, q = 1 - winRate
+    const b = avgWin / avgLoss;
+    const p = winRate;
+    const q = 1 - winRate;
+
+    const kellyFraction = (b * p - q) / b;
+
+    // Apply fraction multiplier (half-Kelly is safer)
+    const adjustedFraction = Math.max(0, Math.min(kellyFraction * fractionMultiplier, 0.95));
+
+    return this.capital * adjustedFraction;
+  }
+
+  // ============================================================================
+  // Private Methods - Costs
+  // ============================================================================
+
+  /**
+   * Apply slippage to a price.
+   */
+  private applySlippage(price: number, side: "BUY" | "SELL"): number {
+    const slippage = this.params.slippageRate;
+
+    if (side === "BUY") {
+      // Buying: price moves up (worse for buyer)
+      return price * (1 + slippage);
+    } else {
+      // Selling: price moves down (worse for seller)
+      return price * (1 - slippage);
+    }
+  }
+
+  /**
+   * Calculate commission for a trade value.
+   */
+  private applyCommission(value: number): number {
+    return value * this.params.commissionRate;
+  }
+
+  // ============================================================================
+  // Private Methods - Equity Tracking
+  // ============================================================================
+
+  /**
+   * Update the equity curve with current bar.
+   */
+  private updateEquityCurve(bar: OHLC): void {
+    // Calculate total equity (cash + unrealized P&L)
+    let equity = this.capital;
+
+    if (this.position) {
+      const positionValue = this.position.quantity * bar.close;
+      if (this.position.side === "LONG") {
+        equity += positionValue;
+      } else {
+        // For short, we have entry value locked, plus/minus unrealized P&L
+        equity += this.position.quantity * this.position.entryPrice + this.position.unrealizedPnL;
+      }
+    }
+
+    // Track peak for drawdown
+    if (equity > this.peakEquity) {
+      this.peakEquity = equity;
+    }
+
+    const drawdown = this.peakEquity - equity;
+    const drawdownPct = this.peakEquity > 0 ? (drawdown / this.peakEquity) * 100 : 0;
+
+    this.equityCurve.push({
+      timestamp: bar.timestamp,
+      equity,
+      drawdown,
+      drawdownPct,
+    });
+
+    // Check max drawdown limit
+    if (this.params.maxDrawdown && drawdownPct / 100 >= this.params.maxDrawdown) {
+      // Would close all positions and stop trading
+      // For now, just log (could throw or set a flag)
+    }
+  }
+
+  // ============================================================================
+  // Private Methods - Indicators
+  // ============================================================================
+
+  /**
+   * Pre-calculate all common indicators for the entire dataset.
+   */
+  private precalculateIndicators(data: OHLC[]): IndicatorArrays {
+    const closes = data.map(bar => bar.close);
+
+    // Convert OHLC to Candle format for ATR
+    const candles: Candle[] = data.map(bar => ({
+      open: bar.open,
+      high: bar.high,
+      low: bar.low,
+      close: bar.close,
+      volume: bar.volume,
+      openTime: bar.timestamp,
+    }));
+
+    // Calculate SMAs
+    const sma20 = calculateSMA(closes, 20);
+    const sma50 = calculateSMA(closes, 50);
+    const sma200 = calculateSMA(closes, 200);
+
+    // Calculate EMAs
+    const ema9Result = calculateEMA(closes, 9);
+    const ema21Result = calculateEMA(closes, 21);
+
+    // Calculate RSI
+    const rsi14Result = calculateRSI(closes, 14);
+
+    // Calculate Bollinger Bands
+    const bbResult = calculateBollingerBands(closes, 20, 2);
+
+    // Calculate ATR
+    const atr14Result = calculateATR(candles, 14);
+
+    // Calculate MACD
+    const macdResult = calculateMACD(closes, 12, 26, 9);
+
+    return {
+      sma20,
+      sma50,
+      sma200,
+      ema9: ema9Result.values,
+      ema21: ema21Result.values,
+      rsi14: rsi14Result.values,
+      bbUpper: bbResult.upper,
+      bbMiddle: bbResult.middle,
+      bbLower: bbResult.lower,
+      bbWidth: bbResult.bandwidth,
+      atr14: atr14Result.values,
+      macdLine: macdResult.macd,
+      macdSignal: macdResult.signal,
+      macdHistogram: macdResult.histogram,
+    };
+  }
+
+  /**
+   * Get indicator state for a specific bar index.
+   */
+  private getIndicatorState(index: number): IndicatorState {
+    if (!this.indicators) {
+      return {};
+    }
+
+    return {
+      sma20: this.indicators.sma20[index],
+      sma50: this.indicators.sma50[index],
+      sma200: this.indicators.sma200[index],
+      ema9: this.indicators.ema9[index],
+      ema21: this.indicators.ema21[index],
+      rsi14: this.indicators.rsi14[index],
+      bbUpper: this.indicators.bbUpper[index],
+      bbMiddle: this.indicators.bbMiddle[index],
+      bbLower: this.indicators.bbLower[index],
+      bbWidth: this.indicators.bbWidth[index],
+      atr14: this.indicators.atr14[index],
+      macdLine: this.indicators.macdLine[index],
+      macdSignal: this.indicators.macdSignal[index],
+      macdHistogram: this.indicators.macdHistogram[index],
+    };
+  }
+
+  // ============================================================================
+  // Private Methods - Utility
+  // ============================================================================
+
+  /**
+   * Reset engine state for a fresh run.
+   */
+  private reset(): void {
+    this.capital = this.params.initialCapital;
+    this.position = null;
+    this.trades = [];
+    this.equityCurve = [];
+    this.tradeCounter = 0;
+    this.peakEquity = this.capital;
+    this.currentBarIndex = 0;
+    this.indicators = null;
+  }
+
+  /**
+   * Build the final backtest result.
+   */
+  private buildResult(
+    strategyId: string,
+    data: OHLC[],
+    finalPositionClosed: boolean = false
+  ): BacktestEngineResult {
+    // Calculate final capital from equity curve
+    const finalCapital = this.equityCurve.length > 0
+      ? this.equityCurve[this.equityCurve.length - 1].equity
+      : this.params.initialCapital;
+
+    // Calculate metrics
+    const metrics = this.calculateMetrics(finalCapital);
+
+    return {
+      strategyId,
+      params: this.params,
+      metrics,
+      trades: this.trades,
+      equityCurve: this.equityCurve,
+      finalCapital,
+      startDate: data.length > 0 ? data[0].timestamp : 0,
+      endDate: data.length > 0 ? data[data.length - 1].timestamp : 0,
+      totalBars: data.length,
+      finalPositionClosed,
+    };
+  }
+
+  /**
+   * Calculate all performance metrics.
+   */
+  private calculateMetrics(finalCapital: number): BacktestMetrics {
+    return calculateMetricsFromTrades(this.trades, this.equityCurve, this.params);
+  }
+}
+
+// ============================================================================
+// Helper Function
+// ============================================================================
+
+/**
+ * Convenience function to run a backtest with default or partial params.
+ *
+ * @param strategy - Strategy to test
+ * @param data - OHLC data array
+ * @param params - Optional partial params (merged with defaults)
+ * @returns Complete backtest result
+ *
+ * @example
+ * ```ts
+ * const result = runBacktest(myStrategy, ohlcData, {
+ *   initialCapital: 50000,
+ *   commissionRate: 0.0005,
+ * });
+ * ```
+ */
+export function runBacktest(
+  strategy: BacktestableStrategy | Strategy,
+  data: OHLC[],
+  params?: Partial<BacktestParams>
+): BacktestEngineResult {
+  const fullParams: BacktestParams = {
+    ...DEFAULT_BACKTEST_PARAMS,
+    ...params,
+  };
+
+  const engine = new BacktestEngine(fullParams);
+  return engine.run(strategy, data);
+}
