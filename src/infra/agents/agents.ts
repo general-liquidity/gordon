@@ -33,7 +33,8 @@ import {
   historyTools,
   accountTools,
   tradingTools,
-  allTools,
+  marketAnalysisTools,
+  riskManagementTools,
 } from "./tools/index.ts";
 
 // ============================================================================
@@ -203,11 +204,12 @@ function getScannerAgent(): Agent {
       description:
         "Specialist in scanning the market and finding trading opportunities. " +
         "Use when the user wants to find coins to trade, asks 'what should I buy?', " +
-        "or needs market overview.",
+        "needs market overview, or wants to discover new coins.",
       instructions: SCANNER_INSTRUCTIONS,
       model: getModel(process.env.GORDON_PROVIDER, process.env.GORDON_MODEL),
       tools: {
         ...indicatorTools,
+        ...discoveryTools,  // Coin discovery tools
         scan_market: marketTools.scan_market,
         analyze_coin: marketTools.analyze_coin,
       },
@@ -227,12 +229,15 @@ function getAnalystAgent(): Agent {
       description:
         "Specialist in deep coin analysis and technical indicators. " +
         "Use when user asks about a specific coin, wants detailed analysis, " +
-        "or needs to understand support/resistance levels.",
+        "needs to understand support/resistance levels, wants whale analysis, " +
+        "breakout detection, or order book depth analysis.",
       instructions: ANALYST_INSTRUCTIONS,
       model: getModel(process.env.GORDON_PROVIDER, process.env.GORDON_MODEL),
       tools: {
         ...indicatorTools,
         ...chartTools,
+        ...orderbookTools,         // Order book depth and liquidity analysis
+        ...marketAnalysisTools,    // Whale detection, breakouts, consolidation, scoring
         analyze_coin: marketTools.analyze_coin,
       },
     });
@@ -250,13 +255,19 @@ function getPlannerAgent(): Agent {
       name: "Planner",
       description:
         "Specialist in creating trading plans with entry, stop-loss, and take-profit levels. " +
-        "Use when user wants to create a trade plan, buy a coin, or needs help with position sizing.",
+        "Use when user wants to create a trade plan, buy a coin, needs help with position sizing, " +
+        "Kelly criterion calculations, or pre-trade risk assessment.",
       instructions: PLANNER_INSTRUCTIONS,
       model: getModel(process.env.GORDON_PROVIDER, process.env.GORDON_MODEL),
       tools: {
         ...indicatorTools,
         create_plan: tradingTools.create_plan,
+        create_grid_plan: tradingTools.create_grid_plan,
         list_plans: tradingTools.list_plans,
+        // Risk-based position sizing tools
+        calculate_kelly_size: riskManagementTools.calculate_kelly_size,
+        calculate_volatility_adjusted_size: riskManagementTools.calculate_volatility_adjusted_size,
+        assess_trade_risk: riskManagementTools.assess_trade_risk,
       },
     });
   }
@@ -297,13 +308,21 @@ function getMonitorAgent(): Agent {
       id: "monitor",
       name: "Monitor",
       description:
-        "Specialist in monitoring open positions and detecting issues. " +
-        "Use when user asks about their trades, positions, or portfolio status.",
+        "Specialist in monitoring open positions, portfolio health, and detecting issues. " +
+        "Use when user asks about their trades, positions, portfolio status, wallet balances, " +
+        "earn positions, trade history, exit conditions, or drawdown status.",
       instructions: MONITOR_INSTRUCTIONS,
       model: getModel(process.env.GORDON_PROVIDER, process.env.GORDON_MODEL),
       tools: {
         check_positions: positionTools.check_positions,
         ...accountTools,
+        ...walletTools,    // Wallet management and transfers
+        ...earnTools,      // Staking/savings positions
+        ...historyTools,   // Trade and transfer history
+        // Risk monitoring tools
+        check_exit_conditions: riskManagementTools.check_exit_conditions,
+        check_drawdown_status: riskManagementTools.check_drawdown_status,
+        check_daily_limit: riskManagementTools.check_daily_limit,
       },
     });
   }
@@ -357,9 +376,12 @@ function getGordonAgent(): Agent {
         teacher: getTeacherAgent(),
       },
 
-      // Direct tools for simple operations
+      // Gordon only has essential routing/system tools
+      // Specialized tools are delegated to sub-agents to avoid confusion
+      // This improves tool selection accuracy by keeping Gordon focused on orchestration
       tools: {
-        ...allTools,
+        ...systemTools,       // arm/disarm system control
+        ...schedulerTools,    // task scheduling (cross-cutting concern)
       },
 
       // Memory for network orchestration

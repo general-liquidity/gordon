@@ -317,86 +317,17 @@ export const getAccountDetailsTool = createTool({
 });
 
 // ============================================================================
-// Earn Positions Tool
-// ============================================================================
-
-export const getEarnPositionsTool = createTool({
-  id: "get_flexible_positions",
-  description:
-    "Get Simple Earn FLEXIBLE positions only (quick access). " +
-    "For comprehensive earn info including LOCKED positions, use get_all_earn_positions instead. " +
-    "Use for quick check: 'flexible savings balance', 'quick earn check'.",
-  inputSchema: z.object({}),
-  outputSchema: z.object({
-    message: z.string().optional(),
-    positions: z.array(z.object({
-      asset: z.string(),
-      totalAmount: z.number(),
-      freeAmount: z.number(),
-      lockedAmount: z.number(),
-      apy: z.string(),
-      rewardAsset: z.string(),
-      productName: z.string(),
-    })),
-    totalPositions: z.number().optional(),
-    summary: z.string().optional(),
-    error: z.string().optional(),
-  }),
-  execute: async (_input, execContext: MastraExecutionContext) => {
-    const ctx = getGordonContext(execContext);
-    if (!ctx?.binance) {
-      return errors.noBinance;
-    }
-
-    try {
-      const positions = await ctx.binance.getEarnPositions();
-
-      if (positions.length === 0) {
-        return {
-          message: "No earn positions found. You can earn interest on your crypto through Binance Simple Earn.",
-          positions: [],
-        };
-      }
-
-      let totalValue = 0;
-      const formattedPositions = positions.map((p) => {
-        const total = parseFloat(p.totalAmount);
-        totalValue += total;
-        return {
-          asset: p.asset,
-          totalAmount: total,
-          freeAmount: parseFloat(p.freeAmount),
-          lockedAmount: parseFloat(p.lockedAmount),
-          apy: `${(parseFloat(p.apy) * 100).toFixed(2)}%`,
-          rewardAsset: p.rewardAsset,
-          productName: p.productName,
-        };
-      });
-
-      return {
-        positions: formattedPositions,
-        totalPositions: positions.length,
-        summary: `You have ${positions.length} earn position(s) active.`,
-      };
-    } catch (error) {
-      return {
-        error: error instanceof Error ? error.message : "Failed to fetch earn positions",
-        positions: [],
-      };
-    }
-  },
-});
-
-// ============================================================================
 // Export as Object (Mastra format)
 // ============================================================================
 
 /**
  * Account tools exported as an object for Mastra Agent
  * This is the format expected by Mastra's Agent class
+ *
+ * NOTE: get_flexible_positions was removed as duplicate of get_all_earn_positions
+ * in earn.ts which is more comprehensive (covers both flexible AND locked positions)
  */
 export const accountTools = {
   get_portfolio: getPortfolioTool,
   get_account_details: getAccountDetailsTool,
-  get_flexible_positions: getEarnPositionsTool,
 };
