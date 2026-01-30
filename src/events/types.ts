@@ -190,6 +190,26 @@ export interface AgentStreamCompletedEvent extends BaseEvent {
   responseLength: number;
 }
 
+export interface AgentStreamChunkEvent extends BaseEvent {
+  type: "agent:stream_chunk";
+  content: string;
+  chunkIndex: number;
+}
+
+export interface AgentNetworkRoutedEvent extends BaseEvent {
+  type: "agent:network_routed";
+  fromAgent: string;
+  toAgent: string;
+  reason?: string;
+}
+
+export interface AgentReflectionEvent extends BaseEvent {
+  type: "agent:reflection";
+  agent: string;
+  analysis: string;
+  adjustments?: string[];
+}
+
 /**
  * Tool lifecycle events
  */
@@ -245,6 +265,9 @@ export type GordonEvent =
   | AgentHandoffEvent
   | AgentMessageProcessedEvent
   | AgentStreamCompletedEvent
+  | AgentStreamChunkEvent
+  | AgentNetworkRoutedEvent
+  | AgentReflectionEvent
   | ToolStartedEvent
   | ToolCompletedEvent
   | GuardrailBlockedEvent;

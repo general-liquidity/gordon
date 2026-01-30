@@ -20,6 +20,7 @@
  * - marketAnalysis: Advanced market analysis (whale detection, breakouts, consolidation, scoring)
  * - riskManagement: Risk management (Kelly sizing, daily limits, exit conditions, drawdown)
  * - strategies: Strategy library (list, detect, scan, suggest)
+ * - metrics: Performance metrics and statistics
  */
 
 // Migrated tools
@@ -40,6 +41,7 @@ export { tradingTools } from "./trading.ts";
 export { marketAnalysisTools } from "./market-analysis.ts";
 export { riskManagementTools } from "./risk-management.ts";
 export { strategyTools } from "./strategies.ts";
+export { metricsTools } from "./metrics.ts";
 
 // ============================================================================
 // Combined Tools Object
@@ -62,6 +64,7 @@ import { tradingTools } from "./trading.ts";
 import { marketAnalysisTools } from "./market-analysis.ts";
 import { riskManagementTools } from "./risk-management.ts";
 import { strategyTools } from "./strategies.ts";
+import { metricsTools } from "./metrics.ts";
 
 /**
  * All tools combined as a single object for Mastra Agent
@@ -84,6 +87,7 @@ export const allTools = {
   ...marketAnalysisTools,
   ...riskManagementTools,
   ...strategyTools,
+  ...metricsTools,
 };
 
 /**
@@ -107,5 +111,6 @@ export const toolCounts = {
   marketAnalysis: Object.keys(marketAnalysisTools).length,
   riskManagement: Object.keys(riskManagementTools).length,
   strategies: Object.keys(strategyTools).length,
+  metrics: Object.keys(metricsTools).length,
   total: Object.keys(allTools).length,
 };

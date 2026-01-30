@@ -36,6 +36,7 @@ import {
   marketAnalysisTools,
   riskManagementTools,
   strategyTools,
+  metricsTools,
 } from "./tools/index.ts";
 
 // ============================================================================
@@ -322,6 +323,7 @@ function getMonitorAgent(): Agent {
         ...walletTools,    // Wallet management and transfers
         ...earnTools,      // Staking/savings positions
         ...historyTools,   // Trade and transfer history
+        ...metricsTools,   // Performance metrics and statistics
         // Risk monitoring tools
         check_exit_conditions: riskManagementTools.check_exit_conditions,
         check_drawdown_status: riskManagementTools.check_drawdown_status,

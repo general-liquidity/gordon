@@ -222,6 +222,15 @@ export const SLASH_COMMANDS: SlashCommand[] = [
     action: "menu",
     target: "model",
   },
+  {
+    name: "metrics",
+    aliases: ["stats", "performance"],
+    description: "Show trading performance metrics",
+    usage: "/metrics",
+    category: "account",
+    action: "tool",
+    target: "get_performance_metrics",
+  },
 ];
 
 /**
@@ -360,6 +369,8 @@ export function commandToPrompt(command: SlashCommand, args: string): string {
       return "Show me all available trading strategies";
     case "strategy":
       return args ? `Tell me about the ${args} strategy` : "What strategy would you like to learn about?";
+    case "metrics":
+      return "Show me my trading performance metrics and statistics";
     default:
       return args || command.description;
   }

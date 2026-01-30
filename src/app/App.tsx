@@ -10,7 +10,7 @@ import { ChatView, type ChatMessage } from "./ChatView.tsx";
 import { Onboarding } from "./Onboarding.tsx";
 import { SetupWizard } from "./SetupWizard.tsx";
 import { ModelSelector } from "./ModelSelector.tsx";
-import { processMessage, initializeTracing } from "../infra/agents/orchestrator.ts";
+import { processMessage, processMessageStream, initializeTracing, type StreamEvent } from "../infra/agents/orchestrator.ts";
 import { createLLMClientFromEnv, type LLMClient } from "../infra/llm/index.ts";
 import { BinanceClient } from "../infra/binance/index.ts";
 import { runMonitorCycle } from "../core/monitor.ts";
