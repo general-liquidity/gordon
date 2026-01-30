@@ -8,12 +8,13 @@
  */
 
 import { BinanceClient } from "../infra/binance/index.ts";
+import type { OrderParams } from "../infra/binance/index.ts";
 import { listTrades, updateTrade } from "../infra/storage/trades.ts";
 import { logEvent } from "../infra/storage/events.ts";
 import { getPlan } from "../infra/storage/plans.ts";
 import { createModuleLogger } from "../infra/logger/index.ts";
 import { emitEvent } from "../events/index.ts";
-import type { Trade, Plan, ExitFill } from "../types/index.ts";
+import type { Trade, Plan, ExitFill, EntryFill } from "../types/index.ts";
 
 const logger = createModuleLogger("monitor");
 
@@ -55,6 +56,36 @@ const TP_APPROACH_THRESHOLD_PERCENT = 2;
 const VOLUME_SPIKE_MULTIPLIER = 3;
 const FLASH_CRASH_THRESHOLD_PERCENT = 5;
 const VOLUME_AVERAGE_PERIODS = 20;
+const GRID_REVERSAL_THRESHOLD = 0.01; // 1% reversal triggers deferred TP placement
+
+// ============================================================================
+// Utility Functions (duplicated from executor for independence)
+// ============================================================================
+
+/**
+ * Round quantity to appropriate precision for Binance
+ */
+function roundQuantity(quantity: number, precision: number = 8): number {
+  const multiplier = Math.pow(10, precision);
+  return Math.floor(quantity * multiplier) / multiplier;
+}
+
+/**
+ * Round price to appropriate precision
+ */
+function roundPrice(price: number, precision: number = 8): number {
+  const multiplier = Math.pow(10, precision);
+  return Math.round(price * multiplier) / multiplier;
+}
+
+/**
+ * Generate a unique client order ID for tracking
+ */
+function generateClientOrderId(planId: string, type: string): string {
+  const timestamp = Date.now().toString(36);
+  const random = Math.random().toString(36).substring(2, 6);
+  return `gordon_${planId.slice(4, 12)}_${type}_${timestamp}_${random}`;
+}
 
 // ============================================================================
 // Main Monitor Function
@@ -225,6 +256,11 @@ async function checkOrderFills(
 ): Promise<Alert[]> {
   const alerts: Alert[] = [];
 
+  // Check if this is a grid entry plan
+  if (plan.strategy === "grid_entry" && plan.grid) {
+    return await checkGridFills(client, trade, plan, alerts);
+  }
+
   try {
     const openOrders = await client.getOpenOrders(trade.symbol);
     const openOrderIds = new Set(openOrders.map((o) => String(o.orderId)));
@@ -379,6 +415,348 @@ async function checkOrderFills(
   }
 
   return alerts;
+}
+
+// ============================================================================
+// Grid Fill Monitoring
+// ============================================================================
+
+/**
+ * Check grid entry fills and manage deferred take profits
+ *
+ * Grid entry strategy works by placing multiple limit buy orders at descending
+ * price levels. As price falls through each level, orders fill incrementally.
+ * Take profits are deferred until either:
+ * 1. All grid levels have filled, OR
+ * 2. Price reverses 1% above the highest filled level
+ */
+async function checkGridFills(
+  client: BinanceClient,
+  trade: Trade,
+  plan: Plan,
+  alerts: Alert[]
+): Promise<Alert[]> {
+  if (!plan.grid) {
+    return alerts;
+  }
+
+  try {
+    const currentPrice = await client.getPrice(trade.symbol);
+    const openOrders = await client.getOpenOrders(trade.symbol);
+    const stopPrice = plan.stopLoss.price;
+
+    let tradeUpdated = false;
+    const updatedTrade = { ...trade };
+
+    // Track which grid levels have filled based on entries
+    const filledLevelPrices = new Set(trade.entries.map(e => e.price));
+    const gridLevels = plan.grid.levels;
+
+    // Check each grid level for fills (price <= level price means fill)
+    for (let i = 0; i < gridLevels.length; i++) {
+      const level = gridLevels[i]!;
+      const levelLabel = `GRID_${i + 1}`;
+
+      // Skip if already filled
+      if (filledLevelPrices.has(level.price)) {
+        continue;
+      }
+
+      // Check if current price has crossed below this grid level
+      if (currentPrice <= level.price) {
+        // Calculate quantity for this level
+        const levelQuantity = roundQuantity(
+          (plan.allocation.amount * level.percentOfAllocation) / level.price
+        );
+
+        // Create entry fill for this grid level
+        const gridFill: EntryFill = {
+          orderId: `grid_${i + 1}_${trade.id}`,
+          price: level.price,
+          quantity: levelQuantity,
+          filledAt: new Date().toISOString(),
+        };
+
+        updatedTrade.entries = [...updatedTrade.entries, gridFill];
+        tradeUpdated = true;
+
+        // Recalculate weighted average entry
+        const newAvgEntry = calculateWeightedAverageEntry(updatedTrade.entries);
+        updatedTrade.averageEntry = newAvgEntry;
+
+        alerts.push({
+          type: "order_filled",
+          tradeId: trade.id,
+          message: `${trade.symbol}: Grid level ${i + 1} filled at ${level.price}`,
+          severity: "info",
+          data: {
+            orderType: levelLabel,
+            fillPrice: level.price,
+            quantity: levelQuantity,
+            newAverageEntry: newAvgEntry,
+            gridLevelsFilled: updatedTrade.entries.length,
+            totalGridLevels: gridLevels.length,
+          },
+        });
+
+        logger.info("Grid level filled", {
+          tradeId: trade.id,
+          symbol: trade.symbol,
+          level: i + 1,
+          price: level.price,
+          quantity: levelQuantity,
+          newAvgEntry,
+        });
+
+        logEvent({
+          type: "ORDER_FILLED",
+          data: {
+            orderType: levelLabel,
+            fillPrice: level.price,
+            quantity: levelQuantity,
+            newAverageEntry: newAvgEntry,
+          },
+          tradeId: trade.id,
+          planId: trade.planId,
+        });
+      }
+    }
+
+    // Check if stop loss has been hit
+    if (currentPrice <= stopPrice && updatedTrade.status !== "CLOSED") {
+      const remainingQty = calculateRemainingQuantity(updatedTrade);
+
+      if (remainingQty > 0) {
+        const stopFill: ExitFill = {
+          orderId: `stop_${trade.id}`,
+          price: stopPrice,
+          quantity: remainingQty,
+          filledAt: new Date().toISOString(),
+          reason: "STOP",
+        };
+
+        updatedTrade.exits = [...updatedTrade.exits, stopFill];
+        updatedTrade.status = "CLOSED";
+        updatedTrade.closedAt = new Date().toISOString();
+
+        const { realizedPnl, realizedPnlPercent } = calculateRealizedPnl(updatedTrade);
+        updatedTrade.realizedPnl = realizedPnl;
+        updatedTrade.realizedPnlPercent = realizedPnlPercent;
+        tradeUpdated = true;
+
+        alerts.push({
+          type: "order_filled",
+          tradeId: trade.id,
+          message: `${trade.symbol}: Grid stop loss triggered at ${stopPrice}`,
+          severity: "critical",
+          data: {
+            orderType: "STOP",
+            fillPrice: stopPrice,
+            quantity: remainingQty,
+            realizedPnl,
+            realizedPnlPercent,
+          },
+        });
+
+        logger.warn("Grid stop loss triggered", {
+          tradeId: trade.id,
+          symbol: trade.symbol,
+          stopPrice,
+          pnl: realizedPnl,
+        });
+
+        logEvent({
+          type: "ORDER_FILLED",
+          data: {
+            orderType: "STOP",
+            fillPrice: stopPrice,
+            realizedPnl,
+            realizedPnlPercent,
+          },
+          tradeId: trade.id,
+          planId: trade.planId,
+        });
+      }
+    }
+
+    // Check if we should place deferred take profits
+    if (updatedTrade.status !== "CLOSED" && updatedTrade.entries.length > 0) {
+      const filledLevels = updatedTrade.entries.length;
+      const totalLevels = gridLevels.length;
+      const allLevelsFilled = filledLevels >= totalLevels;
+
+      // Find the highest filled level price
+      const highestFilledPrice = Math.max(...updatedTrade.entries.map(e => e.price));
+
+      // Check for price reversal (1% above highest filled level)
+      const reversalThreshold = highestFilledPrice * (1 + GRID_REVERSAL_THRESHOLD);
+      const priceReversed = currentPrice >= reversalThreshold;
+
+      // Check if TPs have already been placed (by checking for existing TP exits or TP orders)
+      const hasTakeProfitOrders = openOrders.some(o =>
+        o.side === "SELL" && o.type === "LIMIT"
+      );
+
+      // Place deferred TPs if: (all levels filled OR price reversed) AND no TPs placed yet
+      if ((allLevelsFilled || priceReversed) && !hasTakeProfitOrders && updatedTrade.exits.length === 0) {
+        const totalQuantity = updatedTrade.entries.reduce((sum, e) => sum + e.quantity, 0);
+
+        logger.info("Placing deferred take profits", {
+          tradeId: trade.id,
+          symbol: trade.symbol,
+          reason: allLevelsFilled ? "all_levels_filled" : "price_reversal",
+          totalQuantity,
+          filledLevels,
+          currentPrice,
+        });
+
+        await placeDeferredTakeProfits(client, updatedTrade, plan, totalQuantity, alerts);
+
+        alerts.push({
+          type: "order_filled",
+          tradeId: trade.id,
+          message: `${trade.symbol}: Deferred take profits placed (${allLevelsFilled ? "all levels filled" : "price reversal"})`,
+          severity: "info",
+          data: {
+            reason: allLevelsFilled ? "all_levels_filled" : "price_reversal",
+            filledLevels,
+            totalLevels,
+            currentPrice,
+            reversalThreshold,
+          },
+        });
+      }
+    }
+
+    if (tradeUpdated) {
+      updateTrade(trade.id, updatedTrade);
+    }
+  } catch (error) {
+    logger.error("Error checking grid fills", error as Error, {
+      tradeId: trade.id,
+      symbol: trade.symbol
+    });
+  }
+
+  return alerts;
+}
+
+/**
+ * Calculate weighted average entry from entries array
+ */
+function calculateWeightedAverageEntry(entries: EntryFill[]): number {
+  if (entries.length === 0) return 0;
+
+  let totalValue = 0;
+  let totalQuantity = 0;
+
+  for (const entry of entries) {
+    totalValue += entry.price * entry.quantity;
+    totalQuantity += entry.quantity;
+  }
+
+  return totalQuantity > 0 ? roundPrice(totalValue / totalQuantity) : 0;
+}
+
+/**
+ * Place deferred take profit orders after grid entries have filled
+ *
+ * This is called when either all grid levels have filled or price has
+ * reversed above the highest filled level, indicating the dip-buying
+ * phase is complete.
+ */
+async function placeDeferredTakeProfits(
+  client: BinanceClient,
+  trade: Trade,
+  plan: Plan,
+  totalQuantity: number,
+  alerts: Alert[]
+): Promise<void> {
+  let remainingQuantity = totalQuantity;
+
+  for (let i = 0; i < plan.takeProfit.length; i++) {
+    const tp = plan.takeProfit[i];
+    if (!tp) continue;
+
+    const isLastTP = i === plan.takeProfit.length - 1;
+
+    // Calculate quantity for this TP level
+    const tpQuantity = isLastTP
+      ? roundQuantity(remainingQuantity)
+      : roundQuantity(totalQuantity * tp.percentToSell);
+
+    remainingQuantity = roundQuantity(remainingQuantity - tpQuantity);
+
+    if (tpQuantity <= 0) continue;
+
+    const tpOrderParams: OrderParams = {
+      symbol: trade.symbol,
+      side: "SELL",
+      type: "LIMIT",
+      quantity: tpQuantity,
+      price: roundPrice(tp.price),
+      timeInForce: "GTC",
+      newClientOrderId: generateClientOrderId(trade.planId, `tp${i + 1}`),
+    };
+
+    try {
+      const tpOrder = await client.placeOrder(tpOrderParams);
+
+      logger.info("Deferred take profit order placed", {
+        tradeId: trade.id,
+        level: i + 1,
+        orderId: tpOrder.orderId,
+        price: tp.price,
+        quantity: tpQuantity,
+      });
+
+      logEvent({
+        type: "ORDER_PLACED",
+        data: {
+          action: `DEFERRED_TP_${i + 1}`,
+          orderId: tpOrder.orderId.toString(),
+          symbol: trade.symbol,
+          side: "SELL",
+          type: "LIMIT",
+          price: tp.price,
+          quantity: tpQuantity,
+        },
+        tradeId: trade.id,
+        planId: trade.planId,
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+
+      logger.error("Failed to place deferred TP order", error as Error, {
+        tradeId: trade.id,
+        level: i + 1,
+        params: tpOrderParams,
+      });
+
+      logEvent({
+        type: "ERROR",
+        data: {
+          action: "DEFERRED_TP_FAILED",
+          tpLevel: i + 1,
+          params: tpOrderParams,
+          error: errorMessage,
+        },
+        tradeId: trade.id,
+        planId: trade.planId,
+      });
+
+      alerts.push({
+        type: "order_filled",
+        tradeId: trade.id,
+        message: `${trade.symbol}: Failed to place deferred TP${i + 1}: ${errorMessage}`,
+        severity: "warning",
+        data: {
+          orderType: `DEFERRED_TP_${i + 1}`,
+          error: errorMessage,
+        },
+      });
+    }
+  }
 }
 
 // ============================================================================
