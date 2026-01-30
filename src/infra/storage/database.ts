@@ -41,12 +41,20 @@ export function initDatabase(): Database {
       allocation TEXT NOT NULL,
       entry TEXT NOT NULL,
       dca TEXT,
+      grid TEXT,
       stopLoss TEXT NOT NULL,
       takeProfit TEXT NOT NULL,
       reasoning TEXT NOT NULL,
       status TEXT NOT NULL
     )
   `);
+
+  // Migration: Add grid column if it doesn't exist (for existing databases)
+  try {
+    db.run(`ALTER TABLE plans ADD COLUMN grid TEXT`);
+  } catch {
+    // Column already exists, ignore error
+  }
 
   // Create trades table
   db.run(`

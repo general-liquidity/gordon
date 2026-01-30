@@ -664,6 +664,9 @@ function calculateWeightedAverageEntry(entries: EntryFill[]): number {
  * This is called when either all grid levels have filled or price has
  * reversed above the highest filled level, indicating the dip-buying
  * phase is complete.
+ *
+ * Fixed: Now properly tracks successful placements to calculate remaining
+ * quantity correctly even if some TP orders fail.
  */
 async function placeDeferredTakeProfits(
   client: BinanceClient,
@@ -672,8 +675,11 @@ async function placeDeferredTakeProfits(
   totalQuantity: number,
   alerts: Alert[]
 ): Promise<void> {
-  let remainingQuantity = totalQuantity;
+  // Track successfully placed quantities to properly calculate remaining
+  let placedQuantity = 0;
+  const tpResults: { level: number; success: boolean; quantity: number }[] = [];
 
+  // First pass: attempt to place all TP orders
   for (let i = 0; i < plan.takeProfit.length; i++) {
     const tp = plan.takeProfit[i];
     if (!tp) continue;
@@ -681,13 +687,15 @@ async function placeDeferredTakeProfits(
     const isLastTP = i === plan.takeProfit.length - 1;
 
     // Calculate quantity for this TP level
+    // For the last TP, use whatever quantity remains after previous successful placements
     const tpQuantity = isLastTP
-      ? roundQuantity(remainingQuantity)
+      ? roundQuantity(totalQuantity - placedQuantity)
       : roundQuantity(totalQuantity * tp.percentToSell);
 
-    remainingQuantity = roundQuantity(remainingQuantity - tpQuantity);
-
-    if (tpQuantity <= 0) continue;
+    if (tpQuantity <= 0) {
+      tpResults.push({ level: i + 1, success: false, quantity: 0 });
+      continue;
+    }
 
     const tpOrderParams: OrderParams = {
       symbol: trade.symbol,
@@ -701,6 +709,10 @@ async function placeDeferredTakeProfits(
 
     try {
       const tpOrder = await client.placeOrder(tpOrderParams);
+
+      // Only increment placedQuantity on successful placement
+      placedQuantity += tpQuantity;
+      tpResults.push({ level: i + 1, success: true, quantity: tpQuantity });
 
       logger.info("Deferred take profit order placed", {
         tradeId: trade.id,
@@ -726,6 +738,9 @@ async function placeDeferredTakeProfits(
       });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
+
+      // Don't increment placedQuantity on failure - the quantity is still available
+      tpResults.push({ level: i + 1, success: false, quantity: 0 });
 
       logger.error("Failed to place deferred TP order", error as Error, {
         tradeId: trade.id,
@@ -756,6 +771,21 @@ async function placeDeferredTakeProfits(
         },
       });
     }
+  }
+
+  // Log summary of TP placement
+  const successCount = tpResults.filter(r => r.success).length;
+  const failCount = tpResults.filter(r => !r.success && r.quantity === 0).length;
+
+  if (failCount > 0) {
+    logger.warn("Some deferred TPs failed to place", {
+      tradeId: trade.id,
+      successCount,
+      failCount,
+      placedQuantity,
+      totalQuantity,
+      unplacedQuantity: totalQuantity - placedQuantity,
+    });
   }
 }
 

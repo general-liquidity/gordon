@@ -21,9 +21,9 @@ import { calculateGridLevels } from "../../../core/grid-calculator.ts";
 import { PlanSchema } from "../../../types/plan.ts";
 import { TradeSchema } from "../../../types/trade.ts";
 import { loadConfig, saveConfig } from "../../storage/config.ts";
-import { listPlans, getPlan, updatePlan } from "../../storage/plans.ts";
+import { listPlans, getPlan, updatePlan, createPlan } from "../../storage/plans.ts";
 import { listTrades, getTrade } from "../../storage/trades.ts";
-import { getGordonContext, MastraExecutionContext } from "./types.ts";
+import { getGordonContext, type MastraExecutionContext } from "./types.ts";
 
 // ============================================================================
 // Error Messages
@@ -445,7 +445,39 @@ Returns a grid plan for user approval.`,
       .slice(0, 2)
       .map(r => r.price);
 
-    // Build plan preview
+    // Build take profit levels with percentages
+    const takeProfitLevels = takeProfits.map((price, i) => ({
+      price,
+      percentToSell: i === takeProfits.length - 1
+        ? 1 - (takeProfits.length - 1) * 0.5 // Last TP gets remaining
+        : 0.5, // First TP gets 50%
+    }));
+
+    // Create and persist the plan to the database
+    const savedPlan = createPlan({
+      symbol: normalizedSymbol,
+      direction: "long" as const,
+      strategy: "grid_entry" as const,
+      allocation: {
+        currency: "USDT" as const,
+        amount: allocationAmount,
+        percentOfPortfolio,
+      },
+      entry: {
+        type: "limit" as const,
+        price: gridResult.config.priceRange.high, // Highest grid level
+      },
+      dca: null,
+      grid: gridResult.config,
+      stopLoss: {
+        price: gridResult.stopLossPrice,
+      },
+      takeProfit: takeProfitLevels,
+      reasoning: `Grid entry plan with ${gridResult.levels.length} levels using ${distribution ?? "pyramid"} distribution. Price range: $${gridResult.config.priceRange.high.toFixed(2)} to $${gridResult.config.priceRange.low.toFixed(2)}. Weighted entry if all fill: $${gridResult.weightedEntryIfAllFill.toFixed(2)}`,
+      status: "DRAFT" as const,
+    });
+
+    // Build plan preview for response
     const planPreview = {
       symbol: normalizedSymbol,
       strategy: "grid_entry",
@@ -466,7 +498,7 @@ Returns a grid plan for user approval.`,
     return {
       success: true,
       planPreview,
-      message: `Grid plan for ${normalizedSymbol}: ${gridResult.levels.length} levels from $${gridResult.config.priceRange.high.toFixed(2)} to $${gridResult.config.priceRange.low.toFixed(2)}. ${levelsSummary}. Stop loss at $${gridResult.stopLossPrice.toFixed(2)}. Allocation: $${allocationAmount.toFixed(2)} (${(percentOfPortfolio * 100).toFixed(1)}% of portfolio).`,
+      message: `Grid plan created (ID: ${savedPlan.id}) for ${normalizedSymbol}: ${gridResult.levels.length} levels from $${gridResult.config.priceRange.high.toFixed(2)} to $${gridResult.config.priceRange.low.toFixed(2)}. ${levelsSummary}. Stop loss at $${gridResult.stopLossPrice.toFixed(2)}. Allocation: $${allocationAmount.toFixed(2)} (${(percentOfPortfolio * 100).toFixed(1)}% of portfolio). Use 'approve_plan' with ID ${savedPlan.id} to approve.`,
     };
   },
 });

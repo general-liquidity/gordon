@@ -17,6 +17,7 @@
  * - history: Trade/transfer history
  * - account: Account information
  * - trading: Plan creation and execution
+ * - marketAnalysis: Advanced market analysis (whale detection, breakouts, consolidation, scoring)
  */
 
 // Migrated tools
@@ -34,6 +35,7 @@ export { discoveryTools } from "./discovery.ts";
 export { historyTools } from "./history.ts";
 export { accountTools } from "./account.ts";
 export { tradingTools } from "./trading.ts";
+export { marketAnalysisTools } from "./market-analysis.ts";
 
 // ============================================================================
 // Combined Tools Object
@@ -53,6 +55,7 @@ import { discoveryTools } from "./discovery.ts";
 import { historyTools } from "./history.ts";
 import { accountTools } from "./account.ts";
 import { tradingTools } from "./trading.ts";
+import { marketAnalysisTools } from "./market-analysis.ts";
 
 /**
  * All tools combined as a single object for Mastra Agent
@@ -72,6 +75,7 @@ export const allTools = {
   ...historyTools,
   ...accountTools,
   ...tradingTools,
+  ...marketAnalysisTools,
 };
 
 /**
@@ -92,5 +96,6 @@ export const toolCounts = {
   history: Object.keys(historyTools).length,
   account: Object.keys(accountTools).length,
   trading: Object.keys(tradingTools).length,
+  marketAnalysis: Object.keys(marketAnalysisTools).length,
   total: Object.keys(allTools).length,
 };

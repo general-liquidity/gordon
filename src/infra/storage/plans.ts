@@ -42,8 +42,8 @@ export function createPlan(
   const createdAt = new Date().toISOString();
 
   const stmt = db.prepare(`
-    INSERT INTO plans (id, createdAt, symbol, direction, strategy, allocation, entry, dca, stopLoss, takeProfit, reasoning, status)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO plans (id, createdAt, symbol, direction, strategy, allocation, entry, dca, grid, stopLoss, takeProfit, reasoning, status)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   stmt.run(
@@ -55,6 +55,7 @@ export function createPlan(
     JSON.stringify(plan.allocation),
     JSON.stringify(plan.entry),
     plan.dca ? JSON.stringify(plan.dca) : null,
+    plan.grid ? JSON.stringify(plan.grid) : null,
     JSON.stringify(plan.stopLoss),
     JSON.stringify(plan.takeProfit),
     plan.reasoning,
@@ -99,7 +100,7 @@ export function updatePlan(id: string, updates: Partial<Plan>): Plan {
 
   const stmt = db.prepare(`
     UPDATE plans
-    SET symbol = ?, direction = ?, strategy = ?, allocation = ?, entry = ?, dca = ?, stopLoss = ?, takeProfit = ?, reasoning = ?, status = ?
+    SET symbol = ?, direction = ?, strategy = ?, allocation = ?, entry = ?, dca = ?, grid = ?, stopLoss = ?, takeProfit = ?, reasoning = ?, status = ?
     WHERE id = ?
   `);
 
@@ -110,6 +111,7 @@ export function updatePlan(id: string, updates: Partial<Plan>): Plan {
     JSON.stringify(updated.allocation),
     JSON.stringify(updated.entry),
     updated.dca ? JSON.stringify(updated.dca) : null,
+    updated.grid ? JSON.stringify(updated.grid) : null,
     JSON.stringify(updated.stopLoss),
     JSON.stringify(updated.takeProfit),
     updated.reasoning,

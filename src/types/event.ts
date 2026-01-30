@@ -10,6 +10,7 @@ export const EventTypeSchema = z.enum([
   "ORDER_FILLED",
   "ALERT",
   "ERROR",
+  "SYSTEM",
 ]);
 
 export const EventSchema = z.object({

@@ -19,6 +19,7 @@ import { loadConfig, saveConfig } from "../infra/storage/config.ts";
 import { loadEnvFile, checkEnvStatus, type EnvStatus } from "../infra/storage/env.ts";
 import { initDatabase } from "../infra/storage/index.ts";
 import { initializeContainer } from "../services/container.ts";
+import { reconcileWithBinance } from "../services/reconciliation.service.ts";
 import type { GordonContext } from "../infra/agents/types.ts";
 import type { Mode, GordonConfig } from "../types/index.ts";
 import { COLORS } from "./theme.ts";
@@ -162,6 +163,24 @@ export function App(): React.ReactElement {
             envStatus.keys.BINANCE_API_KEY,
             envStatus.keys.BINANCE_API_SECRET
           );
+
+          // Reconcile local state with Binance on startup
+          // This ensures any orders that filled while offline are recorded
+          reconcileWithBinance(binanceClientRef.current)
+            .then((result) => {
+              if (result.ordersUpdated > 0) {
+                console.log(`Reconciliation complete: ${result.ordersUpdated} orders synced`);
+              }
+              if (result.warnings.length > 0) {
+                console.warn("Reconciliation warnings:", result.warnings);
+              }
+              if (result.errors.length > 0) {
+                console.error("Reconciliation errors:", result.errors);
+              }
+            })
+            .catch((error) => {
+              console.error("Reconciliation failed:", error);
+            });
         } catch (error) {
           console.error("Failed to initialize Binance client:", error);
         }
