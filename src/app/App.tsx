@@ -10,6 +10,8 @@ import { ChatView, type ChatMessage } from "./ChatView.tsx";
 import { Onboarding } from "./Onboarding.tsx";
 import { SetupWizard } from "./SetupWizard.tsx";
 import { ModelSelector } from "./ModelSelector.tsx";
+import { ShortcutsOverlay } from "./components/ShortcutsOverlay.tsx";
+import { ThemeProvider, useTheme } from "./components/ThemeProvider.tsx";
 import { processMessageStream, initializeTracing } from "../infra/agents/orchestrator.ts";
 import { createLLMClientFromEnv, type LLMClient } from "../infra/llm/index.ts";
 import { BinanceClient } from "../infra/binance/index.ts";
@@ -22,7 +24,7 @@ import { initializeContainer } from "../services/container.ts";
 import { reconcileWithBinance } from "../services/reconciliation.service.ts";
 import type { GordonContext } from "../infra/agents/types.ts";
 import type { Mode, GordonConfig } from "../types/index.ts";
-import { COLORS } from "./theme.ts";
+import { COLORS, type ThemeName } from "./theme.ts";
 import { parseSlashCommand, commandToPrompt, formatCommandHelp } from "./slashCommands.ts";
 
 type AppView = "loading" | "onboarding" | "setup" | "model" | "welcome" | "menu" | "chat";
@@ -44,6 +46,7 @@ interface AppState {
   activeToolCall: string | null;
   conversationHistory: ConversationMessage[];
   btcPrice: number | undefined;
+  showShortcuts: boolean;
 }
 
 function getDefaultConfig(): GordonConfig {
@@ -68,7 +71,11 @@ function formatTimestamp(): string {
   });
 }
 
-export function App(): React.ReactElement {
+interface AppContentProps {
+  onThemeChange: (theme: ThemeName | "toggle", args?: string) => void;
+}
+
+function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
   const [state, setState] = useState<AppState>({
     view: "loading",
     mode: "SAFE",
@@ -81,6 +88,7 @@ export function App(): React.ReactElement {
     activeToolCall: null,
     conversationHistory: [],
     btcPrice: undefined,
+    showShortcuts: false,
   });
 
   const llmClientRef = useRef<LLMClient | null>(null);
@@ -278,6 +286,34 @@ export function App(): React.ReactElement {
 
       if (command.action === "menu" && command.target === "model") {
         setState((prev) => ({ ...prev, view: "model" }));
+        return;
+      }
+
+      if (command.action === "menu" && command.target === "shortcuts") {
+        setState((prev) => ({ ...prev, showShortcuts: true }));
+        return;
+      }
+
+      // Handle theme command
+      if (command.action === "menu" && command.target === "theme") {
+        const newTheme = args === "dark" || args === "light" ? args : "toggle";
+        onThemeChange(newTheme);
+
+        const themeMessage: ChatMessage = {
+          role: "gordon",
+          content: newTheme === "toggle"
+            ? "Theme toggled. Use `/theme dark` or `/theme light` to set a specific theme."
+            : `Theme switched to ${newTheme} mode.`,
+          timestamp: formatTimestamp(),
+        };
+        setState((prev) => ({
+          ...prev,
+          messages: [
+            ...prev.messages,
+            { role: "user", content: value.trim(), timestamp: formatTimestamp() },
+            themeMessage,
+          ],
+        }));
         return;
       }
 
@@ -998,6 +1034,21 @@ Please check your API keys in the .env file and restart Gordon.`,
       return;
     }
 
+    // Handle shortcuts overlay
+    if (state.showShortcuts) {
+      if (key.escape || input === "?") {
+        setState((prev) => ({ ...prev, showShortcuts: false }));
+      }
+      return;
+    }
+
+    // Show shortcuts with ? key (only when not actively typing in chat input)
+    // The ? should only trigger when in menu view or when the shortcuts overlay is toggled
+    if (input === "?" && state.view === "menu") {
+      setState((prev) => ({ ...prev, showShortcuts: true }));
+      return;
+    }
+
     // ESC to go back to menu from chat
     if (key.escape && state.view === "chat") {
       setState((prev) => ({ ...prev, view: "menu" }));
@@ -1018,6 +1069,11 @@ Please check your API keys in the .env file and restart Gordon.`,
         connectionStatus={state.connectionStatus}
         btcPrice={state.btcPrice}
       />
+
+      {/* Shortcuts Overlay */}
+      {state.showShortcuts && (
+        <ShortcutsOverlay onClose={() => setState((prev) => ({ ...prev, showShortcuts: false }))} />
+      )}
 
       {/* Main content area */}
       <Box flexDirection="column" flexGrow={1}>
@@ -1082,7 +1138,7 @@ Please check your API keys in the .env file and restart Gordon.`,
             {/* Help hint */}
             <Box paddingX={2} paddingY={0}>
               <Text color={COLORS.DIM}>
-                ESC: menu | /help: commands | Tab: autocomplete
+                ESC: menu | /help: commands | /theme: toggle theme
               </Text>
             </Box>
           </Box>
@@ -1092,4 +1148,32 @@ Please check your API keys in the .env file and restart Gordon.`,
   );
 }
 
-export default App;
+/**
+ * Main App component wrapped with ThemeProvider
+ */
+export function App(): React.ReactElement {
+  const { theme, themeName, toggleTheme, setTheme } = useTheme();
+
+  const handleThemeChange = useCallback((action: ThemeName | "toggle"): void => {
+    if (action === "toggle") {
+      toggleTheme();
+    } else {
+      setTheme(action);
+    }
+  }, [toggleTheme, setTheme]);
+
+  return <AppContent onThemeChange={handleThemeChange} />;
+}
+
+/**
+ * Root component that provides the theme context
+ */
+export function AppWithTheme(): React.ReactElement {
+  return (
+    <ThemeProvider>
+      <App />
+    </ThemeProvider>
+  );
+}
+
+export default AppWithTheme;

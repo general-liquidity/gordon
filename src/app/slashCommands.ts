@@ -269,6 +269,24 @@ export const SLASH_COMMANDS: SlashCommand[] = [
     action: "tool",
     target: "get_cache_stats",
   },
+  {
+    name: "shortcuts",
+    aliases: ["keys", "hotkeys"],
+    description: "Show keyboard shortcuts",
+    usage: "/shortcuts",
+    category: "system",
+    action: "menu",
+    target: "shortcuts",
+  },
+  {
+    name: "theme",
+    aliases: ["th"],
+    description: "Toggle or set color theme (dark/light)",
+    usage: "/theme [dark|light]",
+    category: "system",
+    action: "menu",
+    target: "theme",
+  },
 ];
 
 /**
@@ -421,6 +439,12 @@ export function commandToPrompt(command: SlashCommand, args: string): string {
       return "Show me my risk-adjusted performance metrics including Sharpe ratio and drawdown";
     case "cache":
       return "Show me the tool cache statistics";
+    case "shortcuts":
+      return "Show keyboard shortcuts";
+    case "theme":
+      if (args === "dark") return "Switch to dark theme";
+      if (args === "light") return "Switch to light theme";
+      return "Toggle the color theme";
     default:
       return args || command.description;
   }

@@ -22,3 +22,6 @@ export {
 
 // Markdown rendering
 export { MarkdownText } from "./MarkdownText.tsx";
+
+// Theme system
+export { ThemeProvider, useTheme, useIsDarkTheme, useThemeColors } from "./ThemeProvider.tsx";

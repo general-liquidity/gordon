@@ -9,6 +9,11 @@ import { TextInput } from "@inkjs/ui";
 import { COLORS } from "./theme.ts";
 import { getSlashCommandSuggestions } from "./slashCommands.ts";
 import { CommandAutocomplete } from "./components/CommandAutocomplete.tsx";
+import {
+  QuickActions,
+  getQuickActionCommand,
+  getQuickActionsCount,
+} from "./components/QuickActions.tsx";
 
 interface ChatInputProps {
   onSubmit: (value: string) => void;
@@ -22,6 +27,10 @@ export function ChatInput({ onSubmit, disabled = false, placeholder }: ChatInput
   const [autocompleteIndex, setAutocompleteIndex] = useState(0);
   const [showAutocomplete, setShowAutocomplete] = useState(false);
   const [inputKey, setInputKey] = useState(0); // Key to force TextInput remount
+  const [quickActionIndex, setQuickActionIndex] = useState(0);
+
+  // Show quick actions when input is empty
+  const showQuickActions = !disabled && value.trim() === "";
 
   // Get suggestions based on current input
   const suggestions = useMemo(() => {
@@ -65,9 +74,53 @@ export function ChatInput({ onSubmit, disabled = false, placeholder }: ChatInput
     }
   }, []);
 
-  // Handle special keys for autocomplete navigation
+  // Handle quick action selection
+  const handleQuickActionSelect = useCallback((command: string) => {
+    onSubmit(command);
+    setValue("");
+    setQuickActionIndex(0);
+    setInputKey((k) => k + 1);
+  }, [onSubmit]);
+
+  // Handle special keys for autocomplete and quick action navigation
   useInput((input, key) => {
     if (disabled) return;
+
+    // Handle quick actions when input is empty
+    if (showQuickActions) {
+      // Number keys 1-5 to select quick actions
+      const numKey = parseInt(input, 10);
+      if (numKey >= 1 && numKey <= getQuickActionsCount()) {
+        const command = getQuickActionCommand(numKey - 1);
+        if (command) {
+          handleQuickActionSelect(command);
+          return;
+        }
+      }
+
+      // Left/right arrow to navigate quick actions
+      if (key.leftArrow) {
+        setQuickActionIndex((prev) =>
+          prev > 0 ? prev - 1 : getQuickActionsCount() - 1
+        );
+        return;
+      }
+      if (key.rightArrow) {
+        setQuickActionIndex((prev) =>
+          prev < getQuickActionsCount() - 1 ? prev + 1 : 0
+        );
+        return;
+      }
+
+      // Enter to select current quick action
+      if (key.return && !value.trim()) {
+        const command = getQuickActionCommand(quickActionIndex);
+        if (command) {
+          handleQuickActionSelect(command);
+          return;
+        }
+      }
+    }
 
     // Only handle autocomplete navigation when showing
     if (shouldShowAutocomplete) {
@@ -100,6 +153,13 @@ export function ChatInput({ onSubmit, disabled = false, placeholder }: ChatInput
 
   return (
     <Box flexDirection="column">
+      {/* Quick actions bar */}
+      <QuickActions
+        onSelect={handleQuickActionSelect}
+        selectedIndex={quickActionIndex}
+        visible={showQuickActions}
+      />
+
       {/* Autocomplete dropdown */}
       {shouldShowAutocomplete && (
         <CommandAutocomplete

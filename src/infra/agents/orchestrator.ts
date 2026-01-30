@@ -188,8 +188,7 @@ export async function* processMessageStream(
       payload?: {
         agentId?: string;
         toolName?: string;
-        text?: string;
-        textDelta?: string;
+        text?: string;  // Mastra uses 'text' in TextDeltaPayload
         args?: Record<string, unknown>;
         result?: unknown;
       };
@@ -198,9 +197,17 @@ export async function* processMessageStream(
     const streamObj = streamResult as unknown as {
       fullStream?: ReadableStream<StreamChunk>;
       textStream?: AsyncIterable<string>;
-      text?: string | (() => Promise<string>);
+      text?: string | (() => Promise<string>) | Promise<string>;
       usage?: { inputTokens?: number; outputTokens?: number; totalTokens?: number } | Promise<{ inputTokens?: number; outputTokens?: number; totalTokens?: number }>;
     };
+
+    // Debug: Log available properties on the stream result
+    logger.debug("Stream result properties", {
+      hasFullStream: !!streamObj.fullStream,
+      hasTextStream: !!streamObj.textStream,
+      hasText: !!streamObj.text,
+      textType: typeof streamObj.text,
+    });
 
     // Try fullStream first for complete event information (including tool calls and agent switches)
     if (streamObj.fullStream) {
@@ -214,8 +221,9 @@ export async function* processMessageStream(
 
           switch (chunk.type) {
             case "text-delta":
-              if (chunk.payload?.textDelta) {
-                const outputCheck = await checkOutputGuardrails(chunk.payload.textDelta);
+              // Mastra's TextDeltaPayload uses 'text' field, not 'textDelta'
+              if (chunk.payload?.text) {
+                const outputCheck = await checkOutputGuardrails(chunk.payload.text);
                 const sanitizedChunk = outputCheck.sanitized;
                 fullText += sanitizedChunk;
                 yield {
@@ -273,6 +281,62 @@ export async function* processMessageStream(
                 }
               }
               break;
+
+            // Handle routing agent text (from network routing decisions)
+            case "routing-agent-text-delta":
+              if (chunk.payload?.text) {
+                const outputCheck = await checkOutputGuardrails(chunk.payload.text);
+                const sanitizedChunk = outputCheck.sanitized;
+                fullText += sanitizedChunk;
+                yield {
+                  type: "text_delta",
+                  content: sanitizedChunk,
+                  agentName: currentAgent || "Gordon",
+                };
+              }
+              break;
+
+            default:
+              // Handle agent-execution-event-* types (sub-agent wrapped events)
+              if (chunk.type?.startsWith("agent-execution-event-")) {
+                const innerType = chunk.type.replace("agent-execution-event-", "");
+                const innerPayload = chunk.payload as unknown as StreamChunk;
+
+                if (innerType === "text-delta" && innerPayload?.payload?.text) {
+                  const outputCheck = await checkOutputGuardrails(innerPayload.payload.text);
+                  const sanitizedChunk = outputCheck.sanitized;
+                  fullText += sanitizedChunk;
+                  yield {
+                    type: "text_delta",
+                    content: sanitizedChunk,
+                    agentName: currentAgent,
+                  };
+                } else if (innerType === "tool-call" && innerPayload?.payload?.toolName) {
+                  const toolName = innerPayload.payload.toolName;
+                  const detectedAgent = getAgentForTool(toolName);
+                  if (detectedAgent && detectedAgent !== currentAgent) {
+                    currentAgent = detectedAgent;
+                    yield {
+                      type: "agent_switch",
+                      agentName: currentAgent,
+                    };
+                  }
+                  yield {
+                    type: "tool_call_start",
+                    toolName,
+                    toolArgs: innerPayload.payload.args,
+                    agentName: currentAgent,
+                  };
+                } else if (innerType === "tool-result") {
+                  yield {
+                    type: "tool_call_end",
+                    toolName: innerPayload?.payload?.toolName,
+                    toolResult: innerPayload?.payload?.result,
+                    agentName: currentAgent,
+                  };
+                }
+              }
+              break;
           }
         }
       } finally {
@@ -295,16 +359,33 @@ export async function* processMessageStream(
     } else if (typeof streamObj.text === 'function') {
       // text is a promise function
       const rawText = await streamObj.text();
-      // OUTPUT GUARDRAIL: Sanitize the response
-      const outputCheck = await checkOutputGuardrails(rawText);
-      fullText = outputCheck.sanitized;
-      yield {
-        type: "text_delta",
-        content: fullText,
-        agentName: currentAgent,
-      };
+      logger.debug("Got text from function", { textLength: rawText?.length });
+      if (rawText) {
+        // OUTPUT GUARDRAIL: Sanitize the response
+        const outputCheck = await checkOutputGuardrails(rawText);
+        fullText = outputCheck.sanitized;
+        yield {
+          type: "text_delta",
+          content: fullText,
+          agentName: currentAgent,
+        };
+      }
+    } else if (streamObj.text instanceof Promise) {
+      // text is a Promise
+      const rawText = await streamObj.text;
+      logger.debug("Got text from Promise", { textLength: rawText?.length });
+      if (rawText) {
+        const outputCheck = await checkOutputGuardrails(rawText);
+        fullText = outputCheck.sanitized;
+        yield {
+          type: "text_delta",
+          content: fullText,
+          agentName: currentAgent,
+        };
+      }
     } else if (typeof streamObj.text === 'string') {
       // OUTPUT GUARDRAIL: Sanitize the response
+      logger.debug("Got text as string", { textLength: streamObj.text?.length });
       const outputCheck = await checkOutputGuardrails(streamObj.text);
       fullText = outputCheck.sanitized;
       yield {
@@ -312,6 +393,40 @@ export async function* processMessageStream(
         content: fullText,
         agentName: currentAgent,
       };
+    } else {
+      // No text available - log warning
+      logger.warn("No text content available in stream result", {
+        textType: typeof streamObj.text,
+        textValue: streamObj.text,
+      });
+    }
+
+    // If we still have no text, try awaiting the text property as a final fallback
+    if (!fullText && streamObj.text) {
+      logger.debug("Attempting final text fallback");
+      try {
+        let finalText: string | undefined;
+        if (typeof streamObj.text === 'function') {
+          finalText = await streamObj.text();
+        } else if (streamObj.text instanceof Promise) {
+          finalText = await streamObj.text;
+        } else if (typeof streamObj.text === 'string') {
+          finalText = streamObj.text;
+        }
+
+        if (finalText && finalText.trim()) {
+          const outputCheck = await checkOutputGuardrails(finalText);
+          fullText = outputCheck.sanitized;
+          yield {
+            type: "text_delta",
+            content: fullText,
+            agentName: currentAgent,
+          };
+          logger.debug("Got text from final fallback", { textLength: fullText.length });
+        }
+      } catch (textError) {
+        logger.error("Failed to get text from fallback", textError as Error);
+      }
     }
 
     // Get usage stats
@@ -332,6 +447,16 @@ export async function* processMessageStream(
 
     // Record successful request metrics
     recordRequest(Date.now() - startTime, true);
+
+    // Log warning if no content was generated
+    if (!fullText || fullText.trim().length === 0) {
+      logger.warn("Stream completed with empty content", {
+        userMessage: userMessage.substring(0, 100),
+        hasFullStream: !!streamObj.fullStream,
+        hasTextStream: !!streamObj.textStream,
+        textType: typeof streamObj.text,
+      });
+    }
 
     yield {
       type: "done",

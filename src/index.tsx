@@ -2,7 +2,7 @@
 
 import React from "react";
 import { render } from "ink";
-import { App } from "./app/App.tsx";
+import { AppWithTheme } from "./app/App.tsx";
 import { closeDatabase } from "./infra/storage/database.ts";
 
 // Track if shutdown is in progress to prevent duplicate cleanup
@@ -48,8 +48,8 @@ process.on("unhandledRejection", (reason, promise) => {
   // Don't exit on unhandled rejections, just log them
 });
 
-// Render the application
-const { waitUntilExit } = render(<App />);
+// Render the application with theme support
+const { waitUntilExit } = render(<AppWithTheme />);
 
 // Handle graceful shutdown when app exits
 waitUntilExit().then(() => {
