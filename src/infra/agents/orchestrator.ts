@@ -28,6 +28,69 @@ import type { GordonContext } from "./types.ts";
 const logger = createModuleLogger("orchestrator");
 
 // ============================================================================
+// Tool-to-Agent Mapping
+// ============================================================================
+
+/**
+ * Map tool names to their owning sub-agent
+ * Used to detect which agent is responding during streaming
+ */
+const TOOL_AGENT_MAP: Record<string, string> = {
+  // Scanner tools
+  scan_market: "Scanner",
+  // Analyst tools
+  analyze_coin: "Analyst",
+  get_technical_analysis: "Analyst",
+  get_rsi: "Analyst",
+  get_vwap: "Analyst",
+  get_stochastic_rsi: "Analyst",
+  detect_whales: "Analyst",
+  detect_breakout: "Analyst",
+  detect_consolidation: "Analyst",
+  score_setup: "Analyst",
+  get_orderbook_depth: "Analyst",
+  get_orderbook_imbalance: "Analyst",
+  find_liquidity_clusters: "Analyst",
+  get_chart: "Analyst",
+  // Planner tools
+  create_plan: "Planner",
+  create_grid_plan: "Planner",
+  list_plans: "Planner",
+  calculate_kelly_size: "Planner",
+  calculate_volatility_adjusted_size: "Planner",
+  assess_trade_risk: "Planner",
+  // Executor tools
+  execute_plan: "Executor",
+  close_trade: "Executor",
+  arm_system: "Executor",
+  approve_plan: "Executor",
+  // Monitor tools
+  check_positions: "Monitor",
+  get_portfolio: "Monitor",
+  get_wallet_balances: "Monitor",
+  get_earn_positions: "Monitor",
+  get_trade_history: "Monitor",
+  check_exit_conditions: "Monitor",
+  check_drawdown_status: "Monitor",
+  check_daily_limit: "Monitor",
+  get_performance_metrics: "Monitor",
+  // Teacher tools
+  explain: "Teacher",
+  // Discovery tools (Scanner)
+  discover_coins: "Scanner",
+  get_trending: "Scanner",
+  get_new_listings: "Scanner",
+  get_top_movers: "Scanner",
+};
+
+/**
+ * Get the agent name that owns a specific tool
+ */
+function getAgentForTool(toolName: string): string | undefined {
+  return TOOL_AGENT_MAP[toolName];
+}
+
+// ============================================================================
 // Request Context Helper
 // ============================================================================
 
@@ -116,16 +179,107 @@ export async function* processMessageStream(
     } as Record<string, unknown>);
 
     let fullText = "";
+    let currentAgent: string | undefined;
 
-    // Mastra's stream() returns a MastraModelOutput with textStream
+    // Mastra's stream() returns a MastraModelOutput with fullStream for all events
     // Use type assertion to access the streaming interface
+    interface StreamChunk {
+      type: string;
+      payload?: {
+        agentId?: string;
+        toolName?: string;
+        text?: string;
+        textDelta?: string;
+        args?: Record<string, unknown>;
+        result?: unknown;
+      };
+    }
+
     const streamObj = streamResult as unknown as {
+      fullStream?: ReadableStream<StreamChunk>;
       textStream?: AsyncIterable<string>;
       text?: string | (() => Promise<string>);
       usage?: { inputTokens?: number; outputTokens?: number; totalTokens?: number } | Promise<{ inputTokens?: number; outputTokens?: number; totalTokens?: number }>;
     };
 
-    if (streamObj.textStream && typeof streamObj.textStream[Symbol.asyncIterator] === 'function') {
+    // Try fullStream first for complete event information (including tool calls and agent switches)
+    if (streamObj.fullStream) {
+      const reader = streamObj.fullStream.getReader();
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = value as StreamChunk;
+
+          switch (chunk.type) {
+            case "text-delta":
+              if (chunk.payload?.textDelta) {
+                const outputCheck = await checkOutputGuardrails(chunk.payload.textDelta);
+                const sanitizedChunk = outputCheck.sanitized;
+                fullText += sanitizedChunk;
+                yield {
+                  type: "text_delta",
+                  content: sanitizedChunk,
+                  agentName: currentAgent,
+                };
+              }
+              break;
+
+            case "tool-call":
+              if (chunk.payload?.toolName) {
+                const toolName = chunk.payload.toolName;
+                const detectedAgent = getAgentForTool(toolName);
+
+                // Emit agent switch if we detected a different agent
+                if (detectedAgent && detectedAgent !== currentAgent) {
+                  currentAgent = detectedAgent;
+                  yield {
+                    type: "agent_switch",
+                    agentName: currentAgent,
+                  };
+                }
+
+                yield {
+                  type: "tool_call_start",
+                  toolName,
+                  toolArgs: chunk.payload.args,
+                  agentName: currentAgent,
+                };
+              }
+              break;
+
+            case "tool-result":
+              yield {
+                type: "tool_call_end",
+                toolName: chunk.payload?.toolName,
+                toolResult: chunk.payload?.result,
+                agentName: currentAgent,
+              };
+              break;
+
+            case "agent-execution-start":
+            case "routing-agent-start":
+              if (chunk.payload?.agentId) {
+                const agentId = chunk.payload.agentId;
+                // Capitalize agent name for display
+                const agentName = agentId.charAt(0).toUpperCase() + agentId.slice(1);
+                if (agentName !== currentAgent && agentName.toLowerCase() !== "gordon") {
+                  currentAgent = agentName;
+                  yield {
+                    type: "agent_switch",
+                    agentName: currentAgent,
+                  };
+                }
+              }
+              break;
+          }
+        }
+      } finally {
+        reader.releaseLock();
+      }
+    } else if (streamObj.textStream && typeof streamObj.textStream[Symbol.asyncIterator] === 'function') {
+      // Fallback to textStream if fullStream is not available
       // Stream text chunks as they arrive
       // OUTPUT GUARDRAIL: Sanitize each chunk for sensitive data
       for await (const chunk of streamObj.textStream) {
@@ -135,6 +289,7 @@ export async function* processMessageStream(
         yield {
           type: "text_delta",
           content: sanitizedChunk,
+          agentName: currentAgent,
         };
       }
     } else if (typeof streamObj.text === 'function') {
@@ -146,6 +301,7 @@ export async function* processMessageStream(
       yield {
         type: "text_delta",
         content: fullText,
+        agentName: currentAgent,
       };
     } else if (typeof streamObj.text === 'string') {
       // OUTPUT GUARDRAIL: Sanitize the response
@@ -154,6 +310,7 @@ export async function* processMessageStream(
       yield {
         type: "text_delta",
         content: fullText,
+        agentName: currentAgent,
       };
     }
 
@@ -180,6 +337,7 @@ export async function* processMessageStream(
       type: "done",
       content: fullText,
       usage,
+      agentName: currentAgent,
     };
 
   } catch (err) {

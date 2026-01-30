@@ -15,6 +15,11 @@ import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
 import { getGordonContext, type MastraExecutionContext } from "./types.ts";
+import {
+  resilientGetOrderBook,
+  resilientGetSpread,
+} from "../../resilience/index.ts";
+import { createCachedTool, TOOL_CACHE_CONFIG } from "./cache.ts";
 
 // ============================================================================
 // Error Messages
@@ -87,7 +92,9 @@ export const getOrderBookTool = createTool({
       : `${symbol.toUpperCase()}USDT`;
 
     try {
-      const orderBook = await ctx.binance.getOrderBook(normalizedSymbol, limit);
+      // Use resilient wrapper with automatic retry, cache fallback, and circuit breaker
+      const result = await resilientGetOrderBook(ctx.binance, normalizedSymbol, limit);
+      const orderBook = result.data;
 
       // Calculate totals and find walls
       let bidTotal = 0;
@@ -169,15 +176,20 @@ export const getSpreadTool = createTool({
       : `${symbol.toUpperCase()}USDT`;
 
     try {
-      const spread = await ctx.binance.getSpread(normalizedSymbol);
+      // Use resilient wrapper with automatic retry, cache fallback, and circuit breaker
+      const result = await resilientGetSpread(ctx.binance, normalizedSymbol);
+      const spread = result.data;
 
-      const assessment = spread.spreadPercent < 0.05
-        ? "Excellent liquidity"
-        : spread.spreadPercent < 0.1
-          ? "Good liquidity"
-          : spread.spreadPercent < 0.5
-            ? "Moderate liquidity"
-            : "Low liquidity - be cautious";
+      let assessment: string;
+      if (spread.spreadPercent < 0.05) {
+        assessment = "Excellent liquidity";
+      } else if (spread.spreadPercent < 0.1) {
+        assessment = "Good liquidity";
+      } else if (spread.spreadPercent < 0.5) {
+        assessment = "Moderate liquidity";
+      } else {
+        assessment = "Low liquidity - be cautious";
+      }
 
       return {
         symbol: normalizedSymbol,
@@ -547,11 +559,18 @@ export const getMarketTradesTool = getRecentTradesTool;
 /**
  * Orderbook tools exported as an object for Mastra Agent
  * This is the format expected by Mastra's Agent class
+ *
+ * Caching strategy:
+ * - get_order_book: 5 second TTL (highly dynamic)
+ * - get_spread: 5 second TTL (highly dynamic)
+ * - get_market_trades: 5 second TTL (real-time data)
+ * - Order management tools are NOT cached (mutations)
  */
 export const orderbookTools = {
-  get_order_book: getOrderBookTool,
-  get_spread: getSpreadTool,
-  get_market_trades: getRecentTradesTool,
+  get_order_book: createCachedTool(getOrderBookTool, TOOL_CACHE_CONFIG.orderbook.ttl),
+  get_spread: createCachedTool(getSpreadTool, TOOL_CACHE_CONFIG.orderbook.ttl),
+  get_market_trades: createCachedTool(getRecentTradesTool, TOOL_CACHE_CONFIG.orderbook.ttl),
+  // Order management tools are NOT cached (they are mutations)
   place_oco_order: placeOCOOrderTool,
   cancel_all_orders: cancelAllOrdersTool,
   get_order_status: getOrderStatusTool,

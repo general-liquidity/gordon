@@ -24,6 +24,7 @@ import { loadConfig, saveConfig } from "../../storage/config.ts";
 import { listPlans, getPlan, updatePlan, createPlan } from "../../storage/plans.ts";
 import { listTrades, getTrade } from "../../storage/trades.ts";
 import { getGordonContext, validateToolOutput, type MastraExecutionContext } from "./types.ts";
+import { reflectOnPlan, formatReflectionSummary } from "../reflection.ts";
 
 // ============================================================================
 // Error Messages
@@ -50,6 +51,13 @@ const createPlanOutputSchema = z.object({
   plan: PlanSchema.optional(),
   summary: z.string().optional(),
   error: z.string().optional(),
+  reflection: z.object({
+    isValid: z.boolean(),
+    issues: z.array(z.string()),
+    suggestions: z.array(z.string()),
+    confidence: z.number(),
+  }).optional(),
+  warnings: z.array(z.string()).optional(),
 });
 
 const executePlanOutputSchema = z.object({
@@ -120,6 +128,13 @@ const createGridPlanOutputSchema = z.object({
   }).optional(),
   message: z.string().optional(),
   error: z.string().optional(),
+  reflection: z.object({
+    isValid: z.boolean(),
+    issues: z.array(z.string()),
+    suggestions: z.array(z.string()),
+    confidence: z.number(),
+  }).optional(),
+  warnings: z.array(z.string()).optional(),
 });
 
 // ============================================================================
@@ -191,10 +206,27 @@ export const createPlanTool = createTool({
       portfolioValue: ctx.portfolioValue,
     });
 
+    // Perform reflection on the generated plan
+    const reflectionResult = await reflectOnPlan(plan, ctx, { skipLLM: false });
+
+    // Build result with reflection information
+    const baseSummary = `Created ${plan.strategy} plan for ${plan.symbol}: Entry at ${plan.entry.price ?? "market"}, Stop at ${plan.stopLoss.price}, ${plan.takeProfit.length} TP levels. Allocation: ${plan.allocation.amount} USDT (${(plan.allocation.percentOfPortfolio * 100).toFixed(1)}%)`;
+
+    const reflectionSummary = formatReflectionSummary(reflectionResult);
+
     const result = {
-      success: true,
+      success: reflectionResult.isValid,
       plan,
-      summary: `Created ${plan.strategy} plan for ${plan.symbol}: Entry at ${plan.entry.price ?? "market"}, Stop at ${plan.stopLoss.price}, ${plan.takeProfit.length} TP levels. Allocation: ${plan.allocation.amount} USDT (${(plan.allocation.percentOfPortfolio * 100).toFixed(1)}%)`,
+      summary: reflectionResult.isValid
+        ? `${baseSummary}\n\nReflection: ${reflectionSummary}`
+        : `${baseSummary}\n\nWARNING - ${reflectionSummary}`,
+      reflection: {
+        isValid: reflectionResult.isValid,
+        issues: reflectionResult.issues,
+        suggestions: reflectionResult.suggestions,
+        confidence: reflectionResult.confidence,
+      },
+      warnings: reflectionResult.issues.length > 0 ? reflectionResult.issues : undefined,
     };
 
     return validateToolOutput(createPlanOutputSchema, result, { toolName: "create_plan" });
@@ -528,14 +560,30 @@ Returns a grid plan for user approval.`,
       weightedEntry: gridResult.weightedEntryIfAllFill,
     };
 
+    // Perform reflection on the saved plan (rule-based only for grid plans since no LLM context)
+    const reflectionResult = await reflectOnPlan(savedPlan, ctx, { skipLLM: true });
+
     const levelsSummary = gridResult.levels
       .map((l, i) => `L${i + 1}: $${l.price.toFixed(2)} (${(l.percentOfAllocation * 100).toFixed(1)}%)`)
       .join(", ");
 
+    const baseMessage = `Grid plan created (ID: ${savedPlan.id}) for ${normalizedSymbol}: ${gridResult.levels.length} levels from $${gridResult.config.priceRange.high.toFixed(2)} to $${gridResult.config.priceRange.low.toFixed(2)}. ${levelsSummary}. Stop loss at $${gridResult.stopLossPrice.toFixed(2)}. Allocation: $${allocationAmount.toFixed(2)} (${(percentOfPortfolio * 100).toFixed(1)}% of portfolio). Use 'approve_plan' with ID ${savedPlan.id} to approve.`;
+
+    const reflectionSummary = formatReflectionSummary(reflectionResult);
+
     const result = {
-      success: true,
+      success: reflectionResult.isValid,
       planPreview,
-      message: `Grid plan created (ID: ${savedPlan.id}) for ${normalizedSymbol}: ${gridResult.levels.length} levels from $${gridResult.config.priceRange.high.toFixed(2)} to $${gridResult.config.priceRange.low.toFixed(2)}. ${levelsSummary}. Stop loss at $${gridResult.stopLossPrice.toFixed(2)}. Allocation: $${allocationAmount.toFixed(2)} (${(percentOfPortfolio * 100).toFixed(1)}% of portfolio). Use 'approve_plan' with ID ${savedPlan.id} to approve.`,
+      message: reflectionResult.isValid
+        ? `${baseMessage}\n\nReflection: ${reflectionSummary}`
+        : `${baseMessage}\n\nWARNING - ${reflectionSummary}`,
+      reflection: {
+        isValid: reflectionResult.isValid,
+        issues: reflectionResult.issues,
+        suggestions: reflectionResult.suggestions,
+        confidence: reflectionResult.confidence,
+      },
+      warnings: reflectionResult.issues.length > 0 ? reflectionResult.issues : undefined,
     };
 
     return validateToolOutput(createGridPlanOutputSchema, result, { toolName: "create_grid_plan" });

@@ -15,7 +15,8 @@ import { z } from "zod";
 import { scan } from "../../../core/scanner.ts";
 import { analyze } from "../../../core/analyzer.ts";
 import { getHistoricalOpportunities, getOpportunitySummary } from "../../storage/events.ts";
-import { getGordonContext, validateToolOutput, MastraExecutionContext } from "./types.ts";
+import { getGordonContext, validateToolOutput, type MastraExecutionContext } from "./types.ts";
+import { createCachedTool, TOOL_CACHE_CONFIG } from "./cache.ts";
 
 // ============================================================================
 // Error Messages
@@ -270,9 +271,14 @@ export const getHistoricalOpportunitiesTool = createTool({
 /**
  * Market tools exported as an object for Mastra Agent
  * This is the format expected by Mastra's Agent class
+ *
+ * All tools are wrapped with caching and request deduplication:
+ * - scan_market: 2 minute TTL (comprehensive market scan)
+ * - analyze_coin: 5 minute TTL (deep analysis, expensive)
+ * - get_historical_opportunities: 10 minute TTL (historical data, rarely changes)
  */
 export const marketTools = {
-  scan_market: scanMarketTool,
-  analyze_coin: analyzeCoinTool,
-  get_historical_opportunities: getHistoricalOpportunitiesTool,
+  scan_market: createCachedTool(scanMarketTool, TOOL_CACHE_CONFIG.scanning.ttl),
+  analyze_coin: createCachedTool(analyzeCoinTool, TOOL_CACHE_CONFIG.analysis.ttl),
+  get_historical_opportunities: createCachedTool(getHistoricalOpportunitiesTool, TOOL_CACHE_CONFIG.historical.ttl),
 };

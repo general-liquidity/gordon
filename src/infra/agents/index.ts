@@ -75,3 +75,15 @@ export {
   getMemory,
   resetMemory,
 } from "./memory.ts";
+
+// Reflection
+export {
+  reflectOnPlan,
+  reflectOnPlanRules,
+  reflectOnPlanWithLLM,
+  reflectOnAnalysis,
+  reflectWithLLM,
+  quickValidatePlan,
+  formatReflectionSummary,
+} from "./reflection.ts";
+export type { ReflectionResult, ReflectionOptions } from "./reflection.ts";

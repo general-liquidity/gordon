@@ -8,8 +8,14 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
-import { strategyRegistry, STRATEGY_IDS, type StrategyId } from "../../../strategies/index.ts";
-import { getGordonContext, MastraExecutionContext, normalizeSymbol } from "./types.ts";
+import {
+  strategyRegistry,
+  STRATEGY_IDS,
+  runEnsemble,
+  runQuickEnsemble,
+  type StrategyId,
+} from "../../../strategies/index.ts";
+import { getGordonContext, normalizeSymbol, type MastraExecutionContext } from "./types.ts";
 
 // ============================================================================
 // Error Messages
@@ -379,6 +385,234 @@ export const suggestStrategyTool = createTool({
 });
 
 // ============================================================================
+// Run Strategy Ensemble Tool
+// ============================================================================
+
+export const runStrategyEnsembleTool = createTool({
+  id: "run_strategy_ensemble",
+  description:
+    "Run multiple strategies and combine their signals for more robust detection. " +
+    "Returns confidence weighted by how many strategies agree. " +
+    "Use when you want higher confidence signals or to validate a single strategy's detection.",
+  inputSchema: z.object({
+    symbol: z
+      .string()
+      .describe("Trading pair symbol (e.g., 'BTCUSDT', 'ETH')"),
+    timeframe: z
+      .string()
+      .default("4h")
+      .describe("Timeframe to analyze"),
+    strategies: z
+      .array(z.string())
+      .optional()
+      .describe("Specific strategy IDs to run (omit for all strategies)"),
+    minAgreement: z
+      .number()
+      .min(0)
+      .max(1)
+      .default(0.5)
+      .describe("Minimum percentage of strategies that must agree (0-1, default 0.5)"),
+    tierFilter: z
+      .number()
+      .min(1)
+      .max(2)
+      .optional()
+      .describe("Only run tier 1 or tier 2 strategies"),
+    quickMode: z
+      .boolean()
+      .default(false)
+      .describe("Use quick mode with top 3 strategies and 66% agreement threshold"),
+  }),
+  outputSchema: z.object({
+    symbol: z.string().optional(),
+    timeframe: z.string().optional(),
+    detected: z.boolean().optional(),
+    confidence: z.number().optional(),
+    confidencePercent: z.string().optional(),
+    agreementPercent: z.string().optional(),
+    bullishCount: z.number().optional(),
+    totalCount: z.number().optional(),
+    recommendedStrategy: z.string().nullable().optional(),
+    combinedReasoning: z.string().optional(),
+    strategies: z.array(z.object({
+      id: z.string(),
+      detected: z.boolean(),
+      confidence: z.string(),
+      reasoning: z.string(),
+    })).optional(),
+    error: z.string().optional(),
+  }),
+  execute: async (
+    { symbol, timeframe, strategies, minAgreement, tierFilter, quickMode },
+    execContext: MastraExecutionContext
+  ) => {
+    const ctx = getGordonContext(execContext);
+    if (!ctx?.binance) {
+      return errors.noBinance;
+    }
+
+    const normalizedSymbol = normalizeSymbol(symbol);
+
+    try {
+      const result = quickMode
+        ? await runQuickEnsemble(normalizedSymbol, timeframe, { binance: ctx.binance })
+        : await runEnsemble(normalizedSymbol, timeframe, { binance: ctx.binance }, {
+            strategies,
+            minAgreement,
+            tierFilter: tierFilter as 1 | 2 | undefined,
+          });
+
+      return {
+        symbol: result.symbol,
+        timeframe: result.timeframe,
+        detected: result.detected,
+        confidence: result.confidence,
+        confidencePercent: `${Math.round(result.confidence * 100)}%`,
+        agreementPercent: `${Math.round(result.agreementPercent * 100)}%`,
+        bullishCount: result.bullishCount,
+        totalCount: result.totalCount,
+        recommendedStrategy: result.recommendedStrategy,
+        combinedReasoning: result.combinedReasoning,
+        strategies: result.strategies.map((s) => ({
+          id: s.id,
+          detected: s.detected,
+          confidence: `${Math.round(s.confidence * 100)}%`,
+          reasoning: s.reasoning,
+        })),
+      };
+    } catch (error) {
+      return {
+        error: error instanceof Error ? error.message : "Ensemble detection failed",
+      };
+    }
+  },
+});
+
+// ============================================================================
+// Scan With Ensemble Tool
+// ============================================================================
+
+export const scanWithEnsembleTool = createTool({
+  id: "scan_with_ensemble",
+  description:
+    "Scan multiple coins using ensemble detection for higher confidence signals. " +
+    "Runs all strategies on each coin and ranks by combined confidence. " +
+    "Use for comprehensive market scanning with validated signals.",
+  inputSchema: z.object({
+    symbols: z
+      .array(z.string())
+      .default([
+        "BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT",
+        "ADAUSDT", "DOGEUSDT", "AVAXUSDT", "DOTUSDT", "LINKUSDT",
+      ])
+      .describe("Symbols to scan (defaults to top 10)"),
+    timeframe: z
+      .string()
+      .default("4h")
+      .describe("Timeframe to analyze"),
+    minAgreement: z
+      .number()
+      .min(0)
+      .max(1)
+      .default(0.5)
+      .describe("Minimum percentage of strategies that must agree (0-1)"),
+    tierFilter: z
+      .number()
+      .min(1)
+      .max(2)
+      .optional()
+      .describe("Only run tier 1 or tier 2 strategies"),
+    maxResults: z
+      .number()
+      .min(1)
+      .max(20)
+      .default(5)
+      .describe("Maximum number of results to return"),
+  }),
+  outputSchema: z.object({
+    scanned: z.number().optional(),
+    detected: z.number().optional(),
+    opportunities: z.array(z.object({
+      symbol: z.string(),
+      confidence: z.string(),
+      agreementPercent: z.string(),
+      bullishCount: z.number(),
+      totalCount: z.number(),
+      recommendedStrategy: z.string().nullable(),
+      combinedReasoning: z.string(),
+    })).optional(),
+    noSetups: z.array(z.string()).optional(),
+    error: z.string().optional(),
+  }),
+  execute: async (
+    { symbols, timeframe, minAgreement, tierFilter, maxResults },
+    execContext: MastraExecutionContext
+  ) => {
+    const ctx = getGordonContext(execContext);
+    if (!ctx?.binance) {
+      return errors.noBinance;
+    }
+
+    const opportunities: Array<{
+      symbol: string;
+      confidence: string;
+      agreementPercent: string;
+      bullishCount: number;
+      totalCount: number;
+      recommendedStrategy: string | null;
+      combinedReasoning: string;
+    }> = [];
+    const noSetups: string[] = [];
+
+    for (const symbol of symbols) {
+      const normalizedSymbol = normalizeSymbol(symbol);
+
+      try {
+        const result = await runEnsemble(
+          normalizedSymbol,
+          timeframe,
+          { binance: ctx.binance },
+          {
+            minAgreement,
+            tierFilter: tierFilter as 1 | 2 | undefined,
+          }
+        );
+
+        if (result.detected) {
+          opportunities.push({
+            symbol: normalizedSymbol,
+            confidence: `${Math.round(result.confidence * 100)}%`,
+            agreementPercent: `${Math.round(result.agreementPercent * 100)}%`,
+            bullishCount: result.bullishCount,
+            totalCount: result.totalCount,
+            recommendedStrategy: result.recommendedStrategy,
+            combinedReasoning: result.combinedReasoning,
+          });
+        } else {
+          noSetups.push(normalizedSymbol);
+        }
+      } catch {
+        noSetups.push(`${normalizedSymbol} (error)`);
+      }
+    }
+
+    // Sort by confidence descending
+    opportunities.sort((a, b) => {
+      const confA = parseInt(a.confidence);
+      const confB = parseInt(b.confidence);
+      return confB - confA;
+    });
+
+    return {
+      scanned: symbols.length,
+      detected: opportunities.length,
+      opportunities: opportunities.slice(0, maxResults),
+      noSetups: noSetups.length <= 5 ? noSetups : undefined,
+    };
+  },
+});
+
+// ============================================================================
 // Export as Object (Mastra format)
 // ============================================================================
 
@@ -391,4 +625,6 @@ export const strategyTools = {
   detect_strategy: detectStrategyTool,
   scan_for_strategy: scanForStrategyTool,
   suggest_strategy: suggestStrategyTool,
+  run_strategy_ensemble: runStrategyEnsembleTool,
+  scan_with_ensemble: scanWithEnsembleTool,
 };

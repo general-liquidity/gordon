@@ -45,6 +45,22 @@ export type { FormattedStrategy, FormattedStrategyList } from "./registry.ts";
 export { BaseStrategy } from "./base-strategy.ts";
 
 // ============================================================================
+// Ensemble Exports
+// ============================================================================
+
+export {
+  runEnsemble,
+  runQuickEnsemble,
+  scanWithEnsemble,
+} from "./ensemble.ts";
+
+export type {
+  EnsembleResult,
+  EnsembleStrategyResult,
+  EnsembleOptions,
+} from "./ensemble.ts";
+
+// ============================================================================
 // Strategy Imports (Auto-registration)
 // ============================================================================
 

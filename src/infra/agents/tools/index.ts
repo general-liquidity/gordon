@@ -21,6 +21,7 @@
  * - riskManagement: Risk management (Kelly sizing, daily limits, exit conditions, drawdown)
  * - strategies: Strategy library (list, detect, scan, suggest)
  * - metrics: Performance metrics and statistics
+ * - composition: Tool chaining and composition utilities (sequential, parallel, conditional)
  *
  * All tools are automatically wrapped with metrics recording via withToolsMetrics.
  */
@@ -44,9 +45,44 @@ export { marketAnalysisTools } from "./market-analysis.ts";
 export { riskManagementTools } from "./risk-management.ts";
 export { strategyTools } from "./strategies.ts";
 export { metricsTools } from "./metrics.ts";
+export { compositionTools } from "./composition.ts";
 
 // Tool metrics wrapper
 export { withToolMetrics, withToolsMetrics } from "./withMetrics.ts";
+
+// Tool composition utilities
+export {
+  executeTool,
+  createToolChain,
+  runChain,
+  runParallel,
+  runConditional,
+  runConditionalChain,
+  runFullAnalysis,
+  calculateCombinedScore,
+  technicalAnalysisChain,
+  marketStructureChain,
+  type ToolResult,
+  type ToolChainStep,
+  type ToolChain,
+  type ParallelToolSpec,
+  type ConditionFn,
+} from "./composition.ts";
+
+// Tool caching utilities
+export {
+  withCache,
+  withDeduplication,
+  withCacheAndDeduplication,
+  createCachedTool,
+  TOOL_CACHE_CONFIG,
+  getToolCacheStats,
+  clearToolCache,
+  pruneToolCache,
+  invalidateToolCache,
+  type ToolCacheOptions,
+  type ToolExecutor,
+} from "./cache.ts";
 
 // ============================================================================
 // Combined Tools Object
@@ -70,6 +106,7 @@ import { marketAnalysisTools } from "./market-analysis.ts";
 import { riskManagementTools } from "./risk-management.ts";
 import { strategyTools } from "./strategies.ts";
 import { metricsTools } from "./metrics.ts";
+import { compositionTools } from "./composition.ts";
 
 /**
  * All tools combined as a single object for Mastra Agent
@@ -93,6 +130,7 @@ export const allTools = {
   ...riskManagementTools,
   ...strategyTools,
   ...metricsTools,
+  ...compositionTools,
 };
 
 /**
@@ -117,5 +155,6 @@ export const toolCounts = {
   riskManagement: Object.keys(riskManagementTools).length,
   strategies: Object.keys(strategyTools).length,
   metrics: Object.keys(metricsTools).length,
+  composition: Object.keys(compositionTools).length,
   total: Object.keys(allTools).length,
 };

@@ -363,16 +363,22 @@ export function App(): React.ReactElement {
       // Use streaming API
       const stream = processMessageStream(messageToSend, context, undefined);
       let fullContent = "";
+      let currentAgentName: string | undefined;
 
-      // Helper to update the streaming message
-      const updateStreamingMessage = (content: string): void => {
+      // Helper to update the streaming message with agent attribution
+      const updateStreamingMessage = (content: string, agent?: string): void => {
         setState((prev) => {
           const newMessages = [...prev.messages];
           // Find the last Gordon message with matching timestamp (the streaming one)
           for (let i = newMessages.length - 1; i >= 0; i--) {
             const msg = newMessages[i];
             if (msg && msg.role === "gordon" && msg.timestamp === streamingTimestamp) {
-              newMessages[i] = { role: "gordon", content, timestamp: streamingTimestamp };
+              newMessages[i] = {
+                role: "gordon",
+                content,
+                timestamp: streamingTimestamp,
+                agent: agent || msg.agent,
+              };
               break;
             }
           }
@@ -385,7 +391,15 @@ export function App(): React.ReactElement {
           case "text_delta":
             if (event.content) {
               fullContent += event.content;
-              updateStreamingMessage(fullContent);
+              updateStreamingMessage(fullContent, currentAgentName);
+            }
+            break;
+
+          case "agent_switch":
+            if (event.agentName) {
+              currentAgentName = event.agentName;
+              // Update the message with the new agent attribution
+              updateStreamingMessage(fullContent, currentAgentName);
             }
             break;
 
@@ -394,6 +408,11 @@ export function App(): React.ReactElement {
               ...prev,
               activeToolCall: event.toolName || "tool",
             }));
+            // If the tool call has agent info, update attribution
+            if (event.agentName && event.agentName !== currentAgentName) {
+              currentAgentName = event.agentName;
+              updateStreamingMessage(fullContent, currentAgentName);
+            }
             break;
 
           case "tool_call_end":
@@ -404,6 +423,11 @@ export function App(): React.ReactElement {
             break;
 
           case "done":
+            // Final update with agent attribution
+            if (event.agentName) {
+              currentAgentName = event.agentName;
+            }
+            updateStreamingMessage(fullContent, currentAgentName);
             setState((prev) => ({
               ...prev,
               isStreaming: false,
@@ -413,7 +437,8 @@ export function App(): React.ReactElement {
 
           case "error":
             updateStreamingMessage(
-              fullContent || `Sorry, I encountered an error: ${event.error}. Please try again.`
+              fullContent || `Sorry, I encountered an error: ${event.error}. Please try again.`,
+              currentAgentName
             );
             setState((prev) => ({
               ...prev,
@@ -749,6 +774,7 @@ export function App(): React.ReactElement {
               undefined
             );
             let fullContent = "";
+            let trendingAgent: string | undefined;
 
             for await (const event of stream) {
               if (event.type === "text_delta" && event.content) {
@@ -758,18 +784,47 @@ export function App(): React.ReactElement {
                   for (let i = newMessages.length - 1; i >= 0; i--) {
                     const msg = newMessages[i];
                     if (msg && msg.role === "gordon" && msg.timestamp === trendingTimestamp) {
-                      newMessages[i] = { role: "gordon", content: fullContent, timestamp: trendingTimestamp };
+                      newMessages[i] = {
+                        role: "gordon",
+                        content: fullContent,
+                        timestamp: trendingTimestamp,
+                        agent: trendingAgent || msg.agent,
+                      };
                       break;
                     }
                   }
                   return { ...prev, messages: newMessages };
                 });
+              } else if (event.type === "agent_switch" && event.agentName) {
+                trendingAgent = event.agentName;
               } else if (event.type === "tool_call_start") {
                 setState((prev) => ({ ...prev, activeToolCall: event.toolName || "tool" }));
+                if (event.agentName) {
+                  trendingAgent = event.agentName;
+                }
               } else if (event.type === "tool_call_end") {
                 setState((prev) => ({ ...prev, activeToolCall: null }));
               } else if (event.type === "done") {
-                setState((prev) => ({ ...prev, isStreaming: false, activeToolCall: null }));
+                if (event.agentName) {
+                  trendingAgent = event.agentName;
+                }
+                // Final update with agent attribution
+                setState((prev) => {
+                  const newMessages = [...prev.messages];
+                  for (let i = newMessages.length - 1; i >= 0; i--) {
+                    const msg = newMessages[i];
+                    if (msg && msg.role === "gordon" && msg.timestamp === trendingTimestamp) {
+                      newMessages[i] = {
+                        role: "gordon",
+                        content: fullContent,
+                        timestamp: trendingTimestamp,
+                        agent: trendingAgent,
+                      };
+                      break;
+                    }
+                  }
+                  return { ...prev, messages: newMessages, isStreaming: false, activeToolCall: null };
+                });
               } else if (event.type === "error") {
                 setState((prev) => {
                   const newMessages = [...prev.messages];
@@ -780,6 +835,7 @@ export function App(): React.ReactElement {
                         role: "gordon",
                         content: fullContent || `Failed to get trending: ${event.error}`,
                         timestamp: trendingTimestamp,
+                        agent: trendingAgent,
                       };
                       break;
                     }

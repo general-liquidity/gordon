@@ -14,7 +14,8 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
-import { getGordonContext, MastraExecutionContext } from "./types.ts";
+import { getGordonContext, type MastraExecutionContext } from "./types.ts";
+import { createCachedTool, TOOL_CACHE_CONFIG } from "./cache.ts";
 import {
   calculateTechnicalAnalysis,
   calculateTechnicalSignals,
@@ -681,13 +682,22 @@ export const getStochasticRSITool = createTool({
 /**
  * Indicator tools exported as an object for Mastra Agent
  * This is the format expected by Mastra's Agent class
+ *
+ * All tools are wrapped with caching and request deduplication:
+ * - get_technical_analysis: 1 minute TTL (computationally expensive)
+ * - get_technical_signals: 1 minute TTL (used in scanning)
+ * - get_rsi: 1 minute TTL (indicator data)
+ * - get_stop_loss_levels: 1 minute TTL (ATR-based)
+ * - get_position_size: 1 minute TTL (ATR-based)
+ * - get_vwap: 1 minute TTL (indicator data)
+ * - get_stochastic_rsi: 1 minute TTL (indicator data)
  */
 export const indicatorTools = {
-  get_technical_analysis: getTechnicalAnalysisTool,
-  get_technical_signals: getTechnicalSignalsTool,
-  get_rsi: getRSITool,
-  get_stop_loss_levels: getStopLossLevelsTool,
-  get_position_size: getPositionSizeTool,
-  get_vwap: getVWAPTool,
-  get_stochastic_rsi: getStochasticRSITool,
+  get_technical_analysis: createCachedTool(getTechnicalAnalysisTool, TOOL_CACHE_CONFIG.indicators.ttl),
+  get_technical_signals: createCachedTool(getTechnicalSignalsTool, TOOL_CACHE_CONFIG.indicators.ttl),
+  get_rsi: createCachedTool(getRSITool, TOOL_CACHE_CONFIG.indicators.ttl),
+  get_stop_loss_levels: createCachedTool(getStopLossLevelsTool, TOOL_CACHE_CONFIG.indicators.ttl),
+  get_position_size: createCachedTool(getPositionSizeTool, TOOL_CACHE_CONFIG.indicators.ttl),
+  get_vwap: createCachedTool(getVWAPTool, TOOL_CACHE_CONFIG.indicators.ttl),
+  get_stochastic_rsi: createCachedTool(getStochasticRSITool, TOOL_CACHE_CONFIG.indicators.ttl),
 };

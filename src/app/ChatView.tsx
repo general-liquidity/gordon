@@ -7,6 +7,7 @@ export interface ChatMessage {
   role: "user" | "gordon";
   content: string;
   timestamp?: string;
+  agent?: string;
 }
 
 interface ChatViewProps {
@@ -20,6 +21,7 @@ interface MessageBubbleProps {
 
 const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
   const isUser = message.role === "user";
+  const showAgentBadge = !isUser && message.agent && message.agent !== "gordon";
 
   return (
     <Box
@@ -33,6 +35,9 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
         <Text color={isUser ? COLORS.DIM : COLORS.TAN} bold>
           {isUser ? "You" : "Gordon"}
         </Text>
+        {showAgentBadge && (
+          <Text color="cyan" dimColor> via {message.agent}</Text>
+        )}
         {message.timestamp && (
           <Text color={COLORS.DIM}> {message.timestamp}</Text>
         )}
