@@ -10,13 +10,30 @@ export const TakeProfitLevelSchema = z.object({
   percentToSell: z.number().min(0).max(1),
 });
 
+export const GridLevelSchema = z.object({
+  price: z.number(),
+  percentOfAllocation: z.number().min(0).max(1),
+});
+
+export const GridConfigSchema = z.object({
+  levels: z.array(GridLevelSchema).min(3).max(7),
+  distribution: z.enum(["pyramid", "equal"]),
+  priceRange: z.object({
+    high: z.number(),
+    low: z.number(),
+  }),
+});
+
+export type GridLevel = z.infer<typeof GridLevelSchema>;
+export type GridConfig = z.infer<typeof GridConfigSchema>;
+
 export const PlanSchema = z.object({
   id: z.string(),
   createdAt: z.string(),
 
   symbol: z.string(),
   direction: z.literal("long"),
-  strategy: z.literal("support_bounce"),
+  strategy: z.enum(["support_bounce", "grid_entry"]),
 
   allocation: z.object({
     currency: z.literal("USDT"),
@@ -30,6 +47,8 @@ export const PlanSchema = z.object({
   }),
 
   dca: z.array(DCALevelSchema).nullable(),
+
+  grid: GridConfigSchema.nullable(),
 
   stopLoss: z.object({
     price: z.number(),
