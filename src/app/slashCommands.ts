@@ -165,6 +165,26 @@ export const SLASH_COMMANDS: SlashCommand[] = [
     target: "get_trade_history",
   },
 
+  // Strategies
+  {
+    name: "strategies",
+    aliases: ["strats"],
+    description: "List all available trading strategies",
+    usage: "/strategies",
+    category: "trading",
+    action: "tool",
+    target: "list_strategies",
+  },
+  {
+    name: "strategy",
+    aliases: ["strat"],
+    description: "Get details about a specific strategy",
+    usage: "/strategy <id>",
+    category: "trading",
+    action: "tool",
+    target: "get_strategy_details",
+  },
+
   // System
   {
     name: "help",
@@ -336,6 +356,10 @@ export function commandToPrompt(command: SlashCommand, args: string): string {
       return "I want to configure my settings";
     case "model":
       return "Show me the current AI model and available providers";
+    case "strategies":
+      return "Show me all available trading strategies";
+    case "strategy":
+      return args ? `Tell me about the ${args} strategy` : "What strategy would you like to learn about?";
     default:
       return args || command.description;
   }

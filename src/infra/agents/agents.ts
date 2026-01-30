@@ -263,6 +263,7 @@ function getPlannerAgent(): Agent {
       model: getModel(process.env.GORDON_PROVIDER, process.env.GORDON_MODEL),
       tools: {
         ...indicatorTools,
+        ...strategyTools,  // Strategy library tools for plan creation
         create_plan: tradingTools.create_plan,
         create_grid_plan: tradingTools.create_grid_plan,
         list_plans: tradingTools.list_plans,

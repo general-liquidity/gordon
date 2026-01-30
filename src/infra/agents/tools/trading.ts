@@ -62,6 +62,21 @@ export const createPlanTool = createTool({
       .max(0.5)
       .default(0.1)
       .describe("Percent of portfolio to allocate"),
+    strategyId: z
+      .enum([
+        "support_bounce",
+        "bollinger_bounce",
+        "sma_crossover",
+        "volume_surge",
+        "vwap_bounce",
+        "consolidation_pop",
+        "adx_trend",
+        "ema_rsi_crossover",
+        "relative_strength",
+        "engulfing_pattern",
+      ])
+      .optional()
+      .describe("Specific strategy to use (auto-detected if not specified)"),
   }),
   outputSchema: z.object({
     success: z.boolean().optional(),
@@ -69,7 +84,7 @@ export const createPlanTool = createTool({
     summary: z.string().optional(),
     error: z.string().optional(),
   }),
-  execute: async ({ symbol, riskLevel, allocationPercent }, execContext: MastraExecutionContext) => {
+  execute: async ({ symbol, riskLevel, allocationPercent, strategyId }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
     if (!ctx?.binance || !ctx?.llm) {
       return { error: "Binance or LLM client not connected." };

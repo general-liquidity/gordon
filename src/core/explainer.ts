@@ -27,6 +27,108 @@ export interface ExplainContext {
 // ============================================================================
 
 const PRESET_EXPLANATIONS: Record<string, string> = {
+  // Strategy presets
+  support_bounce: `Support Bounce is Gordon's flagship beginner strategy. It identifies coins near strong support levels showing reversal signals.
+
+Entry conditions:
+- Price within 3% of a strong support level
+- RSI oversold (<35) or recovering
+- Volume confirmation on bounce candle
+- MACD showing bullish momentum
+
+This strategy works best in ranging markets where support levels hold. Stop loss goes below support, and we scale out at resistance levels. It's lower risk because you have a clear invalidation point (support breaking).`,
+
+  bollinger_bounce: `Bollinger Bounce is a mean reversion strategy that buys when price touches the lower Bollinger Band.
+
+Entry conditions:
+- Price at or below lower band (2 std dev)
+- RSI oversold (<30)
+- Bollinger bandwidth not too wide (not trending hard)
+- Volume spike on the touch
+
+The theory: Price tends to revert to the mean (middle band). When it stretches too far, it snaps back. Best in ranging/consolidating markets. Avoid during strong trends where price can "walk the bands."`,
+
+  sma_crossover: `SMA Crossover uses the classic Golden Cross signal - when the 50-day SMA crosses above the 200-day SMA.
+
+Entry conditions:
+- SMA 50 recently crossed above SMA 200
+- Price above both SMAs
+- Volume increasing during crossover
+- RSI in healthy range (40-60)
+
+This is a trend-following strategy that catches major moves. It's slower but more reliable - fewer false signals. Works best on higher timeframes (4h, daily). Stop loss goes below the SMA 200.`,
+
+  volume_surge: `Volume Surge identifies breakouts backed by unusual trading volume - a sign of institutional interest.
+
+Entry conditions:
+- Volume 2x+ above 20-day average
+- Price breaking above recent resistance
+- Bullish candle structure
+- Ideally on news catalyst or fresh breakout
+
+High volume validates price moves. A breakout without volume often fails. This strategy catches momentum early but requires quick stops if the move reverses.`,
+
+  vwap_bounce: `VWAP Bounce is an intraday strategy that buys when price pulls back to VWAP (Volume Weighted Average Price).
+
+Entry conditions:
+- Price at or below VWAP
+- Overall trend is bullish (price was above VWAP)
+- Volume confirming the bounce
+- Time of day matters (works best mid-session)
+
+VWAP represents the "fair value" for the day. Big players use it as a benchmark. Buying at VWAP in an uptrend is buying at fair value with the trend.`,
+
+  ema_rsi_crossover: `EMA+RSI Crossover combines EMA 9/21 crossovers with RSI momentum filter for higher quality signals.
+
+Entry conditions:
+- EMA 9 crosses above EMA 21
+- RSI > 50 and rising
+- Price above EMA 50 (medium-term trend)
+- Volume confirming the crossover
+
+The RSI filter removes many false crossover signals that happen in choppy markets. Best when EMAs are fully aligned (9 > 21 > 50).`,
+
+  engulfing_pattern: `Engulfing Pattern identifies bullish engulfing candlesticks at support - a powerful reversal signal.
+
+Entry conditions:
+- Bearish (red) candle followed by larger bullish (green) candle
+- The green candle's body completely "engulfs" the red
+- Pattern occurs at or near support
+- Volume higher on the engulfing candle
+
+This pattern shows buyers overwhelming sellers in one candle. Stop loss goes below the pattern low. Works best on 4h+ timeframes.`,
+
+  adx_trend: `ADX Trend trades only when trend strength is confirmed by ADX (Average Directional Index).
+
+Entry conditions:
+- ADX > 25 (strong trend)
+- +DI above -DI (bullish direction)
+- ADX rising (trend strengthening)
+- Price above key moving averages
+
+ADX tells you HOW STRONG a trend is, not direction. High ADX = trending, Low ADX = ranging. This avoids choppy markets where other strategies fail.`,
+
+  consolidation_pop: `Consolidation Pop catches breakouts from tight price ranges - compressed springs ready to pop.
+
+Entry conditions:
+- Bollinger bandwidth at 20-day low (price squeezed)
+- ATR compression (low volatility)
+- Price breaks above the range high
+- Volume confirming the breakout
+
+Tight consolidation = energy building up. When it breaks, moves are often explosive. Set stops below the range and ride the momentum.`,
+
+  relative_strength: `Relative Strength identifies coins outperforming BTC - showing they have alpha and aren't just riding the market.
+
+Entry conditions:
+- Coin/BTC ratio rising (outperforming)
+- Price above moving averages
+- BTC not in freefall (market supportive)
+- Strong RS momentum
+
+When BTC is flat or up, strong alts can moon. When BTC dumps, strong alts often hold better. This finds the leaders, not the laggers.`,
+
+  // Indicator presets
   rsi: `RSI (Relative Strength Index) is a momentum indicator that measures how fast and how much a price has moved recently. It ranges from 0 to 100.
 
 When RSI is below 30, the asset is considered "oversold" - meaning it might have dropped too far too fast and could be due for a bounce. When RSI is above 70, it's "overbought" - meaning it might have risen too quickly and could pull back.
@@ -78,6 +180,7 @@ Gordon aims for at least 1.5:1 risk/reward on every trade. This ensures that ove
 
 // Aliases for common variations
 const TOPIC_ALIASES: Record<string, string> = {
+  // Indicator aliases
   "relative strength index": "rsi",
   "rsi indicator": "rsi",
   "moving average convergence divergence": "macd",
@@ -100,6 +203,35 @@ const TOPIC_ALIASES: Record<string, string> = {
   "risk-reward": "risk_reward",
   "r:r": "risk_reward",
   "rr": "risk_reward",
+  // Strategy aliases
+  "support bounce": "support_bounce",
+  "support bounce strategy": "support_bounce",
+  "bollinger bounce": "bollinger_bounce",
+  "bollinger bounce strategy": "bollinger_bounce",
+  "bollinger bands strategy": "bollinger_bounce",
+  "sma crossover": "sma_crossover",
+  "golden cross": "sma_crossover",
+  "golden cross strategy": "sma_crossover",
+  "volume surge": "volume_surge",
+  "volume surge strategy": "volume_surge",
+  "vwap bounce": "vwap_bounce",
+  "vwap bounce strategy": "vwap_bounce",
+  "vwap strategy": "vwap_bounce",
+  "ema rsi crossover": "ema_rsi_crossover",
+  "ema crossover": "ema_rsi_crossover",
+  "ema rsi": "ema_rsi_crossover",
+  "engulfing pattern": "engulfing_pattern",
+  "engulfing pattern strategy": "engulfing_pattern",
+  "bullish engulfing": "engulfing_pattern",
+  "adx trend": "adx_trend",
+  "adx trend strategy": "adx_trend",
+  "adx strategy": "adx_trend",
+  "consolidation pop": "consolidation_pop",
+  "consolidation pop strategy": "consolidation_pop",
+  "breakout strategy": "consolidation_pop",
+  "relative strength": "relative_strength",
+  "relative strength strategy": "relative_strength",
+  "rs strategy": "relative_strength",
 };
 
 // ============================================================================
@@ -213,7 +345,20 @@ export function formatPlanExplanation(plan: Plan): string {
  */
 function formatStrategy(strategy: string): string {
   const strategyNames: Record<string, string> = {
+    // Tier 1 - Beginner
     support_bounce: "Support Bounce",
+    bollinger_bounce: "Bollinger Bounce",
+    sma_crossover: "SMA Crossover (Golden Cross)",
+    volume_surge: "Volume Surge",
+    vwap_bounce: "VWAP Bounce",
+    // Tier 2 - Intermediate
+    ema_rsi_crossover: "EMA+RSI Crossover",
+    engulfing_pattern: "Engulfing Pattern",
+    adx_trend: "ADX Trend",
+    consolidation_pop: "Consolidation Pop",
+    relative_strength: "Relative Strength",
+    // Special
+    grid_entry: "Grid Entry",
   };
 
   return strategyNames[strategy] ?? strategy;
@@ -450,6 +595,7 @@ function detectAndGetPreset(
 
   // Check for topic keywords in the question
   const topicKeywords = [
+    // Indicator keywords
     { keywords: ["what is rsi", "what's rsi", "explain rsi", "rsi mean"], topic: "rsi" },
     { keywords: ["what is macd", "what's macd", "explain macd", "macd mean"], topic: "macd" },
     { keywords: ["what is support", "what's support", "explain support", "support mean", "support level"], topic: "support" },
@@ -458,6 +604,17 @@ function detectAndGetPreset(
     { keywords: ["what is take profit", "what's take profit", "explain take profit", "tp mean"], topic: "take_profit" },
     { keywords: ["what is dca", "what's dca", "explain dca", "dca mean", "dollar cost"], topic: "dca" },
     { keywords: ["what is risk reward", "what's risk reward", "explain risk reward", "r:r mean", "risk/reward"], topic: "risk_reward" },
+    // Strategy keywords
+    { keywords: ["support bounce", "support_bounce", "tell me about support bounce"], topic: "support_bounce" },
+    { keywords: ["bollinger bounce", "bollinger_bounce", "bollinger bands strategy"], topic: "bollinger_bounce" },
+    { keywords: ["sma crossover", "sma_crossover", "golden cross strategy"], topic: "sma_crossover" },
+    { keywords: ["volume surge", "volume_surge", "volume strategy"], topic: "volume_surge" },
+    { keywords: ["vwap bounce", "vwap_bounce", "vwap strategy"], topic: "vwap_bounce" },
+    { keywords: ["ema rsi crossover", "ema_rsi_crossover", "ema crossover strategy"], topic: "ema_rsi_crossover" },
+    { keywords: ["engulfing pattern", "engulfing_pattern", "bullish engulfing strategy"], topic: "engulfing_pattern" },
+    { keywords: ["adx trend", "adx_trend", "adx strategy"], topic: "adx_trend" },
+    { keywords: ["consolidation pop", "consolidation_pop", "breakout strategy"], topic: "consolidation_pop" },
+    { keywords: ["relative strength", "relative_strength", "rs strategy"], topic: "relative_strength" },
   ];
 
   for (const { keywords, topic } of topicKeywords) {

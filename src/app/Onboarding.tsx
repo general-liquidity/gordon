@@ -3,9 +3,9 @@ import { Box, Text, useInput } from "ink";
 import { Select } from "@inkjs/ui";
 import { COLORS } from "./theme.ts";
 
-type OnboardingStep = "welcome" | "how-it-works" | "safety" | "get-started";
+type OnboardingStep = "welcome" | "how-it-works" | "strategies" | "safety" | "get-started";
 
-const STEPS: OnboardingStep[] = ["welcome", "how-it-works", "safety", "get-started"];
+const STEPS: OnboardingStep[] = ["welcome", "how-it-works", "strategies", "safety", "get-started"];
 
 interface OnboardingProps {
   onComplete: (options: { setupApiKeys: boolean; demoMode: boolean }) => void;
@@ -128,6 +128,57 @@ function HowItWorksStep(): React.ReactElement {
           <Box width={12}><Text color={COLORS.WHITE} bold>Teacher</Text></Box>
           <Text color={COLORS.DIM}>Explain trading concepts</Text>
         </Box>
+      </Box>
+    </Box>
+  );
+}
+
+function StrategiesStep(): React.ReactElement {
+  return (
+    <Box flexDirection="column">
+      <Box marginBottom={1}>
+        <Text color={COLORS.ACCENT} bold>
+          10 Trading Strategies
+        </Text>
+      </Box>
+
+      <Box marginBottom={1}>
+        <Text color={COLORS.WHITE}>
+          I come with <Text color={COLORS.HIGHLIGHT} bold>10 battle-tested strategies</Text> for different market conditions:
+        </Text>
+      </Box>
+
+      <Box flexDirection="column" marginBottom={1}>
+        <Text color={COLORS.DIM} bold>Beginner (Tier 1):</Text>
+        <Box paddingLeft={2} flexDirection="column">
+          <Text color={COLORS.DIM}>• <Text color={COLORS.WHITE}>Support Bounce</Text> - Buy near support levels</Text>
+          <Text color={COLORS.DIM}>• <Text color={COLORS.WHITE}>Bollinger Bounce</Text> - Mean reversion at bands</Text>
+          <Text color={COLORS.DIM}>• <Text color={COLORS.WHITE}>SMA Crossover</Text> - Classic Golden Cross</Text>
+          <Text color={COLORS.DIM}>• <Text color={COLORS.WHITE}>Volume Surge</Text> - High volume breakouts</Text>
+          <Text color={COLORS.DIM}>• <Text color={COLORS.WHITE}>VWAP Bounce</Text> - Intraday fair value</Text>
+        </Box>
+      </Box>
+
+      <Box flexDirection="column" marginBottom={1}>
+        <Text color={COLORS.DIM} bold>Intermediate (Tier 2):</Text>
+        <Box paddingLeft={2} flexDirection="column">
+          <Text color={COLORS.DIM}>• <Text color={COLORS.WHITE}>EMA+RSI Crossover</Text> - Momentum filtered</Text>
+          <Text color={COLORS.DIM}>• <Text color={COLORS.WHITE}>Engulfing Pattern</Text> - Candlestick reversal</Text>
+          <Text color={COLORS.DIM}>• <Text color={COLORS.WHITE}>ADX Trend</Text> - Strong trend trading</Text>
+          <Text color={COLORS.DIM}>• <Text color={COLORS.WHITE}>Consolidation Pop</Text> - Range breakouts</Text>
+          <Text color={COLORS.DIM}>• <Text color={COLORS.WHITE}>Relative Strength</Text> - BTC outperformers</Text>
+        </Box>
+      </Box>
+
+      <Box marginTop={1}>
+        <Text color={COLORS.DIM}>
+          Type <Text color={COLORS.HIGHLIGHT}>/strategies</Text> anytime to see all strategies,
+        </Text>
+      </Box>
+      <Box>
+        <Text color={COLORS.DIM}>
+          or <Text color={COLORS.HIGHLIGHT}>/strategy support_bounce</Text> for details.
+        </Text>
       </Box>
     </Box>
   );
@@ -278,6 +329,8 @@ export function Onboarding({ onComplete }: OnboardingProps): React.ReactElement 
         return <WelcomeStep />;
       case "how-it-works":
         return <HowItWorksStep />;
+      case "strategies":
+        return <StrategiesStep />;
       case "safety":
         return <SafetyStep />;
       case "get-started":
