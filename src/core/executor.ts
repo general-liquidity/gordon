@@ -34,7 +34,7 @@ const logger = createModuleLogger("executor");
  * Order placed during execution
  */
 interface PlacedOrder {
-  type: "entry" | "dca" | "stop" | "take_profit";
+  type: "entry" | "dca" | "stop" | "take_profit" | "grid";
   orderId: string;
   price: number;
   quantity: number;
@@ -84,7 +84,7 @@ type CloseReason = "MANUAL" | "STOP" | "TP1" | "TP2" | "TP3";
 /**
  * Generate a unique client order ID for tracking
  */
-function generateClientOrderId(planId: string, type: string): string {
+export function generateClientOrderId(planId: string, type: string): string {
   const timestamp = Date.now().toString(36);
   const random = Math.random().toString(36).substring(2, 6);
   return `gordon_${planId.slice(4, 12)}_${type}_${timestamp}_${random}`;
@@ -94,7 +94,7 @@ function generateClientOrderId(planId: string, type: string): string {
  * Round quantity to appropriate precision for Binance
  * Default to 8 decimal places, which is safe for most pairs
  */
-function roundQuantity(quantity: number, precision: number = 8): number {
+export function roundQuantity(quantity: number, precision: number = 8): number {
   const multiplier = Math.pow(10, precision);
   return Math.floor(quantity * multiplier) / multiplier;
 }
@@ -102,7 +102,7 @@ function roundQuantity(quantity: number, precision: number = 8): number {
 /**
  * Round price to appropriate precision
  */
-function roundPrice(price: number, precision: number = 8): number {
+export function roundPrice(price: number, precision: number = 8): number {
   const multiplier = Math.pow(10, precision);
   return Math.round(price * multiplier) / multiplier;
 }
@@ -236,6 +236,11 @@ export async function executePlan(
       },
       planId: plan.id,
     });
+  }
+
+  // Handle grid_entry strategy
+  if (plan.strategy === "grid_entry" && plan.grid) {
+    return await executeGridPlan(client, plan, config, portfolio);
   }
 
   // Step 4: Get current price for calculations
@@ -582,6 +587,299 @@ export async function executePlan(
     return {
       success: false,
       error: `Unexpected execution error: ${errorMessage}`,
+      orders: placedOrders,
+    };
+  }
+}
+
+/**
+ * Execute a grid entry trading plan
+ *
+ * Places multiple limit buy orders across grid levels with a single stop loss.
+ * Take profits are NOT placed during execution - they are handled by the monitor
+ * after grid levels fill.
+ *
+ * @param client - Authenticated Binance client
+ * @param plan - The grid trading plan to execute
+ * @param config - Gordon configuration
+ * @param portfolio - Current portfolio state
+ * @returns ExecutionResult with success status, trade, and order details
+ */
+async function executeGridPlan(
+  client: BinanceClient,
+  plan: Plan,
+  config: GordonConfig,
+  portfolio: PortfolioState
+): Promise<ExecutionResult> {
+  const placedOrders: PlacedOrder[] = [];
+
+  logger.info("Executing grid plan", {
+    planId: plan.id,
+    symbol: plan.symbol,
+    gridLevels: plan.grid!.levels.length,
+  });
+
+  // Grid must exist (already checked in executePlan)
+  const grid = plan.grid!;
+
+  try {
+    // Step 1: Calculate quantities for each grid level
+    const gridOrders: { price: number; quantity: number; levelIndex: number }[] = [];
+    let totalQuantity = 0;
+
+    for (let i = 0; i < grid.levels.length; i++) {
+      const level = grid.levels[i];
+      if (!level) continue;
+
+      const levelAllocation = plan.allocation.amount * level.percentOfAllocation;
+      const quantity = roundQuantity(levelAllocation / level.price);
+
+      if (quantity > 0) {
+        gridOrders.push({
+          price: level.price,
+          quantity,
+          levelIndex: i + 1,
+        });
+        totalQuantity += quantity;
+      }
+    }
+
+    if (gridOrders.length === 0) {
+      return {
+        success: false,
+        error: "No valid grid orders could be created. Check allocation amounts.",
+        orders: [],
+      };
+    }
+
+    logger.debug("Grid orders calculated", {
+      orderCount: gridOrders.length,
+      totalQuantity,
+    });
+
+    // Step 2: Place limit buy orders for each grid level
+    for (const gridOrder of gridOrders) {
+      const orderParams: OrderParams = {
+        symbol: plan.symbol,
+        side: "BUY",
+        type: "LIMIT",
+        quantity: gridOrder.quantity,
+        price: roundPrice(gridOrder.price),
+        timeInForce: "GTC",
+        newClientOrderId: generateClientOrderId(plan.id, `grid${gridOrder.levelIndex}`),
+      };
+
+      let order: BinanceOrder;
+      try {
+        order = await client.placeOrder(orderParams);
+        logger.info("Grid level order placed", {
+          level: gridOrder.levelIndex,
+          orderId: order.orderId,
+          price: gridOrder.price,
+          quantity: gridOrder.quantity,
+        });
+      } catch (error) {
+        // Rollback all previously placed orders
+        await rollbackOrders(client, plan.symbol, placedOrders, plan.id);
+
+        const errorMessage = isGordonError(error)
+          ? error.message
+          : error instanceof Error
+            ? error.message
+            : "Unknown error";
+
+        logger.error("Grid level order failed", error as Error, {
+          level: gridOrder.levelIndex,
+          params: orderParams,
+        });
+        logEvent({
+          type: "ERROR",
+          data: {
+            action: "GRID_ORDER_FAILED",
+            level: gridOrder.levelIndex,
+            params: orderParams,
+            error: errorMessage,
+          },
+          planId: plan.id,
+        });
+
+        return {
+          success: false,
+          error: `Failed to place grid level ${gridOrder.levelIndex} order: ${errorMessage}. All orders rolled back.`,
+          orders: placedOrders,
+        };
+      }
+
+      placedOrders.push({
+        type: "grid",
+        orderId: order.orderId.toString(),
+        price: gridOrder.price,
+        quantity: gridOrder.quantity,
+      });
+
+      logEvent({
+        type: "ORDER_PLACED",
+        data: {
+          action: `GRID_LEVEL_${gridOrder.levelIndex}`,
+          orderId: order.orderId.toString(),
+          symbol: plan.symbol,
+          side: "BUY",
+          type: "LIMIT",
+          price: gridOrder.price,
+          quantity: gridOrder.quantity,
+        },
+        planId: plan.id,
+      });
+    }
+
+    // Step 3: Place single stop loss for total quantity
+    const stopOrderParams: OrderParams = {
+      symbol: plan.symbol,
+      side: "SELL",
+      type: "STOP_LOSS_LIMIT",
+      quantity: roundQuantity(totalQuantity),
+      price: roundPrice(plan.stopLoss.price * 0.995), // Limit price slightly below stop
+      stopPrice: roundPrice(plan.stopLoss.price),
+      timeInForce: "GTC",
+      newClientOrderId: generateClientOrderId(plan.id, "stop"),
+    };
+
+    let stopOrder: BinanceOrder;
+    try {
+      stopOrder = await client.placeOrder(stopOrderParams);
+      logger.info("Grid stop loss placed", {
+        orderId: stopOrder.orderId,
+        stopPrice: plan.stopLoss.price,
+        quantity: totalQuantity,
+      });
+    } catch (error) {
+      // Rollback all grid orders
+      await rollbackOrders(client, plan.symbol, placedOrders, plan.id);
+
+      const errorMessage = isGordonError(error)
+        ? error.message
+        : error instanceof Error
+          ? error.message
+          : "Unknown error";
+
+      logger.error("Grid stop order failed", error as Error, { params: stopOrderParams });
+      logEvent({
+        type: "ERROR",
+        data: {
+          action: "GRID_STOP_ORDER_FAILED",
+          params: stopOrderParams,
+          error: errorMessage,
+        },
+        planId: plan.id,
+      });
+
+      return {
+        success: false,
+        error: `Failed to place stop-loss order: ${errorMessage}. All grid orders rolled back.`,
+        orders: placedOrders,
+      };
+    }
+
+    placedOrders.push({
+      type: "stop",
+      orderId: stopOrder.orderId.toString(),
+      price: plan.stopLoss.price,
+      quantity: totalQuantity,
+    });
+
+    logEvent({
+      type: "ORDER_PLACED",
+      data: {
+        action: "STOP_LOSS",
+        orderId: stopOrder.orderId.toString(),
+        symbol: plan.symbol,
+        side: "SELL",
+        type: "STOP_LOSS_LIMIT",
+        stopPrice: plan.stopLoss.price,
+        quantity: totalQuantity,
+      },
+      planId: plan.id,
+    });
+
+    // Step 4: Create Trade record with PARTIAL status (no fills yet)
+    // Note: Take profits are NOT placed here - they will be placed by the monitor
+    // after grid levels fill, based on the average entry price
+    const trade = createTrade({
+      planId: plan.id,
+      openedAt: new Date().toISOString(),
+      closedAt: null,
+      symbol: plan.symbol,
+      entries: [], // Empty - no fills yet
+      exits: [],
+      averageEntry: 0, // Will be calculated as levels fill
+      realizedPnl: 0,
+      realizedPnlPercent: 0,
+      status: "PARTIAL", // Grid trades start as PARTIAL until levels fill
+    });
+
+    // Emit trade opened event
+    await emitEvent("trade:opened", { trade, planId: plan.id });
+
+    // Step 5: Log trade creation
+    logger.info("Grid trade created", {
+      tradeId: trade.id,
+      symbol: plan.symbol,
+      gridLevels: gridOrders.length,
+      totalQuantity,
+      orderCount: placedOrders.length,
+    });
+
+    logEvent({
+      type: "ORDER_PLACED",
+      data: {
+        action: "GRID_TRADE_CREATED",
+        tradeId: trade.id,
+        symbol: plan.symbol,
+        gridLevels: gridOrders.length,
+        totalQuantity,
+        orderCount: placedOrders.length,
+        orders: placedOrders.map((o) => ({
+          type: o.type,
+          orderId: o.orderId,
+          price: o.price,
+        })),
+      },
+      planId: plan.id,
+      tradeId: trade.id,
+    });
+
+    // Step 6: Update plan status to EXECUTING
+    updatePlan(plan.id, { status: "EXECUTING" });
+
+    // Step 7: Return success
+    return {
+      success: true,
+      trade,
+      orders: placedOrders,
+    };
+  } catch (error) {
+    // Unexpected error - attempt to rollback any placed orders
+    if (placedOrders.length > 0) {
+      await rollbackOrders(client, plan.symbol, placedOrders, plan.id);
+    }
+
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown error";
+
+    logger.error("Unexpected grid execution error", error as Error, { planId: plan.id });
+    logEvent({
+      type: "ERROR",
+      data: {
+        action: "GRID_EXECUTION_FAILED",
+        error: errorMessage,
+        placedOrdersCount: placedOrders.length,
+      },
+      planId: plan.id,
+    });
+
+    return {
+      success: false,
+      error: `Unexpected grid execution error: ${errorMessage}`,
       orders: placedOrders,
     };
   }
