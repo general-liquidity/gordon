@@ -35,6 +35,7 @@ import {
   tradingTools,
   marketAnalysisTools,
   riskManagementTools,
+  strategyTools,
 } from "./tools/index.ts";
 
 // ============================================================================
@@ -204,12 +205,13 @@ function getScannerAgent(): Agent {
       description:
         "Specialist in scanning the market and finding trading opportunities. " +
         "Use when the user wants to find coins to trade, asks 'what should I buy?', " +
-        "needs market overview, or wants to discover new coins.",
+        "needs market overview, wants to discover new coins, or asks about strategies.",
       instructions: SCANNER_INSTRUCTIONS,
       model: getModel(process.env.GORDON_PROVIDER, process.env.GORDON_MODEL),
       tools: {
         ...indicatorTools,
         ...discoveryTools,  // Coin discovery tools
+        ...strategyTools,   // Strategy library tools
         scan_market: marketTools.scan_market,
         analyze_coin: marketTools.analyze_coin,
       },

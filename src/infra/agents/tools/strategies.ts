@@ -1,0 +1,394 @@
+/**
+ * Strategy Tools (Mastra Format)
+ *
+ * Tools for listing, detecting, and using trading strategies.
+ * These tools bridge the Strategy Library with Gordon's agents.
+ */
+
+import { createTool } from "@mastra/core/tools";
+import { z } from "zod";
+
+import { strategyRegistry, STRATEGY_IDS, type StrategyId } from "../../../strategies/index.ts";
+import { getGordonContext, MastraExecutionContext, normalizeSymbol } from "./types.ts";
+
+// ============================================================================
+// Error Messages
+// ============================================================================
+
+const errors = {
+  noBinance: { error: "Binance client not connected. Please run setup first." },
+  strategyNotFound: (id: string) => ({
+    error: `Strategy "${id}" not found. Use list_strategies to see available strategies.`,
+  }),
+};
+
+// ============================================================================
+// List Strategies Tool
+// ============================================================================
+
+export const listStrategiesTool = createTool({
+  id: "list_strategies",
+  description:
+    "List all available trading strategies with their descriptions and tiers. " +
+    "Use this when the user asks 'what strategies do you have?' or 'show me strategies'.",
+  inputSchema: z.object({
+    tier: z
+      .number()
+      .min(1)
+      .max(2)
+      .optional()
+      .describe("Filter by tier (1 = beginner, 2 = intermediate). Omit for all."),
+  }),
+  outputSchema: z.object({
+    tier1: z.object({
+      label: z.string(),
+      strategies: z.array(z.object({
+        id: z.string(),
+        name: z.string(),
+        description: z.string(),
+        indicators: z.string(),
+        timeframes: z.string(),
+        risk: z.string(),
+      })),
+    }).optional(),
+    tier2: z.object({
+      label: z.string(),
+      strategies: z.array(z.object({
+        id: z.string(),
+        name: z.string(),
+        description: z.string(),
+        indicators: z.string(),
+        timeframes: z.string(),
+        risk: z.string(),
+      })),
+    }).optional(),
+    total: z.number(),
+  }),
+  execute: async ({ tier }) => {
+    const formatted = strategyRegistry.listFormatted();
+
+    if (tier === 1) {
+      return {
+        tier1: formatted.tier1,
+        total: formatted.tier1.strategies.length,
+      };
+    }
+
+    if (tier === 2) {
+      return {
+        tier2: formatted.tier2,
+        total: formatted.tier2.strategies.length,
+      };
+    }
+
+    return formatted;
+  },
+});
+
+// ============================================================================
+// Get Strategy Details Tool
+// ============================================================================
+
+export const getStrategyDetailsTool = createTool({
+  id: "get_strategy_details",
+  description:
+    "Get detailed information about a specific strategy including rules and indicators. " +
+    "Use when the user asks 'tell me about X strategy' or 'how does X work?'.",
+  inputSchema: z.object({
+    strategyId: z
+      .string()
+      .describe("Strategy ID (e.g., 'support_bounce', 'bollinger_bounce')"),
+  }),
+  outputSchema: z.object({
+    id: z.string().optional(),
+    name: z.string().optional(),
+    tier: z.number().optional(),
+    description: z.string().optional(),
+    indicators: z.array(z.string()).optional(),
+    timeframes: z.array(z.string()).optional(),
+    riskLevel: z.string().optional(),
+    rules: z.string().optional(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ strategyId }) => {
+    const strategy = strategyRegistry.get(strategyId as StrategyId);
+
+    if (!strategy) {
+      return errors.strategyNotFound(strategyId);
+    }
+
+    return {
+      id: strategy.id,
+      name: strategy.name,
+      tier: strategy.tier,
+      description: strategy.description,
+      indicators: strategy.indicators,
+      timeframes: strategy.timeframes,
+      riskLevel: strategy.riskLevel,
+      rules: strategy.getPromptFragment(),
+    };
+  },
+});
+
+// ============================================================================
+// Detect Strategy Tool
+// ============================================================================
+
+export const detectStrategyTool = createTool({
+  id: "detect_strategy",
+  description:
+    "Detect if a specific strategy's conditions are met for a symbol. " +
+    "Use when the user asks 'is X strategy good for BTC?' or 'check bollinger bounce on ETH'.",
+  inputSchema: z.object({
+    symbol: z
+      .string()
+      .describe("Trading pair symbol (e.g., 'BTCUSDT', 'ETH')"),
+    strategyId: z
+      .string()
+      .describe("Strategy ID to check (e.g., 'support_bounce')"),
+    timeframe: z
+      .string()
+      .default("4h")
+      .describe("Timeframe to analyze"),
+  }),
+  outputSchema: z.object({
+    symbol: z.string().optional(),
+    strategy: z.string().optional(),
+    detected: z.boolean().optional(),
+    confidence: z.number().optional(),
+    confidencePercent: z.string().optional(),
+    reasoning: z.string().optional(),
+    signals: z.record(z.string(), z.unknown()).optional(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ symbol, strategyId, timeframe }, execContext: MastraExecutionContext) => {
+    const ctx = getGordonContext(execContext);
+    if (!ctx?.binance) {
+      return errors.noBinance;
+    }
+
+    const strategy = strategyRegistry.get(strategyId as StrategyId);
+    if (!strategy) {
+      return errors.strategyNotFound(strategyId);
+    }
+
+    const normalizedSymbol = normalizeSymbol(symbol);
+
+    try {
+      const result = await strategy.detect(normalizedSymbol, timeframe, {
+        binance: ctx.binance,
+      });
+
+      return {
+        symbol: normalizedSymbol,
+        strategy: strategy.name,
+        detected: result.detected,
+        confidence: result.confidence,
+        confidencePercent: `${Math.round(result.confidence * 100)}%`,
+        reasoning: result.reasoning,
+        signals: result.signals,
+      };
+    } catch (error) {
+      return {
+        error: error instanceof Error ? error.message : "Detection failed",
+      };
+    }
+  },
+});
+
+// ============================================================================
+// Scan For Strategy Tool
+// ============================================================================
+
+export const scanForStrategyTool = createTool({
+  id: "scan_for_strategy",
+  description:
+    "Scan multiple coins for a specific strategy. " +
+    "Use when the user asks 'find coins good for bollinger bounce' or 'scan for support bounce setups'.",
+  inputSchema: z.object({
+    strategyId: z
+      .string()
+      .describe("Strategy ID to scan for (e.g., 'support_bounce')"),
+    symbols: z
+      .array(z.string())
+      .default(["BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT", "ADAUSDT", "DOGEUSDT", "AVAXUSDT", "DOTUSDT", "LINKUSDT"])
+      .describe("Symbols to scan (defaults to top 10)"),
+    timeframe: z
+      .string()
+      .default("4h")
+      .describe("Timeframe to analyze"),
+    minConfidence: z
+      .number()
+      .min(0)
+      .max(1)
+      .default(0.5)
+      .describe("Minimum confidence threshold (0-1)"),
+  }),
+  outputSchema: z.object({
+    strategy: z.string().optional(),
+    scanned: z.number().optional(),
+    detected: z.number().optional(),
+    opportunities: z.array(z.object({
+      symbol: z.string(),
+      confidence: z.string(),
+      reasoning: z.string(),
+    })).optional(),
+    noSetups: z.array(z.string()).optional(),
+    error: z.string().optional(),
+  }),
+  execute: async (
+    { strategyId, symbols, timeframe, minConfidence },
+    execContext: MastraExecutionContext
+  ) => {
+    const ctx = getGordonContext(execContext);
+    if (!ctx?.binance) {
+      return errors.noBinance;
+    }
+
+    const strategy = strategyRegistry.get(strategyId as StrategyId);
+    if (!strategy) {
+      return errors.strategyNotFound(strategyId);
+    }
+
+    const opportunities: { symbol: string; confidence: string; reasoning: string }[] = [];
+    const noSetups: string[] = [];
+
+    for (const symbol of symbols) {
+      const normalizedSymbol = normalizeSymbol(symbol);
+
+      try {
+        const result = await strategy.detect(normalizedSymbol, timeframe, {
+          binance: ctx.binance,
+        });
+
+        if (result.detected && result.confidence >= minConfidence) {
+          opportunities.push({
+            symbol: normalizedSymbol,
+            confidence: `${Math.round(result.confidence * 100)}%`,
+            reasoning: result.reasoning,
+          });
+        } else {
+          noSetups.push(normalizedSymbol);
+        }
+      } catch {
+        noSetups.push(`${normalizedSymbol} (error)`);
+      }
+    }
+
+    // Sort by confidence descending
+    opportunities.sort((a, b) => {
+      const confA = parseInt(a.confidence);
+      const confB = parseInt(b.confidence);
+      return confB - confA;
+    });
+
+    return {
+      strategy: strategy.name,
+      scanned: symbols.length,
+      detected: opportunities.length,
+      opportunities: opportunities.slice(0, 10),
+      noSetups: noSetups.length > 5 ? undefined : noSetups, // Only show if few
+    };
+  },
+});
+
+// ============================================================================
+// Suggest Strategy Tool
+// ============================================================================
+
+export const suggestStrategyTool = createTool({
+  id: "suggest_strategy",
+  description:
+    "Suggest the best strategy for a specific coin based on current market conditions. " +
+    "Use when the user asks 'what strategy is best for BTC?' or 'which strategy should I use?'.",
+  inputSchema: z.object({
+    symbol: z
+      .string()
+      .describe("Trading pair symbol (e.g., 'BTCUSDT', 'ETH')"),
+    timeframe: z
+      .string()
+      .default("4h")
+      .describe("Timeframe to analyze"),
+  }),
+  outputSchema: z.object({
+    symbol: z.string().optional(),
+    recommendations: z.array(z.object({
+      strategy: z.string(),
+      strategyId: z.string(),
+      confidence: z.string(),
+      reasoning: z.string(),
+    })).optional(),
+    noSetups: z.boolean().optional(),
+    message: z.string().optional(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ symbol, timeframe }, execContext: MastraExecutionContext) => {
+    const ctx = getGordonContext(execContext);
+    if (!ctx?.binance) {
+      return errors.noBinance;
+    }
+
+    const normalizedSymbol = normalizeSymbol(symbol);
+    const allStrategies = strategyRegistry.getAll();
+
+    const results: { strategy: string; strategyId: StrategyId; confidence: number; reasoning: string }[] = [];
+
+    for (const strategy of allStrategies) {
+      // Skip grid_entry as it's a special strategy
+      if (strategy.id === "grid_entry") continue;
+
+      try {
+        const result = await strategy.detect(normalizedSymbol, timeframe, {
+          binance: ctx.binance,
+        });
+
+        if (result.detected && result.confidence > 0.4) {
+          results.push({
+            strategy: strategy.name,
+            strategyId: strategy.id,
+            confidence: result.confidence,
+            reasoning: result.reasoning,
+          });
+        }
+      } catch {
+        // Skip failed detections
+      }
+    }
+
+    if (results.length === 0) {
+      return {
+        symbol: normalizedSymbol,
+        noSetups: true,
+        message: `No strong setups detected for ${normalizedSymbol}. Consider waiting for better conditions.`,
+      };
+    }
+
+    // Sort by confidence
+    results.sort((a, b) => b.confidence - a.confidence);
+
+    return {
+      symbol: normalizedSymbol,
+      recommendations: results.slice(0, 3).map((r) => ({
+        strategy: r.strategy,
+        strategyId: r.strategyId,
+        confidence: `${Math.round(r.confidence * 100)}%`,
+        reasoning: r.reasoning,
+      })),
+    };
+  },
+});
+
+// ============================================================================
+// Export as Object (Mastra format)
+// ============================================================================
+
+/**
+ * Strategy tools exported as an object for Mastra Agent
+ */
+export const strategyTools = {
+  list_strategies: listStrategiesTool,
+  get_strategy_details: getStrategyDetailsTool,
+  detect_strategy: detectStrategyTool,
+  scan_for_strategy: scanForStrategyTool,
+  suggest_strategy: suggestStrategyTool,
+};

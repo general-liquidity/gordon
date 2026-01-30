@@ -33,7 +33,22 @@ export const PlanSchema = z.object({
 
   symbol: z.string(),
   direction: z.literal("long"),
-  strategy: z.enum(["support_bounce", "grid_entry"]),
+  strategy: z.enum([
+    // Tier 1 - Beginner
+    "support_bounce",
+    "bollinger_bounce",
+    "sma_crossover",
+    "volume_surge",
+    "vwap_bounce",
+    // Tier 2 - Intermediate
+    "consolidation_pop",
+    "adx_trend",
+    "ema_rsi_crossover",
+    "relative_strength",
+    "engulfing_pattern",
+    // Special
+    "grid_entry",
+  ]),
 
   allocation: z.object({
     currency: z.literal("USDT"),
