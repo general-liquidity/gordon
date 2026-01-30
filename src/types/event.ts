@@ -3,6 +3,7 @@ import { z } from "zod";
 export const EventTypeSchema = z.enum([
   "INTENT",
   "SCAN",
+  "SCAN_OPPORTUNITY",
   "ANALYZE",
   "PLAN_CREATED",
   "PLAN_APPROVED",

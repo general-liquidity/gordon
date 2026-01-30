@@ -130,7 +130,7 @@ export function logScanOpportunity(opportunity: {
   change24h: number;
 }): void {
   logEvent({
-    type: "scan:opportunity" as EventType,
+    type: "SCAN_OPPORTUNITY",
     data: opportunity,
   });
 }
@@ -151,7 +151,7 @@ export function getHistoricalOpportunities(options?: {
   let query = `
     SELECT id, timestamp, data
     FROM events
-    WHERE type = 'scan:opportunity'
+    WHERE type = 'SCAN_OPPORTUNITY'
     AND timestamp > datetime('now', '-${daysBack} days')
   `;
 

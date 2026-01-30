@@ -52,6 +52,33 @@ export const SLASH_COMMANDS: SlashCommand[] = [
     action: "agent",
     target: "analyst",
   },
+  {
+    name: "whales",
+    aliases: ["w", "flow"],
+    description: "Detect whale orders and market flow bias",
+    usage: "/whales <symbol>",
+    category: "market",
+    action: "tool",
+    target: "analyze_whale_orders",
+  },
+  {
+    name: "breakouts",
+    aliases: ["bo"],
+    description: "Scan for breakout/breakdown setups",
+    usage: "/breakouts [symbol]",
+    category: "market",
+    action: "tool",
+    target: "scan_breakouts",
+  },
+  {
+    name: "score",
+    aliases: ["sc"],
+    description: "Get market score and trading signal",
+    usage: "/score <symbol>",
+    category: "market",
+    action: "tool",
+    target: "score_market",
+  },
 
   // Trading
   {
@@ -62,6 +89,15 @@ export const SLASH_COMMANDS: SlashCommand[] = [
     category: "trading",
     action: "agent",
     target: "planner",
+  },
+  {
+    name: "grid",
+    aliases: ["g"],
+    description: "Create a grid entry plan with multiple buy levels",
+    usage: "/grid <symbol> [allocation]",
+    category: "trading",
+    action: "tool",
+    target: "create_grid_plan",
   },
   {
     name: "positions",
@@ -268,8 +304,16 @@ export function commandToPrompt(command: SlashCommand, args: string): string {
       return "Show me the highest volume tokens";
     case "analyze":
       return args ? `Analyze ${args} for me` : "What coin should I analyze?";
+    case "whales":
+      return args ? `Check whale orders and flow bias for ${args}` : "What symbol should I check for whale activity?";
+    case "breakouts":
+      return args ? `Scan ${args} for breakout or breakdown setups` : "Scan the market for breakout and breakdown setups";
+    case "score":
+      return args ? `Score ${args} and give me a trading signal` : "What symbol should I score?";
     case "plan":
       return args ? `Create a trade plan for ${args}` : "What coin should I plan a trade for?";
+    case "grid":
+      return args ? `Create a grid entry plan for ${args}` : "What symbol should I create a grid plan for?";
     case "positions":
       return "Check my current positions";
     case "orders":
