@@ -506,4 +506,42 @@ describe("validatePlan - grid_entry", () => {
     const result = validatePlan(widePlan, mockConfig, mockPortfolio);
     expect(result.warnings.some(w => w.includes("range"))).toBe(true);
   });
+
+  test("should error if grid has fewer than 3 levels", () => {
+    const badPlan = {
+      ...baseGridPlan,
+      grid: {
+        ...baseGridPlan.grid!,
+        levels: [
+          { price: 3400, percentOfAllocation: 0.5 },
+          { price: 3300, percentOfAllocation: 0.5 },
+        ],
+      },
+    };
+    const result = validatePlan(badPlan, mockConfig, mockPortfolio);
+    expect(result.valid).toBe(false);
+    expect(result.errors.some(e => e.includes("3-7 levels"))).toBe(true);
+  });
+
+  test("should error if grid has more than 7 levels", () => {
+    const badPlan = {
+      ...baseGridPlan,
+      grid: {
+        ...baseGridPlan.grid!,
+        levels: [
+          { price: 3400, percentOfAllocation: 0.1 },
+          { price: 3380, percentOfAllocation: 0.1 },
+          { price: 3360, percentOfAllocation: 0.1 },
+          { price: 3340, percentOfAllocation: 0.1 },
+          { price: 3320, percentOfAllocation: 0.1 },
+          { price: 3300, percentOfAllocation: 0.15 },
+          { price: 3280, percentOfAllocation: 0.15 },
+          { price: 3260, percentOfAllocation: 0.2 },
+        ],
+      },
+    };
+    const result = validatePlan(badPlan, mockConfig, mockPortfolio);
+    expect(result.valid).toBe(false);
+    expect(result.errors.some(e => e.includes("3-7 levels"))).toBe(true);
+  });
 });
