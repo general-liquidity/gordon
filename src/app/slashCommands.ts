@@ -231,6 +231,44 @@ export const SLASH_COMMANDS: SlashCommand[] = [
     action: "tool",
     target: "get_performance_metrics",
   },
+
+  // New SOTA Features
+  {
+    name: "ensemble",
+    aliases: ["multi", "validate"],
+    description: "Run multiple strategies to validate a setup",
+    usage: "/ensemble <symbol>",
+    category: "market",
+    action: "tool",
+    target: "run_strategy_ensemble",
+  },
+  {
+    name: "deep",
+    aliases: ["full", "comprehensive"],
+    description: "Run comprehensive analysis (signals + RSI + whales + orderbook)",
+    usage: "/deep <symbol>",
+    category: "market",
+    action: "tool",
+    target: "run_full_analysis",
+  },
+  {
+    name: "risk",
+    aliases: ["sharpe", "drawdown"],
+    description: "Show risk-adjusted performance metrics",
+    usage: "/risk",
+    category: "account",
+    action: "tool",
+    target: "get_risk_analysis",
+  },
+  {
+    name: "cache",
+    aliases: ["cachestats"],
+    description: "Show tool cache statistics (debug)",
+    usage: "/cache",
+    category: "system",
+    action: "tool",
+    target: "get_cache_stats",
+  },
 ];
 
 /**
@@ -371,6 +409,18 @@ export function commandToPrompt(command: SlashCommand, args: string): string {
       return args ? `Tell me about the ${args} strategy` : "What strategy would you like to learn about?";
     case "metrics":
       return "Show me my trading performance metrics and statistics";
+    case "ensemble":
+      return args
+        ? `Run multiple strategies on ${args} to validate the setup`
+        : "What symbol should I validate with multiple strategies?";
+    case "deep":
+      return args
+        ? `Run a comprehensive analysis on ${args} including signals, RSI, whale orders, and orderbook`
+        : "What symbol should I analyze comprehensively?";
+    case "risk":
+      return "Show me my risk-adjusted performance metrics including Sharpe ratio and drawdown";
+    case "cache":
+      return "Show me the tool cache statistics";
     default:
       return args || command.description;
   }

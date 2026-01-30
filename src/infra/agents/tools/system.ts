@@ -15,6 +15,7 @@ import { z } from "zod";
 
 import { getGordonContext, MastraExecutionContext } from "./types.ts";
 import { providerRegistry, DEDALUS_MODELS, type DirectProviderName } from "../../providers/registry.ts";
+import { getToolCacheStats, clearToolCache, pruneToolCache } from "./cache.ts";
 
 // ============================================================================
 // Connection Test Tool
@@ -184,6 +185,58 @@ export const getModelInfoTool = createTool({
 });
 
 // ============================================================================
+// Cache Stats Tool
+// ============================================================================
+
+export const getCacheStatsTool = createTool({
+  id: "get_cache_stats",
+  description:
+    "Get tool cache statistics including hit rate, misses, and in-flight requests. " +
+    "Use when user asks '/cache', 'cache stats', 'show cache', or wants to debug performance.",
+  inputSchema: z.object({
+    action: z.enum(["stats", "clear", "prune"]).default("stats")
+      .describe("Action to perform: stats (show statistics), clear (reset cache), prune (remove expired)"),
+  }),
+  outputSchema: z.object({
+    action: z.string(),
+    stats: z.object({
+      hits: z.number(),
+      misses: z.number(),
+      hitRate: z.number(),
+      inFlightRequests: z.number(),
+    }).optional(),
+    message: z.string(),
+  }),
+  execute: async ({ action }) => {
+    if (action === "clear") {
+      clearToolCache();
+      return {
+        action: "clear",
+        message: "Tool cache cleared successfully.",
+      };
+    }
+
+    if (action === "prune") {
+      pruneToolCache();
+      return {
+        action: "prune",
+        message: "Expired cache entries pruned.",
+      };
+    }
+
+    // Default: show stats
+    const stats = getToolCacheStats();
+    const hitRatePercent = (stats.hitRate * 100).toFixed(1);
+
+    return {
+      action: "stats",
+      stats,
+      message: `Cache Stats: ${stats.hits} hits, ${stats.misses} misses (${hitRatePercent}% hit rate). ${stats.inFlightRequests} requests in-flight.`,
+    };
+  },
+});
+
+// ============================================================================
 // Export as Object (Mastra format)
 // ============================================================================
 
@@ -194,4 +247,5 @@ export const getModelInfoTool = createTool({
 export const systemTools = {
   test_connection: testConnectionTool,
   get_model_info: getModelInfoTool,
+  get_cache_stats: getCacheStatsTool,
 };

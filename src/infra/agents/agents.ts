@@ -37,6 +37,7 @@ import {
   riskManagementTools,
   strategyTools,
   metricsTools,
+  compositionTools,
   withToolsMetrics,
 } from "./tools/index.ts";
 
@@ -67,6 +68,7 @@ const instrumentedMarketAnalysisTools = withToolsMetrics(marketAnalysisTools);
 const instrumentedRiskManagementTools = withToolsMetrics(riskManagementTools);
 const instrumentedStrategyTools = withToolsMetrics(strategyTools);
 const instrumentedMetricsTools = withToolsMetrics(metricsTools);
+const instrumentedCompositionTools = withToolsMetrics(compositionTools);
 
 // ============================================================================
 // Memory Configuration (Required for Agent Networks)
@@ -195,6 +197,13 @@ Your role is to provide deep analysis of specific cryptocurrencies.
 - RSI checks for overbought/oversold conditions using get_rsi
 - VWAP for intraday fair value analysis using get_vwap
 - Stochastic RSI for precise entry/exit timing using get_stochastic_rsi
+- **Comprehensive analysis** combining signals, RSI, whale orders, and orderbook using run_full_analysis
+
+## When to Use run_full_analysis
+Use run_full_analysis when user asks for:
+- "deep analysis", "full analysis", "comprehensive analysis"
+- "/deep <symbol>" command
+- Analysis that should combine multiple data sources
 
 ## Important Rules
 - Always explain indicators in simple terms
@@ -338,6 +347,7 @@ function getAnalystAgent(): Agent {
         ...instrumentedChartTools,
         ...instrumentedOrderbookTools,         // Order book depth and liquidity analysis
         ...instrumentedMarketAnalysisTools,    // Whale detection, breakouts, consolidation, scoring
+        ...instrumentedCompositionTools,       // Full analysis composition tool
         analyze_coin: instrumentedMarketTools.analyze_coin,
       },
     });
