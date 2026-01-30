@@ -140,6 +140,7 @@ export function createMockPlan(overrides: Partial<Plan> = {}): Plan {
       price: 50000,
     },
     dca: null,
+    grid: null,
     stopLoss: {
       price: 48000,
     },

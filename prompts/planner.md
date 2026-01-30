@@ -26,6 +26,122 @@ Support Bounce is a trend-following strategy that enters long positions when pri
 
 ---
 
+## The Grid Entry Strategy
+
+Grid Entry is an accumulation strategy that places multiple buy orders at descending price levels, ideal for ranging or uncertain markets.
+
+### Core Concept
+
+1. **Identify support zone**: Find multiple support levels (S1, S2, S3)
+2. **Place layered buys**: Create 3-7 buy orders spread across the support zone
+3. **Pyramid allocation**: Allocate more capital at lower prices (optional)
+4. **Single stop loss**: Below the entire grid for risk management
+5. **Take profits after fills**: Based on actual weighted average entry
+
+### Why This Works
+
+- **Removes timing pressure**: Don't need to pick the exact bottom
+- **Better average entry**: If price drops through grid, average cost is lower
+- **Clear risk management**: One stop loss below the grid protects the position
+
+### When to Use Grid Entry
+
+- Market is ranging or uncertain (not clearly trending)
+- Multiple clear support levels exist
+- User wants to accumulate rather than catch an exact bounce
+- Position size is large enough to warrant splitting
+
+---
+
+## Grid Entry Output Format
+
+When generating a grid_entry plan, use this structure:
+
+```json
+{
+  "symbol": "ETHUSDT",
+  "direction": "long",
+  "strategy": "grid_entry",
+
+  "allocation": {
+    "currency": "USDT",
+    "amount": 1000,
+    "percentOfPortfolio": 0.10
+  },
+
+  "entry": {
+    "type": "limit",
+    "price": 3400
+  },
+
+  "dca": null,
+
+  "grid": {
+    "levels": [
+      { "price": 3400, "percentOfAllocation": 0.10 },
+      { "price": 3340, "percentOfAllocation": 0.15 },
+      { "price": 3280, "percentOfAllocation": 0.20 },
+      { "price": 3220, "percentOfAllocation": 0.25 },
+      { "price": 3160, "percentOfAllocation": 0.30 }
+    ],
+    "distribution": "pyramid",
+    "priceRange": {
+      "high": 3400,
+      "low": 3160
+    }
+  },
+
+  "stopLoss": {
+    "price": 3050
+  },
+
+  "takeProfit": [
+    { "price": 3600, "percentToSell": 0.50 },
+    { "price": 3800, "percentToSell": 0.50 }
+  ],
+
+  "reasoning": "ETH is ranging between $3,100-$3,500. Multiple support levels identified. Grid entry allows accumulation across support zone with pyramid weighting."
+}
+```
+
+### Grid Entry Rules
+
+**Level Count:**
+- Minimum: 3 levels
+- Maximum: 7 levels
+- Default: 5 levels
+
+**Distribution Options:**
+- `pyramid`: More allocation at lower prices (recommended)
+  - 5 levels: 10%, 15%, 20%, 25%, 30%
+- `equal`: Same allocation at each level
+  - 5 levels: 20%, 20%, 20%, 20%, 20%
+
+**Level Placement:**
+1. Highest level: Near S1 or 2% below current price
+2. Lowest level: Near S3 or 10% below current price
+3. Middle levels: Evenly spaced, snapped to nearby support if within 1%
+
+**Stop Loss:**
+- 3% below the lowest grid level
+- Never inside the grid range
+
+**Take Profits:**
+- Based on expected weighted average entry (if all levels fill)
+- Same TP rules as support_bounce (R1, R2 targets)
+- TPs are placed AFTER grid entries start filling (deferred)
+
+### Choosing Between Strategies
+
+| Factor | Support Bounce | Grid Entry |
+|--------|---------------|------------|
+| Market | Clear bounce setup | Ranging/uncertain |
+| Confidence | High (price at support) | Medium (unsure of exact bottom) |
+| Timing | Specific entry point | Spread across zone |
+| Position size | Any | Better for larger positions |
+
+---
+
 ## Input Data
 
 You will receive:

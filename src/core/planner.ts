@@ -34,7 +34,7 @@ export interface PlannerInput {
 interface LLMPlanResponse {
   symbol: string;
   direction: "long";
-  strategy: "support_bounce";
+  strategy: "support_bounce" | "grid_entry";
   allocation: {
     currency: "USDT";
     amount: number;
@@ -48,6 +48,17 @@ interface LLMPlanResponse {
     price: number;
     percentOfAllocation: number;
   }> | null;
+  grid: {
+    levels: Array<{
+      price: number;
+      percentOfAllocation: number;
+    }>;
+    distribution: "pyramid" | "equal";
+    priceRange: {
+      high: number;
+      low: number;
+    };
+  } | null;
   stopLoss: {
     price: number;
   };
@@ -284,6 +295,38 @@ function validatePlanStructure(plan: LLMPlanResponse, input: PlannerInput): stri
           errors.push(`DCA level ${dca.price} must be below entry ${plan.entry.price}`);
         }
       }
+    }
+  }
+
+  // Grid validation (if grid_entry strategy)
+  if (plan.strategy === "grid_entry") {
+    if (!plan.grid || plan.grid.levels.length === 0) {
+      errors.push("Grid entry strategy requires grid configuration with levels");
+    } else {
+      // Grid percentages must sum to 1
+      const gridSum = plan.grid.levels.reduce((sum, l) => sum + l.percentOfAllocation, 0);
+      if (Math.abs(gridSum - 1.0) > 0.01) {
+        errors.push(`Grid percentages must sum to 100%, got ${(gridSum * 100).toFixed(1)}%`);
+      }
+
+      // Grid prices must be descending
+      for (let i = 1; i < plan.grid.levels.length; i++) {
+        if (plan.grid.levels[i]!.price >= plan.grid.levels[i - 1]!.price) {
+          errors.push("Grid levels must be in descending price order");
+          break;
+        }
+      }
+
+      // Stop loss must be below lowest grid level
+      const lowestGridLevel = plan.grid.levels[plan.grid.levels.length - 1]!.price;
+      if (plan.stopLoss.price >= lowestGridLevel) {
+        errors.push(`Stop loss must be below lowest grid level (${lowestGridLevel})`);
+      }
+    }
+
+    // DCA should be null for grid entry
+    if (plan.dca && plan.dca.length > 0) {
+      errors.push("Grid entry strategy should not have DCA levels (use grid.levels instead)");
     }
   }
 
