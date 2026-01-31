@@ -37,6 +37,14 @@ import {
 import { filterExcludeMonths, filterMarketHours, filterFirstLastHour } from "../../../backtest/filters.ts";
 import { analyzeAlphaDecay } from "../../../backtest/alpha-decay.ts";
 import { generateBacktestChart } from "../../../backtest/plotting.ts";
+import { walkForwardTest, type WalkForwardConfig } from "../../../backtest/walk-forward.ts";
+import { runMonteCarloSimulation, type MonteCarloConfig } from "../../../backtest/monte-carlo.ts";
+import {
+  saveBacktestResult,
+  loadBacktestResult,
+  listBacktestHistory,
+  type BacktestQueryOptions,
+} from "../../../backtest/storage.ts";
 import { getGordonContext, normalizeSymbol, type MastraExecutionContext } from "./types.ts";
 
 // ============================================================================
@@ -1169,6 +1177,412 @@ export const randomSearchOptimizationTool = createTool({
 });
 
 // ============================================================================
+// Walk-Forward Testing Tool
+// ============================================================================
+
+export const runWalkForwardTestTool = createTool({
+  id: "run_walk_forward_test",
+  description:
+    "Run walk-forward analysis on a strategy to validate its robustness. " +
+    "Divides data into train/test periods, optimizes on training data, " +
+    "and validates on out-of-sample test data. Use when the user asks to " +
+    "'validate strategy robustness', 'run walk-forward test', or 'check for overfitting'.",
+  inputSchema: z.object({
+    symbol: z.string().describe("Trading pair (e.g., 'BTCUSDT')"),
+    strategyId: z.string().describe("Strategy ID to test"),
+    timeframe: z.string().default("4h").describe("Candle timeframe"),
+    days: z.number().default(180).describe("Number of days of data to use"),
+    trainRatio: z.number().default(0.7).describe("Ratio of data for training (0-1)"),
+    numWindows: z.number().default(3).describe("Number of walk-forward windows"),
+    parameterRanges: z
+      .record(z.string(), z.array(z.number()))
+      .optional()
+      .describe("Parameters to optimize with their value ranges"),
+    optimizeFor: z
+      .enum(["sharpeRatio", "totalReturn", "winRate", "maxDrawdown"])
+      .default("sharpeRatio")
+      .describe("Metric to optimize for"),
+  }),
+  outputSchema: z.object({
+    strategyId: z.string().optional(),
+    strategyName: z.string().optional(),
+    windows: z.array(z.object({
+      windowNumber: z.number(),
+      trainReturn: z.number(),
+      testReturn: z.number(),
+      overfitRatio: z.number(),
+      testTrades: z.number(),
+    })).optional(),
+    aggregatedMetrics: z.object({
+      avgReturn: z.number(),
+      medianReturn: z.number(),
+      avgSharpeRatio: z.number(),
+      avgWinRate: z.number(),
+      maxDrawdown: z.number(),
+      totalTrades: z.number(),
+      avgOverfitRatio: z.number(),
+      profitableWindowsPercent: z.number(),
+    }).optional(),
+    stability: z.object({
+      consistencyScore: z.number(),
+      robustnessScore: z.number(),
+      verdict: z.enum(["excellent", "good", "fair", "poor", "unreliable"]),
+      warnings: z.array(z.string()),
+    }).optional(),
+    executionTime: z.number().optional(),
+    error: z.string().optional(),
+  }),
+  execute: async (
+    { symbol, strategyId, timeframe, days, trainRatio, numWindows, parameterRanges, optimizeFor },
+    execContext: MastraExecutionContext
+  ) => {
+    const ctx = getGordonContext(execContext);
+    if (!ctx?.binance) {
+      return { error: errors.noBinance.error };
+    }
+
+    const strategy = strategyRegistry.get(strategyId as StrategyId);
+    if (!strategy) {
+      return { error: errors.strategyNotFound(strategyId).error };
+    }
+
+    const normalizedSymbol = normalizeSymbol(symbol);
+
+    try {
+      const ohlcData = await fetchHistoricalData(
+        ctx.binance,
+        normalizedSymbol,
+        timeframe,
+        days
+      );
+
+      if (ohlcData.length < 200) {
+        return { error: `Insufficient data for walk-forward test. Need at least 200 candles, got ${ohlcData.length}.` };
+      }
+
+      const config: WalkForwardConfig = {
+        trainRatio,
+        numWindows,
+        parameterRanges: parameterRanges ?? {},
+        optimizeFor: optimizeFor as keyof BacktestMetrics,
+      };
+
+      const result = await walkForwardTest(strategy, ohlcData, config);
+
+      return {
+        strategyId: result.strategyId,
+        strategyName: result.strategyName,
+        windows: result.windows.map((w) => ({
+          windowNumber: w.windowNumber,
+          trainReturn: w.trainMetrics.totalReturn,
+          testReturn: w.testMetrics.totalReturn,
+          overfitRatio: w.overfitRatio,
+          testTrades: w.testTrades,
+        })),
+        aggregatedMetrics: result.aggregatedMetrics,
+        stability: result.stability,
+        executionTime: result.executionTime,
+      };
+    } catch (error) {
+      return {
+        error: error instanceof Error ? error.message : "Walk-forward test failed",
+      };
+    }
+  },
+});
+
+// ============================================================================
+// Monte Carlo Simulation Tool
+// ============================================================================
+
+export const runMonteCarloTool = createTool({
+  id: "run_monte_carlo",
+  description:
+    "Run Monte Carlo simulation on backtest results to assess strategy robustness. " +
+    "Shuffles trade sequences to generate confidence intervals and identify " +
+    "sequence-dependent strategies. Use when the user asks to 'run monte carlo', " +
+    "'assess risk', or 'calculate confidence intervals'.",
+  inputSchema: z.object({
+    symbol: z.string().describe("Trading pair (e.g., 'BTCUSDT')"),
+    strategyId: z.string().describe("Strategy ID to simulate"),
+    timeframe: z.string().default("4h").describe("Candle timeframe"),
+    days: z.number().default(90).describe("Number of days to backtest"),
+    iterations: z.number().default(1000).describe("Number of Monte Carlo iterations"),
+    initialCapital: z.number().default(10000).describe("Initial capital"),
+  }),
+  outputSchema: z.object({
+    originalReturn: z.number().optional(),
+    originalMaxDrawdown: z.number().optional(),
+    tradeCount: z.number().optional(),
+    iterations: z.number().optional(),
+    returnDistribution: z.object({
+      min: z.number(),
+      max: z.number(),
+      mean: z.number(),
+      median: z.number(),
+      stdDev: z.number(),
+      percentile5: z.number(),
+      percentile95: z.number(),
+    }).optional(),
+    drawdownDistribution: z.object({
+      min: z.number(),
+      max: z.number(),
+      mean: z.number(),
+      median: z.number(),
+      percentile95: z.number(),
+    }).optional(),
+    scenarios: z.object({
+      worstCaseReturn: z.number(),
+      bestCaseReturn: z.number(),
+      medianReturn: z.number(),
+      profitProbability: z.number(),
+      majorLossProbability: z.number(),
+    }).optional(),
+    riskMetrics: z.object({
+      valueAtRisk5: z.number(),
+      valueAtRisk1: z.number(),
+      expectedShortfall: z.number(),
+      riskOfRuin: z.number(),
+    }).optional(),
+    robustness: z.object({
+      score: z.number(),
+      verdict: z.enum(["excellent", "good", "fair", "poor", "unreliable"]),
+      observations: z.array(z.string()),
+    }).optional(),
+    executionTime: z.number().optional(),
+    error: z.string().optional(),
+  }),
+  execute: async (
+    { symbol, strategyId, timeframe, days, iterations, initialCapital },
+    execContext: MastraExecutionContext
+  ) => {
+    const ctx = getGordonContext(execContext);
+    if (!ctx?.binance) {
+      return { error: errors.noBinance.error };
+    }
+
+    const strategy = strategyRegistry.get(strategyId as StrategyId);
+    if (!strategy) {
+      return { error: errors.strategyNotFound(strategyId).error };
+    }
+
+    const normalizedSymbol = normalizeSymbol(symbol);
+
+    try {
+      // First run a backtest to get trades
+      const ohlcData = await fetchHistoricalData(
+        ctx.binance,
+        normalizedSymbol,
+        timeframe,
+        days
+      );
+
+      if (ohlcData.length < 100) {
+        return { error: errors.insufficientData(normalizedSymbol).error };
+      }
+
+      const engineParams = {
+        initialCapital,
+        commissionRate: 0.001,
+      };
+
+      const backtestResult = runBacktest(strategy, ohlcData, engineParams);
+
+      if (backtestResult.trades.length < 10) {
+        return { error: `Insufficient trades for Monte Carlo (${backtestResult.trades.length}). Need at least 10.` };
+      }
+
+      // Run Monte Carlo simulation
+      const mcResult = await runMonteCarloSimulation(backtestResult.trades, {
+        iterations,
+        initialCapital,
+      });
+
+      return {
+        originalReturn: mcResult.originalReturn,
+        originalMaxDrawdown: mcResult.originalMaxDrawdown,
+        tradeCount: mcResult.originalTradeCount,
+        iterations: mcResult.config.iterations,
+        returnDistribution: {
+          min: mcResult.returnDistribution.min,
+          max: mcResult.returnDistribution.max,
+          mean: mcResult.returnDistribution.mean,
+          median: mcResult.returnDistribution.median,
+          stdDev: mcResult.returnDistribution.stdDev,
+          percentile5: mcResult.returnDistribution.percentiles[5] ?? 0,
+          percentile95: mcResult.returnDistribution.percentiles[95] ?? 0,
+        },
+        drawdownDistribution: {
+          min: mcResult.drawdownDistribution.min,
+          max: mcResult.drawdownDistribution.max,
+          mean: mcResult.drawdownDistribution.mean,
+          median: mcResult.drawdownDistribution.median,
+          percentile95: mcResult.drawdownDistribution.percentiles[95] ?? 0,
+        },
+        scenarios: {
+          worstCaseReturn: mcResult.scenarios.worstCase.return,
+          bestCaseReturn: mcResult.scenarios.bestCase.return,
+          medianReturn: mcResult.scenarios.medianCase.return,
+          profitProbability: mcResult.scenarios.profitProbability,
+          majorLossProbability: mcResult.scenarios.majorLossProbability,
+        },
+        riskMetrics: mcResult.riskMetrics,
+        robustness: mcResult.robustness,
+        executionTime: mcResult.executionTime,
+      };
+    } catch (error) {
+      return {
+        error: error instanceof Error ? error.message : "Monte Carlo simulation failed",
+      };
+    }
+  },
+});
+
+// ============================================================================
+// Backtest History Tool
+// ============================================================================
+
+export const getBacktestHistoryTool = createTool({
+  id: "get_backtest_history",
+  description:
+    "Get historical backtest results from the database. " +
+    "Use to review past backtest runs, compare historical performance, " +
+    "or find previously optimized parameters.",
+  inputSchema: z.object({
+    strategyId: z.string().optional().describe("Filter by strategy ID"),
+    symbol: z.string().optional().describe("Filter by trading pair"),
+    timeframe: z.string().optional().describe("Filter by timeframe"),
+    minReturn: z.number().optional().describe("Minimum total return filter"),
+    maxDrawdown: z.number().optional().describe("Maximum drawdown filter"),
+    orderBy: z
+      .enum(["createdAt", "totalReturn", "sharpeRatio", "maxDrawdown", "winRate"])
+      .default("createdAt")
+      .describe("Field to order by"),
+    orderDirection: z
+      .enum(["asc", "desc"])
+      .default("desc")
+      .describe("Sort direction"),
+    limit: z.number().default(20).describe("Maximum number of results"),
+  }),
+  outputSchema: z.object({
+    results: z.array(z.object({
+      id: z.string(),
+      strategyId: z.string(),
+      strategyName: z.string(),
+      symbol: z.string(),
+      timeframe: z.string(),
+      startDate: z.string(),
+      endDate: z.string(),
+      totalReturn: z.number(),
+      maxDrawdown: z.number(),
+      sharpeRatio: z.number(),
+      winRate: z.number(),
+      totalTrades: z.number(),
+      createdAt: z.string(),
+    })).optional(),
+    totalCount: z.number().optional(),
+    error: z.string().optional(),
+  }),
+  execute: async ({
+    strategyId,
+    symbol,
+    timeframe,
+    minReturn,
+    maxDrawdown,
+    orderBy,
+    orderDirection,
+    limit,
+  }) => {
+    try {
+      const options: BacktestQueryOptions = {
+        strategyId,
+        symbol: symbol ? normalizeSymbol(symbol) : undefined,
+        timeframe,
+        minReturn,
+        maxDrawdown,
+        orderBy,
+        orderDirection,
+        limit,
+      };
+
+      const results = listBacktestHistory(options);
+
+      return {
+        results,
+        totalCount: results.length,
+      };
+    } catch (error) {
+      return {
+        error: error instanceof Error ? error.message : "Failed to get backtest history",
+      };
+    }
+  },
+});
+
+// ============================================================================
+// Save Backtest Result Tool
+// ============================================================================
+
+export const saveBacktestResultTool = createTool({
+  id: "save_backtest_result",
+  description:
+    "Save a backtest result to the database for future reference. " +
+    "Use after running a backtest to persist results.",
+  inputSchema: z.object({
+    backtestResult: backtestResultSchema.describe("The backtest result to save"),
+  }),
+  outputSchema: z.object({
+    success: z.boolean(),
+    id: z.string().optional(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ backtestResult }) => {
+    try {
+      const result = saveBacktestResult(backtestResult);
+      return result;
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Failed to save backtest result",
+      };
+    }
+  },
+});
+
+// ============================================================================
+// Load Backtest Result Tool
+// ============================================================================
+
+export const loadBacktestResultTool = createTool({
+  id: "load_backtest_result",
+  description:
+    "Load a previously saved backtest result by ID. " +
+    "Use to retrieve full backtest details including trades and equity curve.",
+  inputSchema: z.object({
+    id: z.string().describe("The backtest result ID to load"),
+  }),
+  outputSchema: z.object({
+    result: backtestResultSchema.optional(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ id }) => {
+    try {
+      const result = loadBacktestResult(id);
+
+      if (!result) {
+        return { error: `Backtest result with ID '${id}' not found.` };
+      }
+
+      return { result };
+    } catch (error) {
+      return {
+        error: error instanceof Error ? error.message : "Failed to load backtest result",
+      };
+    }
+  },
+});
+
+// ============================================================================
 // Export as Object (Mastra format)
 // ============================================================================
 
@@ -1194,4 +1608,10 @@ export const backtestTools = {
   generate_backtest_chart: generateBacktestChartTool,
   grid_search_optimization: gridSearchOptimizationTool,
   random_search_optimization: randomSearchOptimizationTool,
+  // New advanced tools
+  run_walk_forward_test: runWalkForwardTestTool,
+  run_monte_carlo: runMonteCarloTool,
+  get_backtest_history: getBacktestHistoryTool,
+  save_backtest_result: saveBacktestResultTool,
+  load_backtest_result: loadBacktestResultTool,
 };

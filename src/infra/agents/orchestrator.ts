@@ -13,7 +13,7 @@ import { RequestContext } from "@mastra/core/request-context";
 import { gordonAgent } from "./agents.ts";
 import { createModuleLogger } from "../logger/index.ts";
 import { emitEvent } from "../../events/index.ts";
-import { checkInputGuardrails, checkOutputGuardrails } from "./middleware/guardrails.ts";
+import { checkInputGuardrails, checkOutputGuardrails, checkToolAccess } from "./middleware/index.ts";
 import {
   initializeTracing as initTracingModule,
   buildTracingOptions,
@@ -21,9 +21,210 @@ import {
   getTracingConfig,
   recordRequest,
   recordError,
+  recordAgentCall,
+  enforceRateLimit,
   type SpanContext,
+  type RateLimitResult,
 } from "../observability/index.ts";
+import { auditLog } from "../audit/index.ts";
+import { checkPermissionsOnInit } from "../binance/permissions.ts";
 import type { GordonContext } from "./types.ts";
+
+// ============================================================================
+// Error Recovery Types & Configuration
+// ============================================================================
+
+/**
+ * Fallback configuration for an agent
+ */
+export interface AgentFallbackConfig {
+  /** The primary agent to try first */
+  primaryAgent: string;
+  /** List of fallback agents/tools to try if primary fails */
+  fallbacks: Array<{
+    /** Name of the fallback agent or tool */
+    name: string;
+    /** Type: 'agent' for another agent, 'tool' for a basic tool, 'cache' for cached results */
+    type: "agent" | "tool" | "cache";
+    /** Optional condition to check before using this fallback */
+    condition?: (error: Error) => boolean;
+  }>;
+  /** Maximum retry attempts with exponential backoff */
+  maxRetries: number;
+  /** Base delay in ms for exponential backoff */
+  baseDelayMs: number;
+  /** Whether to use cached results on failure */
+  useCacheOnFailure: boolean;
+}
+
+/**
+ * Fallback chain type mapping agent names to their fallback configurations
+ */
+export type AgentFallbackChain = Record<string, AgentFallbackConfig>;
+
+/**
+ * Default fallback chain configuration for Gordon agents
+ */
+export const DEFAULT_FALLBACK_CHAIN: AgentFallbackChain = {
+  Analyst: {
+    primaryAgent: "Analyst",
+    fallbacks: [
+      { name: "get_technical_analysis", type: "tool" },
+      { name: "get_rsi", type: "tool" },
+    ],
+    maxRetries: 3,
+    baseDelayMs: 1000,
+    useCacheOnFailure: true,
+  },
+  Backtester: {
+    primaryAgent: "Backtester",
+    fallbacks: [
+      { name: "backtest_cache", type: "cache" },
+    ],
+    maxRetries: 2,
+    baseDelayMs: 2000,
+    useCacheOnFailure: true,
+  },
+  Scanner: {
+    primaryAgent: "Scanner",
+    fallbacks: [
+      { name: "scan_market", type: "tool" },
+    ],
+    maxRetries: 3,
+    baseDelayMs: 1000,
+    useCacheOnFailure: false,
+  },
+  Planner: {
+    primaryAgent: "Planner",
+    fallbacks: [],
+    maxRetries: 2,
+    baseDelayMs: 1000,
+    useCacheOnFailure: false,
+  },
+  Executor: {
+    primaryAgent: "Executor",
+    fallbacks: [],
+    maxRetries: 1, // Be conservative with execution
+    baseDelayMs: 500,
+    useCacheOnFailure: false,
+  },
+  Monitor: {
+    primaryAgent: "Monitor",
+    fallbacks: [
+      { name: "check_positions", type: "tool" },
+    ],
+    maxRetries: 3,
+    baseDelayMs: 1000,
+    useCacheOnFailure: true,
+  },
+};
+
+/**
+ * Check if an error is transient and should be retried
+ */
+function isTransientError(error: Error): boolean {
+  const transientPatterns = [
+    /timeout/i,
+    /rate.?limit/i,
+    /too.?many.?requests/i,
+    /503/,
+    /502/,
+    /504/,
+    /network/i,
+    /ECONNRESET/i,
+    /ETIMEDOUT/i,
+    /ENOTFOUND/i,
+    /temporarily/i,
+    /retry/i,
+    /overloaded/i,
+  ];
+
+  return transientPatterns.some((pattern) => pattern.test(error.message));
+}
+
+/**
+ * Sleep for a given number of milliseconds
+ */
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Calculate exponential backoff delay
+ */
+function calculateBackoffDelay(attempt: number, baseDelayMs: number): number {
+  // Exponential backoff with jitter: baseDelay * 2^attempt + random jitter
+  const exponentialDelay = baseDelayMs * Math.pow(2, attempt);
+  const jitter = Math.random() * baseDelayMs * 0.5;
+  return Math.min(exponentialDelay + jitter, 30000); // Cap at 30 seconds
+}
+
+// ============================================================================
+// Backtest Cache (Simple in-memory cache for fallback)
+// ============================================================================
+
+interface CachedBacktestResult {
+  key: string;
+  result: unknown;
+  timestamp: number;
+  ttlMs: number;
+}
+
+const backtestCache: Map<string, CachedBacktestResult> = new Map();
+const BACKTEST_CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes
+
+/**
+ * Store a backtest result in cache
+ */
+export function cacheBacktestResult(key: string, result: unknown): void {
+  backtestCache.set(key, {
+    key,
+    result,
+    timestamp: Date.now(),
+    ttlMs: BACKTEST_CACHE_TTL_MS,
+  });
+
+  // Prune old entries if cache gets too large
+  if (backtestCache.size > 100) {
+    const now = Date.now();
+    for (const [k, v] of backtestCache.entries()) {
+      if (now - v.timestamp > v.ttlMs) {
+        backtestCache.delete(k);
+      }
+    }
+  }
+
+  logger.debug("Cached backtest result", { key });
+}
+
+/**
+ * Get a cached backtest result
+ */
+export function getCachedBacktestResult(key: string): unknown | null {
+  const cached = backtestCache.get(key);
+  if (!cached) return null;
+
+  // Check if still valid
+  if (Date.now() - cached.timestamp > cached.ttlMs) {
+    backtestCache.delete(key);
+    return null;
+  }
+
+  logger.debug("Retrieved cached backtest result", { key });
+  return cached.result;
+}
+
+/**
+ * Generate a cache key for backtest parameters
+ */
+export function generateBacktestCacheKey(
+  symbol: string,
+  strategyId: string,
+  timeframe: string,
+  days: number
+): string {
+  return `backtest:${symbol}:${strategyId}:${timeframe}:${days}`;
+}
 
 const logger = createModuleLogger("orchestrator");
 
@@ -52,6 +253,7 @@ const TOOL_AGENT_MAP: Record<string, string> = {
   get_orderbook_imbalance: "Analyst",
   find_liquidity_clusters: "Analyst",
   get_chart: "Analyst",
+  run_full_analysis: "Analyst",
   // Planner tools
   create_plan: "Planner",
   create_grid_plan: "Planner",
@@ -86,6 +288,18 @@ const TOOL_AGENT_MAP: Record<string, string> = {
   optimize_strategy: "Backtester",
   compare_backtests: "Backtester",
   get_backtest_summary: "Backtester",
+  analyze_backtest_results: "Backtester",
+  compare_backtest_results: "Backtester",
+  rank_strategies_by_metric: "Backtester",
+  find_best_strategy: "Backtester",
+  analyze_alpha_decay: "Backtester",
+  grid_search_optimization: "Backtester",
+  random_search_optimization: "Backtester",
+  // Shared context tools (used by multiple agents)
+  read_shared_context: "Gordon",
+  write_shared_context: "Gordon",
+  // System tools
+  get_agent_health: "Gordon",
 };
 
 /**
@@ -93,6 +307,200 @@ const TOOL_AGENT_MAP: Record<string, string> = {
  */
 function getAgentForTool(toolName: string): string | undefined {
   return TOOL_AGENT_MAP[toolName];
+}
+
+// ============================================================================
+// Handoff Tracking & Validation
+// ============================================================================
+
+/**
+ * Handoff record for tracking agent transitions
+ */
+export interface HandoffRecord {
+  handoffId: string;
+  fromAgent: string;
+  toAgent: string;
+  timestamp: number;
+  validated: boolean;
+  validationReason?: string;
+  metadata?: Record<string, unknown>;
+}
+
+/**
+ * Handoff validation result
+ */
+export interface HandoffValidation {
+  valid: boolean;
+  reason?: string;
+  warnings?: string[];
+}
+
+// In-memory handoff tracking
+const handoffHistory: HandoffRecord[] = [];
+let handoffCounter = 0;
+
+/**
+ * Valid agent transition rules
+ * Defines which agents can hand off to which other agents
+ */
+const VALID_HANDOFF_RULES: Record<string, string[]> = {
+  Gordon: ["Scanner", "Analyst", "Planner", "Executor", "Monitor", "Teacher", "Backtester"],
+  Scanner: ["Analyst", "Gordon"],
+  Analyst: ["Planner", "Scanner", "Gordon"],
+  Planner: ["Executor", "Analyst", "Gordon"],
+  Executor: ["Monitor", "Planner", "Gordon"],
+  Monitor: ["Planner", "Analyst", "Gordon"],
+  Teacher: ["Gordon"],
+  Backtester: ["Analyst", "Gordon"],
+};
+
+/**
+ * Validate a handoff between agents
+ *
+ * @param fromAgent - The agent handing off
+ * @param toAgent - The agent receiving the handoff
+ * @param context - Optional additional context for validation
+ * @returns Validation result
+ */
+export function validateHandoff(
+  fromAgent: string,
+  toAgent: string,
+  context?: Record<string, unknown>
+): HandoffValidation {
+  const warnings: string[] = [];
+
+  // Check if fromAgent is known
+  if (!VALID_HANDOFF_RULES[fromAgent]) {
+    return {
+      valid: false,
+      reason: `Unknown source agent: ${fromAgent}`,
+    };
+  }
+
+  // Check if toAgent is known
+  const knownAgents = Object.keys(VALID_HANDOFF_RULES);
+  if (!knownAgents.includes(toAgent)) {
+    return {
+      valid: false,
+      reason: `Unknown target agent: ${toAgent}`,
+    };
+  }
+
+  // Check if the transition is allowed
+  const allowedTargets = VALID_HANDOFF_RULES[fromAgent]!;
+  if (!allowedTargets.includes(toAgent)) {
+    return {
+      valid: false,
+      reason: `Handoff from ${fromAgent} to ${toAgent} is not allowed. Allowed targets: ${allowedTargets.join(", ")}`,
+    };
+  }
+
+  // Check for circular handoffs in recent history
+  const recentHandoffs = handoffHistory.slice(-10);
+  const circularCount = recentHandoffs.filter(
+    (h) => h.fromAgent === toAgent && h.toAgent === fromAgent
+  ).length;
+  if (circularCount >= 3) {
+    warnings.push(`Detected potential circular handoff pattern between ${fromAgent} and ${toAgent}`);
+  }
+
+  // Check for rapid handoffs (potential infinite loop)
+  const lastSecondHandoffs = handoffHistory.filter(
+    (h) => Date.now() - h.timestamp < 1000
+  );
+  if (lastSecondHandoffs.length >= 5) {
+    warnings.push("High handoff frequency detected. Possible infinite loop.");
+  }
+
+  // Executor requires armed state for execution
+  if (toAgent === "Executor" && context?.mode !== "ARMED") {
+    warnings.push("Handoff to Executor while system is not ARMED");
+  }
+
+  return {
+    valid: true,
+    warnings: warnings.length > 0 ? warnings : undefined,
+  };
+}
+
+/**
+ * Track an agent handoff
+ *
+ * @param fromAgent - The agent handing off
+ * @param toAgent - The agent receiving the handoff
+ * @param metadata - Optional metadata about the handoff
+ * @returns The handoff record
+ */
+export async function trackHandoff(
+  fromAgent: string,
+  toAgent: string,
+  metadata?: Record<string, unknown>
+): Promise<HandoffRecord> {
+  const handoffId = `handoff_${Date.now()}_${++handoffCounter}`;
+
+  // Validate the handoff
+  const validation = validateHandoff(fromAgent, toAgent, metadata);
+
+  const record: HandoffRecord = {
+    handoffId,
+    fromAgent,
+    toAgent,
+    timestamp: Date.now(),
+    validated: validation.valid,
+    validationReason: validation.reason,
+    metadata,
+  };
+
+  // Store in history
+  handoffHistory.push(record);
+
+  // Keep only last 100 handoffs
+  if (handoffHistory.length > 100) {
+    handoffHistory.shift();
+  }
+
+  // Emit handoff acknowledgment event
+  await emitEvent("agent:handoff_ack", {
+    fromAgent,
+    toAgent,
+    validated: validation.valid,
+    reason: validation.reason || (validation.warnings?.join("; ")),
+    handoffId,
+  });
+
+  // Log the handoff
+  if (validation.valid) {
+    logger.info("Agent handoff tracked", {
+      handoffId,
+      fromAgent,
+      toAgent,
+      warnings: validation.warnings,
+    });
+  } else {
+    logger.warn("Invalid agent handoff attempted", {
+      handoffId,
+      fromAgent,
+      toAgent,
+      reason: validation.reason,
+    });
+  }
+
+  return record;
+}
+
+/**
+ * Get recent handoff history
+ */
+export function getHandoffHistory(limit: number = 20): HandoffRecord[] {
+  return handoffHistory.slice(-limit);
+}
+
+/**
+ * Clear handoff history (for testing)
+ */
+export function clearHandoffHistory(): void {
+  handoffHistory.length = 0;
+  handoffCounter = 0;
 }
 
 // ============================================================================
@@ -161,6 +569,15 @@ export async function* processMessageStream(
     logger.warn("Input blocked by guardrail", { reason: inputCheck.reason });
     recordRequest(Date.now() - startTime, false);
     recordError("InputGuardrailBlock");
+
+    // Audit log the blocked input
+    auditLog.blocked(
+      context.userId || "unknown",
+      "GUARDRAIL_TRIGGERED",
+      { message: userMessage.substring(0, 100) },
+      inputCheck.reason || "Input blocked by guardrail"
+    );
+
     yield { type: "error", error: inputCheck.reason };
     return;
   }
@@ -246,7 +663,15 @@ export async function* processMessageStream(
 
                 // Emit agent switch if we detected a different agent
                 if (detectedAgent && detectedAgent !== currentAgent) {
+                  const previousAgent = currentAgent || "Gordon";
                   currentAgent = detectedAgent;
+
+                  // Track the handoff
+                  await trackHandoff(previousAgent, currentAgent, {
+                    toolName,
+                    mode: context.config?.mode,
+                  });
+
                   yield {
                     type: "agent_switch",
                     agentName: currentAgent,
@@ -278,7 +703,15 @@ export async function* processMessageStream(
                 // Capitalize agent name for display
                 const agentName = agentId.charAt(0).toUpperCase() + agentId.slice(1);
                 if (agentName !== currentAgent && agentName.toLowerCase() !== "gordon") {
+                  const previousAgent = currentAgent || "Gordon";
                   currentAgent = agentName;
+
+                  // Track the handoff
+                  await trackHandoff(previousAgent, currentAgent, {
+                    eventType: chunk.type,
+                    mode: context.config?.mode,
+                  });
+
                   yield {
                     type: "agent_switch",
                     agentName: currentAgent,
@@ -320,7 +753,16 @@ export async function* processMessageStream(
                   const toolName = innerPayload.payload.toolName;
                   const detectedAgent = getAgentForTool(toolName);
                   if (detectedAgent && detectedAgent !== currentAgent) {
+                    const previousAgent = currentAgent || "Gordon";
                     currentAgent = detectedAgent;
+
+                    // Track the handoff
+                    await trackHandoff(previousAgent, currentAgent, {
+                      toolName,
+                      eventType: "agent-execution-event",
+                      mode: context.config?.mode,
+                    });
+
                     yield {
                       type: "agent_switch",
                       agentName: currentAgent,
@@ -453,6 +895,15 @@ export async function* processMessageStream(
     // Record successful request metrics
     recordRequest(Date.now() - startTime, true);
 
+    // Record agent-level metrics
+    const finalAgent = currentAgent || "Gordon";
+    recordAgentCall(
+      finalAgent,
+      Date.now() - startTime,
+      true,
+      usage.totalTokens
+    );
+
     // Log warning if no content was generated
     if (!fullText || fullText.trim().length === 0) {
       logger.warn("Stream completed with empty content", {
@@ -477,6 +928,16 @@ export async function* processMessageStream(
     // Record failed request metrics
     recordRequest(Date.now() - startTime, false);
     recordError(error.name || "UnknownError");
+
+    // Record agent-level failure metrics
+    recordAgentCall(
+      "Gordon", // Use Gordon as default when we don't know which agent failed
+      Date.now() - startTime,
+      false,
+      0,
+      error.name || "UnknownError",
+      error.message
+    );
 
     await emitEvent("system:error", {
       error: {
@@ -846,9 +1307,130 @@ function createAgentTracingOptions(parentContext?: SpanContext): Record<string, 
 }
 
 // ============================================================================
+// Security Middleware for Tool Execution
+// ============================================================================
+
+/**
+ * Result of security check before tool execution
+ */
+export interface ToolSecurityCheckResult {
+  allowed: boolean;
+  error?: string;
+  accessControlResult?: Awaited<ReturnType<typeof checkToolAccess>>;
+  rateLimitResult?: RateLimitResult;
+}
+
+/**
+ * Check security constraints before tool execution
+ *
+ * This function combines:
+ * - Access control (ARMED mode check for trading tools)
+ * - Rate limiting (per-agent-per-tool limits)
+ *
+ * @param agentName - Name of the agent making the call
+ * @param toolName - Name of the tool being called
+ * @param context - Gordon context with config
+ * @param options - Optional configuration
+ * @returns ToolSecurityCheckResult with allowed status and details
+ */
+export async function checkToolSecurity(
+  agentName: string,
+  toolName: string,
+  context: GordonContext,
+  options: { rateLimit?: number } = {}
+): Promise<ToolSecurityCheckResult> {
+  const userId = context.userId || "unknown";
+
+  // Check access control (ARMED mode for trading tools)
+  const accessResult = await checkToolAccess(toolName, context.config, userId);
+  if (!accessResult.allowed) {
+    return {
+      allowed: false,
+      error: accessResult.reason,
+      accessControlResult: accessResult,
+    };
+  }
+
+  // Check rate limiting
+  const rateLimitResult = enforceRateLimit(agentName, toolName, options.rateLimit);
+  if (!rateLimitResult.allowed) {
+    auditLog.record(
+      userId,
+      "RATE_LIMIT_EXCEEDED",
+      { agentName, toolName },
+      "BLOCKED",
+      { resultDetails: rateLimitResult.error }
+    );
+
+    return {
+      allowed: false,
+      error: rateLimitResult.error,
+      rateLimitResult,
+    };
+  }
+
+  return {
+    allowed: true,
+    accessControlResult: accessResult,
+    rateLimitResult,
+  };
+}
+
+/**
+ * Initialize client with permission check
+ * Should be called when connecting to Binance
+ *
+ * @param context - Gordon context with binance client
+ * @returns Permission check result
+ */
+export async function initializeWithPermissionCheck(context: GordonContext): Promise<{
+  success: boolean;
+  warnings: string[];
+  errors: string[];
+  isReadOnly: boolean;
+}> {
+  if (!context.binance) {
+    return {
+      success: false,
+      warnings: [],
+      errors: ["Binance client not connected"],
+      isReadOnly: true,
+    };
+  }
+
+  const result = await checkPermissionsOnInit(context.binance);
+
+  // Audit log the permission check
+  if (result.success) {
+    auditLog.success(
+      context.userId || "system",
+      "PERMISSION_CHECK",
+      {
+        read: result.permissions.read,
+        spotTrade: result.permissions.spotTrade,
+        withdraw: result.permissions.withdraw,
+      },
+      { resultDetails: result.isReadOnly ? "Read-only mode" : "Full access" }
+    );
+  } else {
+    auditLog.failure(
+      context.userId || "system",
+      "PERMISSION_CHECK",
+      {},
+      result.errors.join("; ")
+    );
+  }
+
+  return {
+    success: result.success,
+    warnings: result.warnings,
+    errors: result.errors,
+    isReadOnly: result.isReadOnly,
+  };
+}
+
+// ============================================================================
 // Exports
 // ============================================================================
 
-export {
-  createRequestContext,
-};
+export { createRequestContext };

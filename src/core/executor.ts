@@ -4,13 +4,18 @@
  *
  * This module handles the critical task of executing trading plans.
  * It is defensive by design - trading is critical and errors can be costly.
+ *
+ * Security features:
+ * - Audit logging for all sensitive operations
+ * - Access control checks before execution
+ * - Permission validation before trading
  */
 
 import { BinanceClient } from "../infra/binance/index.ts";
 import type { BinanceOrder, OrderParams } from "../infra/binance/index.ts";
 import { validatePlan } from "./validator.ts";
-import { createTrade, updateTrade } from "../infra/storage/trades.ts";
-import { updatePlan } from "../infra/storage/plans.ts";
+import { createTrade, updateTrade, getTrade, listTrades } from "../infra/storage/trades.ts";
+import { updatePlan, listPlans, getPlan } from "../infra/storage/plans.ts";
 import { logEvent } from "../infra/storage/events.ts";
 import { createModuleLogger } from "../infra/logger/index.ts";
 import { emitEvent } from "../events/index.ts";
@@ -20,6 +25,8 @@ import {
   BinanceError as BinanceErrorType,
   isGordonError,
 } from "../errors/index.ts";
+import { auditLog } from "../infra/audit/index.ts";
+import { validateOperation } from "../infra/binance/permissions.ts";
 import type {
   Plan,
   Trade,
@@ -30,6 +37,26 @@ import type {
 
 const logger = createModuleLogger("executor");
 
+/** Default maximum concurrent trades if not configured */
+const DEFAULT_MAX_CONCURRENT_TRADES = 5;
+
+// ============================================================================
+// Constants
+// ============================================================================
+
+/** Default plan expiration time in milliseconds (24 hours) */
+const DEFAULT_PLAN_EXPIRATION_MS = 24 * 60 * 60 * 1000;
+
+/** Default fill wait timeout in milliseconds (30 seconds) */
+const DEFAULT_FILL_WAIT_TIMEOUT_MS = 30 * 1000;
+
+/** Poll interval when waiting for fills (1 second) */
+const FILL_POLL_INTERVAL_MS = 1000;
+
+// ============================================================================
+// Types
+// ============================================================================
+
 /**
  * Order placed during execution
  */
@@ -38,6 +65,52 @@ interface PlacedOrder {
   orderId: string;
   price: number;
   quantity: number;
+}
+
+/**
+ * Fill status for an order
+ */
+export interface FillStatus {
+  orderId: string;
+  status: "NEW" | "PARTIALLY_FILLED" | "FILLED" | "CANCELED" | "EXPIRED" | "REJECTED";
+  filledQuantity: number;
+  remainingQuantity: number;
+  averagePrice: number;
+  isComplete: boolean;
+}
+
+/**
+ * Options for waiting for fills
+ */
+export interface WaitForFillOptions {
+  /** Timeout in milliseconds (default: 30000) */
+  timeoutMs?: number;
+  /** Action to take on partial fill: 'continue' waits, 'cancel' cancels order */
+  onPartialFill?: "continue" | "cancel";
+  /** Poll interval in milliseconds (default: 1000) */
+  pollIntervalMs?: number;
+}
+
+/**
+ * Result of waiting for a fill
+ */
+export interface WaitForFillResult {
+  success: boolean;
+  fillStatus: FillStatus;
+  timedOut: boolean;
+  error?: string;
+}
+
+/**
+ * Result of partial position close
+ */
+export interface PartialCloseResult {
+  success: boolean;
+  closedQuantity: number;
+  remainingQuantity: number;
+  exitPrice: number;
+  pnl: number;
+  error?: string;
 }
 
 /**
@@ -176,11 +249,31 @@ export async function executePlan(
   client: BinanceClient,
   plan: Plan,
   config: GordonConfig,
-  portfolio: PortfolioState
+  portfolio: PortfolioState,
+  userId: string = "system"
 ): Promise<ExecutionResult> {
   const placedOrders: PlacedOrder[] = [];
 
   logger.info("Executing plan", { planId: plan.id, symbol: plan.symbol });
+
+  // Audit: Record execution attempt
+  auditLog.record(userId, "EXECUTE_PLAN", {
+    planId: plan.id,
+    symbol: plan.symbol,
+    allocation: plan.allocation.amount,
+    strategy: plan.strategy,
+  }, "PENDING", { planId: plan.id });
+
+  // Step 0: Validate trading permissions
+  const permissionCheck = await validateOperation(client, "trade");
+  if (!permissionCheck.allowed) {
+    auditLog.blocked(userId, "EXECUTE_PLAN", { planId: plan.id }, permissionCheck.error || "Permission denied", { planId: plan.id });
+    return {
+      success: false,
+      error: permissionCheck.error,
+      orders: [],
+    };
+  }
 
   // Step 1: Check mode is ARMED
   if (config.mode !== "ARMED") {
@@ -236,6 +329,20 @@ export async function executePlan(
       },
       planId: plan.id,
     });
+  }
+
+  // Step 3.5: Check concurrent trade limit
+  const concurrentTradeCheck = checkConcurrentTradeLimit(config);
+  if (!concurrentTradeCheck.canOpen) {
+    logger.warn("Concurrent trade limit reached", {
+      activeCount: concurrentTradeCheck.activeCount,
+      maxAllowed: concurrentTradeCheck.maxAllowed,
+    });
+    return {
+      success: false,
+      error: `Cannot execute: Maximum concurrent trades limit reached (${concurrentTradeCheck.activeCount}/${concurrentTradeCheck.maxAllowed}). Close existing trades or increase the limit in preferences.`,
+      orders: [],
+    };
   }
 
   // Handle grid_entry strategy
@@ -558,7 +665,14 @@ export async function executePlan(
     // Step 9: Update plan status to EXECUTING
     updatePlan(plan.id, { status: "EXECUTING" });
 
-    // Step 10: Return success with trade details
+    // Step 10: Audit log success and return
+    auditLog.success(userId, "EXECUTE_PLAN", {
+      planId: plan.id,
+      symbol: plan.symbol,
+      tradeId: trade.id,
+      orderCount: placedOrders.length,
+    }, { planId: plan.id, tradeId: trade.id });
+
     return {
       success: true,
       trade,
@@ -583,6 +697,9 @@ export async function executePlan(
       },
       planId: plan.id,
     });
+
+    // Audit log failure
+    auditLog.failure(userId, "EXECUTE_PLAN", { planId: plan.id }, errorMessage, { planId: plan.id });
 
     return {
       success: false,
@@ -1009,11 +1126,20 @@ export async function cancelTrade(
 export async function closeTrade(
   client: BinanceClient,
   trade: Trade,
-  reason: CloseReason
+  reason: CloseReason,
+  userId: string = "system"
 ): Promise<CloseResult> {
   logger.info("Closing trade", { tradeId: trade.id, symbol: trade.symbol, reason });
 
+  // Audit: Record close attempt
+  auditLog.record(userId, "CLOSE_TRADE", {
+    tradeId: trade.id,
+    symbol: trade.symbol,
+    reason,
+  }, "PENDING", { tradeId: trade.id, planId: trade.planId });
+
   if (trade.status === "CLOSED") {
+    auditLog.failure(userId, "CLOSE_TRADE", { tradeId: trade.id }, "Trade is already closed", { tradeId: trade.id });
     return {
       success: false,
       error: "Trade is already closed.",
@@ -1171,6 +1297,15 @@ export async function closeTrade(
       planId: trade.planId,
     });
 
+    // Audit log success
+    auditLog.success(userId, "CLOSE_TRADE", {
+      tradeId: trade.id,
+      symbol: trade.symbol,
+      reason,
+      pnl: totalRealizedPnl,
+      pnlPercent: realizedPnlPercent,
+    }, { tradeId: trade.id, planId: trade.planId, resultDetails: `PnL: ${totalRealizedPnl.toFixed(2)}` });
+
     return {
       success: true,
       pnl: totalRealizedPnl,
@@ -1191,9 +1326,645 @@ export async function closeTrade(
       planId: trade.planId,
     });
 
+    // Audit log failure
+    auditLog.failure(userId, "CLOSE_TRADE", { tradeId: trade.id, reason }, errorMessage, { tradeId: trade.id, planId: trade.planId });
+
     return {
       success: false,
       error: `Failed to close trade: ${errorMessage}`,
     };
   }
+}
+
+// ============================================================================
+// Fill Tracking & Partial Fill Handling
+// ============================================================================
+
+/**
+ * Fill tracker utility for monitoring order fill status
+ */
+export const fillTracker = {
+  /**
+   * Get fill status for an order
+   */
+  async getStatus(
+    client: BinanceClient,
+    symbol: string,
+    orderId: string
+  ): Promise<FillStatus> {
+    const order = await client.getOrderStatus(symbol, parseInt(orderId, 10));
+    const executedQty = parseFloat(order.executedQty);
+    const origQty = parseFloat(order.origQty);
+    const avgPrice = executedQty > 0
+      ? parseFloat(order.cummulativeQuoteQty) / executedQty
+      : 0;
+
+    return {
+      orderId: order.orderId.toString(),
+      status: order.status as FillStatus["status"],
+      filledQuantity: executedQty,
+      remainingQuantity: origQty - executedQty,
+      averagePrice: avgPrice,
+      isComplete: order.status === "FILLED" || order.status === "CANCELED" || order.status === "EXPIRED" || order.status === "REJECTED",
+    };
+  },
+
+  /**
+   * Check if an order is fully filled
+   */
+  async isFilled(
+    client: BinanceClient,
+    symbol: string,
+    orderId: string
+  ): Promise<boolean> {
+    const status = await this.getStatus(client, symbol, orderId);
+    return status.status === "FILLED";
+  },
+
+  /**
+   * Check if an order is partially filled
+   */
+  async isPartiallyFilled(
+    client: BinanceClient,
+    symbol: string,
+    orderId: string
+  ): Promise<boolean> {
+    const status = await this.getStatus(client, symbol, orderId);
+    return status.status === "PARTIALLY_FILLED";
+  },
+};
+
+/**
+ * Wait for an order to fill with timeout and partial fill handling
+ *
+ * @param client - Authenticated Binance client
+ * @param symbol - Trading pair symbol
+ * @param orderId - Order ID to wait for
+ * @param options - Wait options (timeout, partial fill handling)
+ * @returns WaitForFillResult with fill status
+ */
+export async function waitForFill(
+  client: BinanceClient,
+  symbol: string,
+  orderId: string,
+  options: WaitForFillOptions = {}
+): Promise<WaitForFillResult> {
+  const {
+    timeoutMs = DEFAULT_FILL_WAIT_TIMEOUT_MS,
+    onPartialFill = "continue",
+    pollIntervalMs = FILL_POLL_INTERVAL_MS,
+  } = options;
+
+  const startTime = Date.now();
+
+  logger.debug("Waiting for fill", { symbol, orderId, timeoutMs, onPartialFill });
+
+  while (true) {
+    try {
+      const fillStatus = await fillTracker.getStatus(client, symbol, orderId);
+
+      // Order is complete (filled, canceled, expired, or rejected)
+      if (fillStatus.isComplete) {
+        logger.info("Order fill complete", {
+          orderId,
+          status: fillStatus.status,
+          filledQuantity: fillStatus.filledQuantity,
+        });
+
+        return {
+          success: fillStatus.status === "FILLED",
+          fillStatus,
+          timedOut: false,
+          error: fillStatus.status === "REJECTED" ? "Order was rejected" : undefined,
+        };
+      }
+
+      // Handle partial fills
+      if (fillStatus.status === "PARTIALLY_FILLED" && onPartialFill === "cancel") {
+        logger.info("Canceling partially filled order", {
+          orderId,
+          filledQuantity: fillStatus.filledQuantity,
+          remainingQuantity: fillStatus.remainingQuantity,
+        });
+
+        try {
+          await client.cancelOrder(symbol, orderId);
+          const finalStatus = await fillTracker.getStatus(client, symbol, orderId);
+
+          return {
+            success: finalStatus.filledQuantity > 0,
+            fillStatus: finalStatus,
+            timedOut: false,
+          };
+        } catch (cancelError) {
+          logger.error("Failed to cancel partial order", cancelError as Error);
+          return {
+            success: false,
+            fillStatus,
+            timedOut: false,
+            error: "Failed to cancel partial order",
+          };
+        }
+      }
+
+      // Check timeout
+      if (Date.now() - startTime >= timeoutMs) {
+        logger.warn("Wait for fill timed out", { orderId, elapsed: Date.now() - startTime });
+
+        return {
+          success: false,
+          fillStatus,
+          timedOut: true,
+          error: `Timeout waiting for fill after ${timeoutMs}ms`,
+        };
+      }
+
+      // Wait before polling again
+      await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      logger.error("Error checking fill status", error as Error, { orderId });
+
+      return {
+        success: false,
+        fillStatus: {
+          orderId,
+          status: "NEW",
+          filledQuantity: 0,
+          remainingQuantity: 0,
+          averagePrice: 0,
+          isComplete: false,
+        },
+        timedOut: false,
+        error: `Error checking fill status: ${errorMessage}`,
+      };
+    }
+  }
+}
+
+// ============================================================================
+// Idempotency & Order Deduplication
+// ============================================================================
+
+/**
+ * Check if an order already exists by client order ID
+ * Used for idempotency to prevent duplicate orders on retry
+ *
+ * @param client - Authenticated Binance client
+ * @param symbol - Trading pair symbol
+ * @param clientOrderId - The client order ID to check
+ * @returns The existing order if found, null otherwise
+ */
+export async function getExistingOrder(
+  client: BinanceClient,
+  symbol: string,
+  clientOrderId: string
+): Promise<BinanceOrder | null> {
+  try {
+    // Get all orders for the symbol and find by clientOrderId
+    const orders = await client.getOrderHistory(symbol, 100);
+    const existingOrder = orders.find(
+      (order) => order.clientOrderId === clientOrderId
+    );
+
+    if (existingOrder) {
+      logger.info("Found existing order", {
+        clientOrderId,
+        orderId: existingOrder.orderId,
+        status: existingOrder.status,
+      });
+      return existingOrder;
+    }
+
+    // Also check open orders
+    const openOrders = await client.getOpenOrders(symbol);
+    const existingOpenOrder = openOrders.find(
+      (order) => order.clientOrderId === clientOrderId
+    );
+
+    if (existingOpenOrder) {
+      logger.info("Found existing open order", {
+        clientOrderId,
+        orderId: existingOpenOrder.orderId,
+        status: existingOpenOrder.status,
+      });
+      return existingOpenOrder;
+    }
+
+    return null;
+  } catch (error) {
+    logger.error("Error checking for existing order", error as Error, { clientOrderId });
+    return null;
+  }
+}
+
+/**
+ * Place an order with idempotency check
+ * If order with same clientOrderId already exists, returns that order instead
+ *
+ * @param client - Authenticated Binance client
+ * @param params - Order parameters including newClientOrderId
+ * @returns The placed or existing order
+ */
+export async function placeOrderIdempotent(
+  client: BinanceClient,
+  params: OrderParams
+): Promise<BinanceOrder> {
+  if (!params.newClientOrderId) {
+    // No client order ID - just place normally
+    return client.placeOrder(params);
+  }
+
+  // Check if order already exists
+  const existingOrder = await getExistingOrder(
+    client,
+    params.symbol,
+    params.newClientOrderId
+  );
+
+  if (existingOrder) {
+    logger.info("Order already exists, returning existing order", {
+      clientOrderId: params.newClientOrderId,
+      orderId: existingOrder.orderId,
+    });
+    return existingOrder;
+  }
+
+  // Place new order
+  return client.placeOrder(params);
+}
+
+// ============================================================================
+// Partial Position Close
+// ============================================================================
+
+/**
+ * Close a partial position (tier-based exits)
+ * Supports TP1=50%, TP2=30%, TP3=20% style exits
+ *
+ * @param client - Authenticated Binance client
+ * @param tradeId - ID of the trade to partially close
+ * @param percentage - Percentage of remaining position to close (0.0 to 1.0)
+ * @param reason - Reason for closing (TP1, TP2, TP3, MANUAL)
+ * @returns PartialCloseResult with closed quantity and PnL
+ */
+export async function closePartialPosition(
+  client: BinanceClient,
+  tradeId: string,
+  percentage: number,
+  reason: "TP1" | "TP2" | "TP3" | "MANUAL" = "MANUAL"
+): Promise<PartialCloseResult> {
+  logger.info("Closing partial position", { tradeId, percentage, reason });
+
+  // Validate percentage
+  if (percentage <= 0 || percentage > 1) {
+    return {
+      success: false,
+      closedQuantity: 0,
+      remainingQuantity: 0,
+      exitPrice: 0,
+      pnl: 0,
+      error: "Percentage must be between 0 and 1",
+    };
+  }
+
+  // Get trade
+  const trade = getTrade(tradeId);
+  if (!trade) {
+    return {
+      success: false,
+      closedQuantity: 0,
+      remainingQuantity: 0,
+      exitPrice: 0,
+      pnl: 0,
+      error: `Trade not found: ${tradeId}`,
+    };
+  }
+
+  if (trade.status === "CLOSED") {
+    return {
+      success: false,
+      closedQuantity: 0,
+      remainingQuantity: 0,
+      exitPrice: 0,
+      pnl: 0,
+      error: "Trade is already closed",
+    };
+  }
+
+  // Calculate remaining quantity
+  const totalEntryQuantity = trade.entries.reduce((sum, e) => sum + e.quantity, 0);
+  const totalExitQuantity = trade.exits.reduce((sum, e) => sum + e.quantity, 0);
+  const remainingQuantity = roundQuantity(totalEntryQuantity - totalExitQuantity);
+
+  if (remainingQuantity <= 0) {
+    return {
+      success: false,
+      closedQuantity: 0,
+      remainingQuantity: 0,
+      exitPrice: 0,
+      pnl: 0,
+      error: "No remaining position to close",
+    };
+  }
+
+  // Calculate quantity to close
+  const quantityToClose = roundQuantity(remainingQuantity * percentage);
+
+  if (quantityToClose <= 0) {
+    return {
+      success: false,
+      closedQuantity: 0,
+      remainingQuantity,
+      exitPrice: 0,
+      pnl: 0,
+      error: "Calculated quantity too small to close",
+    };
+  }
+
+  // Place market sell order
+  const sellOrderParams: OrderParams = {
+    symbol: trade.symbol,
+    side: "SELL",
+    type: "MARKET",
+    quantity: quantityToClose,
+    newClientOrderId: generateClientOrderId(trade.planId, `partial_${reason.toLowerCase()}`),
+  };
+
+  let sellOrder: BinanceOrder;
+  try {
+    sellOrder = await placeOrderIdempotent(client, sellOrderParams);
+    logger.info("Partial close order placed", {
+      orderId: sellOrder.orderId,
+      quantity: quantityToClose,
+    });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    logger.error("Partial close order failed", error as Error, { params: sellOrderParams });
+
+    logEvent({
+      type: "ERROR",
+      data: {
+        action: "PARTIAL_CLOSE_FAILED",
+        params: sellOrderParams,
+        error: errorMessage,
+      },
+      tradeId: trade.id,
+      planId: trade.planId,
+    });
+
+    return {
+      success: false,
+      closedQuantity: 0,
+      remainingQuantity,
+      exitPrice: 0,
+      pnl: 0,
+      error: `Failed to place partial close order: ${errorMessage}`,
+    };
+  }
+
+  // Calculate exit price and PnL
+  const exitPrice =
+    parseFloat(sellOrder.cummulativeQuoteQty) / parseFloat(sellOrder.executedQty);
+  const executedQuantity = parseFloat(sellOrder.executedQty);
+  const newRemainingQuantity = roundQuantity(remainingQuantity - executedQuantity);
+
+  // Calculate PnL for this partial close
+  const exitValue = exitPrice * executedQuantity;
+  const entryValue = trade.averageEntry * executedQuantity;
+  const pnl = exitValue - entryValue;
+
+  // Create exit fill record
+  const exitFill: ExitFill = {
+    orderId: sellOrder.orderId.toString(),
+    price: exitPrice,
+    quantity: executedQuantity,
+    filledAt: new Date().toISOString(),
+    reason,
+  };
+
+  // Update trade
+  const updatedExits = [...trade.exits, exitFill];
+  const totalRealizedPnl = trade.realizedPnl + pnl;
+  const totalInvested = trade.averageEntry * totalEntryQuantity;
+  const realizedPnlPercent = totalInvested > 0 ? (totalRealizedPnl / totalInvested) * 100 : 0;
+
+  // Determine new status
+  const newStatus = newRemainingQuantity <= 0 ? "CLOSED" : "PARTIAL";
+
+  updateTrade(trade.id, {
+    exits: updatedExits,
+    realizedPnl: totalRealizedPnl,
+    realizedPnlPercent,
+    status: newStatus,
+    closedAt: newStatus === "CLOSED" ? new Date().toISOString() : null,
+  });
+
+  // Log and emit events
+  logger.info("Partial position closed", {
+    tradeId: trade.id,
+    reason,
+    closedQuantity: executedQuantity,
+    remainingQuantity: newRemainingQuantity,
+    pnl,
+  });
+
+  logEvent({
+    type: "ORDER_FILLED",
+    data: {
+      action: "PARTIAL_CLOSE",
+      reason,
+      orderId: sellOrder.orderId.toString(),
+      exitPrice,
+      quantity: executedQuantity,
+      remainingQuantity: newRemainingQuantity,
+      pnl,
+    },
+    tradeId: trade.id,
+    planId: trade.planId,
+  });
+
+  await emitEvent("trade:partial_close", {
+    trade: { ...trade, exits: updatedExits, realizedPnl: totalRealizedPnl, status: newStatus },
+    reason,
+    closedQuantity: executedQuantity,
+    remainingQuantity: newRemainingQuantity,
+    pnl,
+  });
+
+  return {
+    success: true,
+    closedQuantity: executedQuantity,
+    remainingQuantity: newRemainingQuantity,
+    exitPrice,
+    pnl,
+  };
+}
+
+/**
+ * Close position using tier-based exits
+ * Standard tier percentages: TP1=50%, TP2=30%, TP3=20%
+ *
+ * @param client - Authenticated Binance client
+ * @param tradeId - ID of the trade
+ * @param tier - Which tier to execute (1, 2, or 3)
+ * @returns PartialCloseResult
+ */
+export async function closeTierPosition(
+  client: BinanceClient,
+  tradeId: string,
+  tier: 1 | 2 | 3
+): Promise<PartialCloseResult> {
+  // Standard tier percentages (of remaining position)
+  const tierPercentages: Record<1 | 2 | 3, number> = {
+    1: 0.5,  // TP1: 50% of position
+    2: 0.6,  // TP2: 60% of remaining (30% of original)
+    3: 1.0,  // TP3: 100% of remaining (20% of original)
+  };
+
+  const reason = `TP${tier}` as "TP1" | "TP2" | "TP3";
+  return closePartialPosition(client, tradeId, tierPercentages[tier], reason);
+}
+
+// ============================================================================
+// Plan Expiration Management
+// ============================================================================
+
+/**
+ * Check if a plan has expired
+ *
+ * @param plan - The plan to check
+ * @returns true if plan has expired
+ */
+export function isPlanExpired(plan: Plan): boolean {
+  // Check if plan has expiresAt field (extended plan type)
+  const expiresAt = (plan as Plan & { expiresAt?: string }).expiresAt;
+
+  if (!expiresAt) {
+    // If no expiration set, check if plan is older than default expiration
+    const createdAt = new Date(plan.createdAt).getTime();
+    const now = Date.now();
+    return now - createdAt > DEFAULT_PLAN_EXPIRATION_MS;
+  }
+
+  return new Date(expiresAt).getTime() < Date.now();
+}
+
+/**
+ * Get default expiration date for a plan (24 hours from now)
+ */
+export function getDefaultPlanExpiration(): string {
+  return new Date(Date.now() + DEFAULT_PLAN_EXPIRATION_MS).toISOString();
+}
+
+/**
+ * Cleanup expired plans by marking them as CANCELLED
+ * Should be called periodically (e.g., in monitor cycle)
+ *
+ * @returns Number of plans cleaned up
+ */
+export function cleanupExpiredPlans(): number {
+  logger.debug("Running expired plan cleanup");
+
+  // Get all plans that could be expired (DRAFT or APPROVED status)
+  const draftPlans = listPlans({ status: "DRAFT" });
+  const approvedPlans = listPlans({ status: "APPROVED" });
+  const plansToCheck = [...draftPlans, ...approvedPlans];
+
+  let cleanedCount = 0;
+
+  for (const plan of plansToCheck) {
+    if (isPlanExpired(plan)) {
+      logger.info("Cleaning up expired plan", { planId: plan.id, symbol: plan.symbol });
+
+      updatePlan(plan.id, { status: "CANCELLED" });
+
+      logEvent({
+        type: "ALERT",
+        data: {
+          action: "PLAN_EXPIRED",
+          planId: plan.id,
+          symbol: plan.symbol,
+          createdAt: plan.createdAt,
+        },
+        planId: plan.id,
+      });
+
+      cleanedCount++;
+    }
+  }
+
+  if (cleanedCount > 0) {
+    logger.info("Expired plan cleanup complete", { cleanedCount });
+  }
+
+  return cleanedCount;
+}
+
+// ============================================================================
+// Concurrent Trade Limit Management
+// ============================================================================
+
+/**
+ * Result of concurrent trade limit check
+ */
+export interface ConcurrentTradeLimitResult {
+  canOpen: boolean;
+  activeCount: number;
+  maxAllowed: number;
+  remainingSlots: number;
+}
+
+/**
+ * Get the count of currently active trades
+ * Active trades are those with status "OPEN" or "PARTIAL"
+ */
+export function getActiveTradesCount(): number {
+  const openTrades = listTrades({ status: "OPEN" });
+  const partialTrades = listTrades({ status: "PARTIAL" });
+  return openTrades.length + partialTrades.length;
+}
+
+/**
+ * Check if a new trade can be opened based on concurrent trade limit
+ *
+ * @param config - Gordon configuration with preferences
+ * @returns ConcurrentTradeLimitResult with check result and details
+ */
+export function checkConcurrentTradeLimit(
+  config: GordonConfig
+): ConcurrentTradeLimitResult {
+  const maxConcurrentTrades =
+    config.preferences?.maxConcurrentTrades ?? DEFAULT_MAX_CONCURRENT_TRADES;
+  const activeCount = getActiveTradesCount();
+  const remainingSlots = Math.max(0, maxConcurrentTrades - activeCount);
+
+  return {
+    canOpen: activeCount < maxConcurrentTrades,
+    activeCount,
+    maxAllowed: maxConcurrentTrades,
+    remainingSlots,
+  };
+}
+
+/**
+ * Get detailed information about active trades
+ * Useful for displaying to users when limit is reached
+ */
+export function getActiveTradesSummary(): Array<{
+  tradeId: string;
+  symbol: string;
+  status: string;
+  openedAt: string;
+}> {
+  const openTrades = listTrades({ status: "OPEN" });
+  const partialTrades = listTrades({ status: "PARTIAL" });
+  const allActiveTrades = [...openTrades, ...partialTrades];
+
+  return allActiveTrades.map((trade) => ({
+    tradeId: trade.id,
+    symbol: trade.symbol,
+    status: trade.status,
+    openedAt: trade.openedAt,
+  }));
 }

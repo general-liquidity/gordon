@@ -70,6 +70,21 @@ export type {
 // Client
 export { BinanceClient } from "./client.ts";
 
+// WebSocket
+export {
+  BinanceWebSocket,
+  createBinanceWebSocket,
+  DEFAULT_WS_CONFIG,
+  type WSConfig,
+  type ConnectionState,
+  type ConnectionStatus,
+  type WSEventMap,
+  type TickerUpdate,
+  type TradeUpdate,
+  type KlineUpdate,
+  type DepthUpdate,
+} from "./websocket.ts";
+
 // Re-export errors for backward compatibility
 export { BinanceError, RateLimitError, BinanceAuthError, InsufficientBalanceError, InvalidSymbolError } from "../../errors/index.ts";
 
@@ -79,5 +94,8 @@ export {
   validatePermissions,
   checkAndValidatePermissions,
   formatPermissionsDisplay,
+  clearPermissionCache,
+  checkPermissionsOnInit,
+  validateOperation,
 } from "./permissions.ts";
-export type { PermissionValidationResult } from "./permissions.ts";
+export type { PermissionValidationResult, PermissionInitResult } from "./permissions.ts";

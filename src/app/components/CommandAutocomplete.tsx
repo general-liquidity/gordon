@@ -1,44 +1,166 @@
 /**
  * Command Autocomplete Component
- * Shows dropdown of matching slash commands
+ * Shows dropdown of matching slash commands with improved filtering and descriptions
  */
 
-import React from "react";
+import React, { useMemo } from "react";
 import { Box, Text } from "ink";
 import { COLORS } from "../theme.ts";
 import type { SlashCommand } from "../slashCommands.ts";
+
+/**
+ * Category icons for visual grouping
+ */
+const CATEGORY_ICONS: Record<string, string> = {
+  market: "◆",
+  trading: "▲",
+  account: "■",
+  system: "●",
+};
+
+/**
+ * Category colors for visual distinction
+ */
+const CATEGORY_COLORS: Record<string, string> = {
+  market: COLORS.BLUE,
+  trading: COLORS.GREEN,
+  account: COLORS.YELLOW,
+  system: COLORS.DIM,
+};
 
 interface CommandAutocompleteProps {
   suggestions: SlashCommand[];
   selectedIndex: number;
   inputValue: string;
   maxVisible?: number;
+  /** Show category grouping */
+  showCategories?: boolean;
+  /** Show usage examples */
+  showUsage?: boolean;
+}
+
+/**
+ * Score a command match based on search term
+ * Higher score = better match
+ */
+function scoreMatch(cmd: SlashCommand, searchTerm: string): number {
+  const term = searchTerm.toLowerCase();
+  let score = 0;
+
+  // Exact name match (highest priority)
+  if (cmd.name === term) {
+    score += 100;
+  }
+  // Name starts with search term
+  else if (cmd.name.startsWith(term)) {
+    score += 50;
+  }
+  // Name contains search term
+  else if (cmd.name.includes(term)) {
+    score += 25;
+  }
+
+  // Alias matches
+  for (const alias of cmd.aliases) {
+    if (alias === term) {
+      score += 80;
+    } else if (alias.startsWith(term)) {
+      score += 40;
+    } else if (alias.includes(term)) {
+      score += 20;
+    }
+  }
+
+  // Description contains search term (lower priority)
+  if (cmd.description.toLowerCase().includes(term)) {
+    score += 10;
+  }
+
+  return score;
+}
+
+/**
+ * Filter and sort commands based on search term
+ */
+function filterAndSortCommands(commands: SlashCommand[], searchTerm: string): SlashCommand[] {
+  if (!searchTerm) {
+    // Return all commands, grouped by category
+    return [...commands].sort((a, b) => {
+      // First sort by category
+      const categoryOrder = ["market", "trading", "account", "system"];
+      const catA = categoryOrder.indexOf(a.category);
+      const catB = categoryOrder.indexOf(b.category);
+      if (catA !== catB) return catA - catB;
+      // Then alphabetically
+      return a.name.localeCompare(b.name);
+    });
+  }
+
+  // Score and filter commands
+  const scored = commands
+    .map(cmd => ({ cmd, score: scoreMatch(cmd, searchTerm) }))
+    .filter(({ score }) => score > 0)
+    .sort((a, b) => b.score - a.score);
+
+  return scored.map(({ cmd }) => cmd);
 }
 
 export const CommandAutocomplete: React.FC<CommandAutocompleteProps> = ({
   suggestions,
   selectedIndex,
   inputValue,
-  maxVisible = 6,
+  maxVisible = 8,
+  showCategories = true,
+  showUsage = false,
 }) => {
-  if (suggestions.length === 0) {
+  // Extract the search term (after /)
+  const searchTerm = inputValue.startsWith("/") ? inputValue.slice(1).toLowerCase().split(/\s+/)[0] || "" : "";
+
+  // Filter and sort suggestions
+  const filteredSuggestions = useMemo(() => {
+    return filterAndSortCommands(suggestions, searchTerm);
+  }, [suggestions, searchTerm]);
+
+  if (filteredSuggestions.length === 0) {
+    // Show "no matches" message if user is typing a command
+    if (searchTerm.length > 0) {
+      return (
+        <Box
+          flexDirection="column"
+          borderStyle="single"
+          borderColor={COLORS.DIM}
+          paddingX={1}
+          marginX={1}
+          marginBottom={1}
+        >
+          <Text color={COLORS.DIM}>
+            No commands matching "/{searchTerm}"
+          </Text>
+          <Text color={COLORS.DIM}>
+            Type /help to see all available commands
+          </Text>
+        </Box>
+      );
+    }
     return null;
   }
 
   // Determine visible range (scroll if needed)
-  const totalSuggestions = suggestions.length;
+  const totalSuggestions = filteredSuggestions.length;
   const visibleCount = Math.min(totalSuggestions, maxVisible);
 
   let startIndex = 0;
   if (selectedIndex >= visibleCount) {
     startIndex = selectedIndex - visibleCount + 1;
   }
+  // Ensure startIndex doesn't go out of bounds
+  startIndex = Math.min(startIndex, Math.max(0, totalSuggestions - visibleCount));
 
-  const visibleSuggestions = suggestions.slice(startIndex, startIndex + visibleCount);
+  const visibleSuggestions = filteredSuggestions.slice(startIndex, startIndex + visibleCount);
   const adjustedSelectedIndex = selectedIndex - startIndex;
 
-  // Extract the search term (after /)
-  const searchTerm = inputValue.slice(1).toLowerCase();
+  // Track current category for grouping
+  let lastCategory = "";
 
   return (
     <Box
@@ -49,53 +171,98 @@ export const CommandAutocomplete: React.FC<CommandAutocompleteProps> = ({
       marginX={1}
       marginBottom={1}
     >
-      {/* Header */}
-      <Box marginBottom={1}>
+      {/* Header with count */}
+      <Box marginBottom={1} justifyContent="space-between">
+        <Text color={COLORS.WHITE} bold>
+          Commands
+        </Text>
         <Text color={COLORS.DIM}>
-          Commands {totalSuggestions > visibleCount && `(${selectedIndex + 1}/${totalSuggestions})`}
+          {selectedIndex + 1}/{totalSuggestions}
         </Text>
       </Box>
 
       {/* Scroll up indicator */}
       {startIndex > 0 && (
         <Box>
-          <Text color={COLORS.DIM}>  ...</Text>
+          <Text color={COLORS.DIM}>  ... {startIndex} more above</Text>
         </Box>
       )}
 
-      {/* Suggestions */}
+      {/* Suggestions with category grouping */}
       {visibleSuggestions.map((cmd, index) => {
         const isSelected = index === adjustedSelectedIndex;
         const cmdName = `/${cmd.name}`;
 
         // Highlight matching portion
-        const matchEnd = searchTerm.length + 1; // +1 for the /
+        const matchEnd = Math.min(searchTerm.length + 1, cmdName.length);
         const matchedPart = cmdName.slice(0, matchEnd);
         const restPart = cmdName.slice(matchEnd);
 
-        return (
-          <Box key={cmd.name} paddingY={0}>
-            {/* Selection indicator */}
-            <Text color={isSelected ? COLORS.HIGHLIGHT : COLORS.DIM}>
-              {isSelected ? ">" : " "}
-            </Text>
+        // Show category separator if category changed
+        const showCategorySeparator = showCategories && cmd.category !== lastCategory && startIndex === 0;
+        if (showCategories) {
+          lastCategory = cmd.category;
+        }
 
-            {/* Command name with highlight */}
-            <Box width={14}>
-              <Text color={isSelected ? COLORS.HIGHLIGHT : COLORS.ACCENT} bold={isSelected}>
-                {matchedPart}
+        const categoryIcon = CATEGORY_ICONS[cmd.category] || "●";
+        const categoryColor = CATEGORY_COLORS[cmd.category] || COLORS.DIM;
+
+        return (
+          <Box key={cmd.name} flexDirection="column" paddingY={0}>
+            {/* Category separator */}
+            {showCategorySeparator && index > 0 && (
+              <Box marginTop={1}>
+                <Text color={COLORS.DIM}>────</Text>
+              </Box>
+            )}
+
+            {/* Command row */}
+            <Box>
+              {/* Selection indicator */}
+              <Text color={isSelected ? COLORS.HIGHLIGHT : COLORS.DIM}>
+                {isSelected ? ">" : " "}
               </Text>
-              <Text color={isSelected ? COLORS.HIGHLIGHT : COLORS.WHITE} bold={isSelected}>
-                {restPart}
+
+              {/* Category icon */}
+              <Text color={categoryColor}>
+                {categoryIcon}{" "}
+              </Text>
+
+              {/* Command name with highlight */}
+              <Box width={12}>
+                <Text color={isSelected ? COLORS.HIGHLIGHT : COLORS.ACCENT} bold={isSelected}>
+                  {matchedPart}
+                </Text>
+                <Text color={isSelected ? COLORS.HIGHLIGHT : COLORS.WHITE} bold={isSelected}>
+                  {restPart}
+                </Text>
+              </Box>
+
+              {/* Aliases (if any) */}
+              {cmd.aliases.length > 0 && (
+                <Box width={8}>
+                  <Text color={COLORS.MUTED}>
+                    ({cmd.aliases[0]})
+                  </Text>
+                </Box>
+              )}
+
+              {/* Description */}
+              <Text color={isSelected ? COLORS.WHITE : COLORS.DIM}>
+                {cmd.description.length > 35
+                  ? cmd.description.slice(0, 32) + "..."
+                  : cmd.description}
               </Text>
             </Box>
 
-            {/* Description */}
-            <Text color={COLORS.DIM}>
-              {cmd.description.length > 40
-                ? cmd.description.slice(0, 37) + "..."
-                : cmd.description}
-            </Text>
+            {/* Show usage for selected command */}
+            {showUsage && isSelected && (
+              <Box marginLeft={3}>
+                <Text color={COLORS.DIM} italic>
+                  Usage: {cmd.usage}
+                </Text>
+              </Box>
+            )}
           </Box>
         );
       })}
@@ -103,15 +270,20 @@ export const CommandAutocomplete: React.FC<CommandAutocompleteProps> = ({
       {/* Scroll down indicator */}
       {startIndex + visibleCount < totalSuggestions && (
         <Box>
-          <Text color={COLORS.DIM}>  ...</Text>
+          <Text color={COLORS.DIM}>  ... {totalSuggestions - startIndex - visibleCount} more below</Text>
         </Box>
       )}
 
       {/* Help hint */}
-      <Box marginTop={1}>
-        <Text color={COLORS.DIM}>
-          Tab to complete | Enter to run | Esc to cancel
-        </Text>
+      <Box marginTop={1} flexDirection="column">
+        <Box>
+          <Text color={COLORS.DIM}>
+            <Text color={COLORS.HIGHLIGHT}>Tab</Text> complete |{" "}
+            <Text color={COLORS.HIGHLIGHT}>Enter</Text> run |{" "}
+            <Text color={COLORS.HIGHLIGHT}>Up/Down</Text> navigate |{" "}
+            <Text color={COLORS.HIGHLIGHT}>Esc</Text> cancel
+          </Text>
+        </Box>
       </Box>
     </Box>
   );
@@ -122,20 +294,51 @@ export const CommandAutocomplete: React.FC<CommandAutocompleteProps> = ({
  */
 interface CommandHintProps {
   command: SlashCommand | null;
+  showUsage?: boolean;
 }
 
-export const CommandHint: React.FC<CommandHintProps> = ({ command }) => {
+export const CommandHint: React.FC<CommandHintProps> = ({ command, showUsage = false }) => {
   if (!command) {
     return null;
   }
 
+  const categoryIcon = CATEGORY_ICONS[command.category] || "●";
+  const categoryColor = CATEGORY_COLORS[command.category] || COLORS.DIM;
+
   return (
-    <Box marginLeft={1}>
-      <Text color={COLORS.DIM} italic>
-        {command.description}
-      </Text>
+    <Box marginLeft={1} flexDirection="column">
+      <Box>
+        <Text color={categoryColor}>{categoryIcon} </Text>
+        <Text color={COLORS.DIM} italic>
+          {command.description}
+        </Text>
+      </Box>
+      {showUsage && (
+        <Box marginLeft={2}>
+          <Text color={COLORS.MUTED}>
+            Usage: {command.usage}
+          </Text>
+        </Box>
+      )}
     </Box>
   );
 };
+
+/**
+ * Fuzzy match helper - checks if all characters in search appear in target in order
+ */
+export function fuzzyMatch(search: string, target: string): boolean {
+  const searchLower = search.toLowerCase();
+  const targetLower = target.toLowerCase();
+
+  let searchIndex = 0;
+  for (let i = 0; i < targetLower.length && searchIndex < searchLower.length; i++) {
+    if (targetLower[i] === searchLower[searchIndex]) {
+      searchIndex++;
+    }
+  }
+
+  return searchIndex === searchLower.length;
+}
 
 export default CommandAutocomplete;

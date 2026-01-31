@@ -16,6 +16,7 @@ function rowToPlan(row: Record<string, unknown>): Plan {
   return {
     id: row.id as string,
     createdAt: row.createdAt as string,
+    expiresAt: row.expiresAt as string | undefined,
     symbol: row.symbol as string,
     direction: row.direction as "long",
     strategy: row.strategy as "support_bounce" | "grid_entry",
@@ -40,15 +41,18 @@ export function createPlan(
 
   const id = generatePlanId();
   const createdAt = new Date().toISOString();
+  // Default expiration to 24 hours from now if not provided
+  const expiresAt = plan.expiresAt ?? new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
 
   const stmt = db.prepare(`
-    INSERT INTO plans (id, createdAt, symbol, direction, strategy, allocation, entry, dca, grid, stopLoss, takeProfit, reasoning, status)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO plans (id, createdAt, expiresAt, symbol, direction, strategy, allocation, entry, dca, grid, stopLoss, takeProfit, reasoning, status)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   stmt.run(
     id,
     createdAt,
+    expiresAt,
     plan.symbol,
     plan.direction,
     plan.strategy,
@@ -66,6 +70,7 @@ export function createPlan(
     ...plan,
     id,
     createdAt,
+    expiresAt,
   };
 }
 
@@ -100,7 +105,7 @@ export function updatePlan(id: string, updates: Partial<Plan>): Plan {
 
   const stmt = db.prepare(`
     UPDATE plans
-    SET symbol = ?, direction = ?, strategy = ?, allocation = ?, entry = ?, dca = ?, grid = ?, stopLoss = ?, takeProfit = ?, reasoning = ?, status = ?
+    SET symbol = ?, direction = ?, strategy = ?, allocation = ?, entry = ?, dca = ?, grid = ?, stopLoss = ?, takeProfit = ?, reasoning = ?, status = ?, expiresAt = ?
     WHERE id = ?
   `);
 
@@ -116,6 +121,7 @@ export function updatePlan(id: string, updates: Partial<Plan>): Plan {
     JSON.stringify(updated.takeProfit),
     updated.reasoning,
     updated.status,
+    updated.expiresAt ?? null,
     id
   );
 

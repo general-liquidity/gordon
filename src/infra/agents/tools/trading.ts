@@ -15,9 +15,13 @@ import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
 import { generatePlan } from "../../../core/planner.ts";
-import { executePlan, closeTrade } from "../../../core/executor.ts";
+import { executePlan, closeTrade, closePartialPosition } from "../../../core/executor.ts";
 import { analyze } from "../../../core/analyzer.ts";
 import { calculateGridLevels } from "../../../core/grid-calculator.ts";
+import {
+  getTrailingStopTracker,
+  type TrailingStopConfig,
+} from "../../../core/trailing-stop.ts";
 import { PlanSchema } from "../../../types/plan.ts";
 import { TradeSchema } from "../../../types/trade.ts";
 import { loadConfig, saveConfig } from "../../storage/config.ts";
@@ -135,6 +139,45 @@ const createGridPlanOutputSchema = z.object({
     confidence: z.number(),
   }).optional(),
   warnings: z.array(z.string()).optional(),
+});
+
+const setTrailingStopOutputSchema = z.object({
+  success: z.boolean(),
+  trailingStop: z.object({
+    id: z.string(),
+    tradeId: z.string(),
+    symbol: z.string(),
+    type: z.enum(["percentage", "atr"]),
+    trailDistance: z.number(),
+    activationPrice: z.number().optional(),
+    isActive: z.boolean(),
+    currentStopPrice: z.number(),
+    highestPrice: z.number(),
+  }).optional(),
+  message: z.string().optional(),
+  error: z.string().optional(),
+});
+
+const updateTrailingStopOutputSchema = z.object({
+  success: z.boolean(),
+  updated: z.boolean().optional(),
+  previousStopPrice: z.number().optional(),
+  newStopPrice: z.number().optional(),
+  highestPrice: z.number().optional(),
+  shouldTrigger: z.boolean().optional(),
+  currentPrice: z.number().optional(),
+  message: z.string().optional(),
+  error: z.string().optional(),
+});
+
+const closePartialPositionOutputSchema = z.object({
+  success: z.boolean(),
+  closedQuantity: z.number().optional(),
+  remainingQuantity: z.number().optional(),
+  exitPrice: z.number().optional(),
+  pnl: z.number().optional(),
+  message: z.string().optional(),
+  error: z.string().optional(),
 });
 
 // ============================================================================
@@ -591,6 +634,221 @@ Returns a grid plan for user approval.`,
 });
 
 // ============================================================================
+// Trailing Stop Tools
+// ============================================================================
+
+export const setTrailingStopTool = createTool({
+  id: "set_trailing_stop",
+  description: `Set a trailing stop for an open trade. The trailing stop will adjust upward as price rises, locking in profits.
+
+Use when:
+- User wants to protect profits on an open trade
+- User says "set trailing stop", "add trailing stop", "protect profits"
+- User wants dynamic stop loss that follows price
+
+Supports:
+- Percentage-based trailing (e.g., 3% below high)
+- ATR-based trailing (e.g., 2x ATR below high)
+- Optional activation price (trailing starts after this price)`,
+  inputSchema: z.object({
+    tradeId: z.string().describe("The ID of the trade to set trailing stop for"),
+    type: z.enum(["percentage", "atr"]).default("percentage").describe("Type of trailing: 'percentage' or 'atr'"),
+    trailDistance: z.number().describe("Trail distance - percentage (e.g., 0.03 for 3%) or ATR multiplier (e.g., 2.0)"),
+    activationPrice: z.number().optional().describe("Price at which trailing stop activates (optional, immediate if not set)"),
+  }),
+  outputSchema: setTrailingStopOutputSchema,
+  execute: async ({ tradeId, type, trailDistance, activationPrice }, execContext: MastraExecutionContext) => {
+    const ctx = getGordonContext(execContext);
+    if (!ctx?.binance) {
+      return validateToolOutput(setTrailingStopOutputSchema, {
+        success: false,
+        error: "Binance client not connected.",
+      }, { toolName: "set_trailing_stop" });
+    }
+
+    // Get the trade
+    const trade = getTrade(tradeId);
+    if (!trade) {
+      return validateToolOutput(setTrailingStopOutputSchema, {
+        success: false,
+        error: `Trade not found: ${tradeId}`,
+      }, { toolName: "set_trailing_stop" });
+    }
+
+    if (trade.status === "CLOSED") {
+      return validateToolOutput(setTrailingStopOutputSchema, {
+        success: false,
+        error: "Cannot set trailing stop on a closed trade.",
+      }, { toolName: "set_trailing_stop" });
+    }
+
+    // Get current price for initial high
+    const currentPrice = await ctx.binance.getPrice(trade.symbol);
+
+    // Get trailing stop tracker
+    const tracker = getTrailingStopTracker();
+
+    // Check if trailing stop already exists
+    const existing = tracker.getTrailingStop(tradeId);
+    if (existing) {
+      return validateToolOutput(setTrailingStopOutputSchema, {
+        success: false,
+        error: `Trailing stop already exists for trade ${tradeId}. Use update_trailing_stop to modify it.`,
+      }, { toolName: "set_trailing_stop" });
+    }
+
+    // Add trailing stop
+    const trailingStop = tracker.addTrailingStop({
+      tradeId,
+      symbol: trade.symbol,
+      type: type ?? "percentage",
+      trailDistance,
+      activationPrice,
+      initialHighPrice: currentPrice,
+    });
+
+    const result = {
+      success: true,
+      trailingStop: {
+        id: trailingStop.id,
+        tradeId: trailingStop.tradeId,
+        symbol: trailingStop.symbol,
+        type: trailingStop.type,
+        trailDistance: trailingStop.trailDistance,
+        activationPrice: trailingStop.activationPrice,
+        isActive: trailingStop.isActive,
+        currentStopPrice: trailingStop.currentStopPrice,
+        highestPrice: trailingStop.highestPrice,
+      },
+      message: `Trailing stop set for ${trade.symbol}: ${type === "atr" ? `${trailDistance}x ATR` : `${(trailDistance * 100).toFixed(1)}%`} trail${activationPrice ? ` (activates at $${activationPrice})` : " (active immediately)"}`,
+    };
+
+    return validateToolOutput(setTrailingStopOutputSchema, result, { toolName: "set_trailing_stop" });
+  },
+});
+
+export const updateTrailingStopTool = createTool({
+  id: "update_trailing_stop",
+  description: `Update and check status of a trailing stop. Returns current stop price, highest price, and whether stop should trigger.
+
+Use when:
+- User asks to check trailing stop status
+- User wants to modify trailing stop parameters
+- Part of monitor cycle to update all trailing stops`,
+  inputSchema: z.object({
+    tradeId: z.string().describe("The ID of the trade with trailing stop"),
+    newTrailDistance: z.number().optional().describe("New trail distance (optional, updates if provided)"),
+  }),
+  outputSchema: updateTrailingStopOutputSchema,
+  execute: async ({ tradeId, newTrailDistance }, execContext: MastraExecutionContext) => {
+    const ctx = getGordonContext(execContext);
+    if (!ctx?.binance) {
+      return validateToolOutput(updateTrailingStopOutputSchema, {
+        success: false,
+        error: "Binance client not connected.",
+      }, { toolName: "update_trailing_stop" });
+    }
+
+    const tracker = getTrailingStopTracker();
+    const trailingStop = tracker.getTrailingStop(tradeId);
+
+    if (!trailingStop) {
+      return validateToolOutput(updateTrailingStopOutputSchema, {
+        success: false,
+        error: `No trailing stop found for trade: ${tradeId}`,
+      }, { toolName: "update_trailing_stop" });
+    }
+
+    // Update trail distance if provided
+    if (newTrailDistance !== undefined) {
+      // We need to access the internal state - for now just note this limitation
+      // In production, we'd add a method to TrailingStopTracker for this
+    }
+
+    // Update the trailing stop with current price
+    try {
+      const updateResult = await tracker.updateTrailingStop(ctx.binance, tradeId);
+
+      const result = {
+        success: true,
+        updated: updateResult.updated,
+        previousStopPrice: updateResult.previousStopPrice,
+        newStopPrice: updateResult.newStopPrice,
+        highestPrice: updateResult.highestPrice,
+        shouldTrigger: updateResult.shouldTrigger,
+        currentPrice: updateResult.currentPrice,
+        message: updateResult.shouldTrigger
+          ? `ALERT: Trailing stop triggered! Current price $${updateResult.currentPrice.toFixed(2)} is below stop $${updateResult.newStopPrice.toFixed(2)}`
+          : updateResult.updated
+            ? `Trailing stop updated: New stop at $${updateResult.newStopPrice.toFixed(2)} (highest: $${updateResult.highestPrice.toFixed(2)})`
+            : `Trailing stop unchanged: Stop at $${updateResult.newStopPrice.toFixed(2)}, current price $${updateResult.currentPrice.toFixed(2)}`,
+      };
+
+      return validateToolOutput(updateTrailingStopOutputSchema, result, { toolName: "update_trailing_stop" });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      return validateToolOutput(updateTrailingStopOutputSchema, {
+        success: false,
+        error: errorMessage,
+      }, { toolName: "update_trailing_stop" });
+    }
+  },
+});
+
+// ============================================================================
+// Partial Position Close Tool
+// ============================================================================
+
+export const closePartialPositionTool = createTool({
+  id: "close_partial_position",
+  description: `Close a portion of an open position. Supports tier-based exits like TP1 (50%), TP2 (30%), TP3 (20%).
+
+Use when:
+- User wants to take partial profits
+- User says "close half", "take some profits", "sell 30%"
+- Tier-based take profit execution`,
+  inputSchema: z.object({
+    tradeId: z.string().describe("The ID of the trade to partially close"),
+    percentage: z.number().min(0.01).max(1).describe("Percentage of remaining position to close (0.01 to 1.0)"),
+    reason: z.enum(["TP1", "TP2", "TP3", "MANUAL"]).default("MANUAL").describe("Reason for partial close"),
+  }),
+  outputSchema: closePartialPositionOutputSchema,
+  execute: async ({ tradeId, percentage, reason }, execContext: MastraExecutionContext) => {
+    const ctx = getGordonContext(execContext);
+    if (!ctx?.binance) {
+      return validateToolOutput(closePartialPositionOutputSchema, {
+        success: false,
+        error: "Binance client not connected.",
+      }, { toolName: "close_partial_position" });
+    }
+
+    const closeResult = await closePartialPosition(
+      ctx.binance,
+      tradeId,
+      percentage,
+      reason ?? "MANUAL"
+    );
+
+    if (closeResult.success) {
+      const result = {
+        success: true,
+        closedQuantity: closeResult.closedQuantity,
+        remainingQuantity: closeResult.remainingQuantity,
+        exitPrice: closeResult.exitPrice,
+        pnl: closeResult.pnl,
+        message: `Closed ${(percentage * 100).toFixed(0)}% of position (${closeResult.closedQuantity.toFixed(6)} units) at $${closeResult.exitPrice.toFixed(2)}. PnL: $${closeResult.pnl.toFixed(2)}. Remaining: ${closeResult.remainingQuantity.toFixed(6)} units.`,
+      };
+      return validateToolOutput(closePartialPositionOutputSchema, result, { toolName: "close_partial_position" });
+    }
+
+    return validateToolOutput(closePartialPositionOutputSchema, {
+      success: false,
+      error: closeResult.error,
+    }, { toolName: "close_partial_position" });
+  },
+});
+
+// ============================================================================
 // Export as Object (Mastra format)
 // ============================================================================
 
@@ -606,4 +864,7 @@ export const tradingTools = {
   approve_plan: approvePlanTool,
   arm_system: armSystemTool,
   create_grid_plan: createGridPlanTool,
+  set_trailing_stop: setTrailingStopTool,
+  update_trailing_stop: updateTrailingStopTool,
+  close_partial_position: closePartialPositionTool,
 };

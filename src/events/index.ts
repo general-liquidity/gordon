@@ -28,6 +28,9 @@ export type {
   ScanStartedEvent,
   ScanCompletedEvent,
   OpportunityFoundEvent,
+  AgentHandoffAckEvent,
+  AgentFallbackEvent,
+  AgentRetryEvent,
 } from "./types.ts";
 
 // Event bus

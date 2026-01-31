@@ -96,6 +96,20 @@ export {
 export * from "./optimization/index.ts";
 
 // ============================================================================
+// Overfitting Detection Exports
+// ============================================================================
+
+export {
+  detectOverfitting,
+  adjustForOverfitting,
+  calculateRandomChanceProbability,
+  suggestMaxParameters,
+  type OptimizationEntry,
+  type OverfittingResult,
+  type OverfittingDetectionOptions,
+} from "./optimization/overfitting.ts";
+
+// ============================================================================
 // Historical Data Exports
 // ============================================================================
 
@@ -127,3 +141,52 @@ export {
   exportResultsCsv,
   generateHtmlReport,
 } from "./reporting/export.ts";
+
+// ============================================================================
+// Walk-Forward Testing Exports
+// ============================================================================
+
+export {
+  walkForwardTest,
+  DEFAULT_WALK_FORWARD_CONFIG,
+  type WalkForwardConfig,
+  type WalkForwardProgress,
+  type WalkForwardWindow,
+  type WalkForwardResult,
+} from "./walk-forward.ts";
+
+// ============================================================================
+// Monte Carlo Simulation Exports
+// ============================================================================
+
+export {
+  runMonteCarloSimulation,
+  DEFAULT_MONTE_CARLO_CONFIG,
+  type MonteCarloConfig,
+  type MonteCarloProgress,
+  type SimulationIteration,
+  type ConfidenceInterval,
+  type MetricDistribution,
+  type MonteCarloResult,
+} from "./monte-carlo.ts";
+
+// ============================================================================
+// Result Storage Exports
+// ============================================================================
+
+export {
+  initBacktestResultsTable,
+  saveBacktestResult,
+  loadBacktestResult,
+  loadBacktestResultByKey,
+  listBacktestHistory,
+  countBacktestHistory,
+  deleteBacktestResult,
+  deleteBacktestResultsByStrategy,
+  cleanupOldBacktestResults,
+  getBacktestStorageStats,
+  type BacktestKey,
+  type BacktestQueryOptions,
+  type BacktestSummary,
+  type StorageOperationResult,
+} from "./storage.ts";

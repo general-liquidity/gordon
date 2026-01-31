@@ -12,3 +12,14 @@ export {
   type TradeValidationInput,
   type RiskRewardInput,
 } from "./guardrails.ts";
+
+export {
+  checkToolAccess,
+  createAccessControlMiddleware,
+  withAccessControl,
+  requiresArmedMode,
+  getTradingTools,
+  formatRemainingTime,
+  getArmedStatus,
+  type AccessControlResult,
+} from "./access-control.ts";

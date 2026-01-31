@@ -62,3 +62,17 @@ export {
   type ParameterDistributions,
   type RandomSearchOptions,
 } from "./random-search.ts";
+
+// ============================================================================
+// Overfitting Detection Exports
+// ============================================================================
+
+export {
+  detectOverfitting,
+  adjustForOverfitting,
+  calculateRandomChanceProbability,
+  suggestMaxParameters,
+  type OptimizationEntry,
+  type OverfittingResult,
+  type OverfittingDetectionOptions,
+} from "./overfitting.ts";

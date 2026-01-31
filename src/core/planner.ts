@@ -389,7 +389,10 @@ Respond with a JSON object containing the plan. Follow all the rules in the syst
   // Step 7: Set createdAt to now
   const createdAt = new Date().toISOString();
 
-  // Step 8: Set status to DRAFT
+  // Step 8: Set expiresAt (default 24 hours from now)
+  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+
+  // Step 9: Set status to DRAFT
   const status = "DRAFT" as const;
 
   // Build final plan
@@ -397,6 +400,7 @@ Respond with a JSON object containing the plan. Follow all the rules in the syst
     ...llmResponse,
     id,
     createdAt,
+    expiresAt,
     status,
   };
 

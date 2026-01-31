@@ -2,28 +2,62 @@
  * Binance WebSocket Client
  *
  * Real-time market data streaming via WebSocket with:
- * - Automatic reconnection
+ * - Automatic reconnection with exponential backoff
+ * - Heartbeat mechanism (ping every 30s)
+ * - Connection state tracking and events
  * - Multiple stream subscriptions
  * - Event-based updates
  */
 
 import { EventEmitter } from "events";
+import { createModuleLogger } from "../logger/index.ts";
+
+const logger = createModuleLogger("binance-ws");
 
 export interface WSConfig {
   baseUrl: string;
   reconnectDelayMs: number;
+  maxReconnectDelayMs: number;
   maxReconnectAttempts: number;
   pingIntervalMs: number;
   pongTimeoutMs: number;
+  /** Jitter percentage for reconnect delay (0-1) */
+  reconnectJitter: number;
 }
 
 export const DEFAULT_WS_CONFIG: WSConfig = {
   baseUrl: "wss://stream.binance.com:9443/ws",
   reconnectDelayMs: 1000,
+  maxReconnectDelayMs: 60000,
   maxReconnectAttempts: 10,
   pingIntervalMs: 30000,
   pongTimeoutMs: 10000,
+  reconnectJitter: 0.3,
 };
+
+/**
+ * Connection state enumeration
+ */
+export type ConnectionState =
+  | "disconnected"
+  | "connecting"
+  | "connected"
+  | "reconnecting"
+  | "failed";
+
+/**
+ * Connection state details
+ */
+export interface ConnectionStatus {
+  state: ConnectionState;
+  connectedAt: Date | null;
+  disconnectedAt: Date | null;
+  reconnectAttempts: number;
+  lastPingAt: Date | null;
+  lastPongAt: Date | null;
+  latencyMs: number | null;
+  consecutiveFailures: number;
+}
 
 export interface TickerUpdate {
   symbol: string;
@@ -75,11 +109,18 @@ export type WSEventMap = {
   connected: [];
   disconnected: [reason: string];
   reconnecting: [attempt: number];
+  reconnected: [];
   error: [error: Error];
   ticker: [update: TickerUpdate];
   trade: [update: TradeUpdate];
   kline: [update: KlineUpdate];
   depth: [update: DepthUpdate];
+  /** Emitted when connection state changes */
+  stateChange: [state: ConnectionState, previousState: ConnectionState];
+  /** Emitted on successful ping/pong */
+  heartbeat: [latencyMs: number];
+  /** Emitted when connection is considered unhealthy */
+  unhealthy: [reason: string];
 };
 
 export class BinanceWebSocket extends EventEmitter {
@@ -91,10 +132,61 @@ export class BinanceWebSocket extends EventEmitter {
   private isClosing = false;
   private pingInterval: ReturnType<typeof setInterval> | null = null;
   private pongTimeout: ReturnType<typeof setTimeout> | null = null;
+  private reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
+
+  // Connection state tracking
+  private connectionState: ConnectionState = "disconnected";
+  private connectedAt: Date | null = null;
+  private disconnectedAt: Date | null = null;
+  private lastPingAt: Date | null = null;
+  private lastPongAt: Date | null = null;
+  private latencyMs: number | null = null;
+  private consecutiveFailures = 0;
+  private lastPingTimestamp: number = 0;
 
   constructor(config: Partial<WSConfig> = {}) {
     super();
     this.config = { ...DEFAULT_WS_CONFIG, ...config };
+  }
+
+  /**
+   * Update connection state and emit state change event
+   */
+  private setState(newState: ConnectionState): void {
+    if (this.connectionState === newState) return;
+
+    const previousState = this.connectionState;
+    this.connectionState = newState;
+
+    logger.debug("Connection state changed", {
+      from: previousState,
+      to: newState,
+    });
+
+    this.emit("stateChange", newState, previousState);
+  }
+
+  /**
+   * Get current connection status
+   */
+  getConnectionStatus(): ConnectionStatus {
+    return {
+      state: this.connectionState,
+      connectedAt: this.connectedAt,
+      disconnectedAt: this.disconnectedAt,
+      reconnectAttempts: this.reconnectAttempts,
+      lastPingAt: this.lastPingAt,
+      lastPongAt: this.lastPongAt,
+      latencyMs: this.latencyMs,
+      consecutiveFailures: this.consecutiveFailures,
+    };
+  }
+
+  /**
+   * Get current connection state
+   */
+  getState(): ConnectionState {
+    return this.connectionState;
   }
 
   async connect(): Promise<void> {
@@ -104,14 +196,25 @@ export class BinanceWebSocket extends EventEmitter {
 
     this.isConnecting = true;
     this.isClosing = false;
+    this.setState("connecting");
 
     try {
       await this.createConnection();
       this.reconnectAttempts = 0;
+      this.consecutiveFailures = 0;
+      this.connectedAt = new Date();
+      this.disconnectedAt = null;
+      this.setState("connected");
       this.emit("connected");
       this.startPingInterval();
+      logger.info("WebSocket connected", {
+        subscriptions: this.subscriptions.size,
+      });
     } catch (error) {
       this.isConnecting = false;
+      this.consecutiveFailures++;
+      this.setState("failed");
+      logger.error("WebSocket connection failed", error instanceof Error ? error : undefined);
       throw error;
     }
   }
@@ -174,7 +277,7 @@ export class BinanceWebSocket extends EventEmitter {
 
       // Handle pong
       if (data.pong) {
-        this.clearPongTimeout();
+        this.handlePong();
         return;
       }
 
@@ -257,13 +360,20 @@ export class BinanceWebSocket extends EventEmitter {
 
   private handleClose(event: CloseEvent): void {
     this.cleanup();
+    this.disconnectedAt = new Date();
+
+    const reason = `Code: ${event.code}, Reason: ${event.reason || "Unknown"}`;
 
     if (this.isClosing) {
+      this.setState("disconnected");
       this.emit("disconnected", "Manual close");
+      logger.info("WebSocket disconnected (manual)");
       return;
     }
 
-    this.emit("disconnected", `Code: ${event.code}, Reason: ${event.reason || "Unknown"}`);
+    this.setState("reconnecting");
+    this.emit("disconnected", reason);
+    logger.warn("WebSocket disconnected", { code: event.code, reason: event.reason });
     this.attemptReconnect();
   }
 
@@ -271,37 +381,169 @@ export class BinanceWebSocket extends EventEmitter {
     this.emit("error", new Error(`WebSocket error: ${event.type}`));
   }
 
+  /**
+   * Calculate reconnect delay with exponential backoff and jitter
+   */
+  private calculateReconnectDelay(): number {
+    // Exponential backoff: baseDelay * 2^(attempt-1)
+    const exponentialDelay = this.config.reconnectDelayMs * Math.pow(2, this.reconnectAttempts - 1);
+
+    // Cap at max delay
+    const cappedDelay = Math.min(exponentialDelay, this.config.maxReconnectDelayMs);
+
+    // Add jitter to prevent thundering herd
+    const jitter = cappedDelay * this.config.reconnectJitter * Math.random();
+
+    return Math.floor(cappedDelay + jitter);
+  }
+
   private async attemptReconnect(): Promise<void> {
-    if (this.isClosing || this.reconnectAttempts >= this.config.maxReconnectAttempts) {
+    if (this.isClosing) {
+      return;
+    }
+
+    if (this.reconnectAttempts >= this.config.maxReconnectAttempts) {
+      this.setState("failed");
+      this.emit("unhealthy", `Max reconnect attempts (${this.config.maxReconnectAttempts}) reached`);
+      logger.error("Max reconnect attempts reached", undefined, {
+        attempts: this.reconnectAttempts,
+      });
       return;
     }
 
     this.reconnectAttempts++;
+    this.setState("reconnecting");
     this.emit("reconnecting", this.reconnectAttempts);
 
-    const delay = this.config.reconnectDelayMs * Math.pow(2, this.reconnectAttempts - 1);
-    await new Promise((resolve) => setTimeout(resolve, delay));
+    const delay = this.calculateReconnectDelay();
+    logger.info("Attempting reconnect", {
+      attempt: this.reconnectAttempts,
+      maxAttempts: this.config.maxReconnectAttempts,
+      delayMs: delay,
+    });
+
+    // Clear any existing reconnect timeout
+    if (this.reconnectTimeout) {
+      clearTimeout(this.reconnectTimeout);
+    }
+
+    await new Promise<void>((resolve) => {
+      this.reconnectTimeout = setTimeout(resolve, delay);
+    });
 
     if (!this.isClosing) {
       try {
         await this.connect();
-      } catch {
-        // Will retry in handleClose if needed
+        this.emit("reconnected");
+        logger.info("WebSocket reconnected", {
+          attempts: this.reconnectAttempts,
+        });
+      } catch (error) {
+        this.consecutiveFailures++;
+        logger.warn("Reconnect attempt failed", {
+          attempt: this.reconnectAttempts,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        // The handleClose will trigger another reconnect attempt
       }
     }
   }
 
+  /**
+   * Manually trigger a reconnection
+   * Closes current connection (if any) and reconnects
+   */
+  async reconnect(): Promise<void> {
+    logger.info("Manual reconnect requested");
+
+    // Reset reconnect counter for manual reconnects
+    this.reconnectAttempts = 0;
+    this.consecutiveFailures = 0;
+
+    // Close existing connection without triggering auto-reconnect
+    if (this.ws) {
+      this.isClosing = true;
+      this.cleanup();
+      this.ws.close(1000, "Manual reconnect");
+      this.ws = null;
+      this.isClosing = false;
+    }
+
+    // Clear any pending reconnect
+    if (this.reconnectTimeout) {
+      clearTimeout(this.reconnectTimeout);
+      this.reconnectTimeout = null;
+    }
+
+    // Connect with fresh state
+    await this.connect();
+  }
+
   private startPingInterval(): void {
+    // Clear any existing interval
+    if (this.pingInterval) {
+      clearInterval(this.pingInterval);
+    }
+
     this.pingInterval = setInterval(() => {
       if (this.ws?.readyState === WebSocket.OPEN) {
-        this.ws.send(JSON.stringify({ ping: Date.now() }));
-        this.setPongTimeout();
+        this.sendPing();
       }
     }, this.config.pingIntervalMs);
+
+    logger.debug("Heartbeat started", { intervalMs: this.config.pingIntervalMs });
+  }
+
+  /**
+   * Send a ping and track timing
+   */
+  private sendPing(): void {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+      return;
+    }
+
+    this.lastPingTimestamp = Date.now();
+    this.lastPingAt = new Date();
+
+    try {
+      this.ws.send(JSON.stringify({ ping: this.lastPingTimestamp }));
+      this.setPongTimeout();
+      logger.debug("Ping sent");
+    } catch (error) {
+      logger.warn("Failed to send ping", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      this.emit("unhealthy", "Failed to send ping");
+    }
+  }
+
+  /**
+   * Handle pong response
+   */
+  private handlePong(): void {
+    this.clearPongTimeout();
+    this.lastPongAt = new Date();
+
+    // Calculate latency
+    if (this.lastPingTimestamp > 0) {
+      this.latencyMs = Date.now() - this.lastPingTimestamp;
+      this.emit("heartbeat", this.latencyMs);
+
+      // Warn if latency is high
+      if (this.latencyMs > 5000) {
+        logger.warn("High WebSocket latency detected", { latencyMs: this.latencyMs });
+        this.emit("unhealthy", `High latency: ${this.latencyMs}ms`);
+      } else {
+        logger.debug("Pong received", { latencyMs: this.latencyMs });
+      }
+    }
   }
 
   private setPongTimeout(): void {
+    this.clearPongTimeout();
     this.pongTimeout = setTimeout(() => {
+      logger.warn("Pong timeout - closing connection");
+      this.emit("unhealthy", "Pong timeout");
       this.ws?.close(4000, "Pong timeout");
     }, this.config.pongTimeoutMs);
   }
@@ -318,8 +560,13 @@ export class BinanceWebSocket extends EventEmitter {
       clearInterval(this.pingInterval);
       this.pingInterval = null;
     }
+    if (this.reconnectTimeout) {
+      clearTimeout(this.reconnectTimeout);
+      this.reconnectTimeout = null;
+    }
     this.clearPongTimeout();
     this.ws = null;
+    this.lastPingTimestamp = 0;
   }
 
   subscribe(type: StreamType, symbol: string, interval?: string): void {
@@ -382,12 +629,15 @@ export class BinanceWebSocket extends EventEmitter {
   }
 
   disconnect(): void {
+    logger.info("Disconnecting WebSocket");
     this.isClosing = true;
     this.cleanup();
     if (this.ws) {
       this.ws.close(1000, "Manual disconnect");
       this.ws = null;
     }
+    this.setState("disconnected");
+    this.disconnectedAt = new Date();
   }
 
   isConnected(): boolean {
@@ -396,6 +646,58 @@ export class BinanceWebSocket extends EventEmitter {
 
   getSubscriptions(): StreamSubscription[] {
     return Array.from(this.subscriptions.values());
+  }
+
+  /**
+   * Check if the connection is healthy
+   * Returns false if disconnected, high latency, or missed pongs
+   */
+  isHealthy(): boolean {
+    if (!this.isConnected()) {
+      return false;
+    }
+
+    // Check if we've received a pong recently
+    if (this.lastPongAt) {
+      const timeSinceLastPong = Date.now() - this.lastPongAt.getTime();
+      // If more than 2 ping intervals without pong, unhealthy
+      if (timeSinceLastPong > this.config.pingIntervalMs * 2) {
+        return false;
+      }
+    }
+
+    // Check latency
+    if (this.latencyMs && this.latencyMs > 10000) {
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
+   * Get connection uptime in milliseconds
+   */
+  getUptime(): number | null {
+    if (!this.connectedAt || this.connectionState !== "connected") {
+      return null;
+    }
+    return Date.now() - this.connectedAt.getTime();
+  }
+
+  /**
+   * Get current latency in milliseconds
+   */
+  getLatency(): number | null {
+    return this.latencyMs;
+  }
+
+  /**
+   * Reset reconnect attempts counter
+   * Useful after successful operations
+   */
+  resetReconnectAttempts(): void {
+    this.reconnectAttempts = 0;
+    this.consecutiveFailures = 0;
   }
 }
 

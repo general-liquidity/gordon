@@ -18,6 +18,21 @@ export {
   recordError,
   recordApiCall,
 
+  // Per-agent metrics
+  recordAgentCall,
+  getAgentMetrics,
+  getAgentHealthReport,
+  formatAgentHealthReport,
+
+  // Rate limiting
+  checkRateLimit,
+  recordRateLimitedCall,
+  enforceRateLimit,
+  getRateLimitStatus,
+  resetRateLimit,
+  resetAllRateLimits,
+  getRateLimitViolations,
+
   // Display
   formatMetricsReport,
 
@@ -30,6 +45,10 @@ export {
   type AgentMetrics,
   type SystemMetrics,
   type GordonMetrics,
+  type PerAgentMetrics,
+  type AgentHealthReport,
+  type AgentCallRecord,
+  type RateLimitResult,
 } from "./metrics.ts";
 
 export {

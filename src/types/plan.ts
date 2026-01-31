@@ -30,6 +30,7 @@ export type GridConfig = z.infer<typeof GridConfigSchema>;
 export const PlanSchema = z.object({
   id: z.string(),
   createdAt: z.string(),
+  expiresAt: z.string().optional(),
 
   symbol: z.string(),
   direction: z.literal("long"),

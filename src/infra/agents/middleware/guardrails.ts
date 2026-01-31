@@ -3,6 +3,12 @@
  *
  * Mastra doesn't have built-in guardrails like OpenAI Agents SDK.
  * This module provides input/output validation as middleware functions.
+ *
+ * Security improvements:
+ * - Word boundary matching to prevent false positives
+ * - Whitelist for legitimate phrases
+ * - More specific dangerous patterns
+ * - Pattern context awareness
  */
 
 import { createModuleLogger } from "../../logger/index.ts";
@@ -15,17 +21,66 @@ const logger = createModuleLogger("guardrails");
 // ============================================================================
 
 /**
- * Patterns that indicate potentially dangerous commands
+ * Whitelist of legitimate phrases that might match dangerous patterns
+ * These are checked first and bypass pattern matching
  */
-const DANGEROUS_PATTERNS = [
-  /delete\s+all/i,
-  /drop\s+table/i,
-  /execute\s+immediately/i,
-  /bypass\s+safety/i,
-  /ignore\s+limits/i,
-  /max\s+leverage/i,
-  /all\s+in/i,
+const WHITELISTED_PHRASES = [
+  "all in one",
+  "all in all",
+  "all in favor",
+  "all in good time",
+  "all in the family",
+  "all inclusive",
+  "delete all orders", // Legitimate trading command
+  "show all",
+  "list all",
+  "view all",
+  "get all",
+  "fetch all",
+  "check all",
+  "cancel all orders", // Legitimate trading command
 ];
+
+/**
+ * Patterns that indicate potentially dangerous commands
+ * Using word boundaries (\b) to prevent false positives
+ */
+const DANGEROUS_PATTERNS: { pattern: RegExp; description: string; severity: "high" | "medium" }[] = [
+  // High severity - immediate execution or bypass attempts
+  { pattern: /\bexecute\s+immediately\s+without\b/i, description: "Immediate execution without safeguards", severity: "high" },
+  { pattern: /\bbypass\s+(?:all\s+)?safety\b/i, description: "Attempting to bypass safety mechanisms", severity: "high" },
+  { pattern: /\bignore\s+(?:all\s+)?limits?\b/i, description: "Attempting to ignore trading limits", severity: "high" },
+  { pattern: /\bdisable\s+(?:all\s+)?(?:safety|guardrails?|limits?)\b/i, description: "Attempting to disable safety features", severity: "high" },
+  { pattern: /\boverride\s+(?:all\s+)?(?:safety|limits?|restrictions?)\b/i, description: "Attempting to override restrictions", severity: "high" },
+  { pattern: /\bskip\s+(?:all\s+)?(?:validation|checks?|verification)\b/i, description: "Attempting to skip validation", severity: "high" },
+
+  // Medium severity - risky trading patterns
+  { pattern: /\bmax(?:imum)?\s+leverage\b/i, description: "Requesting maximum leverage", severity: "medium" },
+  { pattern: /\b(?:100|hundred)\s*%\s+(?:of\s+)?(?:portfolio|balance|funds?)\b/i, description: "Requesting 100% allocation", severity: "medium" },
+  { pattern: /\ball[\s-]in\b(?!\s+(?:one|all|favor|good|the|clusive))/i, description: "All-in trading request", severity: "medium" },
+  { pattern: /\byolo\s+(?:trade|buy|sell|everything)\b/i, description: "YOLO trading request", severity: "medium" },
+  { pattern: /\bbet\s+everything\b/i, description: "Betting everything", severity: "medium" },
+  { pattern: /\binvest\s+(?:all|everything|entire)\b/i, description: "Investing entire balance", severity: "medium" },
+
+  // SQL injection attempts (medium severity - shouldn't work but flag anyway)
+  { pattern: /\bdrop\s+(?:table|database|index)\b/i, description: "SQL injection attempt", severity: "medium" },
+  { pattern: /\bdelete\s+from\s+\w+\s+where\b/i, description: "SQL injection attempt", severity: "medium" },
+  { pattern: /;\s*(?:drop|delete|truncate|update)\b/i, description: "SQL injection attempt", severity: "medium" },
+
+  // Prompt injection attempts
+  { pattern: /\bignore\s+(?:previous|all|your)\s+instructions?\b/i, description: "Prompt injection attempt", severity: "high" },
+  { pattern: /\bforget\s+(?:all\s+)?(?:previous\s+)?(?:instructions?|rules?)\b/i, description: "Prompt injection attempt", severity: "high" },
+  { pattern: /\byou\s+are\s+now\s+(?:a|an)\b/i, description: "Prompt injection attempt", severity: "high" },
+  { pattern: /\bact\s+as\s+(?:if|though)\s+you\s+(?:have\s+)?no\s+restrictions?\b/i, description: "Prompt injection attempt", severity: "high" },
+];
+
+/**
+ * Check if input contains a whitelisted phrase
+ */
+function containsWhitelistedPhrase(input: string): boolean {
+  const lowerInput = input.toLowerCase();
+  return WHITELISTED_PHRASES.some(phrase => lowerInput.includes(phrase));
+}
 
 /**
  * Check input for dangerous patterns
@@ -34,18 +89,45 @@ export async function checkInputGuardrails(input: string): Promise<{
   allowed: boolean;
   reason?: string;
   sanitized?: string;
+  severity?: "high" | "medium";
 }> {
+  // First check if input contains a whitelisted phrase
+  if (containsWhitelistedPhrase(input)) {
+    logger.debug("Input contains whitelisted phrase, skipping pattern check");
+    // Still continue to check for high-severity patterns even with whitelist
+    for (const { pattern, description, severity } of DANGEROUS_PATTERNS) {
+      if (severity === "high" && pattern.test(input)) {
+        logger.warn("Input guardrail triggered (high severity)", { pattern: pattern.source, description });
+        await emitEvent("guardrail:input_blocked", {
+          reason: "dangerous_pattern",
+          pattern: pattern.source,
+          description,
+          severity,
+        });
+        return {
+          allowed: false,
+          reason: `Security violation: ${description}`,
+          severity,
+        };
+      }
+    }
+    return { allowed: true };
+  }
+
   // Check for dangerous patterns
-  for (const pattern of DANGEROUS_PATTERNS) {
+  for (const { pattern, description, severity } of DANGEROUS_PATTERNS) {
     if (pattern.test(input)) {
-      logger.warn("Input guardrail triggered", { pattern: pattern.source });
+      logger.warn("Input guardrail triggered", { pattern: pattern.source, description, severity });
       await emitEvent("guardrail:input_blocked", {
         reason: "dangerous_pattern",
         pattern: pattern.source,
+        description,
+        severity,
       });
       return {
         allowed: false,
-        reason: `Potentially dangerous command detected. Pattern: ${pattern.source}`,
+        reason: `${severity === "high" ? "Security violation" : "Risky request detected"}: ${description}`,
+        severity,
       };
     }
   }

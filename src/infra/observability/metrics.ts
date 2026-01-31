@@ -73,15 +73,97 @@ export interface GordonMetrics {
 }
 
 // ============================================================================
+// Per-Agent Metrics Types
+// ============================================================================
+
+/**
+ * Metrics tracked per individual agent
+ */
+export interface PerAgentMetrics {
+  agentName: string;
+  totalCalls: number;
+  successfulCalls: number;
+  failedCalls: number;
+  successRate: number;
+  totalLatencyMs: number;
+  avgLatencyMs: number;
+  minLatencyMs: number;
+  maxLatencyMs: number;
+  totalTokens: number;
+  avgTokensPerCall: number;
+  errorTypes: Record<string, number>;
+  recentErrors: Array<{ timestamp: number; errorType: string; message: string }>;
+  lastCallTimestamp: number | null;
+}
+
+/**
+ * Agent health report aggregating all agents
+ */
+export interface AgentHealthReport {
+  timestamp: string;
+  overallHealthScore: number; // 0-100
+  totalAgentCalls: number;
+  totalSuccessfulCalls: number;
+  totalFailedCalls: number;
+  overallSuccessRate: number;
+  agents: Record<string, PerAgentMetrics>;
+  unhealthyAgents: string[];
+  recommendations: string[];
+}
+
+/**
+ * Individual agent call record
+ */
+export interface AgentCallRecord {
+  agentName: string;
+  timestamp: number;
+  durationMs: number;
+  success: boolean;
+  tokens: number;
+  errorType?: string;
+  errorMessage?: string;
+}
+
+// ============================================================================
+// Rate Limiting Configuration
+// ============================================================================
+
+/**
+ * Default rate limit: 10 calls per minute per tool per agent
+ */
+const DEFAULT_RATE_LIMIT = 10;
+const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute
+
+/**
+ * Per-agent-per-tool rate limit tracking
+ * Key format: "agentName:toolName"
+ */
+const rateLimitTracker = new Map<string, number[]>();
+
+/**
+ * Rate limit result
+ */
+export interface RateLimitResult {
+  allowed: boolean;
+  remaining: number;
+  resetInMs: number;
+  error?: string;
+}
+
+// ============================================================================
 // In-Memory Metrics Storage (for session)
 // ============================================================================
 
 const sessionMetrics = {
   startTime: Date.now(),
   requests: [] as { timestamp: number; responseTimeMs: number; success: boolean }[],
-  toolCalls: [] as { timestamp: number; tool: string; success: boolean }[],
+  toolCalls: [] as { timestamp: number; tool: string; success: boolean; agentName?: string }[],
   apiCalls: [] as { timestamp: number; latencyMs: number; endpoint: string }[],
   errors: [] as { timestamp: number; error: string }[],
+  // Per-agent tracking
+  agentCalls: [] as AgentCallRecord[],
+  // Rate limit violations
+  rateLimitViolations: [] as { timestamp: number; agentName: string; toolName: string }[],
 };
 
 // ============================================================================
@@ -276,17 +358,206 @@ export function recordRequest(responseTimeMs: number, success: boolean): void {
 /**
  * Record a tool call for metrics
  */
-export function recordToolCall(tool: string, success: boolean): void {
+export function recordToolCall(tool: string, success: boolean, agentName?: string): void {
   sessionMetrics.toolCalls.push({
     timestamp: Date.now(),
     tool,
     success,
+    agentName,
   });
 
   // Keep only last 1000 tool calls
   if (sessionMetrics.toolCalls.length > 1000) {
     sessionMetrics.toolCalls.shift();
   }
+}
+
+// ============================================================================
+// Per-Agent-Per-Tool Rate Limiting
+// ============================================================================
+
+/**
+ * Get the rate limit key for an agent and tool combination
+ */
+function getRateLimitKey(agentName: string, toolName: string): string {
+  return `${agentName}:${toolName}`;
+}
+
+/**
+ * Clean up old timestamps from rate limit tracker
+ */
+function cleanupRateLimitTracker(key: string): void {
+  const timestamps = rateLimitTracker.get(key);
+  if (!timestamps) return;
+
+  const now = Date.now();
+  const validTimestamps = timestamps.filter(ts => now - ts < RATE_LIMIT_WINDOW_MS);
+
+  if (validTimestamps.length === 0) {
+    rateLimitTracker.delete(key);
+  } else {
+    rateLimitTracker.set(key, validTimestamps);
+  }
+}
+
+/**
+ * Check if a tool call is allowed under the rate limit
+ *
+ * @param agentName - Name of the agent making the call
+ * @param toolName - Name of the tool being called
+ * @param limit - Maximum calls per minute (default: 10)
+ * @returns RateLimitResult with allowed status and details
+ */
+export function checkRateLimit(
+  agentName: string,
+  toolName: string,
+  limit: number = DEFAULT_RATE_LIMIT
+): RateLimitResult {
+  const key = getRateLimitKey(agentName, toolName);
+  const now = Date.now();
+
+  // Clean up old timestamps
+  cleanupRateLimitTracker(key);
+
+  const timestamps = rateLimitTracker.get(key) || [];
+  const remaining = limit - timestamps.length;
+
+  if (remaining <= 0) {
+    // Find when the oldest timestamp will expire
+    const oldestTimestamp = timestamps[0] || now;
+    const resetInMs = RATE_LIMIT_WINDOW_MS - (now - oldestTimestamp);
+
+    // Record the violation
+    sessionMetrics.rateLimitViolations.push({
+      timestamp: now,
+      agentName,
+      toolName,
+    });
+
+    logger.warn("Rate limit exceeded", {
+      agentName,
+      toolName,
+      limit,
+      resetInMs,
+    });
+
+    return {
+      allowed: false,
+      remaining: 0,
+      resetInMs: Math.max(0, resetInMs),
+      error: `Rate limit exceeded for ${toolName}. Max ${limit} calls per minute. Try again in ${Math.ceil(resetInMs / 1000)}s.`,
+    };
+  }
+
+  return {
+    allowed: true,
+    remaining: remaining - 1, // After this call
+    resetInMs: timestamps.length > 0 ? RATE_LIMIT_WINDOW_MS - (now - timestamps[0]!) : RATE_LIMIT_WINDOW_MS,
+  };
+}
+
+/**
+ * Record a tool call for rate limiting
+ * Call this AFTER checkRateLimit returns allowed: true
+ *
+ * @param agentName - Name of the agent making the call
+ * @param toolName - Name of the tool being called
+ */
+export function recordRateLimitedCall(agentName: string, toolName: string): void {
+  const key = getRateLimitKey(agentName, toolName);
+  const timestamps = rateLimitTracker.get(key) || [];
+  timestamps.push(Date.now());
+  rateLimitTracker.set(key, timestamps);
+}
+
+/**
+ * Check rate limit and record the call if allowed
+ * Convenience function that combines check and record
+ *
+ * @param agentName - Name of the agent making the call
+ * @param toolName - Name of the tool being called
+ * @param limit - Maximum calls per minute (default: 10)
+ * @returns RateLimitResult with allowed status and details
+ */
+export function enforceRateLimit(
+  agentName: string,
+  toolName: string,
+  limit: number = DEFAULT_RATE_LIMIT
+): RateLimitResult {
+  const result = checkRateLimit(agentName, toolName, limit);
+
+  if (result.allowed) {
+    recordRateLimitedCall(agentName, toolName);
+  }
+
+  return result;
+}
+
+/**
+ * Get current rate limit status for an agent/tool combination
+ */
+export function getRateLimitStatus(
+  agentName: string,
+  toolName: string,
+  limit: number = DEFAULT_RATE_LIMIT
+): {
+  used: number;
+  remaining: number;
+  limit: number;
+  resetInMs: number;
+} {
+  const key = getRateLimitKey(agentName, toolName);
+  cleanupRateLimitTracker(key);
+
+  const timestamps = rateLimitTracker.get(key) || [];
+  const used = timestamps.length;
+  const remaining = Math.max(0, limit - used);
+  const resetInMs = timestamps.length > 0
+    ? RATE_LIMIT_WINDOW_MS - (Date.now() - timestamps[0]!)
+    : RATE_LIMIT_WINDOW_MS;
+
+  return {
+    used,
+    remaining,
+    limit,
+    resetInMs: Math.max(0, resetInMs),
+  };
+}
+
+/**
+ * Reset rate limit for a specific agent/tool combination
+ * Useful for testing or administrative override
+ */
+export function resetRateLimit(agentName: string, toolName: string): void {
+  const key = getRateLimitKey(agentName, toolName);
+  rateLimitTracker.delete(key);
+  logger.debug("Rate limit reset", { agentName, toolName });
+}
+
+/**
+ * Reset all rate limits
+ */
+export function resetAllRateLimits(): void {
+  rateLimitTracker.clear();
+  logger.debug("All rate limits reset");
+}
+
+/**
+ * Get rate limit violations count
+ */
+export function getRateLimitViolations(options?: {
+  agentName?: string;
+  toolName?: string;
+  sinceMs?: number;
+}): number {
+  const since = options?.sinceMs ? Date.now() - options.sinceMs : 0;
+
+  return sessionMetrics.rateLimitViolations.filter(v => {
+    if (v.timestamp < since) return false;
+    if (options?.agentName && v.agentName !== options.agentName) return false;
+    if (options?.toolName && v.toolName !== options.toolName) return false;
+    return true;
+  }).length;
 }
 
 /**
@@ -297,6 +568,251 @@ export function recordError(error: string): void {
     timestamp: Date.now(),
     error,
   });
+}
+
+// ============================================================================
+// Per-Agent Metrics Recording & Reporting
+// ============================================================================
+
+/**
+ * Record a call to a specific agent
+ *
+ * @param agentName - Name of the agent (e.g., "Analyst", "Scanner", "Backtester")
+ * @param durationMs - Duration of the call in milliseconds
+ * @param success - Whether the call succeeded
+ * @param tokens - Number of tokens used
+ * @param errorType - Optional error type if the call failed
+ * @param errorMessage - Optional error message if the call failed
+ */
+export function recordAgentCall(
+  agentName: string,
+  durationMs: number,
+  success: boolean,
+  tokens: number,
+  errorType?: string,
+  errorMessage?: string
+): void {
+  const record: AgentCallRecord = {
+    agentName,
+    timestamp: Date.now(),
+    durationMs,
+    success,
+    tokens,
+    errorType,
+    errorMessage,
+  };
+
+  sessionMetrics.agentCalls.push(record);
+
+  // Keep only last 5000 agent calls to prevent memory bloat
+  if (sessionMetrics.agentCalls.length > 5000) {
+    sessionMetrics.agentCalls.shift();
+  }
+
+  logger.debug("Recorded agent call", {
+    agentName,
+    durationMs,
+    success,
+    tokens,
+    errorType,
+  });
+}
+
+/**
+ * Get metrics for a specific agent
+ */
+export function getAgentMetrics(agentName: string): PerAgentMetrics {
+  const agentCalls = sessionMetrics.agentCalls.filter(
+    (call) => call.agentName === agentName
+  );
+
+  if (agentCalls.length === 0) {
+    return {
+      agentName,
+      totalCalls: 0,
+      successfulCalls: 0,
+      failedCalls: 0,
+      successRate: 1, // Default to 100% if no calls
+      totalLatencyMs: 0,
+      avgLatencyMs: 0,
+      minLatencyMs: 0,
+      maxLatencyMs: 0,
+      totalTokens: 0,
+      avgTokensPerCall: 0,
+      errorTypes: {},
+      recentErrors: [],
+      lastCallTimestamp: null,
+    };
+  }
+
+  const successfulCalls = agentCalls.filter((c) => c.success);
+  const failedCalls = agentCalls.filter((c) => !c.success);
+
+  const latencies = agentCalls.map((c) => c.durationMs);
+  const totalLatencyMs = latencies.reduce((sum, l) => sum + l, 0);
+  const totalTokens = agentCalls.reduce((sum, c) => sum + c.tokens, 0);
+
+  // Count error types
+  const errorTypes: Record<string, number> = {};
+  for (const call of failedCalls) {
+    const errType = call.errorType || "Unknown";
+    errorTypes[errType] = (errorTypes[errType] || 0) + 1;
+  }
+
+  // Get recent errors (last 10)
+  const recentErrors = failedCalls
+    .slice(-10)
+    .map((call) => ({
+      timestamp: call.timestamp,
+      errorType: call.errorType || "Unknown",
+      message: call.errorMessage || "No message",
+    }));
+
+  return {
+    agentName,
+    totalCalls: agentCalls.length,
+    successfulCalls: successfulCalls.length,
+    failedCalls: failedCalls.length,
+    successRate: agentCalls.length > 0 ? successfulCalls.length / agentCalls.length : 1,
+    totalLatencyMs,
+    avgLatencyMs: agentCalls.length > 0 ? totalLatencyMs / agentCalls.length : 0,
+    minLatencyMs: Math.min(...latencies),
+    maxLatencyMs: Math.max(...latencies),
+    totalTokens,
+    avgTokensPerCall: agentCalls.length > 0 ? totalTokens / agentCalls.length : 0,
+    errorTypes,
+    recentErrors,
+    lastCallTimestamp: agentCalls[agentCalls.length - 1]?.timestamp || null,
+  };
+}
+
+/**
+ * Get a comprehensive health report for all agents
+ */
+export function getAgentHealthReport(): AgentHealthReport {
+  const agentCalls = sessionMetrics.agentCalls;
+
+  // Get unique agent names
+  const agentNames = [...new Set(agentCalls.map((c) => c.agentName))];
+
+  // Build per-agent metrics
+  const agents: Record<string, PerAgentMetrics> = {};
+  for (const agentName of agentNames) {
+    agents[agentName] = getAgentMetrics(agentName);
+  }
+
+  // Calculate overall metrics
+  const totalAgentCalls = agentCalls.length;
+  const totalSuccessfulCalls = agentCalls.filter((c) => c.success).length;
+  const totalFailedCalls = totalAgentCalls - totalSuccessfulCalls;
+  const overallSuccessRate = totalAgentCalls > 0 ? totalSuccessfulCalls / totalAgentCalls : 1;
+
+  // Identify unhealthy agents (success rate < 80% or very high latency)
+  const unhealthyAgents: string[] = [];
+  for (const [name, metrics] of Object.entries(agents)) {
+    if (metrics.totalCalls >= 3 && metrics.successRate < 0.8) {
+      unhealthyAgents.push(name);
+    } else if (metrics.avgLatencyMs > 30000) { // > 30 seconds average
+      unhealthyAgents.push(name);
+    }
+  }
+
+  // Calculate overall health score (0-100)
+  let healthScore = 100;
+  // Penalize for low success rate
+  healthScore -= (1 - overallSuccessRate) * 50;
+  // Penalize for unhealthy agents
+  healthScore -= unhealthyAgents.length * 10;
+  // Clamp to 0-100
+  healthScore = Math.max(0, Math.min(100, healthScore));
+
+  // Generate recommendations
+  const recommendations: string[] = [];
+  if (unhealthyAgents.length > 0) {
+    recommendations.push(
+      `Investigate failing agents: ${unhealthyAgents.join(", ")}`
+    );
+  }
+  if (overallSuccessRate < 0.9) {
+    recommendations.push("Overall success rate is below 90%. Check for systematic issues.");
+  }
+  for (const [name, metrics] of Object.entries(agents)) {
+    if (metrics.avgLatencyMs > 10000) {
+      recommendations.push(`${name} has high latency (${(metrics.avgLatencyMs / 1000).toFixed(1)}s avg). Consider optimization.`);
+    }
+    const topError = Object.entries(metrics.errorTypes).sort(([, a], [, b]) => b - a)[0];
+    if (topError && topError[1] >= 3) {
+      recommendations.push(`${name} frequently fails with "${topError[0]}" (${topError[1]} times).`);
+    }
+  }
+
+  return {
+    timestamp: new Date().toISOString(),
+    overallHealthScore: Math.round(healthScore),
+    totalAgentCalls,
+    totalSuccessfulCalls,
+    totalFailedCalls,
+    overallSuccessRate,
+    agents,
+    unhealthyAgents,
+    recommendations,
+  };
+}
+
+/**
+ * Format agent health report for display
+ */
+export function formatAgentHealthReport(): string {
+  const report = getAgentHealthReport();
+  const lines: string[] = [];
+
+  lines.push("═══════════════════════════════════════════");
+  lines.push("           AGENT HEALTH REPORT             ");
+  lines.push("═══════════════════════════════════════════");
+  lines.push("");
+
+  // Overall health
+  const healthEmoji = report.overallHealthScore >= 90 ? "GREEN" :
+                      report.overallHealthScore >= 70 ? "YELLOW" : "RED";
+  lines.push(`Overall Health: ${report.overallHealthScore}/100 [${healthEmoji}]`);
+  lines.push(`Total Calls: ${report.totalAgentCalls} (${report.totalSuccessfulCalls} OK, ${report.totalFailedCalls} FAILED)`);
+  lines.push(`Success Rate: ${(report.overallSuccessRate * 100).toFixed(1)}%`);
+  lines.push("");
+
+  // Per-agent breakdown
+  lines.push("AGENT BREAKDOWN");
+  lines.push("───────────────────────────────────────────");
+
+  for (const [agentName, metrics] of Object.entries(report.agents)) {
+    const status = metrics.successRate >= 0.9 ? "OK" :
+                   metrics.successRate >= 0.7 ? "WARN" : "FAIL";
+    lines.push(`[${status}] ${agentName}`);
+    lines.push(`    Calls: ${metrics.totalCalls} | Success: ${(metrics.successRate * 100).toFixed(1)}%`);
+    lines.push(`    Latency: ${metrics.avgLatencyMs.toFixed(0)}ms avg (${metrics.minLatencyMs.toFixed(0)}-${metrics.maxLatencyMs.toFixed(0)}ms)`);
+    lines.push(`    Tokens: ${metrics.totalTokens} total (${metrics.avgTokensPerCall.toFixed(0)} avg/call)`);
+    if (Object.keys(metrics.errorTypes).length > 0) {
+      const errStr = Object.entries(metrics.errorTypes)
+        .map(([type, count]) => `${type}: ${count}`)
+        .join(", ");
+      lines.push(`    Errors: ${errStr}`);
+    }
+  }
+
+  // Recommendations
+  if (report.recommendations.length > 0) {
+    lines.push("");
+    lines.push("RECOMMENDATIONS");
+    lines.push("───────────────────────────────────────────");
+    for (const rec of report.recommendations) {
+      lines.push(`  - ${rec}`);
+    }
+  }
+
+  lines.push("");
+  lines.push("═══════════════════════════════════════════");
+  lines.push(`Generated: ${report.timestamp}`);
+
+  return lines.join("\n");
 }
 
 /**
@@ -466,4 +982,7 @@ export function resetSessionMetrics(): void {
   sessionMetrics.toolCalls = [];
   sessionMetrics.apiCalls = [];
   sessionMetrics.errors = [];
+  sessionMetrics.agentCalls = [];
+  sessionMetrics.rateLimitViolations = [];
+  resetAllRateLimits();
 }

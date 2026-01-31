@@ -82,7 +82,27 @@ interface RateLimitState {
   requestWeight: number;
   orderCount: number;
   lastReset: number;
+  /** Timestamp of last throttle warning */
+  lastThrottleWarn: number;
+  /** Number of requests throttled in current window */
+  throttledCount: number;
 }
+
+// Rate limit configuration
+const RATE_LIMIT_CONFIG = {
+  /** Maximum request weight per minute (Binance default: 1200) */
+  maxWeight: 1200,
+  /** Threshold percentage to start proactive throttling (80%) */
+  throttleThreshold: 0.8,
+  /** Warning threshold percentage (90%) */
+  warningThreshold: 0.9,
+  /** Delay in ms when approaching limit */
+  throttleDelayMs: 100,
+  /** Maximum delay in ms when very close to limit */
+  maxThrottleDelayMs: 1000,
+  /** How often to log throttle warnings (ms) */
+  throttleWarnIntervalMs: 10000,
+};
 
 /**
  * Binance API Client
@@ -99,6 +119,8 @@ export class BinanceClient {
       requestWeight: 0,
       orderCount: 0,
       lastReset: Date.now(),
+      lastThrottleWarn: 0,
+      throttledCount: 0,
     };
   }
 
@@ -130,15 +152,113 @@ export class BinanceClient {
 
     // Reset counters if a minute has passed
     if (this.rateLimitState.lastReset < minuteAgo) {
+      // Log throttle stats before reset if any throttling occurred
+      if (this.rateLimitState.throttledCount > 0) {
+        logger.info("Rate limit window reset", {
+          throttledRequests: this.rateLimitState.throttledCount,
+          peakWeight: this.rateLimitState.requestWeight,
+        });
+      }
       this.rateLimitState.requestWeight = 0;
       this.rateLimitState.orderCount = 0;
       this.rateLimitState.lastReset = now;
+      this.rateLimitState.throttledCount = 0;
     }
 
-    // Binance limit is 1200 weight per minute, warn at 80%
-    if (this.rateLimitState.requestWeight > 960) {
-      logger.warn("Approaching Binance rate limit", { weight: this.rateLimitState.requestWeight });
+    // Calculate current usage percentage
+    const usagePercent = this.rateLimitState.requestWeight / RATE_LIMIT_CONFIG.maxWeight;
+
+    // Log warning at 90% (but not too frequently)
+    if (usagePercent > RATE_LIMIT_CONFIG.warningThreshold) {
+      const timeSinceLastWarn = now - this.rateLimitState.lastThrottleWarn;
+      if (timeSinceLastWarn > RATE_LIMIT_CONFIG.throttleWarnIntervalMs) {
+        logger.warn("Rate limit critical - approaching Binance limit", {
+          weight: this.rateLimitState.requestWeight,
+          maxWeight: RATE_LIMIT_CONFIG.maxWeight,
+          usagePercent: Math.round(usagePercent * 100),
+        });
+        this.rateLimitState.lastThrottleWarn = now;
+      }
     }
+  }
+
+  /**
+   * Check if we should throttle requests based on current rate limit usage
+   * Returns true if request should be delayed
+   */
+  shouldThrottle(): boolean {
+    this.checkRateLimit();
+    const usagePercent = this.rateLimitState.requestWeight / RATE_LIMIT_CONFIG.maxWeight;
+    return usagePercent >= RATE_LIMIT_CONFIG.throttleThreshold;
+  }
+
+  /**
+   * Calculate delay needed based on current rate limit usage
+   * Returns 0 if no delay needed, otherwise returns delay in ms
+   */
+  private calculateThrottleDelay(): number {
+    const usagePercent = this.rateLimitState.requestWeight / RATE_LIMIT_CONFIG.maxWeight;
+
+    if (usagePercent < RATE_LIMIT_CONFIG.throttleThreshold) {
+      return 0;
+    }
+
+    // Calculate delay based on how close we are to the limit
+    // At 80% = throttleDelayMs, at 100% = maxThrottleDelayMs
+    const throttleRange = 1 - RATE_LIMIT_CONFIG.throttleThreshold; // 0.2
+    const throttleProgress = (usagePercent - RATE_LIMIT_CONFIG.throttleThreshold) / throttleRange;
+    const delayRange = RATE_LIMIT_CONFIG.maxThrottleDelayMs - RATE_LIMIT_CONFIG.throttleDelayMs;
+
+    return Math.floor(RATE_LIMIT_CONFIG.throttleDelayMs + (delayRange * throttleProgress));
+  }
+
+  /**
+   * Apply throttling delay if needed
+   * Proactively slows down requests at 80% capacity
+   */
+  private async applyThrottling(): Promise<void> {
+    const delay = this.calculateThrottleDelay();
+
+    if (delay > 0) {
+      this.rateLimitState.throttledCount++;
+
+      const usagePercent = Math.round(
+        (this.rateLimitState.requestWeight / RATE_LIMIT_CONFIG.maxWeight) * 100
+      );
+
+      logger.debug("Throttling request", {
+        delayMs: delay,
+        currentWeight: this.rateLimitState.requestWeight,
+        usagePercent,
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    }
+  }
+
+  /**
+   * Get current rate limit status
+   */
+  getRateLimitStatus(): {
+    currentWeight: number;
+    maxWeight: number;
+    usagePercent: number;
+    isThrottling: boolean;
+    throttledCount: number;
+    timeUntilReset: number;
+  } {
+    const now = Date.now();
+    const usagePercent = this.rateLimitState.requestWeight / RATE_LIMIT_CONFIG.maxWeight;
+    const timeUntilReset = Math.max(0, 60000 - (now - this.rateLimitState.lastReset));
+
+    return {
+      currentWeight: this.rateLimitState.requestWeight,
+      maxWeight: RATE_LIMIT_CONFIG.maxWeight,
+      usagePercent: Math.round(usagePercent * 100),
+      isThrottling: usagePercent >= RATE_LIMIT_CONFIG.throttleThreshold,
+      throttledCount: this.rateLimitState.throttledCount,
+      timeUntilReset,
+    };
   }
 
   /**
@@ -153,12 +273,15 @@ export class BinanceClient {
 
   /**
    * Make a public API request (no authentication required)
-   * Includes automatic retry with exponential backoff
+   * Includes automatic retry with exponential backoff and predictive rate limiting
    */
   private async publicRequest<T>(
     endpoint: string,
     params: Record<string, string | number | undefined> = {}
   ): Promise<T> {
+    // Apply predictive throttling before making request
+    await this.applyThrottling();
+
     return withRetry(async () => {
       this.checkRateLimit();
 
@@ -197,7 +320,7 @@ export class BinanceClient {
 
   /**
    * Make a signed API request (authentication required)
-   * Includes automatic retry with exponential backoff and circuit breaker
+   * Includes automatic retry with exponential backoff, circuit breaker, and predictive rate limiting
    */
   private async signedRequest<T>(
     method: "GET" | "POST" | "DELETE",
@@ -208,6 +331,9 @@ export class BinanceClient {
     if (!apiCircuitBreaker.canExecute()) {
       throw new BinanceError("API circuit breaker is open - too many recent failures", -1);
     }
+
+    // Apply predictive throttling before making request
+    await this.applyThrottling();
 
     try {
       const result = await withRetry(async () => {

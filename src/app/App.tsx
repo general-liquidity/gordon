@@ -10,7 +10,7 @@ import { ChatView, type ChatMessage } from "./ChatView.tsx";
 import { Onboarding } from "./Onboarding.tsx";
 import { SetupWizard } from "./SetupWizard.tsx";
 import { ModelSelector } from "./ModelSelector.tsx";
-import { ShortcutsOverlay } from "./components/ShortcutsOverlay.tsx";
+import { ShortcutsOverlay, ShortcutsHint, useShortcutsHint } from "./components/ShortcutsOverlay.tsx";
 import { ThemeProvider, useTheme } from "./components/ThemeProvider.tsx";
 import { processMessageStream, initializeTracing } from "../infra/agents/orchestrator.ts";
 import { createLLMClientFromEnv, type LLMClient } from "../infra/llm/index.ts";
@@ -53,6 +53,7 @@ interface AppState {
   conversationHistory: ConversationMessage[];
   btcPrice: number | undefined;
   showShortcuts: boolean;
+  showStartupHint: boolean;
 }
 
 function getDefaultConfig(): GordonConfig {
@@ -95,6 +96,7 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
     conversationHistory: [],
     btcPrice: undefined,
     showShortcuts: false,
+    showStartupHint: true,
   });
 
   const llmClientRef = useRef<LLMClient | null>(null);
@@ -1146,6 +1148,14 @@ Please check your API keys in the .env file and restart Gordon.`,
 
         {state.view === "chat" && (
           <Box flexDirection="column" flexGrow={1}>
+            {/* Startup hint - shows for 5 seconds */}
+            {state.showStartupHint && state.messages.length === 0 && (
+              <ShortcutsHint
+                duration={5000}
+                visible={state.showStartupHint}
+              />
+            )}
+
             <ChatView messages={state.messages} />
 
             {/* Loading/Streaming indicator */}
@@ -1174,7 +1184,7 @@ Please check your API keys in the .env file and restart Gordon.`,
             {/* Help hint */}
             <Box paddingX={2} paddingY={0}>
               <Text color={COLORS.DIM}>
-                ESC: menu | /help: commands | /theme: toggle theme
+                ESC: menu | /help: commands | /theme: toggle theme | ?: shortcuts
               </Text>
             </Box>
           </Box>

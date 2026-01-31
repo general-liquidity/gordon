@@ -11,6 +11,11 @@
  *
  * IMPORTANT: Agents are lazily initialized to ensure environment
  * variables are loaded before the provider registry is accessed.
+ *
+ * Memory Management:
+ * - Configurable lastMessages via config
+ * - Session duration tracking with auto-clear
+ * - Memory usage warnings when approaching limits
  */
 
 import { Agent } from "@mastra/core/agent";
@@ -39,8 +44,190 @@ import {
   metricsTools,
   compositionTools,
   backtestTools,
+  sharedContextTools,
   withToolsMetrics,
 } from "./tools/index.ts";
+import { getSessionSummary, getMemoryStats, resetSharedMemory } from "./shared-context.ts";
+import type { MemoryConfig } from "../../types/index.ts";
+
+// ============================================================================
+// Memory Configuration & Session Management
+// ============================================================================
+
+/** Default memory configuration */
+const DEFAULT_MEMORY_CONFIG: MemoryConfig = {
+  lastMessages: 20,
+  maxSessionDurationHours: 24,
+  memoryWarningThreshold: 0.8,
+};
+
+/** Session tracking state */
+interface SessionState {
+  startTime: number;
+  lastActivity: number;
+  messageCount: number;
+  warningIssued: boolean;
+}
+
+let _sessionState: SessionState | null = null;
+let _memoryConfig: MemoryConfig = DEFAULT_MEMORY_CONFIG;
+
+/**
+ * Initialize or get session state
+ */
+function getSessionState(): SessionState {
+  if (!_sessionState) {
+    _sessionState = {
+      startTime: Date.now(),
+      lastActivity: Date.now(),
+      messageCount: 0,
+      warningIssued: false,
+    };
+  }
+  return _sessionState;
+}
+
+/**
+ * Set the memory configuration from GordonConfig
+ */
+export function setMemoryConfig(config: Partial<MemoryConfig>): void {
+  _memoryConfig = { ...DEFAULT_MEMORY_CONFIG, ...config };
+  console.log(`[Gordon] Memory config updated: lastMessages=${_memoryConfig.lastMessages}, maxSessionHours=${_memoryConfig.maxSessionDurationHours}`);
+}
+
+/**
+ * Get current memory configuration
+ */
+export function getMemoryConfig(): MemoryConfig {
+  return _memoryConfig;
+}
+
+/**
+ * Check if session has exceeded maximum duration
+ */
+export function isSessionExpired(): boolean {
+  const session = getSessionState();
+  const maxDurationMs = _memoryConfig.maxSessionDurationHours * 60 * 60 * 1000;
+  return Date.now() - session.startTime > maxDurationMs;
+}
+
+/**
+ * Memory usage statistics
+ */
+export interface MemoryUsageStats {
+  messageCount: number;
+  maxMessages: number;
+  usagePercent: number;
+  sessionDurationHours: number;
+  maxSessionHours: number;
+  sessionExpired: boolean;
+  warningLevel: "none" | "warning" | "critical";
+  contextStats: {
+    analysesCount: number;
+    backtestsCount: number;
+    hasScanner: boolean;
+    hasPlanner: boolean;
+    totalVersions: number;
+  };
+}
+
+/**
+ * Get memory usage statistics and check for warnings
+ */
+export function getMemoryUsageStats(): MemoryUsageStats {
+  const session = getSessionState();
+  const contextStats = getMemoryStats();
+
+  const usagePercent = session.messageCount / _memoryConfig.lastMessages;
+  const sessionDurationHours = (Date.now() - session.startTime) / (60 * 60 * 1000);
+  const sessionExpired = isSessionExpired();
+
+  let warningLevel: "none" | "warning" | "critical" = "none";
+  if (usagePercent >= 0.95 || sessionExpired) {
+    warningLevel = "critical";
+  } else if (usagePercent >= _memoryConfig.memoryWarningThreshold) {
+    warningLevel = "warning";
+  }
+
+  return {
+    messageCount: session.messageCount,
+    maxMessages: _memoryConfig.lastMessages,
+    usagePercent: Math.min(usagePercent, 1),
+    sessionDurationHours,
+    maxSessionHours: _memoryConfig.maxSessionDurationHours,
+    sessionExpired,
+    warningLevel,
+    contextStats: {
+      analysesCount: contextStats.analysesCount,
+      backtestsCount: contextStats.backtestsCount,
+      hasScanner: contextStats.hasScanner,
+      hasPlanner: contextStats.hasPlanner,
+      totalVersions: contextStats.totalVersions,
+    },
+  };
+}
+
+/**
+ * Check memory usage and return warning message if needed
+ * Should be called periodically (e.g., after each message)
+ */
+export function checkMemoryUsageWarning(): string | null {
+  const stats = getMemoryUsageStats();
+  const session = getSessionState();
+
+  // Don't repeat warnings too frequently
+  if (session.warningIssued && stats.warningLevel === "warning") {
+    return null;
+  }
+
+  if (stats.warningLevel === "critical") {
+    session.warningIssued = true;
+    if (stats.sessionExpired) {
+      return `[Memory Warning] Session has exceeded maximum duration (${stats.maxSessionHours}h). Consider starting a new session to maintain performance.`;
+    }
+    return `[Memory Warning] Memory usage at ${Math.round(stats.usagePercent * 100)}%. Oldest messages will be dropped soon. Consider starting a new session.`;
+  }
+
+  if (stats.warningLevel === "warning" && !session.warningIssued) {
+    session.warningIssued = true;
+    return `[Memory Notice] Memory usage at ${Math.round(stats.usagePercent * 100)}% (${stats.messageCount}/${stats.maxMessages} messages). Session running for ${stats.sessionDurationHours.toFixed(1)}h.`;
+  }
+
+  return null;
+}
+
+/**
+ * Track a new message in the session
+ */
+export function trackMessage(): void {
+  const session = getSessionState();
+  session.messageCount++;
+  session.lastActivity = Date.now();
+}
+
+/**
+ * Clear session and reset memory
+ * Call this when starting a new session or when session expires
+ */
+export function clearSession(): void {
+  _sessionState = null;
+  resetSharedMemory();
+  resetAgents();
+  console.log("[Gordon] Session cleared and memory reset");
+}
+
+/**
+ * Auto-clear session if expired
+ * Returns true if session was cleared
+ */
+export function autoClearIfExpired(): boolean {
+  if (isSessionExpired()) {
+    console.log("[Gordon] Session expired, auto-clearing...");
+    clearSession();
+    return true;
+  }
+  return false;
+}
 
 // ============================================================================
 // Instrumented Tools (with metrics recording)
@@ -71,6 +258,7 @@ const instrumentedStrategyTools = withToolsMetrics(strategyTools);
 const instrumentedMetricsTools = withToolsMetrics(metricsTools);
 const instrumentedCompositionTools = withToolsMetrics(compositionTools);
 const instrumentedBacktestTools = withToolsMetrics(backtestTools);
+const instrumentedSharedContextTools = withToolsMetrics(sharedContextTools);
 
 // ============================================================================
 // Memory Configuration (Required for Agent Networks)
@@ -113,10 +301,15 @@ const WORKING_MEMORY_TEMPLATE = `
  * - LibSQLVector: Vector database for semantic search (RAG)
  * - semanticRecall: Find similar past trades and analyses
  * - workingMemory: Maintain trading context across conversations
+ * - Configurable lastMessages via _memoryConfig
  */
 function createMemory(): Memory {
   const dbUrl = process.env.DATABASE_URL || "file:gordon.db";
   const vectorDbUrl = process.env.VECTOR_DATABASE_URL || "file:gordon-vector.db";
+
+  // Use configured lastMessages or default
+  const lastMessages = _memoryConfig.lastMessages;
+  console.log(`[Gordon] Creating memory with lastMessages=${lastMessages}`);
 
   return new Memory({
     storage: new LibSQLStore({
@@ -129,7 +322,7 @@ function createMemory(): Memory {
     }),
     embedder: "openai/text-embedding-3-small",
     options: {
-      lastMessages: 20,
+      lastMessages,
       semanticRecall: {
         topK: 5,
         messageRange: {
@@ -179,12 +372,20 @@ Your role is to scan the cryptocurrency market and identify trading opportunitie
 - When user wants to confirm a single strategy's detection
 - For comprehensive market scans (scan_with_ensemble)
 
+## Cross-Agent Context
+After scanning, use write_shared_context to store findings:
+- contextType: "scanner"
+- data: { topOpportunities, marketCondition, ensembleResults }
+
+This allows Analyst and Planner to know what opportunities you found.
+
 ## Important Rules
 - Only present coins with detected setups (setupDetected: true)
 - Higher confidence scores (>0.6) indicate stronger setups
 - For ensemble: >50% agreement is minimum, >66% is strong
 - Always mention the risk level
-- If no good setups found, tell the user to wait`;
+- If no good setups found, tell the user to wait
+- Share your findings via write_shared_context for other agents`;
 
 const ANALYST_INSTRUCTIONS = `You are Gordon's technical analyst agent.
 
@@ -201,6 +402,16 @@ Your role is to provide deep analysis of specific cryptocurrencies.
 - Stochastic RSI for precise entry/exit timing using get_stochastic_rsi
 - **Comprehensive analysis** combining signals, RSI, whale orders, and orderbook using run_full_analysis
 
+## Cross-Agent Context (NEW)
+Use shared context tools to collaborate with other agents:
+- **read_shared_context**: Check if Scanner already found opportunities
+- **write_shared_context**: Store your analysis for Planner/Backtester to use
+
+After completing a significant analysis, always call write_shared_context with:
+- contextType: "analysis"
+- symbol: the analyzed symbol
+- data: { overallBias, confidence, technicalSignals, supportResistance }
+
 ## When to Use run_full_analysis
 Use run_full_analysis when user asks for:
 - "deep analysis", "full analysis", "comprehensive analysis"
@@ -210,7 +421,8 @@ Use run_full_analysis when user asks for:
 ## Important Rules
 - Always explain indicators in simple terms
 - Mention both bullish and bearish scenarios
-- Be honest about uncertainty`;
+- Be honest about uncertainty
+- Share your analysis results via write_shared_context for other agents`;
 
 const PLANNER_INSTRUCTIONS = `You are Gordon's trading planner agent.
 
@@ -223,11 +435,26 @@ Your role is to create well-structured trading plans based on analysis.
 - Calculate ATR-based stop-loss levels using get_stop_loss_levels
 - Calculate optimal position size using get_position_size
 
+## Cross-Agent Context (NEW)
+Use shared context tools to leverage work from other agents:
+- **read_shared_context("analysis", symbol)**: Get Analyst's technical analysis
+- **read_shared_context("backtest", symbol)**: Get Backtester's strategy performance
+- **read_shared_context("scanner")**: See Scanner's latest opportunities
+- **write_shared_context**: Store your plans for Executor to reference
+
+## Recommended Workflow
+1. **Check context first**: read_shared_context to see existing analysis/backtests
+2. **Use context for decisions**: Base entry/exit levels on Analyst's support/resistance
+3. **Validate with backtest data**: Check if strategy was backtested successfully
+4. **Create informed plan**: Build plan using all available context
+5. **Share plan**: write_shared_context so Executor knows the plan details
+
 ## Important Rules
 - Never suggest risking more than user's max allocation
 - Always maintain cash reserve
 - Risk/reward ratio should be at least 1.2:1
-- Explain the reasoning behind each level`;
+- Explain the reasoning behind each level
+- Leverage existing analysis from shared context when available`;
 
 const EXECUTOR_INSTRUCTIONS = `You are Gordon's trade executor agent.
 
@@ -271,18 +498,40 @@ Your role is to run historical backtests and optimize trading strategies.
 - Compare multiple strategies on the same data
 - Analyze backtest results and provide insights
 
+## Pre-Analysis Capabilities (NEW)
+You now have access to analyst tools for comprehensive pre-backtest analysis:
+- **get_technical_analysis**: Get current market context before backtesting
+- **get_rsi/get_vwap/get_stochastic_rsi**: Check indicator values for context
+- **detect_whales**: Check for whale activity that might affect strategy validity
+- **get_orderbook_depth/get_orderbook_imbalance**: Understand liquidity context
+- **run_full_analysis**: Get comprehensive analysis combining all signals
+
+## Cross-Agent Context (NEW)
+Use shared context tools to collaborate with other agents:
+- **read_shared_context**: Check if Analyst already analyzed this coin
+- **write_shared_context**: Store your backtest results for Planner to use
+
+## Recommended Workflow
+1. **Check shared context first**: read_shared_context to see if analysis exists
+2. **Pre-analyze if needed**: Run get_technical_analysis for current market context
+3. **Run backtest**: Execute the strategy backtest with historical data
+4. **Contextualize results**: Compare backtest assumptions to current conditions
+5. **Share results**: write_shared_context so Planner can use your findings
+
 ## When Presenting Results
 1. Always show key metrics: Total Return, Sharpe Ratio, Max Drawdown, Win Rate
 2. Explain what the metrics mean for the strategy
 3. Highlight any concerns (high drawdown, low win rate, few trades)
 4. Compare to benchmarks when relevant (buy & hold)
 5. Suggest parameter adjustments if metrics are poor
+6. **NEW**: Note if current market conditions differ from backtest period
 
 ## Important Rules
 - Warn if backtest period is too short (< 30 days)
 - Note that past performance doesn't guarantee future results
 - Mention if there were very few trades (statistically insignificant)
-- Be honest about overfitting risks when optimizing`;
+- Be honest about overfitting risks when optimizing
+- Check current market context before recommending a strategy from backtest`;
 
 const GORDON_INSTRUCTIONS = `You are Gordon, an AI trading assistant for cryptocurrency.
 
@@ -349,6 +598,8 @@ function getScannerAgent(): Agent {
         ...instrumentedStrategyTools,   // Strategy library tools
         scan_market: instrumentedMarketTools.scan_market,
         analyze_coin: instrumentedMarketTools.analyze_coin,
+        // Shared context for cross-agent memory (Improvement #2)
+        ...instrumentedSharedContextTools,
       },
     });
   }
@@ -377,6 +628,8 @@ function getAnalystAgent(): Agent {
         ...instrumentedMarketAnalysisTools,    // Whale detection, breakouts, consolidation, scoring
         ...instrumentedCompositionTools,       // Full analysis composition tool
         analyze_coin: instrumentedMarketTools.analyze_coin,
+        // Shared context for cross-agent memory (Improvement #2)
+        ...instrumentedSharedContextTools,
       },
     });
   }
@@ -407,6 +660,8 @@ function getPlannerAgent(): Agent {
         calculate_kelly_size: instrumentedRiskManagementTools.calculate_kelly_size,
         calculate_volatility_adjusted_size: instrumentedRiskManagementTools.calculate_volatility_adjusted_size,
         assess_trade_risk: instrumentedRiskManagementTools.assess_trade_risk,
+        // Shared context for cross-agent memory (Improvement #2)
+        ...instrumentedSharedContextTools,
       },
     });
   }
@@ -463,6 +718,8 @@ function getMonitorAgent(): Agent {
         check_exit_conditions: instrumentedRiskManagementTools.check_exit_conditions,
         check_drawdown_status: instrumentedRiskManagementTools.check_drawdown_status,
         check_daily_limit: instrumentedRiskManagementTools.check_daily_limit,
+        // Shared context for cross-agent memory (Improvement #2)
+        ...instrumentedSharedContextTools,
       },
     });
   }
@@ -493,6 +750,11 @@ function getTeacherAgent(): Agent {
 
 /**
  * Get or create the Backtester Agent
+ *
+ * Enhanced with analyst tools for pre-analysis capabilities:
+ * - Can analyze current market conditions before backtesting
+ * - Access to technical indicators for context
+ * - Shared context for cross-agent collaboration
  */
 function getBacktesterAgent(): Agent {
   if (!_agents.backtester) {
@@ -506,8 +768,19 @@ function getBacktesterAgent(): Agent {
       instructions: BACKTESTER_INSTRUCTIONS,
       model: getModel(process.env.GORDON_PROVIDER, process.env.GORDON_MODEL),
       tools: {
+        // Core backtesting tools
         ...instrumentedBacktestTools,
         ...instrumentedStrategyTools,  // For listing strategies
+
+        // Analyst tools for pre-analysis (Improvement #3)
+        ...instrumentedIndicatorTools,           // RSI, MACD, Bollinger, etc.
+        ...instrumentedMarketAnalysisTools,      // Whale detection, breakouts, scoring
+        ...instrumentedOrderbookTools,           // Orderbook depth and imbalance
+        ...instrumentedCompositionTools,         // run_full_analysis for comprehensive context
+        analyze_coin: instrumentedMarketTools.analyze_coin,
+
+        // Shared context tools for cross-agent memory (Improvement #2)
+        ...instrumentedSharedContextTools,
       },
     });
   }

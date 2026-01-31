@@ -16,6 +16,16 @@ import { z } from "zod";
 import { getGordonContext, MastraExecutionContext } from "./types.ts";
 import { providerRegistry, DEDALUS_MODELS, type DirectProviderName } from "../../providers/registry.ts";
 import { getToolCacheStats, clearToolCache, pruneToolCache } from "./cache.ts";
+import {
+  getAgentHealthReport,
+  getAgentMetrics,
+  formatAgentHealthReport,
+  type PerAgentMetrics,
+  type AgentHealthReport,
+} from "../../observability/index.ts";
+
+// NOTE: getHandoffHistory is dynamically imported to break circular dependency
+// (system.ts -> orchestrator.ts -> agents.ts -> tools/index.ts -> system.ts)
 
 // ============================================================================
 // Connection Test Tool
@@ -237,6 +247,174 @@ export const getCacheStatsTool = createTool({
 });
 
 // ============================================================================
+// Agent Health Tool
+// ============================================================================
+
+/**
+ * Schema for per-agent metrics
+ */
+const perAgentMetricsSchema = z.object({
+  agentName: z.string(),
+  totalCalls: z.number(),
+  successfulCalls: z.number(),
+  failedCalls: z.number(),
+  successRate: z.number(),
+  totalLatencyMs: z.number(),
+  avgLatencyMs: z.number(),
+  minLatencyMs: z.number(),
+  maxLatencyMs: z.number(),
+  totalTokens: z.number(),
+  avgTokensPerCall: z.number(),
+  errorTypes: z.record(z.string(), z.number()),
+  recentErrors: z.array(z.object({
+    timestamp: z.number(),
+    errorType: z.string(),
+    message: z.string(),
+  })),
+  lastCallTimestamp: z.number().nullable(),
+});
+
+/**
+ * Schema for agent health report
+ */
+const agentHealthReportSchema = z.object({
+  timestamp: z.string(),
+  overallHealthScore: z.number(),
+  totalAgentCalls: z.number(),
+  totalSuccessfulCalls: z.number(),
+  totalFailedCalls: z.number(),
+  overallSuccessRate: z.number(),
+  agents: z.record(z.string(), perAgentMetricsSchema),
+  unhealthyAgents: z.array(z.string()),
+  recommendations: z.array(z.string()),
+});
+
+/**
+ * Schema for handoff record
+ */
+const handoffRecordSchema = z.object({
+  handoffId: z.string(),
+  fromAgent: z.string(),
+  toAgent: z.string(),
+  timestamp: z.number(),
+  validated: z.boolean(),
+  validationReason: z.string().optional(),
+});
+
+export const getAgentHealthTool = createTool({
+  id: "get_agent_health",
+  description:
+    "Get agent health status showing success rates, average latency, token usage, and recent errors per agent. " +
+    "Use when user asks '/health', 'agent health', 'show agent status', 'which agents are failing?', or 'agent diagnostics'.",
+  inputSchema: z.object({
+    agentName: z.string().optional()
+      .describe("Optional specific agent name to get detailed metrics for (e.g., 'Analyst', 'Scanner')"),
+    includeHandoffs: z.boolean().default(false)
+      .describe("Include recent handoff history in the response"),
+    format: z.enum(["json", "text"]).default("json")
+      .describe("Output format: 'json' for structured data, 'text' for human-readable"),
+  }),
+  outputSchema: z.object({
+    // Full report (when no specific agent requested)
+    report: agentHealthReportSchema.optional(),
+    // Specific agent metrics (when agentName provided)
+    agentMetrics: perAgentMetricsSchema.optional(),
+    // Recent handoffs (when includeHandoffs is true)
+    recentHandoffs: z.array(handoffRecordSchema).optional(),
+    // Formatted text output (when format is 'text')
+    formattedReport: z.string().optional(),
+    // Summary info
+    summary: z.object({
+      overallHealth: z.enum(["healthy", "degraded", "unhealthy"]),
+      healthScore: z.number(),
+      totalAgents: z.number(),
+      unhealthyCount: z.number(),
+      topRecommendation: z.string().optional(),
+    }).optional(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ agentName, includeHandoffs, format }) => {
+    try {
+      // Dynamic import to break circular dependency
+      const { getHandoffHistory } = await import("../orchestrator.ts");
+
+      // If specific agent requested, return just that agent's metrics
+      if (agentName) {
+        const metrics = getAgentMetrics(agentName);
+        const handoffs = includeHandoffs ? getHandoffHistory(10).filter(
+          (h) => h.fromAgent === agentName || h.toAgent === agentName
+        ) : undefined;
+
+        if (format === "text") {
+          const lines = [
+            `Agent: ${metrics.agentName}`,
+            `Total Calls: ${metrics.totalCalls}`,
+            `Success Rate: ${(metrics.successRate * 100).toFixed(1)}%`,
+            `Avg Latency: ${metrics.avgLatencyMs.toFixed(0)}ms`,
+            `Total Tokens: ${metrics.totalTokens}`,
+          ];
+          if (metrics.failedCalls > 0) {
+            lines.push(`Failed Calls: ${metrics.failedCalls}`);
+            lines.push(`Error Types: ${JSON.stringify(metrics.errorTypes)}`);
+          }
+          return {
+            agentMetrics: metrics,
+            recentHandoffs: handoffs,
+            formattedReport: lines.join("\n"),
+          };
+        }
+
+        return {
+          agentMetrics: metrics,
+          recentHandoffs: handoffs,
+        };
+      }
+
+      // Get full health report
+      const report = getAgentHealthReport();
+      const handoffs = includeHandoffs ? getHandoffHistory(20) : undefined;
+
+      // Determine overall health status
+      let overallHealth: "healthy" | "degraded" | "unhealthy";
+      if (report.overallHealthScore >= 90) {
+        overallHealth = "healthy";
+      } else if (report.overallHealthScore >= 70) {
+        overallHealth = "degraded";
+      } else {
+        overallHealth = "unhealthy";
+      }
+
+      const summary = {
+        overallHealth,
+        healthScore: report.overallHealthScore,
+        totalAgents: Object.keys(report.agents).length,
+        unhealthyCount: report.unhealthyAgents.length,
+        topRecommendation: report.recommendations[0],
+      };
+
+      if (format === "text") {
+        return {
+          report,
+          recentHandoffs: handoffs,
+          formattedReport: formatAgentHealthReport(),
+          summary,
+        };
+      }
+
+      return {
+        report,
+        recentHandoffs: handoffs,
+        summary,
+      };
+    } catch (error) {
+      return {
+        error: error instanceof Error ? error.message : "Failed to get agent health",
+      };
+    }
+  },
+});
+
+// ============================================================================
 // Export as Object (Mastra format)
 // ============================================================================
 
@@ -248,4 +426,5 @@ export const systemTools = {
   test_connection: testConnectionTool,
   get_model_info: getModelInfoTool,
   get_cache_stats: getCacheStatsTool,
+  get_agent_health: getAgentHealthTool,
 };

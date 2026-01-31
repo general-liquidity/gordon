@@ -210,6 +210,33 @@ export interface AgentReflectionEvent extends BaseEvent {
   adjustments?: string[];
 }
 
+export interface AgentHandoffAckEvent extends BaseEvent {
+  type: "agent:handoff_ack";
+  fromAgent: string;
+  toAgent: string;
+  validated: boolean;
+  reason?: string;
+  handoffId: string;
+}
+
+export interface AgentFallbackEvent extends BaseEvent {
+  type: "agent:fallback";
+  primaryAgent: string;
+  fallbackTarget: string;
+  fallbackType: "agent" | "tool" | "cache";
+  reason: string;
+  attempt: number;
+}
+
+export interface AgentRetryEvent extends BaseEvent {
+  type: "agent:retry";
+  agent: string;
+  attempt: number;
+  maxAttempts: number;
+  delayMs: number;
+  errorType: string;
+}
+
 /**
  * Tool lifecycle events
  */
@@ -263,6 +290,9 @@ export type GordonEvent =
   | AgentStartedEvent
   | AgentCompletedEvent
   | AgentHandoffEvent
+  | AgentHandoffAckEvent
+  | AgentFallbackEvent
+  | AgentRetryEvent
   | AgentMessageProcessedEvent
   | AgentStreamCompletedEvent
   | AgentStreamChunkEvent

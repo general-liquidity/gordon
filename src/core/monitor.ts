@@ -20,6 +20,8 @@ import {
   BinanceWebSocket,
   type TickerUpdate,
 } from "../infra/binance/websocket.ts";
+import { cleanupExpiredPlans } from "./executor.ts";
+import { getTrailingStopTracker } from "./trailing-stop.ts";
 
 const logger = createModuleLogger("monitor");
 
@@ -51,9 +53,21 @@ export interface Alert {
   data: Record<string, unknown>;
 }
 
+export interface TrailingStopUpdate {
+  tradeId: string;
+  updated: boolean;
+  previousStop: number;
+  newStop: number;
+  highestPrice: number;
+  shouldTrigger: boolean;
+  currentPrice: number;
+}
+
 export interface MonitorResult {
   updates: MonitorUpdate[];
   alerts: Alert[];
+  trailingStopUpdates: TrailingStopUpdate[];
+  expiredPlansCleanedUp: number;
   timestamp: string;
 }
 
@@ -68,6 +82,7 @@ const VOLUME_SPIKE_MULTIPLIER = 3;
 const FLASH_CRASH_THRESHOLD_PERCENT = 5;
 const VOLUME_AVERAGE_PERIODS = 20;
 const GRID_REVERSAL_THRESHOLD = 0.01; // 1% reversal triggers deferred TP placement
+const GRID_TP_MIN_FILL_PERCENT = 0.2; // At least 20% of grid must be filled before placing TPs
 
 // ============================================================================
 // Utility Functions (duplicated from executor for independence)
@@ -145,7 +160,14 @@ export async function runMonitorCycle(
     }
   }
 
-  // 3. Check for market anomalies
+  // 3. Process grid take profit placements
+  try {
+    await processGridTakeProfits(client, alerts);
+  } catch (error) {
+    logger.error("Grid TP processing error", error as Error);
+  }
+
+  // 4. Check for market anomalies
   for (const symbol of symbolsToCheck) {
     try {
       const anomalyAlerts = await checkMarketAnomalies(client, symbol);
@@ -155,14 +177,87 @@ export async function runMonitorCycle(
     }
   }
 
+  // 5. Update trailing stops
+  const trailingStopUpdates: TrailingStopUpdate[] = [];
+  try {
+    const tracker = getTrailingStopTracker();
+    const tsResults = await tracker.updateAllTrailingStops(client);
+
+    for (const [tradeId, result] of tsResults) {
+      trailingStopUpdates.push({
+        tradeId,
+        updated: result.updated,
+        previousStop: result.previousStopPrice,
+        newStop: result.newStopPrice,
+        highestPrice: result.highestPrice,
+        shouldTrigger: result.shouldTrigger,
+        currentPrice: result.currentPrice,
+      });
+
+      // Execute trailing stop if triggered
+      if (result.shouldTrigger) {
+        logger.warn("Executing trailing stop", { tradeId });
+        const execResult = await tracker.executeTrailingStop(client, tradeId);
+
+        if (execResult.success) {
+          alerts.push({
+            type: "order_filled",
+            tradeId,
+            message: `Trailing stop executed for trade ${tradeId}. PnL: $${execResult.pnl?.toFixed(2)}`,
+            severity: "warning",
+            data: {
+              action: "TRAILING_STOP_EXECUTED",
+              pnl: execResult.pnl,
+            },
+          });
+        } else {
+          alerts.push({
+            type: "order_filled",
+            tradeId,
+            message: `Failed to execute trailing stop: ${execResult.error}`,
+            severity: "critical",
+            data: {
+              action: "TRAILING_STOP_FAILED",
+              error: execResult.error,
+            },
+          });
+        }
+      }
+    }
+
+    if (trailingStopUpdates.length > 0) {
+      logger.debug("Trailing stops updated", {
+        count: trailingStopUpdates.length,
+        triggered: trailingStopUpdates.filter((u) => u.shouldTrigger).length,
+      });
+    }
+  } catch (error) {
+    logger.error("Trailing stop update error", error as Error);
+  }
+
+  // 6. Cleanup expired plans
+  let expiredPlansCleanedUp = 0;
+  try {
+    expiredPlansCleanedUp = cleanupExpiredPlans();
+    if (expiredPlansCleanedUp > 0) {
+      logger.info("Expired plans cleaned up", { count: expiredPlansCleanedUp });
+    }
+  } catch (error) {
+    logger.error("Expired plan cleanup error", error as Error);
+  }
+
   logger.debug("Monitor cycle complete", {
     updates: updates.length,
     alerts: alerts.length,
+    trailingStopUpdates: trailingStopUpdates.length,
+    expiredPlansCleanedUp,
   });
 
   return {
     updates,
     alerts,
+    trailingStopUpdates,
+    expiredPlansCleanedUp,
     timestamp,
   };
 }
@@ -797,6 +892,447 @@ async function placeDeferredTakeProfits(
       totalQuantity,
       unplacedQuantity: totalQuantity - placedQuantity,
     });
+  }
+}
+
+// ============================================================================
+// Grid Take Profit Placement
+// ============================================================================
+
+/**
+ * Result of grid TP placement operation
+ */
+export interface GridTPPlacementResult {
+  success: boolean;
+  placedCount: number;
+  failedCount: number;
+  skippedReason?: string;
+  alerts: Alert[];
+}
+
+/**
+ * Information about which grid levels have been filled
+ */
+interface GridLevelStatus {
+  levelIndex: number;
+  price: number;
+  isFilled: boolean;
+  fillQuantity: number;
+  fillTime?: string;
+}
+
+/**
+ * Place Grid Take Profit orders for a trade
+ *
+ * This function handles the placement of take profit orders for grid entry trades.
+ * It is designed to be called during the monitor cycle and handles:
+ * - Detecting grid trades without TP orders
+ * - Calculating TP price based on grid configuration and average entry
+ * - Placing limit sell orders at each TP level
+ * - Tracking which grid levels have been filled
+ * - Handling partial fills of grid entries
+ *
+ * @param trade - The trade to place TPs for
+ * @param binance - Authenticated Binance client
+ * @returns GridTPPlacementResult with status and any alerts generated
+ */
+export async function placeGridTakeProfits(
+  trade: Trade,
+  binance: BinanceClient
+): Promise<GridTPPlacementResult> {
+  const alerts: Alert[] = [];
+
+  // Get the plan for this trade
+  const plan = getPlan(trade.planId);
+  if (!plan) {
+    logger.warn("Cannot place grid TPs - plan not found", { tradeId: trade.id, planId: trade.planId });
+    return {
+      success: false,
+      placedCount: 0,
+      failedCount: 0,
+      skippedReason: "Plan not found",
+      alerts,
+    };
+  }
+
+  // Verify this is a grid entry trade
+  if (plan.strategy !== "grid_entry" || !plan.grid) {
+    return {
+      success: false,
+      placedCount: 0,
+      failedCount: 0,
+      skippedReason: "Not a grid entry trade",
+      alerts,
+    };
+  }
+
+  // Skip if trade is already closed
+  if (trade.status === "CLOSED") {
+    return {
+      success: false,
+      placedCount: 0,
+      failedCount: 0,
+      skippedReason: "Trade is closed",
+      alerts,
+    };
+  }
+
+  // Check if any grid entries have filled
+  if (trade.entries.length === 0) {
+    logger.debug("No grid entries filled yet", { tradeId: trade.id });
+    return {
+      success: false,
+      placedCount: 0,
+      failedCount: 0,
+      skippedReason: "No grid entries filled yet",
+      alerts,
+    };
+  }
+
+  try {
+    // Get current price and open orders
+    const currentPrice = await binance.getPrice(trade.symbol);
+    const openOrders = await binance.getOpenOrders(trade.symbol);
+
+    // Check if TP orders already exist
+    const existingTpOrders = openOrders.filter(o =>
+      o.side === "SELL" && o.type === "LIMIT"
+    );
+
+    if (existingTpOrders.length > 0) {
+      logger.debug("Grid TPs already placed", {
+        tradeId: trade.id,
+        existingTpCount: existingTpOrders.length
+      });
+      return {
+        success: true,
+        placedCount: 0,
+        failedCount: 0,
+        skippedReason: "TP orders already exist",
+        alerts,
+      };
+    }
+
+    // Check if any exits have already occurred (partial TP fills)
+    if (trade.exits.length > 0) {
+      const tpExits = trade.exits.filter(e => e.reason.startsWith("TP"));
+      if (tpExits.length > 0) {
+        logger.debug("Trade already has TP exits", {
+          tradeId: trade.id,
+          tpExitCount: tpExits.length
+        });
+        return {
+          success: true,
+          placedCount: 0,
+          failedCount: 0,
+          skippedReason: "TPs already partially filled",
+          alerts,
+        };
+      }
+    }
+
+    // Analyze grid fill status
+    const gridLevels = plan.grid.levels;
+    const filledLevelPrices = new Set(trade.entries.map(e => e.price));
+    const gridLevelStatus: GridLevelStatus[] = gridLevels.map((level, index) => {
+      const matchingEntry = trade.entries.find(e => e.price === level.price);
+      return {
+        levelIndex: index + 1,
+        price: level.price,
+        isFilled: filledLevelPrices.has(level.price),
+        fillQuantity: matchingEntry?.quantity ?? 0,
+        fillTime: matchingEntry?.filledAt,
+      };
+    });
+
+    const filledLevels = gridLevelStatus.filter(l => l.isFilled);
+    const totalLevels = gridLevels.length;
+    const fillPercent = filledLevels.length / totalLevels;
+
+    logger.debug("Grid fill status", {
+      tradeId: trade.id,
+      filledLevels: filledLevels.length,
+      totalLevels,
+      fillPercent: (fillPercent * 100).toFixed(1) + "%",
+    });
+
+    // Determine if we should place TPs
+    const allLevelsFilled = filledLevels.length >= totalLevels;
+
+    // Find the highest filled level price for reversal detection
+    const highestFilledPrice = Math.max(...trade.entries.map(e => e.price));
+    const reversalThreshold = highestFilledPrice * (1 + GRID_REVERSAL_THRESHOLD);
+    const priceReversed = currentPrice >= reversalThreshold;
+
+    // Check minimum fill threshold (at least 20% of grid should be filled)
+    const minFillThresholdMet = fillPercent >= GRID_TP_MIN_FILL_PERCENT;
+
+    // Determine if conditions are met for TP placement
+    const shouldPlaceTPs = allLevelsFilled || (priceReversed && minFillThresholdMet);
+
+    if (!shouldPlaceTPs) {
+      const reason = !minFillThresholdMet
+        ? `Insufficient fills (${(fillPercent * 100).toFixed(0)}% < ${GRID_TP_MIN_FILL_PERCENT * 100}% required)`
+        : `Waiting for all levels or price reversal (current: ${currentPrice.toFixed(4)}, reversal at: ${reversalThreshold.toFixed(4)})`;
+
+      logger.debug("Conditions not met for grid TP placement", {
+        tradeId: trade.id,
+        allLevelsFilled,
+        priceReversed,
+        minFillThresholdMet,
+        currentPrice,
+        reversalThreshold,
+      });
+
+      return {
+        success: false,
+        placedCount: 0,
+        failedCount: 0,
+        skippedReason: reason,
+        alerts,
+      };
+    }
+
+    // Calculate total quantity from filled entries
+    const totalQuantity = trade.entries.reduce((sum, e) => sum + e.quantity, 0);
+
+    if (totalQuantity <= 0) {
+      return {
+        success: false,
+        placedCount: 0,
+        failedCount: 0,
+        skippedReason: "No quantity to place TPs for",
+        alerts,
+      };
+    }
+
+    logger.info("Placing grid take profit orders", {
+      tradeId: trade.id,
+      symbol: trade.symbol,
+      reason: allLevelsFilled ? "all_levels_filled" : "price_reversal",
+      filledLevels: filledLevels.length,
+      totalLevels,
+      totalQuantity,
+      averageEntry: trade.averageEntry,
+      currentPrice,
+    });
+
+    // Place TP orders
+    let placedCount = 0;
+    let failedCount = 0;
+    let remainingQuantity = totalQuantity;
+
+    for (let i = 0; i < plan.takeProfit.length; i++) {
+      const tp = plan.takeProfit[i];
+      if (!tp) continue;
+
+      const isLastTP = i === plan.takeProfit.length - 1;
+
+      // Calculate quantity for this TP level
+      // For the last TP, use whatever quantity remains
+      const tpQuantity = isLastTP
+        ? roundQuantity(remainingQuantity)
+        : roundQuantity(totalQuantity * tp.percentToSell);
+
+      if (tpQuantity <= 0) {
+        logger.debug("Skipping TP level - no quantity", { level: i + 1 });
+        continue;
+      }
+
+      remainingQuantity = roundQuantity(remainingQuantity - tpQuantity);
+
+      const tpOrderParams: OrderParams = {
+        symbol: trade.symbol,
+        side: "SELL",
+        type: "LIMIT",
+        quantity: tpQuantity,
+        price: roundPrice(tp.price),
+        timeInForce: "GTC",
+        newClientOrderId: generateClientOrderId(trade.planId, `grid_tp${i + 1}`),
+      };
+
+      try {
+        const tpOrder = await binance.placeOrder(tpOrderParams);
+        placedCount++;
+
+        logger.info("Grid TP order placed", {
+          tradeId: trade.id,
+          level: i + 1,
+          orderId: tpOrder.orderId,
+          price: tp.price,
+          quantity: tpQuantity,
+          percentToSell: tp.percentToSell * 100,
+        });
+
+        logEvent({
+          type: "ORDER_PLACED",
+          data: {
+            action: `GRID_TP_${i + 1}`,
+            orderId: tpOrder.orderId.toString(),
+            symbol: trade.symbol,
+            side: "SELL",
+            type: "LIMIT",
+            price: tp.price,
+            quantity: tpQuantity,
+            gridLevelsFilled: filledLevels.length,
+            totalGridLevels: totalLevels,
+            placementReason: allLevelsFilled ? "all_levels_filled" : "price_reversal",
+          },
+          tradeId: trade.id,
+          planId: trade.planId,
+        });
+
+        alerts.push({
+          type: "order_filled",
+          tradeId: trade.id,
+          message: `${trade.symbol}: Grid TP${i + 1} order placed at ${tp.price}`,
+          severity: "info",
+          data: {
+            orderType: `GRID_TP_${i + 1}`,
+            price: tp.price,
+            quantity: tpQuantity,
+            orderId: tpOrder.orderId.toString(),
+          },
+        });
+
+      } catch (error) {
+        failedCount++;
+        const errorMessage = error instanceof Error ? error.message : "Unknown error";
+
+        logger.error("Failed to place grid TP order", error as Error, {
+          tradeId: trade.id,
+          level: i + 1,
+          params: tpOrderParams,
+        });
+
+        logEvent({
+          type: "ERROR",
+          data: {
+            action: "GRID_TP_FAILED",
+            tpLevel: i + 1,
+            params: tpOrderParams,
+            error: errorMessage,
+          },
+          tradeId: trade.id,
+          planId: trade.planId,
+        });
+
+        alerts.push({
+          type: "order_filled",
+          tradeId: trade.id,
+          message: `${trade.symbol}: Failed to place grid TP${i + 1}: ${errorMessage}`,
+          severity: "warning",
+          data: {
+            orderType: `GRID_TP_${i + 1}`,
+            error: errorMessage,
+          },
+        });
+      }
+    }
+
+    // Log summary
+    const success = placedCount > 0 && failedCount === 0;
+
+    if (placedCount > 0) {
+      logger.info("Grid TP placement complete", {
+        tradeId: trade.id,
+        symbol: trade.symbol,
+        placedCount,
+        failedCount,
+        success,
+      });
+
+      alerts.push({
+        type: "order_filled",
+        tradeId: trade.id,
+        message: `${trade.symbol}: Grid TPs placed (${placedCount}/${plan.takeProfit.length}) - ${allLevelsFilled ? "all levels filled" : "price reversal detected"}`,
+        severity: "info",
+        data: {
+          placedCount,
+          failedCount,
+          reason: allLevelsFilled ? "all_levels_filled" : "price_reversal",
+          filledGridLevels: filledLevels.length,
+          totalGridLevels: totalLevels,
+        },
+      });
+    }
+
+    return {
+      success,
+      placedCount,
+      failedCount,
+      alerts,
+    };
+
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+
+    logger.error("Error in placeGridTakeProfits", error as Error, {
+      tradeId: trade.id,
+      symbol: trade.symbol,
+    });
+
+    return {
+      success: false,
+      placedCount: 0,
+      failedCount: 0,
+      skippedReason: `Error: ${errorMessage}`,
+      alerts,
+    };
+  }
+}
+
+/**
+ * Process all grid trades and place TPs where needed
+ * Called from runMonitorCycle
+ */
+async function processGridTakeProfits(
+  client: BinanceClient,
+  alerts: Alert[]
+): Promise<void> {
+  // Get all active trades
+  const openTrades = listTrades({ status: "OPEN" });
+  const partialTrades = listTrades({ status: "PARTIAL" });
+  const allActiveTrades = [...openTrades, ...partialTrades];
+
+  // Filter to grid trades only
+  const gridTrades: Trade[] = [];
+  for (const trade of allActiveTrades) {
+    const plan = getPlan(trade.planId);
+    if (plan?.strategy === "grid_entry" && plan.grid) {
+      gridTrades.push(trade);
+    }
+  }
+
+  if (gridTrades.length === 0) {
+    return;
+  }
+
+  logger.debug("Processing grid TPs", { gridTradeCount: gridTrades.length });
+
+  for (const trade of gridTrades) {
+    try {
+      const result = await placeGridTakeProfits(trade, client);
+
+      // Add any alerts from the placement
+      alerts.push(...result.alerts);
+
+      if (result.placedCount > 0) {
+        logger.info("Grid TPs placed for trade", {
+          tradeId: trade.id,
+          placedCount: result.placedCount,
+        });
+      } else if (result.skippedReason) {
+        logger.debug("Grid TP placement skipped", {
+          tradeId: trade.id,
+          reason: result.skippedReason,
+        });
+      }
+    } catch (error) {
+      logger.error("Error processing grid TPs for trade", error as Error, {
+        tradeId: trade.id,
+      });
+    }
   }
 }
 
