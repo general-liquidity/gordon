@@ -160,10 +160,10 @@ export function calculateStochasticRSI(
   }
 
   // Get current values
-  const currentK = kValues[kValues.length - 1];
-  const currentD = dValues[dValues.length - 1];
-  const prevK = kValues[kValues.length - 2];
-  const prevD = dValues[dValues.length - 2];
+  const currentK = kValues[kValues.length - 1] ?? null;
+  const currentD = dValues[dValues.length - 1] ?? null;
+  const prevK = kValues[kValues.length - 2] ?? null;
+  const prevD = dValues[dValues.length - 2] ?? null;
 
   // Determine signal
   let signal: "oversold" | "neutral" | "overbought" = "neutral";

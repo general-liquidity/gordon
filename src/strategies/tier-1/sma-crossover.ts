@@ -251,7 +251,7 @@ export class SMACrossoverStrategy extends BaseStrategy {
    *
    * Additionally checks SMA alignment for trend confirmation.
    */
-  generateSignal(
+  override generateSignal(
     bar: OHLC,
     _index: number,
     _data: OHLC[],
@@ -313,7 +313,7 @@ export class SMACrossoverStrategy extends BaseStrategy {
   /**
    * Get required indicators for backtesting.
    */
-  getRequiredIndicators(): string[] {
+  override getRequiredIndicators(): string[] {
     return [
       "sma50",
       "sma200",

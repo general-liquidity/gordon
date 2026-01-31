@@ -465,7 +465,6 @@ export function shouldEnhanceTool(
   toolName: string,
   enhancement: keyof typeof TOOL_ENHANCEMENT_CATEGORIES
 ): boolean {
-  return TOOL_ENHANCEMENT_CATEGORIES[enhancement].includes(
-    toolName as (typeof TOOL_ENHANCEMENT_CATEGORIES)[typeof enhancement][number]
-  );
+  const category = TOOL_ENHANCEMENT_CATEGORIES[enhancement] as readonly string[];
+  return category.includes(toolName);
 }

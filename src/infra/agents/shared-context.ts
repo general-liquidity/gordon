@@ -823,6 +823,9 @@ export const readSharedContextTool = createTool({
         }
         const ctx = versioned.data;
         const bt = ctx.lastBacktest;
+        if (!bt) {
+          return { found: false, reason: "No backtest data in context" };
+        }
         const result: Record<string, unknown> = {
           found: true,
           context: ctx,
@@ -964,7 +967,7 @@ export const writeSharedContextTool = createTool({
   inputSchema: z.object({
     contextType: z.enum(["analysis", "scanner", "backtest", "planner"]),
     symbol: z.string().optional(),
-    data: z.record(z.any()).describe("Context data to store"),
+    data: z.record(z.string(), z.any()).describe("Context data to store"),
   }),
   outputSchema: z.object({
     success: z.boolean(),

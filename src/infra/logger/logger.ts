@@ -222,10 +222,23 @@ export class Logger {
 
   /**
    * Log an error message
+   * @param message - The log message
+   * @param errorOrContext - Either an Error object or a context object
+   * @param context - Additional context (only if second arg is Error)
    */
-  error(message: string, error?: Error | GordonError, context?: Record<string, unknown>): void {
+  error(
+    message: string,
+    errorOrContext?: Error | GordonError | Record<string, unknown>,
+    context?: Record<string, unknown>
+  ): void {
     if (this.shouldLog("error")) {
-      this.write(this.createEntry("error", message, context, error));
+      // Check if second arg is an Error instance or a plain context object
+      if (errorOrContext instanceof Error) {
+        this.write(this.createEntry("error", message, context, errorOrContext));
+      } else {
+        // It's a context object
+        this.write(this.createEntry("error", message, errorOrContext));
+      }
     }
   }
 

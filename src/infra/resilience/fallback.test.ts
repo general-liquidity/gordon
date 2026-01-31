@@ -2,7 +2,7 @@
  * Tests for Resilience Patterns
  */
 
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, mock } from "bun:test";
 import {
   withRetry,
   withFallback,
@@ -14,7 +14,7 @@ import {
 
 describe("withRetry", () => {
   it("should return result on first success", async () => {
-    const fn = vi.fn().mockResolvedValue("success");
+    const fn = mock(() => Promise.resolve("success"));
     const result = await withRetry(fn, 3, 10);
 
     expect(result).toBe("success");
@@ -22,11 +22,14 @@ describe("withRetry", () => {
   });
 
   it("should retry on failure and succeed", async () => {
-    const fn = vi
-      .fn()
-      .mockRejectedValueOnce(new Error("fail"))
-      .mockRejectedValueOnce(new Error("fail"))
-      .mockResolvedValue("success");
+    let callCount = 0;
+    const fn = mock(() => {
+      callCount++;
+      if (callCount < 3) {
+        return Promise.reject(new Error("fail"));
+      }
+      return Promise.resolve("success");
+    });
 
     const result = await withRetry(fn, 3, 10);
 
@@ -35,17 +38,21 @@ describe("withRetry", () => {
   });
 
   it("should throw after max retries", async () => {
-    const fn = vi.fn().mockRejectedValue(new Error("always fails"));
+    const fn = mock(() => Promise.reject(new Error("always fails")));
 
     await expect(withRetry(fn, 2, 10)).rejects.toThrow("always fails");
     expect(fn).toHaveBeenCalledTimes(3); // initial + 2 retries
   });
 
   it("should apply exponential backoff", async () => {
-    const fn = vi
-      .fn()
-      .mockRejectedValueOnce(new Error("fail"))
-      .mockResolvedValue("success");
+    let callCount = 0;
+    const fn = mock(() => {
+      callCount++;
+      if (callCount < 2) {
+        return Promise.reject(new Error("fail"));
+      }
+      return Promise.resolve("success");
+    });
 
     const start = Date.now();
     await withRetry(fn, 3, 50);
@@ -186,7 +193,7 @@ describe("withFallback", () => {
   });
 
   it("should return fresh data on success", async () => {
-    const fn = vi.fn().mockResolvedValue("fresh data");
+    const fn = mock(() => Promise.resolve("fresh data"));
 
     const result = await withFallback(fn, "test-key-1", {
       maxRetries: 0,
@@ -198,7 +205,7 @@ describe("withFallback", () => {
   });
 
   it("should cache successful results", async () => {
-    const fn = vi.fn().mockResolvedValue("cached data");
+    const fn = mock(() => Promise.resolve("cached data"));
 
     // First call
     await withFallback(fn, "test-key-2", { maxRetries: 0 });
@@ -213,13 +220,20 @@ describe("withFallback", () => {
 
   it("should use cached data when API fails", async () => {
     // First successful call to populate cache
-    const fn = vi.fn().mockResolvedValueOnce("cached data");
+    let callCount = 0;
+    const fn = mock(() => {
+      callCount++;
+      if (callCount === 1) {
+        return Promise.resolve("cached data");
+      }
+      return Promise.reject(new Error("fail"));
+    });
+
     await withFallback(fn, "test-key-3-cached", {
       maxRetries: 0,
     });
 
     // Second call fails but should use cached data (fresh or stale)
-    fn.mockRejectedValue(new Error("fail"));
     const result = await withFallback(fn, "test-key-3-cached", {
       maxRetries: 0,
       useStaleOnError: true,
@@ -231,7 +245,7 @@ describe("withFallback", () => {
   });
 
   it("should use fallback value when all else fails", async () => {
-    const fn = vi.fn().mockRejectedValue(new Error("fail"));
+    const fn = mock(() => Promise.reject(new Error("fail")));
 
     const result = await withFallback(fn, "test-key-4", {
       maxRetries: 0,
@@ -244,7 +258,7 @@ describe("withFallback", () => {
   });
 
   it("should throw when no fallback available", async () => {
-    const fn = vi.fn().mockRejectedValue(new Error("no fallback"));
+    const fn = mock(() => Promise.reject(new Error("no fallback")));
 
     await expect(
       withFallback(fn, "test-key-5", {
@@ -255,7 +269,7 @@ describe("withFallback", () => {
   });
 
   it("should respect circuit breaker", async () => {
-    const fn = vi.fn().mockRejectedValue(new Error("fail"));
+    const fn = mock(() => Promise.reject(new Error("fail")));
 
     // Trip the circuit breaker
     for (let i = 0; i < 5; i++) {

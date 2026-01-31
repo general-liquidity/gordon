@@ -5,7 +5,7 @@
  * Handles position management, commission/slippage, and equity tracking.
  */
 
-import type { Strategy } from "../../strategies/types.ts";
+import type { Strategy } from "../strategies/types.ts";
 import type {
   OHLC,
   Signal,
@@ -134,6 +134,7 @@ export class BacktestEngine {
     for (let i = 0; i < data.length; i++) {
       this.currentBarIndex = i;
       const bar = data[i];
+      if (!bar) continue;
       const indicatorState = this.getIndicatorState(i);
 
       // Check for stop loss / take profit hits first (using high/low)
@@ -165,8 +166,10 @@ export class BacktestEngine {
     let finalPositionClosed = false;
     if (this.position && data.length > 0) {
       const lastBar = data[data.length - 1];
-      this.closePosition(lastBar.close, lastBar, "END_OF_BACKTEST");
-      finalPositionClosed = true;
+      if (lastBar) {
+        this.closePosition(lastBar.close, lastBar, "END_OF_BACKTEST");
+        finalPositionClosed = true;
+      }
     }
 
     return this.buildResult(strategy.id, data, finalPositionClosed);
@@ -706,12 +709,16 @@ export class BacktestEngine {
     finalPositionClosed: boolean = false
   ): BacktestEngineResult {
     // Calculate final capital from equity curve
-    const finalCapital = this.equityCurve.length > 0
-      ? this.equityCurve[this.equityCurve.length - 1].equity
+    const lastEquityPoint = this.equityCurve[this.equityCurve.length - 1];
+    const finalCapital = this.equityCurve.length > 0 && lastEquityPoint
+      ? lastEquityPoint.equity
       : this.params.initialCapital;
 
     // Calculate metrics
     const metrics = this.calculateMetrics(finalCapital);
+
+    const firstBar = data[0];
+    const lastBar = data[data.length - 1];
 
     return {
       strategyId,
@@ -720,8 +727,8 @@ export class BacktestEngine {
       trades: this.trades,
       equityCurve: this.equityCurve,
       finalCapital,
-      startDate: data.length > 0 ? data[0].timestamp : 0,
-      endDate: data.length > 0 ? data[data.length - 1].timestamp : 0,
+      startDate: firstBar?.timestamp ?? 0,
+      endDate: lastBar?.timestamp ?? 0,
       totalBars: data.length,
       finalPositionClosed,
     };

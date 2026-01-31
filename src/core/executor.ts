@@ -1785,7 +1785,9 @@ export async function closePartialPosition(
   });
 
   await emitEvent("trade:partial_close", {
+    tradeId: trade.id,
     trade: { ...trade, exits: updatedExits, realizedPnl: totalRealizedPnl, status: newStatus },
+    symbol: trade.symbol,
     reason,
     closedQuantity: executedQuantity,
     remainingQuantity: newRemainingQuantity,

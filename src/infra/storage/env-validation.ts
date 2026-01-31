@@ -98,7 +98,7 @@ export function validateApiKey(
 
   const result = schema.safeParse(trimmed);
   if (!result.success) {
-    return { valid: false, error: result.error.errors[0]?.message || "Invalid format" };
+    return { valid: false, error: result.error.issues[0]?.message || "Invalid format" };
   }
 
   return { valid: true };

@@ -164,9 +164,9 @@ export async function checkToolAccess(
     });
 
     await emitEvent("access_control:warning", {
+      message: `Armed mode expiring in ${minutesRemaining} minutes`,
       toolName,
       warning: "armed_expiring_soon",
-      minutesRemaining,
     });
   }
 

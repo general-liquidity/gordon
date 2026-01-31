@@ -143,6 +143,7 @@ function findMigrationPath(
         compareVersions(a.fromVersion, b.fromVersion)
       );
       const migration = availableMigrations[0];
+      if (!migration) break;
       path.push(migration);
       currentVersion = migration.toVersion;
     } else {

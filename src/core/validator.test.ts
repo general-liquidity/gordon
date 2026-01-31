@@ -263,6 +263,7 @@ describe("validatePlan - Risk Validation", () => {
         cashReservePercent: 0.2,
         defaultTimeframes: ["1h", "4h"],
         topNCoins: 50,
+        maxConcurrentTrades: 5,
       },
     });
     const portfolio = createMockPortfolio({ totalValue: 10000 });
@@ -282,6 +283,7 @@ describe("validatePlan - Risk Validation", () => {
         cashReservePercent: 0.2,
         defaultTimeframes: ["1h", "4h"],
         topNCoins: 50,
+        maxConcurrentTrades: 5,
       },
     });
     const portfolio = createMockPortfolio({
@@ -372,6 +374,7 @@ describe("validatePlan - Warnings", () => {
         cashReservePercent: 0.1,
         defaultTimeframes: ["1h", "4h"],
         topNCoins: 50,
+        maxConcurrentTrades: 5,
       },
     });
     const portfolio = createMockPortfolio({ totalValue: 10000 });
@@ -403,6 +406,7 @@ describe("validatePlan - grid_entry", () => {
       cashReservePercent: 0.1,
       defaultTimeframes: ["1h", "4h"],
       topNCoins: 50,
+      maxConcurrentTrades: 5,
     },
   });
   const mockPortfolio = createMockPortfolio();

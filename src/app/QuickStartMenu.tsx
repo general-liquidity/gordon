@@ -48,7 +48,7 @@ export const QuickStartMenu: React.FC<QuickStartMenuProps> = ({
       <Box marginBottom={1}>
         <Select
           options={menuOptions}
-          onChange={(value) => onSelect(value)}
+          onChange={(value) => onSelect(value as MenuOption)}
         />
       </Box>
 

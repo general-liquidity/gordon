@@ -23,11 +23,11 @@ import type { MastraExecutionContext } from "./types.ts";
 /**
  * Validation rule definition
  */
-export interface ValidationRule<T = unknown> {
+export interface ValidationRule {
   /** Field name to validate */
   field: string;
-  /** Validation function */
-  validate: (value: T) => boolean;
+  /** Validation function - receives unknown value, should do its own type checking */
+  validate: (value: unknown) => boolean;
   /** Error message if validation fails */
   message: string;
   /** Whether field is required */
@@ -217,7 +217,7 @@ export function isIntegerInRange(value: unknown, min: number, max: number): bool
 /**
  * Common validation rules that can be reused across tools
  */
-export const commonValidationRules = {
+export const commonValidationRules: Record<string, ValidationRule> = {
   /**
    * Symbol must be a valid trading pair
    */
@@ -227,7 +227,7 @@ export const commonValidationRules = {
     message:
       "Invalid trading symbol. Must be a base currency (e.g., 'BTC', 'ETH') or trading pair (e.g., 'BTCUSDT', 'ETHBTC').",
     required: true,
-  } as ValidationRule<string>,
+  },
 
   /**
    * Symbol must end with a valid quote currency
@@ -238,7 +238,7 @@ export const commonValidationRules = {
     message:
       "Invalid trading pair format. Must end with a valid quote currency (USDT, BTC, ETH, BNB, etc.).",
     required: true,
-  } as ValidationRule<string>,
+  },
 
   /**
    * Amount must be positive
@@ -248,27 +248,27 @@ export const commonValidationRules = {
     validate: isValidAmount,
     message: "Amount must be a positive number greater than 0.",
     required: false,
-  } as ValidationRule<number>,
+  },
 
   /**
    * Allocation percent (0-1)
    */
   allocationPercent: {
     field: "allocationPercent",
-    validate: (v: number) => isValidPercentage(v, true),
+    validate: (v: unknown) => typeof v === "number" && isValidPercentage(v, true),
     message: "Allocation percent must be between 0 and 1 (e.g., 0.1 for 10%).",
     required: false,
-  } as ValidationRule<number>,
+  },
 
   /**
    * Percentage (0-100)
    */
   percentageWhole: {
     field: "percent",
-    validate: (v: number) => isValidPercentage(v, false),
+    validate: (v: unknown) => typeof v === "number" && isValidPercentage(v, false),
     message: "Percentage must be between 0 and 100.",
     required: false,
-  } as ValidationRule<number>,
+  },
 
   /**
    * Timeframe validation
@@ -279,18 +279,18 @@ export const commonValidationRules = {
     message:
       "Invalid timeframe. Valid options: 1m, 3m, 5m, 15m, 30m, 1h, 2h, 4h, 6h, 8h, 12h, 1d, 3d, 1w, 1M.",
     required: false,
-  } as ValidationRule<string>,
+  },
 
   /**
    * Timeframes array validation
    */
   timeframes: {
     field: "timeframes",
-    validate: (v: string[]) => Array.isArray(v) && v.every(isValidTimeframe),
+    validate: (v: unknown) => Array.isArray(v) && v.every(isValidTimeframe),
     message:
       "Invalid timeframes. Each must be one of: 1m, 3m, 5m, 15m, 30m, 1h, 2h, 4h, 6h, 8h, 12h, 1d, 3d, 1w, 1M.",
     required: false,
-  } as ValidationRule<string[]>,
+  },
 
   /**
    * Risk level validation
@@ -300,87 +300,87 @@ export const commonValidationRules = {
     validate: isValidRiskLevel,
     message: "Invalid risk level. Must be 'low', 'medium', or 'high'.",
     required: false,
-  } as ValidationRule<string>,
+  },
 
   /**
    * Days validation (1-365)
    */
   days: {
     field: "days",
-    validate: (v: number) => isIntegerInRange(v, 1, 365),
+    validate: (v: unknown) => typeof v === "number" && isIntegerInRange(v, 1, 365),
     message: "Days must be an integer between 1 and 365.",
     required: false,
-  } as ValidationRule<number>,
+  },
 
   /**
    * Days back validation (1-30)
    */
   daysBack: {
     field: "daysBack",
-    validate: (v: number) => isIntegerInRange(v, 1, 30),
+    validate: (v: unknown) => typeof v === "number" && isIntegerInRange(v, 1, 30),
     message: "Days back must be an integer between 1 and 30.",
     required: false,
-  } as ValidationRule<number>,
+  },
 
   /**
    * Limit validation (1-100)
    */
   limit: {
     field: "limit",
-    validate: (v: number) => isIntegerInRange(v, 1, 100),
+    validate: (v: unknown) => typeof v === "number" && isIntegerInRange(v, 1, 100),
     message: "Limit must be an integer between 1 and 100.",
     required: false,
-  } as ValidationRule<number>,
+  },
 
   /**
    * Top N validation (10-200)
    */
   topN: {
     field: "topN",
-    validate: (v: number) => isIntegerInRange(v, 10, 200),
+    validate: (v: unknown) => typeof v === "number" && isIntegerInRange(v, 10, 200),
     message: "Top N must be an integer between 10 and 200.",
     required: false,
-  } as ValidationRule<number>,
+  },
 
   /**
    * Confidence validation (0-1)
    */
   confidence: {
     field: "minConfidence",
-    validate: (v: number) => isValidPercentage(v, true),
+    validate: (v: unknown) => typeof v === "number" && isValidPercentage(v, true),
     message: "Confidence must be between 0 and 1.",
     required: false,
-  } as ValidationRule<number>,
+  },
 
   /**
    * Initial capital validation ($100 - $10,000,000)
    */
   initialCapital: {
     field: "initialCapital",
-    validate: (v: number) => isAmountInRange(v, 100, 10_000_000),
+    validate: (v: unknown) => typeof v === "number" && isAmountInRange(v, 100, 10_000_000),
     message: "Initial capital must be between $100 and $10,000,000.",
     required: false,
-  } as ValidationRule<number>,
+  },
 
   /**
    * Commission rate validation (0-0.05)
    */
   commission: {
     field: "commission",
-    validate: (v: number) => isAmountInRange(v, 0, 0.05),
+    validate: (v: unknown) => typeof v === "number" && isAmountInRange(v, 0, 0.05),
     message: "Commission rate must be between 0 and 0.05 (5%).",
     required: false,
-  } as ValidationRule<number>,
+  },
 
   /**
    * Grid levels validation (3-7)
    */
   gridLevels: {
     field: "numLevels",
-    validate: (v: number) => isIntegerInRange(v, 3, 7),
+    validate: (v: unknown) => typeof v === "number" && isIntegerInRange(v, 3, 7),
     message: "Number of grid levels must be between 3 and 7.",
     required: false,
-  } as ValidationRule<number>,
+  },
 
   /**
    * Date string validation
@@ -390,7 +390,7 @@ export const commonValidationRules = {
     validate: isValidDateString,
     message: "Invalid date format. Use ISO format (e.g., '2024-01-15').",
     required: false,
-  } as ValidationRule<string>,
+  },
 };
 
 // ============================================================================
@@ -476,12 +476,12 @@ export function validateToolInput(
  * );
  * ```
  */
-export function createValidationRule<T>(
+export function createValidationRule(
   field: string,
-  validate: (value: T) => boolean,
+  validate: (value: unknown) => boolean,
   message: string,
   required = false
-): ValidationRule<T> {
+): ValidationRule {
   return { field, validate, message, required };
 }
 
@@ -538,65 +538,65 @@ export function withValidation<TInput extends Record<string, unknown>, TOutput>(
 export const TOOL_VALIDATION_CONFIG: Record<string, ToolValidationConfig> = {
   // Market analysis tools
   scan_market: {
-    rules: [commonValidationRules.topN, commonValidationRules.timeframes],
+    rules: [commonValidationRules.topN!, commonValidationRules.timeframes!],
   },
   analyze_coin: {
-    rules: [commonValidationRules.symbol, commonValidationRules.timeframes],
+    rules: [commonValidationRules.symbol!, commonValidationRules.timeframes!],
   },
 
   // Trading tools
   create_plan: {
     rules: [
-      commonValidationRules.symbol,
-      commonValidationRules.riskLevel,
-      commonValidationRules.allocationPercent,
+      commonValidationRules.symbol!,
+      commonValidationRules.riskLevel!,
+      commonValidationRules.allocationPercent!,
     ],
   },
   create_grid_plan: {
     rules: [
-      commonValidationRules.symbol,
-      commonValidationRules.amount,
-      commonValidationRules.gridLevels,
+      commonValidationRules.symbol!,
+      commonValidationRules.amount!,
+      commonValidationRules.gridLevels!,
     ],
   },
 
   // Backtest tools
   run_backtest: {
     rules: [
-      commonValidationRules.symbol,
-      commonValidationRules.timeframe,
-      commonValidationRules.days,
-      commonValidationRules.initialCapital,
-      commonValidationRules.commission,
+      commonValidationRules.symbol!,
+      commonValidationRules.timeframe!,
+      commonValidationRules.days!,
+      commonValidationRules.initialCapital!,
+      commonValidationRules.commission!,
     ],
   },
   optimize_strategy: {
-    rules: [commonValidationRules.symbol, commonValidationRules.timeframe],
+    rules: [commonValidationRules.symbol!, commonValidationRules.timeframe!],
   },
   compare_backtests: {
-    rules: [commonValidationRules.symbol, commonValidationRules.timeframe],
+    rules: [commonValidationRules.symbol!, commonValidationRules.timeframe!],
   },
 
   // History tools
   get_trade_history: {
-    rules: [{ ...commonValidationRules.symbol, required: false }, commonValidationRules.limit],
+    rules: [{ ...commonValidationRules.symbol!, required: false }, commonValidationRules.limit!],
   },
   get_historical_opportunities: {
-    rules: [commonValidationRules.daysBack, commonValidationRules.confidence],
+    rules: [commonValidationRules.daysBack!, commonValidationRules.confidence!],
   },
 
   // Technical analysis tools
   get_rsi: {
-    rules: [commonValidationRules.symbol, commonValidationRules.timeframe],
+    rules: [commonValidationRules.symbol!, commonValidationRules.timeframe!],
   },
   get_macd: {
-    rules: [commonValidationRules.symbol, commonValidationRules.timeframe],
+    rules: [commonValidationRules.symbol!, commonValidationRules.timeframe!],
   },
   get_bollinger_bands: {
-    rules: [commonValidationRules.symbol, commonValidationRules.timeframe],
+    rules: [commonValidationRules.symbol!, commonValidationRules.timeframe!],
   },
   get_technical_analysis: {
-    rules: [commonValidationRules.symbol, commonValidationRules.timeframes],
+    rules: [commonValidationRules.symbol!, commonValidationRules.timeframes!],
   },
 };
 

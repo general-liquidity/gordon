@@ -84,7 +84,7 @@ export function calculateRSI(closes: number[], period: number = 14): RSIResult {
     result.push(rsi);
   }
 
-  const current = result[result.length - 1];
+  const current = result[result.length - 1] ?? null;
 
   // Determine signal and action
   let signal: "oversold" | "neutral" | "overbought" = "neutral";

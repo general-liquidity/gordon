@@ -18,7 +18,7 @@ import {
   ExitConditionChecker,
   DrawdownTracker,
 } from "../../../core/risk-management/index.ts";
-import { getGordonContext, type MastraExecutionContext } from "../types.ts";
+import { getGordonContext, type MastraExecutionContext } from "./types.ts";
 
 // ============================================================================
 // Kelly Criterion Position Sizing Tool

@@ -278,7 +278,7 @@ export function formatOptimizationResult(result: OptimizationResult): string {
 
   const top5 = topCombinations.slice(0, 5);
   for (const combo of top5) {
-    const paramValues = paramNames.map((name) => formatNumber(combo.parameters[name], 2));
+    const paramValues = paramNames.map((name) => formatNumber(combo.parameters[name] ?? 0, 2));
     const row = [
       `#${combo.rank}`,
       ...paramValues,

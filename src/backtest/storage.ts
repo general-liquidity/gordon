@@ -358,7 +358,7 @@ export function loadBacktestResultByKey(key: BacktestKey): BacktestResult | null
       SELECT * FROM backtest_results
       WHERE strategy_id = ? AND symbol = ? AND start_date = ? AND end_date = ?
     `;
-    const params: (string | undefined)[] = [key.strategyId, key.symbol, startDate, endDate];
+    const params: string[] = [key.strategyId, key.symbol, startDate, endDate];
 
     if (key.timeframe) {
       sql += " AND timeframe = ?";
@@ -367,7 +367,7 @@ export function loadBacktestResultByKey(key: BacktestKey): BacktestResult | null
 
     sql += " ORDER BY created_at DESC LIMIT 1";
 
-    const query = db.prepare<BacktestResultRow, (string | undefined)[]>(sql);
+    const query = db.prepare<BacktestResultRow, string[]>(sql);
     const row = query.get(...params);
 
     if (!row) {

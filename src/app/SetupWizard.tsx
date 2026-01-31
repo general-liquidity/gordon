@@ -53,6 +53,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
       maxAllocationPerTrade: 0.1,
       defaultTimeframes: ["1h", "4h"],
       topNCoins: 50,
+      maxConcurrentTrades: 5,
     },
     inputValue: "",
     isValidating: false,

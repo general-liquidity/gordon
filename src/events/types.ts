@@ -101,9 +101,20 @@ export interface TradeUpdatedEvent extends BaseEvent {
 export interface TradeClosedEvent extends BaseEvent {
   type: "trade:closed";
   trade: Trade;
-  reason: "MANUAL" | "STOP" | "TP1" | "TP2" | "TP3";
+  reason: "MANUAL" | "STOP" | "TP1" | "TP2" | "TP3" | "TRAILING_STOP";
   pnl: number;
   pnlPercent: number;
+}
+
+export interface TradePartialCloseEvent extends BaseEvent {
+  type: "trade:partial_close";
+  tradeId: string;
+  trade?: Trade;
+  symbol: string;
+  closedQuantity: number;
+  remainingQuantity: number;
+  pnl: number;
+  reason: string;
 }
 
 /**
@@ -124,6 +135,7 @@ export interface StopLossApproachingEvent extends BaseEvent {
   currentPrice: number;
   stopPrice: number;
   distance: number; // percentage
+  realtime?: boolean;
 }
 
 export interface TakeProfitHitEvent extends BaseEvent {
@@ -132,6 +144,17 @@ export interface TakeProfitHitEvent extends BaseEvent {
   symbol: string;
   level: 1 | 2 | 3;
   price: number;
+}
+
+export interface StopTriggeredEvent extends BaseEvent {
+  type: "alert:stop_triggered";
+  tradeId: string;
+  symbol: string;
+  currentPrice?: number;
+  stopPrice: number;
+  exitPrice?: number;
+  pnl?: number;
+  realtime?: boolean;
 }
 
 /**
@@ -263,6 +286,75 @@ export interface GuardrailBlockedEvent extends BaseEvent {
   length?: number;
 }
 
+export interface GuardrailInputBlockedEvent extends BaseEvent {
+  type: "guardrail:input_blocked";
+  reason: string;
+  pattern?: string;
+  description?: string;
+  length?: number;
+  severity?: "low" | "medium" | "high" | "critical";
+}
+
+export interface GuardrailOutputSanitizedEvent extends BaseEvent {
+  type: "guardrail:output_sanitized";
+  patterns: string[];
+  sanitizedLength: number;
+  reason?: string;
+  patternType?: string;
+}
+
+/**
+ * Access control events
+ */
+export interface AccessControlDeniedEvent extends BaseEvent {
+  type: "access_control:denied";
+  reason: string;
+  tool?: string;
+  toolName?: string;
+  userId?: string;
+  mode?: "SAFE" | "ARMED";
+  armedUntil?: string;
+}
+
+export interface AccessControlWarningEvent extends BaseEvent {
+  type: "access_control:warning";
+  message: string;
+  tool?: string;
+  toolName?: string;
+  warning?: string;
+}
+
+/**
+ * Scheduler events
+ */
+export interface SchedulerStartedEvent extends BaseEvent {
+  type: "scheduler:started";
+  intervalMinutes?: number;
+  intervalMs?: number;
+  config?: {
+    intervalMinutes?: number;
+    universeFilter?: string;
+  };
+}
+
+export interface SchedulerStoppedEvent extends BaseEvent {
+  type: "scheduler:stopped";
+}
+
+export interface SchedulerScanCompletedEvent extends BaseEvent {
+  type: "scheduler:scan_completed";
+  coinsScanned?: number;
+  opportunitiesFound?: number;
+  scanNumber?: number;
+  opportunities?: number;
+}
+
+export interface SchedulerScanFailedEvent extends BaseEvent {
+  type: "scheduler:scan_failed";
+  error: string;
+  scanNumber?: number;
+}
+
 /**
  * Union type of all events
  */
@@ -281,8 +373,10 @@ export type GordonEvent =
   | TradeOpenedEvent
   | TradeUpdatedEvent
   | TradeClosedEvent
+  | TradePartialCloseEvent
   | PriceAlertEvent
   | StopLossApproachingEvent
+  | StopTriggeredEvent
   | TakeProfitHitEvent
   | ScanStartedEvent
   | ScanCompletedEvent
@@ -300,7 +394,15 @@ export type GordonEvent =
   | AgentReflectionEvent
   | ToolStartedEvent
   | ToolCompletedEvent
-  | GuardrailBlockedEvent;
+  | GuardrailBlockedEvent
+  | GuardrailInputBlockedEvent
+  | GuardrailOutputSanitizedEvent
+  | AccessControlDeniedEvent
+  | AccessControlWarningEvent
+  | SchedulerStartedEvent
+  | SchedulerStoppedEvent
+  | SchedulerScanCompletedEvent
+  | SchedulerScanFailedEvent;
 
 /**
  * Extract event type string

@@ -74,7 +74,9 @@ function parseBackupFilename(filename: string): { date: Date; type: "manual" | "
   if (!match) return null;
 
   const type = match[1] as "manual" | "auto";
-  const timestampStr = match[2].replace(/-/g, (_, index) => {
+  const matchedTimestamp = match[2];
+  if (!matchedTimestamp) return null;
+  const timestampStr = matchedTimestamp.replace(/-/g, (_, index) => {
     // Convert back to ISO format: first 2 dashes stay, rest become colons or dots
     if (index < 10) return "-";
     if (index === 13 || index === 16) return ":";
@@ -199,7 +201,7 @@ export async function listBackups(): Promise<BackupInfo[]> {
  */
 export async function getLatestBackup(): Promise<BackupInfo | null> {
   const backups = await listBackups();
-  return backups.length > 0 ? backups[0] : null;
+  return backups[0] ?? null;
 }
 
 /**
@@ -319,10 +321,10 @@ export async function pruneOldBackups(
     const isOverMax = backups.length - toDelete.length > config.maxBackups;
 
     // Check if backup is older than retention period
-    const isExpired = backup.date < cutoffDate;
+    const isExpired = backup && backup.date < cutoffDate;
 
     // Delete if over max OR expired (but respect minBackups)
-    if (isOverMax || isExpired) {
+    if (backup && (isOverMax || isExpired)) {
       // Skip the most recent backups even if expired
       if (i < config.minBackups) {
         continue;
@@ -333,17 +335,17 @@ export async function pruneOldBackups(
 
   // Delete the identified backups
   let deleted = 0;
-  for (const backup of toDelete) {
+  for (const backupToDelete of toDelete) {
     try {
-      await unlink(backup.path);
+      await unlink(backupToDelete.path);
       deleted++;
       logger.debug("Pruned old backup", {
-        filename: backup.filename,
-        age: Math.floor((now.getTime() - backup.date.getTime()) / (24 * 60 * 60 * 1000)),
+        filename: backupToDelete.filename,
+        age: Math.floor((now.getTime() - backupToDelete.date.getTime()) / (24 * 60 * 60 * 1000)),
       });
     } catch (error) {
       logger.warn("Failed to prune backup", {
-        path: backup.path,
+        path: backupToDelete.path,
         error: error instanceof Error ? error.message : String(error),
       });
     }
@@ -443,11 +445,14 @@ export async function getBackupStats(): Promise<{
   const autoBackups = backups.filter((b) => b.type === "auto").length;
   const manualBackups = backups.filter((b) => b.type === "manual").length;
 
+  const oldestBackup = backups[backups.length - 1];
+  const newestBackup = backups[0];
+
   return {
     totalBackups: backups.length,
     totalSizeBytes,
-    oldestBackup: backups[backups.length - 1].date,
-    newestBackup: backups[0].date,
+    oldestBackup: oldestBackup?.date ?? new Date(),
+    newestBackup: newestBackup?.date ?? new Date(),
     autoBackups,
     manualBackups,
   };
@@ -470,7 +475,7 @@ export async function verifyBackup(backupPath: string): Promise<boolean> {
     db.close();
 
     // Check for expected tables
-    const tableNames = tables.map((t: { name: string }) => t.name);
+    const tableNames = tables.map((t) => (t as { name: string }).name);
     const expectedTables = ["plans", "trades", "events"];
     const hasExpectedTables = expectedTables.every((t) => tableNames.includes(t));
 

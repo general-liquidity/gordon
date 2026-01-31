@@ -33,6 +33,8 @@ export interface EnvKeys {
   DEDALUS_API_KEY?: string;
   BINANCE_API_KEY?: string;
   BINANCE_API_SECRET?: string;
+  GORDON_PROVIDER?: string;
+  GORDON_MODEL?: string;
 }
 
 export interface EnvStatus {

@@ -87,11 +87,12 @@ export function calculateBollingerBands(
   }
 
   // Get current values
-  const currentUpper = upper[upper.length - 1];
-  const currentMiddle = middle[middle.length - 1];
-  const currentLower = lower[lower.length - 1];
-  const currentBandwidth = bandwidth[bandwidth.length - 1];
-  const price = currentPrice ?? closes[closes.length - 1]!;
+  const currentUpper = upper[upper.length - 1] ?? null;
+  const currentMiddle = middle[middle.length - 1] ?? null;
+  const currentLower = lower[lower.length - 1] ?? null;
+  const currentBandwidth = bandwidth[bandwidth.length - 1] ?? null;
+  const lastClose = closes[closes.length - 1];
+  const price = currentPrice ?? (lastClose ?? 0);
 
   // Determine position within bands
   let position: "above_upper" | "upper" | "middle" | "lower" | "below_lower" = "middle";

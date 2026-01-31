@@ -230,6 +230,26 @@ export interface BacktestMetrics {
 
   /** Maximum drawdown duration in days */
   maxDrawdownDuration: number;
+
+  // Engine-specific extended metrics (optional)
+  /** Total gross profit from winning trades */
+  grossProfit?: number;
+  /** Total gross loss from losing trades */
+  grossLoss?: number;
+  /** Largest single winning trade */
+  largestWin?: number;
+  /** Largest single losing trade */
+  largestLoss?: number;
+  /** Average holding period in hours */
+  avgHoldingPeriod?: number;
+  /** Average holding period for winning trades */
+  avgWinHoldingPeriod?: number;
+  /** Average holding period for losing trades */
+  avgLossHoldingPeriod?: number;
+  /** Total commission paid */
+  totalCommission?: number;
+  /** Commission as percentage of initial capital */
+  commissionPct?: number;
 }
 
 // ============================================================================

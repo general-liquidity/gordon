@@ -12,9 +12,17 @@
 
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
-import asciichart from "asciichart";
 
-import { getGordonContext, MastraExecutionContext } from "./types.ts";
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const asciichart = require("asciichart") as {
+  plot: (series: number[] | number[][], options?: Record<string, unknown>) => string;
+  green: string;
+  red: string;
+  blue: string;
+  yellow: string;
+};
+
+import { getGordonContext, type MastraExecutionContext } from "./types.ts";
 
 // ============================================================================
 // Error Messages

@@ -128,7 +128,9 @@ export function calculateMaxDrawdown(equityCurve: EquityPoint[]): number {
   }
 
   let maxDrawdown = 0;
-  let peak = equityCurve[0].equity;
+  const firstPoint = equityCurve[0];
+  if (!firstPoint) return 0;
+  let peak = firstPoint.equity;
 
   for (const point of equityCurve) {
     if (point.equity > peak) {
@@ -564,8 +566,11 @@ function calculateDailyReturns(equityCurve: EquityPoint[]): number[] {
   const returns: number[] = [];
 
   for (let i = 1; i < equityCurve.length; i++) {
-    const prevEquity = equityCurve[i - 1].equity;
-    const currEquity = equityCurve[i].equity;
+    const prevPoint = equityCurve[i - 1];
+    const currPoint = equityCurve[i];
+    if (!prevPoint || !currPoint) continue;
+    const prevEquity = prevPoint.equity;
+    const currEquity = currPoint.equity;
 
     if (prevEquity > 0) {
       returns.push((currEquity - prevEquity) / prevEquity);
@@ -610,8 +615,10 @@ function calculateMaxDrawdownDuration(equityCurve: EquityPoint[]): number {
   }
 
   let maxDuration = 0;
-  let peak = equityCurve[0].equity;
-  let peakTimestamp = equityCurve[0].timestamp;
+  const firstPoint = equityCurve[0];
+  if (!firstPoint) return 0;
+  let peak = firstPoint.equity;
+  let peakTimestamp = firstPoint.timestamp;
 
   for (const point of equityCurve) {
     if (point.equity >= peak) {
@@ -633,7 +640,7 @@ function calculateMaxDrawdownDuration(equityCurve: EquityPoint[]): number {
 
   // Check if we ended in a drawdown
   const lastPoint = equityCurve[equityCurve.length - 1];
-  if (lastPoint.equity < peak) {
+  if (lastPoint && lastPoint.equity < peak) {
     const finalDuration = lastPoint.timestamp - peakTimestamp;
     if (finalDuration > maxDuration) {
       maxDuration = finalDuration;
@@ -666,9 +673,9 @@ export function calculateMetricsFromTrades(
   params: BacktestParams
 ): BacktestMetrics {
   const initialCapital = params.initialCapital;
-  const finalCapital = equityCurve.length > 0
-    ? equityCurve[equityCurve.length - 1].equity
-    : initialCapital;
+  const lastEquityPoint = equityCurve[equityCurve.length - 1];
+  const firstEquityPoint = equityCurve[0];
+  const finalCapital = lastEquityPoint?.equity ?? initialCapital;
 
   // Convert extended equity curve to basic format for existing functions
   const basicEquityCurve: EquityPoint[] = equityCurve.map(e => ({
@@ -677,8 +684,8 @@ export function calculateMetricsFromTrades(
   }));
 
   // Calculate days from equity curve
-  const days = equityCurve.length > 1
-    ? (equityCurve[equityCurve.length - 1].timestamp - equityCurve[0].timestamp) / (1000 * 60 * 60 * 24)
+  const days = equityCurve.length > 1 && lastEquityPoint && firstEquityPoint
+    ? (lastEquityPoint.timestamp - firstEquityPoint.timestamp) / (1000 * 60 * 60 * 24)
     : 1;
 
   // Convert engine Trade to ClosedTrade format
@@ -746,7 +753,9 @@ function calculateMaxDrawdownDurationBars(equityCurve: EquityPointExtended[]): n
 
   let maxDuration = 0;
   let currentDuration = 0;
-  let peak = equityCurve[0].equity;
+  const firstPoint = equityCurve[0];
+  if (!firstPoint) return 0;
+  let peak = firstPoint.equity;
 
   for (const point of equityCurve) {
     if (point.equity >= peak) {

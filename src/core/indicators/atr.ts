@@ -82,8 +82,9 @@ export function calculateATR(
     atrValues.push(atr);
   }
 
-  const currentATR = atrValues[atrValues.length - 1];
-  const price = currentPrice ?? candles[candles.length - 1]!.close;
+  const currentATR = atrValues[atrValues.length - 1] ?? null;
+  const lastCandle = candles[candles.length - 1];
+  const price = currentPrice ?? (lastCandle?.close ?? 0);
 
   // Calculate stop-loss levels
   const stopDistance = currentATR !== null ? currentATR * atrMultiplier : 0;

@@ -1198,7 +1198,7 @@ export class BinanceClient {
   ): Promise<BinanceEarnRedemption> {
     return this.signedRequest<BinanceEarnRedemption>("POST", "/sapi/v1/simple-earn/flexible/redeem", {
       productId,
-      redeemAll: options?.redeemAll ?? false,
+      redeemAll: (options?.redeemAll ?? false) ? "true" : "false",
       amount: options?.amount,
       destAccount: options?.destAccount ?? "SPOT",
     });

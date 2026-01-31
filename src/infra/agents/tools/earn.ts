@@ -13,7 +13,7 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
-import { getGordonContext, MastraExecutionContext } from "./types.ts";
+import { getGordonContext, type MastraExecutionContext } from "./types.ts";
 
 // ============================================================================
 // Error Messages
@@ -211,6 +211,16 @@ export const getAllEarnPositionsTool = createTool({
         };
       }
 
+      // Transform totalValue to expected format
+      const totalValue = Array.isArray(result.totalValue)
+        ? result.totalValue.reduce((acc: { flexible?: string; locked?: string; total?: string }, item: { asset?: string; amount?: number }) => {
+            if (item.asset === "flexible") acc.flexible = String(item.amount ?? 0);
+            else if (item.asset === "locked") acc.locked = String(item.amount ?? 0);
+            else if (item.asset === "total") acc.total = String(item.amount ?? 0);
+            return acc;
+          }, {})
+        : result.totalValue;
+
       return {
         flexible: result.flexible.map((p) => ({
           asset: p.asset,
@@ -227,7 +237,7 @@ export const getAllEarnPositionsTool = createTool({
           redeemDate: p.redeemDate,
           autoRenew: p.isAutoRenew,
         })),
-        totalValue: result.totalValue,
+        totalValue,
       };
     } catch (error) {
       return { error: `Failed to get earn positions: ${(error as Error).message}` };

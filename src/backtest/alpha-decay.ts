@@ -61,7 +61,8 @@ export function analyzeAlphaDecay(
 
   let maxTolerableDelay: number | null = null;
   for (let i = 0; i < decayRates.length; i++) {
-    if (decayRates[i] < 10) {
+    const rate = decayRates[i];
+    if (rate !== undefined && rate < 10) {
       maxTolerableDelay = delays[i] ?? null;
     } else {
       break;
@@ -89,7 +90,7 @@ export function analyzeAlphaDecay(
     summary: {
       baselinePerformance: baselineValue,
       worstPerformance,
-      worstDelay: delays[worstIndex] ?? delays[0]!,
+      worstDelay: delays[worstIndex] ?? delays[0] ?? 0,
       maxDecayPercent: decayRates.length > 0 ? Math.max(...decayRates) : 0,
     },
   };

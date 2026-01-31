@@ -13,7 +13,7 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
-import { getGordonContext, MastraExecutionContext } from "./types.ts";
+import { getGordonContext, type MastraExecutionContext } from "./types.ts";
 import { explain, getPresetExplanation } from "../../../core/explainer.ts";
 
 // ============================================================================

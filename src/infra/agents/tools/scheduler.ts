@@ -18,7 +18,7 @@ import {
   stopScheduler,
   getSchedulerStatus,
 } from "../../../core/scheduler.ts";
-import { getGordonContext, MastraExecutionContext } from "./types.ts";
+import { getGordonContext, type MastraExecutionContext } from "./types.ts";
 
 // ============================================================================
 // Error Messages
@@ -58,8 +58,8 @@ export const startSchedulerTool = createTool({
       .describe("Minimum confidence to report opportunities (0.3-0.9)"),
   }),
   outputSchema: z.object({
-    success: z.boolean(),
-    message: z.string(),
+    success: z.boolean().optional(),
+    message: z.string().optional(),
     status: z.object({
       isRunning: z.boolean(),
       intervalMs: z.number().optional(),

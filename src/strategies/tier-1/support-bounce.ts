@@ -299,7 +299,7 @@ export class SupportBounceStrategy extends BaseStrategy {
    * - Price hits resistance
    * - RSI > 70 (overbought)
    */
-  generateSignal(
+  override generateSignal(
     bar: OHLC,
     _index: number,
     _data: OHLC[],
@@ -355,7 +355,7 @@ export class SupportBounceStrategy extends BaseStrategy {
   /**
    * Get required indicators for backtesting.
    */
-  getRequiredIndicators(): string[] {
+  override getRequiredIndicators(): string[] {
     return [
       "rsi14",
       "atr14",

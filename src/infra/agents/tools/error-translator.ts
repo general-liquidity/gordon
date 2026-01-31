@@ -457,7 +457,7 @@ export function isBinanceApiError(error: unknown): error is BinanceApiError {
  * @returns Translated error with context
  */
 export function translateBinanceError(code: number, originalMessage?: string): TranslatedError {
-  const errorInfo = BINANCE_ERROR_MESSAGES[code.toString() as keyof typeof BINANCE_ERROR_MESSAGES];
+  const errorInfo = BINANCE_ERROR_MESSAGES[code.toString() as unknown as keyof typeof BINANCE_ERROR_MESSAGES];
 
   if (errorInfo) {
     return {

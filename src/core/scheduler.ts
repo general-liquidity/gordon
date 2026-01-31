@@ -97,7 +97,6 @@ async function runScheduledScan(): Promise<CoinAnalysis[]> {
     await emitEvent("scheduler:scan_completed", {
       scanNumber: state.scanCount,
       opportunitiesFound: opportunities.length,
-      timestamp: state.lastScanTime.toISOString(),
     });
 
     // Call callbacks
@@ -119,7 +118,6 @@ async function runScheduledScan(): Promise<CoinAnalysis[]> {
     logger.error("Scheduled scan failed", error as Error);
     await emitEvent("scheduler:scan_failed", {
       error: (error as Error).message,
-      timestamp: new Date().toISOString(),
     });
     return [];
   }
@@ -161,7 +159,6 @@ export function startScheduler(
 
   emitEvent("scheduler:started", {
     intervalMs: currentConfig.intervalMs,
-    config: currentConfig.scanOptions,
   }).catch(() => {});
 }
 

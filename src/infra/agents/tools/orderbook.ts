@@ -46,19 +46,19 @@ export const getOrderBookTool = createTool({
     limit: z.number().min(5).max(100).default(20).describe("Number of price levels to show"),
   }),
   outputSchema: z.object({
-    symbol: z.string(),
+    symbol: z.string().optional(),
     spread: z.object({
       value: z.string(),
       percent: z.string(),
       bestBid: z.number(),
       bestAsk: z.number(),
-    }),
+    }).optional(),
     liquidity: z.object({
       bidDepth: z.string(),
       askDepth: z.string(),
       ratio: z.string(),
       imbalance: z.string(),
-    }),
+    }).optional(),
     walls: z.object({
       largestBid: z.object({
         price: z.number().optional(),
@@ -68,17 +68,17 @@ export const getOrderBookTool = createTool({
         price: z.number().optional(),
         quantity: z.number().optional(),
       }),
-    }),
+    }).optional(),
     topBids: z.array(z.object({
       price: z.number(),
       quantity: z.number(),
       total: z.number(),
-    })),
+    })).optional(),
     topAsks: z.array(z.object({
       price: z.number(),
       quantity: z.number(),
       total: z.number(),
-    })),
+    })).optional(),
     error: z.string().optional(),
   }),
   execute: async ({ symbol, limit }, execContext: MastraExecutionContext) => {
@@ -497,7 +497,7 @@ export const testOrderTool = createTool({
     price: z.number().default(0).describe("Price (required for LIMIT orders, use 0 for MARKET)"),
   }),
   outputSchema: z.object({
-    valid: z.boolean(),
+    valid: z.boolean().optional(),
     message: z.string().optional(),
     orderDetails: z.object({
       symbol: z.string(),
@@ -511,7 +511,7 @@ export const testOrderTool = createTool({
   execute: async ({ symbol, side, type, quantity, price }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
     if (!ctx?.binance) {
-      return errors.noBinance;
+      return { ...errors.noBinance, valid: false };
     }
 
     const normalizedSymbol = symbol.toUpperCase().endsWith("USDT")

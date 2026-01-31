@@ -8,7 +8,23 @@
  */
 
 import type { BinanceClient } from "../infra/binance/client.ts";
-import type { Order, OrderStatus } from "../infra/binance/types.ts";
+import type { OrderStatus } from "../infra/binance/types.ts";
+
+// Order type for recovery operations
+interface Order {
+  orderId: number;
+  clientOrderId: string;
+  symbol: string;
+  side: "BUY" | "SELL";
+  type: string;
+  status: OrderStatus;
+  price: string;
+  origQty: string;
+  executedQty: string;
+  cummulativeQuoteQty: string;
+  time: number;
+  updateTime: number;
+}
 import { createModuleLogger } from "../infra/logger/index.ts";
 
 const logger = createModuleLogger("order-recovery");
@@ -95,7 +111,7 @@ export async function scanForOrphanedOrders(
           price: parseFloat(order.price),
           origQty: parseFloat(order.origQty),
           executedQty: parseFloat(order.executedQty),
-          time: order.time,
+          time: order.time ?? Date.now(),
           reason: "no_trade_record",
         });
       }
@@ -147,7 +163,7 @@ export async function cancelOrphanedOrder(
   orderId: number
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    await client.cancelOrder(symbol, orderId);
+    await client.cancelOrder(symbol, String(orderId));
     logger.info("Cancelled orphaned order", { symbol, orderId });
     return { success: true };
   } catch (error) {

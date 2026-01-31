@@ -14,7 +14,7 @@ import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
 import { runMonitorCycle, type MonitorResult } from "../../../core/monitor.ts";
-import { getGordonContext, validateToolOutput, MastraExecutionContext } from "./types.ts";
+import { getGordonContext, validateToolOutput, type MastraExecutionContext } from "./types.ts";
 
 // ============================================================================
 // Error Messages

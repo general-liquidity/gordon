@@ -13,7 +13,7 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
-import { getGordonContext, MastraExecutionContext } from "./types.ts";
+import { getGordonContext, type MastraExecutionContext } from "./types.ts";
 
 // ============================================================================
 // Error Messages
@@ -37,7 +37,7 @@ export const getDustableAssetsTool = createTool({
     "Use when user asks to 'clean up small balances', 'convert dust', or 'what can I convert to BNB'.",
   inputSchema: z.object({}),
   outputSchema: z.object({
-    message: z.string(),
+    message: z.string().optional(),
     totalBNB: z.string().optional(),
     assets: z.array(
       z.object({
@@ -45,7 +45,7 @@ export const getDustableAssetsTool = createTool({
         amount: z.string(),
         bnbValue: z.string(),
       })
-    ),
+    ).optional(),
     error: z.string().optional(),
   }),
   execute: async (_input, execContext: MastraExecutionContext) => {

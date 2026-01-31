@@ -163,6 +163,7 @@ export function createMockPreferences(overrides: Partial<Preferences> = {}): Pre
     maxAllocationPerTrade: 0.1,
     defaultTimeframes: ["1h", "4h"],
     topNCoins: 50,
+    maxConcurrentTrades: 5,
     ...overrides,
   };
 }
@@ -174,6 +175,11 @@ export function createMockConfig(overrides: Partial<GordonConfig> = {}): GordonC
   return {
     version: "1.0.0",
     preferences: createMockPreferences(),
+    memoryConfig: {
+      lastMessages: 20,
+      maxSessionDurationHours: 24,
+      memoryWarningThreshold: 0.8,
+    },
     mode: "SAFE",
     armedUntil: null,
     onboardingComplete: false,

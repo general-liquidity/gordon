@@ -48,8 +48,8 @@ export function calculateMACD(
   // Calculate MACD line (fast EMA - slow EMA)
   const macdLine: (number | null)[] = [];
   for (let i = 0; i < closes.length; i++) {
-    const fast = fastEMA.values[i];
-    const slow = slowEMA.values[i];
+    const fast = fastEMA.values[i] ?? null;
+    const slow = slowEMA.values[i] ?? null;
     if (fast !== null && slow !== null) {
       macdLine.push(fast - slow);
     } else {
@@ -76,8 +76,8 @@ export function calculateMACD(
   // Calculate histogram (MACD - Signal)
   const histogram: (number | null)[] = [];
   for (let i = 0; i < macdLine.length; i++) {
-    const m = macdLine[i];
-    const s = signalLine[i];
+    const m = macdLine[i] ?? null;
+    const s = signalLine[i] ?? null;
     if (m !== null && s !== null) {
       histogram.push(m - s);
     } else {
@@ -86,10 +86,10 @@ export function calculateMACD(
   }
 
   // Get current values
-  const currentMacd = macdLine[macdLine.length - 1];
-  const currentSignal = signalLine[signalLine.length - 1];
-  const currentHistogram = histogram[histogram.length - 1];
-  const prevHistogram = histogram[histogram.length - 2];
+  const currentMacd = macdLine[macdLine.length - 1] ?? null;
+  const currentSignal = signalLine[signalLine.length - 1] ?? null;
+  const currentHistogram = histogram[histogram.length - 1] ?? null;
+  const prevHistogram = histogram[histogram.length - 2] ?? null;
 
   // Determine trend
   let trend: "bullish" | "bearish" | "neutral" = "neutral";

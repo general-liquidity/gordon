@@ -14,7 +14,7 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
-import { getGordonContext, MastraExecutionContext } from "./types.ts";
+import { getGordonContext, type MastraExecutionContext } from "./types.ts";
 
 // ============================================================================
 // Error Messages
@@ -442,7 +442,13 @@ export const placeBracketOrderTool = createTool({
       if (!entryOrder || entryOrder.status === "REJECTED") {
         return {
           error: "Entry order was rejected",
-          entryOrder,
+          entryOrder: {
+            orderId: entryOrder?.orderId ?? 0,
+            symbol: entryOrder?.symbol ?? normalizedSymbol,
+            status: entryOrder?.status ?? "REJECTED",
+            executedQty: entryOrder?.executedQty ?? "0",
+            cummulativeQuoteQty: entryOrder?.cummulativeQuoteQty ?? "0",
+          },
         };
       }
 
@@ -453,7 +459,13 @@ export const placeBracketOrderTool = createTool({
       if (filledQty <= 0) {
         return {
           error: "Entry order did not fill",
-          entryOrder,
+          entryOrder: {
+            orderId: entryOrder.orderId,
+            symbol: entryOrder.symbol,
+            status: entryOrder.status,
+            executedQty: entryOrder.executedQty,
+            cummulativeQuoteQty: entryOrder.cummulativeQuoteQty,
+          },
         };
       }
 

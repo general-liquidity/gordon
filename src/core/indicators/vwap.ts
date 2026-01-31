@@ -60,8 +60,9 @@ export function calculateVWAP(
     }
   }
 
-  const currentVWAP = vwapValues[vwapValues.length - 1];
-  const price = currentPrice ?? candles[candles.length - 1]!.close;
+  const currentVWAP = vwapValues[vwapValues.length - 1] ?? null;
+  const lastCandle = candles[candles.length - 1];
+  const price = currentPrice ?? (lastCandle?.close ?? 0);
 
   // Determine price position relative to VWAP
   let pricePosition: "above" | "below" | "at" = "at";

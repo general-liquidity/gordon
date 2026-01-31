@@ -211,7 +211,7 @@ export class BollingerBounceStrategy extends BaseStrategy {
    * - Price touches upper band
    * - Price crosses above middle band (take profit)
    */
-  generateSignal(
+  override generateSignal(
     bar: OHLC,
     _index: number,
     _data: OHLC[],
@@ -276,7 +276,7 @@ export class BollingerBounceStrategy extends BaseStrategy {
   /**
    * Get required indicators for backtesting.
    */
-  getRequiredIndicators(): string[] {
+  override getRequiredIndicators(): string[] {
     return [
       "rsi14",
       "atr14",

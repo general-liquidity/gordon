@@ -274,7 +274,7 @@ function GetStartedStep({ onSelect }: GetStartedStepProps): React.ReactElement {
       <Box marginTop={1}>
         <Select
           options={options}
-          onChange={(value) => onSelect(value)}
+          onChange={(value) => onSelect(value as "setup" | "demo")}
         />
       </Box>
 

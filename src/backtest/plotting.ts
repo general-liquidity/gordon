@@ -2,7 +2,10 @@
  * Backtest Plotting Utilities
  */
 
-import asciichart from "asciichart";
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const asciichart = require("asciichart") as {
+  plot: (series: number[] | number[][], options?: { height?: number; format?: (x: number) => string }) => string;
+};
 import type { OHLC } from "./types.ts";
 
 function downsample(values: number[], maxPoints: number): number[] {

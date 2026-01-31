@@ -197,6 +197,8 @@ export async function checkOutputGuardrails(output: string): Promise<{
         sanitized = sanitized.replace(match, "[REDACTED]");
 
         await emitEvent("guardrail:output_sanitized", {
+          patterns: [pattern.source],
+          sanitizedLength: sanitized.length,
           reason: "sensitive_data",
         });
       }

@@ -92,7 +92,7 @@ function buildProviderList(): ProviderOption[] {
       configured: true,
       viaDedalus: true,
       models: DEDALUS_MODELS.map((m) => ({
-        id: m.id.split("/")[1],
+        id: m.id.split("/")[1] ?? m.id,
         fullId: m.id,
         name: m.name,
         description: getModelDescription(m.id),
