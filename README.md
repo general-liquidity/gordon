@@ -1,11 +1,12 @@
 <p align="center">
 <pre>
- e$$~~\                        \$$$
- d$$$      e$$~-_  $$$-~\  e$$~\$$$  e$$~-_  $$$-~$$e
- $$$$  __ d$$$   i $$$    d$$$  $$$ d$$$   i $$$  $$$
- $$$$   | $$$$   | $$$    $$$$  $$$ $$$$   | $$$  $$$
- Y$$$   | Y$$$   | $$$    Y$$$  $$$ Y$$$   | $$$  $$$
-  "$$__/   "$$_-~  $$$     "$$_/$$$  "$$_-~  $$$  $$$
+  e$$~~\                        \$$$
+░ d$$$      e$$~-_  $$$-~\  e$$~\$$$  e$$~-_  $$$-~$$e ░
+░ $$$$  __ d$$$   i $$$    d$$$  $$$ d$$$   i $$$  $$$ ░
+░ $$$$   | $$$$   | $$$    $$$$  $$$ $$$$   | $$$  $$$ ░
+░ Y$$$   | Y$$$   | $$$    Y$$$  $$$ Y$$$   | $$$  $$$ ░
+░  "$$__/   "$$_-~  $$$     "$$_/$$$  "$$_-~  $$$  $$$ ░
+ ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 </pre>
 </p>
 
@@ -229,9 +230,25 @@ SAFE MODE (default)           ARMED MODE (you enable)
 
 ### Core Platform
 
-- **Multi-Agent Orchestrator** — Mastra-based agent coordination (Scanner, Analyst, Planner, Explainer)
-- **Intent Router** — Natural language → structured trading intent classification
+- **8-Agent Network** — Mastra-based orchestration: Scanner, Analyst, Planner, Executor, Monitor, Teacher, Backtester, Gordon (coordinator)
+- **Agent Handoffs** — Validated transitions between agents with fallback chains and error recovery
+- **Cross-Agent Memory** — Shared context allowing agents to pass analysis, plans, and backtest results
+- **Semantic Memory** — LibSQL Vector for RAG-based recall of past trades and analyses
 - **LLM Client** — Multi-provider support (OpenAI, Anthropic Claude, Google Gemini, Dedalus Labs)
+
+### Security & Middleware
+
+- **Input Guardrails** — Prompt injection detection, dangerous command blocking
+- **Output Sanitization** — Sensitive data filtering in responses
+- **Access Control** — ARMED mode enforcement for trading tools
+- **Rate Limiting** — Per-agent, per-tool rate limits to prevent abuse
+- **Audit Logging** — Comprehensive trail of all sensitive operations
+
+### Observability
+
+- **OpenTelemetry Tracing** — Distributed tracing for agent calls and tool execution
+- **Metrics Collection** — Tool invocation counts, success/failure rates, latency tracking
+- **Request Monitoring** — Per-request performance metrics and error classification
 
 ### Trading Engine
 
@@ -277,12 +294,12 @@ SAFE MODE (default)           ARMED MODE (you enable)
 - **Binance Client** — Full REST API with HMAC signing, rate limiting, circuit breaker
 - **Binance WebSocket** — Real-time price feeds and order updates
 - **SQLite Storage** — Plans, trades, events, audit logs with WAL mode
+- **LibSQL Vector** — Semantic memory and RAG for conversation recall
 - **Service Container** — Dependency injection for clean architecture
 - **Repository Pattern** — Data access layer for trades and plans
 - **Event Bus** — Event-driven architecture for system coordination
-- **Audit Logging** — Comprehensive security audit trail
 - **Caching Layer** — Price and result caching with TTL
-- **Resilience** — Retry logic, fallbacks, error recovery
+- **Resilience** — Retry logic, exponential backoff, circuit breakers, fallback chains
 
 ### User Experience
 
@@ -373,9 +390,12 @@ gordon/
 │   ├── repositories/  # Data access layer
 │   ├── infra/         # Infrastructure
 │   │   ├── agents/        # Mastra multi-agent system
+│   │   │   ├── tools/         # 29 tool modules
+│   │   │   └── middleware/    # Guardrails, access control
 │   │   ├── binance/       # Exchange client + WebSocket
 │   │   ├── llm/           # LLM providers
 │   │   ├── storage/       # SQLite + config
+│   │   ├── observability/ # OpenTelemetry tracing + metrics
 │   │   ├── audit/         # Audit logging
 │   │   └── cache/         # Caching layer
 │   ├── events/        # Event-driven architecture
