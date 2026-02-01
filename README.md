@@ -1,6 +1,6 @@
 <p align="center">
 <pre>
-  e$$~~\                        \$$$
+   e$$~~\                       \$$$
 ░ d$$$      e$$~-_  $$$-~\  e$$~\$$$  e$$~-_  $$$-~$$e ░
 ░ $$$$  __ d$$$   i $$$    d$$$  $$$ d$$$   i $$$  $$$ ░
 ░ $$$$   | $$$$   | $$$    $$$$  $$$ $$$$   | $$$  $$$ ░
@@ -10,7 +10,7 @@
 </pre>
 </p>
 
-<h1 align="center">📈 AI-Powered Vibe Trading for Crypto</h1>
+<h1 align="center">Claude Code for Vibe Trading</h1>
 
 <p align="center">
   <em>Talk naturally. Trade confidently. Sleep peacefully.</em>
