@@ -3,7 +3,7 @@
  * Shows dropdown of matching slash commands with improved filtering and descriptions
  */
 
-import React, { useMemo } from "react";
+import React from "react";
 import { Box, Text } from "ink";
 import { COLORS } from "../theme.ts";
 import type { SlashCommand } from "../slashCommands.ts";
@@ -39,72 +39,6 @@ interface CommandAutocompleteProps {
   showUsage?: boolean;
 }
 
-/**
- * Score a command match based on search term
- * Higher score = better match
- */
-function scoreMatch(cmd: SlashCommand, searchTerm: string): number {
-  const term = searchTerm.toLowerCase();
-  let score = 0;
-
-  // Exact name match (highest priority)
-  if (cmd.name === term) {
-    score += 100;
-  }
-  // Name starts with search term
-  else if (cmd.name.startsWith(term)) {
-    score += 50;
-  }
-  // Name contains search term
-  else if (cmd.name.includes(term)) {
-    score += 25;
-  }
-
-  // Alias matches
-  for (const alias of cmd.aliases) {
-    if (alias === term) {
-      score += 80;
-    } else if (alias.startsWith(term)) {
-      score += 40;
-    } else if (alias.includes(term)) {
-      score += 20;
-    }
-  }
-
-  // Description contains search term (lower priority)
-  if (cmd.description.toLowerCase().includes(term)) {
-    score += 10;
-  }
-
-  return score;
-}
-
-/**
- * Filter and sort commands based on search term
- */
-function filterAndSortCommands(commands: SlashCommand[], searchTerm: string): SlashCommand[] {
-  if (!searchTerm) {
-    // Return all commands, grouped by category
-    return [...commands].sort((a, b) => {
-      // First sort by category
-      const categoryOrder = ["market", "trading", "account", "system"];
-      const catA = categoryOrder.indexOf(a.category);
-      const catB = categoryOrder.indexOf(b.category);
-      if (catA !== catB) return catA - catB;
-      // Then alphabetically
-      return a.name.localeCompare(b.name);
-    });
-  }
-
-  // Score and filter commands
-  const scored = commands
-    .map(cmd => ({ cmd, score: scoreMatch(cmd, searchTerm) }))
-    .filter(({ score }) => score > 0)
-    .sort((a, b) => b.score - a.score);
-
-  return scored.map(({ cmd }) => cmd);
-}
-
 export const CommandAutocomplete: React.FC<CommandAutocompleteProps> = ({
   suggestions,
   selectedIndex,
@@ -116,10 +50,11 @@ export const CommandAutocomplete: React.FC<CommandAutocompleteProps> = ({
   // Extract the search term (after /)
   const searchTerm = inputValue.startsWith("/") ? inputValue.slice(1).toLowerCase().split(/\s+/)[0] || "" : "";
 
-  // Filter and sort suggestions
-  const filteredSuggestions = useMemo(() => {
-    return filterAndSortCommands(suggestions, searchTerm);
-  }, [suggestions, searchTerm]);
+  // Use suggestions directly - DO NOT re-filter or re-sort!
+  // The filtering already happens in getSlashCommandSuggestions() in ChatInput.
+  // Re-sorting here causes a mismatch between displayed order and selectedIndex,
+  // which leads to the wrong command being executed when user presses Enter.
+  const filteredSuggestions = suggestions;
 
   if (filteredSuggestions.length === 0) {
     // Show "no matches" message if user is typing a command

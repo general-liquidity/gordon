@@ -90,3 +90,20 @@ export {
   type ChatSession,
   type ChatSessionSummary,
 } from "./chat-history.ts";
+
+// Session management for Mastra agent memory
+export {
+  loadSessionState,
+  saveSessionState,
+  initializeSession,
+  resumeSession,
+  startNewSession,
+  getCurrentSession,
+  updateThreadId,
+  clearSession,
+  getSessionAge,
+  isSessionStale,
+  generateThreadId,
+  type SessionState,
+  type SessionInfo,
+} from "./session.ts";

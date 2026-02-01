@@ -29,6 +29,14 @@ import {
 import { auditLog } from "../audit/index.ts";
 import { checkPermissionsOnInit } from "../binance/permissions.ts";
 import type { GordonContext } from "./types.ts";
+import {
+  ConversationSummarizer,
+  createSummarizer,
+  createSummarizerConfigFromMemoryConfig,
+  type SummarizerConfig,
+  type SummarizationResult,
+} from "../memory/index.ts";
+import type { Message } from "../llm/types.ts";
 
 // ============================================================================
 // Error Recovery Types & Configuration
@@ -227,6 +235,169 @@ export function generateBacktestCacheKey(
 }
 
 const logger = createModuleLogger("orchestrator");
+
+// ============================================================================
+// Conversation Summarization
+// ============================================================================
+
+/**
+ * Options for message processing with summarization support
+ */
+export interface ProcessingOptions {
+  /**
+   * Enable conversation summarization when message count exceeds threshold
+   * @default false
+   */
+  enableSummarization?: boolean;
+
+  /**
+   * Custom summarizer configuration (overrides defaults)
+   */
+  summarizerConfig?: Partial<SummarizerConfig>;
+
+  /**
+   * Existing conversation history to potentially summarize
+   * If provided, will be checked for summarization before processing
+   */
+  conversationHistory?: Message[];
+}
+
+/**
+ * Extended result including summarization info
+ */
+export interface ProcessingResultWithSummarization {
+  /** The agent's response */
+  response: string;
+  /** Token usage statistics */
+  usage: {
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+  };
+  /** Summarization result if summarization was performed */
+  summarization?: SummarizationResult;
+}
+
+// Singleton summarizer instance (lazy initialized)
+let _summarizer: ConversationSummarizer | null = null;
+
+/**
+ * Get or create the singleton summarizer instance
+ */
+function getSummarizer(context: GordonContext): ConversationSummarizer {
+  if (!_summarizer) {
+    // Create summarizer with config from GordonConfig if available
+    const summarizerConfig = context.config.memoryConfig
+      ? createSummarizerConfigFromMemoryConfig(context.config.memoryConfig)
+      : {};
+
+    _summarizer = createSummarizer(context.llm, summarizerConfig);
+    logger.debug("Created summarizer instance", { config: summarizerConfig });
+  }
+  return _summarizer;
+}
+
+/**
+ * Reset the summarizer instance (for testing or reconfiguration)
+ */
+export function resetSummarizer(): void {
+  _summarizer = null;
+  logger.debug("Summarizer instance reset");
+}
+
+/**
+ * Summarize conversation history if needed
+ *
+ * @param context - Gordon context with LLM client
+ * @param messages - Conversation history to potentially summarize
+ * @param options - Processing options including custom summarizer config
+ * @returns SummarizationResult with original or summarized messages
+ */
+export async function summarizeIfNeeded(
+  context: GordonContext,
+  messages: Message[],
+  options?: ProcessingOptions
+): Promise<SummarizationResult> {
+  // Check if summarization is enabled
+  if (!options?.enableSummarization) {
+    return {
+      summarized: false,
+      messages,
+      messagesSummarized: 0,
+    };
+  }
+
+  const summarizer = getSummarizer(context);
+
+  // Apply custom config if provided
+  if (options.summarizerConfig) {
+    summarizer.updateConfig(options.summarizerConfig);
+  }
+
+  // Check if summarization is needed and perform it
+  if (summarizer.shouldSummarize(messages)) {
+    logger.info("Summarization triggered", {
+      messageCount: messages.length,
+      threshold: summarizer.getConfig().messageThreshold,
+    });
+
+    const result = await summarizer.summarize(messages);
+
+    if (result.summarized) {
+      // Emit event for tracking
+      await emitEvent("memory:summarized", {
+        originalCount: messages.length,
+        newCount: result.messages.length,
+        summarizedCount: result.messagesSummarized,
+      });
+    }
+
+    return result;
+  }
+
+  return {
+    summarized: false,
+    messages,
+    messagesSummarized: 0,
+  };
+}
+
+/**
+ * Check if conversation history needs summarization
+ */
+export function needsSummarization(
+  context: GordonContext,
+  messages: Message[]
+): boolean {
+  const summarizer = getSummarizer(context);
+  return summarizer.shouldSummarize(messages);
+}
+
+/**
+ * Get summarization statistics for current conversation
+ */
+export function getSummarizationStats(
+  context: GordonContext,
+  messages: Message[]
+): {
+  messageCount: number;
+  threshold: number;
+  needsSummarization: boolean;
+  messagesToSummarize: number;
+  messagesToKeep: number;
+} {
+  const summarizer = getSummarizer(context);
+  const config = summarizer.getConfig();
+  const shouldSummarize = summarizer.shouldSummarize(messages);
+
+  return {
+    messageCount: messages.length,
+    threshold: config.messageThreshold,
+    needsSummarization: shouldSummarize,
+    messagesToSummarize: shouldSummarize ? summarizer.getMessagesToSummarizeCount(messages) : 0,
+    messagesToKeep: config.recentMessagesToKeep,
+  };
+}
 
 // ============================================================================
 // Tool-to-Agent Mapping
@@ -554,11 +725,17 @@ export interface StreamEvent {
  *
  * This is the primary way to interact with Gordon - provides real-time feedback
  * as the agent thinks, calls tools, and generates responses.
+ *
+ * @param userMessage - The user's input message
+ * @param context - Gordon's context (binance, llm, config, etc.)
+ * @param threadId - Thread ID for conversation persistence (enables session resume)
+ * @param resourceId - Resource/user ID for memory association (optional, defaults to context.userId)
  */
 export async function* processMessageStream(
   userMessage: string,
   context: GordonContext,
-  threadId?: string
+  threadId?: string,
+  resourceId?: string
 ): AsyncGenerator<StreamEvent, void> {
   const startTime = Date.now();
   logger.debug("Starting streaming message processing", { messageLength: userMessage.length });
@@ -592,10 +769,13 @@ export async function* processMessageStream(
     const tracingOptions = createAgentTracingOptions();
 
     // Use Mastra's stream() method for real-time responses
+    // Pass threadId and resourceId for session continuity and memory association
     // Type assertion needed as Mastra's types don't fully expose all options
+    const effectiveResourceId = resourceId || context.userId || "default";
     const streamResult = await gordonAgent().stream(userMessage, {
       requestContext,
       threadId,
+      resourceId: effectiveResourceId,
       maxSteps: 20,
       ...(tracingOptions && { tracingOptions }),
     } as Record<string, unknown>);
@@ -962,11 +1142,17 @@ export async function* processMessageStream(
  *
  * The network automatically delegates to the most appropriate sub-agent
  * (Scanner, Analyst, Planner, etc.) based on user intent.
+ *
+ * @param userMessage - The user's input message
+ * @param context - Gordon's context (binance, llm, config, etc.)
+ * @param threadId - Thread ID for conversation persistence (enables session resume)
+ * @param resourceId - Resource/user ID for memory association (optional)
  */
 export async function* processWithNetwork(
   userMessage: string,
   context: GordonContext,
-  threadId?: string
+  threadId?: string,
+  resourceId?: string
 ): AsyncGenerator<StreamEvent, void> {
   const startTime = Date.now();
   logger.debug("Starting network processing", { messageLength: userMessage.length });
@@ -990,10 +1176,13 @@ export async function* processWithNetwork(
     const tracingOptions = createAgentTracingOptions();
 
     // Use Agent Network for automatic routing between sub-agents
+    // Pass threadId and resourceId for session continuity and memory association
     // Type assertion needed as Mastra's types don't fully expose all options
+    const effectiveResourceId = resourceId || context.userId || "default";
     const networkResult = await gordonAgent().network(userMessage, {
       requestContext,
       threadId,
+      resourceId: effectiveResourceId,
       maxSteps: 30,
       ...(tracingOptions && { tracingOptions }),
     } as Record<string, unknown>);
@@ -1074,13 +1263,15 @@ export async function* processWithNetwork(
  *
  * @param userMessage - The user's input message
  * @param context - Gordon's context (binance, llm, config, etc.)
- * @param threadId - Thread ID for conversation persistence
+ * @param threadId - Thread ID for conversation persistence (enables session resume)
+ * @param resourceId - Resource/user ID for memory association (optional)
  * @returns The agent's response and usage stats
  */
 export async function processMessage(
   userMessage: string,
   context: GordonContext,
-  threadId?: string
+  threadId?: string,
+  resourceId?: string
 ): Promise<{
   response: string;
   usage: {
@@ -1111,10 +1302,13 @@ export async function processMessage(
     const tracingOptions = createAgentTracingOptions();
 
     // Use generate() for non-streaming responses
+    // Pass threadId and resourceId for session continuity and memory association
     // Type assertion needed for threadId support with Memory
+    const effectiveResourceId = resourceId || context.userId || "default";
     const result = await gordonAgent().generate(userMessage, {
       requestContext,
       threadId,
+      resourceId: effectiveResourceId,
       maxSteps: 20,
       ...(tracingOptions && { tracingOptions }),
     } as Record<string, unknown>);
@@ -1430,7 +1624,312 @@ export async function initializeWithPermissionCheck(context: GordonContext): Pro
 }
 
 // ============================================================================
+// Parallel Execution
+// ============================================================================
+
+// Re-export parallel execution utilities for external use
+export {
+  runParallel,
+  runParallelAgentCalls,
+  runParallelCoinAnalysis,
+  runParallelTimeframeAnalysis,
+  runDeepParallelAnalysis,
+  runMultiCoinParallelAnalysis,
+  createScanAnalyzeWorkflow,
+  createWorkflowStep,
+  // Streaming workflow support
+  createStreamingWorkflow,
+  streamParallelAnalysis,
+  streamMultiCoinAnalysis,
+  createStreamingDeepAnalysis,
+  createStreamingMultiCoinAnalysis,
+  // Stream writers
+  createConsoleWriter,
+  createArrayWriter,
+  createCallbackWriter,
+  createMultiplexWriter,
+  createTransformWriter,
+  ConsoleStreamWriter,
+  ArrayStreamWriter,
+  CallbackStreamWriter,
+  MultiplexStreamWriter,
+  TransformStreamWriter,
+  // Chunk factories
+  createChunk,
+  createProgressChunk,
+  createResultChunk,
+  createErrorChunk,
+  createStartChunk,
+  createEndChunk,
+  createHeartbeatChunk,
+  createStreamingPipeline,
+  // Types
+  type ParallelResult,
+  type ParallelOptions,
+  type AgentCallSpec,
+  type AgentCallResult,
+  type DeepParallelAnalysisResult,
+  type MultiCoinParallelResult,
+  type WorkflowStepDef,
+  type ParallelScanAnalyzeResult,
+  type StreamWriter,
+  type StreamChunk,
+  type StreamingWorkflowOptions,
+  type ProgressData,
+  type ResultData,
+  type AnalysisChunk,
+  type StreamingResult,
+  type StreamingWorkflowResult,
+  type StreamingParallelOptions,
+} from "./parallel.ts";
+
+// ============================================================================
+// Streaming with Pipe Support (Mastra pipeTo Pattern)
+// ============================================================================
+
+/**
+ * Stream chunk type for message processing
+ */
+export interface MessageStreamChunk {
+  type: StreamEvent["type"];
+  content?: string;
+  toolName?: string;
+  toolArgs?: Record<string, unknown>;
+  toolResult?: unknown;
+  agentName?: string;
+  error?: string;
+  usage?: {
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+  };
+}
+
+/**
+ * Process a message with streaming and pipe to a custom writer.
+ *
+ * This implements the Mastra pipeTo(writer) pattern for message processing,
+ * allowing real-time streaming to custom destinations like files, WebSockets,
+ * or other stream consumers.
+ *
+ * @example
+ * ```typescript
+ * // Stream to console for debugging
+ * const consoleWriter = createConsoleWriter("[Gordon]");
+ * await processMessageStreamWithPipe(
+ *   "Analyze BTC",
+ *   context,
+ *   consoleWriter
+ * );
+ *
+ * // Stream to WebSocket
+ * const wsWriter = createCallbackWriter(chunk => ws.send(JSON.stringify(chunk)));
+ * await processMessageStreamWithPipe(
+ *   "Scan market",
+ *   context,
+ *   wsWriter
+ * );
+ *
+ * // Collect chunks in array
+ * const arrayWriter = createArrayWriter<MessageStreamChunk>();
+ * await processMessageStreamWithPipe(
+ *   "Check positions",
+ *   context,
+ *   arrayWriter
+ * );
+ * console.log(arrayWriter.getChunks());
+ * ```
+ *
+ * @param userMessage - The user's input message
+ * @param context - Gordon's context (binance, llm, config, etc.)
+ * @param writer - The stream writer to pipe results to
+ * @param threadId - Thread ID for conversation persistence (optional)
+ * @param resourceId - Resource/user ID for memory association (optional)
+ * @returns StreamingResult with statistics about the operation
+ */
+export async function processMessageStreamWithPipe(
+  userMessage: string,
+  context: GordonContext,
+  writer: StreamWriter<MessageStreamChunk>,
+  threadId?: string,
+  resourceId?: string
+): Promise<StreamingResult<{ response: string; usage: { promptTokens: number; completionTokens: number; totalTokens: number } }>> {
+  const startTime = Date.now();
+  let chunksWritten = 0;
+  let errors = 0;
+  let fullText = "";
+  let finalUsage = { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
+
+  try {
+    // Write start chunk
+    await writer.write(createStartChunk("message-processing") as StreamChunk<MessageStreamChunk>);
+    chunksWritten++;
+
+    // Process message using the existing stream generator
+    const stream = processMessageStream(userMessage, context, threadId, resourceId);
+
+    for await (const event of stream) {
+      // Convert StreamEvent to MessageStreamChunk
+      const chunk: MessageStreamChunk = {
+        type: event.type,
+        content: event.content,
+        toolName: event.toolName,
+        toolArgs: event.toolArgs,
+        toolResult: event.toolResult,
+        agentName: event.agentName,
+        error: event.error,
+        usage: event.usage,
+      };
+
+      // Write the chunk
+      await writer.write(createChunk(
+        event.type === "error" ? "error" : "result",
+        chunk,
+        { source: event.agentName || "Gordon" }
+      ) as StreamChunk<MessageStreamChunk>);
+      chunksWritten++;
+
+      // Track full text and final usage
+      if (event.type === "text_delta" && event.content) {
+        fullText += event.content;
+      }
+
+      if (event.type === "done") {
+        if (event.content) {
+          fullText = event.content;
+        }
+        if (event.usage) {
+          finalUsage = event.usage;
+        }
+      }
+
+      if (event.type === "error") {
+        errors++;
+      }
+    }
+
+    // Write end chunk with summary
+    await writer.write(createEndChunk("message-processing", {
+      responseLength: fullText.length,
+      usage: finalUsage,
+    }) as StreamChunk<MessageStreamChunk>);
+    chunksWritten++;
+
+    await writer.close();
+
+    const duration = Date.now() - startTime;
+
+    logger.debug("Message stream with pipe completed", {
+      duration,
+      chunksWritten,
+      errors,
+      responseLength: fullText.length,
+    });
+
+    return {
+      chunksWritten,
+      errors,
+      duration,
+      summary: {
+        response: fullText,
+        usage: finalUsage,
+      },
+    };
+  } catch (err) {
+    const error = err instanceof Error ? err : new Error(String(err));
+    logger.error("Message stream with pipe failed", error);
+
+    // Write error chunk
+    await writer.write(createErrorChunk(error, "Gordon") as StreamChunk<MessageStreamChunk>);
+    chunksWritten++;
+    errors++;
+
+    if (writer.abort) {
+      await writer.abort(error);
+    } else {
+      await writer.close();
+    }
+
+    return {
+      chunksWritten,
+      errors,
+      duration: Date.now() - startTime,
+    };
+  }
+}
+
+/**
+ * Create a streaming workflow from the message stream.
+ *
+ * Returns an object that can be piped to any StreamWriter, following
+ * the Mastra pipeTo(writer) pattern.
+ *
+ * @example
+ * ```typescript
+ * const workflow = createMessageStreamWorkflow("Analyze BTC", context);
+ *
+ * // Option 1: Pipe to a writer
+ * await workflow.pipeTo(myWriter);
+ *
+ * // Option 2: Consume as async iterator
+ * for await (const chunk of workflow) {
+ *   console.log(chunk);
+ * }
+ * ```
+ */
+export function createMessageStreamWorkflow(
+  userMessage: string,
+  context: GordonContext,
+  threadId?: string,
+  resourceId?: string
+): {
+  pipeTo: (writer: StreamWriter<MessageStreamChunk>) => Promise<StreamingResult<{ response: string; usage: { promptTokens: number; completionTokens: number; totalTokens: number } }>>;
+  [Symbol.asyncIterator]: () => AsyncIterator<MessageStreamChunk>;
+} {
+  // Create an async generator that yields MessageStreamChunks
+  async function* generator(): AsyncGenerator<MessageStreamChunk, void, unknown> {
+    const stream = processMessageStream(userMessage, context, threadId, resourceId);
+
+    for await (const event of stream) {
+      yield {
+        type: event.type,
+        content: event.content,
+        toolName: event.toolName,
+        toolArgs: event.toolArgs,
+        toolResult: event.toolResult,
+        agentName: event.agentName,
+        error: event.error,
+        usage: event.usage,
+      };
+    }
+  }
+
+  const source = generator();
+
+  return {
+    async pipeTo(writer: StreamWriter<MessageStreamChunk>): Promise<StreamingResult<{ response: string; usage: { promptTokens: number; completionTokens: number; totalTokens: number } }>> {
+      return processMessageStreamWithPipe(userMessage, context, writer, threadId, resourceId);
+    },
+
+    [Symbol.asyncIterator](): AsyncIterator<MessageStreamChunk> {
+      return source[Symbol.asyncIterator]();
+    },
+  };
+}
+
+// ============================================================================
 // Exports
 // ============================================================================
 
 export { createRequestContext };
+
+// Re-export summarization utilities
+export {
+  ConversationSummarizer,
+  createSummarizer,
+  createSummarizerConfigFromMemoryConfig,
+  DEFAULT_SUMMARIZER_CONFIG,
+  type SummarizerConfig,
+  type TradingContext,
+  type SummarizationResult,
+} from "../memory/index.ts";

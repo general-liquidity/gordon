@@ -356,6 +356,16 @@ export interface SchedulerScanFailedEvent extends BaseEvent {
 }
 
 /**
+ * Memory events
+ */
+export interface MemorySummarizedEvent extends BaseEvent {
+  type: "memory:summarized";
+  originalCount: number;
+  newCount: number;
+  summarizedCount: number;
+}
+
+/**
  * Union type of all events
  */
 export type GordonEvent =
@@ -402,7 +412,8 @@ export type GordonEvent =
   | SchedulerStartedEvent
   | SchedulerStoppedEvent
   | SchedulerScanCompletedEvent
-  | SchedulerScanFailedEvent;
+  | SchedulerScanFailedEvent
+  | MemorySummarizedEvent;
 
 /**
  * Extract event type string

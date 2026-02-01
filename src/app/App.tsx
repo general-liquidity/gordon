@@ -24,6 +24,24 @@ import { runOrderRecovery } from "../core/order-recovery.ts";
 import { listTrades } from "../infra/storage/trades.ts";
 import { scan } from "../core/scanner.ts";
 import { loadConfig, saveConfig } from "../infra/storage/config.ts";
+import {
+  initializeSession,
+  resumeSession,
+  startNewSession,
+  getCurrentSession,
+  updateThreadId,
+  type SessionInfo,
+} from "../infra/storage/session.ts";
+import {
+  cloneThread,
+  listThreads,
+  getThreadInfo,
+  switchThread,
+  deleteThread,
+  updateThreadLabel,
+  ensureThreadRegistered,
+  type ThreadInfo,
+} from "../infra/agents/threadManager.ts";
 import { loadEnvFile, checkEnvStatus, type EnvStatus } from "../infra/storage/env.ts";
 import { initDatabase } from "../infra/storage/index.ts";
 import { initializeContainer } from "../services/container.ts";
@@ -54,6 +72,8 @@ interface AppState {
   btcPrice: number | undefined;
   showShortcuts: boolean;
   showStartupHint: boolean;
+  /** Current session info for Mastra agent memory */
+  session: SessionInfo | null;
 }
 
 function getDefaultConfig(): GordonConfig {
@@ -103,6 +123,7 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
     btcPrice: undefined,
     showShortcuts: false,
     showStartupHint: true,
+    session: null,
   });
 
   const llmClientRef = useRef<LLMClient | null>(null);
@@ -242,11 +263,22 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
         }
       }
 
+      // Initialize session for Mastra agent memory
+      // Auto-resume is disabled by default - creates fresh sessions
+      // Users can use /resume to continue previous sessions
+      const session = await initializeSession({ autoResume: false });
+      console.log(`[Gordon] Session initialized: threadId=${session.threadId}, resourceId=${session.resourceId}, isNew=${session.isNewSession}`);
+
+      // Ensure the current thread is registered in the thread registry
+      // This enables thread management features like cloning and listing
+      await ensureThreadRegistered();
+
       setState((prev) => ({
         ...prev,
         view: initialView,
         mode: config.mode,
         connectionStatus: llmClientRef.current ? "connected" : "disconnected",
+        session,
       }));
     }
 
@@ -378,6 +410,579 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
         return;
       }
 
+      // Handle /resume command - resume previous session with memory context
+      if (command.action === "menu" && command.target === "resume") {
+        (async () => {
+          const resumed = await resumeSession();
+          if (resumed) {
+            const resumeMessage: ChatMessage = {
+              role: "gordon",
+              content: `Session resumed! I'll remember our previous conversations.\n\n**Session Details:**\n- Thread ID: \`${resumed.threadId.slice(0, 20)}...\`\n- Resource ID: \`${resumed.resourceId}\`\n\nI can now recall relevant context from our past discussions. How can I help you today?`,
+              timestamp: formatTimestamp(),
+            };
+            setState((prev) => ({
+              ...prev,
+              session: resumed,
+              messages: [
+                ...prev.messages,
+                { role: "user", content: value.trim(), timestamp: formatTimestamp() },
+                resumeMessage,
+              ],
+            }));
+          } else {
+            // No previous session to resume
+            const newSession = await startNewSession();
+            const noSessionMessage: ChatMessage = {
+              role: "gordon",
+              content: `No previous session found. Starting a fresh session.\n\n**New Session Details:**\n- Thread ID: \`${newSession.threadId.slice(0, 20)}...\`\n- Resource ID: \`${newSession.resourceId}\``,
+              timestamp: formatTimestamp(),
+            };
+            setState((prev) => ({
+              ...prev,
+              session: newSession,
+              messages: [
+                ...prev.messages,
+                { role: "user", content: value.trim(), timestamp: formatTimestamp() },
+                noSessionMessage,
+              ],
+            }));
+          }
+        })();
+        return;
+      }
+
+      // Handle /new-session command - start a fresh session
+      if (command.action === "menu" && command.target === "new-session") {
+        (async () => {
+          const newSession = await startNewSession();
+          const newSessionMessage: ChatMessage = {
+            role: "gordon",
+            content: `Started a fresh session! Previous memory context has been cleared.\n\n**New Session Details:**\n- Thread ID: \`${newSession.threadId.slice(0, 20)}...\`\n- Resource ID: \`${newSession.resourceId}\`\n\nReady to start fresh. What would you like to do?`,
+            timestamp: formatTimestamp(),
+          };
+          setState((prev) => ({
+            ...prev,
+            session: newSession,
+            messages: [
+              { role: "user", content: value.trim(), timestamp: formatTimestamp() },
+              newSessionMessage,
+            ],
+          }));
+        })();
+        return;
+      }
+
+      // Handle /session command - show current session info
+      if (command.action === "menu" && command.target === "session-info") {
+        (async () => {
+          const sessionInfo = await getCurrentSession();
+          const sessionAge = sessionInfo.threadStartedAt
+            ? Math.round((Date.now() - new Date(sessionInfo.threadStartedAt).getTime()) / 1000 / 60)
+            : 0;
+          const sessionMessage: ChatMessage = {
+            role: "gordon",
+            content: `**Current Session Info:**\n\n` +
+              `- **Thread ID:** \`${sessionInfo.threadId?.slice(0, 25) || "None"}...\`\n` +
+              `- **Resource ID:** \`${sessionInfo.resourceId}\`\n` +
+              `- **Session Started:** ${sessionInfo.threadStartedAt ? new Date(sessionInfo.threadStartedAt).toLocaleString() : "N/A"}\n` +
+              `- **Session Age:** ${sessionAge} minutes\n` +
+              `- **Total Sessions:** ${sessionInfo.sessionCount}\n\n` +
+              `Use \`/resume\` to continue a previous session or \`/new-session\` to start fresh.`,
+            timestamp: formatTimestamp(),
+          };
+          setState((prev) => ({
+            ...prev,
+            messages: [
+              ...prev.messages,
+              { role: "user", content: value.trim(), timestamp: formatTimestamp() },
+              sessionMessage,
+            ],
+          }));
+        })();
+        return;
+      }
+
+      // Handle /clone command - clone current thread for "what if" testing
+      if (command.action === "menu" && command.target === "clone-thread") {
+        (async () => {
+          if (!state.session?.threadId) {
+            const errorMessage: ChatMessage = {
+              role: "gordon",
+              content: "No active session to clone. Start a conversation first.",
+              timestamp: formatTimestamp(),
+            };
+            setState((prev) => ({
+              ...prev,
+              messages: [
+                ...prev.messages,
+                { role: "user", content: value.trim(), timestamp: formatTimestamp() },
+                errorMessage,
+              ],
+            }));
+            return;
+          }
+
+          const label = args || undefined;
+          const result = await cloneThread(state.session.threadId, undefined, label);
+
+          if (result.success && result.newThreadId) {
+            const cloneMessage: ChatMessage = {
+              role: "gordon",
+              content: `**Thread Cloned Successfully!**\n\n` +
+                `A new branch has been created for "what if" testing.\n\n` +
+                `- **New Thread ID:** \`${result.newThreadId.slice(0, 25)}...\`\n` +
+                `- **Messages Copied:** ${result.messagesCopied}\n` +
+                `- **Source Thread:** \`${result.sourceThreadId.slice(0, 20)}...\`\n\n` +
+                `Use \`/switch ${result.newThreadId.slice(0, 15)}\` to switch to the cloned thread, or \`/threads\` to see all threads.`,
+              timestamp: formatTimestamp(),
+            };
+            setState((prev) => ({
+              ...prev,
+              messages: [
+                ...prev.messages,
+                { role: "user", content: value.trim(), timestamp: formatTimestamp() },
+                cloneMessage,
+              ],
+            }));
+          } else {
+            const errorMessage: ChatMessage = {
+              role: "gordon",
+              content: `**Failed to clone thread.**\n\nError: ${result.error || "Unknown error"}`,
+              timestamp: formatTimestamp(),
+            };
+            setState((prev) => ({
+              ...prev,
+              messages: [
+                ...prev.messages,
+                { role: "user", content: value.trim(), timestamp: formatTimestamp() },
+                errorMessage,
+              ],
+            }));
+          }
+        })();
+        return;
+      }
+
+      // Handle /threads command - list all threads
+      if (command.action === "menu" && command.target === "list-threads") {
+        (async () => {
+          const threads = await listThreads();
+
+          if (threads.length === 0) {
+            const noThreadsMessage: ChatMessage = {
+              role: "gordon",
+              content: "No threads found. Your current conversation will be tracked once you start chatting.",
+              timestamp: formatTimestamp(),
+            };
+            setState((prev) => ({
+              ...prev,
+              messages: [
+                ...prev.messages,
+                { role: "user", content: value.trim(), timestamp: formatTimestamp() },
+                noThreadsMessage,
+              ],
+            }));
+            return;
+          }
+
+          const lines = [
+            "**Available Threads:**\n",
+            "| Status | Label | Messages | Created | Last Active |",
+            "|--------|-------|----------|---------|-------------|",
+          ];
+
+          for (const thread of threads) {
+            const status = thread.isActive ? "**ACTIVE**" : "";
+            const created = new Date(thread.createdAt).toLocaleDateString();
+            const lastActive = new Date(thread.lastActiveAt).toLocaleDateString();
+            const cloneInfo = thread.clonedFrom ? " (clone)" : "";
+            lines.push(
+              `| ${status} | ${thread.label}${cloneInfo} | ${thread.messageCount} | ${created} | ${lastActive} |`
+            );
+          }
+
+          lines.push("\n**Thread IDs for switching:**");
+          for (const thread of threads) {
+            const activeMarker = thread.isActive ? " (current)" : "";
+            lines.push(`- \`${thread.threadId.slice(0, 20)}...\`${activeMarker} - ${thread.label}`);
+          }
+
+          lines.push("\nUse `/switch <threadId>` to switch threads or `/clone` to create a branch.");
+
+          const threadsMessage: ChatMessage = {
+            role: "gordon",
+            content: lines.join("\n"),
+            timestamp: formatTimestamp(),
+          };
+          setState((prev) => ({
+            ...prev,
+            messages: [
+              ...prev.messages,
+              { role: "user", content: value.trim(), timestamp: formatTimestamp() },
+              threadsMessage,
+            ],
+          }));
+        })();
+        return;
+      }
+
+      // Handle /switch command - switch to a different thread
+      if (command.action === "menu" && command.target === "switch-thread") {
+        (async () => {
+          if (!args) {
+            // Show available threads
+            const threads = await listThreads();
+            const lines = ["**Which thread would you like to switch to?**\n"];
+
+            if (threads.length === 0) {
+              lines.push("No threads available. Use `/clone` to create a branch first.");
+            } else {
+              for (const thread of threads) {
+                const activeMarker = thread.isActive ? " (current)" : "";
+                lines.push(`- \`${thread.threadId.slice(0, 20)}\`${activeMarker} - ${thread.label}`);
+              }
+              lines.push("\nUsage: `/switch <threadId>`");
+            }
+
+            const helpMessage: ChatMessage = {
+              role: "gordon",
+              content: lines.join("\n"),
+              timestamp: formatTimestamp(),
+            };
+            setState((prev) => ({
+              ...prev,
+              messages: [
+                ...prev.messages,
+                { role: "user", content: value.trim(), timestamp: formatTimestamp() },
+                helpMessage,
+              ],
+            }));
+            return;
+          }
+
+          // Find matching thread (allow partial match)
+          const threads = await listThreads();
+          const targetThread = threads.find((t) =>
+            t.threadId.startsWith(args) || t.threadId.includes(args)
+          );
+
+          if (!targetThread) {
+            const errorMessage: ChatMessage = {
+              role: "gordon",
+              content: `**Thread not found.**\n\nNo thread matching "${args}" was found. Use \`/threads\` to see available threads.`,
+              timestamp: formatTimestamp(),
+            };
+            setState((prev) => ({
+              ...prev,
+              messages: [
+                ...prev.messages,
+                { role: "user", content: value.trim(), timestamp: formatTimestamp() },
+                errorMessage,
+              ],
+            }));
+            return;
+          }
+
+          const result = await switchThread(targetThread.threadId);
+
+          if (result.success) {
+            // Update local session state
+            const newSession: SessionInfo = {
+              resourceId: state.session?.resourceId || "default",
+              threadId: result.threadId,
+              isNewSession: false,
+              previousThreadId: result.previousThreadId,
+            };
+
+            const switchMessage: ChatMessage = {
+              role: "gordon",
+              content: `**Switched to thread: ${targetThread.label}**\n\n` +
+                `- **Thread ID:** \`${result.threadId.slice(0, 25)}...\`\n` +
+                `- **Messages:** ${targetThread.messageCount}\n\n` +
+                `You are now continuing this conversation branch. ` +
+                `Your previous thread is still available via \`/threads\`.`,
+              timestamp: formatTimestamp(),
+            };
+
+            setState((prev) => ({
+              ...prev,
+              session: newSession,
+              messages: [
+                { role: "user", content: value.trim(), timestamp: formatTimestamp() },
+                switchMessage,
+              ],
+            }));
+          } else {
+            const errorMessage: ChatMessage = {
+              role: "gordon",
+              content: `**Failed to switch thread.**\n\nError: ${result.error || "Unknown error"}`,
+              timestamp: formatTimestamp(),
+            };
+            setState((prev) => ({
+              ...prev,
+              messages: [
+                ...prev.messages,
+                { role: "user", content: value.trim(), timestamp: formatTimestamp() },
+                errorMessage,
+              ],
+            }));
+          }
+        })();
+        return;
+      }
+
+      // Handle /thread-info command - get info about a specific thread
+      if (command.action === "menu" && command.target === "thread-info") {
+        (async () => {
+          const threadId = args || state.session?.threadId;
+
+          if (!threadId) {
+            const errorMessage: ChatMessage = {
+              role: "gordon",
+              content: "No thread specified and no active session. Use `/threads` to see available threads.",
+              timestamp: formatTimestamp(),
+            };
+            setState((prev) => ({
+              ...prev,
+              messages: [
+                ...prev.messages,
+                { role: "user", content: value.trim(), timestamp: formatTimestamp() },
+                errorMessage,
+              ],
+            }));
+            return;
+          }
+
+          // Find matching thread
+          const threads = await listThreads();
+          const targetThread = threads.find((t) =>
+            t.threadId.startsWith(threadId) || t.threadId.includes(threadId) || t.threadId === threadId
+          );
+
+          if (!targetThread) {
+            const errorMessage: ChatMessage = {
+              role: "gordon",
+              content: `**Thread not found.**\n\nNo thread matching "${threadId}" was found.`,
+              timestamp: formatTimestamp(),
+            };
+            setState((prev) => ({
+              ...prev,
+              messages: [
+                ...prev.messages,
+                { role: "user", content: value.trim(), timestamp: formatTimestamp() },
+                errorMessage,
+              ],
+            }));
+            return;
+          }
+
+          const info = await getThreadInfo(targetThread.threadId);
+
+          if (info) {
+            const cloneInfo = info.clonedFrom
+              ? `\n- **Cloned From:** \`${info.clonedFrom.slice(0, 20)}...\``
+              : "";
+            const infoMessage: ChatMessage = {
+              role: "gordon",
+              content: `**Thread Info: ${info.label}**\n\n` +
+                `- **Thread ID:** \`${info.threadId}\`\n` +
+                `- **Status:** ${info.isActive ? "Active" : "Inactive"}\n` +
+                `- **Messages:** ${info.messageCount}\n` +
+                `- **Created:** ${new Date(info.createdAt).toLocaleString()}\n` +
+                `- **Last Active:** ${new Date(info.lastActiveAt).toLocaleString()}` +
+                cloneInfo,
+              timestamp: formatTimestamp(),
+            };
+            setState((prev) => ({
+              ...prev,
+              messages: [
+                ...prev.messages,
+                { role: "user", content: value.trim(), timestamp: formatTimestamp() },
+                infoMessage,
+              ],
+            }));
+          }
+        })();
+        return;
+      }
+
+      // Handle /delete-thread command - delete a thread
+      if (command.action === "menu" && command.target === "delete-thread") {
+        (async () => {
+          if (!args) {
+            const helpMessage: ChatMessage = {
+              role: "gordon",
+              content: "**Usage:** `/delete-thread <threadId>`\n\nUse `/threads` to see available threads. Note: You cannot delete the currently active thread.",
+              timestamp: formatTimestamp(),
+            };
+            setState((prev) => ({
+              ...prev,
+              messages: [
+                ...prev.messages,
+                { role: "user", content: value.trim(), timestamp: formatTimestamp() },
+                helpMessage,
+              ],
+            }));
+            return;
+          }
+
+          // Find matching thread
+          const threads = await listThreads();
+          const targetThread = threads.find((t) =>
+            t.threadId.startsWith(args) || t.threadId.includes(args)
+          );
+
+          if (!targetThread) {
+            const errorMessage: ChatMessage = {
+              role: "gordon",
+              content: `**Thread not found.**\n\nNo thread matching "${args}" was found.`,
+              timestamp: formatTimestamp(),
+            };
+            setState((prev) => ({
+              ...prev,
+              messages: [
+                ...prev.messages,
+                { role: "user", content: value.trim(), timestamp: formatTimestamp() },
+                errorMessage,
+              ],
+            }));
+            return;
+          }
+
+          const result = await deleteThread(targetThread.threadId);
+
+          if (result.success) {
+            const deleteMessage: ChatMessage = {
+              role: "gordon",
+              content: `**Thread deleted:** ${targetThread.label}\n\nThe thread and its messages have been removed.`,
+              timestamp: formatTimestamp(),
+            };
+            setState((prev) => ({
+              ...prev,
+              messages: [
+                ...prev.messages,
+                { role: "user", content: value.trim(), timestamp: formatTimestamp() },
+                deleteMessage,
+              ],
+            }));
+          } else {
+            const errorMessage: ChatMessage = {
+              role: "gordon",
+              content: `**Failed to delete thread.**\n\nError: ${result.error || "Unknown error"}`,
+              timestamp: formatTimestamp(),
+            };
+            setState((prev) => ({
+              ...prev,
+              messages: [
+                ...prev.messages,
+                { role: "user", content: value.trim(), timestamp: formatTimestamp() },
+                errorMessage,
+              ],
+            }));
+          }
+        })();
+        return;
+      }
+
+      // Handle /rename-thread command - rename a thread
+      if (command.action === "menu" && command.target === "rename-thread") {
+        (async () => {
+          if (!args) {
+            const helpMessage: ChatMessage = {
+              role: "gordon",
+              content: "**Usage:** `/rename-thread <threadId> <new-label>`\n\nExample: `/rename-thread thread-abc BTC Analysis Branch`",
+              timestamp: formatTimestamp(),
+            };
+            setState((prev) => ({
+              ...prev,
+              messages: [
+                ...prev.messages,
+                { role: "user", content: value.trim(), timestamp: formatTimestamp() },
+                helpMessage,
+              ],
+            }));
+            return;
+          }
+
+          const parts = args.split(/\s+/);
+          const threadIdArg = parts[0];
+          const newLabel = parts.slice(1).join(" ");
+
+          if (!threadIdArg || !newLabel) {
+            const helpMessage: ChatMessage = {
+              role: "gordon",
+              content: "**Usage:** `/rename-thread <threadId> <new-label>`\n\nBoth thread ID and new label are required.",
+              timestamp: formatTimestamp(),
+            };
+            setState((prev) => ({
+              ...prev,
+              messages: [
+                ...prev.messages,
+                { role: "user", content: value.trim(), timestamp: formatTimestamp() },
+                helpMessage,
+              ],
+            }));
+            return;
+          }
+
+          // Find matching thread
+          const threads = await listThreads();
+          const targetThread = threads.find((t) =>
+            t.threadId.startsWith(threadIdArg) || t.threadId.includes(threadIdArg)
+          );
+
+          if (!targetThread) {
+            const errorMessage: ChatMessage = {
+              role: "gordon",
+              content: `**Thread not found.**\n\nNo thread matching "${threadIdArg}" was found.`,
+              timestamp: formatTimestamp(),
+            };
+            setState((prev) => ({
+              ...prev,
+              messages: [
+                ...prev.messages,
+                { role: "user", content: value.trim(), timestamp: formatTimestamp() },
+                errorMessage,
+              ],
+            }));
+            return;
+          }
+
+          const result = await updateThreadLabel(targetThread.threadId, newLabel);
+
+          if (result.success) {
+            const renameMessage: ChatMessage = {
+              role: "gordon",
+              content: `**Thread renamed!**\n\n"${targetThread.label}" is now "${newLabel}"`,
+              timestamp: formatTimestamp(),
+            };
+            setState((prev) => ({
+              ...prev,
+              messages: [
+                ...prev.messages,
+                { role: "user", content: value.trim(), timestamp: formatTimestamp() },
+                renameMessage,
+              ],
+            }));
+          } else {
+            const errorMessage: ChatMessage = {
+              role: "gordon",
+              content: `**Failed to rename thread.**\n\nError: ${result.error || "Unknown error"}`,
+              timestamp: formatTimestamp(),
+            };
+            setState((prev) => ({
+              ...prev,
+              messages: [
+                ...prev.messages,
+                { role: "user", content: value.trim(), timestamp: formatTimestamp() },
+                errorMessage,
+              ],
+            }));
+          }
+        })();
+        return;
+      }
+
       // Convert command to natural language for the agent
       messageToSend = commandToPrompt(command, args);
       displayMessage = value.trim(); // Still show the command to user
@@ -413,13 +1018,15 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
       return;
     }
 
-    // Build the context for Gordon
+    // Build the context for Gordon with session info
     const context: GordonContext = {
       binance: binanceClientRef.current,
       llm: llmClientRef.current,
       config: configRef.current,
       portfolioValue: state.portfolioValue ?? 0,
       availableCash: state.availableCash,
+      userId: state.session?.resourceId,
+      threadId: state.session?.threadId,
     };
 
     // Create initial empty assistant message for streaming
@@ -440,8 +1047,13 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
     }));
 
     try {
-      // Use streaming API
-      const stream = processMessageStream(messageToSend, context, undefined);
+      // Use streaming API with session threadId and resourceId for memory continuity
+      const stream = processMessageStream(
+        messageToSend,
+        context,
+        state.session?.threadId,
+        state.session?.resourceId
+      );
       let fullContent = "";
       let currentAgentName: string | undefined;
 
@@ -833,6 +1445,8 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
             config: configRef.current,
             portfolioValue: state.portfolioValue ?? 0,
             availableCash: state.availableCash,
+            userId: state.session?.resourceId,
+            threadId: state.session?.threadId,
           };
 
           // Create initial empty message for streaming
@@ -851,7 +1465,8 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
             const stream = processMessageStream(
               "Show me what's trending and pumping today",
               context,
-              undefined
+              state.session?.threadId,
+              state.session?.resourceId
             );
             let fullContent = "";
             let trendingAgent: string | undefined;

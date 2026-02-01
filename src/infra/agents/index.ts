@@ -55,8 +55,57 @@ export {
   quickScan,
   quickCheckPositions,
   initializeTracing,
+  // Summarization
+  summarizeIfNeeded,
+  needsSummarization,
+  getSummarizationStats,
+  resetSummarizer,
+  // Streaming with Pipe Support (Mastra pipeTo pattern)
+  processMessageStreamWithPipe,
+  createMessageStreamWorkflow,
+  // Streaming workflow utilities
+  createStreamingWorkflow,
+  streamParallelAnalysis,
+  streamMultiCoinAnalysis,
+  createStreamingDeepAnalysis,
+  createStreamingMultiCoinAnalysis,
+  // Stream writers
+  createConsoleWriter,
+  createArrayWriter,
+  createCallbackWriter,
+  createMultiplexWriter,
+  createTransformWriter,
+  ConsoleStreamWriter,
+  ArrayStreamWriter,
+  CallbackStreamWriter,
+  MultiplexStreamWriter,
+  TransformStreamWriter,
+  // Chunk factories
+  createChunk,
+  createProgressChunk,
+  createResultChunk,
+  createErrorChunk,
+  createStartChunk,
+  createEndChunk,
+  createHeartbeatChunk,
+  createStreamingPipeline,
 } from "./orchestrator.ts";
-export type { StreamEvent } from "./orchestrator.ts";
+export type {
+  StreamEvent,
+  ProcessingOptions,
+  ProcessingResultWithSummarization,
+  MessageStreamChunk,
+  // Streaming types
+  StreamWriter,
+  StreamChunk,
+  StreamingWorkflowOptions,
+  ProgressData,
+  ResultData,
+  AnalysisChunk,
+  StreamingResult,
+  StreamingWorkflowResult,
+  StreamingParallelOptions,
+} from "./orchestrator.ts";
 
 // Guardrails Middleware
 export {
@@ -67,7 +116,7 @@ export {
   withGuardrails,
 } from "./middleware/index.ts";
 
-// Memory
+// Memory (Mastra integration)
 export {
   createMemoryStore,
   createMemoryOptions,
@@ -75,6 +124,35 @@ export {
   getMemory,
   resetMemory,
 } from "./memory.ts";
+
+// Thread Management (for "what if" scenario branching)
+export {
+  cloneThread,
+  listThreads,
+  deleteThread,
+  getThreadInfo,
+  switchThread,
+  updateThreadLabel,
+  ensureThreadRegistered,
+} from "./threadManager.ts";
+export type {
+  ThreadInfo,
+  CloneResult,
+  SwitchResult,
+} from "./threadManager.ts";
+
+// Memory Summarization
+export {
+  ConversationSummarizer,
+  createSummarizer,
+  createSummarizerConfigFromMemoryConfig,
+  DEFAULT_SUMMARIZER_CONFIG,
+} from "../memory/index.ts";
+export type {
+  SummarizerConfig,
+  TradingContext,
+  SummarizationResult,
+} from "../memory/index.ts";
 
 // Reflection
 export {

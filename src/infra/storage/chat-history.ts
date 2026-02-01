@@ -49,6 +49,10 @@ export interface ChatSession {
     messageCount: number;
     /** Session duration in seconds */
     durationSeconds: number;
+    /** Mastra threadId for session resume */
+    threadId?: string;
+    /** Mastra resourceId for user identification */
+    resourceId?: string;
   };
 }
 
@@ -159,6 +163,8 @@ export async function saveChatSession(
     startedAt?: Date;
     mode?: "SAFE" | "ARMED";
     version?: string;
+    threadId?: string;
+    resourceId?: string;
   } = {}
 ): Promise<{ filename: string; path: string }> {
   await ensureHistoryDir();
@@ -180,6 +186,8 @@ export async function saveChatSession(
       mode: options.mode || "SAFE",
       messageCount: messages.length,
       durationSeconds: Math.floor((endDate.getTime() - startDate.getTime()) / 1000),
+      threadId: options.threadId,
+      resourceId: options.resourceId,
     },
   };
 

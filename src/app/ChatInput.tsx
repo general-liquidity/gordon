@@ -7,7 +7,7 @@ import React, { useState, useCallback, useMemo } from "react";
 import { Box, Text, useInput } from "ink";
 import { TextInput } from "@inkjs/ui";
 import { COLORS } from "./theme.ts";
-import { getSlashCommandSuggestions } from "./slashCommands.ts";
+import { getSlashCommandSuggestions, parseSlashCommand } from "./slashCommands.ts";
 import { CommandAutocomplete } from "./components/CommandAutocomplete.tsx";
 import {
   QuickActions,
@@ -46,9 +46,16 @@ export function ChatInput({ onSubmit, disabled = false, placeholder }: ChatInput
   const handleSubmit = useCallback((submitValue: string) => {
     if (!submitValue.trim()) return;
 
-    // If autocomplete is showing and user presses Enter, use the selected command
     let finalValue = submitValue.trim();
-    if (showAutocomplete && suggestions.length > 0 && suggestions[autocompleteIndex]) {
+
+    // First, check if the user typed a complete valid command
+    // This takes priority over autocomplete selection to avoid race conditions
+    const parsedCommand = parseSlashCommand(finalValue);
+    if (parsedCommand) {
+      // User typed a valid command - use it directly (already in finalValue)
+      // No need to modify finalValue
+    } else if (showAutocomplete && suggestions.length > 0 && suggestions[autocompleteIndex]) {
+      // Only use autocomplete selection if user typed a partial/invalid command
       const selectedCmd = suggestions[autocompleteIndex];
       // Extract any args after the partial command (e.g., "/ana btc" -> "btc")
       const parts = submitValue.trim().split(/\s+/);

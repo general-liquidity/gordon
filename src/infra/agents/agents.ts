@@ -19,6 +19,7 @@
  */
 
 import { Agent } from "@mastra/core/agent";
+import { TokenLimiterProcessor } from "@mastra/core/processors";
 import { Memory } from "@mastra/memory";
 import { LibSQLStore, LibSQLVector } from "@mastra/libsql";
 
@@ -45,9 +46,15 @@ import {
   compositionTools,
   backtestTools,
   sharedContextTools,
+  parallelAnalysisTools,
   withToolsMetrics,
 } from "./tools/index.ts";
 import { getSessionSummary, getMemoryStats, resetSharedMemory } from "./shared-context.ts";
+import { evalTools } from "../evals/index.ts";
+import {
+  generatePerformanceContext,
+  formatPerformanceContextForPrompt,
+} from "../evals/feedbackLoop.ts";
 import type { MemoryConfig } from "../../types/index.ts";
 
 // ============================================================================
@@ -259,6 +266,8 @@ const instrumentedMetricsTools = withToolsMetrics(metricsTools);
 const instrumentedCompositionTools = withToolsMetrics(compositionTools);
 const instrumentedBacktestTools = withToolsMetrics(backtestTools);
 const instrumentedSharedContextTools = withToolsMetrics(sharedContextTools);
+const instrumentedParallelAnalysisTools = withToolsMetrics(parallelAnalysisTools);
+const instrumentedEvalTools = withToolsMetrics(evalTools);
 
 // ============================================================================
 // Memory Configuration (Required for Agent Networks)
@@ -267,29 +276,45 @@ const instrumentedSharedContextTools = withToolsMetrics(sharedContextTools);
 /**
  * Working memory template for trading context
  * Maintains persistent state across conversations
+ *
+ * This template captures:
+ * - Trader profile and preferences
+ * - Risk management settings
+ * - Trading style and timeframes
+ * - Account context and defaults
+ * - Session state for ongoing analysis
  */
 const WORKING_MEMORY_TEMPLATE = `
-# Trading Context
+# Trader Profile
 
-## Portfolio State
-- Total Value: <unknown>
-- Available Cash: <unknown>
-- Open Positions: <none>
+## Personal Info
+- Name:
+- Timezone:
+- Trading Experience Level: (beginner/intermediate/advanced)
 
-## Recent Activity
-- Last Trade: <none>
-- Last Analysis: <none>
-- Active Plans: <none>
+## Risk Preferences
+- Max Risk Per Trade: (e.g., 2%)
+- Max Portfolio Allocation Per Position: (e.g., 10%)
+- Preferred Stop Loss Style: (tight/normal/wide)
+- Risk Tolerance: (conservative/moderate/aggressive)
 
-## User Preferences
-- Risk Tolerance: <unknown>
-- Max Position Size: <unknown>
-- Preferred Strategies: <unknown>
+## Trading Style
+- Preferred Timeframes: (1h/4h/1D)
+- Favorite Coins/Tokens:
+- Avoided Coins/Tokens:
+- Preferred Strategies:
+- Trading Hours: (e.g., "9am-5pm EST" or "24/7")
 
-## Market Context
-- Current Watchlist: <none>
-- Recent Signals: <none>
-- Market Sentiment: <unknown>
+## Account Context
+- Default Exchange: Binance
+- Account Type: (spot/margin/futures)
+- Base Currency: USDT
+
+## Session State
+- Current Focus:
+- Active Analysis:
+- Pending Decisions:
+- Recent Wins/Losses:
 `;
 
 /**
@@ -357,6 +382,13 @@ Your role is to scan the cryptocurrency market and identify trading opportunitie
   - Use scan_with_ensemble for comprehensive market scanning
   - Ensemble results show how many strategies agree (agreement %)
 
+## Learning from Past Performance
+Before recommending strategies, consider checking past performance:
+- Use **get_strategy_performance** to see how a specific strategy has performed
+- Use **get_performance_context** to get recent win rate and best/worst setups
+- Prioritize strategies that have shown strong historical performance
+- Be more cautious with strategies that have been underperforming recently
+
 ## When Presenting Opportunities
 1. List the top opportunities by setup confidence
 2. For each opportunity, explain:
@@ -364,6 +396,7 @@ Your role is to scan the cryptocurrency market and identify trading opportunitie
    - Why this is a good setup (near support, oversold RSI, etc.)
    - Risk level (low/medium/high)
    - For ensemble results: how many strategies agree
+   - **Historical performance of this strategy (if available)**
 3. Recommend which coin looks best and why
 
 ## When to Use Ensemble Detection
@@ -385,7 +418,8 @@ This allows Analyst and Planner to know what opportunities you found.
 - For ensemble: >50% agreement is minimum, >66% is strong
 - Always mention the risk level
 - If no good setups found, tell the user to wait
-- Share your findings via write_shared_context for other agents`;
+- Share your findings via write_shared_context for other agents
+- Consider historical strategy performance when making recommendations`;
 
 const ANALYST_INSTRUCTIONS = `You are Gordon's technical analyst agent.
 
@@ -402,7 +436,14 @@ Your role is to provide deep analysis of specific cryptocurrencies.
 - Stochastic RSI for precise entry/exit timing using get_stochastic_rsi
 - **Comprehensive analysis** combining signals, RSI, whale orders, and orderbook using run_full_analysis
 
-## Cross-Agent Context (NEW)
+## Learning from Past Performance
+Your analysis should be informed by historical trade outcomes:
+- Use **get_performance_context** to understand recent performance patterns
+- Use **get_market_condition_performance** to see which market conditions favor our trading
+- Adjust confidence levels based on historical accuracy in similar conditions
+- Note if current market condition historically produces better or worse results
+
+## Cross-Agent Context
 Use shared context tools to collaborate with other agents:
 - **read_shared_context**: Check if Scanner already found opportunities
 - **write_shared_context**: Store your analysis for Planner/Backtester to use
@@ -422,7 +463,8 @@ Use run_full_analysis when user asks for:
 - Always explain indicators in simple terms
 - Mention both bullish and bearish scenarios
 - Be honest about uncertainty
-- Share your analysis results via write_shared_context for other agents`;
+- Share your analysis results via write_shared_context for other agents
+- Consider historical performance when assessing confidence levels`;
 
 const PLANNER_INSTRUCTIONS = `You are Gordon's trading planner agent.
 
@@ -435,7 +477,15 @@ Your role is to create well-structured trading plans based on analysis.
 - Calculate ATR-based stop-loss levels using get_stop_loss_levels
 - Calculate optimal position size using get_position_size
 
-## Cross-Agent Context (NEW)
+## Learning from Past Performance
+Use historical performance data to create better plans:
+- Use **get_strategy_performance** to check how the planned strategy has performed
+- Use **get_risk_reward_analysis** to understand optimal R:R targets
+- Use **get_performance_context** to see recent patterns and best setups
+- Use **track_recommendation** AFTER creating a plan to enable learning from the outcome
+- Adjust position sizing based on strategy's historical win rate
+
+## Cross-Agent Context
 Use shared context tools to leverage work from other agents:
 - **read_shared_context("analysis", symbol)**: Get Analyst's technical analysis
 - **read_shared_context("backtest", symbol)**: Get Backtester's strategy performance
@@ -443,11 +493,13 @@ Use shared context tools to leverage work from other agents:
 - **write_shared_context**: Store your plans for Executor to reference
 
 ## Recommended Workflow
-1. **Check context first**: read_shared_context to see existing analysis/backtests
-2. **Use context for decisions**: Base entry/exit levels on Analyst's support/resistance
-3. **Validate with backtest data**: Check if strategy was backtested successfully
-4. **Create informed plan**: Build plan using all available context
-5. **Share plan**: write_shared_context so Executor knows the plan details
+1. **Check performance context**: get_performance_context to see recent win rate and patterns
+2. **Check strategy performance**: get_strategy_performance for the specific strategy
+3. **Check cross-agent context**: read_shared_context to see existing analysis/backtests
+4. **Use context for decisions**: Base entry/exit levels on Analyst's support/resistance
+5. **Create informed plan**: Build plan using all available context
+6. **Track for learning**: Use track_recommendation to record the plan for outcome tracking
+7. **Share plan**: write_shared_context so Executor knows the plan details
 
 ## Important Rules
 - Never suggest risking more than user's max allocation
@@ -475,7 +527,21 @@ Your role is to watch open positions and keep the user informed.
 2. Number of open trades
 3. Total unrealized P&L (in $ and %)
 4. For each position: entry price, current price, unrealized P&L
-5. Overall portfolio health assessment`;
+5. Overall portfolio health assessment
+
+## Recording Trade Outcomes for Learning
+When a trade closes, record the outcome for the learning system:
+- Use **record_trade_outcome** when notified of a closed trade
+- Use **process_unrecorded_trades** periodically to catch any missed recordings
+- Use **get_performance_report** to show detailed performance analysis
+
+Recording outcomes helps the system learn which strategies and conditions work best.
+
+## Performance Reporting
+When user asks about performance or statistics:
+- Use get_performance_report for comprehensive analysis
+- Include insights about best/worst performing strategies
+- Mention any patterns identified from the trade history`;
 
 const TEACHER_INSTRUCTIONS = `You are Gordon's teacher agent.
 
@@ -596,11 +662,18 @@ function getScannerAgent(): Agent {
         ...instrumentedIndicatorTools,
         ...instrumentedDiscoveryTools,  // Coin discovery tools
         ...instrumentedStrategyTools,   // Strategy library tools
+        ...instrumentedParallelAnalysisTools,  // Parallel execution tools
         scan_market: instrumentedMarketTools.scan_market,
         analyze_coin: instrumentedMarketTools.analyze_coin,
-        // Shared context for cross-agent memory (Improvement #2)
+        // Shared context for cross-agent memory
         ...instrumentedSharedContextTools,
+        // Performance evaluation tools for learning from trade outcomes
+        get_strategy_performance: instrumentedEvalTools.get_strategy_performance,
+        get_performance_context: instrumentedEvalTools.get_performance_context,
+        get_all_strategy_performances: instrumentedEvalTools.get_all_strategy_performances,
       },
+      // Token limiter to prevent context window overflow in long sessions
+      inputProcessors: [new TokenLimiterProcessor({ limit: 8000 })],
     });
   }
   return _agents.scanner;
@@ -627,10 +700,17 @@ function getAnalystAgent(): Agent {
         ...instrumentedOrderbookTools,         // Order book depth and liquidity analysis
         ...instrumentedMarketAnalysisTools,    // Whale detection, breakouts, consolidation, scoring
         ...instrumentedCompositionTools,       // Full analysis composition tool
+        ...instrumentedParallelAnalysisTools,  // Parallel deep analysis tools
         analyze_coin: instrumentedMarketTools.analyze_coin,
-        // Shared context for cross-agent memory (Improvement #2)
+        // Shared context for cross-agent memory
         ...instrumentedSharedContextTools,
+        // Performance evaluation tools for learning from trade outcomes
+        get_performance_context: instrumentedEvalTools.get_performance_context,
+        get_market_condition_performance: instrumentedEvalTools.get_market_condition_performance,
+        get_learning_insights: instrumentedEvalTools.get_learning_insights,
       },
+      // Token limiter to prevent context window overflow in long sessions
+      inputProcessors: [new TokenLimiterProcessor({ limit: 8000 })],
     });
   }
   return _agents.analyst;
@@ -660,9 +740,16 @@ function getPlannerAgent(): Agent {
         calculate_kelly_size: instrumentedRiskManagementTools.calculate_kelly_size,
         calculate_volatility_adjusted_size: instrumentedRiskManagementTools.calculate_volatility_adjusted_size,
         assess_trade_risk: instrumentedRiskManagementTools.assess_trade_risk,
-        // Shared context for cross-agent memory (Improvement #2)
+        // Shared context for cross-agent memory
         ...instrumentedSharedContextTools,
+        // Performance evaluation tools for learning from trade outcomes
+        get_strategy_performance: instrumentedEvalTools.get_strategy_performance,
+        get_performance_context: instrumentedEvalTools.get_performance_context,
+        get_risk_reward_analysis: instrumentedEvalTools.get_risk_reward_analysis,
+        track_recommendation: instrumentedEvalTools.track_recommendation,
       },
+      // Token limiter to prevent context window overflow in long sessions
+      inputProcessors: [new TokenLimiterProcessor({ limit: 8000 })],
     });
   }
   return _agents.planner;
@@ -688,6 +775,8 @@ function getExecutorAgent(): Agent {
         list_plans: instrumentedTradingTools.list_plans,
         approve_plan: instrumentedTradingTools.approve_plan,
       },
+      // Token limiter to prevent context window overflow in long sessions
+      inputProcessors: [new TokenLimiterProcessor({ limit: 8000 })],
     });
   }
   return _agents.executor;
@@ -718,9 +807,15 @@ function getMonitorAgent(): Agent {
         check_exit_conditions: instrumentedRiskManagementTools.check_exit_conditions,
         check_drawdown_status: instrumentedRiskManagementTools.check_drawdown_status,
         check_daily_limit: instrumentedRiskManagementTools.check_daily_limit,
-        // Shared context for cross-agent memory (Improvement #2)
+        // Shared context for cross-agent memory
         ...instrumentedSharedContextTools,
+        // Performance evaluation tools for recording trade outcomes
+        record_trade_outcome: instrumentedEvalTools.record_trade_outcome,
+        get_performance_report: instrumentedEvalTools.get_performance_report,
+        process_unrecorded_trades: instrumentedEvalTools.process_unrecorded_trades,
       },
+      // Token limiter to prevent context window overflow in long sessions
+      inputProcessors: [new TokenLimiterProcessor({ limit: 8000 })],
     });
   }
   return _agents.monitor;
@@ -743,6 +838,8 @@ function getTeacherAgent(): Agent {
       tools: {
         explain: instrumentedExplainTools.explain,
       },
+      // Token limiter to prevent context window overflow in long sessions
+      inputProcessors: [new TokenLimiterProcessor({ limit: 8000 })],
     });
   }
   return _agents.teacher;
@@ -782,6 +879,8 @@ function getBacktesterAgent(): Agent {
         // Shared context tools for cross-agent memory (Improvement #2)
         ...instrumentedSharedContextTools,
       },
+      // Token limiter to prevent context window overflow in long sessions
+      inputProcessors: [new TokenLimiterProcessor({ limit: 8000 })],
     });
   }
   return _agents.backtester;
@@ -823,6 +922,9 @@ function getGordonAgent(): Agent {
 
       // Memory for network orchestration
       memory: createMemory(),
+
+      // Token limiter to prevent context window overflow in long sessions
+      inputProcessors: [new TokenLimiterProcessor({ limit: 8000 })],
     });
   }
   return _agents.gordon;

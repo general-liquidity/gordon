@@ -79,6 +79,33 @@ export const SLASH_COMMANDS: SlashCommand[] = [
     action: "tool",
     target: "score_market",
   },
+  {
+    name: "chart",
+    aliases: ["c", "graph"],
+    description: "Display price chart with indicators",
+    usage: "/chart <symbol> [timeframe]",
+    category: "market",
+    action: "tool",
+    target: "generate_chart",
+  },
+  {
+    name: "ta",
+    aliases: ["tech", "technical"],
+    description: "Quick technical analysis with chart",
+    usage: "/ta <symbol> [timeframe]",
+    category: "market",
+    action: "tool",
+    target: "quick_ta",
+  },
+  {
+    name: "candlestick",
+    aliases: ["candles", "ohlc"],
+    description: "Display candlestick chart with volume",
+    usage: "/candlestick <symbol> [timeframe]",
+    category: "market",
+    action: "tool",
+    target: "display_candlestick_chart",
+  },
 
   // Trading
   {
@@ -281,6 +308,42 @@ export const SLASH_COMMANDS: SlashCommand[] = [
     target: "run_full_analysis",
   },
   {
+    name: "parallel",
+    aliases: ["par", "fast"],
+    description: "Run scan + analysis in parallel (faster comprehensive view)",
+    usage: "/parallel <symbol>",
+    category: "market",
+    action: "tool",
+    target: "parallel_scan_analyze",
+  },
+  {
+    name: "compare-coins",
+    aliases: ["coins", "multi-coin"],
+    description: "Analyze multiple coins in parallel for quick comparison",
+    usage: "/compare-coins BTC ETH SOL",
+    category: "market",
+    action: "tool",
+    target: "parallel_multi_coin",
+  },
+  {
+    name: "fast-deep",
+    aliases: ["fd", "quick-deep"],
+    description: "Run deep analysis with parallel execution (fastest)",
+    usage: "/fast-deep <symbol>",
+    category: "market",
+    action: "tool",
+    target: "parallel_deep_analysis",
+  },
+  {
+    name: "mtf",
+    aliases: ["timeframes", "multi-tf"],
+    description: "Analyze across multiple timeframes in parallel",
+    usage: "/mtf <symbol>",
+    category: "market",
+    action: "tool",
+    target: "parallel_timeframe",
+  },
+  {
     name: "risk",
     aliases: ["sharpe", "drawdown"],
     description: "Show risk-adjusted performance metrics",
@@ -315,6 +378,89 @@ export const SLASH_COMMANDS: SlashCommand[] = [
     category: "system",
     action: "menu",
     target: "theme",
+  },
+  {
+    name: "resume",
+    aliases: ["continue", "r"],
+    description: "Resume previous session with memory context",
+    usage: "/resume",
+    category: "system",
+    action: "menu",
+    target: "resume",
+  },
+  {
+    name: "new-session",
+    aliases: ["fresh", "new"],
+    description: "Start a fresh session (clear memory context)",
+    usage: "/new-session",
+    category: "system",
+    action: "menu",
+    target: "new-session",
+  },
+  {
+    name: "session",
+    aliases: ["sess"],
+    description: "Show current session info",
+    usage: "/session",
+    category: "system",
+    action: "menu",
+    target: "session-info",
+  },
+
+  // Thread Management (for "what if" scenario branching)
+  {
+    name: "clone",
+    aliases: ["branch", "fork"],
+    description: "Clone current session for 'what if' testing",
+    usage: "/clone [label]",
+    category: "system",
+    action: "menu",
+    target: "clone-thread",
+  },
+  {
+    name: "threads",
+    aliases: ["branches", "sessions"],
+    description: "List available session threads",
+    usage: "/threads",
+    category: "system",
+    action: "menu",
+    target: "list-threads",
+  },
+  {
+    name: "switch",
+    aliases: ["sw", "goto"],
+    description: "Switch to a different thread",
+    usage: "/switch <threadId>",
+    category: "system",
+    action: "menu",
+    target: "switch-thread",
+  },
+  {
+    name: "thread-info",
+    aliases: ["ti"],
+    description: "Get info about a specific thread",
+    usage: "/thread-info [threadId]",
+    category: "system",
+    action: "menu",
+    target: "thread-info",
+  },
+  {
+    name: "delete-thread",
+    aliases: ["dt", "remove-thread"],
+    description: "Delete a thread (cannot delete active thread)",
+    usage: "/delete-thread <threadId>",
+    category: "system",
+    action: "menu",
+    target: "delete-thread",
+  },
+  {
+    name: "rename-thread",
+    aliases: ["rt", "label-thread"],
+    description: "Rename/label a thread",
+    usage: "/rename-thread <threadId> <new-label>",
+    category: "system",
+    action: "menu",
+    target: "rename-thread",
   },
 ];
 
@@ -424,6 +570,30 @@ export function commandToPrompt(command: SlashCommand, args: string): string {
       return args ? `Scan ${args} for breakout or breakdown setups` : "Scan the market for breakout and breakdown setups";
     case "score":
       return args ? `Score ${args} and give me a trading signal` : "What symbol should I score?";
+    case "chart":
+      if (args) {
+        const parts = args.split(/\s+/);
+        const symbol = parts[0];
+        const timeframe = parts[1] || "4h";
+        return `Generate a chart for ${symbol} on the ${timeframe} timeframe with indicators`;
+      }
+      return "What symbol should I chart?";
+    case "ta":
+      if (args) {
+        const parts = args.split(/\s+/);
+        const symbol = parts[0];
+        const timeframe = parts[1] || "4h";
+        return `Show me technical analysis for ${symbol} on the ${timeframe} timeframe`;
+      }
+      return "What symbol should I analyze technically?";
+    case "candlestick":
+      if (args) {
+        const parts = args.split(/\s+/);
+        const symbol = parts[0];
+        const timeframe = parts[1] || "4h";
+        return `Display a candlestick chart for ${symbol} on the ${timeframe} timeframe`;
+      }
+      return "What symbol should I show candlesticks for?";
     case "plan":
       return args ? `Create a trade plan for ${args}` : "What coin should I plan a trade for?";
     case "grid":
@@ -486,6 +656,24 @@ export function commandToPrompt(command: SlashCommand, args: string): string {
       return args
         ? `Run a comprehensive analysis on ${args} including signals, RSI, whale orders, and orderbook`
         : "What symbol should I analyze comprehensively?";
+    case "parallel":
+      return args
+        ? `Run market scan and analysis in parallel for ${args} to get a comprehensive market view faster`
+        : "What symbol should I analyze with parallel execution?";
+    case "compare-coins":
+      if (args) {
+        const symbols = args.split(/\s+/).filter(s => s);
+        return `Analyze these coins in parallel to compare: ${symbols.join(", ")}`;
+      }
+      return "Which coins would you like to compare? (e.g., BTC ETH SOL)";
+    case "fast-deep":
+      return args
+        ? `Run fast parallel deep analysis on ${args} combining technical, whale, and orderbook analysis`
+        : "What symbol should I analyze with fast parallel deep analysis?";
+    case "mtf":
+      return args
+        ? `Analyze ${args} across multiple timeframes in parallel for multi-timeframe confluence`
+        : "What symbol should I analyze across timeframes?";
     case "risk":
       return "Show me my risk-adjusted performance metrics including Sharpe ratio and drawdown";
     case "cache":
@@ -496,6 +684,42 @@ export function commandToPrompt(command: SlashCommand, args: string): string {
       if (args === "dark") return "Switch to dark theme";
       if (args === "light") return "Switch to light theme";
       return "Toggle the color theme";
+    case "resume":
+      return "Resume my previous session with memory context";
+    case "new-session":
+      return "Start a fresh session and clear memory context";
+    case "session":
+      return "Show my current session information";
+    // Thread management commands
+    case "clone":
+      return args
+        ? `Clone the current conversation thread with label "${args}" for what-if testing`
+        : "Clone the current conversation thread for what-if testing";
+    case "threads":
+      return "List all my conversation threads";
+    case "switch":
+      return args
+        ? `Switch to thread ${args}`
+        : "Which thread would you like to switch to? Use /threads to see available threads.";
+    case "thread-info":
+      return args
+        ? `Show information about thread ${args}`
+        : "Show information about the current thread";
+    case "delete-thread":
+      return args
+        ? `Delete thread ${args}`
+        : "Which thread would you like to delete? Use /threads to see available threads.";
+    case "rename-thread":
+      if (args) {
+        const parts = args.split(/\s+/);
+        const threadId = parts[0];
+        const newLabel = parts.slice(1).join(" ");
+        if (threadId && newLabel) {
+          return `Rename thread ${threadId} to "${newLabel}"`;
+        }
+        return `Rename thread ${threadId}. What should the new label be?`;
+      }
+      return "Which thread would you like to rename? Use /threads to see available threads.";
     default:
       return args || command.description;
   }

@@ -10,7 +10,8 @@
  * - scheduler: Task scheduling
  * - system: System control (arm/disarm)
  * - earn: Staking and savings
- * - charts: Price visualization
+ * - charts: Price visualization (ASCII line and candlestick charts)
+ * - multiModalCharts: Advanced chart generation with image export and vision analysis
  * - orderbook: Order book and liquidity
  * - wallet: Wallet management
  * - discovery: Coin discovery
@@ -23,6 +24,7 @@
  * - metrics: Performance metrics and statistics
  * - composition: Tool chaining and composition utilities (sequential, parallel, conditional)
  * - backtest: Backtesting and strategy optimization
+ * - parallelAnalysis: Parallel execution tools (multi-coin, multi-timeframe, deep analysis)
  *
  * All tools are automatically wrapped with metrics recording via withToolsMetrics.
  *
@@ -55,9 +57,16 @@ export { strategyTools } from "./strategies.ts";
 export { metricsTools } from "./metrics.ts";
 export { compositionTools } from "./composition.ts";
 export { backtestTools } from "./backtest.ts";
+export { parallelAnalysisTools } from "./parallel-analysis.ts";
+
+// Multi-modal chart tools (image generation and vision analysis)
+export { multiModalChartTools } from "../../tools/chartTools.ts";
 
 // Shared context tools for cross-agent memory
 export { sharedContextTools } from "../shared-context.ts";
+
+// Eval tools for learning from trade outcomes
+export { evalTools } from "../../evals/tools.ts";
 
 // Tool metrics wrapper
 export { withToolMetrics, withToolsMetrics } from "./withMetrics.ts";
@@ -236,6 +245,9 @@ import { strategyTools } from "./strategies.ts";
 import { metricsTools } from "./metrics.ts";
 import { compositionTools } from "./composition.ts";
 import { backtestTools } from "./backtest.ts";
+import { parallelAnalysisTools } from "./parallel-analysis.ts";
+import { multiModalChartTools } from "../../tools/chartTools.ts";
+import { evalTools } from "../../evals/tools.ts";
 
 /**
  * All tools combined as a single object for Mastra Agent
@@ -261,6 +273,9 @@ export const allTools = {
   ...metricsTools,
   ...compositionTools,
   ...backtestTools,
+  ...parallelAnalysisTools,
+  ...multiModalChartTools,
+  ...evalTools,
 };
 
 /**
@@ -287,6 +302,9 @@ export const toolCounts = {
   metrics: Object.keys(metricsTools).length,
   composition: Object.keys(compositionTools).length,
   backtest: Object.keys(backtestTools).length,
+  parallelAnalysis: Object.keys(parallelAnalysisTools).length,
+  multiModalCharts: Object.keys(multiModalChartTools).length,
+  evals: Object.keys(evalTools).length,
   total: Object.keys(allTools).length,
 };
 
