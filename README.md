@@ -1,11 +1,11 @@
 <p align="center">
 <pre>
- ██████╗  ██████╗ ██████╗ ██████╗  ██████╗ ███╗   ██╗
-██╔════╝ ██╔═══██╗██╔══██╗██╔══██╗██╔═══██╗████╗  ██║
-██║  ███╗██║   ██║██████╔╝██║  ██║██║   ██║██╔██╗ ██║
-██║   ██║██║   ██║██╔══██╗██║  ██║██║   ██║██║╚██╗██║
-╚██████╔╝╚██████╔╝██║  ██║██████╔╝╚██████╔╝██║ ╚████║
- ╚═════╝  ╚═════╝ ╚═╝  ╚═╝╚═════╝  ╚═════╝ ╚═╝  ╚═══╝
+ e$$~~\                        \$$$
+ d$$$      e$$~-_  $$$-~\  e$$~\$$$  e$$~-_  $$$-~$$e
+ $$$$  __ d$$$   i $$$    d$$$  $$$ d$$$   i $$$  $$$
+ $$$$   | $$$$   | $$$    $$$$  $$$ $$$$   | $$$  $$$
+ Y$$$   | Y$$$   | $$$    Y$$$  $$$ Y$$$   | $$$  $$$
+  "$$__/   "$$_-~  $$$     "$$_/$$$  "$$_-~  $$$  $$$
 </pre>
 </p>
 
@@ -122,24 +122,58 @@ That's it. No config files needed. Just talk.
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                     📈 GORDON AGENT                            
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐         │
-│  │ Scanner  │  │ Analyst  │  │ Planner  │  │ Teacher  │         │
-│  └──────────┘  └──────────┘  └──────────┘  └──────────┘         │
-│        │             │             │             │              │
-│        └─────────────┴──────┬──────┴─────────────┘              │
-│                             │                                   │
-│                    ┌────────▼────────┐                          │
-│                    │   Orchestrator  │                          │
-│                    └────────┬────────┘                          │
-└─────────────────────────────┼───────────────────────────────────┘
+│                    🛡️ MIDDLEWARE LAYER                          
+│         Input Guardrails │ Access Control │ Rate Limiting       │
+└─────────────────────────────────────────────────────────────────┘
                               │
-              ┌───────────────┼───────────────┐
-              ▼               ▼               ▼
-        ┌──────────┐   ┌──────────┐   ┌──────────┐
-        │ Binance  │   │  OpenAI  │   │  SQLite  │
-        │   API    │   │ /Dedalus │   │ Storage  │
-        └──────────┘   └──────────┘   └──────────┘
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                 📈 GORDON (Mastra Agent Network)                
+│                                                                 │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐            │
+│  │ Scanner  │ │ Analyst  │ │ Planner  │ │ Executor │            │
+│  │ ──────── │ │ ──────── │ │ ──────── │ │ ──────── │            │
+│  │ Find     │ │ Deep     │ │ Create   │ │ Execute  │            │
+│  │ setups   │ │ analysis │ │ plans    │ │ orders   │            │
+│  └──────────┘ └──────────┘ └──────────┘ └──────────┘            │
+│                                                                 │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐            │
+│  │ Monitor  │ │ Teacher  │ │Backtester│ │  Gordon  │            │
+│  │ ──────── │ │ ──────── │ │ ──────── │ │ ──────── │            │
+│  │ Track    │ │ Explain  │ │ Test     │ │ Route &  │            │
+│  │ positions│ │ concepts │ │ strategy │ │ orchestrate│          │
+│  └──────────┘ └──────────┘ └──────────┘ └──────────┘            │
+│                                                                 │
+│        Handoff Validation │ Fallback Chains │ Error Recovery    │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                       🔧 TOOLS LAYER (29 modules)               
+│                                                                 │
+│  Trading: create_plan, execute_plan, close_trade, grid_plan     │
+│  Analysis: indicators, orderbook, market_analysis, charts       │ 
+│  Discovery: scan_market, trending, new_listings, top_movers     │
+│  Risk: kelly_size, volatility_size, exit_conditions, drawdown   │
+│  Portfolio: positions, wallet, earn, history, account           │
+│  Backtest: run_backtest, optimize, monte_carlo, walk_forward    │
+│  System: arm/disarm, scheduler, explain, shared_context         │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    💾 INFRASTRUCTURE LAYER                     
+│                                                                 │
+│  ┌───────────┐  ┌───────────┐  ┌───────────┐  ┌───────────┐     │
+│  │  Binance  │  │    LLM    │  │  SQLite   │  │  LibSQL   │     │
+│  │  REST+WS  │  │ Providers │  │  Storage  │  │  Vector   │     │
+│  └───────────┘  └───────────┘  └───────────┘  └───────────┘     │
+│       │               │              │              │           │
+│   Orders &        OpenAI         Plans &       Semantic         │
+│   Market Data    Anthropic       Trades        Memory           │
+│   Real-time       Google         Events        RAG              │
+│   WebSocket       Dedalus        Audit         Recall           │
+└─────────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
@@ -191,35 +225,74 @@ SAFE MODE (default)           ARMED MODE (you enable)
 
 ## Everything We Built
 
+~200 TypeScript files implementing a production-grade trading platform.
+
 ### Core Platform
-- **Agent Orchestrator** — Multi-agent coordination with OpenAI Agents SDK
-- **Intent Router** — Natural language → structured trading intent
-- **LLM Client** — Multi-provider support (OpenAI, Dedalus Labs)
+
+- **Multi-Agent Orchestrator** — Mastra-based agent coordination (Scanner, Analyst, Planner, Explainer)
+- **Intent Router** — Natural language → structured trading intent classification
+- **LLM Client** — Multi-provider support (OpenAI, Anthropic Claude, Google Gemini, Dedalus Labs)
 
 ### Trading Engine
-- **Scanner** — Market-wide opportunity detection
-- **Analyzer** — Deep technical analysis per coin
-- **Planner** — AI-powered trade plan generation
-- **Validator** — Risk checks before execution
-- **Executor** — Order placement with rollback on failure
-- **Monitor** — Position tracking, fill detection, alerts
+
+- **Scanner** — Market-wide opportunity detection across top 50 cryptos
+- **Analyzer** — Deep technical analysis per coin with multiple timeframes
+- **Planner** — AI-powered trade plan generation with entry/SL/TP levels
+- **Validator** — Risk checks, position limits, allocation validation
+- **Executor** — Order placement with OCO orders and rollback on failure
+- **Monitor** — Real-time position tracking via WebSocket, fill detection, alerts
+- **Trailing Stops** — Automatic trailing stop-loss management
+- **Order Recovery** — Automatic recovery mechanism for failed/interrupted orders
+- **Grid Calculator** — DCA and grid entry calculations
+
+### Trading Strategies
+
+- **Tier 1 (Beginner):** Support Bounce, Bollinger Bounce, SMA Crossover, Volume Surge, VWAP Bounce
+- **Tier 2 (Intermediate):** Consolidation Pop, ADX Trend, EMA-RSI Crossover, Relative Strength, Engulfing Pattern
+- **Strategy Ensemble** — Combine multiple strategies with configurable weights
+
+### Backtesting Engine
+
+- **Historical Simulation** — Full backtesting against historical data
+- **Monte Carlo Analysis** — Statistical confidence intervals
+- **Walk-Forward Validation** — Out-of-sample testing
+- **Grid Search Optimization** — Hyperparameter tuning
+- **Alpha Decay Analysis** — Strategy degradation detection
+- **Performance Metrics** — Sharpe ratio, max drawdown, profit factor, win rate
 
 ### Technical Analysis
+
 - **RSI** — Relative Strength Index (oversold/overbought)
 - **MACD** — Momentum and trend direction
-- **Volume Analysis** — Confirmation signals
-- **Level Detection** — Support/resistance identification
+- **Bollinger Bands** — Volatility and mean reversion
+- **ATR** — Average True Range for stop placement
+- **VWAP** — Volume Weighted Average Price
+- **Stochastic RSI** — Momentum oscillator
+- **EMA/SMA** — Trend following indicators
+- **Volume Analysis** — Confirmation signals and whale detection
+- **Support/Resistance** — Automatic level detection
 
 ### Infrastructure
-- **Binance Client** — Full REST API with HMAC signing
-- **SQLite Storage** — Local persistence for plans, trades, events
-- **Config Management** — JSON config at `~/.gordon/`
+
+- **Binance Client** — Full REST API with HMAC signing, rate limiting, circuit breaker
+- **Binance WebSocket** — Real-time price feeds and order updates
+- **SQLite Storage** — Plans, trades, events, audit logs with WAL mode
+- **Service Container** — Dependency injection for clean architecture
+- **Repository Pattern** — Data access layer for trades and plans
+- **Event Bus** — Event-driven architecture for system coordination
+- **Audit Logging** — Comprehensive security audit trail
+- **Caching Layer** — Price and result caching with TTL
+- **Resilience** — Retry logic, fallbacks, error recovery
 
 ### User Experience
-- **Ink CLI** — Beautiful terminal UI with React
+
+- **Ink CLI** — React-based terminal UI with theme support
+- **Real-time Chat** — Streaming responses with agent attribution
 - **Onboarding Flow** — First-run setup wizard
-- **Error Boundaries** — Graceful error handling
-- **Setup Wizard** — API key configuration
+- **Model Selector** — Choose your preferred LLM
+- **Keyboard Shortcuts** — Power user navigation
+- **Command Autocomplete** — Slash command suggestions
+- **Status Bar** — Mode, portfolio value, BTC price, connection status
 
 ---
 
@@ -244,8 +317,10 @@ Gordon stores config at `~/.gordon/config.json`:
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `OPENAI_API_KEY` | One of these | OpenAI API key |
-| `DEDALUS_API_KEY` | required | Dedalus Labs API key |
+| `OPENAI_API_KEY` | One LLM | OpenAI API key |
+| `ANTHROPIC_API_KEY` | provider | Anthropic Claude API key |
+| `GOOGLE_GENERATIVE_AI_API_KEY` | required | Google Gemini API key |
+| `DEDALUS_API_KEY` | | Dedalus Labs API key (20+ models) |
 | `BINANCE_API_KEY` | For trading | Binance API key |
 | `BINANCE_API_SECRET` | For trading | Binance secret |
 
@@ -256,7 +331,7 @@ Gordon stores config at `~/.gordon/config.json`:
 ```bash
 bun install          # Install dependencies
 bun run dev          # Development mode (hot reload)
-bun test             # Run 90 tests
+bun test             # Run tests
 bun run typecheck    # Type check
 bun run build        # Build for npm
 bun run build:binary # Build standalone executable
@@ -267,24 +342,44 @@ bun run build:binary # Build standalone executable
 ```
 gordon/
 ├── src/
-│   ├── app/           # Ink UI (React for terminals)
+│   ├── app/           # Terminal UI (React + Ink)
 │   │   ├── App.tsx
-│   │   ├── Onboarding.tsx
-│   │   ├── SetupWizard.tsx
+│   │   ├── ChatView.tsx
+│   │   ├── ChatInput.tsx
+│   │   ├── components/    # Reusable UI components
 │   │   └── ...
-│   ├── core/          # Business logic
+│   ├── core/          # Trading logic
 │   │   ├── scanner.ts
 │   │   ├── analyzer.ts
 │   │   ├── planner.ts
 │   │   ├── executor.ts
-│   │   └── ...
-│   ├── infra/         # External integrations
-│   │   ├── agents/    # OpenAI Agents SDK
-│   │   ├── binance/   # Exchange client
-│   │   ├── llm/       # LLM providers
-│   │   └── storage/   # SQLite + JSON
-│   ├── indicators/    # Technical analysis
-│   └── types/         # TypeScript types
+│   │   ├── monitor.ts
+│   │   ├── trailing-stop.ts
+│   │   ├── indicators/    # Technical indicators
+│   │   └── risk-management/
+│   ├── backtest/      # Backtesting engine
+│   │   ├── engine.ts
+│   │   ├── monte-carlo.ts
+│   │   ├── walk-forward.ts
+│   │   └── optimization/
+│   ├── strategies/    # Trading strategies
+│   │   ├── tier-1/        # Beginner strategies
+│   │   ├── tier-2/        # Intermediate strategies
+│   │   └── ensemble.ts
+│   ├── services/      # Business services
+│   │   ├── trading.service.ts
+│   │   ├── portfolio.service.ts
+│   │   └── container.ts   # Dependency injection
+│   ├── repositories/  # Data access layer
+│   ├── infra/         # Infrastructure
+│   │   ├── agents/        # Mastra multi-agent system
+│   │   ├── binance/       # Exchange client + WebSocket
+│   │   ├── llm/           # LLM providers
+│   │   ├── storage/       # SQLite + config
+│   │   ├── audit/         # Audit logging
+│   │   └── cache/         # Caching layer
+│   ├── events/        # Event-driven architecture
+│   └── types/         # TypeScript definitions
 ├── prompts/           # LLM prompt templates
 ├── scripts/           # Install scripts
 └── .github/           # CI/CD workflows
@@ -296,14 +391,19 @@ gordon/
 
 - [x] Support Bounce strategy
 - [x] Binance spot trading
-- [x] Multi-provider LLM
-- [x] Plan-as-diff approval
-- [x] SAFE/ARMED modes
-- [ ] More strategies (breakout, mean reversion)
+- [x] Multi-provider LLM (OpenAI, Anthropic, Google, Dedalus)
+- [x] Plan-as-diff approval UI
+- [x] SAFE/ARMED modes with 24h auto-expiry
+- [x] Trailing stops
+- [x] 10+ trading strategies (tier 1 & tier 2)
+- [x] Backtesting engine with Monte Carlo & walk-forward
+- [x] Real-time WebSocket monitoring
+- [x] Order recovery mechanism
+- [x] Audit logging & security guardrails
 - [ ] More exchanges (Coinbase, Kraken)
 - [ ] Portfolio rebalancing
-- [ ] Trailing stops
 - [ ] Mobile notifications
+- [ ] Paper trading mode
 
 ---
 
