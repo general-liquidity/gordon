@@ -15,8 +15,18 @@ import { z } from "zod";
 import { scan } from "../../../core/scanner.ts";
 import { analyze } from "../../../core/analyzer.ts";
 import { getHistoricalOpportunities, getOpportunitySummary } from "../../storage/events.ts";
-import { getGordonContext, validateToolOutput, type MastraExecutionContext } from "./types.ts";
+import {
+  getGordonContext,
+  validateToolOutput,
+  createToolErrorResponse,
+  type MastraExecutionContext,
+} from "./types.ts";
 import { createCachedTool, TOOL_CACHE_CONFIG } from "./cache.ts";
+import {
+  formatScanResults,
+  formatAnalysisResults,
+  formatCurrency,
+} from "../../../app/components/formatResults.ts";
 
 // ============================================================================
 // Error Messages
@@ -41,6 +51,8 @@ const scanMarketOutputSchema = z.object({
     bias: z.string(),
     risk: z.string(),
   })).optional(),
+  executionTime: z.number().optional(),
+  formattedSummary: z.string().optional(),
   error: z.string().optional(),
 });
 
@@ -64,6 +76,8 @@ const analyzeCoinOutputSchema = z.object({
     volumeTrend: z.string().optional(),
   }).optional(),
   recommendation: z.string().optional(),
+  executionTime: z.number().optional(),
+  formattedSummary: z.string().optional(),
   error: z.string().optional(),
 });
 
@@ -109,12 +123,13 @@ export const scanMarketTool = createTool({
       return validateToolOutput(scanMarketOutputSchema, errors.noBinance, { toolName: "scan_market" });
     }
 
-    const result = await scan(ctx.binance, { topN, timeframes });
+    const startTime = Date.now();
 
-    const output = {
-      timestamp: result.timestamp,
-      coinsScanned: result.coins.length,
-      opportunities: result.coins
+    try {
+      const result = await scan(ctx.binance, { topN, timeframes });
+      const executionTime = Date.now() - startTime;
+
+      const opportunities = result.coins
         .filter((c) => c.setupDetected)
         .slice(0, 10)
         .map((c) => ({
@@ -124,10 +139,36 @@ export const scanMarketTool = createTool({
           setupConfidence: c.setupConfidence,
           bias: c.bias,
           risk: c.risk,
-        })),
-    };
+        }));
 
-    return validateToolOutput(scanMarketOutputSchema, output, { toolName: "scan_market" });
+      // Generate formatted summary
+      const formattedSummary = formatScanResults({
+        coinsScanned: result.coins.length,
+        opportunities,
+        executionTime,
+        maxRows: 10,
+      });
+
+      const output = {
+        timestamp: result.timestamp,
+        coinsScanned: result.coins.length,
+        opportunities,
+        executionTime,
+        formattedSummary,
+      };
+
+      return validateToolOutput(scanMarketOutputSchema, output, { toolName: "scan_market" });
+    } catch (error) {
+      // Return structured error with recovery context
+      const errorResponse = createToolErrorResponse(
+        error instanceof Error ? error : new Error(String(error)),
+        "/scan",
+        { topN, timeframes }
+      );
+      return validateToolOutput(scanMarketOutputSchema, {
+        error: errorResponse.error,
+      }, { toolName: "scan_market" });
+    }
   },
 });
 
@@ -156,45 +197,83 @@ export const analyzeCoinTool = createTool({
       return validateToolOutput(analyzeCoinOutputSchema, errors.noBinance, { toolName: "analyze_coin" });
     }
 
+    const startTime = Date.now();
+
     // Normalize symbol (add USDT if not present)
     const normalizedSymbol = symbol.toUpperCase().endsWith("USDT")
       ? symbol.toUpperCase()
       : `${symbol.toUpperCase()}USDT`;
 
-    const result = await analyze(ctx.binance, normalizedSymbol, {
-      timeframes: timeframes ?? ["1h", "4h", "1d"],
-    });
+    try {
+      const result = await analyze(ctx.binance, normalizedSymbol, {
+        timeframes: timeframes ?? ["1h", "4h", "1d"],
+      });
 
-    const recommendation =
-      result.setupDetected && result.setupConfidence >= 0.6
-        ? "Good setup detected - consider creating a plan"
-        : result.setupDetected
-          ? "Weak setup detected - wait for better entry"
-          : "No setup detected - keep watching";
+      const executionTime = Date.now() - startTime;
 
-    const output = {
-      symbol: result.symbol,
-      price: result.price,
-      trend: result.trend,
-      setupDetected: result.setupDetected,
-      setupConfidence: result.setupConfidence,
-      supports: result.supports.slice(0, 3).map((s) => ({
+      const recommendation =
+        result.setupDetected && result.setupConfidence >= 0.6
+          ? "Good setup detected - consider creating a plan"
+          : result.setupDetected
+            ? "Weak setup detected - wait for better entry"
+            : "No setup detected - keep watching";
+
+      const supports = result.supports.slice(0, 3).map((s) => ({
         price: s.price,
         strength: s.strength,
-      })),
-      resistances: result.resistances.slice(0, 3).map((r) => ({
+      }));
+
+      const resistances = result.resistances.slice(0, 3).map((r) => ({
         price: r.price,
         strength: r.strength,
-      })),
-      indicators: {
+      }));
+
+      const indicators = {
         rsi: result.indicators.rsi,
         macdState: result.macdState,
         volumeTrend: result.volumeTrend,
-      },
-      recommendation,
-    };
+      };
 
-    return validateToolOutput(analyzeCoinOutputSchema, output, { toolName: "analyze_coin" });
+      // Generate formatted summary
+      const formattedSummary = formatAnalysisResults({
+        symbol: result.symbol,
+        price: result.price,
+        trend: result.trend,
+        setupDetected: result.setupDetected,
+        setupConfidence: result.setupConfidence,
+        indicators,
+        supports,
+        resistances,
+        executionTime,
+      });
+
+      const output = {
+        symbol: result.symbol,
+        price: result.price,
+        trend: result.trend,
+        setupDetected: result.setupDetected,
+        setupConfidence: result.setupConfidence,
+        supports,
+        resistances,
+        indicators,
+        recommendation,
+        executionTime,
+        formattedSummary,
+      };
+
+      return validateToolOutput(analyzeCoinOutputSchema, output, { toolName: "analyze_coin" });
+    } catch (error) {
+      // Return structured error with recovery context
+      const errorResponse = createToolErrorResponse(
+        error instanceof Error ? error : new Error(String(error)),
+        `/analyze ${symbol}`,
+        { symbol: normalizedSymbol, timeframes }
+      );
+      return validateToolOutput(analyzeCoinOutputSchema, {
+        error: errorResponse.error,
+        symbol: normalizedSymbol,
+      }, { toolName: "analyze_coin" });
+    }
   },
 });
 

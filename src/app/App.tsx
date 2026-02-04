@@ -3,7 +3,7 @@ import { Box, Text, useInput } from "ink";
 import { Spinner, Alert, StatusMessage } from "@inkjs/ui";
 import { ChatInput } from "./ChatInput.tsx";
 
-import { StatusBar } from "./StatusBar.tsx";
+import { StatusBar, type ThreadStatusInfo } from "./StatusBar.tsx";
 import { WelcomeBanner } from "./WelcomeBanner.tsx";
 import { QuickStartMenu, type MenuOption } from "./QuickStartMenu.tsx";
 import { ChatView, type ChatMessage } from "./ChatView.tsx";
@@ -15,6 +15,7 @@ import { ThemeProvider, useTheme } from "./components/ThemeProvider.tsx";
 import { processMessageStream, initializeTracing } from "../infra/agents/orchestrator.ts";
 import { createLLMClientFromEnv, type LLMClient } from "../infra/llm/index.ts";
 import { BinanceClient } from "../infra/binance/index.ts";
+import { BinanceAdapter, ExchangeFactory, type Exchange } from "../infra/exchange/index.ts";
 import {
   runMonitorCycle,
   initializeRealtimeMonitor,
@@ -46,10 +47,38 @@ import { loadEnvFile, checkEnvStatus, type EnvStatus } from "../infra/storage/en
 import { initDatabase } from "../infra/storage/index.ts";
 import { initializeContainer } from "../services/container.ts";
 import { reconcileWithBinance } from "../services/reconciliation.service.ts";
+import { createErrorContext, formatErrorWithContext } from "../utils/errorContext.ts";
 import type { GordonContext } from "../infra/agents/types.ts";
 import type { Mode, GordonConfig } from "../types/index.ts";
 import { COLORS, type ThemeName } from "./theme.ts";
-import { parseSlashCommand, commandToPrompt, formatCommandHelp } from "./slashCommands.ts";
+import {
+  parseSlashCommand,
+  commandToPrompt,
+  formatCommandHelp,
+  parseHelpArg,
+  formatPaginatedCommandHelp,
+  formatAnalysisCommandsHelp,
+} from "./slashCommands.ts";
+import {
+  handleConfigCommand,
+  handleExchangeCommand,
+  handleStrategyCommand,
+  handleGenCommand,
+  handleMCPCommand,
+  handleWorkflowCommand,
+  formatWorkflowResult,
+  handleExportCommand,
+} from "./commands/index.ts";
+import { formatScanResults, formatPortfolioResults } from "./components/formatResults.ts";
+import {
+  checkForPluginSuggestions,
+  formatPluginSuggestionsMessage,
+} from "./commands/mcp.ts";
+import type {
+  ScanExportData,
+  AnalysisExportData,
+  BacktestExportData,
+} from "./commands/export.ts";
 
 type AppView = "loading" | "onboarding" | "setup" | "model" | "welcome" | "menu" | "chat";
 
@@ -74,11 +103,23 @@ interface AppState {
   showStartupHint: boolean;
   /** Current session info for Mastra agent memory */
   session: SessionInfo | null;
+  /** Thread info for status bar display */
+  threadStatusInfo: ThreadStatusInfo | null;
 }
+
+interface LastResults {
+  scan?: ScanExportData;
+  analysis?: AnalysisExportData;
+  backtest?: BacktestExportData;
+}
+
+type PluginSuggestion = ReturnType<typeof checkForPluginSuggestions>[number];
 
 function getDefaultConfig(): GordonConfig {
   return {
     version: "1.0.0",
+    exchanges: [],
+    mcpServers: [],
     preferences: {
       cashReservePercent: 0.2,
       maxAllocationPerTrade: 0.1,
@@ -124,11 +165,116 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
     showShortcuts: false,
     showStartupHint: true,
     session: null,
+    threadStatusInfo: null,
   });
 
   const llmClientRef = useRef<LLMClient | null>(null);
   const binanceClientRef = useRef<BinanceClient | null>(null);
+  const exchangeRef = useRef<Exchange | null>(null);
   const configRef = useRef<GordonConfig>(getDefaultConfig());
+  const lastResultsRef = useRef<LastResults>({});
+  const pendingPluginSuggestionsRef = useRef<PluginSuggestion[]>([]);
+  const shownPluginSuggestionsRef = useRef<Set<string>>(new Set());
+
+  /**
+   * Helper to update thread status info in state
+   * Call this whenever the thread changes or messages are added
+   */
+  const updateThreadStatusInfo = useCallback(async (threadId: string | undefined): Promise<void> => {
+    if (!threadId) {
+      setState((prev) => ({ ...prev, threadStatusInfo: null }));
+      return;
+    }
+
+    try {
+      const threadInfo = await getThreadInfo(threadId);
+      if (threadInfo) {
+        setState((prev) => ({
+          ...prev,
+          threadStatusInfo: {
+            name: threadInfo.label || "Main",
+            messageCount: threadInfo.messageCount,
+            isBranch: threadInfo.clonedFrom !== null,
+          },
+        }));
+      } else {
+        setState((prev) => ({
+          ...prev,
+          threadStatusInfo: {
+            name: "Main",
+            messageCount: 0,
+            isBranch: false,
+          },
+        }));
+      }
+    } catch (error) {
+      console.error("Failed to update thread status:", error);
+    }
+  }, []);
+
+  const updateLastResultsFromTool = useCallback((toolName: string | undefined, toolResult: unknown): void => {
+    if (!toolName || !toolResult || typeof toolResult !== "object") return;
+    const resultObj = toolResult as Record<string, unknown>;
+    if (resultObj.error) return;
+
+    switch (toolName) {
+      case "scan_market":
+        lastResultsRef.current.scan = resultObj as ScanExportData;
+        break;
+      case "analyze_coin":
+        lastResultsRef.current.analysis = resultObj as AnalysisExportData;
+        break;
+      case "run_backtest":
+      case "compare_backtests":
+      case "get_backtest_summary":
+      case "analyze_backtest_results":
+        lastResultsRef.current.backtest = resultObj as BacktestExportData;
+        break;
+      default:
+        break;
+    }
+  }, []);
+
+  const refreshActiveExchange = useCallback(async (): Promise<void> => {
+    try {
+      const config = await loadConfig();
+      configRef.current = config;
+
+      const exchanges = config.exchanges || [];
+      if (exchanges.length === 0) {
+        exchangeRef.current = null;
+        return;
+      }
+
+      const activeId = config.activeExchangeId || exchanges.find((ex) => ex.isDefault)?.id;
+      const active = exchanges.find((ex) => ex.id === activeId) || exchanges[0];
+      if (!active) {
+        exchangeRef.current = null;
+        return;
+      }
+
+      exchangeRef.current = ExchangeFactory.create(active.type, {
+        apiKey: active.apiKey,
+        apiSecret: active.apiSecret,
+        passphrase: active.passphrase,
+        sandbox: active.sandbox,
+      });
+
+      if (active.type === "binance" && active.apiKey && active.apiSecret) {
+        binanceClientRef.current = new BinanceClient(active.apiKey, active.apiSecret);
+      }
+    } catch (error) {
+      console.error("Failed to refresh active exchange:", error);
+    }
+  }, []);
+
+  const formatCommandError = useCallback(
+    (operation: string, error: unknown, context?: Record<string, unknown>): string => {
+      const err = error instanceof Error ? error : new Error(String(error));
+      return formatErrorWithContext(createErrorContext(err, operation, context));
+    },
+    []
+  );
 
   // Initialize config and LLM client on mount
   useEffect(() => {
@@ -210,6 +356,11 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
             envStatus.keys.BINANCE_API_KEY,
             envStatus.keys.BINANCE_API_SECRET
           );
+          // Also create Exchange adapter for multi-exchange support
+          exchangeRef.current = new BinanceAdapter(
+            envStatus.keys.BINANCE_API_KEY,
+            envStatus.keys.BINANCE_API_SECRET
+          );
 
           // Reconcile local state with Binance on startup
           // This ensures any orders that filled while offline are recorded
@@ -273,12 +424,32 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
       // This enables thread management features like cloning and listing
       await ensureThreadRegistered();
 
+      // Fetch thread info for status bar
+      let threadStatusInfo: ThreadStatusInfo | null = null;
+      if (session.threadId) {
+        const threadInfo = await getThreadInfo(session.threadId);
+        if (threadInfo) {
+          threadStatusInfo = {
+            name: threadInfo.label || "Main",
+            messageCount: threadInfo.messageCount,
+            isBranch: threadInfo.clonedFrom !== null,
+          };
+        } else {
+          threadStatusInfo = {
+            name: "Main",
+            messageCount: 0,
+            isBranch: false,
+          };
+        }
+      }
+
       setState((prev) => ({
         ...prev,
         view: initialView,
         mode: config.mode,
         connectionStatus: llmClientRef.current ? "connected" : "disconnected",
         session,
+        threadStatusInfo,
       }));
     }
 
@@ -388,23 +559,6 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
             ...prev.messages,
             { role: "user", content: value.trim(), timestamp: formatTimestamp() },
             themeMessage,
-          ],
-        }));
-        return;
-      }
-
-      // Handle special /help with no args - show command list
-      if (command.name === "help" && !args) {
-        const helpMessage: ChatMessage = {
-          role: "gordon",
-          content: formatCommandHelp(),
-          timestamp: formatTimestamp(),
-        };
-        setState((prev) => ({
-          ...prev,
-          messages: [...prev.messages,
-            { role: "user", content: value.trim(), timestamp: formatTimestamp() },
-            helpMessage
           ],
         }));
         return;
@@ -526,14 +680,17 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
           const result = await cloneThread(state.session.threadId, undefined, label);
 
           if (result.success && result.newThreadId) {
+            // Get the current thread's info to show the source label
+            const currentThreadInfo = await getThreadInfo(state.session.threadId);
+            const sourceLabel = currentThreadInfo?.label || "Main Thread";
+            const branchLabel = label || `Clone of ${sourceLabel}`;
+
             const cloneMessage: ChatMessage = {
               role: "gordon",
-              content: `**Thread Cloned Successfully!**\n\n` +
-                `A new branch has been created for "what if" testing.\n\n` +
-                `- **New Thread ID:** \`${result.newThreadId.slice(0, 25)}...\`\n` +
-                `- **Messages Copied:** ${result.messagesCopied}\n` +
-                `- **Source Thread:** \`${result.sourceThreadId.slice(0, 20)}...\`\n\n` +
-                `Use \`/switch ${result.newThreadId.slice(0, 15)}\` to switch to the cloned thread, or \`/threads\` to see all threads.`,
+              content: `Created branch: "${branchLabel}"\n` +
+                `  Branched from: ${sourceLabel} at message #${result.messagesCopied}\n` +
+                `  Tip: Changes here won't affect the original thread\n\n` +
+                `Use \`/switch ${result.newThreadId.slice(0, 15)}\` to switch to the new branch, or \`/threads\` to see all threads.`,
               timestamp: formatTimestamp(),
             };
             setState((prev) => ({
@@ -694,19 +851,50 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
               previousThreadId: result.previousThreadId,
             };
 
+            // Calculate relative time for "last active"
+            const lastActiveDate = new Date(targetThread.lastActiveAt);
+            const now = new Date();
+            const diffMs = now.getTime() - lastActiveDate.getTime();
+            const diffMins = Math.floor(diffMs / 60000);
+            const diffHours = Math.floor(diffMs / 3600000);
+            const diffDays = Math.floor(diffMs / 86400000);
+            let lastActiveStr: string;
+            if (diffMins < 1) {
+              lastActiveStr = "Just now";
+            } else if (diffMins < 60) {
+              lastActiveStr = `${diffMins} minute${diffMins === 1 ? "" : "s"} ago`;
+            } else if (diffHours < 24) {
+              lastActiveStr = `${diffHours} hour${diffHours === 1 ? "" : "s"} ago`;
+            } else {
+              lastActiveStr = `${diffDays} day${diffDays === 1 ? "" : "s"} ago`;
+            }
+
+            // Build enhanced switch message
+            const branchInfo = targetThread.clonedFrom
+              ? `\n  Type: Branch (cloned from another thread)`
+              : `\n  Type: Original thread`;
+
             const switchMessage: ChatMessage = {
               role: "gordon",
-              content: `**Switched to thread: ${targetThread.label}**\n\n` +
-                `- **Thread ID:** \`${result.threadId.slice(0, 25)}...\`\n` +
-                `- **Messages:** ${targetThread.messageCount}\n\n` +
-                `You are now continuing this conversation branch. ` +
-                `Your previous thread is still available via \`/threads\`.`,
+              content: `Switched to thread: "${targetThread.label}"\n` +
+                `  Last active: ${lastActiveStr}\n` +
+                `  Messages: ${targetThread.messageCount}` +
+                branchInfo +
+                `\n\nYour previous thread is still available via \`/threads\`.`,
               timestamp: formatTimestamp(),
+            };
+
+            // Update thread status info
+            const newThreadStatusInfo: ThreadStatusInfo = {
+              name: targetThread.label,
+              messageCount: targetThread.messageCount,
+              isBranch: targetThread.clonedFrom !== null,
             };
 
             setState((prev) => ({
               ...prev,
               session: newSession,
+              threadStatusInfo: newThreadStatusInfo,
               messages: [
                 { role: "user", content: value.trim(), timestamp: formatTimestamp() },
                 switchMessage,
@@ -779,18 +967,63 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
           const info = await getThreadInfo(targetThread.threadId);
 
           if (info) {
-            const cloneInfo = info.clonedFrom
-              ? `\n- **Cloned From:** \`${info.clonedFrom.slice(0, 20)}...\``
-              : "";
+            // Calculate session duration
+            const createdDate = new Date(info.createdAt);
+            const lastActiveDate = new Date(info.lastActiveAt);
+            const durationMs = lastActiveDate.getTime() - createdDate.getTime();
+            const durationMins = Math.floor(durationMs / 60000);
+            const durationHours = Math.floor(durationMs / 3600000);
+            let durationStr: string;
+            if (durationMins < 60) {
+              durationStr = `${durationMins} minute${durationMins === 1 ? "" : "s"}`;
+            } else if (durationHours < 24) {
+              const mins = durationMins % 60;
+              durationStr = `${durationHours}h ${mins}m`;
+            } else {
+              const days = Math.floor(durationHours / 24);
+              const hours = durationHours % 24;
+              durationStr = `${days}d ${hours}h`;
+            }
+
+            // Calculate relative time for "last active"
+            const now = new Date();
+            const diffMs = now.getTime() - lastActiveDate.getTime();
+            const diffMins = Math.floor(diffMs / 60000);
+            const diffHours = Math.floor(diffMs / 3600000);
+            const diffDays = Math.floor(diffMs / 86400000);
+            let lastActiveStr: string;
+            if (diffMins < 1) {
+              lastActiveStr = "Just now";
+            } else if (diffMins < 60) {
+              lastActiveStr = `${diffMins} minute${diffMins === 1 ? "" : "s"} ago`;
+            } else if (diffHours < 24) {
+              lastActiveStr = `${diffHours} hour${diffHours === 1 ? "" : "s"} ago`;
+            } else {
+              lastActiveStr = `${diffDays} day${diffDays === 1 ? "" : "s"} ago`;
+            }
+
+            // Build thread type info
+            let threadTypeInfo: string;
+            if (info.clonedFrom) {
+              // Try to get the source thread's label
+              const sourceInfo = await getThreadInfo(info.clonedFrom);
+              const sourceLabel = sourceInfo?.label || info.clonedFrom.slice(0, 15) + "...";
+              threadTypeInfo = `  Type: Branch (cloned from "${sourceLabel}")`;
+            } else {
+              threadTypeInfo = `  Type: Original thread`;
+            }
+
+            // Build the info message with enhanced details
             const infoMessage: ChatMessage = {
               role: "gordon",
-              content: `**Thread Info: ${info.label}**\n\n` +
-                `- **Thread ID:** \`${info.threadId}\`\n` +
-                `- **Status:** ${info.isActive ? "Active" : "Inactive"}\n` +
-                `- **Messages:** ${info.messageCount}\n` +
-                `- **Created:** ${new Date(info.createdAt).toLocaleString()}\n` +
-                `- **Last Active:** ${new Date(info.lastActiveAt).toLocaleString()}` +
-                cloneInfo,
+              content: `Thread Info: "${info.label}"\n\n` +
+                `  Status: ${info.isActive ? "ACTIVE (current thread)" : "Inactive"}\n` +
+                `  Messages: ${info.messageCount}\n` +
+                `  Created: ${createdDate.toLocaleString()}\n` +
+                `  Last active: ${lastActiveStr}\n` +
+                `  Duration: ${durationStr}\n` +
+                threadTypeInfo +
+                (info.isActive ? "\n\n  This is your current thread." : `\n\n  Use \`/switch ${info.threadId.slice(0, 15)}\` to switch to this thread.`),
               timestamp: formatTimestamp(),
             };
             setState((prev) => ({
@@ -983,9 +1216,195 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
         return;
       }
 
+      // Handle /help command locally for known help modes
+      if (command.name === "help") {
+        const helpArg = args.trim();
+        const normalized = helpArg.toLowerCase();
+        const isPaginatedHelp = normalized.startsWith("page") || normalized === "market" || normalized === "account";
+        const isHelpMode =
+          normalized === "" ||
+          normalized === "advanced" ||
+          normalized === "all" ||
+          normalized === "expert" ||
+          normalized === "trading" ||
+          normalized === "analysis" ||
+          normalized === "system";
+
+        if (!helpArg || isPaginatedHelp || isHelpMode) {
+          let helpContent = "";
+          if (!helpArg) {
+            helpContent = formatCommandHelp();
+          } else if (normalized === "analysis") {
+            helpContent = formatAnalysisCommandsHelp();
+          } else if (isPaginatedHelp) {
+            helpContent = formatPaginatedCommandHelp(helpArg);
+          } else {
+            const { mode, category } = parseHelpArg(helpArg);
+            helpContent = formatCommandHelp(mode, category);
+          }
+
+          const helpMessage: ChatMessage = {
+            role: "gordon",
+            content: helpContent,
+            timestamp: formatTimestamp(),
+          };
+          setState((prev) => ({
+            ...prev,
+            messages: [
+              ...prev.messages,
+              { role: "user", content: value.trim(), timestamp: formatTimestamp() },
+              helpMessage,
+            ],
+          }));
+          return;
+        }
+      }
+
+      // Handle tool-based commands locally when possible
+      if (command.action === "tool") {
+        const userMessage: ChatMessage = {
+          role: "user",
+          content: value.trim(),
+          timestamp: formatTimestamp(),
+        };
+
+        switch (command.target) {
+          case "handle_config_command": {
+            setState((prev) => ({ ...prev, messages: [...prev.messages, userMessage], isLoading: true }));
+            const result = await handleConfigCommand(args);
+            if (result.success) {
+              const updatedConfig = await loadConfig();
+              configRef.current = updatedConfig;
+            }
+            setState((prev) => ({
+              ...prev,
+              messages: [
+                ...prev.messages,
+                { role: "gordon", content: result.message, timestamp: formatTimestamp() },
+              ],
+              isLoading: false,
+            }));
+            return;
+          }
+          case "handle_exchange_command": {
+            setState((prev) => ({ ...prev, messages: [...prev.messages, userMessage], isLoading: true }));
+            const message = await handleExchangeCommand(args);
+            await refreshActiveExchange();
+            setState((prev) => ({
+              ...prev,
+              messages: [
+                ...prev.messages,
+                { role: "gordon", content: message, timestamp: formatTimestamp() },
+              ],
+              isLoading: false,
+            }));
+            return;
+          }
+          case "handle_strategy_command": {
+            setState((prev) => ({ ...prev, messages: [...prev.messages, userMessage], isLoading: true }));
+            const message = await handleStrategyCommand(args);
+            setState((prev) => ({
+              ...prev,
+              messages: [
+                ...prev.messages,
+                { role: "gordon", content: message, timestamp: formatTimestamp() },
+              ],
+              isLoading: false,
+            }));
+            return;
+          }
+          case "handle_gen_command": {
+            setState((prev) => ({ ...prev, messages: [...prev.messages, userMessage], isLoading: true }));
+            const message = await handleGenCommand(args);
+            setState((prev) => ({
+              ...prev,
+              messages: [
+                ...prev.messages,
+                { role: "gordon", content: message, timestamp: formatTimestamp() },
+              ],
+              isLoading: false,
+            }));
+            return;
+          }
+          case "handle_mcp_command": {
+            setState((prev) => ({ ...prev, messages: [...prev.messages, userMessage], isLoading: true }));
+            const mcpArgs = args.trim().length > 0 ? args.trim().split(/\s+/) : [];
+            const result = await handleMCPCommand(mcpArgs);
+            setState((prev) => ({
+              ...prev,
+              messages: [
+                ...prev.messages,
+                { role: "gordon", content: result.message, timestamp: formatTimestamp() },
+              ],
+              isLoading: false,
+            }));
+            return;
+          }
+          case "handle_workflow_command": {
+            if (!binanceClientRef.current) {
+              setState((prev) => ({
+                ...prev,
+                messages: [
+                  ...prev.messages,
+                  userMessage,
+                  {
+                    role: "gordon",
+                    content: "Binance API not connected. Run /setup to configure API keys before workflows.",
+                    timestamp: formatTimestamp(),
+                  },
+                ],
+              }));
+              return;
+            }
+
+            setState((prev) => ({ ...prev, messages: [...prev.messages, userMessage], isLoading: true }));
+            const result = await handleWorkflowCommand(args, {
+              binance: binanceClientRef.current,
+              llm: llmClientRef.current ?? undefined,
+              config: configRef.current,
+            });
+            setState((prev) => ({
+              ...prev,
+              messages: [
+                ...prev.messages,
+                { role: "gordon", content: formatWorkflowResult(result), timestamp: formatTimestamp() },
+              ],
+              isLoading: false,
+            }));
+            return;
+          }
+          case "handle_export_command": {
+            setState((prev) => ({ ...prev, messages: [...prev.messages, userMessage], isLoading: true }));
+            const result = await handleExportCommand(args, {
+              lastScan: lastResultsRef.current.scan,
+              lastAnalysis: lastResultsRef.current.analysis,
+              lastBacktest: lastResultsRef.current.backtest,
+              sessionMessages: state.messages,
+            });
+            setState((prev) => ({
+              ...prev,
+              messages: [
+                ...prev.messages,
+                { role: "gordon", content: result.message, timestamp: formatTimestamp() },
+              ],
+              isLoading: false,
+            }));
+            return;
+          }
+          default:
+            break;
+        }
+      }
+
       // Convert command to natural language for the agent
       messageToSend = commandToPrompt(command, args);
       displayMessage = value.trim(); // Still show the command to user
+    }
+
+    if (!parsedCommand) {
+      const suggestions = checkForPluginSuggestions(messageToSend)
+        .filter((s) => !shownPluginSuggestionsRef.current.has(s.pluginId));
+      pendingPluginSuggestionsRef.current = suggestions;
     }
 
     const userMessage: ChatMessage = {
@@ -1021,7 +1440,8 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
     // Build the context for Gordon with session info
     const context: GordonContext = {
       binance: binanceClientRef.current,
-      llm: llmClientRef.current,
+      exchange: exchangeRef.current,
+      llm: llmClientRef.current!,
       config: configRef.current,
       portfolioValue: state.portfolioValue ?? 0,
       availableCash: state.availableCash,
@@ -1112,6 +1532,9 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
               ...prev,
               activeToolCall: null,
             }));
+            if (event.toolResult) {
+              updateLastResultsFromTool(event.toolName, event.toolResult);
+            }
             break;
 
           case "done":
@@ -1125,6 +1548,33 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
               isStreaming: false,
               activeToolCall: null,
             }));
+            // Update thread status info after message exchange
+            if (state.session?.threadId) {
+              updateThreadStatusInfo(state.session.threadId);
+            }
+            // Append MCP plugin suggestions if relevant
+            if (pendingPluginSuggestionsRef.current.length > 0) {
+              const suggestions = pendingPluginSuggestionsRef.current.filter(
+                (s) => !shownPluginSuggestionsRef.current.has(s.pluginId)
+              );
+              if (suggestions.length > 0) {
+                for (const s of suggestions) {
+                  shownPluginSuggestionsRef.current.add(s.pluginId);
+                }
+                setState((prev) => ({
+                  ...prev,
+                  messages: [
+                    ...prev.messages,
+                    {
+                      role: "gordon",
+                      content: formatPluginSuggestionsMessage(suggestions),
+                      timestamp: formatTimestamp(),
+                    },
+                  ],
+                }));
+              }
+              pendingPluginSuggestionsRef.current = [];
+            }
             break;
 
           case "error":
@@ -1172,7 +1622,16 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
         };
       });
     }
-  }, [state.isLoading, state.isStreaming, state.conversationHistory, state.portfolioValue, state.availableCash]);
+  }, [
+    state.isLoading,
+    state.isStreaming,
+    state.conversationHistory,
+    state.portfolioValue,
+    state.availableCash,
+    state.messages,
+    refreshActiveExchange,
+    updateLastResultsFromTool,
+  ]);
 
   // Handle menu selection
   const handleMenuSelect = useCallback((option: MenuOption): void => {
@@ -1211,40 +1670,38 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
 
           (async () => {
             try {
+              const scanStart = Date.now();
               const scanResult = await scan(binanceClientRef.current!, {
                 topN: configRef.current.preferences.topNCoins,
                 timeframes: configRef.current.preferences.defaultTimeframes,
               });
+              const executionTime = Date.now() - scanStart;
 
-              const coinsWithSetup = scanResult.coins.filter((c) => c.setupDetected);
-              const lines: string[] = [];
+              const opportunities = scanResult.coins
+                .filter((c) => c.setupDetected)
+                .map((c) => ({
+                  symbol: c.symbol,
+                  price: c.price,
+                  change24h: c.change24h,
+                  setupConfidence: c.setupConfidence,
+                  bias: c.bias,
+                  risk: c.risk,
+                }));
 
-              if (coinsWithSetup.length === 0) {
-                lines.push("**No support bounce setups detected at this time.**\n");
-                lines.push(`Scanned ${scanResult.coins.length} coins across ${scanResult.timeframes.join(", ")} timeframes.`);
-                lines.push("\nTry again later or ask me to analyze a specific coin.");
-              } else {
-                lines.push(`**Found ${coinsWithSetup.length} potential setup(s):**\n`);
-                lines.push("| Symbol | Price | 24h Change | Confidence | Bias | Risk |");
-                lines.push("|--------|-------|------------|------------|------|------|");
+              const formatted = formatScanResults({
+                coinsScanned: scanResult.coins.length,
+                opportunities,
+                executionTime,
+                maxRows: 10,
+              });
 
-                for (const coin of coinsWithSetup.slice(0, 10)) {
-                  const changeStr = coin.change24h >= 0
-                    ? `+${coin.change24h.toFixed(2)}%`
-                    : `${coin.change24h.toFixed(2)}%`;
-                  const confidenceStr = `${(coin.setupConfidence * 100).toFixed(0)}%`;
-
-                  lines.push(
-                    `| ${coin.symbol} | $${coin.price.toFixed(4)} | ${changeStr} | ${confidenceStr} | ${coin.bias} | ${coin.risk} |`
-                  );
-                }
-
-                if (coinsWithSetup.length > 10) {
-                  lines.push(`\n_...and ${coinsWithSetup.length - 10} more setups_`);
-                }
-
-                lines.push("\nAsk me about any of these coins for a detailed analysis and trade plan.");
-              }
+              lastResultsRef.current.scan = {
+                timestamp: scanResult.timestamp,
+                coinsScanned: scanResult.coins.length,
+                opportunities,
+                executionTime,
+                formattedSummary: formatted,
+              };
 
               setState((prev) => ({
                 ...prev,
@@ -1252,7 +1709,7 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
                   ...prev.messages,
                   {
                     role: "gordon",
-                    content: lines.join("\n"),
+                    content: formatted,
                     timestamp: formatTimestamp(),
                   },
                 ],
@@ -1264,7 +1721,10 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
                   ...prev.messages,
                   {
                     role: "gordon",
-                    content: `Failed to scan market: ${error instanceof Error ? error.message : "Unknown error"}`,
+                    content: formatCommandError("market scan", error, {
+                      topN: configRef.current.preferences.topNCoins,
+                      timeframes: configRef.current.preferences.defaultTimeframes,
+                    }),
                     timestamp: formatTimestamp(),
                   },
                 ],
@@ -1306,6 +1766,7 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
           // Async fetch portfolio from both spot and funding wallets
           (async () => {
             try {
+              const portfolioStart = Date.now();
               const allBalances = await binanceClientRef.current!.getAllBalances();
 
               // Calculate total value and extract USDT balance
@@ -1354,23 +1815,21 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
               // Sort by value
               holdings.sort((a, b) => b.usdtValue - a.usdtValue);
 
-              // Format message
-              const lines = [
-                `**Portfolio Value: $${totalValue.toFixed(2)} USD**\n`,
-                "| Asset | Amount | Value (USD) | Wallet |",
-                "|-------|--------|-------------|--------|",
-              ];
+              const executionTime = Date.now() - portfolioStart;
 
-              for (const h of holdings.slice(0, 15)) {
-                const valueStr = h.usdtValue > 0 ? `$${h.usdtValue.toFixed(2)}` : (h.note || "N/A");
-                lines.push(
-                  `| ${h.asset} | ${h.amount.toFixed(4)} | ${valueStr} | ${h.wallet} |`
-                );
-              }
-
-              if (holdings.length > 15) {
-                lines.push(`\n_...and ${holdings.length - 15} more assets_`);
-              }
+              const formatted = formatPortfolioResults({
+                totalValue,
+                availableCash: usdtBalance,
+                holdings: holdings.map((h) => ({
+                  asset: h.asset,
+                  total: h.amount,
+                  usdValue: h.usdtValue,
+                  wallet: h.wallet,
+                  note: h.note,
+                })),
+                executionTime,
+                maxRows: 15,
+              });
 
               setState((prev) => ({
                 ...prev,
@@ -1380,7 +1839,7 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
                   ...prev.messages,
                   {
                     role: "gordon",
-                    content: lines.join("\n"),
+                    content: formatted,
                     timestamp: formatTimestamp(),
                   },
                 ],
@@ -1392,7 +1851,7 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
                   ...prev.messages,
                   {
                     role: "gordon",
-                    content: `Failed to fetch portfolio: ${error instanceof Error ? error.message : "Unknown error"}`,
+                    content: formatCommandError("portfolio fetch", error),
                     timestamp: formatTimestamp(),
                   },
                 ],
@@ -1441,7 +1900,8 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
           if (!llmClientRef.current) return;
           const context: GordonContext = {
             binance: binanceClientRef.current,
-            llm: llmClientRef.current,
+            exchange: exchangeRef.current,
+            llm: llmClientRef.current!,
             config: configRef.current,
             portfolioValue: state.portfolioValue ?? 0,
             availableCash: state.availableCash,
@@ -1573,7 +2033,7 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
         }));
         break;
     }
-  }, [state.portfolioValue, state.availableCash, state.conversationHistory]);
+  }, [state.portfolioValue, state.availableCash, state.conversationHistory, formatCommandError]);
 
   // Handle onboarding completion
   const handleOnboardingComplete = useCallback(
@@ -1727,6 +2187,7 @@ Please check your API keys in the .env file and restart Gordon.`,
         portfolioValue={state.portfolioValue}
         connectionStatus={state.connectionStatus}
         btcPrice={state.btcPrice}
+        threadInfo={state.threadStatusInfo || undefined}
       />
 
       {/* Shortcuts Overlay */}

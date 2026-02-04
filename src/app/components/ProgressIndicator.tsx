@@ -221,6 +221,9 @@ export const OrderProgress: React.FC<OrderProgressProps> = ({
     error: undefined,
   };
 
+  // Status indicator text that complements the border color for accessibility
+  const statusText = status === "error" ? "[ERROR]" : status === "complete" ? "[SUCCESS]" : "[IN PROGRESS]";
+
   return (
     <Box
       flexDirection="column"
@@ -232,12 +235,12 @@ export const OrderProgress: React.FC<OrderProgressProps> = ({
     >
       {status === "error" ? (
         <Box flexDirection="column">
-          <Text color={COLORS.RED} bold>Order Failed</Text>
+          <Text color={COLORS.RED} bold>{statusText} Order Failed</Text>
           {error && <Text color={COLORS.DIM}>{error}</Text>}
         </Box>
       ) : status === "complete" ? (
         <Box flexDirection="column">
-          <Text color={COLORS.GREEN} bold>Order Executed</Text>
+          <Text color={COLORS.GREEN} bold>{statusText} Order Executed</Text>
           {orderId && (
             <Box>
               <Text color={COLORS.DIM}>Order ID: </Text>
@@ -247,6 +250,7 @@ export const OrderProgress: React.FC<OrderProgressProps> = ({
         </Box>
       ) : (
         <Box flexDirection="column" gap={1}>
+          <Text color={COLORS.DIM}>{statusText}</Text>
           <Spinner label={statusLabels[status]} />
           {statusProgress[status] && (
             <ProgressBar value={statusProgress[status]!} />

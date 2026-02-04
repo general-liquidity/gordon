@@ -183,7 +183,13 @@ export const WelcomeBanner: React.FC = () => {
   return (
     <Box flexDirection="column" paddingX={2} paddingY={1}>
       {/* ASCII Art Banner with flicker animation */}
+      {/* Text alternative: The banner displays "Gordon" in stylized ASCII art */}
       <FlickeringBanner />
+
+      {/* Text alternative for ASCII art - visible for screen readers and when graphics don't render */}
+      <Box>
+        <Text color={COLORS.DIM}>[Gordon CLI - Trading Assistant]</Text>
+      </Box>
 
       {/* Tagline */}
       <Box marginTop={1}>

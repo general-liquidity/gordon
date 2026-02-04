@@ -174,6 +174,8 @@ export function createMockPreferences(overrides: Partial<Preferences> = {}): Pre
 export function createMockConfig(overrides: Partial<GordonConfig> = {}): GordonConfig {
   return {
     version: "1.0.0",
+    exchanges: [],
+    mcpServers: [],
     preferences: createMockPreferences(),
     memoryConfig: {
       lastMessages: 20,

@@ -4,6 +4,7 @@
  */
 
 import type { BinanceClient } from "../binance/index.ts";
+import type { Exchange } from "../exchange/index.ts";
 import type { LLMClient } from "../llm/index.ts";
 import type { GordonConfig, Plan, Trade } from "../../types/index.ts";
 
@@ -11,7 +12,15 @@ import type { GordonConfig, Plan, Trade } from "../../types/index.ts";
  * Context passed to all tools and agents
  */
 export interface GordonContext {
+  /**
+   * @deprecated Use `exchange` instead for multi-exchange support
+   */
   binance: BinanceClient | null;
+  /**
+   * Abstract exchange interface - supports multiple exchanges
+   * Prefer using this over `binance` for forward compatibility
+   */
+  exchange: Exchange | null;
   llm: LLMClient;
   config: GordonConfig;
   portfolioValue: number;

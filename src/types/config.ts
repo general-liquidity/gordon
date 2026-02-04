@@ -6,11 +6,41 @@ export const ExchangePermissionsSchema = z.object({
   withdraw: z.boolean(),
 });
 
+/**
+ * Legacy exchange config schema (for backwards compatibility)
+ * @deprecated Use MultiExchangeConfigSchema for new code
+ */
 export const ExchangeConfigSchema = z.object({
   name: z.literal("binance"),
   apiKey: z.string(),
   apiSecret: z.string(),
   permissions: ExchangePermissionsSchema,
+});
+
+/**
+ * Supported exchange types for multi-exchange configuration
+ */
+export const ExchangeTypeSchema = z.enum(["binance", "coinbase", "kraken", "bybit", "okx"]);
+
+/**
+ * Multi-exchange configuration schema
+ * Supports multiple exchange accounts with different types
+ */
+export const MultiExchangeConfigSchema = z.object({
+  /** Unique identifier for this exchange configuration */
+  id: z.string(),
+  /** Exchange type */
+  type: ExchangeTypeSchema,
+  /** API key for authentication */
+  apiKey: z.string(),
+  /** API secret for authentication */
+  apiSecret: z.string(),
+  /** Whether this is the default/active exchange */
+  isDefault: z.boolean().default(false),
+  /** Use sandbox/testnet mode (optional) */
+  sandbox: z.boolean().optional(),
+  /** Optional passphrase for exchanges that require it (e.g., Coinbase) */
+  passphrase: z.string().optional(),
 });
 
 export const PreferencesSchema = z.object({
@@ -41,9 +71,27 @@ export const ModelConfigSchema = z.object({
   model: z.string().optional(), // If not set, uses provider's flagship model
 });
 
+/**
+ * MCP Server configuration schema
+ * Configuration for individual MCP servers in the registry
+ */
+export const MCPServerConfigSchema = z.object({
+  /** Server identifier (must match a registered server manifest) */
+  id: z.string(),
+  /** Whether this server is enabled */
+  enabled: z.boolean().default(true),
+  /** Priority for tool resolution (higher = preferred) */
+  priority: z.number().optional(),
+});
+
 export const GordonConfigSchema = z.object({
   version: z.string().default("1.0.0"),
+  /** @deprecated Use `exchanges` array instead */
   exchange: ExchangeConfigSchema.optional(),
+  /** Multi-exchange configuration (Phase 2+) */
+  exchanges: z.array(MultiExchangeConfigSchema).default([]),
+  /** ID of the currently active exchange from the exchanges array */
+  activeExchangeId: z.string().optional(),
   preferences: PreferencesSchema.default({
     cashReservePercent: 0.2,
     maxAllocationPerTrade: 0.1,
@@ -60,13 +108,19 @@ export const GordonConfigSchema = z.object({
   mode: z.enum(["SAFE", "ARMED"]).default("SAFE"),
   armedUntil: z.string().nullable().default(null),
   onboardingComplete: z.boolean().default(false),
+  /** MCP Server configurations */
+  mcpServers: z.array(MCPServerConfigSchema).default([]),
 });
 
 export type ExchangePermissions = z.infer<typeof ExchangePermissionsSchema>;
+/** @deprecated Use MultiExchangeConfig instead */
 export type ExchangeConfig = z.infer<typeof ExchangeConfigSchema>;
+export type ExchangeType = z.infer<typeof ExchangeTypeSchema>;
+export type MultiExchangeConfig = z.infer<typeof MultiExchangeConfigSchema>;
 export type Preferences = z.infer<typeof PreferencesSchema>;
 export type ProviderName = z.infer<typeof ProviderSchema>;
 export type ModelConfig = z.infer<typeof ModelConfigSchema>;
 export type MemoryConfig = z.infer<typeof MemoryConfigSchema>;
+export type MCPServerConfig = z.infer<typeof MCPServerConfigSchema>;
 export type GordonConfig = z.infer<typeof GordonConfigSchema>;
 export type Mode = GordonConfig["mode"];

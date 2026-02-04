@@ -46,6 +46,10 @@ import {
   type BacktestQueryOptions,
 } from "../../../backtest/storage.ts";
 import { getGordonContext, normalizeSymbol, type MastraExecutionContext } from "./types.ts";
+import {
+  formatBacktestResults as formatBacktestResultsDetailed,
+  formatComparisonResults,
+} from "../../../app/components/formatResults.ts";
 
 // ============================================================================
 // Helper Functions
@@ -252,6 +256,7 @@ export const runBacktestTool = createTool({
   outputSchema: z.object({
     result: backtestResultSchema.optional(),
     summary: z.string().optional(),
+    formattedSummary: z.string().optional(),
     error: z.string().optional(),
   }),
   execute: async (
@@ -304,7 +309,27 @@ export const runBacktestTool = createTool({
       const result = buildBacktestResult(strategy, backtestConfig, engineResult, executionTime);
       const summary = formatBacktestSummary(result);
 
-      return { result, summary };
+      // Generate detailed formatted summary
+      const formattedSummary = formatBacktestResultsDetailed({
+        strategyName: strategy.name,
+        symbol: normalizedSymbol,
+        timeframe,
+        days,
+        metrics: {
+          totalReturn: result.metrics.totalReturn,
+          winRate: result.metrics.winRate,
+          sharpeRatio: result.metrics.sharpeRatio,
+          maxDrawdown: result.metrics.maxDrawdown,
+          profitFactor: result.metrics.profitFactor,
+          totalTrades: result.metrics.totalTrades,
+          averageWin: result.metrics.averageWin,
+          averageLoss: result.metrics.averageLoss,
+          expectancy: result.metrics.expectancy,
+        },
+        executionTime,
+      });
+
+      return { result, summary, formattedSummary };
     } catch (error) {
       return {
         error: error instanceof Error ? error.message : "Backtest execution failed",
@@ -515,6 +540,8 @@ export const compareBacktestsTool = createTool({
       totalReturn: z.number(),
       maxDrawdown: z.number(),
     }).optional(),
+    executionTime: z.number().optional(),
+    formattedSummary: z.string().optional(),
     warnings: z.array(z.string()).optional(),
     error: z.string().optional(),
   }),
@@ -527,6 +554,7 @@ export const compareBacktestsTool = createTool({
       return { error: errors.noBinance.error };
     }
 
+    const comparisonStartTime = Date.now();
     const normalizedSymbol = normalizeSymbol(symbol);
     const warnings: string[] = [];
 
@@ -633,6 +661,23 @@ export const compareBacktestsTool = createTool({
       }
     }
 
+    const comparisonExecutionTime = Date.now() - comparisonStartTime;
+
+    // Generate formatted comparison summary
+    const formattedSummary = formatComparisonResults({
+      symbol: normalizedSymbol,
+      timeframe,
+      strategies: rankings.map((r) => ({
+        name: r.strategy,
+        totalReturn: r.metrics.totalReturn,
+        sharpeRatio: r.metrics.sharpeRatio,
+        maxDrawdown: r.metrics.maxDrawdown,
+        winRate: r.metrics.winRate,
+        totalTrades: r.metrics.totalTrades,
+      })),
+      executionTime: comparisonExecutionTime,
+    });
+
     return {
       symbol: normalizedSymbol,
       timeframe,
@@ -647,6 +692,8 @@ export const compareBacktestsTool = createTool({
         totalReturn: buyHoldReturn,
         maxDrawdown: buyHoldMaxDrawdown,
       },
+      executionTime: comparisonExecutionTime,
+      formattedSummary,
       warnings,
     };
   },

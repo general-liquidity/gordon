@@ -41,3 +41,64 @@ export { PaginatedOutput, PaginatedText, usePagination } from "./PaginatedOutput
 
 // Quick actions
 export { QuickActions, getQuickActionCommand, getQuickActionsCount, QUICK_ACTIONS } from "./QuickActions.tsx";
+
+// Result summaries and timing
+export {
+  ResultSummaryBox,
+  OperationTimer,
+  withTiming,
+  withTimingSync,
+  formatExecutionTime,
+  formatNumber,
+  formatPercent,
+  formatCurrency,
+  getValueColor,
+  buildScanSummary,
+  buildAnalysisSummary,
+  buildBacktestSummary,
+  buildPortfolioSummary,
+  buildComparisonSummary,
+} from "./ResultSummary.tsx";
+export type { ResultSummary, ResultSummaryProps } from "./ResultSummary.tsx";
+
+// Standard column definitions for RichTable
+export {
+  MARKET_SCAN_COLUMNS,
+  MARKET_SCAN_COLUMNS_COMPACT,
+  TRENDING_COLUMNS,
+  ANALYSIS_COLUMNS,
+  PORTFOLIO_COLUMNS,
+  PORTFOLIO_COLUMNS_COMPACT,
+  PORTFOLIO_COLUMNS_DETAILED,
+  BACKTEST_COLUMNS,
+  BACKTEST_COLUMNS_COMPACT,
+  BACKTEST_METRICS_COLUMNS,
+  BACKTEST_TRADES_COLUMNS,
+  STRATEGY_COMPARISON_COLUMNS,
+  STRATEGY_LIST_COLUMNS,
+  ORDERS_COLUMNS,
+  POSITIONS_COLUMNS,
+  TRADE_HISTORY_COLUMNS,
+  EARN_COLUMNS,
+  getResponsiveColumns,
+  addAllocationColumn,
+  transformScanDataForDisplay,
+  transformBacktestDataForDisplay,
+} from "./StandardColumns.ts";
+
+// Text-based result formatting (for tool outputs)
+export {
+  formatResultSummary,
+  formatScanResults,
+  formatAnalysisResults,
+  formatBacktestResults,
+  formatPortfolioResults,
+  formatComparisonResults,
+} from "./formatResults.ts";
+export type {
+  ScanResultFormatOptions,
+  AnalysisResultFormatOptions,
+  BacktestResultFormatOptions,
+  PortfolioFormatOptions,
+  ComparisonFormatOptions,
+} from "./formatResults.ts";

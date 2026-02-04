@@ -67,6 +67,7 @@
     "asciichart": "^1.5.25",
     "ink": "^6.6.0",
     "ink-text-input": "^6.0.0",
+    "protobufjs": "^8.0.0",
     "react": "^19.2.4",
     "zod": "^4.3.6"
   }

@@ -1,0 +1,396 @@
+/**
+ * Binance Exchange Adapter
+ * Wraps BinanceClient to implement the abstract Exchange interface
+ */
+
+import { BinanceClient } from "../../binance/index.ts";
+import type {
+  Exchange,
+  ExchangeId,
+  ExchangeInfo,
+  Ticker24hr,
+  OrderBook,
+  BookTicker,
+  SpreadInfo,
+  AvgPrice,
+  AccountInfo,
+  AccountDetails,
+  Balance,
+  OrderParams,
+  Order,
+  Trade,
+  Deposit,
+  Withdrawal,
+  RateLimitStatus,
+  SymbolInfo,
+} from "../types.ts";
+import type { Candle } from "../../../types/index.ts";
+
+/**
+ * BinanceAdapter - Adapts BinanceClient to the Exchange interface
+ *
+ * This adapter allows the existing BinanceClient to be used through
+ * the abstract Exchange interface, enabling multi-exchange support
+ * without modifying the original implementation.
+ */
+export class BinanceAdapter implements Exchange {
+  private client: BinanceClient;
+
+  readonly exchangeId: ExchangeId = "binance";
+  readonly displayName = "Binance";
+
+  constructor(apiKey: string, apiSecret: string) {
+    this.client = new BinanceClient(apiKey, apiSecret);
+  }
+
+  /**
+   * Get the underlying BinanceClient for direct access to Binance-specific features
+   * @deprecated Use Exchange interface methods when possible
+   */
+  getUnderlyingClient(): BinanceClient {
+    return this.client;
+  }
+
+  // -------------------------------------------------------------------------
+  // Connection
+  // -------------------------------------------------------------------------
+
+  async testConnection(): Promise<boolean> {
+    return this.client.testConnection();
+  }
+
+  async getExchangeInfo(): Promise<ExchangeInfo> {
+    const info = await this.client.getExchangeInfo();
+    return {
+      timezone: info.timezone,
+      serverTime: info.serverTime,
+      symbols: info.symbols.map(
+        (s): SymbolInfo => ({
+          symbol: s.symbol,
+          status: s.status,
+          baseAsset: s.baseAsset,
+          quoteAsset: s.quoteAsset,
+          baseAssetPrecision: s.baseAssetPrecision,
+          quoteAssetPrecision: s.quoteAssetPrecision,
+          orderTypes: s.orderTypes,
+          isSpotTradingAllowed: s.isSpotTradingAllowed,
+          // Map Binance filters to our generic filter type
+          filters: s.filters.map((f) => ({ ...f })),
+        })
+      ),
+    };
+  }
+
+  // -------------------------------------------------------------------------
+  // Market Data
+  // -------------------------------------------------------------------------
+
+  async getPrice(symbol: string): Promise<number> {
+    return this.client.getPrice(symbol);
+  }
+
+  async getCandles(symbol: string, interval: string, limit?: number): Promise<Candle[]> {
+    return this.client.getCandles(symbol, interval, limit);
+  }
+
+  async get24hrTickers(): Promise<Ticker24hr[]> {
+    const tickers = await this.client.get24hrTickers();
+    return tickers.map(
+      (t): Ticker24hr => ({
+        symbol: t.symbol,
+        priceChange: parseFloat(t.priceChange),
+        priceChangePercent: parseFloat(t.priceChangePercent),
+        lastPrice: parseFloat(t.lastPrice),
+        highPrice: parseFloat(t.highPrice),
+        lowPrice: parseFloat(t.lowPrice),
+        volume: parseFloat(t.volume),
+        quoteVolume: parseFloat(t.quoteVolume),
+        openTime: t.openTime,
+        closeTime: t.closeTime,
+      })
+    );
+  }
+
+  async getTopSymbols(n: number): Promise<string[]> {
+    return this.client.getTopSymbols(n);
+  }
+
+  async getOrderBook(symbol: string, limit?: number): Promise<OrderBook> {
+    const book = await this.client.getOrderBook(symbol, limit);
+    return {
+      lastUpdateId: book.lastUpdateId,
+      bids: book.bids.map(([price, qty]) => ({
+        price: parseFloat(price),
+        quantity: parseFloat(qty),
+      })),
+      asks: book.asks.map(([price, qty]) => ({
+        price: parseFloat(price),
+        quantity: parseFloat(qty),
+      })),
+    };
+  }
+
+  async getBookTicker(symbol: string): Promise<BookTicker> {
+    const ticker = await this.client.getBookTicker(symbol);
+    // Handle both single and array response
+    const t = Array.isArray(ticker) ? ticker[0] : ticker;
+    if (!t) {
+      throw new Error(`No book ticker data available for ${symbol}`);
+    }
+    return {
+      symbol: t.symbol,
+      bidPrice: parseFloat(t.bidPrice),
+      bidQty: parseFloat(t.bidQty),
+      askPrice: parseFloat(t.askPrice),
+      askQty: parseFloat(t.askQty),
+    };
+  }
+
+  async getSpread(symbol: string): Promise<SpreadInfo> {
+    return this.client.getSpread(symbol);
+  }
+
+  async getAvgPrice(symbol: string): Promise<AvgPrice> {
+    const avg = await this.client.getAvgPrice(symbol);
+    return {
+      mins: avg.mins,
+      price: parseFloat(avg.price),
+    };
+  }
+
+  // -------------------------------------------------------------------------
+  // Account
+  // -------------------------------------------------------------------------
+
+  async getAccountInfo(): Promise<AccountInfo> {
+    const info = await this.client.getAccountInfo();
+    return {
+      canTrade: info.canTrade,
+      canWithdraw: info.canWithdraw,
+      canDeposit: info.canDeposit,
+      accountType: info.accountType,
+      updateTime: info.updateTime,
+      balances: info.balances.map(
+        (b): Balance => ({
+          asset: b.asset,
+          free: parseFloat(b.free),
+          locked: parseFloat(b.locked),
+          total: parseFloat(b.free) + parseFloat(b.locked),
+        })
+      ),
+    };
+  }
+
+  async getBalance(asset: string): Promise<number> {
+    return this.client.getBalance(asset);
+  }
+
+  async getAllBalances(): Promise<Balance[]> {
+    const balances = await this.client.getAllBalances();
+    return balances.map(
+      (b): Balance => ({
+        asset: b.asset,
+        free: b.free,
+        locked: b.locked,
+        total: b.free + b.locked,
+      })
+    );
+  }
+
+  async getFullAccountDetails(): Promise<AccountDetails> {
+    // Get account info
+    const accountInfo = await this.getAccountInfo();
+
+    // Get all balances to calculate totals
+    const allBalances = await this.getAllBalances();
+
+    // Filter non-zero balances
+    const nonZeroBalances = allBalances.filter((b) => b.total > 0);
+
+    // Calculate total USDT value (approximate - would need price data for accuracy)
+    // For now, just sum USDT and BUSD balances as a rough estimate
+    const stableBalances = nonZeroBalances.filter(
+      (b) => b.asset === "USDT" || b.asset === "BUSD" || b.asset === "USDC"
+    );
+    const totalUsdtValue = stableBalances.reduce((sum, b) => sum + b.total, 0);
+
+    return {
+      accountInfo,
+      totalUsdtValue,
+      nonZeroBalances,
+    };
+  }
+
+  // -------------------------------------------------------------------------
+  // Trading
+  // -------------------------------------------------------------------------
+
+  async placeOrder(params: OrderParams): Promise<Order> {
+    const order = await this.client.placeOrder({
+      symbol: params.symbol,
+      side: params.side,
+      type: params.type,
+      quantity: params.quantity,
+      quoteOrderQty: params.quoteOrderQty,
+      price: params.price,
+      stopPrice: params.stopPrice,
+      timeInForce: params.timeInForce,
+      newClientOrderId: params.newClientOrderId,
+    });
+    return this.normalizeOrder(order);
+  }
+
+  async cancelOrder(symbol: string, orderId: string): Promise<void> {
+    await this.client.cancelOrder(symbol, orderId);
+  }
+
+  async cancelAllOrders(symbol: string): Promise<Order[]> {
+    const orders = await this.client.cancelAllOrders(symbol);
+    return orders.map((o) => this.normalizeOrder(o));
+  }
+
+  async getOpenOrders(symbol?: string): Promise<Order[]> {
+    const orders = await this.client.getOpenOrders(symbol);
+    return orders.map((o) => this.normalizeOrder(o));
+  }
+
+  async getOrderStatus(symbol: string, orderId: number | string): Promise<Order> {
+    const id = typeof orderId === "string" ? parseInt(orderId, 10) : orderId;
+    const order = await this.client.getOrderStatus(symbol, id);
+    return this.normalizeOrder(order);
+  }
+
+  async testOrder(params: OrderParams): Promise<boolean> {
+    return this.client.testOrder({
+      symbol: params.symbol,
+      side: params.side,
+      type: params.type,
+      quantity: params.quantity,
+      quoteOrderQty: params.quoteOrderQty,
+      price: params.price,
+      stopPrice: params.stopPrice,
+      timeInForce: params.timeInForce,
+    });
+  }
+
+  // -------------------------------------------------------------------------
+  // History
+  // -------------------------------------------------------------------------
+
+  async getTradeHistory(symbol: string, limit?: number): Promise<Trade[]> {
+    const trades = await this.client.getTradeHistory(symbol, limit);
+    return trades.map(
+      (t): Trade => ({
+        id: t.id.toString(),
+        orderId: t.orderId.toString(),
+        symbol: t.symbol,
+        side: t.isBuyer ? "BUY" : "SELL",
+        price: parseFloat(t.price),
+        quantity: parseFloat(t.qty),
+        commission: parseFloat(t.commission),
+        commissionAsset: t.commissionAsset,
+        time: t.time,
+        isMaker: t.isMaker,
+      })
+    );
+  }
+
+  async getOrderHistory(symbol: string, limit?: number): Promise<Order[]> {
+    const orders = await this.client.getOrderHistory(symbol, limit);
+    return orders.map((o) => this.normalizeOrder(o));
+  }
+
+  async getDepositHistory(limit?: number): Promise<Deposit[]> {
+    const deposits = await this.client.getDepositHistory(limit);
+    return deposits.map(
+      (d): Deposit => ({
+        id: d.id ?? d.txId ?? "",
+        amount: parseFloat(String(d.amount)),
+        coin: d.coin,
+        network: d.network,
+        status: d.status,
+        address: d.address,
+        txId: d.txId,
+        insertTime: d.insertTime,
+        confirmTimes: d.confirmTimes,
+      })
+    );
+  }
+
+  async getWithdrawalHistory(limit?: number): Promise<Withdrawal[]> {
+    const withdrawals = await this.client.getWithdrawalHistory(limit);
+    return withdrawals.map(
+      (w): Withdrawal => ({
+        id: w.id,
+        amount: parseFloat(String(w.amount)),
+        coin: w.coin,
+        network: w.network,
+        status: w.status,
+        address: w.address,
+        txId: w.txId,
+        applyTime: new Date(w.applyTime).getTime(),
+        transactionFee: w.transactionFee ? parseFloat(String(w.transactionFee)) : undefined,
+      })
+    );
+  }
+
+  // -------------------------------------------------------------------------
+  // Rate Limiting & Status
+  // -------------------------------------------------------------------------
+
+  shouldThrottle(): boolean {
+    return this.client.shouldThrottle();
+  }
+
+  getRateLimitStatus(): RateLimitStatus {
+    return this.client.getRateLimitStatus();
+  }
+
+  getCircuitBreakerState(): string {
+    return this.client.getCircuitBreakerState();
+  }
+
+  resetCircuitBreaker(): void {
+    this.client.resetCircuitBreaker();
+  }
+
+  // -------------------------------------------------------------------------
+  // Private Helpers
+  // -------------------------------------------------------------------------
+
+  private normalizeOrder(order: {
+    orderId: number;
+    clientOrderId?: string;
+    symbol: string;
+    side: "BUY" | "SELL";
+    type: string;
+    status: string;
+    price: string;
+    origQty: string;
+    executedQty: string;
+    cummulativeQuoteQty: string;
+    timeInForce?: string;
+    stopPrice?: string;
+    time?: number;
+    updateTime?: number;
+    isWorking?: boolean;
+  }): Order {
+    return {
+      orderId: order.orderId.toString(),
+      clientOrderId: order.clientOrderId,
+      symbol: order.symbol,
+      side: order.side,
+      type: order.type as Order["type"],
+      status: order.status as Order["status"],
+      price: parseFloat(order.price),
+      quantity: parseFloat(order.origQty),
+      executedQty: parseFloat(order.executedQty),
+      cummulativeQuoteQty: parseFloat(order.cummulativeQuoteQty),
+      timeInForce: order.timeInForce as Order["timeInForce"],
+      stopPrice: order.stopPrice ? parseFloat(order.stopPrice) : undefined,
+      time: order.time,
+      updateTime: order.updateTime,
+      isWorking: order.isWorking,
+    };
+  }
+}

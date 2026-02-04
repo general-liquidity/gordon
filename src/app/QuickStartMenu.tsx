@@ -34,13 +34,13 @@ export const QuickStartMenu: React.FC<QuickStartMenuProps> = ({
 
   return (
     <Box flexDirection="column" paddingX={2} paddingY={1}>
-      {/* Header with Mode Badge */}
+      {/* Header with Mode Badge - includes descriptive text for accessibility */}
       <Box marginBottom={1} gap={2}>
         <Text color={COLORS.ACCENT} bold>
           Quick Actions
         </Text>
         <Badge color={mode === "ARMED" ? "red" : "green"}>
-          {mode === "ARMED" ? "ARMED" : "SAFE"}
+          {mode === "ARMED" ? "ARMED - Live Trading" : "SAFE - Analysis Only"}
         </Badge>
       </Box>
 
@@ -52,7 +52,7 @@ export const QuickStartMenu: React.FC<QuickStartMenuProps> = ({
         />
       </Box>
 
-      {/* Trading Mode Info */}
+      {/* Trading Mode Info - text description provides meaning beyond border color */}
       <Box
         borderStyle="single"
         borderColor={mode === "ARMED" ? COLORS.RED : COLORS.GREEN}
@@ -61,6 +61,9 @@ export const QuickStartMenu: React.FC<QuickStartMenuProps> = ({
         marginTop={1}
       >
         <Box flexDirection="column">
+          <Text color={COLORS.WHITE} bold>
+            {mode === "SAFE" ? "[SAFE MODE]" : "[ARMED MODE]"}
+          </Text>
           <Text color={COLORS.DIM}>
             {mode === "SAFE"
               ? "Analysis only - no trades will execute"

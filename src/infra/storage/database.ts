@@ -131,6 +131,29 @@ export function initDatabase(): Database {
   db.run("CREATE INDEX IF NOT EXISTS idx_events_tradeId ON events(tradeId)");
   db.run("CREATE INDEX IF NOT EXISTS idx_events_timestamp ON events(timestamp)");
 
+  // Create data source cache table for historical OHLC data
+  db.run(`
+    CREATE TABLE IF NOT EXISTS data_source_cache (
+      symbol TEXT NOT NULL,
+      timeframe TEXT NOT NULL,
+      timestamp INTEGER NOT NULL,
+      open REAL NOT NULL,
+      high REAL NOT NULL,
+      low REAL NOT NULL,
+      close REAL NOT NULL,
+      volume REAL NOT NULL,
+      source_id TEXT NOT NULL,
+      fetched_at INTEGER NOT NULL,
+      PRIMARY KEY (symbol, timeframe, timestamp)
+    )
+  `);
+
+  // Create index for efficient coverage queries on data source cache
+  db.run(`
+    CREATE INDEX IF NOT EXISTS idx_data_cache_coverage
+    ON data_source_cache(symbol, timeframe, timestamp)
+  `);
+
   dbInstance = db;
   return db;
 }

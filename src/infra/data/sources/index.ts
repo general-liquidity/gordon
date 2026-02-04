@@ -1,0 +1,51 @@
+/**
+ * Data Sources Module
+ *
+ * Provides a unified interface for fetching historical OHLC data from multiple sources
+ * with automatic caching and fallback.
+ *
+ * @example
+ * ```typescript
+ * import {
+ *   DataSourceManager,
+ *   ExchangeDataSource,
+ *   getDataSourceManager,
+ * } from "./infra/data/sources";
+ * import { BinanceAdapter } from "./infra/exchange";
+ *
+ * // Setup
+ * const manager = getDataSourceManager();
+ * const exchange = new BinanceAdapter(apiKey, apiSecret);
+ * manager.register(new ExchangeDataSource(exchange));
+ *
+ * // Fetch data
+ * const candles = await manager.fetchOHLC({
+ *   symbol: "BTCUSDT",
+ *   timeframe: "1h",
+ *   startTime: Date.now() - 86400000,
+ *   endTime: Date.now(),
+ * });
+ * ```
+ */
+
+// Core types
+export type {
+  OHLCParams,
+  DataSourceCapabilities,
+  DataSource,
+  DataFetchResult,
+  DataCoverage,
+} from "./types.ts";
+
+// Cache
+export { HistoricalDataCache } from "./cache.ts";
+
+// Data sources
+export { ExchangeDataSource } from "./exchange-source.ts";
+
+// Manager
+export {
+  DataSourceManager,
+  getDataSourceManager,
+  resetDataSourceManager,
+} from "./manager.ts";

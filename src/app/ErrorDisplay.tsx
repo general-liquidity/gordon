@@ -2,6 +2,12 @@ import React, { useState, useMemo } from "react";
 import { Box, Text, useInput } from "ink";
 
 import { COLORS } from "./theme.ts";
+import {
+  createErrorContext,
+  detectErrorType,
+  type ErrorContext,
+  type RecoveryStep,
+} from "../utils/errorContext.ts";
 
 /**
  * Error suggestion with actionable hint
@@ -558,6 +564,318 @@ export function ErrorFallback({
       showMenu={false}
       onRetry={resetError}
       expandedDetails={false}
+    />
+  );
+}
+
+// ============================================================================
+// Enhanced Error Display with Context
+// ============================================================================
+
+/**
+ * Props for enhanced error display with structured context
+ */
+interface EnhancedErrorDisplayProps {
+  /** The error that occurred */
+  error: Error;
+  /** What operation the user was trying to perform */
+  operation: string;
+  /** Additional context about the operation */
+  context?: Record<string, unknown>;
+  /** Show retry button */
+  showRetry?: boolean;
+  /** Show menu button */
+  showMenu?: boolean;
+  /** Retry callback */
+  onRetry?: () => void;
+  /** Menu callback */
+  onMenu?: () => void;
+  /** Command selection callback */
+  onCommandSelect?: (command: string) => void;
+}
+
+/**
+ * Enhanced error display that uses structured error context
+ *
+ * This component provides a more detailed error display with:
+ * - Structured "What happened" section
+ * - Clear "Why" explanation
+ * - Numbered recovery steps with commands
+ *
+ * @example
+ * ```tsx
+ * <EnhancedErrorDisplay
+ *   error={rateLimitError}
+ *   operation="/analyze BTC"
+ *   context={{ symbol: "BTCUSDT", timeframe: "15m" }}
+ *   onCommandSelect={(cmd) => executeCommand(cmd)}
+ * />
+ * ```
+ */
+export function EnhancedErrorDisplay({
+  error,
+  operation,
+  context,
+  showRetry = true,
+  showMenu = true,
+  onRetry,
+  onMenu,
+  onCommandSelect,
+}: EnhancedErrorDisplayProps): React.ReactElement {
+  const [selectedStep, setSelectedStep] = useState(0);
+  const [showDetails, setShowDetails] = useState(false);
+
+  // Create error context
+  const errorCtx = useMemo(
+    () => createErrorContext(error, operation, context),
+    [error, operation, context]
+  );
+
+  // Determine category color based on error type
+  const errorType = detectErrorType(error);
+  const categoryColor = useMemo(() => {
+    switch (errorType) {
+      case "RATE_LIMIT":
+      case "TIMEOUT":
+        return COLORS.YELLOW;
+      case "AUTH_FAILURE":
+      case "INSUFFICIENT_BALANCE":
+      case "RISK_LIMIT":
+        return COLORS.RED;
+      case "NETWORK_ERROR":
+        return COLORS.YELLOW;
+      case "INVALID_SYMBOL":
+        return COLORS.YELLOW;
+      case "TRADING_MODE":
+        return COLORS.BLUE;
+      default:
+        return COLORS.ERROR;
+    }
+  }, [errorType]);
+
+  const hasRetry = showRetry && onRetry;
+  const hasMenu = showMenu && onMenu;
+  const commandSteps = errorCtx.recoverySteps.filter((s) => s.command);
+  const hasCommandSteps = commandSteps.length > 0 && onCommandSelect;
+
+  useInput((input, key) => {
+    // Toggle details with 'd'
+    if (input === "d") {
+      setShowDetails((prev) => !prev);
+      return;
+    }
+
+    // Navigate recovery steps
+    if (key.upArrow || key.downArrow) {
+      const maxSteps = errorCtx.recoverySteps.length;
+      if (key.upArrow) {
+        setSelectedStep((prev) => (prev > 0 ? prev - 1 : maxSteps - 1));
+      } else {
+        setSelectedStep((prev) => (prev < maxSteps - 1 ? prev + 1 : 0));
+      }
+    }
+
+    // Execute selected step's command
+    if (key.return && onCommandSelect) {
+      const step = errorCtx.recoverySteps[selectedStep];
+      if (step?.command) {
+        onCommandSelect(step.command);
+      }
+    }
+
+    // Keyboard shortcuts
+    if (input === "r" && hasRetry) {
+      onRetry();
+    }
+    if (input === "m" && hasMenu) {
+      onMenu();
+    }
+
+    // Number keys for quick step selection (1-9)
+    const numKey = parseInt(input, 10);
+    if (numKey >= 1 && numKey <= 9 && numKey <= errorCtx.recoverySteps.length) {
+      const step = errorCtx.recoverySteps[numKey - 1];
+      if (step?.command && onCommandSelect) {
+        onCommandSelect(step.command);
+      }
+    }
+  });
+
+  return (
+    <Box flexDirection="column" paddingX={2} paddingY={1}>
+      {/* Error Header */}
+      <Box marginBottom={1}>
+        <Text color={categoryColor} bold>
+          [!] {errorCtx.reason}
+        </Text>
+        {errorCtx.errorCode && (
+          <Text color={COLORS.DIM}> (Code: {errorCtx.errorCode})</Text>
+        )}
+      </Box>
+
+      {/* Main Error Box */}
+      <Box
+        borderStyle="single"
+        borderColor={categoryColor}
+        paddingX={2}
+        paddingY={1}
+        flexDirection="column"
+      >
+        {/* What Happened Section */}
+        <Box flexDirection="column">
+          <Text color={COLORS.ACCENT} bold>
+            What happened:
+          </Text>
+          <Box marginLeft={2} flexDirection="column">
+            <Box>
+              <Text color={COLORS.DIM}>Attempted: </Text>
+              <Text color={COLORS.WHITE}>{errorCtx.attempted}</Text>
+            </Box>
+            <Box>
+              <Text color={COLORS.DIM}>During: </Text>
+              <Text color={COLORS.WHITE}>{errorCtx.operation}</Text>
+            </Box>
+          </Box>
+        </Box>
+
+        {/* Why Section */}
+        <Box flexDirection="column" marginTop={1}>
+          <Text color={COLORS.ACCENT} bold>
+            Why:
+          </Text>
+          <Box marginLeft={2}>
+            <Text color={COLORS.WHITE}>{errorCtx.reason}</Text>
+          </Box>
+        </Box>
+
+        {/* Technical Details (toggleable) */}
+        <Box marginTop={1} flexDirection="column">
+          <Box>
+            <Text color={COLORS.DIM}>
+              Details {showDetails ? "[-]" : "[+]"} (press 'd' to toggle)
+            </Text>
+          </Box>
+          {showDetails && (
+            <Box marginTop={1} marginLeft={2} flexDirection="column">
+              <Text color={COLORS.MUTED}>{error.message}</Text>
+              {error.stack && (
+                <Box marginTop={1}>
+                  <Text color={COLORS.MUTED} dimColor>
+                    {error.stack.split("\n").slice(0, 5).join("\n")}
+                  </Text>
+                </Box>
+              )}
+            </Box>
+          )}
+        </Box>
+      </Box>
+
+      {/* Recovery Section */}
+      {errorCtx.recoverySteps.length > 0 && (
+        <Box flexDirection="column" marginTop={1}>
+          <Text color={COLORS.SUCCESS} bold>
+            Recovery:
+          </Text>
+          <Box flexDirection="column" marginLeft={2} marginTop={1}>
+            {errorCtx.recoverySteps.map((step, index) => {
+              const isSelected = selectedStep === index;
+              const hasCommand = !!step.command;
+
+              return (
+                <Box key={`step-${index}`} flexDirection="column" marginBottom={1}>
+                  <Box>
+                    {hasCommand && onCommandSelect ? (
+                      <Text color={isSelected ? COLORS.HIGHLIGHT : COLORS.DIM}>
+                        {isSelected ? ">" : " "} {step.step}.{" "}
+                      </Text>
+                    ) : (
+                      <Text color={COLORS.DIM}>  {step.step}. </Text>
+                    )}
+                    <Text color={COLORS.WHITE} bold={isSelected}>
+                      {step.description}
+                    </Text>
+                    {step.command && (
+                      <Text color={COLORS.ACCENT}> {step.command}</Text>
+                    )}
+                    {step.waitSeconds && (
+                      <Text color={COLORS.YELLOW}> (wait {step.waitSeconds}s)</Text>
+                    )}
+                  </Box>
+                </Box>
+              );
+            })}
+          </Box>
+        </Box>
+      )}
+
+      {/* Action Buttons */}
+      {(hasRetry || hasMenu) && (
+        <Box marginTop={1} gap={2}>
+          {hasRetry && (
+            <Box>
+              <Text color={COLORS.TAN}>[R] Retry</Text>
+            </Box>
+          )}
+          {hasMenu && (
+            <Box>
+              <Text color={COLORS.TAN}>[M] Return to Menu</Text>
+            </Box>
+          )}
+        </Box>
+      )}
+
+      {/* Help Text */}
+      <Box marginTop={1}>
+        <Text color={COLORS.DIM}>
+          {hasCommandSteps && "Use arrows to select | [Enter] Execute | "}
+          {hasCommandSteps && "[1-9] Quick select | "}
+          {hasRetry && "[R] Retry | "}
+          {hasMenu && "[M] Menu | "}
+          [D] Toggle details
+        </Text>
+      </Box>
+    </Box>
+  );
+}
+
+/**
+ * Convert ErrorContext to suggestions format for legacy ErrorDisplay
+ * This bridges the new context system with the existing suggestion-based display
+ */
+export function contextToSuggestions(ctx: ErrorContext): ErrorSuggestion[] {
+  return ctx.recoverySteps.map((step) => ({
+    label: `Step ${step.step}`,
+    description: step.description + (step.waitSeconds ? ` (wait ${step.waitSeconds}s)` : ""),
+    command: step.command,
+  }));
+}
+
+/**
+ * Create an error display from just an Error object
+ * Automatically creates context and renders the enhanced display
+ */
+export function ErrorDisplayFromError({
+  error,
+  operation = "operation",
+  onRetry,
+  onMenu,
+  onCommandSelect,
+}: {
+  error: Error;
+  operation?: string;
+  onRetry?: () => void;
+  onMenu?: () => void;
+  onCommandSelect?: (command: string) => void;
+}): React.ReactElement {
+  return (
+    <EnhancedErrorDisplay
+      error={error}
+      operation={operation}
+      showRetry={!!onRetry}
+      showMenu={!!onMenu}
+      onRetry={onRetry}
+      onMenu={onMenu}
+      onCommandSelect={onCommandSelect}
     />
   );
 }

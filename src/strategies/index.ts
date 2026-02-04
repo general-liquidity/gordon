@@ -112,3 +112,58 @@ export { adxTrendStrategy } from "./tier-2/adx-trend.ts";
 export { emaRsiCrossoverStrategy } from "./tier-2/ema-rsi-crossover.ts";
 export { relativeStrengthStrategy } from "./tier-2/relative-strength.ts";
 export { engulfingPatternStrategy } from "./tier-2/engulfing-pattern.ts";
+
+// ============================================================================
+// DSL Module Exports
+// ============================================================================
+
+export {
+  // Schema and validation
+  StrategyDSLSchema,
+  validateStrategyDSL,
+  createStrategyDSL,
+
+  // Condition evaluation
+  evaluateCondition,
+  evaluateConditionWithResult,
+  evaluateSignalRule,
+
+  // Interpreter
+  DSLBasedStrategy,
+  DSLStrategyInterpreter,
+  interpretDSL,
+  parseStrategy,
+
+  // Adapter (for Backtest Engine)
+  DSLStrategyAdapter,
+  createStrategyFromDSL,
+
+  // Storage
+  saveStrategy,
+  loadStrategy,
+  listStrategies as listGeneratedStrategies,
+  deleteStrategy,
+
+  // Convenience functions
+  createAndSaveStrategy,
+  loadAndInterpret,
+  loadAllAsStrategies,
+
+  // Example templates
+  EXAMPLE_RSI_BOUNCE_DSL,
+  EXAMPLE_MACD_CROSSOVER_DSL,
+} from "./dsl/index.ts";
+
+export type {
+  // DSL Types
+  StrategyDSL,
+  Condition,
+  SignalRule,
+  StopLoss,
+  TakeProfit,
+  IndicatorCondition,
+  PriceCondition,
+  PatternCondition,
+  EvaluationContext,
+  EvaluationResult,
+} from "./dsl/index.ts";

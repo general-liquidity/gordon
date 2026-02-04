@@ -12,10 +12,20 @@ import type { SlashCommand } from "../slashCommands.ts";
  * Category icons for visual grouping
  */
 const CATEGORY_ICONS: Record<string, string> = {
-  market: "◆",
-  trading: "▲",
-  account: "■",
-  system: "●",
+  market: "M",
+  trading: "T",
+  account: "A",
+  system: "S",
+};
+
+/**
+ * Category labels for separators
+ */
+const CATEGORY_LABELS: Record<string, string> = {
+  market: "Market Discovery",
+  trading: "Trading",
+  account: "Account",
+  system: "System",
 };
 
 /**
@@ -26,6 +36,15 @@ const CATEGORY_COLORS: Record<string, string> = {
   trading: COLORS.GREEN,
   account: COLORS.YELLOW,
   system: COLORS.DIM,
+};
+
+/**
+ * Level colors for visual distinction
+ */
+const LEVEL_COLORS: Record<number, string> = {
+  1: COLORS.GREEN,
+  2: COLORS.YELLOW,
+  3: COLORS.ORANGE || COLORS.RED,
 };
 
 interface CommandAutocompleteProps {
@@ -144,10 +163,12 @@ export const CommandAutocomplete: React.FC<CommandAutocompleteProps> = ({
 
         return (
           <Box key={cmd.name} flexDirection="column" paddingY={0}>
-            {/* Category separator */}
+            {/* Category separator with label */}
             {showCategorySeparator && index > 0 && (
               <Box marginTop={1}>
-                <Text color={COLORS.DIM}>────</Text>
+                <Text color={COLORS.DIM}>─── </Text>
+                <Text color={categoryColor} bold>{CATEGORY_LABELS[cmd.category] || cmd.category}</Text>
+                <Text color={COLORS.DIM}> ───</Text>
               </Box>
             )}
 
@@ -188,6 +209,13 @@ export const CommandAutocomplete: React.FC<CommandAutocompleteProps> = ({
                   ? cmd.description.slice(0, 32) + "..."
                   : cmd.description}
               </Text>
+
+              {/* Level badge for advanced/expert commands */}
+              {cmd.level > 1 && (
+                <Text color={LEVEL_COLORS[cmd.level] || COLORS.DIM}>
+                  {" "}[L{cmd.level}]
+                </Text>
+              )}
             </Box>
 
             {/* Show usage for selected command */}

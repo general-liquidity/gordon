@@ -192,10 +192,15 @@ export function PaginatedOutput<T>({
           )}
         </Box>
 
-        {/* Page dots */}
+        {/* Page indicators with text for accessibility */}
         <Box gap={1}>
+          {/* Always show page X of Y as text for screen readers */}
+          <Text color={COLORS.DIM}>
+            Page {currentPage + 1}/{totalPages}
+          </Text>
           {totalPages <= 10 ? (
             // Show all page indicators if 10 or fewer pages
+            // Visual dots complement the text indicator above
             Array.from({ length: totalPages }, (_, i) => (
               <Text
                 key={`page-${i}`}

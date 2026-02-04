@@ -54,6 +54,7 @@ export { tradingTools } from "./trading.ts";
 export { marketAnalysisTools } from "./market-analysis.ts";
 export { riskManagementTools } from "./risk-management.ts";
 export { strategyTools } from "./strategies.ts";
+export { strategyGenerationTools } from "./strategy-generation.ts";
 export { metricsTools } from "./metrics.ts";
 export { compositionTools } from "./composition.ts";
 export { backtestTools } from "./backtest.ts";
@@ -242,6 +243,7 @@ import { tradingTools } from "./trading.ts";
 import { marketAnalysisTools } from "./market-analysis.ts";
 import { riskManagementTools } from "./risk-management.ts";
 import { strategyTools } from "./strategies.ts";
+import { strategyGenerationTools } from "./strategy-generation.ts";
 import { metricsTools } from "./metrics.ts";
 import { compositionTools } from "./composition.ts";
 import { backtestTools } from "./backtest.ts";
@@ -270,6 +272,7 @@ export const allTools = {
   ...marketAnalysisTools,
   ...riskManagementTools,
   ...strategyTools,
+  ...strategyGenerationTools,
   ...metricsTools,
   ...compositionTools,
   ...backtestTools,
@@ -299,6 +302,7 @@ export const toolCounts = {
   marketAnalysis: Object.keys(marketAnalysisTools).length,
   riskManagement: Object.keys(riskManagementTools).length,
   strategies: Object.keys(strategyTools).length,
+  strategyGeneration: Object.keys(strategyGenerationTools).length,
   metrics: Object.keys(metricsTools).length,
   composition: Object.keys(compositionTools).length,
   backtest: Object.keys(backtestTools).length,

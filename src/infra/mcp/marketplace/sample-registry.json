@@ -1,0 +1,444 @@
+{
+  "version": "1.0.0",
+  "lastUpdated": "2025-01-01",
+  "plugins": [
+    {
+      "id": "coingecko",
+      "manifest": {
+        "id": "coingecko",
+        "name": "CoinGecko Data",
+        "version": "1.0.0",
+        "description": "Historical price data from CoinGecko API. Get OHLC data, market caps, volumes, and more for thousands of cryptocurrencies.",
+        "author": "Gordon Team",
+        "category": "data-provider",
+        "tools": [
+          {
+            "name": "get_historical_prices",
+            "description": "Get historical OHLC data for a cryptocurrency",
+            "inputSchema": {
+              "type": "object",
+              "properties": {
+                "coinId": { "type": "string", "description": "CoinGecko coin ID" },
+                "days": { "type": "number", "description": "Number of days of history" },
+                "interval": { "type": "string", "enum": ["daily", "hourly"] }
+              },
+              "required": ["coinId"]
+            }
+          },
+          {
+            "name": "get_market_data",
+            "description": "Get current market data including price, market cap, and volume",
+            "inputSchema": {
+              "type": "object",
+              "properties": {
+                "coinId": { "type": "string", "description": "CoinGecko coin ID" }
+              },
+              "required": ["coinId"]
+            }
+          }
+        ],
+        "authentication": {
+          "type": "api_key",
+          "envVar": "COINGECKO_API_KEY"
+        }
+      },
+      "repository": "https://github.com/gordon-marketplace/coingecko",
+      "stars": 245,
+      "downloads": 12500,
+      "verified": true,
+      "officialProvider": false,
+      "lastUpdated": "2025-01-01",
+      "pricing": {
+        "type": "freemium",
+        "freeUsage": "50 calls/min",
+        "pricingUrl": "https://www.coingecko.com/en/api/pricing"
+      }
+    },
+    {
+      "id": "tradingview-signals",
+      "manifest": {
+        "id": "tradingview-signals",
+        "name": "TradingView Signals",
+        "version": "1.0.0",
+        "description": "Receive TradingView alerts and signals via webhook integration.",
+        "author": "Gordon Team",
+        "category": "analytics",
+        "tools": [
+          {
+            "name": "get_latest_signals",
+            "description": "Get the latest trading signals received from TradingView",
+            "inputSchema": {
+              "type": "object",
+              "properties": {
+                "symbol": { "type": "string", "description": "Filter by trading symbol" },
+                "limit": { "type": "number", "description": "Number of signals to return" }
+              }
+            }
+          },
+          {
+            "name": "configure_webhook",
+            "description": "Configure webhook endpoint for TradingView alerts",
+            "inputSchema": {
+              "type": "object",
+              "properties": {
+                "port": { "type": "number", "description": "Local port to listen on" }
+              }
+            }
+          }
+        ],
+        "authentication": {
+          "type": "none"
+        }
+      },
+      "repository": "https://github.com/gordon-marketplace/tradingview-signals",
+      "stars": 189,
+      "downloads": 8900,
+      "verified": true,
+      "officialProvider": false,
+      "lastUpdated": "2025-01-01",
+      "pricing": {
+        "type": "free"
+      }
+    },
+    {
+      "id": "glassnode",
+      "manifest": {
+        "id": "glassnode",
+        "name": "Glassnode On-Chain Analytics",
+        "version": "1.0.0",
+        "description": "On-chain metrics and analytics from Glassnode. Access NUPL, SOPR, exchange flows, and more.",
+        "author": "Gordon Team",
+        "category": "research",
+        "tools": [
+          {
+            "name": "get_onchain_metric",
+            "description": "Get on-chain metric data for a cryptocurrency",
+            "inputSchema": {
+              "type": "object",
+              "properties": {
+                "asset": { "type": "string", "description": "Asset symbol (e.g., BTC)" },
+                "metric": { "type": "string", "description": "Metric name (e.g., nupl, sopr)" },
+                "resolution": { "type": "string", "enum": ["1h", "24h", "10m"] }
+              },
+              "required": ["asset", "metric"]
+            }
+          },
+          {
+            "name": "get_exchange_flows",
+            "description": "Get exchange inflow/outflow data",
+            "inputSchema": {
+              "type": "object",
+              "properties": {
+                "asset": { "type": "string", "description": "Asset symbol" },
+                "exchange": { "type": "string", "description": "Exchange name (optional)" }
+              },
+              "required": ["asset"]
+            }
+          }
+        ],
+        "authentication": {
+          "type": "api_key",
+          "envVar": "GLASSNODE_API_KEY"
+        }
+      },
+      "repository": "https://github.com/gordon-marketplace/glassnode",
+      "stars": 312,
+      "downloads": 15600,
+      "verified": true,
+      "officialProvider": false,
+      "lastUpdated": "2025-01-01",
+      "pricing": {
+        "type": "paid",
+        "pricingUrl": "https://studio.glassnode.com/pricing"
+      }
+    },
+    {
+      "id": "dexscreener",
+      "manifest": {
+        "id": "dexscreener",
+        "name": "DEX Screener",
+        "version": "1.0.0",
+        "description": "Real-time DEX trading data and token discovery. Track new pairs, liquidity, and trading activity across major DEXes.",
+        "author": "Gordon Team",
+        "category": "data-provider",
+        "tools": [
+          {
+            "name": "search_pairs",
+            "description": "Search for trading pairs across DEXes",
+            "inputSchema": {
+              "type": "object",
+              "properties": {
+                "query": { "type": "string", "description": "Search query (token name/address)" }
+              },
+              "required": ["query"]
+            }
+          },
+          {
+            "name": "get_pair_info",
+            "description": "Get detailed pair information",
+            "inputSchema": {
+              "type": "object",
+              "properties": {
+                "chainId": { "type": "string", "description": "Chain ID" },
+                "pairAddress": { "type": "string", "description": "Pair contract address" }
+              },
+              "required": ["chainId", "pairAddress"]
+            }
+          },
+          {
+            "name": "get_new_pairs",
+            "description": "Get newly created trading pairs",
+            "inputSchema": {
+              "type": "object",
+              "properties": {
+                "chainId": { "type": "string", "description": "Filter by chain" },
+                "minLiquidity": { "type": "number", "description": "Minimum liquidity in USD" }
+              }
+            }
+          }
+        ],
+        "authentication": {
+          "type": "none"
+        }
+      },
+      "repository": "https://github.com/gordon-marketplace/dexscreener",
+      "stars": 423,
+      "downloads": 21000,
+      "verified": true,
+      "officialProvider": false,
+      "lastUpdated": "2025-01-01",
+      "pricing": {
+        "type": "free"
+      }
+    },
+    {
+      "id": "telegram-alerts",
+      "manifest": {
+        "id": "telegram-alerts",
+        "name": "Telegram Alerts",
+        "version": "1.0.0",
+        "description": "Send trading alerts and notifications to Telegram channels or private chats.",
+        "author": "Gordon Team",
+        "category": "utility",
+        "tools": [
+          {
+            "name": "send_alert",
+            "description": "Send an alert message to Telegram",
+            "inputSchema": {
+              "type": "object",
+              "properties": {
+                "message": { "type": "string", "description": "Alert message" },
+                "chatId": { "type": "string", "description": "Telegram chat ID" }
+              },
+              "required": ["message"]
+            }
+          },
+          {
+            "name": "send_trade_notification",
+            "description": "Send a formatted trade notification",
+            "inputSchema": {
+              "type": "object",
+              "properties": {
+                "symbol": { "type": "string" },
+                "side": { "type": "string", "enum": ["buy", "sell"] },
+                "price": { "type": "number" },
+                "quantity": { "type": "number" }
+              },
+              "required": ["symbol", "side", "price", "quantity"]
+            }
+          }
+        ],
+        "authentication": {
+          "type": "api_key",
+          "envVar": "TELEGRAM_BOT_TOKEN",
+          "fields": [
+            {
+              "name": "botToken",
+              "label": "Bot Token",
+              "sensitive": true
+            },
+            {
+              "name": "defaultChatId",
+              "label": "Default Chat ID",
+              "sensitive": false
+            }
+          ]
+        }
+      },
+      "repository": "https://github.com/gordon-marketplace/telegram-alerts",
+      "stars": 567,
+      "downloads": 28000,
+      "verified": true,
+      "officialProvider": false,
+      "lastUpdated": "2025-01-01",
+      "pricing": {
+        "type": "free"
+      }
+    },
+    {
+      "id": "defi-llama",
+      "manifest": {
+        "id": "defi-llama",
+        "name": "DeFi Llama",
+        "version": "1.0.0",
+        "description": "DeFi protocol analytics and TVL data. Track total value locked across protocols and chains.",
+        "author": "Gordon Team",
+        "category": "research",
+        "tools": [
+          {
+            "name": "get_protocol_tvl",
+            "description": "Get TVL data for a DeFi protocol",
+            "inputSchema": {
+              "type": "object",
+              "properties": {
+                "protocol": { "type": "string", "description": "Protocol slug" }
+              },
+              "required": ["protocol"]
+            }
+          },
+          {
+            "name": "get_chain_tvl",
+            "description": "Get TVL data for a blockchain",
+            "inputSchema": {
+              "type": "object",
+              "properties": {
+                "chain": { "type": "string", "description": "Chain name" }
+              },
+              "required": ["chain"]
+            }
+          },
+          {
+            "name": "get_yields",
+            "description": "Get yield farming opportunities",
+            "inputSchema": {
+              "type": "object",
+              "properties": {
+                "minApy": { "type": "number", "description": "Minimum APY filter" },
+                "chain": { "type": "string", "description": "Filter by chain" }
+              }
+            }
+          }
+        ],
+        "authentication": {
+          "type": "none"
+        }
+      },
+      "repository": "https://github.com/gordon-marketplace/defi-llama",
+      "stars": 389,
+      "downloads": 19500,
+      "verified": true,
+      "officialProvider": false,
+      "lastUpdated": "2025-01-01",
+      "pricing": {
+        "type": "free"
+      }
+    },
+    {
+      "id": "lunarcrush",
+      "manifest": {
+        "id": "lunarcrush",
+        "name": "LunarCrush Social Intelligence",
+        "version": "1.0.0",
+        "description": "Social media sentiment and influencer tracking for cryptocurrencies.",
+        "author": "Gordon Team",
+        "category": "research",
+        "tools": [
+          {
+            "name": "get_social_metrics",
+            "description": "Get social metrics for a cryptocurrency",
+            "inputSchema": {
+              "type": "object",
+              "properties": {
+                "symbol": { "type": "string", "description": "Cryptocurrency symbol" }
+              },
+              "required": ["symbol"]
+            }
+          },
+          {
+            "name": "get_influencer_activity",
+            "description": "Get recent influencer posts about a coin",
+            "inputSchema": {
+              "type": "object",
+              "properties": {
+                "symbol": { "type": "string", "description": "Cryptocurrency symbol" },
+                "limit": { "type": "number", "description": "Number of posts to return" }
+              },
+              "required": ["symbol"]
+            }
+          }
+        ],
+        "authentication": {
+          "type": "api_key",
+          "envVar": "LUNARCRUSH_API_KEY"
+        }
+      },
+      "repository": "https://github.com/gordon-marketplace/lunarcrush",
+      "stars": 234,
+      "downloads": 11200,
+      "verified": true,
+      "officialProvider": false,
+      "lastUpdated": "2025-01-01",
+      "pricing": {
+        "type": "freemium",
+        "freeUsage": "Limited daily requests",
+        "pricingUrl": "https://lunarcrush.com/pricing"
+      }
+    },
+    {
+      "id": "portfolio-tracker",
+      "manifest": {
+        "id": "portfolio-tracker",
+        "name": "Portfolio Tracker",
+        "version": "1.0.0",
+        "description": "Track your crypto portfolio across multiple exchanges and wallets. Calculate PnL, cost basis, and tax reports.",
+        "author": "Gordon Team",
+        "category": "portfolio",
+        "tools": [
+          {
+            "name": "get_portfolio_summary",
+            "description": "Get a summary of your portfolio holdings",
+            "inputSchema": {
+              "type": "object",
+              "properties": {}
+            }
+          },
+          {
+            "name": "calculate_pnl",
+            "description": "Calculate profit and loss for a position",
+            "inputSchema": {
+              "type": "object",
+              "properties": {
+                "symbol": { "type": "string", "description": "Trading symbol" }
+              },
+              "required": ["symbol"]
+            }
+          },
+          {
+            "name": "generate_tax_report",
+            "description": "Generate a tax report for a given period",
+            "inputSchema": {
+              "type": "object",
+              "properties": {
+                "year": { "type": "number", "description": "Tax year" },
+                "format": { "type": "string", "enum": ["csv", "pdf"] }
+              },
+              "required": ["year"]
+            }
+          }
+        ],
+        "authentication": {
+          "type": "none"
+        }
+      },
+      "repository": "https://github.com/gordon-marketplace/portfolio-tracker",
+      "stars": 456,
+      "downloads": 22800,
+      "verified": true,
+      "officialProvider": false,
+      "lastUpdated": "2025-01-01",
+      "pricing": {
+        "type": "free"
+      }
+    }
+  ]
+}

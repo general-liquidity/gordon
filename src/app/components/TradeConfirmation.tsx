@@ -31,6 +31,9 @@ export const TradeConfirmation: React.FC<TradeConfirmationProps> = ({
 }) => {
   const actionColor = trade.action === "BUY" ? "green" : "red";
 
+  // Action label for screen readers - complements border color
+  const actionLabel = trade.action === "BUY" ? "[BUY]" : "[SELL]";
+
   return (
     <Box
       flexDirection="column"
@@ -40,12 +43,14 @@ export const TradeConfirmation: React.FC<TradeConfirmationProps> = ({
       paddingY={1}
       marginX={1}
     >
-      {/* Header */}
+      {/* Header - Badge includes action type text for accessibility */}
       <Box marginBottom={1} gap={2}>
         <Text color={COLORS.WHITE} bold>
           Confirm Trade
         </Text>
-        <Badge color={actionColor}>{trade.action}</Badge>
+        <Badge color={actionColor}>
+          {trade.action === "BUY" ? "BUY Order" : "SELL Order"}
+        </Badge>
       </Box>
 
       {/* Trade Details */}

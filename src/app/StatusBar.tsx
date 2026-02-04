@@ -1,10 +1,23 @@
 import React from "react";
 import { Box, Text } from "ink";
-import { Badge, Spinner } from "@inkjs/ui";
+import { Spinner } from "@inkjs/ui";
 import type { Mode } from "../types/index.ts";
 import { COLORS } from "./theme.ts";
+import { TradingModeIndicator, ConnectionStatus, StatusBadge } from "./components/VisualStatus.tsx";
 
 type ConnectionStatus = "connected" | "disconnected" | "connecting";
+
+/**
+ * Thread info for status bar display
+ */
+export interface ThreadStatusInfo {
+  /** Thread name/label to display */
+  name: string;
+  /** Number of messages in the thread */
+  messageCount: number;
+  /** Whether this is a branch/clone of another thread */
+  isBranch: boolean;
+}
 
 interface StatusBarProps {
   mode: Mode;
@@ -12,6 +25,8 @@ interface StatusBarProps {
   connectionStatus?: ConnectionStatus;
   currency?: string;
   btcPrice?: number;
+  /** Thread info for display */
+  threadInfo?: ThreadStatusInfo;
 }
 
 export const StatusBar: React.FC<StatusBarProps> = ({
@@ -20,6 +35,7 @@ export const StatusBar: React.FC<StatusBarProps> = ({
   connectionStatus = "disconnected",
   currency = "USDT",
   btcPrice,
+  threadInfo,
 }) => {
   // Format portfolio value
   const formatValue = (value: number | undefined): string => {
@@ -47,12 +63,13 @@ export const StatusBar: React.FC<StatusBarProps> = ({
       justifyContent="space-between"
       width="100%"
     >
-      {/* Left section: Mode Badge */}
+      {/* Left section: Mode Badge with Visual Hierarchy */}
       <Box gap={1}>
         <Text color={COLORS.DIM}>Mode:</Text>
-        <Badge color={mode === "ARMED" ? "red" : "green"}>
-          {mode === "ARMED" ? "ARMED" : "SAFE"}
-        </Badge>
+        <TradingModeIndicator 
+          mode={mode} 
+          animate={true}
+        />
       </Box>
 
       {/* BTC Price */}
@@ -71,14 +88,30 @@ export const StatusBar: React.FC<StatusBarProps> = ({
         </Text>
       </Box>
 
-      {/* Right section: Connection Badge */}
+      {/* Thread Indicator with Visual Status */}
+      {threadInfo && (
+        <Box gap={1}>
+          <Text color={COLORS.DIM}>Thread:</Text>
+          <StatusBadge 
+            level={threadInfo.isBranch ? "warning" : "info"}
+            label={threadInfo.name}
+            animate={threadInfo.isBranch}
+          />
+          <Text color={COLORS.DIM}>(#{threadInfo.messageCount})</Text>
+        </Box>
+      )}
+
+      {/* Right section: Connection Status with Visual Hierarchy */}
       <Box gap={1}>
+        <Text color={COLORS.DIM}>API:</Text>
         {connectionStatus === "connecting" ? (
-          <Spinner label="connecting" />
+          <Spinner label="Connecting..." />
         ) : (
-          <Badge color={connectionStatus === "connected" ? "green" : "red"}>
-            {connectionStatus}
-          </Badge>
+          <ConnectionStatus 
+            status={connectionStatus}
+            service=""
+            animate={connectionStatus === "connecting"}
+          />
         )}
       </Box>
     </Box>
