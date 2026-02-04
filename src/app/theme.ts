@@ -95,6 +95,7 @@ export const COLORS = {
   YELLOW: "#facc15",
   GREEN: "#22c55e",
   BLUE: "#60a5fa",
+  ORANGE: "#f97316",
   HIGHLIGHT: "#fbbf24",
 
   // Background hints (for reference, Ink uses terminal bg)

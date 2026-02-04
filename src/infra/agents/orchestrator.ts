@@ -37,6 +37,15 @@ import {
   type SummarizationResult,
 } from "../memory/index.ts";
 import type { Message } from "../llm/types.ts";
+import {
+  type StreamWriter,
+  type StreamingResult,
+  type StreamChunk,
+  createStartChunk,
+  createChunk,
+  createEndChunk,
+  createErrorChunk,
+} from "./streamWriter.ts";
 
 // ============================================================================
 // Error Recovery Types & Configuration
@@ -1772,7 +1781,7 @@ export async function processMessageStreamWithPipe(
 
   try {
     // Write start chunk
-    await writer.write(createStartChunk("message-processing") as StreamChunk<MessageStreamChunk>);
+    await writer.write(createStartChunk("message-processing") as unknown as StreamChunk<MessageStreamChunk>);
     chunksWritten++;
 
     // Process message using the existing stream generator
@@ -1822,7 +1831,7 @@ export async function processMessageStreamWithPipe(
     await writer.write(createEndChunk("message-processing", {
       responseLength: fullText.length,
       usage: finalUsage,
-    }) as StreamChunk<MessageStreamChunk>);
+    }) as unknown as StreamChunk<MessageStreamChunk>);
     chunksWritten++;
 
     await writer.close();
@@ -1850,7 +1859,7 @@ export async function processMessageStreamWithPipe(
     logger.error("Message stream with pipe failed", error);
 
     // Write error chunk
-    await writer.write(createErrorChunk(error, "Gordon") as StreamChunk<MessageStreamChunk>);
+    await writer.write(createErrorChunk(error, "Gordon") as unknown as StreamChunk<MessageStreamChunk>);
     chunksWritten++;
     errors++;
 

@@ -65,6 +65,8 @@
     "@types/react": "^19.2.10",
     "ai": "^5.0.0",
     "asciichart": "^1.5.25",
+    "ccxt": "^4.5.36",
+    "ethers": "^6.16.0",
     "ink": "^6.6.0",
     "ink-text-input": "^6.0.0",
     "protobufjs": "^8.0.0",

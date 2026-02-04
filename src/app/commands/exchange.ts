@@ -56,14 +56,20 @@ export async function exchangeList(): Promise<ExchangeCommandResult> {
       };
     }
 
-    const exchangeList = exchanges.map((ex) => ({
-      id: ex.id,
-      type: ex.type,
-      isDefault: ex.isDefault,
-      isActive: ex.id === config.activeExchangeId,
-      sandbox: ex.sandbox || false,
-      apiKeyPrefix: ex.apiKey.substring(0, 8) + '...',
-    }));
+    const exchangeList = exchanges.map((ex) => {
+      const isWallet = isWalletBasedExchange(ex.type);
+      return {
+        id: ex.id,
+        type: ex.type,
+        isDefault: ex.isDefault,
+        isActive: ex.id === config.activeExchangeId,
+        sandbox: ex.sandbox || false,
+        isWalletAuth: isWallet,
+        keyPrefix: isWallet
+          ? (ex.walletPrivateKey ? ex.walletPrivateKey.substring(0, 10) + '...' : 'wallet')
+          : ex.apiKey.substring(0, 8) + '...',
+      };
+    });
 
     const activeCount = exchanges.filter((ex) => ex.id === config.activeExchangeId).length;
 
@@ -110,8 +116,8 @@ export async function exchangeAdd(exchangeType: string): Promise<ExchangeCommand
     const existingOfType = config.exchanges.filter((ex) => ex.type === type);
 
     // Generate a unique ID
-    const baseId = type;
-    let id = baseId;
+    const baseId: string = type;
+    let id: string = baseId;
     let counter = 1;
     while (config.exchanges.some((ex) => ex.id === id)) {
       id = `${baseId}_${counter}`;
@@ -119,20 +125,31 @@ export async function exchangeAdd(exchangeType: string): Promise<ExchangeCommand
     }
 
     // Determine what credentials are needed
-    const needsPassphrase = type === 'coinbase';
+    const needsPassphrase = type === 'coinbase' || type === 'okx';
+    const needsWallet = isWalletBasedExchange(type);
     const hasNativeAdapter = ExchangeFactory.hasNativeAdapter(type);
+
+    // Build required fields based on auth type
+    const requiredFields = needsWallet
+      ? ['walletPrivateKey']
+      : ['apiKey', 'apiSecret', ...(needsPassphrase ? ['passphrase'] : [])];
+
+    const authMessage = needsWallet
+      ? `Ready to add ${type} exchange. Please provide wallet private key.`
+      : `Ready to add ${type} exchange. Please provide API credentials.`;
 
     return {
       success: true,
-      message: `Ready to add ${type} exchange. Please provide API credentials.`,
+      message: authMessage,
       data: {
         exchangeType: type,
         suggestedId: id,
         existingCount: existingOfType.length,
         needsPassphrase,
+        needsWallet,
         hasNativeAdapter,
-        requiredFields: ['apiKey', 'apiSecret', ...(needsPassphrase ? ['passphrase'] : [])],
-        optionalFields: ['sandbox'],
+        requiredFields,
+        optionalFields: needsWallet ? [] : ['sandbox'],
         instructions: getExchangeSetupInstructions(type),
       },
     };
@@ -249,7 +266,11 @@ export async function exchangeRemove(exchangeId: string): Promise<ExchangeComman
     await saveConfig(updatedConfig);
 
     // Clear from factory cache
-    ExchangeFactory.removeFromCache(exchange.type, exchange.apiKey);
+    ExchangeFactory.removeFromCache(exchange.type, {
+      apiKey: exchange.apiKey,
+      apiSecret: exchange.apiSecret,
+      walletPrivateKey: exchange.walletPrivateKey,
+    });
 
     logger.info('Removed exchange', { exchangeId, type: exchange.type });
 
@@ -307,6 +328,7 @@ export async function exchangeStatus(): Promise<ExchangeCommandResult> {
           apiKey: exchangeConfig.apiKey,
           apiSecret: exchangeConfig.apiSecret,
           passphrase: exchangeConfig.passphrase,
+          walletPrivateKey: exchangeConfig.walletPrivateKey,
           sandbox: exchangeConfig.sandbox,
         });
 
@@ -386,6 +408,7 @@ export async function exchangeCompare(symbol: string): Promise<ExchangeCommandRe
           apiKey: exchangeConfig.apiKey,
           apiSecret: exchangeConfig.apiSecret,
           passphrase: exchangeConfig.passphrase,
+          walletPrivateKey: exchangeConfig.walletPrivateKey,
           sandbox: exchangeConfig.sandbox,
         });
 
@@ -452,6 +475,13 @@ export async function exchangeCompare(symbol: string): Promise<ExchangeCommandRe
 /**
  * Get setup instructions for an exchange type
  */
+/**
+ * Check if an exchange uses wallet-based authentication
+ */
+function isWalletBasedExchange(type: ExchangeId): boolean {
+  return type === 'hyperliquid';
+}
+
 function getExchangeSetupInstructions(type: ExchangeId): string {
   const instructions: Record<ExchangeId, string> = {
     binance: `
@@ -477,6 +507,12 @@ function getExchangeSetupInstructions(type: ExchangeId): string {
 1. Log in to OKX and go to Settings > API
 2. Create a new API key with appropriate permissions
 3. Copy the API Key, Secret Key, and Passphrase`,
+    hyperliquid: `
+1. Generate a new Ethereum wallet or use an existing one
+2. Export the private key from your wallet (MetaMask: Account Details > Export Private Key)
+3. IMPORTANT: Use a DEDICATED trading wallet with limited funds
+4. Fund your Hyperliquid account by depositing USDC on Arbitrum
+5. Note: Hyperliquid uses wallet-based auth (no API key needed)`,
   };
 
   return instructions[type] || 'Follow the exchange documentation to create API keys.';

@@ -107,10 +107,10 @@ export const StatusBar: React.FC<StatusBarProps> = ({
         {connectionStatus === "connecting" ? (
           <Spinner label="Connecting..." />
         ) : (
-          <ConnectionStatus 
+          <ConnectionStatus
             status={connectionStatus}
             service=""
-            animate={connectionStatus === "connecting"}
+            animate={false}
           />
         )}
       </Box>

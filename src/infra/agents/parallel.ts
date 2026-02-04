@@ -907,7 +907,7 @@ export async function streamParallelAnalysis(
 
   try {
     // Write start chunk
-    await writer.write(createStartChunk(`parallel-analysis-${normalizedSymbol}`, total) as StreamChunk<AnalysisChunk | ProgressData>);
+    await writer.write(createStartChunk(`parallel-analysis-${normalizedSymbol}`, total) as unknown as StreamChunk<AnalysisChunk | ProgressData>);
     chunksWritten++;
 
     // Write initial progress
@@ -918,7 +918,7 @@ export async function streamParallelAnalysis(
         total,
         percent: 0,
         status: "running",
-      }, normalizedSymbol) as StreamChunk<AnalysisChunk | ProgressData>);
+      }, normalizedSymbol) as unknown as StreamChunk<AnalysisChunk | ProgressData>);
       chunksWritten++;
     }
 
@@ -928,7 +928,7 @@ export async function streamParallelAnalysis(
       const interval = options.heartbeatInterval || 5000;
       heartbeatInterval = setInterval(async () => {
         try {
-          await writer.write(createHeartbeatChunk(normalizedSymbol) as StreamChunk<AnalysisChunk | ProgressData>);
+          await writer.write(createHeartbeatChunk(normalizedSymbol) as unknown as StreamChunk<AnalysisChunk | ProgressData>);
         } catch {
           // Ignore heartbeat errors
         }
@@ -965,7 +965,7 @@ export async function streamParallelAnalysis(
 
           await writer.write(createChunk("result", analysisChunk, {
             source: `${normalizedSymbol}-${key}`,
-          }) as StreamChunk<AnalysisChunk | ProgressData>);
+          }) as unknown as StreamChunk<AnalysisChunk | ProgressData>);
           chunksWritten++;
 
           completed++;
@@ -978,7 +978,7 @@ export async function streamParallelAnalysis(
               total,
               percent: Math.round((completed / total) * 100),
               status: completed === total ? "completed" : "running",
-            }, normalizedSymbol) as StreamChunk<AnalysisChunk | ProgressData>);
+            }, normalizedSymbol) as unknown as StreamChunk<AnalysisChunk | ProgressData>);
             chunksWritten++;
           }
         } catch (err) {
@@ -994,7 +994,7 @@ export async function streamParallelAnalysis(
           await writer.write(createErrorChunk(
             err instanceof Error ? err : new Error(errorMessage),
             `${normalizedSymbol}-${key}`
-          ) as StreamChunk<AnalysisChunk | ProgressData>);
+          ) as unknown as StreamChunk<AnalysisChunk | ProgressData>);
           chunksWritten++;
           errors++;
 
@@ -1008,7 +1008,7 @@ export async function streamParallelAnalysis(
               total,
               percent: Math.round((completed / total) * 100),
               status: completed === total ? "completed" : "running",
-            }, normalizedSymbol) as StreamChunk<AnalysisChunk | ProgressData>);
+            }, normalizedSymbol) as unknown as StreamChunk<AnalysisChunk | ProgressData>);
             chunksWritten++;
           }
         }
@@ -1071,7 +1071,7 @@ export async function streamParallelAnalysis(
       succeeded: Object.values(results).filter((r) => r?.success).length,
       failed: Object.values(results).filter((r) => !r?.success).length,
       consensus,
-    }) as StreamChunk<AnalysisChunk | ProgressData>);
+    }) as unknown as StreamChunk<AnalysisChunk | ProgressData>);
     chunksWritten++;
 
     await writer.close();
@@ -1092,7 +1092,7 @@ export async function streamParallelAnalysis(
     const error = err instanceof Error ? err : new Error(String(err));
     logger.error(`Streaming parallel analysis failed for ${normalizedSymbol}`, error);
 
-    await writer.write(createErrorChunk(error, normalizedSymbol) as StreamChunk<AnalysisChunk | ProgressData>);
+    await writer.write(createErrorChunk(error, normalizedSymbol) as unknown as StreamChunk<AnalysisChunk | ProgressData>);
 
     if (writer.abort) {
       await writer.abort(error);
@@ -1155,7 +1155,7 @@ export async function streamMultiCoinAnalysis(
 
   try {
     // Write start chunk
-    await writer.write(createStartChunk(`multi-coin-analysis`, total) as StreamChunk<AnalysisChunk | ProgressData>);
+    await writer.write(createStartChunk(`multi-coin-analysis`, total) as unknown as StreamChunk<AnalysisChunk | ProgressData>);
     chunksWritten++;
 
     // Write initial progress
@@ -1166,7 +1166,7 @@ export async function streamMultiCoinAnalysis(
         total,
         percent: 0,
         status: "running",
-      }, "multi-coin") as StreamChunk<AnalysisChunk | ProgressData>);
+      }, "multi-coin") as unknown as StreamChunk<AnalysisChunk | ProgressData>);
       chunksWritten++;
     }
 
@@ -1176,7 +1176,7 @@ export async function streamMultiCoinAnalysis(
       const interval = options.heartbeatInterval || 5000;
       heartbeatInterval = setInterval(async () => {
         try {
-          await writer.write(createHeartbeatChunk("multi-coin") as StreamChunk<AnalysisChunk | ProgressData>);
+          await writer.write(createHeartbeatChunk("multi-coin") as unknown as StreamChunk<AnalysisChunk | ProgressData>);
         } catch {
           // Ignore heartbeat errors
         }
@@ -1228,7 +1228,7 @@ export async function streamMultiCoinAnalysis(
 
           await writer.write(createChunk("result", analysisChunk, {
             source: normalizedSymbol,
-          }) as StreamChunk<AnalysisChunk | ProgressData>);
+          }) as unknown as StreamChunk<AnalysisChunk | ProgressData>);
           chunksWritten++;
           succeeded++;
         } catch (err) {
@@ -1252,7 +1252,7 @@ export async function streamMultiCoinAnalysis(
 
           await writer.write(createChunk("result", analysisChunk, {
             source: normalizedSymbol,
-          }) as StreamChunk<AnalysisChunk | ProgressData>);
+          }) as unknown as StreamChunk<AnalysisChunk | ProgressData>);
           chunksWritten++;
           errors++;
         }
@@ -1267,7 +1267,7 @@ export async function streamMultiCoinAnalysis(
             total,
             percent: Math.round((completed / total) * 100),
             status: completed === total ? "completed" : "running",
-          }, "multi-coin") as StreamChunk<AnalysisChunk | ProgressData>);
+          }, "multi-coin") as unknown as StreamChunk<AnalysisChunk | ProgressData>);
           chunksWritten++;
         }
       });
@@ -1304,7 +1304,7 @@ export async function streamMultiCoinAnalysis(
       failed: errors,
       topOpportunities: opportunities.slice(0, 3).map((o) => o.symbol),
       duration,
-    }) as StreamChunk<AnalysisChunk | ProgressData>);
+    }) as unknown as StreamChunk<AnalysisChunk | ProgressData>);
     chunksWritten++;
 
     await writer.close();
@@ -1327,7 +1327,7 @@ export async function streamMultiCoinAnalysis(
     const error = err instanceof Error ? err : new Error(String(err));
     logger.error("Streaming multi-coin analysis failed", error);
 
-    await writer.write(createErrorChunk(error, "multi-coin") as StreamChunk<AnalysisChunk | ProgressData>);
+    await writer.write(createErrorChunk(error, "multi-coin") as unknown as StreamChunk<AnalysisChunk | ProgressData>);
 
     if (writer.abort) {
       await writer.abort(error);

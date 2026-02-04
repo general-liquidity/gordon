@@ -240,7 +240,13 @@ export async function cloneThread(
 
     try {
       // Get thread context including messages and working memory
-      const context = await memory.getContextWindow({
+      // Using type assertion as getContextWindow may not be in public types
+      const context = await (memory as unknown as {
+        getContextWindow(params: { threadId: string; resourceId: string; format: string }): Promise<{
+          messages?: Array<{ role: string; content: string; id?: string; createdAt?: Date }>;
+          workingMemory?: string;
+        }>;
+      }).getContextWindow({
         threadId: sourceThreadId,
         resourceId,
         format: "raw",
@@ -273,12 +279,19 @@ export async function cloneThread(
     let messagesCopied = 0;
     for (const message of messages) {
       try {
-        await memory.saveMessages({
+        // Cast to bypass strict type checking - runtime structure matches expected format
+        await (memory.saveMessages as (params: {
+          messages: Array<{ role: string; content: unknown; id?: string; createdAt?: Date }>;
+          threadId: string;
+          resourceId: string;
+        }) => Promise<unknown>)({
           messages: [{
-            role: message.role as "user" | "assistant" | "system",
+            role: message.role,
             content: typeof message.content === "string"
               ? message.content
               : JSON.stringify(message.content),
+            id: message.id || randomUUID(),
+            createdAt: message.createdAt || new Date(),
           }],
           threadId: targetThreadId,
           resourceId,
@@ -368,7 +381,12 @@ export async function listThreads(resourceId?: string): Promise<ThreadInfo[]> {
         let messageCount = 0;
         try {
           const memory = createMemoryInstance();
-          const context = await memory.getContextWindow({
+          // Using type assertion as getContextWindow may not be in public types
+          const context = await (memory as unknown as {
+            getContextWindow(params: { threadId: string; resourceId: string; format: string }): Promise<{
+              messages?: Array<{ role: string; content: string }>;
+            }>;
+          }).getContextWindow({
             threadId,
             resourceId: effectiveResourceId,
             format: "raw",
@@ -470,7 +488,12 @@ export async function getThreadInfo(threadId: string): Promise<ThreadInfo | null
     let messageCount = 0;
     try {
       const memory = createMemoryInstance();
-      const context = await memory.getContextWindow({
+      // Using type assertion as getContextWindow may not be in public types
+      const context = await (memory as unknown as {
+        getContextWindow(params: { threadId: string; resourceId: string; format: string }): Promise<{
+          messages?: Array<{ role: string; content: string }>;
+        }>;
+      }).getContextWindow({
         threadId,
         resourceId: thread.resourceId,
         format: "raw",

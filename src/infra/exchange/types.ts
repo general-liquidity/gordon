@@ -12,7 +12,7 @@ import type { Candle } from "../../types/index.ts";
 /**
  * Supported exchange identifiers
  */
-export type ExchangeId = "binance" | "coinbase" | "kraken" | "bybit" | "okx";
+export type ExchangeId = "binance" | "coinbase" | "kraken" | "bybit" | "okx" | "hyperliquid";
 
 /**
  * Exchange credentials for authentication
@@ -24,6 +24,8 @@ export interface ExchangeCredentials {
   passphrase?: string;
   /** Use sandbox/testnet mode */
   sandbox?: boolean;
+  /** Wallet private key for DEX exchanges (e.g., Hyperliquid) */
+  walletPrivateKey?: string;
 }
 
 // ============================================================================
@@ -287,6 +289,7 @@ export interface Withdrawal {
   address: string;
   txId?: string;
   applyTime: number;
+  completeTime?: number;
   transactionFee?: number;
 }
 

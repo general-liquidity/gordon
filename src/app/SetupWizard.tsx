@@ -21,6 +21,7 @@ type WizardStep =
   | "exchange-key"
   | "exchange-secret"
   | "exchange-passphrase"
+  | "exchange-wallet"
   | "exchange-validating"
   | "llm"
   | "preferences"
@@ -36,6 +37,7 @@ const EXCHANGE_LABELS: Record<ExchangeId, string> = {
   kraken: "Kraken",
   bybit: "Bybit",
   okx: "OKX",
+  hyperliquid: "Hyperliquid",
 };
 
 const EXCHANGE_PASSPHRASE_REQUIRED: Record<ExchangeId, boolean> = {
@@ -44,6 +46,16 @@ const EXCHANGE_PASSPHRASE_REQUIRED: Record<ExchangeId, boolean> = {
   kraken: false,
   bybit: false,
   okx: true,
+  hyperliquid: false,
+};
+
+const EXCHANGE_WALLET_AUTH: Record<ExchangeId, boolean> = {
+  binance: false,
+  coinbase: false,
+  kraken: false,
+  bybit: false,
+  okx: false,
+  hyperliquid: true,
 };
 
 const EXCHANGE_INSTRUCTIONS: Record<ExchangeId, string[]> = {
@@ -74,6 +86,13 @@ const EXCHANGE_INSTRUCTIONS: Record<ExchangeId, string[]> = {
     "Create a new API key with the needed permissions",
     "Copy the API Key, Secret, and Passphrase",
   ],
+  hyperliquid: [
+    "Generate a new Ethereum wallet or use an existing one",
+    "Export the private key from your wallet (MetaMask: Account Details > Export Private Key)",
+    "IMPORTANT: Use a dedicated wallet with limited funds for trading",
+    "Never use your main wallet's private key",
+    "Fund your Hyperliquid account by depositing USDC on Arbitrum",
+  ],
 };
 
 interface WizardState {
@@ -82,6 +101,7 @@ interface WizardState {
   exchangeApiKey: string;
   exchangeApiSecret: string;
   exchangePassphrase: string;
+  walletPrivateKey: string;
   exchangePermissions: ExchangePermissions | null;
   exchangeError: string | null;
   exchangeValidated: boolean;
@@ -117,9 +137,14 @@ function requiresPassphrase(exchangeType: ExchangeSelection): boolean {
   return EXCHANGE_PASSPHRASE_REQUIRED[exchangeType] || false;
 }
 
+function requiresWalletAuth(exchangeType: ExchangeSelection): boolean {
+  if (!exchangeType) return false;
+  return EXCHANGE_WALLET_AUTH[exchangeType] || false;
+}
+
 function generateExchangeId(type: ExchangeId, exchanges: MultiExchangeConfig[]): string {
-  const baseId = type;
-  let id = baseId;
+  const baseId: string = type;
+  let id: string = baseId;
   let counter = 1;
 
   while (exchanges.some((ex) => ex.id === id)) {
@@ -137,6 +162,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
     exchangeApiKey: "",
     exchangeApiSecret: "",
     exchangePassphrase: "",
+    walletPrivateKey: "",
     exchangePermissions: null,
     exchangeError: null,
     exchangeValidated: false,
@@ -157,7 +183,8 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
     exchangeType: ExchangeId,
     apiKey: string,
     apiSecret: string,
-    passphrase?: string
+    passphrase?: string,
+    walletPrivateKey?: string
   ) => {
     setState((prev) => ({
       ...prev,
@@ -165,6 +192,9 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
       isValidating: true,
       exchangeError: null,
     }));
+
+    const isWalletAuth = requiresWalletAuth(exchangeType);
+    const errorStep = isWalletAuth ? "exchange-wallet" : "exchange-key";
 
     if (exchangeType === "binance") {
       const client = new BinanceClient(apiKey, apiSecret);
@@ -179,6 +209,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
           exchangeApiKey: "",
           exchangeApiSecret: "",
           exchangePassphrase: "",
+          walletPrivateKey: "",
           exchangeValidated: false,
         }));
         return;
@@ -195,6 +226,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
           exchangeApiKey: "",
           exchangeApiSecret: "",
           exchangePassphrase: "",
+          walletPrivateKey: "",
           exchangeValidated: false,
         }));
         return;
@@ -213,9 +245,10 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
 
     try {
       const exchange = ExchangeFactory.create(exchangeType, {
-        apiKey,
-        apiSecret,
+        apiKey: isWalletAuth ? "" : apiKey,
+        apiSecret: isWalletAuth ? "" : apiSecret,
         passphrase,
+        walletPrivateKey,
       });
 
       await exchange.getAccountInfo();
@@ -229,15 +262,20 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
         exchangeValidated: true,
       }));
     } catch (error) {
-      ExchangeFactory.removeFromCache(exchangeType, apiKey);
+      ExchangeFactory.removeFromCache(exchangeType, {
+        apiKey: isWalletAuth ? "" : apiKey,
+        apiSecret: isWalletAuth ? "" : apiSecret,
+        walletPrivateKey,
+      });
       setState((prev) => ({
         ...prev,
-        step: "exchange-key",
+        step: errorStep,
         isValidating: false,
         exchangeError: error instanceof Error ? error.message : String(error),
         exchangeApiKey: "",
         exchangeApiSecret: "",
         exchangePassphrase: "",
+        walletPrivateKey: "",
         exchangeValidated: false,
       }));
     }
@@ -251,8 +289,12 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
       onboardingComplete: true,
     };
 
-    const hasExchangeCredentials =
-      state.exchangeType && state.exchangeApiKey && state.exchangeApiSecret && state.exchangeValidated;
+    const isWalletAuth = requiresWalletAuth(state.exchangeType);
+    const hasExchangeCredentials = state.exchangeType && state.exchangeValidated && (
+      isWalletAuth
+        ? !!state.walletPrivateKey
+        : !!(state.exchangeApiKey && state.exchangeApiSecret)
+    );
 
     if (hasExchangeCredentials) {
       const exchanges = currentConfig.exchanges ? [...currentConfig.exchanges] : [];
@@ -265,6 +307,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
         apiKey: state.exchangeApiKey,
         apiSecret: state.exchangeApiSecret,
         passphrase: state.exchangePassphrase || undefined,
+        walletPrivateKey: state.walletPrivateKey || undefined,
         sandbox: false,
         isDefault: true,
       };
@@ -320,6 +363,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
     state.exchangeApiKey,
     state.exchangeApiSecret,
     state.exchangePassphrase,
+    state.walletPrivateKey,
     state.exchangePermissions,
     state.exchangeType,
     state.exchangeValidated,
@@ -347,11 +391,14 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
             return;
           }
 
+          // Route to wallet auth for DEX exchanges like Hyperliquid
+          const nextStep = requiresWalletAuth(match) ? "exchange-wallet" : "exchange-key";
+
           setState((prev) => ({
             ...prev,
             exchangeType: match,
             exchangeError: null,
-            step: "exchange-key",
+            step: nextStep,
             inputValue: "",
           }));
           break;
@@ -398,6 +445,23 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
               state.exchangeType as ExchangeId,
               state.exchangeApiKey,
               state.exchangeApiSecret,
+              trimmedValue
+            );
+          }
+          break;
+
+        case "exchange-wallet":
+          if (trimmedValue && state.exchangeType) {
+            setState((prev) => ({
+              ...prev,
+              walletPrivateKey: trimmedValue,
+              inputValue: "",
+            }));
+            await validateExchangeCredentials(
+              state.exchangeType as ExchangeId,
+              "",
+              "",
+              undefined,
               trimmedValue
             );
           }
@@ -452,12 +516,14 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
       case "exchange-key":
       case "exchange-secret":
       case "exchange-passphrase":
+      case "exchange-wallet":
         setState((prev) => ({
           ...prev,
           exchangeType: "",
           exchangeApiKey: "",
           exchangeApiSecret: "",
           exchangePassphrase: "",
+          walletPrivateKey: "",
           exchangePermissions: null,
           exchangeError: null,
           exchangeValidated: false,
@@ -540,6 +606,17 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
       {state.step === "exchange-passphrase" && (
         <ExchangePassphraseStep
           exchangeLabel={exchangeLabel}
+          inputValue={state.inputValue}
+          onInputChange={handleInputChange}
+          onSubmit={handleInputSubmit}
+        />
+      )}
+
+      {state.step === "exchange-wallet" && (
+        <ExchangeWalletStep
+          exchangeLabel={exchangeLabel}
+          exchangeType={state.exchangeType}
+          error={state.exchangeError}
           inputValue={state.inputValue}
           onInputChange={handleInputChange}
           onSubmit={handleInputSubmit}
@@ -822,6 +899,93 @@ function ExchangePassphraseStep({
           placeholder="Passphrase"
           mask="*"
         />
+      </Box>
+    </Box>
+  );
+}
+
+interface ExchangeWalletStepProps {
+  exchangeLabel: string;
+  exchangeType: ExchangeSelection;
+  error: string | null;
+  inputValue: string;
+  onInputChange: (value: string) => void;
+  onSubmit: (value: string) => void;
+}
+
+function ExchangeWalletStep({
+  exchangeLabel,
+  exchangeType,
+  error,
+  inputValue,
+  onInputChange,
+  onSubmit,
+}: ExchangeWalletStepProps): React.ReactElement {
+  const instructions = getExchangeInstructions(exchangeType);
+
+  return (
+    <Box flexDirection="column">
+      <Box marginBottom={1}>
+        <Text color={COLORS.TAN} bold>
+          Step 1: {exchangeLabel} Wallet Private Key
+        </Text>
+      </Box>
+
+      {error && (
+        <Box marginBottom={1} borderStyle="single" borderColor="red" paddingX={1}>
+          <Text color="red">{error}</Text>
+        </Box>
+      )}
+
+      <Box flexDirection="column" marginBottom={1}>
+        <Text color={COLORS.WHITE}>
+          {exchangeLabel} uses wallet-based authentication (no API key needed).
+        </Text>
+        <Text color={COLORS.WHITE}>
+          Gordon needs your wallet private key to sign transactions.
+        </Text>
+      </Box>
+
+      <Box marginBottom={1} borderStyle="single" borderColor="yellow" paddingX={1}>
+        <Box flexDirection="column">
+          <Text color="yellow" bold>SECURITY WARNING</Text>
+          <Text color="yellow">
+            Use a DEDICATED trading wallet with limited funds.
+          </Text>
+          <Text color="yellow">
+            Never use your main wallet or hardware wallet private key.
+          </Text>
+        </Box>
+      </Box>
+
+      {instructions.length > 0 && (
+        <Box flexDirection="column" marginBottom={1}>
+          <Text color={COLORS.TAN_DIM} bold>How to get your wallet private key:</Text>
+          <Box flexDirection="column" marginLeft={2}>
+            {instructions.map((line, index) => (
+              <Text key={`${exchangeLabel}-step-${index}`} color={COLORS.DIM}>
+                {index + 1}. {line}
+              </Text>
+            ))}
+          </Box>
+        </Box>
+      )}
+
+      <Box marginTop={1}>
+        <Text color={COLORS.WHITE}>Enter your Wallet Private Key: </Text>
+        <TextInput
+          value={inputValue}
+          onChange={onInputChange}
+          onSubmit={onSubmit}
+          placeholder="0x..."
+          mask="*"
+        />
+      </Box>
+
+      <Box marginTop={1}>
+        <Text color={COLORS.DIM}>
+          Your private key is never displayed and is stored locally in ~/.gordon/config.json
+        </Text>
       </Box>
     </Box>
   );

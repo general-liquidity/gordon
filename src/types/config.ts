@@ -20,7 +20,7 @@ export const ExchangeConfigSchema = z.object({
 /**
  * Supported exchange types for multi-exchange configuration
  */
-export const ExchangeTypeSchema = z.enum(["binance", "coinbase", "kraken", "bybit", "okx"]);
+export const ExchangeTypeSchema = z.enum(["binance", "coinbase", "kraken", "bybit", "okx", "hyperliquid"]);
 
 /**
  * Multi-exchange configuration schema
@@ -41,6 +41,8 @@ export const MultiExchangeConfigSchema = z.object({
   sandbox: z.boolean().optional(),
   /** Optional passphrase for exchanges that require it (e.g., Coinbase) */
   passphrase: z.string().optional(),
+  /** Wallet private key for DEX exchanges (e.g., Hyperliquid) */
+  walletPrivateKey: z.string().optional(),
 });
 
 export const PreferencesSchema = z.object({

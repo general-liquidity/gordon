@@ -10,7 +10,7 @@
  * - /strategy compare <id1> <id2>    - Compare two strategies
  */
 
-import { strategyRegistry } from '../../strategies/registry.ts';
+import { strategyRegistry, type StrategyId } from '../../strategies/index.ts';
 import {
   listGeneratedStrategies,
   loadGeneratedStrategy,
@@ -118,7 +118,7 @@ export async function strategyInfo(strategyId: string): Promise<StrategyCommandR
     }
 
     // First check built-in strategies
-    const builtIn = strategyRegistry.get(strategyId);
+    const builtIn = strategyRegistry.get(strategyId as StrategyId);
 
     if (builtIn) {
       return {
@@ -268,7 +268,7 @@ Example:
   }
 
   // Check if strategy exists
-  const builtIn = strategyRegistry.get(strategyId);
+  const builtIn = strategyRegistry.get(strategyId as StrategyId);
   const generated = builtIn ? null : await loadGeneratedStrategy(strategyId);
 
   if (!builtIn && !generated) {
@@ -317,8 +317,8 @@ Example:
   }
 
   // Load both strategies
-  const strategy1 = strategyRegistry.get(strategyId1) || (await loadGeneratedStrategy(strategyId1));
-  const strategy2 = strategyRegistry.get(strategyId2) || (await loadGeneratedStrategy(strategyId2));
+  const strategy1 = strategyRegistry.get(strategyId1 as StrategyId) || (await loadGeneratedStrategy(strategyId1));
+  const strategy2 = strategyRegistry.get(strategyId2 as StrategyId) || (await loadGeneratedStrategy(strategyId2));
 
   if (!strategy1) {
     return {
@@ -463,7 +463,7 @@ Examples:
     default:
       // Check if it might be a strategy ID directly
       const possibleId = subcommand;
-      const builtIn = strategyRegistry.get(possibleId);
+      const builtIn = strategyRegistry.get(possibleId as StrategyId);
       const generated = builtIn ? null : await loadGeneratedStrategy(possibleId);
 
       if (builtIn || generated) {

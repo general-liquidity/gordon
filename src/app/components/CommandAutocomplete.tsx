@@ -44,7 +44,7 @@ const CATEGORY_COLORS: Record<string, string> = {
 const LEVEL_COLORS: Record<number, string> = {
   1: COLORS.GREEN,
   2: COLORS.YELLOW,
-  3: COLORS.ORANGE || COLORS.RED,
+  3: COLORS.ORANGE,
 };
 
 interface CommandAutocompleteProps {

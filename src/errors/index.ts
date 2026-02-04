@@ -38,3 +38,38 @@ export {
   RiskLimitExceededError,
   AnalysisError,
 } from "./trading.ts";
+
+// Coinbase-specific errors
+export {
+  CoinbaseError,
+  CoinbaseRateLimitError,
+  CoinbaseAuthError,
+  CoinbaseInsufficientBalanceError,
+  CoinbaseInvalidProductError,
+  CoinbaseConnectionError,
+  createCoinbaseError,
+} from "./coinbase.ts";
+
+// Kraken-specific errors
+export {
+  KrakenError,
+  KrakenRateLimitError,
+  KrakenAuthError,
+  KrakenInsufficientBalanceError,
+  KrakenInvalidPairError,
+  KrakenConnectionError,
+  createKrakenError,
+} from "./kraken.ts";
+
+// Hyperliquid-specific errors
+export {
+  HyperliquidError,
+  WalletSigningError,
+  InvalidWalletError,
+  HyperliquidRateLimitError,
+  InsufficientMarginError,
+  HyperliquidInvalidAssetError,
+  HyperliquidConnectionError,
+  HyperliquidNotSupportedError,
+  createHyperliquidError,
+} from "./hyperliquid.ts";

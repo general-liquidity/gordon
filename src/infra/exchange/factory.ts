@@ -5,24 +5,43 @@
 
 import type { Exchange, ExchangeId, ExchangeCredentials } from "./types.ts";
 import { BinanceAdapter } from "./adapters/binance.ts";
+import { CoinbaseAdapter } from "./adapters/coinbase.ts";
+import { KrakenAdapter } from "./adapters/kraken.ts";
+import { HyperliquidAdapter } from "./adapters/hyperliquid.ts";
 import { CCXTAdapter } from "./adapters/ccxt.ts";
 
 /**
  * Supported exchanges and their adapter type
  */
-const NATIVE_ADAPTERS: Set<ExchangeId> = new Set(["binance"]);
+const NATIVE_ADAPTERS: Set<ExchangeId> = new Set([
+  "binance",
+  "coinbase",
+  "kraken",
+  "hyperliquid",
+]);
 
 /**
  * All supported exchange IDs
  */
-const SUPPORTED_EXCHANGES: ExchangeId[] = ["binance", "coinbase", "kraken", "bybit", "okx"];
+const SUPPORTED_EXCHANGES: ExchangeId[] = [
+  "binance",
+  "coinbase",
+  "kraken",
+  "bybit",
+  "okx",
+  "hyperliquid",
+];
 
 /**
  * Cache key generator for exchange instances
  */
-function getCacheKey(exchangeId: ExchangeId, apiKey: string): string {
-  // Use first 8 characters of API key as identifier to avoid storing full key
-  const keyPrefix = apiKey.substring(0, 8);
+function getCacheKey(exchangeId: ExchangeId, credentials: ExchangeCredentials): string {
+  // Use first 8 characters of key as identifier to avoid storing full key
+  // For Hyperliquid, use wallet private key; for others, use API key
+  const key = exchangeId === "hyperliquid"
+    ? credentials.walletPrivateKey || ""
+    : credentials.apiKey;
+  const keyPrefix = key.substring(0, 8);
   return `${exchangeId}:${keyPrefix}`;
 }
 
@@ -30,9 +49,9 @@ function getCacheKey(exchangeId: ExchangeId, apiKey: string): string {
  * ExchangeFactory - Creates and manages exchange adapter instances
  *
  * Features:
- * - Singleton pattern for exchange instances (cached by exchange + API key)
- * - Uses native BinanceAdapter for Binance (more features)
- * - Uses CCXTAdapter for other exchanges (coinbase, kraken, bybit, okx)
+ * - Singleton pattern for exchange instances (cached by exchange + credentials)
+ * - Native adapters for Binance, Coinbase, Kraken, Hyperliquid (exchange-specific APIs)
+ * - CCXT adapter fallback for Bybit, OKX
  *
  * @example
  * ```typescript
@@ -42,15 +61,28 @@ function getCacheKey(exchangeId: ExchangeId, apiKey: string): string {
  *   apiSecret: 'your-api-secret'
  * });
  *
- * // Create a Kraken exchange (uses CCXT adapter)
+ * // Create a Coinbase exchange (requires passphrase)
+ * const coinbase = ExchangeFactory.create('coinbase', {
+ *   apiKey: 'your-api-key',
+ *   apiSecret: 'your-api-secret',
+ *   passphrase: 'your-passphrase'
+ * });
+ *
+ * // Create a Kraken exchange (uses native adapter)
  * const kraken = ExchangeFactory.create('kraken', {
  *   apiKey: 'your-api-key',
  *   apiSecret: 'your-api-secret'
  * });
  *
- * // Both implement the same Exchange interface
+ * // Create a Hyperliquid exchange (wallet-based auth)
+ * const hyperliquid = ExchangeFactory.create('hyperliquid', {
+ *   apiKey: '',
+ *   apiSecret: '',
+ *   walletPrivateKey: 'your-wallet-private-key'
+ * });
+ *
+ * // All implement the same Exchange interface
  * const price = await binance.getPrice('BTCUSDT');
- * const krakenPrice = await kraken.getPrice('BTCUSDT');
  * ```
  */
 export class ExchangeFactory {
@@ -77,7 +109,7 @@ export class ExchangeFactory {
     }
 
     // Check cache
-    const cacheKey = getCacheKey(exchangeId, credentials.apiKey);
+    const cacheKey = getCacheKey(exchangeId, credentials);
     const cached = this.instanceCache.get(cacheKey);
     if (cached) {
       return cached;
@@ -87,8 +119,34 @@ export class ExchangeFactory {
     let exchange: Exchange;
 
     if (NATIVE_ADAPTERS.has(exchangeId)) {
-      // Use native adapter for Binance
-      exchange = new BinanceAdapter(credentials.apiKey, credentials.apiSecret);
+      // Use native adapters for supported exchanges
+      switch (exchangeId) {
+        case "binance":
+          exchange = new BinanceAdapter(credentials.apiKey, credentials.apiSecret);
+          break;
+        case "coinbase":
+          if (!credentials.passphrase) {
+            throw new Error("Coinbase requires a passphrase in addition to API key and secret");
+          }
+          exchange = new CoinbaseAdapter(
+            credentials.apiKey,
+            credentials.apiSecret,
+            credentials.passphrase
+          );
+          break;
+        case "kraken":
+          exchange = new KrakenAdapter(credentials.apiKey, credentials.apiSecret);
+          break;
+        case "hyperliquid":
+          if (!credentials.walletPrivateKey) {
+            throw new Error("Hyperliquid requires a wallet private key for authentication");
+          }
+          exchange = new HyperliquidAdapter(credentials.walletPrivateKey);
+          break;
+        default:
+          // Fallback to CCXT for any native adapter without specific handling
+          exchange = new CCXTAdapter(exchangeId, credentials);
+      }
     } else {
       // Use CCXT adapter for other exchanges
       exchange = new CCXTAdapter(exchangeId, credentials);
@@ -141,10 +199,10 @@ export class ExchangeFactory {
    * Remove a specific instance from the cache
    *
    * @param exchangeId - The exchange ID
-   * @param apiKey - The API key used to create the instance
+   * @param credentials - The credentials used to create the instance
    */
-  static removeFromCache(exchangeId: ExchangeId, apiKey: string): void {
-    const cacheKey = getCacheKey(exchangeId, apiKey);
+  static removeFromCache(exchangeId: ExchangeId, credentials: ExchangeCredentials): void {
+    const cacheKey = getCacheKey(exchangeId, credentials);
     this.instanceCache.delete(cacheKey);
   }
 

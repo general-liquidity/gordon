@@ -1254,7 +1254,7 @@ export function formatPaginatedCommandHelp(args?: string): string {
 
   // Handle page request
   const pageMatch = parsedArgs.match(/^page\s*(\d+)$/);
-  if (pageMatch) {
+  if (pageMatch && pageMatch[1]) {
     return formatHelpPageView(parseInt(pageMatch[1], 10), PAGE_SIZE);
   }
 

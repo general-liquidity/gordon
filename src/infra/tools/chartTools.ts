@@ -608,7 +608,7 @@ export const generateChartTool = createTool({
       }
 
       const candles: ChartDataPoint[] = rawCandles.map((c) => ({
-        timestamp: c.timestamp || Date.now(),
+        timestamp: c.openTime || Date.now(),
         open: c.open,
         high: c.high,
         low: c.low,
@@ -723,7 +723,7 @@ export const analyzeChartTool = createTool({
       }
 
       const candles: ChartDataPoint[] = rawCandles.map((c) => ({
-        timestamp: c.timestamp || Date.now(),
+        timestamp: c.openTime || Date.now(),
         open: c.open,
         high: c.high,
         low: c.low,
@@ -896,7 +896,7 @@ export const quickTATool = createTool({
       }
 
       const candles: ChartDataPoint[] = rawCandles.map((c) => ({
-        timestamp: c.timestamp || Date.now(),
+        timestamp: c.openTime || Date.now(),
         open: c.open,
         high: c.high,
         low: c.low,
