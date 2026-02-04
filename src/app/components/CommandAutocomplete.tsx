@@ -66,6 +66,16 @@ export const CommandAutocomplete: React.FC<CommandAutocompleteProps> = ({
   showCategories = true,
   showUsage = false,
 }) => {
+  const COMMAND_COL_WIDTH = 18;
+  const ALIAS_COL_WIDTH = 10;
+  const DESCRIPTION_COL_WIDTH = 52;
+
+  const truncateText = (value: string, width: number): string => {
+    if (value.length <= width) return value;
+    if (width <= 3) return value.slice(0, width);
+    return value.slice(0, width - 3) + "...";
+  };
+
   // Extract the search term (after /)
   const searchTerm = inputValue.startsWith("/") ? inputValue.slice(1).toLowerCase().split(/\s+/)[0] || "" : "";
 
@@ -146,11 +156,12 @@ export const CommandAutocomplete: React.FC<CommandAutocompleteProps> = ({
       {visibleSuggestions.map((cmd, index) => {
         const isSelected = index === adjustedSelectedIndex;
         const cmdName = `/${cmd.name}`;
+        const displayName = truncateText(cmdName, COMMAND_COL_WIDTH);
 
         // Highlight matching portion
-        const matchEnd = Math.min(searchTerm.length + 1, cmdName.length);
-        const matchedPart = cmdName.slice(0, matchEnd);
-        const restPart = cmdName.slice(matchEnd);
+        const matchEnd = Math.min(searchTerm.length + 1, displayName.length);
+        const matchedPart = displayName.slice(0, matchEnd);
+        const restPart = displayName.slice(matchEnd);
 
         // Show category separator if category changed
         const showCategorySeparator = showCategories && cmd.category !== lastCategory && startIndex === 0;
@@ -185,29 +196,25 @@ export const CommandAutocomplete: React.FC<CommandAutocompleteProps> = ({
               </Text>
 
               {/* Command name with highlight */}
-              <Box width={12}>
-                <Text color={isSelected ? COLORS.HIGHLIGHT : COLORS.ACCENT} bold={isSelected}>
+              <Box width={COMMAND_COL_WIDTH}>
+                <Text color={isSelected ? COLORS.HIGHLIGHT : COLORS.ACCENT} bold={isSelected} wrap="truncate">
                   {matchedPart}
                 </Text>
-                <Text color={isSelected ? COLORS.HIGHLIGHT : COLORS.WHITE} bold={isSelected}>
+                <Text color={isSelected ? COLORS.HIGHLIGHT : COLORS.WHITE} bold={isSelected} wrap="truncate">
                   {restPart}
                 </Text>
               </Box>
 
               {/* Aliases (if any) */}
-              {cmd.aliases.length > 0 && (
-                <Box width={8}>
-                  <Text color={COLORS.MUTED}>
-                    ({cmd.aliases[0]})
-                  </Text>
-                </Box>
-              )}
+              <Box width={ALIAS_COL_WIDTH}>
+                <Text color={COLORS.MUTED} wrap="truncate">
+                  {cmd.aliases.length > 0 ? truncateText(`(${cmd.aliases[0]})`, ALIAS_COL_WIDTH) : ""}
+                </Text>
+              </Box>
 
               {/* Description */}
-              <Text color={isSelected ? COLORS.WHITE : COLORS.DIM}>
-                {cmd.description.length > 35
-                  ? cmd.description.slice(0, 32) + "..."
-                  : cmd.description}
+              <Text color={isSelected ? COLORS.WHITE : COLORS.DIM} wrap="truncate">
+                {truncateText(cmd.description, DESCRIPTION_COL_WIDTH)}
               </Text>
 
               {/* Level badge for advanced/expert commands */}
