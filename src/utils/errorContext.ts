@@ -190,7 +190,7 @@ function getAuthRecovery(): RecoveryStep[] {
       description: "Verify your system clock is synchronized (NTP)",
     },
     {
-      description: "Regenerate API keys from Binance if the issue persists",
+      description: "Regenerate API keys from your exchange if the issue persists",
     },
   ];
 }
@@ -225,7 +225,7 @@ function getInsufficientBalanceRecovery(
   });
 
   steps.push({
-    description: "Deposit more funds to your Binance account",
+    description: "Deposit more funds to your exchange account",
   });
 
   return steps;
@@ -240,15 +240,15 @@ function getNetworkRecovery(): RecoveryStep[] {
       description: "Check your internet connection",
     },
     {
-      description: "Test connection to Binance",
+      description: "Test connection to your exchange",
       command: "/status",
     },
     {
-      description: "Wait a moment and retry - Binance may be experiencing issues",
+      description: "Wait a moment and retry - your exchange may be experiencing issues",
       waitSeconds: 10,
     },
     {
-      description: "Check Binance status page for outages",
+      description: "Check your exchange status page for outages",
     },
   ];
 }
@@ -542,7 +542,7 @@ export function createErrorContext(
       reason = "You don't have enough funds for this operation";
       break;
     case "NETWORK_ERROR":
-      reason = "Could not connect to Binance - check your internet connection";
+      reason = "Could not connect to exchange - check your internet connection";
       break;
     case "INVALID_SYMBOL":
       reason = "The trading pair you specified doesn't exist";

@@ -103,7 +103,7 @@ export const strategyGenerateTool = createTool({
 
     try {
       // Create strategy generator
-      const generator = createStrategyGenerator(ctx.llm, ctx.binance ?? undefined);
+      const generator = createStrategyGenerator(ctx.llm, ctx.exchange ?? undefined);
 
       // Generate strategy
       const result = await generator.generateFromPrompt(input.description, {

@@ -44,11 +44,11 @@ export class PortfolioService {
    */
   async getPortfolio(): Promise<PortfolioSummary> {
     const container = getContainer();
-    const binance = container.binance;
+    const exchange = container.exchange;
     const priceCache = container.priceCache;
 
-    if (!binance) {
-      logger.warn("Binance client not available");
+    if (!exchange) {
+      logger.warn("Exchange client not available");
       return {
         totalValue: 0,
         holdings: [],
@@ -57,7 +57,7 @@ export class PortfolioService {
       };
     }
 
-    const allBalances = await binance.getAllBalances();
+    const allBalances = await exchange.getAllBalances();
     const holdings: Holding[] = [];
     let totalValue = 0;
     let availableCash = 0;
@@ -77,7 +77,7 @@ export class PortfolioService {
         try {
           const price = await priceCache.getOrFetch(
             `${balance.asset}USDT`,
-            () => binance.getPrice(`${balance.asset}USDT`)
+            () => exchange.getPrice(`${balance.asset}USDT`)
           );
           usdValue = total * price;
         } catch {
@@ -93,7 +93,7 @@ export class PortfolioService {
           locked: balance.locked,
           total,
           usdValue,
-          wallet: balance.wallet,
+          wallet: "spot",
         });
         totalValue += usdValue;
       }

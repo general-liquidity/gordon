@@ -207,7 +207,7 @@ export const OrderProgress: React.FC<OrderProgressProps> = ({
 }) => {
   const statusLabels: Record<typeof status, string> = {
     validating: "Validating order parameters...",
-    placing: "Placing order on Binance...",
+    placing: "Placing order on exchange...",
     confirming: "Confirming execution...",
     complete: "Order executed successfully!",
     error: "Order failed",

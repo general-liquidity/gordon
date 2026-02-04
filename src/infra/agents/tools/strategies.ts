@@ -22,7 +22,7 @@ import { getGordonContext, normalizeSymbol, type MastraExecutionContext } from "
 // ============================================================================
 
 const errors = {
-  noBinance: { error: "Binance client not connected. Please run setup first." },
+  noExchange: { error: "Exchange client not connected. Please run setup first." },
   strategyNotFound: (id: string) => ({
     error: `Strategy "${id}" not found. Use list_strategies to see available strategies.`,
   }),
@@ -169,8 +169,8 @@ export const detectStrategyTool = createTool({
   }),
   execute: async ({ symbol, strategyId, timeframe }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
-    if (!ctx?.binance) {
-      return errors.noBinance;
+    if (!ctx?.exchange) {
+      return errors.noExchange;
     }
 
     const strategy = strategyRegistry.get(strategyId as StrategyId);
@@ -182,7 +182,7 @@ export const detectStrategyTool = createTool({
 
     try {
       const result = await strategy.detect(normalizedSymbol, timeframe, {
-        binance: ctx.binance,
+        exchange: ctx.exchange,
       });
 
       return {
@@ -247,8 +247,8 @@ export const scanForStrategyTool = createTool({
     execContext: MastraExecutionContext
   ) => {
     const ctx = getGordonContext(execContext);
-    if (!ctx?.binance) {
-      return errors.noBinance;
+    if (!ctx?.exchange) {
+      return errors.noExchange;
     }
 
     const strategy = strategyRegistry.get(strategyId as StrategyId);
@@ -264,7 +264,7 @@ export const scanForStrategyTool = createTool({
 
       try {
         const result = await strategy.detect(normalizedSymbol, timeframe, {
-          binance: ctx.binance,
+          exchange: ctx.exchange,
         });
 
         if (result.detected && result.confidence >= minConfidence) {
@@ -330,8 +330,8 @@ export const suggestStrategyTool = createTool({
   }),
   execute: async ({ symbol, timeframe }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
-    if (!ctx?.binance) {
-      return errors.noBinance;
+    if (!ctx?.exchange) {
+      return errors.noExchange;
     }
 
     const normalizedSymbol = normalizeSymbol(symbol);
@@ -345,7 +345,7 @@ export const suggestStrategyTool = createTool({
 
       try {
         const result = await strategy.detect(normalizedSymbol, timeframe, {
-          binance: ctx.binance,
+          exchange: ctx.exchange,
         });
 
         if (result.detected && result.confidence > 0.4) {
@@ -447,16 +447,16 @@ export const runStrategyEnsembleTool = createTool({
     execContext: MastraExecutionContext
   ) => {
     const ctx = getGordonContext(execContext);
-    if (!ctx?.binance) {
-      return errors.noBinance;
+    if (!ctx?.exchange) {
+      return errors.noExchange;
     }
 
     const normalizedSymbol = normalizeSymbol(symbol);
 
     try {
       const result = quickMode
-        ? await runQuickEnsemble(normalizedSymbol, timeframe, { binance: ctx.binance })
-        : await runEnsemble(normalizedSymbol, timeframe, { binance: ctx.binance }, {
+        ? await runQuickEnsemble(normalizedSymbol, timeframe, { exchange: ctx.exchange })
+        : await runEnsemble(normalizedSymbol, timeframe, { exchange: ctx.exchange }, {
             strategies,
             minAgreement,
             tierFilter: tierFilter as 1 | 2 | undefined,
@@ -549,8 +549,8 @@ export const scanWithEnsembleTool = createTool({
     execContext: MastraExecutionContext
   ) => {
     const ctx = getGordonContext(execContext);
-    if (!ctx?.binance) {
-      return errors.noBinance;
+    if (!ctx?.exchange) {
+      return errors.noExchange;
     }
 
     const opportunities: Array<{
@@ -571,7 +571,7 @@ export const scanWithEnsembleTool = createTool({
         const result = await runEnsemble(
           normalizedSymbol,
           timeframe,
-          { binance: ctx.binance },
+          { exchange: ctx.exchange },
           {
             minAgreement,
             tierFilter: tierFilter as 1 | 2 | undefined,

@@ -306,7 +306,7 @@ const WORKING_MEMORY_TEMPLATE = `
 - Trading Hours: (e.g., "9am-5pm EST" or "24/7")
 
 ## Account Context
-- Default Exchange: Binance
+- Default Exchange: (active)
 - Account Type: (spot/margin/futures)
 - Base Currency: USDT
 
@@ -510,7 +510,7 @@ Use shared context tools to leverage work from other agents:
 
 const EXECUTOR_INSTRUCTIONS = `You are Gordon's trade executor agent.
 
-Your role is to safely execute trading plans on Binance.
+Your role is to safely execute trading plans on the active exchange.
 
 ## Safety Protocol
 1. NEVER execute unless the system is ARMED

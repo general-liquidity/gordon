@@ -1,6 +1,6 @@
 /**
  * Executor Module
- * Places orders on Binance. Fully deterministic (no AI).
+ * Places orders on the active exchange. Fully deterministic (no AI).
  *
  * This module handles the critical task of executing trading plans.
  * It is defensive by design - trading is critical and errors can be costly.
@@ -11,8 +11,8 @@
  * - Permission validation before trading
  */
 
-import { BinanceClient } from "../infra/binance/index.ts";
-import type { BinanceOrder, OrderParams } from "../infra/binance/index.ts";
+import type { Exchange, Order, OrderParams } from "../infra/exchange/index.ts";
+import { BinanceAdapter } from "../infra/exchange/index.ts";
 import { validatePlan } from "./validator.ts";
 import { createTrade, updateTrade, getTrade, listTrades } from "../infra/storage/trades.ts";
 import { updatePlan, listPlans, getPlan } from "../infra/storage/plans.ts";
@@ -22,7 +22,6 @@ import { emitEvent } from "../events/index.ts";
 import {
   TradingModeError,
   InvalidPlanError,
-  BinanceError as BinanceErrorType,
   isGordonError,
 } from "../errors/index.ts";
 import { auditLog } from "../infra/audit/index.ts";
@@ -164,7 +163,7 @@ export function generateClientOrderId(planId: string, type: string): string {
 }
 
 /**
- * Round quantity to appropriate precision for Binance
+ * Round quantity to appropriate precision for exchange orders
  * Default to 8 decimal places, which is safe for most pairs
  */
 export function roundQuantity(quantity: number, precision: number = 8): number {
@@ -180,11 +179,34 @@ export function roundPrice(price: number, precision: number = 8): number {
   return Math.round(price * multiplier) / multiplier;
 }
 
+async function validateTradePermissions(exchange: Exchange): Promise<{ allowed: boolean; error?: string }> {
+  if (exchange instanceof BinanceAdapter) {
+    return validateOperation(exchange.getUnderlyingClient(), "trade");
+  }
+
+  try {
+    const accountInfo = await exchange.getAccountInfo();
+    if (!accountInfo.canTrade) {
+      return {
+        allowed: false,
+        error: "Permission denied: Exchange account cannot trade.",
+      };
+    }
+  } catch (error) {
+    return {
+      allowed: false,
+      error: error instanceof Error ? error.message : "Failed to verify exchange permissions.",
+    };
+  }
+
+  return { allowed: true };
+}
+
 /**
  * Attempt to cancel a single order, logging any errors
  */
 async function safelyCancelOrder(
-  client: BinanceClient,
+  client: Exchange,
   symbol: string,
   orderId: string,
   planId: string
@@ -225,7 +247,7 @@ async function safelyCancelOrder(
  * Rollback previously placed orders in case of failure
  */
 async function rollbackOrders(
-  client: BinanceClient,
+  client: Exchange,
   symbol: string,
   orders: PlacedOrder[],
   planId: string
@@ -237,16 +259,16 @@ async function rollbackOrders(
 }
 
 /**
- * Execute a trading plan by placing orders on Binance
+ * Execute a trading plan by placing orders on the active exchange
  *
- * @param client - Authenticated Binance client
+ * @param client - Authenticated exchange client
  * @param plan - The trading plan to execute
  * @param config - Gordon configuration
  * @param portfolio - Current portfolio state
  * @returns ExecutionResult with success status, trade, and order details
  */
 export async function executePlan(
-  client: BinanceClient,
+  client: Exchange,
   plan: Plan,
   config: GordonConfig,
   portfolio: PortfolioState,
@@ -265,7 +287,7 @@ export async function executePlan(
   }, "PENDING", { planId: plan.id });
 
   // Step 0: Validate trading permissions
-  const permissionCheck = await validateOperation(client, "trade");
+  const permissionCheck = await validateTradePermissions(client);
   if (!permissionCheck.allowed) {
     auditLog.blocked(userId, "EXECUTE_PLAN", { planId: plan.id }, permissionCheck.error || "Permission denied", { planId: plan.id });
     return {
@@ -400,7 +422,7 @@ export async function executePlan(
       entryOrderParams.timeInForce = "GTC";
     }
 
-    let entryOrder: BinanceOrder;
+    let entryOrder: Order;
     try {
       entryOrder = await client.placeOrder(entryOrderParams);
       logger.info("Entry order placed", {
@@ -435,8 +457,9 @@ export async function executePlan(
 
     const entryPrice =
       plan.entry.type === "market"
-        ? parseFloat(entryOrder.cummulativeQuoteQty) /
-          parseFloat(entryOrder.executedQty)
+        ? (entryOrder.executedQty > 0
+          ? entryOrder.cummulativeQuoteQty / entryOrder.executedQty
+          : currentPrice)
         : plan.entry.price ?? currentPrice;
 
     placedOrders.push({
@@ -472,7 +495,7 @@ export async function executePlan(
       newClientOrderId: generateClientOrderId(plan.id, "stop"),
     };
 
-    let stopOrder: BinanceOrder;
+    let stopOrder: Order;
     try {
       stopOrder = await client.placeOrder(stopOrderParams);
       logger.info("Stop order placed", {
@@ -556,7 +579,7 @@ export async function executePlan(
         newClientOrderId: generateClientOrderId(plan.id, `tp${i + 1}`),
       };
 
-      let tpOrder: BinanceOrder;
+      let tpOrder: Order;
       try {
         tpOrder = await client.placeOrder(tpOrderParams);
         logger.info("Take profit order placed", {
@@ -723,7 +746,7 @@ export async function executePlan(
  * @returns ExecutionResult with success status, trade, and order details
  */
 async function executeGridPlan(
-  client: BinanceClient,
+  client: Exchange,
   plan: Plan,
   config: GordonConfig,
   portfolio: PortfolioState
@@ -786,7 +809,7 @@ async function executeGridPlan(
         newClientOrderId: generateClientOrderId(plan.id, `grid${gridOrder.levelIndex}`),
       };
 
-      let order: BinanceOrder;
+      let order: Order;
       try {
         order = await client.placeOrder(orderParams);
         logger.info("Grid level order placed", {
@@ -861,7 +884,7 @@ async function executeGridPlan(
       newClientOrderId: generateClientOrderId(plan.id, "stop"),
     };
 
-    let stopOrder: BinanceOrder;
+    let stopOrder: Order;
     try {
       stopOrder = await client.placeOrder(stopOrderParams);
       logger.info("Grid stop loss placed", {
@@ -1010,7 +1033,7 @@ async function executeGridPlan(
  * @returns CancelResult with success status
  */
 export async function cancelTrade(
-  client: BinanceClient,
+  client: Exchange,
   trade: Trade
 ): Promise<CancelResult> {
   logger.info("Cancelling trade", { tradeId: trade.id, symbol: trade.symbol });
@@ -1124,7 +1147,7 @@ export async function cancelTrade(
  * @returns CloseResult with success status and PnL
  */
 export async function closeTrade(
-  client: BinanceClient,
+  client: Exchange,
   trade: Trade,
   reason: CloseReason,
   userId: string = "system"
@@ -1200,7 +1223,7 @@ export async function closeTrade(
       newClientOrderId: generateClientOrderId(trade.planId, "close"),
     };
 
-    let sellOrder: BinanceOrder;
+    let sellOrder: Order;
     try {
       sellOrder = await client.placeOrder(sellOrderParams);
       logger.info("Close order placed", { orderId: sellOrder.orderId, quantity: remainingQuantity });
@@ -1230,10 +1253,10 @@ export async function closeTrade(
     }
 
     // Calculate exit price from filled order
-    const exitPrice =
-      parseFloat(sellOrder.cummulativeQuoteQty) /
-      parseFloat(sellOrder.executedQty);
-    const executedQuantity = parseFloat(sellOrder.executedQty);
+    const executedQuantity = sellOrder.executedQty;
+    const exitPrice = executedQuantity > 0
+      ? sellOrder.cummulativeQuoteQty / executedQuantity
+      : trade.averageEntry;
 
     // Create exit fill record
     const exitFill: ExitFill = {
@@ -1348,15 +1371,15 @@ export const fillTracker = {
    * Get fill status for an order
    */
   async getStatus(
-    client: BinanceClient,
+    client: Exchange,
     symbol: string,
     orderId: string
   ): Promise<FillStatus> {
-    const order = await client.getOrderStatus(symbol, parseInt(orderId, 10));
-    const executedQty = parseFloat(order.executedQty);
-    const origQty = parseFloat(order.origQty);
+    const order = await client.getOrderStatus(symbol, orderId);
+    const executedQty = order.executedQty;
+    const origQty = order.quantity;
     const avgPrice = executedQty > 0
-      ? parseFloat(order.cummulativeQuoteQty) / executedQty
+      ? order.cummulativeQuoteQty / executedQty
       : 0;
 
     return {
@@ -1373,7 +1396,7 @@ export const fillTracker = {
    * Check if an order is fully filled
    */
   async isFilled(
-    client: BinanceClient,
+    client: Exchange,
     symbol: string,
     orderId: string
   ): Promise<boolean> {
@@ -1385,7 +1408,7 @@ export const fillTracker = {
    * Check if an order is partially filled
    */
   async isPartiallyFilled(
-    client: BinanceClient,
+    client: Exchange,
     symbol: string,
     orderId: string
   ): Promise<boolean> {
@@ -1404,7 +1427,7 @@ export const fillTracker = {
  * @returns WaitForFillResult with fill status
  */
 export async function waitForFill(
-  client: BinanceClient,
+  client: Exchange,
   symbol: string,
   orderId: string,
   options: WaitForFillOptions = {}
@@ -1516,10 +1539,10 @@ export async function waitForFill(
  * @returns The existing order if found, null otherwise
  */
 export async function getExistingOrder(
-  client: BinanceClient,
+  client: Exchange,
   symbol: string,
   clientOrderId: string
-): Promise<BinanceOrder | null> {
+): Promise<Order | null> {
   try {
     // Get all orders for the symbol and find by clientOrderId
     const orders = await client.getOrderHistory(symbol, 100);
@@ -1567,9 +1590,9 @@ export async function getExistingOrder(
  * @returns The placed or existing order
  */
 export async function placeOrderIdempotent(
-  client: BinanceClient,
+  client: Exchange,
   params: OrderParams
-): Promise<BinanceOrder> {
+): Promise<Order> {
   if (!params.newClientOrderId) {
     // No client order ID - just place normally
     return client.placeOrder(params);
@@ -1609,7 +1632,7 @@ export async function placeOrderIdempotent(
  * @returns PartialCloseResult with closed quantity and PnL
  */
 export async function closePartialPosition(
-  client: BinanceClient,
+  client: Exchange,
   tradeId: string,
   percentage: number,
   reason: "TP1" | "TP2" | "TP3" | "MANUAL" = "MANUAL"
@@ -1691,7 +1714,7 @@ export async function closePartialPosition(
     newClientOrderId: generateClientOrderId(trade.planId, `partial_${reason.toLowerCase()}`),
   };
 
-  let sellOrder: BinanceOrder;
+  let sellOrder: Order;
   try {
     sellOrder = await placeOrderIdempotent(client, sellOrderParams);
     logger.info("Partial close order placed", {
@@ -1724,9 +1747,10 @@ export async function closePartialPosition(
   }
 
   // Calculate exit price and PnL
-  const exitPrice =
-    parseFloat(sellOrder.cummulativeQuoteQty) / parseFloat(sellOrder.executedQty);
-  const executedQuantity = parseFloat(sellOrder.executedQty);
+  const executedQuantity = sellOrder.executedQty;
+  const exitPrice = executedQuantity > 0
+    ? sellOrder.cummulativeQuoteQty / executedQuantity
+    : trade.averageEntry;
   const newRemainingQuantity = roundQuantity(remainingQuantity - executedQuantity);
 
   // Calculate PnL for this partial close
@@ -1813,7 +1837,7 @@ export async function closePartialPosition(
  * @returns PartialCloseResult
  */
 export async function closeTierPosition(
-  client: BinanceClient,
+  client: Exchange,
   tradeId: string,
   tier: 1 | 2 | 3
 ): Promise<PartialCloseResult> {

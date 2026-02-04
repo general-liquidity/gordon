@@ -25,7 +25,7 @@ import { getGordonContext, type MastraExecutionContext } from "./types.ts";
 // ============================================================================
 
 const errors = {
-  noBinance: { error: "Binance client not connected. Please configure API keys." },
+  noExchange: { error: "Exchange client not connected. Please configure an active exchange." },
 };
 
 // ============================================================================
@@ -78,8 +78,8 @@ export const analyzeWhaleOrdersTool = createTool({
   }),
   execute: async ({ symbol, whaleThresholdUsd, depthLimit }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
-    if (!ctx?.binance) {
-      return errors.noBinance;
+    if (!ctx?.exchange) {
+      return errors.noExchange;
     }
 
     const normalizedSymbol = symbol.toUpperCase().endsWith("USDT")
@@ -87,20 +87,20 @@ export const analyzeWhaleOrdersTool = createTool({
       : `${symbol.toUpperCase()}USDT`;
 
     try {
-      const orderBook = await ctx.binance.getOrderBook(normalizedSymbol, depthLimit);
+      const orderBook = await ctx.exchange.getOrderBook(normalizedSymbol, depthLimit);
 
       // Convert to OrderBookEntry format
-      const bids: OrderBookEntry[] = orderBook.bids.map(([price, qty]) => ({
-        price: parseFloat(price),
-        quantity: parseFloat(qty),
+      const bids: OrderBookEntry[] = orderBook.bids.map((entry) => ({
+        price: entry.price,
+        quantity: entry.quantity,
       }));
 
-      const asks: OrderBookEntry[] = orderBook.asks.map(([price, qty]) => ({
-        price: parseFloat(price),
-        quantity: parseFloat(qty),
+      const asks: OrderBookEntry[] = orderBook.asks.map((entry) => ({
+        price: entry.price,
+        quantity: entry.quantity,
       }));
 
-      const currentPrice = await ctx.binance.getPrice(normalizedSymbol);
+      const currentPrice = await ctx.exchange.getPrice(normalizedSymbol);
 
       const detector = new WhaleDetector(whaleThresholdUsd);
       const whaleAnalysis = detector.analyzeWhaleOrders(bids, asks, currentPrice);
@@ -162,8 +162,8 @@ export const estimateMarketImpactTool = createTool({
   }),
   execute: async ({ symbol, orderSizeUsd, side }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
-    if (!ctx?.binance) {
-      return errors.noBinance;
+    if (!ctx?.exchange) {
+      return errors.noExchange;
     }
 
     const normalizedSymbol = symbol.toUpperCase().endsWith("USDT")
@@ -171,16 +171,16 @@ export const estimateMarketImpactTool = createTool({
       : `${symbol.toUpperCase()}USDT`;
 
     try {
-      const orderBook = await ctx.binance.getOrderBook(normalizedSymbol, 100);
+      const orderBook = await ctx.exchange.getOrderBook(normalizedSymbol, 100);
 
-      const bids: OrderBookEntry[] = orderBook.bids.map(([price, qty]) => ({
-        price: parseFloat(price),
-        quantity: parseFloat(qty),
+      const bids: OrderBookEntry[] = orderBook.bids.map((entry) => ({
+        price: entry.price,
+        quantity: entry.quantity,
       }));
 
-      const asks: OrderBookEntry[] = orderBook.asks.map(([price, qty]) => ({
-        price: parseFloat(price),
-        quantity: parseFloat(qty),
+      const asks: OrderBookEntry[] = orderBook.asks.map((entry) => ({
+        price: entry.price,
+        quantity: entry.quantity,
       }));
 
       const detector = new WhaleDetector();
@@ -244,8 +244,8 @@ export const scanBreakoutsTool = createTool({
   }),
   execute: async ({ symbol, timeframe, lookbackBars }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
-    if (!ctx?.binance) {
-      return errors.noBinance;
+    if (!ctx?.exchange) {
+      return errors.noExchange;
     }
 
     const normalizedSymbol = symbol.toUpperCase().endsWith("USDT")
@@ -253,8 +253,8 @@ export const scanBreakoutsTool = createTool({
       : `${symbol.toUpperCase()}USDT`;
 
     try {
-      const candles = await ctx.binance.getCandles(normalizedSymbol, timeframe, lookbackBars + 10);
-      const spread = await ctx.binance.getSpread(normalizedSymbol);
+      const candles = await ctx.exchange.getCandles(normalizedSymbol, timeframe, lookbackBars + 10);
+      const spread = await ctx.exchange.getSpread(normalizedSymbol);
 
       const detector = new BreakoutDetector(lookbackBars);
       const result = detector.scanBreakout(
@@ -322,8 +322,8 @@ export const detectConsolidationTool = createTool({
   }),
   execute: async ({ symbol, timeframe, consolidationThreshold }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
-    if (!ctx?.binance) {
-      return errors.noBinance;
+    if (!ctx?.exchange) {
+      return errors.noExchange;
     }
 
     const normalizedSymbol = symbol.toUpperCase().endsWith("USDT")
@@ -331,8 +331,8 @@ export const detectConsolidationTool = createTool({
       : `${symbol.toUpperCase()}USDT`;
 
     try {
-      const candles = await ctx.binance.getCandles(normalizedSymbol, timeframe, 100);
-      const currentPrice = await ctx.binance.getPrice(normalizedSymbol);
+      const candles = await ctx.exchange.getCandles(normalizedSymbol, timeframe, 100);
+      const currentPrice = await ctx.exchange.getPrice(normalizedSymbol);
 
       const detector = new ConsolidationDetector(consolidationThreshold);
       const result = detector.detectConsolidation(candles);
@@ -412,8 +412,8 @@ export const scoreMarketTool = createTool({
   }),
   execute: async ({ symbol, includeWhaleAnalysis }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
-    if (!ctx?.binance) {
-      return errors.noBinance;
+    if (!ctx?.exchange) {
+      return errors.noExchange;
     }
 
     const normalizedSymbol = symbol.toUpperCase().endsWith("USDT")
@@ -422,7 +422,7 @@ export const scoreMarketTool = createTool({
 
     try {
       // Get market data
-      const candles = await ctx.binance.getCandles(normalizedSymbol, "1d", 30);
+      const candles = await ctx.exchange.getCandles(normalizedSymbol, "1d", 30);
 
       if (candles.length < 14) {
         return { error: `Insufficient data for ${normalizedSymbol}. Need at least 14 days.` };
@@ -476,14 +476,14 @@ export const scoreMarketTool = createTool({
       let flowFeatures = undefined;
       if (includeWhaleAnalysis) {
         try {
-          const orderBook = await ctx.binance.getOrderBook(normalizedSymbol, 100);
-          const bids: OrderBookEntry[] = orderBook.bids.map(([price, qty]) => ({
-            price: parseFloat(price),
-            quantity: parseFloat(qty),
+          const orderBook = await ctx.exchange.getOrderBook(normalizedSymbol, 100);
+          const bids: OrderBookEntry[] = orderBook.bids.map((entry) => ({
+            price: entry.price,
+            quantity: entry.quantity,
           }));
-          const asks: OrderBookEntry[] = orderBook.asks.map(([price, qty]) => ({
-            price: parseFloat(price),
-            quantity: parseFloat(qty),
+          const asks: OrderBookEntry[] = orderBook.asks.map((entry) => ({
+            price: entry.price,
+            quantity: entry.quantity,
           }));
 
           const detector = new WhaleDetector(50000);

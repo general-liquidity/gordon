@@ -15,13 +15,14 @@ import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
 import { getGordonContext, type MastraExecutionContext } from "./types.ts";
+import type { ExchangeExtended } from "../../exchange/types.ts";
 
 // ============================================================================
 // Error Messages
 // ============================================================================
 
 const errors = {
-  noBinance: { error: "Binance client not connected. Please run setup first." },
+  noExchange: { error: "Exchange client not connected. Please run setup first." },
 };
 
 // ============================================================================
@@ -76,12 +77,12 @@ export const getTrendingTokensTool = createTool({
   }),
   execute: async ({ minVolume, minPriceChange, limit, direction }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
-    if (!ctx?.binance) {
-      return errors.noBinance;
+    if (!ctx?.exchange) {
+      return errors.noExchange;
     }
 
     try {
-      const tickers = await ctx.binance.get24hrTickers();
+      const tickers = await ctx.exchange.get24hrTickers();
 
       // Skip leveraged tokens and stablecoins
       const skipPatterns = ["UP", "DOWN", "BEAR", "BULL", "USDC", "BUSD", "TUSD", "USDP", "FDUSD", "DAI"];
@@ -95,8 +96,8 @@ export const getTrendingTokensTool = createTool({
           const base = t.symbol.replace("USDT", "");
           if (skipPatterns.some((p) => base.includes(p))) return false;
 
-          const volume = parseFloat(t.quoteVolume);
-          const priceChange = parseFloat(t.priceChangePercent);
+          const volume = t.quoteVolume;
+          const priceChange = t.priceChangePercent;
 
           // Volume filter
           if (volume < minVolume) return false;
@@ -110,13 +111,12 @@ export const getTrendingTokensTool = createTool({
         })
         .map((t) => ({
           symbol: t.symbol,
-          price: parseFloat(t.lastPrice),
-          priceChange24h: parseFloat(t.priceChange),
-          priceChangePercent: parseFloat(t.priceChangePercent),
-          volume24h: parseFloat(t.quoteVolume),
-          high24h: parseFloat(t.highPrice),
-          low24h: parseFloat(t.lowPrice),
-          trades24h: t.count,
+          price: t.lastPrice,
+          priceChange24h: t.priceChange,
+          priceChangePercent: t.priceChangePercent,
+          volume24h: t.quoteVolume,
+          high24h: t.highPrice,
+          low24h: t.lowPrice,
         }))
         .sort((a, b) => {
           if (direction === "losers") {
@@ -191,12 +191,12 @@ export const getHighVolumeTokensTool = createTool({
   }),
   execute: async ({ minVolume, limit }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
-    if (!ctx?.binance) {
-      return errors.noBinance;
+    if (!ctx?.exchange) {
+      return errors.noExchange;
     }
 
     try {
-      const tickers = await ctx.binance.get24hrTickers();
+      const tickers = await ctx.exchange.get24hrTickers();
 
       // Skip leveraged tokens
       const skipPatterns = ["UP", "DOWN", "BEAR", "BULL"];
@@ -207,17 +207,16 @@ export const getHighVolumeTokensTool = createTool({
           const base = t.symbol.replace("USDT", "");
           if (skipPatterns.some((p) => base.includes(p))) return false;
 
-          const volume = parseFloat(t.quoteVolume);
+          const volume = t.quoteVolume;
           return volume >= minVolume;
         })
         .map((t) => ({
           symbol: t.symbol,
-          price: parseFloat(t.lastPrice),
-          priceChangePercent: parseFloat(t.priceChangePercent),
-          volume24h: parseFloat(t.quoteVolume),
-          trades24h: t.count,
-          high24h: parseFloat(t.highPrice),
-          low24h: parseFloat(t.lowPrice),
+          price: t.lastPrice,
+          priceChangePercent: t.priceChangePercent,
+          volume24h: t.quoteVolume,
+          high24h: t.highPrice,
+          low24h: t.lowPrice,
         }))
         .sort((a, b) => b.volume24h - a.volume24h)
         .slice(0, limit);
@@ -238,7 +237,7 @@ export const getHighVolumeTokensTool = createTool({
           price: t.price.toFixed(8).replace(/\.?0+$/, ""),
           volume24h: `$${(t.volume24h / 1000000).toFixed(2)}M`,
           change24h: `${t.priceChangePercent >= 0 ? "+" : ""}${t.priceChangePercent.toFixed(2)}%`,
-          trades24h: t.trades24h.toLocaleString(),
+          trades24h: "N/A",
         })),
       };
     } catch (error) {
@@ -254,7 +253,7 @@ export const getHighVolumeTokensTool = createTool({
 export const getAvailableMarketsTool = createTool({
   id: "get_available_markets",
   description:
-    "List available trading pairs on Binance with optional filters. " +
+    "List available trading pairs on the active exchange with optional filters. " +
     "Use when user asks 'what pairs are available', 'can I trade X', 'list markets for ETH'.",
   inputSchema: z.object({
     baseAsset: z
@@ -293,12 +292,12 @@ export const getAvailableMarketsTool = createTool({
   }),
   execute: async ({ baseAsset, quoteAsset, limit }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
-    if (!ctx?.binance) {
-      return errors.noBinance;
+    if (!ctx?.exchange) {
+      return errors.noExchange;
     }
 
     try {
-      const exchangeInfo = await ctx.binance.getExchangeInfo();
+      const exchangeInfo = await ctx.exchange.getExchangeInfo();
 
       let symbols = exchangeInfo.symbols.filter((s) => s.status === "TRADING" && s.isSpotTradingAllowed);
 
@@ -400,8 +399,8 @@ export const placeBracketOrderTool = createTool({
   }),
   execute: async ({ symbol, side, quantity, stopLossPrice, takeProfitPrice }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
-    if (!ctx?.binance) {
-      return errors.noBinance;
+    if (!ctx?.exchange) {
+      return errors.noExchange;
     }
 
     if (ctx.config?.mode !== "ARMED") {
@@ -432,7 +431,7 @@ export const placeBracketOrderTool = createTool({
       }
 
       // Step 1: Place market entry order
-      const entryOrder = await ctx.binance.placeOrder({
+      const entryOrder = await ctx.exchange.placeOrder({
         symbol: normalizedSymbol,
         side,
         type: "MARKET",
@@ -443,34 +442,39 @@ export const placeBracketOrderTool = createTool({
         return {
           error: "Entry order was rejected",
           entryOrder: {
-            orderId: entryOrder?.orderId ?? 0,
+            orderId: Number(entryOrder?.orderId) || 0,
             symbol: entryOrder?.symbol ?? normalizedSymbol,
             status: entryOrder?.status ?? "REJECTED",
-            executedQty: entryOrder?.executedQty ?? "0",
-            cummulativeQuoteQty: entryOrder?.cummulativeQuoteQty ?? "0",
+            executedQty: String(entryOrder?.executedQty ?? 0),
+            cummulativeQuoteQty: String(entryOrder?.cummulativeQuoteQty ?? 0),
           },
         };
       }
 
       // Step 2: Place OCO order for stop-loss and take-profit
       const exitSide = side === "BUY" ? "SELL" : "BUY";
-      const filledQty = parseFloat(entryOrder.executedQty);
+      const filledQty = entryOrder.executedQty;
 
       if (filledQty <= 0) {
         return {
           error: "Entry order did not fill",
           entryOrder: {
-            orderId: entryOrder.orderId,
+            orderId: Number(entryOrder.orderId) || 0,
             symbol: entryOrder.symbol,
             status: entryOrder.status,
-            executedQty: entryOrder.executedQty,
-            cummulativeQuoteQty: entryOrder.cummulativeQuoteQty,
+            executedQty: String(entryOrder.executedQty),
+            cummulativeQuoteQty: String(entryOrder.cummulativeQuoteQty),
           },
         };
       }
 
       // For OCO: price = limit/take-profit, stopPrice = stop trigger, stopLimitPrice = stop limit
-      const ocoOrder = await ctx.binance.placeOCOOrder({
+      const exchangeWithOco = ctx.exchange as ExchangeExtended;
+      if (!exchangeWithOco.placeOCOOrder) {
+        return { error: "OCO orders are not supported on this exchange." };
+      }
+
+      const ocoOrder = await exchangeWithOco.placeOCOOrder({
         symbol: normalizedSymbol,
         side: exitSide,
         quantity: filledQty,
@@ -479,24 +483,24 @@ export const placeBracketOrderTool = createTool({
         stopLimitPrice: stopLossPrice, // Stop loss limit price (same as trigger for immediate fill)
       });
 
-      const avgFillPrice = parseFloat(entryOrder.cummulativeQuoteQty) / filledQty;
+      const avgFillPrice = entryOrder.cummulativeQuoteQty / filledQty;
 
       return {
         success: true,
         message: `Bracket order placed: ${side} ${filledQty} ${normalizedSymbol} @ ${avgFillPrice.toFixed(8)}`,
         entry: {
-          orderId: entryOrder.orderId,
+          orderId: Number(entryOrder.orderId) || 0,
           status: entryOrder.status,
           filledQty,
           avgPrice: avgFillPrice,
         },
         exits: {
           ocoOrderListId: ocoOrder.orderListId,
-          status: ocoOrder.listOrderStatus,
+          status: "PLACED",
           takeProfit: takeProfitPrice,
           stopLoss: stopLossPrice,
           orders: ocoOrder.orders.map((o) => ({
-            orderId: o.orderId,
+            orderId: Number(o.orderId) || 0,
           })),
         },
       };

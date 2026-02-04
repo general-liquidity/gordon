@@ -36,8 +36,7 @@ const ERROR_SUGGESTIONS: Record<string, ErrorSuggestion[]> = {
     },
     {
       label: "Regenerate Keys",
-      description: "Try generating new API keys from Binance",
-      docUrl: "https://www.binance.com/en/support/faq/how-to-create-api-keys-on-binance-360002502072",
+      description: "Try generating new API keys from your exchange",
     },
   ],
   "unauthorized": [
@@ -63,7 +62,7 @@ const ERROR_SUGGESTIONS: Record<string, ErrorSuggestion[]> = {
   "rate limit": [
     {
       label: "Wait and Retry",
-      description: "Binance has rate limits. Wait a minute before trying again.",
+      description: "Your exchange has rate limits. Wait a minute before trying again.",
     },
     {
       label: "Reduce Requests",
@@ -138,8 +137,7 @@ const ERROR_SUGGESTIONS: Record<string, ErrorSuggestion[]> = {
     },
     {
       label: "Check Status",
-      description: "Binance may be experiencing issues",
-      docUrl: "https://www.binance.com/en/support",
+      description: "Your exchange may be experiencing issues",
     },
   ],
 
@@ -262,7 +260,7 @@ interface ErrorDisplayProps {
   title?: string;
   message: string;
   details?: string;
-  /** Error code (e.g., from Binance API) */
+  /** Error code (e.g., from exchange API) */
   errorCode?: string;
   showRetry?: boolean;
   showMenu?: boolean;

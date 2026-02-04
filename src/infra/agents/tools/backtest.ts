@@ -62,7 +62,7 @@ import {
 // ============================================================================
 
 const errors = {
-  noBinance: { error: "Binance client not connected. Please run setup first." },
+  noExchange: { error: "Exchange client not connected. Please run setup first." },
   strategyNotFound: (id: string) => ({
     error: `Strategy "${id}" not found. Use list_strategies to see available strategies.`,
   }),
@@ -264,8 +264,8 @@ export const runBacktestTool = createTool({
     execContext: MastraExecutionContext
   ) => {
     const ctx = getGordonContext(execContext);
-    if (!ctx?.binance) {
-      return errors.noBinance;
+    if (!ctx?.exchange) {
+      return errors.noExchange;
     }
 
     const strategy = strategyRegistry.get(strategyId as StrategyId);
@@ -279,7 +279,7 @@ export const runBacktestTool = createTool({
       const executionStart = Date.now();
 
       const ohlcData = await fetchHistoricalData(
-        ctx.binance,
+        ctx.exchange,
         normalizedSymbol,
         timeframe,
         days
@@ -391,8 +391,8 @@ export const optimizeStrategyTool = createTool({
     execContext: MastraExecutionContext
   ) => {
     const ctx = getGordonContext(execContext);
-    if (!ctx?.binance) {
-      return { error: errors.noBinance.error };
+    if (!ctx?.exchange) {
+      return { error: errors.noExchange.error };
     }
 
     const strategy = strategyRegistry.get(strategyId as StrategyId);
@@ -404,7 +404,7 @@ export const optimizeStrategyTool = createTool({
     const warnings: string[] = [];
 
     const ohlcData = await fetchHistoricalData(
-      ctx.binance,
+      ctx.exchange,
       normalizedSymbol,
       timeframe,
       90
@@ -550,8 +550,8 @@ export const compareBacktestsTool = createTool({
     execContext: MastraExecutionContext
   ) => {
     const ctx = getGordonContext(execContext);
-    if (!ctx?.binance) {
-      return { error: errors.noBinance.error };
+    if (!ctx?.exchange) {
+      return { error: errors.noExchange.error };
     }
 
     const comparisonStartTime = Date.now();
@@ -591,13 +591,13 @@ export const compareBacktestsTool = createTool({
 
     const ohlcData = startDate || endDate
       ? await fetchHistoricalDataRange(
-          ctx.binance,
+          ctx.exchange,
           normalizedSymbol,
           timeframe,
           start.getTime(),
           end.getTime()
         )
-      : await fetchHistoricalData(ctx.binance, normalizedSymbol, timeframe, periodDays);
+      : await fetchHistoricalData(ctx.exchange, normalizedSymbol, timeframe, periodDays);
 
     if (ohlcData.length < 100) {
       return { error: errors.insufficientData(normalizedSymbol).error };
@@ -1284,8 +1284,8 @@ export const runWalkForwardTestTool = createTool({
     execContext: MastraExecutionContext
   ) => {
     const ctx = getGordonContext(execContext);
-    if (!ctx?.binance) {
-      return { error: errors.noBinance.error };
+    if (!ctx?.exchange) {
+      return { error: errors.noExchange.error };
     }
 
     const strategy = strategyRegistry.get(strategyId as StrategyId);
@@ -1297,7 +1297,7 @@ export const runWalkForwardTestTool = createTool({
 
     try {
       const ohlcData = await fetchHistoricalData(
-        ctx.binance,
+        ctx.exchange,
         normalizedSymbol,
         timeframe,
         days
@@ -1404,8 +1404,8 @@ export const runMonteCarloTool = createTool({
     execContext: MastraExecutionContext
   ) => {
     const ctx = getGordonContext(execContext);
-    if (!ctx?.binance) {
-      return { error: errors.noBinance.error };
+    if (!ctx?.exchange) {
+      return { error: errors.noExchange.error };
     }
 
     const strategy = strategyRegistry.get(strategyId as StrategyId);
@@ -1418,7 +1418,7 @@ export const runMonteCarloTool = createTool({
     try {
       // First run a backtest to get trades
       const ohlcData = await fetchHistoricalData(
-        ctx.binance,
+        ctx.exchange,
         normalizedSymbol,
         timeframe,
         days

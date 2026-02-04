@@ -34,7 +34,7 @@ import {
 export const testConnectionTool = createTool({
   id: "test_connection",
   description:
-    "Test the connection to Binance and verify API key permissions. " +
+    "Test the connection to the active exchange and verify API key permissions. " +
     "Use when user asks 'test connection', 'check API', 'are my keys working?'",
   inputSchema: z.object({}),
   outputSchema: z.object({
@@ -79,30 +79,30 @@ export const testConnectionTool = createTool({
       error: null,
     };
 
-    if (!ctx?.binance) {
-      results.error = "Binance client not initialized. Check BINANCE_API_KEY and BINANCE_API_SECRET in .env";
+    if (!ctx?.exchange) {
+      results.error = "Exchange client not initialized. Check your API keys in settings.";
       return results;
     }
 
     try {
-      const connected = await ctx.binance.testConnection();
+      const connected = await ctx.exchange.testConnection();
       results.binanceConnected = connected;
 
       if (connected) {
-        const accountInfo = await ctx.binance.getAccountInfo();
+        const accountInfo = await ctx.exchange.getAccountInfo();
         results.accountType = accountInfo.accountType;
         results.canTrade = accountInfo.canTrade;
         results.canWithdraw = accountInfo.canWithdraw;
         results.canDeposit = accountInfo.canDeposit;
 
         const nonZeroBalances = accountInfo.balances.filter(
-          (b) => parseFloat(b.free) > 0 || parseFloat(b.locked) > 0
+          (b) => b.free > 0 || b.locked > 0
         );
         results.assetsWithBalance = nonZeroBalances.length;
         results.assetList = nonZeroBalances.map((b) => ({
           asset: b.asset,
-          free: parseFloat(b.free),
-          locked: parseFloat(b.locked),
+          free: b.free,
+          locked: b.locked,
         }));
       }
     } catch (error) {

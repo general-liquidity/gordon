@@ -21,7 +21,7 @@ import { getGordonContext, validateToolOutput, type MastraExecutionContext } fro
 // ============================================================================
 
 const errors = {
-  noBinance: { error: "Binance client not connected. Please run setup first." },
+  noExchange: { error: "Exchange client not connected. Please run setup first." },
 };
 
 // ============================================================================
@@ -57,9 +57,9 @@ export const checkPositionsTool = createTool({
   outputSchema: checkPositionsOutputSchema,
   execute: async (_input, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
-    if (!ctx?.binance) {
+    if (!ctx?.exchange) {
       return validateToolOutput(checkPositionsOutputSchema, {
-        ...errors.noBinance,
+        ...errors.noExchange,
         openTrades: 0,
         totalUnrealizedPnl: 0,
         totalUnrealizedPnlPercent: 0,
@@ -68,7 +68,7 @@ export const checkPositionsTool = createTool({
       }, { toolName: "check_positions" });
     }
 
-    const result: MonitorResult = await runMonitorCycle(ctx.binance);
+    const result: MonitorResult = await runMonitorCycle(ctx.exchange);
 
     const totalUnrealizedPnl = result.updates.reduce((sum, u) => sum + u.unrealizedPnl, 0);
     const positions = result.updates.map((p) => ({

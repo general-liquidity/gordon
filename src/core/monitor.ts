@@ -8,8 +8,7 @@
  * Optionally supports real-time WebSocket updates for faster detection.
  */
 
-import { BinanceClient } from "../infra/binance/index.ts";
-import type { OrderParams } from "../infra/binance/index.ts";
+import type { Exchange, OrderParams } from "../infra/exchange/index.ts";
 import { listTrades, updateTrade } from "../infra/storage/trades.ts";
 import { logEvent } from "../infra/storage/events.ts";
 import { getPlan } from "../infra/storage/plans.ts";
@@ -89,7 +88,7 @@ const GRID_TP_MIN_FILL_PERCENT = 0.2; // At least 20% of grid must be filled bef
 // ============================================================================
 
 /**
- * Round quantity to appropriate precision for Binance
+ * Round quantity to appropriate precision for exchange orders
  */
 function roundQuantity(quantity: number, precision: number = 8): number {
   const multiplier = Math.pow(10, precision);
@@ -121,7 +120,7 @@ function generateClientOrderId(planId: string, type: string): string {
  * Run a complete monitor cycle
  */
 export async function runMonitorCycle(
-  client: BinanceClient
+  client: Exchange
 ): Promise<MonitorResult> {
   const timestamp = new Date().toISOString();
   const updates: MonitorUpdate[] = [];
@@ -267,7 +266,7 @@ export async function runMonitorCycle(
 // ============================================================================
 
 async function processTradeUpdate(
-  client: BinanceClient,
+  client: Exchange,
   trade: Trade,
   alerts: Alert[]
 ): Promise<MonitorUpdate | null> {
@@ -356,7 +355,7 @@ async function processTradeUpdate(
 }
 
 async function checkOrderFills(
-  client: BinanceClient,
+  client: Exchange,
   trade: Trade,
   plan: Plan
 ): Promise<Alert[]> {
@@ -537,7 +536,7 @@ async function checkOrderFills(
  * 2. Price reverses 1% above the highest filled level
  */
 async function checkGridFills(
-  client: BinanceClient,
+  client: Exchange,
   trade: Trade,
   plan: Plan,
   alerts: Alert[]
@@ -775,7 +774,7 @@ function calculateWeightedAverageEntry(entries: EntryFill[]): number {
  * quantity correctly even if some TP orders fail.
  */
 async function placeDeferredTakeProfits(
-  client: BinanceClient,
+  client: Exchange,
   trade: Trade,
   plan: Plan,
   totalQuantity: number,
@@ -938,7 +937,7 @@ interface GridLevelStatus {
  */
 export async function placeGridTakeProfits(
   trade: Trade,
-  binance: BinanceClient
+  binance: Exchange
 ): Promise<GridTPPlacementResult> {
   const alerts: Alert[] = [];
 
@@ -1287,7 +1286,7 @@ export async function placeGridTakeProfits(
  * Called from runMonitorCycle
  */
 async function processGridTakeProfits(
-  client: BinanceClient,
+  client: Exchange,
   alerts: Alert[]
 ): Promise<void> {
   // Get all active trades
@@ -1448,7 +1447,7 @@ function determineHealthStatus(distanceToStop: number): "healthy" | "warning" | 
 // ============================================================================
 
 async function checkMarketAnomalies(
-  client: BinanceClient,
+  client: Exchange,
   symbol: string
 ): Promise<Alert[]> {
   const alerts: Alert[] = [];
@@ -1572,7 +1571,11 @@ function checkFlashCrash(
  * This enables faster detection of stop-loss and take-profit triggers
  * Only connects if there are active trades to monitor
  */
-export async function initializeRealtimeMonitor(): Promise<void> {
+export async function initializeRealtimeMonitor(exchangeId: string = "binance"): Promise<void> {
+  if (exchangeId !== "binance") {
+    logger.debug("Real-time monitor skipped for non-Binance exchange", { exchangeId });
+    return;
+  }
   if (wsClient) {
     logger.debug("WebSocket already initialized");
     return;
@@ -1728,7 +1731,7 @@ function checkRealtimePriceAlert(symbol: string, price: number): void {
  * Falls back to API if no cached price available
  */
 export async function getRealtimePrice(
-  client: BinanceClient,
+  client: Exchange,
   symbol: string
 ): Promise<number> {
   const cached = realtimePriceCache.get(symbol);

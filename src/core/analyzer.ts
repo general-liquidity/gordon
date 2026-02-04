@@ -5,7 +5,7 @@
  * No AI involved - purely technical indicator and level analysis.
  */
 
-import { BinanceClient } from "../infra/binance/index.ts";
+import type { Exchange } from "../infra/exchange/index.ts";
 import { calculateIndicators, detectLevels } from "../indicators/index.ts";
 import type { CoinAnalysis, Level, Candle, Indicators, Trend, Bias, Risk } from "../types/index.ts";
 import { createModuleLogger } from "../infra/logger/index.ts";
@@ -68,7 +68,7 @@ const INVALIDATION_BUFFER_PERCENT = 1; // 1% below support is invalidation
  * @returns Detailed analysis with supports, resistances, and setup details
  */
 export async function analyze(
-  client: BinanceClient,
+  client: Exchange,
   symbol: string,
   options?: AnalyzeOptions
 ): Promise<DetailedAnalysis> {

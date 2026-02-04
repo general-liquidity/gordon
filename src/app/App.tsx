@@ -243,6 +243,7 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
       const exchanges = config.exchanges || [];
       if (exchanges.length === 0) {
         exchangeRef.current = null;
+        binanceClientRef.current = null;
         return;
       }
 
@@ -250,6 +251,7 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
       const active = exchanges.find((ex) => ex.id === activeId) || exchanges[0];
       if (!active) {
         exchangeRef.current = null;
+        binanceClientRef.current = null;
         return;
       }
 
@@ -262,6 +264,8 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
 
       if (active.type === "binance" && active.apiKey && active.apiSecret) {
         binanceClientRef.current = new BinanceClient(active.apiKey, active.apiSecret);
+      } else {
+        binanceClientRef.current = null;
       }
     } catch (error) {
       console.error("Failed to refresh active exchange:", error);
@@ -349,69 +353,96 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
         console.error("Failed to initialize LLM client:", error);
       }
 
-      // Initialize Binance client if keys are available
-      if (envStatus.hasBinanceKeys && envStatus.keys.BINANCE_API_KEY && envStatus.keys.BINANCE_API_SECRET) {
+      // Initialize exchange based on config (preferred) or env Binance keys (fallback)
+      let exchangeInitialized = false;
+      if (config.exchanges && config.exchanges.length > 0) {
+        const activeId = config.activeExchangeId || config.exchanges.find((ex) => ex.isDefault)?.id;
+        const active = config.exchanges.find((ex) => ex.id === activeId) || config.exchanges[0];
+        if (active) {
+          try {
+            exchangeRef.current = ExchangeFactory.create(active.type, {
+              apiKey: active.apiKey,
+              apiSecret: active.apiSecret,
+              passphrase: active.passphrase,
+              sandbox: active.sandbox,
+            });
+            exchangeInitialized = true;
+
+            if (active.type === "binance") {
+              binanceClientRef.current = new BinanceClient(active.apiKey, active.apiSecret);
+            } else {
+              binanceClientRef.current = null;
+            }
+          } catch (error) {
+            console.error("Failed to initialize configured exchange:", error);
+          }
+        }
+      }
+
+      if (!exchangeInitialized && envStatus.hasBinanceKeys && envStatus.keys.BINANCE_API_KEY && envStatus.keys.BINANCE_API_SECRET) {
         try {
           binanceClientRef.current = new BinanceClient(
             envStatus.keys.BINANCE_API_KEY,
             envStatus.keys.BINANCE_API_SECRET
           );
-          // Also create Exchange adapter for multi-exchange support
           exchangeRef.current = new BinanceAdapter(
             envStatus.keys.BINANCE_API_KEY,
             envStatus.keys.BINANCE_API_SECRET
           );
-
-          // Reconcile local state with Binance on startup
-          // This ensures any orders that filled while offline are recorded
-          reconcileWithBinance(binanceClientRef.current)
-            .then((result) => {
-              if (result.ordersUpdated > 0) {
-                console.log(`Reconciliation complete: ${result.ordersUpdated} orders synced`);
-              }
-              if (result.warnings.length > 0) {
-                console.warn("Reconciliation warnings:", result.warnings);
-              }
-              if (result.errors.length > 0) {
-                console.error("Reconciliation errors:", result.errors);
-              }
-            })
-            .catch((error) => {
-              console.error("Reconciliation failed:", error);
-            });
-
-          // Run order recovery only if there are active trades
-          const allTrades = listTrades({});
-          const activeTrades = allTrades.filter(
-            (t) => t.status === "OPEN" || t.status === "PARTIAL"
-          );
-
-          if (activeTrades.length > 0) {
-            const knownTradeIds = new Set(
-              allTrades.map((t) => t.id.replace("trade_", ""))
-            );
-            runOrderRecovery(binanceClientRef.current, knownTradeIds, {
-              logResults: true,
-            })
-              .then((recoveryResult) => {
-                if (recoveryResult.orphaned.length > 0) {
-                  console.warn(
-                    `Found ${recoveryResult.orphaned.length} orphaned orders on Binance`
-                  );
-                }
-              })
-              .catch(() => {
-                // Silently ignore - not critical for startup
-              });
-          }
-
-          // Initialize real-time WebSocket monitoring (optional enhancement)
-          initializeRealtimeMonitor().catch((error) => {
-            console.warn("Real-time monitoring unavailable:", error);
-          });
+          exchangeInitialized = true;
         } catch (error) {
           console.error("Failed to initialize Binance client:", error);
         }
+      }
+
+      if (binanceClientRef.current) {
+        // Reconcile local state with Binance on startup
+        // This ensures any orders that filled while offline are recorded
+        reconcileWithBinance(binanceClientRef.current)
+          .then((result) => {
+            if (result.ordersUpdated > 0) {
+              console.log(`Reconciliation complete: ${result.ordersUpdated} orders synced`);
+            }
+            if (result.warnings.length > 0) {
+              console.warn("Reconciliation warnings:", result.warnings);
+            }
+            if (result.errors.length > 0) {
+              console.error("Reconciliation errors:", result.errors);
+            }
+          })
+          .catch((error) => {
+            console.error("Reconciliation failed:", error);
+          });
+
+        // Run order recovery only if there are active trades
+        const allTrades = listTrades({});
+        const activeTrades = allTrades.filter(
+          (t) => t.status === "OPEN" || t.status === "PARTIAL"
+        );
+
+        if (activeTrades.length > 0) {
+          const knownTradeIds = new Set(
+            allTrades.map((t) => t.id.replace("trade_", ""))
+          );
+          runOrderRecovery(binanceClientRef.current, knownTradeIds, {
+            logResults: true,
+          })
+            .then((recoveryResult) => {
+              if (recoveryResult.orphaned.length > 0) {
+                console.warn(
+                  `Found ${recoveryResult.orphaned.length} orphaned orders on Binance`
+                );
+              }
+            })
+            .catch(() => {
+              // Silently ignore - not critical for startup
+            });
+        }
+
+        // Initialize real-time WebSocket monitoring (optional enhancement)
+        initializeRealtimeMonitor(exchangeRef.current?.exchangeId).catch((error) => {
+          console.warn("Real-time monitoring unavailable:", error);
+        });
       }
 
       // Initialize session for Mastra agent memory
@@ -461,11 +492,11 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
     const MONITOR_INTERVAL_MS = 900000; // 15 minutes
 
     const intervalId = setInterval(() => {
-      if (!binanceClientRef.current) {
+      if (!exchangeRef.current) {
         return;
       }
 
-      runMonitorCycle(binanceClientRef.current)
+      runMonitorCycle(exchangeRef.current)
         .then((result) => {
           if (result.alerts.length === 0) {
             return;
@@ -495,9 +526,9 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
   // Fetch BTC price periodically
   useEffect(() => {
     const fetchBtcPrice = async () => {
-      if (!binanceClientRef.current) return;
+      if (!exchangeRef.current) return;
       try {
-        const price = await binanceClientRef.current.getPrice("BTCUSDT");
+        const price = await exchangeRef.current.getPrice("BTCUSDT");
         setState((prev) => ({ ...prev, btcPrice: price }));
       } catch (error) {
         console.error("Failed to fetch BTC price:", error);
@@ -1341,7 +1372,7 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
             return;
           }
           case "handle_workflow_command": {
-            if (!binanceClientRef.current) {
+            if (!exchangeRef.current) {
               setState((prev) => ({
                 ...prev,
                 messages: [
@@ -1349,7 +1380,7 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
                   userMessage,
                   {
                     role: "gordon",
-                    content: "Binance API not connected. Run /setup to configure API keys before workflows.",
+                    content: "Exchange API not connected. Run /setup to configure API keys before workflows.",
                     timestamp: formatTimestamp(),
                   },
                 ],
@@ -1359,7 +1390,7 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
 
             setState((prev) => ({ ...prev, messages: [...prev.messages, userMessage], isLoading: true }));
             const result = await handleWorkflowCommand(args, {
-              binance: binanceClientRef.current,
+              exchange: exchangeRef.current,
               llm: llmClientRef.current ?? undefined,
               config: configRef.current,
             });
@@ -1640,7 +1671,7 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
         setState((prev) => ({ ...prev, view: "chat" }));
         break;
       case "scan":
-        if (!binanceClientRef.current) {
+        if (!exchangeRef.current) {
           setState((prev) => ({
             ...prev,
             view: "chat",
@@ -1649,7 +1680,7 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
               {
                 role: "gordon",
                 content:
-                  "Binance API not connected. Add your API keys to the .env file:\n\nBINANCE_API_KEY=your-key\nBINANCE_API_SECRET=your-secret\n\nThen restart Gordon.",
+                  "No exchange configured. Use `/exchange add <type>` to add credentials or run `/setup`.",
                 timestamp: formatTimestamp(),
               },
             ],
@@ -1671,7 +1702,7 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
           (async () => {
             try {
               const scanStart = Date.now();
-              const scanResult = await scan(binanceClientRef.current!, {
+              const scanResult = await scan(exchangeRef.current!, {
                 topN: configRef.current.preferences.topNCoins,
                 timeframes: configRef.current.preferences.defaultTimeframes,
               });
@@ -1734,7 +1765,7 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
         }
         break;
       case "portfolio":
-        if (!binanceClientRef.current) {
+        if (!exchangeRef.current) {
           setState((prev) => ({
             ...prev,
             view: "chat",
@@ -1743,7 +1774,7 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
               {
                 role: "gordon",
                 content:
-                  "Binance API not connected. Add your API keys to the .env file:\n\nBINANCE_API_KEY=your-key\nBINANCE_API_SECRET=your-secret\n\nThen restart Gordon.",
+                  "No exchange configured. Use `/exchange add <type>` to add credentials or run `/setup`.",
                 timestamp: formatTimestamp(),
               },
             ],
@@ -1757,7 +1788,7 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
               ...prev.messages,
               {
                 role: "gordon",
-                content: "Fetching your portfolio from Binance...",
+                content: "Fetching your portfolio from the active exchange...",
                 timestamp: formatTimestamp(),
               },
             ],
@@ -1767,18 +1798,18 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
           (async () => {
             try {
               const portfolioStart = Date.now();
-              const allBalances = await binanceClientRef.current!.getAllBalances();
+              const allBalances = await exchangeRef.current!.getAllBalances();
 
               // Calculate total value and extract USDT balance
               let totalValue = 0;
               let usdtBalance = 0;
-              const holdings: Array<{ asset: string; amount: number; usdtValue: number; wallet: string; note?: string }> = [];
+              const holdings: Array<{ asset: string; amount: number; usdtValue: number; wallet?: string; note?: string }> = [];
 
               // USD-pegged stablecoins
               const stablecoins = ["USDT", "USD", "USDC", "BUSD", "TUSD", "USDP", "FDUSD"];
 
               for (const balance of allBalances) {
-                const amount = balance.free + balance.locked;
+                const amount = balance.total ?? (balance.free + balance.locked);
                 let usdtValue = 0;
 
                 if (stablecoins.includes(balance.asset)) {
@@ -1788,9 +1819,9 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
                     usdtBalance += amount;
                   }
                 } else {
-                  // Try to get price from Binance (works for crypto and some fiat like EUR)
+                  // Try to get price from the active exchange (works for crypto and some fiat like EUR)
                   try {
-                    const price = await binanceClientRef.current!.getPrice(`${balance.asset}USDT`);
+                    const price = await exchangeRef.current!.getPrice(`${balance.asset}USDT`);
                     usdtValue = amount * price;
                   } catch (error) {
                     console.error(`No USDT pair for ${balance.asset}:`, error);
@@ -1799,7 +1830,7 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
                       asset: balance.asset,
                       amount,
                       usdtValue: 0,
-                      wallet: balance.wallet,
+                      wallet: "spot",
                       note: "No USD rate"
                     });
                     continue;
@@ -1807,7 +1838,7 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
                 }
 
                 if (usdtValue > 0.01) {
-                  holdings.push({ asset: balance.asset, amount, usdtValue, wallet: balance.wallet });
+                  holdings.push({ asset: balance.asset, amount, usdtValue, wallet: "spot" });
                   totalValue += usdtValue;
                 }
               }

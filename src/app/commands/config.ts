@@ -136,13 +136,13 @@ export async function configView(): Promise<ConfigCommandResult> {
     // Build API Status section
     const apiLines = ['', '=== API Status ==='];
 
-    // Check Binance status
+    // Check legacy exchange status
     const hasLegacyExchange = !!config.exchange?.apiKey;
     const hasMultiExchange = config.exchanges && config.exchanges.length > 0;
 
     if (hasLegacyExchange && config.exchange) {
       const perms = config.exchange.permissions;
-      apiLines.push(`Binance: Connected (permissions: ${formatPermissions(perms.read, perms.spotTrade)})`);
+      apiLines.push(`Binance (legacy): Connected (permissions: ${formatPermissions(perms.read, perms.spotTrade)})`);
     } else if (hasMultiExchange) {
       const activeExchange = config.exchanges.find(e => e.isDefault) || config.exchanges[0];
       if (activeExchange) {

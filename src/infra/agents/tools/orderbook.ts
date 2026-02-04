@@ -19,6 +19,7 @@ import {
   resilientGetOrderBook,
   resilientGetSpread,
 } from "../../resilience/index.ts";
+import type { OrderBookEntry, ExchangeExtended } from "../../exchange/types.ts";
 import { createCachedTool, TOOL_CACHE_CONFIG } from "./cache.ts";
 
 // ============================================================================
@@ -26,11 +27,20 @@ import { createCachedTool, TOOL_CACHE_CONFIG } from "./cache.ts";
 // ============================================================================
 
 const errors = {
-  noBinance: { error: "Binance client not connected. Please run setup first." },
+  noExchange: { error: "Exchange client not connected. Please run setup first." },
   notArmed: (action: string) => ({
     error: `System must be ARMED to ${action}. Use 'arm' command first.`,
   }),
 };
+
+function normalizeEntries(entries: Array<[string, string] | OrderBookEntry>): OrderBookEntry[] {
+  return entries.map((entry) => {
+    if (Array.isArray(entry)) {
+      return { price: parseFloat(entry[0]), quantity: parseFloat(entry[1]) };
+    }
+    return entry;
+  });
+}
 
 // ============================================================================
 // Order Book / Liquidity Analysis
@@ -83,8 +93,8 @@ export const getOrderBookTool = createTool({
   }),
   execute: async ({ symbol, limit }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
-    if (!ctx?.binance) {
-      return errors.noBinance;
+    if (!ctx?.exchange) {
+      return errors.noExchange;
     }
 
     const normalizedSymbol = symbol.toUpperCase().endsWith("USDT")
@@ -92,23 +102,23 @@ export const getOrderBookTool = createTool({
       : `${symbol.toUpperCase()}USDT`;
 
     try {
-      // Use resilient wrapper with automatic retry, cache fallback, and circuit breaker
-      const result = await resilientGetOrderBook(ctx.binance, normalizedSymbol, limit);
-      const orderBook = result.data;
+      const orderBook = ctx.binance && ctx.exchange.exchangeId === "binance"
+        ? (await resilientGetOrderBook(ctx.binance, normalizedSymbol, limit)).data
+        : await ctx.exchange.getOrderBook(normalizedSymbol, limit);
 
       // Calculate totals and find walls
       let bidTotal = 0;
       let askTotal = 0;
-      const bids = orderBook.bids.slice(0, limit).map(([price, qty]) => {
-        const quantity = parseFloat(qty);
+      const bids = normalizeEntries(orderBook.bids).slice(0, limit).map((entry) => {
+        const quantity = entry.quantity;
         bidTotal += quantity;
-        return { price: parseFloat(price), quantity, total: bidTotal };
+        return { price: entry.price, quantity, total: bidTotal };
       });
 
-      const asks = orderBook.asks.slice(0, limit).map(([price, qty]) => {
-        const quantity = parseFloat(qty);
+      const asks = normalizeEntries(orderBook.asks).slice(0, limit).map((entry) => {
+        const quantity = entry.quantity;
         askTotal += quantity;
-        return { price: parseFloat(price), quantity, total: askTotal };
+        return { price: entry.price, quantity, total: askTotal };
       });
 
       // Find largest walls
@@ -167,8 +177,8 @@ export const getSpreadTool = createTool({
   }),
   execute: async ({ symbol }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
-    if (!ctx?.binance) {
-      return errors.noBinance;
+    if (!ctx?.exchange) {
+      return errors.noExchange;
     }
 
     const normalizedSymbol = symbol.toUpperCase().endsWith("USDT")
@@ -176,9 +186,9 @@ export const getSpreadTool = createTool({
       : `${symbol.toUpperCase()}USDT`;
 
     try {
-      // Use resilient wrapper with automatic retry, cache fallback, and circuit breaker
-      const result = await resilientGetSpread(ctx.binance, normalizedSymbol);
-      const spread = result.data;
+      const spread = ctx.binance && ctx.exchange.exchangeId === "binance"
+        ? (await resilientGetSpread(ctx.binance, normalizedSymbol)).data
+        : await ctx.exchange.getSpread(normalizedSymbol);
 
       let assessment: string;
       if (spread.spreadPercent < 0.05) {
@@ -235,8 +245,11 @@ export const getRecentTradesTool = createTool({
   }),
   execute: async ({ symbol, limit }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
-    if (!ctx?.binance) {
-      return errors.noBinance;
+    if (!ctx?.exchange) {
+      return errors.noExchange;
+    }
+    if (!ctx.binance || ctx.exchange.exchangeId !== "binance") {
+      return { error: "Recent trades are not supported on this exchange yet." };
     }
 
     const normalizedSymbol = symbol.toUpperCase().endsWith("USDT")
@@ -319,8 +332,8 @@ export const placeOCOOrderTool = createTool({
   }),
   execute: async ({ symbol, side, quantity, price, stopPrice, stopLimitPrice }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
-    if (!ctx?.binance) {
-      return errors.noBinance;
+    if (!ctx?.exchange) {
+      return errors.noExchange;
     }
 
     if (ctx.config?.mode !== "ARMED") {
@@ -339,7 +352,12 @@ export const placeOCOOrderTool = createTool({
       : `${symbol.toUpperCase()}USDT`;
 
     try {
-      const result = await ctx.binance.placeOCOOrder({
+      const exchangeWithOco = ctx.exchange as ExchangeExtended;
+      if (!exchangeWithOco.placeOCOOrder) {
+        return { error: "OCO orders are not supported on this exchange." };
+      }
+
+      const result = await exchangeWithOco.placeOCOOrder({
         symbol: normalizedSymbol,
         side,
         quantity,
@@ -352,11 +370,11 @@ export const placeOCOOrderTool = createTool({
         success: true,
         message: `OCO order placed: ${side} ${quantity} ${normalizedSymbol}`,
         orderListId: result.orderListId,
-        status: result.listOrderStatus,
-        orders: result.orderReports.map((o) => ({
-          orderId: o.orderId,
+        status: "NEW",
+        orders: result.orders.map((o) => ({
+          orderId: Number(o.orderId) || 0,
           type: o.type,
-          price: o.price,
+          price: o.price.toFixed(8),
           status: o.status,
         })),
       };
@@ -394,8 +412,8 @@ export const cancelAllOrdersTool = createTool({
   }),
   execute: async ({ symbol }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
-    if (!ctx?.binance) {
-      return errors.noBinance;
+    if (!ctx?.exchange) {
+      return errors.noExchange;
     }
 
     if (ctx.config?.mode !== "ARMED") {
@@ -410,17 +428,17 @@ export const cancelAllOrdersTool = createTool({
       : `${symbol.toUpperCase()}USDT`;
 
     try {
-      const cancelled = await ctx.binance.cancelAllOrders(normalizedSymbol);
+      const cancelled = await ctx.exchange.cancelAllOrders(normalizedSymbol);
 
       return {
         success: true,
         message: `Cancelled ${cancelled.length} orders on ${normalizedSymbol}`,
         cancelledOrders: cancelled.map((o) => ({
-          orderId: o.orderId,
+          orderId: Number(o.orderId) || 0,
           type: o.type,
           side: o.side,
-          price: o.price,
-          quantity: o.origQty,
+          price: o.price.toFixed(8),
+          quantity: o.quantity.toFixed(8),
         })),
       };
     } catch (error) {
@@ -454,8 +472,8 @@ export const getOrderStatusTool = createTool({
   }),
   execute: async ({ symbol, orderId }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
-    if (!ctx?.binance) {
-      return errors.noBinance;
+    if (!ctx?.exchange) {
+      return errors.noExchange;
     }
 
     const normalizedSymbol = symbol.toUpperCase().endsWith("USDT")
@@ -463,19 +481,19 @@ export const getOrderStatusTool = createTool({
       : `${symbol.toUpperCase()}USDT`;
 
     try {
-      const order = await ctx.binance.getOrderStatus(normalizedSymbol, orderId);
+      const order = await ctx.exchange.getOrderStatus(normalizedSymbol, orderId);
 
       return {
-        orderId: order.orderId,
+        orderId: Number(order.orderId) || 0,
         symbol: order.symbol,
         status: order.status,
         type: order.type,
         side: order.side,
-        price: order.price,
-        quantity: order.origQty,
-        filled: order.executedQty,
-        remaining: (parseFloat(order.origQty) - parseFloat(order.executedQty)).toFixed(8),
-        fillPercent: ((parseFloat(order.executedQty) / parseFloat(order.origQty)) * 100).toFixed(1) + "%",
+        price: order.price.toFixed(8),
+        quantity: order.quantity.toFixed(8),
+        filled: order.executedQty.toFixed(8),
+        remaining: (order.quantity - order.executedQty).toFixed(8),
+        fillPercent: order.quantity > 0 ? ((order.executedQty / order.quantity) * 100).toFixed(1) + "%" : "0%",
         time: order.time ? new Date(order.time).toISOString() : undefined,
       };
     } catch (error) {
@@ -510,8 +528,8 @@ export const testOrderTool = createTool({
   }),
   execute: async ({ symbol, side, type, quantity, price }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
-    if (!ctx?.binance) {
-      return { ...errors.noBinance, valid: false };
+    if (!ctx?.exchange) {
+      return { ...errors.noExchange, valid: false };
     }
 
     const normalizedSymbol = symbol.toUpperCase().endsWith("USDT")
@@ -519,7 +537,7 @@ export const testOrderTool = createTool({
       : `${symbol.toUpperCase()}USDT`;
 
     try {
-      const isValid = await ctx.binance.testOrder({
+      const isValid = await ctx.exchange.testOrder({
         symbol: normalizedSymbol,
         side,
         type,

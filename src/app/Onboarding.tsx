@@ -248,7 +248,7 @@ interface GetStartedStepProps {
 function GetStartedStep({ onSelect }: GetStartedStepProps): React.ReactElement {
   const options = [
     {
-      label: "Set up API keys now - Connect to Binance and start trading",
+      label: "Set up API keys now - Connect your exchange and start trading",
       value: "setup" as const,
     },
     {

@@ -5,7 +5,7 @@
  * and opportunity notifications.
  */
 
-import { BinanceClient } from "../infra/binance/index.ts";
+import type { Exchange } from "../infra/exchange/index.ts";
 import { scan, type ScanOptions } from "./scanner.ts";
 import { createModuleLogger } from "../infra/logger/index.ts";
 import { emitEvent } from "../events/index.ts";
@@ -64,14 +64,14 @@ let state: SchedulerState = {
 };
 
 let currentConfig: SchedulerConfig = { ...DEFAULT_CONFIG };
-let binanceClient: BinanceClient | null = null;
+let exchangeClient: Exchange | null = null;
 
 /**
  * Run a single scheduled scan
  */
 async function runScheduledScan(): Promise<CoinAnalysis[]> {
-  if (!binanceClient) {
-    logger.error("Cannot run scheduled scan: Binance client not set");
+  if (!exchangeClient) {
+    logger.error("Cannot run scheduled scan: Exchange client not set");
     return [];
   }
 
@@ -81,7 +81,7 @@ async function runScheduledScan(): Promise<CoinAnalysis[]> {
   });
 
   try {
-    const result = await scan(binanceClient, currentConfig.scanOptions);
+    const result = await scan(exchangeClient, currentConfig.scanOptions);
 
     state.scanCount++;
     state.lastScanTime = new Date();
@@ -127,7 +127,7 @@ async function runScheduledScan(): Promise<CoinAnalysis[]> {
  * Start the scheduled scanner
  */
 export function startScheduler(
-  client: BinanceClient,
+  client: Exchange,
   config?: Partial<SchedulerConfig>
 ): void {
   if (state.isRunning) {
@@ -135,7 +135,7 @@ export function startScheduler(
     return;
   }
 
-  binanceClient = client;
+  exchangeClient = client;
   currentConfig = { ...DEFAULT_CONFIG, ...config };
 
   logger.info("Starting market scanner scheduler", {
@@ -242,7 +242,7 @@ export function getSchedulerStatus(): {
  * Trigger an immediate scan (outside of schedule)
  */
 export async function triggerImmediateScan(): Promise<CoinAnalysis[]> {
-  if (!binanceClient) {
+  if (!exchangeClient) {
     throw new Error("Scheduler not initialized - call startScheduler first");
   }
 

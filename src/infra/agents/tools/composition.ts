@@ -608,7 +608,7 @@ export const runFullAnalysisTool = createTool({
   outputSchema: fullAnalysisOutputSchema,
   execute: async ({ symbol }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
-    if (!ctx?.binance) {
+    if (!ctx?.exchange) {
       return {
         symbol,
         timestamp: new Date().toISOString(),
@@ -619,8 +619,8 @@ export const runFullAnalysisTool = createTool({
         combinedScore: 50,
         consensus: "NEUTRAL" as const,
         confidence: 0,
-        summary: "Unable to run analysis: Binance client not connected.",
-        errors: ["Binance client not connected. Please configure API keys."],
+        summary: "Unable to run analysis: Exchange client not connected.",
+        errors: ["Exchange client not connected. Please configure API keys."],
       };
     }
 

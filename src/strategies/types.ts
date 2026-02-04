@@ -6,7 +6,7 @@
  */
 
 import type { Candle } from "../core/indicators/types.ts";
-import type { BinanceClient } from "../infra/binance/index.ts";
+import type { Exchange } from "../infra/exchange/index.ts";
 import type { OHLC, Signal, IndicatorState } from "../backtest/types.ts";
 
 // ============================================================================
@@ -112,8 +112,8 @@ export interface TakeProfitLevel {
  * Strategies should not store state - all data comes from context.
  */
 export interface StrategyContext {
-  /** Binance client for fetching market data */
-  binance: BinanceClient;
+  /** Exchange client for fetching market data */
+  exchange: Exchange;
 
   /** Pre-fetched candles (optional, for performance) */
   candles?: Candle[];
@@ -136,7 +136,7 @@ export interface Strategy extends StrategyDefinition {
    *
    * @param symbol - Trading pair (e.g., "BTCUSDT")
    * @param timeframe - Timeframe to analyze (e.g., "4h")
-   * @param ctx - Context with binance client and optional pre-fetched data
+   * @param ctx - Context with exchange client and optional pre-fetched data
    * @returns Detection result with confidence and signals
    */
   detect(
@@ -149,7 +149,7 @@ export interface Strategy extends StrategyDefinition {
    * Calculate plan parameters based on strategy rules.
    *
    * @param symbol - Trading pair (e.g., "BTCUSDT")
-   * @param ctx - Context with binance client and optional pre-fetched data
+   * @param ctx - Context with exchange client and optional pre-fetched data
    * @returns Plan parameters with entry, stop, and targets
    */
   getPlanParameters(

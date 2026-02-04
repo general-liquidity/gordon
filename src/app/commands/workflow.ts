@@ -3,7 +3,7 @@
  * Predefined workflows that chain multiple commands for common trading tasks
  */
 
-import type { BinanceClient } from "../../infra/binance/index.ts";
+import type { Exchange } from "../../infra/exchange/index.ts";
 import type { LLMClient } from "../../infra/llm/index.ts";
 import type { GordonConfig } from "../../types/index.ts";
 import { scan } from "../../core/scanner.ts";
@@ -19,7 +19,7 @@ import type { BacktestResult, BacktestConfig } from "../../backtest/types.ts";
 // ============================================================================
 
 export interface WorkflowContext {
-  binance: BinanceClient;
+  exchange: Exchange;
   llm?: LLMClient;
   config?: GordonConfig;
 }
@@ -62,7 +62,7 @@ async function runQuickWorkflow(
   steps.push({ name: "scan", status: "running" });
   const scanStart = Date.now();
   try {
-    const scanResult = await scan(ctx.binance, { topN: 20, timeframes: ["1h"] });
+    const scanResult = await scan(ctx.exchange, { topN: 20, timeframes: ["1h"] });
     const scanDuration = Date.now() - scanStart;
 
     const symbolInScan = scanResult.coins.find(
@@ -95,7 +95,7 @@ async function runQuickWorkflow(
   const analyzeStart = Date.now();
   let analysis: DetailedAnalysis | null = null;
   try {
-    analysis = await analyze(ctx.binance, normalizedSymbol, {
+    analysis = await analyze(ctx.exchange, normalizedSymbol, {
       timeframes: ["1h", "4h"],
     });
     const analyzeDuration = Date.now() - analyzeStart;
@@ -186,7 +186,7 @@ async function runDueDiligenceWorkflow(
   steps.push({ name: "scan", status: "running" });
   const scanStart = Date.now();
   try {
-    const scanResult = await scan(ctx.binance, { topN: 50, timeframes: ["1h", "4h"] });
+    const scanResult = await scan(ctx.exchange, { topN: 50, timeframes: ["1h", "4h"] });
     const position = scanResult.coins.findIndex((c) => c.symbol === normalizedSymbol);
     const topOpportunities = scanResult.coins
       .filter((c) => c.setupDetected)
@@ -218,7 +218,7 @@ async function runDueDiligenceWorkflow(
   const analyzeStart = Date.now();
   let analysis: DetailedAnalysis | null = null;
   try {
-    analysis = await analyze(ctx.binance, normalizedSymbol, {
+    analysis = await analyze(ctx.exchange, normalizedSymbol, {
       timeframes: ["1h", "4h", "1d"],
       candleLimit: 200,
     });
@@ -262,7 +262,7 @@ async function runDueDiligenceWorkflow(
   const portfolioStart = Date.now();
   try {
     // Get account balance to check existing exposure
-    const balances = await ctx.binance.getAccountBalance();
+    const balances = await ctx.exchange.getAllBalances();
     const baseSymbol = normalizedSymbol.replace("USDT", "");
     const existingPosition = balances.find((b) => b.asset === baseSymbol);
     const usdtBalance = balances.find((b) => b.asset === "USDT");
@@ -366,7 +366,7 @@ async function runBacktestCycleWorkflow(
   let backtestResult: BacktestResult | null = null;
 
   try {
-    const ohlcData = await fetchHistoricalData(ctx.binance, normalizedSymbol, "4h", 90);
+    const ohlcData = await fetchHistoricalData(ctx.exchange, normalizedSymbol, "4h", 90);
 
     if (ohlcData.length < 100) {
       steps[0] = {

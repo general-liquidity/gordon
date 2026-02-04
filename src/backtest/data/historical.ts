@@ -1,12 +1,12 @@
 /**
  * Historical Data Fetcher with SQLite Caching
  *
- * Fetches OHLC data from Binance with intelligent caching.
+ * Fetches OHLC data from exchanges with intelligent caching.
  * Minimizes API calls by storing data locally with TTL-based invalidation.
  */
 
 import { getDatabase } from "../../infra/storage/index.ts";
-import type { BinanceClient } from "../../infra/binance/index.ts";
+import type { Exchange } from "../../infra/exchange/index.ts";
 import type { OHLC } from "../types.ts";
 import { createModuleLogger } from "../../infra/logger/index.ts";
 
@@ -244,7 +244,6 @@ export function cleanupStaleCache(): void {
  * Fetch klines from Binance API.
  * Handles pagination for large date ranges.
  *
- * @param binance - BinanceClient instance
  * @param symbol - Trading pair (e.g., "BTCUSDT")
  * @param timeframe - Candle timeframe (e.g., "1h", "4h", "1d")
  * @param startTime - Start time in milliseconds
@@ -252,7 +251,6 @@ export function cleanupStaleCache(): void {
  * @returns Array of OHLC data
  */
 async function fetchKlinesFromBinance(
-  binance: BinanceClient,
   symbol: string,
   timeframe: string,
   startTime: number,
@@ -270,10 +268,8 @@ async function fetchKlinesFromBinance(
   });
 
   while (currentStart < endTime) {
-    // Fetch candles using the BinanceClient's getCandles method
-    // We need to use the underlying klines API to get proper pagination
+    // Fetch candles using the Binance klines API for proper pagination
     const response = await fetchKlinesBatch(
-      binance,
       upperSymbol,
       timeframe,
       currentStart,
@@ -314,7 +310,6 @@ async function fetchKlinesFromBinance(
  * Uses the public klines endpoint with startTime/endTime parameters.
  */
 async function fetchKlinesBatch(
-  binance: BinanceClient,
   symbol: string,
   interval: string,
   startTime: number,
@@ -330,17 +325,16 @@ async function fetchKlinesBatch(
 
   // Binance's getCandles method fetches the most recent candles
   // For historical data, we need to use the raw klines API with startTime
-  const candles = await fetchRawKlines(binance, symbol, interval, startTime, endTime, candleCount);
+  const candles = await fetchRawKlines(symbol, interval, startTime, endTime, candleCount);
 
   return candles;
 }
 
 /**
  * Fetch raw klines data from Binance with specific time range.
- * This is a workaround since BinanceClient.getCandles doesn't support startTime.
+ * This is a workaround since the generic getCandles method doesn't support startTime.
  */
 async function fetchRawKlines(
-  binance: BinanceClient,
   symbol: string,
   interval: string,
   startTime: number,
@@ -348,14 +342,7 @@ async function fetchRawKlines(
   limit: number
 ): Promise<OHLC[]> {
   // Access the internal API through the client
-  // Since BinanceClient doesn't expose startTime/endTime params for getCandles,
-  // we'll use a direct fetch approach via the client's internal methods
-
-  // The BinanceClient class has a publicRequest method we can leverage
-  // However, it's private. We'll use the getCandles method and work with what we have.
-  //
-  // For now, we use a different approach: fetch recent candles and filter
-  // In production, you'd want to extend BinanceClient to support this
+  // Binance's public klines endpoint supports startTime/endTime parameters.
 
   const url = new URL("https://api.binance.com/api/v3/klines");
   url.searchParams.set("symbol", symbol.toUpperCase());
@@ -397,21 +384,55 @@ async function fetchRawKlines(
 }
 
 // ============================================================================
+// Generic Exchange Data Fetching
+// ============================================================================
+
+function mapCandlesToOhlc(candles: Array<{ openTime?: number; open: number; high: number; low: number; close: number; volume: number }>, intervalMs: number, endTime: number): OHLC[] {
+  const total = candles.length;
+  return candles.map((candle, index) => {
+    const fallbackTimestamp = endTime - (total - 1 - index) * intervalMs;
+    return {
+      timestamp: candle.openTime ?? fallbackTimestamp,
+      open: candle.open,
+      high: candle.high,
+      low: candle.low,
+      close: candle.close,
+      volume: candle.volume,
+    };
+  });
+}
+
+async function fetchCandlesFromExchange(
+  exchange: Exchange,
+  symbol: string,
+  timeframe: string,
+  startTime: number,
+  endTime: number,
+  intervalMs: number
+): Promise<OHLC[]> {
+  const totalNeeded = Math.max(1, Math.ceil((endTime - startTime) / intervalMs) + 1);
+  const limit = Math.min(totalNeeded, 1000);
+  const candles = await exchange.getCandles(symbol, timeframe, limit);
+  const mapped = mapCandlesToOhlc(candles, intervalMs, endTime);
+  return mapped.filter((c) => c.timestamp >= startTime && c.timestamp <= endTime);
+}
+
+// ============================================================================
 // Main API
 // ============================================================================
 
 /**
  * Fetch historical OHLC data for a symbol.
- * Uses cache when available, fetches from Binance when needed.
+ * Uses cache when available, fetches from exchange when needed.
  *
- * @param binance - BinanceClient instance
+ * @param exchange - Exchange instance
  * @param symbol - Trading pair (e.g., "BTCUSDT")
  * @param timeframe - Candle timeframe (e.g., "1h", "4h", "1d")
  * @param days - Number of days of historical data to fetch
  * @returns Array of OHLC data sorted by timestamp (oldest first)
  */
 export async function fetchHistoricalData(
-  binance: BinanceClient,
+  exchange: Exchange,
   symbol: string,
   timeframe: string,
   days: number
@@ -444,14 +465,10 @@ export async function fetchHistoricalData(
     return cachedData;
   }
 
-  // Fetch missing data from Binance
-  const freshData = await fetchKlinesFromBinance(
-    binance,
-    upperSymbol,
-    timeframe,
-    startTime,
-    endTime
-  );
+  // Fetch missing data from exchange
+  const freshData = exchange.exchangeId === "binance"
+    ? await fetchKlinesFromBinance(upperSymbol, timeframe, startTime, endTime)
+    : await fetchCandlesFromExchange(exchange, upperSymbol, timeframe, startTime, endTime, intervalMs);
 
   // Cache the fetched data
   if (freshData.length > 0) {
@@ -463,9 +480,9 @@ export async function fetchHistoricalData(
 
 /**
  * Fetch historical data with smart merging of cached and fresh data.
- * Only fetches missing ranges from Binance.
+ * Only fetches missing ranges from exchange (Binance optimized).
  *
- * @param binance - BinanceClient instance
+ * @param exchange - Exchange instance
  * @param symbol - Trading pair (e.g., "BTCUSDT")
  * @param timeframe - Candle timeframe (e.g., "1h", "4h", "1d")
  * @param startTime - Start time in milliseconds
@@ -473,7 +490,7 @@ export async function fetchHistoricalData(
  * @returns Array of OHLC data sorted by timestamp (oldest first)
  */
 export async function fetchHistoricalDataRange(
-  binance: BinanceClient,
+  exchange: Exchange,
   symbol: string,
   timeframe: string,
   startTime: number,
@@ -481,6 +498,12 @@ export async function fetchHistoricalDataRange(
 ): Promise<OHLC[]> {
   const upperSymbol = symbol.toUpperCase();
   const intervalMs = TIMEFRAME_MS[timeframe] ?? TIMEFRAME_MS["1h"]!;
+
+  if (exchange.exchangeId !== "binance") {
+    const days = Math.max(1, Math.ceil((endTime - startTime) / (24 * 60 * 60 * 1000)));
+    const data = await fetchHistoricalData(exchange, upperSymbol, timeframe, days);
+    return data.filter((c) => c.timestamp >= startTime && c.timestamp <= endTime);
+  }
 
   // Get all cached data (including potentially stale)
   const db = getDatabase();
@@ -540,7 +563,6 @@ export async function fetchHistoricalDataRange(
   // Fetch missing ranges
   for (const range of missingRanges) {
     const freshData = await fetchKlinesFromBinance(
-      binance,
       upperSymbol,
       timeframe,
       range.start,

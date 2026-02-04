@@ -106,7 +106,7 @@ export abstract class BaseStrategy implements Strategy {
   // ============================================================================
 
   /**
-   * Fetch candles from Binance.
+   * Fetch candles from exchange.
    * Uses cached candles from context if available.
    */
   protected async fetchCandles(
@@ -120,7 +120,7 @@ export abstract class BaseStrategy implements Strategy {
       return ctx.candles;
     }
 
-    return ctx.binance.getCandles(symbol, timeframe, limit);
+    return ctx.exchange.getCandles(symbol, timeframe, limit);
   }
 
   /**

@@ -1,6 +1,6 @@
 /**
  * SetupWizard Component
- * Step-by-step configuration for Binance and LLM API keys
+ * Step-by-step configuration for exchange and LLM API keys
  */
 
 import React, { useState, useCallback } from "react";
@@ -9,19 +9,82 @@ import TextInput from "ink-text-input";
 
 import { resetAgents } from "../infra/agents/index.ts";
 import { BinanceClient, checkAndValidatePermissions } from "../infra/binance/index.ts";
+import { ExchangeFactory, type ExchangeId } from "../infra/exchange/index.ts";
 import { loadConfig, saveConfig } from "../infra/storage/config.ts";
 import { saveEnvKeys, createEnvFile, checkEnvStatus } from "../infra/storage/env.ts";
-import type { GordonConfig, ExchangePermissions, Preferences } from "../types/index.ts";
+import type { GordonConfig, ExchangePermissions, Preferences, MultiExchangeConfig } from "../types/index.ts";
 import { COLORS } from "./theme.ts";
 
-type WizardStep = "welcome" | "binance-key" | "binance-secret" | "binance-validating" | "llm" | "preferences" | "done";
+type WizardStep =
+  | "welcome"
+  | "exchange-select"
+  | "exchange-key"
+  | "exchange-secret"
+  | "exchange-passphrase"
+  | "exchange-validating"
+  | "llm"
+  | "preferences"
+  | "done";
+
+type ExchangeSelection = ExchangeId | "";
+
+const SUPPORTED_EXCHANGES: ExchangeId[] = ExchangeFactory.getSupportedExchanges();
+
+const EXCHANGE_LABELS: Record<ExchangeId, string> = {
+  binance: "Binance",
+  coinbase: "Coinbase",
+  kraken: "Kraken",
+  bybit: "Bybit",
+  okx: "OKX",
+};
+
+const EXCHANGE_PASSPHRASE_REQUIRED: Record<ExchangeId, boolean> = {
+  binance: false,
+  coinbase: true,
+  kraken: false,
+  bybit: false,
+  okx: true,
+};
+
+const EXCHANGE_INSTRUCTIONS: Record<ExchangeId, string[]> = {
+  binance: [
+    "Go to binance.com and log in",
+    "Navigate to Account > API Management",
+    "Create a new API key",
+    "Enable 'Read' and 'Spot Trading' permissions",
+    "Keep 'Withdrawals' disabled",
+  ],
+  coinbase: [
+    "Go to Coinbase and open Settings > API",
+    "Create a new API key with the needed permissions",
+    "Copy the API Key, Secret, and Passphrase",
+  ],
+  kraken: [
+    "Go to Kraken and open Settings > API",
+    "Create a new API key with the needed permissions",
+    "Copy the API Key and Private Key",
+  ],
+  bybit: [
+    "Go to Bybit and open API Management",
+    "Create a new API key with the needed permissions",
+    "Copy the API Key and Secret",
+  ],
+  okx: [
+    "Go to OKX and open Settings > API",
+    "Create a new API key with the needed permissions",
+    "Copy the API Key, Secret, and Passphrase",
+  ],
+};
 
 interface WizardState {
   step: WizardStep;
-  binanceApiKey: string;
-  binanceApiSecret: string;
-  binancePermissions: ExchangePermissions | null;
-  binanceError: string | null;
+  exchangeType: ExchangeSelection;
+  exchangeApiKey: string;
+  exchangeApiSecret: string;
+  exchangePassphrase: string;
+  exchangePermissions: ExchangePermissions | null;
+  exchangeError: string | null;
+  exchangeValidated: boolean;
   openaiApiKey: string;
   dedalusApiKey: string;
   preferences: Preferences;
@@ -39,13 +102,44 @@ function maskSecret(value: string): string {
   return "*".repeat(value.length - 4) + value.slice(-4);
 }
 
+function getExchangeLabel(exchangeType: ExchangeSelection): string {
+  if (!exchangeType) return "Exchange";
+  return EXCHANGE_LABELS[exchangeType] || exchangeType;
+}
+
+function getExchangeInstructions(exchangeType: ExchangeSelection): string[] {
+  if (!exchangeType) return [];
+  return EXCHANGE_INSTRUCTIONS[exchangeType] || ["Follow your exchange documentation to create API keys."];
+}
+
+function requiresPassphrase(exchangeType: ExchangeSelection): boolean {
+  if (!exchangeType) return false;
+  return EXCHANGE_PASSPHRASE_REQUIRED[exchangeType] || false;
+}
+
+function generateExchangeId(type: ExchangeId, exchanges: MultiExchangeConfig[]): string {
+  const baseId = type;
+  let id = baseId;
+  let counter = 1;
+
+  while (exchanges.some((ex) => ex.id === id)) {
+    id = `${baseId}_${counter}`;
+    counter++;
+  }
+
+  return id;
+}
+
 export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElement {
   const [state, setState] = useState<WizardState>({
     step: "welcome",
-    binanceApiKey: "",
-    binanceApiSecret: "",
-    binancePermissions: null,
-    binanceError: null,
+    exchangeType: "",
+    exchangeApiKey: "",
+    exchangeApiSecret: "",
+    exchangePassphrase: "",
+    exchangePermissions: null,
+    exchangeError: null,
+    exchangeValidated: false,
     openaiApiKey: "",
     dedalusApiKey: "",
     preferences: {
@@ -59,66 +153,139 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
     isValidating: false,
   });
 
-  const validateBinanceKeys = useCallback(async (apiKey: string, apiSecret: string) => {
+  const validateExchangeCredentials = useCallback(async (
+    exchangeType: ExchangeId,
+    apiKey: string,
+    apiSecret: string,
+    passphrase?: string
+  ) => {
     setState((prev) => ({
       ...prev,
-      step: "binance-validating",
+      step: "exchange-validating",
       isValidating: true,
-      binanceError: null,
+      exchangeError: null,
     }));
 
-    const client = new BinanceClient(apiKey, apiSecret);
+    if (exchangeType === "binance") {
+      const client = new BinanceClient(apiKey, apiSecret);
+      const connected = await client.testConnection();
 
-    const connected = await client.testConnection();
-    if (!connected) {
+      if (!connected) {
+        setState((prev) => ({
+          ...prev,
+          step: "exchange-key",
+          isValidating: false,
+          exchangeError: "Could not connect to Binance API. Please check your internet connection.",
+          exchangeApiKey: "",
+          exchangeApiSecret: "",
+          exchangePassphrase: "",
+          exchangeValidated: false,
+        }));
+        return;
+      }
+
+      const { permissions, validation } = await checkAndValidatePermissions(client);
+
+      if (!validation.valid) {
+        setState((prev) => ({
+          ...prev,
+          step: "exchange-key",
+          isValidating: false,
+          exchangeError: validation.errors.join("\n"),
+          exchangeApiKey: "",
+          exchangeApiSecret: "",
+          exchangePassphrase: "",
+          exchangeValidated: false,
+        }));
+        return;
+      }
+
       setState((prev) => ({
         ...prev,
-        step: "binance-key",
+        step: "llm",
         isValidating: false,
-        binanceError: "Could not connect to Binance API. Please check your internet connection.",
+        exchangePermissions: permissions,
+        exchangeError: null,
+        exchangeValidated: true,
       }));
       return;
     }
 
-    const { permissions, validation } = await checkAndValidatePermissions(client);
+    try {
+      const exchange = ExchangeFactory.create(exchangeType, {
+        apiKey,
+        apiSecret,
+        passphrase,
+      });
 
-    if (!validation.valid) {
+      await exchange.getAccountInfo();
+
       setState((prev) => ({
         ...prev,
-        step: "binance-key",
+        step: "llm",
         isValidating: false,
-        binanceError: validation.errors.join("\n"),
-        binanceApiKey: "",
-        binanceApiSecret: "",
+        exchangePermissions: null,
+        exchangeError: null,
+        exchangeValidated: true,
       }));
-      return;
+    } catch (error) {
+      ExchangeFactory.removeFromCache(exchangeType, apiKey);
+      setState((prev) => ({
+        ...prev,
+        step: "exchange-key",
+        isValidating: false,
+        exchangeError: error instanceof Error ? error.message : String(error),
+        exchangeApiKey: "",
+        exchangeApiSecret: "",
+        exchangePassphrase: "",
+        exchangeValidated: false,
+      }));
     }
-
-    setState((prev) => ({
-      ...prev,
-      step: "llm",
-      isValidating: false,
-      binancePermissions: permissions,
-      binanceError: null,
-    }));
   }, []);
 
   const saveConfiguration = useCallback(async () => {
     const currentConfig = await loadConfig();
-
     const newConfig: GordonConfig = {
       ...currentConfig,
       preferences: state.preferences,
       onboardingComplete: true,
     };
 
-    if (state.binanceApiKey && state.binanceApiSecret && state.binancePermissions) {
-      newConfig.exchange = {
-        name: "binance",
-        apiKey: state.binanceApiKey,
-        apiSecret: state.binanceApiSecret,
-        permissions: state.binancePermissions,
+    const hasExchangeCredentials =
+      state.exchangeType && state.exchangeApiKey && state.exchangeApiSecret && state.exchangeValidated;
+
+    if (hasExchangeCredentials) {
+      const exchanges = currentConfig.exchanges ? [...currentConfig.exchanges] : [];
+      const exchangeType = state.exchangeType as ExchangeId;
+      const exchangeId = generateExchangeId(exchangeType, exchanges);
+
+      const newExchange: MultiExchangeConfig = {
+        id: exchangeId,
+        type: exchangeType,
+        apiKey: state.exchangeApiKey,
+        apiSecret: state.exchangeApiSecret,
+        passphrase: state.exchangePassphrase || undefined,
+        sandbox: false,
+        isDefault: true,
       };
+
+      newConfig.exchanges = [
+        ...exchanges.map((ex) => ({
+          ...ex,
+          isDefault: false,
+        })),
+        newExchange,
+      ];
+      newConfig.activeExchangeId = exchangeId;
+
+      if (exchangeType === "binance" && state.exchangePermissions) {
+        newConfig.exchange = {
+          name: "binance",
+          apiKey: state.exchangeApiKey,
+          apiSecret: state.exchangeApiSecret,
+          permissions: state.exchangePermissions,
+        };
+      }
     }
 
     await saveConfig(newConfig);
@@ -133,11 +300,11 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
     if (state.dedalusApiKey) {
       envKeys.DEDALUS_API_KEY = state.dedalusApiKey;
     }
-    if (state.binanceApiKey) {
-      envKeys.BINANCE_API_KEY = state.binanceApiKey;
+    if (state.exchangeType === "binance" && state.exchangeApiKey) {
+      envKeys.BINANCE_API_KEY = state.exchangeApiKey;
     }
-    if (state.binanceApiSecret) {
-      envKeys.BINANCE_API_SECRET = state.binanceApiSecret;
+    if (state.exchangeType === "binance" && state.exchangeApiSecret) {
+      envKeys.BINANCE_API_SECRET = state.exchangeApiSecret;
     }
 
     // Create or update .env file
@@ -149,32 +316,90 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
 
     // Reset agent cache so next access reinitializes with fresh env variables
     resetAgents();
-  }, [state.binanceApiKey, state.binanceApiSecret, state.binancePermissions, state.preferences, state.openaiApiKey, state.dedalusApiKey]);
+  }, [
+    state.exchangeApiKey,
+    state.exchangeApiSecret,
+    state.exchangePassphrase,
+    state.exchangePermissions,
+    state.exchangeType,
+    state.exchangeValidated,
+    state.preferences,
+    state.openaiApiKey,
+    state.dedalusApiKey,
+  ]);
 
   const handleInputSubmit = useCallback(
     async (value: string) => {
       const trimmedValue = value.trim();
 
       switch (state.step) {
-        case "binance-key":
+        case "exchange-select": {
+          if (!trimmedValue) return;
+          const normalized = trimmedValue.toLowerCase();
+          const match = SUPPORTED_EXCHANGES.find((ex) => ex === normalized);
+
+          if (!match) {
+            setState((prev) => ({
+              ...prev,
+              exchangeError: `Unsupported exchange: ${trimmedValue}. Supported: ${SUPPORTED_EXCHANGES.join(", ")}`,
+              inputValue: "",
+            }));
+            return;
+          }
+
+          setState((prev) => ({
+            ...prev,
+            exchangeType: match,
+            exchangeError: null,
+            step: "exchange-key",
+            inputValue: "",
+          }));
+          break;
+        }
+        case "exchange-key":
           if (trimmedValue) {
             setState((prev) => ({
               ...prev,
-              binanceApiKey: trimmedValue,
-              step: "binance-secret",
+              exchangeApiKey: trimmedValue,
+              step: "exchange-secret",
               inputValue: "",
             }));
           }
           break;
 
-        case "binance-secret":
+        case "exchange-secret":
           if (trimmedValue) {
+            const needsPassphrase = requiresPassphrase(state.exchangeType);
             setState((prev) => ({
               ...prev,
-              binanceApiSecret: trimmedValue,
+              exchangeApiSecret: trimmedValue,
+              inputValue: "",
+              step: needsPassphrase ? "exchange-passphrase" : prev.step,
+            }));
+
+            if (!needsPassphrase && state.exchangeType) {
+              await validateExchangeCredentials(
+                state.exchangeType as ExchangeId,
+                state.exchangeApiKey,
+                trimmedValue
+              );
+            }
+          }
+          break;
+
+        case "exchange-passphrase":
+          if (trimmedValue && state.exchangeType) {
+            setState((prev) => ({
+              ...prev,
+              exchangePassphrase: trimmedValue,
               inputValue: "",
             }));
-            await validateBinanceKeys(state.binanceApiKey, trimmedValue);
+            await validateExchangeCredentials(
+              state.exchangeType as ExchangeId,
+              state.exchangeApiKey,
+              state.exchangeApiSecret,
+              trimmedValue
+            );
           }
           break;
 
@@ -189,7 +414,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
           }
           break;
 
-        case "preferences":
+        case "preferences": {
           const percent = parseInt(trimmedValue, 10);
           if (!isNaN(percent) && percent >= 0 && percent <= 100) {
             setState((prev) => ({
@@ -204,9 +429,17 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
             await saveConfiguration();
           }
           break;
+        }
       }
     },
-    [state.step, state.binanceApiKey, validateBinanceKeys, saveConfiguration]
+    [
+      state.step,
+      state.exchangeType,
+      state.exchangeApiKey,
+      state.exchangeApiSecret,
+      validateExchangeCredentials,
+      saveConfiguration,
+    ]
   );
 
   const handleInputChange = useCallback((value: string) => {
@@ -215,18 +448,19 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
 
   const handleSkip = useCallback(async () => {
     switch (state.step) {
-      case "binance-key":
+      case "exchange-select":
+      case "exchange-key":
+      case "exchange-secret":
+      case "exchange-passphrase":
         setState((prev) => ({
           ...prev,
-          step: "llm",
-          inputValue: "",
-        }));
-        break;
-
-      case "binance-secret":
-        setState((prev) => ({
-          ...prev,
-          binanceApiKey: "",
+          exchangeType: "",
+          exchangeApiKey: "",
+          exchangeApiSecret: "",
+          exchangePassphrase: "",
+          exchangePermissions: null,
+          exchangeError: null,
+          exchangeValidated: false,
           step: "llm",
           inputValue: "",
         }));
@@ -253,7 +487,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
 
   useInput((input, key) => {
     if (state.step === "welcome" && (input || key.return)) {
-      setState((prev) => ({ ...prev, step: "binance-key" }));
+      setState((prev) => ({ ...prev, step: "exchange-select" }));
       return;
     }
 
@@ -267,37 +501,59 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
     }
   });
 
+  const exchangeLabel = getExchangeLabel(state.exchangeType);
+
   return (
     <Box flexDirection="column" paddingX={2} paddingY={1}>
-      {state.step === "welcome" && (
-        <WelcomeStep />
-      )}
+      {state.step === "welcome" && <WelcomeStep />}
 
-      {state.step === "binance-key" && (
-        <BinanceKeyStep
-          error={state.binanceError}
+      {state.step === "exchange-select" && (
+        <ExchangeSelectStep
+          error={state.exchangeError}
           inputValue={state.inputValue}
           onInputChange={handleInputChange}
           onSubmit={handleInputSubmit}
         />
       )}
 
-      {state.step === "binance-secret" && (
-        <BinanceSecretStep
-          apiKey={state.binanceApiKey}
+      {state.step === "exchange-key" && (
+        <ExchangeKeyStep
+          exchangeLabel={exchangeLabel}
+          exchangeType={state.exchangeType}
+          error={state.exchangeError}
           inputValue={state.inputValue}
           onInputChange={handleInputChange}
           onSubmit={handleInputSubmit}
         />
       )}
 
-      {state.step === "binance-validating" && (
-        <ValidatingStep />
+      {state.step === "exchange-secret" && (
+        <ExchangeSecretStep
+          exchangeLabel={exchangeLabel}
+          apiKey={state.exchangeApiKey}
+          inputValue={state.inputValue}
+          onInputChange={handleInputChange}
+          onSubmit={handleInputSubmit}
+        />
+      )}
+
+      {state.step === "exchange-passphrase" && (
+        <ExchangePassphraseStep
+          exchangeLabel={exchangeLabel}
+          inputValue={state.inputValue}
+          onInputChange={handleInputChange}
+          onSubmit={handleInputSubmit}
+        />
+      )}
+
+      {state.step === "exchange-validating" && (
+        <ValidatingStep exchangeLabel={exchangeLabel} />
       )}
 
       {state.step === "llm" && (
         <LLMStep
-          binanceConfigured={!!state.binancePermissions}
+          exchangeConfigured={state.exchangeValidated}
+          exchangeLabel={exchangeLabel}
           inputValue={state.inputValue}
           onInputChange={handleInputChange}
           onSubmit={handleInputSubmit}
@@ -315,12 +571,13 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
 
       {state.step === "done" && (
         <DoneStep
-          binanceConfigured={!!state.binancePermissions}
+          exchangeConfigured={state.exchangeValidated}
+          exchangeLabel={exchangeLabel}
           llmConfigured={!!state.openaiApiKey}
         />
       )}
 
-      {state.step !== "welcome" && state.step !== "done" && state.step !== "binance-validating" && (
+      {state.step !== "welcome" && state.step !== "done" && state.step !== "exchange-validating" && (
         <Box marginTop={1}>
           <Text color={COLORS.DIM}>Press ESC to skip this step</Text>
         </Box>
@@ -348,7 +605,7 @@ function WelcomeStep(): React.ReactElement {
       </Box>
 
       <Box flexDirection="column" marginLeft={2}>
-        <Text color={COLORS.DIM}>1. Binance API credentials</Text>
+        <Text color={COLORS.DIM}>1. Exchange API credentials</Text>
         <Text color={COLORS.DIM}>2. LLM API key (for AI features)</Text>
         <Text color={COLORS.DIM}>3. Trading preferences</Text>
       </Box>
@@ -366,19 +623,19 @@ function WelcomeStep(): React.ReactElement {
   );
 }
 
-interface BinanceKeyStepProps {
+interface ExchangeSelectStepProps {
   error: string | null;
   inputValue: string;
   onInputChange: (value: string) => void;
   onSubmit: (value: string) => void;
 }
 
-function BinanceKeyStep({ error, inputValue, onInputChange, onSubmit }: BinanceKeyStepProps): React.ReactElement {
+function ExchangeSelectStep({ error, inputValue, onInputChange, onSubmit }: ExchangeSelectStepProps): React.ReactElement {
   return (
     <Box flexDirection="column">
       <Box marginBottom={1}>
         <Text color={COLORS.TAN} bold>
-          Step 1: Binance API Key
+          Step 1: Choose Exchange
         </Text>
       </Box>
 
@@ -390,20 +647,77 @@ function BinanceKeyStep({ error, inputValue, onInputChange, onSubmit }: BinanceK
 
       <Box flexDirection="column" marginBottom={1}>
         <Text color={COLORS.WHITE}>
-          Gordon needs Binance API access to view your portfolio and place trades.
+          Select the exchange you want to connect.
+        </Text>
+        <Text color={COLORS.DIM}>
+          Supported: {SUPPORTED_EXCHANGES.join(", ")}
         </Text>
       </Box>
 
-      <Box flexDirection="column" marginBottom={1}>
-        <Text color={COLORS.TAN_DIM} bold>How to get your API key:</Text>
-        <Box flexDirection="column" marginLeft={2}>
-          <Text color={COLORS.DIM}>1. Go to binance.com and log in</Text>
-          <Text color={COLORS.DIM}>2. Navigate to Account {">"} API Management</Text>
-          <Text color={COLORS.DIM}>3. Create a new API key</Text>
-          <Text color={COLORS.DIM}>4. Enable "Read" and "Spot Trading" permissions</Text>
-          <Text color={COLORS.DIM}>5. IMPORTANT: Keep "Withdrawals" DISABLED</Text>
-        </Box>
+      <Box marginTop={1}>
+        <Text color={COLORS.WHITE}>Enter exchange name: </Text>
+        <TextInput
+          value={inputValue}
+          onChange={onInputChange}
+          onSubmit={onSubmit}
+          placeholder="binance"
+        />
       </Box>
+    </Box>
+  );
+}
+
+interface ExchangeKeyStepProps {
+  exchangeLabel: string;
+  exchangeType: ExchangeSelection;
+  error: string | null;
+  inputValue: string;
+  onInputChange: (value: string) => void;
+  onSubmit: (value: string) => void;
+}
+
+function ExchangeKeyStep({
+  exchangeLabel,
+  exchangeType,
+  error,
+  inputValue,
+  onInputChange,
+  onSubmit,
+}: ExchangeKeyStepProps): React.ReactElement {
+  const instructions = getExchangeInstructions(exchangeType);
+
+  return (
+    <Box flexDirection="column">
+      <Box marginBottom={1}>
+        <Text color={COLORS.TAN} bold>
+          Step 1: {exchangeLabel} API Key
+        </Text>
+      </Box>
+
+      {error && (
+        <Box marginBottom={1} borderStyle="single" borderColor="red" paddingX={1}>
+          <Text color="red">{error}</Text>
+        </Box>
+      )}
+
+      <Box flexDirection="column" marginBottom={1}>
+        <Text color={COLORS.WHITE}>
+          Gordon needs exchange API access to view your portfolio and place trades.
+        </Text>
+      </Box>
+
+      {instructions.length > 0 && (
+        <Box flexDirection="column" marginBottom={1}>
+          <Text color={COLORS.TAN_DIM} bold>How to get your API key:</Text>
+          <Box flexDirection="column" marginLeft={2}>
+            {instructions.map((line, index) => (
+              <Text key={`${exchangeLabel}-step-${index}`} color={COLORS.DIM}>
+                {index + 1}. {line}
+              </Text>
+            ))}
+          </Box>
+        </Box>
+      )}
 
       <Box marginTop={1}>
         <Text color={COLORS.WHITE}>Enter your API Key: </Text>
@@ -418,19 +732,26 @@ function BinanceKeyStep({ error, inputValue, onInputChange, onSubmit }: BinanceK
   );
 }
 
-interface BinanceSecretStepProps {
+interface ExchangeSecretStepProps {
+  exchangeLabel: string;
   apiKey: string;
   inputValue: string;
   onInputChange: (value: string) => void;
   onSubmit: (value: string) => void;
 }
 
-function BinanceSecretStep({ apiKey, inputValue, onInputChange, onSubmit }: BinanceSecretStepProps): React.ReactElement {
+function ExchangeSecretStep({
+  exchangeLabel,
+  apiKey,
+  inputValue,
+  onInputChange,
+  onSubmit,
+}: ExchangeSecretStepProps): React.ReactElement {
   return (
     <Box flexDirection="column">
       <Box marginBottom={1}>
         <Text color={COLORS.TAN} bold>
-          Step 1: Binance API Secret
+          Step 1: {exchangeLabel} API Secret
         </Text>
       </Box>
 
@@ -441,7 +762,7 @@ function BinanceSecretStep({ apiKey, inputValue, onInputChange, onSubmit }: Bina
 
       <Box flexDirection="column" marginBottom={1}>
         <Text color={COLORS.WHITE}>
-          Now enter the API Secret (this was shown only once when you created the key).
+          Now enter the API Secret (shown only once when you created the key).
         </Text>
       </Box>
 
@@ -465,12 +786,57 @@ function BinanceSecretStep({ apiKey, inputValue, onInputChange, onSubmit }: Bina
   );
 }
 
-function ValidatingStep(): React.ReactElement {
+interface ExchangePassphraseStepProps {
+  exchangeLabel: string;
+  inputValue: string;
+  onInputChange: (value: string) => void;
+  onSubmit: (value: string) => void;
+}
+
+function ExchangePassphraseStep({
+  exchangeLabel,
+  inputValue,
+  onInputChange,
+  onSubmit,
+}: ExchangePassphraseStepProps): React.ReactElement {
   return (
     <Box flexDirection="column">
       <Box marginBottom={1}>
         <Text color={COLORS.TAN} bold>
-          Validating Binance Credentials...
+          Step 1: {exchangeLabel} API Passphrase
+        </Text>
+      </Box>
+
+      <Box flexDirection="column" marginBottom={1}>
+        <Text color={COLORS.WHITE}>
+          Enter the API passphrase for your {exchangeLabel} key.
+        </Text>
+      </Box>
+
+      <Box marginTop={1}>
+        <Text color={COLORS.WHITE}>Enter your Passphrase: </Text>
+        <TextInput
+          value={inputValue}
+          onChange={onInputChange}
+          onSubmit={onSubmit}
+          placeholder="Passphrase"
+          mask="*"
+        />
+      </Box>
+    </Box>
+  );
+}
+
+interface ValidatingStepProps {
+  exchangeLabel: string;
+}
+
+function ValidatingStep({ exchangeLabel }: ValidatingStepProps): React.ReactElement {
+  return (
+    <Box flexDirection="column">
+      <Box marginBottom={1}>
+        <Text color={COLORS.TAN} bold>
+          Validating {exchangeLabel} Credentials...
         </Text>
       </Box>
 
@@ -484,13 +850,20 @@ function ValidatingStep(): React.ReactElement {
 }
 
 interface LLMStepProps {
-  binanceConfigured: boolean;
+  exchangeConfigured: boolean;
+  exchangeLabel: string;
   inputValue: string;
   onInputChange: (value: string) => void;
   onSubmit: (value: string) => void;
 }
 
-function LLMStep({ binanceConfigured, inputValue, onInputChange, onSubmit }: LLMStepProps): React.ReactElement {
+function LLMStep({
+  exchangeConfigured,
+  exchangeLabel,
+  inputValue,
+  onInputChange,
+  onSubmit,
+}: LLMStepProps): React.ReactElement {
   return (
     <Box flexDirection="column">
       <Box marginBottom={1}>
@@ -499,9 +872,9 @@ function LLMStep({ binanceConfigured, inputValue, onInputChange, onSubmit }: LLM
         </Text>
       </Box>
 
-      {binanceConfigured && (
+      {exchangeConfigured && (
         <Box marginBottom={1}>
-          <Text color="green">Binance configured successfully!</Text>
+          <Text color="green">{exchangeLabel} configured successfully!</Text>
         </Box>
       )}
 
@@ -595,11 +968,12 @@ function PreferencesStep({ currentPercent, inputValue, onInputChange, onSubmit }
 }
 
 interface DoneStepProps {
-  binanceConfigured: boolean;
+  exchangeConfigured: boolean;
+  exchangeLabel: string;
   llmConfigured: boolean;
 }
 
-function DoneStep({ binanceConfigured, llmConfigured }: DoneStepProps): React.ReactElement {
+function DoneStep({ exchangeConfigured, exchangeLabel, llmConfigured }: DoneStepProps): React.ReactElement {
   return (
     <Box flexDirection="column">
       <Box marginBottom={1}>
@@ -616,10 +990,10 @@ function DoneStep({ binanceConfigured, llmConfigured }: DoneStepProps): React.Re
 
       <Box flexDirection="column" marginLeft={2} marginBottom={1}>
         <Box>
-          <Text color={binanceConfigured ? "green" : COLORS.DIM}>
-            {binanceConfigured ? "[OK]" : "[--]"} Binance API
+          <Text color={exchangeConfigured ? "green" : COLORS.DIM}>
+            {exchangeConfigured ? "[OK]" : "[--]"} {exchangeLabel} API
           </Text>
-          {!binanceConfigured && (
+          {!exchangeConfigured && (
             <Text color={COLORS.DIM}> (not configured)</Text>
           )}
         </Box>
@@ -636,10 +1010,10 @@ function DoneStep({ binanceConfigured, llmConfigured }: DoneStepProps): React.Re
         </Box>
       </Box>
 
-      {!binanceConfigured && (
+      {!exchangeConfigured && (
         <Box marginBottom={1}>
           <Text color={COLORS.TAN_DIM}>
-            Note: Without Binance API, Gordon runs in demo mode.
+            Note: Without exchange API keys, Gordon runs in demo mode.
           </Text>
         </Box>
       )}

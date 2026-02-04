@@ -30,7 +30,7 @@ import { analyze } from "../../../core/analyzer.ts";
 // ============================================================================
 
 const errors = {
-  noBinance: { error: "Binance client not connected. Please run setup first." },
+  noExchange: { error: "Exchange client not connected. Please run setup or add an exchange." },
 };
 
 // ============================================================================
@@ -170,13 +170,13 @@ export const parallelScanAnalyzeTool = createTool({
     const startTime = Date.now();
     const ctx = getGordonContext(execContext);
 
-    if (!ctx?.binance) {
+    if (!ctx?.exchange) {
       return validateToolOutput(parallelScanAnalyzeOutputSchema, {
         timestamp: new Date().toISOString(),
         duration: 0,
-        scan: { success: false, error: errors.noBinance.error },
-        analysis: { success: false, error: errors.noBinance.error },
-        combined: { recommendedAction: "Connect to Binance first" },
+        scan: { success: false, error: errors.noExchange.error },
+        analysis: { success: false, error: errors.noExchange.error },
+        combined: { recommendedAction: "Connect an exchange first" },
       }, { toolName: "parallel_scan_analyze" });
     }
 
@@ -187,10 +187,10 @@ export const parallelScanAnalyzeTool = createTool({
 
     // Run scan and analyze in parallel
     const [scanResult, analysisResult] = await Promise.all([
-      scan(ctx.binance, { topN, timeframes }).catch((err) => ({
+      scan(ctx.exchange, { topN, timeframes }).catch((err) => ({
         error: err instanceof Error ? err.message : String(err),
       })),
-      analyze(ctx.binance, normalizedSymbol, { timeframes }).catch((err) => ({
+      analyze(ctx.exchange, normalizedSymbol, { timeframes }).catch((err) => ({
         error: err instanceof Error ? err.message : String(err),
       })),
     ]);
@@ -321,7 +321,7 @@ export const parallelMultiCoinTool = createTool({
     const startTime = Date.now();
     const ctx = getGordonContext(execContext);
 
-    if (!ctx?.binance) {
+    if (!ctx?.exchange) {
       return validateToolOutput(parallelMultiCoinOutputSchema, {
         timestamp: new Date().toISOString(),
         duration: 0,
@@ -330,7 +330,7 @@ export const parallelMultiCoinTool = createTool({
         allResults: symbols.map((s) => ({
           symbol: s.toUpperCase(),
           success: false,
-          error: errors.noBinance.error,
+          error: errors.noExchange.error,
         })),
       }, { toolName: "parallel_multi_coin" });
     }
@@ -343,7 +343,7 @@ export const parallelMultiCoinTool = createTool({
     // Create parallel operations
     const operations = normalizedSymbols.map((symbol) => async () => {
       try {
-        const result = await analyze(ctx.binance!, symbol, { timeframes });
+        const result = await analyze(ctx.exchange!, symbol, { timeframes });
         return {
           symbol,
           success: true,
@@ -434,13 +434,13 @@ export const parallelDeepAnalysisTool = createTool({
     const startTime = Date.now();
     const ctx = getGordonContext(execContext);
 
-    if (!ctx?.binance) {
+    if (!ctx?.exchange) {
       return validateToolOutput(parallelDeepAnalysisOutputSchema, {
         symbol: symbol.toUpperCase(),
         timestamp: new Date().toISOString(),
         duration: 0,
         results: {
-          technical: { success: false, error: errors.noBinance.error },
+          technical: { success: false, error: errors.noExchange.error },
         },
       }, { toolName: "parallel_deep_analysis" });
     }
@@ -533,7 +533,7 @@ export const parallelTimeframeTool = createTool({
     const startTime = Date.now();
     const ctx = getGordonContext(execContext);
 
-    if (!ctx?.binance) {
+    if (!ctx?.exchange) {
       return validateToolOutput(parallelTimeframeOutputSchema, {
         symbol: symbol.toUpperCase(),
         timestamp: new Date().toISOString(),
@@ -541,13 +541,13 @@ export const parallelTimeframeTool = createTool({
         timeframes: timeframes.map((tf) => ({
           timeframe: tf,
           success: false,
-          error: errors.noBinance.error,
+          error: errors.noExchange.error,
         })),
         multiTimeframeConsensus: {
           dominantTrend: "unknown",
           dominantBias: "neutral",
           agreementPercent: 0,
-          recommendation: "Connect to Binance first",
+          recommendation: "Connect an exchange first",
         },
       }, { toolName: "parallel_timeframe" });
     }
@@ -560,7 +560,7 @@ export const parallelTimeframeTool = createTool({
     // Create parallel operations for each timeframe
     const operations = timeframes.map((timeframe) => async () => {
       try {
-        const result = await analyze(ctx.binance!, normalizedSymbol, { timeframes: [timeframe] });
+        const result = await analyze(ctx.exchange!, normalizedSymbol, { timeframes: [timeframe] });
         return {
           timeframe,
           success: true,

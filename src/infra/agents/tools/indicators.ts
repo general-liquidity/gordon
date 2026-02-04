@@ -29,7 +29,7 @@ import {
 // ============================================================================
 
 const errors = {
-  noBinance: { error: "Binance client not connected. Please run setup first." },
+  noExchange: { error: "Exchange client not connected. Please run setup first." },
   insufficientData: (symbol: string) => ({ error: `Insufficient data for ${symbol}. Need at least 50 candles.` }),
 };
 
@@ -111,8 +111,8 @@ export const getTechnicalAnalysisTool = createTool({
   execute: async ({ symbol, interval, atrMultiplier }, execContext: MastraExecutionContext) => {
     // Context is injected via Mastra's RuntimeContext
     const ctx = getGordonContext(execContext);
-    if (!ctx?.binance) {
-      return errors.noBinance;
+    if (!ctx?.exchange) {
+      return errors.noExchange;
     }
 
     // Normalize symbol
@@ -122,7 +122,7 @@ export const getTechnicalAnalysisTool = createTool({
 
     try {
       // Need at least 200 candles for EMA200
-      const candles = await ctx.binance.getCandles(normalizedSymbol, interval, 250);
+      const candles = await ctx.exchange.getCandles(normalizedSymbol, interval, 250);
 
       if (!candles || candles.length < 50) {
         return errors.insufficientData(normalizedSymbol);
@@ -230,8 +230,8 @@ export const getTechnicalSignalsTool = createTool({
   }),
   execute: async ({ symbol, interval }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
-    if (!ctx?.binance) {
-      return errors.noBinance;
+    if (!ctx?.exchange) {
+      return errors.noExchange;
     }
 
     const normalizedSymbol = symbol.toUpperCase().endsWith("USDT")
@@ -239,7 +239,7 @@ export const getTechnicalSignalsTool = createTool({
       : `${symbol.toUpperCase()}USDT`;
 
     try {
-      const candles = await ctx.binance.getCandles(normalizedSymbol, interval, 250);
+      const candles = await ctx.exchange.getCandles(normalizedSymbol, interval, 250);
 
       if (!candles || candles.length < 50) {
         return errors.insufficientData(normalizedSymbol);
@@ -288,8 +288,8 @@ export const getRSITool = createTool({
   }),
   execute: async ({ symbol, interval, period }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
-    if (!ctx?.binance) {
-      return errors.noBinance;
+    if (!ctx?.exchange) {
+      return errors.noExchange;
     }
 
     const normalizedSymbol = symbol.toUpperCase().endsWith("USDT")
@@ -297,7 +297,7 @@ export const getRSITool = createTool({
       : `${symbol.toUpperCase()}USDT`;
 
     try {
-      const candles = await ctx.binance.getCandles(normalizedSymbol, interval, 50);
+      const candles = await ctx.exchange.getCandles(normalizedSymbol, interval, 50);
 
       if (!candles || candles.length < period + 1) {
         return { error: "Insufficient data for RSI" };
@@ -389,8 +389,8 @@ export const getStopLossLevelsTool = createTool({
   }),
   execute: async ({ symbol, interval, entryPrice, atrMultiplier, atrPeriod }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
-    if (!ctx?.binance) {
-      return errors.noBinance;
+    if (!ctx?.exchange) {
+      return errors.noExchange;
     }
 
     const normalizedSymbol = symbol.toUpperCase().endsWith("USDT")
@@ -398,7 +398,7 @@ export const getStopLossLevelsTool = createTool({
       : `${symbol.toUpperCase()}USDT`;
 
     try {
-      const candles = await ctx.binance.getCandles(normalizedSymbol, interval, 50);
+      const candles = await ctx.exchange.getCandles(normalizedSymbol, interval, 50);
 
       if (!candles || candles.length < atrPeriod + 1) {
         return { error: `Insufficient data for ATR calculation` };
@@ -488,8 +488,8 @@ export const getPositionSizeTool = createTool({
   }),
   execute: async ({ symbol, riskAmount, interval, atrMultiplier }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
-    if (!ctx?.binance) {
-      return errors.noBinance;
+    if (!ctx?.exchange) {
+      return errors.noExchange;
     }
 
     const normalizedSymbol = symbol.toUpperCase().endsWith("USDT")
@@ -497,7 +497,7 @@ export const getPositionSizeTool = createTool({
       : `${symbol.toUpperCase()}USDT`;
 
     try {
-      const candles = await ctx.binance.getCandles(normalizedSymbol, interval, 50);
+      const candles = await ctx.exchange.getCandles(normalizedSymbol, interval, 50);
 
       if (!candles || candles.length < 15) {
         return { error: "Insufficient data" };
@@ -571,8 +571,8 @@ export const getVWAPTool = createTool({
   }),
   execute: async ({ symbol, interval, limit }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
-    if (!ctx?.binance) {
-      return errors.noBinance;
+    if (!ctx?.exchange) {
+      return errors.noExchange;
     }
 
     const normalizedSymbol = symbol.toUpperCase().endsWith("USDT")
@@ -580,7 +580,7 @@ export const getVWAPTool = createTool({
       : `${symbol.toUpperCase()}USDT`;
 
     try {
-      const candles = await ctx.binance.getCandles(normalizedSymbol, interval, limit);
+      const candles = await ctx.exchange.getCandles(normalizedSymbol, interval, limit);
 
       if (!candles || candles.length < 10) {
         return errors.insufficientData(normalizedSymbol);
@@ -646,8 +646,8 @@ export const getStochasticRSITool = createTool({
   }),
   execute: async ({ symbol, interval, rsiPeriod, stochPeriod, smoothK, smoothD }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
-    if (!ctx?.binance) {
-      return errors.noBinance;
+    if (!ctx?.exchange) {
+      return errors.noExchange;
     }
 
     const normalizedSymbol = symbol.toUpperCase().endsWith("USDT")
@@ -655,7 +655,7 @@ export const getStochasticRSITool = createTool({
       : `${symbol.toUpperCase()}USDT`;
 
     try {
-      const candles = await ctx.binance.getCandles(normalizedSymbol, interval, 100);
+      const candles = await ctx.exchange.getCandles(normalizedSymbol, interval, 100);
 
       if (!candles || candles.length < 50) {
         return errors.insufficientData(normalizedSymbol);

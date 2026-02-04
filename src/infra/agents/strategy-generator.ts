@@ -18,7 +18,7 @@ import {
 import type { BacktestResult, BacktestMetrics } from "../../backtest/types.ts";
 import { runBacktest } from "../../backtest/engine.ts";
 import { fetchHistoricalData } from "../../backtest/data/historical.ts";
-import type { BinanceClient } from "../binance/index.ts";
+import type { Exchange } from "../exchange/index.ts";
 import { createModuleLogger } from "../logger/index.ts";
 import { DSLStrategyAdapter } from "../../strategies/dsl/adapter.ts";
 
@@ -96,18 +96,18 @@ interface ParsedIntent {
  */
 export class StrategyGeneratorAgent {
   private llm: LLMClient;
-  private binance?: BinanceClient;
+  private exchange?: Exchange;
 
-  constructor(llm: LLMClient, binance?: BinanceClient) {
+  constructor(llm: LLMClient, exchange?: Exchange) {
     this.llm = llm;
-    this.binance = binance;
+    this.exchange = exchange;
   }
 
   /**
-   * Set the Binance client for backtesting
+   * Set the exchange client for backtesting
    */
-  setBinanceClient(binance: BinanceClient): void {
-    this.binance = binance;
+  setExchangeClient(exchange: Exchange): void {
+    this.exchange = exchange;
   }
 
   /**
@@ -157,8 +157,8 @@ export class StrategyGeneratorAgent {
         continue;
       }
 
-      // Run backtest if we have Binance client
-      if (this.binance) {
+      // Run backtest if we have exchange client
+      if (this.exchange) {
         try {
           backtestResult = await this.runStrategyBacktest(strategy, options);
 
@@ -203,8 +203,8 @@ export class StrategyGeneratorAgent {
           break;
         }
       } else {
-        // No Binance client, skip backtesting
-        logger.warn("No Binance client available, skipping backtest");
+        // No exchange client, skip backtesting
+        logger.warn("No exchange client available, skipping backtest");
         break;
       }
     }
@@ -493,14 +493,14 @@ Fix these errors and return valid JSON.
     strategy: StrategyDSL,
     options: GenerationOptions
   ): Promise<BacktestResult> {
-    if (!this.binance) {
-      throw new Error("Binance client not available for backtesting");
+    if (!this.exchange) {
+      throw new Error("Exchange client not available for backtesting");
     }
 
     // Fetch historical data
     const timeframe = options.timeframes[0] || "4h";
     const ohlcData = await fetchHistoricalData(
-      this.binance,
+      this.exchange,
       options.symbol,
       timeframe,
       options.backtestDays
@@ -696,7 +696,7 @@ Fix these errors and return valid JSON.
       endDate: new Date().toISOString(),
       executionTime: 0,
       createdAt: new Date().toISOString(),
-      warnings: ["Backtest not performed - Binance client unavailable"],
+      warnings: ["Backtest not performed - exchange client unavailable"],
     };
   }
 
@@ -805,7 +805,7 @@ Return ONLY the improved strategy as valid JSON. No explanation, no markdown.`;
  */
 export function createStrategyGenerator(
   llm: LLMClient,
-  binance?: BinanceClient
+  exchange?: Exchange
 ): StrategyGeneratorAgent {
-  return new StrategyGeneratorAgent(llm, binance);
+  return new StrategyGeneratorAgent(llm, exchange);
 }

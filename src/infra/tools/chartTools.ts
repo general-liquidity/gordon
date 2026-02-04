@@ -587,10 +587,10 @@ export const generateChartTool = createTool({
     execContext: MastraExecutionContext
   ): Promise<ChartGenerationResult> => {
     const ctx = getGordonContext(execContext);
-    if (!ctx?.binance) {
+    if (!ctx?.exchange) {
       return {
         success: false,
-        error: "Binance client not connected. Please run setup first.",
+        error: "Exchange client not connected. Please run setup first.",
       };
     }
 
@@ -598,7 +598,7 @@ export const generateChartTool = createTool({
 
     try {
       // Fetch candle data
-      const rawCandles = await ctx.binance.getCandles(normalizedSymbol, timeframe, periods);
+      const rawCandles = await ctx.exchange.getCandles(normalizedSymbol, timeframe, periods);
 
       if (!rawCandles || rawCandles.length < 20) {
         return {
@@ -702,10 +702,10 @@ export const analyzeChartTool = createTool({
     execContext: MastraExecutionContext
   ): Promise<ChartAnalysisResult> => {
     const ctx = getGordonContext(execContext);
-    if (!ctx?.binance) {
+    if (!ctx?.exchange) {
       return {
         success: false,
-        error: "Binance client not connected. Please run setup first.",
+        error: "Exchange client not connected. Please run setup first.",
       };
     }
 
@@ -713,7 +713,7 @@ export const analyzeChartTool = createTool({
 
     try {
       // Fetch candle data
-      const rawCandles = await ctx.binance.getCandles(normalizedSymbol, timeframe, periods);
+      const rawCandles = await ctx.exchange.getCandles(normalizedSymbol, timeframe, periods);
 
       if (!rawCandles || rawCandles.length < 50) {
         return {
@@ -881,15 +881,15 @@ export const quickTATool = createTool({
     execContext: MastraExecutionContext
   ) => {
     const ctx = getGordonContext(execContext);
-    if (!ctx?.binance) {
-      return { error: "Binance client not connected. Please run setup first." };
+    if (!ctx?.exchange) {
+      return { error: "Exchange client not connected. Please run setup first." };
     }
 
     const normalizedSymbol = normalizeSymbol(symbol);
 
     try {
       // Fetch data
-      const rawCandles = await ctx.binance.getCandles(normalizedSymbol, timeframe, 100);
+      const rawCandles = await ctx.exchange.getCandles(normalizedSymbol, timeframe, 100);
 
       if (!rawCandles || rawCandles.length < 50) {
         return { error: `Insufficient data for ${normalizedSymbol}` };

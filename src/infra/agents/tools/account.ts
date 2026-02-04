@@ -21,7 +21,7 @@ import { getGordonContext, type MastraExecutionContext } from "./types.ts";
 // ============================================================================
 
 const errors = {
-  noBinance: { error: "Binance client not connected. Please run setup first." },
+  noExchange: { error: "Exchange client not connected. Please run setup first." },
 };
 
 // Helper
@@ -34,7 +34,7 @@ const getActiveTrades = () => listTrades({ status: "OPEN" });
 export const getPortfolioTool = createTool({
   id: "get_portfolio",
   description:
-    "Get the current portfolio value and balances from Binance (both Spot and Funding wallets). " +
+    "Get the current portfolio value and balances from the active exchange. " +
     "Use when user asks 'what's my balance?' or 'how much do I have?'",
   inputSchema: z.object({}),
   outputSchema: z.object({
@@ -52,11 +52,11 @@ export const getPortfolioTool = createTool({
   }),
   execute: async (_input, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
-    if (!ctx?.binance) {
-      return errors.noBinance;
+    if (!ctx?.exchange) {
+      return errors.noExchange;
     }
 
-    const allBalances = await ctx.binance.getAllBalances();
+    const allBalances = await ctx.exchange.getAllBalances();
 
     let totalValue = 0;
     const holdings: Array<{ asset: string; free: number; locked: number; usdtValue: number; wallet: string; note?: string }> = [];
@@ -73,7 +73,7 @@ export const getPortfolioTool = createTool({
           usdtValue = total;
         } else {
           try {
-            const price = await ctx.binance.getPrice(`${balance.asset}USDT`);
+            const price = await ctx.exchange.getPrice(`${balance.asset}USDT`);
             usdtValue = total * price;
           } catch {
             holdings.push({
@@ -81,7 +81,7 @@ export const getPortfolioTool = createTool({
               free: balance.free,
               locked: balance.locked,
               usdtValue: 0,
-              wallet: balance.wallet,
+              wallet: "spot",
               note: "No USD price available",
             });
             continue;
@@ -94,7 +94,7 @@ export const getPortfolioTool = createTool({
             free: balance.free,
             locked: balance.locked,
             usdtValue,
-            wallet: balance.wallet,
+            wallet: "spot",
           });
           totalValue += usdtValue;
         }
@@ -211,11 +211,30 @@ export const getAccountDetailsTool = createTool({
     execContext: MastraExecutionContext
   ) => {
     const ctx = getGordonContext(execContext);
-    if (!ctx?.binance) {
-      return errors.noBinance;
+    if (!ctx?.exchange) {
+      return errors.noExchange;
     }
 
     try {
+      if (!ctx.binance || ctx.exchange.exchangeId !== "binance") {
+        const details = await ctx.exchange.getFullAccountDetails();
+        return {
+          accountType: details.accountInfo.accountType,
+          permissions: {
+            canTrade: details.accountInfo.canTrade,
+            canWithdraw: details.accountInfo.canWithdraw,
+            canDeposit: details.accountInfo.canDeposit,
+            accountPermissions: [],
+          },
+          summary: {
+            totalDeposits: 0,
+            totalWithdrawals: 0,
+            totalRecentTrades: 0,
+            earnPositionsCount: 0,
+          },
+        };
+      }
+
       const fullDetails = await ctx.binance.getFullAccountDetails();
       const { account, apiRestrictions, recentTrades, deposits, withdrawals, earnPositions } = fullDetails;
 

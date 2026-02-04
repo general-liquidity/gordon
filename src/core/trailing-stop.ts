@@ -12,7 +12,7 @@
  */
 
 import { EventEmitter } from "events";
-import { BinanceClient } from "../infra/binance/index.ts";
+import type { Exchange, OrderParams, Order } from "../infra/exchange/index.ts";
 import { calculateATR } from "./indicators/atr.ts";
 import { getTrade, updateTrade } from "../infra/storage/trades.ts";
 import { getPlan, updatePlan } from "../infra/storage/plans.ts";
@@ -20,7 +20,6 @@ import { logEvent } from "../infra/storage/events.ts";
 import { createModuleLogger } from "../infra/logger/index.ts";
 import { emitEvent } from "../events/index.ts";
 import type { Trade, Plan, ExitFill } from "../types/index.ts";
-import type { OrderParams, BinanceOrder } from "../infra/binance/index.ts";
 
 const logger = createModuleLogger("trailing-stop");
 
@@ -260,7 +259,7 @@ export class TrailingStopTracker extends EventEmitter {
    * @returns Update result with trigger status
    */
   async updateTrailingStop(
-    client: BinanceClient,
+    client: Exchange,
     tradeId: string
   ): Promise<TrailingStopUpdateResult> {
     const config = this.trailingStops.get(tradeId);
@@ -412,7 +411,7 @@ export class TrailingStopTracker extends EventEmitter {
    * @returns Map of trade ID to update results
    */
   async updateAllTrailingStops(
-    client: BinanceClient
+    client: Exchange
   ): Promise<Map<string, TrailingStopUpdateResult>> {
     const results = new Map<string, TrailingStopUpdateResult>();
 
@@ -436,7 +435,7 @@ export class TrailingStopTracker extends EventEmitter {
    * @returns Success status
    */
   async executeTrailingStop(
-    client: BinanceClient,
+    client: Exchange,
     tradeId: string
   ): Promise<{ success: boolean; pnl?: number; error?: string }> {
     const config = this.trailingStops.get(tradeId);
@@ -478,7 +477,7 @@ export class TrailingStopTracker extends EventEmitter {
       newClientOrderId: `gordon_tsl_${tradeId.slice(4)}_${Date.now().toString(36)}`,
     };
 
-    let sellOrder: BinanceOrder;
+    let sellOrder: Order;
     try {
       sellOrder = await client.placeOrder(orderParams);
     } catch (error) {
@@ -488,9 +487,10 @@ export class TrailingStopTracker extends EventEmitter {
     }
 
     // Calculate exit details
-    const exitPrice =
-      parseFloat(sellOrder.cummulativeQuoteQty) / parseFloat(sellOrder.executedQty);
-    const executedQty = parseFloat(sellOrder.executedQty);
+    const executedQty = sellOrder.executedQty;
+    const exitPrice = executedQty > 0
+      ? sellOrder.cummulativeQuoteQty / executedQty
+      : trade.averageEntry;
 
     // Create exit fill
     const exitFill: ExitFill = {

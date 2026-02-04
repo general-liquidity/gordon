@@ -20,7 +20,8 @@ import { getGordonContext, type MastraExecutionContext } from "./types.ts";
 // ============================================================================
 
 const errors = {
-  noBinance: { error: "Binance client not connected. Please run setup first." },
+  noExchange: { error: "Exchange client not connected. Please run setup first." },
+  binanceOnly: { error: "Wallet operations are currently supported only on Binance." },
   notArmed: (action: string) => ({
     error: `System must be ARMED to ${action}. Use 'arm' command first.`,
   }),
@@ -50,8 +51,11 @@ export const getDustableAssetsTool = createTool({
   }),
   execute: async (_input, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
-    if (!ctx?.binance) {
-      return errors.noBinance;
+    if (!ctx?.exchange) {
+      return errors.noExchange;
+    }
+    if (!ctx.binance || ctx.exchange.exchangeId != "binance") {
+      return errors.binanceOnly;
     }
 
     try {
@@ -108,8 +112,11 @@ export const convertDustTool = createTool({
   }),
   execute: async ({ assets }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
-    if (!ctx?.binance) {
-      return errors.noBinance;
+    if (!ctx?.exchange) {
+      return errors.noExchange;
+    }
+    if (!ctx.binance || ctx.exchange.exchangeId != "binance") {
+      return errors.binanceOnly;
     }
 
     if (ctx.config?.mode !== "ARMED") {
@@ -175,8 +182,11 @@ export const transferFundsTool = createTool({
   }),
   execute: async ({ type, asset, amount }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
-    if (!ctx?.binance) {
-      return errors.noBinance;
+    if (!ctx?.exchange) {
+      return errors.noExchange;
+    }
+    if (!ctx.binance || ctx.exchange.exchangeId != "binance") {
+      return errors.binanceOnly;
     }
 
     if (ctx.config?.mode !== "ARMED") {
@@ -247,8 +257,11 @@ export const getCoinInfoTool = createTool({
   }),
   execute: async ({ coin }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
-    if (!ctx?.binance) {
-      return errors.noBinance;
+    if (!ctx?.exchange) {
+      return errors.noExchange;
+    }
+    if (!ctx.binance || ctx.exchange.exchangeId != "binance") {
+      return errors.binanceOnly;
     }
 
     try {
@@ -310,8 +323,11 @@ export const getTradeFeesTool = createTool({
   }),
   execute: async ({ symbol }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
-    if (!ctx?.binance) {
-      return errors.noBinance;
+    if (!ctx?.exchange) {
+      return errors.noExchange;
+    }
+    if (!ctx.binance || ctx.exchange.exchangeId != "binance") {
+      return errors.binanceOnly;
     }
 
     try {
@@ -378,8 +394,11 @@ export const getAssetDividendsTool = createTool({
   }),
   execute: async ({ asset, limit }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
-    if (!ctx?.binance) {
-      return errors.noBinance;
+    if (!ctx?.exchange) {
+      return errors.noExchange;
+    }
+    if (!ctx.binance || ctx.exchange.exchangeId != "binance") {
+      return errors.binanceOnly;
     }
 
     try {
@@ -426,8 +445,11 @@ export const getDepositAddressTool = createTool({
   }),
   execute: async ({ coin, network }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
-    if (!ctx?.binance) {
-      return errors.noBinance;
+    if (!ctx?.exchange) {
+      return errors.noExchange;
+    }
+    if (!ctx.binance || ctx.exchange.exchangeId != "binance") {
+      return errors.binanceOnly;
     }
 
     try {

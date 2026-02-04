@@ -73,13 +73,13 @@ export class TradingService {
    */
   async checkFunds(required: number, currency: string = "USDT"): Promise<void> {
     const container = getContainer();
-    const binance = container.binance;
+    const exchange = container.exchange;
 
-    if (!binance) {
-      throw new Error("Binance client not available");
+    if (!exchange) {
+      throw new Error("Exchange client not available");
     }
 
-    const balance = await binance.getBalance(currency);
+    const balance = await exchange.getBalance(currency);
     if (balance < required) {
       throw new InsufficientFundsError(required, balance, currency);
     }

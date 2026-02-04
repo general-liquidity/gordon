@@ -5,7 +5,7 @@
  * Fully deterministic - no AI involved.
  */
 
-import { BinanceClient } from "../infra/binance/index.ts";
+import type { Exchange } from "../infra/exchange/index.ts";
 import { calculateIndicators, detectLevels } from "../indicators/index.ts";
 import { createModuleLogger } from "../infra/logger/index.ts";
 import { emitEvent } from "../events/index.ts";
@@ -237,7 +237,7 @@ function determineBias(
  * Analyze a single coin and return CoinAnalysis
  */
 async function analyzeCoin(
-  client: BinanceClient,
+  client: Exchange,
   symbol: string,
   timeframes: string[]
 ): Promise<CoinAnalysis | null> {
@@ -341,7 +341,7 @@ function calculateVolume24h(candles: Candle[], timeframe: string): number {
  * Main scan function - fetches market data and ranks opportunities
  */
 export async function scan(
-  client: BinanceClient,
+  client: Exchange,
   options?: ScanOptions
 ): Promise<ScanResult> {
   const topN = options?.topN ?? 50;

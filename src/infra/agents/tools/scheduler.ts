@@ -25,7 +25,7 @@ import { getGordonContext, type MastraExecutionContext } from "./types.ts";
 // ============================================================================
 
 const errors = {
-  noBinance: { error: "Binance client not connected. Please run setup first." },
+  noExchange: { error: "Exchange client not connected. Please run setup first." },
 };
 
 // ============================================================================
@@ -72,8 +72,8 @@ export const startSchedulerTool = createTool({
   }),
   execute: async ({ intervalMinutes, topN, minConfidence }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
-    if (!ctx?.binance) {
-      return errors.noBinance;
+    if (!ctx?.exchange) {
+      return errors.noExchange;
     }
 
     const status = getSchedulerStatus();
@@ -85,7 +85,7 @@ export const startSchedulerTool = createTool({
       };
     }
 
-    startScheduler(ctx.binance, {
+    startScheduler(ctx.exchange, {
       intervalMs: intervalMinutes * 60 * 1000,
       scanOptions: {
         topN,

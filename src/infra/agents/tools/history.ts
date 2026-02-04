@@ -21,7 +21,7 @@ import { getGordonContext, type MastraExecutionContext } from "./types.ts";
 // ============================================================================
 
 const errors = {
-  noBinance: { error: "Binance client not connected. Please run setup first." },
+  noExchange: { error: "Exchange client not connected. Please run setup first." },
 };
 
 // ============================================================================
@@ -64,19 +64,51 @@ export const getTradeHistoryTool = createTool({
   }),
   execute: async ({ symbol, limit }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
-    if (!ctx?.binance) {
-      return errors.noBinance;
+    if (!ctx?.exchange) {
+      return errors.noExchange;
     }
 
     try {
-      let trades;
+      let trades: Array<{
+        symbol: string;
+        side: "BUY" | "SELL";
+        price: number;
+        quantity: number;
+        commission: number;
+        commissionAsset: string;
+        time: number;
+        isMaker: boolean;
+      }> = [];
+
       if (symbol && symbol.trim() !== "") {
         const normalizedSymbol = symbol.toUpperCase().endsWith("USDT")
           ? symbol.toUpperCase()
           : `${symbol.toUpperCase()}USDT`;
-        trades = await ctx.binance.getTradeHistory(normalizedSymbol, limit);
+        const exchangeTrades = await ctx.exchange.getTradeHistory(normalizedSymbol, limit);
+        trades = exchangeTrades.map((t) => ({
+          symbol: t.symbol,
+          side: t.side,
+          price: t.price,
+          quantity: t.quantity,
+          commission: t.commission,
+          commissionAsset: t.commissionAsset,
+          time: t.time,
+          isMaker: t.isMaker,
+        }));
+      } else if (ctx.binance && ctx.exchange.exchangeId === "binance") {
+        const exchangeTrades = await ctx.binance.getAllTradeHistory(limit);
+        trades = exchangeTrades.map((t) => ({
+          symbol: t.symbol,
+          side: t.isBuyer ? "BUY" : "SELL",
+          price: parseFloat(t.price),
+          quantity: parseFloat(t.qty),
+          commission: parseFloat(t.commission),
+          commissionAsset: t.commissionAsset,
+          time: t.time,
+          isMaker: t.isMaker,
+        }));
       } else {
-        trades = await ctx.binance.getAllTradeHistory(limit);
+        return { error: "This exchange requires a symbol to fetch trade history." };
       }
 
       if (trades.length === 0) {
@@ -88,21 +120,21 @@ export const getTradeHistoryTool = createTool({
       let totalCommission = 0;
 
       const formattedTrades = trades.map((t) => {
-        const quoteQty = parseFloat(t.quoteQty);
-        if (t.isBuyer) {
+        const quoteQty = t.price * t.quantity;
+        if (t.side === "BUY") {
           totalBuyVolume += quoteQty;
         } else {
           totalSellVolume += quoteQty;
         }
-        totalCommission += parseFloat(t.commission);
+        totalCommission += t.commission;
 
         return {
           symbol: t.symbol,
-          side: t.isBuyer ? "BUY" as const : "SELL" as const,
-          price: parseFloat(t.price),
-          quantity: parseFloat(t.qty),
+          side: t.side,
+          price: t.price,
+          quantity: t.quantity,
           quoteQty,
-          commission: `${parseFloat(t.commission).toFixed(6)} ${t.commissionAsset}`,
+          commission: `${t.commission.toFixed(6)} ${t.commissionAsset}`,
           time: new Date(t.time).toISOString(),
           isMaker: t.isMaker,
         };
@@ -170,19 +202,19 @@ export const getTransferHistoryTool = createTool({
   }),
   execute: async ({ type, limit }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
-    if (!ctx?.binance) {
-      return errors.noBinance;
+    if (!ctx?.exchange) {
+      return errors.noExchange;
     }
 
     try {
       const response: Record<string, unknown> = {};
 
       if (type === "deposits" || type === "both") {
-        const deposits = await ctx.binance.getDepositHistory(limit);
+        const deposits = await ctx.exchange.getDepositHistory(limit);
         const statusMap: Record<number, string> = { 0: "pending", 1: "success", 6: "credited" };
         response.deposits = deposits.map((d) => ({
           coin: d.coin,
-          amount: parseFloat(d.amount),
+          amount: d.amount,
           network: d.network,
           status: statusMap[d.status] || `status_${d.status}`,
           txId: d.txId ? `${d.txId.slice(0, 16)}...` : null,
@@ -192,15 +224,15 @@ export const getTransferHistoryTool = createTool({
       }
 
       if (type === "withdrawals" || type === "both") {
-        const withdrawals = await ctx.binance.getWithdrawalHistory(limit);
+        const withdrawals = await ctx.exchange.getWithdrawalHistory(limit);
         const wStatusMap: Record<number, string> = {
           0: "email_sent", 1: "cancelled", 2: "awaiting_approval",
           3: "rejected", 4: "processing", 5: "failure", 6: "completed",
         };
         response.withdrawals = withdrawals.map((w) => ({
           coin: w.coin,
-          amount: parseFloat(w.amount),
-          fee: parseFloat(w.transactionFee),
+          amount: w.amount,
+          fee: w.transactionFee ?? 0,
           network: w.network,
           status: wStatusMap[w.status] || `status_${w.status}`,
           address: `${w.address.slice(0, 10)}...${w.address.slice(-6)}`,

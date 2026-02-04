@@ -114,7 +114,7 @@ export const strategyIterateTool = createTool({
         : undefined;
 
       // Create generator and iterate
-      const generator = createStrategyGenerator(ctx.llm, ctx.binance ?? undefined);
+      const generator = createStrategyGenerator(ctx.llm, ctx.exchange ?? undefined);
 
       // Create a mock backtest result if we don't have one
       const backtestForIteration = previousBacktest || {

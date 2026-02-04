@@ -29,7 +29,7 @@ import { getGordonContext, type MastraExecutionContext } from "./types.ts";
 // ============================================================================
 
 const errors = {
-  noBinance: { error: "Binance client not connected. Please run setup first." },
+  noExchange: { error: "Exchange client not connected. Please run setup first." },
 };
 
 // ============================================================================
@@ -230,8 +230,8 @@ export const displayPriceChartTool = createTool({
   }),
   execute: async ({ symbol, interval, periods }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
-    if (!ctx?.binance) {
-      return errors.noBinance;
+    if (!ctx?.exchange) {
+      return errors.noExchange;
     }
 
     // Normalize symbol
@@ -240,7 +240,7 @@ export const displayPriceChartTool = createTool({
       : `${symbol.toUpperCase()}USDT`;
 
     try {
-      const candles = await ctx.binance.getCandles(normalizedSymbol, interval, periods);
+      const candles = await ctx.exchange.getCandles(normalizedSymbol, interval, periods);
 
       if (!candles || candles.length === 0) {
         return { error: `No candle data found for ${normalizedSymbol}` };
@@ -327,8 +327,8 @@ export const displayCandlestickChartTool = createTool({
   }),
   execute: async ({ symbol, interval, periods, showVolume }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
-    if (!ctx?.binance) {
-      return errors.noBinance;
+    if (!ctx?.exchange) {
+      return errors.noExchange;
     }
 
     // Normalize symbol
@@ -337,7 +337,7 @@ export const displayCandlestickChartTool = createTool({
       : `${symbol.toUpperCase()}USDT`;
 
     try {
-      const candles = await ctx.binance.getCandles(normalizedSymbol, interval, periods);
+      const candles = await ctx.exchange.getCandles(normalizedSymbol, interval, periods);
 
       if (!candles || candles.length === 0) {
         return { error: `No candle data found for ${normalizedSymbol}` };
@@ -419,8 +419,8 @@ export const displayComparisonChartTool = createTool({
   }),
   execute: async ({ symbols, interval, periods }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
-    if (!ctx?.binance) {
-      return errors.noBinance;
+    if (!ctx?.exchange) {
+      return errors.noExchange;
     }
 
     try {
@@ -432,7 +432,7 @@ export const displayComparisonChartTool = createTool({
           ? sym.toUpperCase()
           : `${sym.toUpperCase()}USDT`;
 
-        const candles = await ctx.binance.getCandles(normalizedSymbol, interval, periods);
+        const candles = await ctx.exchange.getCandles(normalizedSymbol, interval, periods);
 
         if (!candles || candles.length === 0) {
           continue;
@@ -511,8 +511,8 @@ export const displayVolumeChartTool = createTool({
   }),
   execute: async ({ symbol, interval, periods }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
-    if (!ctx?.binance) {
-      return errors.noBinance;
+    if (!ctx?.exchange) {
+      return errors.noExchange;
     }
 
     const normalizedSymbol = symbol.toUpperCase().endsWith("USDT")
@@ -520,7 +520,7 @@ export const displayVolumeChartTool = createTool({
       : `${symbol.toUpperCase()}USDT`;
 
     try {
-      const candles = await ctx.binance.getCandles(normalizedSymbol, interval, periods);
+      const candles = await ctx.exchange.getCandles(normalizedSymbol, interval, periods);
 
       if (!candles || candles.length === 0) {
         return { error: `No data found for ${normalizedSymbol}` };

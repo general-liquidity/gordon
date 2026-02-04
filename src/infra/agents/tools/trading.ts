@@ -35,7 +35,7 @@ import { reflectOnPlan, formatReflectionSummary } from "../reflection.ts";
 // ============================================================================
 
 const errors = {
-  noBinance: { error: "Binance client not connected. Please configure API keys." },
+  noExchange: { error: "Exchange client not connected. Please configure an active exchange." },
   noLLM: { error: "LLM client not connected." },
   noContext: { error: "Context not available." },
 } as const;
@@ -220,8 +220,8 @@ export const createPlanTool = createTool({
   outputSchema: createPlanOutputSchema,
   execute: async ({ symbol, riskLevel, allocationPercent, strategyId }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
-    if (!ctx?.binance || !ctx?.llm) {
-      return validateToolOutput(createPlanOutputSchema, { error: "Binance or LLM client not connected." }, { toolName: "create_plan" });
+    if (!ctx?.exchange || !ctx?.llm) {
+      return validateToolOutput(createPlanOutputSchema, { error: "Exchange or LLM client not connected." }, { toolName: "create_plan" });
     }
 
     // Normalize symbol
@@ -230,7 +230,7 @@ export const createPlanTool = createTool({
       : `${symbol.toUpperCase()}USDT`;
 
     // Get detailed analysis first
-    const analysis = await analyze(ctx.binance, normalizedSymbol, {
+    const analysis = await analyze(ctx.exchange, normalizedSymbol, {
       timeframes: ["1h", "4h", "1d"],
     });
 
@@ -284,7 +284,7 @@ export const createPlanTool = createTool({
 export const executePlanTool = createTool({
   id: "execute_plan",
   description:
-    "Execute an approved trading plan by placing orders on Binance. " +
+    "Execute an approved trading plan by placing orders on the active exchange. " +
     "IMPORTANT: This places real orders with real money. Only use after user confirms the plan.",
   inputSchema: z.object({
     planId: z.string().describe("The ID of the plan to execute"),
@@ -292,8 +292,8 @@ export const executePlanTool = createTool({
   outputSchema: executePlanOutputSchema,
   execute: async ({ planId }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
-    if (!ctx?.binance) {
-      return validateToolOutput(executePlanOutputSchema, { ...errors.noBinance, success: false }, { toolName: "execute_plan" });
+    if (!ctx?.exchange) {
+      return validateToolOutput(executePlanOutputSchema, { ...errors.noExchange, success: false }, { toolName: "execute_plan" });
     }
 
     const plan = getPlan(planId);
@@ -308,7 +308,7 @@ export const executePlanTool = createTool({
       }, { toolName: "execute_plan" });
     }
 
-    const result = await executePlan(ctx.binance, plan, ctx.config, {
+    const result = await executePlan(ctx.exchange, plan, ctx.config, {
       totalValue: ctx.portfolioValue,
       availableCash: ctx.availableCash,
       openPositions: getActiveTrades().length,
@@ -349,8 +349,8 @@ export const closeTradeTool = createTool({
   outputSchema: closeTradeOutputSchema,
   execute: async ({ tradeId, reason }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
-    if (!ctx?.binance) {
-      return validateToolOutput(closeTradeOutputSchema, { ...errors.noBinance, success: false }, { toolName: "close_trade" });
+    if (!ctx?.exchange) {
+      return validateToolOutput(closeTradeOutputSchema, { ...errors.noExchange, success: false }, { toolName: "close_trade" });
     }
 
     const trade = getTrade(tradeId);
@@ -358,7 +358,7 @@ export const closeTradeTool = createTool({
       return validateToolOutput(closeTradeOutputSchema, { success: false, error: `Trade not found: ${tradeId}` }, { toolName: "close_trade" });
     }
 
-    const result = await closeTrade(ctx.binance, trade, reason ?? "MANUAL");
+    const result = await closeTrade(ctx.exchange, trade, reason ?? "MANUAL");
 
     return validateToolOutput(closeTradeOutputSchema, {
       success: result.success,
@@ -517,8 +517,8 @@ Returns a grid plan for user approval.`,
   outputSchema: createGridPlanOutputSchema,
   execute: async ({ symbol, allocation, numLevels, distribution }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
-    if (!ctx?.binance) {
-      return validateToolOutput(createGridPlanOutputSchema, { error: "Binance client not connected. Please configure API keys." }, { toolName: "create_grid_plan" });
+    if (!ctx?.exchange) {
+      return validateToolOutput(createGridPlanOutputSchema, { error: "Exchange client not connected. Please configure API keys." }, { toolName: "create_grid_plan" });
     }
 
     // Normalize symbol
@@ -527,7 +527,7 @@ Returns a grid plan for user approval.`,
       : `${symbol.toUpperCase()}USDT`;
 
     // Analyze the symbol to get support/resistance levels
-    const analysis = await analyze(ctx.binance, normalizedSymbol, {
+    const analysis = await analyze(ctx.exchange, normalizedSymbol, {
       timeframes: ["1h", "4h"],
     });
 
@@ -659,10 +659,10 @@ Supports:
   outputSchema: setTrailingStopOutputSchema,
   execute: async ({ tradeId, type, trailDistance, activationPrice }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
-    if (!ctx?.binance) {
+    if (!ctx?.exchange) {
       return validateToolOutput(setTrailingStopOutputSchema, {
         success: false,
-        error: "Binance client not connected.",
+        error: "Exchange client not connected.",
       }, { toolName: "set_trailing_stop" });
     }
 
@@ -683,7 +683,7 @@ Supports:
     }
 
     // Get current price for initial high
-    const currentPrice = await ctx.binance.getPrice(trade.symbol);
+    const currentPrice = await ctx.exchange.getPrice(trade.symbol);
 
     // Get trailing stop tracker
     const tracker = getTrailingStopTracker();
@@ -742,10 +742,10 @@ Use when:
   outputSchema: updateTrailingStopOutputSchema,
   execute: async ({ tradeId, newTrailDistance }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
-    if (!ctx?.binance) {
+    if (!ctx?.exchange) {
       return validateToolOutput(updateTrailingStopOutputSchema, {
         success: false,
-        error: "Binance client not connected.",
+        error: "Exchange client not connected.",
       }, { toolName: "update_trailing_stop" });
     }
 
@@ -767,7 +767,7 @@ Use when:
 
     // Update the trailing stop with current price
     try {
-      const updateResult = await tracker.updateTrailingStop(ctx.binance, tradeId);
+      const updateResult = await tracker.updateTrailingStop(ctx.exchange, tradeId);
 
       const result = {
         success: true,
@@ -815,15 +815,15 @@ Use when:
   outputSchema: closePartialPositionOutputSchema,
   execute: async ({ tradeId, percentage, reason }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
-    if (!ctx?.binance) {
+    if (!ctx?.exchange) {
       return validateToolOutput(closePartialPositionOutputSchema, {
         success: false,
-        error: "Binance client not connected.",
+        error: "Exchange client not connected.",
       }, { toolName: "close_partial_position" });
     }
 
     const closeResult = await closePartialPosition(
-      ctx.binance,
+      ctx.exchange,
       tradeId,
       percentage,
       reason ?? "MANUAL"

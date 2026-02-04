@@ -685,6 +685,7 @@ export function clearHandoffHistory(): void {
 function createRequestContext(context: GordonContext): RequestContext {
   const requestContext = new RequestContext();
   requestContext.set("binance", context.binance);
+  requestContext.set("exchange", context.exchange);
   requestContext.set("config", context.config);
   requestContext.set("llm", context.llm);
   requestContext.set("userId", context.userId || "default");
@@ -1417,14 +1418,14 @@ export async function processSimpleMessage(
  * Quick scan without full agent processing
  */
 export async function quickScan(context: GordonContext) {
-  const { binance, config } = context;
+  const { exchange, config } = context;
 
-  if (!binance) {
-    throw new Error("Binance client not connected");
+  if (!exchange) {
+    throw new Error("Exchange client not connected");
   }
 
   const { scan } = await import("../../core/scanner.ts");
-  return scan(binance, {
+  return scan(exchange, {
     topN: config.preferences.topNCoins,
     timeframes: config.preferences.defaultTimeframes,
   });
@@ -1434,14 +1435,14 @@ export async function quickScan(context: GordonContext) {
  * Quick position check without full agent processing
  */
 export async function quickCheckPositions(context: GordonContext) {
-  const { binance } = context;
+  const { exchange } = context;
 
-  if (!binance) {
-    throw new Error("Binance client not connected");
+  if (!exchange) {
+    throw new Error("Exchange client not connected");
   }
 
   const { runMonitorCycle } = await import("../../core/monitor.ts");
-  return runMonitorCycle(binance);
+  return runMonitorCycle(exchange);
 }
 
 // ============================================================================
@@ -1572,9 +1573,9 @@ export async function checkToolSecurity(
 
 /**
  * Initialize client with permission check
- * Should be called when connecting to Binance
+ * Should be called when connecting to Binance (limited support for other exchanges)
  *
- * @param context - Gordon context with binance client
+ * @param context - Gordon context with exchange client
  * @returns Permission check result
  */
 export async function initializeWithPermissionCheck(context: GordonContext): Promise<{
@@ -1583,12 +1584,21 @@ export async function initializeWithPermissionCheck(context: GordonContext): Pro
   errors: string[];
   isReadOnly: boolean;
 }> {
-  if (!context.binance) {
+  if (!context.exchange) {
     return {
       success: false,
       warnings: [],
-      errors: ["Binance client not connected"],
+      errors: ["Exchange client not connected"],
       isReadOnly: true,
+    };
+  }
+
+  if (!context.binance || context.exchange.exchangeId !== "binance") {
+    return {
+      success: true,
+      warnings: ["Permission check is currently available only for Binance."],
+      errors: [],
+      isReadOnly: false,
     };
   }
 

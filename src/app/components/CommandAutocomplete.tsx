@@ -4,7 +4,7 @@
  */
 
 import React from "react";
-import { Box, Text } from "ink";
+import { Box, Text, useStdout } from "ink";
 import { COLORS } from "../theme.ts";
 import type { SlashCommand } from "../slashCommands.ts";
 
@@ -66,14 +66,28 @@ export const CommandAutocomplete: React.FC<CommandAutocompleteProps> = ({
   showCategories = true,
   showUsage = false,
 }) => {
+  const { stdout } = useStdout();
+  const terminalWidth = stdout?.columns ?? 100;
   const COMMAND_COL_WIDTH = 18;
   const ALIAS_COL_WIDTH = 10;
-  const DESCRIPTION_COL_WIDTH = 52;
+  const DESCRIPTION_COL_MAX = 60;
+  const DESCRIPTION_COL_MIN = 20;
+  const STATIC_COL_WIDTH = COMMAND_COL_WIDTH + ALIAS_COL_WIDTH + 5 + 5; // selection + icon + spaces + level buffer
+  const availableDescriptionWidth = terminalWidth - STATIC_COL_WIDTH;
+  const DESCRIPTION_COL_WIDTH = Math.max(
+    DESCRIPTION_COL_MIN,
+    Math.min(DESCRIPTION_COL_MAX, availableDescriptionWidth)
+  );
 
   const truncateText = (value: string, width: number): string => {
     if (value.length <= width) return value;
     if (width <= 3) return value.slice(0, width);
     return value.slice(0, width - 3) + "...";
+  };
+
+  const padSpaces = (value: string, width: number): string => {
+    if (value.length >= width) return "";
+    return " ".repeat(width - value.length);
   };
 
   // Extract the search term (after /)
@@ -171,6 +185,11 @@ export const CommandAutocomplete: React.FC<CommandAutocompleteProps> = ({
 
         const categoryIcon = CATEGORY_ICONS[cmd.category] || "●";
         const categoryColor = CATEGORY_COLORS[cmd.category] || COLORS.DIM;
+        const aliasText = cmd.aliases.length > 0 ? `(${cmd.aliases[0]})` : "";
+        const aliasDisplay = truncateText(aliasText, ALIAS_COL_WIDTH);
+        const commandPadding = padSpaces(displayName, COMMAND_COL_WIDTH);
+        const aliasPadding = padSpaces(aliasDisplay, ALIAS_COL_WIDTH);
+        const descriptionDisplay = truncateText(cmd.description, DESCRIPTION_COL_WIDTH);
 
         return (
           <Box key={cmd.name} flexDirection="column" paddingY={0}>
@@ -196,25 +215,25 @@ export const CommandAutocomplete: React.FC<CommandAutocompleteProps> = ({
               </Text>
 
               {/* Command name with highlight */}
-              <Box width={COMMAND_COL_WIDTH}>
-                <Text color={isSelected ? COLORS.HIGHLIGHT : COLORS.ACCENT} bold={isSelected} wrap="truncate">
-                  {matchedPart}
-                </Text>
-                <Text color={isSelected ? COLORS.HIGHLIGHT : COLORS.WHITE} bold={isSelected} wrap="truncate">
-                  {restPart}
-                </Text>
-              </Box>
+              <Text color={isSelected ? COLORS.HIGHLIGHT : COLORS.ACCENT} bold={isSelected}>
+                {matchedPart}
+              </Text>
+              <Text color={isSelected ? COLORS.HIGHLIGHT : COLORS.WHITE} bold={isSelected}>
+                {restPart}
+              </Text>
+              <Text color={COLORS.DIM}>{commandPadding}</Text>
+              <Text color={COLORS.DIM}> </Text>
 
               {/* Aliases (if any) */}
-              <Box width={ALIAS_COL_WIDTH}>
-                <Text color={COLORS.MUTED} wrap="truncate">
-                  {cmd.aliases.length > 0 ? truncateText(`(${cmd.aliases[0]})`, ALIAS_COL_WIDTH) : ""}
-                </Text>
-              </Box>
+              <Text color={COLORS.MUTED}>
+                {aliasDisplay}
+              </Text>
+              <Text color={COLORS.DIM}>{aliasPadding}</Text>
+              <Text color={COLORS.DIM}> </Text>
 
               {/* Description */}
-              <Text color={isSelected ? COLORS.WHITE : COLORS.DIM} wrap="truncate">
-                {truncateText(cmd.description, DESCRIPTION_COL_WIDTH)}
+              <Text color={isSelected ? COLORS.WHITE : COLORS.DIM}>
+                {descriptionDisplay}
               </Text>
 
               {/* Level badge for advanced/expert commands */}

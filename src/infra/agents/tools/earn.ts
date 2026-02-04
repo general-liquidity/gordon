@@ -20,7 +20,8 @@ import { getGordonContext, type MastraExecutionContext } from "./types.ts";
 // ============================================================================
 
 const errors = {
-  noBinance: { error: "Binance client not connected. Please run setup first." },
+  noExchange: { error: "Exchange client not connected. Please run setup first." },
+  binanceOnly: { error: "Simple Earn is currently supported only on Binance." },
 };
 
 // ============================================================================
@@ -55,8 +56,11 @@ export const getFlexibleProductsTool = createTool({
   }),
   execute: async ({ asset }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
-    if (!ctx?.binance) {
-      return errors.noBinance;
+    if (!ctx?.exchange) {
+      return errors.noExchange;
+    }
+    if (!ctx.binance || ctx.exchange.exchangeId != "binance") {
+      return errors.binanceOnly;
     }
 
     try {
@@ -115,8 +119,11 @@ export const getLockedProductsTool = createTool({
   }),
   execute: async ({ asset }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
-    if (!ctx?.binance) {
-      return errors.noBinance;
+    if (!ctx?.exchange) {
+      return errors.noExchange;
+    }
+    if (!ctx.binance || ctx.exchange.exchangeId != "binance") {
+      return errors.binanceOnly;
     }
 
     try {
@@ -194,8 +201,11 @@ export const getAllEarnPositionsTool = createTool({
   }),
   execute: async (_input, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
-    if (!ctx?.binance) {
-      return errors.noBinance;
+    if (!ctx?.exchange) {
+      return errors.noExchange;
+    }
+    if (!ctx.binance || ctx.exchange.exchangeId != "binance") {
+      return errors.binanceOnly;
     }
 
     try {
@@ -270,8 +280,11 @@ export const subscribeFlexibleTool = createTool({
   }),
   execute: async ({ productId, amount, sourceAccount }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
-    if (!ctx?.binance) {
-      return errors.noBinance;
+    if (!ctx?.exchange) {
+      return errors.noExchange;
+    }
+    if (!ctx.binance || ctx.exchange.exchangeId != "binance") {
+      return errors.binanceOnly;
     }
 
     if (ctx.config?.mode !== "ARMED") {
@@ -317,8 +330,11 @@ export const redeemFlexibleTool = createTool({
   }),
   execute: async ({ productId, amount, redeemAll, destAccount }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
-    if (!ctx?.binance) {
-      return errors.noBinance;
+    if (!ctx?.exchange) {
+      return errors.noExchange;
+    }
+    if (!ctx.binance || ctx.exchange.exchangeId != "binance") {
+      return errors.binanceOnly;
     }
 
     if (ctx.config?.mode !== "ARMED") {
@@ -366,8 +382,11 @@ export const subscribeLockedTool = createTool({
   }),
   execute: async ({ projectId, amount, sourceAccount }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
-    if (!ctx?.binance) {
-      return errors.noBinance;
+    if (!ctx?.exchange) {
+      return errors.noExchange;
+    }
+    if (!ctx.binance || ctx.exchange.exchangeId != "binance") {
+      return errors.binanceOnly;
     }
 
     if (ctx.config?.mode !== "ARMED") {

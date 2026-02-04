@@ -33,7 +33,7 @@ import {
 // ============================================================================
 
 const errors = {
-  noBinance: { error: "Binance client not connected. Please run setup first." },
+  noExchange: { error: "Exchange client not connected. Please run setup or add an exchange." },
 };
 
 // ============================================================================
@@ -119,14 +119,14 @@ export const scanMarketTool = createTool({
   outputSchema: scanMarketOutputSchema,
   execute: async ({ topN, timeframes }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
-    if (!ctx?.binance) {
-      return validateToolOutput(scanMarketOutputSchema, errors.noBinance, { toolName: "scan_market" });
+    if (!ctx?.exchange) {
+      return validateToolOutput(scanMarketOutputSchema, errors.noExchange, { toolName: "scan_market" });
     }
 
     const startTime = Date.now();
 
     try {
-      const result = await scan(ctx.binance, { topN, timeframes });
+      const result = await scan(ctx.exchange, { topN, timeframes });
       const executionTime = Date.now() - startTime;
 
       const opportunities = result.coins
@@ -193,8 +193,8 @@ export const analyzeCoinTool = createTool({
   outputSchema: analyzeCoinOutputSchema,
   execute: async ({ symbol, timeframes }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
-    if (!ctx?.binance) {
-      return validateToolOutput(analyzeCoinOutputSchema, errors.noBinance, { toolName: "analyze_coin" });
+    if (!ctx?.exchange) {
+      return validateToolOutput(analyzeCoinOutputSchema, errors.noExchange, { toolName: "analyze_coin" });
     }
 
     const startTime = Date.now();
@@ -205,7 +205,7 @@ export const analyzeCoinTool = createTool({
       : `${symbol.toUpperCase()}USDT`;
 
     try {
-      const result = await analyze(ctx.binance, normalizedSymbol, {
+      const result = await analyze(ctx.exchange, normalizedSymbol, {
         timeframes: timeframes ?? ["1h", "4h", "1d"],
       });
 
@@ -306,7 +306,7 @@ export const getHistoricalOpportunitiesTool = createTool({
   }),
   outputSchema: getHistoricalOpportunitiesOutputSchema,
   execute: async ({ daysBack, symbol, minConfidence }, execContext: MastraExecutionContext) => {
-    // This tool doesn't require Binance client - it reads from local storage
+    // This tool doesn't require an exchange client - it reads from local storage
     const opportunities = getHistoricalOpportunities({
       daysBack,
       symbol: symbol || undefined,
