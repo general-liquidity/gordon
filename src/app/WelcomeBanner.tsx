@@ -186,11 +186,6 @@ export const WelcomeBanner: React.FC = () => {
       {/* Text alternative: The banner displays "Gordon" in stylized ASCII art */}
       <FlickeringBanner />
 
-      {/* Text alternative for ASCII art - visible for screen readers and when graphics don't render */}
-      <Box>
-        <Text color={COLORS.DIM}>[Gordon CLI - Trading Assistant]</Text>
-      </Box>
-
       {/* Tagline */}
       <Box marginTop={1}>
         <Text color={COLORS.WHITE} bold>
