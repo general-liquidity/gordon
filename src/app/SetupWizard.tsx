@@ -35,8 +35,7 @@ const EXCHANGE_LABELS: Record<ExchangeId, string> = {
   binance: "Binance",
   coinbase: "Coinbase",
   kraken: "Kraken",
-  bybit: "Bybit",
-  okx: "OKX",
+  bitfinex: "Bitfinex",
   hyperliquid: "Hyperliquid",
 };
 
@@ -44,8 +43,7 @@ const EXCHANGE_PASSPHRASE_REQUIRED: Record<ExchangeId, boolean> = {
   binance: false,
   coinbase: true,
   kraken: false,
-  bybit: false,
-  okx: true,
+  bitfinex: false,
   hyperliquid: false,
 };
 
@@ -53,8 +51,7 @@ const EXCHANGE_WALLET_AUTH: Record<ExchangeId, boolean> = {
   binance: false,
   coinbase: false,
   kraken: false,
-  bybit: false,
-  okx: false,
+  bitfinex: false,
   hyperliquid: true,
 };
 
@@ -76,15 +73,11 @@ const EXCHANGE_INSTRUCTIONS: Record<ExchangeId, string[]> = {
     "Create a new API key with the needed permissions",
     "Copy the API Key and Private Key",
   ],
-  bybit: [
-    "Go to Bybit and open API Management",
+  bitfinex: [
+    "Go to Bitfinex and open Account > API",
     "Create a new API key with the needed permissions",
-    "Copy the API Key and Secret",
-  ],
-  okx: [
-    "Go to OKX and open Settings > API",
-    "Create a new API key with the needed permissions",
-    "Copy the API Key, Secret, and Passphrase",
+    "Enable 'Account Read' and 'Orders Read/Write' permissions",
+    "Copy the API Key and API Secret",
   ],
   hyperliquid: [
     "Generate a new Ethereum wallet or use an existing one",

@@ -7,28 +7,17 @@ import type { Exchange, ExchangeId, ExchangeCredentials } from "./types.ts";
 import { BinanceAdapter } from "./adapters/binance.ts";
 import { CoinbaseAdapter } from "./adapters/coinbase.ts";
 import { KrakenAdapter } from "./adapters/kraken.ts";
+import { BitfinexAdapter } from "./adapters/bitfinex.ts";
 import { HyperliquidAdapter } from "./adapters/hyperliquid.ts";
-import { CCXTAdapter } from "./adapters/ccxt.ts";
 
 /**
- * Supported exchanges and their adapter type
- */
-const NATIVE_ADAPTERS: Set<ExchangeId> = new Set([
-  "binance",
-  "coinbase",
-  "kraken",
-  "hyperliquid",
-]);
-
-/**
- * All supported exchange IDs
+ * All supported exchange IDs with native adapters
  */
 const SUPPORTED_EXCHANGES: ExchangeId[] = [
   "binance",
   "coinbase",
   "kraken",
-  "bybit",
-  "okx",
+  "bitfinex",
   "hyperliquid",
 ];
 
@@ -50,12 +39,11 @@ function getCacheKey(exchangeId: ExchangeId, credentials: ExchangeCredentials): 
  *
  * Features:
  * - Singleton pattern for exchange instances (cached by exchange + credentials)
- * - Native adapters for Binance, Coinbase, Kraken, Hyperliquid (exchange-specific APIs)
- * - CCXT adapter fallback for Bybit, OKX
+ * - Native adapters for all supported exchanges (Binance, Coinbase, Kraken, Bitfinex, Hyperliquid)
  *
  * @example
  * ```typescript
- * // Create a Binance exchange (uses native adapter)
+ * // Create a Binance exchange
  * const binance = ExchangeFactory.create('binance', {
  *   apiKey: 'your-api-key',
  *   apiSecret: 'your-api-secret'
@@ -68,8 +56,14 @@ function getCacheKey(exchangeId: ExchangeId, credentials: ExchangeCredentials): 
  *   passphrase: 'your-passphrase'
  * });
  *
- * // Create a Kraken exchange (uses native adapter)
+ * // Create a Kraken exchange
  * const kraken = ExchangeFactory.create('kraken', {
+ *   apiKey: 'your-api-key',
+ *   apiSecret: 'your-api-secret'
+ * });
+ *
+ * // Create a Bitfinex exchange
+ * const bitfinex = ExchangeFactory.create('bitfinex', {
  *   apiKey: 'your-api-key',
  *   apiSecret: 'your-api-secret'
  * });
@@ -118,38 +112,34 @@ export class ExchangeFactory {
     // Create appropriate adapter
     let exchange: Exchange;
 
-    if (NATIVE_ADAPTERS.has(exchangeId)) {
-      // Use native adapters for supported exchanges
-      switch (exchangeId) {
-        case "binance":
-          exchange = new BinanceAdapter(credentials.apiKey, credentials.apiSecret);
-          break;
-        case "coinbase":
-          if (!credentials.passphrase) {
-            throw new Error("Coinbase requires a passphrase in addition to API key and secret");
-          }
-          exchange = new CoinbaseAdapter(
-            credentials.apiKey,
-            credentials.apiSecret,
-            credentials.passphrase
-          );
-          break;
-        case "kraken":
-          exchange = new KrakenAdapter(credentials.apiKey, credentials.apiSecret);
-          break;
-        case "hyperliquid":
-          if (!credentials.walletPrivateKey) {
-            throw new Error("Hyperliquid requires a wallet private key for authentication");
-          }
-          exchange = new HyperliquidAdapter(credentials.walletPrivateKey);
-          break;
-        default:
-          // Fallback to CCXT for any native adapter without specific handling
-          exchange = new CCXTAdapter(exchangeId, credentials);
-      }
-    } else {
-      // Use CCXT adapter for other exchanges
-      exchange = new CCXTAdapter(exchangeId, credentials);
+    switch (exchangeId) {
+      case "binance":
+        exchange = new BinanceAdapter(credentials.apiKey, credentials.apiSecret);
+        break;
+      case "coinbase":
+        if (!credentials.passphrase) {
+          throw new Error("Coinbase requires a passphrase in addition to API key and secret");
+        }
+        exchange = new CoinbaseAdapter(
+          credentials.apiKey,
+          credentials.apiSecret,
+          credentials.passphrase
+        );
+        break;
+      case "kraken":
+        exchange = new KrakenAdapter(credentials.apiKey, credentials.apiSecret);
+        break;
+      case "bitfinex":
+        exchange = new BitfinexAdapter(credentials.apiKey, credentials.apiSecret);
+        break;
+      case "hyperliquid":
+        if (!credentials.walletPrivateKey) {
+          throw new Error("Hyperliquid requires a wallet private key for authentication");
+        }
+        exchange = new HyperliquidAdapter(credentials.walletPrivateKey);
+        break;
+      default:
+        throw new Error(`No adapter available for exchange: ${exchangeId}`);
     }
 
     // Cache the instance
@@ -179,12 +169,13 @@ export class ExchangeFactory {
 
   /**
    * Check if an exchange uses a native adapter
+   * All supported exchanges now use native adapters
    *
    * @param exchangeId - Exchange ID to check
-   * @returns true if the exchange uses a native adapter (not CCXT)
+   * @returns true if the exchange is supported (all have native adapters)
    */
   static hasNativeAdapter(exchangeId: ExchangeId): boolean {
-    return NATIVE_ADAPTERS.has(exchangeId);
+    return SUPPORTED_EXCHANGES.includes(exchangeId);
   }
 
   /**

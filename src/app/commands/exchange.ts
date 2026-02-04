@@ -125,7 +125,7 @@ export async function exchangeAdd(exchangeType: string): Promise<ExchangeCommand
     }
 
     // Determine what credentials are needed
-    const needsPassphrase = type === 'coinbase' || type === 'okx';
+    const needsPassphrase = type === 'coinbase';
     const needsWallet = isWalletBasedExchange(type);
     const hasNativeAdapter = ExchangeFactory.hasNativeAdapter(type);
 
@@ -498,15 +498,11 @@ function getExchangeSetupInstructions(type: ExchangeId): string {
 1. Log in to Kraken and go to Settings > API
 2. Create a new API key with desired permissions
 3. Copy the API Key and Private Key`,
-    bybit: `
-1. Log in to Bybit and go to API Management
-2. Create a new API key with appropriate permissions
-3. Copy the API Key and Secret Key
-4. Optional: Enable IP restriction for security`,
-    okx: `
-1. Log in to OKX and go to Settings > API
-2. Create a new API key with appropriate permissions
-3. Copy the API Key, Secret Key, and Passphrase`,
+    bitfinex: `
+1. Log in to Bitfinex and go to Account > API
+2. Create a new API key
+3. Enable "Account Read" and "Orders Read/Write" permissions
+4. Copy the API Key and API Secret`,
     hyperliquid: `
 1. Generate a new Ethereum wallet or use an existing one
 2. Export the private key from your wallet (MetaMask: Account Details > Export Private Key)

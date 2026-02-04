@@ -73,3 +73,14 @@ export {
   HyperliquidNotSupportedError,
   createHyperliquidError,
 } from "./hyperliquid.ts";
+
+// Bitfinex-specific errors
+export {
+  BitfinexError,
+  BitfinexRateLimitError,
+  BitfinexAuthError,
+  BitfinexInsufficientBalanceError,
+  BitfinexInvalidSymbolError,
+  BitfinexConnectionError,
+  createBitfinexError,
+} from "./bitfinex.ts";

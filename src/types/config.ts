@@ -20,7 +20,7 @@ export const ExchangeConfigSchema = z.object({
 /**
  * Supported exchange types for multi-exchange configuration
  */
-export const ExchangeTypeSchema = z.enum(["binance", "coinbase", "kraken", "bybit", "okx", "hyperliquid"]);
+export const ExchangeTypeSchema = z.enum(["binance", "coinbase", "kraken", "bitfinex", "hyperliquid"]);
 
 /**
  * Multi-exchange configuration schema

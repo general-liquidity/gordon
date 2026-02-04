@@ -5,12 +5,12 @@
  * cryptocurrency exchanges. The Exchange interface abstracts away exchange-specific
  * details, allowing the rest of the application to work with any supported exchange.
  *
- * Supported exchanges:
- * - Binance (native adapter with full feature support)
- * - Coinbase (via CCXT)
- * - Kraken (via CCXT)
- * - Bybit (via CCXT)
- * - OKX (via CCXT)
+ * Supported exchanges (all with native adapters):
+ * - Binance
+ * - Coinbase
+ * - Kraken
+ * - Bitfinex
+ * - Hyperliquid
  *
  * @example
  * ```typescript
@@ -39,7 +39,10 @@ export { ExchangeFactory } from "./factory.ts";
 
 // Adapters
 export { BinanceAdapter } from "./adapters/binance.ts";
-export { CCXTAdapter } from "./adapters/ccxt.ts";
+export { CoinbaseAdapter } from "./adapters/coinbase.ts";
+export { KrakenAdapter } from "./adapters/kraken.ts";
+export { BitfinexAdapter } from "./adapters/bitfinex.ts";
+export { HyperliquidAdapter } from "./adapters/hyperliquid.ts";
 
 // Type aliases for convenience
 export type {
