@@ -43,3 +43,4 @@ gordon-cli-website/
 *.sqlite
 *.sqlite-shm
 *.sqlite-wal
+.superdesign

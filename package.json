@@ -47,7 +47,8 @@
     "@types/asciichart": "^1.5.8",
     "@types/bun": "latest",
     "@types/node": "^25.1.0",
-    "react-devtools-core": "^6.1.5"
+    "react-devtools-core": "^6.1.5",
+    "shadcn": "^3.8.3"
   },
   "peerDependencies": {
     "typescript": "^5"
