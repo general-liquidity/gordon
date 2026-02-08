@@ -2262,14 +2262,16 @@ Please check your API keys in the .env file and restart Gordon.`,
 
   return (
     <Box flexDirection="column" height="100%">
-      {/* Status Bar - Always visible */}
-      <StatusBar
-        mode={state.mode}
-        portfolioValue={state.portfolioValue}
-        connectionStatus={state.connectionStatus}
-        btcPrice={state.btcPrice}
-        threadInfo={state.threadStatusInfo || undefined}
-      />
+      {/* Status Bar - hidden during loading to prevent SAFE→ARMED flicker */}
+      {state.view !== "loading" && (
+        <StatusBar
+          mode={state.mode}
+          portfolioValue={state.portfolioValue}
+          connectionStatus={state.connectionStatus}
+          btcPrice={state.btcPrice}
+          threadInfo={state.threadStatusInfo || undefined}
+        />
+      )}
 
       {/* Shortcuts Overlay */}
       {state.showShortcuts && (
@@ -2297,12 +2299,7 @@ Please check your API keys in the .env file and restart Gordon.`,
         )}
 
         {state.view === "welcome" && (
-          <Box flexDirection="column">
-            <WelcomeBanner />
-            <Box paddingX={2}>
-              <Text color={COLORS.DIM}>Press any key to continue...</Text>
-            </Box>
-          </Box>
+          <WelcomeBanner />
         )}
 
         {state.view === "menu" && (

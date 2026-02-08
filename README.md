@@ -2,7 +2,7 @@
   <img src="gordon_ascii.png" alt="Gordon" width="400">
 </p>
 
-<h1 align="center">Claude Code for Vibe Trading</h1>
+<h1 align="center">The Frontier Trading Agent</h1>
 
 <p align="center">
   <em>Talk naturally. Trade confidently. Sleep peacefully.</em>
