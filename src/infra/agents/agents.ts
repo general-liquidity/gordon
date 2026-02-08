@@ -28,6 +28,7 @@ import {
   indicatorTools,
   explainTools,
   marketTools,
+  marketDataTools,
   positionTools,
   schedulerTools,
   systemTools,
@@ -42,11 +43,13 @@ import {
   marketAnalysisTools,
   riskManagementTools,
   strategyTools,
+  strategyGenerationTools,
   metricsTools,
   compositionTools,
   backtestTools,
   sharedContextTools,
   parallelAnalysisTools,
+  multiModalChartTools,
   withToolsMetrics,
 } from "./tools/index.ts";
 import { getSessionSummary, getMemoryStats, resetSharedMemory } from "./shared-context.ts";
@@ -267,6 +270,9 @@ const instrumentedCompositionTools = withToolsMetrics(compositionTools);
 const instrumentedBacktestTools = withToolsMetrics(backtestTools);
 const instrumentedSharedContextTools = withToolsMetrics(sharedContextTools);
 const instrumentedParallelAnalysisTools = withToolsMetrics(parallelAnalysisTools);
+const instrumentedStrategyGenerationTools = withToolsMetrics(strategyGenerationTools);
+const instrumentedMultiModalChartTools = withToolsMetrics(multiModalChartTools);
+const instrumentedMarketDataTools = withToolsMetrics(marketDataTools);
 const instrumentedEvalTools = withToolsMetrics(evalTools);
 
 // ============================================================================
@@ -419,7 +425,19 @@ This allows Analyst and Planner to know what opportunities you found.
 - Always mention the risk level
 - If no good setups found, tell the user to wait
 - Share your findings via write_shared_context for other agents
-- Consider historical strategy performance when making recommendations`;
+- Consider historical strategy performance when making recommendations
+
+## Available Tools for Data Fetching
+- get_trending_tokens: Find biggest price movers in the last 24h
+- get_high_volume_tokens: Find most liquid tokens by trading volume
+- get_available_markets: List all tradeable pairs on the exchange
+- get_candles: Fetch raw OHLCV candle data at any interval (1m to 1w)
+- get_price: Get current price for any symbol
+- get_tickers: Get 24hr ticker data for top coins by volume
+- get_order_book: Fetch orderbook with bid/ask walls and liquidity analysis
+- get_spread: Get bid-ask spread for a symbol
+
+Always use these native tools to fetch market data. Never suggest the user run external scripts or code.`;
 
 const ANALYST_INSTRUCTIONS = `You are Gordon's technical analyst agent.
 
@@ -464,7 +482,34 @@ Use run_full_analysis when user asks for:
 - Mention both bullish and bearish scenarios
 - Be honest about uncertainty
 - Share your analysis results via write_shared_context for other agents
-- Consider historical performance when assessing confidence levels`;
+- Consider historical performance when assessing confidence levels
+
+## Available Visualization Tools
+- display_price_chart: ASCII line chart of price action
+- display_candlestick_chart: Candlestick chart with volume
+- display_comparison_chart: Multi-asset comparison chart
+- display_volume_chart: Volume chart
+
+## Advanced Chart Tools (MultiModal)
+- generate_chart: Generate visual charts for detailed analysis
+- analyze_chart: Use vision to analyze chart patterns and formations
+- quick_ta: Quick visual technical analysis summary
+
+## Market Analysis Tools
+- scan_breakouts: Detect breakout patterns across markets
+- detect_consolidation: Find consolidating assets ready for a move
+- score_market: Score overall market conditions
+
+## Available Data Tools
+- get_candles: Fetch raw OHLCV candle data at any interval
+- get_price: Get current price
+- get_order_book: Orderbook depth with walls and liquidity
+- get_spread: Bid-ask spread
+- get_market_trades: Recent trades with buy/sell flow
+- analyze_whale_orders: Detect large orders and smart money positioning
+- estimate_market_impact: Estimate slippage for a given order size
+
+Always use these native tools. Never generate code or scripts for data fetching.`;
 
 const PLANNER_INSTRUCTIONS = `You are Gordon's trading planner agent.
 
@@ -501,6 +546,17 @@ Use shared context tools to leverage work from other agents:
 6. **Track for learning**: Use track_recommendation to record the plan for outcome tracking
 7. **Share plan**: write_shared_context so Executor knows the plan details
 
+## Strategy Generation Tools
+- strategy_generate: Create new AI-generated trading strategies
+- strategy_iterate: Refine and improve an existing strategy
+- list_generated_strategies: View all generated strategies
+- delete_generated_strategy: Remove a generated strategy
+
+## Risk-Based Position Sizing
+- calculate_kelly_size: Optimal position size via Kelly criterion
+- calculate_volatility_adjusted_size: Position size adjusted for current volatility
+- assess_trade_risk: Pre-trade risk assessment
+
 ## Important Rules
 - Never suggest risking more than user's max allocation
 - Always maintain cash reserve
@@ -516,7 +572,10 @@ Your role is to safely execute trading plans on the active exchange.
 1. NEVER execute unless the system is ARMED
 2. ALWAYS confirm the plan details before executing
 3. ALWAYS wait for explicit user approval
-4. If anything seems wrong, STOP and ask the user`;
+4. If anything seems wrong, STOP and ask the user
+
+## Available Tools
+execute_plan, close_trade, arm_system, approve_plan, list_plans, set_trailing_stop, update_trailing_stop, close_partial_position, place_bracket_order, place_oco_order, cancel_all_orders.`;
 
 const MONITOR_INSTRUCTIONS = `You are Gordon's position monitor agent.
 
@@ -541,11 +600,24 @@ Recording outcomes helps the system learn which strategies and conditions work b
 When user asks about performance or statistics:
 - Use get_performance_report for comprehensive analysis
 - Include insights about best/worst performing strategies
-- Mention any patterns identified from the trade history`;
+- Mention any patterns identified from the trade history
+
+## Available Tool Categories
+- **Account**: get_portfolio, get_account_details
+- **Wallet**: get_dustable_assets, convert_dust, transfer_funds, get_coin_info, get_trade_fees, get_deposit_address
+- **Earn**: get_flexible_earn_products, get_locked_earn_products, get_all_earn_positions, subscribe_flexible_earn, redeem_flexible_earn, subscribe_locked_earn
+- **History**: get_trade_history, get_transfer_history
+- **Risk**: check_exit_conditions, check_drawdown_status, check_daily_limit
+- **Metrics**: get_performance_metrics, get_trade_statistics, get_risk_analysis
+- **Eval**: get_win_rate_analysis, get_performance_report`;
 
 const TEACHER_INSTRUCTIONS = `You are Gordon's teacher agent.
 
 Your role is to explain trading concepts in simple, friendly terms.
+
+## Available Tools
+- **explain**: Explain any trading concept, indicator, or term
+- **strategy_explain**: Explain a specific trading strategy in detail
 
 ## Teaching Principles
 1. Use simple language - no jargon without explanation
@@ -568,8 +640,8 @@ Your role is to run historical backtests and optimize trading strategies.
 You now have access to analyst tools for comprehensive pre-backtest analysis:
 - **get_technical_analysis**: Get current market context before backtesting
 - **get_rsi/get_vwap/get_stochastic_rsi**: Check indicator values for context
-- **detect_whales**: Check for whale activity that might affect strategy validity
-- **get_orderbook_depth/get_orderbook_imbalance**: Understand liquidity context
+- **analyze_whale_orders**: Check for whale activity that might affect strategy validity
+- **get_order_book/get_spread**: Understand liquidity context
 - **run_full_analysis**: Get comprehensive analysis combining all signals
 
 ## Cross-Agent Context (NEW)
@@ -623,7 +695,19 @@ The network will automatically route to the appropriate agent based on the user'
 1. NEVER execute trades without explicit user approval
 2. ALWAYS show plan details before execution
 3. In SAFE mode, you can analyze and plan but NOT execute
-4. Remind users about risk appropriately`;
+4. Remind users about risk appropriately
+
+## Key Capabilities Across Agents
+- Raw market data (candles, prices, tickers, orderbook) -> Scanner or Analyst
+- Charts and visualization -> Analyst
+- Whale detection and orderbook analysis -> Analyst
+- Trade plans with risk sizing -> Planner
+- Strategy generation and backtesting -> Planner and Backtester
+- Order execution -> Executor (requires ARMED mode)
+- Portfolio, positions, earn, wallet -> Monitor
+- Educational explanations -> Teacher
+
+When a user asks for market data, prices, candles, or orderbook info, route to Scanner or Analyst. Never generate code or scripts -- all data is available through native tools.`;
 
 // ============================================================================
 // Lazy Agent Initialization
@@ -660,11 +744,19 @@ function getScannerAgent(): Agent {
       model: getModel(process.env.GORDON_PROVIDER, process.env.GORDON_MODEL),
       tools: {
         ...instrumentedIndicatorTools,
-        ...instrumentedDiscoveryTools,  // Coin discovery tools
+        ...instrumentedMarketDataTools,  // Raw market data: candles, prices, tickers, book tickers
+        // Coin discovery tools (excluding place_bracket_order which belongs on Executor)
+        get_trending_tokens: instrumentedDiscoveryTools.get_trending_tokens,
+        get_high_volume_tokens: instrumentedDiscoveryTools.get_high_volume_tokens,
+        get_available_markets: instrumentedDiscoveryTools.get_available_markets,
         ...instrumentedStrategyTools,   // Strategy library tools
         ...instrumentedParallelAnalysisTools,  // Parallel execution tools
         scan_market: instrumentedMarketTools.scan_market,
         analyze_coin: instrumentedMarketTools.analyze_coin,
+        get_historical_opportunities: instrumentedMarketTools.get_historical_opportunities,
+        // Orderbook tools for combining scanning with orderbook analysis
+        get_order_book: instrumentedOrderbookTools.get_order_book,
+        get_spread: instrumentedOrderbookTools.get_spread,
         // Shared context for cross-agent memory
         ...instrumentedSharedContextTools,
         // Performance evaluation tools for learning from trade outcomes
@@ -696,11 +788,18 @@ function getAnalystAgent(): Agent {
       model: getModel(process.env.GORDON_PROVIDER, process.env.GORDON_MODEL),
       tools: {
         ...instrumentedIndicatorTools,
+        ...instrumentedMarketDataTools,        // Raw market data: candles, prices, tickers, book tickers
         ...instrumentedChartTools,
-        ...instrumentedOrderbookTools,         // Order book depth and liquidity analysis
+        // Order book read-only tools (mutation tools like place_oco_order stay on Executor)
+        get_order_book: instrumentedOrderbookTools.get_order_book,
+        get_spread: instrumentedOrderbookTools.get_spread,
+        get_market_trades: instrumentedOrderbookTools.get_market_trades,
+        get_order_status: instrumentedOrderbookTools.get_order_status,
+        test_order: instrumentedOrderbookTools.test_order,
         ...instrumentedMarketAnalysisTools,    // Whale detection, breakouts, consolidation, scoring
         ...instrumentedCompositionTools,       // Full analysis composition tool
         ...instrumentedParallelAnalysisTools,  // Parallel deep analysis tools
+        ...instrumentedMultiModalChartTools,   // Advanced chart generation and vision analysis
         analyze_coin: instrumentedMarketTools.analyze_coin,
         // Shared context for cross-agent memory
         ...instrumentedSharedContextTools,
@@ -736,6 +835,11 @@ function getPlannerAgent(): Agent {
         create_plan: instrumentedTradingTools.create_plan,
         create_grid_plan: instrumentedTradingTools.create_grid_plan,
         list_plans: instrumentedTradingTools.list_plans,
+        // Strategy generation tools for AI-powered strategy creation
+        strategy_generate: instrumentedStrategyGenerationTools.strategy_generate,
+        strategy_iterate: instrumentedStrategyGenerationTools.strategy_iterate,
+        list_generated_strategies: instrumentedStrategyGenerationTools.list_generated_strategies,
+        delete_generated_strategy: instrumentedStrategyGenerationTools.delete_generated_strategy,
         // Risk-based position sizing tools
         calculate_kelly_size: instrumentedRiskManagementTools.calculate_kelly_size,
         calculate_volatility_adjusted_size: instrumentedRiskManagementTools.calculate_volatility_adjusted_size,
@@ -774,6 +878,17 @@ function getExecutorAgent(): Agent {
         arm_system: instrumentedTradingTools.arm_system,
         list_plans: instrumentedTradingTools.list_plans,
         approve_plan: instrumentedTradingTools.approve_plan,
+        // Trailing stop and partial close tools
+        set_trailing_stop: instrumentedTradingTools.set_trailing_stop,
+        update_trailing_stop: instrumentedTradingTools.update_trailing_stop,
+        close_partial_position: instrumentedTradingTools.close_partial_position,
+        // Bracket and OCO order tools
+        place_bracket_order: instrumentedDiscoveryTools.place_bracket_order,
+        place_oco_order: instrumentedOrderbookTools.place_oco_order,
+        cancel_all_orders: instrumentedOrderbookTools.cancel_all_orders,
+        // Order status and validation tools
+        get_order_status: instrumentedOrderbookTools.get_order_status,
+        test_order: instrumentedOrderbookTools.test_order,
       },
       // Token limiter to prevent context window overflow in long sessions
       inputProcessors: [new TokenLimiterProcessor({ limit: 8000 })],
@@ -813,6 +928,7 @@ function getMonitorAgent(): Agent {
         record_trade_outcome: instrumentedEvalTools.record_trade_outcome,
         get_performance_report: instrumentedEvalTools.get_performance_report,
         process_unrecorded_trades: instrumentedEvalTools.process_unrecorded_trades,
+        get_win_rate_analysis: instrumentedEvalTools.get_win_rate_analysis,
       },
       // Token limiter to prevent context window overflow in long sessions
       inputProcessors: [new TokenLimiterProcessor({ limit: 8000 })],
@@ -837,6 +953,7 @@ function getTeacherAgent(): Agent {
       model: getModel(process.env.GORDON_PROVIDER, process.env.GORDON_MODEL),
       tools: {
         explain: instrumentedExplainTools.explain,
+        strategy_explain: instrumentedStrategyGenerationTools.strategy_explain,
       },
       // Token limiter to prevent context window overflow in long sessions
       inputProcessors: [new TokenLimiterProcessor({ limit: 8000 })],
@@ -872,7 +989,10 @@ function getBacktesterAgent(): Agent {
         // Analyst tools for pre-analysis (Improvement #3)
         ...instrumentedIndicatorTools,           // RSI, MACD, Bollinger, etc.
         ...instrumentedMarketAnalysisTools,      // Whale detection, breakouts, scoring
-        ...instrumentedOrderbookTools,           // Orderbook depth and imbalance
+        // Order book read-only tools (mutation tools stay on Executor)
+        get_order_book: instrumentedOrderbookTools.get_order_book,
+        get_spread: instrumentedOrderbookTools.get_spread,
+        get_market_trades: instrumentedOrderbookTools.get_market_trades,
         ...instrumentedCompositionTools,         // run_full_analysis for comprehensive context
         analyze_coin: instrumentedMarketTools.analyze_coin,
 

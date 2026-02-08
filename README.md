@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="gordon-logo.png" alt="Gordon" width="400">
+  <img src="gordon_ascii.png" alt="Gordon" width="400">
 </p>
 
 <h1 align="center">Claude Code for Vibe Trading</h1>

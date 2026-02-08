@@ -417,53 +417,152 @@ export function getSummarizationStats(
  * Used to detect which agent is responding during streaming
  */
 const TOOL_AGENT_MAP: Record<string, string> = {
-  // Scanner tools
+  // ---- Scanner tools ----
+  // marketTools cherry-picks
   scan_market: "Scanner",
-  // Analyst tools
+  get_historical_opportunities: "Scanner",
+  // discoveryTools cherry-picks
+  get_trending_tokens: "Scanner",
+  get_high_volume_tokens: "Scanner",
+  get_available_markets: "Scanner",
+  // indicatorTools spread (Scanner is primary for shared indicator tools)
+  get_technical_analysis: "Scanner",
+  get_technical_signals: "Scanner",
+  get_rsi: "Scanner",
+  get_stop_loss_levels: "Scanner",
+  get_position_size: "Scanner",
+  get_vwap: "Scanner",
+  get_stochastic_rsi: "Scanner",
+  // marketDataTools spread (Scanner is primary for raw market data)
+  get_candles: "Scanner",
+  get_price: "Scanner",
+  get_tickers: "Scanner",
+  get_book_ticker: "Scanner",
+  // strategyTools spread
+  list_strategies: "Scanner",
+  get_strategy_details: "Scanner",
+  detect_strategy: "Scanner",
+  scan_for_strategy: "Scanner",
+  suggest_strategy: "Scanner",
+  run_strategy_ensemble: "Scanner",
+  scan_with_ensemble: "Scanner",
+  // parallelAnalysisTools spread (Scanner is primary)
+  parallel_scan_analyze: "Scanner",
+  parallel_multi_coin: "Scanner",
+  parallel_deep_analysis: "Scanner",
+  parallel_timeframe: "Scanner",
+  // evalTools cherry-picks on Scanner
+  get_strategy_performance: "Scanner",
+  get_performance_context: "Scanner",
+  get_all_strategy_performances: "Scanner",
+
+  // ---- Analyst tools ----
+  // marketTools cherry-pick
   analyze_coin: "Analyst",
-  get_technical_analysis: "Analyst",
-  get_rsi: "Analyst",
-  get_vwap: "Analyst",
-  get_stochastic_rsi: "Analyst",
-  detect_whales: "Analyst",
-  detect_breakout: "Analyst",
+  // chartTools spread
+  display_price_chart: "Analyst",
+  display_candlestick_chart: "Analyst",
+  display_comparison_chart: "Analyst",
+  display_volume_chart: "Analyst",
+  // orderbookTools spread (Analyst has full spread)
+  get_order_book: "Analyst",
+  get_spread: "Analyst",
+  get_market_trades: "Analyst",
+  get_order_status: "Analyst",
+  test_order: "Analyst",
+  // marketAnalysisTools spread
+  analyze_whale_orders: "Analyst",
+  estimate_market_impact: "Analyst",
+  scan_breakouts: "Analyst",
   detect_consolidation: "Analyst",
-  score_setup: "Analyst",
-  get_orderbook_depth: "Analyst",
-  get_orderbook_imbalance: "Analyst",
-  find_liquidity_clusters: "Analyst",
-  get_chart: "Analyst",
+  score_market: "Analyst",
+  // compositionTools spread
   run_full_analysis: "Analyst",
-  // Planner tools
+  // multiModalChartTools spread
+  generate_chart: "Analyst",
+  analyze_chart: "Analyst",
+  quick_ta: "Analyst",
+  // evalTools cherry-picks on Analyst
+  get_market_condition_performance: "Analyst",
+  get_learning_insights: "Analyst",
+
+  // ---- Planner tools ----
+  // tradingTools cherry-picks
   create_plan: "Planner",
   create_grid_plan: "Planner",
   list_plans: "Planner",
+  // strategyGenerationTools cherry-picks
+  strategy_generate: "Planner",
+  strategy_iterate: "Planner",
+  list_generated_strategies: "Planner",
+  delete_generated_strategy: "Planner",
+  // riskManagementTools cherry-picks
   calculate_kelly_size: "Planner",
   calculate_volatility_adjusted_size: "Planner",
   assess_trade_risk: "Planner",
-  // Executor tools
+  // evalTools cherry-picks on Planner
+  get_risk_reward_analysis: "Planner",
+  track_recommendation: "Planner",
+
+  // ---- Executor tools ----
+  // tradingTools cherry-picks
   execute_plan: "Executor",
   close_trade: "Executor",
   arm_system: "Executor",
   approve_plan: "Executor",
-  // Monitor tools
+  set_trailing_stop: "Executor",
+  update_trailing_stop: "Executor",
+  close_partial_position: "Executor",
+  // discoveryTools cherry-pick
+  place_bracket_order: "Executor",
+  // orderbookTools cherry-picks
+  place_oco_order: "Executor",
+  cancel_all_orders: "Executor",
+
+  // ---- Monitor tools ----
+  // positionTools spread
   check_positions: "Monitor",
+  // accountTools spread
   get_portfolio: "Monitor",
-  get_wallet_balances: "Monitor",
-  get_earn_positions: "Monitor",
+  get_account_details: "Monitor",
+  // earnTools spread
+  get_flexible_earn_products: "Monitor",
+  get_locked_earn_products: "Monitor",
+  get_all_earn_positions: "Monitor",
+  subscribe_flexible_earn: "Monitor",
+  redeem_flexible_earn: "Monitor",
+  subscribe_locked_earn: "Monitor",
+  // walletTools spread
+  get_dustable_assets: "Monitor",
+  convert_dust: "Monitor",
+  transfer_funds: "Monitor",
+  get_coin_info: "Monitor",
+  get_trade_fees: "Monitor",
+  get_asset_dividends: "Monitor",
+  get_deposit_address: "Monitor",
+  // historyTools spread
   get_trade_history: "Monitor",
+  get_transfer_history: "Monitor",
+  // metricsTools spread
+  get_performance_metrics: "Monitor",
+  get_trade_statistics: "Monitor",
+  get_risk_analysis: "Monitor",
+  // riskManagementTools cherry-picks
   check_exit_conditions: "Monitor",
   check_drawdown_status: "Monitor",
   check_daily_limit: "Monitor",
-  get_performance_metrics: "Monitor",
-  // Teacher tools
+  // evalTools cherry-picks on Monitor
+  record_trade_outcome: "Monitor",
+  get_performance_report: "Monitor",
+  process_unrecorded_trades: "Monitor",
+  get_win_rate_analysis: "Monitor",
+
+  // ---- Teacher tools ----
   explain: "Teacher",
-  // Discovery tools (Scanner)
-  discover_coins: "Scanner",
-  get_trending: "Scanner",
-  get_new_listings: "Scanner",
-  get_top_movers: "Scanner",
-  // Backtester tools
+  strategy_explain: "Teacher",
+
+  // ---- Backtester tools ----
+  // backtestTools spread
   run_backtest: "Backtester",
   optimize_strategy: "Backtester",
   compare_backtests: "Backtester",
@@ -472,14 +571,35 @@ const TOOL_AGENT_MAP: Record<string, string> = {
   compare_backtest_results: "Backtester",
   rank_strategies_by_metric: "Backtester",
   find_best_strategy: "Backtester",
+  export_results_json: "Backtester",
+  export_results_csv: "Backtester",
+  generate_html_report: "Backtester",
+  filter_exclude_months: "Backtester",
+  filter_market_hours: "Backtester",
+  filter_first_last_hour: "Backtester",
   analyze_alpha_decay: "Backtester",
+  generate_backtest_chart: "Backtester",
   grid_search_optimization: "Backtester",
   random_search_optimization: "Backtester",
-  // Shared context tools (used by multiple agents)
+  run_walk_forward_test: "Backtester",
+  run_monte_carlo: "Backtester",
+  get_backtest_history: "Backtester",
+  save_backtest_result: "Backtester",
+  load_backtest_result: "Backtester",
+
+  // ---- Gordon tools ----
+  // sharedContextTools spread (used by multiple agents, owned by Gordon)
   read_shared_context: "Gordon",
   write_shared_context: "Gordon",
-  // System tools
+  // systemTools spread
+  test_connection: "Gordon",
+  get_model_info: "Gordon",
+  get_cache_stats: "Gordon",
   get_agent_health: "Gordon",
+  // schedulerTools spread
+  start_background_scanning: "Gordon",
+  stop_background_scanning: "Gordon",
+  get_scanning_status: "Gordon",
 };
 
 /**
@@ -779,13 +899,17 @@ export async function* processMessageStream(
     const tracingOptions = createAgentTracingOptions();
 
     // Use Mastra's stream() method for real-time responses
-    // Pass threadId and resourceId for session continuity and memory association
-    // Type assertion needed as Mastra's types don't fully expose all options
+    // Pass threadId and resourceId inside memory option for Mastra's newer execution path
+    // This ensures sub-agents also receive thread/resource context for working memory updates
     const effectiveResourceId = resourceId || context.userId || "default";
     const streamResult = await gordonAgent().stream(userMessage, {
       requestContext,
-      threadId,
-      resourceId: effectiveResourceId,
+      ...(threadId && effectiveResourceId ? {
+        memory: {
+          thread: threadId,
+          resource: effectiveResourceId,
+        },
+      } : {}),
       maxSteps: 20,
       ...(tracingOptions && { tracingOptions }),
     } as Record<string, unknown>);
@@ -1186,13 +1310,17 @@ export async function* processWithNetwork(
     const tracingOptions = createAgentTracingOptions();
 
     // Use Agent Network for automatic routing between sub-agents
-    // Pass threadId and resourceId for session continuity and memory association
-    // Type assertion needed as Mastra's types don't fully expose all options
+    // Pass threadId and resourceId inside memory option for Mastra's network execution path
+    // This ensures sub-agents also receive thread/resource context for working memory updates
     const effectiveResourceId = resourceId || context.userId || "default";
     const networkResult = await gordonAgent().network(userMessage, {
       requestContext,
-      threadId,
-      resourceId: effectiveResourceId,
+      ...(threadId && effectiveResourceId ? {
+        memory: {
+          thread: threadId,
+          resource: effectiveResourceId,
+        },
+      } : {}),
       maxSteps: 30,
       ...(tracingOptions && { tracingOptions }),
     } as Record<string, unknown>);
@@ -1312,13 +1440,17 @@ export async function processMessage(
     const tracingOptions = createAgentTracingOptions();
 
     // Use generate() for non-streaming responses
-    // Pass threadId and resourceId for session continuity and memory association
-    // Type assertion needed for threadId support with Memory
+    // Pass threadId and resourceId inside memory option for Mastra's newer execution path
+    // This ensures sub-agents also receive thread/resource context for working memory updates
     const effectiveResourceId = resourceId || context.userId || "default";
     const result = await gordonAgent().generate(userMessage, {
       requestContext,
-      threadId,
-      resourceId: effectiveResourceId,
+      ...(threadId && effectiveResourceId ? {
+        memory: {
+          thread: threadId,
+          resource: effectiveResourceId,
+        },
+      } : {}),
       maxSteps: 20,
       ...(tracingOptions && { tracingOptions }),
     } as Record<string, unknown>);

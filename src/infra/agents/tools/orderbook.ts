@@ -567,9 +567,6 @@ export const testOrderTool = createTool({
   },
 });
 
-// Alias for clarity
-export const getMarketTradesTool = getRecentTradesTool;
-
 // ============================================================================
 // Export as Object (Mastra format)
 // ============================================================================
