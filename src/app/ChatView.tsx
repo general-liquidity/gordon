@@ -19,7 +19,7 @@ interface MessageBubbleProps {
   message: ChatMessage;
 }
 
-const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
+const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({ message }) => {
   const isUser = message.role === "user";
   const showAgentBadge = !isUser && message.agent && message.agent.toLowerCase() !== "gordon";
 
@@ -62,11 +62,11 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
       </Box>
     </Box>
   );
-};
+});
 
 export const ChatView: React.FC<ChatViewProps> = ({
   messages,
-  maxVisibleMessages = 20,
+  maxVisibleMessages = 6,
 }) => {
   // Get the last N messages for display (simulating scroll)
   const visibleMessages = messages.slice(-maxVisibleMessages);
@@ -94,7 +94,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
         </Box>
       ) : (
         visibleMessages.map((msg, index) => (
-          <MessageBubble key={`${msg.role}-${index}-${msg.content.slice(0, 20)}`} message={msg} />
+          <MessageBubble key={`${msg.role}-${msg.timestamp}-${index}`} message={msg} />
         ))
       )}
     </Box>

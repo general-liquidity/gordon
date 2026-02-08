@@ -474,7 +474,11 @@ Pick the RIGHT tool for the request:
 - "analyze [SYMBOL]", "technical analysis" → **get_technical_analysis** or **get_technical_signals**
 - Specific data requests → get_candles, get_price, get_tickers, get_order_book, get_spread
 
-Always use native tools to fetch market data. Never suggest the user run external scripts or code.`;
+Always use native tools to fetch market data. Never suggest the user run external scripts or code.
+
+## Response Style
+- Execute tool calls immediately with default parameters. Do NOT ask clarifying questions about scope, timeframe, or exchanges — just show results.
+- If the user wants something different, they will tell you.`;
 
 const ANALYST_INSTRUCTIONS = `You are Gordon's technical analyst agent.
 
@@ -847,7 +851,7 @@ function getScannerAgent(): Agent {
         get_all_strategy_performances: instrumentedEvalTools.get_all_strategy_performances,
       },
       memory: createSubAgentMemory(),
-      inputProcessors: [new TokenLimiterProcessor({ limit: 8000 })],
+      inputProcessors: [new TokenLimiterProcessor({ limit: 32000 })],
     });
   }
   return _agents.scanner;
@@ -891,7 +895,7 @@ function getAnalystAgent(): Agent {
         get_learning_insights: instrumentedEvalTools.get_learning_insights,
       },
       memory: createSubAgentMemory(),
-      inputProcessors: [new TokenLimiterProcessor({ limit: 8000 })],
+      inputProcessors: [new TokenLimiterProcessor({ limit: 32000 })],
     });
   }
   return _agents.analyst;
@@ -935,7 +939,7 @@ function getPlannerAgent(): Agent {
         track_recommendation: instrumentedEvalTools.track_recommendation,
       },
       memory: createSubAgentMemory(),
-      inputProcessors: [new TokenLimiterProcessor({ limit: 8000 })],
+      inputProcessors: [new TokenLimiterProcessor({ limit: 32000 })],
     });
   }
   return _agents.planner;
@@ -975,7 +979,7 @@ function getExecutorAgent(): Agent {
         ...instrumentedSharedContextTools,
       },
       memory: createSubAgentMemory(),
-      inputProcessors: [new TokenLimiterProcessor({ limit: 8000 })],
+      inputProcessors: [new TokenLimiterProcessor({ limit: 32000 })],
     });
   }
   return _agents.executor;
@@ -1015,7 +1019,7 @@ function getMonitorAgent(): Agent {
         get_win_rate_analysis: instrumentedEvalTools.get_win_rate_analysis,
       },
       memory: createSubAgentMemory(),
-      inputProcessors: [new TokenLimiterProcessor({ limit: 8000 })],
+      inputProcessors: [new TokenLimiterProcessor({ limit: 32000 })],
     });
   }
   return _agents.monitor;
@@ -1042,7 +1046,7 @@ function getTeacherAgent(): Agent {
         ...instrumentedSharedContextTools,
       },
       memory: createSubAgentMemory(),
-      inputProcessors: [new TokenLimiterProcessor({ limit: 8000 })],
+      inputProcessors: [new TokenLimiterProcessor({ limit: 32000 })],
     });
   }
   return _agents.teacher;
@@ -1086,7 +1090,7 @@ function getBacktesterAgent(): Agent {
         ...instrumentedSharedContextTools,
       },
       memory: createSubAgentMemory(),
-      inputProcessors: [new TokenLimiterProcessor({ limit: 8000 })],
+      inputProcessors: [new TokenLimiterProcessor({ limit: 32000 })],
     });
   }
   return _agents.backtester;
@@ -1130,7 +1134,8 @@ function getGordonAgent(): Agent {
       memory: createMemory(),
 
       // Token limiter to prevent context window overflow in long sessions
-      inputProcessors: [new TokenLimiterProcessor({ limit: 8000 })],
+      // Gordon (routing agent) needs high limit: system prompt + 7 transfer tools + system/scheduler tools + Mastra routing prompt
+      inputProcessors: [new TokenLimiterProcessor({ limit: 64000 })],
     });
   }
   return _agents.gordon;

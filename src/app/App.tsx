@@ -1546,6 +1546,7 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
       );
       let fullContent = "";
       let currentAgentName: string | undefined;
+      let pendingUpdate = false;
 
       // Helper to update the streaming message with agent attribution
       const updateStreamingMessage = (content: string, agent?: string): void => {
@@ -1568,12 +1569,23 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
         });
       };
 
+      // Throttled version — batches updates every 50ms for smooth rendering
+      const scheduleUpdate = (): void => {
+        if (!pendingUpdate) {
+          pendingUpdate = true;
+          setTimeout(() => {
+            pendingUpdate = false;
+            updateStreamingMessage(fullContent, currentAgentName);
+          }, 50);
+        }
+      };
+
       for await (const event of stream) {
         switch (event.type) {
           case "text_delta":
             if (event.content) {
               fullContent += event.content;
-              updateStreamingMessage(fullContent, currentAgentName);
+              scheduleUpdate();
             }
             break;
 

@@ -59,7 +59,7 @@ export interface ModelRoute {
  */
 const DIRECT_MODELS = {
   anthropic: {
-    flagship: "claude-opus-4-5",
+    flagship: "claude-opus-4-6",
     balanced: "claude-sonnet-4-5",
     fast: "claude-haiku-4-5",
   },
@@ -84,7 +84,7 @@ export const DEDALUS_MODELS = [
   // OpenAI
   { id: "openai/gpt-5.2", provider: "openai" as const, name: "GPT-5.2", tier: "flagship" as const },
   // Anthropic
-  { id: "anthropic/claude-opus-4-5", provider: "anthropic" as const, name: "Claude Opus 4.5", tier: "flagship" as const },
+  { id: "anthropic/claude-opus-4-6", provider: "anthropic" as const, name: "Claude Opus 4.6", tier: "flagship" as const },
   { id: "anthropic/claude-sonnet-4-5-20250929", provider: "anthropic" as const, name: "Claude Sonnet 4.5", tier: "balanced" as const },
   { id: "anthropic/claude-haiku-4-5-20251001", provider: "anthropic" as const, name: "Claude Haiku 4.5", tier: "fast" as const },
   // Google
