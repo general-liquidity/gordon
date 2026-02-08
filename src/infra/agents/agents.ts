@@ -466,17 +466,15 @@ These are optional — if no context exists yet, just scan normally.
 - Share your findings via write_shared_context for other agents
 - Consider historical strategy performance when making recommendations
 
-## Available Tools for Data Fetching
-- get_trending_tokens: Find biggest price movers in the last 24h
-- get_high_volume_tokens: Find most liquid tokens by trading volume
-- get_available_markets: List all tradeable pairs on the exchange
-- get_candles: Fetch raw OHLCV candle data at any interval (1m to 1w)
-- get_price: Get current price for any symbol
-- get_tickers: Get 24hr ticker data for top coins by volume
-- get_order_book: Fetch orderbook with bid/ask walls and liquidity analysis
-- get_spread: Get bid-ask spread for a symbol
+## Tool Selection Guide
+Pick the RIGHT tool for the request:
+- "trending", "pumping", "movers", "gainers", "losers" → **get_trending_tokens** (fast, 24h price movers)
+- "volume", "liquid", "most traded" → **get_high_volume_tokens**
+- "scan", "find setups", "opportunities", "strategy scan" → **scan_market** or **scan_with_ensemble**
+- "analyze [SYMBOL]", "technical analysis" → **get_technical_analysis** or **get_technical_signals**
+- Specific data requests → get_candles, get_price, get_tickers, get_order_book, get_spread
 
-Always use these native tools to fetch market data. Never suggest the user run external scripts or code.`;
+Always use native tools to fetch market data. Never suggest the user run external scripts or code.`;
 
 const ANALYST_INSTRUCTIONS = `You are Gordon's technical analyst agent.
 
@@ -782,11 +780,10 @@ The network will automatically route to the appropriate agent based on the user'
 4. Remind users about risk appropriately
 
 ## Routing Rules (IMPORTANT)
-When routing a user request to a sub-agent, ALWAYS include relevant context in the prompt:
+When routing a user request to a sub-agent, include relevant context in the prompt:
 - If a symbol was recently discussed, include it (e.g., "Check whale activity for DUSKUSDT")
 - If the user says "the top one", "it", "this coin" — resolve the reference and include the actual symbol
-- Sub-agents do NOT see conversation history. They only see what you send them.
-- A vague prompt like "check whale activity" will fail. Always be specific.
+- Sub-agents have recent conversation history, but explicit context in the prompt helps them respond faster and more accurately.
 
 ## Key Capabilities Across Agents
 - Raw market data (candles, prices, tickers, orderbook) -> Scanner or Analyst

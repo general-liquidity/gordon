@@ -587,19 +587,10 @@ const TOOL_AGENT_MAP: Record<string, string> = {
   save_backtest_result: "Backtester",
   load_backtest_result: "Backtester",
 
-  // ---- Gordon tools ----
-  // sharedContextTools spread (used by multiple agents, owned by Gordon)
-  read_shared_context: "Gordon",
-  write_shared_context: "Gordon",
-  // systemTools spread
-  test_connection: "Gordon",
-  get_model_info: "Gordon",
-  get_cache_stats: "Gordon",
-  get_agent_health: "Gordon",
-  // schedulerTools spread
-  start_background_scanning: "Gordon",
-  stop_background_scanning: "Gordon",
-  get_scanning_status: "Gordon",
+  // ---- Cross-cutting tools (NOT mapped to any agent) ----
+  // sharedContextTools and systemTools are used by ALL agents.
+  // Mapping them to "Gordon" causes spurious self-handoff detections,
+  // so they are intentionally omitted from TOOL_AGENT_MAP.
 };
 
 /**
@@ -1035,17 +1026,9 @@ export async function* processMessageStream(
               break;
 
             // Handle routing agent text (from network routing decisions)
+            // Suppress routing agent internal reasoning — users should only see sub-agent output
             case "routing-agent-text-delta":
-              if (chunk.payload?.text) {
-                const outputCheck = await checkOutputGuardrails(chunk.payload.text);
-                const sanitizedChunk = outputCheck.sanitized;
-                fullText += sanitizedChunk;
-                yield {
-                  type: "text_delta",
-                  content: sanitizedChunk,
-                  agentName: currentAgent || "Gordon",
-                };
-              }
+              // Don't yield routing agent text to the UI
               break;
 
             default:

@@ -21,7 +21,7 @@ interface MessageBubbleProps {
 
 const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
   const isUser = message.role === "user";
-  const showAgentBadge = !isUser && message.agent && message.agent !== "gordon";
+  const showAgentBadge = !isUser && message.agent && message.agent.toLowerCase() !== "gordon";
 
   return (
     <Box
