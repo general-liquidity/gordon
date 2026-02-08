@@ -12,7 +12,6 @@ export interface ChatMessage {
 
 interface ChatViewProps {
   messages: ChatMessage[];
-  maxVisibleMessages?: number;
 }
 
 interface MessageBubbleProps {
@@ -66,34 +65,17 @@ const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({ message }) => 
 
 export const ChatView: React.FC<ChatViewProps> = ({
   messages,
-  maxVisibleMessages = 15,
 }) => {
-  // Get the last N messages for display (simulating scroll)
-  const visibleMessages = messages.slice(-maxVisibleMessages);
-
-  // Check if there are more messages than visible
-  const hasMore = messages.length > maxVisibleMessages;
-
   return (
     <Box flexDirection="column" flexGrow={1} paddingX={1}>
-      {/* Scroll indicator */}
-      {hasMore && (
-        <Box justifyContent="center" marginBottom={1}>
-          <Text color={COLORS.DIM}>
-            --- {messages.length - maxVisibleMessages} more messages above ---
-          </Text>
-        </Box>
-      )}
-
-      {/* Messages */}
-      {visibleMessages.length === 0 ? (
+      {messages.length === 0 ? (
         <Box justifyContent="center" paddingY={2}>
           <Text color={COLORS.DIM} italic>
             Start a conversation with Gordon...
           </Text>
         </Box>
       ) : (
-        visibleMessages.map((msg, index) => (
+        messages.map((msg, index) => (
           <MessageBubble key={`${msg.role}-${msg.timestamp}-${index}`} message={msg} />
         ))
       )}
