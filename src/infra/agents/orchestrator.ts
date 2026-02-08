@@ -907,6 +907,8 @@ export async function* processMessageStream(
 
     let fullText = "";
     let currentAgent: string | undefined;
+    let subAgentProducedOutput = false;
+    let bufferedRoutingText = "";
 
     // Mastra's stream() returns a MastraModelOutput with fullStream for all events
     // Use type assertion to access the streaming interface
@@ -1026,9 +1028,11 @@ export async function* processMessageStream(
               break;
 
             // Handle routing agent text (from network routing decisions)
-            // Suppress routing agent internal reasoning — users should only see sub-agent output
+            // Buffer this text — only show it if no sub-agent produces output
             case "routing-agent-text-delta":
-              // Don't yield routing agent text to the UI
+              if (chunk.payload?.text) {
+                bufferedRoutingText += chunk.payload.text;
+              }
               break;
 
             default:
@@ -1038,6 +1042,7 @@ export async function* processMessageStream(
                 const innerPayload = chunk.payload as unknown as StreamChunk;
 
                 if (innerType === "text-delta" && innerPayload?.payload?.text) {
+                  subAgentProducedOutput = true;
                   const outputCheck = await checkOutputGuardrails(innerPayload.payload.text);
                   const sanitizedChunk = outputCheck.sanitized;
                   fullText += sanitizedChunk;
@@ -1085,6 +1090,19 @@ export async function* processMessageStream(
         }
       } finally {
         reader.releaseLock();
+      }
+
+      // If no sub-agent produced output, flush the buffered routing agent text
+      // This handles cases where the routing agent responds directly
+      if (!subAgentProducedOutput && bufferedRoutingText.trim()) {
+        const outputCheck = await checkOutputGuardrails(bufferedRoutingText);
+        const sanitizedChunk = outputCheck.sanitized;
+        fullText += sanitizedChunk;
+        yield {
+          type: "text_delta",
+          content: sanitizedChunk,
+          agentName: currentAgent || "Gordon",
+        };
       }
     } else if (streamObj.textStream && typeof streamObj.textStream[Symbol.asyncIterator] === 'function') {
       // Fallback to textStream if fullStream is not available
