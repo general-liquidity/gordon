@@ -41,7 +41,8 @@
     "build:binary": "bun build src/index.tsx --compile --outfile gordon",
     "prepublishOnly": "bun run build",
     "test": "bun test",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "postinstall": "node scripts/patch-mastra.cjs"
   },
   "devDependencies": {
     "@types/asciichart": "^1.5.8",

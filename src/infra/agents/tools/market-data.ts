@@ -80,7 +80,7 @@ export const getCandlesTool = createTool({
           low: c.low,
           close: c.close,
           volume: c.volume,
-          timestamp: c.timestamp,
+          timestamp: c.openTime,
         })),
       };
     } catch (error) {
@@ -145,6 +145,10 @@ export const getTickersTool = createTool({
       .max(200)
       .default(20)
       .describe("Number of top tickers to return sorted by volume (default 20)"),
+    quoteAsset: z
+      .string()
+      .default("USDT")
+      .describe("Quote asset to filter by (default 'USDT'). Use 'ALL' for all pairs."),
   }),
   outputSchema: z.object({
     count: z.number().optional(),
@@ -160,7 +164,7 @@ export const getTickersTool = createTool({
     })).optional(),
     error: z.string().optional(),
   }),
-  execute: async ({ limit }, execContext: MastraExecutionContext) => {
+  execute: async ({ limit, quoteAsset }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
     if (!ctx?.exchange) {
       return errors.noExchange;
@@ -169,8 +173,13 @@ export const getTickersTool = createTool({
     try {
       const tickers = await ctx.exchange.get24hrTickers();
 
+      // Filter by quote asset (default USDT to exclude fiat pairs like USDTIDR)
+      const filtered = quoteAsset === "ALL"
+        ? tickers
+        : tickers.filter((t) => t.symbol.endsWith(quoteAsset.toUpperCase()));
+
       // Sort by quote volume descending and take top N
-      const sorted = tickers
+      const sorted = filtered
         .sort((a, b) => b.quoteVolume - a.quoteVolume)
         .slice(0, limit);
 

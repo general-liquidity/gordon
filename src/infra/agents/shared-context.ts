@@ -140,6 +140,33 @@ export interface PlannerContext {
 }
 
 /**
+ * Monitor context shared from Monitor agent
+ * Ground truth: what the user actually owns, real PnL, capital
+ */
+export interface MonitorContext {
+  timestamp: number;
+  portfolioValue: number;
+  cashAvailable: number;
+  totalExposurePercent: number;
+  openPositions: Array<{
+    symbol: string;
+    side: "long" | "short";
+    entryPrice: number;
+    currentPrice: number;
+    size: number;
+    unrealizedPnl: number;
+    unrealizedPnlPercent: number;
+  }>;
+  recentOutcomes: Array<{
+    symbol: string;
+    strategy: string;
+    result: "win" | "loss" | "breakeven";
+    pnlPercent: number;
+    closedAt: number;
+  }>;
+}
+
+/**
  * Complete shared context across all agents
  * Uses versioned entries with TTL for memory management
  */
@@ -156,6 +183,9 @@ export interface SharedAgentMemory {
   // Active trading plans (versioned)
   planner: VersionedEntry<PlannerContext> | null;
 
+  // Monitor ground truth: portfolio, positions, capital (versioned)
+  monitor: VersionedEntry<MonitorContext> | null;
+
   // Session metadata
   session: {
     startTime: number;
@@ -169,6 +199,7 @@ export interface SharedAgentMemory {
     scanner: number;
     backtests: Map<string, number>;
     planner: number;
+    monitor: number;
   };
 }
 
@@ -188,6 +219,7 @@ export function getSharedMemory(): SharedAgentMemory {
       scanner: null,
       backtests: new Map(),
       planner: null,
+      monitor: null,
       session: {
         startTime: Date.now(),
         lastActivity: Date.now(),
@@ -198,6 +230,7 @@ export function getSharedMemory(): SharedAgentMemory {
         scanner: 0,
         backtests: new Map(),
         planner: 0,
+        monitor: 0,
       },
     };
   }
@@ -270,6 +303,11 @@ export function cleanupExpiredContexts(): void {
     _sharedMemory.planner = null;
   }
 
+  // Clean up monitor if expired
+  if (_sharedMemory.monitor && isExpired(_sharedMemory.monitor)) {
+    _sharedMemory.monitor = null;
+  }
+
   // Enforce max entries limit per type
   enforceMaxEntriesLimit(_sharedMemory.analyses);
   enforceMaxEntriesLimit(_sharedMemory.backtests);
@@ -328,11 +366,11 @@ function getNextVersion(
 ): number;
 function getNextVersion(
   memory: SharedAgentMemory,
-  type: "scanner" | "planner"
+  type: "scanner" | "planner" | "monitor"
 ): number;
 function getNextVersion(
   memory: SharedAgentMemory,
-  type: "analyses" | "backtests" | "scanner" | "planner",
+  type: "analyses" | "backtests" | "scanner" | "planner" | "monitor",
   symbol?: string
 ): number {
   if (type === "analyses" || type === "backtests") {
@@ -587,6 +625,46 @@ export function getPlannerContextVersioned(): VersionedEntry<PlannerContext> | n
 }
 
 /**
+ * Store monitor context (portfolio ground truth)
+ */
+export function storeMonitorContext(
+  context: MonitorContext,
+  author: string = "Monitor"
+): void {
+  const memory = getSharedMemory();
+  const version = getNextVersion(memory, "monitor");
+  memory.monitor = createVersionedEntry(context, author, version);
+  memory.session.lastActivity = Date.now();
+  memory.session.agentHistory.push({
+    agent: author,
+    action: `Portfolio snapshot: $${context.portfolioValue.toFixed(2)}, ${context.openPositions.length} positions (v${version})`,
+    timestamp: Date.now(),
+  });
+}
+
+/**
+ * Get monitor context
+ */
+export function getMonitorContext(): MonitorContext | null {
+  const memory = getSharedMemory();
+  if (!memory.monitor || isExpired(memory.monitor)) {
+    return null;
+  }
+  return memory.monitor.data;
+}
+
+/**
+ * Get versioned monitor context (includes metadata)
+ */
+export function getMonitorContextVersioned(): VersionedEntry<MonitorContext> | null {
+  const memory = getSharedMemory();
+  if (!memory.monitor || isExpired(memory.monitor)) {
+    return null;
+  }
+  return memory.monitor;
+}
+
+/**
  * Get session summary for context injection
  */
 export function getSessionSummary(): string {
@@ -657,6 +735,18 @@ export function getSessionSummary(): string {
     }
   }
 
+  // Monitor portfolio snapshot (using versioned entry)
+  if (memory.monitor && !isExpired(memory.monitor)) {
+    const ctx = memory.monitor.data;
+    const posCount = ctx.openPositions.length;
+    const totalPnl = ctx.openPositions.reduce((sum, p) => sum + p.unrealizedPnl, 0);
+    parts.push(
+      `Portfolio: $${ctx.portfolioValue.toFixed(0)} | ${posCount} positions | ` +
+      `${totalPnl >= 0 ? "+" : ""}$${totalPnl.toFixed(2)} unrealized | ` +
+      `${ctx.totalExposurePercent.toFixed(1)}% exposure (v${memory.monitor.version})`
+    );
+  }
+
   return parts.length > 0
     ? `\n## Cross-Agent Context\n${parts.join("\n")}`
     : "";
@@ -670,6 +760,7 @@ export function getMemoryStats(): {
   backtestsCount: number;
   hasScanner: boolean;
   hasPlanner: boolean;
+  hasMonitor: boolean;
   totalVersions: number;
   oldestEntry: number | null;
 } {
@@ -713,12 +804,19 @@ export function getMemoryStats(): {
       oldestEntry = memory.planner.createdAt;
     }
   }
+  if (memory.monitor) {
+    totalVersions++;
+    if (oldestEntry === null || memory.monitor.createdAt < oldestEntry) {
+      oldestEntry = memory.monitor.createdAt;
+    }
+  }
 
   return {
     analysesCount: memory.analyses.size,
     backtestsCount: memory.backtests.size,
     hasScanner: memory.scanner !== null && !isExpired(memory.scanner),
     hasPlanner: memory.planner !== null && !isExpired(memory.planner),
+    hasMonitor: memory.monitor !== null && !isExpired(memory.monitor),
     totalVersions,
     oldestEntry,
   };
@@ -740,8 +838,8 @@ export const readSharedContextTool = createTool({
     "Use includeHistory=true to retrieve previous versions.",
   inputSchema: z.object({
     contextType: z
-      .enum(["analysis", "scanner", "backtest", "planner", "all", "history"])
-      .describe("Type of context to retrieve. Use 'history' with symbol to get version history."),
+      .enum(["analysis", "scanner", "backtest", "planner", "monitor", "all", "history"])
+      .describe("Type of context to retrieve. Use 'monitor' for portfolio ground truth. Use 'history' with symbol to get version history."),
     symbol: z
       .string()
       .optional()
@@ -867,6 +965,28 @@ export const readSharedContextTool = createTool({
         };
       }
 
+      case "monitor": {
+        const versioned = getMonitorContextVersioned();
+        if (!versioned) {
+          return { found: false, summary: "No portfolio snapshot available" };
+        }
+        const ctx = versioned.data;
+        const totalPnl = ctx.openPositions.reduce((sum, p) => sum + p.unrealizedPnl, 0);
+        return {
+          found: true,
+          context: ctx,
+          summary:
+            `Portfolio: $${ctx.portfolioValue.toFixed(2)} | ` +
+            `${ctx.openPositions.length} positions | ` +
+            `${totalPnl >= 0 ? "+" : ""}$${totalPnl.toFixed(2)} unrealized PnL | ` +
+            `$${ctx.cashAvailable.toFixed(2)} cash | ` +
+            `${ctx.totalExposurePercent.toFixed(1)}% exposure`,
+          age: Math.round((Date.now() - ctx.timestamp) / 1000),
+          version: versioned.version,
+          author: versioned.author,
+        };
+      }
+
       case "history": {
         if (!input.symbol) {
           return { found: false, summary: "Symbol required for history lookup" };
@@ -943,6 +1063,7 @@ export const readSharedContextTool = createTool({
             hasScanner: stats.hasScanner,
             backtestCount: stats.backtestsCount,
             hasPlanner: stats.hasPlanner,
+            hasMonitor: stats.hasMonitor,
             totalVersions: stats.totalVersions,
             history: memory.session.agentHistory.slice(-10),
           },
@@ -965,7 +1086,7 @@ export const writeSharedContextTool = createTool({
     "Write your analysis/results to shared context for other agents to use. " +
     "Call this after completing significant work so other agents can benefit.",
   inputSchema: z.object({
-    contextType: z.enum(["analysis", "scanner", "backtest", "planner"]),
+    contextType: z.enum(["analysis", "scanner", "backtest", "planner", "monitor"]),
     symbol: z.string().optional(),
     data: z.record(z.string(), z.any()).describe("Context data to store"),
   }),
@@ -1010,6 +1131,13 @@ export const writeSharedContextTool = createTool({
             ...input.data,
           } as PlannerContext);
           return { success: true, message: "Stored planner context" };
+
+        case "monitor":
+          storeMonitorContext({
+            timestamp: Date.now(),
+            ...input.data,
+          } as MonitorContext);
+          return { success: true, message: "Stored monitor context (portfolio snapshot)" };
 
         default:
           return { success: false, message: "Unknown context type" };

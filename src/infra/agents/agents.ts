@@ -370,6 +370,38 @@ function createMemory(): Memory {
   });
 }
 
+/**
+ * Lightweight shared memory for sub-agents (Scanner, Analyst, etc.)
+ *
+ * When Mastra's Agent Network routes to a sub-agent, it passes memory context
+ * (threadId, resourceId) which triggers injection of the updateWorkingMemory tool.
+ * Without a Memory instance on the sub-agent, this tool crashes.
+ *
+ * This memory disables workingMemory so the tool is NOT injected (Mastra checks
+ * workingMemory.enabled before adding the tool). Sub-agents use our custom
+ * shared_context tools for cross-agent communication instead.
+ */
+let _subAgentMemory: Memory | null = null;
+
+function createSubAgentMemory(): Memory {
+  if (!_subAgentMemory) {
+    const dbUrl = process.env.DATABASE_URL || "file:gordon.db";
+    _subAgentMemory = new Memory({
+      storage: new LibSQLStore({
+        id: "gordon-sub-memory",
+        url: dbUrl,
+      }),
+      options: {
+        lastMessages: 10,
+        workingMemory: {
+          enabled: false,
+        },
+      },
+    });
+  }
+  return _subAgentMemory;
+}
+
 // ============================================================================
 // Instructions (unchanged from OpenAI SDK)
 // ============================================================================
@@ -412,11 +444,18 @@ Before recommending strategies, consider checking past performance:
 - For comprehensive market scans (scan_with_ensemble)
 
 ## Cross-Agent Context
-After scanning, use write_shared_context to store findings:
+After every scan, ALWAYS call write_shared_context to store your results:
 - contextType: "scanner"
-- data: { topOpportunities, marketCondition, ensembleResults }
+- data: { topOpportunities: [{symbol, confidence, setupType}], marketCondition }
+Other agents (Analyst, Planner) cannot see your output directly — they read shared context
+to know which coins you found.
 
-This allows Analyst and Planner to know what opportunities you found.
+## Portfolio-Aware Scanning (Optional Enrichment)
+If available, check shared context to make smarter recommendations:
+- read_shared_context("monitor") — if the user checked their portfolio, you'll know what they hold and their cash available
+- read_shared_context("planner") — avoid recommending coins with active plans
+- read_shared_context("backtest") — prioritize strategies that have been validated
+These are optional — if no context exists yet, just scan normally.
 
 ## Important Rules
 - Only present coins with detected setups (setupDetected: true)
@@ -462,14 +501,19 @@ Your analysis should be informed by historical trade outcomes:
 - Note if current market condition historically produces better or worse results
 
 ## Cross-Agent Context
-Use shared context tools to collaborate with other agents:
-- **read_shared_context**: Check if Scanner already found opportunities
-- **write_shared_context**: Store your analysis for Planner/Backtester to use
+If the user's request doesn't specify a symbol (e.g., "check whale activity", "analyze the top one"), read shared context to figure out which symbol they mean:
+- read_shared_context("analysis") — check if you already analyzed a symbol this session
+- read_shared_context("scanner") — see what coins were found in a recent scan
+If neither has context, ask the user which symbol they mean.
 
-After completing a significant analysis, always call write_shared_context with:
-- contextType: "analysis"
-- symbol: the analyzed symbol
+Other optional reads (use if available, skip if not):
+- read_shared_context("monitor") — know if user already holds this coin
+- read_shared_context("backtest", symbol) — see if this coin was already backtested
+
+After completing analysis, ALWAYS write_shared_context with:
+- contextType: "analysis", symbol: the analyzed symbol
 - data: { overallBias, confidence, technicalSignals, supportResistance }
+This ensures follow-up requests (like "check whale activity") can find the active symbol.
 
 ## When to Use run_full_analysis
 Use run_full_analysis when user asks for:
@@ -530,12 +574,13 @@ Use historical performance data to create better plans:
 - Use **track_recommendation** AFTER creating a plan to enable learning from the outcome
 - Adjust position sizing based on strategy's historical win rate
 
-## Cross-Agent Context
-Use shared context tools to leverage work from other agents:
-- **read_shared_context("analysis", symbol)**: Get Analyst's technical analysis
-- **read_shared_context("backtest", symbol)**: Get Backtester's strategy performance
-- **read_shared_context("scanner")**: See Scanner's latest opportunities
-- **write_shared_context**: Store your plans for Executor to reference
+## Cross-Agent Context (Optional Enrichment)
+Check shared context when available — each makes your plans better, but none are required to proceed:
+- **read_shared_context("monitor")**: Portfolio value, cash available, open positions — improves position sizing
+- **read_shared_context("analysis", symbol)**: Analyst's technical analysis — improves entry/exit levels
+- **read_shared_context("backtest", symbol)**: Backtester's strategy performance — validates the approach
+- **read_shared_context("scanner")**: Scanner's latest opportunities — provides context on market conditions
+- **write_shared_context**: Store your plans so Executor and Monitor can reference them
 
 ## Recommended Workflow
 1. **Check performance context**: get_performance_context to see recent win rate and patterns
@@ -562,7 +607,8 @@ Use shared context tools to leverage work from other agents:
 - Always maintain cash reserve
 - Risk/reward ratio should be at least 1.2:1
 - Explain the reasoning behind each level
-- Leverage existing analysis from shared context when available`;
+- Leverage existing analysis from shared context when available
+- When possible, check portfolio context to ensure position sizing accounts for existing exposure`;
 
 const EXECUTOR_INSTRUCTIONS = `You are Gordon's trade executor agent.
 
@@ -574,12 +620,32 @@ Your role is to safely execute trading plans on the active exchange.
 3. ALWAYS wait for explicit user approval
 4. If anything seems wrong, STOP and ask the user
 
+## Cross-Agent Context (Recommended Pre-Checks)
+Before executing, try to read shared context for extra safety. Proceed if none exists:
+1. read_shared_context("monitor") — verify portfolio state and available cash if available
+2. read_shared_context("planner") — get the active plan details if available
+3. read_shared_context("analysis", symbol) — verify analysis is still valid if available
+4. If analysis context exists and is stale (>10 min old), warn the user that conditions may have changed
+
 ## Available Tools
-execute_plan, close_trade, arm_system, approve_plan, list_plans, set_trailing_stop, update_trailing_stop, close_partial_position, place_bracket_order, place_oco_order, cancel_all_orders.`;
+execute_plan, close_trade, arm_system, approve_plan, list_plans, set_trailing_stop, update_trailing_stop, close_partial_position, place_bracket_order, place_oco_order, cancel_all_orders, read_shared_context, write_shared_context.`;
 
 const MONITOR_INSTRUCTIONS = `You are Gordon's position monitor agent.
 
 Your role is to watch open positions and keep the user informed.
+
+## Cross-Agent Context
+After checking positions or portfolio, ALWAYS call write_shared_context to store the ground truth:
+- contextType: "monitor"
+- data: { portfolioValue, cashAvailable, totalExposurePercent, openPositions: [{symbol, side, entryPrice, currentPrice, size, unrealizedPnl, unrealizedPnlPercent}], recentOutcomes: [{symbol, strategy, result, pnlPercent, closedAt}] }
+You are the only agent with ground truth about what the user actually owns. Other agents
+read this to make better decisions (position sizing, avoiding duplicates, etc.).
+
+Also READ context from other agents when available (optional enrichment):
+- read_shared_context("planner") — compare positions against original plan levels (entry/SL/TP)
+- read_shared_context("analysis", symbol) — check if analysis still supports holding or suggests exiting
+- read_shared_context("backtest", symbol) — compare live performance vs. backtested expectations
+If no context exists from other agents, just report portfolio status normally.
 
 ## When Reporting Positions
 1. Total portfolio value and cash available
@@ -618,11 +684,22 @@ Your role is to explain trading concepts in simple, friendly terms.
 ## Available Tools
 - **explain**: Explain any trading concept, indicator, or term
 - **strategy_explain**: Explain a specific trading strategy in detail
+- **read_shared_context**: Read data from other agents to give contextual explanations
+
+## Contextual Teaching (Optional but Powerful)
+When explaining concepts, check if other agents have context you can use for concrete examples:
+- read_shared_context("monitor") — use real portfolio/PnL (e.g., "Your ETH position is up 12%, which means...")
+- read_shared_context("analysis", symbol) — use actual indicator values (e.g., "Your ETH RSI is at 28, which means...")
+- read_shared_context("planner") — use actual plan levels to explain entry/SL/TP concepts
+- read_shared_context("backtest") — use actual metrics to explain Sharpe ratio, win rate, etc.
+- read_shared_context("scanner") — use actual found coins to explain setups
+
+If context exists, teaching with real numbers is 10x more effective. If no context exists, explain with general examples — that's perfectly fine too.
 
 ## Teaching Principles
 1. Use simple language - no jargon without explanation
 2. Use analogies when helpful
-3. Give concrete examples
+3. Give concrete examples from their ACTUAL trading session when possible
 4. Connect concepts to practical trading decisions`;
 
 const BACKTESTER_INSTRUCTIONS = `You are Gordon's backtesting specialist agent.
@@ -649,8 +726,15 @@ Use shared context tools to collaborate with other agents:
 - **read_shared_context**: Check if Analyst already analyzed this coin
 - **write_shared_context**: Store your backtest results for Planner to use
 
+## Cross-Agent Context Reading (Optional Enrichment)
+Check what other agents have found — use if available, proceed without if not:
+- read_shared_context("monitor") — know actual portfolio size for realistic position sizing
+- read_shared_context("analysis", symbol) — get Analyst's technical context for the symbol
+- read_shared_context("scanner") — see which coins/strategies Scanner recommended
+- read_shared_context("planner") — if user says "backtest this plan", read the plan details for strategy/symbol/params
+
 ## Recommended Workflow
-1. **Check shared context first**: read_shared_context to see if analysis exists
+1. **Check shared context first**: read_shared_context to see if analysis or plan exists
 2. **Pre-analyze if needed**: Run get_technical_analysis for current market context
 3. **Run backtest**: Execute the strategy backtest with historical data
 4. **Contextualize results**: Compare backtest assumptions to current conditions
@@ -696,6 +780,13 @@ The network will automatically route to the appropriate agent based on the user'
 2. ALWAYS show plan details before execution
 3. In SAFE mode, you can analyze and plan but NOT execute
 4. Remind users about risk appropriately
+
+## Routing Rules (IMPORTANT)
+When routing a user request to a sub-agent, ALWAYS include relevant context in the prompt:
+- If a symbol was recently discussed, include it (e.g., "Check whale activity for DUSKUSDT")
+- If the user says "the top one", "it", "this coin" — resolve the reference and include the actual symbol
+- Sub-agents do NOT see conversation history. They only see what you send them.
+- A vague prompt like "check whale activity" will fail. Always be specific.
 
 ## Key Capabilities Across Agents
 - Raw market data (candles, prices, tickers, orderbook) -> Scanner or Analyst
@@ -764,7 +855,7 @@ function getScannerAgent(): Agent {
         get_performance_context: instrumentedEvalTools.get_performance_context,
         get_all_strategy_performances: instrumentedEvalTools.get_all_strategy_performances,
       },
-      // Token limiter to prevent context window overflow in long sessions
+      memory: createSubAgentMemory(),
       inputProcessors: [new TokenLimiterProcessor({ limit: 8000 })],
     });
   }
@@ -808,7 +899,7 @@ function getAnalystAgent(): Agent {
         get_market_condition_performance: instrumentedEvalTools.get_market_condition_performance,
         get_learning_insights: instrumentedEvalTools.get_learning_insights,
       },
-      // Token limiter to prevent context window overflow in long sessions
+      memory: createSubAgentMemory(),
       inputProcessors: [new TokenLimiterProcessor({ limit: 8000 })],
     });
   }
@@ -852,7 +943,7 @@ function getPlannerAgent(): Agent {
         get_risk_reward_analysis: instrumentedEvalTools.get_risk_reward_analysis,
         track_recommendation: instrumentedEvalTools.track_recommendation,
       },
-      // Token limiter to prevent context window overflow in long sessions
+      memory: createSubAgentMemory(),
       inputProcessors: [new TokenLimiterProcessor({ limit: 8000 })],
     });
   }
@@ -889,8 +980,10 @@ function getExecutorAgent(): Agent {
         // Order status and validation tools
         get_order_status: instrumentedOrderbookTools.get_order_status,
         test_order: instrumentedOrderbookTools.test_order,
+        // Shared context for reading plan details and analysis before execution
+        ...instrumentedSharedContextTools,
       },
-      // Token limiter to prevent context window overflow in long sessions
+      memory: createSubAgentMemory(),
       inputProcessors: [new TokenLimiterProcessor({ limit: 8000 })],
     });
   }
@@ -930,7 +1023,7 @@ function getMonitorAgent(): Agent {
         process_unrecorded_trades: instrumentedEvalTools.process_unrecorded_trades,
         get_win_rate_analysis: instrumentedEvalTools.get_win_rate_analysis,
       },
-      // Token limiter to prevent context window overflow in long sessions
+      memory: createSubAgentMemory(),
       inputProcessors: [new TokenLimiterProcessor({ limit: 8000 })],
     });
   }
@@ -954,8 +1047,10 @@ function getTeacherAgent(): Agent {
       tools: {
         explain: instrumentedExplainTools.explain,
         strategy_explain: instrumentedStrategyGenerationTools.strategy_explain,
+        // Shared context so Teacher can explain using real data from any agent
+        ...instrumentedSharedContextTools,
       },
-      // Token limiter to prevent context window overflow in long sessions
+      memory: createSubAgentMemory(),
       inputProcessors: [new TokenLimiterProcessor({ limit: 8000 })],
     });
   }
@@ -999,7 +1094,7 @@ function getBacktesterAgent(): Agent {
         // Shared context tools for cross-agent memory (Improvement #2)
         ...instrumentedSharedContextTools,
       },
-      // Token limiter to prevent context window overflow in long sessions
+      memory: createSubAgentMemory(),
       inputProcessors: [new TokenLimiterProcessor({ limit: 8000 })],
     });
   }
