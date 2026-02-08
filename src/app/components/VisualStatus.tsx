@@ -392,7 +392,7 @@ export const TradingModeIndicator: React.FC<TradingModeIndicatorProps> = ({
     : "SAFE";
 
   if (isArmed && animate && !isBlinkVisible) {
-    return <Text color={COLORS.MUTED}>SAFE</Text>;
+    return <Text color={COLORS.MUTED}>{label}</Text>;
   }
 
   return (
