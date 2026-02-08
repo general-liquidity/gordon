@@ -66,7 +66,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({ message }) => 
 
 export const ChatView: React.FC<ChatViewProps> = ({
   messages,
-  maxVisibleMessages = 6,
+  maxVisibleMessages = 15,
 }) => {
   // Get the last N messages for display (simulating scroll)
   const visibleMessages = messages.slice(-maxVisibleMessages);

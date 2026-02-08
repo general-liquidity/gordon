@@ -1423,7 +1423,6 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
             return;
           }
           case "arm_system": {
-            setState((prev) => ({ ...prev, messages: [...prev.messages, userMessage], isLoading: true }));
             const currentConfig = await loadConfig();
             const isArming = command.name === "arm";
             if (isArming) {
@@ -1435,13 +1434,13 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
                 mode: "ARMED",
                 messages: [
                   ...prev.messages,
+                  userMessage,
                   {
                     role: "gordon",
                     content: `System **ARMED** for ${armHours} hours. Trading enabled.\n\nI can now execute approved trade plans. I will still ask for your explicit confirmation before placing any order.\n\nTo disarm: \`/disarm\``,
                     timestamp: formatTimestamp(),
                   },
                 ],
-                isLoading: false,
               }));
             } else {
               await saveConfig({ ...currentConfig, mode: "SAFE", armedUntil: null });
@@ -1450,13 +1449,13 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
                 mode: "SAFE",
                 messages: [
                   ...prev.messages,
+                  userMessage,
                   {
                     role: "gordon",
                     content: "System **DISARMED**. Back to SAFE mode. No trades will be executed.",
                     timestamp: formatTimestamp(),
                   },
                 ],
-                isLoading: false,
               }));
             }
             return;
