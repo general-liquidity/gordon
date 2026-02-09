@@ -471,6 +471,189 @@ export const getDepositAddressTool = createTool({
 });
 
 // ============================================================================
+// User Assets & Wallet Balances
+// ============================================================================
+
+export const getUserAssetsTool = createTool({
+  id: "get_user_assets",
+  description:
+    "Get all user assets with BTC valuation. " +
+    "Use when user asks 'what assets do I have?', 'show my balances in BTC', 'total portfolio in BTC'.",
+  inputSchema: z.object({
+    showAll: z
+      .boolean()
+      .default(false)
+      .describe("Show all assets including zero balances. By default only shows non-zero."),
+  }),
+  outputSchema: z.object({
+    count: z.number().optional(),
+    totalBtcValuation: z.string().optional(),
+    assets: z
+      .array(
+        z.object({
+          asset: z.string(),
+          free: z.string(),
+          locked: z.string(),
+          btcValuation: z.string(),
+        })
+      )
+      .optional(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ showAll }, execContext: MastraExecutionContext) => {
+    const ctx = getGordonContext(execContext);
+    if (!ctx?.exchange) {
+      return errors.noExchange;
+    }
+    if (!ctx.binance || ctx.exchange.exchangeId !== "binance") {
+      return errors.binanceOnly;
+    }
+
+    try {
+      const userAssets = await ctx.binance.getUserAssets(true);
+
+      const filtered = showAll
+        ? userAssets
+        : userAssets.filter(
+            (a) => parseFloat(a.free) > 0 || parseFloat(a.locked) > 0
+          );
+
+      const totalBtcValuation = userAssets
+        .reduce((sum, a) => sum + parseFloat(a.btcValuation), 0)
+        .toFixed(8);
+
+      return {
+        count: filtered.length,
+        totalBtcValuation,
+        assets: filtered.map((a) => ({
+          asset: a.asset,
+          free: a.free,
+          locked: a.locked,
+          btcValuation: a.btcValuation,
+        })),
+      };
+    } catch (error) {
+      return { error: `Failed to get user assets: ${(error as Error).message}` };
+    }
+  },
+});
+
+export const getWalletBalancesTool = createTool({
+  id: "get_wallet_balances",
+  description:
+    "Get wallet balance summary across all wallet types (Spot, Funding, Margin, etc.). " +
+    "Use when user asks 'wallet balances', 'how much in each wallet', 'funding wallet balance'.",
+  inputSchema: z.object({}),
+  outputSchema: z.object({
+    wallets: z
+      .array(
+        z.object({
+          walletName: z.string(),
+          balance: z.string(),
+          active: z.boolean(),
+        })
+      )
+      .optional(),
+    totalBalance: z.string().optional(),
+    error: z.string().optional(),
+  }),
+  execute: async (_input, execContext: MastraExecutionContext) => {
+    const ctx = getGordonContext(execContext);
+    if (!ctx?.exchange) {
+      return errors.noExchange;
+    }
+    if (!ctx.binance || ctx.exchange.exchangeId !== "binance") {
+      return errors.binanceOnly;
+    }
+
+    try {
+      const walletBalances = await ctx.binance.getWalletBalances();
+
+      const totalBalance = walletBalances
+        .reduce((sum, w) => sum + parseFloat(w.balance), 0)
+        .toFixed(8);
+
+      return {
+        wallets: walletBalances.map((w) => ({
+          walletName: w.walletName,
+          balance: w.balance,
+          active: w.activate,
+        })),
+        totalBalance,
+      };
+    } catch (error) {
+      return { error: `Failed to get wallet balances: ${(error as Error).message}` };
+    }
+  },
+});
+
+export const getDustLogTool = createTool({
+  id: "get_dust_log",
+  description:
+    "Get history of dust conversions (small balances converted to BNB). " +
+    "Use when user asks 'dust history', 'past dust conversions', 'BNB conversion log'.",
+  inputSchema: z.object({
+    limit: z
+      .number()
+      .min(1)
+      .max(20)
+      .default(10)
+      .describe("Number of recent dust conversions to show"),
+  }),
+  outputSchema: z.object({
+    total: z.number().optional(),
+    conversions: z
+      .array(
+        z.object({
+          time: z.string(),
+          totalBnbReceived: z.string(),
+          serviceFee: z.string(),
+          assets: z.array(
+            z.object({
+              fromAsset: z.string(),
+              amount: z.string(),
+              bnbReceived: z.string(),
+            })
+          ),
+        })
+      )
+      .optional(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ limit }, execContext: MastraExecutionContext) => {
+    const ctx = getGordonContext(execContext);
+    if (!ctx?.exchange) {
+      return errors.noExchange;
+    }
+    if (!ctx.binance || ctx.exchange.exchangeId !== "binance") {
+      return errors.binanceOnly;
+    }
+
+    try {
+      const result = await ctx.binance.getDustLog();
+
+      const dribblets = result.userAssetDribblets.slice(0, limit);
+
+      return {
+        total: result.total,
+        conversions: dribblets.map((d) => ({
+          time: new Date(d.operateTime).toISOString(),
+          totalBnbReceived: d.totalTransferedAmount,
+          serviceFee: d.totalServiceChargeAmount,
+          assets: d.userAssetDribbletDetails.map((detail) => ({
+            fromAsset: detail.fromAsset,
+            amount: detail.amount,
+            bnbReceived: detail.transferedAmount,
+          })),
+        })),
+      };
+    } catch (error) {
+      return { error: `Failed to get dust log: ${(error as Error).message}` };
+    }
+  },
+});
+
+// ============================================================================
 // Export as Object (Mastra format)
 // ============================================================================
 
@@ -486,4 +669,7 @@ export const walletTools = {
   get_trade_fees: getTradeFeesTool,
   get_asset_dividends: getAssetDividendsTool,
   get_deposit_address: getDepositAddressTool,
+  get_user_assets: getUserAssetsTool,
+  get_wallet_balances: getWalletBalancesTool,
+  get_dust_log: getDustLogTool,
 };

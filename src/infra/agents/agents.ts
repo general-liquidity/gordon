@@ -614,13 +614,37 @@ Check shared context when available — each makes your plans better, but none a
 
 const EXECUTOR_INSTRUCTIONS = `You are Gordon's trade executor agent.
 
-Your role is to safely execute trading plans on the active exchange.
+Your role is to safely execute trading plans and orders on the active exchange.
 
 ## Safety Protocol
 1. NEVER execute unless the system is ARMED
-2. ALWAYS confirm the plan details before executing
+2. ALWAYS confirm the order/plan details before executing
 3. ALWAYS wait for explicit user approval
 4. If anything seems wrong, STOP and ask the user
+
+## Simple Market Orders
+For simple spot conversions, swaps, or purchases (e.g., "buy USDT with 54 USDC", "swap USDC to USDT", "buy $50 of ETH"):
+- Use **place_market_order** — it supports both quantity (base asset) and quoteOrderQty (spend amount in quote asset)
+- No stop-loss or take-profit needed
+- Still requires ARMED mode and user confirmation
+
+## Limit Orders
+For orders at a specific price (e.g., "buy BTC at 95000", "set a sell limit at 4000"):
+- Use **place_limit_order** — places a GTC limit order on the book
+- Supports GTC (Good Til Cancelled), IOC (Immediate or Cancel), FOK (Fill or Kill)
+- Requires ARMED mode
+
+## Structured Trading Plans
+For full trading plans with entry, stop-loss, and take-profit:
+- Use **execute_plan** to execute an approved plan
+- Use **place_bracket_order** for market entry with SL/TP
+
+## Order Management
+- **cancel_order** — Cancel a single order by ID (e.g., "cancel order #12345")
+- **cancel_all_orders** — Cancel ALL open orders on a symbol (emergency)
+- **cancel_replace_order** — Atomically cancel and replace an order (e.g., "move my limit from 95k to 94k")
+- **cancel_order_list** — Cancel an OCO/OTO order list by orderListId
+- **get_order_status** — Check status of a specific order
 
 ## Cross-Agent Context (Recommended Pre-Checks)
 Before executing, try to read shared context for extra safety. Proceed if none exists:
@@ -630,7 +654,7 @@ Before executing, try to read shared context for extra safety. Proceed if none e
 4. If analysis context exists and is stale (>10 min old), warn the user that conditions may have changed
 
 ## Available Tools
-execute_plan, close_trade, arm_system, approve_plan, list_plans, set_trailing_stop, update_trailing_stop, close_partial_position, place_bracket_order, place_oco_order, cancel_all_orders, read_shared_context, write_shared_context.`;
+execute_plan, close_trade, arm_system, approve_plan, list_plans, set_trailing_stop, update_trailing_stop, close_partial_position, place_bracket_order, place_market_order, place_limit_order, place_oco_order, cancel_all_orders, cancel_order, cancel_replace_order, cancel_order_list, get_order_status, read_shared_context, write_shared_context.`;
 
 const MONITOR_INSTRUCTIONS = `You are Gordon's position monitor agent.
 
@@ -671,10 +695,10 @@ When user asks about performance or statistics:
 - Mention any patterns identified from the trade history
 
 ## Available Tool Categories
-- **Account**: get_portfolio, get_account_details
-- **Wallet**: get_dustable_assets, convert_dust, transfer_funds, get_coin_info, get_trade_fees, get_deposit_address
-- **Earn**: get_flexible_earn_products, get_locked_earn_products, get_all_earn_positions, subscribe_flexible_earn, redeem_flexible_earn, subscribe_locked_earn
-- **History**: get_trade_history, get_transfer_history
+- **Account**: get_portfolio, get_account_details, get_account_snapshot
+- **Wallet**: get_dustable_assets, convert_dust, transfer_funds, get_coin_info, get_trade_fees, get_deposit_address, get_user_assets, get_wallet_balances, get_dust_log
+- **Earn**: get_flexible_earn_products, get_locked_earn_products, get_all_earn_positions, subscribe_flexible_earn, redeem_flexible_earn, subscribe_locked_earn, get_earn_history
+- **History**: get_trade_history, get_transfer_history, get_order_history
 - **Risk**: check_exit_conditions, check_drawdown_status, check_daily_limit
 - **Metrics**: get_performance_metrics, get_trade_statistics, get_risk_analysis
 - **Eval**: get_win_rate_analysis, get_performance_report`;
@@ -789,8 +813,8 @@ When the user asks for analysis, scanning, planning, backtesting, or execution �
 - Whale detection and orderbook analysis -> Analyst
 - Trade plans with risk sizing -> Planner
 - Strategy generation and backtesting -> Planner and Backtester
-- Order execution -> Executor (requires ARMED mode)
-- Portfolio, positions, earn, wallet -> Monitor
+- Order execution, simple swaps/conversions, market orders, limit orders, cancel orders, open orders -> Executor (requires ARMED mode)
+- Portfolio, positions, earn, wallet, fund transfers -> Monitor
 - Educational explanations -> Teacher
 
 When a user asks for market data, prices, candles, or orderbook info, route to Scanner or Analyst. Never generate code or scripts -- all data is available through native tools.`;
@@ -954,8 +978,9 @@ function getExecutorAgent(): Agent {
       id: "executor",
       name: "Executor",
       description:
-        "Specialist in executing trading plans and managing orders. " +
-        "Use when user wants to execute an approved plan or needs to arm the system.",
+        "Specialist in executing trades, placing orders, and managing positions. " +
+        "Use when user wants to execute a plan, place a market or limit order, " +
+        "swap/convert coins, buy or sell spot, cancel an order, or arm the system.",
       instructions: EXECUTOR_INSTRUCTIONS,
       model: getModel(process.env.GORDON_PROVIDER, process.env.GORDON_MODEL),
       tools: {
@@ -968,10 +993,16 @@ function getExecutorAgent(): Agent {
         set_trailing_stop: instrumentedTradingTools.set_trailing_stop,
         update_trailing_stop: instrumentedTradingTools.update_trailing_stop,
         close_partial_position: instrumentedTradingTools.close_partial_position,
-        // Bracket and OCO order tools
+        // Bracket, market, limit, and OCO order tools
         place_bracket_order: instrumentedDiscoveryTools.place_bracket_order,
+        place_market_order: instrumentedDiscoveryTools.place_market_order,
+        place_limit_order: instrumentedOrderbookTools.place_limit_order,
         place_oco_order: instrumentedOrderbookTools.place_oco_order,
         cancel_all_orders: instrumentedOrderbookTools.cancel_all_orders,
+        cancel_order: instrumentedOrderbookTools.cancel_order,
+        // Order management tools
+        cancel_replace_order: instrumentedOrderbookTools.cancel_replace_order,
+        cancel_order_list: instrumentedOrderbookTools.cancel_order_list,
         // Order status and validation tools
         get_order_status: instrumentedOrderbookTools.get_order_status,
         test_order: instrumentedOrderbookTools.test_order,
@@ -994,17 +1025,22 @@ function getMonitorAgent(): Agent {
       id: "monitor",
       name: "Monitor",
       description:
-        "Specialist in monitoring open positions, portfolio health, and detecting issues. " +
+        "Specialist in monitoring open positions, portfolio health, and wallet management. " +
         "Use when user asks about their trades, positions, portfolio status, wallet balances, " +
-        "earn positions, trade history, exit conditions, or drawdown status.",
+        "open orders, order history, earn positions, trade history, account snapshots, " +
+        "exit conditions, drawdown status, " +
+        "or wants to transfer funds between wallets (spot, funding, futures, margin).",
       instructions: MONITOR_INSTRUCTIONS,
       model: getModel(process.env.GORDON_PROVIDER, process.env.GORDON_MODEL),
       tools: {
         check_positions: instrumentedPositionTools.check_positions,
         ...instrumentedAccountTools,
-        ...instrumentedWalletTools,    // Wallet management and transfers
-        ...instrumentedEarnTools,      // Staking/savings positions
+        ...instrumentedWalletTools,    // Wallet management, transfers, user assets, wallet balances, dust log
+        ...instrumentedEarnTools,      // Staking/savings positions and earn history
         ...instrumentedHistoryTools,   // Trade and transfer history
+        get_order_history: instrumentedOrderbookTools.get_order_history,  // Order history (placed/cancelled/expired)
+        get_open_orders: instrumentedOrderbookTools.get_open_orders,    // Open/pending orders
+        get_open_order_lists: instrumentedOrderbookTools.get_open_order_lists,  // Open OCO/OTO lists
         ...instrumentedMetricsTools,   // Performance metrics and statistics
         // Risk monitoring tools
         check_exit_conditions: instrumentedRiskManagementTools.check_exit_conditions,

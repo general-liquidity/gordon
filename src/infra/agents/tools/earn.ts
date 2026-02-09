@@ -413,6 +413,115 @@ export const subscribeLockedTool = createTool({
 });
 
 // ============================================================================
+// History
+// ============================================================================
+
+export const getEarnHistoryTool = createTool({
+  id: "get_earn_history",
+  description:
+    "Get earn subscription and redemption history. " +
+    "Use when user asks 'earn history', 'past subscriptions', 'redemption history', 'when did I stake?'.",
+  inputSchema: z.object({
+    type: z
+      .enum(["subscriptions", "redemptions", "both"])
+      .default("both")
+      .describe("What type of history to fetch"),
+    asset: z.string().optional().describe("Filter by asset (e.g., 'USDT', 'BTC')"),
+    limit: z
+      .number()
+      .min(1)
+      .max(50)
+      .default(20)
+      .describe("Max records to return per type"),
+  }),
+  outputSchema: z.object({
+    subscriptions: z
+      .object({
+        count: z.number(),
+        records: z.array(
+          z.object({
+            amount: z.string(),
+            asset: z.string(),
+            time: z.string(),
+            purchaseId: z.number(),
+            sourceAccount: z.string(),
+            status: z.string(),
+          })
+        ),
+      })
+      .optional(),
+    redemptions: z
+      .object({
+        count: z.number(),
+        records: z.array(
+          z.object({
+            amount: z.string(),
+            asset: z.string(),
+            time: z.string(),
+            redeemId: z.number(),
+            destAccount: z.string(),
+            status: z.string(),
+          })
+        ),
+      })
+      .optional(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ type, asset, limit }, execContext: MastraExecutionContext) => {
+    const ctx = getGordonContext(execContext);
+    if (!ctx?.exchange) {
+      return errors.noExchange;
+    }
+    if (!ctx.binance || ctx.exchange.exchangeId !== "binance") {
+      return errors.binanceOnly;
+    }
+
+    try {
+      const options = { asset: asset || undefined, size: limit };
+
+      const result: {
+        subscriptions?: { count: number; records: { amount: string; asset: string; time: string; purchaseId: number; sourceAccount: string; status: string }[] };
+        redemptions?: { count: number; records: { amount: string; asset: string; time: string; redeemId: number; destAccount: string; status: string }[] };
+      } = {};
+
+      if (type === "subscriptions" || type === "both") {
+        const subs = await ctx.binance.getFlexibleSubscriptionHistory(options);
+        result.subscriptions = {
+          count: subs.total,
+          records: subs.rows.slice(0, limit).map((r) => ({
+            amount: r.amount,
+            asset: r.asset,
+            time: new Date(r.time).toISOString(),
+            purchaseId: r.purchaseId,
+            sourceAccount: r.sourceAccount,
+            status: r.status,
+          })),
+        };
+      }
+
+      if (type === "redemptions" || type === "both") {
+        const reds = await ctx.binance.getFlexibleRedemptionHistory(options);
+        result.redemptions = {
+          count: reds.total,
+          records: reds.rows.slice(0, limit).map((r) => ({
+            amount: r.amount,
+            asset: r.asset,
+            time: new Date(r.time).toISOString(),
+            redeemId: r.redeemId,
+            destAccount: r.destAccount,
+            status: r.status,
+          })),
+        };
+      }
+
+      return result;
+    } catch (error) {
+      return { error: `Failed to get earn history: ${(error as Error).message}` };
+    }
+  },
+});
+
+// ============================================================================
 // Export as Object (Mastra format)
 // ============================================================================
 
@@ -427,4 +536,5 @@ export const earnTools = {
   subscribe_flexible_earn: subscribeFlexibleTool,
   redeem_flexible_earn: redeemFlexibleTool,
   subscribe_locked_earn: subscribeLockedTool,
+  get_earn_history: getEarnHistoryTool,
 };

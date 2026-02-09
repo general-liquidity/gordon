@@ -219,19 +219,43 @@ export class ProviderRegistry {
    * Get a model string in "provider/model" format
    * Mastra handles the actual model instantiation
    */
-  getModel(provider: DirectProviderName, modelId: string): ModelString {
+  getModel(provider: DirectProviderName | string, modelId: string): ModelString {
     this.initializeFromEnv();
+
+    // When provider is "dedalus", route ALL models through Mastra's OpenAI provider.
+    // Dedalus is OpenAI-compatible (/v1/chat/completions) for every model it serves,
+    // including Anthropic, Google, xAI, etc.  By prefixing with "openai/", Mastra uses
+    // createOpenAI() which sends chat/completions — not the native Anthropic /messages.
+    //
+    // Model string becomes e.g. "openai/anthropic/claude-sonnet-4-5-20250929"
+    //   → Mastra splits: provider="openai", model="anthropic/claude-sonnet-4-5-20250929"
+    //   → OpenAI SDK POSTs to DEDALUS_BASE_URL/chat/completions with that model name
+    //   → Dedalus routes to the correct upstream provider
+    if (provider === "dedalus") {
+      if (!this.hasDedalusKey) {
+        throw new Error(
+          `Provider "dedalus" selected but DEDALUS_API_KEY not configured.\n` +
+            `Set DEDALUS_API_KEY in your .env file or switch provider.`
+        );
+      }
+      // Point Mastra's OpenAI provider at Dedalus
+      process.env.OPENAI_API_KEY = process.env.DEDALUS_API_KEY;
+      process.env.OPENAI_BASE_URL = DEDALUS_BASE_URL;
+      return `openai/${modelId}` as ModelString;
+    }
 
     const modelString = `${provider}/${modelId}` as ModelString;
 
     // Check direct provider first
-    if (this.availableDirectProviders.has(provider)) {
+    if (this.availableDirectProviders.has(provider as DirectProviderName)) {
       return modelString;
     }
 
-    // Check Dedalus fallback
+    // Check Dedalus fallback — route through OpenAI provider
     if (this.hasDedalusKey && DEDALUS_MODELS.some(m => m.id === modelString)) {
-      return modelString;
+      process.env.OPENAI_API_KEY = process.env.DEDALUS_API_KEY;
+      process.env.OPENAI_BASE_URL = DEDALUS_BASE_URL;
+      return `openai/${modelString}` as ModelString;
     }
 
     throw new Error(
@@ -249,7 +273,15 @@ export class ProviderRegistry {
   getDefaultModel(): ModelString {
     this.initializeFromEnv();
 
-    let provider = process.env.GORDON_PROVIDER as DirectProviderName | undefined;
+    const rawProvider = process.env.GORDON_PROVIDER;
+
+    // Handle Dedalus meta-provider
+    if (rawProvider === "dedalus") {
+      const model = process.env.GORDON_MODEL || DEDALUS_MODELS[0].id;
+      return this.getModel("dedalus", model);
+    }
+
+    let provider = rawProvider as DirectProviderName | undefined;
 
     if (!provider) {
       // Auto-detect first available provider (preference order)
@@ -259,7 +291,7 @@ export class ProviderRegistry {
 
       // If no direct provider but Dedalus is available, use first Dedalus model
       if (!provider && this.hasDedalusKey) {
-        return DEDALUS_MODELS[0].id as ModelString;
+        return this.getModel("dedalus", DEDALUS_MODELS[0].id);
       }
 
       if (!provider) {
@@ -283,7 +315,18 @@ export class ProviderRegistry {
   getFastModel(): ModelString {
     this.initializeFromEnv();
 
-    let provider = (process.env.GORDON_FAST_PROVIDER || process.env.GORDON_PROVIDER) as DirectProviderName | undefined;
+    const rawProvider = process.env.GORDON_FAST_PROVIDER || process.env.GORDON_PROVIDER;
+
+    // Handle Dedalus meta-provider
+    if (rawProvider === "dedalus") {
+      const model = process.env.GORDON_FAST_MODEL;
+      if (model) return this.getModel("dedalus", model);
+      const fastModel = DEDALUS_MODELS.find(m => m.tier === "fast");
+      if (fastModel) return this.getModel("dedalus", fastModel.id);
+      return this.getDefaultModel();
+    }
+
+    let provider = rawProvider as DirectProviderName | undefined;
 
     if (!provider) {
       const preferredOrder: DirectProviderName[] = ["openai", "google", "anthropic"];
@@ -291,9 +334,8 @@ export class ProviderRegistry {
       provider = preferredOrder.find(p => available.includes(p)) || available[0];
 
       if (!provider && this.hasDedalusKey) {
-        // Use Dedalus fast model
         const fastModel = DEDALUS_MODELS.find(m => m.tier === "fast");
-        if (fastModel) return fastModel.id as ModelString;
+        if (fastModel) return this.getModel("dedalus", fastModel.id);
       }
 
       if (!provider) {
@@ -311,7 +353,16 @@ export class ProviderRegistry {
   getBalancedModel(): ModelString {
     this.initializeFromEnv();
 
-    let provider = process.env.GORDON_PROVIDER as DirectProviderName | undefined;
+    const rawProvider = process.env.GORDON_PROVIDER;
+
+    // Handle Dedalus meta-provider
+    if (rawProvider === "dedalus") {
+      const balancedModel = DEDALUS_MODELS.find(m => m.tier === "balanced");
+      if (balancedModel) return this.getModel("dedalus", balancedModel.id);
+      return this.getDefaultModel();
+    }
+
+    let provider = rawProvider as DirectProviderName | undefined;
 
     if (!provider) {
       const preferredOrder: DirectProviderName[] = ["openai", "anthropic", "google"];
@@ -320,7 +371,7 @@ export class ProviderRegistry {
 
       if (!provider && this.hasDedalusKey) {
         const balancedModel = DEDALUS_MODELS.find(m => m.tier === "balanced");
-        if (balancedModel) return balancedModel.id as ModelString;
+        if (balancedModel) return this.getModel("dedalus", balancedModel.id);
       }
 
       if (!provider) {

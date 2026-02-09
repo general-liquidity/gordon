@@ -111,6 +111,8 @@ export class BinanceClient {
   private apiKey: string;
   private apiSecret: string;
   private rateLimitState: RateLimitState;
+  private serverTimeOffset: number = 0;
+  private serverTimeSynced: boolean = false;
 
   constructor(apiKey: string, apiSecret: string) {
     this.apiKey = apiKey;
@@ -122,6 +124,33 @@ export class BinanceClient {
       lastThrottleWarn: 0,
       throttledCount: 0,
     };
+  }
+
+  /**
+   * Sync local clock with Binance server time to avoid timestamp drift errors.
+   * Called once before the first signed request.
+   */
+  private async syncServerTime(): Promise<void> {
+    if (this.serverTimeSynced) return;
+    try {
+      const before = Date.now();
+      const res = await fetch(`${BASE_URL}/api/v3/time`);
+      const after = Date.now();
+      const data = await res.json() as { serverTime: number };
+      const localTime = Math.floor((before + after) / 2);
+      this.serverTimeOffset = data.serverTime - localTime;
+      this.serverTimeSynced = true;
+      logger.info(`Server time synced (offset: ${this.serverTimeOffset}ms)`);
+    } catch (error) {
+      logger.warn("Failed to sync server time, using local clock");
+    }
+  }
+
+  /**
+   * Get current timestamp adjusted for Binance server time offset
+   */
+  private getTimestamp(): number {
+    return Date.now() + this.serverTimeOffset;
   }
 
   /**
@@ -339,8 +368,11 @@ export class BinanceClient {
       const result = await withRetry(async () => {
         this.checkRateLimit();
 
+        // Sync server time on first signed request
+        await this.syncServerTime();
+
         // Add timestamp and recvWindow
-        const timestamp = Date.now();
+        const timestamp = this.getTimestamp();
         const allParams = {
           ...params,
           timestamp,

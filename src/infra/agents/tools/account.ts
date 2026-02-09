@@ -336,6 +336,91 @@ export const getAccountDetailsTool = createTool({
 });
 
 // ============================================================================
+// Get Account Snapshot Tool
+// ============================================================================
+
+export const getAccountSnapshotTool = createTool({
+  id: "get_account_snapshot",
+  description:
+    "Get daily account snapshots showing historical portfolio value. " +
+    "Use when user asks 'portfolio history', 'how was my balance yesterday', " +
+    "'account snapshots', 'daily balance history'.",
+  inputSchema: z.object({
+    days: z
+      .number()
+      .min(1)
+      .max(30)
+      .default(7)
+      .describe("Number of days of snapshots to retrieve"),
+    type: z
+      .enum(["SPOT", "MARGIN", "FUTURES"])
+      .default("SPOT")
+      .describe("Account type"),
+  }),
+  outputSchema: z.object({
+    snapshots: z.array(z.object({
+      date: z.string(),
+      totalBtcValue: z.string(),
+      topAssets: z.array(z.object({
+        asset: z.string(),
+        free: z.string(),
+        locked: z.string(),
+      })),
+    })).optional(),
+    count: z.number().optional(),
+    error: z.string().optional(),
+  }),
+  execute: async (
+    { days, type },
+    execContext: MastraExecutionContext
+  ) => {
+    const ctx = getGordonContext(execContext);
+    if (!ctx?.exchange) return errors.noExchange;
+    if (!ctx.binance || ctx.exchange.exchangeId !== "binance") {
+      return { error: "Account snapshots are currently supported only on Binance." };
+    }
+
+    try {
+      const snapshot = await ctx.binance.getAccountSnapshot(type, days);
+
+      if (snapshot.code !== 200) {
+        return { error: `Binance API error: ${snapshot.msg}` };
+      }
+
+      const snapshots = snapshot.snapshotVos.map((s) => {
+        const activeBalances = s.data.balances
+          .filter((b) => parseFloat(b.free) > 0 || parseFloat(b.locked) > 0)
+          .sort((a, b) =>
+            (parseFloat(b.free) + parseFloat(b.locked)) -
+            (parseFloat(a.free) + parseFloat(a.locked))
+          )
+          .slice(0, 10)
+          .map((b) => ({
+            asset: b.asset,
+            free: b.free,
+            locked: b.locked,
+          }));
+
+        return {
+          date: new Date(s.updateTime).toISOString(),
+          totalBtcValue: s.data.totalAssetOfBtc,
+          topAssets: activeBalances,
+        };
+      });
+
+      return {
+        snapshots,
+        count: snapshots.length,
+      };
+    } catch (error) {
+      return {
+        error: error instanceof Error ? error.message : "Failed to fetch account snapshots",
+      };
+    }
+  },
+});
+
+// ============================================================================
 // Export as Object (Mastra format)
 // ============================================================================
 
@@ -349,4 +434,5 @@ export const getAccountDetailsTool = createTool({
 export const accountTools = {
   get_portfolio: getPortfolioTool,
   get_account_details: getAccountDetailsTool,
+  get_account_snapshot: getAccountSnapshotTool,
 };

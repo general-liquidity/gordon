@@ -568,6 +568,494 @@ export const testOrderTool = createTool({
 });
 
 // ============================================================================
+// Limit Order Tool
+// ============================================================================
+
+export const placeLimitOrderTool = createTool({
+  id: "place_limit_order",
+  description:
+    "Place a limit order at a specific price. The order will sit on the book until filled or cancelled. " +
+    "Use when user says 'buy BTC at 95000', 'set a buy order at X price', 'limit buy', 'limit sell'. " +
+    "Requires ARMED mode.",
+  inputSchema: z.object({
+    symbol: z.string().describe("Trading pair (e.g., 'BTCUSDT')"),
+    side: z.enum(["BUY", "SELL"]).describe("BUY or SELL"),
+    quantity: z.number().positive().describe("Quantity of the base asset to trade"),
+    price: z.number().positive().describe("Limit price at which to place the order"),
+    timeInForce: z.enum(["GTC", "IOC", "FOK"]).default("GTC").describe("Time in force: GTC (Good Til Cancelled), IOC (Immediate or Cancel), FOK (Fill or Kill)"),
+  }),
+  outputSchema: z.object({
+    success: z.boolean().optional(),
+    message: z.string().optional(),
+    order: z.object({
+      orderId: z.number(),
+      symbol: z.string(),
+      side: z.string(),
+      type: z.string(),
+      status: z.string(),
+      price: z.number(),
+      quantity: z.number(),
+      executedQty: z.number(),
+    }).optional(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ symbol, side, quantity, price, timeInForce }, execContext: MastraExecutionContext) => {
+    const ctx = getGordonContext(execContext);
+    if (!ctx?.exchange) {
+      return errors.noExchange;
+    }
+
+    if (ctx.config?.mode !== "ARMED") {
+      return errors.notArmed("place limit orders");
+    }
+
+    const normalizedSymbol = symbol.toUpperCase().endsWith("USDT") || symbol.toUpperCase().endsWith("USDC")
+      ? symbol.toUpperCase()
+      : `${symbol.toUpperCase()}USDT`;
+
+    try {
+      const orderResult = await ctx.exchange.placeOrder({
+        symbol: normalizedSymbol,
+        side,
+        type: "LIMIT",
+        quantity,
+        price,
+        timeInForce,
+      });
+
+      if (!orderResult || orderResult.status === "REJECTED") {
+        return {
+          success: false,
+          error: `Order rejected: ${orderResult?.status ?? "unknown"}`,
+        };
+      }
+
+      return {
+        success: true,
+        message: `LIMIT ${side} ${quantity} ${normalizedSymbol} @ ${price} (${timeInForce}) — status: ${orderResult.status}`,
+        order: {
+          orderId: Number(orderResult.orderId) || 0,
+          symbol: orderResult.symbol,
+          side: orderResult.side,
+          type: orderResult.type,
+          status: orderResult.status,
+          price: orderResult.price,
+          quantity: orderResult.quantity,
+          executedQty: orderResult.executedQty,
+        },
+      };
+    } catch (error) {
+      return { error: `Failed to place limit order: ${(error as Error).message}` };
+    }
+  },
+});
+
+// ============================================================================
+// Get Open Orders Tool
+// ============================================================================
+
+export const getOpenOrdersTool = createTool({
+  id: "get_open_orders",
+  description:
+    "List all open/pending orders, optionally filtered by symbol. " +
+    "Use when user asks 'what orders do I have open?', 'show my pending orders', 'open orders', 'any limit orders active?'.",
+  inputSchema: z.object({
+    symbol: z.string().optional().describe("Trading pair to filter (e.g., 'BTCUSDT'). Leave empty for all open orders."),
+  }),
+  outputSchema: z.object({
+    count: z.number().optional(),
+    orders: z.array(z.object({
+      orderId: z.number(),
+      symbol: z.string(),
+      side: z.string(),
+      type: z.string(),
+      status: z.string(),
+      price: z.number(),
+      quantity: z.number(),
+      executedQty: z.number(),
+      remaining: z.number(),
+      time: z.string().optional(),
+    })).optional(),
+    message: z.string().optional(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ symbol }, execContext: MastraExecutionContext) => {
+    const ctx = getGordonContext(execContext);
+    if (!ctx?.exchange) {
+      return errors.noExchange;
+    }
+
+    try {
+      const normalizedSymbol = symbol
+        ? (symbol.toUpperCase().endsWith("USDT") || symbol.toUpperCase().endsWith("USDC")
+          ? symbol.toUpperCase()
+          : `${symbol.toUpperCase()}USDT`)
+        : undefined;
+
+      const openOrders = await ctx.exchange.getOpenOrders(normalizedSymbol);
+
+      if (openOrders.length === 0) {
+        return {
+          count: 0,
+          orders: [],
+          message: normalizedSymbol
+            ? `No open orders for ${normalizedSymbol}`
+            : "No open orders on any pair",
+        };
+      }
+
+      return {
+        count: openOrders.length,
+        orders: openOrders.map((o) => ({
+          orderId: Number(o.orderId) || 0,
+          symbol: o.symbol,
+          side: o.side,
+          type: o.type,
+          status: o.status,
+          price: o.price,
+          quantity: o.quantity,
+          executedQty: o.executedQty,
+          remaining: o.quantity - o.executedQty,
+          time: o.time ? new Date(o.time).toISOString() : undefined,
+        })),
+      };
+    } catch (error) {
+      return { error: `Failed to get open orders: ${(error as Error).message}` };
+    }
+  },
+});
+
+// ============================================================================
+// Cancel Single Order Tool
+// ============================================================================
+
+export const cancelOrderTool = createTool({
+  id: "cancel_order",
+  description:
+    "Cancel a single open order by its order ID. " +
+    "Use when user says 'cancel my BTC order', 'cancel order #12345', 'remove that limit order'. " +
+    "Requires ARMED mode. For cancelling ALL orders on a symbol, use cancel_all_orders instead.",
+  inputSchema: z.object({
+    symbol: z.string().describe("Trading pair (e.g., 'BTCUSDT')"),
+    orderId: z.number().describe("Order ID to cancel"),
+  }),
+  outputSchema: z.object({
+    success: z.boolean().optional(),
+    message: z.string().optional(),
+    cancelledOrderId: z.number().optional(),
+    symbol: z.string().optional(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ symbol, orderId }, execContext: MastraExecutionContext) => {
+    const ctx = getGordonContext(execContext);
+    if (!ctx?.exchange) {
+      return errors.noExchange;
+    }
+
+    if (ctx.config?.mode !== "ARMED") {
+      return errors.notArmed("cancel orders");
+    }
+
+    const normalizedSymbol = symbol.toUpperCase().endsWith("USDT") || symbol.toUpperCase().endsWith("USDC")
+      ? symbol.toUpperCase()
+      : `${symbol.toUpperCase()}USDT`;
+
+    try {
+      await ctx.exchange.cancelOrder(normalizedSymbol, String(orderId));
+
+      return {
+        success: true,
+        message: `Cancelled order #${orderId} on ${normalizedSymbol}`,
+        cancelledOrderId: orderId,
+        symbol: normalizedSymbol,
+      };
+    } catch (error) {
+      return { error: `Failed to cancel order #${orderId}: ${(error as Error).message}` };
+    }
+  },
+});
+
+// ============================================================================
+// Order History Tool
+// ============================================================================
+
+export const getOrderHistoryTool = createTool({
+  id: "get_order_history",
+  description:
+    "Get order history for a symbol (all orders: filled, cancelled, expired, new). " +
+    "Different from get_trade_history which shows fills/executions. " +
+    "Use when user asks 'show my recent orders', 'order history for BTC', 'past orders'.",
+  inputSchema: z.object({
+    symbol: z.string().describe("Trading pair (e.g., 'BTCUSDT')"),
+    limit: z.number().min(1).max(100).default(20).describe("Max orders to return"),
+  }),
+  outputSchema: z.object({
+    symbol: z.string().optional(),
+    count: z.number().optional(),
+    orders: z.array(z.object({
+      orderId: z.number(),
+      symbol: z.string(),
+      side: z.string(),
+      type: z.string(),
+      status: z.string(),
+      price: z.number(),
+      quantity: z.number(),
+      executedQty: z.number(),
+      cummulativeQuoteQty: z.number(),
+      time: z.string().optional(),
+    })).optional(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ symbol, limit }, execContext: MastraExecutionContext) => {
+    const ctx = getGordonContext(execContext);
+    if (!ctx?.exchange) {
+      return errors.noExchange;
+    }
+
+    const normalizedSymbol = symbol.toUpperCase().endsWith("USDT") || symbol.toUpperCase().endsWith("USDC")
+      ? symbol.toUpperCase()
+      : `${symbol.toUpperCase()}USDT`;
+
+    try {
+      const orders = await ctx.exchange.getOrderHistory(normalizedSymbol, limit);
+
+      return {
+        symbol: normalizedSymbol,
+        count: orders.length,
+        orders: orders.map((o) => ({
+          orderId: Number(o.orderId) || 0,
+          symbol: o.symbol,
+          side: o.side,
+          type: o.type,
+          status: o.status,
+          price: o.price,
+          quantity: o.quantity,
+          executedQty: o.executedQty,
+          cummulativeQuoteQty: o.cummulativeQuoteQty,
+          time: o.time ? new Date(o.time).toISOString() : undefined,
+        })),
+      };
+    } catch (error) {
+      return { error: `Failed to get order history: ${(error as Error).message}` };
+    }
+  },
+});
+
+// ============================================================================
+// Cancel & Replace Order (Binance-only)
+// ============================================================================
+
+export const cancelReplaceOrderTool = createTool({
+  id: "cancel_replace_order",
+  description:
+    "Atomically cancel an existing order and replace it with a new one. " +
+    "Use when user says 'replace my order', 'modify order #123', 'change order price', 'update my limit order'. " +
+    "Requires ARMED mode. Binance only.",
+  inputSchema: z.object({
+    symbol: z.string().describe("Trading pair (e.g., 'BTCUSDT')"),
+    cancelOrderId: z.number().describe("Order ID of the existing order to cancel"),
+    side: z.enum(["BUY", "SELL"]).describe("Side of the new replacement order"),
+    type: z.enum(["LIMIT", "MARKET"]).describe("Type of the new replacement order"),
+    quantity: z.number().positive().describe("Quantity for the new order"),
+    price: z.number().optional().describe("Price for the new order (required for LIMIT orders)"),
+    timeInForce: z.enum(["GTC", "IOC", "FOK"]).default("GTC").describe("Time in force for the new order"),
+  }),
+  outputSchema: z.object({
+    success: z.boolean().optional(),
+    message: z.string().optional(),
+    cancelResult: z.string().optional(),
+    newOrderResult: z.string().optional(),
+    newOrder: z.object({
+      orderId: z.number(),
+      symbol: z.string(),
+      side: z.string(),
+      type: z.string(),
+      status: z.string(),
+      price: z.string(),
+      quantity: z.string(),
+    }).optional(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ symbol, cancelOrderId, side, type, quantity, price, timeInForce }, execContext: MastraExecutionContext) => {
+    const ctx = getGordonContext(execContext);
+    if (!ctx?.exchange) {
+      return errors.noExchange;
+    }
+
+    if (ctx.config?.mode !== "ARMED") {
+      return errors.notArmed("cancel and replace orders");
+    }
+
+    if (!ctx.binance || ctx.exchange.exchangeId !== "binance") {
+      return { error: "This feature is currently supported only on Binance." };
+    }
+
+    const normalizedSymbol = symbol.toUpperCase().endsWith("USDT") || symbol.toUpperCase().endsWith("USDC")
+      ? symbol.toUpperCase()
+      : `${symbol.toUpperCase()}USDT`;
+
+    try {
+      const newOrderParams: Record<string, unknown> = {
+        side,
+        type,
+        quantity,
+        timeInForce,
+      };
+      if (price !== undefined) {
+        newOrderParams.price = price;
+      }
+
+      const result = await ctx.binance.cancelReplaceOrder(normalizedSymbol, cancelOrderId, newOrderParams as never);
+
+      const newOrder = result.newOrderResponse;
+      return {
+        success: true,
+        message: `Cancelled order #${cancelOrderId} and placed new ${type} ${side} ${quantity} ${normalizedSymbol}`,
+        cancelResult: result.cancelResult,
+        newOrderResult: result.newOrderResult,
+        newOrder: newOrder
+          ? {
+              orderId: newOrder.orderId,
+              symbol: newOrder.symbol,
+              side: newOrder.side,
+              type: newOrder.type,
+              status: newOrder.status,
+              price: newOrder.price,
+              quantity: newOrder.origQty,
+            }
+          : undefined,
+      };
+    } catch (error) {
+      return { error: `Failed to cancel and replace order: ${(error as Error).message}` };
+    }
+  },
+});
+
+// ============================================================================
+// Cancel Order List (OCO/OTO) (Binance-only)
+// ============================================================================
+
+export const cancelOrderListTool = createTool({
+  id: "cancel_order_list",
+  description:
+    "Cancel an OCO or OTO order list by its orderListId. " +
+    "Use when user says 'cancel my OCO order', 'cancel order list #123'. " +
+    "Requires ARMED mode.",
+  inputSchema: z.object({
+    symbol: z.string().describe("Trading pair (e.g., 'BTCUSDT')"),
+    orderListId: z.number().describe("The orderListId of the OCO/OTO order list to cancel"),
+  }),
+  outputSchema: z.object({
+    success: z.boolean().optional(),
+    message: z.string().optional(),
+    orderListId: z.number().optional(),
+    status: z.string().optional(),
+    cancelledOrders: z.array(z.object({
+      orderId: z.number(),
+      symbol: z.string(),
+    })).optional(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ symbol, orderListId }, execContext: MastraExecutionContext) => {
+    const ctx = getGordonContext(execContext);
+    if (!ctx?.exchange) {
+      return errors.noExchange;
+    }
+
+    if (ctx.config?.mode !== "ARMED") {
+      return errors.notArmed("cancel order lists");
+    }
+
+    if (!ctx.binance || ctx.exchange.exchangeId !== "binance") {
+      return { error: "This feature is currently supported only on Binance." };
+    }
+
+    const normalizedSymbol = symbol.toUpperCase().endsWith("USDT") || symbol.toUpperCase().endsWith("USDC")
+      ? symbol.toUpperCase()
+      : `${symbol.toUpperCase()}USDT`;
+
+    try {
+      const result = await ctx.binance.cancelOrderList(normalizedSymbol, orderListId);
+
+      return {
+        success: true,
+        message: `Cancelled order list #${orderListId} on ${normalizedSymbol}`,
+        orderListId: result.orderListId,
+        status: result.listOrderStatus,
+        cancelledOrders: result.orders.map((o) => ({
+          orderId: o.orderId,
+          symbol: o.symbol,
+        })),
+      };
+    } catch (error) {
+      return { error: `Failed to cancel order list: ${(error as Error).message}` };
+    }
+  },
+});
+
+// ============================================================================
+// Get Open Order Lists (OCO/OTO) (Binance-only)
+// ============================================================================
+
+export const getOpenOrderListsTool = createTool({
+  id: "get_open_order_lists",
+  description:
+    "List all open OCO/OTO order lists. " +
+    "Use when user asks 'show my OCO orders', 'open order lists', 'any active OCO orders?'.",
+  inputSchema: z.object({}),
+  outputSchema: z.object({
+    count: z.number().optional(),
+    orderLists: z.array(z.object({
+      orderListId: z.number(),
+      symbol: z.string(),
+      status: z.string(),
+      orders: z.array(z.object({
+        orderId: z.number(),
+      })),
+    })).optional(),
+    message: z.string().optional(),
+    error: z.string().optional(),
+  }),
+  execute: async (_params, execContext: MastraExecutionContext) => {
+    const ctx = getGordonContext(execContext);
+    if (!ctx?.exchange) {
+      return errors.noExchange;
+    }
+
+    if (!ctx.binance || ctx.exchange.exchangeId !== "binance") {
+      return { error: "This feature is currently supported only on Binance." };
+    }
+
+    try {
+      const orderLists = await ctx.binance.getOpenOrderLists();
+
+      if (orderLists.length === 0) {
+        return {
+          count: 0,
+          orderLists: [],
+          message: "No open OCO/OTO order lists",
+        };
+      }
+
+      return {
+        count: orderLists.length,
+        orderLists: orderLists.map((ol) => ({
+          orderListId: ol.orderListId,
+          symbol: ol.symbol,
+          status: ol.listOrderStatus,
+          orders: ol.orders.map((o) => ({
+            orderId: o.orderId,
+          })),
+        })),
+        message: `Found ${orderLists.length} open order list(s)`,
+      };
+    } catch (error) {
+      return { error: `Failed to get open order lists: ${(error as Error).message}` };
+    }
+  },
+});
+
+// ============================================================================
 // Export as Object (Mastra format)
 // ============================================================================
 
@@ -587,7 +1075,15 @@ export const orderbookTools = {
   get_market_trades: createCachedTool(getRecentTradesTool, TOOL_CACHE_CONFIG.orderbook.ttl),
   // Order management tools are NOT cached (they are mutations)
   place_oco_order: placeOCOOrderTool,
+  place_limit_order: placeLimitOrderTool,
   cancel_all_orders: cancelAllOrdersTool,
+  cancel_order: cancelOrderTool,
   get_order_status: getOrderStatusTool,
+  get_open_orders: getOpenOrdersTool,
+  get_order_history: getOrderHistoryTool,
   test_order: testOrderTool,
+  // Binance-only tools
+  cancel_replace_order: cancelReplaceOrderTool,
+  cancel_order_list: cancelOrderListTool,
+  get_open_order_lists: getOpenOrderListsTool,
 };

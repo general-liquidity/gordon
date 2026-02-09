@@ -513,11 +513,16 @@ const TOOL_AGENT_MAP: Record<string, string> = {
   set_trailing_stop: "Executor",
   update_trailing_stop: "Executor",
   close_partial_position: "Executor",
-  // discoveryTools cherry-pick
+  // discoveryTools cherry-picks
   place_bracket_order: "Executor",
+  place_market_order: "Executor",
   // orderbookTools cherry-picks
+  place_limit_order: "Executor",
   place_oco_order: "Executor",
   cancel_all_orders: "Executor",
+  cancel_order: "Executor",
+  cancel_replace_order: "Executor",
+  cancel_order_list: "Executor",
 
   // ---- Monitor tools ----
   // positionTools spread
@@ -525,6 +530,7 @@ const TOOL_AGENT_MAP: Record<string, string> = {
   // accountTools spread
   get_portfolio: "Monitor",
   get_account_details: "Monitor",
+  get_account_snapshot: "Monitor",
   // earnTools spread
   get_flexible_earn_products: "Monitor",
   get_locked_earn_products: "Monitor",
@@ -532,6 +538,7 @@ const TOOL_AGENT_MAP: Record<string, string> = {
   subscribe_flexible_earn: "Monitor",
   redeem_flexible_earn: "Monitor",
   subscribe_locked_earn: "Monitor",
+  get_earn_history: "Monitor",
   // walletTools spread
   get_dustable_assets: "Monitor",
   convert_dust: "Monitor",
@@ -540,9 +547,15 @@ const TOOL_AGENT_MAP: Record<string, string> = {
   get_trade_fees: "Monitor",
   get_asset_dividends: "Monitor",
   get_deposit_address: "Monitor",
+  get_user_assets: "Monitor",
+  get_wallet_balances: "Monitor",
+  get_dust_log: "Monitor",
   // historyTools spread
   get_trade_history: "Monitor",
   get_transfer_history: "Monitor",
+  get_order_history: "Monitor",
+  get_open_orders: "Monitor",
+  get_open_order_lists: "Monitor",
   // metricsTools spread
   get_performance_metrics: "Monitor",
   get_trade_statistics: "Monitor",

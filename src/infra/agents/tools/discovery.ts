@@ -511,6 +511,101 @@ export const placeBracketOrderTool = createTool({
 });
 
 // ============================================================================
+// Simple Market Order Tool
+// ============================================================================
+
+export const placeMarketOrderTool = createTool({
+  id: "place_market_order",
+  description:
+    "Place a simple spot market order (buy or sell) without stop-loss or take-profit. " +
+    "Use when user says 'buy USDT with my USDC', 'swap USDC to USDT', 'sell 100 BTC', " +
+    "'buy $50 worth of ETH', or any simple spot conversion/purchase. " +
+    "Requires ARMED mode. Supports spending a quote amount (e.g., 'spend 54 USDC') " +
+    "or selling a base quantity (e.g., 'sell 0.01 BTC').",
+  inputSchema: z.object({
+    symbol: z.string().describe("Trading pair (e.g., 'BTCUSDT', 'USDCUSDT')"),
+    side: z.enum(["BUY", "SELL"]).describe("BUY or SELL"),
+    quantity: z.number().positive().optional().describe("Quantity of the base asset to trade (e.g., 0.5 BTC). Use this OR quoteOrderQty, not both."),
+    quoteOrderQty: z.number().positive().optional().describe("Amount of quote asset to spend (e.g., 54 USDC). Use this OR quantity, not both."),
+  }),
+  outputSchema: z.object({
+    success: z.boolean().optional(),
+    message: z.string().optional(),
+    order: z.object({
+      orderId: z.number(),
+      symbol: z.string(),
+      side: z.string(),
+      status: z.string(),
+      executedQty: z.number(),
+      cummulativeQuoteQty: z.number(),
+      avgPrice: z.number(),
+    }).optional(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ symbol, side, quantity, quoteOrderQty }, execContext: MastraExecutionContext) => {
+    const ctx = getGordonContext(execContext);
+    if (!ctx?.exchange) {
+      return errors.noExchange;
+    }
+
+    if (ctx.config?.mode !== "ARMED") {
+      return {
+        error: "System must be ARMED to place orders. Use 'arm' command first.",
+      };
+    }
+
+    if (!quantity && !quoteOrderQty) {
+      return { error: "Either quantity or quoteOrderQty must be provided." };
+    }
+
+    if (quantity && quoteOrderQty) {
+      return { error: "Provide either quantity or quoteOrderQty, not both." };
+    }
+
+    const normalizedSymbol = symbol.toUpperCase().endsWith("USDT") || symbol.toUpperCase().endsWith("USDC")
+      ? symbol.toUpperCase()
+      : `${symbol.toUpperCase()}USDT`;
+
+    try {
+      const orderResult = await ctx.exchange.placeOrder({
+        symbol: normalizedSymbol,
+        side,
+        type: "MARKET",
+        ...(quantity ? { quantity } : {}),
+        ...(quoteOrderQty ? { quoteOrderQty } : {}),
+      });
+
+      if (!orderResult || orderResult.status === "REJECTED") {
+        return {
+          success: false,
+          error: `Order rejected: ${orderResult?.status ?? "unknown"}`,
+        };
+      }
+
+      const executedQty = orderResult.executedQty;
+      const quoteQty = orderResult.cummulativeQuoteQty;
+      const avgPrice = executedQty > 0 ? quoteQty / executedQty : 0;
+
+      return {
+        success: true,
+        message: `${side} ${executedQty} ${normalizedSymbol} at avg price ${avgPrice.toFixed(8).replace(/\.?0+$/, "")} (total: ${quoteQty.toFixed(2)} quote)`,
+        order: {
+          orderId: Number(orderResult.orderId) || 0,
+          symbol: orderResult.symbol,
+          side: orderResult.side,
+          status: orderResult.status,
+          executedQty,
+          cummulativeQuoteQty: quoteQty,
+          avgPrice,
+        },
+      };
+    } catch (error) {
+      return { error: `Failed to place market order: ${(error as Error).message}` };
+    }
+  },
+});
+
+// ============================================================================
 // Export as Object (Mastra format)
 // ============================================================================
 
@@ -523,4 +618,5 @@ export const discoveryTools = {
   get_high_volume_tokens: getHighVolumeTokensTool,
   get_available_markets: getAvailableMarketsTool,
   place_bracket_order: placeBracketOrderTool,
+  place_market_order: placeMarketOrderTool,
 };

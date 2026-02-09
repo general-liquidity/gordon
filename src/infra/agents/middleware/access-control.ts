@@ -39,8 +39,14 @@ const TRADING_TOOLS = new Set([
   "close_trade",
   "cancel_trade",
   "place_order",
+  "place_market_order",
+  "place_limit_order",
+  "place_bracket_order",
+  "place_oco_order",
   "cancel_order",
   "cancel_all_orders",
+  "cancel_replace_order",
+  "cancel_order_list",
 ]);
 
 /**
