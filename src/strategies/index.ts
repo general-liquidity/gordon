@@ -82,8 +82,10 @@ import { engulfingPatternStrategy } from "./tier-2/engulfing-pattern.ts";
 import { orderBlocksStrategy } from "./tier-2/order-blocks.ts";
 import { fairValueGapsStrategy } from "./tier-2/fair-value-gaps.ts";
 import { smartMoneyStrategy } from "./tier-2/smart-money.ts";
+import { ictKillzonesStrategy } from "./tier-2/ict-killzones.ts";
 
 // Tier 2 - Moon Dev Pattern Strategies
+import { trendRangeStrategy } from "./tier-2/trend-range.ts";
 import { squeezeBreakoutStrategy } from "./tier-2/squeeze-breakout.ts";
 import { mfiDivergenceConfluenceStrategy } from "./tier-2/mfi-divergence-confluence.ts";
 import { hiddenDivergenceStrategy } from "./tier-2/hidden-divergence.ts";
@@ -91,6 +93,11 @@ import { whaleAccumulationStrategy } from "./tier-2/whale-accumulation.ts";
 import { dcaLayeringStrategy } from "./tier-2/dca-layering.ts";
 import { exhaustionGapStrategy } from "./tier-2/exhaustion-gap.ts";
 import { liquidationMomentumStrategy } from "./tier-2/liquidation-momentum.ts";
+import { gapTradingStrategy } from "./tier-2/gap-trading.ts";
+import { liquidityZonesStrategy } from "./tier-2/liquidity-zones.ts";
+import { sellersExhaustionStrategy } from "./tier-2/sellers-exhaustion.ts";
+import { atrSteppingStrategy } from "./tier-2/atr-stepping.ts";
+import { statArbStrategy } from "./tier-2/stat-arb.ts";
 
 // ============================================================================
 // Strategy Registration
@@ -116,8 +123,10 @@ strategyRegistry.register(engulfingPatternStrategy);
 strategyRegistry.register(orderBlocksStrategy);
 strategyRegistry.register(fairValueGapsStrategy);
 strategyRegistry.register(smartMoneyStrategy);
+strategyRegistry.register(ictKillzonesStrategy);
 
 // Register Tier 2 Moon Dev Pattern strategies
+strategyRegistry.register(trendRangeStrategy);
 strategyRegistry.register(squeezeBreakoutStrategy);
 strategyRegistry.register(mfiDivergenceConfluenceStrategy);
 strategyRegistry.register(hiddenDivergenceStrategy);
@@ -125,6 +134,11 @@ strategyRegistry.register(whaleAccumulationStrategy);
 strategyRegistry.register(dcaLayeringStrategy);
 strategyRegistry.register(exhaustionGapStrategy);
 strategyRegistry.register(liquidationMomentumStrategy);
+strategyRegistry.register(gapTradingStrategy);
+strategyRegistry.register(liquidityZonesStrategy);
+strategyRegistry.register(sellersExhaustionStrategy);
+strategyRegistry.register(atrSteppingStrategy);
+strategyRegistry.register(statArbStrategy);
 
 // ============================================================================
 // Re-export Individual Strategies
@@ -143,6 +157,8 @@ export { engulfingPatternStrategy } from "./tier-2/engulfing-pattern.ts";
 export { orderBlocksStrategy } from "./tier-2/order-blocks.ts";
 export { fairValueGapsStrategy } from "./tier-2/fair-value-gaps.ts";
 export { smartMoneyStrategy } from "./tier-2/smart-money.ts";
+export { ictKillzonesStrategy } from "./tier-2/ict-killzones.ts";
+export { trendRangeStrategy } from "./tier-2/trend-range.ts";
 export { squeezeBreakoutStrategy } from "./tier-2/squeeze-breakout.ts";
 export { mfiDivergenceConfluenceStrategy } from "./tier-2/mfi-divergence-confluence.ts";
 export { hiddenDivergenceStrategy } from "./tier-2/hidden-divergence.ts";
@@ -150,6 +166,11 @@ export { whaleAccumulationStrategy } from "./tier-2/whale-accumulation.ts";
 export { dcaLayeringStrategy } from "./tier-2/dca-layering.ts";
 export { exhaustionGapStrategy } from "./tier-2/exhaustion-gap.ts";
 export { liquidationMomentumStrategy } from "./tier-2/liquidation-momentum.ts";
+export { gapTradingStrategy } from "./tier-2/gap-trading.ts";
+export { liquidityZonesStrategy } from "./tier-2/liquidity-zones.ts";
+export { sellersExhaustionStrategy } from "./tier-2/sellers-exhaustion.ts";
+export { atrSteppingStrategy } from "./tier-2/atr-stepping.ts";
+export { statArbStrategy } from "./tier-2/stat-arb.ts";
 
 // ============================================================================
 // DSL Module Exports

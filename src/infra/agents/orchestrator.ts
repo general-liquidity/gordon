@@ -445,6 +445,8 @@ const TOOL_AGENT_MAP: Record<string, string> = {
   get_squeeze_momentum: "Scanner",
   get_fvg: "Scanner",
   get_parabolic_sar: "Scanner",
+  get_atr_rope: "Scanner",
+  get_linear_regression: "Scanner",
   // marketDataTools spread (Scanner is primary for raw market data)
   get_candles: "Scanner",
   get_price: "Scanner",

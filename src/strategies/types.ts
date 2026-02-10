@@ -216,7 +216,9 @@ export type StrategyId =
   | "order_blocks"
   | "fair_value_gaps"
   | "smart_money"
+  | "ict_killzones"
   // Tier 2 - Moon Dev Patterns
+  | "trend_range"
   | "squeeze_breakout"
   | "mfi_divergence_confluence"
   | "hidden_divergence"
@@ -224,6 +226,11 @@ export type StrategyId =
   | "dca_layering"
   | "exhaustion_gap"
   | "liquidation_momentum"
+  | "gap_trading"
+  | "liquidity_zones"
+  | "sellers_exhaustion"
+  | "atr_stepping"
+  | "stat_arb"
   // Special
   | "grid_entry";
 
@@ -244,6 +251,8 @@ export const STRATEGY_IDS: StrategyId[] = [
   "order_blocks",
   "fair_value_gaps",
   "smart_money",
+  "ict_killzones",
+  "trend_range",
   "squeeze_breakout",
   "mfi_divergence_confluence",
   "hidden_divergence",
@@ -251,6 +260,11 @@ export const STRATEGY_IDS: StrategyId[] = [
   "dca_layering",
   "exhaustion_gap",
   "liquidation_momentum",
+  "gap_trading",
+  "liquidity_zones",
+  "sellers_exhaustion",
+  "atr_stepping",
+  "stat_arb",
   "grid_entry",
 ];
 
@@ -271,6 +285,8 @@ export const STRATEGY_TIERS: Record<StrategyId, 1 | 2> = {
   order_blocks: 2,
   fair_value_gaps: 2,
   smart_money: 2,
+  ict_killzones: 2,
+  trend_range: 2,
   squeeze_breakout: 2,
   mfi_divergence_confluence: 2,
   hidden_divergence: 2,
@@ -278,5 +294,10 @@ export const STRATEGY_TIERS: Record<StrategyId, 1 | 2> = {
   dca_layering: 2,
   exhaustion_gap: 2,
   liquidation_momentum: 2,
+  gap_trading: 2,
+  liquidity_zones: 2,
+  sellers_exhaustion: 2,
+  atr_stepping: 2,
+  stat_arb: 2,
   grid_entry: 1, // Grid is a special strategy, keep in tier 1
 };
