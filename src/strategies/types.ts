@@ -216,6 +216,13 @@ export type StrategyId =
   | "order_blocks"
   | "fair_value_gaps"
   | "smart_money"
+  // Tier 2 - Moon Dev Patterns
+  | "squeeze_breakout"
+  | "mfi_divergence_confluence"
+  | "hidden_divergence"
+  | "whale_accumulation"
+  | "dca_layering"
+  | "exhaustion_gap"
   // Special
   | "grid_entry";
 
@@ -236,6 +243,12 @@ export const STRATEGY_IDS: StrategyId[] = [
   "order_blocks",
   "fair_value_gaps",
   "smart_money",
+  "squeeze_breakout",
+  "mfi_divergence_confluence",
+  "hidden_divergence",
+  "whale_accumulation",
+  "dca_layering",
+  "exhaustion_gap",
   "grid_entry",
 ];
 
@@ -256,5 +269,11 @@ export const STRATEGY_TIERS: Record<StrategyId, 1 | 2> = {
   order_blocks: 2,
   fair_value_gaps: 2,
   smart_money: 2,
+  squeeze_breakout: 2,
+  mfi_divergence_confluence: 2,
+  hidden_divergence: 2,
+  whale_accumulation: 2,
+  dca_layering: 2,
+  exhaustion_gap: 2,
   grid_entry: 1, // Grid is a special strategy, keep in tier 1
 };

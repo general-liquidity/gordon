@@ -83,6 +83,14 @@ import { orderBlocksStrategy } from "./tier-2/order-blocks.ts";
 import { fairValueGapsStrategy } from "./tier-2/fair-value-gaps.ts";
 import { smartMoneyStrategy } from "./tier-2/smart-money.ts";
 
+// Tier 2 - Moon Dev Pattern Strategies
+import { squeezeBreakoutStrategy } from "./tier-2/squeeze-breakout.ts";
+import { mfiDivergenceConfluenceStrategy } from "./tier-2/mfi-divergence-confluence.ts";
+import { hiddenDivergenceStrategy } from "./tier-2/hidden-divergence.ts";
+import { whaleAccumulationStrategy } from "./tier-2/whale-accumulation.ts";
+import { dcaLayeringStrategy } from "./tier-2/dca-layering.ts";
+import { exhaustionGapStrategy } from "./tier-2/exhaustion-gap.ts";
+
 // ============================================================================
 // Strategy Registration
 // ============================================================================
@@ -108,6 +116,14 @@ strategyRegistry.register(orderBlocksStrategy);
 strategyRegistry.register(fairValueGapsStrategy);
 strategyRegistry.register(smartMoneyStrategy);
 
+// Register Tier 2 Moon Dev Pattern strategies
+strategyRegistry.register(squeezeBreakoutStrategy);
+strategyRegistry.register(mfiDivergenceConfluenceStrategy);
+strategyRegistry.register(hiddenDivergenceStrategy);
+strategyRegistry.register(whaleAccumulationStrategy);
+strategyRegistry.register(dcaLayeringStrategy);
+strategyRegistry.register(exhaustionGapStrategy);
+
 // ============================================================================
 // Re-export Individual Strategies
 // ============================================================================
@@ -125,6 +141,12 @@ export { engulfingPatternStrategy } from "./tier-2/engulfing-pattern.ts";
 export { orderBlocksStrategy } from "./tier-2/order-blocks.ts";
 export { fairValueGapsStrategy } from "./tier-2/fair-value-gaps.ts";
 export { smartMoneyStrategy } from "./tier-2/smart-money.ts";
+export { squeezeBreakoutStrategy } from "./tier-2/squeeze-breakout.ts";
+export { mfiDivergenceConfluenceStrategy } from "./tier-2/mfi-divergence-confluence.ts";
+export { hiddenDivergenceStrategy } from "./tier-2/hidden-divergence.ts";
+export { whaleAccumulationStrategy } from "./tier-2/whale-accumulation.ts";
+export { dcaLayeringStrategy } from "./tier-2/dca-layering.ts";
+export { exhaustionGapStrategy } from "./tier-2/exhaustion-gap.ts";
 
 // ============================================================================
 // DSL Module Exports
