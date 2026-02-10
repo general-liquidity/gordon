@@ -277,3 +277,15 @@ export interface IchimokuResult {
   signal: "strong_buy" | "buy" | "neutral" | "sell" | "strong_sell";
   interpretation: string;
 }
+
+// FlowScope Types
+export { type FlowScopeBin, type FlowScopeResult } from "./flowscope.ts";
+
+// Angled Market Structure Types
+export { type PivotLine, type AMSResult } from "./angled-market-structure.ts";
+
+// Elliott Wave Types
+export { type ZigzagPoint, type WaveLabel, type ElliottWaveResult } from "./elliott-wave.ts";
+
+// False Breakout Types
+export { type SRLevel, type FalseBreakoutResult } from "./false-breakout.ts";

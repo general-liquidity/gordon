@@ -84,3 +84,19 @@ export { calculateWaveTrend } from "./wavetrend.ts";
 
 // Ichimoku Cloud
 export { calculateIchimoku } from "./ichimoku.ts";
+
+// FlowScope (Buy/Sell Volume Profile)
+export { calculateFlowScope } from "./flowscope.ts";
+export type { FlowScopeBin, FlowScopeResult } from "./flowscope.ts";
+
+// Angled Market Structure
+export { calculateAMS } from "./angled-market-structure.ts";
+export type { PivotLine, AMSResult } from "./angled-market-structure.ts";
+
+// Elliott Wave Detection
+export { calculateElliottWave } from "./elliott-wave.ts";
+export type { ZigzagPoint, WaveLabel, ElliottWaveResult } from "./elliott-wave.ts";
+
+// False Breakout Reversal
+export { calculateFalseBreakout } from "./false-breakout.ts";
+export type { SRLevel, FalseBreakoutResult } from "./false-breakout.ts";

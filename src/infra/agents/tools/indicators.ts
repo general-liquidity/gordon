@@ -1174,6 +1174,303 @@ export const getIchimokuTool = createTool({
 });
 
 // ============================================================================
+// FlowScope Tool (Buy/Sell Volume Profile)
+// ============================================================================
+
+export const getFlowScopeTool = createTool({
+  id: "get_flowscope",
+  description:
+    "Get FlowScope buy/sell volume profile for a symbol. " +
+    "Splits volume into buy vs sell pressure at each price level using candle close position. " +
+    "Detects POC (Point of Control) imbalance — when one side dominates at the key level. " +
+    "Pressure score from -100 (all sell) to +100 (all buy). Superior to plain volume profile.",
+  inputSchema: z.object({
+    symbol: z.string().describe("Trading pair (e.g., 'BTCUSDT')"),
+    interval: z.enum(["1h", "4h", "1d"]).default("4h").describe("Timeframe"),
+    numBins: z.number().min(10).max(50).default(20).describe("Number of price bins (default 20)"),
+    imbalanceThreshold: z
+      .number()
+      .min(0.55)
+      .max(0.85)
+      .default(0.65)
+      .describe("Buy ratio threshold for imbalance detection (default 0.65)"),
+  }),
+  outputSchema: z.object({
+    symbol: z.string().optional(),
+    interval: z.string().optional(),
+    currentPrice: z.string().optional(),
+    poc: z.string().optional(),
+    pocBuyRatio: z.string().optional(),
+    pocImbalanced: z.boolean().optional(),
+    imbalanceDirection: z.enum(["buy", "sell", "neutral"]).optional(),
+    pressureScore: z.number().optional(),
+    overallBuyRatio: z.string().optional(),
+    valueAreaHigh: z.string().optional(),
+    valueAreaLow: z.string().optional(),
+    interpretation: z.string().optional(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ symbol, interval, numBins, imbalanceThreshold }, execContext: MastraExecutionContext) => {
+    const ctx = getGordonContext(execContext);
+    if (!ctx?.exchange) return errors.noExchange;
+
+    const normalizedSymbol = symbol.toUpperCase().endsWith("USDT")
+      ? symbol.toUpperCase()
+      : `${symbol.toUpperCase()}USDT`;
+
+    try {
+      const candles = await ctx.exchange.getCandles(normalizedSymbol, interval, 250);
+      if (!candles || candles.length < 20) return errors.insufficientData(normalizedSymbol);
+
+      const { calculateFlowScope } = await import("../../../core/indicators/index.ts");
+      const result = calculateFlowScope(candles, numBins, imbalanceThreshold);
+
+      return {
+        symbol: normalizedSymbol,
+        interval,
+        currentPrice: candles[candles.length - 1]!.close.toFixed(2),
+        poc: result.poc?.toFixed(2),
+        pocBuyRatio: `${(result.pocBuyRatio * 100).toFixed(0)}%`,
+        pocImbalanced: result.pocImbalanced,
+        imbalanceDirection: result.imbalanceDirection,
+        pressureScore: result.pressureScore,
+        overallBuyRatio: `${(result.overallBuyRatio * 100).toFixed(0)}%`,
+        valueAreaHigh: result.valueAreaHigh?.toFixed(2),
+        valueAreaLow: result.valueAreaLow?.toFixed(2),
+        interpretation: result.interpretation,
+      };
+    } catch (error) {
+      return { error: `Failed to get FlowScope: ${(error as Error).message}` };
+    }
+  },
+});
+
+// ============================================================================
+// Angled Market Structure Tool
+// ============================================================================
+
+export const getAngledMarketStructureTool = createTool({
+  id: "get_angled_market_structure",
+  description:
+    "Get Angled Market Structure (AMS) analysis for a symbol. " +
+    "ATR-decaying pivot lines that slope over time — support rises, resistance falls. " +
+    "Detects structure breaks when price crosses angled S/R levels. " +
+    "Better than horizontal S/R — accounts for time decay of levels.",
+  inputSchema: z.object({
+    symbol: z.string().describe("Trading pair (e.g., 'BTCUSDT')"),
+    interval: z.enum(["1h", "4h", "1d"]).default("4h").describe("Timeframe"),
+    pivotLen: z.number().min(3).max(15).default(5).describe("Pivot detection window (default 5)"),
+    angleFactor: z
+      .number()
+      .min(0.001)
+      .max(0.1)
+      .default(0.01)
+      .describe("ATR fraction for per-bar angle (default 0.01)"),
+  }),
+  outputSchema: z.object({
+    symbol: z.string().optional(),
+    interval: z.string().optional(),
+    currentPrice: z.string().optional(),
+    nearestSupport: z.string().optional(),
+    nearestResistance: z.string().optional(),
+    supportCount: z.number().optional(),
+    resistanceCount: z.number().optional(),
+    structureBreak: z.boolean().optional(),
+    breakDirection: z.enum(["bullish", "bearish", "none"]).optional(),
+    atr: z.string().optional(),
+    bias: z.enum(["bullish", "bearish", "neutral"]).optional(),
+    interpretation: z.string().optional(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ symbol, interval, pivotLen, angleFactor }, execContext: MastraExecutionContext) => {
+    const ctx = getGordonContext(execContext);
+    if (!ctx?.exchange) return errors.noExchange;
+
+    const normalizedSymbol = symbol.toUpperCase().endsWith("USDT")
+      ? symbol.toUpperCase()
+      : `${symbol.toUpperCase()}USDT`;
+
+    try {
+      const candles = await ctx.exchange.getCandles(normalizedSymbol, interval, 250);
+      if (!candles || candles.length < 30) return errors.insufficientData(normalizedSymbol);
+
+      const { calculateAMS } = await import("../../../core/indicators/index.ts");
+      const result = calculateAMS(candles, pivotLen, angleFactor);
+
+      return {
+        symbol: normalizedSymbol,
+        interval,
+        currentPrice: candles[candles.length - 1]!.close.toFixed(2),
+        nearestSupport: result.nearestSupport?.toFixed(2),
+        nearestResistance: result.nearestResistance?.toFixed(2),
+        supportCount: result.supportLines.length,
+        resistanceCount: result.resistanceLines.length,
+        structureBreak: result.structureBreak,
+        breakDirection: result.breakDirection,
+        atr: result.atr?.toFixed(2),
+        bias: result.bias,
+        interpretation: result.interpretation,
+      };
+    } catch (error) {
+      return { error: `Failed to get AMS: ${(error as Error).message}` };
+    }
+  },
+});
+
+// ============================================================================
+// Elliott Wave Detection Tool
+// ============================================================================
+
+export const getElliottWaveTool = createTool({
+  id: "get_elliott_wave",
+  description:
+    "Detect Elliott Wave 5-wave impulse patterns for a symbol. " +
+    "Uses zigzag algorithm to find swing points, then validates 5-wave structure. " +
+    "Checks Elliott rules (Wave 2 < 100% retrace, Wave 3 not shortest, Wave 4 above Wave 1) " +
+    "and Fibonacci ratio validation. Projects Wave 5 targets.",
+  inputSchema: z.object({
+    symbol: z.string().describe("Trading pair (e.g., 'BTCUSDT')"),
+    interval: z.enum(["1h", "4h", "1d"]).default("4h").describe("Timeframe"),
+    reversalPct: z
+      .number()
+      .min(0.01)
+      .max(0.15)
+      .default(0.03)
+      .describe("Zigzag reversal threshold as fraction (default 0.03 = 3%)"),
+  }),
+  outputSchema: z.object({
+    symbol: z.string().optional(),
+    interval: z.string().optional(),
+    currentPrice: z.string().optional(),
+    patternFound: z.boolean().optional(),
+    patternDirection: z.enum(["bullish", "bearish", "none"]).optional(),
+    patternScore: z.number().optional(),
+    currentWave: z.number().optional(),
+    fibValid: z.boolean().optional(),
+    wave5Target: z.string().optional(),
+    waves: z.array(z.object({
+      wave: z.number(),
+      startPrice: z.string(),
+      endPrice: z.string(),
+      direction: z.string(),
+      fibRatio: z.string().optional(),
+    })).optional(),
+    interpretation: z.string().optional(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ symbol, interval, reversalPct }, execContext: MastraExecutionContext) => {
+    const ctx = getGordonContext(execContext);
+    if (!ctx?.exchange) return errors.noExchange;
+
+    const normalizedSymbol = symbol.toUpperCase().endsWith("USDT")
+      ? symbol.toUpperCase()
+      : `${symbol.toUpperCase()}USDT`;
+
+    try {
+      const candles = await ctx.exchange.getCandles(normalizedSymbol, interval, 250);
+      if (!candles || candles.length < 30) return errors.insufficientData(normalizedSymbol);
+
+      const { calculateElliottWave } = await import("../../../core/indicators/index.ts");
+      const result = calculateElliottWave(candles, reversalPct);
+
+      return {
+        symbol: normalizedSymbol,
+        interval,
+        currentPrice: candles[candles.length - 1]!.close.toFixed(2),
+        patternFound: result.patternFound,
+        patternDirection: result.patternDirection,
+        patternScore: result.patternScore,
+        currentWave: result.currentWave,
+        fibValid: result.fibValid,
+        wave5Target: result.wave5Target?.toFixed(2),
+        waves: result.waves.map(w => ({
+          wave: w.wave,
+          startPrice: w.startPrice.toFixed(2),
+          endPrice: w.endPrice.toFixed(2),
+          direction: w.direction,
+          fibRatio: w.fibRatio?.toFixed(3),
+        })),
+        interpretation: result.interpretation,
+      };
+    } catch (error) {
+      return { error: `Failed to get Elliott Wave: ${(error as Error).message}` };
+    }
+  },
+});
+
+// ============================================================================
+// False Breakout Reversal Tool
+// ============================================================================
+
+export const getFalseBreakoutTool = createTool({
+  id: "get_false_breakout",
+  description:
+    "Detect false breakout reversals for a symbol. " +
+    "Finds S/R levels, then checks if the last candle broke beyond a level and closed back inside. " +
+    "Confirms with wick ratio (long wick = rejection) and volume spike. " +
+    "bullish_reversal = false break below support (buy), bearish_reversal = false break above resistance (sell).",
+  inputSchema: z.object({
+    symbol: z.string().describe("Trading pair (e.g., 'BTCUSDT')"),
+    interval: z.enum(["1h", "4h", "1d"]).default("4h").describe("Timeframe"),
+    srLookback: z.number().min(3).max(15).default(5).describe("S/R pivot detection window (default 5)"),
+    wickThreshold: z
+      .number()
+      .min(0.3)
+      .max(0.9)
+      .default(0.6)
+      .describe("Min wick ratio for reversal candle (default 0.6)"),
+  }),
+  outputSchema: z.object({
+    symbol: z.string().optional(),
+    interval: z.string().optional(),
+    currentPrice: z.string().optional(),
+    supportCount: z.number().optional(),
+    resistanceCount: z.number().optional(),
+    falseBreakout: z.boolean().optional(),
+    signal: z.enum(["bullish_reversal", "bearish_reversal", "none"]).optional(),
+    brokenLevel: z.string().optional(),
+    wickRatio: z.string().optional(),
+    volumeConfirmed: z.boolean().optional(),
+    confidence: z.number().optional(),
+    interpretation: z.string().optional(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ symbol, interval, srLookback, wickThreshold }, execContext: MastraExecutionContext) => {
+    const ctx = getGordonContext(execContext);
+    if (!ctx?.exchange) return errors.noExchange;
+
+    const normalizedSymbol = symbol.toUpperCase().endsWith("USDT")
+      ? symbol.toUpperCase()
+      : `${symbol.toUpperCase()}USDT`;
+
+    try {
+      const candles = await ctx.exchange.getCandles(normalizedSymbol, interval, 250);
+      if (!candles || candles.length < 20) return errors.insufficientData(normalizedSymbol);
+
+      const { calculateFalseBreakout } = await import("../../../core/indicators/index.ts");
+      const result = calculateFalseBreakout(candles, srLookback, undefined, wickThreshold);
+
+      return {
+        symbol: normalizedSymbol,
+        interval,
+        currentPrice: candles[candles.length - 1]!.close.toFixed(2),
+        supportCount: result.supportLevels.length,
+        resistanceCount: result.resistanceLevels.length,
+        falseBreakout: result.falseBreakout,
+        signal: result.signal,
+        brokenLevel: result.brokenLevel?.toFixed(2),
+        wickRatio: result.wickRatio !== null ? `${(result.wickRatio * 100).toFixed(0)}%` : undefined,
+        volumeConfirmed: result.volumeConfirmed,
+        confidence: result.confidence,
+        interpretation: result.interpretation,
+      };
+    } catch (error) {
+      return { error: `Failed to get false breakout: ${(error as Error).message}` };
+    }
+  },
+});
+
+// ============================================================================
 // Export as Object (Mastra format)
 // ============================================================================
 
@@ -1192,4 +1489,8 @@ export const indicatorTools = {
   get_supertrend: createCachedTool(getSupertrendTool, TOOL_CACHE_CONFIG.indicators.ttl),
   get_wavetrend: createCachedTool(getWaveTrendTool, TOOL_CACHE_CONFIG.indicators.ttl),
   get_ichimoku: createCachedTool(getIchimokuTool, TOOL_CACHE_CONFIG.indicators.ttl),
+  get_flowscope: createCachedTool(getFlowScopeTool, TOOL_CACHE_CONFIG.indicators.ttl),
+  get_angled_market_structure: createCachedTool(getAngledMarketStructureTool, TOOL_CACHE_CONFIG.indicators.ttl),
+  get_elliott_wave: createCachedTool(getElliottWaveTool, TOOL_CACHE_CONFIG.indicators.ttl),
+  get_false_breakout: createCachedTool(getFalseBreakoutTool, TOOL_CACHE_CONFIG.indicators.ttl),
 };
