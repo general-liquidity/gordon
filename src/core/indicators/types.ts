@@ -176,3 +176,47 @@ export interface VolumeProfileResult {
   pricePosition: "above_va" | "in_va" | "below_va";
   interpretation: string;
 }
+
+// Kalman Filter Types
+export interface KalmanFilterResult {
+  values: number[];
+  current: number | null;
+  slope: number | null;
+  deviation: number | null;
+  trend: "bullish" | "bearish" | "neutral";
+  overextended: boolean;
+  interpretation: string;
+}
+
+// Nadaraya-Watson Envelope Types
+export interface NadarayaWatsonResult {
+  values: number[];
+  upperBand: number[];
+  lowerBand: number[];
+  current: number | null;
+  currentUpper: number | null;
+  currentLower: number | null;
+  position: "above_upper" | "upper_zone" | "middle" | "lower_zone" | "below_lower";
+  trend: "bullish" | "bearish" | "neutral";
+  envelopeWidth: number | null;
+  interpretation: string;
+}
+
+// Camarilla Pivot Types
+export interface CamarillaLevel {
+  label: string;
+  price: number;
+  type: "support" | "resistance";
+  role: "reversal" | "breakout" | "intermediate";
+}
+
+export interface CamarillaPivotResult {
+  levels: CamarillaLevel[];
+  prevHigh: number;
+  prevLow: number;
+  prevClose: number;
+  priceZone: string;
+  nearestLevel: CamarillaLevel | null;
+  signal: "long_reversal" | "short_reversal" | "long_breakout" | "short_breakout" | "neutral";
+  interpretation: string;
+}

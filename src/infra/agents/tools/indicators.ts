@@ -685,6 +685,229 @@ export const getStochasticRSITool = createTool({
 });
 
 // ============================================================================
+// Kalman Filter Tool
+// ============================================================================
+
+export const getKalmanFilterTool = createTool({
+  id: "get_kalman_filter",
+  description:
+    "Get Kalman filter trend analysis for a symbol. " +
+    "Zero-lag smoother that estimates fair value dynamically. " +
+    "Detects overextension from fair value for mean reversion setups. " +
+    "Mathematically superior to moving averages — adapts to noise automatically.",
+  inputSchema: z.object({
+    symbol: z.string().describe("Trading pair (e.g., 'BTCUSDT')"),
+    interval: z.enum(["1h", "4h", "1d"]).default("4h").describe("Timeframe"),
+    processVariance: z
+      .number()
+      .min(1e-7)
+      .max(1e-2)
+      .default(1e-5)
+      .describe("Q parameter: lower = smoother (default 0.00001)"),
+    measurementVariance: z
+      .number()
+      .min(0.01)
+      .max(1)
+      .default(0.1)
+      .describe("R parameter: lower = more responsive (default 0.1)"),
+  }),
+  outputSchema: z.object({
+    symbol: z.string().optional(),
+    interval: z.string().optional(),
+    currentPrice: z.string().optional(),
+    kalmanValue: z.string().optional(),
+    slope: z.string().optional(),
+    deviation: z.string().optional(),
+    trend: z.enum(["bullish", "bearish", "neutral"]).optional(),
+    overextended: z.boolean().optional(),
+    interpretation: z.string().optional(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ symbol, interval, processVariance, measurementVariance }, execContext: MastraExecutionContext) => {
+    const ctx = getGordonContext(execContext);
+    if (!ctx?.exchange) return errors.noExchange;
+
+    const normalizedSymbol = symbol.toUpperCase().endsWith("USDT")
+      ? symbol.toUpperCase()
+      : `${symbol.toUpperCase()}USDT`;
+
+    try {
+      const candles = await ctx.exchange.getCandles(normalizedSymbol, interval, 250);
+      if (!candles || candles.length < 20) return errors.insufficientData(normalizedSymbol);
+
+      const { calculateKalmanFilter } = await import("../../../core/indicators/index.ts");
+      const result = calculateKalmanFilter(candles, processVariance, measurementVariance);
+
+      return {
+        symbol: normalizedSymbol,
+        interval,
+        currentPrice: candles[candles.length - 1]!.close.toFixed(2),
+        kalmanValue: result.current?.toFixed(2),
+        slope: result.slope?.toFixed(4),
+        deviation: result.deviation !== null ? `${result.deviation}%` : undefined,
+        trend: result.trend,
+        overextended: result.overextended,
+        interpretation: result.interpretation,
+      };
+    } catch (error) {
+      return { error: `Failed to get Kalman filter: ${(error as Error).message}` };
+    }
+  },
+});
+
+// ============================================================================
+// Nadaraya-Watson Envelope Tool
+// ============================================================================
+
+export const getNadarayaWatsonTool = createTool({
+  id: "get_nadaraya_watson",
+  description:
+    "Get Nadaraya-Watson kernel regression envelope for a symbol. " +
+    "Non-parametric Gaussian smoother with ATR-based bands. " +
+    "Price touching upper band = overbought (sell signal), lower band = oversold (buy signal). " +
+    "Superior to Bollinger Bands for smooth trend estimation.",
+  inputSchema: z.object({
+    symbol: z.string().describe("Trading pair (e.g., 'BTCUSDT')"),
+    interval: z.enum(["1h", "4h", "1d"]).default("4h").describe("Timeframe"),
+    bandwidth: z
+      .number()
+      .min(20)
+      .max(500)
+      .default(100)
+      .describe("Kernel bandwidth / lookback (default 100)"),
+    bandMultiplier: z
+      .number()
+      .min(0.5)
+      .max(5)
+      .default(2.0)
+      .describe("ATR multiplier for envelope bands (default 2.0)"),
+  }),
+  outputSchema: z.object({
+    symbol: z.string().optional(),
+    interval: z.string().optional(),
+    currentPrice: z.string().optional(),
+    nwValue: z.string().optional(),
+    upperBand: z.string().optional(),
+    lowerBand: z.string().optional(),
+    position: z.enum(["above_upper", "upper_zone", "middle", "lower_zone", "below_lower"]).optional(),
+    trend: z.enum(["bullish", "bearish", "neutral"]).optional(),
+    envelopeWidth: z.string().optional(),
+    interpretation: z.string().optional(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ symbol, interval, bandwidth, bandMultiplier }, execContext: MastraExecutionContext) => {
+    const ctx = getGordonContext(execContext);
+    if (!ctx?.exchange) return errors.noExchange;
+
+    const normalizedSymbol = symbol.toUpperCase().endsWith("USDT")
+      ? symbol.toUpperCase()
+      : `${symbol.toUpperCase()}USDT`;
+
+    try {
+      const candles = await ctx.exchange.getCandles(normalizedSymbol, interval, Math.max(bandwidth + 50, 250));
+      if (!candles || candles.length < 20) return errors.insufficientData(normalizedSymbol);
+
+      const { calculateNadarayaWatson } = await import("../../../core/indicators/index.ts");
+      const result = calculateNadarayaWatson(candles, bandwidth, bandMultiplier);
+
+      return {
+        symbol: normalizedSymbol,
+        interval,
+        currentPrice: candles[candles.length - 1]!.close.toFixed(2),
+        nwValue: result.current?.toFixed(2),
+        upperBand: result.currentUpper?.toFixed(2),
+        lowerBand: result.currentLower?.toFixed(2),
+        position: result.position,
+        trend: result.trend,
+        envelopeWidth: result.envelopeWidth !== null ? `${result.envelopeWidth}%` : undefined,
+        interpretation: result.interpretation,
+      };
+    } catch (error) {
+      return { error: `Failed to get Nadaraya-Watson: ${(error as Error).message}` };
+    }
+  },
+});
+
+// ============================================================================
+// Camarilla Pivot Points Tool
+// ============================================================================
+
+export const getCamarillaPivotsTool = createTool({
+  id: "get_camarilla_pivots",
+  description:
+    "Get Camarilla pivot point levels (R1-R4, S1-S4) for a symbol. " +
+    "8 intraday support/resistance levels from previous period range. " +
+    "S3/R3 = reversal levels (bounce trades), S4/R4 = breakout levels (momentum trades). " +
+    "Best for intraday and swing trading entry/exit planning.",
+  inputSchema: z.object({
+    symbol: z.string().describe("Trading pair (e.g., 'BTCUSDT')"),
+    interval: z.enum(["1h", "4h", "1d"]).default("1h").describe("Timeframe (1h works best with 24-bar daily pivots)"),
+    lookbackPeriod: z
+      .number()
+      .min(6)
+      .max(168)
+      .default(24)
+      .describe("Candles for previous period (24 = daily pivots on 1h chart)"),
+  }),
+  outputSchema: z.object({
+    symbol: z.string().optional(),
+    interval: z.string().optional(),
+    currentPrice: z.string().optional(),
+    levels: z.array(z.object({
+      label: z.string(),
+      price: z.string(),
+      type: z.string(),
+      role: z.string(),
+    })).optional(),
+    priceZone: z.string().optional(),
+    nearestLevel: z.object({
+      label: z.string(),
+      price: z.string(),
+    }).optional(),
+    signal: z.enum(["long_reversal", "short_reversal", "long_breakout", "short_breakout", "neutral"]).optional(),
+    interpretation: z.string().optional(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ symbol, interval, lookbackPeriod }, execContext: MastraExecutionContext) => {
+    const ctx = getGordonContext(execContext);
+    if (!ctx?.exchange) return errors.noExchange;
+
+    const normalizedSymbol = symbol.toUpperCase().endsWith("USDT")
+      ? symbol.toUpperCase()
+      : `${symbol.toUpperCase()}USDT`;
+
+    try {
+      const candles = await ctx.exchange.getCandles(normalizedSymbol, interval, lookbackPeriod + 10);
+      if (!candles || candles.length < lookbackPeriod + 1) return errors.insufficientData(normalizedSymbol);
+
+      const { calculateCamarillaPivots } = await import("../../../core/indicators/index.ts");
+      const result = calculateCamarillaPivots(candles, lookbackPeriod);
+
+      return {
+        symbol: normalizedSymbol,
+        interval,
+        currentPrice: candles[candles.length - 1]!.close.toFixed(2),
+        levels: result.levels.map(l => ({
+          label: l.label,
+          price: l.price.toFixed(2),
+          type: l.type,
+          role: l.role,
+        })),
+        priceZone: result.priceZone,
+        nearestLevel: result.nearestLevel ? {
+          label: result.nearestLevel.label,
+          price: result.nearestLevel.price.toFixed(2),
+        } : undefined,
+        signal: result.signal,
+        interpretation: result.interpretation,
+      };
+    } catch (error) {
+      return { error: `Failed to get Camarilla pivots: ${(error as Error).message}` };
+    }
+  },
+});
+
+// ============================================================================
 // Export as Object (Mastra format)
 // ============================================================================
 
@@ -709,4 +932,7 @@ export const indicatorTools = {
   get_position_size: createCachedTool(getPositionSizeTool, TOOL_CACHE_CONFIG.indicators.ttl),
   get_vwap: createCachedTool(getVWAPTool, TOOL_CACHE_CONFIG.indicators.ttl),
   get_stochastic_rsi: createCachedTool(getStochasticRSITool, TOOL_CACHE_CONFIG.indicators.ttl),
+  get_kalman_filter: createCachedTool(getKalmanFilterTool, TOOL_CACHE_CONFIG.indicators.ttl),
+  get_nadaraya_watson: createCachedTool(getNadarayaWatsonTool, TOOL_CACHE_CONFIG.indicators.ttl),
+  get_camarilla_pivots: createCachedTool(getCamarillaPivotsTool, TOOL_CACHE_CONFIG.indicators.ttl),
 };

@@ -20,6 +20,10 @@ export type {
   FibonacciResult,
   ProfileBin,
   VolumeProfileResult,
+  KalmanFilterResult,
+  NadarayaWatsonResult,
+  CamarillaLevel,
+  CamarillaPivotResult,
 } from "./types.ts";
 
 // RSI
@@ -55,3 +59,12 @@ export { calculateFibonacci, calculateFibonacciExtensions } from "./fibonacci.ts
 
 // Volume Profile
 export { calculateVolumeProfile } from "./volume-profile.ts";
+
+// Kalman Filter
+export { calculateKalmanFilter } from "./kalman.ts";
+
+// Nadaraya-Watson Envelope
+export { calculateNadarayaWatson } from "./nadaraya-watson.ts";
+
+// Camarilla Pivot Points
+export { calculateCamarillaPivots } from "./camarilla.ts";
