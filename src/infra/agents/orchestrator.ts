@@ -436,6 +436,10 @@ const TOOL_AGENT_MAP: Record<string, string> = {
   get_kalman_filter: "Scanner",
   get_nadaraya_watson: "Scanner",
   get_camarilla_pivots: "Scanner",
+  get_markov_regime: "Scanner",
+  get_supertrend: "Scanner",
+  get_wavetrend: "Scanner",
+  get_ichimoku: "Scanner",
   // marketDataTools spread (Scanner is primary for raw market data)
   get_candles: "Scanner",
   get_price: "Scanner",

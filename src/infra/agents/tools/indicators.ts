@@ -908,22 +908,275 @@ export const getCamarillaPivotsTool = createTool({
 });
 
 // ============================================================================
+// Markov Chain Regime Detection Tool
+// ============================================================================
+
+export const getMarkovRegimeTool = createTool({
+  id: "get_markov_regime",
+  description:
+    "Get Markov Chain market regime detection for a symbol. " +
+    "Classifies market into Bull/Bear/Neutral using Z-score of returns. " +
+    "Provides transition probability matrix — probability of switching regimes. " +
+    "Detects regime transitions for entry/exit timing.",
+  inputSchema: z.object({
+    symbol: z.string().describe("Trading pair (e.g., 'BTCUSDT')"),
+    interval: z.enum(["1h", "4h", "1d"]).default("4h").describe("Timeframe"),
+    lookback: z
+      .number()
+      .min(20)
+      .max(200)
+      .default(50)
+      .describe("Lookback for Z-score and transition matrix (default 50)"),
+  }),
+  outputSchema: z.object({
+    symbol: z.string().optional(),
+    interval: z.string().optional(),
+    currentPrice: z.string().optional(),
+    regime: z.string().optional(),
+    zScore: z.string().optional(),
+    probToBull: z.string().optional(),
+    probStaySame: z.string().optional(),
+    probToBear: z.string().optional(),
+    confidence: z.string().optional(),
+    transition: z.boolean().optional(),
+    prevRegime: z.string().optional(),
+    interpretation: z.string().optional(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ symbol, interval, lookback }, execContext: MastraExecutionContext) => {
+    const ctx = getGordonContext(execContext);
+    if (!ctx?.exchange) return errors.noExchange;
+
+    const normalizedSymbol = symbol.toUpperCase().endsWith("USDT")
+      ? symbol.toUpperCase()
+      : `${symbol.toUpperCase()}USDT`;
+
+    try {
+      const candles = await ctx.exchange.getCandles(normalizedSymbol, interval, lookback * 2 + 10);
+      if (!candles || candles.length < lookback * 2 + 2) return errors.insufficientData(normalizedSymbol);
+
+      const { calculateMarkovRegime } = await import("../../../core/indicators/index.ts");
+      const result = calculateMarkovRegime(candles, lookback);
+
+      return {
+        symbol: normalizedSymbol,
+        interval,
+        currentPrice: candles[candles.length - 1]!.close.toFixed(2),
+        regime: result.regimeLabel.toUpperCase(),
+        zScore: result.zScore?.toFixed(3),
+        probToBull: `${(result.probToBull * 100).toFixed(1)}%`,
+        probStaySame: `${(result.probStaySame * 100).toFixed(1)}%`,
+        probToBear: `${(result.probToBear * 100).toFixed(1)}%`,
+        confidence: `${result.confidence.toFixed(1)}%`,
+        transition: result.transition,
+        prevRegime: result.prevRegime.toUpperCase(),
+        interpretation: result.interpretation,
+      };
+    } catch (error) {
+      return { error: `Failed to get Markov regime: ${(error as Error).message}` };
+    }
+  },
+});
+
+// ============================================================================
+// Supertrend Tool
+// ============================================================================
+
+export const getSupertrendTool = createTool({
+  id: "get_supertrend",
+  description:
+    "Get Supertrend indicator for a symbol. " +
+    "ATR-based dynamic trailing support/resistance — clean trend-following signal. " +
+    "Direction = 1 (bullish, lower band is support) or -1 (bearish, upper band is resistance). " +
+    "Buy on bearish→bullish flip, sell on bullish→bearish flip. No repainting.",
+  inputSchema: z.object({
+    symbol: z.string().describe("Trading pair (e.g., 'BTCUSDT')"),
+    interval: z.enum(["1h", "4h", "1d"]).default("4h").describe("Timeframe"),
+    atrPeriod: z.number().min(5).max(30).default(10).describe("ATR period (default 10)"),
+    multiplier: z.number().min(0.5).max(5).default(2.0).describe("ATR multiplier (default 2.0)"),
+  }),
+  outputSchema: z.object({
+    symbol: z.string().optional(),
+    interval: z.string().optional(),
+    currentPrice: z.string().optional(),
+    supertrendValue: z.string().optional(),
+    direction: z.string().optional(),
+    trendChange: z.boolean().optional(),
+    signal: z.enum(["buy", "sell", "hold"]).optional(),
+    distance: z.string().optional(),
+    interpretation: z.string().optional(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ symbol, interval, atrPeriod, multiplier }, execContext: MastraExecutionContext) => {
+    const ctx = getGordonContext(execContext);
+    if (!ctx?.exchange) return errors.noExchange;
+
+    const normalizedSymbol = symbol.toUpperCase().endsWith("USDT")
+      ? symbol.toUpperCase()
+      : `${symbol.toUpperCase()}USDT`;
+
+    try {
+      const candles = await ctx.exchange.getCandles(normalizedSymbol, interval, 250);
+      if (!candles || candles.length < atrPeriod + 5) return errors.insufficientData(normalizedSymbol);
+
+      const { calculateSupertrend } = await import("../../../core/indicators/index.ts");
+      const result = calculateSupertrend(candles, atrPeriod, multiplier);
+
+      return {
+        symbol: normalizedSymbol,
+        interval,
+        currentPrice: candles[candles.length - 1]!.close.toFixed(2),
+        supertrendValue: result.current?.toFixed(2),
+        direction: result.currentDirection === 1 ? "BULLISH" : "BEARISH",
+        trendChange: result.trendChange,
+        signal: result.signal,
+        distance: result.distance !== null ? `${result.distance}%` : undefined,
+        interpretation: result.interpretation,
+      };
+    } catch (error) {
+      return { error: `Failed to get Supertrend: ${(error as Error).message}` };
+    }
+  },
+});
+
+// ============================================================================
+// WaveTrend Oscillator Tool
+// ============================================================================
+
+export const getWaveTrendTool = createTool({
+  id: "get_wavetrend",
+  description:
+    "Get WaveTrend oscillator for a symbol. " +
+    "Multi-layer momentum oscillator with volume confirmation (CMF). " +
+    "Better than RSI for overbought/oversold detection — combines price + volume flow. " +
+    "WT1 < -60 = oversold (buy), WT1 > 60 = overbought (sell). Crossovers = entry signals.",
+  inputSchema: z.object({
+    symbol: z.string().describe("Trading pair (e.g., 'BTCUSDT')"),
+    interval: z.enum(["1h", "4h", "1d"]).default("4h").describe("Timeframe"),
+    channelLen: z.number().min(5).max(30).default(10).describe("Channel length (default 10)"),
+    averageLen: z.number().min(10).max(50).default(21).describe("Average length (default 21)"),
+  }),
+  outputSchema: z.object({
+    symbol: z.string().optional(),
+    interval: z.string().optional(),
+    currentPrice: z.string().optional(),
+    wt1: z.string().optional(),
+    wt2: z.string().optional(),
+    zone: z.enum(["overbought", "oversold", "neutral"]).optional(),
+    crossover: z.enum(["bullish_cross", "bearish_cross", "none"]).optional(),
+    momentum: z.enum(["rising", "falling", "flat"]).optional(),
+    cmf: z.string().optional(),
+    cmfBias: z.enum(["bullish", "bearish", "neutral"]).optional(),
+    interpretation: z.string().optional(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ symbol, interval, channelLen, averageLen }, execContext: MastraExecutionContext) => {
+    const ctx = getGordonContext(execContext);
+    if (!ctx?.exchange) return errors.noExchange;
+
+    const normalizedSymbol = symbol.toUpperCase().endsWith("USDT")
+      ? symbol.toUpperCase()
+      : `${symbol.toUpperCase()}USDT`;
+
+    try {
+      const candles = await ctx.exchange.getCandles(normalizedSymbol, interval, 250);
+      if (!candles || candles.length < 50) return errors.insufficientData(normalizedSymbol);
+
+      const { calculateWaveTrend } = await import("../../../core/indicators/index.ts");
+      const result = calculateWaveTrend(candles, channelLen, averageLen);
+
+      return {
+        symbol: normalizedSymbol,
+        interval,
+        currentPrice: candles[candles.length - 1]!.close.toFixed(2),
+        wt1: result.currentWT1?.toFixed(2),
+        wt2: result.currentWT2?.toFixed(2),
+        zone: result.zone,
+        crossover: result.crossover,
+        momentum: result.momentum,
+        cmf: result.cmf?.toFixed(3),
+        cmfBias: result.cmfBias,
+        interpretation: result.interpretation,
+      };
+    } catch (error) {
+      return { error: `Failed to get WaveTrend: ${(error as Error).message}` };
+    }
+  },
+});
+
+// ============================================================================
+// Ichimoku Cloud Tool
+// ============================================================================
+
+export const getIchimokuTool = createTool({
+  id: "get_ichimoku",
+  description:
+    "Get full Ichimoku Cloud analysis for a symbol. " +
+    "5 components: Tenkan-sen, Kijun-sen, Senkou Span A/B, Chikou Span. " +
+    "Cloud color (bullish/bearish), price position (above/in/below cloud), TK crosses. " +
+    "Multi-timeframe trend analysis in one indicator — best for swing trading.",
+  inputSchema: z.object({
+    symbol: z.string().describe("Trading pair (e.g., 'BTCUSDT')"),
+    interval: z.enum(["1h", "4h", "1d"]).default("4h").describe("Timeframe"),
+  }),
+  outputSchema: z.object({
+    symbol: z.string().optional(),
+    interval: z.string().optional(),
+    currentPrice: z.string().optional(),
+    tenkan: z.string().optional(),
+    kijun: z.string().optional(),
+    senkouA: z.string().optional(),
+    senkouB: z.string().optional(),
+    cloudTop: z.string().optional(),
+    cloudBottom: z.string().optional(),
+    cloudColor: z.enum(["bullish", "bearish", "neutral"]).optional(),
+    pricePosition: z.enum(["above_cloud", "in_cloud", "below_cloud"]).optional(),
+    tkCross: z.enum(["bullish_cross", "bearish_cross", "none"]).optional(),
+    signal: z.enum(["strong_buy", "buy", "neutral", "sell", "strong_sell"]).optional(),
+    interpretation: z.string().optional(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ symbol, interval }, execContext: MastraExecutionContext) => {
+    const ctx = getGordonContext(execContext);
+    if (!ctx?.exchange) return errors.noExchange;
+
+    const normalizedSymbol = symbol.toUpperCase().endsWith("USDT")
+      ? symbol.toUpperCase()
+      : `${symbol.toUpperCase()}USDT`;
+
+    try {
+      const candles = await ctx.exchange.getCandles(normalizedSymbol, interval, 250);
+      if (!candles || candles.length < 53) return errors.insufficientData(normalizedSymbol);
+
+      const { calculateIchimoku } = await import("../../../core/indicators/index.ts");
+      const result = calculateIchimoku(candles);
+
+      return {
+        symbol: normalizedSymbol,
+        interval,
+        currentPrice: candles[candles.length - 1]!.close.toFixed(2),
+        tenkan: result.tenkan?.toFixed(2),
+        kijun: result.kijun?.toFixed(2),
+        senkouA: result.senkouA?.toFixed(2),
+        senkouB: result.senkouB?.toFixed(2),
+        cloudTop: result.cloudTop?.toFixed(2),
+        cloudBottom: result.cloudBottom?.toFixed(2),
+        cloudColor: result.cloudColor,
+        pricePosition: result.pricePosition,
+        tkCross: result.tkCross,
+        signal: result.signal,
+        interpretation: result.interpretation,
+      };
+    } catch (error) {
+      return { error: `Failed to get Ichimoku: ${(error as Error).message}` };
+    }
+  },
+});
+
+// ============================================================================
 // Export as Object (Mastra format)
 // ============================================================================
 
-/**
- * Indicator tools exported as an object for Mastra Agent
- * This is the format expected by Mastra's Agent class
- *
- * All tools are wrapped with caching and request deduplication:
- * - get_technical_analysis: 1 minute TTL (computationally expensive)
- * - get_technical_signals: 1 minute TTL (used in scanning)
- * - get_rsi: 1 minute TTL (indicator data)
- * - get_stop_loss_levels: 1 minute TTL (ATR-based)
- * - get_position_size: 1 minute TTL (ATR-based)
- * - get_vwap: 1 minute TTL (indicator data)
- * - get_stochastic_rsi: 1 minute TTL (indicator data)
- */
 export const indicatorTools = {
   get_technical_analysis: createCachedTool(getTechnicalAnalysisTool, TOOL_CACHE_CONFIG.indicators.ttl),
   get_technical_signals: createCachedTool(getTechnicalSignalsTool, TOOL_CACHE_CONFIG.indicators.ttl),
@@ -935,4 +1188,8 @@ export const indicatorTools = {
   get_kalman_filter: createCachedTool(getKalmanFilterTool, TOOL_CACHE_CONFIG.indicators.ttl),
   get_nadaraya_watson: createCachedTool(getNadarayaWatsonTool, TOOL_CACHE_CONFIG.indicators.ttl),
   get_camarilla_pivots: createCachedTool(getCamarillaPivotsTool, TOOL_CACHE_CONFIG.indicators.ttl),
+  get_markov_regime: createCachedTool(getMarkovRegimeTool, TOOL_CACHE_CONFIG.indicators.ttl),
+  get_supertrend: createCachedTool(getSupertrendTool, TOOL_CACHE_CONFIG.indicators.ttl),
+  get_wavetrend: createCachedTool(getWaveTrendTool, TOOL_CACHE_CONFIG.indicators.ttl),
+  get_ichimoku: createCachedTool(getIchimokuTool, TOOL_CACHE_CONFIG.indicators.ttl),
 };

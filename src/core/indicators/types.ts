@@ -220,3 +220,60 @@ export interface CamarillaPivotResult {
   signal: "long_reversal" | "short_reversal" | "long_breakout" | "short_breakout" | "neutral";
   interpretation: string;
 }
+
+// Markov Chain Regime Types
+export interface MarkovRegimeResult {
+  regime: number;
+  regimeLabel: "bull" | "neutral" | "bear";
+  zScore: number | null;
+  transitionMatrix: number[][];
+  probToBull: number;
+  probStaySame: number;
+  probToBear: number;
+  confidence: number;
+  transition: boolean;
+  prevRegime: "bull" | "neutral" | "bear";
+  interpretation: string;
+}
+
+// Supertrend Types
+export interface SupertrendResult {
+  values: number[];
+  direction: number[];
+  current: number | null;
+  currentDirection: 1 | -1;
+  trendChange: boolean;
+  signal: "buy" | "sell" | "hold";
+  distance: number | null;
+  interpretation: string;
+}
+
+// WaveTrend Oscillator Types
+export interface WaveTrendResult {
+  wt1: number[];
+  wt2: number[];
+  currentWT1: number | null;
+  currentWT2: number | null;
+  zone: "overbought" | "oversold" | "neutral";
+  crossover: "bullish_cross" | "bearish_cross" | "none";
+  momentum: "rising" | "falling" | "flat";
+  cmf: number | null;
+  cmfBias: "bullish" | "bearish" | "neutral";
+  interpretation: string;
+}
+
+// Ichimoku Cloud Types
+export interface IchimokuResult {
+  tenkan: number | null;
+  kijun: number | null;
+  senkouA: number | null;
+  senkouB: number | null;
+  chikou: number | null;
+  cloudTop: number | null;
+  cloudBottom: number | null;
+  cloudColor: "bullish" | "bearish" | "neutral";
+  pricePosition: "above_cloud" | "in_cloud" | "below_cloud";
+  tkCross: "bullish_cross" | "bearish_cross" | "none";
+  signal: "strong_buy" | "buy" | "neutral" | "sell" | "strong_sell";
+  interpretation: string;
+}

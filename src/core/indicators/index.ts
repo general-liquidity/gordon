@@ -24,6 +24,10 @@ export type {
   NadarayaWatsonResult,
   CamarillaLevel,
   CamarillaPivotResult,
+  MarkovRegimeResult,
+  SupertrendResult,
+  WaveTrendResult,
+  IchimokuResult,
 } from "./types.ts";
 
 // RSI
@@ -68,3 +72,15 @@ export { calculateNadarayaWatson } from "./nadaraya-watson.ts";
 
 // Camarilla Pivot Points
 export { calculateCamarillaPivots } from "./camarilla.ts";
+
+// Markov Chain Regime Detection
+export { calculateMarkovRegime } from "./markov-regime.ts";
+
+// Supertrend
+export { calculateSupertrend } from "./supertrend.ts";
+
+// WaveTrend Oscillator
+export { calculateWaveTrend } from "./wavetrend.ts";
+
+// Ichimoku Cloud
+export { calculateIchimoku } from "./ichimoku.ts";
