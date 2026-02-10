@@ -16,6 +16,10 @@ export type {
   TechnicalSignals,
   VWAPResult,
   StochasticRSIResult,
+  FibonacciLevel,
+  FibonacciResult,
+  ProfileBin,
+  VolumeProfileResult,
 } from "./types.ts";
 
 // RSI
@@ -45,3 +49,9 @@ export { calculateVWAP, calculateVWAPBands } from "./vwap.ts";
 
 // Stochastic RSI
 export { calculateStochasticRSI } from "./stochastic-rsi.ts";
+
+// Fibonacci
+export { calculateFibonacci, calculateFibonacciExtensions } from "./fibonacci.ts";
+
+// Volume Profile
+export { calculateVolumeProfile } from "./volume-profile.ts";

@@ -140,3 +140,39 @@ export interface StochasticRSIResult {
   action: "potential_buy" | "hold" | "potential_sell";
   interpretation: string;
 }
+
+// Fibonacci Types
+export interface FibonacciLevel {
+  ratio: number;
+  price: number;
+  label: string;
+  isSupport: boolean;
+  isResistance: boolean;
+}
+
+export interface FibonacciResult {
+  swingHigh: number | null;
+  swingLow: number | null;
+  levels: FibonacciLevel[];
+  trend: "uptrend" | "downtrend" | "neutral";
+  nearestLevel: FibonacciLevel | null;
+  interpretation: string;
+}
+
+// Volume Profile Types
+export interface ProfileBin {
+  priceLevel: number;
+  volume: number;
+  buyVolume: number;
+  sellVolume: number;
+  percentage: number;
+}
+
+export interface VolumeProfileResult {
+  poc: number | null;
+  valueAreaHigh: number | null;
+  valueAreaLow: number | null;
+  profileBins: ProfileBin[];
+  pricePosition: "above_va" | "in_va" | "below_va";
+  interpretation: string;
+}

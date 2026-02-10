@@ -60,6 +60,7 @@ export { compositionTools } from "./composition.ts";
 export { backtestTools } from "./backtest.ts";
 export { parallelAnalysisTools } from "./parallel-analysis.ts";
 export { marketDataTools } from "./market-data.ts";
+export { liquidationIntelligenceTools } from "./liquidation-intelligence.ts";
 
 // Multi-modal chart tools (image generation and vision analysis)
 export { multiModalChartTools } from "../../tools/chartTools.ts";
@@ -250,6 +251,7 @@ import { compositionTools } from "./composition.ts";
 import { backtestTools } from "./backtest.ts";
 import { parallelAnalysisTools } from "./parallel-analysis.ts";
 import { marketDataTools } from "./market-data.ts";
+import { liquidationIntelligenceTools } from "./liquidation-intelligence.ts";
 import { multiModalChartTools } from "../../tools/chartTools.ts";
 import { evalTools } from "../../evals/tools.ts";
 
@@ -280,6 +282,7 @@ export const allTools = {
   ...backtestTools,
   ...parallelAnalysisTools,
   ...marketDataTools,
+  ...liquidationIntelligenceTools,
   ...multiModalChartTools,
   ...evalTools,
 };
@@ -311,6 +314,7 @@ export const toolCounts = {
   backtest: Object.keys(backtestTools).length,
   parallelAnalysis: Object.keys(parallelAnalysisTools).length,
   marketData: Object.keys(marketDataTools).length,
+  liquidationIntelligence: Object.keys(liquidationIntelligenceTools).length,
   multiModalCharts: Object.keys(multiModalChartTools).length,
   evals: Object.keys(evalTools).length,
   total: Object.keys(allTools).length,

@@ -212,6 +212,10 @@ export type StrategyId =
   | "ema_rsi_crossover"
   | "relative_strength"
   | "engulfing_pattern"
+  // Tier 2 - Advanced ICT
+  | "order_blocks"
+  | "fair_value_gaps"
+  | "smart_money"
   // Special
   | "grid_entry";
 
@@ -229,6 +233,9 @@ export const STRATEGY_IDS: StrategyId[] = [
   "ema_rsi_crossover",
   "relative_strength",
   "engulfing_pattern",
+  "order_blocks",
+  "fair_value_gaps",
+  "smart_money",
   "grid_entry",
 ];
 
@@ -246,5 +253,8 @@ export const STRATEGY_TIERS: Record<StrategyId, 1 | 2> = {
   ema_rsi_crossover: 2,
   relative_strength: 2,
   engulfing_pattern: 2,
+  order_blocks: 2,
+  fair_value_gaps: 2,
+  smart_money: 2,
   grid_entry: 1, // Grid is a special strategy, keep in tier 1
 };

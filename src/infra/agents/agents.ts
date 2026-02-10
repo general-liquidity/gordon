@@ -50,6 +50,7 @@ import {
   sharedContextTools,
   parallelAnalysisTools,
   multiModalChartTools,
+  liquidationIntelligenceTools,
   withToolsMetrics,
 } from "./tools/index.ts";
 import { getSessionSummary, getMemoryStats, resetSharedMemory } from "./shared-context.ts";
@@ -263,6 +264,7 @@ const instrumentedHistoryTools = withToolsMetrics(historyTools);
 const instrumentedAccountTools = withToolsMetrics(accountTools);
 const instrumentedTradingTools = withToolsMetrics(tradingTools);
 const instrumentedMarketAnalysisTools = withToolsMetrics(marketAnalysisTools);
+const instrumentedLiquidationIntelligenceTools = withToolsMetrics(liquidationIntelligenceTools);
 const instrumentedRiskManagementTools = withToolsMetrics(riskManagementTools);
 const instrumentedStrategyTools = withToolsMetrics(strategyTools);
 const instrumentedMetricsTools = withToolsMetrics(metricsTools);
@@ -867,6 +869,8 @@ function getScannerAgent(): Agent {
         // Orderbook tools for combining scanning with orderbook analysis
         get_order_book: instrumentedOrderbookTools.get_order_book,
         get_spread: instrumentedOrderbookTools.get_spread,
+        // Liquidation intelligence tools (cascade risk, squeeze detection)
+        ...instrumentedLiquidationIntelligenceTools,
         // Shared context for cross-agent memory
         ...instrumentedSharedContextTools,
         // Performance evaluation tools for learning from trade outcomes
@@ -910,6 +914,8 @@ function getAnalystAgent(): Agent {
         ...instrumentedCompositionTools,       // Full analysis composition tool
         ...instrumentedParallelAnalysisTools,  // Parallel deep analysis tools
         ...instrumentedMultiModalChartTools,   // Advanced chart generation and vision analysis
+        // Liquidation intelligence tools (cascade risk, squeeze detection)
+        ...instrumentedLiquidationIntelligenceTools,
         analyze_coin: instrumentedMarketTools.analyze_coin,
         // Shared context for cross-agent memory
         ...instrumentedSharedContextTools,

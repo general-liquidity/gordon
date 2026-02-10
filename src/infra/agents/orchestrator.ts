@@ -485,6 +485,11 @@ const TOOL_AGENT_MAP: Record<string, string> = {
   // evalTools cherry-picks on Analyst
   get_market_condition_performance: "Analyst",
   get_learning_insights: "Analyst",
+  // liquidationIntelligenceTools (on Scanner + Analyst)
+  get_cascade_risk: "Scanner",
+  get_liquidation_pressure: "Scanner",
+  get_crowding_analysis: "Scanner",
+  get_squeeze_candidates: "Scanner",
 
   // ---- Planner tools ----
   // tradingTools cherry-picks

@@ -78,6 +78,11 @@ import { emaRsiCrossoverStrategy } from "./tier-2/ema-rsi-crossover.ts";
 import { relativeStrengthStrategy } from "./tier-2/relative-strength.ts";
 import { engulfingPatternStrategy } from "./tier-2/engulfing-pattern.ts";
 
+// Tier 2 - Advanced ICT Strategies
+import { orderBlocksStrategy } from "./tier-2/order-blocks.ts";
+import { fairValueGapsStrategy } from "./tier-2/fair-value-gaps.ts";
+import { smartMoneyStrategy } from "./tier-2/smart-money.ts";
+
 // ============================================================================
 // Strategy Registration
 // ============================================================================
@@ -98,6 +103,11 @@ strategyRegistry.register(emaRsiCrossoverStrategy);
 strategyRegistry.register(relativeStrengthStrategy);
 strategyRegistry.register(engulfingPatternStrategy);
 
+// Register Tier 2 ICT strategies
+strategyRegistry.register(orderBlocksStrategy);
+strategyRegistry.register(fairValueGapsStrategy);
+strategyRegistry.register(smartMoneyStrategy);
+
 // ============================================================================
 // Re-export Individual Strategies
 // ============================================================================
@@ -112,6 +122,9 @@ export { adxTrendStrategy } from "./tier-2/adx-trend.ts";
 export { emaRsiCrossoverStrategy } from "./tier-2/ema-rsi-crossover.ts";
 export { relativeStrengthStrategy } from "./tier-2/relative-strength.ts";
 export { engulfingPatternStrategy } from "./tier-2/engulfing-pattern.ts";
+export { orderBlocksStrategy } from "./tier-2/order-blocks.ts";
+export { fairValueGapsStrategy } from "./tier-2/fair-value-gaps.ts";
+export { smartMoneyStrategy } from "./tier-2/smart-money.ts";
 
 // ============================================================================
 // DSL Module Exports
