@@ -3,7 +3,7 @@
  * ATR-based dynamic trailing support/resistance that only moves in trend direction.
  * Clean trend-following signal — no repainting.
  *
- * Based on Moon Dev's Supertrend implementation.
+ * Supertrend implementation.
  *
  * Upper band = HL2 + (ATR * multiplier) → resistance in downtrend
  * Lower band = HL2 - (ATR * multiplier) → support in uptrend

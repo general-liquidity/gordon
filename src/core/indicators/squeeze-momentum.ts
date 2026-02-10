@@ -4,7 +4,7 @@
  * Squeeze ON = ranging/compressing, Squeeze OFF = breakout imminent.
  * Momentum via linear regression slope of detrended price.
  *
- * Based on LazyBear's Squeeze Momentum / Moon Dev implementation.
+ * Squeeze Momentum (LazyBear) implementation.
  */
 
 import type { Candle } from "./types.ts";

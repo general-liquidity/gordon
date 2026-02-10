@@ -3,7 +3,7 @@
  * Japanese triple top (Three Mountains) and triple bottom (Three Rivers) detection.
  * Three Mountains = bearish reversal pattern, Three Rivers = bullish reversal.
  *
- * Based on Moon Dev's Three Mountains & Rivers implementation.
+ * Three Mountains & Rivers implementation.
  */
 
 import type { Candle } from "./types.ts";

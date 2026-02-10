@@ -217,7 +217,7 @@ export type StrategyId =
   | "fair_value_gaps"
   | "smart_money"
   | "ict_killzones"
-  // Tier 2 - Moon Dev Patterns
+  // Tier 2 - Advanced Patterns
   | "trend_range"
   | "squeeze_breakout"
   | "mfi_divergence_confluence"

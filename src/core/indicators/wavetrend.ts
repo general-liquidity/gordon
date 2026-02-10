@@ -3,7 +3,7 @@
  * Multi-layer momentum oscillator combining HLC3, ESA, and CI calculation.
  * Better overbought/oversold detection than RSI — includes volume flow analysis.
  *
- * Based on Moon Dev's WaveTrend + MACD + Volume implementation.
+ * WaveTrend + MACD + Volume implementation.
  *
  * Calculation:
  *   HLC3 = (High + Low + Close) / 3

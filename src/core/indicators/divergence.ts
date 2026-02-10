@@ -4,7 +4,7 @@
  * Bullish divergence: price lower low + RSI higher low (reversal up).
  * Bearish divergence: price higher high + RSI lower high (reversal down).
  *
- * Based on Moon Dev's RSI Divergence implementation.
+ * RSI Divergence implementation.
  */
 
 import type { Candle } from "./types.ts";

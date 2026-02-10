@@ -3,7 +3,7 @@
  * ATR-decaying pivot lines that slope over time.
  * Detects structure breaks when price crosses angled S/R.
  *
- * Based on Moon Dev's Angled Market Structure implementation.
+ * Angled Market Structure implementation.
  */
 
 import type { Candle } from "./types.ts";

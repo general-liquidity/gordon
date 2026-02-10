@@ -3,7 +3,7 @@
  * Detects failed breakouts beyond support/resistance for counter-trend entries.
  * Uses wick ratio and volume confirmation.
  *
- * Based on Moon Dev's False Breakout Reversal implementation.
+ * False Breakout Reversal implementation.
  */
 
 import type { Candle } from "./types.ts";

@@ -3,7 +3,7 @@
  * Identifies supply (resistance) and demand (support) zones using rolling extremes.
  * Zones are price ranges, not single levels — defined by high/low and close extremes.
  *
- * Based on Moon Dev's Supply/Demand Zone implementation.
+ * Supply/Demand Zone implementation.
  */
 
 import type { Candle } from "./types.ts";

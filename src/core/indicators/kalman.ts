@@ -3,7 +3,7 @@
  * Zero-lag trend smoother using prediction-correction cycle.
  * Mathematically superior to moving averages — adapts to noise dynamically.
  *
- * Based on Moon Dev's Kalman Filter implementation.
+ * Kalman Filter implementation.
  */
 
 import type { Candle } from "./types.ts";

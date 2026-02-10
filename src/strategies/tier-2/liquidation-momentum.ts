@@ -5,7 +5,7 @@
  * When one side is overleveraged and price moves against them,
  * cascading liquidations create momentum — this strategy rides that wave.
  *
- * Inspired by Moon Dev's liq_momentum_bot.py (597% return, 77% win rate,
+ * Trades WITH liquidation cascades using Hyperliquid data (
  * 3.17 Sharpe in backtest) — adapted for Gordon's aggregate data model.
  *
  * Entry Conditions:

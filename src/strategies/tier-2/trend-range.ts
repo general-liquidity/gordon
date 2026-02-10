@@ -4,7 +4,7 @@
  * Detects when price enters a consolidation range using Weighted Moving Average
  * (WMA) center + ATR bands, waits for minimum duration, then trades the breakout.
  *
- * Based on Moon Dev's Trend Range Detector (Zeiierman concept from TradingView).
+ * Trend Range Detector (Zeiierman concept from TradingView).
  *
  * Entry Conditions:
  * - WMA(20) defines range center

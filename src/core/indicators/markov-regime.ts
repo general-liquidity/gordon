@@ -3,7 +3,7 @@
  * 3-state model (Bull/Bear/Neutral) with transition probability matrix.
  * Uses Z-score of returns for regime classification with Laplace smoothing.
  *
- * Based on Moon Dev's Markov Chain [3D] implementation.
+ * Markov Chain [3D] implementation.
  */
 
 import type { Candle } from "./types.ts";

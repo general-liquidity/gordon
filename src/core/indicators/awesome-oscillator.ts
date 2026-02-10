@@ -4,7 +4,7 @@
  * AO > 0 = bullish momentum, AO < 0 = bearish.
  * Zero-line crossovers = momentum shifts.
  *
- * Based on Bill Williams / Moon Dev's AO implementation.
+ * Awesome Oscillator (Bill Williams) implementation.
  */
 
 import type { Candle } from "./types.ts";

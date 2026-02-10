@@ -3,7 +3,7 @@
  * 3-bar gap pattern where bar[i].low > bar[i-2].high (bullish) or
  * bar[i].high < bar[i-2].low (bearish). Volume confirmation.
  *
- * Based on Moon Dev's FVG Volumatic implementation.
+ * FVG Volumatic implementation.
  */
 
 import type { Candle } from "./types.ts";

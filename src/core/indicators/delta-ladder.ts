@@ -4,7 +4,7 @@
  * Cumulative delta tracks net buying/selling pressure.
  * Delta divergence from price = potential reversal.
  *
- * Based on Moon Dev's Delta Ladder implementation.
+ * Delta Ladder implementation.
  */
 
 import type { Candle } from "./types.ts";

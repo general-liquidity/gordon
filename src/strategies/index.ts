@@ -84,7 +84,7 @@ import { fairValueGapsStrategy } from "./tier-2/fair-value-gaps.ts";
 import { smartMoneyStrategy } from "./tier-2/smart-money.ts";
 import { ictKillzonesStrategy } from "./tier-2/ict-killzones.ts";
 
-// Tier 2 - Moon Dev Pattern Strategies
+// Tier 2 - Advanced Pattern Strategies
 import { trendRangeStrategy } from "./tier-2/trend-range.ts";
 import { squeezeBreakoutStrategy } from "./tier-2/squeeze-breakout.ts";
 import { mfiDivergenceConfluenceStrategy } from "./tier-2/mfi-divergence-confluence.ts";
@@ -125,7 +125,7 @@ strategyRegistry.register(fairValueGapsStrategy);
 strategyRegistry.register(smartMoneyStrategy);
 strategyRegistry.register(ictKillzonesStrategy);
 
-// Register Tier 2 Moon Dev Pattern strategies
+// Register Tier 2 Advanced Pattern strategies
 strategyRegistry.register(trendRangeStrategy);
 strategyRegistry.register(squeezeBreakoutStrategy);
 strategyRegistry.register(mfiDivergenceConfluenceStrategy);

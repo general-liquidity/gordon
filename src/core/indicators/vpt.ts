@@ -4,7 +4,7 @@
  * Rising VPT confirms uptrend, falling VPT confirms downtrend.
  * Divergence between VPT and price = potential reversal.
  *
- * Based on Moon Dev's VPT implementation.
+ * VPT implementation.
  */
 
 import type { Candle } from "./types.ts";

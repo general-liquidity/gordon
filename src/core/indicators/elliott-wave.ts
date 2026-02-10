@@ -3,7 +3,7 @@
  * Zigzag algorithm for 5-wave impulse pattern detection.
  * Validates waves using Elliott rules and Fibonacci ratios.
  *
- * Based on Moon Dev's Elliott Wave Impulse implementation.
+ * Elliott Wave Impulse implementation.
  */
 
 import type { Candle } from "./types.ts";

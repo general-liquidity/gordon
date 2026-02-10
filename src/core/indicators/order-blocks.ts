@@ -3,7 +3,7 @@
  * High-probability order block detection using z-score of price distance.
  * Tracks block mitigation and uses simplified Kaplan-Meier survival probability.
  *
- * Based on Moon Dev's Order Blocks implementation.
+ * Order Blocks implementation.
  */
 
 import type { Candle } from "./types.ts";

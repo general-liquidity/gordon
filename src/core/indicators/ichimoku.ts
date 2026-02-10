@@ -3,7 +3,7 @@
  * All 5 components: Tenkan-sen, Kijun-sen, Senkou Span A & B, Chikou Span.
  * Multi-timeframe trend analysis in one indicator — cloud color = trend strength.
  *
- * Based on Moon Dev's Ichimoku Theories implementation.
+ * Ichimoku Theories implementation.
  *
  * Components:
  *   Tenkan-sen  = (9-period high + 9-period low) / 2   (conversion line)

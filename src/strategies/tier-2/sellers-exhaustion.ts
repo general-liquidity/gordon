@@ -17,7 +17,7 @@
  * Both patterns are classic bottoming signals used to enter long positions
  * at exhaustion points where selling pressure is fading.
  *
- * Inspired by Moon Dev's sellers_exhaustion backtest research
+ * Detects seller capitulation via volume patterns
  * (ClimaxVolumeExhaustion + DecliningVolumeExhaustion).
  */
 

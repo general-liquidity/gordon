@@ -5,7 +5,7 @@
  * or gap fill dynamics. Uses volume confirmation and ATR-relative gap
  * significance to filter high-probability setups.
  *
- * Inspired by Moon Dev's Gap Up Long Strategy with optimized parameters
+ * Gap detection and continuation/fill trading strategy
  * from backtesting (best: 1% threshold, 2.5% TP, 2% SL).
  *
  * Entry Conditions:

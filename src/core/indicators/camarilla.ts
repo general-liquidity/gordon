@@ -3,7 +3,7 @@
  * 8 intraday support/resistance levels (R1-R4, S1-S4)
  * calculated from the previous period's OHLC range.
  *
- * Based on Moon Dev's Camarilla Pivot strategy.
+ * Camarilla Pivot strategy.
  *
  * Camarilla multipliers (using 1.1 factor):
  *   R4 = close + range * 1.1/2   (breakout level)

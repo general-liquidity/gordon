@@ -3,7 +3,7 @@
  * Splits volume into buy vs sell pressure at each price level.
  * Detects POC imbalance (one-sided volume dominance) for directional bias.
  *
- * Based on Moon Dev's FlowScope implementation.
+ * FlowScope implementation.
  */
 
 import type { Candle } from "./types.ts";

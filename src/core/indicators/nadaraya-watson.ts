@@ -3,7 +3,7 @@
  * Non-parametric Gaussian kernel regression for smooth trend estimation
  * with ATR-based envelope bands for overbought/oversold detection.
  *
- * Based on Moon Dev's Nadaraya-Watson Envelope strategy.
+ * Nadaraya-Watson Envelope implementation.
  */
 
 import type { Candle } from "./types.ts";
