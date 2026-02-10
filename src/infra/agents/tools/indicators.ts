@@ -1734,6 +1734,412 @@ export const getSupplyDemandZonesTool = createTool({
 });
 
 // ============================================================================
+// Squeeze Momentum Tool
+// ============================================================================
+
+export const getSqueezeMomentumTool = createTool({
+  id: "get_squeeze_momentum",
+  description:
+    "Get Squeeze Momentum (LazyBear) for a symbol. " +
+    "Detects when Bollinger Bands contract inside Keltner Channels = volatility squeeze. " +
+    "Squeeze ON = compression building, Squeeze FIRED = breakout imminent. " +
+    "Momentum via linear regression slope shows direction of breakout.",
+  inputSchema: z.object({
+    symbol: z.string().describe("Trading pair (e.g., 'BTCUSDT')"),
+    interval: z.enum(["1h", "4h", "1d"]).default("4h").describe("Timeframe"),
+  }),
+  outputSchema: z.object({
+    symbol: z.string().optional(),
+    interval: z.string().optional(),
+    currentPrice: z.string().optional(),
+    squeezeOn: z.boolean().optional(),
+    squeezeFired: z.boolean().optional(),
+    momentum: z.string().optional(),
+    momentumColor: z.string().optional(),
+    signal: z.string().optional(),
+    interpretation: z.string().optional(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ symbol, interval }, execContext: MastraExecutionContext) => {
+    const ctx = getGordonContext(execContext);
+    if (!ctx?.exchange) return errors.noExchange;
+    const normalizedSymbol = symbol.toUpperCase().endsWith("USDT") ? symbol.toUpperCase() : `${symbol.toUpperCase()}USDT`;
+    try {
+      const candles = await ctx.exchange.getCandles(normalizedSymbol, interval, 250);
+      if (!candles || candles.length < 30) return errors.insufficientData(normalizedSymbol);
+      const { calculateSqueezeMomentum } = await import("../../../core/indicators/index.ts");
+      const result = calculateSqueezeMomentum(candles);
+      return {
+        symbol: normalizedSymbol, interval,
+        currentPrice: candles[candles.length - 1]!.close.toFixed(2),
+        squeezeOn: result.squeezeOn, squeezeFired: result.squeezeFired,
+        momentum: result.momentum?.toFixed(4), momentumColor: result.momentumColor,
+        signal: result.signal, interpretation: result.interpretation,
+      };
+    } catch (error) { return { error: `Failed to get Squeeze Momentum: ${(error as Error).message}` }; }
+  },
+});
+
+// ============================================================================
+// Order Blocks Tool
+// ============================================================================
+
+export const getOrderBlocksTool = createTool({
+  id: "get_order_blocks",
+  description:
+    "Detect smart money order blocks for a symbol. " +
+    "Uses z-score of price distance extremes to find high-probability OBs. " +
+    "Tracks block mitigation and uses Kaplan-Meier survival probability. " +
+    "Bullish OB = support, bearish OB = resistance. Only trades when KM prob >= 60%.",
+  inputSchema: z.object({
+    symbol: z.string().describe("Trading pair (e.g., 'BTCUSDT')"),
+    interval: z.enum(["1h", "4h", "1d"]).default("4h").describe("Timeframe"),
+    lookback: z.number().min(20).max(100).default(50).describe("Z-score lookback (default 50)"),
+  }),
+  outputSchema: z.object({
+    symbol: z.string().optional(),
+    interval: z.string().optional(),
+    currentPrice: z.string().optional(),
+    bullishCount: z.number().optional(),
+    bearishCount: z.number().optional(),
+    nearestBullishOB: z.string().optional(),
+    nearestBearishOB: z.string().optional(),
+    bullishProbability: z.string().optional(),
+    bearishProbability: z.string().optional(),
+    newBlock: z.boolean().optional(),
+    newBlockType: z.string().optional(),
+    signal: z.string().optional(),
+    interpretation: z.string().optional(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ symbol, interval, lookback }, execContext: MastraExecutionContext) => {
+    const ctx = getGordonContext(execContext);
+    if (!ctx?.exchange) return errors.noExchange;
+    const normalizedSymbol = symbol.toUpperCase().endsWith("USDT") ? symbol.toUpperCase() : `${symbol.toUpperCase()}USDT`;
+    try {
+      const candles = await ctx.exchange.getCandles(normalizedSymbol, interval, 250);
+      if (!candles || candles.length < lookback + 6) return errors.insufficientData(normalizedSymbol);
+      const { calculateOrderBlocks } = await import("../../../core/indicators/index.ts");
+      const result = calculateOrderBlocks(candles, lookback);
+      return {
+        symbol: normalizedSymbol, interval,
+        currentPrice: candles[candles.length - 1]!.close.toFixed(2),
+        bullishCount: result.bullishBlocks.length, bearishCount: result.bearishBlocks.length,
+        nearestBullishOB: result.nearestBullishOB?.toFixed(2),
+        nearestBearishOB: result.nearestBearishOB?.toFixed(2),
+        bullishProbability: `${(result.bullishProbability * 100).toFixed(0)}%`,
+        bearishProbability: `${(result.bearishProbability * 100).toFixed(0)}%`,
+        newBlock: result.newBlock, newBlockType: result.newBlockType,
+        signal: result.signal, interpretation: result.interpretation,
+      };
+    } catch (error) { return { error: `Failed to get Order Blocks: ${(error as Error).message}` }; }
+  },
+});
+
+// ============================================================================
+// Fair Value Gap (FVG) Tool
+// ============================================================================
+
+export const getFVGTool = createTool({
+  id: "get_fvg",
+  description:
+    "Detect Fair Value Gaps (FVG) for a symbol. " +
+    "3-bar pattern where bar[i].low > bar[i-2].high (bullish gap) or vice versa. " +
+    "Unfilled gaps act as magnets — price tends to return to fill them. " +
+    "Volume confirmation validates gap strength.",
+  inputSchema: z.object({
+    symbol: z.string().describe("Trading pair (e.g., 'BTCUSDT')"),
+    interval: z.enum(["1h", "4h", "1d"]).default("4h").describe("Timeframe"),
+  }),
+  outputSchema: z.object({
+    symbol: z.string().optional(),
+    interval: z.string().optional(),
+    currentPrice: z.string().optional(),
+    bullishGapCount: z.number().optional(),
+    bearishGapCount: z.number().optional(),
+    unfilledCount: z.number().optional(),
+    newGap: z.boolean().optional(),
+    newGapType: z.string().optional(),
+    nearestBullishFVG: z.string().optional(),
+    nearestBearishFVG: z.string().optional(),
+    signal: z.string().optional(),
+    interpretation: z.string().optional(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ symbol, interval }, execContext: MastraExecutionContext) => {
+    const ctx = getGordonContext(execContext);
+    if (!ctx?.exchange) return errors.noExchange;
+    const normalizedSymbol = symbol.toUpperCase().endsWith("USDT") ? symbol.toUpperCase() : `${symbol.toUpperCase()}USDT`;
+    try {
+      const candles = await ctx.exchange.getCandles(normalizedSymbol, interval, 250);
+      if (!candles || candles.length < 25) return errors.insufficientData(normalizedSymbol);
+      const { calculateFVG } = await import("../../../core/indicators/index.ts");
+      const result = calculateFVG(candles);
+      return {
+        symbol: normalizedSymbol, interval,
+        currentPrice: candles[candles.length - 1]!.close.toFixed(2),
+        bullishGapCount: result.bullishGaps.length, bearishGapCount: result.bearishGaps.length,
+        unfilledCount: result.unfilledCount,
+        newGap: result.newGap, newGapType: result.newGapType,
+        nearestBullishFVG: result.nearestBullishFVG ? `${result.nearestBullishFVG.low.toFixed(2)}-${result.nearestBullishFVG.high.toFixed(2)}` : undefined,
+        nearestBearishFVG: result.nearestBearishFVG ? `${result.nearestBearishFVG.low.toFixed(2)}-${result.nearestBearishFVG.high.toFixed(2)}` : undefined,
+        signal: result.signal, interpretation: result.interpretation,
+      };
+    } catch (error) { return { error: `Failed to get FVG: ${(error as Error).message}` }; }
+  },
+});
+
+// ============================================================================
+// Parabolic SAR Tool
+// ============================================================================
+
+export const getParabolicSARTool = createTool({
+  id: "get_parabolic_sar",
+  description:
+    "Get Parabolic SAR (Stop and Reverse) for a symbol. " +
+    "Classic trend-following indicator with accelerating trailing stop. " +
+    "SAR below price = uptrend, above = downtrend. Direction flip = reversal signal. " +
+    "Best for identifying trend direction and setting trailing stops.",
+  inputSchema: z.object({
+    symbol: z.string().describe("Trading pair (e.g., 'BTCUSDT')"),
+    interval: z.enum(["1h", "4h", "1d"]).default("4h").describe("Timeframe"),
+    afStart: z.number().min(0.01).max(0.05).default(0.02).describe("Initial acceleration factor (default 0.02)"),
+    afMax: z.number().min(0.1).max(0.5).default(0.2).describe("Max acceleration factor (default 0.2)"),
+  }),
+  outputSchema: z.object({
+    symbol: z.string().optional(),
+    interval: z.string().optional(),
+    currentPrice: z.string().optional(),
+    sar: z.string().optional(),
+    direction: z.string().optional(),
+    trendChange: z.boolean().optional(),
+    signal: z.string().optional(),
+    distance: z.string().optional(),
+    interpretation: z.string().optional(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ symbol, interval, afStart, afMax }, execContext: MastraExecutionContext) => {
+    const ctx = getGordonContext(execContext);
+    if (!ctx?.exchange) return errors.noExchange;
+    const normalizedSymbol = symbol.toUpperCase().endsWith("USDT") ? symbol.toUpperCase() : `${symbol.toUpperCase()}USDT`;
+    try {
+      const candles = await ctx.exchange.getCandles(normalizedSymbol, interval, 250);
+      if (!candles || candles.length < 10) return errors.insufficientData(normalizedSymbol);
+      const { calculateParabolicSAR } = await import("../../../core/indicators/index.ts");
+      const result = calculateParabolicSAR(candles, afStart, afStart, afMax);
+      return {
+        symbol: normalizedSymbol, interval,
+        currentPrice: candles[candles.length - 1]!.close.toFixed(2),
+        sar: result.current?.toFixed(2),
+        direction: result.currentDirection === 1 ? "UPTREND" : "DOWNTREND",
+        trendChange: result.trendChange, signal: result.signal,
+        distance: result.distance !== null ? `${result.distance}%` : undefined,
+        interpretation: result.interpretation,
+      };
+    } catch (error) { return { error: `Failed to get Parabolic SAR: ${(error as Error).message}` }; }
+  },
+});
+
+// ============================================================================
+// Volume Price Trend (VPT) Tool
+// ============================================================================
+
+export const getVPTTool = createTool({
+  id: "get_vpt",
+  description:
+    "Get Volume Price Trend (VPT) for a symbol. " +
+    "Cumulative indicator: Volume × Price Change %. " +
+    "Rising VPT confirms uptrend, falling confirms downtrend. " +
+    "VPT divergence from price = potential reversal signal.",
+  inputSchema: z.object({
+    symbol: z.string().describe("Trading pair (e.g., 'BTCUSDT')"),
+    interval: z.enum(["1h", "4h", "1d"]).default("4h").describe("Timeframe"),
+  }),
+  outputSchema: z.object({
+    symbol: z.string().optional(),
+    interval: z.string().optional(),
+    currentPrice: z.string().optional(),
+    vpt: z.string().optional(),
+    vptMA: z.string().optional(),
+    slope: z.string().optional(),
+    trend: z.string().optional(),
+    divergence: z.string().optional(),
+    interpretation: z.string().optional(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ symbol, interval }, execContext: MastraExecutionContext) => {
+    const ctx = getGordonContext(execContext);
+    if (!ctx?.exchange) return errors.noExchange;
+    const normalizedSymbol = symbol.toUpperCase().endsWith("USDT") ? symbol.toUpperCase() : `${symbol.toUpperCase()}USDT`;
+    try {
+      const candles = await ctx.exchange.getCandles(normalizedSymbol, interval, 250);
+      if (!candles || candles.length < 20) return errors.insufficientData(normalizedSymbol);
+      const { calculateVPT } = await import("../../../core/indicators/index.ts");
+      const result = calculateVPT(candles);
+      return {
+        symbol: normalizedSymbol, interval,
+        currentPrice: candles[candles.length - 1]!.close.toFixed(2),
+        vpt: result.current?.toFixed(0), vptMA: result.currentMA?.toFixed(0),
+        slope: result.slope?.toFixed(4), trend: result.trend,
+        divergence: result.divergence, interpretation: result.interpretation,
+      };
+    } catch (error) { return { error: `Failed to get VPT: ${(error as Error).message}` }; }
+  },
+});
+
+// ============================================================================
+// Awesome Oscillator Tool
+// ============================================================================
+
+export const getAOTool = createTool({
+  id: "get_awesome_oscillator",
+  description:
+    "Get Awesome Oscillator (AO) for a symbol. " +
+    "Momentum acceleration: SMA(5) - SMA(34) of midpoints. " +
+    "AO > 0 = bullish momentum, < 0 = bearish. " +
+    "Zero-line crossovers = momentum shift signals. Color shows acceleration.",
+  inputSchema: z.object({
+    symbol: z.string().describe("Trading pair (e.g., 'BTCUSDT')"),
+    interval: z.enum(["1h", "4h", "1d"]).default("4h").describe("Timeframe"),
+  }),
+  outputSchema: z.object({
+    symbol: z.string().optional(),
+    interval: z.string().optional(),
+    currentPrice: z.string().optional(),
+    ao: z.string().optional(),
+    color: z.string().optional(),
+    crossover: z.string().optional(),
+    momentum: z.string().optional(),
+    signal: z.string().optional(),
+    interpretation: z.string().optional(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ symbol, interval }, execContext: MastraExecutionContext) => {
+    const ctx = getGordonContext(execContext);
+    if (!ctx?.exchange) return errors.noExchange;
+    const normalizedSymbol = symbol.toUpperCase().endsWith("USDT") ? symbol.toUpperCase() : `${symbol.toUpperCase()}USDT`;
+    try {
+      const candles = await ctx.exchange.getCandles(normalizedSymbol, interval, 250);
+      if (!candles || candles.length < 40) return errors.insufficientData(normalizedSymbol);
+      const { calculateAO } = await import("../../../core/indicators/index.ts");
+      const result = calculateAO(candles);
+      return {
+        symbol: normalizedSymbol, interval,
+        currentPrice: candles[candles.length - 1]!.close.toFixed(2),
+        ao: result.current?.toFixed(4), color: result.color,
+        crossover: result.crossover, momentum: result.momentum,
+        signal: result.signal, interpretation: result.interpretation,
+      };
+    } catch (error) { return { error: `Failed to get AO: ${(error as Error).message}` }; }
+  },
+});
+
+// ============================================================================
+// Three Mountains & Rivers Tool
+// ============================================================================
+
+export const getTMRTool = createTool({
+  id: "get_three_mountains_rivers",
+  description:
+    "Detect Three Mountains (triple top) or Three Rivers (triple bottom) for a symbol. " +
+    "Japanese candlestick pattern: 3 peaks at similar level = bearish reversal, " +
+    "3 troughs at similar level = bullish reversal. " +
+    "Confirmed when price breaks beyond the pattern level.",
+  inputSchema: z.object({
+    symbol: z.string().describe("Trading pair (e.g., 'BTCUSDT')"),
+    interval: z.enum(["1h", "4h", "1d"]).default("4h").describe("Timeframe"),
+    order: z.number().min(10).max(40).default(20).describe("Neighborhood for peak/trough detection (default 20)"),
+  }),
+  outputSchema: z.object({
+    symbol: z.string().optional(),
+    interval: z.string().optional(),
+    currentPrice: z.string().optional(),
+    patternFound: z.boolean().optional(),
+    patternType: z.string().optional(),
+    averageLevel: z.string().optional(),
+    alignment: z.string().optional(),
+    confirmed: z.boolean().optional(),
+    signal: z.string().optional(),
+    interpretation: z.string().optional(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ symbol, interval, order }, execContext: MastraExecutionContext) => {
+    const ctx = getGordonContext(execContext);
+    if (!ctx?.exchange) return errors.noExchange;
+    const normalizedSymbol = symbol.toUpperCase().endsWith("USDT") ? symbol.toUpperCase() : `${symbol.toUpperCase()}USDT`;
+    try {
+      const candles = await ctx.exchange.getCandles(normalizedSymbol, interval, 250);
+      if (!candles || candles.length < order * 2 + 50) return errors.insufficientData(normalizedSymbol);
+      const { calculateThreeMountainsRivers } = await import("../../../core/indicators/index.ts");
+      const result = calculateThreeMountainsRivers(candles, order);
+      return {
+        symbol: normalizedSymbol, interval,
+        currentPrice: candles[candles.length - 1]!.close.toFixed(2),
+        patternFound: result.patternFound,
+        patternType: result.pattern?.type ?? "none",
+        averageLevel: result.pattern?.averageLevel.toFixed(2),
+        alignment: result.pattern ? `${result.pattern.alignment}%` : undefined,
+        confirmed: result.confirmed, signal: result.signal,
+        interpretation: result.interpretation,
+      };
+    } catch (error) { return { error: `Failed to get TMR: ${(error as Error).message}` }; }
+  },
+});
+
+// ============================================================================
+// Delta Ladder Tool
+// ============================================================================
+
+export const getDeltaLadderTool = createTool({
+  id: "get_delta_ladder",
+  description:
+    "Get Delta Ladder order flow analysis for a symbol. " +
+    "Estimates buy/sell delta from candle structure at each price level. " +
+    "Cumulative delta tracks net buying/selling pressure over time. " +
+    "Delta reversal (sign flip) = momentum shift. POC shows highest-volume level.",
+  inputSchema: z.object({
+    symbol: z.string().describe("Trading pair (e.g., 'BTCUSDT')"),
+    interval: z.enum(["1h", "4h", "1d"]).default("4h").describe("Timeframe"),
+    lookback: z.number().min(20).max(100).default(50).describe("Candles for level analysis (default 50)"),
+  }),
+  outputSchema: z.object({
+    symbol: z.string().optional(),
+    interval: z.string().optional(),
+    currentPrice: z.string().optional(),
+    currentDelta: z.string().optional(),
+    cumulativeDelta: z.string().optional(),
+    deltaRatio: z.string().optional(),
+    poc: z.string().optional(),
+    trend: z.string().optional(),
+    reversal: z.boolean().optional(),
+    signal: z.string().optional(),
+    interpretation: z.string().optional(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ symbol, interval, lookback }, execContext: MastraExecutionContext) => {
+    const ctx = getGordonContext(execContext);
+    if (!ctx?.exchange) return errors.noExchange;
+    const normalizedSymbol = symbol.toUpperCase().endsWith("USDT") ? symbol.toUpperCase() : `${symbol.toUpperCase()}USDT`;
+    try {
+      const candles = await ctx.exchange.getCandles(normalizedSymbol, interval, Math.max(lookback + 10, 100));
+      if (!candles || candles.length < 15) return errors.insufficientData(normalizedSymbol);
+      const { calculateDeltaLadder } = await import("../../../core/indicators/index.ts");
+      const result = calculateDeltaLadder(candles, 10, lookback);
+      return {
+        symbol: normalizedSymbol, interval,
+        currentPrice: candles[candles.length - 1]!.close.toFixed(2),
+        currentDelta: result.currentDelta.toFixed(0),
+        cumulativeDelta: result.cumulativeDelta.toFixed(0),
+        deltaRatio: `${(result.deltaRatio * 100).toFixed(0)}%`,
+        poc: result.poc?.toFixed(2), trend: result.trend,
+        reversal: result.reversal, signal: result.signal,
+        interpretation: result.interpretation,
+      };
+    } catch (error) { return { error: `Failed to get Delta Ladder: ${(error as Error).message}` }; }
+  },
+});
+
+// ============================================================================
 // Export as Object (Mastra format)
 // ============================================================================
 
@@ -1760,4 +2166,12 @@ export const indicatorTools = {
   get_mfi: createCachedTool(getMFITool, TOOL_CACHE_CONFIG.indicators.ttl),
   get_divergence: createCachedTool(getDivergenceTool, TOOL_CACHE_CONFIG.indicators.ttl),
   get_supply_demand_zones: createCachedTool(getSupplyDemandZonesTool, TOOL_CACHE_CONFIG.indicators.ttl),
+  get_squeeze_momentum: createCachedTool(getSqueezeMomentumTool, TOOL_CACHE_CONFIG.indicators.ttl),
+  get_order_blocks: createCachedTool(getOrderBlocksTool, TOOL_CACHE_CONFIG.indicators.ttl),
+  get_fvg: createCachedTool(getFVGTool, TOOL_CACHE_CONFIG.indicators.ttl),
+  get_parabolic_sar: createCachedTool(getParabolicSARTool, TOOL_CACHE_CONFIG.indicators.ttl),
+  get_vpt: createCachedTool(getVPTTool, TOOL_CACHE_CONFIG.indicators.ttl),
+  get_awesome_oscillator: createCachedTool(getAOTool, TOOL_CACHE_CONFIG.indicators.ttl),
+  get_three_mountains_rivers: createCachedTool(getTMRTool, TOOL_CACHE_CONFIG.indicators.ttl),
+  get_delta_ladder: createCachedTool(getDeltaLadderTool, TOOL_CACHE_CONFIG.indicators.ttl),
 };

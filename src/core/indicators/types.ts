@@ -301,3 +301,27 @@ export { type DivergenceSignal, type DivergenceResult } from "./divergence.ts";
 
 // Supply/Demand Zone Types
 export { type SDZone, type SDZResult } from "./supply-demand-zones.ts";
+
+// Squeeze Momentum Types
+export { type SqueezeMomentumResult } from "./squeeze-momentum.ts";
+
+// Order Block Types
+export { type OrderBlock, type OrderBlockResult } from "./order-blocks.ts";
+
+// Fair Value Gap Types
+export { type FVGap, type FVGResult } from "./fvg.ts";
+
+// Parabolic SAR Types
+export { type ParabolicSARResult } from "./parabolic-sar.ts";
+
+// Volume Price Trend Types
+export { type VPTResult } from "./vpt.ts";
+
+// Awesome Oscillator Types
+export { type AOResult } from "./awesome-oscillator.ts";
+
+// Three Mountains & Rivers Types
+export { type TMRPattern, type TMRResult } from "./three-mountains-rivers.ts";
+
+// Delta Ladder Types
+export { type DeltaLevel, type DeltaLadderResult } from "./delta-ladder.ts";

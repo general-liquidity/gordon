@@ -116,3 +116,35 @@ export type { DivergenceSignal, DivergenceResult } from "./divergence.ts";
 // Supply/Demand Zones
 export { calculateSupplyDemandZones } from "./supply-demand-zones.ts";
 export type { SDZone, SDZResult } from "./supply-demand-zones.ts";
+
+// Squeeze Momentum
+export { calculateSqueezeMomentum } from "./squeeze-momentum.ts";
+export type { SqueezeMomentumResult } from "./squeeze-momentum.ts";
+
+// Order Blocks
+export { calculateOrderBlocks } from "./order-blocks.ts";
+export type { OrderBlock, OrderBlockResult } from "./order-blocks.ts";
+
+// Fair Value Gaps
+export { calculateFVG } from "./fvg.ts";
+export type { FVGap, FVGResult } from "./fvg.ts";
+
+// Parabolic SAR
+export { calculateParabolicSAR } from "./parabolic-sar.ts";
+export type { ParabolicSARResult } from "./parabolic-sar.ts";
+
+// Volume Price Trend
+export { calculateVPT } from "./vpt.ts";
+export type { VPTResult } from "./vpt.ts";
+
+// Awesome Oscillator
+export { calculateAO } from "./awesome-oscillator.ts";
+export type { AOResult } from "./awesome-oscillator.ts";
+
+// Three Mountains & Rivers
+export { calculateThreeMountainsRivers } from "./three-mountains-rivers.ts";
+export type { TMRPattern, TMRResult } from "./three-mountains-rivers.ts";
+
+// Delta Ladder
+export { calculateDeltaLadder } from "./delta-ladder.ts";
+export type { DeltaLevel, DeltaLadderResult } from "./delta-ladder.ts";
