@@ -223,6 +223,7 @@ export type StrategyId =
   | "whale_accumulation"
   | "dca_layering"
   | "exhaustion_gap"
+  | "liquidation_momentum"
   // Special
   | "grid_entry";
 
@@ -249,6 +250,7 @@ export const STRATEGY_IDS: StrategyId[] = [
   "whale_accumulation",
   "dca_layering",
   "exhaustion_gap",
+  "liquidation_momentum",
   "grid_entry",
 ];
 
@@ -275,5 +277,6 @@ export const STRATEGY_TIERS: Record<StrategyId, 1 | 2> = {
   whale_accumulation: 2,
   dca_layering: 2,
   exhaustion_gap: 2,
+  liquidation_momentum: 2,
   grid_entry: 1, // Grid is a special strategy, keep in tier 1
 };

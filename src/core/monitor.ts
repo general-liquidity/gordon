@@ -83,6 +83,135 @@ const VOLUME_AVERAGE_PERIODS = 20;
 const GRID_REVERSAL_THRESHOLD = 0.01; // 1% reversal triggers deferred TP placement
 const GRID_TP_MIN_FILL_PERCENT = 0.2; // At least 20% of grid must be filled before placing TPs
 
+// Multi-metric baseline anomaly detection constants
+const BASELINE_CALIBRATION_CYCLES = 6; // Need 6 monitor cycles (~90 min at 15min interval) to calibrate
+const BASELINE_ANOMALY_MULTIPLIER = 2.0; // Flag when metric exceeds 2x baseline
+const BASELINE_MULTI_METRIC_THRESHOLD = 2; // Need 2+ metrics spiking simultaneously
+
+// ============================================================================
+// Multi-Metric Baseline Tracker
+// ============================================================================
+
+interface BaselineMetrics {
+  avgVolume: number;
+  avgPriceVelocity: number; // absolute % change per candle
+  avgRange: number; // (high - low) / close as percentage
+}
+
+interface SymbolBaseline {
+  samples: { volume: number; priceVelocity: number; range: number }[];
+  calibrated: boolean;
+  baseline: BaselineMetrics;
+}
+
+/** Rolling baseline per symbol — persists across monitor cycles */
+const symbolBaselines: Map<string, SymbolBaseline> = new Map();
+
+function getOrCreateBaseline(symbol: string): SymbolBaseline {
+  let sb = symbolBaselines.get(symbol);
+  if (!sb) {
+    sb = {
+      samples: [],
+      calibrated: false,
+      baseline: { avgVolume: 0, avgPriceVelocity: 0, avgRange: 0 },
+    };
+    symbolBaselines.set(symbol, sb);
+  }
+  return sb;
+}
+
+function updateBaseline(
+  symbol: string,
+  currentVolume: number,
+  priceVelocity: number,
+  range: number
+): void {
+  const sb = getOrCreateBaseline(symbol);
+
+  sb.samples.push({ volume: currentVolume, priceVelocity, range });
+
+  // Calibrate once we have enough samples
+  if (!sb.calibrated && sb.samples.length >= BASELINE_CALIBRATION_CYCLES) {
+    const n = sb.samples.length;
+    sb.baseline.avgVolume = sb.samples.reduce((s, x) => s + x.volume, 0) / n;
+    sb.baseline.avgPriceVelocity = sb.samples.reduce((s, x) => s + x.priceVelocity, 0) / n;
+    sb.baseline.avgRange = sb.samples.reduce((s, x) => s + x.range, 0) / n;
+    sb.calibrated = true;
+
+    logger.info("Baseline calibrated for symbol", {
+      symbol,
+      avgVolume: sb.baseline.avgVolume.toFixed(0),
+      avgPriceVelocity: sb.baseline.avgPriceVelocity.toFixed(4),
+      avgRange: sb.baseline.avgRange.toFixed(4),
+      samplesUsed: n,
+    });
+  }
+
+  // Rolling update after calibration — exponential moving average with alpha=0.1
+  if (sb.calibrated) {
+    const alpha = 0.1;
+    sb.baseline.avgVolume = sb.baseline.avgVolume * (1 - alpha) + currentVolume * alpha;
+    sb.baseline.avgPriceVelocity = sb.baseline.avgPriceVelocity * (1 - alpha) + priceVelocity * alpha;
+    sb.baseline.avgRange = sb.baseline.avgRange * (1 - alpha) + range * alpha;
+  }
+}
+
+function checkMultiMetricAnomaly(
+  symbol: string,
+  currentVolume: number,
+  priceVelocity: number,
+  range: number
+): Alert | null {
+  const sb = getOrCreateBaseline(symbol);
+  if (!sb.calibrated) return null;
+
+  const b = sb.baseline;
+  const spiking: string[] = [];
+  const multipliers: Record<string, number> = {};
+
+  // Check each metric against baseline
+  if (b.avgVolume > 0) {
+    const volMult = currentVolume / b.avgVolume;
+    multipliers.volume = volMult;
+    if (volMult >= BASELINE_ANOMALY_MULTIPLIER) {
+      spiking.push(`volume ${volMult.toFixed(1)}x`);
+    }
+  }
+
+  if (b.avgPriceVelocity > 0) {
+    const velMult = priceVelocity / b.avgPriceVelocity;
+    multipliers.priceVelocity = velMult;
+    if (velMult >= BASELINE_ANOMALY_MULTIPLIER) {
+      spiking.push(`price velocity ${velMult.toFixed(1)}x`);
+    }
+  }
+
+  if (b.avgRange > 0) {
+    const rangeMult = range / b.avgRange;
+    multipliers.range = rangeMult;
+    if (rangeMult >= BASELINE_ANOMALY_MULTIPLIER) {
+      spiking.push(`candle range ${rangeMult.toFixed(1)}x`);
+    }
+  }
+
+  // Only alert when multiple metrics spike simultaneously
+  if (spiking.length >= BASELINE_MULTI_METRIC_THRESHOLD) {
+    return {
+      type: "volume_spike",
+      message: `${symbol}: Multi-metric anomaly — ${spiking.join(", ")} vs baseline`,
+      severity: "warning",
+      data: {
+        symbol,
+        spikingMetrics: spiking.length,
+        details: spiking.join("; "),
+        multipliers,
+      },
+    };
+  }
+
+  return null;
+}
+
 // ============================================================================
 // Utility Functions (duplicated from executor for independence)
 // ============================================================================
@@ -1494,6 +1623,37 @@ async function checkMarketAnomalies(
           open: currentCandle.open,
           close: currentCandle.close,
           dropPercent: flashCrashAlert.data.dropPercent,
+        },
+      });
+    }
+
+    // Multi-metric baseline anomaly detection
+    const priceVelocity = currentCandle.open > 0
+      ? Math.abs(currentCandle.close - currentCandle.open) / currentCandle.open
+      : 0;
+    const candleRange = currentCandle.close > 0
+      ? (currentCandle.high - currentCandle.low) / currentCandle.close
+      : 0;
+
+    // Feed current metrics into the baseline tracker
+    updateBaseline(symbol, currentCandle.volume, priceVelocity, candleRange);
+
+    // Check for multi-metric anomaly (only fires after baseline is calibrated)
+    const multiMetricAlert = checkMultiMetricAnomaly(
+      symbol, currentCandle.volume, priceVelocity, candleRange
+    );
+    if (multiMetricAlert) {
+      alerts.push(multiMetricAlert);
+      logger.warn("Multi-metric anomaly detected", {
+        symbol,
+        details: multiMetricAlert.data.details,
+      });
+      logEvent({
+        type: "ALERT",
+        data: {
+          alertType: "multi_metric_anomaly",
+          symbol,
+          ...multiMetricAlert.data,
         },
       });
     }

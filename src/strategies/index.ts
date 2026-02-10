@@ -90,6 +90,7 @@ import { hiddenDivergenceStrategy } from "./tier-2/hidden-divergence.ts";
 import { whaleAccumulationStrategy } from "./tier-2/whale-accumulation.ts";
 import { dcaLayeringStrategy } from "./tier-2/dca-layering.ts";
 import { exhaustionGapStrategy } from "./tier-2/exhaustion-gap.ts";
+import { liquidationMomentumStrategy } from "./tier-2/liquidation-momentum.ts";
 
 // ============================================================================
 // Strategy Registration
@@ -123,6 +124,7 @@ strategyRegistry.register(hiddenDivergenceStrategy);
 strategyRegistry.register(whaleAccumulationStrategy);
 strategyRegistry.register(dcaLayeringStrategy);
 strategyRegistry.register(exhaustionGapStrategy);
+strategyRegistry.register(liquidationMomentumStrategy);
 
 // ============================================================================
 // Re-export Individual Strategies
@@ -147,6 +149,7 @@ export { hiddenDivergenceStrategy } from "./tier-2/hidden-divergence.ts";
 export { whaleAccumulationStrategy } from "./tier-2/whale-accumulation.ts";
 export { dcaLayeringStrategy } from "./tier-2/dca-layering.ts";
 export { exhaustionGapStrategy } from "./tier-2/exhaustion-gap.ts";
+export { liquidationMomentumStrategy } from "./tier-2/liquidation-momentum.ts";
 
 // ============================================================================
 // DSL Module Exports

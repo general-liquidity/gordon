@@ -38,6 +38,8 @@ const checkPositionsOutputSchema = z.object({
       status: z.string(),
       unrealizedPnl: z.number(),
       unrealizedPnlPercent: z.number(),
+      minutesOpen: z.number(),
+      ppmUsd: z.number(),
     })
   ),
   alerts: z.array(z.string()),
@@ -51,7 +53,8 @@ const checkPositionsOutputSchema = z.object({
 export const checkPositionsTool = createTool({
   id: "check_positions",
   description:
-    "Check the status of all open positions and detect any alerts or anomalies. " +
+    "Check the status of all open positions with PnL and PPM (Profit Per Minute). " +
+    "PPM measures trade efficiency — how fast a trade is generating profit. " +
     "Use this when the user asks 'how are my trades?' or 'check positions'",
   inputSchema: z.object({}),
   outputSchema: checkPositionsOutputSchema,
@@ -70,13 +73,21 @@ export const checkPositionsTool = createTool({
 
     const result: MonitorResult = await runMonitorCycle(ctx.exchange);
 
+    const now = Date.now();
     const totalUnrealizedPnl = result.updates.reduce((sum, u) => sum + u.unrealizedPnl, 0);
-    const positions = result.updates.map((p) => ({
-      symbol: p.trade.symbol,
-      status: p.status,
-      unrealizedPnl: p.unrealizedPnl,
-      unrealizedPnlPercent: p.unrealizedPnlPercent,
-    }));
+    const positions = result.updates.map((p) => {
+      const openedMs = new Date(p.trade.openedAt).getTime();
+      const minutesOpen = Math.max(1, (now - openedMs) / 60_000);
+      const ppmUsd = p.unrealizedPnl / minutesOpen;
+      return {
+        symbol: p.trade.symbol,
+        status: p.status,
+        unrealizedPnl: p.unrealizedPnl,
+        unrealizedPnlPercent: p.unrealizedPnlPercent,
+        minutesOpen: Math.round(minutesOpen),
+        ppmUsd: Math.round(ppmUsd * 100) / 100,
+      };
+    });
 
     const output = {
       openTrades: result.updates.length,

@@ -13,6 +13,7 @@
  * - Price > 10% below SMA (+15%)
  * - Volume increasing on dips (+10%)
  * - Price near historical support (+10%)
+ * - Liquidation pressure on longs (forced selling confirms dip) (+15%)
  */
 
 import { BaseStrategy } from "../base-strategy.ts";
@@ -129,6 +130,25 @@ export class DCALayeringStrategy extends BaseStrategy {
       Math.abs(supports[0]!.price - currentPrice) / currentPrice < 0.03;
     if (nearSupport) confidence += 0.1;
 
+    // Liquidation filter: check if forced selling is driving this dip
+    // Positive funding = longs are crowded and paying → dip is likely liquidation-driven
+    let liquidationConfirmed = false;
+    let fundingInfo = "";
+    const hlData = await this.fetchLiquidationContext(symbol);
+    if (hlData) {
+      const { fundingRate, annualizedFunding, priceChange24h } = hlData;
+      // Longs paying extreme funding + price dropping = forced selling = ideal DCA zone
+      if (fundingRate > 0.00005 && priceChange24h < -0.01) {
+        liquidationConfirmed = true;
+        confidence += 0.15;
+        fundingInfo = `Funding: ${(annualizedFunding * 100).toFixed(1)}% ann. (longs paying, forced selling)`;
+      } else if (fundingRate > 0.00005) {
+        // Longs crowded but price not falling yet — mild boost
+        confidence += 0.05;
+        fundingInfo = `Funding: ${(annualizedFunding * 100).toFixed(1)}% ann. (longs crowded)`;
+      }
+    }
+
     const signals = {
       discountPct,
       sma50: sma.current,
@@ -138,6 +158,7 @@ export class DCALayeringStrategy extends BaseStrategy {
       layerSpacing: atrVal * LAYER_SPACING_ATR,
       volumeTrend,
       nearSupport,
+      liquidationConfirmed,
     };
 
     const reasons: string[] = [];
@@ -148,6 +169,8 @@ export class DCALayeringStrategy extends BaseStrategy {
     reasons.push(`Layer spacing: $${(atrVal * LAYER_SPACING_ATR).toFixed(2)} (0.5x ATR)`);
     if (nearSupport) reasons.push("Near support level");
     reasons.push(`Volume: ${volumeTrend}`);
+    if (liquidationConfirmed) reasons.push(`Liquidation-driven dip confirmed. ${fundingInfo}`);
+    else if (fundingInfo) reasons.push(fundingInfo);
 
     return this.detected(confidence, signals, reasons.join(". "));
   }
@@ -223,6 +246,12 @@ When creating a plan using the DCA Layering strategy:
 - TP2: At SMA 50 (sell 35%) — full recovery
 - TP3: 3% above SMA 50 (sell 30%) — overshoot
 
+### Liquidation Filter (Confidence Booster)
+- If Hyperliquid shows positive funding (longs paying) during the dip, confidence is higher
+- Forced long liquidations = genuine forced selling, not just a natural pullback
+- Liquidation-confirmed dips have better mean-reversion odds
+- If no liquidation data available, strategy still works on SMA/RSI/volume alone
+
 ### Risk Management
 - Total position (all 5 layers) should be max 5% of portfolio
 - Each layer = 1% of portfolio
@@ -230,6 +259,49 @@ When creating a plan using the DCA Layering strategy:
 - Best for assets you have high conviction on
 - Exit all if fundamental thesis changes
 `;
+  }
+
+  // ============================================================================
+  // Hyperliquid Liquidation Context
+  // ============================================================================
+
+  private async fetchLiquidationContext(symbol: string): Promise<{
+    fundingRate: number;
+    annualizedFunding: number;
+    priceChange24h: number;
+  } | null> {
+    try {
+      const response = await fetch("https://api.hyperliquid.xyz/info", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "metaAndAssetCtxs" }),
+        signal: AbortSignal.timeout(10000),
+      });
+
+      if (!response.ok) return null;
+
+      const [meta, assetCtxs] = (await response.json()) as [
+        { universe: { name: string }[] },
+        { funding: string; markPx: string; prevDayPx: string }[],
+      ];
+
+      const coin = symbol.replace(/USDT$/i, "").replace(/USD$/i, "").toUpperCase();
+      const idx = meta.universe.findIndex((a) => a.name.toUpperCase() === coin);
+      if (idx === -1) return null;
+
+      const ctx = assetCtxs[idx];
+      if (!ctx) return null;
+
+      const fundingRate = parseFloat(ctx.funding);
+      const annualizedFunding = fundingRate * 3 * 365;
+      const markPrice = parseFloat(ctx.markPx);
+      const prevDayPrice = parseFloat(ctx.prevDayPx);
+      const priceChange24h = prevDayPrice > 0 ? (markPrice - prevDayPrice) / prevDayPrice : 0;
+
+      return { fundingRate, annualizedFunding, priceChange24h };
+    } catch {
+      return null;
+    }
   }
 
   override getRequiredIndicators(): string[] {
