@@ -100,3 +100,19 @@ export type { ZigzagPoint, WaveLabel, ElliottWaveResult } from "./elliott-wave.t
 // False Breakout Reversal
 export { calculateFalseBreakout } from "./false-breakout.ts";
 export type { SRLevel, FalseBreakoutResult } from "./false-breakout.ts";
+
+// ADX (Average Directional Index)
+export { calculateADX } from "./adx.ts";
+export type { ADXResult } from "./adx.ts";
+
+// MFI (Money Flow Index)
+export { calculateMFI } from "./mfi.ts";
+export type { MFIResult } from "./mfi.ts";
+
+// Divergence Detection
+export { calculateDivergence } from "./divergence.ts";
+export type { DivergenceSignal, DivergenceResult } from "./divergence.ts";
+
+// Supply/Demand Zones
+export { calculateSupplyDemandZones } from "./supply-demand-zones.ts";
+export type { SDZone, SDZResult } from "./supply-demand-zones.ts";

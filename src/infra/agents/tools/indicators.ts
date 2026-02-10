@@ -1471,6 +1471,269 @@ export const getFalseBreakoutTool = createTool({
 });
 
 // ============================================================================
+// ADX (Average Directional Index) Tool
+// ============================================================================
+
+export const getADXTool = createTool({
+  id: "get_adx",
+  description:
+    "Get ADX (Average Directional Index) with +DI/-DI for a symbol. " +
+    "Measures trend STRENGTH (not direction) — ADX > 25 = strong trend, < 20 = ranging. " +
+    "+DI > -DI = bullish direction, -DI > +DI = bearish direction. " +
+    "DI crossovers = trend reversal signals. Essential for filtering trend vs range strategies.",
+  inputSchema: z.object({
+    symbol: z.string().describe("Trading pair (e.g., 'BTCUSDT')"),
+    interval: z.enum(["1h", "4h", "1d"]).default("4h").describe("Timeframe"),
+    period: z.number().min(7).max(30).default(14).describe("ADX period (default 14)"),
+  }),
+  outputSchema: z.object({
+    symbol: z.string().optional(),
+    interval: z.string().optional(),
+    currentPrice: z.string().optional(),
+    adx: z.string().optional(),
+    plusDI: z.string().optional(),
+    minusDI: z.string().optional(),
+    trendStrength: z.enum(["strong", "moderate", "weak", "absent"]).optional(),
+    direction: z.enum(["bullish", "bearish", "neutral"]).optional(),
+    diCrossover: z.enum(["bullish_cross", "bearish_cross", "none"]).optional(),
+    signal: z.enum(["strong_buy", "buy", "neutral", "sell", "strong_sell"]).optional(),
+    interpretation: z.string().optional(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ symbol, interval, period }, execContext: MastraExecutionContext) => {
+    const ctx = getGordonContext(execContext);
+    if (!ctx?.exchange) return errors.noExchange;
+
+    const normalizedSymbol = symbol.toUpperCase().endsWith("USDT")
+      ? symbol.toUpperCase()
+      : `${symbol.toUpperCase()}USDT`;
+
+    try {
+      const candles = await ctx.exchange.getCandles(normalizedSymbol, interval, 250);
+      if (!candles || candles.length < period * 2 + 2) return errors.insufficientData(normalizedSymbol);
+
+      const { calculateADX } = await import("../../../core/indicators/index.ts");
+      const result = calculateADX(candles, period);
+
+      return {
+        symbol: normalizedSymbol,
+        interval,
+        currentPrice: candles[candles.length - 1]!.close.toFixed(2),
+        adx: result.adx?.toFixed(1),
+        plusDI: result.plusDI?.toFixed(1),
+        minusDI: result.minusDI?.toFixed(1),
+        trendStrength: result.trendStrength,
+        direction: result.direction,
+        diCrossover: result.diCrossover,
+        signal: result.signal,
+        interpretation: result.interpretation,
+      };
+    } catch (error) {
+      return { error: `Failed to get ADX: ${(error as Error).message}` };
+    }
+  },
+});
+
+// ============================================================================
+// MFI (Money Flow Index) Tool
+// ============================================================================
+
+export const getMFITool = createTool({
+  id: "get_mfi",
+  description:
+    "Get Money Flow Index (MFI) for a symbol. " +
+    "Volume-weighted RSI — combines price AND volume to measure buying/selling pressure. " +
+    "MFI > 80 = overbought (smart money selling), MFI < 20 = oversold (smart money buying). " +
+    "More reliable than RSI alone because it includes volume confirmation.",
+  inputSchema: z.object({
+    symbol: z.string().describe("Trading pair (e.g., 'BTCUSDT')"),
+    interval: z.enum(["1h", "4h", "1d"]).default("4h").describe("Timeframe"),
+    period: z.number().min(7).max(30).default(14).describe("MFI period (default 14)"),
+  }),
+  outputSchema: z.object({
+    symbol: z.string().optional(),
+    interval: z.string().optional(),
+    currentPrice: z.string().optional(),
+    mfi: z.string().optional(),
+    signal: z.enum(["overbought", "oversold", "neutral"]).optional(),
+    action: z.enum(["potential_buy", "hold", "potential_sell"]).optional(),
+    flowDirection: z.enum(["positive", "negative", "neutral"]).optional(),
+    interpretation: z.string().optional(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ symbol, interval, period }, execContext: MastraExecutionContext) => {
+    const ctx = getGordonContext(execContext);
+    if (!ctx?.exchange) return errors.noExchange;
+
+    const normalizedSymbol = symbol.toUpperCase().endsWith("USDT")
+      ? symbol.toUpperCase()
+      : `${symbol.toUpperCase()}USDT`;
+
+    try {
+      const candles = await ctx.exchange.getCandles(normalizedSymbol, interval, 100);
+      if (!candles || candles.length < period + 2) return errors.insufficientData(normalizedSymbol);
+
+      const { calculateMFI } = await import("../../../core/indicators/index.ts");
+      const result = calculateMFI(candles, period);
+
+      return {
+        symbol: normalizedSymbol,
+        interval,
+        currentPrice: candles[candles.length - 1]!.close.toFixed(2),
+        mfi: result.current?.toFixed(1),
+        signal: result.signal,
+        action: result.action,
+        flowDirection: result.flowDirection,
+        interpretation: result.interpretation,
+      };
+    } catch (error) {
+      return { error: `Failed to get MFI: ${(error as Error).message}` };
+    }
+  },
+});
+
+// ============================================================================
+// Divergence Detection Tool
+// ============================================================================
+
+export const getDivergenceTool = createTool({
+  id: "get_divergence",
+  description:
+    "Detect RSI divergences for a symbol. " +
+    "Bullish divergence: price makes lower low but RSI makes higher low → reversal UP. " +
+    "Bearish divergence: price makes higher high but RSI makes lower high → reversal DOWN. " +
+    "One of the most reliable reversal signals in technical analysis.",
+  inputSchema: z.object({
+    symbol: z.string().describe("Trading pair (e.g., 'BTCUSDT')"),
+    interval: z.enum(["1h", "4h", "1d"]).default("4h").describe("Timeframe"),
+    rsiPeriod: z.number().min(7).max(21).default(14).describe("RSI period (default 14)"),
+    lookback: z.number().min(5).max(30).default(10).describe("Lookback for extreme detection (default 10)"),
+  }),
+  outputSchema: z.object({
+    symbol: z.string().optional(),
+    interval: z.string().optional(),
+    currentPrice: z.string().optional(),
+    rsi: z.string().optional(),
+    divergenceDetected: z.boolean().optional(),
+    signal: z.enum(["bullish_divergence", "bearish_divergence", "none"]).optional(),
+    strength: z.number().optional(),
+    divergenceCount: z.number().optional(),
+    interpretation: z.string().optional(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ symbol, interval, rsiPeriod, lookback }, execContext: MastraExecutionContext) => {
+    const ctx = getGordonContext(execContext);
+    if (!ctx?.exchange) return errors.noExchange;
+
+    const normalizedSymbol = symbol.toUpperCase().endsWith("USDT")
+      ? symbol.toUpperCase()
+      : `${symbol.toUpperCase()}USDT`;
+
+    try {
+      const candles = await ctx.exchange.getCandles(normalizedSymbol, interval, 250);
+      if (!candles || candles.length < rsiPeriod + lookback * 2 + 2) return errors.insufficientData(normalizedSymbol);
+
+      const { calculateDivergence } = await import("../../../core/indicators/index.ts");
+      const result = calculateDivergence(candles, rsiPeriod, lookback);
+
+      return {
+        symbol: normalizedSymbol,
+        interval,
+        currentPrice: candles[candles.length - 1]!.close.toFixed(2),
+        rsi: result.rsi?.toFixed(1),
+        divergenceDetected: result.divergenceDetected,
+        signal: result.signal,
+        strength: result.strength,
+        divergenceCount: result.divergences.length,
+        interpretation: result.interpretation,
+      };
+    } catch (error) {
+      return { error: `Failed to get divergence: ${(error as Error).message}` };
+    }
+  },
+});
+
+// ============================================================================
+// Supply/Demand Zones Tool
+// ============================================================================
+
+export const getSupplyDemandZonesTool = createTool({
+  id: "get_supply_demand_zones",
+  description:
+    "Detect supply and demand zones for a symbol. " +
+    "Demand zones = price ranges where buying absorbed selling (support). " +
+    "Supply zones = price ranges where selling absorbed buying (resistance). " +
+    "Detects zone bounces, rejections, and breakouts. Better than single S/R levels.",
+  inputSchema: z.object({
+    symbol: z.string().describe("Trading pair (e.g., 'BTCUSDT')"),
+    interval: z.enum(["1h", "4h", "1d"]).default("4h").describe("Timeframe"),
+    lookback: z.number().min(10).max(50).default(20).describe("Rolling window for zone detection (default 20)"),
+  }),
+  outputSchema: z.object({
+    symbol: z.string().optional(),
+    interval: z.string().optional(),
+    currentPrice: z.string().optional(),
+    demandZoneCount: z.number().optional(),
+    supplyZoneCount: z.number().optional(),
+    inDemandZone: z.boolean().optional(),
+    inSupplyZone: z.boolean().optional(),
+    nearestDemand: z.object({
+      lower: z.string(),
+      upper: z.string(),
+      tests: z.number(),
+    }).optional(),
+    nearestSupply: z.object({
+      lower: z.string(),
+      upper: z.string(),
+      tests: z.number(),
+    }).optional(),
+    signal: z.enum(["demand_bounce", "supply_rejection", "breakout_up", "breakout_down", "none"]).optional(),
+    interpretation: z.string().optional(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ symbol, interval, lookback }, execContext: MastraExecutionContext) => {
+    const ctx = getGordonContext(execContext);
+    if (!ctx?.exchange) return errors.noExchange;
+
+    const normalizedSymbol = symbol.toUpperCase().endsWith("USDT")
+      ? symbol.toUpperCase()
+      : `${symbol.toUpperCase()}USDT`;
+
+    try {
+      const candles = await ctx.exchange.getCandles(normalizedSymbol, interval, 250);
+      if (!candles || candles.length < lookback + 6) return errors.insufficientData(normalizedSymbol);
+
+      const { calculateSupplyDemandZones } = await import("../../../core/indicators/index.ts");
+      const result = calculateSupplyDemandZones(candles, lookback);
+
+      return {
+        symbol: normalizedSymbol,
+        interval,
+        currentPrice: candles[candles.length - 1]!.close.toFixed(2),
+        demandZoneCount: result.demandZones.length,
+        supplyZoneCount: result.supplyZones.length,
+        inDemandZone: result.inDemandZone,
+        inSupplyZone: result.inSupplyZone,
+        nearestDemand: result.nearestDemand ? {
+          lower: result.nearestDemand.lower.toFixed(2),
+          upper: result.nearestDemand.upper.toFixed(2),
+          tests: result.nearestDemand.tests,
+        } : undefined,
+        nearestSupply: result.nearestSupply ? {
+          lower: result.nearestSupply.lower.toFixed(2),
+          upper: result.nearestSupply.upper.toFixed(2),
+          tests: result.nearestSupply.tests,
+        } : undefined,
+        signal: result.signal,
+        interpretation: result.interpretation,
+      };
+    } catch (error) {
+      return { error: `Failed to get supply/demand zones: ${(error as Error).message}` };
+    }
+  },
+});
+
+// ============================================================================
 // Export as Object (Mastra format)
 // ============================================================================
 
@@ -1493,4 +1756,8 @@ export const indicatorTools = {
   get_angled_market_structure: createCachedTool(getAngledMarketStructureTool, TOOL_CACHE_CONFIG.indicators.ttl),
   get_elliott_wave: createCachedTool(getElliottWaveTool, TOOL_CACHE_CONFIG.indicators.ttl),
   get_false_breakout: createCachedTool(getFalseBreakoutTool, TOOL_CACHE_CONFIG.indicators.ttl),
+  get_adx: createCachedTool(getADXTool, TOOL_CACHE_CONFIG.indicators.ttl),
+  get_mfi: createCachedTool(getMFITool, TOOL_CACHE_CONFIG.indicators.ttl),
+  get_divergence: createCachedTool(getDivergenceTool, TOOL_CACHE_CONFIG.indicators.ttl),
+  get_supply_demand_zones: createCachedTool(getSupplyDemandZonesTool, TOOL_CACHE_CONFIG.indicators.ttl),
 };

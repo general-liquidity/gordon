@@ -444,6 +444,10 @@ const TOOL_AGENT_MAP: Record<string, string> = {
   get_angled_market_structure: "Scanner",
   get_elliott_wave: "Scanner",
   get_false_breakout: "Scanner",
+  get_adx: "Scanner",
+  get_mfi: "Scanner",
+  get_divergence: "Scanner",
+  get_supply_demand_zones: "Scanner",
   // marketDataTools spread (Scanner is primary for raw market data)
   get_candles: "Scanner",
   get_price: "Scanner",

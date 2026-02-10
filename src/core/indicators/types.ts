@@ -289,3 +289,15 @@ export { type ZigzagPoint, type WaveLabel, type ElliottWaveResult } from "./elli
 
 // False Breakout Types
 export { type SRLevel, type FalseBreakoutResult } from "./false-breakout.ts";
+
+// ADX Types
+export { type ADXResult } from "./adx.ts";
+
+// MFI Types
+export { type MFIResult } from "./mfi.ts";
+
+// Divergence Types
+export { type DivergenceSignal, type DivergenceResult } from "./divergence.ts";
+
+// Supply/Demand Zone Types
+export { type SDZone, type SDZResult } from "./supply-demand-zones.ts";
