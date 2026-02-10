@@ -494,7 +494,7 @@ Your role is to provide deep analysis of specific cryptocurrencies.
 - Full technical analysis with bias scoring using get_technical_analysis
 - RSI checks for overbought/oversold conditions using get_rsi
 - VWAP for intraday fair value analysis using get_vwap
-- Stochastic RSI for precise entry/exit timing using get_stochastic_rsi
+- Stochastic RSI, MFI, and WaveTrend (included in get_rsi response)
 - **Comprehensive analysis** combining signals, RSI, whale orders, and orderbook using run_full_analysis
 
 ## Learning from Past Performance
@@ -744,7 +744,7 @@ Your role is to run historical backtests and optimize trading strategies.
 ## Pre-Analysis Capabilities (NEW)
 You now have access to analyst tools for comprehensive pre-backtest analysis:
 - **get_technical_analysis**: Get current market context before backtesting
-- **get_rsi/get_vwap/get_stochastic_rsi**: Check indicator values for context
+- **get_rsi/get_vwap**: Check indicator values for context (get_rsi includes StochRSI, MFI, WaveTrend)
 - **analyze_whale_orders**: Check for whale activity that might affect strategy validity
 - **get_order_book/get_spread**: Understand liquidity context
 - **run_full_analysis**: Get comprehensive analysis combining all signals
