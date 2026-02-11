@@ -1963,6 +1963,144 @@ export const getLinearRegressionTool = createTool({
 });
 
 // ============================================================================
+// Waddah Attar Explosion (WAE) Tool
+// ============================================================================
+
+export const getWAETool = createTool({
+  id: "get_wae",
+  description:
+    "Waddah Attar Explosion — momentum-envelope confluence indicator with dead zone noise filter. " +
+    "Compares MACD momentum delta against Bollinger Band envelope width. " +
+    "Signals fire only when momentum exceeds BOTH the envelope AND a dead zone (ATR-based noise floor). " +
+    "Eliminates whipsaw in ranging markets. Returns explosion strength, direction, and whether dead zone is cleared.",
+  inputSchema: z.object({
+    symbol: z.string().describe("Trading pair (e.g., 'BTCUSDT')"),
+    interval: z.enum(["1h", "4h", "1d"]).default("4h").describe("Timeframe"),
+    sensitivity: z.number().min(50).max(300).default(150).describe("Sensitivity multiplier for MACD delta (default 150)"),
+    deadZoneMult: z.number().min(1.0).max(6.0).default(3.7).describe("Dead zone ATR multiplier (default 3.7)"),
+  }),
+  outputSchema: z.object({
+    symbol: z.string().optional(),
+    interval: z.string().optional(),
+    currentPrice: z.string().optional(),
+    trendUp: z.string().optional(),
+    trendDown: z.string().optional(),
+    explosion: z.string().optional(),
+    deadZone: z.string().optional(),
+    direction: z.enum(["bullish", "bearish", "neutral"]).optional(),
+    aboveDeadZone: z.boolean().optional(),
+    aboveExplosion: z.boolean().optional(),
+    signal: z.enum(["strong_buy", "strong_sell", "weak_buy", "weak_sell", "none"]).optional(),
+    momentumWeakening: z.boolean().optional(),
+    interpretation: z.string().optional(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ symbol, interval, sensitivity, deadZoneMult }, execContext: MastraExecutionContext) => {
+    const ctx = getGordonContext(execContext);
+    if (!ctx?.exchange) return errors.noExchange;
+    const normalizedSymbol = symbol.toUpperCase().endsWith("USDT") ? symbol.toUpperCase() : `${symbol.toUpperCase()}USDT`;
+
+    try {
+      const candles = await ctx.exchange.getCandles(normalizedSymbol, interval, 120);
+      if (!candles || candles.length < 50) return errors.insufficientData(normalizedSymbol);
+
+      const closes = candles.map(c => c.close);
+
+      // EMA helper (reusing local scope)
+      const ema = (data: number[], period: number): number[] => {
+        const mult = 2 / (period + 1);
+        const result: number[] = [];
+        let val = data.slice(0, period).reduce((a, b) => a + b, 0) / period;
+        for (let i = 0; i < period - 1; i++) result.push(NaN);
+        result.push(val);
+        for (let i = period; i < data.length; i++) {
+          val = (data[i]! - val) * mult + val;
+          result.push(val);
+        }
+        return result;
+      };
+
+      // MACD line = EMA(fast) - EMA(slow)
+      const fastEMA = ema(closes, 20);
+      const slowEMA = ema(closes, 40);
+      const macd: number[] = [];
+      for (let i = 0; i < closes.length; i++) {
+        const f = fastEMA[i]!;
+        const s = slowEMA[i]!;
+        macd.push(isNaN(f) || isNaN(s) ? 0 : f - s);
+      }
+
+      // t1 = (MACD[i] - MACD[i-1]) * sensitivity
+      const len = closes.length;
+      const t1Curr = (macd[len - 1]! - macd[len - 2]!) * sensitivity;
+      const t1Prev = (macd[len - 2]! - macd[len - 3]!) * sensitivity;
+
+      const trendUpVal = t1Curr >= 0 ? t1Curr : 0;
+      const trendDownVal = t1Curr < 0 ? -t1Curr : 0;
+      const prevTrendUp = t1Prev >= 0 ? t1Prev : 0;
+      const prevTrendDown = t1Prev < 0 ? -t1Prev : 0;
+
+      // Bollinger Band envelope = upper - lower (BB channel width)
+      const bbPeriod = 20;
+      const bbMult = 2.0;
+      const bbSlice = closes.slice(-bbPeriod);
+      const bbMean = bbSlice.reduce((a, b) => a + b, 0) / bbPeriod;
+      const bbStdDev = Math.sqrt(bbSlice.reduce((s, v) => s + (v - bbMean) ** 2, 0) / bbPeriod);
+      const explosionLine = 2 * bbMult * bbStdDev; // upper - lower = 2 * mult * stddev
+
+      // Dead zone = RMA(TR, 100) * deadZoneMult
+      const trs: number[] = [];
+      for (let i = 0; i < candles.length; i++) {
+        const c = candles[i]!;
+        if (i === 0) { trs.push(c.high - c.low); continue; }
+        const p = candles[i - 1]!;
+        trs.push(Math.max(c.high - c.low, Math.abs(c.high - p.close), Math.abs(c.low - p.close)));
+      }
+      // RMA(100) — Wilder's smoothing
+      const rmaPeriod = Math.min(100, trs.length);
+      let rmaVal = trs.slice(0, rmaPeriod).reduce((a, b) => a + b, 0) / rmaPeriod;
+      for (let i = rmaPeriod; i < trs.length; i++) {
+        rmaVal = (rmaVal * (rmaPeriod - 1) + trs[i]!) / rmaPeriod;
+      }
+      const deadZoneVal = rmaVal * deadZoneMult;
+
+      // Signal logic
+      const momentum = Math.max(trendUpVal, trendDownVal);
+      const aboveDeadZone = momentum > deadZoneVal;
+      const aboveExplosion = momentum > explosionLine;
+      const dir: "bullish" | "bearish" | "neutral" = trendUpVal > 0 ? "bullish" : trendDownVal > 0 ? "bearish" : "neutral";
+
+      const weakening = dir === "bullish"
+        ? trendUpVal < prevTrendUp
+        : dir === "bearish"
+          ? trendDownVal < prevTrendDown
+          : false;
+
+      let signal: "strong_buy" | "strong_sell" | "weak_buy" | "weak_sell" | "none" = "none";
+      if (dir === "bullish" && aboveDeadZone && aboveExplosion) signal = weakening ? "weak_buy" : "strong_buy";
+      else if (dir === "bearish" && aboveDeadZone && aboveExplosion) signal = weakening ? "weak_sell" : "strong_sell";
+
+      const cp = closes[len - 1]!;
+      const parts: string[] = [];
+      if (signal === "strong_buy") parts.push("Strong bullish explosion — momentum exceeds both dead zone and BB envelope");
+      else if (signal === "strong_sell") parts.push("Strong bearish explosion — momentum exceeds both dead zone and BB envelope");
+      else if (signal === "weak_buy") parts.push("Bullish explosion but momentum weakening — consider tightening stops");
+      else if (signal === "weak_sell") parts.push("Bearish explosion but momentum weakening — consider tightening stops");
+      else if (!aboveDeadZone) parts.push("Inside dead zone — no actionable signal, market is ranging");
+      else parts.push("Momentum above dead zone but below explosion line — building, not yet confirmed");
+
+      return {
+        symbol: normalizedSymbol, interval, currentPrice: cp.toFixed(2),
+        trendUp: trendUpVal.toFixed(4), trendDown: trendDownVal.toFixed(4),
+        explosion: explosionLine.toFixed(4), deadZone: deadZoneVal.toFixed(4),
+        direction: dir, aboveDeadZone, aboveExplosion, signal, momentumWeakening: weakening,
+        interpretation: parts.join(". "),
+      };
+    } catch (error) { return { error: `Failed to get WAE: ${(error as Error).message}` }; }
+  },
+});
+
+// ============================================================================
 // Export as Object (Mastra format)
 // ============================================================================
 
@@ -1988,4 +2126,5 @@ export const indicatorTools = {
   get_parabolic_sar: createCachedTool(getParabolicSARTool, TOOL_CACHE_CONFIG.indicators.ttl),
   get_atr_rope: createCachedTool(getATRRopeTool, TOOL_CACHE_CONFIG.indicators.ttl),
   get_linear_regression: createCachedTool(getLinearRegressionTool, TOOL_CACHE_CONFIG.indicators.ttl),
+  get_wae: createCachedTool(getWAETool, TOOL_CACHE_CONFIG.indicators.ttl),
 };
