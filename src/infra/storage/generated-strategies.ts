@@ -12,6 +12,18 @@ import { createModuleLogger } from "../logger/index.ts";
 
 const logger = createModuleLogger("generated-strategies-storage");
 
+function ensureBacktestResultColumn(): void {
+  const db = getDatabase();
+
+  const columns = db.query("PRAGMA table_info(generated_strategy_backtests)").all();
+  const hasResultColumn = columns.some((col) => (col as { name?: string }).name === "result_json");
+
+  if (!hasResultColumn) {
+    db.run("ALTER TABLE generated_strategy_backtests ADD COLUMN result_json TEXT");
+    logger.info("Added result_json column to generated_strategy_backtests");
+  }
+}
+
 // ============================================================================
 // Type Definitions
 // ============================================================================
@@ -109,10 +121,20 @@ export function initGeneratedStrategiesTable(): void {
       metrics_json TEXT NOT NULL,
       trades_json TEXT NOT NULL,
       equity_curve_json TEXT NOT NULL,
+      result_json TEXT,
       created_at TEXT NOT NULL,
       FOREIGN KEY (strategy_id) REFERENCES generated_strategies(id)
     )
   `);
+
+  // Migration for existing databases created before result_json was introduced.
+  try {
+    ensureBacktestResultColumn();
+  } catch (error) {
+    logger.warn("Failed to ensure generated_strategy_backtests.result_json column", {
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
+  }
 
   db.run(`
     CREATE INDEX IF NOT EXISTS idx_generated_strategy_backtests_strategy_id
@@ -174,8 +196,8 @@ export async function saveGeneratedStrategy(
       const backtestStmt = db.prepare(`
         INSERT OR REPLACE INTO generated_strategy_backtests (
           id, strategy_id, symbol, timeframe, config_json,
-          metrics_json, trades_json, equity_curve_json, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+          metrics_json, trades_json, equity_curve_json, result_json, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
 
       backtestStmt.run(
@@ -187,6 +209,7 @@ export async function saveGeneratedStrategy(
         JSON.stringify(backtestResult.metrics),
         JSON.stringify(backtestResult.trades.slice(0, 100)), // Limit trades stored
         JSON.stringify(backtestResult.equityCurve.slice(0, 500)), // Limit curve points
+        JSON.stringify(backtestResult),
         now
       );
     }
@@ -254,6 +277,7 @@ export async function getGeneratedStrategyBacktest(
       metrics_json: string;
       trades_json: string;
       equity_curve_json: string;
+      result_json: string | null;
       created_at: string;
     }, [string]>(`
       SELECT * FROM generated_strategy_backtests
@@ -268,6 +292,30 @@ export async function getGeneratedStrategyBacktest(
       return null;
     }
 
+    if (row.result_json) {
+      try {
+        const parsed = JSON.parse(row.result_json) as BacktestResult;
+
+        return {
+          ...parsed,
+          id: parsed.id || row.id,
+          strategyName: parsed.strategyName || strategyId,
+          drawdownCurve: Array.isArray(parsed.drawdownCurve) ? parsed.drawdownCurve : [],
+          startDate: parsed.startDate || "",
+          endDate: parsed.endDate || "",
+          executionTime: parsed.executionTime ?? 0,
+          createdAt: parsed.createdAt || row.created_at,
+          warnings: Array.isArray(parsed.warnings) ? parsed.warnings : [],
+        };
+      } catch (error) {
+        logger.warn("Failed to parse result_json for generated strategy backtest", {
+          strategyId,
+          backtestId: row.id,
+          error: error instanceof Error ? error.message : "Unknown error",
+        });
+      }
+    }
+
     return {
       id: row.id,
       strategyName: strategyId,
@@ -280,7 +328,7 @@ export async function getGeneratedStrategyBacktest(
       endDate: "",
       executionTime: 0,
       createdAt: row.created_at,
-      warnings: [],
+      warnings: ["Loaded legacy backtest record with partial metadata."],
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";

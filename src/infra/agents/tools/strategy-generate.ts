@@ -8,7 +8,10 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
-import { createStrategyGenerator } from "../strategy-generator.ts";
+import {
+  BACKTEST_NOT_PERFORMED_WARNING,
+  createStrategyGenerator,
+} from "../strategy-generator.ts";
 import { getGordonContext, normalizeSymbol, type MastraExecutionContext } from "./types.ts";
 import { saveGeneratedStrategy } from "../../storage/generated-strategies.ts";
 
@@ -71,6 +74,8 @@ const outputSchema = z.object({
   iterations: z.number().optional(),
   improvements: z.array(z.string()).optional(),
   meetsThresholds: z.boolean().optional(),
+  backtestPerformed: z.boolean().optional(),
+  warnings: z.array(z.string()).optional(),
   error: z.string().optional(),
 });
 
@@ -125,6 +130,8 @@ export const strategyGenerateTool = createTool({
 
       // Extract backtest summary
       const metrics = result.backtestResult.metrics;
+      const warnings = result.backtestResult.warnings;
+      const backtestPerformed = !warnings.includes(BACKTEST_NOT_PERFORMED_WARNING);
 
       return {
         success: true,
@@ -141,6 +148,8 @@ export const strategyGenerateTool = createTool({
         iterations: result.iterations,
         improvements: result.improvements,
         meetsThresholds: result.meetsThresholds,
+        backtestPerformed,
+        warnings: warnings.length > 0 ? warnings : undefined,
       };
     } catch (error) {
       return {

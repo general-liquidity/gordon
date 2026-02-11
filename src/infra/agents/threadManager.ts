@@ -448,16 +448,24 @@ export async function deleteThread(threadId: string): Promise<{ success: boolean
       };
     }
 
+    // Remove the thread and associated messages from storage first.
+    // Memory.deleteThread() is implemented by the LibSQL memory store.
+    const memory = createMemoryInstance();
+    try {
+      await memory.deleteThread(threadId);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (!message.toLowerCase().includes("not found")) {
+        throw error;
+      }
+    }
+
     // Remove from registry
     const registry = await loadThreadRegistry();
     if (registry.threads[threadId]) {
       delete registry.threads[threadId];
       await saveThreadRegistry(registry);
     }
-
-    // Note: We don't delete from LibSQL as Mastra Memory doesn't expose a delete API
-    // The messages will be orphaned but won't affect anything
-    // In a production system, you might want to add direct LibSQL cleanup
 
     logger.info("Thread deleted", { threadId });
     return { success: true };

@@ -15,6 +15,7 @@ export {
   // Metrics recording
   recordRequest,
   recordToolCall,
+  recordNetworkRouting,
   recordError,
   recordApiCall,
 

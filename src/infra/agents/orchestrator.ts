@@ -20,6 +20,7 @@ import {
   isTracingEnabled,
   getTracingConfig,
   recordRequest,
+  recordNetworkRouting,
   recordError,
   recordAgentCall,
   enforceRateLimit,
@@ -776,6 +777,7 @@ export async function trackHandoff(
 
   // Store in history
   handoffHistory.push(record);
+  recordNetworkRouting(fromAgent, toAgent);
 
   // Keep only last 100 handoffs
   if (handoffHistory.length > 100) {

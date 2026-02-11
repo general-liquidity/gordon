@@ -160,6 +160,7 @@ const sessionMetrics = {
   toolCalls: [] as { timestamp: number; tool: string; success: boolean; agentName?: string }[],
   apiCalls: [] as { timestamp: number; latencyMs: number; endpoint: string }[],
   errors: [] as { timestamp: number; error: string }[],
+  networkRoutings: [] as { timestamp: number; fromAgent: string; toAgent: string }[],
   // Per-agent tracking
   agentCalls: [] as AgentCallRecord[],
   // Rate limit violations
@@ -369,6 +370,21 @@ export function recordToolCall(tool: string, success: boolean, agentName?: strin
   // Keep only last 1000 tool calls
   if (sessionMetrics.toolCalls.length > 1000) {
     sessionMetrics.toolCalls.shift();
+  }
+}
+
+/**
+ * Record an agent-network routing event (handoff between agents).
+ */
+export function recordNetworkRouting(fromAgent: string, toAgent: string): void {
+  sessionMetrics.networkRoutings.push({
+    timestamp: Date.now(),
+    fromAgent,
+    toAgent,
+  });
+
+  if (sessionMetrics.networkRoutings.length > 1000) {
+    sessionMetrics.networkRoutings.shift();
   }
 }
 
@@ -822,6 +838,7 @@ export function calculateAgentMetrics(): AgentMetrics {
   const requests = sessionMetrics.requests;
   const toolCalls = sessionMetrics.toolCalls;
   const errors = sessionMetrics.errors;
+  const networkRoutings = sessionMetrics.networkRoutings;
 
   const successfulRequests = requests.filter((r) => r.success);
   const successfulToolCalls = toolCalls.filter((t) => t.success);
@@ -834,7 +851,7 @@ export function calculateAgentMetrics(): AgentMetrics {
         : 0,
     toolCallCount: toolCalls.length,
     toolSuccessRate: toolCalls.length > 0 ? successfulToolCalls.length / toolCalls.length : 1,
-    networkRoutingCount: 0, // TODO: Track network routing
+    networkRoutingCount: networkRoutings.length,
     errorCount: errors.length,
     errorRate: requests.length > 0 ? errors.length / requests.length : 0,
   };
@@ -865,13 +882,14 @@ export function recordApiCall(endpoint: string, latencyMs: number): void {
  */
 export function calculateSystemMetrics(): SystemMetrics {
   const apiCalls = sessionMetrics.apiCalls;
+  const rateLimitHits = sessionMetrics.rateLimitViolations.length;
 
   return {
     uptime: Date.now() - sessionMetrics.startTime,
     apiCallCount: apiCalls.length,
     avgApiLatencyMs:
       apiCalls.length > 0 ? apiCalls.reduce((sum, c) => sum + c.latencyMs, 0) / apiCalls.length : 0,
-    rateLimitHits: 0, // TODO: Track from Binance client
+    rateLimitHits,
     memoryUsageMb: process.memoryUsage().heapUsed / 1024 / 1024,
   };
 }
@@ -982,6 +1000,7 @@ export function resetSessionMetrics(): void {
   sessionMetrics.toolCalls = [];
   sessionMetrics.apiCalls = [];
   sessionMetrics.errors = [];
+  sessionMetrics.networkRoutings = [];
   sessionMetrics.agentCalls = [];
   sessionMetrics.rateLimitViolations = [];
   resetAllRateLimits();

@@ -12,8 +12,34 @@ import { getPlan } from "../infra/storage/plans.ts";
 import { logEvent } from "../infra/storage/events.ts";
 import { createModuleLogger } from "../infra/logger/index.ts";
 import type { Trade, EntryFill, ExitFill } from "../types/index.ts";
+import { extractOrderOwnerKey } from "../core/order-recovery.ts";
 
 const logger = createModuleLogger("reconciliation");
+
+function getIdSuffix(id: string): string {
+  const separatorIndex = id.indexOf("_");
+  return separatorIndex >= 0 ? id.slice(separatorIndex + 1) : id;
+}
+
+function buildKnownOrderOwnerKeys(activeTrades: Trade[]): Set<string> {
+  const keys = new Set<string>();
+
+  for (const trade of activeTrades) {
+    const tradeSuffix = getIdSuffix(trade.id);
+    const planSuffix = getIdSuffix(trade.planId);
+
+    keys.add(trade.id);
+    keys.add(tradeSuffix);
+    keys.add(trade.planId);
+    keys.add(planSuffix);
+
+    if (planSuffix.length >= 8) {
+      keys.add(planSuffix.slice(0, 8));
+    }
+  }
+
+  return keys;
+}
 
 export interface ReconciliationResult {
   success: boolean;
@@ -302,6 +328,7 @@ async function checkOrphanedOrders(
 ): Promise<void> {
   // Get unique symbols from active trades
   const symbols = new Set(activeTrades.map(t => t.symbol));
+  const knownOrderOwnerKeys = buildKnownOrderOwnerKeys(activeTrades);
 
   for (const symbol of symbols) {
     try {
@@ -313,13 +340,8 @@ async function checkOrphanedOrders(
 
         // Check if this is a Gordon order
         if (clientOrderId.startsWith("gordon_")) {
-          // Extract plan ID from clientOrderId
-          const planIdPart = clientOrderId.split("_")[1];
-
-          // Check if any active trade matches this order
-          const matchingTrade = activeTrades.find(t =>
-            t.planId.includes(planIdPart || "")
-          );
+          const ownerKey = extractOrderOwnerKey(clientOrderId);
+          const matchingTrade = ownerKey ? knownOrderOwnerKeys.has(ownerKey) : false;
 
           if (!matchingTrade) {
             result.warnings.push(

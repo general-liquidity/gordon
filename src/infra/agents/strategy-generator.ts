@@ -23,6 +23,7 @@ import { createModuleLogger } from "../logger/index.ts";
 import { DSLStrategyAdapter } from "../../strategies/dsl/adapter.ts";
 
 const logger = createModuleLogger("strategy-generator");
+export const BACKTEST_NOT_PERFORMED_WARNING = "Backtest not performed - exchange client unavailable";
 
 // ============================================================================
 // Types
@@ -66,6 +67,14 @@ export interface GeneratedStrategy {
   meetsThresholds: boolean;
   /** Generation timestamp */
   generatedAt: string;
+}
+
+interface IterateStrategyOptions {
+  /**
+   * Whether to run a fresh backtest after strategy iteration.
+   * Defaults to true.
+   */
+  reBacktest?: boolean;
 }
 
 /**
@@ -192,9 +201,11 @@ export class StrategyGeneratorAgent {
             strategy,
             backtestResult,
             feedback,
-            options
+            options,
+            { reBacktest: false }
           );
           strategy = improved.strategy;
+          backtestResult = improved.backtestResult;
           iterations++;
         } catch (error) {
           logger.error("Backtest failed", {
@@ -235,8 +246,11 @@ export class StrategyGeneratorAgent {
     strategy: StrategyDSL,
     backtestResult: BacktestResult,
     feedback: string,
-    options: GenerationOptions
+    options: GenerationOptions,
+    iterateOptions: IterateStrategyOptions = {}
   ): Promise<GeneratedStrategy> {
+    const { reBacktest = true } = iterateOptions;
+
     const messages: Message[] = [
       {
         role: "system",
@@ -280,9 +294,30 @@ Please improve the strategy based on this feedback. Return ONLY valid JSON match
         generatedFrom: `Iteration based on feedback: ${feedback}`,
       };
 
+      let nextBacktestResult = backtestResult;
+      if (reBacktest) {
+        if (this.exchange) {
+          try {
+            nextBacktestResult = await this.runStrategyBacktest(response, options);
+          } catch (error) {
+            const message = error instanceof Error ? error.message : "Unknown error";
+            logger.warn("Iteration backtest failed, preserving previous backtest result", { error: message });
+            nextBacktestResult = this.withBacktestWarning(
+              backtestResult,
+              `Iteration backtest failed: ${message}`
+            );
+          }
+        } else {
+          nextBacktestResult = this.withBacktestWarning(
+            backtestResult,
+            BACKTEST_NOT_PERFORMED_WARNING
+          );
+        }
+      }
+
       return {
         strategy: response,
-        backtestResult,
+        backtestResult: nextBacktestResult,
         iterations: 1,
         improvements: [feedback],
         meetsThresholds: false,
@@ -696,7 +731,18 @@ Fix these errors and return valid JSON.
       endDate: new Date().toISOString(),
       executionTime: 0,
       createdAt: new Date().toISOString(),
-      warnings: ["Backtest not performed - exchange client unavailable"],
+      warnings: [BACKTEST_NOT_PERFORMED_WARNING],
+    };
+  }
+
+  private withBacktestWarning(backtestResult: BacktestResult, warning: string): BacktestResult {
+    if (backtestResult.warnings.includes(warning)) {
+      return backtestResult;
+    }
+
+    return {
+      ...backtestResult,
+      warnings: [...backtestResult.warnings, warning],
     };
   }
 

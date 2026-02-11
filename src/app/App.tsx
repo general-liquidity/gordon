@@ -115,6 +115,34 @@ interface LastResults {
 
 type PluginSuggestion = ReturnType<typeof checkForPluginSuggestions>[number];
 
+function getIdSuffix(id: string): string {
+  const separatorIndex = id.indexOf("_");
+  return separatorIndex >= 0 ? id.slice(separatorIndex + 1) : id;
+}
+
+function buildKnownOrderOwnerKeys(
+  trades: Array<{ id: string; planId: string }>
+): Set<string> {
+  const keys = new Set<string>();
+
+  for (const trade of trades) {
+    const tradeSuffix = getIdSuffix(trade.id);
+    const planSuffix = getIdSuffix(trade.planId);
+
+    keys.add(trade.id);
+    keys.add(tradeSuffix);
+    keys.add(trade.planId);
+    keys.add(planSuffix);
+
+    // Gordon client order IDs encode the first 8 chars of plan suffix.
+    if (planSuffix.length >= 8) {
+      keys.add(planSuffix.slice(0, 8));
+    }
+  }
+
+  return keys;
+}
+
 function getDefaultConfig(): GordonConfig {
   return {
     version: "1.0.0",
@@ -421,10 +449,8 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
         );
 
         if (activeTrades.length > 0) {
-          const knownTradeIds = new Set(
-            allTrades.map((t) => t.id.replace("trade_", ""))
-          );
-          runOrderRecovery(binanceClientRef.current, knownTradeIds, {
+          const knownOrderOwnerKeys = buildKnownOrderOwnerKeys(activeTrades);
+          runOrderRecovery(binanceClientRef.current, knownOrderOwnerKeys, {
             logResults: true,
           })
             .then((recoveryResult) => {

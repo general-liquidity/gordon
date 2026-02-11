@@ -71,13 +71,41 @@ export function isGordonOrder(clientOrderId: string): boolean {
 }
 
 /**
- * Extract trade ID from Gordon client order ID
+ * Extract the owner key from a Gordon client order ID.
+ *
+ * Supported formats:
+ * - Standard orders: gordon_{planFragment}_{orderType}_{timestamp}_{random}
+ * - Trailing stop: gordon_tsl_{tradeFragment}_{timestamp}
+ */
+export function extractOrderOwnerKey(clientOrderId: string): string | null {
+  if (!isGordonOrder(clientOrderId)) return null;
+
+  const parts = clientOrderId.split("_");
+  if (parts.length < 2) return null;
+
+  if (parts[1] === "tsl") {
+    return parts[2] || null;
+  }
+
+  return parts[1] || null;
+}
+
+/**
+ * @deprecated Use extractOrderOwnerKey()
  */
 export function extractTradeId(clientOrderId: string): string | null {
-  if (!isGordonOrder(clientOrderId)) return null;
-  // Format: gordon_{tradeId}_{orderType}_{timestamp}
-  const parts = clientOrderId.split("_");
-  return parts[1] || null;
+  return extractOrderOwnerKey(clientOrderId);
+}
+
+function isKnownOrderOwner(ownerKey: string, knownOrderOwnerKeys: Set<string>): boolean {
+  if (knownOrderOwnerKeys.has(ownerKey)) return true;
+
+  // Accept both fragment keys and prefixed IDs for backward compatibility.
+  return (
+    knownOrderOwnerKeys.has(`pln_${ownerKey}`) ||
+    knownOrderOwnerKeys.has(`trd_${ownerKey}`) ||
+    knownOrderOwnerKeys.has(`trade_${ownerKey}`)
+  );
 }
 
 /**
@@ -85,7 +113,7 @@ export function extractTradeId(clientOrderId: string): string | null {
  */
 export async function scanForOrphanedOrders(
   client: BinanceClient,
-  knownTradeIds: Set<string>,
+  knownOrderOwnerKeys: Set<string>,
   symbols?: string[]
 ): Promise<OrphanedOrder[]> {
   const orphaned: OrphanedOrder[] = [];
@@ -99,8 +127,8 @@ export async function scanForOrphanedOrders(
     for (const order of openOrders) {
       if (!isGordonOrder(order.clientOrderId)) continue;
 
-      const tradeId = extractTradeId(order.clientOrderId);
-      if (!tradeId || !knownTradeIds.has(tradeId)) {
+      const ownerKey = extractOrderOwnerKey(order.clientOrderId);
+      if (!ownerKey || !isKnownOrderOwner(ownerKey, knownOrderOwnerKeys)) {
         orphaned.push({
           orderId: order.orderId,
           clientOrderId: order.clientOrderId,
@@ -200,7 +228,7 @@ export function calculateSuggestedStopLoss(
  */
 export async function runOrderRecovery(
   client: BinanceClient,
-  knownTradeIds: Set<string>,
+  knownOrderOwnerKeys: Set<string>,
   options: {
     symbols?: string[];
     cancelOrphaned?: boolean;
@@ -216,7 +244,7 @@ export async function runOrderRecovery(
 
   try {
     // Scan for orphaned orders
-    result.orphaned = await scanForOrphanedOrders(client, knownTradeIds, options.symbols);
+    result.orphaned = await scanForOrphanedOrders(client, knownOrderOwnerKeys, options.symbols);
     result.scanned = result.orphaned.length;
 
     if (options.logResults && result.orphaned.length > 0) {

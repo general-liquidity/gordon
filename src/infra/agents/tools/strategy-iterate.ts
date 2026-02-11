@@ -8,7 +8,10 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
-import { createStrategyGenerator } from "../strategy-generator.ts";
+import {
+  BACKTEST_NOT_PERFORMED_WARNING,
+  createStrategyGenerator,
+} from "../strategy-generator.ts";
 import { getGordonContext, normalizeSymbol, type MastraExecutionContext } from "./types.ts";
 import {
   loadGeneratedStrategy,
@@ -64,6 +67,8 @@ const outputSchema = z.object({
     .optional(),
   changesApplied: z.array(z.string()).optional(),
   improved: z.boolean().optional(),
+  backtestPerformed: z.boolean().optional(),
+  warnings: z.array(z.string()).optional(),
   error: z.string().optional(),
 });
 
@@ -189,17 +194,21 @@ export const strategyIterateTool = createTool({
       }
 
       // Compare metrics
-      const newMetrics = {
-        totalReturn: Math.round(result.backtestResult.metrics.totalReturn * 100) / 100,
-        sharpeRatio: Math.round(result.backtestResult.metrics.sharpeRatio * 100) / 100,
-        maxDrawdown: Math.round(result.backtestResult.metrics.maxDrawdown * 100) / 100,
-        winRate: Math.round(result.backtestResult.metrics.winRate * 100) / 100,
-        totalTrades: result.backtestResult.metrics.totalTrades,
-      };
+      const warnings = result.backtestResult.warnings;
+      const backtestPerformed = !warnings.includes(BACKTEST_NOT_PERFORMED_WARNING);
+      const newMetrics = backtestPerformed
+        ? {
+            totalReturn: Math.round(result.backtestResult.metrics.totalReturn * 100) / 100,
+            sharpeRatio: Math.round(result.backtestResult.metrics.sharpeRatio * 100) / 100,
+            maxDrawdown: Math.round(result.backtestResult.metrics.maxDrawdown * 100) / 100,
+            winRate: Math.round(result.backtestResult.metrics.winRate * 100) / 100,
+            totalTrades: result.backtestResult.metrics.totalTrades,
+          }
+        : undefined;
 
       // Determine if improved based on key metrics
-      let improved = false;
-      if (previousMetrics) {
+      let improved: boolean | undefined;
+      if (previousMetrics && newMetrics) {
         const sharpeImproved = newMetrics.sharpeRatio > previousMetrics.sharpeRatio;
         const returnImproved = newMetrics.totalReturn > previousMetrics.totalReturn;
         const drawdownImproved = newMetrics.maxDrawdown < previousMetrics.maxDrawdown;
@@ -217,6 +226,8 @@ export const strategyIterateTool = createTool({
         newMetrics,
         changesApplied: result.improvements,
         improved,
+        backtestPerformed,
+        warnings: warnings.length > 0 ? warnings : undefined,
       };
     } catch (error) {
       return {
