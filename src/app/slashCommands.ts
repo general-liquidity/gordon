@@ -625,6 +625,19 @@ export const SLASH_COMMANDS: SlashCommand[] = [
     whenToUse: "Automated trading with risk mandates over hours/days",
   },
 
+  // Keyring
+  {
+    name: "keyring",
+    aliases: ["kr", "vault"],
+    description: "Manage OS keyring for secure API key storage",
+    usage: "/keyring [status|enable|disable|store|clear]",
+    category: "system",
+    level: 2,
+    action: "tool",
+    target: "handle_keyring_command",
+    whenToUse: "Store API keys in OS keyring instead of .env file",
+  },
+
   // Withdrawal
   {
     name: "withdraw",
@@ -1175,6 +1188,26 @@ export function commandToPrompt(command: SlashCommand, args: string): string {
         return `Preview withdrawal options for ${coin}`;
       }
       return "Which coin do you want to withdraw? (e.g., /withdraw BTC 0.1 bc1q...)";
+    case "keyring":
+      if (!args) return "Show keyring status — whether OS keyring is available and enabled";
+      const krParts = args.split(/\s+/);
+      const krSubcmd = krParts[0]?.toLowerCase();
+      switch (krSubcmd) {
+        case "status":
+          return "Show keyring status — availability, enabled state, and stored keys";
+        case "enable":
+          return "Enable OS keyring and migrate existing .env keys into secure storage";
+        case "disable":
+          return "Disable OS keyring (fall back to .env, keys preserved in keyring)";
+        case "store":
+          return krParts[1]
+            ? `Store ${krParts[1].toUpperCase()} in the OS keyring`
+            : "Which key should I store in the keyring?";
+        case "clear":
+          return "Remove all Gordon keys from the OS keyring";
+        default:
+          return "Show keyring status";
+      }
     case "shortcuts":
       return "Show keyboard shortcuts";
     case "theme":

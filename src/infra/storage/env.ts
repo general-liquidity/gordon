@@ -17,6 +17,7 @@ import {
   formatValidationResult,
   type ValidationResult,
 } from "./env-validation.ts";
+import { createKeyringProvider, KEYRING_SUPPORTED_KEYS } from "./keyring.ts";
 
 // Primary location: user's Gordon config directory
 const GORDON_DIR = join(homedir(), ".gordon");
@@ -140,24 +141,67 @@ export async function checkEnvStatus(): Promise<EnvStatus> {
 
 /**
  * Load environment variables from .env file into process.env
+ * Resolution order: process.env (shell) > keyring > .env file
  * Checks ~/.gordon/.env first, then cwd/.env
  */
 export async function loadEnvFile(): Promise<void> {
   const envPath = findEnvFilePath();
-  if (!envPath) {
-    return;
-  }
+  if (envPath) {
+    const file = Bun.file(envPath);
+    const content = await file.text();
+    const parsed = parseEnvContent(content);
 
-  const file = Bun.file(envPath);
-  const content = await file.text();
-  const parsed = parseEnvContent(content);
-
-  // Only set if not already in process.env (process.env takes precedence)
-  for (const [key, value] of Object.entries(parsed)) {
-    if (!process.env[key]) {
-      process.env[key] = value;
+    // Only set if not already in process.env (process.env takes precedence)
+    for (const [key, value] of Object.entries(parsed)) {
+      if (!process.env[key]) {
+        process.env[key] = value;
+      }
     }
   }
+
+  // Load from keyring if enabled (overrides .env but not process.env)
+  await loadKeysFromKeyring();
+}
+
+/**
+ * Load keys from OS keyring into process.env (if enabled)
+ * Only sets keys not already present in process.env
+ */
+async function loadKeysFromKeyring(): Promise<void> {
+  try {
+    // Read config directly to check useKeyring (avoid circular dependency)
+    const configFile = Bun.file(join(GORDON_DIR, "config.json"));
+    const configExists = await configFile.exists();
+    if (!configExists) return;
+
+    const config = JSON.parse(await configFile.text());
+    if (!config.useKeyring) return;
+
+    const keyring = createKeyringProvider();
+    if (!(await keyring.isAvailable())) return;
+
+    for (const key of KEYRING_SUPPORTED_KEYS) {
+      if (!process.env[key]) {
+        const value = await keyring.get(key);
+        if (value) {
+          process.env[key] = value;
+        }
+      }
+    }
+  } catch {
+    // Keyring failures are silent — fall back to .env
+  }
+}
+
+/**
+ * Store a key in the OS keyring
+ */
+export async function saveKeyToKeyring(key: string, value: string): Promise<void> {
+  const keyring = createKeyringProvider();
+  if (!(await keyring.isAvailable())) {
+    throw new Error("OS keyring is not available");
+  }
+  await keyring.set(key, value);
 }
 
 /**

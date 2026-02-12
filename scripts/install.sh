@@ -196,6 +196,23 @@ main() {
         echo ""
     fi
 
+    # WSL-specific guidance
+    if grep -qi microsoft /proc/version 2>/dev/null; then
+        echo ""
+        info "WSL detected — Gordon is running as a Linux binary inside WSL."
+        echo ""
+        echo "  Tips:"
+        echo "    - Your Windows files are at /mnt/c/Users/<username>/"
+        echo "    - Config is stored at ~/.gordon/ (inside WSL)"
+        if [ "$INSTALL_DIR" = "$HOME/.local/bin" ]; then
+            echo "    - Ensure ~/.local/bin is in your PATH:"
+            echo "        echo 'export PATH=\"\$HOME/.local/bin:\$PATH\"' >> ~/.bashrc"
+        fi
+        echo "    - For native Windows install, use PowerShell instead:"
+        echo "        irm https://raw.githubusercontent.com/general-liquidity/gordon-cli/main/scripts/install.ps1 | iex"
+        echo ""
+    fi
+
     echo "Get started:"
     echo ""
     echo "    gordon --help     # Show available commands"

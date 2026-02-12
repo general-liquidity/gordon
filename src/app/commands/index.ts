@@ -66,3 +66,14 @@ export {
   handleExportCommand,
   type ExportCommandResult,
 } from './export';
+
+// Keyring Commands
+export {
+  handleKeyringCommand,
+  keyringStatus,
+  keyringEnable,
+  keyringDisable,
+  keyringStore,
+  keyringClear,
+  type KeyringCommandResult,
+} from './keyring';

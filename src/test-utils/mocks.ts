@@ -185,6 +185,7 @@ export function createMockConfig(overrides: Partial<GordonConfig> = {}): GordonC
     mode: "SAFE",
     armedUntil: null,
     onboardingComplete: false,
+    useKeyring: false,
     ...overrides,
   };
 }

@@ -1,0 +1,111 @@
+# Gordon CLI Installer for Windows
+# Usage: irm https://raw.githubusercontent.com/general-liquidity/gordon-cli/main/scripts/install.ps1 | iex
+
+$ErrorActionPreference = "Stop"
+
+$Repo = "general-liquidity/gordon-cli"
+$BinaryName = "gordon"
+
+function Write-Info($msg) { Write-Host "info: $msg" -ForegroundColor Cyan }
+function Write-Success($msg) { Write-Host "success: $msg" -ForegroundColor Green }
+function Write-Warn($msg) { Write-Host "warning: $msg" -ForegroundColor Yellow }
+function Write-Err($msg) { Write-Host "error: $msg" -ForegroundColor Red; exit 1 }
+
+# Detect architecture
+function Get-Arch {
+    $arch = [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture
+    switch ($arch) {
+        "X64" { return "x64" }
+        "Arm64" { return "arm64" }
+        default { Write-Err "Unsupported architecture: $arch" }
+    }
+}
+
+# Get latest version from GitHub
+function Get-LatestVersion {
+    try {
+        $release = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases/latest" -Headers @{ "User-Agent" = "gordon-installer" }
+        return $release.tag_name -replace "^v", ""
+    }
+    catch {
+        Write-Err "Failed to fetch latest version from GitHub: $_"
+    }
+}
+
+function Main {
+    Write-Host ""
+    Write-Host "  Gordon CLI Installer" -ForegroundColor White
+    Write-Host "  The Frontier Trading Agent" -ForegroundColor DarkGray
+    Write-Host ""
+
+    # Detect platform
+    $Arch = Get-Arch
+    Write-Info "Detected platform: windows-$Arch"
+
+    # Get version
+    if ($env:GORDON_VERSION) {
+        $Version = $env:GORDON_VERSION
+        Write-Info "Using specified version: v$Version"
+    }
+    else {
+        Write-Info "Fetching latest version..."
+        $Version = Get-LatestVersion
+        Write-Info "Latest version: v$Version"
+    }
+
+    # Only x64 binary available for Windows currently
+    $FileName = "$BinaryName-windows-x64.exe"
+    $DownloadUrl = "https://github.com/$Repo/releases/download/v$Version/$FileName"
+    Write-Info "Downloading from: $DownloadUrl"
+
+    # Install directory
+    $InstallDir = Join-Path $env:LOCALAPPDATA "gordon"
+    if (-not (Test-Path $InstallDir)) {
+        New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null
+    }
+
+    $InstallPath = Join-Path $InstallDir "$BinaryName.exe"
+    $TempPath = Join-Path $env:TEMP "$FileName"
+
+    # Download
+    try {
+        Invoke-WebRequest -Uri $DownloadUrl -OutFile $TempPath -UseBasicParsing
+    }
+    catch {
+        Write-Err "Failed to download Gordon CLI. Check version and platform. Error: $_"
+    }
+
+    # Move to install location
+    Move-Item -Path $TempPath -Destination $InstallPath -Force
+    Write-Info "Installed to $InstallPath"
+
+    # Add to PATH if needed
+    $UserPath = [Environment]::GetEnvironmentVariable("Path", "User")
+    if ($UserPath -notlike "*$InstallDir*") {
+        $NewPath = "$UserPath;$InstallDir"
+        [Environment]::SetEnvironmentVariable("Path", $NewPath, "User")
+        Write-Info "Added $InstallDir to user PATH"
+        Write-Warn "Restart your terminal for PATH changes to take effect"
+    }
+
+    # Verify
+    if (Test-Path $InstallPath) {
+        Write-Host ""
+        Write-Success "Gordon CLI v$Version installed successfully!"
+    }
+    else {
+        Write-Err "Installation failed: binary not found at $InstallPath"
+    }
+
+    Write-Host ""
+    Write-Host "Get started:" -ForegroundColor White
+    Write-Host ""
+    Write-Host "    gordon --help     # Show available commands" -ForegroundColor Gray
+    Write-Host "    gordon init       # Initialize Gordon in your project" -ForegroundColor Gray
+    Write-Host "    gordon            # Start interactive mode" -ForegroundColor Gray
+    Write-Host ""
+    Write-Host "Note: Open a new terminal window for the 'gordon' command to be available." -ForegroundColor Yellow
+    Write-Host ""
+}
+
+Main

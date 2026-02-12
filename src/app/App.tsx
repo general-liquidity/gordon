@@ -163,6 +163,7 @@ function getDefaultConfig(): GordonConfig {
     mode: "SAFE",
     armedUntil: null,
     onboardingComplete: false,
+    useKeyring: false,
   };
 }
 

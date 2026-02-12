@@ -94,6 +94,8 @@ export const GordonConfigSchema = z.object({
   exchanges: z.array(MultiExchangeConfigSchema).default([]),
   /** ID of the currently active exchange from the exchanges array */
   activeExchangeId: z.string().optional(),
+  /** Enable OS keyring for secure API key storage (opt-in) */
+  useKeyring: z.boolean().default(false),
   preferences: PreferencesSchema.default({
     cashReservePercent: 0.2,
     maxAllocationPerTrade: 0.1,

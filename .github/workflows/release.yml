@@ -96,6 +96,68 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  update-manifests:
+    name: Update Package Manager Manifests
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+
+      - name: Download release assets and compute hashes
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          mkdir -p /tmp/binaries
+
+          for target in linux-x64 linux-arm64 darwin-x64 darwin-arm64; do
+            curl -fsSL -o "/tmp/binaries/gordon-${target}" \
+              "https://github.com/${GITHUB_REPOSITORY}/releases/download/v${VERSION}/gordon-${target}"
+          done
+
+          curl -fsSL -o "/tmp/binaries/gordon-windows-x64.exe" \
+            "https://github.com/${GITHUB_REPOSITORY}/releases/download/v${VERSION}/gordon-windows-x64.exe"
+
+          # Compute SHA256 hashes
+          cd /tmp/binaries
+          for f in *; do
+            sha256sum "$f" | awk '{print $1}' > "${f}.sha256"
+          done
+
+      - name: Update Homebrew formula
+        run: |
+          DARWIN_ARM64=$(cat /tmp/binaries/gordon-darwin-arm64.sha256)
+          DARWIN_X64=$(cat /tmp/binaries/gordon-darwin-x64.sha256)
+          LINUX_ARM64=$(cat /tmp/binaries/gordon-linux-arm64.sha256)
+          LINUX_X64=$(cat /tmp/binaries/gordon-linux-x64.sha256)
+
+          sed -i "s/version \".*\"/version \"${VERSION}\"/" Formula/gordon.rb
+          sed -i "s/PLACEHOLDER_DARWIN_ARM64/${DARWIN_ARM64}/" Formula/gordon.rb
+          sed -i "s/PLACEHOLDER_DARWIN_X64/${DARWIN_X64}/" Formula/gordon.rb
+          sed -i "s/PLACEHOLDER_LINUX_ARM64/${LINUX_ARM64}/" Formula/gordon.rb
+          sed -i "s/PLACEHOLDER_LINUX_X64/${LINUX_X64}/" Formula/gordon.rb
+
+      - name: Update Scoop manifest
+        run: |
+          WINDOWS_X64=$(cat /tmp/binaries/gordon-windows-x64.exe.sha256)
+
+          # Update version and hash in Scoop manifest
+          sed -i "s/\"version\": \".*\"/\"version\": \"${VERSION}\"/" scripts/scoop/gordon.json
+          sed -i "s/PLACEHOLDER_WINDOWS_X64/${WINDOWS_X64}/" scripts/scoop/gordon.json
+          sed -i "s|/v[0-9.]*-\?[a-z0-9]*/gordon-windows|/v${VERSION}/gordon-windows|g" scripts/scoop/gordon.json
+
+      - name: Commit updated manifests
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Formula/gordon.rb scripts/scoop/gordon.json
+          git diff --cached --quiet || git commit -m "chore: update package manifests for v${VERSION}"
+          git push
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   publish-npm:
     name: Publish to npm
     needs: test
