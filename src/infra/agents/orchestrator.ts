@@ -506,6 +506,10 @@ const TOOL_AGENT_MAP: Record<string, string> = {
   get_liquidation_pressure: "Scanner",
   get_crowding_analysis: "Scanner",
   get_squeeze_candidates: "Scanner",
+  // pairAnalysisTools (on Scanner + Analyst)
+  analyze_pair_correlation: "Analyst",
+  analyze_pair_spread: "Analyst",
+  compare_pair_performance: "Analyst",
 
   // ---- Planner tools ----
   // tradingTools cherry-picks
@@ -571,6 +575,9 @@ const TOOL_AGENT_MAP: Record<string, string> = {
   get_user_assets: "Monitor",
   get_wallet_balances: "Monitor",
   get_dust_log: "Monitor",
+  preview_withdrawal: "Monitor",
+  withdraw_to_external: "Monitor",
+  get_withdrawal_status: "Monitor",
   // historyTools spread
   get_trade_history: "Monitor",
   get_transfer_history: "Monitor",
@@ -590,6 +597,8 @@ const TOOL_AGENT_MAP: Record<string, string> = {
   get_performance_report: "Monitor",
   process_unrecorded_trades: "Monitor",
   get_win_rate_analysis: "Monitor",
+  // autonomousTools cherry-pick on Monitor
+  get_autonomous_status: "Monitor",
 
   // ---- Teacher tools ----
   explain: "Teacher",

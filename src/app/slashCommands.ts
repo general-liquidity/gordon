@@ -596,6 +596,48 @@ export const SLASH_COMMANDS: SlashCommand[] = [
     action: "tool",
     target: "get_cache_stats",
   },
+
+  // Cross-Pair Analysis
+  {
+    name: "pairs",
+    aliases: ["pair", "correlation", "corr"],
+    description: "Analyze correlation and spread between two trading pairs",
+    usage: "/pairs <symbolA> <symbolB>",
+    category: "market",
+    level: 2,
+    action: "agent",
+    target: "analyst",
+    executionTime: "~3-5s",
+    whenToUse: "Compare how two coins move together, find pair trading opportunities",
+  },
+
+  // Autonomous Trading
+  {
+    name: "autonomous",
+    aliases: ["auto", "mandate", "swing"],
+    description: "Set up and control autonomous swing trading",
+    usage: "/autonomous [start|stop|pause|resume|status]",
+    category: "trading",
+    level: 2,
+    action: "agent",
+    target: "gordon",
+    executionTime: "~2-5s",
+    whenToUse: "Automated trading with risk mandates over hours/days",
+  },
+
+  // Withdrawal
+  {
+    name: "withdraw",
+    aliases: ["wd", "send"],
+    description: "Preview or execute external withdrawal (to Ledger/cold storage)",
+    usage: "/withdraw <coin> <amount> <address>",
+    category: "account",
+    level: 2,
+    action: "agent",
+    target: "monitor",
+    executionTime: "~2-3s",
+    whenToUse: "Send crypto to hardware wallet or external address",
+  },
 ];
 
 // ============================================================================
@@ -1089,6 +1131,50 @@ export function commandToPrompt(command: SlashCommand, args: string): string {
       return "Show me my risk-adjusted performance metrics including Sharpe ratio and drawdown";
     case "cache":
       return "Show me the tool cache statistics";
+    case "pairs":
+      if (args) {
+        const parts = args.split(/\s+/);
+        const symA = parts[0]?.toUpperCase();
+        const symB = parts[1]?.toUpperCase();
+        if (symA && symB) {
+          return `Analyze the correlation and spread between ${symA} and ${symB} — show me how they move together and any pair trading signals`;
+        }
+        return `Analyze the pair relationship for ${symA} — what's the second coin to compare?`;
+      }
+      return "Which two coins should I compare? (e.g., /pairs BTC ETH)";
+    case "autonomous":
+      if (!args) return "Show me the current autonomous trading status, or help me set up a new swing mandate";
+      const autoParts = args.split(/\s+/);
+      const autoSubcmd = autoParts[0]?.toLowerCase();
+      switch (autoSubcmd) {
+        case "start":
+          return "Create a new swing trading mandate and start autonomous mode";
+        case "stop":
+          return "Stop the autonomous trading loop";
+        case "pause":
+          return "Pause the autonomous trading loop";
+        case "resume":
+          return "Resume the paused autonomous trading loop";
+        case "status":
+          return "Show me the current autonomous trading status and mandate details";
+        default:
+          return "Show me the current autonomous trading status";
+      }
+    case "withdraw":
+      if (args) {
+        const parts = args.split(/\s+/);
+        const coin = parts[0]?.toUpperCase();
+        const amount = parts[1];
+        const address = parts[2];
+        if (coin && amount && address) {
+          return `Preview a withdrawal of ${amount} ${coin} to address ${address} — show me the fees and network options before confirming`;
+        }
+        if (coin && amount) {
+          return `I want to withdraw ${amount} ${coin} — what address should I send to?`;
+        }
+        return `Preview withdrawal options for ${coin}`;
+      }
+      return "Which coin do you want to withdraw? (e.g., /withdraw BTC 0.1 bc1q...)";
     case "shortcuts":
       return "Show keyboard shortcuts";
     case "theme":

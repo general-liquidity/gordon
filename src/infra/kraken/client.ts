@@ -613,4 +613,26 @@ export class KrakenClient {
   }): Promise<KrakenWithdrawStatus[]> {
     return this.signedRequest<KrakenWithdrawStatus[]>("/WithdrawStatus", params);
   }
+
+  /**
+   * Submit a withdrawal request
+   * @param asset - Kraken asset name (e.g., "XBT" for Bitcoin)
+   * @param key - Pre-configured withdrawal address name in Kraken
+   * @param amount - Amount to withdraw
+   */
+  async withdraw(asset: string, key: string, amount: string): Promise<{ refid: string }> {
+    return this.signedRequest<{ refid: string }>("/Withdraw", { asset, key, amount });
+  }
+
+  /**
+   * Get available withdrawal methods for an asset
+   * @param asset - Kraken asset name (e.g., "XBT" for Bitcoin)
+   */
+  async getWithdrawMethods(asset: string): Promise<
+    Array<{ method: string; limit: string | boolean; fee: string; "gen-address"?: boolean }>
+  > {
+    return this.signedRequest<
+      Array<{ method: string; limit: string | boolean; fee: string; "gen-address"?: boolean }>
+    >("/WithdrawMethods", { asset });
+  }
 }

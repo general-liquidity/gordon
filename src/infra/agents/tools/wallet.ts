@@ -654,6 +654,455 @@ export const getDustLogTool = createTool({
 });
 
 // ============================================================================
+// Withdrawal Tools
+// ============================================================================
+
+export const previewWithdrawalTool = createTool({
+  id: "preview_withdrawal",
+  description:
+    "Preview a withdrawal to an external address (e.g., hardware wallet, another exchange). " +
+    "Shows network fees, minimum amounts, estimated arrival time, and address validation. " +
+    "Does NOT execute the withdrawal. Safe to call anytime. " +
+    "Use when user asks 'how much to withdraw BTC', 'withdrawal fee for ETH', 'send USDT to my Ledger'.",
+  inputSchema: z.object({
+    coin: z.string().describe("Coin to withdraw (e.g., 'BTC', 'ETH', 'USDT')"),
+    network: z
+      .string()
+      .default("")
+      .describe("Network to use (e.g., 'ETH', 'TRX', 'BTC', 'BSC'). Empty to show all available networks."),
+    address: z
+      .string()
+      .default("")
+      .describe("Destination address to validate. Empty to skip validation."),
+    amount: z
+      .number()
+      .positive()
+      .optional()
+      .describe("Amount to withdraw (optional, used to calculate net received after fees)"),
+  }),
+  outputSchema: z.object({
+    coin: z.string().optional(),
+    selectedNetwork: z
+      .object({
+        network: z.string(),
+        name: z.string(),
+        withdrawEnabled: z.boolean(),
+        withdrawFee: z.number(),
+        withdrawMin: z.number(),
+        withdrawMax: z.number(),
+        estimatedArrivalMins: z.number(),
+      })
+      .optional(),
+    allNetworks: z
+      .array(
+        z.object({
+          network: z.string(),
+          name: z.string(),
+          withdrawEnabled: z.boolean(),
+          withdrawFee: z.number(),
+          withdrawMin: z.number(),
+          withdrawMax: z.number(),
+          estimatedArrivalMins: z.number(),
+        })
+      )
+      .optional(),
+    amountPreview: z
+      .object({
+        grossAmount: z.number(),
+        fee: z.number(),
+        netReceived: z.number(),
+        meetsMinimum: z.boolean(),
+        withinMaximum: z.boolean(),
+      })
+      .optional(),
+    addressValid: z.boolean().optional(),
+    addressWarning: z.string().optional(),
+    availableBalance: z.number().optional(),
+    sufficientBalance: z.boolean().optional(),
+    warning: z.string().optional(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ coin, network, address, amount }, execContext: MastraExecutionContext) => {
+    const ctx = getGordonContext(execContext);
+    if (!ctx?.exchange) {
+      return errors.noExchange;
+    }
+    if (!ctx.binance || ctx.exchange.exchangeId !== "binance") {
+      return errors.binanceOnly;
+    }
+
+    try {
+      const coinUpper = coin.toUpperCase();
+      const coinInfo = await ctx.binance.getCoinNetworks(coinUpper);
+      if (!coinInfo) {
+        return { error: `Coin ${coinUpper} not found on Binance.` };
+      }
+
+      const allNetworks = coinInfo.networkList.map((n) => ({
+        network: n.network,
+        name: n.name,
+        withdrawEnabled: n.withdrawEnable,
+        withdrawFee: parseFloat(n.withdrawFee),
+        withdrawMin: parseFloat(n.withdrawMin),
+        withdrawMax: parseFloat(n.withdrawMax),
+        estimatedArrivalMins: n.estimatedArrivalTime,
+      }));
+
+      let selectedNetwork = undefined;
+      if (network) {
+        const networkUpper = network.toUpperCase();
+        const found = coinInfo.networkList.find(
+          (n) => n.network.toUpperCase() === networkUpper
+        );
+        if (!found) {
+          return {
+            error: `Network ${network} not available for ${coinUpper}. Available: ${allNetworks.map((n) => n.network).join(", ")}`,
+            allNetworks,
+          };
+        }
+        selectedNetwork = {
+          network: found.network,
+          name: found.name,
+          withdrawEnabled: found.withdrawEnable,
+          withdrawFee: parseFloat(found.withdrawFee),
+          withdrawMin: parseFloat(found.withdrawMin),
+          withdrawMax: parseFloat(found.withdrawMax),
+          estimatedArrivalMins: found.estimatedArrivalTime,
+        };
+      }
+
+      let addressValid: boolean | undefined = undefined;
+      let addressWarning: string | undefined = undefined;
+      if (address && network) {
+        const net = coinInfo.networkList.find(
+          (n) => n.network.toUpperCase() === network.toUpperCase()
+        );
+        if (net?.addressRegex) {
+          try {
+            const regex = new RegExp(net.addressRegex);
+            addressValid = regex.test(address);
+            if (!addressValid) {
+              addressWarning = `Address does not match expected format for ${net.network} network. Double-check before proceeding.`;
+            }
+          } catch {
+            addressValid = undefined;
+            addressWarning = "Could not validate address format. Verify manually.";
+          }
+        }
+      }
+
+      let amountPreview = undefined;
+      if (amount !== undefined && selectedNetwork) {
+        const fee = selectedNetwork.withdrawFee;
+        const netReceived = amount - fee;
+        amountPreview = {
+          grossAmount: amount,
+          fee,
+          netReceived: Math.max(0, netReceived),
+          meetsMinimum: amount >= selectedNetwork.withdrawMin,
+          withinMaximum: selectedNetwork.withdrawMax === 0 || amount <= selectedNetwork.withdrawMax,
+        };
+      }
+
+      let availableBalance: number | undefined = undefined;
+      let sufficientBalance: boolean | undefined = undefined;
+      try {
+        availableBalance = await ctx.binance.getBalance(coinUpper);
+        if (amount !== undefined) {
+          sufficientBalance = availableBalance >= amount;
+        }
+      } catch {
+        // Non-critical
+      }
+
+      let warning: string | undefined = undefined;
+      if (selectedNetwork && !selectedNetwork.withdrawEnabled) {
+        warning = `Withdrawals are currently DISABLED for ${coinUpper} on the ${selectedNetwork.network} network.`;
+      }
+
+      return {
+        coin: coinUpper,
+        selectedNetwork,
+        allNetworks: !network ? allNetworks : undefined,
+        amountPreview,
+        addressValid,
+        addressWarning,
+        availableBalance,
+        sufficientBalance,
+        warning,
+      };
+    } catch (error) {
+      return { error: `Failed to preview withdrawal: ${(error as Error).message}` };
+    }
+  },
+});
+
+export const withdrawToExternalTool = createTool({
+  id: "withdraw_to_external",
+  description:
+    "Execute a withdrawal to an external address (e.g., hardware wallet, another exchange). " +
+    "REQUIRES ARMED MODE and explicit confirm=true. This sends real funds off the exchange. " +
+    "ALWAYS call preview_withdrawal first to show the user fees and details. " +
+    "Use when user confirms 'yes withdraw', 'send it', 'execute the withdrawal'.",
+  inputSchema: z.object({
+    coin: z.string().describe("Coin to withdraw (e.g., 'BTC', 'ETH', 'USDT')"),
+    network: z.string().describe("Network to use (e.g., 'ETH', 'TRX', 'BTC', 'BSC')"),
+    address: z.string().describe("Destination wallet address"),
+    amount: z.number().positive().describe("Amount to withdraw"),
+    tag: z
+      .string()
+      .default("")
+      .describe("Address tag/memo (required for some coins like XRP, BNB on certain networks)"),
+    confirm: z
+      .boolean()
+      .describe("Must be explicitly set to true to execute. If false, returns a final summary instead."),
+  }),
+  outputSchema: z.object({
+    success: z.boolean().optional(),
+    withdrawalId: z.string().optional(),
+    coin: z.string().optional(),
+    amount: z.number().optional(),
+    network: z.string().optional(),
+    address: z.string().optional(),
+    fee: z.number().optional(),
+    netReceived: z.number().optional(),
+    status: z.string().optional(),
+    message: z.string().optional(),
+    confirmationRequired: z.boolean().optional(),
+    summary: z
+      .object({
+        coin: z.string(),
+        network: z.string(),
+        address: z.string(),
+        amount: z.number(),
+        fee: z.number(),
+        netReceived: z.number(),
+        tag: z.string().optional(),
+      })
+      .optional(),
+    error: z.string().optional(),
+  }),
+  execute: async (
+    { coin, network, address, amount, tag, confirm },
+    execContext: MastraExecutionContext
+  ) => {
+    const ctx = getGordonContext(execContext);
+    if (!ctx?.exchange) {
+      return errors.noExchange;
+    }
+    if (!ctx.binance || ctx.exchange.exchangeId !== "binance") {
+      return errors.binanceOnly;
+    }
+
+    const coinUpper = coin.toUpperCase();
+
+    // Fetch network info for fee calculation and validation
+    let networkInfo;
+    try {
+      const coinInfo = await ctx.binance.getCoinNetworks(coinUpper);
+      if (!coinInfo) {
+        return { error: `Coin ${coinUpper} not found on Binance.` };
+      }
+      networkInfo = coinInfo.networkList.find(
+        (n) => n.network.toUpperCase() === network.toUpperCase()
+      );
+      if (!networkInfo) {
+        return {
+          error: `Network ${network} not available for ${coinUpper}. Available: ${coinInfo.networkList.map((n) => n.network).join(", ")}`,
+        };
+      }
+    } catch (error) {
+      return { error: `Failed to fetch network info: ${(error as Error).message}` };
+    }
+
+    const fee = parseFloat(networkInfo.withdrawFee);
+    const netReceived = amount - fee;
+    const withdrawMin = parseFloat(networkInfo.withdrawMin);
+    const withdrawMax = parseFloat(networkInfo.withdrawMax);
+
+    // Validate
+    if (!networkInfo.withdrawEnable) {
+      return { error: `Withdrawals are currently DISABLED for ${coinUpper} on ${networkInfo.network}.` };
+    }
+    if (amount < withdrawMin) {
+      return { error: `Amount ${amount} is below minimum withdrawal of ${withdrawMin} ${coinUpper} for ${networkInfo.network}.` };
+    }
+    if (withdrawMax > 0 && amount > withdrawMax) {
+      return { error: `Amount ${amount} exceeds maximum withdrawal of ${withdrawMax} ${coinUpper} for ${networkInfo.network}.` };
+    }
+    if (netReceived <= 0) {
+      return { error: `Amount ${amount} ${coinUpper} is less than or equal to the network fee (${fee}). Nothing would be received.` };
+    }
+
+    // Validate address format
+    if (networkInfo.addressRegex) {
+      try {
+        const regex = new RegExp(networkInfo.addressRegex);
+        if (!regex.test(address)) {
+          return { error: `Address format is invalid for ${networkInfo.network} network. Please double-check the address.` };
+        }
+      } catch {
+        // Skip if regex can't be parsed
+      }
+    }
+
+    // Check tag/memo requirement
+    if (networkInfo.memoRegex && networkInfo.memoRegex !== "^$") {
+      if (!tag) {
+        return {
+          error: `A tag/memo is REQUIRED for ${coinUpper} on ${networkInfo.network}. Sending without it may result in PERMANENT LOSS OF FUNDS.`,
+        };
+      }
+    }
+
+    // If not confirmed, return summary for review
+    if (!confirm) {
+      return {
+        confirmationRequired: true,
+        message: "Withdrawal is ready. Review the summary below and call again with confirm=true to execute.",
+        summary: {
+          coin: coinUpper,
+          network: networkInfo.network,
+          address,
+          amount,
+          fee,
+          netReceived,
+          tag: tag || undefined,
+        },
+      };
+    }
+
+    // Check ARMED mode
+    if (ctx.config?.mode !== "ARMED") {
+      return {
+        ...errors.notArmed("withdraw funds to an external address"),
+        coin: coinUpper,
+        amount,
+        network: networkInfo.network,
+        address,
+      };
+    }
+
+    // Check balance
+    try {
+      const balance = await ctx.binance.getBalance(coinUpper);
+      if (balance < amount) {
+        return { error: `Insufficient balance. Available: ${balance} ${coinUpper}, requested: ${amount} ${coinUpper}.` };
+      }
+    } catch (error) {
+      return { error: `Failed to check balance: ${(error as Error).message}` };
+    }
+
+    // Execute
+    try {
+      const result = await ctx.binance.withdraw(coinUpper, networkInfo.network, address, amount, tag || undefined);
+
+      return {
+        success: true,
+        withdrawalId: result.id,
+        coin: coinUpper,
+        amount,
+        network: networkInfo.network,
+        address,
+        fee,
+        netReceived,
+        status: "SUBMITTED",
+        message: `Withdrawal submitted. ${amount} ${coinUpper} -> ${address} via ${networkInfo.network}. Fee: ${fee} ${coinUpper}. Estimated arrival: ~${networkInfo.estimatedArrivalTime} mins. Track with withdrawal ID: ${result.id}`,
+      };
+    } catch (error) {
+      return { error: `Withdrawal failed: ${(error as Error).message}` };
+    }
+  },
+});
+
+export const getWithdrawalStatusTool = createTool({
+  id: "get_withdrawal_status",
+  description:
+    "Check the status of recent withdrawals. " +
+    "Use when user asks 'is my withdrawal done', 'withdrawal status', 'did my transfer go through'.",
+  inputSchema: z.object({
+    coin: z.string().default("").describe("Filter by coin (e.g., 'BTC'). Empty for all coins."),
+    limit: z.number().min(1).max(100).default(10).describe("Number of recent withdrawals to show"),
+  }),
+  outputSchema: z.object({
+    withdrawals: z
+      .array(
+        z.object({
+          id: z.string(),
+          coin: z.string(),
+          network: z.string(),
+          address: z.string(),
+          amount: z.string(),
+          fee: z.string(),
+          status: z.string(),
+          statusText: z.string(),
+          txId: z.string().optional(),
+          applyTime: z.string(),
+          completeTime: z.string().optional(),
+        })
+      )
+      .optional(),
+    total: z.number().optional(),
+    message: z.string().optional(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ coin, limit }, execContext: MastraExecutionContext) => {
+    const ctx = getGordonContext(execContext);
+    if (!ctx?.exchange) {
+      return errors.noExchange;
+    }
+    if (!ctx.binance || ctx.exchange.exchangeId !== "binance") {
+      return errors.binanceOnly;
+    }
+
+    const statusMap: Record<number, string> = {
+      0: "Email Sent",
+      1: "Cancelled",
+      2: "Awaiting Approval",
+      3: "Rejected",
+      4: "Processing",
+      5: "Failure",
+      6: "Completed",
+    };
+
+    try {
+      const history = await ctx.binance.getWithdrawalHistory(limit);
+      let filtered = history;
+      if (coin) {
+        const coinUpper = coin.toUpperCase();
+        filtered = history.filter((w) => w.coin.toUpperCase() === coinUpper);
+      }
+
+      if (filtered.length === 0) {
+        return {
+          message: coin ? `No recent withdrawals found for ${coin.toUpperCase()}.` : "No recent withdrawals found.",
+          total: 0,
+        };
+      }
+
+      return {
+        total: filtered.length,
+        withdrawals: filtered.map((w) => ({
+          id: w.id,
+          coin: w.coin,
+          network: w.network,
+          address: w.address,
+          amount: String(w.amount),
+          fee: String(w.transactionFee),
+          status: String(w.status),
+          statusText: statusMap[w.status] ?? `Unknown (${w.status})`,
+          txId: w.txId || undefined,
+          applyTime: w.applyTime,
+          completeTime: w.completeTime || undefined,
+        })),
+      };
+    } catch (error) {
+      return { error: `Failed to get withdrawal history: ${(error as Error).message}` };
+    }
+  },
+});
+
+// ============================================================================
 // Export as Object (Mastra format)
 // ============================================================================
 
@@ -672,4 +1121,7 @@ export const walletTools = {
   get_user_assets: getUserAssetsTool,
   get_wallet_balances: getWalletBalancesTool,
   get_dust_log: getDustLogTool,
+  preview_withdrawal: previewWithdrawalTool,
+  withdraw_to_external: withdrawToExternalTool,
+  get_withdrawal_status: getWithdrawalStatusTool,
 };

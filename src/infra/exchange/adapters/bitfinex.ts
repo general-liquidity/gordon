@@ -25,6 +25,8 @@ import type {
   SymbolInfo,
   OrderType,
   OrderStatus,
+  WithdrawalResult,
+  WithdrawalInfo,
 } from "../types.ts";
 import type { Candle } from "../../../types/index.ts";
 
@@ -538,6 +540,60 @@ export class BitfinexAdapter implements Exchange {
       return 2;
     }
     return 0;
+  }
+
+  // -------------------------------------------------------------------------
+  // Withdrawals (ExchangeExtended)
+  // -------------------------------------------------------------------------
+
+  async withdraw(
+    coin: string,
+    network: string,
+    address: string,
+    amount: number,
+    tag?: string,
+  ): Promise<WithdrawalResult> {
+    // Bitfinex uses POST /auth/w/withdraw with wallet, method, amount, address
+    const result = await this.client.withdraw(
+      "exchange",
+      network.toLowerCase(),
+      amount.toString(),
+      address,
+      tag,
+    );
+
+    const withdrawalId = Array.isArray(result) && Array.isArray((result as unknown[])[4])
+      ? String((result as unknown[])[4])
+      : `bfx_${Date.now()}`;
+
+    return {
+      id: withdrawalId,
+      coin: coin.toUpperCase(),
+      amount,
+      network,
+      address,
+      fee: 0, // Fee returned in movement status
+      status: "pending",
+    };
+  }
+
+  async getWithdrawalInfo(coin: string, _network?: string): Promise<WithdrawalInfo> {
+    // Bitfinex doesn't have a dedicated withdrawal-info endpoint
+    // Return a basic structure with the coin's standard network
+    return {
+      coin: coin.toUpperCase(),
+      networks: [
+        {
+          network: coin.toLowerCase(),
+          name: `${coin.toUpperCase()} Network`,
+          withdrawEnabled: true,
+          withdrawFee: 0, // Bitfinex dynamic fees — shown at withdrawal time
+          withdrawMin: 0,
+          withdrawMax: 0,
+          estimatedArrivalMins: 30,
+        },
+      ],
+    };
   }
 
   // -------------------------------------------------------------------------

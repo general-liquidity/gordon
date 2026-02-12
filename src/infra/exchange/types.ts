@@ -303,6 +303,35 @@ export interface DepositAddress {
   url?: string;
 }
 
+/**
+ * Result of a withdrawal request
+ */
+export interface WithdrawalResult {
+  id: string;
+  coin: string;
+  amount: number;
+  network: string;
+  address: string;
+  fee: number;
+  status: string;
+}
+
+/**
+ * Withdrawal fee and limit information for a coin across networks
+ */
+export interface WithdrawalInfo {
+  coin: string;
+  networks: {
+    network: string;
+    name: string;
+    withdrawEnabled: boolean;
+    withdrawFee: number;
+    withdrawMin: number;
+    withdrawMax: number;
+    estimatedArrivalMins: number;
+  }[];
+}
+
 // ============================================================================
 // Rate Limiting
 // ============================================================================
@@ -462,6 +491,10 @@ export interface ExchangeExtended extends Exchange {
 
   // WebSocket
   getWebSocket?(): Promise<ExchangeWebSocket>;
+
+  // Withdrawals
+  withdraw?(coin: string, network: string, address: string, amount: number, tag?: string): Promise<WithdrawalResult>;
+  getWithdrawalInfo?(coin: string, network?: string): Promise<WithdrawalInfo>;
 }
 
 // ============================================================================

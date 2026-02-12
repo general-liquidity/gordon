@@ -25,6 +25,8 @@ import type {
   SymbolInfo,
   OrderType,
   OrderStatus,
+  WithdrawalResult,
+  WithdrawalInfo,
 } from "../types.ts";
 import type { Candle } from "../../../types/index.ts";
 import { v4 as uuidv4 } from "uuid";
@@ -514,6 +516,44 @@ export class CoinbaseAdapter implements Exchange {
     // Coinbase Advanced Trade API doesn't have a direct withdrawal history endpoint
     // Would need to use Coinbase primary API for this
     return [];
+  }
+
+  // -------------------------------------------------------------------------
+  // Withdrawals (ExchangeExtended)
+  // -------------------------------------------------------------------------
+
+  async withdraw(
+    coin: string,
+    _network: string,
+    address: string,
+    amount: number,
+    _tag?: string,
+  ): Promise<WithdrawalResult> {
+    // Coinbase Advanced Trade API doesn't support direct crypto withdrawal
+    // Withdrawals must be done through the Coinbase primary API (Send endpoint)
+    // This is a placeholder that returns a clear error message
+    throw new Error(
+      `Coinbase Advanced Trade API does not support direct withdrawals. ` +
+      `Use the Coinbase website/app to withdraw ${coin} to ${address}.`
+    );
+  }
+
+  async getWithdrawalInfo(coin: string, _network?: string): Promise<WithdrawalInfo> {
+    // Coinbase doesn't expose network fee info through Advanced Trade API
+    return {
+      coin: coin.toUpperCase(),
+      networks: [
+        {
+          network: coin.toLowerCase(),
+          name: `${coin.toUpperCase()} Network`,
+          withdrawEnabled: false, // Not supported via API
+          withdrawFee: 0,
+          withdrawMin: 0,
+          withdrawMax: 0,
+          estimatedArrivalMins: 0,
+        },
+      ],
+    };
   }
 
   // -------------------------------------------------------------------------

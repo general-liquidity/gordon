@@ -366,6 +366,51 @@ export interface MemorySummarizedEvent extends BaseEvent {
 }
 
 /**
+ * Autonomous loop events
+ */
+export interface AutonomousStartedEvent extends BaseEvent {
+  type: "autonomous:started";
+  mandateId: string;
+  intervalMs: number;
+}
+
+export interface AutonomousStoppedEvent extends BaseEvent {
+  type: "autonomous:stopped";
+  reason?: string;
+  totalCycles: number;
+  totalOpportunities: number;
+}
+
+export interface AutonomousPausedEvent extends BaseEvent {
+  type: "autonomous:paused";
+  mandateId?: string;
+}
+
+export interface AutonomousResumedEvent extends BaseEvent {
+  type: "autonomous:resumed";
+  mandateId?: string;
+}
+
+export interface AutonomousCycleCompletedEvent extends BaseEvent {
+  type: "autonomous:cycle_completed";
+  cycleNumber: number;
+  opportunities: number;
+  mandateId: string;
+}
+
+export interface AutonomousCycleFailedEvent extends BaseEvent {
+  type: "autonomous:cycle_failed";
+  cycleNumber: number;
+  error: string;
+}
+
+export interface AutonomousMandateBreachedEvent extends BaseEvent {
+  type: "autonomous:mandate_breached";
+  reason: string;
+  mandateId: string;
+}
+
+/**
  * Union type of all events
  */
 export type GordonEvent =
@@ -413,7 +458,14 @@ export type GordonEvent =
   | SchedulerStoppedEvent
   | SchedulerScanCompletedEvent
   | SchedulerScanFailedEvent
-  | MemorySummarizedEvent;
+  | MemorySummarizedEvent
+  | AutonomousStartedEvent
+  | AutonomousStoppedEvent
+  | AutonomousPausedEvent
+  | AutonomousResumedEvent
+  | AutonomousCycleCompletedEvent
+  | AutonomousCycleFailedEvent
+  | AutonomousMandateBreachedEvent;
 
 /**
  * Extract event type string

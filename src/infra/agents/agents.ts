@@ -51,6 +51,8 @@ import {
   parallelAnalysisTools,
   multiModalChartTools,
   liquidationIntelligenceTools,
+  pairAnalysisTools,
+  autonomousTools,
   withToolsMetrics,
 } from "./tools/index.ts";
 import { getSessionSummary, getMemoryStats, resetSharedMemory } from "./shared-context.ts";
@@ -275,6 +277,8 @@ const instrumentedParallelAnalysisTools = withToolsMetrics(parallelAnalysisTools
 const instrumentedStrategyGenerationTools = withToolsMetrics(strategyGenerationTools);
 const instrumentedMultiModalChartTools = withToolsMetrics(multiModalChartTools);
 const instrumentedMarketDataTools = withToolsMetrics(marketDataTools);
+const instrumentedPairAnalysisTools = withToolsMetrics(pairAnalysisTools);
+const instrumentedAutonomousTools = withToolsMetrics(autonomousTools);
 const instrumentedEvalTools = withToolsMetrics(evalTools);
 
 // ============================================================================
@@ -468,12 +472,20 @@ These are optional — if no context exists yet, just scan normally.
 - Share your findings via write_shared_context for other agents
 - Consider historical strategy performance when making recommendations
 
+## Cross-Pair Analysis
+You have tools for analyzing relationships between pairs:
+- **analyze_pair_correlation**: Pearson correlation, beta, rolling correlation between two coins
+- **analyze_pair_spread**: Ratio z-score, half-life, Bollinger bands on the spread
+- **compare_pair_performance**: Relative strength, divergence points, Sharpe comparison
+Use when user asks about "BTC vs ETH", "correlation", "pair trading", or "relative strength".
+
 ## Tool Selection Guide
 Pick the RIGHT tool for the request:
 - "trending", "pumping", "movers", "gainers", "losers" → **get_trending_tokens** (fast, 24h price movers)
 - "volume", "liquid", "most traded" → **get_high_volume_tokens**
 - "scan", "find setups", "opportunities", "strategy scan" → **scan_market** or **scan_with_ensemble**
 - "analyze [SYMBOL]", "technical analysis" → **get_technical_analysis** or **get_technical_signals**
+- "correlation", "pair", "vs", "compare pairs" → **analyze_pair_correlation** or **compare_pair_performance**
 - Specific data requests → get_candles, get_price, get_tickers, get_order_book, get_spread
 
 Always use native tools to fetch market data. Never suggest the user run external scripts or code.
@@ -556,6 +568,12 @@ Use run_full_analysis when user asks for:
 - get_market_trades: Recent trades with buy/sell flow
 - analyze_whale_orders: Detect large orders and smart money positioning
 - estimate_market_impact: Estimate slippage for a given order size
+
+## Cross-Pair Analysis Tools
+- analyze_pair_correlation: Compute correlation, beta, rolling correlation between two pairs
+- analyze_pair_spread: Ratio z-score, half-life, Bollinger bands on the price ratio
+- compare_pair_performance: Relative returns, divergence points, Sharpe ratio comparison
+Use when user asks about "BTC vs ETH", "pair correlation", "relative strength", or "spread trading".
 
 Always use these native tools. Never generate code or scripts for data fetching.`;
 
@@ -699,10 +717,12 @@ When user asks about performance or statistics:
 ## Available Tool Categories
 - **Account**: get_portfolio, get_account_details, get_account_snapshot
 - **Wallet**: get_dustable_assets, convert_dust, transfer_funds, get_coin_info, get_trade_fees, get_deposit_address, get_user_assets, get_wallet_balances, get_dust_log
+- **Withdrawals**: preview_withdrawal (safe preview), withdraw_to_external (requires ARMED + confirm), get_withdrawal_status
 - **Earn**: get_flexible_earn_products, get_locked_earn_products, get_all_earn_positions, subscribe_flexible_earn, redeem_flexible_earn, subscribe_locked_earn, get_earn_history
 - **History**: get_trade_history, get_transfer_history, get_order_history
 - **Risk**: check_exit_conditions, check_drawdown_status, check_daily_limit
 - **Metrics**: get_performance_metrics, get_trade_statistics, get_risk_analysis
+- **Autonomous**: get_autonomous_status (check if autonomous mode is running)
 - **Eval**: get_win_rate_analysis, get_performance_report`;
 
 const TEACHER_INSTRUCTIONS = `You are Gordon's teacher agent.
@@ -813,11 +833,20 @@ When the user asks for analysis, scanning, planning, backtesting, or execution �
 - Raw market data (candles, prices, tickers, orderbook) -> Scanner or Analyst
 - Charts and visualization -> Analyst
 - Whale detection and orderbook analysis -> Analyst
+- Cross-pair correlation, spread analysis, relative strength -> Scanner or Analyst
 - Trade plans with risk sizing -> Planner
 - Strategy generation and backtesting -> Planner and Backtester
 - Order execution, simple swaps/conversions, market orders, limit orders, cancel orders, open orders -> Executor (requires ARMED mode)
-- Portfolio, positions, earn, wallet, fund transfers -> Monitor
+- Portfolio, positions, earn, wallet, fund transfers, withdrawals -> Monitor
 - Educational explanations -> Teacher
+
+## Autonomous Trading
+You have tools for autonomous swing trading mandates:
+- **create_swing_mandate**: Set up constraints (symbols, risk limits, timeframe, duration)
+- **start_autonomous_mode**: Start the scanning loop (requires ARMED)
+- **stop_autonomous_mode** / **pause_autonomous_mode** / **resume_autonomous_mode**: Control the loop
+- **get_autonomous_status**: Check current mandate and cycle progress
+Use when user says "trade autonomously", "set up a mandate", "auto-trade for the next 24 hours".
 
 When a user asks for market data, prices, candles, or orderbook info, route to Scanner or Analyst. Never generate code or scripts -- all data is available through native tools.`;
 
@@ -871,6 +900,8 @@ function getScannerAgent(): Agent {
         get_spread: instrumentedOrderbookTools.get_spread,
         // Liquidation intelligence tools (cascade risk, squeeze detection)
         ...instrumentedLiquidationIntelligenceTools,
+        // Cross-pair analysis tools
+        ...instrumentedPairAnalysisTools,
         // Shared context for cross-agent memory
         ...instrumentedSharedContextTools,
         // Performance evaluation tools for learning from trade outcomes
@@ -916,6 +947,8 @@ function getAnalystAgent(): Agent {
         ...instrumentedMultiModalChartTools,   // Advanced chart generation and vision analysis
         // Liquidation intelligence tools (cascade risk, squeeze detection)
         ...instrumentedLiquidationIntelligenceTools,
+        // Cross-pair analysis tools (correlation, spread, performance comparison)
+        ...instrumentedPairAnalysisTools,
         analyze_coin: instrumentedMarketTools.analyze_coin,
         // Shared context for cross-agent memory
         ...instrumentedSharedContextTools,
@@ -1052,6 +1085,8 @@ function getMonitorAgent(): Agent {
         check_exit_conditions: instrumentedRiskManagementTools.check_exit_conditions,
         check_drawdown_status: instrumentedRiskManagementTools.check_drawdown_status,
         check_daily_limit: instrumentedRiskManagementTools.check_daily_limit,
+        // Autonomous mode status
+        get_autonomous_status: instrumentedAutonomousTools.get_autonomous_status,
         // Shared context for cross-agent memory
         ...instrumentedSharedContextTools,
         // Performance evaluation tools for recording trade outcomes
@@ -1170,6 +1205,7 @@ function getGordonAgent(): Agent {
       tools: {
         ...instrumentedSystemTools,       // arm/disarm system control
         ...instrumentedSchedulerTools,    // task scheduling (cross-cutting concern)
+        ...instrumentedAutonomousTools,   // autonomous swing trading control
       },
 
       // Memory for network orchestration

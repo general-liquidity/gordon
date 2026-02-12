@@ -30,6 +30,8 @@ import type {
   OrderType,
   OrderStatus,
   OrderSide,
+  WithdrawalResult,
+  WithdrawalInfo,
 } from "../types.ts";
 import type { Candle } from "../../../types/index.ts";
 
@@ -572,6 +574,29 @@ export class HyperliquidAdapter implements Exchange {
   async getWithdrawalHistory(limit?: number): Promise<Withdrawal[]> {
     // Hyperliquid doesn't have traditional withdrawals - uses L1 bridge
     throw new HyperliquidNotSupportedError("getWithdrawalHistory");
+  }
+
+  // -------------------------------------------------------------------------
+  // Withdrawals (ExchangeExtended)
+  // -------------------------------------------------------------------------
+
+  async withdraw(
+    _coin: string,
+    _network: string,
+    _address: string,
+    _amount: number,
+    _tag?: string,
+  ): Promise<WithdrawalResult> {
+    // Hyperliquid uses L1 bridge for withdrawals — requires on-chain transaction signing
+    throw new HyperliquidNotSupportedError(
+      "withdraw — Hyperliquid uses L1 bridge. Use the Hyperliquid UI to withdraw."
+    );
+  }
+
+  async getWithdrawalInfo(_coin: string, _network?: string): Promise<WithdrawalInfo> {
+    throw new HyperliquidNotSupportedError(
+      "getWithdrawalInfo — Hyperliquid uses L1 bridge for withdrawals."
+    );
   }
 
   // -------------------------------------------------------------------------

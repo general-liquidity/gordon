@@ -23,6 +23,8 @@ import type {
   Withdrawal,
   RateLimitStatus,
   SymbolInfo,
+  WithdrawalResult,
+  WithdrawalInfo,
 } from "../types.ts";
 import type { Candle } from "../../../types/index.ts";
 
@@ -352,6 +354,51 @@ export class BinanceAdapter implements Exchange {
 
   resetCircuitBreaker(): void {
     this.client.resetCircuitBreaker();
+  }
+
+  // -------------------------------------------------------------------------
+  // Withdrawals (Optional)
+  // -------------------------------------------------------------------------
+
+  async withdraw(
+    coin: string,
+    network: string,
+    address: string,
+    amount: number,
+    tag?: string
+  ): Promise<WithdrawalResult> {
+    const result = await this.client.withdraw(coin, network, address, amount, tag);
+
+    return {
+      id: result.id,
+      coin: coin.toUpperCase(),
+      amount,
+      network,
+      address,
+      fee: 0, // Fee is deducted by Binance, not returned in the response
+      status: "SUBMITTED",
+    };
+  }
+
+  async getWithdrawalInfo(coin: string, _network?: string): Promise<WithdrawalInfo> {
+    const info = await this.client.getCoinNetworks(coin);
+
+    if (!info) {
+      throw new Error(`Coin ${coin} not found on Binance.`);
+    }
+
+    return {
+      coin: info.coin,
+      networks: info.networkList.map((n) => ({
+        network: n.network,
+        name: n.name,
+        withdrawEnabled: n.withdrawEnable,
+        withdrawFee: parseFloat(n.withdrawFee),
+        withdrawMin: parseFloat(n.withdrawMin),
+        withdrawMax: parseFloat(n.withdrawMax),
+        estimatedArrivalMins: n.estimatedArrivalTime,
+      })),
+    };
   }
 
   // -------------------------------------------------------------------------

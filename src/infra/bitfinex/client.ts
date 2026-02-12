@@ -719,4 +719,28 @@ export class BitfinexClient {
     };
     return map[interval] || "1h";
   }
+
+  /**
+   * Submit a withdrawal request
+   * @param wallet - Source wallet ("exchange", "margin", "funding")
+   * @param method - Network/method name (e.g., "bitcoin", "ethereum")
+   * @param amount - Amount to withdraw
+   * @param address - Destination address
+   * @param paymentId - Optional memo/tag for networks that require it
+   */
+  async withdraw(
+    wallet: string,
+    method: string,
+    amount: string,
+    address: string,
+    paymentId?: string,
+  ): Promise<unknown> {
+    return this.signedRequest("/auth/w/withdraw", {
+      wallet,
+      method,
+      amount,
+      address,
+      ...(paymentId ? { payment_id: paymentId } : {}),
+    });
+  }
 }

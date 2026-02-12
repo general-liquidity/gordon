@@ -26,6 +26,8 @@ import type {
   OrderType,
   OrderStatus,
   OrderSide,
+  WithdrawalResult,
+  WithdrawalInfo,
 } from "../types.ts";
 import type { Candle } from "../../../types/index.ts";
 
@@ -636,6 +638,52 @@ export class KrakenAdapter implements Exchange {
       Failure: 5,
     };
     return map[status] || 4;
+  }
+
+  // -------------------------------------------------------------------------
+  // Withdrawals (ExchangeExtended)
+  // -------------------------------------------------------------------------
+
+  async withdraw(
+    coin: string,
+    network: string,
+    address: string,
+    amount: number,
+    tag?: string,
+  ): Promise<WithdrawalResult> {
+    // Kraken uses /Withdraw with asset, key (saved address name), and amount
+    // For direct address withdrawal, we use the method (network) as the key
+    const krakenAsset = KRAKEN_ASSET_MAP[coin.toUpperCase()] || coin.toUpperCase();
+    const result = await this.client.withdraw(krakenAsset, network, amount.toString());
+
+    return {
+      id: result.refid,
+      coin: coin.toUpperCase(),
+      amount,
+      network,
+      address,
+      fee: 0, // Kraken returns fee in withdrawal status, not on submit
+      status: "pending",
+    };
+  }
+
+  async getWithdrawalInfo(coin: string, _network?: string): Promise<WithdrawalInfo> {
+    const krakenAsset = KRAKEN_ASSET_MAP[coin.toUpperCase()] || coin.toUpperCase();
+    // Kraken /WithdrawMethods returns available withdrawal methods for an asset
+    const methods = await this.client.getWithdrawMethods(krakenAsset);
+
+    return {
+      coin: coin.toUpperCase(),
+      networks: methods.map((m) => ({
+        network: m.method,
+        name: m.method,
+        withdrawEnabled: true,
+        withdrawFee: parseFloat(m.fee) || 0,
+        withdrawMin: 0,
+        withdrawMax: typeof m.limit === "string" ? parseFloat(m.limit) : 0,
+        estimatedArrivalMins: 30, // Kraken doesn't provide ETA
+      })),
+    };
   }
 
   // -------------------------------------------------------------------------

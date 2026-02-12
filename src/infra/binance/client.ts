@@ -1327,4 +1327,29 @@ export class BinanceClient {
       totalValue,
     };
   }
+
+  // ============================================================================
+  // Withdrawal
+  // ============================================================================
+
+  /**
+   * Submit a withdrawal request to an external address
+   * Requires API key with withdrawal permissions enabled
+   */
+  async withdraw(
+    coin: string,
+    network: string,
+    address: string,
+    amount: number,
+    addressTag?: string
+  ): Promise<{ id: string }> {
+    const params: Record<string, string | number> = {
+      coin: coin.toUpperCase(),
+      network,
+      address,
+      amount,
+    };
+    if (addressTag) params.addressTag = addressTag;
+    return this.signedRequest<{ id: string }>("POST", "/sapi/v1/capital/withdraw/apply", params);
+  }
 }
