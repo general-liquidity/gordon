@@ -8,6 +8,8 @@ import {
   type ErrorContext,
   type RecoveryStep,
 } from "../utils/errorContext.ts";
+import { VERSION } from "../cli.ts";
+import { getErrorCode } from "../errors/codes.ts";
 
 /**
  * Error suggestion with actionable hint
@@ -503,6 +505,11 @@ export function ErrorDisplay({
           </Text>
         </Box>
       )}
+
+      {/* Version footer */}
+      <Box marginTop={1}>
+        <Text color={COLORS.DIM}>gordon v{VERSION}</Text>
+      </Box>
     </Box>
   );
 }
@@ -707,7 +714,7 @@ export function EnhancedErrorDisplay({
           [!] {errorCtx.reason}
         </Text>
         {errorCtx.errorCode && (
-          <Text color={COLORS.DIM}> (Code: {errorCtx.errorCode})</Text>
+          <Text color={COLORS.DIM}> ({getErrorCode(errorCtx.errorCode) ?? errorCtx.errorCode})</Text>
         )}
       </Box>
 
@@ -831,6 +838,11 @@ export function EnhancedErrorDisplay({
           {hasMenu && "[M] Menu | "}
           [D] Toggle details
         </Text>
+      </Box>
+
+      {/* Version footer */}
+      <Box marginTop={1}>
+        <Text color={COLORS.DIM}>gordon v{VERSION}</Text>
       </Box>
     </Box>
   );

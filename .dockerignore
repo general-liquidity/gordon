@@ -1,0 +1,11 @@
+node_modules
+.git
+.github
+.gordon
+dist
+coverage
+*.log
+.env
+.env.*
+website/
+general-liquidity-website/

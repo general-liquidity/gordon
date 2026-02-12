@@ -6,13 +6,11 @@
  */
 
 import { mkdir, copyFile, readdir, stat } from "node:fs/promises";
-import { homedir } from "node:os";
 import { join, basename } from "node:path";
 import { createModuleLogger } from "../logger/index.ts";
+import { GORDON_DIR } from "./paths.ts";
 
 const logger = createModuleLogger("config-migration");
-
-const GORDON_DIR = join(homedir(), ".gordon");
 const CONFIG_PATH = join(GORDON_DIR, "config.json");
 const BACKUPS_DIR = join(GORDON_DIR, "config-backups");
 

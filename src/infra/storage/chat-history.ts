@@ -4,10 +4,8 @@
  */
 
 import { mkdir, readdir, readFile, unlink } from "node:fs/promises";
-import { homedir } from "node:os";
 import { join } from "node:path";
-
-const GORDON_DIR = join(homedir(), ".gordon");
+import { GORDON_DIR } from "./paths.ts";
 const HISTORY_DIR = join(GORDON_DIR, "history");
 
 /**

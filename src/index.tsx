@@ -1,57 +1,125 @@
 #!/usr/bin/env bun
 
+import { parseFlags, shouldUseColor, printHelp, printVersion, printStatusJson, checkRuntime, runCleanup, runUninstall, hasStdinData } from "./cli.ts";
+
+// ============================================================================
+// CLI Flag Handling — runs before TUI loads
+// ============================================================================
+
+const flags = parseFlags();
+
+if (flags.help) {
+  printHelp();
+  process.exit(0);
+}
+
+if (flags.version) {
+  printVersion();
+  process.exit(0);
+}
+
+if (flags.json) {
+  await printStatusJson();
+  process.exit(0);
+}
+
+if (flags.cleanup) {
+  await runCleanup();
+  process.exit(0);
+}
+
+if (flags.uninstall) {
+  await runUninstall();
+  process.exit(0);
+}
+
+// Runtime version check
+const runtimeError = checkRuntime();
+if (runtimeError) {
+  console.error(`[error] ${runtimeError}`);
+  process.exit(1);
+}
+
+// Debug mode — set LOG_LEVEL before any logger is imported
+if (flags.debug) {
+  process.env.LOG_LEVEL = "debug";
+}
+
+// Set NO_COLOR for Ink/chalk when colors should be disabled
+if (!shouldUseColor(flags)) {
+  process.env.NO_COLOR = "1";
+}
+
+// Detect piped stdin — can be used by agents for batch input
+if (hasStdinData()) {
+  process.env.GORDON_STDIN_PIPED = "1";
+}
+
+// ============================================================================
+// TUI Launch
+// ============================================================================
+
 import React from "react";
 import { render } from "ink";
 import { AppWithTheme } from "./app/App.tsx";
 import { closeDatabase } from "./infra/storage/database.ts";
+import { checkForUpdates } from "./utils/update-notifier.ts";
 
-// Track if shutdown is in progress to prevent duplicate cleanup
 let isShuttingDown = false;
 
-/**
- * Graceful shutdown handler
- * Ensures database connections are closed and resources are cleaned up
- */
-async function gracefulShutdown(signal: string): Promise<void> {
-  if (isShuttingDown) {
-    return;
-  }
+async function gracefulShutdown(signal: string, code: number = 0): Promise<void> {
+  if (isShuttingDown) return;
   isShuttingDown = true;
 
-  console.log(`\nReceived ${signal}, shutting down gracefully...`);
-
-  try {
-    // Close database connections
-    closeDatabase();
-    console.log("Database connections closed.");
-  } catch (error) {
-    console.error("Error during shutdown:", error);
+  if (signal === "SIGINT") {
+    // Warn about active positions on Ctrl-C
+    try {
+      const { loadConfig } = await import("./infra/storage/config.ts");
+      const config = await loadConfig();
+      if (config.mode === "ARMED") {
+        console.log("\n[warn] System is ARMED. Open positions will continue on the exchange.");
+        console.log("       Use /disarm before exiting to return to safe mode.");
+      }
+    } catch {
+      // Config may not be loadable during crash
+    }
+    console.log(`\nShutting down...`);
+  } else if (signal !== "exit") {
+    console.log(`\nReceived ${signal}, shutting down gracefully...`);
   }
 
-  process.exit(0);
+  try {
+    closeDatabase();
+  } catch (error) {
+    console.error("Error during shutdown:", error);
+    if (code === 0) code = 1;
+  }
+
+  process.exit(code);
 }
 
-// Register signal handlers for graceful shutdown
+// Register signal handlers
 process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
 process.on("SIGHUP", () => gracefulShutdown("SIGHUP"));
 
-// Handle uncaught exceptions gracefully
+// Uncaught exceptions exit with code 1
 process.on("uncaughtException", (error) => {
   console.error("Uncaught exception:", error);
-  gracefulShutdown("uncaughtException");
+  gracefulShutdown("uncaughtException", 1);
 });
 
-// Handle unhandled promise rejections
+// Unhandled promise rejections — log but don't exit
 process.on("unhandledRejection", (reason, promise) => {
   console.error("Unhandled rejection at:", promise, "reason:", reason);
-  // Don't exit on unhandled rejections, just log them
 });
 
 // Render the application with theme support
 const { waitUntilExit } = render(<AppWithTheme />);
 
-// Handle graceful shutdown when app exits
+// Non-blocking update check — runs after TUI renders, never delays startup
+checkForUpdates().catch(() => {});
+
 waitUntilExit().then(() => {
   gracefulShutdown("exit");
 });

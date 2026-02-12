@@ -19,8 +19,10 @@ import { marketplaceClient } from './registry';
 // Constants
 // ============================================================================
 
+import { GORDON_DIR } from '../../storage/paths.ts';
+
 /** Default plugins directory */
-const DEFAULT_PLUGINS_DIR = path.join(os.homedir(), '.gordon', 'plugins');
+const DEFAULT_PLUGINS_DIR = path.join(GORDON_DIR, 'plugins');
 
 /** Installed plugins manifest file */
 const INSTALLED_MANIFEST = 'installed.json';

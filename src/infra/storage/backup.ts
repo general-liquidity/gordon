@@ -6,14 +6,12 @@
  */
 
 import { mkdir, readdir, stat, unlink, copyFile } from "node:fs/promises";
-import { homedir } from "node:os";
 import { join, basename } from "node:path";
 import { createModuleLogger } from "../logger/index.ts";
 import { DB_PATH, closeDatabase, initDatabase } from "./database.ts";
+import { GORDON_DIR } from "./paths.ts";
 
 const logger = createModuleLogger("backup");
-
-const GORDON_DIR = join(homedir(), ".gordon");
 const BACKUPS_DIR = join(GORDON_DIR, "backups");
 
 /**

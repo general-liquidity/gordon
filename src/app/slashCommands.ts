@@ -651,6 +651,32 @@ export const SLASH_COMMANDS: SlashCommand[] = [
     executionTime: "~2-3s",
     whenToUse: "Send crypto to hardware wallet or external address",
   },
+
+  // Bug Report
+  {
+    name: "bugreport",
+    aliases: ["bug", "report"],
+    description: "Generate a bug report with system info",
+    usage: "/bugreport [description]",
+    category: "system",
+    level: 2,
+    action: "agent",
+    target: "gordon",
+    whenToUse: "Report a bug or unexpected behavior",
+  },
+
+  // What's New / Changelog
+  {
+    name: "whatsnew",
+    aliases: ["changelog", "updates"],
+    description: "Show recent changes and new features",
+    usage: "/whatsnew",
+    category: "system",
+    level: 2,
+    action: "agent",
+    target: "gordon",
+    whenToUse: "See latest features and bug fixes",
+  },
 ];
 
 // ============================================================================
@@ -1346,6 +1372,12 @@ export function commandToPrompt(command: SlashCommand, args: string): string {
         default:
           return "Export types: scan, analysis, backtest, session";
       }
+    case "bugreport":
+      return args
+        ? `Generate a bug report with this description: "${args}". Include system info: gordon version, Bun version, OS, active exchange, config directory, and mode. Format it as a pre-filled GitHub issue link for https://github.com/general-liquidity/gordon-cli/issues/new.`
+        : "Help me create a bug report. Ask what went wrong, then generate a pre-filled GitHub issue link with system diagnostics for https://github.com/general-liquidity/gordon-cli/issues/new.";
+    case "whatsnew":
+      return "Show me the recent changes, new features, and improvements in the latest Gordon version. Summarize the changelog highlights.";
     default:
       return args || command.description;
   }

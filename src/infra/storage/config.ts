@@ -1,9 +1,7 @@
 import { mkdir } from "node:fs/promises";
-import { homedir } from "node:os";
 import { join } from "node:path";
 import { GordonConfigSchema, type GordonConfig } from "../../types/index.ts";
-
-const GORDON_DIR = join(homedir(), ".gordon");
+import { GORDON_DIR } from "./paths.ts";
 export const CONFIG_PATH = join(GORDON_DIR, "config.json");
 
 /**
@@ -22,7 +20,8 @@ function getDefaultConfig(): GordonConfig {
 
 /**
  * Loads the Gordon config from ~/.gordon/config.json
- * If the file doesn't exist, creates a default config
+ * If the file doesn't exist, creates a default config.
+ * Merges per-project .gordonrc overrides if present in CWD.
  */
 export async function loadConfig(): Promise<GordonConfig> {
   await ensureGordonDir();
@@ -30,21 +29,47 @@ export async function loadConfig(): Promise<GordonConfig> {
   const file = Bun.file(CONFIG_PATH);
   const exists = await file.exists();
 
+  let config: GordonConfig;
+
   if (!exists) {
-    const defaultConfig = getDefaultConfig();
-    await saveConfig(defaultConfig);
-    return defaultConfig;
+    config = getDefaultConfig();
+    await saveConfig(config);
+  } else {
+    try {
+      const content = await file.text();
+      const parsed = JSON.parse(content);
+      config = GordonConfigSchema.parse(parsed);
+    } catch (error) {
+      if (error instanceof SyntaxError) {
+        throw new Error(`Invalid JSON in config file: ${CONFIG_PATH}`);
+      }
+      throw error;
+    }
   }
 
+  // Merge per-project .gordonrc if it exists
+  const projectOverrides = await loadProjectConfig();
+  if (projectOverrides) {
+    config = GordonConfigSchema.parse({ ...config, ...projectOverrides });
+  }
+
+  return config;
+}
+
+/**
+ * Load per-project .gordonrc overrides from CWD.
+ * Returns partial config or null if no file found.
+ */
+async function loadProjectConfig(): Promise<Record<string, unknown> | null> {
   try {
-    const content = await file.text();
-    const parsed = JSON.parse(content);
-    return GordonConfigSchema.parse(parsed);
-  } catch (error) {
-    if (error instanceof SyntaxError) {
-      throw new Error(`Invalid JSON in config file: ${CONFIG_PATH}`);
-    }
-    throw error;
+    const rcPath = join(process.cwd(), ".gordonrc");
+    const rcFile = Bun.file(rcPath);
+    if (!(await rcFile.exists())) return null;
+
+    const content = await rcFile.text();
+    return JSON.parse(content);
+  } catch {
+    return null;
   }
 }
 

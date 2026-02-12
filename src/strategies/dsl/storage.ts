@@ -7,15 +7,17 @@
 
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import * as os from "node:os";
 import type { StrategyDSL } from "./schema.ts";
 import { validateStrategyDSL } from "./schema.ts";
+import { GORDON_DIR, getGordonDir } from "../../infra/storage/paths.ts";
+
+// Re-export for callers
+export { getGordonDir };
 
 // ============================================================================
 // Constants
 // ============================================================================
 
-const GORDON_DIR = ".gordon";
 const STRATEGIES_DIR = "strategies";
 const GENERATED_DIR = "generated";
 const STRATEGY_EXT = ".json";
@@ -25,17 +27,10 @@ const STRATEGY_EXT = ".json";
 // ============================================================================
 
 /**
- * Get the base Gordon directory path
- */
-export function getGordonDir(): string {
-  return path.join(os.homedir(), GORDON_DIR);
-}
-
-/**
  * Get the strategies directory path
  */
 export function getStrategiesDir(): string {
-  return path.join(getGordonDir(), STRATEGIES_DIR);
+  return path.join(GORDON_DIR, STRATEGIES_DIR);
 }
 
 /**

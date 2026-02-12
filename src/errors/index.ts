@@ -84,3 +84,12 @@ export {
   BitfinexConnectionError,
   createBitfinexError,
 } from "./bitfinex.ts";
+
+// Error code registry
+export {
+  getErrorCode,
+  getErrorCodeEntry,
+  lookupByGCode,
+  formatErrorCode,
+  type ErrorCodeEntry,
+} from "./codes.ts";

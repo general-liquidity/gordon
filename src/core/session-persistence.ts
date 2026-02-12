@@ -6,10 +6,9 @@
 import { createModuleLogger } from "../infra/logger/index.ts";
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { GORDON_DIR } from "../infra/storage/paths.ts";
 
 const logger = createModuleLogger("session-persistence");
-
-const GORDON_DIR = path.join(process.env.HOME || process.env.USERPROFILE || ".", ".gordon");
 const SESSION_FILE = path.join(GORDON_DIR, "session-state.json");
 const MANDATE_FILE = path.join(GORDON_DIR, "active-mandate.json");
 

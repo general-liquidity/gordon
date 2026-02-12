@@ -7,11 +7,9 @@
  */
 
 import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { homedir } from "node:os";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
-
-const GORDON_DIR = join(homedir(), ".gordon");
+import { GORDON_DIR } from "./paths.ts";
 const SESSION_FILE = join(GORDON_DIR, "session.json");
 
 /**

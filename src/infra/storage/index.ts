@@ -1,3 +1,6 @@
+// Centralized paths (XDG + GORDON_HOME support)
+export { GORDON_DIR, getGordonDir } from "./paths.ts";
+
 // Configuration management
 export { CONFIG_PATH, loadConfig, saveConfig } from "./config.ts";
 

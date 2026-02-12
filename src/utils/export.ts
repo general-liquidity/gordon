@@ -4,8 +4,8 @@
  */
 
 import { mkdir, writeFile } from "node:fs/promises";
-import { homedir } from "node:os";
 import { dirname, join } from "node:path";
+import { GORDON_DIR } from "../infra/storage/paths.ts";
 
 import type { ScanResult, CoinAnalysis } from "../types/market.ts";
 import type { DetailedAnalysis } from "../core/analyzer.ts";
@@ -37,7 +37,6 @@ export interface ExportResult {
 // Constants
 // ============================================================================
 
-const GORDON_DIR = join(homedir(), ".gordon");
 const EXPORTS_DIR = join(GORDON_DIR, "exports");
 
 // ============================================================================

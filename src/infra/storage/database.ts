@@ -1,12 +1,10 @@
 import { Database, type Statement } from "bun:sqlite";
 import { mkdirSync } from "node:fs";
-import { homedir } from "node:os";
 import { join } from "node:path";
 import { createModuleLogger } from "../logger/index.ts";
+import { GORDON_DIR } from "./paths.ts";
 
 const logger = createModuleLogger("database");
-
-const GORDON_DIR = join(homedir(), ".gordon");
 export const DB_PATH = join(GORDON_DIR, "gordon.db");
 
 let dbInstance: Database | null = null;

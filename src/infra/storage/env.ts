@@ -8,7 +8,6 @@
 
 import { existsSync } from "node:fs";
 import { mkdir } from "node:fs/promises";
-import { homedir } from "node:os";
 import { join } from "node:path";
 import {
   validateEnvKeys,
@@ -18,9 +17,7 @@ import {
   type ValidationResult,
 } from "./env-validation.ts";
 import { createKeyringProvider, KEYRING_SUPPORTED_KEYS } from "./keyring.ts";
-
-// Primary location: user's Gordon config directory
-const GORDON_DIR = join(homedir(), ".gordon");
+import { GORDON_DIR } from "./paths.ts";
 const GORDON_ENV_PATH = join(GORDON_DIR, ".env");
 
 // Secondary location: current working directory (for development)
