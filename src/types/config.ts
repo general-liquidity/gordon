@@ -86,6 +86,13 @@ export const MCPServerConfigSchema = z.object({
   priority: z.number().optional(),
 });
 
+export const TelemetryConfigSchema = z.object({
+  /** Whether anonymous telemetry is enabled (strict opt-in) */
+  enabled: z.boolean().default(false),
+  /** Whether anonymized trading data collection is enabled for AI model training (strict opt-in) */
+  researchData: z.boolean().default(false),
+});
+
 export const GordonConfigSchema = z.object({
   version: z.string().default("1.0.0"),
   /** @deprecated Use `exchanges` array instead */
@@ -114,6 +121,8 @@ export const GordonConfigSchema = z.object({
   onboardingComplete: z.boolean().default(false),
   /** MCP Server configurations */
   mcpServers: z.array(MCPServerConfigSchema).default([]),
+  /** Anonymous telemetry configuration (strict opt-in) */
+  telemetry: TelemetryConfigSchema.default({ enabled: false, researchData: false }),
 });
 
 export type ExchangePermissions = z.infer<typeof ExchangePermissionsSchema>;
@@ -126,5 +135,6 @@ export type ProviderName = z.infer<typeof ProviderSchema>;
 export type ModelConfig = z.infer<typeof ModelConfigSchema>;
 export type MemoryConfig = z.infer<typeof MemoryConfigSchema>;
 export type MCPServerConfig = z.infer<typeof MCPServerConfigSchema>;
+export type TelemetryConfig = z.infer<typeof TelemetryConfigSchema>;
 export type GordonConfig = z.infer<typeof GordonConfigSchema>;
 export type Mode = GordonConfig["mode"];

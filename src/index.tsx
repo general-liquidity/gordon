@@ -64,6 +64,7 @@ import { render } from "ink";
 import { AppWithTheme } from "./app/App.tsx";
 import { closeDatabase } from "./infra/storage/database.ts";
 import { checkForUpdates } from "./utils/update-notifier.ts";
+import * as telemetry from "./infra/telemetry/index.ts";
 
 let isShuttingDown = false;
 
@@ -86,6 +87,12 @@ async function gracefulShutdown(signal: string, code: number = 0): Promise<void>
     console.log(`\nShutting down...`);
   } else if (signal !== "exit") {
     console.log(`\nReceived ${signal}, shutting down gracefully...`);
+  }
+
+  try {
+    await telemetry.shutdown();
+  } catch {
+    // Non-critical
   }
 
   try {
@@ -113,6 +120,9 @@ process.on("uncaughtException", (error) => {
 process.on("unhandledRejection", (reason, promise) => {
   console.error("Unhandled rejection at:", promise, "reason:", reason);
 });
+
+// Initialize telemetry (no-op if not opted in)
+telemetry.init();
 
 // Render the application with theme support
 const { waitUntilExit } = render(<AppWithTheme />);

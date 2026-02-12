@@ -186,6 +186,7 @@ export function createMockConfig(overrides: Partial<GordonConfig> = {}): GordonC
     armedUntil: null,
     onboardingComplete: false,
     useKeyring: false,
+    telemetry: { enabled: false, researchData: false },
     ...overrides,
   };
 }

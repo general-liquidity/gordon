@@ -162,13 +162,16 @@ CONFIGURATION
   Per-project: Place a .gordonrc file in your working directory
 
 ENVIRONMENT VARIABLES
-  GORDON_HOME         Override config directory path
-  XDG_CONFIG_HOME     XDG base directory (uses $XDG_CONFIG_HOME/gordon/)
-  GORDON_THEME        Theme: "dark" or "light"
-  GORDON_PROVIDER     LLM provider
-  GORDON_MODEL        LLM model
-  NO_COLOR            Disable colors when set
-  LOG_LEVEL           Set log level: debug, info, warn, error
+  GORDON_HOME                Override config directory path
+  XDG_CONFIG_HOME            XDG base directory (uses $XDG_CONFIG_HOME/gordon/)
+  GORDON_THEME               Theme: "dark" or "light"
+  GORDON_PROVIDER            LLM provider
+  GORDON_MODEL               LLM model
+  NO_COLOR                   Disable colors when set
+  LOG_LEVEL                  Set log level: debug, info, warn, error
+  DO_NOT_TRACK               Disable telemetry (consoledonottrack.com)
+  GORDON_TELEMETRY_DISABLED  Disable telemetry (Gordon-specific)
+  GORDON_TELEMETRY_DEBUG     Print telemetry events to stderr (debug)
 
 UPDATING
   bun update -g @general-liquidity/gordon-cli
@@ -195,6 +198,7 @@ export async function printStatusJson(): Promise<void> {
   try {
     const envStatus = await checkEnvStatus();
     const config = await loadConfig();
+    const { getStatus: getTelemetryStatus } = await import("./infra/telemetry/index.ts");
 
     const status = {
       version: VERSION,
@@ -213,6 +217,7 @@ export async function printStatusJson(): Promise<void> {
       provider: config.modelConfig?.provider || process.env.GORDON_PROVIDER || "openai",
       model: config.modelConfig?.model || process.env.GORDON_MODEL || null,
       runtime: typeof Bun !== "undefined" ? `bun ${Bun.version}` : "unknown",
+      telemetry: getTelemetryStatus(),
     };
 
     console.log(JSON.stringify(status, null, 2));

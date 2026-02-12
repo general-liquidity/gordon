@@ -164,6 +164,7 @@ function getDefaultConfig(): GordonConfig {
     armedUntil: null,
     onboardingComplete: false,
     useKeyring: false,
+    telemetry: { enabled: false, researchData: false },
   };
 }
 

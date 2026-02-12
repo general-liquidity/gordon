@@ -652,6 +652,19 @@ export const SLASH_COMMANDS: SlashCommand[] = [
     whenToUse: "Send crypto to hardware wallet or external address",
   },
 
+  // Telemetry
+  {
+    name: "telemetry",
+    aliases: ["analytics", "tracking"],
+    description: "Manage anonymous telemetry and research data collection (opt-in)",
+    usage: "/telemetry [status|enable|disable|research-enable|research-disable|research-status|research-upload|research-clear]",
+    category: "system",
+    level: 2,
+    action: "menu",
+    target: "telemetry",
+    whenToUse: "Enable/disable anonymous usage analytics or trading data collection for AI training",
+  },
+
   // Bug Report
   {
     name: "bugreport",
@@ -1372,6 +1385,16 @@ export function commandToPrompt(command: SlashCommand, args: string): string {
         default:
           return "Export types: scan, analysis, backtest, session";
       }
+    case "telemetry":
+      if (!args || args === "status") return "Show my current telemetry status — whether anonymous usage analytics and research data collection are enabled or disabled";
+      if (args === "enable") return "Enable anonymous telemetry to help improve Gordon. Only anonymous usage data is collected — no PII, no financial data, no API keys.";
+      if (args === "disable") return "Disable anonymous telemetry and stop sending usage data";
+      if (args === "research-enable" || args === "research enable") return "Enable anonymized trading data collection for AI model training. This collects: trade outcomes (% P&L, strategy, duration, exit reason), backtest results (metrics only), market context (indicators, trend, bias). NO absolute prices, balances, quantities, or wallet addresses are ever collected. Data is stored locally in ~/.gordon/research/ and uploaded only when you choose.";
+      if (args === "research-disable" || args === "research disable") return "Disable anonymized trading data collection";
+      if (args === "research-status" || args === "research status") return "Show research data collection status: how many records collected locally, file sizes, and whether upload is pending";
+      if (args === "research-upload" || args === "research upload") return "Upload collected anonymized research data to help train AI trading models";
+      if (args === "research-clear" || args === "research clear") return "Delete all locally collected research data files";
+      return "Show my current telemetry status";
     case "bugreport":
       return args
         ? `Generate a bug report with this description: "${args}". Include system info: gordon version, Bun version, OS, active exchange, config directory, and mode. Format it as a pre-filled GitHub issue link for https://github.com/general-liquidity/gordon-cli/issues/new.`
