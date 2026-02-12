@@ -253,11 +253,16 @@ export class KrakenAdapter implements Exchange {
       const tickers = await this.client.getTicker(batch);
 
       for (const [key, t] of Object.entries(tickers)) {
+        const lastPrice = parseFloat(t.c[0]);
+        const openPrice = parseFloat(t.o);
+        const priceChange = lastPrice - openPrice;
+        const priceChangePercent = openPrice > 0 ? (priceChange / openPrice) * 100 : 0;
+
         allTickers.push({
           symbol: this.fromKrakenSymbol(key),
-          priceChange: 0, // Kraken doesn't provide this directly
-          priceChangePercent: 0,
-          lastPrice: parseFloat(t.c[0]),
+          priceChange,
+          priceChangePercent,
+          lastPrice,
           highPrice: parseFloat(t.h[1]), // 24h high
           lowPrice: parseFloat(t.l[1]), // 24h low
           volume: parseFloat(t.v[1]), // 24h volume
@@ -352,7 +357,7 @@ export class KrakenAdapter implements Exchange {
   // -------------------------------------------------------------------------
 
   async getAccountInfo(): Promise<AccountInfo> {
-    const balances = await this.client.getBalance();
+    const extBalances = await this.client.getExtendedBalance();
 
     return {
       canTrade: true,
@@ -360,13 +365,17 @@ export class KrakenAdapter implements Exchange {
       canDeposit: true,
       accountType: "SPOT",
       updateTime: Date.now(),
-      balances: Object.entries(balances).map(
-        ([asset, balance]): Balance => ({
-          asset: this.normalizeAsset(asset),
-          free: parseFloat(balance),
-          locked: 0, // Kraken basic balance doesn't show hold separately
-          total: parseFloat(balance),
-        })
+      balances: Object.entries(extBalances).map(
+        ([asset, bal]): Balance => {
+          const total = parseFloat(bal.balance);
+          const locked = parseFloat(bal.hold_trade || "0");
+          return {
+            asset: this.normalizeAsset(asset),
+            free: total - locked,
+            locked,
+            total,
+          };
+        }
       ),
     };
   }

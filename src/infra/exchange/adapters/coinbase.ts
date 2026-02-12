@@ -168,18 +168,26 @@ export class CoinbaseAdapter implements Exchange {
     return products
       .filter((p) => !p.is_disabled)
       .map(
-        (p): Ticker24hr => ({
-          symbol: this.fromCoinbaseSymbol(p.product_id),
-          priceChange: 0, // Coinbase doesn't provide this directly
-          priceChangePercent: parseFloat(p.price_percentage_change_24h) || 0,
-          lastPrice: parseFloat(p.price),
-          highPrice: 0, // Not available in product list
-          lowPrice: 0,
-          volume: parseFloat(p.volume_24h),
-          quoteVolume: parseFloat(p.volume_24h) * parseFloat(p.price),
-          openTime: Date.now() - 86400000,
-          closeTime: Date.now(),
-        })
+        (p): Ticker24hr => {
+          const lastPrice = parseFloat(p.price);
+          const pctChange = parseFloat(p.price_percentage_change_24h) || 0;
+          // Derive open price: openPrice = lastPrice / (1 + pct/100)
+          const openPrice = pctChange !== -100 ? lastPrice / (1 + pctChange / 100) : 0;
+          const priceChange = lastPrice - openPrice;
+
+          return {
+            symbol: this.fromCoinbaseSymbol(p.product_id),
+            priceChange,
+            priceChangePercent: pctChange,
+            lastPrice,
+            highPrice: 0, // Not available in Coinbase Advanced Trade products API
+            lowPrice: 0,
+            volume: parseFloat(p.volume_24h),
+            quoteVolume: parseFloat(p.volume_24h) * lastPrice,
+            openTime: Date.now() - 86400000,
+            closeTime: Date.now(),
+          };
+        }
       );
   }
 
@@ -238,11 +246,26 @@ export class CoinbaseAdapter implements Exchange {
   }
 
   async getAvgPrice(symbol: string): Promise<AvgPrice> {
+    // Compute VWAP from recent 5-minute candles (last ~30 min)
+    try {
+      const candles = await this.getCandles(symbol, "5m", 6);
+      if (candles.length > 0) {
+        let volumeSum = 0;
+        let vwapSum = 0;
+        for (const c of candles) {
+          const typical = (c.high + c.low + c.close) / 3;
+          vwapSum += typical * c.volume;
+          volumeSum += c.volume;
+        }
+        if (volumeSum > 0) {
+          return { mins: 30, price: vwapSum / volumeSum };
+        }
+      }
+    } catch {
+      // Fall back to current price
+    }
     const price = await this.getPrice(symbol);
-    return {
-      mins: 5,
-      price,
-    };
+    return { mins: 5, price };
   }
 
   // -------------------------------------------------------------------------
@@ -313,6 +336,15 @@ export class CoinbaseAdapter implements Exchange {
         market_market_ioc: params.quoteOrderQty
           ? { quote_size: params.quoteOrderQty.toString() }
           : { base_size: params.quantity?.toString() },
+      };
+    } else if (params.type === "LIMIT" && params.price && params.stopPrice) {
+      // OCO (bracket) order: limit + stop-trigger — check before basic LIMIT
+      orderConfig = {
+        trigger_bracket_gtc: {
+          base_size: params.quantity?.toString(),
+          limit_price: params.price.toString(),
+          stop_trigger_price: params.stopPrice.toString(),
+        },
       };
     } else if (params.type === "LIMIT") {
       orderConfig = {
@@ -397,18 +429,53 @@ export class CoinbaseAdapter implements Exchange {
   }
 
   async testOrder(params: OrderParams): Promise<boolean> {
-    // Coinbase doesn't have a test order endpoint
-    // Validate parameters instead
-    if (!params.symbol || !params.side || !params.type) {
+    // Use Coinbase's real order preview endpoint for server-side dry-run
+    try {
+      const coinbaseSymbol = this.toCoinbaseSymbol(params.symbol);
+      const clientOrderId = params.newClientOrderId || uuidv4();
+
+      let orderConfig: Record<string, unknown> = {};
+
+      if (params.type === "MARKET") {
+        orderConfig = {
+          market_market_ioc: params.quoteOrderQty
+            ? { quote_size: params.quoteOrderQty.toString() }
+            : { base_size: params.quantity?.toString() },
+        };
+      } else if (params.type === "LIMIT") {
+        orderConfig = {
+          limit_limit_gtc: {
+            base_size: params.quantity?.toString(),
+            limit_price: params.price?.toString(),
+            post_only: false,
+          },
+        };
+      } else if (params.type === "STOP_LOSS_LIMIT" && params.stopPrice && params.price) {
+        orderConfig = {
+          stop_limit_stop_limit_gtc: {
+            base_size: params.quantity?.toString(),
+            limit_price: params.price.toString(),
+            stop_price: params.stopPrice.toString(),
+            stop_direction:
+              params.side === "BUY"
+                ? "STOP_DIRECTION_STOP_UP"
+                : "STOP_DIRECTION_STOP_DOWN",
+          },
+        };
+      }
+
+      const preview = await this.client.previewOrder({
+        client_order_id: clientOrderId,
+        product_id: coinbaseSymbol,
+        side: params.side,
+        order_configuration: orderConfig as any,
+      });
+
+      // If errs array is non-empty, the order would fail
+      return !preview.errs || preview.errs.length === 0;
+    } catch {
       return false;
     }
-    if (params.type === "LIMIT" && !params.price) {
-      return false;
-    }
-    if (!params.quantity && !params.quoteOrderQty) {
-      return false;
-    }
-    return true;
   }
 
   private normalizeOrder(order: any): Order {
@@ -425,6 +492,9 @@ export class CoinbaseAdapter implements Exchange {
     } else if (config?.stop_limit_stop_limit_gtc) {
       quantity = parseFloat(config.stop_limit_stop_limit_gtc.base_size || "0");
       price = parseFloat(config.stop_limit_stop_limit_gtc.limit_price || "0");
+    } else if (config?.trigger_bracket_gtc) {
+      quantity = parseFloat(config.trigger_bracket_gtc.base_size || "0");
+      price = parseFloat(config.trigger_bracket_gtc.limit_price || "0");
     }
 
     return {
@@ -507,15 +577,97 @@ export class CoinbaseAdapter implements Exchange {
   }
 
   async getDepositHistory(limit?: number): Promise<Deposit[]> {
-    // Coinbase Advanced Trade API doesn't have a direct deposit history endpoint
-    // Would need to use Coinbase primary API for this
-    return [];
+    // V2 API: deposits appear as "receive" or "transfer" type transactions
+    const accounts = await this.client.getV2Accounts();
+    const deposits: Deposit[] = [];
+    const maxResults = limit || 50;
+
+    for (const account of accounts) {
+      if (deposits.length >= maxResults) break;
+      if (parseFloat(account.balance.amount) === 0 && account.type !== "fiat") continue;
+
+      try {
+        const transactions = await this.client.getV2Transactions(account.id, maxResults);
+        for (const tx of transactions) {
+          if (tx.type !== "receive" && tx.type !== "transfer") continue;
+          deposits.push({
+            id: tx.id,
+            amount: Math.abs(parseFloat(tx.amount.amount)),
+            coin: tx.amount.currency,
+            network: tx.network?.status || "unknown",
+            status: this.mapV2TransactionStatus(tx.status),
+            address: tx.from?.address || "",
+            txId: tx.network?.hash || undefined,
+            insertTime: new Date(tx.created_at).getTime(),
+            confirmTimes: tx.network?.confirmations !== undefined
+              ? `${tx.network.confirmations}`
+              : undefined,
+          });
+        }
+      } catch {
+        // Skip accounts that fail (e.g., zero-balance legacy accounts)
+      }
+    }
+
+    return deposits.slice(0, maxResults);
   }
 
   async getWithdrawalHistory(limit?: number): Promise<Withdrawal[]> {
-    // Coinbase Advanced Trade API doesn't have a direct withdrawal history endpoint
-    // Would need to use Coinbase primary API for this
-    return [];
+    // V2 API: withdrawals appear as "send" type transactions
+    const accounts = await this.client.getV2Accounts();
+    const withdrawals: Withdrawal[] = [];
+    const maxResults = limit || 50;
+
+    for (const account of accounts) {
+      if (withdrawals.length >= maxResults) break;
+      if (parseFloat(account.balance.amount) === 0 && account.type !== "fiat") continue;
+
+      try {
+        const transactions = await this.client.getV2Transactions(account.id, maxResults);
+        for (const tx of transactions) {
+          if (tx.type !== "send") continue;
+          withdrawals.push({
+            id: tx.id,
+            amount: Math.abs(parseFloat(tx.amount.amount)),
+            coin: tx.amount.currency,
+            network: tx.network?.status || "unknown",
+            status: this.mapV2TransactionStatus(tx.status),
+            address: tx.to?.address || "",
+            txId: tx.network?.hash || undefined,
+            applyTime: new Date(tx.created_at).getTime(),
+            completeTime: tx.status === "completed"
+              ? new Date(tx.updated_at).getTime()
+              : undefined,
+            transactionFee: undefined, // V2 API does not separate fee from amount
+          });
+        }
+      } catch {
+        // Skip accounts that fail
+      }
+    }
+
+    return withdrawals.slice(0, maxResults);
+  }
+
+  /**
+   * Map Coinbase v2 transaction status to numeric status code
+   * 0 = pending, 1 = completed, 2 = failed/canceled
+   */
+  private mapV2TransactionStatus(status: string): number {
+    switch (status.toLowerCase()) {
+      case "completed":
+        return 1;
+      case "pending":
+      case "waiting_for_signature":
+      case "waiting_for_clearing":
+        return 0;
+      case "failed":
+      case "expired":
+      case "canceled":
+        return 2;
+      default:
+        return 0;
+    }
   }
 
   // -------------------------------------------------------------------------
@@ -524,33 +676,68 @@ export class CoinbaseAdapter implements Exchange {
 
   async withdraw(
     coin: string,
-    _network: string,
+    network: string,
     address: string,
     amount: number,
     _tag?: string,
   ): Promise<WithdrawalResult> {
-    // Coinbase Advanced Trade API doesn't support direct crypto withdrawal
-    // Withdrawals must be done through the Coinbase primary API (Send endpoint)
-    // This is a placeholder that returns a clear error message
-    throw new Error(
-      `Coinbase Advanced Trade API does not support direct withdrawals. ` +
-      `Use the Coinbase website/app to withdraw ${coin} to ${address}.`
+    const coinUpper = coin.toUpperCase();
+
+    // Find the v2 account for this currency
+    const account = await this.client.getV2AccountByCurrency(coinUpper);
+    if (!account) {
+      throw new Error(
+        `No Coinbase account found for ${coinUpper}. Ensure you have a ${coinUpper} wallet.`
+      );
+    }
+
+    if (!account.allow_withdrawals) {
+      throw new Error(`Withdrawals are not allowed for ${coinUpper} on this account.`);
+    }
+
+    const idem = uuidv4();
+    const tx = await this.client.sendCrypto(
+      account.id,
+      address,
+      amount.toString(),
+      coinUpper,
+      idem
     );
+
+    return {
+      id: tx.id,
+      coin: coinUpper,
+      amount,
+      network: network || "default",
+      address,
+      fee: 0, // Coinbase v2 does not return fee separately
+      status: tx.status || "pending",
+    };
   }
 
   async getWithdrawalInfo(coin: string, _network?: string): Promise<WithdrawalInfo> {
-    // Coinbase doesn't expose network fee info through Advanced Trade API
+    const coinUpper = coin.toUpperCase();
+
+    const currencies = await this.client.getCryptoCurrencies();
+    const currency = currencies.find(
+      (c) => c.code.toUpperCase() === coinUpper
+    );
+
+    if (!currency) {
+      throw new Error(`Currency ${coinUpper} not found on Coinbase.`);
+    }
+
     return {
-      coin: coin.toUpperCase(),
+      coin: coinUpper,
       networks: [
         {
-          network: coin.toLowerCase(),
-          name: `${coin.toUpperCase()} Network`,
-          withdrawEnabled: false, // Not supported via API
-          withdrawFee: 0,
+          network: coinUpper,
+          name: currency.name,
+          withdrawEnabled: true,
+          withdrawFee: 0, // Coinbase dynamic fees, not exposed via v2 API
           withdrawMin: 0,
           withdrawMax: 0,
-          estimatedArrivalMins: 0,
+          estimatedArrivalMins: 30,
         },
       ],
     };

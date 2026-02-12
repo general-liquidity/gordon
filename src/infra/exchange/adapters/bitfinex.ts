@@ -252,11 +252,26 @@ export class BitfinexAdapter implements Exchange {
   }
 
   async getAvgPrice(symbol: string): Promise<AvgPrice> {
+    // Compute VWAP from recent 5-minute candles (last ~30 min)
+    try {
+      const candles = await this.getCandles(symbol, "5m", 6);
+      if (candles.length > 0) {
+        let volumeSum = 0;
+        let vwapSum = 0;
+        for (const c of candles) {
+          const typical = (c.high + c.low + c.close) / 3;
+          vwapSum += typical * c.volume;
+          volumeSum += c.volume;
+        }
+        if (volumeSum > 0) {
+          return { mins: 30, price: vwapSum / volumeSum };
+        }
+      }
+    } catch {
+      // Fall back to current price
+    }
     const price = await this.getPrice(symbol);
-    return {
-      mins: 5,
-      price,
-    };
+    return { mins: 5, price };
   }
 
   // -------------------------------------------------------------------------
@@ -317,8 +332,11 @@ export class BitfinexAdapter implements Exchange {
   async placeOrder(params: OrderParams): Promise<Order> {
     const bitfinexSymbol = this.toBitfinexSymbol(params.symbol);
 
-    // Determine order type
+    // Determine order type and flags
     let orderType: string;
+    let flags = 0;
+    let priceAuxLimit = params.stopPrice;
+
     if (params.type === "MARKET") {
       orderType = "EXCHANGE MARKET";
     } else if (params.type === "LIMIT") {
@@ -329,6 +347,13 @@ export class BitfinexAdapter implements Exchange {
       orderType = "EXCHANGE STOP LIMIT";
     } else {
       orderType = "EXCHANGE LIMIT";
+    }
+
+    // OCO support: if both price and stopPrice are set on a LIMIT order,
+    // use OCO flag (16384) with price_oco_stop = stopPrice
+    if (params.type === "LIMIT" && params.price && params.stopPrice) {
+      flags |= 16384; // OCO flag
+      priceAuxLimit = params.stopPrice; // price_aux_limit becomes the OCO stop price
     }
 
     // Bitfinex uses positive for buy, negative for sell
@@ -342,7 +367,8 @@ export class BitfinexAdapter implements Exchange {
       price: params.price,
       type: orderType as any,
       clientOrderId: params.newClientOrderId ? parseInt(params.newClientOrderId) : undefined,
-      priceAuxLimit: params.stopPrice,
+      priceAuxLimit,
+      flags: flags || undefined,
     });
 
     return {
@@ -387,22 +413,18 @@ export class BitfinexAdapter implements Exchange {
   }
 
   async getOrderStatus(symbol: string, orderId: number | string): Promise<Order> {
-    // Bitfinex doesn't have a direct "get order by ID" for active orders
-    // Need to check both active and history
-    const bitfinexSymbol = this.toBitfinexSymbol(symbol);
+    const numericId = typeof orderId === "string" ? parseInt(orderId, 10) : orderId;
 
-    // Try active orders first
-    const activeOrders = await this.client.getActiveOrders(bitfinexSymbol);
-    const activeOrder = activeOrders.find((o) => o.id.toString() === orderId.toString());
-    if (activeOrder) {
-      return this.normalizeOrder(activeOrder, symbol);
+    // Use server-side ID filter — much more efficient than fetching all orders
+    const activeOrders = await this.client.getActiveOrdersById([numericId]);
+    if (activeOrders.length > 0) {
+      return this.normalizeOrder(activeOrders[0], symbol);
     }
 
-    // Try order history
-    const historyOrders = await this.client.getOrderHistory(bitfinexSymbol, 100);
-    const historyOrder = historyOrders.find((o) => o.id.toString() === orderId.toString());
-    if (historyOrder) {
-      return this.normalizeOrder(historyOrder, symbol);
+    // Try order history with ID filter
+    const historyOrders = await this.client.getOrderHistoryById([numericId]);
+    if (historyOrders.length > 0) {
+      return this.normalizeOrder(historyOrders[0], symbol);
     }
 
     throw new Error(`Order ${orderId} not found`);
@@ -578,17 +600,30 @@ export class BitfinexAdapter implements Exchange {
   }
 
   async getWithdrawalInfo(coin: string, _network?: string): Promise<WithdrawalInfo> {
-    // Bitfinex doesn't have a dedicated withdrawal-info endpoint
-    // Return a basic structure with the coin's standard network
+    // Fetch real per-coin withdrawal fees from the conf endpoint
+    const [fees, symbolDetails] = await Promise.all([
+      this.client.getWithdrawalFees().catch(() => [] as Array<[string, number]>),
+      this.client.getSymbolDetails(),
+    ]);
+
+    const coinUpper = coin.toUpperCase();
+    const feeEntry = fees.find(([currency]) => currency.toUpperCase() === coinUpper);
+    const withdrawFee = feeEntry ? feeEntry[1] : 0;
+
+    const detail = symbolDetails.find(
+      (d) => d.pair.toUpperCase().startsWith(coinUpper)
+    );
+    const minOrderSize = detail ? parseFloat(detail.minimum_order_size) : 0;
+
     return {
-      coin: coin.toUpperCase(),
+      coin: coinUpper,
       networks: [
         {
           network: coin.toLowerCase(),
-          name: `${coin.toUpperCase()} Network`,
+          name: `${coinUpper} Network`,
           withdrawEnabled: true,
-          withdrawFee: 0, // Bitfinex dynamic fees — shown at withdrawal time
-          withdrawMin: 0,
+          withdrawFee,
+          withdrawMin: minOrderSize,
           withdrawMax: 0,
           estimatedArrivalMins: 30,
         },

@@ -20,6 +20,7 @@ import type {
   KrakenTrade,
   KrakenDepositStatus,
   KrakenWithdrawStatus,
+  KrakenWithdrawInfo,
   KrakenServerTime,
   KrakenSystemStatus,
 } from "./types.ts";
@@ -634,5 +635,16 @@ export class KrakenClient {
     return this.signedRequest<
       Array<{ method: string; limit: string | boolean; fee: string; "gen-address"?: boolean }>
     >("/WithdrawMethods", { asset });
+  }
+
+  /**
+   * Get withdrawal fee info for a specific asset, key, and amount
+   * Returns the exact fee that would be charged for this specific withdrawal
+   * @param asset - Kraken asset name (e.g., "XBT" for Bitcoin)
+   * @param key - Pre-configured withdrawal address name in Kraken
+   * @param amount - Amount to withdraw
+   */
+  async getWithdrawInfo(asset: string, key: string, amount: string): Promise<KrakenWithdrawInfo> {
+    return this.signedRequest<KrakenWithdrawInfo>("/WithdrawInfo", { asset, key, amount });
   }
 }

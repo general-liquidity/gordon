@@ -200,20 +200,52 @@ export class HyperliquidAdapter implements Exchange {
       this.client.getAllAssetCtxs(),
     ]);
 
+    // Fetch 1d candles for top assets by volume to get high/low
+    const highLowMap = new Map<string, { high: number; low: number }>();
+    const now = Date.now();
+    const dayAgo = now - 86400000;
+
+    // Fetch 1d candles for the top 20 assets by volume (avoid rate limits)
+    const assetsByVolume = meta.universe
+      .map((asset, index) => ({
+        name: asset.name,
+        volume: parseFloat(assetCtxs[index]?.dayNtlVlm || "0"),
+      }))
+      .sort((a, b) => b.volume - a.volume)
+      .slice(0, 20);
+
+    const candlePromises = assetsByVolume.map(async ({ name }) => {
+      try {
+        const candles = await this.client.getCandles(name, "1d", dayAgo, now);
+        const lastCandle = candles[candles.length - 1];
+        if (lastCandle) {
+          highLowMap.set(name, {
+            high: parseFloat(lastCandle[2]),
+            low: parseFloat(lastCandle[3]),
+          });
+        }
+      } catch {
+        // Skip on error
+      }
+    });
+
+    await Promise.all(candlePromises);
+
     return meta.universe.map((asset, index): Ticker24hr => {
       const ctx = assetCtxs[index];
       const prevPrice = parseFloat(ctx?.prevDayPx || "0");
       const markPrice = parseFloat(ctx?.markPx || "0");
       const priceChange = markPrice - prevPrice;
       const priceChangePercent = prevPrice > 0 ? (priceChange / prevPrice) * 100 : 0;
+      const hl = highLowMap.get(asset.name);
 
       return {
         symbol: this.normalizeSymbol(asset.name),
         priceChange,
         priceChangePercent,
         lastPrice: markPrice,
-        highPrice: 0, // Not available
-        lowPrice: 0,
+        highPrice: hl?.high || 0,
+        lowPrice: hl?.low || 0,
         volume: parseFloat(ctx?.dayNtlVlm || "0"),
         quoteVolume: parseFloat(ctx?.dayNtlVlm || "0"),
         openTime: Date.now() - 86400000,
@@ -289,10 +321,34 @@ export class HyperliquidAdapter implements Exchange {
   // -------------------------------------------------------------------------
 
   async getAccountInfo(): Promise<AccountInfo> {
-    const state = await this.client.getUserState();
+    const [state, spotState] = await Promise.all([
+      this.client.getUserState(),
+      this.client.getSpotClearinghouseState().catch(() => ({ balances: [] })),
+    ]);
 
-    // Calculate USD balance from margin summary
+    // USD balance from perp clearinghouse
     const usdBalance = parseFloat(state.withdrawable || "0");
+    const balances: Balance[] = [
+      {
+        asset: "USD",
+        free: usdBalance,
+        locked: parseFloat(state.crossMarginSummary?.totalMarginUsed || "0"),
+        total: parseFloat(state.crossMarginSummary?.accountValue || "0"),
+      },
+    ];
+
+    // Add non-USD spot balances
+    for (const sb of spotState.balances) {
+      const total = parseFloat(sb.total || "0");
+      if (total === 0) continue;
+      const hold = parseFloat(sb.hold || "0");
+      balances.push({
+        asset: sb.coin,
+        free: total - hold,
+        locked: hold,
+        total,
+      });
+    }
 
     return {
       canTrade: true,
@@ -300,14 +356,7 @@ export class HyperliquidAdapter implements Exchange {
       canDeposit: true,
       accountType: "PERPETUAL",
       updateTime: Date.now(),
-      balances: [
-        {
-          asset: "USD",
-          free: usdBalance,
-          locked: parseFloat(state.crossMarginSummary?.totalMarginUsed || "0"),
-          total: parseFloat(state.crossMarginSummary?.accountValue || "0"),
-        },
-      ],
+      balances,
     };
   }
 
@@ -504,7 +553,23 @@ export class HyperliquidAdapter implements Exchange {
     }
 
     try {
-      await this.getAssetIndex(params.symbol);
+      const assetIndex = await this.getAssetIndex(params.symbol);
+      const meta = await this.client.getMeta();
+      const assetInfo = meta.universe[assetIndex];
+
+      if (!assetInfo) return false;
+
+      // Validate quantity precision matches szDecimals
+      const qtyStr = params.quantity.toString();
+      const dotIndex = qtyStr.indexOf(".");
+      if (dotIndex !== -1) {
+        const decimals = qtyStr.length - dotIndex - 1;
+        if (decimals > assetInfo.szDecimals) return false;
+      }
+
+      // Validate quantity is positive
+      if (params.quantity <= 0) return false;
+
       return true;
     } catch {
       return false;
@@ -567,13 +632,43 @@ export class HyperliquidAdapter implements Exchange {
   }
 
   async getDepositHistory(limit?: number): Promise<Deposit[]> {
-    // Hyperliquid doesn't have traditional deposits - uses L1 bridge
-    throw new HyperliquidNotSupportedError("getDepositHistory");
+    const ledger = await this.client.getUserNonFundingLedgerUpdates();
+    const maxResults = limit || 50;
+
+    return ledger
+      .filter((entry) => entry.delta.type === "deposit")
+      .slice(0, maxResults)
+      .map((entry): Deposit => ({
+        id: entry.hash,
+        amount: Math.abs(parseFloat(entry.delta.usdc || "0")),
+        coin: "USDC",
+        network: "Arbitrum",
+        status: 1, // All ledger entries are completed
+        address: "",
+        txId: entry.hash,
+        insertTime: entry.time,
+      }));
   }
 
   async getWithdrawalHistory(limit?: number): Promise<Withdrawal[]> {
-    // Hyperliquid doesn't have traditional withdrawals - uses L1 bridge
-    throw new HyperliquidNotSupportedError("getWithdrawalHistory");
+    const ledger = await this.client.getUserNonFundingLedgerUpdates();
+    const maxResults = limit || 50;
+
+    return ledger
+      .filter((entry) => entry.delta.type === "withdraw")
+      .slice(0, maxResults)
+      .map((entry): Withdrawal => ({
+        id: entry.hash,
+        amount: Math.abs(parseFloat(entry.delta.usdc || "0")),
+        coin: "USDC",
+        network: "Arbitrum",
+        status: 6, // Completed
+        address: "",
+        txId: entry.hash,
+        applyTime: entry.time,
+        completeTime: entry.time,
+        transactionFee: entry.delta.fee ? parseFloat(entry.delta.fee) : undefined,
+      }));
   }
 
   // -------------------------------------------------------------------------
@@ -581,22 +676,52 @@ export class HyperliquidAdapter implements Exchange {
   // -------------------------------------------------------------------------
 
   async withdraw(
-    _coin: string,
+    coin: string,
     _network: string,
-    _address: string,
-    _amount: number,
+    address: string,
+    amount: number,
     _tag?: string,
   ): Promise<WithdrawalResult> {
-    // Hyperliquid uses L1 bridge for withdrawals — requires on-chain transaction signing
-    throw new HyperliquidNotSupportedError(
-      "withdraw — Hyperliquid uses L1 bridge. Use the Hyperliquid UI to withdraw."
-    );
+    if (coin.toUpperCase() !== "USDC" && coin.toUpperCase() !== "USD") {
+      throw new HyperliquidNotSupportedError(
+        "withdraw — Hyperliquid only supports USDC withdrawals via L1 bridge."
+      );
+    }
+
+    const result = await this.client.withdrawUsdc(address, amount.toString());
+
+    return {
+      id: `hl_${Date.now()}`,
+      coin: "USDC",
+      amount,
+      network: "Arbitrum",
+      address,
+      fee: 1, // Hyperliquid charges ~1 USDC flat fee for L1 bridge
+      status: result.status === "ok" ? "pending" : "failed",
+    };
   }
 
-  async getWithdrawalInfo(_coin: string, _network?: string): Promise<WithdrawalInfo> {
-    throw new HyperliquidNotSupportedError(
-      "getWithdrawalInfo — Hyperliquid uses L1 bridge for withdrawals."
-    );
+  async getWithdrawalInfo(coin: string, _network?: string): Promise<WithdrawalInfo> {
+    if (coin.toUpperCase() !== "USDC" && coin.toUpperCase() !== "USD") {
+      throw new HyperliquidNotSupportedError(
+        `getWithdrawalInfo — Hyperliquid only supports USDC withdrawals. ${coin} is not supported.`
+      );
+    }
+
+    return {
+      coin: "USDC",
+      networks: [
+        {
+          network: "Arbitrum",
+          name: "Arbitrum One (L1 Bridge)",
+          withdrawEnabled: true,
+          withdrawFee: 1, // ~1 USDC flat fee
+          withdrawMin: 2, // Minimum 2 USDC
+          withdrawMax: 0, // Limited by account balance
+          estimatedArrivalMins: 5,
+        },
+      ],
+    };
   }
 
   // -------------------------------------------------------------------------

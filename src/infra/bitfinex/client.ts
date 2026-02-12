@@ -721,6 +721,39 @@ export class BitfinexClient {
   }
 
   /**
+   * Get withdrawal fees for all currencies
+   * Returns per-coin withdrawal fees from the conf endpoint
+   */
+  async getWithdrawalFees(): Promise<Array<[string, number]>> {
+    const data = await this.publicRequest<Array<Array<[string, number]>>>(
+      "/conf/pub:map:currency:tx:fee"
+    );
+    // Response is [[["BTC", 0.0004], ["ETH", 0.003], ...]]
+    return data[0] || [];
+  }
+
+  /**
+   * Get active orders filtered by order IDs
+   * More efficient than fetching all orders when you know the ID
+   */
+  async getActiveOrdersById(orderIds: number[]): Promise<BitfinexOrderParsed[]> {
+    const data = await this.signedRequest<BitfinexOrder[]>("/auth/r/orders", {
+      id: orderIds,
+    });
+    return data.map((order) => this.parseOrder(order));
+  }
+
+  /**
+   * Get order history filtered by order IDs
+   */
+  async getOrderHistoryById(orderIds: number[]): Promise<BitfinexOrderParsed[]> {
+    const data = await this.signedRequest<BitfinexOrder[]>("/auth/r/orders/hist", {
+      id: orderIds,
+    });
+    return data.map((order) => this.parseOrder(order));
+  }
+
+  /**
    * Submit a withdrawal request
    * @param wallet - Source wallet ("exchange", "margin", "funding")
    * @param method - Network/method name (e.g., "bitcoin", "ethereum")

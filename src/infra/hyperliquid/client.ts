@@ -396,6 +396,70 @@ export class HyperliquidClient {
   }
 
   /**
+   * Get user non-funding ledger updates (deposits, withdrawals, transfers, liquidations)
+   */
+  async getUserNonFundingLedgerUpdates(
+    user?: string,
+    startTime?: number,
+    endTime?: number
+  ): Promise<Array<{
+    time: number;
+    hash: string;
+    delta: {
+      type: string;
+      usdc: string;
+      token?: string;
+      amount?: string;
+      nonce?: number;
+      fee?: string;
+    };
+  }>> {
+    return this.infoRequest<Array<{
+      time: number;
+      hash: string;
+      delta: {
+        type: string;
+        usdc: string;
+        token?: string;
+        amount?: string;
+        nonce?: number;
+        fee?: string;
+      };
+    }>>({
+      type: "userNonFundingLedgerUpdates",
+      user: user || this.address,
+      startTime: startTime || 0,
+      endTime: endTime || Date.now(),
+    });
+  }
+
+  /**
+   * Get spot clearinghouse state (non-USD token balances)
+   */
+  async getSpotClearinghouseState(user?: string): Promise<{
+    balances: Array<{
+      coin: string;
+      token: number;
+      hold: string;
+      total: string;
+      entryNtl: string;
+    }>;
+  }> {
+    return this.infoRequest<{
+      balances: Array<{
+        coin: string;
+        token: number;
+        hold: string;
+        total: string;
+        entryNtl: string;
+      }>;
+    }>({
+      type: "spotClearinghouseState",
+      user: user || this.address,
+    });
+  }
+
+  /**
    * Get funding history
    */
   async getFundingHistory(
@@ -529,5 +593,56 @@ export class HyperliquidClient {
       isBuy,
       ntli,
     });
+  }
+
+  /**
+   * Withdraw USDC via L1 bridge to Arbitrum
+   * @param destination - Destination address on Arbitrum
+   * @param amount - Amount of USDC to withdraw (will be converted to raw units)
+   */
+  async withdrawUsdc(
+    destination: string,
+    amount: string
+  ): Promise<{ status: string; response?: { type: string } }> {
+    const nonce = this.signer.getNonce();
+    const action = {
+      type: "withdraw3",
+      hyperliquidChain: "Arbitrum",
+      signatureChainId: "0xa4b1",
+      destination,
+      amount,
+      time: nonce,
+    };
+
+    const signature = await this.signer.signL1Action(action, null, nonce);
+
+    const body = {
+      action,
+      nonce,
+      signature,
+    };
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+    try {
+      const response = await fetch(EXCHANGE_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
+
+      const data = await response.json() as Record<string, unknown>;
+
+      if (!response.ok || data.status === "err") {
+        const error = (data.error as string) || "Withdrawal failed";
+        throw new HyperliquidError(error, "WITHDRAW_ERROR", "/exchange");
+      }
+
+      return data as { status: string; response?: { type: string } };
+    } finally {
+      clearTimeout(timeoutId);
+    }
   }
 }

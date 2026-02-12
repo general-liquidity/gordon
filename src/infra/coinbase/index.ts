@@ -29,6 +29,13 @@ export type {
   CoinbaseOrderConfiguration,
   CoinbaseOrderParams,
   CoinbaseAPIError,
+  CoinbaseTransaction,
+  CoinbaseV2Account,
+  CoinbaseV2PaginatedResponse,
+  CoinbaseV2Response,
+  CoinbaseV2CryptoCurrency,
+  CoinbaseV2SendRequest,
+  CoinbaseV2Pagination,
 } from "./types.ts";
 
 // Errors (re-exported from errors module)

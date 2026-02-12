@@ -369,6 +369,97 @@ export interface CoinbaseTransaction {
 }
 
 // ============================================================================
+// V2 API Types (Coinbase Primary API)
+// ============================================================================
+
+/**
+ * V2 API pagination structure
+ */
+export interface CoinbaseV2Pagination {
+  ending_before?: string | null;
+  starting_after?: string | null;
+  previous_ending_before?: string | null;
+  next_starting_after?: string | null;
+  limit: number;
+  order: "asc" | "desc";
+  previous_uri?: string | null;
+  next_uri?: string | null;
+}
+
+/**
+ * Generic paginated v2 response wrapper
+ */
+export interface CoinbaseV2PaginatedResponse<T> {
+  data: T[];
+  pagination: CoinbaseV2Pagination;
+}
+
+/**
+ * V2 API single-item response wrapper
+ */
+export interface CoinbaseV2Response<T> {
+  data: T;
+}
+
+/**
+ * V2 Account (from GET /v2/accounts)
+ */
+export interface CoinbaseV2Account {
+  id: string;
+  name: string;
+  primary: boolean;
+  type: "wallet" | "fiat" | "vault";
+  currency: {
+    code: string;
+    name: string;
+    color: string;
+    sort_index: number;
+    exponent: number;
+    type: "crypto" | "fiat";
+    address_regex?: string;
+    asset_id?: string;
+    slug?: string;
+  };
+  balance: {
+    amount: string;
+    currency: string;
+  };
+  created_at: string;
+  updated_at: string;
+  resource: string;
+  resource_path: string;
+  allow_deposits: boolean;
+  allow_withdrawals: boolean;
+}
+
+/**
+ * V2 Crypto Currency info (from GET /v2/currencies/crypto)
+ */
+export interface CoinbaseV2CryptoCurrency {
+  code: string;
+  name: string;
+  color: string;
+  sort_index: number;
+  exponent: number;
+  type: string;
+  address_regex?: string;
+  asset_id: string;
+  slug?: string;
+}
+
+/**
+ * V2 Send request body (for POST /v2/accounts/:id/transactions)
+ */
+export interface CoinbaseV2SendRequest {
+  type: "send";
+  to: string;
+  amount: string;
+  currency: string;
+  description?: string;
+  idem?: string;
+}
+
+// ============================================================================
 // Order Params (for adapter)
 // ============================================================================
 

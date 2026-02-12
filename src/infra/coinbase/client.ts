@@ -20,6 +20,12 @@ import type {
   CoinbaseFill,
   CoinbaseFillsResponse,
   CoinbaseAPIError,
+  CoinbaseTransaction,
+  CoinbaseV2Account,
+  CoinbaseV2PaginatedResponse,
+  CoinbaseV2Response,
+  CoinbaseV2CryptoCurrency,
+  CoinbaseV2SendRequest,
 } from "./types.ts";
 import { CoinbaseError, CoinbaseRateLimitError, CoinbaseAuthError } from "../../errors/index.ts";
 import { createModuleLogger } from "../logger/index.ts";
@@ -42,6 +48,9 @@ const apiCircuitBreaker = new CircuitBreaker({
 
 // Coinbase API base URL
 const BASE_URL = "https://api.coinbase.com";
+
+// Coinbase Primary API v2 version header
+const CB_API_VERSION = "2024-02-01";
 
 // Rate limit tracking
 interface RateLimitState {
@@ -317,6 +326,77 @@ export class CoinbaseClient {
     }, COINBASE_RETRY_CONFIG);
   }
 
+  /**
+   * Make authenticated request to Coinbase Primary API v2
+   * Same auth as v3 but requires CB-VERSION header
+   */
+  private async signedRequestV2<T>(
+    method: string,
+    endpoint: string,
+    body?: Record<string, unknown>
+  ): Promise<T> {
+    if (!apiCircuitBreaker.canExecute()) {
+      throw new CoinbaseError("API circuit breaker is open", "CIRCUIT_OPEN");
+    }
+
+    await this.applyThrottling();
+    this.checkRateLimit();
+    this.rateLimitState.requestCount++;
+
+    return withRetry(async () => {
+      const timestamp = Math.floor(Date.now() / 1000).toString();
+      const bodyStr = body ? JSON.stringify(body) : "";
+      const signature = this.sign(timestamp, method, endpoint, bodyStr);
+
+      const headers: Record<string, string> = {
+        "CB-ACCESS-KEY": this.apiKey,
+        "CB-ACCESS-SIGN": signature,
+        "CB-ACCESS-TIMESTAMP": timestamp,
+        "CB-VERSION": CB_API_VERSION,
+        "Content-Type": "application/json",
+      };
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+      try {
+        const response = await fetch(`${BASE_URL}${endpoint}`, {
+          method,
+          headers,
+          body: body ? bodyStr : undefined,
+          signal: controller.signal,
+        });
+
+        if (!response.ok) {
+          const error = (await response.json()) as CoinbaseAPIError;
+          logger.error("Coinbase V2 API request failed", undefined, {
+            endpoint,
+            status: response.status,
+            error: error.error,
+            message: error.message,
+          });
+
+          if (response.status === 429) {
+            apiCircuitBreaker.recordFailure();
+            throw new CoinbaseRateLimitError(undefined, endpoint);
+          }
+
+          if (response.status === 401 || response.status === 403) {
+            throw new CoinbaseAuthError(error.message || "Authentication failed");
+          }
+
+          apiCircuitBreaker.recordFailure();
+          throw new CoinbaseError(error.message || "Unknown error", error.error, endpoint);
+        }
+
+        apiCircuitBreaker.recordSuccess();
+        return response.json() as Promise<T>;
+      } finally {
+        clearTimeout(timeoutId);
+      }
+    }, COINBASE_RETRY_CONFIG);
+  }
+
   // =========================================================================
   // Connection
   // =========================================================================
@@ -564,6 +644,135 @@ export class CoinbaseClient {
     return this.signedRequest<CoinbaseFillsResponse>(
       "GET",
       `/api/v3/brokerage/orders/historical/fills${query ? `?${query}` : ""}`
+    );
+  }
+
+  // =========================================================================
+  // V2 API Methods (Coinbase Primary API - Wallet Operations)
+  // =========================================================================
+
+  /**
+   * Get all v2 accounts (wallets)
+   * Auto-paginates to get all accounts
+   */
+  async getV2Accounts(): Promise<CoinbaseV2Account[]> {
+    type V2AccountsResponse = CoinbaseV2PaginatedResponse<CoinbaseV2Account>;
+
+    const allAccounts: CoinbaseV2Account[] = [];
+    let nextUri: string | null = "/v2/accounts?limit=100";
+
+    while (nextUri) {
+      const response: V2AccountsResponse = await this.signedRequestV2<V2AccountsResponse>(
+        "GET", nextUri
+      );
+      allAccounts.push(...response.data);
+      nextUri = response.pagination.next_uri || null;
+    }
+
+    return allAccounts;
+  }
+
+  /**
+   * Find a v2 account by currency code
+   */
+  async getV2AccountByCurrency(currency: string): Promise<CoinbaseV2Account | null> {
+    const accounts = await this.getV2Accounts();
+    return accounts.find(
+      (a) => a.currency.code.toUpperCase() === currency.toUpperCase()
+    ) || null;
+  }
+
+  /**
+   * Get transactions for a v2 account
+   * Includes deposits (type=receive/transfer), withdrawals (type=send), buys, sells
+   */
+  async getV2Transactions(
+    accountId: string,
+    limit: number = 100
+  ): Promise<CoinbaseTransaction[]> {
+    const response = await this.signedRequestV2<
+      CoinbaseV2PaginatedResponse<CoinbaseTransaction>
+    >("GET", `/v2/accounts/${accountId}/transactions?limit=${limit}`);
+    return response.data;
+  }
+
+  /**
+   * Send crypto from a v2 account (withdrawal to external address)
+   */
+  async sendCrypto(
+    accountId: string,
+    to: string,
+    amount: string,
+    currency: string,
+    idem?: string
+  ): Promise<CoinbaseTransaction> {
+    const body: CoinbaseV2SendRequest = {
+      type: "send",
+      to,
+      amount,
+      currency,
+      ...(idem ? { idem } : {}),
+    };
+
+    const response = await this.signedRequestV2<
+      CoinbaseV2Response<CoinbaseTransaction>
+    >("POST", `/v2/accounts/${accountId}/transactions`, body as unknown as Record<string, unknown>);
+    return response.data;
+  }
+
+  /**
+   * Get crypto currency information
+   */
+  async getCryptoCurrencies(): Promise<CoinbaseV2CryptoCurrency[]> {
+    const response = await this.signedRequestV2<
+      CoinbaseV2PaginatedResponse<CoinbaseV2CryptoCurrency>
+    >("GET", "/v2/currencies/crypto");
+    return response.data;
+  }
+
+  // =========================================================================
+  // Order Preview (Test/Dry-Run)
+  // =========================================================================
+
+  /**
+   * Preview an order without placing it (dry-run)
+   * Returns estimated fees, total, and any errors/warnings
+   */
+  async previewOrder(order: CoinbaseCreateOrderRequest): Promise<{
+    order_total: string;
+    commission_total: string;
+    errs: string[];
+    warning: string[];
+    quote_size: string;
+    base_size: string;
+    best_bid: string;
+    best_ask: string;
+    is_max: boolean;
+    order_margin_total?: string;
+    leverage?: string;
+    long_leverage?: string;
+    short_leverage?: string;
+    slippage?: string;
+  }> {
+    return this.signedRequest<{
+      order_total: string;
+      commission_total: string;
+      errs: string[];
+      warning: string[];
+      quote_size: string;
+      base_size: string;
+      best_bid: string;
+      best_ask: string;
+      is_max: boolean;
+      order_margin_total?: string;
+      leverage?: string;
+      long_leverage?: string;
+      short_leverage?: string;
+      slippage?: string;
+    }>(
+      "POST",
+      "/api/v3/brokerage/orders/preview",
+      order as unknown as Record<string, unknown>
     );
   }
 }
