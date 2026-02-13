@@ -615,6 +615,19 @@ const TOOL_AGENT_MAP: Record<string, string> = {
   agentkit_get_wallet: "Monitor",
   agentkit_get_balance: "Monitor",
   agentkit_erc20_balance: "Monitor",
+  // agentKitOnchainTools cherry-picks (Executor: DEX swaps)
+  agentkit_swap: "Executor",
+  agentkit_get_swap_price: "Analyst",
+
+  // ---- Base L2 signal tools ----
+  // baseSignalTools cherry-picks (Scanner: discovery + scanning)
+  scan_base_whale_transfers: "Scanner",
+  scan_base_volume_spikes: "Scanner",
+  scan_base_new_tokens: "Scanner",
+  // baseSignalTools cherry-picks (Analyst: analysis + tracking)
+  track_base_wallet: "Analyst",
+  get_base_token_holders: "Analyst",
+  get_base_dex_pairs: "Scanner",
 
   // ---- Teacher tools ----
   explain: "Teacher",

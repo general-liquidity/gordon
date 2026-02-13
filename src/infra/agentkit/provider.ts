@@ -19,6 +19,7 @@ import {
   erc20ActionProvider,
   wethActionProvider,
   cdpApiActionProvider,
+  cdpEvmWalletActionProvider,
 } from "@coinbase/agentkit";
 import type { Action } from "@coinbase/agentkit";
 
@@ -59,6 +60,7 @@ export function isAgentKitConfigured(): boolean {
  * - erc20ActionProvider (get_balance, transfer for ERC20 tokens)
  * - wethActionProvider (wrap/unwrap ETH)
  * - cdpApiActionProvider (faucet, trade API)
+ * - cdpEvmWalletActionProvider (DEX swap, swap price, spend permissions)
  *
  * @throws Error if CDP keys are not configured
  */
@@ -85,10 +87,11 @@ export async function getAgentKit(): Promise<AgentKit> {
   const erc20 = erc20ActionProvider();
   const weth = wethActionProvider();
   const cdp = cdpApiActionProvider();
+  const cdpEvm = cdpEvmWalletActionProvider();
 
   _agentKit = await AgentKit.from({
     walletProvider,
-    actionProviders: [wallet, erc20, weth, cdp],
+    actionProviders: [wallet, erc20, weth, cdp, cdpEvm],
   });
 
   // Index actions by name for O(1) lookup

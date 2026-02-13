@@ -55,6 +55,7 @@ import {
   autonomousTools,
   baseOnchainTools,
   agentKitOnchainTools,
+  baseSignalTools,
   withToolsMetrics,
 } from "./tools/index.ts";
 import { getSessionSummary, getMemoryStats, resetSharedMemory } from "./shared-context.ts";
@@ -283,6 +284,7 @@ const instrumentedPairAnalysisTools = withToolsMetrics(pairAnalysisTools);
 const instrumentedAutonomousTools = withToolsMetrics(autonomousTools);
 const instrumentedBaseOnchainTools = withToolsMetrics(baseOnchainTools);
 const instrumentedAgentKitOnchainTools = withToolsMetrics(agentKitOnchainTools);
+const instrumentedBaseSignalTools = withToolsMetrics(baseSignalTools);
 const instrumentedEvalTools = withToolsMetrics(evalTools);
 
 // ============================================================================
@@ -916,6 +918,11 @@ function getScannerAgent(): Agent {
         get_base_trending: instrumentedBaseOnchainTools.get_base_trending,
         get_base_featured: instrumentedBaseOnchainTools.get_base_featured,
         get_base_info: instrumentedBaseOnchainTools.get_base_info,
+        // Base L2 on-chain signal tools (whale detection, DEX data, new tokens)
+        scan_base_whale_transfers: instrumentedBaseSignalTools.scan_base_whale_transfers,
+        get_base_dex_pairs: instrumentedBaseSignalTools.get_base_dex_pairs,
+        scan_base_volume_spikes: instrumentedBaseSignalTools.scan_base_volume_spikes,
+        scan_base_new_tokens: instrumentedBaseSignalTools.scan_base_new_tokens,
       },
       memory: createSubAgentMemory(),
       inputProcessors: [new TokenLimiterProcessor({ limit: 32000 })],
@@ -961,6 +968,12 @@ function getAnalystAgent(): Agent {
         // Base L2 onchain tools (gas, balances for onchain analysis)
         get_base_gas: instrumentedBaseOnchainTools.get_base_gas,
         get_base_balance: instrumentedBaseOnchainTools.get_base_balance,
+        // AgentKit DEX price quote (read-only, for onchain price discovery)
+        agentkit_get_swap_price: instrumentedAgentKitOnchainTools.agentkit_get_swap_price,
+        // Base L2 on-chain analysis tools (wallet tracking, holders, DEX pairs)
+        track_base_wallet: instrumentedBaseSignalTools.track_base_wallet,
+        get_base_token_holders: instrumentedBaseSignalTools.get_base_token_holders,
+        get_base_dex_pairs: instrumentedBaseSignalTools.get_base_dex_pairs,
         // Shared context for cross-agent memory
         ...instrumentedSharedContextTools,
         // Performance evaluation tools for learning from trade outcomes
@@ -1061,6 +1074,9 @@ function getExecutorAgent(): Agent {
         agentkit_erc20_transfer: instrumentedAgentKitOnchainTools.agentkit_erc20_transfer,
         agentkit_wrap_eth: instrumentedAgentKitOnchainTools.agentkit_wrap_eth,
         agentkit_request_faucet: instrumentedAgentKitOnchainTools.agentkit_request_faucet,
+        // AgentKit DEX swap tools (Base L2 — 0x aggregation across Uniswap, Aerodrome, etc.)
+        agentkit_swap: instrumentedAgentKitOnchainTools.agentkit_swap,
+        agentkit_get_swap_price: instrumentedAgentKitOnchainTools.agentkit_get_swap_price,
         // Shared context for reading plan details and analysis before execution
         ...instrumentedSharedContextTools,
       },

@@ -13,6 +13,8 @@
  * - agentkit_erc20_transfer: Transfer ERC20 tokens
  * - agentkit_wrap_eth: Wrap ETH to WETH (or unwrap)
  * - agentkit_request_faucet: Request testnet ETH from faucet
+ * - agentkit_get_swap_price: Get DEX swap quote (read-only)
+ * - agentkit_swap: Execute DEX swap on Base (0x aggregation)
  *
  * All tools gracefully handle the case where CDP keys are not configured.
  */
@@ -226,6 +228,66 @@ export const agentKitRequestFaucetTool = createTool({
 });
 
 // ============================================================================
+// DEX Swap Tools
+// ============================================================================
+
+/**
+ * Get a DEX swap price quote (read-only, no execution)
+ */
+export const agentKitGetSwapPriceTool = createTool({
+  id: "agentkit_get_swap_price",
+  description:
+    "Get a DEX swap price quote on Base L2 without executing. Shows expected output amount, " +
+    "liquidity status, and price. Use BEFORE agentkit_swap to show the user what they'll receive. " +
+    "Native ETH address: 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE. " +
+    "Common Base tokens: USDC=0x833589fcd6edb6e08f4c7c32d4f71b54bda02913, " +
+    "WETH=0x4200000000000000000000000000000000000006, " +
+    "AERO=0x940181a94A35A4569E4529A3CDfB74e38FD98631.",
+  inputSchema: z.object({
+    fromToken: z.string().describe("Contract address of token to sell (use 0xEeee...eEEeE for native ETH)"),
+    toToken: z.string().describe("Contract address of token to buy"),
+    fromAmount: z.string().describe("Amount to sell in human-readable units (e.g., '0.1', '100')"),
+    slippageBps: z.number().optional().describe("Max slippage in basis points (100 = 1%). Default: 100"),
+  }),
+  outputSchema: agentKitResultSchema,
+  execute: async ({ fromToken, toToken, fromAmount, slippageBps }) =>
+    safeExecuteAction("get_swap_price", {
+      fromToken,
+      toToken,
+      fromAmount,
+      ...(slippageBps !== undefined ? { slippageBps } : {}),
+    }),
+});
+
+/**
+ * Execute a DEX swap on Base L2 via 0x aggregation
+ */
+export const agentKitSwapTool = createTool({
+  id: "agentkit_swap",
+  description:
+    "Execute a token swap on Base L2 via DEX aggregation (routes through Uniswap, Aerodrome, " +
+    "SushiSwap, etc. for best price). Automatically handles Permit2 token approvals. " +
+    "IMPORTANT: Always call agentkit_get_swap_price first to show the quote. " +
+    "IMPORTANT: Requires ARMED mode. Confirm amount and tokens with user before executing. " +
+    "Native ETH address: 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE. " +
+    "Only works on base-mainnet or ethereum-mainnet.",
+  inputSchema: z.object({
+    fromToken: z.string().describe("Contract address of token to sell (use 0xEeee...eEEeE for native ETH)"),
+    toToken: z.string().describe("Contract address of token to buy"),
+    fromAmount: z.string().describe("Amount to sell in human-readable units"),
+    slippageBps: z.number().optional().describe("Max slippage in basis points (100 = 1%). Default: 100"),
+  }),
+  outputSchema: agentKitResultSchema,
+  execute: async ({ fromToken, toToken, fromAmount, slippageBps }) =>
+    safeExecuteAction("swap", {
+      fromToken,
+      toToken,
+      fromAmount,
+      ...(slippageBps !== undefined ? { slippageBps } : {}),
+    }),
+});
+
+// ============================================================================
 // Export as Mastra tool object
 // ============================================================================
 
@@ -240,4 +302,6 @@ export const agentKitOnchainTools = {
   agentkit_erc20_transfer: agentKitErc20TransferTool,
   agentkit_wrap_eth: agentKitWrapEthTool,
   agentkit_request_faucet: agentKitRequestFaucetTool,
+  agentkit_get_swap_price: agentKitGetSwapPriceTool,
+  agentkit_swap: agentKitSwapTool,
 };

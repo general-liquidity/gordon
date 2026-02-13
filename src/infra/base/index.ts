@@ -31,3 +31,29 @@ export {
   verifyBaseChainId,
   getBaseTokenBalance,
 } from "./chain.ts";
+
+// Basescan API client (token transfers, holders)
+export {
+  getTokenTransfers,
+  getTransactions,
+  getTopTokenHolders,
+  isBasescanConfigured,
+} from "./basescan.ts";
+
+// DexScreener API client (DEX pairs, volume, new tokens)
+export {
+  getBasePairs,
+  searchBasePairs,
+  getBasePairByAddress,
+  getBaseTokensBatch,
+  getNewBaseTokens,
+  getBoostedBaseTokens,
+} from "./dexscreener.ts";
+
+// Signal detection (whale, volume, new listings, pressure)
+export {
+  detectWhaleTransfers,
+  detectVolumeSpikes,
+  detectNewListings,
+  analyzeDexPressure,
+} from "./signals.ts";
