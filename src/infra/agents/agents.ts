@@ -53,6 +53,7 @@ import {
   liquidationIntelligenceTools,
   pairAnalysisTools,
   autonomousTools,
+  baseOnchainTools,
   withToolsMetrics,
 } from "./tools/index.ts";
 import { getSessionSummary, getMemoryStats, resetSharedMemory } from "./shared-context.ts";
@@ -279,6 +280,7 @@ const instrumentedMultiModalChartTools = withToolsMetrics(multiModalChartTools);
 const instrumentedMarketDataTools = withToolsMetrics(marketDataTools);
 const instrumentedPairAnalysisTools = withToolsMetrics(pairAnalysisTools);
 const instrumentedAutonomousTools = withToolsMetrics(autonomousTools);
+const instrumentedBaseOnchainTools = withToolsMetrics(baseOnchainTools);
 const instrumentedEvalTools = withToolsMetrics(evalTools);
 
 // ============================================================================
@@ -908,6 +910,10 @@ function getScannerAgent(): Agent {
         get_strategy_performance: instrumentedEvalTools.get_strategy_performance,
         get_performance_context: instrumentedEvalTools.get_performance_context,
         get_all_strategy_performances: instrumentedEvalTools.get_all_strategy_performances,
+        // Base L2 onchain discovery tools
+        get_base_trending: instrumentedBaseOnchainTools.get_base_trending,
+        get_base_featured: instrumentedBaseOnchainTools.get_base_featured,
+        get_base_info: instrumentedBaseOnchainTools.get_base_info,
       },
       memory: createSubAgentMemory(),
       inputProcessors: [new TokenLimiterProcessor({ limit: 32000 })],
@@ -950,6 +956,9 @@ function getAnalystAgent(): Agent {
         // Cross-pair analysis tools (correlation, spread, performance comparison)
         ...instrumentedPairAnalysisTools,
         analyze_coin: instrumentedMarketTools.analyze_coin,
+        // Base L2 onchain tools (gas, balances for onchain analysis)
+        get_base_gas: instrumentedBaseOnchainTools.get_base_gas,
+        get_base_balance: instrumentedBaseOnchainTools.get_base_balance,
         // Shared context for cross-agent memory
         ...instrumentedSharedContextTools,
         // Performance evaluation tools for learning from trade outcomes

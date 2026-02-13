@@ -471,6 +471,10 @@ const TOOL_AGENT_MAP: Record<string, string> = {
   get_strategy_performance: "Scanner",
   get_performance_context: "Scanner",
   get_all_strategy_performances: "Scanner",
+  // baseOnchainTools cherry-picks (Scanner: discovery/info)
+  get_base_trending: "Scanner",
+  get_base_featured: "Scanner",
+  get_base_info: "Scanner",
 
   // ---- Analyst tools ----
   // marketTools cherry-pick
@@ -510,6 +514,9 @@ const TOOL_AGENT_MAP: Record<string, string> = {
   analyze_pair_correlation: "Analyst",
   analyze_pair_spread: "Analyst",
   compare_pair_performance: "Analyst",
+  // baseOnchainTools cherry-picks (Analyst: gas/balance analysis)
+  get_base_gas: "Analyst",
+  get_base_balance: "Analyst",
 
   // ---- Planner tools ----
   // tradingTools cherry-picks
