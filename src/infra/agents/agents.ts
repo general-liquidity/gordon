@@ -54,6 +54,7 @@ import {
   pairAnalysisTools,
   autonomousTools,
   baseOnchainTools,
+  agentKitOnchainTools,
   withToolsMetrics,
 } from "./tools/index.ts";
 import { getSessionSummary, getMemoryStats, resetSharedMemory } from "./shared-context.ts";
@@ -281,6 +282,7 @@ const instrumentedMarketDataTools = withToolsMetrics(marketDataTools);
 const instrumentedPairAnalysisTools = withToolsMetrics(pairAnalysisTools);
 const instrumentedAutonomousTools = withToolsMetrics(autonomousTools);
 const instrumentedBaseOnchainTools = withToolsMetrics(baseOnchainTools);
+const instrumentedAgentKitOnchainTools = withToolsMetrics(agentKitOnchainTools);
 const instrumentedEvalTools = withToolsMetrics(evalTools);
 
 // ============================================================================
@@ -1054,6 +1056,11 @@ function getExecutorAgent(): Agent {
         // Order status and validation tools
         get_order_status: instrumentedOrderbookTools.get_order_status,
         test_order: instrumentedOrderbookTools.test_order,
+        // AgentKit onchain execution tools (Base L2 transfers, wraps, faucet)
+        agentkit_native_transfer: instrumentedAgentKitOnchainTools.agentkit_native_transfer,
+        agentkit_erc20_transfer: instrumentedAgentKitOnchainTools.agentkit_erc20_transfer,
+        agentkit_wrap_eth: instrumentedAgentKitOnchainTools.agentkit_wrap_eth,
+        agentkit_request_faucet: instrumentedAgentKitOnchainTools.agentkit_request_faucet,
         // Shared context for reading plan details and analysis before execution
         ...instrumentedSharedContextTools,
       },
@@ -1096,6 +1103,10 @@ function getMonitorAgent(): Agent {
         check_daily_limit: instrumentedRiskManagementTools.check_daily_limit,
         // Autonomous mode status
         get_autonomous_status: instrumentedAutonomousTools.get_autonomous_status,
+        // AgentKit onchain wallet tools (Base L2 wallet info, balances)
+        agentkit_get_wallet: instrumentedAgentKitOnchainTools.agentkit_get_wallet,
+        agentkit_get_balance: instrumentedAgentKitOnchainTools.agentkit_get_balance,
+        agentkit_erc20_balance: instrumentedAgentKitOnchainTools.agentkit_erc20_balance,
         // Shared context for cross-agent memory
         ...instrumentedSharedContextTools,
         // Performance evaluation tools for recording trade outcomes

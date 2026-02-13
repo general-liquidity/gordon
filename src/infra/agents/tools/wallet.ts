@@ -2,18 +2,23 @@
  * Wallet Tools (Mastra Format)
  * Tools for wallet management, transfers, and dust conversion
  *
- * Migrated from OpenAI Agents SDK format to Mastra format.
- * Key differences:
- * - tool() -> createTool()
- * - name -> id
- * - parameters -> inputSchema
- * - Context access via first parameter destructuring
+ * Multi-exchange tools (work on all adapters via shared Exchange/ExchangeExtended interface):
+ * - get_coin_info: Network fees and withdrawal info
+ * - preview_withdrawal: Preview withdrawal details
+ * - withdraw_to_external: Execute withdrawal to external address
+ * - get_withdrawal_status: Check recent withdrawal status
+ *
+ * Binance-only tools (use Binance-specific APIs):
+ * - get_dustable_assets, convert_dust, transfer_funds
+ * - get_trade_fees, get_asset_dividends, get_deposit_address
+ * - get_user_assets, get_wallet_balances, get_dust_log
  */
 
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
 import { getGordonContext, type MastraExecutionContext } from "./types.ts";
+import type { ExchangeExtended } from "../../exchange/types.ts";
 
 // ============================================================================
 // Error Messages
@@ -228,28 +233,25 @@ export const transferFundsTool = createTool({
 export const getCoinInfoTool = createTool({
   id: "get_coin_info",
   description:
-    "Get detailed information about a coin including networks, fees, and deposit/withdrawal status. " +
-    "Use when user asks 'what networks for BTC', 'withdrawal fee for ETH', 'can I deposit USDT'.",
+    "Get detailed information about a coin including networks, fees, and withdrawal status. " +
+    "Use when user asks 'what networks for BTC', 'withdrawal fee for ETH', 'can I withdraw USDT'. " +
+    "Works on all supported exchanges.",
   inputSchema: z.object({
     coin: z.string().describe("Coin symbol (e.g., 'BTC', 'ETH', 'USDT')"),
   }),
   outputSchema: z.object({
     coin: z.string().optional(),
-    name: z.string().optional(),
-    canDeposit: z.boolean().optional(),
-    canWithdraw: z.boolean().optional(),
+    exchange: z.string().optional(),
     networks: z
       .array(
         z.object({
           network: z.string(),
           name: z.string(),
-          depositEnabled: z.boolean(),
           withdrawEnabled: z.boolean(),
           withdrawFee: z.string(),
           withdrawMin: z.string(),
-          confirmations: z.number(),
+          withdrawMax: z.string().optional(),
           estimatedArrival: z.string(),
-          isDefault: z.boolean(),
         })
       )
       .optional(),
@@ -260,32 +262,31 @@ export const getCoinInfoTool = createTool({
     if (!ctx?.exchange) {
       return errors.noExchange;
     }
-    if (!ctx.binance || ctx.exchange.exchangeId != "binance") {
-      return errors.binanceOnly;
+
+    const ext = ctx.exchange as ExchangeExtended;
+    if (!ext.getWithdrawalInfo) {
+      return { error: `Withdrawal info is not supported on ${ctx.exchange.displayName}.` };
     }
 
     try {
-      const info = await ctx.binance.getCoinNetworks(coin);
+      const coinUpper = coin.toUpperCase();
+      const info = await ext.getWithdrawalInfo(coinUpper);
 
       if (!info) {
-        return { error: `Coin ${coin} not found on Binance.` };
+        return { error: `Coin ${coinUpper} not found on ${ctx.exchange.displayName}.` };
       }
 
       return {
         coin: info.coin,
-        name: info.name,
-        canDeposit: info.depositAllEnable,
-        canWithdraw: info.withdrawAllEnable,
-        networks: info.networkList.map((n) => ({
+        exchange: ctx.exchange.displayName,
+        networks: info.networks.map((n) => ({
           network: n.network,
           name: n.name,
-          depositEnabled: n.depositEnable,
-          withdrawEnabled: n.withdrawEnable,
-          withdrawFee: n.withdrawFee,
-          withdrawMin: n.withdrawMin,
-          confirmations: n.minConfirm,
-          estimatedArrival: n.estimatedArrivalTime + " mins",
-          isDefault: n.isDefault,
+          withdrawEnabled: n.withdrawEnabled,
+          withdrawFee: String(n.withdrawFee),
+          withdrawMin: String(n.withdrawMin),
+          withdrawMax: n.withdrawMax ? String(n.withdrawMax) : undefined,
+          estimatedArrival: n.estimatedArrivalMins + " mins",
         })),
       };
     } catch (error) {
@@ -661,8 +662,8 @@ export const previewWithdrawalTool = createTool({
   id: "preview_withdrawal",
   description:
     "Preview a withdrawal to an external address (e.g., hardware wallet, another exchange). " +
-    "Shows network fees, minimum amounts, estimated arrival time, and address validation. " +
-    "Does NOT execute the withdrawal. Safe to call anytime. " +
+    "Shows network fees, minimum amounts, estimated arrival time. " +
+    "Does NOT execute the withdrawal. Safe to call anytime. Works on all supported exchanges. " +
     "Use when user asks 'how much to withdraw BTC', 'withdrawal fee for ETH', 'send USDT to my Ledger'.",
   inputSchema: z.object({
     coin: z.string().describe("Coin to withdraw (e.g., 'BTC', 'ETH', 'USDT')"),
@@ -670,10 +671,6 @@ export const previewWithdrawalTool = createTool({
       .string()
       .default("")
       .describe("Network to use (e.g., 'ETH', 'TRX', 'BTC', 'BSC'). Empty to show all available networks."),
-    address: z
-      .string()
-      .default("")
-      .describe("Destination address to validate. Empty to skip validation."),
     amount: z
       .number()
       .positive()
@@ -682,6 +679,7 @@ export const previewWithdrawalTool = createTool({
   }),
   outputSchema: z.object({
     coin: z.string().optional(),
+    exchange: z.string().optional(),
     selectedNetwork: z
       .object({
         network: z.string(),
@@ -715,80 +713,60 @@ export const previewWithdrawalTool = createTool({
         withinMaximum: z.boolean(),
       })
       .optional(),
-    addressValid: z.boolean().optional(),
-    addressWarning: z.string().optional(),
     availableBalance: z.number().optional(),
     sufficientBalance: z.boolean().optional(),
     warning: z.string().optional(),
     error: z.string().optional(),
   }),
-  execute: async ({ coin, network, address, amount }, execContext: MastraExecutionContext) => {
+  execute: async ({ coin, network, amount }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
     if (!ctx?.exchange) {
       return errors.noExchange;
     }
-    if (!ctx.binance || ctx.exchange.exchangeId !== "binance") {
-      return errors.binanceOnly;
+
+    const ext = ctx.exchange as ExchangeExtended;
+    if (!ext.getWithdrawalInfo) {
+      return { error: `Withdrawal info is not supported on ${ctx.exchange.displayName}.` };
     }
 
     try {
       const coinUpper = coin.toUpperCase();
-      const coinInfo = await ctx.binance.getCoinNetworks(coinUpper);
-      if (!coinInfo) {
-        return { error: `Coin ${coinUpper} not found on Binance.` };
+      const info = await ext.getWithdrawalInfo(coinUpper);
+      if (!info) {
+        return { error: `Coin ${coinUpper} not found on ${ctx.exchange.displayName}.` };
       }
 
-      const allNetworks = coinInfo.networkList.map((n) => ({
+      const allNetworks = info.networks.map((n) => ({
         network: n.network,
         name: n.name,
-        withdrawEnabled: n.withdrawEnable,
-        withdrawFee: parseFloat(n.withdrawFee),
-        withdrawMin: parseFloat(n.withdrawMin),
-        withdrawMax: parseFloat(n.withdrawMax),
-        estimatedArrivalMins: n.estimatedArrivalTime,
+        withdrawEnabled: n.withdrawEnabled,
+        withdrawFee: n.withdrawFee,
+        withdrawMin: n.withdrawMin,
+        withdrawMax: n.withdrawMax,
+        estimatedArrivalMins: n.estimatedArrivalMins,
       }));
 
       let selectedNetwork = undefined;
       if (network) {
         const networkUpper = network.toUpperCase();
-        const found = coinInfo.networkList.find(
+        const found = info.networks.find(
           (n) => n.network.toUpperCase() === networkUpper
         );
         if (!found) {
           return {
-            error: `Network ${network} not available for ${coinUpper}. Available: ${allNetworks.map((n) => n.network).join(", ")}`,
+            error: `Network ${network} not available for ${coinUpper} on ${ctx.exchange.displayName}. Available: ${allNetworks.map((n) => n.network).join(", ")}`,
             allNetworks,
           };
         }
         selectedNetwork = {
           network: found.network,
           name: found.name,
-          withdrawEnabled: found.withdrawEnable,
-          withdrawFee: parseFloat(found.withdrawFee),
-          withdrawMin: parseFloat(found.withdrawMin),
-          withdrawMax: parseFloat(found.withdrawMax),
-          estimatedArrivalMins: found.estimatedArrivalTime,
+          withdrawEnabled: found.withdrawEnabled,
+          withdrawFee: found.withdrawFee,
+          withdrawMin: found.withdrawMin,
+          withdrawMax: found.withdrawMax,
+          estimatedArrivalMins: found.estimatedArrivalMins,
         };
-      }
-
-      let addressValid: boolean | undefined = undefined;
-      let addressWarning: string | undefined = undefined;
-      if (address && network) {
-        const net = coinInfo.networkList.find(
-          (n) => n.network.toUpperCase() === network.toUpperCase()
-        );
-        if (net?.addressRegex) {
-          try {
-            const regex = new RegExp(net.addressRegex);
-            addressValid = regex.test(address);
-            if (!addressValid) {
-              addressWarning = `Address does not match expected format for ${net.network} network. Double-check before proceeding.`;
-            }
-          } catch {
-            addressValid = undefined;
-            addressWarning = "Could not validate address format. Verify manually.";
-          }
-        }
       }
 
       let amountPreview = undefined;
@@ -807,12 +785,12 @@ export const previewWithdrawalTool = createTool({
       let availableBalance: number | undefined = undefined;
       let sufficientBalance: boolean | undefined = undefined;
       try {
-        availableBalance = await ctx.binance.getBalance(coinUpper);
+        availableBalance = await ctx.exchange.getBalance(coinUpper);
         if (amount !== undefined) {
           sufficientBalance = availableBalance >= amount;
         }
       } catch {
-        // Non-critical
+        // Non-critical — balance check is best-effort
       }
 
       let warning: string | undefined = undefined;
@@ -822,11 +800,10 @@ export const previewWithdrawalTool = createTool({
 
       return {
         coin: coinUpper,
+        exchange: ctx.exchange.displayName,
         selectedNetwork,
         allNetworks: !network ? allNetworks : undefined,
         amountPreview,
-        addressValid,
-        addressWarning,
         availableBalance,
         sufficientBalance,
         warning,
@@ -840,9 +817,9 @@ export const previewWithdrawalTool = createTool({
 export const withdrawToExternalTool = createTool({
   id: "withdraw_to_external",
   description:
-    "Execute a withdrawal to an external address (e.g., hardware wallet, another exchange). " +
+    "Execute a withdrawal to an external address (e.g., hardware wallet, cold wallet, another exchange). " +
     "REQUIRES ARMED MODE and explicit confirm=true. This sends real funds off the exchange. " +
-    "ALWAYS call preview_withdrawal first to show the user fees and details. " +
+    "ALWAYS call preview_withdrawal first to show the user fees and details. Works on all supported exchanges. " +
     "Use when user confirms 'yes withdraw', 'send it', 'execute the withdrawal'.",
   inputSchema: z.object({
     coin: z.string().describe("Coin to withdraw (e.g., 'BTC', 'ETH', 'USDT')"),
@@ -868,6 +845,7 @@ export const withdrawToExternalTool = createTool({
     netReceived: z.number().optional(),
     status: z.string().optional(),
     message: z.string().optional(),
+    exchange: z.string().optional(),
     confirmationRequired: z.boolean().optional(),
     summary: z
       .object({
@@ -890,8 +868,10 @@ export const withdrawToExternalTool = createTool({
     if (!ctx?.exchange) {
       return errors.noExchange;
     }
-    if (!ctx.binance || ctx.exchange.exchangeId !== "binance") {
-      return errors.binanceOnly;
+
+    const ext = ctx.exchange as ExchangeExtended;
+    if (!ext.getWithdrawalInfo || !ext.withdraw) {
+      return { error: `Withdrawals are not supported on ${ctx.exchange.displayName}.` };
     }
 
     const coinUpper = coin.toUpperCase();
@@ -899,67 +879,44 @@ export const withdrawToExternalTool = createTool({
     // Fetch network info for fee calculation and validation
     let networkInfo;
     try {
-      const coinInfo = await ctx.binance.getCoinNetworks(coinUpper);
-      if (!coinInfo) {
-        return { error: `Coin ${coinUpper} not found on Binance.` };
+      const info = await ext.getWithdrawalInfo(coinUpper);
+      if (!info) {
+        return { error: `Coin ${coinUpper} not found on ${ctx.exchange.displayName}.` };
       }
-      networkInfo = coinInfo.networkList.find(
+      networkInfo = info.networks.find(
         (n) => n.network.toUpperCase() === network.toUpperCase()
       );
       if (!networkInfo) {
         return {
-          error: `Network ${network} not available for ${coinUpper}. Available: ${coinInfo.networkList.map((n) => n.network).join(", ")}`,
+          error: `Network ${network} not available for ${coinUpper} on ${ctx.exchange.displayName}. Available: ${info.networks.map((n) => n.network).join(", ")}`,
         };
       }
     } catch (error) {
       return { error: `Failed to fetch network info: ${(error as Error).message}` };
     }
 
-    const fee = parseFloat(networkInfo.withdrawFee);
+    const fee = networkInfo.withdrawFee;
     const netReceived = amount - fee;
-    const withdrawMin = parseFloat(networkInfo.withdrawMin);
-    const withdrawMax = parseFloat(networkInfo.withdrawMax);
 
     // Validate
-    if (!networkInfo.withdrawEnable) {
+    if (!networkInfo.withdrawEnabled) {
       return { error: `Withdrawals are currently DISABLED for ${coinUpper} on ${networkInfo.network}.` };
     }
-    if (amount < withdrawMin) {
-      return { error: `Amount ${amount} is below minimum withdrawal of ${withdrawMin} ${coinUpper} for ${networkInfo.network}.` };
+    if (amount < networkInfo.withdrawMin) {
+      return { error: `Amount ${amount} is below minimum withdrawal of ${networkInfo.withdrawMin} ${coinUpper} for ${networkInfo.network}.` };
     }
-    if (withdrawMax > 0 && amount > withdrawMax) {
-      return { error: `Amount ${amount} exceeds maximum withdrawal of ${withdrawMax} ${coinUpper} for ${networkInfo.network}.` };
+    if (networkInfo.withdrawMax > 0 && amount > networkInfo.withdrawMax) {
+      return { error: `Amount ${amount} exceeds maximum withdrawal of ${networkInfo.withdrawMax} ${coinUpper} for ${networkInfo.network}.` };
     }
     if (netReceived <= 0) {
       return { error: `Amount ${amount} ${coinUpper} is less than or equal to the network fee (${fee}). Nothing would be received.` };
-    }
-
-    // Validate address format
-    if (networkInfo.addressRegex) {
-      try {
-        const regex = new RegExp(networkInfo.addressRegex);
-        if (!regex.test(address)) {
-          return { error: `Address format is invalid for ${networkInfo.network} network. Please double-check the address.` };
-        }
-      } catch {
-        // Skip if regex can't be parsed
-      }
-    }
-
-    // Check tag/memo requirement
-    if (networkInfo.memoRegex && networkInfo.memoRegex !== "^$") {
-      if (!tag) {
-        return {
-          error: `A tag/memo is REQUIRED for ${coinUpper} on ${networkInfo.network}. Sending without it may result in PERMANENT LOSS OF FUNDS.`,
-        };
-      }
     }
 
     // If not confirmed, return summary for review
     if (!confirm) {
       return {
         confirmationRequired: true,
-        message: "Withdrawal is ready. Review the summary below and call again with confirm=true to execute.",
+        message: `Withdrawal is ready on ${ctx.exchange.displayName}. Review the summary below and call again with confirm=true to execute.`,
         summary: {
           coin: coinUpper,
           network: networkInfo.network,
@@ -985,7 +942,7 @@ export const withdrawToExternalTool = createTool({
 
     // Check balance
     try {
-      const balance = await ctx.binance.getBalance(coinUpper);
+      const balance = await ctx.exchange.getBalance(coinUpper);
       if (balance < amount) {
         return { error: `Insufficient balance. Available: ${balance} ${coinUpper}, requested: ${amount} ${coinUpper}.` };
       }
@@ -995,7 +952,7 @@ export const withdrawToExternalTool = createTool({
 
     // Execute
     try {
-      const result = await ctx.binance.withdraw(coinUpper, networkInfo.network, address, amount, tag || undefined);
+      const result = await ext.withdraw(coinUpper, networkInfo.network, address, amount, tag || undefined);
 
       return {
         success: true,
@@ -1007,7 +964,8 @@ export const withdrawToExternalTool = createTool({
         fee,
         netReceived,
         status: "SUBMITTED",
-        message: `Withdrawal submitted. ${amount} ${coinUpper} -> ${address} via ${networkInfo.network}. Fee: ${fee} ${coinUpper}. Estimated arrival: ~${networkInfo.estimatedArrivalTime} mins. Track with withdrawal ID: ${result.id}`,
+        exchange: ctx.exchange.displayName,
+        message: `Withdrawal submitted on ${ctx.exchange.displayName}. ${amount} ${coinUpper} -> ${address} via ${networkInfo.network}. Fee: ${fee} ${coinUpper}. Estimated arrival: ~${networkInfo.estimatedArrivalMins} mins. Track with withdrawal ID: ${result.id}`,
       };
     } catch (error) {
       return { error: `Withdrawal failed: ${(error as Error).message}` };
@@ -1018,13 +976,14 @@ export const withdrawToExternalTool = createTool({
 export const getWithdrawalStatusTool = createTool({
   id: "get_withdrawal_status",
   description:
-    "Check the status of recent withdrawals. " +
+    "Check the status of recent withdrawals. Works on all supported exchanges. " +
     "Use when user asks 'is my withdrawal done', 'withdrawal status', 'did my transfer go through'.",
   inputSchema: z.object({
     coin: z.string().default("").describe("Filter by coin (e.g., 'BTC'). Empty for all coins."),
     limit: z.number().min(1).max(100).default(10).describe("Number of recent withdrawals to show"),
   }),
   outputSchema: z.object({
+    exchange: z.string().optional(),
     withdrawals: z
       .array(
         z.object({
@@ -1051,9 +1010,6 @@ export const getWithdrawalStatusTool = createTool({
     if (!ctx?.exchange) {
       return errors.noExchange;
     }
-    if (!ctx.binance || ctx.exchange.exchangeId !== "binance") {
-      return errors.binanceOnly;
-    }
 
     const statusMap: Record<number, string> = {
       0: "Email Sent",
@@ -1066,7 +1022,7 @@ export const getWithdrawalStatusTool = createTool({
     };
 
     try {
-      const history = await ctx.binance.getWithdrawalHistory(limit);
+      const history = await ctx.exchange.getWithdrawalHistory(limit);
       let filtered = history;
       if (coin) {
         const coinUpper = coin.toUpperCase();
@@ -1075,12 +1031,14 @@ export const getWithdrawalStatusTool = createTool({
 
       if (filtered.length === 0) {
         return {
+          exchange: ctx.exchange.displayName,
           message: coin ? `No recent withdrawals found for ${coin.toUpperCase()}.` : "No recent withdrawals found.",
           total: 0,
         };
       }
 
       return {
+        exchange: ctx.exchange.displayName,
         total: filtered.length,
         withdrawals: filtered.map((w) => ({
           id: w.id,
@@ -1088,12 +1046,12 @@ export const getWithdrawalStatusTool = createTool({
           network: w.network,
           address: w.address,
           amount: String(w.amount),
-          fee: String(w.transactionFee),
+          fee: w.transactionFee !== undefined ? String(w.transactionFee) : "N/A",
           status: String(w.status),
           statusText: statusMap[w.status] ?? `Unknown (${w.status})`,
           txId: w.txId || undefined,
-          applyTime: w.applyTime,
-          completeTime: w.completeTime || undefined,
+          applyTime: new Date(w.applyTime).toISOString(),
+          completeTime: w.completeTime ? new Date(w.completeTime).toISOString() : undefined,
         })),
       };
     } catch (error) {

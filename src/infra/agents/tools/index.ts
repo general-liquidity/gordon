@@ -64,6 +64,7 @@ export { liquidationIntelligenceTools } from "./liquidation-intelligence.ts";
 export { pairAnalysisTools } from "./pair-analysis.ts";
 export { autonomousTools } from "./autonomous.ts";
 export { baseOnchainTools } from "./base-onchain.ts";
+export { agentKitOnchainTools } from "./agentkit-onchain.ts";
 
 // Multi-modal chart tools (image generation and vision analysis)
 export { multiModalChartTools } from "../../tools/chartTools.ts";
@@ -258,6 +259,7 @@ import { liquidationIntelligenceTools } from "./liquidation-intelligence.ts";
 import { pairAnalysisTools } from "./pair-analysis.ts";
 import { autonomousTools } from "./autonomous.ts";
 import { baseOnchainTools } from "./base-onchain.ts";
+import { agentKitOnchainTools } from "./agentkit-onchain.ts";
 import { multiModalChartTools } from "../../tools/chartTools.ts";
 import { evalTools } from "../../evals/tools.ts";
 
@@ -292,6 +294,7 @@ export const allTools = {
   ...pairAnalysisTools,
   ...autonomousTools,
   ...baseOnchainTools,
+  ...agentKitOnchainTools,
   ...multiModalChartTools,
   ...evalTools,
 };
@@ -327,6 +330,7 @@ export const toolCounts = {
   pairAnalysis: Object.keys(pairAnalysisTools).length,
   autonomous: Object.keys(autonomousTools).length,
   baseOnchain: Object.keys(baseOnchainTools).length,
+  agentKitOnchain: Object.keys(agentKitOnchainTools).length,
   multiModalCharts: Object.keys(multiModalChartTools).length,
   evals: Object.keys(evalTools).length,
   total: Object.keys(allTools).length,

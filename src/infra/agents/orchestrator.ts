@@ -555,6 +555,11 @@ const TOOL_AGENT_MAP: Record<string, string> = {
   cancel_order: "Executor",
   cancel_replace_order: "Executor",
   cancel_order_list: "Executor",
+  // agentKitOnchainTools cherry-picks (Executor: mutations)
+  agentkit_native_transfer: "Executor",
+  agentkit_erc20_transfer: "Executor",
+  agentkit_wrap_eth: "Executor",
+  agentkit_request_faucet: "Executor",
 
   // ---- Monitor tools ----
   // positionTools spread
@@ -606,6 +611,10 @@ const TOOL_AGENT_MAP: Record<string, string> = {
   get_win_rate_analysis: "Monitor",
   // autonomousTools cherry-pick on Monitor
   get_autonomous_status: "Monitor",
+  // agentKitOnchainTools cherry-picks (Monitor: reads)
+  agentkit_get_wallet: "Monitor",
+  agentkit_get_balance: "Monitor",
+  agentkit_erc20_balance: "Monitor",
 
   // ---- Teacher tools ----
   explain: "Teacher",

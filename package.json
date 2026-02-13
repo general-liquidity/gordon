@@ -58,6 +58,7 @@
     "@ai-sdk/anthropic": "^1.0.0",
     "@ai-sdk/google": "^1.0.0",
     "@ai-sdk/openai": "^1.0.0",
+    "@coinbase/agentkit": "^0.10.4",
     "@inkjs/ui": "^2.0.0",
     "@libsql/client": "^0.6.0",
     "@libsql/linux-x64-gnu": "^0.5.22",
