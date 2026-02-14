@@ -56,7 +56,7 @@ interface HLAssetCtx {
 
 let _cache: { meta: HLMeta; assetCtxs: HLAssetCtx[]; timestamp: number } | null = null;
 
-async function fetchMarketData(): Promise<{ meta: HLMeta; assetCtxs: HLAssetCtx[] }> {
+async function fetchMarketData(): Promise<{ meta: HLMeta; assetCtxs: HLAssetCtx[]; error?: undefined } | { error: string }> {
   const now = Date.now();
   if (_cache && now - _cache.timestamp < CACHE_TTL_MS) {
     return { meta: _cache.meta, assetCtxs: _cache.assetCtxs };
@@ -76,7 +76,8 @@ async function fetchMarketData(): Promise<{ meta: HLMeta; assetCtxs: HLAssetCtx[
     clearTimeout(timeoutId);
 
     if (!response.ok) {
-      throw new Error(`Hyperliquid API error: ${response.status}`);
+      clearTimeout(timeoutId);
+      return { error: `Hyperliquid API error: ${response.status}` };
     }
 
     const [meta, assetCtxs] = (await response.json()) as [HLMeta, HLAssetCtx[]];
@@ -84,7 +85,7 @@ async function fetchMarketData(): Promise<{ meta: HLMeta; assetCtxs: HLAssetCtx[
     return { meta, assetCtxs };
   } catch (error) {
     clearTimeout(timeoutId);
-    throw error;
+    return { error: `Hyperliquid API request failed: ${(error as Error).message}` };
   }
 }
 
@@ -268,7 +269,9 @@ export const getCascadeRiskTool = createTool({
   }),
   execute: async ({ coin, limit }) => {
     try {
-      const { meta, assetCtxs } = await fetchMarketData();
+      const data = await fetchMarketData();
+      if ("error" in data) return { error: data.error };
+      const { meta, assetCtxs } = data;
 
       const results = meta.universe
         .map((asset, index) => {
@@ -334,7 +337,9 @@ export const getLiquidationPressureTool = createTool({
   }),
   execute: async ({ coin }) => {
     try {
-      const { meta, assetCtxs } = await fetchMarketData();
+      const data = await fetchMarketData();
+      if ("error" in data) return { error: data.error };
+      const { meta, assetCtxs } = data;
 
       const results = meta.universe
         .map((asset, index) => {
@@ -404,7 +409,9 @@ export const getCrowdingAnalysisTool = createTool({
   }),
   execute: async ({ limit }) => {
     try {
-      const { meta, assetCtxs } = await fetchMarketData();
+      const data = await fetchMarketData();
+      if ("error" in data) return { error: data.error };
+      const { meta, assetCtxs } = data;
 
       const results = meta.universe
         .map((asset, index) => {
@@ -473,7 +480,9 @@ export const getSqueezeCandidatesTool = createTool({
   }),
   execute: async ({ limit }) => {
     try {
-      const { meta, assetCtxs } = await fetchMarketData();
+      const data = await fetchMarketData();
+      if ("error" in data) return { error: data.error };
+      const { meta, assetCtxs } = data;
 
       const results = meta.universe
         .map((asset, index) => {

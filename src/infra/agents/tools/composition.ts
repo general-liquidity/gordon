@@ -100,11 +100,11 @@ export async function executeTool<T = unknown>(
   const tool = registry[toolId];
 
   if (!tool) {
-    throw new Error(`Tool not found: ${toolId}`);
+    return { error: `Tool not found: ${toolId}` } as T;
   }
 
   if (!tool.execute) {
-    throw new Error(`Tool '${toolId}' does not have an execute function`);
+    return { error: `Tool '${toolId}' does not have an execute function` } as T;
   }
 
   return tool.execute(input, context) as Promise<T>;

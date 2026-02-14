@@ -17,11 +17,27 @@ import {
   getLatestBlock,
   getBaseBalance,
   getBaseTokenBalance,
+  searchBasePairs,
   BASE_TOKENS,
   BASE_CHAIN_CONFIG,
   type RegistryCategory,
   type RegistryCuration,
 } from "../../base/index.ts";
+
+/**
+ * Fetch a live ETH/USD price from DexScreener (WETH/USDC pair on Base).
+ * Falls back to a static estimate if the API call fails.
+ */
+async function getLiveEthPrice(): Promise<number> {
+  try {
+    const pairs = await searchBasePairs("WETH/USDC");
+    const price = pairs[0]?.priceUsd;
+    if (price) return parseFloat(price);
+  } catch {
+    // DexScreener unavailable — fall through to fallback
+  }
+  return 2500; // static fallback
+}
 
 // ============================================================================
 // Base Onchain Registry Tools
@@ -163,15 +179,16 @@ export const getBaseGasTool = createTool({
   }),
   execute: async ({ network }) => {
     try {
-      const [gasPrice, block] = await Promise.all([
+      const [gasPrice, block, ethPrice] = await Promise.all([
         getBaseGasPrice(network),
         getLatestBlock(network),
+        getLiveEthPrice(),
       ]);
 
       return {
         gasPriceGwei: Math.round(gasPrice.gasPrice * 1000) / 1000,
         estimatedTransferCostETH: gasPrice.estimatedTransferCostETH,
-        estimatedTransferCostUSD: `~$${(gasPrice.estimatedTransferCostETH * 2500).toFixed(4)}`,
+        estimatedTransferCostUSD: `~$${(gasPrice.estimatedTransferCostETH * ethPrice).toFixed(4)}`,
         latestBlock: block.number,
         blockTimestamp: block.timestamp,
         txCountInBlock: block.transactionCount,

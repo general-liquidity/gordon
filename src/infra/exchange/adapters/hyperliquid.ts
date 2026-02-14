@@ -42,6 +42,8 @@ import type { Candle } from "../../../types/index.ts";
  * Some spot-focused methods will throw HyperliquidNotSupportedError.
  */
 export class HyperliquidAdapter implements Exchange {
+  private static readonly NETWORK = "Arbitrum"; // Hyperliquid operates exclusively on Arbitrum One
+
   private client: HyperliquidClient;
   private assetIndexMap: Map<string, number> = new Map();
   private assetNameMap: Map<number, string> = new Map();
@@ -323,7 +325,10 @@ export class HyperliquidAdapter implements Exchange {
   async getAccountInfo(): Promise<AccountInfo> {
     const [state, spotState] = await Promise.all([
       this.client.getUserState(),
-      this.client.getSpotClearinghouseState().catch(() => ({ balances: [] })),
+      this.client.getSpotClearinghouseState().catch((err) => {
+        console.warn(`[Hyperliquid] Failed to fetch spot balances: ${err instanceof Error ? err.message : String(err)}`);
+        return { balances: [] };
+      }),
     ]);
 
     // USD balance from perp clearinghouse
@@ -495,7 +500,7 @@ export class HyperliquidAdapter implements Exchange {
       clientOrderId: o.cloid,
       symbol: this.normalizeSymbol(o.coin),
       side: o.side === "B" ? "BUY" : "SELL",
-      type: "LIMIT",
+      type: ((o as any).orderType || "LIMIT") as Order["type"], // Hyperliquid API may not return order type
       status: "NEW",
       price: parseFloat(o.limitPx),
       quantity: parseFloat(o.origSz),
@@ -642,8 +647,8 @@ export class HyperliquidAdapter implements Exchange {
         id: entry.hash,
         amount: Math.abs(parseFloat(entry.delta.usdc || "0")),
         coin: "USDC",
-        network: "Arbitrum",
-        status: 1, // All ledger entries are completed
+        network: HyperliquidAdapter.NETWORK,
+        status: 1, // Hyperliquid ledger only returns completed entries
         address: "",
         txId: entry.hash,
         insertTime: entry.time,
@@ -661,8 +666,8 @@ export class HyperliquidAdapter implements Exchange {
         id: entry.hash,
         amount: Math.abs(parseFloat(entry.delta.usdc || "0")),
         coin: "USDC",
-        network: "Arbitrum",
-        status: 6, // Completed
+        network: HyperliquidAdapter.NETWORK,
+        status: 6, // Hyperliquid ledger only returns completed entries
         address: "",
         txId: entry.hash,
         applyTime: entry.time,

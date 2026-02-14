@@ -25,6 +25,7 @@ export type AuditAction =
   | "EXECUTE_PLAN"
   | "CLOSE_TRADE"
   | "CANCEL_TRADE"
+  | "PLACE_OCO_ORDER"
   | "ARM_SYSTEM"
   | "DISARM_SYSTEM"
   | "MODE_CHANGE"

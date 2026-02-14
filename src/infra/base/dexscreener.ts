@@ -23,7 +23,7 @@ const DEXSCREENER_BASE = "https://api.dexscreener.com";
 
 async function dexScreenerFetch<T>(path: string): Promise<T> {
   const url = `${DEXSCREENER_BASE}${path}`;
-  const res = await fetch(url);
+  const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
 
   if (!res.ok) {
     throw new Error(`DexScreener API error: ${res.status} ${res.statusText}`);

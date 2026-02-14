@@ -100,6 +100,11 @@ export class BacktestEngine {
   private peakEquity: number;
   private currentBarIndex: number = 0;
   private indicators: IndicatorArrays | null = null;
+  private reachedMaxDrawdown = false;
+
+  // Grid/DCA position tracking — multiple concurrent positions
+  private gridPositions: Position[] = [];
+  private maxGridPositions: number = 1;
 
   constructor(params: BacktestParams) {
     this.params = { ...DEFAULT_BACKTEST_PARAMS, ...params };
@@ -135,10 +140,17 @@ export class BacktestEngine {
       this.currentBarIndex = i;
       const bar = data[i];
       if (!bar) continue;
+
+      // Stop processing new signals after max drawdown breach
+      if (this.reachedMaxDrawdown) {
+        this.updateEquityCurve(bar);
+        continue;
+      }
       const indicatorState = this.getIndicatorState(i);
 
       // Check for stop loss / take profit hits first (using high/low)
-      if (this.position) {
+      // Covers both single position and grid positions
+      if (this.position || this.gridPositions.length > 0) {
         this.checkStopTakeProfit(bar);
       }
 
@@ -153,8 +165,8 @@ export class BacktestEngine {
         }
       }
 
-      // Update unrealized P&L if we have a position
-      if (this.position) {
+      // Update unrealized P&L if we have any positions (single or grid)
+      if (this.position || this.gridPositions.length > 0) {
         this.updateUnrealizedPnL(bar.close);
       }
 
@@ -162,13 +174,25 @@ export class BacktestEngine {
       this.updateEquityCurve(bar);
     }
 
-    // Close any remaining position at end of backtest
+    // Close any remaining positions at end of backtest (single + grid)
     let finalPositionClosed = false;
-    if (this.position && data.length > 0) {
+    if (data.length > 0) {
       const lastBar = data[data.length - 1];
       if (lastBar) {
-        this.closePosition(lastBar.close, lastBar, "END_OF_BACKTEST");
-        finalPositionClosed = true;
+        // Close single position
+        if (this.position) {
+          this.closePosition(lastBar.close, lastBar, "END_OF_BACKTEST");
+          finalPositionClosed = true;
+        }
+
+        // Close all remaining grid positions
+        if (this.gridPositions.length > 0) {
+          const gridSnapshot = [...this.gridPositions];
+          for (const pos of gridSnapshot) {
+            this.closeGridPosition(pos, lastBar.close, lastBar, "END_OF_BACKTEST");
+          }
+          finalPositionClosed = true;
+        }
       }
     }
 
@@ -229,10 +253,19 @@ export class BacktestEngine {
 
   /**
    * Execute a trading signal.
+   * Supports both single-position (classic) and multi-position (grid/DCA) modes.
+   * Grid mode activates when signal.gridLevel is defined.
    */
   private executeSignal(signal: Signal, bar: OHLC): void {
     const signalType = signal.type;
+    const isGridSignal = signal.gridLevel !== undefined;
 
+    if (isGridSignal) {
+      this.executeGridSignal(signal, bar);
+      return;
+    }
+
+    // Classic single-position path (unchanged behavior)
     if (signalType === "BUY") {
       // If we have a short position, close it first
       if (this.position && this.position.side === "SHORT") {
@@ -253,6 +286,203 @@ export class BacktestEngine {
       if (!this.position && this.params.allowShorts) {
         this.openPosition("SHORT", signal.price || bar.close, bar);
       }
+    }
+  }
+
+  /**
+   * Execute a grid/DCA signal that supports multiple concurrent positions.
+   */
+  private executeGridSignal(signal: Signal, bar: OHLC): void {
+    const maxPos = signal.maxPositions ?? this.maxGridPositions;
+    // Update engine-level max so other methods (equity, stops) know we're in grid mode
+    if (maxPos > this.maxGridPositions) {
+      this.maxGridPositions = maxPos;
+    }
+
+    if (signal.type === "BUY") {
+      // Close any short grid positions on reversal
+      const shortGridPositions = this.gridPositions.filter(p => p.side === "SHORT");
+      for (const pos of shortGridPositions) {
+        this.closeGridPosition(pos, signal.price || bar.close, bar, "SIGNAL_REVERSAL");
+      }
+
+      // Check if we already have a position at this exact grid level
+      const existingAtLevel = this.gridPositions.find(
+        p => p.gridLevel === signal.gridLevel && p.side === "LONG"
+      );
+      if (existingAtLevel) {
+        return; // Already have this grid level filled
+      }
+
+      // Check if we've reached max grid positions
+      const longGridCount = this.gridPositions.filter(p => p.side === "LONG").length;
+      if (longGridCount >= maxPos) {
+        return; // At capacity
+      }
+
+      this.openGridPosition("LONG", signal.price || bar.close, bar, signal.gridLevel!);
+    } else if (signal.type === "SELL") {
+      if (signal.gridLevel !== undefined) {
+        // Close the specific grid level if it exists
+        const matchingPos = this.gridPositions.find(
+          p => p.gridLevel === signal.gridLevel && p.side === "LONG"
+        );
+        if (matchingPos) {
+          this.closeGridPosition(matchingPos, signal.price || bar.close, bar, "SIGNAL_EXIT");
+        }
+      } else {
+        // No specific grid level — close ALL long grid positions
+        const longGridPositions = [...this.gridPositions.filter(p => p.side === "LONG")];
+        for (const pos of longGridPositions) {
+          this.closeGridPosition(pos, signal.price || bar.close, bar, "SIGNAL_EXIT");
+        }
+      }
+
+      // Open short grid positions if allowed
+      if (this.params.allowShorts && signal.gridLevel !== undefined) {
+        const shortGridCount = this.gridPositions.filter(p => p.side === "SHORT").length;
+        if (shortGridCount < maxPos) {
+          this.openGridPosition("SHORT", signal.price || bar.close, bar, signal.gridLevel!);
+        }
+      }
+    }
+  }
+
+  // ============================================================================
+  // Private Methods - Grid Position Management
+  // ============================================================================
+
+  /**
+   * Open a new grid position at a specific grid level.
+   */
+  private openGridPosition(
+    side: "LONG" | "SHORT",
+    price: number,
+    bar: OHLC,
+    gridLevel: number
+  ): void {
+    // Apply slippage
+    const slippedPrice = this.applySlippage(price, side === "LONG" ? "BUY" : "SELL");
+
+    // Calculate position size — divide equally among max grid positions
+    // so total exposure across all levels stays within sizing limits
+    const fullPositionValue = this.calculatePositionSize(slippedPrice);
+    const perGridValue = fullPositionValue / this.maxGridPositions;
+
+    if (perGridValue <= 0) {
+      return; // Insufficient capital
+    }
+
+    const quantity = perGridValue / slippedPrice;
+
+    // Apply entry commission
+    const commission = this.applyCommission(perGridValue);
+
+    // Check if we can afford this position
+    if (perGridValue + commission > this.capital) {
+      const availableForPosition = this.capital - commission;
+      if (availableForPosition <= 0) {
+        return;
+      }
+      const adjustedQuantity = availableForPosition / slippedPrice;
+      const adjustedValue = adjustedQuantity * slippedPrice;
+      const adjustedCommission = this.applyCommission(adjustedValue);
+
+      this.capital -= adjustedValue + adjustedCommission;
+
+      this.gridPositions.push({
+        id: `trade_${++this.tradeCounter}`,
+        side,
+        entryPrice: slippedPrice,
+        entryTime: bar.timestamp,
+        entryBarIndex: this.currentBarIndex,
+        quantity: adjustedQuantity,
+        entryCommission: adjustedCommission,
+        unrealizedPnL: 0,
+        gridLevel,
+      });
+    } else {
+      this.capital -= perGridValue + commission;
+
+      this.gridPositions.push({
+        id: `trade_${++this.tradeCounter}`,
+        side,
+        entryPrice: slippedPrice,
+        entryTime: bar.timestamp,
+        entryBarIndex: this.currentBarIndex,
+        quantity,
+        entryCommission: commission,
+        unrealizedPnL: 0,
+        gridLevel,
+      });
+    }
+  }
+
+  /**
+   * Close a specific grid position.
+   */
+  private closeGridPosition(
+    pos: Position,
+    price: number,
+    bar: OHLC,
+    reason: string
+  ): void {
+    // Apply slippage (opposite direction)
+    const slippedPrice = this.applySlippage(
+      price,
+      pos.side === "LONG" ? "SELL" : "BUY"
+    );
+
+    // Calculate P&L
+    const positionValue = pos.quantity * slippedPrice;
+    const entryValue = pos.quantity * pos.entryPrice;
+
+    let grossPnL: number;
+    if (pos.side === "LONG") {
+      grossPnL = positionValue - entryValue;
+    } else {
+      grossPnL = entryValue - positionValue;
+    }
+
+    // Apply exit commission
+    const exitCommission = this.applyCommission(positionValue);
+    const totalCommission = pos.entryCommission + exitCommission;
+    const netPnL = grossPnL - exitCommission;
+
+    // Add proceeds back to capital
+    if (pos.side === "LONG") {
+      this.capital += positionValue - exitCommission;
+    } else {
+      this.capital += entryValue + grossPnL - exitCommission;
+    }
+
+    // Calculate return percentage
+    const returnPct = (netPnL / entryValue) * 100;
+
+    // Create trade record
+    const trade: Trade = {
+      id: pos.id,
+      side: pos.side,
+      entryPrice: pos.entryPrice,
+      entryTime: pos.entryTime,
+      exitPrice: slippedPrice,
+      exitTime: bar.timestamp,
+      quantity: pos.quantity,
+      grossPnL,
+      commission: totalCommission,
+      netPnL,
+      returnPct,
+      holdingPeriod: this.currentBarIndex - pos.entryBarIndex,
+      exitReason: reason,
+      gridLevel: pos.gridLevel,
+    };
+
+    this.trades.push(trade);
+
+    // Remove from gridPositions array
+    const idx = this.gridPositions.indexOf(pos);
+    if (idx !== -1) {
+      this.gridPositions.splice(idx, 1);
     }
   }
 
@@ -383,55 +613,84 @@ export class BacktestEngine {
 
   /**
    * Check if stop loss or take profit has been hit.
+   * Handles both single position and grid positions.
    */
   private checkStopTakeProfit(bar: OHLC): void {
-    if (!this.position) {
-      return;
+    // Check single position (classic path)
+    if (this.position) {
+      if (this.position.side === "LONG") {
+        if (this.position.stopLoss && bar.low <= this.position.stopLoss) {
+          this.closePosition(this.position.stopLoss, bar, "STOP_LOSS");
+          return;
+        }
+        if (this.position.takeProfit && bar.high >= this.position.takeProfit) {
+          this.closePosition(this.position.takeProfit, bar, "TAKE_PROFIT");
+          return;
+        }
+      } else {
+        if (this.position.stopLoss && bar.high >= this.position.stopLoss) {
+          this.closePosition(this.position.stopLoss, bar, "STOP_LOSS");
+          return;
+        }
+        if (this.position.takeProfit && bar.low <= this.position.takeProfit) {
+          this.closePosition(this.position.takeProfit, bar, "TAKE_PROFIT");
+          return;
+        }
+      }
     }
 
-    if (this.position.side === "LONG") {
-      // Check stop loss (price went below stop)
-      if (this.position.stopLoss && bar.low <= this.position.stopLoss) {
-        this.closePosition(this.position.stopLoss, bar, "STOP_LOSS");
-        return;
-      }
-
-      // Check take profit (price went above target)
-      if (this.position.takeProfit && bar.high >= this.position.takeProfit) {
-        this.closePosition(this.position.takeProfit, bar, "TAKE_PROFIT");
-        return;
-      }
-    } else {
-      // SHORT position
-      // Check stop loss (price went above stop)
-      if (this.position.stopLoss && bar.high >= this.position.stopLoss) {
-        this.closePosition(this.position.stopLoss, bar, "STOP_LOSS");
-        return;
-      }
-
-      // Check take profit (price went below target)
-      if (this.position.takeProfit && bar.low <= this.position.takeProfit) {
-        this.closePosition(this.position.takeProfit, bar, "TAKE_PROFIT");
-        return;
+    // Check each grid position individually
+    // Iterate over a copy since closeGridPosition mutates the array
+    const gridSnapshot = [...this.gridPositions];
+    for (const pos of gridSnapshot) {
+      if (pos.side === "LONG") {
+        if (pos.stopLoss && bar.low <= pos.stopLoss) {
+          this.closeGridPosition(pos, pos.stopLoss, bar, "STOP_LOSS");
+          continue;
+        }
+        if (pos.takeProfit && bar.high >= pos.takeProfit) {
+          this.closeGridPosition(pos, pos.takeProfit, bar, "TAKE_PROFIT");
+          continue;
+        }
+      } else {
+        if (pos.stopLoss && bar.high >= pos.stopLoss) {
+          this.closeGridPosition(pos, pos.stopLoss, bar, "STOP_LOSS");
+          continue;
+        }
+        if (pos.takeProfit && bar.low <= pos.takeProfit) {
+          this.closeGridPosition(pos, pos.takeProfit, bar, "TAKE_PROFIT");
+          continue;
+        }
       }
     }
   }
 
   /**
-   * Update unrealized P&L for current position.
+   * Update unrealized P&L for current position and all grid positions.
    */
   private updateUnrealizedPnL(currentPrice: number): void {
-    if (!this.position) {
-      return;
+    // Update single position (classic path)
+    if (this.position) {
+      const currentValue = this.position.quantity * currentPrice;
+      const entryValue = this.position.quantity * this.position.entryPrice;
+
+      if (this.position.side === "LONG") {
+        this.position.unrealizedPnL = currentValue - entryValue;
+      } else {
+        this.position.unrealizedPnL = entryValue - currentValue;
+      }
     }
 
-    const currentValue = this.position.quantity * currentPrice;
-    const entryValue = this.position.quantity * this.position.entryPrice;
+    // Update each grid position
+    for (const pos of this.gridPositions) {
+      const currentValue = pos.quantity * currentPrice;
+      const entryValue = pos.quantity * pos.entryPrice;
 
-    if (this.position.side === "LONG") {
-      this.position.unrealizedPnL = currentValue - entryValue;
-    } else {
-      this.position.unrealizedPnL = entryValue - currentValue;
+      if (pos.side === "LONG") {
+        pos.unrealizedPnL = currentValue - entryValue;
+      } else {
+        pos.unrealizedPnL = entryValue - currentValue;
+      }
     }
   }
 
@@ -527,11 +786,13 @@ export class BacktestEngine {
 
   /**
    * Update the equity curve with current bar.
+   * Accounts for both single position and all grid positions.
    */
   private updateEquityCurve(bar: OHLC): void {
-    // Calculate total equity (cash + unrealized P&L)
+    // Calculate total equity (cash + unrealized P&L from all positions)
     let equity = this.capital;
 
+    // Add single position value (classic path)
     if (this.position) {
       const positionValue = this.position.quantity * bar.close;
       if (this.position.side === "LONG") {
@@ -539,6 +800,16 @@ export class BacktestEngine {
       } else {
         // For short, we have entry value locked, plus/minus unrealized P&L
         equity += this.position.quantity * this.position.entryPrice + this.position.unrealizedPnL;
+      }
+    }
+
+    // Add all grid positions' value
+    for (const pos of this.gridPositions) {
+      const positionValue = pos.quantity * bar.close;
+      if (pos.side === "LONG") {
+        equity += positionValue;
+      } else {
+        equity += pos.quantity * pos.entryPrice + pos.unrealizedPnL;
       }
     }
 
@@ -557,10 +828,17 @@ export class BacktestEngine {
       drawdownPct,
     });
 
-    // Check max drawdown limit
+    // Enforce max drawdown limit — close all open positions and halt trading
     if (this.params.maxDrawdown && drawdownPct / 100 >= this.params.maxDrawdown) {
-      // Would close all positions and stop trading
-      // For now, just log (could throw or set a flag)
+      if (this.position) {
+        this.closePosition(bar.close, bar, "MAX_DRAWDOWN");
+      }
+      // Close all grid positions on max drawdown
+      const gridSnapshot = [...this.gridPositions];
+      for (const pos of gridSnapshot) {
+        this.closeGridPosition(pos, bar.close, bar, "MAX_DRAWDOWN");
+      }
+      this.reachedMaxDrawdown = true;
     }
   }
 
@@ -665,6 +943,9 @@ export class BacktestEngine {
     this.peakEquity = this.capital;
     this.currentBarIndex = 0;
     this.indicators = null;
+    this.reachedMaxDrawdown = false;
+    this.gridPositions = [];
+    this.maxGridPositions = 1;
   }
 
   /**

@@ -28,6 +28,7 @@ import type {
   WithdrawalResult,
   WithdrawalInfo,
 } from "../types.ts";
+import type { BitfinexOrderType } from "../../bitfinex/types.ts";
 import type { Candle } from "../../../types/index.ts";
 
 /**
@@ -333,7 +334,7 @@ export class BitfinexAdapter implements Exchange {
     const bitfinexSymbol = this.toBitfinexSymbol(params.symbol);
 
     // Determine order type and flags
-    let orderType: string;
+    let orderType: BitfinexOrderType;
     let flags = 0;
     let priceAuxLimit = params.stopPrice;
 
@@ -365,7 +366,7 @@ export class BitfinexAdapter implements Exchange {
       symbol: bitfinexSymbol,
       amount,
       price: params.price,
-      type: orderType as any,
+      type: orderType,
       clientOrderId: params.newClientOrderId ? parseInt(params.newClientOrderId) : undefined,
       priceAuxLimit,
       flags: flags || undefined,
@@ -430,9 +431,13 @@ export class BitfinexAdapter implements Exchange {
     throw new Error(`Order ${orderId} not found`);
   }
 
+  /**
+   * Validate order parameters locally.
+   * Note: Bitfinex does not provide a test order API endpoint.
+   * This validates parameter presence and format only — not exchange-side
+   * rules like lot sizes, price filters, or available balance.
+   */
   async testOrder(params: OrderParams): Promise<boolean> {
-    // Bitfinex doesn't have a test order endpoint
-    // Validate parameters instead
     if (!params.symbol || !params.side || !params.type) {
       return false;
     }

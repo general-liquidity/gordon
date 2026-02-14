@@ -372,7 +372,7 @@ export class CoinbaseAdapter implements Exchange {
       client_order_id: clientOrderId,
       product_id: coinbaseSymbol,
       side: params.side,
-      order_configuration: orderConfig as any,
+      order_configuration: orderConfig,
     });
 
     if (!response.success) {
@@ -468,7 +468,7 @@ export class CoinbaseAdapter implements Exchange {
         client_order_id: clientOrderId,
         product_id: coinbaseSymbol,
         side: params.side,
-        order_configuration: orderConfig as any,
+        order_configuration: orderConfig,
       });
 
       // If errs array is non-empty, the order would fail

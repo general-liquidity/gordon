@@ -24,6 +24,7 @@ import type {
   StrategyId,
 } from "../types.ts";
 import type { Candle } from "../../core/indicators/types.ts";
+import type { OHLC, Signal, IndicatorState } from "../../backtest/types.ts";
 
 // ============================================================================
 // Types
@@ -312,6 +313,94 @@ When creating a plan using the Fair Value Gaps strategy:
 - Gaps that have been tested but not filled are stronger
 - Multiple gaps at same level = high probability zone
 `;
+  }
+  // ============================================================================
+  // Backtesting Methods
+  // ============================================================================
+
+  /**
+   * Generate trading signal for backtesting.
+   *
+   * BUY signal when:
+   * - Bullish FVG detected (candle[i-2].high < candle[i].low — gap up)
+   * - Price above EMA50 (trend alignment)
+   * - Volume ratio > 1.2 (increasing participation)
+   *
+   * SELL signal when:
+   * - Bearish FVG detected (candle[i-2].low > candle[i].high — gap down)
+   * - RSI > 70 (overbought)
+   * - Price below EMA50 (trend reversal)
+   */
+  override generateSignal(
+    bar: OHLC,
+    _index: number,
+    _data: OHLC[],
+    indicators: IndicatorState
+  ): Signal | null {
+    const price = bar.close;
+    const { rsi14, ema50, volumeRatio, atr14 } = indicators;
+
+    // Check SELL signal first (exit conditions)
+    if (rsi14 != null && rsi14 > 70) {
+      return {
+        type: "SELL",
+        price,
+        timestamp: bar.timestamp,
+        reason: `RSI overbought at ${rsi14.toFixed(1)}`,
+      };
+    }
+
+    // Detect FVG from raw data (need at least 3 bars)
+    if (_index >= 2) {
+      const candle1 = _data[_index - 2]!;
+      const candle3 = _data[_index]!;
+
+      // Bullish FVG: candle1.high < candle3.low (gap up — imbalance to the upside)
+      const bullishFVG = candle1.high < candle3.low;
+
+      // Bearish FVG: candle1.low > candle3.high (gap down — imbalance to the downside)
+      const bearishFVG = candle1.low > candle3.high;
+
+      if (bearishFVG && ema50 != null && price < ema50) {
+        return {
+          type: "SELL",
+          price,
+          timestamp: bar.timestamp,
+          reason: `Bearish FVG: gap ${candle3.high.toFixed(2)}-${candle1.low.toFixed(2)}, price below EMA50`,
+        };
+      }
+
+      if (bullishFVG) {
+        const gapSize = candle3.low - candle1.high;
+        const gapIsSignificant = atr14 != null ? gapSize > atr14 * 0.5 : true;
+        const trendAligned = ema50 != null ? price > ema50 : true;
+        const volumeOk = volumeRatio != null ? volumeRatio >= 1.2 : true;
+
+        if (gapIsSignificant && trendAligned && volumeOk) {
+          return {
+            type: "BUY",
+            price,
+            timestamp: bar.timestamp,
+            reason: `Bullish FVG: gap ${candle1.high.toFixed(2)}-${candle3.low.toFixed(2)}${atr14 != null ? ` (${(gapSize / atr14).toFixed(1)}x ATR)` : ""}`,
+          };
+        }
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Get required indicators for backtesting.
+   */
+  override getRequiredIndicators(): string[] {
+    return [
+      "ema50",
+      "rsi14",
+      "atr14",
+      "volumeRatio",
+      "volumeAvg20",
+    ];
   }
 }
 

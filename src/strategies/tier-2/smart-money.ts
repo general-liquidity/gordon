@@ -24,6 +24,7 @@ import type {
   StrategyId,
 } from "../types.ts";
 import type { Candle } from "../../core/indicators/types.ts";
+import type { OHLC, Signal, IndicatorState } from "../../backtest/types.ts";
 
 // ============================================================================
 // Types
@@ -343,6 +344,109 @@ When creating a plan using the Smart Money strategy:
 - This is a counter-trend entry — use smaller position sizes
 - Wait for the reversal candle to close before committing
 `;
+  }
+  // ============================================================================
+  // Backtesting Methods
+  // ============================================================================
+
+  /**
+   * Generate trading signal for backtesting.
+   *
+   * Detects liquidity sweeps from raw OHLC data:
+   * 1. Find swing lows/highs in recent history (using a 5-bar lookback for speed)
+   * 2. Current bar sweeps below a swing low (wick below) but closes above it = bullish sweep
+   * 3. Current bar sweeps above a swing high (wick above) but closes below it = bearish sweep
+   *
+   * BUY signal when:
+   * - Bullish liquidity sweep detected (stop hunt below swing low, reversal close)
+   * - RSI < 60 (not overbought)
+   * - Volume ratio > 1.5 (institutional volume spike)
+   *
+   * SELL signal when:
+   * - Bearish liquidity sweep detected
+   * - RSI > 65
+   */
+  override generateSignal(
+    bar: OHLC,
+    _index: number,
+    _data: OHLC[],
+    indicators: IndicatorState
+  ): Signal | null {
+    const price = bar.close;
+    const { rsi14, volumeRatio } = indicators;
+
+    // Need enough history for swing detection
+    const swingLookback = 5;
+    if (_index < swingLookback * 2 + 2) return null;
+
+    // Find recent swing lows (local minima)
+    for (let i = _index - swingLookback - 1; i >= Math.max(swingLookback, _index - 30); i--) {
+      let isSwingLow = true;
+      let isSwingHigh = true;
+      const candidate = _data[i]!;
+
+      for (let j = i - swingLookback; j <= i + swingLookback; j++) {
+        if (j === i || j < 0 || j >= _index) { continue; }
+        if (_data[j]!.low <= candidate.low) { isSwingLow = false; }
+        if (_data[j]!.high >= candidate.high) { isSwingHigh = false; }
+      }
+
+      // Bullish sweep: bar wicks below swing low but closes above it
+      if (isSwingLow && bar.low < candidate.low && bar.close > candidate.low) {
+        const rsiOk = rsi14 != null ? rsi14 < 60 : true;
+        const volumeOk = volumeRatio != null ? volumeRatio >= 1.5 : true;
+
+        if (rsiOk && volumeOk) {
+          return {
+            type: "BUY",
+            price,
+            timestamp: bar.timestamp,
+            reason: `Bullish sweep below $${candidate.low.toFixed(2)}, reversed to $${price.toFixed(2)}${volumeRatio != null ? `, vol ${volumeRatio.toFixed(1)}x` : ""}`,
+          };
+        }
+      }
+
+      // Bearish sweep: bar wicks above swing high but closes below it
+      if (isSwingHigh && bar.high > candidate.high && bar.close < candidate.high) {
+        const rsiConfirm = rsi14 != null ? rsi14 > 65 : true;
+        const volumeOk = volumeRatio != null ? volumeRatio >= 1.5 : true;
+
+        if (rsiConfirm && volumeOk) {
+          return {
+            type: "SELL",
+            price,
+            timestamp: bar.timestamp,
+            reason: `Bearish sweep above $${candidate.high.toFixed(2)}, reversed to $${price.toFixed(2)}${volumeRatio != null ? `, vol ${volumeRatio.toFixed(1)}x` : ""}`,
+          };
+        }
+      }
+    }
+
+    // Fallback SELL: RSI extreme overbought
+    if (rsi14 != null && rsi14 > 75) {
+      return {
+        type: "SELL",
+        price,
+        timestamp: bar.timestamp,
+        reason: `RSI extreme overbought at ${rsi14.toFixed(1)}`,
+      };
+    }
+
+    return null;
+  }
+
+  /**
+   * Get required indicators for backtesting.
+   */
+  override getRequiredIndicators(): string[] {
+    return [
+      "rsi14",
+      "atr14",
+      "volumeRatio",
+      "volumeAvg20",
+      "nearestSupport",
+      "nearestResistance",
+    ];
   }
 }
 

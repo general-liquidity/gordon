@@ -8,8 +8,7 @@
  * - Singleton: One AgentKit instance shared across all tools
  * - Actions: Exposes actions by name via getAction() for Mastra tool bridging
  *
- * Required env vars: CDP_API_KEY_ID, CDP_API_KEY_SECRET, CDP_WALLET_SECRET
- * Optional: CDP_NETWORK_ID (defaults to "base-sepolia" for safety)
+ * Required env vars: CDP_API_KEY_ID, CDP_API_KEY_SECRET, CDP_WALLET_SECRET, CDP_NETWORK_ID
  */
 
 import {
@@ -82,7 +81,13 @@ export async function getAgentKit(): Promise<AgentKit> {
     );
   }
 
-  const networkId = process.env[CDP_ENV_KEYS.NETWORK_ID] || "base-sepolia";
+  const networkId = process.env[CDP_ENV_KEYS.NETWORK_ID];
+  if (!networkId) {
+    throw new Error(
+      "CDP_NETWORK_ID environment variable is required. " +
+      "Set to 'base-mainnet' for production or 'base-sepolia' for testing."
+    );
+  }
 
   const walletProvider = await CdpEvmWalletProvider.configureWithWallet({
     apiKeyId: process.env[CDP_ENV_KEYS.API_KEY_ID]!,

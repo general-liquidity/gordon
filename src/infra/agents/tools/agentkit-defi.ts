@@ -30,6 +30,26 @@ import { executeAction, isAgentKitConfigured } from "../../agentkit/index.ts";
 import type { AgentKitActionResult } from "../../agentkit/index.ts";
 
 // ============================================================================
+// Moonwell MToken Addresses (Base Mainnet)
+// ============================================================================
+
+/** Moonwell MToken contract addresses on Base mainnet — used for deposit/withdraw */
+const MOONWELL_MTOKENS: Record<string, string> = {
+  USDC: "0xEdc817A28E8B93B03976FBd4a3dDBc9f7D176c22",
+  WETH: "0x628ff693426583D9a7FB391E54366292F509D457",
+  DAI: "0x73b06D8d18De422E269645eaCe15400DE7462417",
+  cbETH: "0x3bf93770f2d4a794c3d9EBEfBAeBAE2a8f09A5E5",
+  wstETH: "0x627Fe393Bc6EdDA28e99AE648fD6fF362514304b",
+  AERO: "0x73902f619CEB9B31FD8EFecf435CbDf89E369Ba6",
+  cbBTC: "0xF877ACaFA28c19b96727966690b2f44d35aD5976",
+};
+
+/** Format Moonwell MToken addresses for tool descriptions */
+const MOONWELL_MTOKEN_LIST = Object.entries(MOONWELL_MTOKENS)
+  .map(([symbol, addr]) => `${symbol}=${addr}`)
+  .join(", ");
+
+// ============================================================================
 // Helper
 // ============================================================================
 
@@ -209,14 +229,7 @@ export const moonwellDepositTool = createTool({
   description:
     "Deposit (supply) assets to Moonwell lending protocol on Base L2 to earn yield. " +
     "IMPORTANT: Requires ARMED mode. Confirm amount and token with user before executing. " +
-    "Moonwell MToken addresses on Base mainnet: " +
-    "USDC=0xEdc817A28E8B93B03976FBd4a3dDBc9f7D176c22, " +
-    "WETH=0x628ff693426583D9a7FB391E54366292F509D457, " +
-    "DAI=0x73b06D8d18De422E269645eaCe15400DE7462417, " +
-    "cbETH=0x3bf93770f2d4a794c3d9EBEfBAeBAE2a8f09A5E5, " +
-    "wstETH=0x627Fe393Bc6EdDA28e99AE648fD6fF362514304b, " +
-    "AERO=0x73902f619CEB9B31FD8EFecf435CbDf89E369Ba6, " +
-    "cbBTC=0xF877ACaFA28c19b96727966690b2f44d35aD5976.",
+    `Moonwell MToken addresses on Base mainnet: ${MOONWELL_MTOKEN_LIST}.`,
   inputSchema: z.object({
     mTokenAddress: z
       .string()
@@ -243,14 +256,7 @@ export const moonwellWithdrawTool = createTool({
   description:
     "Withdraw (redeem) assets from Moonwell lending protocol on Base L2. " +
     "IMPORTANT: Requires ARMED mode. Confirm amount with user before executing. " +
-    "Moonwell MToken addresses on Base mainnet: " +
-    "USDC=0xEdc817A28E8B93B03976FBd4a3dDBc9f7D176c22, " +
-    "WETH=0x628ff693426583D9a7FB391E54366292F509D457, " +
-    "DAI=0x73b06D8d18De422E269645eaCe15400DE7462417, " +
-    "cbETH=0x3bf93770f2d4a794c3d9EBEfBAeBAE2a8f09A5E5, " +
-    "wstETH=0x627Fe393Bc6EdDA28e99AE648fD6fF362514304b, " +
-    "AERO=0x73902f619CEB9B31FD8EFecf435CbDf89E369Ba6, " +
-    "cbBTC=0xF877ACaFA28c19b96727966690b2f44d35aD5976.",
+    `Moonwell MToken addresses on Base mainnet: ${MOONWELL_MTOKEN_LIST}.`,
   inputSchema: z.object({
     mTokenAddress: z
       .string()

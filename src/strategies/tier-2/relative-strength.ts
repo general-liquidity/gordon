@@ -23,6 +23,7 @@ import type {
   StrategyPlanParams,
   StrategyId,
 } from "../types.ts";
+import type { OHLC, Signal, IndicatorState } from "../../backtest/types.ts";
 
 // ============================================================================
 // Constants
@@ -307,6 +308,87 @@ When creating a plan using the Relative Strength strategy:
 - When BTC is consolidating
 - Sector rotation phases
 `;
+  }
+  // ============================================================================
+  // Backtesting Methods
+  // ============================================================================
+
+  /**
+   * Generate trading signal for backtesting.
+   *
+   * Since backtest runs on a single asset (no BTC comparison data available),
+   * we approximate relative strength using momentum indicators:
+   *
+   * BUY signal when:
+   * - Price above SMA50 (trending up)
+   * - RSI between 45-65 (healthy momentum, not overbought)
+   * - Volume ratio > 1.2 (increasing participation)
+   * - Price above EMA26 (short-term momentum positive)
+   *
+   * SELL signal when:
+   * - RSI > 70 (overbought, likely to revert)
+   * - Price drops below SMA50 (trend reversal / RS loss)
+   */
+  override generateSignal(
+    bar: OHLC,
+    _index: number,
+    _data: OHLC[],
+    indicators: IndicatorState
+  ): Signal | null {
+    const price = bar.close;
+    const { rsi14, sma50, ema26, volumeRatio } = indicators;
+
+    // Check SELL signal first (exit conditions)
+    if (rsi14 != null && rsi14 > 70) {
+      return {
+        type: "SELL",
+        price,
+        timestamp: bar.timestamp,
+        reason: `RSI overbought at ${rsi14.toFixed(1)} — momentum exhaustion`,
+      };
+    }
+
+    if (sma50 != null && price < sma50) {
+      return {
+        type: "SELL",
+        price,
+        timestamp: bar.timestamp,
+        reason: `Price below SMA50 ($${sma50.toFixed(2)}) — trend weakening`,
+      };
+    }
+
+    // Check BUY signal — strong momentum proxy for relative strength
+    const aboveSma50 = sma50 != null && price > sma50;
+    const rsiHealthy = rsi14 != null && rsi14 >= 45 && rsi14 <= 65;
+    const aboveEma26 = ema26 != null && price > ema26;
+    const volumeOk = volumeRatio != null && volumeRatio >= 1.2;
+
+    if (aboveSma50 && rsiHealthy && aboveEma26 && volumeOk) {
+      return {
+        type: "BUY",
+        price,
+        timestamp: bar.timestamp,
+        reason: `Strong momentum: above SMA50, RSI ${rsi14!.toFixed(1)}, volume ${volumeRatio!.toFixed(1)}x`,
+      };
+    }
+
+    return null;
+  }
+
+  /**
+   * Get required indicators for backtesting.
+   */
+  override getRequiredIndicators(): string[] {
+    return [
+      "sma50",
+      "ema26",
+      "rsi14",
+      "atr14",
+      "volumeRatio",
+      "volumeAvg20",
+      "nearestSupport",
+      "nearestResistance",
+    ];
   }
 }
 

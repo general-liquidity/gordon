@@ -25,6 +25,7 @@ import type {
   TakeProfitLevel,
 } from "../types.ts";
 import type { Candle } from "../../core/indicators/types.ts";
+import type { OHLC, Signal, IndicatorState } from "../../backtest/types.ts";
 
 // ============================================================================
 // Constants
@@ -352,6 +353,123 @@ When creating a plan using the ADX Trend Strength strategy:
 - Higher timeframes for reliability
 - When ADX is rising (trend strengthening)
 `;
+  }
+
+  // ============================================================================
+  // Backtesting Methods
+  // ============================================================================
+
+  /**
+   * Generate trading signal for backtesting.
+   *
+   * Uses sma20 as proxy for EMA20 (available in IndicatorState),
+   * and custom adx/plusDI/minusDI indicators via index signature.
+   *
+   * BUY signal when:
+   * - ADX > 25 (strong trend)
+   * - +DI > -DI (bullish direction)
+   * - Price near SMA20 (pullback entry)
+   * - RSI in healthy range (40-60)
+   *
+   * SELL signal when:
+   * - Price drops below SMA20 (trend break)
+   * - RSI > 70 (overbought, take profits)
+   * - ADX drops below 20 (trend dying)
+   */
+  override generateSignal(
+    bar: OHLC,
+    _index: number,
+    _data: OHLC[],
+    indicators: IndicatorState
+  ): Signal | null {
+    const price = bar.close;
+    const { rsi14, sma20, sma50 } = indicators;
+    const adx = indicators["adx"] as number | null | undefined;
+    const plusDI = indicators["plusDI"] as number | null | undefined;
+    const minusDI = indicators["minusDI"] as number | null | undefined;
+
+    // SELL signals (exit conditions)
+    if (sma20 != null && price < sma20) {
+      return {
+        type: "SELL",
+        price,
+        timestamp: bar.timestamp,
+        reason: "Price broke below SMA20 — trend break",
+      };
+    }
+
+    if (rsi14 != null && rsi14 > 70) {
+      return {
+        type: "SELL",
+        price,
+        timestamp: bar.timestamp,
+        reason: `RSI overbought at ${rsi14.toFixed(1)}`,
+      };
+    }
+
+    if (adx != null && adx < 20) {
+      return {
+        type: "SELL",
+        price,
+        timestamp: bar.timestamp,
+        reason: `ADX dropped to ${adx.toFixed(1)} — trend dying`,
+      };
+    }
+
+    // BUY signals (entry conditions)
+    // If ADX indicators are available, use full ADX logic
+    if (adx != null && plusDI != null && minusDI != null) {
+      const strongTrend = adx >= ADX_THRESHOLD;
+      const bullishDirection = plusDI > minusDI;
+      const rsiHealthy = rsi14 == null || (rsi14 >= 40 && rsi14 <= 60);
+
+      // Pullback to SMA20 — price within 2% of SMA20
+      const nearSMA20 = sma20 != null
+        ? Math.abs(price - sma20) / sma20 <= PULLBACK_THRESHOLD
+        : false;
+
+      if (strongTrend && bullishDirection && nearSMA20 && rsiHealthy) {
+        return {
+          type: "BUY",
+          price,
+          timestamp: bar.timestamp,
+          reason: `ADX trend: ADX ${adx.toFixed(1)}, +DI ${plusDI.toFixed(1)} > -DI ${minusDI.toFixed(1)}, pullback to SMA20`,
+        };
+      }
+    } else {
+      // Fallback: use SMA crossover + RSI as trend proxy
+      const trendUp = sma20 != null && sma50 != null && sma20 > sma50;
+      const nearSMA20 = sma20 != null
+        ? Math.abs(price - sma20) / sma20 <= PULLBACK_THRESHOLD
+        : false;
+      const rsiHealthy = rsi14 != null && rsi14 >= 40 && rsi14 <= 60;
+
+      if (trendUp && nearSMA20 && rsiHealthy) {
+        return {
+          type: "BUY",
+          price,
+          timestamp: bar.timestamp,
+          reason: `Trend pullback: SMA20 > SMA50, price near SMA20, RSI ${rsi14!.toFixed(1)}`,
+        };
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Get required indicators for backtesting.
+   */
+  override getRequiredIndicators(): string[] {
+    return [
+      "sma20",
+      "sma50",
+      "rsi14",
+      "atr14",
+      "adx",
+      "plusDI",
+      "minusDI",
+    ];
   }
 }
 

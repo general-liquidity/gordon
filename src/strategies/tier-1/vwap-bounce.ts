@@ -23,6 +23,7 @@ import type {
   StrategyPlanParams,
   StrategyId,
 } from "../types.ts";
+import type { OHLC, Signal, IndicatorState } from "../../backtest/types.ts";
 
 // ============================================================================
 // Constants
@@ -302,6 +303,97 @@ When creating a plan using the VWAP Bounce strategy:
 - After market open when VWAP has established
 - Multiple previous bounces from VWAP same session
 `;
+  }
+
+  // ============================================================================
+  // Backtesting Methods
+  // ============================================================================
+
+  /**
+   * Generate trading signal for backtesting.
+   *
+   * BUY signal when:
+   * - Price within 0.5% of VWAP (touching/near VWAP)
+   * - RSI in healthy pullback range (35-55)
+   * - Bullish candle (close > open) at VWAP
+   *
+   * SELL signal when:
+   * - RSI > 70 (overbought)
+   * - Price drops significantly below VWAP (> 1% below)
+   */
+  override generateSignal(
+    bar: OHLC,
+    _index: number,
+    _data: OHLC[],
+    indicators: IndicatorState
+  ): Signal | null {
+    const price = bar.close;
+    const { rsi14, vwap, sma20, nearestResistance } = indicators;
+
+    // SELL signals (exit conditions)
+    if (rsi14 != null && rsi14 > 70) {
+      return {
+        type: "SELL",
+        price,
+        timestamp: bar.timestamp,
+        reason: `RSI overbought at ${rsi14.toFixed(1)}`,
+      };
+    }
+
+    if (nearestResistance != null && price >= nearestResistance) {
+      return {
+        type: "SELL",
+        price,
+        timestamp: bar.timestamp,
+        reason: `Price hit resistance at $${nearestResistance.toFixed(2)}`,
+      };
+    }
+
+    // Price breaking well below VWAP — exit
+    if (vwap != null && price < vwap * (1 - 0.01)) {
+      return {
+        type: "SELL",
+        price,
+        timestamp: bar.timestamp,
+        reason: "Price broke below VWAP — support lost",
+      };
+    }
+
+    // BUY signals (entry conditions)
+    if (vwap != null) {
+      const distanceToVWAP = Math.abs(price - vwap) / vwap;
+      const isNearVWAP = distanceToVWAP <= VWAP_TOUCH_THRESHOLD;
+      const isBullish = bar.close > bar.open;
+      const rsiHealthy = rsi14 != null && rsi14 >= RSI_PULLBACK_LOW && rsi14 <= RSI_PULLBACK_HIGH;
+      const aboveVWAP = price >= vwap;
+      // VWAP should be above or near EMA20 (not bearish structure)
+      const structureOk = sma20 == null || vwap >= sma20 * 0.98;
+
+      if (isNearVWAP && isBullish && rsiHealthy && aboveVWAP && structureOk) {
+        return {
+          type: "BUY",
+          price,
+          timestamp: bar.timestamp,
+          reason: `VWAP bounce: price ${(distanceToVWAP * 100).toFixed(2)}% from VWAP ($${vwap.toFixed(2)}), RSI ${rsi14!.toFixed(1)}`,
+        };
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Get required indicators for backtesting.
+   */
+  override getRequiredIndicators(): string[] {
+    return [
+      "vwap",
+      "sma20",
+      "rsi14",
+      "atr14",
+      "volumeRatio",
+      "nearestResistance",
+    ];
   }
 }
 

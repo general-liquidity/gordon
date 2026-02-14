@@ -1,9 +1,10 @@
-import React, { useState, useCallback, useEffect, useRef } from "react";
+import React, { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { Box, Text, useInput } from "ink";
 import { Spinner, Alert, StatusMessage } from "@inkjs/ui";
 import { ChatInput } from "./ChatInput.tsx";
 
 import { StatusBar, type ThreadStatusInfo } from "./StatusBar.tsx";
+import type { TickerItem } from "./components/effects/index.ts";
 import { WelcomeBanner } from "./WelcomeBanner.tsx";
 import { QuickStartMenu, type MenuOption } from "./QuickStartMenu.tsx";
 import { ChatView, type ChatMessage } from "./ChatView.tsx";
@@ -2296,6 +2297,15 @@ Please check your API keys in the .env file and restart Gordon.`,
     }
   });
 
+  // Build ticker items from available price data
+  const tickerItems = useMemo((): TickerItem[] => {
+    const items: TickerItem[] = [];
+    if (state.btcPrice !== undefined) {
+      items.push({ symbol: "BTC", price: state.btcPrice, change: 0 });
+    }
+    return items;
+  }, [state.btcPrice]);
+
   return (
     <Box flexDirection="column" height="100%">
       {/* Status Bar - hidden during loading to prevent SAFE→ARMED flicker */}
@@ -2306,6 +2316,7 @@ Please check your API keys in the .env file and restart Gordon.`,
           connectionStatus={state.connectionStatus}
           btcPrice={state.btcPrice}
           threadInfo={state.threadStatusInfo || undefined}
+          tickerItems={tickerItems}
         />
       )}
 

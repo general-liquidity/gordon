@@ -42,13 +42,16 @@ export async function detectWhaleTransfers(opts: {
   const tokens = opts.tokens ?? [BASE_TOKENS.USDC, BASE_TOKENS.WETH];
   const limit = opts.limit ?? 50;
 
-  // Token decimals for amount conversion
+  // Token decimals for amount conversion.
+  // Intentionally hardcoded for known Base tokens — these are canonical ERC-20 contracts
+  // with immutable decimals. Falls back to tx.tokenDecimal from Basescan for unknown tokens.
   const DECIMALS: Record<string, number> = {
     [BASE_TOKENS.USDC.toLowerCase()]: 6,
     [BASE_TOKENS.WETH.toLowerCase()]: 18,
     [BASE_TOKENS.DAI.toLowerCase()]: 18,
     [BASE_TOKENS.cbETH.toLowerCase()]: 18,
     [BASE_TOKENS.USDbC.toLowerCase()]: 6,
+    [BASE_TOKENS.AERO.toLowerCase()]: 18,
   };
 
   const signals: WhaleTransferSignal[] = [];
@@ -111,8 +114,8 @@ export async function detectVolumeSpikes(opts: {
   if (opts.tokenAddresses && opts.tokenAddresses.length > 0) {
     pairs = await getBaseTokensBatch(opts.tokenAddresses);
   } else {
-    // Default: scan major Base tokens
-    pairs = await getBaseTokensBatch([BASE_TOKENS.USDC, BASE_TOKENS.WETH]);
+    // Default: scan major Base tokens (USDC, WETH, and AERO — Base's native DEX token)
+    pairs = await getBaseTokensBatch([BASE_TOKENS.USDC, BASE_TOKENS.WETH, BASE_TOKENS.AERO]);
   }
 
   const signals: VolumeSpikeSignal[] = [];

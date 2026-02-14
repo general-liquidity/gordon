@@ -278,13 +278,23 @@ export const agentKitSwapTool = createTool({
     slippageBps: z.number().optional().describe("Max slippage in basis points (100 = 1%). Default: 100"),
   }),
   outputSchema: agentKitResultSchema,
-  execute: async ({ fromToken, toToken, fromAmount, slippageBps }) =>
-    safeExecuteAction("swap", {
+  execute: async ({ fromToken, toToken, fromAmount, slippageBps }) => {
+    const networkId = process.env.CDP_NETWORK_ID;
+    if (networkId && !["base-mainnet", "ethereum-mainnet"].includes(networkId)) {
+      return {
+        success: false,
+        result: "",
+        action: "swap",
+        error: `DEX swaps only supported on base-mainnet or ethereum-mainnet, current network: ${networkId}`,
+      };
+    }
+    return safeExecuteAction("swap", {
       fromToken,
       toToken,
       fromAmount,
       ...(slippageBps !== undefined ? { slippageBps } : {}),
-    }),
+    });
+  },
 });
 
 // ============================================================================

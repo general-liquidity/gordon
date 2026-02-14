@@ -33,6 +33,14 @@ export interface EnvKeys {
   BINANCE_API_SECRET?: string;
   BINANCE_US_API_KEY?: string;
   BINANCE_US_API_SECRET?: string;
+  COINBASE_API_KEY?: string;
+  COINBASE_API_SECRET?: string;
+  COINBASE_PASSPHRASE?: string;
+  KRAKEN_API_KEY?: string;
+  KRAKEN_API_SECRET?: string;
+  BITFINEX_API_KEY?: string;
+  BITFINEX_API_SECRET?: string;
+  HYPERLIQUID_PRIVATE_KEY?: string;
   GORDON_PROVIDER?: string;
   GORDON_MODEL?: string;
 }
@@ -42,6 +50,10 @@ export interface EnvStatus {
   hasLLMKey: boolean;
   hasBinanceKeys: boolean;
   hasBinanceUSKeys: boolean;
+  hasCoinbaseKeys: boolean;
+  hasKrakenKeys: boolean;
+  hasBitfinexKeys: boolean;
+  hasHyperliquidKey: boolean;
   keys: EnvKeys;
 }
 
@@ -111,6 +123,14 @@ export async function checkEnvStatus(): Promise<EnvStatus> {
       BINANCE_API_SECRET: process.env.BINANCE_API_SECRET,
       BINANCE_US_API_KEY: process.env.BINANCE_US_API_KEY,
       BINANCE_US_API_SECRET: process.env.BINANCE_US_API_SECRET,
+      COINBASE_API_KEY: process.env.COINBASE_API_KEY,
+      COINBASE_API_SECRET: process.env.COINBASE_API_SECRET,
+      COINBASE_PASSPHRASE: process.env.COINBASE_PASSPHRASE,
+      KRAKEN_API_KEY: process.env.KRAKEN_API_KEY,
+      KRAKEN_API_SECRET: process.env.KRAKEN_API_SECRET,
+      BITFINEX_API_KEY: process.env.BITFINEX_API_KEY,
+      BITFINEX_API_SECRET: process.env.BITFINEX_API_SECRET,
+      HYPERLIQUID_PRIVATE_KEY: process.env.HYPERLIQUID_PRIVATE_KEY,
     };
 
     return {
@@ -118,6 +138,10 @@ export async function checkEnvStatus(): Promise<EnvStatus> {
       hasLLMKey: !!(keys.OPENAI_API_KEY || keys.DEDALUS_API_KEY),
       hasBinanceKeys: !!(keys.BINANCE_API_KEY && keys.BINANCE_API_SECRET),
       hasBinanceUSKeys: !!(keys.BINANCE_US_API_KEY && keys.BINANCE_US_API_SECRET),
+      hasCoinbaseKeys: !!(keys.COINBASE_API_KEY && keys.COINBASE_API_SECRET),
+      hasKrakenKeys: !!(keys.KRAKEN_API_KEY && keys.KRAKEN_API_SECRET),
+      hasBitfinexKeys: !!(keys.BITFINEX_API_KEY && keys.BITFINEX_API_SECRET),
+      hasHyperliquidKey: !!keys.HYPERLIQUID_PRIVATE_KEY,
       keys,
     };
   }
@@ -134,6 +158,14 @@ export async function checkEnvStatus(): Promise<EnvStatus> {
     BINANCE_API_SECRET: parsed.BINANCE_API_SECRET || process.env.BINANCE_API_SECRET,
     BINANCE_US_API_KEY: parsed.BINANCE_US_API_KEY || process.env.BINANCE_US_API_KEY,
     BINANCE_US_API_SECRET: parsed.BINANCE_US_API_SECRET || process.env.BINANCE_US_API_SECRET,
+    COINBASE_API_KEY: parsed.COINBASE_API_KEY || process.env.COINBASE_API_KEY,
+    COINBASE_API_SECRET: parsed.COINBASE_API_SECRET || process.env.COINBASE_API_SECRET,
+    COINBASE_PASSPHRASE: parsed.COINBASE_PASSPHRASE || process.env.COINBASE_PASSPHRASE,
+    KRAKEN_API_KEY: parsed.KRAKEN_API_KEY || process.env.KRAKEN_API_KEY,
+    KRAKEN_API_SECRET: parsed.KRAKEN_API_SECRET || process.env.KRAKEN_API_SECRET,
+    BITFINEX_API_KEY: parsed.BITFINEX_API_KEY || process.env.BITFINEX_API_KEY,
+    BITFINEX_API_SECRET: parsed.BITFINEX_API_SECRET || process.env.BITFINEX_API_SECRET,
+    HYPERLIQUID_PRIVATE_KEY: parsed.HYPERLIQUID_PRIVATE_KEY || process.env.HYPERLIQUID_PRIVATE_KEY,
   };
 
   return {
@@ -141,6 +173,10 @@ export async function checkEnvStatus(): Promise<EnvStatus> {
     hasLLMKey: !!(keys.OPENAI_API_KEY || keys.DEDALUS_API_KEY),
     hasBinanceKeys: !!(keys.BINANCE_API_KEY && keys.BINANCE_API_SECRET),
     hasBinanceUSKeys: !!(keys.BINANCE_US_API_KEY && keys.BINANCE_US_API_SECRET),
+    hasCoinbaseKeys: !!(keys.COINBASE_API_KEY && keys.COINBASE_API_SECRET),
+    hasKrakenKeys: !!(keys.KRAKEN_API_KEY && keys.KRAKEN_API_SECRET),
+    hasBitfinexKeys: !!(keys.BITFINEX_API_KEY && keys.BITFINEX_API_SECRET),
+    hasHyperliquidKey: !!keys.HYPERLIQUID_PRIVATE_KEY,
     keys,
   };
 }
@@ -348,6 +384,66 @@ export async function createEnvFile(keys: Partial<EnvKeys>): Promise<void> {
     lines.push(`BINANCE_US_API_SECRET='${keys.BINANCE_US_API_SECRET}'`);
   } else {
     lines.push("# BINANCE_US_API_SECRET=");
+  }
+
+  lines.push("");
+  lines.push("# Coinbase");
+
+  if (keys.COINBASE_API_KEY) {
+    lines.push(`COINBASE_API_KEY='${keys.COINBASE_API_KEY}'`);
+  } else {
+    lines.push("# COINBASE_API_KEY=");
+  }
+
+  if (keys.COINBASE_API_SECRET) {
+    lines.push(`COINBASE_API_SECRET='${keys.COINBASE_API_SECRET}'`);
+  } else {
+    lines.push("# COINBASE_API_SECRET=");
+  }
+
+  if (keys.COINBASE_PASSPHRASE) {
+    lines.push(`COINBASE_PASSPHRASE='${keys.COINBASE_PASSPHRASE}'`);
+  } else {
+    lines.push("# COINBASE_PASSPHRASE=");
+  }
+
+  lines.push("");
+  lines.push("# Kraken");
+
+  if (keys.KRAKEN_API_KEY) {
+    lines.push(`KRAKEN_API_KEY='${keys.KRAKEN_API_KEY}'`);
+  } else {
+    lines.push("# KRAKEN_API_KEY=");
+  }
+
+  if (keys.KRAKEN_API_SECRET) {
+    lines.push(`KRAKEN_API_SECRET='${keys.KRAKEN_API_SECRET}'`);
+  } else {
+    lines.push("# KRAKEN_API_SECRET=");
+  }
+
+  lines.push("");
+  lines.push("# Bitfinex");
+
+  if (keys.BITFINEX_API_KEY) {
+    lines.push(`BITFINEX_API_KEY='${keys.BITFINEX_API_KEY}'`);
+  } else {
+    lines.push("# BITFINEX_API_KEY=");
+  }
+
+  if (keys.BITFINEX_API_SECRET) {
+    lines.push(`BITFINEX_API_SECRET='${keys.BITFINEX_API_SECRET}'`);
+  } else {
+    lines.push("# BITFINEX_API_SECRET=");
+  }
+
+  lines.push("");
+  lines.push("# Hyperliquid");
+
+  if (keys.HYPERLIQUID_PRIVATE_KEY) {
+    lines.push(`HYPERLIQUID_PRIVATE_KEY='${keys.HYPERLIQUID_PRIVATE_KEY}'`);
+  } else {
+    lines.push("# HYPERLIQUID_PRIVATE_KEY=");
   }
 
   // Always write to ~/.gordon/.env

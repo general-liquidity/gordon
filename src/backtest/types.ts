@@ -56,6 +56,12 @@ export interface Signal {
 
   /** Human-readable explanation for the signal */
   reason: string;
+
+  /** Grid level index (0-based) for grid/DCA strategies. When set, the engine allows multiple concurrent positions. */
+  gridLevel?: number;
+
+  /** Maximum simultaneous grid positions allowed. Only used when gridLevel is set. Defaults to 1. */
+  maxPositions?: number;
 }
 
 // ============================================================================
@@ -607,6 +613,9 @@ export interface Position {
 
   /** Current unrealized P&L */
   unrealizedPnL: number;
+
+  /** Grid level index (0-based) for grid/DCA positions */
+  gridLevel?: number;
 }
 
 /**
@@ -651,6 +660,9 @@ export interface Trade {
 
   /** Reason for exit */
   exitReason: string;
+
+  /** Grid level index (0-based) if this trade originated from a grid/DCA entry */
+  gridLevel?: number;
 }
 
 /**

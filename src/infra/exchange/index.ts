@@ -7,6 +7,7 @@
  *
  * Supported exchanges (all with native adapters):
  * - Binance
+ * - Binance US
  * - Coinbase
  * - Kraken
  * - Bitfinex
@@ -39,6 +40,7 @@ export { ExchangeFactory } from "./factory.ts";
 
 // Adapters
 export { BinanceAdapter } from "./adapters/binance.ts";
+export { BinanceUSAdapter } from "./adapters/binance-us.ts";
 export { CoinbaseAdapter } from "./adapters/coinbase.ts";
 export { KrakenAdapter } from "./adapters/kraken.ts";
 export { BitfinexAdapter } from "./adapters/bitfinex.ts";

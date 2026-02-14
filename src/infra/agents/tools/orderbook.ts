@@ -21,6 +21,7 @@ import {
 } from "../../resilience/index.ts";
 import type { OrderBookEntry, ExchangeExtended } from "../../exchange/types.ts";
 import { createCachedTool, TOOL_CACHE_CONFIG } from "./cache.ts";
+import { placeOCOOrders } from "../../../core/executor.ts";
 
 // ============================================================================
 // Error Messages
@@ -301,36 +302,34 @@ export const getRecentTradesTool = createTool({
 export const placeOCOOrderTool = createTool({
   id: "place_oco_order",
   description:
-    "Place an OCO (One-Cancels-Other) order combining a limit order with a stop-loss. " +
+    "Place an OCO (One-Cancels-Other) order combining a stop-loss with a take-profit. " +
     "When one triggers, the other is automatically cancelled. " +
+    "On Binance this uses the native atomic OCO endpoint; on other exchanges it places " +
+    "two separate orders (stop-loss + take-profit) that the monitor will coordinate. " +
     "Use for 'set stop loss and take profit', 'OCO order', 'bracket order'. " +
     "Requires ARMED mode.",
   inputSchema: z.object({
     symbol: z.string().describe("Trading pair (e.g., 'BTCUSDT')"),
     side: z.enum(["BUY", "SELL"]).describe("Order side"),
     quantity: z.number().positive().describe("Quantity to trade"),
-    price: z.number().positive().describe("Limit price (take profit)"),
-    stopPrice: z.number().positive().describe("Stop trigger price"),
-    stopLimitPrice: z.number().default(0).describe("Stop limit price. Use 0 to default to stopPrice."),
+    takeProfitPrice: z.number().positive().describe("Take-profit limit price"),
+    stopPrice: z.number().positive().describe("Stop-loss trigger price"),
+    stopLimitPrice: z.number().default(0).describe("Stop-loss limit price (slightly below stopPrice). Use 0 to default to stopPrice * 0.995."),
   }),
   outputSchema: z.object({
     success: z.boolean().optional(),
     message: z.string().optional(),
     orderListId: z.number().optional(),
-    status: z.string().optional(),
-    orders: z.array(z.object({
-      orderId: z.number(),
-      type: z.string(),
-      price: z.string(),
-      status: z.string(),
-    })).optional(),
+    orderIds: z.array(z.string()).optional(),
+    native: z.boolean().optional(),
     symbol: z.string().optional(),
     side: z.enum(["BUY", "SELL"]).optional(),
     quantity: z.number().optional(),
     stopPrice: z.number().optional(),
+    takeProfitPrice: z.number().optional(),
     error: z.string().optional(),
   }),
-  execute: async ({ symbol, side, quantity, price, stopPrice, stopLimitPrice }, execContext: MastraExecutionContext) => {
+  execute: async ({ symbol, side, quantity, takeProfitPrice, stopPrice, stopLimitPrice }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
     if (!ctx?.exchange) {
       return errors.noExchange;
@@ -342,7 +341,7 @@ export const placeOCOOrderTool = createTool({
         symbol,
         side,
         quantity,
-        price,
+        takeProfitPrice,
         stopPrice,
       };
     }
@@ -351,32 +350,39 @@ export const placeOCOOrderTool = createTool({
       ? symbol.toUpperCase()
       : `${symbol.toUpperCase()}USDT`;
 
-    try {
-      const exchangeWithOco = ctx.exchange as ExchangeExtended;
-      if (!exchangeWithOco.placeOCOOrder) {
-        return { error: "OCO orders are not supported on this exchange." };
-      }
+    // Default stopLimitPrice to 0.5% below stopPrice if not provided
+    const effectiveStopLimitPrice = stopLimitPrice && stopLimitPrice > 0
+      ? stopLimitPrice
+      : stopPrice * 0.995;
 
-      const result = await exchangeWithOco.placeOCOOrder({
-        symbol: normalizedSymbol,
+    try {
+      const result = await placeOCOOrders(
+        ctx.exchange,
+        normalizedSymbol,
         side,
         quantity,
-        price,
         stopPrice,
-        stopLimitPrice: stopLimitPrice ?? stopPrice,
-      });
+        effectiveStopLimitPrice,
+        takeProfitPrice,
+        undefined, // no planId for ad-hoc tool calls
+        ctx.userId ?? "system"
+      );
+
+      if (!result.success) {
+        return { error: result.error ?? "OCO order placement failed" };
+      }
 
       return {
         success: true,
-        message: `OCO order placed: ${side} ${quantity} ${normalizedSymbol}`,
+        message: `OCO order placed: ${side} ${quantity} ${normalizedSymbol} — SL @ ${stopPrice}, TP @ ${takeProfitPrice}${result.native ? " (native OCO)" : " (two separate orders)"}`,
         orderListId: result.orderListId,
-        status: "NEW",
-        orders: result.orders.map((o) => ({
-          orderId: Number(o.orderId) || 0,
-          type: o.type,
-          price: o.price.toFixed(8),
-          status: o.status,
-        })),
+        orderIds: result.orderIds,
+        native: result.native,
+        symbol: normalizedSymbol,
+        side,
+        quantity,
+        stopPrice,
+        takeProfitPrice,
       };
     } catch (error) {
       return { error: `Failed to place OCO order: ${(error as Error).message}` };

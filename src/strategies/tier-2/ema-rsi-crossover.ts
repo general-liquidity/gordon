@@ -22,6 +22,7 @@ import type {
   StrategyPlanParams,
   StrategyId,
 } from "../types.ts";
+import type { OHLC, Signal, IndicatorState } from "../../backtest/types.ts";
 
 // ============================================================================
 // Constants
@@ -289,6 +290,112 @@ When creating a plan using the EMA+RSI Crossover strategy:
 - When all 3 EMAs are aligned (9 > 21 > 50)
 - After oversold RSI bounces above 50
 `;
+  }
+
+  // ============================================================================
+  // Backtesting Methods
+  // ============================================================================
+
+  /**
+   * Generate trading signal for backtesting.
+   *
+   * Uses ema12 as proxy for fast EMA (EMA9), ema26 as proxy for
+   * medium EMA (EMA21), and ema50 for the slow trend filter.
+   * Custom ema9/ema21 fields are preferred if available.
+   *
+   * BUY signal when:
+   * - Fast EMA > Slow EMA (bullish crossover)
+   * - RSI > 50 and rising (rsi14 > rsi14Prev)
+   * - Price above EMA50 (trend filter)
+   * - RSI < 70 (not overbought)
+   *
+   * SELL signal when:
+   * - Fast EMA drops below Slow EMA (bearish crossover)
+   * - RSI drops below 50 (momentum lost)
+   * - RSI > 70 (overbought)
+   */
+  override generateSignal(
+    bar: OHLC,
+    _index: number,
+    _data: OHLC[],
+    indicators: IndicatorState
+  ): Signal | null {
+    const price = bar.close;
+    const { rsi14, rsi14Prev, ema12, ema26, ema50 } = indicators;
+
+    // Use custom ema9/ema21 if available, otherwise fall back to ema12/ema26
+    const fastEMA = (indicators["ema9"] as number | null | undefined) ?? ema12;
+    const mediumEMA = (indicators["ema21"] as number | null | undefined) ?? ema26;
+
+    // SELL signals (exit conditions)
+    if (fastEMA != null && mediumEMA != null && fastEMA < mediumEMA) {
+      return {
+        type: "SELL",
+        price,
+        timestamp: bar.timestamp,
+        reason: "Fast EMA crossed below medium EMA — bearish crossover",
+      };
+    }
+
+    if (rsi14 != null && rsi14 < RSI_THRESHOLD) {
+      return {
+        type: "SELL",
+        price,
+        timestamp: bar.timestamp,
+        reason: `RSI dropped below ${RSI_THRESHOLD} (${rsi14.toFixed(1)}) — momentum lost`,
+      };
+    }
+
+    if (rsi14 != null && rsi14 > RSI_OVERBOUGHT) {
+      return {
+        type: "SELL",
+        price,
+        timestamp: bar.timestamp,
+        reason: `RSI overbought at ${rsi14.toFixed(1)}`,
+      };
+    }
+
+    // BUY signals (entry conditions)
+    if (fastEMA != null && mediumEMA != null) {
+      const bullishCrossover = fastEMA > mediumEMA;
+      const aboveEMA50 = ema50 == null || price > ema50;
+      const rsiMomentum = rsi14 != null && rsi14 > RSI_THRESHOLD && rsi14 < RSI_OVERBOUGHT;
+      const rsiRising = rsi14Prev != null && rsi14 != null ? rsi14 > rsi14Prev : true;
+
+      if (bullishCrossover && aboveEMA50 && rsiMomentum && rsiRising) {
+        const reasons: string[] = [];
+        reasons.push("EMA bullish crossover");
+        if (ema50 != null && fastEMA > mediumEMA && mediumEMA > ema50) {
+          reasons.push("full alignment (fast > medium > slow)");
+        }
+        reasons.push(`RSI ${rsi14!.toFixed(1)} rising`);
+        return {
+          type: "BUY",
+          price,
+          timestamp: bar.timestamp,
+          reason: reasons.join(", "),
+        };
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Get required indicators for backtesting.
+   */
+  override getRequiredIndicators(): string[] {
+    return [
+      "ema12",
+      "ema26",
+      "ema50",
+      "ema9",
+      "ema21",
+      "rsi14",
+      "rsi14Prev",
+      "atr14",
+      "volumeRatio",
+    ];
   }
 }
 

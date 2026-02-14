@@ -23,6 +23,7 @@ import type {
   StrategyPlanParams,
   StrategyId,
 } from "../types.ts";
+import type { OHLC, Signal, IndicatorState } from "../../backtest/types.ts";
 
 // ============================================================================
 // Constants
@@ -285,6 +286,92 @@ When creating a plan using the Volume Surge strategy:
 - Early trend continuation after pullbacks
 - Avoid during low-liquidity hours
 `;
+  }
+
+  // ============================================================================
+  // Backtesting Methods
+  // ============================================================================
+
+  /**
+   * Generate trading signal for backtesting.
+   *
+   * BUY signal when:
+   * - Volume ratio >= 2x average
+   * - Bullish candle (close > open)
+   * - RSI < 75 (not overbought)
+   * - Price breaking above resistance or SMA
+   *
+   * SELL signal when:
+   * - RSI > 75 (overbought)
+   * - Price drops below SMA20
+   */
+  override generateSignal(
+    bar: OHLC,
+    _index: number,
+    _data: OHLC[],
+    indicators: IndicatorState
+  ): Signal | null {
+    const price = bar.close;
+    const { rsi14, volumeRatio, sma20, nearestResistance } = indicators;
+
+    // SELL signals (exit conditions)
+    if (rsi14 != null && rsi14 > RSI_MAX) {
+      return {
+        type: "SELL",
+        price,
+        timestamp: bar.timestamp,
+        reason: `RSI overbought at ${rsi14.toFixed(1)} (>${RSI_MAX})`,
+      };
+    }
+
+    if (sma20 != null && price < sma20) {
+      return {
+        type: "SELL",
+        price,
+        timestamp: bar.timestamp,
+        reason: "Price dropped below SMA20 — momentum lost",
+      };
+    }
+
+    // BUY signals (entry conditions)
+    const isBullishCandle = bar.close > bar.open;
+    const hasVolumeSurge = volumeRatio != null && volumeRatio >= MIN_VOLUME_RATIO;
+    const rsiOk = rsi14 == null || rsi14 < RSI_MAX;
+
+    if (isBullishCandle && hasVolumeSurge && rsiOk) {
+      // Extra confirmation: breaking resistance or above SMA20
+      const breakingResistance = nearestResistance != null && price >= nearestResistance;
+      const aboveSMA = sma20 != null && price > sma20;
+
+      if (breakingResistance || aboveSMA) {
+        const reasons: string[] = [];
+        reasons.push(`Volume surge ${volumeRatio!.toFixed(1)}x average`);
+        if (breakingResistance) reasons.push("breaking resistance");
+        if (rsi14 != null) reasons.push(`RSI ${rsi14.toFixed(1)}`);
+        return {
+          type: "BUY",
+          price,
+          timestamp: bar.timestamp,
+          reason: reasons.join(", "),
+        };
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Get required indicators for backtesting.
+   */
+  override getRequiredIndicators(): string[] {
+    return [
+      "sma20",
+      "rsi14",
+      "atr14",
+      "volumeRatio",
+      "volumeAvg20",
+      "nearestResistance",
+    ];
   }
 }
 

@@ -17,7 +17,7 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
-import { getGordonContext, type MastraExecutionContext } from "./types.ts";
+import { getGordonContext, isBinanceFamily, type MastraExecutionContext } from "./types.ts";
 import type { ExchangeExtended } from "../../exchange/types.ts";
 
 // ============================================================================
@@ -506,31 +506,47 @@ export const getUserAssetsTool = createTool({
     if (!ctx?.exchange) {
       return errors.noExchange;
     }
-    if (!ctx.binance || ctx.exchange.exchangeId !== "binance") {
-      return errors.binanceOnly;
-    }
 
     try {
-      const userAssets = await ctx.binance.getUserAssets(true);
+      // Use Binance-specific getUserAssets if available (includes BTC valuation)
+      if (isBinanceFamily(ctx.exchange.exchangeId) && ctx.binance) {
+        const userAssets = await ctx.binance.getUserAssets(true);
 
+        const filtered = showAll
+          ? userAssets
+          : userAssets.filter(
+              (a) => parseFloat(a.free) > 0 || parseFloat(a.locked) > 0
+            );
+
+        const totalBtcValuation = userAssets
+          .reduce((sum, a) => sum + parseFloat(a.btcValuation), 0)
+          .toFixed(8);
+
+        return {
+          count: filtered.length,
+          totalBtcValuation,
+          assets: filtered.map((a) => ({
+            asset: a.asset,
+            free: a.free,
+            locked: a.locked,
+            btcValuation: a.btcValuation,
+          })),
+        };
+      }
+
+      // Fallback: use Exchange interface getAllBalances()
+      const balances = await ctx.exchange.getAllBalances();
       const filtered = showAll
-        ? userAssets
-        : userAssets.filter(
-            (a) => parseFloat(a.free) > 0 || parseFloat(a.locked) > 0
-          );
-
-      const totalBtcValuation = userAssets
-        .reduce((sum, a) => sum + parseFloat(a.btcValuation), 0)
-        .toFixed(8);
+        ? balances
+        : balances.filter((b) => b.free > 0 || b.locked > 0);
 
       return {
         count: filtered.length,
-        totalBtcValuation,
-        assets: filtered.map((a) => ({
-          asset: a.asset,
-          free: a.free,
-          locked: a.locked,
-          btcValuation: a.btcValuation,
+        assets: filtered.map((b) => ({
+          asset: b.asset,
+          free: String(b.free),
+          locked: String(b.locked),
+          btcValuation: "N/A",
         })),
       };
     } catch (error) {
@@ -563,23 +579,38 @@ export const getWalletBalancesTool = createTool({
     if (!ctx?.exchange) {
       return errors.noExchange;
     }
-    if (!ctx.binance || ctx.exchange.exchangeId !== "binance") {
-      return errors.binanceOnly;
-    }
 
     try {
-      const walletBalances = await ctx.binance.getWalletBalances();
+      // Use Binance-specific getWalletBalances if available (multi-wallet breakdown)
+      if (isBinanceFamily(ctx.exchange.exchangeId) && ctx.binance) {
+        const walletBalances = await ctx.binance.getWalletBalances();
 
-      const totalBalance = walletBalances
-        .reduce((sum, w) => sum + parseFloat(w.balance), 0)
+        const totalBalance = walletBalances
+          .reduce((sum, w) => sum + parseFloat(w.balance), 0)
+          .toFixed(8);
+
+        return {
+          wallets: walletBalances.map((w) => ({
+            walletName: w.walletName,
+            balance: w.balance,
+            active: w.activate,
+          })),
+          totalBalance,
+        };
+      }
+
+      // Fallback: use Exchange interface getAllBalances() as single "Spot" wallet
+      const balances = await ctx.exchange.getAllBalances();
+      const totalBalance = balances
+        .reduce((sum, b) => sum + b.total, 0)
         .toFixed(8);
 
       return {
-        wallets: walletBalances.map((w) => ({
-          walletName: w.walletName,
-          balance: w.balance,
-          active: w.activate,
-        })),
+        wallets: [{
+          walletName: "Spot",
+          balance: totalBalance,
+          active: true,
+        }],
         totalBalance,
       };
     } catch (error) {
@@ -626,7 +657,7 @@ export const getDustLogTool = createTool({
     if (!ctx?.exchange) {
       return errors.noExchange;
     }
-    if (!ctx.binance || ctx.exchange.exchangeId !== "binance") {
+    if (!isBinanceFamily(ctx.exchange.exchangeId) || !ctx.binance) {
       return errors.binanceOnly;
     }
 

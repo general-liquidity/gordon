@@ -11,7 +11,7 @@
  * - Permission validation before trading
  */
 
-import type { Exchange, Order, OrderParams } from "../infra/exchange/index.ts";
+import type { Exchange, Order, OrderParams, ExchangeExtended, OCOOrderParams } from "../infra/exchange/index.ts";
 import { BinanceAdapter } from "../infra/exchange/index.ts";
 import { validatePlan } from "./validator.ts";
 import { createTrade, updateTrade, getTrade, listTrades } from "../infra/storage/trades.ts";
@@ -483,109 +483,103 @@ export async function executePlan(
       planId: plan.id,
     });
 
-    // 6b. Place stop-loss order
-    const stopOrderParams: OrderParams = {
-      symbol: plan.symbol,
-      side: "SELL",
-      type: "STOP_LOSS_LIMIT",
-      quantity: totalQuantity,
-      price: roundPrice(plan.stopLoss.price * 0.995),
-      stopPrice: roundPrice(plan.stopLoss.price),
-      timeInForce: "GTC",
-      newClientOrderId: generateClientOrderId(plan.id, "stop"),
-    };
+    // 6b + 6c. Place exit orders (stop-loss + take-profit)
+    //
+    // Optimization: When there is exactly one take-profit level AND the
+    // exchange supports native OCO, place an atomic OCO order that pairs
+    // the stop-loss with the take-profit. This guarantees one cancels the
+    // other without relying on the monitor.
+    //
+    // For multiple take-profit levels (tiered exits), we fall back to
+    // placing separate orders because OCO is a 1:1 pairing.
 
-    let stopOrder: Order;
-    try {
-      stopOrder = await client.placeOrder(stopOrderParams);
-      logger.info("Stop order placed", {
-        orderId: stopOrder.orderId,
-        stopPrice: plan.stopLoss.price,
-      });
-    } catch (error) {
-      await rollbackOrders(client, plan.symbol, placedOrders, plan.id);
+    const canUseOCO = plan.takeProfit.length === 1
+      && plan.takeProfit[0]
+      && getOCOCapableExchange(client) !== null;
 
-      const errorMessage = isGordonError(error)
-        ? error.message
-        : error instanceof Error
-          ? error.message
-          : "Unknown error";
+    if (canUseOCO) {
+      // --- OCO path: single atomic order for SL + TP ---
+      const tp = plan.takeProfit[0]!;
 
-      logger.error("Stop order failed", error as Error, { params: stopOrderParams });
+      const ocoResult = await placeOCOOrders(
+        client,
+        plan.symbol,
+        "SELL",
+        totalQuantity,
+        plan.stopLoss.price,
+        roundPrice(plan.stopLoss.price * 0.995),
+        tp.price,
+        plan.id,
+        userId
+      );
+
+      if (!ocoResult.success) {
+        // OCO failed — rollback entry order
+        await rollbackOrders(client, plan.symbol, placedOrders, plan.id);
+
+        logger.error("OCO exit order failed", new Error(ocoResult.error), { planId: plan.id });
+
+        return {
+          success: false,
+          error: `Failed to place OCO exit orders: ${ocoResult.error}. Entry order rolled back.`,
+          orders: placedOrders,
+        };
+      }
+
+      // Record both legs as placed orders
+      // First order ID is the stop leg, second is the TP leg
+      if (ocoResult.orderIds[0]) {
+        placedOrders.push({
+          type: "stop",
+          orderId: ocoResult.orderIds[0],
+          price: plan.stopLoss.price,
+          quantity: totalQuantity,
+        });
+      }
+      if (ocoResult.orderIds[1]) {
+        placedOrders.push({
+          type: "take_profit",
+          orderId: ocoResult.orderIds[1],
+          price: tp.price,
+          quantity: totalQuantity,
+        });
+      }
+
       logEvent({
-        type: "ERROR",
+        type: "ORDER_PLACED",
         data: {
-          action: "STOP_ORDER_FAILED",
-          params: stopOrderParams,
-          error: errorMessage,
+          action: "OCO_EXIT_PLACED",
+          native: ocoResult.native,
+          orderListId: ocoResult.orderListId,
+          symbol: plan.symbol,
+          stopPrice: plan.stopLoss.price,
+          takeProfitPrice: tp.price,
+          quantity: totalQuantity,
+          orderIds: ocoResult.orderIds,
         },
         planId: plan.id,
       });
+    } else {
+      // --- Standard path: separate stop-loss + take-profit orders ---
 
-      return {
-        success: false,
-        error: `Failed to place stop-loss order: ${errorMessage}. Entry order rolled back.`,
-        orders: placedOrders,
-      };
-    }
-
-    placedOrders.push({
-      type: "stop",
-      orderId: stopOrder.orderId.toString(),
-      price: plan.stopLoss.price,
-      quantity: totalQuantity,
-    });
-
-    logEvent({
-      type: "ORDER_PLACED",
-      data: {
-        action: "STOP_LOSS",
-        orderId: stopOrder.orderId.toString(),
+      // 6b. Place stop-loss order
+      const stopOrderParams: OrderParams = {
         symbol: plan.symbol,
         side: "SELL",
         type: "STOP_LOSS_LIMIT",
-        stopPrice: plan.stopLoss.price,
         quantity: totalQuantity,
-      },
-      planId: plan.id,
-    });
-
-    // 6c. Place take-profit orders
-    let remainingQuantity = totalQuantity;
-    for (let i = 0; i < plan.takeProfit.length; i++) {
-      const tp = plan.takeProfit[i];
-      if (!tp) {
-        continue;
-      }
-      const isLastTP = i === plan.takeProfit.length - 1;
-
-      const tpQuantity = isLastTP
-        ? remainingQuantity
-        : roundQuantity(totalQuantity * tp.percentToSell);
-
-      remainingQuantity = roundQuantity(remainingQuantity - tpQuantity);
-
-      if (tpQuantity <= 0) {
-        continue;
-      }
-
-      const tpOrderParams: OrderParams = {
-        symbol: plan.symbol,
-        side: "SELL",
-        type: "LIMIT",
-        quantity: tpQuantity,
-        price: roundPrice(tp.price),
+        price: roundPrice(plan.stopLoss.price * 0.995),
+        stopPrice: roundPrice(plan.stopLoss.price),
         timeInForce: "GTC",
-        newClientOrderId: generateClientOrderId(plan.id, `tp${i + 1}`),
+        newClientOrderId: generateClientOrderId(plan.id, "stop"),
       };
 
-      let tpOrder: Order;
+      let stopOrder: Order;
       try {
-        tpOrder = await client.placeOrder(tpOrderParams);
-        logger.info("Take profit order placed", {
-          level: i + 1,
-          orderId: tpOrder.orderId,
-          price: tp.price,
+        stopOrder = await client.placeOrder(stopOrderParams);
+        logger.info("Stop order placed", {
+          orderId: stopOrder.orderId,
+          stopPrice: plan.stopLoss.price,
         });
       } catch (error) {
         await rollbackOrders(client, plan.symbol, placedOrders, plan.id);
@@ -596,13 +590,12 @@ export async function executePlan(
             ? error.message
             : "Unknown error";
 
-        logger.error("TP order failed", error as Error, { level: i + 1, params: tpOrderParams });
+        logger.error("Stop order failed", error as Error, { params: stopOrderParams });
         logEvent({
           type: "ERROR",
           data: {
-            action: "TP_ORDER_FAILED",
-            tpLevel: i + 1,
-            params: tpOrderParams,
+            action: "STOP_ORDER_FAILED",
+            params: stopOrderParams,
             error: errorMessage,
           },
           planId: plan.id,
@@ -610,31 +603,118 @@ export async function executePlan(
 
         return {
           success: false,
-          error: `Failed to place take-profit order ${i + 1}: ${errorMessage}. All orders rolled back.`,
+          error: `Failed to place stop-loss order: ${errorMessage}. Entry order rolled back.`,
           orders: placedOrders,
         };
       }
 
       placedOrders.push({
-        type: "take_profit",
-        orderId: tpOrder.orderId.toString(),
-        price: tp.price,
-        quantity: tpQuantity,
+        type: "stop",
+        orderId: stopOrder.orderId.toString(),
+        price: plan.stopLoss.price,
+        quantity: totalQuantity,
       });
 
       logEvent({
         type: "ORDER_PLACED",
         data: {
-          action: `TAKE_PROFIT_${i + 1}`,
-          orderId: tpOrder.orderId.toString(),
+          action: "STOP_LOSS",
+          orderId: stopOrder.orderId.toString(),
           symbol: plan.symbol,
           side: "SELL",
-          type: "LIMIT",
-          price: tp.price,
-          quantity: tpQuantity,
+          type: "STOP_LOSS_LIMIT",
+          stopPrice: plan.stopLoss.price,
+          quantity: totalQuantity,
         },
         planId: plan.id,
       });
+
+      // 6c. Place take-profit orders
+      let remainingQuantity = totalQuantity;
+      for (let i = 0; i < plan.takeProfit.length; i++) {
+        const tp = plan.takeProfit[i];
+        if (!tp) {
+          continue;
+        }
+        const isLastTP = i === plan.takeProfit.length - 1;
+
+        const tpQuantity = isLastTP
+          ? remainingQuantity
+          : roundQuantity(totalQuantity * tp.percentToSell);
+
+        remainingQuantity = roundQuantity(remainingQuantity - tpQuantity);
+
+        if (tpQuantity <= 0) {
+          continue;
+        }
+
+        const tpOrderParams: OrderParams = {
+          symbol: plan.symbol,
+          side: "SELL",
+          type: "LIMIT",
+          quantity: tpQuantity,
+          price: roundPrice(tp.price),
+          timeInForce: "GTC",
+          newClientOrderId: generateClientOrderId(plan.id, `tp${i + 1}`),
+        };
+
+        let tpOrder: Order;
+        try {
+          tpOrder = await client.placeOrder(tpOrderParams);
+          logger.info("Take profit order placed", {
+            level: i + 1,
+            orderId: tpOrder.orderId,
+            price: tp.price,
+          });
+        } catch (error) {
+          await rollbackOrders(client, plan.symbol, placedOrders, plan.id);
+
+          const errorMessage = isGordonError(error)
+            ? error.message
+            : error instanceof Error
+              ? error.message
+              : "Unknown error";
+
+          logger.error("TP order failed", error as Error, { level: i + 1, params: tpOrderParams });
+          logEvent({
+            type: "ERROR",
+            data: {
+              action: "TP_ORDER_FAILED",
+              tpLevel: i + 1,
+              params: tpOrderParams,
+              error: errorMessage,
+            },
+            planId: plan.id,
+          });
+
+          return {
+            success: false,
+            error: `Failed to place take-profit order ${i + 1}: ${errorMessage}. All orders rolled back.`,
+            orders: placedOrders,
+          };
+        }
+
+        placedOrders.push({
+          type: "take_profit",
+          orderId: tpOrder.orderId.toString(),
+          price: tp.price,
+          quantity: tpQuantity,
+        });
+
+        logEvent({
+          type: "ORDER_PLACED",
+          data: {
+            action: `TAKE_PROFIT_${i + 1}`,
+            orderId: tpOrder.orderId.toString(),
+            symbol: plan.symbol,
+            side: "SELL",
+            type: "LIMIT",
+            price: tp.price,
+            quantity: tpQuantity,
+          },
+          planId: plan.id,
+        });
+      }
     }
 
     // Step 7: Create Trade record with order IDs
@@ -1850,6 +1930,269 @@ export async function closeTierPosition(
 
   const reason = `TP${tier}` as "TP1" | "TP2" | "TP3";
   return closePartialPosition(client, tradeId, tierPercentages[tier], reason);
+}
+
+// ============================================================================
+// OCO (One-Cancels-Other) Order Placement
+// ============================================================================
+
+/**
+ * Result of an OCO order placement
+ */
+export interface OCOResult {
+  success: boolean;
+  /** Native OCO orderListId (Binance-family only) */
+  orderListId?: number;
+  /** Individual order IDs placed */
+  orderIds: string[];
+  /** Whether native OCO was used or separate orders */
+  native: boolean;
+  error?: string;
+}
+
+/**
+ * Check whether an exchange supports native OCO orders.
+ * Returns the exchange cast to ExchangeExtended if OCO is available, null otherwise.
+ */
+function getOCOCapableExchange(exchange: Exchange): ExchangeExtended | null {
+  const ext = exchange as ExchangeExtended;
+  if (typeof ext.placeOCOOrder === "function") {
+    return ext;
+  }
+  return null;
+}
+
+/**
+ * Place an OCO (One-Cancels-Other) order combining stop-loss and take-profit.
+ *
+ * For Binance-family exchanges that support native OCO, this uses the atomic
+ * /api/v3/orderList/oco endpoint so both legs are guaranteed to be coordinated.
+ *
+ * For other exchanges, this places two separate orders (stop-loss-limit + limit)
+ * and returns both order IDs. NOTE: without native OCO the caller is responsible
+ * for cancelling the other leg when one fills (the Monitor handles this).
+ *
+ * @param client - Authenticated exchange client
+ * @param symbol - Trading pair (e.g. "BTCUSDT")
+ * @param side - Order side (typically "SELL" for exit OCO)
+ * @param quantity - Position quantity
+ * @param stopPrice - Stop-loss trigger price
+ * @param stopLimitPrice - Limit price for the stop-loss leg (set slightly below stopPrice)
+ * @param takeProfitPrice - Take-profit limit price
+ * @param planId - Optional plan ID for audit trail
+ * @param userId - User ID for audit logging
+ * @returns OCOResult with order IDs and success status
+ */
+export async function placeOCOOrders(
+  client: Exchange,
+  symbol: string,
+  side: "BUY" | "SELL",
+  quantity: number,
+  stopPrice: number,
+  stopLimitPrice: number,
+  takeProfitPrice: number,
+  planId?: string,
+  userId: string = "system"
+): Promise<OCOResult> {
+  const logPrefix = planId ? `[${planId}] ` : "";
+  logger.info(`${logPrefix}Placing OCO order`, { symbol, side, quantity, stopPrice, takeProfitPrice });
+
+  // Audit: Record OCO attempt
+  auditLog.record(userId, "PLACE_OCO_ORDER", {
+    symbol,
+    side,
+    quantity,
+    stopPrice,
+    stopLimitPrice,
+    takeProfitPrice,
+    planId,
+  }, "PENDING", planId ? { planId } : undefined);
+
+  // -----------------------------------------------------------------------
+  // Path A: Native OCO (Binance-family)
+  // -----------------------------------------------------------------------
+  const ocoExchange = getOCOCapableExchange(client);
+  if (ocoExchange) {
+    try {
+      const ocoParams: OCOOrderParams = {
+        symbol,
+        side,
+        quantity: roundQuantity(quantity),
+        price: roundPrice(takeProfitPrice),
+        stopPrice: roundPrice(stopPrice),
+        stopLimitPrice: roundPrice(stopLimitPrice),
+        stopLimitTimeInForce: "GTC",
+      };
+
+      const result = await ocoExchange.placeOCOOrder!(ocoParams);
+
+      const orderIds = result.orders.map((o) => o.orderId.toString());
+
+      logger.info(`${logPrefix}Native OCO placed`, {
+        orderListId: result.orderListId,
+        orderIds,
+      });
+
+      logEvent({
+        type: "ORDER_PLACED",
+        data: {
+          action: "OCO_PLACED",
+          native: true,
+          orderListId: result.orderListId,
+          symbol,
+          side,
+          quantity,
+          stopPrice,
+          takeProfitPrice,
+          orderIds,
+        },
+        planId,
+      });
+
+      auditLog.success(userId, "PLACE_OCO_ORDER", {
+        symbol,
+        orderListId: result.orderListId,
+        orderIds,
+        native: true,
+      }, planId ? { planId } : undefined);
+
+      return {
+        success: true,
+        orderListId: result.orderListId,
+        orderIds,
+        native: true,
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      logger.error(`${logPrefix}Native OCO failed`, error as Error, { symbol });
+
+      logEvent({
+        type: "ERROR",
+        data: {
+          action: "OCO_NATIVE_FAILED",
+          symbol,
+          error: errorMessage,
+        },
+        planId,
+      });
+
+      auditLog.failure(userId, "PLACE_OCO_ORDER", { symbol, native: true }, errorMessage, planId ? { planId } : undefined);
+
+      return {
+        success: false,
+        orderIds: [],
+        native: true,
+        error: `Native OCO failed: ${errorMessage}`,
+      };
+    }
+  }
+
+  // -----------------------------------------------------------------------
+  // Path B: Fallback — place two separate orders
+  // -----------------------------------------------------------------------
+  const placedOrderIds: string[] = [];
+
+  try {
+    // Leg 1: Stop-loss limit order
+    const stopParams: OrderParams = {
+      symbol,
+      side,
+      type: "STOP_LOSS_LIMIT",
+      quantity: roundQuantity(quantity),
+      price: roundPrice(stopLimitPrice),
+      stopPrice: roundPrice(stopPrice),
+      timeInForce: "GTC",
+      newClientOrderId: planId ? generateClientOrderId(planId, "oco_stop") : undefined,
+    };
+
+    const stopOrder = await client.placeOrder(stopParams);
+    placedOrderIds.push(stopOrder.orderId.toString());
+
+    logger.info(`${logPrefix}OCO stop-loss leg placed`, {
+      orderId: stopOrder.orderId,
+      stopPrice,
+    });
+
+    // Leg 2: Take-profit limit order
+    const tpParams: OrderParams = {
+      symbol,
+      side,
+      type: "LIMIT",
+      quantity: roundQuantity(quantity),
+      price: roundPrice(takeProfitPrice),
+      timeInForce: "GTC",
+      newClientOrderId: planId ? generateClientOrderId(planId, "oco_tp") : undefined,
+    };
+
+    let tpOrder: Order;
+    try {
+      tpOrder = await client.placeOrder(tpParams);
+      placedOrderIds.push(tpOrder.orderId.toString());
+
+      logger.info(`${logPrefix}OCO take-profit leg placed`, {
+        orderId: tpOrder.orderId,
+        takeProfitPrice,
+      });
+    } catch (error) {
+      // TP leg failed — roll back the stop leg
+      logger.warn(`${logPrefix}OCO TP leg failed, rolling back stop leg`, { stopOrderId: placedOrderIds[0] });
+      await safelyCancelOrder(client, symbol, placedOrderIds[0]!, planId ?? "");
+
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      auditLog.failure(userId, "PLACE_OCO_ORDER", { symbol, native: false }, errorMessage, planId ? { planId } : undefined);
+
+      return {
+        success: false,
+        orderIds: [],
+        native: false,
+        error: `OCO take-profit leg failed: ${errorMessage}. Stop leg rolled back.`,
+      };
+    }
+
+    logEvent({
+      type: "ORDER_PLACED",
+      data: {
+        action: "OCO_PLACED",
+        native: false,
+        symbol,
+        side,
+        quantity,
+        stopPrice,
+        takeProfitPrice,
+        orderIds: placedOrderIds,
+      },
+      planId,
+    });
+
+    auditLog.success(userId, "PLACE_OCO_ORDER", {
+      symbol,
+      orderIds: placedOrderIds,
+      native: false,
+    }, planId ? { planId } : undefined);
+
+    return {
+      success: true,
+      orderIds: placedOrderIds,
+      native: false,
+    };
+  } catch (error) {
+    // Roll back any placed orders
+    for (const oid of placedOrderIds) {
+      await safelyCancelOrder(client, symbol, oid, planId ?? "");
+    }
+
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    logger.error(`${logPrefix}OCO fallback failed`, error as Error, { symbol });
+
+    auditLog.failure(userId, "PLACE_OCO_ORDER", { symbol, native: false }, errorMessage, planId ? { planId } : undefined);
+
+    return {
+      success: false,
+      orderIds: [],
+      native: false,
+      error: `OCO fallback failed: ${errorMessage}`,
+    };
+  }
 }
 
 // ============================================================================

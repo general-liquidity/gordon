@@ -16,8 +16,15 @@ import type { BaseTokenTransfer, BaseTokenHolder } from "./types.ts";
 const ETHERSCAN_V2_BASE = "https://api.etherscan.io/v2/api";
 const BASE_CHAIN_ID = "8453";
 
+let _apiKeyWarned = false;
+
 function getApiKey(): string {
-  return process.env.BASESCAN_API_KEY || "";
+  const key = process.env.BASESCAN_API_KEY || "";
+  if (!key && !_apiKeyWarned) {
+    console.warn("[Basescan] BASESCAN_API_KEY not set — API calls will be rate-limited");
+    _apiKeyWarned = true;
+  }
+  return key;
 }
 
 // ============================================================================

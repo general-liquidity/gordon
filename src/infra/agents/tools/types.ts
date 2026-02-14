@@ -155,39 +155,6 @@ export function validateToolOutput<T>(
   throw new Error(`${prefix} output validation failed: ${errorSummary}`);
 }
 
-/**
- * Creates a validated executor wrapper for a tool.
- *
- * This is a higher-order function that wraps a tool's execute function
- * to automatically validate its output against the schema.
- *
- * @example
- * ```typescript
- * const outputSchema = z.object({ success: z.boolean() });
- *
- * execute: createValidatedExecutor(
- *   outputSchema,
- *   async (input) => ({ success: true }),
- *   { toolName: "my_tool" }
- * )
- * ```
- *
- * @param schema - Zod schema to validate against
- * @param executor - The original execute function
- * @param options - Validation options
- * @returns Wrapped executor that validates output
- */
-export function createValidatedExecutor<TInput, TOutput>(
-  schema: ZodType<TOutput>,
-  executor: (input: TInput, context?: MastraExecutionContext) => Promise<TOutput>,
-  options: ValidateToolOutputOptions = {}
-): (input: TInput, context?: MastraExecutionContext) => Promise<TOutput> {
-  return async (input: TInput, context?: MastraExecutionContext): Promise<TOutput> => {
-    const result = await executor(input, context);
-    return validateToolOutput(schema, result, options);
-  };
-}
-
 // ============================================================================
 // Tool Error Context Helpers
 // ============================================================================

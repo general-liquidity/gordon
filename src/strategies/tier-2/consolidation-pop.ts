@@ -23,6 +23,7 @@ import type {
   StrategyPlanParams,
   StrategyId,
 } from "../types.ts";
+import type { OHLC, Signal, IndicatorState } from "../../backtest/types.ts";
 
 // ============================================================================
 // Constants
@@ -258,6 +259,93 @@ When creating a plan using the Consolidation Pop strategy:
 - When market has been ranging for days/weeks
 - With clear support/resistance defining the range
 `;
+  }
+
+  // ============================================================================
+  // Backtesting Methods
+  // ============================================================================
+
+  /**
+   * Generate trading signal for backtesting.
+   *
+   * BUY signal when:
+   * - Bollinger Band width is narrow (squeeze: bbWidth < 0.04)
+   * - Price breaks above upper BB
+   * - Bullish candle (close > open)
+   * - Volume ratio >= 1.5x average
+   * - EMA alignment: sma20 > sma50 (bullish structure)
+   *
+   * SELL signal when:
+   * - Price drops back below middle BB (breakout failed)
+   * - RSI > 75 (overbought after pop)
+   */
+  override generateSignal(
+    bar: OHLC,
+    _index: number,
+    _data: OHLC[],
+    indicators: IndicatorState
+  ): Signal | null {
+    const price = bar.close;
+    const { rsi14, bbUpper, bbMiddle, bbWidth, sma20, sma50, volumeRatio } = indicators;
+
+    // SELL signals (exit conditions)
+    if (bbMiddle != null && price < bbMiddle) {
+      return {
+        type: "SELL",
+        price,
+        timestamp: bar.timestamp,
+        reason: "Price dropped below middle BB — breakout failed",
+      };
+    }
+
+    if (rsi14 != null && rsi14 > 75) {
+      return {
+        type: "SELL",
+        price,
+        timestamp: bar.timestamp,
+        reason: `RSI overbought at ${rsi14.toFixed(1)} after pop`,
+      };
+    }
+
+    // BUY signals (entry conditions)
+    const isBullish = bar.close > bar.open;
+    const isSqueeze = bbWidth != null && bbWidth < 0.04; // Tight squeeze
+    const breakingUpperBB = bbUpper != null && price > bbUpper;
+    const hasVolume = volumeRatio != null && volumeRatio >= BREAKOUT_VOLUME_RATIO;
+    const emaAligned = sma20 != null && sma50 != null ? sma20 > sma50 : true; // default ok if missing
+
+    if (isBullish && isSqueeze && breakingUpperBB && hasVolume && emaAligned) {
+      const reasons: string[] = [];
+      reasons.push(`BB squeeze (width ${(bbWidth! * 100).toFixed(2)}%)`);
+      reasons.push(`breakout above upper BB ($${bbUpper!.toFixed(2)})`);
+      reasons.push(`volume ${volumeRatio!.toFixed(1)}x avg`);
+      return {
+        type: "BUY",
+        price,
+        timestamp: bar.timestamp,
+        reason: reasons.join(", "),
+      };
+    }
+
+    return null;
+  }
+
+  /**
+   * Get required indicators for backtesting.
+   */
+  override getRequiredIndicators(): string[] {
+    return [
+      "sma20",
+      "sma50",
+      "rsi14",
+      "atr14",
+      "bbUpper",
+      "bbMiddle",
+      "bbLower",
+      "bbWidth",
+      "volumeRatio",
+      "volumeAvg20",
+    ];
   }
 }
 

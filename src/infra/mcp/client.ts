@@ -71,13 +71,23 @@ function buildPluginEnv(manifest: MCPServerManifest): Record<string, string> {
     }
   }
 
-  // For custom field authentication, inject each field as env var
+  // For custom field authentication, inject each field as env var.
+  // Convention: field names are uppercased to form env var names
+  // (e.g., field.name "apiKey" becomes env var "APIKEY").
+  // If a field has a specific envVar on the parent authentication config,
+  // that is handled above. This loop covers additional custom fields.
   if (authentication.fields) {
     const creds = credentialManager.retrieve(manifest.id);
     if (creds) {
       for (const field of authentication.fields) {
         if (creds[field.name]) {
-          env[field.name.toUpperCase()] = creds[field.name]!;
+          // Use the authentication-level envVar if this is the primary API key field,
+          // otherwise uppercase the field name as the env var convention
+          const envKey =
+            authentication.envVar && authentication.fields.length === 1
+              ? authentication.envVar
+              : field.name.toUpperCase();
+          env[envKey] = creds[field.name]!;
         }
       }
     }

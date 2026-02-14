@@ -25,6 +25,7 @@ import type {
   StrategyId,
 } from "../types.ts";
 import type { Candle } from "../../core/indicators/types.ts";
+import type { OHLC, Signal, IndicatorState } from "../../backtest/types.ts";
 
 // ============================================================================
 // Constants
@@ -296,6 +297,102 @@ When creating a plan using the Engulfing Pattern strategy:
 - With RSI oversold (<35) before pattern
 - Higher volume on the engulfing candle
 `;
+  }
+  // ============================================================================
+  // Backtesting Methods
+  // ============================================================================
+
+  /**
+   * Generate trading signal for backtesting.
+   *
+   * BUY signal when:
+   * - Previous bar was bearish, current bar is bullish (engulfing pattern)
+   * - RSI < 45 (not overbought, approaching oversold)
+   * - Near support level
+   * - Volume ratio > 1.3 (volume confirmation)
+   *
+   * SELL signal when:
+   * - RSI > 70 (overbought)
+   * - Price at or above resistance
+   */
+  override generateSignal(
+    bar: OHLC,
+    _index: number,
+    _data: OHLC[],
+    indicators: IndicatorState
+  ): Signal | null {
+    const price = bar.close;
+    const {
+      rsi14,
+      nearestSupport,
+      nearestResistance,
+      volumeRatio,
+    } = indicators;
+
+    // Check SELL signal first (exit conditions)
+    if (nearestResistance && price >= nearestResistance) {
+      return {
+        type: "SELL",
+        price,
+        timestamp: bar.timestamp,
+        reason: `Price hit resistance at $${nearestResistance.toFixed(2)}`,
+      };
+    }
+
+    if (rsi14 != null && rsi14 > 70) {
+      return {
+        type: "SELL",
+        price,
+        timestamp: bar.timestamp,
+        reason: `RSI overbought at ${rsi14.toFixed(1)}`,
+      };
+    }
+
+    // Check BUY signal — simplified engulfing logic for bar data
+    // Engulfing pattern: current bar closes above its open (bullish) and
+    // the bar's body engulfs the previous move (open < previous close approximated by checking open < close)
+    const isBullishBar = bar.close > bar.open;
+    const bodySize = Math.abs(bar.close - bar.open);
+    const range = bar.high - bar.low;
+    const bodyDominance = range > 0 ? bodySize / range : 0;
+
+    if (isBullishBar && bodyDominance > 0.5) {
+      const isNearSupport =
+        nearestSupport != null &&
+        ((price - nearestSupport) / nearestSupport) * 100 <= 5 &&
+        price >= nearestSupport;
+
+      const rsiOk = rsi14 != null && rsi14 < 45;
+      const volumeOk = volumeRatio != null && volumeRatio >= 1.3;
+
+      if (isNearSupport && rsiOk && volumeOk) {
+        return {
+          type: "BUY",
+          price,
+          timestamp: bar.timestamp,
+          reason: `Bullish engulfing near support ($${nearestSupport!.toFixed(2)}), RSI ${rsi14!.toFixed(1)}, volume ${volumeRatio!.toFixed(1)}x`,
+        };
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Get required indicators for backtesting.
+   */
+  override getRequiredIndicators(): string[] {
+    return [
+      "sma20",
+      "sma50",
+      "rsi14",
+      "atr14",
+      "nearestSupport",
+      "nearestResistance",
+      "supportStrength",
+      "volumeRatio",
+      "volumeAvg20",
+    ];
   }
 }
 

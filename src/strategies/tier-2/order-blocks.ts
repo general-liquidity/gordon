@@ -24,6 +24,7 @@ import type {
   StrategyId,
 } from "../types.ts";
 import type { Candle } from "../../core/indicators/types.ts";
+import type { OHLC, Signal, IndicatorState } from "../../backtest/types.ts";
 
 // ============================================================================
 // Types
@@ -321,6 +322,132 @@ When creating a plan using the Order Blocks strategy:
 - Multiple OBs at same level increase probability
 - Don't trade against the higher-timeframe trend
 `;
+  }
+  // ============================================================================
+  // Backtesting Methods
+  // ============================================================================
+
+  /**
+   * Generate trading signal for backtesting.
+   *
+   * Scans recent bars for impulsive moves (3+ consecutive same-direction candles
+   * with combined body > 2x ATR). When price revisits the order block zone
+   * (the last opposing candle before the impulse), generates a signal.
+   *
+   * BUY signal when:
+   * - Price in a bullish order block zone (last bearish candle before bullish impulse)
+   * - EMA50 trend alignment (price > ema50)
+   * - RSI < 70 (not overbought)
+   *
+   * SELL signal when:
+   * - Price in a bearish order block zone
+   * - RSI > 70 (overbought)
+   */
+  override generateSignal(
+    bar: OHLC,
+    _index: number,
+    _data: OHLC[],
+    indicators: IndicatorState
+  ): Signal | null {
+    const price = bar.close;
+    const { rsi14, ema50, atr14, volumeRatio } = indicators;
+
+    // Check SELL signal first (exit conditions)
+    if (rsi14 != null && rsi14 > 70) {
+      return {
+        type: "SELL",
+        price,
+        timestamp: bar.timestamp,
+        reason: `RSI overbought at ${rsi14.toFixed(1)}`,
+      };
+    }
+
+    // Need ATR to evaluate impulse strength and enough history
+    if (atr14 == null || _index < 10) return null;
+
+    const minImpulseBody = atr14 * IMPULSE_ATR_MULTIPLIER;
+
+    // Scan backwards for a bullish impulse in the last 20 bars
+    for (let start = _index - 3; start >= Math.max(0, _index - 20); start--) {
+      let bullishBody = 0;
+      let bullishCount = 0;
+      for (let j = start; j < Math.min(start + 5, _index); j++) {
+        const c = _data[j]!;
+        if (c.close > c.open) {
+          bullishBody += c.close - c.open;
+          bullishCount++;
+        } else {
+          break;
+        }
+      }
+
+      if (bullishCount >= MIN_IMPULSE_CANDLES && bullishBody > minImpulseBody && start > 0) {
+        const obCandle = _data[start - 1]!;
+        // Must be bearish (last opposing candle)
+        if (obCandle.close < obCandle.open) {
+          // Check if current price is in the OB zone
+          if (price >= obCandle.low && price <= obCandle.high * 1.01) {
+            const trendAligned = ema50 != null ? price > ema50 : true;
+            const rsiOk = rsi14 != null ? rsi14 < 70 : true;
+            const volumeOk = volumeRatio != null ? volumeRatio >= 1.2 : true;
+
+            if (trendAligned && rsiOk && volumeOk) {
+              return {
+                type: "BUY",
+                price,
+                timestamp: bar.timestamp,
+                reason: `Bullish OB zone ${obCandle.low.toFixed(2)}-${obCandle.high.toFixed(2)}, impulse ${(bullishBody / atr14).toFixed(1)}x ATR`,
+              };
+            }
+          }
+        }
+      }
+
+      // Check for bearish impulse (for SELL)
+      let bearishBody = 0;
+      let bearishCount = 0;
+      for (let j = start; j < Math.min(start + 5, _index); j++) {
+        const c = _data[j]!;
+        if (c.close < c.open) {
+          bearishBody += c.open - c.close;
+          bearishCount++;
+        } else {
+          break;
+        }
+      }
+
+      if (bearishCount >= MIN_IMPULSE_CANDLES && bearishBody > minImpulseBody && start > 0) {
+        const obCandle = _data[start - 1]!;
+        if (obCandle.close > obCandle.open) {
+          if (price <= obCandle.high && price >= obCandle.low * 0.99) {
+            const trendAligned = ema50 != null ? price < ema50 : true;
+            if (trendAligned) {
+              return {
+                type: "SELL",
+                price,
+                timestamp: bar.timestamp,
+                reason: `Bearish OB zone ${obCandle.low.toFixed(2)}-${obCandle.high.toFixed(2)}, impulse ${(bearishBody / atr14).toFixed(1)}x ATR`,
+              };
+            }
+          }
+        }
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Get required indicators for backtesting.
+   */
+  override getRequiredIndicators(): string[] {
+    return [
+      "ema50",
+      "rsi14",
+      "atr14",
+      "volumeRatio",
+      "volumeAvg20",
+    ];
   }
 }
 

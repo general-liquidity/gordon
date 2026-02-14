@@ -74,7 +74,11 @@ export async function getBaseGasPrice(
 
   return {
     gasPrice: gasPriceGwei,
-    l1DataFee: 0, // L1 data fee varies per tx, this is a placeholder
+    // L1 data fee is set to 0 because it cannot be pre-calculated without actual
+    // transaction calldata. The L1 fee depends on the compressed tx size posted to
+    // Ethereum and the current L1 blob base fee — it varies per transaction.
+    // Use eth_estimateGas with a concrete tx for accurate total cost.
+    l1DataFee: 0,
     estimatedTransferCostETH: transferCostETH,
     timestamp: Date.now(),
   };
@@ -180,5 +184,14 @@ export async function getBaseTokenBalance(
   )) as string;
 
   const balanceRaw = BigInt(result);
-  return Number(balanceRaw) / Math.pow(10, decimals);
+
+  // String-based conversion to avoid BigInt→Number precision loss for large balances.
+  // Number() loses precision above 2^53, which can happen with 18-decimal tokens
+  // at balances above ~9,007 tokens — unlikely for most wallets but possible for
+  // contracts/whales. This approach is safe for any balance.
+  const balanceStr = balanceRaw.toString();
+  if (decimals === 0) return parseFloat(balanceStr);
+  const intPart = balanceStr.slice(0, -decimals) || "0";
+  const fracPart = balanceStr.slice(-decimals).padStart(decimals, "0");
+  return parseFloat(`${intPart}.${fracPart}`);
 }
