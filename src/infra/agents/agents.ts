@@ -55,6 +55,7 @@ import {
   autonomousTools,
   baseOnchainTools,
   agentKitOnchainTools,
+  agentKitDefiTools,
   baseSignalTools,
   withToolsMetrics,
 } from "./tools/index.ts";
@@ -284,6 +285,7 @@ const instrumentedPairAnalysisTools = withToolsMetrics(pairAnalysisTools);
 const instrumentedAutonomousTools = withToolsMetrics(autonomousTools);
 const instrumentedBaseOnchainTools = withToolsMetrics(baseOnchainTools);
 const instrumentedAgentKitOnchainTools = withToolsMetrics(agentKitOnchainTools);
+const instrumentedAgentKitDefiTools = withToolsMetrics(agentKitDefiTools);
 const instrumentedBaseSignalTools = withToolsMetrics(baseSignalTools);
 const instrumentedEvalTools = withToolsMetrics(evalTools);
 
@@ -923,6 +925,8 @@ function getScannerAgent(): Agent {
         get_base_dex_pairs: instrumentedBaseSignalTools.get_base_dex_pairs,
         scan_base_volume_spikes: instrumentedBaseSignalTools.scan_base_volume_spikes,
         scan_base_new_tokens: instrumentedBaseSignalTools.scan_base_new_tokens,
+        // DeFiLlama protocol discovery (search for DeFi protocols by name)
+        defillama_search_protocols: instrumentedAgentKitDefiTools.defillama_search_protocols,
       },
       memory: createSubAgentMemory(),
       inputProcessors: [new TokenLimiterProcessor({ limit: 32000 })],
@@ -970,6 +974,12 @@ function getAnalystAgent(): Agent {
         get_base_balance: instrumentedBaseOnchainTools.get_base_balance,
         // AgentKit DEX price quote (read-only, for onchain price discovery)
         agentkit_get_swap_price: instrumentedAgentKitOnchainTools.agentkit_get_swap_price,
+        // Pyth oracle price feeds (decentralized real-time prices)
+        pyth_get_price_feed: instrumentedAgentKitDefiTools.pyth_get_price_feed,
+        pyth_fetch_price: instrumentedAgentKitDefiTools.pyth_fetch_price,
+        // DeFiLlama protocol analysis and token prices
+        defillama_get_protocol: instrumentedAgentKitDefiTools.defillama_get_protocol,
+        defillama_get_token_prices: instrumentedAgentKitDefiTools.defillama_get_token_prices,
         // Base L2 on-chain analysis tools (wallet tracking, holders, DEX pairs)
         track_base_wallet: instrumentedBaseSignalTools.track_base_wallet,
         get_base_token_holders: instrumentedBaseSignalTools.get_base_token_holders,
@@ -1077,6 +1087,9 @@ function getExecutorAgent(): Agent {
         // AgentKit DEX swap tools (Base L2 — 0x aggregation across Uniswap, Aerodrome, etc.)
         agentkit_swap: instrumentedAgentKitOnchainTools.agentkit_swap,
         agentkit_get_swap_price: instrumentedAgentKitOnchainTools.agentkit_get_swap_price,
+        // Moonwell lending tools (deposit/withdraw on Base L2)
+        moonwell_deposit: instrumentedAgentKitDefiTools.moonwell_deposit,
+        moonwell_withdraw: instrumentedAgentKitDefiTools.moonwell_withdraw,
         // Shared context for reading plan details and analysis before execution
         ...instrumentedSharedContextTools,
       },

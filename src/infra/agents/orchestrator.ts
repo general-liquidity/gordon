@@ -619,6 +619,18 @@ const TOOL_AGENT_MAP: Record<string, string> = {
   agentkit_swap: "Executor",
   agentkit_get_swap_price: "Analyst",
 
+  // ---- AgentKit DeFi tools ----
+  // Pyth oracle price feeds (read-only, Analyst)
+  pyth_get_price_feed: "Analyst",
+  pyth_fetch_price: "Analyst",
+  // DeFiLlama protocol data (read-only, Scanner + Analyst)
+  defillama_search_protocols: "Scanner",
+  defillama_get_protocol: "Analyst",
+  defillama_get_token_prices: "Analyst",
+  // Moonwell lending (state-changing, Executor)
+  moonwell_deposit: "Executor",
+  moonwell_withdraw: "Executor",
+
   // ---- Base L2 signal tools ----
   // baseSignalTools cherry-picks (Scanner: discovery + scanning)
   scan_base_whale_transfers: "Scanner",

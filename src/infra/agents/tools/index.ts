@@ -65,6 +65,7 @@ export { pairAnalysisTools } from "./pair-analysis.ts";
 export { autonomousTools } from "./autonomous.ts";
 export { baseOnchainTools } from "./base-onchain.ts";
 export { agentKitOnchainTools } from "./agentkit-onchain.ts";
+export { agentKitDefiTools } from "./agentkit-defi.ts";
 export { baseSignalTools } from "./base-signals.ts";
 
 // Multi-modal chart tools (image generation and vision analysis)
@@ -261,6 +262,7 @@ import { pairAnalysisTools } from "./pair-analysis.ts";
 import { autonomousTools } from "./autonomous.ts";
 import { baseOnchainTools } from "./base-onchain.ts";
 import { agentKitOnchainTools } from "./agentkit-onchain.ts";
+import { agentKitDefiTools } from "./agentkit-defi.ts";
 import { baseSignalTools } from "./base-signals.ts";
 import { multiModalChartTools } from "../../tools/chartTools.ts";
 import { evalTools } from "../../evals/tools.ts";
@@ -297,6 +299,7 @@ export const allTools = {
   ...autonomousTools,
   ...baseOnchainTools,
   ...agentKitOnchainTools,
+  ...agentKitDefiTools,
   ...baseSignalTools,
   ...multiModalChartTools,
   ...evalTools,
@@ -334,6 +337,7 @@ export const toolCounts = {
   autonomous: Object.keys(autonomousTools).length,
   baseOnchain: Object.keys(baseOnchainTools).length,
   agentKitOnchain: Object.keys(agentKitOnchainTools).length,
+  agentKitDefi: Object.keys(agentKitDefiTools).length,
   baseSignals: Object.keys(baseSignalTools).length,
   multiModalCharts: Object.keys(multiModalChartTools).length,
   evals: Object.keys(evalTools).length,

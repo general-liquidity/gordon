@@ -20,6 +20,9 @@ import {
   wethActionProvider,
   cdpApiActionProvider,
   cdpEvmWalletActionProvider,
+  pythActionProvider,
+  defillamaActionProvider,
+  moonwellActionProvider,
 } from "@coinbase/agentkit";
 import type { Action } from "@coinbase/agentkit";
 
@@ -61,6 +64,9 @@ export function isAgentKitConfigured(): boolean {
  * - wethActionProvider (wrap/unwrap ETH)
  * - cdpApiActionProvider (faucet, trade API)
  * - cdpEvmWalletActionProvider (DEX swap, swap price, spend permissions)
+ * - pythActionProvider (oracle price feeds)
+ * - defillamaActionProvider (DeFi protocol data, token prices)
+ * - moonwellActionProvider (Base lending — deposit/withdraw)
  *
  * @throws Error if CDP keys are not configured
  */
@@ -88,10 +94,13 @@ export async function getAgentKit(): Promise<AgentKit> {
   const weth = wethActionProvider();
   const cdp = cdpApiActionProvider();
   const cdpEvm = cdpEvmWalletActionProvider();
+  const pyth = pythActionProvider();
+  const defillama = defillamaActionProvider();
+  const moonwell = moonwellActionProvider();
 
   _agentKit = await AgentKit.from({
     walletProvider,
-    actionProviders: [wallet, erc20, weth, cdp, cdpEvm],
+    actionProviders: [wallet, erc20, weth, cdp, cdpEvm, pyth, defillama, moonwell],
   });
 
   // Index actions by name for O(1) lookup
