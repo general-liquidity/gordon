@@ -65,6 +65,7 @@ import { AppWithTheme } from "./app/App.tsx";
 import { closeDatabase } from "./infra/storage/database.ts";
 import { checkForUpdates } from "./utils/update-notifier.ts";
 import * as telemetry from "./infra/telemetry/index.ts";
+import { disconnectMCP } from "./infra/mcp/client.ts";
 
 let isShuttingDown = false;
 
@@ -91,6 +92,12 @@ async function gracefulShutdown(signal: string, code: number = 0): Promise<void>
 
   try {
     await telemetry.shutdown();
+  } catch {
+    // Non-critical
+  }
+
+  try {
+    await disconnectMCP();
   } catch {
     // Non-critical
   }

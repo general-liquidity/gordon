@@ -13,6 +13,7 @@ import { ModelSelector } from "./ModelSelector.tsx";
 import { ShortcutsOverlay, ShortcutsHint, useShortcutsHint } from "./components/ShortcutsOverlay.tsx";
 import { ThemeProvider, useTheme } from "./components/ThemeProvider.tsx";
 import { processMessageStream, initializeTracing } from "../infra/agents/orchestrator.ts";
+import { initMCPTools } from "../infra/mcp/client.ts";
 import { createLLMClientFromEnv, type LLMClient } from "../infra/llm/index.ts";
 import { BinanceClient } from "../infra/binance/index.ts";
 import { BinanceAdapter, ExchangeFactory, type Exchange } from "../infra/exchange/index.ts";
@@ -379,6 +380,11 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
         if (envStatus.keys.OPENAI_API_KEY) {
           initializeTracing();
         }
+
+        // Initialize MCP plugin tools (non-blocking)
+        initMCPTools().catch((err) =>
+          console.error("[MCP] Failed to init tools:", (err as Error).message),
+        );
       } catch (error) {
         console.error("Failed to initialize LLM client:", error);
       }
