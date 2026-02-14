@@ -31,6 +31,8 @@ export interface EnvKeys {
   DEDALUS_API_KEY?: string;
   BINANCE_API_KEY?: string;
   BINANCE_API_SECRET?: string;
+  BINANCE_US_API_KEY?: string;
+  BINANCE_US_API_SECRET?: string;
   GORDON_PROVIDER?: string;
   GORDON_MODEL?: string;
 }
@@ -39,6 +41,7 @@ export interface EnvStatus {
   fileExists: boolean;
   hasLLMKey: boolean;
   hasBinanceKeys: boolean;
+  hasBinanceUSKeys: boolean;
   keys: EnvKeys;
 }
 
@@ -106,12 +109,15 @@ export async function checkEnvStatus(): Promise<EnvStatus> {
       DEDALUS_API_KEY: process.env.DEDALUS_API_KEY,
       BINANCE_API_KEY: process.env.BINANCE_API_KEY,
       BINANCE_API_SECRET: process.env.BINANCE_API_SECRET,
+      BINANCE_US_API_KEY: process.env.BINANCE_US_API_KEY,
+      BINANCE_US_API_SECRET: process.env.BINANCE_US_API_SECRET,
     };
 
     return {
       fileExists: false,
       hasLLMKey: !!(keys.OPENAI_API_KEY || keys.DEDALUS_API_KEY),
       hasBinanceKeys: !!(keys.BINANCE_API_KEY && keys.BINANCE_API_SECRET),
+      hasBinanceUSKeys: !!(keys.BINANCE_US_API_KEY && keys.BINANCE_US_API_SECRET),
       keys,
     };
   }
@@ -126,12 +132,15 @@ export async function checkEnvStatus(): Promise<EnvStatus> {
     DEDALUS_API_KEY: parsed.DEDALUS_API_KEY || process.env.DEDALUS_API_KEY,
     BINANCE_API_KEY: parsed.BINANCE_API_KEY || process.env.BINANCE_API_KEY,
     BINANCE_API_SECRET: parsed.BINANCE_API_SECRET || process.env.BINANCE_API_SECRET,
+    BINANCE_US_API_KEY: parsed.BINANCE_US_API_KEY || process.env.BINANCE_US_API_KEY,
+    BINANCE_US_API_SECRET: parsed.BINANCE_US_API_SECRET || process.env.BINANCE_US_API_SECRET,
   };
 
   return {
     fileExists: true,
     hasLLMKey: !!(keys.OPENAI_API_KEY || keys.DEDALUS_API_KEY),
     hasBinanceKeys: !!(keys.BINANCE_API_KEY && keys.BINANCE_API_SECRET),
+    hasBinanceUSKeys: !!(keys.BINANCE_US_API_KEY && keys.BINANCE_US_API_SECRET),
     keys,
   };
 }
@@ -324,6 +333,21 @@ export async function createEnvFile(keys: Partial<EnvKeys>): Promise<void> {
     lines.push(`BINANCE_API_SECRET='${keys.BINANCE_API_SECRET}'`);
   } else {
     lines.push("# BINANCE_API_SECRET=");
+  }
+
+  lines.push("");
+  lines.push("# Binance US (alternative for US users)");
+
+  if (keys.BINANCE_US_API_KEY) {
+    lines.push(`BINANCE_US_API_KEY='${keys.BINANCE_US_API_KEY}'`);
+  } else {
+    lines.push("# BINANCE_US_API_KEY=");
+  }
+
+  if (keys.BINANCE_US_API_SECRET) {
+    lines.push(`BINANCE_US_API_SECRET='${keys.BINANCE_US_API_SECRET}'`);
+  } else {
+    lines.push("# BINANCE_US_API_SECRET=");
   }
 
   // Always write to ~/.gordon/.env

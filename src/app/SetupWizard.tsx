@@ -33,6 +33,7 @@ const SUPPORTED_EXCHANGES: ExchangeId[] = ExchangeFactory.getSupportedExchanges(
 
 const EXCHANGE_LABELS: Record<ExchangeId, string> = {
   binance: "Binance",
+  binance_us: "Binance US",
   coinbase: "Coinbase",
   kraken: "Kraken",
   bitfinex: "Bitfinex",
@@ -41,6 +42,7 @@ const EXCHANGE_LABELS: Record<ExchangeId, string> = {
 
 const EXCHANGE_PASSPHRASE_REQUIRED: Record<ExchangeId, boolean> = {
   binance: false,
+  binance_us: false,
   coinbase: true,
   kraken: false,
   bitfinex: false,
@@ -49,6 +51,7 @@ const EXCHANGE_PASSPHRASE_REQUIRED: Record<ExchangeId, boolean> = {
 
 const EXCHANGE_WALLET_AUTH: Record<ExchangeId, boolean> = {
   binance: false,
+  binance_us: false,
   coinbase: false,
   kraken: false,
   bitfinex: false,
@@ -62,6 +65,14 @@ const EXCHANGE_INSTRUCTIONS: Record<ExchangeId, string[]> = {
     "Create a new API key",
     "Enable 'Read' and 'Spot Trading' permissions",
     "Keep 'Withdrawals' disabled",
+  ],
+  binance_us: [
+    "Go to binance.us and log in",
+    "Navigate to Account > API Management",
+    "Create a new API key",
+    "Enable 'Read' and 'Spot Trading' permissions",
+    "Keep 'Withdrawals' disabled",
+    "Note: Some features (earn, dust, transfers) are not available on Binance US",
   ],
   coinbase: [
     "Go to Coinbase and open Settings > API",
@@ -189,8 +200,9 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
     const isWalletAuth = requiresWalletAuth(exchangeType);
     const errorStep = isWalletAuth ? "exchange-wallet" : "exchange-key";
 
-    if (exchangeType === "binance") {
-      const client = new BinanceClient(apiKey, apiSecret);
+    if (exchangeType === "binance" || exchangeType === "binance_us") {
+      const baseUrl = exchangeType === "binance_us" ? "https://api.binance.us" : undefined;
+      const client = new BinanceClient(apiKey, apiSecret, baseUrl);
       const connected = await client.testConnection();
 
       if (!connected) {
@@ -341,6 +353,12 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
     }
     if (state.exchangeType === "binance" && state.exchangeApiSecret) {
       envKeys.BINANCE_API_SECRET = state.exchangeApiSecret;
+    }
+    if (state.exchangeType === "binance_us" && state.exchangeApiKey) {
+      envKeys.BINANCE_US_API_KEY = state.exchangeApiKey;
+    }
+    if (state.exchangeType === "binance_us" && state.exchangeApiSecret) {
+      envKeys.BINANCE_US_API_SECRET = state.exchangeApiSecret;
     }
 
     // Create or update .env file

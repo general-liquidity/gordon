@@ -317,5 +317,18 @@ export function getRecoverySteps(response: ToolErrorResponse): RecoveryStep[] {
   return response.errorContext?.recoverySteps ?? [];
 }
 
+// ============================================================================
+// Exchange Family Helpers
+// ============================================================================
+
+/**
+ * Check if an exchange ID belongs to the Binance family (Global or US).
+ * Use this for tools that rely on /api/v3 endpoints which work on both.
+ * Do NOT use this for /sapi/* tools (earn, dust, wallet details) — those are Binance Global only.
+ */
+export function isBinanceFamily(id: string | undefined): boolean {
+  return id === "binance" || id === "binance_us";
+}
+
 // Re-export error context types for convenience
 export type { ErrorContext, RecoveryStep };

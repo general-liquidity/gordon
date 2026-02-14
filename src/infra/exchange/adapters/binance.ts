@@ -36,13 +36,15 @@ import type { Candle } from "../../../types/index.ts";
  * without modifying the original implementation.
  */
 export class BinanceAdapter implements Exchange {
-  private client: BinanceClient;
+  protected client: BinanceClient;
 
   readonly exchangeId: ExchangeId = "binance";
-  readonly displayName = "Binance";
+  readonly displayName: string = "Binance";
 
-  constructor(apiKey: string, apiSecret: string) {
-    this.client = new BinanceClient(apiKey, apiSecret);
+  constructor(apiKeyOrClient: string | BinanceClient, apiSecret?: string) {
+    this.client = typeof apiKeyOrClient === "string"
+      ? new BinanceClient(apiKeyOrClient, apiSecret!)
+      : apiKeyOrClient;
   }
 
   /**

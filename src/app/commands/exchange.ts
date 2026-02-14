@@ -503,6 +503,12 @@ function getExchangeSetupInstructions(type: ExchangeId): string {
 2. Create a new API key
 3. Enable "Account Read" and "Orders Read/Write" permissions
 4. Copy the API Key and API Secret`,
+    binance_us: `
+1. Log in to Binance US (binance.us) and go to API Management
+2. Create a new API key with "Enable Reading" and optionally "Enable Spot Trading"
+3. Copy the API Key and Secret Key (Secret is shown only once!)
+4. Optional: Add your IP to the whitelist for extra security
+5. Note: Some features (earn, dust, transfers) are not available on Binance US`,
     hyperliquid: `
 1. Generate a new Ethereum wallet or use an existing one
 2. Export the private key from your wallet (MetaMask: Account Details > Export Private Key)

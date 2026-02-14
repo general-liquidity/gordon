@@ -293,8 +293,9 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
         sandbox: active.sandbox,
       });
 
-      if (active.type === "binance" && active.apiKey && active.apiSecret) {
-        binanceClientRef.current = new BinanceClient(active.apiKey, active.apiSecret);
+      if ((active.type === "binance" || active.type === "binance_us") && active.apiKey && active.apiSecret) {
+        const baseUrl = active.type === "binance_us" ? "https://api.binance.us" : undefined;
+        binanceClientRef.current = new BinanceClient(active.apiKey, active.apiSecret, baseUrl);
       } else {
         binanceClientRef.current = null;
       }
@@ -404,8 +405,9 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
             });
             exchangeInitialized = true;
 
-            if (active.type === "binance") {
-              binanceClientRef.current = new BinanceClient(active.apiKey, active.apiSecret);
+            if (active.type === "binance" || active.type === "binance_us") {
+              const baseUrl = active.type === "binance_us" ? "https://api.binance.us" : undefined;
+              binanceClientRef.current = new BinanceClient(active.apiKey, active.apiSecret, baseUrl);
             } else {
               binanceClientRef.current = null;
             }

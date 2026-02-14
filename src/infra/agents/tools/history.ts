@@ -14,7 +14,7 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
-import { getGordonContext, type MastraExecutionContext } from "./types.ts";
+import { getGordonContext, isBinanceFamily, type MastraExecutionContext } from "./types.ts";
 
 // ============================================================================
 // Error Messages
@@ -95,7 +95,7 @@ export const getTradeHistoryTool = createTool({
           time: t.time,
           isMaker: t.isMaker,
         }));
-      } else if (ctx.binance && ctx.exchange.exchangeId === "binance") {
+      } else if (ctx.binance && isBinanceFamily(ctx.exchange.exchangeId)) {
         const exchangeTrades = await ctx.binance.getAllTradeHistory(limit);
         trades = exchangeTrades.map((t) => ({
           symbol: t.symbol,

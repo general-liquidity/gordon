@@ -5,6 +5,7 @@
 
 import type { Exchange, ExchangeId, ExchangeCredentials } from "./types.ts";
 import { BinanceAdapter } from "./adapters/binance.ts";
+import { BinanceUSAdapter } from "./adapters/binance-us.ts";
 import { CoinbaseAdapter } from "./adapters/coinbase.ts";
 import { KrakenAdapter } from "./adapters/kraken.ts";
 import { BitfinexAdapter } from "./adapters/bitfinex.ts";
@@ -15,6 +16,7 @@ import { HyperliquidAdapter } from "./adapters/hyperliquid.ts";
  */
 const SUPPORTED_EXCHANGES: ExchangeId[] = [
   "binance",
+  "binance_us",
   "coinbase",
   "kraken",
   "bitfinex",
@@ -115,6 +117,9 @@ export class ExchangeFactory {
     switch (exchangeId) {
       case "binance":
         exchange = new BinanceAdapter(credentials.apiKey, credentials.apiSecret);
+        break;
+      case "binance_us":
+        exchange = new BinanceUSAdapter(credentials.apiKey, credentials.apiSecret);
         break;
       case "coinbase":
         if (!credentials.passphrase) {

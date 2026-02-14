@@ -74,9 +74,6 @@ const apiCircuitBreaker = new CircuitBreaker({
   resetTimeoutMs: 30000,
 });
 
-// Binance API base URL
-const BASE_URL = "https://api.binance.com";
-
 // Rate limit tracking
 interface RateLimitState {
   requestWeight: number;
@@ -110,13 +107,15 @@ const RATE_LIMIT_CONFIG = {
 export class BinanceClient {
   private apiKey: string;
   private apiSecret: string;
+  private baseUrl: string;
   private rateLimitState: RateLimitState;
   private serverTimeOffset: number = 0;
   private serverTimeSynced: boolean = false;
 
-  constructor(apiKey: string, apiSecret: string) {
+  constructor(apiKey: string, apiSecret: string, baseUrl = "https://api.binance.com") {
     this.apiKey = apiKey;
     this.apiSecret = apiSecret;
+    this.baseUrl = baseUrl;
     this.rateLimitState = {
       requestWeight: 0,
       orderCount: 0,
@@ -134,7 +133,7 @@ export class BinanceClient {
     if (this.serverTimeSynced) return;
     try {
       const before = Date.now();
-      const res = await fetch(`${BASE_URL}/api/v3/time`);
+      const res = await fetch(`${this.baseUrl}/api/v3/time`);
       const after = Date.now();
       const data = await res.json() as { serverTime: number };
       const localTime = Math.floor((before + after) / 2);
@@ -315,7 +314,7 @@ export class BinanceClient {
       this.checkRateLimit();
 
       const queryString = this.buildQueryString(params);
-      const url = `${BASE_URL}${endpoint}${queryString ? `?${queryString}` : ""}`;
+      const url = `${this.baseUrl}${endpoint}${queryString ? `?${queryString}` : ""}`;
 
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
@@ -383,7 +382,7 @@ export class BinanceClient {
         const signature = this.sign(queryString);
         const signedQueryString = `${queryString}&signature=${signature}`;
 
-        const url = `${BASE_URL}${endpoint}?${signedQueryString}`;
+        const url = `${this.baseUrl}${endpoint}?${signedQueryString}`;
 
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout

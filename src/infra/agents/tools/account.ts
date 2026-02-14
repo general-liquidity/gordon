@@ -14,7 +14,7 @@ import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
 import { listTrades } from "../../storage/trades.ts";
-import { getGordonContext, type MastraExecutionContext } from "./types.ts";
+import { getGordonContext, isBinanceFamily, type MastraExecutionContext } from "./types.ts";
 
 // ============================================================================
 // Error Messages
@@ -216,7 +216,7 @@ export const getAccountDetailsTool = createTool({
     }
 
     try {
-      if (!ctx.binance || ctx.exchange.exchangeId !== "binance") {
+      if (!ctx.binance || !isBinanceFamily(ctx.exchange.exchangeId)) {
         const details = await ctx.exchange.getFullAccountDetails();
         return {
           accountType: details.accountInfo.accountType,

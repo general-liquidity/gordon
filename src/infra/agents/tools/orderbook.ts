@@ -14,7 +14,7 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
-import { getGordonContext, type MastraExecutionContext } from "./types.ts";
+import { getGordonContext, isBinanceFamily, type MastraExecutionContext } from "./types.ts";
 import {
   resilientGetOrderBook,
   resilientGetSpread,
@@ -102,7 +102,7 @@ export const getOrderBookTool = createTool({
       : `${symbol.toUpperCase()}USDT`;
 
     try {
-      const orderBook = ctx.binance && ctx.exchange.exchangeId === "binance"
+      const orderBook = ctx.binance && isBinanceFamily(ctx.exchange.exchangeId)
         ? (await resilientGetOrderBook(ctx.binance, normalizedSymbol, limit)).data
         : await ctx.exchange.getOrderBook(normalizedSymbol, limit);
 
@@ -186,7 +186,7 @@ export const getSpreadTool = createTool({
       : `${symbol.toUpperCase()}USDT`;
 
     try {
-      const spread = ctx.binance && ctx.exchange.exchangeId === "binance"
+      const spread = ctx.binance && isBinanceFamily(ctx.exchange.exchangeId)
         ? (await resilientGetSpread(ctx.binance, normalizedSymbol)).data
         : await ctx.exchange.getSpread(normalizedSymbol);
 
@@ -248,7 +248,7 @@ export const getRecentTradesTool = createTool({
     if (!ctx?.exchange) {
       return errors.noExchange;
     }
-    if (!ctx.binance || ctx.exchange.exchangeId !== "binance") {
+    if (!ctx.binance || !isBinanceFamily(ctx.exchange.exchangeId)) {
       return { error: "Recent trades are not supported on this exchange yet." };
     }
 
@@ -886,7 +886,7 @@ export const cancelReplaceOrderTool = createTool({
       return errors.notArmed("cancel and replace orders");
     }
 
-    if (!ctx.binance || ctx.exchange.exchangeId !== "binance") {
+    if (!ctx.binance || !isBinanceFamily(ctx.exchange.exchangeId)) {
       return { error: "This feature is currently supported only on Binance." };
     }
 
@@ -966,7 +966,7 @@ export const cancelOrderListTool = createTool({
       return errors.notArmed("cancel order lists");
     }
 
-    if (!ctx.binance || ctx.exchange.exchangeId !== "binance") {
+    if (!ctx.binance || !isBinanceFamily(ctx.exchange.exchangeId)) {
       return { error: "This feature is currently supported only on Binance." };
     }
 
@@ -1022,7 +1022,7 @@ export const getOpenOrderListsTool = createTool({
       return errors.noExchange;
     }
 
-    if (!ctx.binance || ctx.exchange.exchangeId !== "binance") {
+    if (!ctx.binance || !isBinanceFamily(ctx.exchange.exchangeId)) {
       return { error: "This feature is currently supported only on Binance." };
     }
 
