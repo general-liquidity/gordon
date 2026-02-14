@@ -1,39 +1,26 @@
 /**
  * MCP (Model Context Protocol) Server Infrastructure
  *
- * This module provides a registry system for managing MCP servers,
- * enabling Gordon CLI to integrate with external tools and services.
+ * This module provides MCP server integration for Gordon CLI using @mastra/mcp.
  *
  * Architecture:
- * - Registry: Central management of server manifests and instances
+ * - Client: @mastra/mcp MCPClient for connecting to MCP servers and discovering tools
  * - Credentials: Secure storage for server authentication
- * - Server Instance: Process management for local MCP servers
+ * - Marketplace: Plugin discovery, installation, and management
+ * - Types: Shared type definitions
  *
  * Usage:
  * ```typescript
- * import { mcpRegistry, credentialManager } from './infra/mcp';
+ * import { initMCPTools, getMCPTools, disconnectMCP } from './infra/mcp';
  *
- * // Register a server
- * mcpRegistry.register({
- *   id: 'coingecko',
- *   name: 'CoinGecko MCP',
- *   version: '1.0.0',
- *   description: 'Market data from CoinGecko',
- *   author: 'Gordon Team',
- *   category: 'data-provider',
- *   tools: [{ name: 'get_price', description: '...', inputSchema: {} }],
- *   authentication: { type: 'api_key', envVar: 'COINGECKO_API_KEY' },
- *   command: 'npx',
- *   args: ['@gordon/mcp-coingecko'],
- * });
+ * // At startup
+ * await initMCPTools();
  *
- * // Store credentials
- * credentialManager.store('coingecko', { apiKey: 'your-api-key' });
+ * // In agent creation
+ * const tools = getMCPTools(); // Mastra-native Tool objects
  *
- * // Call a tool
- * const result = await mcpRegistry.callTool('coingecko', 'get_price', {
- *   symbol: 'BTC',
- * });
+ * // At shutdown
+ * await disconnectMCP();
  * ```
  */
 
@@ -54,9 +41,27 @@ export type {
 } from './types';
 
 // ============================================================================
-// Class and Instance Exports
+// MCP Client (@mastra/mcp integration)
+// ============================================================================
+
+export {
+  initMCPTools,
+  getMCPTools,
+  getMCPToolsByServer,
+  disconnectMCP,
+  isMCPInitialized,
+  getMCPStats,
+} from './client';
+
+// ============================================================================
+// Credential Management
+// ============================================================================
+
+export { MCPCredentialManager, credentialManager } from './credentials';
+
+// ============================================================================
+// Legacy Exports (deprecated — use client.ts instead)
 // ============================================================================
 
 export { MCPServerRegistry, mcpRegistry } from './registry';
-export { MCPCredentialManager, credentialManager } from './credentials';
 export { LocalMCPServerInstance, createServerInstance } from './server-instance';

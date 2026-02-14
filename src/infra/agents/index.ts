@@ -154,6 +154,16 @@ export type {
   SummarizationResult,
 } from "../memory/index.ts";
 
+// MCP Plugin Integration (@mastra/mcp)
+export {
+  initMCPTools,
+  getMCPTools,
+  getMCPToolsByServer,
+  disconnectMCP,
+  isMCPInitialized,
+  getMCPStats,
+} from "../mcp/client.ts";
+
 // Reflection
 export {
   reflectOnPlan,

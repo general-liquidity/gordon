@@ -61,6 +61,7 @@ import {
 } from "./tools/index.ts";
 import { getSessionSummary, getMemoryStats, resetSharedMemory } from "./shared-context.ts";
 import { evalTools } from "../evals/index.ts";
+import { getMCPTools } from "../mcp/client.ts";
 import {
   generatePerformanceContext,
   formatPerformanceContextForPrompt,
@@ -1248,13 +1249,15 @@ function getGordonAgent(): Agent {
         backtester: getBacktesterAgent(),
       },
 
-      // Gordon only has essential routing/system tools
+      // Gordon only has essential routing/system tools + MCP plugin tools
       // Specialized tools are delegated to sub-agents to avoid confusion
       // This improves tool selection accuracy by keeping Gordon focused on orchestration
+      // MCP tools from installed plugins are included here for direct access
       tools: {
         ...instrumentedSystemTools,       // arm/disarm system control
         ...instrumentedSchedulerTools,    // task scheduling (cross-cutting concern)
         ...instrumentedAutonomousTools,   // autonomous swing trading control
+        ...getMCPTools(),                 // MCP plugin tools (if any installed/enabled)
       },
 
       // Memory for network orchestration
