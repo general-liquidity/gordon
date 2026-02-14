@@ -18,6 +18,7 @@
  * - defillama_get_token_prices: Get token prices from DeFiLlama
  * - moonwell_deposit: Supply assets to Moonwell lending on Base
  * - moonwell_withdraw: Redeem assets from Moonwell lending on Base
+ * - basenames_register: Register a .base domain name
  *
  * All tools gracefully handle the case where CDP keys are not configured.
  */
@@ -265,6 +266,37 @@ export const moonwellWithdrawTool = createTool({
 });
 
 // ============================================================================
+// Basenames Tools (Base Domain Registration)
+// ============================================================================
+
+/**
+ * Register a .base domain name (Basename)
+ */
+export const basenamesRegisterTool = createTool({
+  id: "basenames_register",
+  description:
+    "Register a Basename (.base domain) on Base L2. Basenames are ENS-compatible " +
+    "human-readable names (e.g., 'gordon.base') that resolve to your wallet address. " +
+    "IMPORTANT: Requires ARMED mode. Registration costs ETH (default 0.002 ETH). " +
+    "Confirm the name and cost with the user before executing.",
+  inputSchema: z.object({
+    basename: z
+      .string()
+      .describe("The Basename to register (e.g., 'gordon.base' or 'myname.base')"),
+    amount: z
+      .string()
+      .optional()
+      .describe("Registration payment in ETH (default: '0.002'). Higher amounts may be needed for premium names."),
+  }),
+  outputSchema: agentKitResultSchema,
+  execute: async ({ basename, amount }) =>
+    safeExecuteAction("register", {
+      basename,
+      ...(amount !== undefined ? { amount } : {}),
+    }),
+});
+
+// ============================================================================
 // Export as Mastra tool object
 // ============================================================================
 
@@ -279,4 +311,5 @@ export const agentKitDefiTools = {
   defillama_get_token_prices: defillamaGetTokenPricesTool,
   moonwell_deposit: moonwellDepositTool,
   moonwell_withdraw: moonwellWithdrawTool,
+  basenames_register: basenamesRegisterTool,
 };

@@ -23,6 +23,7 @@ import {
   pythActionProvider,
   defillamaActionProvider,
   moonwellActionProvider,
+  basenameActionProvider,
 } from "@coinbase/agentkit";
 import type { Action } from "@coinbase/agentkit";
 
@@ -67,6 +68,7 @@ export function isAgentKitConfigured(): boolean {
  * - pythActionProvider (oracle price feeds)
  * - defillamaActionProvider (DeFi protocol data, token prices)
  * - moonwellActionProvider (Base lending — deposit/withdraw)
+ * - basenameActionProvider (register .base names)
  *
  * @throws Error if CDP keys are not configured
  */
@@ -97,10 +99,11 @@ export async function getAgentKit(): Promise<AgentKit> {
   const pyth = pythActionProvider();
   const defillama = defillamaActionProvider();
   const moonwell = moonwellActionProvider();
+  const basename = basenameActionProvider();
 
   _agentKit = await AgentKit.from({
     walletProvider,
-    actionProviders: [wallet, erc20, weth, cdp, cdpEvm, pyth, defillama, moonwell],
+    actionProviders: [wallet, erc20, weth, cdp, cdpEvm, pyth, defillama, moonwell, basename],
   });
 
   // Index actions by name for O(1) lookup

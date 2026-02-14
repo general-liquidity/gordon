@@ -630,6 +630,13 @@ const TOOL_AGENT_MAP: Record<string, string> = {
   // Moonwell lending (state-changing, Executor)
   moonwell_deposit: "Executor",
   moonwell_withdraw: "Executor",
+  // Basenames registration (state-changing, Executor)
+  basenames_register: "Executor",
+
+  // ---- Base L2 indexer tools (The Graph) ----
+  indexer_top_pools: "Scanner",
+  indexer_pool_stats: "Analyst",
+  indexer_aerodrome_pools: "Scanner",
 
   // ---- Base L2 signal tools ----
   // baseSignalTools cherry-picks (Scanner: discovery + scanning)

@@ -67,6 +67,7 @@ export { baseOnchainTools } from "./base-onchain.ts";
 export { agentKitOnchainTools } from "./agentkit-onchain.ts";
 export { agentKitDefiTools } from "./agentkit-defi.ts";
 export { baseSignalTools } from "./base-signals.ts";
+export { baseIndexerTools } from "./base-indexers.ts";
 
 // Multi-modal chart tools (image generation and vision analysis)
 export { multiModalChartTools } from "../../tools/chartTools.ts";
@@ -264,6 +265,7 @@ import { baseOnchainTools } from "./base-onchain.ts";
 import { agentKitOnchainTools } from "./agentkit-onchain.ts";
 import { agentKitDefiTools } from "./agentkit-defi.ts";
 import { baseSignalTools } from "./base-signals.ts";
+import { baseIndexerTools } from "./base-indexers.ts";
 import { multiModalChartTools } from "../../tools/chartTools.ts";
 import { evalTools } from "../../evals/tools.ts";
 
@@ -301,6 +303,7 @@ export const allTools = {
   ...agentKitOnchainTools,
   ...agentKitDefiTools,
   ...baseSignalTools,
+  ...baseIndexerTools,
   ...multiModalChartTools,
   ...evalTools,
 };
@@ -339,6 +342,7 @@ export const toolCounts = {
   agentKitOnchain: Object.keys(agentKitOnchainTools).length,
   agentKitDefi: Object.keys(agentKitDefiTools).length,
   baseSignals: Object.keys(baseSignalTools).length,
+  baseIndexers: Object.keys(baseIndexerTools).length,
   multiModalCharts: Object.keys(multiModalChartTools).length,
   evals: Object.keys(evalTools).length,
   total: Object.keys(allTools).length,

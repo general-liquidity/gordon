@@ -57,6 +57,7 @@ import {
   agentKitOnchainTools,
   agentKitDefiTools,
   baseSignalTools,
+  baseIndexerTools,
   withToolsMetrics,
 } from "./tools/index.ts";
 import { getSessionSummary, getMemoryStats, resetSharedMemory } from "./shared-context.ts";
@@ -288,6 +289,7 @@ const instrumentedBaseOnchainTools = withToolsMetrics(baseOnchainTools);
 const instrumentedAgentKitOnchainTools = withToolsMetrics(agentKitOnchainTools);
 const instrumentedAgentKitDefiTools = withToolsMetrics(agentKitDefiTools);
 const instrumentedBaseSignalTools = withToolsMetrics(baseSignalTools);
+const instrumentedBaseIndexerTools = withToolsMetrics(baseIndexerTools);
 const instrumentedEvalTools = withToolsMetrics(evalTools);
 
 // ============================================================================
@@ -928,6 +930,9 @@ function getScannerAgent(): Agent {
         scan_base_new_tokens: instrumentedBaseSignalTools.scan_base_new_tokens,
         // DeFiLlama protocol discovery (search for DeFi protocols by name)
         defillama_search_protocols: instrumentedAgentKitDefiTools.defillama_search_protocols,
+        // Base L2 DEX indexer tools (The Graph — top pools, Aerodrome)
+        indexer_top_pools: instrumentedBaseIndexerTools.indexer_top_pools,
+        indexer_aerodrome_pools: instrumentedBaseIndexerTools.indexer_aerodrome_pools,
       },
       memory: createSubAgentMemory(),
       inputProcessors: [new TokenLimiterProcessor({ limit: 32000 })],
@@ -981,6 +986,8 @@ function getAnalystAgent(): Agent {
         // DeFiLlama protocol analysis and token prices
         defillama_get_protocol: instrumentedAgentKitDefiTools.defillama_get_protocol,
         defillama_get_token_prices: instrumentedAgentKitDefiTools.defillama_get_token_prices,
+        // Base L2 DEX indexer tool (The Graph — detailed pool stats)
+        indexer_pool_stats: instrumentedBaseIndexerTools.indexer_pool_stats,
         // Base L2 on-chain analysis tools (wallet tracking, holders, DEX pairs)
         track_base_wallet: instrumentedBaseSignalTools.track_base_wallet,
         get_base_token_holders: instrumentedBaseSignalTools.get_base_token_holders,
@@ -1091,6 +1098,8 @@ function getExecutorAgent(): Agent {
         // Moonwell lending tools (deposit/withdraw on Base L2)
         moonwell_deposit: instrumentedAgentKitDefiTools.moonwell_deposit,
         moonwell_withdraw: instrumentedAgentKitDefiTools.moonwell_withdraw,
+        // Basenames registration (.base domain names)
+        basenames_register: instrumentedAgentKitDefiTools.basenames_register,
         // Shared context for reading plan details and analysis before execution
         ...instrumentedSharedContextTools,
       },
