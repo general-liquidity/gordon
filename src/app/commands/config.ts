@@ -26,18 +26,28 @@ export interface ConfigCommandResult {
 /**
  * Supported quick-edit config keys
  */
-type QuickEditKey = 'cash-reserve' | 'max-per-trade' | 'timeframes' | 'top-coins';
+type QuickEditKey =
+  | 'cash-reserve' | 'max-per-trade' | 'timeframes' | 'top-coins'
+  | 'risk-mode' | 'max-daily-loss' | 'max-drawdown' | 'max-position-size' | 'max-positions'
+  | 'allocation-strategy' | 'auto-regime';
+
+/**
+ * Config section that a key belongs to
+ */
+type ConfigSection = 'preferences' | 'riskManagement' | 'strategyRuntime' | 'regimeDetection';
 
 /**
  * Mapping of quick-edit keys to config paths
  */
 const QUICK_EDIT_KEYS: Record<QuickEditKey, {
-  path: keyof Preferences;
-  parse: (value: string) => number | string[];
-  format: (value: number | string[]) => string;
-  validate: (value: number | string[]) => string | null;
+  section: ConfigSection;
+  path: string;
+  parse: (value: string) => number | string[] | string | boolean;
+  format: (value: number | string[] | string | boolean) => string;
+  validate: (value: number | string[] | string | boolean) => string | null;
 }> = {
   'cash-reserve': {
+    section: 'preferences',
     path: 'cashReservePercent',
     parse: (v) => parsePercent(v),
     format: (v) => `${(v as number) * 100}%`,
@@ -48,6 +58,7 @@ const QUICK_EDIT_KEYS: Record<QuickEditKey, {
     },
   },
   'max-per-trade': {
+    section: 'preferences',
     path: 'maxAllocationPerTrade',
     parse: (v) => parsePercent(v),
     format: (v) => `${(v as number) * 100}%`,
@@ -58,6 +69,7 @@ const QUICK_EDIT_KEYS: Record<QuickEditKey, {
     },
   },
   'timeframes': {
+    section: 'preferences',
     path: 'defaultTimeframes',
     parse: (v) => v.split(',').map(t => t.trim()).filter(t => t.length > 0),
     format: (v) => (v as string[]).join(', '),
@@ -74,12 +86,93 @@ const QUICK_EDIT_KEYS: Record<QuickEditKey, {
     },
   },
   'top-coins': {
+    section: 'preferences',
     path: 'topNCoins',
     parse: (v) => parseInt(v, 10),
     format: (v) => String(v),
     validate: (v) => {
       const n = v as number;
       if (isNaN(n) || n < 1 || n > 500) return 'Must be between 1 and 500';
+      return null;
+    },
+  },
+  'risk-mode': {
+    section: 'riskManagement',
+    path: 'mode',
+    parse: (v) => v.toLowerCase().trim(),
+    format: (v) => String(v),
+    validate: (v) => {
+      const valid = ['enforce', 'warn', 'paper'];
+      if (!valid.includes(v as string)) return `Must be one of: ${valid.join(', ')}`;
+      return null;
+    },
+  },
+  'max-daily-loss': {
+    section: 'riskManagement',
+    path: 'maxDailyLossPercent',
+    parse: (v) => parseWholePercent(v),
+    format: (v) => `${v}%`,
+    validate: (v) => {
+      const n = v as number;
+      if (isNaN(n) || n < 0 || n > 100) return 'Must be between 0% and 100%';
+      return null;
+    },
+  },
+  'max-drawdown': {
+    section: 'riskManagement',
+    path: 'maxDrawdownPercent',
+    parse: (v) => parseWholePercent(v),
+    format: (v) => `${v}%`,
+    validate: (v) => {
+      const n = v as number;
+      if (isNaN(n) || n < 0 || n > 100) return 'Must be between 0% and 100%';
+      return null;
+    },
+  },
+  'max-position-size': {
+    section: 'riskManagement',
+    path: 'maxPositionSizePercent',
+    parse: (v) => parseWholePercent(v),
+    format: (v) => `${v}%`,
+    validate: (v) => {
+      const n = v as number;
+      if (isNaN(n) || n < 0 || n > 100) return 'Must be between 0% and 100%';
+      return null;
+    },
+  },
+  'max-positions': {
+    section: 'riskManagement',
+    path: 'maxPositions',
+    parse: (v) => parseInt(v, 10),
+    format: (v) => String(v),
+    validate: (v) => {
+      const n = v as number;
+      if (isNaN(n) || !Number.isInteger(n) || n < 1 || n > 100) return 'Must be an integer between 1 and 100';
+      return null;
+    },
+  },
+  'allocation-strategy': {
+    section: 'strategyRuntime',
+    path: 'allocationStrategy',
+    parse: (v) => v.toLowerCase().trim().replace(/\s+/g, '_'),
+    format: (v) => String(v),
+    validate: (v) => {
+      const valid = ['equal_weight', 'risk_parity', 'performance', 'fixed'];
+      if (!valid.includes(v as string)) return `Must be one of: ${valid.join(', ')}`;
+      return null;
+    },
+  },
+  'auto-regime': {
+    section: 'regimeDetection',
+    path: 'autoRegime',
+    parse: (v) => {
+      const lower = v.toLowerCase().trim();
+      return ['enabled', 'on', 'true', '1'].includes(lower);
+    },
+    format: (v) => (v as boolean) ? 'enabled' : 'disabled',
+    validate: (v) => {
+      // Already parsed as boolean, always valid
+      if (typeof v !== 'boolean') return 'Must be enabled/disabled, on/off, or true/false';
       return null;
     },
   },
@@ -90,7 +183,7 @@ const QUICK_EDIT_KEYS: Record<QuickEditKey, {
 // ============================================================================
 
 /**
- * Parse a percentage value (e.g., "25%" or "0.25") to decimal
+ * Parse a percentage value (e.g., "25%" or "0.25") to decimal (0-1 range)
  */
 function parsePercent(value: string): number {
   const trimmed = value.trim();
@@ -98,6 +191,23 @@ function parsePercent(value: string): number {
     return parseFloat(trimmed.slice(0, -1)) / 100;
   }
   return parseFloat(trimmed);
+}
+
+/**
+ * Parse a percentage value to a whole number (0-100 range).
+ * Accepts "5%", "5", "0.05" (interpreted as 5%).
+ */
+function parseWholePercent(value: string): number {
+  const trimmed = value.trim();
+  if (trimmed.endsWith('%')) {
+    return parseFloat(trimmed.slice(0, -1));
+  }
+  const num = parseFloat(trimmed);
+  // If the value is between 0 and 1 (exclusive), treat as decimal percentage
+  if (num > 0 && num < 1) {
+    return num * 100;
+  }
+  return num;
 }
 
 /**
@@ -196,6 +306,35 @@ export async function configView(): Promise<ConfigCommandResult> {
     }
     systemLines.push(`Onboarding Complete: ${config.onboardingComplete ? 'Yes' : 'No'}`);
 
+    // Build Risk Management section (v0.7)
+    const risk = config.riskManagement;
+    const riskLines = ['', '=== Risk Management ==='];
+    riskLines.push(`Risk Mode: ${risk.mode} (enforce/warn/paper)`);
+    riskLines.push(`Max Daily Loss: ${risk.maxDailyLossPercent}%`);
+    riskLines.push(`Max Drawdown: ${risk.maxDrawdownPercent}%`);
+    riskLines.push(`Max Position Size: ${risk.maxPositionSizePercent}%`);
+    riskLines.push(`Max Positions: ${risk.maxPositions}`);
+
+    // Build Strategy Runtime section (v0.7)
+    const runtime = config.strategyRuntime;
+    const runtimeLines = ['', '=== Strategy Runtime ==='];
+    runtimeLines.push(`Allocation: ${runtime.allocationStrategy} (equal_weight/risk_parity/performance/fixed)`);
+    try {
+      const { strategyRuntime: runtimeInstance } = await import('../../core/runtime/index.ts');
+      const activeSlots = runtimeInstance.getActiveSlots();
+      const portfolio = runtimeInstance.getPortfolioState();
+      runtimeLines.push(`Total Capital: ${portfolio.total_capital > 0 ? '$' + portfolio.total_capital.toFixed(2) : '(from exchange)'}`);
+      runtimeLines.push(`Active Slots: ${activeSlots.length}`);
+    } catch {
+      runtimeLines.push('Total Capital: (from exchange)');
+      runtimeLines.push('Active Slots: 0');
+    }
+
+    // Build Regime Detection section (v0.7)
+    const regime = config.regimeDetection;
+    const regimeLines = ['', '=== Regime Detection ==='];
+    regimeLines.push(`Auto-Regime: ${regime.autoRegime ? 'enabled' : 'disabled'} (enable/disable automatic regime matching)`);
+
     // Combine all sections
     const output = [
       ...tradingLines,
@@ -203,6 +342,9 @@ export async function configView(): Promise<ConfigCommandResult> {
       ...exchangeLines,
       ...mcpLines,
       ...systemLines,
+      ...riskLines,
+      ...runtimeLines,
+      ...regimeLines,
     ].join('\n');
 
     return {
@@ -253,12 +395,14 @@ export async function configSet(key: string, value: string): Promise<ConfigComma
     // Load current config
     const config = await loadConfig();
 
-    // Get old value for display
-    const oldValue = config.preferences[keyConfig.path];
-    const oldFormatted = keyConfig.format(oldValue as number | string[]);
+    // Get the config section and old value
+    const section = keyConfig.section;
+    const sectionObj = config[section] as Record<string, unknown>;
+    const oldValue = sectionObj[keyConfig.path];
+    const oldFormatted = keyConfig.format(oldValue as number | string[] | string | boolean);
 
-    // Update the preference
-    (config.preferences as Record<string, unknown>)[keyConfig.path] = parsedValue;
+    // Update the value in the correct section
+    sectionObj[keyConfig.path] = parsedValue;
 
     // Save config
     await saveConfig(config);
@@ -353,10 +497,17 @@ export async function handleConfigCommand(args: string): Promise<ConfigCommandRe
         return {
           success: false,
           message: 'Usage: /config set <key> <value>\n\nAvailable keys:\n' +
-            '  cash-reserve    - Cash reserve percentage (e.g., 25%)\n' +
-            '  max-per-trade   - Max allocation per trade (e.g., 15%)\n' +
-            '  timeframes      - Default timeframes (e.g., 4h,1d)\n' +
-            '  top-coins       - Number of coins to scan (e.g., 100)',
+            '  cash-reserve      - Cash reserve percentage (e.g., 25%)\n' +
+            '  max-per-trade     - Max allocation per trade (e.g., 15%)\n' +
+            '  timeframes        - Default timeframes (e.g., 4h,1d)\n' +
+            '  top-coins         - Number of coins to scan (e.g., 100)\n' +
+            '  risk-mode         - Risk enforcement mode (enforce/warn/paper)\n' +
+            '  max-daily-loss    - Max daily loss percentage (e.g., 5%)\n' +
+            '  max-drawdown      - Max portfolio drawdown (e.g., 15%)\n' +
+            '  max-position-size - Max single position size (e.g., 10%)\n' +
+            '  max-positions     - Max number of open positions (e.g., 5)\n' +
+            '  allocation-strategy - Capital allocation strategy (equal_weight/risk_parity/performance/fixed)\n' +
+            '  auto-regime       - Automatic regime matching (enabled/disabled)',
         };
       }
       return configSet(parts[1]!, parts.slice(2).join(' '));
@@ -374,16 +525,27 @@ export async function handleConfigCommand(args: string): Promise<ConfigCommandRe
   /config reset         - Reset preferences to defaults
 
 Available quick-edit keys:
-  cash-reserve    - Cash reserve percentage (e.g., /config set cash-reserve 25%)
-  max-per-trade   - Max allocation per trade (e.g., /config set max-per-trade 15%)
-  timeframes      - Default timeframes (e.g., /config set timeframes 4h,1d)
-  top-coins       - Number of coins to scan (e.g., /config set top-coins 100)
+  cash-reserve        - Cash reserve percentage (e.g., /config set cash-reserve 25%)
+  max-per-trade       - Max allocation per trade (e.g., /config set max-per-trade 15%)
+  timeframes          - Default timeframes (e.g., /config set timeframes 4h,1d)
+  top-coins           - Number of coins to scan (e.g., /config set top-coins 100)
+  risk-mode           - Risk enforcement mode (e.g., /config set risk-mode warn)
+  max-daily-loss      - Max daily loss percentage (e.g., /config set max-daily-loss 5%)
+  max-drawdown        - Max portfolio drawdown (e.g., /config set max-drawdown 15%)
+  max-position-size   - Max single position size (e.g., /config set max-position-size 10%)
+  max-positions       - Max open positions (e.g., /config set max-positions 5)
+  allocation-strategy - Capital allocation (e.g., /config set allocation-strategy risk_parity)
+  auto-regime         - Auto regime matching (e.g., /config set auto-regime enabled)
 
 Examples:
   /config set cash-reserve 25%
   /config set max-per-trade 0.15
   /config set timeframes 1h,4h,1d
-  /config set top-coins 100`,
+  /config set top-coins 100
+  /config set risk-mode paper
+  /config set max-daily-loss 5%
+  /config set allocation-strategy performance
+  /config set auto-regime disabled`,
       };
 
     default:

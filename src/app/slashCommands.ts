@@ -16,7 +16,7 @@ export interface SlashCommand {
   aliases: string[];
   description: string;
   usage: string;
-  category: "trading" | "market" | "account" | "system";
+  category: "trading" | "market" | "account" | "system" | "strategy";
   /** Command complexity level for progressive disclosure */
   level: CommandLevel;
   // Maps to agent or direct action
@@ -287,12 +287,155 @@ export const SLASH_COMMANDS: SlashCommand[] = [
     whenToUse: "Quickly create a strategy from a description",
   },
 
+  // Strategy Runtime
+  {
+    name: "deploy",
+    aliases: ["run"],
+    description: "Deploy a playbook as a live strategy",
+    usage: "/deploy <playbook-name> [--capital <percent>]",
+    category: "strategy",
+    level: 2,
+    action: "agent",
+    target: "planner",
+    executionTime: "~2-3s",
+    whenToUse: "Activate a playbook strategy with capital allocation",
+  },
+  {
+    name: "strategies-live",
+    aliases: ["sl", "running", "live"],
+    description: "List running strategies and portfolio state",
+    usage: "/strategies-live",
+    category: "strategy",
+    level: 1,
+    action: "agent",
+    target: "planner",
+    executionTime: "~1-2s",
+    whenToUse: "See what strategies are active and their performance",
+  },
+  {
+    name: "pause",
+    aliases: [],
+    description: "Pause a running strategy slot",
+    usage: "/pause <slot-id|playbook-name>",
+    category: "strategy",
+    level: 2,
+    action: "agent",
+    target: "planner",
+  },
+  {
+    name: "resume-strategy",
+    aliases: ["unpause"],
+    description: "Resume a paused strategy slot",
+    usage: "/resume-strategy <slot-id|playbook-name>",
+    category: "strategy",
+    level: 2,
+    action: "agent",
+    target: "planner",
+  },
+  {
+    name: "stop",
+    aliases: ["drain"],
+    description: "Stop and drain a running strategy",
+    usage: "/stop <slot-id|playbook-name>",
+    category: "strategy",
+    level: 2,
+    action: "agent",
+    target: "planner",
+  },
+  {
+    name: "rebalance",
+    aliases: ["rb"],
+    description: "Rebalance portfolio capital allocation across strategies",
+    usage: "/rebalance [equal_weight|risk_parity|performance]",
+    category: "strategy",
+    level: 2,
+    action: "agent",
+    target: "planner",
+    executionTime: "~2-3s",
+    whenToUse: "Optimize capital distribution across active strategies",
+  },
+
+  // Market Regime
+  {
+    name: "regime",
+    aliases: ["market-regime", "mr"],
+    description: "Detect current market regime (trending/ranging/volatile/quiet)",
+    usage: "/regime [symbol]",
+    category: "market",
+    level: 1,
+    action: "agent",
+    target: "scanner",
+    executionTime: "~3-5s",
+    whenToUse: "Understand current market conditions and matching strategies",
+  },
+  {
+    name: "regime-history",
+    aliases: ["rh"],
+    description: "View regime transition history for a symbol",
+    usage: "/regime-history [symbol] [limit]",
+    category: "market",
+    level: 2,
+    action: "agent",
+    target: "scanner",
+  },
+
+  // Strategy Evolution (Genome)
+  {
+    name: "evolve",
+    aliases: ["mutate"],
+    description: "Fork and mutate a playbook to create a new variant",
+    usage: "/evolve <playbook-name>",
+    category: "strategy",
+    level: 3,
+    action: "agent",
+    target: "backtester",
+    executionTime: "~5-10s",
+    whenToUse: "Create an evolved variant of a strategy for A/B testing",
+  },
+  {
+    name: "experiment",
+    aliases: ["ab"],
+    description: "View or manage A/B strategy experiments",
+    usage: "/experiment [status|list|start|evaluate]",
+    category: "strategy",
+    level: 3,
+    action: "agent",
+    target: "backtester",
+  },
+
+  // Audit
+  {
+    name: "audit",
+    aliases: ["trail", "decisions"],
+    description: "Query the agent decision audit trail",
+    usage: "/audit [recent|agent <name>|position <id>]",
+    category: "system",
+    level: 2,
+    action: "agent",
+    target: "monitor",
+    whenToUse: "Investigate why a decision was made or review agent activity",
+  },
+
+  // Health
+  {
+    name: "health",
+    aliases: ["portfolio-health", "ph"],
+    description: "Portfolio health check with risk status",
+    usage: "/health",
+    category: "strategy",
+    level: 1,
+    action: "agent",
+    target: "monitor",
+    executionTime: "~2-3s",
+    whenToUse: "Quick check on portfolio risk, strategy health, and warnings",
+  },
+
   // System
   {
     name: "help",
     aliases: ["?"],
     description: "Get help and learn concepts",
-    usage: "/help [topic|advanced|all|expert|trading|analysis|market|account|system|page N]",
+    usage: "/help [topic|advanced|all|expert|trading|strategy|analysis|market|account|system|page N]",
     category: "system",
     level: 1,
     action: "agent",
@@ -704,7 +847,7 @@ export type HelpMode = "essential" | "advanced" | "all" | "expert";
 /**
  * Help categories for filtering commands by topic
  */
-export type HelpCategory = "trading" | "analysis" | "system" | "market" | "account";
+export type HelpCategory = "trading" | "analysis" | "system" | "market" | "account" | "strategy";
 
 /**
  * Get commands filtered by level
@@ -721,7 +864,7 @@ export function getCommandsByLevel(maxLevel: CommandLevel): SlashCommand[] {
 export function getCommandsByCategory(category: HelpCategory): SlashCommand[] {
   // Map 'analysis' to 'market' for backward compatibility
   const mappedCategory = category === "analysis" ? "market" : category;
-  return SLASH_COMMANDS.filter((cmd) => cmd.category === mappedCategory);
+  return SLASH_COMMANDS.filter((cmd) => (cmd.category as string) === mappedCategory);
 }
 
 /**
@@ -741,6 +884,7 @@ export function parseHelpArg(arg: string): { mode: HelpMode; category?: HelpCate
   if (lowerArg === "analysis" || lowerArg === "market") return { mode: "all", category: "analysis" };
   if (lowerArg === "system") return { mode: "all", category: "system" };
   if (lowerArg === "account") return { mode: "all", category: "account" };
+  if (lowerArg === "strategy" || lowerArg === "strategies") return { mode: "all", category: "strategy" };
 
   // Default to essential mode
   return { mode: "essential" };
@@ -816,8 +960,9 @@ export function getSlashCommandSuggestions(
   const categoryOrder: Record<SlashCommand["category"], number> = {
     market: 0,
     trading: 1,
-    account: 2,
-    system: 3,
+    strategy: 2,
+    account: 3,
+    system: 4,
   };
   const sortByCategoryAndLevel = (a: SlashCommand, b: SlashCommand): number => {
     const catDiff = categoryOrder[a.category] - categoryOrder[b.category];
@@ -848,9 +993,10 @@ export function getSlashCommandSuggestions(
 /**
  * Category display configuration for help formatting
  */
-const CATEGORY_CONFIG = {
+const CATEGORY_CONFIG: Record<string, { label: string; icon: string }> = {
   market: { label: "Market Discovery", icon: "M" },
   trading: { label: "Trading", icon: "T" },
+  strategy: { label: "Strategy & Runtime", icon: "R" },
   account: { label: "Account", icon: "A" },
   system: { label: "System", icon: "S" },
 };
@@ -873,7 +1019,7 @@ export function formatCommandHelp(
   let commands = getCommandsByLevel(maxLevel);
   if (category) {
     const mappedCategory = category === "analysis" ? "market" : category;
-    commands = commands.filter((cmd) => cmd.category === mappedCategory);
+    commands = commands.filter((cmd) => (cmd.category as string) === mappedCategory);
   }
 
   // Build output
@@ -896,10 +1042,11 @@ export function formatCommandHelp(
   }
 
   // Group by category
-  const categories = ["market", "trading", "account", "system"] as const;
+  const categories = ["market", "trading", "strategy", "account", "system"] as const;
 
   for (const cat of categories) {
     const config = CATEGORY_CONFIG[cat];
+    if (!config) continue;
     const catCommands = commands.filter((c) => c.category === cat);
     if (catCommands.length === 0) continue;
 
@@ -919,6 +1066,7 @@ export function formatCommandHelp(
   lines.push("  `/help advanced` - Show Level 1 + Level 2");
   lines.push("  `/help all` or `/help expert` - Show everything");
   lines.push("  `/help trading` - Show trading commands only");
+  lines.push("  `/help strategy` - Show strategy & runtime commands only");
   lines.push("  `/help analysis` - Show analysis commands only");
   lines.push("  `/help market` - Show market discovery commands only");
   lines.push("  `/help account` - Show account commands only");
@@ -1167,7 +1315,7 @@ export function commandToPrompt(command: SlashCommand, args: string): string {
         : "What symbol should I analyze? (Combines scan + analysis in ~5-8s)";
     case "compare-coins":
       if (args) {
-        const symbols = args.split(/\s+/).filter(s => s);
+        const symbols = args.split(/\s+/).filter((s) => s);
         return `Analyze and compare these coins side-by-side: ${symbols.join(", ")} - help me decide which to trade`;
       }
       return "Which coins would you like to compare? (e.g., BTC ETH SOL - takes ~5-10s per 3 coins)";
@@ -1401,6 +1549,86 @@ export function commandToPrompt(command: SlashCommand, args: string): string {
         : "Help me create a bug report. Ask what went wrong, then generate a pre-filled GitHub issue link with system diagnostics for https://github.com/general-liquidity/gordon-cli/issues/new.";
     case "whatsnew":
       return "Show me the recent changes, new features, and improvements in the latest Gordon version. Summarize the changelog highlights.";
+    // Strategy Runtime commands
+    case "deploy":
+      return args
+        ? `Deploy the ${args.split(/\s+/)[0]} playbook as a live strategy. ${args.includes("--capital") ? `Use capital allocation from args: ${args}` : "Show me the allocation details."}`
+        : "Which playbook should I deploy? List available playbooks.";
+    case "strategies-live":
+      return "Show me all running strategies, their performance, and portfolio state.";
+    case "pause":
+      return args
+        ? `Pause the strategy slot "${args}". Confirm the pause and show updated status.`
+        : "Which strategy slot should I pause? Show running strategies.";
+    case "resume-strategy":
+      return args
+        ? `Resume the paused strategy slot "${args}". Confirm the resume and show updated status.`
+        : "Which paused strategy slot should I resume? Show paused strategies.";
+    case "stop":
+      return args
+        ? `Stop and drain the strategy slot "${args}". Show the wind-down plan and final state.`
+        : "Which strategy slot should I stop? Show running strategies.";
+    case "rebalance":
+      if (args) {
+        const method = args.split(/\s+/)[0]?.toLowerCase();
+        return `Rebalance the portfolio capital allocation across running strategies using the ${method} method. Show before/after allocations.`;
+      }
+      return "Rebalance the portfolio capital allocation across running strategies. Show current allocations and recommended changes.";
+    // Market Regime commands
+    case "regime":
+      return args
+        ? `Detect the current market regime for ${args.toUpperCase()}. Show me the regime classification, confidence, and which playbooks match.`
+        : "Detect the current overall market regime. Show me the regime classification, confidence, and which playbooks match.";
+    case "regime-history":
+      if (args) {
+        const rhParts = args.split(/\s+/);
+        const rhSymbol = rhParts[0]?.toUpperCase();
+        const rhLimit = rhParts[1] || "10";
+        return `Show the regime transition history for ${rhSymbol}, last ${rhLimit} transitions. Show timestamps and duration of each regime.`;
+      }
+      return "Show the regime transition history. Which symbol should I look at?";
+    // Strategy Evolution commands
+    case "evolve":
+      return args
+        ? `Fork the ${args} playbook with suggested mutations. Show me what changed and why, and prepare it for A/B testing.`
+        : "Which playbook should I evolve? List available playbooks for mutation.";
+    case "experiment":
+      if (!args) return "Show the status of all active A/B experiments.";
+      const experimentSubcmd = args.split(/\s+/)[0]?.toLowerCase();
+      switch (experimentSubcmd) {
+        case "status":
+          return "Show the status of all active A/B experiments with performance comparisons.";
+        case "list":
+          return "List all A/B experiments — active, completed, and pending.";
+        case "start":
+          return "Start a new A/B experiment between strategy variants.";
+        case "evaluate":
+          return "Evaluate active experiments and recommend winners based on statistical significance.";
+        default:
+          return "Show the status of all active A/B experiments.";
+      }
+    // Audit command
+    case "audit":
+      if (!args) return "Show me the most recent decisions from the audit trail.";
+      const auditParts = args.split(/\s+/);
+      const auditSubcmd = auditParts[0]?.toLowerCase();
+      switch (auditSubcmd) {
+        case "recent":
+          return "Show me the most recent decisions from the audit trail.";
+        case "agent":
+          return auditParts[1]
+            ? `Show audit trail entries for the ${auditParts[1]} agent.`
+            : "Which agent's decisions should I look up?";
+        case "position":
+          return auditParts[1]
+            ? `Show all decisions related to position ${auditParts[1]}.`
+            : "Which position ID should I look up?";
+        default:
+          return "Show me the most recent decisions from the audit trail.";
+      }
+    // Health command
+    case "health":
+      return "Run a portfolio health check. Show risk status, strategy health, and any warnings.";
     default:
       return args || command.description;
   }
@@ -1411,12 +1639,13 @@ export function commandToPrompt(command: SlashCommand, args: string): string {
 // Shows 15 commands per page instead of overwhelming users with 50+ at once
 // ============================================================================
 
-const PAGINATED_HELP_CATEGORIES = {
+const PAGINATED_HELP_CATEGORIES: Record<string, string> = {
   market: "Market Discovery",
   trading: "Trading",
+  strategy: "Strategy & Runtime",
   account: "Account",
   system: "System",
-} as const;
+};
 
 /**
  * Format paginated command help for accessibility
@@ -1432,9 +1661,10 @@ export function formatPaginatedCommandHelp(args?: string): string {
     return formatHelpPageView(parseInt(pageMatch[1], 10), PAGE_SIZE);
   }
 
-  // Handle category filter
-  if (parsedArgs in PAGINATED_HELP_CATEGORIES) {
-    return formatHelpCategoryView(parsedArgs as keyof typeof PAGINATED_HELP_CATEGORIES);
+  // Handle category filter (with aliases)
+  const categoryAlias = parsedArgs === "strategies" ? "strategy" : parsedArgs;
+  if (categoryAlias in PAGINATED_HELP_CATEGORIES) {
+    return formatHelpCategoryView(categoryAlias);
   }
 
   // Handle "all"
@@ -1453,12 +1683,12 @@ function formatHelpSummaryView(): string {
 
   for (const [cat, label] of Object.entries(PAGINATED_HELP_CATEGORIES)) {
     const cmds = SLASH_COMMANDS.filter((c) => c.category === cat);
-    const icon = cat === "market" ? "◆" : cat === "trading" ? "▲" : cat === "account" ? "■" : "●";
+    const icon = cat === "market" ? "◆" : cat === "trading" ? "▲" : cat === "strategy" ? "◇" : cat === "account" ? "■" : "●";
     lines.push(`  ${icon} **${label}** (${cmds.length}) - \`/help ${cat}\``);
   }
 
   lines.push("\n**Essential Commands:**");
-  const essentialCmds = SLASH_COMMANDS.filter((c) => c.level === 1).slice(0, 8);
+  const essentialCmds = SLASH_COMMANDS.filter((c) => c.level === 1).slice(0, 11);
   for (const cmd of essentialCmds) {
     lines.push(`  /${cmd.name} - ${cmd.description}`);
   }
@@ -1484,7 +1714,8 @@ function formatHelpPageView(page: number, pageSize: number): string {
   for (const cmd of pageCommands) {
     if (cmd.category !== lastCat) {
       if (lastCat !== "") lines.push("");
-      lines.push(`**${PAGINATED_HELP_CATEGORIES[cmd.category]}**`);
+      const catLabel = PAGINATED_HELP_CATEGORIES[cmd.category] || cmd.category;
+      lines.push(`**${catLabel}**`);
       lastCat = cmd.category;
     }
     lines.push(`  /${cmd.name} - ${cmd.description}`);
@@ -1499,9 +1730,9 @@ function formatHelpPageView(page: number, pageSize: number): string {
   return lines.join("\n");
 }
 
-function formatHelpCategoryView(category: keyof typeof PAGINATED_HELP_CATEGORIES): string {
+function formatHelpCategoryView(category: string): string {
   const cmds = SLASH_COMMANDS.filter((c) => c.category === category);
-  const label = PAGINATED_HELP_CATEGORIES[category];
+  const label = PAGINATED_HELP_CATEGORIES[category] || category;
 
   const lines: string[] = [`**${label} Commands** (${cmds.length})\n`];
   for (const cmd of cmds) {

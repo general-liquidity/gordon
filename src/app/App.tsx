@@ -170,6 +170,19 @@ function getDefaultConfig(): GordonConfig {
     onboardingComplete: false,
     useKeyring: false,
     telemetry: { enabled: false, researchData: false },
+    riskManagement: {
+      mode: "enforce",
+      maxDailyLossPercent: 3,
+      maxDrawdownPercent: 15,
+      maxPositionSizePercent: 10,
+      maxPositions: 5,
+    },
+    strategyRuntime: {
+      allocationStrategy: "equal_weight",
+    },
+    regimeDetection: {
+      autoRegime: true,
+    },
   };
 }
 
@@ -2189,6 +2202,34 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
             {
               role: "gordon",
               content: "What coin would you like me to analyze? Just type the symbol (e.g., BTC, ETH, SOL)",
+              timestamp: formatTimestamp(),
+            },
+          ],
+        }));
+        break;
+      case "strategies-live":
+        setState((prev) => ({
+          ...prev,
+          view: "chat",
+          messages: [
+            ...prev.messages,
+            {
+              role: "gordon",
+              content: "Use `/strategies-live` to view running strategies, portfolio state, and health.",
+              timestamp: formatTimestamp(),
+            },
+          ],
+        }));
+        break;
+      case "regime":
+        setState((prev) => ({
+          ...prev,
+          view: "chat",
+          messages: [
+            ...prev.messages,
+            {
+              role: "gordon",
+              content: "Use `/regime` to detect current market conditions and matching strategies.",
               timestamp: formatTimestamp(),
             },
           ],

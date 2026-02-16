@@ -18,6 +18,8 @@ import {
   type GeneratedStrategySummary,
 } from '../../infra/storage/generated-strategies.ts';
 import { createModuleLogger } from '../../infra/logger/index.ts';
+import { playbookRegistry } from '../../core/playbooks/index.ts';
+import type { Playbook } from '../../core/playbooks/index.ts';
 
 const logger = createModuleLogger('strategy-commands');
 
@@ -60,9 +62,23 @@ export async function strategyList(): Promise<StrategyCommandResult> {
     const tier1 = builtInStrategies.filter((s) => s.tier === 1);
     const tier2 = builtInStrategies.filter((s) => s.tier === 2);
 
+    // Get playbooks from the registry (v0.7)
+    let playbooks: { id: string; tier: number; riskLevel: string; description: string }[] = [];
+    try {
+      const allPlaybooks = playbookRegistry.getAll();
+      playbooks = allPlaybooks.map((pb) => ({
+        id: pb.id,
+        tier: pb.tier,
+        riskLevel: pb.riskLevel,
+        description: pb.description.length > 80 ? pb.description.slice(0, 77) + '...' : pb.description,
+      }));
+    } catch {
+      // Playbook registry may not be initialized yet
+    }
+
     return {
       success: true,
-      message: `${builtInStrategies.length} built-in strategies, ${generatedStrategies.length} generated strategies`,
+      message: `${builtInStrategies.length} built-in strategies, ${generatedStrategies.length} generated, ${playbooks.length} playbooks`,
       data: {
         builtIn: {
           tier1: tier1.map((s) => ({
@@ -92,8 +108,10 @@ export async function strategyList(): Promise<StrategyCommandResult> {
           backtestReturn: s.backtestReturn,
           backtestSharpe: s.backtestSharpe,
         })),
+        playbooks,
         totalBuiltIn: builtInStrategies.length,
         totalGenerated: generatedStrategies.length,
+        totalPlaybooks: playbooks.length,
       },
     };
   } catch (error) {
@@ -391,6 +409,250 @@ Example:
 }
 
 // ============================================================================
+// v0.7 Sub-Commands
+// ============================================================================
+
+/**
+ * List all registered playbooks with details and validation status
+ * Usage: /strategies playbooks
+ */
+export async function strategyPlaybooks(): Promise<StrategyCommandResult> {
+  try {
+    const allPlaybooks = playbookRegistry.getAll();
+
+    if (allPlaybooks.length === 0) {
+      return {
+        success: true,
+        message: 'No playbooks registered. Load playbooks with the PlaybookLoader first.',
+      };
+    }
+
+    // Get protocol validation status for each playbook
+    let validatePlaybook: ((pb: unknown) => { valid: boolean; errors: string[]; warnings: string[] }) | null = null;
+    let playbookToProtocol: ((pb: Playbook) => unknown) | null = null;
+    try {
+      const validators = await import('../../core/playbooks/index.ts');
+      validatePlaybook = validators.validatePlaybook;
+      playbookToProtocol = validators.playbookToProtocol;
+    } catch {
+      // Validator may not be available
+    }
+
+    // Get backtest results if available
+    let listBacktests: ((query: { playbook_name?: string; limit?: number }) => { playbook_name: string; total_return: number; sharpe_ratio: number }[]) | null = null;
+    try {
+      const backtestStore = await import('../../core/backtesting/index.ts');
+      listBacktests = backtestStore.listPlaybookBacktestResults;
+    } catch {
+      // Backtest store may not be initialized
+    }
+
+    const playbookDetails = allPlaybooks.map((pb) => {
+      // Validation status
+      let validationStatus = 'unknown';
+      let warningCount = 0;
+      if (validatePlaybook && playbookToProtocol) {
+        try {
+          const protocol = playbookToProtocol(pb);
+          const result = validatePlaybook(protocol);
+          if (result.valid) {
+            validationStatus = result.warnings.length > 0 ? 'valid (with warnings)' : 'valid';
+            warningCount = result.warnings.length;
+          } else {
+            validationStatus = `invalid (${result.errors.length} errors)`;
+          }
+        } catch {
+          validationStatus = 'error';
+        }
+      }
+
+      // Last backtest
+      let lastBacktest: { total_return: number; sharpe_ratio: number } | null = null;
+      if (listBacktests) {
+        try {
+          const results = listBacktests({ playbook_name: pb.id, limit: 1 });
+          if (results.length > 0) {
+            lastBacktest = {
+              total_return: results[0]!.total_return,
+              sharpe_ratio: results[0]!.sharpe_ratio,
+            };
+          }
+        } catch {
+          // Backtest query failed
+        }
+      }
+
+      return {
+        id: pb.id,
+        name: pb.name,
+        tier: pb.tier,
+        riskLevel: pb.riskLevel,
+        description: pb.description.length > 80 ? pb.description.slice(0, 77) + '...' : pb.description,
+        timeframes: pb.timeframes,
+        markets: pb.markets,
+        tags: pb.tags,
+        validationStatus,
+        warningCount,
+        lastBacktest,
+      };
+    });
+
+    return {
+      success: true,
+      message: `${allPlaybooks.length} playbooks registered`,
+      data: {
+        playbooks: playbookDetails,
+        totalPlaybooks: allPlaybooks.length,
+      },
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: `Failed to list playbooks: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
+}
+
+/**
+ * Show all active strategy slots from the runtime
+ * Usage: /strategies running
+ */
+export async function strategyRunning(): Promise<StrategyCommandResult> {
+  try {
+    const { strategyRuntime } = await import('../../core/runtime/index.ts');
+
+    const activeSlots = strategyRuntime.getActiveSlots();
+    const portfolio = strategyRuntime.getPortfolioState();
+
+    if (activeSlots.length === 0) {
+      return {
+        success: true,
+        message: 'No active strategy slots.\n\nUse /deploy <playbook-name> to activate a playbook as a live strategy.',
+      };
+    }
+
+    const slotDetails = activeSlots.map((slot) => {
+      const winRate = slot.total_trades > 0
+        ? ((slot.winning_trades / slot.total_trades) * 100).toFixed(1)
+        : 'N/A';
+
+      return {
+        slot_id: slot.slot_id,
+        playbook: slot.playbook_name,
+        status: slot.status,
+        allocated: `$${slot.allocated_capital.toFixed(0)} (${slot.allocated_percent.toFixed(0)}%)`,
+        used: `$${slot.used_capital.toFixed(0)}`,
+        pnl: slot.total_pnl,
+        trades: slot.total_trades,
+        winRate,
+        drawdown: slot.current_drawdown_percent,
+        started: slot.started_at,
+      };
+    });
+
+    return {
+      success: true,
+      message: `${activeSlots.length} active strategy slot(s)`,
+      data: {
+        slots: slotDetails,
+        portfolio: {
+          totalCapital: portfolio.total_capital,
+          allocatedCapital: portfolio.allocated_capital,
+          unallocatedCapital: portfolio.unallocated_capital,
+          deployedCapital: portfolio.deployed_capital,
+          totalPnl: portfolio.total_pnl,
+          drawdown: portfolio.portfolio_drawdown_percent,
+        },
+      },
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: `Failed to get running strategies: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
+}
+
+/**
+ * Show genome variants and evolution status
+ * Usage: /strategies evolving
+ */
+export async function strategyEvolving(): Promise<StrategyCommandResult> {
+  try {
+    const { GenomeManager } = await import('../../core/genome/index.ts');
+    const manager = GenomeManager.getInstance();
+
+    // Get all playbooks and their genomes
+    const allPlaybooks = playbookRegistry.getAll();
+    const playbookGenomes: {
+      playbook: string;
+      genomes: { genome_id: string; generation: number; status: string; fitness_score?: number; mutations: number }[];
+      best_fitness?: number;
+    }[] = [];
+
+    for (const pb of allPlaybooks) {
+      try {
+        const genomes = manager.getGenomes(pb.id);
+        if (genomes.length > 0) {
+          const best = manager.getBestGenome(pb.id);
+          playbookGenomes.push({
+            playbook: pb.id,
+            genomes: genomes.map((g) => ({
+              genome_id: g.genome_id,
+              generation: g.generation,
+              status: g.status,
+              fitness_score: g.fitness_score,
+              mutations: g.mutations_from_parent.length,
+            })),
+            best_fitness: best?.fitness_score,
+          });
+        }
+      } catch {
+        // Skip playbooks that fail genome lookup
+      }
+    }
+
+    // Get active experiments
+    let experiments: { experiment_id: string; name: string; status: string; symbol: string; winner: string; control_trades: number; variant_trades: number }[] = [];
+    try {
+      const active = manager.getActiveExperiments();
+      experiments = active.map((exp) => ({
+        experiment_id: exp.experiment_id,
+        name: exp.name,
+        status: exp.status,
+        symbol: exp.symbol,
+        winner: exp.winner,
+        control_trades: exp.control_trades,
+        variant_trades: exp.variant_trades,
+      }));
+    } catch {
+      // Experiment lookup may fail
+    }
+
+    if (playbookGenomes.length === 0 && experiments.length === 0) {
+      return {
+        success: true,
+        message: 'No genome variants or experiments found.\n\nUse the genome tools to fork and evolve playbooks.',
+      };
+    }
+
+    return {
+      success: true,
+      message: `${playbookGenomes.length} playbook(s) with genomes, ${experiments.length} active experiment(s)`,
+      data: {
+        playbookGenomes,
+        experiments,
+      },
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: `Failed to get evolution status: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
+}
+
+// ============================================================================
 // Command Router
 // ============================================================================
 
@@ -418,6 +680,23 @@ export async function handleStrategyCommand(args: string): Promise<string> {
       result = await strategyInfo(subArgs[0] || '');
       break;
 
+    case 'playbooks':
+    case 'pb':
+      result = await strategyPlaybooks();
+      break;
+
+    case 'running':
+    case 'active':
+    case 'slots':
+      result = await strategyRunning();
+      break;
+
+    case 'evolving':
+    case 'evolution':
+    case 'genomes':
+      result = await strategyEvolving();
+      break;
+
     case 'generate':
     case 'gen':
     case 'create':
@@ -440,9 +719,12 @@ export async function handleStrategyCommand(args: string): Promise<string> {
       result = {
         success: true,
         message: `Strategy Management Commands:
-  /strategies                       - List all strategies
-  /strategy list                    - List all strategies
+  /strategies                       - List all strategies + playbooks
+  /strategy list                    - List all strategies + playbooks
   /strategy info <id>               - Show strategy details
+  /strategy playbooks               - List playbooks with validation & backtest status
+  /strategy running                 - Show active strategy slots
+  /strategy evolving                - Show genome variants and experiments
   /strategy generate <description>  - Generate from natural language
   /strategy backtest <id> [symbol]  - Quick backtest a strategy
   /strategy compare <id1> <id2>     - Compare two strategies
@@ -454,6 +736,9 @@ Aliases:
 Examples:
   /strategies
   /strategy info sma_crossover
+  /strategy playbooks
+  /strategy running
+  /strategy evolving
   /gen buy when RSI is oversold near support
   /strategy backtest ema_rsi_crossover ETHUSDT
   /strategy compare sma_crossover bollinger_bounce`,
@@ -520,6 +805,12 @@ function formatStrategyResult(result: StrategyCommandResult): string {
         riskLevel: string;
         backtestReturn?: number;
       }>;
+      const playbooks = data.playbooks as Array<{
+        id: string;
+        tier: number;
+        riskLevel: string;
+        description: string;
+      }> | undefined;
 
       if (builtIn?.tier1?.length) {
         lines.push('');
@@ -546,6 +837,135 @@ function formatStrategyResult(result: StrategyCommandResult): string {
               ? ` (${s.backtestReturn > 0 ? '+' : ''}${s.backtestReturn.toFixed(1)}%)`
               : '';
           lines.push(`  ${s.id}: ${s.name} [${s.riskLevel}]${returnStr}`);
+        }
+      }
+
+      if (playbooks && playbooks.length > 0) {
+        lines.push('');
+        lines.push('Playbooks (v0.7):');
+        for (const pb of playbooks) {
+          const tierLabel = `Tier ${pb.tier}`;
+          const risk = pb.riskLevel.charAt(0).toUpperCase() + pb.riskLevel.slice(1);
+          lines.push(`  ${pb.id.padEnd(25)} ${tierLabel}  ${risk.padEnd(8)} ${pb.description}`);
+        }
+        lines.push('');
+        lines.push('Use /deploy <name> to activate a playbook as a live strategy.');
+      }
+    }
+
+    // Playbooks list (from /strategies playbooks)
+    if (data.playbooks && data.totalPlaybooks !== undefined && !data.builtIn) {
+      const pbs = data.playbooks as Array<{
+        id: string;
+        name: string;
+        tier: number;
+        riskLevel: string;
+        description: string;
+        timeframes: string[];
+        tags: string[];
+        validationStatus: string;
+        warningCount: number;
+        lastBacktest: { total_return: number; sharpe_ratio: number } | null;
+      }>;
+
+      for (const pb of pbs) {
+        lines.push('');
+        lines.push(`  ${pb.id} (${pb.name})`);
+        lines.push(`    Tier: ${pb.tier}  |  Risk: ${pb.riskLevel}  |  Timeframes: ${pb.timeframes.join(', ')}`);
+        lines.push(`    Tags: ${pb.tags.join(', ') || 'none'}`);
+        lines.push(`    Protocol: ${pb.validationStatus}${pb.warningCount > 0 ? ` (${pb.warningCount} warnings)` : ''}`);
+        if (pb.lastBacktest) {
+          const retSign = pb.lastBacktest.total_return > 0 ? '+' : '';
+          lines.push(`    Last Backtest: ${retSign}${pb.lastBacktest.total_return.toFixed(1)}% return, Sharpe: ${pb.lastBacktest.sharpe_ratio.toFixed(2)}`);
+        } else {
+          lines.push('    Last Backtest: none');
+        }
+        lines.push(`    ${pb.description}`);
+      }
+    }
+
+    // Running slots (from /strategies running)
+    if (data.slots && data.portfolio) {
+      const slots = data.slots as Array<{
+        slot_id: string;
+        playbook: string;
+        status: string;
+        allocated: string;
+        used: string;
+        pnl: number;
+        trades: number;
+        winRate: string;
+        drawdown: number;
+        started: string;
+      }>;
+      const portfolio = data.portfolio as {
+        totalCapital: number;
+        allocatedCapital: number;
+        unallocatedCapital: number;
+        deployedCapital: number;
+        totalPnl: number;
+        drawdown: number;
+      };
+
+      lines.push('');
+      lines.push('Portfolio:');
+      lines.push(`  Total Capital:   $${portfolio.totalCapital.toFixed(2)}`);
+      lines.push(`  Allocated:       $${portfolio.allocatedCapital.toFixed(2)}`);
+      lines.push(`  Unallocated:     $${portfolio.unallocatedCapital.toFixed(2)}`);
+      lines.push(`  Total PnL:       $${portfolio.totalPnl.toFixed(2)}`);
+      lines.push(`  Drawdown:        ${portfolio.drawdown.toFixed(1)}%`);
+
+      lines.push('');
+      lines.push('Active Slots:');
+      lines.push('-'.repeat(80));
+      for (const slot of slots) {
+        const statusIcon = slot.status === 'active' ? '[ON]' : `[${slot.status.toUpperCase()}]`;
+        const pnlStr = `$${slot.pnl.toFixed(2)}`;
+        lines.push(
+          `  ${statusIcon} ${slot.playbook.padEnd(25)} | ${slot.allocated} | PnL: ${pnlStr} | Trades: ${slot.trades} | Win: ${slot.winRate}% | DD: ${slot.drawdown.toFixed(1)}%`
+        );
+      }
+    }
+
+    // Evolving genomes (from /strategies evolving)
+    if (data.playbookGenomes || data.experiments) {
+      const playbookGenomes = (data.playbookGenomes || []) as Array<{
+        playbook: string;
+        genomes: Array<{ genome_id: string; generation: number; status: string; fitness_score?: number; mutations: number }>;
+        best_fitness?: number;
+      }>;
+      const experiments = (data.experiments || []) as Array<{
+        experiment_id: string;
+        name: string;
+        status: string;
+        symbol: string;
+        winner: string;
+        control_trades: number;
+        variant_trades: number;
+      }>;
+
+      if (playbookGenomes.length > 0) {
+        lines.push('');
+        lines.push('Genome Variants:');
+        lines.push('-'.repeat(80));
+        for (const pg of playbookGenomes) {
+          const bestStr = pg.best_fitness !== undefined ? ` (best fitness: ${pg.best_fitness.toFixed(1)})` : '';
+          lines.push(`  ${pg.playbook}: ${pg.genomes.length} variant(s)${bestStr}`);
+          for (const g of pg.genomes) {
+            const fitnessStr = g.fitness_score !== undefined ? ` fitness: ${g.fitness_score.toFixed(1)}` : '';
+            const mutStr = g.mutations > 0 ? ` [${g.mutations} mutations]` : '';
+            lines.push(`    Gen ${g.generation}: ${g.status}${fitnessStr}${mutStr}`);
+          }
+        }
+      }
+
+      if (experiments.length > 0) {
+        lines.push('');
+        lines.push('Active Experiments:');
+        lines.push('-'.repeat(80));
+        for (const exp of experiments) {
+          lines.push(`  ${exp.name} (${exp.symbol})`);
+          lines.push(`    Status: ${exp.status} | Winner: ${exp.winner} | Control: ${exp.control_trades} trades | Variant: ${exp.variant_trades} trades`);
         }
       }
     }

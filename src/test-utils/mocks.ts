@@ -187,6 +187,19 @@ export function createMockConfig(overrides: Partial<GordonConfig> = {}): GordonC
     onboardingComplete: false,
     useKeyring: false,
     telemetry: { enabled: false, researchData: false },
+    riskManagement: {
+      mode: "enforce",
+      maxDailyLossPercent: 3,
+      maxDrawdownPercent: 15,
+      maxPositionSizePercent: 10,
+      maxPositions: 5,
+    },
+    strategyRuntime: {
+      allocationStrategy: "equal_weight",
+    },
+    regimeDetection: {
+      autoRegime: true,
+    },
     ...overrides,
   };
 }

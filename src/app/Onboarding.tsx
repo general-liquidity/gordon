@@ -3,9 +3,9 @@ import { Box, Text, useInput } from "ink";
 import { Select } from "@inkjs/ui";
 import { COLORS } from "./theme.ts";
 
-type OnboardingStep = "welcome" | "how-it-works" | "strategies" | "safety" | "get-started";
+type OnboardingStep = "welcome" | "how-it-works" | "strategies" | "smart-strategies" | "safety" | "get-started";
 
-const STEPS: OnboardingStep[] = ["welcome", "how-it-works", "strategies", "safety", "get-started"];
+const STEPS: OnboardingStep[] = ["welcome", "how-it-works", "strategies", "smart-strategies", "safety", "get-started"];
 
 interface OnboardingProps {
   onComplete: (options: { setupApiKeys: boolean; demoMode: boolean }) => void;
@@ -170,6 +170,34 @@ function StrategiesStep(): React.ReactElement {
         </Box>
       </Box>
 
+      <Box flexDirection="column" marginBottom={1}>
+        <Text color={COLORS.DIM} bold>Playbooks (v0.7):</Text>
+        <Box paddingLeft={2} flexDirection="column">
+          <Text color={COLORS.DIM}>
+            Gordon also supports <Text color={COLORS.WHITE}>Playbooks</Text> — formal, machine-readable trading strategies:
+          </Text>
+          <Box paddingLeft={2} flexDirection="column" marginTop={1}>
+            <Box>
+              <Box width={22}><Text color={COLORS.WHITE}>momentum-breakout</Text></Box>
+              <Text color={COLORS.DIM}>Breakout with volume confirmation</Text>
+            </Box>
+            <Box>
+              <Box width={22}><Text color={COLORS.WHITE}>mean-reversion</Text></Box>
+              <Text color={COLORS.DIM}>RSI bounce at support levels</Text>
+            </Box>
+            <Box>
+              <Box width={22}><Text color={COLORS.WHITE}>trend-following</Text></Box>
+              <Text color={COLORS.DIM}>EMA crossover trend following</Text>
+            </Box>
+          </Box>
+          <Box marginTop={1}>
+            <Text color={COLORS.DIM}>
+              Playbooks can be backtested, deployed as live strategies, and evolved over time.
+            </Text>
+          </Box>
+        </Box>
+      </Box>
+
       <Box marginTop={1}>
         <Text color={COLORS.DIM}>
           Type <Text color={COLORS.HIGHLIGHT}>/strategies</Text> anytime to see all strategies,
@@ -178,6 +206,69 @@ function StrategiesStep(): React.ReactElement {
       <Box>
         <Text color={COLORS.DIM}>
           or <Text color={COLORS.HIGHLIGHT}>/strategy support_bounce</Text> for details.
+        </Text>
+      </Box>
+    </Box>
+  );
+}
+
+function SmartStrategiesStep(): React.ReactElement {
+  return (
+    <Box flexDirection="column">
+      <Box marginBottom={1}>
+        <Text color={COLORS.ACCENT} bold>
+          Smart Strategy Management
+        </Text>
+      </Box>
+
+      <Box marginBottom={1}>
+        <Text color={COLORS.WHITE}>
+          Gordon doesn't just run strategies — he <Text color={COLORS.HIGHLIGHT} bold>manages</Text> them intelligently:
+        </Text>
+      </Box>
+
+      <Box flexDirection="column" paddingLeft={2}>
+        <Box marginBottom={1} flexDirection="column">
+          <Text color={COLORS.WHITE} bold>Market Regime Detection</Text>
+          <Box paddingLeft={2}>
+            <Text color={COLORS.DIM}>
+              Classifies conditions (trending, ranging, volatile, quiet) and automatically matches the right playbook.
+            </Text>
+          </Box>
+        </Box>
+
+        <Box marginBottom={1} flexDirection="column">
+          <Text color={COLORS.WHITE} bold>Strategy Runtime</Text>
+          <Box paddingLeft={2}>
+            <Text color={COLORS.DIM}>
+              Run multiple strategies simultaneously with portfolio-level risk management and capital allocation.
+            </Text>
+          </Box>
+        </Box>
+
+        <Box marginBottom={1} flexDirection="column">
+          <Text color={COLORS.WHITE} bold>Strategy Evolution</Text>
+          <Box paddingLeft={2}>
+            <Text color={COLORS.DIM}>
+              Fork, mutate, and A/B test playbook variants — keeping what works, deprecating what doesn't.
+            </Text>
+          </Box>
+        </Box>
+
+        <Box flexDirection="column">
+          <Text color={COLORS.WHITE} bold>Audit Trail</Text>
+          <Box paddingLeft={2}>
+            <Text color={COLORS.DIM}>
+              Every decision is traced from trigger to outcome — ask "why did you buy X?" and get a complete answer.
+            </Text>
+          </Box>
+        </Box>
+      </Box>
+
+      <Box marginTop={1}>
+        <Text color={COLORS.DIM}>
+          Type <Text color={COLORS.HIGHLIGHT}>/strategies-live</Text> to view running strategies,
+          or <Text color={COLORS.HIGHLIGHT}>/regime</Text> to check market conditions.
         </Text>
       </Box>
     </Box>
@@ -331,6 +422,8 @@ export function Onboarding({ onComplete }: OnboardingProps): React.ReactElement 
         return <HowItWorksStep />;
       case "strategies":
         return <StrategiesStep />;
+      case "smart-strategies":
+        return <SmartStrategiesStep />;
       case "safety":
         return <SafetyStep />;
       case "get-started":

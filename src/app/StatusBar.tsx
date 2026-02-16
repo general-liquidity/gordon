@@ -5,6 +5,7 @@ import type { Mode } from "../types/index.ts";
 import { COLORS } from "./theme.ts";
 import { TradingModeIndicator, ConnectionStatus, StatusBadge } from "./components/VisualStatus.tsx";
 import { TickerTape, type TickerItem } from "./components/effects/index.ts";
+import { StrategyRuntime } from "../core/runtime/index.ts";
 
 type ConnectionStatusType = "connected" | "disconnected" | "connecting";
 
@@ -50,6 +51,15 @@ export const StatusBar: React.FC<StatusBarProps> = ({
     });
   };
 
+  // Get active strategy count (safe — runtime may not be initialized)
+  let activeStrategies = 0;
+  try {
+    const runtime = StrategyRuntime.getInstance();
+    activeStrategies = runtime.getActiveSlots().length;
+  } catch {
+    /* runtime not initialized */
+  }
+
   // Format BTC price
   const formatBtcPrice = (price: number | undefined): string => {
     if (price === undefined) return "---";
@@ -81,6 +91,9 @@ export const StatusBar: React.FC<StatusBarProps> = ({
             mode={mode}
             animate={true}
           />
+          {activeStrategies > 0 && (
+            <Text color={COLORS.DIM}>[<Text color={COLORS.ACCENT_DIM}>{activeStrategies} active</Text>]</Text>
+          )}
         </Box>
 
         {/* BTC Price */}

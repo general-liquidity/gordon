@@ -93,6 +93,41 @@ export const TelemetryConfigSchema = z.object({
   researchData: z.boolean().default(false),
 });
 
+/**
+ * Risk management configuration (v0.7)
+ * Persisted overrides for the Risk Kernel defaults
+ */
+export const RiskManagementConfigSchema = z.object({
+  /** Behavior mode: enforce blocks trades, warn allows with warning, paper simulates */
+  mode: z.enum(["enforce", "warn", "paper"]).default("enforce"),
+  /** Maximum daily loss as a percentage (0-100) */
+  maxDailyLossPercent: z.number().min(0).max(100).default(3),
+  /** Maximum portfolio drawdown before trading halts (0-100) */
+  maxDrawdownPercent: z.number().min(0).max(100).default(15),
+  /** Maximum single position size as a percentage of portfolio (0-100) */
+  maxPositionSizePercent: z.number().min(0).max(100).default(10),
+  /** Maximum number of open positions */
+  maxPositions: z.number().int().min(1).max(100).default(5),
+});
+
+/**
+ * Strategy runtime configuration (v0.7)
+ * Persisted settings for the composable strategy runtime
+ */
+export const StrategyRuntimeConfigSchema = z.object({
+  /** Capital allocation strategy across active slots */
+  allocationStrategy: z.enum(["equal_weight", "risk_parity", "performance", "fixed"]).default("equal_weight"),
+});
+
+/**
+ * Regime detection configuration (v0.7)
+ * Controls automatic market regime matching for playbooks
+ */
+export const RegimeDetectionConfigSchema = z.object({
+  /** Whether automatic regime matching is enabled */
+  autoRegime: z.boolean().default(true),
+});
+
 export const GordonConfigSchema = z.object({
   version: z.string().default("1.0.0"),
   /** @deprecated Use `exchanges` array instead */
@@ -123,6 +158,22 @@ export const GordonConfigSchema = z.object({
   mcpServers: z.array(MCPServerConfigSchema).default([]),
   /** Anonymous telemetry configuration (strict opt-in) */
   telemetry: TelemetryConfigSchema.default({ enabled: false, researchData: false }),
+  /** Risk management configuration (v0.7) */
+  riskManagement: RiskManagementConfigSchema.default({
+    mode: "enforce",
+    maxDailyLossPercent: 3,
+    maxDrawdownPercent: 15,
+    maxPositionSizePercent: 10,
+    maxPositions: 5,
+  }),
+  /** Strategy runtime configuration (v0.7) */
+  strategyRuntime: StrategyRuntimeConfigSchema.default({
+    allocationStrategy: "equal_weight",
+  }),
+  /** Regime detection configuration (v0.7) */
+  regimeDetection: RegimeDetectionConfigSchema.default({
+    autoRegime: true,
+  }),
 });
 
 export type ExchangePermissions = z.infer<typeof ExchangePermissionsSchema>;
@@ -136,5 +187,8 @@ export type ModelConfig = z.infer<typeof ModelConfigSchema>;
 export type MemoryConfig = z.infer<typeof MemoryConfigSchema>;
 export type MCPServerConfig = z.infer<typeof MCPServerConfigSchema>;
 export type TelemetryConfig = z.infer<typeof TelemetryConfigSchema>;
+export type RiskManagementConfig = z.infer<typeof RiskManagementConfigSchema>;
+export type StrategyRuntimeConfig = z.infer<typeof StrategyRuntimeConfigSchema>;
+export type RegimeDetectionConfig = z.infer<typeof RegimeDetectionConfigSchema>;
 export type GordonConfig = z.infer<typeof GordonConfigSchema>;
 export type Mode = GordonConfig["mode"];

@@ -10,6 +10,8 @@ export type MenuOption =
   | "portfolio"
   | "trending"
   | "analyze"
+  | "strategies-live"
+  | "regime"
   | "setup"
   | "help";
 
@@ -28,6 +30,8 @@ export const QuickStartMenu: React.FC<QuickStartMenuProps> = ({
     { label: "View portfolio", value: "portfolio" as MenuOption },
     { label: "Trending tokens", value: "trending" as MenuOption },
     { label: "Deep analysis", value: "analyze" as MenuOption },
+    { label: "Strategy Dashboard", value: "strategies-live" as MenuOption },
+    { label: "Market Regime", value: "regime" as MenuOption },
     { label: "Settings & API keys", value: "setup" as MenuOption },
     { label: "Help & commands", value: "help" as MenuOption },
   ];
