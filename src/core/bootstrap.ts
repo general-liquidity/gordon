@@ -23,6 +23,10 @@ import {
   type PlaybookRegistry,
 } from "./playbooks/index.ts";
 import { getPositionStore, type PositionStore } from "./positions/index.ts";
+import { initAuditTables } from "./audit/index.ts";
+import { initPlaybookBacktestTable } from "./backtesting/index.ts";
+import { initRuntimeTables } from "./runtime/index.ts";
+import { getDatabase } from "../infra/storage/index.ts";
 import { getEventBus } from "../events/index.ts";
 import {
   getSubscriptionRegistry,
@@ -161,6 +165,58 @@ export async function bootstrapV07(): Promise<BootstrapResult> {
       err instanceof Error ? err : new Error(String(err))
     );
   }
+
+  // ------------------------------------------------------------------
+  // 6. Audit Chain Tables
+  // ------------------------------------------------------------------
+  try {
+    initAuditTables();
+    logger.info("Audit chain tables initialized", {
+      elapsed: `${Date.now() - start}ms`,
+    });
+  } catch (err) {
+    logger.error(
+      "Failed to initialize audit chain tables",
+      err instanceof Error ? err : new Error(String(err))
+    );
+  }
+
+  // ------------------------------------------------------------------
+  // 7. Playbook Backtest Tables
+  // ------------------------------------------------------------------
+  try {
+    initPlaybookBacktestTable();
+    logger.info("Playbook backtest tables initialized", {
+      elapsed: `${Date.now() - start}ms`,
+    });
+  } catch (err) {
+    logger.error(
+      "Failed to initialize playbook backtest tables",
+      err instanceof Error ? err : new Error(String(err))
+    );
+  }
+
+  // ------------------------------------------------------------------
+  // 8. Strategy Runtime Tables
+  // ------------------------------------------------------------------
+  try {
+    const db = getDatabase();
+    initRuntimeTables(db);
+    logger.info("Strategy runtime tables initialized", {
+      elapsed: `${Date.now() - start}ms`,
+    });
+  } catch (err) {
+    logger.error(
+      "Failed to initialize strategy runtime tables",
+      err instanceof Error ? err : new Error(String(err))
+    );
+  }
+
+  // ------------------------------------------------------------------
+  // 9. Regime Detector (singleton, lazy-init — no tables needed)
+  // ------------------------------------------------------------------
+  // The RegimeDetector is a pure-computation singleton that initializes
+  // on first use. No database tables to create.
 
   // ------------------------------------------------------------------
   // Done

@@ -706,6 +706,40 @@ const TOOL_AGENT_MAP: Record<string, string> = {
   search_playbooks: "Scanner",
   get_playbook_for_agent: "Scanner",
 
+  // ---- Playbook Backtest tools (v0.7) ----
+  backtest_playbook: "Backtester",
+  get_backtest_results: "Backtester",
+  get_best_strategy: "Backtester",
+
+  // ---- Audit tools (v0.7) ----
+  query_audit_trail: "Monitor",
+  get_decision_path: "Monitor",
+  get_agent_activity: "Monitor",
+  get_audit_stats: "Monitor",
+
+  // ---- Regime tools (v0.7) ----
+  detect_market_regime: "Scanner",
+  get_regime_history: "Scanner",
+  match_playbooks_to_regime: "Scanner",
+  multi_timeframe_regime: "Scanner",
+
+  // ---- Protocol tools (v0.7) ----
+  validate_playbook: "Analyst",
+  export_playbook: "Analyst",
+  import_playbook: "Analyst",
+  compare_playbooks: "Analyst",
+
+  // ---- Runtime tools (v0.7) ----
+  deploy_strategy: "Planner",
+  list_running_strategies: "Planner",
+  pause_strategy: "Planner",
+  resume_strategy: "Planner",
+  stop_strategy: "Planner",
+  get_portfolio_state: "Monitor",
+  rebalance_portfolio: "Planner",
+  check_portfolio_health: "Monitor",
+  approve_strategy_trade: "Executor",
+
   // ---- Cross-cutting tools (NOT mapped to any agent) ----
   // sharedContextTools and systemTools are used by ALL agents.
   // Mapping them to "Gordon" causes spurious self-handoff detections,

@@ -63,6 +63,10 @@ import {
   memoryTools,
   playbookTools,
   playbookBacktestTools,
+  auditTools,
+  protocolTools,
+  regimeTools,
+  runtimeTools,
   withToolsMetrics,
 } from "./tools/index.ts";
 import { getSessionSummary, getMemoryStats, resetSharedMemory } from "./shared-context.ts";
@@ -300,6 +304,10 @@ const instrumentedPositionTrackingTools = withToolsMetrics(positionTrackingTools
 const instrumentedMemoryTools = withToolsMetrics(memoryTools);
 const instrumentedPlaybookTools = withToolsMetrics(playbookTools);
 const instrumentedPlaybookBacktestTools = withToolsMetrics(playbookBacktestTools);
+const instrumentedAuditTools = withToolsMetrics(auditTools);
+const instrumentedProtocolTools = withToolsMetrics(protocolTools);
+const instrumentedRegimeTools = withToolsMetrics(regimeTools);
+const instrumentedRuntimeTools = withToolsMetrics(runtimeTools);
 const instrumentedCheckRiskTool = withToolsMetrics({ check_risk: checkRiskTool });
 
 // ============================================================================
@@ -526,6 +534,12 @@ When you detect a strong setup, create a position record so other agents can tra
 - **search_playbooks**: Find playbooks matching current market conditions
 - Check playbook triggers to prioritize your scanning
 
+## Market Regime Detection
+- **detect_market_regime**: Classify current market as trending, ranging, volatile, quiet, or breakout
+- **multi_timeframe_regime**: Compare hourly vs daily regime for timeframe alignment
+- **match_playbooks_to_regime**: Find playbooks suited to the current regime
+- **get_regime_history**: See how the regime has changed over time
+
 ## Response Style
 - Execute tool calls immediately with default parameters. Do NOT ask clarifying questions about scope, timeframe, or exchanges — just show results.
 - If the user wants something different, they will tell you.`;
@@ -626,7 +640,15 @@ When you complete analysis on a position created by Scanner:
 
 ## Playbooks
 - **get_playbook_for_agent**: Get analyst-specific validation/invalidation criteria
-- Apply playbook criteria when validating setups`;
+- Apply playbook criteria when validating setups
+
+## Market Regime Awareness
+- **detect_market_regime**: Understand current market conditions before deep analysis
+- Use regime context to calibrate confidence levels (e.g., ranging markets = lower trend confidence)
+
+## Playbook Protocol
+- **validate_playbook**: Check a playbook's quality and compliance with the protocol
+- **compare_playbooks**: Side-by-side comparison of two playbooks' parameters`;
 
 const PLANNER_INSTRUCTIONS = `You are Gordon's trading planner agent.
 
@@ -700,7 +722,16 @@ Before finalizing any plan:
 
 ## Playbooks
 - **get_playbook_for_agent**: Get planner-specific execution rules (entry, stop, target, sizing)
-- Apply playbook position sizing and R:R rules to your plans`;
+- Apply playbook position sizing and R:R rules to your plans
+
+## Playbook Protocol
+- **validate_playbook**: Validate a playbook before deploying it as a strategy
+
+## Strategy Runtime
+- **deploy_strategy**: Activate a playbook as a running strategy with allocated capital
+- **list_running_strategies**: See all active strategy slots and their performance
+- **pause_strategy** / **resume_strategy** / **stop_strategy**: Manage active strategy lifecycle
+- **rebalance_portfolio**: Optimize capital allocation across running strategies`;
 
 const EXECUTOR_INSTRUCTIONS = `You are Gordon's trade executor agent.
 
@@ -755,7 +786,11 @@ Before placing any order, the risk kernel validates it:
 ## Position Tracking
 After order execution:
 - Use **list_active_positions** to see tracked positions
-- Use **get_position_detail** to check a specific position's state`;
+- Use **get_position_detail** to check a specific position's state
+
+## Runtime Trade Approval
+- Before placing orders for a strategy slot, call **approve_strategy_trade** to verify the trade is allowed by the portfolio runtime (capital limits, exposure, drawdown)
+- If approval is denied, inform the user with the reasons and do NOT proceed`;
 
 const MONITOR_INSTRUCTIONS = `You are Gordon's position monitor agent.
 
@@ -811,7 +846,17 @@ You have direct access to the position state machine:
 - **list_active_positions**: See all tracked positions and their current state
 - **get_position_detail**: Full detail on a specific position
 - **update_position_live**: Update current price and unrealized PnL on active positions
-- Periodically update live data on monitoring-state positions`;
+- Periodically update live data on monitoring-state positions
+
+## Agent Audit Chain
+- **query_audit_trail**: Search past agent decisions by agent, outcome, position, or time range
+- **get_decision_path**: Inspect the full decision chain for a specific trace or position
+- **get_agent_activity**: Review what a specific agent has been doing recently
+- **get_audit_stats**: Summary statistics across all agent decisions
+
+## Portfolio Runtime Health
+- **check_portfolio_health**: Run health checks across all strategy slots and the portfolio
+- **get_portfolio_state**: Get full portfolio view with risk metrics and capital allocation`;
 
 const TEACHER_INSTRUCTIONS = `You are Gordon's teacher agent.
 
@@ -852,7 +897,11 @@ After a trade closes, review it for learning:
 ## Playbooks
 - **list_playbooks**: Show available trading strategies
 - **get_playbook**: Explain a specific playbook in detail
-- Use playbooks as teaching material for trading concepts`;
+- Use playbooks as teaching material for trading concepts
+
+## Audit-Based Learning
+- **query_audit_trail**: Review past decisions to find real examples for teaching
+- **get_decision_path**: Walk through a specific decision chain to explain what happened and why`;
 
 const BACKTESTER_INSTRUCTIONS = `You are Gordon's backtesting specialist agent.
 
@@ -959,6 +1008,10 @@ When the user asks for analysis, scanning, planning, backtesting, or execution �
 - Risk pre-checks on all orders -> Planner and Executor (automatic)
 - Trade memory, lessons learned, market observations -> all agents via persistent memory
 - Strategy playbooks (trigger, analysis, execution, management rules) -> Scanner, Analyst, Planner, Teacher
+- Strategy Runtime — deploy and manage multiple concurrent strategies with portfolio-level risk -> Planner
+- Market Regime Detection — classify market conditions and match strategies -> Scanner and Analyst
+- Agent Audit Chain — trace and review all agent decisions -> Monitor and Teacher
+- Playbook Protocol — validate, export, import, and compare strategy playbooks -> Analyst and Planner
 
 ## Autonomous Trading
 You have tools for autonomous swing trading mandates:
@@ -1048,6 +1101,8 @@ function getScannerAgent(): Agent {
         ...instrumentedMemoryTools,
         // Playbook tools (v0.7)
         ...instrumentedPlaybookTools,
+        // Regime detection tools (v0.7)
+        ...instrumentedRegimeTools,
       },
       memory: createSubAgentMemory(),
       inputProcessors: [new TokenLimiterProcessor({ limit: 32000 })],
@@ -1119,6 +1174,11 @@ function getAnalystAgent(): Agent {
         ...instrumentedMemoryTools,
         // Playbook tools (v0.7)
         ...instrumentedPlaybookTools,
+        // Regime detection tools (v0.7)
+        detect_market_regime: instrumentedRegimeTools.detect_market_regime,
+        get_regime_history: instrumentedRegimeTools.get_regime_history,
+        // Protocol tools (v0.7)
+        ...instrumentedProtocolTools,
       },
       memory: createSubAgentMemory(),
       inputProcessors: [new TokenLimiterProcessor({ limit: 32000 })],
@@ -1171,6 +1231,15 @@ function getPlannerAgent(): Agent {
         ...instrumentedMemoryTools,
         // Playbook tools (v0.7)
         ...instrumentedPlaybookTools,
+        // Protocol tools (v0.7) — validate before deploying
+        validate_playbook: instrumentedProtocolTools.validate_playbook,
+        // Runtime tools (v0.7) — deploy and manage strategy slots
+        deploy_strategy: instrumentedRuntimeTools.deploy_strategy,
+        list_running_strategies: instrumentedRuntimeTools.list_running_strategies,
+        pause_strategy: instrumentedRuntimeTools.pause_strategy,
+        resume_strategy: instrumentedRuntimeTools.resume_strategy,
+        stop_strategy: instrumentedRuntimeTools.stop_strategy,
+        rebalance_portfolio: instrumentedRuntimeTools.rebalance_portfolio,
       },
       memory: createSubAgentMemory(),
       inputProcessors: [new TokenLimiterProcessor({ limit: 32000 })],
@@ -1238,6 +1307,8 @@ function getExecutorAgent(): Agent {
         get_position_detail: instrumentedPositionTrackingTools.get_position_detail,
         // Memory tools (search only) (v0.7)
         search_memory: instrumentedMemoryTools.search_memory,
+        // Runtime tools (v0.7) — trade approval
+        approve_strategy_trade: instrumentedRuntimeTools.approve_strategy_trade,
       },
       memory: createSubAgentMemory(),
       inputProcessors: [new TokenLimiterProcessor({ limit: 32000 })],
@@ -1295,6 +1366,11 @@ function getMonitorAgent(): Agent {
         update_position_live: instrumentedPositionTrackingTools.update_position_live,
         // Memory tools (v0.7)
         ...instrumentedMemoryTools,
+        // Audit tools (v0.7) — decision traceability
+        ...instrumentedAuditTools,
+        // Runtime tools (v0.7) — portfolio health and state
+        get_portfolio_state: instrumentedRuntimeTools.get_portfolio_state,
+        check_portfolio_health: instrumentedRuntimeTools.check_portfolio_health,
       },
       memory: createSubAgentMemory(),
       inputProcessors: [new TokenLimiterProcessor({ limit: 32000 })],
@@ -1330,6 +1406,9 @@ function getTeacherAgent(): Agent {
         ...instrumentedMemoryTools,
         // Playbook tools (v0.7)
         ...instrumentedPlaybookTools,
+        // Audit tools (v0.7) — learn from past decisions
+        query_audit_trail: instrumentedAuditTools.query_audit_trail,
+        get_decision_path: instrumentedAuditTools.get_decision_path,
       },
       memory: createSubAgentMemory(),
       inputProcessors: [new TokenLimiterProcessor({ limit: 32000 })],
