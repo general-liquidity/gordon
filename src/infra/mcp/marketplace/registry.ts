@@ -18,7 +18,7 @@ import type {
 
 /** Default URL for the marketplace registry */
 const REGISTRY_URL =
-  'https://raw.githubusercontent.com/gordon-cli/mcp-marketplace/main/registry.json';
+  'https://raw.githubusercontent.com/general-liquidity/gordon-mcp-marketplace/master/registry.json';
 
 /** Default cache TTL (1 hour) */
 const DEFAULT_CACHE_TTL = 3600000;
