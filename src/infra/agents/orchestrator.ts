@@ -678,6 +678,34 @@ const TOOL_AGENT_MAP: Record<string, string> = {
   save_backtest_result: "Backtester",
   load_backtest_result: "Backtester",
 
+  // ---- Position Tracking tools (v0.7) ----
+  report_setup: "Scanner",
+  report_analysis: "Analyst",
+  report_plan: "Planner",
+  approve_position: "Planner",
+  reject_position: "Planner",
+  list_active_positions: "Monitor",
+  get_position_detail: "Monitor",
+  update_position_live: "Monitor",
+  close_position_tracking: "Executor",
+  review_position: "Teacher",
+
+  // ---- Risk Gate tools (v0.7) ----
+  check_risk: "Planner",
+
+  // ---- Memory tools (v0.7) ----
+  search_memory: "Analyst",
+  record_observation: "Scanner",
+  record_insight: "Analyst",
+  get_lessons: "Teacher",
+  get_memory_context: "Analyst",
+
+  // ---- Playbook tools (v0.7) ----
+  list_playbooks: "Teacher",
+  get_playbook: "Teacher",
+  search_playbooks: "Scanner",
+  get_playbook_for_agent: "Scanner",
+
   // ---- Cross-cutting tools (NOT mapped to any agent) ----
   // sharedContextTools and systemTools are used by ALL agents.
   // Mapping them to "Gordon" causes spurious self-handoff detections,

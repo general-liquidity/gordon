@@ -58,6 +58,10 @@ import {
   agentKitDefiTools,
   baseSignalTools,
   baseIndexerTools,
+  positionTrackingTools,
+  checkRiskTool,
+  memoryTools,
+  playbookTools,
   withToolsMetrics,
 } from "./tools/index.ts";
 import { getSessionSummary, getMemoryStats, resetSharedMemory } from "./shared-context.ts";
@@ -291,6 +295,10 @@ const instrumentedAgentKitDefiTools = withToolsMetrics(agentKitDefiTools);
 const instrumentedBaseSignalTools = withToolsMetrics(baseSignalTools);
 const instrumentedBaseIndexerTools = withToolsMetrics(baseIndexerTools);
 const instrumentedEvalTools = withToolsMetrics(evalTools);
+const instrumentedPositionTrackingTools = withToolsMetrics(positionTrackingTools);
+const instrumentedMemoryTools = withToolsMetrics(memoryTools);
+const instrumentedPlaybookTools = withToolsMetrics(playbookTools);
+const instrumentedCheckRiskTool = withToolsMetrics({ check_risk: checkRiskTool });
 
 // ============================================================================
 // Memory Configuration (Required for Agent Networks)
@@ -933,6 +941,12 @@ function getScannerAgent(): Agent {
         // Base L2 DEX indexer tools (The Graph — top pools, Aerodrome)
         indexer_top_pools: instrumentedBaseIndexerTools.indexer_top_pools,
         indexer_aerodrome_pools: instrumentedBaseIndexerTools.indexer_aerodrome_pools,
+        // Position tracking (report setups) (v0.7)
+        report_setup: instrumentedPositionTrackingTools.report_setup,
+        // Memory tools (v0.7)
+        ...instrumentedMemoryTools,
+        // Playbook tools (v0.7)
+        ...instrumentedPlaybookTools,
       },
       memory: createSubAgentMemory(),
       inputProcessors: [new TokenLimiterProcessor({ limit: 32000 })],
@@ -998,6 +1012,12 @@ function getAnalystAgent(): Agent {
         get_performance_context: instrumentedEvalTools.get_performance_context,
         get_market_condition_performance: instrumentedEvalTools.get_market_condition_performance,
         get_learning_insights: instrumentedEvalTools.get_learning_insights,
+        // Position tracking (report analysis) (v0.7)
+        report_analysis: instrumentedPositionTrackingTools.report_analysis,
+        // Memory tools (v0.7)
+        ...instrumentedMemoryTools,
+        // Playbook tools (v0.7)
+        ...instrumentedPlaybookTools,
       },
       memory: createSubAgentMemory(),
       inputProcessors: [new TokenLimiterProcessor({ limit: 32000 })],
@@ -1042,6 +1062,14 @@ function getPlannerAgent(): Agent {
         get_performance_context: instrumentedEvalTools.get_performance_context,
         get_risk_reward_analysis: instrumentedEvalTools.get_risk_reward_analysis,
         track_recommendation: instrumentedEvalTools.track_recommendation,
+        // Position tracking (report plan) (v0.7)
+        report_plan: instrumentedPositionTrackingTools.report_plan,
+        // Risk pre-check (v0.7)
+        ...instrumentedCheckRiskTool,
+        // Memory tools (v0.7)
+        ...instrumentedMemoryTools,
+        // Playbook tools (v0.7)
+        ...instrumentedPlaybookTools,
       },
       memory: createSubAgentMemory(),
       inputProcessors: [new TokenLimiterProcessor({ limit: 32000 })],
@@ -1102,6 +1130,13 @@ function getExecutorAgent(): Agent {
         basenames_register: instrumentedAgentKitDefiTools.basenames_register,
         // Shared context for reading plan details and analysis before execution
         ...instrumentedSharedContextTools,
+        // Risk pre-check (v0.7)
+        ...instrumentedCheckRiskTool,
+        // Position tracking (ordering, filled, closed) (v0.7)
+        list_active_positions: instrumentedPositionTrackingTools.list_active_positions,
+        get_position_detail: instrumentedPositionTrackingTools.get_position_detail,
+        // Memory tools (search only) (v0.7)
+        search_memory: instrumentedMemoryTools.search_memory,
       },
       memory: createSubAgentMemory(),
       inputProcessors: [new TokenLimiterProcessor({ limit: 32000 })],
@@ -1153,6 +1188,12 @@ function getMonitorAgent(): Agent {
         get_performance_report: instrumentedEvalTools.get_performance_report,
         process_unrecorded_trades: instrumentedEvalTools.process_unrecorded_trades,
         get_win_rate_analysis: instrumentedEvalTools.get_win_rate_analysis,
+        // Position tracking (monitoring, live updates) (v0.7)
+        list_active_positions: instrumentedPositionTrackingTools.list_active_positions,
+        get_position_detail: instrumentedPositionTrackingTools.get_position_detail,
+        update_position_live: instrumentedPositionTrackingTools.update_position_live,
+        // Memory tools (v0.7)
+        ...instrumentedMemoryTools,
       },
       memory: createSubAgentMemory(),
       inputProcessors: [new TokenLimiterProcessor({ limit: 32000 })],
@@ -1180,6 +1221,14 @@ function getTeacherAgent(): Agent {
         strategy_explain: instrumentedStrategyGenerationTools.strategy_explain,
         // Shared context so Teacher can explain using real data from any agent
         ...instrumentedSharedContextTools,
+        // Position tracking (review) (v0.7)
+        review_position: instrumentedPositionTrackingTools.review_position,
+        list_active_positions: instrumentedPositionTrackingTools.list_active_positions,
+        get_position_detail: instrumentedPositionTrackingTools.get_position_detail,
+        // Memory tools (v0.7)
+        ...instrumentedMemoryTools,
+        // Playbook tools (v0.7)
+        ...instrumentedPlaybookTools,
       },
       memory: createSubAgentMemory(),
       inputProcessors: [new TokenLimiterProcessor({ limit: 32000 })],
@@ -1224,6 +1273,11 @@ function getBacktesterAgent(): Agent {
 
         // Shared context tools for cross-agent memory (Improvement #2)
         ...instrumentedSharedContextTools,
+        // Memory tools (search for past results) (v0.7)
+        search_memory: instrumentedMemoryTools.search_memory,
+        get_lessons: instrumentedMemoryTools.get_lessons,
+        // Playbook tools (v0.7)
+        ...instrumentedPlaybookTools,
       },
       memory: createSubAgentMemory(),
       inputProcessors: [new TokenLimiterProcessor({ limit: 32000 })],

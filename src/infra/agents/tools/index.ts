@@ -69,6 +69,18 @@ export { agentKitDefiTools } from "./agentkit-defi.ts";
 export { baseSignalTools } from "./base-signals.ts";
 export { baseIndexerTools } from "./base-indexers.ts";
 
+// Position tracking tools (v0.7)
+export { positionTrackingTools } from "./position-tracking.ts";
+
+// Risk gate tools (v0.7)
+export { checkRiskTool, evaluateOrderRisk } from "./risk-gate.ts";
+
+// Memory tools (v0.7)
+export { memoryTools } from "./memory-tools.ts";
+
+// Playbook tools (v0.7)
+export { playbookTools } from "./playbook-tools.ts";
+
 // Multi-modal chart tools (image generation and vision analysis)
 export { multiModalChartTools } from "../../tools/chartTools.ts";
 
@@ -266,6 +278,10 @@ import { agentKitOnchainTools } from "./agentkit-onchain.ts";
 import { agentKitDefiTools } from "./agentkit-defi.ts";
 import { baseSignalTools } from "./base-signals.ts";
 import { baseIndexerTools } from "./base-indexers.ts";
+import { positionTrackingTools } from "./position-tracking.ts";
+import { checkRiskTool } from "./risk-gate.ts";
+import { memoryTools } from "./memory-tools.ts";
+import { playbookTools } from "./playbook-tools.ts";
 import { multiModalChartTools } from "../../tools/chartTools.ts";
 import { evalTools } from "../../evals/tools.ts";
 
@@ -306,6 +322,10 @@ export const allTools = {
   ...baseIndexerTools,
   ...multiModalChartTools,
   ...evalTools,
+  ...positionTrackingTools,
+  check_risk: checkRiskTool,
+  ...memoryTools,
+  ...playbookTools,
 };
 
 /**
@@ -345,6 +365,10 @@ export const toolCounts = {
   baseIndexers: Object.keys(baseIndexerTools).length,
   multiModalCharts: Object.keys(multiModalChartTools).length,
   evals: Object.keys(evalTools).length,
+  positionTracking: Object.keys(positionTrackingTools).length,
+  riskGate: 1, // checkRiskTool
+  memory: Object.keys(memoryTools).length,
+  playbook: Object.keys(playbookTools).length,
   total: Object.keys(allTools).length,
 };
 
