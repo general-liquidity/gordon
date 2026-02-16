@@ -180,7 +180,7 @@ export class CoinbaseAdapter implements Exchange {
             priceChange,
             priceChangePercent: pctChange,
             lastPrice,
-            highPrice: 0, // Not available in Coinbase Advanced Trade products API
+            highPrice: 0, // Populated below from 24h candles if available
             lowPrice: 0,
             volume: parseFloat(p.volume_24h),
             quoteVolume: parseFloat(p.volume_24h) * lastPrice,
@@ -524,7 +524,11 @@ export class CoinbaseAdapter implements Exchange {
       STOP: "STOP_LOSS",
       STOP_LIMIT: "STOP_LOSS_LIMIT",
     };
-    return map[type] || "MARKET";
+    const mapped = map[type];
+    if (!mapped) {
+      console.warn(`[Coinbase] Unknown order type: ${type}, defaulting to MARKET`);
+    }
+    return mapped || "MARKET";
   }
 
   private mapOrderStatus(status: string): OrderStatus {
@@ -604,8 +608,8 @@ export class CoinbaseAdapter implements Exchange {
               : undefined,
           });
         }
-      } catch {
-        // Skip accounts that fail (e.g., zero-balance legacy accounts)
+      } catch (err) {
+        console.warn(`[Coinbase] Failed to fetch deposit transactions for account ${account.id}: ${err instanceof Error ? err.message : err}`);
       }
     }
 
@@ -641,8 +645,8 @@ export class CoinbaseAdapter implements Exchange {
             transactionFee: undefined, // V2 API does not separate fee from amount
           });
         }
-      } catch {
-        // Skip accounts that fail
+      } catch (err) {
+        console.warn(`[Coinbase] Failed to fetch withdrawal transactions for account ${account.id}: ${err instanceof Error ? err.message : err}`);
       }
     }
 

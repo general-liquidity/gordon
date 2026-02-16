@@ -24,6 +24,7 @@ export {
 
 // Levels exports
 export { detectLevels, findNearestLevels } from "./levels.ts";
+export type { Level } from "../types/index.ts";
 
 // Import for internal use
 import { calculateRSI } from "./rsi.ts";

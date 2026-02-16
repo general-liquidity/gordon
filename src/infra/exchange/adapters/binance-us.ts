@@ -57,16 +57,29 @@ export class BinanceUSAdapter extends BinanceAdapter {
   }
 
   override async withdraw(
-    _coin: string,
+    coin: string,
     _network: string,
     _address: string,
-    _amount: number,
+    amount: number,
     _tag?: string
   ): Promise<WithdrawalResult> {
-    throw new Error("Withdrawals via API are not supported on Binance US. Use the Binance US website.");
+    return {
+      id: "",
+      coin,
+      amount,
+      network: _network,
+      address: _address,
+      fee: 0,
+      status: "not_supported",
+    };
   }
 
-  override async getWithdrawalInfo(_coin: string, _network?: string): Promise<WithdrawalInfo> {
-    throw new Error("Withdrawal info is not available on Binance US. Use the Binance US website.");
+  override async getWithdrawalInfo(coin: string, _network?: string): Promise<WithdrawalInfo> {
+    return {
+      coin,
+      networks: [],
+      withdrawEnabled: false,
+      message: "Withdrawal info is not available on Binance US. Use the Binance US website.",
+    } as WithdrawalInfo;
   }
 }

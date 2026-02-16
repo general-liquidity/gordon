@@ -85,7 +85,9 @@ export async function getAgentKit(): Promise<AgentKit> {
   if (!networkId) {
     throw new Error(
       "CDP_NETWORK_ID environment variable is required. " +
-      "Set to 'base-mainnet' for production or 'base-sepolia' for testing."
+      "Available options: 'base-mainnet' (production) or 'base-sepolia' (testing). " +
+      "Use 'base-sepolia' for development/testing with faucet funds, " +
+      "'base-mainnet' for real transactions."
     );
   }
 

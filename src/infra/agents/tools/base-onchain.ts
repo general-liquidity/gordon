@@ -36,6 +36,7 @@ async function getLiveEthPrice(): Promise<number> {
   } catch {
     // DexScreener unavailable — fall through to fallback
   }
+  console.warn("[base-onchain] DexScreener unavailable, using fallback ETH price of $2500");
   return 2500; // static fallback
 }
 

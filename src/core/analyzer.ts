@@ -97,7 +97,7 @@ export async function analyze(
     const indicators = calculateIndicators(candles);
 
     // Detect support and resistance levels
-    const allLevels = detectLevels(candles, currentPrice);
+    const allLevels = detectLevels(candles);
 
     // Separate and sort supports and resistances by proximity
     const { supports, resistances } = separateAndSortLevels(allLevels, currentPrice);

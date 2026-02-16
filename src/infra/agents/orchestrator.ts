@@ -688,7 +688,11 @@ const TOOL_AGENT_MAP: Record<string, string> = {
  * Get the agent name that owns a specific tool
  */
 function getAgentForTool(toolName: string): string | undefined {
-  return TOOL_AGENT_MAP[toolName];
+  const agent = TOOL_AGENT_MAP[toolName];
+  if (!agent) {
+    logger.debug("Unmapped tool called, staying with current agent", { toolName });
+  }
+  return agent;
 }
 
 // ============================================================================
@@ -783,7 +787,10 @@ export function validateHandoff(
     (h) => h.fromAgent === toAgent && h.toAgent === fromAgent
   ).length;
   if (circularCount >= 3) {
-    warnings.push(`Detected potential circular handoff pattern between ${fromAgent} and ${toAgent}`);
+    return {
+      valid: false,
+      reason: `Blocked circular handoff loop between ${fromAgent} and ${toAgent} (${circularCount} consecutive round-trips detected)`,
+    };
   }
 
   // Check for rapid handoffs (potential infinite loop)
@@ -791,7 +798,10 @@ export function validateHandoff(
     (h) => Date.now() - h.timestamp < 1000
   );
   if (lastSecondHandoffs.length >= 5) {
-    warnings.push("High handoff frequency detected. Possible infinite loop.");
+    return {
+      valid: false,
+      reason: "Blocked: high handoff frequency detected (5+ handoffs in 1 second). Possible infinite loop.",
+    };
   }
 
   // Executor requires armed state for execution
@@ -1248,30 +1258,35 @@ export async function* processMessageStream(
     }
 
     // If we still have no text, try awaiting the text property as a final fallback
+    // Limited to 3 attempts to prevent infinite retry loops
+    const MAX_TEXT_FALLBACK_ATTEMPTS = 3;
     if (!fullText && streamObj.text) {
-      logger.debug("Attempting final text fallback");
-      try {
-        let finalText: string | undefined;
-        if (typeof streamObj.text === 'function') {
-          finalText = await streamObj.text();
-        } else if (streamObj.text instanceof Promise) {
-          finalText = await streamObj.text;
-        } else if (typeof streamObj.text === 'string') {
-          finalText = streamObj.text;
-        }
+      for (let attempt = 0; attempt < MAX_TEXT_FALLBACK_ATTEMPTS; attempt++) {
+        logger.debug("Attempting final text fallback", { attempt: attempt + 1, maxAttempts: MAX_TEXT_FALLBACK_ATTEMPTS });
+        try {
+          let finalText: string | undefined;
+          if (typeof streamObj.text === 'function') {
+            finalText = await streamObj.text();
+          } else if (streamObj.text instanceof Promise) {
+            finalText = await streamObj.text;
+          } else if (typeof streamObj.text === 'string') {
+            finalText = streamObj.text;
+          }
 
-        if (finalText && finalText.trim()) {
-          const outputCheck = await checkOutputGuardrails(finalText);
-          fullText = outputCheck.sanitized;
-          yield {
-            type: "text_delta",
-            content: fullText,
-            agentName: currentAgent,
-          };
-          logger.debug("Got text from final fallback", { textLength: fullText.length });
+          if (finalText && finalText.trim()) {
+            const outputCheck = await checkOutputGuardrails(finalText);
+            fullText = outputCheck.sanitized;
+            yield {
+              type: "text_delta",
+              content: fullText,
+              agentName: currentAgent,
+            };
+            logger.debug("Got text from final fallback", { textLength: fullText.length, attempt: attempt + 1 });
+            break;
+          }
+        } catch (textError) {
+          logger.error("Failed to get text from fallback", textError as Error);
         }
-      } catch (textError) {
-        logger.error("Failed to get text from fallback", textError as Error);
       }
     }
 
@@ -1303,7 +1318,7 @@ export async function* processMessageStream(
       usage.totalTokens
     );
 
-    // Log warning if no content was generated
+    // Handle empty response with user-friendly message
     if (!fullText || fullText.trim().length === 0) {
       logger.warn("Stream completed with empty content", {
         userMessage: userMessage.substring(0, 100),
@@ -1311,6 +1326,12 @@ export async function* processMessageStream(
         hasTextStream: !!streamObj.textStream,
         textType: typeof streamObj.text,
       });
+      fullText = "I wasn't able to generate a response. Please try again.";
+      yield {
+        type: "text_delta",
+        content: fullText,
+        agentName: currentAgent,
+      };
     }
 
     yield {

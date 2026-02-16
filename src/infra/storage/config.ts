@@ -68,7 +68,8 @@ async function loadProjectConfig(): Promise<Record<string, unknown> | null> {
 
     const content = await rcFile.text();
     return JSON.parse(content);
-  } catch {
+  } catch (err) {
+    console.warn(`[config] Failed to parse .gordonrc: ${err instanceof Error ? err.message : err}`);
     return null;
   }
 }

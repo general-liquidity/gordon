@@ -154,13 +154,13 @@ export class BacktestEngine {
         this.checkStopTakeProfit(bar);
       }
 
-      // If position was closed by stop/TP, continue to next bar
-      if (!this.position || this.position) {
+      // Only process signals when there's no single position OR we're in grid mode
+      if (!this.position || this.gridPositions.length > 0) {
         // Get signal from strategy
         const signal = this.getStrategySignal(adjustedStrategy, bar, i, data, indicatorState);
 
-        // Execute signal
-        if (signal.type !== "HOLD") {
+        // Execute signal if non-null and non-HOLD
+        if (signal && signal.type !== "HOLD") {
           this.executeSignal(signal, bar);
         }
       }
@@ -617,48 +617,52 @@ export class BacktestEngine {
    */
   private checkStopTakeProfit(bar: OHLC): void {
     // Check single position (classic path)
+    // Apply slippage to trigger prices for more realistic fills:
+    // Longs: stop triggers slightly early (worse), TP triggers slightly late (worse)
+    // Shorts: stop triggers slightly early (worse), TP triggers slightly late (worse)
+    const slippage = this.params.slippageRate;
     if (this.position) {
       if (this.position.side === "LONG") {
-        if (this.position.stopLoss && bar.low <= this.position.stopLoss) {
-          this.closePosition(this.position.stopLoss, bar, "STOP_LOSS");
+        if (this.position.stopLoss && bar.low <= this.position.stopLoss * (1 + slippage)) {
+          this.closePosition(this.position.stopLoss * (1 - slippage), bar, "STOP_LOSS");
           return;
         }
-        if (this.position.takeProfit && bar.high >= this.position.takeProfit) {
-          this.closePosition(this.position.takeProfit, bar, "TAKE_PROFIT");
+        if (this.position.takeProfit && bar.high >= this.position.takeProfit * (1 - slippage)) {
+          this.closePosition(this.position.takeProfit * (1 + slippage), bar, "TAKE_PROFIT");
           return;
         }
       } else {
-        if (this.position.stopLoss && bar.high >= this.position.stopLoss) {
-          this.closePosition(this.position.stopLoss, bar, "STOP_LOSS");
+        if (this.position.stopLoss && bar.high >= this.position.stopLoss * (1 - slippage)) {
+          this.closePosition(this.position.stopLoss * (1 + slippage), bar, "STOP_LOSS");
           return;
         }
-        if (this.position.takeProfit && bar.low <= this.position.takeProfit) {
-          this.closePosition(this.position.takeProfit, bar, "TAKE_PROFIT");
+        if (this.position.takeProfit && bar.low <= this.position.takeProfit * (1 + slippage)) {
+          this.closePosition(this.position.takeProfit * (1 - slippage), bar, "TAKE_PROFIT");
           return;
         }
       }
     }
 
     // Check each grid position individually
-    // Iterate over a copy since closeGridPosition mutates the array
+    // Snapshot ensures we iterate over a stable copy while closeGridPosition mutates this.gridPositions
     const gridSnapshot = [...this.gridPositions];
     for (const pos of gridSnapshot) {
       if (pos.side === "LONG") {
-        if (pos.stopLoss && bar.low <= pos.stopLoss) {
-          this.closeGridPosition(pos, pos.stopLoss, bar, "STOP_LOSS");
+        if (pos.stopLoss && bar.low <= pos.stopLoss * (1 + slippage)) {
+          this.closeGridPosition(pos, pos.stopLoss * (1 - slippage), bar, "STOP_LOSS");
           continue;
         }
-        if (pos.takeProfit && bar.high >= pos.takeProfit) {
-          this.closeGridPosition(pos, pos.takeProfit, bar, "TAKE_PROFIT");
+        if (pos.takeProfit && bar.high >= pos.takeProfit * (1 - slippage)) {
+          this.closeGridPosition(pos, pos.takeProfit * (1 + slippage), bar, "TAKE_PROFIT");
           continue;
         }
       } else {
-        if (pos.stopLoss && bar.high >= pos.stopLoss) {
-          this.closeGridPosition(pos, pos.stopLoss, bar, "STOP_LOSS");
+        if (pos.stopLoss && bar.high >= pos.stopLoss * (1 - slippage)) {
+          this.closeGridPosition(pos, pos.stopLoss * (1 + slippage), bar, "STOP_LOSS");
           continue;
         }
-        if (pos.takeProfit && bar.low <= pos.takeProfit) {
-          this.closeGridPosition(pos, pos.takeProfit, bar, "TAKE_PROFIT");
+        if (pos.takeProfit && bar.low <= pos.takeProfit * (1 + slippage)) {
+          this.closeGridPosition(pos, pos.takeProfit * (1 - slippage), bar, "TAKE_PROFIT");
           continue;
         }
       }
@@ -803,13 +807,13 @@ export class BacktestEngine {
       }
     }
 
-    // Add all grid positions' value
+    // Add all grid positions' value (subtract entry commission like the single-position path)
     for (const pos of this.gridPositions) {
       const positionValue = pos.quantity * bar.close;
       if (pos.side === "LONG") {
-        equity += positionValue;
+        equity += positionValue - pos.entryCommission;
       } else {
-        equity += pos.quantity * pos.entryPrice + pos.unrealizedPnL;
+        equity += pos.quantity * pos.entryPrice + pos.unrealizedPnL - pos.entryCommission;
       }
     }
 

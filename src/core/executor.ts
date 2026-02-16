@@ -409,9 +409,13 @@ export async function executePlan(
   // Step 6: Place orders in sequence
   try {
     // 6a. Place entry order
+    const isShort = plan.direction === "short";
+    const entrySide = isShort ? "SELL" : "BUY";
+    const exitSide = isShort ? "BUY" : "SELL";
+
     const entryOrderParams: OrderParams = {
       symbol: plan.symbol,
-      side: "BUY",
+      side: entrySide,
       type: plan.entry.type === "market" ? "MARKET" : "LIMIT",
       quantity: totalQuantity,
       newClientOrderId: generateClientOrderId(plan.id, "entry"),
@@ -565,7 +569,7 @@ export async function executePlan(
       // 6b. Place stop-loss order
       const stopOrderParams: OrderParams = {
         symbol: plan.symbol,
-        side: "SELL",
+        side: exitSide,
         type: "STOP_LOSS_LIMIT",
         quantity: totalQuantity,
         price: roundPrice(plan.stopLoss.price * 0.995),
@@ -650,7 +654,7 @@ export async function executePlan(
 
         const tpOrderParams: OrderParams = {
           symbol: plan.symbol,
-          side: "SELL",
+          side: exitSide,
           type: "LIMIT",
           quantity: tpQuantity,
           price: roundPrice(tp.price),
@@ -1262,11 +1266,11 @@ export async function closeTrade(
     }
 
     // Calculate remaining quantity to sell
-    const totalEntryQuantity = trade.entries.reduce(
+    const totalEntryQuantity = (trade.entries ?? []).reduce(
       (sum, e) => sum + e.quantity,
       0
     );
-    const totalExitQuantity = trade.exits.reduce(
+    const totalExitQuantity = (trade.exits ?? []).reduce(
       (sum, e) => sum + e.quantity,
       0
     );

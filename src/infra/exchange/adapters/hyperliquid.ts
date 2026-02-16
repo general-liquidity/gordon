@@ -65,14 +65,20 @@ export class HyperliquidAdapter implements Exchange {
   /**
    * Initialize asset index mapping
    */
+  private _initPromise: Promise<void> | null = null;
+
   private async initAssetMap(): Promise<void> {
     if (this.assetIndexMap.size > 0) return;
+    if (this._initPromise) return this._initPromise;
 
-    const meta = await this.client.getMeta();
-    meta.universe.forEach((asset, index) => {
-      this.assetIndexMap.set(asset.name, index);
-      this.assetNameMap.set(index, asset.name);
-    });
+    this._initPromise = (async () => {
+      const meta = await this.client.getMeta();
+      meta.universe.forEach((asset, index) => {
+        this.assetIndexMap.set(asset.name, index);
+        this.assetNameMap.set(index, asset.name);
+      });
+    })();
+    return this._initPromise;
   }
 
   /**

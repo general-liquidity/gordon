@@ -21,7 +21,7 @@ let _apiKeyWarned = false;
 function getApiKey(): string {
   const key = process.env.BASESCAN_API_KEY || "";
   if (!key && !_apiKeyWarned) {
-    console.warn("[Basescan] BASESCAN_API_KEY not set — API calls will be rate-limited");
+    console.warn("[Basescan] BASESCAN_API_KEY not set — whale detection will be rate-limited to 1 req/5s");
     _apiKeyWarned = true;
   }
   return key;
@@ -46,7 +46,7 @@ async function etherscanCall<T>(params: Record<string, string>): Promise<T> {
   });
 
   const url = `${ETHERSCAN_V2_BASE}?${query.toString()}`;
-  const res = await fetch(url);
+  const res = await fetch(url, { signal: AbortSignal.timeout(10_000) });
 
   if (!res.ok) {
     throw new Error(`Basescan API error: ${res.status} ${res.statusText}`);

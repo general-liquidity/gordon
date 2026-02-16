@@ -29,7 +29,9 @@ import type {
  * Scans recent ERC-20 transfers for USDC, WETH, and other major tokens
  * and returns those above the minimum USD-equivalent threshold.
  *
- * @param opts.minAmount - Minimum token amount to flag (default: 50000 for USDC-like)
+ * @param opts.minAmount - Minimum token amount (in token units, NOT USD) to flag as a whale
+ *   transfer. Default is 50,000 which is calibrated for USDC (6 decimals). For ETH/WETH
+ *   (18 decimals), a much lower threshold (e.g., 10-50) is appropriate. Adjust per token.
  * @param opts.tokens - Token addresses to scan (default: USDC, WETH)
  * @param opts.limit - Max transfers to fetch per token (default: 50)
  */
@@ -66,7 +68,11 @@ export async function detectWhaleTransfers(opts: {
     if (result.status !== "fulfilled") continue;
 
     for (const tx of result.value) {
-      const decimals = DECIMALS[tx.contractAddress.toLowerCase()] ?? tx.tokenDecimal;
+      const rawDecimal = DECIMALS[tx.contractAddress.toLowerCase()] ?? tx.tokenDecimal;
+      // Validate decimals: must be 0-18, default to 18 if invalid (e.g., NaN or out-of-range from Basescan)
+      const decimals = typeof rawDecimal === 'number' && rawDecimal >= 0 && rawDecimal <= 18
+        ? Math.floor(rawDecimal)
+        : 18;
       const amount = parseFloat(tx.value) / Math.pow(10, decimals);
 
       if (amount >= minAmount) {
@@ -235,6 +241,8 @@ export async function analyzeDexPressure(tokenAddress: string): Promise<DexPress
     sellsH1,
     buysH24,
     sellsH24,
+    // When no transactions exist (totalH1/H24 === 0), 0.5 indicates "no data / neutral" — not measured equality.
+    // Consumers should check buysH1 + sellsH1 === 0 to distinguish from genuine 50/50 pressure.
     buyPressureH1: totalH1 > 0 ? Math.round((buysH1 / totalH1) * 100) / 100 : 0.5,
     buyPressureH24: totalH24 > 0 ? Math.round((buysH24 / totalH24) * 100) / 100 : 0.5,
     volumeH1: pair.volume?.h1 ?? 0,

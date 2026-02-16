@@ -211,12 +211,31 @@ export class BinanceAdapter implements Exchange {
     // Filter non-zero balances
     const nonZeroBalances = allBalances.filter((b) => b.total > 0);
 
-    // Calculate total USDT value (approximate - would need price data for accuracy)
-    // For now, just sum USDT and BUSD balances as a rough estimate
-    const stableBalances = nonZeroBalances.filter(
-      (b) => b.asset === "USDT" || b.asset === "BUSD" || b.asset === "USDC"
+    // Calculate total USD value: sum stablecoins directly, convert others via ticker price
+    const STABLES = new Set(["USDT", "BUSD", "USDC", "TUSD", "FDUSD"]);
+    const stableValue = nonZeroBalances
+      .filter((b) => STABLES.has(b.asset))
+      .reduce((sum, b) => sum + b.total, 0);
+
+    // Fetch prices for non-stable assets in parallel
+    const nonStable = nonZeroBalances.filter((b) => !STABLES.has(b.asset));
+    const priceResults = await Promise.allSettled(
+      nonStable.map(async (b) => {
+        try {
+          const raw = await this.client.getBookTicker(`${b.asset}USDT`);
+          const ticker = Array.isArray(raw) ? raw[0] : raw;
+          if (!ticker) return 0;
+          const mid = (parseFloat(ticker.bidPrice) + parseFloat(ticker.askPrice)) / 2;
+          return b.total * mid;
+        } catch {
+          return 0; // No USDT pair available for this asset
+        }
+      })
     );
-    const totalUsdtValue = stableBalances.reduce((sum, b) => sum + b.total, 0);
+    const nonStableValue = priceResults.reduce(
+      (sum, r) => sum + (r.status === "fulfilled" ? r.value : 0), 0
+    );
+    const totalUsdtValue = stableValue + nonStableValue;
 
     return {
       accountInfo,
@@ -308,7 +327,7 @@ export class BinanceAdapter implements Exchange {
     const deposits = await this.client.getDepositHistory(limit);
     return deposits.map(
       (d): Deposit => ({
-        id: d.id ?? d.txId ?? "",
+        id: d.id ?? d.txId ?? `dep_${d.coin}_${d.insertTime}`,
         amount: parseFloat(String(d.amount)),
         coin: d.coin,
         network: d.network,

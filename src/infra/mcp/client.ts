@@ -147,6 +147,8 @@ export async function initMCPTools(): Promise<Record<string, Tool>> {
         const serverDef = manifestToServerDef(plugin.manifest);
         if (serverDef) {
           servers[plugin.id] = serverDef;
+        } else {
+          console.warn(`[MCP] Skipping plugin without command: ${plugin.manifest.name ?? plugin.id}`);
         }
       }
 

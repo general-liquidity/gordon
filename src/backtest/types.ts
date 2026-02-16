@@ -114,7 +114,10 @@ export interface IndicatorState {
   supportStrength?: number | null;
   resistanceStrength?: number | null;
 
-  // Allow additional custom indicators
+  // Allow additional custom indicators.
+  // Strategies can request custom indicators via getRequiredIndicators() that will not be
+  // pre-calculated by the engine -- they must be computed by the strategy itself
+  // during generateSignal().
   [key: string]: number | null | undefined;
 }
 

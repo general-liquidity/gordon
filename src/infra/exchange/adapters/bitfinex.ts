@@ -438,13 +438,18 @@ export class BitfinexAdapter implements Exchange {
    * rules like lot sizes, price filters, or available balance.
    */
   async testOrder(params: OrderParams): Promise<boolean> {
+    // Local-only validation: checks parameter presence and basic ranges.
+    // Does NOT validate exchange-side rules (lot sizes, price filters, balance).
     if (!params.symbol || !params.side || !params.type) {
       return false;
     }
-    if (params.type === "LIMIT" && !params.price) {
+    if (params.type === "LIMIT" && (!params.price || params.price <= 0)) {
       return false;
     }
     if (!params.quantity && !params.quoteOrderQty) {
+      return false;
+    }
+    if (params.quantity !== undefined && params.quantity <= 0) {
       return false;
     }
     return true;
@@ -476,6 +481,7 @@ export class BitfinexAdapter implements Exchange {
     if (type.includes("STOP LIMIT")) return "STOP_LOSS_LIMIT";
     if (type.includes("STOP")) return "STOP_LOSS";
     if (type.includes("LIMIT")) return "LIMIT";
+    console.warn(`[Bitfinex] Unknown order type: ${type}, defaulting to MARKET`);
     return "MARKET";
   }
 

@@ -53,7 +53,8 @@ async function safeExecuteAction(
       success: false,
       result: "",
       action: actionName,
-      error: `AgentKit action "${actionName}" failed: ${(error as Error).message}`,
+      error: `AgentKit action "${actionName}" failed: ${(error as Error).message}. ` +
+        `Note: The transaction may have been submitted. Check your wallet for pending transactions.`,
     };
   }
 }

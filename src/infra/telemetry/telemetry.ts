@@ -214,6 +214,10 @@ export function record(
     return;
   }
 
+  // Drop oldest events if queue exceeds max size to prevent unbounded memory growth
+  if (eventQueue.length >= MAX_QUEUE_SIZE) {
+    eventQueue.shift();
+  }
   eventQueue.push(fullEvent);
 
   // Auto-flush if queue is full

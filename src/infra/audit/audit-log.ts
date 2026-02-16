@@ -317,7 +317,7 @@ export function getAuditHistory(options: AuditQueryOptions = {}): AuditEntry[] {
   }
 
   const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
-  const limit = options.limit ?? 100;
+  const limit = Math.min(options.limit ?? 100, 500);
   const offset = options.offset ?? 0;
 
   const query = `

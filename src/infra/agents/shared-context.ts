@@ -922,7 +922,7 @@ export const readSharedContextTool = createTool({
         const ctx = versioned.data;
         const bt = ctx.lastBacktest;
         if (!bt) {
-          return { found: false, reason: "No backtest data in context" };
+          return { found: false, summary: "No backtest data in context" };
         }
         const result: Record<string, unknown> = {
           found: true,

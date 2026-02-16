@@ -7,6 +7,9 @@
 
 import type { Candle, Level } from "../types/index.ts";
 
+/** Price tolerance for clustering nearby levels (0.5%) */
+const CLUSTER_TOLERANCE = 0.005;
+
 interface SwingPoint {
   index: number;
   price: number;
@@ -106,6 +109,14 @@ function clusterLevels(
     const avgPrice =
       currentCluster.prices.reduce((a, b) => a + b, 0) /
       currentCluster.prices.length;
+
+    // Guard against division by zero when avgPrice is 0
+    if (avgPrice === 0) {
+      currentCluster.prices.push(point.price);
+      currentCluster.types.push(point.type);
+      continue;
+    }
+
     const diff = Math.abs(point.price - avgPrice) / avgPrice;
 
     if (diff <= tolerance) {
@@ -154,6 +165,9 @@ function countTouches(
   level: number,
   tolerance: number
 ): number {
+  // A price level of 0 can't have meaningful touches
+  if (level === 0) return 0;
+
   let touches = 0;
   const threshold = level * tolerance;
 
@@ -183,29 +197,34 @@ function countTouches(
  * @returns Array of detected levels with strength scores
  */
 export function detectLevels(candles: Candle[], sensitivity: number = 3): Level[] {
-  if (candles.length < sensitivity * 2 + 1) {
+  // Ensure sensitivity is always a positive integer
+  const safeSensitivity = Math.max(1, Math.floor(sensitivity));
+
+  if (candles.length < safeSensitivity * 2 + 1) {
     return [];
   }
 
   // Find swing points
-  const swingPoints = detectSwingPoints(candles, sensitivity);
+  const swingPoints = detectSwingPoints(candles, safeSensitivity);
 
   if (swingPoints.length === 0) {
     return [];
   }
 
   // Cluster nearby levels (0.5% tolerance)
-  const clusteredLevels = clusterLevels(swingPoints, 0.005);
+  const clusteredLevels = clusterLevels(swingPoints, CLUSTER_TOLERANCE);
 
   // Count actual touches on the price data
   const levelsWithTouches = clusteredLevels.map((level) => ({
     ...level,
-    touches: countTouches(candles, level.price, 0.005),
+    touches: countTouches(candles, level.price, CLUSTER_TOLERANCE),
   }));
 
   // Calculate strength score (0-1)
   // Strength based on number of touches, normalized
-  const maxTouches = Math.max(...levelsWithTouches.map((l) => l.touches), 1);
+  const maxTouches = levelsWithTouches.length > 0
+    ? Math.max(...levelsWithTouches.map((l) => l.touches), 1)
+    : 1;
 
   const levels: Level[] = levelsWithTouches.map((level) => ({
     price: level.price,

@@ -93,8 +93,10 @@ export function formatRegistryEntry(entry: RegistryEntry): {
   active: boolean;
 } {
   const now = new Date();
-  const expiration = entry.content.expiration_ts ? new Date(entry.content.expiration_ts) : null;
-  const start = entry.content.start_ts ? new Date(entry.content.start_ts) : null;
+  const expirationRaw = entry.content.expiration_ts ? new Date(entry.content.expiration_ts) : null;
+  const expiration = expirationRaw && !isNaN(expirationRaw.getTime()) ? expirationRaw : null;
+  const startRaw = entry.content.start_ts ? new Date(entry.content.start_ts) : null;
+  const start = startRaw && !isNaN(startRaw.getTime()) ? startRaw : null;
 
   return {
     title: entry.content.title,

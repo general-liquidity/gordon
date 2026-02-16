@@ -248,7 +248,7 @@ export abstract class BaseStrategy implements Strategy {
       volume: c.volume,
       closeTime: c.closeTime ?? 0,
     }));
-    return detectLevels(compatibleCandles, currentPrice);
+    return detectLevels(compatibleCandles);
   }
 
   /**

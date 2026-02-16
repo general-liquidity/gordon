@@ -1321,4 +1321,5 @@ export function getAllAgents() {
  */
 export function resetAgents(): void {
   _agents = {};
+  _subAgentMemory = null;
 }

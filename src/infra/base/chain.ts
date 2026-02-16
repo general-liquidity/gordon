@@ -173,6 +173,8 @@ export async function getBaseTokenBalance(
   decimals: number = 18,
   network: "mainnet" | "testnet" = "mainnet"
 ): Promise<number> {
+  // Validate decimals: must be 0-18
+  decimals = Math.min(Math.max(Math.floor(decimals), 0), 18);
   // balanceOf(address) = 0x70a08231 + padded address
   const paddedAddress = walletAddress.toLowerCase().replace("0x", "").padStart(64, "0");
   const data = `0x70a08231${paddedAddress}`;

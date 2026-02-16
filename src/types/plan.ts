@@ -33,7 +33,7 @@ export const PlanSchema = z.object({
   expiresAt: z.string().optional(),
 
   symbol: z.string(),
-  direction: z.literal("long"),
+  direction: z.enum(["long", "short"]),
   strategy: z.enum([
     // Tier 1 - Beginner
     "support_bounce",
