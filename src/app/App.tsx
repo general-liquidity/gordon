@@ -14,7 +14,7 @@ import { ModelSelector } from "./ModelSelector.tsx";
 import { ShortcutsOverlay, ShortcutsHint, useShortcutsHint } from "./components/ShortcutsOverlay.tsx";
 import { ThemeProvider, useTheme } from "./components/ThemeProvider.tsx";
 import { processMessageStream, initializeTracing } from "../infra/agents/orchestrator.ts";
-import { initMCPTools } from "../infra/mcp/client.ts";
+import { initMCPTools, enableMCPHotReload } from "../infra/mcp/client.ts";
 import { createLLMClientFromEnv, type LLMClient } from "../infra/llm/index.ts";
 import { BinanceClient } from "../infra/binance/index.ts";
 import { BinanceAdapter, ExchangeFactory, type Exchange } from "../infra/exchange/index.ts";
@@ -79,6 +79,7 @@ import {
 import { bootstrapV07 } from "../core/bootstrap.ts";
 import { getMarketEmitter } from "../events/index.ts";
 import { getSubscriptionRegistry } from "../events/index.ts";
+import { buildAppGordonContext } from "../gateway/ui/context.ts";
 import type {
   ScanExportData,
   AnalysisExportData,
@@ -410,6 +411,7 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
         initMCPTools().catch((err) =>
           console.error("[MCP] Failed to init tools:", (err as Error).message),
         );
+        enableMCPHotReload(5000);
       } catch (error) {
         console.error("Failed to initialize LLM client:", error);
       }
@@ -522,15 +524,19 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
         registry.setInvoker(async (agentId: string, prompt: string) => {
           const { processMessageStream } = await import("../infra/agents/orchestrator.ts");
           const session = await getCurrentSession();
-          const gordonCtx = {
-            binance: binanceClientRef.current ?? undefined,
+          if (!llmClientRef.current) {
+            throw new Error(`LLM client not initialized for event-driven invoke (${agentId}).`);
+          }
+          const gordonCtx = buildAppGordonContext({
+            binance: binanceClientRef.current,
             exchange: exchangeRef.current,
-            llm: llmClientRef.current ?? undefined,
+            llm: llmClientRef.current,
             config: configRef.current,
-            userId: session?.resourceId,
             portfolioValue: 0,
             availableCash: 0,
-          } as GordonContext;
+            userId: session?.resourceId,
+            threadId: session?.threadId ?? undefined,
+          }) as GordonContext;
           const stream = processMessageStream(prompt, gordonCtx, session?.threadId ?? undefined, session?.resourceId);
           for await (const _event of stream) { /* consumed */ }
         });
@@ -1601,7 +1607,7 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
     }
 
     // Build the context for Gordon with session info
-    const context: GordonContext = {
+    const context: GordonContext = buildAppGordonContext({
       binance: binanceClientRef.current,
       exchange: exchangeRef.current,
       llm: llmClientRef.current!,
@@ -1610,7 +1616,7 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
       availableCash: state.availableCash,
       userId: state.session?.resourceId,
       threadId: state.session?.threadId,
-    };
+    });
 
     // Create initial empty assistant message for streaming
     const streamingTimestamp = formatTimestamp();
@@ -2073,7 +2079,7 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
         // Trigger the trending request through the agent with streaming
         (async () => {
           if (!llmClientRef.current) return;
-          const context: GordonContext = {
+          const context: GordonContext = buildAppGordonContext({
             binance: binanceClientRef.current,
             exchange: exchangeRef.current,
             llm: llmClientRef.current!,
@@ -2082,7 +2088,7 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
             availableCash: state.availableCash,
             userId: state.session?.resourceId,
             threadId: state.session?.threadId,
-          };
+          });
 
           // Create initial empty message for streaming
           const trendingTimestamp = formatTimestamp();

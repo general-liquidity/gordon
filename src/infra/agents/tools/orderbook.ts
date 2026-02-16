@@ -371,8 +371,9 @@ export const placeOCOOrderTool = createTool({
         quantity = riskResult.quantity;
       }
     } catch (riskErr) {
-      // Risk gate failure is non-fatal — log and continue
-      console.warn("[risk-gate] Failed to evaluate OCO order:", riskErr);
+      return {
+        error: `Risk check failed for OCO order: ${riskErr instanceof Error ? riskErr.message : String(riskErr)}`,
+      };
     }
 
     try {
@@ -655,8 +656,9 @@ export const placeLimitOrderTool = createTool({
         quantity = riskResult.quantity;
       }
     } catch (riskErr) {
-      // Risk gate failure is non-fatal — log and continue
-      console.warn("[risk-gate] Failed to evaluate limit order:", riskErr);
+      return {
+        error: `Risk check failed for limit order: ${riskErr instanceof Error ? riskErr.message : String(riskErr)}`,
+      };
     }
 
     try {
@@ -956,8 +958,9 @@ export const cancelReplaceOrderTool = createTool({
         quantity = riskResult.quantity;
       }
     } catch (riskErr) {
-      // Risk gate failure is non-fatal — log and continue
-      console.warn("[risk-gate] Failed to evaluate cancel-replace order:", riskErr);
+      return {
+        error: `Risk check failed for cancel-replace order: ${riskErr instanceof Error ? riskErr.message : String(riskErr)}`,
+      };
     }
 
     try {

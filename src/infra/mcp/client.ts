@@ -42,6 +42,8 @@ import type { MCPServerManifest } from "./types.ts";
 let _mcpClient: MCPClient | null = null;
 let _mcpTools: Record<string, Tool> | null = null;
 let _initPromise: Promise<Record<string, Tool>> | null = null;
+let _hotReloadTimer: ReturnType<typeof setInterval> | null = null;
+let _lastPluginFingerprint: string | null = null;
 
 // ============================================================================
 // Plugin → Server Definition Conversion
@@ -134,6 +136,10 @@ export async function initMCPTools(): Promise<Record<string, Tool>> {
     try {
       await pluginInstaller.initialize();
       const installed = pluginInstaller.getInstalled().filter((p) => p.enabled);
+      _lastPluginFingerprint = installed
+        .map((p) => `${p.id}:${p.enabled ? "1" : "0"}:${p.version ?? "0"}`)
+        .sort()
+        .join("|");
 
       if (installed.length === 0) {
         _mcpTools = {};
@@ -182,6 +188,14 @@ export async function initMCPTools(): Promise<Record<string, Tool>> {
 }
 
 /**
+ * Reload MCP tools from installed plugins without process restart.
+ */
+export async function reloadMCPTools(): Promise<Record<string, Tool>> {
+  await disconnectMCP();
+  return initMCPTools();
+}
+
+/**
  * Get cached MCP tools (synchronous)
  *
  * Returns empty object if initMCPTools() hasn't been called or no plugins are installed.
@@ -226,6 +240,43 @@ export async function disconnectMCP(): Promise<void> {
   }
   _mcpTools = null;
   _initPromise = null;
+}
+
+/**
+ * Enable hot reload polling for plugin changes.
+ *
+ * This checks installed/enabled plugin metadata periodically and refreshes MCP
+ * tools when a change is detected.
+ */
+export function enableMCPHotReload(intervalMs: number = 5000): void {
+  if (_hotReloadTimer) return;
+
+  _hotReloadTimer = setInterval(async () => {
+    try {
+      await pluginInstaller.initialize();
+      const installed = pluginInstaller.getInstalled().filter((p) => p.enabled);
+      const fingerprint = installed
+        .map((p) => `${p.id}:${p.enabled ? "1" : "0"}:${p.version ?? "0"}`)
+        .sort()
+        .join("|");
+
+      if (_lastPluginFingerprint !== null && fingerprint !== _lastPluginFingerprint) {
+        console.log("[MCP] Plugin change detected, hot-reloading tools...");
+        await reloadMCPTools();
+      }
+
+      _lastPluginFingerprint = fingerprint;
+    } catch (error) {
+      console.error("[MCP] Hot reload polling failed:", (error as Error).message);
+    }
+  }, intervalMs);
+}
+
+export function disableMCPHotReload(): void {
+  if (_hotReloadTimer) {
+    clearInterval(_hotReloadTimer);
+    _hotReloadTimer = null;
+  }
 }
 
 /**

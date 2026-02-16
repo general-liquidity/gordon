@@ -197,6 +197,93 @@ export function initDatabase(): Database {
     ON data_source_cache(symbol, timeframe, timestamp)
   `);
 
+  // Gateway idempotency store
+  db.run(`
+    CREATE TABLE IF NOT EXISTS gateway_idempotency (
+      idempotencyKey TEXT PRIMARY KEY,
+      sessionId TEXT NOT NULL,
+      commandType TEXT NOT NULL,
+      requestHash TEXT NOT NULL,
+      status TEXT NOT NULL,
+      responseJson TEXT,
+      createdAt TEXT NOT NULL,
+      expiresAt TEXT
+    )
+  `);
+  db.run("CREATE INDEX IF NOT EXISTS idx_gateway_idempotency_session ON gateway_idempotency(sessionId)");
+  db.run("CREATE INDEX IF NOT EXISTS idx_gateway_idempotency_created ON gateway_idempotency(createdAt)");
+
+  // Replay protection nonces
+  db.run(`
+    CREATE TABLE IF NOT EXISTS gateway_nonce_cache (
+      nonce TEXT PRIMARY KEY,
+      sessionId TEXT NOT NULL,
+      createdAt TEXT NOT NULL,
+      expiresAt TEXT NOT NULL
+    )
+  `);
+  db.run("CREATE INDEX IF NOT EXISTS idx_gateway_nonce_expires ON gateway_nonce_cache(expiresAt)");
+
+  // Gateway command queue store (durable backpressure + retries)
+  db.run(`
+    CREATE TABLE IF NOT EXISTS gateway_command_queue (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      sessionId TEXT NOT NULL,
+      correlationId TEXT NOT NULL,
+      idempotencyKey TEXT,
+      commandType TEXT NOT NULL,
+      payloadJson TEXT NOT NULL,
+      status TEXT NOT NULL,
+      priority INTEGER NOT NULL DEFAULT 100,
+      attempts INTEGER NOT NULL DEFAULT 0,
+      maxAttempts INTEGER NOT NULL DEFAULT 3,
+      availableAt TEXT NOT NULL,
+      startedAt TEXT,
+      finishedAt TEXT,
+      lastError TEXT,
+      createdAt TEXT NOT NULL,
+      updatedAt TEXT NOT NULL
+    )
+  `);
+  db.run("CREATE INDEX IF NOT EXISTS idx_gateway_queue_session_status ON gateway_command_queue(sessionId, status)");
+  db.run("CREATE INDEX IF NOT EXISTS idx_gateway_queue_available ON gateway_command_queue(availableAt)");
+  db.run("CREATE INDEX IF NOT EXISTS idx_gateway_queue_correlation ON gateway_command_queue(correlationId)");
+
+  // Immutable gateway audit/event log
+  db.run(`
+    CREATE TABLE IF NOT EXISTS gateway_audit_log (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      timestamp TEXT NOT NULL,
+      eventType TEXT NOT NULL,
+      actor TEXT NOT NULL,
+      correlationId TEXT,
+      payloadJson TEXT NOT NULL,
+      prevHash TEXT,
+      entryHash TEXT NOT NULL,
+      signature TEXT
+    )
+  `);
+  db.run("CREATE UNIQUE INDEX IF NOT EXISTS idx_gateway_audit_entry_hash ON gateway_audit_log(entryHash)");
+  db.run("CREATE INDEX IF NOT EXISTS idx_gateway_audit_timestamp ON gateway_audit_log(timestamp)");
+  db.run("CREATE INDEX IF NOT EXISTS idx_gateway_audit_correlation ON gateway_audit_log(correlationId)");
+
+  // Local cron scheduler tasks
+  db.run(`
+    CREATE TABLE IF NOT EXISTS gateway_scheduler_tasks (
+      taskId TEXT PRIMARY KEY,
+      cronExpr TEXT NOT NULL,
+      commandType TEXT NOT NULL,
+      payloadJson TEXT NOT NULL,
+      enabled INTEGER NOT NULL DEFAULT 1,
+      nextRunAt TEXT,
+      lastRunAt TEXT,
+      createdAt TEXT NOT NULL,
+      updatedAt TEXT NOT NULL
+    )
+  `);
+  db.run("CREATE INDEX IF NOT EXISTS idx_gateway_scheduler_next_run ON gateway_scheduler_tasks(nextRunAt)");
+  db.run("CREATE INDEX IF NOT EXISTS idx_gateway_scheduler_enabled ON gateway_scheduler_tasks(enabled)");
+
   dbInstance = db;
   return db;
 }

@@ -67,6 +67,7 @@ import {
   protocolTools,
   regimeTools,
   runtimeTools,
+  advancedTools,
   withToolsMetrics,
 } from "./tools/index.ts";
 import { getSessionSummary, getMemoryStats, resetSharedMemory } from "./shared-context.ts";
@@ -308,6 +309,7 @@ const instrumentedAuditTools = withToolsMetrics(auditTools);
 const instrumentedProtocolTools = withToolsMetrics(protocolTools);
 const instrumentedRegimeTools = withToolsMetrics(regimeTools);
 const instrumentedRuntimeTools = withToolsMetrics(runtimeTools);
+const instrumentedAdvancedTools = withToolsMetrics(advancedTools);
 const instrumentedCheckRiskTool = withToolsMetrics({ check_risk: checkRiskTool });
 
 // ============================================================================
@@ -1240,6 +1242,9 @@ function getPlannerAgent(): Agent {
         resume_strategy: instrumentedRuntimeTools.resume_strategy,
         stop_strategy: instrumentedRuntimeTools.stop_strategy,
         rebalance_portfolio: instrumentedRuntimeTools.rebalance_portfolio,
+        // Advanced tools (v1) — pre-trade simulation + proofs
+        simulate_order_bundle: instrumentedAdvancedTools.simulate_order_bundle,
+        generate_circuit_breaker_proof: instrumentedAdvancedTools.generate_circuit_breaker_proof,
       },
       memory: createSubAgentMemory(),
       inputProcessors: [new TokenLimiterProcessor({ limit: 32000 })],
@@ -1309,6 +1314,9 @@ function getExecutorAgent(): Agent {
         search_memory: instrumentedMemoryTools.search_memory,
         // Runtime tools (v0.7) — trade approval
         approve_strategy_trade: instrumentedRuntimeTools.approve_strategy_trade,
+        // Advanced tools (v1)
+        simulate_order_bundle: instrumentedAdvancedTools.simulate_order_bundle,
+        verify_circuit_breaker_proof: instrumentedAdvancedTools.verify_circuit_breaker_proof,
       },
       memory: createSubAgentMemory(),
       inputProcessors: [new TokenLimiterProcessor({ limit: 32000 })],
@@ -1371,6 +1379,9 @@ function getMonitorAgent(): Agent {
         // Runtime tools (v0.7) — portfolio health and state
         get_portfolio_state: instrumentedRuntimeTools.get_portfolio_state,
         check_portfolio_health: instrumentedRuntimeTools.check_portfolio_health,
+        // Advanced tools (v1)
+        generate_circuit_breaker_proof: instrumentedAdvancedTools.generate_circuit_breaker_proof,
+        query_regime_scoped_memory: instrumentedAdvancedTools.query_regime_scoped_memory,
       },
       memory: createSubAgentMemory(),
       inputProcessors: [new TokenLimiterProcessor({ limit: 32000 })],

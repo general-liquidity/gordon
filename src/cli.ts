@@ -20,6 +20,11 @@ export interface CLIFlags {
   uninstall: boolean;
 }
 
+export type ParsedCLICommand =
+  | { name: "daemon"; action: "start" | "run" | "stop" | "status" }
+  | { name: "schedule"; action: "add" | "remove" | "list"; args: string[] }
+  | { name: "init"; args: string[] };
+
 /** Short flag → long flag mapping */
 const SHORT_FLAGS: Record<string, keyof CLIFlags> = {
   h: "help",
@@ -71,6 +76,38 @@ export function parseFlags(): CLIFlags {
   }
 
   return flags;
+}
+
+/**
+ * Parse non-flag CLI commands like:
+ * - gordon daemon start
+ * - gordon schedule add ...
+ * - gordon init
+ */
+export function parseCommand(): ParsedCLICommand | null {
+  const args = process.argv.slice(2).filter((arg) => !arg.startsWith("-"));
+  if (args.length === 0) return null;
+
+  const command = args[0];
+  if (command === "daemon") {
+    const action = (args[1] || "status") as "start" | "run" | "stop" | "status";
+    if (action === "start" || action === "run" || action === "stop" || action === "status") {
+      return { name: "daemon", action };
+    }
+  }
+
+  if (command === "schedule") {
+    const action = (args[1] || "list") as "add" | "remove" | "list";
+    if (action === "add" || action === "remove" || action === "list") {
+      return { name: "schedule", action, args: args.slice(2) };
+    }
+  }
+
+  if (command === "init") {
+    return { name: "init", args: args.slice(1) };
+  }
+
+  return null;
 }
 
 /**
@@ -130,6 +167,9 @@ export function printHelp(): void {
 USAGE
   gordon                    Launch interactive trading terminal
   gordon [flags]            Launch with options
+  gordon daemon <action>    Manage local daemon (start|stop|status)
+  gordon schedule <action>  Manage local scheduled tasks (add|remove|list)
+  gordon init [dir]         Scaffold a local agent project
 
 FLAGS
   -h, --help       Show help and exit

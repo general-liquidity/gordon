@@ -434,8 +434,9 @@ export const placeBracketOrderTool = createTool({
         quantity = riskResult.quantity;
       }
     } catch (riskErr) {
-      // Risk gate failure is non-fatal — log and continue
-      console.warn("[risk-gate] Failed to evaluate bracket order:", riskErr);
+      return {
+        error: `Risk check failed for bracket order: ${riskErr instanceof Error ? riskErr.message : String(riskErr)}`,
+      };
     }
 
     try {
@@ -603,8 +604,9 @@ export const placeMarketOrderTool = createTool({
           quantity = riskResult.quantity;
         }
       } catch (riskErr) {
-        // Risk gate failure is non-fatal — log and continue
-        console.warn("[risk-gate] Failed to evaluate market order:", riskErr);
+        return {
+          error: `Risk check failed for market order: ${riskErr instanceof Error ? riskErr.message : String(riskErr)}`,
+        };
       }
     }
 

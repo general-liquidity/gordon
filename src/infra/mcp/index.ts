@@ -46,9 +46,12 @@ export type {
 
 export {
   initMCPTools,
+  reloadMCPTools,
   getMCPTools,
   getMCPToolsByServer,
   disconnectMCP,
+  enableMCPHotReload,
+  disableMCPHotReload,
   isMCPInitialized,
   getMCPStats,
 } from './client';

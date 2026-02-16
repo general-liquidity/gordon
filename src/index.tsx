@@ -1,12 +1,30 @@
 #!/usr/bin/env bun
 
-import { parseFlags, shouldUseColor, printHelp, printVersion, printStatusJson, checkRuntime, runCleanup, runUninstall, hasStdinData } from "./cli.ts";
+import {
+  parseCommand,
+  parseFlags,
+  shouldUseColor,
+  printHelp,
+  printVersion,
+  printStatusJson,
+  checkRuntime,
+  runCleanup,
+  runUninstall,
+  hasStdinData,
+} from "./cli.ts";
+import { runCLICommand } from "./gateway/cli-commands.ts";
 
 // ============================================================================
 // CLI Flag Handling — runs before TUI loads
 // ============================================================================
 
 const flags = parseFlags();
+const command = parseCommand();
+
+if (command) {
+  await runCLICommand(command);
+  process.exit(0);
+}
 
 if (flags.help) {
   printHelp();

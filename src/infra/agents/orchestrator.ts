@@ -30,6 +30,7 @@ import {
 import { auditLog } from "../audit/index.ts";
 import { checkPermissionsOnInit } from "../binance/permissions.ts";
 import type { GordonContext } from "./types.ts";
+import { validateHandoffBudget } from "../../gateway/handoffs/index.ts";
 import {
   ConversationSummarizer,
   createSummarizer,
@@ -560,6 +561,8 @@ const TOOL_AGENT_MAP: Record<string, string> = {
   agentkit_erc20_transfer: "Executor",
   agentkit_wrap_eth: "Executor",
   agentkit_request_faucet: "Executor",
+  // advancedTools cherry-picks
+  verify_circuit_breaker_proof: "Executor",
 
   // ---- Monitor tools ----
   // positionTools spread
@@ -604,6 +607,8 @@ const TOOL_AGENT_MAP: Record<string, string> = {
   check_exit_conditions: "Monitor",
   check_drawdown_status: "Monitor",
   check_daily_limit: "Monitor",
+  // advancedTools cherry-picks
+  query_regime_scoped_memory: "Monitor",
   // evalTools cherry-picks on Monitor
   record_trade_outcome: "Monitor",
   get_performance_report: "Monitor",
@@ -757,6 +762,26 @@ function getAgentForTool(toolName: string): string | undefined {
   return agent;
 }
 
+function buildDefaultExecutorHandoffBudget(
+  context: GordonContext,
+  toolArgs?: Record<string, unknown>,
+): Record<string, unknown> {
+  const maxPositionPct = context.config?.riskManagement?.maxPositionSizePercent ?? 10;
+  const maxNotionalUsd = Math.max(25, (context.portfolioValue || 0) * (maxPositionPct / 100));
+  const symbol =
+    typeof toolArgs?.symbol === "string"
+      ? toolArgs.symbol.toUpperCase()
+      : undefined;
+
+  return {
+    maxNotionalUsd,
+    maxDrawdownPercent: context.config?.riskManagement?.maxDrawdownPercent ?? 15,
+    allowedSymbols: symbol ? [symbol] : undefined,
+    reason: "Default executor handoff budget derived from risk config.",
+    expiresAt: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
+  };
+}
+
 // ============================================================================
 // Handoff Tracking & Validation
 // ============================================================================
@@ -869,6 +894,21 @@ export function validateHandoff(
   // Executor requires armed state for execution
   if (toAgent === "Executor" && context?.mode !== "ARMED") {
     warnings.push("Handoff to Executor while system is not ARMED");
+  }
+
+  const budgetValidation = validateHandoffBudget({
+    fromAgent,
+    toAgent,
+    metadata: context,
+  });
+  if (!budgetValidation.valid) {
+    return {
+      valid: false,
+      reason: budgetValidation.reason || "Handoff budget validation failed.",
+    };
+  }
+  if (budgetValidation.warnings && budgetValidation.warnings.length > 0) {
+    warnings.push(...budgetValidation.warnings);
   }
 
   return {
@@ -1130,6 +1170,23 @@ export async function* processMessageStream(
                 const toolName = chunk.payload.toolName;
                 const detectedAgent = getAgentForTool(toolName);
 
+                const securityCheck = await checkToolSecurity(
+                  detectedAgent || currentAgent || "Gordon",
+                  toolName,
+                  context
+                );
+                if (!securityCheck.allowed) {
+                  const reason = securityCheck.error || `Blocked tool call: ${toolName}`;
+                  await emitEvent("guardrail:blocked", {
+                    guardrailType: "input",
+                    reason,
+                    pattern: toolName,
+                    length: 0,
+                  });
+                  yield { type: "error", error: reason };
+                  return;
+                }
+
                 // Emit agent switch if we detected a different agent
                 if (detectedAgent && detectedAgent !== currentAgent) {
                   const previousAgent = currentAgent || "Gordon";
@@ -1138,6 +1195,11 @@ export async function* processMessageStream(
                   // Track the handoff
                   await trackHandoff(previousAgent, currentAgent, {
                     toolName,
+                    toolArgs: chunk.payload.args,
+                    handoffBudget:
+                      currentAgent === "Executor"
+                        ? buildDefaultExecutorHandoffBudget(context, chunk.payload.args)
+                        : undefined,
                     mode: context.config?.mode,
                   });
 
@@ -1178,6 +1240,10 @@ export async function* processMessageStream(
                   // Track the handoff
                   await trackHandoff(previousAgent, currentAgent, {
                     eventType: chunk.type,
+                    handoffBudget:
+                      currentAgent === "Executor"
+                        ? buildDefaultExecutorHandoffBudget(context)
+                        : undefined,
                     mode: context.config?.mode,
                   });
 
@@ -1222,6 +1288,18 @@ export async function* processMessageStream(
                 } else if (innerType === "tool-call" && innerPayload?.payload?.toolName) {
                   const toolName = innerPayload.payload.toolName;
                   const detectedAgent = getAgentForTool(toolName);
+
+                  const securityCheck = await checkToolSecurity(
+                    detectedAgent || currentAgent || "Gordon",
+                    toolName,
+                    context
+                  );
+                  if (!securityCheck.allowed) {
+                    const reason = securityCheck.error || `Blocked tool call: ${toolName}`;
+                    yield { type: "error", error: reason };
+                    return;
+                  }
+
                   if (detectedAgent && detectedAgent !== currentAgent) {
                     const previousAgent = currentAgent || "Gordon";
                     currentAgent = detectedAgent;
@@ -1229,6 +1307,11 @@ export async function* processMessageStream(
                     // Track the handoff
                     await trackHandoff(previousAgent, currentAgent, {
                       toolName,
+                      toolArgs: innerPayload.payload.args,
+                      handoffBudget:
+                        currentAgent === "Executor"
+                          ? buildDefaultExecutorHandoffBudget(context, innerPayload.payload.args)
+                          : undefined,
                       eventType: "agent-execution-event",
                       mode: context.config?.mode,
                     });

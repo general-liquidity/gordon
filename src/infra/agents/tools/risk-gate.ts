@@ -13,9 +13,11 @@ import { z } from "zod";
 import { riskKernel } from "../../../core/risk-kernel/index.ts";
 import { PortfolioContextBuilder } from "../../../core/risk-kernel/portfolio-context.ts";
 import type { OrderRequest } from "../../../core/risk-kernel/audit.ts";
+import { StrategyRuntime } from "../../../core/runtime/engine.ts";
 import { getGordonContext, type MastraExecutionContext } from "./types.ts";
 import type { GordonContext } from "./types.ts";
 import { createModuleLogger } from "../../logger/index.ts";
+import { evaluateBaselineCircuitBreakers } from "../../../gateway/circuit-breakers/index.ts";
 
 const logger = createModuleLogger("risk-gate");
 
@@ -27,9 +29,7 @@ const logger = createModuleLogger("risk-gate");
  * Evaluate an order against the Risk Kernel.
  *
  * Builds a PortfolioContext from the live exchange adapter when available.
- * If the adapter is missing (paper mode, no keys configured) the order is
- * approved with a warning so we never silently block trades just because
- * context could not be built.
+ * Fail-closed policy: if context cannot be built, order is rejected.
  */
 export async function evaluateOrderRisk(
   order: { symbol: string; side: string; type: string; quantity: number; price?: number },
@@ -57,20 +57,40 @@ export async function evaluateOrderRisk(
     try {
       portfolioContext = await builder.buildFromExchange(ctx.exchange);
     } catch (err) {
-      logger.warn("Could not build portfolio context from exchange, approving with warning", {
+      logger.warn("Could not build portfolio context from exchange, rejecting by fail-closed policy", {
         error: (err as Error).message,
       });
-      warnings.push("Portfolio context unavailable — risk checks ran with defaults.");
     }
   }
 
   if (!portfolioContext) {
-    // Fallback: approve without full context rather than blocking
+    // Fail-closed: do not allow execution when portfolio context is unavailable
     return {
-      approved: true,
+      approved: false,
       quantity: order.quantity,
-      reason: "Approved (portfolio context unavailable — risk checks skipped).",
-      warnings: ["No exchange adapter available. Risk kernel evaluation skipped."],
+      reason: "Rejected: portfolio context unavailable, risk checks could not be completed.",
+      warnings: ["No exchange adapter available. Risk kernel evaluation blocked."],
+    };
+  }
+
+  // Baseline circuit breakers (Phase 0 fail-safe controls)
+  const runtime = StrategyRuntime.getInstance();
+  const portfolioState = runtime.getPortfolioState();
+  const breaker = evaluateBaselineCircuitBreakers({
+    portfolioDrawdownPercent: portfolioState.portfolio_drawdown_percent,
+    maxPortfolioDrawdownPercent: ctx.config?.riskManagement?.maxDrawdownPercent ?? 15,
+    correlationShockPercent: 0, // TODO: wire live correlation shock metric
+    maxCorrelationShockPercent: 15,
+    liquidityGapBps: 0, // TODO: wire live liquidity gap metric
+    maxLiquidityGapBps: 250,
+  });
+
+  if (breaker.open) {
+    return {
+      approved: false,
+      quantity: order.quantity,
+      reason: `Rejected by circuit breaker: ${breaker.triggers.map((t) => t.name).join(", ")}`,
+      warnings: breaker.triggers.map((t) => t.message),
     };
   }
 

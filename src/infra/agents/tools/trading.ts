@@ -329,8 +329,14 @@ export const executePlanTool = createTool({
         }, { toolName: "execute_plan" });
       }
     } catch (riskErr) {
-      // Risk gate failure is non-fatal for plan execution — log and continue
-      console.warn("[risk-gate] Failed to evaluate plan:", riskErr);
+      return validateToolOutput(
+        executePlanOutputSchema,
+        {
+          success: false,
+          error: `Risk gate evaluation failed: ${riskErr instanceof Error ? riskErr.message : String(riskErr)}`,
+        },
+        { toolName: "execute_plan" },
+      );
     }
 
     const result = await executePlan(ctx.exchange, plan, ctx.config, {

@@ -93,6 +93,9 @@ export { regimeTools } from "./regime-tools.ts";
 // Audit tools (v0.7) -- agent decision traceability
 export { auditTools } from "./audit-tools.ts";
 
+// Advanced tools (Phase 3) -- execution twin, proofs, regime memory
+export { advancedTools } from "./advanced-tools.ts";
+
 // Protocol tools (v0.7) -- playbook protocol validation/export/import/comparison
 export { protocolTools } from "../../../core/playbooks/protocol-tools.ts";
 
@@ -301,6 +304,7 @@ import { playbookBacktestTools } from "./backtest-tools.ts";
 import { runtimeTools } from "./runtime-tools.ts";
 import { regimeTools } from "./regime-tools.ts";
 import { auditTools } from "./audit-tools.ts";
+import { advancedTools } from "./advanced-tools.ts";
 import { protocolTools } from "../../../core/playbooks/protocol-tools.ts";
 import { multiModalChartTools } from "../../tools/chartTools.ts";
 import { evalTools } from "../../evals/tools.ts";
@@ -350,6 +354,7 @@ export const allTools = {
   ...runtimeTools,
   ...regimeTools,
   ...auditTools,
+  ...advancedTools,
   ...protocolTools,
 };
 
@@ -398,6 +403,7 @@ export const toolCounts = {
   runtime: Object.keys(runtimeTools).length,
   regime: Object.keys(regimeTools).length,
   audit: Object.keys(auditTools).length,
+  advanced: Object.keys(advancedTools).length,
   protocol: Object.keys(protocolTools).length,
   total: Object.keys(allTools).length,
 };
