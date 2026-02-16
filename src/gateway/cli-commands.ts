@@ -188,36 +188,42 @@ async function runScheduleCommand(
 }
 
 async function runInitCommand(args: string[]): Promise<void> {
-  const target = resolve(args[0] || "gordon-agent");
+  const name = args[0] || "gordon-agent";
+  const target = resolve(name);
   if (existsSync(target)) {
     throw new Error(`Target directory already exists: ${target}`);
   }
 
-  await mkdir(target, { recursive: true });
-  await mkdir(join(target, "src"), { recursive: true });
+  // Parse flags
+  let template: "agent" | "strategy" = "agent";
+  let pm: "bun" | "npm" = "bun";
+  for (let i = 1; i < args.length; i++) {
+    if (args[i] === "--template" && args[i + 1]) {
+      const val = args[i + 1];
+      if (val === "agent" || val === "strategy") template = val;
+      i++;
+    }
+    if (args[i] === "--pm" && args[i + 1]) {
+      const val = args[i + 1];
+      if (val === "bun" || val === "npm") pm = val;
+      i++;
+    }
+  }
 
-  const pkg = {
-    name: "gordon-agent",
-    private: true,
-    type: "module",
-    scripts: {
-      start: "bun run src/index.ts",
-    },
-    dependencies: {
-      "@general-liquidity/gordon-cli": "latest",
-    },
-  };
+  const { scaffoldProject } = await import("../sdk/scaffold.ts");
+  const created = await scaffoldProject(target, { name, template, packageManager: pm });
 
-  const source = `console.log("Gordon Agent Project Ready");
-console.log("Next steps:");
-console.log("1. Ensure gordon daemon is running");
-console.log("2. Connect to local IPC and send typed gateway commands");
-`;
-
-  await writeFile(join(target, "package.json"), JSON.stringify(pkg, null, 2), "utf-8");
-  await writeFile(join(target, "src", "index.ts"), source, "utf-8");
-
-  console.log(`Initialized Gordon agent project at ${target}`);
+  console.log(`\nInitialized Gordon ${template} project at ${target}\n`);
+  console.log("Created files:");
+  for (const file of created) {
+    console.log(`  ${file}`);
+  }
+  console.log(`\nNext steps:`);
+  console.log(`  cd ${name}`);
+  console.log(`  ${pm === "bun" ? "bun" : "npm"} install`);
+  console.log(`  cp .env.example .env  # add your daemon auth token`);
+  console.log(`  gordon daemon start   # ensure daemon is running`);
+  console.log(`  ${pm === "bun" ? "bun run" : "npx tsx"} src/index.ts`);
 }
 
 export async function runCLICommand(command: ParsedCLICommand): Promise<void> {
