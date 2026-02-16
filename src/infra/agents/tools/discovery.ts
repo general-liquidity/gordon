@@ -418,6 +418,26 @@ export const placeBracketOrderTool = createTool({
       ? symbol.toUpperCase()
       : `${symbol.toUpperCase()}USDT`;
 
+    // Risk gate: evaluate order before placement
+    try {
+      const { evaluateOrderRisk } = await import("./risk-gate.ts");
+      const riskResult = await evaluateOrderRisk(
+        { symbol: normalizedSymbol, side, type: "MARKET", quantity, price: undefined },
+        ctx,
+        "executor"
+      );
+      if (!riskResult.approved) {
+        return { error: `Risk check rejected: ${riskResult.reason}`, symbol, side, quantity, stopLossPrice, takeProfitPrice };
+      }
+      // Use risk-adjusted quantity if modified
+      if (riskResult.quantity !== quantity) {
+        quantity = riskResult.quantity;
+      }
+    } catch (riskErr) {
+      // Risk gate failure is non-fatal — log and continue
+      console.warn("[risk-gate] Failed to evaluate bracket order:", riskErr);
+    }
+
     try {
       // Validate prices make sense
       if (side === "BUY") {
@@ -565,6 +585,28 @@ export const placeMarketOrderTool = createTool({
     const normalizedSymbol = symbol.toUpperCase().endsWith("USDT") || symbol.toUpperCase().endsWith("USDC")
       ? symbol.toUpperCase()
       : `${symbol.toUpperCase()}USDT`;
+
+    // Risk gate: evaluate order before placement (only when base quantity is provided)
+    if (quantity && quantity > 0) {
+      try {
+        const { evaluateOrderRisk } = await import("./risk-gate.ts");
+        const riskResult = await evaluateOrderRisk(
+          { symbol: normalizedSymbol, side, type: "MARKET", quantity },
+          ctx,
+          "executor"
+        );
+        if (!riskResult.approved) {
+          return { error: `Risk check rejected: ${riskResult.reason}` };
+        }
+        // Use risk-adjusted quantity if modified
+        if (riskResult.quantity !== quantity) {
+          quantity = riskResult.quantity;
+        }
+      } catch (riskErr) {
+        // Risk gate failure is non-fatal — log and continue
+        console.warn("[risk-gate] Failed to evaluate market order:", riskErr);
+      }
+    }
 
     try {
       const orderResult = await ctx.exchange.placeOrder({

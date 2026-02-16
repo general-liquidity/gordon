@@ -308,6 +308,31 @@ export const executePlanTool = createTool({
       }, { toolName: "execute_plan" });
     }
 
+    // Risk gate: evaluate the plan's order against risk kernel
+    try {
+      const { evaluateOrderRisk } = await import("./risk-gate.ts");
+      const riskResult = await evaluateOrderRisk(
+        {
+          symbol: plan.symbol,
+          side: "BUY", // Plans are typically buy entries
+          type: plan.entry.type === "market" ? "MARKET" : "LIMIT",
+          quantity: plan.allocation.amount / (plan.entry.price || 1),
+          price: plan.entry.price ?? undefined,
+        },
+        ctx,
+        "executor"
+      );
+      if (!riskResult.approved) {
+        return validateToolOutput(executePlanOutputSchema, {
+          success: false,
+          error: `Risk kernel rejected this trade: ${riskResult.reason}`,
+        }, { toolName: "execute_plan" });
+      }
+    } catch (riskErr) {
+      // Risk gate failure is non-fatal for plan execution — log and continue
+      console.warn("[risk-gate] Failed to evaluate plan:", riskErr);
+    }
+
     const result = await executePlan(ctx.exchange, plan, ctx.config, {
       totalValue: ctx.portfolioValue,
       availableCash: ctx.availableCash,

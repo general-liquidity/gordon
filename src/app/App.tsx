@@ -76,6 +76,9 @@ import {
   checkForPluginSuggestions,
   formatPluginSuggestionsMessage,
 } from "./commands/mcp.ts";
+import { bootstrapV07 } from "../core/bootstrap.ts";
+import { getMarketEmitter } from "../events/index.ts";
+import { getSubscriptionRegistry } from "../events/index.ts";
 import type {
   ScanExportData,
   AnalysisExportData,
@@ -322,6 +325,13 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
       // Load .env file (if it exists)
       await loadEnvFile();
 
+      // Bootstrap v0.7 subsystems (memory, playbooks, positions, event subscriptions)
+      try {
+        await bootstrapV07();
+      } catch (err) {
+        console.error("[v0.7] Bootstrap failed (non-fatal):", err);
+      }
+
       // Check environment status early to get keys
       const envStatusEarly = await checkEnvStatus();
 
@@ -480,6 +490,40 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
         initializeRealtimeMonitor(exchangeRef.current?.exchangeId).catch((error) => {
           console.warn("Real-time monitoring unavailable:", error);
         });
+      }
+
+      // Connect v0.7 MarketEventEmitter to the exchange WebSocket
+      try {
+        const emitter = getMarketEmitter();
+        // The emitter is ready but not watching anything yet.
+        // Event-driven agent mode can be activated via /autonomous or API.
+        console.log("[v0.7] MarketEventEmitter ready");
+      } catch (err) {
+        console.error("[v0.7] MarketEventEmitter setup failed:", err);
+      }
+
+      // Wire AgentInvoker for event-driven agent execution
+      // Subscriptions are registered but not enabled until user opts in
+      try {
+        const registry = getSubscriptionRegistry();
+        registry.setInvoker(async (agentId: string, prompt: string) => {
+          const { processMessageStream } = await import("../infra/agents/orchestrator.ts");
+          const session = await getCurrentSession();
+          const gordonCtx = {
+            binance: binanceClientRef.current ?? undefined,
+            exchange: exchangeRef.current,
+            llm: llmClientRef.current ?? undefined,
+            config: configRef.current,
+            userId: session?.resourceId,
+            portfolioValue: 0,
+            availableCash: 0,
+          } as GordonContext;
+          const stream = processMessageStream(prompt, gordonCtx, session?.threadId ?? undefined, session?.resourceId);
+          for await (const _event of stream) { /* consumed */ }
+        });
+        console.log("[v0.7] AgentInvoker wired");
+      } catch (err) {
+        console.error("[v0.7] AgentInvoker setup failed:", err);
       }
 
       // Initialize session for Mastra agent memory

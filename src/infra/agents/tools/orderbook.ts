@@ -355,6 +355,26 @@ export const placeOCOOrderTool = createTool({
       ? stopLimitPrice
       : stopPrice * 0.995;
 
+    // Risk gate: evaluate order before placement
+    try {
+      const { evaluateOrderRisk } = await import("./risk-gate.ts");
+      const riskResult = await evaluateOrderRisk(
+        { symbol: normalizedSymbol, side, type: "LIMIT", quantity, price: takeProfitPrice },
+        ctx,
+        "executor"
+      );
+      if (!riskResult.approved) {
+        return { error: `Risk check rejected: ${riskResult.reason}` };
+      }
+      // Use risk-adjusted quantity if modified
+      if (riskResult.quantity !== quantity) {
+        quantity = riskResult.quantity;
+      }
+    } catch (riskErr) {
+      // Risk gate failure is non-fatal — log and continue
+      console.warn("[risk-gate] Failed to evaluate OCO order:", riskErr);
+    }
+
     try {
       const result = await placeOCOOrders(
         ctx.exchange,
@@ -618,6 +638,26 @@ export const placeLimitOrderTool = createTool({
     const normalizedSymbol = symbol.toUpperCase().endsWith("USDT") || symbol.toUpperCase().endsWith("USDC")
       ? symbol.toUpperCase()
       : `${symbol.toUpperCase()}USDT`;
+
+    // Risk gate: evaluate order before placement
+    try {
+      const { evaluateOrderRisk } = await import("./risk-gate.ts");
+      const riskResult = await evaluateOrderRisk(
+        { symbol: normalizedSymbol, side, type: "LIMIT", quantity, price },
+        ctx,
+        "executor"
+      );
+      if (!riskResult.approved) {
+        return { error: `Risk check rejected: ${riskResult.reason}` };
+      }
+      // Use risk-adjusted quantity if modified
+      if (riskResult.quantity !== quantity) {
+        quantity = riskResult.quantity;
+      }
+    } catch (riskErr) {
+      // Risk gate failure is non-fatal — log and continue
+      console.warn("[risk-gate] Failed to evaluate limit order:", riskErr);
+    }
 
     try {
       const orderResult = await ctx.exchange.placeOrder({
@@ -899,6 +939,26 @@ export const cancelReplaceOrderTool = createTool({
     const normalizedSymbol = symbol.toUpperCase().endsWith("USDT") || symbol.toUpperCase().endsWith("USDC")
       ? symbol.toUpperCase()
       : `${symbol.toUpperCase()}USDT`;
+
+    // Risk gate: evaluate the replacement order before placement
+    try {
+      const { evaluateOrderRisk } = await import("./risk-gate.ts");
+      const riskResult = await evaluateOrderRisk(
+        { symbol: normalizedSymbol, side, type, quantity, price },
+        ctx,
+        "executor"
+      );
+      if (!riskResult.approved) {
+        return { error: `Risk check rejected: ${riskResult.reason}` };
+      }
+      // Use risk-adjusted quantity if modified
+      if (riskResult.quantity !== quantity) {
+        quantity = riskResult.quantity;
+      }
+    } catch (riskErr) {
+      // Risk gate failure is non-fatal — log and continue
+      console.warn("[risk-gate] Failed to evaluate cancel-replace order:", riskErr);
+    }
 
     try {
       const newOrderParams: Record<string, unknown> = {
