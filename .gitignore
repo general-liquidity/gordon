@@ -35,7 +35,6 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 
 .claude
 
-gordon-cli-website/
 # Local databases
 *.db
 *.db-shm
@@ -44,3 +43,8 @@ gordon-cli-website/
 *.sqlite-shm
 *.sqlite-wal
 .superdesign
+
+# Website repos (separate git repos)
+general-liquidity-website
+gordon-cli-website
+website
