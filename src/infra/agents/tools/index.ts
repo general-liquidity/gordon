@@ -81,6 +81,15 @@ export { memoryTools } from "./memory-tools.ts";
 // Playbook tools (v0.7)
 export { playbookTools } from "./playbook-tools.ts";
 
+// Playbook backtest tools (v0.7)
+export { playbookBacktestTools } from "./backtest-tools.ts";
+
+// Runtime tools (v0.7) -- composable strategy runtime
+export { runtimeTools } from "./runtime-tools.ts";
+
+// Regime detection tools (v0.7)
+export { regimeTools } from "./regime-tools.ts";
+
 // Multi-modal chart tools (image generation and vision analysis)
 export { multiModalChartTools } from "../../tools/chartTools.ts";
 
@@ -282,6 +291,9 @@ import { positionTrackingTools } from "./position-tracking.ts";
 import { checkRiskTool } from "./risk-gate.ts";
 import { memoryTools } from "./memory-tools.ts";
 import { playbookTools } from "./playbook-tools.ts";
+import { playbookBacktestTools } from "./backtest-tools.ts";
+import { runtimeTools } from "./runtime-tools.ts";
+import { regimeTools } from "./regime-tools.ts";
 import { multiModalChartTools } from "../../tools/chartTools.ts";
 import { evalTools } from "../../evals/tools.ts";
 
@@ -326,6 +338,9 @@ export const allTools = {
   check_risk: checkRiskTool,
   ...memoryTools,
   ...playbookTools,
+  ...playbookBacktestTools,
+  ...runtimeTools,
+  ...regimeTools,
 };
 
 /**
@@ -369,6 +384,9 @@ export const toolCounts = {
   riskGate: 1, // checkRiskTool
   memory: Object.keys(memoryTools).length,
   playbook: Object.keys(playbookTools).length,
+  playbookBacktest: Object.keys(playbookBacktestTools).length,
+  runtime: Object.keys(runtimeTools).length,
+  regime: Object.keys(regimeTools).length,
   total: Object.keys(allTools).length,
 };
 

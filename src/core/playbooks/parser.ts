@@ -15,6 +15,8 @@
 
 import { readFile } from "fs/promises";
 import { createModuleLogger } from "../../infra/logger/logger.ts";
+import { playbookToProtocol } from "./converter.ts";
+import type { PlaybookProtocol } from "./protocol.ts";
 import type {
   Playbook,
   PlaybookTrigger,
@@ -699,5 +701,36 @@ export class PlaybookParser {
       errors,
       warnings,
     };
+  }
+
+  /**
+   * Parse a Markdown string into a PlaybookProtocol object.
+   * First parses to the internal Playbook type, then converts to the formal protocol.
+   *
+   * @param markdown - Raw Markdown content with YAML frontmatter
+   * @param source - Where this playbook came from
+   * @returns PlaybookProtocol object
+   */
+  parseToProtocol(
+    markdown: string,
+    source: "builtin" | "workspace" | "hub" = "builtin"
+  ): PlaybookProtocol {
+    const playbook = this.parse(markdown, source);
+    return playbookToProtocol(playbook);
+  }
+
+  /**
+   * Parse a playbook file into a PlaybookProtocol object.
+   *
+   * @param filePath - Absolute or relative path to a .md file
+   * @param source - Where this playbook came from
+   * @returns PlaybookProtocol object
+   */
+  async parseFileToProtocol(
+    filePath: string,
+    source: "builtin" | "workspace" | "hub" = "builtin"
+  ): Promise<PlaybookProtocol> {
+    const content = await readFile(filePath, "utf-8");
+    return this.parseToProtocol(content, source);
   }
 }

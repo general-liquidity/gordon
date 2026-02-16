@@ -62,6 +62,7 @@ import {
   checkRiskTool,
   memoryTools,
   playbookTools,
+  playbookBacktestTools,
   withToolsMetrics,
 } from "./tools/index.ts";
 import { getSessionSummary, getMemoryStats, resetSharedMemory } from "./shared-context.ts";
@@ -298,6 +299,7 @@ const instrumentedEvalTools = withToolsMetrics(evalTools);
 const instrumentedPositionTrackingTools = withToolsMetrics(positionTrackingTools);
 const instrumentedMemoryTools = withToolsMetrics(memoryTools);
 const instrumentedPlaybookTools = withToolsMetrics(playbookTools);
+const instrumentedPlaybookBacktestTools = withToolsMetrics(playbookBacktestTools);
 const instrumentedCheckRiskTool = withToolsMetrics({ check_risk: checkRiskTool });
 
 // ============================================================================
@@ -862,6 +864,9 @@ Your role is to run historical backtests and optimize trading strategies.
 - Optimize strategy parameters using grid search
 - Compare multiple strategies on the same data
 - Analyze backtest results and provide insights
+- **Backtest playbooks**: Use backtest_playbook to test a playbook's rules against historical candles
+- **Compare playbooks**: Use compare_backtest_results to compare playbook backtests side by side
+- **Rank playbooks**: Use get_best_strategy to find the top-performing playbook for a symbol
 
 ## Pre-Analysis Capabilities (NEW)
 You now have access to analyst tools for comprehensive pre-backtest analysis:
@@ -1374,6 +1379,8 @@ function getBacktesterAgent(): Agent {
         get_lessons: instrumentedMemoryTools.get_lessons,
         // Playbook tools (v0.7)
         ...instrumentedPlaybookTools,
+        // Playbook backtest tools (v0.7) — run/compare/rank playbook backtests
+        ...instrumentedPlaybookBacktestTools,
       },
       memory: createSubAgentMemory(),
       inputProcessors: [new TokenLimiterProcessor({ limit: 32000 })],
