@@ -4,6 +4,11 @@
  */
 
 import type { Plan, Trade } from "../types/index.ts";
+import type {
+  PositionRecord,
+  PositionState,
+  TradeReview,
+} from "../core/positions/types.ts";
 
 /**
  * Base event interface
@@ -411,6 +416,95 @@ export interface AutonomousMandateBreachedEvent extends BaseEvent {
 }
 
 /**
+ * Risk Kernel events
+ */
+export interface RiskApprovedEvent extends BaseEvent {
+  type: "risk:approved";
+  symbol: string;
+  action: "approve" | "modify";
+  agentId: string;
+  checks: number;
+  reason?: string;
+}
+
+export interface RiskRejectedEvent extends BaseEvent {
+  type: "risk:rejected";
+  symbol: string;
+  agentId: string;
+  checks: string[];
+  reason?: string;
+}
+
+/**
+ * Position lifecycle events
+ */
+export interface PositionStateChangedEvent extends BaseEvent {
+  type: "position:state_changed";
+  positionId: string;
+  symbol: string;
+  fromState: PositionState;
+  toState: PositionState;
+  position: PositionRecord;
+}
+
+export interface PositionCreatedEvent extends BaseEvent {
+  type: "position:created";
+  positionId: string;
+  symbol: string;
+  side: "long" | "short";
+  position: PositionRecord;
+}
+
+export interface PositionOpenedEvent extends BaseEvent {
+  type: "position:opened";
+  positionId: string;
+  symbol: string;
+  entryPrice: number;
+  quantity: number;
+  position: PositionRecord;
+}
+
+export interface PositionClosedEventV2 extends BaseEvent {
+  type: "position:closed";
+  positionId: string;
+  symbol: string;
+  realizedPnL: number;
+  position: PositionRecord;
+}
+
+export interface PositionCancelledEvent extends BaseEvent {
+  type: "position:cancelled";
+  positionId: string;
+  symbol: string;
+  reason: string;
+  fromState: PositionState;
+  position: PositionRecord;
+}
+
+export interface PositionRejectedEvent extends BaseEvent {
+  type: "position:rejected";
+  positionId: string;
+  symbol: string;
+  reason: string;
+  position: PositionRecord;
+}
+
+export interface PositionReviewedEvent extends BaseEvent {
+  type: "position:reviewed";
+  positionId: string;
+  symbol: string;
+  review: TradeReview;
+  position: PositionRecord;
+}
+
+export interface PositionUpdatedEvent extends BaseEvent {
+  type: "position:updated";
+  positionId: string;
+  symbol: string;
+  updates: Partial<PositionRecord>;
+}
+
+/**
  * Union type of all events
  */
 export type GordonEvent =
@@ -465,7 +559,17 @@ export type GordonEvent =
   | AutonomousResumedEvent
   | AutonomousCycleCompletedEvent
   | AutonomousCycleFailedEvent
-  | AutonomousMandateBreachedEvent;
+  | AutonomousMandateBreachedEvent
+  | RiskApprovedEvent
+  | RiskRejectedEvent
+  | PositionStateChangedEvent
+  | PositionCreatedEvent
+  | PositionOpenedEvent
+  | PositionClosedEventV2
+  | PositionCancelledEvent
+  | PositionRejectedEvent
+  | PositionReviewedEvent
+  | PositionUpdatedEvent;
 
 /**
  * Extract event type string

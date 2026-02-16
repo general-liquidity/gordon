@@ -129,6 +129,51 @@ export function initDatabase(): Database {
   db.run("CREATE INDEX IF NOT EXISTS idx_events_tradeId ON events(tradeId)");
   db.run("CREATE INDEX IF NOT EXISTS idx_events_timestamp ON events(timestamp)");
 
+  // Create positions table (position state machine lifecycle)
+  db.run(`
+    CREATE TABLE IF NOT EXISTS positions (
+      id TEXT PRIMARY KEY,
+      symbol TEXT NOT NULL,
+      exchangeId TEXT NOT NULL,
+      side TEXT NOT NULL CHECK(side IN ('long', 'short')),
+      state TEXT NOT NULL,
+      stateHistory TEXT NOT NULL DEFAULT '[]',
+      setupSignal TEXT,
+      analysis TEXT,
+      plan TEXT,
+      riskDecision TEXT,
+      entryOrder TEXT,
+      entryPrice REAL,
+      quantity REAL,
+      stopLoss REAL,
+      takeProfit REAL,
+      trailingStop TEXT,
+      currentPrice REAL,
+      unrealizedPnL REAL,
+      highWaterMark REAL,
+      exitOrder TEXT,
+      exitPrice REAL,
+      realizedPnL REAL,
+      review TEXT,
+      strategyId TEXT,
+      playbookId TEXT,
+      tags TEXT,
+      cancelReason TEXT,
+      rejectReason TEXT,
+      closeReason TEXT,
+      createdAt TEXT NOT NULL,
+      updatedAt TEXT NOT NULL,
+      closedAt TEXT
+    )
+  `);
+
+  db.run("CREATE INDEX IF NOT EXISTS idx_positions_state ON positions(state)");
+  db.run("CREATE INDEX IF NOT EXISTS idx_positions_symbol ON positions(symbol)");
+  db.run("CREATE INDEX IF NOT EXISTS idx_positions_exchangeId ON positions(exchangeId)");
+  db.run("CREATE INDEX IF NOT EXISTS idx_positions_createdAt ON positions(createdAt)");
+  db.run("CREATE INDEX IF NOT EXISTS idx_positions_closedAt ON positions(closedAt)");
+  db.run("CREATE INDEX IF NOT EXISTS idx_positions_strategyId ON positions(strategyId)");
+
   // Create data source cache table for historical OHLC data
   db.run(`
     CREATE TABLE IF NOT EXISTS data_source_cache (
