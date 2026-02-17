@@ -18,7 +18,8 @@ export type GatewayCapability =
   | "runtime:health"
   | "reconcile:run"
   | "plugin:reload"
-  | "daemon:manage";
+  | "daemon:manage"
+  | "circuit_breaker:evaluate";
 
 export interface GatewayPrincipal {
   id: string;
@@ -43,6 +44,7 @@ function defaultCapabilities(): Set<GatewayCapability> {
     "reconcile:run",
     "plugin:reload",
     "daemon:manage",
+    "circuit_breaker:evaluate",
   ]);
 }
 
@@ -116,6 +118,8 @@ export function requiredCapabilityForCommand(type: GatewayCommandType): GatewayC
       return "plugin:reload";
     case "daemon.shutdown":
       return "daemon:manage";
+    case "circuit_breaker.evaluate":
+      return "circuit_breaker:evaluate";
     default:
       return "chat:write";
   }

@@ -6,3 +6,10 @@ export {
   type CircuitBreakerTrigger,
 } from "./baseline.ts";
 
+export {
+  computeCorrelationShock,
+  computeLiquidityGap,
+  computeCircuitBreakerLiveData,
+  type CircuitBreakerLiveData,
+} from "./data-provider.ts";
+

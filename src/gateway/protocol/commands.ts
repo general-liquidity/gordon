@@ -14,6 +14,7 @@ export const GatewayCommandTypeSchema = z.enum([
   "reconcile.run",
   "plugin.reload",
   "daemon.shutdown",
+  "circuit_breaker.evaluate",
 ]);
 
 export type GatewayCommandType = z.infer<typeof GatewayCommandTypeSchema>;
@@ -72,6 +73,10 @@ export const DaemonShutdownPayloadSchema = z.object({
   reason: z.string().max(256).optional(),
 });
 
+export const CircuitBreakerEvaluatePayloadSchema = z.object({
+  force: z.boolean().default(false),
+});
+
 export const GatewayCommandPayloadSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("chat.send_message"), payload: ChatSendMessagePayloadSchema }),
   z.object({ type: z.literal("scan.run"), payload: ScanRunPayloadSchema }),
@@ -85,6 +90,7 @@ export const GatewayCommandPayloadSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("reconcile.run"), payload: ReconcileRunPayloadSchema }),
   z.object({ type: z.literal("plugin.reload"), payload: PluginReloadPayloadSchema }),
   z.object({ type: z.literal("daemon.shutdown"), payload: DaemonShutdownPayloadSchema }),
+  z.object({ type: z.literal("circuit_breaker.evaluate"), payload: CircuitBreakerEvaluatePayloadSchema }),
 ]);
 
 export const GatewayCommandEnvelopeSchema = z.object({

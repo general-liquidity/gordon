@@ -14,6 +14,8 @@ interface CachedContext {
   exchange: Exchange | null;
   binance: BinanceClient | null;
   llm: LLMClient | null;
+  portfolioValue: number;
+  availableCash: number;
   updatedAt: number;
 }
 
@@ -27,7 +29,7 @@ export class GatewayContextResolver {
 
   async resolve(sessionId: string): Promise<GordonContext> {
     const config = await loadConfig();
-    const { exchange, binance, llm } = await this.resolveClients(config);
+    const { exchange, binance, llm, portfolioValue, availableCash } = await this.resolveClients(config);
     const session = await getCurrentSession();
 
     return {
@@ -35,8 +37,8 @@ export class GatewayContextResolver {
       exchange,
       llm: (llm ?? ({} as LLMClient)),
       config,
-      portfolioValue: 0,
-      availableCash: 0,
+      portfolioValue,
+      availableCash,
       userId: session.resourceId || sessionId,
       threadId: session.threadId ?? undefined,
     };
@@ -50,12 +52,16 @@ export class GatewayContextResolver {
     exchange: Exchange | null;
     binance: BinanceClient | null;
     llm: LLMClient | null;
+    portfolioValue: number;
+    availableCash: number;
   }> {
     if (this.cache && Date.now() - this.cache.updatedAt < this.ttlMs) {
       return {
         exchange: this.cache.exchange,
         binance: this.cache.binance,
         llm: this.cache.llm,
+        portfolioValue: this.cache.portfolioValue,
+        availableCash: this.cache.availableCash,
       };
     }
 
@@ -111,14 +117,40 @@ export class GatewayContextResolver {
       }
     }
 
+    // Fetch live portfolio data from exchange
+    let portfolioValue = 0;
+    let availableCash = 0;
+
+    if (exchange) {
+      try {
+        const details = await exchange.getFullAccountDetails();
+        portfolioValue = details.totalUsdtValue;
+
+        const stableAssets = ["USDT", "BUSD", "USDC", "FDUSD"];
+        for (const asset of stableAssets) {
+          try {
+            availableCash += await exchange.getBalance(asset);
+          } catch {
+            // Asset not found or no balance
+          }
+        }
+      } catch (error) {
+        logger.warn("Failed to fetch portfolio data from exchange", {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
     this.cache = {
       exchange,
       binance,
       llm,
+      portfolioValue,
+      availableCash,
       updatedAt: Date.now(),
     };
 
-    return { exchange, binance, llm };
+    return { exchange, binance, llm, portfolioValue, availableCash };
   }
 }
 

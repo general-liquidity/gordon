@@ -18,6 +18,7 @@ import { getGordonContext, type MastraExecutionContext } from "./types.ts";
 import type { GordonContext } from "./types.ts";
 import { createModuleLogger } from "../../logger/index.ts";
 import { evaluateBaselineCircuitBreakers } from "../../../gateway/circuit-breakers/index.ts";
+import { computeCircuitBreakerLiveData } from "../../../gateway/circuit-breakers/data-provider.ts";
 
 const logger = createModuleLogger("risk-gate");
 
@@ -76,12 +77,32 @@ export async function evaluateOrderRisk(
   // Baseline circuit breakers (Phase 0 fail-safe controls)
   const runtime = StrategyRuntime.getInstance();
   const portfolioState = runtime.getPortfolioState();
+
+  // Compute live circuit breaker data from exchange
+  let correlationShockPercent = 0;
+  let liquidityGapBps = 0;
+
+  if (ctx.exchange && portfolioContext) {
+    try {
+      const liveData = await computeCircuitBreakerLiveData(
+        ctx.exchange,
+        portfolioContext.openPositions,
+      );
+      correlationShockPercent = liveData.correlationShockPercent;
+      liquidityGapBps = liveData.liquidityGapBps;
+    } catch (err) {
+      logger.warn("Could not compute live circuit breaker data, using defaults", {
+        error: (err as Error).message,
+      });
+    }
+  }
+
   const breaker = evaluateBaselineCircuitBreakers({
     portfolioDrawdownPercent: portfolioState.portfolio_drawdown_percent,
     maxPortfolioDrawdownPercent: ctx.config?.riskManagement?.maxDrawdownPercent ?? 15,
-    correlationShockPercent: 0, // TODO: wire live correlation shock metric
+    correlationShockPercent,
     maxCorrelationShockPercent: 15,
-    liquidityGapBps: 0, // TODO: wire live liquidity gap metric
+    liquidityGapBps,
     maxLiquidityGapBps: 250,
   });
 

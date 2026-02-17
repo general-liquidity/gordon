@@ -4,10 +4,12 @@ import { createEnvelopeMeta, type GatewayCommandType } from "../protocol/index.t
 import { safeAppendAudit } from "../store/audit-log-store.ts";
 import { GatewayRuntime, GatewayContextResolver } from "../runtime/index.ts";
 import { startGatewayIpcServer } from "./ipc.ts";
-import { LocalCronScheduler } from "../scheduler/index.ts";
+import { LocalCronScheduler, computeNextRunAt } from "../scheduler/index.ts";
 import { ReconciliationLoop } from "../reconciliation/index.ts";
 import { getOrCreateDaemonToken } from "../security/index.ts";
 import { initMCPTools, enableMCPHotReload, disableMCPHotReload } from "../../infra/mcp/client.ts";
+import { StrategyRuntime } from "../../core/runtime/engine.ts";
+import { upsertSchedulerTask } from "../store/scheduler-store.ts";
 
 const logger = createModuleLogger("gateway-daemon");
 
@@ -41,6 +43,23 @@ export async function startGatewayDaemonProcess(): Promise<GatewayDaemonHandle> 
     onDaemonShutdown: requestShutdown,
   });
 
+  // Initialize StrategyRuntime and sync capital from exchange
+  const strategyRuntime = StrategyRuntime.getInstance();
+  try {
+    const initCtx = await contextResolver.resolve("daemon");
+    if (initCtx.exchange) {
+      const details = await initCtx.exchange.getFullAccountDetails();
+      strategyRuntime.setTotalCapital(details.totalUsdtValue);
+      logger.info("StrategyRuntime initialized with exchange equity", {
+        totalCapital: details.totalUsdtValue.toFixed(2),
+      });
+    }
+  } catch (error) {
+    logger.warn("Could not sync initial capital from exchange", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+
   const authToken = await getOrCreateDaemonToken();
   const ipc = await startGatewayIpcServer({ runtime });
 
@@ -58,6 +77,24 @@ export async function startGatewayDaemonProcess(): Promise<GatewayDaemonHandle> 
     await runtime.submitCommand(envelope, { token: authToken, processImmediately: true });
   });
   scheduler.start();
+
+  // Schedule built-in daemon tasks (idempotent via upsert)
+  upsertSchedulerTask({
+    taskId: "__health_check",
+    cronExpr: "@every 30s",
+    commandType: "runtime.health_check",
+    payload: {},
+    enabled: true,
+    nextRunAt: computeNextRunAt("@every 30s"),
+  });
+  upsertSchedulerTask({
+    taskId: "__circuit_breaker_eval",
+    cronExpr: "@every 60s",
+    commandType: "circuit_breaker.evaluate",
+    payload: {},
+    enabled: true,
+    nextRunAt: computeNextRunAt("@every 60s"),
+  });
 
   const reconciler = new ReconciliationLoop(async () => {
     const envelope = {

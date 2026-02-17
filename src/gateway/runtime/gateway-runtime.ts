@@ -27,9 +27,13 @@ import {
   upsertSchedulerTask,
 } from "../store/scheduler-store.ts";
 import { StrategyRuntime } from "../../core/runtime/engine.ts";
-import { reconcileWithBinance } from "../../services/reconciliation.service.ts";
+import { reconcileWithExchange } from "../../services/reconciliation-exchange.service.ts";
 import { reloadMCPTools } from "../../infra/mcp/client.ts";
 import { computeNextRunAt } from "../scheduler/index.ts";
+import { PortfolioContextBuilder } from "../../core/risk-kernel/portfolio-context.ts";
+import { evaluateBaselineCircuitBreakers } from "../circuit-breakers/index.ts";
+import { computeCircuitBreakerLiveData } from "../circuit-breakers/data-provider.ts";
+import { generateCircuitBreakerProof } from "../advanced/circuit-breaker-proof.ts";
 
 const logger = createModuleLogger("gateway-runtime");
 
@@ -152,10 +156,20 @@ export class GatewayRuntime {
 
     this.registerHandler("reconcile.run", async (envelope) => {
       const context = await this.deps.resolveContext(envelope.meta.sessionId);
-      if (!context.binance) {
-        throw new Error("Reconciliation requires Binance client credentials.");
+      if (!context.exchange) {
+        throw new Error("Reconciliation requires exchange credentials.");
       }
-      return reconcileWithBinance(context.binance);
+      const result = await reconcileWithExchange(context.exchange);
+
+      // Refresh StrategyRuntime capital after reconciliation
+      try {
+        const details = await context.exchange.getFullAccountDetails();
+        StrategyRuntime.getInstance().setTotalCapital(details.totalUsdtValue);
+      } catch {
+        // Logged inside getFullAccountDetails
+      }
+
+      return result;
     });
 
     this.registerHandler("plugin.reload", async () => {
@@ -169,6 +183,69 @@ export class GatewayRuntime {
     this.registerHandler("daemon.shutdown", async () => {
       await this.deps.onDaemonShutdown();
       return { shuttingDown: true };
+    });
+
+    this.registerHandler("circuit_breaker.evaluate", async (envelope) => {
+      const context = await this.deps.resolveContext(envelope.meta.sessionId);
+
+      if (!context.exchange) {
+        return { evaluated: false, reason: "No exchange available" };
+      }
+
+      const builder = new PortfolioContextBuilder();
+      const portfolioContext = await builder.buildFromExchange(context.exchange);
+
+      const liveData = await computeCircuitBreakerLiveData(
+        context.exchange,
+        portfolioContext.openPositions,
+      );
+
+      const runtime = StrategyRuntime.getInstance();
+      const portfolioState = runtime.getPortfolioState();
+
+      const input = {
+        portfolioDrawdownPercent: portfolioState.portfolio_drawdown_percent,
+        maxPortfolioDrawdownPercent: context.config?.riskManagement?.maxDrawdownPercent ?? 15,
+        correlationShockPercent: liveData.correlationShockPercent,
+        maxCorrelationShockPercent: 15,
+        liquidityGapBps: liveData.liquidityGapBps,
+        maxLiquidityGapBps: 250,
+      };
+
+      const result = evaluateBaselineCircuitBreakers(input);
+
+      if (result.open) {
+        // Auto-disarm and generate cryptographic proof
+        const config = await loadConfig();
+        const updated = { ...config, mode: "SAFE" as const, armedUntil: null };
+        await saveConfig(updated);
+
+        const proof = generateCircuitBreakerProof(input);
+
+        safeAppendAudit({
+          eventType: "circuit_breaker.tripped",
+          actor: "daemon",
+          payload: {
+            triggers: result.triggers,
+            proof: proof.commitment,
+            autoDisarmed: true,
+          },
+        });
+
+        logger.warn("Circuit breakers tripped, system auto-disarmed", {
+          triggers: result.triggers.map((t) => t.name),
+        });
+
+        return {
+          evaluated: true,
+          tripped: true,
+          triggers: result.triggers,
+          proof,
+          autoDisarmed: true,
+        };
+      }
+
+      return { evaluated: true, tripped: false, triggers: [] };
     });
 
   }
