@@ -880,6 +880,104 @@ Use when:
 });
 
 // ============================================================================
+// Algorithmic Execution Tool
+// ============================================================================
+
+import { ExecutionSessionManager } from "../../../core/execution/session-manager.ts";
+import { parseExecutionIntent, describeIntent } from "../../../core/execution/intent-parser.ts";
+
+const executeWithAlgorithmOutputSchema = z.object({
+  success: z.boolean(),
+  sessionId: z.string().optional(),
+  algorithm: z.string().optional(),
+  description: z.string().optional(),
+  slicesTotal: z.number().optional(),
+  estimatedDuration: z.string().optional(),
+  error: z.string().optional(),
+});
+
+export const executeWithAlgorithmTool = createTool({
+  id: "execute_with_algorithm",
+  description:
+    "Execute a large order using an algorithmic execution strategy (TWAP, VWAP, or Iceberg). " +
+    "Use when the user wants to buy/sell slowly, minimize market impact, hide order size, " +
+    "or explicitly requests TWAP/VWAP/Iceberg. Examples: 'buy 1 BTC slowly over 4 hours', " +
+    "'accumulate ETH matching volume', 'sell without moving the market'.",
+  inputSchema: z.object({
+    symbol: z.string().describe("Trading pair symbol (e.g., 'BTCUSDT')"),
+    side: z.enum(["BUY", "SELL"]).describe("Order side"),
+    quantity: z.number().describe("Total quantity to execute"),
+    algorithm: z.enum(["TWAP", "VWAP", "ICEBERG"]).optional().describe("Execution algorithm (auto-detected if not specified)"),
+    description: z.string().optional().describe("Natural language description for algorithm detection (e.g., 'slowly over 4 hours')"),
+    durationMs: z.number().optional().describe("Duration in milliseconds for TWAP/VWAP"),
+  }),
+  outputSchema: executeWithAlgorithmOutputSchema,
+  execute: async ({ symbol, side, quantity, algorithm, description, durationMs }, execContext: MastraExecutionContext) => {
+    const ctx = getGordonContext(execContext);
+    if (!ctx?.exchange) {
+      return validateToolOutput(executeWithAlgorithmOutputSchema, {
+        success: false,
+        error: "Exchange client not connected.",
+      }, { toolName: "execute_with_algorithm" });
+    }
+
+    if (ctx.config?.mode !== "ARMED") {
+      return validateToolOutput(executeWithAlgorithmOutputSchema, {
+        success: false,
+        error: "System must be ARMED to execute algorithmic orders.",
+      }, { toolName: "execute_with_algorithm" });
+    }
+
+    // Normalize symbol
+    const normalizedSymbol = symbol.toUpperCase().endsWith("USDT")
+      ? symbol.toUpperCase()
+      : `${symbol.toUpperCase()}USDT`;
+
+    // Build execution intent
+    const intent = parseExecutionIntent(
+      description ?? algorithm ?? "slowly",
+      normalizedSymbol,
+      side,
+      quantity,
+    );
+
+    // Override algorithm if explicitly specified
+    if (algorithm) {
+      intent.algorithm = algorithm;
+    }
+
+    // Override duration if specified
+    if (durationMs && "durationMs" in intent.config) {
+      (intent.config as { durationMs: number }).durationMs = durationMs;
+    }
+
+    try {
+      const manager = ExecutionSessionManager.getInstance();
+      const session = await manager.startSession(intent, ctx.exchange);
+
+      const desc = describeIntent(intent);
+      const durationHours = "durationMs" in intent.config
+        ? ((intent.config as { durationMs: number }).durationMs / (60 * 60 * 1000)).toFixed(1) + "h"
+        : "N/A";
+
+      return validateToolOutput(executeWithAlgorithmOutputSchema, {
+        success: true,
+        sessionId: session.sessionId,
+        algorithm: intent.algorithm,
+        description: desc,
+        slicesTotal: session.slicesTotal,
+        estimatedDuration: durationHours,
+      }, { toolName: "execute_with_algorithm" });
+    } catch (err) {
+      return validateToolOutput(executeWithAlgorithmOutputSchema, {
+        success: false,
+        error: `Algorithmic execution failed: ${(err as Error).message}`,
+      }, { toolName: "execute_with_algorithm" });
+    }
+  },
+});
+
+// ============================================================================
 // Export as Object (Mastra format)
 // ============================================================================
 
@@ -898,4 +996,5 @@ export const tradingTools = {
   set_trailing_stop: setTrailingStopTool,
   update_trailing_stop: updateTrailingStopTool,
   close_partial_position: closePartialPositionTool,
+  execute_with_algorithm: executeWithAlgorithmTool,
 };

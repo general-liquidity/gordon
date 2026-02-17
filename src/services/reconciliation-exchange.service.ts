@@ -18,6 +18,7 @@ import { createModuleLogger } from "../infra/logger/index.ts";
 import type { Trade, EntryFill, ExitFill } from "../types/index.ts";
 import { extractOrderOwnerKey } from "../core/order-recovery.ts";
 import { StrategyRuntime } from "../core/runtime/engine.ts";
+import { FeedbackLoop } from "../core/learning/feedback-loop.ts";
 import type { ReconciliationResult } from "./reconciliation.service.ts";
 
 const logger = createModuleLogger("reconciliation-exchange");
@@ -313,6 +314,9 @@ async function reconcileTrade(
     // Gap 5: Feed trade closure back to StrategyRuntime
     if (updatedTrade.status === "CLOSED" && previousStatus !== "CLOSED") {
       feedbackToStrategyRuntime(updatedTrade);
+
+      // v0.75: Counterfactual learning — fire-and-forget
+      triggerCounterfactualAnalysis(updatedTrade, exchange).catch(() => {});
     }
   }
 
@@ -348,6 +352,21 @@ function feedbackToStrategyRuntime(trade: Trade): void {
     }
   } catch (err) {
     logger.warn("Could not feed trade result to StrategyRuntime", {
+      tradeId: trade.id,
+      error: (err as Error).message,
+    });
+  }
+}
+
+async function triggerCounterfactualAnalysis(
+  trade: Trade,
+  exchange: Exchange,
+): Promise<void> {
+  try {
+    const feedbackLoop = FeedbackLoop.getInstance();
+    await feedbackLoop.onTradeClosed(trade, exchange);
+  } catch (err) {
+    logger.debug("Counterfactual analysis skipped", {
       tradeId: trade.id,
       error: (err as Error).message,
     });

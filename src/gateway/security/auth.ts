@@ -19,7 +19,11 @@ export type GatewayCapability =
   | "reconcile:run"
   | "plugin:reload"
   | "daemon:manage"
-  | "circuit_breaker:evaluate";
+  | "circuit_breaker:evaluate"
+  | "regime:check"
+  | "evolution:tick"
+  | "learning:analyze"
+  | "execution:intent";
 
 export interface GatewayPrincipal {
   id: string;
@@ -45,6 +49,10 @@ function defaultCapabilities(): Set<GatewayCapability> {
     "plugin:reload",
     "daemon:manage",
     "circuit_breaker:evaluate",
+    "regime:check",
+    "evolution:tick",
+    "learning:analyze",
+    "execution:intent",
   ]);
 }
 
@@ -120,6 +128,14 @@ export function requiredCapabilityForCommand(type: GatewayCommandType): GatewayC
       return "daemon:manage";
     case "circuit_breaker.evaluate":
       return "circuit_breaker:evaluate";
+    case "regime.check":
+      return "regime:check";
+    case "evolution.tick":
+      return "evolution:tick";
+    case "learning.analyze_trade":
+      return "learning:analyze";
+    case "execution.start_intent":
+      return "execution:intent";
     default:
       return "chat:write";
   }

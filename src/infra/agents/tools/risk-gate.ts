@@ -19,6 +19,8 @@ import type { GordonContext } from "./types.ts";
 import { createModuleLogger } from "../../logger/index.ts";
 import { evaluateBaselineCircuitBreakers } from "../../../gateway/circuit-breakers/index.ts";
 import { computeCircuitBreakerLiveData } from "../../../gateway/circuit-breakers/data-provider.ts";
+import { evaluateConsensus } from "../../../core/consensus/protocol.ts";
+import type { TradeProposal, ConsensusResult } from "../../../core/consensus/protocol.ts";
 
 const logger = createModuleLogger("risk-gate");
 
@@ -158,6 +160,10 @@ export const checkRiskTool = createTool({
     type: z.enum(["MARKET", "LIMIT", "STOP_LIMIT"]),
     quantity: z.number(),
     price: z.number().optional(),
+    slotId: z.string().optional().describe("Strategy slot ID for consensus evaluation"),
+    playbookName: z.string().optional().describe("Playbook name for consensus evaluation"),
+    stopLoss: z.number().optional().describe("Stop loss price for consensus evaluation"),
+    takeProfit: z.array(z.number()).optional().describe("Take profit prices for consensus evaluation"),
   }),
   execute: async (input, execContext?: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
@@ -178,13 +184,48 @@ export const checkRiskTool = createTool({
         "check_risk",
       );
 
+      // Run consensus evaluation if we have enough context for a proposal
+      let consensus: ConsensusResult | undefined;
+      if (input.price && input.slotId) {
+        try {
+          const proposal: TradeProposal = {
+            symbol: input.symbol,
+            side: input.side === "BUY" ? "long" : "short",
+            size_usd: input.quantity * (input.price ?? 0),
+            playbook_name: input.playbookName ?? "unknown",
+            slot_id: input.slotId,
+            entry_price: input.price,
+            stop_loss: input.stopLoss ?? input.price * 0.95,
+            take_profit: input.takeProfit ?? [],
+          };
+          consensus = await evaluateConsensus(proposal, ctx);
+        } catch (consensusErr) {
+          logger.debug("Consensus evaluation skipped", {
+            error: (consensusErr as Error).message,
+          });
+        }
+      }
+
+      // If consensus was run and rejected, override approval
+      const finalApproved = consensus
+        ? result.approved && consensus.decision === "APPROVED"
+        : result.approved;
+
       return {
-        approved: result.approved,
+        approved: finalApproved,
         originalQuantity: input.quantity,
         adjustedQuantity: result.quantity,
         sizeAdjusted: result.quantity !== input.quantity,
-        reason: result.reason,
+        reason: consensus && consensus.decision === "REJECTED"
+          ? `Consensus rejected (score: ${consensus.score.toFixed(2)}): ${consensus.dissenting_agents.join(", ")}`
+          : result.reason,
         warnings: result.warnings,
+        consensus: consensus ? {
+          decision: consensus.decision,
+          score: consensus.score,
+          quorumMet: consensus.quorum_met,
+          dissenting: consensus.dissenting_agents,
+        } : undefined,
       };
     } catch (err) {
       logger.error("check_risk tool failed", err as Error);

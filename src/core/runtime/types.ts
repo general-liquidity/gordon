@@ -53,9 +53,13 @@ export const StrategySlotSchema = z.object({
   // Regime filter
   allowed_regimes: z.array(z.string()), // from playbook or override
 
+  // Genome tracking (strategy evolution)
+  genome_id: z.string().uuid().optional(),
+
   // Timing
   started_at: z.string().datetime(),
   paused_at: z.string().datetime().optional(),
+  paused_reason: z.enum(["user", "regime", "cooldown", "health_check"]).optional(),
   last_trade_at: z.string().datetime().optional(),
 });
 

@@ -26,6 +26,10 @@ export { PlaybookMutator } from "./mutator.ts";
 // Fitness
 export { FitnessCalculator } from "./fitness.ts";
 
+// Evolution Loop
+export { EvolutionLoop } from "./evolution-loop.ts";
+export type { EvolutionTickResult } from "./evolution-loop.ts";
+
 // Store
 export {
   initGenomeTables,

@@ -96,6 +96,23 @@ export async function startGatewayDaemonProcess(): Promise<GatewayDaemonHandle> 
     nextRunAt: computeNextRunAt("@every 60s"),
   });
 
+  upsertSchedulerTask({
+    taskId: "__regime_check",
+    cronExpr: "@every 5m",
+    commandType: "regime.check",
+    payload: {},
+    enabled: true,
+    nextRunAt: computeNextRunAt("@every 5m"),
+  });
+  upsertSchedulerTask({
+    taskId: "__evolution_tick",
+    cronExpr: "@every 1h",
+    commandType: "evolution.tick",
+    payload: {},
+    enabled: true,
+    nextRunAt: computeNextRunAt("@every 1h"),
+  });
+
   const reconciler = new ReconciliationLoop(async () => {
     const envelope = {
       meta: createEnvelopeMeta({

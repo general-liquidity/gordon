@@ -96,6 +96,9 @@ export { auditTools } from "./audit-tools.ts";
 // Advanced tools (Phase 3) -- execution twin, proofs, regime memory
 export { advancedTools } from "./advanced-tools.ts";
 
+// Genome tools (v0.75) -- playbook evolution, A/B experiments, mutation suggestions
+export { genomeTools } from "./genome-tools.ts";
+
 // Protocol tools (v0.7) -- playbook protocol validation/export/import/comparison
 export { protocolTools } from "../../../core/playbooks/protocol-tools.ts";
 
@@ -305,6 +308,7 @@ import { runtimeTools } from "./runtime-tools.ts";
 import { regimeTools } from "./regime-tools.ts";
 import { auditTools } from "./audit-tools.ts";
 import { advancedTools } from "./advanced-tools.ts";
+import { genomeTools } from "./genome-tools.ts";
 import { protocolTools } from "../../../core/playbooks/protocol-tools.ts";
 import { multiModalChartTools } from "../../tools/chartTools.ts";
 import { evalTools } from "../../evals/tools.ts";
@@ -355,6 +359,7 @@ export const allTools = {
   ...regimeTools,
   ...auditTools,
   ...advancedTools,
+  ...genomeTools,
   ...protocolTools,
 };
 
@@ -404,6 +409,7 @@ export const toolCounts = {
   regime: Object.keys(regimeTools).length,
   audit: Object.keys(auditTools).length,
   advanced: Object.keys(advancedTools).length,
+  genome: Object.keys(genomeTools).length,
   protocol: Object.keys(protocolTools).length,
   total: Object.keys(allTools).length,
 };

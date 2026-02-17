@@ -15,6 +15,10 @@ export const GatewayCommandTypeSchema = z.enum([
   "plugin.reload",
   "daemon.shutdown",
   "circuit_breaker.evaluate",
+  "regime.check",
+  "evolution.tick",
+  "learning.analyze_trade",
+  "execution.start_intent",
 ]);
 
 export type GatewayCommandType = z.infer<typeof GatewayCommandTypeSchema>;
@@ -77,6 +81,24 @@ export const CircuitBreakerEvaluatePayloadSchema = z.object({
   force: z.boolean().default(false),
 });
 
+export const RegimeCheckPayloadSchema = z.object({});
+
+export const EvolutionTickPayloadSchema = z.object({
+  force: z.boolean().default(false),
+});
+
+export const LearningAnalyzeTradePayloadSchema = z.object({
+  tradeId: z.string().min(1),
+});
+
+export const ExecutionStartIntentPayloadSchema = z.object({
+  symbol: z.string().min(1),
+  side: z.enum(["BUY", "SELL"]),
+  totalQuantity: z.number().positive(),
+  algorithm: z.enum(["TWAP", "VWAP", "ICEBERG"]),
+  config: z.record(z.string(), z.unknown()).default({}),
+});
+
 export const GatewayCommandPayloadSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("chat.send_message"), payload: ChatSendMessagePayloadSchema }),
   z.object({ type: z.literal("scan.run"), payload: ScanRunPayloadSchema }),
@@ -91,6 +113,10 @@ export const GatewayCommandPayloadSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("plugin.reload"), payload: PluginReloadPayloadSchema }),
   z.object({ type: z.literal("daemon.shutdown"), payload: DaemonShutdownPayloadSchema }),
   z.object({ type: z.literal("circuit_breaker.evaluate"), payload: CircuitBreakerEvaluatePayloadSchema }),
+  z.object({ type: z.literal("regime.check"), payload: RegimeCheckPayloadSchema }),
+  z.object({ type: z.literal("evolution.tick"), payload: EvolutionTickPayloadSchema }),
+  z.object({ type: z.literal("learning.analyze_trade"), payload: LearningAnalyzeTradePayloadSchema }),
+  z.object({ type: z.literal("execution.start_intent"), payload: ExecutionStartIntentPayloadSchema }),
 ]);
 
 export const GatewayCommandEnvelopeSchema = z.object({

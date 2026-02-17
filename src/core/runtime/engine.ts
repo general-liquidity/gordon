@@ -82,6 +82,8 @@ export class StrategyRuntime {
       max_positions?: number;
       max_daily_trades?: number;
       max_loss_percent?: number;
+      genome_id?: string;
+      allowed_regimes?: string[];
     }
   ): StrategySlot {
     // Verify playbook exists
@@ -120,11 +122,30 @@ export class StrategyRuntime {
       winning_trades: 0,
       current_drawdown_percent: 0,
       peak_equity: allocatedCapital,
-      allowed_regimes: [],
+      allowed_regimes: options?.allowed_regimes ?? this.inferAllowedRegimes(playbook),
+      genome_id: options?.genome_id,
       started_at: new Date().toISOString(),
     };
 
     this.store.saveSlot(slot);
+
+    // Auto-register genome if not already tracked (fire-and-forget, lazy import)
+    if (!slot.genome_id) {
+      import("../genome/manager.ts").then(({ GenomeManager }) => {
+        try {
+          const gm = GenomeManager.getInstance();
+          const genome = gm.registerPlaybook(playbookName);
+          slot.genome_id = genome.genome_id;
+          this.store.saveSlot(slot);
+          logger.debug("Auto-registered genome for deployed slot", {
+            slot_id: slot.slot_id,
+            genome_id: genome.genome_id,
+          });
+        } catch {
+          // Already registered or not available — skip
+        }
+      }).catch(() => {});
+    }
 
     logger.info("Strategy deployed", {
       slot_id: slot.slot_id,
@@ -150,6 +171,7 @@ export class StrategyRuntime {
 
     slot.status = "paused";
     slot.paused_at = new Date().toISOString();
+    slot.paused_reason = (reason as "user" | "regime" | "cooldown" | "health_check") ?? "user";
     this.store.saveSlot(slot);
 
     logger.info("Strategy paused", { slot_id: slotId, reason });
@@ -169,6 +191,7 @@ export class StrategyRuntime {
 
     slot.status = "active";
     slot.paused_at = undefined;
+    slot.paused_reason = undefined;
     this.store.saveSlot(slot);
 
     logger.info("Strategy resumed", { slot_id: slotId });
@@ -686,5 +709,35 @@ export class StrategyRuntime {
       throw new Error(`Strategy slot ${slotId} not found`);
     }
     return slot;
+  }
+
+  /**
+   * Infer allowed regimes from a playbook's tags using REGIME_TAG_MAP.
+   * Returns the regimes whose tags overlap with the playbook's tags.
+   */
+  private inferAllowedRegimes(playbook: { tags: string[] }): string[] {
+    const REGIME_TAG_MAP: Record<string, string[]> = {
+      trending_up: ["trend", "trend-following", "momentum", "ema", "crossover", "breakout"],
+      trending_down: ["trend", "trend-following", "short", "ema", "crossover"],
+      ranging: ["mean-reversion", "range", "support", "oversold", "overbought"],
+      volatile: ["volatility", "scalp", "breakout", "momentum"],
+      quiet: ["mean-reversion", "accumulation", "range", "support"],
+      breakout: ["breakout", "momentum", "volume", "trend"],
+    };
+
+    const pbTags = playbook.tags.map((t) => t.toLowerCase());
+    if (pbTags.length === 0) return [];
+
+    const matchedRegimes: string[] = [];
+    for (const [regime, regimeTags] of Object.entries(REGIME_TAG_MAP)) {
+      const hasOverlap = regimeTags.some((rt) =>
+        pbTags.some((pt) => pt === rt || pt.includes(rt) || rt.includes(pt)),
+      );
+      if (hasOverlap) {
+        matchedRegimes.push(regime);
+      }
+    }
+
+    return matchedRegimes;
   }
 }

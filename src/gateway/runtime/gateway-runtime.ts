@@ -34,6 +34,12 @@ import { PortfolioContextBuilder } from "../../core/risk-kernel/portfolio-contex
 import { evaluateBaselineCircuitBreakers } from "../circuit-breakers/index.ts";
 import { computeCircuitBreakerLiveData } from "../circuit-breakers/data-provider.ts";
 import { generateCircuitBreakerProof } from "../advanced/circuit-breaker-proof.ts";
+import { RegimeWatcher } from "../../core/regime/watcher.ts";
+import { EvolutionLoop } from "../../core/genome/evolution-loop.ts";
+import { FeedbackLoop } from "../../core/learning/feedback-loop.ts";
+import { ExecutionSessionManager } from "../../core/execution/session-manager.ts";
+import { parseExecutionIntent } from "../../core/execution/intent-parser.ts";
+import { getTrade } from "../../infra/storage/trades.ts";
 
 const logger = createModuleLogger("gateway-runtime");
 
@@ -246,6 +252,87 @@ export class GatewayRuntime {
       }
 
       return { evaluated: true, tripped: false, triggers: [] };
+    });
+
+    // ---- v0.75 Feature Handlers ----
+
+    this.registerHandler("regime.check", async (envelope) => {
+      const context = await this.deps.resolveContext(envelope.meta.sessionId);
+      if (!context.exchange) {
+        return { checked: false, reason: "No exchange available" };
+      }
+      const watcher = RegimeWatcher.getInstance();
+      const result = await watcher.tick(context.exchange);
+      return result;
+    });
+
+    this.registerHandler("evolution.tick", async (envelope) => {
+      const context = await this.deps.resolveContext(envelope.meta.sessionId);
+      if (!context.exchange) {
+        return { ticked: false, reason: "No exchange available" };
+      }
+      const payload = envelope.command.payload as { force?: boolean };
+      const loop = EvolutionLoop.getInstance();
+      const result = await loop.tick(context.exchange, payload.force ?? false);
+      return result;
+    });
+
+    this.registerHandler("learning.analyze_trade", async (envelope) => {
+      const context = await this.deps.resolveContext(envelope.meta.sessionId);
+      if (!context.exchange) {
+        return { analyzed: false, reason: "No exchange available" };
+      }
+      const payload = envelope.command.payload as { tradeId: string };
+      const trade = getTrade(payload.tradeId);
+      if (!trade) {
+        return { analyzed: false, reason: `Trade ${payload.tradeId} not found` };
+      }
+      const feedbackLoop = FeedbackLoop.getInstance();
+      await feedbackLoop.onTradeClosed(trade, context.exchange);
+      return { analyzed: true, tradeId: payload.tradeId };
+    });
+
+    this.registerHandler("execution.start_intent", async (envelope) => {
+      const context = await this.deps.resolveContext(envelope.meta.sessionId);
+      if (!context.exchange) {
+        return { started: false, reason: "No exchange available" };
+      }
+      const payload = envelope.command.payload as Record<string, unknown>;
+
+      // Validate required fields
+      if (!payload.symbol || typeof payload.symbol !== "string") {
+        return { started: false, reason: "Missing or invalid 'symbol'" };
+      }
+      if (!payload.side || (payload.side !== "BUY" && payload.side !== "SELL")) {
+        return { started: false, reason: "Missing or invalid 'side' (must be BUY or SELL)" };
+      }
+      if (!payload.totalQuantity || typeof payload.totalQuantity !== "number" || payload.totalQuantity <= 0) {
+        return { started: false, reason: "Missing or invalid 'totalQuantity' (must be positive number)" };
+      }
+      if (!payload.algorithm || !["TWAP", "VWAP", "ICEBERG"].includes(payload.algorithm as string)) {
+        return { started: false, reason: "Missing or invalid 'algorithm' (must be TWAP, VWAP, or ICEBERG)" };
+      }
+
+      const symbol = payload.symbol as string;
+      const side = payload.side as "BUY" | "SELL";
+      const totalQuantity = payload.totalQuantity as number;
+      const algorithm = payload.algorithm as "TWAP" | "VWAP" | "ICEBERG";
+      const config = (payload.config ?? {}) as Record<string, unknown>;
+
+      const intent = parseExecutionIntent(
+        `Execute ${algorithm} for ${symbol}`,
+        symbol,
+        side,
+        totalQuantity,
+      );
+      // Override parsed algorithm with explicit one
+      intent.algorithm = algorithm;
+      // Merge any explicit config
+      Object.assign(intent.config, config);
+
+      const sessionManager = ExecutionSessionManager.getInstance();
+      const session = await sessionManager.startSession(intent, context.exchange);
+      return { started: true, sessionId: session.sessionId, intent: session.intent };
     });
 
   }

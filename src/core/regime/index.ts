@@ -53,3 +53,7 @@ export { RegimeClassifier } from "./classifier.ts";
 
 // Detector (singleton)
 export { RegimeDetector } from "./detector.ts";
+
+// Watcher (singleton)
+export { RegimeWatcher } from "./watcher.ts";
+export type { RegimeWatchResult, SlotRegimeAction } from "./watcher.ts";
