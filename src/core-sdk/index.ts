@@ -16,6 +16,49 @@ export { simulateOrderBundle } from "../gateway/advanced/counterfactual.ts";
 export { generateCircuitBreakerProof, verifyCircuitBreakerProof } from "../gateway/advanced/circuit-breaker-proof.ts";
 export { queryRegimeScopedMemory } from "../gateway/advanced/regime-memory.ts";
 
-// SDK client
-export { GordonSDKClient, createGordonSDKClient } from "../sdk/index.ts";
-export type { SDKConfig, SDKCommandResponse, DaemonStatus } from "../sdk/types.ts";
+// SDK client and factory
+export {
+  GordonSDKClient,
+  createGordonSDK,
+  createGordonSDKClient,
+} from "../sdk/index.ts";
+
+// SDK types
+export type {
+  SDKConfig,
+  SDKConfigInput,
+  SDKConnectionState,
+  SDKCommandResponse,
+  SDKEvent,
+  SDKEventType,
+  SDKEventHandler,
+  EventSubscription,
+  ScanOptions,
+  MonitorOptions,
+  ArmOptions,
+  DisarmOptions,
+  ScheduleTaskOptions,
+  HealthCheckOptions,
+  ReconcileOptions,
+  PluginReloadOptions,
+  SendMessageOptions,
+  DaemonStatus,
+  ScheduledTaskInfo,
+} from "../sdk/types.ts";
+
+// SDK errors
+export {
+  GordonSDKError,
+  ConnectionError,
+  AuthenticationError,
+  QueueBackpressureError,
+  RiskBlockedError,
+  TimeoutError,
+  ValidationError,
+  IdempotencyConflictError,
+  CircuitBreakerOpenError,
+  HandoffBudgetExceededError,
+  createSDKErrorFromGateway,
+  isGordonSDKError,
+  isRetryableError,
+} from "../sdk/errors.ts";

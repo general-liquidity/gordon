@@ -1,4 +1,10 @@
-export { GordonSDKClient, createGordonSDKClient } from "./sdk/index.ts";
+export {
+  GordonSDKClient,
+  createGordonSDK,
+  createGordonSDKClient,
+  createEnvelopeMeta,
+  getDefaultIpcPath,
+} from "./sdk/index.ts";
 export * from "./sdk/types.ts";
 export * from "./sdk/errors.ts";
 export { scaffoldProject } from "./sdk/scaffold.ts";
