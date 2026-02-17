@@ -393,18 +393,40 @@ async function checkOrphanedOrders(
           const matchingTrade = ownerKey ? knownOrderOwnerKeys.has(ownerKey) : false;
 
           if (!matchingTrade) {
-            result.warnings.push(
-              `Orphaned order found: ${order.orderId} for ${symbol} (clientOrderId: ${clientOrderId})`,
-            );
+            // Auto-cancel orphaned Gordon orders
+            try {
+              await exchange.cancelOrder(symbol, order.orderId.toString());
+              result.warnings.push(
+                `Orphaned order auto-cancelled: ${order.orderId} for ${symbol} (clientOrderId: ${clientOrderId})`,
+              );
+              logger.info("Orphaned order auto-cancelled", {
+                symbol,
+                exchange: exchange.exchangeId,
+                orderId: order.orderId,
+                clientOrderId,
+                side: order.side,
+                type: order.type,
+              });
 
-            logger.warn("Orphaned order detected", {
-              symbol,
-              exchange: exchange.exchangeId,
-              orderId: order.orderId,
-              clientOrderId,
-              side: order.side,
-              type: order.type,
-            });
+              logEvent({
+                type: "SYSTEM",
+                data: {
+                  action: "ORPHANED_ORDER_CANCELLED",
+                  symbol,
+                  orderId: order.orderId,
+                  clientOrderId,
+                },
+              });
+            } catch (cancelErr) {
+              result.warnings.push(
+                `Orphaned order found but cancel failed: ${order.orderId} for ${symbol} — ${(cancelErr as Error).message}`,
+              );
+              logger.warn("Failed to cancel orphaned order", {
+                symbol,
+                orderId: order.orderId,
+                error: (cancelErr as Error).message,
+              });
+            }
           }
         }
       }

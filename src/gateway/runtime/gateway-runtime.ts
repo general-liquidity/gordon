@@ -40,6 +40,9 @@ import { FeedbackLoop } from "../../core/learning/feedback-loop.ts";
 import { ExecutionSessionManager } from "../../core/execution/session-manager.ts";
 import { parseExecutionIntent } from "../../core/execution/intent-parser.ts";
 import { getTrade } from "../../infra/storage/trades.ts";
+import { executeEmergencyLiquidation } from "../../core/safety/emergency-liquidation.ts";
+import { cleanupStalePositions } from "../../core/positions/cleanup.ts";
+import { getAutonomousLoopStatus, runAutonomousCycleOnce } from "../../core/autonomous-loop.ts";
 
 const logger = createModuleLogger("gateway-runtime");
 
@@ -157,7 +160,16 @@ export class GatewayRuntime {
     this.registerHandler("runtime.health_check", async () => {
       const runtime = StrategyRuntime.getInstance();
       const actions = runtime.runHealthCheck();
-      return { actions, count: actions.length };
+
+      // Also clean up stale positions
+      let positionCleanup;
+      try {
+        positionCleanup = await cleanupStalePositions();
+      } catch {
+        positionCleanup = { expired: 0, byState: {} };
+      }
+
+      return { actions, count: actions.length, positionCleanup };
     });
 
     this.registerHandler("reconcile.run", async (envelope) => {
@@ -242,12 +254,22 @@ export class GatewayRuntime {
           triggers: result.triggers.map((t) => t.name),
         });
 
+        // Emergency liquidation: cancel orders + close positions + pause slots
+        let liquidation;
+        try {
+          liquidation = await executeEmergencyLiquidation(context.exchange, result.triggers);
+        } catch (liqErr) {
+          logger.error("Emergency liquidation failed", liqErr as Error);
+          liquidation = { error: (liqErr as Error).message };
+        }
+
         return {
           evaluated: true,
           tripped: true,
           triggers: result.triggers,
           proof,
           autoDisarmed: true,
+          liquidation,
         };
       }
 
@@ -333,6 +355,54 @@ export class GatewayRuntime {
       const sessionManager = ExecutionSessionManager.getInstance();
       const session = await sessionManager.startSession(intent, context.exchange);
       return { started: true, sessionId: session.sessionId, intent: session.intent };
+    });
+
+    // ---- Capital Refresh (Task #85) ----
+
+    this.registerHandler("capital.refresh", async (envelope) => {
+      const context = await this.deps.resolveContext(envelope.meta.sessionId);
+      if (!context.exchange) {
+        return { refreshed: false, reason: "No exchange available" };
+      }
+      try {
+        const details = await context.exchange.getFullAccountDetails();
+        const runtime = StrategyRuntime.getInstance();
+        runtime.setTotalCapital(details.totalUsdtValue);
+        return {
+          refreshed: true,
+          totalCapital: details.totalUsdtValue,
+          timestamp: new Date().toISOString(),
+        };
+      } catch (err) {
+        return {
+          refreshed: false,
+          reason: (err as Error).message,
+        };
+      }
+    });
+
+    // ---- Autonomous Cycle (Task #84) ----
+
+    this.registerHandler("autonomous.run_cycle", async (envelope) => {
+      const context = await this.deps.resolveContext(envelope.meta.sessionId);
+      if (!context.exchange) {
+        return { ran: false, reason: "No exchange available" };
+      }
+
+      const status = getAutonomousLoopStatus();
+      if (!status.isRunning) {
+        return { ran: false, reason: "Autonomous loop not active. Start via create_swing_mandate + start_autonomous_mode." };
+      }
+      if (status.isPaused) {
+        return { ran: false, reason: "Autonomous loop is paused." };
+      }
+
+      try {
+        const report = await runAutonomousCycleOnce();
+        return { ran: true, report };
+      } catch (err) {
+        return { ran: false, reason: (err as Error).message };
+      }
     });
 
   }

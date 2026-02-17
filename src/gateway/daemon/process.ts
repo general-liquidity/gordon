@@ -113,6 +113,24 @@ export async function startGatewayDaemonProcess(): Promise<GatewayDaemonHandle> 
     nextRunAt: computeNextRunAt("@every 1h"),
   });
 
+  upsertSchedulerTask({
+    taskId: "__capital_refresh",
+    cronExpr: "@every 5m",
+    commandType: "capital.refresh",
+    payload: {},
+    enabled: true,
+    nextRunAt: computeNextRunAt("@every 5m"),
+  });
+
+  upsertSchedulerTask({
+    taskId: "__autonomous_cycle",
+    cronExpr: "@every 15m",
+    commandType: "autonomous.run_cycle",
+    payload: {},
+    enabled: true,
+    nextRunAt: computeNextRunAt("@every 15m"),
+  });
+
   const reconciler = new ReconciliationLoop(async () => {
     const envelope = {
       meta: createEnvelopeMeta({

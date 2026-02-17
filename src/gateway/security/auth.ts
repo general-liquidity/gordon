@@ -23,7 +23,9 @@ export type GatewayCapability =
   | "regime:check"
   | "evolution:tick"
   | "learning:analyze"
-  | "execution:intent";
+  | "execution:intent"
+  | "autonomous:cycle"
+  | "capital:refresh";
 
 export interface GatewayPrincipal {
   id: string;
@@ -53,6 +55,8 @@ function defaultCapabilities(): Set<GatewayCapability> {
     "evolution:tick",
     "learning:analyze",
     "execution:intent",
+    "autonomous:cycle",
+    "capital:refresh",
   ]);
 }
 
@@ -136,6 +140,10 @@ export function requiredCapabilityForCommand(type: GatewayCommandType): GatewayC
       return "learning:analyze";
     case "execution.start_intent":
       return "execution:intent";
+    case "autonomous.run_cycle":
+      return "autonomous:cycle";
+    case "capital.refresh":
+      return "capital:refresh";
     default:
       return "chat:write";
   }

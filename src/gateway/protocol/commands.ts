@@ -19,6 +19,8 @@ export const GatewayCommandTypeSchema = z.enum([
   "evolution.tick",
   "learning.analyze_trade",
   "execution.start_intent",
+  "autonomous.run_cycle",
+  "capital.refresh",
 ]);
 
 export type GatewayCommandType = z.infer<typeof GatewayCommandTypeSchema>;
@@ -99,6 +101,10 @@ export const ExecutionStartIntentPayloadSchema = z.object({
   config: z.record(z.string(), z.unknown()).default({}),
 });
 
+export const AutonomousRunCyclePayloadSchema = z.object({});
+
+export const CapitalRefreshPayloadSchema = z.object({});
+
 export const GatewayCommandPayloadSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("chat.send_message"), payload: ChatSendMessagePayloadSchema }),
   z.object({ type: z.literal("scan.run"), payload: ScanRunPayloadSchema }),
@@ -117,6 +123,8 @@ export const GatewayCommandPayloadSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("evolution.tick"), payload: EvolutionTickPayloadSchema }),
   z.object({ type: z.literal("learning.analyze_trade"), payload: LearningAnalyzeTradePayloadSchema }),
   z.object({ type: z.literal("execution.start_intent"), payload: ExecutionStartIntentPayloadSchema }),
+  z.object({ type: z.literal("autonomous.run_cycle"), payload: AutonomousRunCyclePayloadSchema }),
+  z.object({ type: z.literal("capital.refresh"), payload: CapitalRefreshPayloadSchema }),
 ]);
 
 export const GatewayCommandEnvelopeSchema = z.object({

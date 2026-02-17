@@ -348,6 +348,17 @@ export function resumeAutonomousLoop(): void {
   emitEvent("autonomous:resumed", { mandateId: loopState.mandate?.id }).catch(() => {});
 }
 
+/**
+ * Run a single autonomous cycle on demand (called by the daemon scheduler).
+ * Only works if the loop is running and not paused.
+ */
+export async function runAutonomousCycleOnce(): Promise<CycleReport | null> {
+  if (!loopState.isRunning || loopState.isPaused) {
+    return null;
+  }
+  return runCycle();
+}
+
 export function getAutonomousLoopStatus(): {
   isRunning: boolean;
   isPaused: boolean;
