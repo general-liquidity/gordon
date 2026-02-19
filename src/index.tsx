@@ -74,6 +74,13 @@ if (hasStdinData()) {
 }
 
 // ============================================================================
+// License Check — must pass before TUI loads
+// ============================================================================
+
+import { checkLicense, shutdownLicense } from "./infra/license/index.ts";
+await checkLicense();
+
+// ============================================================================
 // TUI Launch
 // ============================================================================
 
@@ -106,6 +113,12 @@ async function gracefulShutdown(signal: string, code: number = 0): Promise<void>
     console.log(`\nShutting down...`);
   } else if (signal !== "exit") {
     console.log(`\nReceived ${signal}, shutting down gracefully...`);
+  }
+
+  try {
+    await shutdownLicense();
+  } catch {
+    // Non-critical
   }
 
   try {
