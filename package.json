@@ -1,7 +1,7 @@
 {
   "name": "@general-liquidity/gordon-cli",
-  "version": "0.1.0",
-  "description": "Claude Code for Vibe Trading",
+  "version": "0.75.0",
+  "description": "The Frontier Trading Agent",
   "author": "General Liquidity, Inc.",
   "license": "MIT",
   "repository": {
