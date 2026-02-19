@@ -44,6 +44,14 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 *.sqlite-wal
 .superdesign
 
+# Compiled binaries
+gordon-linux-*
+gordon-darwin-*
+gordon-windows-*
+
+# Supabase temp
+supabase/.temp
+
 # Website repos (separate git repos)
 general-liquidity-website
 gordon-cli-website
