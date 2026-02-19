@@ -51,7 +51,6 @@ create index idx_activations_token on activations(token);
 create index idx_invite_codes_code on invite_codes(code);
 
 -- Atomic invite code claim (prevents race conditions)
--- Atomic invite code claim (prevents race conditions)
 create or replace function claim_invite(p_code text)
 returns invite_codes as $$
   update invite_codes
@@ -69,6 +68,10 @@ returns void as $$
   set current_uses = greatest(current_uses - 1, 0)
   where code = p_code;
 $$ language sql;
+
+-- Restrict RPC functions to service_role only (prevent anon abuse)
+revoke execute on function claim_invite from anon;
+revoke execute on function unclaim_invite from anon;
 
 -- ============================================================================
 -- Seed: Generate invite codes for alpha testers
