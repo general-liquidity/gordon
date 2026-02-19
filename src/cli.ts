@@ -6,7 +6,7 @@
 
 import { GORDON_DIR } from "./infra/storage/paths.ts";
 
-const VERSION = "0.75.0";
+const VERSION = "0.75.1";
 const MIN_BUN_VERSION = "1.0.0";
 
 export interface CLIFlags {
