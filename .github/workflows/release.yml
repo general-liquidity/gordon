@@ -134,19 +134,21 @@ jobs:
           LINUX_X64=$(cat /tmp/binaries/gordon-linux-x64.sha256)
 
           sed -i "s/version \".*\"/version \"${VERSION}\"/" Formula/gordon.rb
-          sed -i "s/PLACEHOLDER_DARWIN_ARM64/${DARWIN_ARM64}/" Formula/gordon.rb
-          sed -i "s/PLACEHOLDER_DARWIN_X64/${DARWIN_X64}/" Formula/gordon.rb
-          sed -i "s/PLACEHOLDER_LINUX_ARM64/${LINUX_ARM64}/" Formula/gordon.rb
-          sed -i "s/PLACEHOLDER_LINUX_X64/${LINUX_X64}/" Formula/gordon.rb
+          # Replace any existing sha256 hash (64 hex chars) or placeholder
+          sed -i "s/sha256 \"[a-fA-F0-9]\{64\}\"/sha256 \"PLACEHOLDER\"/" Formula/gordon.rb
+          sed -i "0,/PLACEHOLDER/{s/PLACEHOLDER/${DARWIN_ARM64}/}" Formula/gordon.rb
+          sed -i "0,/PLACEHOLDER/{s/PLACEHOLDER/${DARWIN_X64}/}" Formula/gordon.rb
+          sed -i "0,/PLACEHOLDER/{s/PLACEHOLDER/${LINUX_ARM64}/}" Formula/gordon.rb
+          sed -i "0,/PLACEHOLDER/{s/PLACEHOLDER/${LINUX_X64}/}" Formula/gordon.rb
 
       - name: Update Scoop manifest
         run: |
           WINDOWS_X64=$(cat /tmp/binaries/gordon-windows-x64.exe.sha256)
 
-          # Update version and hash in Scoop manifest
           sed -i "s/\"version\": \".*\"/\"version\": \"${VERSION}\"/" scripts/scoop/gordon.json
-          sed -i "s/PLACEHOLDER_WINDOWS_X64/${WINDOWS_X64}/" scripts/scoop/gordon.json
-          sed -i "s|/v[0-9.]*-\?[a-z0-9]*/gordon-windows|/v${VERSION}/gordon-windows|g" scripts/scoop/gordon.json
+          # Replace any existing hash or placeholder
+          sed -i "s/\"hash\": \"[^\"]*\"/\"hash\": \"${WINDOWS_X64}\"/" scripts/scoop/gordon.json
+          sed -i "s|/v[0-9.]*[^/]*/gordon-windows|/v${VERSION}/gordon-windows|g" scripts/scoop/gordon.json
 
       - name: Commit updated manifests
         run: |
