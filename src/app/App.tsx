@@ -402,9 +402,11 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
       try {
         llmClientRef.current = createLLMClientFromEnv();
 
-        // Initialize tracing for Mastra Agent
+        // Initialize tracing for Mastra Agent (non-blocking)
         if (envStatus.keys.OPENAI_API_KEY) {
-          initializeTracing();
+          initializeTracing().catch((err) =>
+            console.error("[Tracing] Init failed:", (err as Error).message),
+          );
         }
 
         // Initialize MCP plugin tools (non-blocking)

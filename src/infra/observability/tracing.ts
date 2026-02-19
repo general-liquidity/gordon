@@ -2,17 +2,22 @@
  * OpenTelemetry Tracing Module
  *
  * Configures OpenTelemetry tracing for Gordon's agent infrastructure.
- * Integrates with Mastra's observability system via the OTEL bridge pattern.
+ * Exports traces to Axiom (or any OTLP-compatible backend).
  *
  * Environment Variables:
- * - OTEL_EXPORTER_OTLP_ENDPOINT: OTLP endpoint URL (default: http://localhost:4318/v1/traces)
- * - OTEL_SERVICE_NAME: Service name for traces (default: gordon-trading)
  * - OTEL_TRACING_ENABLED: Enable/disable tracing (default: false)
+ * - OTEL_EXPORTER_OTLP_ENDPOINT: OTLP endpoint URL (default: https://api.axiom.co/v1/traces)
+ * - OTEL_EXPORTER_OTLP_HEADERS: Auth headers (e.g. "Authorization=Bearer xxx,X-Axiom-Dataset=gordon-traces")
+ * - OTEL_SERVICE_NAME: Service name for traces (default: gordon-trading)
  */
 
 import { createModuleLogger } from "../logger/index.ts";
 
 const logger = createModuleLogger("tracing");
+
+// Lazily-loaded OTEL modules (avoids verbatimModuleSyntax issues)
+let otelApi: typeof import("@opentelemetry/api") | null = null;
+let sdkInstance: InstanceType<typeof import("@opentelemetry/sdk-node").NodeSDK> | null = null;
 
 // ============================================================================
 // Types
@@ -21,6 +26,7 @@ const logger = createModuleLogger("tracing");
 export interface TracingConfig {
   serviceName: string;
   endpoint: string;
+  headers: Record<string, string>;
   enabled: boolean;
 }
 
@@ -51,12 +57,28 @@ const activeSpans = new Map<string, SpanContext>();
 // ============================================================================
 
 /**
+ * Parse OTLP headers from comma-separated "Key=Value" string
+ */
+function parseOtlpHeaders(raw?: string): Record<string, string> {
+  if (!raw) return {};
+  const headers: Record<string, string> = {};
+  for (const pair of raw.split(",")) {
+    const idx = pair.indexOf("=");
+    if (idx > 0) {
+      headers[pair.slice(0, idx).trim()] = pair.slice(idx + 1).trim();
+    }
+  }
+  return headers;
+}
+
+/**
  * Get tracing configuration from environment
  */
 export function getTracingConfig(): TracingConfig {
   return {
     serviceName: process.env.OTEL_SERVICE_NAME || "gordon-trading",
-    endpoint: process.env.OTEL_EXPORTER_OTLP_ENDPOINT || "http://localhost:4318/v1/traces",
+    endpoint: process.env.OTEL_EXPORTER_OTLP_ENDPOINT || "https://api.axiom.co/v1/traces",
+    headers: parseOtlpHeaders(process.env.OTEL_EXPORTER_OTLP_HEADERS),
     enabled: process.env.OTEL_TRACING_ENABLED === "true",
   };
 }
@@ -180,20 +202,14 @@ export function buildTracingOptions(options?: {
 // ============================================================================
 
 /**
- * Initialize OpenTelemetry tracing
+ * Initialize OpenTelemetry tracing with OTLP exporter (Axiom-compatible).
  *
- * This sets up the tracing infrastructure. When OTEL_TRACING_ENABLED is true,
- * traces will be exported to the configured OTLP endpoint.
- *
- * Note: Full OTEL SDK initialization requires additional dependencies:
- * - @opentelemetry/sdk-node
- * - @opentelemetry/auto-instrumentations-node
- * - @opentelemetry/exporter-trace-otlp-proto
- *
- * For now, this module provides lightweight tracing context management
- * that integrates with Mastra's built-in observability system.
+ * Set these env vars to enable:
+ *   OTEL_TRACING_ENABLED=true
+ *   OTEL_EXPORTER_OTLP_ENDPOINT=https://api.axiom.co/v1/traces
+ *   OTEL_EXPORTER_OTLP_HEADERS=Authorization=Bearer <AXIOM_TOKEN>,X-Axiom-Dataset=gordon-traces
  */
-export function initializeTracing(): void {
+export async function initializeTracing(): Promise<void> {
   if (tracingInitialized) {
     logger.debug("Tracing already initialized");
     return;
@@ -212,27 +228,36 @@ export function initializeTracing(): void {
     endpoint: tracingConfig.endpoint,
   });
 
-  // Note: Full OTEL SDK setup would go here when dependencies are added:
-  //
-  // import { NodeSDK } from "@opentelemetry/sdk-node";
-  // import { getNodeAutoInstrumentations } from "@opentelemetry/auto-instrumentations-node";
-  // import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-proto";
-  // import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
-  //
-  // const sdk = new NodeSDK({
-  //   serviceName: tracingConfig.serviceName,
-  //   spanProcessors: [
-  //     new BatchSpanProcessor(
-  //       new OTLPTraceExporter({ url: tracingConfig.endpoint })
-  //     )
-  //   ],
-  //   instrumentations: [getNodeAutoInstrumentations()],
-  // });
-  //
-  // sdk.start();
+  try {
+    const [sdkMod, exporterMod, traceMod, resourceMod, semconvMod] = await Promise.all([
+      import("@opentelemetry/sdk-node"),
+      import("@opentelemetry/exporter-trace-otlp-proto"),
+      import("@opentelemetry/sdk-trace-base"),
+      import("@opentelemetry/resources"),
+      import("@opentelemetry/semantic-conventions"),
+    ]);
+    otelApi = await import("@opentelemetry/api");
 
-  tracingInitialized = true;
-  logger.info("Tracing initialized successfully");
+    const exporter = new exporterMod.OTLPTraceExporter({
+      url: tracingConfig.endpoint,
+      headers: tracingConfig.headers,
+    });
+
+    sdkInstance = new sdkMod.NodeSDK({
+      resource: resourceMod.resourceFromAttributes({
+        [semconvMod.ATTR_SERVICE_NAME]: tracingConfig.serviceName,
+        [semconvMod.ATTR_SERVICE_VERSION]: process.env.npm_package_version || "unknown",
+      }),
+      spanProcessors: [new traceMod.BatchSpanProcessor(exporter)],
+    });
+
+    sdkInstance.start();
+    tracingInitialized = true;
+    logger.info("Tracing initialized successfully");
+  } catch (err) {
+    logger.error("Failed to initialize OTEL tracing", err instanceof Error ? err : new Error(String(err)));
+    tracingInitialized = true; // Mark as initialized to avoid retries
+  }
 }
 
 /**
@@ -245,11 +270,17 @@ export async function shutdownTracing(): Promise<void> {
 
   logger.debug("Shutting down tracing");
 
-  // Clear active spans
   activeSpans.clear();
 
-  // Note: Full OTEL SDK shutdown would go here:
-  // await sdk.shutdown();
+  if (sdkInstance) {
+    try {
+      await sdkInstance.shutdown();
+    } catch (err) {
+      logger.debug("Tracing shutdown error (non-fatal)", { error: String(err) });
+    }
+    sdkInstance = null;
+    otelApi = null;
+  }
 
   tracingInitialized = false;
   logger.debug("Tracing shutdown complete");
@@ -277,7 +308,17 @@ export function getTracingStatus(): {
 }
 
 /**
+ * Get the OTEL tracer instance for Gordon
+ */
+export function getTracer() {
+  return otelApi?.trace.getTracer("gordon-trading") ?? null;
+}
+
+/**
  * Create a traced operation wrapper
+ *
+ * When tracing is enabled, creates a real OTEL span exported to Axiom.
+ * When disabled, falls back to lightweight internal span tracking.
  *
  * Usage:
  * ```typescript
@@ -296,6 +337,33 @@ export async function withTracing<T>(
 
   storeSpanContext(spanKey, spanContext);
 
+  // Use real OTEL tracer when SDK is active
+  const tracer = getTracer();
+  if (tracer && otelApi) {
+    const api = otelApi;
+    return tracer.startActiveSpan(operationName, async (span) => {
+      if (options?.metadata) {
+        for (const [k, v] of Object.entries(options.metadata)) {
+          span.setAttribute(k, String(v));
+        }
+      }
+      try {
+        const result = await fn(spanContext);
+        span.setStatus({ code: api.SpanStatusCode.OK });
+        return result;
+      } catch (err) {
+        const error = err instanceof Error ? err : new Error(String(err));
+        span.setStatus({ code: api.SpanStatusCode.ERROR, message: error.message });
+        span.recordException(error);
+        throw error;
+      } finally {
+        span.end();
+        removeSpanContext(spanKey);
+      }
+    });
+  }
+
+  // Fallback: lightweight internal tracking
   try {
     logger.debug("Starting traced operation", {
       operation: operationName,

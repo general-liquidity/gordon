@@ -1853,9 +1853,9 @@ export async function quickCheckPositions(context: GordonContext) {
  * - OTEL_EXPORTER_OTLP_ENDPOINT: OTLP endpoint URL
  * - OTEL_SERVICE_NAME: Service name for traces
  */
-export function initializeTracing(): void {
+export async function initializeTracing(): Promise<void> {
   // Initialize the tracing module
-  initTracingModule();
+  await initTracingModule();
 
   // Log configuration status
   const config = getTracingConfig();

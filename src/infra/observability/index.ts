@@ -76,6 +76,7 @@ export {
   // Tracing utilities
   buildTracingOptions,
   withTracing,
+  getTracer,
 
   // Types
   type TracingConfig,
