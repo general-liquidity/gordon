@@ -317,7 +317,7 @@ export function stopAutonomousLoop(reason?: string): void {
     totalOpportunities: loopState.totalOpportunities,
   });
 
-  if (loopState.mandate) {
+  if (loopState.mandate && loopState.mandate.status !== "completed") {
     loopState.mandate.status = "cancelled";
     saveMandateState(loopState.mandate);
   }

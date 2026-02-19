@@ -11,15 +11,19 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-gordon-token",
+const MAX_EVENTS_PER_BATCH = 100;
+const MAX_METADATA_SIZE = 4096;
+const MAX_EVENT_TYPE_LENGTH = 128;
+
+// No wildcard CORS — this is a CLI-only endpoint
+const responseHeaders = {
+  "Content-Type": "application/json",
 };
 
 Deno.serve(async (req) => {
-  // Handle CORS preflight
+  // Reject browser preflight — CLI doesn't send OPTIONS
   if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+    return new Response(null, { status: 405 });
   }
 
   try {
@@ -28,13 +32,12 @@ Deno.serve(async (req) => {
     if (!token) {
       return new Response(
         JSON.stringify({ error: "Missing x-gordon-token header." }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        { status: 401, headers: responseHeaders },
       );
     }
 
     const { events = [], cliVersion } = await req.json();
 
-    // Use service_role key to bypass RLS
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
@@ -51,14 +54,14 @@ Deno.serve(async (req) => {
     if (lookupError || !activation) {
       return new Response(
         JSON.stringify({ error: "Invalid token." }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        { status: 401, headers: responseHeaders },
       );
     }
 
     if (activation.status === "revoked") {
       return new Response(
         JSON.stringify({ error: "Access revoked." }),
-        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        { status: 403, headers: responseHeaders },
       );
     }
 
@@ -72,40 +75,51 @@ Deno.serve(async (req) => {
       })
       .eq("id", activation.id);
 
-    // --- Ingest telemetry events ---
+    // --- Ingest telemetry events (with validation) ---
 
-    if (events.length > 0) {
-      const rows = events.map((e: { type: string; metadata?: Record<string, unknown>; timestamp?: string }) => ({
-        activation_id: activation.id,
-        event_type: e.type,
-        metadata: e.metadata || {},
-        cli_version: cliVersion,
-        created_at: e.timestamp || new Date().toISOString(),
-      }));
+    if (Array.isArray(events) && events.length > 0) {
+      // Cap batch size and validate each event
+      const validatedEvents = events
+        .slice(0, MAX_EVENTS_PER_BATCH)
+        .filter((e: unknown): e is { type: string; metadata?: Record<string, unknown>; timestamp?: string } => {
+          if (!e || typeof e !== "object") return false;
+          const evt = e as Record<string, unknown>;
+          if (typeof evt.type !== "string" || evt.type.length > MAX_EVENT_TYPE_LENGTH) return false;
+          if (evt.metadata && JSON.stringify(evt.metadata).length > MAX_METADATA_SIZE) return false;
+          return true;
+        });
 
-      const { error: insertError } = await supabase
-        .from("telemetry_events")
-        .insert(rows);
+      if (validatedEvents.length > 0) {
+        const rows = validatedEvents.map((e) => ({
+          activation_id: activation.id,
+          event_type: e.type,
+          metadata: e.metadata || {},
+          cli_version: cliVersion,
+          created_at: e.timestamp || new Date().toISOString(),
+        }));
 
-      if (insertError) {
-        console.error("Telemetry insert failed:", insertError);
-        // Non-fatal — don't fail the heartbeat for telemetry issues
+        const { error: insertError } = await supabase
+          .from("telemetry_events")
+          .insert(rows);
+
+        if (insertError) {
+          console.error("Telemetry insert failed:", insertError);
+        }
       }
     }
 
     // --- Announcements ---
-    // Add announcements here when needed (e.g., update notices)
     const announcements: string[] = [];
 
     return new Response(
       JSON.stringify({ ok: true, announcements }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      { status: 200, headers: responseHeaders },
     );
   } catch (err) {
     console.error("Heartbeat error:", err);
     return new Response(
       JSON.stringify({ error: "Internal server error." }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      { status: 500, headers: responseHeaders },
     );
   }
 });

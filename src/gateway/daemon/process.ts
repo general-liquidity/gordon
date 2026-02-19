@@ -49,6 +49,7 @@ export async function startGatewayDaemonProcess(): Promise<GatewayDaemonHandle> 
     const initCtx = await contextResolver.resolve("daemon");
     if (initCtx.exchange) {
       const details = await initCtx.exchange.getFullAccountDetails();
+      // TODO: support non-USDT quote currencies (USDC, EUR, etc.)
       strategyRuntime.setTotalCapital(details.totalUsdtValue);
       logger.info("StrategyRuntime initialized with exchange equity", {
         totalCapital: details.totalUsdtValue.toFixed(2),

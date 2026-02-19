@@ -47,8 +47,9 @@ export async function cleanupStalePositions(): Promise<PositionCleanupResult> {
       const positions = await store.getByState(state as PositionState);
 
       for (const pos of positions) {
-        const createdAt = new Date(pos.createdAt).getTime();
-        const ageHours = (now - createdAt) / (1000 * 60 * 60);
+        // Use updatedAt (state-transition time) if available, else fall back to createdAt
+        const stateEntryTime = new Date(pos.updatedAt ?? pos.createdAt).getTime();
+        const ageHours = (now - stateEntryTime) / (1000 * 60 * 60);
 
         if (ageHours > maxHours) {
           try {

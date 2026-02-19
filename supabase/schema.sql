@@ -50,6 +50,17 @@ create index idx_activations_token on activations(token);
 -- Index for invite code lookups
 create index idx_invite_codes_code on invite_codes(code);
 
+-- Atomic invite code claim (prevents race conditions)
+create or replace function claim_invite(p_code text)
+returns invite_codes as $$
+  update invite_codes
+  set current_uses = current_uses + 1
+  where code = p_code
+    and current_uses < max_uses
+    and (expires_at is null or expires_at > now())
+  returning *;
+$$ language sql;
+
 -- ============================================================================
 -- Seed: Generate invite codes for alpha testers
 -- Uncomment and customize labels as needed.

@@ -500,6 +500,9 @@ export class GatewayRuntime {
       await this.queue.drainSession(envelope.meta.sessionId, 32);
     }
 
+    // Note: idempotency records the "accepted" ack, not the handler result.
+    // The queue may still fail during processing. This is acceptable for
+    // fire-and-forget daemon commands; critical commands should check results separately.
     const result = {
       accepted: true,
       queueId: queued.queueId,

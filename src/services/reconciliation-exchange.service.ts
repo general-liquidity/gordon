@@ -10,7 +10,7 @@
  * capital accounting stays in sync.
  */
 
-import type { Exchange, Order } from "../infra/exchange/types.ts";
+import type { Exchange } from "../infra/exchange/types.ts";
 import { listTrades, updateTrade } from "../infra/storage/trades.ts";
 import { getPlan } from "../infra/storage/plans.ts";
 import { logEvent } from "../infra/storage/events.ts";
@@ -269,10 +269,14 @@ async function reconcileTrade(
     }
 
     if (updatedTrade.exits.length > 0 && updatedTrade.averageEntry > 0) {
+      // Determine direction for correct PnL sign (shorts profit when price drops)
+      const tradePlan = getPlan(trade.planId);
+      const pnlMultiplier = tradePlan?.direction === "short" ? -1 : 1;
+
       let totalPnl = 0;
       let totalExitQty = 0;
       for (const exit of updatedTrade.exits) {
-        totalPnl += (exit.price - updatedTrade.averageEntry) * exit.quantity;
+        totalPnl += pnlMultiplier * (exit.price - updatedTrade.averageEntry) * exit.quantity;
         totalExitQty += exit.quantity;
       }
       updatedTrade.realizedPnl = totalPnl;
@@ -334,8 +338,14 @@ function feedbackToStrategyRuntime(trade: Trade): void {
 
     if (activeSlots.length === 0) return;
 
+    if (activeSlots.length > 1) {
+      logger.warn("Multiple active slots — PnL attributed to first slot (heuristic)", {
+        tradeId: trade.id,
+        slotCount: activeSlots.length,
+      });
+    }
+
     // Best-effort match: use first active slot.
-    // For v0.7 with 1-2 slots this heuristic is sufficient.
     // A future enhancement can add a tradeId→slotId mapping table.
     const matchingSlot = activeSlots[0];
 

@@ -21,6 +21,12 @@ import {
 } from "./types.ts";
 
 // ============================================================================
+// Constants
+// ============================================================================
+
+const MAX_QUEUE_SIZE = 500;
+
+// ============================================================================
 // State
 // ============================================================================
 
@@ -36,6 +42,11 @@ let flushTimer: ReturnType<typeof setInterval> | null = null;
  * Start the heartbeat timer. Called after license validation.
  */
 export function startHeartbeat(licenseToken: string): void {
+  // Enforce HTTPS on the license server URL
+  if (!SUPABASE_URL.startsWith("https://")) {
+    return; // Silently refuse to send telemetry over insecure connection
+  }
+
   token = licenseToken;
 
   if (flushTimer) return; // already running
@@ -63,6 +74,9 @@ export async function stopHeartbeat(): Promise<void> {
  * Track a usage event. Fire-and-forget, never throws.
  */
 export function trackEvent(type: string, metadata?: Record<string, unknown>): void {
+  // Drop events if queue is at capacity to prevent unbounded memory growth
+  if (eventQueue.length >= MAX_QUEUE_SIZE) return;
+
   eventQueue.push({
     type,
     metadata,
@@ -113,13 +127,22 @@ async function flush(): Promise<void> {
         }
       }
     } else {
-      // Re-queue on failure (will retry next flush)
-      eventQueue.unshift(...batch);
+      // Re-queue on failure, respecting the cap
+      requeue(batch);
     }
   } catch {
-    // Network error — re-queue for next attempt
-    eventQueue.unshift(...batch);
+    // Network error — re-queue, respecting the cap
+    requeue(batch);
   } finally {
     clearTimeout(timeout);
   }
+}
+
+function requeue(batch: TelemetryEvent[]): void {
+  const available = MAX_QUEUE_SIZE - eventQueue.length;
+  if (available > 0) {
+    // Keep only as many as we have room for (newest events already in queue take priority)
+    eventQueue.unshift(...batch.slice(0, available));
+  }
+  // If no room, drop the batch — better than OOM
 }

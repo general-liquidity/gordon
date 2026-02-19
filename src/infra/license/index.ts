@@ -27,14 +27,33 @@ import {
 import { startHeartbeat, stopHeartbeat, trackEvent } from "./telemetry.ts";
 
 const LICENSE_FILE = path.join(GORDON_DIR, "license.json");
+const MACHINE_ID_FILE = path.join(GORDON_DIR, ".machine-id");
 
 // ============================================================================
 // Machine Fingerprint
 // ============================================================================
 
 function getMachineId(): string {
-  const raw = `${os.hostname()}:${os.userInfo().username}:${os.platform()}:${os.arch()}`;
-  return crypto.createHash("sha256").update(raw).digest("hex").slice(0, 32);
+  // Use a persisted random UUID as the primary machine identifier.
+  // Falls back to hashing system info if the file can't be created.
+  try {
+    if (fs.existsSync(MACHINE_ID_FILE)) {
+      const stored = fs.readFileSync(MACHINE_ID_FILE, "utf-8").trim();
+      if (stored.length >= 16) return stored;
+    }
+
+    // Generate and persist a new machine ID
+    const id = crypto.randomUUID().replace(/-/g, "");
+    fs.mkdirSync(path.dirname(MACHINE_ID_FILE), { recursive: true });
+    fs.writeFileSync(MACHINE_ID_FILE, id, { encoding: "utf-8", mode: 0o600 });
+    return id;
+  } catch {
+    // Fallback: hash system info (works in containers where fs may be read-only)
+    let username = "unknown";
+    try { username = os.userInfo().username; } catch { /* ok — headless/container */ }
+    const raw = `${os.hostname()}:${username}:${os.platform()}:${os.arch()}`;
+    return crypto.createHash("sha256").update(raw).digest("hex").slice(0, 32);
+  }
 }
 
 // ============================================================================
@@ -55,7 +74,7 @@ function readLicense(): LicenseFile | null {
 
 function writeLicense(license: LicenseFile): void {
   fs.mkdirSync(path.dirname(LICENSE_FILE), { recursive: true });
-  fs.writeFileSync(LICENSE_FILE, JSON.stringify(license, null, 2), "utf-8");
+  fs.writeFileSync(LICENSE_FILE, JSON.stringify(license, null, 2), { encoding: "utf-8", mode: 0o600 });
 }
 
 // ============================================================================
@@ -64,6 +83,12 @@ function writeLicense(license: LicenseFile): void {
 
 async function promptInviteCode(): Promise<string> {
   return new Promise((resolve) => {
+    // If stdin is not a TTY (piped, CI), resolve empty immediately
+    if (!process.stdin.isTTY) {
+      resolve("");
+      return;
+    }
+
     const rl = readline.createInterface({
       input: process.stdin,
       output: process.stdout,
@@ -75,7 +100,17 @@ async function promptInviteCode(): Promise<string> {
     console.log("  This build requires an invite code.");
     console.log("");
 
+    // Handle unexpected close (e.g. ctrl+C, pipe closed)
+    let answered = false;
+    rl.on("close", () => {
+      if (!answered) {
+        answered = true;
+        resolve("");
+      }
+    });
+
     rl.question("  Enter invite code: ", (answer) => {
+      answered = true;
       rl.close();
       resolve(answer.trim());
     });
@@ -159,7 +194,11 @@ async function validateToken(token: string): Promise<"valid" | "revoked" | "offl
 
     if (res.status === 403) return "revoked";
     if (res.ok) return "valid";
-    return "offline"; // treat server errors as offline (graceful)
+
+    // 5xx = server issue, treat as offline (graceful)
+    // 4xx (other than 403) = client error, also treat as offline for now
+    // but log it so we can investigate
+    return "offline";
   } catch {
     return "offline"; // network error — allow cached token
   } finally {
@@ -199,7 +238,7 @@ export async function checkLicense(): Promise<void> {
 
       // Start heartbeat for this session
       startHeartbeat(license.token);
-      trackEvent("activation", { inviteCode: code.slice(0, 4) + "..." });
+      trackEvent("activation");
       return;
     } catch (err) {
       console.error(`\n  ${(err as Error).message}`);

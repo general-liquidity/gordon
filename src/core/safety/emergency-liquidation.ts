@@ -165,10 +165,11 @@ async function closeAllOpenPositions(
       updatedTrade.status = "CLOSED";
       updatedTrade.closedAt = new Date().toISOString();
 
-      // Recalculate PnL
+      // Recalculate PnL (invert for shorts: short profits when price drops)
       const avgEntry = trade.averageEntry || 0;
+      const pnlMultiplier = plan?.direction === "short" ? -1 : 1;
       updatedTrade.realizedPnl =
-        (trade.realizedPnl ?? 0) + (exitPrice - avgEntry) * (orderResult.executedQty ?? remainingQty);
+        (trade.realizedPnl ?? 0) + pnlMultiplier * (exitPrice - avgEntry) * (orderResult.executedQty ?? remainingQty);
 
       updateTrade(trade.id, updatedTrade);
       result.positionsClosed++;
