@@ -107,39 +107,22 @@ jobs:
           ref: ${{ github.ref_name }}
 
       - name: Download release assets and compute hashes
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           VERSION=${GITHUB_REF#refs/tags/v}
           echo "VERSION=$VERSION" >> $GITHUB_ENV
           mkdir -p /tmp/binaries
 
-          # Wait for release assets to propagate on CDN
-          echo "Waiting 30s for release assets to propagate..."
-          sleep 30
-
-          download_with_retry() {
-            local url="$1" dest="$2"
-            for attempt in 1 2 3; do
-              if curl -fsSL -o "$dest" "$url"; then return 0; fi
-              echo "Attempt $attempt failed for $url, retrying in 15s..."
-              sleep 15
-            done
-            echo "Failed to download $url after 3 attempts"
-            return 1
-          }
-
-          for target in linux-x64 linux-arm64 darwin-x64 darwin-arm64; do
-            download_with_retry \
-              "https://github.com/${GITHUB_REPOSITORY}/releases/download/v${VERSION}/gordon-${target}" \
-              "/tmp/binaries/gordon-${target}"
-          done
-
-          download_with_retry \
-            "https://github.com/${GITHUB_REPOSITORY}/releases/download/v${VERSION}/gordon-windows-x64.exe" \
-            "/tmp/binaries/gordon-windows-x64.exe"
+          # Use gh CLI to download — bypasses CDN caching issues
+          gh release download "v${VERSION}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --dir /tmp/binaries \
+            --pattern "gordon-*"
 
           # Compute SHA256 hashes
           cd /tmp/binaries
-          for f in *; do
+          for f in gordon-*; do
             sha256sum "$f" | awk '{print $1}' > "${f}.sha256"
           done
 
