@@ -74,6 +74,7 @@ function readLicense(): LicenseFile | null {
 
 function writeLicense(license: LicenseFile): void {
   fs.mkdirSync(path.dirname(LICENSE_FILE), { recursive: true });
+  // mode: 0o600 restricts to owner-only on Unix; no-op on Windows (uses ACLs)
   fs.writeFileSync(LICENSE_FILE, JSON.stringify(license, null, 2), { encoding: "utf-8", mode: 0o600 });
 }
 
@@ -217,6 +218,12 @@ async function validateToken(token: string): Promise<"valid" | "revoked" | "offl
 export async function checkLicense(): Promise<void> {
   // Skip license check in development
   if (process.env.GORDON_SKIP_LICENSE === "1") return;
+
+  // Enforce HTTPS on all license server communication
+  if (!SUPABASE_URL.startsWith("https://")) {
+    console.error("\n  License server URL must use HTTPS. Exiting.");
+    process.exit(1);
+  }
 
   const existing = readLicense();
 

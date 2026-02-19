@@ -85,7 +85,13 @@ Deno.serve(async (req) => {
           if (!e || typeof e !== "object") return false;
           const evt = e as Record<string, unknown>;
           if (typeof evt.type !== "string" || evt.type.length > MAX_EVENT_TYPE_LENGTH) return false;
-          if (evt.metadata && JSON.stringify(evt.metadata).length > MAX_METADATA_SIZE) return false;
+          if (evt.metadata) {
+            try {
+              if (JSON.stringify(evt.metadata).length > MAX_METADATA_SIZE) return false;
+            } catch {
+              return false; // circular reference or other serialization error
+            }
+          }
           return true;
         });
 

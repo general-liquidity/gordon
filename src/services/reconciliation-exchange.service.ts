@@ -270,8 +270,8 @@ async function reconcileTrade(
 
     if (updatedTrade.exits.length > 0 && updatedTrade.averageEntry > 0) {
       // Determine direction for correct PnL sign (shorts profit when price drops)
-      const tradePlan = getPlan(trade.planId);
-      const pnlMultiplier = tradePlan?.direction === "short" ? -1 : 1;
+      // plan is already fetched and validated non-null at line 146
+      const pnlMultiplier = plan.direction === "short" ? -1 : 1;
 
       let totalPnl = 0;
       let totalExitQty = 0;

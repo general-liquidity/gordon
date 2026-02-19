@@ -45,7 +45,12 @@ Deno.serve(async (req) => {
       p_code: code,
     });
 
-    if (rpcError || !claimed) {
+    // claim_invite may return null, empty array [], or a row object.
+    // Handle all falsy/empty cases.
+    const claimSucceeded = !rpcError && claimed &&
+      !(Array.isArray(claimed) && claimed.length === 0);
+
+    if (!claimSucceeded) {
       // Claim failed — determine why for a helpful error message
       const { data: invite } = await supabase
         .from("invite_codes")
@@ -98,6 +103,10 @@ Deno.serve(async (req) => {
 
     if (activationError) {
       console.error("Activation insert failed:", activationError);
+
+      // Compensate: decrement current_uses so the invite code isn't permanently consumed
+      await supabase.rpc("unclaim_invite", { p_code: code }).catch(() => {});
+
       return new Response(
         JSON.stringify({ error: "Activation failed. Please try again." }),
         { status: 500, headers: responseHeaders },

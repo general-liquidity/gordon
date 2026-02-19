@@ -85,6 +85,7 @@ export async function getOrCreateDaemonToken(): Promise<string> {
     token,
     createdAt: new Date().toISOString(),
   };
+  // mode: 0o600 restricts to owner-only on Unix; no-op on Windows (uses ACLs)
   await writeFile(DAEMON_AUTH_FILE, JSON.stringify(payload, null, 2), { encoding: "utf-8", mode: 0o600 });
   logger.info("Created local daemon auth token", { path: DAEMON_AUTH_FILE });
   return token;
