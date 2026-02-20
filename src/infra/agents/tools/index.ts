@@ -69,6 +69,8 @@ export { agentKitDefiTools } from "./agentkit-defi.ts";
 export { baseSignalTools } from "./base-signals.ts";
 export { baseIndexerTools } from "./base-indexers.ts";
 export { uniswapDataTools } from "./uniswap-data.ts";
+export { dexSearchTools } from "./dex-search.ts";
+export { defillamaYieldTools } from "./defillama-yields.ts";
 
 // Position tracking tools (v0.7)
 export { positionTrackingTools } from "./position-tracking.ts";
@@ -301,6 +303,8 @@ import { agentKitDefiTools } from "./agentkit-defi.ts";
 import { baseSignalTools } from "./base-signals.ts";
 import { baseIndexerTools } from "./base-indexers.ts";
 import { uniswapDataTools } from "./uniswap-data.ts";
+import { dexSearchTools } from "./dex-search.ts";
+import { defillamaYieldTools } from "./defillama-yields.ts";
 import { positionTrackingTools } from "./position-tracking.ts";
 import { checkRiskTool } from "./risk-gate.ts";
 import { memoryTools } from "./memory-tools.ts";
@@ -351,6 +355,8 @@ export const allTools = {
   ...baseSignalTools,
   ...baseIndexerTools,
   ...uniswapDataTools,
+  ...dexSearchTools,
+  ...defillamaYieldTools,
   ...multiModalChartTools,
   ...evalTools,
   ...positionTrackingTools,
@@ -402,6 +408,8 @@ export const toolCounts = {
   baseSignals: Object.keys(baseSignalTools).length,
   baseIndexers: Object.keys(baseIndexerTools).length,
   uniswapData: Object.keys(uniswapDataTools).length,
+  dexSearch: Object.keys(dexSearchTools).length,
+  defillamaYields: Object.keys(defillamaYieldTools).length,
   multiModalCharts: Object.keys(multiModalChartTools).length,
   evals: Object.keys(evalTools).length,
   positionTracking: Object.keys(positionTrackingTools).length,

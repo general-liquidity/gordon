@@ -27,7 +27,7 @@ export interface UniswapQuoteRequest {
   swapper: string;
   slippageTolerance?: string;
   autoSlippage?: string;
-  routingPreference?: "BEST_PRICE" | "FASTEST";
+  routingPreference?: "BEST_PRICE" | "FASTEST" | "CLASSIC";
   protocols?: string[];
   urgency?: number;
   /** Request Permit2 data: 'EXACT' or 'FULL' */
@@ -39,7 +39,7 @@ export interface UniswapQuoteRequest {
 export interface UniswapQuoteOptions {
   type?: "EXACT_INPUT" | "EXACT_OUTPUT";
   slippageTolerance?: string;
-  routingPreference?: "BEST_PRICE" | "FASTEST";
+  routingPreference?: "BEST_PRICE" | "FASTEST" | "CLASSIC";
   /** Request Permit2 data for gasless approvals */
   permitAmount?: "EXACT" | "FULL";
   /** Cross-chain: destination chain ID (defaults to same chain) */
@@ -48,7 +48,8 @@ export interface UniswapQuoteOptions {
 
 export interface UniswapQuoteResponse {
   requestId: string;
-  routing: string;
+  /** Routing type chosen by the API (CLASSIC, DUTCH_V2, PRIORITY, etc.) */
+  routing: UniswapRoutingType | string;
   quote: {
     input?: { amount: string; token: string };
     output?: { amount: string; token: string };
@@ -168,7 +169,7 @@ export const USDC_ADDRESSES: Record<number, string> = {
   43114: "0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E",
 };
 
-export const SUPPORTED_CHAIN_IDS = [1, 10, 56, 130, 137, 196, 324, 480, 1868, 8453, 42161, 42220, 43114, 81457, 7777777];
+export const SUPPORTED_CHAIN_IDS = [1, 10, 56, 130, 137, 143, 196, 324, 480, 1868, 8453, 42161, 42220, 43114, 81457, 7777777];
 
 export const CHAIN_NAMES: Record<number, string> = {
   1: "Ethereum",
@@ -176,6 +177,7 @@ export const CHAIN_NAMES: Record<number, string> = {
   56: "BNB Chain",
   130: "Unichain",
   137: "Polygon",
+  143: "Monad",
   196: "X Layer",
   324: "zkSync",
   480: "World Chain",
@@ -190,6 +192,27 @@ export const CHAIN_NAMES: Record<number, string> = {
 
 /** Chains that support UniswapX (for DutchLimit orders) */
 export const UNISWAPX_CHAINS = [1, 42161, 8453, 130]; // Mainnet, Arbitrum, Base, Unichain
+
+/**
+ * Routing types returned by the Trading API in the quote response.
+ * BEST_PRICE routing automatically considers all types; CLASSIC forces AMM-only.
+ */
+export type UniswapRoutingType =
+  | "CLASSIC"     // Standard AMM swap through Uniswap pools
+  | "DUTCH_V2"    // UniswapX Dutch auction V2
+  | "DUTCH_V3"    // UniswapX Dutch auction V3
+  | "PRIORITY"    // MEV-protected priority order (Base, Unichain)
+  | "DUTCH_LIMIT" // UniswapX Dutch limit order
+  | "LIMIT_ORDER" // Limit order
+  | "WRAP"        // ETH → WETH
+  | "UNWRAP"      // WETH → ETH
+  | "BRIDGE"      // Cross-chain bridge
+  | "QUICKROUTE"; // Fast approximation quote
+
+/** Whether a routing type is a UniswapX off-chain order (vs on-chain tx) */
+export function isUniswapXRouting(routing: string): boolean {
+  return ["DUTCH_V2", "DUTCH_V3", "DUTCH_LIMIT", "PRIORITY"].includes(routing);
+}
 
 // ============================================================================
 // Token List Types

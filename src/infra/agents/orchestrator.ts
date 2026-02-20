@@ -651,6 +651,14 @@ const TOOL_AGENT_MAP: Record<string, string> = {
   get_uniswap_protocol_overview: "Scanner",
   get_fee_collections: "Monitor",
 
+  // ---- Multi-chain DEX search tools ----
+  search_dex_pairs: "Scanner",
+  get_boosted_tokens: "Scanner",
+
+  // ---- DefiLlama yield tools ----
+  get_uniswap_pool_yields: "Analyst",
+  get_top_defi_yields: "Analyst",
+
   // ---- Base L2 signal tools ----
   // baseSignalTools cherry-picks (Scanner: discovery + scanning)
   scan_base_whale_transfers: "Scanner",

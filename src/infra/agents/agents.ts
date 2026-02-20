@@ -59,6 +59,8 @@ import {
   baseSignalTools,
   baseIndexerTools,
   uniswapDataTools,
+  dexSearchTools,
+  defillamaYieldTools,
   positionTrackingTools,
   checkRiskTool,
   memoryTools,
@@ -302,6 +304,8 @@ const instrumentedAgentKitDefiTools = withToolsMetrics(agentKitDefiTools);
 const instrumentedBaseSignalTools = withToolsMetrics(baseSignalTools);
 const instrumentedBaseIndexerTools = withToolsMetrics(baseIndexerTools);
 const instrumentedUniswapDataTools = withToolsMetrics(uniswapDataTools);
+const instrumentedDexSearchTools = withToolsMetrics(dexSearchTools);
+const instrumentedDefillamaYieldTools = withToolsMetrics(defillamaYieldTools);
 const instrumentedEvalTools = withToolsMetrics(evalTools);
 const instrumentedPositionTrackingTools = withToolsMetrics(positionTrackingTools);
 const instrumentedMemoryTools = withToolsMetrics(memoryTools);
@@ -1099,6 +1103,9 @@ function getScannerAgent(): Agent {
         // Base L2 DEX indexer tools (The Graph — top pools, Aerodrome)
         indexer_top_pools: instrumentedBaseIndexerTools.indexer_top_pools,
         indexer_aerodrome_pools: instrumentedBaseIndexerTools.indexer_aerodrome_pools,
+        // Multi-chain DexScreener search (all chains, not just Base)
+        search_dex_pairs: instrumentedDexSearchTools.search_dex_pairs,
+        get_boosted_tokens: instrumentedDexSearchTools.get_boosted_tokens,
         // Uniswap V3 subgraph tools (protocol overview, liquidity events)
         get_uniswap_protocol_overview: instrumentedUniswapDataTools.get_uniswap_protocol_overview,
         get_liquidity_events: instrumentedUniswapDataTools.get_liquidity_events,
@@ -1171,6 +1178,11 @@ function getAnalystAgent(): Agent {
         get_pool_flash_events: instrumentedUniswapDataTools.get_pool_flash_events,
         get_fee_collections: instrumentedUniswapDataTools.get_fee_collections,
         get_uniswap_protocol_overview: instrumentedUniswapDataTools.get_uniswap_protocol_overview,
+        // DefiLlama pool yield data (APY, TVL, volume for Uniswap + all DeFi)
+        get_uniswap_pool_yields: instrumentedDefillamaYieldTools.get_uniswap_pool_yields,
+        get_top_defi_yields: instrumentedDefillamaYieldTools.get_top_defi_yields,
+        // Multi-chain DexScreener search
+        search_dex_pairs: instrumentedDexSearchTools.search_dex_pairs,
         // Base L2 on-chain analysis tools (wallet tracking, holders, DEX pairs)
         track_base_wallet: instrumentedBaseSignalTools.track_base_wallet,
         get_base_token_holders: instrumentedBaseSignalTools.get_base_token_holders,

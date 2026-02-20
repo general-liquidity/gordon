@@ -19,7 +19,7 @@
 
 import { UniswapClient } from "../../uniswap/index.ts";
 import { UniswapSubgraph } from "../../uniswap/subgraph.ts";
-import { SUPPORTED_CHAIN_IDS, CHAIN_NAMES } from "../../uniswap/types.ts";
+import { SUPPORTED_CHAIN_IDS, CHAIN_NAMES, isUniswapXRouting } from "../../uniswap/types.ts";
 import type {
   Exchange,
   ExchangeId,
@@ -289,10 +289,17 @@ export class UniswapAdapter implements Exchange {
     const meta: Record<string, unknown> = {
       _unsignedTx: swapTx.swap,
       _quoteTimestamp: quoteTimestamp,
+      _routing: quote.routing, // CLASSIC, DUTCH_V2, PRIORITY, etc.
     };
 
     if (approvalResult.approval) {
       meta._approvalTx = approvalResult.approval;
+    }
+
+    // UniswapX orders require Permit2 signing — pass through permitData
+    if (isUniswapXRouting(quote.routing) && quote.permitData) {
+      meta._permitData = quote.permitData;
+      meta._isUniswapX = true;
     }
 
     if (swapTx.txFailureReasons?.length) {
