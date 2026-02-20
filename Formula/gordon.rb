@@ -7,7 +7,7 @@
 class Gordon < Formula
   desc "The Frontier Trading Agent - AI-powered crypto trading CLI"
   homepage "https://github.com/general-liquidity/gordon-cli"
-  version "0.75.7"
+  version "0.75.8"
   license "MIT"
 
   on_macos do
