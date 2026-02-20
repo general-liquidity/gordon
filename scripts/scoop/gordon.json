@@ -1,12 +1,12 @@
 {
-  "version": "0.75.9",
+  "version": "0.75.10",
   "description": "The Frontier Trading Agent",
   "homepage": "https://github.com/general-liquidity/gordon-cli",
   "license": "MIT",
   "architecture": {
     "64bit": {
-      "url": "https://github.com/general-liquidity/gordon-cli/releases/download/v0.75.9/gordon-windows-x64.exe",
-      "hash": "87ae14e2112ae342e2c1eaded7ea4dbb59547b9b523a399250cc2220a4857296"
+      "url": "https://github.com/general-liquidity/gordon-cli/releases/download/v0.75.10/gordon-windows-x64.exe",
+      "hash": "590783bcbf314d3cd0c3f5a03a6256c52bd46a3703c3b931aca11495ae38bedb"
     }
   },
   "pre_install": "Rename-Item -Path \"$dir\\gordon-windows-x64.exe\" -NewName \"gordon.exe\" -ErrorAction SilentlyContinue",
@@ -17,7 +17,7 @@
   "autoupdate": {
     "architecture": {
       "64bit": {
-        "url": "https://github.com/general-liquidity/gordon-cli/releases/download/v0.75.9/gordon-windows-x64.exe"
+        "url": "https://github.com/general-liquidity/gordon-cli/releases/download/v0.75.10/gordon-windows-x64.exe"
       }
     }
   }
