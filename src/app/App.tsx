@@ -119,6 +119,10 @@ interface LastResults {
   scan?: ScanExportData;
   analysis?: AnalysisExportData;
   backtest?: BacktestExportData;
+  portfolio?: Record<string, unknown>;
+  technicalAnalysis?: Record<string, unknown>;
+  regime?: Record<string, unknown>;
+  toolResults?: Record<string, Record<string, unknown>>;
 }
 
 type PluginSuggestion = ReturnType<typeof checkForPluginSuggestions>[number];
@@ -281,7 +285,21 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
       case "analyze_backtest_results":
         lastResultsRef.current.backtest = resultObj as BacktestExportData;
         break;
+      case "check_positions":
+      case "get_portfolio_state":
+        lastResultsRef.current.portfolio = resultObj;
+        break;
+      case "get_technical_analysis":
+      case "get_advanced_analysis":
+        lastResultsRef.current.technicalAnalysis = resultObj;
+        break;
+      case "detect_market_regime":
+        lastResultsRef.current.regime = resultObj;
+        break;
       default:
+        // Store any tool result in a generic map for potential export
+        if (!lastResultsRef.current.toolResults) lastResultsRef.current.toolResults = {};
+        lastResultsRef.current.toolResults[toolName] = resultObj;
         break;
     }
   }, []);

@@ -47,11 +47,33 @@ export {
   resetAgents,
 } from "./agents.ts";
 
+// Response Schemas (Mastra structuredOutput)
+export {
+  TradeSignalSchema,
+  MarketScanResultSchema,
+  AnalysisResultSchema,
+  PortfolioStatusSchema,
+  AgentDecisionSchema,
+  getSchemaByName,
+  RESPONSE_SCHEMAS,
+} from "./schemas/index.ts";
+export type {
+  TradeSignal,
+  MarketScanResult,
+  AnalysisResult,
+  PortfolioStatus,
+  AgentDecision,
+} from "./schemas/index.ts";
+
+// Native Processors (Mastra guardrails)
+export { GordonInputGuard, GordonOutputSanitizer } from "./processors/index.ts";
+
 // Main Orchestrator
 export {
   processMessage,
   processSimpleMessage,
   processMessageStream,
+  processStructuredMessage,
   quickScan,
   quickCheckPositions,
   initializeTracing,

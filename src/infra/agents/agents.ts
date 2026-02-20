@@ -20,6 +20,11 @@
 
 import { Agent } from "@mastra/core/agent";
 import { TokenLimiterProcessor } from "@mastra/core/processors";
+import { GordonInputGuard, GordonOutputSanitizer } from "./processors/index.ts";
+
+// Singleton processor instances (shared across all agents)
+const gordonInputGuard = new GordonInputGuard();
+const gordonOutputSanitizer = new GordonOutputSanitizer();
 import { Memory } from "@mastra/memory";
 import { LibSQLStore, LibSQLVector } from "@mastra/libsql";
 
@@ -1122,7 +1127,8 @@ function getScannerAgent(): Agent {
         ...getSkillToolsForAgent("Scanner"),
       },
       memory: createSubAgentMemory(),
-      inputProcessors: [new TokenLimiterProcessor({ limit: 32000 })],
+      inputProcessors: [gordonInputGuard, new TokenLimiterProcessor({ limit: 32000 })],
+      outputProcessors: [gordonOutputSanitizer],
     });
   }
   return _agents.scanner;
@@ -1211,7 +1217,8 @@ function getAnalystAgent(): Agent {
         ...getSkillToolsForAgent("Analyst"),
       },
       memory: createSubAgentMemory(),
-      inputProcessors: [new TokenLimiterProcessor({ limit: 32000 })],
+      inputProcessors: [gordonInputGuard, new TokenLimiterProcessor({ limit: 32000 })],
+      outputProcessors: [gordonOutputSanitizer],
     });
   }
   return _agents.analyst;
@@ -1277,7 +1284,8 @@ function getPlannerAgent(): Agent {
         ...getSkillToolsForAgent("Planner"),
       },
       memory: createSubAgentMemory(),
-      inputProcessors: [new TokenLimiterProcessor({ limit: 32000 })],
+      inputProcessors: [gordonInputGuard, new TokenLimiterProcessor({ limit: 32000 })],
+      outputProcessors: [gordonOutputSanitizer],
     });
   }
   return _agents.planner;
@@ -1351,7 +1359,8 @@ function getExecutorAgent(): Agent {
         ...getSkillToolsForAgent("Executor"),
       },
       memory: createSubAgentMemory(),
-      inputProcessors: [new TokenLimiterProcessor({ limit: 32000 })],
+      inputProcessors: [gordonInputGuard, new TokenLimiterProcessor({ limit: 32000 })],
+      outputProcessors: [gordonOutputSanitizer],
     });
   }
   return _agents.executor;
@@ -1421,7 +1430,8 @@ function getMonitorAgent(): Agent {
         ...getSkillToolsForAgent("Monitor"),
       },
       memory: createSubAgentMemory(),
-      inputProcessors: [new TokenLimiterProcessor({ limit: 32000 })],
+      inputProcessors: [gordonInputGuard, new TokenLimiterProcessor({ limit: 32000 })],
+      outputProcessors: [gordonOutputSanitizer],
     });
   }
   return _agents.monitor;
@@ -1461,7 +1471,8 @@ function getTeacherAgent(): Agent {
         ...getSkillToolsForAgent("Teacher"),
       },
       memory: createSubAgentMemory(),
-      inputProcessors: [new TokenLimiterProcessor({ limit: 32000 })],
+      inputProcessors: [gordonInputGuard, new TokenLimiterProcessor({ limit: 32000 })],
+      outputProcessors: [gordonOutputSanitizer],
     });
   }
   return _agents.teacher;
@@ -1514,7 +1525,8 @@ function getBacktesterAgent(): Agent {
         ...getSkillToolsForAgent("Backtester"),
       },
       memory: createSubAgentMemory(),
-      inputProcessors: [new TokenLimiterProcessor({ limit: 32000 })],
+      inputProcessors: [gordonInputGuard, new TokenLimiterProcessor({ limit: 32000 })],
+      outputProcessors: [gordonOutputSanitizer],
     });
   }
   return _agents.backtester;
@@ -1563,7 +1575,8 @@ function getGordonAgent(): Agent {
 
       // Token limiter to prevent context window overflow in long sessions
       // Gordon (routing agent) needs high limit: system prompt + 7 transfer tools + system/scheduler tools + Mastra routing prompt
-      inputProcessors: [new TokenLimiterProcessor({ limit: 64000 })],
+      inputProcessors: [gordonInputGuard, new TokenLimiterProcessor({ limit: 64000 })],
+      outputProcessors: [gordonOutputSanitizer],
     });
   }
   return _agents.gordon;

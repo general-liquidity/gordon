@@ -9,6 +9,7 @@
  */
 
 import { RequestContext } from "@mastra/core/request-context";
+import { z } from "zod";
 
 import { gordonAgent } from "./agents.ts";
 import { getDynamicToolAgentMap } from "../skills/manager.ts";
@@ -1087,25 +1088,7 @@ export async function* processMessageStream(
   const startTime = Date.now();
   logger.debug("Starting streaming message processing", { messageLength: userMessage.length });
 
-  // INPUT GUARDRAIL: Check for dangerous patterns before processing
-  const inputCheck = await checkInputGuardrails(userMessage);
-  if (!inputCheck.allowed) {
-    logger.warn("Input blocked by guardrail", { reason: inputCheck.reason });
-    recordRequest(Date.now() - startTime, false);
-    recordError("InputGuardrailBlock");
-
-    // Audit log the blocked input
-    auditLog.blocked(
-      context.userId || "unknown",
-      "GUARDRAIL_TRIGGERED",
-      { message: userMessage.substring(0, 100) },
-      inputCheck.reason || "Input blocked by guardrail"
-    );
-
-    yield { type: "error", error: inputCheck.reason };
-    return;
-  }
-
+  // Input guardrails are now handled by GordonInputGuard processor (registered on all agents)
   const requestContext = createRequestContext(context);
 
   try {
@@ -1175,13 +1158,12 @@ export async function* processMessageStream(
           switch (chunk.type) {
             case "text-delta":
               // Mastra's TextDeltaPayload uses 'text' field, not 'textDelta'
+              // Output sanitization is now handled by GordonOutputSanitizer processor
               if (chunk.payload?.text) {
-                const outputCheck = await checkOutputGuardrails(chunk.payload.text);
-                const sanitizedChunk = outputCheck.sanitized;
-                fullText += sanitizedChunk;
+                fullText += chunk.payload.text;
                 yield {
                   type: "text_delta",
-                  content: sanitizedChunk,
+                  content: chunk.payload.text,
                   agentName: currentAgent,
                 };
               }
@@ -1280,13 +1262,12 @@ export async function* processMessageStream(
             // Handle routing agent text (from network routing decisions)
             // Show this text — the ChatView case-insensitive check prevents "Gordon via Gordon" display
             case "routing-agent-text-delta":
+              // Output sanitization is now handled by GordonOutputSanitizer processor
               if (chunk.payload?.text) {
-                const outputCheck = await checkOutputGuardrails(chunk.payload.text);
-                const sanitizedChunk = outputCheck.sanitized;
-                fullText += sanitizedChunk;
+                fullText += chunk.payload.text;
                 yield {
                   type: "text_delta",
-                  content: sanitizedChunk,
+                  content: chunk.payload.text,
                   agentName: currentAgent || "Gordon",
                 };
               }
@@ -1299,12 +1280,10 @@ export async function* processMessageStream(
                 const innerPayload = chunk.payload as unknown as StreamChunk;
 
                 if (innerType === "text-delta" && innerPayload?.payload?.text) {
-                  const outputCheck = await checkOutputGuardrails(innerPayload.payload.text);
-                  const sanitizedChunk = outputCheck.sanitized;
-                  fullText += sanitizedChunk;
+                  fullText += innerPayload.payload.text;
                   yield {
                     type: "text_delta",
-                    content: sanitizedChunk,
+                    content: innerPayload.payload.text,
                     agentName: currentAgent,
                   };
                 } else if (innerType === "tool-call" && innerPayload?.payload?.toolName) {
@@ -1544,6 +1523,91 @@ export async function* processMessageStream(
 // Agent Network Processing (SOTA Multi-Agent)
 // ============================================================================
 
+// ============================================================================
+// Structured Output Processing (Mastra structuredOutput API)
+// ============================================================================
+
+/**
+ * Process a message and return typed structured output via Mastra's structuredOutput API.
+ *
+ * Uses gordonAgent().generate() with a Zod schema to get back a validated object
+ * instead of free-text. Ideal for:
+ * - Gateway/API responses that need machine-readable data
+ * - Autonomous event processing where downstream code needs typed decisions
+ * - Export functionality requiring structured data
+ *
+ * @param userMessage - The user's input message
+ * @param schema - Zod schema defining the expected response structure
+ * @param context - Gordon's context
+ * @param threadId - Thread ID for conversation persistence
+ * @param resourceId - Resource/user ID for memory association
+ */
+export async function processStructuredMessage<T extends Record<string, unknown>>(
+  userMessage: string,
+  schema: z.ZodSchema<T>,
+  context: GordonContext,
+  threadId?: string,
+  resourceId?: string,
+): Promise<{
+  data: T;
+  usage: {
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+  };
+}> {
+  const startTime = Date.now();
+  logger.debug("Processing structured message", { messageLength: userMessage.length });
+
+  const requestContext = createRequestContext(context);
+  const tracingOptions = createAgentTracingOptions();
+  const effectiveResourceId = resourceId || context.userId || "default";
+
+  try {
+    const result = await gordonAgent().generate(userMessage, {
+      requestContext,
+      ...(threadId && effectiveResourceId ? {
+        memory: { thread: threadId, resource: effectiveResourceId },
+      } : {}),
+      maxSteps: 20,
+      structuredOutput: { schema },
+      ...(tracingOptions && { tracingOptions }),
+    } as Record<string, unknown>);
+
+    const resultObj = result as unknown as {
+      object?: T;
+      text?: string;
+      usage?: { inputTokens?: number; outputTokens?: number; totalTokens?: number };
+    };
+
+    if (!resultObj.object) {
+      throw new Error("Agent did not return structured output");
+    }
+
+    recordRequest(Date.now() - startTime, true);
+
+    const usage = resultObj.usage ?? {};
+    return {
+      data: resultObj.object,
+      usage: {
+        promptTokens: usage.inputTokens ?? 0,
+        completionTokens: usage.outputTokens ?? 0,
+        totalTokens: usage.totalTokens ?? 0,
+      },
+    };
+  } catch (err) {
+    const error = err instanceof Error ? err : new Error(String(err));
+    logger.error("Structured message processing error", error);
+    recordRequest(Date.now() - startTime, false);
+    recordError(error.name || "StructuredOutputError");
+    throw error;
+  }
+}
+
+// ============================================================================
+// Network Processing
+// ============================================================================
+
 /**
  * Process a message using Mastra's Agent Network for automatic multi-agent routing
  *
@@ -1564,16 +1628,7 @@ export async function* processWithNetwork(
   const startTime = Date.now();
   logger.debug("Starting network processing", { messageLength: userMessage.length });
 
-  // INPUT GUARDRAIL: Check for dangerous patterns before processing
-  const inputCheck = await checkInputGuardrails(userMessage);
-  if (!inputCheck.allowed) {
-    logger.warn("Input blocked by guardrail", { reason: inputCheck.reason });
-    recordRequest(Date.now() - startTime, false);
-    recordError("InputGuardrailBlock");
-    yield { type: "error", error: inputCheck.reason };
-    return;
-  }
-
+  // Input guardrails are now handled by GordonInputGuard processor (registered on all agents)
   const requestContext = createRequestContext(context);
 
   try {
@@ -1614,9 +1669,7 @@ export async function* processWithNetwork(
       fullText = resultObj.text;
     }
 
-    // OUTPUT GUARDRAIL: Sanitize the response for sensitive data
-    const outputCheck = await checkOutputGuardrails(fullText);
-    fullText = outputCheck.sanitized;
+    // Output sanitization is now handled by GordonOutputSanitizer processor
 
     yield {
       type: "text_delta",
@@ -1694,18 +1747,7 @@ export async function processMessage(
   const startTime = Date.now();
   logger.debug("Processing message with Mastra", { messageLength: userMessage.length });
 
-  // INPUT GUARDRAIL: Check for dangerous patterns before processing
-  const inputCheck = await checkInputGuardrails(userMessage);
-  if (!inputCheck.allowed) {
-    logger.warn("Input blocked by guardrail", { reason: inputCheck.reason });
-    recordRequest(Date.now() - startTime, false);
-    recordError("InputGuardrailBlock");
-    return {
-      response: inputCheck.reason || "Input blocked by safety guardrail.",
-      usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
-    };
-  }
-
+  // Input guardrails are now handled by GordonInputGuard processor (registered on all agents)
   const requestContext = createRequestContext(context);
 
   try {
@@ -1734,11 +1776,8 @@ export async function processMessage(
       usage?: { inputTokens?: number; outputTokens?: number; totalTokens?: number };
     };
 
-    const rawResponse = resultObj.text || "I'm not sure how to help with that.";
-
-    // OUTPUT GUARDRAIL: Sanitize response for sensitive data
-    const outputCheck = await checkOutputGuardrails(rawResponse);
-    const response = outputCheck.sanitized;
+    // Output sanitization is now handled by GordonOutputSanitizer processor
+    const response = resultObj.text || "I'm not sure how to help with that.";
 
     // Emit event for tracking
     await emitEvent("agent:message_processed", {

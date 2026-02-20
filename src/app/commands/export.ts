@@ -54,6 +54,10 @@ export interface ExportContext {
   lastScan?: ScanExportData;
   lastAnalysis?: AnalysisExportData;
   lastBacktest?: BacktestExportData;
+  lastPortfolio?: Record<string, unknown>;
+  lastTechnicalAnalysis?: Record<string, unknown>;
+  lastRegime?: Record<string, unknown>;
+  toolResults?: Record<string, Record<string, unknown>>;
   sessionMessages?: ChatMessage[];
 }
 
