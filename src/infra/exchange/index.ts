@@ -45,6 +45,7 @@ export { CoinbaseAdapter } from "./adapters/coinbase.ts";
 export { KrakenAdapter } from "./adapters/kraken.ts";
 export { BitfinexAdapter } from "./adapters/bitfinex.ts";
 export { HyperliquidAdapter } from "./adapters/hyperliquid.ts";
+export { UniswapAdapter } from "./adapters/uniswap.ts";
 
 // Type aliases for convenience
 export type {

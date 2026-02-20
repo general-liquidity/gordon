@@ -12,7 +12,7 @@ import type { Candle } from "../../types/index.ts";
 /**
  * Supported exchange identifiers
  */
-export type ExchangeId = "binance" | "binance_us" | "coinbase" | "kraken" | "bitfinex" | "hyperliquid";
+export type ExchangeId = "binance" | "binance_us" | "coinbase" | "kraken" | "bitfinex" | "hyperliquid" | "uniswap";
 
 /**
  * Exchange credentials for authentication

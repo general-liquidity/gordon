@@ -10,6 +10,7 @@ import { CoinbaseAdapter } from "./adapters/coinbase.ts";
 import { KrakenAdapter } from "./adapters/kraken.ts";
 import { BitfinexAdapter } from "./adapters/bitfinex.ts";
 import { HyperliquidAdapter } from "./adapters/hyperliquid.ts";
+import { UniswapAdapter } from "./adapters/uniswap.ts";
 
 /**
  * All supported exchange IDs with native adapters
@@ -21,6 +22,7 @@ const SUPPORTED_EXCHANGES: ExchangeId[] = [
   "kraken",
   "bitfinex",
   "hyperliquid",
+  "uniswap",
 ];
 
 /**
@@ -28,9 +30,9 @@ const SUPPORTED_EXCHANGES: ExchangeId[] = [
  */
 function getCacheKey(exchangeId: ExchangeId, credentials: ExchangeCredentials): string {
   // Use first 8 characters of key as identifier to avoid storing full key
-  // For Hyperliquid, use wallet private key; for others, use API key
-  const key = exchangeId === "hyperliquid"
-    ? credentials.walletPrivateKey || ""
+  // For wallet-based exchanges, use wallet key; for others, use API key
+  const key = (exchangeId === "hyperliquid" || exchangeId === "uniswap")
+    ? credentials.walletPrivateKey || credentials.apiKey
     : credentials.apiKey;
   const keyPrefix = key.substring(0, 8);
   return `${exchangeId}:${keyPrefix}`;
@@ -142,6 +144,17 @@ export class ExchangeFactory {
           throw new Error("Hyperliquid requires a wallet private key for authentication");
         }
         exchange = new HyperliquidAdapter(credentials.walletPrivateKey);
+        break;
+      case "uniswap":
+        if (!credentials.apiKey) {
+          throw new Error("Uniswap requires an API key from developers.uniswap.org");
+        }
+        exchange = new UniswapAdapter(
+          credentials.apiKey,
+          credentials.walletPrivateKey || credentials.apiSecret, // wallet address
+          // Default to Ethereum mainnet; can be overridden via config
+          1,
+        );
         break;
       default:
         throw new Error(`No adapter available for exchange: ${exchangeId}`);

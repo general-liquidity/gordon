@@ -479,7 +479,7 @@ export async function exchangeCompare(symbol: string): Promise<ExchangeCommandRe
  * Check if an exchange uses wallet-based authentication
  */
 function isWalletBasedExchange(type: ExchangeId): boolean {
-  return type === 'hyperliquid';
+  return type === 'hyperliquid' || type === 'uniswap';
 }
 
 function getExchangeSetupInstructions(type: ExchangeId): string {
@@ -515,6 +515,11 @@ function getExchangeSetupInstructions(type: ExchangeId): string {
 3. IMPORTANT: Use a DEDICATED trading wallet with limited funds
 4. Fund your Hyperliquid account by depositing USDC on Arbitrum
 5. Note: Hyperliquid uses wallet-based auth (no API key needed)`,
+    uniswap: `
+1. Get an API key from developers.uniswap.org
+2. Provide your wallet address (the address that will execute swaps)
+3. Ensure your wallet has ETH for gas and tokens to trade
+4. Supports 15+ chains: Ethereum, Base, Arbitrum, Polygon, Optimism, etc.`,
   };
 
   return instructions[type] || 'Follow the exchange documentation to create API keys.';

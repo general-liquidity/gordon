@@ -38,6 +38,7 @@ const EXCHANGE_LABELS: Record<ExchangeId, string> = {
   kraken: "Kraken",
   bitfinex: "Bitfinex",
   hyperliquid: "Hyperliquid",
+  uniswap: "Uniswap",
 };
 
 const EXCHANGE_PASSPHRASE_REQUIRED: Record<ExchangeId, boolean> = {
@@ -47,6 +48,7 @@ const EXCHANGE_PASSPHRASE_REQUIRED: Record<ExchangeId, boolean> = {
   kraken: false,
   bitfinex: false,
   hyperliquid: false,
+  uniswap: false,
 };
 
 const EXCHANGE_WALLET_AUTH: Record<ExchangeId, boolean> = {
@@ -56,6 +58,7 @@ const EXCHANGE_WALLET_AUTH: Record<ExchangeId, boolean> = {
   kraken: false,
   bitfinex: false,
   hyperliquid: true,
+  uniswap: true,
 };
 
 const EXCHANGE_INSTRUCTIONS: Record<ExchangeId, string[]> = {
@@ -96,6 +99,12 @@ const EXCHANGE_INSTRUCTIONS: Record<ExchangeId, string[]> = {
     "IMPORTANT: Use a dedicated wallet with limited funds for trading",
     "Never use your main wallet's private key",
     "Fund your Hyperliquid account by depositing USDC on Arbitrum",
+  ],
+  uniswap: [
+    "Get an API key from developers.uniswap.org",
+    "Provide your wallet address (the address that will execute swaps)",
+    "Ensure your wallet has ETH for gas and tokens to trade",
+    "Supports 15+ chains: Ethereum, Base, Arbitrum, Polygon, Optimism, etc.",
   ],
 };
 
