@@ -76,7 +76,9 @@ export {
   // Tracing utilities
   buildTracingOptions,
   withTracing,
-  getTracer,
+
+  // Mastra observability
+  getMastraInstance,
 
   // Types
   type TracingConfig,

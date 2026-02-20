@@ -29,6 +29,7 @@ import { Memory } from "@mastra/memory";
 import { LibSQLStore, LibSQLVector } from "@mastra/libsql";
 
 import { getModel, getFastModel } from "../providers/registry.ts";
+import { getMastraInstance } from "../observability/tracing.ts";
 import {
   indicatorTools,
   explainTools,
@@ -1074,6 +1075,23 @@ let _agents: {
 } = {};
 
 /**
+ * Register an agent with the Mastra instance for observability tracing.
+ * When tracing is enabled, this wires agent.#mastra so that generate()/stream()
+ * calls automatically create Mastra spans (agent_run, tool_call, etc.)
+ * exported to Axiom via OtelExporter with SensitiveDataFilter.
+ */
+function registerObservability(agent: Agent): void {
+  const mastra = getMastraInstance();
+  if (mastra) {
+    try {
+      mastra.addAgent(agent);
+    } catch {
+      // Ignore duplicate registration errors
+    }
+  }
+}
+
+/**
  * Get or create the Scanner Agent
  */
 function getScannerAgent(): Agent {
@@ -1147,6 +1165,7 @@ function getScannerAgent(): Agent {
       inputProcessors: [gordonInputGuard, new TokenLimiterProcessor({ limit: 32000 })],
       outputProcessors: [gordonOutputSanitizer],
     });
+    registerObservability(_agents.scanner);
   }
   return _agents.scanner;
 }
@@ -1237,6 +1256,7 @@ function getAnalystAgent(): Agent {
       inputProcessors: [gordonInputGuard, new TokenLimiterProcessor({ limit: 32000 })],
       outputProcessors: [gordonOutputSanitizer],
     });
+    registerObservability(_agents.analyst);
   }
   return _agents.analyst;
 }
@@ -1304,6 +1324,7 @@ function getPlannerAgent(): Agent {
       inputProcessors: [gordonInputGuard, new TokenLimiterProcessor({ limit: 32000 })],
       outputProcessors: [gordonOutputSanitizer],
     });
+    registerObservability(_agents.planner);
   }
   return _agents.planner;
 }
@@ -1379,6 +1400,7 @@ function getExecutorAgent(): Agent {
       inputProcessors: [gordonInputGuard, new TokenLimiterProcessor({ limit: 32000 })],
       outputProcessors: [gordonOutputSanitizer],
     });
+    registerObservability(_agents.executor);
   }
   return _agents.executor;
 }
@@ -1450,6 +1472,7 @@ function getMonitorAgent(): Agent {
       inputProcessors: [gordonInputGuard, new TokenLimiterProcessor({ limit: 32000 })],
       outputProcessors: [gordonOutputSanitizer],
     });
+    registerObservability(_agents.monitor);
   }
   return _agents.monitor;
 }
@@ -1491,6 +1514,7 @@ function getTeacherAgent(): Agent {
       inputProcessors: [gordonInputGuard, new TokenLimiterProcessor({ limit: 32000 })],
       outputProcessors: [gordonOutputSanitizer],
     });
+    registerObservability(_agents.teacher);
   }
   return _agents.teacher;
 }
@@ -1545,6 +1569,7 @@ function getBacktesterAgent(): Agent {
       inputProcessors: [gordonInputGuard, new TokenLimiterProcessor({ limit: 32000 })],
       outputProcessors: [gordonOutputSanitizer],
     });
+    registerObservability(_agents.backtester);
   }
   return _agents.backtester;
 }
@@ -1595,6 +1620,7 @@ function getGordonAgent(): Agent {
       inputProcessors: [gordonInputGuard, new TokenLimiterProcessor({ limit: 64000 })],
       outputProcessors: [gordonOutputSanitizer],
     });
+    registerObservability(_agents.gordon);
   }
   return _agents.gordon;
 }

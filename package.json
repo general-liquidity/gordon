@@ -1,6 +1,6 @@
 {
   "name": "@general-liquidity/gordon-cli",
-  "version": "0.75.9",
+  "version": "0.75.10",
   "description": "The Frontier Trading Agent",
   "author": "General Liquidity, Inc.",
   "license": "MIT",
@@ -66,12 +66,8 @@
     "@mastra/libsql": "^1.5.0",
     "@mastra/mcp": "^1.0.1",
     "@mastra/memory": "^1.4.0",
-    "@opentelemetry/api": "^1.9.0",
-    "@opentelemetry/exporter-trace-otlp-proto": "^0.212.0",
-    "@opentelemetry/resources": "^2.5.1",
-    "@opentelemetry/sdk-node": "^0.212.0",
-    "@opentelemetry/sdk-trace-base": "^2.5.1",
-    "@opentelemetry/semantic-conventions": "^1.39.0",
+    "@mastra/observability": "^1.2.0",
+    "@mastra/otel-exporter": "^1.0.2",
     "@types/react": "^19.2.10",
     "ai": "^5.0.0",
     "asciichart": "^1.5.25",
@@ -79,7 +75,6 @@
     "ethers": "^6.16.0",
     "ink": "^6.6.0",
     "ink-text-input": "^6.0.0",
-    "protobufjs": "^8.0.0",
     "react": "^19.2.4",
     "zod": "^4.3.6"
   }

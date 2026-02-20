@@ -1,10 +1,12 @@
 /**
- * OpenTelemetry Tracing Module
+ * OpenTelemetry Tracing Module (Mastra Native Observability)
  *
- * Configures OpenTelemetry tracing for Gordon's agent infrastructure.
- * Exports traces to Axiom (or any OTLP-compatible backend).
+ * Uses Mastra's Observability framework with OtelExporter for Axiom.
+ * Creates a minimal Mastra instance to wire observability into agents,
+ * enabling automatic agent-level span creation (agent_run, tool_call, etc.)
+ * with SensitiveDataFilter for redacting API keys from exported traces.
  *
- * Environment Variables:
+ * Environment Variables (unchanged from raw OTEL setup):
  * - OTEL_TRACING_ENABLED: Enable/disable tracing (default: false)
  * - OTEL_EXPORTER_OTLP_ENDPOINT: OTLP endpoint URL (default: https://api.axiom.co/v1/traces)
  * - OTEL_EXPORTER_OTLP_HEADERS: Auth headers (e.g. "Authorization=Bearer xxx,X-Axiom-Dataset=gordon-traces")
@@ -14,10 +16,6 @@
 import { createModuleLogger } from "../logger/index.ts";
 
 const logger = createModuleLogger("tracing");
-
-// Lazily-loaded OTEL modules (avoids verbatimModuleSyntax issues)
-let otelApi: typeof import("@opentelemetry/api") | null = null;
-let sdkInstance: InstanceType<typeof import("@opentelemetry/sdk-node").NodeSDK> | null = null;
 
 // ============================================================================
 // Types
@@ -49,7 +47,10 @@ export interface TracingOptions {
 let tracingInitialized = false;
 let tracingConfig: TracingConfig | null = null;
 
-// Track active spans for context propagation
+// Mastra instance for wiring observability to agents
+let _mastraInstance: import("@mastra/core").Mastra | null = null;
+
+// Track active spans for context propagation (backward compat)
 const activeSpans = new Map<string, SpanContext>();
 
 // ============================================================================
@@ -171,16 +172,9 @@ export function getCurrentSpanContext(): SpanContext | undefined {
 // ============================================================================
 
 /**
- * Build tracing options for Mastra agent calls
- *
- * Usage with agent.generate() or agent.stream():
- * ```typescript
- * const tracingOptions = buildTracingOptions({ tags: ["market-scan"] });
- * const result = await agent.generate(message, {
- *   tracingOptions,
- *   requestContext,
- * });
- * ```
+ * Build tracing options for Mastra agent calls.
+ * These are passed to agent.generate()/stream() and used by Mastra's
+ * internal getOrCreateSpan() to link spans into a trace.
  */
 export function buildTracingOptions(options?: {
   parentContext?: SpanContext;
@@ -198,11 +192,33 @@ export function buildTracingOptions(options?: {
 }
 
 // ============================================================================
+// Mastra Observability Instance
+// ============================================================================
+
+/**
+ * Get the Mastra instance for agent registration.
+ * Agents registered via `mastra.addAgent()` get observability spans
+ * automatically (agent_run, tool_call, etc.).
+ *
+ * Returns null if tracing is disabled or not yet initialized.
+ */
+export function getMastraInstance(): import("@mastra/core").Mastra | null {
+  return _mastraInstance;
+}
+
+// ============================================================================
 // Initialization
 // ============================================================================
 
 /**
- * Initialize OpenTelemetry tracing with OTLP exporter (Axiom-compatible).
+ * Initialize Mastra-native observability tracing.
+ *
+ * Creates an Observability instance with:
+ * - OtelExporter: Sends Mastra spans to Axiom via OTLP
+ * - SensitiveDataFilter: Redacts API keys/secrets from exported spans
+ *
+ * Then creates a minimal Mastra instance so agents can be registered
+ * and automatically produce traced spans.
  *
  * Set these env vars to enable:
  *   OTEL_TRACING_ENABLED=true
@@ -223,39 +239,70 @@ export async function initializeTracing(): Promise<void> {
     return;
   }
 
-  logger.info("Initializing OpenTelemetry tracing", {
+  logger.info("Initializing Mastra observability tracing", {
     serviceName: tracingConfig.serviceName,
     endpoint: tracingConfig.endpoint,
   });
 
   try {
-    const [sdkMod, exporterMod, traceMod, resourceMod, semconvMod] = await Promise.all([
-      import("@opentelemetry/sdk-node"),
-      import("@opentelemetry/exporter-trace-otlp-proto"),
-      import("@opentelemetry/sdk-trace-base"),
-      import("@opentelemetry/resources"),
-      import("@opentelemetry/semantic-conventions"),
+    // Lazy imports to avoid loading heavy OTEL deps when tracing is disabled
+    const [
+      { Observability, SensitiveDataFilter },
+      { OtelExporter },
+      { Mastra },
+    ] = await Promise.all([
+      import("@mastra/observability"),
+      import("@mastra/otel-exporter"),
+      import("@mastra/core"),
     ]);
-    otelApi = await import("@opentelemetry/api");
 
-    const exporter = new exporterMod.OTLPTraceExporter({
-      url: tracingConfig.endpoint,
-      headers: tracingConfig.headers,
+    const otelExporter = new OtelExporter({
+      provider: {
+        custom: {
+          endpoint: tracingConfig.endpoint,
+          headers: tracingConfig.headers,
+          protocol: "http/protobuf" as const,
+        },
+      },
+      resourceAttributes: {
+        "service.name": tracingConfig.serviceName,
+        "service.version": process.env.npm_package_version || "unknown",
+      },
     });
 
-    sdkInstance = new sdkMod.NodeSDK({
-      resource: resourceMod.resourceFromAttributes({
-        [semconvMod.ATTR_SERVICE_NAME]: tracingConfig.serviceName,
-        [semconvMod.ATTR_SERVICE_VERSION]: process.env.npm_package_version || "unknown",
-      }),
-      spanProcessors: [new traceMod.BatchSpanProcessor(exporter)],
+    const observability = new Observability({
+      configs: {
+        default: {
+          serviceName: tracingConfig.serviceName,
+          exporters: [otelExporter],
+          spanOutputProcessors: [
+            new SensitiveDataFilter({
+              sensitiveFields: [
+                "apikey", "secret", "token", "authorization",
+                "bearer", "password", "privatekey", "credential",
+              ],
+              redactionStyle: "partial",
+            }),
+          ],
+        },
+      },
     });
 
-    sdkInstance.start();
+    // Create minimal Mastra instance for observability wiring.
+    // Agents are registered later via getMastraInstance().addAgent().
+    // This sets agent.#mastra, enabling getOrCreateSpan() to access
+    // observability and create real Mastra spans (agent_run, tool_call, etc.).
+    _mastraInstance = new Mastra({
+      observability,
+    });
+
     tracingInitialized = true;
-    logger.info("Tracing initialized successfully");
+    logger.info("Mastra observability tracing initialized");
   } catch (err) {
-    logger.error("Failed to initialize OTEL tracing", err instanceof Error ? err : new Error(String(err)));
+    logger.error(
+      "Failed to initialize Mastra observability",
+      err instanceof Error ? err : new Error(String(err)),
+    );
     tracingInitialized = true; // Mark as initialized to avoid retries
   }
 }
@@ -269,17 +316,18 @@ export async function shutdownTracing(): Promise<void> {
   }
 
   logger.debug("Shutting down tracing");
-
   activeSpans.clear();
 
-  if (sdkInstance) {
+  if (_mastraInstance) {
     try {
-      await sdkInstance.shutdown();
+      const obs = (_mastraInstance as any).observability;
+      if (obs && typeof obs.shutdown === "function") {
+        await obs.shutdown();
+      }
     } catch (err) {
-      logger.debug("Tracing shutdown error (non-fatal)", { error: String(err) });
+      logger.debug("Observability shutdown error (non-fatal)", { error: String(err) });
     }
-    sdkInstance = null;
-    otelApi = null;
+    _mastraInstance = null;
   }
 
   tracingInitialized = false;
@@ -298,34 +346,22 @@ export function getTracingStatus(): {
   enabled: boolean;
   config: TracingConfig | null;
   activeSpanCount: number;
+  mastraWired: boolean;
 } {
   return {
     initialized: tracingInitialized,
     enabled: tracingConfig?.enabled ?? false,
     config: tracingConfig,
     activeSpanCount: activeSpans.size,
+    mastraWired: _mastraInstance !== null,
   };
 }
 
 /**
- * Get the OTEL tracer instance for Gordon
- */
-export function getTracer() {
-  return otelApi?.trace.getTracer("gordon-trading") ?? null;
-}
-
-/**
- * Create a traced operation wrapper
+ * Create a traced operation wrapper.
  *
- * When tracing is enabled, creates a real OTEL span exported to Axiom.
- * When disabled, falls back to lightweight internal span tracking.
- *
- * Usage:
- * ```typescript
- * const result = await withTracing("scan-market", async (context) => {
- *   return scanMarket(options);
- * });
- * ```
+ * With Mastra observability enabled, agent.generate()/stream() calls
+ * automatically create spans. Use this for custom non-agent operations.
  */
 export async function withTracing<T>(
   operationName: string,
@@ -337,33 +373,6 @@ export async function withTracing<T>(
 
   storeSpanContext(spanKey, spanContext);
 
-  // Use real OTEL tracer when SDK is active
-  const tracer = getTracer();
-  if (tracer && otelApi) {
-    const api = otelApi;
-    return tracer.startActiveSpan(operationName, async (span) => {
-      if (options?.metadata) {
-        for (const [k, v] of Object.entries(options.metadata)) {
-          span.setAttribute(k, String(v));
-        }
-      }
-      try {
-        const result = await fn(spanContext);
-        span.setStatus({ code: api.SpanStatusCode.OK });
-        return result;
-      } catch (err) {
-        const error = err instanceof Error ? err : new Error(String(err));
-        span.setStatus({ code: api.SpanStatusCode.ERROR, message: error.message });
-        span.recordException(error);
-        throw error;
-      } finally {
-        span.end();
-        removeSpanContext(spanKey);
-      }
-    });
-  }
-
-  // Fallback: lightweight internal tracking
   try {
     logger.debug("Starting traced operation", {
       operation: operationName,
