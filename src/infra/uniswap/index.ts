@@ -9,6 +9,9 @@ export { UniswapClient } from "./client.ts";
 // Token List
 export { UniswapTokenList } from "./token-list.ts";
 
+// Subgraph
+export { UniswapSubgraph } from "./subgraph.ts";
+
 // Types
 export type {
   UniswapAPIError,
@@ -24,6 +27,29 @@ export type {
   RawTokenListEntry,
   UniswapTokenListResponse,
 } from "./types.ts";
+
+// Subgraph Types
+export type {
+  SubgraphPool,
+  SubgraphSwap,
+  SubgraphTokenWithDayData,
+  SubgraphTokenHourData,
+  SubgraphBundle,
+  SubgraphFactory,
+  SubgraphTick,
+  SubgraphTickDayData,
+  SubgraphTickHourData,
+  SubgraphMint,
+  SubgraphBurn,
+  SubgraphCollect,
+  SubgraphFlash,
+  SubgraphPosition,
+  SubgraphPositionSnapshot,
+  SubgraphUniswapDayData,
+  SubgraphTransaction,
+  ResolvedPool,
+} from "./subgraph-types.ts";
+export { V3_SUBGRAPH_IDS } from "./subgraph-types.ts";
 
 // Constants
 export {

@@ -11,9 +11,14 @@
  * Requires:
  * - UNISWAP_API_KEY: API key from developers.uniswap.org
  * - Wallet address for signing transactions
+ *
+ * Optional:
+ * - THEGRAPH_API_KEY: Enables market data (candles, tickers, swap history)
+ *   via the Uniswap V3 Subgraph. Without it, data methods return stubs.
  */
 
 import { UniswapClient } from "../../uniswap/index.ts";
+import { UniswapSubgraph } from "../../uniswap/subgraph.ts";
 import { SUPPORTED_CHAIN_IDS, CHAIN_NAMES } from "../../uniswap/types.ts";
 import type {
   Exchange,
@@ -48,6 +53,8 @@ import type { Candle } from "../../../types/index.ts";
  */
 export class UniswapAdapter implements Exchange {
   private client: UniswapClient;
+  /** Subgraph client for on-chain market data (null if no THEGRAPH_API_KEY) */
+  readonly subgraph: UniswapSubgraph | null;
 
   readonly exchangeId: ExchangeId = "uniswap";
   readonly displayName = "Uniswap";
@@ -57,8 +64,11 @@ export class UniswapAdapter implements Exchange {
   private localTrades: Map<string, Trade[]> = new Map();
   private orderCounter = 0;
 
-  constructor(apiKey: string, walletAddress: string, chainId = 1) {
+  constructor(apiKey: string, walletAddress: string, chainId = 1, graphApiKey?: string) {
     this.client = new UniswapClient(apiKey, walletAddress, chainId);
+    this.subgraph = graphApiKey
+      ? new UniswapSubgraph(graphApiKey, chainId, this.client)
+      : null;
   }
 
   // -------------------------------------------------------------------------
@@ -104,24 +114,41 @@ export class UniswapAdapter implements Exchange {
     return Number(outputAmount) / 10 ** tokenOutDecimals;
   }
 
-  async getCandles(_symbol: string, _interval: string, _limit?: number): Promise<Candle[]> {
-    // Uniswap Trading API doesn't provide historical OHLC data.
-    return [];
+  async getCandles(symbol: string, interval: string, limit?: number): Promise<Candle[]> {
+    if (!this.subgraph?.isAvailable()) return [];
+    try {
+      return await this.subgraph.getCandles(symbol, interval, limit ?? 50);
+    } catch {
+      return [];
+    }
   }
 
   async get24hrTickers(): Promise<Ticker24hr[]> {
-    // Not available via Uniswap Trading API
-    return [];
+    if (!this.subgraph?.isAvailable()) return [];
+    try {
+      return await this.subgraph.get24hrTickers();
+    } catch {
+      return [];
+    }
   }
 
-  async getTopSymbols(_n: number): Promise<string[]> {
-    return ["ETHUSDC", "WBTCUSDC", "ARBUSDC", "LINKUSDC", "UNIUSDC"];
+  async getTopSymbols(n: number): Promise<string[]> {
+    if (!this.subgraph?.isAvailable()) {
+      return ["ETHUSDC", "WBTCUSDC", "ARBUSDC", "LINKUSDC", "UNIUSDC"];
+    }
+    try {
+      return await this.subgraph.getTopSymbols(n);
+    } catch {
+      return ["ETHUSDC", "WBTCUSDC", "ARBUSDC", "LINKUSDC", "UNIUSDC"];
+    }
   }
 
   async getOrderBook(symbol: string, _limit?: number): Promise<OrderBook> {
+    if (this.subgraph?.isAvailable()) {
+      try { return await this.subgraph.getOrderBook(symbol); } catch { /* fall through */ }
+    }
     const price = await this.getPrice(symbol);
-    const spread = price * 0.003; // ~0.3% typical AMM spread
-
+    const spread = price * 0.003;
     return {
       lastUpdateId: Date.now(),
       bids: [{ price: price - spread / 2, quantity: 0 } as OrderBookEntry],
@@ -130,9 +157,11 @@ export class UniswapAdapter implements Exchange {
   }
 
   async getBookTicker(symbol: string): Promise<BookTicker> {
+    if (this.subgraph?.isAvailable()) {
+      try { return await this.subgraph.getBookTicker(symbol); } catch { /* fall through */ }
+    }
     const price = await this.getPrice(symbol);
     const spread = price * 0.003;
-
     return {
       symbol,
       bidPrice: price - spread / 2,
@@ -143,9 +172,11 @@ export class UniswapAdapter implements Exchange {
   }
 
   async getSpread(symbol: string): Promise<SpreadInfo> {
+    if (this.subgraph?.isAvailable()) {
+      try { return await this.subgraph.getSpread(symbol); } catch { /* fall through */ }
+    }
     const price = await this.getPrice(symbol);
     const spread = price * 0.003;
-
     return {
       spread,
       spreadPercent: 0.3,
@@ -155,6 +186,9 @@ export class UniswapAdapter implements Exchange {
   }
 
   async getAvgPrice(symbol: string): Promise<AvgPrice> {
+    if (this.subgraph?.isAvailable()) {
+      try { return await this.subgraph.getAvgPrice(symbol); } catch { /* fall through */ }
+    }
     const price = await this.getPrice(symbol);
     return { mins: 5, price };
   }
@@ -319,8 +353,17 @@ export class UniswapAdapter implements Exchange {
   // History
   // -------------------------------------------------------------------------
 
-  async getTradeHistory(symbol: string, _limit?: number): Promise<Trade[]> {
-    return this.localTrades.get(symbol) || [];
+  async getTradeHistory(symbol: string, limit?: number): Promise<Trade[]> {
+    const local = this.localTrades.get(symbol) || [];
+    if (!this.subgraph?.isAvailable()) return local;
+    try {
+      const onChain = await this.subgraph.getTradeHistory(symbol, limit ?? 50);
+      const localIds = new Set(local.map((t) => t.id));
+      const deduped = onChain.filter((t) => !localIds.has(t.id));
+      return [...local, ...deduped].slice(0, limit ?? 50);
+    } catch {
+      return local;
+    }
   }
 
   async getOrderHistory(symbol: string, _limit?: number): Promise<Order[]> {

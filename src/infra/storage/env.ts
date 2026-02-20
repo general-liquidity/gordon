@@ -41,6 +41,8 @@ export interface EnvKeys {
   BITFINEX_API_KEY?: string;
   BITFINEX_API_SECRET?: string;
   HYPERLIQUID_PRIVATE_KEY?: string;
+  UNISWAP_API_KEY?: string;
+  THEGRAPH_API_KEY?: string;
   GORDON_PROVIDER?: string;
   GORDON_MODEL?: string;
 }
@@ -54,6 +56,8 @@ export interface EnvStatus {
   hasKrakenKeys: boolean;
   hasBitfinexKeys: boolean;
   hasHyperliquidKey: boolean;
+  hasUniswapKey: boolean;
+  hasGraphKey: boolean;
   keys: EnvKeys;
 }
 
@@ -131,6 +135,8 @@ export async function checkEnvStatus(): Promise<EnvStatus> {
       BITFINEX_API_KEY: process.env.BITFINEX_API_KEY,
       BITFINEX_API_SECRET: process.env.BITFINEX_API_SECRET,
       HYPERLIQUID_PRIVATE_KEY: process.env.HYPERLIQUID_PRIVATE_KEY,
+      UNISWAP_API_KEY: process.env.UNISWAP_API_KEY,
+      THEGRAPH_API_KEY: process.env.THEGRAPH_API_KEY,
     };
 
     return {
@@ -142,6 +148,8 @@ export async function checkEnvStatus(): Promise<EnvStatus> {
       hasKrakenKeys: !!(keys.KRAKEN_API_KEY && keys.KRAKEN_API_SECRET),
       hasBitfinexKeys: !!(keys.BITFINEX_API_KEY && keys.BITFINEX_API_SECRET),
       hasHyperliquidKey: !!keys.HYPERLIQUID_PRIVATE_KEY,
+      hasUniswapKey: !!keys.UNISWAP_API_KEY,
+      hasGraphKey: !!keys.THEGRAPH_API_KEY,
       keys,
     };
   }
@@ -166,6 +174,8 @@ export async function checkEnvStatus(): Promise<EnvStatus> {
     BITFINEX_API_KEY: parsed.BITFINEX_API_KEY || process.env.BITFINEX_API_KEY,
     BITFINEX_API_SECRET: parsed.BITFINEX_API_SECRET || process.env.BITFINEX_API_SECRET,
     HYPERLIQUID_PRIVATE_KEY: parsed.HYPERLIQUID_PRIVATE_KEY || process.env.HYPERLIQUID_PRIVATE_KEY,
+    UNISWAP_API_KEY: parsed.UNISWAP_API_KEY || process.env.UNISWAP_API_KEY,
+    THEGRAPH_API_KEY: parsed.THEGRAPH_API_KEY || process.env.THEGRAPH_API_KEY,
   };
 
   return {
@@ -177,6 +187,8 @@ export async function checkEnvStatus(): Promise<EnvStatus> {
     hasKrakenKeys: !!(keys.KRAKEN_API_KEY && keys.KRAKEN_API_SECRET),
     hasBitfinexKeys: !!(keys.BITFINEX_API_KEY && keys.BITFINEX_API_SECRET),
     hasHyperliquidKey: !!keys.HYPERLIQUID_PRIVATE_KEY,
+    hasUniswapKey: !!keys.UNISWAP_API_KEY,
+    hasGraphKey: !!keys.THEGRAPH_API_KEY,
     keys,
   };
 }

@@ -58,6 +58,7 @@ import {
   agentKitDefiTools,
   baseSignalTools,
   baseIndexerTools,
+  uniswapDataTools,
   positionTrackingTools,
   checkRiskTool,
   memoryTools,
@@ -300,6 +301,7 @@ const instrumentedAgentKitOnchainTools = withToolsMetrics(agentKitOnchainTools);
 const instrumentedAgentKitDefiTools = withToolsMetrics(agentKitDefiTools);
 const instrumentedBaseSignalTools = withToolsMetrics(baseSignalTools);
 const instrumentedBaseIndexerTools = withToolsMetrics(baseIndexerTools);
+const instrumentedUniswapDataTools = withToolsMetrics(uniswapDataTools);
 const instrumentedEvalTools = withToolsMetrics(evalTools);
 const instrumentedPositionTrackingTools = withToolsMetrics(positionTrackingTools);
 const instrumentedMemoryTools = withToolsMetrics(memoryTools);
@@ -1097,6 +1099,9 @@ function getScannerAgent(): Agent {
         // Base L2 DEX indexer tools (The Graph — top pools, Aerodrome)
         indexer_top_pools: instrumentedBaseIndexerTools.indexer_top_pools,
         indexer_aerodrome_pools: instrumentedBaseIndexerTools.indexer_aerodrome_pools,
+        // Uniswap V3 subgraph tools (protocol overview, liquidity events)
+        get_uniswap_protocol_overview: instrumentedUniswapDataTools.get_uniswap_protocol_overview,
+        get_liquidity_events: instrumentedUniswapDataTools.get_liquidity_events,
         // Position tracking (report setups) (v0.7)
         report_setup: instrumentedPositionTrackingTools.report_setup,
         // Memory tools (v0.7)
@@ -1160,6 +1165,12 @@ function getAnalystAgent(): Agent {
         defillama_get_token_prices: instrumentedAgentKitDefiTools.defillama_get_token_prices,
         // Base L2 DEX indexer tool (The Graph — detailed pool stats)
         indexer_pool_stats: instrumentedBaseIndexerTools.indexer_pool_stats,
+        // Uniswap V3 subgraph tools (tick liquidity, liquidity events, flash, fees)
+        get_pool_tick_liquidity: instrumentedUniswapDataTools.get_pool_tick_liquidity,
+        get_liquidity_events: instrumentedUniswapDataTools.get_liquidity_events,
+        get_pool_flash_events: instrumentedUniswapDataTools.get_pool_flash_events,
+        get_fee_collections: instrumentedUniswapDataTools.get_fee_collections,
+        get_uniswap_protocol_overview: instrumentedUniswapDataTools.get_uniswap_protocol_overview,
         // Base L2 on-chain analysis tools (wallet tracking, holders, DEX pairs)
         track_base_wallet: instrumentedBaseSignalTools.track_base_wallet,
         get_base_token_holders: instrumentedBaseSignalTools.get_base_token_holders,
@@ -1361,6 +1372,9 @@ function getMonitorAgent(): Agent {
         agentkit_get_wallet: instrumentedAgentKitOnchainTools.agentkit_get_wallet,
         agentkit_get_balance: instrumentedAgentKitOnchainTools.agentkit_get_balance,
         agentkit_erc20_balance: instrumentedAgentKitOnchainTools.agentkit_erc20_balance,
+        // Uniswap V3 LP position tracking
+        get_lp_positions: instrumentedUniswapDataTools.get_lp_positions,
+        get_fee_collections: instrumentedUniswapDataTools.get_fee_collections,
         // Shared context for cross-agent memory
         ...instrumentedSharedContextTools,
         // Performance evaluation tools for recording trade outcomes

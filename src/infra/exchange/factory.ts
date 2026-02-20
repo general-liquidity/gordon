@@ -152,8 +152,8 @@ export class ExchangeFactory {
         exchange = new UniswapAdapter(
           credentials.apiKey,
           credentials.walletPrivateKey || credentials.apiSecret, // wallet address
-          // Default to Ethereum mainnet; can be overridden via config
-          1,
+          1, // Default to Ethereum mainnet
+          process.env.THEGRAPH_API_KEY, // optional — enables subgraph market data
         );
         break;
       default:

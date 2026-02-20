@@ -68,6 +68,7 @@ export { agentKitOnchainTools } from "./agentkit-onchain.ts";
 export { agentKitDefiTools } from "./agentkit-defi.ts";
 export { baseSignalTools } from "./base-signals.ts";
 export { baseIndexerTools } from "./base-indexers.ts";
+export { uniswapDataTools } from "./uniswap-data.ts";
 
 // Position tracking tools (v0.7)
 export { positionTrackingTools } from "./position-tracking.ts";
@@ -299,6 +300,7 @@ import { agentKitOnchainTools } from "./agentkit-onchain.ts";
 import { agentKitDefiTools } from "./agentkit-defi.ts";
 import { baseSignalTools } from "./base-signals.ts";
 import { baseIndexerTools } from "./base-indexers.ts";
+import { uniswapDataTools } from "./uniswap-data.ts";
 import { positionTrackingTools } from "./position-tracking.ts";
 import { checkRiskTool } from "./risk-gate.ts";
 import { memoryTools } from "./memory-tools.ts";
@@ -348,6 +350,7 @@ export const allTools = {
   ...agentKitDefiTools,
   ...baseSignalTools,
   ...baseIndexerTools,
+  ...uniswapDataTools,
   ...multiModalChartTools,
   ...evalTools,
   ...positionTrackingTools,
@@ -398,6 +401,7 @@ export const toolCounts = {
   agentKitDefi: Object.keys(agentKitDefiTools).length,
   baseSignals: Object.keys(baseSignalTools).length,
   baseIndexers: Object.keys(baseIndexerTools).length,
+  uniswapData: Object.keys(uniswapDataTools).length,
   multiModalCharts: Object.keys(multiModalChartTools).length,
   evals: Object.keys(evalTools).length,
   positionTracking: Object.keys(positionTrackingTools).length,

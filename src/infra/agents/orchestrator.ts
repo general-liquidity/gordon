@@ -643,6 +643,14 @@ const TOOL_AGENT_MAP: Record<string, string> = {
   indexer_pool_stats: "Analyst",
   indexer_aerodrome_pools: "Scanner",
 
+  // ---- Uniswap V3 subgraph tools ----
+  get_pool_tick_liquidity: "Analyst",
+  get_liquidity_events: "Scanner",
+  get_pool_flash_events: "Analyst",
+  get_lp_positions: "Monitor",
+  get_uniswap_protocol_overview: "Scanner",
+  get_fee_collections: "Monitor",
+
   // ---- Base L2 signal tools ----
   // baseSignalTools cherry-picks (Scanner: discovery + scanning)
   scan_base_whale_transfers: "Scanner",
