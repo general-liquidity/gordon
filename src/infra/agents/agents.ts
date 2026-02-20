@@ -28,7 +28,7 @@ const gordonOutputSanitizer = new GordonOutputSanitizer();
 import { Memory } from "@mastra/memory";
 import { LibSQLStore, LibSQLVector } from "@mastra/libsql";
 
-import { getModel } from "../providers/registry.ts";
+import { getModel, getFastModel } from "../providers/registry.ts";
 import {
   indicatorTools,
   explainTools,
@@ -381,6 +381,8 @@ const WORKING_MEMORY_TEMPLATE = `
  * - LibSQLVector: Vector database for semantic search (RAG)
  * - semanticRecall: Find similar past trades and analyses
  * - workingMemory: Maintain trading context across conversations
+ * - observationalMemory: Background observation/reflection for long conversations
+ * - Memory processors: Auto-configured (MessageHistory, SemanticRecall, WorkingMemory)
  * - Configurable lastMessages via _memoryConfig
  */
 function createMemory(): Memory {
@@ -415,6 +417,21 @@ function createMemory(): Memory {
         template: WORKING_MEMORY_TEMPLATE,
       },
       generateTitle: true,
+      observationalMemory: {
+        model: getFastModel(),
+        scope: "thread",
+        observation: {
+          messageTokens: 30_000,
+          bufferTokens: 0.2,
+          bufferActivation: 0.8,
+          blockAfter: 1.2,
+        },
+        reflection: {
+          observationTokens: 40_000,
+          bufferActivation: 0.5,
+          blockAfter: 1.2,
+        },
+      },
     },
   });
 }

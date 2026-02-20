@@ -21,120 +21,123 @@ const path = require("path");
 
 let totalPatched = 0;
 
+const distDir = path.resolve(__dirname, "..", "node_modules/@mastra/core/dist");
+
+/**
+ * Scan dist directory for chunk files matching a pattern in their content.
+ * Returns relative paths from the project root.
+ */
+function findChunkFiles(contentPattern) {
+  if (!fs.existsSync(distDir)) return [];
+  return fs
+    .readdirSync(distDir)
+    .filter((f) => /^chunk-.+\.(js|cjs)$/.test(f))
+    .filter((f) => {
+      const content = fs.readFileSync(path.join(distDir, f), "utf8");
+      return content.includes(contentPattern);
+    })
+    .map((f) => path.join(distDir, f));
+}
+
 // ============================================================================
 // Patch 1: Sub-agent lastMessages: 0 → 10
 // ============================================================================
 
-const lastMessagesFiles = [
-  "node_modules/@mastra/core/dist/chunk-FKO2M32N.js",
-  "node_modules/@mastra/core/dist/chunk-DNYIYX4I.cjs",
-];
+const lastMessagesNeedle = "            lastMessages: 0";
+const lastMessagesReplacement = "            lastMessages: 10";
 
-for (const file of lastMessagesFiles) {
-  const filePath = path.resolve(__dirname, "..", file);
-  if (!fs.existsSync(filePath)) {
-    console.log(`[patch-mastra] Skipping ${file} (not found)`);
-    continue;
-  }
-
-  let content = fs.readFileSync(filePath, "utf8");
-  const needle = "            lastMessages: 0";
-  const replacement = "            lastMessages: 10";
-
-  if (content.includes(needle)) {
-    content = content.replaceAll(needle, replacement);
-    fs.writeFileSync(filePath, content, "utf8");
-    const count = (content.match(/lastMessages: 10/g) || []).length;
-    console.log(`[patch-mastra] Patched lastMessages in ${file} (${count} occurrences)`);
-    totalPatched++;
-  } else if (content.includes(replacement)) {
-    console.log(`[patch-mastra] ${file} lastMessages already patched`);
+const lastMessagesFiles = findChunkFiles(lastMessagesNeedle);
+if (lastMessagesFiles.length === 0) {
+  // Check if already patched
+  const alreadyPatched = findChunkFiles(lastMessagesReplacement);
+  if (alreadyPatched.length > 0) {
+    console.log(`[patch-mastra] lastMessages already patched (${alreadyPatched.length} files)`);
   } else {
-    console.log(`[patch-mastra] WARNING: lastMessages pattern not found in ${file}`);
+    console.log(`[patch-mastra] WARNING: lastMessages pattern not found in any chunk file`);
   }
 }
 
-// ============================================================================
-// Patch 2: OpenAI .responses() → .chat() when custom baseURL is set
-// ============================================================================
+for (const filePath of lastMessagesFiles) {
+  let content = fs.readFileSync(filePath, "utf8");
+  content = content.replaceAll(lastMessagesNeedle, lastMessagesReplacement);
+  fs.writeFileSync(filePath, content, "utf8");
+  const count = (content.match(/lastMessages: 10/g) || []).length;
+  const name = path.relative(path.resolve(__dirname, ".."), filePath);
+  console.log(`[patch-mastra] Patched lastMessages in ${name} (${count} occurrences)`);
+  totalPatched++;
+}
 
-const modelResolverFiles = [
-  "node_modules/@mastra/core/dist/chunk-GVINAESE.js",
-  "node_modules/@mastra/core/dist/chunk-UUDZ7CJ4.cjs",
-];
-
-// The original code:
-//   case "openai":
-//     return createOpenAI({ apiKey }).responses(modelId);
-//
-// Patched to use createOpenAICompatible when OPENAI_BASE_URL is set.
-// createOpenAI sends OpenAI-native formats (tool_choice: "auto" as string,
-// stream_options, /responses endpoint) which 3rd-party providers reject.
-// createOpenAICompatible sends the compatible format that Dedalus accepts.
-//
-// When no custom base URL → direct OpenAI → original .responses() path.
+// ============================================================================
+// Patch 2: OpenAI .responses() → createOpenAICompatible when custom baseURL
+// ============================================================================
 
 // Custom fetch that strips tool_choice when it's "auto" for Dedalus compatibility.
 // Dedalus rejects tool_choice:"auto" (string: 422) and {"type":"auto"} (object: empty response).
 // Omitting tool_choice entirely is safe — "auto" is the default behavior.
 const COMPAT_FETCH = `function(url, init) { if (init && init.body && typeof init.body === "string") { try { var b = JSON.parse(init.body); if (b.tool_choice === "auto" || (b.tool_choice && b.tool_choice.type === "auto")) { delete b.tool_choice; init = Object.assign({}, init, { body: JSON.stringify(b) }); } } catch(e) {} } return globalThis.fetch(url, init); }`;
 
-// Two variants: ESM uses bare function names, CJS uses `chunk5KJXHJ4M_cjs.` prefix
-const responsesPatterns = [
-  // ESM — match original, v1 patch (createOpenAI.chat), and v2 patch (createOpenAICompatible without fetch)
-  {
-    needles: [
-      `return createOpenAI({ apiKey }).responses(modelId)`,
-      `return process.env.OPENAI_BASE_URL ? createOpenAI({ apiKey, baseURL: process.env.OPENAI_BASE_URL }).chat(modelId) : createOpenAI({ apiKey }).responses(modelId)`,
-      `return process.env.OPENAI_BASE_URL ? createOpenAICompatible({ name: "openai", apiKey, baseURL: process.env.OPENAI_BASE_URL, supportsStructuredOutputs: true }).chatModel(modelId) : createOpenAI({ apiKey }).responses(modelId)`,
-    ],
-    replacement: `return process.env.OPENAI_BASE_URL ? createOpenAICompatible({ name: "openai", apiKey, baseURL: process.env.OPENAI_BASE_URL, supportsStructuredOutputs: true, fetch: ${COMPAT_FETCH} }).chatModel(modelId) : createOpenAI({ apiKey }).responses(modelId)`,
-  },
-  // CJS — same variants with chunk prefix
-  {
-    needles: [
-      `return chunk5KJXHJ4M_cjs.createOpenAI({ apiKey }).responses(modelId)`,
-      `return process.env.OPENAI_BASE_URL ? chunk5KJXHJ4M_cjs.createOpenAI({ apiKey, baseURL: process.env.OPENAI_BASE_URL }).chat(modelId) : chunk5KJXHJ4M_cjs.createOpenAI({ apiKey }).responses(modelId)`,
-      `return process.env.OPENAI_BASE_URL ? chunk5KJXHJ4M_cjs.createOpenAICompatible({ name: "openai", apiKey, baseURL: process.env.OPENAI_BASE_URL, supportsStructuredOutputs: true }).chatModel(modelId) : chunk5KJXHJ4M_cjs.createOpenAI({ apiKey }).responses(modelId)`,
-    ],
-    replacement: `return process.env.OPENAI_BASE_URL ? chunk5KJXHJ4M_cjs.createOpenAICompatible({ name: "openai", apiKey, baseURL: process.env.OPENAI_BASE_URL, supportsStructuredOutputs: true, fetch: ${COMPAT_FETCH} }).chatModel(modelId) : chunk5KJXHJ4M_cjs.createOpenAI({ apiKey }).responses(modelId)`,
-  },
-];
+// Find all chunk files containing .responses(modelId)
+const responsesFiles = findChunkFiles(".responses(modelId)");
 
-for (const file of modelResolverFiles) {
-  const filePath = path.resolve(__dirname, "..", file);
-  if (!fs.existsSync(filePath)) {
-    console.log(`[patch-mastra] Skipping ${file} (not found)`);
+for (const filePath of responsesFiles) {
+  let content = fs.readFileSync(filePath, "utf8");
+  const name = path.relative(path.resolve(__dirname, ".."), filePath);
+  const isCjs = filePath.endsWith(".cjs");
+
+  // Detect the CJS chunk prefix (e.g., "chunkSH4PCZ3X_cjs.")
+  let cjsPrefix = "";
+  if (isCjs) {
+    const prefixMatch = content.match(/(\w+_cjs)\.createOpenAI\(/);
+    if (prefixMatch) cjsPrefix = prefixMatch[1] + ".";
+  }
+
+  const fn = (name) => (cjsPrefix ? `${cjsPrefix}${name}` : name);
+
+  // All needle variants we might encounter (original or previously patched)
+  const needles = [
+    // Original: createOpenAI({ apiKey }).responses(modelId)
+    `return ${fn("createOpenAI")}({ apiKey }).responses(modelId)`,
+    // Original v2 (core 1.5.0): createOpenAI({ apiKey, baseURL, headers }).responses(modelId)
+    `return ${fn("createOpenAI")}({ apiKey, baseURL, headers }).responses(modelId)`,
+    // Previously patched v1: createOpenAI.chat()
+    `return process.env.OPENAI_BASE_URL ? ${fn("createOpenAI")}({ apiKey, baseURL: process.env.OPENAI_BASE_URL }).chat(modelId) : ${fn("createOpenAI")}({ apiKey }).responses(modelId)`,
+    // Previously patched v2: createOpenAICompatible without fetch
+    `return process.env.OPENAI_BASE_URL ? ${fn("createOpenAICompatible")}({ name: "openai", apiKey, baseURL: process.env.OPENAI_BASE_URL, supportsStructuredOutputs: true }).chatModel(modelId) : ${fn("createOpenAI")}({ apiKey }).responses(modelId)`,
+  ];
+
+  // Replacement for old-style (no baseURL in original call)
+  const replacementOld = `return process.env.OPENAI_BASE_URL ? ${fn("createOpenAICompatible")}({ name: "openai", apiKey, baseURL: process.env.OPENAI_BASE_URL, supportsStructuredOutputs: true, fetch: ${COMPAT_FETCH} }).chatModel(modelId) : ${fn("createOpenAI")}({ apiKey }).responses(modelId)`;
+
+  // Replacement for new-style (baseURL, headers in original call)
+  const replacementNew = `return process.env.OPENAI_BASE_URL ? ${fn("createOpenAICompatible")}({ name: "openai", apiKey, baseURL: process.env.OPENAI_BASE_URL, supportsStructuredOutputs: true, fetch: ${COMPAT_FETCH} }).chatModel(modelId) : ${fn("createOpenAI")}({ apiKey, baseURL, headers }).responses(modelId)`;
+
+  // Check if already has our final patch
+  if (content.includes(replacementOld) || content.includes(replacementNew)) {
+    console.log(`[patch-mastra] ${name} OpenAI compatible already patched`);
     continue;
   }
 
-  let content = fs.readFileSync(filePath, "utf8");
   let patched = false;
-
-  for (const { needles, replacement } of responsesPatterns) {
-    // Already patched?
-    if (content.includes(replacement)) {
-      console.log(`[patch-mastra] ${file} OpenAI compatible already patched`);
+  for (const needle of needles) {
+    if (content.includes(needle)) {
+      // Pick the right replacement based on whether the original had baseURL/headers
+      const replacement = needle.includes("baseURL, headers") ? replacementNew : replacementOld;
+      content = content.replaceAll(needle, replacement);
+      fs.writeFileSync(filePath, content, "utf8");
+      console.log(`[patch-mastra] Patched OpenAI → createOpenAICompatible in ${name}`);
+      totalPatched++;
       patched = true;
       break;
     }
-    // Try each needle variant (original or previously-patched)
-    for (const needle of needles) {
-      if (content.includes(needle)) {
-        content = content.replaceAll(needle, replacement);
-        fs.writeFileSync(filePath, content, "utf8");
-        console.log(`[patch-mastra] Patched OpenAI → createOpenAICompatible in ${file}`);
-        totalPatched++;
-        patched = true;
-        break;
-      }
-    }
-    if (patched) break;
   }
 
   if (!patched) {
-    console.log(`[patch-mastra] WARNING: OpenAI responses pattern not found in ${file}`);
+    console.log(`[patch-mastra] WARNING: Could not match OpenAI responses pattern in ${name}`);
   }
+}
+
+if (responsesFiles.length === 0) {
+  console.log(`[patch-mastra] WARNING: No chunk files found containing .responses(modelId)`);
 }
 
 console.log(`[patch-mastra] Done (${totalPatched} files patched)`);
