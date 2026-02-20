@@ -15,6 +15,7 @@ import { ShortcutsOverlay, ShortcutsHint, useShortcutsHint } from "./components/
 import { ThemeProvider, useTheme } from "./components/ThemeProvider.tsx";
 import { processMessageStream, initializeTracing } from "../infra/agents/orchestrator.ts";
 import { initMCPTools, enableMCPHotReload } from "../infra/mcp/client.ts";
+import { initSkills } from "../infra/skills/manager.ts";
 import { createLLMClientFromEnv, type LLMClient } from "../infra/llm/index.ts";
 import { BinanceClient } from "../infra/binance/index.ts";
 import { BinanceAdapter, ExchangeFactory, type Exchange } from "../infra/exchange/index.ts";
@@ -67,6 +68,7 @@ import {
   handleStrategyCommand,
   handleGenCommand,
   handleMCPCommand,
+  handleSkillCommand,
   handleWorkflowCommand,
   formatWorkflowResult,
   handleExportCommand,
@@ -409,10 +411,12 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
           );
         }
 
-        // Initialize MCP plugin tools (non-blocking)
-        initMCPTools().catch((err) =>
-          console.error("[MCP] Failed to init tools:", (err as Error).message),
-        );
+        // Initialize MCP plugin tools + skill routing (non-blocking)
+        initMCPTools()
+          .then(() => initSkills())
+          .catch((err) =>
+            console.error("[Skills] Init failed:", (err as Error).message),
+          );
         enableMCPHotReload(5000);
       } catch (error) {
         console.error("Failed to initialize LLM client:", error);
@@ -1463,6 +1467,20 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
             setState((prev) => ({ ...prev, messages: [...prev.messages, userMessage], isLoading: true }));
             const mcpArgs = args.trim().length > 0 ? args.trim().split(/\s+/) : [];
             const result = await handleMCPCommand(mcpArgs);
+            setState((prev) => ({
+              ...prev,
+              messages: [
+                ...prev.messages,
+                { role: "gordon", content: result.message, timestamp: formatTimestamp() },
+              ],
+              isLoading: false,
+            }));
+            return;
+          }
+          case "handle_skill_command": {
+            setState((prev) => ({ ...prev, messages: [...prev.messages, userMessage], isLoading: true }));
+            const skillArgs = args.trim().length > 0 ? args.trim().split(/\s+/) : [];
+            const result = await handleSkillCommand(skillArgs);
             setState((prev) => ({
               ...prev,
               messages: [

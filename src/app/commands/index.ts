@@ -18,6 +18,16 @@ export {
   type MCPCommandResult,
 } from './mcp';
 
+// Skill Management Commands
+export {
+  handleSkillCommand,
+  skillList,
+  skillInstall,
+  skillUninstall,
+  skillRoute,
+  type SkillCommandResult,
+} from './skill';
+
 // Config Commands
 export {
   handleConfigCommand,

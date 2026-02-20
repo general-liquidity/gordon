@@ -76,6 +76,7 @@ import {
 import { getSessionSummary, getMemoryStats, resetSharedMemory } from "./shared-context.ts";
 import { evalTools } from "../evals/index.ts";
 import { getMCPTools } from "../mcp/client.ts";
+import { getSkillToolsForAgent } from "../skills/manager.ts";
 import {
   generatePerformanceContext,
   formatPerformanceContextForPrompt,
@@ -1117,6 +1118,8 @@ function getScannerAgent(): Agent {
         ...instrumentedPlaybookTools,
         // Regime detection tools (v0.7)
         ...instrumentedRegimeTools,
+        // Skill tools (dynamic MCP plugins routed to this agent)
+        ...getSkillToolsForAgent("Scanner"),
       },
       memory: createSubAgentMemory(),
       inputProcessors: [new TokenLimiterProcessor({ limit: 32000 })],
@@ -1204,6 +1207,8 @@ function getAnalystAgent(): Agent {
         get_regime_history: instrumentedRegimeTools.get_regime_history,
         // Protocol tools (v0.7)
         ...instrumentedProtocolTools,
+        // Skill tools (dynamic MCP plugins routed to this agent)
+        ...getSkillToolsForAgent("Analyst"),
       },
       memory: createSubAgentMemory(),
       inputProcessors: [new TokenLimiterProcessor({ limit: 32000 })],
@@ -1268,6 +1273,8 @@ function getPlannerAgent(): Agent {
         // Advanced tools (v1) — pre-trade simulation + proofs
         simulate_order_bundle: instrumentedAdvancedTools.simulate_order_bundle,
         generate_circuit_breaker_proof: instrumentedAdvancedTools.generate_circuit_breaker_proof,
+        // Skill tools (dynamic MCP plugins routed to this agent)
+        ...getSkillToolsForAgent("Planner"),
       },
       memory: createSubAgentMemory(),
       inputProcessors: [new TokenLimiterProcessor({ limit: 32000 })],
@@ -1340,6 +1347,8 @@ function getExecutorAgent(): Agent {
         // Advanced tools (v1)
         simulate_order_bundle: instrumentedAdvancedTools.simulate_order_bundle,
         verify_circuit_breaker_proof: instrumentedAdvancedTools.verify_circuit_breaker_proof,
+        // Skill tools (dynamic MCP plugins routed to this agent)
+        ...getSkillToolsForAgent("Executor"),
       },
       memory: createSubAgentMemory(),
       inputProcessors: [new TokenLimiterProcessor({ limit: 32000 })],
@@ -1408,6 +1417,8 @@ function getMonitorAgent(): Agent {
         // Advanced tools (v1)
         generate_circuit_breaker_proof: instrumentedAdvancedTools.generate_circuit_breaker_proof,
         query_regime_scoped_memory: instrumentedAdvancedTools.query_regime_scoped_memory,
+        // Skill tools (dynamic MCP plugins routed to this agent)
+        ...getSkillToolsForAgent("Monitor"),
       },
       memory: createSubAgentMemory(),
       inputProcessors: [new TokenLimiterProcessor({ limit: 32000 })],
@@ -1446,6 +1457,8 @@ function getTeacherAgent(): Agent {
         // Audit tools (v0.7) — learn from past decisions
         query_audit_trail: instrumentedAuditTools.query_audit_trail,
         get_decision_path: instrumentedAuditTools.get_decision_path,
+        // Skill tools (dynamic MCP plugins routed to this agent)
+        ...getSkillToolsForAgent("Teacher"),
       },
       memory: createSubAgentMemory(),
       inputProcessors: [new TokenLimiterProcessor({ limit: 32000 })],
@@ -1497,6 +1510,8 @@ function getBacktesterAgent(): Agent {
         ...instrumentedPlaybookTools,
         // Playbook backtest tools (v0.7) — run/compare/rank playbook backtests
         ...instrumentedPlaybookBacktestTools,
+        // Skill tools (dynamic MCP plugins routed to this agent)
+        ...getSkillToolsForAgent("Backtester"),
       },
       memory: createSubAgentMemory(),
       inputProcessors: [new TokenLimiterProcessor({ limit: 32000 })],
@@ -1540,6 +1555,7 @@ function getGordonAgent(): Agent {
         ...instrumentedSchedulerTools,    // task scheduling (cross-cutting concern)
         ...instrumentedAutonomousTools,   // autonomous swing trading control
         ...getMCPTools(),                 // MCP plugin tools (if any installed/enabled)
+        ...getSkillToolsForAgent("Gordon"), // Skill tools routed to Gordon
       },
 
       // Memory for network orchestration

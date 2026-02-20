@@ -648,6 +648,16 @@ export const SLASH_COMMANDS: SlashCommand[] = [
     target: "handle_mcp_command",
   },
   {
+    name: "skill",
+    aliases: ["skills"],
+    description: "Manage skills (plugins with agent routing)",
+    usage: "/skill <list|search|install|uninstall|route|configure|enable|disable|info|help>",
+    category: "system",
+    level: 2,
+    action: "tool",
+    target: "handle_skill_command",
+  },
+  {
     name: "workflow",
     aliases: ["wf", "flow"],
     description: "Run predefined command workflows",
@@ -1489,6 +1499,38 @@ export function commandToPrompt(command: SlashCommand, args: string): string {
         default:
           return "Show my installed MCP plugins";
       }
+    // Skill command
+    case "skill":
+    case "skills": {
+      if (!args) return "List my installed skills with routing info";
+      const skillParts = args.split(/\s+/);
+      const skillSub = skillParts[0]?.toLowerCase();
+      const skillRest = skillParts.slice(1).join(" ");
+      switch (skillSub) {
+        case "list": case "ls":
+          return "List my installed skills with routing info";
+        case "search": case "find":
+          return skillRest ? `Search for skills matching "${skillRest}"` : "Show the skills marketplace";
+        case "install": case "add":
+          return skillRest ? `Install the skill "${skillRest}"` : "Show available skills";
+        case "uninstall": case "remove": case "rm":
+          return skillRest ? `Uninstall the skill "${skillRest}"` : "Which skill to uninstall?";
+        case "route": case "assign":
+          return `Route skill tools: ${skillRest}`;
+        case "configure": case "config":
+          return skillRest ? `Configure credentials for skill "${skillRest}"` : "Which skill to configure?";
+        case "enable":
+          return skillRest ? `Enable the skill "${skillRest}"` : "Which skill to enable?";
+        case "disable":
+          return skillRest ? `Disable the skill "${skillRest}"` : "Which skill to disable?";
+        case "info":
+          return skillRest ? `Show info for skill "${skillRest}"` : "Which skill?";
+        case "help":
+          return "Show help for skill management commands";
+        default:
+          return "List my installed skills with routing info";
+      }
+    }
     // Workflow command
     case "workflow":
       if (!args) return "Show available workflows. Use: /workflow quick <symbol>, /workflow dd <symbol>, or /workflow backtest-cycle <strategy> <symbol>";

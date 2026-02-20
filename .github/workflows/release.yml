@@ -104,7 +104,16 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.ref_name }}
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Checkout source branch
+        id: branch
+        run: |
+          # Find which branch contains this tag and checkout it (avoids detached HEAD)
+          BRANCH=$(git branch -r --contains "${{ github.ref }}" | grep -v HEAD | head -1 | sed 's|origin/||' | xargs)
+          echo "name=$BRANCH" >> $GITHUB_OUTPUT
+          git checkout "$BRANCH"
 
       - name: Download release assets and compute hashes
         env:

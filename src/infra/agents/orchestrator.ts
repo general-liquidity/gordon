@@ -11,6 +11,7 @@
 import { RequestContext } from "@mastra/core/request-context";
 
 import { gordonAgent } from "./agents.ts";
+import { getDynamicToolAgentMap } from "../skills/manager.ts";
 import { createModuleLogger } from "../logger/index.ts";
 import { emitEvent } from "../../events/index.ts";
 import { checkInputGuardrails, checkOutputGuardrails, checkToolAccess } from "./middleware/index.ts";
@@ -771,6 +772,11 @@ const TOOL_AGENT_MAP: Record<string, string> = {
  * Get the agent name that owns a specific tool
  */
 function getAgentForTool(toolName: string): string | undefined {
+  // Dynamic skill-based map first (MCP/skill tools)
+  const dynamicAgent = getDynamicToolAgentMap()[toolName];
+  if (dynamicAgent) return dynamicAgent;
+
+  // Static map (built-in tools)
   const agent = TOOL_AGENT_MAP[toolName];
   if (!agent) {
     logger.debug("Unmapped tool called, staying with current agent", { toolName });
