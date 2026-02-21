@@ -12,6 +12,8 @@ export type MenuOption =
   | "analyze"
   | "strategies-live"
   | "regime"
+  | "bridge"
+  | "chains"
   | "setup"
   | "help";
 
@@ -32,6 +34,8 @@ export const QuickStartMenu: React.FC<QuickStartMenuProps> = ({
     { label: "Deep analysis", value: "analyze" as MenuOption },
     { label: "Strategy Dashboard", value: "strategies-live" as MenuOption },
     { label: "Market Regime", value: "regime" as MenuOption },
+    { label: "Bridge tokens (cross-chain)", value: "bridge" as MenuOption },
+    { label: "Chain networks status", value: "chains" as MenuOption },
     { label: "Settings & API keys", value: "setup" as MenuOption },
     { label: "Help & commands", value: "help" as MenuOption },
   ];

@@ -10,6 +10,7 @@ import TextInput from "ink-text-input";
 import { resetAgents } from "../infra/agents/index.ts";
 import { BinanceClient, checkAndValidatePermissions } from "../infra/binance/index.ts";
 import { ExchangeFactory, type ExchangeId } from "../infra/exchange/index.ts";
+import { EXCHANGE_ENV_MAP } from "../infra/exchange/types.ts";
 import { loadConfig, saveConfig } from "../infra/storage/config.ts";
 import { saveEnvKeys, createEnvFile, checkEnvStatus } from "../infra/storage/env.ts";
 import type { GordonConfig, ExchangePermissions, Preferences, MultiExchangeConfig } from "../types/index.ts";
@@ -23,9 +24,25 @@ type WizardStep =
   | "exchange-passphrase"
   | "exchange-wallet"
   | "exchange-validating"
+  | "chain-select"
+  | "chain-solana"
+  | "chain-polkadot"
+  | "chain-chainlink"
+  | "chain-evm"
+  | "chain-cdp"
   | "llm"
   | "preferences"
   | "done";
+
+type ChainId = "solana" | "polkadot" | "chainlink" | "evm" | "cdp";
+
+const CHAIN_OPTIONS: Array<{ id: ChainId; label: string; description: string }> = [
+  { id: "solana", label: "Solana", description: "DeFi swaps, token launches, staking, lending (60+ tools)" },
+  { id: "polkadot", label: "Polkadot", description: "Cross-chain swaps, staking, governance" },
+  { id: "chainlink", label: "Chainlink Streams", description: "Real-time institutional-grade price feeds" },
+  { id: "evm", label: "EVM / CCIP", description: "Cross-chain bridging via Chainlink CCIP" },
+  { id: "cdp", label: "Coinbase CDP", description: "Base smart wallets, onchain actions" },
+];
 
 type ExchangeSelection = ExchangeId | "";
 
@@ -108,6 +125,24 @@ const EXCHANGE_INSTRUCTIONS: Record<ExchangeId, string[]> = {
   ],
 };
 
+/** Validation patterns for chain private keys */
+const SOLANA_BASE58_REGEX = /^[1-9A-HJ-NP-Za-km-z]{32,128}$/;
+const EVM_HEX_KEY_REGEX = /^0x[0-9a-fA-F]{64}$/;
+const POLKADOT_HEX_KEY_REGEX = /^0x[0-9a-fA-F]{64}$/;
+
+interface ChainKeys {
+  solanaPrivateKey: string;
+  solanaRpcUrl: string;
+  polkadotMnemonic: string;
+  polkadotPrivateKey: string;
+  chainlinkApiKey: string;
+  chainlinkApiSecret: string;
+  evmPrivateKey: string;
+  cdpApiKeyId: string;
+  cdpApiKeySecret: string;
+  cdpWalletSecret: string;
+}
+
 interface WizardState {
   step: WizardStep;
   exchangeType: ExchangeSelection;
@@ -118,6 +153,10 @@ interface WizardState {
   exchangePermissions: ExchangePermissions | null;
   exchangeError: string | null;
   exchangeValidated: boolean;
+  // Chain setup
+  selectedChains: ChainId[];
+  chainKeys: ChainKeys;
+  chainSetupIndex: number;
   openaiApiKey: string;
   dedalusApiKey: string;
   preferences: Preferences;
@@ -179,6 +218,20 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
     exchangePermissions: null,
     exchangeError: null,
     exchangeValidated: false,
+    selectedChains: [],
+    chainKeys: {
+      solanaPrivateKey: "",
+      solanaRpcUrl: "",
+      polkadotMnemonic: "",
+      polkadotPrivateKey: "",
+      chainlinkApiKey: "",
+      chainlinkApiSecret: "",
+      evmPrivateKey: "",
+      cdpApiKeyId: "",
+      cdpApiKeySecret: "",
+      cdpWalletSecret: "",
+    },
+    chainSetupIndex: 0,
     openaiApiKey: "",
     dedalusApiKey: "",
     preferences: {
@@ -248,7 +301,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
 
       setState((prev) => ({
         ...prev,
-        step: "llm",
+        step: "chain-select",
         isValidating: false,
         exchangePermissions: permissions,
         exchangeError: null,
@@ -269,7 +322,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
 
       setState((prev) => ({
         ...prev,
-        step: "llm",
+        step: "chain-select",
         isValidating: false,
         exchangePermissions: null,
         exchangeError: null,
@@ -295,11 +348,11 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
     }
   }, []);
 
-  const saveConfiguration = useCallback(async () => {
+  const saveConfiguration = useCallback(async (overrides?: { preferences?: Preferences }) => {
     const currentConfig = await loadConfig();
     const newConfig: GordonConfig = {
       ...currentConfig,
-      preferences: state.preferences,
+      preferences: overrides?.preferences ?? state.preferences,
       onboardingComplete: true,
     };
 
@@ -310,6 +363,44 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
         : !!(state.exchangeApiKey && state.exchangeApiSecret)
     );
 
+    // 1. Build env keys for .env file (all exchanges + chains + LLM)
+    const envKeys: Record<string, string> = {};
+
+    if (state.openaiApiKey) envKeys.OPENAI_API_KEY = state.openaiApiKey;
+    if (state.dedalusApiKey) envKeys.DEDALUS_API_KEY = state.dedalusApiKey;
+
+    // Map exchange credentials to env var names (all exchange types, not just Binance)
+    if (state.exchangeType) {
+      const envMap = EXCHANGE_ENV_MAP[state.exchangeType];
+      if (envMap) {
+        if (envMap.key && state.exchangeApiKey) envKeys[envMap.key] = state.exchangeApiKey;
+        if (envMap.secret && state.exchangeApiSecret) envKeys[envMap.secret] = state.exchangeApiSecret;
+        if (envMap.passphrase && state.exchangePassphrase) envKeys[envMap.passphrase] = state.exchangePassphrase;
+        if (envMap.wallet && state.walletPrivateKey) envKeys[envMap.wallet] = state.walletPrivateKey;
+      }
+    }
+
+    // Chain provider keys
+    if (state.chainKeys.solanaPrivateKey) envKeys.SOLANA_PRIVATE_KEY = state.chainKeys.solanaPrivateKey;
+    if (state.chainKeys.solanaRpcUrl) envKeys.SOLANA_RPC_URL = state.chainKeys.solanaRpcUrl;
+    if (state.chainKeys.polkadotMnemonic) envKeys.POLKADOT_MNEMONIC = state.chainKeys.polkadotMnemonic;
+    if (state.chainKeys.polkadotPrivateKey) envKeys.POLKADOT_PRIVATE_KEY = state.chainKeys.polkadotPrivateKey;
+    if (state.chainKeys.chainlinkApiKey) envKeys.CHAINLINK_API_KEY = state.chainKeys.chainlinkApiKey;
+    if (state.chainKeys.chainlinkApiSecret) envKeys.CHAINLINK_API_SECRET = state.chainKeys.chainlinkApiSecret;
+    if (state.chainKeys.evmPrivateKey) envKeys.EVM_PRIVATE_KEY = state.chainKeys.evmPrivateKey;
+    if (state.chainKeys.cdpApiKeyId) envKeys.CDP_API_KEY_ID = state.chainKeys.cdpApiKeyId;
+    if (state.chainKeys.cdpApiKeySecret) envKeys.CDP_API_KEY_SECRET = state.chainKeys.cdpApiKeySecret;
+    if (state.chainKeys.cdpWalletSecret) envKeys.CDP_WALLET_SECRET = state.chainKeys.cdpWalletSecret;
+
+    // 2. Save secrets to .env (the source of truth for credentials)
+    const envStatus = await checkEnvStatus();
+    if (envStatus.fileExists) {
+      await saveEnvKeys(envKeys);
+    } else {
+      await createEnvFile(envKeys);
+    }
+
+    // 3. Build exchange config for config.json with redacted secrets
     if (hasExchangeCredentials) {
       const exchanges = currentConfig.exchanges ? [...currentConfig.exchanges] : [];
       const exchangeType = state.exchangeType as ExchangeId;
@@ -318,10 +409,10 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
       const newExchange: MultiExchangeConfig = {
         id: exchangeId,
         type: exchangeType,
-        apiKey: state.exchangeApiKey,
-        apiSecret: state.exchangeApiSecret,
-        passphrase: state.exchangePassphrase || undefined,
-        walletPrivateKey: state.walletPrivateKey || undefined,
+        apiKey: "***",
+        apiSecret: "***",
+        passphrase: state.exchangePassphrase ? "***" : undefined,
+        walletPrivateKey: state.walletPrivateKey ? "***" : undefined,
         sandbox: false,
         isDefault: true,
       };
@@ -337,45 +428,15 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
 
       if (exchangeType === "binance" && state.exchangePermissions) {
         newConfig.exchange = {
-          name: "binance",
-          apiKey: state.exchangeApiKey,
-          apiSecret: state.exchangeApiSecret,
+          name: "binance" as const,
+          apiKey: "***",
+          apiSecret: "***",
           permissions: state.exchangePermissions,
         };
       }
     }
 
     await saveConfig(newConfig);
-
-    // Save API keys to .env file
-    const envStatus = await checkEnvStatus();
-    const envKeys: Record<string, string> = {};
-
-    if (state.openaiApiKey) {
-      envKeys.OPENAI_API_KEY = state.openaiApiKey;
-    }
-    if (state.dedalusApiKey) {
-      envKeys.DEDALUS_API_KEY = state.dedalusApiKey;
-    }
-    if (state.exchangeType === "binance" && state.exchangeApiKey) {
-      envKeys.BINANCE_API_KEY = state.exchangeApiKey;
-    }
-    if (state.exchangeType === "binance" && state.exchangeApiSecret) {
-      envKeys.BINANCE_API_SECRET = state.exchangeApiSecret;
-    }
-    if (state.exchangeType === "binance_us" && state.exchangeApiKey) {
-      envKeys.BINANCE_US_API_KEY = state.exchangeApiKey;
-    }
-    if (state.exchangeType === "binance_us" && state.exchangeApiSecret) {
-      envKeys.BINANCE_US_API_SECRET = state.exchangeApiSecret;
-    }
-
-    // Create or update .env file
-    if (envStatus.fileExists) {
-      await saveEnvKeys(envKeys);
-    } else {
-      await createEnvFile(envKeys);
-    }
 
     // Reset agent cache so next access reinitializes with fresh env variables
     resetAgents();
@@ -387,10 +448,42 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
     state.exchangePermissions,
     state.exchangeType,
     state.exchangeValidated,
+    state.chainKeys,
     state.preferences,
     state.openaiApiKey,
     state.dedalusApiKey,
   ]);
+
+  // Map chain IDs to their wizard step names
+  const chainStepMap: Record<ChainId, WizardStep> = {
+    solana: "chain-solana",
+    polkadot: "chain-polkadot",
+    chainlink: "chain-chainlink",
+    evm: "chain-evm",
+    cdp: "chain-cdp",
+  };
+
+  // Advance to the next selected chain step, or to LLM if done
+  const advanceChainStep = useCallback((currentIndex: number, chains: ChainId[]) => {
+    const nextIndex = currentIndex + 1;
+    if (nextIndex < chains.length) {
+      const nextChain = chains[nextIndex];
+      setState((prev) => ({
+        ...prev,
+        step: nextChain ? chainStepMap[nextChain] : "llm",
+        chainSetupIndex: nextIndex,
+        inputValue: "",
+        exchangeError: null,
+      }));
+    } else {
+      setState((prev) => ({
+        ...prev,
+        step: "llm",
+        inputValue: "",
+        exchangeError: null,
+      }));
+    }
+  }, []);
 
   const handleInputSubmit = useCallback(
     async (value: string) => {
@@ -487,6 +580,161 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
           }
           break;
 
+        case "chain-select": {
+          // Parse comma-separated chain selections (e.g., "1,3,5" or "solana,chainlink")
+          if (!trimmedValue) {
+            setState((prev) => ({ ...prev, step: "llm", inputValue: "" }));
+            break;
+          }
+          const parts = trimmedValue.split(",").map((s) => s.trim().toLowerCase());
+          const selected: ChainId[] = [];
+          for (const part of parts) {
+            // Support both numbers (1-5) and names
+            const idx = parseInt(part, 10);
+            if (!isNaN(idx) && idx >= 1 && idx <= CHAIN_OPTIONS.length) {
+              const opt = CHAIN_OPTIONS[idx - 1];
+              if (opt) selected.push(opt.id);
+            } else {
+              const match = CHAIN_OPTIONS.find((o) => o.id === part || o.label.toLowerCase() === part);
+              if (match) selected.push(match.id);
+            }
+          }
+          const unique = [...new Set(selected)];
+          if (unique.length === 0) {
+            setState((prev) => ({ ...prev, step: "llm", inputValue: "" }));
+          } else {
+            const firstChain = unique[0]!;
+            setState((prev) => ({
+              ...prev,
+              selectedChains: unique,
+              chainSetupIndex: 0,
+              step: chainStepMap[firstChain],
+              inputValue: "",
+            }));
+          }
+          break;
+        }
+
+        case "chain-solana":
+          if (trimmedValue) {
+            // Validate base58 format (Solana private keys are 64-88 base58 chars)
+            if (!SOLANA_BASE58_REGEX.test(trimmedValue)) {
+              setState((prev) => ({
+                ...prev,
+                exchangeError: "Invalid format. Solana private keys are base58-encoded (no 0, O, I, l characters). Check your key and try again.",
+              }));
+              return;
+            }
+            setState((prev) => ({
+              ...prev,
+              chainKeys: { ...prev.chainKeys, solanaPrivateKey: trimmedValue },
+              exchangeError: null,
+              inputValue: "",
+            }));
+          }
+          advanceChainStep(state.chainSetupIndex, state.selectedChains);
+          break;
+
+        case "chain-polkadot":
+          if (trimmedValue) {
+            // Accept hex private key (0x-prefixed) or mnemonic (12/24 words)
+            const wordCount = trimmedValue.split(/\s+/).length;
+            const isHexKey = POLKADOT_HEX_KEY_REGEX.test(trimmedValue);
+            const isMnemonic = wordCount === 12 || wordCount === 24;
+            if (!isHexKey && !isMnemonic) {
+              setState((prev) => ({
+                ...prev,
+                exchangeError: `Invalid format. Expected a 12 or 24-word mnemonic phrase, or a 0x-prefixed hex private key (66 chars). Got ${wordCount} word(s).`,
+              }));
+              return;
+            }
+            setState((prev) => ({
+              ...prev,
+              chainKeys: {
+                ...prev.chainKeys,
+                ...(isHexKey
+                  ? { polkadotPrivateKey: trimmedValue }
+                  : { polkadotMnemonic: trimmedValue }),
+              },
+              exchangeError: null,
+              inputValue: "",
+            }));
+          }
+          advanceChainStep(state.chainSetupIndex, state.selectedChains);
+          break;
+
+        case "chain-chainlink":
+          // Expect "key,secret" comma-separated (both required for Data Streams)
+          if (trimmedValue) {
+            const [key, secret] = trimmedValue.split(",").map((s) => s.trim());
+            if (!key || !secret) {
+              setState((prev) => ({
+                ...prev,
+                exchangeError: "Both API Key and API Secret are required. Enter them comma-separated: key,secret",
+              }));
+              return;
+            }
+            setState((prev) => ({
+              ...prev,
+              chainKeys: {
+                ...prev.chainKeys,
+                chainlinkApiKey: key,
+                chainlinkApiSecret: secret,
+              },
+              exchangeError: null,
+              inputValue: "",
+            }));
+          }
+          advanceChainStep(state.chainSetupIndex, state.selectedChains);
+          break;
+
+        case "chain-evm":
+          if (trimmedValue) {
+            // Validate EVM private key: 0x-prefixed 64 hex chars
+            const evmKey = trimmedValue.startsWith("0x") ? trimmedValue : `0x${trimmedValue}`;
+            if (!EVM_HEX_KEY_REGEX.test(evmKey)) {
+              setState((prev) => ({
+                ...prev,
+                exchangeError: "Invalid EVM private key. Expected 0x followed by 64 hex characters (66 chars total).",
+              }));
+              return;
+            }
+            setState((prev) => ({
+              ...prev,
+              chainKeys: { ...prev.chainKeys, evmPrivateKey: evmKey },
+              exchangeError: null,
+              inputValue: "",
+            }));
+          }
+          advanceChainStep(state.chainSetupIndex, state.selectedChains);
+          break;
+
+        case "chain-cdp":
+          // Expect "key_id,key_secret,wallet_secret" — all three required
+          if (trimmedValue) {
+            const parts = trimmedValue.split(",").map((s) => s.trim());
+            if (!parts[0] || !parts[1] || !parts[2]) {
+              setState((prev) => ({
+                ...prev,
+                exchangeError: "All three values are required: API Key ID, API Key Secret, and Wallet Secret. Separate with commas.",
+              }));
+              return;
+            }
+            setState((prev) => ({
+              ...prev,
+              chainKeys: {
+                ...prev.chainKeys,
+                cdpApiKeyId: parts[0]!,
+                cdpApiKeySecret: parts[1]!,
+                cdpWalletSecret: parts[2]!,
+              },
+              exchangeError: null,
+              inputValue: "",
+            }));
+          }
+          advanceChainStep(state.chainSetupIndex, state.selectedChains);
+          break;
+
         case "llm":
           if (trimmedValue) {
             setState((prev) => ({
@@ -501,16 +749,14 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
         case "preferences": {
           const percent = parseInt(trimmedValue, 10);
           if (!isNaN(percent) && percent >= 0 && percent <= 100) {
+            const newPreferences = { ...state.preferences, cashReservePercent: percent / 100 };
             setState((prev) => ({
               ...prev,
-              preferences: {
-                ...prev.preferences,
-                cashReservePercent: percent / 100,
-              },
+              preferences: newPreferences,
               step: "done",
               inputValue: "",
             }));
-            await saveConfiguration();
+            await saveConfiguration({ preferences: newPreferences });
           }
           break;
         }
@@ -521,8 +767,12 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
       state.exchangeType,
       state.exchangeApiKey,
       state.exchangeApiSecret,
+      state.chainSetupIndex,
+      state.selectedChains,
+      state.preferences,
       validateExchangeCredentials,
       saveConfiguration,
+      advanceChainStep,
     ]
   );
 
@@ -547,9 +797,25 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
           exchangePermissions: null,
           exchangeError: null,
           exchangeValidated: false,
+          step: "chain-select",
+          inputValue: "",
+        }));
+        break;
+
+      case "chain-select":
+        setState((prev) => ({
+          ...prev,
           step: "llm",
           inputValue: "",
         }));
+        break;
+
+      case "chain-solana":
+      case "chain-polkadot":
+      case "chain-chainlink":
+      case "chain-evm":
+      case "chain-cdp":
+        advanceChainStep(state.chainSetupIndex, state.selectedChains);
         break;
 
       case "llm":
@@ -566,10 +832,10 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
           step: "done",
           inputValue: "",
         }));
-        await saveConfiguration();
+        await saveConfiguration({ preferences: state.preferences });
         break;
     }
-  }, [state.step, saveConfiguration]);
+  }, [state.step, state.chainSetupIndex, state.selectedChains, advanceChainStep, saveConfiguration]);
 
   useInput((input, key) => {
     if (state.step === "welcome" && (input || key.return)) {
@@ -647,6 +913,109 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
         <ValidatingStep exchangeLabel={exchangeLabel} />
       )}
 
+      {state.step === "chain-select" && (
+        <ChainSelectStep
+          inputValue={state.inputValue}
+          onInputChange={handleInputChange}
+          onSubmit={handleInputSubmit}
+        />
+      )}
+
+      {state.step === "chain-solana" && (
+        <ChainKeyStep
+          chainLabel="Solana"
+          description="Enables DeFi swaps, token operations, staking, and lending across 60+ tools."
+          keyLabel="Solana Private Key"
+          placeholder="Base58 private key..."
+          instructions={[
+            "Create a new Solana wallet (e.g., via Phantom or solana-keygen)",
+            "Export your private key (Base58 encoded)",
+            "Use a DEDICATED wallet with limited funds for trading",
+          ]}
+          inputValue={state.inputValue}
+          onInputChange={handleInputChange}
+          onSubmit={handleInputSubmit}
+          isMasked={true}
+          error={state.exchangeError}
+        />
+      )}
+
+      {state.step === "chain-polkadot" && (
+        <ChainKeyStep
+          chainLabel="Polkadot"
+          description="Enables cross-chain swaps on HydraDX, staking, governance, and XCM transfers."
+          keyLabel="Polkadot Mnemonic or Private Key"
+          placeholder="word1 word2 ... (12/24 words) or 0x..."
+          instructions={[
+            "Create a new Polkadot account (e.g., via Polkadot.js extension)",
+            "Export your mnemonic seed phrase (12 or 24 words) or hex private key",
+            "Use a DEDICATED wallet with limited funds",
+          ]}
+          inputValue={state.inputValue}
+          onInputChange={handleInputChange}
+          onSubmit={handleInputSubmit}
+          isMasked={true}
+          error={state.exchangeError}
+        />
+      )}
+
+      {state.step === "chain-chainlink" && (
+        <ChainKeyStep
+          chainLabel="Chainlink Data Streams"
+          description="Enables sub-second institutional-grade price feeds for 50+ crypto pairs."
+          keyLabel="API Key, API Secret"
+          placeholder="api-key,api-secret"
+          instructions={[
+            "Sign up at data.chain.link for Data Streams access",
+            "Generate an API key and secret from your dashboard",
+            "Enter both separated by a comma: key,secret",
+          ]}
+          inputValue={state.inputValue}
+          onInputChange={handleInputChange}
+          onSubmit={handleInputSubmit}
+          isMasked={true}
+          error={state.exchangeError}
+        />
+      )}
+
+      {state.step === "chain-evm" && (
+        <ChainKeyStep
+          chainLabel="EVM / Chainlink CCIP"
+          description="Enables cross-chain token bridging between Ethereum, Arbitrum, Optimism, Polygon, Base, and more."
+          keyLabel="EVM Private Key"
+          placeholder="0x..."
+          instructions={[
+            "Export a private key from MetaMask or another EVM wallet",
+            "Use a DEDICATED wallet with limited funds",
+            "Ensure the wallet has ETH/native tokens for gas on source chains",
+          ]}
+          inputValue={state.inputValue}
+          onInputChange={handleInputChange}
+          onSubmit={handleInputSubmit}
+          isMasked={true}
+          error={state.exchangeError}
+        />
+      )}
+
+      {state.step === "chain-cdp" && (
+        <ChainKeyStep
+          chainLabel="Coinbase CDP"
+          description="Enables Base smart wallets, token deployments, and onchain actions via Coinbase Developer Platform."
+          keyLabel="API Key ID, API Key Secret, Wallet Secret"
+          placeholder="key-id,key-secret,wallet-secret"
+          instructions={[
+            "Go to portal.cdp.coinbase.com and create an API key",
+            "Copy the API Key ID, API Key Secret, and Wallet Secret",
+            "Enter all three separated by commas: id,secret,wallet-secret",
+          ]}
+          inputValue={state.inputValue}
+          onInputChange={handleInputChange}
+          onSubmit={handleInputSubmit}
+          isMasked={true}
+          error={state.exchangeError}
+        />
+      )}
+
       {state.step === "llm" && (
         <LLMStep
           exchangeConfigured={state.exchangeValidated}
@@ -671,6 +1040,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
           exchangeConfigured={state.exchangeValidated}
           exchangeLabel={exchangeLabel}
           llmConfigured={!!state.openaiApiKey}
+          chainKeys={state.chainKeys}
         />
       )}
 
@@ -703,8 +1073,9 @@ function WelcomeStep(): React.ReactElement {
 
       <Box flexDirection="column" marginLeft={2}>
         <Text color={COLORS.DIM}>1. Exchange API credentials</Text>
-        <Text color={COLORS.DIM}>2. LLM API key (for AI features)</Text>
-        <Text color={COLORS.DIM}>3. Trading preferences</Text>
+        <Text color={COLORS.DIM}>2. Blockchain networks (Solana, Polkadot, Chainlink, etc.)</Text>
+        <Text color={COLORS.DIM}>3. LLM API key (for AI features)</Text>
+        <Text color={COLORS.DIM}>4. Trading preferences</Text>
       </Box>
 
       <Box marginTop={2}>
@@ -823,6 +1194,7 @@ function ExchangeKeyStep({
           onChange={onInputChange}
           onSubmit={onSubmit}
           placeholder="Paste your API key here..."
+          mask="*"
         />
       </Box>
     </Box>
@@ -876,7 +1248,7 @@ function ExchangeSecretStep({
 
       <Box marginTop={1}>
         <Text color={COLORS.DIM}>
-          Your secret is never displayed and is stored locally in ~/.gordon/config.json
+          Your secret is never displayed and is stored locally in ~/.gordon/.env
         </Text>
       </Box>
     </Box>
@@ -1004,7 +1376,7 @@ function ExchangeWalletStep({
 
       <Box marginTop={1}>
         <Text color={COLORS.DIM}>
-          Your private key is never displayed and is stored locally in ~/.gordon/config.json
+          Your private key is never displayed and is stored locally in ~/.gordon/.env
         </Text>
       </Box>
     </Box>
@@ -1052,7 +1424,7 @@ function LLMStep({
     <Box flexDirection="column">
       <Box marginBottom={1}>
         <Text color={COLORS.TAN} bold>
-          Step 2: LLM API Key
+          Step 3: LLM API Key
         </Text>
       </Box>
 
@@ -1113,7 +1485,7 @@ function PreferencesStep({ currentPercent, inputValue, onInputChange, onSubmit }
     <Box flexDirection="column">
       <Box marginBottom={1}>
         <Text color={COLORS.TAN} bold>
-          Step 3: Trading Preferences
+          Step 4: Trading Preferences
         </Text>
       </Box>
 
@@ -1151,13 +1523,149 @@ function PreferencesStep({ currentPercent, inputValue, onInputChange, onSubmit }
   );
 }
 
+interface ChainSelectStepProps {
+  inputValue: string;
+  onInputChange: (value: string) => void;
+  onSubmit: (value: string) => void;
+}
+
+function ChainSelectStep({ inputValue, onInputChange, onSubmit }: ChainSelectStepProps): React.ReactElement {
+  return (
+    <Box flexDirection="column">
+      <Box marginBottom={1}>
+        <Text color={COLORS.TAN} bold>
+          Step 2: Blockchain Networks
+        </Text>
+      </Box>
+
+      <Box flexDirection="column" marginBottom={1}>
+        <Text color={COLORS.WHITE}>
+          Configure blockchain network keys to unlock DeFi, bridging, and on-chain tools.
+        </Text>
+        <Text color={COLORS.DIM}>
+          Enter the numbers of the chains you want to configure (comma-separated), or press ESC to skip.
+        </Text>
+      </Box>
+
+      <Box flexDirection="column" marginBottom={1}>
+        {CHAIN_OPTIONS.map((chain, index) => (
+          <Box key={chain.id}>
+            <Box width={4}><Text color={COLORS.ACCENT}>{index + 1}.</Text></Box>
+            <Box width={22}><Text color={COLORS.WHITE} bold>{chain.label}</Text></Box>
+            <Text color={COLORS.DIM}>{chain.description}</Text>
+          </Box>
+        ))}
+      </Box>
+
+      <Box marginTop={1}>
+        <Text color={COLORS.WHITE}>Select chains (e.g., 1,3 or solana,chainlink): </Text>
+        <TextInput
+          value={inputValue}
+          onChange={onInputChange}
+          onSubmit={onSubmit}
+          placeholder="1,2,3"
+        />
+      </Box>
+    </Box>
+  );
+}
+
+interface ChainKeyStepProps {
+  chainLabel: string;
+  description: string;
+  keyLabel: string;
+  placeholder: string;
+  instructions: string[];
+  inputValue: string;
+  onInputChange: (value: string) => void;
+  onSubmit: (value: string) => void;
+  isMasked?: boolean;
+  error?: string | null;
+}
+
+function ChainKeyStep({
+  chainLabel,
+  description,
+  keyLabel,
+  placeholder,
+  instructions,
+  inputValue,
+  onInputChange,
+  onSubmit,
+  isMasked = false,
+  error,
+}: ChainKeyStepProps): React.ReactElement {
+  return (
+    <Box flexDirection="column">
+      <Box marginBottom={1}>
+        <Text color={COLORS.TAN} bold>
+          Step 2: {chainLabel}
+        </Text>
+      </Box>
+
+      <Box flexDirection="column" marginBottom={1}>
+        <Text color={COLORS.WHITE}>{description}</Text>
+      </Box>
+
+      {error && (
+        <Box marginBottom={1} borderStyle="single" borderColor="red" paddingX={1}>
+          <Text color="red">{error}</Text>
+        </Box>
+      )}
+
+      <Box marginBottom={1} borderStyle="single" borderColor="yellow" paddingX={1}>
+        <Box flexDirection="column">
+          <Text color="yellow" bold>SECURITY</Text>
+          <Text color="yellow">Use a DEDICATED wallet with limited funds. Never use your primary wallet.</Text>
+        </Box>
+      </Box>
+
+      <Box flexDirection="column" marginBottom={1}>
+        <Text color={COLORS.TAN_DIM} bold>Setup instructions:</Text>
+        <Box flexDirection="column" marginLeft={2}>
+          {instructions.map((line, index) => (
+            <Text key={`${chainLabel}-${index}`} color={COLORS.DIM}>
+              {index + 1}. {line}
+            </Text>
+          ))}
+        </Box>
+      </Box>
+
+      <Box marginTop={1}>
+        <Text color={COLORS.WHITE}>{keyLabel}: </Text>
+        <TextInput
+          value={inputValue}
+          onChange={onInputChange}
+          onSubmit={onSubmit}
+          placeholder={placeholder}
+          mask={isMasked ? "*" : undefined}
+        />
+      </Box>
+
+      <Box marginTop={1}>
+        <Text color={COLORS.DIM}>
+          Keys are stored locally in ~/.gordon/.env
+        </Text>
+      </Box>
+    </Box>
+  );
+}
+
 interface DoneStepProps {
   exchangeConfigured: boolean;
   exchangeLabel: string;
   llmConfigured: boolean;
+  chainKeys: ChainKeys;
 }
 
-function DoneStep({ exchangeConfigured, exchangeLabel, llmConfigured }: DoneStepProps): React.ReactElement {
+function DoneStep({ exchangeConfigured, exchangeLabel, llmConfigured, chainKeys }: DoneStepProps): React.ReactElement {
+  const hasSolana = !!chainKeys.solanaPrivateKey;
+  const hasPolkadot = !!(chainKeys.polkadotMnemonic || chainKeys.polkadotPrivateKey);
+  const hasChainlink = !!(chainKeys.chainlinkApiKey && chainKeys.chainlinkApiSecret);
+  const hasEVM = !!chainKeys.evmPrivateKey;
+  const hasCDP = !!(chainKeys.cdpApiKeyId && chainKeys.cdpApiKeySecret && chainKeys.cdpWalletSecret);
+  const anyChain = hasSolana || hasPolkadot || hasChainlink || hasEVM || hasCDP;
+
   return (
     <Box flexDirection="column">
       <Box marginBottom={1}>
@@ -1181,6 +1689,31 @@ function DoneStep({ exchangeConfigured, exchangeLabel, llmConfigured }: DoneStep
             <Text color={COLORS.DIM}> (not configured)</Text>
           )}
         </Box>
+
+        {/* Chain status */}
+        {anyChain && (
+          <>
+            {hasSolana && (
+              <Box><Text color="green">[OK] Solana (DeFi, tokens, staking)</Text></Box>
+            )}
+            {hasPolkadot && (
+              <Box><Text color="green">[OK] Polkadot (swaps, staking, governance)</Text></Box>
+            )}
+            {hasChainlink && (
+              <Box><Text color="green">[OK] Chainlink Streams (real-time prices)</Text></Box>
+            )}
+            {hasEVM && (
+              <Box><Text color="green">[OK] EVM / CCIP (cross-chain bridging)</Text></Box>
+            )}
+            {hasCDP && (
+              <Box><Text color="green">[OK] Coinbase CDP (Base smart wallets)</Text></Box>
+            )}
+          </>
+        )}
+        {!anyChain && (
+          <Box><Text color={COLORS.DIM}>[--] Blockchain networks (not configured)</Text></Box>
+        )}
+
         <Box>
           <Text color={llmConfigured ? "green" : COLORS.DIM}>
             {llmConfigured ? "[OK]" : "[--]"} LLM API
@@ -1198,6 +1731,14 @@ function DoneStep({ exchangeConfigured, exchangeLabel, llmConfigured }: DoneStep
         <Box marginBottom={1}>
           <Text color={COLORS.TAN_DIM}>
             Note: Without exchange API keys, Gordon runs in demo mode.
+          </Text>
+        </Box>
+      )}
+
+      {!anyChain && (
+        <Box marginBottom={1}>
+          <Text color={COLORS.TAN_DIM}>
+            Tip: Configure chains later via Settings or by editing ~/.gordon/.env
           </Text>
         </Box>
       )}

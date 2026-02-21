@@ -99,7 +99,7 @@ function HowItWorksStep(): React.ReactElement {
 
       <Box marginBottom={1}>
         <Text color={COLORS.WHITE}>
-          I have <Text color={COLORS.HIGHLIGHT} bold>50+ tools</Text> and <Text color={COLORS.HIGHLIGHT} bold>6 specialized agents</Text>:
+          I have <Text color={COLORS.HIGHLIGHT} bold>350+ tools</Text> and <Text color={COLORS.HIGHLIGHT} bold>6 specialized agents</Text>:
         </Text>
       </Box>
 
@@ -129,6 +129,31 @@ function HowItWorksStep(): React.ReactElement {
           <Text color={COLORS.DIM}>Explain trading concepts</Text>
         </Box>
       </Box>
+
+      <Box marginTop={1} marginBottom={1}>
+        <Text color={COLORS.WHITE}>
+          <Text color={COLORS.HIGHLIGHT} bold>Supported Chains:</Text>
+        </Text>
+      </Box>
+
+      <Box flexDirection="column" paddingLeft={2}>
+        <Box>
+          <Box width={12}><Text color={COLORS.WHITE} bold>Solana</Text></Box>
+          <Text color={COLORS.DIM}>DeFi, tokens, staking, lending (60+ tools)</Text>
+        </Box>
+        <Box>
+          <Box width={12}><Text color={COLORS.WHITE} bold>Polkadot</Text></Box>
+          <Text color={COLORS.DIM}>Cross-chain swaps, staking, governance</Text>
+        </Box>
+        <Box>
+          <Box width={12}><Text color={COLORS.WHITE} bold>EVM</Text></Box>
+          <Text color={COLORS.DIM}>Bridging via Chainlink CCIP, on-chain price feeds</Text>
+        </Box>
+        <Box>
+          <Box width={12}><Text color={COLORS.WHITE} bold>Base</Text></Box>
+          <Text color={COLORS.DIM}>Smart wallets via Coinbase CDP</Text>
+        </Box>
+      </Box>
     </Box>
   );
 }
@@ -138,13 +163,13 @@ function StrategiesStep(): React.ReactElement {
     <Box flexDirection="column">
       <Box marginBottom={1}>
         <Text color={COLORS.ACCENT} bold>
-          10 Trading Strategies
+          Trading Strategies
         </Text>
       </Box>
 
       <Box marginBottom={1}>
         <Text color={COLORS.WHITE}>
-          I come with <Text color={COLORS.HIGHLIGHT} bold>10 battle-tested strategies</Text> for different market conditions:
+          I come with <Text color={COLORS.HIGHLIGHT} bold>battle-tested strategies</Text> for different market conditions:
         </Text>
       </Box>
 

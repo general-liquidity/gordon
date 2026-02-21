@@ -21,26 +21,38 @@ export interface ThreadStatusInfo {
   isBranch: boolean;
 }
 
+export interface ChainStatusInfo {
+  solana: boolean;
+  polkadot: boolean;
+  chainlink: boolean;
+  evm: boolean;
+  /** CDP AgentKit configured (Base smart wallets, onchain execution) */
+  cdp: boolean;
+  /** Base L2 read tools enhanced (Basescan API key or CDP configured) */
+  base: boolean;
+}
+
 interface StatusBarProps {
   mode: Mode;
   portfolioValue?: number;
   connectionStatus?: ConnectionStatusType;
-  currency?: string;
   btcPrice?: number;
   /** Thread info for display */
   threadInfo?: ThreadStatusInfo;
   /** Ticker items for the scrolling price banner */
   tickerItems?: TickerItem[];
+  /** Which blockchain networks are configured */
+  chainStatus?: ChainStatusInfo;
 }
 
 export const StatusBar: React.FC<StatusBarProps> = ({
   mode,
   portfolioValue,
   connectionStatus = "disconnected",
-  currency = "USDT",
   btcPrice,
   threadInfo,
   tickerItems,
+  chainStatus,
 }) => {
   // Format portfolio value
   const formatValue = (value: number | undefined): string => {
@@ -111,6 +123,19 @@ export const StatusBar: React.FC<StatusBarProps> = ({
             ${formatValue(portfolioValue)}
           </Text>
         </Box>
+
+        {/* Chain Status Indicators */}
+        {chainStatus && (chainStatus.solana || chainStatus.polkadot || chainStatus.chainlink || chainStatus.evm || chainStatus.cdp || chainStatus.base) && (
+          <Box gap={1}>
+            <Text color={COLORS.DIM}>Chains:</Text>
+            {chainStatus.solana && <Text color={COLORS.GREEN} bold>SOL</Text>}
+            {chainStatus.polkadot && <Text color={COLORS.GREEN} bold>DOT</Text>}
+            {chainStatus.chainlink && <Text color={COLORS.GREEN} bold>CL</Text>}
+            {chainStatus.evm && <Text color={COLORS.GREEN} bold>EVM</Text>}
+            {chainStatus.cdp && <Text color={COLORS.GREEN} bold>CDP</Text>}
+            {chainStatus.base && !chainStatus.cdp && <Text color={COLORS.GREEN} bold>BASE</Text>}
+          </Box>
+        )}
 
         {/* Thread Indicator with Visual Status */}
         {threadInfo && (

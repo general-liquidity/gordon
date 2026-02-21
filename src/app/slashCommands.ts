@@ -211,12 +211,13 @@ export const SLASH_COMMANDS: SlashCommand[] = [
   {
     name: "earn",
     aliases: ["e", "savings"],
-    description: "View earn/staking positions",
-    usage: "/earn",
+    description: "Earn products — browse, subscribe, redeem, view positions",
+    usage: "/earn [positions|products|subscribe|redeem|history]",
     category: "account",
     level: 2,
-    action: "tool",
-    target: "get_all_earn_positions",
+    action: "agent",
+    target: "executor",
+    whenToUse: "Browse flexible/locked earn products, subscribe, redeem, or view positions and history",
   },
   {
     name: "history",
@@ -395,25 +396,26 @@ export const SLASH_COMMANDS: SlashCommand[] = [
   {
     name: "experiment",
     aliases: ["ab"],
-    description: "View or manage A/B strategy experiments",
-    usage: "/experiment [status|list|start|evaluate]",
+    description: "A/B strategy experiments — start, check, promote, rank, lineage",
+    usage: "/experiment [status|list|start|check|promote|rank|lineage|evaluate]",
     category: "strategy",
     level: 3,
     action: "agent",
     target: "backtester",
+    whenToUse: "Manage A/B experiments: start tests, check progress, promote winners, rank variants, view lineage",
   },
 
   // Audit
   {
     name: "audit",
     aliases: ["trail", "decisions"],
-    description: "Query the agent decision audit trail",
-    usage: "/audit [recent|agent <name>|position <id>]",
+    description: "Agent decision audit trail — entries, paths, activity, stats",
+    usage: "/audit [recent|agent <name>|position <id>|decision <id>|activity|stats]",
     category: "system",
     level: 2,
     action: "agent",
     target: "monitor",
-    whenToUse: "Investigate why a decision was made or review agent activity",
+    whenToUse: "Investigate decision reasoning, review agent activity summaries, or view audit statistics",
   },
 
   // Health
@@ -507,7 +509,7 @@ export const SLASH_COMMANDS: SlashCommand[] = [
   // New SOTA Features
   {
     name: "ensemble",
-    aliases: ["multi", "validate", "strategies"],
+    aliases: ["multi", "validate"],
     description: "Multi-strategy validation (~8-12s, 5 strategies)",
     usage: "/ensemble <symbol>",
     category: "market",
@@ -843,6 +845,103 @@ export const SLASH_COMMANDS: SlashCommand[] = [
     target: "gordon",
     whenToUse: "See latest features and bug fixes",
   },
+
+  // Blockchain Networks
+  {
+    name: "chains",
+    aliases: ["networks", "chain"],
+    description: "Show configured blockchain networks and available tools",
+    usage: "/chains",
+    category: "system",
+    level: 1,
+    action: "agent",
+    target: "gordon",
+    whenToUse: "See which chain networks are configured and what tools are available",
+  },
+  {
+    name: "bridge",
+    aliases: ["ccip", "cross-chain"],
+    description: "Bridge tokens cross-chain via Chainlink CCIP",
+    usage: "/bridge [amount] [token] from [source] to [dest]",
+    category: "trading",
+    level: 1,
+    action: "agent",
+    target: "executor",
+    executionTime: "~10-30s",
+    whenToUse: "Transfer tokens between EVM chains (Ethereum, Arbitrum, Polygon, etc.)",
+  },
+  {
+    name: "solana",
+    aliases: ["sol"],
+    description: "Solana DeFi actions (swap, stake, lend, launch)",
+    usage: "/solana [swap|stake|lend|launch|balance]",
+    category: "trading",
+    level: 2,
+    action: "agent",
+    target: "executor",
+    whenToUse: "Interact with Solana DeFi protocols",
+  },
+  {
+    name: "polkadot",
+    aliases: ["dot"],
+    description: "Polkadot ecosystem actions (swap, stake, transfer)",
+    usage: "/polkadot [swap|stake|transfer|balance]",
+    category: "trading",
+    level: 2,
+    action: "agent",
+    target: "executor",
+    whenToUse: "Interact with Polkadot/HydraDX protocols",
+  },
+  {
+    name: "prices",
+    aliases: ["feeds", "cl-prices"],
+    description: "Real-time Chainlink Data Streams prices",
+    usage: "/prices [BTC ETH SOL ...]",
+    category: "market",
+    level: 1,
+    action: "agent",
+    target: "analyst",
+    executionTime: "~1-2s",
+    whenToUse: "Get sub-second institutional-grade price data from Chainlink",
+  },
+  {
+    name: "base",
+    aliases: ["base-l2"],
+    description: "Base L2 chain — trending apps, signals, DEX analytics",
+    usage: "/base [trending|signals|whales|dex]",
+    category: "market",
+    level: 2,
+    action: "agent",
+    target: "analyst",
+    executionTime: "~2-5s",
+    whenToUse: "Explore Base L2 ecosystem: trending dApps, whale movements, DEX activity",
+  },
+
+  // Risk & Simulation
+  {
+    name: "liquidation",
+    aliases: ["liq", "cascade"],
+    description: "Liquidation intelligence — cascade risk, pressure, crowding, squeezes",
+    usage: "/liquidation [cascade|pressure|crowding|squeeze] [symbol]",
+    category: "trading",
+    level: 2,
+    action: "agent",
+    target: "analyst",
+    executionTime: "~3-5s",
+    whenToUse: "Analyze liquidation risks, crowded positions, and short/long squeeze candidates",
+  },
+  {
+    name: "simulate",
+    aliases: ["sim", "preview"],
+    description: "Simulate order bundles before live execution",
+    usage: "/simulate [orders|breaker]",
+    category: "trading",
+    level: 3,
+    action: "agent",
+    target: "planner",
+    executionTime: "~2-5s",
+    whenToUse: "Preview order execution, simulate fills, or verify circuit breaker state",
+  },
 ];
 
 // ============================================================================
@@ -1176,8 +1275,17 @@ export function commandToPrompt(command: SlashCommand, args: string): string {
       return "Disarm the system and return to safe mode";
     case "portfolio":
       return "Show my portfolio";
-    case "earn":
-      return "Show my earn positions";
+    case "earn": {
+      const earnSub = args?.trim().split(/\s+/)[0]?.toLowerCase();
+      if (earnSub === "products" || earnSub === "browse") return "Show me available flexible and locked earn products with their APY rates and terms";
+      if (earnSub === "flexible") return "Show me available flexible earn products I can subscribe to";
+      if (earnSub === "locked") return "Show me available locked earn products with their lock periods and APY rates";
+      if (earnSub === "subscribe") return "Help me subscribe to an earn product. Show me available options first.";
+      if (earnSub === "redeem") return "Help me redeem from my earn positions. Show my current positions first.";
+      if (earnSub === "history") return "Show my earn subscription and redemption history";
+      if (earnSub === "positions") return "Show all my current earn/staking positions with current value and rewards";
+      return "Show all my current earn/staking positions with current value and rewards";
+    }
     case "history":
       return args ? `Show my trade history for ${args}` : "Show my recent trade history";
     case "help":
@@ -1633,9 +1741,10 @@ export function commandToPrompt(command: SlashCommand, args: string): string {
       return args
         ? `Fork the ${args} playbook with suggested mutations. Show me what changed and why, and prepare it for A/B testing.`
         : "Which playbook should I evolve? List available playbooks for mutation.";
-    case "experiment":
+    case "experiment": {
       if (!args) return "Show the status of all active A/B experiments.";
-      const experimentSubcmd = args.split(/\s+/)[0]?.toLowerCase();
+      const experimentParts = args.split(/\s+/);
+      const experimentSubcmd = experimentParts[0]?.toLowerCase();
       switch (experimentSubcmd) {
         case "status":
           return "Show the status of all active A/B experiments with performance comparisons.";
@@ -1645,9 +1754,28 @@ export function commandToPrompt(command: SlashCommand, args: string): string {
           return "Start a new A/B experiment between strategy variants.";
         case "evaluate":
           return "Evaluate active experiments and recommend winners based on statistical significance.";
+        case "check":
+          return experimentParts[1]
+            ? `Check the status and progress of experiment ${experimentParts[1]}. Show performance metrics for each variant.`
+            : "Check the status of the most recent active experiment.";
+        case "promote":
+          return experimentParts[1]
+            ? `Promote the winning variant from experiment ${experimentParts[1]} to become the primary strategy.`
+            : "Promote the winner from the most recent completed experiment.";
+        case "rank":
+          return "Rank all playbook variants by performance. Show win rate, Sharpe ratio, and recommendation.";
+        case "lineage":
+          return experimentParts[1]
+            ? `Show the playbook family tree for ${experimentParts[1]} — all forks, mutations, and their performance.`
+            : "Show the lineage/family tree of all playbook variants and their evolutionary history.";
+        case "suggest":
+          return experimentParts[1]
+            ? `Suggest mutations for the ${experimentParts[1]} playbook based on recent backtest results.`
+            : "Suggest mutations for the most recent playbook based on backtest performance.";
         default:
           return "Show the status of all active A/B experiments.";
       }
+    }
     // Audit command
     case "audit":
       if (!args) return "Show me the most recent decisions from the audit trail.";
@@ -1664,12 +1792,106 @@ export function commandToPrompt(command: SlashCommand, args: string): string {
           return auditParts[1]
             ? `Show all decisions related to position ${auditParts[1]}.`
             : "Which position ID should I look up?";
+        case "decision":
+          return auditParts[1]
+            ? `Get the full decision path for decision ${auditParts[1]}. Show the complete reasoning chain, inputs, and outcomes.`
+            : "Which decision ID should I trace? Use /audit recent to find decision IDs.";
+        case "activity":
+          return auditParts[1]
+            ? `Show agent activity summary for the ${auditParts[1]} agent — total decisions, success rate, common actions.`
+            : "Show agent activity summary for all agents — total decisions, success rates, and common actions.";
+        case "stats":
+          return "Show audit statistics and trends — decision volume over time, success rates by agent, common failure reasons.";
         default:
           return "Show me the most recent decisions from the audit trail.";
       }
     // Health command
     case "health":
       return "Run a portfolio health check. Show risk status, strategy health, and any warnings.";
+    // Blockchain Network commands
+    case "chains":
+      return "Show me which blockchain networks are configured and available. For each configured chain, show the available tools and capabilities. For unconfigured chains, show what keys are needed.";
+    case "bridge":
+      if (args) {
+        return `Help me bridge tokens cross-chain using Chainlink CCIP: ${args}. Show me the fee estimate before executing.`;
+      }
+      return "Help me bridge tokens cross-chain using Chainlink CCIP. Show me supported chains and tokens.";
+    case "solana": {
+      if (!args) return "Show me Solana DeFi options — what can I do on Solana? Show my Solana balance if configured.";
+      const solSubcmd = args.split(/\s+/)[0]?.toLowerCase();
+      const solArgs = args.split(/\s+/).slice(1).join(" ");
+      switch (solSubcmd) {
+        case "swap": return solArgs ? `Swap tokens on Solana: ${solArgs}` : "Help me swap tokens on Solana. What pair?";
+        case "stake": return solArgs ? `Stake SOL: ${solArgs}` : "Help me stake SOL. Show me staking options.";
+        case "lend": return solArgs ? `Lend on Solana: ${solArgs}` : "Show me Solana lending options.";
+        case "launch": return solArgs ? `Launch a token on Solana: ${solArgs}` : "Help me launch a token on Solana.";
+        case "balance": return "Show my Solana wallet balance and token holdings.";
+        default: return `Solana action: ${args}`;
+      }
+    }
+    case "polkadot": {
+      if (!args) return "Show me Polkadot ecosystem options — what can I do on Polkadot/HydraDX? Show my balance if configured.";
+      const dotSubcmd = args.split(/\s+/)[0]?.toLowerCase();
+      const dotArgs = args.split(/\s+/).slice(1).join(" ");
+      switch (dotSubcmd) {
+        case "swap": return dotArgs ? `Swap on HydraDX: ${dotArgs}` : "Help me swap on HydraDX.";
+        case "stake": return dotArgs ? `Stake DOT: ${dotArgs}` : "Help me stake DOT. Show staking options.";
+        case "transfer": return dotArgs ? `Transfer on Polkadot: ${dotArgs}` : "Help me transfer tokens on Polkadot.";
+        case "balance": return "Show my Polkadot wallet balance.";
+        default: return `Polkadot action: ${args}`;
+      }
+    }
+    case "prices":
+      if (args) {
+        const pairs = args.split(/\s+/).map((s) => s.toUpperCase());
+        return `Get real-time Chainlink Data Streams prices for: ${pairs.join(", ")}. Show bid, ask, and timestamp.`;
+      }
+      return "Get real-time Chainlink Data Streams prices for major crypto pairs (BTC, ETH, SOL, LINK, etc.)";
+    case "base": {
+      const sub = args?.trim().toLowerCase();
+      if (sub === "trending") return "Show me trending dApps and featured projects on Base L2 from the Onchain Registry";
+      if (sub === "signals") return "Detect trading signals on Base: whale transfers, volume spikes, new listings, and DEX pressure";
+      if (sub === "whales") return "Show recent whale transfers on Base L2 using Basescan data";
+      if (sub === "dex") return "Show Base DEX analytics: top pairs by volume, new token listings, and boosted tokens from DexScreener";
+      if (sub) return `Explore Base L2: ${args}`;
+      return "Show me an overview of the Base L2 ecosystem: trending apps, recent signals, and DEX activity";
+    }
+    // Risk & Simulation commands
+    case "liquidation": {
+      if (!args) return "Analyze liquidation risks across my open positions. Show cascade risk, liquidation pressure, and any squeeze candidates.";
+      const liqParts = args.split(/\s+/);
+      const liqSub = liqParts[0]?.toLowerCase();
+      const liqSymbol = liqParts[1]?.toUpperCase();
+      switch (liqSub) {
+        case "cascade":
+          return liqSymbol
+            ? `Analyze cascade liquidation risk for ${liqSymbol}. Show chain reaction scenarios and exposure.`
+            : "Analyze cascade liquidation risk across the market. Show vulnerable positions and chain reaction scenarios.";
+        case "pressure":
+          return liqSymbol
+            ? `Measure liquidation pressure on ${liqSymbol}. Show concentration of stop-losses and liquidation levels.`
+            : "Measure liquidation pressure across my positions. Show which are most at risk.";
+        case "crowding":
+          return liqSymbol
+            ? `Analyze crowding in ${liqSymbol} positions. Show how many traders are in similar positions.`
+            : "Analyze crowding across positions. Show which trades are in overcrowded territory.";
+        case "squeeze":
+          return liqSymbol
+            ? `Analyze squeeze potential for ${liqSymbol}. Is a short or long squeeze likely?`
+            : "Find potential squeeze candidates across the market. Show short and long squeeze probabilities.";
+        default:
+          return `Analyze liquidation risks for ${args}`;
+      }
+    }
+    case "simulate": {
+      const simSub = args?.trim().toLowerCase();
+      if (simSub === "orders" || simSub === "bundle") return "Simulate my pending order bundle. Show projected fills, slippage, and execution impact before going live.";
+      if (simSub === "breaker" || simSub === "circuit") return "Generate a circuit breaker proof for the current state. Verify that safety mechanisms are properly configured.";
+      if (simSub === "verify") return "Verify the integrity of a previously generated circuit breaker proof.";
+      if (simSub === "regime") return "Query regime-scoped memory context. Show what the system remembers about current market conditions and how it affects decisions.";
+      if (simSub) return `Simulate: ${args}. Show projected outcomes before executing.`;
+      return "Simulate pending orders before execution. Show projected fills, slippage, and impact analysis.";
+    }
     default:
       return args || command.description;
   }

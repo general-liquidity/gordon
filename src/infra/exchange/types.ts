@@ -28,6 +28,54 @@ export interface ExchangeCredentials {
   walletPrivateKey?: string;
 }
 
+/**
+ * Maps exchange type → environment variable names for credential storage.
+ * Used by saveConfiguration to persist all exchange keys to .env,
+ * and by resolveExchangeCredentials to restore them from process.env.
+ */
+export const EXCHANGE_ENV_MAP: Record<ExchangeId, { key?: string; secret?: string; passphrase?: string; wallet?: string }> = {
+  binance:     { key: "BINANCE_API_KEY",     secret: "BINANCE_API_SECRET" },
+  binance_us:  { key: "BINANCE_US_API_KEY",  secret: "BINANCE_US_API_SECRET" },
+  coinbase:    { key: "COINBASE_API_KEY",     secret: "COINBASE_API_SECRET",   passphrase: "COINBASE_PASSPHRASE" },
+  kraken:      { key: "KRAKEN_API_KEY",       secret: "KRAKEN_API_SECRET" },
+  bitfinex:    { key: "BITFINEX_API_KEY",     secret: "BITFINEX_API_SECRET" },
+  hyperliquid: { wallet: "HYPERLIQUID_PRIVATE_KEY" },
+  uniswap:     { key: "UNISWAP_API_KEY" },
+};
+
+/**
+ * Resolve exchange credentials, preferring process.env over config values.
+ * Config may store "***" placeholders; this resolves them from env.
+ */
+export function resolveExchangeCredentials(
+  config: { type: string; apiKey: string; apiSecret: string; passphrase?: string; walletPrivateKey?: string; sandbox?: boolean },
+): ExchangeCredentials {
+  const envMap = config.type in EXCHANGE_ENV_MAP
+    ? EXCHANGE_ENV_MAP[config.type as ExchangeId]
+    : undefined;
+  const isRedacted = (v: string | undefined) => !v || v === "***";
+
+  let apiKey = config.apiKey;
+  let apiSecret = config.apiSecret;
+  let passphrase = config.passphrase;
+  let walletPrivateKey = config.walletPrivateKey;
+
+  if (envMap) {
+    if (isRedacted(apiKey) && envMap.key) apiKey = process.env[envMap.key] || "";
+    if (isRedacted(apiSecret) && envMap.secret) apiSecret = process.env[envMap.secret] || "";
+    if (isRedacted(passphrase) && envMap.passphrase) passphrase = process.env[envMap.passphrase] || undefined;
+    if (isRedacted(walletPrivateKey) && envMap.wallet) walletPrivateKey = process.env[envMap.wallet] || undefined;
+  }
+
+  // Final fallback: clear any remaining redacted placeholders
+  if (isRedacted(apiKey)) apiKey = "";
+  if (isRedacted(apiSecret)) apiSecret = "";
+  if (isRedacted(passphrase)) passphrase = undefined;
+  if (isRedacted(walletPrivateKey)) walletPrivateKey = undefined;
+
+  return { apiKey, apiSecret, passphrase, sandbox: config.sandbox, walletPrivateKey };
+}
+
 // ============================================================================
 // Market Data Types (Exchange-Agnostic)
 // ============================================================================

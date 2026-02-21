@@ -3,7 +3,7 @@ import { Box, Text, useInput } from "ink";
 import { Spinner, Alert, StatusMessage } from "@inkjs/ui";
 import { ChatInput } from "./ChatInput.tsx";
 
-import { StatusBar, type ThreadStatusInfo } from "./StatusBar.tsx";
+import { StatusBar, type ThreadStatusInfo, type ChainStatusInfo } from "./StatusBar.tsx";
 import type { TickerItem } from "./components/effects/index.ts";
 import { WelcomeBanner } from "./WelcomeBanner.tsx";
 import { QuickStartMenu, type MenuOption } from "./QuickStartMenu.tsx";
@@ -19,6 +19,7 @@ import { initRouting } from "../infra/routing/manager.ts";
 import { createLLMClientFromEnv, type LLMClient } from "../infra/llm/index.ts";
 import { BinanceClient } from "../infra/binance/index.ts";
 import { BinanceAdapter, ExchangeFactory, type Exchange } from "../infra/exchange/index.ts";
+import { resolveExchangeCredentials } from "../infra/exchange/types.ts";
 import {
   runMonitorCycle,
   initializeRealtimeMonitor,
@@ -113,6 +114,8 @@ interface AppState {
   session: SessionInfo | null;
   /** Thread info for status bar display */
   threadStatusInfo: ThreadStatusInfo | null;
+  /** Chain network status for status bar */
+  chainStatus: ChainStatusInfo | null;
 }
 
 interface LastResults {
@@ -221,6 +224,7 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
     showStartupHint: true,
     session: null,
     threadStatusInfo: null,
+    chainStatus: null,
   });
 
   const llmClientRef = useRef<LLMClient | null>(null);
@@ -262,8 +266,8 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
           },
         }));
       }
-    } catch (error) {
-      console.error("Failed to update thread status:", error);
+    } catch {
+      // Thread status update is non-critical — silently ignore
     }
   }, []);
 
@@ -324,21 +328,17 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
         return;
       }
 
-      exchangeRef.current = ExchangeFactory.create(active.type, {
-        apiKey: active.apiKey,
-        apiSecret: active.apiSecret,
-        passphrase: active.passphrase,
-        sandbox: active.sandbox,
-      });
+      const creds = resolveExchangeCredentials(active);
+      exchangeRef.current = ExchangeFactory.create(active.type, creds);
 
-      if ((active.type === "binance" || active.type === "binance_us") && active.apiKey && active.apiSecret) {
+      if ((active.type === "binance" || active.type === "binance_us") && creds.apiKey && creds.apiSecret) {
         const baseUrl = active.type === "binance_us" ? "https://api.binance.us" : undefined;
-        binanceClientRef.current = new BinanceClient(active.apiKey, active.apiSecret, baseUrl);
+        binanceClientRef.current = new BinanceClient(creds.apiKey, creds.apiSecret, baseUrl);
       } else {
         binanceClientRef.current = null;
       }
-    } catch (error) {
-      console.error("Failed to refresh active exchange:", error);
+    } catch {
+      // Exchange refresh failed — will retry on next config change
     }
   }, []);
 
@@ -447,22 +447,18 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
         const active = config.exchanges.find((ex) => ex.id === activeId) || config.exchanges[0];
         if (active) {
           try {
-            exchangeRef.current = ExchangeFactory.create(active.type, {
-              apiKey: active.apiKey,
-              apiSecret: active.apiSecret,
-              passphrase: active.passphrase,
-              sandbox: active.sandbox,
-            });
+            const creds = resolveExchangeCredentials(active);
+            exchangeRef.current = ExchangeFactory.create(active.type, creds);
             exchangeInitialized = true;
 
             if (active.type === "binance" || active.type === "binance_us") {
               const baseUrl = active.type === "binance_us" ? "https://api.binance.us" : undefined;
-              binanceClientRef.current = new BinanceClient(active.apiKey, active.apiSecret, baseUrl);
+              binanceClientRef.current = new BinanceClient(creds.apiKey, creds.apiSecret, baseUrl);
             } else {
               binanceClientRef.current = null;
             }
-          } catch (error) {
-            console.error("Failed to initialize configured exchange:", error);
+          } catch {
+            // Exchange initialization failed — will fall back to env-based Binance below
           }
         }
       }
@@ -605,6 +601,14 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
         connectionStatus: llmClientRef.current ? "connected" : "disconnected",
         session,
         threadStatusInfo,
+        chainStatus: {
+          solana: envStatus.hasSolanaKey,
+          polkadot: envStatus.hasPolkadotKey,
+          chainlink: envStatus.hasChainlinkStreamsKeys,
+          evm: envStatus.hasChainlinkCCIPKey,
+          cdp: envStatus.hasCDPKeys,
+          base: envStatus.hasBasescanKey || envStatus.hasCDPKeys,
+        },
       }));
     }
 
@@ -1852,6 +1856,95 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
     updateLastResultsFromTool,
   ]);
 
+  /**
+   * Stream a prompt through the agent and update the last Gordon message in-place.
+   * Shared by menu-triggered streaming handlers (trending, chains, etc.)
+   */
+  const runMenuStream = useCallback(
+    (prompt: string, messageTimestamp: string, errorPrefix: string) => {
+      (async () => {
+        if (!llmClientRef.current) return;
+        const context: GordonContext = buildAppGordonContext({
+          binance: binanceClientRef.current,
+          exchange: exchangeRef.current,
+          llm: llmClientRef.current!,
+          config: configRef.current,
+          portfolioValue: state.portfolioValue ?? 0,
+          availableCash: state.availableCash,
+          userId: state.session?.resourceId,
+          threadId: state.session?.threadId,
+        });
+
+        setState((prev) => ({
+          ...prev,
+          messages: [...prev.messages, { role: "gordon" as const, content: "", timestamp: messageTimestamp }],
+          isStreaming: true,
+        }));
+
+        const updateMsg = (content: string, agent?: string): void => {
+          setState((prev) => {
+            const newMessages = [...prev.messages];
+            for (let i = newMessages.length - 1; i >= 0; i--) {
+              const msg = newMessages[i];
+              if (msg && msg.role === "gordon" && msg.timestamp === messageTimestamp) {
+                newMessages[i] = { role: "gordon", content, timestamp: messageTimestamp, agent: agent || msg.agent };
+                break;
+              }
+            }
+            return { ...prev, messages: newMessages };
+          });
+        };
+
+        try {
+          const stream = processMessageStream(prompt, context, state.session?.threadId, state.session?.resourceId);
+          let fullContent = "";
+          let currentAgent: string | undefined;
+
+          for await (const event of stream) {
+            switch (event.type) {
+              case "text_delta":
+                if (event.content) {
+                  fullContent += event.content;
+                  updateMsg(fullContent, currentAgent);
+                }
+                break;
+              case "agent_switch":
+                if (event.agentName) currentAgent = event.agentName;
+                break;
+              case "tool_call_start":
+                setState((prev) => ({ ...prev, activeToolCall: event.toolName || "tool" }));
+                if (event.agentName) currentAgent = event.agentName;
+                break;
+              case "tool_call_end":
+                setState((prev) => ({ ...prev, activeToolCall: null }));
+                break;
+              case "done":
+                if (event.agentName) currentAgent = event.agentName;
+                updateMsg(fullContent, currentAgent);
+                setState((prev) => ({ ...prev, isStreaming: false, activeToolCall: null }));
+                break;
+              case "error":
+                updateMsg(fullContent || `${errorPrefix}: ${event.error}`, currentAgent);
+                setState((prev) => ({ ...prev, isStreaming: false, activeToolCall: null }));
+                break;
+            }
+          }
+        } catch (error) {
+          setState((prev) => ({
+            ...prev,
+            messages: [
+              ...prev.messages,
+              { role: "gordon" as const, content: `${errorPrefix}: ${error instanceof Error ? error.message : "Unknown error"}`, timestamp: formatTimestamp() },
+            ],
+            isStreaming: false,
+            activeToolCall: null,
+          }));
+        }
+      })();
+    },
+    [state.portfolioValue, state.availableCash, state.session?.resourceId, state.session?.threadId]
+  );
+
   // Handle menu selection
   const handleMenuSelect = useCallback((option: MenuOption): void => {
     switch (option) {
@@ -1889,8 +1982,10 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
 
           (async () => {
             try {
+              const exchange = exchangeRef.current;
+              if (!exchange) return;
               const scanStart = Date.now();
-              const scanResult = await scan(exchangeRef.current!, {
+              const scanResult = await scan(exchange, {
                 topN: configRef.current.preferences.topNCoins,
                 timeframes: configRef.current.preferences.defaultTimeframes,
               });
@@ -2096,147 +2191,19 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
           ],
         }));
         break;
-      case "trending":
+      case "trending": {
+        const trendingTs = formatTimestamp();
         setState((prev) => ({
           ...prev,
           view: "chat",
           messages: [
             ...prev.messages,
-            {
-              role: "user",
-              content: "/trending",
-              timestamp: formatTimestamp(),
-            },
-            {
-              role: "gordon",
-              content: "Finding today's trending tokens...",
-              timestamp: formatTimestamp(),
-            },
+            { role: "user", content: "/trending", timestamp: trendingTs },
           ],
         }));
-        // Trigger the trending request through the agent with streaming
-        (async () => {
-          if (!llmClientRef.current) return;
-          const context: GordonContext = buildAppGordonContext({
-            binance: binanceClientRef.current,
-            exchange: exchangeRef.current,
-            llm: llmClientRef.current!,
-            config: configRef.current,
-            portfolioValue: state.portfolioValue ?? 0,
-            availableCash: state.availableCash,
-            userId: state.session?.resourceId,
-            threadId: state.session?.threadId,
-          });
-
-          // Create initial empty message for streaming
-          const trendingTimestamp = formatTimestamp();
-          setState((prev) => ({
-            ...prev,
-            messages: [...prev.messages, {
-              role: "gordon",
-              content: "",
-              timestamp: trendingTimestamp,
-            }],
-            isStreaming: true,
-          }));
-
-          try {
-            const stream = processMessageStream(
-              "Show me what's trending and pumping today",
-              context,
-              state.session?.threadId,
-              state.session?.resourceId
-            );
-            let fullContent = "";
-            let trendingAgent: string | undefined;
-
-            for await (const event of stream) {
-              if (event.type === "text_delta" && event.content) {
-                fullContent += event.content;
-                setState((prev) => {
-                  const newMessages = [...prev.messages];
-                  for (let i = newMessages.length - 1; i >= 0; i--) {
-                    const msg = newMessages[i];
-                    if (msg && msg.role === "gordon" && msg.timestamp === trendingTimestamp) {
-                      newMessages[i] = {
-                        role: "gordon",
-                        content: fullContent,
-                        timestamp: trendingTimestamp,
-                        agent: trendingAgent || msg.agent,
-                      };
-                      break;
-                    }
-                  }
-                  return { ...prev, messages: newMessages };
-                });
-              } else if (event.type === "agent_switch" && event.agentName) {
-                trendingAgent = event.agentName;
-              } else if (event.type === "tool_call_start") {
-                setState((prev) => ({ ...prev, activeToolCall: event.toolName || "tool" }));
-                if (event.agentName) {
-                  trendingAgent = event.agentName;
-                }
-              } else if (event.type === "tool_call_end") {
-                setState((prev) => ({ ...prev, activeToolCall: null }));
-              } else if (event.type === "done") {
-                if (event.agentName) {
-                  trendingAgent = event.agentName;
-                }
-                // Final update with agent attribution
-                setState((prev) => {
-                  const newMessages = [...prev.messages];
-                  for (let i = newMessages.length - 1; i >= 0; i--) {
-                    const msg = newMessages[i];
-                    if (msg && msg.role === "gordon" && msg.timestamp === trendingTimestamp) {
-                      newMessages[i] = {
-                        role: "gordon",
-                        content: fullContent,
-                        timestamp: trendingTimestamp,
-                        agent: trendingAgent,
-                      };
-                      break;
-                    }
-                  }
-                  return { ...prev, messages: newMessages, isStreaming: false, activeToolCall: null };
-                });
-              } else if (event.type === "error") {
-                setState((prev) => {
-                  const newMessages = [...prev.messages];
-                  for (let i = newMessages.length - 1; i >= 0; i--) {
-                    const msg = newMessages[i];
-                    if (msg && msg.role === "gordon" && msg.timestamp === trendingTimestamp) {
-                      newMessages[i] = {
-                        role: "gordon",
-                        content: fullContent || `Failed to get trending: ${event.error}`,
-                        timestamp: trendingTimestamp,
-                        agent: trendingAgent,
-                      };
-                      break;
-                    }
-                  }
-                  return { ...prev, messages: newMessages, isStreaming: false, activeToolCall: null };
-                });
-              }
-            }
-          } catch (error) {
-            setState((prev) => {
-              const newMessages = [...prev.messages];
-              for (let i = newMessages.length - 1; i >= 0; i--) {
-                const msg = newMessages[i];
-                if (msg && msg.role === "gordon" && msg.timestamp === trendingTimestamp) {
-                  newMessages[i] = {
-                    role: "gordon",
-                    content: `Failed to get trending: ${error instanceof Error ? error.message : "Unknown error"}`,
-                    timestamp: trendingTimestamp,
-                  };
-                  break;
-                }
-              }
-              return { ...prev, messages: newMessages, isStreaming: false, activeToolCall: null };
-            });
-          }
-        })();
+        runMenuStream("Show me what's trending and pumping today", trendingTs, "Failed to get trending");
         break;
+      }
       case "analyze":
         setState((prev) => ({
           ...prev,
@@ -2279,8 +2246,44 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
           ],
         }));
         break;
+      case "bridge":
+        setState((prev) => ({
+          ...prev,
+          view: "chat",
+          messages: [
+            ...prev.messages,
+            {
+              role: "user",
+              content: "/bridge",
+              timestamp: formatTimestamp(),
+            },
+            {
+              role: "gordon",
+              content: "What would you like to bridge? Tell me the amount, token, source chain, and destination chain.\n\nExample: \"Bridge 100 USDC from Ethereum to Arbitrum\"",
+              timestamp: formatTimestamp(),
+            },
+          ],
+        }));
+        break;
+      case "chains": {
+        const chainsTs = formatTimestamp();
+        setState((prev) => ({
+          ...prev,
+          view: "chat",
+          messages: [
+            ...prev.messages,
+            { role: "user", content: "/chains", timestamp: chainsTs },
+          ],
+        }));
+        runMenuStream(
+          "Show me which blockchain networks are configured and available. List the tools and capabilities for each configured chain.",
+          chainsTs,
+          "Failed to check chains"
+        );
+        break;
+      }
     }
-  }, [state.portfolioValue, state.availableCash, state.conversationHistory, formatCommandError]);
+  }, [state.portfolioValue, state.availableCash, state.conversationHistory, formatCommandError, runMenuStream]);
 
   // Handle onboarding completion
   const handleOnboardingComplete = useCallback(
@@ -2446,6 +2449,7 @@ Please check your API keys in the .env file and restart Gordon.`,
           btcPrice={state.btcPrice}
           threadInfo={state.threadStatusInfo || undefined}
           tickerItems={tickerItems}
+          chainStatus={state.chainStatus || undefined}
         />
       )}
 

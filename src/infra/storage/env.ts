@@ -45,6 +45,19 @@ export interface EnvKeys {
   THEGRAPH_API_KEY?: string;
   GORDON_PROVIDER?: string;
   GORDON_MODEL?: string;
+  // Chain provider keys
+  SOLANA_PRIVATE_KEY?: string;
+  SOLANA_RPC_URL?: string;
+  POLKADOT_MNEMONIC?: string;
+  POLKADOT_PRIVATE_KEY?: string;
+  CHAINLINK_API_KEY?: string;
+  CHAINLINK_API_SECRET?: string;
+  EVM_PRIVATE_KEY?: string;
+  CDP_API_KEY_ID?: string;
+  CDP_API_KEY_SECRET?: string;
+  CDP_WALLET_SECRET?: string;
+  CDP_NETWORK_ID?: string;
+  BASESCAN_API_KEY?: string;
 }
 
 export interface EnvStatus {
@@ -58,7 +71,37 @@ export interface EnvStatus {
   hasHyperliquidKey: boolean;
   hasUniswapKey: boolean;
   hasGraphKey: boolean;
+  // Chain provider status
+  hasSolanaKey: boolean;
+  hasPolkadotKey: boolean;
+  hasChainlinkStreamsKeys: boolean;
+  hasChainlinkCCIPKey: boolean;
+  hasCDPKeys: boolean;
+  hasBasescanKey: boolean;
   keys: EnvKeys;
+}
+
+/**
+ * Escape a value for single-quoted .env format.
+ * Single quotes inside the value are escaped as: end quote, backslash-escaped quote, reopen quote.
+ */
+function escapeEnvValue(value: string): string {
+  return value.replace(/'/g, "'\\''");
+}
+
+/**
+ * Unescape a value read from a single-quoted .env field.
+ * Reverses the escapeEnvValue transform: '\'' → '
+ */
+function unescapeEnvValue(value: string): string {
+  return value.replace(/'\\''/g, "'");
+}
+
+/**
+ * Format a key=value pair for the .env file (single-quoted)
+ */
+function formatEnvLine(key: string, value: string): string {
+  return `${key}='${escapeEnvValue(value)}'`;
 }
 
 /**
@@ -81,9 +124,10 @@ function parseEnvContent(content: string): Record<string, string> {
       const key = match[1]?.trim();
       let value = match[2]?.trim() ?? "";
 
-      // Remove surrounding quotes
-      if ((value.startsWith("'") && value.endsWith("'")) ||
-          (value.startsWith('"') && value.endsWith('"'))) {
+      // Remove surrounding quotes and unescape
+      if (value.startsWith("'") && value.endsWith("'")) {
+        value = unescapeEnvValue(value.slice(1, -1));
+      } else if (value.startsWith('"') && value.endsWith('"')) {
         value = value.slice(1, -1);
       }
 
@@ -110,6 +154,44 @@ function findEnvFilePath(): string | null {
   return null;
 }
 
+/** All tracked env key names (single source of truth) */
+const ENV_KEY_NAMES: (keyof EnvKeys)[] = [
+  "OPENAI_API_KEY", "DEDALUS_API_KEY",
+  "BINANCE_API_KEY", "BINANCE_API_SECRET", "BINANCE_US_API_KEY", "BINANCE_US_API_SECRET",
+  "COINBASE_API_KEY", "COINBASE_API_SECRET", "COINBASE_PASSPHRASE",
+  "KRAKEN_API_KEY", "KRAKEN_API_SECRET",
+  "BITFINEX_API_KEY", "BITFINEX_API_SECRET",
+  "HYPERLIQUID_PRIVATE_KEY", "UNISWAP_API_KEY", "THEGRAPH_API_KEY", "GORDON_PROVIDER", "GORDON_MODEL",
+  "SOLANA_PRIVATE_KEY", "SOLANA_RPC_URL",
+  "POLKADOT_MNEMONIC", "POLKADOT_PRIVATE_KEY",
+  "CHAINLINK_API_KEY", "CHAINLINK_API_SECRET", "EVM_PRIVATE_KEY",
+  "CDP_API_KEY_ID", "CDP_API_KEY_SECRET", "CDP_WALLET_SECRET", "CDP_NETWORK_ID",
+  "BASESCAN_API_KEY",
+];
+
+/** Build EnvStatus flags from resolved keys */
+function buildEnvStatus(keys: EnvKeys, fileExists: boolean): EnvStatus {
+  return {
+    fileExists,
+    hasLLMKey: !!(keys.OPENAI_API_KEY || keys.DEDALUS_API_KEY),
+    hasBinanceKeys: !!(keys.BINANCE_API_KEY && keys.BINANCE_API_SECRET),
+    hasBinanceUSKeys: !!(keys.BINANCE_US_API_KEY && keys.BINANCE_US_API_SECRET),
+    hasCoinbaseKeys: !!(keys.COINBASE_API_KEY && keys.COINBASE_API_SECRET && keys.COINBASE_PASSPHRASE),
+    hasKrakenKeys: !!(keys.KRAKEN_API_KEY && keys.KRAKEN_API_SECRET),
+    hasBitfinexKeys: !!(keys.BITFINEX_API_KEY && keys.BITFINEX_API_SECRET),
+    hasHyperliquidKey: !!keys.HYPERLIQUID_PRIVATE_KEY,
+    hasUniswapKey: !!keys.UNISWAP_API_KEY,
+    hasGraphKey: !!keys.THEGRAPH_API_KEY,
+    hasSolanaKey: !!keys.SOLANA_PRIVATE_KEY,
+    hasPolkadotKey: !!(keys.POLKADOT_MNEMONIC || keys.POLKADOT_PRIVATE_KEY),
+    hasChainlinkStreamsKeys: !!(keys.CHAINLINK_API_KEY && keys.CHAINLINK_API_SECRET),
+    hasChainlinkCCIPKey: !!keys.EVM_PRIVATE_KEY,
+    hasCDPKeys: !!(keys.CDP_API_KEY_ID && keys.CDP_API_KEY_SECRET && keys.CDP_WALLET_SECRET),
+    hasBasescanKey: !!keys.BASESCAN_API_KEY,
+    keys,
+  };
+}
+
 /**
  * Check if .env file exists and what keys are configured
  * Checks both ~/.gordon/.env and cwd/.env
@@ -118,79 +200,18 @@ export async function checkEnvStatus(): Promise<EnvStatus> {
   const envPath = findEnvFilePath();
   const fileExists = envPath !== null;
 
-  if (!fileExists) {
-    // Check environment variables directly
-    const keys: EnvKeys = {
-      OPENAI_API_KEY: process.env.OPENAI_API_KEY,
-      DEDALUS_API_KEY: process.env.DEDALUS_API_KEY,
-      BINANCE_API_KEY: process.env.BINANCE_API_KEY,
-      BINANCE_API_SECRET: process.env.BINANCE_API_SECRET,
-      BINANCE_US_API_KEY: process.env.BINANCE_US_API_KEY,
-      BINANCE_US_API_SECRET: process.env.BINANCE_US_API_SECRET,
-      COINBASE_API_KEY: process.env.COINBASE_API_KEY,
-      COINBASE_API_SECRET: process.env.COINBASE_API_SECRET,
-      COINBASE_PASSPHRASE: process.env.COINBASE_PASSPHRASE,
-      KRAKEN_API_KEY: process.env.KRAKEN_API_KEY,
-      KRAKEN_API_SECRET: process.env.KRAKEN_API_SECRET,
-      BITFINEX_API_KEY: process.env.BITFINEX_API_KEY,
-      BITFINEX_API_SECRET: process.env.BITFINEX_API_SECRET,
-      HYPERLIQUID_PRIVATE_KEY: process.env.HYPERLIQUID_PRIVATE_KEY,
-      UNISWAP_API_KEY: process.env.UNISWAP_API_KEY,
-      THEGRAPH_API_KEY: process.env.THEGRAPH_API_KEY,
-    };
+  // Parse .env file if it exists, otherwise use empty map
+  const parsed: Record<string, string> = fileExists
+    ? parseEnvContent(await Bun.file(envPath).text())
+    : {};
 
-    return {
-      fileExists: false,
-      hasLLMKey: !!(keys.OPENAI_API_KEY || keys.DEDALUS_API_KEY),
-      hasBinanceKeys: !!(keys.BINANCE_API_KEY && keys.BINANCE_API_SECRET),
-      hasBinanceUSKeys: !!(keys.BINANCE_US_API_KEY && keys.BINANCE_US_API_SECRET),
-      hasCoinbaseKeys: !!(keys.COINBASE_API_KEY && keys.COINBASE_API_SECRET),
-      hasKrakenKeys: !!(keys.KRAKEN_API_KEY && keys.KRAKEN_API_SECRET),
-      hasBitfinexKeys: !!(keys.BITFINEX_API_KEY && keys.BITFINEX_API_SECRET),
-      hasHyperliquidKey: !!keys.HYPERLIQUID_PRIVATE_KEY,
-      hasUniswapKey: !!keys.UNISWAP_API_KEY,
-      hasGraphKey: !!keys.THEGRAPH_API_KEY,
-      keys,
-    };
+  // Resolve each key: .env file value > process.env fallback
+  const keys = {} as EnvKeys;
+  for (const name of ENV_KEY_NAMES) {
+    keys[name] = parsed[name] || process.env[name];
   }
 
-  // Read and parse .env file
-  const file = Bun.file(envPath);
-  const content = await file.text();
-  const parsed = parseEnvContent(content);
-
-  const keys: EnvKeys = {
-    OPENAI_API_KEY: parsed.OPENAI_API_KEY || process.env.OPENAI_API_KEY,
-    DEDALUS_API_KEY: parsed.DEDALUS_API_KEY || process.env.DEDALUS_API_KEY,
-    BINANCE_API_KEY: parsed.BINANCE_API_KEY || process.env.BINANCE_API_KEY,
-    BINANCE_API_SECRET: parsed.BINANCE_API_SECRET || process.env.BINANCE_API_SECRET,
-    BINANCE_US_API_KEY: parsed.BINANCE_US_API_KEY || process.env.BINANCE_US_API_KEY,
-    BINANCE_US_API_SECRET: parsed.BINANCE_US_API_SECRET || process.env.BINANCE_US_API_SECRET,
-    COINBASE_API_KEY: parsed.COINBASE_API_KEY || process.env.COINBASE_API_KEY,
-    COINBASE_API_SECRET: parsed.COINBASE_API_SECRET || process.env.COINBASE_API_SECRET,
-    COINBASE_PASSPHRASE: parsed.COINBASE_PASSPHRASE || process.env.COINBASE_PASSPHRASE,
-    KRAKEN_API_KEY: parsed.KRAKEN_API_KEY || process.env.KRAKEN_API_KEY,
-    KRAKEN_API_SECRET: parsed.KRAKEN_API_SECRET || process.env.KRAKEN_API_SECRET,
-    BITFINEX_API_KEY: parsed.BITFINEX_API_KEY || process.env.BITFINEX_API_KEY,
-    BITFINEX_API_SECRET: parsed.BITFINEX_API_SECRET || process.env.BITFINEX_API_SECRET,
-    HYPERLIQUID_PRIVATE_KEY: parsed.HYPERLIQUID_PRIVATE_KEY || process.env.HYPERLIQUID_PRIVATE_KEY,
-    UNISWAP_API_KEY: parsed.UNISWAP_API_KEY || process.env.UNISWAP_API_KEY,
-    THEGRAPH_API_KEY: parsed.THEGRAPH_API_KEY || process.env.THEGRAPH_API_KEY,
-  };
-
-  return {
-    fileExists: true,
-    hasLLMKey: !!(keys.OPENAI_API_KEY || keys.DEDALUS_API_KEY),
-    hasBinanceKeys: !!(keys.BINANCE_API_KEY && keys.BINANCE_API_SECRET),
-    hasBinanceUSKeys: !!(keys.BINANCE_US_API_KEY && keys.BINANCE_US_API_SECRET),
-    hasCoinbaseKeys: !!(keys.COINBASE_API_KEY && keys.COINBASE_API_SECRET),
-    hasKrakenKeys: !!(keys.KRAKEN_API_KEY && keys.KRAKEN_API_SECRET),
-    hasBitfinexKeys: !!(keys.BITFINEX_API_KEY && keys.BITFINEX_API_SECRET),
-    hasHyperliquidKey: !!keys.HYPERLIQUID_PRIVATE_KEY,
-    hasUniswapKey: !!keys.UNISWAP_API_KEY,
-    hasGraphKey: !!keys.THEGRAPH_API_KEY,
-    keys,
-  };
+  return buildEnvStatus(keys, fileExists);
 }
 
 /**
@@ -298,7 +319,7 @@ export async function saveEnvKeys(newKeys: Partial<EnvKeys>): Promise<void> {
 
   for (const [key, value] of Object.entries(newKeys)) {
     if (value) {
-      updatedKeys[key] = `${key}='${value}'`;
+      updatedKeys[key] = formatEnvLine(key, value);
       // Also set in process.env for immediate use
       process.env[key] = value;
     }
@@ -357,13 +378,13 @@ export async function createEnvFile(keys: Partial<EnvKeys>): Promise<void> {
   ];
 
   if (keys.OPENAI_API_KEY) {
-    lines.push(`OPENAI_API_KEY='${keys.OPENAI_API_KEY}'`);
+    lines.push(formatEnvLine("OPENAI_API_KEY", keys.OPENAI_API_KEY));
   } else {
     lines.push("# OPENAI_API_KEY=sk-...");
   }
 
   if (keys.DEDALUS_API_KEY) {
-    lines.push(`DEDALUS_API_KEY='${keys.DEDALUS_API_KEY}'`);
+    lines.push(formatEnvLine("DEDALUS_API_KEY", keys.DEDALUS_API_KEY));
   } else {
     lines.push("# DEDALUS_API_KEY=dd-...");
   }
@@ -372,13 +393,13 @@ export async function createEnvFile(keys: Partial<EnvKeys>): Promise<void> {
   lines.push("# Binance (required for trading)");
 
   if (keys.BINANCE_API_KEY) {
-    lines.push(`BINANCE_API_KEY='${keys.BINANCE_API_KEY}'`);
+    lines.push(formatEnvLine("BINANCE_API_KEY", keys.BINANCE_API_KEY));
   } else {
     lines.push("# BINANCE_API_KEY=");
   }
 
   if (keys.BINANCE_API_SECRET) {
-    lines.push(`BINANCE_API_SECRET='${keys.BINANCE_API_SECRET}'`);
+    lines.push(formatEnvLine("BINANCE_API_SECRET", keys.BINANCE_API_SECRET));
   } else {
     lines.push("# BINANCE_API_SECRET=");
   }
@@ -387,13 +408,13 @@ export async function createEnvFile(keys: Partial<EnvKeys>): Promise<void> {
   lines.push("# Binance US (alternative for US users)");
 
   if (keys.BINANCE_US_API_KEY) {
-    lines.push(`BINANCE_US_API_KEY='${keys.BINANCE_US_API_KEY}'`);
+    lines.push(formatEnvLine("BINANCE_US_API_KEY", keys.BINANCE_US_API_KEY));
   } else {
     lines.push("# BINANCE_US_API_KEY=");
   }
 
   if (keys.BINANCE_US_API_SECRET) {
-    lines.push(`BINANCE_US_API_SECRET='${keys.BINANCE_US_API_SECRET}'`);
+    lines.push(formatEnvLine("BINANCE_US_API_SECRET", keys.BINANCE_US_API_SECRET));
   } else {
     lines.push("# BINANCE_US_API_SECRET=");
   }
@@ -402,19 +423,19 @@ export async function createEnvFile(keys: Partial<EnvKeys>): Promise<void> {
   lines.push("# Coinbase");
 
   if (keys.COINBASE_API_KEY) {
-    lines.push(`COINBASE_API_KEY='${keys.COINBASE_API_KEY}'`);
+    lines.push(formatEnvLine("COINBASE_API_KEY", keys.COINBASE_API_KEY));
   } else {
     lines.push("# COINBASE_API_KEY=");
   }
 
   if (keys.COINBASE_API_SECRET) {
-    lines.push(`COINBASE_API_SECRET='${keys.COINBASE_API_SECRET}'`);
+    lines.push(formatEnvLine("COINBASE_API_SECRET", keys.COINBASE_API_SECRET));
   } else {
     lines.push("# COINBASE_API_SECRET=");
   }
 
   if (keys.COINBASE_PASSPHRASE) {
-    lines.push(`COINBASE_PASSPHRASE='${keys.COINBASE_PASSPHRASE}'`);
+    lines.push(formatEnvLine("COINBASE_PASSPHRASE", keys.COINBASE_PASSPHRASE));
   } else {
     lines.push("# COINBASE_PASSPHRASE=");
   }
@@ -423,13 +444,13 @@ export async function createEnvFile(keys: Partial<EnvKeys>): Promise<void> {
   lines.push("# Kraken");
 
   if (keys.KRAKEN_API_KEY) {
-    lines.push(`KRAKEN_API_KEY='${keys.KRAKEN_API_KEY}'`);
+    lines.push(formatEnvLine("KRAKEN_API_KEY", keys.KRAKEN_API_KEY));
   } else {
     lines.push("# KRAKEN_API_KEY=");
   }
 
   if (keys.KRAKEN_API_SECRET) {
-    lines.push(`KRAKEN_API_SECRET='${keys.KRAKEN_API_SECRET}'`);
+    lines.push(formatEnvLine("KRAKEN_API_SECRET", keys.KRAKEN_API_SECRET));
   } else {
     lines.push("# KRAKEN_API_SECRET=");
   }
@@ -438,13 +459,13 @@ export async function createEnvFile(keys: Partial<EnvKeys>): Promise<void> {
   lines.push("# Bitfinex");
 
   if (keys.BITFINEX_API_KEY) {
-    lines.push(`BITFINEX_API_KEY='${keys.BITFINEX_API_KEY}'`);
+    lines.push(formatEnvLine("BITFINEX_API_KEY", keys.BITFINEX_API_KEY));
   } else {
     lines.push("# BITFINEX_API_KEY=");
   }
 
   if (keys.BITFINEX_API_SECRET) {
-    lines.push(`BITFINEX_API_SECRET='${keys.BITFINEX_API_SECRET}'`);
+    lines.push(formatEnvLine("BITFINEX_API_SECRET", keys.BITFINEX_API_SECRET));
   } else {
     lines.push("# BITFINEX_API_SECRET=");
   }
@@ -453,9 +474,124 @@ export async function createEnvFile(keys: Partial<EnvKeys>): Promise<void> {
   lines.push("# Hyperliquid");
 
   if (keys.HYPERLIQUID_PRIVATE_KEY) {
-    lines.push(`HYPERLIQUID_PRIVATE_KEY='${keys.HYPERLIQUID_PRIVATE_KEY}'`);
+    lines.push(formatEnvLine("HYPERLIQUID_PRIVATE_KEY", keys.HYPERLIQUID_PRIVATE_KEY));
   } else {
     lines.push("# HYPERLIQUID_PRIVATE_KEY=");
+  }
+
+  lines.push("");
+  lines.push("# Uniswap");
+
+  if (keys.UNISWAP_API_KEY) {
+    lines.push(formatEnvLine("UNISWAP_API_KEY", keys.UNISWAP_API_KEY));
+  } else {
+    lines.push("# UNISWAP_API_KEY=");
+  }
+
+  lines.push("");
+  lines.push("# The Graph (subgraph queries for DeFi protocols)");
+
+  if (keys.THEGRAPH_API_KEY) {
+    lines.push(formatEnvLine("THEGRAPH_API_KEY", keys.THEGRAPH_API_KEY));
+  } else {
+    lines.push("# THEGRAPH_API_KEY=");
+  }
+
+  // ---- Blockchain Network Keys ----
+  lines.push("");
+  lines.push("# ---- Blockchain Networks ----");
+
+  lines.push("");
+  lines.push("# Solana (DeFi, token swaps, staking, lending — 60+ tools)");
+  if (keys.SOLANA_PRIVATE_KEY) {
+    lines.push(formatEnvLine("SOLANA_PRIVATE_KEY", keys.SOLANA_PRIVATE_KEY));
+  } else {
+    lines.push("# SOLANA_PRIVATE_KEY=");
+  }
+  if (keys.SOLANA_RPC_URL) {
+    lines.push(formatEnvLine("SOLANA_RPC_URL", keys.SOLANA_RPC_URL));
+  } else {
+    lines.push("# SOLANA_RPC_URL=https://api.mainnet-beta.solana.com");
+  }
+
+  lines.push("");
+  lines.push("# Polkadot (cross-chain swaps, staking, governance)");
+  if (keys.POLKADOT_MNEMONIC) {
+    lines.push(formatEnvLine("POLKADOT_MNEMONIC", keys.POLKADOT_MNEMONIC));
+  } else {
+    lines.push("# POLKADOT_MNEMONIC=");
+  }
+  if (keys.POLKADOT_PRIVATE_KEY) {
+    lines.push(formatEnvLine("POLKADOT_PRIVATE_KEY", keys.POLKADOT_PRIVATE_KEY));
+  } else {
+    lines.push("# POLKADOT_PRIVATE_KEY=");
+  }
+
+  lines.push("");
+  lines.push("# Chainlink Data Streams (real-time institutional-grade price feeds)");
+  if (keys.CHAINLINK_API_KEY) {
+    lines.push(formatEnvLine("CHAINLINK_API_KEY", keys.CHAINLINK_API_KEY));
+  } else {
+    lines.push("# CHAINLINK_API_KEY=");
+  }
+  if (keys.CHAINLINK_API_SECRET) {
+    lines.push(formatEnvLine("CHAINLINK_API_SECRET", keys.CHAINLINK_API_SECRET));
+  } else {
+    lines.push("# CHAINLINK_API_SECRET=");
+  }
+
+  lines.push("");
+  lines.push("# EVM Private Key (Chainlink CCIP cross-chain bridging)");
+  if (keys.EVM_PRIVATE_KEY) {
+    lines.push(formatEnvLine("EVM_PRIVATE_KEY", keys.EVM_PRIVATE_KEY));
+  } else {
+    lines.push("# EVM_PRIVATE_KEY=0x...");
+  }
+
+  lines.push("");
+  lines.push("# Coinbase CDP (Base smart wallets, onchain actions)");
+  if (keys.CDP_API_KEY_ID) {
+    lines.push(formatEnvLine("CDP_API_KEY_ID", keys.CDP_API_KEY_ID));
+  } else {
+    lines.push("# CDP_API_KEY_ID=");
+  }
+  if (keys.CDP_API_KEY_SECRET) {
+    lines.push(formatEnvLine("CDP_API_KEY_SECRET", keys.CDP_API_KEY_SECRET));
+  } else {
+    lines.push("# CDP_API_KEY_SECRET=");
+  }
+  if (keys.CDP_WALLET_SECRET) {
+    lines.push(formatEnvLine("CDP_WALLET_SECRET", keys.CDP_WALLET_SECRET));
+  } else {
+    lines.push("# CDP_WALLET_SECRET=");
+  }
+  if (keys.CDP_NETWORK_ID) {
+    lines.push(formatEnvLine("CDP_NETWORK_ID", keys.CDP_NETWORK_ID));
+  } else {
+    lines.push("# CDP_NETWORK_ID=base-mainnet");
+  }
+
+  lines.push("");
+  lines.push("# Basescan (optional — enables Base L2 whale detection, holder queries)");
+  if (keys.BASESCAN_API_KEY) {
+    lines.push(formatEnvLine("BASESCAN_API_KEY", keys.BASESCAN_API_KEY));
+  } else {
+    lines.push("# BASESCAN_API_KEY=");
+  }
+
+  // ---- Gordon LLM Provider ----
+  lines.push("");
+  lines.push("# ---- Gordon LLM Provider ----");
+
+  if (keys.GORDON_PROVIDER) {
+    lines.push(formatEnvLine("GORDON_PROVIDER", keys.GORDON_PROVIDER));
+  } else {
+    lines.push("# GORDON_PROVIDER=openai");
+  }
+  if (keys.GORDON_MODEL) {
+    lines.push(formatEnvLine("GORDON_MODEL", keys.GORDON_MODEL));
+  } else {
+    lines.push("# GORDON_MODEL=gpt-4o");
   }
 
   // Always write to ~/.gordon/.env
