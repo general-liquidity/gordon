@@ -61,7 +61,12 @@ jobs:
         run: bun install
 
       - name: Build binary
-        run: bun build --compile --target=bun-${{ matrix.target }} --outfile=${{ matrix.binary_name }} src/index.tsx
+        run: >
+          bun build --compile --target=bun-${{ matrix.target }} --outfile=${{ matrix.binary_name }}
+          --external @lightprotocol/compressed-token
+          --external @lightprotocol/stateless.js
+          --external @solana-developers/helpers
+          src/index.tsx
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4

@@ -873,6 +873,21 @@ const TOOL_AGENT_MAP: Record<string, string> = {
   check_portfolio_health: "Monitor",
   approve_strategy_trade: "Executor",
 
+  // ---- Chainlink tools ----
+  // Data Streams (Scanner: bulk, Analyst: individual)
+  chainlink_get_price: "Analyst",
+  chainlink_get_price_at: "Analyst",
+  chainlink_bulk_prices: "Scanner",
+  chainlink_list_feeds: "Scanner",
+  // Data Feeds (Analyst: on-chain reads)
+  chainlink_read_feed: "Analyst",
+  chainlink_compare_prices: "Analyst",
+  // CCIP (Analyst: info/fees, Executor: transfers, Monitor: status)
+  chainlink_ccip_supported_chains: "Analyst",
+  chainlink_ccip_get_fee: "Analyst",
+  chainlink_ccip_transfer: "Executor",
+  chainlink_ccip_status: "Monitor",
+
   // ---- Cross-cutting tools (NOT mapped to any agent) ----
   // sharedContextTools and systemTools are used by ALL agents.
   // Mapping them to "Gordon" causes spurious self-handoff detections,

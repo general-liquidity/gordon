@@ -80,6 +80,9 @@ export { baseIndexerTools } from "./base-indexers.ts";
 export { uniswapDataTools } from "./uniswap-data.ts";
 export { dexSearchTools } from "./dex-search.ts";
 export { defillamaYieldTools } from "./defillama-yields.ts";
+export { chainlinkStreamsTools } from "./chainlink-streams.ts";
+export { chainlinkFeedsTools } from "./chainlink-feeds.ts";
+export { chainlinkCCIPTools } from "./chainlink-ccip.ts";
 
 // Position tracking tools (v0.7)
 export { positionTrackingTools } from "./position-tracking.ts";
@@ -323,6 +326,9 @@ import { baseIndexerTools } from "./base-indexers.ts";
 import { uniswapDataTools } from "./uniswap-data.ts";
 import { dexSearchTools } from "./dex-search.ts";
 import { defillamaYieldTools } from "./defillama-yields.ts";
+import { chainlinkStreamsTools } from "./chainlink-streams.ts";
+import { chainlinkFeedsTools } from "./chainlink-feeds.ts";
+import { chainlinkCCIPTools } from "./chainlink-ccip.ts";
 import { positionTrackingTools } from "./position-tracking.ts";
 import { checkRiskTool } from "./risk-gate.ts";
 import { memoryTools } from "./memory-tools.ts";
@@ -384,6 +390,9 @@ export const allTools = {
   ...uniswapDataTools,
   ...dexSearchTools,
   ...defillamaYieldTools,
+  ...chainlinkStreamsTools,
+  ...chainlinkFeedsTools,
+  ...chainlinkCCIPTools,
   ...multiModalChartTools,
   ...evalTools,
   ...positionTrackingTools,
@@ -446,6 +455,9 @@ export const toolCounts = {
   uniswapData: Object.keys(uniswapDataTools).length,
   dexSearch: Object.keys(dexSearchTools).length,
   defillamaYields: Object.keys(defillamaYieldTools).length,
+  chainlinkStreams: Object.keys(chainlinkStreamsTools).length,
+  chainlinkFeeds: Object.keys(chainlinkFeedsTools).length,
+  chainlinkCCIP: Object.keys(chainlinkCCIPTools).length,
   multiModalCharts: Object.keys(multiModalChartTools).length,
   evals: Object.keys(evalTools).length,
   positionTracking: Object.keys(positionTrackingTools).length,

@@ -71,6 +71,9 @@ import {
   solanaKitDefiLendingTools,
   solanaKitDefiPoolsTools,
   solanaKitDefiBridgeTools,
+  chainlinkStreamsTools,
+  chainlinkFeedsTools,
+  chainlinkCCIPTools,
   baseSignalTools,
   baseIndexerTools,
   uniswapDataTools,
@@ -326,6 +329,9 @@ const instrumentedSolanaKitDefiPerpsTools = withToolsMetrics(solanaKitDefiPerpsT
 const instrumentedSolanaKitDefiLendingTools = withToolsMetrics(solanaKitDefiLendingTools);
 const instrumentedSolanaKitDefiPoolsTools = withToolsMetrics(solanaKitDefiPoolsTools);
 const instrumentedSolanaKitDefiBridgeTools = withToolsMetrics(solanaKitDefiBridgeTools);
+const instrumentedChainlinkStreamsTools = withToolsMetrics(chainlinkStreamsTools);
+const instrumentedChainlinkFeedsTools = withToolsMetrics(chainlinkFeedsTools);
+const instrumentedChainlinkCCIPTools = withToolsMetrics(chainlinkCCIPTools);
 const instrumentedBaseSignalTools = withToolsMetrics(baseSignalTools);
 const instrumentedBaseIndexerTools = withToolsMetrics(baseIndexerTools);
 const instrumentedUniswapDataTools = withToolsMetrics(uniswapDataTools);
@@ -1063,6 +1069,10 @@ When the user asks for analysis, scanning, planning, backtesting, or execution �
 - Polkadot: DOT/KSM balance checks across 12+ chains -> Monitor (when POLKADOT_PRIVATE_KEY is set)
 - Polkadot: native transfers, XCM cross-chain transfers, nomination pool staking, Hydration DEX swaps, Bifrost vDOT liquid staking, identity registration -> Executor (when POLKADOT_PRIVATE_KEY is set)
 - Polkadot: nomination pool info, chain initialization -> Analyst (when POLKADOT_PRIVATE_KEY is set)
+- Chainlink Data Streams: real-time institutional prices (BTC, ETH, SOL, LINK, etc.), bulk price queries, historical prices -> Analyst and Scanner (when CHAINLINK_API_KEY is set)
+- Chainlink Data Feeds: free on-chain price oracles on Ethereum, Arbitrum, Base, Polygon, price comparison/verification -> Analyst
+- Chainlink CCIP: cross-chain EVM token transfers (USDC, LINK, WETH across Ethereum, Arbitrum, Base, Optimism, Polygon, Avalanche, BNB), fee estimation -> Executor for transfers, Analyst for fees/info (when EVM_PRIVATE_KEY is set)
+- Chainlink CCIP transfer status tracking -> Monitor
 - Educational explanations -> Teacher
 - Position lifecycle tracking (setup → analysis → plan → execute → monitor → review) -> tracked automatically across agents
 - Risk pre-checks on all orders -> Planner and Executor (automatic)
@@ -1189,6 +1199,9 @@ function getScannerAgent(): Agent {
         // Solana Agent Kit discovery tools (token data, rugcheck)
         solana_get_token_data: instrumentedSolanaKitWalletTools.solana_get_token_data,
         solana_rugcheck: instrumentedSolanaKitWalletTools.solana_rugcheck,
+        // Chainlink Data Streams bulk tools (multi-pair price scanning)
+        chainlink_bulk_prices: instrumentedChainlinkStreamsTools.chainlink_bulk_prices,
+        chainlink_list_feeds: instrumentedChainlinkStreamsTools.chainlink_list_feeds,
         // Skill tools (dynamic MCP plugins routed to this agent)
         ...getRoutingToolsForAgent("Scanner"),
       },
@@ -1306,6 +1319,15 @@ function getAnalystAgent(): Agent {
         solana_debridge_status: instrumentedSolanaKitDefiBridgeTools.solana_debridge_status,
         solana_okx_quote: instrumentedSolanaKitDefiBridgeTools.solana_okx_quote,
         solana_okx_tokens: instrumentedSolanaKitDefiBridgeTools.solana_okx_tokens,
+        // Chainlink Data Streams (real-time institutional prices)
+        chainlink_get_price: instrumentedChainlinkStreamsTools.chainlink_get_price,
+        chainlink_get_price_at: instrumentedChainlinkStreamsTools.chainlink_get_price_at,
+        // Chainlink Data Feeds (on-chain price oracles, free)
+        chainlink_read_feed: instrumentedChainlinkFeedsTools.chainlink_read_feed,
+        chainlink_compare_prices: instrumentedChainlinkFeedsTools.chainlink_compare_prices,
+        // Chainlink CCIP read-only tools (chain info, fee estimation)
+        chainlink_ccip_supported_chains: instrumentedChainlinkCCIPTools.chainlink_ccip_supported_chains,
+        chainlink_ccip_get_fee: instrumentedChainlinkCCIPTools.chainlink_ccip_get_fee,
         // Skill tools (dynamic MCP plugins routed to this agent)
         ...getRoutingToolsForAgent("Analyst"),
       },
@@ -1513,6 +1535,8 @@ function getExecutorAgent(): Agent {
         solana_debridge_create_order: instrumentedSolanaKitDefiBridgeTools.solana_debridge_create_order,
         solana_debridge_execute: instrumentedSolanaKitDefiBridgeTools.solana_debridge_execute,
         solana_okx_swap: instrumentedSolanaKitDefiBridgeTools.solana_okx_swap,
+        // Chainlink CCIP cross-chain transfers (state-changing, requires ARMED)
+        chainlink_ccip_transfer: instrumentedChainlinkCCIPTools.chainlink_ccip_transfer,
         // Skill tools (dynamic MCP plugins routed to this agent)
         ...getRoutingToolsForAgent("Executor"),
       },
@@ -1600,6 +1624,8 @@ function getMonitorAgent(): Agent {
         solana_orca_fetch_positions: instrumentedSolanaKitDefiPoolsTools.solana_orca_fetch_positions,
         solana_sanctum_owned_lst: instrumentedSolanaKitDefiLendingTools.solana_sanctum_owned_lst,
         solana_voltr_positions: instrumentedSolanaKitDefiLendingTools.solana_voltr_positions,
+        // Chainlink CCIP transfer status tracking
+        chainlink_ccip_status: instrumentedChainlinkCCIPTools.chainlink_ccip_status,
         // Skill tools (dynamic MCP plugins routed to this agent)
         ...getRoutingToolsForAgent("Monitor"),
       },
