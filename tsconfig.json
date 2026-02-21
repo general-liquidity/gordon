@@ -24,7 +24,10 @@
     // Some stricter flags (disabled by default)
     "noUnusedLocals": false,
     "noUnusedParameters": false,
-    "noPropertyAccessFromIndexSignature": false
+    "noPropertyAccessFromIndexSignature": false,
+
+    // Custom typeRoots: local overrides shadow broken @types stubs (e.g., @types/bs58)
+    "typeRoots": ["./src/typeroots", "./node_modules/@types"]
   },
   "include": ["src/**/*.ts", "src/**/*.tsx", "scripts/**/*.ts"],
   "exclude": ["dist", "node_modules", "supabase"]

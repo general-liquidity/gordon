@@ -19,7 +19,6 @@ import { SolanaAgentKit, KeypairWallet } from "solana-agent-kit";
 import TokenPlugin from "@solana-agent-kit/plugin-token";
 import DefiPlugin from "@solana-agent-kit/plugin-defi";
 import { Keypair } from "@solana/web3.js";
-// @ts-ignore — bs58 has no type declarations
 import bs58 from "bs58";
 
 import { SOLANA_ENV_KEYS } from "./types.ts";
