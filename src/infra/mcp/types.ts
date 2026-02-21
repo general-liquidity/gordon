@@ -14,6 +14,8 @@ export type MCPCategory =
   | 'data-provider'    // Historical data, market data feeds
   | 'analytics'        // Technical analysis, trading signals
   | 'execution'        // Additional exchanges, DEX integrations
+  | 'exchange'         // Exchange integrations (Bitget, etc.)
+  | 'infrastructure'   // RPC providers, node services
   | 'portfolio'        // Portfolio tracking, tax reporting
   | 'research'         // News aggregation, social sentiment, on-chain analysis
   | 'utility';         // Alerts, notifications, general utilities

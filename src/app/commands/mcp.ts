@@ -55,6 +55,13 @@ const PLUGIN_SHOWCASE: ShowcaseCategory[] = [
     ],
   },
   {
+    title: 'For Solana',
+    description: 'Trade, swap, and manage assets on Solana',
+    plugins: [
+      { id: 'solana-agent-kit', summary: 'Jupiter swaps, transfers, NFTs, token deploy' },
+    ],
+  },
+  {
     title: 'For Sentiment',
     description: 'Social metrics and market sentiment',
     plugins: [
@@ -88,6 +95,7 @@ const PLUGIN_SUGGESTIONS: PluginSuggestion[] = [
   { keywords: ['tradingview', 'signal', 'webhook'], pluginId: 'tradingview-signals', reason: 'integrates TradingView alerts' },
   { keywords: ['historical', 'history', 'ohlc', 'altcoin', 'market cap'], pluginId: 'coingecko', reason: 'provides historical price data for thousands of coins' },
   { keywords: ['portfolio', 'pnl', 'profit', 'loss', 'tax'], pluginId: 'portfolio-tracker', reason: 'tracks portfolio and generates tax reports' },
+  { keywords: ['solana', 'sol', 'jupiter', 'raydium', 'spl', 'phantom'], pluginId: 'solana-agent-kit', reason: 'provides Solana trading, swaps, transfers, and NFT minting via Jupiter' },
 ];
 
 // ============================================================================
@@ -588,6 +596,8 @@ function getIntegrationCommands(category: MCPCategory): string[] {
     'data-provider': ['/scan', '/analyze', '/compare', '/history'],
     'analytics': ['/scan', '/analyze', '/signals'],
     'execution': ['/trade', '/order', '/position'],
+    'exchange': ['/trade', '/order', '/balance'],
+    'infrastructure': ['/scan', '/analyze'],
     'portfolio': ['/portfolio', '/pnl', '/balance'],
     'research': ['/analyze', '/research', '/sentiment'],
     'utility': ['/alert', '/notify'],

@@ -458,6 +458,8 @@ export class MCPServerRegistry {
       'data-provider': 0,
       'analytics': 0,
       'execution': 0,
+      'exchange': 0,
+      'infrastructure': 0,
       'portfolio': 0,
       'research': 0,
       'utility': 0,

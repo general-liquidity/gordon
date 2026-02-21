@@ -43,6 +43,8 @@ export interface MarketplaceListing {
   lastUpdated: string;
   /** Pricing information */
   pricing: PluginPricing;
+  /** Optional routing manifest for agent routing (auto-written as routing.json on install) */
+  routingManifest?: import('../../routing/types').RoutingManifest;
 }
 
 // ============================================================================

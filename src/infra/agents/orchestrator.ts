@@ -12,7 +12,7 @@ import { RequestContext } from "@mastra/core/request-context";
 import { z } from "zod";
 
 import { gordonAgent } from "./agents.ts";
-import { getDynamicToolAgentMap } from "../skills/manager.ts";
+import { getDynamicToolAgentMap } from "../routing/manager.ts";
 import { createModuleLogger } from "../logger/index.ts";
 import { emitEvent } from "../../events/index.ts";
 import { checkInputGuardrails, checkOutputGuardrails, checkToolAccess } from "./middleware/index.ts";

@@ -1,9 +1,9 @@
 /**
- * Gordon Skills Infrastructure — Type Definitions
+ * Gordon Tool Routing Infrastructure — Type Definitions
  *
- * A "skill" is an MCP plugin plus agent routing metadata.
- * The skill.json file lives alongside the existing manifest.json
- * in ~/.gordon/plugins/<pluginId>/skill.json.
+ * A "routing config" is an MCP plugin plus agent routing metadata.
+ * The routing.json file lives alongside the existing manifest.json
+ * in ~/.gordon/plugins/<pluginId>/routing.json.
  */
 
 /**
@@ -21,7 +21,7 @@ export type AgentAffinity =
 
 /**
  * Per-tool agent affinity override.
- * Allows a single skill to distribute tools across multiple agents.
+ * Allows a single routing config to distribute tools across multiple agents.
  */
 export interface ToolAgentMapping {
   /** Tool name as it appears in MCPServerManifest.tools (bare, not namespaced) */
@@ -31,32 +31,32 @@ export interface ToolAgentMapping {
 }
 
 /**
- * Skill manifest — agent routing metadata for an MCP plugin.
+ * Routing manifest — agent routing metadata for an MCP plugin.
  *
- * Stored at ~/.gordon/plugins/<pluginId>/skill.json.
+ * Stored at ~/.gordon/plugins/<pluginId>/routing.json.
  * If absent, the system falls back to defaultAgent: "Gordon" + alsoOnGordon: true
  * for backwards compatibility with plain MCP plugins.
  */
-export interface SkillManifest {
+export interface RoutingManifest {
   /** Must match the MCPServerManifest.id */
   pluginId: string;
-  /** Default agent for all tools in this skill (if no per-tool overrides) */
+  /** Default agent for all tools in this routing config (if no per-tool overrides) */
   defaultAgent: AgentAffinity;
   /** Per-tool agent overrides. Takes precedence over defaultAgent. */
   toolAgentMap?: ToolAgentMapping[];
   /** Whether to also keep tools on Gordon (routing agent). Default: false. */
   alsoOnGordon?: boolean;
-  /** Forward-compatible hints for future ToolSearchProcessor discovery. */
+  /** Forward-compatible hints for future discovery. */
   searchHints?: string[];
 }
 
 /**
- * Resolved skill = MCP plugin + skill routing metadata.
- * This is what the SkillManager works with internally.
+ * Resolved routing = MCP plugin + routing metadata.
+ * This is what the routing manager works with internally.
  */
-export interface ResolvedSkill {
+export interface ResolvedRouting {
   pluginId: string;
-  skillManifest: SkillManifest;
+  routingManifest: RoutingManifest;
   enabled: boolean;
   toolCount: number;
 }

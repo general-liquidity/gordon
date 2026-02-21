@@ -125,6 +125,14 @@ export class PluginInstaller {
       JSON.stringify(listing.manifest, null, 2)
     );
 
+    // Write routing.json if the listing includes agent routing metadata
+    if (listing.routingManifest) {
+      await fs.writeFile(
+        path.join(pluginDir, 'routing.json'),
+        JSON.stringify(listing.routingManifest, null, 2)
+      );
+    }
+
     // Add to installed map
     this.installedPlugins.set(listing.id, installed);
 

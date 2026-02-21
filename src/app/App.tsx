@@ -15,7 +15,7 @@ import { ShortcutsOverlay, ShortcutsHint, useShortcutsHint } from "./components/
 import { ThemeProvider, useTheme } from "./components/ThemeProvider.tsx";
 import { processMessageStream, initializeTracing } from "../infra/agents/orchestrator.ts";
 import { initMCPTools, enableMCPHotReload } from "../infra/mcp/client.ts";
-import { initSkills } from "../infra/skills/manager.ts";
+import { initRouting } from "../infra/routing/manager.ts";
 import { createLLMClientFromEnv, type LLMClient } from "../infra/llm/index.ts";
 import { BinanceClient } from "../infra/binance/index.ts";
 import { BinanceAdapter, ExchangeFactory, type Exchange } from "../infra/exchange/index.ts";
@@ -68,7 +68,7 @@ import {
   handleStrategyCommand,
   handleGenCommand,
   handleMCPCommand,
-  handleSkillCommand,
+  handleRoutingCommand,
   handleWorkflowCommand,
   formatWorkflowResult,
   handleExportCommand,
@@ -429,11 +429,11 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
           );
         }
 
-        // Initialize MCP plugin tools + skill routing (non-blocking)
+        // Initialize MCP plugin tools + tool routing (non-blocking)
         initMCPTools()
-          .then(() => initSkills())
+          .then(() => initRouting())
           .catch((err) =>
-            console.error("[Skills] Init failed:", (err as Error).message),
+            console.error("[Routing] Init failed:", (err as Error).message),
           );
         enableMCPHotReload(5000);
       } catch (error) {
@@ -1495,10 +1495,10 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
             }));
             return;
           }
-          case "handle_skill_command": {
+          case "handle_routing_command": {
             setState((prev) => ({ ...prev, messages: [...prev.messages, userMessage], isLoading: true }));
-            const skillArgs = args.trim().length > 0 ? args.trim().split(/\s+/) : [];
-            const result = await handleSkillCommand(skillArgs);
+            const routingArgs = args.trim().length > 0 ? args.trim().split(/\s+/) : [];
+            const result = await handleRoutingCommand(routingArgs);
             setState((prev) => ({
               ...prev,
               messages: [

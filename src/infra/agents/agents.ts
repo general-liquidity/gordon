@@ -82,7 +82,7 @@ import {
 import { getSessionSummary, getMemoryStats, resetSharedMemory } from "./shared-context.ts";
 import { evalTools } from "../evals/index.ts";
 import { getMCPTools } from "../mcp/client.ts";
-import { getSkillToolsForAgent } from "../skills/manager.ts";
+import { getRoutingToolsForAgent } from "../routing/manager.ts";
 import {
   generatePerformanceContext,
   formatPerformanceContextForPrompt,
@@ -1030,11 +1030,14 @@ When the user asks for analysis, scanning, planning, backtesting, or execution �
 - Raw market data (candles, prices, tickers, orderbook) -> Scanner or Analyst
 - Charts and visualization -> Analyst
 - Whale detection and orderbook analysis -> Analyst
+- Solana: token prices, asset metadata -> Analyst (when solana-agent-kit plugin is installed)
 - Cross-pair correlation, spread analysis, relative strength -> Scanner or Analyst
 - Trade plans with risk sizing -> Planner
 - Strategy generation and backtesting -> Planner and Backtester
 - Order execution, simple swaps/conversions, market orders, limit orders, cancel orders, open orders -> Executor (requires ARMED mode)
+- Solana: Jupiter swaps, SOL/SPL transfers, token deploy, NFT minting -> Executor (when solana-agent-kit plugin is installed)
 - Portfolio, positions, earn, wallet, fund transfers, withdrawals -> Monitor
+- Solana: wallet balances, network TPS -> Monitor (when solana-agent-kit plugin is installed)
 - Educational explanations -> Teacher
 - Position lifecycle tracking (setup → analysis → plan → execute → monitor → review) -> tracked automatically across agents
 - Risk pre-checks on all orders -> Planner and Executor (automatic)
@@ -1159,7 +1162,7 @@ function getScannerAgent(): Agent {
         // Regime detection tools (v0.7)
         ...instrumentedRegimeTools,
         // Skill tools (dynamic MCP plugins routed to this agent)
-        ...getSkillToolsForAgent("Scanner"),
+        ...getRoutingToolsForAgent("Scanner"),
       },
       memory: createSubAgentMemory(),
       inputProcessors: [gordonInputGuard, new TokenLimiterProcessor({ limit: 32000 })],
@@ -1250,7 +1253,7 @@ function getAnalystAgent(): Agent {
         // Protocol tools (v0.7)
         ...instrumentedProtocolTools,
         // Skill tools (dynamic MCP plugins routed to this agent)
-        ...getSkillToolsForAgent("Analyst"),
+        ...getRoutingToolsForAgent("Analyst"),
       },
       memory: createSubAgentMemory(),
       inputProcessors: [gordonInputGuard, new TokenLimiterProcessor({ limit: 32000 })],
@@ -1318,7 +1321,7 @@ function getPlannerAgent(): Agent {
         simulate_order_bundle: instrumentedAdvancedTools.simulate_order_bundle,
         generate_circuit_breaker_proof: instrumentedAdvancedTools.generate_circuit_breaker_proof,
         // Skill tools (dynamic MCP plugins routed to this agent)
-        ...getSkillToolsForAgent("Planner"),
+        ...getRoutingToolsForAgent("Planner"),
       },
       memory: createSubAgentMemory(),
       inputProcessors: [gordonInputGuard, new TokenLimiterProcessor({ limit: 32000 })],
@@ -1394,7 +1397,7 @@ function getExecutorAgent(): Agent {
         simulate_order_bundle: instrumentedAdvancedTools.simulate_order_bundle,
         verify_circuit_breaker_proof: instrumentedAdvancedTools.verify_circuit_breaker_proof,
         // Skill tools (dynamic MCP plugins routed to this agent)
-        ...getSkillToolsForAgent("Executor"),
+        ...getRoutingToolsForAgent("Executor"),
       },
       memory: createSubAgentMemory(),
       inputProcessors: [gordonInputGuard, new TokenLimiterProcessor({ limit: 32000 })],
@@ -1466,7 +1469,7 @@ function getMonitorAgent(): Agent {
         generate_circuit_breaker_proof: instrumentedAdvancedTools.generate_circuit_breaker_proof,
         query_regime_scoped_memory: instrumentedAdvancedTools.query_regime_scoped_memory,
         // Skill tools (dynamic MCP plugins routed to this agent)
-        ...getSkillToolsForAgent("Monitor"),
+        ...getRoutingToolsForAgent("Monitor"),
       },
       memory: createSubAgentMemory(),
       inputProcessors: [gordonInputGuard, new TokenLimiterProcessor({ limit: 32000 })],
@@ -1508,7 +1511,7 @@ function getTeacherAgent(): Agent {
         query_audit_trail: instrumentedAuditTools.query_audit_trail,
         get_decision_path: instrumentedAuditTools.get_decision_path,
         // Skill tools (dynamic MCP plugins routed to this agent)
-        ...getSkillToolsForAgent("Teacher"),
+        ...getRoutingToolsForAgent("Teacher"),
       },
       memory: createSubAgentMemory(),
       inputProcessors: [gordonInputGuard, new TokenLimiterProcessor({ limit: 32000 })],
@@ -1563,7 +1566,7 @@ function getBacktesterAgent(): Agent {
         // Playbook backtest tools (v0.7) — run/compare/rank playbook backtests
         ...instrumentedPlaybookBacktestTools,
         // Skill tools (dynamic MCP plugins routed to this agent)
-        ...getSkillToolsForAgent("Backtester"),
+        ...getRoutingToolsForAgent("Backtester"),
       },
       memory: createSubAgentMemory(),
       inputProcessors: [gordonInputGuard, new TokenLimiterProcessor({ limit: 32000 })],
@@ -1609,7 +1612,7 @@ function getGordonAgent(): Agent {
         ...instrumentedSchedulerTools,    // task scheduling (cross-cutting concern)
         ...instrumentedAutonomousTools,   // autonomous swing trading control
         ...getMCPTools(),                 // MCP plugin tools (if any installed/enabled)
-        ...getSkillToolsForAgent("Gordon"), // Skill tools routed to Gordon
+        ...getRoutingToolsForAgent("Gordon"), // Skill tools routed to Gordon
       },
 
       // Memory for network orchestration

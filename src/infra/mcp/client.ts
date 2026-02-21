@@ -32,7 +32,7 @@ import type { Tool } from "@mastra/core/tools";
 import type { MastraMCPServerDefinition } from "@mastra/mcp";
 
 import { pluginInstaller } from "./marketplace/installer.ts";
-import { reloadSkills, isSkillsInitialized } from "../skills/manager.ts";
+import { reloadRouting, isRoutingInitialized } from "../routing/manager.ts";
 import { credentialManager } from "./credentials.ts";
 import type { MCPServerManifest } from "./types.ts";
 
@@ -263,8 +263,8 @@ export function enableMCPHotReload(intervalMs: number = 5000): void {
 
       if (_lastPluginFingerprint !== null && fingerprint !== _lastPluginFingerprint) {
         console.log("[MCP] Plugin change detected, hot-reloading...");
-        if (isSkillsInitialized()) {
-          await reloadSkills();   // reloads MCP tools + rebuilds routing + resets agents
+        if (isRoutingInitialized()) {
+          await reloadRouting();   // reloads MCP tools + rebuilds routing + resets agents
         } else {
           await reloadMCPTools(); // fallback if skills not yet initialized
         }

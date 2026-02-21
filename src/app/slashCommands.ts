@@ -648,14 +648,14 @@ export const SLASH_COMMANDS: SlashCommand[] = [
     target: "handle_mcp_command",
   },
   {
-    name: "skill",
-    aliases: ["skills"],
-    description: "Manage skills (plugins with agent routing)",
-    usage: "/skill <list|search|install|uninstall|route|configure|enable|disable|info|help>",
+    name: "routing",
+    aliases: ["route", "routes"],
+    description: "Manage MCP tool-to-agent routing",
+    usage: "/routing <list|search|install|uninstall|route|configure|enable|disable|info|help>",
     category: "system",
     level: 2,
     action: "tool",
-    target: "handle_skill_command",
+    target: "handle_routing_command",
   },
   {
     name: "workflow",
@@ -1499,36 +1499,35 @@ export function commandToPrompt(command: SlashCommand, args: string): string {
         default:
           return "Show my installed MCP plugins";
       }
-    // Skill command
-    case "skill":
-    case "skills": {
-      if (!args) return "List my installed skills with routing info";
-      const skillParts = args.split(/\s+/);
-      const skillSub = skillParts[0]?.toLowerCase();
-      const skillRest = skillParts.slice(1).join(" ");
-      switch (skillSub) {
+    // Routing command
+    case "routing": {
+      if (!args) return "List my installed plugins with routing info";
+      const routingParts = args.split(/\s+/);
+      const routingSub = routingParts[0]?.toLowerCase();
+      const routingRest = routingParts.slice(1).join(" ");
+      switch (routingSub) {
         case "list": case "ls":
-          return "List my installed skills with routing info";
+          return "List my installed plugins with routing info";
         case "search": case "find":
-          return skillRest ? `Search for skills matching "${skillRest}"` : "Show the skills marketplace";
+          return routingRest ? `Search for plugins matching "${routingRest}"` : "Show the plugin marketplace";
         case "install": case "add":
-          return skillRest ? `Install the skill "${skillRest}"` : "Show available skills";
+          return routingRest ? `Install the plugin "${routingRest}"` : "Show available plugins";
         case "uninstall": case "remove": case "rm":
-          return skillRest ? `Uninstall the skill "${skillRest}"` : "Which skill to uninstall?";
+          return routingRest ? `Uninstall the plugin "${routingRest}"` : "Which plugin to uninstall?";
         case "route": case "assign":
-          return `Route skill tools: ${skillRest}`;
+          return `Route plugin tools: ${routingRest}`;
         case "configure": case "config":
-          return skillRest ? `Configure credentials for skill "${skillRest}"` : "Which skill to configure?";
+          return routingRest ? `Configure credentials for plugin "${routingRest}"` : "Which plugin to configure?";
         case "enable":
-          return skillRest ? `Enable the skill "${skillRest}"` : "Which skill to enable?";
+          return routingRest ? `Enable the plugin "${routingRest}"` : "Which plugin to enable?";
         case "disable":
-          return skillRest ? `Disable the skill "${skillRest}"` : "Which skill to disable?";
+          return routingRest ? `Disable the plugin "${routingRest}"` : "Which plugin to disable?";
         case "info":
-          return skillRest ? `Show info for skill "${skillRest}"` : "Which skill?";
+          return routingRest ? `Show info for plugin "${routingRest}"` : "Which plugin?";
         case "help":
-          return "Show help for skill management commands";
+          return "Show help for routing management commands";
         default:
-          return "List my installed skills with routing info";
+          return "List my installed plugins with routing info";
       }
     }
     // Workflow command
