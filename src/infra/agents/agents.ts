@@ -62,6 +62,15 @@ import {
   baseOnchainTools,
   agentKitOnchainTools,
   agentKitDefiTools,
+  polkadotKitAssetTools,
+  polkadotKitStakingTools,
+  polkadotKitDefiTools,
+  solanaKitWalletTools,
+  solanaKitTradingTools,
+  solanaKitDefiPerpsTools,
+  solanaKitDefiLendingTools,
+  solanaKitDefiPoolsTools,
+  solanaKitDefiBridgeTools,
   baseSignalTools,
   baseIndexerTools,
   uniswapDataTools,
@@ -308,6 +317,15 @@ const instrumentedAutonomousTools = withToolsMetrics(autonomousTools);
 const instrumentedBaseOnchainTools = withToolsMetrics(baseOnchainTools);
 const instrumentedAgentKitOnchainTools = withToolsMetrics(agentKitOnchainTools);
 const instrumentedAgentKitDefiTools = withToolsMetrics(agentKitDefiTools);
+const instrumentedPolkadotKitAssetTools = withToolsMetrics(polkadotKitAssetTools);
+const instrumentedPolkadotKitStakingTools = withToolsMetrics(polkadotKitStakingTools);
+const instrumentedPolkadotKitDefiTools = withToolsMetrics(polkadotKitDefiTools);
+const instrumentedSolanaKitWalletTools = withToolsMetrics(solanaKitWalletTools);
+const instrumentedSolanaKitTradingTools = withToolsMetrics(solanaKitTradingTools);
+const instrumentedSolanaKitDefiPerpsTools = withToolsMetrics(solanaKitDefiPerpsTools);
+const instrumentedSolanaKitDefiLendingTools = withToolsMetrics(solanaKitDefiLendingTools);
+const instrumentedSolanaKitDefiPoolsTools = withToolsMetrics(solanaKitDefiPoolsTools);
+const instrumentedSolanaKitDefiBridgeTools = withToolsMetrics(solanaKitDefiBridgeTools);
 const instrumentedBaseSignalTools = withToolsMetrics(baseSignalTools);
 const instrumentedBaseIndexerTools = withToolsMetrics(baseIndexerTools);
 const instrumentedUniswapDataTools = withToolsMetrics(uniswapDataTools);
@@ -1030,14 +1048,21 @@ When the user asks for analysis, scanning, planning, backtesting, or execution �
 - Raw market data (candles, prices, tickers, orderbook) -> Scanner or Analyst
 - Charts and visualization -> Analyst
 - Whale detection and orderbook analysis -> Analyst
-- Solana: token prices, asset metadata -> Analyst (when solana-agent-kit plugin is installed)
+- Solana: token prices (Jupiter + Pyth), token metadata, rugcheck -> Analyst (when SOLANA_PRIVATE_KEY is set)
+- Solana: token data discovery, rugcheck scanning -> Scanner (when SOLANA_PRIVATE_KEY is set)
 - Cross-pair correlation, spread analysis, relative strength -> Scanner or Analyst
 - Trade plans with risk sizing -> Planner
 - Strategy generation and backtesting -> Planner and Backtester
 - Order execution, simple swaps/conversions, market orders, limit orders, cancel orders, open orders -> Executor (requires ARMED mode)
-- Solana: Jupiter swaps, SOL/SPL transfers, token deploy, NFT minting -> Executor (when solana-agent-kit plugin is installed)
+- Solana: Jupiter DEX swaps, SOL/SPL transfers, limit orders, jupSOL staking, PumpFun launches, faucet -> Executor (when SOLANA_PRIVATE_KEY is set, requires ARMED mode)
+- Solana DeFi: perpetual trading (Adrena, Flash, Drift), lending/staking (Lulo, Drift insurance, Sanctum LST, Solayer, Voltr vaults), LP management (Orca Whirlpool, Raydium, Meteora DLMM, Manifest orderbook), cross-chain bridges (deBridge, OKX DEX aggregator) -> Executor (when SOLANA_PRIVATE_KEY is set, requires ARMED mode)
+- Solana DeFi data: Drift markets/funding/APY, Sanctum LST prices/APY/TVL, Orca LP positions, Voltr positions, deBridge chains/tokens, OKX quotes -> Analyst (when SOLANA_PRIVATE_KEY is set)
 - Portfolio, positions, earn, wallet, fund transfers, withdrawals -> Monitor
-- Solana: wallet balances, network TPS -> Monitor (when solana-agent-kit plugin is installed)
+- Solana: wallet address, SOL/token balances, network TPS, open limit orders, order history -> Monitor (when SOLANA_PRIVATE_KEY is set)
+- Solana DeFi positions: Drift account status, Orca LP positions, Sanctum owned LSTs, Voltr vault positions -> Monitor (when SOLANA_PRIVATE_KEY is set)
+- Polkadot: DOT/KSM balance checks across 12+ chains -> Monitor (when POLKADOT_PRIVATE_KEY is set)
+- Polkadot: native transfers, XCM cross-chain transfers, nomination pool staking, Hydration DEX swaps, Bifrost vDOT liquid staking, identity registration -> Executor (when POLKADOT_PRIVATE_KEY is set)
+- Polkadot: nomination pool info, chain initialization -> Analyst (when POLKADOT_PRIVATE_KEY is set)
 - Educational explanations -> Teacher
 - Position lifecycle tracking (setup → analysis → plan → execute → monitor → review) -> tracked automatically across agents
 - Risk pre-checks on all orders -> Planner and Executor (automatic)
@@ -1161,6 +1186,9 @@ function getScannerAgent(): Agent {
         ...instrumentedPlaybookTools,
         // Regime detection tools (v0.7)
         ...instrumentedRegimeTools,
+        // Solana Agent Kit discovery tools (token data, rugcheck)
+        solana_get_token_data: instrumentedSolanaKitWalletTools.solana_get_token_data,
+        solana_rugcheck: instrumentedSolanaKitWalletTools.solana_rugcheck,
         // Skill tools (dynamic MCP plugins routed to this agent)
         ...getRoutingToolsForAgent("Scanner"),
       },
@@ -1252,6 +1280,32 @@ function getAnalystAgent(): Agent {
         get_regime_history: instrumentedRegimeTools.get_regime_history,
         // Protocol tools (v0.7)
         ...instrumentedProtocolTools,
+        // Polkadot Agent Kit analysis tools (pool info, chain init)
+        polkadot_get_pool_info: instrumentedPolkadotKitStakingTools.polkadot_get_pool_info,
+        polkadot_initialize_chain: instrumentedPolkadotKitDefiTools.polkadot_initialize_chain,
+        // Solana Agent Kit price & data tools (Jupiter prices, Pyth oracle)
+        solana_fetch_price: instrumentedSolanaKitWalletTools.solana_fetch_price,
+        solana_pyth_price: instrumentedSolanaKitWalletTools.solana_pyth_price,
+        solana_get_token_data: instrumentedSolanaKitWalletTools.solana_get_token_data,
+        solana_rugcheck: instrumentedSolanaKitWalletTools.solana_rugcheck,
+        // Solana Agent Kit DeFi read-only tools (Drift info, Sanctum data, positions)
+        solana_drift_has_account: instrumentedSolanaKitDefiPerpsTools.solana_drift_has_account,
+        solana_drift_account_info: instrumentedSolanaKitDefiPerpsTools.solana_drift_account_info,
+        solana_drift_markets: instrumentedSolanaKitDefiPerpsTools.solana_drift_markets,
+        solana_drift_funding_rate: instrumentedSolanaKitDefiPerpsTools.solana_drift_funding_rate,
+        solana_drift_perp_quote: instrumentedSolanaKitDefiPerpsTools.solana_drift_perp_quote,
+        solana_drift_lend_apy: instrumentedSolanaKitDefiLendingTools.solana_drift_lend_apy,
+        solana_sanctum_lst_price: instrumentedSolanaKitDefiLendingTools.solana_sanctum_lst_price,
+        solana_sanctum_apy: instrumentedSolanaKitDefiLendingTools.solana_sanctum_apy,
+        solana_sanctum_tvl: instrumentedSolanaKitDefiLendingTools.solana_sanctum_tvl,
+        solana_voltr_positions: instrumentedSolanaKitDefiLendingTools.solana_voltr_positions,
+        solana_drift_vault_info: instrumentedSolanaKitDefiLendingTools.solana_drift_vault_info,
+        solana_orca_fetch_positions: instrumentedSolanaKitDefiPoolsTools.solana_orca_fetch_positions,
+        solana_debridge_chains: instrumentedSolanaKitDefiBridgeTools.solana_debridge_chains,
+        solana_debridge_tokens: instrumentedSolanaKitDefiBridgeTools.solana_debridge_tokens,
+        solana_debridge_status: instrumentedSolanaKitDefiBridgeTools.solana_debridge_status,
+        solana_okx_quote: instrumentedSolanaKitDefiBridgeTools.solana_okx_quote,
+        solana_okx_tokens: instrumentedSolanaKitDefiBridgeTools.solana_okx_tokens,
         // Skill tools (dynamic MCP plugins routed to this agent)
         ...getRoutingToolsForAgent("Analyst"),
       },
@@ -1396,6 +1450,69 @@ function getExecutorAgent(): Agent {
         // Advanced tools (v1)
         simulate_order_bundle: instrumentedAdvancedTools.simulate_order_bundle,
         verify_circuit_breaker_proof: instrumentedAdvancedTools.verify_circuit_breaker_proof,
+        // Polkadot Agent Kit execution tools (transfers, staking, swaps, liquid staking)
+        polkadot_transfer_native: instrumentedPolkadotKitAssetTools.polkadot_transfer_native,
+        polkadot_xcm_transfer: instrumentedPolkadotKitAssetTools.polkadot_xcm_transfer,
+        polkadot_join_pool: instrumentedPolkadotKitStakingTools.polkadot_join_pool,
+        polkadot_bond_extra: instrumentedPolkadotKitStakingTools.polkadot_bond_extra,
+        polkadot_unbond: instrumentedPolkadotKitStakingTools.polkadot_unbond,
+        polkadot_withdraw_unbonded: instrumentedPolkadotKitStakingTools.polkadot_withdraw_unbonded,
+        polkadot_claim_rewards: instrumentedPolkadotKitStakingTools.polkadot_claim_rewards,
+        polkadot_swap_tokens: instrumentedPolkadotKitDefiTools.polkadot_swap_tokens,
+        polkadot_mint_vdot: instrumentedPolkadotKitDefiTools.polkadot_mint_vdot,
+        polkadot_register_identity: instrumentedPolkadotKitDefiTools.polkadot_register_identity,
+        // Solana Agent Kit execution tools (Jupiter swaps, transfers, limit orders, staking, PumpFun)
+        solana_trade: instrumentedSolanaKitTradingTools.solana_trade,
+        solana_transfer: instrumentedSolanaKitTradingTools.solana_transfer,
+        solana_create_limit_order: instrumentedSolanaKitTradingTools.solana_create_limit_order,
+        solana_cancel_limit_orders: instrumentedSolanaKitTradingTools.solana_cancel_limit_orders,
+        solana_stake_jup: instrumentedSolanaKitTradingTools.solana_stake_jup,
+        solana_request_faucet: instrumentedSolanaKitTradingTools.solana_request_faucet,
+        solana_launch_pumpfun: instrumentedSolanaKitTradingTools.solana_launch_pumpfun,
+        // Solana Agent Kit DeFi execution tools (perps, lending, pools, bridges)
+        // -- Perpetuals (Adrena, Flash, Drift)
+        solana_adrena_open_long: instrumentedSolanaKitDefiPerpsTools.solana_adrena_open_long,
+        solana_adrena_open_short: instrumentedSolanaKitDefiPerpsTools.solana_adrena_open_short,
+        solana_adrena_close_long: instrumentedSolanaKitDefiPerpsTools.solana_adrena_close_long,
+        solana_adrena_close_short: instrumentedSolanaKitDefiPerpsTools.solana_adrena_close_short,
+        solana_flash_open_trade: instrumentedSolanaKitDefiPerpsTools.solana_flash_open_trade,
+        solana_flash_close_trade: instrumentedSolanaKitDefiPerpsTools.solana_flash_close_trade,
+        solana_drift_open_perp: instrumentedSolanaKitDefiPerpsTools.solana_drift_open_perp,
+        solana_drift_create_account: instrumentedSolanaKitDefiPerpsTools.solana_drift_create_account,
+        solana_drift_deposit: instrumentedSolanaKitDefiPerpsTools.solana_drift_deposit,
+        solana_drift_withdraw: instrumentedSolanaKitDefiPerpsTools.solana_drift_withdraw,
+        solana_drift_spot_swap: instrumentedSolanaKitDefiPerpsTools.solana_drift_spot_swap,
+        // -- Lending & Staking (Lulo, Drift, Sanctum, Solayer, Voltr)
+        solana_lulo_lend: instrumentedSolanaKitDefiLendingTools.solana_lulo_lend,
+        solana_lulo_withdraw: instrumentedSolanaKitDefiLendingTools.solana_lulo_withdraw,
+        solana_drift_insurance_stake: instrumentedSolanaKitDefiLendingTools.solana_drift_insurance_stake,
+        solana_drift_insurance_request_unstake: instrumentedSolanaKitDefiLendingTools.solana_drift_insurance_request_unstake,
+        solana_drift_insurance_unstake: instrumentedSolanaKitDefiLendingTools.solana_drift_insurance_unstake,
+        solana_sanctum_swap_lst: instrumentedSolanaKitDefiLendingTools.solana_sanctum_swap_lst,
+        solana_sanctum_add_liquidity: instrumentedSolanaKitDefiLendingTools.solana_sanctum_add_liquidity,
+        solana_sanctum_remove_liquidity: instrumentedSolanaKitDefiLendingTools.solana_sanctum_remove_liquidity,
+        solana_solayer_stake: instrumentedSolanaKitDefiLendingTools.solana_solayer_stake,
+        solana_voltr_deposit: instrumentedSolanaKitDefiLendingTools.solana_voltr_deposit,
+        solana_voltr_withdraw: instrumentedSolanaKitDefiLendingTools.solana_voltr_withdraw,
+        solana_drift_vault_deposit: instrumentedSolanaKitDefiLendingTools.solana_drift_vault_deposit,
+        solana_drift_vault_request_withdraw: instrumentedSolanaKitDefiLendingTools.solana_drift_vault_request_withdraw,
+        solana_drift_vault_withdraw: instrumentedSolanaKitDefiLendingTools.solana_drift_vault_withdraw,
+        // -- Liquidity Pools (Orca, Raydium, Meteora, Manifest)
+        solana_orca_open_centered: instrumentedSolanaKitDefiPoolsTools.solana_orca_open_centered,
+        solana_orca_open_single_sided: instrumentedSolanaKitDefiPoolsTools.solana_orca_open_single_sided,
+        solana_orca_close_position: instrumentedSolanaKitDefiPoolsTools.solana_orca_close_position,
+        solana_orca_create_clmm: instrumentedSolanaKitDefiPoolsTools.solana_orca_create_clmm,
+        solana_orca_create_whirlpool: instrumentedSolanaKitDefiPoolsTools.solana_orca_create_whirlpool,
+        solana_raydium_create_clmm: instrumentedSolanaKitDefiPoolsTools.solana_raydium_create_clmm,
+        solana_raydium_create_cpmm: instrumentedSolanaKitDefiPoolsTools.solana_raydium_create_cpmm,
+        solana_meteora_create_dlmm: instrumentedSolanaKitDefiPoolsTools.solana_meteora_create_dlmm,
+        solana_manifest_limit_order: instrumentedSolanaKitDefiPoolsTools.solana_manifest_limit_order,
+        solana_manifest_cancel_orders: instrumentedSolanaKitDefiPoolsTools.solana_manifest_cancel_orders,
+        solana_manifest_withdraw: instrumentedSolanaKitDefiPoolsTools.solana_manifest_withdraw,
+        // -- Cross-Chain Bridges & DEX Aggregation (deBridge, OKX)
+        solana_debridge_create_order: instrumentedSolanaKitDefiBridgeTools.solana_debridge_create_order,
+        solana_debridge_execute: instrumentedSolanaKitDefiBridgeTools.solana_debridge_execute,
+        solana_okx_swap: instrumentedSolanaKitDefiBridgeTools.solana_okx_swap,
         // Skill tools (dynamic MCP plugins routed to this agent)
         ...getRoutingToolsForAgent("Executor"),
       },
@@ -1468,6 +1585,21 @@ function getMonitorAgent(): Agent {
         // Advanced tools (v1)
         generate_circuit_breaker_proof: instrumentedAdvancedTools.generate_circuit_breaker_proof,
         query_regime_scoped_memory: instrumentedAdvancedTools.query_regime_scoped_memory,
+        // Polkadot Agent Kit wallet tools (balance checks)
+        polkadot_check_balance: instrumentedPolkadotKitAssetTools.polkadot_check_balance,
+        // Solana Agent Kit wallet & monitoring tools (balance, TPS, open orders)
+        solana_wallet_address: instrumentedSolanaKitWalletTools.solana_wallet_address,
+        solana_balance: instrumentedSolanaKitWalletTools.solana_balance,
+        solana_token_balances: instrumentedSolanaKitWalletTools.solana_token_balances,
+        solana_get_tps: instrumentedSolanaKitWalletTools.solana_get_tps,
+        solana_get_open_limit_orders: instrumentedSolanaKitTradingTools.solana_get_open_limit_orders,
+        solana_get_limit_order_history: instrumentedSolanaKitTradingTools.solana_get_limit_order_history,
+        // Solana Agent Kit DeFi monitoring tools (account status, positions)
+        solana_drift_has_account: instrumentedSolanaKitDefiPerpsTools.solana_drift_has_account,
+        solana_drift_account_info: instrumentedSolanaKitDefiPerpsTools.solana_drift_account_info,
+        solana_orca_fetch_positions: instrumentedSolanaKitDefiPoolsTools.solana_orca_fetch_positions,
+        solana_sanctum_owned_lst: instrumentedSolanaKitDefiLendingTools.solana_sanctum_owned_lst,
+        solana_voltr_positions: instrumentedSolanaKitDefiLendingTools.solana_voltr_positions,
         // Skill tools (dynamic MCP plugins routed to this agent)
         ...getRoutingToolsForAgent("Monitor"),
       },

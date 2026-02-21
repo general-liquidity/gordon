@@ -640,6 +640,116 @@ const TOOL_AGENT_MAP: Record<string, string> = {
   // Basenames registration (state-changing, Executor)
   basenames_register: "Executor",
 
+  // ---- Polkadot Agent Kit tools ----
+  // Asset tools (Monitor: balance reads)
+  polkadot_check_balance: "Monitor",
+  // Asset tools (Executor: state-changing transfers)
+  polkadot_transfer_native: "Executor",
+  polkadot_xcm_transfer: "Executor",
+  // Staking tools (Analyst: read-only pool info)
+  polkadot_get_pool_info: "Analyst",
+  // Staking tools (Executor: state-changing staking operations)
+  polkadot_join_pool: "Executor",
+  polkadot_bond_extra: "Executor",
+  polkadot_unbond: "Executor",
+  polkadot_withdraw_unbonded: "Executor",
+  polkadot_claim_rewards: "Executor",
+  // DeFi tools (Executor: state-changing swaps and liquid staking)
+  polkadot_swap_tokens: "Executor",
+  polkadot_mint_vdot: "Executor",
+  polkadot_register_identity: "Executor",
+  // Utility tools (Analyst: chain initialization)
+  polkadot_initialize_chain: "Analyst",
+
+  // ---- Solana Agent Kit tools (native adapter) ----
+  // Wallet & monitoring tools (Monitor: read-only)
+  solana_wallet_address: "Monitor",
+  solana_balance: "Monitor",
+  solana_token_balances: "Monitor",
+  solana_get_tps: "Monitor",
+  solana_get_open_limit_orders: "Monitor",
+  solana_get_limit_order_history: "Monitor",
+  // Price & data tools (Analyst: analysis)
+  solana_fetch_price: "Analyst",
+  solana_pyth_price: "Analyst",
+  solana_get_token_data: "Analyst",
+  solana_rugcheck: "Analyst",
+  // Execution tools (Executor: state-changing)
+  solana_trade: "Executor",
+  solana_transfer: "Executor",
+  solana_create_limit_order: "Executor",
+  solana_cancel_limit_orders: "Executor",
+  solana_stake_jup: "Executor",
+  solana_request_faucet: "Executor",
+  solana_launch_pumpfun: "Executor",
+
+  // ---- Solana Agent Kit DeFi tools (native adapter — plugin-defi) ----
+  // Perpetuals — read-only (Analyst)
+  solana_drift_has_account: "Analyst",
+  solana_drift_account_info: "Analyst",
+  solana_drift_markets: "Analyst",
+  solana_drift_funding_rate: "Analyst",
+  solana_drift_perp_quote: "Analyst",
+  // Perpetuals — state-changing (Executor)
+  solana_adrena_open_long: "Executor",
+  solana_adrena_open_short: "Executor",
+  solana_adrena_close_long: "Executor",
+  solana_adrena_close_short: "Executor",
+  solana_flash_open_trade: "Executor",
+  solana_flash_close_trade: "Executor",
+  solana_drift_open_perp: "Executor",
+  solana_drift_create_account: "Executor",
+  solana_drift_deposit: "Executor",
+  solana_drift_withdraw: "Executor",
+  solana_drift_spot_swap: "Executor",
+  // Lending & Staking — read-only (Analyst)
+  solana_drift_lend_apy: "Analyst",
+  solana_sanctum_lst_price: "Analyst",
+  solana_sanctum_apy: "Analyst",
+  solana_sanctum_tvl: "Analyst",
+  solana_sanctum_owned_lst: "Monitor",
+  solana_voltr_positions: "Analyst",
+  solana_drift_vault_info: "Analyst",
+  // Lending & Staking — state-changing (Executor)
+  solana_lulo_lend: "Executor",
+  solana_lulo_withdraw: "Executor",
+  solana_drift_insurance_stake: "Executor",
+  solana_drift_insurance_request_unstake: "Executor",
+  solana_drift_insurance_unstake: "Executor",
+  solana_sanctum_swap_lst: "Executor",
+  solana_sanctum_add_liquidity: "Executor",
+  solana_sanctum_remove_liquidity: "Executor",
+  solana_solayer_stake: "Executor",
+  solana_voltr_deposit: "Executor",
+  solana_voltr_withdraw: "Executor",
+  solana_drift_vault_deposit: "Executor",
+  solana_drift_vault_request_withdraw: "Executor",
+  solana_drift_vault_withdraw: "Executor",
+  // Liquidity Pools — read-only (Analyst)
+  solana_orca_fetch_positions: "Analyst",
+  // Liquidity Pools — state-changing (Executor)
+  solana_orca_open_centered: "Executor",
+  solana_orca_open_single_sided: "Executor",
+  solana_orca_close_position: "Executor",
+  solana_orca_create_clmm: "Executor",
+  solana_orca_create_whirlpool: "Executor",
+  solana_raydium_create_clmm: "Executor",
+  solana_raydium_create_cpmm: "Executor",
+  solana_meteora_create_dlmm: "Executor",
+  solana_manifest_limit_order: "Executor",
+  solana_manifest_cancel_orders: "Executor",
+  solana_manifest_withdraw: "Executor",
+  // Cross-Chain Bridge — read-only (Analyst)
+  solana_debridge_chains: "Analyst",
+  solana_debridge_tokens: "Analyst",
+  solana_debridge_status: "Analyst",
+  solana_okx_quote: "Analyst",
+  solana_okx_tokens: "Analyst",
+  // Cross-Chain Bridge — state-changing (Executor)
+  solana_debridge_create_order: "Executor",
+  solana_debridge_execute: "Executor",
+  solana_okx_swap: "Executor",
+
   // ---- Base L2 indexer tools (The Graph) ----
   indexer_top_pools: "Scanner",
   indexer_pool_stats: "Analyst",

@@ -66,6 +66,15 @@ export { autonomousTools } from "./autonomous.ts";
 export { baseOnchainTools } from "./base-onchain.ts";
 export { agentKitOnchainTools } from "./agentkit-onchain.ts";
 export { agentKitDefiTools } from "./agentkit-defi.ts";
+export { polkadotKitAssetTools } from "./polkadotkit-assets.ts";
+export { polkadotKitStakingTools } from "./polkadotkit-staking.ts";
+export { polkadotKitDefiTools } from "./polkadotkit-defi.ts";
+export { solanaKitWalletTools } from "./solanakit-wallet.ts";
+export { solanaKitTradingTools } from "./solanakit-trading.ts";
+export { solanaKitDefiPerpsTools } from "./solanakit-defi-perps.ts";
+export { solanaKitDefiLendingTools } from "./solanakit-defi-lending.ts";
+export { solanaKitDefiPoolsTools } from "./solanakit-defi-pools.ts";
+export { solanaKitDefiBridgeTools } from "./solanakit-defi-bridge.ts";
 export { baseSignalTools } from "./base-signals.ts";
 export { baseIndexerTools } from "./base-indexers.ts";
 export { uniswapDataTools } from "./uniswap-data.ts";
@@ -300,6 +309,15 @@ import { autonomousTools } from "./autonomous.ts";
 import { baseOnchainTools } from "./base-onchain.ts";
 import { agentKitOnchainTools } from "./agentkit-onchain.ts";
 import { agentKitDefiTools } from "./agentkit-defi.ts";
+import { polkadotKitAssetTools } from "./polkadotkit-assets.ts";
+import { polkadotKitStakingTools } from "./polkadotkit-staking.ts";
+import { polkadotKitDefiTools } from "./polkadotkit-defi.ts";
+import { solanaKitWalletTools } from "./solanakit-wallet.ts";
+import { solanaKitTradingTools } from "./solanakit-trading.ts";
+import { solanaKitDefiPerpsTools } from "./solanakit-defi-perps.ts";
+import { solanaKitDefiLendingTools } from "./solanakit-defi-lending.ts";
+import { solanaKitDefiPoolsTools } from "./solanakit-defi-pools.ts";
+import { solanaKitDefiBridgeTools } from "./solanakit-defi-bridge.ts";
 import { baseSignalTools } from "./base-signals.ts";
 import { baseIndexerTools } from "./base-indexers.ts";
 import { uniswapDataTools } from "./uniswap-data.ts";
@@ -352,6 +370,15 @@ export const allTools = {
   ...baseOnchainTools,
   ...agentKitOnchainTools,
   ...agentKitDefiTools,
+  ...polkadotKitAssetTools,
+  ...polkadotKitStakingTools,
+  ...polkadotKitDefiTools,
+  ...solanaKitWalletTools,
+  ...solanaKitTradingTools,
+  ...solanaKitDefiPerpsTools,
+  ...solanaKitDefiLendingTools,
+  ...solanaKitDefiPoolsTools,
+  ...solanaKitDefiBridgeTools,
   ...baseSignalTools,
   ...baseIndexerTools,
   ...uniswapDataTools,
@@ -405,6 +432,15 @@ export const toolCounts = {
   baseOnchain: Object.keys(baseOnchainTools).length,
   agentKitOnchain: Object.keys(agentKitOnchainTools).length,
   agentKitDefi: Object.keys(agentKitDefiTools).length,
+  polkadotKitAssets: Object.keys(polkadotKitAssetTools).length,
+  polkadotKitStaking: Object.keys(polkadotKitStakingTools).length,
+  polkadotKitDefi: Object.keys(polkadotKitDefiTools).length,
+  solanaKitWallet: Object.keys(solanaKitWalletTools).length,
+  solanaKitTrading: Object.keys(solanaKitTradingTools).length,
+  solanaKitDefiPerps: Object.keys(solanaKitDefiPerpsTools).length,
+  solanaKitDefiLending: Object.keys(solanaKitDefiLendingTools).length,
+  solanaKitDefiPools: Object.keys(solanaKitDefiPoolsTools).length,
+  solanaKitDefiBridge: Object.keys(solanaKitDefiBridgeTools).length,
   baseSignals: Object.keys(baseSignalTools).length,
   baseIndexers: Object.keys(baseIndexerTools).length,
   uniswapData: Object.keys(uniswapDataTools).length,
