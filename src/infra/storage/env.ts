@@ -58,6 +58,7 @@ export interface EnvKeys {
   CDP_WALLET_SECRET?: string;
   CDP_NETWORK_ID?: string;
   BASESCAN_API_KEY?: string;
+  SYNTHDATA_API_KEY?: string;
 }
 
 export interface EnvStatus {
@@ -78,6 +79,7 @@ export interface EnvStatus {
   hasChainlinkCCIPKey: boolean;
   hasCDPKeys: boolean;
   hasBasescanKey: boolean;
+  hasSynthDataKey: boolean;
   keys: EnvKeys;
 }
 
@@ -167,6 +169,7 @@ const ENV_KEY_NAMES: (keyof EnvKeys)[] = [
   "CHAINLINK_API_KEY", "CHAINLINK_API_SECRET", "EVM_PRIVATE_KEY",
   "CDP_API_KEY_ID", "CDP_API_KEY_SECRET", "CDP_WALLET_SECRET", "CDP_NETWORK_ID",
   "BASESCAN_API_KEY",
+  "SYNTHDATA_API_KEY",
 ];
 
 /** Build EnvStatus flags from resolved keys */
@@ -188,6 +191,7 @@ function buildEnvStatus(keys: EnvKeys, fileExists: boolean): EnvStatus {
     hasChainlinkCCIPKey: !!keys.EVM_PRIVATE_KEY,
     hasCDPKeys: !!(keys.CDP_API_KEY_ID && keys.CDP_API_KEY_SECRET && keys.CDP_WALLET_SECRET),
     hasBasescanKey: !!keys.BASESCAN_API_KEY,
+    hasSynthDataKey: !!keys.SYNTHDATA_API_KEY,
     keys,
   };
 }
@@ -577,6 +581,18 @@ export async function createEnvFile(keys: Partial<EnvKeys>): Promise<void> {
     lines.push(formatEnvLine("BASESCAN_API_KEY", keys.BASESCAN_API_KEY));
   } else {
     lines.push("# BASESCAN_API_KEY=");
+  }
+
+  // ---- Data Providers ----
+  lines.push("");
+  lines.push("# ---- Data Providers ----");
+
+  lines.push("");
+  lines.push("# SynthData (AI probabilistic predictions, volatility, LP optimization)");
+  if (keys.SYNTHDATA_API_KEY) {
+    lines.push(formatEnvLine("SYNTHDATA_API_KEY", keys.SYNTHDATA_API_KEY));
+  } else {
+    lines.push("# SYNTHDATA_API_KEY=");
   }
 
   // ---- Gordon LLM Provider ----

@@ -30,11 +30,12 @@ type WizardStep =
   | "chain-chainlink"
   | "chain-evm"
   | "chain-cdp"
+  | "chain-synthdata"
   | "llm"
   | "preferences"
   | "done";
 
-type ChainId = "solana" | "polkadot" | "chainlink" | "evm" | "cdp";
+type ChainId = "solana" | "polkadot" | "chainlink" | "evm" | "cdp" | "synthdata";
 
 const CHAIN_OPTIONS: Array<{ id: ChainId; label: string; description: string }> = [
   { id: "solana", label: "Solana", description: "DeFi swaps, token launches, staking, lending (60+ tools)" },
@@ -42,6 +43,7 @@ const CHAIN_OPTIONS: Array<{ id: ChainId; label: string; description: string }> 
   { id: "chainlink", label: "Chainlink Streams", description: "Real-time institutional-grade price feeds" },
   { id: "evm", label: "EVM / CCIP", description: "Cross-chain bridging via Chainlink CCIP" },
   { id: "cdp", label: "Coinbase CDP", description: "Base smart wallets, onchain actions" },
+  { id: "synthdata", label: "SynthData", description: "AI price predictions, volatility, options, LP optimization" },
 ];
 
 type ExchangeSelection = ExchangeId | "";
@@ -141,6 +143,7 @@ interface ChainKeys {
   cdpApiKeyId: string;
   cdpApiKeySecret: string;
   cdpWalletSecret: string;
+  synthDataApiKey: string;
 }
 
 interface WizardState {
@@ -230,6 +233,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
       cdpApiKeyId: "",
       cdpApiKeySecret: "",
       cdpWalletSecret: "",
+      synthDataApiKey: "",
     },
     chainSetupIndex: 0,
     openaiApiKey: "",
@@ -391,6 +395,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
     if (state.chainKeys.cdpApiKeyId) envKeys.CDP_API_KEY_ID = state.chainKeys.cdpApiKeyId;
     if (state.chainKeys.cdpApiKeySecret) envKeys.CDP_API_KEY_SECRET = state.chainKeys.cdpApiKeySecret;
     if (state.chainKeys.cdpWalletSecret) envKeys.CDP_WALLET_SECRET = state.chainKeys.cdpWalletSecret;
+    if (state.chainKeys.synthDataApiKey) envKeys.SYNTHDATA_API_KEY = state.chainKeys.synthDataApiKey;
 
     // 2. Save secrets to .env (the source of truth for credentials)
     const envStatus = await checkEnvStatus();
@@ -461,6 +466,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
     chainlink: "chain-chainlink",
     evm: "chain-evm",
     cdp: "chain-cdp",
+    synthdata: "chain-synthdata",
   };
 
   // Advance to the next selected chain step, or to LLM if done
@@ -735,6 +741,21 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
           advanceChainStep(state.chainSetupIndex, state.selectedChains);
           break;
 
+        case "chain-synthdata":
+          if (trimmedValue) {
+            setState((prev) => ({
+              ...prev,
+              chainKeys: {
+                ...prev.chainKeys,
+                synthDataApiKey: trimmedValue,
+              },
+              exchangeError: null,
+              inputValue: "",
+            }));
+          }
+          advanceChainStep(state.chainSetupIndex, state.selectedChains);
+          break;
+
         case "llm":
           if (trimmedValue) {
             setState((prev) => ({
@@ -815,6 +836,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
       case "chain-chainlink":
       case "chain-evm":
       case "chain-cdp":
+      case "chain-synthdata":
         advanceChainStep(state.chainSetupIndex, state.selectedChains);
         break;
 
@@ -1007,6 +1029,25 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
             "Go to portal.cdp.coinbase.com and create an API key",
             "Copy the API Key ID, API Key Secret, and Wallet Secret",
             "Enter all three separated by commas: id,secret,wallet-secret",
+          ]}
+          inputValue={state.inputValue}
+          onInputChange={handleInputChange}
+          onSubmit={handleInputSubmit}
+          isMasked={true}
+          error={state.exchangeError}
+        />
+      )}
+
+      {state.step === "chain-synthdata" && (
+        <ChainKeyStep
+          chainLabel="SynthData"
+          description="AI-powered probabilistic price predictions, volatility forecasts, options pricing, liquidation risk, and LP optimization."
+          keyLabel="API Key"
+          placeholder="your-synthdata-api-key"
+          instructions={[
+            "Sign up at synthdata.co and subscribe to a plan",
+            "Generate an API key from your SynthData dashboard",
+            "Paste your API key below",
           ]}
           inputValue={state.inputValue}
           onInputChange={handleInputChange}
@@ -1664,7 +1705,8 @@ function DoneStep({ exchangeConfigured, exchangeLabel, llmConfigured, chainKeys 
   const hasChainlink = !!(chainKeys.chainlinkApiKey && chainKeys.chainlinkApiSecret);
   const hasEVM = !!chainKeys.evmPrivateKey;
   const hasCDP = !!(chainKeys.cdpApiKeyId && chainKeys.cdpApiKeySecret && chainKeys.cdpWalletSecret);
-  const anyChain = hasSolana || hasPolkadot || hasChainlink || hasEVM || hasCDP;
+  const hasSynthData = !!chainKeys.synthDataApiKey;
+  const anyChain = hasSolana || hasPolkadot || hasChainlink || hasEVM || hasCDP || hasSynthData;
 
   return (
     <Box flexDirection="column">
@@ -1707,6 +1749,9 @@ function DoneStep({ exchangeConfigured, exchangeLabel, llmConfigured, chainKeys 
             )}
             {hasCDP && (
               <Box><Text color="green">[OK] Coinbase CDP (Base smart wallets)</Text></Box>
+            )}
+            {hasSynthData && (
+              <Box><Text color="green">[OK] SynthData (AI predictions, LP optimization)</Text></Box>
             )}
           </>
         )}

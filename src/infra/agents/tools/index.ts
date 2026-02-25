@@ -83,6 +83,7 @@ export { defillamaYieldTools } from "./defillama-yields.ts";
 export { chainlinkStreamsTools } from "./chainlink-streams.ts";
 export { chainlinkFeedsTools } from "./chainlink-feeds.ts";
 export { chainlinkCCIPTools } from "./chainlink-ccip.ts";
+export { synthDataTools } from "./synthdata.ts";
 
 // Position tracking tools (v0.7)
 export { positionTrackingTools } from "./position-tracking.ts";
@@ -329,6 +330,7 @@ import { defillamaYieldTools } from "./defillama-yields.ts";
 import { chainlinkStreamsTools } from "./chainlink-streams.ts";
 import { chainlinkFeedsTools } from "./chainlink-feeds.ts";
 import { chainlinkCCIPTools } from "./chainlink-ccip.ts";
+import { synthDataTools } from "./synthdata.ts";
 import { positionTrackingTools } from "./position-tracking.ts";
 import { checkRiskTool } from "./risk-gate.ts";
 import { memoryTools } from "./memory-tools.ts";
@@ -393,6 +395,7 @@ export const allTools = {
   ...chainlinkStreamsTools,
   ...chainlinkFeedsTools,
   ...chainlinkCCIPTools,
+  ...synthDataTools,
   ...multiModalChartTools,
   ...evalTools,
   ...positionTrackingTools,
@@ -458,6 +461,7 @@ export const toolCounts = {
   chainlinkStreams: Object.keys(chainlinkStreamsTools).length,
   chainlinkFeeds: Object.keys(chainlinkFeedsTools).length,
   chainlinkCCIP: Object.keys(chainlinkCCIPTools).length,
+  synthData: Object.keys(synthDataTools).length,
   multiModalCharts: Object.keys(multiModalChartTools).length,
   evals: Object.keys(evalTools).length,
   positionTracking: Object.keys(positionTrackingTools).length,

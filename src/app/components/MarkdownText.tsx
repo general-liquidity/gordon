@@ -161,112 +161,66 @@ export const MarkdownText: React.FC<MarkdownTextProps> = ({
 
 /**
  * Render inline markdown (bold, italic, code, links)
+ * Single-pass regex tokenizer — unmatched * are stripped instead of rendered literally.
  */
 function renderInlineMarkdown(text: string, baseColor: string): React.ReactNode {
+  // Order matters: bold-italic before bold before italic, code before others
+  const TOKEN_RE =
+    /\*\*\*(.+?)\*\*\*|\*\*(.+?)\*\*|\*(.+?)\*|_(.+?)_|`([^`]+)`|\[([^\]]+)\]\([^)]+\)|(\$[\d,]+\.?\d*)|([+-]?\d+\.?\d*%)/g;
+
   const parts: React.ReactNode[] = [];
-  let remaining = text;
+  let lastIndex = 0;
   let keyIndex = 0;
+  let match: RegExpExecArray | null;
 
-  while (remaining.length > 0) {
-    // Bold **text**
-    const boldMatch = remaining.match(/^\*\*(.+?)\*\*/);
-    if (boldMatch) {
-      parts.push(
-        <Text key={keyIndex++} bold color={baseColor}>
-          {boldMatch[1]}
-        </Text>
-      );
-      remaining = remaining.slice(boldMatch[0].length);
-      continue;
+  while ((match = TOKEN_RE.exec(text)) !== null) {
+    // Plain text before this match — strip stray * characters
+    if (match.index > lastIndex) {
+      const plain = text.slice(lastIndex, match.index).replace(/\*/g, "");
+      if (plain) parts.push(<Text key={keyIndex++} color={baseColor}>{plain}</Text>);
     }
 
-    // Italic *text* or _text_
-    const italicMatch = remaining.match(/^(\*|_)(.+?)\1/);
-    if (italicMatch && !remaining.startsWith("**")) {
+    if (match[1] !== undefined) {
+      // ***bold italic***
+      parts.push(<Text key={keyIndex++} bold italic color={baseColor}>{match[1]}</Text>);
+    } else if (match[2] !== undefined) {
+      // **bold**
+      parts.push(<Text key={keyIndex++} bold color={baseColor}>{match[2]}</Text>);
+    } else if (match[3] !== undefined) {
+      // *italic*
+      parts.push(<Text key={keyIndex++} italic color={baseColor}>{match[3]}</Text>);
+    } else if (match[4] !== undefined) {
+      // _italic_
+      parts.push(<Text key={keyIndex++} italic color={baseColor}>{match[4]}</Text>);
+    } else if (match[5] !== undefined) {
+      // `code`
+      parts.push(<Text key={keyIndex++} color={COLORS.ACCENT}>{match[5]}</Text>);
+    } else if (match[6] !== undefined) {
+      // [link text](url)
+      parts.push(<Text key={keyIndex++} color={COLORS.BLUE} underline>{match[6]}</Text>);
+    } else if (match[7] !== undefined) {
+      // $price
+      parts.push(<Text key={keyIndex++} color={COLORS.HIGHLIGHT}>{match[7]}</Text>);
+    } else if (match[8] !== undefined) {
+      // percentage
       parts.push(
-        <Text key={keyIndex++} italic color={baseColor}>
-          {italicMatch[2]}
+        <Text key={keyIndex++} color={match[8].startsWith("-") ? COLORS.RED : COLORS.GREEN}>
+          {match[8]}
         </Text>
       );
-      remaining = remaining.slice(italicMatch[0].length);
-      continue;
     }
 
-    // Inline code `text`
-    const codeMatch = remaining.match(/^`([^`]+)`/);
-    if (codeMatch) {
-      parts.push(
-        <Text key={keyIndex++} color={COLORS.ACCENT}>
-          {codeMatch[1]}
-        </Text>
-      );
-      remaining = remaining.slice(codeMatch[0].length);
-      continue;
-    }
+    lastIndex = match.index + match[0].length;
+  }
 
-    // Links [text](url) - just show text
-    const linkMatch = remaining.match(/^\[([^\]]+)\]\([^)]+\)/);
-    if (linkMatch) {
-      parts.push(
-        <Text key={keyIndex++} color={COLORS.BLUE} underline>
-          {linkMatch[1]}
-        </Text>
-      );
-      remaining = remaining.slice(linkMatch[0].length);
-      continue;
-    }
+  // Remaining text after last match — strip stray *
+  if (lastIndex < text.length) {
+    const tail = text.slice(lastIndex).replace(/\*/g, "");
+    if (tail) parts.push(<Text key={keyIndex++} color={baseColor}>{tail}</Text>);
+  }
 
-    // Price/number highlighting ($1234.56 or +12.5%)
-    const priceMatch = remaining.match(/^(\$[\d,]+\.?\d*)/);
-    if (priceMatch) {
-      parts.push(
-        <Text key={keyIndex++} color={COLORS.HIGHLIGHT}>
-          {priceMatch[1]}
-        </Text>
-      );
-      remaining = remaining.slice(priceMatch[0].length);
-      continue;
-    }
-
-    const percentMatch = remaining.match(/^([+-]?\d+\.?\d*%)/);
-    if (percentMatch) {
-      const isPositive = percentMatch[1]?.startsWith("+") || (!percentMatch[1]?.startsWith("-") && !percentMatch[1]?.startsWith("0"));
-      parts.push(
-        <Text key={keyIndex++} color={percentMatch[1]?.startsWith("-") ? COLORS.RED : COLORS.GREEN}>
-          {percentMatch[1]}
-        </Text>
-      );
-      remaining = remaining.slice(percentMatch[0].length);
-      continue;
-    }
-
-    // Regular character
-    const nextSpecial = remaining.search(/[\*`\[\$]|[+-]?\d+\.?\d*%/);
-    if (nextSpecial === -1) {
-      // No more special chars
-      parts.push(
-        <Text key={keyIndex++} color={baseColor}>
-          {remaining}
-        </Text>
-      );
-      break;
-    } else if (nextSpecial === 0) {
-      // Current char is special but didn't match - treat as regular
-      parts.push(
-        <Text key={keyIndex++} color={baseColor}>
-          {remaining[0]}
-        </Text>
-      );
-      remaining = remaining.slice(1);
-    } else {
-      // Regular text until next special
-      parts.push(
-        <Text key={keyIndex++} color={baseColor}>
-          {remaining.slice(0, nextSpecial)}
-        </Text>
-      );
-      remaining = remaining.slice(nextSpecial);
-    }
+  if (parts.length === 0) {
+    return <Text color={baseColor}>{text.replace(/\*/g, "")}</Text>;
   }
 
   return <Text>{parts}</Text>;

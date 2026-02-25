@@ -917,6 +917,32 @@ export const SLASH_COMMANDS: SlashCommand[] = [
     whenToUse: "Explore Base L2 ecosystem: trending dApps, whale movements, DEX activity",
   },
 
+  // SynthData — AI Predictions
+  {
+    name: "synth",
+    aliases: ["synthdata", "sd"],
+    description: "SynthData AI predictions — price forecasts, volatility, options, LP ranges",
+    usage: "/synth [predict|volatility|options|lp|liquidation|miners] <asset>",
+    category: "market",
+    level: 2,
+    action: "agent",
+    target: "analyst",
+    executionTime: "~2-5s",
+    whenToUse: "AI probabilistic predictions for BTC, ETH, SOL, XAU, SPYX, NVDAX, TSLAX, AAPLX, GOOGLX",
+  },
+  {
+    name: "predict",
+    aliases: ["forecast", "cone", "pred"],
+    description: "AI price prediction — probability cone from 200+ competing models",
+    usage: "/predict <asset> [days]",
+    category: "market",
+    level: 2,
+    action: "agent",
+    target: "analyst",
+    executionTime: "~2-3s",
+    whenToUse: "Forward-looking price forecast (BTC, ETH, SOL, XAU, SPYX, NVDAX, TSLAX, AAPLX, GOOGLX)",
+  },
+
   // Risk & Simulation
   {
     name: "liquidation",
@@ -1855,6 +1881,56 @@ export function commandToPrompt(command: SlashCommand, args: string): string {
       if (sub === "dex") return "Show Base DEX analytics: top pairs by volume, new token listings, and boosted tokens from DexScreener";
       if (sub) return `Explore Base L2: ${args}`;
       return "Show me an overview of the Base L2 ecosystem: trending apps, recent signals, and DEX activity";
+    }
+    // SynthData commands
+    case "synth": {
+      if (!args) return "Show me SynthData AI prediction capabilities. Supported assets: BTC, ETH, SOL, XAU, SPYX, NVDAX, TSLAX, AAPLX, GOOGLX";
+      const synthParts = args.split(/\s+/);
+      const synthSub = synthParts[0]?.toLowerCase();
+      const synthAsset = synthParts[1]?.toUpperCase();
+      switch (synthSub) {
+        case "predict":
+        case "prediction":
+        case "forecast":
+          return synthAsset
+            ? `Get the AI price prediction percentiles for ${synthAsset} from SynthData. Show the probability cone with 5th to 95th percentile bands.`
+            : "Which asset to predict? Supported: BTC, ETH, SOL, XAU, SPYX, NVDAX, TSLAX, AAPLX, GOOGLX";
+        case "volatility":
+        case "vol":
+          return synthAsset
+            ? `Get the AI volatility forecast for ${synthAsset} from SynthData. Compare predicted vs realized volatility.`
+            : "Which asset? Supported: BTC, ETH, SOL, XAU, SPYX, NVDAX, TSLAX, AAPLX, GOOGLX";
+        case "options":
+        case "option":
+          return synthAsset
+            ? `Get AI-based option pricing for ${synthAsset} from SynthData. Show theoretical call/put values by strike.`
+            : "Which asset? Supported: BTC, ETH, SOL, XAU, SPYX, NVDAX, TSLAX, AAPLX, GOOGLX";
+        case "lp":
+        case "lp-range":
+          return synthAsset
+            ? `Get optimal LP range for ${synthAsset} from SynthData. Show Uniswap V3 bounds, IL estimates, and probability distribution.`
+            : "Which asset? Supported: BTC, ETH, SOL, XAU, SPYX, NVDAX, TSLAX, AAPLX, GOOGLX";
+        case "liquidation":
+        case "liq":
+          return synthAsset
+            ? `Get AI liquidation probability forecast for ${synthAsset} from SynthData. Show long/short liquidation risk over 24h.`
+            : "Which asset? Supported: BTC, ETH, SOL, XAU, SPYX, NVDAX, TSLAX, AAPLX, GOOGLX";
+        case "miners":
+        case "leaderboard":
+          return synthAsset
+            ? `Show the top AI prediction miners for ${synthAsset} from SynthData.`
+            : "Show the top AI prediction miners from SynthData.";
+        default:
+          // Treat first arg as asset for default predict action
+          return `Get the AI price prediction percentiles for ${(synthSub ?? "BTC").toUpperCase()} from SynthData. Show the probability cone.`;
+      }
+    }
+    case "predict": {
+      if (!args) return "Which asset to predict? Supported: BTC, ETH, SOL, XAU, SPYX, NVDAX, TSLAX, AAPLX, GOOGLX";
+      const predParts = args.split(/\s+/);
+      const predAsset = predParts[0]?.toUpperCase();
+      const predDays = predParts[1];
+      return `Get the AI price prediction cone for ${predAsset} from SynthData${predDays ? ` over ${predDays} days` : ""}. Show the 5th to 95th percentile probability bands.`;
     }
     // Risk & Simulation commands
     case "liquidation": {

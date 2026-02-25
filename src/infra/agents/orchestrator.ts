@@ -888,6 +888,15 @@ const TOOL_AGENT_MAP: Record<string, string> = {
   chainlink_ccip_transfer: "Executor",
   chainlink_ccip_status: "Monitor",
 
+  // ---- SynthData tools ----
+  synthdata_prediction_percentiles: "Analyst",
+  synthdata_volatility: "Analyst",
+  synthdata_option_pricing: "Analyst",
+  synthdata_leaderboard: "Scanner",
+  synthdata_liquidation: "Monitor",
+  synthdata_lp_bounds: "Planner",
+  synthdata_lp_probabilities: "Planner",
+
   // ---- Cross-cutting tools (NOT mapped to any agent) ----
   // sharedContextTools and systemTools are used by ALL agents.
   // Mapping them to "Gordon" causes spurious self-handoff detections,

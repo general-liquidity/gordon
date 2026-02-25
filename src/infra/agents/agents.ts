@@ -74,6 +74,7 @@ import {
   chainlinkStreamsTools,
   chainlinkFeedsTools,
   chainlinkCCIPTools,
+  synthDataTools,
   baseSignalTools,
   baseIndexerTools,
   uniswapDataTools,
@@ -332,6 +333,7 @@ const instrumentedSolanaKitDefiBridgeTools = withToolsMetrics(solanaKitDefiBridg
 const instrumentedChainlinkStreamsTools = withToolsMetrics(chainlinkStreamsTools);
 const instrumentedChainlinkFeedsTools = withToolsMetrics(chainlinkFeedsTools);
 const instrumentedChainlinkCCIPTools = withToolsMetrics(chainlinkCCIPTools);
+const instrumentedSynthDataTools = withToolsMetrics(synthDataTools);
 const instrumentedBaseSignalTools = withToolsMetrics(baseSignalTools);
 const instrumentedBaseIndexerTools = withToolsMetrics(baseIndexerTools);
 const instrumentedUniswapDataTools = withToolsMetrics(uniswapDataTools);
@@ -1202,6 +1204,8 @@ function getScannerAgent(): Agent {
         // Chainlink Data Streams bulk tools (multi-pair price scanning)
         chainlink_bulk_prices: instrumentedChainlinkStreamsTools.chainlink_bulk_prices,
         chainlink_list_feeds: instrumentedChainlinkStreamsTools.chainlink_list_feeds,
+        // SynthData discovery tools (leaderboard)
+        synthdata_leaderboard: instrumentedSynthDataTools.synthdata_leaderboard,
         // Skill tools (dynamic MCP plugins routed to this agent)
         ...getRoutingToolsForAgent("Scanner"),
       },
@@ -1328,6 +1332,10 @@ function getAnalystAgent(): Agent {
         // Chainlink CCIP read-only tools (chain info, fee estimation)
         chainlink_ccip_supported_chains: instrumentedChainlinkCCIPTools.chainlink_ccip_supported_chains,
         chainlink_ccip_get_fee: instrumentedChainlinkCCIPTools.chainlink_ccip_get_fee,
+        // SynthData prediction & analytics
+        synthdata_prediction_percentiles: instrumentedSynthDataTools.synthdata_prediction_percentiles,
+        synthdata_volatility: instrumentedSynthDataTools.synthdata_volatility,
+        synthdata_option_pricing: instrumentedSynthDataTools.synthdata_option_pricing,
         // Skill tools (dynamic MCP plugins routed to this agent)
         ...getRoutingToolsForAgent("Analyst"),
       },
@@ -1396,6 +1404,9 @@ function getPlannerAgent(): Agent {
         // Advanced tools (v1) — pre-trade simulation + proofs
         simulate_order_bundle: instrumentedAdvancedTools.simulate_order_bundle,
         generate_circuit_breaker_proof: instrumentedAdvancedTools.generate_circuit_breaker_proof,
+        // SynthData LP strategy planning
+        synthdata_lp_bounds: instrumentedSynthDataTools.synthdata_lp_bounds,
+        synthdata_lp_probabilities: instrumentedSynthDataTools.synthdata_lp_probabilities,
         // Skill tools (dynamic MCP plugins routed to this agent)
         ...getRoutingToolsForAgent("Planner"),
       },
@@ -1626,6 +1637,8 @@ function getMonitorAgent(): Agent {
         solana_voltr_positions: instrumentedSolanaKitDefiLendingTools.solana_voltr_positions,
         // Chainlink CCIP transfer status tracking
         chainlink_ccip_status: instrumentedChainlinkCCIPTools.chainlink_ccip_status,
+        // SynthData risk monitoring (liquidation probabilities)
+        synthdata_liquidation: instrumentedSynthDataTools.synthdata_liquidation,
         // Skill tools (dynamic MCP plugins routed to this agent)
         ...getRoutingToolsForAgent("Monitor"),
       },
