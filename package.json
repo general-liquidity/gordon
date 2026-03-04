@@ -37,8 +37,8 @@
   "scripts": {
     "start": "bun run src/index.tsx",
     "dev": "bun --watch run src/index.tsx",
-    "build": "bun build src/index.tsx --outdir dist --target bun --external @lightprotocol/compressed-token --external @lightprotocol/stateless.js --external @solana-developers/helpers",
-    "build:binary": "bun build src/index.tsx --compile --outfile gordon",
+    "build": "bun build src/index.tsx --outdir dist --target bun --external @lightprotocol/compressed-token --external @lightprotocol/stateless.js --external @solana-developers/helpers --external @galacticcouncil/api-augment/hydradx --external @galacticcouncil/api-augment/basilisk",
+    "build:binary": "bun build src/index.tsx --compile --outfile gordon --external @lightprotocol/compressed-token --external @lightprotocol/stateless.js --external @solana-developers/helpers --external @galacticcouncil/api-augment/hydradx --external @galacticcouncil/api-augment/basilisk",
     "prepublishOnly": "bun run build",
     "test": "bun test",
     "typecheck": "tsc --noEmit",

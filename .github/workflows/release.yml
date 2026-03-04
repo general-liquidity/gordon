@@ -66,6 +66,8 @@ jobs:
           --external @lightprotocol/compressed-token
           --external @lightprotocol/stateless.js
           --external @solana-developers/helpers
+          --external @galacticcouncil/api-augment/hydradx
+          --external @galacticcouncil/api-augment/basilisk
           src/index.tsx
 
       - name: Upload artifact
