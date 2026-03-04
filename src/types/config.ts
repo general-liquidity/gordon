@@ -66,7 +66,7 @@ export const MemoryConfigSchema = z.object({
   memoryWarningThreshold: z.number().min(0.5).max(0.95).default(0.8),
 });
 
-export const ProviderSchema = z.enum(["openai", "anthropic", "google", "dedalus"]);
+export const ProviderSchema = z.enum(["openai", "anthropic", "google", "inception", "dedalus"]);
 
 export const ModelConfigSchema = z.object({
   provider: ProviderSchema.default("openai"),

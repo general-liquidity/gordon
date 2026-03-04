@@ -21,6 +21,7 @@ const KEYRING_JSON_PATH = join(GORDON_DIR, "keyring.json");
 export const KEYRING_SUPPORTED_KEYS = [
   "OPENAI_API_KEY",
   "DEDALUS_API_KEY",
+  "INCEPTION_API_KEY",
   "ANTHROPIC_API_KEY",
   "GOOGLE_API_KEY",
   "GROQ_API_KEY",
@@ -36,6 +37,7 @@ export const KEYRING_SUPPORTED_KEYS = [
   "BITFINEX_API_KEY",
   "BITFINEX_API_SECRET",
   "HYPERLIQUID_PRIVATE_KEY",
+  "TINYFISH_API_KEY",
 ] as const;
 
 export type KeyringKey = (typeof KEYRING_SUPPORTED_KEYS)[number];

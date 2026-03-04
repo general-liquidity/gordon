@@ -21,7 +21,7 @@ async function main() {
   console.log("Daemon status:", status);
 
   // 3. Run a market scan
-  const scan = await gordon.scan({ topN: 20, timeframes: ["1h", "4h"] });
+  const scan = await gordon.scan({ topN: 20, timeframes: ["1h"] });
   console.log("Scan result:", scan.data);
 
   // 4. Send an analysis request to the agent network

@@ -22,12 +22,29 @@ import type {
 } from "../types/index.ts";
 
 const logger = createModuleLogger("scanner");
+const SCAN_CONCURRENCY = 6;
+const SCAN_CACHE_TTL_MS = 20_000;
+const TOP_SYMBOLS_CACHE_TTL_MS = 30_000;
+
+interface CacheEntry<T> {
+  expiresAt: number;
+  value: T;
+}
+
+interface TopSymbolsCacheEntry extends CacheEntry<string[]> {
+  count: number;
+}
+
+const scanCache = new Map<string, CacheEntry<ScanResult>>();
+const inFlightScans = new Map<string, Promise<ScanResult>>();
+const topSymbolsCache = new Map<string, TopSymbolsCacheEntry>();
 
 /**
  * Options for the scan function
  */
 export interface ScanOptions {
   topN?: number;
+  // Ordered preference list; scanner uses the first timeframe only.
   timeframes?: string[];
 }
 
@@ -37,6 +54,111 @@ export interface ScanOptions {
 interface SupportBounceResult {
   detected: boolean;
   confidence: number;
+}
+
+function getExchangeCacheKey(client: Exchange): string {
+  const constructorName = client?.constructor?.name?.trim();
+  return constructorName && constructorName !== "Object"
+    ? constructorName.toLowerCase()
+    : "exchange";
+}
+
+function getPrimaryScanTimeframe(timeframes?: string[]): string {
+  return timeframes?.[0] ?? "1h";
+}
+
+function createScanCacheKey(
+  client: Exchange,
+  topN: number,
+  timeframe: string
+): string {
+  return `${getExchangeCacheKey(client)}:${topN}:${timeframe}`;
+}
+
+function getCachedValue<T>(
+  cache: Map<string, CacheEntry<T>>,
+  key: string
+): T | null {
+  const entry = cache.get(key);
+  if (!entry) {
+    return null;
+  }
+
+  if (entry.expiresAt <= Date.now()) {
+    cache.delete(key);
+    return null;
+  }
+
+  return entry.value;
+}
+
+function setCachedValue<T>(
+  cache: Map<string, CacheEntry<T>>,
+  key: string,
+  value: T,
+  ttlMs: number
+): void {
+  cache.set(key, {
+    value,
+    expiresAt: Date.now() + ttlMs,
+  });
+}
+
+async function mapWithConcurrency<TInput, TOutput>(
+  items: TInput[],
+  concurrency: number,
+  mapper: (item: TInput, index: number) => Promise<TOutput>
+): Promise<TOutput[]> {
+  if (items.length === 0) {
+    return [];
+  }
+
+  const results = new Array<TOutput>(items.length);
+  let nextIndex = 0;
+
+  async function worker(): Promise<void> {
+    while (true) {
+      const currentIndex = nextIndex;
+      nextIndex += 1;
+
+      if (currentIndex >= items.length) {
+        return;
+      }
+
+      const item = items[currentIndex];
+      if (item === undefined) {
+        return;
+      }
+
+      results[currentIndex] = await mapper(item, currentIndex);
+    }
+  }
+
+  const workerCount = Math.min(Math.max(concurrency, 1), items.length);
+  await Promise.all(Array.from({ length: workerCount }, () => worker()));
+  return results;
+}
+
+async function getTopSymbolsCached(
+  client: Exchange,
+  topN: number
+): Promise<string[]> {
+  const exchangeKey = getExchangeCacheKey(client);
+  const cached = topSymbolsCache.get(exchangeKey);
+  const now = Date.now();
+
+  if (cached && cached.expiresAt > now && cached.count >= topN) {
+    return cached.value.slice(0, topN);
+  }
+
+  const symbols = await client.getTopSymbols(topN);
+  topSymbolsCache.set(exchangeKey, {
+    value: symbols,
+    count: symbols.length,
+    expiresAt: now + TOP_SYMBOLS_CACHE_TTL_MS,
+  });
+
+  return symbols;
 }
 
 /**
@@ -239,11 +361,10 @@ function determineBias(
 async function analyzeCoin(
   client: Exchange,
   symbol: string,
-  timeframes: string[]
+  timeframe: string
 ): Promise<CoinAnalysis | null> {
   try {
-    const primaryTimeframe = timeframes[0] ?? "1h";
-    const candles = await client.getCandles(symbol, primaryTimeframe, 100);
+    const candles = await client.getCandles(symbol, timeframe, 100);
 
     if (candles.length === 0) {
       return null;
@@ -260,7 +381,7 @@ async function analyzeCoin(
     const trend = determineTrend(candles);
     const bounceResult = detectSupportBounce(candles, levels, indicators);
     const change24h = calculateChange24h(candles);
-    const volume24h = calculateVolume24h(candles, primaryTimeframe);
+    const volume24h = calculateVolume24h(candles, timeframe);
     const bias = determineBias(bounceResult.detected, currentPrice, levels);
 
     const partialAnalysis: Partial<CoinAnalysis> = {
@@ -345,79 +466,113 @@ export async function scan(
   options?: ScanOptions
 ): Promise<ScanResult> {
   const topN = options?.topN ?? 50;
-  const timeframes = options?.timeframes ?? ["1h", "4h"];
+  const requestedTimeframes = options?.timeframes ?? ["1h", "4h"];
+  const primaryTimeframe = getPrimaryScanTimeframe(requestedTimeframes);
+  const timeframes = [primaryTimeframe];
+  const cacheKey = createScanCacheKey(client, topN, primaryTimeframe);
 
-  logger.info("Starting market scan", { topN, timeframes });
-
-  // Emit scan started event
-  await emitEvent("scan:started", { universe: `top${topN}`, timeframes });
-
-  const startTime = Date.now();
-
-  // Get top symbols by volume
-  const symbols = await client.getTopSymbols(topN);
-  logger.debug("Got top symbols", { count: symbols.length });
-
-  // Analyze each symbol
-  const analysisPromises = symbols.map((symbol) =>
-    analyzeCoin(client, symbol, timeframes)
-  );
-
-  const analysisResults = await Promise.all(analysisPromises);
-
-  // Filter out failed analyses and sort by setup confidence
-  const coins = analysisResults
-    .filter((result): result is CoinAnalysis => result !== null)
-    .sort((a, b) => {
-      if (a.setupDetected !== b.setupDetected) {
-        return a.setupDetected ? -1 : 1;
-      }
-      return b.setupConfidence - a.setupConfidence;
-    });
-
-  const opportunitiesFound = coins.filter((c) => c.setupDetected).length;
-  const duration = Date.now() - startTime;
-
-  logger.info("Scan complete", {
-    coinsScanned: coins.length,
-    opportunitiesFound,
-    duration,
-  });
-
-  // Emit scan completed event
-  await emitEvent("scan:completed", {
-    coinsScanned: coins.length,
-    opportunitiesFound,
-    duration,
-  });
-
-  // Emit opportunity events for top setups AND persist to database
-  for (const coin of coins.filter((c) => c.setupDetected).slice(0, 5)) {
-    await emitEvent("scan:opportunity", {
-      symbol: coin.symbol,
-      confidence: coin.setupConfidence,
-      bias: coin.bias,
-    });
-
-    // Persist opportunity to database for historical queries
-    try {
-      logScanOpportunity({
-        symbol: coin.symbol,
-        price: coin.price,
-        confidence: coin.setupConfidence,
-        bias: coin.bias,
-        risk: coin.risk,
-        change24h: coin.change24h,
-      });
-    } catch (error) {
-      logger.warn("Failed to persist opportunity", { symbol: coin.symbol, error });
-    }
+  const cachedResult = getCachedValue(scanCache, cacheKey);
+  if (cachedResult) {
+    logger.debug("Returning cached market scan", { topN, timeframes });
+    return cachedResult;
   }
 
-  return {
-    timestamp: new Date().toISOString(),
-    universe: `top${topN}`,
-    timeframes,
-    coins,
-  };
+  const inFlight = inFlightScans.get(cacheKey);
+  if (inFlight) {
+    logger.debug("Joining in-flight market scan", { topN, timeframes });
+    return inFlight;
+  }
+
+  const scanPromise = (async (): Promise<ScanResult> => {
+    if (requestedTimeframes.length > 1) {
+      logger.debug("Scanner using primary timeframe only", {
+        requestedTimeframes,
+        primaryTimeframe,
+      });
+    }
+
+    logger.info("Starting market scan", { topN, timeframes });
+
+    // Emit scan started event
+    await emitEvent("scan:started", { universe: `top${topN}`, timeframes });
+
+    const startTime = Date.now();
+
+    // Get top symbols by volume
+    const symbols = await getTopSymbolsCached(client, topN);
+    logger.debug("Got top symbols", { count: symbols.length });
+
+    const analysisResults = await mapWithConcurrency(
+      symbols,
+      SCAN_CONCURRENCY,
+      (symbol) => analyzeCoin(client, symbol, primaryTimeframe)
+    );
+
+    // Filter out failed analyses and sort by setup confidence
+    const coins = analysisResults
+      .filter((result): result is CoinAnalysis => result !== null)
+      .sort((a, b) => {
+        if (a.setupDetected !== b.setupDetected) {
+          return a.setupDetected ? -1 : 1;
+        }
+        return b.setupConfidence - a.setupConfidence;
+      });
+
+    const opportunitiesFound = coins.filter((c) => c.setupDetected).length;
+    const duration = Date.now() - startTime;
+
+    logger.info("Scan complete", {
+      coinsScanned: coins.length,
+      opportunitiesFound,
+      duration,
+    });
+
+    // Emit scan completed event
+    await emitEvent("scan:completed", {
+      coinsScanned: coins.length,
+      opportunitiesFound,
+      duration,
+    });
+
+    const result: ScanResult = {
+      timestamp: new Date().toISOString(),
+      universe: `top${topN}`,
+      timeframes,
+      coins,
+    };
+
+    // Emit opportunity events for top setups AND persist to database
+    for (const coin of coins.filter((c) => c.setupDetected).slice(0, 5)) {
+      await emitEvent("scan:opportunity", {
+        symbol: coin.symbol,
+        confidence: coin.setupConfidence,
+        bias: coin.bias,
+      });
+
+      // Persist opportunity to database for historical queries
+      try {
+        logScanOpportunity({
+          symbol: coin.symbol,
+          price: coin.price,
+          confidence: coin.setupConfidence,
+          bias: coin.bias,
+          risk: coin.risk,
+          change24h: coin.change24h,
+        });
+      } catch (error) {
+        logger.warn("Failed to persist opportunity", { symbol: coin.symbol, error });
+      }
+    }
+
+    setCachedValue(scanCache, cacheKey, result, SCAN_CACHE_TTL_MS);
+    return result;
+  })();
+
+  inFlightScans.set(cacheKey, scanPromise);
+
+  try {
+    return await scanPromise;
+  } finally {
+    inFlightScans.delete(cacheKey);
+  }
 }

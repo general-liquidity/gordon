@@ -1,6 +1,6 @@
 {
   "name": "@general-liquidity/gordon-cli",
-  "version": "0.75.15",
+  "version": "0.8.0",
   "description": "The Frontier Trading Agent",
   "author": "General Liquidity, Inc.",
   "license": "MIT",
@@ -60,7 +60,6 @@
     "@ai-sdk/openai": "^1.0.0",
     "@chainlink/data-streams-sdk": "^1.2.1",
     "@coinbase/agentkit": "^0.10.4",
-    "@galacticcouncil/api-augment": "^0.9.0",
     "@inkjs/ui": "^2.0.0",
     "@libsql/client": "^0.6.0",
     "@libsql/linux-x64-gnu": "^0.5.22",

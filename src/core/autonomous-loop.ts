@@ -19,8 +19,9 @@ import {
   isMandateBreached,
   validateMandate,
 } from "./swing-mandate.ts";
-import { scan, type ScanOptions } from "./scanner.ts";
+import type { ScanOptions } from "./scanner.ts";
 import type { CoinAnalysis } from "../types/index.ts";
+import { runSharedScan } from "./market-data-coordinator.ts";
 
 const logger = createModuleLogger("autonomous-loop");
 
@@ -92,6 +93,34 @@ let loopState: LoopState = {
   lastCycleTime: null,
   totalOpportunities: 0,
 };
+let cycleInFlight: Promise<CycleReport | null> | null = null;
+
+function runCycleSafely(trigger: "startup" | "interval" | "manual"): Promise<CycleReport | null> {
+  if (!loopState.isRunning) {
+    return Promise.resolve(null);
+  }
+
+  if (cycleInFlight) {
+    if (trigger !== "manual") {
+      logger.debug("Skipping autonomous cycle because previous cycle is still running", { trigger });
+    }
+    return cycleInFlight;
+  }
+
+  const cyclePromise = runCycle()
+    .catch((error) => {
+      logger.error("Autonomous cycle failed", error as Error);
+      return null;
+    })
+    .finally(() => {
+      if (cycleInFlight === cyclePromise) {
+        cycleInFlight = null;
+      }
+    });
+
+  cycleInFlight = cyclePromise;
+  return cyclePromise;
+}
 
 // ============================================================================
 // Core Loop
@@ -147,7 +176,7 @@ async function runCycle(): Promise<CycleReport | null> {
       timeframes: [mandate.timeframe],
     };
 
-    const result = await scan(exchange, scanOptions);
+    const result = await runSharedScan(exchange, scanOptions);
 
     // Filter by mandate constraints
     let opportunities = result.coins.filter(
@@ -272,15 +301,11 @@ export function startAutonomousLoop(config: AutonomousLoopConfig): { success: bo
   saveMandateState(config.mandate);
 
   // Run first cycle immediately
-  runCycle().catch((err) => {
-    logger.error("Initial autonomous cycle failed", err as Error);
-  });
+  void runCycleSafely("startup");
 
   // Set up interval
   loopState.intervalId = setInterval(() => {
-    runCycle().catch((err) => {
-      logger.error("Autonomous cycle failed", err as Error);
-    });
+    void runCycleSafely("interval");
   }, intervalMs);
 
   // Set up heartbeat (every 5 minutes)
@@ -310,6 +335,7 @@ export function stopAutonomousLoop(reason?: string): void {
     clearInterval(loopState.heartbeatId);
     loopState.heartbeatId = null;
   }
+  cycleInFlight = null;
 
   logger.info("Autonomous loop stopped", {
     reason,
@@ -356,7 +382,7 @@ export async function runAutonomousCycleOnce(): Promise<CycleReport | null> {
   if (!loopState.isRunning || loopState.isPaused) {
     return null;
   }
-  return runCycle();
+  return runCycleSafely("manual");
 }
 
 export function getAutonomousLoopStatus(): {

@@ -419,36 +419,41 @@ export const displayComparisonChartTool = createTool({
   }),
   execute: async ({ symbols, interval, periods }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
-    if (!ctx?.exchange) {
+    const exchange = ctx?.exchange;
+    if (!exchange) {
       return errors.noExchange;
     }
 
     try {
       // Fetch data for all symbols
-      const allData: Array<{ symbol: string; changes: number[]; currentChange: number }> = [];
+      const symbolData = await Promise.all(
+        symbols.map(async (sym) => {
+          const normalizedSymbol = sym.toUpperCase().endsWith("USDT")
+            ? sym.toUpperCase()
+            : `${sym.toUpperCase()}USDT`;
 
-      for (const sym of symbols) {
-        const normalizedSymbol = sym.toUpperCase().endsWith("USDT")
-          ? sym.toUpperCase()
-          : `${sym.toUpperCase()}USDT`;
+          try {
+            const candles = await exchange.getCandles(normalizedSymbol, interval, periods);
+            if (!candles || candles.length === 0) {
+              return null;
+            }
 
-        const candles = await ctx.exchange.getCandles(normalizedSymbol, interval, periods);
+            // Normalize to percentage change from first candle
+            const startPrice = candles[0]?.close ?? 1;
+            const changes = candles.map((c) => ((c.close - startPrice) / startPrice) * 100);
+            const currentChange = changes[changes.length - 1] ?? 0;
 
-        if (!candles || candles.length === 0) {
-          continue;
-        }
-
-        // Normalize to percentage change from first candle
-        const startPrice = candles[0]?.close ?? 1;
-        const changes = candles.map((c) => ((c.close - startPrice) / startPrice) * 100);
-        const currentChange = changes[changes.length - 1] ?? 0;
-
-        allData.push({
-          symbol: normalizedSymbol.replace("USDT", ""),
-          changes,
-          currentChange,
-        });
-      }
+            return {
+              symbol: normalizedSymbol.replace("USDT", ""),
+              changes,
+              currentChange,
+            };
+          } catch {
+            return null;
+          }
+        }),
+      );
+      const allData = symbolData.filter((item): item is { symbol: string; changes: number[]; currentChange: number } => item !== null);
 
       if (allData.length === 0) {
         return { error: "No data found for any of the specified symbols" };

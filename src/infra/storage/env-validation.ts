@@ -52,12 +52,24 @@ export const BinanceSecretSchema = z
     "Binance API secret must be exactly 64 alphanumeric characters"
   );
 
+export const TinyfishKeySchema = z
+  .string()
+  .trim()
+  .min(1, "Tinyfish API key cannot be empty");
+
+export const InceptionKeySchema = z
+  .string()
+  .trim()
+  .min(1, "Inception API key cannot be empty");
+
 // Combined environment schema
 export const EnvKeysSchema = z.object({
   OPENAI_API_KEY: OpenAIKeySchema.optional(),
   DEDALUS_API_KEY: DedalusKeySchema.optional(),
+  INCEPTION_API_KEY: InceptionKeySchema.optional(),
   BINANCE_API_KEY: BinanceKeySchema.optional(),
   BINANCE_API_SECRET: BinanceSecretSchema.optional(),
+  TINYFISH_API_KEY: TinyfishKeySchema.optional(),
 });
 
 export type ValidatedEnvKeys = z.infer<typeof EnvKeysSchema>;
@@ -132,6 +144,15 @@ export function validateEnvKeys(keys: Record<string, string | undefined>): Valid
     }
   }
 
+  if (keys.INCEPTION_API_KEY) {
+    const result = validateApiKey("INCEPTION_API_KEY", keys.INCEPTION_API_KEY, InceptionKeySchema);
+    if (!result.valid) {
+      errors.push({ key: "INCEPTION_API_KEY", message: result.error! });
+    } else {
+      validated.INCEPTION_API_KEY = keys.INCEPTION_API_KEY.trim();
+    }
+  }
+
   // Validate Binance keys (must be paired)
   const hasBinanceKey = !!keys.BINANCE_API_KEY;
   const hasBinanceSecret = !!keys.BINANCE_API_SECRET;
@@ -157,19 +178,28 @@ export function validateEnvKeys(keys: Record<string, string | undefined>): Valid
     }
   }
 
+  if (keys.TINYFISH_API_KEY) {
+    const result = validateApiKey("TINYFISH_API_KEY", keys.TINYFISH_API_KEY, TinyfishKeySchema);
+    if (!result.valid) {
+      errors.push({ key: "TINYFISH_API_KEY", message: result.error! });
+    } else {
+      validated.TINYFISH_API_KEY = keys.TINYFISH_API_KEY.trim();
+    }
+  }
+
   // Check if at least one LLM key is present
-  if (!keys.OPENAI_API_KEY && !keys.DEDALUS_API_KEY) {
+  if (!keys.OPENAI_API_KEY && !keys.DEDALUS_API_KEY && !keys.INCEPTION_API_KEY) {
     warnings.push({
       key: "LLM",
-      message: "No LLM API key configured. Set OPENAI_API_KEY or DEDALUS_API_KEY.",
+      message: "No LLM API key configured. Set OPENAI_API_KEY, INCEPTION_API_KEY, or DEDALUS_API_KEY.",
     });
   }
 
-  // Check if both LLM keys are present (might be intentional)
-  if (keys.OPENAI_API_KEY && keys.DEDALUS_API_KEY) {
+  const configuredLLMKeys = [keys.OPENAI_API_KEY, keys.INCEPTION_API_KEY, keys.DEDALUS_API_KEY].filter(Boolean).length;
+  if (configuredLLMKeys > 1) {
     warnings.push({
       key: "LLM",
-      message: "Both OpenAI and Dedalus keys are configured. OpenAI will be used by default.",
+      message: "Multiple LLM API keys are configured. Gordon will use the provider selected in model settings.",
     });
   }
 
@@ -195,6 +225,7 @@ export function isPlaceholderKey(value: string | undefined): boolean {
     lower.includes("example") ||
     lower === "sk-..." ||
     lower === "dd-..." ||
+    lower === "icl-..." ||
     lower === ""
   );
 }

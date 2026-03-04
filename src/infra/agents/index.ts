@@ -30,6 +30,7 @@ export {
   historyTools,
   accountTools,
   tradingTools,
+  tinyfishTools,
   allTools,
   toolCounts,
 } from "./tools/index.ts";

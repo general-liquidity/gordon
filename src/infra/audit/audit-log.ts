@@ -35,7 +35,12 @@ export type AuditAction =
   | "PERMISSION_CHECK"
   | "RATE_LIMIT_EXCEEDED"
   | "GUARDRAIL_TRIGGERED"
-  | "ACCESS_DENIED";
+  | "ACCESS_DENIED"
+  | "WEB_RESEARCH_RUN"
+  | "WEB_AUTOMATION_RUN"
+  | "WEB_MONITOR_SCHEDULE"
+  | "WEB_MONITOR_REMOVE"
+  | "WEB_MONITOR_RUN";
 
 /**
  * Result status of an audited action

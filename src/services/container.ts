@@ -5,7 +5,7 @@
 
 import { BinanceClient } from "../infra/binance/index.ts";
 import { BinanceAdapter, type Exchange } from "../infra/exchange/index.ts";
-import { LLMClient } from "../infra/llm/index.ts";
+import { LLMClient, type LLMProvider } from "../infra/llm/index.ts";
 import { PriceCache } from "../infra/cache/index.ts";
 import { EventBus } from "../events/index.ts";
 import { Logger, ConsoleTransport, type LogLevel } from "../infra/logger/index.ts";
@@ -23,6 +23,13 @@ export interface ContainerConfig {
   };
   openai?: {
     apiKey: string;
+    model?: string;
+  };
+  llm?: {
+    openaiApiKey?: string;
+    inceptionApiKey?: string;
+    dedalusApiKey?: string;
+    defaultProvider?: LLMProvider;
     model?: string;
   };
   logLevel?: LogLevel;
@@ -106,12 +113,22 @@ export class ServiceContainer {
       this.services.logger.warn("Exchange client not initialized - no credentials");
     }
 
-    // Create LLM client if API key provided
-    if (config.openai?.apiKey) {
+    // Create LLM client if any configured provider key is available
+    const llmConfig = config.llm ?? (config.openai?.apiKey
+      ? {
+          openaiApiKey: config.openai.apiKey,
+          defaultProvider: "openai" as const,
+          model: config.openai.model,
+        }
+      : undefined);
+
+    if (llmConfig?.openaiApiKey || llmConfig?.inceptionApiKey || llmConfig?.dedalusApiKey) {
       this.services.llm = new LLMClient({
-        openaiApiKey: config.openai.apiKey,
-        defaultModel: config.openai.model,
-        defaultProvider: "openai",
+        openaiApiKey: llmConfig.openaiApiKey,
+        inceptionApiKey: llmConfig.inceptionApiKey,
+        dedalusApiKey: llmConfig.dedalusApiKey,
+        defaultModel: llmConfig.model,
+        defaultProvider: llmConfig.defaultProvider,
       });
       this.services.logger.info("LLM client initialized");
     } else {

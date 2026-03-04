@@ -8,6 +8,7 @@ import { Box, Text, useInput } from "ink";
 import TextInput from "ink-text-input";
 
 import { resetAgents } from "../infra/agents/index.ts";
+import { resetProviderRegistry } from "../infra/providers/index.ts";
 import { BinanceClient, checkAndValidatePermissions } from "../infra/binance/index.ts";
 import { ExchangeFactory, type ExchangeId } from "../infra/exchange/index.ts";
 import { EXCHANGE_ENV_MAP } from "../infra/exchange/types.ts";
@@ -36,6 +37,7 @@ type WizardStep =
   | "done";
 
 type ChainId = "solana" | "polkadot" | "chainlink" | "evm" | "cdp" | "synthdata";
+type LLMWizardProvider = "openai" | "inception" | "dedalus";
 
 const CHAIN_OPTIONS: Array<{ id: ChainId; label: string; description: string }> = [
   { id: "solana", label: "Solana", description: "DeFi swaps, token launches, staking, lending (60+ tools)" },
@@ -160,7 +162,9 @@ interface WizardState {
   selectedChains: ChainId[];
   chainKeys: ChainKeys;
   chainSetupIndex: number;
+  selectedLlmProvider: LLMWizardProvider | "";
   openaiApiKey: string;
+  inceptionApiKey: string;
   dedalusApiKey: string;
   preferences: Preferences;
   inputValue: string;
@@ -210,6 +214,18 @@ function generateExchangeId(type: ExchangeId, exchanges: MultiExchangeConfig[]):
   return id;
 }
 
+function parseLLMProviderInput(value: string): { provider: LLMWizardProvider; apiKey: string } | null {
+  const match = value.match(/^(openai|inception|dedalus)\s*[:=\/]\s*(.+)$/i);
+  if (!match?.[1] || !match[2]) {
+    return null;
+  }
+
+  return {
+    provider: match[1].toLowerCase() as LLMWizardProvider,
+    apiKey: match[2].trim(),
+  };
+}
+
 export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElement {
   const [state, setState] = useState<WizardState>({
     step: "welcome",
@@ -236,7 +252,9 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
       synthDataApiKey: "",
     },
     chainSetupIndex: 0,
+    selectedLlmProvider: "",
     openaiApiKey: "",
+    inceptionApiKey: "",
     dedalusApiKey: "",
     preferences: {
       cashReservePercent: 0.2,
@@ -371,7 +389,17 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
     const envKeys: Record<string, string> = {};
 
     if (state.openaiApiKey) envKeys.OPENAI_API_KEY = state.openaiApiKey;
+    if (state.inceptionApiKey) envKeys.INCEPTION_API_KEY = state.inceptionApiKey;
     if (state.dedalusApiKey) envKeys.DEDALUS_API_KEY = state.dedalusApiKey;
+    if (state.selectedLlmProvider) {
+      envKeys.GORDON_PROVIDER = state.selectedLlmProvider;
+      envKeys.GORDON_MODEL =
+        state.selectedLlmProvider === "openai"
+          ? "openai/gpt-5.2"
+          : state.selectedLlmProvider === "inception"
+            ? "inception/mercury-2"
+            : "openai/gpt-5.2";
+    }
 
     // Map exchange credentials to env var names (all exchange types, not just Binance)
     if (state.exchangeType) {
@@ -443,7 +471,8 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
 
     await saveConfig(newConfig);
 
-    // Reset agent cache so next access reinitializes with fresh env variables
+    // Reset provider and agent caches so next access reinitializes with fresh env variables
+    resetProviderRegistry();
     resetAgents();
   }, [
     state.exchangeApiKey,
@@ -455,7 +484,9 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
     state.exchangeValidated,
     state.chainKeys,
     state.preferences,
+    state.selectedLlmProvider,
     state.openaiApiKey,
+    state.inceptionApiKey,
     state.dedalusApiKey,
   ]);
 
@@ -758,11 +789,23 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
 
         case "llm":
           if (trimmedValue) {
+            const parsed = parseLLMProviderInput(trimmedValue);
+            if (!parsed) {
+              setState((prev) => ({
+                ...prev,
+                exchangeError: "Use explicit provider format: openai:<key>, inception:<key>, or dedalus:<key>.",
+              }));
+              return;
+            }
             setState((prev) => ({
               ...prev,
-              openaiApiKey: trimmedValue,
+              selectedLlmProvider: parsed.provider,
+              openaiApiKey: parsed.provider === "openai" ? parsed.apiKey : prev.openaiApiKey,
+              dedalusApiKey: parsed.provider === "dedalus" ? parsed.apiKey : prev.dedalusApiKey,
+              inceptionApiKey: parsed.provider === "inception" ? parsed.apiKey : prev.inceptionApiKey,
               step: "preferences",
               inputValue: "",
+              exchangeError: null,
             }));
           }
           break;
@@ -798,7 +841,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
   );
 
   const handleInputChange = useCallback((value: string) => {
-    setState((prev) => ({ ...prev, inputValue: value }));
+    setState((prev) => ({ ...prev, inputValue: value, exchangeError: null }));
   }, []);
 
   const handleSkip = useCallback(async () => {
@@ -1061,6 +1104,8 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
         <LLMStep
           exchangeConfigured={state.exchangeValidated}
           exchangeLabel={exchangeLabel}
+          llmConfigured={!!(state.openaiApiKey || state.inceptionApiKey || state.dedalusApiKey)}
+          error={state.exchangeError}
           inputValue={state.inputValue}
           onInputChange={handleInputChange}
           onSubmit={handleInputSubmit}
@@ -1080,7 +1125,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
         <DoneStep
           exchangeConfigured={state.exchangeValidated}
           exchangeLabel={exchangeLabel}
-          llmConfigured={!!state.openaiApiKey}
+          llmConfigured={!!(state.openaiApiKey || state.inceptionApiKey || state.dedalusApiKey)}
           chainKeys={state.chainKeys}
         />
       )}
@@ -1449,6 +1494,8 @@ function ValidatingStep({ exchangeLabel }: ValidatingStepProps): React.ReactElem
 interface LLMStepProps {
   exchangeConfigured: boolean;
   exchangeLabel: string;
+  llmConfigured: boolean;
+  error: string | null;
   inputValue: string;
   onInputChange: (value: string) => void;
   onSubmit: (value: string) => void;
@@ -1457,6 +1504,8 @@ interface LLMStepProps {
 function LLMStep({
   exchangeConfigured,
   exchangeLabel,
+  llmConfigured,
+  error,
   inputValue,
   onInputChange,
   onSubmit,
@@ -1475,38 +1524,49 @@ function LLMStep({
         </Box>
       )}
 
+      {llmConfigured && (
+        <Box marginBottom={1}>
+          <Text color="green">An LLM key is already configured. Enter a new key only if you want to replace it.</Text>
+        </Box>
+      )}
+
+      {error && (
+        <Box marginBottom={1} borderStyle="single" borderColor="red" paddingX={1}>
+          <Text color="red">{error}</Text>
+        </Box>
+      )}
+
       <Box flexDirection="column" marginBottom={1}>
         <Text color={COLORS.WHITE}>
           Gordon uses AI to analyze markets and generate trade plans.
         </Text>
         <Text color={COLORS.WHITE}>
-          You can use either OpenAI or Dedalus Labs API.
+          Enter one provider-key pair using explicit format.
         </Text>
       </Box>
 
       <Box flexDirection="column" marginBottom={1}>
-        <Text color={COLORS.TAN_DIM} bold>How to get an OpenAI API key:</Text>
+        <Text color={COLORS.TAN_DIM} bold>Accepted formats:</Text>
         <Box flexDirection="column" marginLeft={2}>
-          <Text color={COLORS.DIM}>1. Go to platform.openai.com</Text>
-          <Text color={COLORS.DIM}>2. Sign in or create an account</Text>
-          <Text color={COLORS.DIM}>3. Navigate to API keys</Text>
-          <Text color={COLORS.DIM}>4. Create a new secret key</Text>
+          <Text color={COLORS.DIM}>1. openai:sk-...</Text>
+          <Text color={COLORS.DIM}>2. inception:your-key</Text>
+          <Text color={COLORS.DIM}>3. dedalus:dd-...</Text>
         </Box>
       </Box>
 
       <Box marginBottom={1}>
         <Text color={COLORS.TAN_DIM}>
-          Alternatively, set OPENAI_API_KEY or DEDALUS_API_KEY environment variables.
+          Alternatively, set OPENAI_API_KEY, INCEPTION_API_KEY, or DEDALUS_API_KEY environment variables.
         </Text>
       </Box>
 
       <Box marginTop={1}>
-        <Text color={COLORS.WHITE}>Enter your OpenAI API Key: </Text>
+        <Text color={COLORS.WHITE}>Enter provider and API key: </Text>
         <TextInput
           value={inputValue}
           onChange={onInputChange}
           onSubmit={onSubmit}
-          placeholder="sk-..."
+          placeholder="openai:sk-..."
           mask="*"
         />
       </Box>

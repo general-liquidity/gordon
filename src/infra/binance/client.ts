@@ -101,6 +101,21 @@ const RATE_LIMIT_CONFIG = {
   throttleWarnIntervalMs: 10000,
 };
 
+const TICKER_CACHE_TTL_MS = 15_000;
+const TOP_SYMBOLS_CACHE_TTL_MS = 15_000;
+const TRADE_HISTORY_CONCURRENCY = 3;
+
+interface TickerCacheEntry {
+  expiresAt: number;
+  value: BinanceTicker24hr[];
+}
+
+interface TopSymbolsCacheEntry {
+  expiresAt: number;
+  count: number;
+  value: string[];
+}
+
 /**
  * Binance API Client
  */
@@ -111,6 +126,44 @@ export class BinanceClient {
   private rateLimitState: RateLimitState;
   private serverTimeOffset: number = 0;
   private serverTimeSynced: boolean = false;
+  private tickers24hCache: TickerCacheEntry | null = null;
+  private topSymbolsCache: TopSymbolsCacheEntry | null = null;
+  private inFlight24hrTickers: Promise<BinanceTicker24hr[]> | null = null;
+
+  private async mapWithConcurrency<TInput, TOutput>(
+    items: TInput[],
+    concurrency: number,
+    mapper: (item: TInput) => Promise<TOutput>
+  ): Promise<TOutput[]> {
+    if (items.length === 0) {
+      return [];
+    }
+
+    const results = new Array<TOutput>(items.length);
+    let nextIndex = 0;
+    const workerCount = Math.min(Math.max(concurrency, 1), items.length);
+
+    const worker = async (): Promise<void> => {
+      while (true) {
+        const currentIndex = nextIndex;
+        nextIndex += 1;
+
+        if (currentIndex >= items.length) {
+          return;
+        }
+
+        const item = items[currentIndex];
+        if (item === undefined) {
+          return;
+        }
+
+        results[currentIndex] = await mapper(item);
+      }
+    };
+
+    await Promise.all(Array.from({ length: workerCount }, () => worker()));
+    return results;
+  }
 
   constructor(apiKey: string, apiSecret: string, baseUrl = "https://api.binance.com") {
     this.apiKey = apiKey;
@@ -524,23 +577,53 @@ export class BinanceClient {
    * Get top N symbols by 24h quote volume
    */
   async getTopSymbols(n: number): Promise<string[]> {
-    const tickers = await this.publicRequest<BinanceTicker24hr[]>(
-      "/api/v3/ticker/24hr"
-    );
+    const now = Date.now();
+    if (this.topSymbolsCache && this.topSymbolsCache.expiresAt > now && this.topSymbolsCache.count >= n) {
+      return this.topSymbolsCache.value.slice(0, n);
+    }
 
-    // Filter for USDT pairs and sort by quote volume (USDT volume)
-    const usdtPairs = tickers
+    const tickers = await this.get24hrTickers();
+
+    const topSymbols = tickers
       .filter((t) => t.symbol.endsWith("USDT"))
-      .sort((a, b) => parseFloat(b.quoteVolume) - parseFloat(a.quoteVolume));
+      .sort((a, b) => parseFloat(b.quoteVolume) - parseFloat(a.quoteVolume))
+      .map((t) => t.symbol);
 
-    return usdtPairs.slice(0, n).map((t) => t.symbol);
+    this.topSymbolsCache = {
+      value: topSymbols,
+      count: topSymbols.length,
+      expiresAt: now + TOP_SYMBOLS_CACHE_TTL_MS,
+    };
+
+    return topSymbols.slice(0, n);
   }
 
   /**
    * Get all 24hr tickers (useful for market scanning)
    */
   async get24hrTickers(): Promise<BinanceTicker24hr[]> {
-    return this.publicRequest<BinanceTicker24hr[]>("/api/v3/ticker/24hr");
+    const now = Date.now();
+    if (this.tickers24hCache && this.tickers24hCache.expiresAt > now) {
+      return this.tickers24hCache.value;
+    }
+
+    if (this.inFlight24hrTickers) {
+      return this.inFlight24hrTickers;
+    }
+
+    this.inFlight24hrTickers = this.publicRequest<BinanceTicker24hr[]>("/api/v3/ticker/24hr")
+      .then((tickers) => {
+        this.tickers24hCache = {
+          value: tickers,
+          expiresAt: Date.now() + TICKER_CACHE_TTL_MS,
+        };
+        return tickers;
+      })
+      .finally(() => {
+        this.inFlight24hrTickers = null;
+      });
+
+    return this.inFlight24hrTickers;
   }
 
   /**
@@ -676,11 +759,11 @@ export class BinanceClient {
       const topSymbols = await this.getTopSymbols(10);
       const allTrades: BinanceTrade[] = [];
 
-      // Fetch trades for each symbol in parallel
-      const tradePromises = topSymbols.map((symbol) =>
-        this.getTradeHistory(symbol, Math.ceil(limit / 10))
+      const results = await this.mapWithConcurrency(
+        topSymbols,
+        TRADE_HISTORY_CONCURRENCY,
+        (symbol) => this.getTradeHistory(symbol, Math.ceil(limit / 10))
       );
-      const results = await Promise.all(tradePromises);
 
       for (const trades of results) {
         allTrades.push(...trades);

@@ -163,7 +163,7 @@ export const parallelScanAnalyzeTool = createTool({
   inputSchema: z.object({
     symbol: z.string().default("BTCUSDT").describe("Primary coin to analyze (e.g., 'BTCUSDT')"),
     topN: z.number().min(10).max(100).default(30).describe("Number of coins to scan"),
-    timeframes: z.array(z.string()).default(["1h", "4h"]).describe("Timeframes for analysis"),
+    timeframes: z.array(z.string()).default(["1h", "4h"]).describe("Ordered timeframe preference. The scan leg uses the first timeframe only; the deep analysis leg uses the full list."),
   }),
   outputSchema: parallelScanAnalyzeOutputSchema,
   execute: async ({ symbol, topN, timeframes }, execContext: MastraExecutionContext) => {

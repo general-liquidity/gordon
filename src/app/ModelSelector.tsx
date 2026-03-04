@@ -8,10 +8,10 @@ import React, { useState, useCallback, useEffect } from "react";
 import { Box, Text, useInput } from "ink";
 
 import { resetAgents } from "../infra/agents/index.ts";
-import { providerRegistry, DEDALUS_MODELS } from "../infra/providers/registry.ts";
+import { providerRegistry, getDedalusModels, refreshDedalusModels, resetProviderRegistry, getActiveRoute, type DirectProviderName } from "../infra/providers/registry.ts";
 import { loadConfig, saveConfig } from "../infra/storage/config.ts";
 import { saveEnvKeys } from "../infra/storage/env.ts";
-import type { GordonConfig } from "../types/index.ts";
+import type { GordonConfig, ProviderName } from "../types/index.ts";
 import { COLORS } from "./theme.ts";
 
 interface ModelOption {
@@ -34,10 +34,14 @@ interface ProviderOption {
 /**
  * Build provider list based on available API keys
  */
-function buildProviderList(): ProviderOption[] {
+async function buildProviderList(): Promise<ProviderOption[]> {
   const providers: ProviderOption[] = [];
   const hasDedalus = providerRegistry.hasDedalus();
   const directProviders = providerRegistry.getAvailableProviders();
+
+  if (hasDedalus) {
+    await refreshDedalusModels().catch(() => undefined);
+  }
 
   // Direct providers
   const directProviderConfigs = [
@@ -54,7 +58,7 @@ function buildProviderList(): ProviderOption[] {
       id: "anthropic",
       name: "Anthropic",
       models: [
-        { id: "claude-opus-4-5", name: "Claude Opus 4.5", description: "Most capable, excellent reasoning", tier: "flagship" as const },
+        { id: "claude-opus-4-6", name: "Claude Opus 4.6", description: "Most capable, excellent reasoning", tier: "flagship" as const },
         { id: "claude-sonnet-4-5", name: "Claude Sonnet 4.5", description: "Good balance of speed and capability", tier: "balanced" as const },
         { id: "claude-haiku-4-5", name: "Claude Haiku 4.5", description: "Fastest responses, lower cost", tier: "fast" as const },
       ],
@@ -67,10 +71,17 @@ function buildProviderList(): ProviderOption[] {
         { id: "gemini-3-flash-preview", name: "Gemini 3 Flash", description: "Fast and efficient", tier: "fast" as const },
       ],
     },
+    {
+      id: "inception",
+      name: "Inception Labs",
+      models: [
+        { id: "mercury-2", name: "Mercury 2", description: "128K context, fast tool-capable reasoning via Inception", tier: "flagship" as const },
+      ],
+    },
   ];
 
   for (const config of directProviderConfigs) {
-    const isConfigured = directProviders.includes(config.id as "openai" | "anthropic" | "google");
+    const isConfigured = directProviders.includes(config.id as DirectProviderName);
     providers.push({
       id: config.id,
       name: config.name,
@@ -91,7 +102,7 @@ function buildProviderList(): ProviderOption[] {
       name: "Dedalus Labs",
       configured: true,
       viaDedalus: true,
-      models: DEDALUS_MODELS.map((m) => ({
+      models: getDedalusModels().map((m) => ({
         id: m.id.split("/")[1] ?? m.id,
         fullId: m.id,
         name: m.name,
@@ -108,7 +119,7 @@ function buildProviderList(): ProviderOption[] {
 function getModelDescription(modelId: string): string {
   const descriptions: Record<string, string> = {
     "openai/gpt-5.2": "OpenAI's flagship model via Dedalus",
-    "anthropic/claude-opus-4-5": "Most capable Claude, excellent reasoning",
+    "anthropic/claude-opus-4-6": "Most capable Claude, excellent reasoning",
     "anthropic/claude-sonnet-4-5-20250929": "Balanced Claude with great tool use",
     "anthropic/claude-haiku-4-5-20251001": "Fast Claude for quick responses",
     "google/gemini-3-pro-preview": "Google's most capable model",
@@ -116,6 +127,7 @@ function getModelDescription(modelId: string): string {
     "xai/grok-4-1-fast-reasoning": "xAI's reasoning-optimized model",
     "xai/grok-4-1-fast-non-reasoning": "xAI's fast response model",
     "moonshot/kimi-k2.5": "Moonshot's extended context model",
+    "inception/mercury-2": "Mercury 2 via Inception's OpenAI-compatible API",
   };
   return descriptions[modelId] || "AI model via Dedalus";
 }
@@ -149,11 +161,12 @@ export function ModelSelector({ onComplete }: ModelSelectorProps): React.ReactEl
   useEffect(() => {
     const init = async () => {
       const config = await loadConfig();
-      const providers = buildProviderList();
+      const providers = await buildProviderList();
 
       // Find current provider index
-      const currentProvider = config.modelConfig?.provider || process.env.GORDON_PROVIDER || null;
-      const currentModel = config.modelConfig?.model || process.env.GORDON_MODEL || null;
+      const activeRoute = getActiveRoute();
+      const currentProvider = config.modelConfig?.provider || activeRoute.provider || null;
+      const currentModel = config.modelConfig?.model || activeRoute.modelString || null;
 
       let providerIndex = 0;
       if (currentProvider) {
@@ -181,14 +194,14 @@ export function ModelSelector({ onComplete }: ModelSelectorProps): React.ReactEl
     const config = await loadConfig();
 
     // Determine provider ID for config (use the prefix from fullId for Dedalus models)
-    const providerForConfig = selectedProvider.viaDedalus
+    const providerForConfig: ProviderName = selectedProvider.viaDedalus
       ? "dedalus"
-      : selectedProvider.id;
+      : (selectedProvider.id as ProviderName);
 
     const newConfig: GordonConfig = {
       ...config,
       modelConfig: {
-        provider: providerForConfig as "openai" | "anthropic" | "google",
+        provider: providerForConfig,
         model: selectedModel.fullId,
       },
     };
@@ -202,6 +215,7 @@ export function ModelSelector({ onComplete }: ModelSelectorProps): React.ReactEl
     });
 
     // Reset agent cache so next access reinitializes with new model
+    resetProviderRegistry();
     resetAgents();
 
     setState((prev) => ({ ...prev, step: "done" }));

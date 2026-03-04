@@ -17,6 +17,41 @@ import {
   type ResilientResult,
 } from "./fallback.ts";
 
+const BATCH_CONCURRENCY = 6;
+
+async function mapWithConcurrency<TInput>(
+  items: TInput[],
+  concurrency: number,
+  mapper: (item: TInput) => Promise<void>
+): Promise<void> {
+  if (items.length === 0) {
+    return;
+  }
+
+  const workerCount = Math.min(Math.max(concurrency, 1), items.length);
+  let nextIndex = 0;
+
+  const worker = async (): Promise<void> => {
+    while (true) {
+      const currentIndex = nextIndex;
+      nextIndex += 1;
+
+      if (currentIndex >= items.length) {
+        return;
+      }
+
+      const item = items[currentIndex];
+      if (item === undefined) {
+        return;
+      }
+
+      await mapper(item);
+    }
+  };
+
+  await Promise.all(Array.from({ length: workerCount }, () => worker()));
+}
+
 // ============================================================================
 // Default Configuration
 // ============================================================================
@@ -360,7 +395,7 @@ export async function resilientGetPrices(
 ): Promise<Map<string, ResilientResult<number>>> {
   const results = new Map<string, ResilientResult<number>>();
 
-  const promises = symbols.map(async (symbol) => {
+  await mapWithConcurrency(symbols, BATCH_CONCURRENCY, async (symbol) => {
     try {
       const result = await resilientGetPrice(binance, symbol, options);
       results.set(normalizeSymbol(symbol), result);
@@ -368,8 +403,6 @@ export async function resilientGetPrices(
       // Individual failures don't fail the batch
     }
   });
-
-  await Promise.all(promises);
   return results;
 }
 
@@ -382,7 +415,7 @@ export async function getPrices(
 ): Promise<Map<string, number>> {
   const results = new Map<string, number>();
 
-  const promises = symbols.map(async (symbol) => {
+  await mapWithConcurrency(symbols, BATCH_CONCURRENCY, async (symbol) => {
     try {
       const price = await getPrice(binance, symbol);
       results.set(normalizeSymbol(symbol), price);
@@ -390,8 +423,6 @@ export async function getPrices(
       // Individual failures don't fail the batch
     }
   });
-
-  await Promise.all(promises);
   return results;
 }
 

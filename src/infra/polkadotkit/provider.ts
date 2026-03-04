@@ -11,16 +11,26 @@
  * Required env vars: POLKADOT_PRIVATE_KEY or POLKADOT_MNEMONIC
  */
 
-import { PolkadotAgentKit } from "@polkadot-agent-kit/sdk";
-
 import { POLKADOT_ENV_KEYS } from "./types.ts";
 
 // ============================================================================
 // Singleton State
 // ============================================================================
 
-let _agentKit: PolkadotAgentKit | null = null;
-let _actions: Map<string, { name: string; invoke: (args: unknown) => Promise<string> }> | null = null;
+type PolkadotAction = { name: string; invoke: (args: unknown) => Promise<string> };
+
+interface PolkadotAgentKitLike {
+  initializeApi(): Promise<void>;
+  getActions(): PolkadotAction[];
+}
+
+let _agentKit: PolkadotAgentKitLike | null = null;
+let _actions: Map<string, PolkadotAction> | null = null;
+
+async function loadPolkadotAgentKit() {
+  const module = await import("@polkadot-agent-kit/sdk");
+  return module.PolkadotAgentKit;
+}
 
 // ============================================================================
 // Configuration Check
@@ -50,7 +60,7 @@ export function isPolkadotKitConfigured(): boolean {
  *
  * @throws Error if credentials are not configured
  */
-export async function getPolkadotKit(): Promise<PolkadotAgentKit> {
+export async function getPolkadotKit(): Promise<PolkadotAgentKitLike> {
   if (_agentKit) return _agentKit;
 
   if (!isPolkadotKitConfigured()) {
@@ -76,7 +86,8 @@ export async function getPolkadotKit(): Promise<PolkadotAgentKit> {
     config.chains = chains;
   }
 
-  _agentKit = new PolkadotAgentKit(config as ConstructorParameters<typeof PolkadotAgentKit>[0]);
+  const PolkadotAgentKit = await loadPolkadotAgentKit();
+  _agentKit = new PolkadotAgentKit(config) as PolkadotAgentKitLike;
 
   // Connect to chain RPCs
   await _agentKit.initializeApi();
@@ -102,7 +113,7 @@ export async function getPolkadotKit(): Promise<PolkadotAgentKit> {
  * @param actionName - Action name (e.g., "check_balance", "transfer_native")
  * @returns The action object with invoke(), or null if not found
  */
-export async function getAction(actionName: string): Promise<{ name: string; invoke: (args: unknown) => Promise<string> } | null> {
+export async function getAction(actionName: string): Promise<PolkadotAction | null> {
   await getPolkadotKit(); // Ensure initialized
   return _actions?.get(actionName) ?? null;
 }

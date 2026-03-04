@@ -1,12 +1,12 @@
 /**
  * LLM Client Types
- * Type definitions for multi-provider LLM support (OpenAI + Dedalus Labs)
+ * Type definitions for multi-provider LLM support.
  */
 
 /**
  * Supported LLM providers
  */
-export type LLMProvider = "openai" | "dedalus";
+export type LLMProvider = "openai" | "dedalus" | "inception";
 
 /**
  * Message role in a chat conversation
@@ -94,11 +94,18 @@ export type DedalusModel =
   | (string & {});
 
 /**
+ * Inception Labs model identifiers
+ */
+export type InceptionModel =
+  | "mercury-2"
+  | (string & {});
+
+/**
  * Model configuration for specific use cases
  */
 export interface ModelConfig {
   provider: LLMProvider;
-  model: OpenAIModel | DedalusModel;
+  model: OpenAIModel | DedalusModel | InceptionModel;
   temperature?: number;
   maxTokens?: number;
 }
@@ -162,6 +169,7 @@ export const GORDON_MODELS = {
 export interface LLMClientConfig {
   openaiApiKey?: string;
   dedalusApiKey?: string;
+  inceptionApiKey?: string;
   defaultProvider?: LLMProvider;
   defaultModel?: string;
   temperature?: number;
@@ -185,6 +193,7 @@ export interface ProviderConfig {
 export const API_ENDPOINTS = {
   openai: "https://api.openai.com/v1",
   dedalus: "https://api.dedaluslabs.ai/v1",
+  inception: "https://api.inceptionlabs.ai/v1",
 } as const;
 
 /**

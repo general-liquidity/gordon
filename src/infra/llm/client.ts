@@ -1,6 +1,6 @@
 /**
  * LLM Client
- * Multi-provider support for OpenAI (direct) and Dedalus Labs (orchestration)
+ * Multi-provider support for OpenAI, Inception Labs, and Dedalus Labs.
  */
 
 import { z } from "zod";
@@ -15,6 +15,7 @@ import type {
   OpenAIErrorResponse,
 } from "./types.ts";
 import { API_ENDPOINTS, GORDON_MODELS } from "./types.ts";
+import { getLegacyClientRoute } from "../providers/registry.ts";
 
 // Default configuration values
 const DEFAULT_PROVIDER: LLMProvider = "dedalus";
@@ -75,23 +76,26 @@ function getBackoffDelay(attempt: number): number {
  *
  * Supports:
  * - OpenAI direct (GPT-5.2 variants)
+ * - Inception Labs Mercury 2
  * - Dedalus Labs (multi-provider orchestration)
  */
 export class LLMClient {
   private openaiApiKey?: string;
   private dedalusApiKey?: string;
+  private inceptionApiKey?: string;
   private defaultProvider: LLMProvider;
   private defaultModel: string;
   private defaultTemperature: number;
   private defaultMaxTokens: number;
 
   constructor(config: LLMClientConfig) {
-    if (!config.openaiApiKey && !config.dedalusApiKey) {
-      throw new Error("LLMClient requires at least one API key (openaiApiKey or dedalusApiKey)");
+    if (!config.openaiApiKey && !config.dedalusApiKey && !config.inceptionApiKey) {
+      throw new Error("LLMClient requires at least one API key (openaiApiKey, inceptionApiKey, or dedalusApiKey)");
     }
 
     this.openaiApiKey = config.openaiApiKey;
     this.dedalusApiKey = config.dedalusApiKey;
+    this.inceptionApiKey = config.inceptionApiKey;
     this.defaultProvider = config.defaultProvider ?? DEFAULT_PROVIDER;
     this.defaultModel = config.defaultModel ?? DEFAULT_MODEL;
     this.defaultTemperature = config.temperature ?? DEFAULT_TEMPERATURE;
@@ -104,6 +108,9 @@ export class LLMClient {
     if (this.defaultProvider === "dedalus" && !this.dedalusApiKey) {
       throw new Error("Dedalus API key required when defaultProvider is 'dedalus'");
     }
+    if (this.defaultProvider === "inception" && !this.inceptionApiKey) {
+      throw new Error("Inception API key required when defaultProvider is 'inception'");
+    }
   }
 
   /**
@@ -115,12 +122,19 @@ export class LLMClient {
         throw new LLMError("OpenAI API key not configured", 401, "auth_error", provider);
       }
       return this.openaiApiKey;
-    } else {
-      if (!this.dedalusApiKey) {
-        throw new LLMError("Dedalus API key not configured", 401, "auth_error", provider);
-      }
-      return this.dedalusApiKey;
     }
+
+    if (provider === "inception") {
+      if (!this.inceptionApiKey) {
+        throw new LLMError("Inception API key not configured", 401, "auth_error", provider);
+      }
+      return this.inceptionApiKey;
+    }
+
+    if (!this.dedalusApiKey) {
+      throw new LLMError("Dedalus API key not configured", 401, "auth_error", provider);
+    }
+    return this.dedalusApiKey;
   }
 
   /**
@@ -288,8 +302,13 @@ export class LLMClient {
     messages: Message[],
     preset: keyof typeof GORDON_MODELS
   ): Promise<LLMResponse> {
-    const config = GORDON_MODELS[preset];
-    return this.chatWithConfig(messages, config);
+    const presetConfig = GORDON_MODELS[preset];
+    return this.chatWithConfig(messages, {
+      provider: this.defaultProvider,
+      model: this.defaultModel,
+      temperature: presetConfig.temperature,
+      maxTokens: presetConfig.maxTokens,
+    });
   }
 
   /**
@@ -363,21 +382,35 @@ export class LLMClient {
    * Convenience method for intent parsing (fast, cheap)
    */
   async parseIntent<T>(messages: Message[], schema: z.ZodSchema<T>): Promise<T> {
-    return this.chatWithJSON(messages, schema, GORDON_MODELS.intentParsing);
+    const preset = GORDON_MODELS.intentParsing;
+    return this.chatWithJSON(messages, schema, {
+      temperature: preset.temperature,
+      maxTokens: preset.maxTokens,
+    });
   }
 
   /**
    * Convenience method for plan generation (reasoning)
    */
   async generatePlan<T>(messages: Message[], schema: z.ZodSchema<T>): Promise<T> {
-    return this.chatWithJSON(messages, schema, GORDON_MODELS.planGeneration);
+    const preset = GORDON_MODELS.planGeneration;
+    return this.chatWithJSON(messages, schema, {
+      temperature: preset.temperature,
+      maxTokens: preset.maxTokens,
+    });
   }
 
   /**
    * Convenience method for explanations
    */
   async explain(messages: Message[]): Promise<LLMResponse> {
-    return this.chatWithConfig(messages, GORDON_MODELS.explanations);
+    const preset = GORDON_MODELS.explanations;
+    return this.chatWithConfig(messages, {
+      provider: this.defaultProvider,
+      model: this.defaultModel,
+      temperature: preset.temperature,
+      maxTokens: preset.maxTokens,
+    });
   }
 
   /**
@@ -385,6 +418,7 @@ export class LLMClient {
    */
   hasProvider(provider: LLMProvider): boolean {
     if (provider === "openai") return !!this.openaiApiKey;
+    if (provider === "inception") return !!this.inceptionApiKey;
     if (provider === "dedalus") return !!this.dedalusApiKey;
     return false;
   }
@@ -395,6 +429,7 @@ export class LLMClient {
   getAvailableProviders(): LLMProvider[] {
     const providers: LLMProvider[] = [];
     if (this.openaiApiKey) providers.push("openai");
+    if (this.inceptionApiKey) providers.push("inception");
     if (this.dedalusApiKey) providers.push("dedalus");
     return providers;
   }
@@ -404,10 +439,20 @@ export class LLMClient {
  * Create a client from environment variables
  */
 export function createLLMClientFromEnv(): LLMClient {
+  const configuredProvider = process.env.GORDON_PROVIDER;
+  const configuredModel = process.env.GORDON_MODEL ?? process.env.LLM_DEFAULT_MODEL;
+  const route = getLegacyClientRoute(configuredProvider, configuredModel);
+
+  const defaultProvider: LLMProvider =
+    route.provider === "dedalus" || route.provider === "inception" || route.provider === "openai"
+      ? route.provider
+      : "dedalus";
+
   return new LLMClient({
     openaiApiKey: process.env.OPENAI_API_KEY,
     dedalusApiKey: process.env.DEDALUS_API_KEY,
-    defaultProvider: (process.env.LLM_DEFAULT_PROVIDER as LLMProvider) ?? "dedalus",
-    defaultModel: process.env.LLM_DEFAULT_MODEL,
+    inceptionApiKey: process.env.INCEPTION_API_KEY,
+    defaultProvider,
+    defaultModel: route.transportModelId,
   });
 }

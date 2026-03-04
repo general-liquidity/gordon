@@ -18,6 +18,7 @@ import {
 } from "./env-validation.ts";
 import { createKeyringProvider, KEYRING_SUPPORTED_KEYS } from "./keyring.ts";
 import { GORDON_DIR } from "./paths.ts";
+import { resetProviderRegistry } from "../providers/index.ts";
 const GORDON_ENV_PATH = join(GORDON_DIR, ".env");
 
 // Secondary location: current working directory (for development)
@@ -29,6 +30,7 @@ const ENV_FILE_PATH = GORDON_ENV_PATH;
 export interface EnvKeys {
   OPENAI_API_KEY?: string;
   DEDALUS_API_KEY?: string;
+  INCEPTION_API_KEY?: string;
   BINANCE_API_KEY?: string;
   BINANCE_API_SECRET?: string;
   BINANCE_US_API_KEY?: string;
@@ -41,6 +43,7 @@ export interface EnvKeys {
   BITFINEX_API_KEY?: string;
   BITFINEX_API_SECRET?: string;
   HYPERLIQUID_PRIVATE_KEY?: string;
+  TINYFISH_API_KEY?: string;
   UNISWAP_API_KEY?: string;
   THEGRAPH_API_KEY?: string;
   GORDON_PROVIDER?: string;
@@ -64,12 +67,14 @@ export interface EnvKeys {
 export interface EnvStatus {
   fileExists: boolean;
   hasLLMKey: boolean;
+  hasInceptionKey: boolean;
   hasBinanceKeys: boolean;
   hasBinanceUSKeys: boolean;
   hasCoinbaseKeys: boolean;
   hasKrakenKeys: boolean;
   hasBitfinexKeys: boolean;
   hasHyperliquidKey: boolean;
+  hasTinyfishKey: boolean;
   hasUniswapKey: boolean;
   hasGraphKey: boolean;
   // Chain provider status
@@ -158,12 +163,12 @@ function findEnvFilePath(): string | null {
 
 /** All tracked env key names (single source of truth) */
 const ENV_KEY_NAMES: (keyof EnvKeys)[] = [
-  "OPENAI_API_KEY", "DEDALUS_API_KEY",
+  "OPENAI_API_KEY", "DEDALUS_API_KEY", "INCEPTION_API_KEY",
   "BINANCE_API_KEY", "BINANCE_API_SECRET", "BINANCE_US_API_KEY", "BINANCE_US_API_SECRET",
   "COINBASE_API_KEY", "COINBASE_API_SECRET", "COINBASE_PASSPHRASE",
   "KRAKEN_API_KEY", "KRAKEN_API_SECRET",
   "BITFINEX_API_KEY", "BITFINEX_API_SECRET",
-  "HYPERLIQUID_PRIVATE_KEY", "UNISWAP_API_KEY", "THEGRAPH_API_KEY", "GORDON_PROVIDER", "GORDON_MODEL",
+  "HYPERLIQUID_PRIVATE_KEY", "TINYFISH_API_KEY", "UNISWAP_API_KEY", "THEGRAPH_API_KEY", "GORDON_PROVIDER", "GORDON_MODEL",
   "SOLANA_PRIVATE_KEY", "SOLANA_RPC_URL",
   "POLKADOT_MNEMONIC", "POLKADOT_PRIVATE_KEY",
   "CHAINLINK_API_KEY", "CHAINLINK_API_SECRET", "EVM_PRIVATE_KEY",
@@ -176,13 +181,15 @@ const ENV_KEY_NAMES: (keyof EnvKeys)[] = [
 function buildEnvStatus(keys: EnvKeys, fileExists: boolean): EnvStatus {
   return {
     fileExists,
-    hasLLMKey: !!(keys.OPENAI_API_KEY || keys.DEDALUS_API_KEY),
+    hasLLMKey: !!(keys.OPENAI_API_KEY || keys.DEDALUS_API_KEY || keys.INCEPTION_API_KEY),
+    hasInceptionKey: !!keys.INCEPTION_API_KEY,
     hasBinanceKeys: !!(keys.BINANCE_API_KEY && keys.BINANCE_API_SECRET),
     hasBinanceUSKeys: !!(keys.BINANCE_US_API_KEY && keys.BINANCE_US_API_SECRET),
     hasCoinbaseKeys: !!(keys.COINBASE_API_KEY && keys.COINBASE_API_SECRET && keys.COINBASE_PASSPHRASE),
     hasKrakenKeys: !!(keys.KRAKEN_API_KEY && keys.KRAKEN_API_SECRET),
     hasBitfinexKeys: !!(keys.BITFINEX_API_KEY && keys.BITFINEX_API_SECRET),
     hasHyperliquidKey: !!keys.HYPERLIQUID_PRIVATE_KEY,
+    hasTinyfishKey: !!keys.TINYFISH_API_KEY,
     hasUniswapKey: !!keys.UNISWAP_API_KEY,
     hasGraphKey: !!keys.THEGRAPH_API_KEY,
     hasSolanaKey: !!keys.SOLANA_PRIVATE_KEY,
@@ -224,6 +231,10 @@ export async function checkEnvStatus(): Promise<EnvStatus> {
  * Checks ~/.gordon/.env first, then cwd/.env
  */
 export async function loadEnvFile(): Promise<void> {
+  const shellEnvKeys = new Set<string>(
+    ENV_KEY_NAMES.filter((name) => !!process.env[name]).map((name) => String(name))
+  );
+
   const envPath = findEnvFilePath();
   if (envPath) {
     const file = Bun.file(envPath);
@@ -232,21 +243,23 @@ export async function loadEnvFile(): Promise<void> {
 
     // Only set if not already in process.env (process.env takes precedence)
     for (const [key, value] of Object.entries(parsed)) {
-      if (!process.env[key]) {
+      if (!shellEnvKeys.has(key) && !process.env[key]) {
         process.env[key] = value;
       }
     }
   }
 
-  // Load from keyring if enabled (overrides .env but not process.env)
-  await loadKeysFromKeyring();
+  // Load from keyring if enabled (overrides .env but not original shell env)
+  await loadKeysFromKeyring(shellEnvKeys);
+
+  resetProviderRegistry();
 }
 
 /**
  * Load keys from OS keyring into process.env (if enabled)
- * Only sets keys not already present in process.env
+ * Only overrides values that did not originate from the shell environment
  */
-async function loadKeysFromKeyring(): Promise<void> {
+async function loadKeysFromKeyring(shellEnvKeys: ReadonlySet<string>): Promise<void> {
   try {
     // Read config directly to check useKeyring (avoid circular dependency)
     const configFile = Bun.file(join(GORDON_DIR, "config.json"));
@@ -260,7 +273,7 @@ async function loadKeysFromKeyring(): Promise<void> {
     if (!(await keyring.isAvailable())) return;
 
     for (const key of KEYRING_SUPPORTED_KEYS) {
-      if (!process.env[key]) {
+      if (!shellEnvKeys.has(key)) {
         const value = await keyring.get(key);
         if (value) {
           process.env[key] = value;
@@ -326,6 +339,9 @@ export async function saveEnvKeys(newKeys: Partial<EnvKeys>): Promise<void> {
       updatedKeys[key] = formatEnvLine(key, value);
       // Also set in process.env for immediate use
       process.env[key] = value;
+      if (key === "OPENAI_API_KEY" && !process.env.GORDON_NATIVE_OPENAI_API_KEY) {
+        process.env.GORDON_NATIVE_OPENAI_API_KEY = value;
+      }
     }
   }
 
@@ -365,6 +381,7 @@ export async function saveEnvKeys(newKeys: Partial<EnvKeys>): Promise<void> {
 
   // Always write to ~/.gordon/.env
   await Bun.write(GORDON_ENV_PATH, lines.join("\n") + "\n");
+  resetProviderRegistry();
 }
 
 /**
@@ -391,6 +408,12 @@ export async function createEnvFile(keys: Partial<EnvKeys>): Promise<void> {
     lines.push(formatEnvLine("DEDALUS_API_KEY", keys.DEDALUS_API_KEY));
   } else {
     lines.push("# DEDALUS_API_KEY=dd-...");
+  }
+
+  if (keys.INCEPTION_API_KEY) {
+    lines.push(formatEnvLine("INCEPTION_API_KEY", keys.INCEPTION_API_KEY));
+  } else {
+    lines.push("# INCEPTION_API_KEY=...");
   }
 
   lines.push("");
@@ -481,6 +504,15 @@ export async function createEnvFile(keys: Partial<EnvKeys>): Promise<void> {
     lines.push(formatEnvLine("HYPERLIQUID_PRIVATE_KEY", keys.HYPERLIQUID_PRIVATE_KEY));
   } else {
     lines.push("# HYPERLIQUID_PRIVATE_KEY=");
+  }
+
+  lines.push("");
+  lines.push("# Tinyfish (browser-native research and automation)");
+
+  if (keys.TINYFISH_API_KEY) {
+    lines.push(formatEnvLine("TINYFISH_API_KEY", keys.TINYFISH_API_KEY));
+  } else {
+    lines.push("# TINYFISH_API_KEY=");
   }
 
   lines.push("");
@@ -607,7 +639,7 @@ export async function createEnvFile(keys: Partial<EnvKeys>): Promise<void> {
   if (keys.GORDON_MODEL) {
     lines.push(formatEnvLine("GORDON_MODEL", keys.GORDON_MODEL));
   } else {
-    lines.push("# GORDON_MODEL=gpt-4o");
+    lines.push("# GORDON_MODEL=openai/gpt-5.2");
   }
 
   // Always write to ~/.gordon/.env
@@ -617,8 +649,13 @@ export async function createEnvFile(keys: Partial<EnvKeys>): Promise<void> {
   for (const [key, value] of Object.entries(keys)) {
     if (value) {
       process.env[key] = value;
+      if (key === "OPENAI_API_KEY" && !process.env.GORDON_NATIVE_OPENAI_API_KEY) {
+        process.env.GORDON_NATIVE_OPENAI_API_KEY = value;
+      }
     }
   }
+
+  resetProviderRegistry();
 }
 
 /**
@@ -658,10 +695,10 @@ export async function isReadyForTrading(): Promise<{ ready: boolean; reason?: st
 export async function isReadyForLLM(): Promise<{ ready: boolean; reason?: string }> {
   const validation = await validateEnv();
 
-  if (!validation.keys.OPENAI_API_KEY && !validation.keys.DEDALUS_API_KEY) {
+  if (!validation.keys.OPENAI_API_KEY && !validation.keys.DEDALUS_API_KEY && !validation.keys.INCEPTION_API_KEY) {
     return {
       ready: false,
-      reason: "No LLM API key configured. Set OPENAI_API_KEY or DEDALUS_API_KEY.",
+      reason: "No LLM API key configured. Set OPENAI_API_KEY, INCEPTION_API_KEY, or DEDALUS_API_KEY.",
     };
   }
 

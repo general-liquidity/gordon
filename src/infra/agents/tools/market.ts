@@ -114,7 +114,7 @@ export const scanMarketTool = createTool({
     timeframes: z
       .array(z.string())
       .default(["1h", "4h"])
-      .describe("Timeframes to analyze"),
+      .describe("Ordered timeframe preference for scan ranking. The scanner uses the first timeframe only for fast market scans."),
   }),
   outputSchema: scanMarketOutputSchema,
   execute: async ({ topN, timeframes }, execContext: MastraExecutionContext) => {

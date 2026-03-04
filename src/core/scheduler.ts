@@ -6,10 +6,11 @@
  */
 
 import type { Exchange } from "../infra/exchange/index.ts";
-import { scan, type ScanOptions } from "./scanner.ts";
+import type { ScanOptions } from "./scanner.ts";
 import { createModuleLogger } from "../infra/logger/index.ts";
 import { emitEvent } from "../events/index.ts";
 import type { CoinAnalysis } from "../types/index.ts";
+import { runSharedScan } from "./market-data-coordinator.ts";
 
 const logger = createModuleLogger("scheduler");
 
@@ -49,7 +50,7 @@ const DEFAULT_CONFIG: SchedulerConfig = {
   intervalMs: 3600000, // 1 hour
   scanOptions: {
     topN: 50,
-    timeframes: ["1h", "4h"],
+    timeframes: ["1h"],
   },
   minConfidence: 0.5,
 };
@@ -65,6 +66,30 @@ let state: SchedulerState = {
 
 let currentConfig: SchedulerConfig = { ...DEFAULT_CONFIG };
 let exchangeClient: Exchange | null = null;
+let scanInFlight: Promise<CoinAnalysis[]> | null = null;
+
+function runScheduledScanSafely(trigger: "startup" | "interval" | "manual"): Promise<CoinAnalysis[]> {
+  if (scanInFlight) {
+    if (trigger !== "manual") {
+      logger.debug("Skipping scheduled scan trigger because previous scan is still running", { trigger });
+    }
+    return scanInFlight;
+  }
+
+  const scanPromise = runScheduledScan()
+    .catch((error) => {
+      logger.error("Scheduled scan failed", error as Error);
+      return [];
+    })
+    .finally(() => {
+      if (scanInFlight === scanPromise) {
+        scanInFlight = null;
+      }
+    });
+
+  scanInFlight = scanPromise;
+  return scanPromise;
+}
 
 /**
  * Run a single scheduled scan
@@ -81,7 +106,7 @@ async function runScheduledScan(): Promise<CoinAnalysis[]> {
   });
 
   try {
-    const result = await scan(exchangeClient, currentConfig.scanOptions);
+    const result = await runSharedScan(exchangeClient, currentConfig.scanOptions);
 
     state.scanCount++;
     state.lastScanTime = new Date();
@@ -146,15 +171,11 @@ export function startScheduler(
   state.isRunning = true;
 
   // Run immediately on start
-  runScheduledScan().catch((err) => {
-    logger.error("Initial scheduled scan failed", err as Error);
-  });
+  void runScheduledScanSafely("startup");
 
   // Set up interval
   state.intervalId = setInterval(() => {
-    runScheduledScan().catch((err) => {
-      logger.error("Scheduled scan failed", err as Error);
-    });
+    void runScheduledScanSafely("interval");
   }, currentConfig.intervalMs);
 
   emitEvent("scheduler:started", {
@@ -199,9 +220,7 @@ export function updateSchedulerConfig(config: Partial<SchedulerConfig>): void {
   if (config.intervalMs && state.isRunning && state.intervalId) {
     clearInterval(state.intervalId);
     state.intervalId = setInterval(() => {
-      runScheduledScan().catch((err) => {
-        logger.error("Scheduled scan failed", err as Error);
-      });
+      void runScheduledScanSafely("interval");
     }, currentConfig.intervalMs);
 
     logger.info("Scheduler interval updated", {
@@ -247,7 +266,7 @@ export async function triggerImmediateScan(): Promise<CoinAnalysis[]> {
   }
 
   logger.info("Triggering immediate scan");
-  return runScheduledScan();
+  return runScheduledScanSafely("manual");
 }
 
 /**

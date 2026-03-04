@@ -28,8 +28,9 @@ const gordonOutputSanitizer = new GordonOutputSanitizer();
 import { Memory } from "@mastra/memory";
 import { LibSQLStore, LibSQLVector } from "@mastra/libsql";
 
-import { getModel, getFastModel } from "../providers/registry.ts";
+import { getFastMastraModel, getMastraModel, type MastraModelConfig } from "../providers/registry.ts";
 import { getMastraInstance } from "../observability/tracing.ts";
+import { LocalEmbeddingProvider } from "../../core/memory/embeddings.ts";
 import {
   indicatorTools,
   explainTools,
@@ -100,7 +101,7 @@ import {
   generatePerformanceContext,
   formatPerformanceContextForPrompt,
 } from "../evals/feedbackLoop.ts";
-import type { MemoryConfig } from "../../types/index.ts";
+import type { GordonConfig, MemoryConfig } from "../../types/index.ts";
 
 // ============================================================================
 // Memory Configuration & Session Management
@@ -412,6 +413,18 @@ const WORKING_MEMORY_TEMPLATE = `
  * - Memory processors: Auto-configured (MessageHistory, SemanticRecall, WorkingMemory)
  * - Configurable lastMessages via _memoryConfig
  */
+function createMastraLocalEmbedder() {
+  const provider = new LocalEmbeddingProvider();
+
+  return {
+    modelId: provider.name,
+    async doEmbed(args: { values: string[] }): Promise<{ embeddings: number[][] }> {
+      const embeddings = await provider.embedBatch(args.values);
+      return { embeddings };
+    },
+  };
+}
+
 function createMemory(): Memory {
   const dbUrl = process.env.DATABASE_URL || "file:gordon.db";
   const vectorDbUrl = process.env.VECTOR_DATABASE_URL || "file:gordon-vector.db";
@@ -429,7 +442,7 @@ function createMemory(): Memory {
       id: "gordon-vector",
       url: vectorDbUrl,
     }),
-    embedder: "openai/text-embedding-3-small",
+    embedder: createMastraLocalEmbedder(),
     options: {
       lastMessages,
       semanticRecall: {
@@ -445,7 +458,7 @@ function createMemory(): Memory {
       },
       generateTitle: true,
       observationalMemory: {
-        model: getFastModel(),
+        model: getFastMastraModel(),
         scope: "thread",
         observation: {
           messageTokens: 30_000,
@@ -1131,6 +1144,38 @@ function registerObservability(agent: Agent): void {
   }
 }
 
+function resolveRuntimeModel(args?: { requestContext?: { get: (key: string) => unknown } }): MastraModelConfig {
+  const requestConfig = args?.requestContext?.get?.("config") as GordonConfig | undefined;
+  const provider = requestConfig?.modelConfig?.provider ?? process.env.GORDON_PROVIDER;
+  const model = requestConfig?.modelConfig?.model ?? process.env.GORDON_MODEL;
+  return getMastraModel(provider, model);
+}
+
+function formatModelLabel(model: MastraModelConfig): string {
+  if (typeof model === "string") {
+    return model;
+  }
+
+  if (typeof model.id === "string" && model.id.length > 0) {
+    return model.id;
+  }
+
+  const providerId =
+    typeof model.providerId === "string" && model.providerId.length > 0
+      ? model.providerId
+      : undefined;
+  const modelId =
+    typeof model.modelId === "string" && model.modelId.length > 0
+      ? model.modelId
+      : undefined;
+
+  if (providerId && modelId) {
+    return `${providerId}/${modelId}`;
+  }
+
+  return JSON.stringify(model);
+}
+
 /**
  * Get or create the Scanner Agent
  */
@@ -1144,7 +1189,7 @@ function getScannerAgent(): Agent {
         "Use when the user wants to find coins to trade, asks 'what should I buy?', " +
         "needs market overview, wants to discover new coins, or asks about strategies.",
       instructions: SCANNER_INSTRUCTIONS,
-      model: getModel(process.env.GORDON_PROVIDER, process.env.GORDON_MODEL),
+      model: resolveRuntimeModel,
       tools: {
         ...instrumentedIndicatorTools,
         ...instrumentedMarketDataTools,  // Raw market data: candles, prices, tickers, book tickers
@@ -1232,7 +1277,7 @@ function getAnalystAgent(): Agent {
         "needs to understand support/resistance levels, wants whale analysis, " +
         "breakout detection, or order book depth analysis.",
       instructions: ANALYST_INSTRUCTIONS,
-      model: getModel(process.env.GORDON_PROVIDER, process.env.GORDON_MODEL),
+      model: resolveRuntimeModel,
       tools: {
         ...instrumentedIndicatorTools,
         ...instrumentedMarketDataTools,        // Raw market data: candles, prices, tickers, book tickers
@@ -1361,7 +1406,7 @@ function getPlannerAgent(): Agent {
         "Use when user wants to create a trade plan, buy a coin, needs help with position sizing, " +
         "Kelly criterion calculations, or pre-trade risk assessment.",
       instructions: PLANNER_INSTRUCTIONS,
-      model: getModel(process.env.GORDON_PROVIDER, process.env.GORDON_MODEL),
+      model: resolveRuntimeModel,
       tools: {
         ...instrumentedIndicatorTools,
         ...instrumentedStrategyTools,  // Strategy library tools for plan creation
@@ -1432,7 +1477,7 @@ function getExecutorAgent(): Agent {
         "Use when user wants to execute a plan, place a market or limit order, " +
         "swap/convert coins, buy or sell spot, cancel an order, or arm the system.",
       instructions: EXECUTOR_INSTRUCTIONS,
-      model: getModel(process.env.GORDON_PROVIDER, process.env.GORDON_MODEL),
+      model: resolveRuntimeModel,
       tools: {
         execute_plan: instrumentedTradingTools.execute_plan,
         close_trade: instrumentedTradingTools.close_trade,
@@ -1575,7 +1620,7 @@ function getMonitorAgent(): Agent {
         "exit conditions, drawdown status, " +
         "or wants to transfer funds between wallets (spot, funding, futures, margin).",
       instructions: MONITOR_INSTRUCTIONS,
-      model: getModel(process.env.GORDON_PROVIDER, process.env.GORDON_MODEL),
+      model: resolveRuntimeModel,
       tools: {
         check_positions: instrumentedPositionTools.check_positions,
         ...instrumentedAccountTools,
@@ -1664,7 +1709,7 @@ function getTeacherAgent(): Agent {
         "Use when user asks 'what is X?', needs help understanding something, " +
         "or is confused about trading terms.",
       instructions: TEACHER_INSTRUCTIONS,
-      model: getModel(process.env.GORDON_PROVIDER, process.env.GORDON_MODEL),
+      model: resolveRuntimeModel,
       tools: {
         explain: instrumentedExplainTools.explain,
         strategy_explain: instrumentedStrategyGenerationTools.strategy_explain,
@@ -1711,7 +1756,7 @@ function getBacktesterAgent(): Agent {
         "Use when user asks to backtest, test a strategy historically, optimize parameters, " +
         "or compare strategy performance.",
       instructions: BACKTESTER_INSTRUCTIONS,
-      model: getModel(process.env.GORDON_PROVIDER, process.env.GORDON_MODEL),
+      model: resolveRuntimeModel,
       tools: {
         // Core backtesting tools
         ...instrumentedBacktestTools,
@@ -1753,8 +1798,9 @@ function getBacktesterAgent(): Agent {
  */
 function getGordonAgent(): Agent {
   if (!_agents.gordon) {
-    const model = getModel(process.env.GORDON_PROVIDER, process.env.GORDON_MODEL);
-    console.log(`[Gordon] Initializing agent with model: ${model}`);
+    const model = resolveRuntimeModel();
+    const modelLabel = formatModelLabel(model);
+    console.log(`[Gordon] Initializing agent with model: ${modelLabel}`);
 
     _agents.gordon = new Agent({
       id: "gordon",

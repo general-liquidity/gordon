@@ -45,6 +45,7 @@ import { getTrade } from "../../infra/storage/trades.ts";
 import { executeEmergencyLiquidation } from "../../core/safety/emergency-liquidation.ts";
 import { cleanupStalePositions } from "../../core/positions/cleanup.ts";
 import { getAutonomousLoopStatus, runAutonomousCycleOnce } from "../../core/autonomous-loop.ts";
+import { executeTinyfishMonitorRun } from "../../infra/tinyfish/service.ts";
 
 const logger = createModuleLogger("gateway-runtime");
 
@@ -422,6 +423,15 @@ export class GatewayRuntime {
       } catch (err) {
         return { ran: false, reason: (err as Error).message };
       }
+    });
+
+    this.registerHandler("tinyfish.monitor.run", async (envelope) => {
+      const payload = envelope.command.payload as { monitorId: string };
+      return executeTinyfishMonitorRun({
+        monitorId: payload.monitorId,
+        correlationId: envelope.meta.correlationId,
+        actor: "daemon",
+      });
     });
 
   }

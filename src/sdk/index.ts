@@ -15,7 +15,7 @@
  * await client.connect();
  *
  * // Scan the market
- * const scanResult = await client.scan({ topN: 25, timeframes: ["1h", "4h"] });
+ * const scanResult = await client.scan({ topN: 25, timeframes: ["1h"] });
  *
  * // Arm the system for 2 hours
  * await client.arm({ durationHours: 2, reason: "Momentum trade window" });

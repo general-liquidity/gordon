@@ -13,6 +13,10 @@ import { runBacktest } from "../../backtest/engine.ts";
 import { fetchHistoricalData } from "../../backtest/data/historical.ts";
 import { formatBacktestSummary } from "../../backtest/reporting/formatter.ts";
 import type { BacktestResult, BacktestConfig } from "../../backtest/types.ts";
+import { createStreamingWorkflow, type StreamingWorkflowResult } from "../../infra/agents/index.ts";
+import { TinyfishClient, summarizeTinyfishResult } from "../../infra/tinyfish/client.ts";
+import { buildTinyfishRequest, runTinyfishResearch, scheduleTinyfishMonitor } from "../../infra/tinyfish/service.ts";
+import type { TinyfishSSEEvent, TinyfishRunResponse } from "../../infra/tinyfish/types.ts";
 
 // ============================================================================
 // Types
@@ -41,7 +45,14 @@ export interface WorkflowStep {
   duration?: number;
 }
 
-type WorkflowType = "quick" | "dd" | "backtest-cycle";
+type WorkflowType = "quick" | "dd" | "backtest-cycle" | "web-dd" | "web-monitor";
+
+export interface TinyfishWorkflowStreamEvent {
+  event: string;
+  status: "running" | "completed" | "failed";
+  summary?: string;
+  data?: unknown;
+}
 
 // ============================================================================
 // Workflow Definitions
@@ -186,7 +197,7 @@ async function runDueDiligenceWorkflow(
   steps.push({ name: "scan", status: "running" });
   const scanStart = Date.now();
   try {
-    const scanResult = await scan(ctx.exchange, { topN: 50, timeframes: ["1h", "4h"] });
+    const scanResult = await scan(ctx.exchange, { topN: 50, timeframes: ["1h"] });
     const position = scanResult.coins.findIndex((c) => c.symbol === normalizedSymbol);
     const topOpportunities = scanResult.coins
       .filter((c) => c.setupDetected)
@@ -529,6 +540,268 @@ async function runBacktestCycleWorkflow(
   };
 }
 
+function getTinyfishWorkflowSummary(response: TinyfishRunResponse): string {
+  return response.summary ?? summarizeTinyfishResult(response.result ?? response.raw) ?? "Tinyfish run completed.";
+}
+
+function mapTinyfishSseEvent(event: TinyfishSSEEvent): TinyfishWorkflowStreamEvent {
+  const payload =
+    typeof event.data === "object" && event.data !== null
+      ? (event.data as Record<string, unknown>)
+      : undefined;
+  const summary = (() => {
+    if (typeof event.data === "string") return event.data;
+    if (payload && typeof payload.summary === "string") return payload.summary;
+    if (payload && typeof payload.message === "string") return payload.message;
+    if (payload && typeof payload.status === "string") return payload.status;
+    return event.event;
+  })();
+
+  const status =
+    event.event === "error" ? "failed" :
+    event.event === "done" || event.event === "complete" ? "completed" :
+    "running";
+
+  return {
+    event: event.event,
+    status,
+    summary,
+    data: payload ?? event.data,
+  };
+}
+
+export function createTinyfishDueDiligenceStream(
+  url: string,
+  goal: string,
+  options?: {
+    browserProfile?: string;
+    proxyCountry?: string;
+  },
+): StreamingWorkflowResult<TinyfishWorkflowStreamEvent> {
+  return createStreamingWorkflow<TinyfishWorkflowStreamEvent>(
+    async function* () {
+      const client = new TinyfishClient();
+      if (!client.isConfigured()) {
+        yield {
+          event: "error",
+          status: "failed",
+          summary: "Tinyfish not configured. Set TINYFISH_API_KEY.",
+        };
+        return;
+      }
+
+      yield {
+        event: "start",
+        status: "running",
+        summary: `Starting Tinyfish due diligence for ${url}`,
+        data: { url, goal },
+      };
+
+      try {
+        for await (const event of client.runSSE(
+          buildTinyfishRequest({
+            url,
+            goal,
+            browserProfile: options?.browserProfile,
+            proxyCountry: options?.proxyCountry,
+            allowAuthenticated: false,
+            metadata: { source: "workflow.web-dd" },
+          }),
+        )) {
+          yield mapTinyfishSseEvent(event);
+        }
+      } catch (error) {
+        yield {
+          event: "error",
+          status: "failed",
+          summary: error instanceof Error ? error.message : String(error),
+        };
+        return;
+      }
+
+      yield {
+        event: "done",
+        status: "completed",
+        summary: `Tinyfish due diligence stream completed for ${url}`,
+      };
+    },
+    {
+      enableHeartbeat: true,
+      heartbeatInterval: 5000,
+      metadata: { source: "workflow.web-dd" },
+    },
+  );
+}
+
+async function runTinyfishDueDiligenceWorkflow(
+  url: string,
+  goal: string,
+  _ctx: WorkflowContext,
+): Promise<WorkflowResult> {
+  const client = new TinyfishClient();
+  if (!client.isConfigured()) {
+    return {
+      success: false,
+      workflow: "web-dd",
+      steps: [],
+      summary: "Tinyfish not configured. Set TINYFISH_API_KEY before running web due diligence.",
+      error: "Tinyfish not configured",
+    };
+  }
+
+  const steps: WorkflowStep[] = [];
+  steps.push({ name: "research", status: "running" });
+  const researchStart = Date.now();
+  let response: TinyfishRunResponse | null = null;
+  let extractedSummary = "";
+
+  try {
+    response = await runTinyfishResearch(
+      buildTinyfishRequest({
+        url,
+        goal,
+        allowAuthenticated: false,
+        metadata: { source: "workflow.web-dd" },
+      }),
+    );
+    extractedSummary = getTinyfishWorkflowSummary(response);
+    steps[0] = {
+      name: "research",
+      status: response.success ? "completed" : "failed",
+      message: extractedSummary,
+      data: {
+        runId: response.runId,
+        status: response.status,
+        url,
+      },
+      duration: Date.now() - researchStart,
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    steps[0] = {
+      name: "research",
+      status: "failed",
+      message,
+      duration: Date.now() - researchStart,
+    };
+    return {
+      success: false,
+      workflow: "web-dd",
+      steps,
+      summary: `Web due diligence failed for ${url}`,
+      error: message,
+    };
+  }
+
+  steps.push({ name: "assessment", status: "running" });
+  const assessmentStart = Date.now();
+  const assessmentMessage = response?.success
+    ? `Captured browser-native evidence for ${url}. Summary: ${extractedSummary}`
+    : `Tinyfish reached ${url} but did not return a successful result. Summary: ${extractedSummary}`;
+
+  steps[1] = {
+    name: "assessment",
+    status: response?.success ? "completed" : "failed",
+    message: assessmentMessage,
+    data: {
+      summary: extractedSummary,
+      success: response?.success ?? false,
+    },
+    duration: Date.now() - assessmentStart,
+  };
+
+  return {
+    success: response?.success ?? false,
+    workflow: "web-dd",
+    steps,
+    summary: response?.success
+      ? `Tinyfish web due diligence completed for ${url}`
+      : `Tinyfish web due diligence returned an unsuccessful result for ${url}`,
+    data: {
+      url,
+      goal,
+      response,
+      summary: extractedSummary,
+    },
+    error: response?.success ? undefined : response?.error,
+  };
+}
+
+async function runTinyfishMonitorWorkflow(
+  monitorId: string,
+  schedule: string,
+  url: string,
+  goal: string,
+  _ctx: WorkflowContext,
+): Promise<WorkflowResult> {
+  const client = new TinyfishClient();
+  if (!client.isConfigured()) {
+    return {
+      success: false,
+      workflow: "web-monitor",
+      steps: [],
+      summary: "Tinyfish not configured. Set TINYFISH_API_KEY before scheduling web monitors.",
+      error: "Tinyfish not configured",
+    };
+  }
+
+  const steps: WorkflowStep[] = [];
+  steps.push({ name: "schedule", status: "running" });
+  const scheduleStart = Date.now();
+
+  try {
+    const monitor = scheduleTinyfishMonitor({
+      monitorId,
+      name: monitorId,
+      url,
+      goal,
+      schedule,
+      createdBy: "workflow",
+      enabled: true,
+    });
+
+    steps[0] = {
+      name: "schedule",
+      status: "completed",
+      message: `Scheduled ${monitor.monitorId} on ${monitor.cronExpr}`,
+      data: {
+        monitorId: monitor.monitorId,
+        cronExpr: monitor.cronExpr,
+        url: monitor.url,
+      },
+      duration: Date.now() - scheduleStart,
+    };
+
+    return {
+      success: true,
+      workflow: "web-monitor",
+      steps,
+      summary: `Tinyfish monitor '${monitor.monitorId}' scheduled for ${url}`,
+      data: {
+        monitorId: monitor.monitorId,
+        cronExpr: monitor.cronExpr,
+        url: monitor.url,
+        goal: monitor.goal,
+      },
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    steps[0] = {
+      name: "schedule",
+      status: "failed",
+      message,
+      duration: Date.now() - scheduleStart,
+    };
+    return {
+      success: false,
+      workflow: "web-monitor",
+      steps,
+      summary: `Failed to schedule Tinyfish monitor '${monitorId}'`,
+      error: message,
+    };
+  }
+}
+
 // ============================================================================
 // Helper Functions
 // ============================================================================
@@ -801,6 +1074,8 @@ function generateBacktestCycleSummary(
  * - /workflow quick <symbol> - Quick scan, analyze, and plan
  * - /workflow dd <symbol> - Full due diligence
  * - /workflow backtest-cycle <strategy> <symbol> - Backtest, optimize, compare
+ * - /workflow web-dd <url> <goal...> - Tinyfish browser-native due diligence
+ * - /workflow web-monitor <monitorId> <schedule> <url> <goal...> - Tinyfish recurring web monitor
  */
 export async function handleWorkflowCommand(
   args: string,
@@ -814,7 +1089,7 @@ export async function handleWorkflowCommand(
       success: false,
       workflow: "unknown",
       steps: [],
-      summary: "Usage: /workflow [quick|dd|backtest-cycle] <args>",
+      summary: "Usage: /workflow [quick|dd|backtest-cycle|web-dd|web-monitor] <args>",
       error: "No workflow type specified",
     };
   }
@@ -863,12 +1138,44 @@ export async function handleWorkflowCommand(
       return runBacktestCycleWorkflow(strategy, symbol, ctx);
     }
 
+    case "web-dd": {
+      const url = parts[1];
+      const goal = parts.slice(2).join(" ").trim();
+      if (!url || !goal) {
+        return {
+          success: false,
+          workflow: "web-dd",
+          steps: [],
+          summary: "Usage: /workflow web-dd <url> <goal...>",
+          error: "URL and goal are required",
+        };
+      }
+      return runTinyfishDueDiligenceWorkflow(url, goal, ctx);
+    }
+
+    case "web-monitor": {
+      const monitorId = parts[1];
+      const schedule = parts[2];
+      const url = parts[3];
+      const goal = parts.slice(4).join(" ").trim();
+      if (!monitorId || !schedule || !url || !goal) {
+        return {
+          success: false,
+          workflow: "web-monitor",
+          steps: [],
+          summary: "Usage: /workflow web-monitor <monitorId> <schedule> <url> <goal...>",
+          error: "Monitor ID, schedule, URL, and goal are required",
+        };
+      }
+      return runTinyfishMonitorWorkflow(monitorId, schedule, url, goal, ctx);
+    }
+
     default:
       return {
         success: false,
         workflow: workflowType,
         steps: [],
-        summary: `Unknown workflow: ${workflowType}. Available: quick, dd, backtest-cycle`,
+        summary: `Unknown workflow: ${workflowType}. Available: quick, dd, backtest-cycle, web-dd, web-monitor`,
         error: `Unknown workflow type: ${workflowType}`,
       };
   }
@@ -897,6 +1204,16 @@ export function getAvailableWorkflows(): Array<{
       name: "backtest-cycle",
       description: "Strategy evaluation: backtest -> optimize -> compare",
       usage: "/workflow backtest-cycle <strategy> <symbol>",
+    },
+    {
+      name: "web-dd",
+      description: "Tinyfish browser-native due diligence against dynamic or authenticated web pages",
+      usage: "/workflow web-dd <url> <goal...>",
+    },
+    {
+      name: "web-monitor",
+      description: "Schedule a recurring Tinyfish web monitor for listings, governance, or campaign pages",
+      usage: "/workflow web-monitor <monitorId> <schedule> <url> <goal...>",
     },
   ];
 }

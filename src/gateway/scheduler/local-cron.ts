@@ -6,6 +6,37 @@ import {
 } from "../store/scheduler-store.ts";
 
 const logger = createModuleLogger("gateway-cron");
+const DUE_TASK_CONCURRENCY = 3;
+
+async function forEachWithConcurrency<T>(
+  items: T[],
+  concurrency: number,
+  handler: (item: T) => Promise<void>,
+): Promise<void> {
+  if (items.length === 0) {
+    return;
+  }
+
+  const workerCount = Math.min(Math.max(concurrency, 1), items.length);
+  let nextIndex = 0;
+
+  async function worker(): Promise<void> {
+    while (true) {
+      const index = nextIndex;
+      nextIndex += 1;
+      if (index >= items.length) {
+        return;
+      }
+      const item = items[index];
+      if (item === undefined) {
+        return;
+      }
+      await handler(item);
+    }
+  }
+
+  await Promise.all(Array.from({ length: workerCount }, () => worker()));
+}
 
 function parseEveryExpression(expr: string): number | null {
   const trimmed = expr.trim();
@@ -49,6 +80,7 @@ export class LocalCronScheduler {
   private timer: ReturnType<typeof setInterval> | null = null;
   private readonly onTrigger: (task: SchedulerTaskRecord) => Promise<void>;
   private running = false;
+  private tickPromise: Promise<void> | null = null;
 
   constructor(
     onTrigger: (task: SchedulerTaskRecord) => Promise<void>,
@@ -62,9 +94,7 @@ export class LocalCronScheduler {
     if (this.running) return;
     this.running = true;
     this.timer = setInterval(() => {
-      this.tick().catch((error) => {
-        logger.error("Scheduler tick failed", error as Error);
-      });
+      void this.runTickOnce();
     }, this.tickIntervalMs);
     logger.info("Local cron scheduler started", { tickIntervalMs: this.tickIntervalMs });
   }
@@ -75,6 +105,7 @@ export class LocalCronScheduler {
       this.timer = null;
     }
     this.running = false;
+    this.tickPromise = null;
     logger.info("Local cron scheduler stopped");
   }
 
@@ -90,15 +121,39 @@ export class LocalCronScheduler {
       return Date.parse(task.nextRunAt) <= now.getTime();
     });
 
-    for (const task of due) {
+    await forEachWithConcurrency(due, DUE_TASK_CONCURRENCY, async (task) => {
       await this.onTrigger(task);
       const lastRunAt = now.toISOString();
       const nextRunAt = computeNextRunAt(task.cronExpr, now);
       updateSchedulerTaskRunState(task.taskId, { lastRunAt, nextRunAt });
       logger.debug("Scheduler task triggered", { taskId: task.taskId, nextRunAt });
-    }
+    });
 
     return due.length;
   }
-}
 
+  private runTickOnce(now = new Date()): Promise<void> {
+    if (this.tickPromise) {
+      logger.debug("Skipping scheduler tick because previous tick is still running");
+      return this.tickPromise;
+    }
+
+    const pending = this.tick(now)
+      .then((triggered) => {
+        if (triggered > 0) {
+          logger.debug("Scheduler tick completed", { triggered });
+        }
+      })
+      .catch((error) => {
+        logger.error("Scheduler tick failed", error as Error);
+      })
+      .finally(() => {
+        if (this.tickPromise === pending) {
+          this.tickPromise = null;
+        }
+      });
+
+    this.tickPromise = pending;
+    return pending;
+  }
+}

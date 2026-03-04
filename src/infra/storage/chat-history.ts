@@ -7,6 +7,41 @@ import { mkdir, readdir, readFile, unlink } from "node:fs/promises";
 import { join } from "node:path";
 import { GORDON_DIR } from "./paths.ts";
 const HISTORY_DIR = join(GORDON_DIR, "history");
+const HISTORY_READ_CONCURRENCY = 6;
+
+async function mapWithConcurrency<TInput, TOutput>(
+  items: TInput[],
+  concurrency: number,
+  mapper: (item: TInput, index: number) => Promise<TOutput>,
+): Promise<TOutput[]> {
+  if (items.length === 0) {
+    return [];
+  }
+
+  const workerCount = Math.min(Math.max(concurrency, 1), items.length);
+  const results = new Array<TOutput>(items.length);
+  let nextIndex = 0;
+
+  async function worker(): Promise<void> {
+    while (true) {
+      const currentIndex = nextIndex;
+      nextIndex += 1;
+      if (currentIndex >= items.length) {
+        return;
+      }
+
+      const item = items[currentIndex];
+      if (item === undefined) {
+        return;
+      }
+
+      results[currentIndex] = await mapper(item, currentIndex);
+    }
+  }
+
+  await Promise.all(Array.from({ length: workerCount }, () => worker()));
+  return results;
+}
 
 /**
  * Message structure for chat history
@@ -274,39 +309,47 @@ export async function listChatSessions(options: {
   const selected = filtered.slice(offset, offset + limit);
 
   // Load summaries
-  const summaries: ChatSessionSummary[] = [];
-  for (const filename of selected) {
-    try {
-      const session = await loadChatSession(filename);
-      if (!session) continue;
+  const summaryCandidates: Array<ChatSessionSummary | null> = await mapWithConcurrency(
+    selected,
+    HISTORY_READ_CONCURRENCY,
+    async (filename) => {
+      try {
+        const session = await loadChatSession(filename);
+        if (!session) {
+          return null;
+        }
 
-      // Apply symbol filter
-      if (options.symbols && options.symbols.length > 0) {
-        const hasSymbol = options.symbols.some(s =>
-          session.symbolsDiscussed.includes(s.toUpperCase())
-        );
-        if (!hasSymbol) continue;
+        // Apply symbol filter
+        if (options.symbols && options.symbols.length > 0) {
+          const hasSymbol = options.symbols.some(s =>
+            session.symbolsDiscussed.includes(s.toUpperCase())
+          );
+          if (!hasSymbol) {
+            return null;
+          }
+        }
+
+        // Get preview message (first user message)
+        const firstUserMsg = session.messages.find(m => m.role === "user");
+
+        const summary: ChatSessionSummary = {
+          id: session.id,
+          filename,
+          startedAt: session.startedAt,
+          endedAt: session.endedAt,
+          messageCount: session.metadata.messageCount,
+          symbolsDiscussed: session.symbolsDiscussed,
+          ...(firstUserMsg ? { previewMessage: firstUserMsg.content.slice(0, 100) } : {}),
+        };
+        return summary;
+      } catch {
+        // Skip corrupted files
+        return null;
       }
-
-      // Get preview message (first user message)
-      const firstUserMsg = session.messages.find(m => m.role === "user");
-
-      summaries.push({
-        id: session.id,
-        filename,
-        startedAt: session.startedAt,
-        endedAt: session.endedAt,
-        messageCount: session.metadata.messageCount,
-        symbolsDiscussed: session.symbolsDiscussed,
-        previewMessage: firstUserMsg?.content.slice(0, 100),
-      });
-    } catch {
-      // Skip corrupted files
-      continue;
     }
-  }
+  );
 
-  return summaries;
+  return summaryCandidates.filter((summary): summary is ChatSessionSummary => summary !== null);
 }
 
 /**
@@ -392,35 +435,57 @@ export async function searchChatHistory(
 
   const searchQuery = options.caseSensitive ? query : query.toLowerCase();
 
-  for (const summary of sessions) {
-    const session = await loadChatSession(summary.filename);
-    if (!session) continue;
-
-    const matches: Array<{
-      messageIndex: number;
-      role: string;
-      content: string;
-      timestamp: string;
-    }> = [];
-
-    for (let i = 0; i < session.messages.length; i++) {
-      const msg = session.messages[i]!;
-      const content = options.caseSensitive ? msg.content : msg.content.toLowerCase();
-
-      if (content.includes(searchQuery)) {
-        matches.push({
-          messageIndex: i,
-          role: msg.role,
-          content: msg.content,
-          timestamp: msg.timestamp,
-        });
+  const perSessionResults = await mapWithConcurrency(
+    sessions,
+    HISTORY_READ_CONCURRENCY,
+    async (summary) => {
+      const session = await loadChatSession(summary.filename);
+      if (!session) {
+        return null;
       }
-    }
 
-    if (matches.length > 0) {
-      results.push({ session: summary, matches });
+      const matches: Array<{
+        messageIndex: number;
+        role: string;
+        content: string;
+        timestamp: string;
+      }> = [];
+
+      for (let i = 0; i < session.messages.length; i++) {
+        const msg = session.messages[i]!;
+        const content = options.caseSensitive ? msg.content : msg.content.toLowerCase();
+
+        if (content.includes(searchQuery)) {
+          matches.push({
+            messageIndex: i,
+            role: msg.role,
+            content: msg.content,
+            timestamp: msg.timestamp,
+          });
+        }
+      }
+
+      if (matches.length === 0) {
+        return null;
+      }
+
+      return { session: summary, matches };
     }
-  }
+  );
+
+  results.push(
+    ...perSessionResults.filter(
+      (entry): entry is {
+        session: ChatSessionSummary;
+        matches: Array<{
+          messageIndex: number;
+          role: string;
+          content: string;
+          timestamp: string;
+        }>;
+      } => entry !== null
+    )
+  );
 
   return results;
 }
@@ -456,9 +521,16 @@ export async function getChatHistoryStats(): Promise<{
   let totalMessages = 0;
   let totalDuration = 0;
 
-  for (const summary of sessions) {
-    const session = await loadChatSession(summary.filename);
-    if (!session) continue;
+  const loadedSessions = await mapWithConcurrency(
+    sessions,
+    HISTORY_READ_CONCURRENCY,
+    async (summary) => loadChatSession(summary.filename)
+  );
+
+  for (const session of loadedSessions) {
+    if (!session) {
+      continue;
+    }
 
     totalMessages += session.metadata.messageCount;
     totalDuration += session.metadata.durationSeconds;
@@ -506,13 +578,12 @@ export async function exportChatHistory(options: {
     toDate: options.toDate,
   });
 
-  const fullSessions: ChatSession[] = [];
-  for (const summary of sessions) {
-    const session = await loadChatSession(summary.filename);
-    if (session) {
-      fullSessions.push(session);
-    }
-  }
+  const loadedSessions = await mapWithConcurrency(
+    sessions,
+    HISTORY_READ_CONCURRENCY,
+    async (summary) => loadChatSession(summary.filename)
+  );
+  const fullSessions = loadedSessions.filter((session): session is ChatSession => session !== null);
 
   const exportData = {
     exportedAt: new Date().toISOString(),

@@ -11,6 +11,41 @@ import { HistoricalDataCache } from "./cache.ts";
 import { createModuleLogger } from "../../logger/index.ts";
 
 const logger = createModuleLogger("data-manager");
+const PREFETCH_CONCURRENCY = 6;
+const AVAILABILITY_CHECK_CONCURRENCY = 4;
+
+async function mapWithConcurrency<T>(
+  items: T[],
+  concurrency: number,
+  mapper: (item: T) => Promise<void>
+): Promise<void> {
+  if (items.length === 0) {
+    return;
+  }
+
+  const workerCount = Math.min(Math.max(concurrency, 1), items.length);
+  let nextIndex = 0;
+
+  async function worker(): Promise<void> {
+    while (true) {
+      const currentIndex = nextIndex;
+      nextIndex += 1;
+
+      if (currentIndex >= items.length) {
+        return;
+      }
+
+      const item = items[currentIndex];
+      if (item === undefined) {
+        return;
+      }
+
+      await mapper(item);
+    }
+  }
+
+  await Promise.all(Array.from({ length: workerCount }, () => worker()));
+}
 
 // ============================================================================
 // DataSourceManager Class
@@ -167,10 +202,25 @@ export class DataSourceManager {
     }
 
     const errors: Array<{ sourceId: string; error: Error }> = [];
+    const availability = new Map<string, boolean>();
+
+    await mapWithConcurrency(this.sources, AVAILABILITY_CHECK_CONCURRENCY, async (source) => {
+      try {
+        availability.set(source.id, await source.isAvailable());
+      } catch (error) {
+        const err = error instanceof Error ? error : new Error(String(error));
+        logger.warn("Source availability check failed", {
+          sourceId: source.id,
+          error: err.message,
+        });
+        availability.set(source.id, false);
+        errors.push({ sourceId: source.id, error: err });
+      }
+    });
 
     for (const source of this.sources) {
       // Check if source is available
-      const available = await source.isAvailable();
+      const available = availability.get(source.id) ?? false;
       if (!available) {
         logger.debug("Source not available, skipping", {
           sourceId: source.id,
@@ -269,7 +319,7 @@ export class DataSourceManager {
       errors: [] as Array<{ params: OHLCParams; error: string }>,
     };
 
-    for (const params of requests) {
+    await mapWithConcurrency(requests, PREFETCH_CONCURRENCY, async (params) => {
       try {
         await this.fetchOHLC(params);
         results.succeeded++;
@@ -280,7 +330,7 @@ export class DataSourceManager {
           error: error instanceof Error ? error.message : String(error),
         });
       }
-    }
+    });
 
     logger.info("Prefetch completed", {
       succeeded: String(results.succeeded),

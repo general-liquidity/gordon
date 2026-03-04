@@ -10,7 +10,6 @@
         "@ai-sdk/openai": "^1.0.0",
         "@chainlink/data-streams-sdk": "^1.2.1",
         "@coinbase/agentkit": "^0.10.4",
-        "@galacticcouncil/api-augment": "^0.9.0",
         "@inkjs/ui": "^2.0.0",
         "@libsql/client": "^0.6.0",
         "@libsql/linux-x64-gnu": "^0.5.22",
@@ -362,8 +361,6 @@
     "@floating-ui/react-dom": ["@floating-ui/react-dom@2.1.7", "", { "dependencies": { "@floating-ui/dom": "^1.7.5" }, "peerDependencies": { "react": ">=16.8.0", "react-dom": ">=16.8.0" } }, "sha512-0tLRojf/1Go2JgEVm+3Frg9A3IW8bJgKgdO0BN5RkF//ufuz2joZM63Npau2ff3J6lUVYgDSNzNkR+aH3IVfjg=="],
 
     "@floating-ui/utils": ["@floating-ui/utils@0.2.10", "", {}, "sha512-aGTxbpbg8/b5JfU1HXSrbH3wXZuLPJcNEcZQFMxLs3oSzgtVu6nFPkbbGGUvBcUjKV2YyB9Wxxabo+HEH9tcRQ=="],
-
-    "@galacticcouncil/api-augment": ["@galacticcouncil/api-augment@0.9.0", "", {}, "sha512-OvLWSP2gcqokAlZCGgZniiDOP03MamhLUpyveg3yn30FRuVKt8+A8UHGJZMBzfyFGQxy9mKvE8cjeoWYWn4I9Q=="],
 
     "@galacticcouncil/math-hsm": ["@galacticcouncil/math-hsm@1.1.0", "", {}, "sha512-S6dGohpr+TejaFc4+heMQbp/r7PWUJLDotocCVC5XIJLfMwfwQgqifU9rg5rzwdrhWNUaqLX02D2ya6ouJt/Eg=="],
 

@@ -79,7 +79,7 @@ export type SDKConnectionState =
 export interface ScanOptions {
   /** Number of top coins to scan (1-500). Default 50. */
   topN?: number;
-  /** Candlestick timeframes. Default ["1h", "4h"]. */
+  /** Ordered timeframe preference. Scanner uses the first timeframe only. Default ["1h", "4h"]. */
   timeframes?: string[];
 }
 

@@ -155,11 +155,11 @@ export const checkRiskTool = createTool({
   description:
     "Pre-check a proposed order against the risk kernel. Returns approval status, any size adjustments, and warnings. Call this before placing orders.",
   inputSchema: z.object({
-    symbol: z.string(),
-    side: z.enum(["BUY", "SELL"]),
-    type: z.enum(["MARKET", "LIMIT", "STOP_LIMIT"]),
-    quantity: z.number(),
-    price: z.number().optional(),
+    symbol: z.string().describe("Trading pair symbol, e.g. BTCUSDT"),
+    side: z.enum(["BUY", "SELL"]).describe("Order side: BUY or SELL"),
+    type: z.enum(["MARKET", "LIMIT", "STOP_LIMIT"]).describe("type: order type — MARKET, LIMIT, or STOP_LIMIT"),
+    quantity: z.number().describe("Order quantity in base asset"),
+    price: z.number().optional().describe("Limit price (required for LIMIT/STOP_LIMIT)"),
     slotId: z.string().optional().describe("Strategy slot ID for consensus evaluation"),
     playbookName: z.string().optional().describe("Playbook name for consensus evaluation"),
     stopLoss: z.number().optional().describe("Stop loss price for consensus evaluation"),

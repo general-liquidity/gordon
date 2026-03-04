@@ -1,7 +1,8 @@
-import React, { useMemo, useState, useCallback } from "react";
+import React, { useMemo, useState, useCallback, useEffect } from "react";
 import { Box, Text } from "ink";
 import { COLORS } from "./theme.ts";
 import { GlitchReveal } from "./components/effects/GlitchReveal.tsx";
+import { getActiveRoute } from "../infra/providers/index.ts";
 
 // Import version from package.json
 import packageJson from "../../package.json";
@@ -45,34 +46,20 @@ const ASCII_BANNER = `
  ╚═════╝  ╚═════╝ ╚═╝  ╚═╝╚═════╝  ╚═════╝ ╚═╝  ╚═══╝
 `.trim();
 
-/** Resolve the active model name from env for display */
-function getModelDisplay(): string {
+function formatModelDisplay(): string {
   try {
-    // Explicit model override
-    const model = process.env.GORDON_MODEL || process.env.LLM_DEFAULT_MODEL;
-    if (model) {
-      // Strip provider prefix for cleaner display (e.g. "openai/gpt-5-nano" → "gpt-5-nano")
-      return model.includes("/") ? model.split("/").slice(1).join("/") : model;
-    }
-
-    // Infer from provider
-    const provider = process.env.GORDON_PROVIDER || process.env.LLM_DEFAULT_PROVIDER;
-    if (provider === "openai" && process.env.OPENAI_API_KEY) return "openai";
-    if (provider === "anthropic" && process.env.ANTHROPIC_API_KEY) return "anthropic";
-
-    // Auto-detect from available keys
-    if (process.env.DEDALUS_API_KEY) return "dedalus";
-    if (process.env.OPENAI_API_KEY) return "openai";
-    if (process.env.ANTHROPIC_API_KEY) return "anthropic";
-
-    return "no model";
+    const route = getActiveRoute();
+    return route.modelString.includes("/")
+      ? route.modelString.split("/").slice(1).join("/")
+      : route.modelString;
   } catch {
-    return "unknown";
+    return "no model";
   }
 }
 
 export const WelcomeBanner: React.FC = () => {
   const [revealed, setRevealed] = useState(false);
+  const [modelDisplay, setModelDisplay] = useState("loading...");
 
   // Select random quote on mount
   const randomQuote = useMemo(() => {
@@ -82,6 +69,10 @@ export const WelcomeBanner: React.FC = () => {
 
   const handleRevealComplete = useCallback(() => {
     setRevealed(true);
+  }, []);
+
+  useEffect(() => {
+    setModelDisplay(formatModelDisplay());
   }, []);
 
   return (
@@ -116,7 +107,7 @@ export const WelcomeBanner: React.FC = () => {
         </Text>
         <Text color={COLORS.DIM}>v{packageJson.version}</Text>
         <Text color={COLORS.DIM}>·</Text>
-        <Text color={COLORS.ACCENT_DIM}>{getModelDisplay()}</Text>
+        <Text color={COLORS.ACCENT_DIM}>{modelDisplay}</Text>
       </Box>
 
       {/* Gekko Quote */}

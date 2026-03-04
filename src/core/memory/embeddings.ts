@@ -40,13 +40,21 @@ export class OpenAIEmbeddingProvider implements EmbeddingProvider {
   private model: string;
 
   constructor(options?: { apiKey?: string; baseUrl?: string; model?: string }) {
+    const nativeApiKey = process.env.GORDON_NATIVE_OPENAI_API_KEY;
+    const nativeBaseUrl = process.env.GORDON_NATIVE_OPENAI_BASE_URL;
+    const currentBaseUrl = process.env.OPENAI_BASE_URL;
+    const looksLikeNativeOpenAI =
+      !currentBaseUrl || currentBaseUrl === "https://api.openai.com/v1";
+
     this.apiKey =
       options?.apiKey ??
-      process.env.OPENAI_API_KEY ??
+      nativeApiKey ??
+      (looksLikeNativeOpenAI ? process.env.OPENAI_API_KEY : undefined) ??
       "";
     this.baseUrl =
       options?.baseUrl ??
-      process.env.OPENAI_BASE_URL ??
+      nativeBaseUrl ??
+      (looksLikeNativeOpenAI ? process.env.OPENAI_BASE_URL : undefined) ??
       "https://api.openai.com/v1";
     this.model = options?.model ?? "text-embedding-3-small";
 
@@ -226,11 +234,20 @@ export class LocalEmbeddingProvider implements EmbeddingProvider {
  * otherwise falls back to LocalEmbeddingProvider (no API needed).
  */
 export function createEmbeddingProvider(): EmbeddingProvider {
-  const apiKey = process.env.OPENAI_API_KEY;
+  const nativeApiKey = process.env.GORDON_NATIVE_OPENAI_API_KEY;
+  const currentBaseUrl = process.env.OPENAI_BASE_URL;
+  const looksLikeNativeOpenAI =
+    !currentBaseUrl || currentBaseUrl === "https://api.openai.com/v1";
+  const apiKey = nativeApiKey ?? (looksLikeNativeOpenAI ? process.env.OPENAI_API_KEY : undefined);
 
   if (apiKey) {
     try {
-      const provider = new OpenAIEmbeddingProvider({ apiKey });
+      const provider = new OpenAIEmbeddingProvider({
+        apiKey,
+        baseUrl:
+          process.env.GORDON_NATIVE_OPENAI_BASE_URL ??
+          (looksLikeNativeOpenAI ? process.env.OPENAI_BASE_URL : undefined),
+      });
       logger.info("Using OpenAI embedding provider", {
         model: "text-embedding-3-small",
         dimensions: String(provider.dimensions),

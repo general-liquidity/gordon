@@ -45,6 +45,14 @@ let _mcpTools: Record<string, Tool> | null = null;
 let _initPromise: Promise<Record<string, Tool>> | null = null;
 let _hotReloadTimer: ReturnType<typeof setInterval> | null = null;
 let _lastPluginFingerprint: string | null = null;
+let _hotReloadInFlight = false;
+
+function buildPluginFingerprint(installedPlugins: Array<{ id: string; enabled: boolean; version?: string }>): string {
+  return installedPlugins
+    .map((plugin) => `${plugin.id}:${plugin.enabled ? "1" : "0"}:${plugin.version ?? "0"}`)
+    .sort()
+    .join("|");
+}
 
 // ============================================================================
 // Plugin → Server Definition Conversion
@@ -137,10 +145,7 @@ export async function initMCPTools(): Promise<Record<string, Tool>> {
     try {
       await pluginInstaller.initialize();
       const installed = pluginInstaller.getInstalled().filter((p) => p.enabled);
-      _lastPluginFingerprint = installed
-        .map((p) => `${p.id}:${p.enabled ? "1" : "0"}:${p.version ?? "0"}`)
-        .sort()
-        .join("|");
+      _lastPluginFingerprint = buildPluginFingerprint(installed);
 
       if (installed.length === 0) {
         _mcpTools = {};
@@ -252,28 +257,34 @@ export async function disconnectMCP(): Promise<void> {
 export function enableMCPHotReload(intervalMs: number = 5000): void {
   if (_hotReloadTimer) return;
 
-  _hotReloadTimer = setInterval(async () => {
-    try {
-      await pluginInstaller.initialize();
-      const installed = pluginInstaller.getInstalled().filter((p) => p.enabled);
-      const fingerprint = installed
-        .map((p) => `${p.id}:${p.enabled ? "1" : "0"}:${p.version ?? "0"}`)
-        .sort()
-        .join("|");
-
-      if (_lastPluginFingerprint !== null && fingerprint !== _lastPluginFingerprint) {
-        console.log("[MCP] Plugin change detected, hot-reloading...");
-        if (isRoutingInitialized()) {
-          await reloadRouting();   // reloads MCP tools + rebuilds routing + resets agents
-        } else {
-          await reloadMCPTools(); // fallback if skills not yet initialized
-        }
-      }
-
-      _lastPluginFingerprint = fingerprint;
-    } catch (error) {
-      console.error("[MCP] Hot reload polling failed:", (error as Error).message);
+  _hotReloadTimer = setInterval(() => {
+    if (_hotReloadInFlight) {
+      return;
     }
+
+    _hotReloadInFlight = true;
+    void (async () => {
+      try {
+        await pluginInstaller.initialize();
+        const installed = pluginInstaller.getInstalled().filter((p) => p.enabled);
+        const fingerprint = buildPluginFingerprint(installed);
+
+        if (_lastPluginFingerprint !== null && fingerprint !== _lastPluginFingerprint) {
+          console.log("[MCP] Plugin change detected, hot-reloading...");
+          if (isRoutingInitialized()) {
+            await reloadRouting(); // reloads MCP tools + rebuilds routing + resets agents
+          } else {
+            await reloadMCPTools(); // fallback if skills not yet initialized
+          }
+        }
+
+        _lastPluginFingerprint = fingerprint;
+      } catch (error) {
+        console.error("[MCP] Hot reload polling failed:", (error as Error).message);
+      } finally {
+        _hotReloadInFlight = false;
+      }
+    })();
   }, intervalMs);
 }
 
@@ -282,6 +293,7 @@ export function disableMCPHotReload(): void {
     clearInterval(_hotReloadTimer);
     _hotReloadTimer = null;
   }
+  _hotReloadInFlight = false;
 }
 
 /**

@@ -839,7 +839,7 @@ export const readSharedContextTool = createTool({
   inputSchema: z.object({
     contextType: z
       .enum(["analysis", "scanner", "backtest", "planner", "monitor", "all", "history"])
-      .describe("Type of context to retrieve. Use 'monitor' for portfolio ground truth. Use 'history' with symbol to get version history."),
+      .describe("contextType: which agent's context to read — 'analysis', 'scanner', 'backtest', 'planner', 'monitor', 'all', or 'history'. Use 'monitor' for portfolio ground truth."),
     symbol: z
       .string()
       .optional()

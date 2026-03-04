@@ -14,7 +14,8 @@ import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
 import { getGordonContext, type MastraExecutionContext } from "./types.ts";
-import { providerRegistry, DEDALUS_MODELS, type DirectProviderName } from "../../providers/registry.ts";
+import { providerRegistry, getDedalusModels, refreshDedalusModels, getActiveRoute, type DirectProviderName } from "../../providers/registry.ts";
+import { loadConfig } from "../../storage/config.ts";
 import { getToolCacheStats, clearToolCache, pruneToolCache } from "./cache.ts";
 import {
   getAgentHealthReport,
@@ -119,7 +120,7 @@ export const testConnectionTool = createTool({
 
 const DIRECT_MODEL_TIERS: Record<DirectProviderName, { flagship: string; balanced: string; fast: string }> = {
   anthropic: {
-    flagship: "claude-opus-4-5",
+    flagship: "claude-opus-4-6",
     balanced: "claude-sonnet-4-5",
     fast: "claude-haiku-4-5",
   },
@@ -132,6 +133,11 @@ const DIRECT_MODEL_TIERS: Record<DirectProviderName, { flagship: string; balance
     flagship: "gemini-3-pro-preview",
     balanced: "gemini-3-pro-preview",
     fast: "gemini-3-flash-preview",
+  },
+  inception: {
+    flagship: "mercury-2",
+    balanced: "mercury-2",
+    fast: "mercury-2",
   },
 };
 
@@ -162,19 +168,25 @@ export const getModelInfoTool = createTool({
     tip: z.string(),
   }),
   execute: async () => {
-    const currentProvider = (process.env.GORDON_PROVIDER || "auto-detected") as string;
-    const currentModel = process.env.GORDON_MODEL || "default (flagship)";
+    const config = await loadConfig().catch(() => null);
+    const activeRoute = getActiveRoute();
+    const currentProvider = config?.modelConfig?.provider || activeRoute.provider;
+    const currentModel = config?.modelConfig?.model || activeRoute.modelString;
     const availableProviders = providerRegistry.getAvailableProviders();
     const hasDedalus = providerRegistry.hasDedalus();
 
-    const directProviders = (["openai", "anthropic", "google"] as DirectProviderName[]).map((name) => ({
+    if (hasDedalus) {
+      await refreshDedalusModels().catch(() => undefined);
+    }
+
+    const directProviders = (["openai", "anthropic", "google", "inception"] as DirectProviderName[]).map((name) => ({
       name,
       configured: availableProviders.includes(name),
       models: DIRECT_MODEL_TIERS[name],
     }));
 
     const dedalusModels = hasDedalus
-      ? DEDALUS_MODELS.map((m) => ({
+      ? getDedalusModels().map((m) => ({
           id: m.id,
           name: m.name,
           provider: m.provider,
@@ -188,8 +200,8 @@ export const getModelInfoTool = createTool({
       directProviders,
       dedalusModels,
       tip: hasDedalus
-        ? "Use /model to select from direct providers or Dedalus models (xAI, Moonshot, etc.)"
-        : "Set DEDALUS_API_KEY to access models from multiple providers with one key",
+        ? "Use /model to select from direct providers, Inception Mercury, or Dedalus models (xAI, Moonshot, etc.)"
+        : "Set INCEPTION_API_KEY for Mercury 2 or DEDALUS_API_KEY for a multi-provider gateway",
     };
   },
 });

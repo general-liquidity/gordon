@@ -1225,6 +1225,27 @@ export async function* processMessageStream(
   // Input guardrails are now handled by GordonInputGuard processor (registered on all agents)
   const requestContext = createRequestContext(context);
 
+  // Inject dynamic system state so the routing agent knows the current mode.
+  // Without this, the LLM has no way to tell if the system is ARMED or SAFE
+  // and defaults to telling the user to arm — even when already armed.
+  const mode = context.config?.mode ?? "SAFE";
+  const armedUntil = context.config?.armedUntil;
+  let systemState = `[System: mode=${mode}`;
+  if (mode === "ARMED" && armedUntil) {
+    const remaining = new Date(armedUntil).getTime() - Date.now();
+    if (remaining > 0) {
+      const mins = Math.round(remaining / 60_000);
+      systemState += `, armed for ${mins}min`;
+    } else {
+      systemState += `, expired`;
+    }
+  }
+  if (context.exchange) {
+    systemState += `, exchange=${context.exchange.exchangeId}`;
+  }
+  systemState += `]\n`;
+  const enrichedMessage = systemState + userMessage;
+
   try {
     // Emit agent started event
     await emitEvent("agent:started", { agent: "gordon" });
@@ -1236,7 +1257,7 @@ export async function* processMessageStream(
     // Pass threadId and resourceId inside memory option for Mastra's newer execution path
     // This ensures sub-agents also receive thread/resource context for working memory updates
     const effectiveResourceId = resourceId || context.userId || "default";
-    const streamResult = await gordonAgent().stream(userMessage, {
+    const streamResult = await gordonAgent().stream(enrichedMessage, {
       requestContext,
       ...(threadId && effectiveResourceId ? {
         memory: {
@@ -1250,6 +1271,9 @@ export async function* processMessageStream(
 
     let fullText = "";
     let currentAgent: string | undefined;
+    // Track last sub-agent tool result — used to synthesize a response when
+    // Mastra doesn't emit text-delta after a sub-agent tool execution.
+    let lastSubAgentToolResult: { toolName: string; result: unknown; agent: string | undefined } | null = null;
 
     // Mastra's stream() returns a MastraModelOutput with fullStream for all events
     // Use type assertion to access the streaming interface
@@ -1463,10 +1487,20 @@ export async function* processMessageStream(
                     agentName: currentAgent,
                   };
                 } else if (innerType === "tool-result") {
+                  // Capture tool result — if the sub-agent never emits text-delta after
+                  // this, we use lastSubAgentToolResult to synthesize a response.
+                  const toolResult = innerPayload?.payload?.result;
+                  if (toolResult) {
+                    lastSubAgentToolResult = {
+                      toolName: innerPayload?.payload?.toolName || "unknown",
+                      result: toolResult,
+                      agent: currentAgent,
+                    };
+                  }
                   yield {
                     type: "tool_call_end",
                     toolName: innerPayload?.payload?.toolName,
-                    toolResult: innerPayload?.payload?.result,
+                    toolResult,
                     agentName: currentAgent,
                   };
                 }
@@ -1598,15 +1632,40 @@ export async function* processMessageStream(
       usage.totalTokens
     );
 
-    // Handle empty response with user-friendly message
+    // Handle empty response — synthesize from sub-agent tool results if available
     if (!fullText || fullText.trim().length === 0) {
-      logger.warn("Stream completed with empty content", {
-        userMessage: userMessage.substring(0, 100),
-        hasFullStream: !!streamObj.fullStream,
-        hasTextStream: !!streamObj.textStream,
-        textType: typeof streamObj.text,
-      });
-      fullText = "I wasn't able to generate a response. Please try again.";
+      if (lastSubAgentToolResult) {
+        // Mastra didn't emit text-delta after the sub-agent tool call.
+        // Synthesize a human-readable response from the tool result.
+        try {
+          const { toolName, result } = lastSubAgentToolResult;
+          const resultObj = typeof result === "string" ? JSON.parse(result) : result;
+          const resultData = (resultObj as Record<string, unknown>)?.result ?? resultObj;
+
+          if ((resultData as Record<string, unknown>)?.success === false) {
+            fullText = `Tool ${toolName} failed: ${(resultData as Record<string, unknown>)?.error || "Unknown error"}`;
+          } else {
+            // Format the result as readable text for the user
+            fullText = JSON.stringify(resultData, null, 2);
+          }
+        } catch {
+          fullText = String(lastSubAgentToolResult.result);
+        }
+
+        logger.info("Synthesized response from sub-agent tool result", {
+          toolName: lastSubAgentToolResult.toolName,
+          agent: lastSubAgentToolResult.agent,
+          responseLength: fullText.length,
+        });
+      } else {
+        logger.warn("Stream completed with empty content", {
+          userMessage: userMessage.substring(0, 100),
+          hasFullStream: !!streamObj.fullStream,
+          hasTextStream: !!streamObj.textStream,
+          textType: typeof streamObj.text,
+        });
+        fullText = "I wasn't able to generate a response. Please try again.";
+      }
       yield {
         type: "text_delta",
         content: fullText,

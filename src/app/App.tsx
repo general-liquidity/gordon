@@ -21,14 +21,17 @@ import { BinanceClient } from "../infra/binance/index.ts";
 import { BinanceAdapter, ExchangeFactory, type Exchange } from "../infra/exchange/index.ts";
 import { resolveExchangeCredentials } from "../infra/exchange/types.ts";
 import {
-  runMonitorCycle,
   initializeRealtimeMonitor,
   shutdownRealtimeMonitor,
 } from "../core/monitor.ts";
 import { runOrderRecovery } from "../core/order-recovery.ts";
 import { listTrades } from "../infra/storage/trades.ts";
-import { scan } from "../core/scanner.ts";
 import { loadConfig, saveConfig } from "../infra/storage/config.ts";
+import {
+  runSharedMonitorCycle,
+  runSharedScan,
+  subscribeToMarketPrice,
+} from "../core/market-data-coordinator.ts";
 import {
   initializeSession,
   resumeSession,
@@ -106,6 +109,7 @@ interface AppState {
   isLoading: boolean;
   isStreaming: boolean;
   activeToolCall: string | null;
+  activityStatus: string | null;
   conversationHistory: ConversationMessage[];
   btcPrice: number | undefined;
   showShortcuts: boolean;
@@ -203,6 +207,43 @@ function formatTimestamp(): string {
   });
 }
 
+const STARTUP_TASK_CONCURRENCY = 2;
+
+async function runDeferredTasksWithConcurrency(
+  tasks: Array<() => Promise<void>>,
+  concurrency = STARTUP_TASK_CONCURRENCY,
+): Promise<void> {
+  if (tasks.length === 0) {
+    return;
+  }
+
+  const workerCount = Math.min(Math.max(concurrency, 1), tasks.length);
+  let nextIndex = 0;
+
+  async function worker(): Promise<void> {
+    while (true) {
+      const currentIndex = nextIndex;
+      nextIndex += 1;
+      if (currentIndex >= tasks.length) {
+        return;
+      }
+
+      const task = tasks[currentIndex];
+      if (!task) {
+        return;
+      }
+
+      try {
+        await task();
+      } catch (error) {
+        console.error("[Startup] Deferred task failed:", error);
+      }
+    }
+  }
+
+  await Promise.all(Array.from({ length: workerCount }, () => worker()));
+}
+
 interface AppContentProps {
   onThemeChange: (theme: ThemeName | "toggle", args?: string) => void;
 }
@@ -218,6 +259,7 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
     isLoading: false,
     isStreaming: false,
     activeToolCall: null,
+    activityStatus: null,
     conversationHistory: [],
     btcPrice: undefined,
     showShortcuts: false,
@@ -234,6 +276,7 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
   const lastResultsRef = useRef<LastResults>({});
   const pendingPluginSuggestionsRef = useRef<PluginSuggestion[]>([]);
   const shownPluginSuggestionsRef = useRef<Set<string>>(new Set());
+  const monitorCycleInFlightRef = useRef(false);
 
   /**
    * Helper to update thread status info in state
@@ -308,6 +351,38 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
     }
   }, []);
 
+  const appendMessages = useCallback((nextMessages: ChatMessage[]): void => {
+    if (nextMessages.length === 0) {
+      return;
+    }
+
+    setState((prev) => ({
+      ...prev,
+      messages: [...prev.messages, ...nextMessages],
+    }));
+  }, []);
+
+  const updateMessageByTimestamp = useCallback((
+    timestamp: string,
+    updater: (message: ChatMessage) => ChatMessage
+  ): void => {
+    setState((prev) => {
+      const nextMessages = [...prev.messages];
+      for (let i = nextMessages.length - 1; i >= 0; i--) {
+        const message = nextMessages[i];
+        if (message && message.timestamp === timestamp && message.role === "gordon") {
+          nextMessages[i] = updater(message);
+          return {
+            ...prev,
+            messages: nextMessages,
+          };
+        }
+      }
+
+      return prev;
+    });
+  }, []);
+
   const refreshActiveExchange = useCallback(async (): Promise<void> => {
     try {
       const config = await loadConfig();
@@ -353,6 +428,8 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
   // Initialize config and LLM client on mount
   useEffect(() => {
     async function initialize(): Promise<void> {
+      const deferredStartupTasks: Array<() => Promise<void>> = [];
+
       // Initialize database first
       await initDatabase();
 
@@ -369,23 +446,28 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
       // Check environment status early to get keys
       const envStatusEarly = await checkEnvStatus();
 
-      // Initialize service container with available credentials
-      try {
-        await initializeContainer({
-          binance: envStatusEarly.hasBinanceKeys && envStatusEarly.keys.BINANCE_API_KEY && envStatusEarly.keys.BINANCE_API_SECRET
-            ? {
-                apiKey: envStatusEarly.keys.BINANCE_API_KEY,
-                apiSecret: envStatusEarly.keys.BINANCE_API_SECRET,
-              }
-            : undefined,
-          openai: envStatusEarly.hasLLMKey && envStatusEarly.keys.OPENAI_API_KEY
-            ? { apiKey: envStatusEarly.keys.OPENAI_API_KEY }
-            : undefined,
-          logLevel: "info",
-        });
-      } catch (error) {
-        console.error("Failed to initialize service container:", error);
-      }
+      deferredStartupTasks.push(async () => {
+        try {
+          await initializeContainer({
+            binance: envStatusEarly.hasBinanceKeys && envStatusEarly.keys.BINANCE_API_KEY && envStatusEarly.keys.BINANCE_API_SECRET
+              ? {
+                  apiKey: envStatusEarly.keys.BINANCE_API_KEY,
+                  apiSecret: envStatusEarly.keys.BINANCE_API_SECRET,
+                }
+              : undefined,
+            llm: envStatusEarly.hasLLMKey
+              ? {
+                  openaiApiKey: envStatusEarly.keys.OPENAI_API_KEY,
+                  inceptionApiKey: envStatusEarly.keys.INCEPTION_API_KEY,
+                  dedalusApiKey: envStatusEarly.keys.DEDALUS_API_KEY,
+                }
+              : undefined,
+            logLevel: "info",
+          });
+        } catch (error) {
+          console.error("Failed to initialize service container:", error);
+        }
+      });
 
       // Use the already fetched env status
       const envStatus = envStatusEarly;
@@ -422,20 +504,25 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
       try {
         llmClientRef.current = createLLMClientFromEnv();
 
-        // Initialize tracing for Mastra Agent (non-blocking)
-        if (envStatus.keys.OPENAI_API_KEY) {
-          initializeTracing().catch((err) =>
-            console.error("[Tracing] Init failed:", (err as Error).message),
-          );
-        }
+        deferredStartupTasks.push(async () => {
+          if (envStatus.hasLLMKey) {
+            try {
+              await initializeTracing();
+            } catch (err) {
+              console.error("[Tracing] Init failed:", (err as Error).message);
+            }
+          }
+        });
 
-        // Initialize MCP plugin tools + tool routing (non-blocking)
-        initMCPTools()
-          .then(() => initRouting())
-          .catch((err) =>
-            console.error("[Routing] Init failed:", (err as Error).message),
-          );
-        enableMCPHotReload(5000);
+        deferredStartupTasks.push(async () => {
+          try {
+            await initMCPTools();
+            await initRouting();
+            enableMCPHotReload(5000);
+          } catch (err) {
+            console.error("[Routing] Init failed:", (err as Error).message);
+          }
+        });
       } catch (error) {
         console.error("Failed to initialize LLM client:", error);
       }
@@ -480,10 +567,9 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
       }
 
       if (binanceClientRef.current) {
-        // Reconcile local state with Binance on startup
-        // This ensures any orders that filled while offline are recorded
-        reconcileWithBinance(binanceClientRef.current)
-          .then((result) => {
+        deferredStartupTasks.push(async () => {
+          try {
+            const result = await reconcileWithBinance(binanceClientRef.current!);
             if (result.ordersUpdated > 0) {
               console.log(`Reconciliation complete: ${result.ordersUpdated} orders synced`);
             }
@@ -493,77 +579,83 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
             if (result.errors.length > 0) {
               console.error("Reconciliation errors:", result.errors);
             }
-          })
-          .catch((error) => {
+          } catch (error) {
             console.error("Reconciliation failed:", error);
-          });
-
-        // Run order recovery only if there are active trades
-        const allTrades = listTrades({});
-        const activeTrades = allTrades.filter(
-          (t) => t.status === "OPEN" || t.status === "PARTIAL"
-        );
-
-        if (activeTrades.length > 0) {
-          const knownOrderOwnerKeys = buildKnownOrderOwnerKeys(activeTrades);
-          runOrderRecovery(binanceClientRef.current, knownOrderOwnerKeys, {
-            logResults: true,
-          })
-            .then((recoveryResult) => {
-              if (recoveryResult.orphaned.length > 0) {
-                console.warn(
-                  `Found ${recoveryResult.orphaned.length} orphaned orders on Binance`
-                );
-              }
-            })
-            .catch(() => {
-              // Silently ignore - not critical for startup
-            });
-        }
-
-        // Initialize real-time WebSocket monitoring (optional enhancement)
-        initializeRealtimeMonitor(exchangeRef.current?.exchangeId).catch((error) => {
-          console.warn("Real-time monitoring unavailable:", error);
-        });
-      }
-
-      // Connect v0.7 MarketEventEmitter to the exchange WebSocket
-      try {
-        const emitter = getMarketEmitter();
-        // The emitter is ready but not watching anything yet.
-        // Event-driven agent mode can be activated via /autonomous or API.
-        console.log("[v0.7] MarketEventEmitter ready");
-      } catch (err) {
-        console.error("[v0.7] MarketEventEmitter setup failed:", err);
-      }
-
-      // Wire AgentInvoker for event-driven agent execution
-      // Subscriptions are registered but not enabled until user opts in
-      try {
-        const registry = getSubscriptionRegistry();
-        registry.setInvoker(async (agentId: string, prompt: string) => {
-          const { processMessageStream } = await import("../infra/agents/orchestrator.ts");
-          const session = await getCurrentSession();
-          if (!llmClientRef.current) {
-            throw new Error(`LLM client not initialized for event-driven invoke (${agentId}).`);
           }
-          const gordonCtx = buildAppGordonContext({
-            binance: binanceClientRef.current,
-            exchange: exchangeRef.current,
-            llm: llmClientRef.current,
-            config: configRef.current,
-            portfolioValue: 0,
-            availableCash: 0,
-            userId: session?.resourceId,
-            threadId: session?.threadId ?? undefined,
-          }) as GordonContext;
-          const stream = processMessageStream(prompt, gordonCtx, session?.threadId ?? undefined, session?.resourceId);
-          for await (const _event of stream) { /* consumed */ }
         });
-        console.log("[v0.7] AgentInvoker wired");
-      } catch (err) {
-        console.error("[v0.7] AgentInvoker setup failed:", err);
+
+        deferredStartupTasks.push(async () => {
+          const allTrades = listTrades({});
+          const activeTrades = allTrades.filter(
+            (t) => t.status === "OPEN" || t.status === "PARTIAL"
+          );
+
+          if (activeTrades.length === 0) {
+            return;
+          }
+
+          const knownOrderOwnerKeys = buildKnownOrderOwnerKeys(activeTrades);
+          try {
+            const recoveryResult = await runOrderRecovery(binanceClientRef.current!, knownOrderOwnerKeys, {
+              logResults: true,
+            });
+            if (recoveryResult.orphaned.length > 0) {
+              console.warn(
+                `Found ${recoveryResult.orphaned.length} orphaned orders on Binance`
+              );
+            }
+          } catch {
+            // Silently ignore - not critical for startup
+          }
+        });
+
+        deferredStartupTasks.push(async () => {
+          try {
+            await initializeRealtimeMonitor(exchangeRef.current?.exchangeId);
+          } catch (error) {
+            console.warn("Real-time monitoring unavailable:", error);
+          }
+        });
       }
+
+      deferredStartupTasks.push(async () => {
+        try {
+          getMarketEmitter();
+          console.log("[v0.7] MarketEventEmitter ready");
+        } catch (err) {
+          console.error("[v0.7] MarketEventEmitter setup failed:", err);
+        }
+      });
+
+      deferredStartupTasks.push(async () => {
+        try {
+          const registry = getSubscriptionRegistry();
+          registry.setInvoker(async (_agentId: string, prompt: string) => {
+            const { processMessageStream } = await import("../infra/agents/orchestrator.ts");
+            const session = await getCurrentSession();
+            if (!llmClientRef.current) {
+              throw new Error("LLM client not initialized for event-driven invoke.");
+            }
+            const gordonCtx = buildAppGordonContext({
+              binance: binanceClientRef.current,
+              exchange: exchangeRef.current,
+              llm: llmClientRef.current,
+              config: configRef.current,
+              portfolioValue: 0,
+              availableCash: 0,
+              userId: session?.resourceId,
+              threadId: session?.threadId ?? undefined,
+            }) as GordonContext;
+            const stream = processMessageStream(prompt, gordonCtx, session?.threadId ?? undefined, session?.resourceId);
+            for await (const _event of stream) {
+              // Consume stream for event-driven flows.
+            }
+          });
+          console.log("[v0.7] AgentInvoker wired");
+        } catch (err) {
+          console.error("[v0.7] AgentInvoker setup failed:", err);
+        }
+      });
 
       // Initialize session for Mastra agent memory
       // Auto-resume is disabled by default - creates fresh sessions
@@ -610,6 +702,8 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
           base: envStatus.hasBasescanKey || envStatus.hasCDPKeys,
         },
       }));
+
+      void runDeferredTasksWithConcurrency(deferredStartupTasks);
     }
 
     initialize();
@@ -624,7 +718,12 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
         return;
       }
 
-      runMonitorCycle(exchangeRef.current)
+      if (monitorCycleInFlightRef.current) {
+        return;
+      }
+      monitorCycleInFlightRef.current = true;
+
+      runSharedMonitorCycle(exchangeRef.current)
         .then((result) => {
           if (result.alerts.length === 0) {
             return;
@@ -636,40 +735,30 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
             timestamp: formatTimestamp(),
           }));
 
-          setState((prev) => ({
-            ...prev,
-            messages: [...prev.messages, ...alertMessages],
-          }));
+          appendMessages(alertMessages);
         })
         .catch((error) => {
           console.error("Monitor cycle error:", error);
+        })
+        .finally(() => {
+          monitorCycleInFlightRef.current = false;
         });
     }, MONITOR_INTERVAL_MS);
 
     return () => {
       clearInterval(intervalId);
     };
-  }, []);
+  }, [appendMessages]);
 
   // Fetch BTC price periodically
   useEffect(() => {
-    const fetchBtcPrice = async () => {
-      if (!exchangeRef.current) return;
-      try {
-        const price = await exchangeRef.current.getPrice("BTCUSDT");
-        setState((prev) => ({ ...prev, btcPrice: price }));
-      } catch (error) {
-        console.error("Failed to fetch BTC price:", error);
-      }
-    };
+    if (!exchangeRef.current) {
+      return;
+    }
 
-    // Fetch immediately
-    fetchBtcPrice();
-
-    // Then every 30 seconds
-    const intervalId = setInterval(fetchBtcPrice, 30000);
-
-    return () => clearInterval(intervalId);
+    return subscribeToMarketPrice(exchangeRef.current, "BTCUSDT", (price) => {
+      setState((prev) => ({ ...prev, btcPrice: price }));
+    });
   }, []);
 
   const handleSubmit = useCallback(async (value: string): Promise<void> => {
@@ -1629,6 +1718,7 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
       ...prev,
       messages: [...prev.messages, userMessage],
       isLoading: true,
+      activityStatus: "Routing request...",
     }));
 
     // Check if LLM client is configured
@@ -1636,7 +1726,7 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
       const errorMessage: ChatMessage = {
         role: "gordon",
         content:
-          "I'm not fully configured yet. Please set up your API keys in the environment (OPENAI_API_KEY or DEDALUS_API_KEY).",
+          "I'm not fully configured yet. Please set up your API keys in the environment (OPENAI_API_KEY, INCEPTION_API_KEY, or DEDALUS_API_KEY).",
         timestamp: formatTimestamp(),
       };
 
@@ -1644,6 +1734,7 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
         ...prev,
         messages: [...prev.messages, errorMessage],
         isLoading: false,
+        activityStatus: null,
       }));
       return;
     }
@@ -1675,6 +1766,7 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
       isLoading: false,
       isStreaming: true,
       activeToolCall: null,
+      activityStatus: "Preparing response...",
     }));
 
     try {
@@ -1691,23 +1783,11 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
 
       // Helper to update the streaming message with agent attribution
       const updateStreamingMessage = (content: string, agent?: string): void => {
-        setState((prev) => {
-          const newMessages = [...prev.messages];
-          // Find the last Gordon message with matching timestamp (the streaming one)
-          for (let i = newMessages.length - 1; i >= 0; i--) {
-            const msg = newMessages[i];
-            if (msg && msg.role === "gordon" && msg.timestamp === streamingTimestamp) {
-              newMessages[i] = {
-                role: "gordon",
-                content,
-                timestamp: streamingTimestamp,
-                agent: agent || msg.agent,
-              };
-              break;
-            }
-          }
-          return { ...prev, messages: newMessages };
-        });
+        updateMessageByTimestamp(streamingTimestamp, (message) => ({
+          ...message,
+          content,
+          agent: agent || message.agent,
+        }));
       };
 
       // Throttled version — batches updates every 50ms for smooth rendering
@@ -1742,6 +1822,7 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
             setState((prev) => ({
               ...prev,
               activeToolCall: event.toolName || "tool",
+              activityStatus: `Running ${event.toolName || "tool"}...`,
             }));
             // If the tool call has agent info, update attribution
             if (event.agentName && event.agentName !== currentAgentName) {
@@ -1754,6 +1835,7 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
             setState((prev) => ({
               ...prev,
               activeToolCall: null,
+              activityStatus: "Finalizing response...",
             }));
             if (event.toolResult) {
               updateLastResultsFromTool(event.toolName, event.toolResult);
@@ -1770,6 +1852,7 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
               ...prev,
               isStreaming: false,
               activeToolCall: null,
+              activityStatus: null,
             }));
             // Update thread status info after message exchange
             if (state.session?.threadId) {
@@ -1809,6 +1892,7 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
               ...prev,
               isStreaming: false,
               activeToolCall: null,
+              activityStatus: null,
             }));
             break;
         }
@@ -1842,6 +1926,7 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
           isStreaming: false,
           isLoading: false,
           activeToolCall: null,
+          activityStatus: null,
         };
       });
     }
@@ -1853,6 +1938,7 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
     state.availableCash,
     state.messages,
     refreshActiveExchange,
+    updateMessageByTimestamp,
     updateLastResultsFromTool,
   ]);
 
@@ -1879,70 +1965,100 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
           ...prev,
           messages: [...prev.messages, { role: "gordon" as const, content: "", timestamp: messageTimestamp }],
           isStreaming: true,
+          activityStatus: "Preparing response...",
         }));
 
         const updateMsg = (content: string, agent?: string): void => {
-          setState((prev) => {
-            const newMessages = [...prev.messages];
-            for (let i = newMessages.length - 1; i >= 0; i--) {
-              const msg = newMessages[i];
-              if (msg && msg.role === "gordon" && msg.timestamp === messageTimestamp) {
-                newMessages[i] = { role: "gordon", content, timestamp: messageTimestamp, agent: agent || msg.agent };
-                break;
-              }
-            }
-            return { ...prev, messages: newMessages };
-          });
+          updateMessageByTimestamp(messageTimestamp, (message) => ({
+            ...message,
+            content,
+            agent: agent || message.agent,
+          }));
         };
 
+        let currentAgent: string | undefined;
         try {
           const stream = processMessageStream(prompt, context, state.session?.threadId, state.session?.resourceId);
           let fullContent = "";
-          let currentAgent: string | undefined;
+          let pendingUpdate = false;
+
+          const scheduleUpdate = (): void => {
+            if (!pendingUpdate) {
+              pendingUpdate = true;
+              setTimeout(() => {
+                pendingUpdate = false;
+                updateMsg(fullContent, currentAgent);
+              }, 50);
+            }
+          };
 
           for await (const event of stream) {
             switch (event.type) {
               case "text_delta":
                 if (event.content) {
                   fullContent += event.content;
-                  updateMsg(fullContent, currentAgent);
+                  scheduleUpdate();
                 }
                 break;
               case "agent_switch":
-                if (event.agentName) currentAgent = event.agentName;
+                if (event.agentName) {
+                  currentAgent = event.agentName;
+                  updateMsg(fullContent, currentAgent);
+                }
                 break;
               case "tool_call_start":
-                setState((prev) => ({ ...prev, activeToolCall: event.toolName || "tool" }));
-                if (event.agentName) currentAgent = event.agentName;
+                setState((prev) => ({
+                  ...prev,
+                  activeToolCall: event.toolName || "tool",
+                  activityStatus: `Running ${event.toolName || "tool"}...`,
+                }));
+                if (event.agentName) {
+                  currentAgent = event.agentName;
+                }
                 break;
               case "tool_call_end":
-                setState((prev) => ({ ...prev, activeToolCall: null }));
+                setState((prev) => ({
+                  ...prev,
+                  activeToolCall: null,
+                  activityStatus: "Finalizing response...",
+                }));
                 break;
               case "done":
                 if (event.agentName) currentAgent = event.agentName;
                 updateMsg(fullContent, currentAgent);
-                setState((prev) => ({ ...prev, isStreaming: false, activeToolCall: null }));
+                setState((prev) => ({
+                  ...prev,
+                  isStreaming: false,
+                  activeToolCall: null,
+                  activityStatus: null,
+                }));
                 break;
               case "error":
                 updateMsg(fullContent || `${errorPrefix}: ${event.error}`, currentAgent);
-                setState((prev) => ({ ...prev, isStreaming: false, activeToolCall: null }));
+                setState((prev) => ({
+                  ...prev,
+                  isStreaming: false,
+                  activeToolCall: null,
+                  activityStatus: null,
+                }));
                 break;
             }
           }
         } catch (error) {
+          updateMsg(
+            `${errorPrefix}: ${error instanceof Error ? error.message : "Unknown error"}`,
+            currentAgent
+          );
           setState((prev) => ({
             ...prev,
-            messages: [
-              ...prev.messages,
-              { role: "gordon" as const, content: `${errorPrefix}: ${error instanceof Error ? error.message : "Unknown error"}`, timestamp: formatTimestamp() },
-            ],
             isStreaming: false,
             activeToolCall: null,
+            activityStatus: null,
           }));
         }
       })();
     },
-    [state.portfolioValue, state.availableCash, state.session?.resourceId, state.session?.threadId]
+    [state.portfolioValue, state.availableCash, state.session?.resourceId, state.session?.threadId, updateMessageByTimestamp]
   );
 
   // Handle menu selection
@@ -1970,6 +2086,8 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
           setState((prev) => ({
             ...prev,
             view: "chat",
+            isLoading: true,
+            activityStatus: "Scanning market...",
             messages: [
               ...prev.messages,
               {
@@ -1985,7 +2103,7 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
               const exchange = exchangeRef.current;
               if (!exchange) return;
               const scanStart = Date.now();
-              const scanResult = await scan(exchange, {
+              const scanResult = await runSharedScan(exchange, {
                 topN: configRef.current.preferences.topNCoins,
                 timeframes: configRef.current.preferences.defaultTimeframes,
               });
@@ -2019,6 +2137,8 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
 
               setState((prev) => ({
                 ...prev,
+                isLoading: false,
+                activityStatus: null,
                 messages: [
                   ...prev.messages,
                   {
@@ -2031,6 +2151,8 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
             } catch (error) {
               setState((prev) => ({
                 ...prev,
+                isLoading: false,
+                activityStatus: null,
                 messages: [
                   ...prev.messages,
                   {
@@ -2067,6 +2189,8 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
           setState((prev) => ({
             ...prev,
             view: "chat",
+            isLoading: true,
+            activityStatus: "Fetching portfolio...",
             messages: [
               ...prev.messages,
               {
@@ -2149,6 +2273,8 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
                 ...prev,
                 portfolioValue: totalValue,
                 availableCash: usdtBalance,
+                isLoading: false,
+                activityStatus: null,
                 messages: [
                   ...prev.messages,
                   {
@@ -2161,6 +2287,8 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
             } catch (error) {
               setState((prev) => ({
                 ...prev,
+                isLoading: false,
+                activityStatus: null,
                 messages: [
                   ...prev.messages,
                   {
@@ -2342,7 +2470,7 @@ Try saying: "What's the market looking like today?"`,
             role: "gordon",
             content: `Setup complete! I'm ready to help you trade.
 
-Your API keys have been saved to the .env file in your project directory.
+Your API keys have been saved to ~/.gordon/.env.
 
 Try saying: "What's the market looking like today?" or "Find me a good BTC setup"`,
             timestamp: formatTimestamp(),
@@ -2438,6 +2566,13 @@ Please check your API keys in the .env file and restart Gordon.`,
     return items;
   }, [state.btcPrice]);
 
+  const maxVisibleMessages = 80;
+  const hiddenMessageCount = Math.max(0, state.messages.length - maxVisibleMessages);
+  const visibleMessages = useMemo(
+    () => (hiddenMessageCount > 0 ? state.messages.slice(-maxVisibleMessages) : state.messages),
+    [hiddenMessageCount, maxVisibleMessages, state.messages]
+  );
+
   return (
     <Box flexDirection="column" height="100%">
       {/* Status Bar - hidden during loading to prevent SAFE→ARMED flicker */}
@@ -2496,17 +2631,17 @@ Please check your API keys in the .env file and restart Gordon.`,
               />
             )}
 
-            <ChatView messages={state.messages} />
+            <ChatView messages={visibleMessages} hiddenCount={hiddenMessageCount} />
 
             {/* Loading/Streaming indicator */}
             {state.isLoading && (
               <Box paddingX={2}>
-                <Spinner label="Gordon is thinking..." />
+                <Spinner label={state.activityStatus || "Gordon is thinking..."} />
               </Box>
             )}
-            {state.isStreaming && state.activeToolCall && (
+            {state.isStreaming && (state.activeToolCall || state.activityStatus) && (
               <Box paddingX={2}>
-                <Spinner label={`Running ${state.activeToolCall}...`} />
+                <Spinner label={state.activityStatus || `Running ${state.activeToolCall}...`} />
               </Box>
             )}
 

@@ -12,6 +12,7 @@ export interface ChatMessage {
 
 interface ChatViewProps {
   messages: ChatMessage[];
+  hiddenCount?: number;
 }
 
 interface MessageBubbleProps {
@@ -65,6 +66,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({ message }) => 
 
 export const ChatView: React.FC<ChatViewProps> = ({
   messages,
+  hiddenCount = 0,
 }) => {
   return (
     <Box flexDirection="column" flexGrow={1} paddingX={1}>
@@ -75,9 +77,18 @@ export const ChatView: React.FC<ChatViewProps> = ({
           </Text>
         </Box>
       ) : (
-        messages.map((msg, index) => (
-          <MessageBubble key={`${msg.role}-${msg.timestamp}-${index}`} message={msg} />
-        ))
+        <>
+          {hiddenCount > 0 && (
+            <Box paddingX={1} paddingY={0}>
+              <Text color={COLORS.DIM}>
+                {hiddenCount} earlier message{hiddenCount === 1 ? "" : "s"} hidden to keep the terminal responsive.
+              </Text>
+            </Box>
+          )}
+          {messages.map((msg, index) => (
+            <MessageBubble key={`${msg.role}-${msg.timestamp}-${hiddenCount + index}`} message={msg} />
+          ))}
+        </>
       )}
     </Box>
   );

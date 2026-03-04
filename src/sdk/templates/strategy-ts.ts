@@ -14,7 +14,7 @@ async function main() {
   console.log("System armed");
 
   // 2. Run a market scan to find opportunities
-  const scan = await gordon.scan({ topN: 30, timeframes: ["15m", "1h", "4h"] });
+  const scan = await gordon.scan({ topN: 30, timeframes: ["15m"] });
   console.log("Scan complete:", scan.data);
 
   // 3. Ask Gordon to analyze and plan trades
