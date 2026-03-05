@@ -520,6 +520,13 @@ function getExchangeSetupInstructions(type: ExchangeId): string {
 2. Provide your wallet address (the address that will execute swaps)
 3. Ensure your wallet has ETH for gas and tokens to trade
 4. Supports 15+ chains: Ethereum, Base, Arbitrum, Polygon, Optimism, etc.`,
+    robinhood: `
+1. Open Robinhood Crypto API settings and create API credentials
+2. Copy your API key and private signing key
+3. Use /setup and enter:
+   - API Key -> ROBINHOOD_API_KEY
+   - API Secret -> ROBINHOOD_API_SECRET (private key)
+4. Keep your private key encrypted and never commit it`,
   };
 
   return instructions[type] || 'Follow the exchange documentation to create API keys.';

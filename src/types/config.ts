@@ -20,7 +20,21 @@ export const ExchangeConfigSchema = z.object({
 /**
  * Supported exchange types for multi-exchange configuration
  */
-export const ExchangeTypeSchema = z.enum(["binance", "binance_us", "coinbase", "kraken", "bitfinex", "hyperliquid", "uniswap"]);
+export const ExchangeTypeSchema = z.enum(["binance", "binance_us", "coinbase", "kraken", "bitfinex", "hyperliquid", "uniswap", "robinhood"]);
+
+/**
+ * Supported stock broker types
+ */
+export const BrokerTypeSchema = z.enum([
+  "alpaca",
+  "webull",
+  "schwab",
+  "tradier",
+  "tradestation",
+  "tastytrade",
+  "etrade",
+  "ibkr",
+]);
 
 /**
  * Multi-exchange configuration schema
@@ -43,6 +57,31 @@ export const MultiExchangeConfigSchema = z.object({
   passphrase: z.string().optional(),
   /** Wallet private key for DEX exchanges (e.g., Hyperliquid) */
   walletPrivateKey: z.string().optional(),
+});
+
+/**
+ * Multi-broker configuration schema
+ * Supports stock/options brokers with API key + secret auth.
+ */
+export const MultiBrokerConfigSchema = z.object({
+  /** Unique identifier for this broker configuration */
+  id: z.string(),
+  /** Broker type */
+  type: BrokerTypeSchema,
+  /** API key for authentication */
+  apiKey: z.string(),
+  /** API secret for authentication */
+  apiSecret: z.string(),
+  /** Optional account identifier for broker APIs that require it */
+  accountId: z.string().optional(),
+  /** Whether this is the default/active broker */
+  isDefault: z.boolean().default(false),
+  /** Paper trading mode */
+  paper: z.boolean().default(true),
+  /** Optional override for trading API host */
+  baseUrl: z.string().url().optional(),
+  /** Optional override for market data API host */
+  dataBaseUrl: z.string().url().optional(),
 });
 
 export const PreferencesSchema = z.object({
@@ -136,6 +175,10 @@ export const GordonConfigSchema = z.object({
   exchanges: z.array(MultiExchangeConfigSchema).default([]),
   /** ID of the currently active exchange from the exchanges array */
   activeExchangeId: z.string().optional(),
+  /** Multi-broker configuration (stocks/options) */
+  brokers: z.array(MultiBrokerConfigSchema).default([]),
+  /** ID of the currently active broker from the brokers array */
+  activeBrokerId: z.string().optional(),
   /** Enable OS keyring for secure API key storage (opt-in) */
   useKeyring: z.boolean().default(false),
   preferences: PreferencesSchema.default({
@@ -181,6 +224,8 @@ export type ExchangePermissions = z.infer<typeof ExchangePermissionsSchema>;
 export type ExchangeConfig = z.infer<typeof ExchangeConfigSchema>;
 export type ExchangeType = z.infer<typeof ExchangeTypeSchema>;
 export type MultiExchangeConfig = z.infer<typeof MultiExchangeConfigSchema>;
+export type BrokerType = z.infer<typeof BrokerTypeSchema>;
+export type MultiBrokerConfig = z.infer<typeof MultiBrokerConfigSchema>;
 export type Preferences = z.infer<typeof PreferencesSchema>;
 export type ProviderName = z.infer<typeof ProviderSchema>;
 export type ModelConfig = z.infer<typeof ModelConfigSchema>;

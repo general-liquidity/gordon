@@ -89,10 +89,10 @@ interface DedalusModelDiscoveryResponse {
 /**
  * Native provider models exposed directly via Mastra.
  */
-const DIRECT_MODELS = {
+export const DIRECT_MODELS = {
   anthropic: {
     flagship: "claude-opus-4-6",
-    balanced: "claude-sonnet-4-5",
+    balanced: "claude-sonnet-4-6",
     fast: "claude-haiku-4-5",
   },
   openai: {
@@ -101,8 +101,8 @@ const DIRECT_MODELS = {
     fast: "gpt-5-mini",
   },
   google: {
-    flagship: "gemini-3-pro-preview",
-    balanced: "gemini-3-pro-preview",
+    flagship: "gemini-3-1-pro-preview",
+    balanced: "gemini-3-1-pro-preview",
     fast: "gemini-3-flash-preview",
   },
   inception: {
@@ -136,6 +136,8 @@ export const DEDALUS_MODELS = [
   { id: "xai/grok-4-1-fast-non-reasoning", provider: "xai" as const, name: "Grok 4.1 Fast", tier: "fast" as const },
   { id: "moonshot/kimi-k2.5", provider: "moonshot" as const, name: "Kimi K2.5", tier: "flagship" as const },
 ] as const satisfies ReadonlyArray<ModelMetadata>;
+
+const DEDALUS_MODEL_ID_SET = new Set<ModelString>(DEDALUS_MODELS.map((model) => model.id));
 
 /** OpenAI-compatible provider base URLs */
 export const DEDALUS_BASE_URL = "https://api.dedaluslabs.ai/v1";
@@ -339,9 +341,13 @@ export class ProviderRegistry {
         }
 
         const payload = await response.json();
-        const discovered = this.normalizeDiscoveredDedalusModels(payload);
+        const discovered = this.normalizeDiscoveredDedalusModels(payload)
+          .filter((model) => DEDALUS_MODEL_ID_SET.has(model.id));
         if (discovered.length > 0) {
-          this.dedalusModels = discovered;
+          const discoveredById = new Map(discovered.map((model) => [model.id, model]));
+          this.dedalusModels = DEDALUS_MODELS.map((model) => discoveredById.get(model.id) ?? model);
+        } else {
+          this.dedalusModels = [...DEDALUS_MODELS];
         }
       } catch {
         this.dedalusModels = this.dedalusModels.length > 0 ? this.dedalusModels : [...DEDALUS_MODELS];

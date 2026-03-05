@@ -376,7 +376,7 @@ Timeframes: ${options.timeframes.join(", ")}`,
     try {
       return await this.llm.chatWithJSON(messages, intentSchema, {
         provider: "dedalus",
-        model: "openai/gpt-5-mini",
+        model: "anthropic/claude-haiku-4-5-20251001",
         temperature: 0.3,
         maxTokens: 1000,
       });

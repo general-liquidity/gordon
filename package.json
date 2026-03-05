@@ -1,6 +1,6 @@
 {
   "name": "@general-liquidity/gordon-cli",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "description": "The Frontier Trading Agent",
   "author": "General Liquidity, Inc.",
   "license": "MIT",
@@ -39,6 +39,8 @@
     "dev": "bun --watch run src/index.tsx",
     "build": "bun build src/index.tsx --outdir dist --target bun --external @lightprotocol/compressed-token --external @lightprotocol/stateless.js --external @solana-developers/helpers --external @galacticcouncil/api-augment/hydradx --external @galacticcouncil/api-augment/basilisk",
     "build:binary": "bun build src/index.tsx --compile --outfile gordon --external @lightprotocol/compressed-token --external @lightprotocol/stateless.js --external @solana-developers/helpers --external @galacticcouncil/api-augment/hydradx --external @galacticcouncil/api-augment/basilisk",
+    "test:broker-conformance": "bun test src/infra/broker/adapters/conformance.test.ts src/infra/broker/adapters/conformance.matrix.test.ts src/infra/broker/factory.extended.test.ts src/infra/broker/inclusion-gate.test.ts",
+    "quality:brokers": "bun run scripts/broker-quality.ts --ci",
     "prepublishOnly": "bun run build",
     "test": "bun test",
     "typecheck": "tsc --noEmit",

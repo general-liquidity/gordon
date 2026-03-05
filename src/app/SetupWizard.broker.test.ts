@@ -1,0 +1,45 @@
+import { describe, expect, test } from "bun:test";
+import { __setupWizardBrokerInternals } from "./SetupWizard.tsx";
+
+describe("setup wizard broker helpers", () => {
+  test("parses broker mode values", () => {
+    expect(__setupWizardBrokerInternals.parseBrokerMode("paper")).toBe(true);
+    expect(__setupWizardBrokerInternals.parseBrokerMode("true")).toBe(true);
+    expect(__setupWizardBrokerInternals.parseBrokerMode("1")).toBe(true);
+    expect(__setupWizardBrokerInternals.parseBrokerMode("live")).toBe(false);
+    expect(__setupWizardBrokerInternals.parseBrokerMode("false")).toBe(false);
+    expect(__setupWizardBrokerInternals.parseBrokerMode("0")).toBe(false);
+    expect(__setupWizardBrokerInternals.parseBrokerMode("invalid")).toBeNull();
+  });
+
+  test("returns broker label and setup instructions", () => {
+    expect(__setupWizardBrokerInternals.getBrokerLabel("alpaca")).toBe("Alpaca");
+    expect(__setupWizardBrokerInternals.getBrokerInstructions("alpaca").length).toBeGreaterThan(0);
+    expect(__setupWizardBrokerInternals.getBrokerLabel("webull")).toBe("Webull");
+    expect(__setupWizardBrokerInternals.getBrokerInstructions("webull").length).toBeGreaterThan(0);
+  });
+
+  test("generates unique broker IDs", () => {
+    const existing = [
+      {
+        id: "alpaca",
+        type: "alpaca" as const,
+        apiKey: "***",
+        apiSecret: "***",
+        isDefault: true,
+        paper: true,
+      },
+      {
+        id: "alpaca_1",
+        type: "alpaca" as const,
+        apiKey: "***",
+        apiSecret: "***",
+        isDefault: false,
+        paper: true,
+      },
+    ];
+
+    const generated = __setupWizardBrokerInternals.generateBrokerId("alpaca", existing);
+    expect(generated).toBe("alpaca_2");
+  });
+});

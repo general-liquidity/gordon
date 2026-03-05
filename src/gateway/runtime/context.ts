@@ -117,6 +117,19 @@ export class GatewayContextResolver {
       }
     }
 
+    if (!exchange && env.hasRobinhoodKeys && env.keys.ROBINHOOD_API_KEY && env.keys.ROBINHOOD_API_SECRET) {
+      try {
+        exchange = ExchangeFactory.create("robinhood", {
+          apiKey: env.keys.ROBINHOOD_API_KEY,
+          apiSecret: env.keys.ROBINHOOD_API_SECRET,
+        });
+      } catch (error) {
+        logger.warn("Failed to initialize Robinhood fallback exchange for gateway", {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
     // Fetch live portfolio data from exchange
     let portfolioValue = 0;
     let availableCash = 0;
@@ -126,7 +139,7 @@ export class GatewayContextResolver {
         const details = await exchange.getFullAccountDetails();
         portfolioValue = details.totalUsdtValue;
 
-        const stableAssets = ["USDT", "BUSD", "USDC", "FDUSD"];
+        const stableAssets = ["USD", "USDT", "BUSD", "USDC", "FDUSD"];
         for (const asset of stableAssets) {
           try {
             availableCash += await exchange.getBalance(asset);
@@ -153,4 +166,3 @@ export class GatewayContextResolver {
     return { exchange, binance, llm, portfolioValue, availableCash };
   }
 }
-

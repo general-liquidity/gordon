@@ -12,6 +12,7 @@
  * - Kraken
  * - Bitfinex
  * - Hyperliquid
+ * - Robinhood Crypto
  *
  * @example
  * ```typescript
@@ -46,6 +47,7 @@ export { KrakenAdapter } from "./adapters/kraken.ts";
 export { BitfinexAdapter } from "./adapters/bitfinex.ts";
 export { HyperliquidAdapter } from "./adapters/hyperliquid.ts";
 export { UniswapAdapter } from "./adapters/uniswap.ts";
+export { RobinhoodAdapter } from "./adapters/robinhood.ts";
 
 // Type aliases for convenience
 export type {

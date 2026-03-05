@@ -486,6 +486,30 @@ export const SLASH_COMMANDS: SlashCommand[] = [
     whenToUse: "Configure, switch, or check status of trading exchanges",
   },
   {
+    name: "broker",
+    aliases: ["brokers", "br"],
+    description: "Manage stock/options brokers",
+    usage: "/broker [list|add|switch|remove|status]",
+    category: "account",
+    level: 2,
+    action: "tool",
+    target: "handle_broker_command",
+    executionTime: "~1-3s",
+    whenToUse: "Configure stock broker credentials and choose the active broker",
+  },
+  {
+    name: "stocks",
+    aliases: ["stock", "equities", "eq"],
+    description: "Stock broker commands (account, quote, positions, orders, buy/sell)",
+    usage: "/stocks [account|quote|positions|orders|buy|sell]",
+    category: "account",
+    level: 2,
+    action: "tool",
+    target: "handle_stocks_command",
+    executionTime: "~1-3s",
+    whenToUse: "Use stock market broker actions via the active broker",
+  },
+  {
     name: "model",
     aliases: ["m", "provider"],
     description: "Select AI model and provider",
@@ -1292,14 +1316,17 @@ export function commandToPrompt(command: SlashCommand, args: string): string {
     case "grid":
       return args ? `Create a grid entry plan for ${args}` : "What symbol should I create a grid plan for?";
     case "positions":
+      if (/^\s*(stocks?|equit(y|ies)|alpaca|webull|schwab|tradier|tradestation|tastytrade|etrade|ibkr)\b/i.test(args || "")) return "Show my current stock positions";
       return "Check my current positions";
     case "orders":
+      if (/^\s*(stocks?|equit(y|ies)|alpaca|webull|schwab|tradier|tradestation|tastytrade|etrade|ibkr)\b/i.test(args || "")) return "Show my open stock broker orders";
       return "Show my open orders";
     case "arm":
       return "Arm the system for live trading";
     case "disarm":
       return "Disarm the system and return to safe mode";
     case "portfolio":
+      if (/^\s*(stocks?|equit(y|ies)|alpaca|webull|schwab|tradier|tradestation|tastytrade|etrade|ibkr)\b/i.test(args || "")) return "Show my stock broker account summary";
       return "Show my portfolio";
     case "earn": {
       const earnSub = args?.trim().split(/\s+/)[0]?.toLowerCase();
@@ -1355,7 +1382,7 @@ export function commandToPrompt(command: SlashCommand, args: string): string {
         case "new":
           return exArgs
             ? `Add a new ${exArgs} exchange configuration`
-            : "What type of exchange would you like to add? (binance, coinbase, kraken, bybit, okx)";
+            : "What type of exchange would you like to add? (binance, coinbase, kraken, bitfinex, hyperliquid, uniswap, robinhood)";
         case "switch":
         case "use":
           return exArgs
@@ -1378,6 +1405,63 @@ export function commandToPrompt(command: SlashCommand, args: string): string {
           return "Show help for exchange management commands";
         default:
           return "List my configured trading exchanges";
+      }
+    case "broker":
+      if (!args) return "List my configured stock brokers";
+      const brokerParts = args.split(/\s+/);
+      const brokerSubcmd = brokerParts[0]?.toLowerCase();
+      const brokerArgs = brokerParts.slice(1).join(" ");
+      switch (brokerSubcmd) {
+        case "list":
+        case "ls":
+          return "List all my configured stock brokers";
+        case "add":
+        case "new":
+          return brokerArgs
+            ? `Add a new ${brokerArgs} broker configuration`
+            : "What type of broker would you like to add? (alpaca, webull, schwab, tradier, tradestation, tastytrade, etrade, ibkr)";
+        case "switch":
+        case "use":
+          return brokerArgs
+            ? `Switch to using the "${brokerArgs}" broker`
+            : "Which broker should I switch to?";
+        case "remove":
+        case "delete":
+          return brokerArgs
+            ? `Remove the "${brokerArgs}" broker configuration`
+            : "Which broker should I remove?";
+        case "status":
+        case "check":
+          return "Check the connection status for all configured brokers";
+        case "help":
+          return "Show help for broker management commands";
+        default:
+          return "List my configured stock brokers";
+      }
+    case "stocks":
+      if (!args) return "Show stock broker command help";
+      const stockParts = args.split(/\s+/);
+      const stockSubcmd = stockParts[0]?.toLowerCase();
+      const stockArgs = stockParts.slice(1).join(" ");
+      switch (stockSubcmd) {
+        case "account":
+        case "portfolio":
+        case "summary":
+          return "Show my stock broker account summary";
+        case "quote":
+          return stockArgs ? `Get a stock quote for ${stockArgs.toUpperCase()}` : "Which stock symbol should I quote?";
+        case "positions":
+          return "Show my current stock positions";
+        case "orders":
+          return "Show my stock broker orders";
+        case "buy":
+          return stockArgs ? `Place a stock buy order: ${stockArgs}` : "Provide a buy order like: /stocks buy AAPL 5";
+        case "sell":
+          return stockArgs ? `Place a stock sell order: ${stockArgs}` : "Provide a sell order like: /stocks sell AAPL 5";
+        case "help":
+          return "Show help for stocks commands";
+        default:
+          return "Show stock broker command help";
       }
     case "backtest":
       if (args) {

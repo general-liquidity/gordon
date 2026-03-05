@@ -25,6 +25,12 @@ jobs:
       - name: Run tests
         run: bun test
 
+      - name: Run broker conformance matrix
+        run: bun run test:broker-conformance
+
+      - name: Run broker latency quality gate
+        run: bun run quality:brokers
+
       - name: Run typecheck
         run: bun run typecheck
 

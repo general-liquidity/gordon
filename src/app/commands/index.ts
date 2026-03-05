@@ -49,6 +49,22 @@ export {
   type ExchangeCommandResult,
 } from './exchange';
 
+// Broker Management Commands
+export {
+  handleBrokerCommand,
+  brokerList,
+  brokerAdd,
+  brokerSwitch,
+  brokerRemove,
+  brokerStatus,
+  type BrokerCommandResult,
+} from './broker';
+
+// Stocks Commands
+export {
+  handleStocksCommand,
+} from './stocks';
+
 // Strategy Management Commands
 export {
   handleStrategyCommand,

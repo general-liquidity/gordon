@@ -1,6 +1,6 @@
 /**
  * SetupWizard Component
- * Step-by-step configuration for exchange and LLM API keys
+ * Step-by-step configuration for exchange, broker, and LLM API keys
  */
 
 import React, { useState, useCallback } from "react";
@@ -12,9 +12,17 @@ import { resetProviderRegistry } from "../infra/providers/index.ts";
 import { BinanceClient, checkAndValidatePermissions } from "../infra/binance/index.ts";
 import { ExchangeFactory, type ExchangeId } from "../infra/exchange/index.ts";
 import { EXCHANGE_ENV_MAP } from "../infra/exchange/types.ts";
+import { BrokerFactory } from "../infra/broker/factory.ts";
+import { BROKER_ENV_MAP, type BrokerId } from "../infra/broker/types.ts";
 import { loadConfig, saveConfig } from "../infra/storage/config.ts";
 import { saveEnvKeys, createEnvFile, checkEnvStatus } from "../infra/storage/env.ts";
-import type { GordonConfig, ExchangePermissions, Preferences, MultiExchangeConfig } from "../types/index.ts";
+import type {
+  GordonConfig,
+  ExchangePermissions,
+  Preferences,
+  MultiExchangeConfig,
+  MultiBrokerConfig,
+} from "../types/index.ts";
 import { COLORS } from "./theme.ts";
 
 type WizardStep =
@@ -25,6 +33,11 @@ type WizardStep =
   | "exchange-passphrase"
   | "exchange-wallet"
   | "exchange-validating"
+  | "broker-select"
+  | "broker-key"
+  | "broker-secret"
+  | "broker-mode"
+  | "broker-validating"
   | "chain-select"
   | "chain-solana"
   | "chain-polkadot"
@@ -49,8 +62,10 @@ const CHAIN_OPTIONS: Array<{ id: ChainId; label: string; description: string }> 
 ];
 
 type ExchangeSelection = ExchangeId | "";
+type BrokerSelection = BrokerId | "";
 
 const SUPPORTED_EXCHANGES: ExchangeId[] = ExchangeFactory.getSupportedExchanges();
+const SUPPORTED_BROKERS: BrokerId[] = BrokerFactory.getSupportedBrokers();
 
 const EXCHANGE_LABELS: Record<ExchangeId, string> = {
   binance: "Binance",
@@ -60,6 +75,7 @@ const EXCHANGE_LABELS: Record<ExchangeId, string> = {
   bitfinex: "Bitfinex",
   hyperliquid: "Hyperliquid",
   uniswap: "Uniswap",
+  robinhood: "Robinhood Crypto",
 };
 
 const EXCHANGE_PASSPHRASE_REQUIRED: Record<ExchangeId, boolean> = {
@@ -70,6 +86,7 @@ const EXCHANGE_PASSPHRASE_REQUIRED: Record<ExchangeId, boolean> = {
   bitfinex: false,
   hyperliquid: false,
   uniswap: false,
+  robinhood: false,
 };
 
 const EXCHANGE_WALLET_AUTH: Record<ExchangeId, boolean> = {
@@ -80,6 +97,7 @@ const EXCHANGE_WALLET_AUTH: Record<ExchangeId, boolean> = {
   bitfinex: false,
   hyperliquid: true,
   uniswap: true,
+  robinhood: false,
 };
 
 const EXCHANGE_INSTRUCTIONS: Record<ExchangeId, string[]> = {
@@ -127,6 +145,74 @@ const EXCHANGE_INSTRUCTIONS: Record<ExchangeId, string[]> = {
     "Ensure your wallet has ETH for gas and tokens to trade",
     "Supports 15+ chains: Ethereum, Base, Arbitrum, Polygon, Optimism, etc.",
   ],
+  robinhood: [
+    "Go to Robinhood Crypto API settings and create API credentials",
+    "Copy your API key and private signing key",
+    "Paste API key into Exchange API Key and private key into Exchange API Secret",
+    "Keep your private key secure and never share it",
+  ],
+};
+
+const BROKER_LABELS: Record<BrokerId, string> = {
+  alpaca: "Alpaca",
+  webull: "Webull",
+  schwab: "Schwab",
+  tradier: "Tradier",
+  tradestation: "TradeStation",
+  tastytrade: "tastytrade",
+  etrade: "E*TRADE",
+  ibkr: "Interactive Brokers",
+};
+
+const BROKER_INSTRUCTIONS: Record<BrokerId, string[]> = {
+  alpaca: [
+    "Sign in to app.alpaca.markets",
+    "Go to Paper Trading and generate an API key",
+    "Copy the API Key ID and API Secret",
+    "Use paper mode first, then switch to live once validated",
+  ],
+  webull: [
+    "Sign in to developer.webull.com and create an OpenAPI application",
+    "Copy your Webull App Key and App Secret",
+    "If your account has multiple brokerage accounts, set WEBULL_ACCOUNT_ID",
+    "Use paper/UAT mode first, then switch to live once validated",
+  ],
+  schwab: [
+    "Create a Schwab Developer application and enable trader APIs",
+    "Copy API credentials/token details",
+    "Optionally set SCHWAB_ACCOUNT_ID for specific account routing",
+    "Validate in paper mode before live deployment",
+  ],
+  tradier: [
+    "Create a Tradier developer app and brokerage account",
+    "Copy API token/secret values",
+    "Optionally set TRADIER_ACCOUNT_ID for explicit account selection",
+    "Use sandbox first, then switch to production",
+  ],
+  tradestation: [
+    "Create a TradeStation API app and authorize account access",
+    "Copy API credentials/token material",
+    "Optionally set TRADESTATION_ACCOUNT_ID for fixed account routing",
+    "Validate in SIM mode before live routing",
+  ],
+  tastytrade: [
+    "Create a tastytrade API application",
+    "Copy API key/token and secret credentials",
+    "Optionally set TASTYTRADE_ACCOUNT_ID for account pinning",
+    "Validate in sandbox mode before live execution",
+  ],
+  etrade: [
+    "Create an E*TRADE developer application",
+    "Copy API credentials and OAuth token material",
+    "Optionally set ETRADE_ACCOUNT_ID if multiple accounts exist",
+    "Validate in sandbox mode before live execution",
+  ],
+  ibkr: [
+    "Start IBKR Client Portal Gateway locally and authenticate session",
+    "Configure gateway host/ports as needed",
+    "Optionally set IBKR_ACCOUNT_ID to pin a specific account",
+    "Validate paper account flow before live routing",
+  ],
 };
 
 /** Validation patterns for chain private keys */
@@ -158,6 +244,11 @@ interface WizardState {
   exchangePermissions: ExchangePermissions | null;
   exchangeError: string | null;
   exchangeValidated: boolean;
+  brokerType: BrokerSelection;
+  brokerApiKey: string;
+  brokerApiSecret: string;
+  brokerPaper: boolean;
+  brokerValidated: boolean;
   // Chain setup
   selectedChains: ChainId[];
   chainKeys: ChainKeys;
@@ -201,6 +292,16 @@ function requiresWalletAuth(exchangeType: ExchangeSelection): boolean {
   return EXCHANGE_WALLET_AUTH[exchangeType] || false;
 }
 
+function getBrokerLabel(brokerType: BrokerSelection): string {
+  if (!brokerType) return "Broker";
+  return BROKER_LABELS[brokerType] || brokerType;
+}
+
+function getBrokerInstructions(brokerType: BrokerSelection): string[] {
+  if (!brokerType) return [];
+  return BROKER_INSTRUCTIONS[brokerType] || ["Follow your broker documentation to create API keys."];
+}
+
 function generateExchangeId(type: ExchangeId, exchanges: MultiExchangeConfig[]): string {
   const baseId: string = type;
   let id: string = baseId;
@@ -212,6 +313,30 @@ function generateExchangeId(type: ExchangeId, exchanges: MultiExchangeConfig[]):
   }
 
   return id;
+}
+
+function generateBrokerId(type: BrokerId, brokers: MultiBrokerConfig[]): string {
+  const baseId: string = type;
+  let id: string = baseId;
+  let counter = 1;
+
+  while (brokers.some((broker) => broker.id === id)) {
+    id = `${baseId}_${counter}`;
+    counter++;
+  }
+
+  return id;
+}
+
+function parseBrokerMode(value: string): boolean | null {
+  const normalized = value.trim().toLowerCase();
+  if (!normalized || normalized === "paper" || normalized === "true" || normalized === "1") {
+    return true;
+  }
+  if (normalized === "live" || normalized === "false" || normalized === "0") {
+    return false;
+  }
+  return null;
 }
 
 function parseLLMProviderInput(value: string): { provider: LLMWizardProvider; apiKey: string } | null {
@@ -237,6 +362,11 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
     exchangePermissions: null,
     exchangeError: null,
     exchangeValidated: false,
+    brokerType: "",
+    brokerApiKey: "",
+    brokerApiSecret: "",
+    brokerPaper: true,
+    brokerValidated: false,
     selectedChains: [],
     chainKeys: {
       solanaPrivateKey: "",
@@ -323,7 +453,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
 
       setState((prev) => ({
         ...prev,
-        step: "chain-select",
+        step: "broker-select",
         isValidating: false,
         exchangePermissions: permissions,
         exchangeError: null,
@@ -344,7 +474,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
 
       setState((prev) => ({
         ...prev,
-        step: "chain-select",
+        step: "broker-select",
         isValidating: false,
         exchangePermissions: null,
         exchangeError: null,
@@ -370,6 +500,61 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
     }
   }, []);
 
+  const validateBrokerCredentials = useCallback(async (
+    brokerType: BrokerId,
+    apiKey: string,
+    apiSecret: string,
+    paper: boolean,
+  ) => {
+    setState((prev) => ({
+      ...prev,
+      step: "broker-validating",
+      isValidating: true,
+      exchangeError: null,
+    }));
+
+    try {
+      const broker = BrokerFactory.create(brokerType, { apiKey, apiSecret, paper });
+      const connected = await broker.testConnection();
+
+      if (!connected) {
+        setState((prev) => ({
+          ...prev,
+          step: "broker-key",
+          isValidating: false,
+          exchangeError: "Could not connect to broker API. Check key/secret and try again.",
+          brokerApiKey: "",
+          brokerApiSecret: "",
+          brokerValidated: false,
+          inputValue: "",
+        }));
+        return;
+      }
+
+      setState((prev) => ({
+        ...prev,
+        step: "chain-select",
+        isValidating: false,
+        exchangeError: null,
+        brokerPaper: paper,
+        brokerValidated: true,
+        inputValue: "",
+      }));
+    } catch (error) {
+      BrokerFactory.removeFromCache(brokerType, { apiKey, apiSecret, paper });
+      setState((prev) => ({
+        ...prev,
+        step: "broker-key",
+        isValidating: false,
+        exchangeError: error instanceof Error ? error.message : String(error),
+        brokerApiKey: "",
+        brokerApiSecret: "",
+        brokerValidated: false,
+        inputValue: "",
+      }));
+    }
+  }, []);
+
   const saveConfiguration = useCallback(async (overrides?: { preferences?: Preferences }) => {
     const currentConfig = await loadConfig();
     const newConfig: GordonConfig = {
@@ -384,6 +569,9 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
         ? !!state.walletPrivateKey
         : !!(state.exchangeApiKey && state.exchangeApiSecret)
     );
+    const hasBrokerCredentials = state.brokerType
+      && state.brokerValidated
+      && !!(state.brokerApiKey && state.brokerApiSecret);
 
     // 1. Build env keys for .env file (all exchanges + chains + LLM)
     const envKeys: Record<string, string> = {};
@@ -399,6 +587,16 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
           : state.selectedLlmProvider === "inception"
             ? "inception/mercury-2"
             : "openai/gpt-5.2";
+    }
+
+    // Broker credentials
+    if (state.brokerType) {
+      const envMap = BROKER_ENV_MAP[state.brokerType];
+      if (envMap) {
+        if (envMap.key && state.brokerApiKey) envKeys[envMap.key] = state.brokerApiKey;
+        if (envMap.secret && state.brokerApiSecret) envKeys[envMap.secret] = state.brokerApiSecret;
+        if (envMap.paper) envKeys[envMap.paper] = state.brokerPaper ? "true" : "false";
+      }
     }
 
     // Map exchange credentials to env var names (all exchange types, not just Binance)
@@ -469,6 +667,30 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
       }
     }
 
+    if (hasBrokerCredentials) {
+      const brokers = currentConfig.brokers ? [...currentConfig.brokers] : [];
+      const brokerType = state.brokerType as BrokerId;
+      const brokerId = generateBrokerId(brokerType, brokers);
+
+      const newBroker: MultiBrokerConfig = {
+        id: brokerId,
+        type: brokerType,
+        apiKey: "***",
+        apiSecret: "***",
+        paper: state.brokerPaper,
+        isDefault: true,
+      };
+
+      newConfig.brokers = [
+        ...brokers.map((broker) => ({
+          ...broker,
+          isDefault: false,
+        })),
+        newBroker,
+      ];
+      newConfig.activeBrokerId = brokerId;
+    }
+
     await saveConfig(newConfig);
 
     // Reset provider and agent caches so next access reinitializes with fresh env variables
@@ -482,6 +704,11 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
     state.exchangePermissions,
     state.exchangeType,
     state.exchangeValidated,
+    state.brokerType,
+    state.brokerApiKey,
+    state.brokerApiSecret,
+    state.brokerPaper,
+    state.brokerValidated,
     state.chainKeys,
     state.preferences,
     state.selectedLlmProvider,
@@ -616,6 +843,95 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
             );
           }
           break;
+
+        case "broker-select": {
+          if (!trimmedValue) {
+            setState((prev) => ({ ...prev, step: "chain-select", inputValue: "" }));
+            break;
+          }
+
+          const normalized = trimmedValue.toLowerCase();
+          const match = SUPPORTED_BROKERS.find((broker) => broker === normalized);
+
+          if (!match) {
+            setState((prev) => ({
+              ...prev,
+              exchangeError: `Unsupported broker: ${trimmedValue}. Supported: ${SUPPORTED_BROKERS.join(", ")}`,
+              inputValue: "",
+            }));
+            return;
+          }
+
+          setState((prev) => ({
+            ...prev,
+            brokerType: match,
+            brokerApiKey: "",
+            brokerApiSecret: "",
+            brokerPaper: true,
+            brokerValidated: false,
+            exchangeError: null,
+            step: "broker-key",
+            inputValue: "",
+          }));
+          break;
+        }
+
+        case "broker-key":
+          if (trimmedValue) {
+            setState((prev) => ({
+              ...prev,
+              brokerApiKey: trimmedValue,
+              step: "broker-secret",
+              inputValue: "",
+            }));
+          }
+          break;
+
+        case "broker-secret":
+          if (trimmedValue) {
+            setState((prev) => ({
+              ...prev,
+              brokerApiSecret: trimmedValue,
+              step: "broker-mode",
+              inputValue: "",
+            }));
+          }
+          break;
+
+        case "broker-mode": {
+          if (!state.brokerType) {
+            setState((prev) => ({
+              ...prev,
+              step: "broker-select",
+              inputValue: "",
+            }));
+            break;
+          }
+
+          const paper = parseBrokerMode(trimmedValue);
+          if (paper === null) {
+            setState((prev) => ({
+              ...prev,
+              exchangeError: 'Use "paper" or "live" (or true/false).',
+            }));
+            return;
+          }
+
+          setState((prev) => ({
+            ...prev,
+            brokerPaper: paper,
+            inputValue: "",
+            exchangeError: null,
+          }));
+
+          await validateBrokerCredentials(
+            state.brokerType as BrokerId,
+            state.brokerApiKey,
+            state.brokerApiSecret,
+            paper,
+          );
+          break;
+        }
 
         case "chain-select": {
           // Parse comma-separated chain selections (e.g., "1,3,5" or "solana,chainlink")
@@ -831,10 +1147,14 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
       state.exchangeType,
       state.exchangeApiKey,
       state.exchangeApiSecret,
+      state.brokerType,
+      state.brokerApiKey,
+      state.brokerApiSecret,
       state.chainSetupIndex,
       state.selectedChains,
       state.preferences,
       validateExchangeCredentials,
+      validateBrokerCredentials,
       saveConfiguration,
       advanceChainStep,
     ]
@@ -861,6 +1181,23 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
           exchangePermissions: null,
           exchangeError: null,
           exchangeValidated: false,
+          step: "broker-select",
+          inputValue: "",
+        }));
+        break;
+
+      case "broker-select":
+      case "broker-key":
+      case "broker-secret":
+      case "broker-mode":
+        setState((prev) => ({
+          ...prev,
+          brokerType: "",
+          brokerApiKey: "",
+          brokerApiSecret: "",
+          brokerPaper: true,
+          brokerValidated: false,
+          exchangeError: null,
           step: "chain-select",
           inputValue: "",
         }));
@@ -919,6 +1256,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
   });
 
   const exchangeLabel = getExchangeLabel(state.exchangeType);
+  const brokerLabel = getBrokerLabel(state.brokerType);
 
   return (
     <Box flexDirection="column" paddingX={2} paddingY={1}>
@@ -976,6 +1314,49 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
 
       {state.step === "exchange-validating" && (
         <ValidatingStep exchangeLabel={exchangeLabel} />
+      )}
+
+      {state.step === "broker-select" && (
+        <BrokerSelectStep
+          error={state.exchangeError}
+          inputValue={state.inputValue}
+          onInputChange={handleInputChange}
+          onSubmit={handleInputSubmit}
+        />
+      )}
+
+      {state.step === "broker-key" && (
+        <BrokerKeyStep
+          brokerLabel={brokerLabel}
+          brokerType={state.brokerType}
+          error={state.exchangeError}
+          inputValue={state.inputValue}
+          onInputChange={handleInputChange}
+          onSubmit={handleInputSubmit}
+        />
+      )}
+
+      {state.step === "broker-secret" && (
+        <BrokerSecretStep
+          brokerLabel={brokerLabel}
+          apiKey={state.brokerApiKey}
+          inputValue={state.inputValue}
+          onInputChange={handleInputChange}
+          onSubmit={handleInputSubmit}
+        />
+      )}
+
+      {state.step === "broker-mode" && (
+        <BrokerModeStep
+          brokerLabel={brokerLabel}
+          inputValue={state.inputValue}
+          onInputChange={handleInputChange}
+          onSubmit={handleInputSubmit}
+        />
+      )}
+
+      {state.step === "broker-validating" && (
+        <BrokerValidatingStep brokerLabel={brokerLabel} />
       )}
 
       {state.step === "chain-select" && (
@@ -1104,6 +1485,8 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
         <LLMStep
           exchangeConfigured={state.exchangeValidated}
           exchangeLabel={exchangeLabel}
+          brokerConfigured={state.brokerValidated}
+          brokerLabel={brokerLabel}
           llmConfigured={!!(state.openaiApiKey || state.inceptionApiKey || state.dedalusApiKey)}
           error={state.exchangeError}
           inputValue={state.inputValue}
@@ -1125,12 +1508,14 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
         <DoneStep
           exchangeConfigured={state.exchangeValidated}
           exchangeLabel={exchangeLabel}
+          brokerConfigured={state.brokerValidated}
+          brokerLabel={brokerLabel}
           llmConfigured={!!(state.openaiApiKey || state.inceptionApiKey || state.dedalusApiKey)}
           chainKeys={state.chainKeys}
         />
       )}
 
-      {state.step !== "welcome" && state.step !== "done" && state.step !== "exchange-validating" && (
+      {state.step !== "welcome" && state.step !== "done" && state.step !== "exchange-validating" && state.step !== "broker-validating" && (
         <Box marginTop={1}>
           <Text color={COLORS.DIM}>Press ESC to skip this step</Text>
         </Box>
@@ -1159,9 +1544,10 @@ function WelcomeStep(): React.ReactElement {
 
       <Box flexDirection="column" marginLeft={2}>
         <Text color={COLORS.DIM}>1. Exchange API credentials</Text>
-        <Text color={COLORS.DIM}>2. Blockchain networks (Solana, Polkadot, Chainlink, etc.)</Text>
-        <Text color={COLORS.DIM}>3. LLM API key (for AI features)</Text>
-        <Text color={COLORS.DIM}>4. Trading preferences</Text>
+        <Text color={COLORS.DIM}>2. Stock broker API credentials (optional)</Text>
+        <Text color={COLORS.DIM}>3. Blockchain networks (Solana, Polkadot, Chainlink, etc.)</Text>
+        <Text color={COLORS.DIM}>4. LLM API key (for AI features)</Text>
+        <Text color={COLORS.DIM}>5. Trading preferences</Text>
       </Box>
 
       <Box marginTop={2}>
@@ -1214,7 +1600,7 @@ function ExchangeSelectStep({ error, inputValue, onInputChange, onSubmit }: Exch
           value={inputValue}
           onChange={onInputChange}
           onSubmit={onSubmit}
-          placeholder="binance"
+          placeholder="binance | robinhood"
         />
       </Box>
     </Box>
@@ -1491,9 +1877,227 @@ function ValidatingStep({ exchangeLabel }: ValidatingStepProps): React.ReactElem
   );
 }
 
+interface BrokerSelectStepProps {
+  error: string | null;
+  inputValue: string;
+  onInputChange: (value: string) => void;
+  onSubmit: (value: string) => void;
+}
+
+function BrokerSelectStep({
+  error,
+  inputValue,
+  onInputChange,
+  onSubmit,
+}: BrokerSelectStepProps): React.ReactElement {
+  return (
+    <Box flexDirection="column">
+      <Box marginBottom={1}>
+        <Text color={COLORS.TAN} bold>
+          Step 2: Choose Stock Broker
+        </Text>
+      </Box>
+
+      {error && (
+        <Box marginBottom={1} borderStyle="single" borderColor="red" paddingX={1}>
+          <Text color="red">{error}</Text>
+        </Box>
+      )}
+
+      <Box flexDirection="column" marginBottom={1}>
+        <Text color={COLORS.WHITE}>
+          Optional: connect a stock/options broker.
+        </Text>
+        <Text color={COLORS.DIM}>
+          Supported: {SUPPORTED_BROKERS.join(", ")}
+        </Text>
+      </Box>
+
+      <Box marginTop={1}>
+        <Text color={COLORS.WHITE}>Enter broker name (or ESC to skip): </Text>
+        <TextInput
+          value={inputValue}
+          onChange={onInputChange}
+          onSubmit={onSubmit}
+          placeholder="alpaca | webull | schwab | tradier | tradestation | tastytrade | etrade | ibkr"
+        />
+      </Box>
+    </Box>
+  );
+}
+
+interface BrokerKeyStepProps {
+  brokerLabel: string;
+  brokerType: BrokerSelection;
+  error: string | null;
+  inputValue: string;
+  onInputChange: (value: string) => void;
+  onSubmit: (value: string) => void;
+}
+
+function BrokerKeyStep({
+  brokerLabel,
+  brokerType,
+  error,
+  inputValue,
+  onInputChange,
+  onSubmit,
+}: BrokerKeyStepProps): React.ReactElement {
+  const instructions = getBrokerInstructions(brokerType);
+
+  return (
+    <Box flexDirection="column">
+      <Box marginBottom={1}>
+        <Text color={COLORS.TAN} bold>
+          Step 2: {brokerLabel} API Key
+        </Text>
+      </Box>
+
+      {error && (
+        <Box marginBottom={1} borderStyle="single" borderColor="red" paddingX={1}>
+          <Text color="red">{error}</Text>
+        </Box>
+      )}
+
+      {instructions.length > 0 && (
+        <Box flexDirection="column" marginBottom={1}>
+          <Text color={COLORS.TAN_DIM} bold>How to get your API key:</Text>
+          <Box flexDirection="column" marginLeft={2}>
+            {instructions.map((line, index) => (
+              <Text key={`${brokerLabel}-step-${index}`} color={COLORS.DIM}>
+                {index + 1}. {line}
+              </Text>
+            ))}
+          </Box>
+        </Box>
+      )}
+
+      <Box marginTop={1}>
+        <Text color={COLORS.WHITE}>Enter your API Key: </Text>
+        <TextInput
+          value={inputValue}
+          onChange={onInputChange}
+          onSubmit={onSubmit}
+          placeholder="Alpaca API key"
+          mask="*"
+        />
+      </Box>
+    </Box>
+  );
+}
+
+interface BrokerSecretStepProps {
+  brokerLabel: string;
+  apiKey: string;
+  inputValue: string;
+  onInputChange: (value: string) => void;
+  onSubmit: (value: string) => void;
+}
+
+function BrokerSecretStep({
+  brokerLabel,
+  apiKey,
+  inputValue,
+  onInputChange,
+  onSubmit,
+}: BrokerSecretStepProps): React.ReactElement {
+  return (
+    <Box flexDirection="column">
+      <Box marginBottom={1}>
+        <Text color={COLORS.TAN} bold>
+          Step 2: {brokerLabel} API Secret
+        </Text>
+      </Box>
+
+      <Box marginBottom={1}>
+        <Text color={COLORS.DIM}>API Key: </Text>
+        <Text color={COLORS.TAN_DIM}>{maskSecret(apiKey)}</Text>
+      </Box>
+
+      <Box marginTop={1}>
+        <Text color={COLORS.WHITE}>Enter your API Secret: </Text>
+        <TextInput
+          value={inputValue}
+          onChange={onInputChange}
+          onSubmit={onSubmit}
+          placeholder="Alpaca API secret"
+          mask="*"
+        />
+      </Box>
+    </Box>
+  );
+}
+
+interface BrokerModeStepProps {
+  brokerLabel: string;
+  inputValue: string;
+  onInputChange: (value: string) => void;
+  onSubmit: (value: string) => void;
+}
+
+function BrokerModeStep({
+  brokerLabel,
+  inputValue,
+  onInputChange,
+  onSubmit,
+}: BrokerModeStepProps): React.ReactElement {
+  return (
+    <Box flexDirection="column">
+      <Box marginBottom={1}>
+        <Text color={COLORS.TAN} bold>
+          Step 2: {brokerLabel} Trading Mode
+        </Text>
+      </Box>
+
+      <Box flexDirection="column" marginBottom={1}>
+        <Text color={COLORS.WHITE}>
+          Choose trading mode: paper (recommended) or live.
+        </Text>
+        <Text color={COLORS.DIM}>
+          Paper mode uses simulated trades with real market data.
+        </Text>
+      </Box>
+
+      <Box marginTop={1}>
+        <Text color={COLORS.WHITE}>Enter mode (paper/live): </Text>
+        <TextInput
+          value={inputValue}
+          onChange={onInputChange}
+          onSubmit={onSubmit}
+          placeholder="paper"
+        />
+      </Box>
+    </Box>
+  );
+}
+
+interface BrokerValidatingStepProps {
+  brokerLabel: string;
+}
+
+function BrokerValidatingStep({ brokerLabel }: BrokerValidatingStepProps): React.ReactElement {
+  return (
+    <Box flexDirection="column">
+      <Box marginBottom={1}>
+        <Text color={COLORS.TAN} bold>
+          Validating {brokerLabel} Credentials...
+        </Text>
+      </Box>
+
+      <Box>
+        <Text color={COLORS.WHITE}>
+          Testing broker API connection...
+        </Text>
+      </Box>
+    </Box>
+  );
+}
+
 interface LLMStepProps {
   exchangeConfigured: boolean;
   exchangeLabel: string;
+  brokerConfigured: boolean;
+  brokerLabel: string;
   llmConfigured: boolean;
   error: string | null;
   inputValue: string;
@@ -1504,6 +2108,8 @@ interface LLMStepProps {
 function LLMStep({
   exchangeConfigured,
   exchangeLabel,
+  brokerConfigured,
+  brokerLabel,
   llmConfigured,
   error,
   inputValue,
@@ -1514,13 +2120,19 @@ function LLMStep({
     <Box flexDirection="column">
       <Box marginBottom={1}>
         <Text color={COLORS.TAN} bold>
-          Step 3: LLM API Key
+          Step 4: LLM API Key
         </Text>
       </Box>
 
       {exchangeConfigured && (
         <Box marginBottom={1}>
           <Text color="green">{exchangeLabel} configured successfully!</Text>
+        </Box>
+      )}
+
+      {brokerConfigured && (
+        <Box marginBottom={1}>
+          <Text color="green">{brokerLabel} broker configured successfully!</Text>
         </Box>
       )}
 
@@ -1586,7 +2198,7 @@ function PreferencesStep({ currentPercent, inputValue, onInputChange, onSubmit }
     <Box flexDirection="column">
       <Box marginBottom={1}>
         <Text color={COLORS.TAN} bold>
-          Step 4: Trading Preferences
+          Step 5: Trading Preferences
         </Text>
       </Box>
 
@@ -1635,7 +2247,7 @@ function ChainSelectStep({ inputValue, onInputChange, onSubmit }: ChainSelectSte
     <Box flexDirection="column">
       <Box marginBottom={1}>
         <Text color={COLORS.TAN} bold>
-          Step 2: Blockchain Networks
+          Step 3: Blockchain Networks
         </Text>
       </Box>
 
@@ -1700,7 +2312,7 @@ function ChainKeyStep({
     <Box flexDirection="column">
       <Box marginBottom={1}>
         <Text color={COLORS.TAN} bold>
-          Step 2: {chainLabel}
+          Step 3: {chainLabel}
         </Text>
       </Box>
 
@@ -1755,11 +2367,20 @@ function ChainKeyStep({
 interface DoneStepProps {
   exchangeConfigured: boolean;
   exchangeLabel: string;
+  brokerConfigured: boolean;
+  brokerLabel: string;
   llmConfigured: boolean;
   chainKeys: ChainKeys;
 }
 
-function DoneStep({ exchangeConfigured, exchangeLabel, llmConfigured, chainKeys }: DoneStepProps): React.ReactElement {
+function DoneStep({
+  exchangeConfigured,
+  exchangeLabel,
+  brokerConfigured,
+  brokerLabel,
+  llmConfigured,
+  chainKeys,
+}: DoneStepProps): React.ReactElement {
   const hasSolana = !!chainKeys.solanaPrivateKey;
   const hasPolkadot = !!(chainKeys.polkadotMnemonic || chainKeys.polkadotPrivateKey);
   const hasChainlink = !!(chainKeys.chainlinkApiKey && chainKeys.chainlinkApiSecret);
@@ -1788,6 +2409,14 @@ function DoneStep({ exchangeConfigured, exchangeLabel, llmConfigured, chainKeys 
             {exchangeConfigured ? "[OK]" : "[--]"} {exchangeLabel} API
           </Text>
           {!exchangeConfigured && (
+            <Text color={COLORS.DIM}> (not configured)</Text>
+          )}
+        </Box>
+        <Box>
+          <Text color={brokerConfigured ? "green" : COLORS.DIM}>
+            {brokerConfigured ? "[OK]" : "[--]"} {brokerLabel} Broker
+          </Text>
+          {!brokerConfigured && (
             <Text color={COLORS.DIM}> (not configured)</Text>
           )}
         </Box>
@@ -1854,5 +2483,12 @@ function DoneStep({ exchangeConfigured, exchangeLabel, llmConfigured, chainKeys 
     </Box>
   );
 }
+
+export const __setupWizardBrokerInternals = {
+  getBrokerLabel,
+  getBrokerInstructions,
+  generateBrokerId,
+  parseBrokerMode,
+};
 
 export default SetupWizard;

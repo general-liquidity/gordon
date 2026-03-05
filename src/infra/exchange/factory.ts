@@ -11,6 +11,7 @@ import { KrakenAdapter } from "./adapters/kraken.ts";
 import { BitfinexAdapter } from "./adapters/bitfinex.ts";
 import { HyperliquidAdapter } from "./adapters/hyperliquid.ts";
 import { UniswapAdapter } from "./adapters/uniswap.ts";
+import { RobinhoodAdapter } from "./adapters/robinhood.ts";
 
 /**
  * All supported exchange IDs with native adapters
@@ -23,6 +24,7 @@ const SUPPORTED_EXCHANGES: ExchangeId[] = [
   "bitfinex",
   "hyperliquid",
   "uniswap",
+  "robinhood",
 ];
 
 /**
@@ -43,7 +45,7 @@ function getCacheKey(exchangeId: ExchangeId, credentials: ExchangeCredentials): 
  *
  * Features:
  * - Singleton pattern for exchange instances (cached by exchange + credentials)
- * - Native adapters for all supported exchanges (Binance, Coinbase, Kraken, Bitfinex, Hyperliquid)
+ * - Native adapters for all supported exchanges (Binance, Coinbase, Kraken, Bitfinex, Hyperliquid, Robinhood)
  *
  * @example
  * ```typescript
@@ -155,6 +157,9 @@ export class ExchangeFactory {
           1, // Default to Ethereum mainnet
           process.env.THEGRAPH_API_KEY, // optional — enables subgraph market data
         );
+        break;
+      case "robinhood":
+        exchange = new RobinhoodAdapter(credentials.apiKey, credentials.apiSecret);
         break;
       default:
         throw new Error(`No adapter available for exchange: ${exchangeId}`);

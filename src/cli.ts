@@ -253,6 +253,13 @@ export async function printStatusJson(): Promise<void> {
         sandbox: e.sandbox ?? false,
       })),
       activeExchangeId: config.activeExchangeId || null,
+      brokers: (config.brokers || []).map((b) => ({
+        id: b.id,
+        type: b.type,
+        isDefault: b.isDefault,
+        paper: b.paper,
+      })),
+      activeBrokerId: config.activeBrokerId || null,
       theme: process.env.GORDON_THEME || "dark",
       provider: config.modelConfig?.provider || process.env.GORDON_PROVIDER || "openai",
       model: config.modelConfig?.model || process.env.GORDON_MODEL || null,

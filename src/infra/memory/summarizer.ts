@@ -274,7 +274,7 @@ export class ConversationSummarizer {
       { role: "user", content: userPrompt },
     ], {
       provider: "dedalus",
-      model: "openai/gpt-5-nano",
+      model: "openai/gpt-5.2",
       temperature: this.config.temperature,
       maxTokens: this.config.maxSummaryTokens,
     });

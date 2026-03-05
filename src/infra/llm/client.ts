@@ -19,7 +19,7 @@ import { getLegacyClientRoute } from "../providers/registry.ts";
 
 // Default configuration values
 const DEFAULT_PROVIDER: LLMProvider = "dedalus";
-const DEFAULT_MODEL = "openai/gpt-5-nano";
+const DEFAULT_MODEL = "openai/gpt-5.2";
 const DEFAULT_TEMPERATURE = 0.7;
 const DEFAULT_MAX_TOKENS = 2000;
 
@@ -142,6 +142,23 @@ export class LLMClient {
    */
   private getBaseUrl(provider: LLMProvider): string {
     return API_ENDPOINTS[provider];
+  }
+
+  /**
+   * Resolve a preset into runtime config.
+   * Uses preset provider/model when that provider is configured;
+   * otherwise falls back to client defaults while preserving preset sampling params.
+   */
+  private resolvePresetConfig(
+    preset: (typeof GORDON_MODELS)[keyof typeof GORDON_MODELS]
+  ): ModelConfig {
+    const usePresetProvider = this.hasProvider(preset.provider);
+    return {
+      provider: usePresetProvider ? preset.provider : this.defaultProvider,
+      model: (usePresetProvider ? preset.model : this.defaultModel) as ModelConfig["model"],
+      temperature: preset.temperature,
+      maxTokens: preset.maxTokens,
+    };
   }
 
   /**
@@ -303,12 +320,7 @@ export class LLMClient {
     preset: keyof typeof GORDON_MODELS
   ): Promise<LLMResponse> {
     const presetConfig = GORDON_MODELS[preset];
-    return this.chatWithConfig(messages, {
-      provider: this.defaultProvider,
-      model: this.defaultModel,
-      temperature: presetConfig.temperature,
-      maxTokens: presetConfig.maxTokens,
-    });
+    return this.chatWithConfig(messages, this.resolvePresetConfig(presetConfig));
   }
 
   /**
@@ -383,10 +395,7 @@ export class LLMClient {
    */
   async parseIntent<T>(messages: Message[], schema: z.ZodSchema<T>): Promise<T> {
     const preset = GORDON_MODELS.intentParsing;
-    return this.chatWithJSON(messages, schema, {
-      temperature: preset.temperature,
-      maxTokens: preset.maxTokens,
-    });
+    return this.chatWithJSON(messages, schema, this.resolvePresetConfig(preset));
   }
 
   /**
@@ -394,10 +403,7 @@ export class LLMClient {
    */
   async generatePlan<T>(messages: Message[], schema: z.ZodSchema<T>): Promise<T> {
     const preset = GORDON_MODELS.planGeneration;
-    return this.chatWithJSON(messages, schema, {
-      temperature: preset.temperature,
-      maxTokens: preset.maxTokens,
-    });
+    return this.chatWithJSON(messages, schema, this.resolvePresetConfig(preset));
   }
 
   /**
@@ -405,12 +411,7 @@ export class LLMClient {
    */
   async explain(messages: Message[]): Promise<LLMResponse> {
     const preset = GORDON_MODELS.explanations;
-    return this.chatWithConfig(messages, {
-      provider: this.defaultProvider,
-      model: this.defaultModel,
-      temperature: preset.temperature,
-      maxTokens: preset.maxTokens,
-    });
+    return this.chatWithConfig(messages, this.resolvePresetConfig(preset));
   }
 
   /**

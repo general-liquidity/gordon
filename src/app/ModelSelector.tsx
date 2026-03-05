@@ -8,7 +8,7 @@ import React, { useState, useCallback, useEffect } from "react";
 import { Box, Text, useInput } from "ink";
 
 import { resetAgents } from "../infra/agents/index.ts";
-import { providerRegistry, getDedalusModels, refreshDedalusModels, resetProviderRegistry, getActiveRoute, type DirectProviderName } from "../infra/providers/registry.ts";
+import { providerRegistry, getDedalusModels, refreshDedalusModels, resetProviderRegistry, getActiveRoute, DIRECT_MODELS, type DirectProviderName } from "../infra/providers/registry.ts";
 import { loadConfig, saveConfig } from "../infra/storage/config.ts";
 import { saveEnvKeys } from "../infra/storage/env.ts";
 import type { GordonConfig, ProviderName } from "../types/index.ts";
@@ -49,33 +49,33 @@ async function buildProviderList(): Promise<ProviderOption[]> {
       id: "openai",
       name: "OpenAI",
       models: [
-        { id: "gpt-5.2-pro", name: "GPT-5.2 Pro", description: "Most capable, best for complex analysis", tier: "flagship" as const },
-        { id: "gpt-5.2", name: "GPT-5.2", description: "Great balance of speed and capability", tier: "balanced" as const },
-        { id: "gpt-5-mini", name: "GPT-5 Mini", description: "Fastest responses, lower cost", tier: "fast" as const },
+        { id: DIRECT_MODELS.openai.flagship, name: "GPT-5.2 Pro", description: "Most capable, best for complex analysis", tier: "flagship" as const },
+        { id: DIRECT_MODELS.openai.balanced, name: "GPT-5.2", description: "Great balance of speed and capability", tier: "balanced" as const },
+        { id: DIRECT_MODELS.openai.fast, name: "GPT-5 Mini", description: "Fastest responses, lower cost", tier: "fast" as const },
       ],
     },
     {
       id: "anthropic",
       name: "Anthropic",
       models: [
-        { id: "claude-opus-4-6", name: "Claude Opus 4.6", description: "Most capable, excellent reasoning", tier: "flagship" as const },
-        { id: "claude-sonnet-4-5", name: "Claude Sonnet 4.5", description: "Good balance of speed and capability", tier: "balanced" as const },
-        { id: "claude-haiku-4-5", name: "Claude Haiku 4.5", description: "Fastest responses, lower cost", tier: "fast" as const },
+        { id: DIRECT_MODELS.anthropic.flagship, name: "Claude Opus 4.6", description: "Most capable, excellent reasoning", tier: "flagship" as const },
+        { id: DIRECT_MODELS.anthropic.balanced, name: "Claude Sonnet 4.6", description: "Good balance of speed and capability", tier: "balanced" as const },
+        { id: DIRECT_MODELS.anthropic.fast, name: "Claude Haiku 4.5", description: "Fastest responses, lower cost", tier: "fast" as const },
       ],
     },
     {
       id: "google",
       name: "Google",
       models: [
-        { id: "gemini-3-pro-preview", name: "Gemini 3 Pro", description: "Most capable Google model", tier: "flagship" as const },
-        { id: "gemini-3-flash-preview", name: "Gemini 3 Flash", description: "Fast and efficient", tier: "fast" as const },
+        { id: DIRECT_MODELS.google.flagship, name: "Gemini 3.1 Pro", description: "Most capable Google model", tier: "flagship" as const },
+        { id: DIRECT_MODELS.google.fast, name: "Gemini 3 Flash", description: "Fast and efficient", tier: "fast" as const },
       ],
     },
     {
       id: "inception",
       name: "Inception Labs",
       models: [
-        { id: "mercury-2", name: "Mercury 2", description: "128K context, fast tool-capable reasoning via Inception", tier: "flagship" as const },
+        { id: DIRECT_MODELS.inception.flagship, name: "Mercury 2", description: "128K context, fast tool-capable reasoning via Inception", tier: "flagship" as const },
       ],
     },
   ];
@@ -122,6 +122,7 @@ function getModelDescription(modelId: string): string {
     "anthropic/claude-opus-4-6": "Most capable Claude, excellent reasoning",
     "anthropic/claude-sonnet-4-5-20250929": "Balanced Claude with great tool use",
     "anthropic/claude-haiku-4-5-20251001": "Fast Claude for quick responses",
+    "google/gemini-3-1-pro-preview": "Google's most capable model",
     "google/gemini-3-pro-preview": "Google's most capable model",
     "google/gemini-3-flash-preview": "Fast and efficient Gemini",
     "xai/grok-4-1-fast-reasoning": "xAI's reasoning-optimized model",

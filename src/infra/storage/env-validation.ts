@@ -62,11 +62,119 @@ export const InceptionKeySchema = z
   .trim()
   .min(1, "Inception API key cannot be empty");
 
+export const AlpacaKeySchema = z
+  .string()
+  .trim()
+  .min(1, "Alpaca API key cannot be empty");
+
+export const AlpacaSecretSchema = z
+  .string()
+  .trim()
+  .min(1, "Alpaca API secret cannot be empty");
+
+export const SchwabKeySchema = z
+  .string()
+  .trim()
+  .min(1, "Schwab API key cannot be empty");
+
+export const SchwabSecretSchema = z
+  .string()
+  .trim()
+  .min(1, "Schwab API secret cannot be empty");
+
+export const TradierKeySchema = z
+  .string()
+  .trim()
+  .min(1, "Tradier API key cannot be empty");
+
+export const TradierSecretSchema = z
+  .string()
+  .trim()
+  .min(1, "Tradier API secret cannot be empty");
+
+export const TradeStationKeySchema = z
+  .string()
+  .trim()
+  .min(1, "TradeStation API key cannot be empty");
+
+export const TradeStationSecretSchema = z
+  .string()
+  .trim()
+  .min(1, "TradeStation API secret cannot be empty");
+
+export const TastytradeKeySchema = z
+  .string()
+  .trim()
+  .min(1, "tastytrade API key cannot be empty");
+
+export const TastytradeSecretSchema = z
+  .string()
+  .trim()
+  .min(1, "tastytrade API secret cannot be empty");
+
+export const EtradeKeySchema = z
+  .string()
+  .trim()
+  .min(1, "E*TRADE API key cannot be empty");
+
+export const EtradeSecretSchema = z
+  .string()
+  .trim()
+  .min(1, "E*TRADE API secret cannot be empty");
+
+export const IbkrKeySchema = z
+  .string()
+  .trim()
+  .min(1, "IBKR API key/token cannot be empty");
+
+export const IbkrSecretSchema = z
+  .string()
+  .trim()
+  .min(1, "IBKR API secret/session value cannot be empty");
+
+export const RobinhoodKeySchema = z
+  .string()
+  .trim()
+  .min(1, "Robinhood API key cannot be empty");
+
+export const RobinhoodSecretSchema = z
+  .string()
+  .trim()
+  .min(1, "Robinhood API secret/private key cannot be empty");
+
+export const WebullKeySchema = z
+  .string()
+  .trim()
+  .min(1, "Webull API key cannot be empty");
+
+export const WebullSecretSchema = z
+  .string()
+  .trim()
+  .min(1, "Webull API secret cannot be empty");
+
 // Combined environment schema
 export const EnvKeysSchema = z.object({
   OPENAI_API_KEY: OpenAIKeySchema.optional(),
   DEDALUS_API_KEY: DedalusKeySchema.optional(),
   INCEPTION_API_KEY: InceptionKeySchema.optional(),
+  ALPACA_API_KEY: AlpacaKeySchema.optional(),
+  ALPACA_API_SECRET: AlpacaSecretSchema.optional(),
+  SCHWAB_API_KEY: SchwabKeySchema.optional(),
+  SCHWAB_API_SECRET: SchwabSecretSchema.optional(),
+  TRADIER_API_KEY: TradierKeySchema.optional(),
+  TRADIER_API_SECRET: TradierSecretSchema.optional(),
+  TRADESTATION_API_KEY: TradeStationKeySchema.optional(),
+  TRADESTATION_API_SECRET: TradeStationSecretSchema.optional(),
+  TASTYTRADE_API_KEY: TastytradeKeySchema.optional(),
+  TASTYTRADE_API_SECRET: TastytradeSecretSchema.optional(),
+  ETRADE_API_KEY: EtradeKeySchema.optional(),
+  ETRADE_API_SECRET: EtradeSecretSchema.optional(),
+  IBKR_API_KEY: IbkrKeySchema.optional(),
+  IBKR_API_SECRET: IbkrSecretSchema.optional(),
+  ROBINHOOD_API_KEY: RobinhoodKeySchema.optional(),
+  ROBINHOOD_API_SECRET: RobinhoodSecretSchema.optional(),
+  WEBULL_API_KEY: WebullKeySchema.optional(),
+  WEBULL_API_SECRET: WebullSecretSchema.optional(),
   BINANCE_API_KEY: BinanceKeySchema.optional(),
   BINANCE_API_SECRET: BinanceSecretSchema.optional(),
   TINYFISH_API_KEY: TinyfishKeySchema.optional(),
@@ -150,6 +258,222 @@ export function validateEnvKeys(keys: Record<string, string | undefined>): Valid
       errors.push({ key: "INCEPTION_API_KEY", message: result.error! });
     } else {
       validated.INCEPTION_API_KEY = keys.INCEPTION_API_KEY.trim();
+    }
+  }
+
+  // Validate Alpaca keys (must be paired)
+  const hasAlpacaKey = !!keys.ALPACA_API_KEY;
+  const hasAlpacaSecret = !!keys.ALPACA_API_SECRET;
+  if (hasAlpacaKey !== hasAlpacaSecret) {
+    errors.push({
+      key: hasAlpacaKey ? "ALPACA_API_SECRET" : "ALPACA_API_KEY",
+      message: "Alpaca API key and secret must both be provided",
+    });
+  } else if (hasAlpacaKey && hasAlpacaSecret) {
+    const keyResult = validateApiKey("ALPACA_API_KEY", keys.ALPACA_API_KEY, AlpacaKeySchema);
+    if (!keyResult.valid) {
+      errors.push({ key: "ALPACA_API_KEY", message: keyResult.error! });
+    } else {
+      validated.ALPACA_API_KEY = keys.ALPACA_API_KEY!.trim();
+    }
+
+    const secretResult = validateApiKey("ALPACA_API_SECRET", keys.ALPACA_API_SECRET, AlpacaSecretSchema);
+    if (!secretResult.valid) {
+      errors.push({ key: "ALPACA_API_SECRET", message: secretResult.error! });
+    } else {
+      validated.ALPACA_API_SECRET = keys.ALPACA_API_SECRET!.trim();
+    }
+  }
+
+  // Validate Schwab keys (must be paired)
+  const hasSchwabKey = !!keys.SCHWAB_API_KEY;
+  const hasSchwabSecret = !!keys.SCHWAB_API_SECRET;
+  if (hasSchwabKey !== hasSchwabSecret) {
+    errors.push({
+      key: hasSchwabKey ? "SCHWAB_API_SECRET" : "SCHWAB_API_KEY",
+      message: "Schwab API key and secret must both be provided",
+    });
+  } else if (hasSchwabKey && hasSchwabSecret) {
+    const keyResult = validateApiKey("SCHWAB_API_KEY", keys.SCHWAB_API_KEY, SchwabKeySchema);
+    if (!keyResult.valid) {
+      errors.push({ key: "SCHWAB_API_KEY", message: keyResult.error! });
+    } else {
+      validated.SCHWAB_API_KEY = keys.SCHWAB_API_KEY!.trim();
+    }
+
+    const secretResult = validateApiKey("SCHWAB_API_SECRET", keys.SCHWAB_API_SECRET, SchwabSecretSchema);
+    if (!secretResult.valid) {
+      errors.push({ key: "SCHWAB_API_SECRET", message: secretResult.error! });
+    } else {
+      validated.SCHWAB_API_SECRET = keys.SCHWAB_API_SECRET!.trim();
+    }
+  }
+
+  // Validate Tradier keys (must be paired)
+  const hasTradierKey = !!keys.TRADIER_API_KEY;
+  const hasTradierSecret = !!keys.TRADIER_API_SECRET;
+  if (hasTradierKey !== hasTradierSecret) {
+    errors.push({
+      key: hasTradierKey ? "TRADIER_API_SECRET" : "TRADIER_API_KEY",
+      message: "Tradier API key and secret must both be provided",
+    });
+  } else if (hasTradierKey && hasTradierSecret) {
+    const keyResult = validateApiKey("TRADIER_API_KEY", keys.TRADIER_API_KEY, TradierKeySchema);
+    if (!keyResult.valid) {
+      errors.push({ key: "TRADIER_API_KEY", message: keyResult.error! });
+    } else {
+      validated.TRADIER_API_KEY = keys.TRADIER_API_KEY!.trim();
+    }
+
+    const secretResult = validateApiKey("TRADIER_API_SECRET", keys.TRADIER_API_SECRET, TradierSecretSchema);
+    if (!secretResult.valid) {
+      errors.push({ key: "TRADIER_API_SECRET", message: secretResult.error! });
+    } else {
+      validated.TRADIER_API_SECRET = keys.TRADIER_API_SECRET!.trim();
+    }
+  }
+
+  // Validate TradeStation keys (must be paired)
+  const hasTradeStationKey = !!keys.TRADESTATION_API_KEY;
+  const hasTradeStationSecret = !!keys.TRADESTATION_API_SECRET;
+  if (hasTradeStationKey !== hasTradeStationSecret) {
+    errors.push({
+      key: hasTradeStationKey ? "TRADESTATION_API_SECRET" : "TRADESTATION_API_KEY",
+      message: "TradeStation API key and secret must both be provided",
+    });
+  } else if (hasTradeStationKey && hasTradeStationSecret) {
+    const keyResult = validateApiKey("TRADESTATION_API_KEY", keys.TRADESTATION_API_KEY, TradeStationKeySchema);
+    if (!keyResult.valid) {
+      errors.push({ key: "TRADESTATION_API_KEY", message: keyResult.error! });
+    } else {
+      validated.TRADESTATION_API_KEY = keys.TRADESTATION_API_KEY!.trim();
+    }
+
+    const secretResult = validateApiKey("TRADESTATION_API_SECRET", keys.TRADESTATION_API_SECRET, TradeStationSecretSchema);
+    if (!secretResult.valid) {
+      errors.push({ key: "TRADESTATION_API_SECRET", message: secretResult.error! });
+    } else {
+      validated.TRADESTATION_API_SECRET = keys.TRADESTATION_API_SECRET!.trim();
+    }
+  }
+
+  // Validate tastytrade keys (must be paired)
+  const hasTastytradeKey = !!keys.TASTYTRADE_API_KEY;
+  const hasTastytradeSecret = !!keys.TASTYTRADE_API_SECRET;
+  if (hasTastytradeKey !== hasTastytradeSecret) {
+    errors.push({
+      key: hasTastytradeKey ? "TASTYTRADE_API_SECRET" : "TASTYTRADE_API_KEY",
+      message: "tastytrade API key and secret must both be provided",
+    });
+  } else if (hasTastytradeKey && hasTastytradeSecret) {
+    const keyResult = validateApiKey("TASTYTRADE_API_KEY", keys.TASTYTRADE_API_KEY, TastytradeKeySchema);
+    if (!keyResult.valid) {
+      errors.push({ key: "TASTYTRADE_API_KEY", message: keyResult.error! });
+    } else {
+      validated.TASTYTRADE_API_KEY = keys.TASTYTRADE_API_KEY!.trim();
+    }
+
+    const secretResult = validateApiKey("TASTYTRADE_API_SECRET", keys.TASTYTRADE_API_SECRET, TastytradeSecretSchema);
+    if (!secretResult.valid) {
+      errors.push({ key: "TASTYTRADE_API_SECRET", message: secretResult.error! });
+    } else {
+      validated.TASTYTRADE_API_SECRET = keys.TASTYTRADE_API_SECRET!.trim();
+    }
+  }
+
+  // Validate E*TRADE keys (must be paired)
+  const hasEtradeKey = !!keys.ETRADE_API_KEY;
+  const hasEtradeSecret = !!keys.ETRADE_API_SECRET;
+  if (hasEtradeKey !== hasEtradeSecret) {
+    errors.push({
+      key: hasEtradeKey ? "ETRADE_API_SECRET" : "ETRADE_API_KEY",
+      message: "E*TRADE API key and secret must both be provided",
+    });
+  } else if (hasEtradeKey && hasEtradeSecret) {
+    const keyResult = validateApiKey("ETRADE_API_KEY", keys.ETRADE_API_KEY, EtradeKeySchema);
+    if (!keyResult.valid) {
+      errors.push({ key: "ETRADE_API_KEY", message: keyResult.error! });
+    } else {
+      validated.ETRADE_API_KEY = keys.ETRADE_API_KEY!.trim();
+    }
+
+    const secretResult = validateApiKey("ETRADE_API_SECRET", keys.ETRADE_API_SECRET, EtradeSecretSchema);
+    if (!secretResult.valid) {
+      errors.push({ key: "ETRADE_API_SECRET", message: secretResult.error! });
+    } else {
+      validated.ETRADE_API_SECRET = keys.ETRADE_API_SECRET!.trim();
+    }
+  }
+
+  // Validate IBKR keys (must be paired)
+  const hasIbkrKey = !!keys.IBKR_API_KEY;
+  const hasIbkrSecret = !!keys.IBKR_API_SECRET;
+  if (hasIbkrKey !== hasIbkrSecret) {
+    errors.push({
+      key: hasIbkrKey ? "IBKR_API_SECRET" : "IBKR_API_KEY",
+      message: "IBKR API key and secret must both be provided",
+    });
+  } else if (hasIbkrKey && hasIbkrSecret) {
+    const keyResult = validateApiKey("IBKR_API_KEY", keys.IBKR_API_KEY, IbkrKeySchema);
+    if (!keyResult.valid) {
+      errors.push({ key: "IBKR_API_KEY", message: keyResult.error! });
+    } else {
+      validated.IBKR_API_KEY = keys.IBKR_API_KEY!.trim();
+    }
+
+    const secretResult = validateApiKey("IBKR_API_SECRET", keys.IBKR_API_SECRET, IbkrSecretSchema);
+    if (!secretResult.valid) {
+      errors.push({ key: "IBKR_API_SECRET", message: secretResult.error! });
+    } else {
+      validated.IBKR_API_SECRET = keys.IBKR_API_SECRET!.trim();
+    }
+  }
+
+  // Validate Robinhood keys (must be paired)
+  const hasRobinhoodKey = !!keys.ROBINHOOD_API_KEY;
+  const hasRobinhoodSecret = !!keys.ROBINHOOD_API_SECRET;
+  if (hasRobinhoodKey !== hasRobinhoodSecret) {
+    errors.push({
+      key: hasRobinhoodKey ? "ROBINHOOD_API_SECRET" : "ROBINHOOD_API_KEY",
+      message: "Robinhood API key and secret must both be provided",
+    });
+  } else if (hasRobinhoodKey && hasRobinhoodSecret) {
+    const keyResult = validateApiKey("ROBINHOOD_API_KEY", keys.ROBINHOOD_API_KEY, RobinhoodKeySchema);
+    if (!keyResult.valid) {
+      errors.push({ key: "ROBINHOOD_API_KEY", message: keyResult.error! });
+    } else {
+      validated.ROBINHOOD_API_KEY = keys.ROBINHOOD_API_KEY!.trim();
+    }
+
+    const secretResult = validateApiKey("ROBINHOOD_API_SECRET", keys.ROBINHOOD_API_SECRET, RobinhoodSecretSchema);
+    if (!secretResult.valid) {
+      errors.push({ key: "ROBINHOOD_API_SECRET", message: secretResult.error! });
+    } else {
+      validated.ROBINHOOD_API_SECRET = keys.ROBINHOOD_API_SECRET!.trim();
+    }
+  }
+
+  // Validate Webull keys (must be paired)
+  const hasWebullKey = !!keys.WEBULL_API_KEY;
+  const hasWebullSecret = !!keys.WEBULL_API_SECRET;
+  if (hasWebullKey !== hasWebullSecret) {
+    errors.push({
+      key: hasWebullKey ? "WEBULL_API_SECRET" : "WEBULL_API_KEY",
+      message: "Webull API key and secret must both be provided",
+    });
+  } else if (hasWebullKey && hasWebullSecret) {
+    const keyResult = validateApiKey("WEBULL_API_KEY", keys.WEBULL_API_KEY, WebullKeySchema);
+    if (!keyResult.valid) {
+      errors.push({ key: "WEBULL_API_KEY", message: keyResult.error! });
+    } else {
+      validated.WEBULL_API_KEY = keys.WEBULL_API_KEY!.trim();
+    }
+
+    const secretResult = validateApiKey("WEBULL_API_SECRET", keys.WEBULL_API_SECRET, WebullSecretSchema);
+    if (!secretResult.valid) {
+      errors.push({ key: "WEBULL_API_SECRET", message: secretResult.error! });
+    } else {
+      validated.WEBULL_API_SECRET = keys.WEBULL_API_SECRET!.trim();
     }
   }
 

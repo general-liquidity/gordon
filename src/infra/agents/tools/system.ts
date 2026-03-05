@@ -14,7 +14,7 @@ import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
 import { getGordonContext, type MastraExecutionContext } from "./types.ts";
-import { providerRegistry, getDedalusModels, refreshDedalusModels, getActiveRoute, type DirectProviderName } from "../../providers/registry.ts";
+import { providerRegistry, getDedalusModels, refreshDedalusModels, getActiveRoute, DIRECT_MODELS, type DirectProviderName } from "../../providers/registry.ts";
 import { loadConfig } from "../../storage/config.ts";
 import { getToolCacheStats, clearToolCache, pruneToolCache } from "./cache.ts";
 import {
@@ -118,28 +118,7 @@ export const testConnectionTool = createTool({
 // Model Info Tool
 // ============================================================================
 
-const DIRECT_MODEL_TIERS: Record<DirectProviderName, { flagship: string; balanced: string; fast: string }> = {
-  anthropic: {
-    flagship: "claude-opus-4-6",
-    balanced: "claude-sonnet-4-5",
-    fast: "claude-haiku-4-5",
-  },
-  openai: {
-    flagship: "gpt-5.2-pro",
-    balanced: "gpt-5.2",
-    fast: "gpt-5-mini",
-  },
-  google: {
-    flagship: "gemini-3-pro-preview",
-    balanced: "gemini-3-pro-preview",
-    fast: "gemini-3-flash-preview",
-  },
-  inception: {
-    flagship: "mercury-2",
-    balanced: "mercury-2",
-    fast: "mercury-2",
-  },
-};
+const DIRECT_MODEL_TIERS: Record<DirectProviderName, { flagship: string; balanced: string; fast: string }> = DIRECT_MODELS;
 
 export const getModelInfoTool = createTool({
   id: "get_model_info",

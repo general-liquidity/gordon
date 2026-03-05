@@ -9,6 +9,7 @@
 export { StrategyRuntime } from "../core/runtime/engine.ts";
 export { riskKernel } from "../core/risk-kernel/index.ts";
 export type { Exchange } from "../infra/exchange/index.ts";
+export type { BrokerAdapter } from "../infra/broker/index.ts";
 
 // Gateway advanced features
 export { evaluateBaselineCircuitBreakers } from "../gateway/circuit-breakers/index.ts";

@@ -20,6 +20,8 @@ import { createLLMClientFromEnv, type LLMClient } from "../infra/llm/index.ts";
 import { BinanceClient } from "../infra/binance/index.ts";
 import { BinanceAdapter, ExchangeFactory, type Exchange } from "../infra/exchange/index.ts";
 import { resolveExchangeCredentials } from "../infra/exchange/types.ts";
+import { BrokerFactory, type BrokerAdapter } from "../infra/broker/index.ts";
+import { resolveBrokerCredentials } from "../infra/broker/types.ts";
 import {
   initializeRealtimeMonitor,
   shutdownRealtimeMonitor,
@@ -69,6 +71,8 @@ import {
 import {
   handleConfigCommand,
   handleExchangeCommand,
+  handleBrokerCommand,
+  handleStocksCommand,
   handleStrategyCommand,
   handleGenCommand,
   handleMCPCommand,
@@ -166,6 +170,7 @@ function getDefaultConfig(): GordonConfig {
   return {
     version: "1.0.0",
     exchanges: [],
+    brokers: [],
     mcpServers: [],
     preferences: {
       cashReservePercent: 0.2,
@@ -205,6 +210,34 @@ function formatTimestamp(): string {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+function isStocksMarketArgs(args: string): boolean {
+  return /^\s*(stocks?|equit(y|ies)|alpaca|webull|schwab|tradier|tradestation|tastytrade|etrade|ibkr)\b/i.test(args || "");
+}
+
+function stripStocksMarketPrefix(args: string): string {
+  const trimmed = (args || "").trim();
+  if (!trimmed) return "";
+  const parts = trimmed.split(/\s+/);
+  const first = parts[0]?.toLowerCase();
+  if (
+    first === "stock"
+    || first === "stocks"
+    || first === "equity"
+    || first === "equities"
+    || first === "alpaca"
+    || first === "webull"
+    || first === "schwab"
+    || first === "tradier"
+    || first === "tradestation"
+    || first === "tastytrade"
+    || first === "etrade"
+    || first === "ibkr"
+  ) {
+    return parts.slice(1).join(" ");
+  }
+  return trimmed;
 }
 
 const STARTUP_TASK_CONCURRENCY = 2;
@@ -272,6 +305,7 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
   const llmClientRef = useRef<LLMClient | null>(null);
   const binanceClientRef = useRef<BinanceClient | null>(null);
   const exchangeRef = useRef<Exchange | null>(null);
+  const brokerRef = useRef<BrokerAdapter | null>(null);
   const configRef = useRef<GordonConfig>(getDefaultConfig());
   const lastResultsRef = useRef<LastResults>({});
   const pendingPluginSuggestionsRef = useRef<PluginSuggestion[]>([]);
@@ -414,6 +448,36 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
       }
     } catch {
       // Exchange refresh failed — will retry on next config change
+    }
+  }, []);
+
+  const refreshActiveBroker = useCallback(async (): Promise<void> => {
+    try {
+      const config = await loadConfig();
+      configRef.current = config;
+
+      const brokers = config.brokers || [];
+      if (brokers.length === 0) {
+        brokerRef.current = null;
+        return;
+      }
+
+      const activeId = config.activeBrokerId || brokers.find((entry) => entry.isDefault)?.id;
+      const active = brokers.find((entry) => entry.id === activeId) || brokers[0];
+      if (!active) {
+        brokerRef.current = null;
+        return;
+      }
+
+      const creds = resolveBrokerCredentials(active);
+      if (!creds.apiKey || !creds.apiSecret) {
+        brokerRef.current = null;
+        return;
+      }
+
+      brokerRef.current = BrokerFactory.create(active.type, creds);
+    } catch {
+      // Broker refresh failed — will retry on next config change
     }
   }, []);
 
@@ -566,6 +630,120 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
         }
       }
 
+      if (
+        !exchangeInitialized
+        && envStatus.hasRobinhoodKeys
+        && envStatus.keys.ROBINHOOD_API_KEY
+        && envStatus.keys.ROBINHOOD_API_SECRET
+      ) {
+        try {
+          exchangeRef.current = ExchangeFactory.create("robinhood", {
+            apiKey: envStatus.keys.ROBINHOOD_API_KEY,
+            apiSecret: envStatus.keys.ROBINHOOD_API_SECRET,
+          });
+          exchangeInitialized = true;
+        } catch (error) {
+          console.error("Failed to initialize Robinhood exchange:", error);
+        }
+      }
+
+      // Initialize active broker from config or env fallback
+      if (config.brokers && config.brokers.length > 0) {
+        const activeBrokerId = config.activeBrokerId || config.brokers.find((entry) => entry.isDefault)?.id;
+        const activeBroker = config.brokers.find((entry) => entry.id === activeBrokerId) || config.brokers[0];
+        if (activeBroker) {
+          try {
+            const brokerCreds = resolveBrokerCredentials(activeBroker);
+            if (brokerCreds.apiKey && brokerCreds.apiSecret) {
+              brokerRef.current = BrokerFactory.create(activeBroker.type, brokerCreds);
+            } else {
+              brokerRef.current = null;
+            }
+          } catch {
+            brokerRef.current = null;
+          }
+        }
+      } else {
+        const brokerEnvCandidates: Array<{
+          type: Parameters<typeof BrokerFactory.create>[0];
+          key?: string;
+          secret?: string;
+          paper?: string;
+          accountId?: string;
+        }> = [
+          {
+            type: "alpaca",
+            key: envStatus.keys.ALPACA_API_KEY,
+            secret: envStatus.keys.ALPACA_API_SECRET,
+            paper: envStatus.keys.ALPACA_PAPER,
+          },
+          {
+            type: "webull",
+            key: envStatus.keys.WEBULL_API_KEY,
+            secret: envStatus.keys.WEBULL_API_SECRET,
+            paper: envStatus.keys.WEBULL_PAPER,
+            accountId: envStatus.keys.WEBULL_ACCOUNT_ID,
+          },
+          {
+            type: "schwab",
+            key: envStatus.keys.SCHWAB_API_KEY,
+            secret: envStatus.keys.SCHWAB_API_SECRET,
+            paper: envStatus.keys.SCHWAB_PAPER,
+            accountId: envStatus.keys.SCHWAB_ACCOUNT_ID,
+          },
+          {
+            type: "tradier",
+            key: envStatus.keys.TRADIER_API_KEY,
+            secret: envStatus.keys.TRADIER_API_SECRET,
+            paper: envStatus.keys.TRADIER_PAPER,
+            accountId: envStatus.keys.TRADIER_ACCOUNT_ID,
+          },
+          {
+            type: "tradestation",
+            key: envStatus.keys.TRADESTATION_API_KEY,
+            secret: envStatus.keys.TRADESTATION_API_SECRET,
+            paper: envStatus.keys.TRADESTATION_PAPER,
+            accountId: envStatus.keys.TRADESTATION_ACCOUNT_ID,
+          },
+          {
+            type: "tastytrade",
+            key: envStatus.keys.TASTYTRADE_API_KEY,
+            secret: envStatus.keys.TASTYTRADE_API_SECRET,
+            paper: envStatus.keys.TASTYTRADE_PAPER,
+            accountId: envStatus.keys.TASTYTRADE_ACCOUNT_ID,
+          },
+          {
+            type: "etrade",
+            key: envStatus.keys.ETRADE_API_KEY,
+            secret: envStatus.keys.ETRADE_API_SECRET,
+            paper: envStatus.keys.ETRADE_PAPER,
+            accountId: envStatus.keys.ETRADE_ACCOUNT_ID,
+          },
+          {
+            type: "ibkr",
+            key: envStatus.keys.IBKR_API_KEY,
+            secret: envStatus.keys.IBKR_API_SECRET,
+            paper: envStatus.keys.IBKR_PAPER,
+            accountId: envStatus.keys.IBKR_ACCOUNT_ID,
+          },
+        ];
+
+        for (const candidate of brokerEnvCandidates) {
+          if (!candidate.key || !candidate.secret) continue;
+          try {
+            brokerRef.current = BrokerFactory.create(candidate.type, {
+              apiKey: candidate.key,
+              apiSecret: candidate.secret,
+              paper: (candidate.paper || "true").toLowerCase() !== "false",
+              accountId: candidate.accountId,
+            });
+            break;
+          } catch {
+            brokerRef.current = null;
+          }
+        }
+      }
+
       if (binanceClientRef.current) {
         deferredStartupTasks.push(async () => {
           try {
@@ -639,6 +817,7 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
             const gordonCtx = buildAppGordonContext({
               binance: binanceClientRef.current,
               exchange: exchangeRef.current,
+              broker: brokerRef.current,
               llm: llmClientRef.current,
               config: configRef.current,
               portfolioValue: 0,
@@ -772,6 +951,24 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
 
     if (parsedCommand) {
       const { command, args } = parsedCommand;
+
+      if (command.name === "portfolio" && isStocksMarketArgs(args)) {
+        const userMessage: ChatMessage = {
+          role: "user",
+          content: value.trim(),
+          timestamp: formatTimestamp(),
+        };
+        setState((prev) => ({ ...prev, messages: [...prev.messages, userMessage], isLoading: true }));
+        const stocksArgs = stripStocksMarketPrefix(args);
+        const message = await handleStocksCommand(`account ${stocksArgs}`.trim());
+        await refreshActiveBroker();
+        setState((prev) => ({
+          ...prev,
+          messages: [...prev.messages, { role: "gordon", content: message, timestamp: formatTimestamp() }],
+          isLoading: false,
+        }));
+        return;
+      }
 
       // Handle menu-type commands - just convert to prompts, let agent handle
       if (command.action === "menu" && command.target === "setup") {
@@ -1548,6 +1745,70 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
             }));
             return;
           }
+          case "handle_broker_command": {
+            setState((prev) => ({ ...prev, messages: [...prev.messages, userMessage], isLoading: true }));
+            const message = await handleBrokerCommand(args);
+            await refreshActiveBroker();
+            setState((prev) => ({
+              ...prev,
+              messages: [
+                ...prev.messages,
+                { role: "gordon", content: message, timestamp: formatTimestamp() },
+              ],
+              isLoading: false,
+            }));
+            return;
+          }
+          case "handle_stocks_command": {
+            setState((prev) => ({ ...prev, messages: [...prev.messages, userMessage], isLoading: true }));
+            const message = await handleStocksCommand(args);
+            await refreshActiveBroker();
+            setState((prev) => ({
+              ...prev,
+              messages: [
+                ...prev.messages,
+                { role: "gordon", content: message, timestamp: formatTimestamp() },
+              ],
+              isLoading: false,
+            }));
+            return;
+          }
+          case "check_positions": {
+            if (!isStocksMarketArgs(args)) {
+              break;
+            }
+            const stocksArgs = stripStocksMarketPrefix(args);
+            setState((prev) => ({ ...prev, messages: [...prev.messages, userMessage], isLoading: true }));
+            const message = await handleStocksCommand(`positions ${stocksArgs}`.trim());
+            await refreshActiveBroker();
+            setState((prev) => ({
+              ...prev,
+              messages: [
+                ...prev.messages,
+                { role: "gordon", content: message, timestamp: formatTimestamp() },
+              ],
+              isLoading: false,
+            }));
+            return;
+          }
+          case "get_order_status": {
+            if (!isStocksMarketArgs(args)) {
+              break;
+            }
+            const stocksArgs = stripStocksMarketPrefix(args);
+            setState((prev) => ({ ...prev, messages: [...prev.messages, userMessage], isLoading: true }));
+            const message = await handleStocksCommand(`orders ${stocksArgs}`.trim());
+            await refreshActiveBroker();
+            setState((prev) => ({
+              ...prev,
+              messages: [
+                ...prev.messages,
+                { role: "gordon", content: message, timestamp: formatTimestamp() },
+              ],
+              isLoading: false,
+            }));
+            return;
+          }
           case "handle_strategy_command": {
             setState((prev) => ({ ...prev, messages: [...prev.messages, userMessage], isLoading: true }));
             const message = await handleStrategyCommand(args);
@@ -1743,6 +2004,7 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
     const context: GordonContext = buildAppGordonContext({
       binance: binanceClientRef.current,
       exchange: exchangeRef.current,
+      broker: brokerRef.current,
       llm: llmClientRef.current!,
       config: configRef.current,
       portfolioValue: state.portfolioValue ?? 0,
@@ -1938,6 +2200,7 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
     state.availableCash,
     state.messages,
     refreshActiveExchange,
+    refreshActiveBroker,
     updateMessageByTimestamp,
     updateLastResultsFromTool,
   ]);
@@ -1953,6 +2216,7 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
         const context: GordonContext = buildAppGordonContext({
           binance: binanceClientRef.current,
           exchange: exchangeRef.current,
+          broker: brokerRef.current,
           llm: llmClientRef.current!,
           config: configRef.current,
           portfolioValue: state.portfolioValue ?? 0,
@@ -2458,6 +2722,9 @@ Try saying: "What's the market looking like today?"`,
 
   // Handle setup wizard completion
   const handleSetupComplete = useCallback(async (): Promise<void> => {
+    await loadEnvFile();
+    await Promise.all([refreshActiveExchange(), refreshActiveBroker()]);
+
     // Try to initialize LLM client with new keys
     try {
       llmClientRef.current = createLLMClientFromEnv();
@@ -2494,7 +2761,7 @@ Please check your API keys in the .env file and restart Gordon.`,
         ],
       }));
     }
-  }, []);
+  }, [refreshActiveExchange, refreshActiveBroker]);
 
   // Handle model selector completion
   const handleModelComplete = useCallback((changed: boolean): void => {

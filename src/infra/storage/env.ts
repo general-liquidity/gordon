@@ -31,6 +31,39 @@ export interface EnvKeys {
   OPENAI_API_KEY?: string;
   DEDALUS_API_KEY?: string;
   INCEPTION_API_KEY?: string;
+  ALPACA_API_KEY?: string;
+  ALPACA_API_SECRET?: string;
+  ALPACA_PAPER?: string;
+  SCHWAB_API_KEY?: string;
+  SCHWAB_API_SECRET?: string;
+  SCHWAB_PAPER?: string;
+  SCHWAB_ACCOUNT_ID?: string;
+  TRADIER_API_KEY?: string;
+  TRADIER_API_SECRET?: string;
+  TRADIER_PAPER?: string;
+  TRADIER_ACCOUNT_ID?: string;
+  TRADESTATION_API_KEY?: string;
+  TRADESTATION_API_SECRET?: string;
+  TRADESTATION_PAPER?: string;
+  TRADESTATION_ACCOUNT_ID?: string;
+  TASTYTRADE_API_KEY?: string;
+  TASTYTRADE_API_SECRET?: string;
+  TASTYTRADE_PAPER?: string;
+  TASTYTRADE_ACCOUNT_ID?: string;
+  ETRADE_API_KEY?: string;
+  ETRADE_API_SECRET?: string;
+  ETRADE_PAPER?: string;
+  ETRADE_ACCOUNT_ID?: string;
+  IBKR_API_KEY?: string;
+  IBKR_API_SECRET?: string;
+  IBKR_PAPER?: string;
+  IBKR_ACCOUNT_ID?: string;
+  ROBINHOOD_API_KEY?: string;
+  ROBINHOOD_API_SECRET?: string;
+  WEBULL_API_KEY?: string;
+  WEBULL_API_SECRET?: string;
+  WEBULL_PAPER?: string;
+  WEBULL_ACCOUNT_ID?: string;
   BINANCE_API_KEY?: string;
   BINANCE_API_SECRET?: string;
   BINANCE_US_API_KEY?: string;
@@ -68,6 +101,9 @@ export interface EnvStatus {
   fileExists: boolean;
   hasLLMKey: boolean;
   hasInceptionKey: boolean;
+  hasAlpacaKeys: boolean;
+  hasRobinhoodKeys: boolean;
+  hasWebullKeys: boolean;
   hasBinanceKeys: boolean;
   hasBinanceUSKeys: boolean;
   hasCoinbaseKeys: boolean;
@@ -164,6 +200,15 @@ function findEnvFilePath(): string | null {
 /** All tracked env key names (single source of truth) */
 const ENV_KEY_NAMES: (keyof EnvKeys)[] = [
   "OPENAI_API_KEY", "DEDALUS_API_KEY", "INCEPTION_API_KEY",
+  "ALPACA_API_KEY", "ALPACA_API_SECRET", "ALPACA_PAPER",
+  "SCHWAB_API_KEY", "SCHWAB_API_SECRET", "SCHWAB_PAPER", "SCHWAB_ACCOUNT_ID",
+  "TRADIER_API_KEY", "TRADIER_API_SECRET", "TRADIER_PAPER", "TRADIER_ACCOUNT_ID",
+  "TRADESTATION_API_KEY", "TRADESTATION_API_SECRET", "TRADESTATION_PAPER", "TRADESTATION_ACCOUNT_ID",
+  "TASTYTRADE_API_KEY", "TASTYTRADE_API_SECRET", "TASTYTRADE_PAPER", "TASTYTRADE_ACCOUNT_ID",
+  "ETRADE_API_KEY", "ETRADE_API_SECRET", "ETRADE_PAPER", "ETRADE_ACCOUNT_ID",
+  "IBKR_API_KEY", "IBKR_API_SECRET", "IBKR_PAPER", "IBKR_ACCOUNT_ID",
+  "ROBINHOOD_API_KEY", "ROBINHOOD_API_SECRET",
+  "WEBULL_API_KEY", "WEBULL_API_SECRET", "WEBULL_PAPER", "WEBULL_ACCOUNT_ID",
   "BINANCE_API_KEY", "BINANCE_API_SECRET", "BINANCE_US_API_KEY", "BINANCE_US_API_SECRET",
   "COINBASE_API_KEY", "COINBASE_API_SECRET", "COINBASE_PASSPHRASE",
   "KRAKEN_API_KEY", "KRAKEN_API_SECRET",
@@ -183,6 +228,9 @@ function buildEnvStatus(keys: EnvKeys, fileExists: boolean): EnvStatus {
     fileExists,
     hasLLMKey: !!(keys.OPENAI_API_KEY || keys.DEDALUS_API_KEY || keys.INCEPTION_API_KEY),
     hasInceptionKey: !!keys.INCEPTION_API_KEY,
+    hasAlpacaKeys: !!(keys.ALPACA_API_KEY && keys.ALPACA_API_SECRET),
+    hasRobinhoodKeys: !!(keys.ROBINHOOD_API_KEY && keys.ROBINHOOD_API_SECRET),
+    hasWebullKeys: !!(keys.WEBULL_API_KEY && keys.WEBULL_API_SECRET),
     hasBinanceKeys: !!(keys.BINANCE_API_KEY && keys.BINANCE_API_SECRET),
     hasBinanceUSKeys: !!(keys.BINANCE_US_API_KEY && keys.BINANCE_US_API_SECRET),
     hasCoinbaseKeys: !!(keys.COINBASE_API_KEY && keys.COINBASE_API_SECRET && keys.COINBASE_PASSPHRASE),

@@ -175,6 +175,7 @@ export function createMockConfig(overrides: Partial<GordonConfig> = {}): GordonC
   return {
     version: "1.0.0",
     exchanges: [],
+    brokers: [],
     mcpServers: [],
     preferences: createMockPreferences(),
     memoryConfig: {

@@ -45,13 +45,8 @@ export interface LLMResponse {
  */
 export type OpenAIModel =
   | "gpt-5.2"           // Default GPT-5.2
-  | "gpt-5.2-instant"   // Fast responses
-  | "gpt-5.2-thinking"  // Reasoning mode
   | "gpt-5.2-pro"       // Most capable
-  | "gpt-5.2-codex"     // Code optimized
-  | "o3"                // Deep reasoning
-  | "o3-mini"           // Lightweight reasoning
-  | "o4-mini";          // Latest reasoning
+  | "gpt-5-mini";       // Fast and cost-efficient
 
 /**
  * Dedalus Labs model identifiers (provider/model format)
@@ -59,37 +54,18 @@ export type OpenAIModel =
 export type DedalusModel =
   // OpenAI via Dedalus
   | "openai/gpt-5.2"
-  | "openai/gpt-5.1"
-  | "openai/gpt-5"
-  | "openai/gpt-5-mini"
-  | "openai/gpt-5-nano"
-  | "openai/gpt-5-codex"
-  | "openai/gpt-4o"
-  | "openai/o3"
-  | "openai/o3-mini"
   // Anthropic via Dedalus
-  | "anthropic/claude-opus-4-5"
+  | "anthropic/claude-opus-4-6"
   | "anthropic/claude-sonnet-4-5-20250929"
   | "anthropic/claude-haiku-4-5-20251001"
   // Google via Dedalus
-  | "google/gemini-2.5-pro"
-  | "google/gemini-2.5-flash"
-  | "google/gemini-2.5-flash-lite"
+  | "google/gemini-3-flash-preview"
   | "google/gemini-3-pro-preview"
-  // DeepSeek via Dedalus
-  | "deepseek/deepseek-chat"
-  | "deepseek/deepseek-reasoner"
-  | "deepseek/deepseek-coder"
   // xAI via Dedalus
-  | "xai/grok-4-fast-reasoning"
-  | "xai/grok-4-fast-non-reasoning"
-  | "xai/grok-code-fast-1"
-  // Groq via Dedalus (fast inference)
-  | "groq/llama-3.3-70b-versatile"
-  | "groq/llama-3.1-8b-instant"
-  // Cerebras via Dedalus (ultra-fast)
-  | "cerebras/llama-3.3-70b"
-  | "cerebras/llama3.1-8b"
+  | "xai/grok-4-1-fast-reasoning"
+  | "xai/grok-4-1-fast-non-reasoning"
+  // Moonshot via Dedalus
+  | "moonshot/kimi-k2.5"
   // Any other model string
   | (string & {});
 
@@ -117,7 +93,7 @@ export const GORDON_MODELS = {
   // Intent parsing - fast and cheap
   intentParsing: {
     provider: "dedalus" as LLMProvider,
-    model: "openai/gpt-5-nano",
+    model: "anthropic/claude-haiku-4-5-20251001",
     temperature: 0.3,
     maxTokens: 500,
   },
@@ -132,8 +108,8 @@ export const GORDON_MODELS = {
 
   // Complex reasoning (fallback to direct OpenAI)
   complexReasoning: {
-    provider: "openai" as LLMProvider,
-    model: "gpt-5.2-thinking" as OpenAIModel,
+    provider: "dedalus" as LLMProvider,
+    model: "anthropic/claude-opus-4-6",
     temperature: 0.4,
     maxTokens: 4000,
   },
@@ -141,7 +117,7 @@ export const GORDON_MODELS = {
   // Explanations - clear and educational
   explanations: {
     provider: "dedalus" as LLMProvider,
-    model: "openai/gpt-5-mini",
+    model: "anthropic/claude-sonnet-4-5-20250929",
     temperature: 0.7,
     maxTokens: 1000,
   },
@@ -149,7 +125,7 @@ export const GORDON_MODELS = {
   // Fast/cheap operations
   fast: {
     provider: "dedalus" as LLMProvider,
-    model: "google/gemini-2.5-flash",
+    model: "google/gemini-3-flash-preview",
     temperature: 0.3,
     maxTokens: 500,
   },
@@ -157,7 +133,7 @@ export const GORDON_MODELS = {
   // Ultra-fast (Groq/Cerebras)
   ultraFast: {
     provider: "dedalus" as LLMProvider,
-    model: "groq/llama-3.1-8b-instant",
+    model: "xai/grok-4-1-fast-non-reasoning",
     temperature: 0.3,
     maxTokens: 500,
   },
