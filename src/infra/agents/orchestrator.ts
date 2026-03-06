@@ -520,6 +520,19 @@ const TOOL_AGENT_MAP: Record<string, string> = {
   // baseOnchainTools cherry-picks (Analyst: gas/balance analysis)
   get_base_gas: "Analyst",
   get_base_balance: "Analyst",
+  // Native agent rails
+  get_agent_rails_status: "Analyst",
+  helius_wallet_overview: "Analyst",
+  helius_recent_transactions: "Analyst",
+  helius_token_metadata: "Analyst",
+  moonpay_currency_limits: "Analyst",
+  moonpay_quote: "Analyst",
+  moonpay_swap_pairs: "Analyst",
+  moonpay_transactions: "Analyst",
+  moonpay_customer_limits: "Analyst",
+  moonpay_virtual_accounts: "Analyst",
+  moonpay_virtual_account_transactions: "Analyst",
+  moonpay_verify_webhook: "Analyst",
 
   // ---- Planner tools ----
   // tradingTools cherry-picks
@@ -749,6 +762,9 @@ const TOOL_AGENT_MAP: Record<string, string> = {
   solana_debridge_create_order: "Executor",
   solana_debridge_execute: "Executor",
   solana_okx_swap: "Executor",
+  moonpay_funding_link: "Executor",
+  moonpay_swap_link: "Executor",
+  polygon_payment_intent: "Executor",
 
   // ---- Base L2 indexer tools (The Graph) ----
   indexer_top_pools: "Scanner",
@@ -1167,9 +1183,12 @@ function createRequestContext(context: GordonContext): RequestContext {
   const requestContext = new RequestContext();
   requestContext.set("binance", context.binance);
   requestContext.set("exchange", context.exchange);
+  requestContext.set("broker", context.broker);
+  requestContext.set("agentRails", context.agentRails);
   requestContext.set("config", context.config);
   requestContext.set("llm", context.llm);
   requestContext.set("userId", context.userId || "default");
+  requestContext.set("threadId", context.threadId || "");
   requestContext.set("portfolioValue", context.portfolioValue || 0);
   requestContext.set("availableCash", context.availableCash || 0);
   return requestContext;

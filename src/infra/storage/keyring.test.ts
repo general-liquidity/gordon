@@ -88,6 +88,7 @@ describe("KEYRING_SUPPORTED_KEYS", () => {
     expect(KEYRING_SUPPORTED_KEYS).toContain("BINANCE_API_SECRET");
     expect(KEYRING_SUPPORTED_KEYS).toContain("KRAKEN_API_KEY");
     expect(KEYRING_SUPPORTED_KEYS).toContain("COINBASE_API_KEY");
+    expect(KEYRING_SUPPORTED_KEYS).toContain("TRADING212_API_KEY");
   });
 
   test("contains expected LLM keys", () => {
@@ -95,6 +96,14 @@ describe("KEYRING_SUPPORTED_KEYS", () => {
     expect(KEYRING_SUPPORTED_KEYS).toContain("DEDALUS_API_KEY");
     expect(KEYRING_SUPPORTED_KEYS).toContain("INCEPTION_API_KEY");
     expect(KEYRING_SUPPORTED_KEYS).toContain("ANTHROPIC_API_KEY");
+  });
+
+  test("contains expected agent rail keys", () => {
+    expect(KEYRING_SUPPORTED_KEYS).toContain("HELIUS_API_KEY");
+    expect(KEYRING_SUPPORTED_KEYS).toContain("MOONPAY_API_KEY");
+    expect(KEYRING_SUPPORTED_KEYS).toContain("MOONPAY_WEBHOOK_API_KEY");
+    expect(KEYRING_SUPPORTED_KEYS).toContain("MOONPAY_VIRTUAL_ACCOUNTS_PRIVATE_KEY");
+    expect(KEYRING_SUPPORTED_KEYS).toContain("POLYGON_X402_PRIVATE_KEY");
   });
 
   test("all keys are uppercase with underscores", () => {

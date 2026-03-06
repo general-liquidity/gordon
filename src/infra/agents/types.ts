@@ -7,6 +7,7 @@ import type { BinanceClient } from "../binance/index.ts";
 import type { Exchange } from "../exchange/index.ts";
 import type { BrokerAdapter } from "../broker/index.ts";
 import type { LLMClient } from "../llm/index.ts";
+import type { AgentRailsRegistry } from "../rails/index.ts";
 import type { GordonConfig, Plan, Trade } from "../../types/index.ts";
 
 /**
@@ -26,6 +27,7 @@ export interface GordonContext {
    * Abstract stock/options broker interface (Alpaca first)
    */
   broker?: BrokerAdapter | null;
+  agentRails?: AgentRailsRegistry | null;
   llm: LLMClient;
   config: GordonConfig;
   portfolioValue: number;

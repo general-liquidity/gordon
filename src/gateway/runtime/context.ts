@@ -5,6 +5,7 @@ import { getCurrentSession } from "../../infra/storage/session.ts";
 import { createLLMClientFromEnv } from "../../infra/llm/index.ts";
 import { BinanceClient } from "../../infra/binance/index.ts";
 import { BinanceAdapter, ExchangeFactory, type Exchange } from "../../infra/exchange/index.ts";
+import { createAgentRailsRegistry } from "../../infra/rails/index.ts";
 import type { LLMClient } from "../../infra/llm/index.ts";
 import type { GordonContext } from "../../infra/agents/types.ts";
 
@@ -35,6 +36,7 @@ export class GatewayContextResolver {
     return {
       binance,
       exchange,
+      agentRails: createAgentRailsRegistry(config),
       llm: (llm ?? ({} as LLMClient)),
       config,
       portfolioValue,

@@ -3,6 +3,8 @@
  * Defines all available slash commands for quick actions
  */
 
+import { BrokerFactory } from "../infra/broker/index.ts";
+
 /**
  * Command levels for progressive disclosure
  * - Level 1 (essential): Core commands for daily use
@@ -27,6 +29,11 @@ export interface SlashCommand {
   /** Guidance on when to use this command */
   whenToUse?: string;
 }
+
+const BROKER_TOKENS = BrokerFactory.getSupportedBrokers();
+const STOCK_MARKET_TOKENS = ["stock", "stocks", "equity", "equities", ...BROKER_TOKENS];
+const STOCK_MARKET_PATTERN = new RegExp(`^\\s*(${STOCK_MARKET_TOKENS.join("|")})\\b`, "i");
+const BROKER_TYPES_HINT = BROKER_TOKENS.join(", ");
 
 export const SLASH_COMMANDS: SlashCommand[] = [
   // Market Discovery
@@ -207,6 +214,39 @@ export const SLASH_COMMANDS: SlashCommand[] = [
     level: 1,
     action: "menu",
     target: "portfolio",
+  },
+  {
+    name: "wallet",
+    aliases: ["funds", "wallets"],
+    description: "Wallet rails status, funding, MoonPay history, and virtual-account workflows",
+    usage: "/wallet [status|solana|fund|history|virtual]",
+    category: "account",
+    level: 1,
+    action: "agent",
+    target: "gordon",
+    whenToUse: "Inspect Gordon wallet rails and connected wallet workflows",
+  },
+  {
+    name: "fund",
+    aliases: ["onramp", "offramp"],
+    description: "Create MoonPay flows or fetch quotes and limits",
+    usage: "/fund [buy|sell|swap|quote|limits|history] ...",
+    category: "trading",
+    level: 2,
+    action: "agent",
+    target: "executor",
+    whenToUse: "Fund a wallet, off-ramp, create a hosted swap flow, or inspect live MoonPay pricing and limits",
+  },
+  {
+    name: "pay",
+    aliases: ["x402", "payments"],
+    description: "Prepare Polygon x402 payment intents for paid APIs or agent payments",
+    usage: "/pay <resource> <amount>",
+    category: "trading",
+    level: 2,
+    action: "agent",
+    target: "executor",
+    whenToUse: "Prepare Gordon-native payment headers for external services",
   },
   {
     name: "earn",
@@ -883,6 +923,17 @@ export const SLASH_COMMANDS: SlashCommand[] = [
     whenToUse: "See which chain networks are configured and what tools are available",
   },
   {
+    name: "rails",
+    aliases: ["providers", "wallet-rails"],
+    description: "Show native wallet, chain-data, and payment rails",
+    usage: "/rails",
+    category: "system",
+    level: 1,
+    action: "agent",
+    target: "gordon",
+    whenToUse: "Inspect Helius, MoonPay, and Polygon x402 availability",
+  },
+  {
     name: "bridge",
     aliases: ["ccip", "cross-chain"],
     description: "Bridge tokens cross-chain via Chainlink CCIP",
@@ -1316,17 +1367,17 @@ export function commandToPrompt(command: SlashCommand, args: string): string {
     case "grid":
       return args ? `Create a grid entry plan for ${args}` : "What symbol should I create a grid plan for?";
     case "positions":
-      if (/^\s*(stocks?|equit(y|ies)|alpaca|webull|schwab|tradier|tradestation|tastytrade|etrade|ibkr)\b/i.test(args || "")) return "Show my current stock positions";
+      if (STOCK_MARKET_PATTERN.test(args || "")) return "Show my current stock positions";
       return "Check my current positions";
     case "orders":
-      if (/^\s*(stocks?|equit(y|ies)|alpaca|webull|schwab|tradier|tradestation|tastytrade|etrade|ibkr)\b/i.test(args || "")) return "Show my open stock broker orders";
+      if (STOCK_MARKET_PATTERN.test(args || "")) return "Show my open stock broker orders";
       return "Show my open orders";
     case "arm":
       return "Arm the system for live trading";
     case "disarm":
       return "Disarm the system and return to safe mode";
     case "portfolio":
-      if (/^\s*(stocks?|equit(y|ies)|alpaca|webull|schwab|tradier|tradestation|tastytrade|etrade|ibkr)\b/i.test(args || "")) return "Show my stock broker account summary";
+      if (STOCK_MARKET_PATTERN.test(args || "")) return "Show my stock broker account summary";
       return "Show my portfolio";
     case "earn": {
       const earnSub = args?.trim().split(/\s+/)[0]?.toLowerCase();
@@ -1419,7 +1470,7 @@ export function commandToPrompt(command: SlashCommand, args: string): string {
         case "new":
           return brokerArgs
             ? `Add a new ${brokerArgs} broker configuration`
-            : "What type of broker would you like to add? (alpaca, webull, schwab, tradier, tradestation, tastytrade, etrade, ibkr)";
+            : `What type of broker would you like to add? (${BROKER_TYPES_HINT})`;
         case "switch":
         case "use":
           return brokerArgs
@@ -1926,9 +1977,71 @@ export function commandToPrompt(command: SlashCommand, args: string): string {
     // Health command
     case "health":
       return "Run a portfolio health check. Show risk status, strategy health, and any warnings.";
+    case "wallet": {
+      if (!args || args === "status") {
+        return "Show Gordon wallet rails status. Include native providers, MCP fast paths, active wallet provider, and any configuration gaps.";
+      }
+      const walletSubcmd = args.split(/\s+/)[0]?.toLowerCase();
+      const walletArgs = args.split(/\s+/).slice(1).join(" ");
+      switch (walletSubcmd) {
+        case "solana":
+          return walletArgs
+            ? `Inspect this Solana wallet using the native Helius provider: ${walletArgs}`
+            : "Inspect my configured Solana wallet and show balances, assets, and recent activity.";
+        case "fund":
+          return walletArgs
+            ? `Help me fund a wallet using Gordon's wallet rails: ${walletArgs}`
+            : "Show my wallet funding options, including MoonPay buy, sell, swap, quote, and limit flows.";
+        case "history":
+          return walletArgs
+            ? `Show recent wallet activity for ${walletArgs}, including MoonPay transaction history if relevant.`
+            : "Show recent wallet activity for my configured wallets, including MoonPay transaction history if available.";
+        case "virtual":
+          return walletArgs
+            ? `Show MoonPay virtual account state and transactions for ${walletArgs}`
+            : "Show MoonPay virtual account state, account details, and recent virtual-account transactions.";
+        default:
+          return `Wallet workflow: ${args}`;
+      }
+    }
+    case "fund": {
+      if (!args) {
+        return "Show MoonPay funding flows for buy, sell, swap, live quotes, limits, and history. Ask which asset, amount, and wallet should be used.";
+      }
+      const fundSubcmd = args.split(/\s+/)[0]?.toLowerCase();
+      const fundArgs = args.split(/\s+/).slice(1).join(" ");
+      switch (fundSubcmd) {
+        case "buy":
+          return fundArgs ? `Create a MoonPay buy link: ${fundArgs}` : "Create a MoonPay buy link. Which fiat currency, crypto asset, and wallet address?";
+        case "sell":
+          return fundArgs ? `Create a MoonPay sell link: ${fundArgs}` : "Create a MoonPay sell link. Which crypto asset, payout currency, and refund wallet?";
+        case "swap":
+          return fundArgs ? `Create a MoonPay swap link: ${fundArgs}` : "Create a MoonPay swap link. Which asset pair and wallet address?";
+        case "quote":
+          return fundArgs
+            ? `Get a live MoonPay quote for this request: ${fundArgs}`
+            : "Get a live MoonPay quote. Which mode (buy, sell, or swap), asset, amount, and fiat currency should be used?";
+        case "limits":
+          return fundArgs
+            ? `Get MoonPay currency limits for: ${fundArgs}`
+            : "Get MoonPay currency limits. Which crypto asset and optional payment method should be checked?";
+        case "history":
+          return fundArgs
+            ? `Show MoonPay transaction history for: ${fundArgs}`
+            : "Show MoonPay transaction history. Which customer, transaction id, or external transaction id should be used?";
+        default:
+          return `Wallet funding workflow: ${args}`;
+      }
+    }
+    case "pay":
+      return args
+        ? `Prepare a Polygon x402 payment intent for this request: ${args}. Show the headers and require approval before signing.`
+        : "Prepare a Polygon x402 payment intent for a paid API or agent-to-agent request. Ask which resource and amount should be used.";
     // Blockchain Network commands
     case "chains":
       return "Show me which blockchain networks are configured and available. For each configured chain, show the available tools and capabilities. For unconfigured chains, show what keys are needed.";
+    case "rails":
+      return "Show Gordon's native wallet, chain-data, and payment rails. Include Helius, MoonPay, and Polygon x402 status, active providers, auth modes, MCP fast paths, and any missing credentials.";
     case "bridge":
       if (args) {
         return `Help me bridge tokens cross-chain using Chainlink CCIP: ${args}. Show me the fee estimate before executing.`;

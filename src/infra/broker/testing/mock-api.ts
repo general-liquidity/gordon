@@ -5,6 +5,7 @@ type FetchInit = Parameters<typeof fetch>[1];
 
 export type MockBrokerOperation =
   | "oauthToken"
+  | "sessionCreate"
   | "accountDiscovery"
   | "clock"
   | "account"
@@ -45,6 +46,7 @@ export interface MockBrokerApiHarness {
 
 const DEFAULT_LATENCY_MS: Record<Exclude<MockBrokerOperation, "unknown">, number> = {
   oauthToken: 1,
+  sessionCreate: 1,
   accountDiscovery: 1,
   clock: 1,
   account: 1,
@@ -138,6 +140,7 @@ const BROKER_RULES: Record<BrokerId, BrokerPathRules> = {
     quote: [/^\/v3\/marketdata\/quotes\/[^/]+$/i, /^\/v2\/data\/quote\/[^/]+$/i],
   },
   tastytrade: {
+    oauthToken: [/^\/sessions$/i],
     accountDiscovery: [/^\/customers\/me\/accounts$/i, /^\/accounts$/i],
     clock: [/^\/market-sessions$/i],
     account: [/^\/accounts\/[^/]+\/balances$/i],
@@ -148,6 +151,23 @@ const BROKER_RULES: Record<BrokerId, BrokerPathRules> = {
     cancelOrder: [/^\/accounts\/[^/]+\/orders\/[^/]+$/i],
     cancelAll: [],
     quote: [/^\/market-data\/quotes\/[^/]+$/i, /^\/market-data\/quotes$/i],
+  },
+  trading212: {
+    accountDiscovery: [/^\/api\/v0\/equity\/account\/info$/i],
+    clock: [/^\/api\/v0\/equity\/account\/info$/i],
+    account: [/^\/api\/v0\/equity\/account\/info$/i, /^\/api\/v0\/equity\/account\/cash$/i],
+    positions: [/^\/api\/v0\/equity\/positions$/i, /^\/api\/v0\/equity\/portfolio$/i],
+    listOrders: [/^\/api\/v0\/equity\/orders$/i, /^\/api\/v0\/equity\/history\/orders$/i],
+    getOrder: [/^\/api\/v0\/equity\/orders\/[^/]+$/i, /^\/api\/v0\/equity\/history\/orders\/[^/]+$/i],
+    placeOrder: [
+      /^\/api\/v0\/equity\/orders\/market$/i,
+      /^\/api\/v0\/equity\/orders\/limit$/i,
+      /^\/api\/v0\/equity\/orders\/stop$/i,
+      /^\/api\/v0\/equity\/orders\/stop-limit$/i,
+    ],
+    cancelOrder: [/^\/api\/v0\/equity\/orders\/[^/]+$/i],
+    cancelAll: [],
+    quote: [/^\/api\/v0\/equity\/portfolio\/ticker$/i, /^\/api\/v0\/equity\/portfolio\/[^/]+$/i],
   },
   etrade: {
     accountDiscovery: [/^\/v1\/accounts\/list$/i],
@@ -188,6 +208,7 @@ function detectOperation(brokerId: BrokerId, method: string, pathname: string): 
   const rules = BROKER_RULES[brokerId];
 
   if (method === "POST" && rules.oauthToken && match(pathname, rules.oauthToken)) return "oauthToken";
+  if (method === "POST" && brokerId === "tastytrade" && match(pathname, [/^\/sessions$/i])) return "sessionCreate";
 
   if (method === "GET") {
     if (match(pathname, rules.accountDiscovery)) return "accountDiscovery";
@@ -200,6 +221,7 @@ function detectOperation(brokerId: BrokerId, method: string, pathname: string): 
   }
 
   if (method === "POST") {
+    if (match(pathname, rules.quote)) return "quote";
     if (match(pathname, rules.placeOrder)) return "placeOrder";
     if (match(pathname, rules.cancelOrder)) return "cancelOrder";
     if (match(pathname, rules.cancelAll)) return "cancelAll";
@@ -505,9 +527,208 @@ function buildWebullPayload(operation: MockBrokerOperation): Response {
   }
 }
 
+function buildTastytradePayload(operation: MockBrokerOperation): Response {
+  switch (operation) {
+    case "sessionCreate":
+    case "oauthToken":
+      return json({
+        data: {
+          "session-token": "tastytrade-session-token",
+        },
+      });
+    case "accountDiscovery":
+      return json({
+        data: {
+          items: [{
+            "account-number": "TT-ACC-1",
+          }],
+        },
+      });
+    case "clock":
+      return json({
+        data: {
+          timestamp: ISO_NOW,
+          isOpen: true,
+          nextOpen: ISO_NEXT_OPEN,
+          nextClose: ISO_NEXT_CLOSE,
+        },
+      });
+    case "account":
+      return json({
+        data: {
+          "account-number": "TT-ACC-1",
+          status: "ACTIVE",
+          currency: "USD",
+          "cash-balance": "12000",
+          "buying-power": "25000",
+          "net-liquidating-value": "30000",
+          "is-pattern-day-trader": false,
+        },
+      });
+    case "positions":
+      return json({
+        data: {
+          items: [{
+            symbol: "AAPL",
+            quantity: "2",
+            "market-value": "410.20",
+            "average-open-price": "200.00",
+            "unrealized-day-gain": "10.20",
+            "unrealized-day-gain-percent": "0.0255",
+          }],
+        },
+      });
+    case "listOrders":
+      return json({
+        data: {
+          items: [{
+            id: "order-1",
+            status: "Live",
+            "order-type": "Market",
+            "time-in-force": "Day",
+            legs: [{
+              symbol: "AAPL",
+              action: "Buy to Open",
+              quantity: "1",
+            }],
+            "filled-quantity": "0",
+          }],
+        },
+      });
+    case "getOrder":
+      return json({
+        data: {
+          id: "order-1",
+          status: "Filled",
+          "order-type": "Market",
+          "time-in-force": "Day",
+          legs: [{
+            symbol: "AAPL",
+            action: "Buy to Open",
+            quantity: "1",
+          }],
+          "filled-quantity": "1",
+        },
+      });
+    case "placeOrder":
+      return json({
+        data: {
+          id: "order-1",
+          status: "Live",
+          "order-type": "Market",
+          "time-in-force": "Day",
+          legs: [{
+            symbol: "AAPL",
+            action: "Buy to Open",
+            quantity: "1",
+          }],
+          "filled-quantity": "0",
+        },
+      });
+    case "cancelOrder":
+    case "cancelAll":
+      return new Response(null, { status: 204 });
+    case "quote":
+      return json({
+        data: {
+          items: [{
+            symbol: "AAPL",
+            "bid-price": 205.10,
+            "bid-size": 10,
+            "ask-price": 205.20,
+            "ask-size": 12,
+            "quote-time": ISO_NOW,
+          }],
+        },
+      });
+    default:
+      return new Response("Unhandled tastytrade operation", { status: 500 });
+  }
+}
+
+function buildTrading212Payload(operation: MockBrokerOperation): Response {
+  switch (operation) {
+    case "accountDiscovery":
+    case "account":
+      return json({
+        id: "TR212-ACC-1",
+        status: "ACTIVE",
+        currencyCode: "USD",
+        equity: "30000",
+        free: "12000",
+        availableToInvest: "25000",
+      });
+    case "clock":
+      return json({
+        timestamp: ISO_NOW,
+        isOpen: true,
+        nextOpen: ISO_NEXT_OPEN,
+        nextClose: ISO_NEXT_CLOSE,
+      });
+    case "positions":
+      return json([{
+        ticker: "AAPL",
+        quantity: "2",
+        currentValue: "410.20",
+        averagePrice: "200.00",
+        result: "10.20",
+        resultPct: "0.0255",
+      }]);
+    case "listOrders":
+      return json([{
+        id: "order-1",
+        ticker: "AAPL",
+        side: "BUY",
+        type: "MARKET",
+        timeValidity: "DAY",
+        status: "accepted",
+        quantity: "1",
+        filledQuantity: "0",
+      }]);
+    case "getOrder":
+      return json({
+        id: "order-1",
+        ticker: "AAPL",
+        side: "BUY",
+        type: "MARKET",
+        timeValidity: "DAY",
+        status: "filled",
+        quantity: "1",
+        filledQuantity: "1",
+      });
+    case "placeOrder":
+      return json({
+        id: "order-1",
+        ticker: "AAPL",
+        side: "BUY",
+        type: "MARKET",
+        timeValidity: "DAY",
+        status: "accepted",
+        quantity: "1",
+        filledQuantity: "0",
+      });
+    case "cancelOrder":
+    case "cancelAll":
+      return new Response(null, { status: 204 });
+    case "quote":
+      return json([{
+        ticker: "AAPL",
+        bid: 205.10,
+        bidQuantity: 10,
+        ask: 205.20,
+        askQuantity: 12,
+        updatedAt: ISO_NOW,
+      }]);
+    default:
+      return new Response("Unhandled Trading 212 operation", { status: 500 });
+  }
+}
+
 function buildPayload(brokerId: BrokerId, operation: MockBrokerOperation): Response {
   if (brokerId === "alpaca") return buildAlpacaPayload(operation);
   if (brokerId === "webull") return buildWebullPayload(operation);
+  if (brokerId === "tastytrade") return buildTastytradePayload(operation);
+  if (brokerId === "trading212") return buildTrading212Payload(operation);
   return buildRestPayload(operation);
 }
 

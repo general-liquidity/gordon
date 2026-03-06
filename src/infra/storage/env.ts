@@ -50,6 +50,10 @@ export interface EnvKeys {
   TASTYTRADE_API_SECRET?: string;
   TASTYTRADE_PAPER?: string;
   TASTYTRADE_ACCOUNT_ID?: string;
+  TRADING212_API_KEY?: string;
+  TRADING212_API_SECRET?: string;
+  TRADING212_PAPER?: string;
+  TRADING212_ACCOUNT_ID?: string;
   ETRADE_API_KEY?: string;
   ETRADE_API_SECRET?: string;
   ETRADE_PAPER?: string;
@@ -84,6 +88,9 @@ export interface EnvKeys {
   // Chain provider keys
   SOLANA_PRIVATE_KEY?: string;
   SOLANA_RPC_URL?: string;
+  HELIUS_API_KEY?: string;
+  JUPITER_REFERRAL_ACCOUNT?: string;
+  JUPITER_FEE_BPS?: string;
   POLKADOT_MNEMONIC?: string;
   POLKADOT_PRIVATE_KEY?: string;
   CHAINLINK_API_KEY?: string;
@@ -95,6 +102,15 @@ export interface EnvKeys {
   CDP_NETWORK_ID?: string;
   BASESCAN_API_KEY?: string;
   SYNTHDATA_API_KEY?: string;
+  MOONPAY_API_KEY?: string;
+  MOONPAY_SECRET_KEY?: string;
+  MOONPAY_WIDGET_URL?: string;
+  MOONPAY_WEBHOOK_API_KEY?: string;
+  MOONPAY_VIRTUAL_ACCOUNTS_PRIVATE_KEY?: string;
+  POLYGON_X402_PRIVATE_KEY?: string;
+  POLYGON_X402_RECIPIENT?: string;
+  POLYGON_X402_CHAIN_ID?: string;
+  POLYGON_X402_FACILITATOR_URL?: string;
 }
 
 export interface EnvStatus {
@@ -115,12 +131,15 @@ export interface EnvStatus {
   hasGraphKey: boolean;
   // Chain provider status
   hasSolanaKey: boolean;
+  hasHeliusKey: boolean;
   hasPolkadotKey: boolean;
   hasChainlinkStreamsKeys: boolean;
   hasChainlinkCCIPKey: boolean;
   hasCDPKeys: boolean;
   hasBasescanKey: boolean;
   hasSynthDataKey: boolean;
+  hasMoonPayKeys: boolean;
+  hasPolygonX402Key: boolean;
   keys: EnvKeys;
 }
 
@@ -205,6 +224,7 @@ const ENV_KEY_NAMES: (keyof EnvKeys)[] = [
   "TRADIER_API_KEY", "TRADIER_API_SECRET", "TRADIER_PAPER", "TRADIER_ACCOUNT_ID",
   "TRADESTATION_API_KEY", "TRADESTATION_API_SECRET", "TRADESTATION_PAPER", "TRADESTATION_ACCOUNT_ID",
   "TASTYTRADE_API_KEY", "TASTYTRADE_API_SECRET", "TASTYTRADE_PAPER", "TASTYTRADE_ACCOUNT_ID",
+  "TRADING212_API_KEY", "TRADING212_API_SECRET", "TRADING212_PAPER", "TRADING212_ACCOUNT_ID",
   "ETRADE_API_KEY", "ETRADE_API_SECRET", "ETRADE_PAPER", "ETRADE_ACCOUNT_ID",
   "IBKR_API_KEY", "IBKR_API_SECRET", "IBKR_PAPER", "IBKR_ACCOUNT_ID",
   "ROBINHOOD_API_KEY", "ROBINHOOD_API_SECRET",
@@ -214,12 +234,14 @@ const ENV_KEY_NAMES: (keyof EnvKeys)[] = [
   "KRAKEN_API_KEY", "KRAKEN_API_SECRET",
   "BITFINEX_API_KEY", "BITFINEX_API_SECRET",
   "HYPERLIQUID_PRIVATE_KEY", "TINYFISH_API_KEY", "UNISWAP_API_KEY", "THEGRAPH_API_KEY", "GORDON_PROVIDER", "GORDON_MODEL",
-  "SOLANA_PRIVATE_KEY", "SOLANA_RPC_URL",
+  "SOLANA_PRIVATE_KEY", "SOLANA_RPC_URL", "HELIUS_API_KEY", "JUPITER_REFERRAL_ACCOUNT", "JUPITER_FEE_BPS",
   "POLKADOT_MNEMONIC", "POLKADOT_PRIVATE_KEY",
   "CHAINLINK_API_KEY", "CHAINLINK_API_SECRET", "EVM_PRIVATE_KEY",
   "CDP_API_KEY_ID", "CDP_API_KEY_SECRET", "CDP_WALLET_SECRET", "CDP_NETWORK_ID",
   "BASESCAN_API_KEY",
   "SYNTHDATA_API_KEY",
+  "MOONPAY_API_KEY", "MOONPAY_SECRET_KEY", "MOONPAY_WIDGET_URL", "MOONPAY_WEBHOOK_API_KEY", "MOONPAY_VIRTUAL_ACCOUNTS_PRIVATE_KEY",
+  "POLYGON_X402_PRIVATE_KEY", "POLYGON_X402_RECIPIENT", "POLYGON_X402_CHAIN_ID", "POLYGON_X402_FACILITATOR_URL",
 ];
 
 /** Build EnvStatus flags from resolved keys */
@@ -241,12 +263,21 @@ function buildEnvStatus(keys: EnvKeys, fileExists: boolean): EnvStatus {
     hasUniswapKey: !!keys.UNISWAP_API_KEY,
     hasGraphKey: !!keys.THEGRAPH_API_KEY,
     hasSolanaKey: !!keys.SOLANA_PRIVATE_KEY,
+    hasHeliusKey: !!keys.HELIUS_API_KEY,
     hasPolkadotKey: !!(keys.POLKADOT_MNEMONIC || keys.POLKADOT_PRIVATE_KEY),
     hasChainlinkStreamsKeys: !!(keys.CHAINLINK_API_KEY && keys.CHAINLINK_API_SECRET),
     hasChainlinkCCIPKey: !!keys.EVM_PRIVATE_KEY,
     hasCDPKeys: !!(keys.CDP_API_KEY_ID && keys.CDP_API_KEY_SECRET && keys.CDP_WALLET_SECRET),
     hasBasescanKey: !!keys.BASESCAN_API_KEY,
     hasSynthDataKey: !!keys.SYNTHDATA_API_KEY,
+    hasMoonPayKeys: !!(
+      keys.MOONPAY_API_KEY
+      || keys.MOONPAY_SECRET_KEY
+      || keys.MOONPAY_WIDGET_URL
+      || keys.MOONPAY_WEBHOOK_API_KEY
+      || keys.MOONPAY_VIRTUAL_ACCOUNTS_PRIVATE_KEY
+    ),
+    hasPolygonX402Key: !!(keys.POLYGON_X402_PRIVATE_KEY || keys.POLYGON_X402_RECIPIENT),
     keys,
   };
 }
@@ -597,6 +628,21 @@ export async function createEnvFile(keys: Partial<EnvKeys>): Promise<void> {
   } else {
     lines.push("# SOLANA_RPC_URL=https://api.mainnet-beta.solana.com");
   }
+  if (keys.HELIUS_API_KEY) {
+    lines.push(formatEnvLine("HELIUS_API_KEY", keys.HELIUS_API_KEY));
+  } else {
+    lines.push("# HELIUS_API_KEY=");
+  }
+  if (keys.JUPITER_REFERRAL_ACCOUNT) {
+    lines.push(formatEnvLine("JUPITER_REFERRAL_ACCOUNT", keys.JUPITER_REFERRAL_ACCOUNT));
+  } else {
+    lines.push("# JUPITER_REFERRAL_ACCOUNT=");
+  }
+  if (keys.JUPITER_FEE_BPS) {
+    lines.push(formatEnvLine("JUPITER_FEE_BPS", keys.JUPITER_FEE_BPS));
+  } else {
+    lines.push("# JUPITER_FEE_BPS=");
+  }
 
   lines.push("");
   lines.push("# Polkadot (cross-chain swaps, staking, governance)");
@@ -673,6 +719,57 @@ export async function createEnvFile(keys: Partial<EnvKeys>): Promise<void> {
     lines.push(formatEnvLine("SYNTHDATA_API_KEY", keys.SYNTHDATA_API_KEY));
   } else {
     lines.push("# SYNTHDATA_API_KEY=");
+  }
+
+  lines.push("");
+  lines.push("# MoonPay (wallet funding, swaps, on/off-ramp)");
+  if (keys.MOONPAY_API_KEY) {
+    lines.push(formatEnvLine("MOONPAY_API_KEY", keys.MOONPAY_API_KEY));
+  } else {
+    lines.push("# MOONPAY_API_KEY=");
+  }
+  if (keys.MOONPAY_SECRET_KEY) {
+    lines.push(formatEnvLine("MOONPAY_SECRET_KEY", keys.MOONPAY_SECRET_KEY));
+  } else {
+    lines.push("# MOONPAY_SECRET_KEY=");
+  }
+  if (keys.MOONPAY_WIDGET_URL) {
+    lines.push(formatEnvLine("MOONPAY_WIDGET_URL", keys.MOONPAY_WIDGET_URL));
+  } else {
+    lines.push("# MOONPAY_WIDGET_URL=");
+  }
+  if (keys.MOONPAY_WEBHOOK_API_KEY) {
+    lines.push(formatEnvLine("MOONPAY_WEBHOOK_API_KEY", keys.MOONPAY_WEBHOOK_API_KEY));
+  } else {
+    lines.push("# MOONPAY_WEBHOOK_API_KEY=");
+  }
+  if (keys.MOONPAY_VIRTUAL_ACCOUNTS_PRIVATE_KEY) {
+    lines.push(formatEnvLine("MOONPAY_VIRTUAL_ACCOUNTS_PRIVATE_KEY", keys.MOONPAY_VIRTUAL_ACCOUNTS_PRIVATE_KEY));
+  } else {
+    lines.push("# MOONPAY_VIRTUAL_ACCOUNTS_PRIVATE_KEY=-----BEGIN PRIVATE KEY-----...");
+  }
+
+  lines.push("");
+  lines.push("# Polygon x402 (agent payments and paid API access)");
+  if (keys.POLYGON_X402_PRIVATE_KEY) {
+    lines.push(formatEnvLine("POLYGON_X402_PRIVATE_KEY", keys.POLYGON_X402_PRIVATE_KEY));
+  } else {
+    lines.push("# POLYGON_X402_PRIVATE_KEY=0x...");
+  }
+  if (keys.POLYGON_X402_RECIPIENT) {
+    lines.push(formatEnvLine("POLYGON_X402_RECIPIENT", keys.POLYGON_X402_RECIPIENT));
+  } else {
+    lines.push("# POLYGON_X402_RECIPIENT=");
+  }
+  if (keys.POLYGON_X402_CHAIN_ID) {
+    lines.push(formatEnvLine("POLYGON_X402_CHAIN_ID", keys.POLYGON_X402_CHAIN_ID));
+  } else {
+    lines.push("# POLYGON_X402_CHAIN_ID=polygon");
+  }
+  if (keys.POLYGON_X402_FACILITATOR_URL) {
+    lines.push(formatEnvLine("POLYGON_X402_FACILITATOR_URL", keys.POLYGON_X402_FACILITATOR_URL));
+  } else {
+    lines.push("# POLYGON_X402_FACILITATOR_URL=");
   }
 
   // ---- Gordon LLM Provider ----

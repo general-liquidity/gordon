@@ -100,6 +100,19 @@ export const BROKER_INCLUSION_GATE: Record<BrokerId, BrokerInclusionDecision> = 
     },
     rationale: "Retail API with account/order workflows and maintainable auth lifecycle in TS runtime.",
   },
+  trading212: {
+    brokerId: "trading212",
+    segment: "b2c",
+    approved: true,
+    criteria: {
+      retailB2COnboarding: true,
+      documentedExecutionEndpoints: true,
+      apiTermsAllowCustomerExecution: true,
+      paperOrSafeDryRunPath: true,
+      tsRuntimeAuthMaintainable: true,
+    },
+    rationale: "Retail public API covers account, positions, and equity orders with maintainable TS auth patterns.",
+  },
   etrade: {
     brokerId: "etrade",
     segment: "b2c",
@@ -176,4 +189,3 @@ export function assertBrokerPassesInclusionGate(brokerId: BrokerId): void {
     throw new Error(`Broker failed B2C inclusion gate: ${details}`);
   }
 }
-

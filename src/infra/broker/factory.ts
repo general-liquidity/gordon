@@ -9,6 +9,7 @@ import { SchwabAdapter } from "./adapters/schwab.ts";
 import { TradierAdapter } from "./adapters/tradier.ts";
 import { TradeStationAdapter } from "./adapters/tradestation.ts";
 import { TastytradeAdapter } from "./adapters/tastytrade.ts";
+import { Trading212Adapter } from "./adapters/trading212.ts";
 import { EtradeAdapter } from "./adapters/etrade.ts";
 import { IbkrAdapter } from "./adapters/ibkr.ts";
 import {
@@ -25,6 +26,7 @@ const SUPPORTED_BROKERS: BrokerId[] = [
   "tradier",
   "tradestation",
   "tastytrade",
+  "trading212",
   "etrade",
   "ibkr",
 ];
@@ -72,6 +74,9 @@ export class BrokerFactory {
         break;
       case "tastytrade":
         broker = new TastytradeAdapter(credentials);
+        break;
+      case "trading212":
+        broker = new Trading212Adapter(credentials);
         break;
       case "etrade":
         broker = new EtradeAdapter(credentials);

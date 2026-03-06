@@ -10,6 +10,7 @@ describe("BrokerFactory extended broker support", () => {
     expect(supported).toContain("tradier");
     expect(supported).toContain("tradestation");
     expect(supported).toContain("tastytrade");
+    expect(supported).toContain("trading212");
     expect(supported).toContain("etrade");
     expect(supported).toContain("ibkr");
   });
@@ -37,4 +38,3 @@ describe("BrokerFactory extended broker support", () => {
     ).toThrow("Unsupported broker");
   });
 });
-

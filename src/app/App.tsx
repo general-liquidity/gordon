@@ -17,6 +17,7 @@ import { processMessageStream, initializeTracing } from "../infra/agents/orchest
 import { initMCPTools, enableMCPHotReload } from "../infra/mcp/client.ts";
 import { initRouting } from "../infra/routing/manager.ts";
 import { createLLMClientFromEnv, type LLMClient } from "../infra/llm/index.ts";
+import { syncAgentRailMcpPlugins } from "../infra/rails/index.ts";
 import { BinanceClient } from "../infra/binance/index.ts";
 import { BinanceAdapter, ExchangeFactory, type Exchange } from "../infra/exchange/index.ts";
 import { resolveExchangeCredentials } from "../infra/exchange/types.ts";
@@ -171,6 +172,13 @@ function getDefaultConfig(): GordonConfig {
     version: "1.0.0",
     exchanges: [],
     brokers: [],
+    agentRails: {
+      walletProviders: [],
+      chainProviders: [],
+      paymentProviders: [],
+      autoSyncMcpPlugins: true,
+      requireApprovalForExternalActions: true,
+    },
     mcpServers: [],
     preferences: {
       cashReservePercent: 0.2,
@@ -212,8 +220,11 @@ function formatTimestamp(): string {
   });
 }
 
+const STOCK_MARKET_TOKENS = ["stock", "stocks", "equity", "equities", ...BrokerFactory.getSupportedBrokers()];
+const STOCK_MARKET_PATTERN = new RegExp(`^\\s*(${STOCK_MARKET_TOKENS.join("|")})\\b`, "i");
+
 function isStocksMarketArgs(args: string): boolean {
-  return /^\s*(stocks?|equit(y|ies)|alpaca|webull|schwab|tradier|tradestation|tastytrade|etrade|ibkr)\b/i.test(args || "");
+  return STOCK_MARKET_PATTERN.test(args || "");
 }
 
 function stripStocksMarketPrefix(args: string): string {
@@ -221,20 +232,7 @@ function stripStocksMarketPrefix(args: string): string {
   if (!trimmed) return "";
   const parts = trimmed.split(/\s+/);
   const first = parts[0]?.toLowerCase();
-  if (
-    first === "stock"
-    || first === "stocks"
-    || first === "equity"
-    || first === "equities"
-    || first === "alpaca"
-    || first === "webull"
-    || first === "schwab"
-    || first === "tradier"
-    || first === "tradestation"
-    || first === "tastytrade"
-    || first === "etrade"
-    || first === "ibkr"
-  ) {
+  if (first && STOCK_MARKET_TOKENS.includes(first)) {
     return parts.slice(1).join(" ");
   }
   return trimmed;
@@ -580,6 +578,7 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
 
         deferredStartupTasks.push(async () => {
           try {
+            await syncAgentRailMcpPlugins(config);
             await initMCPTools();
             await initRouting();
             enableMCPHotReload(5000);
@@ -711,6 +710,13 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
             secret: envStatus.keys.TASTYTRADE_API_SECRET,
             paper: envStatus.keys.TASTYTRADE_PAPER,
             accountId: envStatus.keys.TASTYTRADE_ACCOUNT_ID,
+          },
+          {
+            type: "trading212",
+            key: envStatus.keys.TRADING212_API_KEY,
+            secret: envStatus.keys.TRADING212_API_SECRET,
+            paper: envStatus.keys.TRADING212_PAPER,
+            accountId: envStatus.keys.TRADING212_ACCOUNT_ID,
           },
           {
             type: "etrade",

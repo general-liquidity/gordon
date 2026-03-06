@@ -13,7 +13,7 @@
 
 import { loadConfig } from "../../infra/storage/config.ts";
 import { BrokerFactory } from "../../infra/broker/factory.ts";
-import { resolveBrokerCredentials, type BrokerAdapter, type BrokerTimeInForce } from "../../infra/broker/types.ts";
+import { resolveBrokerCredentials, type BrokerAdapter, type BrokerId, type BrokerTimeInForce } from "../../infra/broker/types.ts";
 import { checkEnvStatus } from "../../infra/storage/env.ts";
 
 interface ActiveBrokerResolution {
@@ -99,7 +99,7 @@ async function resolveActiveBroker(): Promise<ActiveBrokerResolution> {
   }
 
   const fallbackCandidates: Array<{
-    brokerId: "schwab" | "tradier" | "tradestation" | "tastytrade" | "etrade" | "ibkr";
+    brokerId: BrokerId;
     key?: string;
     secret?: string;
     paper?: string;
@@ -132,6 +132,13 @@ async function resolveActiveBroker(): Promise<ActiveBrokerResolution> {
       secret: env.keys.TASTYTRADE_API_SECRET,
       paper: env.keys.TASTYTRADE_PAPER,
       accountId: env.keys.TASTYTRADE_ACCOUNT_ID,
+    },
+    {
+      brokerId: "trading212",
+      key: env.keys.TRADING212_API_KEY,
+      secret: env.keys.TRADING212_API_SECRET,
+      paper: env.keys.TRADING212_PAPER,
+      accountId: env.keys.TRADING212_ACCOUNT_ID,
     },
     {
       brokerId: "etrade",

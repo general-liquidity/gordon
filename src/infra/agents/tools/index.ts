@@ -85,6 +85,7 @@ export { chainlinkFeedsTools } from "./chainlink-feeds.ts";
 export { chainlinkCCIPTools } from "./chainlink-ccip.ts";
 export { synthDataTools } from "./synthdata.ts";
 export { tinyfishTools } from "./tinyfish.ts";
+export { agentRailsTools } from "./agent-rails.ts";
 
 // Position tracking tools (v0.7)
 export { positionTrackingTools } from "./position-tracking.ts";
@@ -333,6 +334,7 @@ import { chainlinkFeedsTools } from "./chainlink-feeds.ts";
 import { chainlinkCCIPTools } from "./chainlink-ccip.ts";
 import { synthDataTools } from "./synthdata.ts";
 import { tinyfishTools } from "./tinyfish.ts";
+import { agentRailsTools } from "./agent-rails.ts";
 import { positionTrackingTools } from "./position-tracking.ts";
 import { checkRiskTool } from "./risk-gate.ts";
 import { memoryTools } from "./memory-tools.ts";
@@ -399,6 +401,7 @@ export const allTools = {
   ...chainlinkCCIPTools,
   ...synthDataTools,
   ...tinyfishTools,
+  ...agentRailsTools,
   ...multiModalChartTools,
   ...evalTools,
   ...positionTrackingTools,
@@ -466,6 +469,7 @@ export const toolCounts = {
   chainlinkCCIP: Object.keys(chainlinkCCIPTools).length,
   synthData: Object.keys(synthDataTools).length,
   tinyfish: Object.keys(tinyfishTools).length,
+  agentRails: Object.keys(agentRailsTools).length,
   multiModalCharts: Object.keys(multiModalChartTools).length,
   evals: Object.keys(evalTools).length,
   positionTracking: Object.keys(positionTrackingTools).length,

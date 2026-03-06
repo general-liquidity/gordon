@@ -10,6 +10,7 @@ const BROKER_CASES: BrokerId[] = [
   "tradier",
   "tradestation",
   "tastytrade",
+  "trading212",
   "etrade",
   "ibkr",
 ];

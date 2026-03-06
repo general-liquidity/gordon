@@ -8,7 +8,9 @@ import type { z, ZodType } from "zod";
 import type { GordonContext } from "../types.ts";
 import type { BinanceClient } from "../../binance/index.ts";
 import type { Exchange } from "../../exchange/index.ts";
+import type { BrokerAdapter } from "../../broker/index.ts";
 import type { LLMClient } from "../../llm/index.ts";
+import type { AgentRailsRegistry } from "../../rails/index.ts";
 import type { GordonConfig } from "../../../types/index.ts";
 import {
   createErrorContext,
@@ -40,13 +42,20 @@ export function getGordonContext(execContext?: MastraExecutionContext): GordonCo
   // Get exchange (new abstract interface) or fall back to binance
   const exchange = rc.get("exchange") as Exchange | undefined;
   const binance = rc.get("binance") as BinanceClient | undefined;
+  const broker = rc.get("broker") as BrokerAdapter | undefined;
+  const agentRails = rc.get("agentRails") as AgentRailsRegistry | undefined;
 
   return {
     binance: binance,
     exchange: exchange ?? null,
+    broker: broker ?? null,
+    agentRails: agentRails ?? null,
     llm: rc.get("llm") as LLMClient | undefined,
     config: rc.get("config") as GordonConfig | undefined,
+    portfolioValue: (rc.get("portfolioValue") as number | undefined) ?? 0,
+    availableCash: (rc.get("availableCash") as number | undefined) ?? 0,
     userId: rc.get("userId") as string | undefined,
+    threadId: rc.get("threadId") as string | undefined,
   } as GordonContext;
 }
 

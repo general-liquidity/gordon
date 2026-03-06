@@ -333,11 +333,17 @@ function getBrokerSetupInstructions(type: BrokerId): string {
 4. Optional: set TRADESTATION_ACCOUNT_ID to force account selection
 5. Validate in SIM mode before live trading`,
     tastytrade: `
-1. Create a tastytrade API application and generate credentials
-2. Copy API key/token and secret
+1. Use your tastytrade login/email and password for session auth
+2. Keep them available for Gordon as TASTYTRADE_API_KEY and TASTYTRADE_API_SECRET
 3. Use /setup to store TASTYTRADE_API_KEY, TASTYTRADE_API_SECRET, TASTYTRADE_PAPER
 4. Optional: set TASTYTRADE_ACCOUNT_ID for explicit account routing
 5. Validate in sandbox before going live`,
+    trading212: `
+1. Create Trading 212 Public API credentials
+2. Copy the API key and API secret
+3. Use /setup to store TRADING212_API_KEY, TRADING212_API_SECRET, TRADING212_PAPER
+4. Optional: set TRADING212_ACCOUNT_ID to pin a specific account
+5. Validate in demo mode before live routing`,
     etrade: `
 1. Create an E*TRADE developer application
 2. Generate API credentials and OAuth token material

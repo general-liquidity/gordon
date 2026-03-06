@@ -18,6 +18,7 @@ export type BrokerId =
   | "tradier"
   | "tradestation"
   | "tastytrade"
+  | "trading212"
   | "etrade"
   | "ibkr";
 
@@ -57,6 +58,12 @@ export const BROKER_ENV_MAP: Record<BrokerId, { key: string; secret: string; pap
     secret: "TASTYTRADE_API_SECRET",
     paper: "TASTYTRADE_PAPER",
     accountId: "TASTYTRADE_ACCOUNT_ID",
+  },
+  trading212: {
+    key: "TRADING212_API_KEY",
+    secret: "TRADING212_API_SECRET",
+    paper: "TRADING212_PAPER",
+    accountId: "TRADING212_ACCOUNT_ID",
   },
   etrade: {
     key: "ETRADE_API_KEY",

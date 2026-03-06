@@ -160,6 +160,7 @@ const BROKER_LABELS: Record<BrokerId, string> = {
   tradier: "Tradier",
   tradestation: "TradeStation",
   tastytrade: "tastytrade",
+  trading212: "Trading 212",
   etrade: "E*TRADE",
   ibkr: "Interactive Brokers",
 };
@@ -196,10 +197,15 @@ const BROKER_INSTRUCTIONS: Record<BrokerId, string[]> = {
     "Validate in SIM mode before live routing",
   ],
   tastytrade: [
-    "Create a tastytrade API application",
-    "Copy API key/token and secret credentials",
+    "Use your tastytrade login/email and password for session auth",
     "Optionally set TASTYTRADE_ACCOUNT_ID for account pinning",
     "Validate in sandbox mode before live execution",
+  ],
+  trading212: [
+    "Create Trading 212 Public API credentials",
+    "Copy API key and API secret",
+    "Optionally set TRADING212_ACCOUNT_ID if you want explicit account pinning",
+    "Use the demo environment first before switching to live",
   ],
   etrade: [
     "Create an E*TRADE developer application",
@@ -1919,7 +1925,7 @@ function BrokerSelectStep({
           value={inputValue}
           onChange={onInputChange}
           onSubmit={onSubmit}
-          placeholder="alpaca | webull | schwab | tradier | tradestation | tastytrade | etrade | ibkr"
+          placeholder={SUPPORTED_BROKERS.join(" | ")}
         />
       </Box>
     </Box>

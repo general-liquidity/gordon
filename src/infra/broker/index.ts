@@ -10,6 +10,7 @@
  * - Tradier
  * - TradeStation
  * - tastytrade
+ * - Trading 212
  * - E*TRADE
  * - Interactive Brokers
  */
@@ -34,6 +35,7 @@ export { SchwabAdapter } from "./adapters/schwab.ts";
 export { TradierAdapter } from "./adapters/tradier.ts";
 export { TradeStationAdapter } from "./adapters/tradestation.ts";
 export { TastytradeAdapter } from "./adapters/tastytrade.ts";
+export { Trading212Adapter } from "./adapters/trading212.ts";
 export { EtradeAdapter } from "./adapters/etrade.ts";
 export { IbkrAdapter } from "./adapters/ibkr.ts";
 

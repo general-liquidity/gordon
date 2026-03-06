@@ -62,6 +62,36 @@ export const InceptionKeySchema = z
   .trim()
   .min(1, "Inception API key cannot be empty");
 
+export const HeliusKeySchema = z
+  .string()
+  .trim()
+  .min(1, "Helius API key cannot be empty");
+
+export const MoonPayKeySchema = z
+  .string()
+  .trim()
+  .min(1, "MoonPay API key cannot be empty");
+
+export const MoonPaySecretSchema = z
+  .string()
+  .trim()
+  .min(1, "MoonPay secret key cannot be empty");
+
+export const MoonPayWebhookApiKeySchema = z
+  .string()
+  .trim()
+  .min(1, "MoonPay webhook API key cannot be empty");
+
+export const MoonPayVirtualAccountsPrivateKeySchema = z
+  .string()
+  .trim()
+  .min(1, "MoonPay virtual accounts private key cannot be empty");
+
+export const PolygonX402PrivateKeySchema = z
+  .string()
+  .trim()
+  .min(1, "Polygon x402 private key cannot be empty");
+
 export const AlpacaKeySchema = z
   .string()
   .trim()
@@ -105,12 +135,22 @@ export const TradeStationSecretSchema = z
 export const TastytradeKeySchema = z
   .string()
   .trim()
-  .min(1, "tastytrade API key cannot be empty");
+  .min(1, "tastytrade login/email cannot be empty");
 
 export const TastytradeSecretSchema = z
   .string()
   .trim()
-  .min(1, "tastytrade API secret cannot be empty");
+  .min(1, "tastytrade password cannot be empty");
+
+export const Trading212KeySchema = z
+  .string()
+  .trim()
+  .min(1, "Trading 212 API key cannot be empty");
+
+export const Trading212SecretSchema = z
+  .string()
+  .trim()
+  .min(1, "Trading 212 API secret cannot be empty");
 
 export const EtradeKeySchema = z
   .string()
@@ -167,6 +207,8 @@ export const EnvKeysSchema = z.object({
   TRADESTATION_API_SECRET: TradeStationSecretSchema.optional(),
   TASTYTRADE_API_KEY: TastytradeKeySchema.optional(),
   TASTYTRADE_API_SECRET: TastytradeSecretSchema.optional(),
+  TRADING212_API_KEY: Trading212KeySchema.optional(),
+  TRADING212_API_SECRET: Trading212SecretSchema.optional(),
   ETRADE_API_KEY: EtradeKeySchema.optional(),
   ETRADE_API_SECRET: EtradeSecretSchema.optional(),
   IBKR_API_KEY: IbkrKeySchema.optional(),
@@ -178,6 +220,12 @@ export const EnvKeysSchema = z.object({
   BINANCE_API_KEY: BinanceKeySchema.optional(),
   BINANCE_API_SECRET: BinanceSecretSchema.optional(),
   TINYFISH_API_KEY: TinyfishKeySchema.optional(),
+  HELIUS_API_KEY: HeliusKeySchema.optional(),
+  MOONPAY_API_KEY: MoonPayKeySchema.optional(),
+  MOONPAY_SECRET_KEY: MoonPaySecretSchema.optional(),
+  MOONPAY_WEBHOOK_API_KEY: MoonPayWebhookApiKeySchema.optional(),
+  MOONPAY_VIRTUAL_ACCOUNTS_PRIVATE_KEY: MoonPayVirtualAccountsPrivateKeySchema.optional(),
+  POLYGON_X402_PRIVATE_KEY: PolygonX402PrivateKeySchema.optional(),
 });
 
 export type ValidatedEnvKeys = z.infer<typeof EnvKeysSchema>;
@@ -258,6 +306,15 @@ export function validateEnvKeys(keys: Record<string, string | undefined>): Valid
       errors.push({ key: "INCEPTION_API_KEY", message: result.error! });
     } else {
       validated.INCEPTION_API_KEY = keys.INCEPTION_API_KEY.trim();
+    }
+  }
+
+  if (keys.HELIUS_API_KEY) {
+    const result = validateApiKey("HELIUS_API_KEY", keys.HELIUS_API_KEY, HeliusKeySchema);
+    if (!result.valid) {
+      errors.push({ key: "HELIUS_API_KEY", message: result.error! });
+    } else {
+      validated.HELIUS_API_KEY = keys.HELIUS_API_KEY.trim();
     }
   }
 
@@ -363,7 +420,7 @@ export function validateEnvKeys(keys: Record<string, string | undefined>): Valid
   if (hasTastytradeKey !== hasTastytradeSecret) {
     errors.push({
       key: hasTastytradeKey ? "TASTYTRADE_API_SECRET" : "TASTYTRADE_API_KEY",
-      message: "tastytrade API key and secret must both be provided",
+      message: "tastytrade login/email and password must both be provided",
     });
   } else if (hasTastytradeKey && hasTastytradeSecret) {
     const keyResult = validateApiKey("TASTYTRADE_API_KEY", keys.TASTYTRADE_API_KEY, TastytradeKeySchema);
@@ -378,6 +435,30 @@ export function validateEnvKeys(keys: Record<string, string | undefined>): Valid
       errors.push({ key: "TASTYTRADE_API_SECRET", message: secretResult.error! });
     } else {
       validated.TASTYTRADE_API_SECRET = keys.TASTYTRADE_API_SECRET!.trim();
+    }
+  }
+
+  // Validate Trading 212 keys (must be paired)
+  const hasTrading212Key = !!keys.TRADING212_API_KEY;
+  const hasTrading212Secret = !!keys.TRADING212_API_SECRET;
+  if (hasTrading212Key !== hasTrading212Secret) {
+    errors.push({
+      key: hasTrading212Key ? "TRADING212_API_SECRET" : "TRADING212_API_KEY",
+      message: "Trading 212 API key and secret must both be provided",
+    });
+  } else if (hasTrading212Key && hasTrading212Secret) {
+    const keyResult = validateApiKey("TRADING212_API_KEY", keys.TRADING212_API_KEY, Trading212KeySchema);
+    if (!keyResult.valid) {
+      errors.push({ key: "TRADING212_API_KEY", message: keyResult.error! });
+    } else {
+      validated.TRADING212_API_KEY = keys.TRADING212_API_KEY!.trim();
+    }
+
+    const secretResult = validateApiKey("TRADING212_API_SECRET", keys.TRADING212_API_SECRET, Trading212SecretSchema);
+    if (!secretResult.valid) {
+      errors.push({ key: "TRADING212_API_SECRET", message: secretResult.error! });
+    } else {
+      validated.TRADING212_API_SECRET = keys.TRADING212_API_SECRET!.trim();
     }
   }
 
@@ -508,6 +589,55 @@ export function validateEnvKeys(keys: Record<string, string | undefined>): Valid
       errors.push({ key: "TINYFISH_API_KEY", message: result.error! });
     } else {
       validated.TINYFISH_API_KEY = keys.TINYFISH_API_KEY.trim();
+    }
+  }
+
+  if (keys.MOONPAY_API_KEY) {
+    const result = validateApiKey("MOONPAY_API_KEY", keys.MOONPAY_API_KEY, MoonPayKeySchema);
+    if (!result.valid) {
+      errors.push({ key: "MOONPAY_API_KEY", message: result.error! });
+    } else {
+      validated.MOONPAY_API_KEY = keys.MOONPAY_API_KEY.trim();
+    }
+  }
+
+  if (keys.MOONPAY_SECRET_KEY) {
+    const result = validateApiKey("MOONPAY_SECRET_KEY", keys.MOONPAY_SECRET_KEY, MoonPaySecretSchema);
+    if (!result.valid) {
+      errors.push({ key: "MOONPAY_SECRET_KEY", message: result.error! });
+    } else {
+      validated.MOONPAY_SECRET_KEY = keys.MOONPAY_SECRET_KEY.trim();
+    }
+  }
+
+  if (keys.MOONPAY_WEBHOOK_API_KEY) {
+    const result = validateApiKey("MOONPAY_WEBHOOK_API_KEY", keys.MOONPAY_WEBHOOK_API_KEY, MoonPayWebhookApiKeySchema);
+    if (!result.valid) {
+      errors.push({ key: "MOONPAY_WEBHOOK_API_KEY", message: result.error! });
+    } else {
+      validated.MOONPAY_WEBHOOK_API_KEY = keys.MOONPAY_WEBHOOK_API_KEY.trim();
+    }
+  }
+
+  if (keys.MOONPAY_VIRTUAL_ACCOUNTS_PRIVATE_KEY) {
+    const result = validateApiKey(
+      "MOONPAY_VIRTUAL_ACCOUNTS_PRIVATE_KEY",
+      keys.MOONPAY_VIRTUAL_ACCOUNTS_PRIVATE_KEY,
+      MoonPayVirtualAccountsPrivateKeySchema,
+    );
+    if (!result.valid) {
+      errors.push({ key: "MOONPAY_VIRTUAL_ACCOUNTS_PRIVATE_KEY", message: result.error! });
+    } else {
+      validated.MOONPAY_VIRTUAL_ACCOUNTS_PRIVATE_KEY = keys.MOONPAY_VIRTUAL_ACCOUNTS_PRIVATE_KEY.trim();
+    }
+  }
+
+  if (keys.POLYGON_X402_PRIVATE_KEY) {
+    const result = validateApiKey("POLYGON_X402_PRIVATE_KEY", keys.POLYGON_X402_PRIVATE_KEY, PolygonX402PrivateKeySchema);
+    if (!result.valid) {
+      errors.push({ key: "POLYGON_X402_PRIVATE_KEY", message: result.error! });
+    } else {
+      validated.POLYGON_X402_PRIVATE_KEY = keys.POLYGON_X402_PRIVATE_KEY.trim();
     }
   }
 

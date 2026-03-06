@@ -11,6 +11,7 @@ import {
 } from '../../infra/mcp/marketplace';
 import { credentialManager } from '../../infra/mcp/credentials';
 import type { MCPCategory, MCPToolDefinition } from '../../infra/mcp/types';
+import { getBuiltInAgentRailListings } from '../../infra/rails/index.ts';
 
 // ============================================================================
 // Showcase Data
@@ -59,6 +60,14 @@ const PLUGIN_SHOWCASE: ShowcaseCategory[] = [
     description: 'Trade, swap, and manage assets on Solana',
     plugins: [
       { id: 'solana-agent-kit', summary: 'Jupiter swaps, transfers, NFTs, token deploy' },
+      { id: 'helius', summary: 'Solana wallet, transaction, and asset MCP' },
+    ],
+  },
+  {
+    title: 'For Wallet Funding',
+    description: 'Fund wallets, off-ramp, and move between fiat and crypto',
+    plugins: [
+      { id: 'moonpay', summary: 'Wallet funding, swaps, bridges, on/off-ramp' },
     ],
   },
   {
@@ -96,7 +105,24 @@ const PLUGIN_SUGGESTIONS: PluginSuggestion[] = [
   { keywords: ['historical', 'history', 'ohlc', 'altcoin', 'market cap'], pluginId: 'coingecko', reason: 'provides historical price data for thousands of coins' },
   { keywords: ['portfolio', 'pnl', 'profit', 'loss', 'tax'], pluginId: 'portfolio-tracker', reason: 'tracks portfolio and generates tax reports' },
   { keywords: ['solana', 'sol', 'jupiter', 'raydium', 'spl', 'phantom'], pluginId: 'solana-agent-kit', reason: 'provides Solana trading, swaps, transfers, and NFT minting via Jupiter' },
+  { keywords: ['helius', 'das', 'solana wallet', 'solana transactions', 'solana portfolio'], pluginId: 'helius', reason: 'provides Solana wallet, transaction, and asset tooling through Helius MCP' },
+  { keywords: ['moonpay', 'fund wallet', 'onramp', 'offramp', 'buy crypto', 'cash out'], pluginId: 'moonpay', reason: 'provides wallet funding, hosted swaps, and fiat on/off-ramp flows via MoonPay MCP' },
 ];
+
+function getBuiltInListing(pluginId: string): MarketplaceListing | null {
+  return getBuiltInAgentRailListings().find((listing) => listing.id === pluginId) ?? null;
+}
+
+function mergeListings(primary: MarketplaceListing[], secondary: MarketplaceListing[]): MarketplaceListing[] {
+  const seen = new Set<string>();
+  const merged: MarketplaceListing[] = [];
+  for (const listing of [...primary, ...secondary]) {
+    if (seen.has(listing.id)) continue;
+    seen.add(listing.id);
+    merged.push(listing);
+  }
+  return merged;
+}
 
 // ============================================================================
 // Types
@@ -208,9 +234,26 @@ export async function mcpSearch(query: string): Promise<MCPCommandResult> {
       sortBy: 'downloads',
       sortOrder: 'desc',
       limit: 20,
-    });
+    }).catch(() => ({
+      plugins: [] as MarketplaceListing[],
+      total: 0,
+      query: searchQuery || undefined,
+    }));
 
-    if (results.plugins.length === 0) {
+    const builtIns = getBuiltInAgentRailListings().filter((listing) => {
+      if (category && listing.manifest.category !== category) return false;
+      if (!searchQuery) return true;
+      const haystack = [
+        listing.id,
+        listing.manifest.name,
+        listing.manifest.description,
+        listing.manifest.author,
+      ].join(' ').toLowerCase();
+      return haystack.includes(searchQuery.toLowerCase());
+    });
+    const combinedListings = mergeListings(results.plugins, builtIns);
+
+    if (combinedListings.length === 0) {
       return {
         success: true,
         message: query
@@ -220,7 +263,7 @@ export async function mcpSearch(query: string): Promise<MCPCommandResult> {
       };
     }
 
-    const pluginList = results.plugins.map((p) => ({
+    const pluginList = combinedListings.map((p) => ({
       id: p.id,
       name: p.manifest.name,
       description: p.manifest.description,
@@ -239,7 +282,7 @@ export async function mcpSearch(query: string): Promise<MCPCommandResult> {
     }));
 
     // Build enhanced message output
-    const lines = [`Found ${results.total} plugin(s)${query ? ` matching "${query}"` : ''}:\n`];
+    const lines = [`Found ${combinedListings.length} plugin(s)${query ? ` matching "${query}"` : ''}:\n`];
 
     for (const plugin of pluginList) {
       const status = plugin.installed ? '[installed]' : '';
@@ -253,7 +296,7 @@ export async function mcpSearch(query: string): Promise<MCPCommandResult> {
     return {
       success: true,
       message: lines.join('\n'),
-      data: { plugins: pluginList, total: results.total },
+      data: { plugins: pluginList, total: combinedListings.length },
     };
   } catch (error) {
     return {
@@ -278,11 +321,11 @@ export async function mcpInstall(pluginId: string): Promise<MCPCommandResult> {
     }
 
     // Fetch plugin from marketplace
-    const listing = await marketplaceClient.getPlugin(pluginId);
+    const listing = (await marketplaceClient.getPlugin(pluginId).catch(() => null)) ?? getBuiltInListing(pluginId);
     if (!listing) {
       return {
         success: false,
-        message: `Plugin "${pluginId}" not found in marketplace`,
+        message: `Plugin "${pluginId}" not found in marketplace or built-in catalog`,
       };
     }
 
@@ -613,7 +656,7 @@ export async function mcpInfo(pluginId: string): Promise<MCPCommandResult> {
   try {
     // Check installed first
     const installed = pluginInstaller.getPlugin(pluginId);
-    const listing = await marketplaceClient.getPlugin(pluginId);
+    const listing = (await marketplaceClient.getPlugin(pluginId).catch(() => null)) ?? getBuiltInListing(pluginId);
 
     if (!installed && !listing) {
       return {
@@ -858,7 +901,7 @@ export async function mcpSuggest(query: string): Promise<MCPCommandResult> {
       const status = match.installed ? '[installed]' : '';
 
       // Fetch additional info from marketplace
-      const listing = await marketplaceClient.getPlugin(match.pluginId);
+      const listing = (await marketplaceClient.getPlugin(match.pluginId).catch(() => null)) ?? getBuiltInListing(match.pluginId);
       const name = listing?.manifest.name || match.pluginId;
       const pricing = listing ? formatPricing(listing.pricing) : '';
 
