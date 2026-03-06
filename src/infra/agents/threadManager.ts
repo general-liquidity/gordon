@@ -45,6 +45,11 @@ export interface ThreadInfo {
   isActive: boolean;
 }
 
+export interface ThreadTreeNode extends ThreadInfo {
+  depth: number;
+  childCount: number;
+}
+
 /**
  * Result of a clone operation
  */
@@ -428,6 +433,67 @@ export async function listThreads(resourceId?: string): Promise<ThreadInfo[]> {
     });
     return [];
   }
+}
+
+export async function listThreadTree(resourceId?: string): Promise<ThreadTreeNode[]> {
+  const threads = await listThreads(resourceId);
+  return buildThreadTree(threads);
+}
+
+export function buildThreadTree(threads: ThreadInfo[]): ThreadTreeNode[] {
+  if (threads.length === 0) {
+    return [];
+  }
+
+  const childrenByParent = new Map<string | null, ThreadInfo[]>();
+  for (const thread of threads) {
+    const parentId = thread.clonedFrom ?? null;
+    const siblings = childrenByParent.get(parentId) ?? [];
+    siblings.push(thread);
+    childrenByParent.set(parentId, siblings);
+  }
+
+  for (const siblings of childrenByParent.values()) {
+    siblings.sort((left, right) =>
+      new Date(right.lastActiveAt).getTime() - new Date(left.lastActiveAt).getTime()
+    );
+  }
+
+  const ordered: ThreadTreeNode[] = [];
+  const seen = new Set<string>();
+
+  const visit = (thread: ThreadInfo, depth: number): void => {
+    if (seen.has(thread.threadId)) {
+      return;
+    }
+    seen.add(thread.threadId);
+
+    const children = childrenByParent.get(thread.threadId) ?? [];
+    ordered.push({
+      ...thread,
+      depth,
+      childCount: children.length,
+    });
+
+    for (const child of children) {
+      visit(child, depth + 1);
+    }
+  };
+
+  const roots = threads.filter((thread) => !thread.clonedFrom || !threads.some((candidate) => candidate.threadId === thread.clonedFrom));
+  const sortedRoots = [...roots].sort((left, right) =>
+    new Date(right.lastActiveAt).getTime() - new Date(left.lastActiveAt).getTime()
+  );
+
+  for (const root of sortedRoots) {
+    visit(root, 0);
+  }
+
+  for (const thread of threads) {
+    visit(thread, thread.clonedFrom ? 1 : 0);
+  }
+
+  return ordered;
 }
 
 /**

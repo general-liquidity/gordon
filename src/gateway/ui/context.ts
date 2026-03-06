@@ -4,6 +4,7 @@ import type { Exchange } from "../../infra/exchange/index.ts";
 import type { BrokerAdapter } from "../../infra/broker/index.ts";
 import type { LLMClient } from "../../infra/llm/index.ts";
 import { createAgentRailsRegistry, type AgentRailsRegistry } from "../../infra/rails/index.ts";
+import type { ActionTaskScope, CredentialProfile } from "../../infra/actions/types.ts";
 import type { GordonConfig } from "../../types/index.ts";
 
 export interface AppContextInput {
@@ -17,6 +18,9 @@ export interface AppContextInput {
   agentRails?: AgentRailsRegistry | null;
   userId?: string;
   threadId?: string;
+  requestedActionId?: string;
+  requestedTaskScope?: ActionTaskScope;
+  credentialProfile?: CredentialProfile;
 }
 
 export function buildAppGordonContext(input: AppContextInput): GordonContext {
@@ -31,5 +35,8 @@ export function buildAppGordonContext(input: AppContextInput): GordonContext {
     availableCash: input.availableCash,
     userId: input.userId,
     threadId: input.threadId,
+    requestedActionId: input.requestedActionId,
+    requestedTaskScope: input.requestedTaskScope,
+    credentialProfile: input.credentialProfile,
   };
 }

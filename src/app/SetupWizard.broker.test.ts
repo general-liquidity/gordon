@@ -42,4 +42,19 @@ describe("setup wizard broker helpers", () => {
     const generated = __setupWizardBrokerInternals.generateBrokerId("alpaca", existing);
     expect(generated).toBe("alpaca_2");
   });
+
+  test("parses rail credentials bundle", () => {
+    const parsed = __setupWizardBrokerInternals.parseRailsInput(
+      "helius:helius-key; moonpay:moonpay-key,moonpay-secret; polygon:recipient,private-key"
+    );
+    expect(parsed.errors).toHaveLength(0);
+    expect(parsed.keys.heliusApiKey).toBe("helius-key");
+    expect(parsed.keys.moonpayApiKey).toBe("moonpay-key");
+    expect(parsed.keys.polygonRecipient).toBe("recipient");
+  });
+
+  test("maps quickstart to llm-first flow", () => {
+    expect(__setupWizardBrokerInternals.getFirstActionStep("quickstart", null)).toBe("llm");
+    expect(__setupWizardBrokerInternals.getFirstActionStep("configure", "broker")).toBe("broker-select");
+  });
 });

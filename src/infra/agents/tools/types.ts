@@ -6,6 +6,7 @@ import type { RequestContext } from "@mastra/core/request-context";
 import type { z, ZodType } from "zod";
 
 import type { GordonContext } from "../types.ts";
+import type { ActionTaskScope, CredentialProfile } from "../../actions/types.ts";
 import type { BinanceClient } from "../../binance/index.ts";
 import type { Exchange } from "../../exchange/index.ts";
 import type { BrokerAdapter } from "../../broker/index.ts";
@@ -56,6 +57,9 @@ export function getGordonContext(execContext?: MastraExecutionContext): GordonCo
     availableCash: (rc.get("availableCash") as number | undefined) ?? 0,
     userId: rc.get("userId") as string | undefined,
     threadId: rc.get("threadId") as string | undefined,
+    requestedActionId: rc.get("requestedActionId") as string | undefined,
+    requestedTaskScope: rc.get("requestedTaskScope") as ActionTaskScope | undefined,
+    credentialProfile: rc.get("credentialProfile") as CredentialProfile | undefined,
   } as GordonContext;
 }
 

@@ -3,14 +3,24 @@
  * Defines all available slash commands for quick actions
  */
 
+import {
+  buildGeneratedPrompt,
+  getGeneratedSlashCommands,
+  mergeSlashCommands,
+} from "../infra/actions/surfaces.ts";
 import { BrokerFactory } from "../infra/broker/index.ts";
+import {
+  type CommandAudience,
+  type LegacyCommandCategory,
+  type WorkflowGroup,
+  WORKFLOW_CONFIG,
+  getAudienceFromLevel,
+  getAudienceLabel,
+  normalizeCommandUx,
+  resolveWorkflowTopic,
+  sortCommandsForPresentation,
+} from "./commandUx.ts";
 
-/**
- * Command levels for progressive disclosure
- * - Level 1 (essential): Core commands for daily use
- * - Level 2 (advanced): Power user features
- * - Level 3 (expert): Advanced/experimental features
- */
 export type CommandLevel = 1 | 2 | 3;
 
 export interface SlashCommand {
@@ -18,24 +28,32 @@ export interface SlashCommand {
   aliases: string[];
   description: string;
   usage: string;
-  category: "trading" | "market" | "account" | "system" | "strategy";
-  /** Command complexity level for progressive disclosure */
+  category: LegacyCommandCategory;
   level: CommandLevel;
-  // Maps to agent or direct action
+  workflow: WorkflowGroup;
+  workflowLabel: string;
+  workflowOrder: number;
+  audience: CommandAudience;
+  audienceLabel: string;
+  audienceOrder: number;
+  hideAliasesByDefault: boolean;
   action: "agent" | "tool" | "menu";
-  target?: string; // Agent name or tool name
-  /** Estimated execution time (e.g., "~3-5s") */
+  target?: string;
   executionTime?: string;
-  /** Guidance on when to use this command */
   whenToUse?: string;
 }
+
+type SlashCommandSeed = Omit<
+  SlashCommand,
+  "workflow" | "workflowLabel" | "workflowOrder" | "audience" | "audienceLabel" | "audienceOrder" | "hideAliasesByDefault"
+>;
 
 const BROKER_TOKENS = BrokerFactory.getSupportedBrokers();
 const STOCK_MARKET_TOKENS = ["stock", "stocks", "equity", "equities", ...BROKER_TOKENS];
 const STOCK_MARKET_PATTERN = new RegExp(`^\\s*(${STOCK_MARKET_TOKENS.join("|")})\\b`, "i");
 const BROKER_TYPES_HINT = BROKER_TOKENS.join(", ");
 
-export const SLASH_COMMANDS: SlashCommand[] = [
+const LEGACY_SLASH_COMMANDS: SlashCommandSeed[] = [
   // Market Discovery
   {
     name: "scan",
@@ -496,12 +514,52 @@ export const SLASH_COMMANDS: SlashCommand[] = [
   {
     name: "setup",
     aliases: [],
-    description: "Configure API keys and settings",
+    description: "Open Advanced setup and configuration",
     usage: "/setup",
     category: "system",
     level: 1,
     action: "menu",
     target: "setup",
+  },
+  {
+    name: "menu",
+    aliases: ["home"],
+    description: "Open Quick Actions and workflow navigation",
+    usage: "/menu",
+    category: "system",
+    level: 1,
+    action: "menu",
+    target: "menu",
+  },
+  {
+    name: "chat",
+    aliases: [],
+    description: "Return to the chat workspace",
+    usage: "/chat",
+    category: "system",
+    level: 1,
+    action: "menu",
+    target: "chat",
+  },
+  {
+    name: "configure",
+    aliases: ["cfg"],
+    description: "Re-run setup for a specific area or the full advanced flow",
+    usage: "/configure [exchange|broker|chains|rails|mcp|llm|preferences|advanced]",
+    category: "system",
+    level: 1,
+    action: "menu",
+    target: "configure",
+  },
+  {
+    name: "doctor",
+    aliases: ["diag", "diagnostics"],
+    description: "Run Gordon diagnostics across config, credentials, and plugins",
+    usage: "/doctor",
+    category: "system",
+    level: 1,
+    action: "menu",
+    target: "doctor",
   },
   {
     name: "config",
@@ -1045,19 +1103,26 @@ export const SLASH_COMMANDS: SlashCommand[] = [
   },
 ];
 
+export const SLASH_COMMANDS: SlashCommand[] = sortCommandsForPresentation(
+  mergeSlashCommands(
+    getGeneratedSlashCommands() as SlashCommandSeed[],
+    LEGACY_SLASH_COMMANDS,
+  ).map((command) => normalizeCommandUx(command))
+);
+
 // ============================================================================
 // Help System Types and Functions
 // ============================================================================
 
 /**
- * Help display modes for filtering commands by level
+ * Help display modes for filtering commands by audience
  */
 export type HelpMode = "essential" | "advanced" | "all" | "expert";
 
 /**
- * Help categories for filtering commands by topic
+ * Help topics for filtering commands by workflow
  */
-export type HelpCategory = "trading" | "analysis" | "system" | "market" | "account" | "strategy";
+export type HelpCategory = WorkflowGroup;
 
 /**
  * Get commands filtered by level
@@ -1068,52 +1133,37 @@ export function getCommandsByLevel(maxLevel: CommandLevel): SlashCommand[] {
 }
 
 /**
- * Get commands filtered by category
- * @param category - Category to filter by
+ * Get commands filtered by workflow
+ * @param workflow - Workflow to filter by
  */
-export function getCommandsByCategory(category: HelpCategory): SlashCommand[] {
-  // Map 'analysis' to 'market' for backward compatibility
-  const mappedCategory = category === "analysis" ? "market" : category;
-  return SLASH_COMMANDS.filter((cmd) => (cmd.category as string) === mappedCategory);
+export function getCommandsByCategory(workflow: HelpCategory): SlashCommand[] {
+  return SLASH_COMMANDS.filter((cmd) => cmd.workflow === workflow);
 }
 
 /**
  * Parse help mode from help command argument
  * @param arg - The argument passed to /help
- * @returns Parsed help mode and optional category
+ * @returns Parsed help mode and optional workflow
  */
 export function parseHelpArg(arg: string): { mode: HelpMode; category?: HelpCategory } {
   const lowerArg = arg.toLowerCase().trim();
 
-  // Check for level-based modes
   if (lowerArg === "advanced") return { mode: "advanced" };
   if (lowerArg === "all" || lowerArg === "expert") return { mode: "all" };
 
-  // Check for category-based filtering
-  if (lowerArg === "trading") return { mode: "all", category: "trading" };
-  if (lowerArg === "analysis" || lowerArg === "market") return { mode: "all", category: "analysis" };
-  if (lowerArg === "system") return { mode: "all", category: "system" };
-  if (lowerArg === "account") return { mode: "all", category: "account" };
-  if (lowerArg === "strategy" || lowerArg === "strategies") return { mode: "all", category: "strategy" };
+  const workflow = resolveWorkflowTopic(lowerArg);
+  if (workflow) {
+    return { mode: "all", category: workflow };
+  }
 
-  // Default to essential mode
   return { mode: "essential" };
 }
 
 /**
- * Get level label for display
+ * Get audience label for display
  */
 export function getLevelLabel(level: CommandLevel): string {
-  switch (level) {
-    case 1:
-      return "Essential";
-    case 2:
-      return "Advanced";
-    case 3:
-      return "Expert";
-    default:
-      return "Unknown";
-  }
+  return getAudienceLabel(getAudienceFromLevel(level));
 }
 
 // ============================================================================
@@ -1156,7 +1206,7 @@ export function parseSlashCommand(input: string): {
  * Get command suggestions for autocomplete
  * @param partial - The partial input (including /)
  * @param maxLevel - Maximum level to include in suggestions (default: show all)
- * @returns Array of matching commands sorted by level (essential first)
+ * @returns Array of matching commands sorted by workflow, then alphabetically
  */
 export function getSlashCommandSuggestions(
   partial: string,
@@ -1167,49 +1217,30 @@ export function getSlashCommandSuggestions(
   }
 
   const search = partial.slice(1).toLowerCase();
-  const categoryOrder: Record<SlashCommand["category"], number> = {
-    market: 0,
-    trading: 1,
-    strategy: 2,
-    account: 3,
-    system: 4,
-  };
-  const sortByCategoryAndLevel = (a: SlashCommand, b: SlashCommand): number => {
-    const catDiff = categoryOrder[a.category] - categoryOrder[b.category];
-    if (catDiff !== 0) return catDiff;
-    const levelDiff = a.level - b.level;
-    if (levelDiff !== 0) return levelDiff;
-    return a.name.localeCompare(b.name);
-  };
 
-  // Filter by level first
   const levelFiltered = SLASH_COMMANDS.filter((cmd) => cmd.level <= maxLevel);
 
   if (search === "") {
-    // Show all commands when just "/" is typed, grouped by category
-    return [...levelFiltered].sort(sortByCategoryAndLevel);
+    return levelFiltered;
   }
 
-  // Filter by name or alias prefix, then sort by category/level
   return levelFiltered
     .filter(
       (cmd) =>
         cmd.name.startsWith(search) ||
         cmd.aliases.some((alias) => alias.startsWith(search))
     )
-    .sort(sortByCategoryAndLevel);
+    .sort((left, right) => {
+      const workflowDiff = left.workflowOrder - right.workflowOrder;
+      if (workflowDiff !== 0) return workflowDiff;
+      return left.name.localeCompare(right.name);
+    });
 }
 
 /**
- * Category display configuration for help formatting
+ * Workflow display configuration for help formatting
  */
-const CATEGORY_CONFIG: Record<string, { label: string; icon: string }> = {
-  market: { label: "Market Discovery", icon: "M" },
-  trading: { label: "Trading", icon: "T" },
-  strategy: { label: "Strategy & Runtime", icon: "R" },
-  account: { label: "Account", icon: "A" },
-  system: { label: "System", icon: "S" },
-};
+const CATEGORY_CONFIG = WORKFLOW_CONFIG;
 
 /**
  * Format command list for display with level-based filtering
@@ -1220,67 +1251,58 @@ export function formatCommandHelp(
   mode: HelpMode = "essential",
   category?: HelpCategory
 ): string {
-  // Determine max level based on mode
   let maxLevel: CommandLevel = 1;
   if (mode === "advanced") maxLevel = 2;
   if (mode === "all" || mode === "expert") maxLevel = 3;
 
-  // Filter commands
   let commands = getCommandsByLevel(maxLevel);
   if (category) {
-    const mappedCategory = category === "analysis" ? "market" : category;
-    commands = commands.filter((cmd) => (cmd.category as string) === mappedCategory);
+    commands = commands.filter((cmd) => cmd.workflow === category);
   }
 
-  // Build output
   const lines: string[] = [];
 
-  // Header with mode indicator
   if (mode === "essential") {
-    lines.push("**Essential Commands:**\n");
-    lines.push("_Use `/help advanced` for more commands, `/help all` for everything._\n");
+    lines.push("**Core Workflows**\n");
+    lines.push("_Use `/help advanced` for more depth, or `/help all` to include operator commands._\n");
   } else if (mode === "advanced") {
-    lines.push("**Commands (Essential + Advanced):**\n");
-    lines.push("_Use `/help all` or `/help expert` to see expert-level commands._\n");
+    lines.push("**Core + Advanced Workflows**\n");
+    lines.push("_Use `/help all` to include operator-grade commands and maintenance surfaces._\n");
   } else {
-    lines.push("**All Commands:**\n");
+    lines.push("**All Workflows**\n");
   }
 
-  // Category filter indicator
   if (category) {
-    lines.push(`_Filtered by: ${category}_\n`);
+    lines.push(`_Workflow: ${WORKFLOW_CONFIG[category].label}_\n`);
   }
 
-  // Group by category
-  const categories = ["market", "trading", "strategy", "account", "system"] as const;
+  const categories = Object.keys(WORKFLOW_CONFIG) as HelpCategory[];
 
   for (const cat of categories) {
     const config = CATEGORY_CONFIG[cat];
     if (!config) continue;
-    const catCommands = commands.filter((c) => c.category === cat);
+    const catCommands = commands.filter((c) => c.workflow === cat);
     if (catCommands.length === 0) continue;
 
-    lines.push(`\n**[${config.icon}] ${config.label}**`);
+    lines.push(`\n**${config.icon} ${config.label}**`);
+    lines.push(`_${config.description}_`);
 
     for (const cmd of catCommands) {
-      const aliases = cmd.aliases.length > 0 ? ` (${cmd.aliases.slice(0, 2).join(", ")})` : "";
-      const levelTag = cmd.level > 1 ? ` [L${cmd.level}]` : "";
-      lines.push(`  /${cmd.name}${aliases}${levelTag} - ${cmd.description}`);
+      lines.push(`  /${cmd.name} - ${cmd.description}`);
     }
   }
 
-  // Footer with tips
   lines.push("\n_Type a command or just chat naturally with Gordon._");
   lines.push("\n**Help Options:**");
-  lines.push("  `/help` - Show essential commands (Level 1)");
-  lines.push("  `/help advanced` - Show Level 1 + Level 2");
-  lines.push("  `/help all` or `/help expert` - Show everything");
-  lines.push("  `/help trading` - Show trading commands only");
-  lines.push("  `/help strategy` - Show strategy & runtime commands only");
-  lines.push("  `/help analysis` - Show analysis commands only");
-  lines.push("  `/help market` - Show market discovery commands only");
-  lines.push("  `/help account` - Show account commands only");
-  lines.push("  `/help system` - Show system commands only");
+  lines.push("  `/help` - Show the core workflow surface");
+  lines.push("  `/help advanced` - Include advanced commands");
+  lines.push("  `/help all` - Include operator commands and maintenance surfaces");
+  lines.push("  `/help discover` - Find market discovery tools");
+  lines.push("  `/help analyze` - Find analysis tools");
+  lines.push("  `/help trade` - Find planning and execution commands");
+  lines.push("  `/help run` - Find strategy and runtime commands");
+  lines.push("  `/help accounts` - Find portfolio, broker, and wallet commands");
+  lines.push("  `/help operate` - Find setup, doctor, model, and system commands");
   lines.push("  `/help page 1` - Browse all commands in pages");
 
   return lines.join("\n");
@@ -1319,6 +1341,11 @@ export function formatAnalysisCommandsHelp(): string {
  * Convert slash command to natural language for the agent
  */
 export function commandToPrompt(command: SlashCommand, args: string): string {
+  const generatedPrompt = buildGeneratedPrompt(command.name, args);
+  if (generatedPrompt) {
+    return generatedPrompt;
+  }
+
   switch (command.name) {
     case "scan":
       return "Scan the market for trading opportunities across multiple coins (~10-30s depending on market size)";
@@ -1398,6 +1425,10 @@ export function commandToPrompt(command: SlashCommand, args: string): string {
       return "Check system status and connection";
     case "setup":
       return "I want to configure my settings";
+    case "configure":
+      return args ? `Open Gordon configure flow for ${args}` : "Open the Gordon configure flow";
+    case "doctor":
+      return "Run Gordon diagnostics and show me configuration issues";
     case "config":
       if (!args) return "Show my current configuration settings";
       const configParts = args.split(/\s+/);
@@ -2183,12 +2214,13 @@ export function commandToPrompt(command: SlashCommand, args: string): string {
 // Shows 15 commands per page instead of overwhelming users with 50+ at once
 // ============================================================================
 
-const PAGINATED_HELP_CATEGORIES: Record<string, string> = {
-  market: "Market Discovery",
-  trading: "Trading",
-  strategy: "Strategy & Runtime",
-  account: "Account",
-  system: "System",
+const PAGINATED_HELP_CATEGORIES: Record<WorkflowGroup, string> = {
+  discover: WORKFLOW_CONFIG.discover.label,
+  analyze: WORKFLOW_CONFIG.analyze.label,
+  trade: WORKFLOW_CONFIG.trade.label,
+  run: WORKFLOW_CONFIG.run.label,
+  accounts: WORKFLOW_CONFIG.accounts.label,
+  operate: WORKFLOW_CONFIG.operate.label,
 };
 
 /**
@@ -2199,46 +2231,51 @@ export function formatPaginatedCommandHelp(args?: string): string {
   const PAGE_SIZE = 15;
   const parsedArgs = args?.toLowerCase().trim() || "";
 
-  // Handle page request
+  if (!parsedArgs) {
+    return formatHelpSummaryView();
+  }
+
+  if (parsedArgs === "advanced" || parsedArgs === "all" || parsedArgs === "expert") {
+    const { mode } = parseHelpArg(parsedArgs);
+    return formatCommandHelp(mode);
+  }
+
   const pageMatch = parsedArgs.match(/^page\s*(\d+)$/);
   if (pageMatch && pageMatch[1]) {
     return formatHelpPageView(parseInt(pageMatch[1], 10), PAGE_SIZE);
   }
 
-  // Handle category filter (with aliases)
-  const categoryAlias = parsedArgs === "strategies" ? "strategy" : parsedArgs;
-  if (categoryAlias in PAGINATED_HELP_CATEGORIES) {
-    return formatHelpCategoryView(categoryAlias);
+  const workflow = resolveWorkflowTopic(parsedArgs);
+  if (workflow) {
+    return formatHelpCategoryView(workflow);
   }
 
-  // Handle "all"
-  if (parsedArgs === "all") return formatHelpPageView(1, PAGE_SIZE);
-
-  // Default: accessible summary
   return formatHelpSummaryView();
 }
 
 function formatHelpSummaryView(): string {
   const total = SLASH_COMMANDS.length;
   const lines: string[] = [
-    "**Gordon Help** - Command Reference\n",
-    `Gordon has **${total} commands** in these categories:\n`,
+    "**Gordon Help** - Workflow Guide\n",
+    `Gordon has **${total} commands** organized around these workflows:\n`,
   ];
 
   for (const [cat, label] of Object.entries(PAGINATED_HELP_CATEGORIES)) {
-    const cmds = SLASH_COMMANDS.filter((c) => c.category === cat);
-    const icon = cat === "market" ? "◆" : cat === "trading" ? "▲" : cat === "strategy" ? "◇" : cat === "account" ? "■" : "●";
-    lines.push(`  ${icon} **${label}** (${cmds.length}) - \`/help ${cat}\``);
+    const workflow = cat as WorkflowGroup;
+    const cmds = SLASH_COMMANDS.filter((c) => c.workflow === workflow);
+    lines.push(`  ${WORKFLOW_CONFIG[workflow].icon} **${label}** (${cmds.length}) - \`/help ${workflow}\``);
   }
 
-  lines.push("\n**Essential Commands:**");
-  const essentialCmds = SLASH_COMMANDS.filter((c) => c.level === 1).slice(0, 11);
+  lines.push("\n**Recommended starting points:**");
+  const essentialCmds = SLASH_COMMANDS
+    .filter((c) => c.level === 1)
+    .slice(0, 10);
   for (const cmd of essentialCmds) {
     lines.push(`  /${cmd.name} - ${cmd.description}`);
   }
 
   lines.push("\n---");
-  lines.push("**Browse:** `/help <category>` | `/help page 1` | `/help <topic>`");
+  lines.push("**Browse:** `/help <workflow>` | `/help advanced` | `/help all` | `/help page 1`");
   return lines.join("\n");
 }
 
@@ -2256,11 +2293,11 @@ function formatHelpPageView(page: number, pageSize: number): string {
 
   let lastCat = "";
   for (const cmd of pageCommands) {
-    if (cmd.category !== lastCat) {
+    if (cmd.workflow !== lastCat) {
       if (lastCat !== "") lines.push("");
-      const catLabel = PAGINATED_HELP_CATEGORIES[cmd.category] || cmd.category;
+      const catLabel = PAGINATED_HELP_CATEGORIES[cmd.workflow] || cmd.workflow;
       lines.push(`**${catLabel}**`);
-      lastCat = cmd.category;
+      lastCat = cmd.workflow;
     }
     lines.push(`  /${cmd.name} - ${cmd.description}`);
   }
@@ -2274,14 +2311,13 @@ function formatHelpPageView(page: number, pageSize: number): string {
   return lines.join("\n");
 }
 
-function formatHelpCategoryView(category: string): string {
-  const cmds = SLASH_COMMANDS.filter((c) => c.category === category);
+function formatHelpCategoryView(category: WorkflowGroup): string {
+  const cmds = SLASH_COMMANDS.filter((c) => c.workflow === category);
   const label = PAGINATED_HELP_CATEGORIES[category] || category;
 
   const lines: string[] = [`**${label} Commands** (${cmds.length})\n`];
   for (const cmd of cmds) {
-    const aliases = cmd.aliases.length > 0 ? ` (${cmd.aliases[0]})` : "";
-    lines.push(`  /${cmd.name}${aliases} - ${cmd.description}`);
+    lines.push(`  /${cmd.name} - ${cmd.description}`);
   }
 
   lines.push("\n---");

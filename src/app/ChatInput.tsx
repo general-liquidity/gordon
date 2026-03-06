@@ -3,7 +3,7 @@
  * Uses ink-ui TextInput with built-in features
  */
 
-import React, { useState, useCallback, useMemo } from "react";
+import React, { useState, useCallback, useEffect, useMemo } from "react";
 import { Box, Text, useInput } from "ink";
 import { TextInput } from "@inkjs/ui";
 import { COLORS } from "./theme.ts";
@@ -14,14 +14,31 @@ import {
   getQuickActionCommand,
   getQuickActionsCount,
 } from "./components/QuickActions.tsx";
+import type { QuickActionContext } from "./commandUx.ts";
 
 interface ChatInputProps {
   onSubmit: (value: string) => void;
+  onOpenQuickActions?: () => void;
   disabled?: boolean;
+  busy?: boolean;
+  queueDepth?: number;
   placeholder?: string;
+  quickActionContext: QuickActionContext;
+  seedValue?: string;
+  seedNonce?: number;
 }
 
-export function ChatInput({ onSubmit, disabled = false, placeholder }: ChatInputProps): React.ReactElement {
+export function ChatInput({
+  onSubmit,
+  onOpenQuickActions,
+  disabled = false,
+  busy = false,
+  queueDepth = 0,
+  placeholder,
+  quickActionContext,
+  seedValue = "",
+  seedNonce = 0,
+}: ChatInputProps): React.ReactElement {
   // Local state - isolated from parent re-renders
   const [value, setValue] = useState("");
   const [autocompleteIndex, setAutocompleteIndex] = useState(0);
@@ -30,7 +47,7 @@ export function ChatInput({ onSubmit, disabled = false, placeholder }: ChatInput
   const [quickActionIndex, setQuickActionIndex] = useState(0);
 
   // Show quick actions when input is empty
-  const showQuickActions = !disabled && value.trim() === "";
+  const showQuickActions = !disabled && !busy && value.trim() === "";
 
   // Get suggestions based on current input
   const suggestions = useMemo(() => {
@@ -42,6 +59,18 @@ export function ChatInput({ onSubmit, disabled = false, placeholder }: ChatInput
 
   // Show autocomplete when typing a command
   const shouldShowAutocomplete = showAutocomplete && suggestions.length > 0 && value.startsWith("/");
+
+  useEffect(() => {
+    if (seedNonce === 0) {
+      return;
+    }
+
+    setValue(seedValue);
+    setShowAutocomplete(seedValue.startsWith("/"));
+    setAutocompleteIndex(0);
+    setQuickActionIndex(0);
+    setInputKey((k) => k + 1);
+  }, [seedNonce, seedValue]);
 
   const handleSubmit = useCallback((submitValue: string) => {
     if (!submitValue.trim()) return;
@@ -95,10 +124,15 @@ export function ChatInput({ onSubmit, disabled = false, placeholder }: ChatInput
 
     // Handle quick actions when input is empty
     if (showQuickActions) {
+      if (key.upArrow && onOpenQuickActions) {
+        onOpenQuickActions();
+        return;
+      }
+
       // Number keys 1-5 to select quick actions
       const numKey = parseInt(input, 10);
-      if (numKey >= 1 && numKey <= getQuickActionsCount()) {
-        const command = getQuickActionCommand(numKey - 1);
+      if (numKey >= 1 && numKey <= getQuickActionsCount(quickActionContext)) {
+        const command = getQuickActionCommand(numKey - 1, quickActionContext);
         if (command) {
           handleQuickActionSelect(command);
           return;
@@ -108,20 +142,20 @@ export function ChatInput({ onSubmit, disabled = false, placeholder }: ChatInput
       // Left/right arrow to navigate quick actions
       if (key.leftArrow) {
         setQuickActionIndex((prev) =>
-          prev > 0 ? prev - 1 : getQuickActionsCount() - 1
+          prev > 0 ? prev - 1 : getQuickActionsCount(quickActionContext) - 1
         );
         return;
       }
       if (key.rightArrow) {
         setQuickActionIndex((prev) =>
-          prev < getQuickActionsCount() - 1 ? prev + 1 : 0
+          prev < getQuickActionsCount(quickActionContext) - 1 ? prev + 1 : 0
         );
         return;
       }
 
       // Enter to select current quick action
       if (key.return && !value.trim()) {
-        const command = getQuickActionCommand(quickActionIndex);
+        const command = getQuickActionCommand(quickActionIndex, quickActionContext);
         if (command) {
           handleQuickActionSelect(command);
           return;
@@ -165,6 +199,7 @@ export function ChatInput({ onSubmit, disabled = false, placeholder }: ChatInput
         onSelect={handleQuickActionSelect}
         selectedIndex={quickActionIndex}
         visible={showQuickActions}
+        context={quickActionContext}
       />
 
       {/* Autocomplete dropdown */}
@@ -174,6 +209,19 @@ export function ChatInput({ onSubmit, disabled = false, placeholder }: ChatInput
           selectedIndex={autocompleteIndex}
           inputValue={value}
         />
+      )}
+
+      {(busy || queueDepth > 0) && (
+        <Box marginBottom={1} marginX={2}>
+          <Text color={COLORS.DIM}>
+            {busy
+              ? "Enter queues a follow-up. Esc stops the current streamed response when possible. Use /steer <message> to redirect the next run."
+              : "Queued follow-ups are ready to run."}
+          </Text>
+          {queueDepth > 0 && (
+            <Text color={COLORS.HIGHLIGHT}> Queue: {queueDepth}</Text>
+          )}
+        </Box>
       )}
 
       {/* Input box */}
@@ -189,6 +237,7 @@ export function ChatInput({ onSubmit, disabled = false, placeholder }: ChatInput
         <TextInput
           key={inputKey}
           isDisabled={disabled}
+          defaultValue={value}
           placeholder={placeholder || "Ask Gordon anything... (try /help)"}
           onChange={handleChange}
           onSubmit={handleSubmit}

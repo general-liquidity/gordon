@@ -8,6 +8,19 @@ import { GatewayCommandTypeSchema, type GatewayCommandType, type GatewayCommandE
 import { getOrCreateDaemonToken } from "./security/auth.ts";
 import { getDefaultIpcPath, isIpcDaemonReachable, sendIpcCommand } from "./daemon/ipc.ts";
 import { startGatewayDaemonProcess } from "./daemon/process.ts";
+import {
+  applyBootstrap,
+  collectDoctorReport,
+  doctorReportToJson,
+  formatDoctorReport,
+  parseBootstrapArgs,
+} from "../app/setup-runtime.ts";
+import { parseSetupWizardSection } from "../app/setup-flow.ts";
+
+export interface CLICommandResult {
+  exit: boolean;
+  code?: number;
+}
 
 async function waitForDaemon(timeoutMs: number = 60_000): Promise<boolean> {
   const started = Date.now();
@@ -226,19 +239,71 @@ async function runInitCommand(args: string[]): Promise<void> {
   console.log(`  ${pm === "bun" ? "bun run" : "npx tsx"} src/index.ts`);
 }
 
-export async function runCLICommand(command: ParsedCLICommand): Promise<void> {
+export async function runCLICommand(command: ParsedCLICommand): Promise<CLICommandResult> {
   if (command.name === "daemon") {
     await runDaemonCommand(command.action);
-    return;
+    return { exit: true };
   }
 
   if (command.name === "schedule") {
     await runScheduleCommand(command.action, command.args);
-    return;
+    return { exit: true };
   }
 
   if (command.name === "init") {
     await runInitCommand(command.args);
-    return;
+    return { exit: true };
   }
+
+  if (command.name === "doctor") {
+    const report = await collectDoctorReport();
+    if (command.args.includes("--json")) {
+      console.log(JSON.stringify(doctorReportToJson(report), null, 2));
+    } else {
+      console.log(formatDoctorReport(report));
+    }
+    return { exit: true };
+  }
+
+  if (command.name === "configure") {
+    const requested = command.args[0]?.toLowerCase();
+    if (requested === "quickstart") {
+      process.env.GORDON_START_VIEW = "quickstart";
+      process.env.GORDON_SETUP_MODE = "quickstart";
+      delete process.env.GORDON_SETUP_SECTION;
+      return { exit: false };
+    }
+
+    const section = parseSetupWizardSection(requested);
+    process.env.GORDON_START_VIEW = "setup";
+    process.env.GORDON_SETUP_MODE = section ? "configure" : "advanced";
+    if (section) {
+      process.env.GORDON_SETUP_SECTION = section;
+    } else {
+      delete process.env.GORDON_SETUP_SECTION;
+    }
+    return { exit: false };
+  }
+
+  if (command.name === "bootstrap") {
+    const options = parseBootstrapArgs(command.args);
+    const result = await applyBootstrap(options);
+    if (options.json) {
+      console.log(JSON.stringify({
+        summary: result.summary,
+        savedEnvKeys: result.savedEnvKeys,
+        keyringStoredKeys: result.keyringStoredKeys,
+        doctor: result.doctor ? doctorReportToJson(result.doctor) : null,
+      }, null, 2));
+    } else {
+      console.log(result.summary.join("\n"));
+      if (result.doctor) {
+        console.log("");
+        console.log(formatDoctorReport(result.doctor));
+      }
+    }
+    return { exit: true };
+  }
+
+  return { exit: true };
 }

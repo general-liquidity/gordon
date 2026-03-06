@@ -8,6 +8,7 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Box, Text, useInput } from "ink";
 import { ProgressBar, Spinner } from "@inkjs/ui";
 import { COLORS } from "../theme.ts";
+import { getGordonLoadingPhrases, useGordonLoader } from "./GordonLoader.tsx";
 
 /**
  * Format elapsed time in human-readable format
@@ -86,6 +87,14 @@ export const ProgressIndicator: React.FC<ProgressIndicatorProps> = ({
     }
   }, { isActive: cancellable });
 
+  const { glyph, phrase } = useGordonLoader({
+    enabled: progress === undefined,
+    phrases: getGordonLoadingPhrases({
+      activityStatus: status,
+      variant: "startup",
+    }),
+  });
+
   return (
     <Box flexDirection="column" paddingX={2} paddingY={1}>
       {progress !== undefined ? (
@@ -116,11 +125,15 @@ export const ProgressIndicator: React.FC<ProgressIndicatorProps> = ({
           )}
         </Box>
       ) : (
-        // Indeterminate spinner with elapsed time
+        // Indeterminate Gordon-themed loader
         <Box flexDirection="column" gap={1}>
           <Box gap={2} justifyContent="space-between">
-            <Box>
-              <Spinner label={label} />
+            <Box flexDirection="column">
+              <Box>
+                <Text color={COLORS.HIGHLIGHT}>{glyph}</Text>
+                <Text color={COLORS.WHITE}> {label}</Text>
+              </Box>
+              <Text color={COLORS.DIM}>{phrase}</Text>
             </Box>
             {showElapsed && (
               <Text color={COLORS.DIM}>
@@ -327,6 +340,15 @@ export const StreamingProgress: React.FC<StreamingProgressProps> = ({
     }
   }, { isActive: isStreaming && !!onCancel });
 
+  const { glyph, phrase } = useGordonLoader({
+    enabled: isStreaming,
+    phrases: getGordonLoadingPhrases({
+      currentTool,
+      activityStatus: null,
+      variant: "streaming",
+    }),
+  });
+
   if (!isStreaming) {
     return null;
   }
@@ -340,10 +362,13 @@ export const StreamingProgress: React.FC<StreamingProgressProps> = ({
       paddingY={1}
       marginX={1}
     >
-      {/* Main operation spinner */}
       <Box justifyContent="space-between">
-        <Box>
-          <Spinner label={operation} />
+        <Box flexDirection="column">
+          <Box>
+            <Text color={COLORS.HIGHLIGHT}>{glyph}</Text>
+            <Text color={COLORS.WHITE}> {operation}</Text>
+          </Box>
+          <Text color={COLORS.DIM}>{phrase}</Text>
         </Box>
         {showElapsed && (
           <Text color={COLORS.DIM}>

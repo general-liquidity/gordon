@@ -15,9 +15,12 @@ export {
 
 export {
   checkToolAccess,
+  checkExplicitExecutionAccess,
   createAccessControlMiddleware,
   withAccessControl,
   requiresArmedMode,
+  requiresArmedModeForTool,
+  isStateModifyingTool,
   getTradingTools,
   formatRemainingTime,
   getArmedStatus,

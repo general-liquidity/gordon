@@ -34,7 +34,7 @@ import type { MastraMCPServerDefinition } from "@mastra/mcp";
 import { pluginInstaller } from "./marketplace/installer.ts";
 import { reloadRouting, isRoutingInitialized } from "../routing/manager.ts";
 import { credentialManager } from "./credentials.ts";
-import type { MCPServerManifest } from "./types.ts";
+import type { MCPCategory, MCPServerManifest } from "./types.ts";
 
 // ============================================================================
 // State
@@ -209,6 +209,36 @@ export async function reloadMCPTools(): Promise<Record<string, Tool>> {
  */
 export function getMCPTools(): Record<string, Tool> {
   return _mcpTools ?? {};
+}
+
+export function getScopedMCPTools(options?: {
+  categories?: MCPCategory[];
+  excludeCategories?: MCPCategory[];
+}): Record<string, Tool> {
+  const tools = _mcpTools ?? {};
+  if (!options?.categories?.length && !options?.excludeCategories?.length) {
+    return tools;
+  }
+
+  const allowedCategories = options.categories ? new Set(options.categories) : null;
+  const excludedCategories = new Set(options.excludeCategories ?? []);
+  const categoriesByServer = new Map(
+    pluginInstaller.getInstalled().map((plugin) => [plugin.id, plugin.manifest.category] as const),
+  );
+
+  return Object.fromEntries(
+    Object.entries(tools).filter(([toolName]) => {
+      const underscoreIdx = toolName.indexOf("_");
+      if (underscoreIdx <= 0) return true;
+
+      const serverId = toolName.substring(0, underscoreIdx);
+      const category = categoriesByServer.get(serverId);
+      if (!category) return true;
+      if (excludedCategories.has(category)) return false;
+      if (allowedCategories && !allowedCategories.has(category)) return false;
+      return true;
+    }),
+  );
 }
 
 /**

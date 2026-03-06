@@ -1,0 +1,117 @@
+[
+  {
+    "actionId": "market.scan",
+    "title": "Scan Market",
+    "taskScope": "scan",
+    "capability": "read",
+    "promptExample": "/scan",
+    "tags": [
+      "market",
+      "scan",
+      "discovery"
+    ]
+  },
+  {
+    "actionId": "market.analyze",
+    "title": "Analyze Market",
+    "taskScope": "analysis",
+    "capability": "read",
+    "promptExample": "/analyze <symbol>",
+    "tags": [
+      "market",
+      "analysis"
+    ]
+  },
+  {
+    "actionId": "trading.plan",
+    "title": "Create Trade Plan",
+    "taskScope": "planning",
+    "capability": "plan",
+    "promptExample": "/plan <symbol>",
+    "tags": [
+      "trading",
+      "planning"
+    ]
+  },
+  {
+    "actionId": "trading.preview_market_order",
+    "title": "Preview Market Order",
+    "taskScope": "execution",
+    "capability": "plan",
+    "promptExample": "/preview-order <symbol> <buy|sell> <amount> [quote]",
+    "tags": [
+      "trading",
+      "preview",
+      "dry-run"
+    ]
+  },
+  {
+    "actionId": "trading.market_order",
+    "title": "Place Market Order",
+    "taskScope": "execution",
+    "capability": "execute",
+    "promptExample": null,
+    "tags": [
+      "trading",
+      "execution",
+      "armed"
+    ]
+  },
+  {
+    "actionId": "account.portfolio",
+    "title": "Show Portfolio",
+    "taskScope": "ops",
+    "capability": "read",
+    "promptExample": "/portfolio",
+    "tags": [
+      "portfolio",
+      "account"
+    ]
+  },
+  {
+    "actionId": "wallet.fund",
+    "title": "Wallet Funding",
+    "taskScope": "funding",
+    "capability": "plan",
+    "promptExample": "/fund [buy|sell|swap|quote|limits|history] ...",
+    "tags": [
+      "wallet",
+      "funding",
+      "moonpay"
+    ]
+  },
+  {
+    "actionId": "payments.intent",
+    "title": "Prepare Payment Intent",
+    "taskScope": "funding",
+    "capability": "plan",
+    "promptExample": "/pay <resource> <amount>",
+    "tags": [
+      "payments",
+      "polygon",
+      "x402"
+    ]
+  },
+  {
+    "actionId": "system.arm",
+    "title": "Arm System",
+    "taskScope": "system",
+    "capability": "configure",
+    "promptExample": "/arm",
+    "tags": [
+      "system",
+      "armed"
+    ]
+  },
+  {
+    "actionId": "system.disarm",
+    "title": "Disarm System",
+    "taskScope": "system",
+    "capability": "configure",
+    "promptExample": "/disarm",
+    "tags": [
+      "system",
+      "safe"
+    ]
+  }
+]

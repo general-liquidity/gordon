@@ -48,7 +48,8 @@ export function ShortcutsOverlay({ onClose }: ShortcutsOverlayProps): React.Reac
         <ShortcutRow keys="Enter" description="Send message" />
         <ShortcutRow keys="Tab" description="Autocomplete command" />
         <ShortcutRow keys="Up / Down" description="Navigate suggestions" />
-        <ShortcutRow keys="Escape" description="Dismiss overlay / Back to menu" />
+        <ShortcutRow keys="Ctrl+K" description="Open Quick Actions from chat" />
+        <ShortcutRow keys="Escape" description="Dismiss overlays or stop the active agent response" />
         <ShortcutRow keys="Ctrl+L" description="Clear screen" />
         <ShortcutRow keys="Ctrl+C" description="Exit Gordon" />
         <ShortcutRow keys="?" description="Show this help" />
@@ -117,7 +118,13 @@ export function ShortcutsHint({
         ?
       </Text>
       <Text color={textColor}>
-        {" "}for help | Type{" "}
+        {" "}for help | Press{" "}
+      </Text>
+      <Text color={highlightColor} bold>
+        Ctrl+K
+      </Text>
+      <Text color={textColor}>
+        {" "}for actions | Type{" "}
       </Text>
       <Text color={highlightColor} bold>
         /help

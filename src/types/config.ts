@@ -229,6 +229,7 @@ export const RegimeDetectionConfigSchema = z.object({
 
 export const GordonConfigSchema = z.object({
   version: z.string().default("1.0.0"),
+  activeProfile: z.string().min(1).optional(),
   /** @deprecated Use `exchanges` array instead */
   exchange: ExchangeConfigSchema.optional(),
   /** Multi-exchange configuration (Phase 2+) */

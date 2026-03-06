@@ -95,7 +95,7 @@ import {
 } from "./tools/index.ts";
 import { getSessionSummary, getMemoryStats, resetSharedMemory } from "./shared-context.ts";
 import { evalTools } from "../evals/index.ts";
-import { getMCPTools } from "../mcp/client.ts";
+import { getScopedMCPTools } from "../mcp/client.ts";
 import { getRoutingToolsForAgent } from "../routing/manager.ts";
 import {
   generatePerformanceContext,
@@ -1449,6 +1449,7 @@ function getPlannerAgent(): Agent {
         // Advanced tools (v1) — pre-trade simulation + proofs
         simulate_order_bundle: instrumentedAdvancedTools.simulate_order_bundle,
         generate_circuit_breaker_proof: instrumentedAdvancedTools.generate_circuit_breaker_proof,
+        preview_market_order: instrumentedDiscoveryTools.preview_market_order,
         // SynthData LP strategy planning
         synthdata_lp_bounds: instrumentedSynthDataTools.synthdata_lp_bounds,
         synthdata_lp_probabilities: instrumentedSynthDataTools.synthdata_lp_probabilities,
@@ -1490,6 +1491,7 @@ function getExecutorAgent(): Agent {
         close_partial_position: instrumentedTradingTools.close_partial_position,
         // Bracket, market, limit, and OCO order tools
         place_bracket_order: instrumentedDiscoveryTools.place_bracket_order,
+        preview_market_order: instrumentedDiscoveryTools.preview_market_order,
         place_market_order: instrumentedDiscoveryTools.place_market_order,
         place_limit_order: instrumentedOrderbookTools.place_limit_order,
         place_oco_order: instrumentedOrderbookTools.place_oco_order,
@@ -1828,7 +1830,9 @@ function getGordonAgent(): Agent {
         ...instrumentedSystemTools,       // arm/disarm system control
         ...instrumentedSchedulerTools,    // task scheduling (cross-cutting concern)
         ...instrumentedAutonomousTools,   // autonomous swing trading control
-        ...getMCPTools(),                 // MCP plugin tools (if any installed/enabled)
+        ...getScopedMCPTools({
+          categories: ["data-provider", "analytics", "research", "portfolio", "utility", "infrastructure"],
+        }),
         ...getRoutingToolsForAgent("Gordon"), // Skill tools routed to Gordon
       },
 

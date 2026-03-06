@@ -1,0 +1,290 @@
+import type { Mode } from "../types/index.ts";
+
+export type LegacyCommandCategory = "trading" | "market" | "account" | "system" | "strategy";
+export type CommandLevel = 1 | 2 | 3;
+export type WorkflowGroup = "discover" | "analyze" | "trade" | "run" | "accounts" | "operate";
+export type CommandAudience = "core" | "advanced" | "operator";
+
+export interface WorkflowConfigEntry {
+  label: string;
+  shortLabel: string;
+  description: string;
+  icon: string;
+  order: number;
+  helpAliases: string[];
+}
+
+export interface CommandUxShape {
+  name: string;
+  category: LegacyCommandCategory;
+  level: CommandLevel;
+}
+
+export interface CommandUxMetadata {
+  workflow: WorkflowGroup;
+  audience: CommandAudience;
+  workflowLabel: string;
+  audienceLabel: string;
+  workflowOrder: number;
+  audienceOrder: number;
+  hideAliasesByDefault: boolean;
+}
+
+export interface QuickActionContext {
+  mode: Mode;
+  setupComplete: boolean;
+  hasExchange: boolean;
+  hasBroker: boolean;
+  hasWalletRails: boolean;
+}
+
+export interface QuickActionItem {
+  label: string;
+  command: string;
+}
+
+export const WORKFLOW_CONFIG: Record<WorkflowGroup, WorkflowConfigEntry> = {
+  discover: {
+    label: "Discover",
+    shortLabel: "Discover",
+    description: "Find markets, movers, regimes, and setup candidates.",
+    icon: "◆",
+    order: 0,
+    helpAliases: ["discover", "market", "markets", "scan"],
+  },
+  analyze: {
+    label: "Analyze",
+    shortLabel: "Analyze",
+    description: "Inspect a symbol, compare setups, and dig into signals.",
+    icon: "◈",
+    order: 1,
+    helpAliases: ["analyze", "analysis"],
+  },
+  trade: {
+    label: "Trade",
+    shortLabel: "Trade",
+    description: "Plan, preview, fund, bridge, and execute trading actions.",
+    icon: "▲",
+    order: 2,
+    helpAliases: ["trade", "trading", "execution"],
+  },
+  run: {
+    label: "Run",
+    shortLabel: "Run",
+    description: "Backtests, strategies, and live runtime workflows.",
+    icon: "◇",
+    order: 3,
+    helpAliases: ["run", "strategy", "strategies"],
+  },
+  accounts: {
+    label: "Accounts",
+    shortLabel: "Accounts",
+    description: "Portfolio, brokers, wallets, balances, and connected rails.",
+    icon: "■",
+    order: 4,
+    helpAliases: ["accounts", "account", "portfolio", "wallet"],
+  },
+  operate: {
+    label: "Operate",
+    shortLabel: "Operate",
+    description: "Configuration, diagnostics, model control, and system operations.",
+    icon: "●",
+    order: 5,
+    helpAliases: ["operate", "ops", "system", "config", "configure"],
+  },
+};
+
+const AUDIENCE_LABELS: Record<CommandAudience, string> = {
+  core: "Core",
+  advanced: "Advanced",
+  operator: "Operator",
+};
+
+const AUDIENCE_ORDER: Record<CommandAudience, number> = {
+  core: 0,
+  advanced: 1,
+  operator: 2,
+};
+
+const ANALYZE_COMMANDS = new Set([
+  "analyze",
+  "whales",
+  "chart",
+  "ta",
+  "candlestick",
+  "research",
+  "ensemble",
+  "deep",
+  "parallel",
+  "compare-coins",
+  "fast-deep",
+  "mtf",
+  "pair-analysis",
+  "chainlink",
+  "base",
+  "synthdata",
+  "forecast",
+  "liquidation",
+]);
+
+const RUN_COMMANDS = new Set([
+  "backtest",
+  "optimize",
+  "compare",
+  "strategies",
+  "gen",
+  "deploy",
+  "strategies-live",
+  "pause",
+  "stop",
+  "rebalance",
+  "mutate",
+  "autobacktest",
+  "portfolio-health",
+  "autonomous",
+]);
+
+const ACCOUNT_COMMANDS = new Set([
+  "portfolio",
+  "wallet",
+  "earn",
+  "history",
+  "exchange",
+  "broker",
+  "stocks",
+  "performance",
+  "withdraw",
+  "chains",
+  "rails",
+]);
+
+const OPERATE_COMMANDS = new Set([
+  "help",
+  "status",
+  "setup",
+  "configure",
+  "doctor",
+  "preferences",
+  "model",
+  "shortcuts",
+  "theme",
+  "resume-thread",
+  "new-thread",
+  "threads",
+  "switch-thread",
+  "thread-info",
+  "delete-thread",
+  "rename-thread",
+  "cache-stats",
+  "mcp",
+  "routing",
+  "workflow",
+  "export",
+  "clone-thread",
+  "keyring",
+  "telemetry",
+  "bugreport",
+  "whatsnew",
+  "arm",
+  "disarm",
+  "validate",
+]);
+
+const CATEGORY_DEFAULT_WORKFLOW: Record<LegacyCommandCategory, WorkflowGroup> = {
+  market: "discover",
+  trading: "trade",
+  strategy: "run",
+  account: "accounts",
+  system: "operate",
+};
+
+export function getAudienceFromLevel(level: CommandLevel): CommandAudience {
+  if (level === 1) return "core";
+  if (level === 2) return "advanced";
+  return "operator";
+}
+
+export function getAudienceLabel(audience: CommandAudience): string {
+  return AUDIENCE_LABELS[audience];
+}
+
+export function inferWorkflowGroup(command: Pick<CommandUxShape, "name" | "category">): WorkflowGroup {
+  const name = command.name.toLowerCase();
+
+  if (ANALYZE_COMMANDS.has(name)) return "analyze";
+  if (RUN_COMMANDS.has(name)) return "run";
+  if (ACCOUNT_COMMANDS.has(name)) return "accounts";
+  if (OPERATE_COMMANDS.has(name)) return "operate";
+
+  return CATEGORY_DEFAULT_WORKFLOW[command.category];
+}
+
+export function normalizeCommandUx<T extends CommandUxShape>(command: T): T & CommandUxMetadata {
+  const workflow = inferWorkflowGroup(command);
+  const audience = getAudienceFromLevel(command.level);
+  const workflowConfig = WORKFLOW_CONFIG[workflow];
+
+  return {
+    ...command,
+    workflow,
+    audience,
+    workflowLabel: workflowConfig.label,
+    audienceLabel: getAudienceLabel(audience),
+    workflowOrder: workflowConfig.order,
+    audienceOrder: AUDIENCE_ORDER[audience],
+    hideAliasesByDefault: true,
+  };
+}
+
+export function sortCommandsForPresentation<T extends CommandUxMetadata & { name: string }>(commands: T[]): T[] {
+  return [...commands].sort((left, right) => {
+    const workflowDiff = left.workflowOrder - right.workflowOrder;
+    if (workflowDiff !== 0) return workflowDiff;
+
+    return left.name.localeCompare(right.name);
+  });
+}
+
+export function resolveWorkflowTopic(arg: string): WorkflowGroup | undefined {
+  const normalized = arg.trim().toLowerCase();
+  if (!normalized) return undefined;
+
+  for (const [workflow, config] of Object.entries(WORKFLOW_CONFIG) as Array<[WorkflowGroup, WorkflowConfigEntry]>) {
+    if (config.helpAliases.includes(normalized)) {
+      return workflow;
+    }
+  }
+
+  return undefined;
+}
+
+export function getQuickActionItems(context: QuickActionContext): QuickActionItem[] {
+  const hasVenue = context.hasExchange || context.hasBroker;
+
+  if (!context.setupComplete || !hasVenue) {
+    return [
+      { label: "Setup", command: "/setup" },
+      { label: "Doctor", command: "/doctor" },
+      { label: "Model", command: "/model" },
+      { label: "Help", command: "/help" },
+      { label: "Configure", command: "/configure advanced" },
+    ];
+  }
+
+  const actions: QuickActionItem[] = [
+    { label: "Scan", command: "/scan" },
+    { label: "Trending", command: "/trending" },
+    { label: "Portfolio", command: "/portfolio" },
+    { label: "Preview", command: "/preview-order" },
+  ];
+
+  if (context.hasWalletRails) {
+    actions.push({ label: "Fund", command: "/fund quote" });
+  } else if (context.mode === "ARMED") {
+    actions.push({ label: "Orders", command: "/orders" });
+  } else {
+    actions.push({ label: "Doctor", command: "/doctor" });
+  }
+
+  return actions;
+}

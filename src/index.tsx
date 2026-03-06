@@ -22,8 +22,10 @@ const flags = parseFlags();
 const command = parseCommand();
 
 if (command) {
-  await runCLICommand(command);
-  process.exit(0);
+  const result = await runCLICommand(command);
+  if (result.exit) {
+    process.exit(result.code ?? 0);
+  }
 }
 
 if (flags.help) {

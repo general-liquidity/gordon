@@ -1,0 +1,434 @@
+[
+  {
+    "id": "market.scan",
+    "title": "Scan Market",
+    "description": "Scan the active exchange universe for trading opportunities.",
+    "domain": "market",
+    "capability": "read",
+    "taskScope": "scan",
+    "sideEffectLevel": "none",
+    "approvalPolicy": "none",
+    "dryRunSupported": false,
+    "visibility": [
+      "interactive",
+      "json",
+      "agent"
+    ],
+    "providerRequirements": [
+      {
+        "kind": "exchange"
+      }
+    ],
+    "slash": {
+      "name": "scan",
+      "aliases": [
+        "s"
+      ],
+      "description": "Scan market for trading opportunities (~10-30s depending on coins)",
+      "usage": "/scan",
+      "category": "market",
+      "level": 1,
+      "workflow": "discover",
+      "audience": "core",
+      "action": "agent",
+      "target": "scanner",
+      "executionTime": "~10-30s",
+      "whenToUse": "Discover opportunities across multiple coins"
+    },
+    "tool": {
+      "toolName": "scan_market",
+      "agentTarget": "Scanner",
+      "description": "Canonical market scan tool"
+    },
+    "promptExample": "/scan",
+    "tags": [
+      "market",
+      "scan",
+      "discovery"
+    ]
+  },
+  {
+    "id": "market.analyze",
+    "title": "Analyze Market",
+    "description": "Run a single-symbol analysis on the active exchange.",
+    "domain": "market",
+    "capability": "read",
+    "taskScope": "analysis",
+    "sideEffectLevel": "none",
+    "approvalPolicy": "none",
+    "dryRunSupported": false,
+    "visibility": [
+      "interactive",
+      "json",
+      "agent"
+    ],
+    "providerRequirements": [
+      {
+        "kind": "exchange"
+      }
+    ],
+    "slash": {
+      "name": "analyze",
+      "aliases": [
+        "a",
+        "quick"
+      ],
+      "description": "Single comprehensive analysis (~3-5s)",
+      "usage": "/analyze <symbol>",
+      "category": "market",
+      "level": 1,
+      "workflow": "analyze",
+      "audience": "core",
+      "action": "agent",
+      "target": "analyst",
+      "executionTime": "~3-5s",
+      "whenToUse": "Quick check on a single coin"
+    },
+    "tool": {
+      "toolName": "analyze_coin",
+      "agentTarget": "Analyst",
+      "description": "Canonical single-symbol analysis tool"
+    },
+    "promptExample": "/analyze <symbol>",
+    "tags": [
+      "market",
+      "analysis"
+    ]
+  },
+  {
+    "id": "trading.plan",
+    "title": "Create Trade Plan",
+    "description": "Create a structured trading plan before execution.",
+    "domain": "trading",
+    "capability": "plan",
+    "taskScope": "planning",
+    "sideEffectLevel": "preview",
+    "approvalPolicy": "confirm",
+    "dryRunSupported": true,
+    "visibility": [
+      "interactive",
+      "json",
+      "agent"
+    ],
+    "providerRequirements": [
+      {
+        "kind": "exchange"
+      }
+    ],
+    "slash": {
+      "name": "plan",
+      "aliases": [
+        "p"
+      ],
+      "description": "Create a trade plan for a coin",
+      "usage": "/plan <symbol>",
+      "category": "trading",
+      "level": 1,
+      "workflow": "trade",
+      "audience": "core",
+      "action": "agent",
+      "target": "planner",
+      "whenToUse": "Create a structured trade plan before execution"
+    },
+    "tool": {
+      "toolName": "create_plan",
+      "agentTarget": "Planner",
+      "description": "Canonical plan creation tool"
+    },
+    "promptExample": "/plan <symbol>",
+    "tags": [
+      "trading",
+      "planning"
+    ]
+  },
+  {
+    "id": "trading.preview_market_order",
+    "title": "Preview Market Order",
+    "description": "Preview a spot market order without placing it.",
+    "domain": "trading",
+    "capability": "plan",
+    "taskScope": "execution",
+    "sideEffectLevel": "preview",
+    "approvalPolicy": "confirm",
+    "dryRunSupported": true,
+    "visibility": [
+      "interactive",
+      "json",
+      "agent"
+    ],
+    "providerRequirements": [
+      {
+        "kind": "exchange"
+      }
+    ],
+    "slash": {
+      "name": "preview-order",
+      "aliases": [
+        "order-preview"
+      ],
+      "description": "Preview a market order before execution",
+      "usage": "/preview-order <symbol> <buy|sell> <amount> [quote]",
+      "category": "trading",
+      "level": 2,
+      "workflow": "trade",
+      "audience": "advanced",
+      "action": "agent",
+      "target": "planner",
+      "executionTime": "~1-2s",
+      "whenToUse": "See readiness, estimated fills, policy blockers, and side effects before placing a market order"
+    },
+    "tool": {
+      "toolName": "preview_market_order",
+      "agentTarget": "Planner",
+      "description": "Canonical market-order preview tool"
+    },
+    "promptExample": "/preview-order <symbol> <buy|sell> <amount> [quote]",
+    "tags": [
+      "trading",
+      "preview",
+      "dry-run"
+    ]
+  },
+  {
+    "id": "trading.market_order",
+    "title": "Place Market Order",
+    "description": "Place a live spot market order on the active exchange.",
+    "domain": "trading",
+    "capability": "execute",
+    "taskScope": "execution",
+    "sideEffectLevel": "funds",
+    "approvalPolicy": "armed_mode",
+    "dryRunSupported": true,
+    "visibility": [
+      "agent"
+    ],
+    "providerRequirements": [
+      {
+        "kind": "exchange"
+      }
+    ],
+    "tool": {
+      "toolName": "place_market_order",
+      "agentTarget": "Executor",
+      "description": "Canonical live market-order tool"
+    },
+    "promptExample": null,
+    "tags": [
+      "trading",
+      "execution",
+      "armed"
+    ]
+  },
+  {
+    "id": "account.portfolio",
+    "title": "Show Portfolio",
+    "description": "Show portfolio or broker account balances.",
+    "domain": "account",
+    "capability": "read",
+    "taskScope": "ops",
+    "sideEffectLevel": "none",
+    "approvalPolicy": "none",
+    "dryRunSupported": false,
+    "visibility": [
+      "interactive",
+      "json",
+      "agent"
+    ],
+    "providerRequirements": [
+      {
+        "kind": "exchange",
+        "optional": true
+      },
+      {
+        "kind": "broker",
+        "optional": true
+      }
+    ],
+    "slash": {
+      "name": "portfolio",
+      "aliases": [
+        "pf",
+        "balance"
+      ],
+      "description": "View portfolio and balances",
+      "usage": "/portfolio",
+      "category": "account",
+      "level": 1,
+      "workflow": "accounts",
+      "audience": "core",
+      "action": "menu",
+      "target": "portfolio",
+      "whenToUse": "Inspect current balances and holdings"
+    },
+    "promptExample": "/portfolio",
+    "tags": [
+      "portfolio",
+      "account"
+    ]
+  },
+  {
+    "id": "wallet.fund",
+    "title": "Wallet Funding",
+    "description": "Fund wallets or fetch MoonPay funding flows and quotes.",
+    "domain": "wallet",
+    "capability": "plan",
+    "taskScope": "funding",
+    "sideEffectLevel": "preview",
+    "approvalPolicy": "external",
+    "dryRunSupported": true,
+    "visibility": [
+      "interactive",
+      "json",
+      "agent",
+      "mcp"
+    ],
+    "providerRequirements": [
+      {
+        "kind": "wallet"
+      }
+    ],
+    "slash": {
+      "name": "fund",
+      "aliases": [
+        "onramp",
+        "offramp"
+      ],
+      "description": "Create MoonPay flows or fetch quotes and limits",
+      "usage": "/fund [buy|sell|swap|quote|limits|history] ...",
+      "category": "trading",
+      "level": 2,
+      "workflow": "trade",
+      "audience": "advanced",
+      "action": "agent",
+      "target": "executor",
+      "whenToUse": "Fund a wallet, off-ramp, create a hosted swap flow, or inspect live MoonPay pricing and limits"
+    },
+    "promptExample": "/fund [buy|sell|swap|quote|limits|history] ...",
+    "tags": [
+      "wallet",
+      "funding",
+      "moonpay"
+    ]
+  },
+  {
+    "id": "payments.intent",
+    "title": "Prepare Payment Intent",
+    "description": "Prepare a Polygon x402 payment intent for a paid API or agent payment.",
+    "domain": "payments",
+    "capability": "plan",
+    "taskScope": "funding",
+    "sideEffectLevel": "preview",
+    "approvalPolicy": "external",
+    "dryRunSupported": true,
+    "visibility": [
+      "interactive",
+      "json",
+      "agent"
+    ],
+    "providerRequirements": [
+      {
+        "kind": "payments"
+      }
+    ],
+    "slash": {
+      "name": "pay",
+      "aliases": [
+        "x402",
+        "payments"
+      ],
+      "description": "Prepare Polygon x402 payment intents for paid APIs or agent payments",
+      "usage": "/pay <resource> <amount>",
+      "category": "trading",
+      "level": 2,
+      "workflow": "trade",
+      "audience": "advanced",
+      "action": "agent",
+      "target": "executor",
+      "whenToUse": "Prepare Gordon-native payment headers for external services"
+    },
+    "promptExample": "/pay <resource> <amount>",
+    "tags": [
+      "payments",
+      "polygon",
+      "x402"
+    ]
+  },
+  {
+    "id": "system.arm",
+    "title": "Arm System",
+    "description": "Switch Gordon into ARMED mode for live execution.",
+    "domain": "system",
+    "capability": "configure",
+    "taskScope": "system",
+    "sideEffectLevel": "state",
+    "approvalPolicy": "confirm",
+    "dryRunSupported": false,
+    "visibility": [
+      "interactive",
+      "json",
+      "agent"
+    ],
+    "providerRequirements": [
+      {
+        "kind": "system"
+      }
+    ],
+    "slash": {
+      "name": "arm",
+      "aliases": [],
+      "description": "Enable live trading (ARMED mode)",
+      "usage": "/arm",
+      "category": "trading",
+      "level": 2,
+      "workflow": "operate",
+      "audience": "advanced",
+      "action": "tool",
+      "target": "arm_system"
+    },
+    "promptExample": "/arm",
+    "tags": [
+      "system",
+      "armed"
+    ]
+  },
+  {
+    "id": "system.disarm",
+    "title": "Disarm System",
+    "description": "Return Gordon to SAFE mode.",
+    "domain": "system",
+    "capability": "configure",
+    "taskScope": "system",
+    "sideEffectLevel": "state",
+    "approvalPolicy": "none",
+    "dryRunSupported": false,
+    "visibility": [
+      "interactive",
+      "json",
+      "agent"
+    ],
+    "providerRequirements": [
+      {
+        "kind": "system"
+      }
+    ],
+    "slash": {
+      "name": "disarm",
+      "aliases": [
+        "safe"
+      ],
+      "description": "Return to SAFE mode",
+      "usage": "/disarm",
+      "category": "trading",
+      "level": 2,
+      "workflow": "operate",
+      "audience": "advanced",
+      "action": "tool",
+      "target": "arm_system"
+    },
+    "promptExample": "/disarm",
+    "tags": [
+      "system",
+      "safe"
+    ]
+  }
+]

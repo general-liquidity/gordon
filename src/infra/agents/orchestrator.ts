@@ -12,10 +12,17 @@ import { RequestContext } from "@mastra/core/request-context";
 import { z } from "zod";
 
 import { gordonAgent } from "./agents.ts";
+import { evaluateToolRequestPolicy } from "../actions/runtime.ts";
 import { getDynamicToolAgentMap } from "../routing/manager.ts";
 import { createModuleLogger } from "../logger/index.ts";
 import { emitEvent } from "../../events/index.ts";
-import { checkInputGuardrails, checkOutputGuardrails, checkToolAccess } from "./middleware/index.ts";
+import {
+  checkInputGuardrails,
+  checkOutputGuardrails,
+  checkToolAccess,
+  checkExplicitExecutionAccess,
+  requiresArmedModeForTool,
+} from "./middleware/index.ts";
 import {
   initializeTracing as initTracingModule,
   buildTracingOptions,
@@ -551,6 +558,7 @@ const TOOL_AGENT_MAP: Record<string, string> = {
   // evalTools cherry-picks on Planner
   get_risk_reward_analysis: "Planner",
   track_recommendation: "Planner",
+  preview_market_order: "Planner",
 
   // ---- Executor tools ----
   // tradingTools cherry-picks
@@ -1191,6 +1199,9 @@ function createRequestContext(context: GordonContext): RequestContext {
   requestContext.set("threadId", context.threadId || "");
   requestContext.set("portfolioValue", context.portfolioValue || 0);
   requestContext.set("availableCash", context.availableCash || 0);
+  requestContext.set("requestedActionId", context.requestedActionId);
+  requestContext.set("requestedTaskScope", context.requestedTaskScope);
+  requestContext.set("credentialProfile", context.credentialProfile ?? "default");
   return requestContext;
 }
 
@@ -1202,7 +1213,7 @@ function createRequestContext(context: GordonContext): RequestContext {
  * Stream event types emitted during processing
  */
 export interface StreamEvent {
-  type: "text_delta" | "tool_call_start" | "tool_call_end" | "agent_switch" | "step_complete" | "done" | "error";
+  type: "text_delta" | "tool_call_start" | "tool_call_end" | "agent_switch" | "step_complete" | "done" | "error" | "cancelled";
   content?: string;
   toolName?: string;
   toolArgs?: Record<string, unknown>;
@@ -1215,6 +1226,96 @@ export interface StreamEvent {
     completionTokens: number;
     totalTokens: number;
   };
+}
+
+export interface ProcessMessageStreamOptions {
+  signal?: AbortSignal;
+}
+
+class StreamCancelledError extends Error {
+  constructor(message: string = "Response stopped.") {
+    super(message);
+    this.name = "StreamCancelledError";
+  }
+}
+
+async function cancelReadableStreamReader<T>(reader: ReadableStreamDefaultReader<T>): Promise<void> {
+  try {
+    await reader.cancel("user_cancelled");
+  } catch {
+    // Ignore reader cancellation failures. The caller is already unwinding.
+  }
+}
+
+type ReaderReadResult<T> = Awaited<ReturnType<ReadableStreamDefaultReader<T>["read"]>>;
+
+async function readStreamChunkWithAbort<T>(
+  reader: ReadableStreamDefaultReader<T>,
+  signal?: AbortSignal
+): Promise<ReaderReadResult<T>> {
+  if (!signal) {
+    return reader.read();
+  }
+
+  if (signal.aborted) {
+    await cancelReadableStreamReader(reader);
+    throw new StreamCancelledError();
+  }
+
+  return new Promise<ReaderReadResult<T>>((resolve, reject) => {
+    const onAbort = (): void => {
+      signal.removeEventListener("abort", onAbort);
+      void cancelReadableStreamReader(reader);
+      reject(new StreamCancelledError());
+    };
+
+    signal.addEventListener("abort", onAbort, { once: true });
+    reader.read().then(
+      (result) => {
+        signal.removeEventListener("abort", onAbort);
+        resolve(result);
+      },
+      (error) => {
+        signal.removeEventListener("abort", onAbort);
+        reject(error);
+      }
+    );
+  });
+}
+
+async function throwIfStreamAborted(signal?: AbortSignal): Promise<void> {
+  if (signal?.aborted) {
+    throw new StreamCancelledError();
+  }
+}
+
+async function awaitWithAbort<T>(promise: Promise<T>, signal?: AbortSignal): Promise<T> {
+  if (!signal) {
+    return promise;
+  }
+
+  if (signal.aborted) {
+    throw new StreamCancelledError();
+  }
+
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = (): void => {
+      signal.removeEventListener("abort", onAbort);
+      reject(new StreamCancelledError());
+    };
+
+    signal.addEventListener("abort", onAbort, { once: true });
+    promise.then(
+      (value) => {
+        signal.removeEventListener("abort", onAbort);
+        resolve(value);
+      },
+      (error) => {
+        signal.removeEventListener("abort", onAbort);
+        reject(error);
+      }
+    );
+  });
 }
 
 // ============================================================================
@@ -1236,10 +1337,12 @@ export async function* processMessageStream(
   userMessage: string,
   context: GordonContext,
   threadId?: string,
-  resourceId?: string
+  resourceId?: string,
+  options: ProcessMessageStreamOptions = {}
 ): AsyncGenerator<StreamEvent, void> {
   const startTime = Date.now();
   logger.debug("Starting streaming message processing", { messageLength: userMessage.length });
+  const { signal } = options;
 
   // Input guardrails are now handled by GordonInputGuard processor (registered on all agents)
   const requestContext = createRequestContext(context);
@@ -1266,6 +1369,8 @@ export async function* processMessageStream(
   const enrichedMessage = systemState + userMessage;
 
   try {
+    await throwIfStreamAborted(signal);
+
     // Emit agent started event
     await emitEvent("agent:started", { agent: "gordon" });
 
@@ -1276,7 +1381,7 @@ export async function* processMessageStream(
     // Pass threadId and resourceId inside memory option for Mastra's newer execution path
     // This ensures sub-agents also receive thread/resource context for working memory updates
     const effectiveResourceId = resourceId || context.userId || "default";
-    const streamResult = await gordonAgent().stream(enrichedMessage, {
+    const streamRequest = gordonAgent().stream(enrichedMessage, {
       requestContext,
       ...(threadId && effectiveResourceId ? {
         memory: {
@@ -1287,6 +1392,7 @@ export async function* processMessageStream(
       maxSteps: 20,
       ...(tracingOptions && { tracingOptions }),
     } as Record<string, unknown>);
+    const streamResult = await awaitWithAbort(streamRequest, signal);
 
     let fullText = "";
     let currentAgent: string | undefined;
@@ -1327,7 +1433,7 @@ export async function* processMessageStream(
       const reader = streamObj.fullStream.getReader();
       try {
         while (true) {
-          const { done, value } = await reader.read();
+          const { done, value } = await readStreamChunkWithAbort(reader, signal);
           if (done) break;
 
           const chunk = value as StreamChunk;
@@ -1536,6 +1642,7 @@ export async function* processMessageStream(
       // Stream text chunks as they arrive
       // OUTPUT GUARDRAIL: Sanitize each chunk for sensitive data
       for await (const chunk of streamObj.textStream) {
+        await throwIfStreamAborted(signal);
         const outputCheck = await checkOutputGuardrails(chunk);
         const sanitizedChunk = outputCheck.sanitized;
         fullText += sanitizedChunk;
@@ -1547,6 +1654,7 @@ export async function* processMessageStream(
       }
     } else if (typeof streamObj.text === 'function') {
       // text is a promise function
+      await throwIfStreamAborted(signal);
       const rawText = await streamObj.text();
       logger.debug("Got text from function", { textLength: rawText?.length });
       if (rawText) {
@@ -1561,6 +1669,7 @@ export async function* processMessageStream(
       }
     } else if (streamObj.text instanceof Promise) {
       // text is a Promise
+      await throwIfStreamAborted(signal);
       const rawText = await streamObj.text;
       logger.debug("Got text from Promise", { textLength: rawText?.length });
       if (rawText) {
@@ -1595,6 +1704,7 @@ export async function* processMessageStream(
     const MAX_TEXT_FALLBACK_ATTEMPTS = 3;
     if (!fullText && streamObj.text) {
       for (let attempt = 0; attempt < MAX_TEXT_FALLBACK_ATTEMPTS; attempt++) {
+        await throwIfStreamAborted(signal);
         logger.debug("Attempting final text fallback", { attempt: attempt + 1, maxAttempts: MAX_TEXT_FALLBACK_ATTEMPTS });
         try {
           let finalText: string | undefined;
@@ -1626,6 +1736,7 @@ export async function* processMessageStream(
     // Get usage stats
     let usage = { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
     if (streamObj.usage) {
+      await throwIfStreamAborted(signal);
       const usageData = streamObj.usage instanceof Promise ? await streamObj.usage : streamObj.usage;
       usage = {
         promptTokens: usageData.inputTokens || 0,
@@ -1700,6 +1811,17 @@ export async function* processMessageStream(
     };
 
   } catch (err) {
+    if (err instanceof StreamCancelledError) {
+      logger.info("Streaming cancelled by user", {
+        messageLength: userMessage.length,
+      });
+      yield {
+        type: "cancelled",
+        content: err.message,
+      };
+      return;
+    }
+
     const error = err instanceof Error ? err : new Error(String(err));
     logger.error("Streaming error", error);
 
@@ -2201,14 +2323,46 @@ export async function checkToolSecurity(
 ): Promise<ToolSecurityCheckResult> {
   const userId = context.userId || "unknown";
 
+  const policyResult = await evaluateToolRequestPolicy(toolName, context);
+  if (!policyResult.allowed) {
+    auditLog.record(
+      userId,
+      "ACCESS_DENIED",
+      {
+        agentName,
+        toolName,
+        requestedActionId: context.requestedActionId,
+        requestedTaskScope: context.requestedTaskScope,
+      },
+      "BLOCKED",
+      { resultDetails: policyResult.reason }
+    );
+
+    return {
+      allowed: false,
+      error: policyResult.reason,
+    };
+  }
+
   // Check access control (ARMED mode for trading tools)
-  const accessResult = await checkToolAccess(toolName, context.config, userId);
+  let accessResult = await checkToolAccess(toolName, context.config, userId);
   if (!accessResult.allowed) {
     return {
       allowed: false,
       error: accessResult.reason,
       accessControlResult: accessResult,
     };
+  }
+
+  if (policyResult.requiresArmedMode && !requiresArmedModeForTool(toolName)) {
+    accessResult = await checkExplicitExecutionAccess(toolName, context.config, userId);
+    if (!accessResult.allowed) {
+      return {
+        allowed: false,
+        error: accessResult.reason,
+        accessControlResult: accessResult,
+      };
+    }
   }
 
   // Check rate limiting

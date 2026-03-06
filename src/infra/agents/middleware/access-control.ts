@@ -125,35 +125,19 @@ const STATE_MODIFYING_TOOLS = new Set([
   "approve_plan",
 ]);
 
-// ============================================================================
-// Access Control Check
-// ============================================================================
+export function requiresArmedModeForTool(toolName: string): boolean {
+  return TRADING_TOOLS.has(toolName);
+}
 
-/**
- * Check if a tool is allowed to execute based on current system state
- *
- * @param toolName - Name of the tool being executed
- * @param config - Current Gordon configuration (optional, will load if not provided)
- * @param userId - User ID for audit logging
- * @returns AccessControlResult with allowed status and details
- */
-export async function checkToolAccess(
+export function isStateModifyingTool(toolName: string): boolean {
+  return STATE_MODIFYING_TOOLS.has(toolName);
+}
+
+async function evaluateArmedModeRequirement(
   toolName: string,
-  config?: GordonConfig,
-  userId: string = "unknown"
+  currentConfig: GordonConfig,
+  userId: string,
 ): Promise<AccessControlResult> {
-  // Load config if not provided
-  const currentConfig = config ?? await loadConfig();
-
-  // Non-trading tools are always allowed
-  if (!TRADING_TOOLS.has(toolName) && !STATE_MODIFYING_TOOLS.has(toolName)) {
-    return {
-      allowed: true,
-      mode: currentConfig.mode,
-      armedUntil: currentConfig.armedUntil,
-    };
-  }
-
   // Check if system is in ARMED mode
   if (currentConfig.mode !== "ARMED") {
     const reason = `System is in SAFE mode. Cannot execute ${toolName}. Use 'arm' command to enable trading.`;
@@ -256,6 +240,47 @@ export async function checkToolAccess(
     armedUntil: currentConfig.armedUntil,
     remainingTimeMs,
   };
+}
+
+// ============================================================================
+// Access Control Check
+// ============================================================================
+
+/**
+ * Check if a tool is allowed to execute based on current system state
+ *
+ * @param toolName - Name of the tool being executed
+ * @param config - Current Gordon configuration (optional, will load if not provided)
+ * @param userId - User ID for audit logging
+ * @returns AccessControlResult with allowed status and details
+ */
+export async function checkToolAccess(
+  toolName: string,
+  config?: GordonConfig,
+  userId: string = "unknown"
+): Promise<AccessControlResult> {
+  // Load config if not provided
+  const currentConfig = config ?? await loadConfig();
+
+  // Non-trading tools are always allowed
+  if (!TRADING_TOOLS.has(toolName) && !STATE_MODIFYING_TOOLS.has(toolName)) {
+    return {
+      allowed: true,
+      mode: currentConfig.mode,
+      armedUntil: currentConfig.armedUntil,
+    };
+  }
+
+  return evaluateArmedModeRequirement(toolName, currentConfig, userId);
+}
+
+export async function checkExplicitExecutionAccess(
+  toolName: string,
+  config?: GordonConfig,
+  userId: string = "unknown",
+): Promise<AccessControlResult> {
+  const currentConfig = config ?? await loadConfig();
+  return evaluateArmedModeRequirement(toolName, currentConfig, userId);
 }
 
 // ============================================================================

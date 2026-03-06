@@ -6,7 +6,7 @@
 
 import { GORDON_DIR } from "./infra/storage/paths.ts";
 
-const VERSION = "0.75.3";
+const VERSION = "0.8.4";
 const MIN_BUN_VERSION = "1.0.0";
 
 export interface CLIFlags {
@@ -23,7 +23,10 @@ export interface CLIFlags {
 export type ParsedCLICommand =
   | { name: "daemon"; action: "start" | "run" | "stop" | "status" }
   | { name: "schedule"; action: "add" | "remove" | "list"; args: string[] }
-  | { name: "init"; args: string[] };
+  | { name: "init"; args: string[] }
+  | { name: "doctor"; args: string[] }
+  | { name: "configure"; args: string[] }
+  | { name: "bootstrap"; args: string[] };
 
 /** Short flag → long flag mapping */
 const SHORT_FLAGS: Record<string, keyof CLIFlags> = {
@@ -85,10 +88,12 @@ export function parseFlags(): CLIFlags {
  * - gordon init
  */
 export function parseCommand(): ParsedCLICommand | null {
-  const args = process.argv.slice(2).filter((arg) => !arg.startsWith("-"));
+  const args = process.argv.slice(2);
   if (args.length === 0) return null;
 
   const command = args[0];
+  if (!command || command.startsWith("-")) return null;
+
   if (command === "daemon") {
     const action = (args[1] || "status") as "start" | "run" | "stop" | "status";
     if (action === "start" || action === "run" || action === "stop" || action === "status") {
@@ -105,6 +110,18 @@ export function parseCommand(): ParsedCLICommand | null {
 
   if (command === "init") {
     return { name: "init", args: args.slice(1) };
+  }
+
+  if (command === "doctor") {
+    return { name: "doctor", args: args.slice(1) };
+  }
+
+  if (command === "configure") {
+    return { name: "configure", args: args.slice(1) };
+  }
+
+  if (command === "bootstrap") {
+    return { name: "bootstrap", args: args.slice(1) };
   }
 
   return null;
@@ -169,6 +186,9 @@ USAGE
   gordon [flags]            Launch with options
   gordon daemon <action>    Manage local daemon (start|stop|status)
   gordon schedule <action>  Manage local scheduled tasks (add|remove|list)
+  gordon doctor [--json]    Run configuration and provider diagnostics
+  gordon configure [area]   Launch Gordon directly into a re-runnable setup flow
+  gordon bootstrap [...]    Non-interactive setup for CI, cloud, and scripted machines
   gordon init [dir]         Scaffold a local agent project
 
 FLAGS
@@ -189,10 +209,10 @@ INTERACTIVE COMMANDS
     /trending       Show trending tokens
     /analyze BTC    Analyze a specific coin
     /portfolio      View your portfolio
-    /plan ETHUSDT   Create a trade plan
+    /preview-order  Preview a trade before execution
     /positions      View open positions
     /bugreport      Generate a bug report link
-    /help           Show all 54+ commands
+    /help           Browse workflows and commands
 
 CONFIGURATION
   Config:     ${GORDON_DIR}/config.json
@@ -219,8 +239,14 @@ UPDATING
 
 GETTING STARTED
   1. Run 'gordon' to launch the terminal
-  2. Follow the setup wizard to configure API keys
+  2. Choose QuickStart or Advanced onboarding
   3. Use /scan to find trading opportunities
+
+OPERATIONS
+  gordon doctor
+  gordon configure llm
+  gordon configure exchange
+  gordon bootstrap --profile quickstart --llm-provider openai --llm-key sk-...
 
 SUPPORT
   GitHub:  https://github.com/general-liquidity/gordon-cli

@@ -1,9 +1,8 @@
 import React from "react";
 import { Box, Text } from "ink";
-import { Spinner } from "@inkjs/ui";
 import type { Mode } from "../types/index.ts";
+import type { CredentialProfile } from "../infra/actions/types.ts";
 import { COLORS } from "./theme.ts";
-import { TradingModeIndicator, ConnectionStatus, StatusBadge } from "./components/VisualStatus.tsx";
 import { TickerTape, type TickerItem } from "./components/effects/index.ts";
 import { StrategyRuntime } from "../core/runtime/index.ts";
 
@@ -32,6 +31,17 @@ export interface ChainStatusInfo {
   base: boolean;
 }
 
+export interface OperatorStatusInfo {
+  modelLabel: string;
+  credentialProfile: CredentialProfile;
+  activeVenueLabel: string;
+  requestState: "idle" | "loading" | "streaming";
+  queueDepth: number;
+  configScopeLabel: string;
+  activeProfile?: string | null;
+  activityStatus?: string | null;
+}
+
 interface StatusBarProps {
   mode: Mode;
   portfolioValue?: number;
@@ -43,7 +53,33 @@ interface StatusBarProps {
   tickerItems?: TickerItem[];
   /** Which blockchain networks are configured */
   chainStatus?: ChainStatusInfo;
+  operatorStatus?: OperatorStatusInfo;
 }
+
+interface StatusColumnProps {
+  width: number;
+  label: string;
+  value: string;
+  valueColor?: string;
+  valueBold?: boolean;
+  paddingRight?: number;
+}
+
+const StatusColumn: React.FC<StatusColumnProps> = ({
+  width,
+  label,
+  value,
+  valueColor = COLORS.WHITE,
+  valueBold = false,
+  paddingRight = 1,
+}) => (
+  <Box width={width} paddingRight={paddingRight}>
+    <Text color={COLORS.DIM}>{label}: </Text>
+    <Text color={valueColor} bold={valueBold} wrap="truncate-end">
+      {value}
+    </Text>
+  </Box>
+);
 
 export const StatusBar: React.FC<StatusBarProps> = ({
   mode,
@@ -53,7 +89,10 @@ export const StatusBar: React.FC<StatusBarProps> = ({
   threadInfo,
   tickerItems,
   chainStatus,
+  operatorStatus,
 }) => {
+  const stdoutWidth = process.stdout.columns ?? 160;
+
   // Format portfolio value
   const formatValue = (value: number | undefined): string => {
     if (value === undefined) return "---";
@@ -81,6 +120,47 @@ export const StatusBar: React.FC<StatusBarProps> = ({
     });
   };
 
+  const innerWidth = Math.max(80, stdoutWidth - 4);
+  const modeColumnWidth = Math.max(10, Math.floor(innerWidth * 0.26));
+  const btcColumnWidth = Math.max(10, Math.floor(innerWidth * 0.16));
+  const portfolioColumnWidth = Math.max(10, Math.floor(innerWidth * 0.18));
+  const threadColumnWidth = Math.max(10, Math.floor(innerWidth * 0.26));
+  const apiColumnWidth = Math.max(
+    10,
+    innerWidth - modeColumnWidth - btcColumnWidth - portfolioColumnWidth - threadColumnWidth
+  );
+
+  const secondaryScopeLabel = operatorStatus?.activeProfile
+    ? `${operatorStatus.configScopeLabel}/${operatorStatus.activeProfile}`
+    : operatorStatus?.configScopeLabel;
+
+  const configuredChains = [
+    chainStatus?.solana ? "SOL" : null,
+    chainStatus?.polkadot ? "DOT" : null,
+    chainStatus?.chainlink ? "CL" : null,
+    chainStatus?.evm ? "EVM" : null,
+    chainStatus?.cdp ? "CDP" : null,
+    chainStatus?.base && !chainStatus?.cdp ? "BASE" : null,
+  ].filter((value): value is string => Boolean(value));
+
+  const modeValue = activeStrategies > 0 ? `${mode} [${activeStrategies} active]` : mode;
+  const portfolioValueLabel = configuredChains.length > 0
+    ? `$${formatValue(portfolioValue)} · ${configuredChains.join(" ")}`
+    : `$${formatValue(portfolioValue)}`;
+  const threadValue = threadInfo
+    ? `${threadInfo.name}${threadInfo.isBranch ? " [branch]" : ""} (#${threadInfo.messageCount})`
+    : "---";
+  const connectionValue = connectionStatus === "connecting"
+    ? "◐ Connecting"
+    : connectionStatus === "connected"
+      ? "●"
+      : "○";
+  const connectionColor = connectionStatus === "connecting"
+    ? COLORS.BLUE
+    : connectionStatus === "connected"
+      ? COLORS.GREEN
+      : COLORS.RED;
+
   return (
     <Box flexDirection="column" width="100%">
       {/* Scrolling ticker tape — only shown when items are available */}
@@ -93,76 +173,88 @@ export const StatusBar: React.FC<StatusBarProps> = ({
         borderStyle="single"
         borderColor={COLORS.TAN_DIM}
         paddingX={1}
-        justifyContent="space-between"
+        paddingY={0}
         width="100%"
+        flexDirection="column"
       >
-        {/* Left section: Mode Badge with Visual Hierarchy */}
-        <Box gap={1}>
-          <Text color={COLORS.DIM}>Mode:</Text>
-          <TradingModeIndicator
-            mode={mode}
-            animate={true}
+        <Box width="100%">
+          <StatusColumn
+            width={modeColumnWidth}
+            label="Mode"
+            value={modeValue}
+            valueColor={mode === "ARMED" ? COLORS.RED : COLORS.GREEN}
+            valueBold={true}
           />
-          {activeStrategies > 0 && (
-            <Text color={COLORS.DIM}>[<Text color={COLORS.ACCENT_DIM}>{activeStrategies} active</Text>]</Text>
-          )}
+          <StatusColumn
+            width={btcColumnWidth}
+            label="BTC"
+            value={`$${formatBtcPrice(btcPrice)}`}
+            valueColor={COLORS.HIGHLIGHT}
+            valueBold={true}
+          />
+          <StatusColumn
+            width={portfolioColumnWidth}
+            label="Portfolio"
+            value={portfolioValueLabel}
+            valueColor={COLORS.WHITE}
+            valueBold={true}
+          />
+          <StatusColumn
+            width={threadColumnWidth}
+            label="Thread"
+            value={threadValue}
+            valueColor={threadInfo?.isBranch ? COLORS.YELLOW : COLORS.BLUE}
+          />
+          <StatusColumn
+            width={apiColumnWidth}
+            label="API"
+            value={connectionValue}
+            valueColor={connectionColor}
+            valueBold={true}
+            paddingRight={0}
+          />
         </Box>
 
-        {/* BTC Price */}
-        <Box gap={1}>
-          <Text color={COLORS.DIM}>BTC:</Text>
-          <Text color={COLORS.HIGHLIGHT} bold>
-            ${formatBtcPrice(btcPrice)}
-          </Text>
-        </Box>
-
-        {/* Portfolio */}
-        <Box gap={1}>
-          <Text color={COLORS.DIM}>Portfolio:</Text>
-          <Text color={COLORS.WHITE} bold>
-            ${formatValue(portfolioValue)}
-          </Text>
-        </Box>
-
-        {/* Chain Status Indicators */}
-        {chainStatus && (chainStatus.solana || chainStatus.polkadot || chainStatus.chainlink || chainStatus.evm || chainStatus.cdp || chainStatus.base) && (
-          <Box gap={1}>
-            <Text color={COLORS.DIM}>Chains:</Text>
-            {chainStatus.solana && <Text color={COLORS.GREEN} bold>SOL</Text>}
-            {chainStatus.polkadot && <Text color={COLORS.GREEN} bold>DOT</Text>}
-            {chainStatus.chainlink && <Text color={COLORS.GREEN} bold>CL</Text>}
-            {chainStatus.evm && <Text color={COLORS.GREEN} bold>EVM</Text>}
-            {chainStatus.cdp && <Text color={COLORS.GREEN} bold>CDP</Text>}
-            {chainStatus.base && !chainStatus.cdp && <Text color={COLORS.GREEN} bold>BASE</Text>}
+        {operatorStatus && (
+          <Box width="100%">
+            <StatusColumn
+              width={modeColumnWidth}
+              label="Model"
+              value={operatorStatus.modelLabel}
+            />
+            <StatusColumn
+              width={btcColumnWidth}
+              label="Profile"
+              value={operatorStatus.credentialProfile}
+              valueColor={operatorStatus.credentialProfile === "live" ? COLORS.TAN : COLORS.ACCENT_DIM}
+            />
+            <StatusColumn
+              width={portfolioColumnWidth}
+              label="Venue"
+              value={operatorStatus.activeVenueLabel}
+            />
+            <StatusColumn
+              width={threadColumnWidth}
+              label="Scope"
+              value={secondaryScopeLabel ?? "---"}
+            />
+            <StatusColumn
+              width={apiColumnWidth}
+              label="Run"
+              value={`${operatorStatus.requestState} · Q ${operatorStatus.queueDepth}`}
+              valueColor={
+                operatorStatus.requestState === "streaming"
+                  ? COLORS.HIGHLIGHT
+                  : operatorStatus.requestState === "loading"
+                    ? COLORS.ACCENT
+                    : operatorStatus.queueDepth > 0
+                      ? COLORS.WHITE
+                      : COLORS.DIM
+              }
+              paddingRight={0}
+            />
           </Box>
         )}
-
-        {/* Thread Indicator with Visual Status */}
-        {threadInfo && (
-          <Box gap={1}>
-            <Text color={COLORS.DIM}>Thread:</Text>
-            <StatusBadge
-              level={threadInfo.isBranch ? "warning" : "info"}
-              label={threadInfo.name}
-              animate={threadInfo.isBranch}
-            />
-            <Text color={COLORS.DIM}>(#{threadInfo.messageCount})</Text>
-          </Box>
-        )}
-
-        {/* Right section: Connection Status with Visual Hierarchy */}
-        <Box gap={1}>
-          <Text color={COLORS.DIM}>API:</Text>
-          {connectionStatus === "connecting" ? (
-            <Spinner label="Connecting..." />
-          ) : (
-            <ConnectionStatus
-              status={connectionStatus}
-              service=""
-              animate={false}
-            />
-          )}
-        </Box>
       </Box>
     </Box>
   );

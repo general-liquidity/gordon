@@ -14,6 +14,7 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
+import { formatActionPlanMarkdown, planActionExecution } from "../../actions/runtime.ts";
 import { getGordonContext, type MastraExecutionContext } from "./types.ts";
 import type { ExchangeExtended } from "../../exchange/types.ts";
 
@@ -24,6 +25,14 @@ import type { ExchangeExtended } from "../../exchange/types.ts";
 const errors = {
   noExchange: { error: "Exchange client not connected. Please run setup first." },
 };
+
+const marketOrderPlanOutputSchema = z.object({
+  ready: z.boolean(),
+  summary: z.string(),
+  blockers: z.array(z.string()),
+  preview: z.record(z.string(), z.unknown()).optional(),
+  error: z.string().optional(),
+});
 
 // ============================================================================
 // Trending Tokens Tool
@@ -568,22 +577,16 @@ export const placeMarketOrderTool = createTool({
     if (!ctx?.exchange) {
       return errors.noExchange;
     }
-
-    if (ctx.config?.mode !== "ARMED") {
+    const plan = await planActionExecution("trading.market_order", { symbol, side, quantity, quoteOrderQty }, ctx);
+    if (!plan.ready) {
       return {
-        error: "System must be ARMED to place orders. Use 'arm' command first.",
+        error: formatActionPlanMarkdown(plan),
       };
     }
 
-    if (!quantity && !quoteOrderQty) {
-      return { error: "Either quantity or quoteOrderQty must be provided." };
-    }
-
-    if (quantity && quoteOrderQty) {
-      return { error: "Provide either quantity or quoteOrderQty, not both." };
-    }
-
-    const normalizedSymbol = symbol.toUpperCase().endsWith("USDT") || symbol.toUpperCase().endsWith("USDC")
+    const normalizedSymbol = typeof plan.preview?.symbol === "string"
+      ? plan.preview.symbol
+      : symbol.toUpperCase().endsWith("USDT") || symbol.toUpperCase().endsWith("USDC")
       ? symbol.toUpperCase()
       : `${symbol.toUpperCase()}USDT`;
 
@@ -649,6 +652,43 @@ export const placeMarketOrderTool = createTool({
   },
 });
 
+export const previewMarketOrderTool = createTool({
+  id: "preview_market_order",
+  description:
+    "Preview a spot market order without placing it. " +
+    "Use before live execution to inspect readiness, live price estimates, account blockers, and ARMED-mode requirements.",
+  inputSchema: z.object({
+    symbol: z.string().describe("Trading pair (e.g., 'BTCUSDT', 'ETHUSDT')"),
+    side: z.enum(["BUY", "SELL"]).describe("BUY or SELL"),
+    quantity: z.number().positive().optional().describe("Base asset quantity to trade"),
+    quoteOrderQty: z.number().positive().optional().describe("Quote asset amount to spend"),
+  }),
+  outputSchema: marketOrderPlanOutputSchema,
+  execute: async ({ symbol, side, quantity, quoteOrderQty }, execContext: MastraExecutionContext) => {
+    const ctx = getGordonContext(execContext);
+    if (!ctx) {
+      return { error: "Context not available.", ready: false, summary: "Context not available.", blockers: ["Context not available."] };
+    }
+
+    try {
+      const plan = await planActionExecution("trading.preview_market_order", { symbol, side, quantity, quoteOrderQty }, ctx);
+      return {
+        ready: plan.ready,
+        summary: formatActionPlanMarkdown(plan),
+        blockers: plan.blockers,
+        preview: plan.preview,
+      };
+    } catch (error) {
+      return {
+        ready: false,
+        summary: "Unable to build order preview.",
+        blockers: [error instanceof Error ? error.message : String(error)],
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+  },
+});
+
 // ============================================================================
 // Export as Object (Mastra format)
 // ============================================================================
@@ -662,5 +702,6 @@ export const discoveryTools = {
   get_high_volume_tokens: getHighVolumeTokensTool,
   get_available_markets: getAvailableMarketsTool,
   place_bracket_order: placeBracketOrderTool,
+  preview_market_order: previewMarketOrderTool,
   place_market_order: placeMarketOrderTool,
 };

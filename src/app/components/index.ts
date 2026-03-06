@@ -40,7 +40,7 @@ export { ShortcutsOverlay, ShortcutsHint, useShortcutsHint } from "./ShortcutsOv
 export { PaginatedOutput, PaginatedText, usePagination } from "./PaginatedOutput.tsx";
 
 // Quick actions
-export { QuickActions, getQuickActionCommand, getQuickActionsCount, QUICK_ACTIONS } from "./QuickActions.tsx";
+export { QuickActions, getQuickActionCommand, getQuickActionsCount, getQuickActionItems } from "./QuickActions.tsx";
 
 // Result summaries and timing
 export {

@@ -3,7 +3,7 @@
  * Step-by-step configuration for exchange, broker, and LLM API keys
  */
 
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import { Box, Text, useInput } from "ink";
 import TextInput from "ink-text-input";
 
@@ -24,6 +24,11 @@ import type {
   MultiBrokerConfig,
 } from "../types/index.ts";
 import { COLORS } from "./theme.ts";
+import {
+  getSetupSectionLabel,
+  type SetupWizardMode,
+  type SetupWizardSection,
+} from "./setup-flow.ts";
 
 type WizardStep =
   | "welcome"
@@ -45,12 +50,15 @@ type WizardStep =
   | "chain-evm"
   | "chain-cdp"
   | "chain-synthdata"
+  | "rails"
+  | "mcp"
   | "llm"
   | "preferences"
   | "done";
 
 type ChainId = "solana" | "polkadot" | "chainlink" | "evm" | "cdp" | "synthdata";
 type LLMWizardProvider = "openai" | "inception" | "dedalus";
+type RailProviderId = "helius" | "moonpay" | "polygon";
 
 const CHAIN_OPTIONS: Array<{ id: ChainId; label: string; description: string }> = [
   { id: "solana", label: "Solana", description: "DeFi swaps, token launches, staking, lending (60+ tools)" },
@@ -240,6 +248,14 @@ interface ChainKeys {
   synthDataApiKey: string;
 }
 
+interface RailKeys {
+  heliusApiKey: string;
+  moonpayApiKey: string;
+  moonpaySecretKey: string;
+  polygonRecipient: string;
+  polygonPrivateKey: string;
+}
+
 interface WizardState {
   step: WizardStep;
   exchangeType: ExchangeSelection;
@@ -258,6 +274,8 @@ interface WizardState {
   // Chain setup
   selectedChains: ChainId[];
   chainKeys: ChainKeys;
+  railKeys: RailKeys;
+  mcpAutoSync: boolean;
   chainSetupIndex: number;
   selectedLlmProvider: LLMWizardProvider | "";
   openaiApiKey: string;
@@ -270,6 +288,85 @@ interface WizardState {
 
 interface SetupWizardProps {
   onComplete: () => void;
+  mode?: SetupWizardMode;
+  initialSection?: SetupWizardSection | null;
+}
+
+const SECTION_STEP_MAP: Record<SetupWizardSection, WizardStep> = {
+  exchange: "exchange-select",
+  broker: "broker-select",
+  chains: "chain-select",
+  rails: "rails",
+  mcp: "mcp",
+  llm: "llm",
+  preferences: "preferences",
+};
+
+function getFirstActionStep(
+  mode: SetupWizardMode,
+  initialSection: SetupWizardSection | null | undefined,
+): WizardStep {
+  if (mode === "quickstart") return "llm";
+  if (mode === "configure" && initialSection) return SECTION_STEP_MAP[initialSection];
+  return "exchange-select";
+}
+
+function getPostExchangeStep(
+  mode: SetupWizardMode,
+  initialSection: SetupWizardSection | null | undefined,
+): WizardStep {
+  if (mode === "quickstart") return "preferences";
+  if (mode === "configure" && initialSection === "exchange") return "done";
+  return "broker-select";
+}
+
+function getPostBrokerStep(
+  mode: SetupWizardMode,
+  initialSection: SetupWizardSection | null | undefined,
+): WizardStep {
+  if (mode === "configure" && initialSection === "broker") return "done";
+  return "chain-select";
+}
+
+function getPostChainsStep(
+  mode: SetupWizardMode,
+  initialSection: SetupWizardSection | null | undefined,
+): WizardStep {
+  if (mode === "configure" && initialSection === "chains") return "done";
+  return "rails";
+}
+
+function getPostRailsStep(
+  mode: SetupWizardMode,
+  initialSection: SetupWizardSection | null | undefined,
+): WizardStep {
+  if (mode === "configure" && initialSection === "rails") return "done";
+  return "mcp";
+}
+
+function getPostMcpStep(
+  mode: SetupWizardMode,
+  initialSection: SetupWizardSection | null | undefined,
+): WizardStep {
+  if (mode === "configure" && initialSection === "mcp") return "done";
+  return "llm";
+}
+
+function getPostLlmStep(
+  mode: SetupWizardMode,
+  initialSection: SetupWizardSection | null | undefined,
+): WizardStep {
+  if (mode === "quickstart") return "exchange-select";
+  if (mode === "configure" && initialSection === "llm") return "done";
+  return "preferences";
+}
+
+function getPostPreferencesStep(
+  mode: SetupWizardMode,
+  initialSection: SetupWizardSection | null | undefined,
+): WizardStep {
+  if (mode === "configure" && initialSection === "preferences") return "done";
+  return "done";
 }
 
 function maskSecret(value: string): string {
@@ -357,7 +454,71 @@ function parseLLMProviderInput(value: string): { provider: LLMWizardProvider; ap
   };
 }
 
-export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElement {
+function parseRailsInput(value: string): { keys: Partial<RailKeys>; errors: string[] } {
+  const keys: Partial<RailKeys> = {};
+  const errors: string[] = [];
+  const entries = value
+    .split(";")
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+
+  for (const entry of entries) {
+    const [provider, rawValue] = entry.split(/[:=]/, 2).map((part) => part.trim());
+    if (!provider || !rawValue) {
+      errors.push(`Invalid rail entry: ${entry}`);
+      continue;
+    }
+
+    const normalized = provider.toLowerCase() as RailProviderId;
+    if (normalized === "helius") {
+      keys.heliusApiKey = rawValue;
+      continue;
+    }
+
+    if (normalized === "moonpay") {
+      const [apiKey, secretKey] = rawValue.split(",").map((part) => part.trim());
+      if (!apiKey || !secretKey) {
+        errors.push("MoonPay requires both api key and secret key: moonpay:apiKey,secretKey");
+        continue;
+      }
+      keys.moonpayApiKey = apiKey;
+      keys.moonpaySecretKey = secretKey;
+      continue;
+    }
+
+    if (normalized === "polygon") {
+      const [recipient, privateKey] = rawValue.split(",").map((part) => part.trim());
+      if (!recipient || !privateKey) {
+        errors.push("Polygon x402 requires recipient and private key: polygon:recipient,privateKey");
+        continue;
+      }
+      keys.polygonRecipient = recipient;
+      keys.polygonPrivateKey = privateKey;
+      continue;
+    }
+
+    errors.push(`Unsupported rail provider: ${provider}`);
+  }
+
+  return { keys, errors };
+}
+
+function parseMcpSyncInput(value: string): boolean | null {
+  const normalized = value.trim().toLowerCase();
+  if (!normalized || normalized === "auto" || normalized === "on" || normalized === "true" || normalized === "yes") {
+    return true;
+  }
+  if (normalized === "manual" || normalized === "off" || normalized === "false" || normalized === "no") {
+    return false;
+  }
+  return null;
+}
+
+export function SetupWizard({
+  onComplete,
+  mode = "advanced",
+  initialSection = null,
+}: SetupWizardProps): React.ReactElement {
   const [state, setState] = useState<WizardState>({
     step: "welcome",
     exchangeType: "",
@@ -387,6 +548,14 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
       cdpWalletSecret: "",
       synthDataApiKey: "",
     },
+    railKeys: {
+      heliusApiKey: "",
+      moonpayApiKey: "",
+      moonpaySecretKey: "",
+      polygonRecipient: "",
+      polygonPrivateKey: "",
+    },
+    mcpAutoSync: true,
     chainSetupIndex: 0,
     selectedLlmProvider: "",
     openaiApiKey: "",
@@ -402,6 +571,24 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
     inputValue: "",
     isValidating: false,
   });
+
+  useEffect(() => {
+    let mounted = true;
+    void loadConfig().then((config) => {
+      if (!mounted) return;
+      setState((prev) => ({
+        ...prev,
+        preferences: config.preferences,
+        mcpAutoSync: config.agentRails.autoSyncMcpPlugins,
+      }));
+    }).catch(() => {
+      // Best effort only. The wizard still works with defaults.
+    });
+
+    return () => {
+      mounted = false;
+    };
+  }, [initialSection, mode]);
 
   const validateExchangeCredentials = useCallback(async (
     exchangeType: ExchangeId,
@@ -459,7 +646,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
 
       setState((prev) => ({
         ...prev,
-        step: "broker-select",
+        step: getPostExchangeStep(mode, initialSection),
         isValidating: false,
         exchangePermissions: permissions,
         exchangeError: null,
@@ -480,7 +667,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
 
       setState((prev) => ({
         ...prev,
-        step: "broker-select",
+        step: getPostExchangeStep(mode, initialSection),
         isValidating: false,
         exchangePermissions: null,
         exchangeError: null,
@@ -504,7 +691,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
         exchangeValidated: false,
       }));
     }
-  }, []);
+  }, [initialSection, mode]);
 
   const validateBrokerCredentials = useCallback(async (
     brokerType: BrokerId,
@@ -539,7 +726,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
 
       setState((prev) => ({
         ...prev,
-        step: "chain-select",
+        step: getPostBrokerStep(mode, initialSection),
         isValidating: false,
         exchangeError: null,
         brokerPaper: paper,
@@ -628,6 +815,11 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
     if (state.chainKeys.cdpApiKeySecret) envKeys.CDP_API_KEY_SECRET = state.chainKeys.cdpApiKeySecret;
     if (state.chainKeys.cdpWalletSecret) envKeys.CDP_WALLET_SECRET = state.chainKeys.cdpWalletSecret;
     if (state.chainKeys.synthDataApiKey) envKeys.SYNTHDATA_API_KEY = state.chainKeys.synthDataApiKey;
+    if (state.railKeys.heliusApiKey) envKeys.HELIUS_API_KEY = state.railKeys.heliusApiKey;
+    if (state.railKeys.moonpayApiKey) envKeys.MOONPAY_API_KEY = state.railKeys.moonpayApiKey;
+    if (state.railKeys.moonpaySecretKey) envKeys.MOONPAY_SECRET_KEY = state.railKeys.moonpaySecretKey;
+    if (state.railKeys.polygonRecipient) envKeys.POLYGON_X402_RECIPIENT = state.railKeys.polygonRecipient;
+    if (state.railKeys.polygonPrivateKey) envKeys.POLYGON_X402_PRIVATE_KEY = state.railKeys.polygonPrivateKey;
 
     // 2. Save secrets to .env (the source of truth for credentials)
     const envStatus = await checkEnvStatus();
@@ -697,6 +889,65 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
       newConfig.activeBrokerId = brokerId;
     }
 
+    newConfig.agentRails = {
+      ...currentConfig.agentRails,
+      autoSyncMcpPlugins: state.mcpAutoSync,
+      walletProviders: state.railKeys.moonpayApiKey || state.railKeys.moonpaySecretKey
+        ? [
+            ...currentConfig.agentRails.walletProviders
+              .filter((provider) => provider.type !== "moonpay")
+              .map((provider) => ({ ...provider, isDefault: false })),
+            {
+              id: "moonpay",
+              type: "moonpay",
+              authMode: "native",
+              enabled: true,
+              isDefault: true,
+            },
+          ]
+        : currentConfig.agentRails.walletProviders,
+      activeWalletProviderId: state.railKeys.moonpayApiKey || state.railKeys.moonpaySecretKey
+        ? "moonpay"
+        : currentConfig.agentRails.activeWalletProviderId,
+      chainProviders: state.railKeys.heliusApiKey
+        ? [
+            ...currentConfig.agentRails.chainProviders
+              .filter((provider) => provider.type !== "helius")
+              .map((provider) => ({ ...provider, isDefault: false })),
+            {
+              id: "helius",
+              type: "helius",
+              authMode: "native",
+              enabled: true,
+              isDefault: true,
+              network: "solana",
+            },
+          ]
+        : currentConfig.agentRails.chainProviders,
+      activeChainProviderId: state.railKeys.heliusApiKey
+        ? "helius"
+        : currentConfig.agentRails.activeChainProviderId,
+      paymentProviders: state.railKeys.polygonRecipient || state.railKeys.polygonPrivateKey
+        ? [
+            ...currentConfig.agentRails.paymentProviders
+              .filter((provider) => provider.type !== "polygon")
+              .map((provider) => ({ ...provider, isDefault: false })),
+            {
+              id: "polygon",
+              type: "polygon",
+              authMode: "native",
+              enabled: true,
+              isDefault: true,
+              network: "polygon",
+              recipient: state.railKeys.polygonRecipient || undefined,
+            },
+          ]
+        : currentConfig.agentRails.paymentProviders,
+      activePaymentProviderId: state.railKeys.polygonRecipient || state.railKeys.polygonPrivateKey
+        ? "polygon"
+        : currentConfig.agentRails.activePaymentProviderId,
+    };
+
     await saveConfig(newConfig);
 
     // Reset provider and agent caches so next access reinitializes with fresh env variables
@@ -716,6 +967,8 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
     state.brokerPaper,
     state.brokerValidated,
     state.chainKeys,
+    state.railKeys,
+    state.mcpAutoSync,
     state.preferences,
     state.selectedLlmProvider,
     state.openaiApiKey,
@@ -740,7 +993,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
       const nextChain = chains[nextIndex];
       setState((prev) => ({
         ...prev,
-        step: nextChain ? chainStepMap[nextChain] : "llm",
+        step: nextChain ? chainStepMap[nextChain] : getPostChainsStep(mode, initialSection),
         chainSetupIndex: nextIndex,
         inputValue: "",
         exchangeError: null,
@@ -748,12 +1001,12 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
     } else {
       setState((prev) => ({
         ...prev,
-        step: "llm",
+        step: getPostChainsStep(mode, initialSection),
         inputValue: "",
         exchangeError: null,
       }));
     }
-  }, []);
+  }, [initialSection, mode]);
 
   const handleInputSubmit = useCallback(
     async (value: string) => {
@@ -942,7 +1195,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
         case "chain-select": {
           // Parse comma-separated chain selections (e.g., "1,3,5" or "solana,chainlink")
           if (!trimmedValue) {
-            setState((prev) => ({ ...prev, step: "llm", inputValue: "" }));
+            setState((prev) => ({ ...prev, step: getPostChainsStep(mode, initialSection), inputValue: "" }));
             break;
           }
           const parts = trimmedValue.split(",").map((s) => s.trim().toLowerCase());
@@ -960,7 +1213,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
           }
           const unique = [...new Set(selected)];
           if (unique.length === 0) {
-            setState((prev) => ({ ...prev, step: "llm", inputValue: "" }));
+            setState((prev) => ({ ...prev, step: getPostChainsStep(mode, initialSection), inputValue: "" }));
           } else {
             const firstChain = unique[0]!;
             setState((prev) => ({
@@ -1125,12 +1378,65 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
               openaiApiKey: parsed.provider === "openai" ? parsed.apiKey : prev.openaiApiKey,
               dedalusApiKey: parsed.provider === "dedalus" ? parsed.apiKey : prev.dedalusApiKey,
               inceptionApiKey: parsed.provider === "inception" ? parsed.apiKey : prev.inceptionApiKey,
-              step: "preferences",
+              step: getPostLlmStep(mode, initialSection),
               inputValue: "",
               exchangeError: null,
             }));
           }
           break;
+
+        case "rails": {
+          if (!trimmedValue) {
+            setState((prev) => ({
+              ...prev,
+              step: getPostRailsStep(mode, initialSection),
+              inputValue: "",
+              exchangeError: null,
+            }));
+            break;
+          }
+
+          const parsed = parseRailsInput(trimmedValue);
+          if (parsed.errors.length > 0) {
+            setState((prev) => ({
+              ...prev,
+              exchangeError: parsed.errors.join("\n"),
+            }));
+            break;
+          }
+
+          setState((prev) => ({
+            ...prev,
+            railKeys: {
+              ...prev.railKeys,
+              ...parsed.keys,
+            },
+            step: getPostRailsStep(mode, initialSection),
+            inputValue: "",
+            exchangeError: null,
+          }));
+          break;
+        }
+
+        case "mcp": {
+          const autoSync = parseMcpSyncInput(trimmedValue);
+          if (autoSync === null) {
+            setState((prev) => ({
+              ...prev,
+              exchangeError: 'Use "auto" or "manual" (or on/off, true/false).',
+            }));
+            break;
+          }
+
+          setState((prev) => ({
+            ...prev,
+            mcpAutoSync: autoSync,
+            step: getPostMcpStep(mode, initialSection),
+            inputValue: "",
+            exchangeError: null,
+          }));
+          break;
+        }
 
         case "preferences": {
           const percent = parseInt(trimmedValue, 10);
@@ -1139,7 +1445,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
             setState((prev) => ({
               ...prev,
               preferences: newPreferences,
-              step: "done",
+              step: getPostPreferencesStep(mode, initialSection),
               inputValue: "",
             }));
             await saveConfiguration({ preferences: newPreferences });
@@ -1159,6 +1465,8 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
       state.chainSetupIndex,
       state.selectedChains,
       state.preferences,
+      initialSection,
+      mode,
       validateExchangeCredentials,
       validateBrokerCredentials,
       saveConfiguration,
@@ -1187,7 +1495,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
           exchangePermissions: null,
           exchangeError: null,
           exchangeValidated: false,
-          step: "broker-select",
+          step: getPostExchangeStep(mode, initialSection),
           inputValue: "",
         }));
         break;
@@ -1204,7 +1512,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
           brokerPaper: true,
           brokerValidated: false,
           exchangeError: null,
-          step: "chain-select",
+          step: getPostBrokerStep(mode, initialSection),
           inputValue: "",
         }));
         break;
@@ -1212,7 +1520,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
       case "chain-select":
         setState((prev) => ({
           ...prev,
-          step: "llm",
+          step: getPostChainsStep(mode, initialSection),
           inputValue: "",
         }));
         break;
@@ -1229,25 +1537,43 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
       case "llm":
         setState((prev) => ({
           ...prev,
-          step: "preferences",
+          step: getPostLlmStep(mode, initialSection),
           inputValue: "",
+        }));
+        break;
+
+      case "rails":
+        setState((prev) => ({
+          ...prev,
+          step: getPostRailsStep(mode, initialSection),
+          inputValue: "",
+          exchangeError: null,
+        }));
+        break;
+
+      case "mcp":
+        setState((prev) => ({
+          ...prev,
+          step: getPostMcpStep(mode, initialSection),
+          inputValue: "",
+          exchangeError: null,
         }));
         break;
 
       case "preferences":
         setState((prev) => ({
           ...prev,
-          step: "done",
+          step: getPostPreferencesStep(mode, initialSection),
           inputValue: "",
         }));
         await saveConfiguration({ preferences: state.preferences });
         break;
     }
-  }, [state.step, state.chainSetupIndex, state.selectedChains, advanceChainStep, saveConfiguration]);
+  }, [state.step, state.chainSetupIndex, state.selectedChains, advanceChainStep, initialSection, mode, saveConfiguration, state.preferences]);
 
   useInput((input, key) => {
     if (state.step === "welcome" && (input || key.return)) {
-      setState((prev) => ({ ...prev, step: "exchange-select" }));
+      setState((prev) => ({ ...prev, step: getFirstActionStep(mode, initialSection) }));
       return;
     }
 
@@ -1266,7 +1592,9 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
 
   return (
     <Box flexDirection="column" paddingX={2} paddingY={1}>
-      {state.step === "welcome" && <WelcomeStep />}
+      {state.step === "welcome" && (
+        <WelcomeStep mode={mode} initialSection={initialSection} />
+      )}
 
       {state.step === "exchange-select" && (
         <ExchangeSelectStep
@@ -1487,6 +1815,25 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
         />
       )}
 
+      {state.step === "rails" && (
+        <RailsStep
+          error={state.exchangeError}
+          inputValue={state.inputValue}
+          onInputChange={handleInputChange}
+          onSubmit={handleInputSubmit}
+        />
+      )}
+
+      {state.step === "mcp" && (
+        <McpStep
+          currentMode={state.mcpAutoSync}
+          error={state.exchangeError}
+          inputValue={state.inputValue}
+          onInputChange={handleInputChange}
+          onSubmit={handleInputSubmit}
+        />
+      )}
+
       {state.step === "llm" && (
         <LLMStep
           exchangeConfigured={state.exchangeValidated}
@@ -1518,6 +1865,8 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
           brokerLabel={brokerLabel}
           llmConfigured={!!(state.openaiApiKey || state.inceptionApiKey || state.dedalusApiKey)}
           chainKeys={state.chainKeys}
+          railKeys={state.railKeys}
+          mcpAutoSync={state.mcpAutoSync}
         />
       )}
 
@@ -1530,30 +1879,54 @@ export function SetupWizard({ onComplete }: SetupWizardProps): React.ReactElemen
   );
 }
 
-function WelcomeStep(): React.ReactElement {
+interface WelcomeStepProps {
+  mode: SetupWizardMode;
+  initialSection: SetupWizardSection | null;
+}
+
+function WelcomeStep({ mode, initialSection }: WelcomeStepProps): React.ReactElement {
+  const setupLabel = mode === "quickstart"
+    ? "QuickStart"
+    : mode === "configure"
+      ? `Configure ${initialSection ? getSetupSectionLabel(initialSection) : "Gordon"}`
+      : "Advanced Setup";
+
+  const scopeLines = mode === "quickstart"
+    ? [
+        "1. Choose one LLM provider",
+        "2. Connect one primary trading venue",
+        "3. Set a starting cash reserve",
+        "4. Land directly in the terminal for scan and analysis",
+      ]
+    : [
+        "1. Exchange API credentials",
+        "2. Stock broker API credentials (optional)",
+        "3. Blockchain networks and agent rails",
+        "4. MCP auto-sync and LLM provider",
+        "5. Trading preferences",
+      ];
+
   return (
     <Box flexDirection="column">
       <Box marginBottom={1}>
         <Text color={COLORS.TAN} bold>
-          Welcome to Gordon Setup
+          {setupLabel}
         </Text>
       </Box>
 
       <Box flexDirection="column" marginBottom={1}>
         <Text color={COLORS.WHITE}>
-          This wizard will help you configure Gordon for trading.
+          This wizard will configure Gordon for the workflow you selected.
         </Text>
         <Text color={COLORS.WHITE}>
-          We will set up:
+          Gordon will set up:
         </Text>
       </Box>
 
       <Box flexDirection="column" marginLeft={2}>
-        <Text color={COLORS.DIM}>1. Exchange API credentials</Text>
-        <Text color={COLORS.DIM}>2. Stock broker API credentials (optional)</Text>
-        <Text color={COLORS.DIM}>3. Blockchain networks (Solana, Polkadot, Chainlink, etc.)</Text>
-        <Text color={COLORS.DIM}>4. LLM API key (for AI features)</Text>
-        <Text color={COLORS.DIM}>5. Trading preferences</Text>
+        {scopeLines.map((line) => (
+          <Text key={line} color={COLORS.DIM}>{line}</Text>
+        ))}
       </Box>
 
       <Box marginTop={2}>
@@ -1581,7 +1954,7 @@ function ExchangeSelectStep({ error, inputValue, onInputChange, onSubmit }: Exch
     <Box flexDirection="column">
       <Box marginBottom={1}>
         <Text color={COLORS.TAN} bold>
-          Step 1: Choose Exchange
+          Choose Exchange
         </Text>
       </Box>
 
@@ -1636,7 +2009,7 @@ function ExchangeKeyStep({
     <Box flexDirection="column">
       <Box marginBottom={1}>
         <Text color={COLORS.TAN} bold>
-          Step 1: {exchangeLabel} API Key
+          {exchangeLabel} API Key
         </Text>
       </Box>
 
@@ -1698,7 +2071,7 @@ function ExchangeSecretStep({
     <Box flexDirection="column">
       <Box marginBottom={1}>
         <Text color={COLORS.TAN} bold>
-          Step 1: {exchangeLabel} API Secret
+          {exchangeLabel} API Secret
         </Text>
       </Box>
 
@@ -1750,7 +2123,7 @@ function ExchangePassphraseStep({
     <Box flexDirection="column">
       <Box marginBottom={1}>
         <Text color={COLORS.TAN} bold>
-          Step 1: {exchangeLabel} API Passphrase
+          {exchangeLabel} API Passphrase
         </Text>
       </Box>
 
@@ -1797,7 +2170,7 @@ function ExchangeWalletStep({
     <Box flexDirection="column">
       <Box marginBottom={1}>
         <Text color={COLORS.TAN} bold>
-          Step 1: {exchangeLabel} Wallet Private Key
+          {exchangeLabel} Wallet Private Key
         </Text>
       </Box>
 
@@ -1900,7 +2273,7 @@ function BrokerSelectStep({
     <Box flexDirection="column">
       <Box marginBottom={1}>
         <Text color={COLORS.TAN} bold>
-          Step 2: Choose Stock Broker
+          Choose Stock Broker
         </Text>
       </Box>
 
@@ -1955,7 +2328,7 @@ function BrokerKeyStep({
     <Box flexDirection="column">
       <Box marginBottom={1}>
         <Text color={COLORS.TAN} bold>
-          Step 2: {brokerLabel} API Key
+          {brokerLabel} API Key
         </Text>
       </Box>
 
@@ -2011,7 +2384,7 @@ function BrokerSecretStep({
     <Box flexDirection="column">
       <Box marginBottom={1}>
         <Text color={COLORS.TAN} bold>
-          Step 2: {brokerLabel} API Secret
+          {brokerLabel} API Secret
         </Text>
       </Box>
 
@@ -2051,7 +2424,7 @@ function BrokerModeStep({
     <Box flexDirection="column">
       <Box marginBottom={1}>
         <Text color={COLORS.TAN} bold>
-          Step 2: {brokerLabel} Trading Mode
+          {brokerLabel} Trading Mode
         </Text>
       </Box>
 
@@ -2099,6 +2472,113 @@ function BrokerValidatingStep({ brokerLabel }: BrokerValidatingStepProps): React
   );
 }
 
+interface RailsStepProps {
+  error: string | null;
+  inputValue: string;
+  onInputChange: (value: string) => void;
+  onSubmit: (value: string) => void;
+}
+
+function RailsStep({
+  error,
+  inputValue,
+  onInputChange,
+  onSubmit,
+}: RailsStepProps): React.ReactElement {
+  return (
+    <Box flexDirection="column">
+      <Box marginBottom={1}>
+        <Text color={COLORS.TAN} bold>
+          Agent Rails
+        </Text>
+      </Box>
+
+      {error && (
+        <Box marginBottom={1} borderStyle="single" borderColor="red" paddingX={1}>
+          <Text color="red">{error}</Text>
+        </Box>
+      )}
+
+      <Box flexDirection="column" marginBottom={1}>
+        <Text color={COLORS.WHITE}>
+          Optional: configure native rails for wallet funding, Solana data, and agent payments.
+        </Text>
+        <Text color={COLORS.DIM}>
+          Enter one or more entries separated by semicolons.
+        </Text>
+      </Box>
+
+      <Box flexDirection="column" marginBottom={1} marginLeft={2}>
+        <Text color={COLORS.DIM}>helius:your-api-key</Text>
+        <Text color={COLORS.DIM}>moonpay:api-key,secret-key</Text>
+        <Text color={COLORS.DIM}>polygon:recipient,private-key</Text>
+      </Box>
+
+      <Box marginTop={1}>
+        <Text color={COLORS.WHITE}>Enter rail credentials: </Text>
+        <TextInput
+          value={inputValue}
+          onChange={onInputChange}
+          onSubmit={onSubmit}
+          placeholder="helius:key; moonpay:api,secret"
+          mask="*"
+        />
+      </Box>
+    </Box>
+  );
+}
+
+interface McpStepProps {
+  currentMode: boolean;
+  error: string | null;
+  inputValue: string;
+  onInputChange: (value: string) => void;
+  onSubmit: (value: string) => void;
+}
+
+function McpStep({
+  currentMode,
+  error,
+  inputValue,
+  onInputChange,
+  onSubmit,
+}: McpStepProps): React.ReactElement {
+  return (
+    <Box flexDirection="column">
+      <Box marginBottom={1}>
+        <Text color={COLORS.TAN} bold>
+          MCP Auto-Sync
+        </Text>
+      </Box>
+
+      {error && (
+        <Box marginBottom={1} borderStyle="single" borderColor="red" paddingX={1}>
+          <Text color="red">{error}</Text>
+        </Box>
+      )}
+
+      <Box flexDirection="column" marginBottom={1}>
+        <Text color={COLORS.WHITE}>
+          Gordon can auto-sync built-in MCP plugins for native rails like Helius and MoonPay.
+        </Text>
+        <Text color={COLORS.DIM}>
+          Current default: {currentMode ? "auto" : "manual"}
+        </Text>
+      </Box>
+
+      <Box marginTop={1}>
+        <Text color={COLORS.WHITE}>Enter mode (auto/manual): </Text>
+        <TextInput
+          value={inputValue}
+          onChange={onInputChange}
+          onSubmit={onSubmit}
+          placeholder={currentMode ? "auto" : "manual"}
+        />
+      </Box>
+    </Box>
+  );
+}
+
 interface LLMStepProps {
   exchangeConfigured: boolean;
   exchangeLabel: string;
@@ -2126,7 +2606,7 @@ function LLMStep({
     <Box flexDirection="column">
       <Box marginBottom={1}>
         <Text color={COLORS.TAN} bold>
-          Step 4: LLM API Key
+          LLM API Key
         </Text>
       </Box>
 
@@ -2204,7 +2684,7 @@ function PreferencesStep({ currentPercent, inputValue, onInputChange, onSubmit }
     <Box flexDirection="column">
       <Box marginBottom={1}>
         <Text color={COLORS.TAN} bold>
-          Step 5: Trading Preferences
+          Trading Preferences
         </Text>
       </Box>
 
@@ -2253,7 +2733,7 @@ function ChainSelectStep({ inputValue, onInputChange, onSubmit }: ChainSelectSte
     <Box flexDirection="column">
       <Box marginBottom={1}>
         <Text color={COLORS.TAN} bold>
-          Step 3: Blockchain Networks
+          Blockchain Networks
         </Text>
       </Box>
 
@@ -2318,7 +2798,7 @@ function ChainKeyStep({
     <Box flexDirection="column">
       <Box marginBottom={1}>
         <Text color={COLORS.TAN} bold>
-          Step 3: {chainLabel}
+          {chainLabel}
         </Text>
       </Box>
 
@@ -2377,6 +2857,8 @@ interface DoneStepProps {
   brokerLabel: string;
   llmConfigured: boolean;
   chainKeys: ChainKeys;
+  railKeys: RailKeys;
+  mcpAutoSync: boolean;
 }
 
 function DoneStep({
@@ -2386,6 +2868,8 @@ function DoneStep({
   brokerLabel,
   llmConfigured,
   chainKeys,
+  railKeys,
+  mcpAutoSync,
 }: DoneStepProps): React.ReactElement {
   const hasSolana = !!chainKeys.solanaPrivateKey;
   const hasPolkadot = !!(chainKeys.polkadotMnemonic || chainKeys.polkadotPrivateKey);
@@ -2394,6 +2878,7 @@ function DoneStep({
   const hasCDP = !!(chainKeys.cdpApiKeyId && chainKeys.cdpApiKeySecret && chainKeys.cdpWalletSecret);
   const hasSynthData = !!chainKeys.synthDataApiKey;
   const anyChain = hasSolana || hasPolkadot || hasChainlink || hasEVM || hasCDP || hasSynthData;
+  const hasRails = !!(railKeys.heliusApiKey || railKeys.moonpayApiKey || railKeys.polygonRecipient);
 
   return (
     <Box flexDirection="column">
@@ -2465,6 +2950,17 @@ function DoneStep({
         <Box>
           <Text color="green">[OK] Preferences</Text>
         </Box>
+        <Box>
+          <Text color={hasRails ? "green" : COLORS.DIM}>
+            {hasRails ? "[OK]" : "[--]"} Agent rails
+          </Text>
+          {!hasRails && (
+            <Text color={COLORS.DIM}> (not configured)</Text>
+          )}
+        </Box>
+        <Box>
+          <Text color="green">[OK] MCP auto-sync: {mcpAutoSync ? "auto" : "manual"}</Text>
+        </Box>
       </Box>
 
       {!exchangeConfigured && (
@@ -2495,6 +2991,9 @@ export const __setupWizardBrokerInternals = {
   getBrokerInstructions,
   generateBrokerId,
   parseBrokerMode,
+  parseRailsInput,
+  parseMcpSyncInput,
+  getFirstActionStep,
 };
 
 export default SetupWizard;

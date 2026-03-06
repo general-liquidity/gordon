@@ -1,17 +1,24 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { Box, Text, useInput } from "ink";
-import { Spinner, Alert, StatusMessage } from "@inkjs/ui";
 import { ChatInput } from "./ChatInput.tsx";
 
-import { StatusBar, type ThreadStatusInfo, type ChainStatusInfo } from "./StatusBar.tsx";
+import {
+  StatusBar,
+  type ThreadStatusInfo,
+  type ChainStatusInfo,
+  type OperatorStatusInfo,
+} from "./StatusBar.tsx";
 import type { TickerItem } from "./components/effects/index.ts";
 import { WelcomeBanner } from "./WelcomeBanner.tsx";
 import { QuickStartMenu, type MenuOption } from "./QuickStartMenu.tsx";
 import { ChatView, type ChatMessage } from "./ChatView.tsx";
 import { Onboarding } from "./Onboarding.tsx";
+import { QuickStartWizard } from "./QuickStartWizard.tsx";
 import { SetupWizard } from "./SetupWizard.tsx";
+import { DoctorPanel } from "./DoctorPanel.tsx";
 import { ModelSelector } from "./ModelSelector.tsx";
-import { ShortcutsOverlay, ShortcutsHint, useShortcutsHint } from "./components/ShortcutsOverlay.tsx";
+import { ShortcutsOverlay, ShortcutsHint } from "./components/ShortcutsOverlay.tsx";
+import { ProgressIndicator, StreamingProgress } from "./components/ProgressIndicator.tsx";
 import { ThemeProvider, useTheme } from "./components/ThemeProvider.tsx";
 import { processMessageStream, initializeTracing } from "../infra/agents/orchestrator.ts";
 import { initMCPTools, enableMCPHotReload } from "../infra/mcp/client.ts";
@@ -30,6 +37,7 @@ import {
 import { runOrderRecovery } from "../core/order-recovery.ts";
 import { listTrades } from "../infra/storage/trades.ts";
 import { loadConfig, saveConfig } from "../infra/storage/config.ts";
+import { loadConfigBundle, type ConfigLayers } from "../infra/storage/config.ts";
 import {
   runSharedMonitorCycle,
   runSharedScan,
@@ -46,6 +54,7 @@ import {
 import {
   cloneThread,
   listThreads,
+  listThreadTree,
   getThreadInfo,
   switchThread,
   deleteThread,
@@ -67,7 +76,6 @@ import {
   formatCommandHelp,
   parseHelpArg,
   formatPaginatedCommandHelp,
-  formatAnalysisCommandsHelp,
 } from "./slashCommands.ts";
 import {
   handleConfigCommand,
@@ -91,13 +99,31 @@ import { bootstrapV07 } from "../core/bootstrap.ts";
 import { getMarketEmitter } from "../events/index.ts";
 import { getSubscriptionRegistry } from "../events/index.ts";
 import { buildAppGordonContext } from "../gateway/ui/context.ts";
+import { getActionBySlashName, type CredentialProfile } from "../infra/actions/index.ts";
 import type {
   ScanExportData,
   AnalysisExportData,
   BacktestExportData,
 } from "./commands/export.ts";
+import {
+  parseSetupWizardMode,
+  parseSetupWizardSection,
+  type OnboardingSelection,
+  type SetupWizardMode,
+  type SetupWizardSection,
+} from "./setup-flow.ts";
+import { OVERLAY_NONE, isOverlayOpen, openOverlay, type OverlayState } from "./overlayState.ts";
 
-type AppView = "loading" | "onboarding" | "setup" | "model" | "welcome" | "menu" | "chat";
+type AppView =
+  | "loading"
+  | "onboarding"
+  | "quickstart"
+  | "setup"
+  | "doctor"
+  | "model"
+  | "welcome"
+  | "menu"
+  | "chat";
 
 interface ConversationMessage {
   role: "user" | "assistant";
@@ -113,18 +139,25 @@ interface AppState {
   messages: ChatMessage[];
   isLoading: boolean;
   isStreaming: boolean;
+  streamingMessageTimestamp: string | null;
   activeToolCall: string | null;
   activityStatus: string | null;
   conversationHistory: ConversationMessage[];
   btcPrice: number | undefined;
-  showShortcuts: boolean;
+  overlay: OverlayState;
+  queuedSubmissions: QueuedSubmission[];
   showStartupHint: boolean;
+  chatInputSeed: string;
+  chatInputSeedNonce: number;
+  setupMode: SetupWizardMode;
+  setupSection: SetupWizardSection | null;
   /** Current session info for Mastra agent memory */
   session: SessionInfo | null;
   /** Thread info for status bar display */
   threadStatusInfo: ThreadStatusInfo | null;
   /** Chain network status for status bar */
   chainStatus: ChainStatusInfo | null;
+  configLayers: ConfigLayers | null;
 }
 
 interface LastResults {
@@ -139,9 +172,31 @@ interface LastResults {
 
 type PluginSuggestion = ReturnType<typeof checkForPluginSuggestions>[number];
 
+type QueuedSubmissionKind = "follow-up" | "steer";
+
+interface QueuedSubmission {
+  id: string;
+  kind: QueuedSubmissionKind;
+  value: string;
+  preview: string;
+}
+
 function getIdSuffix(id: string): string {
   const separatorIndex = id.indexOf("_");
   return separatorIndex >= 0 ? id.slice(separatorIndex + 1) : id;
+}
+
+function getRequestCredentialProfile(config: GordonConfig): CredentialProfile {
+  if (config.mode === "ARMED") {
+    return "live";
+  }
+  const activeBroker = config.brokers.find((broker) => broker.id === config.activeBrokerId)
+    ?? config.brokers.find((broker) => broker.isDefault)
+    ?? config.brokers[0];
+  if (activeBroker?.paper) {
+    return "paper";
+  }
+  return "default";
 }
 
 function buildKnownOrderOwnerKeys(
@@ -220,6 +275,44 @@ function formatTimestamp(): string {
   });
 }
 
+function parseQueuedSubmission(value: string): {
+  kind: QueuedSubmissionKind;
+  submitValue: string;
+  preview: string;
+} | null {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  const steeringMatch = trimmed.match(/^\/steer\s+(.+)$/isu);
+  if (steeringMatch) {
+    const submitValue = steeringMatch[1]?.trim();
+    if (!submitValue) {
+      return null;
+    }
+    return {
+      kind: "steer",
+      submitValue,
+      preview: submitValue,
+    };
+  }
+
+  return {
+    kind: "follow-up",
+    submitValue: trimmed,
+    preview: trimmed,
+  };
+}
+
+function getConfigScopeLabel(layers: ConfigLayers | null): string {
+  if (!layers || layers.sources.length === 0) {
+    return "global";
+  }
+
+  return layers.sources.join(" + ");
+}
+
 const STOCK_MARKET_TOKENS = ["stock", "stocks", "equity", "equities", ...BrokerFactory.getSupportedBrokers()];
 const STOCK_MARKET_PATTERN = new RegExp(`^\\s*(${STOCK_MARKET_TOKENS.join("|")})\\b`, "i");
 
@@ -289,15 +382,22 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
     messages: [],
     isLoading: false,
     isStreaming: false,
+    streamingMessageTimestamp: null,
     activeToolCall: null,
     activityStatus: null,
     conversationHistory: [],
     btcPrice: undefined,
-    showShortcuts: false,
+    overlay: OVERLAY_NONE,
+    queuedSubmissions: [],
     showStartupHint: true,
+    chatInputSeed: "",
+    chatInputSeedNonce: 0,
+    setupMode: parseSetupWizardMode(process.env.GORDON_SETUP_MODE, "advanced"),
+    setupSection: parseSetupWizardSection(process.env.GORDON_SETUP_SECTION),
     session: null,
     threadStatusInfo: null,
     chainStatus: null,
+    configLayers: null,
   });
 
   const llmClientRef = useRef<LLMClient | null>(null);
@@ -309,6 +409,8 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
   const pendingPluginSuggestionsRef = useRef<PluginSuggestion[]>([]);
   const shownPluginSuggestionsRef = useRef<Set<string>>(new Set());
   const monitorCycleInFlightRef = useRef(false);
+  const activeStreamAbortControllerRef = useRef<AbortController | null>(null);
+  const isDrainingQueueRef = useRef(false);
 
   /**
    * Helper to update thread status info in state
@@ -415,10 +517,19 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
     });
   }, []);
 
+  const refreshResolvedConfig = useCallback(async (): Promise<GordonConfig> => {
+    const resolved = await loadConfigBundle();
+    configRef.current = resolved.config;
+    setState((prev) => ({
+      ...prev,
+      configLayers: resolved.layers,
+    }));
+    return resolved.config;
+  }, []);
+
   const refreshActiveExchange = useCallback(async (): Promise<void> => {
     try {
-      const config = await loadConfig();
-      configRef.current = config;
+      const config = await refreshResolvedConfig();
 
       const exchanges = config.exchanges || [];
       if (exchanges.length === 0) {
@@ -447,12 +558,11 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
     } catch {
       // Exchange refresh failed — will retry on next config change
     }
-  }, []);
+  }, [refreshResolvedConfig]);
 
   const refreshActiveBroker = useCallback(async (): Promise<void> => {
     try {
-      const config = await loadConfig();
-      configRef.current = config;
+      const config = await refreshResolvedConfig();
 
       const brokers = config.brokers || [];
       if (brokers.length === 0) {
@@ -477,7 +587,7 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
     } catch {
       // Broker refresh failed — will retry on next config change
     }
-  }, []);
+  }, [refreshResolvedConfig]);
 
   const formatCommandError = useCallback(
     (operation: string, error: unknown, context?: Record<string, unknown>): string => {
@@ -535,8 +645,12 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
       const envStatus = envStatusEarly;
 
       // Load config and check onboarding status
-      const config = await loadConfig();
+      const { config, layers } = await loadConfigBundle();
       configRef.current = config;
+      setState((prev) => ({ ...prev, configLayers: layers }));
+      const requestedSetupMode = parseSetupWizardMode(process.env.GORDON_SETUP_MODE, "advanced");
+      const requestedSetupSection = parseSetupWizardSection(process.env.GORDON_SETUP_SECTION);
+      const requestedStartView = process.env.GORDON_START_VIEW;
 
       // Determine initial view:
       // - If keys are configured (either in .env or env vars), skip onboarding
@@ -544,7 +658,13 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
       // - Otherwise show onboarding
       let initialView: AppView;
 
-      if (envStatus.hasLLMKey) {
+      if (requestedStartView === "doctor") {
+        initialView = "doctor";
+      } else if (requestedStartView === "quickstart") {
+        initialView = "quickstart";
+      } else if (requestedStartView === "setup") {
+        initialView = "setup";
+      } else if (envStatus.hasLLMKey) {
         // Keys are already configured - skip onboarding entirely
         initialView = "welcome";
 
@@ -830,6 +950,7 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
               availableCash: 0,
               userId: session?.resourceId,
               threadId: session?.threadId ?? undefined,
+              credentialProfile: getRequestCredentialProfile(configRef.current),
             }) as GordonContext;
             const stream = processMessageStream(prompt, gordonCtx, session?.threadId ?? undefined, session?.resourceId);
             for await (const _event of stream) {
@@ -874,6 +995,8 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
       setState((prev) => ({
         ...prev,
         view: initialView,
+        setupMode: requestedSetupMode,
+        setupSection: requestedSetupSection,
         mode: config.mode,
         connectionStatus: llmClientRef.current ? "connected" : "disconnected",
         session,
@@ -946,17 +1069,77 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
     });
   }, []);
 
-  const handleSubmit = useCallback(async (value: string): Promise<void> => {
+  useEffect(() => () => {
+    activeStreamAbortControllerRef.current?.abort();
+  }, []);
+
+  const openChatWorkspace = useCallback((options?: { seed?: string; resetInput?: boolean }): void => {
+    setState((prev) => ({
+      ...prev,
+      view: "chat",
+      overlay: OVERLAY_NONE,
+      ...(prev.view !== "chat" || options?.resetInput
+        ? {
+            chatInputSeed: options?.seed ?? "",
+            chatInputSeedNonce: prev.chatInputSeedNonce + 1,
+          }
+        : {}),
+    }));
+  }, []);
+
+  const openQuickActionsOverlay = useCallback((): void => {
+    setState((prev) => ({
+      ...prev,
+      view: "chat",
+      overlay: openOverlay("quick-actions"),
+    }));
+  }, []);
+
+  const openShortcutsOverlay = useCallback((): void => {
+    setState((prev) => ({
+      ...prev,
+      overlay: openOverlay("shortcuts"),
+    }));
+  }, []);
+
+  const closeOverlay = useCallback((): void => {
+    setState((prev) => ({ ...prev, overlay: OVERLAY_NONE }));
+  }, []);
+
+  const cancelActiveResponse = useCallback((): void => {
+    const controller = activeStreamAbortControllerRef.current;
+    if (!controller || controller.signal.aborted) {
+      return;
+    }
+
+    controller.abort();
+    setState((prev) => ({
+      ...prev,
+      activityStatus: "Stopping current response...",
+      activeToolCall: null,
+    }));
+  }, []);
+
+  const processSubmission = useCallback(async (value: string): Promise<void> => {
     if (!value.trim()) return;
-    if (state.isLoading || state.isStreaming) return;
+
+    const queuedIntent = parseQueuedSubmission(value);
+    const normalizedValue = queuedIntent?.submitValue ?? value.trim();
+    if (!normalizedValue) return;
 
     // Check for slash commands
-    const parsedCommand = parseSlashCommand(value);
-    let messageToSend = value.trim();
-    let displayMessage = value.trim();
+    const parsedCommand = parseSlashCommand(normalizedValue);
+    let messageToSend = normalizedValue;
+    let displayMessage = normalizedValue;
+    let requestedActionId: string | undefined;
+    let requestedTaskScope: GordonContext["requestedTaskScope"];
+    const credentialProfile = getRequestCredentialProfile(configRef.current);
 
     if (parsedCommand) {
       const { command, args } = parsedCommand;
+      const requestedAction = getActionBySlashName(command.name);
+      requestedActionId = requestedAction?.id;
+      requestedTaskScope = requestedAction?.taskScope;
 
       if (command.name === "portfolio" && isStocksMarketArgs(args)) {
         const userMessage: ChatMessage = {
@@ -978,17 +1161,54 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
 
       // Handle menu-type commands - just convert to prompts, let agent handle
       if (command.action === "menu" && command.target === "setup") {
-        setState((prev) => ({ ...prev, view: "setup" }));
+        setState((prev) => ({
+          ...prev,
+          view: "setup",
+          overlay: OVERLAY_NONE,
+          setupMode: "advanced",
+          setupSection: null,
+        }));
+        return;
+      }
+
+      if (command.action === "menu" && command.target === "menu") {
+        if (state.view === "chat") {
+          openQuickActionsOverlay();
+        } else {
+          setState((prev) => ({ ...prev, view: "menu", overlay: OVERLAY_NONE }));
+        }
+        return;
+      }
+
+      if (command.action === "menu" && command.target === "chat") {
+        openChatWorkspace();
+        return;
+      }
+
+      if (command.action === "menu" && command.target === "configure") {
+        const section = parseSetupWizardSection(args.trim() || undefined);
+        setState((prev) => ({
+          ...prev,
+          view: "setup",
+          overlay: OVERLAY_NONE,
+          setupMode: section ? "configure" : "advanced",
+          setupSection: section,
+        }));
+        return;
+      }
+
+      if (command.action === "menu" && command.target === "doctor") {
+        setState((prev) => ({ ...prev, view: "doctor", overlay: OVERLAY_NONE }));
         return;
       }
 
       if (command.action === "menu" && command.target === "model") {
-        setState((prev) => ({ ...prev, view: "model" }));
+        setState((prev) => ({ ...prev, view: "model", overlay: OVERLAY_NONE }));
         return;
       }
 
       if (command.action === "menu" && command.target === "shortcuts") {
-        setState((prev) => ({ ...prev, showShortcuts: true }));
+        openShortcutsOverlay();
         return;
       }
 
@@ -1175,6 +1395,7 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
       if (command.action === "menu" && command.target === "list-threads") {
         (async () => {
           const threads = await listThreads();
+          const threadTree = await listThreadTree();
 
           if (threads.length === 0) {
             const noThreadsMessage: ChatMessage = {
@@ -1194,7 +1415,7 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
           }
 
           const lines = [
-            "**Available Threads:**\n",
+            "**Session Tree:**\n",
             "| Status | Label | Messages | Created | Last Active |",
             "|--------|-------|----------|---------|-------------|",
           ];
@@ -1207,6 +1428,15 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
             lines.push(
               `| ${status} | ${thread.label}${cloneInfo} | ${thread.messageCount} | ${created} | ${lastActive} |`
             );
+          }
+
+          lines.push("\n**Branch structure:**");
+          for (const thread of threadTree) {
+            const indent = "  ".repeat(thread.depth);
+            const branchGlyph = thread.depth === 0 ? "•" : "└";
+            const activeMarker = thread.isActive ? " [current]" : "";
+            const childInfo = thread.childCount > 0 ? ` (${thread.childCount} branch${thread.childCount === 1 ? "" : "es"})` : "";
+            lines.push(`${indent}${branchGlyph} ${thread.label}${activeMarker}${childInfo}`);
           }
 
           lines.push("\n**Thread IDs for switching:**");
@@ -1671,28 +1901,19 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
       if (command.name === "help") {
         const helpArg = args.trim();
         const normalized = helpArg.toLowerCase();
-        const isPaginatedHelp = normalized.startsWith("page") || normalized === "market" || normalized === "account";
-        const isHelpMode =
+        const isPaginatedHelp =
           normalized === "" ||
           normalized === "advanced" ||
           normalized === "all" ||
           normalized === "expert" ||
-          normalized === "trading" ||
-          normalized === "analysis" ||
-          normalized === "system";
+          normalized.startsWith("page") ||
+          ["discover", "analyze", "trade", "run", "accounts", "operate", "market", "analysis", "trading", "strategy", "strategies", "account", "system", "ops"].includes(normalized);
 
-        if (!helpArg || isPaginatedHelp || isHelpMode) {
-          let helpContent = "";
-          if (!helpArg) {
-            helpContent = formatCommandHelp();
-          } else if (normalized === "analysis") {
-            helpContent = formatAnalysisCommandsHelp();
-          } else if (isPaginatedHelp) {
-            helpContent = formatPaginatedCommandHelp(helpArg);
-          } else {
-            const { mode, category } = parseHelpArg(helpArg);
-            helpContent = formatCommandHelp(mode, category);
-          }
+        if (isPaginatedHelp) {
+          const { mode, category } = parseHelpArg(helpArg);
+          const helpContent = !helpArg || normalized.startsWith("page")
+            ? formatPaginatedCommandHelp(helpArg)
+            : formatCommandHelp(mode, category);
 
           const helpMessage: ChatMessage = {
             role: "gordon",
@@ -1724,8 +1945,7 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
             setState((prev) => ({ ...prev, messages: [...prev.messages, userMessage], isLoading: true }));
             const result = await handleConfigCommand(args);
             if (result.success) {
-              const updatedConfig = await loadConfig();
-              configRef.current = updatedConfig;
+              await refreshResolvedConfig();
             }
             setState((prev) => ({
               ...prev,
@@ -1926,7 +2146,8 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
             if (isArming) {
               const armHours = 24;
               const armedUntil = new Date(Date.now() + armHours * 60 * 60 * 1000).toISOString();
-              await saveConfig({ ...currentConfig, mode: "ARMED", armedUntil });
+              configRef.current = { ...currentConfig, mode: "ARMED", armedUntil };
+              await saveConfig(configRef.current);
               setState((prev) => ({
                 ...prev,
                 mode: "ARMED",
@@ -1941,7 +2162,8 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
                 ],
               }));
             } else {
-              await saveConfig({ ...currentConfig, mode: "SAFE", armedUntil: null });
+              configRef.current = { ...currentConfig, mode: "SAFE", armedUntil: null };
+              await saveConfig(configRef.current);
               setState((prev) => ({
                 ...prev,
                 mode: "SAFE",
@@ -1985,6 +2207,7 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
       ...prev,
       messages: [...prev.messages, userMessage],
       isLoading: true,
+      overlay: OVERLAY_NONE,
       activityStatus: "Routing request...",
     }));
 
@@ -2017,6 +2240,9 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
       availableCash: state.availableCash,
       userId: state.session?.resourceId,
       threadId: state.session?.threadId,
+      requestedActionId,
+      requestedTaskScope,
+      credentialProfile,
     });
 
     // Create initial empty assistant message for streaming
@@ -2033,21 +2259,27 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
       messages: [...prev.messages, initialGordonMessage],
       isLoading: false,
       isStreaming: true,
+      streamingMessageTimestamp: streamingTimestamp,
       activeToolCall: null,
       activityStatus: "Preparing response...",
     }));
 
     try {
+      const streamAbortController = new AbortController();
+      activeStreamAbortControllerRef.current = streamAbortController;
+
       // Use streaming API with session threadId and resourceId for memory continuity
       const stream = processMessageStream(
         messageToSend,
         context,
         state.session?.threadId,
-        state.session?.resourceId
+        state.session?.resourceId,
+        { signal: streamAbortController.signal }
       );
       let fullContent = "";
       let currentAgentName: string | undefined;
       let pendingUpdate = false;
+      let pendingTimer: ReturnType<typeof setTimeout> | null = null;
 
       // Helper to update the streaming message with agent attribution
       const updateStreamingMessage = (content: string, agent?: string): void => {
@@ -2062,11 +2294,20 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
       const scheduleUpdate = (): void => {
         if (!pendingUpdate) {
           pendingUpdate = true;
-          setTimeout(() => {
+          pendingTimer = setTimeout(() => {
             pendingUpdate = false;
+            pendingTimer = null;
             updateStreamingMessage(fullContent, currentAgentName);
           }, 50);
         }
+      };
+
+      const flushPendingUpdate = (): void => {
+        if (pendingTimer) {
+          clearTimeout(pendingTimer);
+          pendingTimer = null;
+        }
+        pendingUpdate = false;
       };
 
       for await (const event of stream) {
@@ -2115,10 +2356,12 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
             if (event.agentName) {
               currentAgentName = event.agentName;
             }
+            flushPendingUpdate();
             updateStreamingMessage(fullContent, currentAgentName);
             setState((prev) => ({
               ...prev,
               isStreaming: false,
+              streamingMessageTimestamp: null,
               activeToolCall: null,
               activityStatus: null,
             }));
@@ -2151,7 +2394,24 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
             }
             break;
 
+          case "cancelled": {
+            flushPendingUpdate();
+            const stoppedContent = fullContent.trim().length > 0
+              ? `${fullContent.trimEnd()}\n\nResponse stopped.`
+              : (event.content || "Response stopped.");
+            updateStreamingMessage(stoppedContent, currentAgentName);
+            setState((prev) => ({
+              ...prev,
+              isStreaming: false,
+              streamingMessageTimestamp: null,
+              activeToolCall: null,
+              activityStatus: null,
+            }));
+            break;
+          }
+
           case "error":
+            flushPendingUpdate();
             updateStreamingMessage(
               fullContent || `Sorry, I encountered an error: ${event.error}. Please try again.`,
               currentAgentName
@@ -2159,6 +2419,7 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
             setState((prev) => ({
               ...prev,
               isStreaming: false,
+              streamingMessageTimestamp: null,
               activeToolCall: null,
               activityStatus: null,
             }));
@@ -2192,23 +2453,115 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
             { role: "user", content: messageToSend },
           ],
           isStreaming: false,
+          streamingMessageTimestamp: null,
           isLoading: false,
           activeToolCall: null,
           activityStatus: null,
         };
       });
+    } finally {
+      activeStreamAbortControllerRef.current = null;
     }
   }, [
-    state.isLoading,
-    state.isStreaming,
+    state.view,
     state.conversationHistory,
     state.portfolioValue,
     state.availableCash,
     state.messages,
     refreshActiveExchange,
     refreshActiveBroker,
+    openChatWorkspace,
+    openQuickActionsOverlay,
+    openShortcutsOverlay,
     updateMessageByTimestamp,
     updateLastResultsFromTool,
+  ]);
+
+  const handleSubmit = useCallback(async (value: string): Promise<void> => {
+    const queuedIntent = parseQueuedSubmission(value);
+    if (!queuedIntent) {
+      return;
+    }
+
+    if (state.isLoading || state.isStreaming) {
+      const queuedSubmission: QueuedSubmission = {
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        kind: queuedIntent.kind,
+        value: queuedIntent.submitValue,
+        preview: queuedIntent.preview,
+      };
+
+      setState((prev) => ({
+        ...prev,
+        queuedSubmissions: queuedIntent.kind === "steer"
+          ? [queuedSubmission, ...prev.queuedSubmissions.filter((entry) => entry.kind !== "steer")]
+          : [...prev.queuedSubmissions, queuedSubmission],
+        messages: [
+          ...prev.messages,
+          {
+            role: "gordon",
+            badge: queuedIntent.kind === "steer" ? "Steer" : "Queued",
+            content: queuedIntent.kind === "steer"
+              ? `Steering update queued. Gordon will stop the current run and pivot to:\n\n${queuedIntent.preview}`
+              : `Queued follow-up for after the current run:\n\n${queuedIntent.preview}`,
+            timestamp: formatTimestamp(),
+          },
+        ],
+        overlay: OVERLAY_NONE,
+        activityStatus: queuedIntent.kind === "steer"
+          ? "Interrupt requested..."
+          : prev.activityStatus,
+      }));
+
+      if (queuedIntent.kind === "steer") {
+        cancelActiveResponse();
+      }
+      return;
+    }
+
+    await processSubmission(queuedIntent.submitValue);
+  }, [
+    state.isLoading,
+    state.isStreaming,
+    cancelActiveResponse,
+    processSubmission,
+  ]);
+
+  useEffect(() => {
+    if (state.view !== "chat" || state.isLoading || state.isStreaming || state.queuedSubmissions.length === 0) {
+      return;
+    }
+
+    if (isDrainingQueueRef.current) {
+      return;
+    }
+
+    const [nextSubmission] = state.queuedSubmissions;
+    if (!nextSubmission) {
+      return;
+    }
+
+    isDrainingQueueRef.current = true;
+    setState((prev) => ({
+      ...prev,
+      queuedSubmissions: prev.queuedSubmissions.filter((entry) => entry.id !== nextSubmission.id),
+      activityStatus: nextSubmission.kind === "steer"
+        ? "Applying steering update..."
+        : "Running queued follow-up...",
+    }));
+
+    queueMicrotask(() => {
+      void processSubmission(nextSubmission.value)
+        .finally(() => {
+          isDrainingQueueRef.current = false;
+        });
+    });
+  }, [
+    processSubmission,
+    state.isLoading,
+    state.isStreaming,
+    state.queuedSubmissions,
+    state.view,
   ]);
 
   /**
@@ -2229,12 +2582,15 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
           availableCash: state.availableCash,
           userId: state.session?.resourceId,
           threadId: state.session?.threadId,
+          credentialProfile: getRequestCredentialProfile(configRef.current),
         });
 
         setState((prev) => ({
           ...prev,
           messages: [...prev.messages, { role: "gordon" as const, content: "", timestamp: messageTimestamp }],
           isStreaming: true,
+          streamingMessageTimestamp: messageTimestamp,
+          overlay: OVERLAY_NONE,
           activityStatus: "Preparing response...",
         }));
 
@@ -2248,18 +2604,36 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
 
         let currentAgent: string | undefined;
         try {
-          const stream = processMessageStream(prompt, context, state.session?.threadId, state.session?.resourceId);
+          const streamAbortController = new AbortController();
+          activeStreamAbortControllerRef.current = streamAbortController;
+          const stream = processMessageStream(
+            prompt,
+            context,
+            state.session?.threadId,
+            state.session?.resourceId,
+            { signal: streamAbortController.signal }
+          );
           let fullContent = "";
           let pendingUpdate = false;
+          let pendingTimer: ReturnType<typeof setTimeout> | null = null;
 
           const scheduleUpdate = (): void => {
             if (!pendingUpdate) {
               pendingUpdate = true;
-              setTimeout(() => {
+              pendingTimer = setTimeout(() => {
                 pendingUpdate = false;
+                pendingTimer = null;
                 updateMsg(fullContent, currentAgent);
               }, 50);
             }
+          };
+
+          const flushPendingUpdate = (): void => {
+            if (pendingTimer) {
+              clearTimeout(pendingTimer);
+              pendingTimer = null;
+            }
+            pendingUpdate = false;
           };
 
           for await (const event of stream) {
@@ -2295,19 +2669,38 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
                 break;
               case "done":
                 if (event.agentName) currentAgent = event.agentName;
+                flushPendingUpdate();
                 updateMsg(fullContent, currentAgent);
                 setState((prev) => ({
                   ...prev,
                   isStreaming: false,
+                  streamingMessageTimestamp: null,
                   activeToolCall: null,
                   activityStatus: null,
                 }));
                 break;
+              case "cancelled": {
+                flushPendingUpdate();
+                const stoppedContent = fullContent.trim().length > 0
+                  ? `${fullContent.trimEnd()}\n\nResponse stopped.`
+                  : (event.content || "Response stopped.");
+                updateMsg(stoppedContent, currentAgent);
+                setState((prev) => ({
+                  ...prev,
+                  isStreaming: false,
+                  streamingMessageTimestamp: null,
+                  activeToolCall: null,
+                  activityStatus: null,
+                }));
+                break;
+              }
               case "error":
+                flushPendingUpdate();
                 updateMsg(fullContent || `${errorPrefix}: ${event.error}`, currentAgent);
                 setState((prev) => ({
                   ...prev,
                   isStreaming: false,
+                  streamingMessageTimestamp: null,
                   activeToolCall: null,
                   activityStatus: null,
                 }));
@@ -2322,9 +2715,12 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
           setState((prev) => ({
             ...prev,
             isStreaming: false,
+            streamingMessageTimestamp: null,
             activeToolCall: null,
             activityStatus: null,
           }));
+        } finally {
+          activeStreamAbortControllerRef.current = null;
         }
       })();
     },
@@ -2333,15 +2729,31 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
 
   // Handle menu selection
   const handleMenuSelect = useCallback((option: MenuOption): void => {
+    const buildChatTransition = (prev: AppState): Partial<AppState> => (
+      state.view === "chat"
+        ? {}
+        : {
+            chatInputSeed: "",
+            chatInputSeedNonce: prev.chatInputSeedNonce + 1,
+          }
+    );
+
+    const submitMenuCommand = (command: string): void => {
+      openChatWorkspace();
+      void handleSubmit(command);
+    };
+
     switch (option) {
       case "chat":
-        setState((prev) => ({ ...prev, view: "chat" }));
+        openChatWorkspace();
         break;
       case "scan":
         if (!exchangeRef.current) {
           setState((prev) => ({
             ...prev,
             view: "chat",
+            overlay: OVERLAY_NONE,
+            ...buildChatTransition(prev),
             messages: [
               ...prev.messages,
               {
@@ -2357,6 +2769,8 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
             ...prev,
             view: "chat",
             isLoading: true,
+            overlay: OVERLAY_NONE,
+            ...buildChatTransition(prev),
             activityStatus: "Scanning market...",
             messages: [
               ...prev.messages,
@@ -2444,6 +2858,8 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
           setState((prev) => ({
             ...prev,
             view: "chat",
+            overlay: OVERLAY_NONE,
+            ...buildChatTransition(prev),
             messages: [
               ...prev.messages,
               {
@@ -2460,6 +2876,8 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
             ...prev,
             view: "chat",
             isLoading: true,
+            overlay: OVERLAY_NONE,
+            ...buildChatTransition(prev),
             activityStatus: "Fetching portfolio...",
             messages: [
               ...prev.messages,
@@ -2573,27 +2991,40 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
         }
         break;
       case "setup":
-        setState((prev) => ({ ...prev, view: "setup" }));
+        setState((prev) => ({
+          ...prev,
+          view: "setup",
+          overlay: OVERLAY_NONE,
+          setupMode: "advanced",
+          setupSection: null,
+        }));
+        break;
+      case "doctor":
+        setState((prev) => ({ ...prev, view: "doctor", overlay: OVERLAY_NONE }));
         break;
       case "help":
         setState((prev) => ({
           ...prev,
           view: "chat",
+          overlay: OVERLAY_NONE,
+          ...buildChatTransition(prev),
           messages: [
             ...prev.messages,
-            {
-              role: "gordon",
-              content: formatCommandHelp(),
-              timestamp: formatTimestamp(),
-            },
-          ],
-        }));
+              {
+                role: "gordon",
+                content: formatPaginatedCommandHelp(),
+                timestamp: formatTimestamp(),
+              },
+            ],
+          }));
         break;
       case "trending": {
         const trendingTs = formatTimestamp();
         setState((prev) => ({
           ...prev,
           view: "chat",
+          overlay: OVERLAY_NONE,
+          ...buildChatTransition(prev),
           messages: [
             ...prev.messages,
             { role: "user", content: "/trending", timestamp: trendingTs },
@@ -2606,6 +3037,8 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
         setState((prev) => ({
           ...prev,
           view: "chat",
+          overlay: OVERLAY_NONE,
+          ...buildChatTransition(prev),
           messages: [
             ...prev.messages,
             {
@@ -2616,38 +3049,36 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
           ],
         }));
         break;
+      case "preview-order":
+        submitMenuCommand("/preview-order");
+        break;
+      case "plan":
+        submitMenuCommand("/plan");
+        break;
+      case "positions":
+        submitMenuCommand("/positions");
+        break;
+      case "orders":
+        submitMenuCommand("/orders");
+        break;
+      case "wallet":
+        submitMenuCommand("/wallet");
+        break;
+      case "fund":
+        submitMenuCommand("/fund quote");
+        break;
       case "strategies-live":
-        setState((prev) => ({
-          ...prev,
-          view: "chat",
-          messages: [
-            ...prev.messages,
-            {
-              role: "gordon",
-              content: "Use `/strategies-live` to view running strategies, portfolio state, and health.",
-              timestamp: formatTimestamp(),
-            },
-          ],
-        }));
+        submitMenuCommand("/strategies-live");
         break;
       case "regime":
-        setState((prev) => ({
-          ...prev,
-          view: "chat",
-          messages: [
-            ...prev.messages,
-            {
-              role: "gordon",
-              content: "Use `/regime` to detect current market conditions and matching strategies.",
-              timestamp: formatTimestamp(),
-            },
-          ],
-        }));
+        submitMenuCommand("/regime");
         break;
       case "bridge":
         setState((prev) => ({
           ...prev,
           view: "chat",
+          overlay: OVERLAY_NONE,
+          ...buildChatTransition(prev),
           messages: [
             ...prev.messages,
             {
@@ -2664,28 +3095,24 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
         }));
         break;
       case "chains": {
-        const chainsTs = formatTimestamp();
-        setState((prev) => ({
-          ...prev,
-          view: "chat",
-          messages: [
-            ...prev.messages,
-            { role: "user", content: "/chains", timestamp: chainsTs },
-          ],
-        }));
-        runMenuStream(
-          "Show me which blockchain networks are configured and available. List the tools and capabilities for each configured chain.",
-          chainsTs,
-          "Failed to check chains"
-        );
+        submitMenuCommand("/chains");
         break;
       }
     }
-  }, [state.portfolioValue, state.availableCash, state.conversationHistory, formatCommandError, runMenuStream]);
+  }, [
+    state.view,
+    state.portfolioValue,
+    state.availableCash,
+    state.conversationHistory,
+    formatCommandError,
+    handleSubmit,
+    openChatWorkspace,
+    runMenuStream,
+  ]);
 
   // Handle onboarding completion
   const handleOnboardingComplete = useCallback(
-    async (options: { setupApiKeys: boolean; demoMode: boolean }): Promise<void> => {
+    async (selection: OnboardingSelection): Promise<void> => {
       // Update config with onboarding complete
       const updatedConfig: GordonConfig = {
         ...configRef.current,
@@ -2694,18 +3121,27 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
       configRef.current = updatedConfig;
       await saveConfig(updatedConfig);
 
-      // Navigate based on user choice
-      if (options.setupApiKeys) {
-        // Go to setup wizard to collect API keys
+      if (selection.mode === "quickstart") {
+        setState((prev) => ({
+          ...prev,
+          view: "quickstart",
+          setupMode: "quickstart",
+          setupSection: null,
+        }));
+      } else if (selection.mode === "advanced") {
         setState((prev) => ({
           ...prev,
           view: "setup",
+          setupMode: "advanced",
+          setupSection: null,
         }));
       } else {
-        // Demo mode
         setState((prev) => ({
           ...prev,
           view: "chat",
+          overlay: OVERLAY_NONE,
+          chatInputSeed: "",
+          chatInputSeedNonce: prev.chatInputSeedNonce + 1,
           messages: [
             {
               role: "gordon",
@@ -2737,6 +3173,10 @@ Try saying: "What's the market looking like today?"`,
       setState((prev) => ({
         ...prev,
         view: "chat",
+        overlay: OVERLAY_NONE,
+        chatInputSeed: "",
+        chatInputSeedNonce: prev.chatInputSeedNonce + 1,
+        setupSection: null,
         connectionStatus: "connected",
         messages: [
           {
@@ -2755,6 +3195,10 @@ Try saying: "What's the market looking like today?" or "Find me a good BTC setup
       setState((prev) => ({
         ...prev,
         view: "chat",
+        overlay: OVERLAY_NONE,
+        chatInputSeed: "",
+        chatInputSeedNonce: prev.chatInputSeedNonce + 1,
+        setupSection: null,
         connectionStatus: "disconnected",
         messages: [
           {
@@ -2782,6 +3226,9 @@ Please check your API keys in the .env file and restart Gordon.`,
       setState((prev) => ({
         ...prev,
         view: "chat",
+        overlay: OVERLAY_NONE,
+        chatInputSeed: "",
+        chatInputSeedNonce: prev.chatInputSeedNonce + 1,
         messages: [
           ...prev.messages,
           {
@@ -2800,35 +3247,70 @@ Please check your API keys in the .env file and restart Gordon.`,
   // Handle global keyboard shortcuts
   useInput((input, key) => {
     // Don't process input during loading or onboarding (onboarding has its own handler)
-    if (state.view === "loading" || state.view === "onboarding" || state.view === "model") {
+    if (
+      state.view === "loading"
+      || state.view === "onboarding"
+      || state.view === "quickstart"
+      || state.view === "setup"
+      || state.view === "doctor"
+      || state.view === "model"
+    ) {
       return;
     }
 
     // Handle shortcuts overlay
-    if (state.showShortcuts) {
+    if (isOverlayOpen(state.overlay, "shortcuts")) {
       if (key.escape || input === "?") {
-        setState((prev) => ({ ...prev, showShortcuts: false }));
+        closeOverlay();
       }
+      return;
+    }
+
+    if (key.escape && (state.isLoading || state.isStreaming)) {
+      if (activeStreamAbortControllerRef.current) {
+        cancelActiveResponse();
+      } else {
+        setState((prev) => ({
+          ...prev,
+          activityStatus: "Current operation must finish before queued instructions can run.",
+        }));
+      }
+      return;
+    }
+
+    if (key.escape && isOverlayOpen(state.overlay)) {
+      closeOverlay();
+      return;
+    }
+
+    if (
+      input.toLowerCase() === "k"
+      && key.ctrl
+      && state.view === "chat"
+      && !state.isLoading
+      && !state.isStreaming
+    ) {
+      setState((prev) => ({
+        ...prev,
+        overlay: isOverlayOpen(prev.overlay, "quick-actions")
+          ? OVERLAY_NONE
+          : openOverlay("quick-actions"),
+      }));
       return;
     }
 
     // Show shortcuts with ? key (only when not actively typing in chat input)
     // The ? should only trigger when in menu view or when the shortcuts overlay is toggled
-    if (input === "?" && state.view === "menu") {
-      setState((prev) => ({ ...prev, showShortcuts: true }));
+    if (input === "?" && (state.view === "menu" || isOverlayOpen(state.overlay, "quick-actions"))) {
+      openShortcutsOverlay();
       return;
-    }
-
-    // ESC to go back to menu from chat
-    if (key.escape && state.view === "chat") {
-      setState((prev) => ({ ...prev, view: "menu" }));
     }
 
     // Any key to dismiss welcome banner
     if (state.view === "welcome" && (input || key.return)) {
       setState((prev) => ({ ...prev, view: "menu" }));
     }
-  });
+  }, { isActive: true });
 
   // Build ticker items from available price data
   const tickerItems = useMemo((): TickerItem[] => {
@@ -2845,6 +3327,31 @@ Please check your API keys in the .env file and restart Gordon.`,
     () => (hiddenMessageCount > 0 ? state.messages.slice(-maxVisibleMessages) : state.messages),
     [hiddenMessageCount, maxVisibleMessages, state.messages]
   );
+  const hasWalletRails = (
+    configRef.current.agentRails.walletProviders.length > 0
+    || configRef.current.agentRails.chainProviders.length > 0
+    || configRef.current.agentRails.paymentProviders.length > 0
+  );
+  const quickActionsOverlayOpen = isOverlayOpen(state.overlay, "quick-actions");
+  const shortcutsOverlayOpen = isOverlayOpen(state.overlay, "shortcuts");
+  const operatorStatus: OperatorStatusInfo = {
+    modelLabel: configRef.current.modelConfig?.model
+      || configRef.current.modelConfig?.provider
+      || "auto",
+    credentialProfile: getRequestCredentialProfile(configRef.current),
+    activeVenueLabel: brokerRef.current
+      ? `broker:${configRef.current.activeBrokerId || "default"}`
+      : exchangeRef.current
+        ? `exchange:${configRef.current.activeExchangeId || "default"}`
+        : hasWalletRails
+          ? "wallet rails"
+          : "none",
+    requestState: state.isStreaming ? "streaming" : state.isLoading ? "loading" : "idle",
+    queueDepth: state.queuedSubmissions.length,
+    configScopeLabel: getConfigScopeLabel(state.configLayers),
+    activeProfile: state.configLayers?.activeProfile ?? configRef.current.activeProfile ?? null,
+    activityStatus: state.activityStatus,
+  };
 
   return (
     <Box flexDirection="column" height="100%">
@@ -2858,28 +3365,42 @@ Please check your API keys in the .env file and restart Gordon.`,
           threadInfo={state.threadStatusInfo || undefined}
           tickerItems={tickerItems}
           chainStatus={state.chainStatus || undefined}
+          operatorStatus={operatorStatus}
         />
       )}
 
       {/* Shortcuts Overlay */}
-      {state.showShortcuts && (
-        <ShortcutsOverlay onClose={() => setState((prev) => ({ ...prev, showShortcuts: false }))} />
+      {shortcutsOverlayOpen && (
+        <ShortcutsOverlay onClose={closeOverlay} />
       )}
 
       {/* Main content area */}
       <Box flexDirection="column" flexGrow={1}>
         {state.view === "loading" && (
-          <Box flexDirection="column" paddingX={2} paddingY={1}>
-            <Spinner label="Loading Gordon..." />
-          </Box>
+          <ProgressIndicator
+            label="Loading Gordon..."
+            status="Initializing services, providers, and runtime state..."
+          />
         )}
 
         {state.view === "onboarding" && (
           <Onboarding onComplete={handleOnboardingComplete} />
         )}
 
+        {state.view === "quickstart" && (
+          <QuickStartWizard onComplete={handleSetupComplete} />
+        )}
+
         {state.view === "setup" && (
-          <SetupWizard onComplete={handleSetupComplete} />
+          <SetupWizard
+            mode={state.setupMode === "quickstart" ? "advanced" : state.setupMode}
+            initialSection={state.setupSection}
+            onComplete={handleSetupComplete}
+          />
+        )}
+
+        {state.view === "doctor" && (
+          <DoctorPanel onComplete={() => setState((prev) => ({ ...prev, view: "menu" }))} />
         )}
 
         {state.view === "model" && (
@@ -2891,7 +3412,17 @@ Please check your API keys in the .env file and restart Gordon.`,
         )}
 
         {state.view === "menu" && (
-          <QuickStartMenu onSelect={handleMenuSelect} mode={state.mode} />
+          <QuickStartMenu
+            onSelect={handleMenuSelect}
+            onTypeToChat={(seed) => openChatWorkspace({ seed, resetInput: true })}
+            mode={state.mode}
+            setupComplete={configRef.current.onboardingComplete}
+            hasExchange={Boolean(exchangeRef.current)}
+            hasBroker={Boolean(brokerRef.current)}
+            hasWalletRails={hasWalletRails}
+            hasMcpServers={configRef.current.mcpServers.length > 0}
+            variant="home"
+          />
         )}
 
         {state.view === "chat" && (
@@ -2904,35 +3435,104 @@ Please check your API keys in the .env file and restart Gordon.`,
               />
             )}
 
-            <ChatView messages={visibleMessages} hiddenCount={hiddenMessageCount} />
+            <ChatView
+              messages={visibleMessages}
+              hiddenCount={hiddenMessageCount}
+              isStreaming={state.isStreaming}
+              activeStreamingTimestamp={state.streamingMessageTimestamp}
+              activityStatus={state.activityStatus}
+              activeToolCall={state.activeToolCall}
+            />
 
-            {/* Loading/Streaming indicator */}
-            {state.isLoading && (
-              <Box paddingX={2}>
-                <Spinner label={state.activityStatus || "Gordon is thinking..."} />
+            {quickActionsOverlayOpen && (
+              <QuickStartMenu
+                onSelect={handleMenuSelect}
+                onTypeToChat={(seed) => openChatWorkspace({ seed, resetInput: true })}
+                mode={state.mode}
+                setupComplete={configRef.current.onboardingComplete}
+                hasExchange={Boolean(exchangeRef.current)}
+                hasBroker={Boolean(brokerRef.current)}
+                hasWalletRails={hasWalletRails}
+                hasMcpServers={configRef.current.mcpServers.length > 0}
+                variant="overlay"
+              />
+            )}
+
+            {(state.isLoading || state.isStreaming || state.queuedSubmissions.length > 0) && (
+              <Box
+                flexDirection="column"
+                borderStyle="round"
+                borderColor={COLORS.ACCENT_DIM}
+                marginX={2}
+                marginBottom={1}
+                paddingX={1}
+              >
+                <Text color={COLORS.WHITE}>
+                  {state.isStreaming
+                    ? "Run active"
+                    : state.isLoading
+                      ? "Run starting"
+                      : "Queue ready"}
+                  {state.activityStatus ? `: ${state.activityStatus}` : ""}
+                </Text>
+                <Text color={COLORS.DIM}>
+                  {"Esc stops the active streamed response when possible. Enter queues a follow-up. Use /steer <message> to redirect the next run."}
+                </Text>
+                {state.queuedSubmissions.length > 0 && (
+                  <Text color={COLORS.HIGHLIGHT}>
+                    Next queued: {state.queuedSubmissions[0]?.preview}
+                    {state.queuedSubmissions.length > 1 ? ` (+${state.queuedSubmissions.length - 1} more)` : ""}
+                  </Text>
+                )}
               </Box>
             )}
-            {state.isStreaming && (state.activeToolCall || state.activityStatus) && (
-              <Box paddingX={2}>
-                <Spinner label={state.activityStatus || `Running ${state.activeToolCall}...`} />
-              </Box>
+
+            {state.isLoading && (
+              <ProgressIndicator
+                label={state.activityStatus || "Gordon is thinking..."}
+                status="Routing request and preparing the response..."
+                onCancel={cancelActiveResponse}
+                cancellable={Boolean(activeStreamAbortControllerRef.current)}
+              />
+            )}
+            {state.isStreaming && (
+              <StreamingProgress
+                operation={state.activityStatus || "Streaming response..."}
+                currentTool={state.activeToolCall}
+                isStreaming={state.isStreaming}
+                onCancel={cancelActiveResponse}
+              />
             )}
 
             {/* Input area - isolated component to prevent re-render issues */}
             <ChatInput
               onSubmit={handleSubmit}
-              disabled={state.isLoading || state.isStreaming}
+              onOpenQuickActions={openQuickActionsOverlay}
+              disabled={quickActionsOverlayOpen}
+              busy={state.isLoading || state.isStreaming}
+              queueDepth={state.queuedSubmissions.length}
               placeholder={
-                state.isLoading || state.isStreaming
+                quickActionsOverlayOpen
+                  ? "Quick Actions open..."
+                  : state.isLoading || state.isStreaming
                   ? "Waiting for response..."
                   : "Ask Gordon anything..."
               }
+              seedValue={state.chatInputSeed}
+              seedNonce={state.chatInputSeedNonce}
+              quickActionContext={{
+                mode: state.mode,
+                setupComplete: configRef.current.onboardingComplete,
+                hasExchange: Boolean(exchangeRef.current),
+                hasBroker: Boolean(brokerRef.current),
+                hasWalletRails,
+              }}
             />
 
             {/* Help hint */}
             <Box paddingX={2} paddingY={0}>
               <Text color={COLORS.DIM}>
-                ESC: menu | /help: commands | /theme: toggle theme | ?: shortcuts
+                Ctrl+K: actions | ESC: stop agent response | /menu: actions | /help: commands
               </Text>
             </Box>
           </Box>

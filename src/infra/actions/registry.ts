@@ -1,0 +1,495 @@
+import { z } from "zod";
+
+import type {
+  ActionDefinition,
+  ActionTaskScope,
+  SlashActionSurface,
+  ActionToolSurface,
+} from "./types.ts";
+
+const scanInputSchema = z.object({
+  topN: z.number().int().min(1).max(500).default(50),
+  timeframes: z.array(z.string()).min(1).default(["1h", "4h"]),
+});
+
+const scanOutputSchema = z.object({
+  timestamp: z.string(),
+  coinsScanned: z.number(),
+  opportunities: z.array(z.object({
+    symbol: z.string(),
+    price: z.number(),
+    change24h: z.number(),
+    setupConfidence: z.number(),
+    bias: z.string(),
+    risk: z.string(),
+  })),
+});
+
+const analyzeInputSchema = z.object({
+  symbol: z.string(),
+  timeframes: z.array(z.string()).default(["1h", "4h"]),
+});
+
+const analyzeOutputSchema = z.object({
+  symbol: z.string(),
+  price: z.number(),
+  trend: z.string(),
+  setupDetected: z.boolean(),
+  recommendation: z.string(),
+});
+
+const planInputSchema = z.object({
+  symbol: z.string(),
+});
+
+const planOutputSchema = z.object({
+  success: z.boolean(),
+  summary: z.string().optional(),
+  error: z.string().optional(),
+});
+
+const previewOrderInputSchema = z.object({
+  symbol: z.string(),
+  side: z.enum(["BUY", "SELL"]),
+  quantity: z.number().positive().optional(),
+  quoteOrderQty: z.number().positive().optional(),
+});
+
+const previewOrderOutputSchema = z.object({
+  ready: z.boolean(),
+  summary: z.string(),
+  blockers: z.array(z.string()),
+  preview: z.record(z.string(), z.unknown()).optional(),
+});
+
+const marketOrderInputSchema = previewOrderInputSchema;
+
+const marketOrderOutputSchema = z.object({
+  success: z.boolean().optional(),
+  message: z.string().optional(),
+  error: z.string().optional(),
+});
+
+const portfolioInputSchema = z.object({
+  market: z.enum(["crypto", "stocks"]).default("crypto"),
+});
+
+const portfolioOutputSchema = z.object({
+  summary: z.string().optional(),
+});
+
+const armInputSchema = z.object({
+  mode: z.enum(["ARMED", "SAFE"]),
+});
+
+const armOutputSchema = z.object({
+  success: z.boolean(),
+  mode: z.enum(["ARMED", "SAFE"]),
+});
+
+const fundInputSchema = z.object({
+  intent: z.enum(["buy", "sell", "swap", "quote", "limits", "history"]).default("quote"),
+});
+
+const fundOutputSchema = z.object({
+  summary: z.string().optional(),
+});
+
+const payInputSchema = z.object({
+  resource: z.string(),
+  amount: z.number().positive(),
+});
+
+const payOutputSchema = z.object({
+  summary: z.string().optional(),
+});
+
+function createSlash(
+  surface: SlashActionSurface,
+  tool?: ActionToolSurface,
+): Pick<ActionDefinition, "slash" | "tool"> {
+  return {
+    slash: surface,
+    ...(tool ? { tool } : {}),
+  };
+}
+
+export const CANONICAL_ACTIONS: ActionDefinition[] = [
+  {
+    id: "market.scan",
+    title: "Scan Market",
+    description: "Scan the active exchange universe for trading opportunities.",
+    domain: "market",
+    capability: "read",
+    taskScope: "scan",
+    sideEffectLevel: "none",
+    approvalPolicy: "none",
+    dryRunSupported: false,
+    providerRequirements: [{ kind: "exchange" }],
+    rateLimitBudget: "scanning",
+    visibility: ["interactive", "json", "agent"],
+    inputSchema: scanInputSchema,
+    outputSchema: scanOutputSchema,
+    ...createSlash(
+      {
+        name: "scan",
+        aliases: ["s"],
+        description: "Scan market for trading opportunities (~10-30s depending on coins)",
+        usage: "/scan",
+        category: "market",
+        level: 1,
+        workflow: "discover",
+        audience: "core",
+        action: "agent",
+        target: "scanner",
+        executionTime: "~10-30s",
+        whenToUse: "Discover opportunities across multiple coins",
+      },
+      {
+        toolName: "scan_market",
+        agentTarget: "Scanner",
+        description: "Canonical market scan tool",
+      },
+    ),
+    prompt: () => "Scan the market for trading opportunities across multiple coins (~10-30s depending on market size)",
+    tags: ["market", "scan", "discovery"],
+  },
+  {
+    id: "market.analyze",
+    title: "Analyze Market",
+    description: "Run a single-symbol analysis on the active exchange.",
+    domain: "market",
+    capability: "read",
+    taskScope: "analysis",
+    sideEffectLevel: "none",
+    approvalPolicy: "none",
+    dryRunSupported: false,
+    providerRequirements: [{ kind: "exchange" }],
+    rateLimitBudget: "analysis",
+    visibility: ["interactive", "json", "agent"],
+    inputSchema: analyzeInputSchema,
+    outputSchema: analyzeOutputSchema,
+    ...createSlash(
+      {
+        name: "analyze",
+        aliases: ["a", "quick"],
+        description: "Single comprehensive analysis (~3-5s)",
+        usage: "/analyze <symbol>",
+        category: "market",
+        level: 1,
+        workflow: "analyze",
+        audience: "core",
+        action: "agent",
+        target: "analyst",
+        executionTime: "~3-5s",
+        whenToUse: "Quick check on a single coin",
+      },
+      {
+        toolName: "analyze_coin",
+        agentTarget: "Analyst",
+        description: "Canonical single-symbol analysis tool",
+      },
+    ),
+    prompt: ({ args }) => args
+      ? `Run a quick single analysis on ${args} - get price action, key levels, and trading signal`
+      : "What coin should I analyze? (This is a quick ~3-5s analysis)",
+    tags: ["market", "analysis"],
+  },
+  {
+    id: "trading.plan",
+    title: "Create Trade Plan",
+    description: "Create a structured trading plan before execution.",
+    domain: "trading",
+    capability: "plan",
+    taskScope: "planning",
+    sideEffectLevel: "preview",
+    approvalPolicy: "confirm",
+    dryRunSupported: true,
+    providerRequirements: [{ kind: "exchange" }],
+    rateLimitBudget: "analysis",
+    visibility: ["interactive", "json", "agent"],
+    inputSchema: planInputSchema,
+    outputSchema: planOutputSchema,
+    ...createSlash(
+      {
+        name: "plan",
+        aliases: ["p"],
+        description: "Create a trade plan for a coin",
+        usage: "/plan <symbol>",
+        category: "trading",
+        level: 1,
+        workflow: "trade",
+        audience: "core",
+        action: "agent",
+        target: "planner",
+        whenToUse: "Create a structured trade plan before execution",
+      },
+      {
+        toolName: "create_plan",
+        agentTarget: "Planner",
+        description: "Canonical plan creation tool",
+      },
+    ),
+    prompt: ({ args }) => args ? `Create a trade plan for ${args}` : "What coin should I plan a trade for?",
+    tags: ["trading", "planning"],
+  },
+  {
+    id: "trading.preview_market_order",
+    title: "Preview Market Order",
+    description: "Preview a spot market order without placing it.",
+    domain: "trading",
+    capability: "plan",
+    taskScope: "execution",
+    sideEffectLevel: "preview",
+    approvalPolicy: "confirm",
+    dryRunSupported: true,
+    providerRequirements: [{ kind: "exchange" }],
+    rateLimitBudget: "execution",
+    visibility: ["interactive", "json", "agent"],
+    inputSchema: previewOrderInputSchema,
+    outputSchema: previewOrderOutputSchema,
+    ...createSlash(
+      {
+        name: "preview-order",
+        aliases: ["order-preview"],
+        description: "Preview a market order before execution",
+        usage: "/preview-order <symbol> <buy|sell> <amount> [quote]",
+        category: "trading",
+        level: 2,
+        workflow: "trade",
+        audience: "advanced",
+        action: "agent",
+        target: "planner",
+        executionTime: "~1-2s",
+        whenToUse: "See readiness, estimated fills, policy blockers, and side effects before placing a market order",
+      },
+      {
+        toolName: "preview_market_order",
+        agentTarget: "Planner",
+        description: "Canonical market-order preview tool",
+      },
+    ),
+    prompt: ({ args }) => args
+      ? `Preview a market order before execution: ${args}. Show readiness, estimated fills, fees, and policy blockers.`
+      : "What market order should I preview? Example: /preview-order BTC buy 100 quote",
+    tags: ["trading", "preview", "dry-run"],
+  },
+  {
+    id: "trading.market_order",
+    title: "Place Market Order",
+    description: "Place a live spot market order on the active exchange.",
+    domain: "trading",
+    capability: "execute",
+    taskScope: "execution",
+    sideEffectLevel: "funds",
+    approvalPolicy: "armed_mode",
+    dryRunSupported: true,
+    providerRequirements: [{ kind: "exchange" }],
+    rateLimitBudget: "execution",
+    visibility: ["agent"],
+    inputSchema: marketOrderInputSchema,
+    outputSchema: marketOrderOutputSchema,
+    tool: {
+      toolName: "place_market_order",
+      agentTarget: "Executor",
+      description: "Canonical live market-order tool",
+    },
+    prompt: ({ args }) => args ? `Place a live market order: ${args}` : "What market order should I place?",
+    tags: ["trading", "execution", "armed"],
+  },
+  {
+    id: "account.portfolio",
+    title: "Show Portfolio",
+    description: "Show portfolio or broker account balances.",
+    domain: "account",
+    capability: "read",
+    taskScope: "ops",
+    sideEffectLevel: "none",
+    approvalPolicy: "none",
+    dryRunSupported: false,
+    providerRequirements: [{ kind: "exchange", optional: true }, { kind: "broker", optional: true }],
+    rateLimitBudget: "minimal",
+    visibility: ["interactive", "json", "agent"],
+    inputSchema: portfolioInputSchema,
+    outputSchema: portfolioOutputSchema,
+    ...createSlash({
+      name: "portfolio",
+      aliases: ["pf", "balance"],
+      description: "View portfolio and balances",
+      usage: "/portfolio",
+      category: "account",
+      level: 1,
+      workflow: "accounts",
+      audience: "core",
+      action: "menu",
+      target: "portfolio",
+      whenToUse: "Inspect current balances and holdings",
+    }),
+    prompt: ({ args }) => args.toLowerCase().includes("stock")
+      ? "Show my stock broker account summary"
+      : "Show my portfolio",
+    tags: ["portfolio", "account"],
+  },
+  {
+    id: "wallet.fund",
+    title: "Wallet Funding",
+    description: "Fund wallets or fetch MoonPay funding flows and quotes.",
+    domain: "wallet",
+    capability: "plan",
+    taskScope: "funding",
+    sideEffectLevel: "preview",
+    approvalPolicy: "external",
+    dryRunSupported: true,
+    providerRequirements: [{ kind: "wallet" }],
+    rateLimitBudget: "ops",
+    visibility: ["interactive", "json", "agent", "mcp"],
+    inputSchema: fundInputSchema,
+    outputSchema: fundOutputSchema,
+    ...createSlash({
+      name: "fund",
+      aliases: ["onramp", "offramp"],
+      description: "Create MoonPay flows or fetch quotes and limits",
+      usage: "/fund [buy|sell|swap|quote|limits|history] ...",
+      category: "trading",
+      level: 2,
+      workflow: "trade",
+      audience: "advanced",
+      action: "agent",
+      target: "executor",
+      whenToUse: "Fund a wallet, off-ramp, create a hosted swap flow, or inspect live MoonPay pricing and limits",
+    }),
+    prompt: ({ args }) => args
+      ? `Handle a MoonPay wallet funding workflow: ${args}`
+      : "Show wallet funding, quotes, or MoonPay history flows",
+    tags: ["wallet", "funding", "moonpay"],
+  },
+  {
+    id: "payments.intent",
+    title: "Prepare Payment Intent",
+    description: "Prepare a Polygon x402 payment intent for a paid API or agent payment.",
+    domain: "payments",
+    capability: "plan",
+    taskScope: "funding",
+    sideEffectLevel: "preview",
+    approvalPolicy: "external",
+    dryRunSupported: true,
+    providerRequirements: [{ kind: "payments" }],
+    rateLimitBudget: "ops",
+    visibility: ["interactive", "json", "agent"],
+    inputSchema: payInputSchema,
+    outputSchema: payOutputSchema,
+    ...createSlash({
+      name: "pay",
+      aliases: ["x402", "payments"],
+      description: "Prepare Polygon x402 payment intents for paid APIs or agent payments",
+      usage: "/pay <resource> <amount>",
+      category: "trading",
+      level: 2,
+      workflow: "trade",
+      audience: "advanced",
+      action: "agent",
+      target: "executor",
+      whenToUse: "Prepare Gordon-native payment headers for external services",
+    }),
+    prompt: ({ args }) => args
+      ? `Prepare a Polygon x402 payment intent: ${args}`
+      : "What resource and amount should I prepare a payment for?",
+    tags: ["payments", "polygon", "x402"],
+  },
+  {
+    id: "system.arm",
+    title: "Arm System",
+    description: "Switch Gordon into ARMED mode for live execution.",
+    domain: "system",
+    capability: "configure",
+    taskScope: "system",
+    sideEffectLevel: "state",
+    approvalPolicy: "confirm",
+    dryRunSupported: false,
+    providerRequirements: [{ kind: "system" }],
+    rateLimitBudget: "ops",
+    visibility: ["interactive", "json", "agent"],
+    inputSchema: armInputSchema,
+    outputSchema: armOutputSchema,
+    ...createSlash({
+      name: "arm",
+      aliases: [],
+      description: "Enable live trading (ARMED mode)",
+      usage: "/arm",
+      category: "trading",
+      level: 2,
+      workflow: "operate",
+      audience: "advanced",
+      action: "tool",
+      target: "arm_system",
+    }),
+    prompt: () => "Arm the system for live trading",
+    tags: ["system", "armed"],
+  },
+  {
+    id: "system.disarm",
+    title: "Disarm System",
+    description: "Return Gordon to SAFE mode.",
+    domain: "system",
+    capability: "configure",
+    taskScope: "system",
+    sideEffectLevel: "state",
+    approvalPolicy: "none",
+    dryRunSupported: false,
+    providerRequirements: [{ kind: "system" }],
+    rateLimitBudget: "ops",
+    visibility: ["interactive", "json", "agent"],
+    inputSchema: armInputSchema,
+    outputSchema: armOutputSchema,
+    ...createSlash({
+      name: "disarm",
+      aliases: ["safe"],
+      description: "Return to SAFE mode",
+      usage: "/disarm",
+      category: "trading",
+      level: 2,
+      workflow: "operate",
+      audience: "advanced",
+      action: "tool",
+      target: "arm_system",
+    }),
+    prompt: () => "Disarm the system and return to safe mode",
+    tags: ["system", "safe"],
+  },
+];
+
+const ACTIONS_BY_ID = new Map(CANONICAL_ACTIONS.map((action) => [action.id, action]));
+const ACTIONS_BY_SLASH_NAME = new Map<string, ActionDefinition>();
+const ACTIONS_BY_TOOL_NAME = new Map<string, ActionDefinition>();
+
+for (const action of CANONICAL_ACTIONS) {
+  if (action.slash) {
+    ACTIONS_BY_SLASH_NAME.set(action.slash.name, action);
+    for (const alias of action.slash.aliases) {
+      ACTIONS_BY_SLASH_NAME.set(alias, action);
+    }
+  }
+  if (action.tool) {
+    ACTIONS_BY_TOOL_NAME.set(action.tool.toolName, action);
+  }
+}
+
+export function getCanonicalActions(): ActionDefinition[] {
+  return [...CANONICAL_ACTIONS];
+}
+
+export function getActionById(actionId: string): ActionDefinition | undefined {
+  return ACTIONS_BY_ID.get(actionId);
+}
+
+export function getActionBySlashName(commandName: string): ActionDefinition | undefined {
+  return ACTIONS_BY_SLASH_NAME.get(commandName.toLowerCase());
+}
+
+export function getActionByToolName(toolName: string): ActionDefinition | undefined {
+  return ACTIONS_BY_TOOL_NAME.get(toolName);
+}
+
+export function getActionsForTaskScope(taskScope: ActionTaskScope): ActionDefinition[] {
+  return CANONICAL_ACTIONS.filter((action) => action.taskScope === taskScope);
+}

@@ -8,6 +8,7 @@ import type { Exchange } from "../exchange/index.ts";
 import type { BrokerAdapter } from "../broker/index.ts";
 import type { LLMClient } from "../llm/index.ts";
 import type { AgentRailsRegistry } from "../rails/index.ts";
+import type { ActionTaskScope, CredentialProfile } from "../actions/types.ts";
 import type { GordonConfig, Plan, Trade } from "../../types/index.ts";
 
 /**
@@ -36,6 +37,12 @@ export interface GordonContext {
   userId?: string;
   /** Thread ID for conversation persistence */
   threadId?: string;
+  /** Canonical action requested by the UI/command layer */
+  requestedActionId?: string;
+  /** Runtime scope used to constrain tool usage for the current request */
+  requestedTaskScope?: ActionTaskScope;
+  /** Credential profile the request should prefer */
+  credentialProfile?: CredentialProfile;
 }
 
 /**
