@@ -80,7 +80,7 @@ export class ServiceContainer {
 
     // Create logger
     this.services.logger = new Logger({
-      level: config.logLevel || (process.env.LOG_LEVEL as LogLevel) || "info",
+      level: config.logLevel || (process.env.LOG_LEVEL as LogLevel) || "error",
       transports: [new ConsoleTransport()],
     });
 

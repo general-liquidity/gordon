@@ -313,6 +313,11 @@ export function resolveMarketVenue(
 }
 
 export function isValidTradingSymbol(symbol: string): boolean {
+  const trimmed = symbol.trim();
+  if (!trimmed || trimmed !== trimmed.toUpperCase()) {
+    return false;
+  }
+
   const normalizedStock = sanitizeStockSymbol(symbol);
   const normalizedCrypto = sanitizeCryptoSymbol(symbol);
   return (

@@ -905,7 +905,7 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
                   dedalusApiKey: envStatusEarly.keys.DEDALUS_API_KEY,
                 }
               : undefined,
-            logLevel: "info",
+            logLevel: (process.env.LOG_LEVEL as "debug" | "info" | "warn" | "error" | undefined) ?? "error",
           });
         } catch (error) {
           console.error("Failed to initialize service container:", error);
