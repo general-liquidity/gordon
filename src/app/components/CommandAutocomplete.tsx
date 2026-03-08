@@ -4,10 +4,12 @@
  */
 
 import React from "react";
-import { Box, Text, useStdout } from "ink";
+import { Box, Text } from "ink";
+import { getAutocompleteTokens } from "../componentTheme.ts";
+import { clampWidth, truncateWithEllipsis, useMeasuredWidth } from "../layout.ts";
 import { COLORS } from "../theme.ts";
 import type { SlashCommand } from "../slashCommands.ts";
-import { WORKFLOW_CONFIG, type WorkflowGroup } from "../commandUx.ts";
+import { WORKFLOW_CONFIG } from "../commandUx.ts";
 
 interface CommandAutocompleteProps {
   suggestions: SlashCommand[];
@@ -28,31 +30,13 @@ export const CommandAutocomplete: React.FC<CommandAutocompleteProps> = ({
   showCategories = true,
   showUsage = false,
 }) => {
-  const getWorkflowColor = (workflow: WorkflowGroup): string =>
-    workflow === "discover" ? COLORS.DISCOVER :
-      workflow === "analyze" ? COLORS.ANALYZE :
-        workflow === "trade" ? COLORS.TRADE :
-          workflow === "run" ? COLORS.RUN :
-            workflow === "accounts" ? COLORS.RAILS :
-              COLORS.OPERATE;
-
-  const { stdout } = useStdout();
-  const terminalWidth = stdout?.columns ?? 100;
+  const { ref, width: terminalWidth } = useMeasuredWidth(100);
   const COMMAND_COL_WIDTH = 20;
   const DESCRIPTION_COL_MAX = 68;
   const DESCRIPTION_COL_MIN = 24;
   const STATIC_COL_WIDTH = COMMAND_COL_WIDTH + 6;
   const availableDescriptionWidth = terminalWidth - STATIC_COL_WIDTH;
-  const DESCRIPTION_COL_WIDTH = Math.max(
-    DESCRIPTION_COL_MIN,
-    Math.min(DESCRIPTION_COL_MAX, availableDescriptionWidth)
-  );
-
-  const truncateText = (value: string, width: number): string => {
-    if (value.length <= width) return value;
-    if (width <= 3) return value.slice(0, width);
-    return value.slice(0, width - 3) + "...";
-  };
+  const DESCRIPTION_COL_WIDTH = clampWidth(availableDescriptionWidth, DESCRIPTION_COL_MIN, DESCRIPTION_COL_MAX);
 
   const padSpaces = (value: string, width: number): string => {
     if (value.length >= width) return "";
@@ -69,6 +53,7 @@ export const CommandAutocomplete: React.FC<CommandAutocompleteProps> = ({
     if (searchTerm.length > 0) {
       return (
         <Box
+          ref={ref}
           flexDirection="column"
           borderStyle="single"
           borderColor={COLORS.DIM}
@@ -106,6 +91,7 @@ export const CommandAutocomplete: React.FC<CommandAutocompleteProps> = ({
 
   return (
     <Box
+      ref={ref}
       flexDirection="column"
       borderStyle="single"
       borderColor={COLORS.ACCENT_DIM}
@@ -134,7 +120,7 @@ export const CommandAutocomplete: React.FC<CommandAutocompleteProps> = ({
       {visibleSuggestions.map((cmd, index) => {
         const isSelected = index === adjustedSelectedIndex;
         const cmdName = `/${cmd.name}`;
-        const displayName = truncateText(cmdName, COMMAND_COL_WIDTH);
+        const displayName = truncateWithEllipsis(cmdName, COMMAND_COL_WIDTH);
 
         // Highlight matching portion
         const matchEnd = Math.min(searchTerm.length + 1, displayName.length);
@@ -147,9 +133,9 @@ export const CommandAutocomplete: React.FC<CommandAutocompleteProps> = ({
         }
 
         const commandPadding = padSpaces(displayName, COMMAND_COL_WIDTH);
-        const descriptionDisplay = truncateText(cmd.description, DESCRIPTION_COL_WIDTH);
+        const descriptionDisplay = truncateWithEllipsis(cmd.description, DESCRIPTION_COL_WIDTH);
         const workflowConfig = WORKFLOW_CONFIG[cmd.workflow];
-        const workflowColor = getWorkflowColor(cmd.workflow);
+        const tokens = getAutocompleteTokens(cmd.workflow, isSelected);
 
         return (
           <Box key={cmd.name} flexDirection="column" paddingY={0}>
@@ -157,27 +143,27 @@ export const CommandAutocomplete: React.FC<CommandAutocompleteProps> = ({
             {showCategorySeparator && index > 0 && (
               <Box marginTop={1}>
                 <Text color={COLORS.DIM}>─── </Text>
-                <Text color={workflowColor} bold>{workflowConfig.label}</Text>
+                <Text color={tokens.accent} bold>{workflowConfig.label}</Text>
                 <Text color={COLORS.DIM}> ───</Text>
               </Box>
             )}
 
             {/* Command row */}
             <Box>
-              <Text color={isSelected ? COLORS.HIGHLIGHT : COLORS.DIM}>
+              <Text color={tokens.prompt}>
                 {isSelected ? ">" : " "}
               </Text>
 
-              <Text color={isSelected ? workflowColor : COLORS.ACCENT_DIM} bold={isSelected}>
+              <Text color={tokens.accent} bold={isSelected}>
                 {matchedPart}
               </Text>
-              <Text color={COLORS.WHITE} bold={isSelected}>
+              <Text color={tokens.label} bold={isSelected}>
                 {restPart}
               </Text>
               <Text color={COLORS.DIM}>{commandPadding}</Text>
               <Text color={COLORS.DIM}> </Text>
 
-              <Text color={isSelected ? COLORS.WHITE : COLORS.DIM}>
+              <Text color={tokens.description}>
                 {descriptionDisplay}
               </Text>
             </Box>
@@ -185,14 +171,14 @@ export const CommandAutocomplete: React.FC<CommandAutocompleteProps> = ({
             {(showUsage || isSelected) && (
               <Box marginLeft={2} flexDirection="column">
                 <Text color={COLORS.DIM} italic>
-                  {workflowConfig.label}: {cmd.usage}
+                {workflowConfig.label}: {cmd.usage}
+              </Text>
+              {cmd.whenToUse && (
+                <Text color={COLORS.DIM}>
+                    When to use: {truncateWithEllipsis(cmd.whenToUse, terminalWidth - 8)}
                 </Text>
-                {cmd.whenToUse && (
-                  <Text color={COLORS.DIM}>
-                    When to use: {truncateText(cmd.whenToUse, terminalWidth - 8)}
-                  </Text>
-                )}
-              </Box>
+              )}
+            </Box>
             )}
           </Box>
         );
@@ -234,13 +220,7 @@ export const CommandHint: React.FC<CommandHintProps> = ({ command, showUsage = f
   }
 
   const workflowConfig = WORKFLOW_CONFIG[command.workflow];
-  const workflowColor =
-    command.workflow === "discover" ? COLORS.DISCOVER :
-      command.workflow === "analyze" ? COLORS.ANALYZE :
-        command.workflow === "trade" ? COLORS.TRADE :
-          command.workflow === "run" ? COLORS.RUN :
-            command.workflow === "accounts" ? COLORS.RAILS :
-              COLORS.OPERATE;
+  const workflowColor = getAutocompleteTokens(command.workflow, true).accent;
 
   return (
     <Box marginLeft={1} flexDirection="column">

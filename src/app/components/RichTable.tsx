@@ -5,6 +5,7 @@
 
 import React from "react";
 import { Box, Text } from "ink";
+import { fitColumnWidths, truncateWithEllipsis, useMeasuredWidth } from "../layout.ts";
 import { COLORS } from "../theme.ts";
 
 export type ColumnType = "text" | "number" | "currency" | "percent" | "change";
@@ -95,9 +96,10 @@ export const RichTable: React.FC<RichTableProps> = ({
 }) => {
   const visibleData = data.slice(0, maxRows);
   const hasMore = data.length > maxRows;
+  const { ref, width } = useMeasuredWidth(96);
 
   // Calculate column widths
-  const colWidths = columns.map((col) => {
+  const requestedWidths = columns.map((col) => {
     if (col.width) return col.width;
     // Auto-calculate based on header and data
     const headerLen = col.header.length;
@@ -110,11 +112,15 @@ export const RichTable: React.FC<RichTableProps> = ({
     );
     return Math.max(headerLen, maxDataLen) + 2;
   });
-
   const rankWidth = showRank ? 4 : 0;
+  const colWidths = fitColumnWidths({
+    widths: requestedWidths,
+    maxTotalWidth: Math.max(24, width - rankWidth - 2),
+    minWidth: 6,
+  });
 
   return (
-    <Box flexDirection="column" marginY={1}>
+    <Box ref={ref} flexDirection="column" marginY={1}>
       {/* Title */}
       {title && (
         <Box marginBottom={1}>
@@ -181,7 +187,7 @@ export const RichTable: React.FC<RichTableProps> = ({
                   width={width}
                   justifyContent={align === "right" ? "flex-end" : "flex-start"}
                 >
-                  <Text color={color}>{formatted}</Text>
+                  <Text color={color}>{truncateWithEllipsis(formatted, Math.max(4, width - 1))}</Text>
                 </Box>
               );
             })}

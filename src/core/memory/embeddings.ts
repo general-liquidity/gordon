@@ -254,7 +254,7 @@ export function createEmbeddingProvider(): EmbeddingProvider {
       });
       return provider;
     } catch (err) {
-      logger.warn("Failed to create OpenAI embedding provider, falling back to local", {
+      logger.info("Failed to create OpenAI embedding provider, falling back to local", {
         error: err instanceof Error ? err.message : String(err),
       });
     }

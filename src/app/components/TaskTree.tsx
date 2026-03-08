@@ -1,12 +1,14 @@
 import React, { useMemo } from "react";
-import { Box, Text } from "ink";
+import { Box, Static, Text } from "ink";
+import { getTaskTreeTokens } from "../componentTheme.ts";
+import { truncateWithEllipsis, useMeasuredWidth } from "../layout.ts";
 import { COLORS } from "../theme.ts";
 import type { TaskTreeNode, TaskTreeNodeStatus, TaskTreeState } from "../taskTree.ts";
-import { getTaskLabelColor, getTaskStatusColor } from "../tuiSemantics.ts";
 
 interface TaskTreeProps {
   tree: TaskTreeState;
   title?: string;
+  staticCompleted?: boolean;
 }
 
 interface RenderRow {
@@ -73,33 +75,51 @@ function buildRows(tree: TaskTreeState): RenderRow[] {
   return rows;
 }
 
-export const TaskTree: React.FC<TaskTreeProps> = ({ tree, title = "Task Tree" }) => {
+export const TaskTree: React.FC<TaskTreeProps> = ({ tree, title = "Task Tree", staticCompleted = true }) => {
   const rows = useMemo(() => buildRows(tree), [tree]);
+  const { ref, width } = useMeasuredWidth(72);
+  const completedRows = staticCompleted
+    ? rows.filter(({ node }) => ["completed", "failed", "cancelled"].includes(node.status))
+    : [];
+  const activeRows = staticCompleted
+    ? rows.filter(({ node }) => !["completed", "failed", "cancelled"].includes(node.status))
+    : rows;
+
+  const renderRow = ({ node, prefix, isActiveLeaf }: RenderRow): React.ReactElement => {
+    const statusGlyph = getStatusGlyph(node.status);
+    const tokens = getTaskTreeTokens(node, node.status, isActiveLeaf);
+    const availableTextWidth = Math.max(16, width - prefix.length - 8);
+    const label = truncateWithEllipsis(node.label, Math.min(availableTextWidth, 48));
+    const detail = node.detail
+      ? truncateWithEllipsis(node.detail, Math.min(availableTextWidth, 40))
+      : null;
+
+    return (
+      <Box key={node.id}>
+        <Text color={COLORS.DIM}>{prefix}</Text>
+        <Text color={tokens.status}>{statusGlyph}</Text>
+        <Text> </Text>
+        <Text color={tokens.label} bold={node.kind === "request" || isActiveLeaf} underline={isActiveLeaf}>
+          {label}
+        </Text>
+        {detail && (
+          <Text color={tokens.detail}> {" — "}{detail}</Text>
+        )}
+      </Box>
+    );
+  };
 
   return (
-    <Box flexDirection="column" marginX={2} marginBottom={1}>
+    <Box ref={ref} flexDirection="column" marginX={2} marginBottom={1}>
       <Text color={COLORS.TAN} bold>
         {title}
       </Text>
-      {rows.map(({ node, prefix, isActiveLeaf }) => {
-        const statusGlyph = getStatusGlyph(node.status);
-        const statusColor = getTaskStatusColor(node.status);
-        const labelColor = getTaskLabelColor(node, isActiveLeaf);
-
-        return (
-          <Box key={node.id}>
-            <Text color={COLORS.DIM}>{prefix}</Text>
-            <Text color={statusColor}>{statusGlyph}</Text>
-            <Text> </Text>
-            <Text color={labelColor} bold={node.kind === "request" || isActiveLeaf} underline={isActiveLeaf}>
-              {node.label}
-            </Text>
-            {node.detail && (
-              <Text color={COLORS.DIM}> {" — "}{node.detail}</Text>
-            )}
-          </Box>
-        );
-      })}
+      {staticCompleted && completedRows.length > 0 && (
+        <Static key={tree.rootId} items={completedRows}>
+          {(item) => renderRow(item)}
+        </Static>
+      )}
+      {activeRows.map(renderRow)}
     </Box>
   );
 };

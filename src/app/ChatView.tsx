@@ -7,7 +7,7 @@ import {
   useGordonLoader,
 } from "./components/GordonLoader.tsx";
 import { MarkdownText } from "./components/MarkdownText.tsx";
-import { formatHiddenMessageNotice } from "./threadDensity.ts";
+import { formatHiddenMessageNotice, formatHiddenNewerNotice } from "./threadDensity.ts";
 
 export interface ChatMessage {
   role: "user" | "gordon";
@@ -19,8 +19,10 @@ export interface ChatMessage {
 
 interface ChatViewProps {
   messages: ChatMessage[];
-  hiddenCount?: number;
+  hiddenBefore?: number;
+  hiddenAfter?: number;
   visibleLimit?: number;
+  isPinnedBottom?: boolean;
   isStreaming?: boolean;
   activeStreamingTimestamp?: string | null;
   activityStatus?: string | null;
@@ -82,39 +84,37 @@ const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({
 }) => {
   const isUser = message.role === "user";
   const showAgentBadge = !isUser && message.agent && message.agent.toLowerCase() !== "gordon";
+  const roleLabel = isUser ? "You" : "Gordon";
+  const metaColor = isUser ? COLORS.DIM : COLORS.TAN;
 
   return (
     <Box
       flexDirection="column"
       marginY={0}
-      paddingX={1}
+      paddingX={0}
       alignSelf={isUser ? "flex-end" : "flex-start"}
     >
-      {/* Role label */}
-      <Box>
-        <Text color={isUser ? COLORS.DIM : COLORS.TAN} bold>
-          {isUser ? "You" : "Gordon"}
-        </Text>
-        {message.badge && (
-          <Text color={COLORS.HIGHLIGHT}> [{message.badge}]</Text>
-        )}
-        {showAgentBadge && (
-          <Text color="cyan" dimColor> via {message.agent}</Text>
-        )}
-        {message.timestamp && (
-          <Text color={COLORS.DIM}> {message.timestamp}</Text>
-        )}
-      </Box>
-
       {/* Message content */}
       <Box
         borderStyle="round"
         borderColor={isUser ? COLORS.DIM : isStreamingMessage ? COLORS.HIGHLIGHT : COLORS.TAN_DIM}
         paddingX={1}
-        marginLeft={isUser ? 4 : 0}
-        marginRight={isUser ? 0 : 4}
+        marginLeft={isUser ? 2 : 0}
+        marginRight={isUser ? 0 : 2}
         flexDirection="column"
       >
+        <Box>
+          <Text color={metaColor} bold>{roleLabel}</Text>
+          {message.badge && (
+            <Text color={COLORS.HIGHLIGHT}> [{message.badge}]</Text>
+          )}
+          {showAgentBadge && (
+            <Text color={COLORS.CYAN} dimColor> via {message.agent}</Text>
+          )}
+          {message.timestamp && (
+            <Text color={COLORS.DIM}> {` · ${message.timestamp}`}</Text>
+          )}
+        </Box>
         {isUser ? (
           <Text color={COLORS.WHITE} wrap="wrap">
             {message.content}
@@ -135,44 +135,55 @@ const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({
 
 export const ChatView: React.FC<ChatViewProps> = ({
   messages,
-  hiddenCount = 0,
+  hiddenBefore = 0,
+  hiddenAfter = 0,
   visibleLimit,
+  isPinnedBottom = true,
   isStreaming = false,
   activeStreamingTimestamp = null,
   activityStatus = null,
   activeToolCall = null,
 }) => {
+  const renderedMessages = messages
+    .map((message, index) => ({ message, index }))
+    .map(({ message, index }) => {
+      const isStreamingMessage =
+        isStreaming
+        && message.role === "gordon"
+        && activeStreamingTimestamp !== null
+        && message.timestamp === activeStreamingTimestamp;
+
+      return (
+        <MessageBubble
+          key={`${index}-${message.role}-${message.timestamp ?? "no-ts"}-${message.agent ?? "gordon"}-${message.badge ?? ""}`}
+          message={message}
+          isStreamingMessage={isStreamingMessage}
+          activityStatus={isStreamingMessage ? activityStatus : null}
+          activeToolCall={isStreamingMessage ? activeToolCall : null}
+        />
+      );
+    });
+
   return (
-    <Box flexDirection="column" flexGrow={1} paddingX={1}>
-      {messages.length === 0 ? (
-        <Box justifyContent="center" paddingY={2}>
-          <Text color={COLORS.DIM} italic>
-            Ask Gordon to scan, analyze, plan, or review a market.
-          </Text>
-        </Box>
-      ) : (
+    <Box flexDirection="column" flexGrow={1} paddingX={0}>
+      {messages.length > 0 && (
         <>
-          {hiddenCount > 0 && (
-            <Box paddingX={1} paddingY={0}>
+          {hiddenBefore > 0 && (
+            <Box paddingX={0} paddingY={0}>
               <Text color={COLORS.DIM}>
-                {formatHiddenMessageNotice(hiddenCount, visibleLimit ?? messages.length)}
+                {formatHiddenMessageNotice(hiddenBefore, visibleLimit ?? messages.length)}
               </Text>
             </Box>
           )}
-          {messages.map((msg, index) => (
-            <MessageBubble
-              key={`${index}-${msg.role}-${msg.timestamp ?? "no-ts"}-${msg.agent ?? "gordon"}-${msg.badge ?? ""}`}
-              message={msg}
-              isStreamingMessage={
-                isStreaming
-                && msg.role === "gordon"
-                && activeStreamingTimestamp !== null
-                && msg.timestamp === activeStreamingTimestamp
-              }
-              activityStatus={activityStatus}
-              activeToolCall={activeToolCall}
-            />
-          ))}
+          {renderedMessages}
+          {hiddenAfter > 0 && (
+            <Box paddingX={0} paddingY={0}>
+              <Text color={COLORS.DIM}>
+                {formatHiddenNewerNotice(hiddenAfter)}
+                {!isPinnedBottom ? " Use PgDn or End to jump back to the live edge." : ""}
+              </Text>
+            </Box>
+          )}
         </>
       )}
     </Box>

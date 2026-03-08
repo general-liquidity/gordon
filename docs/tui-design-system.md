@@ -29,6 +29,14 @@ Gordon is a chat-first CLI. TUI changes should optimize operator speed and reada
 - The default Gordon loader uses bar-style market frames: `▁ ▃ ▅ ▇`.
 - Reserve circles or dot badges for status indicators, not generic loading.
 
+## TUI Primitives
+
+- Use append-only transcript rendering for completed output where possible.
+- Keep live/streaming content in a separate dynamic region.
+- Prefer shared confirm/select/alert primitives over ad hoc local widgets.
+- Measure terminal width before deciding how much copy or how many columns to show.
+- Short aliases should favor session, log, and control-plane utilities, not market-analysis sprawl.
+
 ## Transcript Density
 
 - Keep a bounded visible message window.

@@ -32,6 +32,12 @@ Gordon should scale like an internal platform without forcing a monorepo/package
   - transcript density and visible-window policy
 - `src/app/tuiSemantics.ts`
   - semantic loader and task-tree presentation rules
+- `src/app/layout.ts`
+  - measured-width and truncation helpers for terminal-aware layout
+- `src/app/componentTheme.ts`
+  - component-scoped semantic tokens above the raw color palette
+- `src/app/components/PromptPrimitives.tsx`
+  - shared confirm/select/alert primitives for high-value TUI flows
 
 ## Why Not A Pi-Style Package Split Yet
 

@@ -6,6 +6,7 @@
 import React, { useState, useCallback, useEffect } from "react";
 import { Box, Text, useInput } from "ink";
 import TextInput from "ink-text-input";
+import { NoticeAlert } from "./components/PromptPrimitives.tsx";
 
 import { resetAgents } from "../infra/agents/index.ts";
 import { resetProviderRegistry } from "../infra/providers/index.ts";
@@ -1508,7 +1509,7 @@ export function SetupWizard({
   );
 
   const handleInputChange = useCallback((value: string) => {
-    setState((prev) => ({ ...prev, inputValue: value, exchangeError: null }));
+    setState((prev) => ({ ...prev, inputValue: value.replace(/\r\n/g, "\n"), exchangeError: null }));
   }, []);
 
   const handleSkip = useCallback(async () => {
@@ -1935,9 +1936,18 @@ export function SetupWizard({
       )}
 
       {state.step !== "welcome" && state.step !== "done" && state.step !== "exchange-validating" && state.step !== "broker-validating" && (
-        <Box marginTop={1}>
-          <Text color={COLORS.DIM}>Press ESC to skip this step</Text>
-        </Box>
+        <>
+          {state.inputValue.includes("\n") && (
+            <Box marginTop={1}>
+              <NoticeAlert title="Multi-line paste detected" variant="info">
+                Enter submits the full block for this setup step.
+              </NoticeAlert>
+            </Box>
+          )}
+          <Box marginTop={1}>
+            <Text color={COLORS.DIM}>Press ESC to skip this step</Text>
+          </Box>
+        </>
       )}
     </Box>
   );

@@ -104,3 +104,15 @@ export {
   keyringClear,
   type KeyringCommandResult,
 } from './keyring';
+
+// Telemetry Commands
+export {
+  handleTelemetryCommand,
+  type TelemetryCommandResult,
+} from './telemetry';
+
+// Context / cost diagnostics commands
+export {
+  handleContextCommand,
+  type ContextCommandResult,
+} from './context';

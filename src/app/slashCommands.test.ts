@@ -5,6 +5,8 @@ import {
   formatCommandHelp,
   formatPaginatedCommandHelp,
   getSlashCommandSuggestions,
+  getSlashCommandRuntimeDrift,
+  isRuntimeHandledSlashCommand,
   parseHelpArg,
 } from "./slashCommands.ts";
 
@@ -91,5 +93,64 @@ describe("slash command UX formatting", () => {
     expect(actionLog?.target).toBe("action-log");
     expect(bookmark?.aliases).toContain("pin");
     expect(compactThread?.target).toBe("compact-thread");
+  });
+
+  it("adds shorter pi-style aliases for session and log utilities", () => {
+    const rename = SLASH_COMMANDS.find((command) => command.name === "rename-thread");
+    const actionLog = SLASH_COMMANDS.find((command) => command.name === "action-log");
+    const threadSummary = SLASH_COMMANDS.find((command) => command.name === "thread-summary");
+    const compactThread = SLASH_COMMANDS.find((command) => command.name === "compact-thread");
+
+    expect(rename?.aliases).toContain("name");
+    expect(actionLog?.aliases).toContain("log");
+    expect(threadSummary?.aliases).toContain("summary");
+    expect(compactThread?.aliases).toContain("compact");
+  });
+
+  it("has no deterministic slash-command drift between registry and runtime", () => {
+    expect(getSlashCommandRuntimeDrift()).toEqual([]);
+  });
+
+  it("keeps built-in deterministic commands wired directly", () => {
+    const telemetry = SLASH_COMMANDS.find((command) => command.name === "telemetry");
+    const context = SLASH_COMMANDS.find((command) => command.name === "context");
+    const portfolio = SLASH_COMMANDS.find((command) => command.name === "portfolio");
+    const status = SLASH_COMMANDS.find((command) => command.name === "status");
+    const keyring = SLASH_COMMANDS.find((command) => command.name === "keyring");
+    const orders = SLASH_COMMANDS.find((command) => command.name === "orders");
+    const positions = SLASH_COMMANDS.find((command) => command.name === "positions");
+
+    expect(telemetry?.action).toBe("menu");
+    expect(context?.action).toBe("menu");
+    expect(portfolio?.action).toBe("menu");
+    expect(status?.action).toBe("tool");
+    expect(keyring?.action).toBe("tool");
+    expect(orders?.action).toBe("tool");
+    expect(positions?.action).toBe("tool");
+    expect(telemetry && isRuntimeHandledSlashCommand(telemetry)).toBe(true);
+    expect(context && isRuntimeHandledSlashCommand(context)).toBe(true);
+    expect(portfolio && isRuntimeHandledSlashCommand(portfolio)).toBe(true);
+    expect(status && isRuntimeHandledSlashCommand(status)).toBe(true);
+    expect(keyring && isRuntimeHandledSlashCommand(keyring)).toBe(true);
+    expect(orders && isRuntimeHandledSlashCommand(orders)).toBe(true);
+    expect(positions && isRuntimeHandledSlashCommand(positions)).toBe(true);
+  });
+
+  it("relabels prompt-routed analysis shortcuts as agent commands", () => {
+    const trending = SLASH_COMMANDS.find((command) => command.name === "trending");
+    const volume = SLASH_COMMANDS.find((command) => command.name === "volume");
+    const ta = SLASH_COMMANDS.find((command) => command.name === "ta");
+
+    expect(trending?.action).toBe("agent");
+    expect(volume?.action).toBe("agent");
+    expect(ta?.action).toBe("agent");
+  });
+
+  it("adds a direct context diagnostics command with a short alias", () => {
+    const context = SLASH_COMMANDS.find((command) => command.name === "context");
+
+    expect(context?.aliases).toContain("cost");
+    expect(context?.target).toBe("context");
+    expect(context && isRuntimeHandledSlashCommand(context)).toBe(true);
   });
 });

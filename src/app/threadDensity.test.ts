@@ -3,6 +3,7 @@ import { describe, expect, it } from "bun:test";
 import {
   buildVisibleThreadPolicy,
   formatHiddenMessageNotice,
+  formatHiddenNewerNotice,
   getVisibleMessageLimit,
 } from "./threadDensity.ts";
 
@@ -29,7 +30,32 @@ describe("thread density policy", () => {
     });
 
     expect(policy.visibleLimit).toBeLessThan(90);
-    expect(policy.hiddenCount).toBeGreaterThan(0);
-    expect(formatHiddenMessageNotice(policy.hiddenCount, policy.visibleLimit)).toContain("showing last");
+    expect(policy.hiddenBefore).toBeGreaterThan(0);
+    expect(formatHiddenMessageNotice(policy.hiddenBefore, policy.visibleLimit)).toContain("showing last");
+  });
+
+  it("supports reader offsets without losing pinned-bottom semantics", () => {
+    const messages = Array.from({ length: 220 }, (_, index) => ({ content: `message-${index}` }));
+    const idleLimit = getVisibleMessageLimit({
+      messages,
+      isStreaming: false,
+      hasTaskTree: false,
+      hasBackgroundTasks: false,
+    });
+    const policy = buildVisibleThreadPolicy({
+      messages,
+      isStreaming: false,
+      hasTaskTree: false,
+      hasBackgroundTasks: false,
+      bottomOffset: 12,
+    });
+
+    expect(policy.visibleLimit).toBe(idleLimit);
+    expect(policy.bottomOffset).toBe(12);
+    expect(policy.hiddenAfter).toBe(12);
+    expect(policy.isPinnedBottom).toBe(false);
+    expect(policy.endIndex).toBe(messages.length - 12);
+    expect(policy.startIndex).toBe(Math.max(0, policy.endIndex - idleLimit));
+    expect(formatHiddenNewerNotice(policy.hiddenAfter)).toContain("newer messages below");
   });
 });

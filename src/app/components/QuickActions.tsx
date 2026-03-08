@@ -5,31 +5,13 @@
 
 import React from "react";
 import { Box, Text } from "ink";
+import { getQuickActionTokens } from "../componentTheme.ts";
+import { truncateWithEllipsis, useMeasuredWidth } from "../layout.ts";
 import { COLORS } from "../theme.ts";
 import {
   getQuickActionItems,
   type QuickActionContext,
-  type WorkflowGroup,
 } from "../commandUx.ts";
-
-function getWorkflowColor(workflow?: WorkflowGroup): string {
-  switch (workflow) {
-    case "discover":
-      return COLORS.DISCOVER;
-    case "analyze":
-      return COLORS.ANALYZE;
-    case "trade":
-      return COLORS.TRADE;
-    case "run":
-      return COLORS.RUN;
-    case "accounts":
-      return COLORS.RAILS;
-    case "operate":
-      return COLORS.OPERATE;
-    default:
-      return COLORS.HIGHLIGHT;
-  }
-}
 
 interface QuickActionsProps {
   onSelect: (command: string) => void;
@@ -49,26 +31,30 @@ export function QuickActions({
   }
 
   const actions = getQuickActionItems(context);
+  const { ref, width } = useMeasuredWidth(88);
+  const perActionWidth = Math.max(8, Math.floor((width - 8) / Math.max(actions.length, 1)));
+  const showCommandHint = width >= 96;
 
   return (
-    <Box marginBottom={1} marginX={1} paddingX={1}>
+    <Box ref={ref} marginBottom={1} marginX={1} paddingX={1}>
       <Text color={COLORS.DIM}>Next: </Text>
       {actions.map((action, i) => {
         const isSelected = i === selectedIndex;
-        const workflowColor = getWorkflowColor(action.workflow);
+        const tokens = getQuickActionTokens(action.workflow, isSelected);
+        const label = truncateWithEllipsis(action.label, Math.max(4, perActionWidth - 4));
         return (
           <Box key={action.command} marginRight={2}>
-            <Text color={isSelected ? workflowColor : COLORS.DIM}>
+            <Text color={tokens.cue}>
               {isSelected ? ">" : " "}
             </Text>
-            <Text color={COLORS.WHITE} bold={isSelected}>
-              {action.label}
+            <Text color={tokens.label} bold={isSelected}>
+              {label}
             </Text>
             <Text color={COLORS.DIM} dimColor>
               [{i + 1}]
             </Text>
-            {isSelected && (
-              <Text color={workflowColor}> ({action.command})</Text>
+            {isSelected && showCommandHint && (
+              <Text color={tokens.command}> ({action.command})</Text>
             )}
           </Box>
         );

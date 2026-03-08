@@ -127,6 +127,13 @@ const LEVEL_PRIORITY: Record<LogLevel, number> = {
   error: 3,
 };
 
+function isStartupQuietInfoSuppressed(level: LogLevel): boolean {
+  return (
+    level === "info" &&
+    process.env.GORDON_STARTUP_QUIET === "1"
+  );
+}
+
 /**
  * Main Logger class
  */
@@ -147,6 +154,9 @@ export class Logger {
    * Check if a log level should be output
    */
   private shouldLog(level: LogLevel): boolean {
+    if (isStartupQuietInfoSuppressed(level)) {
+      return false;
+    }
     return LEVEL_PRIORITY[level] >= LEVEL_PRIORITY[this.config.level];
   }
 

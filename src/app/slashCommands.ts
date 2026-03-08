@@ -48,6 +48,52 @@ type SlashCommandSeed = Omit<
   "workflow" | "workflowLabel" | "workflowOrder" | "audience" | "audienceLabel" | "audienceOrder" | "hideAliasesByDefault"
 >;
 
+export const DIRECT_MENU_TARGETS = new Set([
+  "setup",
+  "menu",
+  "chat",
+  "configure",
+  "doctor",
+  "model",
+  "shortcuts",
+  "theme",
+  "resume",
+  "new-session",
+  "session-info",
+  "clone-thread",
+  "list-threads",
+  "switch-thread",
+  "thread-info",
+  "delete-thread",
+  "rename-thread",
+  "action-log",
+  "bookmark-entry",
+  "list-bookmarks",
+  "thread-summary",
+  "compact-thread",
+  "portfolio",
+  "telemetry",
+  "context",
+]);
+
+export const DIRECT_TOOL_TARGETS = new Set([
+  "handle_config_command",
+  "handle_exchange_command",
+  "handle_broker_command",
+  "handle_stocks_command",
+  "check_positions",
+  "get_open_orders",
+  "arm_system",
+  "test_connection",
+  "get_cache_stats",
+  "handle_mcp_command",
+  "handle_routing_command",
+  "handle_workflow_command",
+  "handle_export_command",
+  "handle_keyring_command",
+  "handle_telemetry_command",
+]);
+
 const BROKER_TOKENS = BrokerFactory.getSupportedBrokers();
 const STOCK_MARKET_TOKENS = ["stock", "stocks", "equity", "equities", ...BROKER_TOKENS];
 const STOCK_MARKET_PATTERN = new RegExp(`^\\s*(${STOCK_MARKET_TOKENS.join("|")})\\b`, "i");
@@ -910,7 +956,7 @@ const LEGACY_SLASH_COMMANDS: SlashCommandSeed[] = [
   },
   {
     name: "rename-thread",
-    aliases: ["rt", "label-thread"],
+    aliases: ["rt", "label-thread", "name"],
     description: "Rename/label a thread",
     usage: "/rename-thread <threadId> <new-label>",
     category: "system",
@@ -920,7 +966,7 @@ const LEGACY_SLASH_COMMANDS: SlashCommandSeed[] = [
   },
   {
     name: "action-log",
-    aliases: ["alog", "events"],
+    aliases: ["alog", "events", "log"],
     description: "Inspect typed action log entries for the current thread or daemon",
     usage: "/action-log [type|group|bookmarked|daemon|threadId] [limit]",
     category: "system",
@@ -950,7 +996,7 @@ const LEGACY_SLASH_COMMANDS: SlashCommandSeed[] = [
   },
   {
     name: "thread-summary",
-    aliases: ["tsummary", "branch-summary"],
+    aliases: ["tsummary", "branch-summary", "summary"],
     description: "Summarize a thread using the typed action log",
     usage: "/thread-summary [threadId]",
     category: "system",
@@ -1045,6 +1091,17 @@ const LEGACY_SLASH_COMMANDS: SlashCommandSeed[] = [
     action: "menu",
     target: "telemetry",
     whenToUse: "Enable/disable anonymous usage analytics or trading data collection for AI training",
+  },
+  {
+    name: "context",
+    aliases: ["cost", "ctx"],
+    description: "Show prompt grounding, context budget, and latest model usage",
+    usage: "/context [threadId]",
+    category: "system",
+    level: 2,
+    action: "menu",
+    target: "context",
+    whenToUse: "Inspect how Gordon grounded the last request and how much prompt budget it used",
   },
 
   // Bug Report
@@ -1208,12 +1265,42 @@ const LEGACY_SLASH_COMMANDS: SlashCommandSeed[] = [
   },
 ];
 
+function normalizeSlashCommandRuntime(command: SlashCommand): SlashCommand {
+  if (command.action === "tool" && command.target && !DIRECT_TOOL_TARGETS.has(command.target)) {
+    return { ...command, action: "agent" };
+  }
+
+  return command;
+}
+
 export const SLASH_COMMANDS: SlashCommand[] = sortCommandsForPresentation(
   mergeSlashCommands(
     getGeneratedSlashCommands() as SlashCommandSeed[],
     LEGACY_SLASH_COMMANDS,
-  ).map((command) => normalizeCommandUx(command))
+  )
+    .map((command) => normalizeCommandUx(command))
+    .map((command) => normalizeSlashCommandRuntime(command))
 );
+
+export function isDeterministicSlashCommand(command: SlashCommand): boolean {
+  return command.action === "menu" || command.action === "tool";
+}
+
+export function isRuntimeHandledSlashCommand(command: SlashCommand): boolean {
+  if (!isDeterministicSlashCommand(command) || !command.target) {
+    return command.action === "agent";
+  }
+
+  if (command.action === "menu") {
+    return DIRECT_MENU_TARGETS.has(command.target);
+  }
+
+  return DIRECT_TOOL_TARGETS.has(command.target);
+}
+
+export function getSlashCommandRuntimeDrift(commands: SlashCommand[] = SLASH_COMMANDS): SlashCommand[] {
+  return commands.filter((command) => isDeterministicSlashCommand(command) && !isRuntimeHandledSlashCommand(command));
+}
 
 // ============================================================================
 // Help System Types and Functions
@@ -1997,6 +2084,10 @@ export function commandToPrompt(command: SlashCommand, args: string): string {
       if (args === "research-upload" || args === "research upload") return "Upload collected anonymized research data to help train AI trading models";
       if (args === "research-clear" || args === "research clear") return "Delete all locally collected research data files";
       return "Show my current telemetry status";
+    case "context":
+      return args
+        ? `Show the latest prompt context and token budget report for thread ${args}`
+        : "Show the latest prompt grounding, context budget, and model-usage report for this thread";
     case "bugreport":
       return args
         ? `Generate a bug report with this description: "${args}". Include system info: gordon version, Bun version, OS, active exchange, config directory, and mode. Format it as a pre-filled GitHub issue link for https://github.com/general-liquidity/gordon-cli/issues/new.`

@@ -83,6 +83,26 @@ if (hasStdinData()) {
 // License Check — must pass before TUI loads
 // ============================================================================
 
+import { maybePromptForUpdate, runSelfUpgrade } from "./utils/update-notifier.ts";
+
+if (flags.upgrade) {
+  const result = await runSelfUpgrade();
+  if (result === "updated") {
+    process.exit(0);
+  }
+  if (result === "unsupported") {
+    console.error("This Gordon install channel does not support in-place self-upgrade. Reinstall the latest release manually.");
+    process.exit(1);
+  }
+  console.error("Gordon update failed. Retry `gordon --upgrade` or reinstall manually.");
+  process.exit(1);
+}
+
+const updateResult = await maybePromptForUpdate();
+if (updateResult === "updated") {
+  process.exit(0);
+}
+
 import { checkLicense, shutdownLicense } from "./infra/license/index.ts";
 await checkLicense();
 
@@ -94,7 +114,6 @@ import React from "react";
 import { render } from "ink";
 import { AppWithTheme } from "./app/index.ts";
 import { closeDatabase } from "./infra/storage/database.ts";
-import { checkForUpdates } from "./utils/update-notifier.ts";
 import * as telemetry from "./infra/telemetry/index.ts";
 import { disconnectMCP } from "./infra/mcp/client.ts";
 
@@ -169,12 +188,8 @@ process.on("unhandledRejection", (reason, promise) => {
 telemetry.init();
 
 // Render the application with theme support
+process.env.GORDON_APP_READY = "1";
 const { waitUntilExit } = render(<AppWithTheme />);
-
-// Non-blocking update check — runs after TUI renders, never delays startup
-if (process.env.GORDON_STARTUP_QUIET !== "1") {
-  checkForUpdates().catch(() => {});
-}
 
 waitUntilExit().then(() => {
   gracefulShutdown("exit");

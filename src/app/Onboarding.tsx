@@ -1,7 +1,6 @@
 import React from "react";
 import { Box, Text } from "ink";
-import { Select } from "@inkjs/ui";
-
+import { FocusSelect } from "./components/PromptPrimitives.tsx";
 import { COLORS } from "./theme.ts";
 import type { OnboardingSelection } from "./setup-flow.ts";
 
@@ -50,20 +49,13 @@ export function Onboarding({ onComplete }: OnboardingProps): React.ReactElement 
         </Text>
       </Box>
 
-      <Select
+      <FocusSelect
+        title="Choose a path"
+        hint="Use the arrow keys to move fast. You can reconfigure everything later."
         options={[
-          {
-            label: "QuickStart (Recommended)",
-            value: "quickstart",
-          },
-          {
-            label: "Advanced Setup",
-            value: "advanced",
-          },
-          {
-            label: "Demo Mode",
-            value: "demo",
-          },
+          { label: "QuickStart", value: "quickstart" },
+          { label: "Advanced setup", value: "advanced" },
+          { label: "Demo mode", value: "demo" },
         ]}
         onChange={(value) => onComplete({ mode: value as OnboardingSelection["mode"] })}
       />

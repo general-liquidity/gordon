@@ -26,6 +26,7 @@ export {
   RiskWarning,
   ConnectionAlert
 } from "./StatusMessages.tsx";
+export { NoticeAlert, ConfirmationPrompt, FocusSelect } from "./PromptPrimitives.tsx";
 
 // Markdown rendering
 export { MarkdownText } from "./MarkdownText.tsx";

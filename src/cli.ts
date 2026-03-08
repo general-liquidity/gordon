@@ -5,8 +5,26 @@
  */
 
 import { GORDON_DIR } from "./infra/storage/paths.ts";
+import * as fs from "node:fs";
+import * as path from "node:path";
+import { fileURLToPath } from "node:url";
 
-const VERSION = "0.8.4";
+function loadVersion(): string {
+  try {
+    const currentFile = fileURLToPath(import.meta.url);
+    const packageJsonPath = path.resolve(path.dirname(currentFile), "../package.json");
+    const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf-8")) as { version?: string };
+    if (typeof packageJson.version === "string" && packageJson.version.length > 0) {
+      return packageJson.version;
+    }
+  } catch {
+    // Fall back to a hardcoded version if package.json is unavailable.
+  }
+
+  return "0.8.8";
+}
+
+const VERSION = loadVersion();
 const MIN_BUN_VERSION = "1.0.0";
 
 export interface CLIFlags {
@@ -18,6 +36,7 @@ export interface CLIFlags {
   debug: boolean;
   cleanup: boolean;
   uninstall: boolean;
+  upgrade: boolean;
 }
 
 export type ParsedCLICommand =
@@ -46,6 +65,7 @@ const LONG_FLAGS: Record<string, keyof CLIFlags> = {
   "--verbose": "debug",
   "--cleanup": "cleanup",
   "--uninstall": "uninstall",
+  "--upgrade": "upgrade",
 };
 
 export function parseFlags(): CLIFlags {
@@ -59,6 +79,7 @@ export function parseFlags(): CLIFlags {
     debug: false,
     cleanup: false,
     uninstall: false,
+    upgrade: false,
   };
 
   for (const arg of args) {
@@ -200,6 +221,7 @@ FLAGS
       --no-color   Disable colors (also respects NO_COLOR env var)
       --cleanup    Remove stale sessions, caches, and temp files
       --uninstall  Remove all Gordon data (~/.gordon) and exit
+      --upgrade    Upgrade Gordon using the current install channel and exit
 
   Short flags can be grouped: -dv = --debug --version
 
@@ -234,7 +256,7 @@ ENVIRONMENT VARIABLES
   GORDON_TELEMETRY_DEBUG     Print telemetry events to stderr (debug)
 
 UPDATING
-  bun update -g @general-liquidity/gordon-cli
+  gordon --upgrade
   Gordon checks for updates daily and notifies you on startup.
 
 GETTING STARTED

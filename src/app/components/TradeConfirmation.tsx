@@ -5,7 +5,8 @@
 
 import React from "react";
 import { Box, Text } from "ink";
-import { ConfirmInput, Badge } from "@inkjs/ui";
+import { Badge } from "@inkjs/ui";
+import { ConfirmationPrompt } from "./PromptPrimitives.tsx";
 import { COLORS } from "../theme.ts";
 
 interface TradeDetails {
@@ -87,7 +88,9 @@ export const TradeConfirmation: React.FC<TradeConfirmationProps> = ({
 
       {/* Confirmation */}
       <Box marginTop={1}>
-        <ConfirmInput
+        <ConfirmationPrompt
+          title={`${actionLabel} ${trade.symbol}`}
+          description={`Approve ${trade.action.toLowerCase()} execution for ${trade.quantity} units at $${trade.price.toFixed(2)}.`}
           onConfirm={onConfirm}
           onCancel={onCancel}
         />

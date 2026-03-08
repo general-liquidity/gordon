@@ -61,9 +61,9 @@ export function useGordonLoader(options?: {
     () => (options?.phrases && options.phrases.length > 0 ? options.phrases : BASE_GORDON_LOADING_PHRASES),
     [options?.phrases]
   );
-  const glyphIntervalMs = options?.glyphIntervalMs ?? 240;
-  const phraseIntervalMs = options?.phraseIntervalMs ?? 1800;
-  const cursorIntervalMs = options?.cursorIntervalMs ?? 450;
+  const glyphIntervalMs = options?.glyphIntervalMs ?? 480;
+  const phraseIntervalMs = options?.phraseIntervalMs ?? 2600;
+  const cursorIntervalMs = options?.cursorIntervalMs ?? 800;
 
   const [glyphIndex, setGlyphIndex] = useState(0);
   const [phraseIndex, setPhraseIndex] = useState(0);

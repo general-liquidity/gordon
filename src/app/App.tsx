@@ -75,6 +75,8 @@ import {
   formatCommandHelp,
   parseHelpArg,
   formatPaginatedCommandHelp,
+  isDeterministicSlashCommand,
+  isRuntimeHandledSlashCommand,
 } from "./slashCommands.ts";
 import {
   handleConfigCommand,
@@ -83,8 +85,11 @@ import {
   handleStocksCommand,
   handleStrategyCommand,
   handleGenCommand,
+  handleKeyringCommand,
   handleMCPCommand,
   handleRoutingCommand,
+  handleTelemetryCommand,
+  handleContextCommand,
   handleWorkflowCommand,
   formatWorkflowResult,
   handleExportCommand,
@@ -97,6 +102,7 @@ import {
 import { bootstrapV07 } from "../core/bootstrap.ts";
 import { getMarketEmitter } from "../events/index.ts";
 import { getSubscriptionRegistry } from "../events/index.ts";
+import { clearToolCache, getToolCacheStats, pruneToolCache } from "../infra/agents/tools/cache.ts";
 import { buildAppGordonContext } from "../gateway/ui/context.ts";
 import { getActionBySlashName, type CredentialProfile } from "../infra/actions/index.ts";
 import type {
@@ -183,6 +189,8 @@ interface AppState {
   overlay: OverlayState;
   queuedSubmissions: QueuedSubmission[];
   showStartupHint: boolean;
+  transcriptBottomOffset: number;
+  isUserTyping: boolean;
   chatInputSeed: string;
   chatInputSeedNonce: number;
   setupMode: SetupWizardMode;
@@ -439,6 +447,24 @@ function stripStocksMarketPrefix(args: string): string {
 
 const STARTUP_TASK_CONCURRENCY = 2;
 
+function getMaxTranscriptBottomOffset(state: Pick<AppState, "messages" | "isStreaming" | "taskTree" | "backgroundTaskTree">): number {
+  const policy = buildVisibleThreadPolicy({
+    messages: state.messages,
+    isStreaming: state.isStreaming,
+    hasTaskTree: Boolean(state.taskTree),
+    hasBackgroundTasks: Boolean(state.backgroundTaskTree),
+  });
+
+  return Math.max(0, state.messages.length - policy.visibleLimit);
+}
+
+function clampTranscriptBottomOffset(
+  state: Pick<AppState, "messages" | "isStreaming" | "taskTree" | "backgroundTaskTree">,
+  requestedOffset: number,
+): number {
+  return Math.max(0, Math.min(requestedOffset, getMaxTranscriptBottomOffset(state)));
+}
+
 async function runDeferredTasksWithConcurrency(
   tasks: Array<() => Promise<void>>,
   concurrency = STARTUP_TASK_CONCURRENCY,
@@ -498,6 +524,8 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
     overlay: OVERLAY_NONE,
     queuedSubmissions: [],
     showStartupHint: true,
+    transcriptBottomOffset: 0,
+    isUserTyping: false,
     chatInputSeed: "",
     chatInputSeedNonce: 0,
     setupMode: parseSetupWizardMode(process.env.GORDON_SETUP_MODE, "advanced"),
@@ -521,6 +549,9 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
   const isDrainingQueueRef = useRef(false);
   const daemonTokenRef = useRef<string | null>(null);
   const loggedMessageKeysRef = useRef<Set<string>>(new Set());
+  const transcriptBottomOffsetRef = useRef(0);
+  const isUserTypingRef = useRef(false);
+  const previousMessageCountRef = useRef(0);
 
   /**
    * Helper to update thread status info in state
@@ -560,6 +591,41 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
 
   const backgroundRefreshInFlightRef = useRef(false);
   const backgroundTaskTreeSignatureRef = useRef<string | null>(null);
+  const backgroundRefreshLastRanAtRef = useRef(0);
+
+  useEffect(() => {
+    transcriptBottomOffsetRef.current = state.transcriptBottomOffset;
+  }, [state.transcriptBottomOffset]);
+
+  useEffect(() => {
+    isUserTypingRef.current = state.isUserTyping;
+  }, [state.isUserTyping]);
+
+  useEffect(() => {
+    const previousCount = previousMessageCountRef.current;
+    const nextCount = state.messages.length;
+
+    if (state.view === "chat" && previousCount !== 0 && nextCount !== previousCount) {
+      const delta = nextCount - previousCount;
+      setState((prev) => {
+        if (prev.view !== "chat" || prev.transcriptBottomOffset === 0) {
+          return prev;
+        }
+
+        const nextOffset = clampTranscriptBottomOffset(prev, prev.transcriptBottomOffset + delta);
+        if (nextOffset === prev.transcriptBottomOffset) {
+          return prev;
+        }
+
+        return {
+          ...prev,
+          transcriptBottomOffset: nextOffset,
+        };
+      });
+    }
+
+    previousMessageCountRef.current = nextCount;
+  }, [state.messages.length, state.view]);
 
   const refreshBackgroundTaskTree = useCallback(async (): Promise<void> => {
     if (backgroundRefreshInFlightRef.current) {
@@ -868,6 +934,221 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
     },
     []
   );
+
+  const runLocalCommand = useCallback(async (
+    submittedValue: string,
+    operation: string,
+    task: () => Promise<string>,
+  ): Promise<void> => {
+    const userMessage: ChatMessage = {
+      role: "user",
+      content: submittedValue.trim(),
+      timestamp: formatTimestamp(),
+    };
+
+    setState((prev) => ({ ...prev, messages: [...prev.messages, userMessage], isLoading: true }));
+
+    try {
+      const content = await task();
+      setState((prev) => ({
+        ...prev,
+        messages: [...prev.messages, { role: "gordon", content, timestamp: formatTimestamp() }],
+        isLoading: false,
+      }));
+    } catch (error) {
+      setState((prev) => ({
+        ...prev,
+        messages: [
+          ...prev.messages,
+          { role: "gordon", content: formatCommandError(operation, error), timestamp: formatTimestamp() },
+        ],
+        isLoading: false,
+      }));
+    }
+  }, [formatCommandError]);
+
+  const getCryptoPortfolioSummary = useCallback(async (): Promise<{
+    message: string;
+    totalValue: number;
+    availableCash: number;
+  }> => {
+    if (!exchangeRef.current) {
+      throw new Error("No active exchange configured. Use /exchange add <type> or /setup.");
+    }
+
+    const portfolioStart = Date.now();
+    const allBalances = await exchangeRef.current.getAllBalances();
+    const stablecoins = ["USDT", "USD", "USDC", "BUSD", "TUSD", "USDP", "FDUSD"];
+    let totalValue = 0;
+    let availableCash = 0;
+    const holdings: Array<{ asset: string; amount: number; usdtValue: number; wallet?: string; note?: string }> = [];
+
+    for (const balance of allBalances) {
+      const amount = balance.total ?? (balance.free + balance.locked);
+      if (amount <= 0) {
+        continue;
+      }
+
+      let usdtValue = 0;
+      if (stablecoins.includes(balance.asset)) {
+        usdtValue = amount;
+        if (balance.asset === "USDT" || balance.asset === "USD") {
+          availableCash += amount;
+        }
+      } else {
+        try {
+          const price = await exchangeRef.current.getPrice(`${balance.asset}USDT`);
+          usdtValue = amount * price;
+        } catch {
+          holdings.push({
+            asset: balance.asset,
+            amount,
+            usdtValue: 0,
+            wallet: "spot",
+            note: "No USD rate",
+          });
+          continue;
+        }
+      }
+
+      if (usdtValue > 0.01) {
+        holdings.push({ asset: balance.asset, amount, usdtValue, wallet: "spot" });
+        totalValue += usdtValue;
+      }
+    }
+
+    holdings.sort((left, right) => right.usdtValue - left.usdtValue);
+
+    return {
+      totalValue,
+      availableCash,
+      message: formatPortfolioResults({
+        totalValue,
+        availableCash,
+        holdings: holdings.map((holding) => ({
+          asset: holding.asset,
+          total: holding.amount,
+          usdValue: holding.usdtValue,
+          wallet: holding.wallet,
+          note: holding.note,
+        })),
+        executionTime: Date.now() - portfolioStart,
+        maxRows: 15,
+      }),
+    };
+  }, []);
+
+  const getCryptoPositionsSummary = useCallback(async (): Promise<string> => {
+    if (!exchangeRef.current) {
+      throw new Error("No active exchange configured. Use /exchange add <type> or /setup.");
+    }
+
+    const result = await runSharedMonitorCycle(exchangeRef.current);
+    if (result.updates.length === 0) {
+      return "No open crypto positions.";
+    }
+
+    const totalUnrealized = result.updates.reduce((sum, update) => sum + update.unrealizedPnl, 0);
+    const lines = [
+      `Open crypto positions: ${result.updates.length}`,
+      `Total unrealized PnL: $${totalUnrealized.toFixed(2)}`,
+      "",
+      "| Symbol | Status | Unrealized | PnL % | Minutes Open |",
+      "|--------|--------|------------|-------|--------------|",
+    ];
+
+    const now = Date.now();
+    for (const update of result.updates) {
+      const minutesOpen = Math.max(
+        1,
+        Math.round((now - new Date(update.trade.openedAt).getTime()) / 60_000),
+      );
+      lines.push(
+        `| ${update.trade.symbol} | ${update.status} | $${update.unrealizedPnl.toFixed(2)} | ${update.unrealizedPnlPercent.toFixed(2)}% | ${minutesOpen} |`,
+      );
+    }
+
+    if (result.alerts.length > 0) {
+      lines.push("", "**Alerts**");
+      for (const alert of result.alerts.slice(0, 5)) {
+        lines.push(`- ${alert.message}`);
+      }
+    }
+
+    return lines.join("\n");
+  }, []);
+
+  const getCryptoOpenOrdersSummary = useCallback(async (symbolFilter?: string): Promise<string> => {
+    if (!exchangeRef.current) {
+      throw new Error("No active exchange configured. Use /exchange add <type> or /setup.");
+    }
+
+    const normalizedSymbol = symbolFilter?.trim() ? symbolFilter.trim().toUpperCase() : undefined;
+    const orders = await exchangeRef.current.getOpenOrders(normalizedSymbol);
+    if (orders.length === 0) {
+      return normalizedSymbol ? `No open crypto orders for ${normalizedSymbol}.` : "No open crypto orders.";
+    }
+
+    const lines = [
+      normalizedSymbol ? `Open crypto orders for ${normalizedSymbol}:` : "Open crypto orders:",
+      "| Symbol | Side | Type | Status | Qty | Price | Filled |",
+      "|--------|------|------|--------|-----|-------|--------|",
+    ];
+
+    for (const order of orders) {
+      lines.push(
+        `| ${order.symbol} | ${order.side} | ${order.type} | ${order.status} | ${order.quantity} | ${order.price} | ${order.executedQty} |`,
+      );
+    }
+
+    return lines.join("\n");
+  }, []);
+
+  const getSystemStatusSummary = useCallback(async (): Promise<string> => {
+    const config = configRef.current;
+    const exchangeStatus = await handleExchangeCommand("status");
+    const brokerStatus = await handleBrokerCommand("status");
+    const keyringStatus = await handleKeyringCommand("status");
+
+    return [
+      "**Gordon Status**",
+      "",
+      `Mode: ${config.mode === "ARMED" ? "Live enabled" : "Read-only"}`,
+      `Exchange route: ${exchangeRef.current ? exchangeRef.current.exchangeId : "none"}`,
+      `Broker route: ${brokerRef.current ? brokerRef.current.displayName : "none"}`,
+      "",
+      exchangeStatus,
+      "",
+      brokerStatus,
+      "",
+      keyringStatus.message,
+    ].join("\n");
+  }, []);
+
+  const getCacheSummary = useCallback(async (args: string): Promise<string> => {
+    const action = args.trim().toLowerCase() || "stats";
+
+    if (action === "clear") {
+      clearToolCache();
+      return "Tool cache cleared successfully.";
+    }
+
+    if (action === "prune") {
+      const removed = pruneToolCache();
+      return `Expired cache entries pruned: ${removed}.`;
+    }
+
+    const stats = getToolCacheStats();
+    return [
+      "**Tool Cache Stats**",
+      "",
+      `Entries: ${stats.entries}`,
+      `Hits: ${stats.hits}`,
+      `Misses: ${stats.misses}`,
+      `Hit rate: ${(stats.hitRate * 100).toFixed(1)}%`,
+      `In-flight requests: ${stats.inFlightRequests}`,
+    ].join("\n");
+  }, []);
 
   // Initialize config and LLM client on mount
   useEffect(() => {
@@ -1353,11 +1634,82 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
     activeStreamAbortControllerRef.current?.abort();
   }, []);
 
+  const setTranscriptTypingState = useCallback((isTyping: boolean): void => {
+    isUserTypingRef.current = isTyping;
+    setState((prev) => (
+      prev.isUserTyping === isTyping
+        ? prev
+        : { ...prev, isUserTyping: isTyping }
+    ));
+  }, []);
+
+  const moveTranscriptViewport = useCallback((delta: number): void => {
+    if (delta === 0) {
+      return;
+    }
+
+    setState((prev) => {
+      if (prev.view !== "chat") {
+        return prev;
+      }
+
+      const nextOffset = clampTranscriptBottomOffset(prev, prev.transcriptBottomOffset + delta);
+      if (nextOffset === prev.transcriptBottomOffset && !prev.showStartupHint) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        transcriptBottomOffset: nextOffset,
+        showStartupHint: false,
+      };
+    });
+  }, []);
+
+  const jumpTranscriptToBottom = useCallback((): void => {
+    setState((prev) => {
+      if (prev.view !== "chat") {
+        return prev;
+      }
+
+      if (prev.transcriptBottomOffset === 0 && !prev.showStartupHint) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        transcriptBottomOffset: 0,
+        showStartupHint: false,
+      };
+    });
+  }, []);
+
+  const jumpTranscriptToTop = useCallback((): void => {
+    setState((prev) => {
+      if (prev.view !== "chat") {
+        return prev;
+      }
+
+      const nextOffset = getMaxTranscriptBottomOffset(prev);
+      if (nextOffset === prev.transcriptBottomOffset && !prev.showStartupHint) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        transcriptBottomOffset: nextOffset,
+        showStartupHint: false,
+      };
+    });
+  }, []);
+
   const openChatWorkspace = useCallback((options?: { seed?: string; resetInput?: boolean }): void => {
     setState((prev) => ({
       ...prev,
       view: "chat",
       overlay: OVERLAY_NONE,
+      transcriptBottomOffset: 0,
+      showStartupHint: false,
       ...(prev.view !== "chat" || options?.resetInput
         ? {
             chatInputSeed: options?.seed ?? "",
@@ -1372,6 +1724,7 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
       ...prev,
       view: "chat",
       overlay: openOverlay("quick-actions"),
+      showStartupHint: false,
     }));
   }, []);
 
@@ -1407,6 +1760,16 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
     const normalizedValue = queuedIntent?.submitValue ?? value.trim();
     if (!normalizedValue) return;
 
+    setState((prev) => (
+      prev.transcriptBottomOffset === 0 && !prev.showStartupHint
+        ? prev
+        : {
+            ...prev,
+            transcriptBottomOffset: 0,
+            showStartupHint: false,
+          }
+    ));
+
     // Check for slash commands
     const parsedCommand = parseSlashCommand(normalizedValue);
     let messageToSend = normalizedValue;
@@ -1421,21 +1784,26 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
       requestedActionId = requestedAction?.id;
       requestedTaskScope = requestedAction?.taskScope;
 
-      if (command.name === "portfolio" && isStocksMarketArgs(args)) {
-        const userMessage: ChatMessage = {
-          role: "user",
-          content: value.trim(),
-          timestamp: formatTimestamp(),
-        };
-        setState((prev) => ({ ...prev, messages: [...prev.messages, userMessage], isLoading: true }));
-        const stocksArgs = stripStocksMarketPrefix(args);
-        const message = await handleStocksCommand(`account ${stocksArgs}`.trim());
-        await refreshActiveBroker();
-        setState((prev) => ({
-          ...prev,
-          messages: [...prev.messages, { role: "gordon", content: message, timestamp: formatTimestamp() }],
-          isLoading: false,
-        }));
+      if (command.name === "portfolio") {
+        if (isStocksMarketArgs(args) || (!exchangeRef.current && brokerRef.current)) {
+          const stocksArgs = stripStocksMarketPrefix(args);
+          await runLocalCommand(value, "portfolio", async () => {
+            const message = await handleStocksCommand(`account ${stocksArgs}`.trim());
+            await refreshActiveBroker();
+            return message;
+          });
+          return;
+        }
+
+        await runLocalCommand(value, "portfolio", async () => {
+          const summary = await getCryptoPortfolioSummary();
+          setState((prev) => ({
+            ...prev,
+            portfolioValue: summary.totalValue,
+            availableCash: summary.availableCash,
+          }));
+          return summary.message;
+        });
         return;
       }
 
@@ -1479,6 +1847,25 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
 
       if (command.action === "menu" && command.target === "doctor") {
         setState((prev) => ({ ...prev, view: "doctor", overlay: OVERLAY_NONE }));
+        return;
+      }
+
+      if (command.action === "menu" && command.target === "telemetry") {
+        await runLocalCommand(value, "telemetry", async () => {
+          const result = await handleTelemetryCommand(args);
+          if (result.success) {
+            await refreshResolvedConfig();
+          }
+          return result.message;
+        });
+        return;
+      }
+
+      if (command.action === "menu" && command.target === "context") {
+        await runLocalCommand(value, "context", async () => {
+          const result = await handleContextCommand(args, state.session?.threadId);
+          return result.message;
+        });
         return;
       }
 
@@ -2535,6 +2922,10 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
         };
 
         switch (command.target) {
+          case "test_connection": {
+            await runLocalCommand(value, "status", async () => getSystemStatusSummary());
+            return;
+          }
           case "handle_config_command": {
             setState((prev) => ({ ...prev, messages: [...prev.messages, userMessage], isLoading: true }));
             const result = await handleConfigCommand(args);
@@ -2594,39 +2985,41 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
             return;
           }
           case "check_positions": {
-            if (!isStocksMarketArgs(args)) {
-              break;
+            if (isStocksMarketArgs(args) || (!exchangeRef.current && brokerRef.current)) {
+              const stocksArgs = stripStocksMarketPrefix(args);
+              await runLocalCommand(value, "positions", async () => {
+                const message = await handleStocksCommand(`positions ${stocksArgs}`.trim());
+                await refreshActiveBroker();
+                return message;
+              });
+              return;
             }
-            const stocksArgs = stripStocksMarketPrefix(args);
-            setState((prev) => ({ ...prev, messages: [...prev.messages, userMessage], isLoading: true }));
-            const message = await handleStocksCommand(`positions ${stocksArgs}`.trim());
-            await refreshActiveBroker();
-            setState((prev) => ({
-              ...prev,
-              messages: [
-                ...prev.messages,
-                { role: "gordon", content: message, timestamp: formatTimestamp() },
-              ],
-              isLoading: false,
-            }));
+
+            await runLocalCommand(value, "positions", async () => getCryptoPositionsSummary());
             return;
           }
-          case "get_order_status": {
-            if (!isStocksMarketArgs(args)) {
-              break;
+          case "get_open_orders": {
+            if (isStocksMarketArgs(args) || (!exchangeRef.current && brokerRef.current)) {
+              const stocksArgs = stripStocksMarketPrefix(args);
+              await runLocalCommand(value, "orders", async () => {
+                const message = await handleStocksCommand(`orders ${stocksArgs}`.trim());
+                await refreshActiveBroker();
+                return message;
+              });
+              return;
             }
-            const stocksArgs = stripStocksMarketPrefix(args);
-            setState((prev) => ({ ...prev, messages: [...prev.messages, userMessage], isLoading: true }));
-            const message = await handleStocksCommand(`orders ${stocksArgs}`.trim());
-            await refreshActiveBroker();
-            setState((prev) => ({
-              ...prev,
-              messages: [
-                ...prev.messages,
-                { role: "gordon", content: message, timestamp: formatTimestamp() },
-              ],
-              isLoading: false,
-            }));
+
+            await runLocalCommand(value, "orders", async () => getCryptoOpenOrdersSummary(args));
+            return;
+          }
+          case "handle_keyring_command": {
+            await runLocalCommand(value, "keyring", async () => {
+              const result = await handleKeyringCommand(args);
+              if (result.success) {
+                await refreshResolvedConfig();
+              }
+              return result.message;
+            });
             return;
           }
           case "handle_strategy_command": {
@@ -2734,6 +3127,20 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
             }));
             return;
           }
+          case "get_cache_stats": {
+            await runLocalCommand(value, "cache", async () => getCacheSummary(args));
+            return;
+          }
+          case "handle_telemetry_command": {
+            await runLocalCommand(value, "telemetry", async () => {
+              const result = await handleTelemetryCommand(args);
+              if (result.success) {
+                await refreshResolvedConfig();
+              }
+              return result.message;
+            });
+            return;
+          }
           case "arm_system": {
             const currentConfig = await loadConfig();
             const isArming = command.name === "arm";
@@ -2777,6 +3184,22 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
           default:
             break;
         }
+      }
+
+      if (isDeterministicSlashCommand(command) && !isRuntimeHandledSlashCommand(command)) {
+        setState((prev) => ({
+          ...prev,
+          messages: [
+            ...prev.messages,
+            { role: "user", content: value.trim(), timestamp: formatTimestamp() },
+            {
+              role: "gordon",
+              content: `/${command.name} is registered as a built-in command, but it is not wired for direct execution yet. This is a product bug, not a prompt limitation.`,
+              timestamp: formatTimestamp(),
+            },
+          ],
+        }));
+        return;
       }
 
       // Convert command to natural language for the agent
@@ -2913,7 +3336,7 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
         }));
       };
 
-      // Throttled version — batches updates every 50ms for smooth rendering
+      // Throttled version — batches updates to reduce chat input jitter while streaming
       const scheduleUpdate = (): void => {
         if (!pendingUpdate) {
           pendingUpdate = true;
@@ -2921,7 +3344,7 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
             pendingUpdate = false;
             pendingTimer = null;
             updateStreamingMessage(fullContent, currentAgentName);
-          }, 50);
+          }, 100);
         }
       };
 
@@ -3198,6 +3621,17 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
       return;
     }
 
+    setTranscriptTypingState(false);
+    setState((prev) => (
+      prev.transcriptBottomOffset === 0 && !prev.showStartupHint
+        ? prev
+        : {
+            ...prev,
+            transcriptBottomOffset: 0,
+            showStartupHint: false,
+          }
+    ));
+
     if (state.isLoading || state.isStreaming) {
       const queuedSubmission: QueuedSubmission = {
         id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -3250,6 +3684,7 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
     appendCurrentActionLogEntry,
     cancelActiveResponse,
     processSubmission,
+    setTranscriptTypingState,
   ]);
 
   useEffect(() => {
@@ -3293,12 +3728,20 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
   useEffect(() => {
     let disposed = false;
 
-    const syncBackgroundStatus = async (): Promise<void> => {
+    const syncBackgroundStatus = async (force = false): Promise<void> => {
       if (disposed) return;
+      const now = Date.now();
+      const shouldThrottle = isUserTypingRef.current || transcriptBottomOffsetRef.current > 0;
+      const minimumRefreshGap = shouldThrottle ? 20_000 : 5_000;
+      if (!force && now - backgroundRefreshLastRanAtRef.current < minimumRefreshGap) {
+        return;
+      }
+
+      backgroundRefreshLastRanAtRef.current = now;
       await refreshBackgroundTaskTree();
     };
 
-    void syncBackgroundStatus();
+    void syncBackgroundStatus(true);
     const intervalId = setInterval(() => {
       void syncBackgroundStatus();
     }, 5_000);
@@ -3387,13 +3830,13 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
           const scheduleUpdate = (): void => {
             if (!pendingUpdate) {
               pendingUpdate = true;
-              pendingTimer = setTimeout(() => {
-                pendingUpdate = false;
-                pendingTimer = null;
-                updateMsg(fullContent, currentAgent);
-              }, 50);
-            }
-          };
+                pendingTimer = setTimeout(() => {
+                  pendingUpdate = false;
+                  pendingTimer = null;
+                  updateMsg(fullContent, currentAgent);
+                }, 100);
+              }
+            };
 
           const flushPendingUpdate = (): void => {
             if (pendingTimer) {
@@ -4162,6 +4605,23 @@ Please check your API keys in the .env file and restart Gordon.`,
     }
 
     if (
+      state.view === "chat"
+      && !isOverlayOpen(state.overlay)
+      && (key.pageUp || key.pageDown || key.home || key.end)
+    ) {
+      if (key.pageUp) {
+        moveTranscriptViewport(transcriptPageSize);
+      } else if (key.pageDown) {
+        moveTranscriptViewport(-transcriptPageSize);
+      } else if (key.home) {
+        jumpTranscriptToTop();
+      } else if (key.end) {
+        jumpTranscriptToBottom();
+      }
+      return;
+    }
+
+    if (
       input.toLowerCase() === "k"
       && key.ctrl
       && state.view === "chat"
@@ -4203,7 +4663,9 @@ Please check your API keys in the .env file and restart Gordon.`,
     if (state.view === "welcome" && (input || key.return)) {
       setState((prev) => ({ ...prev, view: "menu" }));
     }
-  }, { isActive: true });
+  }, {
+    isActive: true,
+  });
 
   const visibleThreadPolicy = useMemo(
     () => buildVisibleThreadPolicy({
@@ -4211,14 +4673,18 @@ Please check your API keys in the .env file and restart Gordon.`,
       isStreaming: state.isStreaming,
       hasTaskTree: Boolean(state.taskTree),
       hasBackgroundTasks: Boolean(state.backgroundTaskTree),
+      bottomOffset: state.transcriptBottomOffset,
     }),
-    [state.backgroundTaskTree, state.isStreaming, state.messages, state.taskTree]
+    [state.backgroundTaskTree, state.isStreaming, state.messages, state.taskTree, state.transcriptBottomOffset]
   );
   const maxVisibleMessages = visibleThreadPolicy.visibleLimit;
-  const hiddenMessageCount = visibleThreadPolicy.hiddenCount;
+  const transcriptPageSize = useMemo(
+    () => Math.max(8, Math.floor(visibleThreadPolicy.visibleLimit * 0.66)),
+    [visibleThreadPolicy.visibleLimit]
+  );
   const visibleMessages = useMemo(
-    () => (hiddenMessageCount > 0 ? state.messages.slice(-maxVisibleMessages) : state.messages),
-    [hiddenMessageCount, maxVisibleMessages, state.messages]
+    () => state.messages.slice(visibleThreadPolicy.startIndex, visibleThreadPolicy.endIndex),
+    [state.messages, visibleThreadPolicy.endIndex, visibleThreadPolicy.startIndex]
   );
   const hasWalletRails = (
     configRef.current.agentRails.walletProviders.length > 0
@@ -4228,6 +4694,25 @@ Please check your API keys in the .env file and restart Gordon.`,
   const quickActionsOverlayOpen = isOverlayOpen(state.overlay, "quick-actions");
   const shortcutsOverlayOpen = isOverlayOpen(state.overlay, "shortcuts");
   const showChatBanner = state.view === "chat" && state.messages.length < 4;
+  const quickActionContext = useMemo(
+    () => ({
+      mode: state.mode,
+      setupComplete: configRef.current.onboardingComplete,
+      hasExchange: Boolean(exchangeRef.current),
+      hasBroker: Boolean(brokerRef.current),
+      hasWalletRails,
+    }),
+    [hasWalletRails, state.mode]
+  );
+  const chatInputPlaceholder = useMemo(() => {
+    if (quickActionsOverlayOpen) {
+      return "Quick Actions open...";
+    }
+    if (state.isLoading || state.isStreaming) {
+      return "Waiting for response...";
+    }
+    return "Ask Gordon anything...";
+  }, [quickActionsOverlayOpen, state.isLoading, state.isStreaming]);
 
   return (
     <Box flexDirection="column" height="100%">
@@ -4303,8 +4788,10 @@ Please check your API keys in the .env file and restart Gordon.`,
 
             <ChatView
               messages={visibleMessages}
-              hiddenCount={hiddenMessageCount}
+              hiddenBefore={visibleThreadPolicy.hiddenBefore}
+              hiddenAfter={visibleThreadPolicy.hiddenAfter}
               visibleLimit={maxVisibleMessages}
+              isPinnedBottom={visibleThreadPolicy.isPinnedBottom}
               isStreaming={state.isStreaming}
               activeStreamingTimestamp={state.streamingMessageTimestamp}
               activityStatus={state.activityStatus}
@@ -4367,7 +4854,7 @@ Please check your API keys in the .env file and restart Gordon.`,
                 <Text color={COLORS.DIM}>
                   Daemon-owned work continues outside the active chat run.
                 </Text>
-                <TaskTree tree={state.backgroundTaskTree} title="Background Tasks" />
+                <TaskTree tree={state.backgroundTaskTree} title="Background Tasks" staticCompleted={false} />
               </Box>
             )}
 
@@ -4392,31 +4879,25 @@ Please check your API keys in the .env file and restart Gordon.`,
             <ChatInput
               onSubmit={handleSubmit}
               onOpenQuickActions={openQuickActionsOverlay}
+              onTypingStateChange={setTranscriptTypingState}
               disabled={quickActionsOverlayOpen}
               busy={state.isLoading || state.isStreaming}
               queueDepth={state.queuedSubmissions.length}
-              placeholder={
-                quickActionsOverlayOpen
-                  ? "Quick Actions open..."
-                  : state.isLoading || state.isStreaming
-                  ? "Waiting for response..."
-                  : "Ask Gordon anything..."
+              placeholder={chatInputPlaceholder}
+              emptyStateHint={
+                state.messages.length === 0
+                  ? "Ask Gordon to scan, analyze, plan, or review a market."
+                  : null
               }
               seedValue={state.chatInputSeed}
               seedNonce={state.chatInputSeedNonce}
-              quickActionContext={{
-                mode: state.mode,
-                setupComplete: configRef.current.onboardingComplete,
-                hasExchange: Boolean(exchangeRef.current),
-                hasBroker: Boolean(brokerRef.current),
-                hasWalletRails,
-              }}
+              quickActionContext={quickActionContext}
             />
 
             {/* Help hint */}
             <Box paddingX={2} paddingY={0}>
               <Text color={COLORS.DIM}>
-                Ctrl+K: actions | ESC: stop agent response | /menu: actions | /help: commands
+                Ctrl+K: actions | PgUp/PgDn/Home/End: transcript | ESC: stop agent response | /menu: actions | /help: commands
               </Text>
             </Box>
           </Box>

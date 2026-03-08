@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { Box, Text, useInput } from "ink";
-import { Select, Badge } from "@inkjs/ui";
+import { Badge } from "@inkjs/ui";
+import { FocusSelect } from "./components/PromptPrimitives.tsx";
 import { COLORS } from "./theme.ts";
 import type { Mode } from "../types/index.ts";
 import { WORKFLOW_CONFIG, type WorkflowGroup } from "./commandUx.ts";
@@ -47,30 +48,30 @@ interface MenuEntry {
 
 const WORKFLOW_ACTIONS: Record<WorkflowGroup, MenuEntry[]> = {
   discover: [
-    { label: "Scan market", value: "scan" },
-    { label: "Trending now", value: "trending" },
-    { label: "Check regime", value: "regime" },
+    { label: "Scan", value: "scan" },
+    { label: "Trending", value: "trending" },
+    { label: "Regime", value: "regime" },
   ],
   analyze: [
-    { label: "Analyze symbol", value: "analyze" },
-    { label: "Plan trade", value: "plan" },
-    { label: "Analysis help", value: "help" },
+    { label: "Analyze", value: "analyze" },
+    { label: "Plan", value: "plan" },
+    { label: "Help", value: "help" },
   ],
   trade: [
-    { label: "Preview order", value: "preview-order" },
-    { label: "Open positions", value: "positions" },
-    { label: "Working orders", value: "orders" },
-    { label: "Fund rails", value: "fund" },
-    { label: "Bridge assets", value: "bridge" },
+    { label: "Preview", value: "preview-order" },
+    { label: "Positions", value: "positions" },
+    { label: "Orders", value: "orders" },
+    { label: "Fund", value: "fund" },
+    { label: "Bridge", value: "bridge" },
   ],
   run: [
-    { label: "Strategy runtime", value: "strategies-live" },
-    { label: "Check regime", value: "regime" },
-    { label: "Run help", value: "help" },
+    { label: "Runtime", value: "strategies-live" },
+    { label: "Regime", value: "regime" },
+    { label: "Help", value: "help" },
   ],
   accounts: [
     { label: "Portfolio", value: "portfolio" },
-    { label: "Wallet rails", value: "wallet" },
+    { label: "Wallet", value: "wallet" },
     { label: "Chains", value: "chains" },
   ],
   operate: [
@@ -119,9 +120,9 @@ function getMenuLabel(option: MenuOption): string {
     case "analyze":
       return "Analyze";
     case "preview-order":
-      return "Preview order";
+      return "Preview";
     case "plan":
-      return "Plan trade";
+      return "Plan";
     case "positions":
       return "Positions";
     case "orders":
@@ -135,9 +136,9 @@ function getMenuLabel(option: MenuOption): string {
     case "chains":
       return "Chains";
     case "wallet":
-      return "Wallet rails";
+      return "Wallet";
     case "fund":
-      return "Fund rails";
+      return "Fund";
     case "setup":
       return "Setup";
     case "doctor":
@@ -191,7 +192,7 @@ export const QuickStartMenu: React.FC<QuickStartMenuProps> = ({
 
     return [
       ...WORKFLOW_ACTIONS[workflow],
-      { label: "Back to all actions", value: "back" as const },
+      { label: "All actions", value: "back" as const },
     ];
   }, [workflow, mode, setupComplete, hasExchange, hasBroker, hasWalletRails]);
 
@@ -291,7 +292,9 @@ export const QuickStartMenu: React.FC<QuickStartMenuProps> = ({
       </Box>
 
       <Box marginBottom={1}>
-        <Select
+        <FocusSelect
+          title={workflow === "root" ? undefined : WORKFLOW_CONFIG[workflow].label}
+          hint={workflow === "root" ? "Start with one action. Chat handles the rest." : undefined}
           options={menuOptions}
           onChange={handleSelection}
         />

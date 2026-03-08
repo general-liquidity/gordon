@@ -12,6 +12,11 @@ import { RequestContext } from "@mastra/core/request-context";
 import { z } from "zod";
 
 import { gordonAgent } from "./agents.ts";
+import { buildPromptEnvelope, attachUsageToPromptReport } from "./contextBudget.ts";
+import {
+  formatIntegrationGlossary,
+  selectRelevantIntegrationGlossary,
+} from "./integrationGlossary.ts";
 import { evaluateToolRequestPolicy } from "../actions/runtime.ts";
 import { getDynamicToolAgentMap } from "../routing/manager.ts";
 import { createModuleLogger } from "../logger/index.ts";
@@ -1219,6 +1224,29 @@ function createRequestContext(context: GordonContext): RequestContext {
   return requestContext;
 }
 
+async function buildGroundedPrompt(
+  userMessage: string,
+  context: GordonContext,
+  requestContext: RequestContext,
+): Promise<{
+  prompt: string;
+  requestOptions: Record<string, unknown>;
+}> {
+  const glossarySelection = await selectRelevantIntegrationGlossary(userMessage, context);
+  const glossaryText = formatIntegrationGlossary(glossarySelection.entries);
+  const envelope = buildPromptEnvelope(userMessage, context, glossarySelection, glossaryText);
+
+  requestContext.set("integrationGlossaryIds", envelope.report.glossaryIds);
+  requestContext.set("activeIntegrationIds", envelope.report.activeIntegrationIds);
+  requestContext.set("promptContextReport", envelope.report);
+  requestContext.set("promptCacheMetadata", envelope.report.cache);
+
+  return {
+    prompt: envelope.prompt,
+    requestOptions: envelope.requestOptions,
+  };
+}
+
 // ============================================================================
 // Stream Event Types
 // ============================================================================
@@ -1361,28 +1389,9 @@ export async function* processMessageStream(
   // Input guardrails are now handled by GordonInputGuard processor (registered on all agents)
   const requestContext = createRequestContext(context);
 
-  // Inject dynamic system state so the routing agent knows the current mode.
-  // Without this, the LLM has no way to tell if the system is ARMED or SAFE
-  // and defaults to telling the user to arm — even when already armed.
-  const mode = context.config?.mode ?? "SAFE";
-  const armedUntil = context.config?.armedUntil;
-  let systemState = `[System: mode=${mode}`;
-  if (mode === "ARMED" && armedUntil) {
-    const remaining = new Date(armedUntil).getTime() - Date.now();
-    if (remaining > 0) {
-      const mins = Math.round(remaining / 60_000);
-      systemState += `, armed for ${mins}min`;
-    } else {
-      systemState += `, expired`;
-    }
-  }
-  if (context.exchange) {
-    systemState += `, exchange=${context.exchange.exchangeId}`;
-  }
-  systemState += `]\n`;
-  const enrichedMessage = systemState + userMessage;
-
   try {
+    const groundedPrompt = await buildGroundedPrompt(userMessage, context, requestContext);
+    const enrichedMessage = groundedPrompt.prompt;
     await throwIfStreamAborted(signal);
 
     // Emit agent started event
@@ -1404,6 +1413,7 @@ export async function* processMessageStream(
         },
       } : {}),
       maxSteps: 20,
+      ...groundedPrompt.requestOptions,
       ...(tracingOptions && { tracingOptions }),
     } as Record<string, unknown>);
     const streamResult = await awaitWithAbort(streamRequest, signal);
@@ -1758,6 +1768,7 @@ export async function* processMessageStream(
         totalTokens: usageData.totalTokens || 0,
       };
     }
+    attachUsageToPromptReport(threadId ?? context.threadId, usage);
 
     // Emit completion events
     await emitEvent("agent:stream_completed", {
@@ -1912,13 +1923,15 @@ export async function processStructuredMessage<T extends Record<string, unknown>
   const effectiveResourceId = resourceId || context.userId || "default";
 
   try {
-    const result = await gordonAgent().generate(userMessage, {
+    const groundedPrompt = await buildGroundedPrompt(userMessage, context, requestContext);
+    const result = await gordonAgent().generate(groundedPrompt.prompt, {
       requestContext,
       ...(threadId && effectiveResourceId ? {
         memory: { thread: threadId, resource: effectiveResourceId },
       } : {}),
       maxSteps: 20,
       structuredOutput: { schema },
+      ...groundedPrompt.requestOptions,
       ...(tracingOptions && { tracingOptions }),
     } as Record<string, unknown>);
 
@@ -1935,13 +1948,15 @@ export async function processStructuredMessage<T extends Record<string, unknown>
     recordRequest(Date.now() - startTime, true);
 
     const usage = resultObj.usage ?? {};
+    const normalizedUsage = {
+      promptTokens: usage.inputTokens ?? 0,
+      completionTokens: usage.outputTokens ?? 0,
+      totalTokens: usage.totalTokens ?? 0,
+    };
+    attachUsageToPromptReport(threadId ?? context.threadId, normalizedUsage);
     return {
       data: resultObj.object,
-      usage: {
-        promptTokens: usage.inputTokens ?? 0,
-        completionTokens: usage.outputTokens ?? 0,
-        totalTokens: usage.totalTokens ?? 0,
-      },
+      usage: normalizedUsage,
     };
   } catch (err) {
     const error = err instanceof Error ? err : new Error(String(err));
@@ -1980,6 +1995,7 @@ export async function* processWithNetwork(
   const requestContext = createRequestContext(context);
 
   try {
+    const groundedPrompt = await buildGroundedPrompt(userMessage, context, requestContext);
     await emitEvent("agent:started", { agent: "gordon-network" });
 
     // Build tracing options if tracing is enabled
@@ -1989,7 +2005,7 @@ export async function* processWithNetwork(
     // Pass threadId and resourceId inside memory option for Mastra's network execution path
     // This ensures sub-agents also receive thread/resource context for working memory updates
     const effectiveResourceId = resourceId || context.userId || "default";
-    const networkResult = await gordonAgent().network(userMessage, {
+    const networkResult = await gordonAgent().network(groundedPrompt.prompt, {
       requestContext,
       ...(threadId && effectiveResourceId ? {
         memory: {
@@ -1998,6 +2014,7 @@ export async function* processWithNetwork(
         },
       } : {}),
       maxSteps: 30,
+      ...groundedPrompt.requestOptions,
       ...(tracingOptions && { tracingOptions }),
     } as Record<string, unknown>);
 
@@ -2038,6 +2055,7 @@ export async function* processWithNetwork(
         totalTokens: usageData.totalTokens || 0,
       };
     }
+    attachUsageToPromptReport(threadId ?? context.threadId, usage);
 
     // Record successful request metrics
     recordRequest(Date.now() - startTime, true);
@@ -2099,6 +2117,7 @@ export async function processMessage(
   const requestContext = createRequestContext(context);
 
   try {
+    const groundedPrompt = await buildGroundedPrompt(userMessage, context, requestContext);
     // Build tracing options if tracing is enabled
     const tracingOptions = createAgentTracingOptions();
 
@@ -2106,7 +2125,7 @@ export async function processMessage(
     // Pass threadId and resourceId inside memory option for Mastra's newer execution path
     // This ensures sub-agents also receive thread/resource context for working memory updates
     const effectiveResourceId = resourceId || context.userId || "default";
-    const result = await gordonAgent().generate(userMessage, {
+    const result = await gordonAgent().generate(groundedPrompt.prompt, {
       requestContext,
       ...(threadId && effectiveResourceId ? {
         memory: {
@@ -2115,6 +2134,7 @@ export async function processMessage(
         },
       } : {}),
       maxSteps: 20,
+      ...groundedPrompt.requestOptions,
       ...(tracingOptions && { tracingOptions }),
     } as Record<string, unknown>);
 
@@ -2139,13 +2159,16 @@ export async function processMessage(
     // Record successful request metrics
     recordRequest(Date.now() - startTime, true);
 
+    const usage = {
+      promptTokens: resultObj.usage?.inputTokens || 0,
+      completionTokens: resultObj.usage?.outputTokens || 0,
+      totalTokens: resultObj.usage?.totalTokens || 0,
+    };
+    attachUsageToPromptReport(threadId ?? context.threadId, usage);
+
     return {
       response,
-      usage: {
-        promptTokens: resultObj.usage?.inputTokens || 0,
-        completionTokens: resultObj.usage?.outputTokens || 0,
-        totalTokens: resultObj.usage?.totalTokens || 0,
-      },
+      usage,
     };
   } catch (err) {
     const error = err instanceof Error ? err : new Error(String(err));
@@ -2181,16 +2204,21 @@ export async function processSimpleMessage(
   const requestContext = createRequestContext(context);
 
   try {
+    const groundedPrompt = await buildGroundedPrompt(userMessage, context, requestContext);
     // Build tracing options if tracing is enabled
     const tracingOptions = createAgentTracingOptions();
 
-    const result = await gordonAgent().generate(userMessage, {
+    const result = await gordonAgent().generate(groundedPrompt.prompt, {
       requestContext,
       maxSteps: 5, // Limit steps for simple queries
+      ...groundedPrompt.requestOptions,
       ...(tracingOptions && { tracingOptions }),
     });
 
-    const resultObj = result as unknown as { text?: string };
+    const resultObj = result as unknown as {
+      text?: string;
+      usage?: { inputTokens?: number; outputTokens?: number; totalTokens?: number };
+    };
     const rawResponse = resultObj.text || "I'm not sure how to help with that.";
 
     // OUTPUT GUARDRAIL: Sanitize response for sensitive data
@@ -2198,6 +2226,11 @@ export async function processSimpleMessage(
 
     // Record successful request metrics
     recordRequest(Date.now() - startTime, true);
+    attachUsageToPromptReport(context.threadId, {
+      promptTokens: resultObj.usage?.inputTokens || 0,
+      completionTokens: resultObj.usage?.outputTokens || 0,
+      totalTokens: resultObj.usage?.totalTokens || 0,
+    });
 
     return outputCheck.sanitized;
   } catch (err) {

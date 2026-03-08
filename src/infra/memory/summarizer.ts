@@ -11,6 +11,12 @@
 import type { Message, MessageRole } from "../llm/types.ts";
 import type { LLMClient } from "../llm/client.ts";
 import { createModuleLogger } from "../logger/index.ts";
+import {
+  INTEGRATION_GLOSSARY_MARKER,
+  PROJECT_TRUTH_MARKER,
+  RUNTIME_STATE_MARKER,
+  TOOL_CONTEXT_MARKER,
+} from "../agents/contextBudget.ts";
 
 const logger = createModuleLogger("summarizer");
 
@@ -188,9 +194,19 @@ export class ConversationSummarizer {
       // Split messages: older ones to summarize, recent ones to keep
       const olderMessages = messages.slice(0, messagesToSummarize);
       const recentMessages = messages.slice(messagesToSummarize);
+      const preservedStableMessages = olderMessages.filter((message) => this.isStableContextMessage(message));
+      const summarizableOlderMessages = olderMessages.filter((message) => !this.isStableContextMessage(message));
+
+      if (summarizableOlderMessages.length === 0) {
+        return {
+          summarized: false,
+          messages: [...preservedStableMessages, ...recentMessages],
+          messagesSummarized: 0,
+        };
+      }
 
       // Format older messages for summarization
-      const conversationText = this.formatMessagesForSummary(olderMessages);
+      const conversationText = this.formatMessagesForSummary(summarizableOlderMessages);
 
       // Generate summary using LLM
       const summaryText = await this.generateSummary(conversationText);
@@ -205,7 +221,7 @@ export class ConversationSummarizer {
       };
 
       // Combine summary with recent messages
-      const summarizedMessages: Message[] = [summaryMessage, ...recentMessages];
+      const summarizedMessages: Message[] = [...preservedStableMessages, summaryMessage, ...recentMessages];
 
       logger.info("Summarization complete", {
         originalCount: messages.length,
@@ -261,6 +277,19 @@ export class ConversationSummarizer {
       default:
         return role;
     }
+  }
+
+  private isStableContextMessage(message: Message): boolean {
+    if (message.role !== "system") {
+      return false;
+    }
+
+    return [
+      PROJECT_TRUTH_MARKER,
+      INTEGRATION_GLOSSARY_MARKER,
+      TOOL_CONTEXT_MARKER,
+      RUNTIME_STATE_MARKER,
+    ].some((marker) => message.content.includes(marker));
   }
 
   /**

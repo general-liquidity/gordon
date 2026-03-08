@@ -5,8 +5,9 @@
 
 import React from "react";
 import { Box, Text } from "ink";
-import { Alert, StatusMessage } from "@inkjs/ui";
+import { StatusMessage } from "@inkjs/ui";
 import { COLORS } from "../theme.ts";
+import { NoticeAlert } from "./PromptPrimitives.tsx";
 
 /**
  * Success message for completed operations
@@ -73,9 +74,7 @@ export const WarningAlert: React.FC<WarningAlertProps> = ({
 }) => {
   return (
     <Box paddingX={2} paddingY={1}>
-      <Alert variant="warning" title={title}>
-        {children}
-      </Alert>
+      <NoticeAlert title={title} variant="warning">{children}</NoticeAlert>
     </Box>
   );
 };
@@ -94,9 +93,7 @@ export const InfoAlert: React.FC<InfoAlertProps> = ({
 }) => {
   return (
     <Box paddingX={2} paddingY={1}>
-      <Alert variant="info" title={title}>
-        {children}
-      </Alert>
+      <NoticeAlert title={title} variant="info">{children}</NoticeAlert>
     </Box>
   );
 };
@@ -127,9 +124,9 @@ export const RiskWarning: React.FC<RiskWarningProps> = ({
 
   return (
     <Box paddingX={2} paddingY={1}>
-      <Alert variant={variants[riskLevel]} title={titles[riskLevel]}>
+      <NoticeAlert title={titles[riskLevel]} variant={variants[riskLevel]}>
         <Text>{message}</Text>
-      </Alert>
+      </NoticeAlert>
     </Box>
   );
 };
@@ -155,9 +152,9 @@ export const ConnectionAlert: React.FC<ConnectionAlertProps> = ({
   }
 
   return (
-    <Alert variant="error" title={`${service} Disconnected`}>
+    <NoticeAlert title={`${service} Disconnected`} variant="error">
       <Text>Please check your API keys and network connection.</Text>
-    </Alert>
+    </NoticeAlert>
   );
 };
 

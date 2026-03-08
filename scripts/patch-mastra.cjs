@@ -20,8 +20,19 @@ const fs = require("fs");
 const path = require("path");
 
 let totalPatched = 0;
+const verbose = process.argv.includes("--verbose") || process.env.PATCH_MASTRA_VERBOSE === "1";
 
 const distDir = path.resolve(__dirname, "..", "node_modules/@mastra/core/dist");
+
+function log(message) {
+  if (verbose) {
+    console.log(message);
+  }
+}
+
+function warn(message) {
+  console.warn(message);
+}
 
 /**
  * Scan dist directory for chunk files matching a pattern in their content.
@@ -51,9 +62,9 @@ if (lastMessagesFiles.length === 0) {
   // Check if already patched
   const alreadyPatched = findChunkFiles(lastMessagesReplacement);
   if (alreadyPatched.length > 0) {
-    console.log(`[patch-mastra] lastMessages already patched (${alreadyPatched.length} files)`);
+    log(`[patch-mastra] lastMessages already patched (${alreadyPatched.length} files)`);
   } else {
-    console.log(`[patch-mastra] WARNING: lastMessages pattern not found in any chunk file`);
+    warn(`[patch-mastra] WARNING: lastMessages pattern not found in any chunk file`);
   }
 }
 
@@ -63,7 +74,7 @@ for (const filePath of lastMessagesFiles) {
   fs.writeFileSync(filePath, content, "utf8");
   const count = (content.match(/lastMessages: 10/g) || []).length;
   const name = path.relative(path.resolve(__dirname, ".."), filePath);
-  console.log(`[patch-mastra] Patched lastMessages in ${name} (${count} occurrences)`);
+  log(`[patch-mastra] Patched lastMessages in ${name} (${count} occurrences)`);
   totalPatched++;
 }
 
@@ -113,7 +124,7 @@ for (const filePath of responsesFiles) {
 
   // Check if already has our final patch
   if (content.includes(replacementOld) || content.includes(replacementNew)) {
-    console.log(`[patch-mastra] ${name} OpenAI compatible already patched`);
+    log(`[patch-mastra] ${name} OpenAI compatible already patched`);
     continue;
   }
 
@@ -124,7 +135,7 @@ for (const filePath of responsesFiles) {
       const replacement = needle.includes("baseURL, headers") ? replacementNew : replacementOld;
       content = content.replaceAll(needle, replacement);
       fs.writeFileSync(filePath, content, "utf8");
-      console.log(`[patch-mastra] Patched OpenAI → createOpenAICompatible in ${name}`);
+      log(`[patch-mastra] Patched OpenAI → createOpenAICompatible in ${name}`);
       totalPatched++;
       patched = true;
       break;
@@ -132,12 +143,14 @@ for (const filePath of responsesFiles) {
   }
 
   if (!patched) {
-    console.log(`[patch-mastra] WARNING: Could not match OpenAI responses pattern in ${name}`);
+    warn(`[patch-mastra] WARNING: Could not match OpenAI responses pattern in ${name}`);
   }
 }
 
 if (responsesFiles.length === 0) {
-  console.log(`[patch-mastra] WARNING: No chunk files found containing .responses(modelId)`);
+  warn(`[patch-mastra] WARNING: No chunk files found containing .responses(modelId)`);
 }
 
-console.log(`[patch-mastra] Done (${totalPatched} files patched)`);
+if (verbose && totalPatched > 0) {
+  console.log(`[patch-mastra] Done (${totalPatched} files patched)`);
+}

@@ -189,6 +189,11 @@ const OPERATE_COMMANDS = new Set([
   "arm",
   "disarm",
   "validate",
+  "session",
+  "log",
+  "summary",
+  "compact",
+  "name",
 ]);
 
 const CATEGORY_DEFAULT_WORKFLOW: Record<LegacyCommandCategory, WorkflowGroup> = {
