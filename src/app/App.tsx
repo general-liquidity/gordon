@@ -294,6 +294,7 @@ function getDefaultConfig(): GordonConfig {
     mode: "SAFE",
     armedUntil: null,
     onboardingComplete: false,
+    startupBannerMode: "full",
     useKeyring: false,
     telemetry: { enabled: false, researchData: false },
     riskManagement: {
@@ -4184,8 +4185,12 @@ Please check your API keys in the .env file and restart Gordon.`,
     }
 
     if (state.view === "welcome" && input.toLowerCase() === "b") {
-      const nextBannerMode = configRef.current.startupBannerMode === "quiet" ? "full" : "quiet";
-      const updatedConfig = { ...configRef.current, startupBannerMode: nextBannerMode };
+      const nextBannerMode: GordonConfig["startupBannerMode"] =
+        configRef.current.startupBannerMode === "quiet" ? "full" : "quiet";
+      const updatedConfig: GordonConfig = {
+        ...configRef.current,
+        startupBannerMode: nextBannerMode,
+      };
       configRef.current = updatedConfig;
       setState((prev) => ({ ...prev }));
       void saveConfig(updatedConfig).catch(() => {

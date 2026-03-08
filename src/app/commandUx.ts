@@ -263,13 +263,14 @@ export function getQuickActionItems(context: QuickActionContext): QuickActionIte
   const hasVenue = context.hasExchange || context.hasBroker;
 
   if (!context.setupComplete || !hasVenue) {
-    return [
+    const setupActions: QuickActionItem[] = [
       { label: "Setup", command: "/setup", workflow: "operate" },
       { label: "Doctor", command: "/doctor", workflow: "operate" },
       { label: "Model", command: "/model", workflow: "operate" },
       { label: "Help", command: "/help", workflow: "operate" },
       { label: "Configure", command: "/configure advanced", workflow: "operate" },
-    ].slice(0, 5);
+    ];
+    return setupActions.slice(0, 5);
   }
 
   const actions: QuickActionItem[] = [

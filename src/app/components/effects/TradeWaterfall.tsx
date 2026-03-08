@@ -193,7 +193,6 @@ function dimColor(color: string): string {
     [COLORS.GREEN]: "#15803d",
     [COLORS.RED]: "#991b1b",
     [COLORS.WHITE]: COLORS.DIM,
-    [COLORS.HIGHLIGHT]: "#92400e",
     [COLORS.DIM]: "#3f3f46",
     [COLORS.ACCENT_DIM]: COLORS.DIM,
   };
