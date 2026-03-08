@@ -214,8 +214,11 @@ function collectActiveIntegrationIds(context: GordonContext): string[] {
     ids.add(provider);
     const model = context.config.modelConfig?.model?.toLowerCase();
     if (provider === "dedalus" && model?.includes("/")) {
-      const [gatewayChild] = model.split(/\s+/);
-      ids.add(`dedalus/${gatewayChild.split("/")[0]}`);
+      const [gatewayChild = ""] = model.split(/\s+/);
+      const routedProvider = gatewayChild.split("/")[0];
+      if (routedProvider) {
+        ids.add(`dedalus/${routedProvider}`);
+      }
     }
   }
   for (const wallet of context.config.agentRails.walletProviders) {

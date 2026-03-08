@@ -181,7 +181,7 @@ export function formatUpdatePromptLines(
   latestVersion: string,
   updateCommand: UpdateCommand,
   options: { color?: boolean } = {},
-): string[] {
+): [string, string, string] {
   const color = options.color ?? shouldColorPrompt();
   const display = highlightCommandStem(updateCommand.publicDisplay, "gordon", color);
   return [

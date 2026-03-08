@@ -4,7 +4,7 @@ import { formatUpdatePromptLines } from "./update-notifier.ts";
 
 describe("update notifier prompt formatting", () => {
   it("selectively highlights only the npm command stem", () => {
-    const [, commandLine] = formatUpdatePromptLines(
+    const lines = formatUpdatePromptLines(
       "0.8.9",
       {
         command: "npm",
@@ -14,6 +14,7 @@ describe("update notifier prompt formatting", () => {
       },
       { color: true },
     );
+    const commandLine = lines[1];
 
     const plainLine = commandLine.replace(/\u001B\[[0-9;]*m/g, "");
     expect(plainLine).toContain("gordon --upgrade");
@@ -22,7 +23,7 @@ describe("update notifier prompt formatting", () => {
   });
 
   it("keeps plain-text output available for non-color terminals", () => {
-    const [, commandLine] = formatUpdatePromptLines(
+    const lines = formatUpdatePromptLines(
       "0.8.9",
       {
         command: "bun",
@@ -32,6 +33,7 @@ describe("update notifier prompt formatting", () => {
       },
       { color: false },
     );
+    const commandLine = lines[1];
 
     expect(commandLine).toBe("Run now? gordon --upgrade");
   });
