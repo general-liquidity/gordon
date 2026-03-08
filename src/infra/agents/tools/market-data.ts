@@ -12,7 +12,7 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
-import { getGordonContext, type MastraExecutionContext } from "./types.ts";
+import { getGordonContext, normalizeSymbol, type MastraExecutionContext } from "./types.ts";
 import { createCachedTool, TOOL_CACHE_CONFIG } from "./cache.ts";
 
 // ============================================================================
@@ -63,9 +63,7 @@ export const getCandlesTool = createTool({
       return errors.noExchange;
     }
 
-    const normalizedSymbol = symbol.toUpperCase().endsWith("USDT")
-      ? symbol.toUpperCase()
-      : `${symbol.toUpperCase()}USDT`;
+    const normalizedSymbol = normalizeSymbol(symbol);
 
     try {
       const candles = await ctx.exchange.getCandles(normalizedSymbol, interval, limit);
@@ -112,9 +110,7 @@ export const getPriceTool = createTool({
       return errors.noExchange;
     }
 
-    const normalizedSymbol = symbol.toUpperCase().endsWith("USDT")
-      ? symbol.toUpperCase()
-      : `${symbol.toUpperCase()}USDT`;
+    const normalizedSymbol = normalizeSymbol(symbol);
 
     try {
       const price = await ctx.exchange.getPrice(normalizedSymbol);
@@ -229,9 +225,7 @@ export const getBookTickerTool = createTool({
       return errors.noExchange;
     }
 
-    const normalizedSymbol = symbol.toUpperCase().endsWith("USDT")
-      ? symbol.toUpperCase()
-      : `${symbol.toUpperCase()}USDT`;
+    const normalizedSymbol = normalizeSymbol(symbol);
 
     try {
       const bookTicker = await ctx.exchange.getBookTicker(normalizedSymbol);

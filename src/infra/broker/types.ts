@@ -3,6 +3,8 @@
  * Defines normalized broker interfaces for stock/options integrations.
  */
 
+import type { Candle } from "../../types/index.ts";
+
 // ============================================================================
 // Broker Identification
 // ============================================================================
@@ -149,6 +151,7 @@ export interface BrokerCapabilities {
   supportsOptions: boolean;
   supportsStreaming: boolean;
   supportsPaperTrading: boolean;
+  supportsHistoricalBars: boolean;
 }
 
 export type BrokerOrderSide = "buy" | "sell";
@@ -253,6 +256,14 @@ export interface BrokerQuote {
   timestamp: string;
 }
 
+export interface BrokerHistoricalBarsParams {
+  symbol: string;
+  timeframe: string;
+  startTime: number;
+  endTime: number;
+  limit?: number;
+}
+
 // ============================================================================
 // Broker Interface
 // ============================================================================
@@ -301,4 +312,7 @@ export interface BrokerAdapter {
 
   /** Latest best bid/ask quote for a symbol */
   getLatestQuote(symbol: string): Promise<BrokerQuote>;
+
+  /** Historical bars for research and backtesting */
+  getHistoricalBars(params: BrokerHistoricalBarsParams): Promise<Candle[]>;
 }

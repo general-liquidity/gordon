@@ -8,7 +8,11 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Box, Text, useInput } from "ink";
 import { ProgressBar, Spinner } from "@inkjs/ui";
 import { COLORS } from "../theme.ts";
-import { getGordonLoadingPhrases, useGordonLoader } from "./GordonLoader.tsx";
+import {
+  getGordonLoaderColor,
+  getGordonLoadingPhrases,
+  useGordonLoader,
+} from "./GordonLoader.tsx";
 
 /**
  * Format elapsed time in human-readable format
@@ -94,6 +98,10 @@ export const ProgressIndicator: React.FC<ProgressIndicatorProps> = ({
       variant: "startup",
     }),
   });
+  const loaderColor = getGordonLoaderColor({
+    activityStatus: status,
+    variant: "startup",
+  });
 
   return (
     <Box flexDirection="column" paddingX={2} paddingY={1}>
@@ -130,7 +138,7 @@ export const ProgressIndicator: React.FC<ProgressIndicatorProps> = ({
           <Box gap={2} justifyContent="space-between">
             <Box flexDirection="column">
               <Box>
-                <Text color={COLORS.HIGHLIGHT}>{glyph}</Text>
+                <Text color={loaderColor}>{glyph}</Text>
                 <Text color={COLORS.WHITE}> {label}</Text>
               </Box>
               <Text color={COLORS.DIM}>{phrase}</Text>

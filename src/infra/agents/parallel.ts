@@ -16,6 +16,7 @@
  */
 
 import { createModuleLogger } from "../logger/index.ts";
+import { normalizeCryptoSymbol } from "../markets/instruments.ts";
 import type { GordonContext } from "./types.ts";
 import type {
   StreamWriter,
@@ -424,9 +425,7 @@ export async function runDeepParallelAnalysis(
   context: GordonContext
 ): Promise<DeepParallelAnalysisResult> {
   const startTime = Date.now();
-  const normalizedSymbol = symbol.toUpperCase().endsWith("USDT")
-    ? symbol.toUpperCase()
-    : `${symbol.toUpperCase()}USDT`;
+  const normalizedSymbol = normalizeCryptoSymbol(symbol);
 
   logger.info(`Starting deep parallel analysis for ${normalizedSymbol}`);
 
@@ -620,9 +619,7 @@ export async function runMultiCoinParallelAnalysis(
   });
 
   const operations = symbols.map((symbol) => async () => {
-    const normalizedSymbol = symbol.toUpperCase().endsWith("USDT")
-      ? symbol.toUpperCase()
-      : `${symbol.toUpperCase()}USDT`;
+    const normalizedSymbol = normalizeCryptoSymbol(symbol);
 
     try {
       const analysis = await analyzeFunction(normalizedSymbol, context);
@@ -706,9 +703,7 @@ export function createScanAnalyzeWorkflow(
   context: GordonContext
 ): (symbol: string) => Promise<ParallelScanAnalyzeResult> {
   return async (symbol: string): Promise<ParallelScanAnalyzeResult> => {
-    const normalizedSymbol = symbol.toUpperCase().endsWith("USDT")
-      ? symbol.toUpperCase()
-      : `${symbol.toUpperCase()}USDT`;
+    const normalizedSymbol = normalizeCryptoSymbol(symbol);
 
     // Run scan and analyze in parallel
     const [scanResult, analyzeResult] = await Promise.all([
@@ -890,9 +885,7 @@ export async function streamParallelAnalysis(
   options?: StreamingParallelOptions
 ): Promise<StreamingResult<DeepParallelAnalysisResult>> {
   const startTime = Date.now();
-  const normalizedSymbol = symbol.toUpperCase().endsWith("USDT")
-    ? symbol.toUpperCase()
-    : `${symbol.toUpperCase()}USDT`;
+  const normalizedSymbol = normalizeCryptoSymbol(symbol);
 
   logger.info(`Starting streaming parallel analysis for ${normalizedSymbol}`);
 
@@ -1188,9 +1181,7 @@ export async function streamMultiCoinAnalysis(
       const batch = symbols.slice(i, i + concurrency);
 
       const batchPromises = batch.map(async (symbol) => {
-        const normalizedSymbol = symbol.toUpperCase().endsWith("USDT")
-          ? symbol.toUpperCase()
-          : `${symbol.toUpperCase()}USDT`;
+        const normalizedSymbol = normalizeCryptoSymbol(symbol);
 
         const analyzeStart = Date.now();
 
@@ -1366,9 +1357,7 @@ export function createStreamingDeepAnalysis(
   context: GordonContext,
   options?: StreamingWorkflowOptions
 ): StreamingWorkflowResult<AnalysisChunk | ProgressData> {
-  const normalizedSymbol = symbol.toUpperCase().endsWith("USDT")
-    ? symbol.toUpperCase()
-    : `${symbol.toUpperCase()}USDT`;
+  const normalizedSymbol = normalizeCryptoSymbol(symbol);
 
   async function* generator(): AsyncGenerator<AnalysisChunk | ProgressData, void, unknown> {
     const analyzerKeys = Object.keys(analyzers).filter(
@@ -1499,9 +1488,7 @@ export function createStreamingMultiCoinAnalysis(
     };
 
     for (const symbol of symbols) {
-      const normalizedSymbol = symbol.toUpperCase().endsWith("USDT")
-        ? symbol.toUpperCase()
-        : `${symbol.toUpperCase()}USDT`;
+      const normalizedSymbol = normalizeCryptoSymbol(symbol);
 
       const analyzeStart = Date.now();
 

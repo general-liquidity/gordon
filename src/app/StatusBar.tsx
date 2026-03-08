@@ -156,7 +156,7 @@ export const StatusBar: React.FC<StatusBarProps> = ({
       ? "●"
       : "○";
   const connectionColor = connectionStatus === "connecting"
-    ? COLORS.BLUE
+    ? COLORS.DISCOVER
     : connectionStatus === "connected"
       ? COLORS.GREEN
       : COLORS.RED;
@@ -189,7 +189,7 @@ export const StatusBar: React.FC<StatusBarProps> = ({
             width={btcColumnWidth}
             label="BTC"
             value={`$${formatBtcPrice(btcPrice)}`}
-            valueColor={COLORS.HIGHLIGHT}
+            valueColor={COLORS.WHITE}
             valueBold={true}
           />
           <StatusColumn
@@ -203,7 +203,7 @@ export const StatusBar: React.FC<StatusBarProps> = ({
             width={threadColumnWidth}
             label="Thread"
             value={threadValue}
-            valueColor={threadInfo?.isBranch ? COLORS.YELLOW : COLORS.BLUE}
+            valueColor={threadInfo?.isBranch ? COLORS.ANALYZE : COLORS.ACCENT}
           />
           <StatusColumn
             width={apiColumnWidth}
@@ -226,7 +226,7 @@ export const StatusBar: React.FC<StatusBarProps> = ({
               width={btcColumnWidth}
               label="Profile"
               value={operatorStatus.credentialProfile}
-              valueColor={operatorStatus.credentialProfile === "live" ? COLORS.TAN : COLORS.ACCENT_DIM}
+              valueColor={operatorStatus.credentialProfile === "live" ? COLORS.TRADE : COLORS.ACCENT_DIM}
             />
             <StatusColumn
               width={portfolioColumnWidth}
@@ -246,9 +246,9 @@ export const StatusBar: React.FC<StatusBarProps> = ({
                 operatorStatus.requestState === "streaming"
                   ? COLORS.HIGHLIGHT
                   : operatorStatus.requestState === "loading"
-                    ? COLORS.ACCENT
+                    ? COLORS.DISCOVER
                     : operatorStatus.queueDepth > 0
-                      ? COLORS.WHITE
+                      ? COLORS.ACCENT
                       : COLORS.DIM
               }
               paddingRight={0}

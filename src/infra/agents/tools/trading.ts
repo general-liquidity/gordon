@@ -27,7 +27,7 @@ import { TradeSchema } from "../../../types/trade.ts";
 import { loadConfig, saveConfig } from "../../storage/config.ts";
 import { listPlans, getPlan, updatePlan, createPlan } from "../../storage/plans.ts";
 import { listTrades, getTrade } from "../../storage/trades.ts";
-import { getGordonContext, validateToolOutput, type MastraExecutionContext } from "./types.ts";
+import { getGordonContext, normalizeSymbol, validateToolOutput, type MastraExecutionContext } from "./types.ts";
 import { reflectOnPlan, formatReflectionSummary } from "../reflection.ts";
 
 // ============================================================================
@@ -225,9 +225,7 @@ export const createPlanTool = createTool({
     }
 
     // Normalize symbol
-    const normalizedSymbol = symbol.toUpperCase().endsWith("USDT")
-      ? symbol.toUpperCase()
-      : `${symbol.toUpperCase()}USDT`;
+    const normalizedSymbol = normalizeSymbol(symbol);
 
     // Get detailed analysis first
     const analysis = await analyze(ctx.exchange, normalizedSymbol, {
@@ -553,9 +551,7 @@ Returns a grid plan for user approval.`,
     }
 
     // Normalize symbol
-    const normalizedSymbol = symbol.toUpperCase().endsWith("USDT")
-      ? symbol.toUpperCase()
-      : `${symbol.toUpperCase()}USDT`;
+    const normalizedSymbol = normalizeSymbol(symbol);
 
     // Analyze the symbol to get support/resistance levels
     const analysis = await analyze(ctx.exchange, normalizedSymbol, {
@@ -929,9 +925,7 @@ export const executeWithAlgorithmTool = createTool({
     }
 
     // Normalize symbol
-    const normalizedSymbol = symbol.toUpperCase().endsWith("USDT")
-      ? symbol.toUpperCase()
-      : `${symbol.toUpperCase()}USDT`;
+    const normalizedSymbol = normalizeSymbol(symbol);
 
     // Build execution intent
     const intent = parseExecutionIntent(

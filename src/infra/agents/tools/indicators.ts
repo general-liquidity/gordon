@@ -14,7 +14,7 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
-import { getGordonContext, type MastraExecutionContext } from "./types.ts";
+import { getGordonContext, normalizeSymbol, type MastraExecutionContext } from "./types.ts";
 import { createCachedTool, TOOL_CACHE_CONFIG } from "./cache.ts";
 import {
   calculateTechnicalAnalysis,
@@ -148,9 +148,7 @@ export const getTechnicalAnalysisTool = createTool({
     }
 
     // Normalize symbol
-    const normalizedSymbol = symbol.toUpperCase().endsWith("USDT")
-      ? symbol.toUpperCase()
-      : `${symbol.toUpperCase()}USDT`;
+    const normalizedSymbol = normalizeSymbol(symbol);
 
     try {
       // Need at least 200 candles for EMA200
@@ -287,9 +285,7 @@ export const getTechnicalSignalsTool = createTool({
       return errors.noExchange;
     }
 
-    const normalizedSymbol = symbol.toUpperCase().endsWith("USDT")
-      ? symbol.toUpperCase()
-      : `${symbol.toUpperCase()}USDT`;
+    const normalizedSymbol = normalizeSymbol(symbol);
 
     try {
       const candles = await ctx.exchange.getCandles(normalizedSymbol, interval, 250);
@@ -379,9 +375,7 @@ export const getRSITool = createTool({
       return errors.noExchange;
     }
 
-    const normalizedSymbol = symbol.toUpperCase().endsWith("USDT")
-      ? symbol.toUpperCase()
-      : `${symbol.toUpperCase()}USDT`;
+    const normalizedSymbol = normalizeSymbol(symbol);
 
     try {
       const candles = await ctx.exchange.getCandles(normalizedSymbol, interval, 250);
@@ -543,9 +537,7 @@ export const getStopLossLevelsTool = createTool({
       return errors.noExchange;
     }
 
-    const normalizedSymbol = symbol.toUpperCase().endsWith("USDT")
-      ? symbol.toUpperCase()
-      : `${symbol.toUpperCase()}USDT`;
+    const normalizedSymbol = normalizeSymbol(symbol);
 
     try {
       const candles = await ctx.exchange.getCandles(normalizedSymbol, interval, 50);
@@ -642,9 +634,7 @@ export const getPositionSizeTool = createTool({
       return errors.noExchange;
     }
 
-    const normalizedSymbol = symbol.toUpperCase().endsWith("USDT")
-      ? symbol.toUpperCase()
-      : `${symbol.toUpperCase()}USDT`;
+    const normalizedSymbol = normalizeSymbol(symbol);
 
     try {
       const candles = await ctx.exchange.getCandles(normalizedSymbol, interval, 50);
@@ -731,9 +721,7 @@ export const getVWAPTool = createTool({
       return errors.noExchange;
     }
 
-    const normalizedSymbol = symbol.toUpperCase().endsWith("USDT")
-      ? symbol.toUpperCase()
-      : `${symbol.toUpperCase()}USDT`;
+    const normalizedSymbol = normalizeSymbol(symbol);
 
     try {
       const candles = await ctx.exchange.getCandles(normalizedSymbol, interval, limit);
@@ -874,9 +862,7 @@ export const getCamarillaPivotsTool = createTool({
     const ctx = getGordonContext(execContext);
     if (!ctx?.exchange) return errors.noExchange;
 
-    const normalizedSymbol = symbol.toUpperCase().endsWith("USDT")
-      ? symbol.toUpperCase()
-      : `${symbol.toUpperCase()}USDT`;
+    const normalizedSymbol = normalizeSymbol(symbol);
 
     try {
       const candles = await ctx.exchange.getCandles(normalizedSymbol, interval, lookbackPeriod + 10);
@@ -949,9 +935,7 @@ export const getMarkovRegimeTool = createTool({
     const ctx = getGordonContext(execContext);
     if (!ctx?.exchange) return errors.noExchange;
 
-    const normalizedSymbol = symbol.toUpperCase().endsWith("USDT")
-      ? symbol.toUpperCase()
-      : `${symbol.toUpperCase()}USDT`;
+    const normalizedSymbol = normalizeSymbol(symbol);
 
     try {
       const candles = await ctx.exchange.getCandles(normalizedSymbol, interval, lookback * 2 + 10);
@@ -1013,9 +997,7 @@ export const getSupertrendTool = createTool({
     const ctx = getGordonContext(execContext);
     if (!ctx?.exchange) return errors.noExchange;
 
-    const normalizedSymbol = symbol.toUpperCase().endsWith("USDT")
-      ? symbol.toUpperCase()
-      : `${symbol.toUpperCase()}USDT`;
+    const normalizedSymbol = normalizeSymbol(symbol);
 
     try {
       const candles = await ctx.exchange.getCandles(normalizedSymbol, interval, 250);
@@ -1078,9 +1060,7 @@ export const getIchimokuTool = createTool({
     const ctx = getGordonContext(execContext);
     if (!ctx?.exchange) return errors.noExchange;
 
-    const normalizedSymbol = symbol.toUpperCase().endsWith("USDT")
-      ? symbol.toUpperCase()
-      : `${symbol.toUpperCase()}USDT`;
+    const normalizedSymbol = normalizeSymbol(symbol);
 
     try {
       const candles = await ctx.exchange.getCandles(normalizedSymbol, interval, 250);
@@ -1169,9 +1149,7 @@ export const getFlowScopeTool = createTool({
     const ctx = getGordonContext(execContext);
     if (!ctx?.exchange) return errors.noExchange;
 
-    const normalizedSymbol = symbol.toUpperCase().endsWith("USDT")
-      ? symbol.toUpperCase()
-      : `${symbol.toUpperCase()}USDT`;
+    const normalizedSymbol = normalizeSymbol(symbol);
 
     try {
       const candles = await ctx.exchange.getCandles(normalizedSymbol, interval, 250);
@@ -1288,9 +1266,7 @@ export const getAngledMarketStructureTool = createTool({
     const ctx = getGordonContext(execContext);
     if (!ctx?.exchange) return errors.noExchange;
 
-    const normalizedSymbol = symbol.toUpperCase().endsWith("USDT")
-      ? symbol.toUpperCase()
-      : `${symbol.toUpperCase()}USDT`;
+    const normalizedSymbol = normalizeSymbol(symbol);
 
     try {
       const candles = await ctx.exchange.getCandles(normalizedSymbol, interval, 250);
@@ -1361,9 +1337,7 @@ export const getFalseBreakoutTool = createTool({
     const ctx = getGordonContext(execContext);
     if (!ctx?.exchange) return errors.noExchange;
 
-    const normalizedSymbol = symbol.toUpperCase().endsWith("USDT")
-      ? symbol.toUpperCase()
-      : `${symbol.toUpperCase()}USDT`;
+    const normalizedSymbol = normalizeSymbol(symbol);
 
     try {
       const candles = await ctx.exchange.getCandles(normalizedSymbol, interval, 250);
@@ -1426,9 +1400,7 @@ export const getADXTool = createTool({
     const ctx = getGordonContext(execContext);
     if (!ctx?.exchange) return errors.noExchange;
 
-    const normalizedSymbol = symbol.toUpperCase().endsWith("USDT")
-      ? symbol.toUpperCase()
-      : `${symbol.toUpperCase()}USDT`;
+    const normalizedSymbol = normalizeSymbol(symbol);
 
     try {
       const candles = await ctx.exchange.getCandles(normalizedSymbol, interval, 250);
@@ -1498,9 +1470,7 @@ export const getDivergenceTool = createTool({
     const ctx = getGordonContext(execContext);
     if (!ctx?.exchange) return errors.noExchange;
 
-    const normalizedSymbol = symbol.toUpperCase().endsWith("USDT")
-      ? symbol.toUpperCase()
-      : `${symbol.toUpperCase()}USDT`;
+    const normalizedSymbol = normalizeSymbol(symbol);
 
     try {
       const candles = await ctx.exchange.getCandles(normalizedSymbol, interval, 250);
@@ -1590,9 +1560,7 @@ export const getSupplyDemandZonesTool = createTool({
     const ctx = getGordonContext(execContext);
     if (!ctx?.exchange) return errors.noExchange;
 
-    const normalizedSymbol = symbol.toUpperCase().endsWith("USDT")
-      ? symbol.toUpperCase()
-      : `${symbol.toUpperCase()}USDT`;
+    const normalizedSymbol = normalizeSymbol(symbol);
 
     try {
       const candles = await ctx.exchange.getCandles(normalizedSymbol, interval, 250);
@@ -1671,7 +1639,7 @@ export const getSqueezeMomentumTool = createTool({
   execute: async ({ symbol, interval }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
     if (!ctx?.exchange) return errors.noExchange;
-    const normalizedSymbol = symbol.toUpperCase().endsWith("USDT") ? symbol.toUpperCase() : `${symbol.toUpperCase()}USDT`;
+    const normalizedSymbol = normalizeSymbol(symbol);
     try {
       const candles = await ctx.exchange.getCandles(normalizedSymbol, interval, 250);
       if (!candles || candles.length < 30) return errors.insufficientData(normalizedSymbol);
@@ -1722,7 +1690,7 @@ export const getFVGTool = createTool({
   execute: async ({ symbol, interval }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
     if (!ctx?.exchange) return errors.noExchange;
-    const normalizedSymbol = symbol.toUpperCase().endsWith("USDT") ? symbol.toUpperCase() : `${symbol.toUpperCase()}USDT`;
+    const normalizedSymbol = normalizeSymbol(symbol);
     try {
       const candles = await ctx.exchange.getCandles(normalizedSymbol, interval, 250);
       if (!candles || candles.length < 25) return errors.insufficientData(normalizedSymbol);
@@ -1774,7 +1742,7 @@ export const getParabolicSARTool = createTool({
   execute: async ({ symbol, interval, afStart, afMax }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
     if (!ctx?.exchange) return errors.noExchange;
-    const normalizedSymbol = symbol.toUpperCase().endsWith("USDT") ? symbol.toUpperCase() : `${symbol.toUpperCase()}USDT`;
+    const normalizedSymbol = normalizeSymbol(symbol);
     try {
       const candles = await ctx.exchange.getCandles(normalizedSymbol, interval, 250);
       if (!candles || candles.length < 10) return errors.insufficientData(normalizedSymbol);
@@ -1829,7 +1797,7 @@ export const getATRRopeTool = createTool({
   execute: async ({ symbol, interval, threshold }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
     if (!ctx?.exchange) return errors.noExchange;
-    const normalizedSymbol = symbol.toUpperCase().endsWith("USDT") ? symbol.toUpperCase() : `${symbol.toUpperCase()}USDT`;
+    const normalizedSymbol = normalizeSymbol(symbol);
 
     try {
       const candles = await ctx.exchange.getCandles(normalizedSymbol, interval, 100);
@@ -1916,7 +1884,7 @@ export const getLinearRegressionTool = createTool({
   execute: async ({ symbol, interval }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
     if (!ctx?.exchange) return errors.noExchange;
-    const normalizedSymbol = symbol.toUpperCase().endsWith("USDT") ? symbol.toUpperCase() : `${symbol.toUpperCase()}USDT`;
+    const normalizedSymbol = normalizeSymbol(symbol);
 
     try {
       const candles = await ctx.exchange.getCandles(normalizedSymbol, interval, 100);
@@ -1998,7 +1966,7 @@ export const getWAETool = createTool({
   execute: async ({ symbol, interval, sensitivity, deadZoneMult }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
     if (!ctx?.exchange) return errors.noExchange;
-    const normalizedSymbol = symbol.toUpperCase().endsWith("USDT") ? symbol.toUpperCase() : `${symbol.toUpperCase()}USDT`;
+    const normalizedSymbol = normalizeSymbol(symbol);
 
     try {
       const candles = await ctx.exchange.getCandles(normalizedSymbol, interval, 120);

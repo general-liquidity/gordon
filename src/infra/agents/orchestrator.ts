@@ -868,6 +868,18 @@ const TOOL_AGENT_MAP: Record<string, string> = {
   get_backtest_results: "Backtester",
   get_best_strategy: "Backtester",
 
+  // ---- Systematic research tools ----
+  get_systematic_strategy_status: "Backtester",
+  list_systematic_datasets: "Backtester",
+  list_dataset_snapshots: "Backtester",
+  get_dataset_snapshot: "Backtester",
+  list_research_experiments: "Backtester",
+  analyze_systematic_portfolio: "Monitor",
+  diagnose_strategy_bias: "Backtester",
+  get_strategy_decay_report: "Monitor",
+  list_systematic_lifecycle: "Backtester",
+  export_systematic_artifact: "Backtester",
+
   // ---- Audit tools (v0.7) ----
   query_audit_trail: "Monitor",
   get_decision_path: "Monitor",
@@ -895,6 +907,8 @@ const TOOL_AGENT_MAP: Record<string, string> = {
   get_portfolio_state: "Monitor",
   rebalance_portfolio: "Planner",
   check_portfolio_health: "Monitor",
+  get_runtime_health_report: "Monitor",
+  compare_live_vs_backtest: "Monitor",
   approve_strategy_trade: "Executor",
 
   // ---- Chainlink tools ----

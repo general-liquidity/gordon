@@ -10,6 +10,7 @@ const ETRADE_CAPABILITIES: BrokerCapabilities = {
   supportsOptions: true,
   supportsStreaming: false,
   supportsPaperTrading: true,
+  supportsHistoricalBars: false,
 };
 
 const ETRADE_CONFIG: RestBrokerAdapterConfig = {
@@ -63,4 +64,3 @@ export class EtradeAdapter extends RestBrokerAdapter {
     super(credentials, ETRADE_CONFIG);
   }
 }
-

@@ -1,11 +1,7 @@
-import React, { useMemo, useState, useCallback, useEffect } from "react";
-import { Box, Text } from "ink";
+import React, { useMemo, useState, useCallback } from "react";
+import { Box, Text, useStdout } from "ink";
 import { COLORS } from "./theme.ts";
 import { GlitchReveal } from "./components/effects/GlitchReveal.tsx";
-import { getActiveRoute } from "../infra/providers/index.ts";
-
-// Import version from package.json
-import packageJson from "../../package.json";
 
 // Gordon Gekko quotes — Wall Street (1987) & Wall Street: Money Never Sleeps (2010)
 const GEKKO_QUOTES = [
@@ -37,29 +33,39 @@ const GEKKO_QUOTES = [
 ] as const;
 
 // ASCII art banner (ANSI Shadow style - clean and bold)
-const ASCII_BANNER = `
+const RAW_ASCII_BANNER = `
  ██████╗  ██████╗ ██████╗ ██████╗  ██████╗ ███╗   ██╗
 ██╔════╝ ██╔═══██╗██╔══██╗██╔══██╗██╔═══██╗████╗  ██║
 ██║  ███╗██║   ██║██████╔╝██║  ██║██║   ██║██╔██╗ ██║
 ██║   ██║██║   ██║██╔══██╗██║  ██║██║   ██║██║╚██╗██║
 ╚██████╔╝╚██████╔╝██║  ██║██████╔╝╚██████╔╝██║ ╚████║
  ╚═════╝  ╚═════╝ ╚═╝  ╚═╝╚═════╝  ╚═════╝ ╚═╝  ╚═══╝
-`.trim();
+`;
 
-function formatModelDisplay(): string {
-  try {
-    const route = getActiveRoute();
-    return route.modelString.includes("/")
-      ? route.modelString.split("/").slice(1).join("/")
-      : route.modelString;
-  } catch {
-    return "no model";
-  }
+function normalizeBanner(raw: string): string {
+  return raw.replace(/^\n/, "").trimEnd();
 }
 
-export const WelcomeBanner: React.FC = () => {
+const ASCII_BANNER = normalizeBanner(RAW_ASCII_BANNER);
+const WINDOWS_ASCII_BANNER = normalizeBanner(RAW_ASCII_BANNER);
+
+interface WelcomeBannerProps {
+  mode?: "full" | "quiet";
+  context?: "welcome" | "chat";
+}
+
+export const WelcomeBanner: React.FC<WelcomeBannerProps> = ({
+  mode = "full",
+  context = "welcome",
+}) => {
+  const quiet = mode === "quiet";
+  const showStartupHint = context === "welcome";
   const [revealed, setRevealed] = useState(false);
-  const [modelDisplay, setModelDisplay] = useState("loading...");
+  const { stdout } = useStdout();
+  const isWindowsTerminal = process.platform === "win32" || Boolean(process.env.WT_SESSION);
+  const bannerText = isWindowsTerminal ? WINDOWS_ASCII_BANNER : ASCII_BANNER;
+  const separatorWidth = Math.max(28, Math.min((stdout?.columns ?? 80) - 4, 120));
+  const separatorLine = "─".repeat(separatorWidth);
 
   // Select random quote on mount
   const randomQuote = useMemo(() => {
@@ -71,55 +77,57 @@ export const WelcomeBanner: React.FC = () => {
     setRevealed(true);
   }, []);
 
-  useEffect(() => {
-    setModelDisplay(formatModelDisplay());
-  }, []);
-
   return (
-    <Box flexDirection="column" paddingX={2} paddingY={1}>
-      {/* ASCII Art Banner — glitch decrypt on first load, gradient after */}
-      <Box flexDirection="column">
-        {revealed ? (
-          ASCII_BANNER.split("\n").map((line, i) => (
-            <Text key={i} color={COLORS.GREEN} bold>
-              {line}
+    <Box flexDirection="column" paddingX={quiet ? 2 : 1} paddingY={1}>
+      {!quiet && (
+        <Box flexDirection="column">
+          {revealed ? (
+            <Text color={COLORS.GREEN} bold>
+              {bannerText}
             </Text>
-          ))
-        ) : (
-          <GlitchReveal
-            duration={1200}
-            frameRate={50}
-            charset="block"
-            gradient={["#22c55e", "#22c55e"]}
-            scrambleColor="#15803d"
-            bold
-            onComplete={handleRevealComplete}
-          >
-            {ASCII_BANNER}
-          </GlitchReveal>
-        )}
-      </Box>
+          ) : (
+            <GlitchReveal
+              duration={1200}
+              frameRate={50}
+              charset="block"
+              gradient={["#22c55e", "#22c55e"]}
+              scrambleColor="#15803d"
+              bold
+              onComplete={handleRevealComplete}
+            >
+              {bannerText}
+            </GlitchReveal>
+          )}
+        </Box>
+      )}
 
-      {/* Tagline + version + model */}
-      <Box marginTop={1} gap={1}>
+      <Box marginTop={quiet ? 0 : 1}>
         <Text color={COLORS.WHITE} bold>
-          The Frontier Trading Agent
-        </Text>
-        <Text color={COLORS.DIM}>v{packageJson.version}</Text>
-        <Text color={COLORS.DIM}>·</Text>
-        <Text color={COLORS.ACCENT_DIM}>{modelDisplay}</Text>
-      </Box>
-
-      {/* Gekko Quote */}
-      <Box marginTop={1} paddingX={1}>
-        <Text color={COLORS.TAN_DIM} italic>
-          "{randomQuote}"
+          {quiet ? "Gordon" : "The Frontier Trading Agent"}
         </Text>
       </Box>
 
-      <Box marginTop={1}>
-        <Text color={COLORS.DIM}>Press any key to start...</Text>
-      </Box>
+      {!quiet && (
+        <Box marginTop={1} paddingX={1}>
+          <Text color={COLORS.TAN_DIM} italic>
+            "{randomQuote}"
+          </Text>
+        </Box>
+      )}
+
+      {context === "chat" && (
+        <Box marginTop={1}>
+          <Text color={COLORS.DIM}>{separatorLine}</Text>
+        </Box>
+      )}
+
+      {showStartupHint && (
+        <Box marginTop={1}>
+          <Text color={COLORS.DIM}>
+            Press Enter to start.
+          </Text>
+        </Box>
+      )}
     </Box>
   );
 };

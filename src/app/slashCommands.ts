@@ -58,19 +58,19 @@ const LEGACY_SLASH_COMMANDS: SlashCommandSeed[] = [
   {
     name: "scan",
     aliases: ["s"],
-    description: "Scan market for trading opportunities (~10-30s depending on coins)",
+    description: "Scan crypto markets for trading setups (~10-30s)",
     usage: "/scan",
     category: "market",
     level: 1,
     action: "agent",
     target: "scanner",
     executionTime: "~10-30s",
-    whenToUse: "Discover opportunities across multiple coins",
+    whenToUse: "Discover crypto setups across multiple symbols",
   },
   {
     name: "trending",
     aliases: ["t", "hot"],
-    description: "Show trending tokens (biggest movers)",
+    description: "Show trending crypto tokens (biggest movers)",
     usage: "/trending [gainers|losers]",
     category: "market",
     level: 1,
@@ -80,7 +80,7 @@ const LEGACY_SLASH_COMMANDS: SlashCommandSeed[] = [
   {
     name: "volume",
     aliases: ["v", "liquid"],
-    description: "Show highest volume markets",
+    description: "Show highest-volume crypto markets",
     usage: "/volume",
     category: "market",
     level: 2,
@@ -90,14 +90,14 @@ const LEGACY_SLASH_COMMANDS: SlashCommandSeed[] = [
   {
     name: "analyze",
     aliases: ["a", "quick"],
-    description: "Single comprehensive analysis (~3-5s)",
+    description: "Single-symbol analysis (~3-5s)",
     usage: "/analyze <symbol>",
     category: "market",
     level: 1,
     action: "agent",
     target: "analyst",
     executionTime: "~3-5s",
-    whenToUse: "Quick check on a single coin",
+    whenToUse: "Quick check on a symbol or ticker",
   },
   {
     name: "whales",
@@ -164,7 +164,7 @@ const LEGACY_SLASH_COMMANDS: SlashCommandSeed[] = [
   {
     name: "plan",
     aliases: ["p"],
-    description: "Create a trade plan for a coin",
+    description: "Create a trade plan for a symbol",
     usage: "/plan <symbol>",
     category: "trading",
     level: 1,
@@ -184,7 +184,7 @@ const LEGACY_SLASH_COMMANDS: SlashCommandSeed[] = [
   {
     name: "positions",
     aliases: ["pos"],
-    description: "Check active positions",
+    description: "Check active positions across crypto or stocks",
     usage: "/positions",
     category: "trading",
     level: 2,
@@ -194,17 +194,17 @@ const LEGACY_SLASH_COMMANDS: SlashCommandSeed[] = [
   {
     name: "orders",
     aliases: ["o"],
-    description: "View open orders",
+    description: "View open orders across crypto or stocks",
     usage: "/orders",
     category: "trading",
     level: 2,
     action: "tool",
-    target: "get_order_status",
+    target: "get_open_orders",
   },
   {
     name: "arm",
     aliases: [],
-    description: "Enable live trading (ARMED mode)",
+    description: "Enable live trading permission",
     usage: "/arm",
     category: "trading",
     level: 2,
@@ -214,7 +214,7 @@ const LEGACY_SLASH_COMMANDS: SlashCommandSeed[] = [
   {
     name: "disarm",
     aliases: ["safe"],
-    description: "Return to SAFE mode",
+    description: "Return Gordon to read-only mode",
     usage: "/disarm",
     category: "trading",
     level: 2,
@@ -226,7 +226,7 @@ const LEGACY_SLASH_COMMANDS: SlashCommandSeed[] = [
   {
     name: "portfolio",
     aliases: ["pf", "balance"],
-    description: "View portfolio and balances",
+    description: "View portfolio and balances across crypto or stocks",
     usage: "/portfolio",
     category: "account",
     level: 1,
@@ -461,6 +461,61 @@ const LEGACY_SLASH_COMMANDS: SlashCommandSeed[] = [
     action: "agent",
     target: "backtester",
     whenToUse: "Manage A/B experiments: start tests, check progress, promote winners, rank variants, view lineage",
+  },
+  {
+    name: "systematic",
+    aliases: ["sys"],
+    description: "Systematic research status — profile, datasets, experiments, portfolio, lifecycle",
+    usage: "/systematic [status|portfolio|datasets|experiments|lifecycle] [strategy]",
+    category: "strategy",
+    level: 2,
+    action: "agent",
+    target: "backtester",
+    whenToUse: "Inspect systematic research state and portfolio-level validation context",
+  },
+  {
+    name: "dataset",
+    aliases: ["datasets"],
+    description: "Dataset and snapshot workflows for systematic research",
+    usage: "/dataset [list|snapshots|show|export] [id|strategy]",
+    category: "strategy",
+    level: 2,
+    action: "agent",
+    target: "backtester",
+    whenToUse: "Inspect reproducible datasets, snapshots, and export research artifacts",
+  },
+  {
+    name: "decay",
+    aliases: ["drift"],
+    description: "Show strategy decay and degradation state",
+    usage: "/decay <strategy>",
+    category: "strategy",
+    level: 2,
+    action: "agent",
+    target: "monitor",
+    whenToUse: "Check whether a systematic strategy is degrading relative to prior validation",
+  },
+  {
+    name: "validate",
+    aliases: ["validation"],
+    description: "Inspect validation gates and bias blockers for a strategy",
+    usage: "/validate <strategy>",
+    category: "strategy",
+    level: 2,
+    action: "agent",
+    target: "backtester",
+    whenToUse: "Review systematic validation and promotion blockers before paper/live deployment",
+  },
+  {
+    name: "runtime",
+    aliases: ["rt"],
+    description: "Runtime health, slots, and live-vs-backtest diff",
+    usage: "/runtime [health|slots|diff <strategy>]",
+    category: "strategy",
+    level: 2,
+    action: "agent",
+    target: "monitor",
+    whenToUse: "Inspect active strategy slots and compare live runtime to validated backtests",
   },
 
   // Audit
@@ -862,6 +917,56 @@ const LEGACY_SLASH_COMMANDS: SlashCommandSeed[] = [
     level: 3,
     action: "menu",
     target: "rename-thread",
+  },
+  {
+    name: "action-log",
+    aliases: ["alog", "events"],
+    description: "Inspect typed action log entries for the current thread or daemon",
+    usage: "/action-log [type|group|bookmarked|daemon|threadId] [limit]",
+    category: "system",
+    level: 3,
+    action: "menu",
+    target: "action-log",
+  },
+  {
+    name: "bookmark",
+    aliases: ["bm", "pin"],
+    description: "Bookmark an action-log entry by ID or bookmark the latest entry",
+    usage: "/bookmark [entryId|last] [label]",
+    category: "system",
+    level: 3,
+    action: "menu",
+    target: "bookmark-entry",
+  },
+  {
+    name: "bookmarks",
+    aliases: ["pins", "saved"],
+    description: "List bookmarked action-log entries",
+    usage: "/bookmarks [threadId|daemon] [limit]",
+    category: "system",
+    level: 3,
+    action: "menu",
+    target: "list-bookmarks",
+  },
+  {
+    name: "thread-summary",
+    aliases: ["tsummary", "branch-summary"],
+    description: "Summarize a thread using the typed action log",
+    usage: "/thread-summary [threadId]",
+    category: "system",
+    level: 3,
+    action: "menu",
+    target: "thread-summary",
+  },
+  {
+    name: "compact-thread",
+    aliases: ["compact", "summarize-thread"],
+    description: "Persist a compact thread summary from recent typed action-log entries",
+    usage: "/compact-thread [threadId] [note]",
+    category: "system",
+    level: 3,
+    action: "menu",
+    target: "compact-thread",
   },
   {
     name: "cache",
@@ -1459,17 +1564,17 @@ export function commandToPrompt(command: SlashCommand, args: string): string {
       switch (exSubcmd) {
         case "list":
         case "ls":
-          return "List all my configured trading exchanges";
+          return "List all my configured crypto execution venues";
         case "add":
         case "new":
           return exArgs
-            ? `Add a new ${exArgs} exchange configuration`
-            : "What type of exchange would you like to add? (binance, coinbase, kraken, bitfinex, hyperliquid, uniswap, robinhood)";
+            ? `Add a new ${exArgs} crypto venue configuration`
+            : "Which crypto execution venue would you like to add? (binance, coinbase, kraken, bitfinex, hyperliquid, uniswap, robinhood)";
         case "switch":
         case "use":
           return exArgs
-            ? `Switch to using the "${exArgs}" exchange`
-            : "Which exchange should I switch to?";
+            ? `Switch to using the "${exArgs}" crypto venue`
+            : "Which crypto execution venue should I switch to?";
         case "remove":
         case "delete":
           return exArgs
@@ -1974,6 +2079,92 @@ export function commandToPrompt(command: SlashCommand, args: string): string {
             : "Suggest mutations for the most recent playbook based on backtest performance.";
         default:
           return "Show the status of all active A/B experiments.";
+      }
+    }
+    case "systematic": {
+      if (!args) {
+        return "Show the overall systematic research state. Include validation health, portfolio diversification, recent experiments, and current promotion posture.";
+      }
+      const systematicParts = args.split(/\s+/);
+      const systematicSubcmd = systematicParts[0]?.toLowerCase();
+      const systematicArg = systematicParts.slice(1).join(" ");
+      switch (systematicSubcmd) {
+        case "status":
+          return systematicArg
+            ? `Show the full systematic status for ${systematicArg}. Include profile, latest validation, experiments, lifecycle events, and promotion eligibility.`
+            : "Which strategy should I inspect? Show the systematic status for a specific strategy.";
+        case "portfolio":
+          return "Analyze the systematic portfolio across stocks and crypto. Show diversification, correlation heuristics, allocation concentration, and operator recommendations.";
+        case "datasets":
+          return systematicArg
+            ? `List systematic datasets for ${systematicArg}. Include quality score, provenance, candle coverage, and recent snapshots.`
+            : "List all available systematic datasets with quality, provenance, and snapshot coverage.";
+        case "experiments":
+          return systematicArg
+            ? `List systematic research experiments for ${systematicArg}. Show hypothesis, status, and latest validation linkage.`
+            : "List recent systematic research experiments and their current status.";
+        case "lifecycle":
+          return systematicArg
+            ? `Show systematic lifecycle events for ${systematicArg}. Include promotions, degradations, overrides, and validation recordings.`
+            : "Which strategy lifecycle should I inspect?";
+        default:
+          return `Run a systematic workflow for: ${args}`;
+      }
+    }
+    case "dataset": {
+      if (!args) {
+        return "Show dataset workflows for systematic research. Support listing datasets, listing snapshots, showing a snapshot, or exporting a notebook-friendly artifact.";
+      }
+      const datasetParts = args.split(/\s+/);
+      const datasetSubcmd = datasetParts[0]?.toLowerCase();
+      const datasetArg = datasetParts.slice(1).join(" ");
+      switch (datasetSubcmd) {
+        case "list":
+          return datasetArg
+            ? `List systematic datasets matching ${datasetArg}. Include market family, timeframe, quality, provenance, and candle coverage.`
+            : "List all systematic datasets and summarize quality and provenance.";
+        case "snapshots":
+          return datasetArg
+            ? `List reproducible dataset snapshots for ${datasetArg}. Include date window, candle count, and creation time.`
+            : "List recent reproducible dataset snapshots across all datasets.";
+        case "show":
+          return datasetArg
+            ? `Show dataset snapshot ${datasetArg}. Include the time window, candle count, metadata, and sample candles.`
+            : "Which dataset snapshot should I show?";
+        case "export":
+          return datasetArg
+            ? `Export a systematic dataset or research artifact with this request: ${datasetArg}. Prefer notebook-friendly JSON, CSV, or Markdown output.`
+            : "What systematic artifact should I export? You can export dataset snapshots, validations, experiments, or backtests.";
+        default:
+          return `Run a dataset workflow for: ${args}`;
+      }
+    }
+    case "decay":
+      return args
+        ? `Show the systematic decay report for ${args}. Include validation drift, lifecycle events, degradation risk, and next actions.`
+        : "Which strategy should I inspect for decay?";
+    case "validate":
+      return args
+        ? `Inspect validation gates and bias diagnostics for ${args}. Show blockers, warnings, promotion eligibility, and required next steps.`
+        : "Which strategy should I validate?";
+    case "runtime": {
+      if (!args || args === "health") {
+        return "Show runtime health for all active strategy slots. Include slot status, allocation, drawdown, warnings, and operator actions.";
+      }
+      const runtimeParts = args.split(/\s+/);
+      const runtimeSubcmd = runtimeParts[0]?.toLowerCase();
+      const runtimeArg = runtimeParts.slice(1).join(" ");
+      switch (runtimeSubcmd) {
+        case "health":
+          return "Show runtime health for all active strategy slots. Include slot status, allocation, drawdown, warnings, and operator actions.";
+        case "slots":
+          return "List running strategy slots with their current allocation, PnL, drawdown, and trade counts.";
+        case "diff":
+          return runtimeArg
+            ? `Compare live runtime performance against the latest systematic backtest for ${runtimeArg}. Include win rate, drawdown, trade count, and decay context.`
+            : "Which strategy should I compare live versus backtest for?";
+        default:
+          return `Run a runtime workflow for: ${args}`;
       }
     }
     // Audit command

@@ -21,7 +21,7 @@ import { getGordonContext, isBinanceFamily, type MastraExecutionContext } from "
 // ============================================================================
 
 const errors = {
-  noExchange: { error: "Exchange client not connected. Please run setup first." },
+  noExchange: { error: "No active trading venue is connected. Please run setup first." },
 };
 
 // Helper
@@ -38,11 +38,24 @@ export const getPortfolioTool = createTool({
     "Use when user asks 'what's my balance?' or 'how much do I have?'",
   inputSchema: z.object({}),
   outputSchema: z.object({
+    marketFamily: z.enum(["crypto", "stocks"]).optional(),
+    venueRoute: z.enum(["exchange", "broker"]).optional(),
+    quoteCurrency: z.string().optional(),
+    capabilities: z.object({
+      supportsQuotes: z.boolean(),
+      supportsBidAsk: z.boolean(),
+      supportsOrderBook: z.boolean(),
+      supportsSessionCalendar: z.boolean(),
+      supportsExtendedHours: z.boolean(),
+      supportsHistoricalBars: z.boolean(),
+    }).optional(),
     totalValue: z.number().optional(),
     holdings: z.array(z.object({
       asset: z.string(),
       free: z.number(),
       locked: z.number(),
+      marketValue: z.number().optional(),
+      quoteCurrency: z.string().optional(),
       usdtValue: z.number(),
       wallet: z.string(),
       note: z.string().optional(),
@@ -52,11 +65,58 @@ export const getPortfolioTool = createTool({
   }),
   execute: async (_input, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
-    if (!ctx?.exchange) {
+    if (!ctx?.exchange && !ctx?.broker) {
       return errors.noExchange;
     }
 
-    const allBalances = await ctx.exchange.getAllBalances();
+    if (ctx.broker && !ctx.exchange) {
+      const [account, positions] = await Promise.all([
+        ctx.broker.getAccount(),
+        ctx.broker.getPositions(),
+      ]);
+
+      const holdings = [
+        {
+          asset: account.currency,
+          free: account.cash,
+          locked: 0,
+          usdtValue: account.cash,
+          wallet: "broker_cash",
+          note: "Broker cash balance",
+        },
+        ...positions.map((position) => ({
+          asset: position.symbol,
+          free: position.qty,
+          locked: 0,
+          usdtValue: position.marketValue,
+          wallet: "broker_position",
+          note: `${position.side} position · avg ${position.avgEntryPrice.toFixed(2)}`,
+        })),
+      ];
+
+      return {
+        marketFamily: "stocks" as const,
+        venueRoute: "broker" as const,
+        quoteCurrency: account.currency,
+        capabilities: {
+          supportsQuotes: true,
+          supportsBidAsk: true,
+          supportsOrderBook: false,
+          supportsSessionCalendar: true,
+          supportsExtendedHours: Boolean(ctx.broker.capabilities?.supportsExtendedHours),
+          supportsHistoricalBars: Boolean(ctx.broker.capabilities?.supportsHistoricalBars),
+        },
+        totalValue: account.portfolioValue,
+        holdings: holdings.slice(0, 15).map((holding) => ({
+          ...holding,
+          marketValue: holding.usdtValue,
+          quoteCurrency: account.currency,
+        })),
+        openTrades: positions.length,
+      };
+    }
+
+    const allBalances = await ctx.exchange!.getAllBalances();
 
     let totalValue = 0;
     const holdings: Array<{ asset: string; free: number; locked: number; usdtValue: number; wallet: string; note?: string }> = [];
@@ -73,7 +133,7 @@ export const getPortfolioTool = createTool({
           usdtValue = total;
         } else {
           try {
-            const price = await ctx.exchange.getPrice(`${balance.asset}USDT`);
+            const price = await ctx.exchange!.getPrice(`${balance.asset}USDT`);
             usdtValue = total * price;
           } catch {
             holdings.push({
@@ -105,7 +165,22 @@ export const getPortfolioTool = createTool({
 
     return {
       totalValue,
-      holdings: holdings.slice(0, 15),
+      marketFamily: "crypto" as const,
+      venueRoute: "exchange" as const,
+      quoteCurrency: "USD",
+      capabilities: {
+        supportsQuotes: true,
+        supportsBidAsk: true,
+        supportsOrderBook: true,
+        supportsSessionCalendar: false,
+        supportsExtendedHours: false,
+        supportsHistoricalBars: true,
+      },
+      holdings: holdings.slice(0, 15).map((holding) => ({
+        ...holding,
+        marketValue: holding.usdtValue,
+        quoteCurrency: "USD",
+      })),
       openTrades: getActiveTrades().length,
     };
   },

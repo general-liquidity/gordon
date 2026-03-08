@@ -32,6 +32,7 @@ describe("setup runtime helpers", () => {
       healthy: false,
       summary: {
         onboardingComplete: true,
+        startupBannerMode: "full",
         llmReady: false,
         activeExchange: null,
         activeBroker: "alpaca",

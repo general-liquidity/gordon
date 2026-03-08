@@ -22,7 +22,7 @@ const asciichart = require("asciichart") as {
   yellow: string;
 };
 
-import { getGordonContext, type MastraExecutionContext } from "./types.ts";
+import { getGordonContext, normalizeSymbol, type MastraExecutionContext } from "./types.ts";
 
 // ============================================================================
 // Error Messages
@@ -235,9 +235,7 @@ export const displayPriceChartTool = createTool({
     }
 
     // Normalize symbol
-    const normalizedSymbol = symbol.toUpperCase().endsWith("USDT")
-      ? symbol.toUpperCase()
-      : `${symbol.toUpperCase()}USDT`;
+    const normalizedSymbol = normalizeSymbol(symbol);
 
     try {
       const candles = await ctx.exchange.getCandles(normalizedSymbol, interval, periods);
@@ -332,9 +330,7 @@ export const displayCandlestickChartTool = createTool({
     }
 
     // Normalize symbol
-    const normalizedSymbol = symbol.toUpperCase().endsWith("USDT")
-      ? symbol.toUpperCase()
-      : `${symbol.toUpperCase()}USDT`;
+    const normalizedSymbol = normalizeSymbol(symbol);
 
     try {
       const candles = await ctx.exchange.getCandles(normalizedSymbol, interval, periods);
@@ -428,9 +424,7 @@ export const displayComparisonChartTool = createTool({
       // Fetch data for all symbols
       const symbolData = await Promise.all(
         symbols.map(async (sym) => {
-          const normalizedSymbol = sym.toUpperCase().endsWith("USDT")
-            ? sym.toUpperCase()
-            : `${sym.toUpperCase()}USDT`;
+          const normalizedSymbol = normalizeSymbol(sym);
 
           try {
             const candles = await exchange.getCandles(normalizedSymbol, interval, periods);
@@ -520,9 +514,7 @@ export const displayVolumeChartTool = createTool({
       return errors.noExchange;
     }
 
-    const normalizedSymbol = symbol.toUpperCase().endsWith("USDT")
-      ? symbol.toUpperCase()
-      : `${symbol.toUpperCase()}USDT`;
+    const normalizedSymbol = normalizeSymbol(symbol);
 
     try {
       const candles = await ctx.exchange.getCandles(normalizedSymbol, interval, periods);

@@ -136,7 +136,7 @@ export class Logger {
 
   constructor(config: Partial<LoggerConfig> = {}) {
     this.config = {
-      level: config.level || "info",
+      level: config.level || (process.env.LOG_LEVEL as LogLevel) || "error",
       transports: config.transports || [new ConsoleTransport()],
       context: config.context,
     };
@@ -276,7 +276,7 @@ let defaultLogger: Logger | null = null;
 export function getLogger(): Logger {
   if (!defaultLogger) {
     defaultLogger = new Logger({
-      level: process.env.LOG_LEVEL as LogLevel || "info",
+      level: process.env.LOG_LEVEL as LogLevel || "error",
     });
   }
   return defaultLogger;

@@ -1,9 +1,11 @@
+import type { Candle } from "../../../types/index.ts";
 import type {
   BrokerAdapter,
   BrokerAccount,
   BrokerCapabilities,
   BrokerClock,
   BrokerCredentials,
+  BrokerHistoricalBarsParams,
   BrokerId,
   BrokerOrder,
   BrokerOrderListParams,
@@ -38,6 +40,7 @@ const TASTYTRADE_CAPABILITIES: BrokerCapabilities = {
   supportsOptions: true,
   supportsStreaming: true,
   supportsPaperTrading: true,
+  supportsHistoricalBars: false,
 };
 
 function mapTastytradeOrderType(value: BrokerOrderRequest["type"]): string {
@@ -402,5 +405,9 @@ export class TastytradeAdapter implements BrokerAdapter {
       askSize: parseNumber(quoteRecord["ask-size"] ?? quoteRecord.askSize),
       timestamp: String(quoteRecord["quote-time"] ?? quoteRecord.timestamp ?? new Date().toISOString()),
     };
+  }
+
+  async getHistoricalBars(_params: BrokerHistoricalBarsParams): Promise<Candle[]> {
+    throw new Error("tastytrade historical bars are not wired through Gordon yet.");
   }
 }

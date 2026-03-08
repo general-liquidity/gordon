@@ -20,10 +20,10 @@ export function Onboarding({ onComplete }: OnboardingProps): React.ReactElement 
 
       <Box flexDirection="column" marginBottom={1}>
         <Text color={COLORS.WHITE}>
-          Gordon should get you to first trading value quickly, then let you expand safely.
+          Gordon should get you to first trading value quickly, then widen the surface safely.
         </Text>
         <Text color={COLORS.DIM}>
-          Choose the setup path that matches what you need right now.
+          Pick the setup path that fits what you need right now.
         </Text>
       </Box>
 
@@ -33,20 +33,20 @@ export function Onboarding({ onComplete }: OnboardingProps): React.ReactElement 
         </Text>
         <Box flexDirection="column" marginLeft={2}>
           <Text color={COLORS.WHITE}>
-            QuickStart: one LLM, one primary venue, one risk profile, then straight to scan and analysis.
+            QuickStart: one model, one venue, then straight to scan and analysis.
           </Text>
           <Text color={COLORS.WHITE}>
-            Advanced: brokers, chains, agent rails, MCP, and the full multi-provider surface.
+            Advanced: brokers, chains, rails, MCP, and the full provider surface.
           </Text>
           <Text color={COLORS.WHITE}>
-            Demo: no credentials, SAFE mode only, useful for exploring commands and agent behavior.
+            Demo: no credentials, read-only mode, useful for exploring the interface.
           </Text>
         </Box>
       </Box>
 
       <Box marginBottom={1}>
         <Text color={COLORS.DIM}>
-          You can re-run setup later with `gordon configure`, and inspect the machine with `gordon doctor`.
+          Re-run setup later with `gordon configure`. Inspect the machine with `gordon doctor`.
         </Text>
       </Box>
 

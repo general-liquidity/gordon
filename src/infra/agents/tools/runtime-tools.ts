@@ -12,9 +12,21 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
+import { loadBacktestResult } from "../../../backtest/storage.ts";
 import { StrategyRuntime } from "../../../core/runtime/engine.ts";
 import { AllocationStrategySchema } from "../../../core/runtime/types.ts";
+import { getAuditLogger } from "../../audit/index.ts";
 import { createModuleLogger } from "../../logger/index.ts";
+import {
+  buildLiveBacktestDiffReport,
+  buildRuntimeHealthOperatorReport,
+  formatOperatorReport,
+  getSystematicStrategyStatus,
+  operatorReportSchema,
+  promoteStrategyProfile,
+  recordSystematicOverride,
+} from "../../systematic/index.ts";
+import { getGordonContext, type MastraExecutionContext } from "./types.ts";
 
 const logger = createModuleLogger("runtime-tools");
 
@@ -64,6 +76,10 @@ export const deployStrategyTool = createTool({
       .max(100)
       .optional()
       .describe("Maximum loss percentage before auto-pause (default: 10%)"),
+    override_reason: z
+      .string()
+      .optional()
+      .describe("Reason for overriding systematic deployment gates in semi-systematic mode"),
   }),
   outputSchema: z.object({
     success: z.boolean(),
@@ -80,14 +96,68 @@ export const deployStrategyTool = createTool({
     max_positions,
     max_daily_trades,
     max_loss_percent,
-  }) => {
+    override_reason,
+  }, execContext?: MastraExecutionContext) => {
     try {
+      const ctx = getGordonContext(execContext);
+      const actor = ctx?.userId || "system";
+      const config = ctx?.config;
+      const executionMode = config?.systematic?.executionMode ?? "assisted";
+      const targetStatus = config?.mode === "ARMED" ? "live" : "paper";
+      const systematicStatus = getSystematicStrategyStatus(playbook_name);
+      const profile = systematicStatus.profile;
+
+      if (executionMode === "strict_systematic") {
+        if (!profile?.liveEligible) {
+          const reason = profile
+            ? `Strategy ${playbook_name} is not live-eligible under strict systematic mode.`
+            : `Strategy ${playbook_name} has no systematic validation profile yet.`;
+          getAuditLogger(actor).blocked("SYSTEMATIC_PROMOTION", { strategyId: playbook_name, targetStatus }, reason);
+          return { success: false, error: reason };
+        }
+      }
+
+      if (executionMode === "semi_systematic" && !profile?.liveEligible) {
+        if (!override_reason?.trim()) {
+          return {
+            success: false,
+            error: `Strategy ${playbook_name} is not validated for ${targetStatus}. Provide override_reason to proceed in semi-systematic mode.`,
+          };
+        }
+
+        recordSystematicOverride(playbook_name, {
+          targetStatus,
+          overrideReason: override_reason,
+          validationScore: profile?.validationScore ?? null,
+        });
+        getAuditLogger(actor).record(
+          "SYSTEMATIC_OVERRIDE",
+          { strategyId: playbook_name, targetStatus, overrideReason: override_reason },
+          "SUCCESS",
+        );
+      }
+
       const runtime = getRuntime();
       const slot = runtime.deployStrategy(playbook_name, {
         allocated_percent,
         max_positions,
         max_daily_trades,
         max_loss_percent,
+      });
+
+      const promoted = promoteStrategyProfile(playbook_name, targetStatus, {
+        reason: override_reason,
+        override: Boolean(override_reason),
+      });
+      getAuditLogger(actor).success("SYSTEMATIC_PROMOTION", {
+        strategyId: playbook_name,
+        targetStatus,
+        allocated_percent: allocated_percent ?? 20,
+      }, {
+        metadata: {
+          validationScore: promoted?.validationScore ?? profile?.validationScore ?? null,
+          liveEligible: promoted?.liveEligible ?? profile?.liveEligible ?? false,
+        },
       });
 
       return {
@@ -101,6 +171,12 @@ export const deployStrategyTool = createTool({
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       logger.error("deploy_strategy failed", { error: message });
+      const ctx = getGordonContext(execContext);
+      getAuditLogger(ctx?.userId || "system").failure(
+        "SYSTEMATIC_PROMOTION",
+        { strategyId: playbook_name },
+        message,
+      );
       return { success: false, error: message };
     }
   },
@@ -266,6 +342,8 @@ export const getPortfolioStateTool = createTool({
   inputSchema: z.object({}),
   outputSchema: z.object({
     summary: z.string(),
+    formattedSummary: z.string().optional(),
+    operatorReport: operatorReportSchema.optional(),
     total_capital: z.number(),
     allocated_capital: z.number(),
     unallocated_capital: z.number(),
@@ -280,9 +358,12 @@ export const getPortfolioStateTool = createTool({
       const runtime = getRuntime();
       const state = runtime.getPortfolioState();
       const summary = runtime.formatPortfolioSummary();
+      const operatorReport = buildRuntimeHealthOperatorReport({ portfolio: state, actions: [] });
 
       return {
         summary,
+        formattedSummary: formatOperatorReport(operatorReport),
+        operatorReport,
         total_capital: state.total_capital,
         allocated_capital: state.allocated_capital,
         unallocated_capital: state.unallocated_capital,
@@ -296,6 +377,8 @@ export const getPortfolioStateTool = createTool({
       logger.error("get_portfolio_state failed", { error: message });
       return {
         summary: "",
+        formattedSummary: undefined,
+        operatorReport: undefined,
         total_capital: 0,
         allocated_capital: 0,
         unallocated_capital: 0,
@@ -373,6 +456,8 @@ export const checkPortfolioHealthTool = createTool({
   inputSchema: z.object({}),
   outputSchema: z.object({
     healthy: z.boolean(),
+    formattedSummary: z.string().optional(),
+    operatorReport: operatorReportSchema.optional(),
     actions: z.array(
       z.object({
         type: z.string(),
@@ -388,13 +473,17 @@ export const checkPortfolioHealthTool = createTool({
   execute: async () => {
     try {
       const runtime = getRuntime();
+      const portfolio = runtime.getPortfolioState();
       const actions = runtime.runHealthCheck();
+      const operatorReport = buildRuntimeHealthOperatorReport({ portfolio, actions });
 
       const warnings = actions.filter((a) => a.severity === "warning").length;
       const critical = actions.filter((a) => a.severity === "critical").length;
 
       return {
         healthy: actions.length === 0,
+        formattedSummary: formatOperatorReport(operatorReport),
+        operatorReport,
         actions: actions.map((a) => ({
           type: a.type,
           slot_id: a.slot_id,
@@ -409,11 +498,84 @@ export const checkPortfolioHealthTool = createTool({
       logger.error("check_portfolio_health failed", { error: message });
       return {
         healthy: false,
+        formattedSummary: undefined,
+        operatorReport: undefined,
         actions: [],
         warnings: 0,
         critical: 0,
         error: message,
       };
+    }
+  },
+});
+
+export const getRuntimeHealthReportTool = createTool({
+  id: "get_runtime_health_report",
+  description:
+    "Return a CLI-native runtime health report with slot table, portfolio metrics, and auto-action warnings.",
+  inputSchema: z.object({}),
+  outputSchema: z.object({
+    operatorReport: operatorReportSchema.optional(),
+    formattedSummary: z.string().optional(),
+    error: z.string().optional(),
+  }),
+  execute: async () => {
+    try {
+      const runtime = getRuntime();
+      const portfolio = runtime.getPortfolioState();
+      const actions = runtime.runHealthCheck();
+      const operatorReport = buildRuntimeHealthOperatorReport({ portfolio, actions });
+      return {
+        operatorReport,
+        formattedSummary: formatOperatorReport(operatorReport),
+      };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      logger.error("get_runtime_health_report failed", { error: message });
+      return { error: message };
+    }
+  },
+});
+
+export const compareLiveVsBacktestTool = createTool({
+  id: "compare_live_vs_backtest",
+  description:
+    "Compare live runtime performance against the latest stored systematic backtest for a strategy or playbook.",
+  inputSchema: z.object({
+    strategyId: z.string().describe("Strategy or playbook identifier"),
+  }),
+  outputSchema: z.object({
+    slotId: z.string().optional(),
+    operatorReport: operatorReportSchema.optional(),
+    formattedSummary: z.string().optional(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ strategyId }) => {
+    try {
+      const runtime = getRuntime();
+      const status = getSystematicStrategyStatus(strategyId);
+      const slot = runtime.getActiveSlots().find((candidate) => candidate.playbook_name === strategyId) ?? null;
+      const backtest = status.profile?.latestBacktestResultId
+        ? loadBacktestResult(status.profile.latestBacktestResultId)
+        : null;
+
+      const operatorReport = buildLiveBacktestDiffReport({
+        strategyId,
+        strategyName: status.profile?.strategyName ?? strategyId,
+        slot,
+        backtest,
+        profile: status.profile,
+      });
+
+      return {
+        slotId: slot?.slot_id,
+        operatorReport,
+        formattedSummary: formatOperatorReport(operatorReport),
+      };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      logger.error("compare_live_vs_backtest failed", { error: message });
+      return { error: message };
     }
   },
 });
@@ -482,5 +644,7 @@ export const runtimeTools = {
   get_portfolio_state: getPortfolioStateTool,
   rebalance_portfolio: rebalancePortfolioTool,
   check_portfolio_health: checkPortfolioHealthTool,
+  get_runtime_health_report: getRuntimeHealthReportTool,
+  compare_live_vs_backtest: compareLiveVsBacktestTool,
   approve_strategy_trade: approveStrategyTradeTool,
 };

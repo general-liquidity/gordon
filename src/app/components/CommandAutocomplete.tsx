@@ -7,7 +7,7 @@ import React from "react";
 import { Box, Text, useStdout } from "ink";
 import { COLORS } from "../theme.ts";
 import type { SlashCommand } from "../slashCommands.ts";
-import { WORKFLOW_CONFIG } from "../commandUx.ts";
+import { WORKFLOW_CONFIG, type WorkflowGroup } from "../commandUx.ts";
 
 interface CommandAutocompleteProps {
   suggestions: SlashCommand[];
@@ -28,6 +28,14 @@ export const CommandAutocomplete: React.FC<CommandAutocompleteProps> = ({
   showCategories = true,
   showUsage = false,
 }) => {
+  const getWorkflowColor = (workflow: WorkflowGroup): string =>
+    workflow === "discover" ? COLORS.DISCOVER :
+      workflow === "analyze" ? COLORS.ANALYZE :
+        workflow === "trade" ? COLORS.TRADE :
+          workflow === "run" ? COLORS.RUN :
+            workflow === "accounts" ? COLORS.RAILS :
+              COLORS.OPERATE;
+
   const { stdout } = useStdout();
   const terminalWidth = stdout?.columns ?? 100;
   const COMMAND_COL_WIDTH = 20;
@@ -141,13 +149,7 @@ export const CommandAutocomplete: React.FC<CommandAutocompleteProps> = ({
         const commandPadding = padSpaces(displayName, COMMAND_COL_WIDTH);
         const descriptionDisplay = truncateText(cmd.description, DESCRIPTION_COL_WIDTH);
         const workflowConfig = WORKFLOW_CONFIG[cmd.workflow];
-        const workflowColor =
-          cmd.workflow === "discover" ? COLORS.BLUE :
-          cmd.workflow === "analyze" ? COLORS.ACCENT :
-          cmd.workflow === "trade" ? COLORS.GREEN :
-          cmd.workflow === "run" ? COLORS.ORANGE :
-          cmd.workflow === "accounts" ? COLORS.YELLOW :
-          COLORS.DIM;
+        const workflowColor = getWorkflowColor(cmd.workflow);
 
         return (
           <Box key={cmd.name} flexDirection="column" paddingY={0}>
@@ -166,10 +168,10 @@ export const CommandAutocomplete: React.FC<CommandAutocompleteProps> = ({
                 {isSelected ? ">" : " "}
               </Text>
 
-              <Text color={isSelected ? COLORS.HIGHLIGHT : COLORS.ACCENT} bold={isSelected}>
+              <Text color={isSelected ? workflowColor : COLORS.ACCENT_DIM} bold={isSelected}>
                 {matchedPart}
               </Text>
-              <Text color={isSelected ? COLORS.HIGHLIGHT : COLORS.WHITE} bold={isSelected}>
+              <Text color={COLORS.WHITE} bold={isSelected}>
                 {restPart}
               </Text>
               <Text color={COLORS.DIM}>{commandPadding}</Text>
@@ -233,12 +235,12 @@ export const CommandHint: React.FC<CommandHintProps> = ({ command, showUsage = f
 
   const workflowConfig = WORKFLOW_CONFIG[command.workflow];
   const workflowColor =
-    command.workflow === "discover" ? COLORS.BLUE :
-    command.workflow === "analyze" ? COLORS.ACCENT :
-    command.workflow === "trade" ? COLORS.GREEN :
-    command.workflow === "run" ? COLORS.ORANGE :
-    command.workflow === "accounts" ? COLORS.YELLOW :
-    COLORS.DIM;
+    command.workflow === "discover" ? COLORS.DISCOVER :
+      command.workflow === "analyze" ? COLORS.ANALYZE :
+        command.workflow === "trade" ? COLORS.TRADE :
+          command.workflow === "run" ? COLORS.RUN :
+            command.workflow === "accounts" ? COLORS.RAILS :
+              COLORS.OPERATE;
 
   return (
     <Box marginLeft={1} flexDirection="column">

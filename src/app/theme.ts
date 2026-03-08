@@ -1,6 +1,7 @@
 /**
  * Gordon CLI color theme system
- * Supports dark and light themes with monochromatic palettes
+ * Supports dark and light themes with terminal-safe palettes.
+ * Gordon is neutral-first with a green-led brand accent and semantic task colors.
  */
 
 export interface Theme {
@@ -34,14 +35,14 @@ export const darkTheme: Theme = {
     background: "#09090b",
     success: "#22c55e",
     error: "#ef4444",
-    warning: "#ca8a04",
-    info: "#60a5fa",
+    warning: "#d97706",
+    info: "#22d3ee",
     border: "#52525b",
     userMessage: "#27272a",
     assistantMessage: "#e5e5e5",
-    highlight: "#fbbf24",
-    accent: "#e5e5e5",
-    accentDim: "#a3a3a3",
+    highlight: "#22c55e",
+    accent: "#bbf7d0",
+    accentDim: "#6b8f71",
   },
 };
 
@@ -55,14 +56,14 @@ export const lightTheme: Theme = {
     background: "#fafafa",
     success: "#16a34a",
     error: "#dc2626",
-    warning: "#ca8a04",
-    info: "#2563eb",
+    warning: "#d97706",
+    info: "#0891b2",
     border: "#a1a1aa",
-    userMessage: "#2563eb",
+    userMessage: "#166534",
     assistantMessage: "#7c3aed",
-    highlight: "#d97706",
-    accent: "#27272a",
-    accentDim: "#52525b",
+    highlight: "#16a34a",
+    accent: "#166534",
+    accentDim: "#4d7c57",
   },
 };
 
@@ -77,26 +78,34 @@ export const COLORS = {
   MUTED: "#52525b",
 
   // Accent (replacing old TAN)
-  ACCENT: "#e5e5e5",
-  ACCENT_DIM: "#a3a3a3",
+  ACCENT: "#bbf7d0",
+  ACCENT_DIM: "#6b8f71",
 
   // Legacy aliases for backward compatibility
-  TAN: "#e5e5e5",
-  TAN_DIM: "#a3a3a3",
+  TAN: "#bbf7d0",
+  TAN_DIM: "#6b8f71",
   DIM: "#52525b",
 
   // Semantic colors
   ERROR: "#ef4444",
-  WARNING: "#ca8a04",
+  WARNING: "#d97706",
   SUCCESS: "#22c55e",
 
   // Status colors (legacy aliases)
   RED: "#ef4444",
-  YELLOW: "#facc15",
+  YELLOW: "#f59e0b",
   GREEN: "#22c55e",
-  BLUE: "#60a5fa",
+  BLUE: "#22d3ee",
+  CYAN: "#22d3ee",
+  PURPLE: "#c084fc",
   ORANGE: "#f97316",
-  HIGHLIGHT: "#fbbf24",
+  HIGHLIGHT: "#22c55e",
+  DISCOVER: "#22d3ee",
+  ANALYZE: "#c084fc",
+  TRADE: "#22c55e",
+  RUN: "#f59e0b",
+  RAILS: "#c084fc",
+  OPERATE: "#f97316",
 
   // Background hints (for reference, Ink uses terminal bg)
   BG: "#09090b",

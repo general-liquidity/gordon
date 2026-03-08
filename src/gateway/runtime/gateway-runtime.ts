@@ -46,6 +46,8 @@ import { executeEmergencyLiquidation } from "../../core/safety/emergency-liquida
 import { cleanupStalePositions } from "../../core/positions/cleanup.ts";
 import { getAutonomousLoopStatus, runAutonomousCycleOnce } from "../../core/autonomous-loop.ts";
 import { executeTinyfishMonitorRun } from "../../infra/tinyfish/service.ts";
+import { appendActionLogEntry } from "../../infra/action-log/index.ts";
+import type { ActionLogEntryType } from "../../infra/action-log/index.ts";
 
 const logger = createModuleLogger("gateway-runtime");
 
@@ -79,6 +81,135 @@ export class GatewayRuntime {
       retryBackoffMs: 1_500,
     });
     this.registerDefaultHandlers();
+  }
+
+  private appendRuntimeLog(
+    envelope: GatewayCommandEnvelope,
+    entryType: ActionLogEntryType,
+    title: string,
+    content: string = "",
+    payload: Record<string, unknown> = {},
+  ): void {
+    appendActionLogEntry({
+      sessionId: envelope.meta.sessionId,
+      correlationId: envelope.meta.correlationId,
+      runId: envelope.meta.requestId,
+      resourceId: envelope.meta.sessionId === "daemon" ? "daemon" : undefined,
+      entryType,
+      title,
+      content,
+      payload: {
+        source: envelope.meta.source,
+        commandType: envelope.command.type,
+        ...payload,
+      },
+    });
+  }
+
+  private shouldPersistLifecycle(envelope: GatewayCommandEnvelope): boolean {
+    return envelope.command.type !== "runtime.background_status";
+  }
+
+  private getLifecycleEntryType(envelope: GatewayCommandEnvelope): ActionLogEntryType {
+    if (envelope.meta.source === "scheduler" || envelope.command.type.startsWith("scheduler.")) {
+      return "scheduler_event";
+    }
+    if (envelope.meta.source === "reconciler" || envelope.command.type === "reconcile.run") {
+      return "reconciliation_event";
+    }
+    if (envelope.command.type === "daemon.shutdown") {
+      return "daemon_event";
+    }
+    if (envelope.command.type === "autonomous.run_cycle") {
+      return "autonomous_cycle";
+    }
+    if (envelope.command.type === "runtime.health_check" || envelope.command.type === "runtime.background_status") {
+      return "runtime_health";
+    }
+    if (envelope.command.type === "monitor.run_cycle") {
+      return "monitor_event";
+    }
+    return "run_status";
+  }
+
+  private async executeLoggedHandler(
+    envelope: GatewayCommandEnvelope,
+    handler: (envelope: GatewayCommandEnvelope) => Promise<unknown>,
+  ): Promise<unknown> {
+    const lifecycleType = this.getLifecycleEntryType(envelope);
+
+    if (envelope.command.type === "chat.send_message") {
+      const payload = envelope.command.payload as { text: string; threadId?: string; resourceId?: string };
+      appendActionLogEntry({
+        threadId: payload.threadId,
+        resourceId: payload.resourceId,
+        sessionId: envelope.meta.sessionId,
+        correlationId: envelope.meta.correlationId,
+        runId: envelope.meta.requestId,
+        entryType: "user_message",
+        title: "User message",
+        content: payload.text,
+        payload: {
+          source: envelope.meta.source,
+          commandType: envelope.command.type,
+        },
+      });
+    }
+
+    if (this.shouldPersistLifecycle(envelope)) {
+      this.appendRuntimeLog(
+        envelope,
+        lifecycleType,
+        "Command started",
+        `${envelope.command.type} via ${envelope.meta.source}`,
+      );
+    }
+
+    try {
+      const result = await handler(envelope);
+
+      if (envelope.command.type === "chat.send_message") {
+        const payload = envelope.command.payload as { threadId?: string; resourceId?: string };
+        const response = result as { response?: string; usage?: unknown };
+        appendActionLogEntry({
+          threadId: payload.threadId,
+          resourceId: payload.resourceId,
+          sessionId: envelope.meta.sessionId,
+          correlationId: envelope.meta.correlationId,
+          runId: envelope.meta.requestId,
+          entryType: "assistant_message",
+          title: "Assistant response",
+          content: response.response ?? "",
+          payload: {
+            usage: response.usage ?? null,
+            source: envelope.meta.source,
+            commandType: envelope.command.type,
+          },
+        });
+      }
+
+      if (this.shouldPersistLifecycle(envelope)) {
+        this.appendRuntimeLog(
+          envelope,
+          lifecycleType,
+          "Command completed",
+          `${envelope.command.type} completed`,
+          { result },
+        );
+      }
+      return result;
+    } catch (error) {
+      if (this.shouldPersistLifecycle(envelope)) {
+        this.appendRuntimeLog(
+          envelope,
+          lifecycleType,
+          "Command failed",
+          error instanceof Error ? error.message : String(error),
+          { error: error instanceof Error ? error.message : String(error) },
+        );
+      }
+      throw error;
+    }
   }
 
   private registerDefaultHandlers(): void {
@@ -175,6 +306,18 @@ export class GatewayRuntime {
 
     this.registerHandler("scheduler.list_tasks", async () => {
       return { tasks: listSchedulerTasks() };
+    });
+
+    this.registerHandler("runtime.background_status", async () => {
+      return {
+        daemon: {
+          running: true,
+        },
+        scheduler: {
+          tasks: listSchedulerTasks(),
+        },
+        autonomous: getAutonomousLoopStatus(),
+      };
     });
 
     this.registerHandler("runtime.health_check", async () => {
@@ -437,8 +580,9 @@ export class GatewayRuntime {
   }
 
   registerHandler(type: GatewayCommandType, handler: (envelope: GatewayCommandEnvelope) => Promise<unknown>): void {
-    this.handlers.set(type, handler);
-    this.queue.registerHandler(type, async ({ envelope }) => handler(envelope));
+    const wrapped = (envelope: GatewayCommandEnvelope) => this.executeLoggedHandler(envelope, handler);
+    this.handlers.set(type, wrapped);
+    this.queue.registerHandler(type, async ({ envelope }) => wrapped(envelope));
   }
 
   async submitCommand(
@@ -524,6 +668,15 @@ export class GatewayRuntime {
         sessionId: envelope.meta.sessionId,
       },
     });
+    if (this.shouldPersistLifecycle(envelope)) {
+      this.appendRuntimeLog(
+        envelope,
+        this.getLifecycleEntryType(envelope),
+        options.processImmediately === false ? "Command queued" : "Command accepted",
+        `${envelope.command.type} accepted into the gateway queue`,
+        { queueId: queued.queueId },
+      );
+    }
 
     if (options.processImmediately !== false) {
       await this.queue.drainSession(envelope.meta.sessionId, 32);
@@ -579,5 +732,14 @@ export class GatewayRuntime {
       code,
       message,
     });
+    if (this.shouldPersistLifecycle(envelope)) {
+      this.appendRuntimeLog(
+        envelope,
+        this.getLifecycleEntryType(envelope),
+        "Command rejected",
+        `${code}: ${message}`,
+        { code },
+      );
+    }
   }
 }

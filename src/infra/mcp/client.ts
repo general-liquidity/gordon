@@ -149,7 +149,9 @@ export async function initMCPTools(): Promise<Record<string, Tool>> {
 
       if (installed.length === 0) {
         _mcpTools = {};
-        console.log("[MCP] No enabled plugins found");
+        if (process.env.GORDON_STARTUP_QUIET !== "1") {
+          console.log("[MCP] No enabled plugins found");
+        }
         return _mcpTools;
       }
 
@@ -166,7 +168,9 @@ export async function initMCPTools(): Promise<Record<string, Tool>> {
 
       if (Object.keys(servers).length === 0) {
         _mcpTools = {};
-        console.log("[MCP] No plugins with valid commands found");
+        if (process.env.GORDON_STARTUP_QUIET !== "1") {
+          console.log("[MCP] No plugins with valid commands found");
+        }
         return _mcpTools;
       }
 
@@ -180,7 +184,9 @@ export async function initMCPTools(): Promise<Record<string, Tool>> {
       _mcpTools = await _mcpClient.listTools();
       const toolCount = Object.keys(_mcpTools).length;
       const serverCount = Object.keys(servers).length;
-      console.log(`[MCP] Loaded ${toolCount} tools from ${serverCount} plugin(s)`);
+      if (process.env.GORDON_STARTUP_QUIET !== "1") {
+        console.log(`[MCP] Loaded ${toolCount} tools from ${serverCount} plugin(s)`);
+      }
 
       return _mcpTools;
     } catch (error) {

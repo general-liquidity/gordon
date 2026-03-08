@@ -41,13 +41,14 @@ export interface QuickActionContext {
 export interface QuickActionItem {
   label: string;
   command: string;
+  workflow?: WorkflowGroup;
 }
 
 export const WORKFLOW_CONFIG: Record<WorkflowGroup, WorkflowConfigEntry> = {
   discover: {
     label: "Discover",
     shortLabel: "Discover",
-    description: "Find markets, movers, regimes, and setup candidates.",
+    description: "Scan, movers, regime.",
     icon: "◆",
     order: 0,
     helpAliases: ["discover", "market", "markets", "scan"],
@@ -55,7 +56,7 @@ export const WORKFLOW_CONFIG: Record<WorkflowGroup, WorkflowConfigEntry> = {
   analyze: {
     label: "Analyze",
     shortLabel: "Analyze",
-    description: "Inspect a symbol, compare setups, and dig into signals.",
+    description: "Inspect symbols and signals.",
     icon: "◈",
     order: 1,
     helpAliases: ["analyze", "analysis"],
@@ -63,7 +64,7 @@ export const WORKFLOW_CONFIG: Record<WorkflowGroup, WorkflowConfigEntry> = {
   trade: {
     label: "Trade",
     shortLabel: "Trade",
-    description: "Plan, preview, fund, bridge, and execute trading actions.",
+    description: "Plan, preview, fund, execute.",
     icon: "▲",
     order: 2,
     helpAliases: ["trade", "trading", "execution"],
@@ -71,7 +72,7 @@ export const WORKFLOW_CONFIG: Record<WorkflowGroup, WorkflowConfigEntry> = {
   run: {
     label: "Run",
     shortLabel: "Run",
-    description: "Backtests, strategies, and live runtime workflows.",
+    description: "Backtests, strategies, runtime.",
     icon: "◇",
     order: 3,
     helpAliases: ["run", "strategy", "strategies"],
@@ -79,7 +80,7 @@ export const WORKFLOW_CONFIG: Record<WorkflowGroup, WorkflowConfigEntry> = {
   accounts: {
     label: "Accounts",
     shortLabel: "Accounts",
-    description: "Portfolio, brokers, wallets, balances, and connected rails.",
+    description: "Portfolio, venues, rails.",
     icon: "■",
     order: 4,
     helpAliases: ["accounts", "account", "portfolio", "wallet"],
@@ -87,7 +88,7 @@ export const WORKFLOW_CONFIG: Record<WorkflowGroup, WorkflowConfigEntry> = {
   operate: {
     label: "Operate",
     shortLabel: "Operate",
-    description: "Configuration, diagnostics, model control, and system operations.",
+    description: "Setup, diagnostics, system control.",
     icon: "●",
     order: 5,
     helpAliases: ["operate", "ops", "system", "config", "configure"],
@@ -263,28 +264,28 @@ export function getQuickActionItems(context: QuickActionContext): QuickActionIte
 
   if (!context.setupComplete || !hasVenue) {
     return [
-      { label: "Setup", command: "/setup" },
-      { label: "Doctor", command: "/doctor" },
-      { label: "Model", command: "/model" },
-      { label: "Help", command: "/help" },
-      { label: "Configure", command: "/configure advanced" },
-    ];
+      { label: "Setup", command: "/setup", workflow: "operate" },
+      { label: "Doctor", command: "/doctor", workflow: "operate" },
+      { label: "Model", command: "/model", workflow: "operate" },
+      { label: "Help", command: "/help", workflow: "operate" },
+      { label: "Configure", command: "/configure advanced", workflow: "operate" },
+    ].slice(0, 5);
   }
 
   const actions: QuickActionItem[] = [
-    { label: "Scan", command: "/scan" },
-    { label: "Trending", command: "/trending" },
-    { label: "Portfolio", command: "/portfolio" },
-    { label: "Preview", command: "/preview-order" },
+    { label: "Scan", command: "/scan", workflow: "discover" },
+    { label: "Trending", command: "/trending", workflow: "discover" },
+    { label: "Portfolio", command: "/portfolio", workflow: "accounts" },
+    { label: "Preview", command: "/preview-order", workflow: "trade" },
   ];
 
   if (context.hasWalletRails) {
-    actions.push({ label: "Fund", command: "/fund quote" });
+    actions.push({ label: "Fund", command: "/fund quote", workflow: "trade" });
   } else if (context.mode === "ARMED") {
-    actions.push({ label: "Orders", command: "/orders" });
+    actions.push({ label: "Orders", command: "/orders", workflow: "accounts" });
   } else {
-    actions.push({ label: "Doctor", command: "/doctor" });
+    actions.push({ label: "Doctor", command: "/doctor", workflow: "operate" });
   }
 
-  return actions;
+  return actions.slice(0, 5);
 }

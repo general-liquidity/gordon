@@ -14,7 +14,7 @@ const StatusBadge: React.FC<{ status: PlanStatus }> = ({ status }) => {
       case "DRAFT":
         return COLORS.YELLOW;
       case "APPROVED":
-        return COLORS.BLUE;
+        return COLORS.ACCENT;
       case "EXECUTING":
         return COLORS.GREEN;
       case "CLOSED":

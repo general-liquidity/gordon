@@ -14,7 +14,7 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
-import { getGordonContext, isBinanceFamily, type MastraExecutionContext } from "./types.ts";
+import { getGordonContext, isBinanceFamily, normalizeSymbol, type MastraExecutionContext } from "./types.ts";
 
 // ============================================================================
 // Error Messages
@@ -81,9 +81,7 @@ export const getTradeHistoryTool = createTool({
       }> = [];
 
       if (symbol && symbol.trim() !== "") {
-        const normalizedSymbol = symbol.toUpperCase().endsWith("USDT")
-          ? symbol.toUpperCase()
-          : `${symbol.toUpperCase()}USDT`;
+        const normalizedSymbol = normalizeSymbol(symbol);
         const exchangeTrades = await ctx.exchange.getTradeHistory(normalizedSymbol, limit);
         trades = exchangeTrades.map((t) => ({
           symbol: t.symbol,

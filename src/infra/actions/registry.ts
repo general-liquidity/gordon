@@ -71,7 +71,7 @@ const marketOrderOutputSchema = z.object({
 });
 
 const portfolioInputSchema = z.object({
-  market: z.enum(["crypto", "stocks"]).default("crypto"),
+  market: z.enum(["crypto", "stocks"]).default("stocks"),
 });
 
 const portfolioOutputSchema = z.object({
@@ -118,7 +118,7 @@ export const CANONICAL_ACTIONS: ActionDefinition[] = [
   {
     id: "market.scan",
     title: "Scan Market",
-    description: "Scan the active exchange universe for trading opportunities.",
+    description: "Scan the active crypto venue universe for trading opportunities.",
     domain: "market",
     capability: "read",
     taskScope: "scan",
@@ -134,7 +134,7 @@ export const CANONICAL_ACTIONS: ActionDefinition[] = [
       {
         name: "scan",
         aliases: ["s"],
-        description: "Scan market for trading opportunities (~10-30s depending on coins)",
+        description: "Scan crypto markets for trading setups (~10-30s)",
         usage: "/scan",
         category: "market",
         level: 1,
@@ -143,7 +143,7 @@ export const CANONICAL_ACTIONS: ActionDefinition[] = [
         action: "agent",
         target: "scanner",
         executionTime: "~10-30s",
-        whenToUse: "Discover opportunities across multiple coins",
+        whenToUse: "Discover crypto setups across multiple symbols",
       },
       {
         toolName: "scan_market",
@@ -151,20 +151,20 @@ export const CANONICAL_ACTIONS: ActionDefinition[] = [
         description: "Canonical market scan tool",
       },
     ),
-    prompt: () => "Scan the market for trading opportunities across multiple coins (~10-30s depending on market size)",
+    prompt: () => "Scan crypto markets for trading opportunities across multiple symbols (~10-30s depending on market size)",
     tags: ["market", "scan", "discovery"],
   },
   {
     id: "market.analyze",
     title: "Analyze Market",
-    description: "Run a single-symbol analysis on the active exchange.",
+    description: "Run a single-symbol analysis on the active crypto venue or stock broker.",
     domain: "market",
     capability: "read",
     taskScope: "analysis",
     sideEffectLevel: "none",
     approvalPolicy: "none",
     dryRunSupported: false,
-    providerRequirements: [{ kind: "exchange" }],
+    providerRequirements: [{ kind: "exchange", optional: true }, { kind: "broker", optional: true }],
     rateLimitBudget: "analysis",
     visibility: ["interactive", "json", "agent"],
     inputSchema: analyzeInputSchema,
@@ -173,7 +173,7 @@ export const CANONICAL_ACTIONS: ActionDefinition[] = [
       {
         name: "analyze",
         aliases: ["a", "quick"],
-        description: "Single comprehensive analysis (~3-5s)",
+        description: "Single-symbol analysis (~3-5s) for crypto or stocks",
         usage: "/analyze <symbol>",
         category: "market",
         level: 1,
@@ -182,7 +182,7 @@ export const CANONICAL_ACTIONS: ActionDefinition[] = [
         action: "agent",
         target: "analyst",
         executionTime: "~3-5s",
-        whenToUse: "Quick check on a single coin",
+        whenToUse: "Quick check on a single crypto pair or stock ticker",
       },
       {
         toolName: "analyze_coin",
@@ -192,7 +192,7 @@ export const CANONICAL_ACTIONS: ActionDefinition[] = [
     ),
     prompt: ({ args }) => args
       ? `Run a quick single analysis on ${args} - get price action, key levels, and trading signal`
-      : "What coin should I analyze? (This is a quick ~3-5s analysis)",
+      : "What symbol should I analyze? (Crypto pair or stock ticker)",
     tags: ["market", "analysis"],
   },
   {
@@ -236,14 +236,14 @@ export const CANONICAL_ACTIONS: ActionDefinition[] = [
   {
     id: "trading.preview_market_order",
     title: "Preview Market Order",
-    description: "Preview a spot market order without placing it.",
+    description: "Preview a crypto or stock market order without placing it.",
     domain: "trading",
     capability: "plan",
     taskScope: "execution",
     sideEffectLevel: "preview",
     approvalPolicy: "confirm",
     dryRunSupported: true,
-    providerRequirements: [{ kind: "exchange" }],
+    providerRequirements: [{ kind: "exchange", optional: true }, { kind: "broker", optional: true }],
     rateLimitBudget: "execution",
     visibility: ["interactive", "json", "agent"],
     inputSchema: previewOrderInputSchema,
@@ -252,7 +252,7 @@ export const CANONICAL_ACTIONS: ActionDefinition[] = [
       {
         name: "preview-order",
         aliases: ["order-preview"],
-        description: "Preview a market order before execution",
+        description: "Preview a market order before execution across crypto or stocks",
         usage: "/preview-order <symbol> <buy|sell> <amount> [quote]",
         category: "trading",
         level: 2,
@@ -271,20 +271,20 @@ export const CANONICAL_ACTIONS: ActionDefinition[] = [
     ),
     prompt: ({ args }) => args
       ? `Preview a market order before execution: ${args}. Show readiness, estimated fills, fees, and policy blockers.`
-      : "What market order should I preview? Example: /preview-order BTC buy 100 quote",
+      : "What market order should I preview? Example: /preview-order BTC buy 100 quote or /preview-order AAPL buy 5",
     tags: ["trading", "preview", "dry-run"],
   },
   {
     id: "trading.market_order",
     title: "Place Market Order",
-    description: "Place a live spot market order on the active exchange.",
+    description: "Place a live crypto or stock market order on the active execution venue.",
     domain: "trading",
     capability: "execute",
     taskScope: "execution",
     sideEffectLevel: "funds",
     approvalPolicy: "armed_mode",
     dryRunSupported: true,
-    providerRequirements: [{ kind: "exchange" }],
+    providerRequirements: [{ kind: "exchange", optional: true }, { kind: "broker", optional: true }],
     rateLimitBudget: "execution",
     visibility: ["agent"],
     inputSchema: marketOrderInputSchema,

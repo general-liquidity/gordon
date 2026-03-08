@@ -3,12 +3,14 @@
  * Implements the broker abstraction for Alpaca's Trading + Market Data APIs.
  */
 
+import type { Candle } from "../../../types/index.ts";
 import type {
   BrokerAdapter,
   BrokerAccount,
   BrokerCapabilities,
   BrokerClock,
   BrokerCredentials,
+  BrokerHistoricalBarsParams,
   BrokerId,
   BrokerOrder,
   BrokerOrderListParams,
@@ -99,6 +101,26 @@ interface AlpacaLatestQuoteResponse {
   symbol: string;
 }
 
+interface AlpacaBarsResponse {
+  bars: Record<string, Array<{
+    t: string;
+    o: number;
+    h: number;
+    l: number;
+    c: number;
+    v: number;
+  }>>;
+}
+
+const ALPACA_TIMEFRAME_MAP: Record<string, string> = {
+  "1m": "1Min",
+  "5m": "5Min",
+  "15m": "15Min",
+  "30m": "30Min",
+  "1h": "1Hour",
+  "1d": "1Day",
+};
+
 function parseNumber(value: string | number | undefined): number {
   if (value === undefined) return 0;
   const parsed = typeof value === "number" ? value : Number(value);
@@ -170,6 +192,7 @@ export class AlpacaAdapter implements BrokerAdapter {
     supportsOptions: true,
     supportsStreaming: true,
     supportsPaperTrading: true,
+    supportsHistoricalBars: true,
   };
 
   private readonly credentials: BrokerCredentials;
@@ -356,6 +379,41 @@ export class AlpacaAdapter implements BrokerAdapter {
     };
   }
 
+  async getHistoricalBars(params: BrokerHistoricalBarsParams): Promise<Candle[]> {
+    const timeframe = ALPACA_TIMEFRAME_MAP[params.timeframe];
+    if (!timeframe) {
+      throw new Error(`Alpaca historical bars do not support timeframe '${params.timeframe}'.`);
+    }
+
+    const url = new URL("/v2/stocks/bars", this.dataBaseUrl);
+    url.searchParams.set("symbols", params.symbol.toUpperCase());
+    url.searchParams.set("timeframe", timeframe);
+    url.searchParams.set("start", new Date(params.startTime).toISOString());
+    url.searchParams.set("end", new Date(params.endTime).toISOString());
+    url.searchParams.set("adjustment", "raw");
+    url.searchParams.set("limit", String(Math.min(params.limit ?? 10000, 10000)));
+
+    const response = await this.request<AlpacaBarsResponse>(
+      `${url.pathname}${url.search}`,
+      undefined,
+      { dataApi: true },
+    );
+
+    const bars = response.bars?.[params.symbol.toUpperCase()] ?? [];
+    return bars.map((bar) => {
+      const openTime = Date.parse(bar.t);
+      return {
+        openTime,
+        open: bar.o,
+        high: bar.h,
+        low: bar.l,
+        close: bar.c,
+        volume: bar.v,
+        closeTime: openTime,
+      };
+    });
+  }
+
   private toBrokerOrder(order: AlpacaOrderResponse): BrokerOrder {
     return {
       id: order.id,
@@ -377,4 +435,3 @@ export class AlpacaAdapter implements BrokerAdapter {
     };
   }
 }
-

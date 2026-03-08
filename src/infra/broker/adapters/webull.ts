@@ -7,12 +7,14 @@
  */
 
 import { createHash, createHmac, randomUUID } from "node:crypto";
+import type { Candle } from "../../../types/index.ts";
 import type {
   BrokerAdapter,
   BrokerAccount,
   BrokerCapabilities,
   BrokerClock,
   BrokerCredentials,
+  BrokerHistoricalBarsParams,
   BrokerId,
   BrokerOrder,
   BrokerOrderListParams,
@@ -231,6 +233,7 @@ export class WebullAdapter implements BrokerAdapter {
     supportsOptions: true,
     supportsStreaming: false,
     supportsPaperTrading: true,
+    supportsHistoricalBars: false,
   };
 
   private readonly credentials: BrokerCredentials;
@@ -783,5 +786,8 @@ export class WebullAdapter implements BrokerAdapter {
       timestamp: String(quoteRaw.timestamp ?? quoteRaw.time ?? quoteRaw.t ?? new Date().toISOString()),
     };
   }
-}
 
+  async getHistoricalBars(_params: BrokerHistoricalBarsParams): Promise<Candle[]> {
+    throw new Error("Webull historical bars are not wired through Gordon yet.");
+  }
+}

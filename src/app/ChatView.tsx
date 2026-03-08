@@ -1,8 +1,13 @@
 import React from "react";
 import { Box, Text } from "ink";
 import { COLORS } from "./theme.ts";
-import { getGordonLoadingPhrases, useGordonLoader } from "./components/GordonLoader.tsx";
+import {
+  getGordonLoaderColor,
+  getGordonLoadingPhrases,
+  useGordonLoader,
+} from "./components/GordonLoader.tsx";
 import { MarkdownText } from "./components/MarkdownText.tsx";
+import { formatHiddenMessageNotice } from "./threadDensity.ts";
 
 export interface ChatMessage {
   role: "user" | "gordon";
@@ -15,6 +20,7 @@ export interface ChatMessage {
 interface ChatViewProps {
   messages: ChatMessage[];
   hiddenCount?: number;
+  visibleLimit?: number;
   isStreaming?: boolean;
   activeStreamingTimestamp?: string | null;
   activityStatus?: string | null;
@@ -40,6 +46,11 @@ const StreamingStateLine: React.FC<{
       variant: "response",
     }),
   });
+  const loaderColor = getGordonLoaderColor({
+    currentTool: activeToolCall,
+    activityStatus,
+    variant: "response",
+  });
   const liveStatus = activeToolCall
     ? `Running ${activeToolCall}`
     : activityStatus || phrase;
@@ -50,14 +61,14 @@ const StreamingStateLine: React.FC<{
         <MarkdownText>{message.content}</MarkdownText>
       ) : (
         <Box>
-          <Text color={COLORS.HIGHLIGHT}>{glyph}</Text>
+          <Text color={loaderColor}>{glyph}</Text>
           <Text color={COLORS.DIM}> {phrase}...</Text>
         </Box>
       )}
       <Box marginTop={message.content.trim().length > 0 ? 1 : 0}>
-        <Text color={COLORS.HIGHLIGHT}>{glyph}</Text>
+        <Text color={loaderColor}>{glyph}</Text>
         <Text color={COLORS.DIM}> {liveStatus}</Text>
-        <Text color={COLORS.HIGHLIGHT}>{cursorVisible ? " ▋" : "  "}</Text>
+        <Text color={loaderColor}>{cursorVisible ? " ▋" : "  "}</Text>
       </Box>
     </Box>
   );
@@ -125,6 +136,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({
 export const ChatView: React.FC<ChatViewProps> = ({
   messages,
   hiddenCount = 0,
+  visibleLimit,
   isStreaming = false,
   activeStreamingTimestamp = null,
   activityStatus = null,
@@ -135,7 +147,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
       {messages.length === 0 ? (
         <Box justifyContent="center" paddingY={2}>
           <Text color={COLORS.DIM} italic>
-            Start a conversation with Gordon...
+            Ask Gordon to scan, analyze, plan, or review a market.
           </Text>
         </Box>
       ) : (
@@ -143,13 +155,13 @@ export const ChatView: React.FC<ChatViewProps> = ({
           {hiddenCount > 0 && (
             <Box paddingX={1} paddingY={0}>
               <Text color={COLORS.DIM}>
-                {hiddenCount} earlier message{hiddenCount === 1 ? "" : "s"} hidden to keep the terminal responsive.
+                {formatHiddenMessageNotice(hiddenCount, visibleLimit ?? messages.length)}
               </Text>
             </Box>
           )}
           {messages.map((msg, index) => (
             <MessageBubble
-              key={`${msg.role}-${msg.timestamp}-${hiddenCount + index}`}
+              key={`${index}-${msg.role}-${msg.timestamp ?? "no-ts"}-${msg.agent ?? "gordon"}-${msg.badge ?? ""}`}
               message={msg}
               isStreamingMessage={
                 isStreaming

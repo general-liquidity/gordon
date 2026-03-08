@@ -47,37 +47,37 @@ interface MenuEntry {
 
 const WORKFLOW_ACTIONS: Record<WorkflowGroup, MenuEntry[]> = {
   discover: [
-    { label: "Scan market for fresh setups", value: "scan" },
-    { label: "See what is trending right now", value: "trending" },
-    { label: "Check current market regime", value: "regime" },
+    { label: "Scan market", value: "scan" },
+    { label: "Trending now", value: "trending" },
+    { label: "Check regime", value: "regime" },
   ],
   analyze: [
-    { label: "Analyze a single market", value: "analyze" },
-    { label: "Build a trade plan", value: "plan" },
-    { label: "Open command guide for analysis", value: "help" },
+    { label: "Analyze symbol", value: "analyze" },
+    { label: "Plan trade", value: "plan" },
+    { label: "Analysis help", value: "help" },
   ],
   trade: [
-    { label: "Preview a trade before execution", value: "preview-order" },
-    { label: "Review open positions", value: "positions" },
-    { label: "Review working orders", value: "orders" },
-    { label: "Fund or quote wallet rails", value: "fund" },
-    { label: "Bridge assets across chains", value: "bridge" },
+    { label: "Preview order", value: "preview-order" },
+    { label: "Open positions", value: "positions" },
+    { label: "Working orders", value: "orders" },
+    { label: "Fund rails", value: "fund" },
+    { label: "Bridge assets", value: "bridge" },
   ],
   run: [
-    { label: "Open live strategy dashboard", value: "strategies-live" },
-    { label: "Check current market regime", value: "regime" },
-    { label: "Open command guide for strategy workflows", value: "help" },
+    { label: "Strategy runtime", value: "strategies-live" },
+    { label: "Check regime", value: "regime" },
+    { label: "Run help", value: "help" },
   ],
   accounts: [
-    { label: "Review portfolio and balances", value: "portfolio" },
-    { label: "Inspect wallet rails and history", value: "wallet" },
-    { label: "Inspect configured chains", value: "chains" },
+    { label: "Portfolio", value: "portfolio" },
+    { label: "Wallet rails", value: "wallet" },
+    { label: "Chains", value: "chains" },
   ],
   operate: [
-    { label: "Return to open chat", value: "chat" },
-    { label: "Run diagnostics", value: "doctor" },
-    { label: "Open setup and configuration", value: "setup" },
-    { label: "Open command guide", value: "help" },
+    { label: "Chat", value: "chat" },
+    { label: "Doctor", value: "doctor" },
+    { label: "Setup", value: "setup" },
+    { label: "Help", value: "help" },
   ],
 };
 
@@ -109,41 +109,41 @@ export function buildQuickStartRecommendedOptions(context: {
 function getMenuLabel(option: MenuOption): string {
   switch (option) {
     case "chat":
-      return "Ask Gordon in chat";
+      return "Chat";
     case "scan":
-      return "Scan market for opportunities";
+      return "Scan";
     case "portfolio":
-      return "Review portfolio and balances";
+      return "Portfolio";
     case "trending":
-      return "See trending markets";
+      return "Trending";
     case "analyze":
-      return "Analyze a market";
+      return "Analyze";
     case "preview-order":
-      return "Preview a trade";
+      return "Preview order";
     case "plan":
-      return "Create a trade plan";
+      return "Plan trade";
     case "positions":
-      return "Check active positions";
+      return "Positions";
     case "orders":
-      return "Check live orders";
+      return "Orders";
     case "strategies-live":
-      return "Open strategy runtime";
+      return "Runtime";
     case "regime":
-      return "Check market regime";
+      return "Regime";
     case "bridge":
-      return "Bridge assets";
+      return "Bridge";
     case "chains":
-      return "Inspect chains";
+      return "Chains";
     case "wallet":
-      return "Inspect wallet rails";
+      return "Wallet rails";
     case "fund":
-      return "Fund or quote wallet rails";
+      return "Fund rails";
     case "setup":
-      return "Open setup and configuration";
+      return "Setup";
     case "doctor":
-      return "Run doctor diagnostics";
+      return "Doctor";
     case "help":
-      return "Open command guide";
+      return "Help";
     default:
       return option;
   }
@@ -158,12 +158,12 @@ function buildRootOptions(context: {
 }): MenuEntry[] {
   const recommendedOptions = Array.from(new Set(buildQuickStartRecommendedOptions(context)));
   const recommended = recommendedOptions.map((option) => ({
-    label: `Now: ${getMenuLabel(option)}`,
+    label: getMenuLabel(option),
     value: option as MenuSelection,
   }));
 
   const workflows = (Object.keys(WORKFLOW_CONFIG) as WorkflowGroup[]).map((workflow) => ({
-    label: `Workflow: ${WORKFLOW_CONFIG[workflow].label} - ${WORKFLOW_CONFIG[workflow].description}`,
+    label: WORKFLOW_CONFIG[workflow].label,
     value: `workflow:${workflow}` as const,
   }));
 
@@ -191,7 +191,7 @@ export const QuickStartMenu: React.FC<QuickStartMenuProps> = ({
 
     return [
       ...WORKFLOW_ACTIONS[workflow],
-      { label: "Back to workflow overview", value: "back" as const },
+      { label: "Back to all actions", value: "back" as const },
     ];
   }, [workflow, mode, setupComplete, hasExchange, hasBroker, hasWalletRails]);
 
@@ -252,15 +252,16 @@ export const QuickStartMenu: React.FC<QuickStartMenuProps> = ({
   }, { isActive: Boolean(onTypeToChat) });
 
   const isOverlay = variant === "overlay";
+  const modeLabel = mode === "ARMED" ? "Live enabled" : "Read-only";
   const title = isOverlay ? "Action Palette" : "Quick Actions";
   const subtitle = workflow === "root"
     ? isOverlay
-      ? "Browse actions or start typing to jump back into chat."
-      : "Choose the next best action or start typing to talk to Gordon."
-    : `${WORKFLOW_CONFIG[workflow].label} workflow`;
+      ? "Pick an action or start typing to return to chat."
+      : "Pick the next action or start typing to jump into chat."
+    : WORKFLOW_CONFIG[workflow].label;
   const hintText = isOverlay
-    ? "Ctrl+K toggles this palette. Type any prompt to return to chat instantly."
-    : "Press Enter to launch an action, or type any prompt to jump straight into chat.";
+    ? "Ctrl+K toggles the palette. Typing jumps straight back to chat."
+    : "Press Enter to launch an action. Typing jumps straight to chat.";
 
   return (
     <Box flexDirection="column" paddingX={2} paddingY={1}>
@@ -269,9 +270,9 @@ export const QuickStartMenu: React.FC<QuickStartMenuProps> = ({
           {title}
         </Text>
         <Badge color={mode === "ARMED" ? "red" : "green"}>
-          {mode === "ARMED" ? "ARMED" : "SAFE"}
+          {modeLabel}
         </Badge>
-        <Badge color={!setupComplete || !hasVenue ? "yellow" : "green"}>
+        <Badge color={!setupComplete || !hasVenue ? "blue" : "green"}>
           {readinessLabel}
         </Badge>
       </Box>
@@ -281,7 +282,7 @@ export const QuickStartMenu: React.FC<QuickStartMenuProps> = ({
           {subtitle}
         </Text>
         <Text color={COLORS.DIM}>
-          {workflow === "root"
+              {workflow === "root"
             ? connectedLabel
               ? `Connected: ${connectedLabel}`
               : "Connected: none yet"
@@ -305,16 +306,16 @@ export const QuickStartMenu: React.FC<QuickStartMenuProps> = ({
       >
         <Box flexDirection="column">
           <Text color={COLORS.WHITE} bold>
-            {mode === "SAFE" ? "[SAFE MODE]" : "[ARMED MODE]"}
+            {mode === "SAFE" ? "[READ-ONLY]" : "[LIVE ENABLED]"}
           </Text>
           <Text color={COLORS.DIM}>
             {mode === "SAFE"
-              ? "Analysis and previews only. No live trades will execute."
+              ? "Analysis and previews only. No live orders will execute."
               : "Live trading is enabled. Gordon will still require approval on execution paths."}
           </Text>
           <Box marginTop={1}>
             <Text color={COLORS.DIM}>
-              Type <Text color={COLORS.ACCENT}>/arm</Text> or <Text color={COLORS.ACCENT}>/disarm</Text> to change execution state
+              Type <Text color={COLORS.ACCENT}>/arm</Text> or <Text color={COLORS.ACCENT}>/disarm</Text> to change execution permission
             </Text>
           </Box>
         </Box>
@@ -338,7 +339,7 @@ export const QuickStartMenu: React.FC<QuickStartMenuProps> = ({
           </Box>
           <Box marginTop={1}>
             <Text color={COLORS.DIM}>
-              Recommended flow: scan the market, analyze one symbol, then preview a trade before execution.
+              Recommended flow: scan, analyze one symbol, then preview before execution.
             </Text>
           </Box>
         </Box>

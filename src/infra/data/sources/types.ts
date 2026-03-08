@@ -43,6 +43,26 @@ export interface DataSourceCapabilities {
   realtime: boolean;
   /** List of supported exchanges (if applicable) */
   exchanges?: string[];
+  /** Supported Gordon market families */
+  markets?: Array<"crypto" | "stocks">;
+  /** Whether latest quote lookups are available */
+  supportsQuotes?: boolean;
+  /** Whether best bid/ask data is available */
+  supportsBidAsk?: boolean;
+  /** Whether order book depth is available */
+  supportsOrderBook?: boolean;
+  /** Whether trading-session calendars are available */
+  supportsSessionCalendar?: boolean;
+  /** Whether corporate actions are available */
+  supportsCorporateActions?: boolean;
+  /** Whether extended-hours data is available */
+  supportsExtendedHours?: boolean;
+  /** Whether funding-rate style derivatives data is available */
+  supportsFundingRates?: boolean;
+  /** Whether open-interest data is available */
+  supportsOpenInterest?: boolean;
+  /** Whether liquidation data is available */
+  supportsLiquidations?: boolean;
 }
 
 // ============================================================================

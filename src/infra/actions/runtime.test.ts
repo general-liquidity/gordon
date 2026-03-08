@@ -50,9 +50,45 @@ describe("action runtime", () => {
 
     expect(plan.actionId).toBe("trading.preview_market_order");
     expect(plan.preview?.symbol).toBe("BTCUSDT");
+    expect(plan.preview?.resolutionSource).toBe("heuristic");
+    expect(plan.preview?.quoteAsset).toBeUndefined();
+    expect((plan.preview?.capabilities as { supportsOrderBook: boolean } | undefined)?.supportsOrderBook).toBeTrue();
     expect(plan.preview?.estimatedBaseQty).toBeGreaterThan(0);
     expect(plan.blockers).toContain("System is in SAFE mode.");
     expect(plan.ready).toBeFalse();
+  });
+
+  it("builds a broker-backed preview plan for stocks when the symbol resolves to equities", async () => {
+    const plan = await planActionExecution(
+      "trading.preview_market_order",
+      { symbol: "AAPL", side: "BUY", quantity: 2 },
+      createContext({
+        exchange: null,
+        broker: {
+          brokerId: "webull",
+          displayName: "Webull",
+          getLatestQuote: async () => ({ symbol: "AAPL", bidPrice: 210, askPrice: 211, lastPrice: 210.5, timestamp: Date.now() }),
+          getAccount: async () => ({
+            accountId: "acct-1",
+            accountType: "cash",
+            buyingPower: 5000,
+            cash: 5000,
+            portfolioValue: 5000,
+            dayTradeBuyingPower: 5000,
+          }),
+        } as unknown as GordonContext["broker"],
+      }),
+    );
+
+    expect(plan.actionId).toBe("trading.preview_market_order");
+    expect(plan.preview?.symbol).toBe("AAPL");
+    expect(plan.preview?.marketFamily).toBe("stocks");
+    expect(plan.preview?.venue).toBe("webull");
+    expect(plan.preview?.venueRoute).toBe("broker");
+    expect(plan.preview?.resolutionSource).toBe("broker_quote");
+    expect(plan.preview?.quoteAsset).toBe("USD");
+    expect(plan.preview?.estimatedNotional).toBe(422);
+    expect(plan.preview?.availableBuyingPower).toBe(5000);
   });
 
   it("blocks live market-order tools during preview-only requests", async () => {

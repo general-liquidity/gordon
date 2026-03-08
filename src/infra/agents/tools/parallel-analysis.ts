@@ -21,7 +21,7 @@ import {
   createScanAnalyzeWorkflow,
   type ParallelOptions,
 } from "../parallel.ts";
-import { getGordonContext, validateToolOutput, type MastraExecutionContext } from "./types.ts";
+import { getGordonContext, normalizeSymbol, validateToolOutput, type MastraExecutionContext } from "./types.ts";
 import { scan } from "../../../core/scanner.ts";
 import { analyze } from "../../../core/analyzer.ts";
 
@@ -181,9 +181,7 @@ export const parallelScanAnalyzeTool = createTool({
     }
 
     // Normalize symbol
-    const normalizedSymbol = symbol.toUpperCase().endsWith("USDT")
-      ? symbol.toUpperCase()
-      : `${symbol.toUpperCase()}USDT`;
+    const normalizedSymbol = normalizeSymbol(symbol);
 
     // Run scan and analyze in parallel
     const [scanResult, analysisResult] = await Promise.all([
@@ -337,7 +335,7 @@ export const parallelMultiCoinTool = createTool({
 
     // Normalize symbols
     const normalizedSymbols = symbols.map((s) =>
-      s.toUpperCase().endsWith("USDT") ? s.toUpperCase() : `${s.toUpperCase()}USDT`
+      normalizeSymbol(s)
     );
 
     // Create parallel operations
@@ -446,9 +444,7 @@ export const parallelDeepAnalysisTool = createTool({
     }
 
     // Normalize symbol
-    const normalizedSymbol = symbol.toUpperCase().endsWith("USDT")
-      ? symbol.toUpperCase()
-      : `${symbol.toUpperCase()}USDT`;
+    const normalizedSymbol = normalizeSymbol(symbol);
 
     // Import and use the existing runFullAnalysis which already runs in parallel
     const { runFullAnalysis } = await import("./composition.ts");
@@ -553,9 +549,7 @@ export const parallelTimeframeTool = createTool({
     }
 
     // Normalize symbol
-    const normalizedSymbol = symbol.toUpperCase().endsWith("USDT")
-      ? symbol.toUpperCase()
-      : `${symbol.toUpperCase()}USDT`;
+    const normalizedSymbol = normalizeSymbol(symbol);
 
     // Create parallel operations for each timeframe
     const operations = timeframes.map((timeframe) => async () => {

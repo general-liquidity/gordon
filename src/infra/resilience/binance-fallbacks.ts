@@ -16,6 +16,7 @@ import {
   type FallbackOptions,
   type ResilientResult,
 } from "./fallback.ts";
+import { normalizeCryptoSymbol } from "../markets/instruments.ts";
 
 const BATCH_CONCURRENCY = 6;
 
@@ -434,8 +435,7 @@ export async function getPrices(
  * Normalize symbol to uppercase with USDT suffix if needed
  */
 function normalizeSymbol(symbol: string): string {
-  const upper = symbol.toUpperCase();
-  return upper.endsWith("USDT") ? upper : `${upper}USDT`;
+  return normalizeCryptoSymbol(symbol);
 }
 
 /**

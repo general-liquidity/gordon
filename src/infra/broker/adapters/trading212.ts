@@ -1,10 +1,12 @@
 import { Buffer } from "node:buffer";
+import type { Candle } from "../../../types/index.ts";
 import type {
   BrokerAdapter,
   BrokerAccount,
   BrokerCapabilities,
   BrokerClock,
   BrokerCredentials,
+  BrokerHistoricalBarsParams,
   BrokerId,
   BrokerOrder,
   BrokerOrderListParams,
@@ -39,6 +41,7 @@ const TRADING212_CAPABILITIES: BrokerCapabilities = {
   supportsOptions: false,
   supportsStreaming: false,
   supportsPaperTrading: true,
+  supportsHistoricalBars: false,
 };
 
 function mapTrading212TimeValidity(value: BrokerOrderRequest["timeInForce"]): string {
@@ -326,5 +329,9 @@ export class Trading212Adapter implements BrokerAdapter {
       askSize: parseNumber(quoteRecord.askQuantity ?? quoteRecord.askSize),
       timestamp: String(quoteRecord.updatedAt ?? quoteRecord.timestamp ?? new Date().toISOString()),
     };
+  }
+
+  async getHistoricalBars(_params: BrokerHistoricalBarsParams): Promise<Candle[]> {
+    throw new Error("Trading 212 historical bars are not wired through Gordon yet.");
   }
 }

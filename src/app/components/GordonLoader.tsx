@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-
-export const GORDON_GLYPH_FRAMES = ["◆", "◇", "▲", "△"] as const;
+import { GORDON_GLYPH_FRAMES, getLoaderColor } from "../tuiSemantics.ts";
 
 const BASE_GORDON_LOADING_PHRASES = [
   "Reading the tape",
@@ -40,6 +39,14 @@ export function getGordonLoadingPhrases(options?: {
   ];
 
   return Array.from(new Set(phrases.filter(Boolean)));
+}
+
+export function getGordonLoaderColor(options?: {
+  currentTool?: string | null;
+  activityStatus?: string | null;
+  variant?: "startup" | "streaming" | "response";
+}): string {
+  return getLoaderColor(options);
 }
 
 export function useGordonLoader(options?: {

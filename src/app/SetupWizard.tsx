@@ -54,6 +54,7 @@ type WizardStep =
   | "mcp"
   | "llm"
   | "preferences"
+  | "startup-banner"
   | "done";
 
 type ChainId = "solana" | "polkadot" | "chainlink" | "evm" | "cdp" | "synthdata";
@@ -282,6 +283,7 @@ interface WizardState {
   inceptionApiKey: string;
   dedalusApiKey: string;
   preferences: Preferences;
+  startupBannerMode: "full" | "quiet";
   inputValue: string;
   isValidating: boolean;
 }
@@ -568,6 +570,7 @@ export function SetupWizard({
       topNCoins: 50,
       maxConcurrentTrades: 5,
     },
+    startupBannerMode: "full",
     inputValue: "",
     isValidating: false,
   });
@@ -580,6 +583,7 @@ export function SetupWizard({
         ...prev,
         preferences: config.preferences,
         mcpAutoSync: config.agentRails.autoSyncMcpPlugins,
+        startupBannerMode: config.startupBannerMode,
       }));
     }).catch(() => {
       // Best effort only. The wizard still works with defaults.
@@ -748,11 +752,15 @@ export function SetupWizard({
     }
   }, []);
 
-  const saveConfiguration = useCallback(async (overrides?: { preferences?: Preferences }) => {
+  const saveConfiguration = useCallback(async (overrides?: {
+    preferences?: Preferences;
+    startupBannerMode?: "full" | "quiet";
+  }) => {
     const currentConfig = await loadConfig();
     const newConfig: GordonConfig = {
       ...currentConfig,
       preferences: overrides?.preferences ?? state.preferences,
+      startupBannerMode: overrides?.startupBannerMode ?? state.startupBannerMode,
       onboardingComplete: true,
     };
 
@@ -970,6 +978,7 @@ export function SetupWizard({
     state.railKeys,
     state.mcpAutoSync,
     state.preferences,
+    state.startupBannerMode,
     state.selectedLlmProvider,
     state.openaiApiKey,
     state.inceptionApiKey,
@@ -1021,13 +1030,13 @@ export function SetupWizard({
           if (!match) {
             setState((prev) => ({
               ...prev,
-              exchangeError: `Unsupported exchange: ${trimmedValue}. Supported: ${SUPPORTED_EXCHANGES.join(", ")}`,
+              exchangeError: `Unsupported crypto venue: ${trimmedValue}. Supported: ${SUPPORTED_EXCHANGES.join(", ")}`,
               inputValue: "",
             }));
             return;
           }
 
-          // Route to wallet auth for DEX exchanges like Hyperliquid
+          // Route to wallet auth for DEX venues like Hyperliquid
           const nextStep = requiresWalletAuth(match) ? "exchange-wallet" : "exchange-key";
 
           setState((prev) => ({
@@ -1445,11 +1454,34 @@ export function SetupWizard({
             setState((prev) => ({
               ...prev,
               preferences: newPreferences,
-              step: getPostPreferencesStep(mode, initialSection),
+              step: "startup-banner",
               inputValue: "",
             }));
-            await saveConfiguration({ preferences: newPreferences });
           }
+          break;
+        }
+
+        case "startup-banner": {
+          const normalized = trimmedValue.toLowerCase();
+          if (normalized !== "full" && normalized !== "quiet") {
+            setState((prev) => ({
+              ...prev,
+              exchangeError: 'Use "full" or "quiet".',
+            }));
+            break;
+          }
+
+          setState((prev) => ({
+            ...prev,
+            startupBannerMode: normalized,
+            step: getPostPreferencesStep(mode, initialSection),
+            inputValue: "",
+            exchangeError: null,
+          }));
+          await saveConfiguration({
+            preferences: state.preferences,
+            startupBannerMode: normalized,
+          });
           break;
         }
       }
@@ -1465,6 +1497,7 @@ export function SetupWizard({
       state.chainSetupIndex,
       state.selectedChains,
       state.preferences,
+      state.startupBannerMode,
       initialSection,
       mode,
       validateExchangeCredentials,
@@ -1563,13 +1596,34 @@ export function SetupWizard({
       case "preferences":
         setState((prev) => ({
           ...prev,
+          step: "startup-banner",
+          inputValue: "",
+        }));
+        break;
+
+      case "startup-banner":
+        setState((prev) => ({
+          ...prev,
           step: getPostPreferencesStep(mode, initialSection),
           inputValue: "",
         }));
-        await saveConfiguration({ preferences: state.preferences });
+        await saveConfiguration({
+          preferences: state.preferences,
+          startupBannerMode: state.startupBannerMode,
+        });
         break;
     }
-  }, [state.step, state.chainSetupIndex, state.selectedChains, advanceChainStep, initialSection, mode, saveConfiguration, state.preferences]);
+  }, [
+    state.step,
+    state.chainSetupIndex,
+    state.selectedChains,
+    state.preferences,
+    state.startupBannerMode,
+    advanceChainStep,
+    initialSection,
+    mode,
+    saveConfiguration,
+  ]);
 
   useInput((input, key) => {
     if (state.step === "welcome" && (input || key.return)) {
@@ -1857,6 +1911,16 @@ export function SetupWizard({
         />
       )}
 
+      {state.step === "startup-banner" && (
+        <StartupBannerStep
+          currentMode={state.startupBannerMode}
+          error={state.exchangeError}
+          inputValue={state.inputValue}
+          onInputChange={handleInputChange}
+          onSubmit={handleInputSubmit}
+        />
+      )}
+
       {state.step === "done" && (
         <DoneStep
           exchangeConfigured={state.exchangeValidated}
@@ -1896,7 +1960,8 @@ function WelcomeStep({ mode, initialSection }: WelcomeStepProps): React.ReactEle
         "1. Choose one LLM provider",
         "2. Connect one primary trading venue",
         "3. Set a starting cash reserve",
-        "4. Land directly in the terminal for scan and analysis",
+        "4. Choose your startup banner mode",
+        "5. Land directly in the terminal for scan and analysis",
       ]
     : [
         "1. Exchange API credentials",
@@ -1904,6 +1969,7 @@ function WelcomeStep({ mode, initialSection }: WelcomeStepProps): React.ReactEle
         "3. Blockchain networks and agent rails",
         "4. MCP auto-sync and LLM provider",
         "5. Trading preferences",
+        "6. Startup banner mode",
       ];
 
   return (
@@ -2717,6 +2783,60 @@ function PreferencesStep({ currentPercent, inputValue, onInputChange, onSubmit }
         <Text color={COLORS.DIM}>
           Recommended: 20% for conservative, 10% for moderate, 5% for aggressive
         </Text>
+      </Box>
+    </Box>
+  );
+}
+
+interface StartupBannerStepProps {
+  currentMode: "full" | "quiet";
+  error: string | null;
+  inputValue: string;
+  onInputChange: (value: string) => void;
+  onSubmit: (value: string) => void;
+}
+
+function StartupBannerStep({
+  currentMode,
+  error,
+  inputValue,
+  onInputChange,
+  onSubmit,
+}: StartupBannerStepProps): React.ReactElement {
+  return (
+    <Box flexDirection="column">
+      <Box marginBottom={1}>
+        <Text color={COLORS.TAN} bold>
+          Startup Banner
+        </Text>
+      </Box>
+
+      {error && (
+        <Box marginBottom={1} borderStyle="single" borderColor="red" paddingX={1}>
+          <Text color="red">{error}</Text>
+        </Box>
+      )}
+
+      <Box flexDirection="column" marginBottom={1}>
+        <Text color={COLORS.WHITE}>
+          Choose how Gordon should appear on startup.
+        </Text>
+        <Text color={COLORS.DIM}>
+          Full shows the ASCII banner and quote. Quiet shows the compact header only.
+        </Text>
+        <Text color={COLORS.DIM}>
+          Current default: {currentMode}
+        </Text>
+      </Box>
+
+      <Box marginTop={1}>
+        <Text color={COLORS.WHITE}>Enter mode (full/quiet): </Text>
+        <TextInput
+          value={inputValue}
+          onChange={onInputChange}
+          onSubmit={onSubmit}
+          placeholder={currentMode}
+        />
       </Box>
     </Box>
   );

@@ -13,6 +13,7 @@ import type { BrokerAdapter } from "../../broker/index.ts";
 import type { LLMClient } from "../../llm/index.ts";
 import type { AgentRailsRegistry } from "../../rails/index.ts";
 import type { GordonConfig } from "../../../types/index.ts";
+import { normalizeCryptoSymbol } from "../../markets/instruments.ts";
 import {
   createErrorContext,
   formatErrorWithContext,
@@ -68,8 +69,8 @@ export function getGordonContext(execContext?: MastraExecutionContext): GordonCo
  */
 export const errors = {
   /** @deprecated Use noExchange instead */
-  noBinance: { error: "Exchange client not connected. Please configure API keys." },
-  noExchange: { error: "Exchange client not connected. Please configure API keys." },
+  noBinance: { error: "No active trading venue is connected. Please configure credentials." },
+  noExchange: { error: "No active trading venue is connected. Please configure credentials." },
   noLLM: { error: "LLM client not connected." },
   noContext: { error: "Context not available." },
   notArmed: (action: string) => ({
@@ -84,9 +85,7 @@ export const errors = {
  * Helper to normalize trading pair symbols
  */
 export function normalizeSymbol(symbol: string): string {
-  return symbol.toUpperCase().endsWith("USDT")
-    ? symbol.toUpperCase()
-    : `${symbol.toUpperCase()}USDT`;
+  return normalizeCryptoSymbol(symbol);
 }
 
 /**

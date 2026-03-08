@@ -305,6 +305,7 @@ export async function configView(): Promise<ConfigCommandResult> {
       systemLines.push(`Armed Until: ${new Date(config.armedUntil).toLocaleString()}`);
     }
     systemLines.push(`Onboarding Complete: ${config.onboardingComplete ? 'Yes' : 'No'}`);
+    systemLines.push(`Startup Banner: ${config.startupBannerMode}`);
 
     // Build Risk Management section (v0.7)
     const risk = config.riskManagement;

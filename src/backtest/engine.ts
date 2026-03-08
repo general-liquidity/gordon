@@ -101,6 +101,7 @@ export class BacktestEngine {
   private currentBarIndex: number = 0;
   private indicators: IndicatorArrays | null = null;
   private reachedMaxDrawdown = false;
+  private pendingSignals: Array<{ signal: Signal; executeAtBar: number }> = [];
 
   // Grid/DCA position tracking — multiple concurrent positions
   private gridPositions: Position[] = [];
@@ -143,6 +144,7 @@ export class BacktestEngine {
 
       // Stop processing new signals after max drawdown breach
       if (this.reachedMaxDrawdown) {
+        this.flushPendingSignals(bar);
         this.updateEquityCurve(bar);
         continue;
       }
@@ -154,6 +156,8 @@ export class BacktestEngine {
         this.checkStopTakeProfit(bar);
       }
 
+      this.flushPendingSignals(bar);
+
       // Only process signals when there's no single position OR we're in grid mode
       if (!this.position || this.gridPositions.length > 0) {
         // Get signal from strategy
@@ -161,7 +165,7 @@ export class BacktestEngine {
 
         // Execute signal if non-null and non-HOLD
         if (signal && signal.type !== "HOLD") {
-          this.executeSignal(signal, bar);
+          this.queueOrExecuteSignal(signal, bar);
         }
       }
 
@@ -286,6 +290,39 @@ export class BacktestEngine {
       if (!this.position && this.params.allowShorts) {
         this.openPosition("SHORT", signal.price || bar.close, bar);
       }
+    }
+  }
+
+  private queueOrExecuteSignal(signal: Signal, bar: OHLC): void {
+    const lagBars = Math.max(0, this.params.executionLagBars ?? 0);
+    if (lagBars === 0) {
+      this.executeSignal(signal, bar);
+      return;
+    }
+
+    this.pendingSignals.push({
+      signal,
+      executeAtBar: this.currentBarIndex + lagBars,
+    });
+  }
+
+  private flushPendingSignals(bar: OHLC): void {
+    if (this.pendingSignals.length === 0) return;
+
+    const dueSignals = this.pendingSignals.filter((pending) => pending.executeAtBar <= this.currentBarIndex);
+    if (dueSignals.length === 0) return;
+
+    this.pendingSignals = this.pendingSignals.filter((pending) => pending.executeAtBar > this.currentBarIndex);
+    for (const pending of dueSignals) {
+      const executionSignal: Signal = {
+        ...pending.signal,
+        price: bar.open,
+        timestamp: bar.timestamp,
+        reason: pending.signal.reason
+          ? `${pending.signal.reason} (lagged ${Math.max(0, this.params.executionLagBars ?? 0)} bar)`
+          : `Lagged execution (${Math.max(0, this.params.executionLagBars ?? 0)} bar)`,
+      };
+      this.executeSignal(executionSignal, bar);
     }
   }
 
@@ -620,7 +657,7 @@ export class BacktestEngine {
     // Apply slippage to trigger prices for more realistic fills:
     // Longs: stop triggers slightly early (worse), TP triggers slightly late (worse)
     // Shorts: stop triggers slightly early (worse), TP triggers slightly late (worse)
-    const slippage = this.params.slippageRate;
+    const slippage = this.getExecutionRate();
     if (this.position) {
       if (this.position.side === "LONG") {
         if (this.position.stopLoss && bar.low <= this.position.stopLoss * (1 + slippage)) {
@@ -766,7 +803,7 @@ export class BacktestEngine {
    * Apply slippage to a price.
    */
   private applySlippage(price: number, side: "BUY" | "SELL"): number {
-    const slippage = this.params.slippageRate;
+    const slippage = this.getExecutionRate();
 
     if (side === "BUY") {
       // Buying: price moves up (worse for buyer)
@@ -782,6 +819,12 @@ export class BacktestEngine {
    */
   private applyCommission(value: number): number {
     return value * this.params.commissionRate;
+  }
+
+  private getExecutionRate(): number {
+    return (this.params.slippageRate ?? 0)
+      + ((this.params.spreadRate ?? 0) / 2)
+      + (this.params.marketImpactRate ?? 0);
   }
 
   // ============================================================================
@@ -948,6 +991,7 @@ export class BacktestEngine {
     this.currentBarIndex = 0;
     this.indicators = null;
     this.reachedMaxDrawdown = false;
+    this.pendingSignals = [];
     this.gridPositions = [];
     this.maxGridPositions = 1;
   }

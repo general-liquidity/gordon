@@ -1,4 +1,5 @@
 import type { ZodTypeAny } from "zod";
+import type { IntegrationSurfaceMetadata } from "../integrations/taxonomy.ts";
 
 export type ActionDomain =
   | "market"
@@ -32,6 +33,9 @@ export type ActionProviderKind =
   | "chain"
   | "payments"
   | "llm"
+  | "data"
+  | "automation"
+  | "observability"
   | "mcp"
   | "system";
 
@@ -131,6 +135,7 @@ export interface CapabilitySnapshot {
   supportsExecution: boolean;
   capabilities: string[];
   notes: string[];
+  integration?: IntegrationSurfaceMetadata;
 }
 
 export type CredentialProfile = "default" | "paper" | "live" | "ops";
@@ -162,4 +167,5 @@ export interface ProviderCredentialStatus {
   fields: CredentialFieldStatus[];
   missing: string[];
   notes: string[];
+  integration?: IntegrationSurfaceMetadata;
 }

@@ -227,6 +227,46 @@ export const RegimeDetectionConfigSchema = z.object({
   autoRegime: z.boolean().default(true),
 });
 
+/**
+ * Systematic trading configuration.
+ * Controls how strictly Gordon enforces research/validation discipline.
+ */
+export const SystematicTradingConfigSchema = z.object({
+  executionMode: z
+    .enum(["assisted", "semi_systematic", "strict_systematic"])
+    .default("assisted"),
+  minTradesForPromotion: z.number().int().min(1).default(30),
+  minValidationScore: z.number().min(0).max(100).default(60),
+  autoSnapshotDatasets: z.boolean().default(true),
+  autoCreateResearchExperiments: z.boolean().default(true),
+  simulationRealism: z.object({
+    profile: z.enum(["baseline", "realistic", "conservative"]).default("realistic"),
+    executionLagBars: z.number().int().min(0).max(3).default(1),
+    spreadBps: z.number().min(0).max(50).default(2),
+    marketImpactBps: z.number().min(0).max(50).default(1),
+  }).default({
+    profile: "realistic",
+    executionLagBars: 1,
+    spreadBps: 2,
+    marketImpactBps: 1,
+  }),
+  biasDiagnostics: z.object({
+    minBacktestDays: z.number().int().min(7).default(90),
+    minOutOfSampleWindows: z.number().int().min(1).default(3),
+    maxTradePnlConcentrationPercent: z.number().min(10).max(100).default(55),
+    maxCagrPercent: z.number().min(20).max(2000).default(300),
+    requireWalkForward: z.boolean().default(true),
+    requireMonteCarlo: z.boolean().default(true),
+  }).default({
+    minBacktestDays: 90,
+    minOutOfSampleWindows: 3,
+    maxTradePnlConcentrationPercent: 55,
+    maxCagrPercent: 300,
+    requireWalkForward: true,
+    requireMonteCarlo: true,
+  }),
+});
+
 export const GordonConfigSchema = z.object({
   version: z.string().default("1.0.0"),
   activeProfile: z.string().min(1).optional(),
@@ -266,6 +306,7 @@ export const GordonConfigSchema = z.object({
   mode: z.enum(["SAFE", "ARMED"]).default("SAFE"),
   armedUntil: z.string().nullable().default(null),
   onboardingComplete: z.boolean().default(false),
+  startupBannerMode: z.enum(["full", "quiet"]).default("full"),
   /** MCP Server configurations */
   mcpServers: z.array(MCPServerConfigSchema).default([]),
   /** Anonymous telemetry configuration (strict opt-in) */
@@ -285,6 +326,28 @@ export const GordonConfigSchema = z.object({
   /** Regime detection configuration (v0.7) */
   regimeDetection: RegimeDetectionConfigSchema.default({
     autoRegime: true,
+  }),
+  /** Systematic trading research and promotion controls */
+  systematic: SystematicTradingConfigSchema.default({
+    executionMode: "assisted",
+    minTradesForPromotion: 30,
+    minValidationScore: 60,
+    autoSnapshotDatasets: true,
+    autoCreateResearchExperiments: true,
+    simulationRealism: {
+      profile: "realistic",
+      executionLagBars: 1,
+      spreadBps: 2,
+      marketImpactBps: 1,
+    },
+    biasDiagnostics: {
+      minBacktestDays: 90,
+      minOutOfSampleWindows: 3,
+      maxTradePnlConcentrationPercent: 55,
+      maxCagrPercent: 300,
+      requireWalkForward: true,
+      requireMonteCarlo: true,
+    },
   }),
 });
 
@@ -312,5 +375,6 @@ export type TelemetryConfig = z.infer<typeof TelemetryConfigSchema>;
 export type RiskManagementConfig = z.infer<typeof RiskManagementConfigSchema>;
 export type StrategyRuntimeConfig = z.infer<typeof StrategyRuntimeConfigSchema>;
 export type RegimeDetectionConfig = z.infer<typeof RegimeDetectionConfigSchema>;
+export type SystematicTradingConfig = z.infer<typeof SystematicTradingConfigSchema>;
 export type GordonConfig = z.infer<typeof GordonConfigSchema>;
 export type Mode = GordonConfig["mode"];

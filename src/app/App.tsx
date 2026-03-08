@@ -3,12 +3,9 @@ import { Box, Text, useInput } from "ink";
 import { ChatInput } from "./ChatInput.tsx";
 
 import {
-  StatusBar,
   type ThreadStatusInfo,
   type ChainStatusInfo,
-  type OperatorStatusInfo,
 } from "./StatusBar.tsx";
-import type { TickerItem } from "./components/effects/index.ts";
 import { WelcomeBanner } from "./WelcomeBanner.tsx";
 import { QuickStartMenu, type MenuOption } from "./QuickStartMenu.tsx";
 import { ChatView, type ChatMessage } from "./ChatView.tsx";
@@ -17,6 +14,7 @@ import { QuickStartWizard } from "./QuickStartWizard.tsx";
 import { SetupWizard } from "./SetupWizard.tsx";
 import { DoctorPanel } from "./DoctorPanel.tsx";
 import { ModelSelector } from "./ModelSelector.tsx";
+import { TaskTree } from "./components/TaskTree.tsx";
 import { ShortcutsOverlay, ShortcutsHint } from "./components/ShortcutsOverlay.tsx";
 import { ProgressIndicator, StreamingProgress } from "./components/ProgressIndicator.tsx";
 import { ThemeProvider, useTheme } from "./components/ThemeProvider.tsx";
@@ -70,6 +68,7 @@ import { createErrorContext, formatErrorWithContext } from "../utils/errorContex
 import type { GordonContext } from "../infra/agents/types.ts";
 import type { Mode, GordonConfig } from "../types/index.ts";
 import { COLORS, type ThemeName } from "./theme.ts";
+import { buildVisibleThreadPolicy } from "./threadDensity.ts";
 import {
   parseSlashCommand,
   commandToPrompt,
@@ -113,6 +112,41 @@ import {
   type SetupWizardSection,
 } from "./setup-flow.ts";
 import { OVERLAY_NONE, isOverlayOpen, openOverlay, type OverlayState } from "./overlayState.ts";
+import {
+  cancelTaskTree,
+  completeTaskTree,
+  createTaskTree,
+  dequeueTaskTreeSubmission,
+  failTaskTree,
+  markTaskTreeRoutingResolved,
+  queueTaskTreeSubmission,
+  recordTaskTreeAgentSwitch,
+  recordTaskTreeToolEnd,
+  recordTaskTreeToolStart,
+  type TaskTreeState,
+} from "./taskTree.ts";
+import {
+  buildBackgroundTaskTree,
+  buildBackgroundTaskTreeSignature,
+  type BackgroundStatusResponse,
+} from "./backgroundTasks.ts";
+import { getOrCreateDaemonToken } from "../gateway/security/auth.ts";
+import { sendIpcCommand, isIpcDaemonReachable } from "../gateway/daemon/ipc.ts";
+import { createEnvelopeMeta } from "../gateway/protocol/envelope.ts";
+import {
+  ACTION_LOG_GROUP_ALIASES,
+  appendActionLogEntry,
+  buildCompactionSummary,
+  buildThreadSummaryReport,
+  formatActionLogEntries,
+  getActionLogEntry,
+  isActionLogEntryType,
+  isActionLogGroupAlias,
+  listActionLogEntries,
+  setActionLogBookmarked,
+  type ActionLogEntry,
+  type ActionLogEntryType,
+} from "../infra/action-log/index.ts";
 
 type AppView =
   | "loading"
@@ -142,6 +176,8 @@ interface AppState {
   streamingMessageTimestamp: string | null;
   activeToolCall: string | null;
   activityStatus: string | null;
+  taskTree: TaskTreeState | null;
+  backgroundTaskTree: TaskTreeState | null;
   conversationHistory: ConversationMessage[];
   btcPrice: number | undefined;
   overlay: OverlayState;
@@ -179,6 +215,14 @@ interface QueuedSubmission {
   kind: QueuedSubmissionKind;
   value: string;
   preview: string;
+}
+
+interface ParsedActionLogRequest {
+  entryTypes?: ActionLogEntryType[];
+  bookmarkedOnly: boolean;
+  sessionId?: string;
+  threadQuery?: string;
+  limit: number;
 }
 
 function getIdSuffix(id: string): string {
@@ -265,6 +309,27 @@ function getDefaultConfig(): GordonConfig {
     regimeDetection: {
       autoRegime: true,
     },
+    systematic: {
+      executionMode: "assisted",
+      minTradesForPromotion: 30,
+      minValidationScore: 60,
+      autoSnapshotDatasets: true,
+      autoCreateResearchExperiments: true,
+      simulationRealism: {
+        profile: "realistic",
+        executionLagBars: 1,
+        spreadBps: 2,
+        marketImpactBps: 1,
+      },
+      biasDiagnostics: {
+        minBacktestDays: 90,
+        minOutOfSampleWindows: 3,
+        maxTradePnlConcentrationPercent: 55,
+        maxCagrPercent: 300,
+        requireWalkForward: true,
+        requireMonteCarlo: true,
+      },
+    },
   };
 }
 
@@ -305,12 +370,52 @@ function parseQueuedSubmission(value: string): {
   };
 }
 
-function getConfigScopeLabel(layers: ConfigLayers | null): string {
-  if (!layers || layers.sources.length === 0) {
-    return "global";
+function parseActionLogArgs(args: string): ParsedActionLogRequest {
+  const tokens = args.split(/\s+/).map((token) => token.trim()).filter(Boolean);
+  const parsed: ParsedActionLogRequest = {
+    bookmarkedOnly: false,
+    limit: 20,
+  };
+
+  for (const token of tokens) {
+    const lower = token.toLowerCase();
+    if (/^\d+$/.test(lower)) {
+      parsed.limit = Math.max(1, Math.min(100, Number.parseInt(lower, 10)));
+      continue;
+    }
+    if (lower === "daemon") {
+      parsed.sessionId = "daemon";
+      continue;
+    }
+    if (lower === "bookmarked" || lower === "bookmark" || lower === "bookmarks") {
+      parsed.bookmarkedOnly = true;
+      continue;
+    }
+    if (isActionLogEntryType(lower)) {
+      parsed.entryTypes = [...(parsed.entryTypes ?? []), lower];
+      continue;
+    }
+    if (isActionLogGroupAlias(lower)) {
+      parsed.entryTypes = [...(parsed.entryTypes ?? []), ...ACTION_LOG_GROUP_ALIASES[lower]];
+      continue;
+    }
+    parsed.threadQuery = token;
   }
 
-  return layers.sources.join(" + ");
+  if (parsed.entryTypes && parsed.entryTypes.length > 0) {
+    parsed.entryTypes = [...new Set(parsed.entryTypes)];
+  }
+
+  return parsed;
+}
+
+function resolveBookmarkedTargetId(raw: string | undefined, entries: ActionLogEntry[]): string | null {
+  if (!raw || raw.toLowerCase() === "last") {
+    return entries.find((entry) => entry.entryType !== "bookmark")?.id ?? null;
+  }
+
+  const lowered = raw.toLowerCase();
+  return entries.find((entry) => entry.id.toLowerCase().startsWith(lowered))?.id ?? null;
 }
 
 const STOCK_MARKET_TOKENS = ["stock", "stocks", "equity", "equities", ...BrokerFactory.getSupportedBrokers()];
@@ -385,6 +490,8 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
     streamingMessageTimestamp: null,
     activeToolCall: null,
     activityStatus: null,
+    taskTree: null,
+    backgroundTaskTree: null,
     conversationHistory: [],
     btcPrice: undefined,
     overlay: OVERLAY_NONE,
@@ -411,6 +518,8 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
   const monitorCycleInFlightRef = useRef(false);
   const activeStreamAbortControllerRef = useRef<AbortController | null>(null);
   const isDrainingQueueRef = useRef(false);
+  const daemonTokenRef = useRef<string | null>(null);
+  const loggedMessageKeysRef = useRef<Set<string>>(new Set());
 
   /**
    * Helper to update thread status info in state
@@ -447,6 +556,168 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
       // Thread status update is non-critical — silently ignore
     }
   }, []);
+
+  const backgroundRefreshInFlightRef = useRef(false);
+  const backgroundTaskTreeSignatureRef = useRef<string | null>(null);
+
+  const refreshBackgroundTaskTree = useCallback(async (): Promise<void> => {
+    if (backgroundRefreshInFlightRef.current) {
+      return;
+    }
+    backgroundRefreshInFlightRef.current = true;
+    const reachable = await isIpcDaemonReachable().catch(() => false);
+    if (!reachable) {
+      backgroundTaskTreeSignatureRef.current = null;
+      setState((prev) => (
+        prev.backgroundTaskTree
+          ? { ...prev, backgroundTaskTree: null }
+          : prev
+      ));
+      backgroundRefreshInFlightRef.current = false;
+      return;
+    }
+
+    try {
+      const token = daemonTokenRef.current ?? await getOrCreateDaemonToken();
+      daemonTokenRef.current = token;
+
+      const response = await sendIpcCommand({
+        request: {
+          token,
+          processImmediately: true,
+          envelope: {
+            meta: createEnvelopeMeta({
+              sessionId: "app",
+              source: "agent",
+              idempotencyKey: `background_status_${Date.now()}`,
+            }),
+            command: {
+              type: "runtime.background_status",
+              payload: {},
+            },
+          },
+        },
+        timeoutMs: 5_000,
+      });
+
+      if (!response.ok || !response.data) {
+        throw new Error(response.error?.message || "Background status unavailable");
+      }
+
+      const payload = response.data as BackgroundStatusResponse;
+      const nextSignature = buildBackgroundTaskTreeSignature(payload);
+      if (nextSignature !== backgroundTaskTreeSignatureRef.current) {
+        backgroundTaskTreeSignatureRef.current = nextSignature;
+        const nextTree = buildBackgroundTaskTree(payload);
+        setState((prev) => ({
+          ...prev,
+          backgroundTaskTree: nextTree,
+        }));
+      }
+    } catch {
+      backgroundTaskTreeSignatureRef.current = null;
+      setState((prev) => (
+        prev.backgroundTaskTree
+          ? { ...prev, backgroundTaskTree: null }
+          : prev
+      ));
+    } finally {
+      backgroundRefreshInFlightRef.current = false;
+    }
+  }, []);
+
+  const appendCurrentActionLogEntry = useCallback((input: {
+    entryType: ActionLogEntryType;
+    title: string;
+    content?: string;
+    payload?: Record<string, unknown>;
+    threadId?: string;
+    resourceId?: string;
+    sessionId?: string;
+    correlationId?: string;
+    runId?: string;
+    parentEntryId?: string;
+    label?: string;
+    bookmarked?: boolean;
+  }): ActionLogEntry => {
+    return appendActionLogEntry({
+      threadId: input.threadId ?? state.session?.threadId,
+      resourceId: input.resourceId ?? state.session?.resourceId,
+      sessionId: input.sessionId ?? state.session?.threadId ?? "app",
+      correlationId: input.correlationId,
+      runId: input.runId,
+      parentEntryId: input.parentEntryId,
+      entryType: input.entryType,
+      title: input.title,
+      content: input.content,
+      payload: input.payload,
+      label: input.label,
+      bookmarked: input.bookmarked,
+    });
+  }, [state.session]);
+
+  const resolveThreadFromQuery = useCallback(async (threadQuery?: string): Promise<ThreadInfo | null> => {
+    if (!threadQuery) {
+      return state.session?.threadId ? getThreadInfo(state.session.threadId) : null;
+    }
+
+    const threads = await listThreads();
+    return threads.find((thread) =>
+      thread.threadId === threadQuery
+      || thread.threadId.startsWith(threadQuery)
+      || thread.threadId.includes(threadQuery)
+      || thread.label.toLowerCase() === threadQuery.toLowerCase()
+    ) ?? null;
+  }, [state.session?.threadId]);
+
+  useEffect(() => {
+    const threadId = state.session?.threadId;
+    const resourceId = state.session?.resourceId;
+    if (!threadId || !resourceId) {
+      return;
+    }
+
+    for (const [index, message] of state.messages.entries()) {
+      if (!message.content.trim()) {
+        continue;
+      }
+      if (
+        state.isStreaming
+        && state.streamingMessageTimestamp
+        && message.role === "gordon"
+        && message.timestamp === state.streamingMessageTimestamp
+      ) {
+        continue;
+      }
+
+      const key = [threadId, message.role, message.timestamp ?? `idx-${index}`, index].join(":");
+      if (loggedMessageKeysRef.current.has(key)) {
+        continue;
+      }
+
+      appendActionLogEntry({
+        threadId,
+        resourceId,
+        sessionId: threadId,
+        entryType: message.role === "user" ? "user_message" : "assistant_message",
+        title: message.role === "user" ? "User message" : "Assistant response",
+        content: message.content,
+        payload: {
+          timestamp: message.timestamp,
+          badge: message.badge,
+          agent: message.agent,
+          index,
+        },
+      });
+      loggedMessageKeysRef.current.add(key);
+    }
+  }, [
+    state.isStreaming,
+    state.messages,
+    state.session?.resourceId,
+    state.session?.threadId,
+    state.streamingMessageTimestamp,
+  ]);
 
   const updateLastResultsFromTool = useCallback((toolName: string | undefined, toolResult: unknown): void => {
     if (!toolName || !toolResult || typeof toolResult !== "object") return;
@@ -875,7 +1146,9 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
           try {
             const result = await reconcileWithBinance(binanceClientRef.current!);
             if (result.ordersUpdated > 0) {
-              console.log(`Reconciliation complete: ${result.ordersUpdated} orders synced`);
+              if (process.env.GORDON_STARTUP_QUIET !== "1") {
+                console.log(`Reconciliation complete: ${result.ordersUpdated} orders synced`);
+              }
             }
             if (result.warnings.length > 0) {
               console.warn("Reconciliation warnings:", result.warnings);
@@ -925,7 +1198,9 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
       deferredStartupTasks.push(async () => {
         try {
           getMarketEmitter();
-          console.log("[v0.7] MarketEventEmitter ready");
+          if (process.env.GORDON_STARTUP_QUIET !== "1") {
+            console.log("[v0.7] MarketEventEmitter ready");
+          }
         } catch (err) {
           console.error("[v0.7] MarketEventEmitter setup failed:", err);
         }
@@ -957,7 +1232,9 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
               // Consume stream for event-driven flows.
             }
           });
-          console.log("[v0.7] AgentInvoker wired");
+          if (process.env.GORDON_STARTUP_QUIET !== "1") {
+            console.log("[v0.7] AgentInvoker wired");
+          }
         } catch (err) {
           console.error("[v0.7] AgentInvoker setup failed:", err);
         }
@@ -967,7 +1244,9 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
       // Auto-resume is disabled by default - creates fresh sessions
       // Users can use /resume to continue previous sessions
       const session = await initializeSession({ autoResume: false });
-      console.log(`[Gordon] Session initialized: threadId=${session.threadId}, resourceId=${session.resourceId}, isNew=${session.isNewSession}`);
+      if (process.env.GORDON_STARTUP_QUIET !== "1") {
+        console.log(`[Gordon] Session initialized: threadId=${session.threadId}, resourceId=${session.resourceId}, isNew=${session.isNewSession}`);
+      }
 
       // Ensure the current thread is registered in the thread registry
       // This enables thread management features like cloning and listing
@@ -1355,6 +1634,19 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
             const currentThreadInfo = await getThreadInfo(state.session.threadId);
             const sourceLabel = currentThreadInfo?.label || "Main Thread";
             const branchLabel = label || `Clone of ${sourceLabel}`;
+            appendActionLogEntry({
+              threadId: result.newThreadId,
+              resourceId: state.session?.resourceId,
+              sessionId: result.newThreadId,
+              entryType: "branch_summary",
+              title: "Branch created",
+              content: `Created branch "${branchLabel}" from "${sourceLabel}"`,
+              payload: {
+                sourceThreadId: state.session.threadId,
+                clonedFrom: sourceLabel,
+                messagesCopied: result.messagesCopied,
+              },
+            });
 
             const cloneMessage: ChatMessage = {
               role: "gordon",
@@ -1865,6 +2157,19 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
           const result = await updateThreadLabel(targetThread.threadId, newLabel);
 
           if (result.success) {
+            appendActionLogEntry({
+              threadId: targetThread.threadId,
+              resourceId: targetThread.resourceId,
+              sessionId: targetThread.threadId,
+              entryType: "label",
+              title: "Thread renamed",
+              content: `"${targetThread.label}" -> "${newLabel}"`,
+              label: newLabel,
+              payload: {
+                previousLabel: targetThread.label,
+                nextLabel: newLabel,
+              },
+            });
             const renameMessage: ChatMessage = {
               role: "gordon",
               content: `**Thread renamed!**\n\n"${targetThread.label}" is now "${newLabel}"`,
@@ -1893,6 +2198,294 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
               ],
             }));
           }
+        })();
+        return;
+      }
+
+      if (command.action === "menu" && command.target === "action-log") {
+        (async () => {
+          const parsed = parseActionLogArgs(args);
+          const targetThread = parsed.sessionId === "daemon"
+            ? null
+            : await resolveThreadFromQuery(parsed.threadQuery);
+
+          if (!parsed.sessionId && parsed.threadQuery && !targetThread) {
+            const errorMessage: ChatMessage = {
+              role: "gordon",
+              content: `No thread matching "${parsed.threadQuery}" was found.`,
+              timestamp: formatTimestamp(),
+            };
+            setState((prev) => ({
+              ...prev,
+              messages: [
+                ...prev.messages,
+                { role: "user", content: value.trim(), timestamp: formatTimestamp() },
+                errorMessage,
+              ],
+            }));
+            return;
+          }
+
+          const entries = listActionLogEntries({
+            threadId: targetThread?.threadId,
+            sessionId: parsed.sessionId,
+            entryTypes: parsed.entryTypes,
+            bookmarkedOnly: parsed.bookmarkedOnly,
+            limit: parsed.limit,
+          });
+
+          const title = parsed.sessionId === "daemon"
+            ? "Daemon action log"
+            : targetThread
+              ? `Action log for ${targetThread.label}`
+              : "Current thread action log";
+
+          const response: ChatMessage = {
+            role: "gordon",
+            content: formatActionLogEntries(entries, title),
+            timestamp: formatTimestamp(),
+          };
+
+          setState((prev) => ({
+            ...prev,
+            messages: [
+              ...prev.messages,
+              { role: "user", content: value.trim(), timestamp: formatTimestamp() },
+              response,
+            ],
+          }));
+        })();
+        return;
+      }
+
+      if (command.action === "menu" && command.target === "bookmark-entry") {
+        (async () => {
+          const [rawTarget, ...labelParts] = args.split(/\s+/).filter(Boolean);
+          const targetThread = await resolveThreadFromQuery();
+          const entries = listActionLogEntries({
+            threadId: targetThread?.threadId,
+            limit: 100,
+          });
+          const targetEntryId = resolveBookmarkedTargetId(rawTarget, entries);
+          if (!targetEntryId) {
+            const errorMessage: ChatMessage = {
+              role: "gordon",
+              content: "No matching action-log entry found. Use `/action-log` first to inspect entry IDs.",
+              timestamp: formatTimestamp(),
+            };
+            setState((prev) => ({
+              ...prev,
+              messages: [
+                ...prev.messages,
+                { role: "user", content: value.trim(), timestamp: formatTimestamp() },
+                errorMessage,
+              ],
+            }));
+            return;
+          }
+
+          const bookmarkLabel = labelParts.join(" ").trim() || undefined;
+          const updated = setActionLogBookmarked(targetEntryId, true, bookmarkLabel);
+          const targetEntry = getActionLogEntry(targetEntryId);
+          if (updated && targetEntry) {
+            appendCurrentActionLogEntry({
+              entryType: "bookmark",
+              title: "Bookmark created",
+              content: `Bookmarked ${targetEntry.title}`,
+              parentEntryId: targetEntryId,
+              label: bookmarkLabel,
+              payload: {
+                targetEntryId,
+                bookmarkLabel,
+              },
+            });
+          }
+
+          const bookmarkMessage: ChatMessage = {
+            role: "gordon",
+            content: updated && targetEntry
+              ? `Bookmarked \`${targetEntryId.slice(0, 8)}\` - ${targetEntry.title}`
+              : "Failed to bookmark the requested entry.",
+            timestamp: formatTimestamp(),
+          };
+          setState((prev) => ({
+            ...prev,
+            messages: [
+              ...prev.messages,
+              { role: "user", content: value.trim(), timestamp: formatTimestamp() },
+              bookmarkMessage,
+            ],
+          }));
+        })();
+        return;
+      }
+
+      if (command.action === "menu" && command.target === "list-bookmarks") {
+        (async () => {
+          const parsed = parseActionLogArgs(args);
+          const targetThread = parsed.sessionId === "daemon"
+            ? null
+            : await resolveThreadFromQuery(parsed.threadQuery);
+          if (!parsed.sessionId && parsed.threadQuery && !targetThread) {
+            const errorMessage: ChatMessage = {
+              role: "gordon",
+              content: `No thread matching "${parsed.threadQuery}" was found.`,
+              timestamp: formatTimestamp(),
+            };
+            setState((prev) => ({
+              ...prev,
+              messages: [
+                ...prev.messages,
+                { role: "user", content: value.trim(), timestamp: formatTimestamp() },
+                errorMessage,
+              ],
+            }));
+            return;
+          }
+          const entries = listActionLogEntries({
+            threadId: targetThread?.threadId,
+            sessionId: parsed.sessionId,
+            bookmarkedOnly: true,
+            limit: parsed.limit,
+          });
+          const response: ChatMessage = {
+            role: "gordon",
+            content: formatActionLogEntries(
+              entries,
+              parsed.sessionId === "daemon"
+                ? "Daemon bookmarks"
+                : targetThread
+                  ? `Bookmarks for ${targetThread.label}`
+                  : "Current thread bookmarks",
+            ),
+            timestamp: formatTimestamp(),
+          };
+          setState((prev) => ({
+            ...prev,
+            messages: [
+              ...prev.messages,
+              { role: "user", content: value.trim(), timestamp: formatTimestamp() },
+              response,
+            ],
+          }));
+        })();
+        return;
+      }
+
+      if (command.action === "menu" && command.target === "thread-summary") {
+        (async () => {
+          const targetThread = await resolveThreadFromQuery(args.trim() || undefined);
+          if (!targetThread) {
+            const errorMessage: ChatMessage = {
+              role: "gordon",
+              content: "No matching thread found for `/thread-summary`.",
+              timestamp: formatTimestamp(),
+            };
+            setState((prev) => ({
+              ...prev,
+              messages: [
+                ...prev.messages,
+                { role: "user", content: value.trim(), timestamp: formatTimestamp() },
+                errorMessage,
+              ],
+            }));
+            return;
+          }
+
+          const entries = listActionLogEntries({
+            threadId: targetThread.threadId,
+            limit: 80,
+          });
+          const summary = buildThreadSummaryReport(targetThread, entries);
+          appendActionLogEntry({
+            threadId: targetThread.threadId,
+            resourceId: targetThread.resourceId,
+            sessionId: targetThread.threadId,
+            entryType: "branch_summary",
+            title: "Thread summary generated",
+            content: summary,
+            payload: {
+              sourceThreadId: targetThread.clonedFrom,
+              entryCount: entries.length,
+            },
+          });
+
+          const response: ChatMessage = {
+            role: "gordon",
+            content: summary,
+            timestamp: formatTimestamp(),
+          };
+          setState((prev) => ({
+            ...prev,
+            messages: [
+              ...prev.messages,
+              { role: "user", content: value.trim(), timestamp: formatTimestamp() },
+              response,
+            ],
+          }));
+        })();
+        return;
+      }
+
+      if (command.action === "menu" && command.target === "compact-thread") {
+        (async () => {
+          const trimmedArgs = args.trim();
+          const parts = trimmedArgs ? trimmedArgs.split(/\s+/) : [];
+          const maybeThread = parts[0];
+          const explicitThread = maybeThread ? await resolveThreadFromQuery(maybeThread) : null;
+          const targetThread = explicitThread ?? await resolveThreadFromQuery();
+          const note = explicitThread
+            ? parts.slice(1).join(" ").trim()
+            : trimmedArgs;
+
+          if (!targetThread) {
+            const errorMessage: ChatMessage = {
+              role: "gordon",
+              content: "No matching thread found for `/compact-thread`.",
+              timestamp: formatTimestamp(),
+            };
+            setState((prev) => ({
+              ...prev,
+              messages: [
+                ...prev.messages,
+                { role: "user", content: value.trim(), timestamp: formatTimestamp() },
+                errorMessage,
+              ],
+            }));
+            return;
+          }
+
+          const entries = listActionLogEntries({
+            threadId: targetThread.threadId,
+            limit: 40,
+          });
+          const summary = buildCompactionSummary(entries, note || undefined);
+          appendActionLogEntry({
+            threadId: targetThread.threadId,
+            resourceId: targetThread.resourceId,
+            sessionId: targetThread.threadId,
+            entryType: "compaction_summary",
+            title: "Thread compaction generated",
+            content: summary,
+            payload: {
+              entryCount: entries.length,
+              note: note || null,
+            },
+          });
+
+          const response: ChatMessage = {
+            role: "gordon",
+            content: summary,
+            timestamp: formatTimestamp(),
+          };
+          setState((prev) => ({
+            ...prev,
+            messages: [
+              ...prev.messages,
+              { role: "user", content: value.trim(), timestamp: formatTimestamp() },
+              response,
+            ],
+          }));
         })();
         return;
       }
@@ -2156,7 +2749,7 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
                   userMessage,
                   {
                     role: "gordon",
-                    content: `System **ARMED** for ${armHours} hours. Trading enabled.\n\nI can now execute approved trade plans. I will still ask for your explicit confirmation before placing any order.\n\nTo disarm: \`/disarm\``,
+                    content: `System **live enabled** for ${armHours} hours.\n\nI can now execute approved trade plans. I will still ask for your explicit confirmation before placing any order.\n\nTo return to read-only mode: \`/disarm\``,
                     timestamp: formatTimestamp(),
                   },
                 ],
@@ -2172,7 +2765,7 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
                   userMessage,
                   {
                     role: "gordon",
-                    content: "System **DISARMED**. Back to SAFE mode. No trades will be executed.",
+                    content: "System **read-only**. Live order execution is disabled.",
                     timestamp: formatTimestamp(),
                   },
                 ],
@@ -2196,6 +2789,23 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
       pendingPluginSuggestionsRef.current = suggestions;
     }
 
+    const initialTaskTree = createTaskTree({
+      input: displayMessage,
+      actionId: requestedActionId,
+      commandName: parsedCommand?.command.name,
+    });
+    appendCurrentActionLogEntry({
+      entryType: "action_route",
+      title: "Request received",
+      content: displayMessage,
+      runId: initialTaskTree.runId,
+      payload: {
+        requestedActionId,
+        requestedTaskScope,
+        commandName: parsedCommand?.command.name,
+      },
+    });
+
     const userMessage: ChatMessage = {
       role: "user",
       content: displayMessage,
@@ -2209,6 +2819,7 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
       isLoading: true,
       overlay: OVERLAY_NONE,
       activityStatus: "Routing request...",
+      taskTree: initialTaskTree,
     }));
 
     // Check if LLM client is configured
@@ -2225,6 +2836,7 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
         messages: [...prev.messages, errorMessage],
         isLoading: false,
         activityStatus: null,
+        taskTree: failTaskTree(prev.taskTree, "No LLM provider configured"),
       }));
       return;
     }
@@ -2262,7 +2874,17 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
       streamingMessageTimestamp: streamingTimestamp,
       activeToolCall: null,
       activityStatus: "Preparing response...",
+      taskTree: markTaskTreeRoutingResolved(prev.taskTree ?? initialTaskTree, "Request accepted"),
     }));
+    appendCurrentActionLogEntry({
+      entryType: "run_status",
+      title: "Response started",
+      content: "Streaming response initialized",
+      runId: initialTaskTree.runId,
+      payload: {
+        actionId: requestedActionId,
+      },
+    });
 
     try {
       const streamAbortController = new AbortController();
@@ -2316,22 +2938,58 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
             if (event.content) {
               fullContent += event.content;
               scheduleUpdate();
+              if (fullContent.length === event.content.length) {
+                setState((prev) => ({
+                  ...prev,
+                  taskTree: markTaskTreeRoutingResolved(prev.taskTree ?? initialTaskTree, "Response streaming"),
+                }));
+              }
             }
             break;
 
           case "agent_switch":
             if (event.agentName) {
               currentAgentName = event.agentName;
+              appendCurrentActionLogEntry({
+                entryType: "agent_switch",
+                title: "Agent switch",
+                content: `Delegated to ${event.agentName}`,
+                runId: initialTaskTree.runId,
+                payload: {
+                  agentName: event.agentName,
+                },
+              });
               // Update the message with the new agent attribution
               updateStreamingMessage(fullContent, currentAgentName);
+              setState((prev) => ({
+                ...prev,
+                taskTree: recordTaskTreeAgentSwitch(prev.taskTree ?? initialTaskTree, event.agentName!),
+              }));
             }
             break;
 
           case "tool_call_start":
+            appendCurrentActionLogEntry({
+              entryType: "tool_call",
+              title: event.toolName || "Tool call",
+              content: `Started ${event.toolName || "tool"}`,
+              runId: initialTaskTree.runId,
+              payload: {
+                toolName: event.toolName,
+                toolArgs: event.toolArgs,
+                agentName: event.agentName ?? currentAgentName,
+              },
+            });
             setState((prev) => ({
               ...prev,
               activeToolCall: event.toolName || "tool",
               activityStatus: `Running ${event.toolName || "tool"}...`,
+              taskTree: recordTaskTreeToolStart(
+                prev.taskTree ?? initialTaskTree,
+                event.toolName || "tool",
+                event.toolArgs,
+                event.agentName ?? currentAgentName,
+              ),
             }));
             // If the tool call has agent info, update attribution
             if (event.agentName && event.agentName !== currentAgentName) {
@@ -2341,10 +2999,22 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
             break;
 
           case "tool_call_end":
+            appendCurrentActionLogEntry({
+              entryType: "tool_result",
+              title: event.toolName || "Tool result",
+              content: `Completed ${event.toolName || "tool"}`,
+              runId: initialTaskTree.runId,
+              payload: {
+                toolName: event.toolName,
+                toolResult: event.toolResult ?? null,
+                agentName: event.agentName ?? currentAgentName,
+              },
+            });
             setState((prev) => ({
               ...prev,
               activeToolCall: null,
               activityStatus: "Finalizing response...",
+              taskTree: recordTaskTreeToolEnd(prev.taskTree ?? initialTaskTree, event.toolName, true),
             }));
             if (event.toolResult) {
               updateLastResultsFromTool(event.toolName, event.toolResult);
@@ -2364,6 +3034,7 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
               streamingMessageTimestamp: null,
               activeToolCall: null,
               activityStatus: null,
+              taskTree: completeTaskTree(prev.taskTree, "Response ready"),
             }));
             // Update thread status info after message exchange
             if (state.session?.threadId) {
@@ -2392,6 +3063,16 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
               }
               pendingPluginSuggestionsRef.current = [];
             }
+            appendCurrentActionLogEntry({
+              entryType: "run_status",
+              title: "Response completed",
+              content: fullContent,
+              runId: initialTaskTree.runId,
+              payload: {
+                agentName: currentAgentName,
+                usage: event.usage ?? null,
+              },
+            });
             break;
 
           case "cancelled": {
@@ -2406,7 +3087,17 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
               streamingMessageTimestamp: null,
               activeToolCall: null,
               activityStatus: null,
+              taskTree: cancelTaskTree(prev.taskTree, "Response stopped"),
             }));
+            appendCurrentActionLogEntry({
+              entryType: "run_status",
+              title: "Response cancelled",
+              content: stoppedContent,
+              runId: initialTaskTree.runId,
+              payload: {
+                agentName: currentAgentName,
+              },
+            });
             break;
           }
 
@@ -2422,7 +3113,17 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
               streamingMessageTimestamp: null,
               activeToolCall: null,
               activityStatus: null,
+              taskTree: failTaskTree(prev.taskTree, event.error),
             }));
+            appendCurrentActionLogEntry({
+              entryType: "run_status",
+              title: "Response failed",
+              content: event.error ?? "Unknown streaming error",
+              runId: initialTaskTree.runId,
+              payload: {
+                agentName: currentAgentName,
+              },
+            });
             break;
         }
       }
@@ -2457,7 +3158,18 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
           isLoading: false,
           activeToolCall: null,
           activityStatus: null,
+          taskTree: failTaskTree(prev.taskTree, errorContent),
         };
+      });
+      appendCurrentActionLogEntry({
+        entryType: "run_status",
+        title: "Response failed",
+        content: errorContent,
+        runId: initialTaskTree.runId,
+        payload: {
+          requestedActionId,
+          requestedTaskScope,
+        },
       });
     } finally {
       activeStreamAbortControllerRef.current = null;
@@ -2473,6 +3185,8 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
     openChatWorkspace,
     openQuickActionsOverlay,
     openShortcutsOverlay,
+    appendCurrentActionLogEntry,
+    resolveThreadFromQuery,
     updateMessageByTimestamp,
     updateLastResultsFromTool,
   ]);
@@ -2511,7 +3225,16 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
         activityStatus: queuedIntent.kind === "steer"
           ? "Interrupt requested..."
           : prev.activityStatus,
+        taskTree: queueTaskTreeSubmission(prev.taskTree, queuedIntent.preview, queuedIntent.kind),
       }));
+      appendCurrentActionLogEntry({
+        entryType: "queue_update",
+        title: queuedIntent.kind === "steer" ? "Steering update queued" : "Follow-up queued",
+        content: queuedIntent.preview,
+        payload: {
+          kind: queuedIntent.kind,
+        },
+      });
 
       if (queuedIntent.kind === "steer") {
         cancelActiveResponse();
@@ -2523,6 +3246,7 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
   }, [
     state.isLoading,
     state.isStreaming,
+    appendCurrentActionLogEntry,
     cancelActiveResponse,
     processSubmission,
   ]);
@@ -2548,6 +3272,7 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
       activityStatus: nextSubmission.kind === "steer"
         ? "Applying steering update..."
         : "Running queued follow-up...",
+      taskTree: dequeueTaskTreeSubmission(prev.taskTree),
     }));
 
     queueMicrotask(() => {
@@ -2564,6 +3289,25 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
     state.view,
   ]);
 
+  useEffect(() => {
+    let disposed = false;
+
+    const syncBackgroundStatus = async (): Promise<void> => {
+      if (disposed) return;
+      await refreshBackgroundTaskTree();
+    };
+
+    void syncBackgroundStatus();
+    const intervalId = setInterval(() => {
+      void syncBackgroundStatus();
+    }, 5_000);
+
+    return () => {
+      disposed = true;
+      clearInterval(intervalId);
+    };
+  }, [refreshBackgroundTaskTree]);
+
   /**
    * Stream a prompt through the agent and update the last Gordon message in-place.
    * Shared by menu-triggered streaming handlers (trending, chains, etc.)
@@ -2572,6 +3316,18 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
     (prompt: string, messageTimestamp: string, errorPrefix: string) => {
       (async () => {
         if (!llmClientRef.current) return;
+        const initialTaskTree = createTaskTree({
+          input: prompt,
+        });
+        appendCurrentActionLogEntry({
+          entryType: "action_route",
+          title: "Menu request received",
+          content: prompt,
+          runId: initialTaskTree.runId,
+          payload: {
+            source: "menu",
+          },
+        });
         const context: GordonContext = buildAppGordonContext({
           binance: binanceClientRef.current,
           exchange: exchangeRef.current,
@@ -2592,7 +3348,17 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
           streamingMessageTimestamp: messageTimestamp,
           overlay: OVERLAY_NONE,
           activityStatus: "Preparing response...",
+          taskTree: initialTaskTree,
         }));
+        appendCurrentActionLogEntry({
+          entryType: "run_status",
+          title: "Menu response started",
+          content: "Streaming response initialized",
+          runId: initialTaskTree.runId,
+          payload: {
+            source: "menu",
+          },
+        });
 
         const updateMsg = (content: string, agent?: string): void => {
           updateMessageByTimestamp(messageTimestamp, (message) => ({
@@ -2642,29 +3408,79 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
                 if (event.content) {
                   fullContent += event.content;
                   scheduleUpdate();
+                  if (fullContent.length === event.content.length) {
+                    setState((prev) => ({
+                      ...prev,
+                      taskTree: markTaskTreeRoutingResolved(prev.taskTree ?? initialTaskTree, "Response streaming"),
+                    }));
+                  }
                 }
                 break;
               case "agent_switch":
                 if (event.agentName) {
                   currentAgent = event.agentName;
+                  appendCurrentActionLogEntry({
+                    entryType: "agent_switch",
+                    title: "Agent switch",
+                    content: `Delegated to ${event.agentName}`,
+                    runId: initialTaskTree.runId,
+                    payload: {
+                      agentName: event.agentName,
+                      source: "menu",
+                    },
+                  });
                   updateMsg(fullContent, currentAgent);
+                  setState((prev) => ({
+                    ...prev,
+                    taskTree: recordTaskTreeAgentSwitch(prev.taskTree ?? initialTaskTree, event.agentName!),
+                  }));
                 }
                 break;
               case "tool_call_start":
+                appendCurrentActionLogEntry({
+                  entryType: "tool_call",
+                  title: event.toolName || "Tool call",
+                  content: `Started ${event.toolName || "tool"}`,
+                  runId: initialTaskTree.runId,
+                  payload: {
+                    toolName: event.toolName,
+                    toolArgs: event.toolArgs,
+                    agentName: event.agentName ?? currentAgent,
+                    source: "menu",
+                  },
+                });
                 setState((prev) => ({
                   ...prev,
                   activeToolCall: event.toolName || "tool",
                   activityStatus: `Running ${event.toolName || "tool"}...`,
+                  taskTree: recordTaskTreeToolStart(
+                    prev.taskTree ?? initialTaskTree,
+                    event.toolName || "tool",
+                    event.toolArgs,
+                    event.agentName ?? currentAgent,
+                  ),
                 }));
                 if (event.agentName) {
                   currentAgent = event.agentName;
                 }
                 break;
               case "tool_call_end":
+                appendCurrentActionLogEntry({
+                  entryType: "tool_result",
+                  title: event.toolName || "Tool result",
+                  content: `Completed ${event.toolName || "tool"}`,
+                  runId: initialTaskTree.runId,
+                  payload: {
+                    toolName: event.toolName,
+                    toolResult: event.toolResult ?? null,
+                    source: "menu",
+                  },
+                });
                 setState((prev) => ({
                   ...prev,
                   activeToolCall: null,
                   activityStatus: "Finalizing response...",
+                  taskTree: recordTaskTreeToolEnd(prev.taskTree ?? initialTaskTree, event.toolName, true),
                 }));
                 break;
               case "done":
@@ -2677,7 +3493,19 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
                   streamingMessageTimestamp: null,
                   activeToolCall: null,
                   activityStatus: null,
+                  taskTree: completeTaskTree(prev.taskTree, "Response ready"),
                 }));
+                appendCurrentActionLogEntry({
+                  entryType: "run_status",
+                  title: "Menu response completed",
+                  content: fullContent,
+                  runId: initialTaskTree.runId,
+                  payload: {
+                    agentName: currentAgent,
+                    usage: event.usage ?? null,
+                    source: "menu",
+                  },
+                });
                 break;
               case "cancelled": {
                 flushPendingUpdate();
@@ -2691,7 +3519,18 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
                   streamingMessageTimestamp: null,
                   activeToolCall: null,
                   activityStatus: null,
+                  taskTree: cancelTaskTree(prev.taskTree, "Response stopped"),
                 }));
+                appendCurrentActionLogEntry({
+                  entryType: "run_status",
+                  title: "Menu response cancelled",
+                  content: stoppedContent,
+                  runId: initialTaskTree.runId,
+                  payload: {
+                    agentName: currentAgent,
+                    source: "menu",
+                  },
+                });
                 break;
               }
               case "error":
@@ -2703,7 +3542,18 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
                   streamingMessageTimestamp: null,
                   activeToolCall: null,
                   activityStatus: null,
+                  taskTree: failTaskTree(prev.taskTree, event.error),
                 }));
+                appendCurrentActionLogEntry({
+                  entryType: "run_status",
+                  title: "Menu response failed",
+                  content: event.error ?? "Unknown error",
+                  runId: initialTaskTree.runId,
+                  payload: {
+                    agentName: currentAgent,
+                    source: "menu",
+                  },
+                });
                 break;
             }
           }
@@ -2718,13 +3568,30 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
             streamingMessageTimestamp: null,
             activeToolCall: null,
             activityStatus: null,
+            taskTree: failTaskTree(prev.taskTree, error instanceof Error ? error.message : "Unknown error"),
           }));
+          appendCurrentActionLogEntry({
+            entryType: "run_status",
+            title: "Menu response failed",
+            content: error instanceof Error ? error.message : "Unknown error",
+            runId: initialTaskTree.runId,
+            payload: {
+              source: "menu",
+            },
+          });
         } finally {
           activeStreamAbortControllerRef.current = null;
         }
       })();
     },
-    [state.portfolioValue, state.availableCash, state.session?.resourceId, state.session?.threadId, updateMessageByTimestamp]
+    [
+      state.portfolioValue,
+      state.availableCash,
+      state.session?.resourceId,
+      state.session?.threadId,
+      appendCurrentActionLogEntry,
+      updateMessageByTimestamp,
+    ]
   );
 
   // Handle menu selection
@@ -3145,7 +4012,7 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
           messages: [
             {
               role: "gordon",
-              content: `Welcome to demo mode! You're in SAFE mode, so nothing will execute.
+              content: `Welcome to demo mode! You're in read-only mode, so nothing will execute.
 
 This is a great way to explore what I can do:
 - Ask me to scan the market for opportunities
@@ -3223,6 +4090,16 @@ Please check your API keys in the .env file and restart Gordon.`,
         console.error("Failed to reinitialize LLM client:", error);
       }
 
+      appendCurrentActionLogEntry({
+        entryType: "model_change",
+        title: "Model updated",
+        content: `Model switched to ${configRef.current.modelConfig?.model ?? "default model"}`,
+        payload: {
+          provider: configRef.current.modelConfig?.provider ?? null,
+          model: configRef.current.modelConfig?.model ?? null,
+        },
+      });
+
       setState((prev) => ({
         ...prev,
         view: "chat",
@@ -3242,7 +4119,7 @@ Please check your API keys in the .env file and restart Gordon.`,
       // User cancelled
       setState((prev) => ({ ...prev, view: "menu" }));
     }
-  }, []);
+  }, [appendCurrentActionLogEntry]);
 
   // Handle global keyboard shortcuts
   useInput((input, key) => {
@@ -3306,23 +4183,34 @@ Please check your API keys in the .env file and restart Gordon.`,
       return;
     }
 
-    // Any key to dismiss welcome banner
+    if (state.view === "welcome" && input.toLowerCase() === "b") {
+      const nextBannerMode = configRef.current.startupBannerMode === "quiet" ? "full" : "quiet";
+      const updatedConfig = { ...configRef.current, startupBannerMode: nextBannerMode };
+      configRef.current = updatedConfig;
+      setState((prev) => ({ ...prev }));
+      void saveConfig(updatedConfig).catch(() => {
+        // Best effort only. The next explicit configure flow can still persist it.
+      });
+      return;
+    }
+
+    // Enter any startup key to dismiss welcome banner
     if (state.view === "welcome" && (input || key.return)) {
       setState((prev) => ({ ...prev, view: "menu" }));
     }
   }, { isActive: true });
 
-  // Build ticker items from available price data
-  const tickerItems = useMemo((): TickerItem[] => {
-    const items: TickerItem[] = [];
-    if (state.btcPrice !== undefined) {
-      items.push({ symbol: "BTC", price: state.btcPrice, change: 0 });
-    }
-    return items;
-  }, [state.btcPrice]);
-
-  const maxVisibleMessages = 80;
-  const hiddenMessageCount = Math.max(0, state.messages.length - maxVisibleMessages);
+  const visibleThreadPolicy = useMemo(
+    () => buildVisibleThreadPolicy({
+      messages: state.messages,
+      isStreaming: state.isStreaming,
+      hasTaskTree: Boolean(state.taskTree),
+      hasBackgroundTasks: Boolean(state.backgroundTaskTree),
+    }),
+    [state.backgroundTaskTree, state.isStreaming, state.messages, state.taskTree]
+  );
+  const maxVisibleMessages = visibleThreadPolicy.visibleLimit;
+  const hiddenMessageCount = visibleThreadPolicy.hiddenCount;
   const visibleMessages = useMemo(
     () => (hiddenMessageCount > 0 ? state.messages.slice(-maxVisibleMessages) : state.messages),
     [hiddenMessageCount, maxVisibleMessages, state.messages]
@@ -3334,41 +4222,10 @@ Please check your API keys in the .env file and restart Gordon.`,
   );
   const quickActionsOverlayOpen = isOverlayOpen(state.overlay, "quick-actions");
   const shortcutsOverlayOpen = isOverlayOpen(state.overlay, "shortcuts");
-  const operatorStatus: OperatorStatusInfo = {
-    modelLabel: configRef.current.modelConfig?.model
-      || configRef.current.modelConfig?.provider
-      || "auto",
-    credentialProfile: getRequestCredentialProfile(configRef.current),
-    activeVenueLabel: brokerRef.current
-      ? `broker:${configRef.current.activeBrokerId || "default"}`
-      : exchangeRef.current
-        ? `exchange:${configRef.current.activeExchangeId || "default"}`
-        : hasWalletRails
-          ? "wallet rails"
-          : "none",
-    requestState: state.isStreaming ? "streaming" : state.isLoading ? "loading" : "idle",
-    queueDepth: state.queuedSubmissions.length,
-    configScopeLabel: getConfigScopeLabel(state.configLayers),
-    activeProfile: state.configLayers?.activeProfile ?? configRef.current.activeProfile ?? null,
-    activityStatus: state.activityStatus,
-  };
+  const showChatBanner = state.view === "chat" && state.messages.length < 4;
 
   return (
     <Box flexDirection="column" height="100%">
-      {/* Status Bar - hidden during loading to prevent SAFE→ARMED flicker */}
-      {state.view !== "loading" && (
-        <StatusBar
-          mode={state.mode}
-          portfolioValue={state.portfolioValue}
-          connectionStatus={state.connectionStatus}
-          btcPrice={state.btcPrice}
-          threadInfo={state.threadStatusInfo || undefined}
-          tickerItems={tickerItems}
-          chainStatus={state.chainStatus || undefined}
-          operatorStatus={operatorStatus}
-        />
-      )}
-
       {/* Shortcuts Overlay */}
       {shortcutsOverlayOpen && (
         <ShortcutsOverlay onClose={closeOverlay} />
@@ -3408,7 +4265,7 @@ Please check your API keys in the .env file and restart Gordon.`,
         )}
 
         {state.view === "welcome" && (
-          <WelcomeBanner />
+          <WelcomeBanner mode={configRef.current.startupBannerMode} context="welcome" />
         )}
 
         {state.view === "menu" && (
@@ -3428,16 +4285,21 @@ Please check your API keys in the .env file and restart Gordon.`,
         {state.view === "chat" && (
           <Box flexDirection="column" flexGrow={1}>
             {/* Startup hint - shows for 5 seconds */}
-            {state.showStartupHint && state.messages.length === 0 && (
+            {state.showStartupHint && state.messages.length === 0 && !showChatBanner && (
               <ShortcutsHint
                 duration={5000}
                 visible={state.showStartupHint}
               />
             )}
 
+            {showChatBanner && (
+              <WelcomeBanner mode={configRef.current.startupBannerMode} context="chat" />
+            )}
+
             <ChatView
               messages={visibleMessages}
               hiddenCount={hiddenMessageCount}
+              visibleLimit={maxVisibleMessages}
               isStreaming={state.isStreaming}
               activeStreamingTimestamp={state.streamingMessageTimestamp}
               activityStatus={state.activityStatus}
@@ -3478,12 +4340,29 @@ Please check your API keys in the .env file and restart Gordon.`,
                 <Text color={COLORS.DIM}>
                   {"Esc stops the active streamed response when possible. Enter queues a follow-up. Use /steer <message> to redirect the next run."}
                 </Text>
+                {state.taskTree && <TaskTree tree={state.taskTree} />}
                 {state.queuedSubmissions.length > 0 && (
                   <Text color={COLORS.HIGHLIGHT}>
                     Next queued: {state.queuedSubmissions[0]?.preview}
                     {state.queuedSubmissions.length > 1 ? ` (+${state.queuedSubmissions.length - 1} more)` : ""}
                   </Text>
                 )}
+              </Box>
+            )}
+
+            {state.backgroundTaskTree && (
+              <Box
+                flexDirection="column"
+                borderStyle="round"
+                borderColor={COLORS.TAN_DIM}
+                marginX={2}
+                marginBottom={1}
+                paddingX={1}
+              >
+                <Text color={COLORS.DIM}>
+                  Daemon-owned work continues outside the active chat run.
+                </Text>
+                <TaskTree tree={state.backgroundTaskTree} title="Background Tasks" />
               </Box>
             )}
 

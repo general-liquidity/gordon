@@ -7,12 +7,14 @@
  */
 
 import { Buffer } from "node:buffer";
+import type { Candle } from "../../../types/index.ts";
 import type {
   BrokerAdapter,
   BrokerAccount,
   BrokerCapabilities,
   BrokerClock,
   BrokerCredentials,
+  BrokerHistoricalBarsParams,
   BrokerId,
   BrokerOrder,
   BrokerOrderListParams,
@@ -648,5 +650,9 @@ export class RestBrokerAdapter implements BrokerAdapter {
       askSize: parseNumber(quoteRecord.askSize ?? quoteRecord.ask_size ?? quoteRecord.as),
       timestamp: String(quoteRecord.timestamp ?? quoteRecord.time ?? quoteRecord.quoteTime ?? new Date().toISOString()),
     };
+  }
+
+  async getHistoricalBars(_params: BrokerHistoricalBarsParams): Promise<Candle[]> {
+    throw new Error(`${this.displayName} does not expose normalized historical bars in Gordon yet.`);
   }
 }

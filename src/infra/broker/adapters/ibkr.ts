@@ -10,6 +10,7 @@ const IBKR_CAPABILITIES: BrokerCapabilities = {
   supportsOptions: true,
   supportsStreaming: true,
   supportsPaperTrading: true,
+  supportsHistoricalBars: false,
 };
 
 const IBKR_CONFIG: RestBrokerAdapterConfig = {
@@ -80,4 +81,3 @@ export class IbkrAdapter extends RestBrokerAdapter {
     super(credentials, IBKR_CONFIG);
   }
 }
-

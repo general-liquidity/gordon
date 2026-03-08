@@ -18,7 +18,7 @@ import {
   MarketScorer,
   type OrderBookEntry,
 } from "../../../core/market-analysis/index.ts";
-import { getGordonContext, type MastraExecutionContext } from "./types.ts";
+import { getGordonContext, normalizeSymbol, type MastraExecutionContext } from "./types.ts";
 
 // ============================================================================
 // Error Messages
@@ -82,9 +82,7 @@ export const analyzeWhaleOrdersTool = createTool({
       return errors.noExchange;
     }
 
-    const normalizedSymbol = symbol.toUpperCase().endsWith("USDT")
-      ? symbol.toUpperCase()
-      : `${symbol.toUpperCase()}USDT`;
+    const normalizedSymbol = normalizeSymbol(symbol);
 
     try {
       const orderBook = await ctx.exchange.getOrderBook(normalizedSymbol, depthLimit);
@@ -166,9 +164,7 @@ export const estimateMarketImpactTool = createTool({
       return errors.noExchange;
     }
 
-    const normalizedSymbol = symbol.toUpperCase().endsWith("USDT")
-      ? symbol.toUpperCase()
-      : `${symbol.toUpperCase()}USDT`;
+    const normalizedSymbol = normalizeSymbol(symbol);
 
     try {
       const orderBook = await ctx.exchange.getOrderBook(normalizedSymbol, 100);
@@ -248,9 +244,7 @@ export const scanBreakoutsTool = createTool({
       return errors.noExchange;
     }
 
-    const normalizedSymbol = symbol.toUpperCase().endsWith("USDT")
-      ? symbol.toUpperCase()
-      : `${symbol.toUpperCase()}USDT`;
+    const normalizedSymbol = normalizeSymbol(symbol);
 
     try {
       const candles = await ctx.exchange.getCandles(normalizedSymbol, timeframe, lookbackBars + 10);
@@ -326,9 +320,7 @@ export const detectConsolidationTool = createTool({
       return errors.noExchange;
     }
 
-    const normalizedSymbol = symbol.toUpperCase().endsWith("USDT")
-      ? symbol.toUpperCase()
-      : `${symbol.toUpperCase()}USDT`;
+    const normalizedSymbol = normalizeSymbol(symbol);
 
     try {
       const candles = await ctx.exchange.getCandles(normalizedSymbol, timeframe, 100);
@@ -416,9 +408,7 @@ export const scoreMarketTool = createTool({
       return errors.noExchange;
     }
 
-    const normalizedSymbol = symbol.toUpperCase().endsWith("USDT")
-      ? symbol.toUpperCase()
-      : `${symbol.toUpperCase()}USDT`;
+    const normalizedSymbol = normalizeSymbol(symbol);
 
     try {
       // Get market data

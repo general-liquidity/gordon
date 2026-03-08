@@ -1,4 +1,5 @@
 import type { Plan, GordonConfig } from "../types/index.ts";
+import { isValidTradingSymbol } from "../infra/markets/instruments.ts";
 
 /**
  * Result of plan validation
@@ -13,8 +14,8 @@ export interface ValidationResult {
  * Current portfolio state for validation context
  */
 export interface PortfolioState {
-  totalValue: number; // in USDT
-  availableCash: number; // USDT not in positions
+  totalValue: number; // account currency equivalent
+  availableCash: number; // liquid buying power / cash equivalent
   openPositions: number; // count of open trades
 }
 
@@ -25,8 +26,6 @@ const HIGH_VOLATILITY_THRESHOLD = 0.1; // 10% stop triggers warning
 const MIN_RISK_REWARD_RATIO = 1.2; // Minimum R:R ratio
 const LOW_REWARD_THRESHOLD = 1.5; // Below this triggers warning
 const LARGE_ALLOCATION_THRESHOLD = 0.08; // 8% of portfolio triggers warning
-const SYMBOL_REGEX = /^[A-Z]{2,10}USDT$/; // Valid symbol format
-
 /**
  * Calculate the risk/reward ratio for a plan
  * Risk = distance from entry to stop loss
@@ -151,9 +150,9 @@ function validateStructure(plan: Plan, errors: string[]): void {
   }
 
   // Symbol format validation
-  if (!SYMBOL_REGEX.test(plan.symbol)) {
+  if (!isValidTradingSymbol(plan.symbol)) {
     errors.push(
-      `Invalid symbol format: "${plan.symbol}". Expected format like "DOTUSDT" (2-10 uppercase letters followed by USDT).`
+      `Invalid symbol format: "${plan.symbol}". Use a supported crypto pair like "BTCUSDT" or a stock ticker like "AAPL".`
     );
   }
 }
@@ -175,7 +174,7 @@ function validateRisk(
   // Allocation amount check
   if (plan.allocation.amount > maxAllocationAmount) {
     errors.push(
-      `Allocation of ${plan.allocation.amount} USDT exceeds maximum allowed per trade (${maxAllocationAmount.toFixed(2)} USDT = ${(config.preferences.maxAllocationPerTrade * 100).toFixed(0)}% of portfolio).`
+      `Allocation of ${plan.allocation.amount} exceeds maximum allowed per trade (${maxAllocationAmount.toFixed(2)} = ${(config.preferences.maxAllocationPerTrade * 100).toFixed(0)}% of portfolio).`
     );
   }
 
@@ -183,7 +182,7 @@ function validateRisk(
   const remainingCash = portfolio.availableCash - plan.allocation.amount;
   if (remainingCash < minCashReserve) {
     errors.push(
-      `Insufficient cash reserve after trade. Would have ${remainingCash.toFixed(2)} USDT remaining, but need at least ${minCashReserve.toFixed(2)} USDT (${(config.preferences.cashReservePercent * 100).toFixed(0)}% reserve).`
+      `Insufficient cash reserve after trade. Would have ${remainingCash.toFixed(2)} remaining, but need at least ${minCashReserve.toFixed(2)} (${(config.preferences.cashReservePercent * 100).toFixed(0)}% reserve).`
     );
   }
 

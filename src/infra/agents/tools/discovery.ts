@@ -15,6 +15,7 @@ import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
 import { formatActionPlanMarkdown, planActionExecution } from "../../actions/runtime.ts";
+import { normalizeCryptoSymbol, resolveInstrument } from "../../markets/instruments.ts";
 import { getGordonContext, type MastraExecutionContext } from "./types.ts";
 import type { ExchangeExtended } from "../../exchange/types.ts";
 
@@ -23,7 +24,7 @@ import type { ExchangeExtended } from "../../exchange/types.ts";
 // ============================================================================
 
 const errors = {
-  noExchange: { error: "Exchange client not connected. Please run setup first." },
+  noExchange: { error: "No active trading venue is connected. Please run setup first." },
 };
 
 const marketOrderPlanOutputSchema = z.object({
@@ -32,6 +33,15 @@ const marketOrderPlanOutputSchema = z.object({
   blockers: z.array(z.string()),
   preview: z.record(z.string(), z.unknown()).optional(),
   error: z.string().optional(),
+});
+
+const cryptoDiscoveryCapabilitySchema = z.object({
+  supportsQuotes: z.boolean(),
+  supportsBidAsk: z.boolean(),
+  supportsOrderBook: z.boolean(),
+  supportsSessionCalendar: z.boolean(),
+  supportsExtendedHours: z.boolean(),
+  supportsHistoricalBars: z.boolean(),
 });
 
 // ============================================================================
@@ -66,6 +76,9 @@ export const getTrendingTokensTool = createTool({
       .describe("Filter by price direction"),
   }),
   outputSchema: z.object({
+    marketFamily: z.enum(["crypto", "stocks"]).optional(),
+    venueRoute: z.enum(["exchange", "broker"]).optional(),
+    capabilities: cryptoDiscoveryCapabilitySchema.optional(),
     direction: z.string().optional(),
     filters: z.object({
       minVolume: z.number(),
@@ -86,6 +99,13 @@ export const getTrendingTokensTool = createTool({
   }),
   execute: async ({ minVolume, minPriceChange, limit, direction }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
+    if (ctx?.broker && !ctx?.exchange) {
+      return {
+        marketFamily: "stocks" as const,
+        venueRoute: "broker" as const,
+        error: "Trending token discovery requires a crypto venue with 24h ticker coverage. Use /analyze <ticker> for stock-specific workflows.",
+      };
+    }
     if (!ctx?.exchange) {
       return errors.noExchange;
     }
@@ -137,12 +157,32 @@ export const getTrendingTokensTool = createTool({
 
       if (filtered.length === 0) {
         return {
+          marketFamily: "crypto" as const,
+          venueRoute: "exchange" as const,
+          capabilities: {
+            supportsQuotes: true,
+            supportsBidAsk: true,
+            supportsOrderBook: true,
+            supportsSessionCalendar: false,
+            supportsExtendedHours: false,
+            supportsHistoricalBars: true,
+          },
           message: `No tokens found matching criteria (min volume: ${minVolume}, min change: ${minPriceChange}%)`,
           tokens: [],
         };
       }
 
       return {
+        marketFamily: "crypto" as const,
+        venueRoute: "exchange" as const,
+        capabilities: {
+          supportsQuotes: true,
+          supportsBidAsk: true,
+          supportsOrderBook: true,
+          supportsSessionCalendar: false,
+          supportsExtendedHours: false,
+          supportsHistoricalBars: true,
+        },
         direction,
         filters: { minVolume, minPriceChange },
         count: filtered.length,
@@ -185,6 +225,9 @@ export const getHighVolumeTokensTool = createTool({
       .describe("Max results to return"),
   }),
   outputSchema: z.object({
+    marketFamily: z.enum(["crypto", "stocks"]).optional(),
+    venueRoute: z.enum(["exchange", "broker"]).optional(),
+    capabilities: cryptoDiscoveryCapabilitySchema.optional(),
     minVolume: z.string().optional(),
     count: z.number().optional(),
     tokens: z.array(z.object({
@@ -200,6 +243,13 @@ export const getHighVolumeTokensTool = createTool({
   }),
   execute: async ({ minVolume, limit }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
+    if (ctx?.broker && !ctx?.exchange) {
+      return {
+        marketFamily: "stocks" as const,
+        venueRoute: "broker" as const,
+        error: "High-volume token discovery requires a crypto venue with market-wide ticker coverage. Use /analyze <ticker> for stock-specific workflows.",
+      };
+    }
     if (!ctx?.exchange) {
       return errors.noExchange;
     }
@@ -232,12 +282,32 @@ export const getHighVolumeTokensTool = createTool({
 
       if (filtered.length === 0) {
         return {
+          marketFamily: "crypto" as const,
+          venueRoute: "exchange" as const,
+          capabilities: {
+            supportsQuotes: true,
+            supportsBidAsk: true,
+            supportsOrderBook: true,
+            supportsSessionCalendar: false,
+            supportsExtendedHours: false,
+            supportsHistoricalBars: true,
+          },
           message: `No tokens found with volume above $${(minVolume / 1000000).toFixed(1)}M`,
           tokens: [],
         };
       }
 
       return {
+        marketFamily: "crypto" as const,
+        venueRoute: "exchange" as const,
+        capabilities: {
+          supportsQuotes: true,
+          supportsBidAsk: true,
+          supportsOrderBook: true,
+          supportsSessionCalendar: false,
+          supportsExtendedHours: false,
+          supportsHistoricalBars: true,
+        },
         minVolume: `$${(minVolume / 1000000).toFixed(1)}M`,
         count: filtered.length,
         tokens: filtered.map((t, i) => ({
@@ -423,9 +493,7 @@ export const placeBracketOrderTool = createTool({
       };
     }
 
-    const normalizedSymbol = symbol.toUpperCase().endsWith("USDT")
-      ? symbol.toUpperCase()
-      : `${symbol.toUpperCase()}USDT`;
+    const normalizedSymbol = normalizeCryptoSymbol(symbol);
 
     // Risk gate: evaluate order before placement
     try {
@@ -574,7 +642,7 @@ export const placeMarketOrderTool = createTool({
   }),
   execute: async ({ symbol, side, quantity, quoteOrderQty }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
-    if (!ctx?.exchange) {
+    if (!ctx?.exchange && !ctx?.broker) {
       return errors.noExchange;
     }
     const plan = await planActionExecution("trading.market_order", { symbol, side, quantity, quoteOrderQty }, ctx);
@@ -584,14 +652,13 @@ export const placeMarketOrderTool = createTool({
       };
     }
 
+    const instrument = await resolveInstrument(ctx, symbol);
     const normalizedSymbol = typeof plan.preview?.symbol === "string"
-      ? plan.preview.symbol
-      : symbol.toUpperCase().endsWith("USDT") || symbol.toUpperCase().endsWith("USDC")
-      ? symbol.toUpperCase()
-      : `${symbol.toUpperCase()}USDT`;
+      ? String(plan.preview.symbol)
+      : instrument.normalizedSymbol;
 
-    // Risk gate: evaluate order before placement (only when base quantity is provided)
-    if (quantity && quantity > 0) {
+    // Risk gate: evaluate order before placement (crypto execution only today)
+    if (instrument.route === "exchange" && quantity && quantity > 0) {
       try {
         const { evaluateOrderRisk } = await import("./risk-gate.ts");
         const riskResult = await evaluateOrderRisk(
@@ -614,6 +681,38 @@ export const placeMarketOrderTool = createTool({
     }
 
     try {
+      if (instrument.route === "broker" && ctx.broker) {
+        const orderResult = await ctx.broker.placeOrder({
+          symbol: normalizedSymbol,
+          side: side.toLowerCase() as "buy" | "sell",
+          type: "market",
+          timeInForce: "day",
+          ...(quantity ? { qty: quantity } : {}),
+          ...(quoteOrderQty ? { notional: quoteOrderQty } : {}),
+        });
+
+        return {
+          success: true,
+          message: `${side} ${orderResult.qty || quantity || 0} ${normalizedSymbol} via ${ctx.broker.displayName} — status: ${orderResult.status}`,
+          order: {
+            orderId: Number(orderResult.id) || 0,
+            symbol: orderResult.symbol,
+            side: orderResult.side.toUpperCase(),
+            status: orderResult.status,
+            executedQty: orderResult.filledQty,
+            cummulativeQuoteQty: orderResult.notional ?? 0,
+            avgPrice: orderResult.limitPrice ?? 0,
+          },
+        };
+      }
+
+      if (!ctx.exchange) {
+        return {
+          success: false,
+          error: "No active crypto execution venue is connected.",
+        };
+      }
+
       const orderResult = await ctx.exchange.placeOrder({
         symbol: normalizedSymbol,
         side,

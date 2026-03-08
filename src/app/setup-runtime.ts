@@ -5,6 +5,7 @@ import { getProviderCredentialStatuses, type ProviderCredentialStatus } from "..
 import { BROKER_ENV_MAP, type BrokerId } from "../infra/broker/types.ts";
 import { EXCHANGE_ENV_MAP, type ExchangeId } from "../infra/exchange/types.ts";
 import { pluginInstaller } from "../infra/mcp/marketplace/installer.ts";
+import { getExecutionVenueMetadata, getIntegrationSurfaceMetadata } from "../infra/integrations/index.ts";
 import type {
   GordonConfig,
   MultiBrokerConfig,
@@ -27,6 +28,7 @@ export interface DoctorReport {
   healthy: boolean;
   summary: {
     onboardingComplete: boolean;
+    startupBannerMode: "full" | "quiet";
     llmReady: boolean;
     activeExchange: string | null;
     activeBroker: string | null;
@@ -408,7 +410,7 @@ export async function collectDoctorReport(configInput?: GordonConfig): Promise<D
       ok: Boolean(activeExchange),
       severity: activeExchange ? "info" : "warn",
       message: activeExchange
-        ? `Active exchange: ${activeExchange.type}.`
+        ? `Active execution venue: ${getExecutionVenueMetadata(activeExchange.type).displayName}.`
         : "No active exchange is configured.",
     },
     {
@@ -416,7 +418,7 @@ export async function collectDoctorReport(configInput?: GordonConfig): Promise<D
       ok: Boolean(activeBroker),
       severity: activeBroker ? "info" : "info",
       message: activeBroker
-        ? `Active broker: ${activeBroker.type}${activeBroker.paper ? " (paper)" : " (live)"}.`
+        ? `Active broker: ${getExecutionVenueMetadata(activeBroker.type).displayName}${activeBroker.paper ? " (paper)" : " (live)"}.`
         : "No active stock broker is configured.",
     },
     {
@@ -433,7 +435,7 @@ export async function collectDoctorReport(configInput?: GordonConfig): Promise<D
       id: "mcp",
       ok: true,
       severity: installedMcpPlugins > 0 ? "info" : "info",
-      message: `${enabledMcpPlugins}/${installedMcpPlugins} MCP plugins are enabled.`,
+      message: `${enabledMcpPlugins}/${installedMcpPlugins} ${getIntegrationSurfaceMetadata("gordon_mcp").displayName} plugins are enabled.`,
     },
   ];
 
@@ -456,6 +458,7 @@ export async function collectDoctorReport(configInput?: GordonConfig): Promise<D
       llmReady: envStatus.hasLLMKey,
       activeExchange: activeExchange?.type ?? null,
       activeBroker: activeBroker?.type ?? null,
+      startupBannerMode: config.startupBannerMode,
       keyringEnabled: config.useKeyring,
       keyringAvailable,
       installedMcpPlugins,
@@ -474,8 +477,9 @@ export function formatDoctorReport(report: DoctorReport): string {
     `Generated: ${report.generatedAt}`,
     `Healthy: ${report.healthy ? "yes" : "no"}`,
     `Onboarding complete: ${report.summary.onboardingComplete ? "yes" : "no"}`,
+    `Startup banner: ${report.summary.startupBannerMode}`,
     `LLM ready: ${report.summary.llmReady ? "yes" : "no"}`,
-    `Active exchange: ${report.summary.activeExchange ?? "none"}`,
+    `Active crypto venue: ${report.summary.activeExchange ?? "none"}`,
     `Active broker: ${report.summary.activeBroker ?? "none"}`,
     `Keyring: ${report.summary.keyringEnabled ? "enabled" : "disabled"} (${report.summary.keyringAvailable ? "available" : "unavailable"})`,
     `MCP plugins: ${report.summary.enabledMcpPlugins}/${report.summary.installedMcpPlugins} enabled`,
@@ -493,7 +497,9 @@ export function formatDoctorReport(report: DoctorReport): string {
     for (const status of report.providerStatuses) {
       const prefix = status.ready ? "[OK]" : "[--]";
       const missing = status.missing.length > 0 ? ` | missing: ${status.missing.join(", ")}` : "";
-      lines.push(`${prefix} ${status.providerKind}:${status.providerId} (${status.sessionMode})${missing}`);
+      const label = status.integration?.displayName ?? status.label;
+      const domain = status.integration?.integrationDomain ?? status.providerKind;
+      lines.push(`${prefix} ${label} [${domain}] (${status.sessionMode})${missing}`);
     }
   }
 

@@ -63,6 +63,10 @@ if (runtimeError) {
 // Debug mode — set LOG_LEVEL before any logger is imported
 if (flags.debug) {
   process.env.LOG_LEVEL = "debug";
+  process.env.GORDON_STARTUP_QUIET = "0";
+} else {
+  process.env.LOG_LEVEL = process.env.LOG_LEVEL || "error";
+  process.env.GORDON_STARTUP_QUIET = process.env.GORDON_STARTUP_QUIET || "1";
 }
 
 // Set NO_COLOR for Ink/chalk when colors should be disabled
@@ -88,7 +92,7 @@ await checkLicense();
 
 import React from "react";
 import { render } from "ink";
-import { AppWithTheme } from "./app/App.tsx";
+import { AppWithTheme } from "./app/index.ts";
 import { closeDatabase } from "./infra/storage/database.ts";
 import { checkForUpdates } from "./utils/update-notifier.ts";
 import * as telemetry from "./infra/telemetry/index.ts";
@@ -168,7 +172,9 @@ telemetry.init();
 const { waitUntilExit } = render(<AppWithTheme />);
 
 // Non-blocking update check — runs after TUI renders, never delays startup
-checkForUpdates().catch(() => {});
+if (process.env.GORDON_STARTUP_QUIET !== "1") {
+  checkForUpdates().catch(() => {});
+}
 
 waitUntilExit().then(() => {
   gracefulShutdown("exit");

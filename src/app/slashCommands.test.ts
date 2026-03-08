@@ -68,4 +68,28 @@ describe("slash command UX formatting", () => {
     expect(chat?.workflow).toBe("operate");
     expect(chat?.target).toBe("chat");
   });
+
+  it("includes CLI-native systematic workflows", () => {
+    const systematic = SLASH_COMMANDS.find((command) => command.name === "systematic");
+    const dataset = SLASH_COMMANDS.find((command) => command.name === "dataset");
+    const runtime = SLASH_COMMANDS.find((command) => command.name === "runtime");
+
+    expect(systematic?.workflow).toBe("run");
+    expect(systematic?.target).toBe("backtester");
+    expect(dataset?.workflow).toBe("run");
+    expect(dataset?.aliases).toContain("datasets");
+    expect(runtime?.workflow).toBe("run");
+    expect(runtime?.target).toBe("monitor");
+  });
+
+  it("includes typed action-log workflow commands", () => {
+    const actionLog = SLASH_COMMANDS.find((command) => command.name === "action-log");
+    const bookmark = SLASH_COMMANDS.find((command) => command.name === "bookmark");
+    const compactThread = SLASH_COMMANDS.find((command) => command.name === "compact-thread");
+
+    expect(actionLog?.workflow).toBe("operate");
+    expect(actionLog?.target).toBe("action-log");
+    expect(bookmark?.aliases).toContain("pin");
+    expect(compactThread?.target).toBe("compact-thread");
+  });
 });

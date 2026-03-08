@@ -78,8 +78,8 @@ const LEVEL_CONFIG: Record<UrgencyLevel, {
 }> = {
   info: {
     icon: "ℹ",
-    color: COLORS.BLUE,
-    bgColor: "#1e3a5f",
+    color: COLORS.DISCOVER,
+    bgColor: "#12363c",
     size: "small",
     animate: false,
     animationType: "none",
@@ -361,7 +361,7 @@ export const AlertBanner: React.FC<AlertBannerProps> = ({
 
 /**
  * Trading Mode Indicator
- * Specialized component for SAFE/ARMED mode display
+ * Specialized component for SAFE/ARMED mode display with user-facing labels
  */
 export interface TradingModeIndicatorProps {
   mode: "SAFE" | "ARMED";
@@ -387,9 +387,9 @@ export const TradingModeIndicator: React.FC<TradingModeIndicatorProps> = ({
 
   const label = isArmed
     ? timeRemaining
-      ? `ARMED (${timeRemaining}m)`
-      : "ARMED"
-    : "SAFE";
+      ? `Live enabled (${timeRemaining}m)`
+      : "Live enabled"
+    : "Read-only";
 
   if (isArmed && animate && !isBlinkVisible) {
     return <Text color={COLORS.MUTED}>{label}</Text>;

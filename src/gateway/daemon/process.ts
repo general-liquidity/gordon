@@ -10,6 +10,7 @@ import { getOrCreateDaemonToken } from "../security/index.ts";
 import { initMCPTools, enableMCPHotReload, disableMCPHotReload } from "../../infra/mcp/client.ts";
 import { StrategyRuntime } from "../../core/runtime/engine.ts";
 import { upsertSchedulerTask } from "../store/scheduler-store.ts";
+import { appendActionLogEntry } from "../../infra/action-log/index.ts";
 
 const logger = createModuleLogger("gateway-daemon");
 
@@ -152,6 +153,17 @@ export async function startGatewayDaemonProcess(): Promise<GatewayDaemonHandle> 
     actor: "daemon",
     payload: { socketPath: ipc.socketPath },
   });
+  appendActionLogEntry({
+    sessionId: "daemon",
+    resourceId: "daemon",
+    entryType: "daemon_event",
+    title: "Daemon started",
+    content: `Gateway daemon started on ${ipc.socketPath}`,
+    payload: {
+      socketPath: ipc.socketPath,
+      builtInSchedulerTasks: listBuiltInTaskIds(),
+    },
+  });
 
   logger.info("Gateway daemon started", {
     socketPath: ipc.socketPath,
@@ -172,6 +184,14 @@ export async function startGatewayDaemonProcess(): Promise<GatewayDaemonHandle> 
       actor: "daemon",
       payload: { socketPath: ipc.socketPath },
     });
+    appendActionLogEntry({
+      sessionId: "daemon",
+      resourceId: "daemon",
+      entryType: "daemon_event",
+      title: "Daemon stopped",
+      content: `Gateway daemon stopped on ${ipc.socketPath}`,
+      payload: { socketPath: ipc.socketPath },
+    });
     logger.info("Gateway daemon stopped");
   };
 
@@ -182,4 +202,15 @@ export async function startGatewayDaemonProcess(): Promise<GatewayDaemonHandle> 
     authToken,
     stop,
   };
+}
+
+function listBuiltInTaskIds(): string[] {
+  return [
+    "__health_check",
+    "__circuit_breaker_eval",
+    "__regime_check",
+    "__evolution_tick",
+    "__capital_refresh",
+    "__autonomous_cycle",
+  ];
 }

@@ -3,6 +3,10 @@ import { join } from "node:path";
 import type { GordonConfig } from "../../types/index.ts";
 import { BROKER_ENV_MAP, type BrokerId } from "../broker/types.ts";
 import { EXCHANGE_ENV_MAP, type ExchangeId } from "../exchange/types.ts";
+import {
+  getExecutionVenueMetadata,
+  getIntegrationSurfaceMetadata,
+} from "../integrations/taxonomy.ts";
 import { credentialManager } from "../mcp/credentials.ts";
 import { pluginInstaller } from "../mcp/marketplace/installer.ts";
 import { createAgentRailsRegistry } from "../rails/registry.ts";
@@ -103,6 +107,7 @@ function buildStatus(
   sessionMode: ProviderCredentialStatus["sessionMode"],
   fields: CredentialFieldStatus[],
   notes: string[] = [],
+  integrationId?: string,
 ): ProviderCredentialStatus {
   const missing = fields.filter((field) => !field.present).map((field) => field.key);
   return {
@@ -116,6 +121,9 @@ function buildStatus(
     fields,
     missing,
     notes,
+    integration: providerKind === "exchange" || providerKind === "broker"
+      ? getExecutionVenueMetadata((integrationId ?? providerId) as ExchangeId | BrokerId)
+      : getIntegrationSurfaceMetadata(integrationId ?? providerId),
   };
 }
 
@@ -140,7 +148,7 @@ function getLlmStatuses(envKeys: EnvMapRecord, keyringKeys: Set<string>): Provid
   return providers.map((provider) => buildStatus(
     provider.id,
     "llm",
-    provider.label,
+    getIntegrationSurfaceMetadata(provider.id).displayName,
     "ops",
     provider.authMode,
     "static",
@@ -200,12 +208,13 @@ function getExchangeStatuses(
     return buildStatus(
       exchange.id,
       "exchange",
-      exchange.type,
+      getExecutionVenueMetadata(exchange.type as ExchangeId).displayName,
       "default",
       exchange.type === "hyperliquid" ? "wallet" : "api_key",
       getExchangeSessionMode(exchange.type as ExchangeId),
       fields,
       exchange.isDefault ? ["active_exchange"] : [],
+      exchange.type,
     );
   });
 }
@@ -241,12 +250,13 @@ function getBrokerStatuses(
     return buildStatus(
       broker.id,
       "broker",
-      broker.type,
+      getExecutionVenueMetadata(broker.type as BrokerId).displayName,
       broker.paper ? "paper" : "live",
       "api_key",
       getBrokerSessionMode(broker.type as BrokerId),
       fields,
       broker.isDefault ? ["active_broker"] : [],
+      broker.type,
     );
   });
 }
@@ -263,7 +273,7 @@ function getRailStatuses(
     statuses.push(buildStatus(
       provider.config.id,
       "wallet",
-      provider.config.type,
+      getIntegrationSurfaceMetadata(provider.config.type).displayName,
       "ops",
       provider.config.authMode,
       provider.config.authMode === "mcp" ? "mcp" : provider.config.authMode === "hybrid" ? "hybrid" : "static",
@@ -272,6 +282,7 @@ function getRailStatuses(
         resolveFieldStatus("MOONPAY_SECRET_KEY", "MoonPay secret key", true, { envKeys, keyringKeys }),
       ],
       [provider.config.isDefault ? "active_wallet_provider" : ""].filter(Boolean),
+      provider.config.type,
     ));
   }
 
@@ -279,12 +290,13 @@ function getRailStatuses(
     statuses.push(buildStatus(
       provider.config.id,
       "chain",
-      provider.config.type,
+      getIntegrationSurfaceMetadata(provider.config.type).displayName,
       "ops",
       provider.config.authMode,
       provider.config.authMode === "mcp" ? "mcp" : provider.config.authMode === "hybrid" ? "hybrid" : "static",
       [resolveFieldStatus("HELIUS_API_KEY", "Helius API key", true, { envKeys, keyringKeys })],
       [provider.config.isDefault ? "active_chain_provider" : ""].filter(Boolean),
+      provider.config.type,
     ));
   }
 
@@ -292,7 +304,7 @@ function getRailStatuses(
     statuses.push(buildStatus(
       provider.config.id,
       "payments",
-      provider.config.type,
+      getIntegrationSurfaceMetadata(provider.config.type).displayName,
       "ops",
       provider.config.authMode,
       provider.config.authMode === "mcp" ? "mcp" : provider.config.authMode === "hybrid" ? "hybrid" : "static",
@@ -301,10 +313,67 @@ function getRailStatuses(
         resolveFieldStatus("POLYGON_X402_RECIPIENT", "Polygon x402 recipient", false, { envKeys, keyringKeys }),
       ],
       [provider.config.isDefault ? "active_payment_provider" : ""].filter(Boolean),
+      provider.config.type,
     ));
   }
 
   return statuses;
+}
+
+function getDataAndAutomationStatuses(
+  envKeys: EnvMapRecord,
+  keyringKeys: Set<string>,
+): ProviderCredentialStatus[] {
+  return [
+    buildStatus(
+      "tinyfish",
+      "automation",
+      getIntegrationSurfaceMetadata("tinyfish").displayName,
+      "ops",
+      "api_key",
+      "static",
+      [resolveFieldStatus("TINYFISH_API_KEY", "Tinyfish API key", true, { envKeys, keyringKeys })],
+    ),
+    buildStatus(
+      "thegraph",
+      "data",
+      getIntegrationSurfaceMetadata("thegraph").displayName,
+      "ops",
+      "api_key",
+      "static",
+      [resolveFieldStatus("THEGRAPH_API_KEY", "The Graph API key", true, { envKeys, keyringKeys })],
+    ),
+    buildStatus(
+      "synthdata",
+      "data",
+      getIntegrationSurfaceMetadata("synthdata").displayName,
+      "ops",
+      "api_key",
+      "static",
+      [resolveFieldStatus("SYNTHDATA_API_KEY", "SynthData API key", true, { envKeys, keyringKeys })],
+    ),
+    buildStatus(
+      "basescan",
+      "data",
+      getIntegrationSurfaceMetadata("basescan").displayName,
+      "ops",
+      "api_key",
+      "static",
+      [resolveFieldStatus("BASESCAN_API_KEY", "Basescan API key", true, { envKeys, keyringKeys })],
+    ),
+    buildStatus(
+      "chainlink_data_streams",
+      "data",
+      getIntegrationSurfaceMetadata("chainlink_data_streams").displayName,
+      "ops",
+      "api_key",
+      "static",
+      [
+        resolveFieldStatus("CHAINLINK_API_KEY", "Chainlink API key", true, { envKeys, keyringKeys }),
+        resolveFieldStatus("CHAINLINK_API_SECRET", "Chainlink API secret", true, { envKeys, keyringKeys }),
+      ],
+    ),
+  ];
 }
 
 async function getMcpStatuses(): Promise<ProviderCredentialStatus[]> {
@@ -349,6 +418,7 @@ async function getMcpStatuses(): Promise<ProviderCredentialStatus[]> {
         "mcp",
         fields,
         [plugin.enabled ? "enabled" : "disabled", `category=${plugin.manifest.category}`],
+        "gordon_mcp",
       );
     });
   } catch {
@@ -365,6 +435,7 @@ export async function getProviderCredentialStatuses(config: GordonConfig): Promi
     ...getExchangeStatuses(config, envKeys, keyringKeys),
     ...getBrokerStatuses(config, envKeys, keyringKeys),
     ...getRailStatuses(config, envKeys, keyringKeys),
+    ...getDataAndAutomationStatuses(envKeys, keyringKeys),
     ...await getMcpStatuses(),
   ];
 }

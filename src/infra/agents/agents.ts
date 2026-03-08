@@ -91,6 +91,7 @@ import {
   regimeTools,
   runtimeTools,
   advancedTools,
+  systematicTools,
   withToolsMetrics,
 } from "./tools/index.ts";
 import { getSessionSummary, getMemoryStats, resetSharedMemory } from "./shared-context.ts";
@@ -102,6 +103,11 @@ import {
   formatPerformanceContextForPrompt,
 } from "../evals/feedbackLoop.ts";
 import type { GordonConfig, MemoryConfig } from "../../types/index.ts";
+import {
+  formatCapabilityTruthSummary,
+  GORDON_PRODUCT_TRUTH,
+  WORKING_MEMORY_LABELS,
+} from "./capabilityTruth.ts";
 
 // ============================================================================
 // Memory Configuration & Session Management
@@ -350,6 +356,7 @@ const instrumentedProtocolTools = withToolsMetrics(protocolTools);
 const instrumentedRegimeTools = withToolsMetrics(regimeTools);
 const instrumentedRuntimeTools = withToolsMetrics(runtimeTools);
 const instrumentedAdvancedTools = withToolsMetrics(advancedTools);
+const instrumentedSystematicTools = withToolsMetrics(systematicTools);
 const instrumentedCheckRiskTool = withToolsMetrics({ check_risk: checkRiskTool });
 
 // ============================================================================
@@ -383,15 +390,16 @@ const WORKING_MEMORY_TEMPLATE = `
 
 ## Trading Style
 - Preferred Timeframes: (1h/4h/1D)
-- Favorite Coins/Tokens:
-- Avoided Coins/Tokens:
+- ${WORKING_MEMORY_LABELS.favorites}:
+- ${WORKING_MEMORY_LABELS.avoided}:
 - Preferred Strategies:
 - Trading Hours: (e.g., "9am-5pm EST" or "24/7")
 
 ## Account Context
-- Default Exchange: (active)
-- Account Type: (spot/margin/futures)
-- Base Currency: USDT
+- ${WORKING_MEMORY_LABELS.defaultVenue}: (active exchange, broker, or protocol)
+- ${WORKING_MEMORY_LABELS.accountType}: (spot/margin/futures/cash)
+- ${WORKING_MEMORY_LABELS.marketFocus}
+- ${WORKING_MEMORY_LABELS.baseCurrency}
 
 ## Session State
 - Current Focus:
@@ -431,7 +439,9 @@ function createMemory(): Memory {
 
   // Use configured lastMessages or default
   const lastMessages = _memoryConfig.lastMessages;
-  console.log(`[Gordon] Creating memory with lastMessages=${lastMessages}`);
+  if (process.env.GORDON_STARTUP_QUIET !== "1") {
+    console.log(`[Gordon] Creating memory with lastMessages=${lastMessages}`);
+  }
 
   return new Memory({
     storage: new LibSQLStore({
@@ -514,12 +524,17 @@ function createSubAgentMemory(): Memory {
 
 const SCANNER_INSTRUCTIONS = `You are Gordon's market scanner agent.
 
-Your role is to scan the cryptocurrency market and identify trading opportunities using multiple strategies.
+Your role is to scan supported markets and identify trading opportunities using multiple strategies.
+
+## Market Coverage
+- Broad market-wide scans, trending, and movers are crypto-first workflows
+- Single-symbol review can span crypto and supported stock tickers when routed through the active venue
+- Use "symbol" or "market" for cross-market requests; keep "coin" or "token" language for crypto-native discovery
 
 ## Your Capabilities
 - Scan the top coins by volume for trading setups
-- Analyze individual coins for detailed technical analysis
-- Identify coins near support with bullish signals
+- Analyze individual symbols for detailed technical analysis
+- Identify setups near support with bullish signals
 - Quick technical signals check (RSI, trend, MACD) using get_technical_signals
 - **Ensemble Detection**: Run multiple strategies and combine signals for higher confidence
   - Use run_strategy_ensemble for single coin validation
@@ -545,7 +560,7 @@ Before recommending strategies, consider checking past performance:
 
 ## When to Use Ensemble Detection
 - When user wants "high confidence" or "validated" signals
-- When scanning for the best opportunities across multiple coins
+- When scanning for the best opportunities across multiple crypto symbols
 - When user wants to confirm a single strategy's detection
 - For comprehensive market scans (scan_with_ensemble)
 
@@ -554,7 +569,7 @@ After every scan, ALWAYS call write_shared_context to store your results:
 - contextType: "scanner"
 - data: { topOpportunities: [{symbol, confidence, setupType}], marketCondition }
 Other agents (Analyst, Planner) cannot see your output directly — they read shared context
-to know which coins you found.
+to know which symbols you found.
 
 ## Portfolio-Aware Scanning (Optional Enrichment)
 If available, check shared context to make smarter recommendations:
@@ -564,7 +579,7 @@ If available, check shared context to make smarter recommendations:
 These are optional — if no context exists yet, just scan normally.
 
 ## Important Rules
-- Only present coins with detected setups (setupDetected: true)
+- Only present symbols with detected setups (setupDetected: true)
 - Higher confidence scores (>0.6) indicate stronger setups
 - For ensemble: >50% agreement is minimum, >66% is strong
 - Always mention the risk level
@@ -574,7 +589,7 @@ These are optional — if no context exists yet, just scan normally.
 
 ## Cross-Pair Analysis
 You have tools for analyzing relationships between pairs:
-- **analyze_pair_correlation**: Pearson correlation, beta, rolling correlation between two coins
+- **analyze_pair_correlation**: Pearson correlation, beta, rolling correlation between two symbols
 - **analyze_pair_spread**: Ratio z-score, half-life, Bollinger bands on the spread
 - **compare_pair_performance**: Relative strength, divergence points, Sharpe comparison
 Use when user asks about "BTC vs ETH", "correlation", "pair trading", or "relative strength".
@@ -617,7 +632,12 @@ When you detect a strong setup, create a position record so other agents can tra
 
 const ANALYST_INSTRUCTIONS = `You are Gordon's technical analyst agent.
 
-Your role is to provide deep analysis of specific cryptocurrencies.
+Your role is to provide deep analysis of specific markets and tickers.
+
+## Market Coverage
+- You can analyze crypto symbols and supported stock tickers
+- Keep crypto-native language for onchain, DEX, liquidation, and protocol flows
+- When the request is cross-market, prefer symbol or ticker wording over coin-only phrasing
 
 ## Your Capabilities
 - Analyze any trading pair with multiple timeframes
@@ -644,8 +664,8 @@ If the user's request doesn't specify a symbol (e.g., "check whale activity", "a
 If neither has context, ask the user which symbol they mean.
 
 Other optional reads (use if available, skip if not):
-- read_shared_context("monitor") — know if user already holds this coin
-- read_shared_context("backtest", symbol) — see if this coin was already backtested
+- read_shared_context("monitor") — know if user already holds this symbol
+- read_shared_context("backtest", symbol) — see if this symbol was already backtested
 
 After completing analysis, ALWAYS write_shared_context with:
 - contextType: "analysis", symbol: the analyzed symbol
@@ -723,7 +743,7 @@ When you complete analysis on a position created by Scanner:
 
 const PLANNER_INSTRUCTIONS = `You are Gordon's trading planner agent.
 
-Your role is to create well-structured trading plans based on analysis.
+Your role is to create well-structured trading plans based on analysis across supported markets.
 
 ## Your Capabilities
 - Create trading plans with entry, stop-loss, and take-profit levels
@@ -806,7 +826,7 @@ Before finalizing any plan:
 
 const EXECUTOR_INSTRUCTIONS = `You are Gordon's trade executor agent.
 
-Your role is to safely execute trading plans and orders on the active exchange.
+Your role is to safely execute trading plans and orders on the active execution venue.
 
 ## Safety Protocol
 1. NEVER execute unless the system is ARMED
@@ -865,7 +885,7 @@ After order execution:
 
 const MONITOR_INSTRUCTIONS = `You are Gordon's position monitor agent.
 
-Your role is to watch open positions and keep the user informed.
+Your role is to watch open positions and keep the user informed across crypto and stocks.
 
 ## Cross-Agent Context
 After checking positions or portfolio, ALWAYS call write_shared_context to store the ground truth:
@@ -931,7 +951,7 @@ You have direct access to the position state machine:
 
 const TEACHER_INSTRUCTIONS = `You are Gordon's teacher agent.
 
-Your role is to explain trading concepts in simple, friendly terms.
+Your role is to explain trading concepts in simple, friendly terms across crypto and stocks.
 
 ## Available Tools
 - **explain**: Explain any trading concept, indicator, or term
@@ -976,7 +996,7 @@ After a trade closes, review it for learning:
 
 const BACKTESTER_INSTRUCTIONS = `You are Gordon's backtesting specialist agent.
 
-Your role is to run historical backtests and optimize trading strategies.
+Your role is to run historical backtests and optimize trading strategies across crypto and supported stock workflows.
 
 ## Your Capabilities
 - Run backtests on any strategy with historical data
@@ -1039,7 +1059,7 @@ Check what other agents have found — use if available, proceed without if not:
 - **search_playbooks**: Find playbooks to test
 - **get_playbook_for_agent**: Get strategy details in structured form`;
 
-const GORDON_INSTRUCTIONS = `You are Gordon, an AI trading assistant for cryptocurrency.
+const GORDON_INSTRUCTIONS = `You are Gordon, an AI trading assistant for crypto and stocks.
 
 ## Your Personality
 - Friendly and approachable, like a knowledgeable friend
@@ -1059,6 +1079,9 @@ You coordinate specialized agents via the Agent Network:
 
 When the user asks for analysis, scanning, planning, backtesting, or execution — immediately transfer to the specialist agent. Do not narrate or describe what you plan to do. Just transfer.
 
+## Market Coverage
+${formatCapabilityTruthSummary()}
+
 ## Safety Rules
 1. NEVER execute trades without explicit user approval
 2. ALWAYS show plan details before execution
@@ -1066,6 +1089,8 @@ When the user asks for analysis, scanning, planning, backtesting, or execution �
 4. Remind users about risk appropriately
 
 ## Key Capabilities Across Agents
+- Broad crypto discovery, trending, movers, and market-wide scans -> Scanner
+- Cross-market single-symbol analysis, plans, previews, portfolio checks, and systematic workflows -> specialist agents routed by venue support
 - Raw market data (candles, prices, tickers, orderbook) -> Scanner or Analyst
 - Charts and visualization -> Analyst
 - Whale detection and orderbook analysis -> Analyst
@@ -1089,6 +1114,7 @@ When the user asks for analysis, scanning, planning, backtesting, or execution �
 - Chainlink CCIP: cross-chain EVM token transfers (USDC, LINK, WETH across Ethereum, Arbitrum, Base, Optimism, Polygon, Avalanche, BNB), fee estimation -> Executor for transfers, Analyst for fees/info (when EVM_PRIVATE_KEY is set)
 - Chainlink CCIP transfer status tracking -> Monitor
 - Educational explanations -> Teacher
+- Stock workflows: broker-linked quotes, analysis, plans, positions, orders, portfolio checks, and backtests -> Analyst, Planner, Monitor, Executor, Backtester
 - Position lifecycle tracking (setup → analysis → plan → execute → monitor → review) -> tracked automatically across agents
 - Risk pre-checks on all orders -> Planner and Executor (automatic)
 - Trade memory, lessons learned, market observations -> all agents via persistent memory
@@ -1186,8 +1212,7 @@ function getScannerAgent(): Agent {
       name: "Scanner",
       description:
         "Specialist in scanning the market and finding trading opportunities. " +
-        "Use when the user wants to find coins to trade, asks 'what should I buy?', " +
-        "needs market overview, wants to discover new coins, or asks about strategies.",
+        "Use when the user wants market discovery, crypto movers, broad setup scans, or symbol-level opportunity finding.",
       instructions: SCANNER_INSTRUCTIONS,
       model: resolveRuntimeModel,
       tools: {
@@ -1272,8 +1297,8 @@ function getAnalystAgent(): Agent {
       id: "analyst",
       name: "Analyst",
       description:
-        "Specialist in deep coin analysis and technical indicators. " +
-        "Use when user asks about a specific coin, wants detailed analysis, " +
+        "Specialist in deep market analysis and technical indicators. " +
+        "Use when user asks about a specific symbol or ticker, wants detailed analysis, " +
         "needs to understand support/resistance levels, wants whale analysis, " +
         "breakout detection, or order book depth analysis.",
       instructions: ANALYST_INSTRUCTIONS,
@@ -1403,7 +1428,7 @@ function getPlannerAgent(): Agent {
       name: "Planner",
       description:
         "Specialist in creating trading plans with entry, stop-loss, and take-profit levels. " +
-        "Use when user wants to create a trade plan, buy a coin, needs help with position sizing, " +
+        "Use when user wants to create a trade plan, buy a symbol, needs help with position sizing, " +
         "Kelly criterion calculations, or pre-trade risk assessment.",
       instructions: PLANNER_INSTRUCTIONS,
       model: resolveRuntimeModel,
@@ -1476,7 +1501,7 @@ function getExecutorAgent(): Agent {
       description:
         "Specialist in executing trades, placing orders, and managing positions. " +
         "Use when user wants to execute a plan, place a market or limit order, " +
-        "swap/convert coins, buy or sell spot, cancel an order, or arm the system.",
+        "swap/convert crypto, buy or sell a symbol, cancel an order, or arm the system.",
       instructions: EXECUTOR_INSTRUCTIONS,
       model: resolveRuntimeModel,
       tools: {
@@ -1617,7 +1642,7 @@ function getMonitorAgent(): Agent {
       name: "Monitor",
       description:
         "Specialist in monitoring open positions, portfolio health, and wallet management. " +
-        "Use when user asks about their trades, positions, portfolio status, wallet balances, " +
+        "Use when user asks about their trades, positions, portfolio status, balances, " +
         "open orders, order history, earn positions, trade history, account snapshots, " +
         "exit conditions, drawdown status, " +
         "or wants to transfer funds between wallets (spot, funding, futures, margin).",
@@ -1783,6 +1808,7 @@ function getBacktesterAgent(): Agent {
         ...instrumentedPlaybookTools,
         // Playbook backtest tools (v0.7) — run/compare/rank playbook backtests
         ...instrumentedPlaybookBacktestTools,
+        ...instrumentedSystematicTools,
         // Skill tools (dynamic MCP plugins routed to this agent)
         ...getRoutingToolsForAgent("Backtester"),
       },
@@ -1802,12 +1828,14 @@ function getGordonAgent(): Agent {
   if (!_agents.gordon) {
     const model = resolveRuntimeModel();
     const modelLabel = formatModelLabel(model);
-    console.log(`[Gordon] Initializing agent with model: ${modelLabel}`);
+    if (process.env.GORDON_STARTUP_QUIET !== "1") {
+      console.log(`[Gordon] Initializing agent with model: ${modelLabel}`);
+    }
 
     _agents.gordon = new Agent({
       id: "gordon",
       name: "Gordon",
-      description: "Main AI trading assistant for cryptocurrency. Coordinates specialized agents.",
+      description: GORDON_PRODUCT_TRUTH.headline,
       instructions: GORDON_INSTRUCTIONS,
       model,
 

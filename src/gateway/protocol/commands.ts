@@ -10,6 +10,7 @@ export const GatewayCommandTypeSchema = z.enum([
   "scheduler.create_task",
   "scheduler.delete_task",
   "scheduler.list_tasks",
+  "runtime.background_status",
   "runtime.health_check",
   "reconcile.run",
   "plugin.reload",
@@ -63,6 +64,7 @@ export const SchedulerDeleteTaskPayloadSchema = z.object({
 });
 
 export const SchedulerListTasksPayloadSchema = z.object({});
+export const RuntimeBackgroundStatusPayloadSchema = z.object({});
 
 export const RuntimeHealthCheckPayloadSchema = z.object({
   aggressive: z.boolean().default(false),
@@ -119,6 +121,7 @@ export const GatewayCommandPayloadSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("scheduler.create_task"), payload: SchedulerCreateTaskPayloadSchema }),
   z.object({ type: z.literal("scheduler.delete_task"), payload: SchedulerDeleteTaskPayloadSchema }),
   z.object({ type: z.literal("scheduler.list_tasks"), payload: SchedulerListTasksPayloadSchema }),
+  z.object({ type: z.literal("runtime.background_status"), payload: RuntimeBackgroundStatusPayloadSchema }),
   z.object({ type: z.literal("runtime.health_check"), payload: RuntimeHealthCheckPayloadSchema }),
   z.object({ type: z.literal("reconcile.run"), payload: ReconcileRunPayloadSchema }),
   z.object({ type: z.literal("plugin.reload"), payload: PluginReloadPayloadSchema }),

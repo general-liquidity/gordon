@@ -1,6 +1,7 @@
 import type { MCPCategory } from "../mcp/types.ts";
 import { pluginInstaller } from "../mcp/marketplace/installer.ts";
 import type { GordonContext } from "../agents/types.ts";
+import { resolveInstrument } from "../markets/instruments.ts";
 import { checkExplicitExecutionAccess, requiresArmedModeForTool } from "../agents/middleware/access-control.ts";
 import { getCredentialSummaryForKinds } from "./credentials.ts";
 import { getActionById, getActionByToolName } from "./registry.ts";
@@ -67,14 +68,6 @@ const MCP_SCOPE_MATRIX: Record<MCPCategory, ActionTaskScope[]> = {
   utility: ["planning", "ops", "funding", "setup", "system"],
 };
 
-function normalizeOrderSymbol(symbol: string): string {
-  const normalized = symbol.trim().toUpperCase();
-  if (normalized.endsWith("USDT") || normalized.endsWith("USDC") || normalized.endsWith("USD")) {
-    return normalized;
-  }
-  return `${normalized}USDT`;
-}
-
 function isCompatibleTaskScope(requestedScope: ActionTaskScope, toolScope: ActionTaskScope): boolean {
   return REQUEST_SCOPE_MATRIX[requestedScope]?.includes(toolScope) ?? false;
 }
@@ -115,7 +108,8 @@ async function buildMarketOrderPlan(
   },
   context: GordonContext,
 ): Promise<ActionExecutionPlan> {
-  const normalizedSymbol = normalizeOrderSymbol(input.symbol);
+  const instrument = await resolveInstrument(context, input.symbol);
+  const normalizedSymbol = instrument.normalizedSymbol;
   const providerKinds = action.providerRequirements.filter((entry) => !entry.optional).map((entry) => entry.kind);
   const credentialSummary = providerKinds.length > 0
     ? await getCredentialSummaryForKinds(context.config, providerKinds)
@@ -126,24 +120,45 @@ async function buildMarketOrderPlan(
   const preview: Record<string, unknown> = {
     symbol: normalizedSymbol,
     side: input.side,
+    marketFamily: instrument.marketFamily,
+    venueRoute: instrument.route,
+    resolutionSource: instrument.resolutionSource,
+    quoteAsset: instrument.quoteAsset,
+    capabilities: instrument.capabilities,
   };
 
-  if (!context.exchange) {
-    blockers.push("No active exchange connection is available.");
+  if (instrument.route === "exchange" && !context.exchange) {
+    blockers.push("No active crypto execution venue is available.");
     steps.push({
-      id: "exchange",
-      title: "Exchange connection",
+      id: "venue",
+      title: "Execution venue",
       status: "blocked",
-      detail: "Connect and select an active exchange before planning or executing spot orders.",
+      detail: "Connect and select an active crypto venue before planning or executing this order.",
     });
-  } else {
+  } else if (instrument.route === "broker" && !context.broker) {
+    blockers.push("No active stock broker is available.");
     steps.push({
-      id: "exchange",
-      title: "Exchange connection",
-      status: "ready",
-      detail: `Active exchange: ${context.exchange.displayName}.`,
+      id: "venue",
+      title: "Execution venue",
+      status: "blocked",
+      detail: "Connect and select an active stock broker before planning or executing this order.",
     });
-    preview.exchange = context.exchange.exchangeId;
+  } else if (instrument.route === "exchange" && context.exchange) {
+    steps.push({
+      id: "venue",
+      title: "Execution venue",
+      status: "ready",
+      detail: `Active crypto venue: ${context.exchange.displayName}.`,
+    });
+    preview.venue = context.exchange.exchangeId;
+  } else if (instrument.route === "broker" && context.broker) {
+    steps.push({
+      id: "venue",
+      title: "Execution venue",
+      status: "ready",
+      detail: `Active stock broker: ${context.broker.displayName}.`,
+    });
+    preview.venue = context.broker.brokerId;
   }
 
   steps.push(buildCredentialStep(action.title, credentialSummary.ready, credentialSummary.missing));
@@ -199,7 +214,7 @@ async function buildMarketOrderPlan(
     });
   }
 
-  if (context.exchange) {
+  if (instrument.route === "exchange" && context.exchange) {
     try {
       const price = await context.exchange.getPrice(normalizedSymbol);
       preview.estimatedPrice = price;
@@ -228,6 +243,45 @@ async function buildMarketOrderPlan(
         title: "Price estimate",
         status: "blocked",
         detail: `Failed to fetch price: ${error instanceof Error ? error.message : String(error)}`,
+      });
+    }
+  } else if (instrument.route === "broker" && context.broker) {
+    try {
+      const [quote, account] = await Promise.all([
+        context.broker.getLatestQuote(normalizedSymbol),
+        context.broker.getAccount(),
+      ]);
+      const price = quote.askPrice || quote.bidPrice;
+      preview.estimatedPrice = price;
+      preview.bidPrice = quote.bidPrice;
+      preview.askPrice = quote.askPrice;
+      preview.availableBuyingPower = account.buyingPower;
+
+      if (input.quantity) {
+        preview.estimatedNotional = Number((input.quantity * price).toFixed(2));
+      }
+      if (input.quoteOrderQty) {
+        preview.estimatedBaseQty = Number((input.quoteOrderQty / price).toFixed(6));
+        preview.estimatedNotional = Number(input.quoteOrderQty.toFixed(2));
+      }
+
+      if (input.side === "BUY" && typeof preview.estimatedNotional === "number" && preview.estimatedNotional > account.buyingPower) {
+        blockers.push(`Estimated notional ${preview.estimatedNotional} exceeds available buying power ${account.buyingPower}.`);
+      }
+
+      steps.push({
+        id: "price",
+        title: "Price estimate",
+        status: "ready",
+        detail: `Estimated market price for ${normalizedSymbol}: ${price}.`,
+      });
+    } catch (error) {
+      blockers.push(`Unable to fetch live quote for ${normalizedSymbol}.`);
+      steps.push({
+        id: "price",
+        title: "Price estimate",
+        status: "blocked",
+        detail: `Failed to fetch quote: ${error instanceof Error ? error.message : String(error)}`,
       });
     }
   }

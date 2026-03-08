@@ -10,6 +10,7 @@ const TRADIER_CAPABILITIES: BrokerCapabilities = {
   supportsOptions: true,
   supportsStreaming: true,
   supportsPaperTrading: true,
+  supportsHistoricalBars: false,
 };
 
 const TRADIER_CONFIG: RestBrokerAdapterConfig = {
@@ -74,4 +75,3 @@ export class TradierAdapter extends RestBrokerAdapter {
     super(credentials, TRADIER_CONFIG);
   }
 }
-

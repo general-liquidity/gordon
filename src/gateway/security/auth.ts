@@ -124,6 +124,7 @@ export function requiredCapabilityForCommand(type: GatewayCommandType): GatewayC
     case "scheduler.delete_task":
       return "scheduler:write";
     case "scheduler.list_tasks":
+    case "runtime.background_status":
       return "scheduler:read";
     case "runtime.health_check":
       return "runtime:health";

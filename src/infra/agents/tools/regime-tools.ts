@@ -18,11 +18,19 @@ import {
   RegimeMetricsSchema,
   RegimeSpanSchema,
 } from "../../../core/regime/types.ts";
+import { resolveInstrument } from "../../markets/instruments.ts";
 import { getGordonContext, normalizeSymbol, errors } from "./types.ts";
 import type { MastraExecutionContext } from "./types.ts";
 import { createModuleLogger } from "../../logger/index.ts";
 
 const logger = createModuleLogger("regime-tools");
+
+function timeframeToMs(timeframe: string): number {
+  if (timeframe.endsWith("m")) return Number.parseInt(timeframe, 10) * 60_000;
+  if (timeframe.endsWith("h")) return Number.parseInt(timeframe, 10) * 3_600_000;
+  if (timeframe.endsWith("d")) return Number.parseInt(timeframe, 10) * 86_400_000;
+  return 3_600_000;
+}
 
 // ============================================================================
 // Detect Market Regime Tool
@@ -64,17 +72,26 @@ export const detectMarketRegimeTool = createTool({
     execContext: MastraExecutionContext,
   ) => {
     const ctx = getGordonContext(execContext);
-    if (!ctx?.exchange) {
+    if (!ctx?.exchange && !ctx?.broker) {
       return errors.noExchange;
     }
 
     try {
-      const normalizedSymbol = normalizeSymbol(symbol);
-      const candles = await ctx.exchange.getCandles(
-        normalizedSymbol,
-        timeframe,
-        candle_limit,
-      );
+      const instrument = await resolveInstrument(ctx, symbol);
+      const normalizedSymbol = instrument.normalizedSymbol;
+      const candles = instrument.route === "broker" && ctx.broker
+        ? await ctx.broker.getHistoricalBars({
+          symbol: normalizedSymbol,
+          timeframe,
+          startTime: Date.now() - (candle_limit * timeframeToMs(timeframe)),
+          endTime: Date.now(),
+          limit: candle_limit,
+        })
+        : await ctx.exchange!.getCandles(
+          normalizedSymbol,
+          timeframe,
+          candle_limit,
+        );
 
       if (!candles || candles.length < 30) {
         return {
@@ -199,16 +216,25 @@ export const matchPlaybooksToRegimeTool = createTool({
       // If no regime given, auto-detect from symbol
       if (!resolvedRegime && symbol) {
         const ctx = getGordonContext(execContext);
-        if (!ctx?.exchange) {
+        if (!ctx?.exchange && !ctx?.broker) {
           return errors.noExchange;
         }
 
-        const normalizedSymbol = normalizeSymbol(symbol);
-        const candles = await ctx.exchange.getCandles(
-          normalizedSymbol,
-          timeframe,
-          100,
-        );
+        const instrument = await resolveInstrument(ctx!, symbol);
+        const normalizedSymbol = instrument.normalizedSymbol;
+        const candles = instrument.route === "broker" && ctx?.broker
+          ? await ctx.broker.getHistoricalBars({
+            symbol: normalizedSymbol,
+            timeframe,
+            startTime: Date.now() - (100 * timeframeToMs(timeframe)),
+            endTime: Date.now(),
+            limit: 100,
+          })
+          : await ctx!.exchange!.getCandles(
+            normalizedSymbol,
+            timeframe,
+            100,
+          );
 
         if (!candles || candles.length < 30) {
           return {
@@ -291,18 +317,36 @@ export const multiTimeframeRegimeTool = createTool({
     execContext: MastraExecutionContext,
   ) => {
     const ctx = getGordonContext(execContext);
-    if (!ctx?.exchange) {
+    if (!ctx?.exchange && !ctx?.broker) {
       return errors.noExchange;
     }
 
     try {
-      const normalizedSymbol = normalizeSymbol(symbol);
+      const instrument = await resolveInstrument(ctx, symbol);
+      const normalizedSymbol = instrument.normalizedSymbol;
 
       // Fetch candles for both timeframes in parallel
-      const [hourlyCandles, dailyCandles] = await Promise.all([
-        ctx.exchange.getCandles(normalizedSymbol, "1h", 100),
-        ctx.exchange.getCandles(normalizedSymbol, "1d", 100),
-      ]);
+      const [hourlyCandles, dailyCandles] = instrument.route === "broker" && ctx.broker
+        ? await Promise.all([
+          ctx.broker.getHistoricalBars({
+            symbol: normalizedSymbol,
+            timeframe: "1h",
+            startTime: Date.now() - (100 * 3_600_000),
+            endTime: Date.now(),
+            limit: 100,
+          }),
+          ctx.broker.getHistoricalBars({
+            symbol: normalizedSymbol,
+            timeframe: "1d",
+            startTime: Date.now() - (100 * 86_400_000),
+            endTime: Date.now(),
+            limit: 100,
+          }),
+        ])
+        : await Promise.all([
+          ctx.exchange!.getCandles(normalizedSymbol, "1h", 100),
+          ctx.exchange!.getCandles(normalizedSymbol, "1d", 100),
+        ]);
 
       if (!hourlyCandles || hourlyCandles.length < 30) {
         return {

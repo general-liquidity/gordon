@@ -14,6 +14,7 @@ import { fetchHistoricalData } from "../../backtest/data/historical.ts";
 import { formatBacktestSummary } from "../../backtest/reporting/formatter.ts";
 import type { BacktestResult, BacktestConfig } from "../../backtest/types.ts";
 import { createStreamingWorkflow, type StreamingWorkflowResult } from "../../infra/agents/index.ts";
+import { normalizeCryptoSymbol } from "../../infra/markets/instruments.ts";
 import { TinyfishClient, summarizeTinyfishResult } from "../../infra/tinyfish/client.ts";
 import { buildTinyfishRequest, runTinyfishResearch, scheduleTinyfishMonitor } from "../../infra/tinyfish/service.ts";
 import type { TinyfishSSEEvent, TinyfishRunResponse } from "../../infra/tinyfish/types.ts";
@@ -807,9 +808,7 @@ async function runTinyfishMonitorWorkflow(
 // ============================================================================
 
 function normalizeSymbol(symbol: string): string {
-  return symbol.toUpperCase().endsWith("USDT")
-    ? symbol.toUpperCase()
-    : `${symbol.toUpperCase()}USDT`;
+  return normalizeCryptoSymbol(symbol);
 }
 
 function generatePlanRecommendation(analysis: DetailedAnalysis): {

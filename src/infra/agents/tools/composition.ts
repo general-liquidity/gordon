@@ -12,7 +12,7 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
-import { getGordonContext, type MastraExecutionContext } from "./types.ts";
+import { getGordonContext, normalizeSymbol, type MastraExecutionContext } from "./types.ts";
 
 // ============================================================================
 // Types
@@ -479,9 +479,7 @@ export async function runFullAnalysis(
   symbol: string,
   context: MastraExecutionContext
 ): Promise<z.infer<typeof fullAnalysisOutputSchema>> {
-  const normalizedSymbol = symbol.toUpperCase().endsWith("USDT")
-    ? symbol.toUpperCase()
-    : `${symbol.toUpperCase()}USDT`;
+  const normalizedSymbol = normalizeSymbol(symbol);
 
   // Run all analyses in parallel
   const [signalsResult, rsiResult, whalesResult, orderbookResult] = await Promise.all([

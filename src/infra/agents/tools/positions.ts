@@ -21,7 +21,7 @@ import { getGordonContext, validateToolOutput, type MastraExecutionContext } fro
 // ============================================================================
 
 const errors = {
-  noExchange: { error: "Exchange client not connected. Please run setup first." },
+  noExchange: { error: "No active trading venue is connected. Please run setup first." },
 };
 
 // ============================================================================
@@ -29,6 +29,17 @@ const errors = {
 // ============================================================================
 
 const checkPositionsOutputSchema = z.object({
+  marketFamily: z.enum(["crypto", "stocks"]).optional(),
+  venueRoute: z.enum(["exchange", "broker"]).optional(),
+  quoteCurrency: z.string().optional(),
+  capabilities: z.object({
+    supportsQuotes: z.boolean(),
+    supportsBidAsk: z.boolean(),
+    supportsOrderBook: z.boolean(),
+    supportsSessionCalendar: z.boolean(),
+    supportsExtendedHours: z.boolean(),
+    supportsHistoricalBars: z.boolean(),
+  }).optional(),
   openTrades: z.number(),
   totalUnrealizedPnl: z.number(),
   totalUnrealizedPnlPercent: z.number(),
@@ -60,7 +71,7 @@ export const checkPositionsTool = createTool({
   outputSchema: checkPositionsOutputSchema,
   execute: async (_input, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
-    if (!ctx?.exchange) {
+    if (!ctx?.exchange && !ctx?.broker) {
       return validateToolOutput(checkPositionsOutputSchema, {
         ...errors.noExchange,
         openTrades: 0,
@@ -71,7 +82,41 @@ export const checkPositionsTool = createTool({
       }, { toolName: "check_positions" });
     }
 
-    const result: MonitorResult = await runMonitorCycle(ctx.exchange);
+    if (ctx.broker && !ctx.exchange) {
+      const positions = await ctx.broker.getPositions();
+      const totalUnrealizedPnl = positions.reduce((sum, position) => sum + position.unrealizedPl, 0);
+      const output = {
+        marketFamily: "stocks" as const,
+        venueRoute: "broker" as const,
+        quoteCurrency: "USD",
+        capabilities: {
+          supportsQuotes: true,
+          supportsBidAsk: true,
+          supportsOrderBook: false,
+          supportsSessionCalendar: true,
+          supportsExtendedHours: Boolean(ctx.broker.capabilities.supportsExtendedHours),
+          supportsHistoricalBars: Boolean(ctx.broker.capabilities.supportsHistoricalBars),
+        },
+        openTrades: positions.length,
+        totalUnrealizedPnl,
+        totalUnrealizedPnlPercent: ctx.portfolioValue > 0
+          ? (totalUnrealizedPnl / ctx.portfolioValue) * 100
+          : 0,
+        positions: positions.map((position) => ({
+          symbol: position.symbol,
+          status: position.side,
+          unrealizedPnl: position.unrealizedPl,
+          unrealizedPnlPercent: position.unrealizedPlPercent,
+          minutesOpen: 0,
+          ppmUsd: 0,
+        })),
+        alerts: [],
+      };
+
+      return validateToolOutput(checkPositionsOutputSchema, output, { toolName: "check_positions" });
+    }
+
+    const result: MonitorResult = await runMonitorCycle(ctx.exchange!);
 
     const now = Date.now();
     const totalUnrealizedPnl = result.updates.reduce((sum, u) => sum + u.unrealizedPnl, 0);
@@ -90,6 +135,17 @@ export const checkPositionsTool = createTool({
     });
 
     const output = {
+      marketFamily: "crypto" as const,
+      venueRoute: "exchange" as const,
+      quoteCurrency: "USD",
+      capabilities: {
+        supportsQuotes: true,
+        supportsBidAsk: true,
+        supportsOrderBook: true,
+        supportsSessionCalendar: false,
+        supportsExtendedHours: false,
+        supportsHistoricalBars: true,
+      },
       openTrades: result.updates.length,
       totalUnrealizedPnl,
       totalUnrealizedPnlPercent: ctx.portfolioValue > 0 ? (totalUnrealizedPnl / ctx.portfolioValue) * 100 : 0,

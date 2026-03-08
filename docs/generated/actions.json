@@ -2,7 +2,7 @@
   {
     "id": "market.scan",
     "title": "Scan Market",
-    "description": "Scan the active exchange universe for trading opportunities.",
+    "description": "Scan the active crypto venue universe for trading opportunities.",
     "domain": "market",
     "capability": "read",
     "taskScope": "scan",
@@ -24,7 +24,7 @@
       "aliases": [
         "s"
       ],
-      "description": "Scan market for trading opportunities (~10-30s depending on coins)",
+      "description": "Scan crypto markets for trading setups (~10-30s)",
       "usage": "/scan",
       "category": "market",
       "level": 1,
@@ -33,7 +33,7 @@
       "action": "agent",
       "target": "scanner",
       "executionTime": "~10-30s",
-      "whenToUse": "Discover opportunities across multiple coins"
+      "whenToUse": "Discover crypto setups across multiple symbols"
     },
     "tool": {
       "toolName": "scan_market",
@@ -50,7 +50,7 @@
   {
     "id": "market.analyze",
     "title": "Analyze Market",
-    "description": "Run a single-symbol analysis on the active exchange.",
+    "description": "Run a single-symbol analysis on the active crypto venue or stock broker.",
     "domain": "market",
     "capability": "read",
     "taskScope": "analysis",
@@ -64,7 +64,12 @@
     ],
     "providerRequirements": [
       {
-        "kind": "exchange"
+        "kind": "exchange",
+        "optional": true
+      },
+      {
+        "kind": "broker",
+        "optional": true
       }
     ],
     "slash": {
@@ -73,7 +78,7 @@
         "a",
         "quick"
       ],
-      "description": "Single comprehensive analysis (~3-5s)",
+      "description": "Single-symbol analysis (~3-5s) for crypto or stocks",
       "usage": "/analyze <symbol>",
       "category": "market",
       "level": 1,
@@ -82,7 +87,7 @@
       "action": "agent",
       "target": "analyst",
       "executionTime": "~3-5s",
-      "whenToUse": "Quick check on a single coin"
+      "whenToUse": "Quick check on a single crypto pair or stock ticker"
     },
     "tool": {
       "toolName": "analyze_coin",
@@ -144,7 +149,7 @@
   {
     "id": "trading.preview_market_order",
     "title": "Preview Market Order",
-    "description": "Preview a spot market order without placing it.",
+    "description": "Preview a crypto or stock market order without placing it.",
     "domain": "trading",
     "capability": "plan",
     "taskScope": "execution",
@@ -158,7 +163,12 @@
     ],
     "providerRequirements": [
       {
-        "kind": "exchange"
+        "kind": "exchange",
+        "optional": true
+      },
+      {
+        "kind": "broker",
+        "optional": true
       }
     ],
     "slash": {
@@ -166,7 +176,7 @@
       "aliases": [
         "order-preview"
       ],
-      "description": "Preview a market order before execution",
+      "description": "Preview a market order before execution across crypto or stocks",
       "usage": "/preview-order <symbol> <buy|sell> <amount> [quote]",
       "category": "trading",
       "level": 2,
@@ -192,7 +202,7 @@
   {
     "id": "trading.market_order",
     "title": "Place Market Order",
-    "description": "Place a live spot market order on the active exchange.",
+    "description": "Place a live crypto or stock market order on the active execution venue.",
     "domain": "trading",
     "capability": "execute",
     "taskScope": "execution",
@@ -204,7 +214,12 @@
     ],
     "providerRequirements": [
       {
-        "kind": "exchange"
+        "kind": "exchange",
+        "optional": true
+      },
+      {
+        "kind": "broker",
+        "optional": true
       }
     ],
     "tool": {

@@ -1,4 +1,5 @@
 import { LLMClient, loadPrompt, buildMessages } from "../infra/llm/index.ts";
+import { normalizeCryptoSymbol } from "../infra/markets/instruments.ts";
 import { IntentSchema, type Intent } from "../types/index.ts";
 
 /**
@@ -61,8 +62,7 @@ function normalizeSymbol(input: string): string {
     return input.toUpperCase();
   }
 
-  // Otherwise append USDT
-  return input.toUpperCase() + "USDT";
+  return normalizeCryptoSymbol(input);
 }
 
 /**

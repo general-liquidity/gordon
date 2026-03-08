@@ -42,6 +42,7 @@ export { HistoricalDataCache } from "./cache.ts";
 
 // Data sources
 export { ExchangeDataSource } from "./exchange-source.ts";
+export { BrokerDataSource } from "./broker-source.ts";
 
 // Manager
 export {

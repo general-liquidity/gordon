@@ -4,6 +4,8 @@
  * Core type definitions for backtesting strategies.
  */
 
+import type { SystematicBacktestMetadata } from "../infra/systematic/types.ts";
+
 // ============================================================================
 // OHLC Data
 // ============================================================================
@@ -295,6 +297,18 @@ export interface BacktestConfig {
 
   /** Slippage percentage to simulate (e.g., 0.05 for 0.05%) */
   slippagePercent: number;
+
+  /** Named simulation realism profile */
+  simulationProfile?: "baseline" | "realistic" | "conservative";
+
+  /** Execution lag in whole bars */
+  executionLagBars?: number;
+
+  /** Half-spread cost in basis points */
+  spreadBps?: number;
+
+  /** Additional market-impact cost in basis points */
+  marketImpactBps?: number;
 }
 
 /**
@@ -308,6 +322,10 @@ export const DEFAULT_BACKTEST_CONFIG: Omit<BacktestConfig, "strategyId" | "symbo
   compounding: false,
   feePercent: 0.1,
   slippagePercent: 0.05,
+  simulationProfile: "realistic",
+  executionLagBars: 1,
+  spreadBps: 2,
+  marketImpactBps: 1,
 };
 
 // ============================================================================
@@ -401,6 +419,9 @@ export interface BacktestResult {
 
   /** Any warnings generated during backtest */
   warnings: string[];
+
+  /** Optional systematic research metadata for reproducibility and promotion gating */
+  systematic?: SystematicBacktestMetadata;
 }
 
 // ============================================================================
@@ -561,6 +582,15 @@ export interface BacktestParams {
   /** Slippage rate as decimal (e.g., 0.0005 = 0.05%) */
   slippageRate: number;
 
+  /** Signal execution lag in whole bars */
+  executionLagBars?: number;
+
+  /** Half-spread cost as decimal (e.g., 0.0002 = 2 bps) */
+  spreadRate?: number;
+
+  /** Additional market-impact cost as decimal */
+  marketImpactRate?: number;
+
   /** Whether to allow short positions */
   allowShorts: boolean;
 
@@ -580,6 +610,9 @@ export const DEFAULT_BACKTEST_PARAMS: BacktestParams = {
   fixedPercent: 0.1, // 10% of equity
   commissionRate: 0.001, // 0.1%
   slippageRate: 0.0005, // 0.05%
+  executionLagBars: 0,
+  spreadRate: 0,
+  marketImpactRate: 0,
   allowShorts: false,
 };
 

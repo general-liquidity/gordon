@@ -14,7 +14,7 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
-import { getGordonContext, isBinanceFamily, type MastraExecutionContext } from "./types.ts";
+import { getGordonContext, isBinanceFamily, normalizeSymbol, type MastraExecutionContext } from "./types.ts";
 import {
   resilientGetOrderBook,
   resilientGetSpread,
@@ -22,13 +22,14 @@ import {
 import type { OrderBookEntry, ExchangeExtended } from "../../exchange/types.ts";
 import { createCachedTool, TOOL_CACHE_CONFIG } from "./cache.ts";
 import { placeOCOOrders } from "../../../core/executor.ts";
+import { resolveInstrument } from "../../markets/instruments.ts";
 
 // ============================================================================
 // Error Messages
 // ============================================================================
 
 const errors = {
-  noExchange: { error: "Exchange client not connected. Please run setup first." },
+  noExchange: { error: "No active trading venue is connected. Please run setup first." },
   notArmed: (action: string) => ({
     error: `System must be ARMED to ${action}. Use 'arm' command first.`,
   }),
@@ -57,7 +58,18 @@ export const getOrderBookTool = createTool({
     limit: z.number().min(5).max(100).default(20).describe("Number of price levels to show"),
   }),
   outputSchema: z.object({
+    marketFamily: z.enum(["crypto", "stocks"]).optional(),
+    venueRoute: z.enum(["exchange", "broker"]).optional(),
+    capabilities: z.object({
+      supportsQuotes: z.boolean(),
+      supportsBidAsk: z.boolean(),
+      supportsOrderBook: z.boolean(),
+      supportsSessionCalendar: z.boolean(),
+      supportsExtendedHours: z.boolean(),
+      supportsHistoricalBars: z.boolean(),
+    }).optional(),
     symbol: z.string().optional(),
+    message: z.string().optional(),
     spread: z.object({
       value: z.string(),
       percent: z.string(),
@@ -94,13 +106,41 @@ export const getOrderBookTool = createTool({
   }),
   execute: async ({ symbol, limit }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
-    if (!ctx?.exchange) {
+    if (!ctx?.exchange && !ctx?.broker) {
       return errors.noExchange;
     }
+    const instrument = await resolveInstrument(ctx, symbol);
+    const normalizedSymbol = instrument.normalizedSymbol;
 
-    const normalizedSymbol = symbol.toUpperCase().endsWith("USDT")
-      ? symbol.toUpperCase()
-      : `${symbol.toUpperCase()}USDT`;
+    if (instrument.route === "broker" && ctx.broker) {
+      try {
+        const quote = await ctx.broker.getLatestQuote(normalizedSymbol);
+        const spreadValue = quote.askPrice - quote.bidPrice;
+        const spreadPercent = quote.askPrice > 0 ? (spreadValue / quote.askPrice) * 100 : 0;
+
+        return {
+          marketFamily: instrument.marketFamily,
+          venueRoute: instrument.route,
+          capabilities: instrument.capabilities,
+          symbol: normalizedSymbol,
+          message: "Level-2 order book depth is not available on the active broker. Returning top-of-book quote instead.",
+          spread: {
+            value: spreadValue.toFixed(4),
+            percent: `${spreadPercent.toFixed(4)}%`,
+            bestBid: quote.bidPrice,
+            bestAsk: quote.askPrice,
+          },
+          topBids: [{ price: quote.bidPrice, quantity: quote.bidSize, total: quote.bidSize }],
+          topAsks: [{ price: quote.askPrice, quantity: quote.askSize, total: quote.askSize }],
+        };
+      } catch (error) {
+        return { error: `Failed to get top-of-book quote: ${(error as Error).message}` };
+      }
+    }
+
+    if (!ctx?.exchange) {
+      return { error: "No active crypto execution venue is connected." };
+    }
 
     try {
       const orderBook = ctx.binance && isBinanceFamily(ctx.exchange.exchangeId)
@@ -133,6 +173,9 @@ export const getOrderBookTool = createTool({
       const spreadPercent = (spread / bestAsk) * 100;
 
       return {
+        marketFamily: instrument.marketFamily,
+        venueRoute: instrument.route,
+        capabilities: instrument.capabilities,
         symbol: normalizedSymbol,
         spread: {
           value: spread.toFixed(8),
@@ -168,25 +211,64 @@ export const getSpreadTool = createTool({
     symbol: z.string().describe("Trading pair (e.g., 'BTCUSDT')"),
   }),
   outputSchema: z.object({
-    symbol: z.string(),
-    bidPrice: z.number(),
-    askPrice: z.number(),
-    spread: z.string(),
-    spreadPercent: z.string(),
-    assessment: z.string(),
+    marketFamily: z.enum(["crypto", "stocks"]).optional(),
+    venueRoute: z.enum(["exchange", "broker"]).optional(),
+    capabilities: z.object({
+      supportsQuotes: z.boolean(),
+      supportsBidAsk: z.boolean(),
+      supportsOrderBook: z.boolean(),
+      supportsSessionCalendar: z.boolean(),
+      supportsExtendedHours: z.boolean(),
+      supportsHistoricalBars: z.boolean(),
+    }).optional(),
+    symbol: z.string().optional(),
+    bidPrice: z.number().optional(),
+    askPrice: z.number().optional(),
+    spread: z.string().optional(),
+    spreadPercent: z.string().optional(),
+    assessment: z.string().optional(),
     error: z.string().optional(),
   }),
   execute: async ({ symbol }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
-    if (!ctx?.exchange) {
+    if (!ctx?.exchange && !ctx?.broker) {
       return errors.noExchange;
     }
-
-    const normalizedSymbol = symbol.toUpperCase().endsWith("USDT")
-      ? symbol.toUpperCase()
-      : `${symbol.toUpperCase()}USDT`;
+    const instrument = await resolveInstrument(ctx, symbol);
+    const normalizedSymbol = instrument.normalizedSymbol;
 
     try {
+      if (instrument.route === "broker" && ctx.broker) {
+        const quote = await ctx.broker.getLatestQuote(normalizedSymbol);
+        const spread = quote.askPrice - quote.bidPrice;
+        const spreadPercent = quote.askPrice > 0 ? (spread / quote.askPrice) * 100 : 0;
+
+        let assessment: string;
+        if (spreadPercent < 0.05) {
+          assessment = "Tight top-of-book quote";
+        } else if (spreadPercent < 0.2) {
+          assessment = "Moderate top-of-book spread";
+        } else {
+          assessment = "Wide top-of-book spread";
+        }
+
+        return {
+          marketFamily: instrument.marketFamily,
+          venueRoute: instrument.route,
+          capabilities: instrument.capabilities,
+          symbol: normalizedSymbol,
+          bidPrice: quote.bidPrice,
+          askPrice: quote.askPrice,
+          spread: spread.toFixed(4),
+          spreadPercent: `${spreadPercent.toFixed(4)}%`,
+          assessment,
+        };
+      }
+
+      if (!ctx?.exchange) {
+        return { error: "No active crypto execution venue is connected." };
+      }
+
       const spread = ctx.binance && isBinanceFamily(ctx.exchange.exchangeId)
         ? (await resilientGetSpread(ctx.binance, normalizedSymbol)).data
         : await ctx.exchange.getSpread(normalizedSymbol);
@@ -203,6 +285,9 @@ export const getSpreadTool = createTool({
       }
 
       return {
+        marketFamily: instrument.marketFamily,
+        venueRoute: instrument.route,
+        capabilities: instrument.capabilities,
         symbol: normalizedSymbol,
         bidPrice: spread.bidPrice,
         askPrice: spread.askPrice,
@@ -253,9 +338,7 @@ export const getRecentTradesTool = createTool({
       return { error: "Recent trades are not supported on this exchange yet." };
     }
 
-    const normalizedSymbol = symbol.toUpperCase().endsWith("USDT")
-      ? symbol.toUpperCase()
-      : `${symbol.toUpperCase()}USDT`;
+    const normalizedSymbol = normalizeSymbol(symbol);
 
     try {
       const trades = await ctx.binance.getRecentTrades(normalizedSymbol, limit);
@@ -346,9 +429,7 @@ export const placeOCOOrderTool = createTool({
       };
     }
 
-    const normalizedSymbol = symbol.toUpperCase().endsWith("USDT")
-      ? symbol.toUpperCase()
-      : `${symbol.toUpperCase()}USDT`;
+    const normalizedSymbol = normalizeSymbol(symbol);
 
     // Default stopLimitPrice to 0.5% below stopPrice if not provided
     const effectiveStopLimitPrice = stopLimitPrice && stopLimitPrice > 0
@@ -450,9 +531,7 @@ export const cancelAllOrdersTool = createTool({
       };
     }
 
-    const normalizedSymbol = symbol.toUpperCase().endsWith("USDT")
-      ? symbol.toUpperCase()
-      : `${symbol.toUpperCase()}USDT`;
+    const normalizedSymbol = normalizeSymbol(symbol);
 
     try {
       const cancelled = await ctx.exchange.cancelAllOrders(normalizedSymbol);
@@ -499,16 +578,38 @@ export const getOrderStatusTool = createTool({
   }),
   execute: async ({ symbol, orderId }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
-    if (!ctx?.exchange) {
+    if (!ctx?.exchange && !ctx?.broker) {
       return errors.noExchange;
     }
 
-    const normalizedSymbol = symbol.toUpperCase().endsWith("USDT")
-      ? symbol.toUpperCase()
-      : `${symbol.toUpperCase()}USDT`;
+    if (ctx.broker && !ctx.exchange) {
+      try {
+        const order = await ctx.broker.getOrder(String(orderId));
+        const price = order.limitPrice ?? order.notional ?? 0;
+        const quantity = order.qty ?? 0;
+        const filled = order.filledQty ?? 0;
+        return {
+          orderId: Number(order.id) || orderId,
+          symbol: order.symbol,
+          status: order.status,
+          type: order.type,
+          side: order.side.toUpperCase(),
+          price: price.toFixed(2),
+          quantity: quantity.toFixed(4),
+          filled: filled.toFixed(4),
+          remaining: Math.max(quantity - filled, 0).toFixed(4),
+          fillPercent: quantity > 0 ? ((filled / quantity) * 100).toFixed(1) + "%" : "0%",
+          time: order.submittedAt,
+        };
+      } catch (error) {
+        return { error: `Failed to get broker order status: ${(error as Error).message}` };
+      }
+    }
+
+    const normalizedSymbol = normalizeSymbol(symbol);
 
     try {
-      const order = await ctx.exchange.getOrderStatus(normalizedSymbol, orderId);
+      const order = await ctx.exchange!.getOrderStatus(normalizedSymbol, orderId);
 
       return {
         orderId: Number(order.orderId) || 0,
@@ -559,9 +660,7 @@ export const testOrderTool = createTool({
       return { ...errors.noExchange, valid: false };
     }
 
-    const normalizedSymbol = symbol.toUpperCase().endsWith("USDT")
-      ? symbol.toUpperCase()
-      : `${symbol.toUpperCase()}USDT`;
+    const normalizedSymbol = normalizeSymbol(symbol);
 
     try {
       const isValid = await ctx.exchange.testOrder({
@@ -636,9 +735,7 @@ export const placeLimitOrderTool = createTool({
       return errors.notArmed("place limit orders");
     }
 
-    const normalizedSymbol = symbol.toUpperCase().endsWith("USDT") || symbol.toUpperCase().endsWith("USDC")
-      ? symbol.toUpperCase()
-      : `${symbol.toUpperCase()}USDT`;
+    const normalizedSymbol = normalizeSymbol(symbol);
 
     // Risk gate: evaluate order before placement
     try {
@@ -729,18 +826,50 @@ export const getOpenOrdersTool = createTool({
   }),
   execute: async ({ symbol }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
-    if (!ctx?.exchange) {
+    if (!ctx?.exchange && !ctx?.broker) {
       return errors.noExchange;
     }
 
     try {
+      if (ctx.broker && !ctx.exchange) {
+        const openOrders = await ctx.broker.getOpenOrders();
+        const normalizedSymbol = symbol ? symbol.toUpperCase() : undefined;
+        const filtered = normalizedSymbol
+          ? openOrders.filter((order) => order.symbol.toUpperCase() === normalizedSymbol)
+          : openOrders;
+
+        if (filtered.length === 0) {
+          return {
+            count: 0,
+            orders: [],
+            message: normalizedSymbol
+              ? `No open broker orders for ${normalizedSymbol}`
+              : "No open broker orders",
+          };
+        }
+
+        return {
+          count: filtered.length,
+          orders: filtered.map((order) => ({
+            orderId: Number(order.id) || 0,
+            symbol: order.symbol,
+            side: order.side.toUpperCase(),
+            type: order.type,
+            status: order.status,
+            price: order.limitPrice ?? order.stopPrice ?? order.notional ?? 0,
+            quantity: order.qty,
+            executedQty: order.filledQty,
+            remaining: Math.max(order.qty - order.filledQty, 0),
+            time: order.submittedAt,
+          })),
+        };
+      }
+
       const normalizedSymbol = symbol
-        ? (symbol.toUpperCase().endsWith("USDT") || symbol.toUpperCase().endsWith("USDC")
-          ? symbol.toUpperCase()
-          : `${symbol.toUpperCase()}USDT`)
+        ? (normalizeSymbol(symbol))
         : undefined;
 
-      const openOrders = await ctx.exchange.getOpenOrders(normalizedSymbol);
+      const openOrders = await ctx.exchange!.getOpenOrders(normalizedSymbol);
 
       if (openOrders.length === 0) {
         return {
@@ -804,9 +933,7 @@ export const cancelOrderTool = createTool({
       return errors.notArmed("cancel orders");
     }
 
-    const normalizedSymbol = symbol.toUpperCase().endsWith("USDT") || symbol.toUpperCase().endsWith("USDC")
-      ? symbol.toUpperCase()
-      : `${symbol.toUpperCase()}USDT`;
+    const normalizedSymbol = normalizeSymbol(symbol);
 
     try {
       await ctx.exchange.cancelOrder(normalizedSymbol, String(orderId));
@@ -860,9 +987,7 @@ export const getOrderHistoryTool = createTool({
       return errors.noExchange;
     }
 
-    const normalizedSymbol = symbol.toUpperCase().endsWith("USDT") || symbol.toUpperCase().endsWith("USDC")
-      ? symbol.toUpperCase()
-      : `${symbol.toUpperCase()}USDT`;
+    const normalizedSymbol = normalizeSymbol(symbol);
 
     try {
       const orders = await ctx.exchange.getOrderHistory(normalizedSymbol, limit);
@@ -938,9 +1063,7 @@ export const cancelReplaceOrderTool = createTool({
       return { error: "This feature is currently supported only on Binance." };
     }
 
-    const normalizedSymbol = symbol.toUpperCase().endsWith("USDT") || symbol.toUpperCase().endsWith("USDC")
-      ? symbol.toUpperCase()
-      : `${symbol.toUpperCase()}USDT`;
+    const normalizedSymbol = normalizeSymbol(symbol);
 
     // Risk gate: evaluate the replacement order before placement
     try {
@@ -1039,9 +1162,7 @@ export const cancelOrderListTool = createTool({
       return { error: "This feature is currently supported only on Binance." };
     }
 
-    const normalizedSymbol = symbol.toUpperCase().endsWith("USDT") || symbol.toUpperCase().endsWith("USDC")
-      ? symbol.toUpperCase()
-      : `${symbol.toUpperCase()}USDT`;
+    const normalizedSymbol = normalizeSymbol(symbol);
 
     try {
       const result = await ctx.binance.cancelOrderList(normalizedSymbol, orderListId);

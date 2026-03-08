@@ -158,6 +158,7 @@ export function initBacktestResultsTable(): void {
       drawdown_curve_json TEXT NOT NULL,
       execution_time INTEGER NOT NULL,
       warnings_json TEXT NOT NULL,
+      metadata_json TEXT,
       created_at TEXT NOT NULL,
 
       -- Denormalized metrics for efficient querying
@@ -207,6 +208,12 @@ export function initBacktestResultsTable(): void {
   `);
 
   logger.info("Backtest results table initialized");
+
+  try {
+    db.run("ALTER TABLE backtest_results ADD COLUMN metadata_json TEXT");
+  } catch {
+    // Column already exists in most runs. SQLite does not support IF NOT EXISTS here.
+  }
 }
 
 // ============================================================================
@@ -252,13 +259,14 @@ export function saveBacktestResult(result: BacktestResult): StorageOperationResu
         drawdown_curve_json,
         execution_time,
         warnings_json,
+        metadata_json,
         created_at,
         total_return,
         max_drawdown,
         sharpe_ratio,
         win_rate,
         total_trades
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     insertStmt.run(
@@ -276,6 +284,7 @@ export function saveBacktestResult(result: BacktestResult): StorageOperationResu
       JSON.stringify(result.drawdownCurve),
       result.executionTime,
       JSON.stringify(result.warnings),
+      result.systematic ? JSON.stringify(result.systematic) : null,
       result.createdAt,
       result.metrics.totalReturn,
       result.metrics.maxDrawdown,
@@ -765,6 +774,7 @@ interface BacktestResultRow {
   drawdown_curve_json: string;
   execution_time: number;
   warnings_json: string;
+  metadata_json: string | null;
   created_at: string;
   total_return: number;
   max_drawdown: number;
@@ -807,6 +817,7 @@ function rowToBacktestResult(row: BacktestResultRow): BacktestResult {
     executionTime: row.execution_time,
     createdAt: row.created_at,
     warnings: JSON.parse(row.warnings_json),
+    systematic: row.metadata_json ? JSON.parse(row.metadata_json) : undefined,
   };
 }
 

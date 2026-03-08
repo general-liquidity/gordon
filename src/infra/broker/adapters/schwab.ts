@@ -10,6 +10,7 @@ const SCHWAB_CAPABILITIES: BrokerCapabilities = {
   supportsOptions: true,
   supportsStreaming: false,
   supportsPaperTrading: true,
+  supportsHistoricalBars: false,
 };
 
 const SCHWAB_CONFIG: RestBrokerAdapterConfig = {
@@ -63,4 +64,3 @@ export class SchwabAdapter extends RestBrokerAdapter {
     super(credentials, SCHWAB_CONFIG);
   }
 }
-

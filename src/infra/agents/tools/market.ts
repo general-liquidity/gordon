@@ -22,6 +22,9 @@ import {
   type MastraExecutionContext,
 } from "./types.ts";
 import { createCachedTool, TOOL_CACHE_CONFIG } from "./cache.ts";
+import { calculateIndicators, detectLevels } from "../../../indicators/index.ts";
+import { detectSupportBounce, determineTrend } from "../../../core/scanner.ts";
+import { resolveInstrument } from "../../markets/instruments.ts";
 import {
   formatScanResults,
   formatAnalysisResults,
@@ -33,7 +36,7 @@ import {
 // ============================================================================
 
 const errors = {
-  noExchange: { error: "Exchange client not connected. Please run setup or add an exchange." },
+  noExchange: { error: "No active market venue is connected. Please run setup or add a venue." },
 };
 
 // ============================================================================
@@ -41,6 +44,16 @@ const errors = {
 // ============================================================================
 
 const scanMarketOutputSchema = z.object({
+  marketFamily: z.enum(["crypto", "stocks"]).optional(),
+  venueRoute: z.enum(["exchange", "broker"]).optional(),
+  capabilities: z.object({
+    supportsQuotes: z.boolean(),
+    supportsBidAsk: z.boolean(),
+    supportsOrderBook: z.boolean(),
+    supportsSessionCalendar: z.boolean(),
+    supportsExtendedHours: z.boolean(),
+    supportsHistoricalBars: z.boolean(),
+  }).optional(),
   timestamp: z.string().optional(),
   coinsScanned: z.number().optional(),
   opportunities: z.array(z.object({
@@ -57,6 +70,18 @@ const scanMarketOutputSchema = z.object({
 });
 
 const analyzeCoinOutputSchema = z.object({
+  marketFamily: z.enum(["crypto", "stocks"]).optional(),
+  venueRoute: z.enum(["exchange", "broker"]).optional(),
+  quoteAsset: z.string().optional(),
+  resolutionSource: z.enum(["exchange_catalog", "broker_quote", "heuristic"]).optional(),
+  capabilities: z.object({
+    supportsQuotes: z.boolean(),
+    supportsBidAsk: z.boolean(),
+    supportsOrderBook: z.boolean(),
+    supportsSessionCalendar: z.boolean(),
+    supportsExtendedHours: z.boolean(),
+    supportsHistoricalBars: z.boolean(),
+  }).optional(),
   symbol: z.string().optional(),
   price: z.number().optional(),
   trend: z.string().optional(),
@@ -119,14 +144,33 @@ export const scanMarketTool = createTool({
   outputSchema: scanMarketOutputSchema,
   execute: async ({ topN, timeframes }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
-    if (!ctx?.exchange) {
+    if (!ctx?.exchange && !ctx?.broker) {
+      return validateToolOutput(scanMarketOutputSchema, errors.noExchange, { toolName: "scan_market" });
+    }
+    if (!ctx?.exchange && ctx?.broker) {
+      return validateToolOutput(scanMarketOutputSchema, {
+        marketFamily: "stocks",
+        venueRoute: "broker",
+        capabilities: {
+          supportsQuotes: true,
+          supportsBidAsk: true,
+          supportsOrderBook: false,
+          supportsSessionCalendar: true,
+          supportsExtendedHours: Boolean(ctx.broker.capabilities.supportsExtendedHours),
+          supportsHistoricalBars: Boolean(ctx.broker.capabilities.supportsHistoricalBars),
+        },
+        error: "Market-wide scan currently requires a crypto venue with 24h ticker coverage. Use /analyze <ticker> for stock-specific analysis.",
+      }, { toolName: "scan_market" });
+    }
+    const exchange = ctx.exchange;
+    if (!exchange) {
       return validateToolOutput(scanMarketOutputSchema, errors.noExchange, { toolName: "scan_market" });
     }
 
     const startTime = Date.now();
 
     try {
-      const result = await scan(ctx.exchange, { topN, timeframes });
+      const result = await scan(exchange, { topN, timeframes });
       const executionTime = Date.now() - startTime;
 
       const opportunities = result.coins
@@ -150,6 +194,16 @@ export const scanMarketTool = createTool({
       });
 
       const output = {
+        marketFamily: "crypto" as const,
+        venueRoute: "exchange" as const,
+        capabilities: {
+          supportsQuotes: true,
+          supportsBidAsk: true,
+          supportsOrderBook: true,
+          supportsSessionCalendar: false,
+          supportsExtendedHours: false,
+          supportsHistoricalBars: true,
+        },
         timestamp: result.timestamp,
         coinsScanned: result.coins.length,
         opportunities,
@@ -193,18 +247,94 @@ export const analyzeCoinTool = createTool({
   outputSchema: analyzeCoinOutputSchema,
   execute: async ({ symbol, timeframes }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
-    if (!ctx?.exchange) {
+    if (!ctx?.exchange && !ctx?.broker) {
       return validateToolOutput(analyzeCoinOutputSchema, errors.noExchange, { toolName: "analyze_coin" });
     }
 
     const startTime = Date.now();
-
-    // Normalize symbol (add USDT if not present)
-    const normalizedSymbol = symbol.toUpperCase().endsWith("USDT")
-      ? symbol.toUpperCase()
-      : `${symbol.toUpperCase()}USDT`;
+    const instrument = await resolveInstrument(ctx, symbol);
+    const normalizedSymbol = instrument.normalizedSymbol;
 
     try {
+      if (instrument.route === "broker" && ctx.broker) {
+        const primaryTimeframe = timeframes?.[0] ?? "1h";
+        const endTime = Date.now();
+        const timeframeMs = primaryTimeframe === "1d" ? 86_400_000 : primaryTimeframe === "4h" ? 14_400_000 : 3_600_000;
+        const startTimeMs = endTime - (120 * timeframeMs);
+        const candles = await ctx.broker.getHistoricalBars({
+          symbol: normalizedSymbol,
+          timeframe: primaryTimeframe,
+          startTime: startTimeMs,
+          endTime,
+          limit: 120,
+        });
+
+        if (!candles || candles.length < 30) {
+          return validateToolOutput(analyzeCoinOutputSchema, {
+            error: `Insufficient market data for ${normalizedSymbol}.`,
+            symbol: normalizedSymbol,
+          }, { toolName: "analyze_coin" });
+        }
+
+        const indicatorsRaw = calculateIndicators(candles);
+        const levels = detectLevels(candles);
+        const currentPrice = candles[candles.length - 1]?.close ?? 0;
+        const supports = levels.filter((level) => level.type === "support").slice(0, 3).map((level) => ({
+          price: level.price,
+          strength: level.strength,
+        }));
+        const resistances = levels.filter((level) => level.type === "resistance").slice(0, 3).map((level) => ({
+          price: level.price,
+          strength: level.strength,
+        }));
+        const bounce = detectSupportBounce(candles, levels, indicatorsRaw);
+        const trend = determineTrend(candles);
+        const indicators = {
+          rsi: indicatorsRaw.rsi,
+          macdState: indicatorsRaw.macd?.histogram && indicatorsRaw.macd.histogram > 0 ? "bullish" : "bearish",
+          volumeTrend: indicatorsRaw.volumeRatio && indicatorsRaw.volumeRatio > 1 ? "rising" : "stable",
+        };
+        const executionTime = Date.now() - startTime;
+        const formattedSummary = formatAnalysisResults({
+          symbol: normalizedSymbol,
+          price: currentPrice,
+          trend,
+          setupDetected: bounce.detected,
+          setupConfidence: bounce.confidence,
+          indicators,
+          supports,
+          resistances,
+          executionTime,
+        });
+
+        return validateToolOutput(analyzeCoinOutputSchema, {
+          marketFamily: instrument.marketFamily,
+          venueRoute: instrument.route,
+          quoteAsset: instrument.quoteAsset,
+          resolutionSource: instrument.resolutionSource,
+          capabilities: instrument.capabilities,
+          symbol: normalizedSymbol,
+          price: currentPrice,
+          trend,
+          setupDetected: bounce.detected,
+          setupConfidence: bounce.confidence,
+          supports,
+          resistances,
+          indicators,
+          recommendation: bounce.detected
+            ? "Actionable setup detected on the active stock broker feed."
+            : "No clean setup detected. Wait for clearer structure.",
+          executionTime,
+          formattedSummary,
+        }, { toolName: "analyze_coin" });
+      }
+
+      if (!ctx.exchange) {
+        return validateToolOutput(analyzeCoinOutputSchema, {
+          error: "No active crypto execution venue is connected.",
+        }, { toolName: "analyze_coin" });
+      }
+
       const result = await analyze(ctx.exchange, normalizedSymbol, {
         timeframes: timeframes ?? ["1h", "4h", "1d"],
       });
@@ -248,6 +378,11 @@ export const analyzeCoinTool = createTool({
       });
 
       const output = {
+        marketFamily: instrument.marketFamily,
+        venueRoute: instrument.route,
+        quoteAsset: instrument.quoteAsset,
+        resolutionSource: instrument.resolutionSource,
+        capabilities: instrument.capabilities,
         symbol: result.symbol,
         price: result.price,
         trend: result.trend,

@@ -284,6 +284,31 @@ export function initDatabase(): Database {
   db.run("CREATE INDEX IF NOT EXISTS idx_gateway_scheduler_next_run ON gateway_scheduler_tasks(nextRunAt)");
   db.run("CREATE INDEX IF NOT EXISTS idx_gateway_scheduler_enabled ON gateway_scheduler_tasks(enabled)");
 
+  // Typed action log for chat, tools, daemon, scheduler, thread branching, and bookmarks
+  db.run(`
+    CREATE TABLE IF NOT EXISTS action_log_entries (
+      id TEXT PRIMARY KEY,
+      threadId TEXT,
+      resourceId TEXT,
+      sessionId TEXT,
+      correlationId TEXT,
+      runId TEXT,
+      parentEntryId TEXT,
+      entryType TEXT NOT NULL,
+      title TEXT NOT NULL,
+      content TEXT NOT NULL DEFAULT '',
+      payloadJson TEXT NOT NULL DEFAULT '{}',
+      label TEXT,
+      bookmarked INTEGER NOT NULL DEFAULT 0,
+      createdAt TEXT NOT NULL
+    )
+  `);
+  db.run("CREATE INDEX IF NOT EXISTS idx_action_log_thread_created ON action_log_entries(threadId, createdAt)");
+  db.run("CREATE INDEX IF NOT EXISTS idx_action_log_session_created ON action_log_entries(sessionId, createdAt)");
+  db.run("CREATE INDEX IF NOT EXISTS idx_action_log_type_created ON action_log_entries(entryType, createdAt)");
+  db.run("CREATE INDEX IF NOT EXISTS idx_action_log_bookmarked_created ON action_log_entries(bookmarked, createdAt)");
+  db.run("CREATE INDEX IF NOT EXISTS idx_action_log_correlation ON action_log_entries(correlationId)");
+
   dbInstance = db;
   return db;
 }

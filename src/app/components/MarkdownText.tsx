@@ -44,7 +44,7 @@ export const MarkdownText: React.FC<MarkdownTextProps> = ({
             marginY={1}
           >
             {codeBlockContent.map((codeLine, j) => (
-              <Text key={`code-line-${i}-${j}`} color={COLORS.ACCENT}>
+              <Text key={`code-line-${i}-${j}`} color={COLORS.ACCENT_DIM}>
                 {codeLine}
               </Text>
             ))}
@@ -91,7 +91,7 @@ export const MarkdownText: React.FC<MarkdownTextProps> = ({
     // Headers
     if (line.startsWith("### ")) {
       elements.push(
-        <Text key={`h3-${i}`} color={COLORS.ACCENT} bold>
+        <Text key={`h3-${i}`} color={COLORS.ACCENT_DIM} bold>
           {line.slice(4)}
         </Text>
       );
@@ -118,7 +118,7 @@ export const MarkdownText: React.FC<MarkdownTextProps> = ({
     if (line.startsWith("- ") || line.startsWith("* ")) {
       elements.push(
         <Box key={`bullet-${i}`}>
-          <Text color={COLORS.ACCENT}>  • </Text>
+          <Text color={COLORS.ACCENT_DIM}>  • </Text>
           {renderInlineMarkdown(line.slice(2), color)}
         </Box>
       );
@@ -130,7 +130,7 @@ export const MarkdownText: React.FC<MarkdownTextProps> = ({
     if (numberedMatch) {
       elements.push(
         <Box key={`num-${i}`}>
-          <Text color={COLORS.ACCENT}>  {numberedMatch[1]}. </Text>
+          <Text color={COLORS.ACCENT_DIM}>  {numberedMatch[1]}. </Text>
           {renderInlineMarkdown(numberedMatch[2] ?? "", color)}
         </Box>
       );
@@ -194,13 +194,13 @@ function renderInlineMarkdown(text: string, baseColor: string): React.ReactNode 
       parts.push(<Text key={keyIndex++} italic color={baseColor}>{match[4]}</Text>);
     } else if (match[5] !== undefined) {
       // `code`
-      parts.push(<Text key={keyIndex++} color={COLORS.ACCENT}>{match[5]}</Text>);
+      parts.push(<Text key={keyIndex++} color={COLORS.ACCENT_DIM}>{match[5]}</Text>);
     } else if (match[6] !== undefined) {
       // [link text](url)
-      parts.push(<Text key={keyIndex++} color={COLORS.BLUE} underline>{match[6]}</Text>);
+      parts.push(<Text key={keyIndex++} color={COLORS.DISCOVER} underline>{match[6]}</Text>);
     } else if (match[7] !== undefined) {
       // $price
-      parts.push(<Text key={keyIndex++} color={COLORS.HIGHLIGHT}>{match[7]}</Text>);
+      parts.push(<Text key={keyIndex++} color={COLORS.TRADE}>{match[7]}</Text>);
     } else if (match[8] !== undefined) {
       // percentage
       parts.push(
@@ -249,7 +249,7 @@ function renderTable(rows: string[][], keyPrefix: number): React.ReactNode {
       <Box>
         {headers.map((header, i) => (
           <Box key={`th-${keyPrefix}-${i}`} width={colWidths[i]! + 2}>
-            <Text color={COLORS.ACCENT} bold>
+            <Text color={COLORS.ACCENT_DIM} bold>
               {header.padEnd(colWidths[i]!)}
             </Text>
           </Box>

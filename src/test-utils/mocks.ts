@@ -193,6 +193,7 @@ export function createMockConfig(overrides: Partial<GordonConfig> = {}): GordonC
     mode: "SAFE",
     armedUntil: null,
     onboardingComplete: false,
+    startupBannerMode: "full",
     useKeyring: false,
     telemetry: { enabled: false, researchData: false },
     riskManagement: {
@@ -207,6 +208,27 @@ export function createMockConfig(overrides: Partial<GordonConfig> = {}): GordonC
     },
     regimeDetection: {
       autoRegime: true,
+    },
+    systematic: {
+      executionMode: "assisted",
+      minTradesForPromotion: 30,
+      minValidationScore: 60,
+      autoSnapshotDatasets: true,
+      autoCreateResearchExperiments: true,
+      simulationRealism: {
+        profile: "realistic",
+        executionLagBars: 1,
+        spreadBps: 2,
+        marketImpactBps: 1,
+      },
+      biasDiagnostics: {
+        minBacktestDays: 90,
+        minOutOfSampleWindows: 3,
+        maxTradePnlConcentrationPercent: 55,
+        maxCagrPercent: 300,
+        requireWalkForward: true,
+        requireMonteCarlo: true,
+      },
     },
     ...overrides,
   };

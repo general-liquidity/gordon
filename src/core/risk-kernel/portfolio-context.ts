@@ -9,6 +9,7 @@
 import { z } from "zod";
 import { createModuleLogger } from "../../infra/logger/index.ts";
 import type { Exchange } from "../../infra/exchange/types.ts";
+import type { BrokerAdapter } from "../../infra/broker/types.ts";
 import { dailyLimitTracker } from "../risk-management/daily-limits.ts";
 import { drawdownTracker } from "../risk-management/drawdown-tracker.ts";
 
@@ -144,6 +145,56 @@ export class PortfolioContextBuilder {
       logger.error("Failed to build portfolio context from exchange", error as Error);
       throw error;
     }
+  }
+
+  async buildFromBroker(adapter: BrokerAdapter): Promise<PortfolioContext> {
+    try {
+      const [account, positions] = await Promise.all([
+        adapter.getAccount(),
+        adapter.getPositions(),
+      ]);
+
+      const totalEquity = account.portfolioValue;
+      const availableBalance = account.buyingPower || account.cash;
+      const openPositions: OpenPosition[] = positions.map((position) => ({
+        symbol: position.symbol,
+        side: position.side,
+        size: position.qty,
+        entryPrice: position.avgEntryPrice,
+        currentPrice: position.qty !== 0 ? position.marketValue / position.qty : position.avgEntryPrice,
+        unrealizedPnL: position.unrealizedPl,
+        exchangeId: adapter.brokerId,
+      }));
+
+      const dailyStatus = dailyLimitTracker.getStatus(totalEquity);
+      const todayPnL = dailyStatus.totalPnL;
+      const todayTradeCount = dailyLimitTracker.getTodaysTrades().length;
+
+      drawdownTracker.updateBalance(totalEquity);
+      const ddStatus = drawdownTracker.getStatus();
+      const currentDrawdown = ddStatus.drawdownPercent;
+      const peakEquity = ddStatus.peakBalance;
+
+      return {
+        totalEquity,
+        availableBalance,
+        openPositions,
+        todayPnL,
+        todayTradeCount,
+        currentDrawdown,
+        peakEquity: peakEquity > 0 ? peakEquity : totalEquity,
+      };
+    } catch (error) {
+      logger.error("Failed to build portfolio context from broker", error as Error);
+      throw error;
+    }
+  }
+
+  async buildFromVenue(adapter: Exchange | BrokerAdapter): Promise<PortfolioContext> {
+    if ("exchangeId" in adapter) {
+      return this.buildFromExchange(adapter);
+    }
+    return this.buildFromBroker(adapter);
   }
 
   /**

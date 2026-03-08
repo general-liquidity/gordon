@@ -10,6 +10,7 @@ const TRADESTATION_CAPABILITIES: BrokerCapabilities = {
   supportsOptions: true,
   supportsStreaming: true,
   supportsPaperTrading: true,
+  supportsHistoricalBars: false,
 };
 
 const TRADESTATION_CONFIG: RestBrokerAdapterConfig = {
@@ -71,4 +72,3 @@ export class TradeStationAdapter extends RestBrokerAdapter {
     super(credentials, TRADESTATION_CONFIG);
   }
 }
-

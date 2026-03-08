@@ -22,7 +22,14 @@ import type {
 } from "../../../backtest/types.ts";
 import { runBacktest } from "../../../backtest/engine.ts";
 import { formatBacktestSummary } from "../../../backtest/reporting/formatter.ts";
-import { fetchHistoricalData, fetchHistoricalDataRange } from "../../../backtest/data/historical.ts";
+import type {
+  HistoricalDataClient,
+  HistoricalFetchMetadata,
+} from "../../../backtest/data/historical.ts";
+import {
+  fetchHistoricalDataRangeWithMetadata,
+  fetchHistoricalDataWithMetadata,
+} from "../../../backtest/data/historical.ts";
 import {
   analyzeBacktestResult,
   compareBacktestResults,
@@ -39,17 +46,25 @@ import { analyzeAlphaDecay } from "../../../backtest/alpha-decay.ts";
 import { generateBacktestChart } from "../../../backtest/plotting.ts";
 import { walkForwardTest, type WalkForwardConfig } from "../../../backtest/walk-forward.ts";
 import { runMonteCarloSimulation, type MonteCarloConfig } from "../../../backtest/monte-carlo.ts";
+import { detectOverfitting } from "../../../backtest/optimization/overfitting.ts";
 import {
   saveBacktestResult,
   loadBacktestResult,
   listBacktestHistory,
   type BacktestQueryOptions,
 } from "../../../backtest/storage.ts";
-import { getGordonContext, normalizeSymbol, type MastraExecutionContext } from "./types.ts";
+import { getAuditLogger } from "../../audit/index.ts";
 import {
-  formatBacktestResults as formatBacktestResultsDetailed,
-  formatComparisonResults,
-} from "../../../app/components/formatResults.ts";
+  buildBacktestOperatorReport,
+  buildComparisonOperatorReport,
+  buildOptimizationOperatorReport,
+  buildSimulationRealismProfile,
+  formatOperatorReport,
+  operatorReportSchema,
+  processSystematicBacktest,
+} from "../../systematic/index.ts";
+import { getGordonContext, type MastraExecutionContext } from "./types.ts";
+import { normalizeCryptoSymbol, normalizeStockSymbol, resolveInstrument } from "../../markets/instruments.ts";
 
 // ============================================================================
 // Helper Functions
@@ -63,6 +78,7 @@ import {
 
 const errors = {
   noExchange: { error: "Exchange client not connected. Please run setup first." },
+  noDataClient: { error: "No connected exchange or broker can provide historical market data." },
   strategyNotFound: (id: string) => ({
     error: `Strategy "${id}" not found. Use list_strategies to see available strategies.`,
   }),
@@ -70,6 +86,8 @@ const errors = {
     error: `Insufficient historical data for ${symbol}. Try a shorter backtest period or different timeframe.`,
   }),
 };
+
+type HistoricalMarket = "auto" | "crypto" | "stocks";
 
 function mapExitReason(reason: string): BacktestTrade["exitReason"] {
   const upper = reason.toUpperCase();
@@ -79,13 +97,106 @@ function mapExitReason(reason: string): BacktestTrade["exitReason"] {
   return "SIGNAL";
 }
 
+function looksExplicitlyCrypto(symbol: string): boolean {
+  return symbol.includes("/")
+    || /USDT|USDC|BUSD|USD|PERP$/i.test(symbol.trim().toUpperCase());
+}
+
+async function resolveHistoricalClient(
+  ctx: ReturnType<typeof getGordonContext>,
+  symbol: string,
+  market: HistoricalMarket = "auto",
+): Promise<{
+  client: HistoricalDataClient;
+  normalizedSymbol: string;
+  marketFamily: "crypto" | "stocks";
+}> {
+  if (!ctx) {
+    throw new Error(errors.noDataClient.error);
+  }
+
+  if (market === "stocks") {
+    if (!ctx.broker) throw new Error("Broker client not connected. Please configure a broker first.");
+    if (!ctx.broker.capabilities.supportsHistoricalBars) {
+      throw new Error(`${ctx.broker.displayName} does not support historical bars in Gordon yet.`);
+    }
+    return {
+      client: ctx.broker,
+      normalizedSymbol: normalizeStockSymbol(symbol),
+      marketFamily: "stocks",
+    };
+  }
+
+  if (market === "crypto") {
+    if (!ctx.exchange) throw new Error(errors.noExchange.error);
+    return {
+      client: ctx.exchange,
+      normalizedSymbol: normalizeCryptoSymbol(symbol),
+      marketFamily: "crypto",
+    };
+  }
+
+  const instrument = await resolveInstrument(ctx, symbol);
+  if (instrument.route === "exchange" && ctx.exchange) {
+    return {
+      client: ctx.exchange,
+      normalizedSymbol: instrument.normalizedSymbol,
+      marketFamily: "crypto",
+    };
+  }
+
+  if (instrument.route === "broker" && ctx.broker && ctx.broker.capabilities.supportsHistoricalBars) {
+    return {
+      client: ctx.broker,
+      normalizedSymbol: instrument.normalizedSymbol,
+      marketFamily: "stocks",
+    };
+  }
+
+  throw new Error(errors.noDataClient.error);
+}
+
+async function fetchHistoricalSeries(
+  ctx: ReturnType<typeof getGordonContext>,
+  params: {
+    symbol: string;
+    timeframe: string;
+    market?: HistoricalMarket;
+    days?: number;
+    startTime?: number;
+    endTime?: number;
+  },
+): Promise<{ data: Array<{ timestamp: number; open: number; high: number; low: number; close: number; volume: number }>; metadata: HistoricalFetchMetadata }> {
+  const selection = await resolveHistoricalClient(ctx, params.symbol, params.market);
+
+  if (params.startTime !== undefined && params.endTime !== undefined) {
+    const result = await fetchHistoricalDataRangeWithMetadata(
+      selection.client,
+      selection.normalizedSymbol,
+      params.timeframe,
+      params.startTime,
+      params.endTime,
+    );
+    return result;
+  }
+
+  const result = await fetchHistoricalDataWithMetadata(
+    selection.client,
+    selection.normalizedSymbol,
+    params.timeframe,
+    params.days ?? 90,
+  );
+  return result;
+}
+
 function buildBacktestConfig(
   strategyId: string,
   symbol: string,
   timeframe: string,
   days: number,
   initialCapital: number,
-  commissionRate: number
+  commissionRate: number,
+  realism: ReturnType<typeof buildSimulationRealismProfile>,
 ): BacktestConfig {
   return {
     strategyId,
@@ -97,6 +208,25 @@ function buildBacktestConfig(
     compounding: DEFAULT_BACKTEST_CONFIG.compounding ?? false,
     feePercent: commissionRate * 100,
     slippagePercent: DEFAULT_BACKTEST_CONFIG.slippagePercent ?? 0.05,
+    simulationProfile: realism.profile,
+    executionLagBars: realism.executionLagBars,
+    spreadBps: realism.spreadBps,
+    marketImpactBps: realism.marketImpactBps,
+  };
+}
+
+function buildEngineParams(
+  initialCapital: number,
+  commissionRate: number,
+  realism: ReturnType<typeof buildSimulationRealismProfile>,
+) {
+  return {
+    initialCapital,
+    commissionRate,
+    slippageRate: (DEFAULT_BACKTEST_CONFIG.slippagePercent ?? 0.05) / 100,
+    executionLagBars: realism.executionLagBars,
+    spreadRate: realism.spreadBps / 10000,
+    marketImpactRate: realism.marketImpactBps / 10000,
   };
 }
 
@@ -223,6 +353,25 @@ const backtestResultSchema = z.object({
   executionTime: z.number(),
   createdAt: z.string(),
   warnings: z.array(z.string()),
+  systematic: z.object({
+    datasetId: z.string(),
+    datasetSnapshotId: z.string().optional(),
+    validationId: z.string().optional(),
+    researchExperimentId: z.string().optional(),
+    sourceId: z.string(),
+    sourceKind: z.enum(["exchange", "broker", "cache"]),
+    marketFamily: z.enum(["crypto", "stocks"]),
+    quality: z.object({
+      qualityScore: z.number(),
+      coveragePercent: z.number(),
+      expectedCandles: z.number(),
+      actualCandles: z.number(),
+      gapCount: z.number(),
+      duplicateCount: z.number(),
+      stale: z.boolean(),
+      warnings: z.array(z.string()),
+    }),
+  }).optional(),
 });
 
 const ohlcSchema = z.object({
@@ -248,6 +397,7 @@ export const runBacktestTool = createTool({
   inputSchema: z.object({
     symbol: z.string().describe("Trading pair (e.g., 'BTCUSDT')"),
     strategyId: z.string().describe("Strategy ID (e.g., 'support_bounce')"),
+    market: z.enum(["auto", "crypto", "stocks"]).default("auto").describe("Market family to backtest against"),
     timeframe: z.string().default("4h").describe("Candle timeframe"),
     days: z.number().default(90).describe("Number of days to backtest"),
     initialCapital: z.number().default(10000).describe("Starting capital in USDT"),
@@ -257,80 +407,119 @@ export const runBacktestTool = createTool({
     result: backtestResultSchema.optional(),
     summary: z.string().optional(),
     formattedSummary: z.string().optional(),
+    operatorReport: operatorReportSchema.optional(),
+    savedResultId: z.string().optional(),
+    validationStatus: z.enum(["passed", "warning", "failed"]).optional(),
+    validationScore: z.number().optional(),
+    liveEligible: z.boolean().optional(),
     error: z.string().optional(),
   }),
   execute: async (
-    { symbol, strategyId, timeframe, days, initialCapital, commission },
+    { symbol, strategyId, market, timeframe, days, initialCapital, commission },
     execContext: MastraExecutionContext
   ) => {
     const ctx = getGordonContext(execContext);
-    if (!ctx?.exchange) {
-      return errors.noExchange;
-    }
 
     const strategy = strategyRegistry.get(strategyId as StrategyId);
     if (!strategy) {
       return errors.strategyNotFound(strategyId);
     }
 
-    const normalizedSymbol = normalizeSymbol(symbol);
-
     try {
       const executionStart = Date.now();
+      const realism = buildSimulationRealismProfile(ctx?.config);
 
-      const ohlcData = await fetchHistoricalData(
-        ctx.exchange,
-        normalizedSymbol,
+      const { data: ohlcData, metadata } = await fetchHistoricalSeries(ctx, {
+        symbol,
         timeframe,
-        days
-      );
+        market,
+        days,
+      });
 
       if (ohlcData.length < 100) {
-        return errors.insufficientData(normalizedSymbol);
+        return errors.insufficientData(metadata.symbol);
       }
 
       const backtestConfig = buildBacktestConfig(
         strategyId,
-        normalizedSymbol,
+        metadata.symbol,
         timeframe,
         days,
         initialCapital,
-        commission
+        commission,
+        realism,
       );
 
-      const engineParams = {
-        initialCapital,
-        commissionRate: commission,
-      };
+      const engineParams = buildEngineParams(initialCapital, commission, realism);
 
       const engineResult = runBacktest(strategy, ohlcData, engineParams);
       const executionTime = Date.now() - executionStart;
 
       const result = buildBacktestResult(strategy, backtestConfig, engineResult, executionTime);
-      const summary = formatBacktestSummary(result);
-
-      // Generate detailed formatted summary
-      const formattedSummary = formatBacktestResultsDetailed({
+      const systematic = await processSystematicBacktest({
+        strategyId,
         strategyName: strategy.name,
-        symbol: normalizedSymbol,
+        strategy,
+        candles: ohlcData,
+        backtestResult: result,
+        fetchMetadata: metadata,
+        config: ctx?.config,
+      });
+      result.systematic = {
+        datasetId: systematic.dataset.datasetId,
+        datasetSnapshotId: systematic.snapshot?.snapshotId,
+        validationId: systematic.validation.validationId,
+        researchExperimentId: systematic.experiment?.experimentId,
+        sourceId: metadata.sourceId,
+        sourceKind: metadata.sourceKind,
+        marketFamily: metadata.marketFamily,
+        quality: systematic.dataset.quality,
+        realism,
+      };
+
+      const saveResult = saveBacktestResult(result);
+      getAuditLogger(ctx?.userId || "system").success("SYSTEMATIC_VALIDATION", {
+        strategyId,
+        symbol: metadata.symbol,
+        marketFamily: metadata.marketFamily,
+      }, {
+        metadata: {
+          validationStatus: systematic.validation.status,
+          validationScore: systematic.validation.score,
+          liveEligible: systematic.validation.liveEligible,
+          datasetId: systematic.dataset.datasetId,
+        },
+      });
+      const summary = formatBacktestSummary(result);
+      const operatorReport = buildBacktestOperatorReport({
+        strategyName: strategy.name,
+        symbol: metadata.symbol,
         timeframe,
         days,
-        metrics: {
-          totalReturn: result.metrics.totalReturn,
-          winRate: result.metrics.winRate,
-          sharpeRatio: result.metrics.sharpeRatio,
-          maxDrawdown: result.metrics.maxDrawdown,
-          profitFactor: result.metrics.profitFactor,
-          totalTrades: result.metrics.totalTrades,
-          averageWin: result.metrics.averageWin,
-          averageLoss: result.metrics.averageLoss,
-          expectancy: result.metrics.expectancy,
-        },
         executionTime,
+        result,
+        validation: systematic.validation,
+        profile: systematic.profile,
+        biasDiagnostics: systematic.validation.biasDiagnostics,
       });
+      const formattedSummary = formatOperatorReport(operatorReport);
 
-      return { result, summary, formattedSummary };
+      return {
+        result,
+        summary,
+        formattedSummary,
+        operatorReport,
+        savedResultId: saveResult.id ?? result.id,
+        validationStatus: systematic.validation.status,
+        validationScore: systematic.validation.score,
+        liveEligible: systematic.validation.liveEligible,
+      };
     } catch (error) {
+      getAuditLogger(ctx?.userId || "system").failure(
+        "SYSTEMATIC_VALIDATION",
+        { strategyId, symbol, market },
+        error instanceof Error ? error.message : "Backtest execution failed",
+      );
       return {
         error: error instanceof Error ? error.message : "Backtest execution failed",
       };
@@ -352,6 +541,10 @@ export const optimizeStrategyTool = createTool({
     symbol: z
       .string()
       .describe("Trading pair symbol (e.g., 'BTCUSDT', 'ETH')"),
+    market: z
+      .enum(["auto", "crypto", "stocks"])
+      .default("auto")
+      .describe("Market family to source candles from"),
     strategyId: z
       .string()
       .describe("Strategy ID to optimize"),
@@ -375,6 +568,8 @@ export const optimizeStrategyTool = createTool({
     symbol: z.string().optional(),
     strategy: z.string().optional(),
     optimizedFor: z.string().optional(),
+    formattedSummary: z.string().optional(),
+    operatorReport: operatorReportSchema.optional(),
     bestParameters: z.record(z.string(), z.unknown()).optional(),
     bestMetrics: backtestMetricsSchema.optional(),
     iterationsTested: z.number().optional(),
@@ -387,102 +582,126 @@ export const optimizeStrategyTool = createTool({
     error: z.string().optional(),
   }),
   execute: async (
-    { symbol, strategyId, timeframe, parameterRanges, optimizeFor, maxIterations },
+    { symbol, market, strategyId, timeframe, parameterRanges, optimizeFor, maxIterations },
     execContext: MastraExecutionContext
-  ) => {
-    const ctx = getGordonContext(execContext);
-    if (!ctx?.exchange) {
-      return { error: errors.noExchange.error };
-    }
-
-    const strategy = strategyRegistry.get(strategyId as StrategyId);
-    if (!strategy) {
-      return { error: errors.strategyNotFound(strategyId).error };
-    }
-
-    const normalizedSymbol = normalizeSymbol(symbol);
-    const warnings: string[] = [];
-
-    const ohlcData = await fetchHistoricalData(
-      ctx.exchange,
-      normalizedSymbol,
-      timeframe,
-      90
-    );
-
-    if (ohlcData.length < 100) {
-      return { error: errors.insufficientData(normalizedSymbol).error };
-    }
-
-    const metricKeyMap: Record<string, keyof BacktestMetrics> = {
-      sharpe: "sharpeRatio",
-      return: "totalReturn",
-      winRate: "winRate",
-      drawdown: "maxDrawdown",
-    };
-
-    const metricKey = metricKeyMap[optimizeFor] ?? "sharpeRatio";
-
-    // Generate parameter combinations
-    const paramNames = Object.keys(parameterRanges);
-    const combinations: Array<Record<string, number>> = [];
-
-    function generateCombinations(index: number, current: Record<string, number>) {
-      if (index === paramNames.length) {
-        combinations.push({ ...current });
-        return;
+    ) => {
+    try {
+      const ctx = getGordonContext(execContext);
+      const realism = buildSimulationRealismProfile(ctx?.config);
+      const strategy = strategyRegistry.get(strategyId as StrategyId);
+      if (!strategy) {
+        return { error: errors.strategyNotFound(strategyId).error };
       }
-      const paramName = paramNames[index]!;
-      for (const value of parameterRanges[paramName]!) {
-        current[paramName] = value;
-        generateCombinations(index + 1, current);
-      }
-    }
 
-    generateCombinations(0, {});
-
-    const testCombinations = combinations.slice(0, maxIterations);
-    if (combinations.length > maxIterations) {
-      warnings.push(`Testing ${maxIterations} of ${combinations.length} possible combinations.`);
-    }
-
-    const allResults: Array<{
-      parameters: Record<string, number>;
-      metrics: BacktestMetrics;
-      score: number;
-    }> = [];
-
-    const engineParams = {
-      initialCapital: DEFAULT_BACKTEST_CONFIG.initialCapital,
-      commissionRate: 0.001,
-    };
-
-    for (const params of testCombinations) {
-      const result = runBacktest(strategy, ohlcData, engineParams, params);
-      const metricValue = (result.metrics[metricKey] as number) ?? 0;
-      const score = metricKey === "maxDrawdown" ? -metricValue : metricValue;
-
-      allResults.push({
-        parameters: params,
-        metrics: result.metrics,
-        score,
+      const warnings: string[] = [];
+      const { data: ohlcData, metadata } = await fetchHistoricalSeries(ctx, {
+        symbol,
+        timeframe,
+        market,
+        days: 90,
       });
+
+      if (ohlcData.length < 100) {
+        return { error: errors.insufficientData(metadata.symbol).error };
+      }
+
+      const metricKeyMap: Record<string, keyof BacktestMetrics> = {
+        sharpe: "sharpeRatio",
+        return: "totalReturn",
+        winRate: "winRate",
+        drawdown: "maxDrawdown",
+      };
+
+      const metricKey = metricKeyMap[optimizeFor] ?? "sharpeRatio";
+
+      const paramNames = Object.keys(parameterRanges);
+      const combinations: Array<Record<string, number>> = [];
+
+      function generateCombinations(index: number, current: Record<string, number>) {
+        if (index === paramNames.length) {
+          combinations.push({ ...current });
+          return;
+        }
+        const paramName = paramNames[index]!;
+        for (const value of parameterRanges[paramName]!) {
+          current[paramName] = value;
+          generateCombinations(index + 1, current);
+        }
+      }
+
+      generateCombinations(0, {});
+
+      const testCombinations = combinations.slice(0, maxIterations);
+      if (combinations.length > maxIterations) {
+        warnings.push(`Testing ${maxIterations} of ${combinations.length} possible combinations.`);
+      }
+
+      const allResults: Array<{
+        parameters: Record<string, number>;
+        metrics: BacktestMetrics;
+        score: number;
+      }> = [];
+
+      const engineParams = buildEngineParams(DEFAULT_BACKTEST_CONFIG.initialCapital, 0.001, realism);
+
+      for (const params of testCombinations) {
+        const result = runBacktest(strategy, ohlcData, engineParams, params);
+        const metricValue = (result.metrics[metricKey] as number) ?? 0;
+        const score = metricKey === "maxDrawdown" ? -metricValue : metricValue;
+
+        allResults.push({
+          parameters: params,
+          metrics: result.metrics,
+          score,
+        });
+      }
+
+      allResults.sort((a, b) => b.score - a.score);
+      const best = allResults[0];
+      const overfitSummary = allResults.length > 1
+        ? detectOverfitting(
+            allResults.map((result) => ({
+              parameters: result.parameters,
+              metrics: result.metrics,
+              score: result.score,
+            })),
+            { metric: metricKey },
+          )
+        : undefined;
+      const operatorReport = buildOptimizationOperatorReport({
+        strategyName: strategy.name,
+        symbol: metadata.symbol,
+        timeframe,
+        optimizeFor,
+        warnings,
+        rankedResults: allResults,
+        overfitSummary: overfitSummary
+          ? {
+              overfitScore: overfitSummary.overfitScore,
+              severity: overfitSummary.severity,
+              isLikelyOverfit: overfitSummary.isLikelyOverfit,
+            }
+          : undefined,
+      });
+      const formattedSummary = formatOperatorReport(operatorReport);
+
+      return {
+        symbol: metadata.symbol,
+        strategy: strategy.name,
+        optimizedFor: optimizeFor,
+        formattedSummary,
+        operatorReport,
+        bestParameters: best?.parameters ?? {},
+        bestMetrics: best?.metrics,
+        iterationsTested: testCombinations.length,
+        allResults,
+        warnings,
+      };
+    } catch (error) {
+      return {
+        error: error instanceof Error ? error.message : "Strategy optimization failed",
+      };
     }
-
-    allResults.sort((a, b) => b.score - a.score);
-
-    const best = allResults[0];
-
-    return {
-      symbol: normalizedSymbol,
-      strategy: strategy.name,
-      optimizedFor: optimizeFor,
-      bestParameters: best?.parameters ?? {},
-      bestMetrics: best?.metrics,
-      iterationsTested: testCombinations.length,
-      allResults,
-      warnings,
-    };
   },
 });
 
@@ -500,6 +719,10 @@ export const compareBacktestsTool = createTool({
     symbol: z
       .string()
       .describe("Trading pair symbol (e.g., 'BTCUSDT', 'ETH')"),
+    market: z
+      .enum(["auto", "crypto", "stocks"])
+      .default("auto")
+      .describe("Market family to source candles from"),
     strategyIds: z
       .array(z.string())
       .describe("List of strategy IDs to compare"),
@@ -542,160 +765,155 @@ export const compareBacktestsTool = createTool({
     }).optional(),
     executionTime: z.number().optional(),
     formattedSummary: z.string().optional(),
+    operatorReport: operatorReportSchema.optional(),
     warnings: z.array(z.string()).optional(),
     error: z.string().optional(),
   }),
   execute: async (
-    { symbol, strategyIds, timeframe, startDate, endDate, rankBy },
+    { symbol, market, strategyIds, timeframe, startDate, endDate, rankBy },
     execContext: MastraExecutionContext
-  ) => {
-    const ctx = getGordonContext(execContext);
-    if (!ctx?.exchange) {
-      return { error: errors.noExchange.error };
-    }
+    ) => {
+    try {
+      const ctx = getGordonContext(execContext);
+      const realism = buildSimulationRealismProfile(ctx?.config);
+      const comparisonStartTime = Date.now();
+      const warnings: string[] = [];
 
-    const comparisonStartTime = Date.now();
-    const normalizedSymbol = normalizeSymbol(symbol);
-    const warnings: string[] = [];
+      const metricKeyMap: Record<string, keyof BacktestMetrics> = {
+        sharpe: "sharpeRatio",
+        return: "totalReturn",
+        winRate: "winRate",
+        drawdown: "maxDrawdown",
+      };
 
-    const metricKeyMap: Record<string, keyof BacktestMetrics> = {
-      sharpe: "sharpeRatio",
-      return: "totalReturn",
-      winRate: "winRate",
-      drawdown: "maxDrawdown",
-    };
+      const metricKey = metricKeyMap[rankBy] ?? "sharpeRatio";
 
-    const metricKey = metricKeyMap[rankBy] ?? "sharpeRatio";
-
-    // Validate strategies
-    const validStrategies: Strategy[] = [];
-    for (const id of strategyIds) {
-      const found = strategyRegistry.get(id as StrategyId);
-      if (found) {
-        validStrategies.push(found);
-      } else {
-        warnings.push(`Strategy '${id}' not found and will be skipped.`);
-      }
-    }
-
-    if (validStrategies.length === 0) {
-      return { error: "No valid strategies to compare." };
-    }
-
-    const end = endDate ? new Date(endDate) : new Date();
-    const start = startDate ? new Date(startDate) : new Date(end.getTime() - 90 * 24 * 60 * 60 * 1000);
-    const periodDays = Math.max(
-      1,
-      Math.round((end.getTime() - start.getTime()) / (24 * 60 * 60 * 1000))
-    );
-
-    const ohlcData = startDate || endDate
-      ? await fetchHistoricalDataRange(
-          ctx.exchange,
-          normalizedSymbol,
-          timeframe,
-          start.getTime(),
-          end.getTime()
-        )
-      : await fetchHistoricalData(ctx.exchange, normalizedSymbol, timeframe, periodDays);
-
-    if (ohlcData.length < 100) {
-      return { error: errors.insufficientData(normalizedSymbol).error };
-    }
-
-    const engineParams = {
-      initialCapital: DEFAULT_BACKTEST_CONFIG.initialCapital,
-      commissionRate: 0.001,
-    };
-
-    const results: BacktestResult[] = [];
-    for (const strat of validStrategies) {
-      const execStart = Date.now();
-      const config = buildBacktestConfig(
-        strat.id,
-        normalizedSymbol,
-        timeframe,
-        periodDays,
-        engineParams.initialCapital,
-        engineParams.commissionRate
-      );
-      const engineResult = runBacktest(strat, ohlcData, engineParams);
-      const backtestResult = buildBacktestResult(
-        strat,
-        config,
-        engineResult,
-        Date.now() - execStart
-      );
-      results.push(backtestResult);
-    }
-
-    const comparison = compareBacktestResults(results, metricKey);
-
-    const rankings = comparison.comparisonTable.map((row, index) => ({
-      rank: index + 1,
-      strategy: row.strategy as string,
-      strategyId: (row.result as BacktestResult)?.config.strategyId ?? "unknown",
-      metrics: row.metrics as BacktestMetrics,
-      score: (() => {
-        const metrics = row.metrics as BacktestMetrics;
-        if (!metrics) return 0;
-        const value = metrics[metricKey] as number;
-        return metricKey === "maxDrawdown" ? -value : value;
-      })(),
-    }));
-
-    // Simple buy-and-hold benchmark
-    const firstClose = ohlcData[0]?.close ?? 0;
-    const lastClose = ohlcData[ohlcData.length - 1]?.close ?? 0;
-    let buyHoldReturn = 0;
-    let buyHoldMaxDrawdown = 0;
-    if (firstClose > 0) {
-      buyHoldReturn = ((lastClose - firstClose) / firstClose) * 100;
-      let peak = firstClose;
-      for (const bar of ohlcData) {
-        if (bar.close > peak) {
-          peak = bar.close;
+      const validStrategies: Strategy[] = [];
+      for (const id of strategyIds) {
+        const found = strategyRegistry.get(id as StrategyId);
+        if (found) {
+          validStrategies.push(found);
+        } else {
+          warnings.push(`Strategy '${id}' not found and will be skipped.`);
         }
-        const drawdown = ((peak - bar.close) / peak) * 100;
-        buyHoldMaxDrawdown = Math.max(buyHoldMaxDrawdown, drawdown);
       }
-    }
 
-    const comparisonExecutionTime = Date.now() - comparisonStartTime;
+      if (validStrategies.length === 0) {
+        return { error: "No valid strategies to compare." };
+      }
 
-    // Generate formatted comparison summary
-    const formattedSummary = formatComparisonResults({
-      symbol: normalizedSymbol,
-      timeframe,
-      strategies: rankings.map((r) => ({
-        name: r.strategy,
-        totalReturn: r.metrics.totalReturn,
-        sharpeRatio: r.metrics.sharpeRatio,
-        maxDrawdown: r.metrics.maxDrawdown,
-        winRate: r.metrics.winRate,
-        totalTrades: r.metrics.totalTrades,
-      })),
-      executionTime: comparisonExecutionTime,
-    });
+      const end = endDate ? new Date(endDate) : new Date();
+      const start = startDate ? new Date(startDate) : new Date(end.getTime() - 90 * 24 * 60 * 60 * 1000);
+      const periodDays = Math.max(
+        1,
+        Math.round((end.getTime() - start.getTime()) / (24 * 60 * 60 * 1000))
+      );
 
-    return {
-      symbol: normalizedSymbol,
-      timeframe,
-      period: {
-        startDate: start.toISOString(),
-        endDate: end.toISOString(),
+      const { data: ohlcData, metadata } = await fetchHistoricalSeries(ctx, {
+        symbol,
+        timeframe,
+        market,
+        startTime: startDate || endDate ? start.getTime() : undefined,
+        endTime: startDate || endDate ? end.getTime() : undefined,
         days: periodDays,
-      },
-      rankedBy: rankBy,
-      rankings,
-      buyAndHold: {
-        totalReturn: buyHoldReturn,
-        maxDrawdown: buyHoldMaxDrawdown,
-      },
-      executionTime: comparisonExecutionTime,
-      formattedSummary,
-      warnings,
-    };
+      });
+
+      if (ohlcData.length < 100) {
+        return { error: errors.insufficientData(metadata.symbol).error };
+      }
+
+      const engineParams = buildEngineParams(DEFAULT_BACKTEST_CONFIG.initialCapital, 0.001, realism);
+
+      const results: BacktestResult[] = [];
+      for (const strat of validStrategies) {
+        const execStart = Date.now();
+        const config = buildBacktestConfig(
+          strat.id,
+          metadata.symbol,
+          timeframe,
+          periodDays,
+          engineParams.initialCapital,
+          engineParams.commissionRate,
+          realism,
+        );
+        const engineResult = runBacktest(strat, ohlcData, engineParams);
+        const backtestResult = buildBacktestResult(
+          strat,
+          config,
+          engineResult,
+          Date.now() - execStart
+        );
+        results.push(backtestResult);
+      }
+
+      const comparison = compareBacktestResults(results, metricKey);
+
+      const rankings = comparison.comparisonTable.map((row, index) => ({
+        rank: index + 1,
+        strategy: row.strategy as string,
+        strategyId: (row.result as BacktestResult)?.config.strategyId ?? "unknown",
+        metrics: row.metrics as BacktestMetrics,
+        score: (() => {
+          const metrics = row.metrics as BacktestMetrics;
+          if (!metrics) return 0;
+          const value = metrics[metricKey] as number;
+          return metricKey === "maxDrawdown" ? -value : value;
+        })(),
+      }));
+
+      const firstClose = ohlcData[0]?.close ?? 0;
+      const lastClose = ohlcData[ohlcData.length - 1]?.close ?? 0;
+      let buyHoldReturn = 0;
+      let buyHoldMaxDrawdown = 0;
+      if (firstClose > 0) {
+        buyHoldReturn = ((lastClose - firstClose) / firstClose) * 100;
+        let peak = firstClose;
+        for (const bar of ohlcData) {
+          if (bar.close > peak) {
+            peak = bar.close;
+          }
+          const drawdown = ((peak - bar.close) / peak) * 100;
+          buyHoldMaxDrawdown = Math.max(buyHoldMaxDrawdown, drawdown);
+        }
+      }
+
+      const comparisonExecutionTime = Date.now() - comparisonStartTime;
+      const operatorReport = buildComparisonOperatorReport({
+        symbol: metadata.symbol,
+        timeframe,
+        rankBy,
+        rankings,
+        buyAndHold: {
+          totalReturn: buyHoldReturn,
+          maxDrawdown: buyHoldMaxDrawdown,
+        },
+      });
+      const formattedSummary = formatOperatorReport(operatorReport);
+
+      return {
+        symbol: metadata.symbol,
+        timeframe,
+        period: {
+          startDate: start.toISOString(),
+          endDate: end.toISOString(),
+          days: periodDays,
+        },
+        rankedBy: rankBy,
+        rankings,
+        buyAndHold: {
+          totalReturn: buyHoldReturn,
+          maxDrawdown: buyHoldMaxDrawdown,
+        },
+        executionTime: comparisonExecutionTime,
+        formattedSummary,
+        operatorReport,
+        warnings,
+      };
+    } catch (error) {
+      return {
+        error: error instanceof Error ? error.message : "Strategy comparison failed",
+      };
+    }
   },
 });
 
@@ -1237,6 +1455,7 @@ export const runWalkForwardTestTool = createTool({
   inputSchema: z.object({
     symbol: z.string().describe("Trading pair (e.g., 'BTCUSDT')"),
     strategyId: z.string().describe("Strategy ID to test"),
+    market: z.enum(["auto", "crypto", "stocks"]).default("auto").describe("Market family to source candles from"),
     timeframe: z.string().default("4h").describe("Candle timeframe"),
     days: z.number().default(180).describe("Number of days of data to use"),
     trainRatio: z.number().default(0.7).describe("Ratio of data for training (0-1)"),
@@ -1280,28 +1499,23 @@ export const runWalkForwardTestTool = createTool({
     error: z.string().optional(),
   }),
   execute: async (
-    { symbol, strategyId, timeframe, days, trainRatio, numWindows, parameterRanges, optimizeFor },
+    { symbol, strategyId, market, timeframe, days, trainRatio, numWindows, parameterRanges, optimizeFor },
     execContext: MastraExecutionContext
   ) => {
     const ctx = getGordonContext(execContext);
-    if (!ctx?.exchange) {
-      return { error: errors.noExchange.error };
-    }
 
     const strategy = strategyRegistry.get(strategyId as StrategyId);
     if (!strategy) {
       return { error: errors.strategyNotFound(strategyId).error };
     }
 
-    const normalizedSymbol = normalizeSymbol(symbol);
-
     try {
-      const ohlcData = await fetchHistoricalData(
-        ctx.exchange,
-        normalizedSymbol,
+      const { data: ohlcData } = await fetchHistoricalSeries(ctx, {
+        symbol,
         timeframe,
-        days
-      );
+        market,
+        days,
+      });
 
       if (ohlcData.length < 200) {
         return { error: `Insufficient data for walk-forward test. Need at least 200 candles, got ${ohlcData.length}.` };
@@ -1352,6 +1566,7 @@ export const runMonteCarloTool = createTool({
   inputSchema: z.object({
     symbol: z.string().describe("Trading pair (e.g., 'BTCUSDT')"),
     strategyId: z.string().describe("Strategy ID to simulate"),
+    market: z.enum(["auto", "crypto", "stocks"]).default("auto").describe("Market family to source candles from"),
     timeframe: z.string().default("4h").describe("Candle timeframe"),
     days: z.number().default(90).describe("Number of days to backtest"),
     iterations: z.number().default(1000).describe("Number of Monte Carlo iterations"),
@@ -1400,32 +1615,27 @@ export const runMonteCarloTool = createTool({
     error: z.string().optional(),
   }),
   execute: async (
-    { symbol, strategyId, timeframe, days, iterations, initialCapital },
+    { symbol, strategyId, market, timeframe, days, iterations, initialCapital },
     execContext: MastraExecutionContext
   ) => {
     const ctx = getGordonContext(execContext);
-    if (!ctx?.exchange) {
-      return { error: errors.noExchange.error };
-    }
 
     const strategy = strategyRegistry.get(strategyId as StrategyId);
     if (!strategy) {
       return { error: errors.strategyNotFound(strategyId).error };
     }
 
-    const normalizedSymbol = normalizeSymbol(symbol);
-
     try {
       // First run a backtest to get trades
-      const ohlcData = await fetchHistoricalData(
-        ctx.exchange,
-        normalizedSymbol,
+      const { data: ohlcData, metadata } = await fetchHistoricalSeries(ctx, {
+        symbol,
         timeframe,
-        days
-      );
+        market,
+        days,
+      });
 
       if (ohlcData.length < 100) {
-        return { error: errors.insufficientData(normalizedSymbol).error };
+        return { error: errors.insufficientData(metadata.symbol).error };
       }
 
       const engineParams = {
@@ -1543,7 +1753,11 @@ export const getBacktestHistoryTool = createTool({
     try {
       const options: BacktestQueryOptions = {
         strategyId,
-        symbol: symbol ? normalizeSymbol(symbol) : undefined,
+        symbol: symbol
+          ? looksExplicitlyCrypto(symbol)
+            ? normalizeCryptoSymbol(symbol)
+            : normalizeStockSymbol(symbol)
+          : undefined,
         timeframe,
         minReturn,
         maxDrawdown,

@@ -92,8 +92,27 @@ async function main(): Promise<void> {
 
   markdownLines.push("", "## Provider Capability Discovery", "");
   for (const capability of capabilities) {
+    const capabilityLabel = capability.integration
+      ? [
+        capability.integration.integrationDomain,
+        capability.integration.venueKind,
+        capability.integration.venueSubtype,
+        capability.integration.sourceKind,
+        capability.integration.providerKind,
+        capability.integration.accessPath,
+        capability.integration.railKind,
+        capability.integration.infraKind,
+        capability.integration.automationKind,
+        capability.integration.taxonomyScope,
+        capability.integration.parentSurfaceId
+          ? `parent:${capability.integration.parentSurfaceId}`
+          : undefined,
+      ].filter(Boolean).join(" / ")
+      : capability.providerKind;
+
+    const capabilityName = capability.integration?.displayName ?? capability.providerId;
     markdownLines.push(
-      `- \`${capability.providerId}\` [${capability.providerKind}] supports ${capability.capabilities.length} capability binding(s)`,
+      `- \`${capabilityName}\` [${capabilityLabel}] supports ${capability.capabilities.length} capability binding(s)`,
     );
   }
 
