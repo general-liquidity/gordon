@@ -50,7 +50,14 @@ export function createMockCandles(
     const randomFactor = 1 + (Math.random() - 0.5) * volatility;
 
     const open = currentPrice;
-    currentPrice *= trendMultiplier * randomFactor;
+    let nextPrice = currentPrice * trendMultiplier * randomFactor;
+    const minimumDirectionalMove = Math.max(0.0005, volatility * 0.1);
+    if (trend === "up" && nextPrice <= currentPrice) {
+      nextPrice = currentPrice * (1 + minimumDirectionalMove);
+    } else if (trend === "down" && nextPrice >= currentPrice) {
+      nextPrice = currentPrice * (1 - minimumDirectionalMove);
+    }
+    currentPrice = nextPrice;
     const close = currentPrice;
 
     const high = Math.max(open, close) * (1 + Math.random() * volatility);

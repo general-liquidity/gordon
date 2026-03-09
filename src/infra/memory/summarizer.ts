@@ -227,16 +227,18 @@ export class ConversationSummarizer {
     });
 
     try {
-      // Split messages: older ones to summarize, recent ones to keep
-      const recentKeepCount = this.getRecentMessagesToKeepForStage(compactionStage);
-      const adjustedMessagesToSummarize = Math.max(0, messages.length - recentKeepCount);
-      const olderMessages = messages.slice(0, adjustedMessagesToSummarize);
-      const recentMessages = messages.slice(adjustedMessagesToSummarize);
-      const preservedStableMessages = olderMessages.filter((message) => this.isStableContextMessage(message));
-      const summarizableOlderMessages = this.preprocessMessagesForStage(
-        olderMessages.filter((message) => !this.isStableContextMessage(message)),
-        compactionStage,
+      // Preserve stable system context outside compaction across the full message list.
+      const preservedStableMessages = messages.filter((message) => this.isStableContextMessage(message));
+      const nonStableMessages = messages.filter((message) => !this.isStableContextMessage(message));
+      const desiredRecentKeepCount = this.getRecentMessagesToKeepForStage(compactionStage);
+      const recentKeepCount = Math.min(
+        Math.max(this.config.recentMessagesToKeep, desiredRecentKeepCount),
+        Math.max(this.config.recentMessagesToKeep, nonStableMessages.length - 1),
       );
+      const adjustedMessagesToSummarize = Math.max(0, nonStableMessages.length - recentKeepCount);
+      const olderMessages = nonStableMessages.slice(0, adjustedMessagesToSummarize);
+      const recentMessages = nonStableMessages.slice(adjustedMessagesToSummarize);
+      const summarizableOlderMessages = this.preprocessMessagesForStage(olderMessages, compactionStage);
 
       if (summarizableOlderMessages.length === 0) {
         return {
