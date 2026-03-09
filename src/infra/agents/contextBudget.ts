@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import type { CoreSystemMessage, CoreUserMessage } from "@mastra/core/src/_types/ai-sdk.types";
+import type { CoreSystemMessage, CoreUserMessage } from "ai";
 import type { GordonConfig } from "../../types/index.ts";
 import { GORDON_PRODUCT_TRUTH } from "./capabilityTruth.ts";
 import { buildEventDrivenReminders, getExecutionReadiness } from "./runtimeHarness.ts";
@@ -103,12 +103,7 @@ export interface AnthropicCacheBlock {
   cache_control?: { type: "ephemeral" };
 }
 
-export interface GroundedPromptMessage {
-  role: "system" | "user";
-  content: string;
-  providerOptions?: CoreSystemMessage["providerOptions"] | CoreUserMessage["providerOptions"];
-  experimental_providerMetadata?: CoreSystemMessage["experimental_providerMetadata"] | CoreUserMessage["experimental_providerMetadata"];
-}
+export type GroundedPromptMessage = CoreSystemMessage | CoreUserMessage;
 
 export interface PromptEnvelope {
   prompt: string;
