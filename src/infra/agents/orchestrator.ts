@@ -16,6 +16,7 @@ import {
   buildPromptEnvelope,
   attachCumulativeUsageToPromptReport,
   attachUsageToPromptReport,
+  type GroundedPromptMessage,
 } from "./contextBudget.ts";
 import {
   formatIntegrationGlossary,
@@ -76,6 +77,7 @@ import {
   runLifecycleHooks,
   startLifecycleSession,
   endLifecycleSession,
+  type LifecycleHookPayload,
 } from "./lifecycleHooks.ts";
 import { recordSessionCostUsage } from "./sessionCostLedger.ts";
 import { compileSubagentProfiles, isToolAllowedForAgent } from "./subagentProfiles.ts";
@@ -1326,7 +1328,7 @@ async function buildGroundedPrompt(
   requestContext: RequestContext,
 ): Promise<{
   prompt: string;
-  messages: Array<Record<string, unknown>>;
+  messages: GroundedPromptMessage[];
   requestOptions: Record<string, unknown>;
 }> {
   let mcpDiscoveryNote = "";
@@ -1437,7 +1439,7 @@ async function buildGroundedPrompt(
 
   return {
     prompt: envelope.prompt,
-    messages: messageValidation.messages as Array<Record<string, unknown>>,
+    messages: messageValidation.messages,
     requestOptions: envelope.requestOptions,
   };
 }
@@ -1478,7 +1480,7 @@ function rebuildThreadACEArtifacts(context: GordonContext, threadId?: string): v
 
 async function finalizeAfterRequest(
   context: GordonContext,
-  payload: Parameters<typeof runLifecycleHooks>[2],
+  payload: LifecycleHookPayload,
   options: {
     resetLoops?: boolean;
     rebuildAce?: boolean;
@@ -1694,7 +1696,7 @@ export async function* processMessageStream(
       maxSteps: 20,
       ...groundedPrompt.requestOptions,
       ...(tracingOptions && { tracingOptions }),
-    } as Record<string, unknown>);
+    });
     const streamResult = await awaitWithAbort(streamRequest, signal);
 
     let fullText = "";
@@ -2491,7 +2493,7 @@ export async function processStructuredMessage<T extends Record<string, unknown>
       structuredOutput: { schema },
       ...groundedPrompt.requestOptions,
       ...(tracingOptions && { tracingOptions }),
-    } as Record<string, unknown>);
+    });
 
     const resultObj = result as unknown as {
       object?: T;
@@ -2599,7 +2601,7 @@ export async function* processWithNetwork(
       maxSteps: 30,
       ...groundedPrompt.requestOptions,
       ...(tracingOptions && { tracingOptions }),
-    } as Record<string, unknown>);
+    });
 
     // Stream the network result
     let fullText = "";
@@ -2743,7 +2745,7 @@ export async function processMessage(
       maxSteps: 20,
       ...groundedPrompt.requestOptions,
       ...(tracingOptions && { tracingOptions }),
-    } as Record<string, unknown>);
+    });
 
     // Extract text from result - Mastra returns { text, usage, ... }
     const resultObj = result as unknown as {

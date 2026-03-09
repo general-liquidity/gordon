@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import type { CoreSystemMessage, CoreUserMessage } from "@mastra/core/src/_types/ai-sdk.types";
 import type { GordonConfig } from "../../types/index.ts";
 import { GORDON_PRODUCT_TRUTH } from "./capabilityTruth.ts";
 import { buildEventDrivenReminders, getExecutionReadiness } from "./runtimeHarness.ts";
@@ -105,9 +106,8 @@ export interface AnthropicCacheBlock {
 export interface GroundedPromptMessage {
   role: "system" | "user";
   content: string;
-  providerOptions?: Record<string, unknown>;
-  providerMetadata?: Record<string, unknown>;
-  experimental_providerMetadata?: Record<string, unknown>;
+  providerOptions?: CoreSystemMessage["providerOptions"] | CoreUserMessage["providerOptions"];
+  experimental_providerMetadata?: CoreSystemMessage["experimental_providerMetadata"] | CoreUserMessage["experimental_providerMetadata"];
 }
 
 export interface PromptEnvelope {
@@ -442,8 +442,7 @@ export function buildPromptEnvelope(
       content: stablePrefix,
       ...(providerOptions ? {
         providerOptions,
-        // Keep both metadata fields for compatibility with older AI SDK paths.
-        providerMetadata: providerOptions,
+        // Keep deprecated metadata field for compatibility with older AI SDK paths.
         experimental_providerMetadata: providerOptions,
       } : {}),
     });

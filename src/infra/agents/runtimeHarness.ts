@@ -101,7 +101,7 @@ function getToolFamilyLimit(toolName: string): number {
     if (family === "default") continue;
     if (lower.includes(family)) return limit;
   }
-  return TOOL_RESULT_LIMITS.default;
+  return TOOL_RESULT_LIMITS.default ?? 2500;
 }
 
 // ─── Reminder state tracking (one-shot flags + counters per thread) ──────────
