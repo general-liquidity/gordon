@@ -164,7 +164,7 @@ export function validateAndRepairModelMessages(
       repairNotes.push("Converted a misplaced runtime reminder block into user-side guidance semantics.");
     }
 
-    if (role === "system" && !rawMessage.providerOptions && !rawMessage.experimental_providerMetadata) {
+    if (role === "system" && !rawMessage.providerOptions) {
       if (seenDynamicSystemBlocks.has(normalizedForDedup)) {
         repairNotes.push("Dropped a duplicate dynamic system block before provider call.");
         continue;
@@ -197,9 +197,7 @@ export function validateAndRepairModelMessages(
       previous.role === "system" &&
       role === "system" &&
       !previous.providerOptions &&
-      !previous.experimental_providerMetadata &&
-      !rawMessage.providerOptions &&
-      !rawMessage.experimental_providerMetadata
+      !rawMessage.providerOptions
     ) {
       previous.content = `${previous.content}\n\n${sanitizedContent}`;
       repairNotes.push("Merged adjacent uncached system messages before provider call.");
@@ -210,9 +208,6 @@ export function validateAndRepairModelMessages(
       role,
       content: sanitizedContent,
       ...(rawMessage.providerOptions ? { providerOptions: rawMessage.providerOptions } : {}),
-      ...(rawMessage.experimental_providerMetadata
-        ? { experimental_providerMetadata: rawMessage.experimental_providerMetadata }
-        : {}),
     });
   }
 
