@@ -30,5 +30,7 @@ describe("ConversationSummarizer", () => {
     expect(result.summarized).toBe(true);
     expect(result.messages[0]?.content).toContain(PROJECT_TRUTH_MARKER);
     expect(result.messages[1]?.content).toContain(INTEGRATION_GLOSSARY_MARKER);
+    expect(result.messages.some((message) => message.content.includes("[GORDON_ARTIFACT_INDEX]"))).toBeTrue();
+    expect(result.compactionStage).toBeDefined();
   });
 });

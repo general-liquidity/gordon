@@ -66,8 +66,35 @@ describe("integration glossary grounding", () => {
 
     expect(envelope.prompt).toContain("[GORDON_PROJECT_TRUTH]");
     expect(envelope.prompt).toContain("[GORDON_INTEGRATION_GLOSSARY]");
+    expect(envelope.prompt).toContain("[GORDON_PHASE_GUIDANCE]");
     expect(envelope.prompt).toContain("Tinyfish");
     expect(envelope.report.cache.supported).toBe(true);
+    expect(envelope.report.workflowPhase).toBe("analysis");
     expect(envelope.report.sectionBudget.totalEstimated).toBeGreaterThan(0);
+    expect(envelope.contextPieces.some((piece) => piece.source === "prompt-section-registry")).toBeTrue();
+  });
+
+  it("attaches transport-level Anthropic cache hints to the stable system message", async () => {
+    const context = createContext({
+      requestedTaskScope: "execution",
+      config: GordonConfigSchema.parse({
+        mode: "ARMED",
+        modelConfig: { provider: "anthropic", model: "claude-sonnet-4-5-20250929" },
+      }),
+    });
+    const selection = await selectRelevantIntegrationGlossary("Review my approved execution plan", context);
+    const envelope = buildPromptEnvelope(
+      "Review my approved execution plan",
+      context,
+      selection,
+      formatIntegrationGlossary(selection.entries),
+    );
+
+    expect(envelope.messages[0]?.providerOptions).toEqual({
+      anthropic: { cacheControl: { type: "ephemeral" } },
+    });
+    expect((envelope.requestOptions.providerOptions as Record<string, unknown>)?.anthropic).toEqual({
+      cacheControl: { type: "ephemeral" },
+    });
   });
 });

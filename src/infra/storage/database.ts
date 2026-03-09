@@ -309,6 +309,35 @@ export function initDatabase(): Database {
   db.run("CREATE INDEX IF NOT EXISTS idx_action_log_bookmarked_created ON action_log_entries(bookmarked, createdAt)");
   db.run("CREATE INDEX IF NOT EXISTS idx_action_log_correlation ON action_log_entries(correlationId)");
 
+  // Persistent cumulative token/cost ledger by thread/session
+  db.run(`
+    CREATE TABLE IF NOT EXISTS session_cost_ledger (
+      threadId TEXT PRIMARY KEY,
+      sessionId TEXT,
+      resourceId TEXT,
+      provider TEXT,
+      model TEXT,
+      requestCount INTEGER NOT NULL DEFAULT 0,
+      promptTokens INTEGER NOT NULL DEFAULT 0,
+      completionTokens INTEGER NOT NULL DEFAULT 0,
+      totalTokens INTEGER NOT NULL DEFAULT 0,
+      updatedAt TEXT NOT NULL
+    )
+  `);
+  db.run("CREATE INDEX IF NOT EXISTS idx_session_cost_updated ON session_cost_ledger(updatedAt)");
+  db.run("CREATE INDEX IF NOT EXISTS idx_session_cost_provider ON session_cost_ledger(provider)");
+
+  // ACE reflector/curator compact memory snapshots
+  db.run(`
+    CREATE TABLE IF NOT EXISTS ace_memory (
+      threadId TEXT PRIMARY KEY,
+      bulletJson TEXT NOT NULL DEFAULT '[]',
+      renderedBlock TEXT NOT NULL DEFAULT '',
+      updatedAt TEXT NOT NULL
+    )
+  `);
+  db.run("CREATE INDEX IF NOT EXISTS idx_ace_memory_updated ON ace_memory(updatedAt)");
+
   dbInstance = db;
   return db;
 }

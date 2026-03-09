@@ -32,7 +32,7 @@ import type { Tool } from "@mastra/core/tools";
 import type { MastraMCPServerDefinition } from "@mastra/mcp";
 
 import { pluginInstaller } from "./marketplace/installer.ts";
-import { reloadRouting, isRoutingInitialized } from "../routing/manager.ts";
+import { reloadRouting, isRoutingInitialized, syncRoutingWithCurrentMCPTools } from "../routing/manager.ts";
 import { credentialManager } from "./credentials.ts";
 import type { MCPCategory, MCPServerManifest } from "./types.ts";
 
@@ -43,9 +43,13 @@ import type { MCPCategory, MCPServerManifest } from "./types.ts";
 let _mcpClient: MCPClient | null = null;
 let _mcpTools: Record<string, Tool> | null = null;
 let _initPromise: Promise<Record<string, Tool>> | null = null;
+let _discoveryPromise: Promise<Record<string, Tool>> | null = null;
 let _hotReloadTimer: ReturnType<typeof setInterval> | null = null;
 let _lastPluginFingerprint: string | null = null;
 let _hotReloadInFlight = false;
+let _mcpServers: Record<string, MastraMCPServerDefinition> | null = null;
+let _schemasDiscovered = false;
+const _discoveredServerIds = new Set<string>();
 
 function buildPluginFingerprint(installedPlugins: Array<{ id: string; enabled: boolean; version?: string }>): string {
   return installedPlugins
@@ -131,6 +135,8 @@ function manifestToServerDef(manifest: MCPServerManifest): MastraMCPServerDefini
  * Initialize MCP tools from installed+enabled plugins
  *
  * Call this once at app startup. Safe to call multiple times — returns cached result.
+ * This primes plugin metadata and server definitions but defers expensive tool-schema
+ * discovery until the first request that needs external MCP tools.
  * If no plugins are installed/enabled, returns an empty object.
  *
  * @returns Record of Mastra-native Tool objects, namespaced as `pluginId_toolName`
@@ -149,6 +155,8 @@ export async function initMCPTools(): Promise<Record<string, Tool>> {
 
       if (installed.length === 0) {
         _mcpTools = {};
+        _mcpServers = {};
+        _schemasDiscovered = true;
         if (process.env.GORDON_STARTUP_QUIET !== "1") {
           console.log("[MCP] No enabled plugins found");
         }
@@ -168,25 +176,20 @@ export async function initMCPTools(): Promise<Record<string, Tool>> {
 
       if (Object.keys(servers).length === 0) {
         _mcpTools = {};
+        _mcpServers = {};
+        _schemasDiscovered = true;
         if (process.env.GORDON_STARTUP_QUIET !== "1") {
           console.log("[MCP] No plugins with valid commands found");
         }
         return _mcpTools;
       }
 
-      // Create MCPClient and discover tools
-      _mcpClient = new MCPClient({
-        id: "gordon-mcp",
-        servers,
-        timeout: 30_000,
-      });
-
-      _mcpTools = await _mcpClient.listTools();
-      const toolCount = Object.keys(_mcpTools).length;
+      _mcpServers = servers;
+      _mcpTools = {};
+      _schemasDiscovered = false;
+      _discoveredServerIds.clear();
       const serverCount = Object.keys(servers).length;
-      if (process.env.GORDON_STARTUP_QUIET !== "1") {
-        console.log(`[MCP] Loaded ${toolCount} tools from ${serverCount} plugin(s)`);
-      }
+      loggerInfo(`[MCP] Ready ${serverCount} plugin(s) for lazy tool discovery`);
 
       return _mcpTools;
     } catch (error) {
@@ -197,6 +200,116 @@ export async function initMCPTools(): Promise<Record<string, Tool>> {
   })();
 
   return _initPromise;
+}
+
+function loggerInfo(message: string): void {
+  if (process.env.GORDON_STARTUP_QUIET !== "1") {
+    console.log(message);
+  }
+}
+
+export async function ensureMCPToolsDiscovered(serverIds?: string[]): Promise<Record<string, Tool>> {
+  const normalizedServerIds = serverIds?.filter(Boolean);
+
+  if (
+    _mcpTools &&
+    (
+      (_schemasDiscovered && !normalizedServerIds?.length) ||
+      (normalizedServerIds?.length && normalizedServerIds.every((id) => _discoveredServerIds.has(id)))
+    )
+  ) {
+    return _mcpTools;
+  }
+
+  if (!normalizedServerIds?.length && _discoveryPromise) {
+    return _discoveryPromise;
+  }
+
+  const discoveryTask = (async () => {
+    await initMCPTools();
+
+    if (
+      _mcpTools &&
+      (
+        (_schemasDiscovered && !normalizedServerIds?.length) ||
+        (normalizedServerIds?.length && normalizedServerIds.every((id) => _discoveredServerIds.has(id)))
+      )
+    ) {
+      return _mcpTools;
+    }
+
+    const servers = _mcpServers ?? {};
+    if (Object.keys(servers).length === 0) {
+      _mcpTools = {};
+      _schemasDiscovered = true;
+      return _mcpTools;
+    }
+
+    const selectedServers = normalizedServerIds?.length
+      ? Object.fromEntries(
+          normalizedServerIds
+            .filter((id) => Boolean(servers[id]))
+            .map((id) => [id, servers[id]!]),
+        )
+      : servers;
+
+    if (Object.keys(selectedServers).length === 0) {
+      return _mcpTools ?? {};
+    }
+
+    if (!normalizedServerIds?.length && !_mcpClient) {
+      _mcpClient = new MCPClient({
+        id: "gordon-mcp",
+        servers,
+        timeout: 30_000,
+      });
+    }
+
+    const client = normalizedServerIds?.length
+      ? new MCPClient({
+          id: "gordon-mcp-targeted",
+          servers: selectedServers,
+          timeout: 30_000,
+        })
+      : _mcpClient!;
+
+    const discoveredTools = await client.listTools();
+    _mcpTools = {
+      ...(_mcpTools ?? {}),
+      ...discoveredTools,
+    };
+
+    if (normalizedServerIds?.length) {
+      normalizedServerIds.forEach((id) => _discoveredServerIds.add(id));
+      try {
+        await client.disconnect();
+      } catch {
+        // best effort for targeted one-shot discovery
+      }
+    } else {
+      _schemasDiscovered = true;
+      Object.keys(servers).forEach((id) => _discoveredServerIds.add(id));
+    }
+    loggerInfo(`[MCP] Loaded ${Object.keys(discoveredTools).length} tool(s) on demand`);
+
+    if (isRoutingInitialized()) {
+      syncRoutingWithCurrentMCPTools();
+    }
+
+    return _mcpTools;
+  })();
+
+  if (!normalizedServerIds?.length) {
+    _discoveryPromise = discoveryTask;
+  }
+
+  try {
+    return await discoveryTask;
+  } finally {
+    if (!normalizedServerIds?.length) {
+      _discoveryPromise = null;
+    }
+  }
 }
 
 /**
@@ -247,6 +360,80 @@ export function getScopedMCPTools(options?: {
   );
 }
 
+export function areMCPSchemasDiscovered(serverIds?: string[]): boolean {
+  if (!serverIds?.length) {
+    return _schemasDiscovered;
+  }
+  return serverIds.every((id) => _discoveredServerIds.has(id));
+}
+
+export interface MCPDiscoveryIntent {
+  shouldDiscover: boolean;
+  matchedServerIds: string[];
+  reasons: string[];
+}
+
+function tokenizeForDiscoveryMatch(value: string): string[] {
+  return value
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .map((token) => token.trim())
+    .filter((token) => token.length >= 3);
+}
+
+export function getMCPDiscoveryIntent(userMessage: string): MCPDiscoveryIntent {
+  const summaries = getMCPServerSummary();
+  if (summaries.length === 0) {
+    return {
+      shouldDiscover: false,
+      matchedServerIds: [],
+      reasons: [],
+    };
+  }
+
+  const lower = userMessage.toLowerCase();
+  const matchedServerIds = new Set<string>();
+  const reasons = new Set<string>();
+
+  if (/\b(mcp|plugin|plugins|tool server|external tool)\b/i.test(lower)) {
+    summaries.forEach((summary) => matchedServerIds.add(summary.id));
+    reasons.add("The request explicitly mentions MCP or plugins.");
+  }
+
+  for (const summary of summaries) {
+    const aliases = new Set<string>([
+      summary.id.toLowerCase(),
+      summary.name.toLowerCase(),
+      summary.category.toLowerCase(),
+      ...tokenizeForDiscoveryMatch(summary.name),
+      ...tokenizeForDiscoveryMatch(summary.category),
+    ]);
+
+    for (const alias of aliases) {
+      if (!alias) continue;
+      if (alias.includes(" ")) {
+        if (lower.includes(alias)) {
+          matchedServerIds.add(summary.id);
+          reasons.add(`The request mentions ${summary.name}.`);
+        }
+        continue;
+      }
+
+      const pattern = new RegExp(`(^|[^a-z0-9])${alias.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}([^a-z0-9]|$)`, "i");
+      if (pattern.test(lower)) {
+        matchedServerIds.add(summary.id);
+        reasons.add(`The request mentions ${summary.name}.`);
+      }
+    }
+  }
+
+  return {
+    shouldDiscover: matchedServerIds.size > 0,
+    matchedServerIds: [...matchedServerIds],
+    reasons: [...reasons],
+  };
+}
+
 /**
  * Get tool names organized by plugin server
  * Useful for TOOL_AGENT_MAP population
@@ -282,6 +469,10 @@ export async function disconnectMCP(): Promise<void> {
   }
   _mcpTools = null;
   _initPromise = null;
+  _discoveryPromise = null;
+  _mcpServers = null;
+  _schemasDiscovered = false;
+  _discoveredServerIds.clear();
 }
 
 /**
@@ -340,24 +531,58 @@ export function isMCPInitialized(): boolean {
 }
 
 /**
+ * Get a compact metadata-only summary of available MCP servers without
+ * triggering full tool-schema discovery. Safe to call at startup.
+ *
+ * This implements the paper's "compact summary of available servers and their
+ * capabilities" that is loaded at startup (<5% context cost) while deferring
+ * full schema discovery to point-of-use via ensureMCPToolsDiscovered().
+ */
+export function getMCPServerSummary(): Array<{
+  id: string;
+  name: string;
+  category: string;
+  toolCount: number | null;
+}> {
+  const installed = pluginInstaller.getInstalled().filter((p) => p.enabled);
+  return installed.map((plugin) => {
+    let toolCount: number | null = null;
+    if (_schemasDiscovered && _mcpTools) {
+      const prefix = plugin.id + "_";
+      toolCount = Object.keys(_mcpTools).filter((t) => t.startsWith(prefix)).length;
+    }
+    return {
+      id: plugin.id,
+      name: plugin.manifest.name ?? plugin.id,
+      category: plugin.manifest.category ?? "general",
+      toolCount,
+    };
+  });
+}
+
+/**
  * Get MCP client stats
  */
 export function getMCPStats(): {
   initialized: boolean;
+  discovered: boolean;
   toolCount: number;
   serverCount: number;
   toolNames: string[];
 } {
   const toolNames = Object.keys(_mcpTools ?? {});
-  const servers = new Set(
-    toolNames.map((name) => {
-      const idx = name.indexOf("_");
-      return idx > 0 ? name.substring(0, idx) : name;
-    }),
-  );
+  const servers = _mcpServers
+    ? new Set(Object.keys(_mcpServers))
+    : new Set(
+        toolNames.map((name) => {
+          const idx = name.indexOf("_");
+          return idx > 0 ? name.substring(0, idx) : name;
+        }),
+      );
 
   return {
     initialized: _mcpTools !== null,
+    discovered: _schemasDiscovered,
     toolCount: toolNames.length,
     serverCount: servers.size,
     toolNames,

@@ -1,0 +1,28 @@
+[
+  { "id": "shared.runtime-authority", "file": "shared.runtime-authority.md", "mount": "instructions", "priority": 10, "stable": true },
+  { "id": "shared.product-truth", "file": "shared.product-truth.md", "mount": "instructions", "priority": 20, "stable": true },
+  { "id": "shared.execution-safety", "file": "shared.execution-safety.md", "mount": "instructions", "priority": 30, "stable": true },
+  { "id": "shared.recovery-discipline", "file": "shared.recovery-discipline.md", "mount": "instructions", "priority": 40, "stable": true },
+  { "id": "shared.wording", "file": "shared.wording.md", "mount": "instructions", "priority": 50, "stable": true },
+
+  { "id": "role.gordon.orchestration", "file": "role.gordon.orchestration.md", "mount": "instructions", "priority": 100, "stable": true, "roles": ["gordon"] },
+  { "id": "role.scanner.discovery", "file": "role.scanner.discovery.md", "mount": "instructions", "priority": 100, "stable": true, "roles": ["scanner"] },
+  { "id": "role.analyst.analysis", "file": "role.analyst.analysis.md", "mount": "instructions", "priority": 100, "stable": true, "roles": ["analyst"] },
+  { "id": "role.planner.planning", "file": "role.planner.planning.md", "mount": "instructions", "priority": 100, "stable": true, "roles": ["planner"] },
+  { "id": "role.executor.execution", "file": "role.executor.execution.md", "mount": "instructions", "priority": 100, "stable": true, "roles": ["executor"] },
+  { "id": "role.monitor.monitoring", "file": "role.monitor.monitoring.md", "mount": "instructions", "priority": 100, "stable": true, "roles": ["monitor"] },
+  { "id": "role.teacher.explainer", "file": "role.teacher.explainer.md", "mount": "instructions", "priority": 100, "stable": true, "roles": ["teacher"] },
+  { "id": "role.backtester.research", "file": "role.backtester.research.md", "mount": "instructions", "priority": 100, "stable": true, "roles": ["backtester"] },
+
+  { "id": "context.runtime-shared", "file": "context.runtime-shared.md", "mount": "context", "priority": 14, "stable": false },
+  { "id": "context.thinking-enabled", "file": "context.thinking-enabled.md", "mount": "context", "priority": 14, "stable": false, "thinkingEnabledOnly": true },
+  { "id": "context.exchange-connected", "file": "context.exchange-connected.md", "mount": "context", "priority": 15, "stable": true, "requiresExchange": true },
+  { "id": "context.broker-connected", "file": "context.broker-connected.md", "mount": "context", "priority": 16, "stable": true, "requiresBroker": true },
+  { "id": "context.mcp-summary", "file": "context.mcp-summary.md", "mount": "context", "priority": 17, "stable": true, "requiresMcp": true },
+  { "id": "context.execution-blocked", "file": "context.execution-blocked.md", "mount": "context", "priority": 18, "stable": false, "taskScopes": ["execution"], "executionBlocked": true },
+  { "id": "context.live-execution", "file": "context.live-execution.md", "mount": "context", "priority": 19, "stable": false, "taskScopes": ["execution"], "liveModeOnly": true },
+  { "id": "context.execution-ready", "file": "context.execution-ready.md", "mount": "context", "priority": 20, "stable": false, "taskScopes": ["execution"], "requiresExecutionReady": true },
+  { "id": "context.planning-handoff", "file": "context.planning-handoff.md", "mount": "context", "priority": 21, "stable": false, "requiresPlanningHandoff": true },
+  { "id": "context.active-venue", "file": "context.active-venue.md", "mount": "context", "priority": 22, "stable": true, "activeVenueOnly": true },
+  { "id": "context.action-mandate", "file": "context.action-mandate.md", "mount": "context", "priority": 23, "stable": false, "requiresRequestedAction": true }
+]

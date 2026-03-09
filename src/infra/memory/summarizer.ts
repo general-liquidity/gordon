@@ -11,6 +11,7 @@
 import type { Message, MessageRole } from "../llm/types.ts";
 import type { LLMClient } from "../llm/client.ts";
 import { createModuleLogger } from "../logger/index.ts";
+import { resolveLegacyModelRouteForWorkflowPhase } from "../agents/workflowPhase.ts";
 import {
   INTEGRATION_GLOSSARY_MARKER,
   PROJECT_TRUTH_MARKER,
@@ -91,6 +92,37 @@ export interface SummarizationResult {
   summaryText?: string;
   /** Extracted trading context */
   tradingContext?: TradingContext;
+  /** Compaction stage used for this summarization pass */
+  compactionStage?: CompactionStage;
+}
+
+export type CompactionStage = "masking" | "pruning" | "aggressive" | "full";
+
+/** Compaction pressure thresholds (fraction of max context budget used, per OPENDEV paper §2.3.6) */
+export const COMPACTION_PRESSURE_THRESHOLDS = {
+  masking: 0.70,    // 70% — warn and begin gentle masking
+  pruning: 0.80,    // 80% — observation masking, preserve 6 recent
+  aggressive: 0.90, // 90% — aggressive masking, preserve 3 recent
+  full: 0.99,       // 99% — full LLM summary generation
+} as const;
+
+/** Recent observation counts to preserve per stage (paper §2.3.6) */
+export const RECENT_OBSERVATIONS_TO_KEEP: Record<CompactionStage, number> = {
+  masking: 6,
+  pruning: 6,
+  aggressive: 3,
+  full: 3,
+};
+
+/**
+ * Determine compaction stage from token-pressure ratio (0–1).
+ * Preferred over message-count heuristics when token budget is known.
+ */
+export function determineCompactionStageFromPressure(contextFillRatio: number): CompactionStage {
+  if (contextFillRatio >= COMPACTION_PRESSURE_THRESHOLDS.full) return "full";
+  if (contextFillRatio >= COMPACTION_PRESSURE_THRESHOLDS.aggressive) return "aggressive";
+  if (contextFillRatio >= COMPACTION_PRESSURE_THRESHOLDS.pruning) return "pruning";
+  return "masking";
 }
 
 // ============================================================================
@@ -127,6 +159,8 @@ CONVERSATION HISTORY:
 {conversation}
 
 Remember to use the exact template format with the three sections: Key Decisions Made, Active Positions/Analysis, and Important Context.`;
+
+const ARTIFACT_INDEX_MARKER = "[GORDON_ARTIFACT_INDEX]";
 
 // ============================================================================
 // ConversationSummarizer Class
@@ -184,24 +218,32 @@ export class ConversationSummarizer {
     }
 
     const messagesToSummarize = messages.length - this.config.recentMessagesToKeep;
+    const compactionStage = this.determineCompactionStage(messages.length);
     logger.info("Starting conversation summarization", {
       totalMessages: messages.length,
       messagesToSummarize,
       keepingRecent: this.config.recentMessagesToKeep,
+      compactionStage,
     });
 
     try {
       // Split messages: older ones to summarize, recent ones to keep
-      const olderMessages = messages.slice(0, messagesToSummarize);
-      const recentMessages = messages.slice(messagesToSummarize);
+      const recentKeepCount = this.getRecentMessagesToKeepForStage(compactionStage);
+      const adjustedMessagesToSummarize = Math.max(0, messages.length - recentKeepCount);
+      const olderMessages = messages.slice(0, adjustedMessagesToSummarize);
+      const recentMessages = messages.slice(adjustedMessagesToSummarize);
       const preservedStableMessages = olderMessages.filter((message) => this.isStableContextMessage(message));
-      const summarizableOlderMessages = olderMessages.filter((message) => !this.isStableContextMessage(message));
+      const summarizableOlderMessages = this.preprocessMessagesForStage(
+        olderMessages.filter((message) => !this.isStableContextMessage(message)),
+        compactionStage,
+      );
 
       if (summarizableOlderMessages.length === 0) {
         return {
           summarized: false,
           messages: [...preservedStableMessages, ...recentMessages],
           messagesSummarized: 0,
+          compactionStage,
         };
       }
 
@@ -214,10 +256,16 @@ export class ConversationSummarizer {
       // Extract trading context from summary
       const tradingContext = this.extractTradingContext(summaryText);
 
+      const artifactIndexBlock = this.buildArtifactIndexBlock(olderMessages, tradingContext);
+
       // Create summary message
       const summaryMessage: Message = {
         role: "system" as MessageRole,
-        content: summaryText,
+        content: [
+          `[GORDON_COMPACTION_STAGE:${compactionStage}]`,
+          artifactIndexBlock,
+          summaryText,
+        ].filter(Boolean).join("\n"),
       };
 
       // Combine summary with recent messages
@@ -232,9 +280,10 @@ export class ConversationSummarizer {
       return {
         summarized: true,
         messages: summarizedMessages,
-        messagesSummarized: messagesToSummarize,
+        messagesSummarized: adjustedMessagesToSummarize,
         summaryText,
         tradingContext,
+        compactionStage,
       };
     } catch (error) {
       logger.error("Summarization failed, returning original messages", error as Error);
@@ -243,8 +292,45 @@ export class ConversationSummarizer {
         summarized: false,
         messages,
         messagesSummarized: 0,
+        compactionStage,
       };
     }
+  }
+
+  private determineCompactionStage(messageCount: number): CompactionStage {
+    const overage = messageCount - this.config.messageThreshold;
+    if (overage >= Math.max(12, Math.floor(this.config.messageThreshold * 1.0))) {
+      return "full";
+    }
+    if (overage >= Math.max(8, Math.floor(this.config.messageThreshold * 0.75))) {
+      return "aggressive";
+    }
+    if (overage >= Math.max(4, Math.floor(this.config.messageThreshold * 0.35))) {
+      return "pruning";
+    }
+    return "masking";
+  }
+
+  private getRecentMessagesToKeepForStage(stage: CompactionStage): number {
+    const observationCount = RECENT_OBSERVATIONS_TO_KEEP[stage];
+    return Math.max(observationCount, Math.min(this.config.recentMessagesToKeep, observationCount + 2));
+  }
+
+  private preprocessMessagesForStage(messages: Message[], stage: CompactionStage): Message[] {
+    const truncateTo = stage === "full" || stage === "aggressive" ? 450 : stage === "pruning" ? 900 : 1400;
+
+    return messages
+      .map((message) => {
+        if (message.content.length <= truncateTo) {
+          return message;
+        }
+
+        return {
+          ...message,
+          content: `${message.content.slice(0, truncateTo)}... [${stage} compaction truncated]`,
+        };
+      })
+      .filter((message) => message.content.trim().length > 0);
   }
 
   /**
@@ -289,7 +375,74 @@ export class ConversationSummarizer {
       INTEGRATION_GLOSSARY_MARKER,
       TOOL_CONTEXT_MARKER,
       RUNTIME_STATE_MARKER,
+      ARTIFACT_INDEX_MARKER,
     ].some((marker) => message.content.includes(marker));
+  }
+
+  private buildArtifactIndexBlock(messages: Message[], context: TradingContext): string {
+    const symbolMatches = new Set<string>();
+    const venueMatches = new Set<string>();
+    const strategyMatches = new Set<string>();
+    const datasetMatches = new Set<string>();
+    const mandateMatches = new Set<string>();
+    const approvalMatches = new Set<string>();
+
+    const combinedText = [
+      ...messages.map((message) => message.content),
+      ...context.decisions,
+      ...context.positionsAndAnalysis,
+      ...context.userPreferences,
+      ...context.importantContext,
+    ].join("\n");
+
+    for (const match of combinedText.matchAll(/\b[A-Z]{2,10}(?:USDT|USD|BTC|ETH|SOL)?\b/g)) {
+      const symbol = match[0];
+      if (/[A-Z]{2,10}(USDT|USD|BTC|ETH|SOL)$/.test(symbol) || /^[A-Z]{1,5}$/.test(symbol)) {
+        symbolMatches.add(symbol);
+      }
+    }
+
+    for (const venue of ["Binance", "Coinbase", "Kraken", "Hyperliquid", "Uniswap", "Robinhood", "Webull", "Alpaca", "IBKR", "Trading 212", "Schwab", "tastytrade"]) {
+      if (combinedText.toLowerCase().includes(venue.toLowerCase())) {
+        venueMatches.add(venue);
+      }
+    }
+
+    for (const strategy of ["momentum", "mean reversion", "breakout", "grid", "swing", "carry", "arbitrage"]) {
+      if (combinedText.toLowerCase().includes(strategy.toLowerCase())) {
+        strategyMatches.add(strategy);
+      }
+    }
+
+    for (const dataset of ["snapshot", "dataset", "backtest", "experiment", "playbook"]) {
+      if (combinedText.toLowerCase().includes(dataset)) {
+        datasetMatches.add(dataset);
+      }
+    }
+
+    for (const mandate of ["mandate", "autonomous", "daemon", "schedule"]) {
+      if (combinedText.toLowerCase().includes(mandate)) {
+        mandateMatches.add(mandate);
+      }
+    }
+
+    for (const approval of ["approved", "rejected", "preview", "blocked"]) {
+      if (combinedText.toLowerCase().includes(approval)) {
+        approvalMatches.add(approval);
+      }
+    }
+
+    const lines = [
+      ARTIFACT_INDEX_MARKER,
+      `- Symbols: ${[...symbolMatches].slice(0, 12).join(", ") || "none"}`,
+      `- Venues: ${[...venueMatches].join(", ") || "none"}`,
+      `- Strategies: ${[...strategyMatches].join(", ") || "none"}`,
+      `- Research artifacts: ${[...datasetMatches].join(", ") || "none"}`,
+      `- Runtime mandates: ${[...mandateMatches].join(", ") || "none"}`,
+      `- Approval state hints: ${[...approvalMatches].join(", ") || "none"}`,
+    ];
+
+    return lines.join("\n");
   }
 
   /**
@@ -297,13 +450,14 @@ export class ConversationSummarizer {
    */
   private async generateSummary(conversationText: string): Promise<string> {
     const userPrompt = SUMMARIZATION_USER_PROMPT.replace("{conversation}", conversationText);
+    const route = resolveLegacyModelRouteForWorkflowPhase("compaction");
 
     const response = await this.llm.chatWithConfig([
       { role: "system", content: SUMMARIZATION_SYSTEM_PROMPT },
       { role: "user", content: userPrompt },
     ], {
-      provider: "dedalus",
-      model: "openai/gpt-5.2",
+      provider: route.provider,
+      model: route.model,
       temperature: this.config.temperature,
       maxTokens: this.config.maxSummaryTokens,
     });
@@ -426,6 +580,151 @@ export function createSummarizer(
   config?: Partial<SummarizerConfig>
 ): ConversationSummarizer {
   return new ConversationSummarizer(llm, config);
+}
+
+// ============================================================================
+// ACE Reflector / Curator Pipeline
+// ============================================================================
+
+export interface ReflectorBullet {
+  content: string;
+  category: "decision" | "observation" | "preference" | "risk" | "venue" | "strategy";
+  score: number; // 0–1, higher = more important to retain
+  createdAt: number;
+}
+
+export interface CuratorResult {
+  retained: ReflectorBullet[];
+  pruned: number;
+  totalScore: number;
+}
+
+const CATEGORY_WEIGHTS: Record<ReflectorBullet["category"], number> = {
+  risk: 0.90,
+  decision: 0.85,
+  venue: 0.70,
+  strategy: 0.70,
+  observation: 0.60,
+  preference: 0.50,
+};
+
+const CATEGORY_PATTERNS: Array<{ category: ReflectorBullet["category"]; patterns: RegExp[] }> = [
+  {
+    category: "decision",
+    patterns: [/\b(buy|sell|long|short|enter|exit|place|executed?|order|trade)\b/i],
+  },
+  {
+    category: "risk",
+    patterns: [/\b(stop.?loss|risk|liquidat|drawdown|danger|blocked|reject|fail)\b/i],
+  },
+  {
+    category: "venue",
+    patterns: [/\b(binance|coinbase|hyperliquid|bybit|kraken|uniswap|alpaca|robinhood|ibkr|schwab)\b/i],
+  },
+  {
+    category: "strategy",
+    patterns: [/\b(momentum|breakout|mean.?reversion|swing|grid|carry|arbitrage|scalp)\b/i],
+  },
+  {
+    category: "preference",
+    patterns: [/\b(prefer|always|never|avoid|like|want|risk.tolerance|timeframe)\b/i],
+  },
+  {
+    category: "observation",
+    patterns: [/\b(noticed|observed|appears?|seems?|trending|pumping|support|resistance|level)\b/i],
+  },
+];
+
+function classifyContent(text: string): ReflectorBullet["category"] {
+  for (const { category, patterns } of CATEGORY_PATTERNS) {
+    if (patterns.some((p) => p.test(text))) return category;
+  }
+  return "observation";
+}
+
+/**
+ * Extract structured memory bullets from conversation messages.
+ * Deterministic — no LLM call. Used as the Reflector step in the ACE pipeline.
+ */
+export function reflectOnMessages(messages: Message[], maxBullets = 20): ReflectorBullet[] {
+  const bullets: ReflectorBullet[] = [];
+  const totalMessages = messages.length;
+
+  messages.forEach((message, index) => {
+    if (message.role === "system") return;
+
+    const content = String(message.content);
+    const recencyScore = (index + 1) / totalMessages; // newer = higher
+
+    // Split into sentences / bullet lines for granular extraction
+    const lines = content
+      .split(/[.\n;]+/)
+      .map((l) => l.trim())
+      .filter((l) => l.length > 20 && l.length < 300);
+
+    for (const line of lines.slice(0, 4)) { // max 4 bullets per message
+      const category = classifyContent(line);
+      const categoryWeight = CATEGORY_WEIGHTS[category];
+      const score = Math.min(1, categoryWeight * 0.7 + recencyScore * 0.3);
+
+      bullets.push({
+        content: line,
+        category,
+        score,
+        createdAt: Date.now(),
+      });
+    }
+  });
+
+  // Sort by score descending, take top N
+  return bullets
+    .sort((a, b) => b.score - a.score)
+    .slice(0, maxBullets);
+}
+
+/**
+ * Rank and prune memory bullets, removing duplicates.
+ * Used as the Curator step in the ACE pipeline.
+ */
+export function curateMemoryBullets(bullets: ReflectorBullet[], maxRetain = 12): CuratorResult {
+  if (bullets.length === 0) {
+    return { retained: [], pruned: 0, totalScore: 0 };
+  }
+
+  const sorted = [...bullets].sort((a, b) => b.score - a.score);
+  const retained: ReflectorBullet[] = [];
+
+  for (const bullet of sorted) {
+    if (retained.length >= maxRetain) break;
+
+    // Deduplicate: skip if >80% word overlap with an already-retained bullet
+    const words = new Set(bullet.content.toLowerCase().split(/\W+/).filter((w) => w.length > 3));
+    const isDuplicate = retained.some((existing) => {
+      const existingWords = new Set(existing.content.toLowerCase().split(/\W+/).filter((w) => w.length > 3));
+      if (words.size === 0 || existingWords.size === 0) return false;
+      const intersection = [...words].filter((w) => existingWords.has(w)).length;
+      return intersection / Math.min(words.size, existingWords.size) > 0.8;
+    });
+
+    if (!isDuplicate) {
+      retained.push(bullet);
+    }
+  }
+
+  const totalScore = retained.reduce((sum, b) => sum + b.score, 0);
+  return { retained, pruned: bullets.length - retained.length, totalScore };
+}
+
+/**
+ * Format curator result as a compact memory block for injection into context.
+ */
+export function formatMemoryBullets(result: CuratorResult): string {
+  if (result.retained.length === 0) return "";
+  const lines = [
+    "[GORDON_MEMORY_BULLETS]",
+    ...result.retained.map((b) => `- [${b.category}] ${b.content} (score: ${b.score.toFixed(2)})`),
+  ];
+  return lines.join("\n");
 }
 
 /**

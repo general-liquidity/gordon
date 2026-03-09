@@ -103,11 +103,14 @@ import {
   formatPerformanceContextForPrompt,
 } from "../evals/feedbackLoop.ts";
 import type { GordonConfig, MemoryConfig } from "../../types/index.ts";
+import type { GordonContext } from "./types.ts";
 import {
   formatCapabilityTruthSummary,
   GORDON_PRODUCT_TRUTH,
   WORKING_MEMORY_LABELS,
 } from "./capabilityTruth.ts";
+import { determineWorkflowPhase, resolveModelForWorkflowPhase } from "./workflowPhase.ts";
+import { composeAgentInstructions, type PromptAgentRole } from "./promptSections.ts";
 
 // ============================================================================
 // Memory Configuration & Session Management
@@ -408,15 +411,8 @@ const WORKING_MEMORY_TEMPLATE = `
 - Recent Wins/Losses:
 `;
 
-const RUNTIME_GROUNDING_INSTRUCTIONS = `
-
-## Runtime Grounding
-- When the request includes [GORDON_RUNTIME_STATE], [GORDON_PROJECT_TRUTH], [GORDON_INTEGRATION_GLOSSARY], or [GORDON_TOOL_CONTEXT], treat those sections as authoritative.
-- Prefer grounded runtime context over your general model priors when describing integrations, providers, or Gordon's capabilities.
-- Do not invent capabilities for integrations that are not present in the grounded glossary slice.`;
-
-function withRuntimeGrounding(instructions: string): string {
-  return `${instructions.trim()}\n${RUNTIME_GROUNDING_INSTRUCTIONS}`;
+function withRuntimeGrounding(role: PromptAgentRole, instructions: string): string {
+  return composeAgentInstructions(role, instructions);
 }
 
 /**
@@ -1183,9 +1179,21 @@ function registerObservability(agent: Agent): void {
 
 function resolveRuntimeModel(args?: { requestContext?: { get: (key: string) => unknown } }): MastraModelConfig {
   const requestConfig = args?.requestContext?.get?.("config") as GordonConfig | undefined;
-  const provider = requestConfig?.modelConfig?.provider ?? process.env.GORDON_PROVIDER;
-  const model = requestConfig?.modelConfig?.model ?? process.env.GORDON_MODEL;
-  return getMastraModel(provider, model);
+  const requestedActionId = args?.requestContext?.get?.("requestedActionId") as GordonContext["requestedActionId"];
+  const requestedTaskScope = args?.requestContext?.get?.("requestedTaskScope") as GordonContext["requestedTaskScope"];
+  const workflowPhase = determineWorkflowPhase({
+    requestedActionId,
+    requestedTaskScope,
+  });
+  return resolveModelForWorkflowPhase(
+    requestConfig ?? ({
+      modelConfig: {
+        provider: process.env.GORDON_PROVIDER,
+        model: process.env.GORDON_MODEL,
+      },
+    } as GordonConfig),
+    workflowPhase,
+  );
 }
 
 function formatModelLabel(model: MastraModelConfig): string {
@@ -1224,7 +1232,7 @@ function getScannerAgent(): Agent {
       description:
         "Specialist in scanning the market and finding trading opportunities. " +
         "Use when the user wants market discovery, crypto movers, broad setup scans, or symbol-level opportunity finding.",
-      instructions: withRuntimeGrounding(SCANNER_INSTRUCTIONS),
+      instructions: withRuntimeGrounding("scanner", SCANNER_INSTRUCTIONS),
       model: resolveRuntimeModel,
       tools: {
         ...instrumentedIndicatorTools,
@@ -1312,7 +1320,7 @@ function getAnalystAgent(): Agent {
         "Use when user asks about a specific symbol or ticker, wants detailed analysis, " +
         "needs to understand support/resistance levels, wants whale analysis, " +
         "breakout detection, or order book depth analysis.",
-      instructions: withRuntimeGrounding(ANALYST_INSTRUCTIONS),
+      instructions: withRuntimeGrounding("analyst", ANALYST_INSTRUCTIONS),
       model: resolveRuntimeModel,
       tools: {
         ...instrumentedIndicatorTools,
@@ -1441,7 +1449,7 @@ function getPlannerAgent(): Agent {
         "Specialist in creating trading plans with entry, stop-loss, and take-profit levels. " +
         "Use when user wants to create a trade plan, buy a symbol, needs help with position sizing, " +
         "Kelly criterion calculations, or pre-trade risk assessment.",
-      instructions: withRuntimeGrounding(PLANNER_INSTRUCTIONS),
+      instructions: withRuntimeGrounding("planner", PLANNER_INSTRUCTIONS),
       model: resolveRuntimeModel,
       tools: {
         ...instrumentedIndicatorTools,
@@ -1513,7 +1521,7 @@ function getExecutorAgent(): Agent {
         "Specialist in executing trades, placing orders, and managing positions. " +
         "Use when user wants to execute a plan, place a market or limit order, " +
         "swap/convert crypto, buy or sell a symbol, cancel an order, or arm the system.",
-      instructions: withRuntimeGrounding(EXECUTOR_INSTRUCTIONS),
+      instructions: withRuntimeGrounding("executor", EXECUTOR_INSTRUCTIONS),
       model: resolveRuntimeModel,
       tools: {
         execute_plan: instrumentedTradingTools.execute_plan,
@@ -1657,7 +1665,7 @@ function getMonitorAgent(): Agent {
         "open orders, order history, earn positions, trade history, account snapshots, " +
         "exit conditions, drawdown status, " +
         "or wants to transfer funds between wallets (spot, funding, futures, margin).",
-      instructions: withRuntimeGrounding(MONITOR_INSTRUCTIONS),
+      instructions: withRuntimeGrounding("monitor", MONITOR_INSTRUCTIONS),
       model: resolveRuntimeModel,
       tools: {
         check_positions: instrumentedPositionTools.check_positions,
@@ -1746,7 +1754,7 @@ function getTeacherAgent(): Agent {
         "Specialist in explaining trading concepts in simple terms. " +
         "Use when user asks 'what is X?', needs help understanding something, " +
         "or is confused about trading terms.",
-      instructions: withRuntimeGrounding(TEACHER_INSTRUCTIONS),
+      instructions: withRuntimeGrounding("teacher", TEACHER_INSTRUCTIONS),
       model: resolveRuntimeModel,
       tools: {
         explain: instrumentedExplainTools.explain,
@@ -1793,7 +1801,7 @@ function getBacktesterAgent(): Agent {
         "Specialist in backtesting strategies and parameter optimization. " +
         "Use when user asks to backtest, test a strategy historically, optimize parameters, " +
         "or compare strategy performance.",
-      instructions: withRuntimeGrounding(BACKTESTER_INSTRUCTIONS),
+      instructions: withRuntimeGrounding("backtester", BACKTESTER_INSTRUCTIONS),
       model: resolveRuntimeModel,
       tools: {
         // Core backtesting tools
@@ -1847,7 +1855,7 @@ function getGordonAgent(): Agent {
       id: "gordon",
       name: "Gordon",
       description: GORDON_PRODUCT_TRUTH.headline,
-      instructions: withRuntimeGrounding(GORDON_INSTRUCTIONS),
+      instructions: withRuntimeGrounding("gordon", GORDON_INSTRUCTIONS),
       model,
 
       // Sub-agents for network routing (replaces handoffs)

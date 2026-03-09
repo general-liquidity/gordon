@@ -197,6 +197,19 @@ export function getRoutingToolsForAgent(
 }
 
 /**
+ * Rebuild routing tables against the currently loaded MCP tool set without
+ * forcing a full disconnect/reload cycle.
+ */
+export function syncRoutingWithCurrentMCPTools(): void {
+  if (!_initialized) {
+    return;
+  }
+
+  rebuildRoutingTables();
+  resetAgents();
+}
+
+/**
  * Reload routings after plugin changes.
  * Full reconstruction chain:
  * 1. Reload MCP tools (disconnect + reconnect servers)

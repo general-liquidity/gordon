@@ -12,7 +12,11 @@ import { RequestContext } from "@mastra/core/request-context";
 import { z } from "zod";
 
 import { gordonAgent } from "./agents.ts";
-import { buildPromptEnvelope, attachUsageToPromptReport } from "./contextBudget.ts";
+import {
+  buildPromptEnvelope,
+  attachCumulativeUsageToPromptReport,
+  attachUsageToPromptReport,
+} from "./contextBudget.ts";
 import {
   formatIntegrationGlossary,
   selectRelevantIntegrationGlossary,
@@ -44,6 +48,37 @@ import {
 import { auditLog } from "../audit/index.ts";
 import { checkPermissionsOnInit } from "../binance/permissions.ts";
 import type { GordonContext } from "./types.ts";
+import {
+  classifyRecoveryGuidance,
+  formatRecoveryGuidance,
+  formatPlanningHandoffBlock,
+  getExecutionReadiness,
+  getPlanningHandoff,
+  optimizeToolResultForContext,
+  recordToolCallFingerprint,
+  registerPlanningArtifactFromResult,
+  resetLoopSignals,
+  resetReminderState,
+} from "./runtimeHarness.ts";
+import { determineWorkflowPhase } from "./workflowPhase.ts";
+import {
+  runThinkingPhase,
+  getThinkingDepthFromContext,
+  type ThinkingResult,
+} from "./thinkingPhase.ts";
+import { runCritiquePhase } from "./critiquePhase.ts";
+import {
+  validateAndRepairTranscript,
+  formatTranscriptRepairBlock,
+  validateAndRepairModelMessages,
+} from "./transcriptValidator.ts";
+import {
+  runLifecycleHooks,
+  startLifecycleSession,
+  endLifecycleSession,
+} from "./lifecycleHooks.ts";
+import { recordSessionCostUsage } from "./sessionCostLedger.ts";
+import { compileSubagentProfiles, isToolAllowedForAgent } from "./subagentProfiles.ts";
 import { validateHandoffBudget } from "../../gateway/handoffs/index.ts";
 import {
   ConversationSummarizer,
@@ -52,7 +87,14 @@ import {
   type SummarizerConfig,
   type SummarizationResult,
 } from "../memory/index.ts";
+import {
+  ensureMCPToolsDiscovered,
+  getMCPDiscoveryIntent,
+  areMCPSchemasDiscovered,
+} from "../mcp/client.ts";
 import type { Message } from "../llm/types.ts";
+import { resetAgents } from "./agents.ts";
+import { rebuildACEMemoryForThread, getACEMemorySnapshot } from "./aceMemory.ts";
 import {
   type StreamWriter,
   type StreamingResult,
@@ -305,6 +347,29 @@ export interface ProcessingResultWithSummarization {
 
 // Singleton summarizer instance (lazy initialized)
 let _summarizer: ConversationSummarizer | null = null;
+const lifecycleSessionContexts = new Map<string, GordonContext>();
+let lifecycleProcessHooksRegistered = false;
+
+function registerLifecycleProcessHooks(): void {
+  if (lifecycleProcessHooksRegistered) {
+    return;
+  }
+
+  lifecycleProcessHooksRegistered = true;
+  const closeSessions = (): void => {
+    for (const [threadId, context] of lifecycleSessionContexts.entries()) {
+      void endLifecycleSession(context, {
+        threadId,
+        agentName: "Gordon",
+      });
+      resetReminderState(context);
+    }
+    lifecycleSessionContexts.clear();
+  };
+
+  process.once("beforeExit", closeSessions);
+  process.once("exit", closeSessions);
+}
 
 /**
  * Get or create the singleton summarizer instance
@@ -366,6 +431,14 @@ export async function summarizeIfNeeded(
       threshold: summarizer.getConfig().messageThreshold,
     });
 
+    await runLifecycleHooks("before_compaction", context, {
+      threadId: context.threadId,
+      payload: {
+        messageCount: messages.length,
+        threshold: summarizer.getConfig().messageThreshold,
+      },
+    });
+
     const result = await summarizer.summarize(messages);
 
     if (result.summarized) {
@@ -376,6 +449,15 @@ export async function summarizeIfNeeded(
         summarizedCount: result.messagesSummarized,
       });
     }
+
+    await runLifecycleHooks("after_compaction", context, {
+      threadId: context.threadId,
+      payload: {
+        summarized: result.summarized,
+        messagesSummarized: result.messagesSummarized,
+        compactionStage: result.compactionStage,
+      },
+    });
 
     return result;
   }
@@ -1027,6 +1109,14 @@ const VALID_HANDOFF_RULES: Record<string, string[]> = {
   Backtester: ["Analyst", "Gordon"],
 };
 
+function getCompiledSubagentProfiles() {
+  return compileSubagentProfiles(
+    TOOL_AGENT_MAP,
+    VALID_HANDOFF_RULES,
+    getDynamicToolAgentMap(),
+  );
+}
+
 /**
  * Validate a handoff between agents
  *
@@ -1208,6 +1298,9 @@ export function clearHandoffHistory(): void {
  */
 function createRequestContext(context: GordonContext): RequestContext {
   const requestContext = new RequestContext();
+  const workflowPhase = determineWorkflowPhase(context);
+  const executionReadiness = getExecutionReadiness(context);
+  const compiledSubagentProfiles = getCompiledSubagentProfiles();
   requestContext.set("binance", context.binance);
   requestContext.set("exchange", context.exchange);
   requestContext.set("broker", context.broker);
@@ -1221,6 +1314,9 @@ function createRequestContext(context: GordonContext): RequestContext {
   requestContext.set("requestedActionId", context.requestedActionId);
   requestContext.set("requestedTaskScope", context.requestedTaskScope);
   requestContext.set("credentialProfile", context.credentialProfile ?? "default");
+  requestContext.set("workflowPhase", workflowPhase);
+  requestContext.set("executionReadiness", executionReadiness);
+  requestContext.set("compiledSubagentProfiles", compiledSubagentProfiles);
   return requestContext;
 }
 
@@ -1230,21 +1326,171 @@ async function buildGroundedPrompt(
   requestContext: RequestContext,
 ): Promise<{
   prompt: string;
+  messages: Array<Record<string, unknown>>;
   requestOptions: Record<string, unknown>;
 }> {
-  const glossarySelection = await selectRelevantIntegrationGlossary(userMessage, context);
+  let mcpDiscoveryNote = "";
+  const transcriptValidation = validateAndRepairTranscript(userMessage, context);
+  const sanitizedUserMessage = transcriptValidation.sanitizedUserMessage;
+
+  const discoveryIntent = getMCPDiscoveryIntent(sanitizedUserMessage);
+  if (
+    discoveryIntent.shouldDiscover &&
+    !areMCPSchemasDiscovered(discoveryIntent.matchedServerIds)
+  ) {
+    try {
+      await ensureMCPToolsDiscovered(discoveryIntent.matchedServerIds);
+      resetAgents();
+      requestContext.set("mcpDiscoveryIntent", discoveryIntent);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      mcpDiscoveryNote = `Lazy MCP discovery failed for this turn: ${message}. Ignore MCP tools unless the user explicitly retries plugin-related work.`;
+    }
+  }
+
+  registerLifecycleProcessHooks();
+  await startLifecycleSession(context, {
+    threadId: context.threadId,
+    agentName: "Gordon",
+  });
+  if (context.threadId) {
+    lifecycleSessionContexts.set(context.threadId, context);
+  }
+  const lifecycleResult = await runLifecycleHooks("before_request", context, {
+    threadId: context.threadId,
+    userMessage: sanitizedUserMessage,
+  });
+  if (lifecycleResult.blocked) {
+    throw new Error(lifecycleResult.reason ?? "Request blocked by lifecycle hook.");
+  }
+
+  const glossarySelection = await selectRelevantIntegrationGlossary(sanitizedUserMessage, context);
   const glossaryText = formatIntegrationGlossary(glossarySelection.entries);
-  const envelope = buildPromptEnvelope(userMessage, context, glossarySelection, glossaryText);
+  const planningHandoff = getPlanningHandoff(context);
+  const transcriptRepairBlock = formatTranscriptRepairBlock(transcriptValidation);
+  const planningHandoffBlock = formatPlanningHandoffBlock(planningHandoff);
+  const aceSnapshot = getACEMemorySnapshot(context.threadId);
+  const lifecycleAnnotationBlock = lifecycleResult.annotations.length > 0
+    ? ["[GORDON_LIFECYCLE_NOTES]", ...lifecycleResult.annotations.map((note) => `- ${note}`)].join("\n")
+    : "";
+
+  const envelope = buildPromptEnvelope(sanitizedUserMessage, context, glossarySelection, glossaryText, {
+    additionalSections: [
+      transcriptRepairBlock
+        ? {
+            kind: "transcript_repair" as const,
+            source: "transcript-validator",
+            priority: 70,
+            content: transcriptRepairBlock,
+          }
+        : null,
+      planningHandoffBlock
+        ? {
+            kind: "planning_handoff" as const,
+            source: "runtime-harness",
+            priority: 80,
+            content: planningHandoffBlock,
+          }
+        : null,
+      lifecycleAnnotationBlock
+        ? {
+            kind: "runtime_reminders" as const,
+            source: "lifecycle-hooks",
+            priority: 90,
+            content: lifecycleAnnotationBlock,
+          }
+        : null,
+      mcpDiscoveryNote
+        ? {
+            kind: "runtime_reminders" as const,
+            source: "mcp-discovery",
+            priority: 95,
+            content: `[GORDON_RUNTIME_REMINDERS]\n- ${mcpDiscoveryNote}`,
+          }
+        : null,
+      aceSnapshot?.renderedBlock
+        ? {
+            kind: "tool_hints" as const,
+            source: "ace-memory",
+            stable: false,
+            priority: 96,
+            content: aceSnapshot.renderedBlock,
+          }
+        : null,
+    ].filter((section): section is NonNullable<typeof section> => Boolean(section)),
+  });
+
+  const messageValidation = validateAndRepairModelMessages(envelope.messages);
+  if (messageValidation.repairNotes.length > 0) {
+    requestContext.set("modelMessageValidation", messageValidation);
+  }
 
   requestContext.set("integrationGlossaryIds", envelope.report.glossaryIds);
   requestContext.set("activeIntegrationIds", envelope.report.activeIntegrationIds);
   requestContext.set("promptContextReport", envelope.report);
   requestContext.set("promptCacheMetadata", envelope.report.cache);
+  requestContext.set("workflowPhase", envelope.report.workflowPhase);
+  requestContext.set("executionReadiness", envelope.report.executionReadiness);
+  requestContext.set("transcriptValidation", transcriptValidation);
+  requestContext.set("planningHandoff", planningHandoff);
+  requestContext.set("mcpDiscoveryIntent", discoveryIntent);
 
   return {
     prompt: envelope.prompt,
+    messages: messageValidation.messages as Array<Record<string, unknown>>,
     requestOptions: envelope.requestOptions,
   };
+}
+
+function recordPromptUsage(
+  context: GordonContext,
+  threadId: string | undefined,
+  usage: { promptTokens: number; completionTokens: number; totalTokens: number },
+): void {
+  const effectiveThreadId = threadId ?? context.threadId;
+  attachUsageToPromptReport(effectiveThreadId, usage);
+
+  const ledger = recordSessionCostUsage({
+    threadId: effectiveThreadId ?? "default",
+    sessionId: context.threadId,
+    resourceId: context.userId,
+    provider: context.config.modelConfig?.provider ?? process.env.GORDON_PROVIDER,
+    model: context.config.modelConfig?.model ?? process.env.GORDON_MODEL ?? null,
+    ...usage,
+  });
+
+  attachCumulativeUsageToPromptReport(effectiveThreadId, {
+    requestCount: ledger.requestCount,
+    promptTokens: ledger.promptTokens,
+    completionTokens: ledger.completionTokens,
+    totalTokens: ledger.totalTokens,
+    updatedAt: ledger.updatedAt,
+  });
+}
+
+function rebuildThreadACEArtifacts(context: GordonContext, threadId?: string): void {
+  const effectiveThreadId = threadId ?? context.threadId;
+  if (!effectiveThreadId) {
+    return;
+  }
+  rebuildACEMemoryForThread(effectiveThreadId);
+}
+
+async function finalizeAfterRequest(
+  context: GordonContext,
+  payload: Parameters<typeof runLifecycleHooks>[2],
+  options: {
+    resetLoops?: boolean;
+    rebuildAce?: boolean;
+  } = {},
+): Promise<void> {
+  await runLifecycleHooks("after_request", context, payload);
+  if (options.rebuildAce !== false && !payload.error) {
+    rebuildThreadACEArtifacts(context, payload.threadId);
+  }
+  if (options.resetLoops !== false) {
+    resetLoopSignals(context);
+  }
 }
 
 // ============================================================================
@@ -1331,6 +1577,14 @@ async function throwIfStreamAborted(signal?: AbortSignal): Promise<void> {
   }
 }
 
+function isPlanningArtifactTool(toolName?: string): boolean {
+  return toolName === "preview_market_order" || toolName === "create_plan";
+}
+
+function requiresPlanningArtifact(toolName?: string): boolean {
+  return toolName === "place_market_order" || toolName === "execute_plan" || toolName === "place_bracket_order";
+}
+
 async function awaitWithAbort<T>(promise: Promise<T>, signal?: AbortSignal): Promise<T> {
   if (!signal) {
     return promise;
@@ -1385,14 +1639,39 @@ export async function* processMessageStream(
   const startTime = Date.now();
   logger.debug("Starting streaming message processing", { messageLength: userMessage.length });
   const { signal } = options;
+  const workflowPhase = determineWorkflowPhase(context);
+  let currentAgent: string | undefined;
 
   // Input guardrails are now handled by GordonInputGuard processor (registered on all agents)
   const requestContext = createRequestContext(context);
 
   try {
     const groundedPrompt = await buildGroundedPrompt(userMessage, context, requestContext);
-    const enrichedMessage = groundedPrompt.prompt;
     await throwIfStreamAborted(signal);
+
+    // ── Thinking phase (tool-free pre-action reasoning, OPENDEV §2.2.6) ──────
+    // ReAct Stage Ordering (per OPENDEV paper §2.2.6):
+    // 1. Context compaction check (pressure evaluation) — summarizeIfNeeded upstream
+    // 2. Interrupt check (user cancellation gate) — throwIfStreamAborted above
+    // 3. Thinking phase (tool-free pre-action reasoning) ← HERE
+    // 4. Subagent-completion signal (if a sub-agent returned results)
+    // 5. Drain UI-thread messages (approval results, user input)
+    // 6. Interrupt check (second gate before LLM call) — throwIfStreamAborted below
+    // 7. Action phase LLM call (gordonAgent.stream)
+    // 8. Response dispatch: nudges, plan-approved signals, tool-denied nudges
+    // 9. Session persistence (auto-save)
+    let _thinkingResult: ThinkingResult | null = null;
+    const _thinkingDepth = getThinkingDepthFromContext(context);
+    if (_thinkingDepth !== "off") {
+      _thinkingResult = await runThinkingPhase(userMessage, [], context, _thinkingDepth);
+      if (_thinkingDepth === "high" && _thinkingResult && !_thinkingResult.skipped && _thinkingResult.trace) {
+        const _critique = await runCritiquePhase(_thinkingResult.trace, userMessage, context);
+        if (_critique && _critique !== "Reasoning is sound.") {
+          _thinkingResult = { ..._thinkingResult, trace: `${_thinkingResult.trace}\n[Critique]: ${_critique}` };
+        }
+      }
+    }
+    // ─────────────────────────────────────────────────────────────────────────
 
     // Emit agent started event
     await emitEvent("agent:started", { agent: "gordon" });
@@ -1404,7 +1683,7 @@ export async function* processMessageStream(
     // Pass threadId and resourceId inside memory option for Mastra's newer execution path
     // This ensures sub-agents also receive thread/resource context for working memory updates
     const effectiveResourceId = resourceId || context.userId || "default";
-    const streamRequest = gordonAgent().stream(enrichedMessage, {
+    const streamRequest = gordonAgent().stream(groundedPrompt.messages, {
       requestContext,
       ...(threadId && effectiveResourceId ? {
         memory: {
@@ -1419,7 +1698,6 @@ export async function* processMessageStream(
     const streamResult = await awaitWithAbort(streamRequest, signal);
 
     let fullText = "";
-    let currentAgent: string | undefined;
     // Track last sub-agent tool result — used to synthesize a response when
     // Mastra doesn't emit text-delta after a sub-agent tool execution.
     let lastSubAgentToolResult: { toolName: string; result: unknown; agent: string | undefined } | null = null;
@@ -1480,6 +1758,44 @@ export async function* processMessageStream(
               if (chunk.payload?.toolName) {
                 const toolName = chunk.payload.toolName;
                 const detectedAgent = getAgentForTool(toolName);
+                const loopState = recordToolCallFingerprint(
+                  context,
+                  toolName,
+                  chunk.payload.args ?? {},
+                );
+                if (loopState.blocked) {
+                  yield {
+                    type: "error",
+                    error: formatRecoveryGuidance({
+                      category: "policy_block",
+                      title: "Repeated tool loop blocked",
+                      detail: `${toolName} was invoked ${loopState.count} times with the same arguments in a short window.`,
+                      nextSteps: [
+                        "Revise the request or narrow the scope before retrying.",
+                        "Check whether the active venue or provider is causing the repeated fallback loop.",
+                      ],
+                    }),
+                  };
+                  resetLoopSignals(context);
+                  return;
+                }
+
+                const compiledProfiles = getCompiledSubagentProfiles();
+                if (detectedAgent && !isToolAllowedForAgent(compiledProfiles, detectedAgent, toolName)) {
+                  yield {
+                    type: "error",
+                    error: formatRecoveryGuidance({
+                      category: "policy_block",
+                      title: "Tool blocked by subagent profile",
+                      detail: `${toolName} is not allowed for the compiled ${detectedAgent} tool profile.`,
+                      nextSteps: [
+                        "Retry with a narrower request or a different task scope.",
+                        "If this is a real capability gap, update the routed tool map rather than bypassing profile isolation.",
+                      ],
+                    }),
+                  };
+                  return;
+                }
 
                 const securityCheck = await checkToolSecurity(
                   detectedAgent || currentAgent || "Gordon",
@@ -1498,6 +1814,28 @@ export async function* processMessageStream(
                   return;
                 }
 
+                if (requiresPlanningArtifact(toolName)) {
+                  const symbol = typeof chunk.payload.args?.symbol === "string"
+                    ? chunk.payload.args.symbol
+                    : undefined;
+                  const readiness = getExecutionReadiness(context, symbol);
+                  if (!readiness.ready) {
+                    yield {
+                      type: "error",
+                      error: formatRecoveryGuidance({
+                        category: "approval_required",
+                        title: "Execution phase blocked",
+                        detail: readiness.reason ?? "Execution requires a recent plan or preview.",
+                        nextSteps: [
+                          "Run a plan or preview step first in this thread.",
+                          "Then retry the live execution step once the plan is explicit.",
+                        ],
+                      }),
+                    };
+                    return;
+                  }
+                }
+
                 // Emit agent switch if we detected a different agent
                 if (detectedAgent && detectedAgent !== currentAgent) {
                   const previousAgent = currentAgent || "Gordon";
@@ -1514,10 +1852,44 @@ export async function* processMessageStream(
                     mode: context.config?.mode,
                   });
 
+                  await runLifecycleHooks("agent_switch", context, {
+                    threadId: context.threadId,
+                    agentName: currentAgent,
+                    payload: {
+                      fromAgent: previousAgent,
+                      toAgent: currentAgent,
+                    },
+                  });
+
+                  await runLifecycleHooks("subagent_stop", context, {
+                    threadId: context.threadId,
+                    subagentName: previousAgent,
+                    subagentType: previousAgent,
+                    payload: { eventType: "subagent_stop" },
+                  });
+
+                  await runLifecycleHooks("subagent_start", context, {
+                    threadId: context.threadId,
+                    subagentName: currentAgent,
+                    subagentType: currentAgent,
+                    payload: { eventType: "subagent_start" },
+                  });
+
                   yield {
                     type: "agent_switch",
                     agentName: currentAgent,
                   };
+                }
+
+                const hookResult = await runLifecycleHooks("tool_call_start", context, {
+                  threadId: context.threadId,
+                  agentName: currentAgent,
+                  toolName,
+                  payload: chunk.payload.args,
+                });
+                if (hookResult.blocked) {
+                  yield { type: "error", error: hookResult.reason ?? `Tool blocked before start: ${toolName}` };
+                  return;
                 }
 
                 yield {
@@ -1530,10 +1902,31 @@ export async function* processMessageStream(
               break;
 
             case "tool-result":
+              if (isPlanningArtifactTool(chunk.payload?.toolName)) {
+                registerPlanningArtifactFromResult(
+                  context,
+                  chunk.payload?.toolName ?? "tool",
+                  chunk.payload?.result,
+                );
+              }
+              const optimizedToolResult = await optimizeToolResultForContext(
+                context,
+                chunk.payload?.toolName ?? "tool",
+                chunk.payload?.result,
+              );
+              await runLifecycleHooks("tool_call_end", context, {
+                threadId: context.threadId,
+                agentName: currentAgent,
+                toolName: chunk.payload?.toolName,
+                payload: {
+                  optimized: optimizedToolResult.offloaded,
+                  scratchFile: optimizedToolResult.scratchFile,
+                },
+              });
               yield {
                 type: "tool_call_end",
                 toolName: chunk.payload?.toolName,
-                toolResult: chunk.payload?.result,
+                toolResult: optimizedToolResult.result,
                 agentName: currentAgent,
               };
               break;
@@ -1556,6 +1949,29 @@ export async function* processMessageStream(
                         ? buildDefaultExecutorHandoffBudget(context)
                         : undefined,
                     mode: context.config?.mode,
+                  });
+
+                  await runLifecycleHooks("agent_switch", context, {
+                    threadId: context.threadId,
+                    agentName: currentAgent,
+                    payload: {
+                      fromAgent: previousAgent,
+                      toAgent: currentAgent,
+                    },
+                  });
+
+                  await runLifecycleHooks("subagent_stop", context, {
+                    threadId: context.threadId,
+                    subagentName: previousAgent,
+                    subagentType: previousAgent,
+                    payload: { eventType: "subagent_stop" },
+                  });
+
+                  await runLifecycleHooks("subagent_start", context, {
+                    threadId: context.threadId,
+                    subagentName: currentAgent,
+                    subagentType: currentAgent,
+                    payload: { eventType: "subagent_start" },
                   });
 
                   yield {
@@ -1596,6 +2012,44 @@ export async function* processMessageStream(
                 } else if (innerType === "tool-call" && innerPayload?.payload?.toolName) {
                   const toolName = innerPayload.payload.toolName;
                   const detectedAgent = getAgentForTool(toolName);
+                  const loopState = recordToolCallFingerprint(
+                    context,
+                    toolName,
+                    innerPayload.payload.args ?? {},
+                  );
+                  if (loopState.blocked) {
+                    yield {
+                      type: "error",
+                      error: formatRecoveryGuidance({
+                        category: "policy_block",
+                        title: "Repeated tool loop blocked",
+                        detail: `${toolName} was invoked ${loopState.count} times with the same arguments in a short window.`,
+                        nextSteps: [
+                          "Revise the request or narrow the scope before retrying.",
+                          "Check whether the active venue or provider is causing the repeated fallback loop.",
+                        ],
+                      }),
+                    };
+                    resetLoopSignals(context);
+                    return;
+                  }
+
+                  const compiledProfiles = getCompiledSubagentProfiles();
+                  if (detectedAgent && !isToolAllowedForAgent(compiledProfiles, detectedAgent, toolName)) {
+                    yield {
+                      type: "error",
+                      error: formatRecoveryGuidance({
+                        category: "policy_block",
+                        title: "Tool blocked by subagent profile",
+                        detail: `${toolName} is not allowed for the compiled ${detectedAgent} tool profile.`,
+                        nextSteps: [
+                          "Retry with a narrower request or a different task scope.",
+                          "If this is a real capability gap, update the routed tool map rather than bypassing profile isolation.",
+                        ],
+                      }),
+                    };
+                    return;
+                  }
 
                   const securityCheck = await checkToolSecurity(
                     detectedAgent || currentAgent || "Gordon",
@@ -1606,6 +2060,28 @@ export async function* processMessageStream(
                     const reason = securityCheck.error || `Blocked tool call: ${toolName}`;
                     yield { type: "error", error: reason };
                     return;
+                  }
+
+                  if (requiresPlanningArtifact(toolName)) {
+                    const symbol = typeof innerPayload.payload.args?.symbol === "string"
+                      ? innerPayload.payload.args.symbol
+                      : undefined;
+                    const readiness = getExecutionReadiness(context, symbol);
+                    if (!readiness.ready) {
+                      yield {
+                        type: "error",
+                        error: formatRecoveryGuidance({
+                          category: "approval_required",
+                          title: "Execution phase blocked",
+                          detail: readiness.reason ?? "Execution requires a recent plan or preview.",
+                          nextSteps: [
+                            "Run a plan or preview step first in this thread.",
+                            "Then retry the live execution step once the plan is explicit.",
+                          ],
+                        }),
+                      };
+                      return;
+                    }
                   }
 
                   if (detectedAgent && detectedAgent !== currentAgent) {
@@ -1624,11 +2100,31 @@ export async function* processMessageStream(
                       mode: context.config?.mode,
                     });
 
+                    await runLifecycleHooks("agent_switch", context, {
+                      threadId: context.threadId,
+                      agentName: currentAgent,
+                      payload: {
+                        fromAgent: previousAgent,
+                        toAgent: currentAgent,
+                      },
+                    });
+
                     yield {
                       type: "agent_switch",
                       agentName: currentAgent,
                     };
                   }
+                  const hookResult = await runLifecycleHooks("tool_call_start", context, {
+                    threadId: context.threadId,
+                    agentName: currentAgent,
+                    toolName,
+                    payload: innerPayload.payload.args,
+                  });
+                  if (hookResult.blocked) {
+                    yield { type: "error", error: hookResult.reason ?? `Tool blocked before start: ${toolName}` };
+                    return;
+                  }
+
                   yield {
                     type: "tool_call_start",
                     toolName,
@@ -1639,17 +2135,38 @@ export async function* processMessageStream(
                   // Capture tool result — if the sub-agent never emits text-delta after
                   // this, we use lastSubAgentToolResult to synthesize a response.
                   const toolResult = innerPayload?.payload?.result;
+                  if (isPlanningArtifactTool(innerPayload?.payload?.toolName)) {
+                    registerPlanningArtifactFromResult(
+                      context,
+                      innerPayload?.payload?.toolName ?? "tool",
+                      toolResult,
+                    );
+                  }
+                  const optimizedToolResult = await optimizeToolResultForContext(
+                    context,
+                    innerPayload?.payload?.toolName || "tool",
+                    toolResult,
+                  );
+                  await runLifecycleHooks("tool_call_end", context, {
+                    threadId: context.threadId,
+                    agentName: currentAgent,
+                    toolName: innerPayload?.payload?.toolName,
+                    payload: {
+                      optimized: optimizedToolResult.offloaded,
+                      scratchFile: optimizedToolResult.scratchFile,
+                    },
+                  });
                   if (toolResult) {
                     lastSubAgentToolResult = {
                       toolName: innerPayload?.payload?.toolName || "unknown",
-                      result: toolResult,
+                      result: optimizedToolResult.result,
                       agent: currentAgent,
                     };
                   }
                   yield {
                     type: "tool_call_end",
                     toolName: innerPayload?.payload?.toolName,
-                    toolResult,
+                    toolResult: optimizedToolResult.result,
                     agentName: currentAgent,
                   };
                 }
@@ -1659,6 +2176,15 @@ export async function* processMessageStream(
         }
       } finally {
         reader.releaseLock();
+        // Fire subagent_stop for the last active sub-agent when the stream ends
+        if (currentAgent && currentAgent.toLowerCase() !== "gordon") {
+          await runLifecycleHooks("subagent_stop", context, {
+            threadId: context.threadId,
+            subagentName: currentAgent,
+            subagentType: currentAgent,
+            payload: { eventType: "subagent_stop_stream_end" },
+          });
+        }
       }
 
     } else if (streamObj.textStream && typeof streamObj.textStream[Symbol.asyncIterator] === 'function') {
@@ -1768,7 +2294,7 @@ export async function* processMessageStream(
         totalTokens: usageData.totalTokens || 0,
       };
     }
-    attachUsageToPromptReport(threadId ?? context.threadId, usage);
+    recordPromptUsage(context, threadId, usage);
 
     // Emit completion events
     await emitEvent("agent:stream_completed", {
@@ -1819,7 +2345,13 @@ export async function* processMessageStream(
           hasTextStream: !!streamObj.textStream,
           textType: typeof streamObj.text,
         });
-        fullText = "I wasn't able to generate a response. Please try again.";
+        fullText = formatRecoveryGuidance(
+          classifyRecoveryGuidance(
+            "empty_response",
+            context,
+            { emptyResponse: true, phase: workflowPhase, currentAgent },
+          ),
+        );
       }
       yield {
         type: "text_delta",
@@ -1834,6 +2366,17 @@ export async function* processMessageStream(
       usage,
       agentName: currentAgent,
     };
+    await finalizeAfterRequest(context, {
+      threadId: threadId ?? context.threadId,
+      agentName: currentAgent,
+      userMessage,
+      response: fullText,
+      payload: {
+        promptTokens: usage.promptTokens,
+        completionTokens: usage.completionTokens,
+        totalTokens: usage.totalTokens,
+      },
+    });
 
   } catch (err) {
     if (err instanceof StreamCancelledError) {
@@ -1844,6 +2387,7 @@ export async function* processMessageStream(
         type: "cancelled",
         content: err.message,
       };
+      resetLoopSignals(context);
       return;
     }
 
@@ -1873,8 +2417,22 @@ export async function* processMessageStream(
 
     yield {
       type: "error",
-      error: error.message,
+      error: formatRecoveryGuidance(
+        classifyRecoveryGuidance(error, context, {
+          phase: workflowPhase,
+          currentAgent,
+        }),
+      ),
     };
+    await finalizeAfterRequest(context, {
+      threadId: threadId ?? context.threadId,
+      agentName: currentAgent,
+      userMessage,
+      error: error.message,
+      payload: {
+        failed: true,
+      },
+    });
   }
 }
 
@@ -1924,7 +2482,7 @@ export async function processStructuredMessage<T extends Record<string, unknown>
 
   try {
     const groundedPrompt = await buildGroundedPrompt(userMessage, context, requestContext);
-    const result = await gordonAgent().generate(groundedPrompt.prompt, {
+    const result = await gordonAgent().generate(groundedPrompt.messages, {
       requestContext,
       ...(threadId && effectiveResourceId ? {
         memory: { thread: threadId, resource: effectiveResourceId },
@@ -1953,7 +2511,17 @@ export async function processStructuredMessage<T extends Record<string, unknown>
       completionTokens: usage.outputTokens ?? 0,
       totalTokens: usage.totalTokens ?? 0,
     };
-    attachUsageToPromptReport(threadId ?? context.threadId, normalizedUsage);
+    recordPromptUsage(context, threadId, normalizedUsage);
+    await finalizeAfterRequest(context, {
+      threadId: threadId ?? context.threadId,
+      userMessage,
+      payload: {
+        structured: true,
+        promptTokens: normalizedUsage.promptTokens,
+        completionTokens: normalizedUsage.completionTokens,
+        totalTokens: normalizedUsage.totalTokens,
+      },
+    });
     return {
       data: resultObj.object,
       usage: normalizedUsage,
@@ -1963,7 +2531,22 @@ export async function processStructuredMessage<T extends Record<string, unknown>
     logger.error("Structured message processing error", error);
     recordRequest(Date.now() - startTime, false);
     recordError(error.name || "StructuredOutputError");
-    throw error;
+    await finalizeAfterRequest(context, {
+      threadId: threadId ?? context.threadId,
+      userMessage,
+      error: error.message,
+      payload: {
+        structured: true,
+        failed: true,
+      },
+    });
+    throw new Error(
+      formatRecoveryGuidance(
+        classifyRecoveryGuidance(error, context, {
+          phase: determineWorkflowPhase(context),
+        }),
+      ),
+    );
   }
 }
 
@@ -2005,7 +2588,7 @@ export async function* processWithNetwork(
     // Pass threadId and resourceId inside memory option for Mastra's network execution path
     // This ensures sub-agents also receive thread/resource context for working memory updates
     const effectiveResourceId = resourceId || context.userId || "default";
-    const networkResult = await gordonAgent().network(groundedPrompt.prompt, {
+    const networkResult = await gordonAgent().network(groundedPrompt.messages, {
       requestContext,
       ...(threadId && effectiveResourceId ? {
         memory: {
@@ -2055,7 +2638,18 @@ export async function* processWithNetwork(
         totalTokens: usageData.totalTokens || 0,
       };
     }
-    attachUsageToPromptReport(threadId ?? context.threadId, usage);
+    recordPromptUsage(context, threadId, usage);
+    await finalizeAfterRequest(context, {
+      threadId: threadId ?? context.threadId,
+      userMessage,
+      response: fullText,
+      payload: {
+        promptTokens: usage.promptTokens,
+        completionTokens: usage.completionTokens,
+        totalTokens: usage.totalTokens,
+        network: true,
+      },
+    });
 
     // Record successful request metrics
     recordRequest(Date.now() - startTime, true);
@@ -2073,10 +2667,23 @@ export async function* processWithNetwork(
     // Record failed request metrics
     recordRequest(Date.now() - startTime, false);
     recordError(error.name || "UnknownError");
+    await finalizeAfterRequest(context, {
+      threadId: threadId ?? context.threadId,
+      userMessage,
+      error: error.message,
+      payload: {
+        network: true,
+        failed: true,
+      },
+    });
 
     yield {
       type: "error",
-      error: error.message,
+      error: formatRecoveryGuidance(
+        classifyRecoveryGuidance(error, context, {
+          phase: determineWorkflowPhase(context),
+        }),
+      ),
     };
   }
 }
@@ -2125,7 +2732,7 @@ export async function processMessage(
     // Pass threadId and resourceId inside memory option for Mastra's newer execution path
     // This ensures sub-agents also receive thread/resource context for working memory updates
     const effectiveResourceId = resourceId || context.userId || "default";
-    const result = await gordonAgent().generate(groundedPrompt.prompt, {
+    const result = await gordonAgent().generate(groundedPrompt.messages, {
       requestContext,
       ...(threadId && effectiveResourceId ? {
         memory: {
@@ -2164,7 +2771,17 @@ export async function processMessage(
       completionTokens: resultObj.usage?.outputTokens || 0,
       totalTokens: resultObj.usage?.totalTokens || 0,
     };
-    attachUsageToPromptReport(threadId ?? context.threadId, usage);
+    recordPromptUsage(context, threadId, usage);
+    await finalizeAfterRequest(context, {
+      threadId: threadId ?? context.threadId,
+      userMessage,
+      response,
+      payload: {
+        promptTokens: usage.promptTokens,
+        completionTokens: usage.completionTokens,
+        totalTokens: usage.totalTokens,
+      },
+    });
 
     return {
       response,
@@ -2177,8 +2794,22 @@ export async function processMessage(
     // Record failed request metrics
     recordRequest(Date.now() - startTime, false);
     recordError(error.name || "UnknownError");
+    await finalizeAfterRequest(context, {
+      threadId: threadId ?? context.threadId,
+      userMessage,
+      error: error.message,
+      payload: {
+        failed: true,
+      },
+    });
 
-    throw error;
+    throw new Error(
+      formatRecoveryGuidance(
+        classifyRecoveryGuidance(error, context, {
+          phase: determineWorkflowPhase(context),
+        }),
+      ),
+    );
   }
 }
 
@@ -2208,7 +2839,7 @@ export async function processSimpleMessage(
     // Build tracing options if tracing is enabled
     const tracingOptions = createAgentTracingOptions();
 
-    const result = await gordonAgent().generate(groundedPrompt.prompt, {
+    const result = await gordonAgent().generate(groundedPrompt.messages, {
       requestContext,
       maxSteps: 5, // Limit steps for simple queries
       ...groundedPrompt.requestOptions,
@@ -2226,10 +2857,18 @@ export async function processSimpleMessage(
 
     // Record successful request metrics
     recordRequest(Date.now() - startTime, true);
-    attachUsageToPromptReport(context.threadId, {
+    recordPromptUsage(context, context.threadId, {
       promptTokens: resultObj.usage?.inputTokens || 0,
       completionTokens: resultObj.usage?.outputTokens || 0,
       totalTokens: resultObj.usage?.totalTokens || 0,
+    });
+    await finalizeAfterRequest(context, {
+      threadId: context.threadId,
+      userMessage,
+      response: outputCheck.sanitized,
+      payload: {
+        simple: true,
+      },
     });
 
     return outputCheck.sanitized;
@@ -2239,6 +2878,15 @@ export async function processSimpleMessage(
     // Record failed request metrics
     recordRequest(Date.now() - startTime, false);
     recordError(error.name || "UnknownError");
+    await finalizeAfterRequest(context, {
+      threadId: context.threadId,
+      userMessage,
+      error: error.message,
+      payload: {
+        simple: true,
+        failed: true,
+      },
+    });
 
     throw error;
   }

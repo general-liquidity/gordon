@@ -153,6 +153,7 @@ import {
   type ActionLogEntry,
   type ActionLogEntryType,
 } from "../infra/action-log/index.ts";
+import { rebuildACEMemoryForThread } from "../infra/agents/aceMemory.ts";
 
 type AppView =
   | "loading"
@@ -707,7 +708,7 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
     label?: string;
     bookmarked?: boolean;
   }): ActionLogEntry => {
-    return appendActionLogEntry({
+    const entry = appendActionLogEntry({
       threadId: input.threadId ?? state.session?.threadId,
       resourceId: input.resourceId ?? state.session?.resourceId,
       sessionId: input.sessionId ?? state.session?.threadId ?? "app",
@@ -721,6 +722,15 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
       label: input.label,
       bookmarked: input.bookmarked,
     });
+    if (
+      entry.threadId &&
+      (entry.entryType === "user_message" ||
+        entry.entryType === "assistant_message" ||
+        entry.entryType === "tool_result")
+    ) {
+      rebuildACEMemoryForThread(entry.threadId);
+    }
+    return entry;
   }, [state.session]);
 
   const resolveThreadFromQuery = useCallback(async (threadQuery?: string): Promise<ThreadInfo | null> => {
@@ -744,6 +754,7 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
       return;
     }
 
+    let appendedAny = false;
     for (const [index, message] of state.messages.entries()) {
       if (!message.content.trim()) {
         continue;
@@ -777,6 +788,11 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
         },
       });
       loggedMessageKeysRef.current.add(key);
+      appendedAny = true;
+    }
+
+    if (appendedAny) {
+      rebuildACEMemoryForThread(threadId);
     }
   }, [
     state.isStreaming,

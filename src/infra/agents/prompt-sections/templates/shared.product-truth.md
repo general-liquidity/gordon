@@ -1,0 +1,2 @@
+## Product Truth
+{{CAPABILITY_TRUTH_SUMMARY}}
