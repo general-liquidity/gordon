@@ -1,4 +1,5 @@
 import { listActionLogEntries } from "../action-log/store.ts";
+import type { CoreSystemMessage, CoreUserMessage } from "ai";
 import type { GroundedPromptMessage } from "./contextBudget.ts";
 import type { GordonContext } from "./types.ts";
 
@@ -41,6 +42,14 @@ function normalizeWhitespace(message: string): string {
 
 function normalizeForDeduplication(message: string): string {
   return normalizeWhitespace(message).toLowerCase();
+}
+
+type GroundedProviderOptions = CoreSystemMessage["providerOptions"] | CoreUserMessage["providerOptions"];
+
+function getProviderOptions(message: GroundedPromptMessage): GroundedProviderOptions | undefined {
+  return "providerOptions" in message
+    ? message.providerOptions
+    : undefined;
 }
 
 function isMeaningfulUserContent(message: string): boolean {
@@ -151,6 +160,7 @@ export function validateAndRepairModelMessages(
   for (const rawMessage of messages) {
     const role = rawMessage.role === "system" ? "system" : "user";
     const normalizedContent = normalizeWhitespace(String(rawMessage.content ?? ""));
+    const providerOptions = getProviderOptions(rawMessage);
     if (!normalizedContent) {
       repairNotes.push(`Dropped empty ${role} message before model call.`);
       continue;
@@ -164,7 +174,7 @@ export function validateAndRepairModelMessages(
       repairNotes.push("Converted a misplaced runtime reminder block into user-side guidance semantics.");
     }
 
-    if (role === "system" && !rawMessage.providerOptions) {
+    if (role === "system" && !providerOptions) {
       if (seenDynamicSystemBlocks.has(normalizedForDedup)) {
         repairNotes.push("Dropped a duplicate dynamic system block before provider call.");
         continue;
@@ -196,19 +206,27 @@ export function validateAndRepairModelMessages(
       previous &&
       previous.role === "system" &&
       role === "system" &&
-      !previous.providerOptions &&
-      !rawMessage.providerOptions
+      !getProviderOptions(previous) &&
+      !providerOptions
     ) {
       previous.content = `${previous.content}\n\n${sanitizedContent}`;
       repairNotes.push("Merged adjacent uncached system messages before provider call.");
       continue;
     }
 
-    repaired.push({
-      role,
-      content: sanitizedContent,
-      ...(rawMessage.providerOptions ? { providerOptions: rawMessage.providerOptions } : {}),
-    });
+    if (role === "system") {
+      repaired.push({
+        role: "system",
+        content: sanitizedContent,
+        ...(providerOptions ? { providerOptions } : {}),
+      });
+    } else {
+      repaired.push({
+        role: "user",
+        content: sanitizedContent,
+        ...(providerOptions ? { providerOptions } : {}),
+      });
+    }
   }
 
   if (repaired.length === 0 || repaired[repaired.length - 1]?.role !== "user") {

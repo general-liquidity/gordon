@@ -52,6 +52,13 @@ export interface SummarizerConfig {
    * @default 0.3
    */
   temperature: number;
+
+  /**
+   * Estimated maximum prompt-token budget available to the conversation layer.
+   * Used to select compaction stages from pressure ratio rather than raw message count.
+   * @default 12000
+   */
+  maxContextTokensEstimate: number;
 }
 
 /**
@@ -62,6 +69,7 @@ export const DEFAULT_SUMMARIZER_CONFIG: SummarizerConfig = {
   recentMessagesToKeep: 5,
   maxSummaryTokens: 1000,
   temperature: 0.3,
+  maxContextTokensEstimate: 12000,
 };
 
 /**
@@ -94,6 +102,8 @@ export interface SummarizationResult {
   tradingContext?: TradingContext;
   /** Compaction stage used for this summarization pass */
   compactionStage?: CompactionStage;
+  /** Estimated conversation fill ratio (0-1) used for stage selection */
+  contextFillRatio?: number;
 }
 
 export type CompactionStage = "masking" | "pruning" | "aggressive" | "full";
@@ -184,7 +194,8 @@ export class ConversationSummarizer {
    * Check if summarization is needed based on message count
    */
   shouldSummarize(messages: Message[]): boolean {
-    return messages.length > this.config.messageThreshold;
+    return messages.length > this.config.messageThreshold
+      || this.estimateContextFillRatio(messages) >= COMPACTION_PRESSURE_THRESHOLDS.masking;
   }
 
   /**
@@ -195,6 +206,15 @@ export class ConversationSummarizer {
       return 0;
     }
     return messages.length - this.config.recentMessagesToKeep;
+  }
+
+  private estimateMessageTokens(messages: Message[]): number {
+    return messages.reduce((total, message) => total + Math.ceil(message.content.length / 4), 0);
+  }
+
+  private estimateContextFillRatio(messages: Message[]): number {
+    const budget = Math.max(1, this.config.maxContextTokensEstimate);
+    return Math.min(1, this.estimateMessageTokens(messages) / budget);
   }
 
   /**
@@ -214,16 +234,19 @@ export class ConversationSummarizer {
         summarized: false,
         messages,
         messagesSummarized: 0,
+        contextFillRatio: this.estimateContextFillRatio(messages),
       };
     }
 
     const messagesToSummarize = messages.length - this.config.recentMessagesToKeep;
-    const compactionStage = this.determineCompactionStage(messages.length);
+    const contextFillRatio = this.estimateContextFillRatio(messages);
+    const compactionStage = determineCompactionStageFromPressure(contextFillRatio);
     logger.info("Starting conversation summarization", {
       totalMessages: messages.length,
       messagesToSummarize,
       keepingRecent: this.config.recentMessagesToKeep,
       compactionStage,
+      contextFillRatio,
     });
 
     try {
@@ -246,6 +269,7 @@ export class ConversationSummarizer {
           messages: [...preservedStableMessages, ...recentMessages],
           messagesSummarized: 0,
           compactionStage,
+          contextFillRatio,
         };
       }
 
@@ -286,6 +310,7 @@ export class ConversationSummarizer {
         summaryText,
         tradingContext,
         compactionStage,
+        contextFillRatio,
       };
     } catch (error) {
       logger.error("Summarization failed, returning original messages", error as Error);
@@ -295,22 +320,9 @@ export class ConversationSummarizer {
         messages,
         messagesSummarized: 0,
         compactionStage,
+        contextFillRatio,
       };
     }
-  }
-
-  private determineCompactionStage(messageCount: number): CompactionStage {
-    const overage = messageCount - this.config.messageThreshold;
-    if (overage >= Math.max(12, Math.floor(this.config.messageThreshold * 1.0))) {
-      return "full";
-    }
-    if (overage >= Math.max(8, Math.floor(this.config.messageThreshold * 0.75))) {
-      return "aggressive";
-    }
-    if (overage >= Math.max(4, Math.floor(this.config.messageThreshold * 0.35))) {
-      return "pruning";
-    }
-    return "masking";
   }
 
   private getRecentMessagesToKeepForStage(stage: CompactionStage): number {
@@ -748,5 +760,6 @@ export function createSummarizerConfigFromMemoryConfig(memoryConfig: {
   return {
     messageThreshold,
     recentMessagesToKeep,
+    maxContextTokensEstimate: Math.max(6000, lastMessages * 600),
   };
 }

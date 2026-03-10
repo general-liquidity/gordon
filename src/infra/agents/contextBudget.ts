@@ -1,5 +1,4 @@
-import { createHash } from "node:crypto";
-import type { CoreSystemMessage, CoreUserMessage } from "ai";
+import type { CoreMessage } from "ai";
 import type { GordonConfig } from "../../types/index.ts";
 import { GORDON_PRODUCT_TRUTH } from "./capabilityTruth.ts";
 import { buildEventDrivenReminders, getExecutionReadiness } from "./runtimeHarness.ts";
@@ -58,7 +57,6 @@ export interface PromptContextSectionBudget {
 export interface PromptCacheMetadata {
   supported: boolean;
   provider: string;
-  key?: string;
   reason?: string;
 }
 
@@ -103,7 +101,7 @@ export interface AnthropicCacheBlock {
   cache_control?: { type: "ephemeral" };
 }
 
-export type GroundedPromptMessage = CoreSystemMessage | CoreUserMessage;
+export type GroundedPromptMessage = CoreMessage;
 
 export interface PromptEnvelope {
   prompt: string;
@@ -227,36 +225,21 @@ function isAnthropicProvider(provider: string): boolean {
 
 function getPromptCacheMetadata(
   context: GordonContext,
-  stablePrefix: string,
+  _stablePrefix: string,
 ): PromptCacheMetadata {
   const provider = context.config.modelConfig?.provider ?? process.env.GORDON_PROVIDER ?? "unknown";
 
   if (isAnthropicProvider(provider)) {
-    // Anthropic caches by content automatically — we just need to mark the cache boundary
     return {
       supported: true,
       provider,
-      key: "anthropic-stable-prefix",
     };
   }
-
-  if (provider !== "openai") {
-    return {
-      supported: false,
-      provider,
-      reason: "Prompt-cache key hooks are only enabled on the native OpenAI and Anthropic paths.",
-    };
-  }
-
-  const hash = createHash("sha256")
-    .update(stablePrefix)
-    .digest("hex")
-    .slice(0, 32);
 
   return {
-    supported: true,
+    supported: false,
     provider,
-    key: `gordon:${hash}`,
+    reason: "Transport-level prompt caching is currently only emitted on the Anthropic path.",
   };
 }
 
@@ -422,11 +405,8 @@ export function buildPromptEnvelope(
   latestReports.set(report.threadId, report);
 
   const requestOptions: Record<string, unknown> = {};
-  if (report.cache.supported && report.cache.key) {
-    requestOptions.promptCacheKey = report.cache.key;
-  }
 
-  const providerOptions = report.cache.key === "anthropic-stable-prefix"
+  const providerOptions = report.cache.supported && isAnthropicProvider(report.cache.provider)
     ? { anthropic: { cacheControl: { type: "ephemeral" as const } } }
     : undefined;
 
@@ -437,8 +417,6 @@ export function buildPromptEnvelope(
       content: stablePrefix,
       ...(providerOptions ? {
         providerOptions,
-        // Keep deprecated metadata field for compatibility with older AI SDK paths.
-        experimental_providerMetadata: providerOptions,
       } : {}),
     });
   }
@@ -480,7 +458,7 @@ export function buildPromptEnvelope(
   };
 
   // Populate Anthropic cache blocks when provider is Anthropic
-  if (report.cache.key === "anthropic-stable-prefix") {
+  if (report.cache.supported && isAnthropicProvider(report.cache.provider)) {
     envelope.anthropicSystemBlocks = buildAnthropicCacheControlBlocks(envelope);
   }
 
@@ -542,9 +520,7 @@ export function formatPromptContextReport(report: PromptContextReport | null): s
   }
 
   const cacheLine = report.cache.supported
-    ? report.cache.key === "anthropic-stable-prefix"
-      ? "Enabled (anthropic-cache-control)"
-      : `Enabled (${report.cache.key})`
+    ? "Enabled (anthropic-cache-control)"
     : `Unavailable (${report.cache.reason ?? "unsupported"})`;
   const usageLine = report.usage
     ? `${report.usage.promptTokens} prompt / ${report.usage.completionTokens} completion / ${report.usage.totalTokens} total`

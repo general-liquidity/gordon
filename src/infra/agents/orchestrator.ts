@@ -1616,6 +1616,34 @@ async function awaitWithAbort<T>(promise: Promise<T>, signal?: AbortSignal): Pro
   });
 }
 
+type ReActStage =
+  | "compaction_checked"
+  | "interrupt_checked_before_thinking"
+  | "thinking_complete"
+  | "ui_drained"
+  | "interrupt_checked_before_action"
+  | "action_started"
+  | "response_dispatched"
+  | "persisted";
+
+const REACT_STAGE_TRANSITIONS: Record<ReActStage, ReActStage[]> = {
+  compaction_checked: ["interrupt_checked_before_thinking"],
+  interrupt_checked_before_thinking: ["thinking_complete"],
+  thinking_complete: ["ui_drained"],
+  ui_drained: ["interrupt_checked_before_action"],
+  interrupt_checked_before_action: ["action_started"],
+  action_started: ["response_dispatched"],
+  response_dispatched: ["persisted"],
+  persisted: [],
+};
+
+function advanceReActStage(current: ReActStage, next: ReActStage): ReActStage {
+  if (!REACT_STAGE_TRANSITIONS[current].includes(next)) {
+    throw new Error(`Invalid ReAct stage transition: ${current} -> ${next}`);
+  }
+  return next;
+}
+
 // ============================================================================
 // Streaming Message Processing (SOTA)
 // ============================================================================
@@ -1649,7 +1677,9 @@ export async function* processMessageStream(
 
   try {
     const groundedPrompt = await buildGroundedPrompt(userMessage, context, requestContext);
+    let reactStage: ReActStage = "compaction_checked";
     await throwIfStreamAborted(signal);
+    reactStage = advanceReActStage(reactStage, "interrupt_checked_before_thinking");
 
     // ── Thinking phase (tool-free pre-action reasoning, OPENDEV §2.2.6) ──────
     // ReAct Stage Ordering (per OPENDEV paper §2.2.6):
@@ -1673,6 +1703,8 @@ export async function* processMessageStream(
         }
       }
     }
+    reactStage = advanceReActStage(reactStage, "thinking_complete");
+    reactStage = advanceReActStage(reactStage, "ui_drained");
     // ─────────────────────────────────────────────────────────────────────────
 
     // Emit agent started event
@@ -1685,6 +1717,8 @@ export async function* processMessageStream(
     // Pass threadId and resourceId inside memory option for Mastra's newer execution path
     // This ensures sub-agents also receive thread/resource context for working memory updates
     const effectiveResourceId = resourceId || context.userId || "default";
+    await throwIfStreamAborted(signal);
+    reactStage = advanceReActStage(reactStage, "interrupt_checked_before_action");
     const streamRequest = gordonAgent().stream(groundedPrompt.messages, {
       requestContext,
       ...(threadId && effectiveResourceId ? {
@@ -1697,6 +1731,7 @@ export async function* processMessageStream(
       ...groundedPrompt.requestOptions,
       ...(tracingOptions && { tracingOptions }),
     });
+    reactStage = advanceReActStage(reactStage, "action_started");
     const streamResult = await awaitWithAbort(streamRequest, signal);
 
     let fullText = "";
@@ -2368,6 +2403,7 @@ export async function* processMessageStream(
       usage,
       agentName: currentAgent,
     };
+    reactStage = advanceReActStage(reactStage, "response_dispatched");
     await finalizeAfterRequest(context, {
       threadId: threadId ?? context.threadId,
       agentName: currentAgent,
@@ -2379,6 +2415,7 @@ export async function* processMessageStream(
         totalTokens: usage.totalTokens,
       },
     });
+    reactStage = advanceReActStage(reactStage, "persisted");
 
   } catch (err) {
     if (err instanceof StreamCancelledError) {

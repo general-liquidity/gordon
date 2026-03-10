@@ -68,7 +68,7 @@ describe("integration glossary grounding", () => {
     expect(envelope.prompt).toContain("[GORDON_INTEGRATION_GLOSSARY]");
     expect(envelope.prompt).toContain("[GORDON_PHASE_GUIDANCE]");
     expect(envelope.prompt).toContain("Tinyfish");
-    expect(envelope.report.cache.supported).toBe(true);
+    expect(envelope.report.cache.supported).toBe(false);
     expect(envelope.report.workflowPhase).toBe("analysis");
     expect(envelope.report.sectionBudget.totalEstimated).toBeGreaterThan(0);
     expect(envelope.contextPieces.some((piece) => piece.source === "prompt-section-registry")).toBeTrue();
