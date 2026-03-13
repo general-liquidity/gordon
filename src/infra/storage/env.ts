@@ -85,6 +85,16 @@ export interface EnvKeys {
   THEGRAPH_API_KEY?: string;
   GORDON_PROVIDER?: string;
   GORDON_MODEL?: string;
+  GORDON_AXIOM_STRUCTURED_ENABLED?: string;
+  GORDON_AXIOM_TOKEN?: string;
+  GORDON_AXIOM_HASH_SALT?: string;
+  GORDON_AXIOM_BASE_URL?: string;
+  GORDON_AXIOM_EVENTS_DATASET?: string;
+  GORDON_AXIOM_AUDIT_DATASET?: string;
+  OTEL_TRACING_ENABLED?: string;
+  GORDON_TRACING_REVIEWED?: string;
+  OTEL_EXPORTER_OTLP_ENDPOINT?: string;
+  OTEL_EXPORTER_OTLP_HEADERS?: string;
   // Chain provider keys
   SOLANA_PRIVATE_KEY?: string;
   SOLANA_RPC_URL?: string;
@@ -129,6 +139,11 @@ export interface EnvStatus {
   hasTinyfishKey: boolean;
   hasUniswapKey: boolean;
   hasGraphKey: boolean;
+  hasStructuredAxiomEnabled: boolean;
+  hasAxiomToken: boolean;
+  hasAxiomHashSalt: boolean;
+  tracingRequested: boolean;
+  tracingReviewed: boolean;
   // Chain provider status
   hasSolanaKey: boolean;
   hasHeliusKey: boolean;
@@ -234,6 +249,9 @@ const ENV_KEY_NAMES: (keyof EnvKeys)[] = [
   "KRAKEN_API_KEY", "KRAKEN_API_SECRET",
   "BITFINEX_API_KEY", "BITFINEX_API_SECRET",
   "HYPERLIQUID_PRIVATE_KEY", "TINYFISH_API_KEY", "UNISWAP_API_KEY", "THEGRAPH_API_KEY", "GORDON_PROVIDER", "GORDON_MODEL",
+  "GORDON_AXIOM_STRUCTURED_ENABLED", "GORDON_AXIOM_TOKEN", "GORDON_AXIOM_HASH_SALT",
+  "GORDON_AXIOM_BASE_URL", "GORDON_AXIOM_EVENTS_DATASET", "GORDON_AXIOM_AUDIT_DATASET",
+  "OTEL_TRACING_ENABLED", "GORDON_TRACING_REVIEWED", "OTEL_EXPORTER_OTLP_ENDPOINT", "OTEL_EXPORTER_OTLP_HEADERS",
   "SOLANA_PRIVATE_KEY", "SOLANA_RPC_URL", "HELIUS_API_KEY", "JUPITER_REFERRAL_ACCOUNT", "JUPITER_FEE_BPS",
   "POLKADOT_MNEMONIC", "POLKADOT_PRIVATE_KEY",
   "CHAINLINK_API_KEY", "CHAINLINK_API_SECRET", "EVM_PRIVATE_KEY",
@@ -262,6 +280,11 @@ function buildEnvStatus(keys: EnvKeys, fileExists: boolean): EnvStatus {
     hasTinyfishKey: !!keys.TINYFISH_API_KEY,
     hasUniswapKey: !!keys.UNISWAP_API_KEY,
     hasGraphKey: !!keys.THEGRAPH_API_KEY,
+    hasStructuredAxiomEnabled: keys.GORDON_AXIOM_STRUCTURED_ENABLED === "true",
+    hasAxiomToken: !!keys.GORDON_AXIOM_TOKEN,
+    hasAxiomHashSalt: !!keys.GORDON_AXIOM_HASH_SALT,
+    tracingRequested: keys.OTEL_TRACING_ENABLED === "true",
+    tracingReviewed: keys.GORDON_TRACING_REVIEWED === "true",
     hasSolanaKey: !!keys.SOLANA_PRIVATE_KEY,
     hasHeliusKey: !!keys.HELIUS_API_KEY,
     hasPolkadotKey: !!(keys.POLKADOT_MNEMONIC || keys.POLKADOT_PRIVATE_KEY),
@@ -785,6 +808,34 @@ export async function createEnvFile(keys: Partial<EnvKeys>): Promise<void> {
     lines.push(formatEnvLine("GORDON_MODEL", keys.GORDON_MODEL));
   } else {
     lines.push("# GORDON_MODEL=openai/gpt-5.2");
+  }
+
+  lines.push("");
+  lines.push("# ---- Observability & Privacy ----");
+  if (keys.GORDON_AXIOM_STRUCTURED_ENABLED) {
+    lines.push(formatEnvLine("GORDON_AXIOM_STRUCTURED_ENABLED", keys.GORDON_AXIOM_STRUCTURED_ENABLED));
+  } else {
+    lines.push("# GORDON_AXIOM_STRUCTURED_ENABLED=false");
+  }
+  if (keys.GORDON_AXIOM_HASH_SALT) {
+    lines.push(formatEnvLine("GORDON_AXIOM_HASH_SALT", keys.GORDON_AXIOM_HASH_SALT));
+  } else {
+    lines.push("# GORDON_AXIOM_HASH_SALT=");
+  }
+  if (keys.GORDON_AXIOM_TOKEN) {
+    lines.push(formatEnvLine("GORDON_AXIOM_TOKEN", keys.GORDON_AXIOM_TOKEN));
+  } else {
+    lines.push("# GORDON_AXIOM_TOKEN=");
+  }
+  if (keys.OTEL_TRACING_ENABLED) {
+    lines.push(formatEnvLine("OTEL_TRACING_ENABLED", keys.OTEL_TRACING_ENABLED));
+  } else {
+    lines.push("# OTEL_TRACING_ENABLED=false");
+  }
+  if (keys.GORDON_TRACING_REVIEWED) {
+    lines.push(formatEnvLine("GORDON_TRACING_REVIEWED", keys.GORDON_TRACING_REVIEWED));
+  } else {
+    lines.push("# GORDON_TRACING_REVIEWED=false");
   }
 
   // Always write to ~/.gordon/.env

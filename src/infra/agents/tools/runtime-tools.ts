@@ -17,6 +17,7 @@ import { StrategyRuntime } from "../../../core/runtime/engine.ts";
 import { AllocationStrategySchema } from "../../../core/runtime/types.ts";
 import { getAuditLogger } from "../../audit/index.ts";
 import { createModuleLogger } from "../../logger/index.ts";
+import { recordStructuredObservation } from "../../observability/index.ts";
 import {
   buildLiveBacktestDiffReport,
   buildRuntimeHealthOperatorReport,
@@ -35,6 +36,39 @@ const logger = createModuleLogger("runtime-tools");
  */
 function getRuntime(): StrategyRuntime {
   return StrategyRuntime.getInstance();
+}
+
+function recordRuntimeHealthObservation(
+  source: string,
+  input: {
+    healthy: boolean;
+    actions: Array<{ type: string; severity: string; reason: string; slot_id?: string }>;
+    operatorReport?: unknown;
+    error?: string;
+  },
+): void {
+  const warningCount = input.actions.filter((action) => action.severity === "warning").length;
+  const criticalCount = input.actions.filter((action) => action.severity === "critical").length;
+
+  recordStructuredObservation({
+    eventType: "runtime.health_checked",
+    workflow: "runtime_health",
+    source,
+    component: "runtime_tools",
+    outcome: input.error ? "failure" : input.healthy ? "success" : "failure",
+    status: input.error ? "error" : input.healthy ? "healthy" : "needs_attention",
+    healthy: input.error ? false : input.healthy,
+    actionCount: input.actions.length,
+    warningCount,
+    criticalCount,
+    reason: input.error ?? input.actions[0]?.reason,
+    details: {
+      actionTypes: input.actions.map((action) => action.type),
+      affectedSlots: input.actions.map((action) => action.slot_id).filter(Boolean),
+      operatorReport: input.operatorReport,
+      error: input.error,
+    },
+  });
 }
 
 // ============================================================================
@@ -480,6 +514,12 @@ export const checkPortfolioHealthTool = createTool({
       const warnings = actions.filter((a) => a.severity === "warning").length;
       const critical = actions.filter((a) => a.severity === "critical").length;
 
+      recordRuntimeHealthObservation("agent_tool.check_portfolio_health", {
+        healthy: actions.length === 0,
+        actions,
+        operatorReport,
+      });
+
       return {
         healthy: actions.length === 0,
         formattedSummary: formatOperatorReport(operatorReport),
@@ -496,6 +536,11 @@ export const checkPortfolioHealthTool = createTool({
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       logger.error("check_portfolio_health failed", { error: message });
+      recordRuntimeHealthObservation("agent_tool.check_portfolio_health", {
+        healthy: false,
+        actions: [],
+        error: message,
+      });
       return {
         healthy: false,
         formattedSummary: undefined,
@@ -525,6 +570,11 @@ export const getRuntimeHealthReportTool = createTool({
       const portfolio = runtime.getPortfolioState();
       const actions = runtime.runHealthCheck();
       const operatorReport = buildRuntimeHealthOperatorReport({ portfolio, actions });
+      recordRuntimeHealthObservation("agent_tool.get_runtime_health_report", {
+        healthy: actions.length === 0,
+        actions,
+        operatorReport,
+      });
       return {
         operatorReport,
         formattedSummary: formatOperatorReport(operatorReport),
@@ -532,6 +582,11 @@ export const getRuntimeHealthReportTool = createTool({
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       logger.error("get_runtime_health_report failed", { error: message });
+      recordRuntimeHealthObservation("agent_tool.get_runtime_health_report", {
+        healthy: false,
+        actions: [],
+        error: message,
+      });
       return { error: message };
     }
   },

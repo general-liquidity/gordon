@@ -24,6 +24,8 @@ import {
 } from "../../../core/trailing-stop.ts";
 import { PlanSchema } from "../../../types/plan.ts";
 import { TradeSchema } from "../../../types/trade.ts";
+import { emitEvent } from "../../../events/index.ts";
+import { recordStructuredObservation } from "../../observability/index.ts";
 import { loadConfig, saveConfig } from "../../storage/config.ts";
 import { listPlans, getPlan, updatePlan, createPlan } from "../../storage/plans.ts";
 import { listTrades, getTrade } from "../../storage/trades.ts";
@@ -291,15 +293,50 @@ export const executePlanTool = createTool({
   execute: async ({ planId }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
     if (!ctx?.exchange) {
+      recordStructuredObservation({
+        eventType: "execution.blocked",
+        workflow: "execution",
+        source: "agent_tool",
+        component: "execute_plan",
+        toolName: "execute_plan",
+        outcome: "failure",
+        status: "exchange_missing",
+        planId,
+        reason: errors.noExchange.error,
+      });
       return validateToolOutput(executePlanOutputSchema, { ...errors.noExchange, success: false }, { toolName: "execute_plan" });
     }
 
     const plan = getPlan(planId);
     if (!plan) {
+      recordStructuredObservation({
+        eventType: "execution.blocked",
+        workflow: "execution",
+        source: "agent_tool",
+        component: "execute_plan",
+        toolName: "execute_plan",
+        outcome: "failure",
+        status: "plan_missing",
+        planId,
+        reason: `Plan not found: ${planId}`,
+      });
       return validateToolOutput(executePlanOutputSchema, { success: false, error: `Plan not found: ${planId}` }, { toolName: "execute_plan" });
     }
 
     if (ctx.config.mode !== "ARMED") {
+      recordStructuredObservation({
+        eventType: "execution.blocked",
+        workflow: "execution",
+        source: "agent_tool",
+        component: "execute_plan",
+        toolName: "execute_plan",
+        outcome: "failure",
+        status: "not_armed",
+        mode: ctx.config.mode,
+        planId,
+        symbol: plan.symbol,
+        reason: "Cannot execute: System is in SAFE mode. User must arm the system first.",
+      });
       return validateToolOutput(executePlanOutputSchema, {
         success: false,
         error: "Cannot execute: System is in SAFE mode. User must arm the system first.",
@@ -321,17 +358,47 @@ export const executePlanTool = createTool({
         "executor"
       );
       if (!riskResult.approved) {
+        recordStructuredObservation({
+          eventType: "execution.blocked",
+          workflow: "execution",
+          source: "agent_tool",
+          component: "execute_plan",
+          toolName: "execute_plan",
+          outcome: "failure",
+          status: "risk_rejected",
+          mode: ctx.config.mode,
+          planId,
+          symbol: plan.symbol,
+          reason: riskResult.reason,
+          details: {
+            warnings: riskResult.warnings,
+          },
+        });
         return validateToolOutput(executePlanOutputSchema, {
           success: false,
           error: `Risk kernel rejected this trade: ${riskResult.reason}`,
         }, { toolName: "execute_plan" });
       }
     } catch (riskErr) {
+      const message = riskErr instanceof Error ? riskErr.message : String(riskErr);
+      recordStructuredObservation({
+        eventType: "execution.blocked",
+        workflow: "execution",
+        source: "agent_tool",
+        component: "execute_plan",
+        toolName: "execute_plan",
+        outcome: "failure",
+        status: "risk_gate_failed",
+        mode: ctx.config.mode,
+        planId,
+        symbol: plan.symbol,
+        reason: message,
+      });
       return validateToolOutput(
         executePlanOutputSchema,
         {
           success: false,
-          error: `Risk gate evaluation failed: ${riskErr instanceof Error ? riskErr.message : String(riskErr)}`,
+          error: `Risk gate evaluation failed: ${message}`,
         },
         { toolName: "execute_plan" },
       );
@@ -344,6 +411,20 @@ export const executePlanTool = createTool({
     });
 
     if (result.success && result.trade) {
+      recordStructuredObservation({
+        eventType: "execution.completed",
+        workflow: "execution",
+        source: "agent_tool",
+        component: "execute_plan",
+        toolName: "execute_plan",
+        outcome: "success",
+        status: "executed",
+        mode: ctx.config.mode,
+        planId,
+        tradeId: result.trade.id,
+        symbol: result.trade.symbol,
+        actionCount: result.orders.length,
+      });
       return validateToolOutput(executePlanOutputSchema, {
         success: true,
         trade: result.trade,
@@ -351,6 +432,19 @@ export const executePlanTool = createTool({
       }, { toolName: "execute_plan" });
     }
 
+    recordStructuredObservation({
+      eventType: "execution.blocked",
+      workflow: "execution",
+      source: "agent_tool",
+      component: "execute_plan",
+      toolName: "execute_plan",
+      outcome: "failure",
+      status: "execution_failed",
+      mode: ctx.config.mode,
+      planId,
+      symbol: plan.symbol,
+      reason: result.error,
+    });
     return validateToolOutput(executePlanOutputSchema, {
       success: false,
       error: result.error,
@@ -457,14 +551,55 @@ export const approvePlanTool = createTool({
   execute: async ({ planId }) => {
     const plan = getPlan(planId);
     if (!plan) {
+      recordStructuredObservation({
+        eventType: "plan.approval_failed",
+        workflow: "execution",
+        source: "agent_tool",
+        component: "approve_plan",
+        toolName: "approve_plan",
+        outcome: "failure",
+        status: "plan_missing",
+        planId,
+        reason: `Plan not found: ${planId}`,
+      });
       return validateToolOutput(approvePlanOutputSchema, { success: false, error: `Plan not found: ${planId}` }, { toolName: "approve_plan" });
     }
 
     if (plan.status !== "DRAFT") {
+      recordStructuredObservation({
+        eventType: "plan.approval_failed",
+        workflow: "execution",
+        source: "agent_tool",
+        component: "approve_plan",
+        toolName: "approve_plan",
+        outcome: "failure",
+        status: "invalid_status",
+        planId,
+        symbol: plan.symbol,
+        reason: `Plan is not in DRAFT status, current status: ${plan.status}`,
+        details: {
+          previousStatus: plan.status,
+        },
+      });
       return validateToolOutput(approvePlanOutputSchema, { success: false, error: `Plan is not in DRAFT status, current status: ${plan.status}` }, { toolName: "approve_plan" });
     }
 
     updatePlan(planId, { status: "APPROVED" });
+    await emitEvent("plan:approved", { planId });
+    recordStructuredObservation({
+      eventType: "plan.approved",
+      workflow: "execution",
+      source: "agent_tool",
+      component: "approve_plan",
+      toolName: "approve_plan",
+      outcome: "success",
+      status: "approved",
+      planId,
+      symbol: plan.symbol,
+      details: {
+        previousStatus: plan.status,
+      },
+    });
 
     return validateToolOutput(approvePlanOutputSchema, {
       success: true,
@@ -502,6 +637,21 @@ export const armSystemTool = createTool({
       const armedUntil = new Date(Date.now() + armHours * 60 * 60 * 1000).toISOString();
 
       await saveConfig({ ...config, mode: "ARMED", armedUntil });
+      recordStructuredObservation({
+        eventType: "system.armed",
+        workflow: "execution",
+        source: "agent_tool",
+        component: "arm_system",
+        toolName: "arm_system",
+        outcome: "success",
+        status: "armed",
+        mode: "ARMED",
+        durationMs: armHours * 60 * 60 * 1000,
+        details: {
+          armHours,
+          armedUntil,
+        },
+      });
 
       return validateToolOutput(armSystemOutputSchema, {
         success: true,
@@ -511,6 +661,16 @@ export const armSystemTool = createTool({
       }, { toolName: "arm_system" });
     } else {
       await saveConfig({ ...config, mode: "SAFE", armedUntil: null });
+      recordStructuredObservation({
+        eventType: "system.disarmed",
+        workflow: "execution",
+        source: "agent_tool",
+        component: "arm_system",
+        toolName: "arm_system",
+        outcome: "success",
+        status: "disarmed",
+        mode: "SAFE",
+      });
 
       return validateToolOutput(armSystemOutputSchema, {
         success: true,

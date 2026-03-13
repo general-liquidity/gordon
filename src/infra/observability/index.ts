@@ -85,3 +85,19 @@ export {
   type SpanContext,
   type TracingOptions,
 } from "./tracing.ts";
+
+export {
+  initializeStructuredAxiom,
+  refreshStructuredAxiomState,
+  shutdownStructuredAxiom,
+  flushStructuredAxiom,
+  getStructuredAxiomConfig,
+  getStructuredAxiomPrivacyStatus,
+  getStructuredAxiomStatus,
+  recordStructuredProductEvent,
+  recordStructuredAuditEvent,
+  recordStructuredSessionCost,
+  recordStructuredObservation,
+  type StructuredAxiomConfig,
+  type StructuredObservationInput,
+} from "./structured.ts";

@@ -3,7 +3,7 @@
  * Step-by-step configuration for exchange, broker, and LLM API keys
  */
 
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import { Box, Text, useInput } from "ink";
 import TextInput from "ink-text-input";
 import { NoticeAlert } from "./components/PromptPrimitives.tsx";
@@ -15,6 +15,7 @@ import { ExchangeFactory, type ExchangeId } from "../infra/exchange/index.ts";
 import { EXCHANGE_ENV_MAP } from "../infra/exchange/types.ts";
 import { BrokerFactory } from "../infra/broker/factory.ts";
 import { BROKER_ENV_MAP, type BrokerId } from "../infra/broker/types.ts";
+import { recordStructuredObservation } from "../infra/observability/index.ts";
 import { loadConfig, saveConfig } from "../infra/storage/config.ts";
 import { saveEnvKeys, createEnvFile, checkEnvStatus } from "../infra/storage/env.ts";
 import type {
@@ -522,6 +523,7 @@ export function SetupWizard({
   mode = "advanced",
   initialSection = null,
 }: SetupWizardProps): React.ReactElement {
+  const lastTrackedStepRef = useRef<WizardStep | null>(null);
   const [state, setState] = useState<WizardState>({
     step: "welcome",
     exchangeType: "",
@@ -595,6 +597,87 @@ export function SetupWizard({
     };
   }, [initialSection, mode]);
 
+  const llmConfigured = Boolean(state.openaiApiKey || state.inceptionApiKey || state.dedalusApiKey);
+
+  const recordSetupObservation = useCallback((eventType: string, options?: {
+    outcome?: "success" | "failure" | "info" | "cancelled";
+    status?: string;
+    step?: WizardStep;
+    exchange?: string;
+    broker?: string;
+    provider?: string;
+    selectedCount?: number;
+    reason?: string;
+    durationMs?: number;
+    details?: Record<string, unknown>;
+  }) => {
+    recordStructuredObservation({
+      eventType,
+      workflow: "setup",
+      source: "setup_wizard",
+      component: "SetupWizard",
+      outcome: options?.outcome,
+      status: options?.status,
+      step: options?.step ?? state.step,
+      exchange: (options?.exchange ?? state.exchangeType) || undefined,
+      broker: (options?.broker ?? state.brokerType) || undefined,
+      provider: (options?.provider ?? state.selectedLlmProvider) || undefined,
+      selectedCount: options?.selectedCount ?? state.selectedChains.length,
+      reason: options?.reason,
+      durationMs: options?.durationMs,
+      details: {
+        wizardMode: mode,
+        initialSection: initialSection ?? undefined,
+        exchangeValidated: state.exchangeValidated,
+        brokerValidated: state.brokerValidated,
+        llmConfigured,
+        selectedChains: state.selectedChains,
+        mcpAutoSync: state.mcpAutoSync,
+        startupBannerMode: state.startupBannerMode,
+        ...options?.details,
+      },
+    });
+  }, [
+    initialSection,
+    llmConfigured,
+    mode,
+    state.brokerType,
+    state.brokerValidated,
+    state.exchangeType,
+    state.exchangeValidated,
+    state.mcpAutoSync,
+    state.selectedChains,
+    state.selectedLlmProvider,
+    state.startupBannerMode,
+    state.step,
+  ]);
+
+  useEffect(() => {
+    recordStructuredObservation({
+      eventType: "setup.wizard_opened",
+      workflow: "setup",
+      source: "setup_wizard",
+      component: "SetupWizard",
+      outcome: "info",
+      step: "welcome",
+      details: {
+        wizardMode: mode,
+        initialSection: initialSection ?? undefined,
+      },
+    });
+  }, [initialSection, mode]);
+
+  useEffect(() => {
+    if (lastTrackedStepRef.current === state.step) return;
+    lastTrackedStepRef.current = state.step;
+
+    recordSetupObservation("setup.step_viewed", {
+      outcome: "info",
+      status: "viewed",
+      step: state.step,
+    });
+  }, [recordSetupObservation, state.step]);
+
   const validateExchangeCredentials = useCallback(async (
     exchangeType: ExchangeId,
     apiKey: string,
@@ -602,6 +685,7 @@ export function SetupWizard({
     passphrase?: string,
     walletPrivateKey?: string
   ) => {
+    const startedAt = Date.now();
     setState((prev) => ({
       ...prev,
       step: "exchange-validating",
@@ -618,6 +702,16 @@ export function SetupWizard({
       const connected = await client.testConnection();
 
       if (!connected) {
+        recordSetupObservation("setup.exchange_validation_failed", {
+          outcome: "failure",
+          status: "connection_failed",
+          step: "exchange-key",
+          exchange: exchangeType,
+          reason: "Could not connect to Binance API. Please check your internet connection.",
+          details: {
+            durationMs: Date.now() - startedAt,
+          },
+        });
         setState((prev) => ({
           ...prev,
           step: "exchange-key",
@@ -635,6 +729,17 @@ export function SetupWizard({
       const { permissions, validation } = await checkAndValidatePermissions(client);
 
       if (!validation.valid) {
+        recordSetupObservation("setup.exchange_validation_failed", {
+          outcome: "failure",
+          status: "permissions_invalid",
+          step: "exchange-key",
+          exchange: exchangeType,
+          reason: validation.errors[0] ?? "Exchange permissions validation failed.",
+          details: {
+            durationMs: Date.now() - startedAt,
+            validationErrors: validation.errors,
+          },
+        });
         setState((prev) => ({
           ...prev,
           step: "exchange-key",
@@ -657,6 +762,15 @@ export function SetupWizard({
         exchangeError: null,
         exchangeValidated: true,
       }));
+      recordSetupObservation("setup.exchange_validated", {
+        outcome: "success",
+        status: "validated",
+        exchange: exchangeType,
+        details: {
+          durationMs: Date.now() - startedAt,
+          permissionSummary: permissions,
+        },
+      });
       return;
     }
 
@@ -678,17 +792,36 @@ export function SetupWizard({
         exchangeError: null,
         exchangeValidated: true,
       }));
+      recordSetupObservation("setup.exchange_validated", {
+        outcome: "success",
+        status: "validated",
+        exchange: exchangeType,
+        details: {
+          durationMs: Date.now() - startedAt,
+        },
+      });
     } catch (error) {
       ExchangeFactory.removeFromCache(exchangeType, {
         apiKey: isWalletAuth ? "" : apiKey,
         apiSecret: isWalletAuth ? "" : apiSecret,
         walletPrivateKey,
       });
+      const message = error instanceof Error ? error.message : String(error);
+      recordSetupObservation("setup.exchange_validation_failed", {
+        outcome: "failure",
+        status: "validation_failed",
+        step: errorStep,
+        exchange: exchangeType,
+        reason: message,
+        details: {
+          durationMs: Date.now() - startedAt,
+        },
+      });
       setState((prev) => ({
         ...prev,
         step: errorStep,
         isValidating: false,
-        exchangeError: error instanceof Error ? error.message : String(error),
+        exchangeError: message,
         exchangeApiKey: "",
         exchangeApiSecret: "",
         exchangePassphrase: "",
@@ -704,6 +837,7 @@ export function SetupWizard({
     apiSecret: string,
     paper: boolean,
   ) => {
+    const startedAt = Date.now();
     setState((prev) => ({
       ...prev,
       step: "broker-validating",
@@ -716,6 +850,16 @@ export function SetupWizard({
       const connected = await broker.testConnection();
 
       if (!connected) {
+        recordSetupObservation("setup.broker_validation_failed", {
+          outcome: "failure",
+          status: "connection_failed",
+          step: "broker-key",
+          broker: brokerType,
+          reason: "Could not connect to broker API. Check key/secret and try again.",
+          details: {
+            durationMs: Date.now() - startedAt,
+          },
+        });
         setState((prev) => ({
           ...prev,
           step: "broker-key",
@@ -738,13 +882,34 @@ export function SetupWizard({
         brokerValidated: true,
         inputValue: "",
       }));
+      recordSetupObservation("setup.broker_validated", {
+        outcome: "success",
+        status: paper ? "paper_validated" : "live_validated",
+        broker: brokerType,
+        details: {
+          durationMs: Date.now() - startedAt,
+          paper,
+        },
+      });
     } catch (error) {
       BrokerFactory.removeFromCache(brokerType, { apiKey, apiSecret, paper });
+      const message = error instanceof Error ? error.message : String(error);
+      recordSetupObservation("setup.broker_validation_failed", {
+        outcome: "failure",
+        status: "validation_failed",
+        step: "broker-key",
+        broker: brokerType,
+        reason: message,
+        details: {
+          durationMs: Date.now() - startedAt,
+          paper,
+        },
+      });
       setState((prev) => ({
         ...prev,
         step: "broker-key",
         isValidating: false,
-        exchangeError: error instanceof Error ? error.message : String(error),
+        exchangeError: message,
         brokerApiKey: "",
         brokerApiSecret: "",
         brokerValidated: false,
@@ -962,6 +1127,35 @@ export function SetupWizard({
     // Reset provider and agent caches so next access reinitializes with fresh env variables
     resetProviderRegistry();
     resetAgents();
+
+    recordStructuredObservation({
+      eventType: "setup.configuration_saved",
+      workflow: "setup",
+      source: "setup_wizard",
+      component: "SetupWizard",
+      outcome: "success",
+      status: mode === "configure" ? "section_saved" : "completed",
+      exchange: state.exchangeType || undefined,
+      broker: state.brokerType || undefined,
+      provider: state.selectedLlmProvider || undefined,
+      selectedCount: state.selectedChains.length,
+      details: {
+        wizardMode: mode,
+        initialSection: initialSection ?? undefined,
+        onboardingComplete: true,
+        hasExchangeCredentials,
+        hasBrokerCredentials,
+        llmConfigured,
+        envKeysSavedCount: Object.keys(envKeys).length,
+        railsConfiguredCount: [
+          state.railKeys.heliusApiKey,
+          state.railKeys.moonpayApiKey || state.railKeys.moonpaySecretKey,
+          state.railKeys.polygonRecipient || state.railKeys.polygonPrivateKey,
+        ].filter(Boolean).length,
+        startupBannerMode: overrides?.startupBannerMode ?? state.startupBannerMode,
+        mcpAutoSync: state.mcpAutoSync,
+      },
+    });
   }, [
     state.exchangeApiKey,
     state.exchangeApiSecret,
@@ -984,6 +1178,9 @@ export function SetupWizard({
     state.openaiApiKey,
     state.inceptionApiKey,
     state.dedalusApiKey,
+    llmConfigured,
+    initialSection,
+    mode,
   ]);
 
   // Map chain IDs to their wizard step names
@@ -1513,6 +1710,12 @@ export function SetupWizard({
   }, []);
 
   const handleSkip = useCallback(async () => {
+    recordSetupObservation("setup.step_skipped", {
+      outcome: "cancelled",
+      status: "skipped",
+      step: state.step,
+    });
+
     switch (state.step) {
       case "exchange-select":
       case "exchange-key":
@@ -1623,6 +1826,7 @@ export function SetupWizard({
     advanceChainStep,
     initialSection,
     mode,
+    recordSetupObservation,
     saveConfiguration,
   ]);
 

@@ -2974,11 +2974,12 @@ export async function quickCheckPositions(context: GordonContext) {
  * Initialize OpenTelemetry tracing for agent operations
  *
  * This initializes the tracing infrastructure and logs configuration.
- * When OTEL_TRACING_ENABLED=true, traces will be exported to the
+ * When OTEL_TRACING_ENABLED=true and GORDON_TRACING_REVIEWED=true, traces will be exported to the
  * configured OTLP endpoint.
  *
  * Environment variables:
  * - OTEL_TRACING_ENABLED: Enable tracing (default: false)
+ * - GORDON_TRACING_REVIEWED: Explicit review gate for trace export
  * - OTEL_EXPORTER_OTLP_ENDPOINT: OTLP endpoint URL
  * - OTEL_SERVICE_NAME: Service name for traces
  */
@@ -2994,7 +2995,7 @@ export async function initializeTracing(): Promise<void> {
       endpoint: config.endpoint,
     });
   } else {
-    logger.debug("Tracing disabled (set OTEL_TRACING_ENABLED=true to enable)");
+    logger.debug("Tracing disabled (set OTEL_TRACING_ENABLED=true and GORDON_TRACING_REVIEWED=true to enable)");
   }
 }
 

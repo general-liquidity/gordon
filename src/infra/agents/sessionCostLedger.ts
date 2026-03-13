@@ -1,4 +1,5 @@
 import { executeWithLogging, getDatabase } from "../storage/database.ts";
+import { recordStructuredSessionCost } from "../observability/index.ts";
 
 export interface SessionCostUsageInput {
   threadId: string;
@@ -90,7 +91,7 @@ export function recordSessionCostUsage(input: SessionCostUsageInput): SessionCos
     "UPSERT session_cost_ledger",
   );
 
-  return getSessionCostLedgerEntry(input.threadId) ?? {
+  const entry = getSessionCostLedgerEntry(input.threadId) ?? {
     threadId: input.threadId,
     sessionId: input.sessionId,
     resourceId: input.resourceId,
@@ -102,6 +103,14 @@ export function recordSessionCostUsage(input: SessionCostUsageInput): SessionCos
     totalTokens: input.totalTokens,
     updatedAt,
   };
+
+  try {
+    recordStructuredSessionCost(entry);
+  } catch {
+    // Non-fatal observability path
+  }
+
+  return entry;
 }
 
 export function getSessionCostLedgerEntry(threadId?: string): SessionCostLedgerEntry | null {

@@ -48,6 +48,7 @@ import { getAutonomousLoopStatus, runAutonomousCycleOnce } from "../../core/auto
 import { executeTinyfishMonitorRun } from "../../infra/tinyfish/service.ts";
 import { appendActionLogEntry } from "../../infra/action-log/index.ts";
 import type { ActionLogEntryType } from "../../infra/action-log/index.ts";
+import { recordStructuredObservation } from "../../infra/observability/index.ts";
 
 const logger = createModuleLogger("gateway-runtime");
 
@@ -270,6 +271,20 @@ export class GatewayRuntime {
       const expiresAt = new Date(Date.now() + (payload.durationHours ?? 1) * 60 * 60 * 1000).toISOString();
       const updated = { ...config, mode: "ARMED" as const, armedUntil: expiresAt };
       await saveConfig(updated);
+      recordStructuredObservation({
+        eventType: "system.armed",
+        workflow: "execution",
+        source: "gateway_runtime",
+        component: "GatewayRuntime",
+        outcome: "success",
+        status: "armed",
+        mode: updated.mode,
+        durationMs: (payload.durationHours ?? 1) * 60 * 60 * 1000,
+        details: {
+          reason: payload.reason,
+          expiresAt,
+        },
+      });
       return { mode: updated.mode, armedUntil: updated.armedUntil, reason: payload.reason };
     });
 
@@ -278,6 +293,18 @@ export class GatewayRuntime {
       const config = await loadConfig();
       const updated = { ...config, mode: "SAFE" as const, armedUntil: null };
       await saveConfig(updated);
+      recordStructuredObservation({
+        eventType: "system.disarmed",
+        workflow: "execution",
+        source: "gateway_runtime",
+        component: "GatewayRuntime",
+        outcome: "success",
+        status: "disarmed",
+        mode: updated.mode,
+        details: {
+          reason: payload.reason,
+        },
+      });
       return { mode: updated.mode, armedUntil: updated.armedUntil, reason: payload.reason };
     });
 
@@ -331,6 +358,25 @@ export class GatewayRuntime {
       } catch {
         positionCleanup = { expired: 0, byState: {} };
       }
+
+      const warningCount = actions.filter((action) => action.severity === "warning").length;
+      const criticalCount = actions.filter((action) => action.severity === "critical").length;
+      recordStructuredObservation({
+        eventType: "runtime.health_checked",
+        workflow: "runtime_health",
+        source: "gateway_runtime",
+        component: "GatewayRuntime",
+        outcome: actions.length === 0 ? "success" : "failure",
+        status: actions.length === 0 ? "healthy" : "needs_attention",
+        healthy: actions.length === 0,
+        actionCount: actions.length,
+        warningCount,
+        criticalCount,
+        details: {
+          actionTypes: actions.map((action) => action.type),
+          positionCleanup,
+        },
+      });
 
       return { actions, count: actions.length, positionCleanup };
     });
@@ -415,6 +461,27 @@ export class GatewayRuntime {
 
         logger.warn("Circuit breakers tripped, system auto-disarmed", {
           triggers: result.triggers.map((t) => t.name),
+        });
+
+        recordStructuredObservation({
+          eventType: "runtime.circuit_breaker_tripped",
+          workflow: "runtime_health",
+          source: "gateway_runtime",
+          component: "GatewayRuntime",
+          outcome: "failure",
+          status: "tripped",
+          mode: updated.mode,
+          reason: result.triggers.map((trigger) => trigger.name).join(", "),
+          details: {
+            autoDisarmed: true,
+            triggers: result.triggers.map((trigger) => ({
+              name: trigger.name,
+              current: trigger.current,
+              threshold: trigger.threshold,
+              message: trigger.message,
+            })),
+            proofCommitment: proof.commitment,
+          },
         });
 
         // Emergency liquidation: cancel orders + close positions + pause slots

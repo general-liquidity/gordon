@@ -5,6 +5,7 @@
 
 import type { GordonEvent, EventType, EventData } from "./types.ts";
 import { createModuleLogger } from "../infra/logger/index.ts";
+import { recordStructuredProductEvent } from "../infra/observability/index.ts";
 
 const logger = createModuleLogger("events");
 
@@ -126,6 +127,15 @@ export class EventBus {
     }
 
     logger.debug(`Event emitted: ${event.type}`, { event });
+
+    try {
+      recordStructuredProductEvent(event as GordonEvent);
+    } catch (error) {
+      logger.debug("Structured event export failed (non-fatal)", {
+        type: event.type,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
 
     // Get handlers for this specific event type
     const typeHandlers = this.handlers.get(event.type as EventType) || [];

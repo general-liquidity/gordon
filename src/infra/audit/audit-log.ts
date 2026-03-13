@@ -10,6 +10,7 @@
 
 import { getDatabase } from "../storage/database.ts";
 import { createModuleLogger } from "../logger/index.ts";
+import { recordStructuredAuditEvent } from "../observability/index.ts";
 import { v4 as uuidv4 } from "uuid";
 
 const logger = createModuleLogger("audit");
@@ -227,6 +228,26 @@ export class AuditLogger {
       result: entry.result,
       userId: entry.userId,
     });
+
+    try {
+      recordStructuredAuditEvent({
+        timestamp: entry.timestamp,
+        userId: entry.userId,
+        action: entry.action,
+        parameters: entry.parameters,
+        result: entry.result,
+        resultDetails: entry.resultDetails,
+        sessionId: entry.sessionId,
+        tradeId: entry.tradeId,
+        planId: entry.planId,
+        metadata: entry.metadata,
+      });
+    } catch (error) {
+      logger.debug("Structured audit export failed (non-fatal)", {
+        action: entry.action,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
 
     return entry;
   }

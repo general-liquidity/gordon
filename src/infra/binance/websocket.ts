@@ -11,6 +11,7 @@
 
 import { EventEmitter } from "events";
 import { createModuleLogger } from "../logger/index.ts";
+import { recordStructuredObservation } from "../observability/index.ts";
 
 const logger = createModuleLogger("binance-ws");
 
@@ -149,6 +150,30 @@ export class BinanceWebSocket extends EventEmitter {
     this.config = { ...DEFAULT_WS_CONFIG, ...config };
   }
 
+  private recordConnectionObservation(
+    eventType: string,
+    outcome: "success" | "failure" | "info" | "cancelled",
+    details?: Record<string, unknown>,
+  ): void {
+    recordStructuredObservation({
+      eventType,
+      workflow: "venue_health",
+      source: "binance_websocket",
+      component: "BinanceWebSocket",
+      outcome,
+      status: this.connectionState,
+      exchange: "binance",
+      venue: "binance",
+      attempt: this.reconnectAttempts || undefined,
+      latencyMs: this.latencyMs ?? undefined,
+      details: {
+        subscriptions: this.subscriptions.size,
+        consecutiveFailures: this.consecutiveFailures,
+        ...details,
+      },
+    });
+  }
+
   /**
    * Update connection state and emit state change event
    */
@@ -207,6 +232,7 @@ export class BinanceWebSocket extends EventEmitter {
       this.setState("connected");
       this.emit("connected");
       this.startPingInterval();
+      this.recordConnectionObservation("venue.websocket_connected", "success");
       logger.info("WebSocket connected", {
         subscriptions: this.subscriptions.size,
       });
@@ -214,6 +240,9 @@ export class BinanceWebSocket extends EventEmitter {
       this.isConnecting = false;
       this.consecutiveFailures++;
       this.setState("failed");
+      this.recordConnectionObservation("venue.websocket_connect_failed", "failure", {
+        error: error instanceof Error ? error.message : String(error),
+      });
       logger.error("WebSocket connection failed", error instanceof Error ? error : undefined);
       throw error;
     }
@@ -367,12 +396,19 @@ export class BinanceWebSocket extends EventEmitter {
     if (this.isClosing) {
       this.setState("disconnected");
       this.emit("disconnected", "Manual close");
+      this.recordConnectionObservation("venue.websocket_disconnected", "cancelled", {
+        reason: "Manual close",
+      });
       logger.info("WebSocket disconnected (manual)");
       return;
     }
 
     this.setState("reconnecting");
     this.emit("disconnected", reason);
+    this.recordConnectionObservation("venue.websocket_disconnected", "failure", {
+      closeCode: event.code,
+      reason,
+    });
     logger.warn("WebSocket disconnected", { code: event.code, reason: event.reason });
     this.attemptReconnect();
   }
@@ -405,6 +441,9 @@ export class BinanceWebSocket extends EventEmitter {
     if (this.reconnectAttempts >= this.config.maxReconnectAttempts) {
       this.setState("failed");
       this.emit("unhealthy", `Max reconnect attempts (${this.config.maxReconnectAttempts}) reached`);
+      this.recordConnectionObservation("venue.websocket_unhealthy", "failure", {
+        reason: `Max reconnect attempts (${this.config.maxReconnectAttempts}) reached`,
+      });
       logger.error("Max reconnect attempts reached", undefined, {
         attempts: this.reconnectAttempts,
       });
@@ -416,6 +455,10 @@ export class BinanceWebSocket extends EventEmitter {
     this.emit("reconnecting", this.reconnectAttempts);
 
     const delay = this.calculateReconnectDelay();
+    this.recordConnectionObservation("venue.websocket_reconnecting", "info", {
+      attempt: this.reconnectAttempts,
+      delayMs: delay,
+    });
     logger.info("Attempting reconnect", {
       attempt: this.reconnectAttempts,
       maxAttempts: this.config.maxReconnectAttempts,
@@ -435,6 +478,7 @@ export class BinanceWebSocket extends EventEmitter {
       try {
         await this.connect();
         this.emit("reconnected");
+        this.recordConnectionObservation("venue.websocket_reconnected", "success");
         logger.info("WebSocket reconnected", {
           attempts: this.reconnectAttempts,
         });
@@ -514,6 +558,9 @@ export class BinanceWebSocket extends EventEmitter {
         error: error instanceof Error ? error.message : String(error),
       });
       this.emit("unhealthy", "Failed to send ping");
+      this.recordConnectionObservation("venue.websocket_unhealthy", "failure", {
+        reason: "Failed to send ping",
+      });
     }
   }
 
@@ -533,6 +580,9 @@ export class BinanceWebSocket extends EventEmitter {
       if (this.latencyMs > 5000) {
         logger.warn("High WebSocket latency detected", { latencyMs: this.latencyMs });
         this.emit("unhealthy", `High latency: ${this.latencyMs}ms`);
+        this.recordConnectionObservation("venue.websocket_unhealthy", "failure", {
+          reason: `High latency: ${this.latencyMs}ms`,
+        });
       } else {
         logger.debug("Pong received", { latencyMs: this.latencyMs });
       }
@@ -544,6 +594,9 @@ export class BinanceWebSocket extends EventEmitter {
     this.pongTimeout = setTimeout(() => {
       logger.warn("Pong timeout - closing connection");
       this.emit("unhealthy", "Pong timeout");
+      this.recordConnectionObservation("venue.websocket_unhealthy", "failure", {
+        reason: "Pong timeout",
+      });
       this.ws?.close(4000, "Pong timeout");
     }, this.config.pongTimeoutMs);
   }

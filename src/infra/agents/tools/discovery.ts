@@ -16,6 +16,7 @@ import { z } from "zod";
 
 import { formatActionPlanMarkdown, planActionExecution } from "../../actions/runtime.ts";
 import { normalizeCryptoSymbol, resolveInstrument } from "../../markets/instruments.ts";
+import { recordStructuredObservation } from "../../observability/index.ts";
 import { getGordonContext, type MastraExecutionContext } from "./types.ts";
 import type { ExchangeExtended } from "../../exchange/types.ts";
 
@@ -765,12 +766,59 @@ export const previewMarketOrderTool = createTool({
   outputSchema: marketOrderPlanOutputSchema,
   execute: async ({ symbol, side, quantity, quoteOrderQty }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
+    const normalizedSymbol = normalizeCryptoSymbol(symbol);
     if (!ctx) {
+      recordStructuredObservation({
+        eventType: "execution.preview_failed",
+        workflow: "execution",
+        source: "agent_tool",
+        component: "preview_market_order",
+        toolName: "preview_market_order",
+        outcome: "failure",
+        status: "context_missing",
+        symbol: normalizedSymbol,
+        reason: "Context not available.",
+        details: {
+          side,
+        },
+      });
       return { error: "Context not available.", ready: false, summary: "Context not available.", blockers: ["Context not available."] };
     }
 
     try {
       const plan = await planActionExecution("trading.preview_market_order", { symbol, side, quantity, quoteOrderQty }, ctx);
+      const previewDetails = plan.preview && typeof plan.preview === "object"
+        ? plan.preview as Record<string, unknown>
+        : undefined;
+      const venue = typeof previewDetails?.venue === "string"
+        ? previewDetails.venue
+        : ctx.exchange?.exchangeId ?? ctx.broker?.brokerId;
+
+      recordStructuredObservation({
+        eventType: plan.ready ? "execution.preview_generated" : "execution.preview_blocked",
+        workflow: "execution",
+        source: "agent_tool",
+        component: "preview_market_order",
+        toolName: "preview_market_order",
+        outcome: plan.ready ? "success" : "failure",
+        status: plan.ready ? "ready" : "blocked",
+        symbol: normalizedSymbol,
+        mode: ctx.config?.mode,
+        exchange: ctx.exchange?.exchangeId,
+        broker: ctx.broker?.brokerId,
+        venue,
+        ready: plan.ready,
+        blockerCount: plan.blockers.length,
+        reason: plan.blockers[0],
+        details: {
+          side,
+          quantityProvided: quantity != null,
+          quoteOrderQtyProvided: quoteOrderQty != null,
+          blockers: plan.blockers,
+          preview: previewDetails,
+        },
+      });
+
       return {
         ready: plan.ready,
         summary: formatActionPlanMarkdown(plan),
@@ -778,11 +826,31 @@ export const previewMarketOrderTool = createTool({
         preview: plan.preview,
       };
     } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      recordStructuredObservation({
+        eventType: "execution.preview_failed",
+        workflow: "execution",
+        source: "agent_tool",
+        component: "preview_market_order",
+        toolName: "preview_market_order",
+        outcome: "failure",
+        status: "error",
+        symbol: normalizedSymbol,
+        mode: ctx.config?.mode,
+        exchange: ctx.exchange?.exchangeId,
+        broker: ctx.broker?.brokerId,
+        reason: message,
+        details: {
+          side,
+          quantityProvided: quantity != null,
+          quoteOrderQtyProvided: quoteOrderQty != null,
+        },
+      });
       return {
         ready: false,
         summary: "Unable to build order preview.",
-        blockers: [error instanceof Error ? error.message : String(error)],
-        error: error instanceof Error ? error.message : String(error),
+        blockers: [message],
+        error: message,
       };
     }
   },

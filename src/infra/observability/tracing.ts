@@ -6,14 +6,18 @@
  * enabling automatic agent-level span creation (agent_run, tool_call, etc.)
  * with SensitiveDataFilter for redacting API keys from exported traces.
  *
- * Environment Variables (unchanged from raw OTEL setup):
+ * Environment Variables:
  * - OTEL_TRACING_ENABLED: Enable/disable tracing (default: false)
+ * - GORDON_TRACING_REVIEWED: Secondary explicit review gate required for export (default: false)
  * - OTEL_EXPORTER_OTLP_ENDPOINT: OTLP endpoint URL (default: https://api.axiom.co/v1/traces)
  * - OTEL_EXPORTER_OTLP_HEADERS: Auth headers (e.g. "Authorization=Bearer xxx,X-Axiom-Dataset=gordon-traces")
  * - OTEL_SERVICE_NAME: Service name for traces (default: gordon-trading)
+ *
+ * Tracing also follows the user's telemetry consent state from `/telemetry enable`.
  */
 
 import { createModuleLogger } from "../logger/index.ts";
+import { isEnabled as isTelemetryConsentEnabled } from "../telemetry/telemetry.ts";
 
 const logger = createModuleLogger("tracing");
 
@@ -26,6 +30,9 @@ export interface TracingConfig {
   endpoint: string;
   headers: Record<string, string>;
   enabled: boolean;
+  requested: boolean;
+  reviewed: boolean;
+  consentEnabled: boolean;
 }
 
 export interface SpanContext {
@@ -46,6 +53,8 @@ export interface TracingOptions {
 
 let tracingInitialized = false;
 let tracingConfig: TracingConfig | null = null;
+let tracingReviewWarningShown = false;
+let tracingConsentWarningShown = false;
 
 // Mastra instance for wiring observability to agents
 let _mastraInstance: import("@mastra/core").Mastra | null = null;
@@ -76,11 +85,17 @@ function parseOtlpHeaders(raw?: string): Record<string, string> {
  * Get tracing configuration from environment
  */
 export function getTracingConfig(): TracingConfig {
+  const requested = process.env.OTEL_TRACING_ENABLED === "true";
+  const reviewed = process.env.GORDON_TRACING_REVIEWED === "true";
+  const consentEnabled = isTelemetryConsentEnabled();
   return {
     serviceName: process.env.OTEL_SERVICE_NAME || "gordon-trading",
     endpoint: process.env.OTEL_EXPORTER_OTLP_ENDPOINT || "https://api.axiom.co/v1/traces",
     headers: parseOtlpHeaders(process.env.OTEL_EXPORTER_OTLP_HEADERS),
-    enabled: process.env.OTEL_TRACING_ENABLED === "true",
+    enabled: requested && reviewed && consentEnabled,
+    requested,
+    reviewed,
+    consentEnabled,
   };
 }
 
@@ -222,19 +237,54 @@ export function getMastraInstance(): import("@mastra/core").Mastra | null {
  *
  * Set these env vars to enable:
  *   OTEL_TRACING_ENABLED=true
+ *   GORDON_TRACING_REVIEWED=true
  *   OTEL_EXPORTER_OTLP_ENDPOINT=https://api.axiom.co/v1/traces
  *   OTEL_EXPORTER_OTLP_HEADERS=Authorization=Bearer <AXIOM_TOKEN>,X-Axiom-Dataset=gordon-traces
+ *
+ * The local install must also have telemetry consent enabled.
  */
 export async function initializeTracing(): Promise<void> {
-  if (tracingInitialized) {
+  const nextConfig = getTracingConfig();
+  const hadMastraInstance = _mastraInstance !== null;
+  const configChanged = !tracingConfig
+    || tracingConfig.enabled !== nextConfig.enabled
+    || tracingConfig.requested !== nextConfig.requested
+    || tracingConfig.reviewed !== nextConfig.reviewed
+    || tracingConfig.consentEnabled !== nextConfig.consentEnabled
+    || tracingConfig.serviceName !== nextConfig.serviceName
+    || tracingConfig.endpoint !== nextConfig.endpoint
+    || JSON.stringify(tracingConfig.headers) !== JSON.stringify(nextConfig.headers);
+
+  if (hadMastraInstance && configChanged) {
+    await shutdownTracing();
+  } else if (tracingInitialized && !configChanged) {
     logger.debug("Tracing already initialized");
     return;
   }
 
-  tracingConfig = getTracingConfig();
+  tracingConfig = nextConfig;
 
   if (!tracingConfig.enabled) {
-    logger.debug("Tracing disabled (set OTEL_TRACING_ENABLED=true to enable)");
+    if (tracingConfig.requested && !tracingConfig.reviewed && !tracingReviewWarningShown) {
+      logger.warn(
+        "OTEL tracing was requested but remains disabled until GORDON_TRACING_REVIEWED=true is set.",
+      );
+      tracingReviewWarningShown = true;
+    } else if (
+      tracingConfig.requested
+      && tracingConfig.reviewed
+      && !tracingConfig.consentEnabled
+      && !tracingConsentWarningShown
+    ) {
+      logger.warn(
+        "OTEL tracing was requested and reviewed, but remains blocked until telemetry consent is enabled.",
+      );
+      tracingConsentWarningShown = true;
+    } else {
+      logger.debug(
+        "Tracing disabled (set OTEL_TRACING_ENABLED=true, GORDON_TRACING_REVIEWED=true, and enable telemetry consent to export)",
+      );
+    }
     tracingInitialized = true;
     return;
   }

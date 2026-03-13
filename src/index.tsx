@@ -114,6 +114,12 @@ import React from "react";
 import { render } from "ink";
 import { AppWithTheme } from "./app/index.ts";
 import { closeDatabase } from "./infra/storage/database.ts";
+import { emitEvent } from "./events/index.ts";
+import { loadConfig } from "./infra/storage/config.ts";
+import {
+  initializeStructuredAxiom,
+  shutdownStructuredAxiom,
+} from "./infra/observability/index.ts";
 import * as telemetry from "./infra/telemetry/index.ts";
 import { disconnectMCP } from "./infra/mcp/client.ts";
 
@@ -153,6 +159,12 @@ async function gracefulShutdown(signal: string, code: number = 0): Promise<void>
   }
 
   try {
+    await shutdownStructuredAxiom();
+  } catch {
+    // Non-critical
+  }
+
+  try {
     await disconnectMCP();
   } catch {
     // Non-critical
@@ -186,6 +198,14 @@ process.on("unhandledRejection", (reason, promise) => {
 
 // Initialize telemetry (no-op if not opted in)
 telemetry.init();
+initializeStructuredAxiom();
+
+try {
+  const startupConfig = await loadConfig();
+  await emitEvent("system:started", { mode: startupConfig.mode });
+} catch {
+  // Non-critical startup observability path
+}
 
 // Render the application with theme support
 process.env.GORDON_APP_READY = "1";

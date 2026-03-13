@@ -5,6 +5,11 @@ import { getProviderCredentialStatuses, type ProviderCredentialStatus } from "..
 import { BROKER_ENV_MAP, type BrokerId } from "../infra/broker/types.ts";
 import { EXCHANGE_ENV_MAP, type ExchangeId } from "../infra/exchange/types.ts";
 import { pluginInstaller } from "../infra/mcp/marketplace/installer.ts";
+import {
+  getStructuredAxiomPrivacyStatus,
+  getTracingConfig,
+  recordStructuredObservation,
+} from "../infra/observability/index.ts";
 import { getExecutionVenueMetadata, getIntegrationSurfaceMetadata } from "../infra/integrations/index.ts";
 import type {
   GordonConfig,
@@ -36,6 +41,14 @@ export interface DoctorReport {
     keyringAvailable: boolean;
     installedMcpPlugins: number;
     enabledMcpPlugins: number;
+    structuredAxiomRequested: boolean;
+    structuredAxiomEnabled: boolean;
+    structuredAxiomConsentEnabled: boolean;
+    structuredAxiomHashSaltConfigured: boolean;
+    tracingEnabled: boolean;
+    tracingRequested: boolean;
+    tracingReviewed: boolean;
+    tracingConsentEnabled: boolean;
   };
   checks: DoctorCheck[];
   providerStatuses: ProviderCredentialStatus[];
@@ -368,6 +381,16 @@ export async function collectDoctorReport(configInput?: GordonConfig): Promise<D
   const keyring = createKeyringProvider();
   const keyringAvailable = await keyring.isAvailable();
   const providerStatuses = await getProviderCredentialStatuses(config);
+  const structuredPrivacy = getStructuredAxiomPrivacyStatus();
+  const tracingConfig = getTracingConfig();
+  const structuredRequested = envStatus.hasStructuredAxiomEnabled || structuredPrivacy.requested;
+  const structuredConsentEnabled = structuredPrivacy.consentEnabled;
+  const structuredEnabled = structuredRequested && structuredConsentEnabled;
+  const structuredHashSaltConfigured = envStatus.hasAxiomHashSalt || structuredPrivacy.hashSaltConfigured;
+  const tracingRequested = envStatus.tracingRequested || tracingConfig.requested;
+  const tracingReviewed = envStatus.tracingReviewed || tracingConfig.reviewed;
+  const tracingConsentEnabled = tracingConfig.consentEnabled;
+  const tracingEnabled = tracingRequested && tracingReviewed && tracingConsentEnabled;
 
   let installedMcpPlugins = 0;
   let enabledMcpPlugins = 0;
@@ -437,6 +460,30 @@ export async function collectDoctorReport(configInput?: GordonConfig): Promise<D
       severity: installedMcpPlugins > 0 ? "info" : "info",
       message: `${enabledMcpPlugins}/${installedMcpPlugins} ${getIntegrationSurfaceMetadata("gordon_mcp").displayName} plugins are enabled.`,
     },
+    {
+      id: "axiom_privacy",
+      ok: !structuredEnabled || structuredHashSaltConfigured,
+      severity: !structuredEnabled || structuredHashSaltConfigured ? "info" : "warn",
+      message: !structuredRequested
+        ? "Structured Axiom export is disabled unless GORDON_AXIOM_STRUCTURED_ENABLED=true."
+        : !structuredConsentEnabled
+          ? "Structured Axiom export is configured but blocked until telemetry consent is enabled."
+        : structuredHashSaltConfigured
+          ? "Structured Axiom export is enabled with GORDON_AXIOM_HASH_SALT configured."
+          : "Structured Axiom export is enabled without GORDON_AXIOM_HASH_SALT. Configure a salt before collecting tester data.",
+    },
+    {
+      id: "otel_review",
+      ok: !tracingRequested || (tracingReviewed && tracingConsentEnabled),
+      severity: !tracingRequested || tracingReviewed ? "info" : "warn",
+      message: !tracingRequested
+        ? "OTEL tracing is disabled by default."
+        : !tracingReviewed
+          ? "OTEL tracing was requested but is blocked until GORDON_TRACING_REVIEWED=true is set."
+        : tracingConsentEnabled
+          ? "OTEL tracing review gate is acknowledged."
+          : "OTEL tracing is reviewed but blocked until telemetry consent is enabled.",
+    },
   ];
 
   const nextActions: string[] = [];
@@ -447,10 +494,22 @@ export async function collectDoctorReport(configInput?: GordonConfig): Promise<D
   if (config.agentRails.walletProviders.length === 0 && config.agentRails.chainProviders.length === 0 && config.agentRails.paymentProviders.length === 0) {
     nextActions.push("Use `gordon configure rails` if you want MoonPay, Helius, or Polygon x402 integrated natively.");
   }
+  if (structuredEnabled && !structuredHashSaltConfigured) {
+    nextActions.push("Set `GORDON_AXIOM_HASH_SALT` before collecting structured Axiom telemetry from external testers.");
+  }
+  if (structuredRequested && !structuredConsentEnabled) {
+    nextActions.push("Run `/telemetry enable` if you want structured Axiom export to activate for this install.");
+  }
+  if (tracingRequested && !tracingReviewed) {
+    nextActions.push("Keep OTEL tracing disabled or explicitly acknowledge review with `GORDON_TRACING_REVIEWED=true` after checking trace payloads.");
+  }
+  if (tracingRequested && tracingReviewed && !tracingConsentEnabled) {
+    nextActions.push("Run `/telemetry enable` if you want reviewed OTEL tracing to activate for this install.");
+  }
 
   const healthy = checks.every((check) => check.ok || check.severity === "info");
 
-  return {
+  const report: DoctorReport = {
     generatedAt: new Date().toISOString(),
     healthy,
     summary: {
@@ -463,11 +522,61 @@ export async function collectDoctorReport(configInput?: GordonConfig): Promise<D
       keyringAvailable,
       installedMcpPlugins,
       enabledMcpPlugins,
+      structuredAxiomRequested: structuredRequested,
+      structuredAxiomEnabled: structuredEnabled,
+      structuredAxiomConsentEnabled: structuredConsentEnabled,
+      structuredAxiomHashSaltConfigured: structuredHashSaltConfigured,
+      tracingEnabled,
+      tracingRequested,
+      tracingReviewed,
+      tracingConsentEnabled,
     },
     checks,
     providerStatuses,
     nextActions,
   };
+
+  recordStructuredObservation({
+    eventType: "ops.doctor_report_generated",
+    workflow: "ops",
+    source: "doctor",
+    component: "setup_runtime",
+    outcome: healthy ? "success" : "failure",
+    status: healthy ? "healthy" : "needs_attention",
+    exchange: activeExchange?.type ?? undefined,
+    broker: activeBroker?.type ?? undefined,
+    healthy,
+    actionCount: checks.length,
+    missingCount: providerStatuses.filter((status) => !status.ready).length,
+    details: {
+      onboardingComplete: report.summary.onboardingComplete,
+      llmReady: report.summary.llmReady,
+      startupBannerMode: report.summary.startupBannerMode,
+      keyringEnabled: report.summary.keyringEnabled,
+      keyringAvailable: report.summary.keyringAvailable,
+      installedMcpPlugins: report.summary.installedMcpPlugins,
+      enabledMcpPlugins: report.summary.enabledMcpPlugins,
+      structuredAxiomRequested: structuredRequested,
+      structuredAxiomEnabled: structuredEnabled,
+      structuredAxiomConsentEnabled: structuredConsentEnabled,
+      structuredHashSaltConfigured,
+      tracingEnabled,
+      tracingRequested,
+      tracingReviewed,
+      tracingConsentEnabled,
+      failingChecks: checks.filter((check) => !check.ok).map((check) => check.id),
+      blockedProviders: providerStatuses
+        .filter((status) => !status.ready)
+        .map((status) => ({
+          providerId: status.providerId,
+          providerKind: status.providerKind,
+          missing: status.missing,
+        })),
+      nextActions,
+    },
+  });
+
+  return report;
 }
 
 export function formatDoctorReport(report: DoctorReport): string {
@@ -483,6 +592,8 @@ export function formatDoctorReport(report: DoctorReport): string {
     `Active broker: ${report.summary.activeBroker ?? "none"}`,
     `Keyring: ${report.summary.keyringEnabled ? "enabled" : "disabled"} (${report.summary.keyringAvailable ? "available" : "unavailable"})`,
     `MCP plugins: ${report.summary.enabledMcpPlugins}/${report.summary.installedMcpPlugins} enabled`,
+    `Structured Axiom: ${report.summary.structuredAxiomRequested ? (report.summary.structuredAxiomEnabled ? (report.summary.structuredAxiomHashSaltConfigured ? "enabled" : "enabled (hash salt missing)") : "requested but blocked by telemetry consent") : "disabled"}`,
+    `OTEL tracing: ${report.summary.tracingRequested ? (!report.summary.tracingReviewed ? "requested but blocked by review gate" : report.summary.tracingEnabled ? "enabled/reviewed" : "reviewed but blocked by telemetry consent") : "disabled"}`,
     "",
     "**Checks**",
   ];
@@ -617,6 +728,36 @@ export async function applyBootstrap(options: BootstrapOptions): Promise<Bootstr
   if (options.runDoctor) {
     result.doctor = await collectDoctorReport(config);
   }
+
+  recordStructuredObservation({
+    eventType: "setup.bootstrap_applied",
+    workflow: "setup",
+    source: "bootstrap",
+    component: "setup_runtime",
+    outcome: "success",
+    status: "completed",
+    exchange: options.exchange,
+    broker: options.broker,
+    provider: options.llmProvider,
+    selectedCount: [
+      options.solanaPrivateKey || options.solanaRpcUrl,
+      options.polkadotMnemonic || options.polkadotPrivateKey,
+      options.chainlinkApiKey || options.chainlinkApiSecret,
+      options.evmPrivateKey,
+      options.cdpApiKeyId || options.cdpApiKeySecret || options.cdpWalletSecret,
+      options.synthDataApiKey,
+    ].filter(Boolean).length,
+    details: {
+      profile: options.profile,
+      runDoctor: Boolean(options.runDoctor),
+      useKeyring: config.useKeyring,
+      savedEnvKeys: Object.keys(envKeys),
+      keyringStoredKeys,
+      onboardingComplete: config.onboardingComplete,
+      activeExchangeId: config.activeExchangeId,
+      activeBrokerId: config.activeBrokerId,
+    },
+  });
 
   return result;
 }

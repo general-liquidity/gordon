@@ -34,6 +34,7 @@ import {
 } from "../core/monitor.ts";
 import { runOrderRecovery } from "../core/order-recovery.ts";
 import { listTrades } from "../infra/storage/trades.ts";
+import { recordStructuredObservation } from "../infra/observability/index.ts";
 import { loadConfig, saveConfig } from "../infra/storage/config.ts";
 import { loadConfigBundle, type ConfigLayers } from "../infra/storage/config.ts";
 import {
@@ -902,6 +903,19 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
 
       const creds = resolveExchangeCredentials(active);
       exchangeRef.current = ExchangeFactory.create(active.type, creds);
+      recordStructuredObservation({
+        eventType: "provider.init_succeeded",
+        workflow: "setup",
+        source: "config_refresh",
+        component: "App",
+        outcome: "success",
+        status: "exchange_ready",
+        exchange: active.type,
+        details: {
+          providerKind: "exchange",
+          activeExchangeId: active.id,
+        },
+      });
 
       if ((active.type === "binance" || active.type === "binance_us") && creds.apiKey && creds.apiSecret) {
         const baseUrl = active.type === "binance_us" ? "https://api.binance.us" : undefined;
@@ -909,7 +923,19 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
       } else {
         binanceClientRef.current = null;
       }
-    } catch {
+    } catch (error) {
+      recordStructuredObservation({
+        eventType: "provider.init_failed",
+        workflow: "setup",
+        source: "config_refresh",
+        component: "App",
+        outcome: "failure",
+        status: "exchange_refresh_failed",
+        reason: error instanceof Error ? error.message : String(error),
+        details: {
+          providerKind: "exchange",
+        },
+      });
       // Exchange refresh failed — will retry on next config change
     }
   }, [refreshResolvedConfig]);
@@ -938,7 +964,33 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
       }
 
       brokerRef.current = BrokerFactory.create(active.type, creds);
-    } catch {
+      recordStructuredObservation({
+        eventType: "provider.init_succeeded",
+        workflow: "setup",
+        source: "config_refresh",
+        component: "App",
+        outcome: "success",
+        status: "broker_ready",
+        broker: active.type,
+        details: {
+          providerKind: "broker",
+          activeBrokerId: active.id,
+          paper: active.paper,
+        },
+      });
+    } catch (error) {
+      recordStructuredObservation({
+        eventType: "provider.init_failed",
+        workflow: "setup",
+        source: "config_refresh",
+        component: "App",
+        outcome: "failure",
+        status: "broker_refresh_failed",
+        reason: error instanceof Error ? error.message : String(error),
+        details: {
+          providerKind: "broker",
+        },
+      });
       // Broker refresh failed — will retry on next config change
     }
   }, [refreshResolvedConfig]);
@@ -1226,30 +1278,68 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
       // - If onboarding was completed before, show welcome
       // - Otherwise show onboarding
       let initialView: AppView;
+      let onboardingEntryReason = "first_run";
 
       if (requestedStartView === "doctor") {
         initialView = "doctor";
+        onboardingEntryReason = "requested_doctor";
       } else if (requestedStartView === "quickstart") {
         initialView = "quickstart";
+        onboardingEntryReason = "requested_quickstart";
       } else if (requestedStartView === "setup") {
         initialView = "setup";
+        onboardingEntryReason = "requested_setup";
       } else if (envStatus.hasLLMKey) {
         // Keys are already configured - skip onboarding entirely
         initialView = "welcome";
+        onboardingEntryReason = "env_llm_ready";
 
         // Mark onboarding as complete if it wasn't
         if (!config.onboardingComplete) {
           const updatedConfig = { ...config, onboardingComplete: true };
           configRef.current = updatedConfig;
           await saveConfig(updatedConfig);
+          recordStructuredObservation({
+            eventType: "setup.onboarding_auto_completed",
+            workflow: "setup",
+            source: "app_startup",
+            component: "App",
+            outcome: "success",
+            status: "auto_completed",
+            details: {
+              envFileExists: envStatus.fileExists,
+              requestedStartView: requestedStartView ?? null,
+            },
+          });
         }
       } else if (config.onboardingComplete) {
         // Onboarding was done but no keys - show welcome anyway
         initialView = "welcome";
+        onboardingEntryReason = "config_onboarding_complete";
       } else {
         // New user without keys - show onboarding
         initialView = "onboarding";
       }
+
+      recordStructuredObservation({
+        eventType: "setup.onboarding_entry_resolved",
+        workflow: "setup",
+        source: "app_startup",
+        component: "App",
+        outcome: "info",
+        status: initialView,
+        reason: onboardingEntryReason,
+        details: {
+          requestedStartView: requestedStartView ?? null,
+          requestedSetupMode,
+          requestedSetupSection: requestedSetupSection ?? null,
+          llmReady: envStatus.hasLLMKey,
+          onboardingComplete: config.onboardingComplete,
+          hasExchange: config.exchanges.length > 0,
+          hasBroker: config.brokers.length > 0,
+          envFileExists: envStatus.fileExists,
+        },
+      });
 
       // Initialize LLM client
       try {
@@ -3165,6 +3255,21 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
               const armedUntil = new Date(Date.now() + armHours * 60 * 60 * 1000).toISOString();
               configRef.current = { ...currentConfig, mode: "ARMED", armedUntil };
               await saveConfig(configRef.current);
+              recordStructuredObservation({
+                eventType: "system.armed",
+                workflow: "execution",
+                source: "app_slash_command",
+                component: "App",
+                outcome: "success",
+                status: "armed",
+                mode: "ARMED",
+                durationMs: armHours * 60 * 60 * 1000,
+                details: {
+                  command: command.name,
+                  armHours,
+                  armedUntil,
+                },
+              });
               setState((prev) => ({
                 ...prev,
                 mode: "ARMED",
@@ -3181,6 +3286,18 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
             } else {
               configRef.current = { ...currentConfig, mode: "SAFE", armedUntil: null };
               await saveConfig(configRef.current);
+              recordStructuredObservation({
+                eventType: "system.disarmed",
+                workflow: "execution",
+                source: "app_slash_command",
+                component: "App",
+                outcome: "success",
+                status: "disarmed",
+                mode: "SAFE",
+                details: {
+                  command: command.name,
+                },
+              });
               setState((prev) => ({
                 ...prev,
                 mode: "SAFE",
@@ -4440,6 +4557,14 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
   // Handle onboarding completion
   const handleOnboardingComplete = useCallback(
     async (selection: OnboardingSelection): Promise<void> => {
+      const hadLlmReady = Boolean(
+        process.env.OPENAI_API_KEY
+        || process.env.DEDALUS_API_KEY
+        || process.env.INCEPTION_API_KEY
+      );
+      const hadExchange = configRef.current.exchanges.length > 0;
+      const hadBroker = configRef.current.brokers.length > 0;
+
       // Update config with onboarding complete
       const updatedConfig: GordonConfig = {
         ...configRef.current,
@@ -4447,6 +4572,28 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
       };
       configRef.current = updatedConfig;
       await saveConfig(updatedConfig);
+
+      recordStructuredObservation({
+        eventType: "setup.onboarding_path_selected",
+        workflow: "setup",
+        source: "onboarding",
+        component: "App",
+        outcome: "success",
+        status: selection.mode,
+        details: {
+          selectionMode: selection.mode,
+          nextView:
+            selection.mode === "quickstart"
+              ? "quickstart"
+              : selection.mode === "advanced"
+                ? "setup"
+                : "chat",
+          onboardingCompleteBefore: false,
+          llmReadyBefore: hadLlmReady,
+          hasExchangeBefore: hadExchange,
+          hasBrokerBefore: hadBroker,
+        },
+      });
 
       if (selection.mode === "quickstart") {
         setState((prev) => ({
@@ -4493,10 +4640,30 @@ Try saying: "What's the market looking like today?"`,
   const handleSetupComplete = useCallback(async (): Promise<void> => {
     await loadEnvFile();
     await Promise.all([refreshActiveExchange(), refreshActiveBroker()]);
+    const hasExchangeLoaded = Boolean(exchangeRef.current);
+    const hasBrokerLoaded = Boolean(brokerRef.current);
 
     // Try to initialize LLM client with new keys
     try {
       llmClientRef.current = createLLMClientFromEnv();
+      recordStructuredObservation({
+        eventType: "setup.activation_completed",
+        workflow: "setup",
+        source: "setup_completion",
+        component: "App",
+        outcome: "success",
+        status: "activated",
+        provider: configRef.current.modelConfig?.provider ?? undefined,
+        model: configRef.current.modelConfig?.model ?? undefined,
+        exchange: exchangeRef.current?.exchangeId,
+        broker: brokerRef.current?.brokerId,
+        ready: true,
+        details: {
+          connectionStatus: "connected",
+          hasExchangeLoaded,
+          hasBrokerLoaded,
+        },
+      });
       setState((prev) => ({
         ...prev,
         view: "chat",
@@ -4519,6 +4686,25 @@ Try saying: "What's the market looking like today?" or "Find me a good BTC setup
       }));
     } catch (error) {
       console.error("Failed to initialize LLM client after setup:", error);
+      recordStructuredObservation({
+        eventType: "setup.activation_failed",
+        workflow: "setup",
+        source: "setup_completion",
+        component: "App",
+        outcome: "failure",
+        status: "llm_init_failed",
+        provider: configRef.current.modelConfig?.provider ?? undefined,
+        model: configRef.current.modelConfig?.model ?? undefined,
+        exchange: exchangeRef.current?.exchangeId,
+        broker: brokerRef.current?.brokerId,
+        ready: false,
+        reason: error instanceof Error ? error.message : String(error),
+        details: {
+          connectionStatus: "disconnected",
+          hasExchangeLoaded,
+          hasBrokerLoaded,
+        },
+      });
       setState((prev) => ({
         ...prev,
         view: "chat",
