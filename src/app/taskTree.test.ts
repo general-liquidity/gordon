@@ -64,4 +64,22 @@ describe("taskTree", () => {
 
     expect(cancelled.nodes.find((node) => node.kind === "request")?.status).toBe("cancelled");
   });
+
+  test("deduplicates repeated tool-start events while the same tool is already running", () => {
+    let tree = createTaskTree({ input: "Start autonomous mode" });
+    tree = recordTaskTreeToolStart(
+      tree,
+      "start_autonomous_mode",
+      { mandateId: "mandate_1", timeframe: "5m" },
+      "Gordon",
+    );
+    tree = recordTaskTreeToolStart(
+      tree,
+      "start_autonomous_mode",
+      { mandateId: "mandate_1", timeframe: "5m" },
+      "Gordon",
+    );
+
+    expect(tree.nodes.filter((node) => node.kind === "tool" && node.label === "Start Autonomous Mode")).toHaveLength(1);
+  });
 });

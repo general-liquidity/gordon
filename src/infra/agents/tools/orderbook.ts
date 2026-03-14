@@ -31,7 +31,7 @@ import { resolveInstrument } from "../../markets/instruments.ts";
 const errors = {
   noExchange: { error: "No active trading venue is connected. Please run setup first." },
   notArmed: (action: string) => ({
-    error: `System must be ARMED to ${action}. Use 'arm' command first.`,
+    error: `System must be ARMED to ${action}. Use /arm first.`,
   }),
 };
 
@@ -420,7 +420,7 @@ export const placeOCOOrderTool = createTool({
 
     if (ctx.config?.mode !== "ARMED") {
       return {
-        error: "System must be ARMED to place OCO orders. Use 'arm' command first.",
+        error: "System must be ARMED to place OCO orders. Use /arm first.",
         symbol,
         side,
         quantity,
@@ -526,7 +526,7 @@ export const cancelAllOrdersTool = createTool({
 
     if (ctx.config?.mode !== "ARMED") {
       return {
-        error: "System must be ARMED to cancel orders. Use 'arm' command first.",
+        error: "System must be ARMED to cancel orders. Use /arm first.",
         symbol,
       };
     }

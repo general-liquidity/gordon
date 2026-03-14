@@ -28,7 +28,7 @@ const errors = {
   noExchange: { error: "Exchange client not connected. Please run setup first." },
   binanceOnly: { error: "Wallet operations are currently supported only on Binance." },
   notArmed: (action: string) => ({
-    error: `System must be ARMED to ${action}. Use 'arm' command first.`,
+    error: `System must be ARMED to ${action}. Use /arm first.`,
   }),
 };
 

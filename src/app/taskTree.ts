@@ -245,6 +245,10 @@ function summarizeArgs(args?: Record<string, unknown>): string | undefined {
   return shorten(parts.join(" · "), 64);
 }
 
+function buildToolFingerprint(agentNodeId: string, toolName: string, detail?: string): string {
+  return `${agentNodeId}::${toolName}::${detail ?? ""}`;
+}
+
 function getPrimaryFamily(actionId?: string): TaskFamily {
   if (actionId && ACTION_FAMILIES[actionId]) {
     return ACTION_FAMILIES[actionId];
@@ -383,14 +387,31 @@ export function recordTaskTreeToolStart(
   let agentNode: TaskTreeNode;
   [next, agentNode] = ensureAgentNode(next, familyNode, resolvedAgentName);
   next = markNodeStatus(next, agentNode.id, "running");
+  const toolDetail = summarizeArgs(args);
+  const toolFingerprint = buildToolFingerprint(agentNode.id, toolName, toolDetail);
+  const existingRunningTool = [...next.nodes]
+    .reverse()
+    .find((node) => (
+      node.kind === "tool"
+      && node.parentId === agentNode.id
+      && node.status === "running"
+      && node.meta?.toolFingerprint === toolFingerprint
+    ));
+
+  if (existingRunningTool) {
+    return {
+      ...next,
+      currentAgentName: resolvedAgentName,
+    };
+  }
 
   const toolNode = createNode(
     "tool",
     humanizeIdentifier(toolName),
     "running",
     agentNode.id,
-    summarizeArgs(args),
-    { toolName },
+    toolDetail,
+    { toolName, toolFingerprint },
   );
 
   return {

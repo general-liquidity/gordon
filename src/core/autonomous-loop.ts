@@ -6,7 +6,7 @@
 import { createModuleLogger } from "../infra/logger/index.ts";
 import { emitEvent } from "../events/index.ts";
 import type { Exchange } from "../infra/exchange/index.ts";
-import type { SwingMandate } from "./swing-mandate.ts";
+import type { MandateTimeframe, SwingMandate } from "./swing-mandate.ts";
 import {
   saveSessionState,
   updateHeartbeat,
@@ -95,6 +95,32 @@ let loopState: LoopState = {
 };
 let cycleInFlight: Promise<CycleReport | null> | null = null;
 
+function getMandateScanTimeframes(mandate: SwingMandate): string[] {
+  const timeframes: MandateTimeframe[] = [
+    mandate.executionTimeframe ?? mandate.timeframe,
+    mandate.trendTimeframe,
+    mandate.timeframe,
+  ].filter((timeframe): timeframe is MandateTimeframe => timeframe !== undefined);
+
+  return Array.from(new Set(timeframes));
+}
+
+function resolveOpportunityDirection(
+  mandate: SwingMandate,
+  opportunity: Pick<CoinAnalysis, "bias" | "trend">,
+): "long" | "short" {
+  if (mandate.direction !== "both") {
+    return mandate.direction;
+  }
+
+  const biasText = `${opportunity.bias ?? ""} ${opportunity.trend ?? ""}`.toLowerCase();
+  if (biasText.includes("bear") || biasText.includes("short") || biasText.includes("down")) {
+    return "short";
+  }
+
+  return "long";
+}
+
 function runCycleSafely(trigger: "startup" | "interval" | "manual"): Promise<CycleReport | null> {
   if (!loopState.isRunning) {
     return Promise.resolve(null);
@@ -166,14 +192,15 @@ async function runCycle(): Promise<CycleReport | null> {
   logger.info(`Running autonomous cycle #${cycleNum}`, {
     mandateId: mandate.id,
     symbols: mandate.symbols.length || "all",
-    timeframe: mandate.timeframe,
+    timeframe: mandate.executionTimeframe ?? mandate.timeframe,
+    trendTimeframe: mandate.trendTimeframe,
   });
 
   try {
     // Run scanner
     const scanOptions: ScanOptions = {
       topN: mandate.symbols.length > 0 ? mandate.symbols.length : 50,
-      timeframes: [mandate.timeframe],
+      timeframes: getMandateScanTimeframes(mandate),
     };
 
     const result = await runSharedScan(exchange, scanOptions);
@@ -201,10 +228,10 @@ async function runCycle(): Promise<CycleReport | null> {
     for (const opp of opportunities) {
       const report: OpportunityReport = {
         symbol: opp.symbol,
-        direction: mandate.direction === "both" ? "long" : mandate.direction,
+        direction: resolveOpportunityDirection(mandate, opp),
         confidence: opp.setupConfidence,
         strategy: opp.bias || "unknown",
-        reason: `${opp.trend} trend, confidence ${(opp.setupConfidence * 100).toFixed(0)}%`,
+        reason: `${opp.trend} trend on ${mandate.executionTimeframe ?? mandate.timeframe}, confidence ${(opp.setupConfidence * 100).toFixed(0)}%`,
       };
 
       if (onOpportunityFound) {
@@ -290,7 +317,7 @@ export function startAutonomousLoop(config: AutonomousLoopConfig): { success: bo
       intervalMs,
       topN: config.mandate.symbols.length || 50,
       minConfidence: config.mandate.minConfidence,
-      timeframes: [config.mandate.timeframe],
+      timeframes: getMandateScanTimeframes(config.mandate),
     },
     mandateId: config.mandate.id,
     scanCount: 0,

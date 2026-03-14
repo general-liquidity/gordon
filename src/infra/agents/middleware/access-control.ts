@@ -118,10 +118,9 @@ const TRADING_TOOLS = new Set([
 ]);
 
 /**
- * Tools that modify system state (require ARMED for safety)
+ * Tools that modify execution state after arming
  */
 const STATE_MODIFYING_TOOLS = new Set([
-  "arm_system",
   "approve_plan",
 ]);
 
@@ -140,7 +139,7 @@ async function evaluateArmedModeRequirement(
 ): Promise<AccessControlResult> {
   // Check if system is in ARMED mode
   if (currentConfig.mode !== "ARMED") {
-    const reason = `System is in SAFE mode. Cannot execute ${toolName}. Use 'arm' command to enable trading.`;
+    const reason = `System is in SAFE mode. Cannot execute ${toolName}. Use /arm to enable trading.`;
 
     logger.warn("Access denied - system not armed", { toolName, mode: currentConfig.mode });
 
@@ -259,8 +258,10 @@ export async function checkToolAccess(
   config?: GordonConfig,
   userId: string = "unknown"
 ): Promise<AccessControlResult> {
-  // Load config if not provided
-  const currentConfig = config ?? await loadConfig();
+  const requiresFreshResolvedConfig = TRADING_TOOLS.has(toolName) || STATE_MODIFYING_TOOLS.has(toolName);
+  const currentConfig = requiresFreshResolvedConfig
+    ? await resolveAccessControlConfig(config)
+    : config ?? await loadConfig();
 
   // Non-trading tools are always allowed
   if (!TRADING_TOOLS.has(toolName) && !STATE_MODIFYING_TOOLS.has(toolName)) {
@@ -279,8 +280,20 @@ export async function checkExplicitExecutionAccess(
   config?: GordonConfig,
   userId: string = "unknown",
 ): Promise<AccessControlResult> {
-  const currentConfig = config ?? await loadConfig();
+  const currentConfig = await resolveAccessControlConfig(config);
   return evaluateArmedModeRequirement(toolName, currentConfig, userId);
+}
+
+async function resolveAccessControlConfig(config?: GordonConfig): Promise<GordonConfig> {
+  try {
+    return await loadConfig();
+  } catch {
+    if (config) {
+      return config;
+    }
+
+    throw new Error("Unable to resolve current Gordon config for access control.");
+  }
 }
 
 // ============================================================================

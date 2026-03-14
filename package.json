@@ -1,6 +1,6 @@
 {
   "name": "@general-liquidity/gordon-cli",
-  "version": "0.8.18",
+  "version": "0.8.19",
   "private": true,
   "description": "The Frontier Trading Agent",
   "author": "General Liquidity, Inc.",

@@ -485,7 +485,7 @@ export const placeBracketOrderTool = createTool({
 
     if (ctx.config?.mode !== "ARMED") {
       return {
-        error: "System must be ARMED to place bracket orders. Use 'arm' command first.",
+        error: "System must be ARMED to place bracket orders. Use /arm first.",
         symbol,
         side,
         quantity,

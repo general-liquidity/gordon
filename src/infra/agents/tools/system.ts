@@ -39,6 +39,9 @@ export const testConnectionTool = createTool({
     "Use when user asks 'test connection', 'check API', 'are my keys working?'",
   inputSchema: z.object({}),
   outputSchema: z.object({
+    mode: z.enum(["ARMED", "SAFE"]),
+    isArmed: z.boolean(),
+    armedUntil: z.string().nullable(),
     llmConnected: z.boolean(),
     binanceConnected: z.boolean(),
     binancePermissions: z.object({
@@ -62,6 +65,9 @@ export const testConnectionTool = createTool({
     // Context is extracted from Mastra's RequestContext
     const ctx = getGordonContext(execContext);
     const results: {
+      mode: "ARMED" | "SAFE";
+      isArmed: boolean;
+      armedUntil: string | null;
       llmConnected: boolean;
       binanceConnected: boolean;
       binancePermissions?: { read: boolean; spotTrade: boolean; withdraw: boolean } | null;
@@ -73,12 +79,24 @@ export const testConnectionTool = createTool({
       assetList?: Array<{ asset: string; free: number; locked: number }>;
       error: string | null;
     } = {
+      mode: "SAFE",
+      isArmed: false,
+      armedUntil: null,
       llmConnected: !!ctx?.llm,
       binanceConnected: false,
       binancePermissions: null,
       accountType: null,
       error: null,
     };
+
+    const config = await loadConfig().catch(() => null);
+    if (config) {
+      results.mode = config.mode;
+      results.armedUntil = config.armedUntil;
+      results.isArmed = config.mode === "ARMED"
+        && !!config.armedUntil
+        && new Date(config.armedUntil).getTime() > Date.now();
+    }
 
     if (!ctx?.exchange) {
       results.error = "Exchange client not initialized. Check your API keys in settings.";

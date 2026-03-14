@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import {
+  getResolvedConfigWriteScope,
   mergeConfigRecords,
   normalizeWorkspaceConfigPayload,
 } from "./config.ts";
@@ -63,5 +64,31 @@ describe("config layering helpers", () => {
         mode: "SAFE",
       },
     });
+  });
+
+  it("writes to the highest-precedence active config layer", () => {
+    expect(getResolvedConfigWriteScope({
+      activeProfile: null,
+      sources: ["global"],
+      globalPath: "global.json",
+      workspacePath: ".gordonrc",
+      profilePath: null,
+    })).toBe("global");
+
+    expect(getResolvedConfigWriteScope({
+      activeProfile: "swing",
+      sources: ["global", "profile"],
+      globalPath: "global.json",
+      workspacePath: ".gordonrc",
+      profilePath: "profiles/swing.json",
+    })).toBe("profile");
+
+    expect(getResolvedConfigWriteScope({
+      activeProfile: "workspace-profile",
+      sources: ["global", "profile", "workspace"],
+      globalPath: "global.json",
+      workspacePath: ".gordonrc",
+      profilePath: "profiles/workspace-profile.json",
+    })).toBe("workspace");
   });
 });

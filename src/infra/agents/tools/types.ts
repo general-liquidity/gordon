@@ -74,7 +74,7 @@ export const errors = {
   noLLM: { error: "LLM client not connected." },
   noContext: { error: "Context not available." },
   notArmed: (action: string) => ({
-    error: `System must be ARMED to ${action}. Use 'arm' command first.`,
+    error: `System must be ARMED to ${action}. Use /arm first.`,
   }),
   insufficientData: (symbol: string) => ({
     error: `Insufficient data for ${symbol}. Need at least 50 candles.`,

@@ -21,6 +21,10 @@ export interface ResolvedConfigResult {
   layers: ConfigLayers;
 }
 
+export interface SaveResolvedConfigOptions {
+  profileName?: string | null;
+}
+
 interface WorkspaceConfigPayload {
   profile?: string | null;
   overrides: Record<string, unknown>;
@@ -96,6 +100,18 @@ export function normalizeWorkspaceConfigPayload(raw: unknown): WorkspaceConfigPa
     profile: typeof profile === "string" && profile.trim().length > 0 ? profile.trim() : null,
     overrides: rest,
   };
+}
+
+export function getResolvedConfigWriteScope(layers: ConfigLayers): ConfigScope {
+  if (layers.sources.includes("workspace")) {
+    return "workspace";
+  }
+
+  if (layers.activeProfile) {
+    return "profile";
+  }
+
+  return "global";
 }
 
 function getProfilePath(profileName: string): string {
@@ -257,4 +273,16 @@ export async function saveConfig(
   }
 
   await Bun.write(CONFIG_PATH, JSON.stringify(validated, null, 2));
+}
+
+export async function saveResolvedConfig(
+  config: GordonConfig,
+  layers: ConfigLayers,
+  options?: SaveResolvedConfigOptions,
+): Promise<void> {
+  await saveConfig(
+    config,
+    getResolvedConfigWriteScope(layers),
+    { profileName: options?.profileName ?? layers.activeProfile },
+  );
 }

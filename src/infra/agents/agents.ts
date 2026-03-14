@@ -1520,7 +1520,7 @@ function getExecutorAgent(): Agent {
       description:
         "Specialist in executing trades, placing orders, and managing positions. " +
         "Use when user wants to execute a plan, place a market or limit order, " +
-        "swap/convert crypto, buy or sell a symbol, cancel an order, or arm the system.",
+        "swap/convert crypto, buy or sell a symbol, cancel an order, or explicitly use /arm or /disarm.",
       instructions: withRuntimeGrounding("executor", EXECUTOR_INSTRUCTIONS),
       model: resolveRuntimeModel,
       tools: {

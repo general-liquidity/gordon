@@ -26,7 +26,7 @@ import { PlanSchema } from "../../../types/plan.ts";
 import { TradeSchema } from "../../../types/trade.ts";
 import { emitEvent } from "../../../events/index.ts";
 import { recordStructuredObservation } from "../../observability/index.ts";
-import { loadConfig, saveConfig } from "../../storage/config.ts";
+import { loadConfigBundle, saveResolvedConfig } from "../../storage/config.ts";
 import { listPlans, getPlan, updatePlan, createPlan } from "../../storage/plans.ts";
 import { listTrades, getTrade } from "../../storage/trades.ts";
 import { getGordonContext, normalizeSymbol, validateToolOutput, type MastraExecutionContext } from "./types.ts";
@@ -335,11 +335,11 @@ export const executePlanTool = createTool({
         mode: ctx.config.mode,
         planId,
         symbol: plan.symbol,
-        reason: "Cannot execute: System is in SAFE mode. User must arm the system first.",
+        reason: "Cannot execute: System is in SAFE mode. Use /arm to enable trading first.",
       });
       return validateToolOutput(executePlanOutputSchema, {
         success: false,
-        error: "Cannot execute: System is in SAFE mode. User must arm the system first.",
+        error: "Cannot execute: System is in SAFE mode. Use /arm to enable trading first.",
       }, { toolName: "execute_plan" });
     }
 
@@ -618,7 +618,8 @@ export const armSystemTool = createTool({
   id: "arm_system",
   description:
     "Arm or disarm the trading system. When armed, Gordon can execute trades. " +
-    "Use when user says 'arm' or 'enable trading' or 'disarm' or 'disable trading'",
+    "Prefer the explicit slash commands /arm and /disarm in the terminal UI. " +
+    "Use this tool only when the user has clearly requested a mode change.",
   inputSchema: z.object({
     action: z.enum(["arm", "disarm"]).describe("Whether to arm or disarm"),
     hours: z
@@ -630,13 +631,14 @@ export const armSystemTool = createTool({
   }),
   outputSchema: armSystemOutputSchema,
   execute: async ({ action, hours }) => {
-    const config = await loadConfig();
+    const resolved = await loadConfigBundle();
+    const config = resolved.config;
 
     if (action === "arm") {
       const armHours = Math.min(hours ?? 24, 24);
       const armedUntil = new Date(Date.now() + armHours * 60 * 60 * 1000).toISOString();
 
-      await saveConfig({ ...config, mode: "ARMED", armedUntil });
+      await saveResolvedConfig({ ...config, mode: "ARMED", armedUntil }, resolved.layers);
       recordStructuredObservation({
         eventType: "system.armed",
         workflow: "execution",
@@ -660,7 +662,7 @@ export const armSystemTool = createTool({
         message: `System armed for ${armHours} hours. Trading enabled.`,
       }, { toolName: "arm_system" });
     } else {
-      await saveConfig({ ...config, mode: "SAFE", armedUntil: null });
+      await saveResolvedConfig({ ...config, mode: "SAFE", armedUntil: null }, resolved.layers);
       recordStructuredObservation({
         eventType: "system.disarmed",
         workflow: "execution",

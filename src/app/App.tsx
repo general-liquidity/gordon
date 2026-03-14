@@ -35,7 +35,7 @@ import {
 import { runOrderRecovery } from "../core/order-recovery.ts";
 import { listTrades } from "../infra/storage/trades.ts";
 import { recordStructuredObservation } from "../infra/observability/index.ts";
-import { loadConfig, saveConfig } from "../infra/storage/config.ts";
+import { getResolvedConfigWriteScope, loadConfig, saveConfig, saveResolvedConfig } from "../infra/storage/config.ts";
 import { loadConfigBundle, type ConfigLayers } from "../infra/storage/config.ts";
 import {
   runSharedMonitorCycle,
@@ -155,6 +155,8 @@ import {
   type ActionLogEntryType,
 } from "../infra/action-log/index.ts";
 import { rebuildACEMemoryForThread } from "../infra/agents/aceMemory.ts";
+import { getArmedStatus } from "../infra/agents/middleware/access-control.ts";
+import { parseSystemShortcut } from "./systemCommandShortcuts.ts";
 
 type AppView =
   | "loading"
@@ -1173,7 +1175,7 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
   }, []);
 
   const getSystemStatusSummary = useCallback(async (): Promise<string> => {
-    const config = configRef.current;
+    const armedStatus = await getArmedStatus();
     const exchangeStatus = await handleExchangeCommand("status");
     const brokerStatus = await handleBrokerCommand("status");
     const keyringStatus = await handleKeyringCommand("status");
@@ -1181,7 +1183,10 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
     return [
       "**Gordon Status**",
       "",
-      `Mode: ${config.mode === "ARMED" ? "Live enabled" : "Read-only"}`,
+      `Mode: ${armedStatus.isArmed ? "Live enabled" : "Read-only"}`,
+      `Effective config mode: ${armedStatus.mode}`,
+      `Armed until: ${armedStatus.armedUntil ?? "Not armed"}`,
+      `Remaining armed time: ${armedStatus.remainingTime ?? "Not armed"}`,
       `Exchange route: ${exchangeRef.current ? exchangeRef.current.exchangeId : "none"}`,
       `Broker route: ${brokerRef.current ? brokerRef.current.displayName : "none"}`,
       "",
@@ -1192,6 +1197,77 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
       keyringStatus.message,
     ].join("\n");
   }, []);
+
+  const applySystemMode = useCallback(async (
+    submittedValue: string,
+    action: "arm" | "disarm",
+  ): Promise<void> => {
+    const userMessage: ChatMessage = {
+      role: "user",
+      content: submittedValue.trim(),
+      timestamp: formatTimestamp(),
+    };
+
+    setState((prev) => ({ ...prev, messages: [...prev.messages, userMessage], isLoading: true }));
+
+    try {
+      const resolved = await loadConfigBundle();
+      const armHours = 24;
+      const armedUntil = action === "arm"
+        ? new Date(Date.now() + armHours * 60 * 60 * 1000).toISOString()
+        : null;
+      const nextConfig: GordonConfig = {
+        ...resolved.config,
+        mode: action === "arm" ? "ARMED" : "SAFE",
+        armedUntil,
+      };
+
+      await saveResolvedConfig(nextConfig, resolved.layers);
+      configRef.current = nextConfig;
+      const refreshedConfig = await refreshResolvedConfig();
+
+      recordStructuredObservation({
+        eventType: action === "arm" ? "system.armed" : "system.disarmed",
+        workflow: "execution",
+        source: "app_command",
+        component: "App",
+        outcome: "success",
+        status: action === "arm" ? "armed" : "disarmed",
+        mode: refreshedConfig.mode,
+        ...(armedUntil ? { durationMs: armHours * 60 * 60 * 1000 } : {}),
+        details: {
+          command: submittedValue.trim(),
+          armedUntil,
+          writeScope: getResolvedConfigWriteScope(resolved.layers),
+        },
+      });
+
+      setState((prev) => ({
+        ...prev,
+        mode: refreshedConfig.mode,
+        messages: [
+          ...prev.messages,
+          {
+            role: "gordon",
+            content: action === "arm"
+              ? `System **live enabled** for ${armHours} hours.\n\nI can now execute approved trade plans. I will still ask for your explicit confirmation before placing any order.\n\nTo return to read-only mode: \`/disarm\``
+              : "System **read-only**. Live order execution is disabled.",
+            timestamp: formatTimestamp(),
+          },
+        ],
+        isLoading: false,
+      }));
+    } catch (error) {
+      setState((prev) => ({
+        ...prev,
+        messages: [
+          ...prev.messages,
+          { role: "gordon", content: formatCommandError(action, error), timestamp: formatTimestamp() },
+        ],
+        isLoading: false,
+      }));
+    }
+  }, [formatCommandError, refreshResolvedConfig]);
 
   const getCacheSummary = useCallback(async (args: string): Promise<string> => {
     const action = args.trim().toLowerCase() || "stats";
@@ -1866,6 +1942,26 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
     const normalizedValue = queuedIntent?.submitValue ?? value.trim();
     if (!normalizedValue) return;
 
+    const parsedCommand = parseSlashCommand(normalizedValue);
+    if (!parsedCommand) {
+      const systemShortcut = parseSystemShortcut(normalizedValue);
+      if (systemShortcut === "status") {
+        await runLocalCommand(value, "status", async () => getSystemStatusSummary());
+        return;
+      }
+
+      if (systemShortcut === "arm" || systemShortcut === "disarm") {
+        const explanation = systemShortcut === "arm"
+          ? "Use `/arm` to enable live trading."
+          : "Use `/disarm` to return Gordon to read-only mode.";
+
+        await runLocalCommand(value, systemShortcut, async () => (
+          `${explanation}\n\nMode changes stay slash-only so Gordon does not mutate execution state from plain chat text.`
+        ));
+        return;
+      }
+    }
+
     setState((prev) => (
       prev.transcriptBottomOffset === 0 && !prev.showStartupHint
         ? prev
@@ -1877,7 +1973,6 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
     ));
 
     // Check for slash commands
-    const parsedCommand = parseSlashCommand(normalizedValue);
     let messageToSend = normalizedValue;
     let displayMessage = normalizedValue;
     let requestedActionId: string | undefined;
@@ -3248,70 +3343,7 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
             return;
           }
           case "arm_system": {
-            const currentConfig = await loadConfig();
-            const isArming = command.name === "arm";
-            if (isArming) {
-              const armHours = 24;
-              const armedUntil = new Date(Date.now() + armHours * 60 * 60 * 1000).toISOString();
-              configRef.current = { ...currentConfig, mode: "ARMED", armedUntil };
-              await saveConfig(configRef.current);
-              recordStructuredObservation({
-                eventType: "system.armed",
-                workflow: "execution",
-                source: "app_slash_command",
-                component: "App",
-                outcome: "success",
-                status: "armed",
-                mode: "ARMED",
-                durationMs: armHours * 60 * 60 * 1000,
-                details: {
-                  command: command.name,
-                  armHours,
-                  armedUntil,
-                },
-              });
-              setState((prev) => ({
-                ...prev,
-                mode: "ARMED",
-                messages: [
-                  ...prev.messages,
-                  userMessage,
-                  {
-                    role: "gordon",
-                    content: `System **live enabled** for ${armHours} hours.\n\nI can now execute approved trade plans. I will still ask for your explicit confirmation before placing any order.\n\nTo return to read-only mode: \`/disarm\``,
-                    timestamp: formatTimestamp(),
-                  },
-                ],
-              }));
-            } else {
-              configRef.current = { ...currentConfig, mode: "SAFE", armedUntil: null };
-              await saveConfig(configRef.current);
-              recordStructuredObservation({
-                eventType: "system.disarmed",
-                workflow: "execution",
-                source: "app_slash_command",
-                component: "App",
-                outcome: "success",
-                status: "disarmed",
-                mode: "SAFE",
-                details: {
-                  command: command.name,
-                },
-              });
-              setState((prev) => ({
-                ...prev,
-                mode: "SAFE",
-                messages: [
-                  ...prev.messages,
-                  userMessage,
-                  {
-                    role: "gordon",
-                    content: "System **read-only**. Live order execution is disabled.",
-                    timestamp: formatTimestamp(),
-                  },
-                ],
-              }));
-            }
+            await applySystemMode(value, command.name === "arm" ? "arm" : "disarm");
             return;
           }
           default:
@@ -3737,6 +3769,8 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
     state.portfolioValue,
     state.availableCash,
     state.messages,
+    applySystemMode,
+    getSystemStatusSummary,
     refreshActiveExchange,
     refreshActiveBroker,
     openChatWorkspace,
@@ -3744,6 +3778,7 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
     openShortcutsOverlay,
     appendCurrentActionLogEntry,
     resolveThreadFromQuery,
+    runLocalCommand,
     updateMessageByTimestamp,
     updateLastResultsFromTool,
   ]);
