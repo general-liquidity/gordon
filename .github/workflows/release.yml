@@ -34,9 +34,42 @@ jobs:
       - name: Run typecheck
         run: bun run typecheck
 
+  verify-npm-wrapper:
+    name: Verify npm Wrapper (${{ matrix.os }})
+    needs: test
+    runs-on: ${{ matrix.os }}
+    env:
+      GORDON_NPM_VERSION: ${{ github.ref_name }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+          - windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Prepare npm wrapper
+        run: npm run prepare:npm-wrapper
+
+      - name: Check npm wrapper
+        run: npm run check:npm-wrapper
+
+      - name: Smoke test npm wrapper
+        run: npm run smoke:npm-wrapper
+
   create-release:
     name: Create Release
-    needs: test
+    needs:
+      - test
+      - verify-npm-wrapper
     runs-on: ubuntu-latest
     steps:
       - name: Create or update GitHub Release
@@ -50,6 +83,7 @@ jobs:
     name: Build ${{ matrix.target }}
     needs:
       - test
+      - verify-npm-wrapper
       - create-release
     runs-on: ${{ matrix.os }}
     strategy:
@@ -175,30 +209,26 @@ jobs:
     name: Publish to npm
     needs: build
     runs-on: ubuntu-latest
+    env:
+      GORDON_NPM_VERSION: ${{ github.ref_name }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v1
-
-      - name: Install dependencies
-        run: bun install
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
 
       - name: Configure npm for scoped publish
         run: |
           echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" > ~/.npmrc
 
-      - name: Update package.json for publish
-        run: |
-          bun -e "
-            const pkg = await Bun.file('package.json').json();
-            pkg.name = '@general-liquidity/gordon-cli';
-            pkg.private = false;
-            await Bun.write('package.json', JSON.stringify(pkg, null, 2));
-          "
+      - name: Prepare npm wrapper
+        run: npm run prepare:npm-wrapper
 
       - name: Publish to npm
+        working-directory: npm
         run: npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

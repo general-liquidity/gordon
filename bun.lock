@@ -12,7 +12,6 @@
         "@coinbase/agentkit": "^0.10.4",
         "@inkjs/ui": "^2.0.0",
         "@libsql/client": "^0.6.0",
-        "@libsql/linux-x64-gnu": "^0.5.22",
         "@lightprotocol/compressed-token": "^0.22.0",
         "@lightprotocol/stateless.js": "^0.22.0",
         "@mastra/core": "^1.5.0",

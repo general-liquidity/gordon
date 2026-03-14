@@ -25,6 +25,11 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 # caches
 .eslintcache
 .cache
+.npm-cache
+.package-smoke
+npm/*.tgz
+npm/README.md
+npm/LICENSE
 *.tsbuildinfo
 
 # IntelliJ based IDEs

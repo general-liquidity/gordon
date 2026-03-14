@@ -1,6 +1,7 @@
 {
   "name": "@general-liquidity/gordon-cli",
-  "version": "0.8.17",
+  "version": "0.8.18",
+  "private": true,
   "description": "The Frontier Trading Agent",
   "author": "General Liquidity, Inc.",
   "license": "MIT",
@@ -26,6 +27,7 @@
   },
   "files": [
     "dist",
+    "scripts/patch-mastra.cjs",
     "prompts",
     "README.md",
     "LICENSE"
@@ -42,6 +44,9 @@
     "generate:actions-docs": "bun run scripts/generate-action-docs.ts",
     "test:broker-conformance": "bun test src/infra/broker/adapters/conformance.test.ts src/infra/broker/adapters/conformance.matrix.test.ts src/infra/broker/factory.extended.test.ts src/infra/broker/inclusion-gate.test.ts",
     "quality:brokers": "bun run scripts/broker-quality.ts --ci",
+    "prepare:npm-wrapper": "node scripts/prepare-npm-wrapper.cjs",
+    "check:npm-wrapper": "node scripts/check-npm-wrapper.cjs",
+    "smoke:npm-wrapper": "node scripts/smoke-npm-wrapper.cjs",
     "prepublishOnly": "bun run build",
     "test": "bun test",
     "typecheck": "tsc --noEmit",
@@ -65,7 +70,6 @@
     "@coinbase/agentkit": "^0.10.4",
     "@inkjs/ui": "^2.0.0",
     "@libsql/client": "^0.6.0",
-    "@libsql/linux-x64-gnu": "^0.5.22",
     "@lightprotocol/compressed-token": "^0.22.0",
     "@lightprotocol/stateless.js": "^0.22.0",
     "@mastra/core": "^1.5.0",

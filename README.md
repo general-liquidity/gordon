@@ -53,6 +53,7 @@ No dashboards. No charts. No complexity. Just vibes. 📈
 ```bash
 npm install -g @general-liquidity/gordon-cli
 ```
+Downloads the matching prebuilt binary for your platform during install.
 
 **bun**
 ```bash

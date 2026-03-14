@@ -1,0 +1,39 @@
+{
+  "name": "@general-liquidity/gordon-cli",
+  "version": "0.8.18",
+  "description": "The Frontier Trading Agent",
+  "author": "General Liquidity, Inc.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/general-liquidity/gordon-cli.git"
+  },
+  "homepage": "https://github.com/general-liquidity/gordon-cli#readme",
+  "bugs": "https://github.com/general-liquidity/gordon-cli/issues",
+  "keywords": [
+    "trading",
+    "crypto",
+    "ai",
+    "cli",
+    "binance",
+    "cryptocurrency",
+    "vibe-trading"
+  ],
+  "bin": {
+    "gordon": "bin/gordon.cjs"
+  },
+  "files": [
+    "bin",
+    "lib",
+    "scripts",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "prepack": "node ../scripts/prepare-npm-wrapper.cjs",
+    "postinstall": "node scripts/postinstall.cjs"
+  }
+}
