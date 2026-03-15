@@ -102,6 +102,13 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Create or update public dist release
+        env:
+          GH_TOKEN: ${{ secrets.DIST_REPO_TOKEN }}
+        run: |
+          gh release view "${{ github.ref_name }}" --repo "${DIST_REPO}" >/dev/null 2>&1 \
+            || gh release create "${{ github.ref_name }}" --repo "${DIST_REPO}" --title "${{ github.ref_name }}" --notes "Public Gordon CLI binaries"
+
   build:
     name: Build ${{ matrix.target }}
     needs:
@@ -145,12 +152,12 @@ jobs:
           --external @galacticcouncil/api-augment/basilisk
           src/index.tsx
 
-      - name: Upload binary artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.binary_name }}
-          path: ${{ matrix.binary_name }}
-          if-no-files-found: error
+      - name: Upload binary to public dist release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.DIST_REPO_TOKEN }}
+        run: |
+          & gh release upload "${env:GITHUB_REF_NAME}" "${{ matrix.binary_name }}#${{ matrix.binary_name }}" --repo "${env:DIST_REPO}" --clobber
 
   publish-public-dist:
     name: Publish Public Dist Repo
@@ -170,11 +177,15 @@ jobs:
         with:
           node-version: 20
 
-      - name: Download binary artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: dist-assets
-          merge-multiple: true
+      - name: Download public release assets
+        env:
+          GH_TOKEN: ${{ secrets.DIST_REPO_TOKEN }}
+        run: |
+          mkdir -p dist-assets
+          gh release download "${VERSION}" \
+            --repo "${DIST_REPO}" \
+            --dir dist-assets \
+            --pattern "gordon-*"
 
       - name: Compute hashes and update manifests
         run: |
@@ -246,14 +257,6 @@ jobs:
           git add README.md LICENSE install.sh install.ps1 Formula/gordon.rb bucket/gordon.json
           git diff --cached --quiet || git commit -m "chore: sync public install assets for ${VERSION}"
           git push origin HEAD:main
-
-      - name: Create or update public dist release
-        env:
-          GH_TOKEN: ${{ secrets.DIST_REPO_TOKEN }}
-        run: |
-          gh release view "${VERSION}" --repo "${DIST_REPO}" >/dev/null 2>&1 \
-            || gh release create "${VERSION}" --repo "${DIST_REPO}" --title "${VERSION}" --notes "Public Gordon CLI binaries"
-          gh release upload "${VERSION}" dist-assets/gordon-* --repo "${DIST_REPO}" --clobber
 
   publish-npm:
     name: Publish to npm
