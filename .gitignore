@@ -28,7 +28,6 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 .npm-cache
 .package-smoke
 npm/*.tgz
-npm/README.md
 npm/LICENSE
 *.tsbuildinfo
 

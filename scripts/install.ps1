@@ -1,9 +1,9 @@
 # Gordon CLI Installer for Windows
-# Usage: irm https://raw.githubusercontent.com/general-liquidity/gordon-cli/main/scripts/install.ps1 | iex
+# Usage: irm https://raw.githubusercontent.com/general-liquidity/gordon-cli-dist/main/install.ps1 | iex
 
 $ErrorActionPreference = "Stop"
 
-$Repo = "general-liquidity/gordon-cli"
+$Repo = if ($env:GORDON_DIST_REPO) { $env:GORDON_DIST_REPO } else { "general-liquidity/gordon-cli-dist" }
 $BinaryName = "gordon"
 
 function Write-Info($msg) { Write-Host "info: $msg" -ForegroundColor Cyan }

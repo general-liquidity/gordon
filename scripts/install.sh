@@ -1,10 +1,10 @@
 #!/bin/sh
 # Gordon CLI installer script
-# Usage: curl -fsSL https://raw.githubusercontent.com/general-liquidity/gordon-cli/main/scripts/install.sh | sh
+# Usage: curl -fsSL https://raw.githubusercontent.com/general-liquidity/gordon-cli-dist/main/install.sh | sh
 
 set -e
 
-REPO="general-liquidity/gordon-cli"
+REPO="${GORDON_DIST_REPO:-general-liquidity/gordon-cli-dist}"
 BINARY_NAME="gordon"
 
 # Colors for output (if terminal supports it)
@@ -209,7 +209,7 @@ main() {
             echo "        echo 'export PATH=\"\$HOME/.local/bin:\$PATH\"' >> ~/.bashrc"
         fi
         echo "    - For native Windows install, use PowerShell instead:"
-        echo "        irm https://raw.githubusercontent.com/general-liquidity/gordon-cli/main/scripts/install.ps1 | iex"
+        echo "        irm https://raw.githubusercontent.com/general-liquidity/gordon-cli-dist/main/install.ps1 | iex"
         echo ""
     fi
 

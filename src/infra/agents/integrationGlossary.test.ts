@@ -17,7 +17,7 @@ function createContext(overrides: Partial<GordonContext> = {}): GordonContext {
     agentRails: null,
     llm: {} as GordonContext["llm"],
     config: GordonConfigSchema.parse({
-      modelConfig: { provider: "openai", model: "gpt-5.2" },
+      modelConfig: { provider: "openai", model: "gpt-5.4" },
     }),
     portfolioValue: 0,
     availableCash: 0,

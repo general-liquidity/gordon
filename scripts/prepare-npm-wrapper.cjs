@@ -5,7 +5,10 @@ const rootDirectory = path.resolve(__dirname, "..");
 const rootPackagePath = path.join(rootDirectory, "package.json");
 const wrapperDirectory = path.join(rootDirectory, "npm");
 const wrapperPackagePath = path.join(wrapperDirectory, "package.json");
-const filesToCopy = ["README.md", "LICENSE"];
+const filesToCopy = ["LICENSE"];
+const WRAPPER_REPOSITORY_URL = "https://github.com/general-liquidity/gordon-cli-dist.git";
+const WRAPPER_HOMEPAGE = "https://gordoncli.com";
+const WRAPPER_BUGS_URL = "https://github.com/general-liquidity/gordon-cli-dist/issues";
 
 function readJson(filePath) {
   return JSON.parse(fs.readFileSync(filePath, "utf8"));
@@ -34,12 +37,15 @@ const version = getRequestedVersion(rootPkg.version);
 
 wrapperPkg.version = version;
 wrapperPkg.author = rootPkg.author;
-wrapperPkg.bugs = rootPkg.bugs;
+wrapperPkg.bugs = WRAPPER_BUGS_URL;
 wrapperPkg.description = rootPkg.description;
-wrapperPkg.homepage = rootPkg.homepage;
+wrapperPkg.homepage = WRAPPER_HOMEPAGE;
 wrapperPkg.keywords = rootPkg.keywords;
 wrapperPkg.license = rootPkg.license;
-wrapperPkg.repository = rootPkg.repository;
+wrapperPkg.repository = {
+  type: "git",
+  url: WRAPPER_REPOSITORY_URL
+};
 
 const packageChanged = writeFileIfChanged(
   wrapperPackagePath,

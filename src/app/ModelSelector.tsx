@@ -49,9 +49,8 @@ async function buildProviderList(): Promise<ProviderOption[]> {
       id: "openai",
       name: "OpenAI",
       models: [
-        { id: DIRECT_MODELS.openai.flagship, name: "GPT-5.2 Pro", description: "Most capable, best for complex analysis", tier: "flagship" as const },
-        { id: DIRECT_MODELS.openai.balanced, name: "GPT-5.2", description: "Great balance of speed and capability", tier: "balanced" as const },
-        { id: DIRECT_MODELS.openai.fast, name: "GPT-5 Mini", description: "Fastest responses, lower cost", tier: "fast" as const },
+        { id: DIRECT_MODELS.openai.flagship, name: "GPT-5.4 Pro", description: "Most capable, best for complex analysis", tier: "flagship" as const },
+        { id: DIRECT_MODELS.openai.balanced, name: "GPT-5.4", description: "Best default for direct OpenAI usage", tier: "balanced" as const },
       ],
     },
     {
@@ -68,7 +67,7 @@ async function buildProviderList(): Promise<ProviderOption[]> {
       name: "Google",
       models: [
         { id: DIRECT_MODELS.google.flagship, name: "Gemini 3.1 Pro", description: "Most capable Google model", tier: "flagship" as const },
-        { id: DIRECT_MODELS.google.fast, name: "Gemini 3 Flash", description: "Fast and efficient", tier: "fast" as const },
+        { id: DIRECT_MODELS.google.fast, name: "Gemini 3.1 Flash Lite", description: "Fast and lightweight", tier: "fast" as const },
       ],
     },
     {

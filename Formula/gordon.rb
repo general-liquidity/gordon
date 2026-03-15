@@ -6,26 +6,26 @@
 
 class Gordon < Formula
   desc "The Frontier Trading Agent - AI-powered crypto trading CLI"
-  homepage "https://github.com/general-liquidity/gordon-cli"
+  homepage "https://gordoncli.com"
   version "0.8.19"
   license "MIT"
 
   on_macos do
     if Hardware::CPU.arm?
-      url "https://github.com/general-liquidity/gordon-cli/releases/download/v#{version}/gordon-darwin-arm64"
+      url "https://github.com/general-liquidity/gordon-cli-dist/releases/download/v#{version}/gordon-darwin-arm64"
       sha256 "f015704dd325f92db7bed39dc0aebd66ccad7326e83aafe60eb7f06417d6e343_DARWIN_ARM64"
     else
-      url "https://github.com/general-liquidity/gordon-cli/releases/download/v#{version}/gordon-darwin-x64"
+      url "https://github.com/general-liquidity/gordon-cli-dist/releases/download/v#{version}/gordon-darwin-x64"
       sha256 "5919dea7824708267e4c01cb7f19201594d427a7c04bfdf67bdb6644df4c3e6f_DARWIN_X64"
     end
   end
 
   on_linux do
     if Hardware::CPU.arm?
-      url "https://github.com/general-liquidity/gordon-cli/releases/download/v#{version}/gordon-linux-arm64"
+      url "https://github.com/general-liquidity/gordon-cli-dist/releases/download/v#{version}/gordon-linux-arm64"
       sha256 "e3579f7b089e66937685e2222322f0786baf67d9ec066c2a99da122c53221430_LINUX_ARM64"
     else
-      url "https://github.com/general-liquidity/gordon-cli/releases/download/v#{version}/gordon-linux-x64"
+      url "https://github.com/general-liquidity/gordon-cli-dist/releases/download/v#{version}/gordon-linux-x64"
       sha256 "b562be53fc040bd9f76f04daa0d505d85bab0eb3a7c663618da2e58ba21d5266_LINUX_X64"
     end
   end

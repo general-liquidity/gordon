@@ -33,6 +33,18 @@ if ((wrapperPkg.scripts || {}).postinstall !== "node scripts/postinstall.cjs") {
   errors.push('Wrapper package postinstall must run "node scripts/postinstall.cjs".');
 }
 
+if ((wrapperPkg.repository || {}).url !== "https://github.com/general-liquidity/gordon-cli-dist.git") {
+  errors.push('Wrapper package repository.url must point to "https://github.com/general-liquidity/gordon-cli-dist.git".');
+}
+
+if (wrapperPkg.homepage !== "https://gordoncli.com") {
+  errors.push('Wrapper package homepage must point to "https://gordoncli.com".');
+}
+
+if (wrapperPkg.bugs !== "https://github.com/general-liquidity/gordon-cli-dist/issues") {
+  errors.push('Wrapper package bugs must point to "https://github.com/general-liquidity/gordon-cli-dist/issues".');
+}
+
 for (const relativePath of [
   "bin/gordon.cjs",
   "lib/platform.cjs",

@@ -204,7 +204,7 @@ export function parseBootstrapArgs(args: string[]): BootstrapOptions {
 function getProviderDefaultModel(provider: "openai" | "inception" | "dedalus"): string {
   switch (provider) {
     case "openai":
-      return "gpt-5.2";
+      return "openai/gpt-5.4";
     case "inception":
       return "mercury-2";
     case "dedalus":

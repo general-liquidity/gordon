@@ -8,6 +8,9 @@ on:
 permissions:
   contents: write
 
+env:
+  DIST_REPO: general-liquidity/gordon-cli-dist
+
 jobs:
   test:
     name: Test
@@ -65,11 +68,31 @@ jobs:
       - name: Smoke test npm wrapper
         run: npm run smoke:npm-wrapper
 
-  create-release:
-    name: Create Release
+  verify-public-dist:
+    name: Verify Public Dist Bundle
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prepare public dist bundle
+        run: node scripts/prepare-public-dist.cjs --out-dir .public-dist
+
+      - name: Verify public dist bundle
+        run: |
+          test -f .public-dist/README.md
+          test -f .public-dist/install.sh
+          test -f .public-dist/install.ps1
+          test -f .public-dist/Formula/gordon.rb
+          test -f .public-dist/bucket/gordon.json
+
+  create-source-release:
+    name: Create Source Release
     needs:
       - test
       - verify-npm-wrapper
+      - verify-public-dist
     runs-on: ubuntu-latest
     steps:
       - name: Create or update GitHub Release
@@ -82,9 +105,7 @@ jobs:
   build:
     name: Build ${{ matrix.target }}
     needs:
-      - test
-      - verify-npm-wrapper
-      - create-release
+      - create-source-release
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -124,90 +145,119 @@ jobs:
           --external @galacticcouncil/api-augment/basilisk
           src/index.tsx
 
-      - name: Upload binary to GitHub Release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: >
-          gh release upload "${{ github.ref_name }}" "${{ matrix.binary_name }}#${{ matrix.binary_name }}"
-          --repo "${{ github.repository }}"
-          --clobber
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.binary_name }}
+          path: ${{ matrix.binary_name }}
+          if-no-files-found: error
 
-  update-manifests:
-    name: Update Package Manager Manifests
+  publish-public-dist:
+    name: Publish Public Dist Repo
     needs: build
     runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ github.ref_name }}
     steps:
-      - name: Checkout
+      - name: Checkout source repo
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Checkout source branch
-        id: branch
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Download binary artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist-assets
+          merge-multiple: true
+
+      - name: Compute hashes and update manifests
         run: |
-          # Find which branch contains this tag and checkout it (avoids detached HEAD)
-          BRANCH=$(git branch -r --contains "${{ github.ref }}" | grep -v HEAD | head -1 | sed 's|origin/||' | xargs)
-          echo "name=$BRANCH" >> $GITHUB_OUTPUT
-          git checkout "$BRANCH"
+          VERSION_NUMBER="${VERSION#v}"
+          echo "VERSION_NUMBER=$VERSION_NUMBER" >> "$GITHUB_ENV"
 
-      - name: Download release assets and compute hashes
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          VERSION=${GITHUB_REF#refs/tags/v}
-          echo "VERSION=$VERSION" >> $GITHUB_ENV
-          mkdir -p /tmp/binaries
+          sha256sum dist-assets/gordon-darwin-arm64 | awk '{print $1}' > dist-assets/gordon-darwin-arm64.sha256
+          sha256sum dist-assets/gordon-darwin-x64 | awk '{print $1}' > dist-assets/gordon-darwin-x64.sha256
+          sha256sum dist-assets/gordon-linux-arm64 | awk '{print $1}' > dist-assets/gordon-linux-arm64.sha256
+          sha256sum dist-assets/gordon-linux-x64 | awk '{print $1}' > dist-assets/gordon-linux-x64.sha256
+          sha256sum dist-assets/gordon-windows-x64.exe | awk '{print $1}' > dist-assets/gordon-windows-x64.exe.sha256
 
-          # Use gh CLI to download — bypasses CDN caching issues
-          gh release download "v${VERSION}" \
-            --repo "${GITHUB_REPOSITORY}" \
-            --dir /tmp/binaries \
-            --pattern "gordon-*"
+          DARWIN_ARM64=$(cat dist-assets/gordon-darwin-arm64.sha256)
+          DARWIN_X64=$(cat dist-assets/gordon-darwin-x64.sha256)
+          LINUX_ARM64=$(cat dist-assets/gordon-linux-arm64.sha256)
+          LINUX_X64=$(cat dist-assets/gordon-linux-x64.sha256)
+          WINDOWS_X64=$(cat dist-assets/gordon-windows-x64.exe.sha256)
 
-          # Compute SHA256 hashes
-          cd /tmp/binaries
-          for f in gordon-*; do
-            sha256sum "$f" | awk '{print $1}' > "${f}.sha256"
-          done
+          sed -i "s/version \".*\"/version \"${VERSION_NUMBER}\"/" Formula/gordon.rb
+          sed -i "0,/sha256 \"[^\"]*\"/{s//sha256 \"${DARWIN_ARM64}\"/}" Formula/gordon.rb
+          sed -i "0,/sha256 \"[^\"]*\"/{s//sha256 \"${DARWIN_X64}\"/}" Formula/gordon.rb
+          sed -i "0,/sha256 \"[^\"]*\"/{s//sha256 \"${LINUX_ARM64}\"/}" Formula/gordon.rb
+          sed -i "0,/sha256 \"[^\"]*\"/{s//sha256 \"${LINUX_X64}\"/}" Formula/gordon.rb
 
-      - name: Update Homebrew formula
-        run: |
-          DARWIN_ARM64=$(cat /tmp/binaries/gordon-darwin-arm64.sha256)
-          DARWIN_X64=$(cat /tmp/binaries/gordon-darwin-x64.sha256)
-          LINUX_ARM64=$(cat /tmp/binaries/gordon-linux-arm64.sha256)
-          LINUX_X64=$(cat /tmp/binaries/gordon-linux-x64.sha256)
-
-          sed -i "s/version \".*\"/version \"${VERSION}\"/" Formula/gordon.rb
-          # Replace any existing sha256 hash (64 hex chars) or placeholder
-          sed -i "s/sha256 \"[a-fA-F0-9]\{64\}\"/sha256 \"PLACEHOLDER\"/" Formula/gordon.rb
-          sed -i "0,/PLACEHOLDER/{s/PLACEHOLDER/${DARWIN_ARM64}/}" Formula/gordon.rb
-          sed -i "0,/PLACEHOLDER/{s/PLACEHOLDER/${DARWIN_X64}/}" Formula/gordon.rb
-          sed -i "0,/PLACEHOLDER/{s/PLACEHOLDER/${LINUX_ARM64}/}" Formula/gordon.rb
-          sed -i "0,/PLACEHOLDER/{s/PLACEHOLDER/${LINUX_X64}/}" Formula/gordon.rb
-
-      - name: Update Scoop manifest
-        run: |
-          WINDOWS_X64=$(cat /tmp/binaries/gordon-windows-x64.exe.sha256)
-
-          sed -i "s/\"version\": \".*\"/\"version\": \"${VERSION}\"/" scripts/scoop/gordon.json
-          # Replace any existing hash or placeholder
+          sed -i "s/\"version\": \".*\"/\"version\": \"${VERSION_NUMBER}\"/" scripts/scoop/gordon.json
           sed -i "s/\"hash\": \"[^\"]*\"/\"hash\": \"${WINDOWS_X64}\"/" scripts/scoop/gordon.json
-          sed -i "s|/v[0-9.]*[^/]*/gordon-windows|/v${VERSION}/gordon-windows|g" scripts/scoop/gordon.json
+          sed -i "s|/v[0-9.]*[^/]*/gordon-windows|/v${VERSION_NUMBER}/gordon-windows|g" scripts/scoop/gordon.json
 
-      - name: Commit updated manifests
+      - name: Prepare npm wrapper metadata
+        env:
+          GORDON_NPM_VERSION: ${{ github.ref_name }}
+        run: npm run prepare:npm-wrapper
+
+      - name: Resolve source branch
+        run: |
+          SOURCE_BRANCH=$(git branch -r --contains "${GITHUB_SHA}" | grep -v HEAD | sed 's|origin/||' | grep '^v' | head -1 | xargs)
+          if [ -z "${SOURCE_BRANCH}" ]; then
+            SOURCE_BRANCH=$(git branch -r --contains "${GITHUB_SHA}" | grep -v HEAD | sed 's|origin/||' | head -1 | xargs)
+          fi
+          if [ -z "${SOURCE_BRANCH}" ]; then
+            SOURCE_BRANCH="main"
+          fi
+          echo "SOURCE_BRANCH=${SOURCE_BRANCH}" >> "$GITHUB_ENV"
+          git checkout "${SOURCE_BRANCH}"
+
+      - name: Commit source manifest updates
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add Formula/gordon.rb scripts/scoop/gordon.json
-          git diff --cached --quiet || git commit -m "chore: update package manifests for v${VERSION}"
-          git push
+          git add Formula/gordon.rb scripts/scoop/gordon.json npm/package.json npm/README.md
+          git diff --cached --quiet || git commit -m "chore: publish assets for ${VERSION}"
+          git push origin "HEAD:${SOURCE_BRANCH}"
+
+      - name: Checkout public dist repo
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.DIST_REPO }}
+          token: ${{ secrets.DIST_REPO_TOKEN }}
+          path: public-dist
+
+      - name: Prepare public dist repo contents
+        run: node scripts/prepare-public-dist.cjs --out-dir public-dist
+
+      - name: Commit public dist repo updates
+        working-directory: public-dist
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add README.md LICENSE install.sh install.ps1 Formula/gordon.rb bucket/gordon.json
+          git diff --cached --quiet || git commit -m "chore: sync public install assets for ${VERSION}"
+          git push origin HEAD:main
+
+      - name: Create or update public dist release
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.DIST_REPO_TOKEN }}
+        run: |
+          gh release view "${VERSION}" --repo "${DIST_REPO}" >/dev/null 2>&1 \
+            || gh release create "${VERSION}" --repo "${DIST_REPO}" --title "${VERSION}" --notes "Public Gordon CLI binaries"
+          gh release upload "${VERSION}" dist-assets/gordon-* --repo "${DIST_REPO}" --clobber
 
   publish-npm:
     name: Publish to npm
-    needs: build
+    needs: publish-public-dist
     runs-on: ubuntu-latest
     env:
       GORDON_NPM_VERSION: ${{ github.ref_name }}

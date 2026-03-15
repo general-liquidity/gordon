@@ -93,7 +93,7 @@ export function resolveLegacyModelRouteForWorkflowPhase(phase: WorkflowPhase): {
         return { provider: "dedalus", model: "google/gemini-3-flash-preview" };
       }
       if (process.env.OPENAI_API_KEY) {
-        return { provider: "openai", model: "gpt-5-mini" };
+        return { provider: "openai", model: "gpt-5.4" };
       }
       return { provider: "dedalus", model: "openai/gpt-5.2" };
     case "analysis":
@@ -105,7 +105,7 @@ export function resolveLegacyModelRouteForWorkflowPhase(phase: WorkflowPhase): {
         return { provider: "dedalus", model: "openai/gpt-5.2" };
       }
       if (process.env.OPENAI_API_KEY) {
-        return { provider: "openai", model: "gpt-5.2" };
+        return { provider: "openai", model: "gpt-5.4" };
       }
       return { provider: "dedalus", model: "openai/gpt-5.2" };
   }

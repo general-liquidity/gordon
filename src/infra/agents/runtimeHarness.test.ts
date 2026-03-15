@@ -26,7 +26,7 @@ function createContext(overrides: Partial<GordonContext> = {}): GordonContext {
     llm: {} as GordonContext["llm"],
     config: GordonConfigSchema.parse({
       mode: "ARMED",
-      modelConfig: { provider: "openai", model: "gpt-5.2" },
+      modelConfig: { provider: "openai", model: "gpt-5.4" },
     }),
     portfolioValue: 10000,
     availableCash: 1000,

@@ -807,7 +807,7 @@ export async function createEnvFile(keys: Partial<EnvKeys>): Promise<void> {
   if (keys.GORDON_MODEL) {
     lines.push(formatEnvLine("GORDON_MODEL", keys.GORDON_MODEL));
   } else {
-    lines.push("# GORDON_MODEL=openai/gpt-5.2");
+    lines.push("# GORDON_MODEL=openai/gpt-5.4");
   }
 
   lines.push("");

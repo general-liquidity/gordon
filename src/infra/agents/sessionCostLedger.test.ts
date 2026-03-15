@@ -14,7 +14,7 @@ describe("sessionCostLedger", () => {
     recordSessionCostUsage({
       threadId,
       provider: "openai",
-      model: "gpt-5.2",
+      model: "gpt-5.4",
       promptTokens: 100,
       completionTokens: 40,
       totalTokens: 140,
@@ -22,7 +22,7 @@ describe("sessionCostLedger", () => {
     recordSessionCostUsage({
       threadId,
       provider: "openai",
-      model: "gpt-5.2",
+      model: "gpt-5.4",
       promptTokens: 60,
       completionTokens: 20,
       totalTokens: 80,

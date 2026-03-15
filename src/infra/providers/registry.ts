@@ -37,7 +37,7 @@ export interface ProviderConfig {
 
 /**
  * Model string type stored in Gordon config/env.
- * Format: "provider/model" (e.g. "openai/gpt-5.2" or "inception/mercury-2")
+ * Format: "provider/model" (e.g. "openai/gpt-5.4" or "inception/mercury-2")
  */
 export type ModelString = `${string}/${string}`;
 
@@ -96,14 +96,14 @@ export const DIRECT_MODELS = {
     fast: "claude-haiku-4-5",
   },
   openai: {
-    flagship: "gpt-5.2-pro",
-    balanced: "gpt-5.2",
-    fast: "gpt-5-mini",
+    flagship: "gpt-5.4-pro",
+    balanced: "gpt-5.4",
+    fast: "gpt-5.4",
   },
   google: {
     flagship: "gemini-3-1-pro-preview",
     balanced: "gemini-3-1-pro-preview",
-    fast: "gemini-3-flash-preview",
+    fast: "gemini-3.1-flash-lite-preview",
   },
   inception: {
     flagship: "mercury-2",
@@ -627,7 +627,7 @@ export class ProviderRegistry {
           "No LLM provider configured. Set one of these API keys in your .env file:\n" +
           "  DEDALUS_API_KEY   - Dedalus Labs (access to many providers)\n" +
           "  INCEPTION_API_KEY - Inception Labs Mercury 2\n" +
-          "  OPENAI_API_KEY    - OpenAI GPT-5.2\n" +
+          "  OPENAI_API_KEY    - OpenAI GPT-5.4\n" +
           "  ANTHROPIC_API_KEY - Anthropic Claude Opus 4.6\n" +
           "  GOOGLE_GENERATIVE_AI_API_KEY - Google Gemini 3 Pro"
         );

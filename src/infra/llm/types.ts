@@ -41,12 +41,13 @@ export interface LLMResponse {
 }
 
 /**
- * OpenAI GPT-5.2 model variants
+ * OpenAI direct model variants
  */
 export type OpenAIModel =
-  | "gpt-5.2"           // Default GPT-5.2
-  | "gpt-5.2-pro"       // Most capable
-  | "gpt-5-mini";       // Fast and cost-efficient
+  | "gpt-5.4"           // Default direct OpenAI model
+  | "gpt-5.4-pro"       // Most capable
+  | "openai/gpt-5.4"
+  | "openai/gpt-5.4-pro";
 
 /**
  * Dedalus Labs model identifiers (provider/model format)

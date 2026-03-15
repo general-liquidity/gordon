@@ -1,11 +1,11 @@
 /**
  * Chat Input Component with Slash Command Support
- * Uses a controlled terminal text input that preserves pasted content
+ * Uses ink-ui TextInput with built-in features
  */
 
 import React, { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { Box, Text, useInput } from "ink";
-import TextInput from "ink-text-input";
+import { TextInput } from "@inkjs/ui";
 import { NoticeAlert } from "./components/PromptPrimitives.tsx";
 import { COLORS } from "./theme.ts";
 import { getSlashCommandSuggestions, parseSlashCommand } from "./slashCommands.ts";
@@ -116,12 +116,9 @@ function ChatInputComponent({
   }, [emitTypingState]);
 
   const handleSubmit = useCallback((submitValue: string) => {
-    const normalizedSubmitValue = normalizeInputValue(submitValue);
-    if (!normalizedSubmitValue.trim()) return;
+    if (!submitValue.trim()) return;
 
-    let finalValue = normalizedSubmitValue.includes("\n")
-      ? normalizedSubmitValue.replace(/\n+$/g, "")
-      : normalizedSubmitValue.trim();
+    let finalValue = normalizeInputValue(submitValue).trim();
 
     // First, check if the user typed a complete valid command
     // This takes priority over autocomplete selection to avoid race conditions
@@ -133,7 +130,7 @@ function ChatInputComponent({
       // Only use autocomplete selection if user typed a partial/invalid command
       const selectedCmd = suggestions[autocompleteIndex];
       // Extract any args after the partial command (e.g., "/ana btc" -> "btc")
-      const parts = normalizedSubmitValue.trim().split(/\s+/);
+      const parts = submitValue.trim().split(/\s+/);
       const args = parts.slice(1).join(" ");
       finalValue = args ? `/${selectedCmd.name} ${args}` : `/${selectedCmd.name}`;
     }
@@ -317,10 +314,8 @@ function ChatInputComponent({
         </Text>
         <TextInput
           key={inputKey}
-          value={value}
-          focus={!disabled}
-          showCursor={!disabled}
-          highlightPastedText
+          isDisabled={disabled}
+          defaultValue={value}
           placeholder={placeholder || "Ask Gordon anything... (try /help)"}
           onChange={handleChange}
           onSubmit={handleSubmit}

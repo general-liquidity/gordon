@@ -950,7 +950,7 @@ export function SetupWizard({
       envKeys.GORDON_PROVIDER = state.selectedLlmProvider;
       envKeys.GORDON_MODEL =
         state.selectedLlmProvider === "openai"
-          ? "openai/gpt-5.2"
+          ? "openai/gpt-5.4"
           : state.selectedLlmProvider === "inception"
             ? "inception/mercury-2"
             : "openai/gpt-5.2";

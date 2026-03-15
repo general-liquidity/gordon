@@ -35,3 +35,21 @@ jobs:
 
       - name: Smoke test npm wrapper
         run: npm run smoke:npm-wrapper
+
+  public-dist:
+    name: Public Dist Bundle
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prepare public dist bundle
+        run: node scripts/prepare-public-dist.cjs --out-dir .public-dist
+
+      - name: Verify public dist bundle
+        run: |
+          test -f .public-dist/README.md
+          test -f .public-dist/install.sh
+          test -f .public-dist/install.ps1
+          test -f .public-dist/Formula/gordon.rb
+          test -f .public-dist/bucket/gordon.json
