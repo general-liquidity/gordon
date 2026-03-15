@@ -413,7 +413,8 @@ export async function runUninstall(): Promise<void> {
     const { rm } = await import("node:fs/promises");
     await rm(GORDON_DIR, { recursive: true, force: true });
     console.log(`\nRemoved ${GORDON_DIR}`);
-    console.log("To reinstall: bun install -g @general-liquidity/gordon-cli");
+    console.log("To reinstall: npm install -g @general-liquidity/gordon-cli");
+    console.log("If global npm permissions are blocked: npx @general-liquidity/gordon-cli@latest install");
   } catch (error) {
     console.error(`\nFailed to remove ${GORDON_DIR}:`, error);
     process.exit(1);

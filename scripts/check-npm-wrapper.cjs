@@ -48,6 +48,7 @@ if (wrapperPkg.bugs !== "https://github.com/general-liquidity/gordon-cli-dist/is
 for (const relativePath of [
   "bin/gordon.cjs",
   "lib/platform.cjs",
+  "lib/self-install.cjs",
   "scripts/postinstall.cjs",
   "README.md",
   "LICENSE"

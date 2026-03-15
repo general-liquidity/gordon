@@ -1,11 +1,13 @@
 #!/bin/sh
 # Gordon CLI installer script
 # Usage: curl -fsSL https://raw.githubusercontent.com/general-liquidity/gordon-cli-dist/main/install.sh | sh
+# Custom dir: GORDON_INSTALL_DIR="$HOME/.local/bin" curl -fsSL https://raw.githubusercontent.com/general-liquidity/gordon-cli-dist/main/install.sh | sh
 
 set -e
 
 REPO="${GORDON_DIST_REPO:-general-liquidity/gordon-cli-dist}"
 BINARY_NAME="gordon"
+INSTALL_METADATA_NAME="gordon-install.json"
 
 # Colors for output (if terminal supports it)
 if [ -t 1 ]; then
@@ -103,6 +105,15 @@ download() {
 
 # Determine install directory
 get_install_dir() {
+    if [ -n "${GORDON_INSTALL_DIR:-}" ]; then
+        mkdir -p "${GORDON_INSTALL_DIR}" 2>/dev/null || error "Cannot create install directory ${GORDON_INSTALL_DIR}"
+        if [ ! -w "${GORDON_INSTALL_DIR}" ]; then
+            error "Install directory is not writable: ${GORDON_INSTALL_DIR}"
+        fi
+        echo "${GORDON_INSTALL_DIR}"
+        return
+    fi
+
     if [ -w "/usr/local/bin" ]; then
         echo "/usr/local/bin"
     elif [ -d "$HOME/.local/bin" ] || mkdir -p "$HOME/.local/bin" 2>/dev/null; then
@@ -182,6 +193,14 @@ main() {
     if [ ! -x "$INSTALL_PATH" ]; then
         error "Installation failed: binary not found at ${INSTALL_PATH}"
     fi
+
+    cat > "${INSTALL_DIR}/${INSTALL_METADATA_NAME}" <<EOF
+{
+  "channel": "script-unix",
+  "installDir": "${INSTALL_DIR}",
+  "version": "${VERSION}"
+}
+EOF
 
     success "Gordon CLI v${VERSION} installed successfully!"
     echo ""

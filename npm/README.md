@@ -19,10 +19,32 @@
 npm install -g @general-liquidity/gordon-cli
 ```
 
+If global npm install fails with `EACCES` / permission errors on Linux or macOS, use the user-local npm path instead:
+
+```bash
+npx @general-liquidity/gordon-cli@latest install
+```
+
+That installs Gordon into a user-writable bin directory without `sudo`.
+
 `bun`:
 
 ```bash
 bun add -g @general-liquidity/gordon-cli
+```
+
+`Homebrew`:
+
+```bash
+brew tap general-liquidity/gordon-cli-dist https://github.com/general-liquidity/gordon-cli-dist
+brew install general-liquidity/gordon-cli-dist/gordon
+```
+
+`Scoop`:
+
+```powershell
+scoop bucket add gordon https://github.com/general-liquidity/gordon-cli-dist
+scoop install gordon/gordon
 ```
 
 Standalone install script:
@@ -38,6 +60,26 @@ irm https://raw.githubusercontent.com/general-liquidity/gordon-cli-dist/main/ins
 ```
 
 The npm package is a thin wrapper. It downloads the matching prebuilt binary for your platform during install.
+
+## npm Permission Fallback
+
+Global `npm install -g` can fail on Unix machines when the npm global prefix is root-owned. Gordon now supports a universal npm fallback:
+
+```bash
+npx @general-liquidity/gordon-cli@latest install
+```
+
+If the chosen install directory is not already on `PATH`, Gordon prints the exact command to add it.
+
+## Upgrades
+
+Once installed, Gordon can upgrade itself with:
+
+```bash
+gordon --upgrade
+```
+
+That now resolves through the active install channel for npm, the user-local `npx` installer, Homebrew, Scoop, and the standalone install scripts.
 
 ## Supported binaries
 

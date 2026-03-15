@@ -1,7 +1,9 @@
 # Homebrew formula for Gordon CLI
 # The Frontier Trading Agent
 #
-# Install: brew tap general-liquidity/tap && brew install gordon
+# Install:
+#   brew tap general-liquidity/gordon-cli-dist https://github.com/general-liquidity/gordon-cli-dist
+#   brew install general-liquidity/gordon-cli-dist/gordon
 # SHA256 hashes are updated automatically by CI on each release.
 
 class Gordon < Formula

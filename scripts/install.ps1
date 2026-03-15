@@ -1,5 +1,11 @@
 # Gordon CLI Installer for Windows
 # Usage: irm https://raw.githubusercontent.com/general-liquidity/gordon-cli-dist/main/install.ps1 | iex
+# Custom dir: $env:GORDON_INSTALL_DIR="$env:LOCALAPPDATA\\Programs\\Gordon"; irm https://raw.githubusercontent.com/general-liquidity/gordon-cli-dist/main/install.ps1 | iex
+
+[CmdletBinding()]
+param(
+    [string]$InstallDir = $(if ($env:GORDON_INSTALL_DIR) { $env:GORDON_INSTALL_DIR } else { "" })
+)
 
 $ErrorActionPreference = "Stop"
 
@@ -59,7 +65,9 @@ function Main {
     Write-Info "Downloading from: $DownloadUrl"
 
     # Install directory
-    $InstallDir = Join-Path $env:LOCALAPPDATA "gordon"
+    if (-not $InstallDir) {
+        $InstallDir = Join-Path $env:LOCALAPPDATA "gordon"
+    }
     if (-not (Test-Path $InstallDir)) {
         New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null
     }
@@ -78,6 +86,13 @@ function Main {
     # Move to install location
     Move-Item -Path $TempPath -Destination $InstallPath -Force
     Write-Info "Installed to $InstallPath"
+
+    $metadata = @{
+        channel = "script-windows"
+        installDir = $InstallDir
+        version = $Version
+    } | ConvertTo-Json
+    Set-Content -Path (Join-Path $InstallDir "gordon-install.json") -Value $metadata
 
     # Add to PATH if needed
     $UserPath = [Environment]::GetEnvironmentVariable("Path", "User")

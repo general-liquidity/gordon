@@ -6,6 +6,7 @@ const rootDirectory = path.resolve(__dirname, "..");
 const wrapperDirectory = path.join(rootDirectory, "npm");
 const cacheDirectory = path.join(rootDirectory, ".npm-cache");
 const smokeDirectory = path.join(rootDirectory, ".package-smoke");
+const selfInstallDirectory = path.join(rootDirectory, ".package-smoke-user-bin");
 const npmExecPath = process.env.npm_execpath;
 const npmCommand = npmExecPath ? process.execPath : process.platform === "win32" ? "npm.cmd" : "npm";
 
@@ -57,6 +58,7 @@ runNode(path.join(rootDirectory, "scripts", "prepare-npm-wrapper.cjs"));
 
 fs.mkdirSync(cacheDirectory, { recursive: true });
 fs.rmSync(smokeDirectory, { recursive: true, force: true });
+fs.rmSync(selfInstallDirectory, { recursive: true, force: true });
 
 runNpm(["pack", "--cache", cacheDirectory], { cwd: wrapperDirectory });
 
@@ -103,6 +105,28 @@ const launched = spawnSync(process.execPath, [launcherPath, "--version"], {
 
 if (launched.status !== 0) {
   throw new Error("Wrapper launcher failed to start the installed binary.");
+}
+
+const selfInstall = spawnSync(
+  process.execPath,
+  [launcherPath, "install", "--target-dir", selfInstallDirectory],
+  {
+    cwd: rootDirectory,
+    stdio: "inherit"
+  }
+);
+
+if (selfInstall.status !== 0) {
+  throw new Error("Wrapper self-install command failed.");
+}
+
+const selfInstalledBinary = path.join(
+  selfInstallDirectory,
+  process.platform === "win32" ? "gordon.exe" : "gordon"
+);
+
+if (!fs.existsSync(selfInstalledBinary)) {
+  throw new Error(`Wrapper self-install did not create ${selfInstalledBinary}`);
 }
 
 console.log(`npm wrapper smoke test passed for ${path.basename(tarballPath)}.`);

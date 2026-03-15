@@ -15,8 +15,27 @@ const UPDATE_CHECK_FILE = path.join(GORDON_DIR, ".update-check");
 const CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
 const PACKAGE_NAME = "@general-liquidity/gordon-cli";
 const NPM_REGISTRY_URL = `https://registry.npmjs.org/${PACKAGE_NAME}/latest`;
+const PUBLIC_INSTALL_SH_URL = "https://raw.githubusercontent.com/general-liquidity/gordon-cli-dist/main/install.sh";
+const PUBLIC_INSTALL_PS1_URL = "https://raw.githubusercontent.com/general-liquidity/gordon-cli-dist/main/install.ps1";
+const NPM_WRAPPER_INSTALL_MANIFEST = "install.json";
+const INSTALL_CHANNEL_METADATA_FILE = "gordon-install.json";
 
-type InstallChannel = "bun" | "npm" | "binary" | "dev" | "unknown";
+export type InstallChannel =
+  | "bun"
+  | "npm"
+  | "homebrew"
+  | "scoop"
+  | "npx"
+  | "script-unix"
+  | "script-windows"
+  | "binary"
+  | "dev"
+  | "unknown";
+
+export interface InstallContext {
+  channel: InstallChannel;
+  installDir?: string;
+}
 
 interface UpdateCheckState {
   lastCheck: number;
@@ -30,6 +49,7 @@ interface UpdateCommand {
   args: string[];
   display: string;
   publicDisplay: string;
+  env?: Record<string, string>;
 }
 
 const ANSI = {
@@ -99,24 +119,108 @@ function currentPackageRoot(): string | null {
   }
 }
 
-function detectInstallChannel(): InstallChannel {
-  const packageRoot = currentPackageRoot();
-  const scriptArg = process.argv[1] ?? "";
-  const execPath = process.execPath;
+function readJsonFile<T>(filePath: string): T | null {
+  try {
+    if (!fs.existsSync(filePath)) {
+      return null;
+    }
+    return JSON.parse(fs.readFileSync(filePath, "utf-8")) as T;
+  } catch {
+    return null;
+  }
+}
+
+function normalizeInstallChannel(value: string | undefined | null): InstallChannel | null {
+  switch (value) {
+    case "bun":
+    case "npm":
+    case "homebrew":
+    case "scoop":
+    case "npx":
+    case "script-unix":
+    case "script-windows":
+    case "binary":
+    case "dev":
+    case "unknown":
+      return value;
+    default:
+      return null;
+  }
+}
+
+function readAdjacentInstallContext(execPath: string): InstallContext | null {
+  const executableDirectory = path.dirname(execPath);
+  const sidecarMetadata = readJsonFile<{ channel?: string; installDir?: string }>(
+    path.join(executableDirectory, INSTALL_CHANNEL_METADATA_FILE),
+  );
+
+  const normalizedSidecarChannel = normalizeInstallChannel(sidecarMetadata?.channel ?? null);
+  if (normalizedSidecarChannel) {
+    return {
+      channel: normalizedSidecarChannel,
+      installDir: sidecarMetadata?.installDir || executableDirectory,
+    };
+  }
+
+  const wrapperInstallManifest = readJsonFile<{ binaryName?: string }>(
+    path.join(executableDirectory, NPM_WRAPPER_INSTALL_MANIFEST),
+  );
+  if (wrapperInstallManifest) {
+    return {
+      channel: "npm",
+      installDir: executableDirectory,
+    };
+  }
+
+  return null;
+}
+
+function isHomebrewPath(normalizedExec: string): boolean {
+  return /\/(?:opt\/homebrew|usr\/local|homebrew)\/cellar\/gordon\//i.test(normalizedExec)
+    || /\/cellar\/gordon\//i.test(normalizedExec);
+}
+
+function isScoopPath(normalizedExec: string): boolean {
+  return normalizedExec.includes("/scoop/apps/gordon/");
+}
+
+export function detectInstallContext(options: {
+  packageRoot?: string | null;
+  scriptArg?: string;
+  execPath?: string;
+  env?: NodeJS.ProcessEnv;
+} = {}): InstallContext {
+  const packageRoot = options.packageRoot === undefined ? currentPackageRoot() : options.packageRoot;
+  const scriptArg = options.scriptArg ?? process.argv[1] ?? "";
+  const execPath = options.execPath ?? process.execPath;
+  const env = options.env ?? process.env;
 
   if (scriptArg.endsWith("src/index.tsx") || (packageRoot && fs.existsSync(path.join(packageRoot, "src", "index.tsx")))) {
-    return "dev";
+    return { channel: "dev" };
+  }
+
+  const envChannel = normalizeInstallChannel(env.GORDON_INSTALL_CHANNEL);
+  if (envChannel) {
+    return {
+      channel: envChannel,
+      installDir: env.GORDON_INSTALL_DIR || path.dirname(execPath),
+    };
+  }
+
+  const adjacentInstallContext = readAdjacentInstallContext(execPath);
+  if (adjacentInstallContext) {
+    return adjacentInstallContext;
   }
 
   const normalizedRoot = packageRoot?.replace(/\\/g, "/") ?? "";
-  const normalizedExec = execPath.replace(/\\/g, "/");
+  const normalizedExec = execPath.replace(/\\/g, "/").toLowerCase();
 
   if (normalizedRoot.includes("/.bun/install/global/")) {
-    return "bun";
+    return { channel: "bun" };
   }
 
   if (normalizedRoot.includes("/node_modules/")) {
-    return "npm";
+    return { channel: "npm" };
   }
 
   if (
@@ -124,18 +228,26 @@ function detectInstallChannel(): InstallChannel {
     || normalizedExec.endsWith("/bun")
     || normalizedExec.endsWith("/bun.exe")
   ) {
-    return "bun";
+    return { channel: "bun" };
+  }
+
+  if (isHomebrewPath(normalizedExec)) {
+    return { channel: "homebrew" };
+  }
+
+  if (isScoopPath(normalizedExec)) {
+    return { channel: "scoop" };
   }
 
   if (scriptArg && !scriptArg.endsWith(".js") && !scriptArg.endsWith(".ts")) {
-    return "binary";
+    return { channel: "binary" };
   }
 
-  return "unknown";
+  return { channel: "unknown" };
 }
 
-function getUpdateCommand(channel: InstallChannel): UpdateCommand | null {
-  switch (channel) {
+export function getUpdateCommand(context: InstallContext): UpdateCommand | null {
+  switch (context.channel) {
     case "bun":
       return {
         command: "bun",
@@ -149,6 +261,53 @@ function getUpdateCommand(channel: InstallChannel): UpdateCommand | null {
         args: ["install", "-g", `${PACKAGE_NAME}@latest`],
         display: `npm install -g ${PACKAGE_NAME}@latest`,
         publicDisplay: "gordon --upgrade",
+      };
+    case "homebrew":
+      return {
+        command: "brew",
+        args: ["upgrade", "general-liquidity/gordon-cli-dist/gordon"],
+        display: "brew upgrade general-liquidity/gordon-cli-dist/gordon",
+        publicDisplay: "gordon --upgrade",
+      };
+    case "scoop":
+      return {
+        command: "scoop",
+        args: ["update", "gordon"],
+        display: "scoop update gordon",
+        publicDisplay: "gordon --upgrade",
+      };
+    case "npx": {
+      const args = ["--yes", `${PACKAGE_NAME}@latest`, "install"];
+      if (context.installDir) {
+        args.push("--target-dir", context.installDir);
+      }
+      return {
+        command: "npx",
+        args,
+        display: context.installDir
+          ? `npx --yes ${PACKAGE_NAME}@latest install --target-dir "${context.installDir}"`
+          : `npx --yes ${PACKAGE_NAME}@latest install`,
+        publicDisplay: "gordon --upgrade",
+      };
+    }
+    case "script-unix":
+      return {
+        command: "sh",
+        args: [
+          "-c",
+          `command -v curl >/dev/null 2>&1 && curl -fsSL ${PUBLIC_INSTALL_SH_URL} | sh || wget -qO- ${PUBLIC_INSTALL_SH_URL} | sh`,
+        ],
+        display: `curl -fsSL ${PUBLIC_INSTALL_SH_URL} | sh`,
+        publicDisplay: "gordon --upgrade",
+        env: context.installDir ? { GORDON_INSTALL_DIR: context.installDir } : undefined,
+      };
+    case "script-windows":
+      return {
+        command: "powershell",
+        args: ["-NoProfile", "-Command", `irm ${PUBLIC_INSTALL_PS1_URL} | iex`],
+        display: `irm ${PUBLIC_INSTALL_PS1_URL} | iex`,
+        publicDisplay: "gordon --upgrade",
+        env: context.installDir ? { GORDON_INSTALL_DIR: context.installDir } : undefined,
       };
     default:
       return null;
@@ -233,6 +392,7 @@ async function runUpdateCommand(updateCommand: UpdateCommand): Promise<boolean> 
     const child = spawn(updateCommand.command, updateCommand.args, {
       stdio: "inherit",
       shell: process.platform === "win32",
+      env: updateCommand.env ? { ...process.env, ...updateCommand.env } : process.env,
     });
 
     child.on("exit", (code) => resolve(code === 0));
@@ -243,8 +403,8 @@ async function runUpdateCommand(updateCommand: UpdateCommand): Promise<boolean> 
 export async function maybePromptForUpdate(): Promise<"updated" | "skipped" | "none"> {
   if (!isInteractiveSession()) return "none";
 
-  const channel = detectInstallChannel();
-  const updateCommand = getUpdateCommand(channel);
+  const installContext = detectInstallContext();
+  const updateCommand = getUpdateCommand(installContext);
   if (!updateCommand) return "none";
 
   const state = loadState();
@@ -294,8 +454,8 @@ export async function maybePromptForUpdate(): Promise<"updated" | "skipped" | "n
 }
 
 export async function runSelfUpgrade(): Promise<"updated" | "unsupported" | "failed"> {
-  const channel = detectInstallChannel();
-  const updateCommand = getUpdateCommand(channel);
+  const installContext = detectInstallContext();
+  const updateCommand = getUpdateCommand(installContext);
   if (!updateCommand) {
     return "unsupported";
   }
