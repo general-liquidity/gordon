@@ -1529,7 +1529,14 @@ class StreamCancelledError extends Error {
   }
 }
 
-async function cancelReadableStreamReader<T>(reader: ReadableStreamDefaultReader<T>): Promise<void> {
+interface StreamReaderLike<T> {
+  read(): Promise<ReadableStreamReadResult<T>>;
+  cancel(reason?: unknown): Promise<void>;
+}
+
+type ReaderReadResult<T> = ReadableStreamReadResult<T>;
+
+async function cancelReadableStreamReader<T>(reader: StreamReaderLike<T>): Promise<void> {
   try {
     await reader.cancel("user_cancelled");
   } catch {
@@ -1537,10 +1544,8 @@ async function cancelReadableStreamReader<T>(reader: ReadableStreamDefaultReader
   }
 }
 
-type ReaderReadResult<T> = Awaited<ReturnType<ReadableStreamDefaultReader<T>["read"]>>;
-
 async function readStreamChunkWithAbort<T>(
-  reader: ReadableStreamDefaultReader<T>,
+  reader: StreamReaderLike<T>,
   signal?: AbortSignal
 ): Promise<ReaderReadResult<T>> {
   if (!signal) {
