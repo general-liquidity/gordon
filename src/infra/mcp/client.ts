@@ -32,7 +32,6 @@ import type { Tool } from "@mastra/core/tools";
 import type { MastraMCPServerDefinition } from "@mastra/mcp";
 
 import { pluginInstaller } from "./marketplace/installer.ts";
-import { reloadRouting, isRoutingInitialized, syncRoutingWithCurrentMCPTools } from "../routing/manager.ts";
 import { credentialManager } from "./credentials.ts";
 import type { MCPCategory, MCPServerManifest } from "./types.ts";
 
@@ -50,12 +49,38 @@ let _hotReloadInFlight = false;
 let _mcpServers: Record<string, MastraMCPServerDefinition> | null = null;
 let _schemasDiscovered = false;
 const _discoveredServerIds = new Set<string>();
+let _routingManagerPromise: Promise<typeof import("../routing/manager.ts")> | null = null;
 
 function buildPluginFingerprint(installedPlugins: Array<{ id: string; enabled: boolean; version?: string }>): string {
   return installedPlugins
     .map((plugin) => `${plugin.id}:${plugin.enabled ? "1" : "0"}:${plugin.version ?? "0"}`)
     .sort()
     .join("|");
+}
+
+function loadRoutingManager(): Promise<typeof import("../routing/manager.ts")> {
+  if (!_routingManagerPromise) {
+    // Avoid a static import cycle with routing/manager when Bun compiles the binary.
+    _routingManagerPromise = import("../routing/manager.ts");
+  }
+
+  return _routingManagerPromise;
+}
+
+async function syncRoutingIfInitialized(): Promise<void> {
+  const routingManager = await loadRoutingManager();
+  if (routingManager.isRoutingInitialized()) {
+    routingManager.syncRoutingWithCurrentMCPTools();
+  }
+}
+
+async function reloadRoutingOrMCPTools(): Promise<void> {
+  const routingManager = await loadRoutingManager();
+  if (routingManager.isRoutingInitialized()) {
+    await routingManager.reloadRouting();
+  } else {
+    await reloadMCPTools();
+  }
 }
 
 // ============================================================================
@@ -292,9 +317,7 @@ export async function ensureMCPToolsDiscovered(serverIds?: string[]): Promise<Re
     }
     loggerInfo(`[MCP] Loaded ${Object.keys(discoveredTools).length} tool(s) on demand`);
 
-    if (isRoutingInitialized()) {
-      syncRoutingWithCurrentMCPTools();
-    }
+    await syncRoutingIfInitialized();
 
     return _mcpTools;
   })();
@@ -498,11 +521,7 @@ export function enableMCPHotReload(intervalMs: number = 5000): void {
 
         if (_lastPluginFingerprint !== null && fingerprint !== _lastPluginFingerprint) {
           console.log("[MCP] Plugin change detected, hot-reloading...");
-          if (isRoutingInitialized()) {
-            await reloadRouting(); // reloads MCP tools + rebuilds routing + resets agents
-          } else {
-            await reloadMCPTools(); // fallback if skills not yet initialized
-          }
+          await reloadRoutingOrMCPTools();
         }
 
         _lastPluginFingerprint = fingerprint;

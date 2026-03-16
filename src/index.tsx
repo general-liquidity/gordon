@@ -12,7 +12,6 @@ import {
   runUninstall,
   hasStdinData,
 } from "./cli.ts";
-import { runCLICommand } from "./gateway/cli-commands.ts";
 
 // ============================================================================
 // CLI Flag Handling — runs before TUI loads
@@ -22,6 +21,7 @@ const flags = parseFlags();
 const command = parseCommand();
 
 if (command) {
+  const { runCLICommand } = await import("./gateway/cli-commands.ts");
   const result = await runCLICommand(command);
   if (result.exit) {
     process.exit(result.code ?? 0);

@@ -15,31 +15,82 @@
  * Required env vars: SOLANA_PRIVATE_KEY, SOLANA_RPC_URL
  */
 
-import { SolanaAgentKit, KeypairWallet } from "solana-agent-kit";
-import TokenPlugin from "@solana-agent-kit/plugin-token";
-import DefiPlugin from "@solana-agent-kit/plugin-defi";
-import { Keypair } from "@solana/web3.js";
-import bs58 from "bs58";
-
 import { SOLANA_ENV_KEYS } from "./types.ts";
 
 // ============================================================================
-// Action type (from solana-agent-kit core)
+// Action/runtime types
 // ============================================================================
+
+interface SolanaAgentKitLike {
+  use(plugin: unknown): void;
+  actions: SolanaAction[];
+}
 
 interface SolanaAction {
   name: string;
   description: string;
   schema: { parse: (input: unknown) => Record<string, unknown> };
-  handler: (agent: SolanaAgentKit, input: Record<string, unknown>) => Promise<Record<string, unknown>>;
+  handler: (agent: SolanaAgentKitLike, input: Record<string, unknown>) => Promise<Record<string, unknown>>;
+}
+
+interface SolanaRuntime {
+  SolanaAgentKit: new (
+    wallet: unknown,
+    rpcUrl: string,
+    config?: Record<string, unknown>,
+  ) => SolanaAgentKitLike;
+  KeypairWallet: new (keypair: unknown, rpcUrl: string) => unknown;
+  Keypair: { fromSecretKey(secretKey: Uint8Array): unknown };
+  TokenPlugin: unknown;
+  DefiPlugin: unknown;
+  bs58: { decode(value: string): Uint8Array };
 }
 
 // ============================================================================
 // Singleton State
 // ============================================================================
 
-let _agentKit: SolanaAgentKit | null = null;
+let _agentKit: SolanaAgentKitLike | null = null;
 let _actions: Map<string, SolanaAction> | null = null;
+let _runtimePromise: Promise<SolanaRuntime> | null = null;
+
+// ============================================================================
+// Runtime loading
+// ============================================================================
+
+function getDynamicImporter() {
+  return new Function("specifier", "return import(specifier);") as (
+    specifier: string,
+  ) => Promise<Record<string, unknown>>;
+}
+
+async function loadSolanaRuntime(): Promise<SolanaRuntime> {
+  if (_runtimePromise) {
+    return _runtimePromise;
+  }
+
+  const dynamicImport = getDynamicImporter();
+  _runtimePromise = (async () => {
+    const [solanaAgentKit, tokenPlugin, defiPlugin, web3, bs58Module] = await Promise.all([
+      dynamicImport("solana-agent-kit"),
+      dynamicImport("@solana-agent-kit/plugin-token"),
+      dynamicImport("@solana-agent-kit/plugin-defi"),
+      dynamicImport("@solana/web3.js"),
+      dynamicImport("bs58"),
+    ]);
+
+    return {
+      SolanaAgentKit: solanaAgentKit.SolanaAgentKit as SolanaRuntime["SolanaAgentKit"],
+      KeypairWallet: solanaAgentKit.KeypairWallet as SolanaRuntime["KeypairWallet"],
+      Keypair: web3.Keypair as SolanaRuntime["Keypair"],
+      TokenPlugin: (tokenPlugin.default ?? tokenPlugin) as unknown,
+      DefiPlugin: (defiPlugin.default ?? defiPlugin) as unknown,
+      bs58: (bs58Module.default ?? bs58Module) as SolanaRuntime["bs58"],
+    };
+  })();
+
+  return _runtimePromise;
+}
 
 // ============================================================================
 // Configuration Check
@@ -51,7 +102,7 @@ let _actions: Map<string, SolanaAction> | null = null;
 export function isSolanaKitConfigured(): boolean {
   return Boolean(
     process.env[SOLANA_ENV_KEYS.PRIVATE_KEY] &&
-    process.env[SOLANA_ENV_KEYS.RPC_URL]
+    process.env[SOLANA_ENV_KEYS.RPC_URL],
   );
 }
 
@@ -68,21 +119,30 @@ export function isSolanaKitConfigured(): boolean {
  *
  * @throws Error if credentials are not configured
  */
-export async function getSolanaKit(): Promise<SolanaAgentKit> {
+export async function getSolanaKit(): Promise<SolanaAgentKitLike> {
   if (_agentKit) return _agentKit;
 
   if (!isSolanaKitConfigured()) {
     throw new Error(
       "Solana Agent Kit not configured. Set SOLANA_PRIVATE_KEY and SOLANA_RPC_URL environment variables. " +
-      "Learn more at https://github.com/sendaifun/solana-agent-kit"
+      "Learn more at https://github.com/sendaifun/solana-agent-kit",
+    );
+  }
+
+  let runtime: SolanaRuntime;
+  try {
+    runtime = await loadSolanaRuntime();
+  } catch (error) {
+    throw new Error(
+      `Solana Agent Kit runtime is unavailable in this build: ${(error as Error).message}`,
     );
   }
 
   const privateKey = process.env[SOLANA_ENV_KEYS.PRIVATE_KEY]!;
   const rpcUrl = process.env[SOLANA_ENV_KEYS.RPC_URL]!;
 
-  const keypair = Keypair.fromSecretKey(bs58.decode(privateKey));
-  const wallet = new KeypairWallet(keypair, rpcUrl);
+  const keypair = runtime.Keypair.fromSecretKey(runtime.bs58.decode(privateKey));
+  const wallet = new runtime.KeypairWallet(keypair, rpcUrl);
 
   const config: Record<string, unknown> = {};
   if (process.env[SOLANA_ENV_KEYS.HELIUS_API_KEY]) {
@@ -95,15 +155,12 @@ export async function getSolanaKit(): Promise<SolanaAgentKit> {
     config.JUPITER_FEE_BPS = parseInt(process.env[SOLANA_ENV_KEYS.JUPITER_FEE_BPS]!, 10);
   }
 
-  _agentKit = new SolanaAgentKit(wallet, rpcUrl, config as ConstructorParameters<typeof SolanaAgentKit>[2]);
+  _agentKit = new runtime.SolanaAgentKit(wallet, rpcUrl, config);
+  _agentKit.use(runtime.TokenPlugin);
+  _agentKit.use(runtime.DefiPlugin);
 
-  // Register plugins (all actions indexed by name for O(1) lookup)
-  _agentKit.use(TokenPlugin);
-  _agentKit.use(DefiPlugin);
-
-  // Index actions by name for O(1) lookup
   _actions = new Map();
-  for (const action of (_agentKit as unknown as { actions: SolanaAction[] }).actions) {
+  for (const action of _agentKit.actions) {
     _actions.set(action.name, action);
   }
 
@@ -127,20 +184,21 @@ export async function getSolanaKit(): Promise<SolanaAgentKit> {
  * @returns JSON-stringified result from the action handler
  * @throws Error if action not found or execution fails
  */
-export async function executeAction(actionName: string, args: Record<string, unknown> = {}): Promise<string> {
+export async function executeAction(
+  actionName: string,
+  args: Record<string, unknown> = {},
+): Promise<string> {
   const agent = await getSolanaKit();
   const action = _actions?.get(actionName);
   if (!action) {
-    throw new Error(`Solana Agent Kit action "${actionName}" not found. Available: ${getAvailableActionNames().join(", ")}`);
+    throw new Error(
+      `Solana Agent Kit action "${actionName}" not found. Available: ${getAvailableActionNames().join(", ")}`,
+    );
   }
 
-  // Validate input with the action's Zod schema
   const validatedInput = action.schema.parse(args);
+  const result = await action.handler(agent, validatedInput);
 
-  // Execute: handler needs the agent instance (holds wallet/connection)
-  const result = await action.handler(agent as unknown as SolanaAgentKit, validatedInput as Record<string, unknown>);
-
-  // Convert Record<string, any> to LLM-friendly string
   return typeof result === "string" ? result : JSON.stringify(result);
 }
 

@@ -26,9 +26,15 @@ interface PolkadotAgentKitLike {
 
 let _agentKit: PolkadotAgentKitLike | null = null;
 let _actions: Map<string, PolkadotAction> | null = null;
+const POLKADOT_AGENT_KIT_MODULE = "@polkadot-agent-kit/sdk";
 
 async function loadPolkadotAgentKit() {
-  const module = await import("@polkadot-agent-kit/sdk");
+  // Keep this import opaque to Bun's compiler so the standalone binary
+  // does not eagerly pull in the optional Polkadot dependency tree.
+  const dynamicImport = new Function("specifier", "return import(specifier);") as (
+    specifier: string,
+  ) => Promise<{ PolkadotAgentKit: new (config: Record<string, unknown>) => PolkadotAgentKitLike }>;
+  const module = await dynamicImport(POLKADOT_AGENT_KIT_MODULE);
   return module.PolkadotAgentKit;
 }
 
@@ -86,7 +92,15 @@ export async function getPolkadotKit(): Promise<PolkadotAgentKitLike> {
     config.chains = chains;
   }
 
-  const PolkadotAgentKit = await loadPolkadotAgentKit();
+  let PolkadotAgentKit: new (config: Record<string, unknown>) => PolkadotAgentKitLike;
+  try {
+    PolkadotAgentKit = await loadPolkadotAgentKit();
+  } catch (error) {
+    throw new Error(
+      `Polkadot Agent Kit runtime is unavailable in this build: ${(error as Error).message}`,
+    );
+  }
+
   _agentKit = new PolkadotAgentKit(config) as PolkadotAgentKitLike;
 
   // Connect to chain RPCs

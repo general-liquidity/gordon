@@ -25,6 +25,9 @@ jobs:
       - name: Install dependencies
         run: bun install
 
+      - name: Patch Bun-incompatible dependencies
+        run: node scripts/patch-mastra.cjs
+
       - name: Run tests
         run: bun test
 
@@ -142,6 +145,9 @@ jobs:
       - name: Install dependencies
         run: bun install
 
+      - name: Patch Bun-incompatible dependencies
+        run: node scripts/patch-mastra.cjs
+
       - name: Build binary
         run: >
           bun build --compile --target=bun-${{ matrix.target }} --outfile=${{ matrix.binary_name }}
@@ -150,7 +156,7 @@ jobs:
           --external @solana-developers/helpers
           --external @galacticcouncil/api-augment/hydradx
           --external @galacticcouncil/api-augment/basilisk
-          src/index.tsx
+          src/entry.ts
 
       - name: Upload binary to public dist release
         shell: pwsh

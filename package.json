@@ -1,6 +1,6 @@
 {
   "name": "@general-liquidity/gordon-cli",
-  "version": "0.8.22",
+  "version": "0.8.23",
   "private": true,
   "description": "The Frontier Trading Agent",
   "author": "General Liquidity, Inc.",
@@ -39,8 +39,8 @@
   "scripts": {
     "start": "bun run --silent src/index.tsx",
     "dev": "bun --watch run src/index.tsx",
-    "build": "bun build src/index.tsx --outdir dist --target bun --external @lightprotocol/compressed-token --external @lightprotocol/stateless.js --external @solana-developers/helpers --external @galacticcouncil/api-augment/hydradx --external @galacticcouncil/api-augment/basilisk --external @polkadot-agent-kit/sdk",
-    "build:binary": "bun build src/index.tsx --compile --outfile gordon --external @lightprotocol/compressed-token --external @lightprotocol/stateless.js --external @solana-developers/helpers --external @galacticcouncil/api-augment/hydradx --external @galacticcouncil/api-augment/basilisk",
+    "build": "bun build src/entry.ts --outdir dist --target bun --external @lightprotocol/compressed-token --external @lightprotocol/stateless.js --external @solana-developers/helpers --external @galacticcouncil/api-augment/hydradx --external @galacticcouncil/api-augment/basilisk --external @polkadot-agent-kit/sdk",
+    "build:binary": "bun build src/entry.ts --compile --outfile gordon --external @lightprotocol/compressed-token --external @lightprotocol/stateless.js --external @solana-developers/helpers --external @galacticcouncil/api-augment/hydradx --external @galacticcouncil/api-augment/basilisk",
     "generate:actions-docs": "bun run scripts/generate-action-docs.ts",
     "test:broker-conformance": "bun test src/infra/broker/adapters/conformance.test.ts src/infra/broker/adapters/conformance.matrix.test.ts src/infra/broker/factory.extended.test.ts src/infra/broker/inclusion-gate.test.ts",
     "quality:brokers": "bun run scripts/broker-quality.ts --ci",
