@@ -26,11 +26,11 @@ import { GordonInputGuard, GordonOutputSanitizer } from "./processors/index.ts";
 const gordonInputGuard = new GordonInputGuard();
 const gordonOutputSanitizer = new GordonOutputSanitizer();
 import { Memory } from "@mastra/memory";
-import { LibSQLStore, LibSQLVector } from "@mastra/libsql";
 
 import { getFastMastraModel, getMastraModel, type MastraModelConfig } from "../providers/registry.ts";
 import { getMastraInstance } from "../observability/tracing.ts";
 import { LocalEmbeddingProvider } from "../../core/memory/embeddings.ts";
+import { createMastraStorageConfig } from "./mastraStorage.ts";
 import {
   indicatorTools,
   explainTools,
@@ -420,8 +420,8 @@ function withRuntimeGrounding(role: PromptAgentRole, instructions: string): stri
  * Required when using .network() for multi-agent orchestration
  *
  * Features:
- * - LibSQLStore: Persistent storage for conversation history
- * - LibSQLVector: Vector database for semantic search (RAG)
+ * - LibSQLStore: Persistent storage for conversation history when available
+ * - LibSQLVector: Vector database for semantic search (RAG) when available
  * - semanticRecall: Find similar past trades and analyses
  * - workingMemory: Maintain trading context across conversations
  * - observationalMemory: Background observation/reflection for long conversations
@@ -443,32 +443,35 @@ function createMastraLocalEmbedder() {
 function createMemory(): Memory {
   const dbUrl = process.env.DATABASE_URL || "file:gordon.db";
   const vectorDbUrl = process.env.VECTOR_DATABASE_URL || "file:gordon-vector.db";
+  const { storage, vector, mode } = createMastraStorageConfig({
+    storeId: "gordon-memory",
+    dbUrl,
+    vectorId: "gordon-vector",
+    vectorDbUrl,
+    enableVector: true,
+  });
 
   // Use configured lastMessages or default
   const lastMessages = _memoryConfig.lastMessages;
   if (process.env.GORDON_STARTUP_QUIET !== "1") {
-    console.log(`[Gordon] Creating memory with lastMessages=${lastMessages}`);
+    console.log(`[Gordon] Creating memory with lastMessages=${lastMessages}, mode=${mode}`);
   }
 
   return new Memory({
-    storage: new LibSQLStore({
-      id: "gordon-memory",
-      url: dbUrl,
-    }),
-    vector: new LibSQLVector({
-      id: "gordon-vector",
-      url: vectorDbUrl,
-    }),
-    embedder: createMastraLocalEmbedder(),
+    storage,
+    vector,
+    embedder: vector ? createMastraLocalEmbedder() : undefined,
     options: {
       lastMessages,
-      semanticRecall: {
-        topK: 5,
-        messageRange: {
-          before: 3,
-          after: 2,
-        },
-      },
+      semanticRecall: vector
+        ? {
+          topK: 5,
+          messageRange: {
+            before: 3,
+            after: 2,
+          },
+        }
+        : false,
       workingMemory: {
         enabled: true,
         template: WORKING_MEMORY_TEMPLATE,
@@ -509,11 +512,13 @@ let _subAgentMemory: Memory | null = null;
 function createSubAgentMemory(): Memory {
   if (!_subAgentMemory) {
     const dbUrl = process.env.DATABASE_URL || "file:gordon.db";
+    const { storage } = createMastraStorageConfig({
+      storeId: "gordon-sub-memory",
+      dbUrl,
+      enableVector: false,
+    });
     _subAgentMemory = new Memory({
-      storage: new LibSQLStore({
-        id: "gordon-sub-memory",
-        url: dbUrl,
-      }),
+      storage,
       options: {
         lastMessages: 10,
         workingMemory: {

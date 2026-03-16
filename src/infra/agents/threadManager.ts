@@ -7,9 +7,9 @@
  */
 
 import { Memory } from "@mastra/memory";
-import { LibSQLStore } from "@mastra/libsql";
 import { randomUUID } from "node:crypto";
 import { createModuleLogger } from "../logger/index.ts";
+import { createMastraStorageConfig } from "./mastraStorage.ts";
 import {
   loadSessionState,
   saveSessionState,
@@ -111,11 +111,13 @@ function getDbUrl(): string {
  */
 function createMemoryInstance(): Memory {
   const dbUrl = getDbUrl();
+  const { storage } = createMastraStorageConfig({
+    storeId: "gordon-memory",
+    dbUrl,
+    enableVector: false,
+  });
   return new Memory({
-    storage: new LibSQLStore({
-      id: "gordon-memory",
-      url: dbUrl,
-    }),
+    storage,
   });
 }
 

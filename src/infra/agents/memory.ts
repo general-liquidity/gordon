@@ -6,7 +6,7 @@
  */
 
 import { Memory } from "@mastra/memory";
-import { LibSQLStore } from "@mastra/libsql";
+import { createMastraStorageConfig } from "./mastraStorage.ts";
 
 // ============================================================================
 // Memory Store Configuration
@@ -15,14 +15,19 @@ import { LibSQLStore } from "@mastra/libsql";
 /**
  * Create a memory store for Gordon agent networks
  *
- * Uses LibSQL (SQLite-compatible) for local persistence.
- * In production, this can be swapped for Turso (hosted LibSQL).
+ * Uses LibSQL (SQLite-compatible) for local persistence when available.
+ * Standalone binaries fall back to in-memory storage if the native LibSQL runtime is unavailable.
  */
 export function createMemoryStore() {
   const dbUrl = process.env.GORDON_DATABASE_URL || process.env.DATABASE_URL || "file:gordon.db";
+  const { storage } = createMastraStorageConfig({
+    storeId: "gordon-memory",
+    dbUrl,
+    enableVector: false,
+  });
 
   return new Memory({
-    storage: new LibSQLStore({ id: "gordon-memory", url: dbUrl }),
+    storage,
   });
 }
 
