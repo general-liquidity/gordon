@@ -6,6 +6,8 @@
 import React, { useState, useCallback, useMemo } from "react";
 import { Box, Text, useInput } from "ink";
 import { COLORS } from "../theme.ts";
+import { DeskPanel } from "./desk/DeskPanel.tsx";
+import { TicketCard } from "./desk/TicketCard.tsx";
 
 interface PaginatedOutputProps<T> {
   /** The items to paginate */
@@ -107,12 +109,7 @@ export function PaginatedOutput<T>({
   if (items.length === 0) {
     return (
       <Box flexDirection="column" paddingX={1}>
-        {title && (
-          <Box marginBottom={1}>
-            <Text color={COLORS.WHITE} bold>{title}</Text>
-          </Box>
-        )}
-        <Text color={COLORS.DIM} italic>{emptyMessage}</Text>
+        <DeskPanel eyebrow="Output" title={title || "Paginated output"} subtitle={emptyMessage} tone="info" compact />
       </Box>
     );
   }
@@ -139,27 +136,12 @@ export function PaginatedOutput<T>({
       )}
 
       {/* Page info */}
-      <Box
-        borderStyle="single"
-        borderColor={COLORS.ACCENT_DIM}
-        paddingX={1}
-        marginBottom={1}
-        justifyContent="space-between"
-      >
-        <Text color={COLORS.DIM}>
-          Page{" "}
-          <Text color={COLORS.HIGHLIGHT} bold>
-            {currentPage + 1}
-          </Text>
-          {" "}of{" "}
-          <Text color={COLORS.WHITE}>
-            {totalPages}
-          </Text>
-        </Text>
-        <Text color={COLORS.DIM}>
-          Showing {startIndex + 1}-{endIndex} of {items.length}
-        </Text>
-      </Box>
+      <TicketCard
+        eyebrow="Page"
+        title={`${currentPage + 1} of ${totalPages}`}
+        subtitle={`Showing ${startIndex + 1}-${endIndex} of ${items.length}`}
+        tone="info"
+      />
 
       {/* Items */}
       <Box flexDirection="column" paddingX={1}>
@@ -172,9 +154,6 @@ export function PaginatedOutput<T>({
 
       {/* Navigation bar */}
       <Box
-        borderStyle="single"
-        borderColor={COLORS.DIM}
-        paddingX={1}
         marginTop={1}
         justifyContent="space-between"
       >

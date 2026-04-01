@@ -5,6 +5,7 @@ import type { CredentialProfile } from "../infra/actions/types.ts";
 import { COLORS } from "./theme.ts";
 import { TickerTape, type TickerItem } from "./components/effects/index.ts";
 import { StrategyRuntime } from "../core/runtime/index.ts";
+import { DeskRail } from "./components/desk/DeskRail.tsx";
 
 type ConnectionStatusType = "connected" | "disconnected" | "connecting";
 
@@ -74,7 +75,8 @@ const StatusColumn: React.FC<StatusColumnProps> = ({
   paddingRight = 1,
 }) => (
   <Box width={width} paddingRight={paddingRight}>
-    <Text color={COLORS.DIM}>{label}: </Text>
+    <Text color={COLORS.BRASS_DIM} bold>{label.toUpperCase()}</Text>
+    <Text color={COLORS.DIM}> · </Text>
     <Text color={valueColor} bold={valueBold} wrap="truncate-end">
       {value}
     </Text>
@@ -143,18 +145,18 @@ export const StatusBar: React.FC<StatusBarProps> = ({
     chainStatus?.base && !chainStatus?.cdp ? "BASE" : null,
   ].filter((value): value is string => Boolean(value));
 
-  const modeValue = activeStrategies > 0 ? `${mode} [${activeStrategies} active]` : mode;
+  const modeValue = activeStrategies > 0 ? `${mode} · ${activeStrategies} active` : mode;
   const portfolioValueLabel = configuredChains.length > 0
     ? `$${formatValue(portfolioValue)} · ${configuredChains.join(" ")}`
     : `$${formatValue(portfolioValue)}`;
   const threadValue = threadInfo
-    ? `${threadInfo.name}${threadInfo.isBranch ? " [branch]" : ""} (#${threadInfo.messageCount})`
+    ? `${threadInfo.name}${threadInfo.isBranch ? " · branch" : ""} · ${threadInfo.messageCount} msgs`
     : "---";
   const connectionValue = connectionStatus === "connecting"
-    ? "◐ Connecting"
+    ? "Connecting"
     : connectionStatus === "connected"
-      ? "●"
-      : "○";
+      ? "Online"
+      : "Offline";
   const connectionColor = connectionStatus === "connecting"
     ? COLORS.DISCOVER
     : connectionStatus === "connected"
@@ -163,26 +165,21 @@ export const StatusBar: React.FC<StatusBarProps> = ({
 
   return (
     <Box flexDirection="column" width="100%">
-      {/* Scrolling ticker tape — only shown when items are available */}
       {tickerItems && tickerItems.length > 0 && (
         <TickerTape items={tickerItems} speed={150} position="top" />
       )}
 
-      {/* Main status bar */}
-      <Box
-        borderStyle="single"
-        borderColor={COLORS.TAN_DIM}
-        paddingX={1}
-        paddingY={0}
-        width="100%"
-        flexDirection="column"
+      <DeskRail
+        title="Desk Rail"
+        subtitle={operatorStatus?.activityStatus ?? "Live market state"}
+        tone="brand"
       >
         <Box width="100%">
           <StatusColumn
             width={modeColumnWidth}
             label="Mode"
             value={modeValue}
-            valueColor={mode === "ARMED" ? COLORS.RED : COLORS.GREEN}
+            valueColor={mode === "ARMED" ? COLORS.RISK : COLORS.MONEY}
             valueBold={true}
           />
           <StatusColumn
@@ -194,7 +191,7 @@ export const StatusBar: React.FC<StatusBarProps> = ({
           />
           <StatusColumn
             width={portfolioColumnWidth}
-            label="Portfolio"
+            label="Book"
             value={portfolioValueLabel}
             valueColor={COLORS.WHITE}
             valueBold={true}
@@ -203,11 +200,11 @@ export const StatusBar: React.FC<StatusBarProps> = ({
             width={threadColumnWidth}
             label="Thread"
             value={threadValue}
-            valueColor={threadInfo?.isBranch ? COLORS.ANALYZE : COLORS.ACCENT}
+            valueColor={threadInfo?.isBranch ? COLORS.ANALYZE : COLORS.BRASS}
           />
           <StatusColumn
             width={apiColumnWidth}
-            label="API"
+            label="Link"
             value={connectionValue}
             valueColor={connectionColor}
             valueBold={true}
@@ -226,7 +223,7 @@ export const StatusBar: React.FC<StatusBarProps> = ({
               width={btcColumnWidth}
               label="Profile"
               value={operatorStatus.credentialProfile}
-              valueColor={operatorStatus.credentialProfile === "live" ? COLORS.TRADE : COLORS.ACCENT_DIM}
+              valueColor={operatorStatus.credentialProfile === "live" ? COLORS.TRADE : COLORS.BRASS_DIM}
             />
             <StatusColumn
               width={portfolioColumnWidth}
@@ -248,14 +245,14 @@ export const StatusBar: React.FC<StatusBarProps> = ({
                   : operatorStatus.requestState === "loading"
                     ? COLORS.DISCOVER
                     : operatorStatus.queueDepth > 0
-                      ? COLORS.ACCENT
+                      ? COLORS.AMBER
                       : COLORS.DIM
               }
               paddingRight={0}
             />
           </Box>
         )}
-      </Box>
+      </DeskRail>
     </Box>
   );
 };

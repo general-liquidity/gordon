@@ -146,24 +146,22 @@ export const TickerTape: React.FC<TickerTapeProps> = ({
   const segments = buildColoredSegments(items, start, termWidth, fullTape);
 
   return (
-    <Box
-      width={termWidth}
-      height={1}
-      overflow="hidden"
-      borderStyle="single"
-      borderTop={position === "bottom"}
-      borderBottom={position === "top"}
-      borderLeft={false}
-      borderRight={false}
-      borderColor={COLORS.DIM}
-    >
-      <Box>
-        {segments.map((seg, i) => (
-          <Text key={i} color={seg.color} bold={seg.bold} dimColor={seg.dim}>
-            {seg.text}
-          </Text>
-        ))}
+    <Box width={termWidth} flexDirection="column">
+      {position === "bottom" && (
+        <Text color={COLORS.DIM}>{"─".repeat(Math.max(1, termWidth - 1))}</Text>
+      )}
+      <Box height={1} overflow="hidden">
+        <Box>
+          {segments.map((seg, i) => (
+            <Text key={i} color={seg.color} bold={seg.bold} dimColor={seg.dim}>
+              {seg.text}
+            </Text>
+          ))}
+        </Box>
       </Box>
+      {position === "top" && (
+        <Text color={COLORS.DIM}>{"─".repeat(Math.max(1, termWidth - 1))}</Text>
+      )}
     </Box>
   );
 };

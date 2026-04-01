@@ -7,7 +7,10 @@ import {
   useGordonLoader,
 } from "./components/GordonLoader.tsx";
 import { MarkdownText } from "./components/MarkdownText.tsx";
+import { TranscriptBlock, type TranscriptVariant } from "./components/desk/TranscriptBlock.tsx";
 import { formatHiddenMessageNotice, formatHiddenNewerNotice } from "./threadDensity.ts";
+
+export type ChatMessageVariant = TranscriptVariant;
 
 export interface ChatMessage {
   role: "user" | "gordon";
@@ -15,6 +18,7 @@ export interface ChatMessage {
   timestamp?: string;
   agent?: string;
   badge?: string;
+  variant?: ChatMessageVariant;
 }
 
 interface ChatViewProps {
@@ -31,9 +35,42 @@ interface ChatViewProps {
 
 interface MessageBubbleProps {
   message: ChatMessage;
+  variant: ChatMessageVariant;
   isStreamingMessage?: boolean;
   activityStatus?: string | null;
   activeToolCall?: string | null;
+}
+
+export function inferMessageVariant(message: ChatMessage): ChatMessageVariant {
+  if (message.variant) {
+    return message.variant;
+  }
+
+  if (message.role === "user") {
+    return "user";
+  }
+
+  const badge = message.badge?.toLowerCase() ?? "";
+  const agent = message.agent?.toLowerCase() ?? "";
+
+  if (agent.includes("critic")) return "critic";
+  if (agent.includes("auditor")) return "auditor";
+  if (badge.includes("approval")) return "approval";
+  if (badge.includes("signal") || badge.includes("scan")) return "signal";
+  if (badge.includes("execution") || badge.includes("order") || badge.includes("fill")) return "execution";
+  if (badge.includes("tool") || badge.includes("plugin") || badge.includes("mcp")) return "tool";
+  if (badge.includes("system") || badge.includes("runtime")) return "system";
+  if (badge.includes("handoff")) return "handoff";
+
+  return "gordon";
+}
+
+export function normalizeChatMessage(message: ChatMessage): ChatMessage {
+  const variant = inferMessageVariant(message);
+  return {
+    ...message,
+    variant,
+  };
 }
 
 const StreamingStateLine: React.FC<{
@@ -78,58 +115,56 @@ const StreamingStateLine: React.FC<{
 
 const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({
   message,
+  variant,
   isStreamingMessage = false,
   activityStatus,
   activeToolCall,
 }) => {
-  const isUser = message.role === "user";
+  const isUser = variant === "user";
   const showAgentBadge = !isUser && message.agent && message.agent.toLowerCase() !== "gordon";
-  const roleLabel = isUser ? "You" : "Gordon";
-  const metaColor = isUser ? COLORS.DIM : COLORS.TAN;
+  const roleLabel = variant === "user"
+    ? "You"
+    : variant === "tool"
+      ? "Tool"
+      : variant === "system"
+        ? "System"
+        : variant === "approval"
+          ? "Approval Ticket"
+          : variant === "signal"
+            ? "Signal"
+            : variant === "execution"
+              ? "Execution"
+              : variant === "critic"
+                ? "Critic"
+                : variant === "auditor"
+                  ? "Auditor"
+                  : variant === "handoff"
+                    ? "Handoff"
+                    : "Gordon";
 
   return (
-    <Box
-      flexDirection="column"
-      marginY={0}
-      paddingX={0}
-      alignSelf={isUser ? "flex-end" : "flex-start"}
+    <TranscriptBlock
+      variant={variant}
+      title={roleLabel}
+      timestamp={message.timestamp}
+      badge={message.badge}
+      agent={showAgentBadge ? message.agent : undefined}
+      isStreaming={isStreamingMessage}
     >
-      {/* Message content */}
-      <Box
-        borderStyle="round"
-        borderColor={isUser ? COLORS.DIM : isStreamingMessage ? COLORS.HIGHLIGHT : COLORS.TAN_DIM}
-        paddingX={1}
-        marginLeft={isUser ? 2 : 0}
-        marginRight={isUser ? 0 : 2}
-        flexDirection="column"
-      >
-        <Box>
-          <Text color={metaColor} bold>{roleLabel}</Text>
-          {message.badge && (
-            <Text color={COLORS.HIGHLIGHT}> [{message.badge}]</Text>
-          )}
-          {showAgentBadge && (
-            <Text color={COLORS.CYAN} dimColor> via {message.agent}</Text>
-          )}
-          {message.timestamp && (
-            <Text color={COLORS.DIM}> {` · ${message.timestamp}`}</Text>
-          )}
-        </Box>
-        {isUser ? (
-          <Text color={COLORS.WHITE} wrap="wrap">
-            {message.content}
-          </Text>
-        ) : isStreamingMessage ? (
-          <StreamingStateLine
-            message={message}
-            activityStatus={activityStatus}
-            activeToolCall={activeToolCall}
-          />
-        ) : (
-          <MarkdownText>{message.content}</MarkdownText>
-        )}
-      </Box>
-    </Box>
+      {isUser ? (
+        <Text color={COLORS.WHITE} wrap="wrap">
+          {message.content}
+        </Text>
+      ) : isStreamingMessage ? (
+        <StreamingStateLine
+          message={message}
+          activityStatus={activityStatus}
+          activeToolCall={activeToolCall}
+        />
+      ) : (
+        <MarkdownText>{message.content}</MarkdownText>
+      )}
+    </TranscriptBlock>
   );
 });
 
@@ -147,6 +182,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
   const renderedMessages = messages
     .map((message, index) => ({ message, index }))
     .map(({ message, index }) => {
+      const variant = inferMessageVariant(message);
       const isStreamingMessage =
         isStreaming
         && message.role === "gordon"
@@ -157,6 +193,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
         <MessageBubble
           key={`${index}-${message.role}-${message.timestamp ?? "no-ts"}-${message.agent ?? "gordon"}-${message.badge ?? ""}`}
           message={message}
+          variant={variant}
           isStreamingMessage={isStreamingMessage}
           activityStatus={isStreamingMessage ? activityStatus : null}
           activeToolCall={isStreamingMessage ? activeToolCall : null}
@@ -165,11 +202,11 @@ export const ChatView: React.FC<ChatViewProps> = ({
     });
 
   return (
-    <Box flexDirection="column" flexGrow={1} paddingX={0}>
+    <Box flexDirection="column" flexGrow={1} paddingX={1}>
       {messages.length > 0 && (
         <>
           {hiddenBefore > 0 && (
-            <Box paddingX={0} paddingY={0}>
+            <Box paddingX={1} paddingY={0}>
               <Text color={COLORS.DIM}>
                 {formatHiddenMessageNotice(hiddenBefore, visibleLimit ?? messages.length)}
               </Text>
@@ -177,7 +214,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
           )}
           {renderedMessages}
           {hiddenAfter > 0 && (
-            <Box paddingX={0} paddingY={0}>
+            <Box paddingX={1} paddingY={0}>
               <Text color={COLORS.DIM}>
                 {formatHiddenNewerNotice(hiddenAfter)}
                 {!isPinnedBottom ? " Use PgDn or End to jump back to the live edge." : ""}

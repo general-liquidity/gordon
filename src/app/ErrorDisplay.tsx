@@ -2,6 +2,8 @@ import React, { useState, useMemo } from "react";
 import { Box, Text, useInput } from "ink";
 
 import { COLORS } from "./theme.ts";
+import { DeskPanel } from "./components/desk/DeskPanel.tsx";
+import { TicketCard } from "./components/desk/TicketCard.tsx";
 import {
   createErrorContext,
   detectErrorType,
@@ -387,12 +389,9 @@ export function ErrorDisplay({
       </Box>
 
       {/* Error message */}
-      <Box
-        borderStyle="single"
-        borderColor={categoryColor}
-        paddingX={2}
-        paddingY={1}
-        flexDirection="column"
+      <DeskPanel
+        tone={category === "connection" ? "warning" : category === "system" ? "info" : "danger"}
+        compact
       >
         <Text color={COLORS.WHITE}>{message}</Text>
 
@@ -411,7 +410,7 @@ export function ErrorDisplay({
             )}
           </Box>
         )}
-      </Box>
+      </DeskPanel>
 
       {/* Suggestions section */}
       {hasSuggestions && (
@@ -719,12 +718,8 @@ export function EnhancedErrorDisplay({
       </Box>
 
       {/* Main Error Box */}
-      <Box
-        borderStyle="single"
-        borderColor={categoryColor}
-        paddingX={2}
-        paddingY={1}
-        flexDirection="column"
+      <DeskPanel
+        tone={errorType === "TRADING_MODE" ? "info" : errorType === "RATE_LIMIT" || errorType === "TIMEOUT" || errorType === "NETWORK_ERROR" || errorType === "INVALID_SYMBOL" ? "warning" : "danger"}
       >
         {/* What Happened Section */}
         <Box flexDirection="column">
@@ -773,7 +768,7 @@ export function EnhancedErrorDisplay({
             </Box>
           )}
         </Box>
-      </Box>
+      </DeskPanel>
 
       {/* Recovery Section */}
       {errorCtx.recoverySteps.length > 0 && (

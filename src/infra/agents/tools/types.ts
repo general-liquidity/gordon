@@ -61,6 +61,7 @@ export function getGordonContext(execContext?: MastraExecutionContext): GordonCo
     requestedActionId: rc.get("requestedActionId") as string | undefined,
     requestedTaskScope: rc.get("requestedTaskScope") as ActionTaskScope | undefined,
     credentialProfile: rc.get("credentialProfile") as CredentialProfile | undefined,
+    runtime: rc.get("runtime") as GordonContext["runtime"],
   } as GordonContext;
 }
 

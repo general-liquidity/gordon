@@ -46,6 +46,9 @@ export function createDefaultRuntimeSessionState(runtimeId: string, sessionId?: 
     },
     tooling: {
       lastSyncedAt: null,
+      lastReloadAt: null,
+      hotReloadEnabled: false,
+      routingCount: 0,
       plugins: [],
       mcpServers: [],
       tools: [],

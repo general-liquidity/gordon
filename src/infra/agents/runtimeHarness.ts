@@ -557,11 +557,11 @@ export function classifyRecoveryGuidance(
   if (recoveryContext.emptyResponse) {
     return {
       category: "empty_response",
-      title: "The run completed without a usable reply",
-      detail: "Gordon finished the run but the active model/tool chain did not yield usable text.",
+      title: "No usable reply returned",
+      detail: "The run finished, but the current model or tool chain came back empty.",
       nextSteps: [
-        "Retry the request once the provider and venue are healthy.",
-        "If this keeps happening, use a narrower request or a different model manually.",
+        "Retry once after narrowing the request.",
+        "If it repeats, switch models or check provider health.",
       ],
     };
   }
@@ -578,13 +578,16 @@ export function classifyRecoveryGuidance(
 }
 
 export function formatRecoveryGuidance(guidance: RecoveryGuidance): string {
-  return [
+  const lines = [
     `${guidance.title}.`,
     guidance.detail,
-    "",
-    "Next steps:",
-    ...guidance.nextSteps.map((step) => `- ${step}`),
-  ].join("\n");
+  ];
+
+  if (guidance.nextSteps.length > 0) {
+    lines.push("", `Try: ${guidance.nextSteps.join(" ")}`);
+  }
+
+  return lines.join("\n");
 }
 
 function buildPreviewText(serialized: string): string {

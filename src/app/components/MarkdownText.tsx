@@ -6,6 +6,7 @@
 import React from "react";
 import { Text, Box } from "ink";
 import { COLORS } from "../theme.ts";
+import { DeskPanel } from "./desk/DeskPanel.tsx";
 
 interface MarkdownTextProps {
   children: string;
@@ -35,20 +36,18 @@ export const MarkdownText: React.FC<MarkdownTextProps> = ({
       if (inCodeBlock) {
         // End code block
         elements.push(
-          <Box
+          <DeskPanel
             key={`code-block-${i}`}
-            flexDirection="column"
-            borderStyle="single"
-            borderColor={COLORS.DIM}
-            paddingX={1}
-            marginY={1}
+            eyebrow="Code"
+            tone="neutral"
+            compact
           >
             {codeBlockContent.map((codeLine, j) => (
               <Text key={`code-line-${i}-${j}`} color={COLORS.ACCENT_DIM}>
                 {codeLine}
               </Text>
             ))}
-          </Box>
+          </DeskPanel>
         );
         codeBlockContent = [];
         inCodeBlock = false;

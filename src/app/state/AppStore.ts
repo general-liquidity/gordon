@@ -3,7 +3,7 @@ import type { ConfigLayers } from "../../infra/storage/config.ts";
 import type { SessionInfo } from "../../infra/storage/session.ts";
 import type { Mode } from "../../types/index.ts";
 import type { ScanExportData, AnalysisExportData, BacktestExportData } from "../commands/export.ts";
-import type { ChatMessage } from "../ChatView.tsx";
+import { normalizeChatMessage, type ChatMessage } from "../ChatView.tsx";
 import type { ChainStatusInfo, ThreadStatusInfo } from "../StatusBar.tsx";
 import type { OverlayState } from "../overlayState.ts";
 import type { RuntimeInspectorViewModel } from "../presenters/RuntimePresenter.ts";
@@ -81,6 +81,11 @@ export interface AppStateStore {
   getState(): AppState;
   setState(updater: (previous: AppState) => AppState): AppState;
   patchState(patch: Partial<AppState>): AppState;
+  updateMessages(updater: (messages: ChatMessage[]) => ChatMessage[]): AppState;
+  appendMessages(messages: ChatMessage[]): AppState;
+  replaceMessages(messages: ChatMessage[]): AppState;
+  setView(view: AppView): AppState;
+  setRuntimeInspector(runtimeInspector: RuntimeInspectorViewModel | null): AppState;
   subscribe(listener: () => void): () => void;
 }
 
@@ -136,6 +141,9 @@ export function createAppStore(initialState: AppState): AppStateStore {
     return state;
   };
 
+  const normalizeMessages = (messages: ChatMessage[]): ChatMessage[] =>
+    messages.map((message) => normalizeChatMessage(message));
+
   return {
     getState(): AppState {
       return state;
@@ -145,6 +153,39 @@ export function createAppStore(initialState: AppState): AppStateStore {
       return setState((previous) => ({
         ...previous,
         ...patch,
+      }));
+    },
+    updateMessages(updater: (messages: ChatMessage[]) => ChatMessage[]): AppState {
+      return setState((previous) => ({
+        ...previous,
+        messages: normalizeMessages(updater(previous.messages)),
+      }));
+    },
+    appendMessages(messages: ChatMessage[]): AppState {
+      if (messages.length === 0) {
+        return state;
+      }
+      return setState((previous) => ({
+        ...previous,
+        messages: [...previous.messages, ...normalizeMessages(messages)],
+      }));
+    },
+    replaceMessages(messages: ChatMessage[]): AppState {
+      return setState((previous) => ({
+        ...previous,
+        messages: normalizeMessages([...messages]),
+      }));
+    },
+    setView(view: AppView): AppState {
+      return setState((previous) => ({
+        ...previous,
+        view,
+      }));
+    },
+    setRuntimeInspector(runtimeInspector: RuntimeInspectorViewModel | null): AppState {
+      return setState((previous) => ({
+        ...previous,
+        runtimeInspector,
       }));
     },
     subscribe(listener: () => void): () => void {

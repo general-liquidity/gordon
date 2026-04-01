@@ -5,6 +5,9 @@ import { FocusSelect } from "./components/PromptPrimitives.tsx";
 import { COLORS } from "./theme.ts";
 import type { Mode } from "../types/index.ts";
 import { WORKFLOW_CONFIG, type WorkflowGroup } from "./commandUx.ts";
+import { DeskPanel } from "./components/desk/DeskPanel.tsx";
+import { TicketCard } from "./components/desk/TicketCard.tsx";
+import { BlotterRow } from "./components/desk/BlotterRow.tsx";
 
 export type MenuOption =
   | "chat"
@@ -266,86 +269,73 @@ export const QuickStartMenu: React.FC<QuickStartMenuProps> = ({
 
   return (
     <Box flexDirection="column" paddingX={2} paddingY={1}>
-      <Box marginBottom={1} gap={2}>
-        <Text color={COLORS.ACCENT} bold>
-          {title}
-        </Text>
-        <Badge color={mode === "ARMED" ? "red" : "green"}>
-          {modeLabel}
-        </Badge>
-        <Badge color={!setupComplete || !hasVenue ? "blue" : "green"}>
-          {readinessLabel}
-        </Badge>
-      </Box>
-
-      <Box marginBottom={1} flexDirection="column">
-        <Text color={COLORS.WHITE} bold>
-          {subtitle}
-        </Text>
+      <DeskPanel
+        eyebrow={isOverlay ? "Action Palette" : "Desk Actions"}
+        title={title}
+        subtitle={subtitle}
+        tone="brand"
+      >
+        <Box gap={2} marginBottom={1}>
+          <Badge color={mode === "ARMED" ? "red" : "green"}>
+            {modeLabel}
+          </Badge>
+          <Badge color={!setupComplete || !hasVenue ? "blue" : "green"}>
+            {readinessLabel}
+          </Badge>
+        </Box>
         <Text color={COLORS.DIM}>
-              {workflow === "root"
+          {workflow === "root"
             ? connectedLabel
               ? `Connected: ${connectedLabel}`
               : "Connected: none yet"
             : WORKFLOW_CONFIG[workflow].description}
         </Text>
-      </Box>
+      </DeskPanel>
 
-      <Box marginBottom={1}>
+      {workflow === "root" && (
+        <Box flexDirection="column" marginTop={1}>
+          <Box marginBottom={1}>
+            <TicketCard
+              eyebrow="Desk Posture"
+              title={mode === "SAFE" ? "Read-only desk" : "Live desk enabled"}
+              subtitle={
+                mode === "SAFE"
+                  ? "Scan, analyze, and preview. No live execution."
+                  : "Execution paths are available, but Gordon still requests approval."
+              }
+              tone={mode === "SAFE" ? "info" : "danger"}
+              actions={["/arm", "/disarm"]}
+            >
+              <Text color={COLORS.DIM}>
+                {mode === "SAFE"
+                  ? "Use SAFE while shaping the thesis and trade ticket."
+                  : "Use ARMED only when the desk is staffed and approvals are intentional."}
+              </Text>
+            </TicketCard>
+          </Box>
+          <DeskPanel eyebrow="Recommended Flow" title="Run the desk in sequence" tone="operate" compact>
+            <BlotterRow label="1" value="Scan the tape" detail="Start with movers, regime, or one symbol." tone="info" />
+            <BlotterRow label="2" value="Build the ticket" detail="Analyze, plan, and pressure-test the setup." tone="analysis" />
+            <BlotterRow label="3" value="Preview before action" detail="Route into preview or live execution only after the thesis is clean." tone="success" />
+          </DeskPanel>
+        </Box>
+      )}
+
+      <Box marginTop={1}>
         <FocusSelect
-          title={workflow === "root" ? undefined : WORKFLOW_CONFIG[workflow].label}
-          hint={workflow === "root" ? "Start with one action. Chat handles the rest." : undefined}
+          title={workflow === "root" ? "Choose the next desk action" : WORKFLOW_CONFIG[workflow].label}
+          hint={workflow === "root" ? "One move is enough. Typing jumps straight back into chat." : "Workflow actions stay narrow on purpose."}
           options={menuOptions}
           onChange={handleSelection}
         />
       </Box>
 
-      <Box
-        borderStyle="single"
-        borderColor={mode === "ARMED" ? COLORS.RED : COLORS.GREEN}
-        paddingX={2}
-        paddingY={1}
-        marginTop={1}
-      >
-        <Box flexDirection="column">
-          <Text color={COLORS.WHITE} bold>
-            {mode === "SAFE" ? "[READ-ONLY]" : "[LIVE ENABLED]"}
-          </Text>
-          <Text color={COLORS.DIM}>
-            {mode === "SAFE"
-              ? "Analysis and previews only. No live orders will execute."
-              : "Live trading is enabled. Gordon will still require approval on execution paths."}
-          </Text>
-          <Box marginTop={1}>
-            <Text color={COLORS.DIM}>
-              Type <Text color={COLORS.ACCENT}>/arm</Text> or <Text color={COLORS.ACCENT}>/disarm</Text> to change execution permission
-            </Text>
-          </Box>
-        </Box>
-      </Box>
-
-      <Box
-        borderStyle="round"
-        borderColor={COLORS.DIM}
-        paddingX={2}
-        paddingY={1}
-        marginTop={1}
-      >
-        <Box flexDirection="column">
+      <Box marginTop={1}>
+        <DeskPanel eyebrow="Desk Shortcuts" title="Move fast" subtitle={hintText} tone="neutral" compact>
           <Text color={COLORS.WHITE}>
-            Use <Text color={COLORS.ACCENT}>/help discover</Text>, <Text color={COLORS.ACCENT}>/help trade</Text>, or <Text color={COLORS.ACCENT}>/help operate</Text> to browse workflows directly.
+            Use <Text color={COLORS.ACCENT}>/help discover</Text>, <Text color={COLORS.ACCENT}>/help trade</Text>, or <Text color={COLORS.ACCENT}>/help operate</Text> to browse the desk by workflow.
           </Text>
-          <Box marginTop={1}>
-            <Text color={COLORS.DIM}>
-              {hintText}
-            </Text>
-          </Box>
-          <Box marginTop={1}>
-            <Text color={COLORS.DIM}>
-              Recommended flow: scan, analyze one symbol, then preview before execution.
-            </Text>
-          </Box>
-        </Box>
+        </DeskPanel>
       </Box>
     </Box>
   );

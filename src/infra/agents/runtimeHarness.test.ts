@@ -75,7 +75,7 @@ describe("runtimeHarness", () => {
       { phase: "analysis" },
     );
     expect(guidance.category).toBe("provider_throttle");
-    expect(formatRecoveryGuidance(guidance)).toContain("Next steps");
+    expect(formatRecoveryGuidance(guidance)).toContain("Try:");
   });
 
   it("offloads large tool payloads to scratch files", async () => {

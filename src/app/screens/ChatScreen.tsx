@@ -1,12 +1,9 @@
 import React from "react";
-import { Box, Text } from "ink";
+import { Box, Text, useStdout } from "ink";
 import { ChatInput } from "../ChatInput.tsx";
 import { ChatView, type ChatMessage } from "../ChatView.tsx";
-import { WelcomeBanner } from "../WelcomeBanner.tsx";
 import { QuickStartMenu, type MenuOption } from "../QuickStartMenu.tsx";
-import { TaskTree } from "../components/TaskTree.tsx";
 import { ShortcutsHint } from "../components/ShortcutsOverlay.tsx";
-import { ProgressIndicator, StreamingProgress } from "../components/ProgressIndicator.tsx";
 import RuntimeInspector from "../components/RuntimeInspector.tsx";
 import { COLORS } from "../theme.ts";
 import type { QuickActionContext } from "../commandUx.ts";
@@ -45,6 +42,7 @@ interface ChatScreenProps {
   isLoading: boolean;
   chatInputPlaceholder: string;
   quickActionContext: QuickActionContext;
+  hasConversationMomentum: boolean;
   onSubmit: (value: string) => Promise<void>;
   onOpenQuickActions: () => void;
   onTypingStateChange: (typing: boolean) => void;
@@ -56,27 +54,93 @@ interface ChatScreenProps {
 }
 
 export function ChatScreen(props: ChatScreenProps): React.ReactElement {
+  const { stdout } = useStdout();
+  const widescreen = (stdout?.columns ?? 0) >= 170;
+  const columns = stdout?.columns ?? 80;
+  const runStatusTone = props.isStreaming
+    ? COLORS.MONEY
+    : props.queuedCount > 0
+      ? COLORS.AMBER
+      : COLORS.ACCENT;
+  const runStatusLabel = props.isStreaming
+    ? "LIVE"
+    : props.isLoading
+      ? "BOOT"
+      : "QUEUE";
+  const runStatusText = props.activityStatus
+    ?? (props.queuedCount > 0
+      ? `Queued follow-ups: ${props.queuedCount}`
+      : "The desk is routing the current request.");
+  const showRuntimeRail = Boolean(
+    props.runtimeInspector
+    && (
+      !props.busy
+      || props.runtimeInspector.pendingApprovalCount > 0
+      || props.runtimeInspector.backgroundTaskCount > 0
+      || props.runtimeInspector.activeBridgeSessions > 0
+    ),
+  );
+  const footerText = props.busy
+    ? (columns >= 110 ? "Enter queues follow-up · Esc stops current run · /help" : "Enter queues · Esc stops")
+    : columns >= 130
+      ? "Ctrl+K actions · PgUp/PgDn/Home/End transcript · /menu actions · /help commands"
+      : columns >= 100
+        ? "Ctrl+K actions · PgUp/PgDn transcript · /help"
+        : "Ctrl+K · Pg keys · /help";
+
   return (
     <Box flexDirection="column" flexGrow={1}>
       {props.showStartupHint && props.allMessagesCount === 0 && !props.showChatBanner && (
         <ShortcutsHint duration={5000} visible={props.showStartupHint} />
       )}
 
-      {props.showChatBanner && (
-        <WelcomeBanner mode={props.startupBannerMode} context="chat" />
-      )}
+      <Box flexDirection={widescreen ? "row" : "column"} flexGrow={1}>
+        <Box flexDirection="column" flexGrow={1}>
+          <ChatView
+            messages={props.visibleMessages}
+            hiddenBefore={props.hiddenBefore}
+            hiddenAfter={props.hiddenAfter}
+            visibleLimit={props.visibleLimit}
+            isPinnedBottom={props.isPinnedBottom}
+            isStreaming={props.isStreaming}
+            activeStreamingTimestamp={props.activeStreamingTimestamp}
+            activityStatus={props.activityStatus}
+            activeToolCall={props.activeToolCall}
+          />
 
-      <ChatView
-        messages={props.visibleMessages}
-        hiddenBefore={props.hiddenBefore}
-        hiddenAfter={props.hiddenAfter}
-        visibleLimit={props.visibleLimit}
-        isPinnedBottom={props.isPinnedBottom}
-        isStreaming={props.isStreaming}
-        activeStreamingTimestamp={props.activeStreamingTimestamp}
-        activityStatus={props.activityStatus}
-        activeToolCall={props.activeToolCall}
-      />
+          {(props.isLoading || props.isStreaming || props.queuedCount > 0) && (
+            <Box marginX={1} marginBottom={1}>
+              <Box paddingX={1}>
+                <Text color={runStatusTone} bold>
+                  {runStatusLabel}
+                </Text>
+                <Text color={COLORS.DIM}>
+                  {" "}{runStatusText}
+                </Text>
+                {props.queuedCount > 0 && props.queuedPreview && (
+                  <Text color={COLORS.DIM}>
+                    {" "}· next {props.queuedPreview}
+                    {props.queuedCount > 1 ? ` (+${props.queuedCount - 1})` : ""}
+                  </Text>
+                )}
+              </Box>
+            </Box>
+          )}
+        </Box>
+
+        {(showRuntimeRail || (props.backgroundTaskTree && !props.busy)) && (
+          <Box
+            flexDirection="column"
+            width={widescreen ? 36 : undefined}
+            marginLeft={widescreen ? 1 : 0}
+            marginTop={widescreen ? 0 : 1}
+          >
+            {showRuntimeRail && (
+              <RuntimeInspector inspector={props.runtimeInspector} />
+            )}
+          </Box>
+        )}
+      </Box>
 
       {props.quickActionsOverlayOpen && (
         <QuickStartMenu
@@ -89,72 +153,6 @@ export function ChatScreen(props: ChatScreenProps): React.ReactElement {
           hasWalletRails={props.hasWalletRails}
           hasMcpServers={props.hasMcpServers}
           variant="overlay"
-        />
-      )}
-
-      {(props.isLoading || props.isStreaming || props.queuedCount > 0) && (
-        <Box
-          flexDirection="column"
-          borderStyle="round"
-          borderColor={COLORS.ACCENT_DIM}
-          marginX={2}
-          marginBottom={1}
-          paddingX={1}
-        >
-          <Text color={COLORS.WHITE}>
-            {props.isStreaming
-              ? "Run active"
-              : props.isLoading
-                ? "Run starting"
-                : "Queue ready"}
-            {props.activityStatus ? `: ${props.activityStatus}` : ""}
-          </Text>
-          <Text color={COLORS.DIM}>
-            Esc stops the active streamed response when possible. Enter queues a follow-up. Use /steer {"<message>"} to redirect the next run.
-          </Text>
-          {props.taskTree && <TaskTree tree={props.taskTree} />}
-          {props.queuedCount > 0 && props.queuedPreview && (
-            <Text color={COLORS.HIGHLIGHT}>
-              Next queued: {props.queuedPreview}
-              {props.queuedCount > 1 ? ` (+${props.queuedCount - 1} more)` : ""}
-            </Text>
-          )}
-        </Box>
-      )}
-
-      {props.backgroundTaskTree && (
-        <Box
-          flexDirection="column"
-          borderStyle="round"
-          borderColor={COLORS.TAN_DIM}
-          marginX={2}
-          marginBottom={1}
-          paddingX={1}
-        >
-          <Text color={COLORS.DIM}>
-            Daemon-owned work continues outside the active chat run.
-          </Text>
-          <TaskTree tree={props.backgroundTaskTree} title="Background Tasks" staticCompleted={false} />
-        </Box>
-      )}
-
-      <RuntimeInspector inspector={props.runtimeInspector} />
-
-      {props.isLoading && (
-        <ProgressIndicator
-          label={props.activityStatus || "Gordon is thinking..."}
-          status="Routing request and preparing the response..."
-          onCancel={props.onCancel}
-          cancellable={props.canCancel}
-        />
-      )}
-
-      {props.isStreaming && (
-        <StreamingProgress
-          operation={props.activityStatus || "Streaming response..."}
-          currentTool={props.activeToolCall}
-          isStreaming={props.isStreaming}
-          onCancel={props.onCancel}
         />
       )}
 
@@ -174,11 +172,12 @@ export function ChatScreen(props: ChatScreenProps): React.ReactElement {
         seedValue={props.seedValue}
         seedNonce={props.seedNonce}
         quickActionContext={props.quickActionContext}
+        hasConversationMomentum={props.hasConversationMomentum}
       />
 
       <Box paddingX={2} paddingY={0}>
         <Text color={COLORS.DIM}>
-          Ctrl+K: actions | PgUp/PgDn/Home/End: transcript | ESC: stop agent response | /menu: actions | /help: commands
+          {footerText}
         </Text>
       </Box>
     </Box>

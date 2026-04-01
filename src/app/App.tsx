@@ -8,6 +8,7 @@ import {
 import { WelcomeBanner } from "./WelcomeBanner.tsx";
 import { QuickStartMenu, type MenuOption } from "./QuickStartMenu.tsx";
 import { ChatView, type ChatMessage } from "./ChatView.tsx";
+import { appendPendingApprovalMessages, hasConversationMomentum } from "./chatFlow.ts";
 import { Onboarding } from "./Onboarding.tsx";
 import { QuickStartWizard } from "./QuickStartWizard.tsx";
 import { SetupWizard } from "./SetupWizard.tsx";
@@ -150,9 +151,9 @@ import {
 } from "../infra/action-log/index.ts";
 import { rebuildACEMemoryForThread } from "../infra/agents/aceMemory.ts";
 import { getArmedStatus } from "../infra/agents/middleware/access-control.ts";
-import { parseSystemShortcut } from "./systemCommandShortcuts.ts";
+import { parseRuntimeApprovalShortcut, parseSystemShortcut } from "./systemCommandShortcuts.ts";
 import { SessionRuntimeFactory, type SessionRuntime } from "../runtime/index.ts";
-import type { RuntimeTranscriptEntry } from "../runtime/contracts/types.ts";
+import type { RuntimeApprovalRequest, RuntimeTranscriptEntry } from "../runtime/contracts/types.ts";
 import {
   createAppStore,
   createInitialAppState,
@@ -172,6 +173,7 @@ import {
   formatRuntimeBridge,
   formatRuntimeHistory,
   formatRuntimeHandoffs,
+  formatRuntimePlugins,
   formatRuntimeScratchpad,
   formatRuntimeSessionInfo,
   formatRuntimeState,
@@ -339,19 +341,27 @@ function toChatMessageFromRuntimeTranscript(entry: RuntimeTranscriptEntry): Chat
 
   let badge: string | undefined;
   let agent: string | undefined;
+  let variant: ChatMessage["variant"];
 
   switch (entry.role) {
     case "system":
       badge = "System";
+      variant = "system";
       break;
     case "tool":
       badge = "Tool";
+      variant = "tool";
       break;
     case "agent":
       badge = "Agent";
+      variant = "handoff";
       break;
     default:
       break;
+  }
+
+  if (typeof metadata.uiVariant === "string") {
+    variant = metadata.uiVariant as ChatMessage["variant"];
   }
 
   if (typeof metadata.activeAgent === "string") {
@@ -371,6 +381,7 @@ function toChatMessageFromRuntimeTranscript(entry: RuntimeTranscriptEntry): Chat
     timestamp,
     badge,
     agent,
+    variant,
   };
 }
 
@@ -449,24 +460,6 @@ function stripStocksMarketPrefix(args: string): string {
 }
 
 const STARTUP_TASK_CONCURRENCY = 2;
-
-function getMaxTranscriptBottomOffset(state: Pick<AppState, "messages" | "isStreaming" | "taskTree" | "backgroundTaskTree">): number {
-  const policy = buildVisibleThreadPolicy({
-    messages: state.messages,
-    isStreaming: state.isStreaming,
-    hasTaskTree: Boolean(state.taskTree),
-    hasBackgroundTasks: Boolean(state.backgroundTaskTree),
-  });
-
-  return Math.max(0, state.messages.length - policy.visibleLimit);
-}
-
-function clampTranscriptBottomOffset(
-  state: Pick<AppState, "messages" | "isStreaming" | "taskTree" | "backgroundTaskTree">,
-  requestedOffset: number,
-): number {
-  return Math.max(0, Math.min(requestedOffset, getMaxTranscriptBottomOffset(state)));
-}
 
 async function runDeferredTasksWithConcurrency(
   tasks: Array<() => Promise<void>>,
@@ -613,6 +606,32 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
   const backgroundTaskTreeSignatureRef = useRef<string | null>(null);
   const backgroundRefreshLastRanAtRef = useRef(0);
 
+  const getTranscriptMessagesForState = useCallback((
+    snapshot: Pick<AppState, "messages">,
+  ): ChatMessage[] => appendPendingApprovalMessages(
+    snapshot.messages,
+    getSessionRuntime("app").getState().approvals.pending,
+  ), [getSessionRuntime]);
+
+  const getTranscriptMaxOffset = useCallback((
+    snapshot: Pick<AppState, "messages" | "isStreaming" | "taskTree" | "backgroundTaskTree">,
+  ): number => {
+    const transcriptMessages = getTranscriptMessagesForState(snapshot);
+    const policy = buildVisibleThreadPolicy({
+      messages: transcriptMessages,
+      isStreaming: snapshot.isStreaming,
+      hasTaskTree: Boolean(snapshot.taskTree),
+      hasBackgroundTasks: Boolean(snapshot.backgroundTaskTree),
+    });
+
+    return Math.max(0, transcriptMessages.length - policy.visibleLimit);
+  }, [getTranscriptMessagesForState]);
+
+  const clampTranscriptOffset = useCallback((
+    snapshot: Pick<AppState, "messages" | "isStreaming" | "taskTree" | "backgroundTaskTree">,
+    requestedOffset: number,
+  ): number => Math.max(0, Math.min(requestedOffset, getTranscriptMaxOffset(snapshot))), [getTranscriptMaxOffset]);
+
   useEffect(() => {
     transcriptBottomOffsetRef.current = state.transcriptBottomOffset;
   }, [state.transcriptBottomOffset]);
@@ -662,7 +681,7 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
 
   useEffect(() => {
     const previousCount = previousMessageCountRef.current;
-    const nextCount = state.messages.length;
+    const nextCount = getTranscriptMessagesForState({ messages: state.messages }).length;
 
     if (state.view === "chat" && previousCount !== 0 && nextCount !== previousCount) {
       const delta = nextCount - previousCount;
@@ -671,7 +690,7 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
           return prev;
         }
 
-        const nextOffset = clampTranscriptBottomOffset(prev, prev.transcriptBottomOffset + delta);
+        const nextOffset = clampTranscriptOffset(prev, prev.transcriptBottomOffset + delta);
         if (nextOffset === prev.transcriptBottomOffset) {
           return prev;
         }
@@ -684,7 +703,16 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
     }
 
     previousMessageCountRef.current = nextCount;
-  }, [state.messages.length, state.view]);
+  }, [
+    clampTranscriptOffset,
+    getTranscriptMessagesForState,
+    state.backgroundTaskTree,
+    state.isStreaming,
+    state.messages,
+    state.runtimeInspector?.pendingApprovalCount,
+    state.taskTree,
+    state.view,
+  ]);
 
   useEffect(() => {
     void syncRuntimeToolingState();
@@ -942,32 +970,26 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
       return;
     }
 
-    setState((prev) => ({
-      ...prev,
-      messages: [...prev.messages, ...nextMessages],
-    }));
-  }, []);
+    appStore.appendMessages(nextMessages);
+  }, [appStore]);
 
   const updateMessageByTimestamp = useCallback((
     timestamp: string,
     updater: (message: ChatMessage) => ChatMessage
   ): void => {
-    setState((prev) => {
-      const nextMessages = [...prev.messages];
+    appStore.updateMessages((previousMessages) => {
+      const nextMessages = [...previousMessages];
       for (let i = nextMessages.length - 1; i >= 0; i--) {
         const message = nextMessages[i];
         if (message && message.timestamp === timestamp && message.role === "gordon") {
           nextMessages[i] = updater(message);
-          return {
-            ...prev,
-            messages: nextMessages,
-          };
+          return nextMessages;
         }
       }
 
-      return prev;
+      return previousMessages;
     });
-  }, []);
+  }, [appStore]);
 
   const refreshResolvedConfig = useCallback(async (): Promise<GordonConfig> => {
     const resolved = await loadConfigBundle();
@@ -1936,7 +1958,7 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
         return prev;
       }
 
-      const nextOffset = clampTranscriptBottomOffset(prev, prev.transcriptBottomOffset + delta);
+      const nextOffset = clampTranscriptOffset(prev, prev.transcriptBottomOffset + delta);
       if (nextOffset === prev.transcriptBottomOffset && !prev.showStartupHint) {
         return prev;
       }
@@ -1947,7 +1969,7 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
         showStartupHint: false,
       };
     });
-  }, []);
+  }, [clampTranscriptOffset]);
 
   const jumpTranscriptToBottom = useCallback((): void => {
     setState((prev) => {
@@ -1973,7 +1995,7 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
         return prev;
       }
 
-      const nextOffset = getMaxTranscriptBottomOffset(prev);
+      const nextOffset = getTranscriptMaxOffset(prev);
       if (nextOffset === prev.transcriptBottomOffset && !prev.showStartupHint) {
         return prev;
       }
@@ -1984,7 +2006,7 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
         showStartupHint: false,
       };
     });
-  }, []);
+  }, [getTranscriptMaxOffset]);
 
   const openChatWorkspace = useCallback((options?: { seed?: string; resetInput?: boolean }): void => {
     setState((prev) => ({
@@ -2045,6 +2067,26 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
 
     const parsedCommand = parseSlashCommand(normalizedValue);
     if (!parsedCommand) {
+      const approvalShortcut = parseRuntimeApprovalShortcut(normalizedValue);
+      if (approvalShortcut) {
+        const approvalArgs = [
+          approvalShortcut.requestId,
+          approvalShortcut.persist ? "persist" : null,
+          approvalShortcut.decision === "deny" ? approvalShortcut.reason ?? null : null,
+        ].filter(Boolean).join(" ");
+
+        await runLocalCommand(
+          value,
+          approvalShortcut.decision === "approve" ? "runtime approve" : "runtime deny",
+          async () => applyRuntimeApprovalDecision(
+            getSessionRuntime("app"),
+            approvalArgs,
+            approvalShortcut.decision,
+          ),
+        );
+        return;
+      }
+
       const systemShortcut = parseSystemShortcut(normalizedValue);
       if (systemShortcut === "status") {
         await runLocalCommand(value, "status", async () => getSystemStatusSummary());
@@ -2275,6 +2317,11 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
 
       if (command.action === "menu" && command.target === "runtime-state") {
         void runLocalCommand(value, "runtime", async () => formatRuntimeState(getSessionRuntime("app")));
+        return;
+      }
+
+      if (command.action === "menu" && command.target === "runtime-plugins") {
+        void runLocalCommand(value, "runtime plugins", async () => formatRuntimePlugins(getSessionRuntime("app")));
         return;
       }
 
@@ -5093,15 +5140,28 @@ Please check your API keys in the .env file and restart Gordon.`,
     isActive: true,
   });
 
+  const pendingApprovals = useMemo((): RuntimeApprovalRequest[] => (
+    getSessionRuntime("app").getState().approvals.pending
+  ), [
+    getSessionRuntime,
+    state.runtimeInspector?.lastUpdatedAt,
+    state.runtimeInspector?.pendingApprovalCount,
+  ]);
+
+  const transcriptMessages = useMemo(
+    () => getTranscriptMessagesForState(state),
+    [getTranscriptMessagesForState, pendingApprovals, state.messages]
+  );
+
   const visibleThreadPolicy = useMemo(
     () => buildVisibleThreadPolicy({
-      messages: state.messages,
+      messages: transcriptMessages,
       isStreaming: state.isStreaming,
       hasTaskTree: Boolean(state.taskTree),
       hasBackgroundTasks: Boolean(state.backgroundTaskTree),
       bottomOffset: state.transcriptBottomOffset,
     }),
-    [state.backgroundTaskTree, state.isStreaming, state.messages, state.taskTree, state.transcriptBottomOffset]
+    [state.backgroundTaskTree, state.isStreaming, state.taskTree, state.transcriptBottomOffset, transcriptMessages]
   );
   const maxVisibleMessages = visibleThreadPolicy.visibleLimit;
   const transcriptPageSize = useMemo(
@@ -5109,9 +5169,10 @@ Please check your API keys in the .env file and restart Gordon.`,
     [visibleThreadPolicy.visibleLimit]
   );
   const visibleMessages = useMemo(
-    () => state.messages.slice(visibleThreadPolicy.startIndex, visibleThreadPolicy.endIndex),
-    [state.messages, visibleThreadPolicy.endIndex, visibleThreadPolicy.startIndex]
+    () => transcriptMessages.slice(visibleThreadPolicy.startIndex, visibleThreadPolicy.endIndex),
+    [transcriptMessages, visibleThreadPolicy.endIndex, visibleThreadPolicy.startIndex]
   );
+  const transcriptHasMomentum = useMemo(() => hasConversationMomentum(state.messages), [state.messages]);
   const hasWalletRails = (
     configRef.current.agentRails.walletProviders.length > 0
     || configRef.current.agentRails.chainProviders.length > 0
@@ -5119,7 +5180,7 @@ Please check your API keys in the .env file and restart Gordon.`,
   );
   const quickActionsOverlayOpen = isOverlayOpen(state.overlay, "quick-actions");
   const shortcutsOverlayOpen = isOverlayOpen(state.overlay, "shortcuts");
-  const showChatBanner = state.view === "chat" && state.messages.length < 4;
+  const showChatBanner = false;
   const quickActionContext = useMemo(
     () => ({
       mode: state.mode,
@@ -5212,7 +5273,7 @@ Please check your API keys in the .env file and restart Gordon.`,
             showStartupHint={state.showStartupHint}
             showChatBanner={showChatBanner}
             startupBannerMode={configRef.current.startupBannerMode}
-            allMessagesCount={state.messages.length}
+            allMessagesCount={transcriptMessages.length}
             quickActionsOverlayOpen={quickActionsOverlayOpen}
             onMenuSelect={handleMenuSelect}
             onTypeToChat={(seed) => openChatWorkspace({ seed, resetInput: true })}
@@ -5230,6 +5291,7 @@ Please check your API keys in the .env file and restart Gordon.`,
             isLoading={state.isLoading}
             chatInputPlaceholder={chatInputPlaceholder}
             quickActionContext={quickActionContext}
+            hasConversationMomentum={transcriptHasMomentum}
             onSubmit={handleSubmit}
             onOpenQuickActions={openQuickActionsOverlay}
             onTypingStateChange={setTranscriptTypingState}

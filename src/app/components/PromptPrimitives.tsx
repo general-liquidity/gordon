@@ -3,6 +3,8 @@ import { Box, Text } from "ink";
 import { Alert, ConfirmInput, Select } from "@inkjs/ui";
 import { getAlertAccent } from "../componentTheme.ts";
 import { COLORS } from "../theme.ts";
+import { DeskPanel } from "./desk/DeskPanel.tsx";
+import { TicketCard } from "./desk/TicketCard.tsx";
 
 export interface NoticeAlertProps {
   title: string;
@@ -19,11 +21,21 @@ export function NoticeAlert({
     ? <Text color={getAlertAccent(variant)}>{children}</Text>
     : children;
 
+  const tone = variant === "error"
+    ? "danger"
+    : variant === "warning"
+      ? "warning"
+      : variant === "success"
+        ? "success"
+        : "info";
+
   return (
-    <Box paddingX={1}>
-      <Alert variant={variant} title={title}>
-        <Box flexDirection="column">{content}</Box>
-      </Alert>
+    <Box paddingX={1} marginBottom={1}>
+      <DeskPanel eyebrow="Desk Note" title={title} tone={tone}>
+        <Alert variant={variant} title="">
+          <Box flexDirection="column">{content}</Box>
+        </Alert>
+      </DeskPanel>
     </Box>
   );
 }
@@ -46,19 +58,20 @@ export function ConfirmationPrompt({
   onCancel,
 }: ConfirmationPromptProps): React.ReactElement {
   return (
-    <Box flexDirection="column">
-      <Text color={COLORS.WHITE} bold>{title}</Text>
-      {description && (
-        <Text color={COLORS.DIM}>{description}</Text>
-      )}
-      <Box marginTop={1}>
+    <TicketCard
+      eyebrow="Decision"
+      title={title}
+      subtitle={description}
+      tone="warning"
+      actions={[`${confirmLabel}: Enter`, `${cancelLabel}: Esc`]}
+    >
+      <Box marginTop={0}>
         <ConfirmInput
           onConfirm={onConfirm}
           onCancel={onCancel}
         />
-        <Text color={COLORS.DIM}> {confirmLabel} / {cancelLabel}</Text>
       </Box>
-    </Box>
+    </TicketCard>
   );
 }
 
@@ -83,18 +96,12 @@ export function FocusSelect({
   defaultValue,
 }: FocusSelectProps): React.ReactElement {
   return (
-    <Box flexDirection="column">
-      {title && (
-        <Text color={COLORS.WHITE} bold>{title}</Text>
-      )}
-      {hint && (
-        <Text color={COLORS.DIM}>{hint}</Text>
-      )}
+    <DeskPanel eyebrow={title ? "Desk Choice" : undefined} title={title} subtitle={hint} tone="brand">
       <Select
         options={options}
         defaultValue={defaultValue}
         onChange={onChange}
       />
-    </Box>
+    </DeskPanel>
   );
 }

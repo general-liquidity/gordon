@@ -55,6 +55,12 @@ export class QueryRuntime {
     options: RuntimeQueryExecutionOptions = {},
   ): AsyncGenerator<StreamEvent, void> {
     const context = await this.resolveContext(session, options);
+    const runtimeQueryTool = this.deps.toolRegistry.ensure("runtime_query_stream");
+    await this.toolInvoker.prepare("runtime_query_stream", context, this.buildInvocationInput(session, options));
+    this.deps.runtimeStore.setPermissionScopes([
+      ...this.deps.runtimeStore.getState().permissionScopes,
+      runtimeQueryTool.permissionScope,
+    ]);
     this.deps.runtimeStore.startStream({ session, userMessage });
     this.deps.transcriptStore.append({
       role: "user",
@@ -62,6 +68,7 @@ export class QueryRuntime {
       metadata: {
         threadId: session.threadId,
         resourceId: session.resourceId,
+        uiVariant: "user",
       },
     });
 
@@ -87,6 +94,7 @@ export class QueryRuntime {
           content: fullResponse,
           metadata: {
             activeAgent: this.deps.runtimeStore.getState().stream.activeAgent,
+            uiVariant: "gordon",
           },
         });
       }
@@ -98,6 +106,7 @@ export class QueryRuntime {
         content: message,
         metadata: {
           failed: true,
+          uiVariant: "system",
         },
       });
       this.deps.runtimeStore.failStream(message);
@@ -111,18 +120,35 @@ export class QueryRuntime {
     options: RuntimeQueryExecutionOptions = {},
   ): Promise<Awaited<ReturnType<typeof processMessage>>> {
     const context = await this.resolveContext(session, options);
+    const runtimeQueryTool = this.deps.toolRegistry.ensure("runtime_query_message");
+    this.deps.runtimeStore.setPermissionScopes([
+      ...this.deps.runtimeStore.getState().permissionScopes,
+      runtimeQueryTool.permissionScope,
+    ]);
     this.deps.runtimeStore.startStream({ session, userMessage });
     this.deps.transcriptStore.append({
       role: "user",
       content: userMessage,
+      metadata: {
+        uiVariant: "user",
+      },
     });
     try {
-      const result = await processMessage(userMessage, context, session.threadId, session.resourceId);
+      const invocation = await this.toolInvoker.invoke<Awaited<ReturnType<typeof processMessage>>>(
+        "runtime_query_message",
+        context,
+        {
+          ...this.buildInvocationInput(session, options),
+          executor: async () => processMessage(userMessage, context, session.threadId, session.resourceId),
+        },
+      );
+      const result = invocation.result;
       this.deps.transcriptStore.append({
         role: "assistant",
         content: result.response,
         metadata: {
           usage: result.usage,
+          uiVariant: "gordon",
         },
       });
       this.deps.runtimeStore.completeStream(result.response);
@@ -148,22 +174,44 @@ export class QueryRuntime {
     };
   }> {
     const context = await this.resolveContext(session, options);
+    const runtimeQueryTool = this.deps.toolRegistry.ensure("runtime_query_structured");
+    this.deps.runtimeStore.setPermissionScopes([
+      ...this.deps.runtimeStore.getState().permissionScopes,
+      runtimeQueryTool.permissionScope,
+    ]);
     this.deps.runtimeStore.startStream({ session, userMessage });
     this.deps.transcriptStore.append({
       role: "user",
       content: userMessage,
       metadata: {
         structured: true,
+        uiVariant: "user",
       },
     });
     try {
-      const result = await processStructuredMessage(userMessage, schema, context, session.threadId, session.resourceId);
+      const invocation = await this.toolInvoker.invoke<{
+        data: T;
+        usage: {
+          promptTokens: number;
+          completionTokens: number;
+          totalTokens: number;
+        };
+      }>(
+        "runtime_query_structured",
+        context,
+        {
+          ...this.buildInvocationInput(session, options),
+          executor: async () => processStructuredMessage(userMessage, schema, context, session.threadId, session.resourceId),
+        },
+      );
+      const result = invocation.result;
       this.deps.transcriptStore.append({
         role: "assistant",
         content: JSON.stringify(result.data),
         metadata: {
           structured: true,
           usage: result.usage,
+          uiVariant: "tool",
         },
       });
       this.deps.runtimeStore.completeStream(JSON.stringify(result.data));
@@ -181,15 +229,12 @@ export class QueryRuntime {
   ): Promise<Awaited<ReturnType<typeof quickScan>>> {
     const context = await this.resolveContext(session, options);
     const tool = this.deps.toolRegistry.ensure("quick_scan");
-    this.deps.runtimeStore.setPermissionScopes([tool.permissionScope]);
+    this.deps.runtimeStore.setPermissionScopes([
+      ...this.deps.runtimeStore.getState().permissionScopes,
+      tool.permissionScope,
+    ]);
     const invocation = await this.toolInvoker.invoke<Awaited<ReturnType<typeof quickScan>>>("quick_scan", context, {
-      session,
-      runtimeState: this.deps.runtimeStore.getState(),
-      transcriptStore: this.deps.transcriptStore,
-      scratchpadStore: this.deps.scratchpadStore,
-      workerRegistry: this.deps.workerRegistry,
-      signal: options.signal,
-      listRuntimeCommands: () => this.deps.runtimeStore.getState().tooling.commands,
+      ...this.buildInvocationInput(session, options),
     });
     return invocation.result;
   }
@@ -200,8 +245,29 @@ export class QueryRuntime {
   ): Promise<Awaited<ReturnType<typeof quickCheckPositions>>> {
     const context = await this.resolveContext(session, options);
     const tool = this.deps.toolRegistry.ensure("quick_check_positions");
-    this.deps.runtimeStore.setPermissionScopes([tool.permissionScope]);
+    this.deps.runtimeStore.setPermissionScopes([
+      ...this.deps.runtimeStore.getState().permissionScopes,
+      tool.permissionScope,
+    ]);
     const invocation = await this.toolInvoker.invoke<Awaited<ReturnType<typeof quickCheckPositions>>>("quick_check_positions", context, {
+      ...this.buildInvocationInput(session, options),
+    });
+    return invocation.result;
+  }
+
+  private buildInvocationInput(
+    session: RuntimeSessionContext,
+    options: RuntimeQueryExecutionOptions,
+  ): {
+    session: RuntimeSessionContext;
+    runtimeState: ReturnType<RuntimeStore["getState"]>;
+    transcriptStore: TranscriptStore;
+    scratchpadStore: ScratchpadStore;
+    workerRegistry: WorkerRegistry;
+    signal?: AbortSignal;
+    listRuntimeCommands: () => string[];
+  } {
+    return {
       session,
       runtimeState: this.deps.runtimeStore.getState(),
       transcriptStore: this.deps.transcriptStore,
@@ -209,8 +275,7 @@ export class QueryRuntime {
       workerRegistry: this.deps.workerRegistry,
       signal: options.signal,
       listRuntimeCommands: () => this.deps.runtimeStore.getState().tooling.commands,
-    });
-    return invocation.result;
+    };
   }
 
   private async resolveContext(
@@ -244,6 +309,7 @@ export class QueryRuntime {
             metadata: {
               sessionId: session.sessionId,
               handoffValid: this.deps.workerRegistry.has(event.agentName),
+              uiVariant: "handoff",
             },
           });
         }
@@ -275,6 +341,7 @@ export class QueryRuntime {
               toolArgs: event.toolArgs,
               toolResult: event.toolResult,
               toolSpec: tool,
+              uiVariant: "tool",
             },
           });
         }
@@ -293,6 +360,17 @@ export class QueryRuntime {
   }
 
   private registerBuiltInRuntimeTools(): void {
+    for (const toolId of ["runtime_query_stream", "runtime_query_message", "runtime_query_structured"] as const) {
+      const spec = this.deps.toolRegistry.ensure(toolId);
+      this.deps.toolRegistry.registerDefinition({
+        spec: {
+          ...spec,
+          origin: "builtin",
+        },
+        origin: "builtin",
+      });
+    }
+
     const quickScanSpec = this.deps.toolRegistry.ensure("quick_scan");
     this.deps.toolRegistry.registerDefinition({
       spec: {

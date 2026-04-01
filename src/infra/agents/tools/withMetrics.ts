@@ -7,6 +7,42 @@
  */
 
 import { recordToolCall } from "../../observability/metrics.ts";
+import { getGordonContext, type MastraExecutionContext } from "./types.ts";
+
+function getMastraExecutionContext(args: unknown[]): MastraExecutionContext | undefined {
+  for (const arg of args) {
+    if (
+      arg
+      && typeof arg === "object"
+      && ("requestContext" in arg || "abortSignal" in arg || "tracingContext" in arg)
+    ) {
+      return arg as MastraExecutionContext;
+    }
+  }
+  return undefined;
+}
+
+function createRuntimeAccessError(
+  toolId: string,
+  status: "blocked" | "pending",
+  reason?: string,
+  requestId?: string,
+): {
+  error: string;
+  approvalRequestId?: string;
+  runtimeStatus: "blocked" | "pending";
+  toolId: string;
+} {
+  const suffix = requestId
+    ? ` Use /runtime-approve ${requestId} or /runtime-deny ${requestId}.`
+    : "";
+  return {
+    error: `${reason ?? `Runtime ${status} ${toolId}.`}${suffix}`,
+    approvalRequestId: requestId,
+    runtimeStatus: status,
+    toolId,
+  };
+}
 
 /**
  * Wraps a single tool to record metrics on each execution.
@@ -32,6 +68,21 @@ export function withToolMetrics<T extends { id: string; execute?: unknown }>(too
   // Create a wrapped execute function that records metrics
   const wrappedExecute = async (...args: unknown[]): Promise<unknown> => {
     try {
+      const execContext = getMastraExecutionContext(args);
+      const gordonContext = getGordonContext(execContext);
+      if (gordonContext?.runtime?.evaluateToolAccess) {
+        const runtimeDecision = await gordonContext.runtime.evaluateToolAccess(tool.id, gordonContext);
+        if (runtimeDecision.status !== "allowed") {
+          recordToolCall(tool.id, false);
+          return createRuntimeAccessError(
+            tool.id,
+            runtimeDecision.status,
+            runtimeDecision.reason,
+            runtimeDecision.requestId,
+          );
+        }
+      }
+
       const result = await originalExecute.apply(tool, args);
 
       // Check if result indicates an error (tools often return { error: string })

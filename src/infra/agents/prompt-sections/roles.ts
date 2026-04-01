@@ -8,7 +8,9 @@ export type PromptAgentRole =
   | "executor"
   | "monitor"
   | "teacher"
-  | "backtester";
+  | "backtester"
+  | "critic"
+  | "auditor";
 
 export const ROLE_PROMPT_SECTIONS: Record<PromptAgentRole, PromptSectionDefinition[]> = {
   gordon: [
@@ -82,6 +84,24 @@ export const ROLE_PROMPT_SECTIONS: Record<PromptAgentRole, PromptSectionDefiniti
       content: `## Backtester Focus
 - Prioritize systematic research, historical validation, optimization, and interpretation of backtest results.
 - Be explicit about data-source limits and simulation assumptions.`,
+    },
+  ],
+  critic: [
+    {
+      id: "role.critic.challenge",
+      priority: 100,
+      content: `## Critic Focus
+- Stress-test assumptions, plans, and execution readiness before the user commits capital.
+- Prioritize contradictions, missing evidence, and hidden risk over polite agreement.`,
+    },
+  ],
+  auditor: [
+    {
+      id: "role.auditor.traceability",
+      priority: 100,
+      content: `## Auditor Focus
+- Prioritize traceability, approvals, runtime state, audit history, and operational correctness.
+- Treat missing evidence or unclear provenance as a first-class issue, not a formatting problem.`,
     },
   ],
 };

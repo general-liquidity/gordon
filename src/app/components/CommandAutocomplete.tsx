@@ -20,6 +20,8 @@ interface CommandAutocompleteProps {
   showCategories?: boolean;
   /** Show usage examples */
   showUsage?: boolean;
+  /** Render as a compact prompt-attached picker instead of a standalone panel */
+  embedded?: boolean;
 }
 
 export const CommandAutocomplete: React.FC<CommandAutocompleteProps> = ({
@@ -29,9 +31,10 @@ export const CommandAutocomplete: React.FC<CommandAutocompleteProps> = ({
   maxVisible = 8,
   showCategories = true,
   showUsage = false,
+  embedded = false,
 }) => {
   const { ref, width: terminalWidth } = useMeasuredWidth(100);
-  const COMMAND_COL_WIDTH = 20;
+  const COMMAND_COL_WIDTH = embedded ? 18 : 20;
   const DESCRIPTION_COL_MAX = 68;
   const DESCRIPTION_COL_MIN = 24;
   const STATIC_COL_WIDTH = COMMAND_COL_WIDTH + 6;
@@ -54,19 +57,13 @@ export const CommandAutocomplete: React.FC<CommandAutocompleteProps> = ({
       return (
         <Box
           ref={ref}
-          flexDirection="column"
-          borderStyle="single"
-          borderColor={COLORS.DIM}
+          marginX={embedded ? 0 : 1}
+          marginTop={1}
           paddingX={1}
-          marginX={1}
-          marginBottom={1}
+          flexDirection="column"
         >
-          <Text color={COLORS.DIM}>
-            No commands matching "/{searchTerm}"
-          </Text>
-          <Text color={COLORS.DIM}>
-            Type /help to see all available commands
-          </Text>
+          <Text color={COLORS.WARNING}>No command matches "/{searchTerm}"</Text>
+          <Text color={COLORS.DIM}>Type /help to open the full command book.</Text>
         </Box>
       );
     }
@@ -88,120 +85,100 @@ export const CommandAutocomplete: React.FC<CommandAutocompleteProps> = ({
   const adjustedSelectedIndex = selectedIndex - startIndex;
 
   let lastWorkflow = "";
+  const shouldGroup = embedded ? false : showCategories;
 
   return (
     <Box
       ref={ref}
+      marginX={embedded ? 0 : 1}
+      marginTop={1}
+      paddingX={1}
       flexDirection="column"
       borderStyle="single"
-      borderColor={COLORS.ACCENT_DIM}
-      paddingX={1}
-      marginX={1}
-      marginBottom={1}
+      borderColor={embedded ? COLORS.ACCENT_DIM : COLORS.BRASS_DIM}
     >
-      {/* Header with count */}
-      <Box marginBottom={1} justifyContent="space-between">
-        <Text color={COLORS.WHITE} bold>
-          Commands
+      <Box justifyContent="space-between" marginBottom={1}>
+        <Text color={COLORS.ACCENT} bold>
+          /
+          <Text color={COLORS.WHITE}>commands</Text>
         </Text>
         <Text color={COLORS.DIM}>
           {selectedIndex + 1}/{totalSuggestions}
         </Text>
       </Box>
 
-      {/* Scroll up indicator */}
       {startIndex > 0 && (
-        <Box>
-          <Text color={COLORS.DIM}>  ... {startIndex} more above</Text>
-        </Box>
+        <Text color={COLORS.DIM}>... {startIndex} more above</Text>
       )}
 
-      {/* Suggestions with workflow grouping */}
       {visibleSuggestions.map((cmd, index) => {
         const isSelected = index === adjustedSelectedIndex;
         const cmdName = `/${cmd.name}`;
         const displayName = truncateWithEllipsis(cmdName, COMMAND_COL_WIDTH);
-
-        // Highlight matching portion
-        const matchEnd = Math.min(searchTerm.length + 1, displayName.length);
-        const matchedPart = displayName.slice(0, matchEnd);
-        const restPart = displayName.slice(matchEnd);
-
-        const showCategorySeparator = showCategories && cmd.workflow !== lastWorkflow && startIndex === 0;
-        if (showCategories) {
-          lastWorkflow = cmd.workflow;
-        }
-
-        const commandPadding = padSpaces(displayName, COMMAND_COL_WIDTH);
         const descriptionDisplay = truncateWithEllipsis(cmd.description, DESCRIPTION_COL_WIDTH);
         const workflowConfig = WORKFLOW_CONFIG[cmd.workflow];
         const tokens = getAutocompleteTokens(cmd.workflow, isSelected);
 
+        const matchEnd = Math.min(searchTerm.length + 1, displayName.length);
+        const matchedPart = displayName.slice(0, matchEnd);
+        const restPart = displayName.slice(matchEnd);
+
+        const showCategorySeparator =
+          shouldGroup && cmd.workflow !== lastWorkflow && index > 0;
+        if (shouldGroup) {
+          lastWorkflow = cmd.workflow;
+        }
+
         return (
-          <Box key={cmd.name} flexDirection="column" paddingY={0}>
-            {/* Workflow separator with label */}
-            {showCategorySeparator && index > 0 && (
-              <Box marginTop={1}>
-                <Text color={COLORS.DIM}>─── </Text>
-                <Text color={tokens.accent} bold>{workflowConfig.label}</Text>
-                <Text color={COLORS.DIM}> ───</Text>
-              </Box>
+          <Box key={cmd.name} flexDirection="column" marginBottom={isSelected && (showUsage || embedded) ? 1 : 0}>
+            {showCategorySeparator && (
+              <Text color={tokens.accent} bold>
+                {workflowConfig.label.toUpperCase()}
+              </Text>
             )}
 
-            {/* Command row */}
             <Box>
-              <Text color={tokens.prompt}>
+              <Text color={isSelected ? COLORS.ACCENT : COLORS.DIM}>
                 {isSelected ? ">" : " "}
               </Text>
-
               <Text color={tokens.accent} bold={isSelected}>
                 {matchedPart}
               </Text>
               <Text color={tokens.label} bold={isSelected}>
                 {restPart}
               </Text>
-              <Text color={COLORS.DIM}>{commandPadding}</Text>
-              <Text color={COLORS.DIM}> </Text>
-
-              <Text color={tokens.description}>
+              <Text color={COLORS.DIM}>{padSpaces(displayName, COMMAND_COL_WIDTH)}</Text>
+              <Text color={embedded ? COLORS.DIM : tokens.description}>
                 {descriptionDisplay}
               </Text>
             </Box>
 
-            {(showUsage || isSelected) && (
+            {isSelected && (
               <Box marginLeft={2} flexDirection="column">
                 <Text color={COLORS.DIM} italic>
-                {workflowConfig.label}: {cmd.usage}
-              </Text>
-              {cmd.whenToUse && (
-                <Text color={COLORS.DIM}>
-                    When to use: {truncateWithEllipsis(cmd.whenToUse, terminalWidth - 8)}
+                  {workflowConfig.label}: {truncateWithEllipsis(cmd.usage, terminalWidth - 8)}
                 </Text>
-              )}
-            </Box>
+                {cmd.whenToUse && showUsage && (
+                  <Text color={COLORS.DIM}>
+                    When to use: {truncateWithEllipsis(cmd.whenToUse, terminalWidth - 8)}
+                  </Text>
+                )}
+              </Box>
             )}
           </Box>
         );
       })}
 
-      {/* Scroll down indicator */}
       {startIndex + visibleCount < totalSuggestions && (
-        <Box>
-          <Text color={COLORS.DIM}>  ... {totalSuggestions - startIndex - visibleCount} more below</Text>
-        </Box>
+        <Text color={COLORS.DIM}>... {totalSuggestions - startIndex - visibleCount} more below</Text>
       )}
 
-      {/* Help hint */}
-      <Box marginTop={1} flexDirection="column">
-        <Box>
-          <Text color={COLORS.DIM}>
-            <Text color={COLORS.HIGHLIGHT}>Tab</Text> complete |{" "}
-            <Text color={COLORS.HIGHLIGHT}>Enter</Text> run |{" "}
-            <Text color={COLORS.HIGHLIGHT}>Up/Down</Text> navigate |{" "}
-            <Text color={COLORS.HIGHLIGHT}>Esc</Text> cancel
-          </Text>
-        </Box>
-      </Box>
+      <Text color={COLORS.DIM}>
+        <Text color={COLORS.HIGHLIGHT}>Tab</Text> complete |{" "}
+        <Text color={COLORS.HIGHLIGHT}>Enter</Text> run |{" "}
+        <Text color={COLORS.HIGHLIGHT}>Up/Down</Text> navigate |{" "}
+        <Text color={COLORS.HIGHLIGHT}>Esc</Text> cancel
+      </Text>
     </Box>
   );
 };

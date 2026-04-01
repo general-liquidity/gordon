@@ -13,6 +13,8 @@ import { loadConfig, saveConfig } from "../infra/storage/config.ts";
 import { saveEnvKeys } from "../infra/storage/env.ts";
 import type { GordonConfig, ProviderName } from "../types/index.ts";
 import { COLORS } from "./theme.ts";
+import { DeskPanel } from "./components/desk/DeskPanel.tsx";
+import { TicketCard } from "./components/desk/TicketCard.tsx";
 
 interface ModelOption {
   id: string;
@@ -130,6 +132,18 @@ function getModelDescription(modelId: string): string {
     "inception/mercury-2": "Mercury 2 via Inception's OpenAI-compatible API",
   };
   return descriptions[modelId] || "AI model via Dedalus";
+}
+
+function getTierTone(tier: ModelOption["tier"]): "brand" | "analysis" | "info" {
+  switch (tier) {
+    case "flagship":
+      return "brand";
+    case "balanced":
+      return "analysis";
+    case "fast":
+    default:
+      return "info";
+  }
 }
 
 type Step = "provider" | "model" | "confirm" | "done";
@@ -280,160 +294,146 @@ export function ModelSelector({ onComplete }: ModelSelectorProps): React.ReactEl
   });
 
   return (
-    <Box flexDirection="column" paddingX={2} paddingY={1}>
-      {/* Header */}
-      <Box marginBottom={1}>
-        <Text color={COLORS.TAN} bold>
-          AI Model Selection
-        </Text>
-      </Box>
+    <Box flexDirection="column" paddingX={2} paddingY={1} gap={1}>
+      <DeskPanel
+        eyebrow="Model Routing"
+        title="AI Model Selection"
+        subtitle="Choose the provider and model that run the current desk."
+        tone="brand"
+      >
+        <Box flexDirection="column" gap={1}>
+          <TicketCard
+            eyebrow="Active Route"
+            title={state.currentModel || `${state.currentProvider || "auto"}/default`}
+            subtitle={state.currentProvider
+              ? `Current provider: ${state.currentProvider}`
+              : "Current provider follows the detected active route."}
+            tone="info"
+          />
 
-      {/* Current Model Info */}
-      <Box marginBottom={1}>
-        <Text color={COLORS.DIM}>Current: </Text>
-        <Text color={COLORS.WHITE}>
-          {state.currentModel || `${state.currentProvider || "auto"}/default`}
-        </Text>
-      </Box>
+          {state.step === "provider" && (
+            <DeskPanel
+              eyebrow="Provider Shelf"
+              title="Select a provider"
+              subtitle="Providers without configured credentials are shown but cannot be selected."
+              tone="neutral"
+            >
+              <Box flexDirection="column" gap={1}>
+                {state.providers.map((provider, index) => {
+                  const isSelected = index === state.selectedProviderIndex;
+                  const tone = !provider.configured
+                    ? "warning"
+                    : provider.viaDedalus
+                      ? "analysis"
+                      : "brand";
 
-      {/* Provider Selection */}
-      {state.step === "provider" && (
-        <Box flexDirection="column">
-          <Box marginBottom={1}>
-            <Text color={COLORS.WHITE}>Select Provider:</Text>
-          </Box>
-
-          {state.providers.map((provider, index) => (
-            <Box key={`provider-${provider.id}`} marginLeft={1}>
-              <Text color={index === state.selectedProviderIndex ? COLORS.TAN : COLORS.DIM}>
-                {index === state.selectedProviderIndex ? "> " : "  "}
-              </Text>
-              <Text
-                color={provider.configured
-                  ? (index === state.selectedProviderIndex ? COLORS.TAN : COLORS.WHITE)
-                  : COLORS.DIM
-                }
-                bold={index === state.selectedProviderIndex}
-              >
-                {provider.name}
-              </Text>
-              {provider.viaDedalus && provider.configured && (
-                <Text color={COLORS.TAN_DIM}> (multi-provider)</Text>
-              )}
-              {!provider.configured && (
-                <Text color={COLORS.DIM}> (API key not set)</Text>
-              )}
-              {provider.configured && index === state.selectedProviderIndex && (
-                <Text color={COLORS.TAN_DIM}> - {provider.models.length} models</Text>
-              )}
-            </Box>
-          ))}
-
-          <Box marginTop={1}>
-            <Text color={COLORS.DIM}>
-              Arrow keys to navigate, Enter to select, ESC to cancel
-            </Text>
-          </Box>
-        </Box>
-      )}
-
-      {/* Model Selection */}
-      {state.step === "model" && selectedProvider && (
-        <Box flexDirection="column">
-          <Box marginBottom={1}>
-            <Text color={COLORS.WHITE}>Select Model from </Text>
-            <Text color={COLORS.TAN} bold>{selectedProvider.name}</Text>
-            <Text color={COLORS.WHITE}>:</Text>
-          </Box>
-
-          {selectedProvider.models.map((model, index) => (
-            <Box key={`model-${model.fullId}`} flexDirection="column" marginLeft={1} marginBottom={index === state.selectedModelIndex ? 1 : 0}>
-              <Box>
-                <Text color={index === state.selectedModelIndex ? COLORS.TAN : COLORS.DIM}>
-                  {index === state.selectedModelIndex ? "> " : "  "}
+                  return (
+                    <TicketCard
+                      key={`provider-${provider.id}`}
+                      eyebrow={provider.viaDedalus ? "Multi-Provider Route" : "Direct Route"}
+                      title={`${isSelected ? ">" : " "} ${provider.name}`}
+                      subtitle={!provider.configured
+                        ? "API key not set for this route."
+                        : provider.viaDedalus
+                          ? `${provider.models.length} routed models available via Dedalus`
+                          : `${provider.models.length} direct models available`}
+                      tone={tone}
+                      actions={isSelected
+                        ? ["Move: Up/Down", provider.configured ? "Select: Enter" : "Selection locked", "Exit: Esc"]
+                        : undefined}
+                    >
+                      {provider.configured && isSelected && (
+                        <Text color={COLORS.DIM}>
+                          Highlighted route will open its model shelf.
+                        </Text>
+                      )}
+                    </TicketCard>
+                  );
+                })}
+                <Text color={COLORS.DIM}>
+                  Arrow keys move between routes. Enter opens the selected provider. Esc returns to the menu.
                 </Text>
-                <Text
-                  color={index === state.selectedModelIndex ? COLORS.TAN : COLORS.WHITE}
-                  bold={index === state.selectedModelIndex}
-                >
-                  {model.name}
-                </Text>
-                <Text color={COLORS.DIM}> [{model.tier}]</Text>
               </Box>
-              {index === state.selectedModelIndex && (
-                <Box marginLeft={4} flexDirection="column">
-                  <Text color={COLORS.TAN_DIM}>{model.description}</Text>
-                  <Text color={COLORS.DIM}>ID: {model.fullId}</Text>
-                </Box>
-              )}
-            </Box>
-          ))}
+            </DeskPanel>
+          )}
 
-          <Box marginTop={1}>
-            <Text color={COLORS.DIM}>
-              Arrow keys to navigate, Enter to select, ESC to go back
-            </Text>
-          </Box>
+          {state.step === "model" && selectedProvider && (
+            <DeskPanel
+              eyebrow="Model Shelf"
+              title={`Select a model from ${selectedProvider.name}`}
+              subtitle={selectedProvider.viaDedalus
+                ? "These models run through the Dedalus route."
+                : "These models run directly against the selected provider."}
+              tone={selectedProvider.viaDedalus ? "analysis" : "brand"}
+            >
+              <Box flexDirection="column" gap={1}>
+                {selectedProvider.models.map((model, index) => {
+                  const isSelected = index === state.selectedModelIndex;
+                  return (
+                    <TicketCard
+                      key={`model-${model.fullId}`}
+                      eyebrow={model.tier}
+                      title={`${isSelected ? ">" : " "} ${model.name}`}
+                      subtitle={model.description}
+                      tone={getTierTone(model.tier)}
+                      actions={isSelected ? [`ID: ${model.fullId}`, "Choose: Enter", "Back: Esc"] : undefined}
+                    >
+                      <Text color={COLORS.DIM}>
+                        Route: {model.viaDedalus ? "Dedalus" : selectedProvider.name} · Tier: {model.tier}
+                      </Text>
+                    </TicketCard>
+                  );
+                })}
+                <Text color={COLORS.DIM}>
+                  Arrow keys move between models. Enter stages the selected route. Esc returns to providers.
+                </Text>
+              </Box>
+            </DeskPanel>
+          )}
+
+          {state.step === "confirm" && selectedProvider && selectedModel && (
+            <TicketCard
+              eyebrow="Trade-Off"
+              title="Confirm model change"
+              subtitle="This updates Gordon's active route and resets the in-memory agent cache."
+              tone="warning"
+              actions={["Apply: Enter or Y", "Back: Esc or N"]}
+            >
+              <Box flexDirection="column">
+                <Text color={COLORS.DIM}>
+                  Provider: <Text color={COLORS.ACCENT}>{selectedProvider.name}</Text>
+                  {selectedProvider.viaDedalus && <Text color={COLORS.ACCENT_DIM}> via Dedalus</Text>}
+                </Text>
+                <Text color={COLORS.DIM}>
+                  Model: <Text color={COLORS.ACCENT}>{selectedModel.name}</Text>
+                </Text>
+                <Text color={COLORS.DIM}>
+                  Route ID: <Text color={COLORS.WHITE}>{selectedModel.fullId}</Text>
+                </Text>
+              </Box>
+            </TicketCard>
+          )}
+
+          {state.step === "done" && selectedProvider && selectedModel && (
+            <TicketCard
+              eyebrow="Route Updated"
+              title="Model updated"
+              subtitle="The desk will use the new route for the next agent initialization."
+              tone="success"
+              actions={["Continue: Any key"]}
+            >
+              <Box flexDirection="column">
+                <Text color={COLORS.DIM}>
+                  Now using: <Text color={COLORS.MONEY}>{selectedModel.name}</Text>
+                </Text>
+                <Text color={COLORS.DIM}>
+                  Via: <Text color={COLORS.WHITE}>{selectedProvider.viaDedalus ? "Dedalus Labs" : selectedProvider.name}</Text>
+                </Text>
+              </Box>
+            </TicketCard>
+          )}
         </Box>
-      )}
-
-      {/* Confirmation */}
-      {state.step === "confirm" && selectedProvider && selectedModel && (
-        <Box flexDirection="column">
-          <Box marginBottom={1}>
-            <Text color={COLORS.WHITE}>Confirm model change:</Text>
-          </Box>
-
-          <Box marginLeft={2} marginBottom={1} flexDirection="column">
-            <Box>
-              <Text color={COLORS.DIM}>Provider: </Text>
-              <Text color={COLORS.TAN}>{selectedProvider.name}</Text>
-              {selectedProvider.viaDedalus && (
-                <Text color={COLORS.TAN_DIM}> (via Dedalus)</Text>
-              )}
-            </Box>
-            <Box>
-              <Text color={COLORS.DIM}>Model: </Text>
-              <Text color={COLORS.TAN}>{selectedModel.name}</Text>
-            </Box>
-            <Box>
-              <Text color={COLORS.DIM}>ID: </Text>
-              <Text color={COLORS.WHITE}>{selectedModel.fullId}</Text>
-            </Box>
-          </Box>
-
-          <Box marginTop={1}>
-            <Text color={COLORS.WHITE}>Apply this change? </Text>
-            <Text color={COLORS.TAN}>[Y/n]</Text>
-          </Box>
-        </Box>
-      )}
-
-      {/* Done */}
-      {state.step === "done" && selectedProvider && selectedModel && (
-        <Box flexDirection="column">
-          <Box marginBottom={1}>
-            <Text color="green" bold>Model Updated!</Text>
-          </Box>
-
-          <Box marginLeft={2} marginBottom={1} flexDirection="column">
-            <Box>
-              <Text color={COLORS.DIM}>Now using: </Text>
-              <Text color={COLORS.TAN}>{selectedModel.name}</Text>
-            </Box>
-            <Box>
-              <Text color={COLORS.DIM}>Via: </Text>
-              <Text color={COLORS.WHITE}>
-                {selectedProvider.viaDedalus ? "Dedalus Labs" : selectedProvider.name}
-              </Text>
-            </Box>
-          </Box>
-
-          <Box marginTop={1}>
-            <Text color={COLORS.DIM}>Press any key to continue...</Text>
-          </Box>
-        </Box>
-      )}
+      </DeskPanel>
     </Box>
   );
 }

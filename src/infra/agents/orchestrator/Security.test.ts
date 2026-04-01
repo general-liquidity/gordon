@@ -3,7 +3,7 @@ import { describe, expect, it } from "bun:test";
 import { checkToolSecurity } from "../orchestrator.ts";
 
 describe("checkToolSecurity", () => {
-  it("surfaces pending runtime approvals in the main tool gate", async () => {
+  it("keeps static preflight decoupled from runtime approval state", async () => {
     const result = await checkToolSecurity(
       "Analyst",
       "get_price",
@@ -24,33 +24,26 @@ describe("checkToolSecurity", () => {
       } as any,
     );
 
-    expect(result.allowed).toBe(false);
-    expect(result.approvalRequestId).toBe("req-123");
-    expect(result.error).toContain("/runtime-approve req-123");
+    expect(result.allowed).toBe(true);
+    expect(result.approvalRequestId).toBeUndefined();
+    expect(result.error).toBeUndefined();
   });
 
-  it("blocks immediately when runtime access denies the tool", async () => {
+  it("still blocks static execution tools in SAFE mode", async () => {
     const result = await checkToolSecurity(
-      "Analyst",
-      "get_price",
+      "Executor",
+      "execute_plan",
       {
         userId: "user-1",
         config: {
           mode: "SAFE",
           armedUntil: null,
         },
-        runtime: {
-          runtimeId: "app",
-          evaluateToolAccess: async () => ({
-            status: "blocked",
-            reason: "Runtime policy blocked market reads for this session.",
-          }),
-        },
       } as any,
     );
 
     expect(result.allowed).toBe(false);
-    expect(result.error).toContain("Runtime policy blocked market reads for this session.");
+    expect(result.error).toContain("ARMED");
     expect(result.approvalRequestId).toBeUndefined();
   });
 });

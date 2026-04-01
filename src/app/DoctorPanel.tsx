@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { Box, Text, useInput } from "ink";
 
+import { DeskPanel } from "./components/desk/DeskPanel.tsx";
+import { TicketCard } from "./components/desk/TicketCard.tsx";
 import { COLORS } from "./theme.ts";
 import { collectDoctorReport, formatDoctorReport, type DoctorReport } from "./setup-runtime.ts";
 
@@ -36,31 +38,48 @@ export function DoctorPanel({ onComplete }: DoctorPanelProps): React.ReactElemen
   });
 
   return (
-    <Box flexDirection="column" paddingX={2} paddingY={1}>
-      <Box marginBottom={1}>
-        <Text color={COLORS.ACCENT} bold>
-          Gordon Doctor
-        </Text>
-      </Box>
+    <Box flexDirection="column" paddingX={2} paddingY={1} gap={1}>
+      <DeskPanel
+        eyebrow="Diagnostics"
+        title="Gordon Doctor"
+        subtitle="Configuration, venue, provider, and runtime health for the current desk."
+        tone={error ? "danger" : report ? "info" : "brand"}
+      >
+        {!report && !error && (
+          <TicketCard
+            eyebrow="Scan"
+            title="Collecting desk diagnostics"
+            subtitle="Checking providers, configuration, and local runtime state."
+            tone="info"
+            actions={["Return when ready: Any key"]}
+          />
+        )}
 
-      {!report && !error && (
-        <Text color={COLORS.DIM}>Collecting configuration and provider diagnostics...</Text>
-      )}
+        {error && (
+          <TicketCard
+            eyebrow="Failure"
+            title="Doctor scan failed"
+            subtitle={error}
+            tone="danger"
+            actions={["Return: Any key"]}
+          />
+        )}
 
-      {error && (
-        <Box borderStyle="single" borderColor="red" paddingX={1}>
-          <Text color="red">{error}</Text>
-        </Box>
-      )}
-
-      {report && (
-        <>
-          <Text>{formatDoctorReport(report)}</Text>
-          <Box marginTop={1}>
+        {report && (
+          <Box flexDirection="column" gap={1}>
+            <TicketCard
+              eyebrow="Report"
+              title="Desk health snapshot"
+              subtitle="Review the current environment before returning to the main desk."
+              tone="info"
+              actions={["Return: Any key"]}
+            >
+              <Text>{formatDoctorReport(report)}</Text>
+            </TicketCard>
             <Text color={COLORS.DIM}>Press any key to return.</Text>
           </Box>
-        </>
-      )}
+        )}
+      </DeskPanel>
     </Box>
   );
 }

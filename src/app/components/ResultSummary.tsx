@@ -13,6 +13,8 @@
 import React from "react";
 import { Box, Text } from "ink";
 import { COLORS } from "../theme.ts";
+import { DeskPanel } from "./desk/DeskPanel.tsx";
+import { TicketCard } from "./desk/TicketCard.tsx";
 
 // ============================================================================
 // Types
@@ -140,72 +142,58 @@ export const ResultSummaryBox: React.FC<ResultSummaryProps> = ({
   const displayTitle = title ?? `${operation.toUpperCase()} RESULTS`;
 
   const content = (
-    <Box flexDirection="column" gap={0}>
-      {/* Header */}
-      <Box>
-        <Text color={COLORS.ACCENT} bold>
-          === {displayTitle} ===
-        </Text>
-      </Box>
-
-      {/* Stats line */}
-      <Box gap={1} marginTop={1}>
-        {total !== undefined && (
-          <>
-            <Text color={COLORS.DIM}>Scanned:</Text>
-            <Text color={COLORS.WHITE}>{total.toLocaleString()}</Text>
-            <Text color={COLORS.DIM}>|</Text>
-          </>
-        )}
-        <Text color={COLORS.DIM}>Found:</Text>
-        <Text color={found > 0 ? COLORS.GREEN : COLORS.WHITE} bold>
-          {found.toLocaleString()}
-        </Text>
-        {filtered !== undefined && (
-          <>
-            <Text color={COLORS.DIM}>|</Text>
-            <Text color={COLORS.DIM}>Filtered:</Text>
-            <Text color={COLORS.WHITE}>{filtered.toLocaleString()}</Text>
-          </>
-        )}
-      </Box>
-
-      {/* Top result */}
-      {topResult && (
-        <Box marginTop={1}>
-          <Text color={COLORS.DIM}>Top: </Text>
-          <Text color={COLORS.HIGHLIGHT} bold>
-            {topResult}
+    <Box flexDirection="column" gap={1}>
+      <TicketCard
+        eyebrow="Summary"
+        title={displayTitle}
+        subtitle={`${formatExecutionTime(executionTime)} execution time`}
+        tone={found > 0 ? "success" : "info"}
+      >
+        <Box gap={1}>
+          {total !== undefined && (
+            <>
+              <Text color={COLORS.DIM}>Scanned:</Text>
+              <Text color={COLORS.WHITE}>{total.toLocaleString()}</Text>
+              <Text color={COLORS.DIM}>|</Text>
+            </>
+          )}
+          <Text color={COLORS.DIM}>Found:</Text>
+          <Text color={found > 0 ? COLORS.GREEN : COLORS.WHITE} bold>
+            {found.toLocaleString()}
           </Text>
+          {filtered !== undefined && (
+            <>
+              <Text color={COLORS.DIM}>|</Text>
+              <Text color={COLORS.DIM}>Filtered:</Text>
+              <Text color={COLORS.WHITE}>{filtered.toLocaleString()}</Text>
+            </>
+          )}
         </Box>
-      )}
 
-      {/* Context */}
-      {context && (
-        <Box marginTop={1}>
-          <Text color={COLORS.DIM}>{context}</Text>
-        </Box>
-      )}
+        {topResult && (
+          <Box marginTop={1}>
+            <Text color={COLORS.DIM}>Top: </Text>
+            <Text color={COLORS.HIGHLIGHT} bold>
+              {topResult}
+            </Text>
+          </Box>
+        )}
 
-      {/* Execution time */}
-      <Box marginTop={1}>
-        <Text color={COLORS.DIM}>Execution: </Text>
-        <Text color={COLORS.ACCENT_DIM}>{formatExecutionTime(executionTime)}</Text>
-      </Box>
+        {context && (
+          <Box marginTop={1}>
+            <Text color={COLORS.DIM}>{context}</Text>
+          </Box>
+        )}
+      </TicketCard>
     </Box>
   );
 
   if (bordered) {
     return (
-      <Box
-        flexDirection="column"
-        borderStyle="single"
-        borderColor={COLORS.ACCENT_DIM}
-        paddingX={2}
-        paddingY={1}
-        marginY={1}
-      >
+      <Box marginY={1}>
+        <DeskPanel eyebrow="Result" title={operation} subtitle="Operational output at a glance." tone="brand">
         {content}
+        </DeskPanel>
       </Box>
     );
   }

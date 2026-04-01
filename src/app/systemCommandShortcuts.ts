@@ -1,5 +1,12 @@
 export type SystemShortcutAction = "arm" | "disarm" | "status";
 
+export interface RuntimeApprovalShortcut {
+  decision: "approve" | "deny";
+  requestId: string;
+  persist: boolean;
+  reason?: string;
+}
+
 interface PhrasePattern {
   action: SystemShortcutAction;
   tokens: string[];
@@ -62,4 +69,40 @@ export function parseSystemShortcut(input: string): SystemShortcutAction | null 
   }
 
   return null;
+}
+
+export function parseRuntimeApprovalShortcut(input: string): RuntimeApprovalShortcut | null {
+  const trimmed = input.trim();
+  if (!trimmed || trimmed.startsWith("/")) {
+    return null;
+  }
+
+  const tokens = trimmed.split(/\s+/).filter(Boolean);
+  if (tokens.length < 2) {
+    return null;
+  }
+
+  const verb = tokens[0]?.toLowerCase();
+  const requestId = tokens[1]?.trim();
+  if (!requestId) {
+    return null;
+  }
+
+  if (verb !== "approve" && verb !== "deny" && verb !== "reject") {
+    return null;
+  }
+
+  const remainder = tokens.slice(2);
+  const persistIndex = remainder.findIndex((token) => token.toLowerCase() === "persist");
+  const persist = persistIndex >= 0;
+  const reasonTokens = verb === "approve"
+    ? []
+    : remainder.filter((token, index) => !(persist && index === persistIndex));
+
+  return {
+    decision: verb === "approve" ? "approve" : "deny",
+    requestId,
+    persist,
+    reason: reasonTokens.length > 0 ? reasonTokens.join(" ") : undefined,
+  };
 }

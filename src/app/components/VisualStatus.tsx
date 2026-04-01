@@ -17,6 +17,8 @@
 import React, { useState, useEffect } from "react";
 import { Box, Text, useStdout } from "ink";
 import { COLORS } from "../theme.ts";
+import { DeskPanel } from "./desk/DeskPanel.tsx";
+import { TicketCard } from "./desk/TicketCard.tsx";
 
 // ============================================================================
 // Types
@@ -210,12 +212,9 @@ export const VisualStatus: React.FC<VisualStatusProps> = ({
   }
 
   return (
-    <Box
-      borderStyle="round"
-      borderColor={isDimmed ? COLORS.MUTED : displayColor}
-      paddingX={size.paddingX}
-      paddingY={size.paddingY}
-      flexDirection="column"
+    <DeskPanel
+      tone={level === "critical" ? "danger" : level === "warning" ? "warning" : level === "success" ? "success" : "info"}
+      compact={config.size === "small"}
     >
       <Box>
         <Text
@@ -236,7 +235,7 @@ export const VisualStatus: React.FC<VisualStatusProps> = ({
           <Text color={COLORS.DIM}>{details}</Text>
         </Box>
       )}
-    </Box>
+    </DeskPanel>
   );
 };
 
@@ -334,27 +333,14 @@ export const AlertBanner: React.FC<AlertBannerProps> = ({
   const size = SIZE_CONFIG[config.size];
 
   return (
-    <Box
-      borderStyle="double"
-      borderColor={config.color}
-      paddingX={size.paddingX}
-      paddingY={size.paddingY}
-      flexDirection="column"
-      width="100%"
-    >
-      <Box>
-        <Text color={config.color} bold>
-          {config.icon} {title.toUpperCase()}
-        </Text>
-      </Box>
-      <Box marginTop={1}>
-        <Text color={COLORS.WHITE}>{message}</Text>
-      </Box>
-      {action && (
-        <Box marginTop={1}>
-          <Text color={COLORS.ACCENT}>→ {action}</Text>
-        </Box>
-      )}
+    <Box width="100%">
+      <TicketCard
+        eyebrow={config.prefix}
+        title={title.toUpperCase()}
+        subtitle={message}
+        tone={level === "critical" ? "danger" : level === "warning" ? "warning" : level === "success" ? "success" : "info"}
+        actions={action ? [`Action: ${action}`] : undefined}
+      />
     </Box>
   );
 };

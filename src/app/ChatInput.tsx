@@ -10,6 +10,7 @@ import { NoticeAlert } from "./components/PromptPrimitives.tsx";
 import { COLORS } from "./theme.ts";
 import { getSlashCommandSuggestions, parseSlashCommand } from "./slashCommands.ts";
 import { CommandAutocomplete } from "./components/CommandAutocomplete.tsx";
+import { shouldShowInlineQuickActions } from "./chatFlow.ts";
 import {
   QuickActions,
   getQuickActionCommand,
@@ -27,6 +28,7 @@ interface ChatInputProps {
   placeholder?: string;
   emptyStateHint?: string | null;
   quickActionContext: QuickActionContext;
+  hasConversationMomentum?: boolean;
   seedValue?: string;
   seedNonce?: number;
 }
@@ -41,6 +43,7 @@ function ChatInputComponent({
   placeholder,
   emptyStateHint = null,
   quickActionContext,
+  hasConversationMomentum = false,
   seedValue = "",
   seedNonce = 0,
 }: ChatInputProps): React.ReactElement {
@@ -75,7 +78,12 @@ function ChatInputComponent({
   }, [emitTypingState]);
 
   // Show quick actions when input is empty
-  const showQuickActions = !disabled && !busy && value.trim() === "";
+  const showQuickActions = shouldShowInlineQuickActions({
+    disabled,
+    busy,
+    value,
+    hasConversationMomentum,
+  });
 
   // Get suggestions based on current input
   const suggestions = useMemo(() => {
@@ -274,52 +282,51 @@ function ChatInputComponent({
         context={quickActionContext}
       />
 
-      {/* Autocomplete dropdown */}
-      {shouldShowAutocomplete && (
-        <CommandAutocomplete
-          suggestions={suggestions}
-          selectedIndex={autocompleteIndex}
-          inputValue={value}
-        />
-      )}
-
-      {(busy || queueDepth > 0) && (
-        <Box marginBottom={1} marginX={2}>
-          <Text color={COLORS.DIM}>
-            {busy
-              ? "Enter queues a follow-up. Esc stops the current streamed response when possible. Use /steer <message> to redirect the next run."
-              : "Queued follow-ups are ready to run."}
-          </Text>
-          {queueDepth > 0 && (
-            <Text color={COLORS.HIGHLIGHT}> Queue: {queueDepth}</Text>
-          )}
-        </Box>
-      )}
-
       {value.includes("\n") && (
         <NoticeAlert title="Multi-line input ready" variant="info">
           Enter submits the full pasted block. Gordon will keep the line breaks intact.
         </NoticeAlert>
       )}
 
-      {/* Input box */}
-      <Box
-        borderStyle="single"
-        borderColor={disabled ? COLORS.DIM : COLORS.ACCENT_DIM}
-        paddingX={1}
-        marginX={1}
-      >
-        <Text color={disabled ? COLORS.DIM : COLORS.ACCENT}>
-          {">"}{" "}
-        </Text>
-        <TextInput
-          key={inputKey}
-          isDisabled={disabled}
-          defaultValue={value}
-          placeholder={placeholder || "Ask Gordon anything... (try /help)"}
-          onChange={handleChange}
-          onSubmit={handleSubmit}
-        />
+      <Box marginX={1} flexDirection="column">
+        <Box paddingX={1}>
+          <Text color={disabled ? COLORS.DIM : COLORS.ACCENT}>
+            {">"}{" "}
+          </Text>
+          <TextInput
+            key={inputKey}
+            isDisabled={disabled}
+            defaultValue={value}
+            placeholder={placeholder || "Ask Gordon anything... (try /help)"}
+            onChange={handleChange}
+            onSubmit={handleSubmit}
+          />
+          {disabled && (
+            <Text color={COLORS.DIM}>  prompt locked</Text>
+          )}
+          {!disabled && queueDepth > 0 && !busy && (
+            <Text color={COLORS.DIM}>  queue {queueDepth}</Text>
+          )}
+        </Box>
+        {shouldShowAutocomplete && (
+          <CommandAutocomplete
+            suggestions={suggestions}
+            selectedIndex={autocompleteIndex}
+            inputValue={value}
+            embedded
+            maxVisible={6}
+            showCategories={false}
+          />
+        )}
+        <Box marginTop={0}>
+          <Text color={COLORS.DIM}>
+            {busy
+              ? "Enter queues a follow-up. Esc stops the current run."
+              : queueDepth > 0
+                ? `Queued: ${queueDepth}. Enter adds another follow-up.`
+                : "Enter sends. /help opens the command book."}
+          </Text>
+        </Box>
       </Box>
     </Box>
   );

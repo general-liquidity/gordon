@@ -5,6 +5,7 @@ import {
   getMCPToolsByServer,
   initMCPTools,
 } from "../../infra/mcp/client.ts";
+import { getCanonicalActions } from "../../infra/actions/registry.ts";
 import { pluginInstaller } from "../../infra/mcp/marketplace/installer.ts";
 import {
   getResolvedRoutings,
@@ -19,6 +20,10 @@ import type {
 import type { SessionRuntime } from "../session/SessionRuntime.ts";
 
 export interface RuntimePluginInventory {
+  lastSyncedAt?: string | null;
+  lastReloadAt?: string | null;
+  hotReloadEnabled?: boolean;
+  routingCount?: number;
   plugins: RuntimePluginSummary[];
   mcpServers: RuntimeMcpServerSummary[];
   tools: RuntimeToolSummary[];
@@ -36,50 +41,116 @@ export interface RuntimePluginManagerDeps {
   disableHotReload?: () => void;
 }
 
-function getIntegrationCommands(category: string | undefined): string[] {
-  const integrations: Record<string, string[]> = {
-    "data-provider": ["/scan", "/analyze", "/compare", "/history"],
-    analytics: ["/scan", "/analyze", "/signals"],
-    execution: ["/trade", "/order", "/position"],
-    exchange: ["/trade", "/order", "/balance"],
-    infrastructure: ["/scan", "/analyze"],
-    portfolio: ["/portfolio", "/pnl", "/balance"],
-    research: ["/analyze", "/research", "/sentiment"],
-    utility: ["/alert", "/notify"],
-  };
-  return category ? [...(integrations[category] ?? [])] : [];
+function buildToolCommandLookup(): Map<string, string[]> {
+  const lookup = new Map<string, Set<string>>();
+
+  for (const action of getCanonicalActions()) {
+    if (!action.tool || !action.slash) {
+      continue;
+    }
+
+    const existing = lookup.get(action.tool.toolName) ?? new Set<string>();
+    existing.add(`/${action.slash.name}`);
+    lookup.set(action.tool.toolName, existing);
+  }
+
+  return new Map(
+    [...lookup.entries()].map(([toolName, commands]) => [toolName, [...commands].sort()]),
+  );
 }
 
-function buildDefaultInventory(): RuntimePluginInventory {
+function deriveIntegrationCommands(
+  pluginId: string,
+  toolIds: string[],
+  manifestToolNames: string[],
+  toolCommandLookup: Map<string, string[]>,
+): string[] {
+  const commands = new Set<string>();
+  const toolNames = new Set<string>(manifestToolNames);
+
+  for (const toolId of toolIds) {
+    const underscoreIndex = toolId.indexOf("_");
+    toolNames.add(underscoreIndex > 0 ? toolId.slice(underscoreIndex + 1) : toolId);
+  }
+
+  for (const toolName of toolNames) {
+    for (const command of toolCommandLookup.get(toolName) ?? []) {
+      commands.add(command);
+    }
+  }
+
+  if (toolIds.length > 0 || manifestToolNames.length > 0) {
+    commands.add("/mcp");
+    commands.add("/runtime-plugins");
+  }
+
+  if (pluginId) {
+    commands.add("/routing");
+  }
+
+  return [...commands].sort();
+}
+
+function buildDefaultInventory(state: {
+  hotReloadEnabled: boolean;
+  lastReloadAt: string | null;
+}): RuntimePluginInventory {
   const installedPlugins = pluginInstaller.getInstalled();
   const toolsByServer = getMCPToolsByServer();
   const routings = getResolvedRoutings();
   const routingByPlugin = new Map(routings.map((routing) => [routing.pluginId, routing]));
+  const toolCommandLookup = buildToolCommandLookup();
   const commands = new Set<string>();
 
   const plugins = installedPlugins.map((plugin) => {
-    const integrationCommands = getIntegrationCommands(plugin.manifest.category);
+    const serverToolIds = toolsByServer[plugin.id] ?? [];
+    const integrationCommands = deriveIntegrationCommands(
+      plugin.id,
+      serverToolIds,
+      plugin.manifest.tools.map((tool) => tool.name),
+      toolCommandLookup,
+    );
     for (const command of integrationCommands) {
       commands.add(command);
     }
 
     const routing = routingByPlugin.get(plugin.id);
+    const routed = Boolean(
+      routing
+      && (
+        routing.routingManifest.defaultAgent !== "Gordon"
+        || (routing.routingManifest.toolAgentMap?.length ?? 0) > 0
+      ),
+    );
+    const toolCount = serverToolIds.length > 0 ? serverToolIds.length : plugin.manifest.tools.length;
+    const status = !plugin.enabled
+      ? "disabled"
+      : toolCount > 0
+        ? "ready"
+        : "degraded";
     return {
       id: plugin.id,
       name: plugin.manifest.name ?? plugin.id,
       enabled: plugin.enabled,
       category: plugin.manifest.category,
       version: plugin.version,
-      toolCount: toolsByServer[plugin.id]?.length ?? plugin.manifest.tools.length,
+      status,
+      lifecycle: routed ? "routed" : "mcp",
+      toolCount,
       commandCount: integrationCommands.length,
       integrationCommands,
       defaultAgent: routing?.routingManifest.defaultAgent,
       alsoOnGordon: routing?.routingManifest.alsoOnGordon,
       routedToolCount: routing?.toolCount,
+      reloadRecommended: status === "degraded",
+      lastReloadAt: state.lastReloadAt,
     } satisfies RuntimePluginSummary;
   });
 
   return {
+    lastReloadAt: state.lastReloadAt,
+    hotReloadEnabled: state.hotReloadEnabled,
+    routingCount: routings.filter((routing) => routing.enabled).length,
     plugins,
     mcpServers: getMCPServerSummary(),
     tools: Object.entries(toolsByServer).flatMap(([serverId, toolIds]) => {
@@ -109,6 +180,8 @@ function buildDefaultInventory(): RuntimePluginInventory {
 export class RuntimePluginManager {
   private readonly deps: Required<RuntimePluginManagerDeps>;
   private stopHotReloadFn: (() => void) | null = null;
+  private hotReloadEnabled = false;
+  private lastReloadAt: string | null = null;
 
   constructor(deps: RuntimePluginManagerDeps = {}) {
     this.deps = {
@@ -117,10 +190,22 @@ export class RuntimePluginManager {
         await initMCPTools();
         await initRouting();
       }),
-      listPlugins: deps.listPlugins ?? (() => buildDefaultInventory().plugins),
-      listMcpServers: deps.listMcpServers ?? (() => buildDefaultInventory().mcpServers),
-      listTools: deps.listTools ?? (() => buildDefaultInventory().tools),
-      listCommands: deps.listCommands ?? (() => buildDefaultInventory().commands),
+      listPlugins: deps.listPlugins ?? (() => buildDefaultInventory({
+        hotReloadEnabled: this.hotReloadEnabled,
+        lastReloadAt: this.lastReloadAt,
+      }).plugins),
+      listMcpServers: deps.listMcpServers ?? (() => buildDefaultInventory({
+        hotReloadEnabled: this.hotReloadEnabled,
+        lastReloadAt: this.lastReloadAt,
+      }).mcpServers),
+      listTools: deps.listTools ?? (() => buildDefaultInventory({
+        hotReloadEnabled: this.hotReloadEnabled,
+        lastReloadAt: this.lastReloadAt,
+      }).tools),
+      listCommands: deps.listCommands ?? (() => buildDefaultInventory({
+        hotReloadEnabled: this.hotReloadEnabled,
+        lastReloadAt: this.lastReloadAt,
+      }).commands),
       reloadPlugins: deps.reloadPlugins ?? (async () => {
         await reloadRouting();
       }),
@@ -139,7 +224,15 @@ export class RuntimePluginManager {
   }
 
   async sync(runtime: SessionRuntime): Promise<RuntimePluginInventory> {
+    const snapshot = buildDefaultInventory({
+      hotReloadEnabled: this.hotReloadEnabled,
+      lastReloadAt: this.lastReloadAt,
+    });
     const inventory: RuntimePluginInventory = {
+      lastSyncedAt: new Date().toISOString(),
+      lastReloadAt: snapshot.lastReloadAt,
+      hotReloadEnabled: snapshot.hotReloadEnabled,
+      routingCount: snapshot.routingCount,
       plugins: this.deps.listPlugins(),
       mcpServers: this.deps.listMcpServers(),
       tools: this.deps.listTools(),
@@ -151,13 +244,16 @@ export class RuntimePluginManager {
 
   async reload(runtime: SessionRuntime): Promise<RuntimePluginInventory> {
     await this.deps.reloadPlugins();
+    this.lastReloadAt = new Date().toISOString();
     return this.sync(runtime);
   }
 
   startHotReload(runtime: SessionRuntime, intervalMs: number = 5000): void {
     this.stopHotReloadFn?.();
+    this.hotReloadEnabled = true;
     this.deps.enableHotReload(intervalMs);
     this.stopHotReloadFn = () => {
+      this.hotReloadEnabled = false;
       this.deps.disableHotReload();
       this.stopHotReloadFn = null;
     };

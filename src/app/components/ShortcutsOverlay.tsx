@@ -7,6 +7,7 @@
 import React, { useState, useEffect } from "react";
 import { Box, Text } from "ink";
 import { COLORS } from "../theme.ts";
+import { DeskPanel } from "./desk/DeskPanel.tsx";
 
 interface ShortcutsOverlayProps {
   onClose: () => void;
@@ -30,33 +31,27 @@ function ShortcutRow({ keys, description }: ShortcutRowProps): React.ReactElemen
 
 export function ShortcutsOverlay({ onClose }: ShortcutsOverlayProps): React.ReactElement {
   return (
-    <Box
-      flexDirection="column"
-      borderStyle="double"
-      borderColor={COLORS.ACCENT}
-      paddingX={2}
-      paddingY={1}
-      marginX={1}
-      marginY={1}
-    >
-      <Text bold color={COLORS.WHITE}>
-        Keyboard Shortcuts
-      </Text>
-      <Text> </Text>
-
-      <Box flexDirection="column">
-        <ShortcutRow keys="Enter" description="Send message" />
-        <ShortcutRow keys="Tab" description="Autocomplete command" />
-        <ShortcutRow keys="Up / Down" description="Navigate suggestions" />
-        <ShortcutRow keys="Ctrl+K" description="Open Quick Actions from chat" />
-        <ShortcutRow keys="Escape" description="Dismiss overlays or stop the active agent response" />
-        <ShortcutRow keys="Ctrl+L" description="Clear screen" />
-        <ShortcutRow keys="Ctrl+C" description="Exit Gordon" />
-        <ShortcutRow keys="?" description="Show this help" />
-      </Box>
-
-      <Text> </Text>
-      <Text color={COLORS.DIM}>Press Escape or ? to close</Text>
+    <Box marginX={1} marginY={1}>
+      <DeskPanel
+        eyebrow="Desk Keys"
+        title="Keyboard Shortcuts"
+        subtitle="Operator controls for the active shell"
+        tone="brand"
+      >
+        <Box flexDirection="column">
+          <ShortcutRow keys="Enter" description="Send message" />
+          <ShortcutRow keys="Tab" description="Autocomplete command" />
+          <ShortcutRow keys="Up / Down" description="Navigate suggestions" />
+          <ShortcutRow keys="Ctrl+K" description="Open desk actions from chat" />
+          <ShortcutRow keys="Escape" description="Dismiss overlays or stop the active run" />
+          <ShortcutRow keys="Ctrl+L" description="Clear screen" />
+          <ShortcutRow keys="Ctrl+C" description="Exit Gordon" />
+          <ShortcutRow keys="?" description="Show this help" />
+        </Box>
+        <Box marginTop={1}>
+          <Text color={COLORS.DIM}>Press Escape or ? to close</Text>
+        </Box>
+      </DeskPanel>
     </Box>
   );
 }

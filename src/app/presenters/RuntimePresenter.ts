@@ -2,6 +2,7 @@ import type { SessionRuntime } from "../../runtime/index.ts";
 import type { RuntimeApprovalRequest, RuntimeBridgeSession, RuntimeTranscriptEntry } from "../../runtime/contracts/types.ts";
 import type { RuntimeSessionState } from "../../runtime/state/SessionState.ts";
 import type { HandoffArtifact, WorkerScratchpadEntry } from "../../runtime/workers/HandoffArtifact.ts";
+import { getRuntimeApprovalShortId } from "../runtimeApprovalId.ts";
 
 export interface RuntimeInspectorViewModel {
   sessionId?: string;
@@ -13,10 +14,16 @@ export interface RuntimeInspectorViewModel {
   backgroundTaskCount: number;
   pendingApprovalCount: number;
   recentApprovalCount: number;
+  pendingApprovals: RuntimeApprovalRequest[];
   pluginCount: number;
   mcpServerCount: number;
   registeredToolCount: number;
   commandCount: number;
+  routingCount: number;
+  toolingLastSyncedAt?: string | null;
+  toolingLastReloadAt?: string | null;
+  toolingHotReloadEnabled: boolean;
+  recentPlugins: RuntimeSessionState["tooling"]["plugins"];
   remoteConnectionStatus: RuntimeSessionState["remote"]["connectionStatus"];
   remoteReachable: boolean;
   remoteDetail?: string;
@@ -42,6 +49,11 @@ export function createRuntimeInspectorViewModel(
   const scratchpad = runtime.getScratchpadEntries();
   const handoffs = runtime.getHandoffArtifacts();
 
+  const hasActionableRail =
+    state.approvals.pending.length > 0
+    || state.background.tasks.length > 0
+    || state.bridge.active.length > 0;
+
   return {
     sessionId: state.session.sessionId,
     resourceId: state.session.resourceId ?? state.session.snapshot?.resourceId,
@@ -52,10 +64,16 @@ export function createRuntimeInspectorViewModel(
     backgroundTaskCount: state.background.tasks.length,
     pendingApprovalCount: state.approvals.pending.length,
     recentApprovalCount: state.approvals.recent.length,
+    pendingApprovals: state.approvals.pending.slice(0, maxItems),
     pluginCount: state.tooling.plugins.length,
     mcpServerCount: state.tooling.mcpServers.length,
     registeredToolCount: runtime.getRegisteredTools().length,
     commandCount: state.tooling.commands.length,
+    routingCount: state.tooling.routingCount,
+    toolingLastSyncedAt: state.tooling.lastSyncedAt,
+    toolingLastReloadAt: state.tooling.lastReloadAt,
+    toolingHotReloadEnabled: state.tooling.hotReloadEnabled,
+    recentPlugins: state.tooling.plugins.slice(0, maxItems),
     remoteConnectionStatus: state.remote.connectionStatus,
     remoteReachable: state.remote.reachable,
     remoteDetail: state.remote.detail,
@@ -67,16 +85,7 @@ export function createRuntimeInspectorViewModel(
     recentApprovals: state.approvals.recent.slice(0, maxItems),
     recentScratchpad: scratchpad.slice(-maxItems),
     recentHandoffs: handoffs.slice(-maxItems),
-    hasContent:
-      transcript.length > 0
-      || scratchpad.length > 0
-      || handoffs.length > 0
-      || state.approvals.pending.length > 0
-      || state.approvals.recent.length > 0
-      || state.tooling.plugins.length > 0
-      || state.tooling.mcpServers.length > 0
-      || state.bridge.active.length > 0
-      || state.remote.connectionStatus !== "offline",
+    hasContent: hasActionableRail,
     lastUpdatedAt: state.lastUpdatedAt,
   };
 }
@@ -93,9 +102,29 @@ export function formatRuntimeInspectorSummary(viewModel: RuntimeInspectorViewMod
     `Background tasks: ${viewModel.backgroundTaskCount}`,
     `Pending approvals: ${viewModel.pendingApprovalCount} · Recent approvals: ${viewModel.recentApprovalCount}`,
     `Plugins: ${viewModel.pluginCount} · MCP servers: ${viewModel.mcpServerCount} · Tools: ${viewModel.registeredToolCount} · Commands: ${viewModel.commandCount}`,
+    `Routing configs: ${viewModel.routingCount} · Hot reload: ${viewModel.toolingHotReloadEnabled ? "on" : "off"}${viewModel.toolingLastReloadAt ? ` · last reload ${viewModel.toolingLastReloadAt}` : ""}`,
     `Remote runtime: ${viewModel.remoteConnectionStatus}${viewModel.remoteDetail ? ` (${viewModel.remoteDetail})` : ""} · Bridge sessions: ${viewModel.activeBridgeSessions}`,
     `Permission scopes: ${viewModel.permissionScopes.length > 0 ? viewModel.permissionScopes.join(", ") : "none"}`,
   ];
+
+  if (viewModel.pendingApprovals.length > 0) {
+    lines.push("", "**Pending approvals**");
+    for (const request of viewModel.pendingApprovals) {
+      const shortId = getRuntimeApprovalShortId(request.id);
+      lines.push(`- ${shortId} · ${request.toolName} · ${request.reason ?? "approval required"}`);
+      lines.push(`  Approve: /runtime-approve ${shortId} or approve ${shortId}`);
+      lines.push(`  Deny: /runtime-deny ${shortId} reason or deny ${shortId} reason`);
+    }
+  }
+
+  if (viewModel.recentPlugins.length > 0) {
+    lines.push("", "**Plugin lifecycle**");
+    for (const plugin of viewModel.recentPlugins) {
+      lines.push(
+        `- ${plugin.name} · ${plugin.status ?? "unknown"} · ${plugin.lifecycle ?? "mcp"}${plugin.defaultAgent ? ` · ${plugin.defaultAgent}` : ""}${plugin.integrationCommands && plugin.integrationCommands.length > 0 ? ` · ${plugin.integrationCommands.join(", ")}` : ""}`,
+      );
+    }
+  }
 
   if (viewModel.recentApprovals.length > 0) {
     lines.push("", "**Recent approvals**");

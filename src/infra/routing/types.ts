@@ -17,6 +17,8 @@ export type AgentAffinity =
   | "Monitor"
   | "Teacher"
   | "Backtester"
+  | "Critic"
+  | "Auditor"
   | "Gordon";
 
 /**

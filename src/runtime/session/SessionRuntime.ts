@@ -194,14 +194,14 @@ export class SessionRuntime {
     requestId: string,
     options?: { actor?: string; persist?: boolean; scope?: "session" | "persistent" },
   ): RuntimeApprovalRequest | null {
-    return this.permissionEngine.approve(requestId, options);
+    return this.permissionEngine.approve(this.resolvePendingApprovalId(requestId), options);
   }
 
   denyPendingRequest(
     requestId: string,
     options?: { actor?: string; persist?: boolean; scope?: "session" | "persistent"; reason?: string },
   ): RuntimeApprovalRequest | null {
-    return this.permissionEngine.deny(requestId, options);
+    return this.permissionEngine.deny(this.resolvePendingApprovalId(requestId), options);
   }
 
   getBridgeSessions(): ReturnType<RuntimeStore["getState"]>["bridge"] {
@@ -258,6 +258,10 @@ export class SessionRuntime {
   }
 
   syncToolingState(input: {
+    lastSyncedAt?: string | null;
+    lastReloadAt?: string | null;
+    hotReloadEnabled?: boolean;
+    routingCount?: number;
     plugins?: RuntimePluginSummary[];
     mcpServers?: RuntimeMcpServerSummary[];
     tools?: RuntimeToolSummary[];
@@ -292,10 +296,13 @@ export class SessionRuntime {
     this.runtimeStore.setToolingState({
       ...input,
       tools: toolSummaries,
+      lastSyncedAt: input.lastSyncedAt ?? new Date().toISOString(),
+      lastReloadAt: input.lastReloadAt ?? this.runtimeStore.getState().tooling.lastReloadAt,
+      hotReloadEnabled: input.hotReloadEnabled ?? this.runtimeStore.getState().tooling.hotReloadEnabled,
+      routingCount: input.routingCount ?? this.runtimeStore.getState().tooling.routingCount,
       commands: input.commands ?? this.runtimeStore.getState().tooling.commands,
       plugins: input.plugins ?? this.runtimeStore.getState().tooling.plugins,
       mcpServers: input.mcpServers ?? this.runtimeStore.getState().tooling.mcpServers,
-      lastSyncedAt: new Date().toISOString(),
     });
   }
 
@@ -500,5 +507,27 @@ export class SessionRuntime {
           content: entry.content,
         })),
     };
+  }
+
+  private resolvePendingApprovalId(requestId: string): string {
+    const normalized = requestId.trim();
+    if (!normalized) {
+      return requestId;
+    }
+
+    const exact = this.permissionEngine.listPending().find((entry) => entry.id === normalized);
+    if (exact) {
+      return exact.id;
+    }
+
+    const partial = this.permissionEngine.listPending().find((entry) => {
+      if (entry.id.startsWith(normalized)) {
+        return true;
+      }
+
+      const stripped = entry.id.replace(/^approval[-_:]*/i, "");
+      return stripped === normalized || stripped.startsWith(normalized);
+    });
+    return partial?.id ?? requestId;
   }
 }

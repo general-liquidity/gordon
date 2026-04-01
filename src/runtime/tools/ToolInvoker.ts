@@ -14,6 +14,12 @@ export interface ToolInvocationResult<T> {
   policy: RuntimeToolPolicyDecision;
 }
 
+export interface PreparedToolInvocation {
+  policy: RuntimeToolPolicyDecision;
+  definition?: ReturnType<ToolRegistry["getDefinition"]>;
+  executionContext: RuntimeToolExecutionContext;
+}
+
 export class ToolInvoker {
   private readonly toolRegistry: ToolRegistry;
   private readonly permissionEngine: PermissionEngine;
@@ -23,7 +29,7 @@ export class ToolInvoker {
     this.permissionEngine = permissionEngine;
   }
 
-  async invoke<T>(
+  async prepare(
     toolName: string,
     context: GordonContext,
     input: {
@@ -33,13 +39,12 @@ export class ToolInvoker {
       scratchpadStore: ScratchpadStore;
       workerRegistry: WorkerRegistry;
       signal?: AbortSignal;
-      executor?: () => Promise<T>;
       listRuntimeCommands?: () => string[];
       refreshPlugins?: () => Promise<void>;
       reloadPlugins?: () => Promise<void>;
       searchHistory?: (query: string, options?: { limit?: number }) => RuntimeHistoryResult[];
     },
-  ): Promise<ToolInvocationResult<T>> {
+  ): Promise<PreparedToolInvocation> {
     const definition = this.toolRegistry.getDefinition(toolName);
     const policy = await evaluateRuntimeToolPolicy(toolName, context, undefined, definition?.spec);
     if (!policy.allowed) {
@@ -70,14 +75,41 @@ export class ToolInvoker {
       searchHistory: input.searchHistory,
     };
 
+    return {
+      policy,
+      definition,
+      executionContext,
+    };
+  }
+
+  async invoke<T>(
+    toolName: string,
+    context: GordonContext,
+    input: {
+      session: RuntimeSessionContext;
+      runtimeState: RuntimeSessionState;
+      transcriptStore: TranscriptStore;
+      scratchpadStore: ScratchpadStore;
+      workerRegistry: WorkerRegistry;
+      signal?: AbortSignal;
+      executor?: () => Promise<T>;
+      listRuntimeCommands?: () => string[];
+      refreshPlugins?: () => Promise<void>;
+      reloadPlugins?: () => Promise<void>;
+      searchHistory?: (query: string, options?: { limit?: number }) => RuntimeHistoryResult[];
+    },
+  ): Promise<ToolInvocationResult<T>> {
+    const prepared = await this.prepare(toolName, context, input);
+
+    const definition = prepared.definition;
     const executor = definition?.execute
-      ? async () => definition.execute!(executionContext) as T
+      ? async () => definition.execute!(prepared.executionContext) as T
       : input.executor;
     if (!executor) {
       throw new Error(`Tool ${toolName} has no registered runtime executor.`);
     }
 
     const result = await executor();
-    return { result, policy };
+    return { result, policy: prepared.policy };
   }
 }

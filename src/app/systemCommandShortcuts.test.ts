@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { parseSystemShortcut } from "./systemCommandShortcuts.ts";
+import { parseRuntimeApprovalShortcut, parseSystemShortcut } from "./systemCommandShortcuts.ts";
 
 describe("parseSystemShortcut", () => {
   it("recognizes plain-text arm and disarm guidance requests", () => {
@@ -30,5 +30,26 @@ describe("parseSystemShortcut", () => {
   it("ignores non-system prompts", () => {
     expect(parseSystemShortcut("start the scalping process")).toBeNull();
     expect(parseSystemShortcut("scan btc and eth")).toBeNull();
+  });
+
+  it("parses explicit runtime approval shortcuts without using slash commands", () => {
+    expect(parseRuntimeApprovalShortcut("approve req-123")).toEqual({
+      decision: "approve",
+      requestId: "req-123",
+      persist: false,
+      reason: undefined,
+    });
+    expect(parseRuntimeApprovalShortcut("deny req-456 persist risk too high")).toEqual({
+      decision: "deny",
+      requestId: "req-456",
+      persist: true,
+      reason: "risk too high",
+    });
+    expect(parseRuntimeApprovalShortcut("reject req-789 bad venue")).toEqual({
+      decision: "deny",
+      requestId: "req-789",
+      persist: false,
+      reason: "bad venue",
+    });
   });
 });

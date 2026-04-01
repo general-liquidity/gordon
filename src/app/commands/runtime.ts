@@ -1,4 +1,5 @@
 import type { SessionRuntime } from "../../runtime/index.ts";
+import { getRuntimeApprovalShortId } from "../runtimeApprovalId.ts";
 import { createRuntimeInspectorViewModel, formatRuntimeInspectorSummary } from "../presenters/RuntimePresenter.ts";
 
 function parsePositiveInt(value: string | undefined, fallback: number): number {
@@ -39,6 +40,43 @@ export async function formatRuntimeSessionInfo(runtime: SessionRuntime): Promise
 
 export function formatRuntimeState(runtime: SessionRuntime): string {
   return formatRuntimeInspectorSummary(createRuntimeInspectorViewModel(runtime));
+}
+
+export function formatRuntimePlugins(runtime: SessionRuntime): string {
+  const inspector = createRuntimeInspectorViewModel(runtime, { maxItems: 12 });
+  const tooling = runtime.getState().tooling;
+
+  if (tooling.plugins.length === 0 && tooling.mcpServers.length === 0) {
+    return "No runtime plugins or MCP servers are currently active.";
+  }
+
+  const lines = [
+    "**Runtime Plugins**",
+    "",
+    `- Last sync: ${tooling.lastSyncedAt ?? "never"}`,
+    `- Last reload: ${tooling.lastReloadAt ?? "never"}`,
+    `- Hot reload: ${tooling.hotReloadEnabled ? "enabled" : "disabled"}`,
+    `- Routing configs: ${tooling.routingCount}`,
+    `- Commands surfaced: ${tooling.commands.length > 0 ? tooling.commands.join(", ") : "none"}`,
+  ];
+
+  if (inspector.recentPlugins.length > 0) {
+    lines.push("", "**Plugin inventory**");
+    for (const plugin of inspector.recentPlugins) {
+      lines.push(
+        `- ${plugin.name} · ${plugin.status ?? "unknown"} · ${plugin.lifecycle ?? "mcp"} · tools=${plugin.toolCount ?? 0} · commands=${plugin.commandCount ?? 0}${plugin.defaultAgent ? ` · default=${plugin.defaultAgent}` : ""}${plugin.reloadRecommended ? " · reload suggested" : ""}${plugin.integrationCommands && plugin.integrationCommands.length > 0 ? ` · ${plugin.integrationCommands.join(", ")}` : ""}`,
+      );
+    }
+  }
+
+  if (tooling.mcpServers.length > 0) {
+    lines.push("", "**MCP servers**");
+    for (const server of tooling.mcpServers.slice(0, 12)) {
+      lines.push(`- ${server.name} · ${server.category} · tools=${server.toolCount ?? "unknown"}`);
+    }
+  }
+
+  return lines.join("\n");
 }
 
 export function formatRuntimeTranscript(runtime: SessionRuntime, args: string): string {
@@ -102,14 +140,17 @@ export function formatRuntimeApprovals(runtime: SessionRuntime): string {
   if (pending.length > 0) {
     lines.push("Pending:");
     for (const request of pending.slice(0, 12)) {
-      lines.push(`- ${request.id.slice(0, 8)} · ${request.toolName} · ${request.approvalClass} · ${request.reason ?? "approval required"}`);
+      const shortId = getRuntimeApprovalShortId(request.id);
+      lines.push(`- ${shortId} · ${request.toolName} · ${request.approvalClass} · ${request.reason ?? "approval required"}`);
+      lines.push(`  Approve: /runtime-approve ${shortId} or approve ${shortId}`);
+      lines.push(`  Deny: /runtime-deny ${shortId} reason or deny ${shortId} reason`);
     }
   }
 
   if (recent.length > 0) {
     lines.push("", "Recent:");
     for (const request of recent) {
-      lines.push(`- ${request.status.toUpperCase()} · ${request.id.slice(0, 8)} · ${request.toolName}${request.actor ? ` · ${request.actor}` : ""}`);
+      lines.push(`- ${request.status.toUpperCase()} · ${getRuntimeApprovalShortId(request.id)} · ${request.toolName}${request.actor ? ` · ${request.actor}` : ""}`);
     }
   }
 
@@ -155,6 +196,7 @@ export function applyRuntimeApprovalDecision(
     `**Runtime Approval ${decision === "approve" ? "Approved" : "Denied"}**`,
     "",
     `- Request: ${result.id}`,
+    `- Short ID: ${getRuntimeApprovalShortId(result.id)}`,
     `- Tool: ${result.toolName}`,
     `- Scope: ${persist ? "persistent" : "session"}`,
     `- Status: ${result.status}`,

@@ -13,6 +13,8 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Box, Text, useInput } from "ink";
 import { COLORS } from "../theme.ts";
+import { DeskPanel } from "./desk/DeskPanel.tsx";
+import { TicketCard } from "./desk/TicketCard.tsx";
 
 // ============================================================================
 // Types
@@ -374,12 +376,13 @@ export const ChartViewer: React.FC<ChartViewerProps> = ({
   const changeSign = (data.priceChangePercent ?? 0) >= 0 ? "+" : "";
 
   return (
-    <Box
-      flexDirection="column"
-      borderStyle="single"
-      borderColor={COLORS.ACCENT_DIM}
-      paddingX={2}
-      paddingY={1}
+    <DeskPanel
+      eyebrow="Chart Desk"
+      title={`${data.symbol} · ${data.timeframe}`}
+      subtitle={data.currentPrice !== undefined
+        ? `${formatPrice(data.currentPrice)}${data.priceChangePercent !== undefined ? ` · ${changeSign}${data.priceChangePercent.toFixed(2)}%` : ""}`
+        : "Terminal chart view"}
+      tone="analysis"
     >
       {/* Header */}
       <Box justifyContent="space-between" marginBottom={1}>
@@ -473,7 +476,7 @@ export const ChartViewer: React.FC<ChartViewerProps> = ({
           )}
         </Box>
       )}
-    </Box>
+    </DeskPanel>
   );
 };
 
@@ -514,12 +517,13 @@ export const CompactChart: React.FC<CompactChartProps> = ({
   const trendArrow = trend === "bullish" ? "/^" : trend === "bearish" ? "\\v" : "--";
 
   return (
-    <Box
-      borderStyle="round"
-      borderColor={trendColor}
-      paddingX={1}
-      gap={2}
+    <TicketCard
+      eyebrow="Compact Chart"
+      title={`${symbol} · ${timeframe}`}
+      subtitle={`${trend.charAt(0).toUpperCase() + trend.slice(1)} trend`}
+      tone={trend === "bullish" ? "success" : trend === "bearish" ? "danger" : "warning"}
     >
+      <Box gap={2}>
       {/* Symbol and timeframe */}
       <Box flexDirection="column" width={12}>
         <Text color={COLORS.ACCENT} bold>
@@ -564,7 +568,8 @@ export const CompactChart: React.FC<CompactChartProps> = ({
           </Box>
         )}
       </Box>
-    </Box>
+      </Box>
+    </TicketCard>
   );
 };
 
@@ -592,24 +597,12 @@ export const ChartLoading: React.FC<ChartLoadingProps> = ({
   }, []);
 
   return (
-    <Box
-      flexDirection="column"
-      borderStyle="single"
-      borderColor={COLORS.ACCENT_DIM}
-      paddingX={2}
-      paddingY={1}
-      alignItems="center"
-    >
-      <Text color={COLORS.ACCENT} bold>
-        {symbol}
-      </Text>
-      <Box marginY={1}>
-        <Text color={COLORS.DIM}>
-          {message}
-          {dots}
-        </Text>
-      </Box>
-    </Box>
+    <TicketCard
+      eyebrow="Chart Desk"
+      title={symbol}
+      subtitle={`${message}${dots}`}
+      tone="info"
+    />
   );
 };
 
@@ -631,31 +624,13 @@ export const ChartError: React.FC<ChartErrorProps> = ({ symbol, error, onRetry }
   });
 
   return (
-    <Box
-      flexDirection="column"
-      borderStyle="single"
-      borderColor={COLORS.RED}
-      paddingX={2}
-      paddingY={1}
-    >
-      <Box gap={2}>
-        <Text color={COLORS.RED} bold>
-          Chart Error
-        </Text>
-        <Text color={COLORS.DIM}>|</Text>
-        <Text color={COLORS.ACCENT}>{symbol}</Text>
-      </Box>
-      <Box marginY={1}>
-        <Text color={COLORS.SECONDARY}>{error}</Text>
-      </Box>
-      {onRetry && (
-        <Box marginTop={1}>
-          <Text color={COLORS.MUTED}>
-            Press <Text color={COLORS.DIM}>R</Text> to retry
-          </Text>
-        </Box>
-      )}
-    </Box>
+    <TicketCard
+      eyebrow="Chart Error"
+      title={symbol}
+      subtitle={error}
+      tone="danger"
+      actions={onRetry ? ["Retry: R"] : undefined}
+    />
   );
 };
 

@@ -2,6 +2,8 @@ import React from "react";
 import { Box, Text } from "ink";
 import type { Plan, PlanStatus } from "../types/index.ts";
 import { COLORS } from "./theme.ts";
+import { DeskPanel } from "./components/desk/DeskPanel.tsx";
+import { TicketCard } from "./components/desk/TicketCard.tsx";
 
 interface PlanDiffProps {
   plan: Plan;
@@ -83,26 +85,15 @@ export const PlanDiff: React.FC<PlanDiffProps> = ({ plan }) => {
   const riskReward = calculateRiskReward(plan);
 
   return (
-    <Box
-      flexDirection="column"
-      borderStyle="double"
-      borderColor={COLORS.TAN}
-      paddingX={2}
-      paddingY={1}
+    <DeskPanel
+      eyebrow="Trade Plan"
+      title={`${plan.symbol} · ${plan.direction.toUpperCase()}`}
+      subtitle={`Status: ${plan.status}`}
+      tone="brand"
     >
       {/* Header */}
       <Box justifyContent="space-between" marginBottom={1}>
-        <Box>
-          <Text color={COLORS.TAN} bold>
-            TRADE PLAN
-          </Text>
-          <Text color={COLORS.DIM}> | </Text>
-          <Text color={COLORS.WHITE} bold>
-            {plan.symbol}
-          </Text>
-          <Text color={COLORS.DIM}> | </Text>
-          <Text color={COLORS.GREEN}>{plan.direction.toUpperCase()}</Text>
-        </Box>
+        <Box />
         <StatusBadge status={plan.status} />
       </Box>
 
@@ -114,31 +105,17 @@ export const PlanDiff: React.FC<PlanDiffProps> = ({ plan }) => {
       </Box>
 
       {/* Entry Section */}
-      <Box flexDirection="column" marginBottom={1}>
-        <Text color={COLORS.TAN} bold>
-          Entry
-        </Text>
-        <Box paddingLeft={2}>
-          <Text color={COLORS.DIM}>Type: </Text>
-          <Text color={COLORS.WHITE}>{plan.entry.type.toUpperCase()}</Text>
-        </Box>
-        {plan.entry.price && (
-          <Box paddingLeft={2}>
-            <Text color={COLORS.DIM}>Price: </Text>
-            <Text color={COLORS.WHITE}>{formatPrice(plan.entry.price)}</Text>
-          </Box>
-        )}
-        <Box paddingLeft={2}>
-          <Text color={COLORS.DIM}>Allocation: </Text>
-          <Text color={COLORS.WHITE}>
-            {plan.allocation.amount.toLocaleString()} {plan.allocation.currency}
-          </Text>
+      <TicketCard eyebrow="Entry" title={plan.entry.type.toUpperCase()} tone="info">
+        <Box flexDirection="column">
+          {plan.entry.price && (
+            <Text color={COLORS.DIM}>Price: <Text color={COLORS.WHITE}>{formatPrice(plan.entry.price)}</Text></Text>
+          )}
           <Text color={COLORS.DIM}>
-            {" "}
-            ({(plan.allocation.percentOfPortfolio * 100).toFixed(1)}%)
+            Allocation: <Text color={COLORS.WHITE}>{plan.allocation.amount.toLocaleString()} {plan.allocation.currency}</Text>
+            <Text color={COLORS.DIM}> ({(plan.allocation.percentOfPortfolio * 100).toFixed(1)}%)</Text>
           </Text>
         </Box>
-      </Box>
+      </TicketCard>
 
       {/* DCA Section */}
       {plan.dca && plan.dca.length > 0 && (
@@ -237,7 +214,7 @@ export const PlanDiff: React.FC<PlanDiffProps> = ({ plan }) => {
           </Text>
         </Box>
       </Box>
-    </Box>
+    </DeskPanel>
   );
 };
 

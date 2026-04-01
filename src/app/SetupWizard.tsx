@@ -7,6 +7,8 @@ import React, { useState, useCallback, useEffect, useRef } from "react";
 import { Box, Text, useInput } from "ink";
 import TextInput from "ink-text-input";
 import { NoticeAlert } from "./components/PromptPrimitives.tsx";
+import { DeskPanel } from "./components/desk/DeskPanel.tsx";
+import { TicketCard } from "./components/desk/TicketCard.tsx";
 
 import { resetAgents } from "../infra/agents/index.ts";
 import { resetProviderRegistry } from "../infra/providers/index.ts";
@@ -1848,9 +1850,28 @@ export function SetupWizard({
 
   const exchangeLabel = getExchangeLabel(state.exchangeType);
   const brokerLabel = getBrokerLabel(state.brokerType);
+  const wizardTitle = mode === "quickstart"
+    ? "QuickStart Provisioning"
+    : mode === "configure"
+      ? `Configure ${initialSection ? getSetupSectionLabel(initialSection) : "Gordon"}`
+      : "Advanced Provisioning";
+  const wizardSubtitle = state.step === "welcome"
+    ? "Open the desk by wiring the systems Gordon actually needs."
+    : `Current step: ${state.step.replace(/-/g, " ")}`;
 
   return (
     <Box flexDirection="column" paddingX={2} paddingY={1}>
+      {state.step !== "welcome" && (
+        <Box marginBottom={1}>
+          <TicketCard
+            eyebrow="Desk Provisioning"
+            title={wizardTitle}
+            subtitle={wizardSubtitle}
+            tone="brand"
+          />
+        </Box>
+      )}
+
       {state.step === "welcome" && (
         <WelcomeStep mode={mode} initialSection={initialSection} />
       )}
@@ -2188,36 +2209,26 @@ function WelcomeStep({ mode, initialSection }: WelcomeStepProps): React.ReactEle
 
   return (
     <Box flexDirection="column">
-      <Box marginBottom={1}>
-        <Text color={COLORS.TAN} bold>
-          {setupLabel}
-        </Text>
-      </Box>
-
-      <Box flexDirection="column" marginBottom={1}>
-        <Text color={COLORS.WHITE}>
-          This wizard will configure Gordon for the workflow you selected.
-        </Text>
-        <Text color={COLORS.WHITE}>
-          Gordon will set up:
-        </Text>
-      </Box>
-
-      <Box flexDirection="column" marginLeft={2}>
-        {scopeLines.map((line) => (
-          <Text key={line} color={COLORS.DIM}>{line}</Text>
-        ))}
-      </Box>
-
-      <Box marginTop={2}>
-        <Text color={COLORS.TAN_DIM}>
-          You can skip any step and configure it later.
-        </Text>
-      </Box>
-
-      <Box marginTop={1}>
-        <Text color={COLORS.DIM}>Press any key to continue...</Text>
-      </Box>
+      <DeskPanel
+        eyebrow="Desk Provisioning"
+        title={setupLabel}
+        subtitle="Provision the stack Gordon needs for the workflow you selected."
+        tone="brand"
+      >
+        <Box flexDirection="column">
+          {scopeLines.map((line) => (
+            <Text key={line} color={COLORS.DIM}>{line}</Text>
+          ))}
+        </Box>
+        <Box marginTop={1}>
+          <Text color={COLORS.BRASS_DIM}>
+            You can skip any step and configure it later.
+          </Text>
+        </Box>
+        <Box marginTop={1}>
+          <Text color={COLORS.DIM}>Press any key to continue...</Text>
+        </Box>
+      </DeskPanel>
     </Box>
   );
 }
@@ -2239,9 +2250,9 @@ function ExchangeSelectStep({ error, inputValue, onInputChange, onSubmit }: Exch
       </Box>
 
       {error && (
-        <Box marginBottom={1} borderStyle="single" borderColor="red" paddingX={1}>
-          <Text color="red">{error}</Text>
-        </Box>
+        <NoticeAlert title="Setup issue" variant="error">
+          {error}
+        </NoticeAlert>
       )}
 
       <Box flexDirection="column" marginBottom={1}>
@@ -2294,9 +2305,9 @@ function ExchangeKeyStep({
       </Box>
 
       {error && (
-        <Box marginBottom={1} borderStyle="single" borderColor="red" paddingX={1}>
-          <Text color="red">{error}</Text>
-        </Box>
+        <NoticeAlert title="Setup issue" variant="error">
+          {error}
+        </NoticeAlert>
       )}
 
       <Box flexDirection="column" marginBottom={1}>
@@ -2455,9 +2466,9 @@ function ExchangeWalletStep({
       </Box>
 
       {error && (
-        <Box marginBottom={1} borderStyle="single" borderColor="red" paddingX={1}>
-          <Text color="red">{error}</Text>
-        </Box>
+        <NoticeAlert title="Setup issue" variant="error">
+          {error}
+        </NoticeAlert>
       )}
 
       <Box flexDirection="column" marginBottom={1}>
@@ -2469,17 +2480,16 @@ function ExchangeWalletStep({
         </Text>
       </Box>
 
-      <Box marginBottom={1} borderStyle="single" borderColor="yellow" paddingX={1}>
+      <NoticeAlert title="Security warning" variant="warning">
         <Box flexDirection="column">
-          <Text color="yellow" bold>SECURITY WARNING</Text>
-          <Text color="yellow">
+          <Text color={COLORS.WARNING}>
             Use a DEDICATED trading wallet with limited funds.
           </Text>
-          <Text color="yellow">
+          <Text color={COLORS.WARNING}>
             Never use your main wallet or hardware wallet private key.
           </Text>
         </Box>
-      </Box>
+      </NoticeAlert>
 
       {instructions.length > 0 && (
         <Box flexDirection="column" marginBottom={1}>
@@ -2558,9 +2568,9 @@ function BrokerSelectStep({
       </Box>
 
       {error && (
-        <Box marginBottom={1} borderStyle="single" borderColor="red" paddingX={1}>
-          <Text color="red">{error}</Text>
-        </Box>
+        <NoticeAlert title="Setup issue" variant="error">
+          {error}
+        </NoticeAlert>
       )}
 
       <Box flexDirection="column" marginBottom={1}>
@@ -2613,9 +2623,9 @@ function BrokerKeyStep({
       </Box>
 
       {error && (
-        <Box marginBottom={1} borderStyle="single" borderColor="red" paddingX={1}>
-          <Text color="red">{error}</Text>
-        </Box>
+        <NoticeAlert title="Setup issue" variant="error">
+          {error}
+        </NoticeAlert>
       )}
 
       {instructions.length > 0 && (
@@ -2774,9 +2784,9 @@ function RailsStep({
       </Box>
 
       {error && (
-        <Box marginBottom={1} borderStyle="single" borderColor="red" paddingX={1}>
-          <Text color="red">{error}</Text>
-        </Box>
+        <NoticeAlert title="Setup issue" variant="error">
+          {error}
+        </NoticeAlert>
       )}
 
       <Box flexDirection="column" marginBottom={1}>
@@ -2832,9 +2842,9 @@ function McpStep({
       </Box>
 
       {error && (
-        <Box marginBottom={1} borderStyle="single" borderColor="red" paddingX={1}>
-          <Text color="red">{error}</Text>
-        </Box>
+        <NoticeAlert title="Setup issue" variant="error">
+          {error}
+        </NoticeAlert>
       )}
 
       <Box flexDirection="column" marginBottom={1}>
@@ -2909,9 +2919,9 @@ function LLMStep({
       )}
 
       {error && (
-        <Box marginBottom={1} borderStyle="single" borderColor="red" paddingX={1}>
-          <Text color="red">{error}</Text>
-        </Box>
+        <NoticeAlert title="Setup issue" variant="error">
+          {error}
+        </NoticeAlert>
       )}
 
       <Box flexDirection="column" marginBottom={1}>
@@ -3026,9 +3036,9 @@ function StartupBannerStep({
       </Box>
 
       {error && (
-        <Box marginBottom={1} borderStyle="single" borderColor="red" paddingX={1}>
-          <Text color="red">{error}</Text>
-        </Box>
+        <NoticeAlert title="Setup issue" variant="error">
+          {error}
+        </NoticeAlert>
       )}
 
       <Box flexDirection="column" marginBottom={1}>
@@ -3141,17 +3151,14 @@ function ChainKeyStep({
       </Box>
 
       {error && (
-        <Box marginBottom={1} borderStyle="single" borderColor="red" paddingX={1}>
-          <Text color="red">{error}</Text>
-        </Box>
+        <NoticeAlert title="Setup issue" variant="error">
+          {error}
+        </NoticeAlert>
       )}
 
-      <Box marginBottom={1} borderStyle="single" borderColor="yellow" paddingX={1}>
-        <Box flexDirection="column">
-          <Text color="yellow" bold>SECURITY</Text>
-          <Text color="yellow">Use a DEDICATED wallet with limited funds. Never use your primary wallet.</Text>
-        </Box>
-      </Box>
+      <NoticeAlert title="Security" variant="warning">
+        <Text color={COLORS.WARNING}>Use a DEDICATED wallet with limited funds. Never use your primary wallet.</Text>
+      </NoticeAlert>
 
       <Box flexDirection="column" marginBottom={1}>
         <Text color={COLORS.TAN_DIM} bold>Setup instructions:</Text>
@@ -3331,3 +3338,4 @@ export const __setupWizardBrokerInternals = {
 };
 
 export default SetupWizard;
+

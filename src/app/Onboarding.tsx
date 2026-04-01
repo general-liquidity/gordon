@@ -3,6 +3,9 @@ import { Box, Text } from "ink";
 import { FocusSelect } from "./components/PromptPrimitives.tsx";
 import { COLORS } from "./theme.ts";
 import type { OnboardingSelection } from "./setup-flow.ts";
+import { DeskPanel } from "./components/desk/DeskPanel.tsx";
+import { TicketCard } from "./components/desk/TicketCard.tsx";
+import { WelcomeBanner } from "./WelcomeBanner.tsx";
 
 interface OnboardingProps {
   onComplete: (selection: OnboardingSelection) => void;
@@ -11,54 +14,75 @@ interface OnboardingProps {
 export function Onboarding({ onComplete }: OnboardingProps): React.ReactElement {
   return (
     <Box flexDirection="column" paddingX={2} paddingY={1}>
-      <Box marginBottom={1}>
-        <Text color={COLORS.ACCENT} bold>
-          Gordon Onboarding
-        </Text>
+      <WelcomeBanner mode="quiet" context="welcome" />
+
+      <Box marginTop={1}>
+        <DeskPanel
+          eyebrow="Open The Desk"
+          title="Choose how Gordon should come online"
+          subtitle="Start with first value, full infrastructure, or a clean read-only demo."
+          tone="brand"
+        >
+          <Text color={COLORS.WHITE}>
+            Gordon should get you to trading value quickly, then widen the surface safely.
+          </Text>
+          <Text color={COLORS.DIM}>
+            Re-run setup later with `gordon configure`. Inspect the machine with `gordon doctor`.
+          </Text>
+        </DeskPanel>
       </Box>
 
-      <Box flexDirection="column" marginBottom={1}>
-        <Text color={COLORS.WHITE}>
-          Gordon should get you to first trading value quickly, then widen the surface safely.
-        </Text>
-        <Text color={COLORS.DIM}>
-          Pick the setup path that fits what you need right now.
-        </Text>
-      </Box>
-
-      <Box flexDirection="column" marginBottom={1}>
-        <Text color={COLORS.TAN} bold>
-          Paths
-        </Text>
-        <Box flexDirection="column" marginLeft={2}>
-          <Text color={COLORS.WHITE}>
-            QuickStart: one model, one venue, then straight to scan and analysis.
-          </Text>
-          <Text color={COLORS.WHITE}>
-            Advanced: brokers, chains, rails, MCP, and the full provider surface.
-          </Text>
-          <Text color={COLORS.WHITE}>
-            Demo: no credentials, read-only mode, useful for exploring the interface.
-          </Text>
+      <Box flexDirection="column" marginTop={1}>
+        <Box marginBottom={1}>
+          <TicketCard
+            eyebrow="QuickStart"
+            title="Open a read-only desk fast"
+            subtitle="One model, then straight into scan, analysis, and planning."
+            tone="info"
+          >
+            <Text color={COLORS.DIM}>
+              Best when you want first market value in minutes.
+            </Text>
+          </TicketCard>
+        </Box>
+        <Box marginBottom={1}>
+          <TicketCard
+            eyebrow="Advanced"
+            title="Provision the full desk"
+            subtitle="Brokers, chains, rails, MCP, and the full provider surface."
+            tone="brand"
+          >
+            <Text color={COLORS.DIM}>
+              Best when you already know the stack you want to wire.
+            </Text>
+          </TicketCard>
+        </Box>
+        <Box marginBottom={1}>
+          <TicketCard
+            eyebrow="Demo"
+            title="Enter with no credentials"
+            subtitle="Read-only mode for exploring the shell, workflows, and operator surfaces."
+            tone="analysis"
+          >
+            <Text color={COLORS.DIM}>
+              Best when you want to feel the product before committing anything.
+            </Text>
+          </TicketCard>
         </Box>
       </Box>
 
-      <Box marginBottom={1}>
-        <Text color={COLORS.DIM}>
-          Re-run setup later with `gordon configure`. Inspect the machine with `gordon doctor`.
-        </Text>
+      <Box marginTop={1}>
+        <FocusSelect
+          title="Choose the desk opening"
+          hint="Use the arrow keys to move fast. You can widen or reconfigure the desk later."
+          options={[
+            { label: "QuickStart", value: "quickstart" },
+            { label: "Advanced setup", value: "advanced" },
+            { label: "Demo mode", value: "demo" },
+          ]}
+          onChange={(value) => onComplete({ mode: value as OnboardingSelection["mode"] })}
+        />
       </Box>
-
-      <FocusSelect
-        title="Choose a path"
-        hint="Use the arrow keys to move fast. You can reconfigure everything later."
-        options={[
-          { label: "QuickStart", value: "quickstart" },
-          { label: "Advanced setup", value: "advanced" },
-          { label: "Demo mode", value: "demo" },
-        ]}
-        onChange={(value) => onComplete({ mode: value as OnboardingSelection["mode"] })}
-      />
     </Box>
   );
 }

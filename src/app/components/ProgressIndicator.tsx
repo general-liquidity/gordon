@@ -8,8 +8,9 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Box, Text, useInput } from "ink";
 import { ProgressBar, Spinner } from "@inkjs/ui";
 import { COLORS } from "../theme.ts";
+import { DeskPanel } from "./desk/DeskPanel.tsx";
+import { TicketCard } from "./desk/TicketCard.tsx";
 import {
-  getGordonLoaderColor,
   getGordonLoadingPhrases,
   useGordonLoader,
 } from "./GordonLoader.tsx";
@@ -98,28 +99,38 @@ export const ProgressIndicator: React.FC<ProgressIndicatorProps> = ({
       variant: "startup",
     }),
   });
-  const loaderColor = getGordonLoaderColor({
-    activityStatus: status,
-    variant: "startup",
-  });
-
   return (
     <Box flexDirection="column" paddingX={2} paddingY={1}>
       {progress !== undefined ? (
-        // Determinate progress
-        <Box flexDirection="column" gap={1}>
-          <Box gap={2} justifyContent="space-between">
-            <Box gap={2}>
-              <Text color={COLORS.ACCENT}>{label}</Text>
-              <Text color={COLORS.HIGHLIGHT} bold>{progress}%</Text>
-            </Box>
-            {showElapsed && (
-              <Text color={COLORS.DIM}>
-                {formatElapsedTime(elapsedSeconds)}
-              </Text>
-            )}
-          </Box>
+        <DeskPanel
+          eyebrow="Desk Progress"
+          title={label}
+          subtitle={`${progress}%${showElapsed ? ` · ${formatElapsedTime(elapsedSeconds)}` : ""}`}
+          tone="brand"
+        >
           <ProgressBar value={progress} />
+          {status && (
+            <Box marginTop={1}>
+              <Text color={COLORS.DIM}>{status}</Text>
+            </Box>
+          )}
+          {cancellable && onCancel && (
+            <Box marginTop={1}>
+              <Text color={COLORS.DIM}>
+                Press <Text color={COLORS.HIGHLIGHT}>Esc</Text> or{" "}
+                <Text color={COLORS.HIGHLIGHT}>C</Text> to cancel
+              </Text>
+            </Box>
+          )}
+        </DeskPanel>
+      ) : (
+        <TicketCard
+          eyebrow="Active Run"
+          title={`${glyph} ${label}`}
+          subtitle={`${phrase}${showElapsed ? ` · ${formatElapsedTime(elapsedSeconds)}` : ""}`}
+          tone="success"
+          actions={cancellable && onCancel ? ["Esc", "C"] : undefined}
+        >
           {status && (
             <Text color={COLORS.DIM}>{status}</Text>
           )}
@@ -131,36 +142,7 @@ export const ProgressIndicator: React.FC<ProgressIndicatorProps> = ({
               </Text>
             </Box>
           )}
-        </Box>
-      ) : (
-        // Indeterminate Gordon-themed loader
-        <Box flexDirection="column" gap={1}>
-          <Box gap={2} justifyContent="space-between">
-            <Box flexDirection="column">
-              <Box>
-                <Text color={loaderColor}>{glyph}</Text>
-                <Text color={COLORS.WHITE}> {label}</Text>
-              </Box>
-              <Text color={COLORS.DIM}>{phrase}</Text>
-            </Box>
-            {showElapsed && (
-              <Text color={COLORS.DIM}>
-                {formatElapsedTime(elapsedSeconds)}
-              </Text>
-            )}
-          </Box>
-          {status && (
-            <Text color={COLORS.DIM}>{status}</Text>
-          )}
-          {cancellable && onCancel && (
-            <Box>
-              <Text color={COLORS.DIM}>
-                Press <Text color={COLORS.HIGHLIGHT}>Esc</Text> or{" "}
-                <Text color={COLORS.HIGHLIGHT}>C</Text> to cancel
-              </Text>
-            </Box>
-          )}
-        </Box>
+        </TicketCard>
       )}
     </Box>
   );
@@ -184,29 +166,21 @@ export const ScanProgress: React.FC<ScanProgressProps> = ({
   const progress = Math.round((coinsScanned / totalCoins) * 100);
 
   return (
-    <Box
-      flexDirection="column"
-      borderStyle="single"
-      borderColor={COLORS.ACCENT_DIM}
-      paddingX={2}
-      paddingY={1}
-      marginX={1}
-    >
-      <Box gap={2} marginBottom={1}>
-        <Text color={COLORS.WHITE} bold>Scanning Market</Text>
-        <Text color={COLORS.DIM}>
-          {coinsScanned}/{totalCoins} coins
-        </Text>
-      </Box>
-
-      <ProgressBar value={progress} />
-
-      {currentSymbol && (
-        <Box marginTop={1}>
-          <Text color={COLORS.DIM}>Current: </Text>
-          <Text color={COLORS.HIGHLIGHT}>{currentSymbol}</Text>
-        </Box>
-      )}
+    <Box marginX={1}>
+      <DeskPanel
+        eyebrow="Scan"
+        title="Scanning the tape"
+        subtitle={`${coinsScanned}/${totalCoins} symbols`}
+        tone="info"
+      >
+        <ProgressBar value={progress} />
+        {currentSymbol && (
+          <Box marginTop={1}>
+            <Text color={COLORS.DIM}>Current: </Text>
+            <Text color={COLORS.HIGHLIGHT}>{currentSymbol}</Text>
+          </Box>
+        )}
+      </DeskPanel>
     </Box>
   );
 };
@@ -246,14 +220,13 @@ export const OrderProgress: React.FC<OrderProgressProps> = ({
   const statusText = status === "error" ? "[ERROR]" : status === "complete" ? "[SUCCESS]" : "[IN PROGRESS]";
 
   return (
-    <Box
-      flexDirection="column"
-      borderStyle="single"
-      borderColor={status === "error" ? COLORS.RED : status === "complete" ? COLORS.GREEN : COLORS.ACCENT_DIM}
-      paddingX={2}
-      paddingY={1}
-      marginX={1}
-    >
+    <Box marginX={1}>
+      <DeskPanel
+        eyebrow="Execution"
+        title={status === "error" ? "Order Failed" : status === "complete" ? "Order Executed" : "Routing order"}
+        subtitle={statusLabels[status]}
+        tone={status === "error" ? "danger" : status === "complete" ? "success" : "warning"}
+      >
       {status === "error" ? (
         <Box flexDirection="column">
           <Text color={COLORS.RED} bold>{statusText} Order Failed</Text>
@@ -278,6 +251,7 @@ export const OrderProgress: React.FC<OrderProgressProps> = ({
           )}
         </Box>
       )}
+      </DeskPanel>
     </Box>
   );
 };
@@ -362,45 +336,21 @@ export const StreamingProgress: React.FC<StreamingProgressProps> = ({
   }
 
   return (
-    <Box
-      flexDirection="column"
-      borderStyle="single"
-      borderColor={COLORS.ACCENT_DIM}
-      paddingX={2}
-      paddingY={1}
-      marginX={1}
-    >
-      <Box justifyContent="space-between">
-        <Box flexDirection="column">
+    <Box marginX={1}>
+      <TicketCard
+        eyebrow="Streaming"
+        title={`${glyph} ${operation}`}
+        subtitle={`${phrase}${showElapsed ? ` · ${formatElapsedTime(elapsedSeconds)}` : ""}`}
+        tone="success"
+        actions={onCancel && showElapsed ? ["Esc to cancel"] : undefined}
+      >
+        {currentTool && (
           <Box>
-            <Text color={COLORS.HIGHLIGHT}>{glyph}</Text>
-            <Text color={COLORS.WHITE}> {operation}</Text>
+            <Text color={COLORS.DIM}>Running: </Text>
+            <Text color={COLORS.HIGHLIGHT}>{currentTool}</Text>
           </Box>
-          <Text color={COLORS.DIM}>{phrase}</Text>
-        </Box>
-        {showElapsed && (
-          <Text color={COLORS.DIM}>
-            {formatElapsedTime(elapsedSeconds)}
-          </Text>
         )}
-      </Box>
-
-      {/* Current tool indicator */}
-      {currentTool && (
-        <Box marginTop={1}>
-          <Text color={COLORS.DIM}>Running: </Text>
-          <Text color={COLORS.HIGHLIGHT}>{currentTool}</Text>
-        </Box>
-      )}
-
-      {/* Cancel hint */}
-      {onCancel && showElapsed && (
-        <Box marginTop={1}>
-          <Text color={COLORS.MUTED}>
-            Press <Text color={COLORS.DIM}>Esc</Text> to cancel
-          </Text>
-        </Box>
-      )}
+      </TicketCard>
     </Box>
   );
 };

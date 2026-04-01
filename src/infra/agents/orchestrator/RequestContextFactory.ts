@@ -23,6 +23,7 @@ export function createAgentRequestContext(
   requestContext.set("requestedActionId", context.requestedActionId);
   requestContext.set("requestedTaskScope", context.requestedTaskScope);
   requestContext.set("credentialProfile", context.credentialProfile ?? "default");
+  requestContext.set("runtime", context.runtime);
   requestContext.set("workflowPhase", workflowPhase);
   requestContext.set("executionReadiness", executionReadiness);
   requestContext.set("compiledSubagentProfiles", compiledSubagentProfiles);

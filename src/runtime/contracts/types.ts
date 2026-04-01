@@ -109,12 +109,16 @@ export interface RuntimePluginSummary {
   enabled: boolean;
   category?: string;
   version?: string;
+  status?: "ready" | "disabled" | "degraded";
+  lifecycle?: "mcp" | "routed";
   toolCount?: number;
   commandCount?: number;
   integrationCommands?: string[];
   defaultAgent?: string;
   alsoOnGordon?: boolean;
   routedToolCount?: number;
+  reloadRecommended?: boolean;
+  lastReloadAt?: string | null;
 }
 
 export interface RuntimeMcpServerSummary {
@@ -136,6 +140,9 @@ export interface RuntimeToolSummary {
 
 export interface RuntimeToolingState {
   lastSyncedAt: string | null;
+  lastReloadAt: string | null;
+  hotReloadEnabled: boolean;
+  routingCount: number;
   plugins: RuntimePluginSummary[];
   mcpServers: RuntimeMcpServerSummary[];
   tools: RuntimeToolSummary[];

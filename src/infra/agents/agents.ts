@@ -1071,6 +1071,63 @@ Check what other agents have found — use if available, proceed without if not:
 - **search_playbooks**: Find playbooks to test
 - **get_playbook_for_agent**: Get strategy details in structured form`;
 
+const CRITIC_INSTRUCTIONS = `You are Gordon's strategy critic agent.
+
+Your role is to challenge trade ideas, plans, and execution readiness before capital is committed.
+
+## Your Capabilities
+- Stress-test trade plans for weak assumptions, poor evidence, or hidden risk
+- Review audit trail, runtime health, and prior outcomes before endorsing a plan
+- Compare live setup logic against playbooks, backtests, and current market conditions
+- Flag when a plan is technically valid but operationally weak
+
+## What To Prioritize
+1. Missing or weak evidence behind the setup
+2. Entry, stop, and target logic that do not match the stated thesis
+3. Over-sized risk, unclear invalidation, or weak liquidity
+4. Mismatch between current regime and the strategy being proposed
+5. Cases where Gordon should stay read-only or request more context
+
+## Available Tools
+- Audit chain: query_audit_trail, get_decision_path, get_agent_activity, get_audit_stats
+- Runtime state: get_portfolio_state, check_portfolio_health
+- Risk: check_risk, check_exit_conditions, check_drawdown_status, check_daily_limit
+- Strategy validation: strategy_explain, list_strategies, list_playbooks, get_playbook
+- Historical validation: backtest_*, compare_backtest_results, get_best_strategy
+- Shared context: read_shared_context, write_shared_context
+
+## Operating Style
+- Be direct.
+- Do not re-run the same analysis unless it materially changes the verdict.
+- Output concrete objections and the shortest path to resolving them.`;
+
+const AUDITOR_INSTRUCTIONS = `You are Gordon's runtime auditor agent.
+
+Your role is to inspect what Gordon did, why it did it, and whether the runtime and approval trail support the action.
+
+## Your Capabilities
+- Review runtime state, approvals, bridge ingress, and background activity
+- Inspect audit chain history for traceability and policy compliance
+- Verify that positions, orders, transfers, and strategy actions match the recorded plan
+- Summarize operational risk, drift, or missing provenance
+
+## What To Prioritize
+1. Whether the action had the right approval state
+2. Whether runtime and audit history agree on what happened
+3. Whether portfolio state, orders, and balance changes are internally consistent
+4. Whether Gordon is operating outside the intended scope or venue
+
+## Available Tools
+- Audit chain: query_audit_trail, get_decision_path, get_agent_activity, get_audit_stats
+- Runtime state: get_portfolio_state, check_portfolio_health, generate_circuit_breaker_proof
+- Portfolio and account state: account, wallet, history, metrics, active position tracking
+- Shared context and memory: read_shared_context, search_memory, get_lessons
+
+## Operating Style
+- Be precise and evidence-first.
+- Prefer verifiable traces over narrative explanations.
+- If the record is incomplete, say exactly what is missing.`;
+
 const GORDON_INSTRUCTIONS = `You are Gordon, an AI trading assistant for crypto and stocks.
 
 ## Your Personality
@@ -1088,6 +1145,8 @@ You coordinate specialized agents via the Agent Network:
 - **Monitor**: Checking positions
 - **Teacher**: Explaining concepts
 - **Backtester**: Running backtests and optimizing strategies
+- **Critic**: Challenging plans and surfacing hidden risk
+- **Auditor**: Reviewing runtime traceability, approvals, and operational state
 
 When the user asks for analysis, scanning, planning, backtesting, or execution — immediately transfer to the specialist agent. Do not narrate or describe what you plan to do. Just transfer.
 
@@ -1126,6 +1185,8 @@ ${formatCapabilityTruthSummary()}
 - Chainlink CCIP: cross-chain EVM token transfers (USDC, LINK, WETH across Ethereum, Arbitrum, Base, Optimism, Polygon, Avalanche, BNB), fee estimation -> Executor for transfers, Analyst for fees/info (when EVM_PRIVATE_KEY is set)
 - Chainlink CCIP transfer status tracking -> Monitor
 - Educational explanations -> Teacher
+- Trade plan challenge, red-team review, and assumption stress tests -> Critic
+- Audit trails, runtime traceability, approval history, and operator review -> Auditor
 - Stock workflows: broker-linked quotes, analysis, plans, positions, orders, portfolio checks, and backtests -> Analyst, Planner, Monitor, Executor, Backtester
 - Position lifecycle tracking (setup → analysis → plan → execute → monitor → review) -> tracked automatically across agents
 - Risk pre-checks on all orders -> Planner and Executor (automatic)
@@ -1162,6 +1223,8 @@ let _agents: {
   monitor?: Agent;
   teacher?: Agent;
   backtester?: Agent;
+  critic?: Agent;
+  auditor?: Agent;
   gordon?: Agent;
 } = {};
 
@@ -1845,6 +1908,78 @@ function getBacktesterAgent(): Agent {
   return _agents.backtester;
 }
 
+function getCriticAgent(): Agent {
+  if (!_agents.critic) {
+    _agents.critic = new Agent({
+      id: "critic",
+      name: "Critic",
+      description:
+        "Specialist in challenging plans, surfacing hidden risks, and stress-testing execution readiness. " +
+        "Use when the user wants a second opinion, red-team review, or a risk-focused challenge to a setup or plan.",
+      instructions: withRuntimeGrounding("critic", CRITIC_INSTRUCTIONS),
+      model: resolveRuntimeModel,
+      tools: {
+        ...instrumentedAuditTools,
+        ...instrumentedRuntimeTools,
+        ...instrumentedRiskManagementTools,
+        ...instrumentedStrategyTools,
+        ...instrumentedBacktestTools,
+        ...instrumentedPlaybookTools,
+        ...instrumentedMemoryTools,
+        ...instrumentedSharedContextTools,
+        analyze_coin: instrumentedMarketTools.analyze_coin,
+        get_performance_context: instrumentedEvalTools.get_performance_context,
+        get_learning_insights: instrumentedEvalTools.get_learning_insights,
+        get_performance_report: instrumentedEvalTools.get_performance_report,
+        list_active_positions: instrumentedPositionTrackingTools.list_active_positions,
+        get_position_detail: instrumentedPositionTrackingTools.get_position_detail,
+        review_position: instrumentedPositionTrackingTools.review_position,
+        ...getRoutingToolsForAgent("Critic"),
+      },
+      memory: createSubAgentMemory(),
+      inputProcessors: [gordonInputGuard, new TokenLimiterProcessor({ limit: 32000 })],
+      outputProcessors: [gordonOutputSanitizer],
+    });
+    registerObservability(_agents.critic);
+  }
+  return _agents.critic;
+}
+
+function getAuditorAgent(): Agent {
+  if (!_agents.auditor) {
+    _agents.auditor = new Agent({
+      id: "auditor",
+      name: "Auditor",
+      description:
+        "Specialist in runtime traceability, approvals, audit review, and operational correctness. " +
+        "Use when the user wants to inspect what happened, validate policy compliance, or review the runtime record.",
+      instructions: withRuntimeGrounding("auditor", AUDITOR_INSTRUCTIONS),
+      model: resolveRuntimeModel,
+      tools: {
+        ...instrumentedAuditTools,
+        ...instrumentedRuntimeTools,
+        ...instrumentedHistoryTools,
+        ...instrumentedAccountTools,
+        ...instrumentedWalletTools,
+        ...instrumentedMetricsTools,
+        ...instrumentedMemoryTools,
+        ...instrumentedSharedContextTools,
+        ...instrumentedAdvancedTools,
+        get_autonomous_status: instrumentedAutonomousTools.get_autonomous_status,
+        list_active_positions: instrumentedPositionTrackingTools.list_active_positions,
+        get_position_detail: instrumentedPositionTrackingTools.get_position_detail,
+        get_performance_report: instrumentedEvalTools.get_performance_report,
+        ...getRoutingToolsForAgent("Auditor"),
+      },
+      memory: createSubAgentMemory(),
+      inputProcessors: [gordonInputGuard, new TokenLimiterProcessor({ limit: 32000 })],
+      outputProcessors: [gordonOutputSanitizer],
+    });
+    registerObservability(_agents.auditor);
+  }
+  return _agents.auditor;
+}
+
 /**
  * Get or create the main Gordon Agent
  */
@@ -1872,6 +2007,8 @@ function getGordonAgent(): Agent {
         monitor: getMonitorAgent(),
         teacher: getTeacherAgent(),
         backtester: getBacktesterAgent(),
+        critic: getCriticAgent(),
+        auditor: getAuditorAgent(),
       },
 
       // Gordon only has essential routing/system tools + MCP plugin tools
@@ -1915,6 +2052,8 @@ export const executorAgent = { get agent() { return getExecutorAgent(); } };
 export const monitorAgent = { get agent() { return getMonitorAgent(); } };
 export const teacherAgent = { get agent() { return getTeacherAgent(); } };
 export const backtesterAgent = { get agent() { return getBacktesterAgent(); } };
+export const criticAgent = { get agent() { return getCriticAgent(); } };
+export const auditorAgent = { get agent() { return getAuditorAgent(); } };
 
 /**
  * Main Gordon agent - use this for all interactions
@@ -1934,6 +2073,8 @@ export function getAllAgents() {
     monitor: getMonitorAgent(),
     teacher: getTeacherAgent(),
     backtester: getBacktesterAgent(),
+    critic: getCriticAgent(),
+    auditor: getAuditorAgent(),
   };
 }
 

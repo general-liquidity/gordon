@@ -2742,31 +2742,6 @@ export async function checkToolSecurity(
     };
   }
 
-  if (context.runtime?.evaluateToolAccess) {
-    const runtimeDecision = await context.runtime.evaluateToolAccess(toolName, context);
-    if (runtimeDecision.status === "blocked") {
-      return {
-        allowed: false,
-        error: runtimeDecision.reason || `Runtime policy blocked tool call: ${toolName}`,
-        accessControlResult: policyResult.accessControlResult,
-        rateLimitResult,
-      };
-    }
-
-    if (runtimeDecision.status === "pending") {
-      const approvalHint = runtimeDecision.requestId
-        ? ` Use /runtime-approve ${runtimeDecision.requestId} or /runtime-deny ${runtimeDecision.requestId}.`
-        : "";
-      return {
-        allowed: false,
-        error: `${runtimeDecision.reason || `Approval required for ${toolName}.`}${approvalHint}`,
-        accessControlResult: policyResult.accessControlResult,
-        rateLimitResult,
-        approvalRequestId: runtimeDecision.requestId,
-      };
-    }
-  }
-
   return {
     allowed: true,
     accessControlResult: policyResult.accessControlResult,

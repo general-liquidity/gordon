@@ -109,6 +109,9 @@ export class RuntimeStore {
       tooling: {
         ...this.state.tooling,
         ...tooling,
+        lastReloadAt: tooling.lastReloadAt ?? this.state.tooling.lastReloadAt,
+        hotReloadEnabled: tooling.hotReloadEnabled ?? this.state.tooling.hotReloadEnabled,
+        routingCount: tooling.routingCount ?? this.state.tooling.routingCount,
         plugins: tooling.plugins ? [...tooling.plugins] : this.state.tooling.plugins,
         mcpServers: tooling.mcpServers ? [...tooling.mcpServers] : this.state.tooling.mcpServers,
         tools: tooling.tools ? [...tooling.tools] : this.state.tooling.tools,

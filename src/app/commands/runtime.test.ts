@@ -9,6 +9,7 @@ import {
   formatRuntimeBridge,
   formatRuntimeHistory,
   formatRuntimeHandoffs,
+  formatRuntimePlugins,
   formatRuntimeScratchpad,
   formatRuntimeSessionInfo,
   formatRuntimeState,
@@ -152,6 +153,7 @@ describe("runtime commands", () => {
       expect(formatRuntimeScratchpad(runtime, "")).toContain("Runtime Scratchpad");
       expect(formatRuntimeHandoffs(runtime)).toContain("Runtime Handoffs");
       expect(formatRuntimeBridge(runtime)).toContain("Runtime Bridge");
+      expect(formatRuntimePlugins(runtime)).toContain("No runtime plugins");
     } finally {
       factory.dispose();
     }
@@ -177,12 +179,12 @@ describe("runtime commands", () => {
     }
   });
 
-  it("formats and resolves runtime approvals and history", () => {
+  it("formats and resolves runtime approvals using short request ids", () => {
     const { runtime, factory } = createRuntime();
     try {
       const store = runtime.getState();
       store.approvals.pending.push({
-        id: "approval-1",
+        id: "approval-12345678",
         toolName: "place_market_order",
         permissionScope: "livetrade.execute",
         approvalClass: "per_action",
@@ -198,9 +200,9 @@ describe("runtime commands", () => {
       });
 
       expect(formatRuntimeApprovals(runtime)).toContain("Runtime Approvals");
-      expect(applyRuntimeApprovalDecision(runtime, "approval-1 persist", "approve")).toContain("Runtime Approval Approved");
-      runtime.persistNow();
-      expect(formatRuntimeHistory(runtime, "BTC 5")).toContain("Runtime History Search");
+      expect(formatRuntimeApprovals(runtime)).toContain("12345678");
+      expect(applyRuntimeApprovalDecision(runtime, "12345678 persist", "approve")).toContain("Runtime Approval Approved");
+      expect(formatRuntimeHistory(runtime, "BTC 5")).toContain("No runtime history matches");
     } finally {
       factory.dispose();
     }

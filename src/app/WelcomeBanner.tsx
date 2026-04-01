@@ -2,6 +2,7 @@ import React, { useMemo, useState, useCallback } from "react";
 import { Box, Text, useStdout } from "ink";
 import { COLORS } from "./theme.ts";
 import { GlitchReveal } from "./components/effects/GlitchReveal.tsx";
+import { DeskPanel } from "./components/desk/DeskPanel.tsx";
 
 // Gordon Gekko quotes — Wall Street (1987) & Wall Street: Money Never Sleeps (2010)
 const GEKKO_QUOTES = [
@@ -79,55 +80,68 @@ export const WelcomeBanner: React.FC<WelcomeBannerProps> = ({
 
   return (
     <Box flexDirection="column" paddingX={quiet ? 2 : 1} paddingY={1}>
-      {!quiet && (
-        <Box flexDirection="column">
-          {revealed ? (
-            <Text color={COLORS.GREEN} bold>
-              {bannerText}
-            </Text>
-          ) : (
-            <GlitchReveal
-              duration={1200}
-              frameRate={50}
-              charset="block"
-              gradient={["#22c55e", "#22c55e"]}
-              scrambleColor="#15803d"
-              bold
-              onComplete={handleRevealComplete}
-            >
-              {bannerText}
-            </GlitchReveal>
-          )}
-        </Box>
-      )}
+      <DeskPanel
+        eyebrow="General Liquidity"
+        title={quiet ? "Gordon Desk" : "Gordon Desk"}
+        subtitle={context === "welcome"
+          ? "The Frontier Trading Agent"
+          : quiet
+            ? "Plan-first trading workstation"
+            : "Plan. Size. Execute."}
+        tone="brand"
+      >
+        {!quiet && (
+          <Box flexDirection="column">
+            {revealed ? (
+              <Text color={COLORS.MONEY} bold>
+                {bannerText}
+              </Text>
+            ) : (
+              <GlitchReveal
+                duration={1200}
+                frameRate={50}
+                charset="block"
+                gradient={[COLORS.MONEY, COLORS.MONEY]}
+                scrambleColor={COLORS.MONEY_DIM}
+                bold
+                onComplete={handleRevealComplete}
+              >
+                {bannerText}
+              </GlitchReveal>
+            )}
+          </Box>
+        )}
 
-      <Box marginTop={quiet ? 0 : 1}>
-        <Text color={COLORS.WHITE} bold>
-          {quiet ? "Gordon" : "The Frontier Trading Agent"}
-        </Text>
-      </Box>
-
-      {!quiet && (
-        <Box marginTop={1} paddingX={1}>
-          <Text color={COLORS.TAN_DIM} italic>
-            "{randomQuote}"
-          </Text>
-        </Box>
-      )}
-
-      {context === "chat" && (
-        <Box marginTop={1}>
-          <Text color={COLORS.DIM}>{separatorLine}</Text>
-        </Box>
-      )}
-
-      {showStartupHint && (
-        <Box marginTop={1}>
+        <Box marginTop={quiet ? 0 : 1} flexDirection="column">
           <Text color={COLORS.DIM}>
-            Press Enter to start.
+            {quiet
+              ? "Private desk state loaded."
+              : "Markets are noisy. Gordon turns the tape into tickets, plans, and controlled action."}
           </Text>
         </Box>
-      )}
+
+        {!quiet && (
+          <Box marginTop={1}>
+            <Text color={COLORS.BRASS_DIM} italic>
+              "{randomQuote}"
+            </Text>
+          </Box>
+        )}
+
+        {context === "chat" && (
+          <Box marginTop={1}>
+            <Text color={COLORS.DIM}>{separatorLine}</Text>
+          </Box>
+        )}
+
+        {showStartupHint && (
+          <Box marginTop={1}>
+            <Text color={COLORS.DIM}>
+              Press Enter to open the desk.
+            </Text>
+          </Box>
+        )}
+      </DeskPanel>
     </Box>
   );
 };

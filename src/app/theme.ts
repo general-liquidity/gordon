@@ -25,24 +25,48 @@ export interface Theme {
   };
 }
 
+export const DESK_PALETTE = {
+  INK_BLACK: "#06070a",
+  INK_ELEVATED: "#10131a",
+  INK_PANEL: "#151922",
+  PAPER: "#f2eee4",
+  PAPER_DIM: "#c8c0b0",
+  SMOKE: "#7d7567",
+  ASH: "#4f4a42",
+  BRASS: "#c7a56a",
+  BRASS_DIM: "#6f5d3d",
+  MONEY: "#3fcb79",
+  MONEY_DIM: "#1d7a46",
+  RISK: "#d96868",
+  RISK_DIM: "#7d3434",
+  AMBER: "#d9a441",
+  AMBER_DIM: "#7d5d1e",
+  ICE: "#79bfd2",
+  ICE_DIM: "#3d6670",
+  VIOLET: "#9385d1",
+  VIOLET_DIM: "#584f8d",
+  ORANGE: "#d98552",
+  ORANGE_DIM: "#875233",
+} as const;
+
 export const darkTheme: Theme = {
   name: "dark",
   colors: {
-    primary: "#fafafa",
-    secondary: "#a1a1aa",
-    text: "#fafafa",
-    textDim: "#52525b",
-    background: "#09090b",
-    success: "#22c55e",
-    error: "#ef4444",
-    warning: "#d97706",
-    info: "#22d3ee",
-    border: "#52525b",
-    userMessage: "#27272a",
-    assistantMessage: "#e5e5e5",
-    highlight: "#22c55e",
-    accent: "#bbf7d0",
-    accentDim: "#6b8f71",
+    primary: DESK_PALETTE.PAPER,
+    secondary: DESK_PALETTE.PAPER_DIM,
+    text: DESK_PALETTE.PAPER,
+    textDim: DESK_PALETTE.SMOKE,
+    background: DESK_PALETTE.INK_BLACK,
+    success: DESK_PALETTE.MONEY,
+    error: DESK_PALETTE.RISK,
+    warning: DESK_PALETTE.AMBER,
+    info: DESK_PALETTE.ICE,
+    border: DESK_PALETTE.BRASS_DIM,
+    userMessage: DESK_PALETTE.INK_ELEVATED,
+    assistantMessage: DESK_PALETTE.PAPER,
+    highlight: DESK_PALETTE.MONEY,
+    accent: DESK_PALETTE.BRASS,
+    accentDim: DESK_PALETTE.BRASS_DIM,
   },
 };
 
@@ -73,47 +97,63 @@ export const lightTheme: Theme = {
  */
 export const COLORS = {
   // Primary text colors
-  WHITE: "#fafafa",
-  SECONDARY: "#a1a1aa",
-  MUTED: "#52525b",
+  WHITE: DESK_PALETTE.PAPER,
+  SECONDARY: DESK_PALETTE.PAPER_DIM,
+  MUTED: DESK_PALETTE.ASH,
 
   // Accent (replacing old TAN)
-  ACCENT: "#bbf7d0",
-  ACCENT_DIM: "#6b8f71",
+  ACCENT: DESK_PALETTE.BRASS,
+  ACCENT_DIM: DESK_PALETTE.BRASS_DIM,
 
   // Legacy aliases for backward compatibility
-  TAN: "#bbf7d0",
-  TAN_DIM: "#6b8f71",
-  DIM: "#52525b",
+  TAN: DESK_PALETTE.BRASS,
+  TAN_DIM: DESK_PALETTE.BRASS_DIM,
+  DIM: DESK_PALETTE.SMOKE,
 
   // Semantic colors
-  ERROR: "#ef4444",
-  WARNING: "#d97706",
-  SUCCESS: "#22c55e",
+  ERROR: DESK_PALETTE.RISK,
+  WARNING: DESK_PALETTE.AMBER,
+  SUCCESS: DESK_PALETTE.MONEY,
 
   // Status colors (legacy aliases)
-  RED: "#ef4444",
-  YELLOW: "#f59e0b",
-  GREEN: "#22c55e",
-  BLUE: "#22d3ee",
-  CYAN: "#22d3ee",
-  PURPLE: "#c084fc",
-  ORANGE: "#f97316",
-  HIGHLIGHT: "#22c55e",
-  DISCOVER: "#22d3ee",
-  ANALYZE: "#c084fc",
-  TRADE: "#22c55e",
-  RUN: "#f59e0b",
-  RAILS: "#c084fc",
-  OPERATE: "#f97316",
+  RED: DESK_PALETTE.RISK,
+  YELLOW: DESK_PALETTE.AMBER,
+  GREEN: DESK_PALETTE.MONEY,
+  BLUE: DESK_PALETTE.ICE,
+  CYAN: DESK_PALETTE.ICE,
+  PURPLE: DESK_PALETTE.VIOLET,
+  ORANGE: DESK_PALETTE.ORANGE,
+  ORANGE_DIM: DESK_PALETTE.ORANGE_DIM,
+  HIGHLIGHT: DESK_PALETTE.MONEY,
+  DISCOVER: DESK_PALETTE.ICE,
+  ANALYZE: DESK_PALETTE.VIOLET,
+  TRADE: DESK_PALETTE.MONEY,
+  RUN: DESK_PALETTE.AMBER,
+  RAILS: DESK_PALETTE.ICE,
+  OPERATE: DESK_PALETTE.ORANGE,
+
+  // Desk-specific tones
+  BRASS: DESK_PALETTE.BRASS,
+  BRASS_DIM: DESK_PALETTE.BRASS_DIM,
+  MONEY: DESK_PALETTE.MONEY,
+  MONEY_DIM: DESK_PALETTE.MONEY_DIM,
+  RISK: DESK_PALETTE.RISK,
+  RISK_DIM: DESK_PALETTE.RISK_DIM,
+  AMBER: DESK_PALETTE.AMBER,
+  AMBER_DIM: DESK_PALETTE.AMBER_DIM,
+  ICE: DESK_PALETTE.ICE,
+  ICE_DIM: DESK_PALETTE.ICE_DIM,
+  VIOLET: DESK_PALETTE.VIOLET,
+  VIOLET_DIM: DESK_PALETTE.VIOLET_DIM,
 
   // Background hints (for reference, Ink uses terminal bg)
-  BG: "#09090b",
-  BG_ELEVATED: "#18181b",
+  BG: DESK_PALETTE.INK_BLACK,
+  BG_ELEVATED: DESK_PALETTE.INK_ELEVATED,
+  BG_PANEL: DESK_PALETTE.INK_PANEL,
 
   // Chat backgrounds
-  USER_BG: "#27272a",
-  GORDON_BG: "#18181b",
+  USER_BG: DESK_PALETTE.INK_ELEVATED,
+  GORDON_BG: DESK_PALETTE.INK_PANEL,
 } as const;
 
 export type ColorKey = keyof typeof COLORS;
