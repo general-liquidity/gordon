@@ -11,6 +11,32 @@ import type { AgentRailsRegistry } from "../rails/index.ts";
 import type { ActionTaskScope, CredentialProfile } from "../actions/types.ts";
 import type { GordonConfig, Plan, Trade } from "../../types/index.ts";
 
+export interface GordonRuntimeToolAccessResult {
+  status: "allowed" | "blocked" | "pending";
+  reason?: string;
+  requestId?: string;
+}
+
+export interface GordonRuntimeAccess {
+  runtimeId: string;
+  sessionId?: string;
+  resourceId?: string;
+  threadId?: string;
+  evaluateToolAccess: (
+    toolName: string,
+    context: GordonContext,
+  ) => Promise<GordonRuntimeToolAccessResult>;
+  refreshPlugins?: () => Promise<void>;
+  reloadPlugins?: () => Promise<void>;
+  listRuntimeCommands?: () => string[];
+  listRegisteredTools?: () => string[];
+  searchHistory?: (query: string, options?: { limit?: number }) => Array<{
+    timestamp: string;
+    source: string;
+    content: string;
+  }>;
+}
+
 /**
  * Context passed to all tools and agents
  */
@@ -43,6 +69,8 @@ export interface GordonContext {
   requestedTaskScope?: ActionTaskScope;
   /** Credential profile the request should prefer */
   credentialProfile?: CredentialProfile;
+  /** Session-bound runtime access for approvals, tooling, and history */
+  runtime?: GordonRuntimeAccess;
 }
 
 /**

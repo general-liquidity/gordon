@@ -14,15 +14,12 @@ import { z } from "zod";
 import { gordonAgent } from "./agents.ts";
 import {
   buildPromptEnvelope,
-  attachCumulativeUsageToPromptReport,
-  attachUsageToPromptReport,
   type GroundedPromptMessage,
 } from "./contextBudget.ts";
 import {
   formatIntegrationGlossary,
   selectRelevantIntegrationGlossary,
 } from "./integrationGlossary.ts";
-import { evaluateToolRequestPolicy } from "../actions/runtime.ts";
 import { getDynamicToolAgentMap } from "../routing/manager.ts";
 import { createModuleLogger } from "../logger/index.ts";
 import { emitEvent } from "../../events/index.ts";
@@ -30,8 +27,6 @@ import {
   checkInputGuardrails,
   checkOutputGuardrails,
   checkToolAccess,
-  checkExplicitExecutionAccess,
-  requiresArmedModeForTool,
 } from "./middleware/index.ts";
 import {
   initializeTracing as initTracingModule,
@@ -39,7 +34,6 @@ import {
   isTracingEnabled,
   getTracingConfig,
   recordRequest,
-  recordNetworkRouting,
   recordError,
   recordAgentCall,
   enforceRateLimit,
@@ -79,9 +73,23 @@ import {
   endLifecycleSession,
   type LifecycleHookPayload,
 } from "./lifecycleHooks.ts";
-import { recordSessionCostUsage } from "./sessionCostLedger.ts";
 import { compileSubagentProfiles, isToolAllowedForAgent } from "./subagentProfiles.ts";
-import { validateHandoffBudget } from "../../gateway/handoffs/index.ts";
+import {
+  defaultHandoffCoordinator,
+  type HandoffRecord,
+  type HandoffValidation,
+} from "./orchestrator/HandoffCoordinator.ts";
+import { createAgentRequestContext } from "./orchestrator/RequestContextFactory.ts";
+import { recordPromptUsage, resolveNormalizedUsage } from "./orchestrator/UsageTracker.ts";
+import { toMessageStreamChunk, type MessageStreamChunk } from "./orchestrator/StreamCoordinator.ts";
+import {
+  advanceReActStage,
+  awaitWithAbort,
+  readStreamChunkWithAbort,
+  StreamCancelledError,
+  throwIfStreamAborted,
+  type ReActStage,
+} from "./orchestrator/StreamLifecycle.ts";
 import {
   ConversationSummarizer,
   createSummarizer,
@@ -106,6 +114,7 @@ import {
   createEndChunk,
   createErrorChunk,
 } from "./streamWriter.ts";
+import { evaluateRuntimeToolPolicy } from "../../runtime/tools/ToolPolicy.ts";
 
 // ============================================================================
 // Error Recovery Types & Configuration
@@ -1070,51 +1079,10 @@ function buildDefaultExecutorHandoffBudget(
 // Handoff Tracking & Validation
 // ============================================================================
 
-/**
- * Handoff record for tracking agent transitions
- */
-export interface HandoffRecord {
-  handoffId: string;
-  fromAgent: string;
-  toAgent: string;
-  timestamp: number;
-  validated: boolean;
-  validationReason?: string;
-  metadata?: Record<string, unknown>;
-}
-
-/**
- * Handoff validation result
- */
-export interface HandoffValidation {
-  valid: boolean;
-  reason?: string;
-  warnings?: string[];
-}
-
-// In-memory handoff tracking
-const handoffHistory: HandoffRecord[] = [];
-let handoffCounter = 0;
-
-/**
- * Valid agent transition rules
- * Defines which agents can hand off to which other agents
- */
-const VALID_HANDOFF_RULES: Record<string, string[]> = {
-  Gordon: ["Scanner", "Analyst", "Planner", "Executor", "Monitor", "Teacher", "Backtester"],
-  Scanner: ["Analyst", "Gordon"],
-  Analyst: ["Planner", "Scanner", "Gordon"],
-  Planner: ["Executor", "Analyst", "Gordon"],
-  Executor: ["Monitor", "Planner", "Gordon"],
-  Monitor: ["Planner", "Analyst", "Gordon"],
-  Teacher: ["Gordon"],
-  Backtester: ["Analyst", "Gordon"],
-};
-
 function getCompiledSubagentProfiles() {
   return compileSubagentProfiles(
     TOOL_AGENT_MAP,
-    VALID_HANDOFF_RULES,
+    defaultHandoffCoordinator.getValidHandoffRules(),
     getDynamicToolAgentMap(),
   );
 }
@@ -1132,81 +1100,7 @@ export function validateHandoff(
   toAgent: string,
   context?: Record<string, unknown>
 ): HandoffValidation {
-  const warnings: string[] = [];
-
-  // Check if fromAgent is known
-  if (!VALID_HANDOFF_RULES[fromAgent]) {
-    return {
-      valid: false,
-      reason: `Unknown source agent: ${fromAgent}`,
-    };
-  }
-
-  // Check if toAgent is known
-  const knownAgents = Object.keys(VALID_HANDOFF_RULES);
-  if (!knownAgents.includes(toAgent)) {
-    return {
-      valid: false,
-      reason: `Unknown target agent: ${toAgent}`,
-    };
-  }
-
-  // Check if the transition is allowed
-  const allowedTargets = VALID_HANDOFF_RULES[fromAgent]!;
-  if (!allowedTargets.includes(toAgent)) {
-    return {
-      valid: false,
-      reason: `Handoff from ${fromAgent} to ${toAgent} is not allowed. Allowed targets: ${allowedTargets.join(", ")}`,
-    };
-  }
-
-  // Check for circular handoffs in recent history
-  const recentHandoffs = handoffHistory.slice(-10);
-  const circularCount = recentHandoffs.filter(
-    (h) => h.fromAgent === toAgent && h.toAgent === fromAgent
-  ).length;
-  if (circularCount >= 3) {
-    return {
-      valid: false,
-      reason: `Blocked circular handoff loop between ${fromAgent} and ${toAgent} (${circularCount} consecutive round-trips detected)`,
-    };
-  }
-
-  // Check for rapid handoffs (potential infinite loop)
-  const lastSecondHandoffs = handoffHistory.filter(
-    (h) => Date.now() - h.timestamp < 1000
-  );
-  if (lastSecondHandoffs.length >= 5) {
-    return {
-      valid: false,
-      reason: "Blocked: high handoff frequency detected (5+ handoffs in 1 second). Possible infinite loop.",
-    };
-  }
-
-  // Executor requires armed state for execution
-  if (toAgent === "Executor" && context?.mode !== "ARMED") {
-    warnings.push("Handoff to Executor while system is not ARMED");
-  }
-
-  const budgetValidation = validateHandoffBudget({
-    fromAgent,
-    toAgent,
-    metadata: context,
-  });
-  if (!budgetValidation.valid) {
-    return {
-      valid: false,
-      reason: budgetValidation.reason || "Handoff budget validation failed.",
-    };
-  }
-  if (budgetValidation.warnings && budgetValidation.warnings.length > 0) {
-    warnings.push(...budgetValidation.warnings);
-  }
-
-  return {
-    valid: true,
-    warnings: warnings.length > 0 ? warnings : undefined,
-  };
+  return defaultHandoffCoordinator.validate(fromAgent, toAgent, context);
 }
 
 /**
@@ -1222,72 +1116,21 @@ export async function trackHandoff(
   toAgent: string,
   metadata?: Record<string, unknown>
 ): Promise<HandoffRecord> {
-  const handoffId = `handoff_${Date.now()}_${++handoffCounter}`;
-
-  // Validate the handoff
-  const validation = validateHandoff(fromAgent, toAgent, metadata);
-
-  const record: HandoffRecord = {
-    handoffId,
-    fromAgent,
-    toAgent,
-    timestamp: Date.now(),
-    validated: validation.valid,
-    validationReason: validation.reason,
-    metadata,
-  };
-
-  // Store in history
-  handoffHistory.push(record);
-  recordNetworkRouting(fromAgent, toAgent);
-
-  // Keep only last 100 handoffs
-  if (handoffHistory.length > 100) {
-    handoffHistory.shift();
-  }
-
-  // Emit handoff acknowledgment event
-  await emitEvent("agent:handoff_ack", {
-    fromAgent,
-    toAgent,
-    validated: validation.valid,
-    reason: validation.reason || (validation.warnings?.join("; ")),
-    handoffId,
-  });
-
-  // Log the handoff
-  if (validation.valid) {
-    logger.info("Agent handoff tracked", {
-      handoffId,
-      fromAgent,
-      toAgent,
-      warnings: validation.warnings,
-    });
-  } else {
-    logger.warn("Invalid agent handoff attempted", {
-      handoffId,
-      fromAgent,
-      toAgent,
-      reason: validation.reason,
-    });
-  }
-
-  return record;
+  return defaultHandoffCoordinator.track(fromAgent, toAgent, metadata);
 }
 
 /**
  * Get recent handoff history
  */
 export function getHandoffHistory(limit: number = 20): HandoffRecord[] {
-  return handoffHistory.slice(-limit);
+  return defaultHandoffCoordinator.getHistory(limit);
 }
 
 /**
  * Clear handoff history (for testing)
  */
 export function clearHandoffHistory(): void {
-  handoffHistory.length = 0;
-  handoffCounter = 0;
+  defaultHandoffCoordinator.clear();
 }
 
 // ============================================================================
@@ -1299,27 +1142,8 @@ export function clearHandoffHistory(): void {
  * This is how we inject context into tools in Mastra
  */
 function createRequestContext(context: GordonContext): RequestContext {
-  const requestContext = new RequestContext();
-  const workflowPhase = determineWorkflowPhase(context);
-  const executionReadiness = getExecutionReadiness(context);
   const compiledSubagentProfiles = getCompiledSubagentProfiles();
-  requestContext.set("binance", context.binance);
-  requestContext.set("exchange", context.exchange);
-  requestContext.set("broker", context.broker);
-  requestContext.set("agentRails", context.agentRails);
-  requestContext.set("config", context.config);
-  requestContext.set("llm", context.llm);
-  requestContext.set("userId", context.userId || "default");
-  requestContext.set("threadId", context.threadId || "");
-  requestContext.set("portfolioValue", context.portfolioValue || 0);
-  requestContext.set("availableCash", context.availableCash || 0);
-  requestContext.set("requestedActionId", context.requestedActionId);
-  requestContext.set("requestedTaskScope", context.requestedTaskScope);
-  requestContext.set("credentialProfile", context.credentialProfile ?? "default");
-  requestContext.set("workflowPhase", workflowPhase);
-  requestContext.set("executionReadiness", executionReadiness);
-  requestContext.set("compiledSubagentProfiles", compiledSubagentProfiles);
-  return requestContext;
+  return createAgentRequestContext(context, compiledSubagentProfiles);
 }
 
 async function buildGroundedPrompt(
@@ -1444,32 +1268,6 @@ async function buildGroundedPrompt(
   };
 }
 
-function recordPromptUsage(
-  context: GordonContext,
-  threadId: string | undefined,
-  usage: { promptTokens: number; completionTokens: number; totalTokens: number },
-): void {
-  const effectiveThreadId = threadId ?? context.threadId;
-  attachUsageToPromptReport(effectiveThreadId, usage);
-
-  const ledger = recordSessionCostUsage({
-    threadId: effectiveThreadId ?? "default",
-    sessionId: context.threadId,
-    resourceId: context.userId,
-    provider: context.config.modelConfig?.provider ?? process.env.GORDON_PROVIDER,
-    model: context.config.modelConfig?.model ?? process.env.GORDON_MODEL ?? null,
-    ...usage,
-  });
-
-  attachCumulativeUsageToPromptReport(effectiveThreadId, {
-    requestCount: ledger.requestCount,
-    promptTokens: ledger.promptTokens,
-    completionTokens: ledger.completionTokens,
-    totalTokens: ledger.totalTokens,
-    updatedAt: ledger.updatedAt,
-  });
-}
-
 function rebuildThreadACEArtifacts(context: GordonContext, threadId?: string): void {
   const effectiveThreadId = threadId ?? context.threadId;
   if (!effectiveThreadId) {
@@ -1522,68 +1320,6 @@ export interface ProcessMessageStreamOptions {
   signal?: AbortSignal;
 }
 
-class StreamCancelledError extends Error {
-  constructor(message: string = "Response stopped.") {
-    super(message);
-    this.name = "StreamCancelledError";
-  }
-}
-
-interface StreamReaderLike<T> {
-  read(): Promise<ReadableStreamReadResult<T>>;
-  cancel(reason?: unknown): Promise<void>;
-}
-
-type ReaderReadResult<T> = ReadableStreamReadResult<T>;
-
-async function cancelReadableStreamReader<T>(reader: StreamReaderLike<T>): Promise<void> {
-  try {
-    await reader.cancel("user_cancelled");
-  } catch {
-    // Ignore reader cancellation failures. The caller is already unwinding.
-  }
-}
-
-async function readStreamChunkWithAbort<T>(
-  reader: StreamReaderLike<T>,
-  signal?: AbortSignal
-): Promise<ReaderReadResult<T>> {
-  if (!signal) {
-    return reader.read();
-  }
-
-  if (signal.aborted) {
-    await cancelReadableStreamReader(reader);
-    throw new StreamCancelledError();
-  }
-
-  return new Promise<ReaderReadResult<T>>((resolve, reject) => {
-    const onAbort = (): void => {
-      signal.removeEventListener("abort", onAbort);
-      void cancelReadableStreamReader(reader);
-      reject(new StreamCancelledError());
-    };
-
-    signal.addEventListener("abort", onAbort, { once: true });
-    reader.read().then(
-      (result) => {
-        signal.removeEventListener("abort", onAbort);
-        resolve(result);
-      },
-      (error) => {
-        signal.removeEventListener("abort", onAbort);
-        reject(error);
-      }
-    );
-  });
-}
-
-async function throwIfStreamAborted(signal?: AbortSignal): Promise<void> {
-  if (signal?.aborted) {
-    throw new StreamCancelledError();
-  }
-}
-
 function isPlanningArtifactTool(toolName?: string): boolean {
   return toolName === "preview_market_order" || toolName === "create_plan";
 }
@@ -1592,62 +1328,6 @@ function requiresPlanningArtifact(toolName?: string): boolean {
   return toolName === "place_market_order" || toolName === "execute_plan" || toolName === "place_bracket_order";
 }
 
-async function awaitWithAbort<T>(promise: Promise<T>, signal?: AbortSignal): Promise<T> {
-  if (!signal) {
-    return promise;
-  }
-
-  if (signal.aborted) {
-    throw new StreamCancelledError();
-  }
-
-  return new Promise<T>((resolve, reject) => {
-    const onAbort = (): void => {
-      signal.removeEventListener("abort", onAbort);
-      reject(new StreamCancelledError());
-    };
-
-    signal.addEventListener("abort", onAbort, { once: true });
-    promise.then(
-      (value) => {
-        signal.removeEventListener("abort", onAbort);
-        resolve(value);
-      },
-      (error) => {
-        signal.removeEventListener("abort", onAbort);
-        reject(error);
-      }
-    );
-  });
-}
-
-type ReActStage =
-  | "compaction_checked"
-  | "interrupt_checked_before_thinking"
-  | "thinking_complete"
-  | "ui_drained"
-  | "interrupt_checked_before_action"
-  | "action_started"
-  | "response_dispatched"
-  | "persisted";
-
-const REACT_STAGE_TRANSITIONS: Record<ReActStage, ReActStage[]> = {
-  compaction_checked: ["interrupt_checked_before_thinking"],
-  interrupt_checked_before_thinking: ["thinking_complete"],
-  thinking_complete: ["ui_drained"],
-  ui_drained: ["interrupt_checked_before_action"],
-  interrupt_checked_before_action: ["action_started"],
-  action_started: ["response_dispatched"],
-  response_dispatched: ["persisted"],
-  persisted: [],
-};
-
-function advanceReActStage(current: ReActStage, next: ReActStage): ReActStage {
-  if (!REACT_STAGE_TRANSITIONS[current].includes(next)) {
-    throw new Error(`Invalid ReAct stage transition: ${current} -> ${next}`);
-  }
-  return next;
-}
 
 // ============================================================================
 // Streaming Message Processing (SOTA)
@@ -2326,16 +2006,8 @@ export async function* processMessageStream(
     }
 
     // Get usage stats
-    let usage = { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
-    if (streamObj.usage) {
-      await throwIfStreamAborted(signal);
-      const usageData = streamObj.usage instanceof Promise ? await streamObj.usage : streamObj.usage;
-      usage = {
-        promptTokens: usageData.inputTokens || 0,
-        completionTokens: usageData.outputTokens || 0,
-        totalTokens: usageData.totalTokens || 0,
-      };
-    }
+    await throwIfStreamAborted(signal);
+    const usage = await resolveNormalizedUsage(streamObj.usage);
     recordPromptUsage(context, threadId, usage);
 
     // Emit completion events
@@ -2549,12 +2221,7 @@ export async function processStructuredMessage<T extends Record<string, unknown>
 
     recordRequest(Date.now() - startTime, true);
 
-    const usage = resultObj.usage ?? {};
-    const normalizedUsage = {
-      promptTokens: usage.inputTokens ?? 0,
-      completionTokens: usage.outputTokens ?? 0,
-      totalTokens: usage.totalTokens ?? 0,
-    };
+    const normalizedUsage = await resolveNormalizedUsage(resultObj.usage);
     recordPromptUsage(context, threadId, normalizedUsage);
     await finalizeAfterRequest(context, {
       threadId: threadId ?? context.threadId,
@@ -2673,15 +2340,7 @@ export async function* processWithNetwork(
     });
 
     // Get usage stats
-    let usage = { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
-    if (resultObj.usage) {
-      const usageData = resultObj.usage instanceof Promise ? await resultObj.usage : resultObj.usage;
-      usage = {
-        promptTokens: usageData.inputTokens || 0,
-        completionTokens: usageData.outputTokens || 0,
-        totalTokens: usageData.totalTokens || 0,
-      };
-    }
+    const usage = await resolveNormalizedUsage(resultObj.usage);
     recordPromptUsage(context, threadId, usage);
     await finalizeAfterRequest(context, {
       threadId: threadId ?? context.threadId,
@@ -2810,11 +2469,7 @@ export async function processMessage(
     // Record successful request metrics
     recordRequest(Date.now() - startTime, true);
 
-    const usage = {
-      promptTokens: resultObj.usage?.inputTokens || 0,
-      completionTokens: resultObj.usage?.outputTokens || 0,
-      totalTokens: resultObj.usage?.totalTokens || 0,
-    };
+    const usage = await resolveNormalizedUsage(resultObj.usage);
     recordPromptUsage(context, threadId, usage);
     await finalizeAfterRequest(context, {
       threadId: threadId ?? context.threadId,
@@ -2901,11 +2556,7 @@ export async function processSimpleMessage(
 
     // Record successful request metrics
     recordRequest(Date.now() - startTime, true);
-    recordPromptUsage(context, context.threadId, {
-      promptTokens: resultObj.usage?.inputTokens || 0,
-      completionTokens: resultObj.usage?.outputTokens || 0,
-      totalTokens: resultObj.usage?.totalTokens || 0,
-    });
+    recordPromptUsage(context, context.threadId, await resolveNormalizedUsage(resultObj.usage));
     await finalizeAfterRequest(context, {
       threadId: context.threadId,
       userMessage,
@@ -3040,6 +2691,7 @@ export interface ToolSecurityCheckResult {
   error?: string;
   accessControlResult?: Awaited<ReturnType<typeof checkToolAccess>>;
   rateLimitResult?: RateLimitResult;
+  approvalRequestId?: string;
 }
 
 /**
@@ -3063,46 +2715,13 @@ export async function checkToolSecurity(
 ): Promise<ToolSecurityCheckResult> {
   const userId = context.userId || "unknown";
 
-  const policyResult = await evaluateToolRequestPolicy(toolName, context);
+  const policyResult = await evaluateRuntimeToolPolicy(toolName, context);
   if (!policyResult.allowed) {
-    auditLog.record(
-      userId,
-      "ACCESS_DENIED",
-      {
-        agentName,
-        toolName,
-        requestedActionId: context.requestedActionId,
-        requestedTaskScope: context.requestedTaskScope,
-      },
-      "BLOCKED",
-      { resultDetails: policyResult.reason }
-    );
-
     return {
       allowed: false,
       error: policyResult.reason,
+      accessControlResult: policyResult.accessControlResult,
     };
-  }
-
-  // Check access control (ARMED mode for trading tools)
-  let accessResult = await checkToolAccess(toolName, context.config, userId);
-  if (!accessResult.allowed) {
-    return {
-      allowed: false,
-      error: accessResult.reason,
-      accessControlResult: accessResult,
-    };
-  }
-
-  if (policyResult.requiresArmedMode && !requiresArmedModeForTool(toolName)) {
-    accessResult = await checkExplicitExecutionAccess(toolName, context.config, userId);
-    if (!accessResult.allowed) {
-      return {
-        allowed: false,
-        error: accessResult.reason,
-        accessControlResult: accessResult,
-      };
-    }
   }
 
   // Check rate limiting
@@ -3123,9 +2742,34 @@ export async function checkToolSecurity(
     };
   }
 
+  if (context.runtime?.evaluateToolAccess) {
+    const runtimeDecision = await context.runtime.evaluateToolAccess(toolName, context);
+    if (runtimeDecision.status === "blocked") {
+      return {
+        allowed: false,
+        error: runtimeDecision.reason || `Runtime policy blocked tool call: ${toolName}`,
+        accessControlResult: policyResult.accessControlResult,
+        rateLimitResult,
+      };
+    }
+
+    if (runtimeDecision.status === "pending") {
+      const approvalHint = runtimeDecision.requestId
+        ? ` Use /runtime-approve ${runtimeDecision.requestId} or /runtime-deny ${runtimeDecision.requestId}.`
+        : "";
+      return {
+        allowed: false,
+        error: `${runtimeDecision.reason || `Approval required for ${toolName}.`}${approvalHint}`,
+        accessControlResult: policyResult.accessControlResult,
+        rateLimitResult,
+        approvalRequestId: runtimeDecision.requestId,
+      };
+    }
+  }
+
   return {
     allowed: true,
-    accessControlResult: accessResult,
+    accessControlResult: policyResult.accessControlResult,
     rateLimitResult,
   };
 }
@@ -3257,24 +2901,6 @@ export {
 // ============================================================================
 
 /**
- * Stream chunk type for message processing
- */
-export interface MessageStreamChunk {
-  type: StreamEvent["type"];
-  content?: string;
-  toolName?: string;
-  toolArgs?: Record<string, unknown>;
-  toolResult?: unknown;
-  agentName?: string;
-  error?: string;
-  usage?: {
-    promptTokens: number;
-    completionTokens: number;
-    totalTokens: number;
-  };
-}
-
-/**
  * Process a message with streaming and pipe to a custom writer.
  *
  * This implements the Mastra pipeTo(writer) pattern for message processing,
@@ -3338,17 +2964,7 @@ export async function processMessageStreamWithPipe(
     const stream = processMessageStream(userMessage, context, threadId, resourceId);
 
     for await (const event of stream) {
-      // Convert StreamEvent to MessageStreamChunk
-      const chunk: MessageStreamChunk = {
-        type: event.type,
-        content: event.content,
-        toolName: event.toolName,
-        toolArgs: event.toolArgs,
-        toolResult: event.toolResult,
-        agentName: event.agentName,
-        error: event.error,
-        usage: event.usage,
-      };
+      const chunk = toMessageStreamChunk(event);
 
       // Write the chunk
       await writer.write(createChunk(
@@ -3460,16 +3076,7 @@ export function createMessageStreamWorkflow(
     const stream = processMessageStream(userMessage, context, threadId, resourceId);
 
     for await (const event of stream) {
-      yield {
-        type: event.type,
-        content: event.content,
-        toolName: event.toolName,
-        toolArgs: event.toolArgs,
-        toolResult: event.toolResult,
-        agentName: event.agentName,
-        error: event.error,
-        usage: event.usage,
-      };
+      yield toMessageStreamChunk(event);
     }
   }
 
@@ -3491,6 +3098,7 @@ export function createMessageStreamWorkflow(
 // ============================================================================
 
 export { createRequestContext };
+export type { MessageStreamChunk } from "./orchestrator/StreamCoordinator.ts";
 
 // Re-export summarization utilities
 export {

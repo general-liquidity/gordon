@@ -16,6 +16,14 @@ import type { GordonConfig } from "../../../types/index.ts";
 
 const logger = createModuleLogger("access-control");
 
+function safeAuditBlocked(userId: string, parameters: Record<string, unknown>, reason: string): void {
+  try {
+    auditLog.blocked(userId, "ACCESS_DENIED", parameters, reason);
+  } catch {
+    // Audit persistence must never change access-control decisions.
+  }
+}
+
 // ============================================================================
 // Types
 // ============================================================================
@@ -150,7 +158,7 @@ async function evaluateArmedModeRequirement(
     });
 
     // Audit log the blocked access
-    auditLog.blocked(userId, "ACCESS_DENIED", { toolName }, reason);
+    safeAuditBlocked(userId, { toolName }, reason);
 
     return {
       allowed: false,
@@ -171,7 +179,7 @@ async function evaluateArmedModeRequirement(
       reason: "no_armed_until",
     });
 
-    auditLog.blocked(userId, "ACCESS_DENIED", { toolName }, reason);
+    safeAuditBlocked(userId, { toolName }, reason);
 
     return {
       allowed: false,
@@ -200,7 +208,7 @@ async function evaluateArmedModeRequirement(
       armedUntil: currentConfig.armedUntil,
     });
 
-    auditLog.blocked(userId, "ACCESS_DENIED", { toolName, armedUntil: currentConfig.armedUntil }, reason);
+    safeAuditBlocked(userId, { toolName, armedUntil: currentConfig.armedUntil }, reason);
 
     return {
       allowed: false,

@@ -100,11 +100,15 @@ describe("slash command UX formatting", () => {
     const actionLog = SLASH_COMMANDS.find((command) => command.name === "action-log");
     const threadSummary = SLASH_COMMANDS.find((command) => command.name === "thread-summary");
     const compactThread = SLASH_COMMANDS.find((command) => command.name === "compact-thread");
+    const runtimeState = SLASH_COMMANDS.find((command) => command.name === "runtime-state");
+    const runtimeTranscript = SLASH_COMMANDS.find((command) => command.name === "runtime-transcript");
 
     expect(rename?.aliases).toContain("name");
     expect(actionLog?.aliases).toContain("log");
     expect(threadSummary?.aliases).toContain("summary");
     expect(compactThread?.aliases).toContain("compact");
+    expect(runtimeState?.aliases).toContain("rs");
+    expect(runtimeTranscript?.aliases).toContain("transcript");
   });
 
   it("has no deterministic slash-command drift between registry and runtime", () => {
@@ -152,5 +156,36 @@ describe("slash command UX formatting", () => {
     expect(context?.aliases).toContain("cost");
     expect(context?.target).toBe("context");
     expect(context && isRuntimeHandledSlashCommand(context)).toBe(true);
+  });
+
+  it("wires runtime inspection commands directly", () => {
+    const runtimeState = SLASH_COMMANDS.find((command) => command.name === "runtime-state");
+    const runtimeTranscript = SLASH_COMMANDS.find((command) => command.name === "runtime-transcript");
+    const runtimeScratchpad = SLASH_COMMANDS.find((command) => command.name === "runtime-scratchpad");
+    const runtimeHandoffs = SLASH_COMMANDS.find((command) => command.name === "runtime-handoffs");
+    const runtimeApprovals = SLASH_COMMANDS.find((command) => command.name === "runtime-approvals");
+    const runtimeApprove = SLASH_COMMANDS.find((command) => command.name === "runtime-approve");
+    const runtimeDeny = SLASH_COMMANDS.find((command) => command.name === "runtime-deny");
+    const runtimeBridge = SLASH_COMMANDS.find((command) => command.name === "runtime-bridge");
+    const runtimeHistory = SLASH_COMMANDS.find((command) => command.name === "runtime-history");
+
+    expect(runtimeState?.target).toBe("runtime-state");
+    expect(runtimeTranscript?.target).toBe("runtime-transcript");
+    expect(runtimeScratchpad?.target).toBe("runtime-scratchpad");
+    expect(runtimeHandoffs?.target).toBe("runtime-handoffs");
+    expect(runtimeApprovals?.target).toBe("runtime-approvals");
+    expect(runtimeApprove?.target).toBe("runtime-approve");
+    expect(runtimeDeny?.target).toBe("runtime-deny");
+    expect(runtimeBridge?.target).toBe("runtime-bridge");
+    expect(runtimeHistory?.target).toBe("runtime-history");
+    expect(runtimeState && isRuntimeHandledSlashCommand(runtimeState)).toBe(true);
+    expect(runtimeTranscript && isRuntimeHandledSlashCommand(runtimeTranscript)).toBe(true);
+    expect(runtimeScratchpad && isRuntimeHandledSlashCommand(runtimeScratchpad)).toBe(true);
+    expect(runtimeHandoffs && isRuntimeHandledSlashCommand(runtimeHandoffs)).toBe(true);
+    expect(runtimeApprovals && isRuntimeHandledSlashCommand(runtimeApprovals)).toBe(true);
+    expect(runtimeApprove && isRuntimeHandledSlashCommand(runtimeApprove)).toBe(true);
+    expect(runtimeDeny && isRuntimeHandledSlashCommand(runtimeDeny)).toBe(true);
+    expect(runtimeBridge && isRuntimeHandledSlashCommand(runtimeBridge)).toBe(true);
+    expect(runtimeHistory && isRuntimeHandledSlashCommand(runtimeHistory)).toBe(true);
   });
 });

@@ -1,6 +1,5 @@
-import React, { useState, useCallback, useEffect, useRef, useMemo } from "react";
+import React, { useCallback, useEffect, useRef, useMemo, useSyncExternalStore } from "react";
 import { Box, Text, useInput } from "ink";
-import { ChatInput } from "./ChatInput.tsx";
 
 import {
   type ThreadStatusInfo,
@@ -14,12 +13,11 @@ import { QuickStartWizard } from "./QuickStartWizard.tsx";
 import { SetupWizard } from "./SetupWizard.tsx";
 import { DoctorPanel } from "./DoctorPanel.tsx";
 import { ModelSelector } from "./ModelSelector.tsx";
-import { TaskTree } from "./components/TaskTree.tsx";
-import { ShortcutsOverlay, ShortcutsHint } from "./components/ShortcutsOverlay.tsx";
-import { ProgressIndicator, StreamingProgress } from "./components/ProgressIndicator.tsx";
+import { ShortcutsOverlay } from "./components/ShortcutsOverlay.tsx";
+import { ProgressIndicator } from "./components/ProgressIndicator.tsx";
 import { ThemeProvider, useTheme } from "./components/ThemeProvider.tsx";
-import { processMessageStream, initializeTracing } from "../infra/agents/orchestrator.ts";
-import { initMCPTools, enableMCPHotReload } from "../infra/mcp/client.ts";
+import { ChatScreen } from "./screens/ChatScreen.tsx";
+import { initializeTracing } from "../infra/agents/orchestrator.ts";
 import { initRouting } from "../infra/routing/manager.ts";
 import { createLLMClientFromEnv, type LLMClient } from "../infra/llm/index.ts";
 import { syncAgentRailMcpPlugins } from "../infra/rails/index.ts";
@@ -43,10 +41,6 @@ import {
   subscribeToMarketPrice,
 } from "../core/market-data-coordinator.ts";
 import {
-  initializeSession,
-  resumeSession,
-  startNewSession,
-  getCurrentSession,
   updateThreadId,
   type SessionInfo,
 } from "../infra/storage/session.ts";
@@ -157,77 +151,39 @@ import {
 import { rebuildACEMemoryForThread } from "../infra/agents/aceMemory.ts";
 import { getArmedStatus } from "../infra/agents/middleware/access-control.ts";
 import { parseSystemShortcut } from "./systemCommandShortcuts.ts";
-
-type AppView =
-  | "loading"
-  | "onboarding"
-  | "quickstart"
-  | "setup"
-  | "doctor"
-  | "model"
-  | "welcome"
-  | "menu"
-  | "chat";
-
-interface ConversationMessage {
-  role: "user" | "assistant";
-  content: string;
-}
-
-interface AppState {
-  view: AppView;
-  mode: Mode;
-  portfolioValue: number | undefined;
-  availableCash: number;
-  connectionStatus: "connected" | "disconnected" | "connecting";
-  messages: ChatMessage[];
-  isLoading: boolean;
-  isStreaming: boolean;
-  streamingMessageTimestamp: string | null;
-  activeToolCall: string | null;
-  activityStatus: string | null;
-  taskTree: TaskTreeState | null;
-  backgroundTaskTree: TaskTreeState | null;
-  conversationHistory: ConversationMessage[];
-  btcPrice: number | undefined;
-  overlay: OverlayState;
-  queuedSubmissions: QueuedSubmission[];
-  showStartupHint: boolean;
-  transcriptBottomOffset: number;
-  isUserTyping: boolean;
-  chatInputSeed: string;
-  chatInputSeedNonce: number;
-  setupMode: SetupWizardMode;
-  setupSection: SetupWizardSection | null;
-  /** Current session info for Mastra agent memory */
-  session: SessionInfo | null;
-  /** Thread info for status bar display */
-  threadStatusInfo: ThreadStatusInfo | null;
-  /** Chain network status for status bar */
-  chainStatus: ChainStatusInfo | null;
-  configLayers: ConfigLayers | null;
-}
-
-interface LastResults {
-  scan?: ScanExportData;
-  analysis?: AnalysisExportData;
-  backtest?: BacktestExportData;
-  portfolio?: Record<string, unknown>;
-  technicalAnalysis?: Record<string, unknown>;
-  regime?: Record<string, unknown>;
-  toolResults?: Record<string, Record<string, unknown>>;
-}
+import { SessionRuntimeFactory, type SessionRuntime } from "../runtime/index.ts";
+import type { RuntimeTranscriptEntry } from "../runtime/contracts/types.ts";
+import {
+  createAppStore,
+  createInitialAppState,
+  parseQueuedSubmission,
+  type AppView,
+  type AppState,
+  type AppStateStore,
+  type LastResults,
+  type QueuedSubmission,
+  type QueuedSubmissionKind,
+} from "./state/AppStore.ts";
+import { createRuntimeInspectorViewModel } from "./presenters/RuntimePresenter.ts";
+import {
+  applyRuntimeApprovalDecision,
+  compactRuntimeTranscript,
+  formatRuntimeApprovals,
+  formatRuntimeBridge,
+  formatRuntimeHistory,
+  formatRuntimeHandoffs,
+  formatRuntimeScratchpad,
+  formatRuntimeSessionInfo,
+  formatRuntimeState,
+  formatRuntimeTranscript,
+} from "./commands/runtime.ts";
+import {
+  buildRuntimeActivityStatus,
+  buildRuntimeLinkedSession,
+  shouldRefreshRuntimeInspector,
+} from "./runtime/runtimeStateSync.ts";
 
 type PluginSuggestion = ReturnType<typeof checkForPluginSuggestions>[number];
-
-type QueuedSubmissionKind = "follow-up" | "steer";
-
-interface QueuedSubmission {
-  id: string;
-  kind: QueuedSubmissionKind;
-  value: string;
-  preview: string;
-}
 
 interface ParsedActionLogRequest {
   entryTypes?: ActionLogEntryType[];
@@ -353,34 +309,77 @@ function formatTimestamp(): string {
   });
 }
 
-function parseQueuedSubmission(value: string): {
-  kind: QueuedSubmissionKind;
-  submitValue: string;
-  preview: string;
-} | null {
-  const trimmed = value.trim();
-  if (!trimmed) {
-    return null;
+function formatChatTimestamp(value?: string): string | undefined {
+  if (!value) {
+    return undefined;
   }
 
-  const steeringMatch = trimmed.match(/^\/steer\s+(.+)$/isu);
-  if (steeringMatch) {
-    const submitValue = steeringMatch[1]?.trim();
-    if (!submitValue) {
-      return null;
-    }
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return value;
+  }
+
+  return parsed.toLocaleTimeString("en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function toChatMessageFromRuntimeTranscript(entry: RuntimeTranscriptEntry): ChatMessage {
+  const timestamp = formatChatTimestamp(entry.timestamp);
+  const metadata = entry.metadata ?? {};
+
+  if (entry.role === "user") {
     return {
-      kind: "steer",
-      submitValue,
-      preview: submitValue,
+      role: "user",
+      content: entry.content,
+      timestamp,
     };
   }
 
+  let badge: string | undefined;
+  let agent: string | undefined;
+
+  switch (entry.role) {
+    case "system":
+      badge = "System";
+      break;
+    case "tool":
+      badge = "Tool";
+      break;
+    case "agent":
+      badge = "Agent";
+      break;
+    default:
+      break;
+  }
+
+  if (typeof metadata.activeAgent === "string") {
+    agent = metadata.activeAgent;
+  } else if (typeof metadata.agentName === "string") {
+    agent = metadata.agentName;
+  } else if (entry.role === "agent") {
+    const match = entry.content.match(/Agent switched to\s+(.+)$/i);
+    if (match?.[1]) {
+      agent = match[1];
+    }
+  }
+
   return {
-    kind: "follow-up",
-    submitValue: trimmed,
-    preview: trimmed,
+    role: "gordon",
+    content: entry.content,
+    timestamp,
+    badge,
+    agent,
   };
+}
+
+function buildChatMessagesFromRuntimeTranscript(
+  entries: RuntimeTranscriptEntry[],
+  options: { maxEntries?: number } = {},
+): ChatMessage[] {
+  const maxEntries = Math.max(1, Math.min(options.maxEntries ?? 80, 160));
+  return entries.slice(-maxEntries).map(toChatMessageFromRuntimeTranscript);
 }
 
 function parseActionLogArgs(args: string): ParsedActionLogRequest {
@@ -509,36 +508,17 @@ interface AppContentProps {
 }
 
 function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
-  const [state, setState] = useState<AppState>({
-    view: "loading",
-    mode: "SAFE",
-    portfolioValue: undefined,
-    availableCash: 0,
-    connectionStatus: "disconnected",
-    messages: [],
-    isLoading: false,
-    isStreaming: false,
-    streamingMessageTimestamp: null,
-    activeToolCall: null,
-    activityStatus: null,
-    taskTree: null,
-    backgroundTaskTree: null,
-    conversationHistory: [],
-    btcPrice: undefined,
-    overlay: OVERLAY_NONE,
-    queuedSubmissions: [],
-    showStartupHint: true,
-    transcriptBottomOffset: 0,
-    isUserTyping: false,
-    chatInputSeed: "",
-    chatInputSeedNonce: 0,
-    setupMode: parseSetupWizardMode(process.env.GORDON_SETUP_MODE, "advanced"),
-    setupSection: parseSetupWizardSection(process.env.GORDON_SETUP_SECTION),
-    session: null,
-    threadStatusInfo: null,
-    chainStatus: null,
-    configLayers: null,
-  });
+  const appStoreRef = useRef<AppStateStore | null>(null);
+  if (!appStoreRef.current) {
+    appStoreRef.current = createAppStore(createInitialAppState({
+      setupMode: parseSetupWizardMode(process.env.GORDON_SETUP_MODE, "advanced"),
+      setupSection: parseSetupWizardSection(process.env.GORDON_SETUP_SECTION),
+      overlay: OVERLAY_NONE,
+    }));
+  }
+  const appStore = appStoreRef.current!;
+  const state = useSyncExternalStore(appStore.subscribe, appStore.getState, appStore.getState);
+  const setState = useCallback((updater: (previous: AppState) => AppState) => appStore.setState(updater), [appStore]);
 
   const llmClientRef = useRef<LLMClient | null>(null);
   const binanceClientRef = useRef<BinanceClient | null>(null);
@@ -556,6 +536,42 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
   const transcriptBottomOffsetRef = useRef(0);
   const isUserTypingRef = useRef(false);
   const previousMessageCountRef = useRef(0);
+  const portfolioValueRef = useRef<number | undefined>(state.portfolioValue);
+  const availableCashRef = useRef<number>(state.availableCash);
+  const sessionRuntimeFactoryRef = useRef<SessionRuntimeFactory | null>(null);
+
+  const getSessionRuntime = useCallback((runtimeId: string = "app"): SessionRuntime => {
+    if (!sessionRuntimeFactoryRef.current) {
+      sessionRuntimeFactoryRef.current = new SessionRuntimeFactory({
+        resolveContext: async ({ session, contextOverride }) => {
+          if (contextOverride) {
+            return contextOverride;
+          }
+          if (!llmClientRef.current) {
+            throw new Error("LLM client not initialized");
+          }
+          return buildAppGordonContext({
+            binance: binanceClientRef.current,
+            exchange: exchangeRef.current,
+            broker: brokerRef.current,
+            llm: llmClientRef.current,
+            config: configRef.current,
+            portfolioValue: portfolioValueRef.current ?? 0,
+            availableCash: availableCashRef.current,
+            userId: session.resourceId,
+            threadId: session.threadId,
+            credentialProfile: getRequestCredentialProfile(configRef.current),
+          });
+        },
+      });
+    }
+    return sessionRuntimeFactoryRef.current.get(runtimeId, { sessionId: runtimeId });
+  }, []);
+
+  const syncRuntimeToolingState = useCallback(async () => {
+    const runtime = getSessionRuntime("app");
+    await runtime.refreshPlugins();
+  }, [getSessionRuntime]);
 
   /**
    * Helper to update thread status info in state
@@ -606,6 +622,45 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
   }, [state.isUserTyping]);
 
   useEffect(() => {
+    portfolioValueRef.current = state.portfolioValue;
+    availableCashRef.current = state.availableCash;
+  }, [state.availableCash, state.portfolioValue]);
+
+  useEffect(() => {
+    const runtime = getSessionRuntime("app");
+    return runtime.subscribe((runtimeState) => {
+      const nextInspector = createRuntimeInspectorViewModel(runtime);
+      const snapshot = runtimeState.session.snapshot;
+      setState((prev) => {
+        const nextSession = buildRuntimeLinkedSession(prev.session, runtimeState);
+
+        const nextIsStreaming = runtimeState.stream.status === "running";
+        const nextActivityStatus = buildRuntimeActivityStatus(prev.activityStatus, prev.isStreaming, runtimeState);
+
+        const sessionChanged = (
+          (prev.session?.resourceId ?? null) !== (nextSession?.resourceId ?? null)
+          || (prev.session?.threadId ?? null) !== (nextSession?.threadId ?? null)
+        );
+        const streamingChanged = prev.isStreaming !== nextIsStreaming;
+        const activityChanged = prev.activityStatus !== nextActivityStatus;
+        const inspectorChanged = shouldRefreshRuntimeInspector(prev.runtimeInspector, nextInspector);
+
+        if (!sessionChanged && !streamingChanged && !activityChanged && !inspectorChanged) {
+          return prev;
+        }
+
+        return {
+          ...prev,
+          session: nextSession,
+          isStreaming: nextIsStreaming,
+          activityStatus: nextActivityStatus,
+          runtimeInspector: nextInspector,
+        };
+      });
+    });
+  }, [getSessionRuntime]);
+
+  useEffect(() => {
     const previousCount = previousMessageCountRef.current;
     const nextCount = state.messages.length;
 
@@ -631,6 +686,10 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
     previousMessageCountRef.current = nextCount;
   }, [state.messages.length, state.view]);
 
+  useEffect(() => {
+    void syncRuntimeToolingState();
+  }, [syncRuntimeToolingState]);
+
   const refreshBackgroundTaskTree = useCallback(async (): Promise<void> => {
     if (backgroundRefreshInFlightRef.current) {
       return;
@@ -638,6 +697,13 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
     backgroundRefreshInFlightRef.current = true;
     const reachable = await isIpcDaemonReachable().catch(() => false);
     if (!reachable) {
+      getSessionRuntime("app").setBackgroundTasks([]);
+      getSessionRuntime("app").setRemoteState({
+        connectionStatus: "offline",
+        reachable: false,
+        actor: "daemon",
+        detail: "IPC daemon unavailable",
+      });
       backgroundTaskTreeSignatureRef.current = null;
       setState((prev) => (
         prev.backgroundTaskTree
@@ -676,6 +742,28 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
       }
 
       const payload = response.data as BackgroundStatusResponse;
+      getSessionRuntime("app").setBackgroundTasks([
+        ...payload.scheduler.tasks.map((task) => ({
+          id: task.taskId,
+          label: task.taskId,
+          status: (task.enabled ? "running" : "idle") as "running" | "idle",
+          updatedAt: task.lastRunAt ?? task.nextRunAt ?? new Date().toISOString(),
+        })),
+        {
+          id: "autonomous",
+          label: "autonomous",
+          status: (payload.autonomous.isRunning
+            ? (payload.autonomous.isPaused ? "idle" : "running")
+            : "completed") as "idle" | "running" | "completed",
+          updatedAt: payload.autonomous.lastCycleTime ?? new Date().toISOString(),
+        },
+      ]);
+      getSessionRuntime("app").setRemoteState({
+        connectionStatus: "connected",
+        reachable: true,
+        actor: "daemon",
+        detail: `scheduler=${payload.scheduler.tasks.length} autonomous=${payload.autonomous.isRunning ? "on" : "off"}`,
+      });
       const nextSignature = buildBackgroundTaskTreeSignature(payload);
       if (nextSignature !== backgroundTaskTreeSignatureRef.current) {
         backgroundTaskTreeSignatureRef.current = nextSignature;
@@ -686,6 +774,13 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
         }));
       }
     } catch {
+      getSessionRuntime("app").setBackgroundTasks([]);
+      getSessionRuntime("app").setRemoteState({
+        connectionStatus: "degraded",
+        reachable: true,
+        actor: "daemon",
+        detail: "background status fetch failed",
+      });
       backgroundTaskTreeSignatureRef.current = null;
       setState((prev) => (
         prev.backgroundTaskTree
@@ -1434,9 +1529,11 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
         deferredStartupTasks.push(async () => {
           try {
             await syncAgentRailMcpPlugins(config);
-            await initMCPTools();
+            await getSessionRuntime("app").initializeTooling({
+              enableHotReload: true,
+              intervalMs: 5000,
+            });
             await initRouting();
-            enableMCPHotReload(5000);
           } catch (err) {
             console.error("[Routing] Init failed:", (err as Error).message);
           }
@@ -1674,8 +1771,8 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
         try {
           const registry = getSubscriptionRegistry();
           registry.setInvoker(async (_agentId: string, prompt: string) => {
-            const { processMessageStream } = await import("../infra/agents/orchestrator.ts");
-            const session = await getCurrentSession();
+            const runtime = getSessionRuntime("app");
+            const session = await runtime.getCurrentSession();
             if (!llmClientRef.current) {
               throw new Error("LLM client not initialized for event-driven invoke.");
             }
@@ -1691,7 +1788,11 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
               threadId: session?.threadId ?? undefined,
               credentialProfile: getRequestCredentialProfile(configRef.current),
             }) as GordonContext;
-            const stream = processMessageStream(prompt, gordonCtx, session?.threadId ?? undefined, session?.resourceId);
+            const stream = runtime.streamMessage(prompt, {
+              contextOverride: gordonCtx,
+              threadId: session?.threadId ?? undefined,
+              resourceId: session?.resourceId,
+            });
             for await (const _event of stream) {
               // Consume stream for event-driven flows.
             }
@@ -1707,7 +1808,7 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
       // Initialize session for Mastra agent memory
       // Auto-resume is disabled by default - creates fresh sessions
       // Users can use /resume to continue previous sessions
-      const session = await initializeSession({ autoResume: false });
+      const session = await getSessionRuntime("app").initializeSession({ autoResume: false });
       if (process.env.GORDON_STARTUP_QUIET !== "1") {
         console.log(`[Gordon] Session initialized: threadId=${session.threadId}, resourceId=${session.resourceId}, isNew=${session.isNewSession}`);
       }
@@ -2106,25 +2207,25 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
       // Handle /resume command - resume previous session with memory context
       if (command.action === "menu" && command.target === "resume") {
         (async () => {
-          const resumed = await resumeSession();
+          const runtime = getSessionRuntime("app");
+          const resumed = await runtime.resumeSession();
           if (resumed) {
+            const restoredMessages = buildChatMessagesFromRuntimeTranscript(runtime.getTranscript());
             const resumeMessage: ChatMessage = {
               role: "gordon",
-              content: `Session resumed! I'll remember our previous conversations.\n\n**Session Details:**\n- Thread ID: \`${resumed.threadId.slice(0, 20)}...\`\n- Resource ID: \`${resumed.resourceId}\`\n\nI can now recall relevant context from our past discussions. How can I help you today?`,
+              content: `Session resumed.\n\n**Session Details:**\n- Thread ID: \`${resumed.threadId.slice(0, 20)}...\`\n- Resource ID: \`${resumed.resourceId}\`\n- Restored messages: ${restoredMessages.length}\n\nI restored the runtime transcript for this session. How can I help you today?`,
               timestamp: formatTimestamp(),
+              badge: "System",
             };
             setState((prev) => ({
               ...prev,
               session: resumed,
-              messages: [
-                ...prev.messages,
-                { role: "user", content: value.trim(), timestamp: formatTimestamp() },
-                resumeMessage,
-              ],
+              messages: [...restoredMessages, resumeMessage],
             }));
+            void updateThreadStatusInfo(resumed.threadId);
           } else {
             // No previous session to resume
-            const newSession = await startNewSession();
+            const newSession = await runtime.startNewSession();
             const noSessionMessage: ChatMessage = {
               role: "gordon",
               content: `No previous session found. Starting a fresh session.\n\n**New Session Details:**\n- Thread ID: \`${newSession.threadId.slice(0, 20)}...\`\n- Resource ID: \`${newSession.resourceId}\``,
@@ -2139,6 +2240,7 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
                 noSessionMessage,
               ],
             }));
+            void updateThreadStatusInfo(newSession.threadId);
           }
         })();
         return;
@@ -2147,7 +2249,7 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
       // Handle /new-session command - start a fresh session
       if (command.action === "menu" && command.target === "new-session") {
         (async () => {
-          const newSession = await startNewSession();
+          const newSession = await getSessionRuntime("app").startNewSession();
           const newSessionMessage: ChatMessage = {
             role: "gordon",
             content: `Started a fresh session! Previous memory context has been cleared.\n\n**New Session Details:**\n- Thread ID: \`${newSession.threadId.slice(0, 20)}...\`\n- Resource ID: \`${newSession.resourceId}\`\n\nReady to start fresh. What would you like to do?`,
@@ -2167,31 +2269,54 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
 
       // Handle /session command - show current session info
       if (command.action === "menu" && command.target === "session-info") {
-        (async () => {
-          const sessionInfo = await getCurrentSession();
-          const sessionAge = sessionInfo.threadStartedAt
-            ? Math.round((Date.now() - new Date(sessionInfo.threadStartedAt).getTime()) / 1000 / 60)
-            : 0;
-          const sessionMessage: ChatMessage = {
-            role: "gordon",
-            content: `**Current Session Info:**\n\n` +
-              `- **Thread ID:** \`${sessionInfo.threadId?.slice(0, 25) || "None"}...\`\n` +
-              `- **Resource ID:** \`${sessionInfo.resourceId}\`\n` +
-              `- **Session Started:** ${sessionInfo.threadStartedAt ? new Date(sessionInfo.threadStartedAt).toLocaleString() : "N/A"}\n` +
-              `- **Session Age:** ${sessionAge} minutes\n` +
-              `- **Total Sessions:** ${sessionInfo.sessionCount}\n\n` +
-              `Use \`/resume\` to continue a previous session or \`/new-session\` to start fresh.`,
-            timestamp: formatTimestamp(),
-          };
-          setState((prev) => ({
-            ...prev,
-            messages: [
-              ...prev.messages,
-              { role: "user", content: value.trim(), timestamp: formatTimestamp() },
-              sessionMessage,
-            ],
-          }));
-        })();
+        void runLocalCommand(value, "session", async () => formatRuntimeSessionInfo(getSessionRuntime("app")));
+        return;
+      }
+
+      if (command.action === "menu" && command.target === "runtime-state") {
+        void runLocalCommand(value, "runtime", async () => formatRuntimeState(getSessionRuntime("app")));
+        return;
+      }
+
+      if (command.action === "menu" && command.target === "runtime-transcript") {
+        void runLocalCommand(value, "runtime transcript", async () => formatRuntimeTranscript(getSessionRuntime("app"), args));
+        return;
+      }
+
+      if (command.action === "menu" && command.target === "runtime-scratchpad") {
+        void runLocalCommand(value, "runtime scratchpad", async () => formatRuntimeScratchpad(getSessionRuntime("app"), args));
+        return;
+      }
+
+      if (command.action === "menu" && command.target === "runtime-handoffs") {
+        void runLocalCommand(value, "runtime handoffs", async () => formatRuntimeHandoffs(getSessionRuntime("app")));
+        return;
+      }
+
+      if (command.action === "menu" && command.target === "runtime-approvals") {
+        void runLocalCommand(value, "runtime approvals", async () => formatRuntimeApprovals(getSessionRuntime("app")));
+        return;
+      }
+
+      if (command.action === "menu" && command.target === "runtime-approve") {
+        void runLocalCommand(value, "runtime approval", async () =>
+          applyRuntimeApprovalDecision(getSessionRuntime("app"), args, "approve"));
+        return;
+      }
+
+      if (command.action === "menu" && command.target === "runtime-deny") {
+        void runLocalCommand(value, "runtime denial", async () =>
+          applyRuntimeApprovalDecision(getSessionRuntime("app"), args, "deny"));
+        return;
+      }
+
+      if (command.action === "menu" && command.target === "runtime-bridge") {
+        void runLocalCommand(value, "runtime bridge", async () => formatRuntimeBridge(getSessionRuntime("app")));
+        return;
+      }
+
+      if (command.action === "menu" && command.target === "runtime-history") {
+        void runLocalCommand(value, "runtime history", async () => formatRuntimeHistory(getSessionRuntime("app"), args));
         return;
       }
 
@@ -2981,6 +3106,40 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
             return;
           }
 
+          if (targetThread.threadId === state.session?.threadId) {
+            const runtimeSummary = [
+              `**Runtime Thread Summary: ${targetThread.label}**`,
+              "",
+              getSessionRuntime("app").getProjectedTranscript() || "Runtime transcript is empty for this thread.",
+            ].join("\n");
+            appendActionLogEntry({
+              threadId: targetThread.threadId,
+              resourceId: targetThread.resourceId,
+              sessionId: targetThread.threadId,
+              entryType: "branch_summary",
+              title: "Runtime thread summary generated",
+              content: runtimeSummary,
+              payload: {
+                source: "runtime_transcript",
+              },
+            });
+
+            const response: ChatMessage = {
+              role: "gordon",
+              content: runtimeSummary,
+              timestamp: formatTimestamp(),
+            };
+            setState((prev) => ({
+              ...prev,
+              messages: [
+                ...prev.messages,
+                { role: "user", content: value.trim(), timestamp: formatTimestamp() },
+                response,
+              ],
+            }));
+            return;
+          }
+
           const entries = listActionLogEntries({
             threadId: targetThread.threadId,
             limit: 80,
@@ -3039,6 +3198,37 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
                 ...prev.messages,
                 { role: "user", content: value.trim(), timestamp: formatTimestamp() },
                 errorMessage,
+              ],
+            }));
+            return;
+          }
+
+          if (!explicitThread || targetThread.threadId === state.session?.threadId) {
+            const responseContent = compactRuntimeTranscript(getSessionRuntime("app"), note);
+            appendActionLogEntry({
+              threadId: targetThread.threadId,
+              resourceId: targetThread.resourceId,
+              sessionId: targetThread.threadId,
+              entryType: "compaction_summary",
+              title: "Runtime compaction generated",
+              content: responseContent,
+              payload: {
+                source: "runtime_transcript",
+                note: note || null,
+              },
+            });
+
+            const response: ChatMessage = {
+              role: "gordon",
+              content: responseContent,
+              timestamp: formatTimestamp(),
+            };
+            setState((prev) => ({
+              ...prev,
+              messages: [
+                ...prev.messages,
+                { role: "user", content: value.trim(), timestamp: formatTimestamp() },
+                response,
               ],
             }));
             return;
@@ -3253,6 +3443,7 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
             setState((prev) => ({ ...prev, messages: [...prev.messages, userMessage], isLoading: true }));
             const mcpArgs = args.trim().length > 0 ? args.trim().split(/\s+/) : [];
             const result = await handleMCPCommand(mcpArgs);
+            await syncRuntimeToolingState().catch(() => undefined);
             setState((prev) => ({
               ...prev,
               messages: [
@@ -3480,13 +3671,12 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
       activeStreamAbortControllerRef.current = streamAbortController;
 
       // Use streaming API with session threadId and resourceId for memory continuity
-      const stream = processMessageStream(
-        messageToSend,
-        context,
-        state.session?.threadId,
-        state.session?.resourceId,
-        { signal: streamAbortController.signal }
-      );
+      const stream = getSessionRuntime("app").streamMessage(messageToSend, {
+        contextOverride: context,
+        threadId: state.session?.threadId,
+        resourceId: state.session?.resourceId,
+        signal: streamAbortController.signal,
+      });
       let fullContent = "";
       let currentAgentName: string | undefined;
       let pendingUpdate = false;
@@ -3984,13 +4174,12 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
         try {
           const streamAbortController = new AbortController();
           activeStreamAbortControllerRef.current = streamAbortController;
-          const stream = processMessageStream(
-            prompt,
-            context,
-            state.session?.threadId,
-            state.session?.resourceId,
-            { signal: streamAbortController.signal }
-          );
+          const stream = getSessionRuntime("app").streamMessage(prompt, {
+            contextOverride: context,
+            threadId: state.session?.threadId,
+            resourceId: state.session?.resourceId,
+            signal: streamAbortController.signal,
+          });
           let fullContent = "";
           let pendingUpdate = false;
           let pendingTimer: ReturnType<typeof setTimeout> | null = null;
@@ -5010,134 +5199,46 @@ Please check your API keys in the .env file and restart Gordon.`,
         )}
 
         {state.view === "chat" && (
-          <Box flexDirection="column" flexGrow={1}>
-            {/* Startup hint - shows for 5 seconds */}
-            {state.showStartupHint && state.messages.length === 0 && !showChatBanner && (
-              <ShortcutsHint
-                duration={5000}
-                visible={state.showStartupHint}
-              />
-            )}
-
-            {showChatBanner && (
-              <WelcomeBanner mode={configRef.current.startupBannerMode} context="chat" />
-            )}
-
-            <ChatView
-              messages={visibleMessages}
-              hiddenBefore={visibleThreadPolicy.hiddenBefore}
-              hiddenAfter={visibleThreadPolicy.hiddenAfter}
-              visibleLimit={maxVisibleMessages}
-              isPinnedBottom={visibleThreadPolicy.isPinnedBottom}
-              isStreaming={state.isStreaming}
-              activeStreamingTimestamp={state.streamingMessageTimestamp}
-              activityStatus={state.activityStatus}
-              activeToolCall={state.activeToolCall}
-            />
-
-            {quickActionsOverlayOpen && (
-              <QuickStartMenu
-                onSelect={handleMenuSelect}
-                onTypeToChat={(seed) => openChatWorkspace({ seed, resetInput: true })}
-                mode={state.mode}
-                setupComplete={configRef.current.onboardingComplete}
-                hasExchange={Boolean(exchangeRef.current)}
-                hasBroker={Boolean(brokerRef.current)}
-                hasWalletRails={hasWalletRails}
-                hasMcpServers={configRef.current.mcpServers.length > 0}
-                variant="overlay"
-              />
-            )}
-
-            {(state.isLoading || state.isStreaming || state.queuedSubmissions.length > 0) && (
-              <Box
-                flexDirection="column"
-                borderStyle="round"
-                borderColor={COLORS.ACCENT_DIM}
-                marginX={2}
-                marginBottom={1}
-                paddingX={1}
-              >
-                <Text color={COLORS.WHITE}>
-                  {state.isStreaming
-                    ? "Run active"
-                    : state.isLoading
-                      ? "Run starting"
-                      : "Queue ready"}
-                  {state.activityStatus ? `: ${state.activityStatus}` : ""}
-                </Text>
-                <Text color={COLORS.DIM}>
-                  {"Esc stops the active streamed response when possible. Enter queues a follow-up. Use /steer <message> to redirect the next run."}
-                </Text>
-                {state.taskTree && <TaskTree tree={state.taskTree} />}
-                {state.queuedSubmissions.length > 0 && (
-                  <Text color={COLORS.HIGHLIGHT}>
-                    Next queued: {state.queuedSubmissions[0]?.preview}
-                    {state.queuedSubmissions.length > 1 ? ` (+${state.queuedSubmissions.length - 1} more)` : ""}
-                  </Text>
-                )}
-              </Box>
-            )}
-
-            {state.backgroundTaskTree && (
-              <Box
-                flexDirection="column"
-                borderStyle="round"
-                borderColor={COLORS.TAN_DIM}
-                marginX={2}
-                marginBottom={1}
-                paddingX={1}
-              >
-                <Text color={COLORS.DIM}>
-                  Daemon-owned work continues outside the active chat run.
-                </Text>
-                <TaskTree tree={state.backgroundTaskTree} title="Background Tasks" staticCompleted={false} />
-              </Box>
-            )}
-
-            {state.isLoading && (
-              <ProgressIndicator
-                label={state.activityStatus || "Gordon is thinking..."}
-                status="Routing request and preparing the response..."
-                onCancel={cancelActiveResponse}
-                cancellable={Boolean(activeStreamAbortControllerRef.current)}
-              />
-            )}
-            {state.isStreaming && (
-              <StreamingProgress
-                operation={state.activityStatus || "Streaming response..."}
-                currentTool={state.activeToolCall}
-                isStreaming={state.isStreaming}
-                onCancel={cancelActiveResponse}
-              />
-            )}
-
-            {/* Input area - isolated component to prevent re-render issues */}
-            <ChatInput
-              onSubmit={handleSubmit}
-              onOpenQuickActions={openQuickActionsOverlay}
-              onTypingStateChange={setTranscriptTypingState}
-              disabled={quickActionsOverlayOpen}
-              busy={state.isLoading || state.isStreaming}
-              queueDepth={state.queuedSubmissions.length}
-              placeholder={chatInputPlaceholder}
-              emptyStateHint={
-                state.messages.length === 0
-                  ? "Ask Gordon to scan, analyze, plan, or review a market."
-                  : null
-              }
-              seedValue={state.chatInputSeed}
-              seedNonce={state.chatInputSeedNonce}
-              quickActionContext={quickActionContext}
-            />
-
-            {/* Help hint */}
-            <Box paddingX={2} paddingY={0}>
-              <Text color={COLORS.DIM}>
-                Ctrl+K: actions | PgUp/PgDn/Home/End: transcript | ESC: stop agent response | /menu: actions | /help: commands
-              </Text>
-            </Box>
-          </Box>
+          <ChatScreen
+            visibleMessages={visibleMessages}
+            hiddenBefore={visibleThreadPolicy.hiddenBefore}
+            hiddenAfter={visibleThreadPolicy.hiddenAfter}
+            visibleLimit={maxVisibleMessages}
+            isPinnedBottom={visibleThreadPolicy.isPinnedBottom}
+            isStreaming={state.isStreaming}
+            activeStreamingTimestamp={state.streamingMessageTimestamp}
+            activityStatus={state.activityStatus}
+            activeToolCall={state.activeToolCall}
+            showStartupHint={state.showStartupHint}
+            showChatBanner={showChatBanner}
+            startupBannerMode={configRef.current.startupBannerMode}
+            allMessagesCount={state.messages.length}
+            quickActionsOverlayOpen={quickActionsOverlayOpen}
+            onMenuSelect={handleMenuSelect}
+            onTypeToChat={(seed) => openChatWorkspace({ seed, resetInput: true })}
+            mode={state.mode}
+            setupComplete={configRef.current.onboardingComplete}
+            hasExchange={Boolean(exchangeRef.current)}
+            hasBroker={Boolean(brokerRef.current)}
+            hasWalletRails={hasWalletRails}
+            hasMcpServers={configRef.current.mcpServers.length > 0}
+            queuedPreview={state.queuedSubmissions[0]?.preview}
+            queuedCount={state.queuedSubmissions.length}
+            taskTree={state.taskTree}
+            backgroundTaskTree={state.backgroundTaskTree}
+            runtimeInspector={state.runtimeInspector}
+            isLoading={state.isLoading}
+            chatInputPlaceholder={chatInputPlaceholder}
+            quickActionContext={quickActionContext}
+            onSubmit={handleSubmit}
+            onOpenQuickActions={openQuickActionsOverlay}
+            onTypingStateChange={setTranscriptTypingState}
+            busy={state.isLoading || state.isStreaming}
+            seedValue={state.chatInputSeed}
+            seedNonce={state.chatInputSeedNonce}
+            onCancel={cancelActiveResponse}
+            canCancel={Boolean(activeStreamAbortControllerRef.current)}
+          />
         )}
       </Box>
     </Box>

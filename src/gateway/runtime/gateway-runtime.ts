@@ -1,9 +1,9 @@
 import { createModuleLogger } from "../../infra/logger/index.ts";
 import { loadConfig, saveConfig } from "../../infra/storage/config.ts";
-import { processMessage, processStructuredMessage, quickCheckPositions, quickScan } from "../../infra/agents/orchestrator.ts";
 import { getSchemaByName } from "../../infra/agents/schemas/index.ts";
 import { z } from "zod";
 import type { GordonContext } from "../../infra/agents/types.ts";
+import { SessionRuntimeFactory } from "../../runtime/index.ts";
 import {
   createGatewayError,
   validateGatewayCommand,
@@ -64,11 +64,17 @@ export interface GatewayRuntimeDeps {
   resolveContext: (sessionId: string) => Promise<GordonContext>;
   requireAuth?: boolean;
   onDaemonShutdown?: () => Promise<void> | void;
+  sessionRuntimeFactory?: SessionRuntimeFactory;
 }
 
 export class GatewayRuntime {
   private readonly queue: CommandQueueManager;
-  private readonly deps: Required<GatewayRuntimeDeps>;
+  private readonly deps: {
+    resolveContext: GatewayRuntimeDeps["resolveContext"];
+    requireAuth: boolean;
+    onDaemonShutdown: NonNullable<GatewayRuntimeDeps["onDaemonShutdown"]>;
+  };
+  private readonly sessionRuntimeFactory: SessionRuntimeFactory;
   private readonly handlers = new Map<GatewayCommandType, (envelope: GatewayCommandEnvelope) => Promise<unknown>>();
 
   constructor(deps: GatewayRuntimeDeps) {
@@ -81,7 +87,14 @@ export class GatewayRuntime {
       maxPendingPerSession: 256,
       retryBackoffMs: 1_500,
     });
+    this.sessionRuntimeFactory = deps.sessionRuntimeFactory ?? new SessionRuntimeFactory({
+      resolveContext: async ({ session }) => this.deps.resolveContext(session.sessionId ?? session.runtimeId),
+    });
     this.registerDefaultHandlers();
+  }
+
+  private getSessionRuntime(sessionId: string) {
+    return this.sessionRuntimeFactory.get(sessionId, { sessionId });
   }
 
   private appendRuntimeLog(
@@ -138,6 +151,14 @@ export class GatewayRuntime {
     handler: (envelope: GatewayCommandEnvelope) => Promise<unknown>,
   ): Promise<unknown> {
     const lifecycleType = this.getLifecycleEntryType(envelope);
+    const runtime = this.getSessionRuntime(envelope.meta.sessionId);
+    const bridgeSession = runtime.beginBridgeIngress({
+      source: envelope.meta.source,
+      commandType: envelope.command.type,
+      correlationId: envelope.meta.correlationId,
+      requestId: envelope.meta.requestId,
+      detail: envelope.command.type,
+    });
 
     if (envelope.command.type === "chat.send_message") {
       const payload = envelope.command.payload as { text: string; threadId?: string; resourceId?: string };
@@ -198,8 +219,13 @@ export class GatewayRuntime {
           { result },
         );
       }
+      runtime.completeBridgeIngress(bridgeSession.id, `${envelope.command.type} completed`);
       return result;
     } catch (error) {
+      runtime.failBridgeIngress(
+        bridgeSession.id,
+        error instanceof Error ? error.message : String(error),
+      );
       if (this.shouldPersistLifecycle(envelope)) {
         this.appendRuntimeLog(
           envelope,
@@ -215,54 +241,56 @@ export class GatewayRuntime {
 
   private registerDefaultHandlers(): void {
     this.registerHandler("chat.send_message", async (envelope) => {
-      const context = await this.deps.resolveContext(envelope.meta.sessionId);
       const payload = envelope.command.payload as { text: string; threadId?: string; resourceId?: string };
-      const result = await processMessage(
-        payload.text,
-        context,
-        payload.threadId ?? context.threadId,
-        payload.resourceId ?? context.userId,
-      );
-      return result;
+      return this.getSessionRuntime(envelope.meta.sessionId).processMessage(payload.text, {
+        sessionId: envelope.meta.sessionId,
+        threadId: payload.threadId,
+        resourceId: payload.resourceId,
+      });
     });
 
     (this as unknown as { registerHandler(type: string, handler: (envelope: unknown) => Promise<unknown>): void }).registerHandler("chat.structured_message", async (envelope: unknown) => {
       const env = envelope as { meta: { sessionId: string }; command: { payload: { text: string; schemaName: string; threadId?: string; resourceId?: string } } };
-      const context = await this.deps.resolveContext(env.meta.sessionId);
       const payload = env.command.payload;
       const schema = getSchemaByName(payload.schemaName);
       if (!schema) {
         throw new Error(`Unknown schema: "${payload.schemaName}". Available: tradeSignal, marketScan, analysis, portfolioStatus, agentDecision`);
       }
-      return processStructuredMessage(
+      return this.getSessionRuntime(env.meta.sessionId).processStructuredMessage(
         payload.text,
         schema as z.ZodSchema<Record<string, unknown>>,
-        context,
-        payload.threadId ?? context.threadId,
-        payload.resourceId ?? context.userId,
+        {
+          sessionId: env.meta.sessionId,
+          threadId: payload.threadId,
+          resourceId: payload.resourceId,
+        },
       );
     });
 
     this.registerHandler("scan.run", async (envelope) => {
       const context = await this.deps.resolveContext(envelope.meta.sessionId);
-      return quickScan({
-        ...context,
-        config: {
-          ...context.config,
-          preferences: {
-            ...context.config.preferences,
-            topNCoins: (envelope.command.payload as { topN?: number }).topN ?? context.config.preferences.topNCoins,
-            defaultTimeframes:
-              (envelope.command.payload as { timeframes?: string[] }).timeframes ??
-              context.config.preferences.defaultTimeframes,
+      return this.getSessionRuntime(envelope.meta.sessionId).quickScan({
+        sessionId: envelope.meta.sessionId,
+        contextOverride: {
+          ...context,
+          config: {
+            ...context.config,
+            preferences: {
+              ...context.config.preferences,
+              topNCoins: (envelope.command.payload as { topN?: number }).topN ?? context.config.preferences.topNCoins,
+              defaultTimeframes:
+                (envelope.command.payload as { timeframes?: string[] }).timeframes ??
+                context.config.preferences.defaultTimeframes,
+            },
           },
         },
       });
     });
 
     this.registerHandler("monitor.run_cycle", async (envelope) => {
-      const context = await this.deps.resolveContext(envelope.meta.sessionId);
-      return quickCheckPositions(context);
+      return this.getSessionRuntime(envelope.meta.sessionId).quickCheckPositions({
+        sessionId: envelope.meta.sessionId,
+      });
     });
 
     this.registerHandler("system.arm", async (envelope) => {
