@@ -173,13 +173,11 @@ import {
 } from "./state/AppStore.ts";
 import { createRuntimeInspectorViewModel } from "./presenters/RuntimePresenter.ts";
 import {
-  type WorkspaceStrategyInventorySnapshot,
-} from "./workspaceTypes.ts";
-import {
-  buildWorkspaceSurfaceViewModel,
-  clampWorkspaceSurfaceSectionIndex,
-  getPrimaryWorkspaceSurfaceAction,
-} from "./workspaceSurfaces.ts";
+  buildCockpitModel,
+  clampCockpitSectionIndex,
+  getPrimaryCockpitAction,
+  type CockpitStrategyInventorySnapshot,
+} from "./cockpitModels.ts";
 import { getRuntimeApprovalShortId } from "./runtimeApprovalId.ts";
 import {
   applyRuntimeApprovalDecision,
@@ -5526,13 +5524,13 @@ Please check your API keys in the .env file and restart Gordon.`,
       && state.chatDraft.trim().length === 0
       && !state.isLoading
       && !state.isStreaming
-      && workspaceSurfaceModel
+      && cockpitModel
       && (key.upArrow || key.downArrow)
     ) {
-      const sectionCount = workspaceSurfaceModel.sections.length;
+      const sectionCount = cockpitModel.sections.length;
       if (sectionCount > 0) {
         const delta = key.downArrow ? 1 : -1;
-        const nextIndex = (selectedWorkspaceCardIndex + delta + sectionCount) % sectionCount;
+        const nextIndex = (selectedCockpitSectionIndex + delta + sectionCount) % sectionCount;
         appStore.setWorkspaceSelection(state.workspace, nextIndex);
       }
       return;
@@ -5545,10 +5543,10 @@ Please check your API keys in the .env file and restart Gordon.`,
       && state.chatDraft.trim().length === 0
       && !state.isLoading
       && !state.isStreaming
-      && workspaceSurfaceModel
+      && cockpitModel
       && key.tab
     ) {
-      const primaryAction = getPrimaryWorkspaceSurfaceAction(workspaceSurfaceModel, selectedWorkspaceCardIndex);
+      const primaryAction = getPrimaryCockpitAction(cockpitModel, selectedCockpitSectionIndex);
       if (primaryAction) {
         openWorkspaceShell(state.workspace, { seed: primaryAction, resetInput: true });
       }
@@ -5687,19 +5685,19 @@ Please check your API keys in the .env file and restart Gordon.`,
     }
   }, [overlayKind, state.isLoading, state.isStreaming, state.workspace]);
 
-  const strategyInventory = useMemo<WorkspaceStrategyInventorySnapshot>(() => {
+  const strategyInventory = useMemo<CockpitStrategyInventorySnapshot>(() => {
     let builtInStrategyCount = 0;
     let builtInTier1Count = 0;
     let builtInTier2Count = 0;
     let playbookCount = 0;
-    let builtInStrategies: WorkspaceStrategyInventorySnapshot["builtInStrategies"] = [];
-    let generatedStrategies: WorkspaceStrategyInventorySnapshot["generatedStrategies"] = [];
-    let playbooks: WorkspaceStrategyInventorySnapshot["playbooks"] = [];
+    let builtInStrategies: CockpitStrategyInventorySnapshot["builtInStrategies"] = [];
+    let generatedStrategies: CockpitStrategyInventorySnapshot["generatedStrategies"] = [];
+    let playbooks: CockpitStrategyInventorySnapshot["playbooks"] = [];
     let systematicProfileCount = 0;
     let systematicLiveEligibleCount = 0;
-    let systematicProfiles: WorkspaceStrategyInventorySnapshot["systematicProfiles"] = [];
+    let systematicProfiles: CockpitStrategyInventorySnapshot["systematicProfiles"] = [];
     let researchExperimentCount = 0;
-    let researchExperiments: WorkspaceStrategyInventorySnapshot["researchExperiments"] = [];
+    let researchExperiments: CockpitStrategyInventorySnapshot["researchExperiments"] = [];
     let diversificationScore: number | undefined;
     let concentrationRisk: string | undefined;
 
@@ -5804,16 +5802,17 @@ Please check your API keys in the .env file and restart Gordon.`,
     };
   }, [state.messages]);
 
+  const storedPlans = useMemo(() => {
+    try {
+      return listPlans().slice(0, 8);
+    } catch {
+      return [] as Plan[];
+    }
+  }, [state.messages]);
+
   const workspaceViewInput = useMemo(() => {
     if (state.workspace === "desk") {
       return null;
-    }
-
-    let plans: Plan[] = [];
-    try {
-      plans = listPlans().slice(0, 8);
-    } catch {
-      plans = [];
     }
 
     return {
@@ -5826,7 +5825,7 @@ Please check your API keys in the .env file and restart Gordon.`,
       runtimeInspector: state.runtimeInspector,
       queuedCount: state.queuedSubmissions.length,
       lastResults: lastResultsRef.current,
-      plans,
+      plans: storedPlans,
       workspaceMemory: state.workspaceMemory,
       strategyInventory,
       planReview: {
@@ -5846,43 +5845,66 @@ Please check your API keys in the .env file and restart Gordon.`,
     state.runtimeInspector,
     state.workspaceMemory,
     state.workspace,
+    storedPlans,
     strategyInventory,
   ]);
 
-  const workspaceSurfaceModel = useMemo(() => (
+  const cockpitModel = useMemo(() => (
     workspaceViewInput
-      ? buildWorkspaceSurfaceViewModel(workspaceViewInput)
+      ? buildCockpitModel(workspaceViewInput)
       : null
   ), [workspaceViewInput]);
 
-  const reviewDeskSurfaceModel = useMemo(() => {
-    if (!workspaceViewInput) {
-      return null;
-    }
-
-    const model = buildWorkspaceSurfaceViewModel({
-      ...workspaceViewInput,
+  const reviewDeskModel = useMemo(() => {
+    const model = buildCockpitModel({
       workspace: "plan",
+      mode: state.mode,
+      hasExchange: Boolean(exchangeRef.current),
+      hasBroker: Boolean(brokerRef.current),
+      hasWalletRails,
+      hasMcpServers: (state.runtimeInspector?.mcpServerCount ?? 0) > 0 || configRef.current.mcpServers.length > 0,
+      runtimeInspector: state.runtimeInspector,
+      queuedCount: state.queuedSubmissions.length,
+      lastResults: lastResultsRef.current,
+      plans: storedPlans,
+      workspaceMemory: state.workspaceMemory,
+      strategyInventory,
+      planReview: {
+        portfolioValue: state.portfolioValue ?? lastResultsRef.current.portfolioSummary?.totalValue ?? 0,
+        availableCash: state.availableCash ?? lastResultsRef.current.portfolioSummary?.availableCash ?? 0,
+        maxAllocationPerTrade: configRef.current.preferences.maxAllocationPerTrade,
+        cashReservePercent: configRef.current.preferences.cashReservePercent,
+      },
     });
 
     return model && model.workspace === "plan" ? model : null;
-  }, [workspaceViewInput]);
+  }, [
+    hasWalletRails,
+    state.availableCash,
+    state.mode,
+    state.portfolioValue,
+    state.queuedSubmissions.length,
+    state.runtimeInspector,
+    state.workspaceMemory,
+    storedPlans,
+    strategyInventory,
+  ]);
 
-  const selectedWorkspaceCardIndex = useMemo(() => {
+  const selectedCockpitSectionIndex = useMemo(() => {
     if (state.workspace === "desk") {
       return 0;
     }
 
     const selectedIndex = state.workspaceInteraction[state.workspace].selectedCardIndex;
-    if (!workspaceSurfaceModel) {
+    if (!cockpitModel) {
       return 0;
     }
 
-    return clampWorkspaceSurfaceSectionIndex(
-      workspaceSurfaceModel,
+    return clampCockpitSectionIndex(
+      cockpitModel,
       selectedIndex,
     );
-  }, [state.workspace, state.workspaceInteraction, workspaceSurfaceModel]);
+  }, [cockpitModel, state.workspace, state.workspaceInteraction]);
 
   const commandPaletteItems = useMemo(() => {
     const items = [
@@ -5896,7 +5918,7 @@ Please check your API keys in the .env file and restart Gordon.`,
         command: item.command,
         detail: item.workflow ? `Flow ${item.workflow}` : "Flow",
       })),
-      ...(workspaceSurfaceModel?.sections.flatMap((section) =>
+      ...(cockpitModel?.sections.flatMap((section) =>
         section.actions.map((action) => ({
           label: action,
           command: action,
@@ -5918,7 +5940,7 @@ Please check your API keys in the .env file and restart Gordon.`,
       seen.add(key);
       return true;
     }).slice(0, 24);
-  }, [quickActionContext, workspaceSurfaceModel]);
+  }, [cockpitModel, quickActionContext]);
 
   const symbolJumpSymbols = useMemo(() => {
     const symbols = new Set<string>();
@@ -5932,7 +5954,7 @@ Please check your API keys in the .env file and restart Gordon.`,
 
     lastResultsRef.current.scan?.opportunities?.forEach((entry) => add(entry.symbol));
     add(lastResultsRef.current.analysis?.symbol);
-    reviewDeskSurfaceModel?.book.rows.forEach((row) => add(row.symbol));
+    storedPlans.forEach((plan) => add(plan.symbol));
     lastResultsRef.current.positionsSummary?.positions.forEach((row) => add(row.symbol));
     lastResultsRef.current.ordersSummary?.orders.forEach((row) => add(row.symbol));
     lastResultsRef.current.portfolioSummary?.holdings.forEach((row) => add(row.asset));
@@ -5941,7 +5963,7 @@ Please check your API keys in the .env file and restart Gordon.`,
     add(state.workspaceMemory.monitor.focusSymbol);
 
     return Array.from(symbols).slice(0, 16);
-  }, [reviewDeskSurfaceModel, state.workspaceMemory]);
+  }, [state.workspaceMemory, storedPlans]);
 
   return (
     <Box flexDirection="column" height="100%">
@@ -6025,8 +6047,8 @@ Please check your API keys in the .env file and restart Gordon.`,
             taskTree={state.taskTree}
             backgroundTaskTree={state.backgroundTaskTree}
             runtimeInspector={state.runtimeInspector}
-            workspaceSurfaceModel={workspaceSurfaceModel}
-            selectedWorkspaceCardIndex={selectedWorkspaceCardIndex}
+            cockpitModel={cockpitModel}
+            selectedCockpitSectionIndex={selectedCockpitSectionIndex}
             isLoading={state.isLoading}
             chatInputPlaceholder={chatInputPlaceholder}
             quickActionContext={quickActionContext}
@@ -6045,8 +6067,7 @@ Please check your API keys in the .env file and restart Gordon.`,
             canCancel={Boolean(activeStreamAbortControllerRef.current)}
             commandPaletteItems={commandPaletteItems}
             symbolJumpSymbols={symbolJumpSymbols}
-            reviewDeskTicket={reviewDeskSurfaceModel?.ticket ?? null}
-            reviewDeskApprovals={reviewDeskSurfaceModel?.approvals ?? null}
+            reviewDeskModel={reviewDeskModel}
           />
         )}
       </Box>

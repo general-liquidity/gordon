@@ -71,6 +71,16 @@ This census is based on the current repository surfaces, especially:
 - `Rezi`
 - `Glyph`
 - `Pi / pi-tui`
+- Charmbracelet stack:
+  - `gum`
+  - `glow`
+  - `lipgloss`
+  - `bubbletea`
+  - `bubbles`
+  - `ultraviolet`
+  - `colorprofile`
+- Hatchet "TUIs are easy now"
+- `CLI-Anything`
 - `clig.dev` / `cli-guidelines`
 - Karpathy "Build for Agents" CLI thesis
 - `fintool`
@@ -99,6 +109,7 @@ Gordon’s features should surface through five primary workspaces and four seco
 - `Command palette`
 - `Approval review`
 - `Export / share / compare overlays`
+- `Document / markdown overlays`
 - `Startup / onboarding identity sequence`
 
 ### Terminal primitive families
@@ -119,6 +130,7 @@ The reset should map capabilities into these primitives:
 - `StatusToken`
 - `MiniChartCell`
 - `Timeline`
+- `MarkdownPane`
 - `Overlay`
 - `OrbitalBoot`
 
@@ -155,6 +167,7 @@ This is the primary planning table.
 | Backtesting | `src/backtest/engine.ts`, `src/infra/agents/tools/backtest.ts`, `src/app/commands/workflow.ts` | `/backtest`, `/workflow backtest-cycle` | `Lab` | `Timeline` + results `DataTable` + `DetailPane` | reviewable | low | P0 |
 | Optimization and compare | `src/infra/agents/tools/backtest.ts`, `src/app/slashCommands.ts` | `/optimize`, `/compare` | `Lab` | compare overlay + leaderboard `DataTable` | reviewable | low | P1 |
 | Playbooks and protocol | `src/core/playbooks/index.ts`, `src/infra/agents/tools/playbook-tools.ts`, `src/core/playbooks/protocol-tools.ts` | `/strategy playbooks` and protocol flows | `Lab` | `DataTable` + `DetailPane` | persistent | low | P1 |
+| Markdown playbooks, research notes, runbooks, and exported summaries | `docs/*.md`, `src/app/commands/export.ts`, `src/core/playbooks/*`, research/report flows | help, playbooks, exports, research summaries | `Desk`, `Lab`, global overlays | `MarkdownPane` + export overlay | reviewable | low | P1 |
 | Genome / experiment lifecycle | `src/infra/agents/tools/genome-tools.ts` | `/evolve`, `/experiment` | `Lab` | `Timeline` + experiment `DataTable` | reviewable | low | P1 |
 | Systematic datasets and validation | `src/infra/systematic/service.ts`, `src/infra/agents/tools/systematic-tools.ts` | `/systematic`, `/dataset`, `/validate`, `/decay` | `Lab` | `Systematic slate` + `Timeline` + export overlay | reviewable | low | P0 |
 | Runtime strategy deployment | `src/infra/agents/tools/runtime-tools.ts` | `/deploy`, `/strategies-live`, `/pause`, `/resume-strategy`, `/stop`, `/rebalance` | `Lab`, `Monitor` | `BlotterTable` + runtime `DetailPane` | persistent | high | P1 |
@@ -729,6 +742,14 @@ This section records how the external inspirations should influence Gordon.
 | `Rezi` | stable lists and dynamic TUI discipline | engine usage style |
 | `Glyph` | focus scopes, modal trapping, list-heavy full-screen React TUI benchmark | engine benchmark and workspace interaction model |
 | `Pi / pi-tui` | command-bar replacement, extension-owned UI slots, differential rendering, session-tree style recoverability | `Desk`, overlays, session/navigation model |
+| `gum` | setup prompts, bootstrap confirmations, lightweight operator ask flows | onboarding, setup, credential / routing prompts |
+| `glow` | markdown-native document rendering instead of transcript dumping | playbooks, reports, runbooks, exports |
+| `lipgloss` | spacing rhythm, border restraint, typography hierarchy, token consistency | global shell grammar and component system |
+| `bubbletea` / `bubbles` | state-machine workspaces, table/list/help/viewport behavior, pane-local keymaps | `Market`, `Lab`, `Monitor`, overlays |
+| `ultraviolet` | cell-diffing ambition and atomic redraw expectations | render discipline, motion, stability |
+| `colorprofile` | safe terminal capability handling and color degradation | global color system, warnings, accessibility |
+| Hatchet "TUIs are easy now" | reference-driven iteration, tmux/capture visual validation, small deterministic views | implementation process, shell rebuild workflow |
+| `CLI-Anything` | REPL + subcommand duality, discoverable agent-friendly command contracts, structured CLI parity | command surfaces, automation, non-TUI entrypoints |
 | `clig.dev` / `cli-guidelines` | help shape, output contracts, stdout/stderr discipline, `--json`, `--dry-run`, TTY-safe interactivity, configuration precedence | command surfaces, exports, setup, non-TUI CLI behavior |
 | Karpathy "Build for Agents" CLI thesis | CLI, MCP, markdown, and skills as agent-distribution surfaces | Gordon ecosystem contract, exports, external integrations |
 | `fintool` | agent-friendly financial CLI surface and ecosystem contract | Gordon external integrations, helper tools, agent-facing exports |

@@ -1,51 +1,31 @@
 import React from "react";
-import { Box, Text, useStdout } from "ink";
+import { Box, Text } from "ink";
+
 import { COLORS } from "../../theme.ts";
-import { getDeskToneTokens, type DeskTone } from "./DeskPanel.tsx";
+import { DeskPanel, type DeskTone, getDeskToneColor } from "./DeskPanel.tsx";
 
 interface DeskRailProps {
-  title?: string;
+  title: string;
   subtitle?: string;
   tone?: DeskTone;
-  children: React.ReactNode;
+  children?: React.ReactNode;
 }
 
-export function DeskRail({
+export const DeskRail: React.FC<DeskRailProps> = ({
   title,
   subtitle,
   tone = "brand",
   children,
-}: DeskRailProps): React.ReactElement {
-  const tokens = getDeskToneTokens(tone);
-  const { stdout } = useStdout();
-  const width = Math.max(24, Math.min((stdout?.columns ?? 120) - 4, 120));
-  const topRule = "═".repeat(width);
-  const bottomRule = "─".repeat(Math.max(18, width - 8));
+}) => {
+  const toneColor = getDeskToneColor(tone);
 
   return (
-    <Box flexDirection="column" width="100%">
-      <Text color={tokens.border}>{topRule}</Text>
-      {(title || subtitle) && (
-        <Box marginBottom={1} flexWrap="wrap">
-          {title && (
-            <Text color={tokens.label} bold>
-              {title.toUpperCase()}
-            </Text>
-          )}
-          {subtitle && (
-            <Text color={COLORS.DIM}>
-              {title ? " · " : ""}
-              {subtitle}
-            </Text>
-          )}
-        </Box>
-      )}
-      {children}
-      <Box marginTop={1}>
-        <Text color={tokens.border}>{bottomRule}</Text>
+    <DeskPanel eyebrow="Interlock" title={title} subtitle={subtitle} tone={tone} compact>
+      <Box flexDirection="column">
+        <Text color={toneColor}>{"=".repeat(18)}</Text>
+        {children}
       </Box>
-    </Box>
+    </DeskPanel>
   );
-}
+};
 
-export default DeskRail;

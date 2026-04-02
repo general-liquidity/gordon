@@ -1,7 +1,8 @@
 import React from "react";
 import { Box, Text } from "ink";
+
 import { COLORS } from "../../theme.ts";
-import { getDeskToneTokens, type DeskTone } from "./DeskPanel.tsx";
+import { type DeskTone, getDeskToneColor } from "./DeskPanel.tsx";
 
 interface BlotterRowProps {
   label: string;
@@ -10,37 +11,24 @@ interface BlotterRowProps {
   tone?: DeskTone;
 }
 
-export function BlotterRow({
+export const BlotterRow: React.FC<BlotterRowProps> = ({
   label,
   value,
   detail,
-  tone = "neutral",
-}: BlotterRowProps): React.ReactElement {
-  const tokens = getDeskToneTokens(tone);
-
+  tone = "muted",
+}) => {
   return (
-    <Box flexDirection="column" marginBottom={1}>
-      <Box>
-        <Text color={tokens.accent} bold>
-          ■
-        </Text>
-        <Text color={tokens.label} bold>
-          {" "}{label.toUpperCase()}
-        </Text>
-        <Text color={COLORS.DIM}> / </Text>
-        <Text color={COLORS.WHITE}>
-          {value}
-        </Text>
-      </Box>
-      {detail && (
-        <Box marginLeft={2}>
-          <Text color={COLORS.DIM}>
-            {detail}
-          </Text>
-        </Box>
-      )}
+    <Box gap={1}>
+      <Text color={COLORS.BRASS_DIM}>{label.toUpperCase()}</Text>
+      <Text color={COLORS.DIM}>/</Text>
+      <Text color={getDeskToneColor(tone)}>{value}</Text>
+      {detail ? (
+        <>
+          <Text color={COLORS.DIM}>/</Text>
+          <Text color={COLORS.DIM}>{detail}</Text>
+        </>
+      ) : null}
     </Box>
   );
-}
+};
 
-export default BlotterRow;

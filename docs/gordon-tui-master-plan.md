@@ -224,12 +224,15 @@ The closest useful references are:
 - Claude Code for fluency, progressive action, and composability
 - ticker for market tables and watchlist discipline
 - CLI Trader for the command -> strategize -> approve -> execute loop
+- Charmbracelet's modern TUI stack for operator prompts, markdown rendering, layout discipline, table/viewports, and terminal-capability handling
 - Karpathy's agent-native CLI thesis and `fintool` for financial capabilities exposed through agent-usable command surfaces
 - Evangelion screen graphics for interlock grammar, warning semantics, and typographic authority
 - donut-math style ASCII rendering for startup motion philosophy, adapted into a Gordon-specific orbital identity
 - Pi / `pi-tui` for custom full-screen terminal interaction architecture
 - k9s / lazygit / hledger-ui for focused panes, drill-downs, and high-signal operator ergonomics
 - OpenTUI / Rezi for render ambition, overlays, and list stability
+- Hatchet's "TUIs are easy now" article for the development loop, reference-driven iteration, and visual validation discipline
+- `CLI-Anything` for REPL + subcommand duality, machine-readable contracts, and agent-friendly command surfaces
 - CLIG / cli-guidelines for command behavior, help, output contracts, and error semantics
 
 ### Gordon thesis
@@ -855,6 +858,20 @@ Every Gordon command surface should follow these rules where applicable.
 - exported artifacts should be script-friendly
 - commands should be pipeline-safe where feasible
 - machine-readable output should be deterministic and stable enough for agents to depend on
+- interactive REPL behavior and explicit subcommands should share the same command grammar where possible
+- command discovery should be available from both the conversational prompt path and explicit command trees
+
+#### Agent-facing command contract
+
+Gordon should borrow the useful parts of `CLI-Anything` without copying its product form.
+
+That means:
+
+- keep both REPL-style and explicit subcommand entrypaths available
+- make command trees discoverable without collapsing the product into a raw help maze
+- prefer stable machine-readable response shapes for agent-facing non-TUI flows
+- let the human operator stay in the TUI while agents can still call equivalent command surfaces directly
+- ensure setup, diagnostics, export, and automation flows are callable as proper commands outside the fullscreen shell
 
 ### 9.2 Approvals and safety
 
@@ -1235,9 +1252,18 @@ Additional framework references reviewed:
 
 - `https://github.com/vadimdemedes/ink`
 - `https://github.com/vadimdemedes/ink-ui`
+- `https://github.com/charmbracelet/gum`
+- `https://github.com/charmbracelet/glow`
+- `https://github.com/charmbracelet/lipgloss`
+- `https://github.com/charmbracelet/bubbletea`
+- `https://github.com/charmbracelet/bubbles`
+- `https://github.com/charmbracelet/ultraviolet`
+- `https://github.com/charmbracelet/colorprofile`
 - `https://github.com/nberlette/tui`
 - `https://github.com/semos-labs/glyph`
 - `https://github.com/badlogic/pi-mono`
+- `https://hatchet.run/blog/tuis-are-easy-now`
+- `https://github.com/HKUDS/CLI-Anything`
 - `https://github.com/second-state/fintool`
 - Evangelion interface / screen-graphics studies
 - `https://www.a1k0n.net/2011/07/20/donut-math.html`
@@ -1290,6 +1316,81 @@ Where Gordon should not let it define the product:
 Reason:
 
 Ink UI provides polished commodity controls, but if it becomes the dominant grammar, Gordon risks looking like a generic developer CLI instead of a trading-native terminal.
+
+### Charmbracelet stack
+
+The Charmbracelet stack should influence Gordon heavily, but selectively and by layer.
+
+#### `gum`
+
+Use as a reference for:
+
+- setup and onboarding prompts
+- lightweight confirmations
+- credential and environment bootstrap flows
+- temporary operator prompts outside the main cockpit
+
+Do not use it as the primary grammar for the fullscreen shell.
+
+#### `glow`
+
+Use as a reference for:
+
+- markdown playbooks
+- research notes
+- export previews
+- help, runbook, and report rendering inside overlays or side panes
+
+This strengthens the case for a dedicated markdown/document primitive inside Gordon rather than treating longform content as transcript text.
+
+#### `lipgloss`
+
+Use as a reference for:
+
+- typography hierarchy
+- spacing rhythm
+- border restraint
+- adaptive layout discipline
+- consistent token styling
+
+This is a design-system reference, not a reason to move Gordon away from React / Ink.
+
+#### `bubbletea` and `bubbles`
+
+Use as references for:
+
+- explicit state machines per workspace
+- table, list, help, and viewport behavior
+- pane-local keymaps
+- model/view/update clarity
+- deterministic workspace-local interaction
+
+These are especially relevant to `Market`, `Monitor`, and `Lab`, where the user should feel focused list/detail control rather than generic component stacking.
+
+#### `ultraviolet`
+
+Use as a render-ambition reference for:
+
+- cell-diffing discipline
+- atomic redraw expectations
+- stable geometry under rapid updates
+- motion without terminal corruption
+
+This raises the bar for how Gordon should use Ink rather than introducing a new runtime today.
+
+#### `colorprofile`
+
+Use as the reference for terminal capability handling:
+
+- degrade color safely
+- avoid unreadable palettes on weaker terminals
+- adapt warnings, emphasis, and semantic color tokens to actual terminal support
+- keep Gordon legible in low-color and no-color environments
+
+The net result:
+
+- Charmbracelet is not a migration target
+- it is a strong reference family for prompt flows, markdown surfaces, layout discipline, state machines, redraw quality, and terminal compatibility
 
 ### nberlette/tui
 
@@ -1382,14 +1483,49 @@ What this changes for Gordon:
 - it strengthens the case for approval overlays, setup dialogs, compare dialogs, and future session-tree navigation
 - it also raises the bar for render stability expectations inside Ink
 
+### Hatchet development loop
+
+Hatchet's "TUIs are easy now" article is not a product-shape reference.
+It is an implementation-discipline reference.
+
+What Gordon should take from it:
+
+- build the fullscreen shell as a small set of deterministic views
+- iterate visually and frequently instead of overabstracting before seeing the terminal
+- validate layouts and copy in real terminal sessions, not only in tests
+- treat capture / tmux / screenshot review as part of the design loop
+- keep view modules small enough that replacing a surface is cheap
+
+This matters because Gordon is being rebuilt from scratch; the implementation loop should stay reference-driven and terminal-observed, not purely theoretical.
+
+### CLI-Anything
+
+`CLI-Anything` is not a UI reference.
+It is a command-contract reference.
+
+What Gordon should take from it:
+
+- keep a real CLI surface outside the fullscreen TUI
+- support agent-friendly command discovery and structured outputs
+- preserve parity between interactive and scriptable paths where practical
+- let automation invoke the same capability families without the cockpit being mandatory
+
+What Gordon should avoid:
+
+- turning the product into a raw command tree with no strong cockpit identity
+- weakening the fullscreen trading terminal just to satisfy generic CLI symmetry
+
 ### Final framework stance
 
 - keep Ink as the primary renderer
 - use Ink features more deeply
 - adopt Ink UI only for commodity operator controls and overlays
+- use Charmbracelet projects as reference libraries for prompt flows, markdown panes, layout rules, state machines, render ambition, and terminal color handling
 - keep `nberlette/tui` as a future reference, not the current implementation target
 - treat `Glyph` as the primary alternative-engine benchmark if Ink still underdelivers after the reset
 - treat Pi as the primary interaction-architecture benchmark for overlays, command-bar replacement, and session-tree style recoverability
+- treat Hatchet as the implementation-discipline reference for how the rebuild is executed and visually validated
+- treat `CLI-Anything` as the reference for agent-friendly command contracts and REPL/subcommand duality
 - treat agent-friendly finance CLIs such as `fintool` as ecosystem-pattern references, not as visual references
 - treat Evangelion screen graphics as the reference for interlock grammar and state signaling, not layout skeleton
 - treat donut-math style ASCII rendering as the reference for startup / transition motion, not persistent workspace chrome
@@ -1478,6 +1614,8 @@ Build:
 - compare overlay
 - approval review overlay
 - export overlay
+- markdown / runbook / research overlay
+- setup and environment prompt flows
 
 ### Phase 8: Perf and stability
 
@@ -1485,6 +1623,8 @@ Build:
 - scroll isolation
 - table redraw tuning
 - log compaction
+- terminal capability-aware color and emphasis degradation
+- visual validation in real terminal sessions before each shell tranche closes
 
 ### Phase 9: Identity motion and onboarding polish
 

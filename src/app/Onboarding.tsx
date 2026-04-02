@@ -1,90 +1,70 @@
-import React from "react";
-import { Box, Text } from "ink";
-import { FocusSelect } from "./components/PromptPrimitives.tsx";
-import { COLORS } from "./theme.ts";
+import React, { useState } from "react";
+import { Box, Text, useInput } from "ink";
+
 import type { OnboardingSelection } from "./setup-flow.ts";
+import { COLORS } from "./theme.ts";
 import { DeskPanel } from "./components/desk/DeskPanel.tsx";
-import { TicketCard } from "./components/desk/TicketCard.tsx";
-import { WelcomeBanner } from "./WelcomeBanner.tsx";
 
-interface OnboardingProps {
-  onComplete: (selection: OnboardingSelection) => void;
-}
+const OPTIONS: OnboardingSelection[] = [
+  { mode: "quickstart" },
+  { mode: "advanced" },
+  { mode: "demo" },
+];
 
-export function Onboarding({ onComplete }: OnboardingProps): React.ReactElement {
+const COPY: Record<OnboardingSelection["mode"], { title: string; detail: string }> = {
+  quickstart: { title: "Quickstart", detail: "Fast operator bootstrap with sane defaults." },
+  advanced: { title: "Advanced setup", detail: "Walk venues, rails, MCP, and preferences deliberately." },
+  demo: { title: "Demo mode", detail: "Skip setup and open a read-only desk." },
+};
+
+export const Onboarding: React.FC<{
+  onComplete: (selection: OnboardingSelection) => void | Promise<void>;
+}> = ({ onComplete }) => {
+  const [selectedIndex, setSelectedIndex] = useState(0);
+
+  useInput((input, key) => {
+    if (key.upArrow) setSelectedIndex((current) => (current - 1 + OPTIONS.length) % OPTIONS.length);
+    else if (key.downArrow) setSelectedIndex((current) => (current + 1) % OPTIONS.length);
+    else if (key.return) void onComplete(OPTIONS[selectedIndex]!);
+    else if (/^[1-3]$/u.test(input)) {
+      const index = Number.parseInt(input, 10) - 1;
+      if (OPTIONS[index]) {
+        setSelectedIndex(index);
+        void onComplete(OPTIONS[index]!);
+      }
+    }
+  });
+
   return (
-    <Box flexDirection="column" paddingX={2} paddingY={1}>
-      <WelcomeBanner mode="quiet" context="welcome" />
-
-      <Box marginTop={1}>
+    <Box flexGrow={1} justifyContent="center" alignItems="center">
+      <Box width={84}>
         <DeskPanel
-          eyebrow="Open The Desk"
-          title="Choose how Gordon should come online"
-          subtitle="Start with first value, full infrastructure, or a clean read-only demo."
+          eyebrow="Onboarding"
+          title="Choose the initial route"
+          subtitle="This only decides the first operating path. Gordon stays reversible."
           tone="brand"
         >
-          <Text color={COLORS.WHITE}>
-            Gordon should get you to trading value quickly, then widen the surface safely.
-          </Text>
-          <Text color={COLORS.DIM}>
-            Re-run setup later with `gordon configure`. Inspect the machine with `gordon doctor`.
-          </Text>
+          {OPTIONS.map((option, index) => {
+            const active = index === selectedIndex;
+            const copy = COPY[option.mode];
+            return (
+              <Box
+                key={option.mode}
+                borderStyle="single"
+                borderColor={active ? COLORS.BRASS : COLORS.BRASS_DIM}
+                paddingX={1}
+                marginBottom={1}
+              >
+                <Text color={active ? COLORS.BRASS : COLORS.WHITE}>
+                  {active ? ">" : " "} {index + 1}. {copy.title}
+                  <Text color={COLORS.DIM}> · {copy.detail}</Text>
+                </Text>
+              </Box>
+            );
+          })}
+          <Text color={COLORS.DIM}>Use arrows or 1-3. Enter commits the route.</Text>
         </DeskPanel>
-      </Box>
-
-      <Box flexDirection="column" marginTop={1}>
-        <Box marginBottom={1}>
-          <TicketCard
-            eyebrow="QuickStart"
-            title="Open a read-only desk fast"
-            subtitle="One model, then straight into scan, analysis, and planning."
-            tone="info"
-          >
-            <Text color={COLORS.DIM}>
-              Best when you want first market value in minutes.
-            </Text>
-          </TicketCard>
-        </Box>
-        <Box marginBottom={1}>
-          <TicketCard
-            eyebrow="Advanced"
-            title="Provision the full desk"
-            subtitle="Brokers, chains, rails, MCP, and the full provider surface."
-            tone="brand"
-          >
-            <Text color={COLORS.DIM}>
-              Best when you already know the stack you want to wire.
-            </Text>
-          </TicketCard>
-        </Box>
-        <Box marginBottom={1}>
-          <TicketCard
-            eyebrow="Demo"
-            title="Enter with no credentials"
-            subtitle="Read-only mode for exploring the shell, workflows, and operator surfaces."
-            tone="analysis"
-          >
-            <Text color={COLORS.DIM}>
-              Best when you want to feel the product before committing anything.
-            </Text>
-          </TicketCard>
-        </Box>
-      </Box>
-
-      <Box marginTop={1}>
-        <FocusSelect
-          title="Choose the desk opening"
-          hint="Use the arrow keys to move fast. You can widen or reconfigure the desk later."
-          options={[
-            { label: "QuickStart", value: "quickstart" },
-            { label: "Advanced setup", value: "advanced" },
-            { label: "Demo mode", value: "demo" },
-          ]}
-          onChange={(value) => onComplete({ mode: value as OnboardingSelection["mode"] })}
-        />
       </Box>
     </Box>
   );
-}
-
-export default Onboarding;
+};

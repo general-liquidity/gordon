@@ -1,111 +1,67 @@
 import React from "react";
-import { Box } from "ink";
-import SurfaceFrame from "../components/workspace/SurfaceFrame.tsx";
-import TicketSheet from "../components/workspace/TicketSheet.tsx";
-import ApprovalDrawer from "../components/workspace/ApprovalDrawer.tsx";
-import DetailPane from "../components/workspace/DetailPane.tsx";
-import DataTable from "../components/workspace/DataTable.tsx";
-import type { PlanWorkspaceSurfaceModel } from "../workspaceSurfaces.ts";
+import { Box, Text } from "ink";
 
-interface PlanWorkspaceProps {
-  model: PlanWorkspaceSurfaceModel;
-  selectedSectionIndex?: number;
-}
+import type { PlanCockpitModel } from "../cockpitModels.ts";
+import { CockpitLines } from "../components/cockpit/CockpitLines.tsx";
+import { CockpitTable } from "../components/cockpit/CockpitTable.tsx";
+import { COLORS } from "../theme.ts";
+import { TicketCard } from "../components/desk/TicketCard.tsx";
+import { DeskPanel, getDeskToneColor } from "../components/desk/DeskPanel.tsx";
 
-export function PlanWorkspace({
-  model,
-  selectedSectionIndex = 0,
-}: PlanWorkspaceProps): React.ReactElement {
-  const ticketSelected = selectedSectionIndex === 0;
-  const approvalSelected = selectedSectionIndex === 1;
-  const riskSelected = selectedSectionIndex === 2;
-  const bookSelected = selectedSectionIndex === 3;
-
-  return (
-    <Box flexDirection="column" marginX={1} marginBottom={1}>
-      <SurfaceFrame
-        eyebrow="Plan Mandate"
-        title={model.title}
-        subtitle={model.subtitle}
-        tone="brand"
+export const PlanWorkspace: React.FC<{
+  model: PlanCockpitModel;
+}> = ({ model }) => (
+  <Box gap={1}>
+    <Box flexGrow={1} flexDirection="column">
+      <TicketCard eyebrow="Ticket" title={model.ticket.title} subtitle={model.ticket.subtitle} tone="brand">
+        {model.ticket.emptyTitle ? (
+          <>
+            <Text color={COLORS.WHITE}>{model.ticket.emptyTitle}</Text>
+            <Text color={COLORS.DIM}>{model.ticket.emptyDetail}</Text>
+          </>
+        ) : (
+          <>
+            <Text color={COLORS.BRASS}>{model.ticket.status}</Text>
+            {model.ticket.thesis ? <Text color={COLORS.WHITE}>{model.ticket.thesis}</Text> : null}
+            {model.ticket.metrics.map((metric) => (
+              <Text key={metric.label} color={getDeskToneColor(metric.tone ?? "neutral")}>
+                {metric.label}
+                <Text color={COLORS.DIM}> · {metric.value}</Text>
+              </Text>
+            ))}
+            {model.ticket.ladder.map((line) => (
+              <Text key={line} color={COLORS.DIM}>{line}</Text>
+            ))}
+          </>
+        )}
+      </TicketCard>
+      <CockpitLines
+        eyebrow="Risk"
+        title={model.risk.title}
+        subtitle={model.risk.subtitle}
+        lines={model.risk.lines}
+        tone="warning"
       />
-
-      <Box marginTop={1} flexDirection="row">
-        <Box flexDirection="column" width="64%" paddingRight={1}>
-          <SurfaceFrame
-            eyebrow="Ticket Sheet"
-            title={model.ticket.title}
-            subtitle={model.ticket.subtitle}
-            tone={model.ticket.tone}
-            selected={ticketSelected}
-            actions={model.ticket.actions}
-          >
-            <TicketSheet ticket={model.ticket} />
-          </SurfaceFrame>
-
-          <Box marginTop={1}>
-            <SurfaceFrame
-              eyebrow="Risk Ladder"
-              title={model.risk.title}
-              subtitle={model.risk.subtitle}
-              tone={model.risk.tone}
-              selected={riskSelected}
-              actions={model.risk.actions}
-            >
-              <DetailPane rows={model.risk.rows} />
-            </SurfaceFrame>
-          </Box>
-        </Box>
-
-        <Box flexDirection="column" width="36%">
-          <SurfaceFrame
-            eyebrow="Approval Drawer"
-            title={model.approvals.title}
-            subtitle={model.approvals.subtitle}
-            tone={model.approvals.tone}
-            selected={approvalSelected}
-            actions={model.approvals.actions}
-          >
-            <ApprovalDrawer approval={model.approvals} />
-          </SurfaceFrame>
-
-          <Box marginTop={1}>
-            <SurfaceFrame
-              eyebrow="Plan Book"
-              title={model.book.title}
-              subtitle={model.book.subtitle}
-              tone={model.book.tone}
-              selected={bookSelected}
-              actions={model.book.actions}
-            >
-              <DataTable
-                columns={[
-                  { key: "symbol", label: "Symbol" },
-                  { key: "status", label: "Status" },
-                  { key: "strategy", label: "Strategy" },
-                  { key: "allocation", label: "Alloc", align: "right" },
-                  { key: "entry", label: "Entry", align: "right" },
-                ]}
-                rows={model.book.rows.map((row) => ({
-                  id: row.planId,
-                  tone: row.tone,
-                  values: {
-                    symbol: row.symbol,
-                    status: row.status,
-                    strategy: row.strategy,
-                    allocation: row.allocation,
-                    entry: row.entry,
-                  },
-                }))}
-                emptyTitle="No stored tickets yet"
-                emptyDetail="Create a plan and Gordon will keep it here for review and execution."
-              />
-            </SurfaceFrame>
-          </Box>
-        </Box>
-      </Box>
     </Box>
-  );
-}
-
-export default PlanWorkspace;
+    <Box width={44} flexDirection="column">
+      <DeskPanel eyebrow="Approval" title={model.approvals.title} subtitle={model.approvals.subtitle} tone="warning">
+        <Text color={COLORS.WHITE}>mode <Text color={COLORS.DIM}>{model.approvals.mode}</Text></Text>
+        <Text color={COLORS.WHITE}>route <Text color={COLORS.DIM}>{model.approvals.route}</Text></Text>
+        {model.approvals.rows.length > 0 ? model.approvals.rows.map((row) => (
+          <Text key={row.id} color={getDeskToneColor(row.tone ?? "warning")}>
+            {row.id}
+            <Text color={COLORS.DIM}> · {row.tool} · {row.summary}</Text>
+          </Text>
+        )) : <Text color={COLORS.DIM}>No blocking approvals</Text>}
+      </DeskPanel>
+      <CockpitTable
+        eyebrow="Book"
+        title={model.book.title}
+        subtitle={model.book.subtitle}
+        headers={model.book.headers}
+        rows={model.book.rows}
+        tone="analysis"
+      />
+    </Box>
+  </Box>
+);

@@ -172,6 +172,14 @@ This section answers the question about repos, frameworks, and websites.
 | `CLI Trader` | website / product | Covered | command -> strategize -> approve -> execute loop, personal software thesis, one-interface-many-markets, non-technical onboarding, process-quality discipline | strong |
 | `OpenTUI` | GitHub repo | Covered | rendering ambition, overlays, pane stability | medium |
 | `Rezi` | GitHub repo | Covered | dynamic/stable TUI discipline | medium |
+| `gum` | GitHub repo | Covered | setup/bootstrap prompt flows and lightweight operator confirmations | medium |
+| `glow` | GitHub repo | Covered | markdown document rendering for runbooks, reports, and playbooks | medium |
+| `lipgloss` | GitHub repo | Covered | layout discipline, spacing rhythm, border restraint, terminal typography hierarchy | medium |
+| `bubbletea` / `bubbles` | GitHub repos | Covered | state-machine workspaces, table/list/help/viewport behavior, pane-local keymaps | strong |
+| `ultraviolet` | GitHub repo | Covered | render ambition, cell-diffing expectations, atomic redraw quality | medium |
+| `colorprofile` | GitHub repo | Covered | terminal capability and graceful color degradation discipline | medium |
+| Hatchet "TUIs are easy now" | article | Covered | implementation loop, reference-driven iteration, tmux/capture visual validation | medium |
+| `CLI-Anything` | GitHub repo | Covered | REPL + subcommand duality, agent-friendly CLI contracts, structured command parity outside the cockpit | medium |
 | `clig.dev` / `cli-guidelines` | guideline site / repo | Covered | command behavior, help, output contracts, error semantics, machine-readable CLI rules | strong |
 | Karpathy "Build for Agents" CLI thesis | post / article cluster | Covered | agent-native CLI / MCP / markdown product-access model | strong |
 | `fintool` | GitHub repo | Covered | agent-friendly financial CLI ecosystem contract | medium |
@@ -201,6 +209,12 @@ What is **not** true:
 
 - that every linked repo from the giant lists was exhaustively reviewed
 - that every listed framework or TUI library was individually incorporated
+
+What **is** true after the latest planning pass:
+
+- the final planning set now explicitly incorporates the Charmbracelet stack as reference material
+- the Hatchet article is used as an implementation-discipline reference
+- `CLI-Anything` is used as a command-contract reference
 
 So the reference coverage is:
 
