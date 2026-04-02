@@ -1,4 +1,5 @@
 import type { Mode } from "../types/index.ts";
+import type { WorkspaceId } from "./state/AppStore.ts";
 
 export type LegacyCommandCategory = "trading" | "market" | "account" | "system" | "strategy";
 export type CommandLevel = 1 | 2 | 3;
@@ -32,6 +33,7 @@ export interface CommandUxMetadata {
 
 export interface QuickActionContext {
   mode: Mode;
+  workspace: WorkspaceId;
   setupComplete: boolean;
   hasExchange: boolean;
   hasBroker: boolean;
@@ -276,6 +278,46 @@ export function getQuickActionItems(context: QuickActionContext): QuickActionIte
       { label: "Configure", command: "/configure advanced", workflow: "operate" },
     ];
     return setupActions.slice(0, 5);
+  }
+
+  switch (context.workspace) {
+    case "market":
+      return [
+        { label: "Scan", command: "/scan", workflow: "discover" },
+        { label: "Trending", command: "/trending", workflow: "discover" },
+        { label: "Analyze", command: "/analyze BTC", workflow: "analyze" },
+        { label: "Regime", command: "/regime", workflow: "discover" },
+        { label: "DD", command: "/workflow dd BTC", workflow: "analyze" },
+      ];
+    case "plan":
+      return [
+        { label: "Plan", command: "/plan BTC", workflow: "trade" },
+        { label: "Preview", command: "/preview-order", workflow: "trade" },
+        { label: "Orders", command: "/orders", workflow: "accounts" },
+        { label: "Positions", command: "/positions", workflow: "accounts" },
+        context.hasWalletRails
+          ? { label: "Fund", command: "/fund quote", workflow: "trade" }
+          : { label: "Portfolio", command: "/portfolio", workflow: "accounts" },
+      ];
+    case "lab":
+      return [
+        { label: "Strategies", command: "/strategies", workflow: "run" },
+        { label: "Generate", command: "/gen trend strategy for ETH", workflow: "run" },
+        { label: "Playbooks", command: "/strategy playbooks", workflow: "run" },
+        { label: "Backtest", command: "/workflow backtest-cycle sma_crossover BTCUSDT", workflow: "run" },
+        { label: "Running", command: "/strategy running", workflow: "run" },
+      ];
+    case "monitor":
+      return [
+        { label: "Portfolio", command: "/portfolio", workflow: "accounts" },
+        { label: "Positions", command: "/positions", workflow: "accounts" },
+        { label: "Orders", command: "/orders", workflow: "accounts" },
+        { label: "Runtime", command: "/runtime-state", workflow: "operate" },
+        { label: "Health", command: "/health", workflow: "operate" },
+      ];
+    case "desk":
+    default:
+      break;
   }
 
   const actions: QuickActionItem[] = [

@@ -22,12 +22,14 @@ function formatApprovalTicketContent(approval: RuntimeApprovalRequest, shortId: 
   ].filter(Boolean);
 
   const lines = [
-    `Approval required before Gordon can act on \`${approval.toolName}\`.`,
+    `Approval required before Gordon can route \`${approval.toolName}\`.`,
     detailParts.length > 0 ? detailParts.join(" · ") : null,
     approval.reason ? approval.reason : null,
     "",
     `Approve: \`approve ${shortId}\` or \`/runtime-approve ${shortId}\``,
+    `Persist: \`approve ${shortId} persist\``,
     `Deny: \`deny ${shortId} reason\``,
+    `Persist deny: \`deny ${shortId} persist reason\``,
   ].filter((line): line is string => Boolean(line));
 
   return lines.join("\n");

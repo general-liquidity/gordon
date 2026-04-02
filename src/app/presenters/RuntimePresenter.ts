@@ -14,8 +14,13 @@ export interface RuntimeInspectorViewModel {
   backgroundTaskCount: number;
   pendingApprovalCount: number;
   recentApprovalCount: number;
+  approvalRuleCount: number;
   pendingApprovals: RuntimeApprovalRequest[];
   pluginCount: number;
+  degradedPluginCount: number;
+  reloadRecommendedCount: number;
+  routedPluginCount: number;
+  pluginAttentionCount: number;
   mcpServerCount: number;
   registeredToolCount: number;
   commandCount: number;
@@ -52,7 +57,8 @@ export function createRuntimeInspectorViewModel(
   const hasActionableRail =
     state.approvals.pending.length > 0
     || state.background.tasks.length > 0
-    || state.bridge.active.length > 0;
+    || state.bridge.active.length > 0
+    || state.tooling.plugins.some((plugin) => plugin.attentionLevel && plugin.attentionLevel !== "none");
 
   return {
     sessionId: state.session.sessionId,
@@ -64,8 +70,13 @@ export function createRuntimeInspectorViewModel(
     backgroundTaskCount: state.background.tasks.length,
     pendingApprovalCount: state.approvals.pending.length,
     recentApprovalCount: state.approvals.recent.length,
+    approvalRuleCount: state.approvals.rules.length,
     pendingApprovals: state.approvals.pending.slice(0, maxItems),
     pluginCount: state.tooling.plugins.length,
+    degradedPluginCount: state.tooling.plugins.filter((plugin) => plugin.status === "degraded").length,
+    reloadRecommendedCount: state.tooling.plugins.filter((plugin) => plugin.reloadRecommended).length,
+    routedPluginCount: state.tooling.plugins.filter((plugin) => plugin.lifecycle === "routed").length,
+    pluginAttentionCount: state.tooling.plugins.filter((plugin) => plugin.attentionLevel && plugin.attentionLevel !== "none").length,
     mcpServerCount: state.tooling.mcpServers.length,
     registeredToolCount: runtime.getRegisteredTools().length,
     commandCount: state.tooling.commands.length,
@@ -100,8 +111,8 @@ export function formatRuntimeInspectorSummary(viewModel: RuntimeInspectorViewMod
     `Transcript entries: ${viewModel.transcriptEntryCount}`,
     `Compactions: ${viewModel.compactionCount}`,
     `Background tasks: ${viewModel.backgroundTaskCount}`,
-    `Pending approvals: ${viewModel.pendingApprovalCount} · Recent approvals: ${viewModel.recentApprovalCount}`,
-    `Plugins: ${viewModel.pluginCount} · MCP servers: ${viewModel.mcpServerCount} · Tools: ${viewModel.registeredToolCount} · Commands: ${viewModel.commandCount}`,
+    `Pending approvals: ${viewModel.pendingApprovalCount} · Recent approvals: ${viewModel.recentApprovalCount} · Rules: ${viewModel.approvalRuleCount}`,
+    `Plugins: ${viewModel.pluginCount} · attention ${viewModel.pluginAttentionCount} · routed ${viewModel.routedPluginCount} · reload suggested ${viewModel.reloadRecommendedCount} · MCP servers: ${viewModel.mcpServerCount} · Tools: ${viewModel.registeredToolCount} · Commands: ${viewModel.commandCount}`,
     `Routing configs: ${viewModel.routingCount} · Hot reload: ${viewModel.toolingHotReloadEnabled ? "on" : "off"}${viewModel.toolingLastReloadAt ? ` · last reload ${viewModel.toolingLastReloadAt}` : ""}`,
     `Remote runtime: ${viewModel.remoteConnectionStatus}${viewModel.remoteDetail ? ` (${viewModel.remoteDetail})` : ""} · Bridge sessions: ${viewModel.activeBridgeSessions}`,
     `Permission scopes: ${viewModel.permissionScopes.length > 0 ? viewModel.permissionScopes.join(", ") : "none"}`,
@@ -121,7 +132,7 @@ export function formatRuntimeInspectorSummary(viewModel: RuntimeInspectorViewMod
     lines.push("", "**Plugin lifecycle**");
     for (const plugin of viewModel.recentPlugins) {
       lines.push(
-        `- ${plugin.name} · ${plugin.status ?? "unknown"} · ${plugin.lifecycle ?? "mcp"}${plugin.defaultAgent ? ` · ${plugin.defaultAgent}` : ""}${plugin.integrationCommands && plugin.integrationCommands.length > 0 ? ` · ${plugin.integrationCommands.join(", ")}` : ""}`,
+        `- ${plugin.name} · ${plugin.status ?? "unknown"} · ${plugin.lifecycle ?? "mcp"}${plugin.defaultAgent ? ` · ${plugin.defaultAgent}` : ""}${plugin.attentionReasons && plugin.attentionReasons.length > 0 ? ` · ${plugin.attentionReasons.join(", ")}` : ""}${plugin.integrationCommands && plugin.integrationCommands.length > 0 ? ` · ${plugin.integrationCommands.join(", ")}` : ""}`,
       );
     }
   }

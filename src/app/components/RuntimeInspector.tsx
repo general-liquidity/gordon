@@ -4,6 +4,7 @@ import { COLORS } from "../theme.ts";
 import type { RuntimeInspectorViewModel } from "../presenters/RuntimePresenter.ts";
 import { DeskPanel } from "./desk/DeskPanel.tsx";
 import { BlotterRow } from "./desk/BlotterRow.tsx";
+import { getRuntimeApprovalShortId } from "../runtimeApprovalId.ts";
 
 interface RuntimeInspectorProps {
   inspector: RuntimeInspectorViewModel | null;
@@ -23,6 +24,7 @@ export function RuntimeInspector({ inspector }: RuntimeInspectorProps): React.Re
   const showRecentFlow =
     inspector.recentHandoffs.length > 0
     || inspector.recentBridge.length > 0;
+  const showApprovalDesk = inspector.pendingApprovalCount > 0;
 
   return (
     <Box flexDirection="column" marginX={1} marginBottom={1}>
@@ -41,9 +43,22 @@ export function RuntimeInspector({ inspector }: RuntimeInspectorProps): React.Re
         <BlotterRow
           label="Queue"
           value={`Background ${inspector.backgroundTaskCount} · Pending approvals ${inspector.pendingApprovalCount}`}
-          detail={`Recent approvals ${inspector.recentApprovalCount} · Bridge ${inspector.activeBridgeSessions}`}
+          detail={`Rules ${inspector.approvalRuleCount} · Recent approvals ${inspector.recentApprovalCount} · Bridge ${inspector.activeBridgeSessions}`}
           tone="info"
         />
+        {(inspector.pendingApprovalCount > 0 || inspector.pluginAttentionCount > 0) && (
+          <BlotterRow
+            label="Focus"
+            value={inspector.pendingApprovalCount > 0
+              ? `Shift+A stage approve · Shift+D stage deny`
+              : `${inspector.pluginAttentionCount} plugin lifecycle item${inspector.pluginAttentionCount === 1 ? "" : "s"} need review`}
+            detail={inspector.pendingApprovalCount > 0
+              ? "Approval shortcuts stage commands into the prompt without mutating state immediately."
+              : "Use /runtime-plugins to inspect lifecycle and routing issues."
+            }
+            tone={inspector.pendingApprovalCount > 0 ? "warning" : "brand"}
+          />
+        )}
         <BlotterRow
           label="Runtime"
           value={`${inspector.remoteConnectionStatus}${inspector.remoteDetail ? ` · ${inspector.remoteDetail}` : ""}`}
@@ -51,12 +66,44 @@ export function RuntimeInspector({ inspector }: RuntimeInspectorProps): React.Re
           tone="operate"
         />
       </DeskPanel>
+      {showApprovalDesk && (
+        <Box marginTop={1}>
+          <DeskPanel
+            eyebrow="Approval Desk"
+            title={`${inspector.pendingApprovalCount} pending approval${inspector.pendingApprovalCount === 1 ? "" : "s"}`}
+            subtitle="Review the blocking request, then approve or deny from the prompt."
+            tone="warning"
+            compact
+          >
+            {inspector.pendingApprovals.map((approval) => {
+              const shortId = getRuntimeApprovalShortId(approval.id);
+              return (
+                <BlotterRow
+                  key={approval.id}
+                  label={shortId}
+                  value={`${approval.toolName} · ${approval.riskClass} risk · ${approval.sideEffectLevel}`}
+                  detail={`${approval.reason ?? "approval required"} · approve ${shortId} · deny ${shortId} reason`}
+                  tone="warning"
+                />
+              );
+            })}
+            <Box marginTop={1}>
+              <Text color={COLORS.DIM}>
+                Persist:
+              </Text>
+              <Text color={COLORS.WHITE}>
+                {" "}approve &lt;id&gt; persist · deny &lt;id&gt; persist reason
+              </Text>
+            </Box>
+          </DeskPanel>
+        </Box>
+      )}
       {showToolingPanel && (
         <Box marginTop={1}>
           <DeskPanel
             eyebrow="Desk Tooling"
             title="Plugins, MCP, and Commands"
-            subtitle={`Plugins ${inspector.pluginCount} · MCP ${inspector.mcpServerCount} · Tools ${inspector.registeredToolCount} · Commands ${inspector.commandCount}`}
+            subtitle={`Plugins ${inspector.pluginCount} · attention ${inspector.pluginAttentionCount} · routed ${inspector.routedPluginCount} · reload ${inspector.reloadRecommendedCount} · MCP ${inspector.mcpServerCount} · Tools ${inspector.registeredToolCount} · Commands ${inspector.commandCount}`}
             tone="brand"
             compact
           >
@@ -71,8 +118,8 @@ export function RuntimeInspector({ inspector }: RuntimeInspectorProps): React.Re
                     key={plugin.id}
                     label={plugin.name}
                     value={`${plugin.status ?? "unknown"} · ${plugin.lifecycle ?? "mcp"}`}
-                    detail={`${plugin.defaultAgent ? `${plugin.defaultAgent} · ` : ""}${plugin.reloadRecommended ? "reload suggested · " : ""}${plugin.integrationCommands && plugin.integrationCommands.length > 0 ? plugin.integrationCommands.join(", ") : "no surfaced commands"}`}
-                    tone="brand"
+                    detail={`${plugin.defaultAgent ? `${plugin.defaultAgent} · ` : ""}${plugin.attentionReasons && plugin.attentionReasons.length > 0 ? `${plugin.attentionReasons.join(", ")} · ` : ""}${plugin.integrationCommands && plugin.integrationCommands.length > 0 ? plugin.integrationCommands.join(", ") : "no surfaced commands"}`}
+                    tone={plugin.attentionLevel === "warning" ? "warning" : "brand"}
                   />
                 ))}
               </Box>

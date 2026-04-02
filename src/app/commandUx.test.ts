@@ -31,6 +31,7 @@ describe("command UX model", () => {
   it("prioritizes setup-oriented quick actions when Gordon is not ready", () => {
     const actions = getQuickActionItems({
       mode: "SAFE",
+      workspace: "desk",
       setupComplete: false,
       hasExchange: false,
       hasBroker: false,
@@ -49,6 +50,7 @@ describe("command UX model", () => {
   it("surfaces funding when rails are configured and the system is ready", () => {
     const actions = getQuickActionItems({
       mode: "SAFE",
+      workspace: "desk",
       setupComplete: true,
       hasExchange: true,
       hasBroker: false,
@@ -57,6 +59,25 @@ describe("command UX model", () => {
 
     expect(actions.map((entry) => entry.command)).toContain("/fund quote");
     expect(actions.map((entry) => entry.command)).toContain("/preview-order");
+  });
+
+  it("switches suggested quick actions with the active workspace", () => {
+    const actions = getQuickActionItems({
+      mode: "SAFE",
+      workspace: "lab",
+      setupComplete: true,
+      hasExchange: true,
+      hasBroker: false,
+      hasWalletRails: false,
+    });
+
+    expect(actions.map((entry) => entry.command)).toEqual([
+      "/strategies",
+      "/gen trend strategy for ETH",
+      "/strategy playbooks",
+      "/workflow backtest-cycle sma_crossover BTCUSDT",
+      "/strategy running",
+    ]);
   });
 
   it("changes quick-start recommendations based on readiness", () => {

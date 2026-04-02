@@ -21,9 +21,113 @@ export type AppView =
   | "menu"
   | "chat";
 
+export type WorkspaceId =
+  | "desk"
+  | "market"
+  | "plan"
+  | "lab"
+  | "monitor";
+
 export interface ConversationMessage {
   role: "user" | "assistant";
   content: string;
+}
+
+export interface PortfolioHoldingSummary {
+  asset: string;
+  amount: number;
+  usdtValue: number;
+  wallet?: string;
+  note?: string;
+}
+
+export interface PortfolioWorkspaceSnapshot {
+  message: string;
+  totalValue: number;
+  availableCash: number;
+  holdings: PortfolioHoldingSummary[];
+  executionTime?: number;
+}
+
+export interface PositionWorkspaceRow {
+  symbol: string;
+  status: string;
+  unrealizedPnl: number;
+  unrealizedPnlPercent: number;
+  minutesOpen: number;
+}
+
+export interface PositionsWorkspaceSnapshot {
+  message: string;
+  count: number;
+  totalUnrealized: number;
+  positions: PositionWorkspaceRow[];
+  alerts: string[];
+}
+
+export interface OrderWorkspaceRow {
+  symbol: string;
+  side: string;
+  type: string;
+  status: string;
+  quantity: number | string;
+  price: number | string;
+  executedQty: number | string;
+}
+
+export interface OrdersWorkspaceSnapshot {
+  message: string;
+  count: number;
+  symbolFilter?: string;
+  orders: OrderWorkspaceRow[];
+}
+
+export interface WorkflowWorkspaceStepSummary {
+  name: string;
+  status: "pending" | "running" | "completed" | "failed" | "skipped";
+  message?: string;
+  duration?: number;
+}
+
+export interface WorkflowWorkspaceSnapshot {
+  workflow: string;
+  success: boolean;
+  summary: string;
+  steps: WorkflowWorkspaceStepSummary[];
+}
+
+export interface WorkspaceMemoryState {
+  market: {
+    focusSymbol?: string;
+    focusWorkflow?: string;
+  };
+  plan: {
+    selectedPlanId?: string;
+    focusSymbol?: string;
+  };
+  lab: {
+    selectedStrategyId?: string;
+    selectedSource?: "built-in" | "generated" | "playbook" | "systematic";
+  };
+  monitor: {
+    focusSection?: "book" | "positions" | "runtime";
+    focusSymbol?: string;
+  };
+}
+
+export interface WorkspaceInteractionState {
+  market: {
+    selectedCardIndex: number;
+  };
+  plan: {
+    selectedCardIndex: number;
+  };
+  lab: {
+    selectedCardIndex: number;
+  };
+  monitor: {
+    selectedCardIndex: number;
+  };
 }
 
 export type QueuedSubmissionKind = "follow-up" | "steer";
@@ -37,6 +141,7 @@ export interface QueuedSubmission {
 
 export interface AppState {
   view: AppView;
+  workspace: WorkspaceId;
   mode: Mode;
   portfolioValue: number | undefined;
   availableCash: number;
@@ -56,6 +161,7 @@ export interface AppState {
   showStartupHint: boolean;
   transcriptBottomOffset: number;
   isUserTyping: boolean;
+  chatDraft: string;
   chatInputSeed: string;
   chatInputSeedNonce: number;
   setupMode: SetupWizardMode;
@@ -65,6 +171,8 @@ export interface AppState {
   chainStatus: ChainStatusInfo | null;
   configLayers: ConfigLayers | null;
   runtimeInspector: RuntimeInspectorViewModel | null;
+  workspaceMemory: WorkspaceMemoryState;
+  workspaceInteraction: WorkspaceInteractionState;
 }
 
 export interface LastResults {
@@ -74,6 +182,10 @@ export interface LastResults {
   portfolio?: Record<string, unknown>;
   technicalAnalysis?: Record<string, unknown>;
   regime?: Record<string, unknown>;
+  portfolioSummary?: PortfolioWorkspaceSnapshot;
+  positionsSummary?: PositionsWorkspaceSnapshot;
+  ordersSummary?: OrdersWorkspaceSnapshot;
+  workflowSummary?: WorkflowWorkspaceSnapshot;
   toolResults?: Record<string, Record<string, unknown>>;
 }
 
@@ -85,7 +197,16 @@ export interface AppStateStore {
   appendMessages(messages: ChatMessage[]): AppState;
   replaceMessages(messages: ChatMessage[]): AppState;
   setView(view: AppView): AppState;
+  setWorkspace(workspace: WorkspaceId): AppState;
   setRuntimeInspector(runtimeInspector: RuntimeInspectorViewModel | null): AppState;
+  updateWorkspaceMemory<K extends keyof WorkspaceMemoryState>(
+    workspace: K,
+    patch: Partial<WorkspaceMemoryState[K]>,
+  ): AppState;
+  setWorkspaceSelection<K extends keyof WorkspaceInteractionState>(
+    workspace: K,
+    selectedCardIndex: number,
+  ): AppState;
   subscribe(listener: () => void): () => void;
 }
 
@@ -96,6 +217,7 @@ export function createInitialAppState(input: {
 }): AppState {
   return {
     view: "loading",
+    workspace: "desk",
     mode: "SAFE",
     portfolioValue: undefined,
     availableCash: 0,
@@ -115,6 +237,7 @@ export function createInitialAppState(input: {
     showStartupHint: true,
     transcriptBottomOffset: 0,
     isUserTyping: false,
+    chatDraft: "",
     chatInputSeed: "",
     chatInputSeedNonce: 0,
     setupMode: input.setupMode,
@@ -124,6 +247,18 @@ export function createInitialAppState(input: {
     chainStatus: null,
     configLayers: null,
     runtimeInspector: null,
+    workspaceMemory: {
+      market: {},
+      plan: {},
+      lab: {},
+      monitor: {},
+    },
+    workspaceInteraction: {
+      market: { selectedCardIndex: 0 },
+      plan: { selectedCardIndex: 0 },
+      lab: { selectedCardIndex: 0 },
+      monitor: { selectedCardIndex: 0 },
+    },
   };
 }
 
@@ -182,10 +317,45 @@ export function createAppStore(initialState: AppState): AppStateStore {
         view,
       }));
     },
+    setWorkspace(workspace: WorkspaceId): AppState {
+      return setState((previous) => ({
+        ...previous,
+        workspace,
+      }));
+    },
     setRuntimeInspector(runtimeInspector: RuntimeInspectorViewModel | null): AppState {
       return setState((previous) => ({
         ...previous,
         runtimeInspector,
+      }));
+    },
+    updateWorkspaceMemory<K extends keyof WorkspaceMemoryState>(
+      workspace: K,
+      patch: Partial<WorkspaceMemoryState[K]>,
+    ): AppState {
+      return setState((previous) => ({
+        ...previous,
+        workspaceMemory: {
+          ...previous.workspaceMemory,
+          [workspace]: {
+            ...previous.workspaceMemory[workspace],
+            ...patch,
+          },
+        },
+      }));
+    },
+    setWorkspaceSelection<K extends keyof WorkspaceInteractionState>(
+      workspace: K,
+      selectedCardIndex: number,
+    ): AppState {
+      return setState((previous) => ({
+        ...previous,
+        workspaceInteraction: {
+          ...previous.workspaceInteraction,
+          [workspace]: {
+            selectedCardIndex: Math.max(0, selectedCardIndex),
+          },
+        },
       }));
     },
     subscribe(listener: () => void): () => void {

@@ -20,8 +20,10 @@ import type { QuickActionContext } from "./commandUx.ts";
 
 interface ChatInputProps {
   onSubmit: (value: string) => void;
+  onWorkspaceShortcut?: (digit: string) => void;
   onOpenQuickActions?: () => void;
   onTypingStateChange?: (isTyping: boolean) => void;
+  onDraftChange?: (value: string) => void;
   disabled?: boolean;
   busy?: boolean;
   queueDepth?: number;
@@ -35,8 +37,10 @@ interface ChatInputProps {
 
 function ChatInputComponent({
   onSubmit,
+  onWorkspaceShortcut,
   onOpenQuickActions,
   onTypingStateChange,
+  onDraftChange,
   disabled = false,
   busy = false,
   queueDepth = 0,
@@ -95,6 +99,20 @@ function ChatInputComponent({
 
   // Show autocomplete when typing a command
   const shouldShowAutocomplete = showAutocomplete && suggestions.length > 0 && value.startsWith("/");
+  const promptTone = disabled
+    ? COLORS.DIM
+    : busy
+      ? COLORS.AMBER
+      : COLORS.ACCENT;
+  const promptBorder = disabled
+    ? COLORS.DIM
+    : busy
+      ? COLORS.AMBER_DIM
+      : COLORS.ACCENT_DIM;
+  const promptLabel = busy ? "LIVE PROMPT" : "DESK PROMPT";
+  const promptStatus = !busy && queueDepth > 0
+    ? `queue ${queueDepth} waiting`
+    : null;
 
   useEffect(() => {
     if (seedNonce === 0) {
@@ -103,6 +121,7 @@ function ChatInputComponent({
 
     const normalizedSeed = normalizeInputValue(seedValue);
     setValue(normalizedSeed);
+    onDraftChange?.(normalizedSeed);
     setShowAutocomplete(normalizedSeed.startsWith("/"));
     setAutocompleteIndex(0);
     setQuickActionIndex(0);
@@ -113,7 +132,7 @@ function ChatInputComponent({
     } else {
       emitTypingState(false);
     }
-  }, [emitTypingState, normalizeInputValue, scheduleTypingIdle, seedNonce, seedValue]);
+  }, [emitTypingState, normalizeInputValue, onDraftChange, scheduleTypingIdle, seedNonce, seedValue]);
 
   useEffect(() => () => {
     if (typingTimeoutRef.current) {
@@ -145,6 +164,7 @@ function ChatInputComponent({
 
     onSubmit(finalValue);
     emitTypingState(false);
+    onDraftChange?.("");
     if (typingTimeoutRef.current) {
       clearTimeout(typingTimeoutRef.current);
       typingTimeoutRef.current = null;
@@ -153,11 +173,12 @@ function ChatInputComponent({
     setShowAutocomplete(false);
     setAutocompleteIndex(0);
     setInputKey((k) => k + 1); // Force TextInput remount to clear its internal state
-  }, [autocompleteIndex, emitTypingState, normalizeInputValue, onSubmit, showAutocomplete, suggestions]);
+  }, [autocompleteIndex, emitTypingState, normalizeInputValue, onDraftChange, onSubmit, showAutocomplete, suggestions]);
 
   const handleChange = useCallback((newValue: string) => {
     const normalizedValue = normalizeInputValue(newValue);
     setValue(normalizedValue);
+    onDraftChange?.(normalizedValue);
     if (normalizedValue.length > 0) {
       emitTypingState(true);
       scheduleTypingIdle();
@@ -175,12 +196,13 @@ function ChatInputComponent({
     } else {
       setShowAutocomplete(false);
     }
-  }, [emitTypingState, normalizeInputValue, scheduleTypingIdle]);
+  }, [emitTypingState, normalizeInputValue, onDraftChange, scheduleTypingIdle]);
 
   // Handle quick action selection
   const handleQuickActionSelect = useCallback((command: string) => {
     onSubmit(command);
     emitTypingState(false);
+    onDraftChange?.("");
     if (typingTimeoutRef.current) {
       clearTimeout(typingTimeoutRef.current);
       typingTimeoutRef.current = null;
@@ -188,27 +210,33 @@ function ChatInputComponent({
     setValue("");
     setQuickActionIndex(0);
     setInputKey((k) => k + 1);
-  }, [emitTypingState, onSubmit]);
+  }, [emitTypingState, onDraftChange, onSubmit]);
 
   // Handle special keys for autocomplete and quick action navigation
   useInput((input, key) => {
     if (disabled) return;
+
+    if (!value.trim() && /^[1-5]$/.test(input) && onWorkspaceShortcut) {
+      onWorkspaceShortcut(input);
+      setValue("");
+      onDraftChange?.("");
+      setShowAutocomplete(false);
+      setAutocompleteIndex(0);
+      setQuickActionIndex(0);
+      setInputKey((k) => k + 1);
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+        typingTimeoutRef.current = null;
+      }
+      emitTypingState(false);
+      return;
+    }
 
     // Handle quick actions when input is empty
     if (showQuickActions) {
       if (key.upArrow && onOpenQuickActions) {
         onOpenQuickActions();
         return;
-      }
-
-      // Number keys 1-5 to select quick actions
-      const numKey = parseInt(input, 10);
-      if (numKey >= 1 && numKey <= getQuickActionsCount(quickActionContext)) {
-        const command = getQuickActionCommand(numKey - 1, quickActionContext);
-        if (command) {
-          handleQuickActionSelect(command);
-          return;
-        }
       }
 
       // Left/right arrow to navigate quick actions
@@ -289,42 +317,60 @@ function ChatInputComponent({
       )}
 
       <Box marginX={1} flexDirection="column">
-        <Box paddingX={1}>
-          <Text color={disabled ? COLORS.DIM : COLORS.ACCENT}>
-            {">"}{" "}
+        <Box marginBottom={0}>
+          <Text color={promptTone} bold>
+            {promptLabel}
           </Text>
-          <TextInput
-            key={inputKey}
-            isDisabled={disabled}
-            defaultValue={value}
-            placeholder={placeholder || "Ask Gordon anything... (try /help)"}
-            onChange={handleChange}
-            onSubmit={handleSubmit}
-          />
-          {disabled && (
-            <Text color={COLORS.DIM}>  prompt locked</Text>
-          )}
-          {!disabled && queueDepth > 0 && !busy && (
-            <Text color={COLORS.DIM}>  queue {queueDepth}</Text>
+          {promptStatus && (
+            <Text color={COLORS.DIM}>
+              {" "}· {promptStatus}
+            </Text>
           )}
         </Box>
-        {shouldShowAutocomplete && (
-          <CommandAutocomplete
-            suggestions={suggestions}
-            selectedIndex={autocompleteIndex}
-            inputValue={value}
-            embedded
-            maxVisible={6}
-            showCategories={false}
-          />
-        )}
+        <Box
+          borderStyle="single"
+          borderColor={promptBorder}
+          paddingX={1}
+          paddingY={0}
+          flexDirection="column"
+        >
+          <Box>
+            <Text color={promptTone} bold>
+              {busy ? "»" : ">"}
+            </Text>
+            <Text color={promptTone}> </Text>
+            <TextInput
+              key={inputKey}
+              isDisabled={disabled}
+              defaultValue={value}
+              placeholder={placeholder || "Ask Gordon anything... (try /help)"}
+              onChange={handleChange}
+              onSubmit={handleSubmit}
+            />
+            {disabled && (
+              <Text color={COLORS.DIM}>  prompt locked</Text>
+            )}
+          </Box>
+          {shouldShowAutocomplete && (
+            <Box marginTop={1}>
+              <CommandAutocomplete
+                suggestions={suggestions}
+                selectedIndex={autocompleteIndex}
+                inputValue={value}
+                embedded
+                maxVisible={6}
+                showCategories={false}
+              />
+            </Box>
+          )}
+        </Box>
         <Box marginTop={0}>
           <Text color={COLORS.DIM}>
             {busy
-              ? "Enter queues a follow-up. Esc stops the current run."
+              ? "Enter queues. Esc stops."
               : queueDepth > 0
-                ? `Queued: ${queueDepth}. Enter adds another follow-up.`
-                : "Enter sends. /help opens the command book."}
+                ? `Queue ${queueDepth} ready. Enter sends next.`
+                : "Enter sends. /help."}
           </Text>
         </Box>
       </Box>

@@ -50,6 +50,8 @@ export function shouldRefreshRuntimeInspector(
     || previous?.remoteConnectionStatus !== next.remoteConnectionStatus
     || previous?.pendingApprovalCount !== next.pendingApprovalCount
     || previous?.recentApprovalCount !== next.recentApprovalCount
+    || previous?.approvalRuleCount !== next.approvalRuleCount
+    || previous?.pluginAttentionCount !== next.pluginAttentionCount
     || previous?.activeBridgeSessions !== next.activeBridgeSessions
   );
 }

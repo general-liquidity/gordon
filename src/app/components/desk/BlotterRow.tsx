@@ -21,18 +21,23 @@ export function BlotterRow({
   return (
     <Box flexDirection="column" marginBottom={1}>
       <Box>
-        <Text color={tokens.label} bold>
-          {label.toUpperCase()}
+        <Text color={tokens.accent} bold>
+          ■
         </Text>
-        <Text color={COLORS.DIM}> · </Text>
+        <Text color={tokens.label} bold>
+          {" "}{label.toUpperCase()}
+        </Text>
+        <Text color={COLORS.DIM}> / </Text>
         <Text color={COLORS.WHITE}>
           {value}
         </Text>
       </Box>
       {detail && (
-        <Text color={COLORS.DIM}>
-          {detail}
-        </Text>
+        <Box marginLeft={2}>
+          <Text color={COLORS.DIM}>
+            {detail}
+          </Text>
+        </Box>
       )}
     </Box>
   );

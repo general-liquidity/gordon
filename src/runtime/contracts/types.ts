@@ -113,11 +113,14 @@ export interface RuntimePluginSummary {
   lifecycle?: "mcp" | "routed";
   toolCount?: number;
   commandCount?: number;
+  surfacedCommandCount?: number;
   integrationCommands?: string[];
   defaultAgent?: string;
   alsoOnGordon?: boolean;
   routedToolCount?: number;
   reloadRecommended?: boolean;
+  attentionLevel?: "none" | "info" | "warning";
+  attentionReasons?: string[];
   lastReloadAt?: string | null;
 }
 

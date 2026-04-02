@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useMemo, useSyncExternalStore } from "react";
+import React, { useCallback, useEffect, useRef, useMemo, useState, useSyncExternalStore } from "react";
 import { Box, Text, useInput } from "ink";
 
 import {
@@ -33,6 +33,7 @@ import {
 } from "../core/monitor.ts";
 import { runOrderRecovery } from "../core/order-recovery.ts";
 import { listTrades } from "../infra/storage/trades.ts";
+import { listPlans } from "../infra/storage/plans.ts";
 import { recordStructuredObservation } from "../infra/observability/index.ts";
 import { getResolvedConfigWriteScope, loadConfig, saveConfig, saveResolvedConfig } from "../infra/storage/config.ts";
 import { loadConfigBundle, type ConfigLayers } from "../infra/storage/config.ts";
@@ -63,8 +64,11 @@ import { reconcileWithBinance } from "../services/reconciliation.service.ts";
 import { createErrorContext, formatErrorWithContext } from "../utils/errorContext.ts";
 import type { GordonContext } from "../infra/agents/types.ts";
 import type { Mode, GordonConfig } from "../types/index.ts";
+import type { Plan } from "../types/plan.ts";
 import { COLORS, type ThemeName } from "./theme.ts";
 import { buildVisibleThreadPolicy } from "./threadDensity.ts";
+import { getNextWorkspace, getPreviousWorkspace, getWorkspaceByShortcut } from "./workspaces.ts";
+import { loadWorkspaceShellState, saveWorkspaceShellState } from "./workspaceShellState.ts";
 import {
   parseSlashCommand,
   commandToPrompt,
@@ -164,8 +168,16 @@ import {
   type LastResults,
   type QueuedSubmission,
   type QueuedSubmissionKind,
+  type WorkspaceId,
 } from "./state/AppStore.ts";
 import { createRuntimeInspectorViewModel } from "./presenters/RuntimePresenter.ts";
+import {
+  buildWorkspaceBoardViewModel,
+  clampWorkspaceCardIndex,
+  getPrimaryWorkspaceAction,
+  type WorkspaceStrategyInventorySnapshot,
+} from "./workspaceViewModels.ts";
+import { getRuntimeApprovalShortId } from "./runtimeApprovalId.ts";
 import {
   applyRuntimeApprovalDecision,
   compactRuntimeTranscript,
@@ -184,6 +196,14 @@ import {
   buildRuntimeLinkedSession,
   shouldRefreshRuntimeInspector,
 } from "./runtime/runtimeStateSync.ts";
+import { strategyRegistry } from "../strategies/index.ts";
+import { listGeneratedStrategies } from "../infra/storage/generated-strategies.ts";
+import { playbookRegistry } from "../core/playbooks/index.ts";
+import {
+  buildSystematicPortfolioSummary,
+  listResearchExperiments,
+  listStrategyProfiles,
+} from "../infra/systematic/service.ts";
 
 type PluginSuggestion = ReturnType<typeof checkForPluginSuggestions>[number];
 
@@ -512,6 +532,7 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
   const appStore = appStoreRef.current!;
   const state = useSyncExternalStore(appStore.subscribe, appStore.getState, appStore.getState);
   const setState = useCallback((updater: (previous: AppState) => AppState) => appStore.setState(updater), [appStore]);
+  const [workspaceShellVersion, setWorkspaceShellVersion] = useState(0);
 
   const llmClientRef = useRef<LLMClient | null>(null);
   const binanceClientRef = useRef<BinanceClient | null>(null);
@@ -532,6 +553,9 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
   const portfolioValueRef = useRef<number | undefined>(state.portfolioValue);
   const availableCashRef = useRef<number>(state.availableCash);
   const sessionRuntimeFactoryRef = useRef<SessionRuntimeFactory | null>(null);
+  const bumpWorkspaceShellVersion = useCallback(() => {
+    setWorkspaceShellVersion((value) => value + 1);
+  }, []);
 
   const getSessionRuntime = useCallback((runtimeId: string = "app"): SessionRuntime => {
     if (!sessionRuntimeFactoryRef.current) {
@@ -932,23 +956,59 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
     if (!toolName || !toolResult || typeof toolResult !== "object") return;
     const resultObj = toolResult as Record<string, unknown>;
     if (resultObj.error) return;
+    let workspaceSnapshotChanged = false;
 
     switch (toolName) {
       case "scan_market":
         lastResultsRef.current.scan = resultObj as ScanExportData;
+        workspaceSnapshotChanged = true;
+        if (Array.isArray((resultObj as ScanExportData).opportunities) && (resultObj as ScanExportData).opportunities?.[0]?.symbol) {
+          appStore.updateWorkspaceMemory("market", {
+            focusSymbol: (resultObj as ScanExportData).opportunities?.[0]?.symbol,
+          });
+        }
         break;
       case "analyze_coin":
         lastResultsRef.current.analysis = resultObj as AnalysisExportData;
+        workspaceSnapshotChanged = true;
+        if (typeof (resultObj as AnalysisExportData).symbol === "string") {
+          appStore.updateWorkspaceMemory("market", {
+            focusSymbol: (resultObj as AnalysisExportData).symbol,
+          });
+        }
         break;
       case "run_backtest":
       case "compare_backtests":
       case "get_backtest_summary":
       case "analyze_backtest_results":
         lastResultsRef.current.backtest = resultObj as BacktestExportData;
+        workspaceSnapshotChanged = true;
+        {
+          const backtestConfig = (
+            resultObj
+            && typeof resultObj.result === "object"
+            && resultObj.result !== null
+            && "config" in (resultObj.result as Record<string, unknown>)
+            && typeof (resultObj.result as Record<string, unknown>).config === "object"
+            && (resultObj.result as Record<string, unknown>).config !== null
+          )
+            ? ((resultObj.result as { config: Record<string, unknown> }).config)
+            : null;
+          const strategyId = backtestConfig && typeof backtestConfig.strategyId === "string"
+            ? backtestConfig.strategyId
+            : undefined;
+          if (strategyId) {
+            appStore.updateWorkspaceMemory("lab", {
+              selectedStrategyId: strategyId,
+              selectedSource: "built-in",
+            });
+          }
+        }
         break;
       case "check_positions":
       case "get_portfolio_state":
         lastResultsRef.current.portfolio = resultObj;
+        workspaceSnapshotChanged = true;
         break;
       case "get_technical_analysis":
       case "get_advanced_analysis":
@@ -956,14 +1016,85 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
         break;
       case "detect_market_regime":
         lastResultsRef.current.regime = resultObj;
+        workspaceSnapshotChanged = true;
         break;
+      case "create_plan": {
+        workspaceSnapshotChanged = true;
+        const plan = "plan" in resultObj && typeof resultObj.plan === "object" && resultObj.plan !== null
+          ? resultObj.plan as { id?: string; symbol?: string }
+          : null;
+        if (plan) {
+          appStore.updateWorkspaceMemory("plan", {
+            selectedPlanId: plan.id,
+            focusSymbol: plan.symbol,
+          });
+        }
+        if (plan?.symbol) {
+          appStore.updateWorkspaceMemory("market", {
+            focusSymbol: plan.symbol,
+          });
+        }
+        break;
+      }
+      case "create_grid_plan": {
+        workspaceSnapshotChanged = true;
+        const preview = "planPreview" in resultObj && typeof resultObj.planPreview === "object" && resultObj.planPreview !== null
+          ? resultObj.planPreview as { symbol?: string }
+          : null;
+        if (preview?.symbol) {
+          appStore.updateWorkspaceMemory("plan", {
+            focusSymbol: preview.symbol,
+          });
+        }
+        break;
+      }
       default:
         // Store any tool result in a generic map for potential export
         if (!lastResultsRef.current.toolResults) lastResultsRef.current.toolResults = {};
         lastResultsRef.current.toolResults[toolName] = resultObj;
         break;
     }
-  }, []);
+    if (workspaceSnapshotChanged) {
+      bumpWorkspaceShellVersion();
+    }
+  }, [appStore, bumpWorkspaceShellVersion]);
+
+  const getPersistedWorkspaceLastResults = useCallback(() => ({
+    scan: lastResultsRef.current.scan,
+    analysis: lastResultsRef.current.analysis,
+    backtest: lastResultsRef.current.backtest,
+    regime: lastResultsRef.current.regime,
+    portfolioSummary: lastResultsRef.current.portfolioSummary,
+    positionsSummary: lastResultsRef.current.positionsSummary,
+    ordersSummary: lastResultsRef.current.ordersSummary,
+    workflowSummary: lastResultsRef.current.workflowSummary,
+  }), []);
+
+  useEffect(() => {
+    if (state.view === "loading") {
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      void saveWorkspaceShellState({
+        workspace: state.workspace,
+        workspaceMemory: state.workspaceMemory,
+        workspaceInteraction: state.workspaceInteraction,
+        lastResults: getPersistedWorkspaceLastResults(),
+      }).catch(() => undefined);
+    }, 80);
+
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [
+    getPersistedWorkspaceLastResults,
+    state.view,
+    state.workspace,
+    state.workspaceMemory,
+    state.workspaceInteraction,
+    workspaceShellVersion,
+  ]);
 
   const appendMessages = useCallback((nextMessages: ChatMessage[]): void => {
     if (nextMessages.length === 0) {
@@ -1158,6 +1289,8 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
     message: string;
     totalValue: number;
     availableCash: number;
+    holdings: Array<{ asset: string; amount: number; usdtValue: number; wallet?: string; note?: string }>;
+    executionTime: number;
   }> => {
     if (!exchangeRef.current) {
       throw new Error("No active exchange configured. Use /exchange add <type> or /setup.");
@@ -1206,9 +1339,13 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
 
     holdings.sort((left, right) => right.usdtValue - left.usdtValue);
 
+    const executionTime = Date.now() - portfolioStart;
+
     return {
       totalValue,
       availableCash,
+      holdings,
+      executionTime,
       message: formatPortfolioResults({
         totalValue,
         availableCash,
@@ -1219,39 +1356,66 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
           wallet: holding.wallet,
           note: holding.note,
         })),
-        executionTime: Date.now() - portfolioStart,
+        executionTime,
         maxRows: 15,
       }),
     };
   }, []);
 
-  const getCryptoPositionsSummary = useCallback(async (): Promise<string> => {
+  const getCryptoPositionsSummary = useCallback(async (): Promise<{
+    message: string;
+    count: number;
+    totalUnrealized: number;
+    positions: Array<{
+      symbol: string;
+      status: string;
+      unrealizedPnl: number;
+      unrealizedPnlPercent: number;
+      minutesOpen: number;
+    }>;
+    alerts: string[];
+  }> => {
     if (!exchangeRef.current) {
       throw new Error("No active exchange configured. Use /exchange add <type> or /setup.");
     }
 
     const result = await runSharedMonitorCycle(exchangeRef.current);
     if (result.updates.length === 0) {
-      return "No open crypto positions.";
+      return {
+        message: "No open crypto positions.",
+        count: 0,
+        totalUnrealized: 0,
+        positions: [],
+        alerts: [],
+      };
     }
 
     const totalUnrealized = result.updates.reduce((sum, update) => sum + update.unrealizedPnl, 0);
+    const positions = result.updates.map((update) => {
+      const minutesOpen = Math.max(
+        1,
+        Math.round((Date.now() - new Date(update.trade.openedAt).getTime()) / 60_000),
+      );
+
+      return {
+        symbol: update.trade.symbol,
+        status: update.status,
+        unrealizedPnl: update.unrealizedPnl,
+        unrealizedPnlPercent: update.unrealizedPnlPercent,
+        minutesOpen,
+      };
+    });
     const lines = [
-      `Open crypto positions: ${result.updates.length}`,
+      `Open crypto positions: ${positions.length}`,
       `Total unrealized PnL: $${totalUnrealized.toFixed(2)}`,
       "",
       "| Symbol | Status | Unrealized | PnL % | Minutes Open |",
       "|--------|--------|------------|-------|--------------|",
     ];
 
-    const now = Date.now();
-    for (const update of result.updates) {
-      const minutesOpen = Math.max(
-        1,
-        Math.round((now - new Date(update.trade.openedAt).getTime()) / 60_000),
-      );
+    for (const update of positions) {
       lines.push(
-        `| ${update.trade.symbol} | ${update.status} | $${update.unrealizedPnl.toFixed(2)} | ${update.unrealizedPnlPercent.toFixed(2)}% | ${minutesOpen} |`,
+        `| ${update.symbol} | ${update.status} | $${update.unrealizedPnl.toFixed(2)} | ${update.unrealizedPnlPercent.toFixed(2)}% | ${update.minutesOpen} |`,
       );
     }
 
@@ -1262,10 +1426,29 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
       }
     }
 
-    return lines.join("\n");
+    return {
+      message: lines.join("\n"),
+      count: positions.length,
+      totalUnrealized,
+      positions,
+      alerts: result.alerts.map((alert) => alert.message),
+    };
   }, []);
 
-  const getCryptoOpenOrdersSummary = useCallback(async (symbolFilter?: string): Promise<string> => {
+  const getCryptoOpenOrdersSummary = useCallback(async (symbolFilter?: string): Promise<{
+    message: string;
+    count: number;
+    symbolFilter?: string;
+    orders: Array<{
+      symbol: string;
+      side: string;
+      type: string;
+      status: string;
+      quantity: number | string;
+      price: number | string;
+      executedQty: number | string;
+    }>;
+  }> => {
     if (!exchangeRef.current) {
       throw new Error("No active exchange configured. Use /exchange add <type> or /setup.");
     }
@@ -1273,7 +1456,12 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
     const normalizedSymbol = symbolFilter?.trim() ? symbolFilter.trim().toUpperCase() : undefined;
     const orders = await exchangeRef.current.getOpenOrders(normalizedSymbol);
     if (orders.length === 0) {
-      return normalizedSymbol ? `No open crypto orders for ${normalizedSymbol}.` : "No open crypto orders.";
+      return {
+        message: normalizedSymbol ? `No open crypto orders for ${normalizedSymbol}.` : "No open crypto orders.",
+        count: 0,
+        symbolFilter: normalizedSymbol,
+        orders: [],
+      };
     }
 
     const lines = [
@@ -1288,7 +1476,20 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
       );
     }
 
-    return lines.join("\n");
+    return {
+      message: lines.join("\n"),
+      count: orders.length,
+      symbolFilter: normalizedSymbol,
+      orders: orders.map((order) => ({
+        symbol: order.symbol,
+        side: order.side,
+        type: order.type,
+        status: order.status,
+        quantity: order.quantity,
+        price: order.price,
+        executedQty: order.executedQty,
+      })),
+    };
   }, []);
 
   const getSystemStatusSummary = useCallback(async (): Promise<string> => {
@@ -1460,6 +1661,10 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
 
       // Load config and check onboarding status
       const { config, layers } = await loadConfigBundle();
+      const persistedWorkspaceShell = await loadWorkspaceShellState().catch(() => null);
+      if (persistedWorkspaceShell?.lastResults) {
+        lastResultsRef.current = persistedWorkspaceShell.lastResults;
+      }
       configRef.current = config;
       setState((prev) => ({ ...prev, configLayers: layers }));
       const requestedSetupMode = parseSetupWizardMode(process.env.GORDON_SETUP_MODE, "advanced");
@@ -1861,9 +2066,12 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
       setState((prev) => ({
         ...prev,
         view: initialView,
+        workspace: persistedWorkspaceShell?.workspace ?? prev.workspace,
         setupMode: requestedSetupMode,
         setupSection: requestedSetupSection,
         mode: config.mode,
+        portfolioValue: persistedWorkspaceShell?.lastResults.portfolioSummary?.totalValue ?? prev.portfolioValue,
+        availableCash: persistedWorkspaceShell?.lastResults.portfolioSummary?.availableCash ?? prev.availableCash,
         connectionStatus: llmClientRef.current ? "connected" : "disconnected",
         session,
         threadStatusInfo,
@@ -1875,7 +2083,13 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
           cdp: envStatus.hasCDPKeys,
           base: envStatus.hasBasescanKey || envStatus.hasCDPKeys,
         },
+        workspaceMemory: persistedWorkspaceShell?.workspaceMemory ?? prev.workspaceMemory,
+        workspaceInteraction: persistedWorkspaceShell?.workspaceInteraction ?? prev.workspaceInteraction,
       }));
+
+      if (persistedWorkspaceShell) {
+        bumpWorkspaceShellVersion();
+      }
 
       void runDeferredTasksWithConcurrency(deferredStartupTasks);
     }
@@ -1948,6 +2162,14 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
     ));
   }, []);
 
+  const setChatDraft = useCallback((value: string): void => {
+    setState((prev) => (
+      prev.chatDraft === value
+        ? prev
+        : { ...prev, chatDraft: value }
+    ));
+  }, []);
+
   const moveTranscriptViewport = useCallback((delta: number): void => {
     if (delta === 0) {
       return;
@@ -2008,21 +2230,59 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
     });
   }, [getTranscriptMaxOffset]);
 
-  const openChatWorkspace = useCallback((options?: { seed?: string; resetInput?: boolean }): void => {
+  const openWorkspaceShell = useCallback((
+    workspace: WorkspaceId,
+    options?: {
+      seed?: string;
+      resetInput?: boolean;
+      memoryPatch?: Partial<AppState["workspaceMemory"][Exclude<WorkspaceId, "desk">]>;
+    },
+  ): void => {
     setState((prev) => ({
       ...prev,
       view: "chat",
+      workspace,
       overlay: OVERLAY_NONE,
       transcriptBottomOffset: 0,
       showStartupHint: false,
       ...(prev.view !== "chat" || options?.resetInput
         ? {
+            chatDraft: "",
+            isUserTyping: false,
             chatInputSeed: options?.seed ?? "",
             chatInputSeedNonce: prev.chatInputSeedNonce + 1,
           }
         : {}),
+      ...(workspace !== "desk" && options?.memoryPatch
+        ? {
+            workspaceMemory: {
+              ...prev.workspaceMemory,
+              [workspace]: {
+                ...prev.workspaceMemory[workspace],
+                ...options.memoryPatch,
+              },
+            },
+          }
+        : {}),
     }));
   }, []);
+
+  const openChatWorkspace = useCallback((options?: { seed?: string; resetInput?: boolean }): void => {
+    openWorkspaceShell("desk", options);
+  }, [openWorkspaceShell]);
+
+  const handleWorkspaceShortcut = useCallback((digit: string): void => {
+    if (state.view !== "chat" || isOverlayOpen(state.overlay)) {
+      return;
+    }
+
+    const nextWorkspace = getWorkspaceByShortcut(digit);
+    if (!nextWorkspace) {
+      return;
+    }
+
+    openWorkspaceShell(nextWorkspace, { seed: "", resetInput: true });
+  }, [openWorkspaceShell, state.overlay, state.view]);
 
   const openQuickActionsOverlay = useCallback((): void => {
     setState((prev) => ({
@@ -2141,6 +2401,11 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
 
         await runLocalCommand(value, "portfolio", async () => {
           const summary = await getCryptoPortfolioSummary();
+          lastResultsRef.current.portfolioSummary = summary;
+          appStore.updateWorkspaceMemory("monitor", {
+            focusSection: "book",
+          });
+          bumpWorkspaceShellVersion();
           setState((prev) => ({
             ...prev,
             portfolioValue: summary.totalValue,
@@ -2174,6 +2439,26 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
 
       if (command.action === "menu" && command.target === "chat") {
         openChatWorkspace();
+        return;
+      }
+
+      if (command.action === "menu" && command.target === "workspace-market") {
+        openWorkspaceShell("market");
+        return;
+      }
+
+      if (command.action === "menu" && command.target === "workspace-plan") {
+        openWorkspaceShell("plan");
+        return;
+      }
+
+      if (command.action === "menu" && command.target === "workspace-lab") {
+        openWorkspaceShell("lab");
+        return;
+      }
+
+      if (command.action === "menu" && command.target === "workspace-monitor") {
+        openWorkspaceShell("monitor");
         return;
       }
 
@@ -2251,6 +2536,11 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
         (async () => {
           const runtime = getSessionRuntime("app");
           const resumed = await runtime.resumeSession();
+          const persistedWorkspaceShell = await loadWorkspaceShellState().catch(() => null);
+          if (persistedWorkspaceShell?.lastResults) {
+            lastResultsRef.current = persistedWorkspaceShell.lastResults;
+            bumpWorkspaceShellVersion();
+          }
           if (resumed) {
             const restoredMessages = buildChatMessagesFromRuntimeTranscript(runtime.getTranscript());
             const resumeMessage: ChatMessage = {
@@ -2262,6 +2552,11 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
             setState((prev) => ({
               ...prev,
               session: resumed,
+              workspace: persistedWorkspaceShell?.workspace ?? prev.workspace,
+              workspaceMemory: persistedWorkspaceShell?.workspaceMemory ?? prev.workspaceMemory,
+              workspaceInteraction: persistedWorkspaceShell?.workspaceInteraction ?? prev.workspaceInteraction,
+              portfolioValue: persistedWorkspaceShell?.lastResults.portfolioSummary?.totalValue ?? prev.portfolioValue,
+              availableCash: persistedWorkspaceShell?.lastResults.portfolioSummary?.availableCash ?? prev.availableCash,
               messages: [...restoredMessages, resumeMessage],
             }));
             void updateThreadStatusInfo(resumed.threadId);
@@ -2276,6 +2571,11 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
             setState((prev) => ({
               ...prev,
               session: newSession,
+              workspace: persistedWorkspaceShell?.workspace ?? prev.workspace,
+              workspaceMemory: persistedWorkspaceShell?.workspaceMemory ?? prev.workspaceMemory,
+              workspaceInteraction: persistedWorkspaceShell?.workspaceInteraction ?? prev.workspaceInteraction,
+              portfolioValue: persistedWorkspaceShell?.lastResults.portfolioSummary?.totalValue ?? prev.portfolioValue,
+              availableCash: persistedWorkspaceShell?.lastResults.portfolioSummary?.availableCash ?? prev.availableCash,
               messages: [
                 ...prev.messages,
                 { role: "user", content: value.trim(), timestamp: formatTimestamp() },
@@ -3433,7 +3733,16 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
               return;
             }
 
-            await runLocalCommand(value, "positions", async () => getCryptoPositionsSummary());
+            await runLocalCommand(value, "positions", async () => {
+              const summary = await getCryptoPositionsSummary();
+              lastResultsRef.current.positionsSummary = summary;
+              appStore.updateWorkspaceMemory("monitor", {
+                focusSection: "positions",
+                focusSymbol: summary.positions[0]?.symbol,
+              });
+              bumpWorkspaceShellVersion();
+              return summary.message;
+            });
             return;
           }
           case "get_open_orders": {
@@ -3447,7 +3756,16 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
               return;
             }
 
-            await runLocalCommand(value, "orders", async () => getCryptoOpenOrdersSummary(args));
+            await runLocalCommand(value, "orders", async () => {
+              const summary = await getCryptoOpenOrdersSummary(args);
+              lastResultsRef.current.ordersSummary = summary;
+              appStore.updateWorkspaceMemory("monitor", {
+                focusSection: "positions",
+                focusSymbol: summary.orders[0]?.symbol,
+              });
+              bumpWorkspaceShellVersion();
+              return summary.message;
+            });
             return;
           }
           case "handle_keyring_command": {
@@ -3463,6 +3781,26 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
           case "handle_strategy_command": {
             setState((prev) => ({ ...prev, messages: [...prev.messages, userMessage], isLoading: true }));
             const message = await handleStrategyCommand(args);
+            const strategyArgs = args.trim().split(/\s+/).filter(Boolean);
+            const strategyCommand = strategyArgs[0]?.toLowerCase() ?? "list";
+            const strategyId = strategyArgs[1];
+            if (strategyCommand === "playbooks") {
+              appStore.updateWorkspaceMemory("lab", {
+                selectedStrategyId: undefined,
+                selectedSource: "playbook",
+              });
+            } else if (strategyCommand === "running" || strategyCommand === "evolving") {
+              appStore.updateWorkspaceMemory("lab", {
+                selectedSource: "systematic",
+              });
+            } else if (strategyId) {
+              appStore.updateWorkspaceMemory("lab", {
+                selectedStrategyId: strategyId,
+                selectedSource: strategyCommand === "info" || strategyCommand === "backtest" || strategyCommand === "compare"
+                  ? "built-in"
+                  : "generated",
+              });
+            }
             setState((prev) => ({
               ...prev,
               messages: [
@@ -3538,6 +3876,39 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
               llm: llmClientRef.current ?? undefined,
               config: configRef.current,
             });
+            lastResultsRef.current.workflowSummary = {
+              workflow: result.workflow,
+              success: result.success,
+              summary: result.summary,
+              steps: result.steps.map((step) => ({
+                name: step.name,
+                status: step.status,
+                message: step.message,
+                duration: step.duration,
+              })),
+            };
+            const workflowParts = args.trim().split(/\s+/).filter(Boolean);
+            const workflowType = workflowParts[0]?.toLowerCase();
+            if (workflowType === "backtest-cycle") {
+              appStore.updateWorkspaceMemory("lab", {
+                selectedStrategyId: workflowParts[1],
+                selectedSource: "built-in",
+              });
+              if (workflowParts[2]) {
+                appStore.updateWorkspaceMemory("market", {
+                  focusSymbol: workflowParts[2].toUpperCase(),
+                  focusWorkflow: "backtest-cycle",
+                });
+              }
+            } else if (workflowType === "quick" || workflowType === "dd") {
+              if (workflowParts[1]) {
+                appStore.updateWorkspaceMemory("market", {
+                  focusSymbol: workflowParts[1].toUpperCase(),
+                  focusWorkflow: workflowType,
+                });
+              }
+            }
+            bumpWorkspaceShellVersion();
             setState((prev) => ({
               ...prev,
               messages: [
@@ -4056,8 +4427,8 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
             role: "gordon",
             badge: queuedIntent.kind === "steer" ? "Steer" : "Queued",
             content: queuedIntent.kind === "steer"
-              ? `Steering update queued. Gordon will stop the current run and pivot to:\n\n${queuedIntent.preview}`
-              : `Queued follow-up for after the current run:\n\n${queuedIntent.preview}`,
+              ? `Pivot queued:\n\n${queuedIntent.preview}`
+              : `Next:\n\n${queuedIntent.preview}`,
             timestamp: formatTimestamp(),
           },
         ],
@@ -4453,8 +4824,8 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
           }
     );
 
-    const submitMenuCommand = (command: string): void => {
-      openChatWorkspace();
+    const submitMenuCommand = (command: string, workspace: WorkspaceId = "desk"): void => {
+      openWorkspaceShell(workspace);
       void handleSubmit(command);
     };
 
@@ -4463,10 +4834,12 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
         openChatWorkspace();
         break;
       case "scan":
+        openWorkspaceShell("market");
         if (!exchangeRef.current) {
           setState((prev) => ({
             ...prev,
             view: "chat",
+            workspace: "market",
             overlay: OVERLAY_NONE,
             ...buildChatTransition(prev),
             messages: [
@@ -4483,6 +4856,7 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
           setState((prev) => ({
             ...prev,
             view: "chat",
+            workspace: "market",
             isLoading: true,
             overlay: OVERLAY_NONE,
             ...buildChatTransition(prev),
@@ -4533,6 +4907,7 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
                 executionTime,
                 formattedSummary: formatted,
               };
+              bumpWorkspaceShellVersion();
 
               setState((prev) => ({
                 ...prev,
@@ -4569,10 +4944,12 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
         }
         break;
       case "portfolio":
+        openWorkspaceShell("monitor");
         if (!exchangeRef.current) {
           setState((prev) => ({
             ...prev,
             view: "chat",
+            workspace: "monitor",
             overlay: OVERLAY_NONE,
             ...buildChatTransition(prev),
             messages: [
@@ -4590,6 +4967,7 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
           setState((prev) => ({
             ...prev,
             view: "chat",
+            workspace: "monitor",
             isLoading: true,
             overlay: OVERLAY_NONE,
             ...buildChatTransition(prev),
@@ -4607,82 +4985,21 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
           // Async fetch portfolio from both spot and funding wallets
           (async () => {
             try {
-              const portfolioStart = Date.now();
-              const allBalances = await exchangeRef.current!.getAllBalances();
-
-              // Calculate total value and extract USDT balance
-              let totalValue = 0;
-              let usdtBalance = 0;
-              const holdings: Array<{ asset: string; amount: number; usdtValue: number; wallet?: string; note?: string }> = [];
-
-              // USD-pegged stablecoins
-              const stablecoins = ["USDT", "USD", "USDC", "BUSD", "TUSD", "USDP", "FDUSD"];
-
-              for (const balance of allBalances) {
-                const amount = balance.total ?? (balance.free + balance.locked);
-                let usdtValue = 0;
-
-                if (stablecoins.includes(balance.asset)) {
-                  // Stablecoins are 1:1 with USD
-                  usdtValue = amount;
-                  if (balance.asset === "USDT" || balance.asset === "USD") {
-                    usdtBalance += amount;
-                  }
-                } else {
-                  // Try to get price from the active exchange (works for crypto and some fiat like EUR)
-                  try {
-                    const price = await exchangeRef.current!.getPrice(`${balance.asset}USDT`);
-                    usdtValue = amount * price;
-                  } catch (error) {
-                    console.error(`No USDT pair for ${balance.asset}:`, error);
-                    // Show raw amount without USD value
-                    holdings.push({
-                      asset: balance.asset,
-                      amount,
-                      usdtValue: 0,
-                      wallet: "spot",
-                      note: "No USD rate"
-                    });
-                    continue;
-                  }
-                }
-
-                if (usdtValue > 0.01) {
-                  holdings.push({ asset: balance.asset, amount, usdtValue, wallet: "spot" });
-                  totalValue += usdtValue;
-                }
-              }
-
-              // Sort by value
-              holdings.sort((a, b) => b.usdtValue - a.usdtValue);
-
-              const executionTime = Date.now() - portfolioStart;
-
-              const formatted = formatPortfolioResults({
-                totalValue,
-                availableCash: usdtBalance,
-                holdings: holdings.map((h) => ({
-                  asset: h.asset,
-                  total: h.amount,
-                  usdValue: h.usdtValue,
-                  wallet: h.wallet,
-                  note: h.note,
-                })),
-                executionTime,
-                maxRows: 15,
-              });
+              const summary = await getCryptoPortfolioSummary();
+              lastResultsRef.current.portfolioSummary = summary;
+              bumpWorkspaceShellVersion();
 
               setState((prev) => ({
                 ...prev,
-                portfolioValue: totalValue,
-                availableCash: usdtBalance,
+                portfolioValue: summary.totalValue,
+                availableCash: summary.availableCash,
                 isLoading: false,
                 activityStatus: null,
                 messages: [
                   ...prev.messages,
                   {
                     role: "gordon",
-                    content: formatted,
+                    content: summary.message,
                     timestamp: formatTimestamp(),
                   },
                 ],
@@ -4738,6 +5055,7 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
         setState((prev) => ({
           ...prev,
           view: "chat",
+          workspace: "market",
           overlay: OVERLAY_NONE,
           ...buildChatTransition(prev),
           messages: [
@@ -4752,6 +5070,7 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
         setState((prev) => ({
           ...prev,
           view: "chat",
+          workspace: "market",
           overlay: OVERLAY_NONE,
           ...buildChatTransition(prev),
           messages: [
@@ -4765,33 +5084,34 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
         }));
         break;
       case "preview-order":
-        submitMenuCommand("/preview-order");
+        submitMenuCommand("/preview-order", "plan");
         break;
       case "plan":
-        submitMenuCommand("/plan");
+        submitMenuCommand("/plan", "plan");
         break;
       case "positions":
-        submitMenuCommand("/positions");
+        submitMenuCommand("/positions", "monitor");
         break;
       case "orders":
-        submitMenuCommand("/orders");
+        submitMenuCommand("/orders", "monitor");
         break;
       case "wallet":
-        submitMenuCommand("/wallet");
+        submitMenuCommand("/wallet", "plan");
         break;
       case "fund":
-        submitMenuCommand("/fund quote");
+        submitMenuCommand("/fund quote", "plan");
         break;
       case "strategies-live":
-        submitMenuCommand("/strategies-live");
+        submitMenuCommand("/strategies-live", "lab");
         break;
       case "regime":
-        submitMenuCommand("/regime");
+        submitMenuCommand("/regime", "market");
         break;
       case "bridge":
         setState((prev) => ({
           ...prev,
           view: "chat",
+          workspace: "plan",
           overlay: OVERLAY_NONE,
           ...buildChatTransition(prev),
           messages: [
@@ -4810,7 +5130,7 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
         }));
         break;
       case "chains": {
-        submitMenuCommand("/chains");
+        submitMenuCommand("/chains", "monitor");
         break;
       }
     }
@@ -4822,6 +5142,7 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
     formatCommandError,
     handleSubmit,
     openChatWorkspace,
+    openWorkspaceShell,
     runMenuStream,
   ]);
 
@@ -5110,6 +5431,81 @@ Please check your API keys in the .env file and restart Gordon.`,
       return;
     }
 
+    if (
+      state.view === "chat"
+      && !isOverlayOpen(state.overlay)
+      && state.chatDraft.trim().length === 0
+      && !state.isLoading
+      && !state.isStreaming
+      && (input === "[" || input === "]")
+    ) {
+      openWorkspaceShell(
+        input === "]"
+          ? getNextWorkspace(state.workspace)
+          : getPreviousWorkspace(state.workspace),
+        { seed: "", resetInput: true },
+      );
+      return;
+    }
+
+    if (
+      state.view === "chat"
+      && state.workspace !== "desk"
+      && !isOverlayOpen(state.overlay)
+      && state.chatDraft.trim().length === 0
+      && !state.isLoading
+      && !state.isStreaming
+      && workspaceViewModel
+      && (key.upArrow || key.downArrow)
+    ) {
+      const cardCount = workspaceViewModel.cards.length;
+      if (cardCount > 0) {
+        const delta = key.downArrow ? 1 : -1;
+        const nextIndex = (selectedWorkspaceCardIndex + delta + cardCount) % cardCount;
+        appStore.setWorkspaceSelection(state.workspace, nextIndex);
+      }
+      return;
+    }
+
+    if (
+      state.view === "chat"
+      && state.workspace !== "desk"
+      && !isOverlayOpen(state.overlay)
+      && state.chatDraft.trim().length === 0
+      && !state.isLoading
+      && !state.isStreaming
+      && workspaceViewModel
+      && key.tab
+    ) {
+      const primaryAction = getPrimaryWorkspaceAction(workspaceViewModel, selectedWorkspaceCardIndex);
+      if (primaryAction) {
+        openWorkspaceShell(state.workspace, { seed: primaryAction, resetInput: true });
+      }
+      return;
+    }
+
+    if (
+      state.view === "chat"
+      && !isOverlayOpen(state.overlay)
+      && state.chatDraft.trim().length === 0
+      && !state.isLoading
+      && !state.isStreaming
+      && state.runtimeInspector?.pendingApprovals.length
+      && key.shift
+      && (input === "A" || input === "D")
+    ) {
+      const activeApproval = state.runtimeInspector.pendingApprovals[0];
+      if (!activeApproval) {
+        return;
+      }
+      const shortId = getRuntimeApprovalShortId(activeApproval.id);
+      openWorkspaceShell(state.workspace, {
+        seed: input === "A" ? `approve ${shortId}` : `deny ${shortId} `,
+        resetInput: true,
+      });
+      return;
+    }
+
     // Show shortcuts with ? key (only when not actively typing in chat input)
     // The ? should only trigger when in menu view or when the shortcuts overlay is toggled
     if (input === "?" && (state.view === "menu" || isOverlayOpen(state.overlay, "quick-actions"))) {
@@ -5184,12 +5580,13 @@ Please check your API keys in the .env file and restart Gordon.`,
   const quickActionContext = useMemo(
     () => ({
       mode: state.mode,
+      workspace: state.workspace,
       setupComplete: configRef.current.onboardingComplete,
       hasExchange: Boolean(exchangeRef.current),
       hasBroker: Boolean(brokerRef.current),
       hasWalletRails,
     }),
-    [hasWalletRails, state.mode]
+    [hasWalletRails, state.mode, state.workspace]
   );
   const chatInputPlaceholder = useMemo(() => {
     if (quickActionsOverlayOpen) {
@@ -5198,8 +5595,193 @@ Please check your API keys in the .env file and restart Gordon.`,
     if (state.isLoading || state.isStreaming) {
       return "Waiting for response...";
     }
-    return "Ask Gordon anything...";
-  }, [quickActionsOverlayOpen, state.isLoading, state.isStreaming]);
+    switch (state.workspace) {
+      case "market":
+        return "Ask about the tape, regime, or a symbol...";
+      case "plan":
+        return "Shape or review a trade ticket...";
+      case "lab":
+        return "Build, compare, or validate a strategy...";
+      case "monitor":
+        return "Check the book, runtime, or live health...";
+      case "desk":
+      default:
+        return "Ask Gordon anything...";
+    }
+  }, [quickActionsOverlayOpen, state.isLoading, state.isStreaming, state.workspace]);
+
+  const strategyInventory = useMemo<WorkspaceStrategyInventorySnapshot>(() => {
+    let builtInStrategyCount = 0;
+    let builtInTier1Count = 0;
+    let builtInTier2Count = 0;
+    let playbookCount = 0;
+    let builtInStrategies: WorkspaceStrategyInventorySnapshot["builtInStrategies"] = [];
+    let generatedStrategies: WorkspaceStrategyInventorySnapshot["generatedStrategies"] = [];
+    let playbooks: WorkspaceStrategyInventorySnapshot["playbooks"] = [];
+    let systematicProfileCount = 0;
+    let systematicLiveEligibleCount = 0;
+    let systematicProfiles: WorkspaceStrategyInventorySnapshot["systematicProfiles"] = [];
+    let researchExperimentCount = 0;
+    let researchExperiments: WorkspaceStrategyInventorySnapshot["researchExperiments"] = [];
+    let diversificationScore: number | undefined;
+    let concentrationRisk: string | undefined;
+
+    try {
+      const strategies = strategyRegistry.listStrategies();
+      builtInStrategyCount = strategies.length;
+      builtInTier1Count = strategies.filter((strategy) => strategy.tier === 1).length;
+      builtInTier2Count = strategies.filter((strategy) => strategy.tier === 2).length;
+      builtInStrategies = strategies.slice(0, 8).map((strategy) => ({
+        id: strategy.id,
+        name: strategy.name,
+        riskLevel: strategy.riskLevel,
+        timeframes: strategy.timeframes,
+      }));
+    } catch {
+      // Registry may not be hydrated yet during boot.
+    }
+
+    try {
+      const registryPlaybooks = playbookRegistry.getAll();
+      playbookCount = registryPlaybooks.length;
+      playbooks = registryPlaybooks.slice(0, 8).map((playbook) => ({
+        id: playbook.id,
+        name: playbook.name,
+        riskLevel: playbook.riskLevel,
+        timeframes: playbook.timeframes,
+      }));
+    } catch {
+      // Playbook registry may not be loaded yet.
+    }
+
+    try {
+      generatedStrategies = listGeneratedStrategies({
+        orderBy: "createdAt",
+        orderDirection: "desc",
+        limit: 6,
+      }).map((strategy) => ({
+        id: strategy.id,
+        name: strategy.name,
+        riskLevel: strategy.riskLevel,
+        timeframes: strategy.timeframes,
+        backtestReturn: strategy.backtestReturn,
+        backtestSharpe: strategy.backtestSharpe,
+      }));
+    } catch {
+      // Generated-strategy storage may not be initialized yet.
+    }
+
+    try {
+      const profiles = listStrategyProfiles();
+      systematicProfileCount = profiles.length;
+      systematicLiveEligibleCount = profiles.filter((profile) => profile.liveEligible).length;
+      systematicProfiles = profiles.slice(0, 8).map((profile) => ({
+        strategyId: profile.strategyId,
+        strategyName: profile.strategyName,
+        status: profile.status,
+        validationScore: profile.validationScore,
+        marketFamily: profile.marketFamily,
+        liveEligible: profile.liveEligible,
+        capitalWeight: profile.capitalWeight,
+      }));
+    } catch {
+      // Systematic store may not be initialized yet.
+    }
+
+    try {
+      const experiments = listResearchExperiments();
+      researchExperimentCount = experiments.length;
+      researchExperiments = experiments.slice(0, 8).map((experiment) => ({
+        experimentId: experiment.experimentId,
+        strategyId: experiment.strategyId,
+        strategyName: experiment.strategyName,
+        status: experiment.status,
+      }));
+    } catch {
+      // Systematic experiment store may not be initialized yet.
+    }
+
+    try {
+      const summary = buildSystematicPortfolioSummary();
+      diversificationScore = summary.diversificationScore;
+      concentrationRisk = summary.concentrationRisk;
+    } catch {
+      // Portfolio summary is best-effort only.
+    }
+
+    return {
+      builtInStrategyCount,
+      builtInTier1Count,
+      builtInTier2Count,
+      builtInStrategies,
+      generatedStrategies,
+      playbookCount,
+      playbooks,
+      systematicProfileCount,
+      systematicLiveEligibleCount,
+      systematicProfiles,
+      researchExperimentCount,
+      researchExperiments,
+      diversificationScore,
+      concentrationRisk,
+    };
+  }, [state.messages]);
+
+  const workspaceViewModel = useMemo(() => {
+    if (state.workspace === "desk") {
+      return null;
+    }
+
+    let plans: Plan[] = [];
+    try {
+      plans = listPlans().slice(0, 8);
+    } catch {
+      plans = [];
+    }
+
+    return buildWorkspaceBoardViewModel({
+      workspace: state.workspace,
+      mode: state.mode,
+      hasExchange: Boolean(exchangeRef.current),
+      hasBroker: Boolean(brokerRef.current),
+      hasWalletRails,
+      hasMcpServers: (state.runtimeInspector?.mcpServerCount ?? 0) > 0 || configRef.current.mcpServers.length > 0,
+      runtimeInspector: state.runtimeInspector,
+      queuedCount: state.queuedSubmissions.length,
+      lastResults: lastResultsRef.current,
+      plans,
+      workspaceMemory: state.workspaceMemory,
+      strategyInventory,
+      planReview: {
+        portfolioValue: state.portfolioValue ?? lastResultsRef.current.portfolioSummary?.totalValue ?? 0,
+        availableCash: state.availableCash ?? lastResultsRef.current.portfolioSummary?.availableCash ?? 0,
+        maxAllocationPerTrade: configRef.current.preferences.maxAllocationPerTrade,
+        cashReservePercent: configRef.current.preferences.cashReservePercent,
+      },
+    });
+  }, [
+    hasWalletRails,
+    state.availableCash,
+    state.messages,
+    state.mode,
+    state.portfolioValue,
+    state.queuedSubmissions.length,
+    state.runtimeInspector,
+    state.workspaceMemory,
+    state.workspace,
+    strategyInventory,
+  ]);
+
+  const selectedWorkspaceCardIndex = useMemo(() => {
+    if (state.workspace === "desk" || !workspaceViewModel) {
+      return 0;
+    }
+
+    return clampWorkspaceCardIndex(
+      workspaceViewModel,
+      state.workspaceInteraction[state.workspace].selectedCardIndex,
+    );
+  }, [state.workspace, state.workspaceInteraction, workspaceViewModel]);
 
   return (
     <Box flexDirection="column" height="100%">
@@ -5266,6 +5848,8 @@ Please check your API keys in the .env file and restart Gordon.`,
             hiddenAfter={visibleThreadPolicy.hiddenAfter}
             visibleLimit={maxVisibleMessages}
             isPinnedBottom={visibleThreadPolicy.isPinnedBottom}
+            workspace={state.workspace}
+            workspaceMemory={state.workspaceMemory}
             isStreaming={state.isStreaming}
             activeStreamingTimestamp={state.streamingMessageTimestamp}
             activityStatus={state.activityStatus}
@@ -5288,13 +5872,17 @@ Please check your API keys in the .env file and restart Gordon.`,
             taskTree={state.taskTree}
             backgroundTaskTree={state.backgroundTaskTree}
             runtimeInspector={state.runtimeInspector}
+            workspaceViewModel={workspaceViewModel}
+            selectedWorkspaceCardIndex={selectedWorkspaceCardIndex}
             isLoading={state.isLoading}
             chatInputPlaceholder={chatInputPlaceholder}
             quickActionContext={quickActionContext}
             hasConversationMomentum={transcriptHasMomentum}
             onSubmit={handleSubmit}
+            onWorkspaceShortcut={handleWorkspaceShortcut}
             onOpenQuickActions={openQuickActionsOverlay}
             onTypingStateChange={setTranscriptTypingState}
+            onDraftChange={setChatDraft}
             busy={state.isLoading || state.isStreaming}
             seedValue={state.chatInputSeed}
             seedNonce={state.chatInputSeedNonce}

@@ -57,6 +57,7 @@ export function formatRuntimePlugins(runtime: SessionRuntime): string {
     `- Last reload: ${tooling.lastReloadAt ?? "never"}`,
     `- Hot reload: ${tooling.hotReloadEnabled ? "enabled" : "disabled"}`,
     `- Routing configs: ${tooling.routingCount}`,
+    `- Plugin attention: ${inspector.pluginAttentionCount}`,
     `- Commands surfaced: ${tooling.commands.length > 0 ? tooling.commands.join(", ") : "none"}`,
   ];
 
@@ -64,7 +65,7 @@ export function formatRuntimePlugins(runtime: SessionRuntime): string {
     lines.push("", "**Plugin inventory**");
     for (const plugin of inspector.recentPlugins) {
       lines.push(
-        `- ${plugin.name} · ${plugin.status ?? "unknown"} · ${plugin.lifecycle ?? "mcp"} · tools=${plugin.toolCount ?? 0} · commands=${plugin.commandCount ?? 0}${plugin.defaultAgent ? ` · default=${plugin.defaultAgent}` : ""}${plugin.reloadRecommended ? " · reload suggested" : ""}${plugin.integrationCommands && plugin.integrationCommands.length > 0 ? ` · ${plugin.integrationCommands.join(", ")}` : ""}`,
+        `- ${plugin.name} · ${plugin.status ?? "unknown"} · ${plugin.lifecycle ?? "mcp"} · tools=${plugin.toolCount ?? 0} · commands=${plugin.commandCount ?? 0}${plugin.defaultAgent ? ` · default=${plugin.defaultAgent}` : ""}${plugin.attentionReasons && plugin.attentionReasons.length > 0 ? ` · ${plugin.attentionReasons.join(", ")}` : ""}${plugin.reloadRecommended ? " · reload suggested" : ""}${plugin.integrationCommands && plugin.integrationCommands.length > 0 ? ` · ${plugin.integrationCommands.join(", ")}` : ""}`,
       );
     }
   }
@@ -143,7 +144,9 @@ export function formatRuntimeApprovals(runtime: SessionRuntime): string {
       const shortId = getRuntimeApprovalShortId(request.id);
       lines.push(`- ${shortId} · ${request.toolName} · ${request.approvalClass} · ${request.reason ?? "approval required"}`);
       lines.push(`  Approve: /runtime-approve ${shortId} or approve ${shortId}`);
+      lines.push(`  Approve + persist: /runtime-approve ${shortId} persist`);
       lines.push(`  Deny: /runtime-deny ${shortId} reason or deny ${shortId} reason`);
+      lines.push(`  Deny + persist: /runtime-deny ${shortId} persist reason`);
     }
   }
 

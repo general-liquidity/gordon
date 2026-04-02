@@ -63,12 +63,21 @@ describe("slash command UX formatting", () => {
   it("includes explicit workspace navigation commands", () => {
     const menu = SLASH_COMMANDS.find((command) => command.name === "menu");
     const chat = SLASH_COMMANDS.find((command) => command.name === "chat");
+    const market = SLASH_COMMANDS.find((command) => command.name === "market");
+    const plans = SLASH_COMMANDS.find((command) => command.name === "plans");
+    const lab = SLASH_COMMANDS.find((command) => command.name === "lab");
+    const monitor = SLASH_COMMANDS.find((command) => command.name === "monitor");
 
     expect(menu?.workflow).toBe("operate");
     expect(menu?.action).toBe("menu");
     expect(menu?.aliases).toContain("home");
     expect(chat?.workflow).toBe("operate");
     expect(chat?.target).toBe("chat");
+    expect(chat?.aliases).toContain("desk");
+    expect(market?.target).toBe("workspace-market");
+    expect(plans?.target).toBe("workspace-plan");
+    expect(lab?.target).toBe("workspace-lab");
+    expect(monitor?.target).toBe("workspace-monitor");
   });
 
   it("includes CLI-native systematic workflows", () => {

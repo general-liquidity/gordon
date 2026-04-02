@@ -1,5 +1,5 @@
 import React from "react";
-import { Box, Text } from "ink";
+import { Box, Text, useStdout } from "ink";
 import { COLORS } from "../../theme.ts";
 import { getDeskToneTokens, type DeskTone } from "./DeskPanel.tsx";
 
@@ -17,18 +17,16 @@ export function DeskRail({
   children,
 }: DeskRailProps): React.ReactElement {
   const tokens = getDeskToneTokens(tone);
+  const { stdout } = useStdout();
+  const width = Math.max(24, Math.min((stdout?.columns ?? 120) - 4, 120));
+  const topRule = "═".repeat(width);
+  const bottomRule = "─".repeat(Math.max(18, width - 8));
 
   return (
-    <Box
-      flexDirection="column"
-      borderStyle="single"
-      borderColor={tokens.border}
-      paddingX={1}
-      paddingY={0}
-      width="100%"
-    >
+    <Box flexDirection="column" width="100%">
+      <Text color={tokens.border}>{topRule}</Text>
       {(title || subtitle) && (
-        <Box marginBottom={1}>
+        <Box marginBottom={1} flexWrap="wrap">
           {title && (
             <Text color={tokens.label} bold>
               {title.toUpperCase()}
@@ -43,6 +41,9 @@ export function DeskRail({
         </Box>
       )}
       {children}
+      <Box marginTop={1}>
+        <Text color={tokens.border}>{bottomRule}</Text>
+      </Box>
     </Box>
   );
 }

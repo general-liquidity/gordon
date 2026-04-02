@@ -165,4 +165,35 @@ describe("RuntimePresenter", () => {
       factory.dispose();
     }
   });
+
+  it("surfaces plugin lifecycle attention when tooling needs review", () => {
+    const { factory, runtime } = createRuntime();
+
+    try {
+      runtime.syncToolingState({
+        plugins: [
+          {
+            id: "coingecko",
+            name: "CoinGecko",
+            enabled: true,
+            status: "ready",
+            lifecycle: "routed",
+            toolCount: 2,
+            commandCount: 0,
+            surfacedCommandCount: 0,
+            attentionLevel: "warning",
+            attentionReasons: ["no commands surfaced"],
+            integrationCommands: [],
+          },
+        ],
+      });
+
+      const viewModel = createRuntimeInspectorViewModel(runtime);
+
+      expect(viewModel.pluginAttentionCount).toBe(1);
+      expect(viewModel.hasContent).toBe(true);
+    } finally {
+      factory.dispose();
+    }
+  });
 });

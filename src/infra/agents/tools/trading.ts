@@ -31,6 +31,7 @@ import { listPlans, getPlan, updatePlan, createPlan } from "../../storage/plans.
 import { listTrades, getTrade } from "../../storage/trades.ts";
 import { getGordonContext, normalizeSymbol, validateToolOutput, type MastraExecutionContext } from "./types.ts";
 import { reflectOnPlan, formatReflectionSummary } from "../reflection.ts";
+import { getTradingService } from "../../../services/trading.service.ts";
 
 // ============================================================================
 // Error Messages
@@ -249,17 +250,37 @@ export const createPlanTool = createTool({
       portfolioValue: ctx.portfolioValue,
     });
 
+    let savedPlan = plan;
+    try {
+      savedPlan = await getTradingService().createPlan(plan);
+    } catch {
+      savedPlan = createPlan({
+        symbol: plan.symbol,
+        direction: plan.direction,
+        strategy: plan.strategy,
+        allocation: plan.allocation,
+        entry: plan.entry,
+        dca: plan.dca,
+        grid: plan.grid,
+        stopLoss: plan.stopLoss,
+        takeProfit: plan.takeProfit,
+        reasoning: plan.reasoning,
+        status: plan.status,
+        expiresAt: plan.expiresAt,
+      });
+    }
+
     // Perform reflection on the generated plan
-    const reflectionResult = await reflectOnPlan(plan, ctx, { skipLLM: false });
+    const reflectionResult = await reflectOnPlan(savedPlan, ctx, { skipLLM: false });
 
     // Build result with reflection information
-    const baseSummary = `Created ${plan.strategy} plan for ${plan.symbol}: Entry at ${plan.entry.price ?? "market"}, Stop at ${plan.stopLoss.price}, ${plan.takeProfit.length} TP levels. Allocation: ${plan.allocation.amount} USDT (${(plan.allocation.percentOfPortfolio * 100).toFixed(1)}%)`;
+    const baseSummary = `Created ${savedPlan.strategy} plan (${savedPlan.id}) for ${savedPlan.symbol}: Entry at ${savedPlan.entry.price ?? "market"}, Stop at ${savedPlan.stopLoss.price}, ${savedPlan.takeProfit.length} TP levels. Allocation: ${savedPlan.allocation.amount} USDT (${(savedPlan.allocation.percentOfPortfolio * 100).toFixed(1)}%)`;
 
     const reflectionSummary = formatReflectionSummary(reflectionResult);
 
     const result = {
       success: reflectionResult.isValid,
-      plan,
+      plan: savedPlan,
       summary: reflectionResult.isValid
         ? `${baseSummary}\n\nReflection: ${reflectionSummary}`
         : `${baseSummary}\n\nWARNING - ${reflectionSummary}`,

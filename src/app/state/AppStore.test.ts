@@ -56,14 +56,32 @@ describe("AppStore", () => {
     store.setView("chat");
     expect(store.getState().view).toBe("chat");
 
+    store.setWorkspace("lab");
+    expect(store.getState().workspace).toBe("lab");
+
+    store.updateWorkspaceMemory("plan", {
+      selectedPlanId: "pln_123",
+      focusSymbol: "BTCUSDT",
+    });
+    expect(store.getState().workspaceMemory.plan.selectedPlanId).toBe("pln_123");
+    expect(store.getState().workspaceMemory.plan.focusSymbol).toBe("BTCUSDT");
+
+    store.setWorkspaceSelection("monitor", 2);
+    expect(store.getState().workspaceInteraction.monitor.selectedCardIndex).toBe(2);
+
     store.setRuntimeInspector({
       streamStatus: "idle",
       permissionScopes: [],
       backgroundTaskCount: 0,
       pendingApprovalCount: 0,
       recentApprovalCount: 0,
+      approvalRuleCount: 0,
       pendingApprovals: [],
       pluginCount: 0,
+      degradedPluginCount: 0,
+      reloadRecommendedCount: 0,
+      routedPluginCount: 0,
+      pluginAttentionCount: 0,
       mcpServerCount: 0,
       registeredToolCount: 0,
       commandCount: 0,

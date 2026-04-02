@@ -58,4 +58,26 @@ describe("thread density policy", () => {
     expect(policy.startIndex).toBe(Math.max(0, policy.endIndex - idleLimit));
     expect(formatHiddenNewerNotice(policy.hiddenAfter)).toContain("newer messages below");
   });
+
+  it("keeps the reader window stable while streaming when scrolled away from the live edge", () => {
+    const messages = Array.from({ length: 220 }, () => ({ content: "x".repeat(400) }));
+    const idleLimit = getVisibleMessageLimit({
+      messages,
+      isStreaming: false,
+      hasTaskTree: false,
+      hasBackgroundTasks: false,
+      bottomOffset: 18,
+    });
+    const policy = buildVisibleThreadPolicy({
+      messages,
+      isStreaming: true,
+      hasTaskTree: true,
+      hasBackgroundTasks: true,
+      bottomOffset: 18,
+    });
+
+    expect(policy.visibleLimit).toBe(idleLimit);
+    expect(policy.bottomOffset).toBe(18);
+    expect(policy.isPinnedBottom).toBe(false);
+  });
 });

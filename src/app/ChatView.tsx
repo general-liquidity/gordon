@@ -73,6 +73,30 @@ export function normalizeChatMessage(message: ChatMessage): ChatMessage {
   };
 }
 
+function buildMessageSignature(messages: ChatMessage[]): string {
+  return messages
+    .map((message) => [
+      message.role,
+      message.timestamp ?? "",
+      message.variant ?? "",
+      message.agent ?? "",
+      message.badge ?? "",
+      message.content.length,
+    ].join(":"))
+    .join("|");
+}
+
+function getMessageKey(message: ChatMessage): string {
+  return [
+    message.role,
+    message.timestamp ?? "",
+    message.variant ?? "",
+    message.agent ?? "",
+    message.badge ?? "",
+    message.content.slice(0, 96),
+  ].join(":");
+}
+
 const StreamingStateLine: React.FC<{
   message: ChatMessage;
   activityStatus?: string | null;
@@ -168,7 +192,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({
   );
 });
 
-export const ChatView: React.FC<ChatViewProps> = ({
+export const ChatView = React.memo(({
   messages,
   hiddenBefore = 0,
   hiddenAfter = 0,
@@ -178,10 +202,9 @@ export const ChatView: React.FC<ChatViewProps> = ({
   activeStreamingTimestamp = null,
   activityStatus = null,
   activeToolCall = null,
-}) => {
-  const renderedMessages = messages
-    .map((message, index) => ({ message, index }))
-    .map(({ message, index }) => {
+}: ChatViewProps) => {
+  const renderedMessages = React.useMemo(() => messages
+    .map((message) => {
       const variant = inferMessageVariant(message);
       const isStreamingMessage =
         isStreaming
@@ -191,7 +214,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
 
       return (
         <MessageBubble
-          key={`${index}-${message.role}-${message.timestamp ?? "no-ts"}-${message.agent ?? "gordon"}-${message.badge ?? ""}`}
+          key={getMessageKey(message)}
           message={message}
           variant={variant}
           isStreamingMessage={isStreamingMessage}
@@ -199,7 +222,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
           activeToolCall={isStreamingMessage ? activeToolCall : null}
         />
       );
-    });
+    }), [messages, isStreaming, activeStreamingTimestamp, activityStatus, activeToolCall]);
 
   return (
     <Box flexDirection="column" flexGrow={1} paddingX={1}>
@@ -225,6 +248,16 @@ export const ChatView: React.FC<ChatViewProps> = ({
       )}
     </Box>
   );
-};
+}, (previous, next) => (
+  previous.hiddenBefore === next.hiddenBefore
+  && previous.hiddenAfter === next.hiddenAfter
+  && previous.visibleLimit === next.visibleLimit
+  && previous.isPinnedBottom === next.isPinnedBottom
+  && previous.isStreaming === next.isStreaming
+  && previous.activeStreamingTimestamp === next.activeStreamingTimestamp
+  && previous.activityStatus === next.activityStatus
+  && previous.activeToolCall === next.activeToolCall
+  && buildMessageSignature(previous.messages) === buildMessageSignature(next.messages)
+));
 
 export default ChatView;

@@ -123,11 +123,29 @@ function buildDefaultInventory(state: {
       ),
     );
     const toolCount = serverToolIds.length > 0 ? serverToolIds.length : plugin.manifest.tools.length;
+    const attentionReasons: string[] = [];
+    if (!plugin.enabled) {
+      attentionReasons.push("disabled");
+    }
+    if (toolCount === 0) {
+      attentionReasons.push("no tools exposed");
+    }
+    if (toolCount > 0 && integrationCommands.length === 0) {
+      attentionReasons.push("no commands surfaced");
+    }
+    if (routed && !routing?.routingManifest.alsoOnGordon) {
+      attentionReasons.push("agent-routed only");
+    }
     const status = !plugin.enabled
       ? "disabled"
       : toolCount > 0
         ? "ready"
         : "degraded";
+    const attentionLevel = status === "degraded" || attentionReasons.includes("no commands surfaced")
+      ? "warning"
+      : attentionReasons.length > 0
+        ? "info"
+        : "none";
     return {
       id: plugin.id,
       name: plugin.manifest.name ?? plugin.id,
@@ -138,11 +156,14 @@ function buildDefaultInventory(state: {
       lifecycle: routed ? "routed" : "mcp",
       toolCount,
       commandCount: integrationCommands.length,
+      surfacedCommandCount: integrationCommands.length,
       integrationCommands,
       defaultAgent: routing?.routingManifest.defaultAgent,
       alsoOnGordon: routing?.routingManifest.alsoOnGordon,
       routedToolCount: routing?.toolCount,
-      reloadRecommended: status === "degraded",
+      reloadRecommended: status === "degraded" || attentionReasons.includes("no commands surfaced"),
+      attentionLevel,
+      attentionReasons,
       lastReloadAt: state.lastReloadAt,
     } satisfies RuntimePluginSummary;
   });

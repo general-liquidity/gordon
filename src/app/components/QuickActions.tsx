@@ -41,7 +41,7 @@ export function QuickActions({
       {actions.map((action, i) => {
         const isSelected = i === selectedIndex;
         const tokens = getQuickActionTokens(action.workflow, isSelected);
-        const label = truncateWithEllipsis(action.label, Math.max(4, perActionWidth - 4));
+        const label = truncateWithEllipsis(action.label, Math.max(4, perActionWidth - 2));
         return (
           <Box key={action.command} marginRight={2}>
             <Text color={tokens.cue}>
@@ -50,15 +50,13 @@ export function QuickActions({
             <Text color={tokens.label} bold={isSelected}>
               {label}
             </Text>
-            <Text color={COLORS.DIM} dimColor>
-              [{i + 1}]
-            </Text>
             {isSelected && showCommandHint && (
               <Text color={tokens.command}> ({action.command})</Text>
             )}
           </Box>
         );
       })}
+      <Text color={COLORS.DIM}>  · ←/→ move · Enter run</Text>
     </Box>
   );
 }

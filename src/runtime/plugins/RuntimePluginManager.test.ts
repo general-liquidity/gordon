@@ -55,4 +55,42 @@ describe("RuntimePluginManager", () => {
     expect(updates).toHaveLength(1);
     expect((updates[0] as { commands: string[] }).commands).toEqual(["/scan", "/analyze"]);
   });
+
+  it("surfaces lifecycle attention when a plugin exposes no commands", async () => {
+    const runtime = {
+      syncToolingState() {
+        return undefined;
+      },
+    } as any;
+
+    const manager = new RuntimePluginManager({
+      initializePlugins: async () => undefined,
+      listPlugins: () => [
+        {
+          id: "agent-only",
+          name: "Agent Only",
+          enabled: true,
+          category: "execution",
+          status: "ready",
+          lifecycle: "routed",
+          toolCount: 2,
+          commandCount: 0,
+          surfacedCommandCount: 0,
+          integrationCommands: [],
+          attentionLevel: "warning",
+          attentionReasons: ["no commands surfaced", "agent-routed only"],
+        },
+      ],
+      listMcpServers: () => [],
+      listTools: () => [],
+      listCommands: () => [],
+      reloadPlugins: async () => undefined,
+      enableHotReload: () => undefined,
+      disableHotReload: () => undefined,
+    });
+
+    const inventory = await manager.initialize(runtime);
+    expect(inventory.plugins[0]?.attentionLevel).toBe("warning");
+    expect(inventory.plugins[0]?.attentionReasons).toContain("no commands surfaced");
+  });
 });

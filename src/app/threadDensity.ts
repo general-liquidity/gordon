@@ -35,7 +35,10 @@ function getRecentCharacterLoad(messages: ThreadDensityMessage[], sampleSize: nu
 }
 
 export function getVisibleMessageLimit(input: VisibleThreadPolicyInput): number {
-  let visibleLimit = input.isStreaming || input.hasTaskTree || input.hasBackgroundTasks ? 96 : 132;
+  const isReaderMode = (input.bottomOffset ?? 0) > 0;
+  let visibleLimit = isReaderMode
+    ? 132
+    : input.isStreaming || input.hasTaskTree || input.hasBackgroundTasks ? 96 : 132;
   const recentCharacterLoad = getRecentCharacterLoad(input.messages);
 
   if (recentCharacterLoad >= 22_000) {
