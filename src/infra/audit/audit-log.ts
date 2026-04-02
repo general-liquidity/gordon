@@ -8,7 +8,7 @@
  * Audit logs are stored in SQLite for persistence and queryability.
  */
 
-import { getDatabase } from "../storage/database.ts";
+import { getDatabase, getDatabasePath } from "../storage/database.ts";
 import { createModuleLogger } from "../logger/index.ts";
 import { recordStructuredAuditEvent } from "../observability/index.ts";
 import { v4 as uuidv4 } from "uuid";
@@ -100,13 +100,14 @@ export interface AuditQueryOptions {
 // Database Initialization
 // ============================================================================
 
-let isInitialized = false;
+let initializedDatabasePath: string | null = null;
 
 /**
  * Initialize the audit_log table if it doesn't exist
  */
 function initAuditTable(): void {
-  if (isInitialized) return;
+  const currentDatabasePath = getDatabasePath();
+  if (initializedDatabasePath === currentDatabasePath) return;
 
   const db = getDatabase();
 
@@ -136,7 +137,7 @@ function initAuditTable(): void {
   db.run("CREATE INDEX IF NOT EXISTS idx_audit_planId ON audit_log(planId)");
   db.run("CREATE INDEX IF NOT EXISTS idx_audit_tradeId ON audit_log(tradeId)");
 
-  isInitialized = true;
+  initializedDatabasePath = currentDatabasePath;
   logger.debug("Audit table initialized");
 }
 

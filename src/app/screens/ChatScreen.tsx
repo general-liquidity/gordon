@@ -2,19 +2,25 @@ import React from "react";
 import { Box, Text, useStdout } from "ink";
 import { ChatInput } from "../ChatInput.tsx";
 import { ChatView, type ChatMessage } from "../ChatView.tsx";
-import { QuickStartMenu, type MenuOption } from "../QuickStartMenu.tsx";
 import { ShortcutsHint } from "../components/ShortcutsOverlay.tsx";
+import { CommandPaletteOverlay, type CommandPaletteItem } from "../components/overlays/CommandPaletteOverlay.tsx";
+import { SymbolJumpOverlay } from "../components/overlays/SymbolJumpOverlay.tsx";
+import { ReviewDeskOverlay } from "../components/overlays/ReviewDeskOverlay.tsx";
 import { WorkspaceRail } from "../components/WorkspaceRail.tsx";
 import { DeskRail } from "../components/desk/DeskRail.tsx";
 import RuntimeInspector from "../components/RuntimeInspector.tsx";
-import { WorkspaceBoard } from "./WorkspaceBoard.tsx";
+import { MarketWorkspace } from "./MarketWorkspace.tsx";
+import { PlanWorkspace } from "./PlanWorkspace.tsx";
+import { LabWorkspace } from "./LabWorkspace.tsx";
+import { MonitorWorkspace } from "./MonitorWorkspace.tsx";
 import { COLORS } from "../theme.ts";
 import { getQuickActionItems, type QuickActionContext } from "../commandUx.ts";
 import type { RuntimeInspectorViewModel } from "../presenters/RuntimePresenter.ts";
 import type { WorkspaceId, WorkspaceMemoryState } from "../state/AppStore.ts";
 import type { TaskTreeState } from "../taskTree.ts";
 import type { GordonConfig } from "../../types/index.ts";
-import type { WorkspaceBoardViewModel } from "../workspaceViewModels.ts";
+import type { WorkspaceSurfaceViewModel, PlanWorkspaceApprovalModel, PlanWorkspaceTicketModel } from "../workspaceSurfaces.ts";
+import type { OverlayKind } from "../overlayState.ts";
 
 interface ChatScreenProps {
   visibleMessages: ChatMessage[];
@@ -32,21 +38,14 @@ interface ChatScreenProps {
   showChatBanner: boolean;
   startupBannerMode: GordonConfig["startupBannerMode"];
   allMessagesCount: number;
-  quickActionsOverlayOpen: boolean;
-  onMenuSelect: (option: MenuOption) => void;
-  onTypeToChat: (seed: string) => void;
+  overlayKind: OverlayKind;
   mode: "SAFE" | "ARMED";
-  setupComplete: boolean;
-  hasExchange: boolean;
-  hasBroker: boolean;
-  hasWalletRails: boolean;
-  hasMcpServers: boolean;
   queuedPreview?: string;
   queuedCount: number;
   taskTree: TaskTreeState | null;
   backgroundTaskTree: TaskTreeState | null;
   runtimeInspector: RuntimeInspectorViewModel | null;
-  workspaceViewModel: WorkspaceBoardViewModel | null;
+  workspaceSurfaceModel: WorkspaceSurfaceViewModel | null;
   selectedWorkspaceCardIndex?: number;
   isLoading: boolean;
   chatInputPlaceholder: string;
@@ -55,6 +54,8 @@ interface ChatScreenProps {
   onSubmit: (value: string) => Promise<void>;
   onWorkspaceShortcut: (digit: string) => void;
   onOpenQuickActions: () => void;
+  onStageOverlayCommand: (command: string) => void;
+  onJumpSymbol: (symbol: string) => void;
   onTypingStateChange: (typing: boolean) => void;
   onDraftChange: (value: string) => void;
   busy: boolean;
@@ -62,6 +63,10 @@ interface ChatScreenProps {
   seedNonce: number;
   onCancel: () => void;
   canCancel: boolean;
+  commandPaletteItems: CommandPaletteItem[];
+  symbolJumpSymbols: string[];
+  reviewDeskTicket: PlanWorkspaceTicketModel | null;
+  reviewDeskApprovals: PlanWorkspaceApprovalModel | null;
 }
 
 function DeskFocusStrip(props: {
@@ -83,7 +88,7 @@ function DeskFocusStrip(props: {
     <Box marginTop={1} marginBottom={1}>
       <DeskRail
         title="Live Desk"
-        subtitle={props.busy ? "Routing the active request." : "Reason, route, and approve from the transcript."}
+        subtitle={props.busy ? "Active route open." : "Reason, route, approve from the transcript."}
         tone="analysis"
       >
         <Box flexWrap="wrap">
@@ -105,14 +110,14 @@ function DeskFocusStrip(props: {
               Approval:
             </Text>
             <Text color={COLORS.WHITE}>
-              {" "}Shift+A stage approve · Shift+D stage deny
+              {" "}Shift+A approve · Shift+D deny
             </Text>
           </Box>
         )}
         {!props.hasConversationMomentum && suggestedPaths.length > 0 && (
           <Box marginTop={1} flexWrap="wrap">
             <Text color={COLORS.DIM}>
-              Flows:
+              Start:
             </Text>
             <Text color={COLORS.WHITE}>
               {" "}{suggestedPaths.map((item) => item.command).join(" · ")}
@@ -152,19 +157,19 @@ export function ChatScreen(props: ChatScreenProps): React.ReactElement {
         : "IDLE";
   const runStatusText = props.activityStatus
     ?? (props.queuedCount > 0
-      ? "Queued follow-up ready."
+      ? "Queued route ready."
       : props.isLoading
         ? "Preparing the desk."
         : "Desk clear.");
   const footerText = props.busy
-    ? (columns >= 110 ? "PgUp/PgDn/Home/End transcript · /help" : "/help")
+    ? (columns >= 110 ? "Enter queue · Esc stop · PgUp/PgDn/Home/End · /help" : "Enter queue · Esc stop · /help")
     : columns >= 130
-      ? "Ctrl+K actions · [ ] or 1-5 workspaces · PgUp/PgDn/Home/End transcript · /menu actions · /help commands"
+      ? "Ctrl+K palette · Ctrl+J symbol · Ctrl+R review · [ ] or 1-5 workspace · PgUp/PgDn/Home/End · /help"
       : columns >= 100
-        ? "Ctrl+K actions · [ ] or 1-5 workspaces · PgUp/PgDn transcript · /help"
-        : "Ctrl+K · [ ] or 1-5 · /help";
+        ? "Ctrl+K palette · Ctrl+J symbol · Ctrl+R review · [ ] or 1-5 · /help"
+        : "Ctrl+K · Ctrl+J · Ctrl+R · /help";
   const runtimeInspectorForRender = useFrozenWhenDetached(props.runtimeInspector, props.isPinnedBottom);
-  const workspaceViewModelForRender = useFrozenWhenDetached(props.workspaceViewModel, props.isPinnedBottom);
+  const workspaceSurfaceModelForRender = useFrozenWhenDetached(props.workspaceSurfaceModel, props.isPinnedBottom);
   const visibleMessagesForRender = useFrozenWhenDetached(props.visibleMessages, props.isPinnedBottom);
   const hiddenBeforeForRender = useFrozenWhenDetached(props.hiddenBefore, props.isPinnedBottom);
   const visibleLimitForRender = useFrozenWhenDetached(props.visibleLimit, props.isPinnedBottom);
@@ -205,11 +210,28 @@ export function ChatScreen(props: ChatScreenProps): React.ReactElement {
           )}
 
           {props.workspace !== "desk" && (
-            workspaceViewModelForRender && (
-              <WorkspaceBoard
-                model={workspaceViewModelForRender}
-                selectedCardIndex={props.selectedWorkspaceCardIndex}
-              />
+            workspaceSurfaceModelForRender && (
+              workspaceSurfaceModelForRender.workspace === "market" ? (
+                <MarketWorkspace
+                  model={workspaceSurfaceModelForRender}
+                  selectedSectionIndex={props.selectedWorkspaceCardIndex}
+                />
+              ) : workspaceSurfaceModelForRender.workspace === "plan" ? (
+                <PlanWorkspace
+                  model={workspaceSurfaceModelForRender}
+                  selectedSectionIndex={props.selectedWorkspaceCardIndex}
+                />
+              ) : workspaceSurfaceModelForRender.workspace === "lab" ? (
+                <LabWorkspace
+                  model={workspaceSurfaceModelForRender}
+                  selectedSectionIndex={props.selectedWorkspaceCardIndex}
+                />
+              ) : workspaceSurfaceModelForRender.workspace === "monitor" ? (
+                <MonitorWorkspace
+                  model={workspaceSurfaceModelForRender}
+                  selectedSectionIndex={props.selectedWorkspaceCardIndex}
+                />
+              ) : null
             )
           )}
 
@@ -251,17 +273,25 @@ export function ChatScreen(props: ChatScreenProps): React.ReactElement {
         )}
       </Box>
 
-      {props.quickActionsOverlayOpen && (
-        <QuickStartMenu
-          onSelect={props.onMenuSelect}
-          onTypeToChat={props.onTypeToChat}
-          mode={props.mode}
-          setupComplete={props.setupComplete}
-          hasExchange={props.hasExchange}
-          hasBroker={props.hasBroker}
-          hasWalletRails={props.hasWalletRails}
-          hasMcpServers={props.hasMcpServers}
-          variant="overlay"
+      {props.overlayKind === "quick-actions" && (
+        <CommandPaletteOverlay
+          items={props.commandPaletteItems}
+          onSelect={props.onStageOverlayCommand}
+        />
+      )}
+
+      {props.overlayKind === "symbol-jump" && (
+        <SymbolJumpOverlay
+          symbols={props.symbolJumpSymbols}
+          onSelect={props.onJumpSymbol}
+        />
+      )}
+
+      {props.overlayKind === "review-desk" && (
+        <ReviewDeskOverlay
+          ticket={props.reviewDeskTicket}
+          approvals={props.reviewDeskApprovals}
+          onStage={props.onStageOverlayCommand}
         />
       )}
 
@@ -271,7 +301,7 @@ export function ChatScreen(props: ChatScreenProps): React.ReactElement {
         onOpenQuickActions={props.onOpenQuickActions}
         onTypingStateChange={props.onTypingStateChange}
         onDraftChange={props.onDraftChange}
-        disabled={props.quickActionsOverlayOpen}
+        disabled={props.overlayKind !== "none"}
         busy={props.busy}
         queueDepth={props.queuedCount}
         placeholder={props.chatInputPlaceholder}

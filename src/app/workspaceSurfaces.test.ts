@@ -1,10 +1,11 @@
 import { describe, expect, it } from "bun:test";
-import {
-  buildWorkspaceBoardViewModel,
-  getPrimaryWorkspaceAction,
-  type WorkspaceBoardViewInput,
-} from "./workspaceViewModels.ts";
 import type { Plan } from "../types/plan.ts";
+import {
+  buildWorkspaceSurfaceViewModel,
+  clampWorkspaceSurfaceSectionIndex,
+  getPrimaryWorkspaceSurfaceAction,
+} from "./workspaceSurfaces.ts";
+import type { WorkspaceBoardViewInput } from "./workspaceTypes.ts";
 
 function createBaseInput(
   workspace: WorkspaceBoardViewInput["workspace"],
@@ -114,8 +115,8 @@ function createPlan(overrides: Partial<Plan> = {}): Plan {
   };
 }
 
-describe("workspace view models", () => {
-  it("builds market workspace cards from scan and analysis results", () => {
+describe("workspace surface models", () => {
+  it("builds a market surface with shortlist rows and a focus dossier", () => {
     const input = createBaseInput("market");
     input.lastResults.scan = {
       coinsScanned: 42,
@@ -146,19 +147,20 @@ describe("workspace view models", () => {
       resistances: [{ price: 86200, strength: 0.68 }],
     };
 
-    const model = buildWorkspaceBoardViewModel(input);
+    const model = buildWorkspaceSurfaceViewModel(input);
 
-    expect(model.workspace).toBe("market");
-    expect(model.cards[0]?.title).toContain("live setups");
-    expect(model.cards[1]?.title).toContain("BTCUSDT");
+    expect(model?.workspace).toBe("market");
+    if (!model || model.workspace !== "market") {
+      throw new Error("Expected market surface");
+    }
+    expect(model.shortlist.rows[0]?.symbol).toBe("BTCUSDT");
+    expect(model.focus.title).toContain("BTCUSDT");
+    expect(getPrimaryWorkspaceSurfaceAction(model, 0)).toBe("/scan");
   });
 
-  it("builds plan workspace cards from stored plans and approvals", () => {
+  it("builds a plan surface with ticket, risk, approvals, and book sections", () => {
     const input = createBaseInput("plan");
-    input.runtimeInspector = {
-      ...input.runtimeInspector!,
-      pendingApprovalCount: 2,
-    };
+    input.mode = "ARMED";
     input.plans = [
       createPlan(),
       createPlan({
@@ -168,39 +170,47 @@ describe("workspace view models", () => {
         strategy: "ema_rsi_crossover",
       }),
     ];
-
-    const model = buildWorkspaceBoardViewModel(input);
-
-    expect(model.cards[0]?.title).toContain("BTCUSDT");
-    expect(model.cards[1]?.title).toContain("stored tickets");
-    expect(model.cards[1]?.notes).toContain("Approved: 1");
-  });
-
-  it("returns the primary action for the selected workspace card", () => {
-    const input = createBaseInput("market");
-    input.lastResults.scan = {
-      coinsScanned: 12,
-      opportunities: [
+    input.runtimeInspector = {
+      ...input.runtimeInspector!,
+      pendingApprovalCount: 1,
+      pendingApprovals: [
         {
-          symbol: "BTCUSDT",
-          price: 84500,
-          change24h: 2.1,
-          setupConfidence: 0.76,
-          bias: "bullish",
-          risk: "medium",
-        },
+          id: "approval_1234abcd",
+          toolName: "place_order",
+          reason: "Live order requires sign-off",
+          permissionScope: "broker:trade",
+          riskClass: "high",
+        } as never,
       ],
-      executionTime: 1200,
     };
 
-    const model = buildWorkspaceBoardViewModel(input);
-    expect(getPrimaryWorkspaceAction(model, 0)).toBe("/scan");
+    const model = buildWorkspaceSurfaceViewModel(input);
+
+    expect(model?.workspace).toBe("plan");
+    if (!model || model.workspace !== "plan") {
+      throw new Error("Expected plan surface");
+    }
+    expect(model.ticket.title).toContain("BTCUSDT");
+    expect(model.approvals.rows[0]?.tool).toBe("place_order");
+    expect(model.book.rows).toHaveLength(2);
+    expect(clampWorkspaceSurfaceSectionIndex(model, 8)).toBe(3);
+    expect(getPrimaryWorkspaceSurfaceAction(model, 1)).toBe("/runtime-approvals");
   });
 
-  it("builds lab workspace cards from strategy inventory and backtest data", () => {
+  it("builds a lab surface from strategy inventory and backtest state", () => {
     const input = createBaseInput("lab");
+    input.workspaceMemory.lab = {
+      selectedStrategyId: "gen_rsi",
+      selectedSource: "generated",
+    };
     input.strategyInventory.generatedStrategies = [
-      { id: "gen_rsi", name: "RSI Bounce", backtestReturn: 12.4, backtestSharpe: 1.3 },
+      { id: "gen_rsi", name: "RSI Bounce", riskLevel: "medium", backtestReturn: 12.4, backtestSharpe: 1.3 },
+    ];
+    input.strategyInventory.builtInStrategies = [
+      { id: "ema_cross", name: "EMA Cross", riskLevel: "medium", timeframes: ["1h", "4h"] },
+    ];
+    input.strategyInventory.playbooks = [
+      { id: "pb_mean", name: "Mean Reversion", riskLevel: "medium", timeframes: ["15m", "1h"] },
     ];
     input.lastResults.backtest = {
       summary: "Recent backtest complete.",
@@ -214,14 +224,19 @@ describe("workspace view models", () => {
       },
     };
 
-    const model = buildWorkspaceBoardViewModel(input);
+    const model = buildWorkspaceSurfaceViewModel(input);
 
-    expect(model.cards[0]?.title).toContain("generated");
-    expect(model.cards[1]?.title).toContain("Last backtest");
-    expect(model.cards[2]?.rows?.some((row) => row.label === "Live eligible" && row.value === "1")).toBe(true);
+    expect(model?.workspace).toBe("lab");
+    if (!model || model.workspace !== "lab") {
+      throw new Error("Expected lab surface");
+    }
+    expect(model.bench.rows[0]?.name).toContain("RSI");
+    expect(model.validation.title).toContain("Last backtest");
+    expect(model.registry.rows[0]?.kind).toBe("Built-in");
+    expect(getPrimaryWorkspaceSurfaceAction(model, 0)).toBe("/strategies");
   });
 
-  it("builds monitor workspace cards from portfolio and book snapshots", () => {
+  it("builds a monitor surface from book, positions, orders, and runtime state", () => {
     const input = createBaseInput("monitor");
     input.lastResults.portfolioSummary = {
       message: "Portfolio snapshot",
@@ -263,10 +278,15 @@ describe("workspace view models", () => {
       ],
     };
 
-    const model = buildWorkspaceBoardViewModel(input);
+    const model = buildWorkspaceSurfaceViewModel(input);
 
-    expect(model.cards[0]?.title).toContain("$15250.00");
-    expect(model.cards[1]?.title).toContain("open position");
-    expect(model.cards[2]?.rows?.some((row) => row.label === "Approvals")).toBe(true);
+    expect(model?.workspace).toBe("monitor");
+    if (!model || model.workspace !== "monitor") {
+      throw new Error("Expected monitor surface");
+    }
+    expect(model.book.rows[0]?.symbol).toBe("BTC");
+    expect(model.blotter.rows[0]?.symbol).toBe("BTCUSDT");
+    expect(model.runtime.rows[0]?.label).toBe("Approvals");
+    expect(getPrimaryWorkspaceSurfaceAction(model, 2)).toBe("/positions");
   });
 });

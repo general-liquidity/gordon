@@ -42,7 +42,9 @@ export function ShortcutsOverlay({ onClose }: ShortcutsOverlayProps): React.Reac
           <ShortcutRow keys="Enter" description="Send message" />
           <ShortcutRow keys="Tab" description="Autocomplete command" />
           <ShortcutRow keys="Up / Down" description="Navigate suggestions" />
-          <ShortcutRow keys="Ctrl+K" description="Open desk actions from chat" />
+          <ShortcutRow keys="Ctrl+K" description="Open command palette" />
+          <ShortcutRow keys="Ctrl+J" description="Promote one symbol into focus" />
+          <ShortcutRow keys="Ctrl+R" description="Open review desk" />
           <ShortcutRow keys="Escape" description="Dismiss overlays or stop the active run" />
           <ShortcutRow keys="Ctrl+L" description="Clear screen" />
           <ShortcutRow keys="Ctrl+C" description="Exit Gordon" />
@@ -107,26 +109,28 @@ export function ShortcutsHint({
   return (
     <Box paddingX={2} marginTop={1}>
       <Text color={textColor}>
-        Press{" "}
+        Keys{" "}
       </Text>
       <Text color={highlightColor} bold>
         ?
       </Text>
       <Text color={textColor}>
-        {" "}for help | Press{" "}
+        {" "}help ·{" "}
       </Text>
       <Text color={highlightColor} bold>
         Ctrl+K
       </Text>
       <Text color={textColor}>
-        {" "}for actions | Type{" "}
+        {" "} palette ·{" "}
       </Text>
       <Text color={highlightColor} bold>
-        /help
+        Ctrl+J
       </Text>
       <Text color={textColor}>
-        {" "}for commands
+        {" "} symbol ·{" "}
       </Text>
+      <Text color={highlightColor} bold>/help</Text>
+      <Text color={textColor}> commands</Text>
     </Box>
   );
 }

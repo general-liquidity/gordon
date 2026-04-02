@@ -1,10 +1,29 @@
-import { describe, expect, it } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+import { mkdtempSync, rmSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 
 import {
   clearSessionCostLedger,
   getSessionCostLedgerEntry,
   recordSessionCostUsage,
 } from "./sessionCostLedger.ts";
+import { setDatabasePathForTesting } from "../storage/database.ts";
+
+let tempDatabaseDir = "";
+
+beforeEach(() => {
+  tempDatabaseDir = mkdtempSync(join(tmpdir(), "gordon-cost-ledger-"));
+  setDatabasePathForTesting(join(tempDatabaseDir, "gordon.db"));
+});
+
+afterEach(() => {
+  setDatabasePathForTesting(null);
+  if (tempDatabaseDir) {
+    rmSync(tempDatabaseDir, { recursive: true, force: true });
+    tempDatabaseDir = "";
+  }
+});
 
 describe("sessionCostLedger", () => {
   it("persists cumulative usage totals by thread", () => {

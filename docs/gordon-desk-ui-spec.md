@@ -1,5 +1,11 @@
 # Gordon Desk UI Specification
 
+This document records the desk-language and shell-identity direction.
+
+For the consolidated current source-of-truth plan, see:
+
+- [docs/gordon-tui-master-plan.md](/C:/Users/tibit/Downloads/gordon-cli-0.8/gordon-cli-0.8/docs/gordon-tui-master-plan.md)
+
 This document defines the target UI and UX for Gordon as a premium operator-grade trading terminal.
 
 It is intentionally opinionated. The goal is not to make Gordon "prettier" in the abstract. The goal is to make Gordon feel coherent, high-signal, high-discipline, and unmistakably financial.

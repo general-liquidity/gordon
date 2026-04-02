@@ -19,10 +19,12 @@ import { marketplaceClient } from './registry';
 // Constants
 // ============================================================================
 
-import { GORDON_DIR } from '../../storage/paths.ts';
+import { getGordonDir } from '../../storage/paths.ts';
 
 /** Default plugins directory */
-const DEFAULT_PLUGINS_DIR = path.join(GORDON_DIR, 'plugins');
+function getDefaultPluginsDir(): string {
+  return path.join(getGordonDir(), 'plugins');
+}
 
 /** Installed plugins manifest file */
 const INSTALLED_MANIFEST = 'installed.json';
@@ -48,7 +50,13 @@ export class PluginInstaller {
   private progressListeners: ((progress: InstallationProgress) => void)[] = [];
 
   constructor(pluginsDir?: string) {
-    this.pluginsDir = pluginsDir ?? DEFAULT_PLUGINS_DIR;
+    this.pluginsDir = pluginsDir ?? getDefaultPluginsDir();
+  }
+
+  resetForTesting(pluginsDir?: string): void {
+    this.pluginsDir = pluginsDir ?? getDefaultPluginsDir();
+    this.installedPlugins.clear();
+    this.initialized = false;
   }
 
   /**

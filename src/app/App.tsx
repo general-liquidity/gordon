@@ -67,8 +67,9 @@ import type { Mode, GordonConfig } from "../types/index.ts";
 import type { Plan } from "../types/plan.ts";
 import { COLORS, type ThemeName } from "./theme.ts";
 import { buildVisibleThreadPolicy } from "./threadDensity.ts";
-import { getNextWorkspace, getPreviousWorkspace, getWorkspaceByShortcut } from "./workspaces.ts";
+import { getNextWorkspace, getPreviousWorkspace, getWorkspaceByShortcut, WORKSPACES } from "./workspaces.ts";
 import { loadWorkspaceShellState, saveWorkspaceShellState } from "./workspaceShellState.ts";
+import { getQuickActionItems } from "./commandUx.ts";
 import {
   parseSlashCommand,
   commandToPrompt,
@@ -172,11 +173,13 @@ import {
 } from "./state/AppStore.ts";
 import { createRuntimeInspectorViewModel } from "./presenters/RuntimePresenter.ts";
 import {
-  buildWorkspaceBoardViewModel,
-  clampWorkspaceCardIndex,
-  getPrimaryWorkspaceAction,
   type WorkspaceStrategyInventorySnapshot,
-} from "./workspaceViewModels.ts";
+} from "./workspaceTypes.ts";
+import {
+  buildWorkspaceSurfaceViewModel,
+  clampWorkspaceSurfaceSectionIndex,
+  getPrimaryWorkspaceSurfaceAction,
+} from "./workspaceSurfaces.ts";
 import { getRuntimeApprovalShortId } from "./runtimeApprovalId.ts";
 import {
   applyRuntimeApprovalDecision,
@@ -2293,6 +2296,24 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
     }));
   }, []);
 
+  const openSymbolJumpOverlay = useCallback((): void => {
+    setState((prev) => ({
+      ...prev,
+      view: "chat",
+      overlay: openOverlay("symbol-jump"),
+      showStartupHint: false,
+    }));
+  }, []);
+
+  const openReviewDeskOverlay = useCallback((): void => {
+    setState((prev) => ({
+      ...prev,
+      view: "chat",
+      overlay: openOverlay("review-desk"),
+      showStartupHint: false,
+    }));
+  }, []);
+
   const openShortcutsOverlay = useCallback((): void => {
     setState((prev) => ({
       ...prev,
@@ -2303,6 +2324,24 @@ function AppContent({ onThemeChange }: AppContentProps): React.ReactElement {
   const closeOverlay = useCallback((): void => {
     setState((prev) => ({ ...prev, overlay: OVERLAY_NONE }));
   }, []);
+
+  const stageOverlayCommand = useCallback((command: string): void => {
+    const workspaceRoute = WORKSPACES.find((workspace) => workspace.command === command);
+    if (workspaceRoute) {
+      openWorkspaceShell(workspaceRoute.id, { seed: "", resetInput: true });
+      return;
+    }
+
+    openWorkspaceShell(state.workspace, { seed: command, resetInput: true });
+  }, [openWorkspaceShell, state.workspace]);
+
+  const jumpToSymbol = useCallback((symbol: string): void => {
+    openWorkspaceShell("market", {
+      seed: `/analyze ${symbol}`,
+      resetInput: true,
+      memoryPatch: { focusSymbol: symbol },
+    });
+  }, [openWorkspaceShell]);
 
   const cancelActiveResponse = useCallback((): void => {
     const controller = activeStreamAbortControllerRef.current;
@@ -5432,6 +5471,38 @@ Please check your API keys in the .env file and restart Gordon.`,
     }
 
     if (
+      input.toLowerCase() === "j"
+      && key.ctrl
+      && state.view === "chat"
+      && !state.isLoading
+      && !state.isStreaming
+    ) {
+      setState((prev) => ({
+        ...prev,
+        overlay: isOverlayOpen(prev.overlay, "symbol-jump")
+          ? OVERLAY_NONE
+          : openOverlay("symbol-jump"),
+      }));
+      return;
+    }
+
+    if (
+      input.toLowerCase() === "r"
+      && key.ctrl
+      && state.view === "chat"
+      && !state.isLoading
+      && !state.isStreaming
+    ) {
+      setState((prev) => ({
+        ...prev,
+        overlay: isOverlayOpen(prev.overlay, "review-desk")
+          ? OVERLAY_NONE
+          : openOverlay("review-desk"),
+      }));
+      return;
+    }
+
+    if (
       state.view === "chat"
       && !isOverlayOpen(state.overlay)
       && state.chatDraft.trim().length === 0
@@ -5455,13 +5526,13 @@ Please check your API keys in the .env file and restart Gordon.`,
       && state.chatDraft.trim().length === 0
       && !state.isLoading
       && !state.isStreaming
-      && workspaceViewModel
+      && workspaceSurfaceModel
       && (key.upArrow || key.downArrow)
     ) {
-      const cardCount = workspaceViewModel.cards.length;
-      if (cardCount > 0) {
+      const sectionCount = workspaceSurfaceModel.sections.length;
+      if (sectionCount > 0) {
         const delta = key.downArrow ? 1 : -1;
-        const nextIndex = (selectedWorkspaceCardIndex + delta + cardCount) % cardCount;
+        const nextIndex = (selectedWorkspaceCardIndex + delta + sectionCount) % sectionCount;
         appStore.setWorkspaceSelection(state.workspace, nextIndex);
       }
       return;
@@ -5474,10 +5545,10 @@ Please check your API keys in the .env file and restart Gordon.`,
       && state.chatDraft.trim().length === 0
       && !state.isLoading
       && !state.isStreaming
-      && workspaceViewModel
+      && workspaceSurfaceModel
       && key.tab
     ) {
-      const primaryAction = getPrimaryWorkspaceAction(workspaceViewModel, selectedWorkspaceCardIndex);
+      const primaryAction = getPrimaryWorkspaceSurfaceAction(workspaceSurfaceModel, selectedWorkspaceCardIndex);
       if (primaryAction) {
         openWorkspaceShell(state.workspace, { seed: primaryAction, resetInput: true });
       }
@@ -5508,7 +5579,7 @@ Please check your API keys in the .env file and restart Gordon.`,
 
     // Show shortcuts with ? key (only when not actively typing in chat input)
     // The ? should only trigger when in menu view or when the shortcuts overlay is toggled
-    if (input === "?" && (state.view === "menu" || isOverlayOpen(state.overlay, "quick-actions"))) {
+    if (input === "?" && (state.view === "menu" || isOverlayOpen(state.overlay))) {
       openShortcutsOverlay();
       return;
     }
@@ -5574,7 +5645,7 @@ Please check your API keys in the .env file and restart Gordon.`,
     || configRef.current.agentRails.chainProviders.length > 0
     || configRef.current.agentRails.paymentProviders.length > 0
   );
-  const quickActionsOverlayOpen = isOverlayOpen(state.overlay, "quick-actions");
+  const overlayKind = state.overlay.kind;
   const shortcutsOverlayOpen = isOverlayOpen(state.overlay, "shortcuts");
   const showChatBanner = false;
   const quickActionContext = useMemo(
@@ -5589,8 +5660,14 @@ Please check your API keys in the .env file and restart Gordon.`,
     [hasWalletRails, state.mode, state.workspace]
   );
   const chatInputPlaceholder = useMemo(() => {
-    if (quickActionsOverlayOpen) {
-      return "Quick Actions open...";
+    if (overlayKind === "quick-actions") {
+      return "Command palette open...";
+    }
+    if (overlayKind === "symbol-jump") {
+      return "Symbol jump open...";
+    }
+    if (overlayKind === "review-desk") {
+      return "Review desk open...";
     }
     if (state.isLoading || state.isStreaming) {
       return "Waiting for response...";
@@ -5608,7 +5685,7 @@ Please check your API keys in the .env file and restart Gordon.`,
       default:
         return "Ask Gordon anything...";
     }
-  }, [quickActionsOverlayOpen, state.isLoading, state.isStreaming, state.workspace]);
+  }, [overlayKind, state.isLoading, state.isStreaming, state.workspace]);
 
   const strategyInventory = useMemo<WorkspaceStrategyInventorySnapshot>(() => {
     let builtInStrategyCount = 0;
@@ -5727,7 +5804,7 @@ Please check your API keys in the .env file and restart Gordon.`,
     };
   }, [state.messages]);
 
-  const workspaceViewModel = useMemo(() => {
+  const workspaceViewInput = useMemo(() => {
     if (state.workspace === "desk") {
       return null;
     }
@@ -5739,7 +5816,7 @@ Please check your API keys in the .env file and restart Gordon.`,
       plans = [];
     }
 
-    return buildWorkspaceBoardViewModel({
+    return {
       workspace: state.workspace,
       mode: state.mode,
       hasExchange: Boolean(exchangeRef.current),
@@ -5758,7 +5835,7 @@ Please check your API keys in the .env file and restart Gordon.`,
         maxAllocationPerTrade: configRef.current.preferences.maxAllocationPerTrade,
         cashReservePercent: configRef.current.preferences.cashReservePercent,
       },
-    });
+    };
   }, [
     hasWalletRails,
     state.availableCash,
@@ -5772,16 +5849,99 @@ Please check your API keys in the .env file and restart Gordon.`,
     strategyInventory,
   ]);
 
+  const workspaceSurfaceModel = useMemo(() => (
+    workspaceViewInput
+      ? buildWorkspaceSurfaceViewModel(workspaceViewInput)
+      : null
+  ), [workspaceViewInput]);
+
+  const reviewDeskSurfaceModel = useMemo(() => {
+    if (!workspaceViewInput) {
+      return null;
+    }
+
+    const model = buildWorkspaceSurfaceViewModel({
+      ...workspaceViewInput,
+      workspace: "plan",
+    });
+
+    return model && model.workspace === "plan" ? model : null;
+  }, [workspaceViewInput]);
+
   const selectedWorkspaceCardIndex = useMemo(() => {
-    if (state.workspace === "desk" || !workspaceViewModel) {
+    if (state.workspace === "desk") {
       return 0;
     }
 
-    return clampWorkspaceCardIndex(
-      workspaceViewModel,
-      state.workspaceInteraction[state.workspace].selectedCardIndex,
+    const selectedIndex = state.workspaceInteraction[state.workspace].selectedCardIndex;
+    if (!workspaceSurfaceModel) {
+      return 0;
+    }
+
+    return clampWorkspaceSurfaceSectionIndex(
+      workspaceSurfaceModel,
+      selectedIndex,
     );
-  }, [state.workspace, state.workspaceInteraction, workspaceViewModel]);
+  }, [state.workspace, state.workspaceInteraction, workspaceSurfaceModel]);
+
+  const commandPaletteItems = useMemo(() => {
+    const items = [
+      ...WORKSPACES.map((workspace) => ({
+        label: workspace.label,
+        command: workspace.command,
+        detail: "Workspace",
+      })),
+      ...getQuickActionItems(quickActionContext).map((item) => ({
+        label: item.label,
+        command: item.command,
+        detail: item.workflow ? `Flow ${item.workflow}` : "Flow",
+      })),
+      ...(workspaceSurfaceModel?.sections.flatMap((section) =>
+        section.actions.map((action) => ({
+          label: action,
+          command: action,
+          detail: `Section ${section.id}`,
+        }))
+      ) ?? []),
+      { label: "Runtime approvals", command: "/runtime-approvals", detail: "Operate" },
+      { label: "Portfolio", command: "/portfolio", detail: "Accounts" },
+      { label: "Health", command: "/health", detail: "Operate" },
+      { label: "Help", command: "/help", detail: "Operate" },
+    ];
+
+    const seen = new Set<string>();
+    return items.filter((item) => {
+      const key = `${item.command}:${item.detail}`;
+      if (seen.has(key)) {
+        return false;
+      }
+      seen.add(key);
+      return true;
+    }).slice(0, 24);
+  }, [quickActionContext, workspaceSurfaceModel]);
+
+  const symbolJumpSymbols = useMemo(() => {
+    const symbols = new Set<string>();
+
+    const add = (value: string | undefined): void => {
+      if (!value || !value.trim()) {
+        return;
+      }
+      symbols.add(value.trim().toUpperCase());
+    };
+
+    lastResultsRef.current.scan?.opportunities?.forEach((entry) => add(entry.symbol));
+    add(lastResultsRef.current.analysis?.symbol);
+    reviewDeskSurfaceModel?.book.rows.forEach((row) => add(row.symbol));
+    lastResultsRef.current.positionsSummary?.positions.forEach((row) => add(row.symbol));
+    lastResultsRef.current.ordersSummary?.orders.forEach((row) => add(row.symbol));
+    lastResultsRef.current.portfolioSummary?.holdings.forEach((row) => add(row.asset));
+    add(state.workspaceMemory.market.focusSymbol);
+    add(state.workspaceMemory.plan.focusSymbol);
+    add(state.workspaceMemory.monitor.focusSymbol);
+
+    return Array.from(symbols).slice(0, 16);
+  }, [reviewDeskSurfaceModel, state.workspaceMemory]);
 
   return (
     <Box flexDirection="column" height="100%">
@@ -5858,21 +6018,14 @@ Please check your API keys in the .env file and restart Gordon.`,
             showChatBanner={showChatBanner}
             startupBannerMode={configRef.current.startupBannerMode}
             allMessagesCount={transcriptMessages.length}
-            quickActionsOverlayOpen={quickActionsOverlayOpen}
-            onMenuSelect={handleMenuSelect}
-            onTypeToChat={(seed) => openChatWorkspace({ seed, resetInput: true })}
+            overlayKind={overlayKind}
             mode={state.mode}
-            setupComplete={configRef.current.onboardingComplete}
-            hasExchange={Boolean(exchangeRef.current)}
-            hasBroker={Boolean(brokerRef.current)}
-            hasWalletRails={hasWalletRails}
-            hasMcpServers={configRef.current.mcpServers.length > 0}
             queuedPreview={state.queuedSubmissions[0]?.preview}
             queuedCount={state.queuedSubmissions.length}
             taskTree={state.taskTree}
             backgroundTaskTree={state.backgroundTaskTree}
             runtimeInspector={state.runtimeInspector}
-            workspaceViewModel={workspaceViewModel}
+            workspaceSurfaceModel={workspaceSurfaceModel}
             selectedWorkspaceCardIndex={selectedWorkspaceCardIndex}
             isLoading={state.isLoading}
             chatInputPlaceholder={chatInputPlaceholder}
@@ -5881,6 +6034,8 @@ Please check your API keys in the .env file and restart Gordon.`,
             onSubmit={handleSubmit}
             onWorkspaceShortcut={handleWorkspaceShortcut}
             onOpenQuickActions={openQuickActionsOverlay}
+            onStageOverlayCommand={stageOverlayCommand}
+            onJumpSymbol={jumpToSymbol}
             onTypingStateChange={setTranscriptTypingState}
             onDraftChange={setChatDraft}
             busy={state.isLoading || state.isStreaming}
@@ -5888,6 +6043,10 @@ Please check your API keys in the .env file and restart Gordon.`,
             seedNonce={state.chatInputSeedNonce}
             onCancel={cancelActiveResponse}
             canCancel={Boolean(activeStreamAbortControllerRef.current)}
+            commandPaletteItems={commandPaletteItems}
+            symbolJumpSymbols={symbolJumpSymbols}
+            reviewDeskTicket={reviewDeskSurfaceModel?.ticket ?? null}
+            reviewDeskApprovals={reviewDeskSurfaceModel?.approvals ?? null}
           />
         )}
       </Box>

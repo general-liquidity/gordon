@@ -1,13 +1,32 @@
-import { describe, expect, it } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+import { mkdtempSync, rmSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 
 import { GordonConfigSchema } from "../../types/config.ts";
 import { appendActionLogEntry } from "../action-log/store.ts";
+import { setDatabasePathForTesting } from "../storage/database.ts";
 import {
   formatTranscriptRepairBlock,
   validateAndRepairModelMessages,
   validateAndRepairTranscript,
 } from "./transcriptValidator.ts";
 import type { GordonContext } from "./types.ts";
+
+let tempDatabaseDir = "";
+
+beforeEach(() => {
+  tempDatabaseDir = mkdtempSync(join(tmpdir(), "gordon-transcript-validator-"));
+  setDatabasePathForTesting(join(tempDatabaseDir, "gordon.db"));
+});
+
+afterEach(() => {
+  setDatabasePathForTesting(null);
+  if (tempDatabaseDir) {
+    rmSync(tempDatabaseDir, { recursive: true, force: true });
+    tempDatabaseDir = "";
+  }
+});
 
 function createContext(overrides: Partial<GordonContext> = {}): GordonContext {
   return {

@@ -5,7 +5,10 @@
  *        updateHeartbeat, isStaleSession, saveMandateState, loadMandateState, clearMandateState
  */
 
-import { describe, test, expect, beforeEach } from "bun:test";
+import { describe, test, expect, beforeEach, afterEach } from "bun:test";
+import { mkdtempSync, rmSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 import {
   saveSessionState,
   loadSessionState,
@@ -15,14 +18,29 @@ import {
   saveMandateState,
   loadMandateState,
   clearMandateState,
+  setSessionPersistenceDirForTesting,
   type PersistedSessionState,
 } from "./session-persistence.ts";
 import { createMandate } from "./swing-mandate.ts";
 
+let tempGordonDir = "";
+
 // Clean up before each test to avoid cross-contamination
 beforeEach(() => {
+  tempGordonDir = mkdtempSync(join(tmpdir(), "gordon-session-test-"));
+  setSessionPersistenceDirForTesting(tempGordonDir);
   clearSessionState();
   clearMandateState();
+});
+
+afterEach(() => {
+  clearSessionState();
+  clearMandateState();
+  setSessionPersistenceDirForTesting(null);
+  if (tempGordonDir) {
+    rmSync(tempGordonDir, { recursive: true, force: true });
+    tempGordonDir = "";
+  }
 });
 
 describe("session state persistence", () => {

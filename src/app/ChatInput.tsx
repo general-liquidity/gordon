@@ -7,6 +7,7 @@ import React, { useState, useCallback, useEffect, useMemo, useRef } from "react"
 import { Box, Text, useInput } from "ink";
 import { TextInput } from "@inkjs/ui";
 import { NoticeAlert } from "./components/PromptPrimitives.tsx";
+import { CommandBar } from "./components/workspace/CommandBar.tsx";
 import { COLORS } from "./theme.ts";
 import { getSlashCommandSuggestions, parseSlashCommand } from "./slashCommands.ts";
 import { CommandAutocomplete } from "./components/CommandAutocomplete.tsx";
@@ -103,16 +104,7 @@ function ChatInputComponent({
     ? COLORS.DIM
     : busy
       ? COLORS.AMBER
-      : COLORS.ACCENT;
-  const promptBorder = disabled
-    ? COLORS.DIM
-    : busy
-      ? COLORS.AMBER_DIM
-      : COLORS.ACCENT_DIM;
-  const promptLabel = busy ? "LIVE PROMPT" : "DESK PROMPT";
-  const promptStatus = !busy && queueDepth > 0
-    ? `queue ${queueDepth} waiting`
-    : null;
+      : COLORS.BRASS;
 
   useEffect(() => {
     if (seedNonce === 0) {
@@ -316,27 +308,31 @@ function ChatInputComponent({
         </NoticeAlert>
       )}
 
-      <Box marginX={1} flexDirection="column">
-        <Box marginBottom={0}>
-          <Text color={promptTone} bold>
-            {promptLabel}
-          </Text>
-          {promptStatus && (
-            <Text color={COLORS.DIM}>
-              {" "}· {promptStatus}
-            </Text>
-          )}
-        </Box>
-        <Box
-          borderStyle="single"
-          borderColor={promptBorder}
-          paddingX={1}
-          paddingY={0}
-          flexDirection="column"
-        >
+      <CommandBar
+        busy={busy}
+        queueDepth={queueDepth}
+        disabled={disabled}
+        autocomplete={shouldShowAutocomplete ? (
+          <CommandAutocomplete
+            suggestions={suggestions}
+            selectedIndex={autocompleteIndex}
+            inputValue={value}
+            embedded
+            maxVisible={6}
+            showCategories={false}
+          />
+        ) : null}
+        hint={busy
+          ? "Enter queues. Esc stops."
+          : queueDepth > 0
+            ? `Queue ${queueDepth} ready. Enter sends next.`
+            : "Enter sends. /help opens the book."}
+      >
+        <Box flexDirection="column">
           <Box>
+            <Text color={COLORS.DIM}>route</Text>
             <Text color={promptTone} bold>
-              {busy ? "»" : ">"}
+              {busy ? " »" : " >"}
             </Text>
             <Text color={promptTone}> </Text>
             <TextInput
@@ -351,29 +347,8 @@ function ChatInputComponent({
               <Text color={COLORS.DIM}>  prompt locked</Text>
             )}
           </Box>
-          {shouldShowAutocomplete && (
-            <Box marginTop={1}>
-              <CommandAutocomplete
-                suggestions={suggestions}
-                selectedIndex={autocompleteIndex}
-                inputValue={value}
-                embedded
-                maxVisible={6}
-                showCategories={false}
-              />
-            </Box>
-          )}
         </Box>
-        <Box marginTop={0}>
-          <Text color={COLORS.DIM}>
-            {busy
-              ? "Enter queues. Esc stops."
-              : queueDepth > 0
-                ? `Queue ${queueDepth} ready. Enter sends next.`
-                : "Enter sends. /help."}
-          </Text>
-        </Box>
-      </Box>
+      </CommandBar>
     </Box>
   );
 }

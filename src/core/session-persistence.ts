@@ -6,11 +6,26 @@
 import { createModuleLogger } from "../infra/logger/index.ts";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { GORDON_DIR } from "../infra/storage/paths.ts";
+import { getGordonDir } from "../infra/storage/paths.ts";
 
 const logger = createModuleLogger("session-persistence");
-const SESSION_FILE = path.join(GORDON_DIR, "session-state.json");
-const MANDATE_FILE = path.join(GORDON_DIR, "active-mandate.json");
+let persistenceDirOverride: string | null = null;
+
+function getPersistenceDir(): string {
+  return persistenceDirOverride ?? getGordonDir();
+}
+
+function getSessionFilePath(): string {
+  return path.join(getPersistenceDir(), "session-state.json");
+}
+
+function getMandateFilePath(): string {
+  return path.join(getPersistenceDir(), "active-mandate.json");
+}
+
+export function setSessionPersistenceDirForTesting(directory: string | null): void {
+  persistenceDirOverride = directory;
+}
 
 // ============================================================================
 // Types
@@ -37,9 +52,10 @@ export interface PersistedSessionState {
 // ============================================================================
 
 function ensureGordonDir(): void {
-  if (!fs.existsSync(GORDON_DIR)) {
-    fs.mkdirSync(GORDON_DIR, { recursive: true });
-    logger.info("Created .gordon directory", { path: GORDON_DIR });
+  const gordonDir = getPersistenceDir();
+  if (!fs.existsSync(gordonDir)) {
+    fs.mkdirSync(gordonDir, { recursive: true });
+    logger.info("Created .gordon directory", { path: gordonDir });
   }
 }
 
@@ -50,7 +66,7 @@ function ensureGordonDir(): void {
 export function saveSessionState(state: PersistedSessionState): void {
   try {
     ensureGordonDir();
-    fs.writeFileSync(SESSION_FILE, JSON.stringify(state, null, 2), "utf-8");
+    fs.writeFileSync(getSessionFilePath(), JSON.stringify(state, null, 2), "utf-8");
     logger.debug("Session state saved", { sessionId: state.sessionId });
   } catch (error) {
     logger.error("Failed to save session state", error as Error);
@@ -59,8 +75,9 @@ export function saveSessionState(state: PersistedSessionState): void {
 
 export function loadSessionState(): PersistedSessionState | null {
   try {
-    if (!fs.existsSync(SESSION_FILE)) return null;
-    const data = fs.readFileSync(SESSION_FILE, "utf-8");
+    const sessionFile = getSessionFilePath();
+    if (!fs.existsSync(sessionFile)) return null;
+    const data = fs.readFileSync(sessionFile, "utf-8");
     return JSON.parse(data) as PersistedSessionState;
   } catch (error) {
     logger.error("Failed to load session state", error as Error);
@@ -70,8 +87,9 @@ export function loadSessionState(): PersistedSessionState | null {
 
 export function clearSessionState(): void {
   try {
-    if (fs.existsSync(SESSION_FILE)) {
-      fs.unlinkSync(SESSION_FILE);
+    const sessionFile = getSessionFilePath();
+    if (fs.existsSync(sessionFile)) {
+      fs.unlinkSync(sessionFile);
       logger.info("Session state cleared");
     }
   } catch (error) {
@@ -101,7 +119,7 @@ import type { SwingMandate } from "./swing-mandate.ts";
 export function saveMandateState(mandate: SwingMandate): void {
   try {
     ensureGordonDir();
-    fs.writeFileSync(MANDATE_FILE, JSON.stringify(mandate, null, 2), "utf-8");
+    fs.writeFileSync(getMandateFilePath(), JSON.stringify(mandate, null, 2), "utf-8");
     logger.info("Mandate state saved", { mandateId: mandate.id });
   } catch (error) {
     logger.error("Failed to save mandate state", error as Error);
@@ -110,8 +128,9 @@ export function saveMandateState(mandate: SwingMandate): void {
 
 export function loadMandateState(): SwingMandate | null {
   try {
-    if (!fs.existsSync(MANDATE_FILE)) return null;
-    const data = fs.readFileSync(MANDATE_FILE, "utf-8");
+    const mandateFile = getMandateFilePath();
+    if (!fs.existsSync(mandateFile)) return null;
+    const data = fs.readFileSync(mandateFile, "utf-8");
     return JSON.parse(data) as SwingMandate;
   } catch (error) {
     logger.error("Failed to load mandate state", error as Error);
@@ -121,8 +140,9 @@ export function loadMandateState(): SwingMandate | null {
 
 export function clearMandateState(): void {
   try {
-    if (fs.existsSync(MANDATE_FILE)) {
-      fs.unlinkSync(MANDATE_FILE);
+    const mandateFile = getMandateFilePath();
+    if (fs.existsSync(mandateFile)) {
+      fs.unlinkSync(mandateFile);
       logger.info("Mandate state cleared");
     }
   } catch (error) {

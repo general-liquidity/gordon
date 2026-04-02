@@ -43,7 +43,7 @@ describe("checkToolSecurity", () => {
     );
 
     expect(result.allowed).toBe(false);
-    expect(result.error).toContain("ARMED");
+    expect(result.error).toContain("SAFE mode");
     expect(result.approvalRequestId).toBeUndefined();
   });
 });

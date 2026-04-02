@@ -1,5 +1,11 @@
 # Gordon Workspace Redesign
 
+This document records the initial workspace-direction pass.
+
+For the current source-of-truth implementation contract, see:
+
+- [docs/gordon-tui-master-plan.md](/C:/Users/tibit/Downloads/gordon-cli-0.8/gordon-cli-0.8/docs/gordon-tui-master-plan.md)
+
 ## 1. Codebase understanding
 
 Gordon is already a multi-surface trading runtime. The current terminal exposes it mostly as a chat shell.

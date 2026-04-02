@@ -10,6 +10,7 @@ import { ProgressBar, Spinner } from "@inkjs/ui";
 import { COLORS } from "../theme.ts";
 import { DeskPanel } from "./desk/DeskPanel.tsx";
 import { TicketCard } from "./desk/TicketCard.tsx";
+import { OrbitalBoot } from "./effects/OrbitalBoot.tsx";
 import {
   getGordonLoadingPhrases,
   useGordonLoader,
@@ -131,6 +132,13 @@ export const ProgressIndicator: React.FC<ProgressIndicatorProps> = ({
           tone="success"
           actions={cancellable && onCancel ? ["Esc", "C"] : undefined}
         >
+          <Box marginBottom={1}>
+            <OrbitalBoot
+              compact
+              title="Orbital load"
+              subtitle={status ?? "Preparing the desk surface."}
+            />
+          </Box>
           {status && (
             <Text color={COLORS.DIM}>{status}</Text>
           )}

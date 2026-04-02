@@ -1,4 +1,9 @@
-export type OverlayKind = "none" | "quick-actions" | "shortcuts";
+export type OverlayKind =
+  | "none"
+  | "quick-actions"
+  | "shortcuts"
+  | "symbol-jump"
+  | "review-desk";
 
 export interface OverlayState {
   kind: OverlayKind;

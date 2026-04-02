@@ -64,8 +64,8 @@ export function WorkspaceRail({
 
   return (
     <DeskRail
-      title="Desk Mandate"
-      subtitle={activeWorkspace.cue}
+      title="Gordon"
+      subtitle={`${activeWorkspace.label} mandate · ${activeWorkspace.cue}`}
       tone="brand"
     >
       <Box flexWrap="wrap">
@@ -74,10 +74,10 @@ export function WorkspaceRail({
           return (
             <Box key={item.id} marginRight={2}>
               <Text color={isActive ? COLORS.WHITE : COLORS.DIM} bold={isActive}>
-                {isActive ? `■ ${item.label}` : item.label}
+                {isActive ? `${index + 1} ${item.label}` : `${index + 1} ${item.label}`}
               </Text>
               {index < WORKSPACES.length - 1 && (
-                <Text color={COLORS.BRASS_DIM}> · </Text>
+                <Text color={COLORS.BRASS_DIM}>  </Text>
               )}
             </Box>
           );
@@ -96,7 +96,7 @@ export function WorkspaceRail({
           </Text>
         ))}
         <Text color={COLORS.DIM}>
-          {" "}· [ ] or 1-5
+          {" "}· [ ] cycle · 1-5 switch
         </Text>
       </Box>
     </DeskRail>

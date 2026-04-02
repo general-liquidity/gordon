@@ -2,6 +2,7 @@ import React, { useMemo, useState, useCallback } from "react";
 import { Box, Text, useStdout } from "ink";
 import { COLORS } from "./theme.ts";
 import { GlitchReveal } from "./components/effects/GlitchReveal.tsx";
+import { OrbitalBoot } from "./components/effects/OrbitalBoot.tsx";
 import { DeskPanel } from "./components/desk/DeskPanel.tsx";
 
 // Gordon Gekko quotes — Wall Street (1987) & Wall Street: Money Never Sleeps (2010)
@@ -84,7 +85,7 @@ export const WelcomeBanner: React.FC<WelcomeBannerProps> = ({
         eyebrow="General Liquidity"
         title={quiet ? "Gordon Desk" : "Gordon Desk"}
         subtitle={context === "welcome"
-          ? "The Frontier Trading Agent"
+          ? "The AI-native trading command terminal"
           : quiet
             ? "Plan-first trading workstation"
             : "Plan. Size. Execute."}
@@ -92,6 +93,12 @@ export const WelcomeBanner: React.FC<WelcomeBannerProps> = ({
       >
         {!quiet && (
           <Box flexDirection="column">
+            <Box marginBottom={1}>
+              <OrbitalBoot
+                title="Orbital boot"
+                subtitle="Liquidity map, routing rails, risk interlocks."
+              />
+            </Box>
             {revealed ? (
               <Text color={COLORS.MONEY} bold>
                 {bannerText}
@@ -112,10 +119,20 @@ export const WelcomeBanner: React.FC<WelcomeBannerProps> = ({
           </Box>
         )}
 
+        {quiet && (
+          <Box marginBottom={1}>
+            <OrbitalBoot
+              compact
+              title="Desk boot"
+              subtitle="Private desk state restored."
+            />
+          </Box>
+        )}
+
         <Box marginTop={quiet ? 0 : 1} flexDirection="column">
           <Text color={COLORS.DIM}>
             {quiet
-              ? "Private desk state loaded."
+              ? "Quiet startup enabled."
               : "Markets are noisy. Gordon turns the tape into tickets, plans, and controlled action."}
           </Text>
         </Box>

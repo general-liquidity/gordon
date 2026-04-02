@@ -1,9 +1,13 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { mkdtempSync, rmSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 
 import { GordonConfigSchema } from "../../types/index.ts";
 import { getBuiltInAgentRailListings, syncAgentRailMcpPlugins } from "./index.ts";
 import { createAgentRailsRegistry } from "./registry.ts";
 import { pluginInstaller } from "../mcp/marketplace/installer.ts";
+import { setDatabasePathForTesting } from "../storage/database.ts";
 
 const ORIGINAL_ENV = { ...process.env };
 const RAIL_ENV_KEYS = [
@@ -17,6 +21,8 @@ const RAIL_ENV_KEYS = [
   "POLYGON_X402_CHAIN_ID",
 ] as const;
 
+let tempPluginsDir = "";
+
 function resetRailEnv(): void {
   for (const key of RAIL_ENV_KEYS) {
     delete process.env[key];
@@ -25,6 +31,9 @@ function resetRailEnv(): void {
 
 beforeEach(() => {
   resetRailEnv();
+  tempPluginsDir = mkdtempSync(join(tmpdir(), "gordon-plugin-installer-"));
+  pluginInstaller.resetForTesting(tempPluginsDir);
+  setDatabasePathForTesting(join(tempPluginsDir, "gordon.db"));
 });
 
 afterEach(async () => {
@@ -41,6 +50,16 @@ afterEach(async () => {
     if (installed) {
       await pluginInstaller.uninstall(pluginId);
     }
+  }
+  pluginInstaller.resetForTesting();
+  setDatabasePathForTesting(null);
+  if (tempPluginsDir) {
+    try {
+      rmSync(tempPluginsDir, { recursive: true, force: true });
+    } catch {
+      // Windows can hold a transient lock on recently touched temp dirs.
+    }
+    tempPluginsDir = "";
   }
 });
 

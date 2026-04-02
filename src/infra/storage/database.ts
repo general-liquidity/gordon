@@ -1,11 +1,21 @@
 import { Database, type Statement } from "bun:sqlite";
 import { mkdirSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { createModuleLogger } from "../logger/index.ts";
-import { GORDON_DIR } from "./paths.ts";
+import { getGordonDir } from "./paths.ts";
 
 const logger = createModuleLogger("database");
-export const DB_PATH = join(GORDON_DIR, "gordon.db");
+let databasePathOverride: string | null = null;
+export const DB_PATH = join(getGordonDir(), "gordon.db");
+
+export function getDatabasePath(): string {
+  return databasePathOverride ?? join(getGordonDir(), "gordon.db");
+}
+
+export function setDatabasePathForTesting(databasePath: string | null): void {
+  closeDatabase();
+  databasePathOverride = databasePath;
+}
 
 let dbInstance: Database | null = null;
 
@@ -37,7 +47,7 @@ let savepointCounter = 0;
  * Ensures the ~/.gordon directory exists (sync version)
  */
 function ensureGordonDirSync(): void {
-  mkdirSync(GORDON_DIR, { recursive: true });
+  mkdirSync(dirname(getDatabasePath()), { recursive: true });
 }
 
 /**
@@ -50,7 +60,7 @@ export function initDatabase(): Database {
 
   ensureGordonDirSync();
 
-  const db = new Database(DB_PATH);
+  const db = new Database(getDatabasePath());
 
   // Enable WAL mode for better concurrent access
   db.run("PRAGMA journal_mode = WAL");
