@@ -3,6 +3,7 @@ import { Box, Text } from "ink";
 import { CollapsibleOutput } from "./CollapsibleOutput.js";
 import { DataTable, fmtNum, fmtPct, changeColor, type Column } from "./DataTable.js";
 import { InlineChart } from "./InlineChart.js";
+import { MarkdownRenderer } from "./MarkdownRenderer.js";
 import { getRenderer } from "../renderers/index.js";
 
 // ============================================================================
@@ -34,13 +35,8 @@ export function RichContent({ content, maxLines = 15 }: Props) {
     return <CollapsibleOutput content={content} maxLines={maxLines} />;
   }
 
-  return (
-    <Box flexDirection="column">
-      {lines.map((line, i) => (
-        <RichLine key={i} line={line} />
-      ))}
-    </Box>
-  );
+  // Phase 15: Use MarkdownRenderer for rich message formatting
+  return <MarkdownRenderer content={content} />;
 }
 
 // ============================================================================
@@ -112,7 +108,7 @@ function renderStructuredJson(data: unknown, surroundingText: string): React.Rea
         key="table"
         columns={columns}
         data={rows}
-        borderColor="gray"
+        /* borderColor omitted — DataTable uses plain aligned columns */
       />
     );
 
@@ -143,7 +139,7 @@ function renderStructuredJson(data: unknown, surroundingText: string): React.Rea
           { key: "value", header: "VALUE", width: 20, align: "right" as const },
         ]}
         data={rows}
-        borderColor="gray"
+        /* borderColor omitted — DataTable uses plain aligned columns */
       />
     );
 
@@ -179,6 +175,11 @@ function detectRenderer(data: unknown): { name: string; props: Record<string, un
     if (keys.includes("name") && keys.includes("description") && keys.includes("workflow")) {
       return { name: "help", props: { commands: data } };
     }
+
+    // strategy: array with name + status + pnl + sharpe
+    if (keys.includes("name") && keys.includes("status") && keys.includes("pnl") && keys.includes("sharpe")) {
+      return { name: "strategy", props: { data } };
+    }
   }
 
   // ── Object shapes ──
@@ -209,6 +210,27 @@ function detectRenderer(data: unknown): { name: string; props: Record<string, un
     // doctor: object with checks array
     if (keys.includes("checks") && Array.isArray(obj.checks)) {
       return { name: "doctor", props: { data: obj } };
+    }
+
+    // risk: object with positionSize + dailyLoss + drawdown + leverage
+    if (keys.includes("positionSize") && keys.includes("dailyLoss") && keys.includes("drawdown") && keys.includes("leverage")) {
+      return { name: "risk", props: { data: obj } };
+    }
+
+    // marketanalysis: object with symbol + type + summary + signal + confidence (deep/ensemble/mtf)
+    if (keys.includes("symbol") && keys.includes("type") && keys.includes("summary") && keys.includes("confidence") &&
+        (keys.includes("timeframes") || keys.includes("ensemble") || keys.includes("keyLevels"))) {
+      return { name: "marketanalysis", props: { data: obj } };
+    }
+
+    // indicator: object with rsi + macd + trend
+    if (keys.includes("rsi") && keys.includes("macd") && keys.includes("trend") && keys.includes("macdState")) {
+      return { name: "indicator", props: { data: obj } };
+    }
+
+    // liquidation: object with currentPrice + levels array
+    if (keys.includes("currentPrice") && keys.includes("levels") && Array.isArray(obj.levels)) {
+      return { name: "liquidation", props: { data: obj } };
     }
   }
 

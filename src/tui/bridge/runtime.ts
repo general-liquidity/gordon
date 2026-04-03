@@ -568,6 +568,26 @@ async function handleMenuCommand(
       );
       return;
     }
+    case "telemetry": {
+      try {
+        const result = await handleTelemetryCommand(args);
+        const content = typeof result === "string" ? result : JSON.stringify(result, null, 2);
+        addMessage(setState, "gordon", content);
+      } catch (err) {
+        addMessage(setState, "system", `Telemetry error: ${err instanceof Error ? err.message : String(err)}`, "system");
+      }
+      return;
+    }
+    case "context": {
+      try {
+        const result = await handleContextCommand(args);
+        const content = typeof result === "string" ? result : JSON.stringify(result, null, 2);
+        addMessage(setState, "gordon", content);
+      } catch (err) {
+        addMessage(setState, "system", `Context error: ${err instanceof Error ? err.message : String(err)}`, "system");
+      }
+      return;
+    }
     case "bugreport": {
       const state = runtime.getState();
       addMessage(setState, "gordon",

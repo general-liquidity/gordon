@@ -11,6 +11,11 @@ export { BacktestRenderer } from "./BacktestRenderer.js";
 export { OrderBookRenderer } from "./OrderBookRenderer.js";
 export { DoctorRenderer } from "./DoctorRenderer.js";
 export { HelpRenderer } from "./HelpRenderer.js";
+export { StrategyRenderer } from "./StrategyRenderer.js";
+export { RiskRenderer } from "./RiskRenderer.js";
+export { MarketAnalysisRenderer } from "./MarketAnalysisRenderer.js";
+export { IndicatorRenderer } from "./IndicatorRenderer.js";
+export { LiquidationRenderer } from "./LiquidationRenderer.js";
 
 // ============================================================================
 // Registry -- name -> renderer component mapping
@@ -24,6 +29,11 @@ import { BacktestRenderer } from "./BacktestRenderer.js";
 import { OrderBookRenderer } from "./OrderBookRenderer.js";
 import { DoctorRenderer } from "./DoctorRenderer.js";
 import { HelpRenderer } from "./HelpRenderer.js";
+import { StrategyRenderer } from "./StrategyRenderer.js";
+import { RiskRenderer } from "./RiskRenderer.js";
+import { MarketAnalysisRenderer } from "./MarketAnalysisRenderer.js";
+import { IndicatorRenderer } from "./IndicatorRenderer.js";
+import { LiquidationRenderer } from "./LiquidationRenderer.js";
 
 import type { ComponentType } from "react";
 
@@ -41,6 +51,11 @@ const RENDERER_REGISTRY: Record<string, ComponentType<any>> = {
   orderbook: OrderBookRenderer,
   doctor: DoctorRenderer,
   help: HelpRenderer,
+  strategy: StrategyRenderer,
+  risk: RiskRenderer,
+  marketanalysis: MarketAnalysisRenderer,
+  indicator: IndicatorRenderer,
+  liquidation: LiquidationRenderer,
 };
 
 /**
