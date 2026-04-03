@@ -174,6 +174,28 @@ export function appReducer(state: AppState, action: Action): AppState {
         autonomousStrategyCount: action.strategyCount ?? (action.active ? 1 : 0),
       };
 
+    // Phase 15-18 — Panel toggles
+    case "SET_SHOW_SETTINGS":
+      return { ...state, showSettings: action.show };
+
+    case "SET_SHOW_EXPORT":
+      return { ...state, showExport: action.show };
+
+    case "SET_SHOW_EMERGENCY":
+      return { ...state, showEmergency: action.show };
+
+    case "SET_SHOW_CONTEXT":
+      return { ...state, showContext: action.show };
+
+    case "SET_SHOW_SESSIONS":
+      return { ...state, showSessions: action.show };
+
+    case "SET_SHOW_MEMORY":
+      return { ...state, showMemory: action.show };
+
+    case "SET_PRIVACY_MODE":
+      return { ...state, privacyMode: action.enabled };
+
     default: {
       // Exhaustive check — if we get here, we missed a case
       const _exhaustive: never = action;

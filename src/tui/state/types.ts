@@ -98,6 +98,15 @@ export interface AppState {
   runtimeReady: boolean;
   bootPhase: BootPhase;
 
+  // Phase 15-18 panels
+  showSettings: boolean;
+  showExport: boolean;
+  showEmergency: boolean;
+  showContext: boolean;
+  showSessions: boolean;
+  showMemory: boolean;
+  privacyMode: boolean;
+
   // Workspace (legacy lens system)
   activeWorkspace: string | null;
 }
@@ -127,6 +136,13 @@ export const INITIAL_STATE: AppState = {
   showHelp: false,
   runtimeReady: false,
   bootPhase: "boot",
+  showSettings: false,
+  showExport: false,
+  showEmergency: false,
+  showContext: false,
+  showSessions: false,
+  showMemory: false,
+  privacyMode: false,
   activeWorkspace: null,
 };
 
@@ -170,7 +186,15 @@ export type Action =
   | { type: "AGENT_SWITCH"; from: string; to: string }
   | { type: "UPDATE_COST"; pnl: number; pnlPercent: number }
   // Phase 6 — Autonomous loop
-  | { type: "SET_AUTONOMOUS_ACTIVE"; active: boolean; strategyCount?: number };
+  | { type: "SET_AUTONOMOUS_ACTIVE"; active: boolean; strategyCount?: number }
+  // Phase 15-18 — Panel toggles
+  | { type: "SET_SHOW_SETTINGS"; show: boolean }
+  | { type: "SET_SHOW_EXPORT"; show: boolean }
+  | { type: "SET_SHOW_EMERGENCY"; show: boolean }
+  | { type: "SET_SHOW_CONTEXT"; show: boolean }
+  | { type: "SET_SHOW_SESSIONS"; show: boolean }
+  | { type: "SET_SHOW_MEMORY"; show: boolean }
+  | { type: "SET_PRIVACY_MODE"; enabled: boolean };
 
 // ============================================================================
 // Dispatch

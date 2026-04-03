@@ -1,7 +1,9 @@
-import React, { useCallback, useEffect } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { Box, Text, Spacer, useInput, useApp } from "ink";
 
 // ── Providers ──
+import { SettingsProvider } from "./state/SettingsProvider.js";
+import { MemoryProvider } from "./state/MemoryProvider.js";
 import { StatsProvider } from "./state/StatsProvider.js";
 import { NotificationsProvider } from "./state/NotificationsProvider.js";
 import {
@@ -28,6 +30,17 @@ import { PromptInput } from "./components/PromptInput.js";
 import { VirtualMessageList } from "./components/VirtualMessageList.js";
 import { CostDisplay } from "./components/CostDisplay.js";
 
+// ── Phase 15-18 Components ──
+import { SettingsDialog } from "./components/SettingsDialog.js";
+import { ExportDialog } from "./components/ExportDialog.js";
+import { EmergencyHalt } from "./components/EmergencyHalt.js";
+import { ContextVisualization } from "./components/ContextVisualization.js";
+import { SessionBrowser } from "./components/SessionBrowser.js";
+import { MemorySelector } from "./components/MemorySelector.js";
+import { PrivacyScreen } from "./components/PrivacyScreen.js";
+import { FeedbackSurvey } from "./components/FeedbackSurvey.js";
+import { ThinkStep } from "./components/ThinkStep.js";
+
 // ── Hooks ──
 import { useDoublePress } from "./hooks/useDoublePress.js";
 import { useElapsedTime } from "./hooks/useElapsedTime.js";
@@ -43,8 +56,12 @@ import { initializeRuntime, handleInput, handleApprovalDecision } from "./bridge
 // Conversation-first. No borders on messages. No panels. No dashboard.
 // Inline tables, charts, approvals, agent progress — all in the conversation.
 //
-// Provider tree: StatsProvider > NotificationsProvider > AppStateProvider
+// Provider tree:
+//   SettingsProvider > MemoryProvider > StatsProvider > NotificationsProvider
+//   > AppStateProvider > AppInner
+//
 // State: useAppState(selector) + useDispatch() from AppStateProvider
+//        + local useState for Phase 15-18 dialog toggles
 // ============================================================================
 
 // ── Height constants (terminal lines) ──
@@ -52,6 +69,14 @@ const HEADER_HEIGHT = 6;
 const INPUT_HEIGHT = 2;
 const FOOTER_HEIGHT = 1;
 const CHROME_HEIGHT = HEADER_HEIGHT + INPUT_HEIGHT + FOOTER_HEIGHT;
+
+// ── Feedback trade data shape ──
+interface FeedbackTradeData {
+  tradeId: string;
+  symbol: string;
+  pnl?: number;
+  pnlPercent?: number;
+}
 
 /**
  * AppInner — The core UI, mounted inside the provider tree.
@@ -83,6 +108,17 @@ function AppInner() {
   const autonomousActive = useAppState((s) => s.autonomousActive);
   const autonomousStrategyCount = useAppState((s) => s.autonomousStrategyCount);
 
+  // ── Phase 15-18 local state ──
+  const [showSettings, setShowSettings] = useState(false);
+  const [showExport, setShowExport] = useState(false);
+  const [showEmergency, setShowEmergency] = useState(false);
+  const [showContext, setShowContext] = useState(false);
+  const [showSessions, setShowSessions] = useState(false);
+  const [showMemory, setShowMemory] = useState(false);
+  const [privacyMode, setPrivacyMode] = useState(false);
+  const [showFeedback, setShowFeedback] = useState(false);
+  const [feedbackTradeData, setFeedbackTradeData] = useState<FeedbackTradeData | null>(null);
+
   // ── Custom hooks ──
   const { rows } = useTerminalSize();
   const ctrlC = useDoublePress(2000);
@@ -93,6 +129,19 @@ function AppInner() {
   const activeAgentCount = activeAgents.filter((c) => c.status === "running").length;
   const activeAgentName = activeAgents.length === 1 ? (activeAgents[0]?.agentName ?? null) : null;
   const viewportHeight = Math.max(rows - CHROME_HEIGHT, 6);
+
+  // Check if any dialog is open (to suppress other keybindings)
+  const anyDialogOpen =
+    showSettings || showExport || showEmergency || showContext ||
+    showSessions || showMemory || showFeedback;
+
+  // ── Determine if agent is in "thinking" mode (Planner/Critic reasoning) ──
+  const thinkingAgent = activeAgents.find(
+    (a) =>
+      a.status === "running" &&
+      (a.agentName === "planner" || a.agentName === "critic" || a.agentName === "analyst"),
+  );
+  const isThinking = isStreaming && thinkingAgent != null && !streamBuffer;
 
   // ── StateUpdater adapter ──
   // The runtime bridge still uses `setState(fn)` — this adapter runs
@@ -207,7 +256,17 @@ function AppInner() {
       return;
     }
     if (key.ctrl && input === "p") {
+      // Ctrl+Shift+P → toggle privacy mode (shift detected via uppercase)
+      if (input === "P") {
+        setPrivacyMode((prev) => !prev);
+        return;
+      }
       dispatch({ type: "TOGGLE_PALETTE" });
+      return;
+    }
+    // Ctrl+Shift+X → toggle emergency halt
+    if (key.ctrl && input === "X") {
+      setShowEmergency((prev) => !prev);
       return;
     }
     // ? help disabled — conflicts with TextInput. Use /help or Ctrl+P instead.
@@ -220,6 +279,36 @@ function AppInner() {
       if (!trimmed || isStreaming) return;
 
       dispatch({ type: "SET_SHOW_HELP", show: false });
+
+      // ── Phase 15-18 slash commands ──
+      if (trimmed === "/settings") {
+        setShowSettings(true);
+        return;
+      }
+      if (trimmed === "/export") {
+        setShowExport(true);
+        return;
+      }
+      if (trimmed === "/emergency" || trimmed === "/halt") {
+        setShowEmergency(true);
+        return;
+      }
+      if (trimmed === "/context") {
+        setShowContext(true);
+        return;
+      }
+      if (trimmed === "/sessions") {
+        setShowSessions(true);
+        return;
+      }
+      if (trimmed === "/memory") {
+        setShowMemory(true);
+        return;
+      }
+      if (trimmed === "/privacy") {
+        setPrivacyMode((prev) => !prev);
+        return;
+      }
 
       const userMsg: Message = {
         id: `user-${Date.now()}`,
@@ -247,6 +336,44 @@ function AppInner() {
     },
     [stateUpdater],
   );
+
+  // ── Emergency halt confirm ──
+  const handleEmergencyConfirm = useCallback(() => {
+    setShowEmergency(false);
+    dispatch({
+      type: "ADD_MESSAGE",
+      message: {
+        id: `emergency-${Date.now()}`,
+        role: "system",
+        variant: "error" as MessageVariant,
+        content: "EMERGENCY HALT executed. All positions closed, all orders cancelled.",
+        timestamp: new Date().toISOString(),
+      },
+    });
+  }, [dispatch]);
+
+  // ── Session resume ──
+  const handleSessionSelect = useCallback(
+    (selectedSessionId: string) => {
+      setShowSessions(false);
+      dispatch({
+        type: "ADD_MESSAGE",
+        message: {
+          id: `session-resume-${Date.now()}`,
+          role: "system",
+          content: `Resuming session ${selectedSessionId}...`,
+          timestamp: new Date().toISOString(),
+        },
+      });
+    },
+    [dispatch],
+  );
+
+  // ── Feedback handlers ──
+  const handleFeedbackComplete = useCallback(() => {
+    setShowFeedback(false);
+    setFeedbackTradeData(null);
+  }, []);
 
   // ── Boot screen: Gekko ASCII art + "Press Enter to start" ──
   if (bootPhase === "boot") {
@@ -301,92 +428,103 @@ function AppInner() {
         toolCount={5}
       />
 
-      {/* ── Conversation — only renders when there's content ── */}
-      <Box flexDirection="column" paddingX={1}>
-        {messages.length > 0 && (
-          <VirtualMessageList
-            messages={messages}
-            viewportHeight={viewportHeight}
-            scrollEnabled={!showPalette && !isStreaming}
-          />
-        )}
-
-        {/* Pending approvals (inline) */}
-        {pendingApprovals.map((a) => (
-          <ApprovalDialog key={a.id} approval={a} onDecision={handleApproval} />
-        ))}
-
-        {/* Handoff arrows */}
-        {isStreaming && handoffHistory.length > 0 && (
-          <HandoffArrow
-            from={handoffHistory[handoffHistory.length - 1]!.from}
-            to={handoffHistory[handoffHistory.length - 1]!.to}
-          />
-        )}
-
-        {/* Agent progress (parallel chains) or swarm tree */}
-        {isStreaming && activeAgents.length > 0 && (
-          swarmMode ? (
-            <SwarmTree
-              agents={activeAgents.map((c) => ({
-                id: c.id,
-                name: c.agentName,
-                symbol: c.symbol,
-                status:
-                  c.status === "running"
-                    ? ("running" as const)
-                    : c.status === "done"
-                      ? ("done" as const)
-                      : ("error" as const),
-                duration: c.duration,
-              }))}
+      {/* ── Conversation — wrapped in PrivacyScreen ── */}
+      <PrivacyScreen active={privacyMode}>
+        <Box flexDirection="column" paddingX={1}>
+          {messages.length > 0 && (
+            <VirtualMessageList
+              messages={messages}
+              viewportHeight={viewportHeight}
+              scrollEnabled={!showPalette && !isStreaming && !anyDialogOpen}
             />
-          ) : (
-            <AgentProgress
-              chains={activeAgents}
-              handoffs={handoffHistory}
-              tokenCount={tokenCount}
-            />
-          )
-        )}
+          )}
 
-        {/* Streaming text with cursor */}
-        {isStreaming && (
-          <Box flexDirection="column" marginTop={1}>
-            <Box>
-              <Text bold color="cyanBright">GORDON</Text>
-              {activeAgentName && (
-                <>
-                  <Text dimColor> {"\u00b7"} </Text>
-                  <WorkerBadge agent={activeAgentName} showBullet={false} />
-                </>
-              )}
-              <Text dimColor> {elapsedFormatted}</Text>
-            </Box>
-            {streamBuffer ? (
-              <Box paddingLeft={2}>
-                <StreamingText content={streamBuffer} isStreaming={true} />
-              </Box>
+          {/* Pending approvals (inline) */}
+          {pendingApprovals.map((a) => (
+            <ApprovalDialog key={a.id} approval={a} onDecision={handleApproval} />
+          ))}
+
+          {/* Handoff arrows */}
+          {isStreaming && handoffHistory.length > 0 && (
+            <HandoffArrow
+              from={handoffHistory[handoffHistory.length - 1]!.from}
+              to={handoffHistory[handoffHistory.length - 1]!.to}
+            />
+          )}
+
+          {/* Agent progress (parallel chains) or swarm tree */}
+          {isStreaming && activeAgents.length > 0 && (
+            swarmMode ? (
+              <SwarmTree
+                agents={activeAgents.map((c) => ({
+                  id: c.id,
+                  name: c.agentName,
+                  symbol: c.symbol,
+                  status:
+                    c.status === "running"
+                      ? ("running" as const)
+                      : c.status === "done"
+                        ? ("done" as const)
+                        : ("error" as const),
+                  duration: c.duration,
+                }))}
+              />
             ) : (
-              <Text color="cyanBright">  {"\u25CF"} thinking...</Text>
-            )}
-          </Box>
-        )}
+              <AgentProgress
+                chains={activeAgents}
+                handoffs={handoffHistory}
+                tokenCount={tokenCount}
+              />
+            )
+          )}
 
-        {/* Inline help */}
-        {showHelp && !isStreaming && <InlineHelp />}
+          {/* ThinkStep — shown during agent reasoning (Planner/Critic/Analyst) */}
+          {isThinking && thinkingAgent && (
+            <ThinkStep
+              reasoning="Analyzing context and formulating response..."
+              agentName={thinkingAgent.agentName}
+              elapsedMs={thinkingAgent.duration}
+            />
+          )}
 
-        {/* Ctrl+C pending warning */}
-        {ctrlC.isPending && (
-          <Box marginTop={1}>
-            <Text color="red" bold>
-              {permissionMode === "auto"
-                ? "\u26A0 Auto mode. Pending operations will continue. Press Ctrl+C again to exit."
-                : "Press Ctrl+C again to exit."}
-            </Text>
-          </Box>
-        )}
-      </Box>
+          {/* Streaming text with cursor */}
+          {isStreaming && (
+            <Box flexDirection="column" marginTop={1}>
+              <Box>
+                <Text bold color="cyanBright">GORDON</Text>
+                {activeAgentName && (
+                  <>
+                    <Text dimColor> {"\u00b7"} </Text>
+                    <WorkerBadge agent={activeAgentName} showBullet={false} />
+                  </>
+                )}
+                <Text dimColor> {elapsedFormatted}</Text>
+              </Box>
+              {streamBuffer ? (
+                <Box paddingLeft={2}>
+                  <StreamingText content={streamBuffer} isStreaming={true} />
+                </Box>
+              ) : (
+                !isThinking && <Text color="cyanBright">  {"\u25CF"} thinking...</Text>
+              )}
+            </Box>
+          )}
+
+          {/* Inline help */}
+          {showHelp && !isStreaming && <InlineHelp />}
+
+          {/* Ctrl+C pending warning */}
+          {ctrlC.isPending && (
+            <Box marginTop={1}>
+              <Text color="red" bold>
+                {permissionMode === "auto"
+                  ? "\u26A0 Auto mode. Pending operations will continue. Press Ctrl+C again to exit."
+                  : "Press Ctrl+C again to exit."}
+              </Text>
+            </Box>
+          )}
+        </Box>
+      </PrivacyScreen>
 
       {/* ── Command palette overlay ── */}
       {showPalette && (
@@ -394,6 +532,59 @@ function AppInner() {
           items={paletteItems}
           onSelect={handlePaletteSelect}
           onClose={() => dispatch({ type: "SET_SHOW_PALETTE", show: false })}
+        />
+      )}
+
+      {/* ── Phase 15-18 dialog overlays ── */}
+      {showSettings && (
+        <SettingsDialog onClose={() => setShowSettings(false)} />
+      )}
+
+      {showExport && (
+        <ExportDialog onClose={() => setShowExport(false)} />
+      )}
+
+      {showEmergency && (
+        <EmergencyHalt
+          onConfirm={handleEmergencyConfirm}
+          onCancel={() => setShowEmergency(false)}
+        />
+      )}
+
+      {showContext && (
+        <ContextVisualization
+          context={{
+            activePositions: 0,
+            recentSymbols: [],
+            loadedStrategies: [],
+            contextWindowPercent: Math.round((tokenCount / 128000) * 100),
+            memoryFilesLoaded: 0,
+          }}
+        />
+      )}
+
+      {showSessions && (
+        <SessionBrowser
+          sessions={[]}
+          onSelect={handleSessionSelect}
+          onClose={() => setShowSessions(false)}
+        />
+      )}
+
+      {showMemory && (
+        <MemorySelector
+          onSelect={() => setShowMemory(false)}
+        />
+      )}
+
+      {showFeedback && feedbackTradeData && (
+        <FeedbackSurvey
+          tradeId={feedbackTradeData.tradeId}
+          symbol={feedbackTradeData.symbol}
+          pnl={feedbackTradeData.pnl}
+          pnlPercent={feedbackTradeData.pnlPercent}
+          onComplete={handleFeedbackComplete}
+          onSkip={handleFeedbackComplete}
         />
       )}
 
@@ -425,17 +616,22 @@ function AppInner() {
 // ============================================================================
 // App — Public export wrapped in provider tree
 //
-// StatsProvider  > NotificationsProvider > AppStateProvider > AppInner
+// SettingsProvider > MemoryProvider > StatsProvider > NotificationsProvider
+// > AppStateProvider > AppInner
 // ============================================================================
 
 export function App() {
   return (
-    <StatsProvider>
-      <NotificationsProvider>
-        <AppStateProvider>
-          <AppInner />
-        </AppStateProvider>
-      </NotificationsProvider>
-    </StatsProvider>
+    <SettingsProvider>
+      <MemoryProvider>
+        <StatsProvider>
+          <NotificationsProvider>
+            <AppStateProvider>
+              <AppInner />
+            </AppStateProvider>
+          </NotificationsProvider>
+        </StatsProvider>
+      </MemoryProvider>
+    </SettingsProvider>
   );
 }

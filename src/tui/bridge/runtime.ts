@@ -785,6 +785,68 @@ async function handleMenuCommand(
         }
       }
     }
+    // ── Phase 15-18: Panel toggles ──
+    case "settings-panel": {
+      setState((prev: any) => ({ ...prev, showSettings: true }));
+      return;
+    }
+    case "export-panel": {
+      setState((prev: any) => ({ ...prev, showExport: true }));
+      return;
+    }
+    case "emergency": {
+      setState((prev: any) => ({ ...prev, showEmergency: true }));
+      addMessage(setState, "system", "EMERGENCY PANEL OPENED — confirm actions to halt all operations.");
+      return;
+    }
+    case "context-viz": {
+      setState((prev: any) => ({ ...prev, showContext: true }));
+      return;
+    }
+    case "session-browser": {
+      setState((prev: any) => ({ ...prev, showSessions: true }));
+      return;
+    }
+    case "memory-panel": {
+      setState((prev: any) => ({ ...prev, showMemory: true }));
+      return;
+    }
+    case "privacy": {
+      let toggled = false;
+      setState((prev: any) => {
+        toggled = !prev.privacyMode;
+        return { ...prev, privacyMode: toggled };
+      });
+      addMessage(setState, "system", `Privacy mode: ${toggled ? "ON — sensitive data redacted" : "OFF — full display"}`);
+      return;
+    }
+    case "journal": {
+      const limit = parseInt(args) || 10;
+      try {
+        const transcript = runtime.getTranscript();
+        // Filter for trade-related entries from memory/transcript
+        const tradeEntries = transcript
+          .filter((e) =>
+            e.content.toLowerCase().includes("trade") ||
+            e.content.toLowerCase().includes("position") ||
+            e.content.toLowerCase().includes("p&l") ||
+            e.content.toLowerCase().includes("entry") ||
+            e.content.toLowerCase().includes("exit")
+          )
+          .slice(-limit);
+        if (tradeEntries.length === 0) {
+          addMessage(setState, "gordon", "No trade journal entries found. Trades will appear here as you execute them.");
+        } else {
+          const lines = tradeEntries.map((e, i) =>
+            `${i + 1}. [${e.role}] ${e.content.slice(0, 120)}${e.content.length > 120 ? "..." : ""}`
+          );
+          addMessage(setState, "gordon", `TRADE JOURNAL (last ${tradeEntries.length}):\n${lines.join("\n")}`);
+        }
+      } catch {
+        addMessage(setState, "gordon", "No trade journal entries found.");
+      }
+      return;
+    }
     default: {
       // Fall through to agent for unhandled menu commands
       const prompt = commandToPrompt(command, args);
