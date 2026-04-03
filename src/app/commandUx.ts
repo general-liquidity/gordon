@@ -1,5 +1,6 @@
 import type { Mode } from "../types/index.ts";
-import type { WorkspaceId } from "./state/AppStore.ts";
+
+export type WorkspaceId = "desk" | "market" | "plan" | "lab" | "monitor";
 
 export type LegacyCommandCategory = "trading" | "market" | "account" | "system" | "strategy";
 export type CommandLevel = 1 | 2 | 3;

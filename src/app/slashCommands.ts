@@ -1196,12 +1196,12 @@ const LEGACY_SLASH_COMMANDS: SlashCommandSeed[] = [
   // Autonomous Trading
   {
     name: "autonomous",
-    aliases: ["auto", "mandate", "swing"],
+    aliases: ["mandate", "swing"],
     description: "Set up and control autonomous swing trading",
     usage: "/autonomous [start|stop|pause|resume|status]",
     category: "trading",
     level: 2,
-    action: "agent",
+    action: "menu",
     target: "gordon",
     executionTime: "~2-5s",
     whenToUse: "Automated trading with risk mandates over hours/days",

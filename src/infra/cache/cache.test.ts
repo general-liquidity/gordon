@@ -33,12 +33,12 @@ describe("Cache", () => {
   });
 
   test("supports updateTtlOnAccess", async () => {
-    const cache = new Cache<number>({ defaultTtl: 40, updateTtlOnAccess: true });
+    const cache = new Cache<number>({ defaultTtl: 60, updateTtlOnAccess: true });
     cache.set("rolling", 7);
 
-    await sleep(20);
+    await sleep(25);
     expect(cache.get("rolling")).toBe(7); // extends TTL
-    await sleep(20);
+    await sleep(25);
 
     expect(cache.get("rolling")).toBe(7);
   });

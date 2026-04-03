@@ -6,11 +6,11 @@
 import { mkdir, writeFile } from "fs/promises";
 import path from "path";
 
-import type { ChatMessage } from "../ChatView.tsx";
+import type { ChatMessage } from "../chatTypes.ts";
 import {
   formatScanResults,
   formatAnalysisResults,
-} from "../components/formatResults.ts";
+} from "../resultFormatting.ts";
 
 export interface ScanExportData {
   timestamp?: string;
