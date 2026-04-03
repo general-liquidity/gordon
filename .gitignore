@@ -52,6 +52,8 @@ npm/LICENSE
 gordon-linux-*
 gordon-darwin-*
 gordon-windows-*
+gordon-charm
+gordon-charm.exe
 
 # Supabase temp
 supabase/.temp
@@ -64,3 +66,7 @@ website
 gordon-spot-1-main
 hanabi-1-main
 misc
+
+# Claude Code reference repos (not part of Gordon)
+claude-code-meta/
+open-claude-code-main/

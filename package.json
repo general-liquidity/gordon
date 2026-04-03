@@ -79,6 +79,8 @@
     "@mastra/observability": "^1.2.0",
     "@mastra/otel-exporter": "^1.0.2",
     "@polkadot-agent-kit/sdk": "^2.1.5",
+    "@rezi-ui/native": "^0.1.0-alpha.60",
+    "@rezi-ui/node": "^0.1.0-alpha.60",
     "@solana-agent-kit/plugin-defi": "^2.0.8",
     "@solana-agent-kit/plugin-token": "^2.0.9",
     "@types/react": "^19.2.10",

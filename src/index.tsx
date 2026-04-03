@@ -98,10 +98,9 @@ if (flags.upgrade) {
   process.exit(1);
 }
 
-const updateResult = await maybePromptForUpdate();
-if (updateResult === "updated") {
-  process.exit(0);
-}
+// Skip interactive update prompt — it blocks stdin before TUI loads
+// Users can manually update via `gordon --upgrade`
+const updateResult = "skipped";
 
 import { checkLicense, shutdownLicense } from "./infra/license/index.ts";
 await checkLicense();
@@ -110,9 +109,7 @@ await checkLicense();
 // TUI Launch
 // ============================================================================
 
-import React from "react";
-import { render } from "ink";
-import { AppWithTheme } from "./app/index.ts";
+import { startGordonTUI } from "./tui/index.js";
 import { closeDatabase } from "./infra/storage/database.ts";
 import { emitEvent } from "./events/index.ts";
 import { loadConfig } from "./infra/storage/config.ts";
@@ -180,8 +177,8 @@ async function gracefulShutdown(signal: string, code: number = 0): Promise<void>
   process.exit(code);
 }
 
-// Register signal handlers
-process.on("SIGINT", () => gracefulShutdown("SIGINT"));
+// Signal handlers — let Ink handle Ctrl+C (App has double-press guard)
+// Only register SIGTERM/SIGHUP for non-interactive shutdown
 process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
 process.on("SIGHUP", () => gracefulShutdown("SIGHUP"));
 
@@ -207,10 +204,9 @@ try {
   // Non-critical startup observability path
 }
 
-// Render the application with theme support
+// Launch the rebuilt cockpit shell
 process.env.GORDON_APP_READY = "1";
-const { waitUntilExit } = render(<AppWithTheme />);
 
-waitUntilExit().then(() => {
-  gracefulShutdown("exit");
-});
+await startGordonTUI();
+
+await gracefulShutdown("exit");
