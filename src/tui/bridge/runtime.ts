@@ -21,34 +21,26 @@ import {
   formatPaginatedCommandHelp,
   type SlashCommand,
 } from "../../app/slashCommands.ts";
-import {
-  handleMCPCommand,
-  handleConfigCommand,
-  handleExchangeCommand,
-  handleBrokerCommand,
-  handleStocksCommand,
-  handleStrategyCommand,
-  handleWorkflowCommand,
-  handleExportCommand,
-  handleKeyringCommand,
-  handleTelemetryCommand,
-  handleContextCommand,
-} from "../../app/commands/index.ts";
 import { loadConfig, saveConfig } from "../../infra/storage/config.ts";
 import { collectDoctorReport, formatDoctorReport } from "../../app/setup-runtime.ts";
-import {
-  startAutonomousLoop,
-  stopAutonomousLoop,
-  pauseAutonomousLoop,
-  resumeAutonomousLoop,
-  getAutonomousLoopStatus,
-} from "../../core/autonomous-loop.ts";
 import type { Message } from "../components/MessageBubble.js";
 import type { ProgressNode } from "../components/AgentProgress.js";
 import type { ApprovalRequest } from "../components/ApprovalDialog.js";
 import { getRuntimeApprovalShortId } from "../../app/runtimeApprovalId.ts";
 import { subscribeToEvents } from "./eventSubscriptions.js";
 import type { Action, TuiNotification } from "../state/types.js";
+
+// ── Extracted handlers ──
+import {
+  handleSessionMenuCommand,
+  handleThreadMenuCommand,
+  handleRuntimeMenuCommand,
+  handleWorkspaceMenuCommand,
+  handleUIMenuCommand,
+  handleSystemMenuCommand,
+  handleAutonomousMenuCommand,
+} from "./menuHandlers.js";
+import { routeToolCommand } from "./toolHandlers.js";
 
 // ============================================================================
 // Runtime Bridge — connects SessionRuntime to Ink App state
@@ -220,31 +212,9 @@ async function handleSlashCommand(
   }
 }
 
-async function routeToolCommand(
-  command: SlashCommand,
-  args: string,
-  runtime: SessionRuntime,
-): Promise<string | object | null> {
-  const argsArray = args.split(/\s+/).filter(Boolean);
-
-  switch (command.name) {
-    case "mcp": return handleMCPCommand(argsArray);
-    case "config": return handleConfigCommand(args);
-    case "exchange": return handleExchangeCommand(args);
-    case "broker": return handleBrokerCommand(args);
-    case "stocks": return handleStocksCommand(args);
-    case "strategy":
-    case "gen": return handleStrategyCommand(args);
-    case "workflow": return handleWorkflowCommand(args, {} as never);
-    case "export": return handleExportCommand(args, {} as never);
-    case "keyring": return handleKeyringCommand(args);
-    case "telemetry": return handleTelemetryCommand(args);
-    case "context": return handleContextCommand(args);
-    default:
-      // No explicit handler — return null to signal fallback to agent
-      return null;
-  }
-}
+// ============================================================================
+// Menu Command Dispatch — thin dispatcher to grouped handlers
+// ============================================================================
 
 async function handleMenuCommand(
   command: SlashCommand,
@@ -252,628 +222,26 @@ async function handleMenuCommand(
   setState: StateUpdater,
   runtime: SessionRuntime,
 ): Promise<void> {
-  // Resolve via target (e.g. /clone → "clone-thread") or fall back to name
   const resolved = command.target ?? command.name;
-  switch (resolved) {
-    case "help": {
-      const helpText = formatPaginatedCommandHelp(args || undefined);
-      addMessage(setState, "gordon", helpText);
-      return;
-    }
-    case "doctor":
-    case "diag": {
-      try {
-        const report = await collectDoctorReport();
-        const formatted = formatDoctorReport(report);
-        addMessage(setState, "gordon", formatted);
-      } catch (err) {
-        addMessage(setState, "system", `Doctor error: ${err instanceof Error ? err.message : String(err)}`, "system");
-      }
-      return;
-    }
-    case "resume":
-    case "continue": {
-      try {
-        await runtime.resumeSession();
-        const transcript = runtime.getTranscript();
-        const messages: Message[] = transcript.map((entry, i) => ({
-          id: `resumed-${i}`,
-          role: entry.role === "user" ? "user" as const : "gordon" as const,
-          content: entry.content,
-          timestamp: entry.timestamp,
-        }));
-        setState((prev: any) => ({ ...prev, messages }));
-        addMessage(setState, "system", `Session resumed. ${transcript.length} messages restored.`);
-      } catch {
-        addMessage(setState, "system", "No session to resume.", "system");
-      }
-      return;
-    }
-    case "new-session":
-    case "fresh": {
-      await runtime.startNewSession();
-      setState((prev: any) => ({ ...prev, messages: [] }));
-      addMessage(setState, "system", "New session started.");
-      return;
-    }
-    case "session":
-    case "session-info": {
-      const snapshot = await runtime.getCurrentSession();
-      addMessage(setState, "gordon",
-        `Session: ${snapshot.resourceId}\n` +
-        `Thread: ${snapshot.threadId ?? "none"}\n` +
-        `Started: ${snapshot.threadStartedAt ?? "unknown"}\n` +
-        `Sessions: ${snapshot.sessionCount}`
-      );
-      return;
-    }
-    case "threads":
-    case "list-threads": {
-      const threads = runtime.listRecentHistory(10);
-      const lines = threads.map((t) =>
-        `${t.runtimeId}  ${t.threadId ?? "—"}  ${t.transcriptEntryCount} msgs  ${t.savedAt}`
-      );
-      addMessage(setState, "gordon", lines.length > 0 ? lines.join("\n") : "No saved threads.");
-      return;
-    }
-    case "runtime-state":
-    case "rstate":
-    case "rs": {
-      const state = runtime.getState();
-      addMessage(setState, "gordon",
-        `Stream: ${state.stream.status}\n` +
-        `Agent: ${state.stream.activeAgent ?? "none"}\n` +
-        `Tooling: ${state.tooling.tools.length} tools, ${state.tooling.plugins.length} plugins\n` +
-        `Approvals: ${state.approvals.pending.length} pending\n` +
-        `Scopes: ${state.permissionScopes.join(", ") || "none"}`
-      );
-      return;
-    }
-    case "runtime-plugins":
-    case "rplugins": {
-      const state = runtime.getState();
-      const lines = state.tooling.plugins.map((p) =>
-        `${p.enabled ? "✓" : "✗"} ${p.name} (${p.toolCount ?? 0} tools)`
-      );
-      addMessage(setState, "gordon", lines.length > 0 ? lines.join("\n") : "No plugins installed.");
-      return;
-    }
-    case "runtime-approvals": {
-      const pending = runtime.getPendingApprovals();
-      const recent = runtime.getRecentApprovals(5);
-      const lines: string[] = [];
-      if (pending.length > 0) {
-        lines.push("PENDING:");
-        for (const a of pending) {
-          const shortId = getRuntimeApprovalShortId(a.id);
-          lines.push(`  [${shortId}] ${a.toolName} (${a.riskClass}) — approve ${shortId} / deny ${shortId}`);
-        }
-      }
-      if (recent.length > 0) {
-        lines.push("RECENT:");
-        for (const a of recent) {
-          lines.push(`  ${a.status === "approved" ? "✓" : "✗"} ${a.toolName} (${a.status})`);
-        }
-      }
-      addMessage(setState, "gordon", lines.length > 0 ? lines.join("\n") : "No approvals.");
-      return;
-    }
-    case "runtime-approve": {
-      if (!args) { addMessage(setState, "system", "Usage: /runtime-approve <id> [persist]"); return; }
-      const parts = args.split(/\s+/);
-      const result = runtime.approvePendingRequest(parts[0]!, { persist: parts.includes("persist"), actor: "user" });
-      addMessage(setState, "gordon", result ? `Approved: ${result.toolName}` : `No pending approval: ${parts[0]}`);
-      return;
-    }
-    case "runtime-deny": {
-      if (!args) { addMessage(setState, "system", "Usage: /runtime-deny <id> [reason]"); return; }
-      const parts = args.split(/\s+/);
-      const reason = parts.slice(1).join(" ") || undefined;
-      const result = runtime.denyPendingRequest(parts[0]!, { reason, actor: "user" });
-      addMessage(setState, "gordon", result ? `Denied: ${result.toolName}` : `No pending approval: ${parts[0]}`);
-      return;
-    }
-    case "runtime-transcript": {
-      const limit = parseInt(args) || 10;
-      const transcript = runtime.getTranscript().slice(-limit);
-      const lines = transcript.map((e) => `[${e.role}] ${e.content.slice(0, 100)}`);
-      addMessage(setState, "gordon", lines.join("\n") || "Empty transcript.");
-      return;
-    }
-    case "runtime-scratchpad": {
-      const entries = runtime.getScratchpadEntries(args || undefined);
-      const lines = entries.map((e: any) => `[${e.worker}] ${e.content?.slice(0, 100) ?? ""}`);
-      addMessage(setState, "gordon", lines.length > 0 ? lines.join("\n") : "Empty scratchpad.");
-      return;
-    }
-    case "runtime-handoffs":
-    case "delegations": {
-      const handoffs = runtime.getHandoffArtifacts();
-      const lines = handoffs.map((h: any) => `${h.fromWorker} → ${h.toWorker}: ${h.reason ?? ""}`);
-      addMessage(setState, "gordon", lines.length > 0 ? lines.join("\n") : "No handoffs recorded.");
-      return;
-    }
-    case "compact": {
-      runtime.compactTranscript();
-      addMessage(setState, "system", "Conversation compacted.");
-      return;
-    }
-    case "clone-thread": {
-      try {
-        const session = await runtime.getCurrentSession();
-        await runtime.startNewSession();
-        const transcript = runtime.getTranscript();
-        addMessage(setState, "system",
-          `Thread cloned from ${session.threadId ?? "current"}. ` +
-          `${transcript.length} messages carried over to new thread.`
-        );
-      } catch {
-        addMessage(setState, "system", "Failed to clone thread.", "system");
-      }
-      return;
-    }
-    case "switch-thread": {
-      if (!args) { addMessage(setState, "system", "Usage: /switch-thread <thread-id>"); return; }
-      try {
-        const threads = runtime.listRecentHistory(50);
-        const match = threads.find((t) => t.threadId === args.trim() || t.runtimeId === args.trim());
-        if (!match) {
-          addMessage(setState, "system", `Thread not found: ${args.trim()}`, "system");
-          return;
-        }
-        await runtime.initializeSession({ autoResume: true });
-        addMessage(setState, "system", `Switched to thread: ${match.threadId ?? match.runtimeId}`);
-      } catch {
-        addMessage(setState, "system", "Failed to switch thread.", "system");
-      }
-      return;
-    }
-    case "rename-thread": {
-      if (!args) { addMessage(setState, "system", "Usage: /rename-thread <new-name>"); return; }
-      addMessage(setState, "system", `Thread renamed to: ${args.trim()}`);
-      return;
-    }
-    case "delete-thread": {
-      if (!args) { addMessage(setState, "system", "Usage: /delete-thread <thread-id>"); return; }
-      addMessage(setState, "system", `Thread deleted: ${args.trim()}`);
-      return;
-    }
-    case "thread-info": {
-      try {
-        const session = await runtime.getCurrentSession();
-        const transcript = runtime.getTranscript();
-        addMessage(setState, "gordon",
-          `Thread: ${session.threadId ?? "none"}\n` +
-          `Resource: ${session.resourceId}\n` +
-          `Messages: ${transcript.length}\n` +
-          `Started: ${session.threadStartedAt ?? "unknown"}\n` +
-          `Sessions: ${session.sessionCount}`
-        );
-      } catch {
-        addMessage(setState, "system", "No active thread.", "system");
-      }
-      return;
-    }
-    case "runtime-bridge": {
-      const bridgeState = runtime.getBridgeSessions();
-      const lines: string[] = ["BRIDGE STATE:"];
-      if (bridgeState.active.length > 0) {
-        lines.push("Active:");
-        for (const s of bridgeState.active) {
-          lines.push(`  ${s.source} → ${s.commandType} (${s.status})`);
-        }
-      }
-      if (bridgeState.recent.length > 0) {
-        lines.push("Recent:");
-        for (const s of bridgeState.recent) {
-          lines.push(`  ${s.source} → ${s.commandType} (${s.status})`);
-        }
-      }
-      if (bridgeState.active.length === 0 && bridgeState.recent.length === 0) {
-        lines.push("  No bridge sessions.");
-      }
-      addMessage(setState, "gordon", lines.join("\n"));
-      return;
-    }
-    case "runtime-history": {
-      if (args.trim()) {
-        const results = runtime.searchHistory(args.trim(), { limit: 10 });
-        const lines = results.map((r) =>
-          `[${r.timestamp}] ${r.source}: ${r.content.slice(0, 80)}`
-        );
-        addMessage(setState, "gordon", lines.length > 0 ? lines.join("\n") : `No history matches for: ${args.trim()}`);
-      } else {
-        const recent = runtime.listRecentHistory(10);
-        const lines = recent.map((r) =>
-          `${r.runtimeId}  ${r.threadId ?? "—"}  ${r.transcriptEntryCount} msgs  ${r.savedAt}`
-        );
-        addMessage(setState, "gordon", lines.length > 0 ? lines.join("\n") : "No history.");
-      }
-      return;
-    }
-    case "cache-stats": {
-      const state = runtime.getState();
-      addMessage(setState, "gordon",
-        `CACHE STATS:\n` +
-        `Tools: ${state.tooling.tools.length} registered\n` +
-        `Plugins: ${state.tooling.plugins.length} loaded\n` +
-        `MCP servers: ${state.tooling.mcpServers.length}\n` +
-        `Last sync: ${state.tooling.lastSyncedAt ?? "never"}\n` +
-        `Last reload: ${state.tooling.lastReloadAt ?? "never"}\n` +
-        `Hot reload: ${state.tooling.hotReloadEnabled ? "enabled" : "disabled"}`
-      );
-      return;
-    }
-    case "theme": {
-      addMessage(setState, "gordon",
-        `THEME: Gordon Dark (default)\n` +
-        `Primary: cyanBright\n` +
-        `Accent: greenBright\n` +
-        `Warning: yellow\n` +
-        `Error: red\n` +
-        `Dimmed: gray`
-      );
-      return;
-    }
-    case "shortcuts": {
-      addMessage(setState, "gordon",
-        `KEYBOARD SHORTCUTS:\n` +
-        `Ctrl+C      — Cancel / exit (double-press)\n` +
-        `Ctrl+P      — Command palette\n` +
-        `?           — Toggle inline help\n` +
-        `Up/Down     — Input history\n` +
-        `Tab         — Autocomplete command`
-      );
-      return;
-    }
-    case "model": {
-      const config = await loadConfig();
-      addMessage(setState, "gordon",
-        `MODEL: ${config.model ?? "default"}\n` +
-        `Provider: ${config.provider ?? "openai-compatible"}\n` +
-        `Temperature: ${config.temperature ?? "default"}`
-      );
-      return;
-    }
-    case "menu": {
-      setState((prev: any) => ({ ...prev, showPalette: true }));
-      return;
-    }
-    case "chat": {
-      setState((prev: any) => ({ ...prev, activeWorkspace: null, showPalette: false }));
-      addMessage(setState, "system", "Returned to chat workspace.");
-      return;
-    }
-    case "workspace-market":
-    case "workspace-plan":
-    case "workspace-lab":
-    case "workspace-monitor": {
-      const workspace = resolved.replace("workspace-", "");
-      setState((prev: any) => ({ ...prev, activeWorkspace: workspace }));
-      addMessage(setState, "system", `Workspace: ${workspace}. Context adjusted for ${workspace} workflows.`);
-      return;
-    }
-    case "whatsnew": {
-      addMessage(setState, "gordon",
-        `WHAT'S NEW in Gordon v0.9:\n` +
-        `- Full TUI rebuild with Ink/React\n` +
-        `- Runtime session management\n` +
-        `- Agent handoff visualization\n` +
-        `- Approval workflow with persist\n` +
-        `- Background task monitoring\n` +
-        `- Command palette (Ctrl+P)\n` +
-        `- 119 slash commands\n` +
-        `- Plugin hot reload\n` +
-        `- MCP server support`
-      );
-      return;
-    }
-    case "telemetry": {
-      try {
-        const result = await handleTelemetryCommand(args);
-        const content = typeof result === "string" ? result : JSON.stringify(result, null, 2);
-        addMessage(setState, "gordon", content);
-      } catch (err) {
-        addMessage(setState, "system", `Telemetry error: ${err instanceof Error ? err.message : String(err)}`, "system");
-      }
-      return;
-    }
-    case "context": {
-      try {
-        const result = await handleContextCommand(args);
-        const content = typeof result === "string" ? result : JSON.stringify(result, null, 2);
-        addMessage(setState, "gordon", content);
-      } catch (err) {
-        addMessage(setState, "system", `Context error: ${err instanceof Error ? err.message : String(err)}`, "system");
-      }
-      return;
-    }
-    case "bugreport": {
-      const state = runtime.getState();
-      addMessage(setState, "gordon",
-        `BUG REPORT TEMPLATE:\n` +
-        `Runtime: ${state.runtimeId}\n` +
-        `Session: ${state.sessionId ?? "none"}\n` +
-        `Stream: ${state.stream.status}\n` +
-        `Tools: ${state.tooling.tools.length}\n` +
-        `Plugins: ${state.tooling.plugins.length}\n` +
-        `Last error: ${state.lastError ?? "none"}\n\n` +
-        `Paste this with your bug description at: https://github.com/gordon/gordon-cli/issues`
-      );
-      return;
-    }
-    case "validate": {
-      try {
-        const report = await collectDoctorReport();
-        const issues = report.filter((r: any) => r.status === "fail" || r.status === "warn");
-        if (issues.length === 0) {
-          addMessage(setState, "gordon", "All systems validated. No issues found.");
-        } else {
-          const formatted = formatDoctorReport(report);
-          addMessage(setState, "gordon", `VALIDATION:\n${formatted}`);
-        }
-      } catch (err) {
-        addMessage(setState, "system", `Validation error: ${err instanceof Error ? err.message : String(err)}`, "system");
-      }
-      return;
-    }
-    case "summary":
-    case "thread-summary": {
-      const transcript = runtime.getTranscript();
-      const userMsgs = transcript.filter((e) => e.role === "user").length;
-      const assistantMsgs = transcript.filter((e) => e.role === "assistant").length;
-      addMessage(setState, "gordon",
-        `SESSION SUMMARY:\n` +
-        `Total messages: ${transcript.length}\n` +
-        `User messages: ${userMsgs}\n` +
-        `Assistant messages: ${assistantMsgs}\n` +
-        `Topics discussed: ${transcript.filter((e) => e.role === "user").slice(-5).map((e) => e.content.slice(0, 40)).join(", ") || "none"}`
-      );
-      return;
-    }
-    case "name": {
-      if (!args) { addMessage(setState, "system", "Usage: /name <session-name>"); return; }
-      addMessage(setState, "system", `Session named: ${args.trim()}`);
-      return;
-    }
-    case "log": {
-      if (args.trim()) {
-        const level = args.trim().toLowerCase();
-        if (["debug", "info", "warn", "error", "silent"].includes(level)) {
-          addMessage(setState, "system", `Log level set to: ${level}`);
-        } else {
-          addMessage(setState, "system", `Invalid log level: ${level}. Use: debug, info, warn, error, silent`);
-        }
-      } else {
-        addMessage(setState, "gordon", "Current log level: info\nAvailable: debug, info, warn, error, silent");
-      }
-      return;
-    }
-    case "portfolio": {
-      const prompt = commandToPrompt(command, args);
-      return streamResponse(prompt, setState, runtime);
-    }
-    case "action-log": {
-      const state = runtime.getState();
-      const bridgeActive = state.bridge.active;
-      const bridgeRecent = state.bridge.recent;
-      const lines: string[] = ["ACTION LOG:"];
-      for (const a of [...bridgeRecent, ...bridgeActive].slice(-10)) {
-        lines.push(`  [${a.status}] ${a.source} → ${a.commandType}`);
-      }
-      addMessage(setState, "gordon", lines.length > 1 ? lines.join("\n") : "No actions recorded.");
-      return;
-    }
-    case "bookmark-entry": {
-      addMessage(setState, "system", args ? `Bookmarked: ${args.trim()}` : "Current message bookmarked.");
-      return;
-    }
-    case "list-bookmarks": {
-      addMessage(setState, "gordon", "No bookmarks saved yet. Use /bookmark-entry to save one.");
-      return;
-    }
-    case "compact-thread": {
-      runtime.compactTranscript();
-      addMessage(setState, "system", "Thread compacted. Older messages summarized.");
-      return;
-    }
-    case "arm":
-    case "auto": {
-      setState((prev: any) => ({ ...prev, permissionMode: "auto" }));
-      addMessage(setState, "system", "Permission mode: auto — actions execute without approval. Use /ask to return to ask mode.");
-      return;
-    }
-    case "disarm":
-    case "safe":
-    case "ask": {
-      setState((prev: any) => ({ ...prev, permissionMode: "ask" }));
-      addMessage(setState, "system", "Permission mode: ask — actions require per-action approval.");
-      return;
-    }
-    case "strict": {
-      setState((prev: any) => ({ ...prev, permissionMode: "strict" }));
-      addMessage(setState, "system", "Permission mode: strict — every action requires approval, no 'always allow'.");
-      return;
-    }
-    case "setup":
-    case "configure":
-    case "preferences": {
-      setState((prev: any) => ({ ...prev, showSetup: true }));
-      return;
-    }
-    // ── Phase 6: Autonomous loop control ──
-    case "autonomous": {
-      const subcommand = args.trim().split(/\s+/)[0]?.toLowerCase() ?? "status";
 
-      switch (subcommand) {
-        case "start": {
-          // Parse optional mandate from remaining args (e.g. /autonomous start BTC 4h long)
-          const status = getAutonomousLoopStatus();
-          if (status.isRunning) {
-            addMessage(setState, "system", "Autonomous loop is already running. Use /autonomous stop first.");
-            return;
-          }
-          // Delegate to agent to construct mandate and start loop
-          const prompt = commandToPrompt(command, args);
-          return streamResponse(prompt, setState, runtime);
-        }
-        case "stop": {
-          const status = getAutonomousLoopStatus();
-          if (!status.isRunning) {
-            addMessage(setState, "system", "Autonomous loop is not running.");
-            return;
-          }
-          stopAutonomousLoop("user requested via /autonomous stop");
-          setState((prev: any) => ({
-            ...prev,
-            autonomousActive: false,
-            autonomousStrategyCount: 0,
-          }));
-          addMessage(setState, "gordon", "\u25C8 Autonomous loop stopped.");
-          return;
-        }
-        case "pause": {
-          const status = getAutonomousLoopStatus();
-          if (!status.isRunning) {
-            addMessage(setState, "system", "Autonomous loop is not running.");
-            return;
-          }
-          if (status.isPaused) {
-            addMessage(setState, "system", "Autonomous loop is already paused.");
-            return;
-          }
-          pauseAutonomousLoop();
-          addMessage(setState, "gordon", "\u25C8 Autonomous loop paused.");
-          return;
-        }
-        case "resume": {
-          const status = getAutonomousLoopStatus();
-          if (!status.isRunning) {
-            addMessage(setState, "system", "Autonomous loop is not running. Use /autonomous start.");
-            return;
-          }
-          if (!status.isPaused) {
-            addMessage(setState, "system", "Autonomous loop is not paused.");
-            return;
-          }
-          resumeAutonomousLoop();
-          addMessage(setState, "gordon", "\u25C8 Autonomous loop resumed.");
-          return;
-        }
-        case "status":
-        default: {
-          const status = getAutonomousLoopStatus();
-          if (!status.isRunning) {
-            addMessage(setState, "gordon", "\u25C8 Autonomous loop: inactive\nUse /autonomous start to begin.");
-            return;
-          }
-          const stateLabel = status.isPaused ? "paused" : "running";
-          const mandateInfo = status.mandate
-            ? `\nMandate: ${status.mandate.id ?? "unnamed"}\n` +
-              `Direction: ${status.mandate.direction}\n` +
-              `Timeframe: ${status.mandate.timeframe}`
-            : "";
-          addMessage(setState, "gordon",
-            `\u25C8 Autonomous loop: ${stateLabel}\n` +
-            `Cycles: ${status.cycleCount}\n` +
-            `Opportunities: ${status.totalOpportunities}` +
-            mandateInfo +
-            (status.lastCycleTime ? `\nLast cycle: ${status.lastCycleTime}` : "") +
-            (status.nextCycleTime ? `\nNext cycle: ${status.nextCycleTime}` : "")
-          );
-          return;
-        }
-      }
-    }
-    // ── Phase 15-18: Panel toggles ──
-    case "settings-panel": {
-      setState((prev: any) => ({ ...prev, showSettings: true }));
-      return;
-    }
-    case "export-panel": {
-      setState((prev: any) => ({ ...prev, showExport: true }));
-      return;
-    }
-    case "emergency": {
-      setState((prev: any) => ({ ...prev, showEmergency: true }));
-      addMessage(setState, "system", "EMERGENCY PANEL OPENED — confirm actions to halt all operations.");
-      return;
-    }
-    case "context-viz": {
-      setState((prev: any) => ({ ...prev, showContext: true }));
-      return;
-    }
-    case "session-browser": {
-      setState((prev: any) => ({ ...prev, showSessions: true }));
-      return;
-    }
-    case "memory-panel": {
-      setState((prev: any) => ({ ...prev, showMemory: true }));
-      return;
-    }
-    case "privacy": {
-      let toggled = false;
-      setState((prev: any) => {
-        toggled = !prev.privacyMode;
-        return { ...prev, privacyMode: toggled };
-      });
-      addMessage(setState, "system", `Privacy mode: ${toggled ? "ON — sensitive data redacted" : "OFF — full display"}`);
-      return;
-    }
-    // ── Backend module panel toggles ──
-    case "audit": {
-      addMessage(setState, "system", "Opening audit browser...");
-      return;
-    }
-    case "scheduler": {
-      addMessage(setState, "system", "Opening scheduler panel...");
-      return;
-    }
-    case "playbooks": {
-      addMessage(setState, "system", "Opening playbook browser...");
-      return;
-    }
-    case "strategies-browser": {
-      addMessage(setState, "system", "Opening strategy browser...");
-      return;
-    }
-    case "indicators": {
-      addMessage(setState, "system", "Opening indicator dashboard...");
-      return;
-    }
-    case "journal": {
-      const limit = parseInt(args) || 10;
-      try {
-        const transcript = runtime.getTranscript();
-        // Filter for trade-related entries from memory/transcript
-        const tradeEntries = transcript
-          .filter((e) =>
-            e.content.toLowerCase().includes("trade") ||
-            e.content.toLowerCase().includes("position") ||
-            e.content.toLowerCase().includes("p&l") ||
-            e.content.toLowerCase().includes("entry") ||
-            e.content.toLowerCase().includes("exit")
-          )
-          .slice(-limit);
-        if (tradeEntries.length === 0) {
-          addMessage(setState, "gordon", "No trade journal entries found. Trades will appear here as you execute them.");
-        } else {
-          const lines = tradeEntries.map((e, i) =>
-            `${i + 1}. [${e.role}] ${e.content.slice(0, 120)}${e.content.length > 120 ? "..." : ""}`
-          );
-          addMessage(setState, "gordon", `TRADE JOURNAL (last ${tradeEntries.length}):\n${lines.join("\n")}`);
-        }
-      } catch {
-        addMessage(setState, "gordon", "No trade journal entries found.");
-      }
-      return;
-    }
-    default: {
-      // Fall through to agent for unhandled menu commands
-      const prompt = commandToPrompt(command, args);
-      return streamResponse(prompt, setState, runtime);
-    }
+  // Try each handler group in order; first match wins
+  if (await handleSessionMenuCommand(resolved, args, setState, runtime)) return;
+  if (await handleThreadMenuCommand(resolved, args, setState, runtime)) return;
+  if (await handleRuntimeMenuCommand(resolved, args, setState, runtime)) return;
+  if (handleWorkspaceMenuCommand(resolved, args, setState)) return;
+  if (handleUIMenuCommand(resolved, args, setState)) return;
+  if (await handleSystemMenuCommand(resolved, args, setState, runtime)) return;
+  if (await handleAutonomousMenuCommand(resolved, args, setState, runtime, command, streamResponse)) return;
+
+  // Portfolio — delegates to agent
+  if (resolved === "portfolio") {
+    const prompt = commandToPrompt(command, args);
+    return streamResponse(prompt, setState, runtime);
   }
+
+  // Fall through to agent for unhandled menu commands
+  const prompt = commandToPrompt(command, args);
+  return streamResponse(prompt, setState, runtime);
 }
 
 // ============================================================================
@@ -1009,7 +377,7 @@ async function streamResponse(
                   id: `risk-deny-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
                   role: "system",
                   variant: "approval" as const,
-                  content: `\u2717 Auto-denied: ${approval.toolName} — ${accessResult.reason ?? "risk kernel block"}`,
+                  content: `\u2717 Auto-denied: ${approval.toolName} \u2014 ${accessResult.reason ?? "risk kernel block"}`,
                   timestamp: new Date().toISOString(),
                 });
               } else if (accessResult.status === "allowed") {
@@ -1022,7 +390,7 @@ async function streamResponse(
                   id: `risk-approve-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
                   role: "system",
                   variant: "approval" as const,
-                  content: `\u2713 Auto-approved: ${approval.toolName} — ${accessResult.reason ?? "risk kernel pass"}`,
+                  content: `\u2713 Auto-approved: ${approval.toolName} \u2014 ${accessResult.reason ?? "risk kernel pass"}`,
                   timestamp: new Date().toISOString(),
                 });
               } else {
@@ -1117,7 +485,7 @@ async function handleApproval(
       const persist = rest.includes("persist");
       const result = runtime.approvePendingRequest(requestId, { persist, actor: "user" });
       addMessage(setState, "gordon",
-        result ? `✓ Approved: ${result.toolName}${persist ? " (persisted)" : ""}` : `No pending approval: ${requestId}`,
+        result ? `\u2713 Approved: ${result.toolName}${persist ? " (persisted)" : ""}` : `No pending approval: ${requestId}`,
         "approval"
       );
     } else {
@@ -1125,7 +493,7 @@ async function handleApproval(
       const reason = rest.replace("persist", "").trim() || undefined;
       const result = runtime.denyPendingRequest(requestId, { persist, reason, actor: "user" });
       addMessage(setState, "gordon",
-        result ? `✗ Denied: ${result.toolName}${reason ? ` (${reason})` : ""}` : `No pending approval: ${requestId}`,
+        result ? `\u2717 Denied: ${result.toolName}${reason ? ` (${reason})` : ""}` : `No pending approval: ${requestId}`,
         "approval"
       );
     }
@@ -1145,11 +513,11 @@ export function handleApprovalDecision(
 
   if (decision === "deny") {
     runtime.denyPendingRequest(approvalId, { actor: "user" });
-    addMessage(setState, "gordon", "✗ Denied.", "approval");
+    addMessage(setState, "gordon", "\u2717 Denied.", "approval");
   } else {
     const persist = decision === "always";
     runtime.approvePendingRequest(approvalId, { persist, actor: "user", scope: persist ? "session" : undefined });
-    addMessage(setState, "gordon", `✓ Approved${persist ? " (always for this tool)" : ""}.`, "approval");
+    addMessage(setState, "gordon", `\u2713 Approved${persist ? " (always for this tool)" : ""}.`, "approval");
   }
 }
 
@@ -1171,9 +539,9 @@ function startBackgroundMonitoring(setState: StateUpdater): void {
     // Check for status changes and inject notifications
     for (const task of tasks) {
       if (task.status === "completed" || task.status === "failed") {
-        const icon = task.status === "completed" ? "✓" : "✗";
+        const icon = task.status === "completed" ? "\u2713" : "\u2717";
         const color = task.status === "completed" ? "green" : "red";
-        addMessage(setState, "system", `${icon} Background: ${task.label} — ${task.status}`);
+        addMessage(setState, "system", `${icon} Background: ${task.label} \u2014 ${task.status}`);
       }
     }
 

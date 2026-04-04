@@ -1,4 +1,4 @@
-import type { StreamEvent } from "../orchestrator.ts";
+import type { StreamEvent } from "./types.ts";
 
 export interface MessageStreamChunk {
   type: StreamEvent["type"];
