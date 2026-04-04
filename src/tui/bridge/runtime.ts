@@ -820,6 +820,27 @@ async function handleMenuCommand(
       addMessage(setState, "system", `Privacy mode: ${toggled ? "ON — sensitive data redacted" : "OFF — full display"}`);
       return;
     }
+    // ── Backend module panel toggles ──
+    case "audit": {
+      addMessage(setState, "system", "Opening audit browser...");
+      return;
+    }
+    case "scheduler": {
+      addMessage(setState, "system", "Opening scheduler panel...");
+      return;
+    }
+    case "playbooks": {
+      addMessage(setState, "system", "Opening playbook browser...");
+      return;
+    }
+    case "strategies-browser": {
+      addMessage(setState, "system", "Opening strategy browser...");
+      return;
+    }
+    case "indicators": {
+      addMessage(setState, "system", "Opening indicator dashboard...");
+      return;
+    }
     case "journal": {
       const limit = parseInt(args) || 10;
       try {

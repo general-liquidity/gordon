@@ -41,6 +41,22 @@ import { PrivacyScreen } from "./components/PrivacyScreen.js";
 import { FeedbackSurvey } from "./components/FeedbackSurvey.js";
 import { ThinkStep } from "./components/ThinkStep.js";
 
+// ── Backend Module UI Components ──
+import { LivePositions, type Position } from "./components/LivePositions.js";
+import type { MutationResult } from "./components/GenomeDiffViewer.js";
+import { AuditBrowser } from "./components/AuditBrowser.js";
+import { SchedulerPanel } from "./components/SchedulerPanel.js";
+import { PlaybookBrowser } from "./components/PlaybookBrowser.js";
+import { StrategyBrowser } from "./components/StrategyBrowser.js";
+import { GenomeDiffViewer } from "./components/GenomeDiffViewer.js";
+import { IndicatorDashboard } from "./components/IndicatorDashboard.js";
+import { ConsensusView } from "./components/ConsensusView.js";
+import { ExecutionAlgoSelector } from "./components/ExecutionAlgoSelector.js";
+import { DaemonStatus } from "./components/DaemonStatus.js";
+import { TrailingStopDisplay } from "./components/TrailingStopDisplay.js";
+import { OrderRecoveryNotice } from "./components/OrderRecoveryNotice.js";
+import { MarketDataStatus } from "./components/MarketDataStatus.js";
+
 // ── Hooks ──
 import { useDoublePress } from "./hooks/useDoublePress.js";
 import { useElapsedTime } from "./hooks/useElapsedTime.js";
@@ -119,6 +135,29 @@ function AppInner() {
   const [showFeedback, setShowFeedback] = useState(false);
   const [feedbackTradeData, setFeedbackTradeData] = useState<FeedbackTradeData | null>(null);
 
+  // ── Backend module UI toggles ──
+  const [showAudit, setShowAudit] = useState(false);
+  const [showScheduler, setShowScheduler] = useState(false);
+  const [showPlaybooks, setShowPlaybooks] = useState(false);
+  const [showStrategies, setShowStrategies] = useState(false);
+  const [showGenome, setShowGenome] = useState(false);
+  const [showIndicators, setShowIndicators] = useState(false);
+  const [showConsensus, setShowConsensus] = useState(false);
+  const [livePositions, setLivePositions] = useState<Position[]>([]);
+  const [orderRecovery, setOrderRecovery] = useState<{
+    orderId: string; symbol: string; reason: string; attempt: number; maxAttempts: number;
+  } | null>(null);
+  const [daemonStatus, setDaemonStatus] = useState<{
+    status: "running" | "stopped" | "error"; taskCount: number; uptime: number;
+  }>({ status: "stopped", taskCount: 0, uptime: 0 });
+  const [marketFeeds, setMarketFeeds] = useState<Array<{
+    name: string; status: "connected" | "degraded" | "disconnected"; latencyMs: number;
+  }>>([]);
+  const [genomeMutation, setGenomeMutation] = useState<MutationResult | null>(null);
+  const [trailingStop, setTrailingStop] = useState<{
+    symbol: string; currentPrice: number; stopLevel: number; trailAmount: number; side: "long" | "short";
+  } | null>(null);
+
   // ── Custom hooks ──
   const { rows } = useTerminalSize();
   const ctrlC = useDoublePress(2000);
@@ -133,7 +172,9 @@ function AppInner() {
   // Check if any dialog is open (to suppress other keybindings)
   const anyDialogOpen =
     showSettings || showExport || showEmergency || showContext ||
-    showSessions || showMemory || showFeedback;
+    showSessions || showMemory || showFeedback ||
+    showAudit || showScheduler || showPlaybooks || showStrategies ||
+    showGenome || showIndicators || showConsensus;
 
   // ── Determine if agent is in "thinking" mode (Planner/Critic reasoning) ──
   const thinkingAgent = activeAgents.find(
@@ -307,6 +348,28 @@ function AppInner() {
       }
       if (trimmed === "/privacy") {
         setPrivacyMode((prev) => !prev);
+        return;
+      }
+
+      // ── Backend module slash commands ──
+      if (trimmed === "/audit") {
+        setShowAudit(true);
+        return;
+      }
+      if (trimmed === "/scheduler") {
+        setShowScheduler(true);
+        return;
+      }
+      if (trimmed === "/playbooks") {
+        setShowPlaybooks(true);
+        return;
+      }
+      if (trimmed === "/strategies-browser") {
+        setShowStrategies(true);
+        return;
+      }
+      if (trimmed === "/indicators") {
+        setShowIndicators(true);
         return;
       }
 
@@ -523,6 +586,38 @@ function AppInner() {
               </Text>
             </Box>
           )}
+
+          {/* ── LivePositions — always visible when positions exist ── */}
+          {livePositions.length > 0 && (
+            <LivePositions initialPositions={livePositions} />
+          )}
+
+          {/* ── Order recovery notice ── */}
+          {orderRecovery && (
+            <OrderRecoveryNotice
+              orderId={orderRecovery.orderId}
+              symbol={orderRecovery.symbol}
+              reason={orderRecovery.reason}
+              attempt={orderRecovery.attempt}
+              maxAttempts={orderRecovery.maxAttempts}
+            />
+          )}
+
+          {/* ── Trailing stop display — inline when active ── */}
+          {trailingStop && (
+            <TrailingStopDisplay
+              symbol={trailingStop.symbol}
+              currentPrice={trailingStop.currentPrice}
+              stopLevel={trailingStop.stopLevel}
+              trailAmount={trailingStop.trailAmount}
+              side={trailingStop.side}
+            />
+          )}
+
+          {/* ── Genome diff viewer — inline after mutation events ── */}
+          {genomeMutation && (
+            <GenomeDiffViewer mutation={genomeMutation} />
+          )}
         </Box>
       </PrivacyScreen>
 
@@ -587,6 +682,68 @@ function AppInner() {
           onSkip={handleFeedbackComplete}
         />
       )}
+
+      {/* ── Backend module dialog overlays ── */}
+      {showAudit && (
+        <AuditBrowser entries={[]} onClose={() => setShowAudit(false)} />
+      )}
+
+      {showScheduler && (
+        <SchedulerPanel
+          jobs={[]}
+          onPause={() => {}}
+          onResume={() => {}}
+          onDelete={() => {}}
+          onClose={() => setShowScheduler(false)}
+        />
+      )}
+
+      {showPlaybooks && (
+        <PlaybookBrowser
+          playbooks={[]}
+          onSelect={() => {}}
+          onDeploy={() => setShowPlaybooks(false)}
+          onClose={() => setShowPlaybooks(false)}
+        />
+      )}
+
+      {showStrategies && (
+        <StrategyBrowser
+          strategies={[]}
+          onSelect={() => {}}
+          onDeploy={() => setShowStrategies(false)}
+          onClose={() => setShowStrategies(false)}
+        />
+      )}
+
+      {showIndicators && (
+        <IndicatorDashboard
+          symbol="--"
+          rsi={50}
+          macd={{ value: 0, signal: 0, histogram: 0 }}
+          trend={{ direction: "neutral", strength: 0, ema20: 0, ema50: 0, ema200: 0 }}
+          bollinger={{ upper: 0, middle: 0, lower: 0, width: 0, percentB: 0.5 }}
+          volume={{ current: 0, average: 0, ratio: 1 }}
+        />
+      )}
+
+      {showConsensus && (
+        <ConsensusView
+          signals={[]}
+          decision="NEUTRAL"
+          confidence={0}
+        />
+      )}
+
+      {/* ── DaemonStatus + MarketDataStatus footer hints area ── */}
+      <Box paddingX={1} gap={2}>
+        <DaemonStatus
+          status={daemonStatus.status}
+          taskCount={daemonStatus.taskCount}
+          uptime={daemonStatus.uptime}
+        />
+        <MarketDataStatus feeds={marketFeeds} />
+      </Box>
 
       {/* ── Input area with border (like Claude Code) ── */}
       <Box
