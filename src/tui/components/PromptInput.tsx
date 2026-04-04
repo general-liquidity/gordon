@@ -4,11 +4,12 @@ import { FooterHints } from "./FooterHints.js";
 import { useSlashCommandTypeahead, type TypeaheadMatch } from "../hooks/useSlashCommandTypeahead.js";
 
 // ============================================================================
-// PromptInput — Claude Code-style input with full slash command browser
+// PromptInput — Claude Code-style compact slash command picker
 //
-// Typing "/" instantly shows ALL commands grouped by workflow category.
-// Arrow keys scroll the list, Tab completes, Enter selects. Escape clears.
-// As you type after /, the list filters by prefix → alias → fuzzy match.
+// Typing "/" shows a compact list of commands like Claude Code does:
+//   /command    Description text here
+// No aliases clutter. Full descriptions visible. Tight rows.
+// Arrow keys scroll, Tab completes, Enter selects.
 // ============================================================================
 
 interface Props {
@@ -22,6 +23,9 @@ interface Props {
   autonomousStrategyCount?: number;
 }
 
+// Fixed width for command name column — keeps descriptions aligned
+const CMD_COL_WIDTH = 18;
+
 export function PromptInput({
   onSubmit,
   placeholder = "",
@@ -34,6 +38,7 @@ export function PromptInput({
 }: Props) {
   const { stdout } = useStdout();
   const termRows = stdout?.rows ?? 24;
+  const termCols = stdout?.columns ?? 80;
   const [value, setValue] = useState("");
   const [selectedIdx, setSelectedIdx] = useState(0);
 
@@ -69,14 +74,11 @@ export function PromptInput({
     return groups;
   }, [suggestions, showSuggestions]);
 
-  // Max visible rows (leave room for input line + hints + scroll indicators)
-  const maxVisible = Math.max(5, termRows - 6);
-
-  // Scroll window centered on selected item
-  const scrollStart = Math.max(0, selectedIdx - Math.floor(maxVisible / 2));
+  // Show as many as Claude Code does — use most of the terminal height
+  // Leave 3 rows: 1 for hints bar, 1 for input line, 1 for breathing room
+  const maxVisible = Math.max(8, termRows - 3);
 
   useInput((input, key) => {
-    // Enter → select command or submit text
     if (key.return) {
       if (showSuggestions && suggestions[selectedIdx]) {
         const cmd = suggestions[selectedIdx]!;
@@ -94,21 +96,18 @@ export function PromptInput({
       return;
     }
 
-    // Escape → clear input and close suggestions
     if (key.escape) {
       setValue("");
       setSelectedIdx(0);
       return;
     }
 
-    // Backspace
     if (key.backspace || key.delete) {
       setValue((prev) => prev.slice(0, -1));
       setSelectedIdx(0);
       return;
     }
 
-    // Arrow keys for suggestion navigation (wraps around)
     if (showSuggestions) {
       if (key.upArrow) {
         setSelectedIdx((i) => (i > 0 ? i - 1 : suggestions.length - 1));
@@ -128,7 +127,6 @@ export function PromptInput({
       }
     }
 
-    // Regular character input
     if (input && !key.ctrl && !key.meta && !key.upArrow && !key.downArrow) {
       setValue((prev) => prev + input);
       setSelectedIdx(0);
@@ -149,8 +147,7 @@ export function PromptInput({
     }
   }
 
-  // Apply scroll window to the flat row list
-  // Find the row index of the selected item
+  // Scroll window centered on selected item
   let selectedRowIdx = 0;
   for (let i = 0; i < allRows.length; i++) {
     const row = allRows[i]!;
@@ -164,23 +161,26 @@ export function PromptInput({
   const hasMoreAbove = rowScrollStart > 0;
   const hasMoreBelow = rowScrollStart + maxVisible < allRows.length;
 
+  // Description width = terminal width - pointer(3) - "/" - cmd name - padding
+  const descWidth = Math.max(20, termCols - 3 - 1 - CMD_COL_WIDTH - 4);
+
   const promptChar = isSlashMode ? "/" : "\u276F";
 
   return (
     <Box flexDirection="column">
-      {/* Slash command browser above input */}
+      {/* Slash command picker above input — compact like Claude Code */}
       {showSuggestions && (
-        <Box flexDirection="column" paddingX={1}>
+        <Box flexDirection="column">
           {hasMoreAbove && (
-            <Text dimColor>  {"\u25B2"} {rowScrollStart} more above</Text>
+            <Text dimColor> {"\u25B2"} {rowScrollStart} more</Text>
           )}
 
           {visibleSlice.map((row, i) => {
             if (row.kind === "header") {
               return (
-                <Box key={`hdr-${row.text}-${i}`} marginTop={i > 0 ? 1 : 0}>
+                <Box key={`hdr-${row.text}-${i}`}>
                   <Text dimColor bold>
-                    {"  "}{row.text.toUpperCase()}
+                    {" "}{row.text.toUpperCase()}
                   </Text>
                 </Box>
               );
@@ -188,36 +188,31 @@ export function PromptInput({
 
             const { cmd, globalIdx } = row;
             const isFocused = globalIdx === selectedIdx;
+            const cmdName = `/${cmd.name}`;
+            const padded = cmdName.padEnd(CMD_COL_WIDTH + 1);
 
             return (
               <Box key={cmd.name}>
                 <Text color={isFocused ? "cyanBright" : undefined}>
-                  {isFocused ? " \u25B8 " : "   "}
+                  {isFocused ? " \u25B8" : "  "}
                 </Text>
                 <Text color={isFocused ? "cyanBright" : undefined} bold={isFocused}>
-                  /{cmd.name}
+                  {" "}{padded}
                 </Text>
-                {cmd.aliases && cmd.aliases.length > 0 ? (
-                  <Text dimColor> ({cmd.aliases.slice(0, 2).join(", ")})</Text>
-                ) : null}
-                <Text dimColor>{"  "}{(cmd.description ?? "").slice(0, 45)}</Text>
-                {cmd.subcommandCount ? (
-                  <Text dimColor italic> ({cmd.subcommandCount} subcommands)</Text>
-                ) : null}
+                <Text dimColor={!isFocused} color={isFocused ? "white" : undefined}>
+                  {(cmd.description ?? "").slice(0, descWidth)}
+                </Text>
               </Box>
             );
           })}
 
           {hasMoreBelow && (
-            <Text dimColor>  {"\u25BC"} {allRows.length - rowScrollStart - maxVisible} more below</Text>
+            <Text dimColor> {"\u25BC"} {allRows.length - rowScrollStart - maxVisible} more</Text>
           )}
 
-          <Box marginTop={0}>
-            <Text dimColor>
-              {"  "}{"\u2191\u2193"} navigate {"\u00B7"} Tab complete {"\u00B7"} Enter select {"\u00B7"} Esc cancel
-              {" \u00B7 "}{suggestions.length} commands
-            </Text>
-          </Box>
+          <Text dimColor>
+            {" "}{"\u2191\u2193"} select {"\u00B7"} Tab complete {"\u00B7"} Enter run {"\u00B7"} Esc cancel
+          </Text>
         </Box>
       )}
 

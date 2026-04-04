@@ -1814,7 +1814,7 @@ export function formatCommandHelp(
   lines.push("  `/help trade` - Find planning and execution commands");
   lines.push("  `/help run` - Find strategy and runtime commands");
   lines.push("  `/help accounts` - Find portfolio, broker, and wallet commands");
-  lines.push("  `/help operate` - Find setup, doctor, model, and system commands");
+  lines.push("  `/help system` - Find setup, doctor, model, and system commands");
   lines.push("  `/help page 1` - Browse all commands in pages");
 
   return lines.join("\n");
@@ -2822,7 +2822,9 @@ const PAGINATED_HELP_CATEGORIES: Record<WorkflowGroup, string> = {
   trade: WORKFLOW_CONFIG.trade.label,
   run: WORKFLOW_CONFIG.run.label,
   accounts: WORKFLOW_CONFIG.accounts.label,
-  operate: WORKFLOW_CONFIG.operate.label,
+  monitor: WORKFLOW_CONFIG.monitor.label,
+  build: WORKFLOW_CONFIG.build.label,
+  system: WORKFLOW_CONFIG.system.label,
 };
 
 /**

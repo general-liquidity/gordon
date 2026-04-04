@@ -438,13 +438,11 @@ function AppInner() {
     setFeedbackTradeData(null);
   }, []);
 
-  // ── Boot screen: Gekko ASCII art + "Press Enter to start" ──
+  // ── Skip boot screen — go straight to chat ──
   if (bootPhase === "boot") {
-    return (
-      <BootScreen
-        onReady={() => dispatch({ type: "SET_BOOT_PHASE", phase: "ready" })}
-      />
-    );
+    // Auto-advance to ready immediately
+    setTimeout(() => dispatch({ type: "SET_BOOT_PHASE", phase: "ready" }), 0);
+    return null;
   }
 
   // ── Setup wizard ──
