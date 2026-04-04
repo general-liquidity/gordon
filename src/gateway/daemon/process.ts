@@ -22,7 +22,9 @@ export interface GatewayDaemonHandle {
 
 export async function startGatewayDaemonProcess(): Promise<GatewayDaemonHandle> {
   await bootstrapV07();
-  await initMCPTools().catch(() => ({}));
+  await initMCPTools().catch((err) => {
+    logger.warn("MCP tools initialization failed — MCP tools will be unavailable", err instanceof Error ? err : new Error(String(err)));
+  });
   enableMCPHotReload(5000);
 
   const contextResolver = new GatewayContextResolver();
@@ -50,10 +52,17 @@ export async function startGatewayDaemonProcess(): Promise<GatewayDaemonHandle> 
     const initCtx = await contextResolver.resolve("daemon");
     if (initCtx.exchange) {
       const details = await initCtx.exchange.getFullAccountDetails();
-      // TODO: support non-USDT quote currencies (USDC, EUR, etc.)
-      strategyRuntime.setTotalCapital(details.totalUsdtValue);
+      // Support multiple quote currencies (USDT, USDC, EUR, etc.)
+      const totalCapital = details.totalUsdtValue
+        ?? (details as any).totalUsdcValue
+        ?? (details as any).totalValue
+        ?? 0;
+      if (totalCapital === 0) {
+        logger.warn("Could not determine total capital — no supported quote currency found in account details");
+      }
+      strategyRuntime.setTotalCapital(totalCapital);
       logger.info("StrategyRuntime initialized with exchange equity", {
-        totalCapital: details.totalUsdtValue.toFixed(2),
+        totalCapital: totalCapital.toFixed(2),
       });
     }
   } catch (error) {

@@ -49,10 +49,12 @@ export class BinanceUSAdapter extends BinanceAdapter {
   }
 
   override async getDepositHistory(_limit?: number): Promise<Deposit[]> {
+    console.warn("[binance-us] Deposit/withdrawal history not available via Binance US API (SAPI endpoints unsupported). Use the Binance US website for fund transfer records.");
     return [];
   }
 
   override async getWithdrawalHistory(_limit?: number): Promise<Withdrawal[]> {
+    console.warn("[binance-us] Deposit/withdrawal history not available via Binance US API (SAPI endpoints unsupported). Use the Binance US website for fund transfer records.");
     return [];
   }
 

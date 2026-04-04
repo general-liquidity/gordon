@@ -21,6 +21,9 @@
 import { Agent } from "@mastra/core/agent";
 import { TokenLimiterProcessor } from "@mastra/core/processors";
 import { GordonInputGuard, GordonOutputSanitizer } from "./processors/index.ts";
+import { createModuleLogger } from "../logger/logger.ts";
+
+const logger = createModuleLogger("agents");
 
 // Singleton processor instances (shared across all agents)
 const gordonInputGuard = new GordonInputGuard();
@@ -154,7 +157,7 @@ function getSessionState(): SessionState {
  */
 export function setMemoryConfig(config: Partial<MemoryConfig>): void {
   _memoryConfig = { ...DEFAULT_MEMORY_CONFIG, ...config };
-  console.log(`[Gordon] Memory config updated: lastMessages=${_memoryConfig.lastMessages}, maxSessionHours=${_memoryConfig.maxSessionDurationHours}`);
+  logger.info("Memory config updated", { lastMessages: _memoryConfig.lastMessages, maxSessionHours: _memoryConfig.maxSessionDurationHours });
 }
 
 /**
@@ -275,7 +278,7 @@ export function clearSession(): void {
   _sessionState = null;
   resetSharedMemory();
   resetAgents();
-  console.log("[Gordon] Session cleared and memory reset");
+  logger.info("Session cleared and memory reset");
 }
 
 /**
@@ -284,7 +287,7 @@ export function clearSession(): void {
  */
 export function autoClearIfExpired(): boolean {
   if (isSessionExpired()) {
-    console.log("[Gordon] Session expired, auto-clearing...");
+    logger.info("Session expired, auto-clearing");
     clearSession();
     return true;
   }
@@ -453,9 +456,7 @@ function createMemory(): Memory {
 
   // Use configured lastMessages or default
   const lastMessages = _memoryConfig.lastMessages;
-  if (process.env.GORDON_STARTUP_QUIET !== "1") {
-    console.log(`[Gordon] Creating memory with lastMessages=${lastMessages}, mode=${mode}`);
-  }
+  logger.info("Creating memory", { lastMessages, mode });
 
   return new Memory({
     storage,
@@ -1987,9 +1988,7 @@ function getGordonAgent(): Agent {
   if (!_agents.gordon) {
     const model = resolveRuntimeModel();
     const modelLabel = formatModelLabel(model);
-    if (process.env.GORDON_STARTUP_QUIET !== "1") {
-      console.log(`[Gordon] Initializing agent with model: ${modelLabel}`);
-    }
+    logger.info("Initializing agent", { model: modelLabel });
 
     _agents.gordon = new Agent({
       id: "gordon",

@@ -12,7 +12,7 @@ import type { Candle } from "../../types/index.ts";
 /**
  * Supported exchange identifiers
  */
-export type ExchangeId = "binance" | "binance_us" | "coinbase" | "kraken" | "bitfinex" | "hyperliquid" | "uniswap" | "robinhood";
+export type ExchangeId = "binance" | "binance_us" | "coinbase" | "kraken" | "bitfinex" | "hyperliquid" | "uniswap" | "robinhood" | "okx";
 
 /**
  * Exchange credentials for authentication
@@ -42,6 +42,7 @@ export const EXCHANGE_ENV_MAP: Record<ExchangeId, { key?: string; secret?: strin
   hyperliquid: { wallet: "HYPERLIQUID_PRIVATE_KEY" },
   uniswap:     { key: "UNISWAP_API_KEY" },
   robinhood:   { key: "ROBINHOOD_API_KEY",    secret: "ROBINHOOD_API_SECRET" },
+  okx:         { key: "OKX_API_KEY",          secret: "OKX_API_SECRET",       passphrase: "OKX_PASSPHRASE" },
 };
 
 /**

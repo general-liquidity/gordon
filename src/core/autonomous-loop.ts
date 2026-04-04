@@ -343,7 +343,7 @@ export function startAutonomousLoop(config: AutonomousLoopConfig): { success: bo
   emitEvent("autonomous:started", {
     mandateId: config.mandate.id,
     intervalMs,
-  }).catch(() => {});
+  }).catch((err) => { logger.error("Failed to emit event:", err instanceof Error ? err.message : String(err)); });
 
   return { success: true };
 }
@@ -384,21 +384,21 @@ export function stopAutonomousLoop(reason?: string): void {
     reason,
     totalCycles: loopState.cycleCount,
     totalOpportunities: loopState.totalOpportunities,
-  }).catch(() => {});
+  }).catch((err) => { logger.error("Failed to emit event:", err instanceof Error ? err.message : String(err)); });
 }
 
 export function pauseAutonomousLoop(): void {
   if (!loopState.isRunning) return;
   loopState.isPaused = true;
   logger.info("Autonomous loop paused");
-  emitEvent("autonomous:paused", { mandateId: loopState.mandate?.id }).catch(() => {});
+  emitEvent("autonomous:paused", { mandateId: loopState.mandate?.id }).catch((err) => { logger.error("Failed to emit event:", err instanceof Error ? err.message : String(err)); });
 }
 
 export function resumeAutonomousLoop(): void {
   if (!loopState.isRunning || !loopState.isPaused) return;
   loopState.isPaused = false;
   logger.info("Autonomous loop resumed");
-  emitEvent("autonomous:resumed", { mandateId: loopState.mandate?.id }).catch(() => {});
+  emitEvent("autonomous:resumed", { mandateId: loopState.mandate?.id }).catch((err) => { logger.error("Failed to emit event:", err instanceof Error ? err.message : String(err)); });
 }
 
 /**

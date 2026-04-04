@@ -192,10 +192,10 @@ export class KrakenAdapter implements Exchange {
     // Find the OHLC data (exclude 'last' key)
     const ohlcData = Object.entries(response)
       .filter(([key]) => key !== "last")
-      .flatMap(([, data]) => data as any[]);
+      .flatMap(([, data]) => data as Array<[number, string, string, string, string, string, string, number]>);
 
     const candles = ohlcData.slice(-(limit || 100)).map(
-      (c: any): Candle => ({
+      (c: [number, string, string, string, string, string, string, number]): Candle => ({
         openTime: c[0] * 1000,
         open: parseFloat(c[1]),
         high: parseFloat(c[2]),

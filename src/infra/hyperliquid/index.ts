@@ -34,6 +34,37 @@ export type {
   HyperliquidOrderParams,
 } from "./types.ts";
 
+// HIP-3 Builder-Deployed Perpetuals
+export {
+  HIP3_ASSETS,
+  HIP3_CATEGORIES,
+  isHIP3Asset,
+  getHIP3AssetInfo,
+  getHIP3AssetsByCategory,
+  getAllHIP3Symbols,
+  resolveDexOffset,
+  resolveAssetInDex,
+  resolveHIP3GlobalIndex,
+  fetchDexMeta,
+  getHIP3Quote,
+  getAllHIP3Quotes,
+  getHIP3L2Book,
+  sizeToWire,
+  priceToWire,
+  placeHIP3Order,
+  updateHIP3Leverage,
+} from "./hip3.ts";
+
+export type {
+  HIP3AssetInfo,
+  HIP3CategorizedAsset,
+  HIP3AssetCategory,
+  HIP3Quote,
+  HIP3OrderParams,
+  HIP3OrderResult,
+  HIP3DexMeta,
+} from "./hip3-types.ts";
+
 // Errors (re-exported from errors module)
 export {
   HyperliquidError,

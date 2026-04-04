@@ -3,6 +3,8 @@
  *
  * Provides user-friendly error messages for various error types:
  * - Binance API error codes
+ * - Coinbase error codes
+ * - Kraken error codes
  * - Network errors
  * - Validation errors
  * - Internal tool errors
@@ -117,11 +119,17 @@ const BINANCE_ERROR_MESSAGES: Record<
     recoverable: true,
     suggestion: "Please try again.",
   },
+  "-1013": {
+    message: "Invalid quantity for this order.",
+    category: "validation",
+    recoverable: false,
+    suggestion: "The order quantity does not meet the minimum, maximum, or step size requirements for this trading pair. Check the symbol's LOT_SIZE filter and adjust your quantity.",
+  },
   "-1015": {
     message: "Too many orders. Rate limit exceeded.",
     category: "rate_limit",
     recoverable: true,
-    suggestion: "You've placed too many orders recently. Wait before placing more.",
+    suggestion: "You've placed too many orders recently. Wait a minute before placing more.",
   },
   "-1016": {
     message: "Service is unavailable.",
@@ -139,7 +147,7 @@ const BINANCE_ERROR_MESSAGES: Record<
     message: "Timestamp is outside the valid window.",
     category: "system",
     recoverable: true,
-    suggestion: "Your system clock may be out of sync. Try synchronizing your computer's time.",
+    suggestion: "Your system clock may be out of sync. Synchronize your computer's time (e.g., enable automatic time sync in your OS settings) and try again.",
   },
   "-1022": {
     message: "Invalid API signature.",
@@ -284,11 +292,11 @@ const BINANCE_ERROR_MESSAGES: Record<
 
   // Order Issues (-2000 to -2099)
   "-2010": {
-    message: "Order would immediately trigger.",
-    category: "order",
+    message: "Insufficient balance to place this order.",
+    category: "insufficient_funds",
     recoverable: false,
     suggestion:
-      "Your stop or limit price is too close to the current price. Adjust the price and try again.",
+      "You don't have enough funds for this order. Check your available balance and reduce the order size, or deposit more funds.",
   },
   "-2011": {
     message: "Order cancellation failed.",
@@ -375,6 +383,64 @@ const BINANCE_ERROR_MESSAGES: Record<
     category: "validation",
     recoverable: false,
     suggestion: "The order doesn't meet the trading pair's requirements.",
+  },
+};
+
+// ============================================================================
+// Coinbase Error Code Mapping
+// ============================================================================
+
+/**
+ * Coinbase Advanced Trade API error codes to user-friendly messages.
+ * These are string-based error identifiers returned by the Coinbase API.
+ */
+const COINBASE_ERROR_MESSAGES: Record<
+  string,
+  { message: string; category: ErrorCategory; recoverable: boolean; suggestion?: string }
+> = {
+  INSUFFICIENT_FUNDS: {
+    message: "Insufficient funds on Coinbase.",
+    category: "insufficient_funds",
+    recoverable: false,
+    suggestion: "You don't have enough balance to complete this order. Deposit more funds or reduce the order size.",
+  },
+  INVALID_AMOUNT: {
+    message: "Invalid amount for this Coinbase order.",
+    category: "validation",
+    recoverable: false,
+    suggestion: "The order amount does not meet Coinbase requirements. Check the minimum order size and increment for this trading pair.",
+  },
+  NOT_FOUND: {
+    message: "Resource not found on Coinbase.",
+    category: "validation",
+    recoverable: false,
+    suggestion: "The requested order, product, or account was not found. Verify the ID or symbol is correct.",
+  },
+};
+
+// ============================================================================
+// Kraken Error Code Mapping
+// ============================================================================
+
+/**
+ * Kraken API error strings to user-friendly messages.
+ * Kraken returns errors as string arrays prefixed with 'E' for errors.
+ */
+const KRAKEN_ERROR_MESSAGES: Record<
+  string,
+  { message: string; category: ErrorCategory; recoverable: boolean; suggestion?: string }
+> = {
+  "EOrder:Insufficient funds": {
+    message: "Insufficient funds on Kraken.",
+    category: "insufficient_funds",
+    recoverable: false,
+    suggestion: "You don't have enough balance to place this order. Deposit more funds or reduce the order size.",
+  },
+  "EGeneral:Invalid arguments": {
+    message: "Invalid arguments in Kraken request.",
+    category: "validation",
+    recoverable: false,
+    suggestion: "One or more parameters are invalid. Check the order type, pair name, volume, and price values.",
   },
 };
 
@@ -480,6 +546,48 @@ export function translateBinanceError(code: number, originalMessage?: string): T
 }
 
 /**
+ * Translate a Coinbase error code string to a user-friendly message
+ *
+ * @param errorCode - Coinbase error code string (e.g., "INSUFFICIENT_FUNDS")
+ * @param originalMessage - Original error message from Coinbase
+ * @returns Translated error with context, or null if not a known Coinbase error
+ */
+export function translateCoinbaseError(errorCode: string, originalMessage?: string): TranslatedError | null {
+  const errorInfo = COINBASE_ERROR_MESSAGES[errorCode];
+  if (errorInfo) {
+    return {
+      message: errorInfo.message,
+      code: errorCode,
+      category: errorInfo.category,
+      recoverable: errorInfo.recoverable,
+      suggestion: errorInfo.suggestion,
+    };
+  }
+  return null;
+}
+
+/**
+ * Translate a Kraken error string to a user-friendly message
+ *
+ * @param errorString - Kraken error string (e.g., "EOrder:Insufficient funds")
+ * @param originalMessage - Original error message from Kraken
+ * @returns Translated error with context, or null if not a known Kraken error
+ */
+export function translateKrakenError(errorString: string, originalMessage?: string): TranslatedError | null {
+  const errorInfo = KRAKEN_ERROR_MESSAGES[errorString];
+  if (errorInfo) {
+    return {
+      message: errorInfo.message,
+      code: errorString,
+      category: errorInfo.category,
+      recoverable: errorInfo.recoverable,
+      suggestion: errorInfo.suggestion,
+    };
+  }
+  return null;
+}
+
+/**
  * Translate a network error to a user-friendly message
  *
  * @param error - The error to translate
@@ -521,6 +629,28 @@ export function translateValidationError(field: string, issue: string): Translat
     recoverable: false,
     suggestion: `Please provide a valid value for ${field}.`,
   };
+}
+
+/**
+ * Try to match an error message against known Coinbase and Kraken error patterns.
+ * Returns a TranslatedError if matched, or null otherwise.
+ */
+function tryTranslateExchangeErrorString(errorMessage: string): TranslatedError | null {
+  // Check Coinbase error codes (appear as uppercase identifiers in messages)
+  for (const code of Object.keys(COINBASE_ERROR_MESSAGES)) {
+    if (errorMessage.includes(code)) {
+      return translateCoinbaseError(code, errorMessage);
+    }
+  }
+
+  // Check Kraken error strings (appear as "EOrder:..." or "EGeneral:..." in messages)
+  for (const code of Object.keys(KRAKEN_ERROR_MESSAGES)) {
+    if (errorMessage.includes(code)) {
+      return translateKrakenError(code, errorMessage);
+    }
+  }
+
+  return null;
 }
 
 /**
@@ -579,6 +709,12 @@ export function translateError(error: unknown): TranslatedError {
       return translateBinanceError(code, error.message);
     }
 
+    // Check for Coinbase / Kraken error patterns in the message
+    const exchangeMatch = tryTranslateExchangeErrorString(error.message);
+    if (exchangeMatch) {
+      return exchangeMatch;
+    }
+
     // Generic error
     return {
       message: error.message || "An error occurred.",
@@ -597,6 +733,12 @@ export function translateError(error: unknown): TranslatedError {
       return translateBinanceError(code, error);
     }
 
+    // Check for Coinbase / Kraken error patterns in the string
+    const exchangeMatch = tryTranslateExchangeErrorString(error);
+    if (exchangeMatch) {
+      return exchangeMatch;
+    }
+
     return {
       message: error,
       category: "unknown",
@@ -609,6 +751,12 @@ export function translateError(error: unknown): TranslatedError {
   if (typeof error === "object" && "error" in error) {
     const errorObj = error as { error: unknown };
     if (typeof errorObj.error === "string") {
+      // Check for Coinbase / Kraken error patterns
+      const exchangeMatch = tryTranslateExchangeErrorString(errorObj.error);
+      if (exchangeMatch) {
+        return exchangeMatch;
+      }
+
       return {
         message: errorObj.error,
         category: "unknown",

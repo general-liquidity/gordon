@@ -13,6 +13,7 @@
  * - Bitfinex
  * - Hyperliquid
  * - Robinhood Crypto
+ * - OKX
  *
  * @example
  * ```typescript
@@ -48,6 +49,7 @@ export { BitfinexAdapter } from "./adapters/bitfinex.ts";
 export { HyperliquidAdapter } from "./adapters/hyperliquid.ts";
 export { UniswapAdapter } from "./adapters/uniswap.ts";
 export { RobinhoodAdapter } from "./adapters/robinhood.ts";
+export { OkxAdapter } from "./adapters/okx.ts";
 
 // Type aliases for convenience
 export type {

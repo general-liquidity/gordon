@@ -38,6 +38,16 @@ export interface BrokerCredentials {
   baseUrl?: string;
   /** Optional override for market-data API host */
   dataBaseUrl?: string;
+  /** OAuth2 refresh token for automatic token renewal */
+  refreshToken?: string;
+  /** OAuth2 token endpoint URL (broker-specific) */
+  tokenEndpoint?: string;
+  /** OAuth2 client ID (if different from apiKey) */
+  oauthClientId?: string;
+  /** OAuth2 client secret (if different from apiSecret) */
+  oauthClientSecret?: string;
+  /** Token expiry time in seconds from issuance (default 3600) */
+  tokenExpiresIn?: number;
 }
 
 /**

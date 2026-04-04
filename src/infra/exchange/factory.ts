@@ -12,6 +12,7 @@ import { BitfinexAdapter } from "./adapters/bitfinex.ts";
 import { HyperliquidAdapter } from "./adapters/hyperliquid.ts";
 import { UniswapAdapter } from "./adapters/uniswap.ts";
 import { RobinhoodAdapter } from "./adapters/robinhood.ts";
+import { OkxAdapter } from "./adapters/okx.ts";
 
 /**
  * All supported exchange IDs with native adapters
@@ -25,6 +26,7 @@ const SUPPORTED_EXCHANGES: ExchangeId[] = [
   "hyperliquid",
   "uniswap",
   "robinhood",
+  "okx",
 ];
 
 /**
@@ -160,6 +162,17 @@ export class ExchangeFactory {
         break;
       case "robinhood":
         exchange = new RobinhoodAdapter(credentials.apiKey, credentials.apiSecret);
+        break;
+      case "okx":
+        if (!credentials.passphrase) {
+          throw new Error("OKX requires a passphrase in addition to API key and secret");
+        }
+        exchange = new OkxAdapter(
+          credentials.apiKey,
+          credentials.apiSecret,
+          credentials.passphrase,
+          credentials.sandbox,
+        );
         break;
       default:
         throw new Error(`No adapter available for exchange: ${exchangeId}`);

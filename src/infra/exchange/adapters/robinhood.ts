@@ -58,6 +58,21 @@ const INTERVAL_MAP: Record<string, IntervalMapping> = {
   "1w": { interval: "week", span: "5year", intervalMs: 604_800_000 },
 };
 
+/**
+ * Ordered list of intervals from smallest to largest for fallback resolution.
+ */
+const INTERVAL_KEYS_ORDERED = ["1m", "5m", "15m", "30m", "1h", "4h", "1d", "1w"];
+
+/**
+ * Map an interval string to its approximate milliseconds for comparison.
+ */
+function intervalToMs(interval: string): number {
+  const units: Record<string, number> = { m: 60_000, h: 3_600_000, d: 86_400_000, w: 604_800_000 };
+  const match = interval.match(/^(\d+)([mhdw])$/);
+  if (!match) return 3_600_000; // default to 1h
+  return parseInt(match[1]!, 10) * (units[match[2]!] ?? 3_600_000);
+}
+
 function parseNumber(value: unknown): number {
   if (value === undefined || value === null || value === "") return 0;
   if (typeof value === "number") return Number.isFinite(value) ? value : 0;
@@ -370,7 +385,22 @@ export class RobinhoodAdapter implements Exchange {
   }
 
   private getIntervalConfig(interval: string): IntervalMapping {
-    return INTERVAL_MAP[interval] ?? INTERVAL_MAP["1h"]!;
+    const direct = INTERVAL_MAP[interval];
+    if (direct) return direct;
+
+    // Fallback: find the closest available interval by duration
+    const requestedMs = intervalToMs(interval);
+    let bestKey = "1h";
+    let bestDiff = Infinity;
+    for (const key of INTERVAL_KEYS_ORDERED) {
+      const diff = Math.abs(INTERVAL_MAP[key]!.intervalMs - requestedMs);
+      if (diff < bestDiff) {
+        bestDiff = diff;
+        bestKey = key;
+      }
+    }
+    console.warn(`[robinhood] Interval "${interval}" is not supported. Falling back to closest available interval "${bestKey}".`);
+    return INTERVAL_MAP[bestKey]!;
   }
 
   private async getRawAccount(): Promise<Record<string, unknown>> {
@@ -836,11 +866,13 @@ export class RobinhoodAdapter implements Exchange {
 
   async getDepositHistory(_limit = 100): Promise<Deposit[]> {
     // Robinhood crypto trading API does not currently expose a standardized deposit history endpoint.
+    console.warn("[robinhood] Deposit/withdrawal history not available via Robinhood Crypto API. Use Robinhood app for fund transfer records.");
     return [];
   }
 
   async getWithdrawalHistory(_limit = 100): Promise<Withdrawal[]> {
     // Robinhood crypto trading API does not currently expose a standardized withdrawal history endpoint.
+    console.warn("[robinhood] Deposit/withdrawal history not available via Robinhood Crypto API. Use Robinhood app for fund transfer records.");
     return [];
   }
 

@@ -9,9 +9,13 @@ import { Box, Text, useStdout } from "ink";
 
 interface Props {
   title?: string;
+  color?: string;
+  style?: "solid" | "dashed" | "double";
 }
 
-export function Divider({ title }: Props) {
+const CHARS = { solid: "\u2500", dashed: "\u2504", double: "\u2550" };
+
+export function Divider({ title, color, style = "solid" }: Props) {
   const { stdout } = useStdout();
   const width = stdout?.columns ?? 80;
 
@@ -20,18 +24,20 @@ export function Divider({ title }: Props) {
     const remaining = Math.max(0, width - titleWithPad.length - 2);
     const left = Math.floor(remaining / 2);
     const right = remaining - left;
+    const ch = CHARS[style];
     return (
       <Box>
-        <Text dimColor>
-          {"\u2500".repeat(left)}{titleWithPad}{"\u2500".repeat(right)}
+        <Text dimColor={!color} color={color}>
+          {ch.repeat(left)}{titleWithPad}{ch.repeat(right)}
         </Text>
       </Box>
     );
   }
 
+  const ch = CHARS[style];
   return (
     <Box>
-      <Text dimColor>{"\u2500".repeat(width - 2)}</Text>
+      <Text dimColor={!color} color={color}>{ch.repeat(width - 2)}</Text>
     </Box>
   );
 }

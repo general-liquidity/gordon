@@ -13,13 +13,15 @@ const IBKR_CAPABILITIES: BrokerCapabilities = {
   supportsHistoricalBars: false,
 };
 
+const IBKR_DEFAULT_URL = "http://127.0.0.1:5000";
+
 const IBKR_CONFIG: RestBrokerAdapterConfig = {
   brokerId: "ibkr",
   displayName: "Interactive Brokers",
   capabilities: IBKR_CAPABILITIES,
   authStyle: "none",
-  defaultLiveBaseUrl: "http://127.0.0.1:5000",
-  defaultPaperBaseUrl: "http://127.0.0.1:5000",
+  defaultLiveBaseUrl: process.env.IBKR_GATEWAY_URL ?? IBKR_DEFAULT_URL,
+  defaultPaperBaseUrl: process.env.IBKR_GATEWAY_URL ?? IBKR_DEFAULT_URL,
   accountDiscoveryPaths: [
     "/v1/api/iserver/accounts",
   ],

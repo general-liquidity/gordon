@@ -8,6 +8,7 @@
 
 import { Buffer } from "node:buffer";
 import type { Candle } from "../../../types/index.ts";
+import { TokenManager, type TokenConfig } from "../tokenRefresh.ts";
 import type {
   BrokerAdapter,
   BrokerAccount,
@@ -291,6 +292,9 @@ export class RestBrokerAdapter implements BrokerAdapter {
   private readonly dataBaseUrl: string;
   private accountIdCache?: string;
 
+  /** Token manager for automatic OAuth2 token refresh (bearer auth only). */
+  protected readonly tokenManager: TokenManager | null;
+
   constructor(credentials: BrokerCredentials, config: RestBrokerAdapterConfig) {
     this.credentials = credentials;
     this.config = config;
@@ -308,6 +312,25 @@ export class RestBrokerAdapter implements BrokerAdapter {
           : config.defaultLiveDataBaseUrl || this.baseUrl
       );
     this.accountIdCache = credentials.accountId;
+
+    // Initialize token manager for bearer auth when OAuth2 credentials are available.
+    if (config.authStyle === "bearer") {
+      const tokenConfig: TokenConfig = {
+        accessToken: credentials.apiKey,
+        refreshToken: credentials.refreshToken,
+        tokenEndpoint: credentials.tokenEndpoint,
+        clientId: credentials.oauthClientId ?? credentials.apiKey,
+        clientSecret: credentials.oauthClientSecret ?? credentials.apiSecret,
+      };
+
+      if (credentials.tokenExpiresIn) {
+        tokenConfig.expiresAt = Date.now() + credentials.tokenExpiresIn * 1000;
+      }
+
+      this.tokenManager = new TokenManager(tokenConfig);
+    } else {
+      this.tokenManager = null;
+    }
   }
 
   protected renderPath(template: string, vars: Record<string, string | number | undefined>): string {
@@ -318,12 +341,13 @@ export class RestBrokerAdapter implements BrokerAdapter {
     });
   }
 
-  private buildHeaders(initHeaders?: HeadersInit): Headers {
+  private buildHeaders(initHeaders?: HeadersInit, bearerToken?: string): Headers {
     const headers = new Headers(initHeaders);
     headers.set("accept", "application/json");
 
     if (this.config.authStyle === "bearer") {
-      headers.set("authorization", `Bearer ${this.credentials.apiKey}`);
+      const token = bearerToken ?? this.credentials.apiKey;
+      headers.set("authorization", `Bearer ${token}`);
     } else if (this.config.authStyle === "basic") {
       const token = Buffer.from(`${this.credentials.apiKey}:${this.credentials.apiSecret}`).toString("base64");
       headers.set("authorization", `Basic ${token}`);
@@ -347,7 +371,12 @@ export class RestBrokerAdapter implements BrokerAdapter {
   ): Promise<T> {
     const base = options?.dataApi ? this.dataBaseUrl : this.baseUrl;
     const url = new URL(path, base).toString();
-    const headers = this.buildHeaders(init?.headers);
+
+    // Ensure bearer token is fresh before sending the request.
+    const bearerToken = this.tokenManager
+      ? await this.tokenManager.ensureValidToken()
+      : undefined;
+    const headers = this.buildHeaders(init?.headers, bearerToken);
 
     if (init?.body && !headers.has("content-type")) {
       headers.set("content-type", "application/json");

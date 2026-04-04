@@ -76,7 +76,7 @@ export class PositionStateMachine {
 
     // Emit creation event
     await this.bus.emit({
-      type: "position:created" as any,
+      type: "position:created" as const,
       timestamp: now,
       positionId: id,
       symbol: params.symbol,
@@ -174,7 +174,7 @@ export class PositionStateMachine {
 
     // Emit the generic state_changed event
     await this.bus.emit({
-      type: "position:state_changed" as any,
+      type: "position:state_changed" as const,
       timestamp: now,
       positionId,
       symbol: updated.symbol,
@@ -252,7 +252,7 @@ export class PositionStateMachine {
 
     // Emit an update event (non-state-change data update)
     await this.bus.emit({
-      type: "position:updated" as any,
+      type: "position:updated" as const,
       timestamp: now,
       positionId,
       symbol: updated.symbol,
@@ -280,7 +280,7 @@ export class PositionStateMachine {
     switch (toState) {
       case "filled":
         await this.bus.emit({
-          type: "position:opened" as any,
+          type: "position:opened" as const,
           timestamp: now,
           positionId: position.id,
           symbol: position.symbol,
@@ -292,7 +292,7 @@ export class PositionStateMachine {
 
       case "closed":
         await this.bus.emit({
-          type: "position:closed" as any,
+          type: "position:closed" as const,
           timestamp: now,
           positionId: position.id,
           symbol: position.symbol,
@@ -303,7 +303,7 @@ export class PositionStateMachine {
 
       case "cancelled":
         await this.bus.emit({
-          type: "position:cancelled" as any,
+          type: "position:cancelled" as const,
           timestamp: now,
           positionId: position.id,
           symbol: position.symbol,
@@ -315,7 +315,7 @@ export class PositionStateMachine {
 
       case "rejected":
         await this.bus.emit({
-          type: "position:rejected" as any,
+          type: "position:rejected" as const,
           timestamp: now,
           positionId: position.id,
           symbol: position.symbol,
@@ -327,7 +327,7 @@ export class PositionStateMachine {
       case "reviewed":
         if (position.review) {
           await this.bus.emit({
-            type: "position:reviewed" as any,
+            type: "position:reviewed" as const,
             timestamp: now,
             positionId: position.id,
             symbol: position.symbol,

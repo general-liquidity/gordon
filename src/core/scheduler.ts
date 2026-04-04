@@ -180,7 +180,7 @@ export function startScheduler(
 
   emitEvent("scheduler:started", {
     intervalMs: currentConfig.intervalMs,
-  }).catch(() => {});
+  }).catch((err) => { logger.error("Failed to emit scheduler event:", err instanceof Error ? err.message : String(err)); });
 }
 
 /**
@@ -207,7 +207,7 @@ export function stopScheduler(): void {
   emitEvent("scheduler:stopped", {
     totalScans: state.scanCount,
     totalOpportunities: state.opportunitiesFound,
-  }).catch(() => {});
+  }).catch((err) => { logger.error("Failed to emit scheduler event:", err instanceof Error ? err.message : String(err)); });
 }
 
 /**

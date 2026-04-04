@@ -16,6 +16,10 @@ export { RiskRenderer } from "./RiskRenderer.js";
 export { MarketAnalysisRenderer } from "./MarketAnalysisRenderer.js";
 export { IndicatorRenderer } from "./IndicatorRenderer.js";
 export { LiquidationRenderer } from "./LiquidationRenderer.js";
+export { YieldRenderer } from "./YieldRenderer.js";
+export { SECFilingRenderer } from "./SECFilingRenderer.js";
+export { NewsRenderer } from "./NewsRenderer.js";
+export { EnrichedQuoteRenderer } from "./EnrichedQuoteRenderer.js";
 
 // ============================================================================
 // Registry -- name -> renderer component mapping
@@ -34,6 +38,10 @@ import { RiskRenderer } from "./RiskRenderer.js";
 import { MarketAnalysisRenderer } from "./MarketAnalysisRenderer.js";
 import { IndicatorRenderer } from "./IndicatorRenderer.js";
 import { LiquidationRenderer } from "./LiquidationRenderer.js";
+import { YieldRenderer } from "./YieldRenderer.js";
+import { SECFilingRenderer } from "./SECFilingRenderer.js";
+import { NewsRenderer } from "./NewsRenderer.js";
+import { EnrichedQuoteRenderer } from "./EnrichedQuoteRenderer.js";
 
 import type { ComponentType } from "react";
 
@@ -56,6 +64,10 @@ const RENDERER_REGISTRY: Record<string, ComponentType<any>> = {
   marketanalysis: MarketAnalysisRenderer,
   indicator: IndicatorRenderer,
   liquidation: LiquidationRenderer,
+  yield: YieldRenderer,
+  secfiling: SECFilingRenderer,
+  news: NewsRenderer,
+  enrichedquote: EnrichedQuoteRenderer,
 };
 
 /**
