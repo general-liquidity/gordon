@@ -67,6 +67,11 @@ gordon-spot-1-main
 hanabi-1-main
 misc
 
-# Claude Code reference repos (not part of Gordon)
+# Reference repos (not part of Gordon source)
 claude-code-meta/
+claude-code-meta-2/
+fintool-main/
 open-claude-code-main/
+.history/
+
+

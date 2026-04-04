@@ -27,7 +27,7 @@ import {
   getLPProbabilities,
   getLeaderboard,
   SYNTHDATA_ASSETS,
-} from "../../synthdata/index.ts";
+} from "../../external/synthdata/index.ts";
 
 // ============================================================================
 // Shared

@@ -31,8 +31,8 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
-import { executeAction, isSolanaKitConfigured } from "../../solanakit/index.ts";
-import type { SolanaKitActionResult } from "../../solanakit/index.ts";
+import { executeAction, isSolanaKitConfigured } from "../../protocols/solana/index.ts";
+import type { SolanaKitActionResult } from "../../protocols/solana/index.ts";
 
 // ============================================================================
 // Helper

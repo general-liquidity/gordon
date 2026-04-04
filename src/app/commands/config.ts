@@ -4,7 +4,7 @@
  */
 
 import { loadConfig, saveConfig } from '../../infra/storage/config.ts';
-import { pluginInstaller } from '../../infra/mcp/marketplace/installer.ts';
+import { pluginInstaller } from '../../infra/ai/mcp/marketplace/installer.ts';
 import type { GordonConfig, Preferences } from '../../types/config.ts';
 
 // ============================================================================

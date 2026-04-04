@@ -9,7 +9,7 @@ import type { Exchange } from "../../infra/exchange/types.ts";
 import type { BrokerAdapter } from "../../infra/broker/types.ts";
 import type { OHLC } from "../types.ts";
 import { createModuleLogger } from "../../infra/logger/index.ts";
-import { normalizeCryptoSymbol } from "../../infra/markets/instruments.ts";
+import { normalizeCryptoSymbol } from "../../infra/domain/markets/instruments.ts";
 import { getDatabase } from "../../infra/storage/index.ts";
 import {
   DataSourceManager,

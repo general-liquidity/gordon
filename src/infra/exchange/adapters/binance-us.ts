@@ -8,7 +8,7 @@
  * graceful fallbacks.
  */
 
-import { BinanceClient } from "../../binance/index.ts";
+import { BinanceClient } from "../../venues/exchange/clients/binance/index.ts";
 import { BinanceAdapter } from "./binance.ts";
 import type {
   ExchangeId,

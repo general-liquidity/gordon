@@ -4,7 +4,7 @@
  */
 
 import type { Exchange } from "../../infra/exchange/index.ts";
-import type { LLMClient } from "../../infra/llm/index.ts";
+import type { LLMClient } from "../../infra/ai/llm/index.ts";
 import type { GordonConfig } from "../../types/index.ts";
 import { scan } from "../../core/scanner.ts";
 import { analyze, type DetailedAnalysis } from "../../core/analyzer.ts";
@@ -14,10 +14,10 @@ import { fetchHistoricalData } from "../../backtest/data/historical.ts";
 import { formatBacktestSummary } from "../../backtest/reporting/formatter.ts";
 import type { BacktestResult, BacktestConfig } from "../../backtest/types.ts";
 import { createStreamingWorkflow, type StreamingWorkflowResult } from "../../infra/agents/index.ts";
-import { normalizeCryptoSymbol } from "../../infra/markets/instruments.ts";
-import { TinyfishClient, summarizeTinyfishResult } from "../../infra/tinyfish/client.ts";
-import { buildTinyfishRequest, runTinyfishResearch, scheduleTinyfishMonitor } from "../../infra/tinyfish/service.ts";
-import type { TinyfishSSEEvent, TinyfishRunResponse } from "../../infra/tinyfish/types.ts";
+import { normalizeCryptoSymbol } from "../../infra/domain/markets/instruments.ts";
+import { TinyfishClient, summarizeTinyfishResult } from "../../infra/external/tinyfish/client.ts";
+import { buildTinyfishRequest, runTinyfishResearch, scheduleTinyfishMonitor } from "../../infra/external/tinyfish/service.ts";
+import type { TinyfishSSEEvent, TinyfishRunResponse } from "../../infra/external/tinyfish/types.ts";
 
 // ============================================================================
 // Types

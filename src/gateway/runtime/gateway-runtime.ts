@@ -30,7 +30,7 @@ import {
 } from "../store/scheduler-store.ts";
 import { StrategyRuntime } from "../../core/runtime/engine.ts";
 import { reconcileWithExchange } from "../../services/reconciliation-exchange.service.ts";
-import { reloadMCPTools } from "../../infra/mcp/client.ts";
+import { reloadMCPTools } from "../../infra/ai/mcp/client.ts";
 import { computeNextRunAt } from "../scheduler/index.ts";
 import { PortfolioContextBuilder } from "../../core/risk-kernel/portfolio-context.ts";
 import { evaluateBaselineCircuitBreakers } from "../circuit-breakers/index.ts";
@@ -45,10 +45,10 @@ import { getTrade } from "../../infra/storage/trades.ts";
 import { executeEmergencyLiquidation } from "../../core/safety/emergency-liquidation.ts";
 import { cleanupStalePositions } from "../../core/positions/cleanup.ts";
 import { getAutonomousLoopStatus, runAutonomousCycleOnce } from "../../core/autonomous-loop.ts";
-import { executeTinyfishMonitorRun } from "../../infra/tinyfish/service.ts";
+import { executeTinyfishMonitorRun } from "../../infra/external/tinyfish/service.ts";
 import { appendActionLogEntry } from "../../infra/action-log/index.ts";
 import type { ActionLogEntryType } from "../../infra/action-log/index.ts";
-import { recordStructuredObservation } from "../../infra/observability/index.ts";
+import { recordStructuredObservation } from "../../infra/platform/observability/index.ts";
 
 const logger = createModuleLogger("gateway-runtime");
 

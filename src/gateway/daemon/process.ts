@@ -7,7 +7,7 @@ import { startGatewayIpcServer } from "./ipc.ts";
 import { LocalCronScheduler, computeNextRunAt } from "../scheduler/index.ts";
 import { ReconciliationLoop } from "../reconciliation/index.ts";
 import { getOrCreateDaemonToken } from "../security/index.ts";
-import { initMCPTools, enableMCPHotReload, disableMCPHotReload } from "../../infra/mcp/client.ts";
+import { initMCPTools, enableMCPHotReload, disableMCPHotReload } from "../../infra/ai/mcp/client.ts";
 import { StrategyRuntime } from "../../core/runtime/engine.ts";
 import { upsertSchedulerTask } from "../store/scheduler-store.ts";
 import { appendActionLogEntry } from "../../infra/action-log/index.ts";

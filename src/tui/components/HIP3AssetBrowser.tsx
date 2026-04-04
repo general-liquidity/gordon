@@ -15,12 +15,12 @@ import {
   HIP3_ASSETS,
   HIP3_CATEGORIES,
   getAllHIP3Quotes,
-} from "../../infra/hyperliquid/hip3.ts";
+} from "../../infra/venues/exchange/clients/hyperliquid/hip3.ts";
 import type {
   HIP3CategorizedAsset,
   HIP3AssetCategory,
   HIP3Quote,
-} from "../../infra/hyperliquid/hip3-types.ts";
+} from "../../infra/venues/exchange/clients/hyperliquid/hip3-types.ts";
 
 // ============================================================================
 // Types

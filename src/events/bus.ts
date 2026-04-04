@@ -5,7 +5,7 @@
 
 import type { GordonEvent, EventType, EventData } from "./types.ts";
 import { createModuleLogger } from "../infra/logger/index.ts";
-import { recordStructuredProductEvent } from "../infra/observability/index.ts";
+import { recordStructuredProductEvent } from "../infra/platform/observability/index.ts";
 
 const logger = createModuleLogger("events");
 

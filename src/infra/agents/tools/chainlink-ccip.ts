@@ -20,7 +20,7 @@ import {
   getCCIPFee,
   executeCCIPTransfer,
   getCCIPStatus,
-} from "../../chainlink/index.ts";
+} from "../../protocols/chainlink/index.ts";
 
 // ============================================================================
 // Tools

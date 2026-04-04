@@ -102,7 +102,7 @@ if (flags.upgrade) {
 // Users can manually update via `gordon --upgrade`
 const updateResult = "skipped";
 
-import { checkLicense, shutdownLicense } from "./infra/license/index.ts";
+import { checkLicense, shutdownLicense } from "./infra/external/license/index.ts";
 await checkLicense();
 
 // ============================================================================
@@ -116,9 +116,9 @@ import { loadConfig } from "./infra/storage/config.ts";
 import {
   initializeStructuredAxiom,
   shutdownStructuredAxiom,
-} from "./infra/observability/index.ts";
-import * as telemetry from "./infra/telemetry/index.ts";
-import { disconnectMCP } from "./infra/mcp/client.ts";
+} from "./infra/platform/observability/index.ts";
+import * as telemetry from "./infra/platform/telemetry/index.ts";
+import { disconnectMCP } from "./infra/ai/mcp/client.ts";
 
 let isShuttingDown = false;
 

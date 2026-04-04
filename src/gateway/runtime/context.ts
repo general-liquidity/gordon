@@ -2,11 +2,11 @@ import { createModuleLogger } from "../../infra/logger/index.ts";
 import { loadConfig } from "../../infra/storage/config.ts";
 import { checkEnvStatus, loadEnvFile } from "../../infra/storage/env.ts";
 import { getCurrentSession } from "../../infra/storage/session.ts";
-import { createLLMClientFromEnv } from "../../infra/llm/index.ts";
-import { BinanceClient } from "../../infra/binance/index.ts";
+import { createLLMClientFromEnv } from "../../infra/ai/llm/index.ts";
+import { BinanceClient } from "../../infra/venues/exchange/clients/binance/index.ts";
 import { BinanceAdapter, ExchangeFactory, type Exchange } from "../../infra/exchange/index.ts";
-import { createAgentRailsRegistry } from "../../infra/rails/index.ts";
-import type { LLMClient } from "../../infra/llm/index.ts";
+import { createAgentRailsRegistry } from "../../infra/runtime/rails/index.ts";
+import type { LLMClient } from "../../infra/ai/llm/index.ts";
 import type { GordonContext } from "../../infra/agents/types.ts";
 
 const logger = createModuleLogger("gateway-context");

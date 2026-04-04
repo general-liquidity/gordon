@@ -26,8 +26,8 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
-import { executeAction, isAgentKitConfigured } from "../../agentkit/index.ts";
-import type { AgentKitActionResult } from "../../agentkit/index.ts";
+import { executeAction, isAgentKitConfigured } from "../../protocols/agentkit/index.ts";
+import type { AgentKitActionResult } from "../../protocols/agentkit/index.ts";
 
 // ============================================================================
 // Moonwell MToken Addresses (Base Mainnet)

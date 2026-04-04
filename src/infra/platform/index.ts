@@ -6,7 +6,9 @@
 // ============================================================================
 
 export * from "../storage/index.ts";
-export * from "../cache/index.ts";
+export * from "./cache/index.ts";
 export * from "../logger/index.ts";
-export * from "../observability/index.ts";
-export * from "../resilience/index.ts";
+export * from "./observability/index.ts";
+export * from "./resilience/index.ts";
+export * from "./telemetry/index.ts";
+export * from "./audit/index.ts";

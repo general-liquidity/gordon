@@ -6,7 +6,7 @@
  * will return empty results or throw HyperliquidNotSupportedError.
  */
 
-import { HyperliquidClient } from "../../hyperliquid/index.ts";
+import { HyperliquidClient } from "../../venues/exchange/clients/hyperliquid/index.ts";
 import { HyperliquidNotSupportedError } from "../../../errors/index.ts";
 import type {
   Exchange,

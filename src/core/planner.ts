@@ -5,7 +5,7 @@
  * The planner is the brain that turns analysis into actionable plans.
  */
 
-import { LLMClient, loadPrompt, buildMessages } from "../infra/llm/index.ts";
+import { LLMClient, loadPrompt, buildMessages } from "../infra/ai/llm/index.ts";
 import { PlanSchema, type Plan, type GordonConfig } from "../types/index.ts";
 import type { DetailedAnalysis } from "./analyzer.ts";
 import { createModuleLogger } from "../infra/logger/index.ts";

@@ -23,9 +23,9 @@ import {
   detectVolumeSpikes,
   detectNewListings,
   analyzeDexPressure,
-} from "../../base/signals.ts";
-import { getTokenTransfers, getTopTokenHolders, isBasescanConfigured } from "../../base/basescan.ts";
-import { getBasePairs, searchBasePairs } from "../../base/dexscreener.ts";
+} from "../../protocols/base/signals.ts";
+import { getTokenTransfers, getTopTokenHolders, isBasescanConfigured } from "../../protocols/base/basescan.ts";
+import { getBasePairs, searchBasePairs } from "../../protocols/base/dexscreener.ts";
 
 // ============================================================================
 // Whale Transfer Detection

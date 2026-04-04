@@ -3,10 +3,10 @@
  * Dependency injection container for Gordon services
  */
 
-import { BinanceClient } from "../infra/binance/index.ts";
+import { BinanceClient } from "../infra/venues/exchange/clients/binance/index.ts";
 import { BinanceAdapter, type Exchange } from "../infra/exchange/index.ts";
-import { LLMClient, type LLMProvider } from "../infra/llm/index.ts";
-import { PriceCache } from "../infra/cache/index.ts";
+import { LLMClient, type LLMProvider } from "../infra/ai/llm/index.ts";
+import { PriceCache } from "../infra/platform/cache/index.ts";
 import { EventBus } from "../events/index.ts";
 import { Logger, ConsoleTransport, type LogLevel } from "../infra/logger/index.ts";
 import { PlansRepository, TradesRepository } from "../repositories/index.ts";

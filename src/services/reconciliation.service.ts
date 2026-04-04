@@ -6,7 +6,7 @@
  * are properly recorded in the local database.
  */
 
-import { BinanceClient } from "../infra/binance/index.ts";
+import { BinanceClient } from "../infra/venues/exchange/clients/binance/index.ts";
 import { listTrades, updateTrade } from "../infra/storage/trades.ts";
 import { getPlan } from "../infra/storage/plans.ts";
 import { logEvent } from "../infra/storage/events.ts";

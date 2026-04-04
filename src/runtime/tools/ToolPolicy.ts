@@ -1,5 +1,5 @@
-import { auditLog } from "../../infra/audit/index.ts";
-import { evaluateToolRequestPolicy } from "../../infra/actions/runtime.ts";
+import { auditLog } from "../../infra/platform/audit/index.ts";
+import { evaluateToolRequestPolicy } from "../../infra/runtime/actions/runtime.ts";
 import {
   checkExplicitExecutionAccess,
   checkToolAccess,

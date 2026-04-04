@@ -12,7 +12,7 @@ import { z } from "zod";
 import {
   getUniswapPoolYields,
   getTopYieldPools,
-} from "../../defillama/client.ts";
+} from "../../protocols/defillama/client.ts";
 
 // ============================================================================
 // Uniswap Pool Yields

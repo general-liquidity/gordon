@@ -3,7 +3,7 @@
  * Wraps KrakenClient to implement the abstract Exchange interface
  */
 
-import { KrakenClient, KrakenError } from "../../kraken/index.ts";
+import { KrakenClient, KrakenError } from "../../venues/exchange/clients/kraken/index.ts";
 import type {
   Exchange,
   ExchangeId,

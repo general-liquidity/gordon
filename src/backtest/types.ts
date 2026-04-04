@@ -4,7 +4,7 @@
  * Core type definitions for backtesting strategies.
  */
 
-import type { SystematicBacktestMetadata } from "../infra/systematic/types.ts";
+import type { SystematicBacktestMetadata } from "../infra/domain/systematic/types.ts";
 
 // ============================================================================
 // OHLC Data

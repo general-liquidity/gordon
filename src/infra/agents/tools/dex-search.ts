@@ -14,7 +14,7 @@ import {
   getDexPairs,
   getBoostedTokens,
   DEXSCREENER_CHAIN_IDS,
-} from "../../base/dexscreener.ts";
+} from "../../protocols/base/dexscreener.ts";
 
 // ============================================================================
 // Multi-Chain DEX Search

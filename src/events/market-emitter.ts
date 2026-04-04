@@ -23,7 +23,7 @@ import type {
   BinanceWebSocket,
   KlineUpdate,
   TickerUpdate,
-} from "../infra/binance/websocket.ts";
+} from "../infra/venues/exchange/clients/binance/websocket.ts";
 
 const logger = createModuleLogger("market-emitter");
 

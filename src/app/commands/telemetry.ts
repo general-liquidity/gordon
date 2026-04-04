@@ -7,7 +7,7 @@ import {
   initializeTracing,
   refreshStructuredAxiomState,
   shutdownTracing,
-} from "../../infra/observability/index.ts";
+} from "../../infra/platform/observability/index.ts";
 import {
   clearResearchData,
   disable,
@@ -17,7 +17,7 @@ import {
   getResearchStatus,
   getStatus,
   uploadResearchData,
-} from "../../infra/telemetry/index.ts";
+} from "../../infra/platform/telemetry/index.ts";
 
 export interface TelemetryCommandResult {
   success: boolean;

@@ -6,13 +6,13 @@
 // ============================================================================
 
 // Protocol re-exports
-export * as chainlink from "../chainlink/index.ts";
-export * as uniswap from "../uniswap/index.ts";
-export * as defillama from "../defillama/client.ts";
-export * as solana from "../solanakit/index.ts";
-export * as polkadot from "../polkadotkit/index.ts";
-export * as base from "../base/index.ts";
-export * as agentkit from "../agentkit/index.ts";
+export * as chainlink from "./chainlink/index.ts";
+export * as uniswap from "./uniswap/index.ts";
+export * as defillama from "./defillama/client.ts";
+export * as solana from "./solana/index.ts";
+export * as polkadot from "./polkadot/index.ts";
+export * as base from "./base/index.ts";
+export * as agentkit from "./agentkit/index.ts";
 
 // Protocol registry for discovery and health monitoring
 export interface ProtocolInfo {

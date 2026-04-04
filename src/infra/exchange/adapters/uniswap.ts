@@ -17,9 +17,9 @@
  *   via the Uniswap V3 Subgraph. Without it, data methods return stubs.
  */
 
-import { UniswapClient } from "../../uniswap/index.ts";
-import { UniswapSubgraph } from "../../uniswap/subgraph.ts";
-import { SUPPORTED_CHAIN_IDS, CHAIN_NAMES, isUniswapXRouting } from "../../uniswap/types.ts";
+import { UniswapClient } from "../../protocols/uniswap/index.ts";
+import { UniswapSubgraph } from "../../protocols/uniswap/subgraph.ts";
+import { SUPPORTED_CHAIN_IDS, CHAIN_NAMES, isUniswapXRouting } from "../../protocols/uniswap/types.ts";
 import type {
   Exchange,
   ExchangeId,

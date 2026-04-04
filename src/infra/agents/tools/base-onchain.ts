@@ -22,7 +22,7 @@ import {
   BASE_CHAIN_CONFIG,
   type RegistryCategory,
   type RegistryCuration,
-} from "../../base/index.ts";
+} from "../../protocols/base/index.ts";
 
 /**
  * Fetch a live ETH/USD price from DexScreener (WETH/USDC pair on Base).

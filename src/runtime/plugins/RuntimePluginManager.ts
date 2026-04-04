@@ -4,14 +4,14 @@ import {
   getMCPServerSummary,
   getMCPToolsByServer,
   initMCPTools,
-} from "../../infra/mcp/client.ts";
-import { getCanonicalActions } from "../../infra/actions/registry.ts";
-import { pluginInstaller } from "../../infra/mcp/marketplace/installer.ts";
+} from "../../infra/ai/mcp/client.ts";
+import { getCanonicalActions } from "../../infra/runtime/actions/registry.ts";
+import { pluginInstaller } from "../../infra/ai/mcp/marketplace/installer.ts";
 import {
   getResolvedRoutings,
   initRouting,
   reloadRouting,
-} from "../../infra/routing/manager.ts";
+} from "../../infra/runtime/routing/manager.ts";
 import type {
   RuntimeMcpServerSummary,
   RuntimePluginSummary,

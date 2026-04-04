@@ -3,7 +3,7 @@
  * Wraps BitfinexClient to implement the abstract Exchange interface
  */
 
-import { BitfinexClient } from "../../bitfinex/index.ts";
+import { BitfinexClient } from "../../venues/exchange/clients/bitfinex/index.ts";
 import type {
   Exchange,
   ExchangeId,
@@ -28,7 +28,7 @@ import type {
   WithdrawalResult,
   WithdrawalInfo,
 } from "../types.ts";
-import type { BitfinexOrderType } from "../../bitfinex/types.ts";
+import type { BitfinexOrderType } from "../../venues/exchange/clients/bitfinex/types.ts";
 import type { Candle } from "../../../types/index.ts";
 
 /**

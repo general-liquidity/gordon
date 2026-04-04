@@ -24,8 +24,8 @@ import {
   InvalidPlanError,
   isGordonError,
 } from "../errors/index.ts";
-import { auditLog } from "../infra/audit/index.ts";
-import { validateOperation } from "../infra/binance/permissions.ts";
+import { auditLog } from "../infra/platform/audit/index.ts";
+import { validateOperation } from "../infra/venues/exchange/clients/binance/permissions.ts";
 import type {
   Plan,
   Trade,

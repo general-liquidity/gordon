@@ -18,7 +18,7 @@ import type { Trade, Plan, ExitFill, EntryFill } from "../types/index.ts";
 import {
   BinanceWebSocket,
   type TickerUpdate,
-} from "../infra/binance/websocket.ts";
+} from "../infra/venues/exchange/clients/binance/websocket.ts";
 import { cleanupExpiredPlans } from "./executor.ts";
 import { getTrailingStopTracker } from "./trailing-stop.ts";
 

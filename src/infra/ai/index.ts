@@ -5,5 +5,5 @@
 // MCP: Model Context Protocol servers, registry, marketplace
 // ============================================================================
 
-export * from "../llm/index.ts";
-export * from "../mcp/index.ts";
+export * from "./llm/index.ts";
+export * from "./mcp/index.ts";

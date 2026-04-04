@@ -3,7 +3,7 @@
  * Wraps BinanceClient to implement the abstract Exchange interface
  */
 
-import { BinanceClient } from "../../binance/index.ts";
+import { BinanceClient } from "../../venues/exchange/clients/binance/index.ts";
 import type {
   Exchange,
   ExchangeId,

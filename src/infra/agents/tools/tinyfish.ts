@@ -3,14 +3,14 @@ import { z } from "zod";
 
 import { auditLog } from "../../audit/index.ts";
 import { safeAppendAudit } from "../../../gateway/store/audit-log-store.ts";
-import { listTinyfishMonitorRuns, listTinyfishMonitors } from "../../tinyfish/monitor-store.ts";
+import { listTinyfishMonitorRuns, listTinyfishMonitors } from "../../external/tinyfish/monitor-store.ts";
 import {
   buildTinyfishRequest,
   executeTinyfishMonitorRun,
   removeTinyfishMonitor,
   scheduleTinyfishMonitor,
-} from "../../tinyfish/service.ts";
-import { TinyfishClient } from "../../tinyfish/client.ts";
+} from "../../external/tinyfish/service.ts";
+import { TinyfishClient } from "../../external/tinyfish/client.ts";
 import { getGordonContext, type MastraExecutionContext } from "./types.ts";
 
 function getTinyfishActor(execContext?: MastraExecutionContext): string {

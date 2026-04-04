@@ -5,18 +5,18 @@
  * agent affinity (routing.json) and automatic agent reconstruction.
  */
 
-import { pluginInstaller } from "../../infra/mcp/marketplace/installer.ts";
-import { marketplaceClient } from "../../infra/mcp/marketplace/registry.ts";
-import { credentialManager } from "../../infra/mcp/credentials.ts";
+import { pluginInstaller } from "../../infra/ai/mcp/marketplace/installer.ts";
+import { marketplaceClient } from "../../infra/ai/mcp/marketplace/registry.ts";
+import { credentialManager } from "../../infra/ai/mcp/credentials.ts";
 import {
   reloadRouting,
   getResolvedRoutings,
   writeRoutingManifest,
-} from "../../infra/routing/manager.ts";
+} from "../../infra/runtime/routing/manager.ts";
 import type {
   AgentAffinity,
   RoutingManifest,
-} from "../../infra/routing/types.ts";
+} from "../../infra/runtime/routing/types.ts";
 
 // ============================================================================
 // Types

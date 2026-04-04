@@ -3,7 +3,7 @@
  * Wraps CoinbaseClient to implement the abstract Exchange interface
  */
 
-import { CoinbaseClient } from "../../coinbase/index.ts";
+import { CoinbaseClient } from "../../venues/exchange/clients/coinbase/index.ts";
 import type {
   Exchange,
   ExchangeId,

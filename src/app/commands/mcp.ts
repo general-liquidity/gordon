@@ -8,10 +8,10 @@ import {
   pluginInstaller,
   type MarketplaceListing,
   type InstalledPlugin,
-} from '../../infra/mcp/marketplace';
-import { credentialManager } from '../../infra/mcp/credentials';
-import type { MCPCategory, MCPToolDefinition } from '../../infra/mcp/types';
-import { getBuiltInAgentRailListings } from '../../infra/rails/index.ts';
+} from '../../infra/ai/mcp/marketplace';
+import { credentialManager } from '../../infra/ai/mcp/credentials';
+import type { MCPCategory, MCPToolDefinition } from '../../infra/ai/mcp/types';
+import { getBuiltInAgentRailListings } from '../../infra/runtime/rails/index.ts';
 
 // ============================================================================
 // Showcase Data

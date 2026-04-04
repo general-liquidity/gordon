@@ -13,8 +13,8 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
-import { executeAction, isPolkadotKitConfigured } from "../../polkadotkit/index.ts";
-import type { PolkadotKitActionResult } from "../../polkadotkit/index.ts";
+import { executeAction, isPolkadotKitConfigured } from "../../protocols/polkadot/index.ts";
+import type { PolkadotKitActionResult } from "../../protocols/polkadot/index.ts";
 
 // ============================================================================
 // Helper

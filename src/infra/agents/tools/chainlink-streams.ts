@@ -20,7 +20,7 @@ import {
   getReportAtTimestamp,
   getBulkReports,
   listStreamFeeds,
-} from "../../chainlink/index.ts";
+} from "../../protocols/chainlink/index.ts";
 
 // ============================================================================
 // Tools
