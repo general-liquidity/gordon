@@ -41,12 +41,19 @@ export interface SlashCommand {
   target?: string;
   executionTime?: string;
   whenToUse?: string;
+  subcommands?: string[];
+  subcommandDescriptions?: Record<string, string>;
+  hideFromTypeahead?: boolean;
 }
 
 type SlashCommandSeed = Omit<
   SlashCommand,
-  "workflow" | "workflowLabel" | "workflowOrder" | "audience" | "audienceLabel" | "audienceOrder" | "hideAliasesByDefault"
->;
+  "workflow" | "workflowLabel" | "workflowOrder" | "audience" | "audienceLabel" | "audienceOrder" | "hideAliasesByDefault" | "subcommands" | "subcommandDescriptions" | "hideFromTypeahead"
+> & {
+  subcommands?: string[];
+  subcommandDescriptions?: Record<string, string>;
+  hideFromTypeahead?: boolean;
+};
 
 export const DIRECT_MENU_TARGETS = new Set([
   "setup",
@@ -88,6 +95,10 @@ export const DIRECT_MENU_TARGETS = new Set([
   "portfolio",
   "telemetry",
   "context",
+  "watch-panel",
+  "strategy-panel",
+  "thread-panel",
+  "log-panel",
 ]);
 
 export const DIRECT_TOOL_TARGETS = new Set([
@@ -106,7 +117,13 @@ export const DIRECT_TOOL_TARGETS = new Set([
   "handle_export_command",
   "handle_keyring_command",
   "handle_telemetry_command",
+  "cancel_order",
+  "close_position",
+  "set_stop_loss",
+  "set_take_profit",
+  "handle_alerts_command",
 ]);
+
 
 const BROKER_TOKENS = BrokerFactory.getSupportedBrokers();
 const STOCK_MARKET_TOKENS = ["stock", "stocks", "equity", "equities", ...BROKER_TOKENS];
@@ -282,6 +299,14 @@ const LEGACY_SLASH_COMMANDS: SlashCommandSeed[] = [
     target: "arm_system",
   },
 
+  // New Trading Commands
+  { name: "cancel", aliases: [], description: "Cancel open orders by ID or symbol", usage: "/cancel <symbol|orderId>", category: "trading", level: 1, action: "tool", target: "cancel_order", whenToUse: "Cancel pending orders" },
+  { name: "close", aliases: [], description: "Close an open position", usage: "/close <symbol> [market|limit <price>]", category: "trading", level: 1, action: "tool", target: "close_position", whenToUse: "Close a position at market or limit price" },
+  { name: "stop-loss", aliases: ["sl"], description: "Set stop-loss on a position", usage: "/stop-loss <symbol> <price>", category: "trading", level: 2, action: "tool", target: "set_stop_loss", whenToUse: "Protect position with stop-loss" },
+  { name: "take-profit", aliases: ["tp"], description: "Set take-profit on a position", usage: "/take-profit <symbol> <price>", category: "trading", level: 2, action: "tool", target: "set_take_profit", whenToUse: "Set profit target" },
+  { name: "watch", aliases: ["w"], description: "Watch symbol prices live", usage: "/watch <symbol> [interval]", category: "market", level: 1, action: "menu", target: "watch-panel", whenToUse: "Monitor price changes in real-time" },
+  { name: "alerts", aliases: ["alert"], description: "Manage price alerts", usage: "/alerts [set|list|delete] <symbol> [price]", category: "market", level: 1, action: "tool", target: "handle_alerts_command", whenToUse: "Get notified when price hits target" },
+
   // Account
   {
     name: "portfolio",
@@ -382,16 +407,16 @@ const LEGACY_SLASH_COMMANDS: SlashCommandSeed[] = [
 
   // Strategies
   {
-    name: "strategies",
-    aliases: ["strategy", "strat", "strats"],
+    name: "strategy",
+    aliases: ["strategies", "strat", "strats"],
     description: "View and manage trading strategies",
-    usage: "/strategies [list|info|generate|backtest|compare]",
-    category: "trading",
+    usage: "/strategy [list|running|gen|deploy|pause|resume|stop|rebalance]",
+    category: "strategy",
     level: 1,
-    action: "tool",
-    target: "handle_strategy_command",
-    executionTime: "~1-5s",
-    whenToUse: "Browse strategies, view details, or generate new ones",
+    action: "menu",
+    target: "strategy-panel",
+    subcommands: ["list", "running", "gen", "deploy", "pause", "resume", "stop", "rebalance", "info", "compare"],
+    subcommandDescriptions: { list: "List all strategies", running: "Show running strategies", gen: "Generate a new strategy", deploy: "Deploy to live", pause: "Pause a running strategy", resume: "Resume paused strategy", stop: "Stop a strategy", rebalance: "Rebalance allocations", info: "Strategy details", compare: "Compare strategies" },
   },
   {
     name: "gen",
@@ -576,6 +601,22 @@ const LEGACY_SLASH_COMMANDS: SlashCommandSeed[] = [
     action: "agent",
     target: "monitor",
     whenToUse: "Inspect active strategy slots and compare live runtime to validated backtests",
+    subcommands: ["state", "plugins", "transcript", "scratchpad", "handoffs", "approvals", "approve", "deny", "bridge", "history", "health", "slots", "diff"],
+    subcommandDescriptions: {
+      state: "Inspect runtime state and scopes",
+      plugins: "Plugin lifecycle and hot-reload",
+      transcript: "In-memory transcript",
+      scratchpad: "Worker scratchpad entries",
+      handoffs: "Recorded worker handoffs",
+      approvals: "Pending approval decisions",
+      approve: "Approve a pending request",
+      deny: "Deny a pending request",
+      bridge: "Bridge ingress and remote sessions",
+      history: "Search persisted history",
+      health: "Strategy slot health",
+      slots: "Running strategy slots",
+      diff: "Live vs backtest comparison",
+    },
   },
 
   // Audit
@@ -915,6 +956,8 @@ const LEGACY_SLASH_COMMANDS: SlashCommandSeed[] = [
     level: 2,
     action: "menu",
     target: "session-info",
+    subcommands: ["info", "resume", "new", "browser"],
+    subcommandDescriptions: { info: "Current session info", resume: "Resume previous session", new: "Start new session", browser: "Browse past sessions" },
   },
   {
     name: "runtime-state",
@@ -1059,6 +1102,18 @@ const LEGACY_SLASH_COMMANDS: SlashCommandSeed[] = [
 
   // Thread Management (for "what if" scenario branching) - Expert Level
   {
+    name: "thread",
+    aliases: ["threads"],
+    description: "Manage conversation threads",
+    usage: "/thread [list|clone|switch|info|delete|rename|summary|compact]",
+    category: "system",
+    level: 2,
+    action: "menu",
+    target: "thread-panel",
+    subcommands: ["list", "clone", "switch", "info", "delete", "rename", "summary", "compact"],
+    subcommandDescriptions: { list: "List recent threads", clone: "Clone current thread", switch: "Switch to thread", info: "Thread details", delete: "Delete a thread", rename: "Rename a thread", summary: "Thread summary", compact: "Compact thread" },
+  },
+  {
     name: "clone",
     aliases: ["branch", "fork"],
     description: "Clone current session for 'what if' testing",
@@ -1119,8 +1174,20 @@ const LEGACY_SLASH_COMMANDS: SlashCommandSeed[] = [
     target: "rename-thread",
   },
   {
+    name: "log",
+    aliases: [],
+    description: "View action log and bookmarks",
+    usage: "/log [actions|bookmark|bookmarks]",
+    category: "system",
+    level: 3,
+    action: "menu",
+    target: "log-panel",
+    subcommands: ["actions", "bookmark", "bookmarks"],
+    subcommandDescriptions: { actions: "Recent action log", bookmark: "Bookmark a message", bookmarks: "List bookmarks" },
+  },
+  {
     name: "action-log",
-    aliases: ["alog", "events", "log"],
+    aliases: ["alog", "events"],
     description: "Inspect typed action log entries for the current thread or daemon",
     usage: "/action-log [type|group|bookmarked|daemon|threadId] [limit]",
     category: "system",
@@ -1604,6 +1671,7 @@ export function getLevelLabel(level: CommandLevel): string {
  */
 export function parseSlashCommand(input: string): {
   command: SlashCommand;
+  subcommand: string | null;
   args: string;
 } | null {
   const trimmed = input.trim();
@@ -1616,7 +1684,7 @@ export function parseSlashCommand(input: string): {
   // Extract command and args
   const parts = trimmed.slice(1).split(/\s+/);
   const commandName = parts[0]?.toLowerCase() ?? "";
-  const args = parts.slice(1).join(" ");
+  const restParts = parts.slice(1);
 
   // Find matching command
   const command = SLASH_COMMANDS.find(
@@ -1627,7 +1695,23 @@ export function parseSlashCommand(input: string): {
     return null;
   }
 
-  return { command, args };
+  // Check if command has subcommands and the next word matches one
+  let subcommand: string | null = null;
+  let args: string;
+
+  if (command.subcommands && restParts.length > 0) {
+    const candidateSub = restParts[0]?.toLowerCase() ?? "";
+    if (command.subcommands.includes(candidateSub)) {
+      subcommand = candidateSub;
+      args = restParts.slice(1).join(" ");
+    } else {
+      args = restParts.join(" ");
+    }
+  } else {
+    args = restParts.join(" ");
+  }
+
+  return { command, subcommand, args };
 }
 
 /**

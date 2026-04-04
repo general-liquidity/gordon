@@ -4,7 +4,7 @@ export type WorkspaceId = "desk" | "market" | "plan" | "lab" | "monitor";
 
 export type LegacyCommandCategory = "trading" | "market" | "account" | "system" | "strategy";
 export type CommandLevel = 1 | 2 | 3;
-export type WorkflowGroup = "discover" | "analyze" | "trade" | "run" | "accounts" | "operate";
+export type WorkflowGroup = "discover" | "analyze" | "trade" | "run" | "accounts" | "monitor" | "build" | "system";
 export type CommandAudience = "core" | "advanced" | "operator";
 
 export interface WorkflowConfigEntry {
@@ -88,13 +88,29 @@ export const WORKFLOW_CONFIG: Record<WorkflowGroup, WorkflowConfigEntry> = {
     order: 4,
     helpAliases: ["accounts", "account", "portfolio", "wallet"],
   },
-  operate: {
-    label: "Operate",
-    shortLabel: "Operate",
-    description: "Setup, diagnostics, system control.",
-    icon: "●",
+  monitor: {
+    label: "Monitor",
+    shortLabel: "Monitor",
+    description: "Health, audit, alerts, watch.",
+    icon: "○",
     order: 5,
-    helpAliases: ["operate", "ops", "system", "config", "configure"],
+    helpAliases: ["monitor", "observe", "health", "audit"],
+  },
+  build: {
+    label: "Build",
+    shortLabel: "Build",
+    description: "MCP, workflows, export, extend.",
+    icon: "⚙",
+    order: 6,
+    helpAliases: ["build", "extend", "automate", "mcp"],
+  },
+  system: {
+    label: "System",
+    shortLabel: "System",
+    description: "Setup, config, sessions, runtime.",
+    icon: "●",
+    order: 7,
+    helpAliases: ["system", "operate", "ops", "config", "configure", "setup"],
   },
 };
 
@@ -162,7 +178,26 @@ const ACCOUNT_COMMANDS = new Set([
   "rails",
 ]);
 
-const OPERATE_COMMANDS = new Set([
+const MONITOR_COMMANDS = new Set([
+  "health",
+  "audit",
+  "decay",
+  "validate",
+  "watch",
+  "alerts",
+  "autonomous",
+]);
+
+const BUILD_COMMANDS = new Set([
+  "mcp",
+  "routing",
+  "workflow",
+  "export",
+  "keyring",
+  "gen",
+]);
+
+const SYSTEM_COMMANDS = new Set([
   "help",
   "status",
   "setup",
@@ -180,23 +215,30 @@ const OPERATE_COMMANDS = new Set([
   "delete-thread",
   "rename-thread",
   "cache-stats",
-  "mcp",
-  "routing",
-  "workflow",
-  "export",
   "clone-thread",
-  "keyring",
   "telemetry",
   "bugreport",
   "whatsnew",
   "arm",
   "disarm",
-  "validate",
   "session",
   "log",
   "summary",
   "compact",
   "name",
+  "runtime",
+  "runtime-state",
+  "runtime-plugins",
+  "runtime-transcript",
+  "runtime-scratchpad",
+  "runtime-handoffs",
+  "runtime-approvals",
+  "runtime-approve",
+  "runtime-deny",
+  "runtime-bridge",
+  "runtime-history",
+  "thread",
+  "config",
 ]);
 
 const CATEGORY_DEFAULT_WORKFLOW: Record<LegacyCommandCategory, WorkflowGroup> = {
@@ -204,7 +246,7 @@ const CATEGORY_DEFAULT_WORKFLOW: Record<LegacyCommandCategory, WorkflowGroup> = 
   trading: "trade",
   strategy: "run",
   account: "accounts",
-  system: "operate",
+  system: "system",
 };
 
 export function getAudienceFromLevel(level: CommandLevel): CommandAudience {
@@ -223,7 +265,9 @@ export function inferWorkflowGroup(command: Pick<CommandUxShape, "name" | "categ
   if (ANALYZE_COMMANDS.has(name)) return "analyze";
   if (RUN_COMMANDS.has(name)) return "run";
   if (ACCOUNT_COMMANDS.has(name)) return "accounts";
-  if (OPERATE_COMMANDS.has(name)) return "operate";
+  if (MONITOR_COMMANDS.has(name)) return "monitor";
+  if (BUILD_COMMANDS.has(name)) return "build";
+  if (SYSTEM_COMMANDS.has(name)) return "system";
 
   return CATEGORY_DEFAULT_WORKFLOW[command.category];
 }
@@ -272,11 +316,11 @@ export function getQuickActionItems(context: QuickActionContext): QuickActionIte
 
   if (!context.setupComplete || !hasVenue) {
     const setupActions: QuickActionItem[] = [
-      { label: "Setup", command: "/setup", workflow: "operate" },
-      { label: "Doctor", command: "/doctor", workflow: "operate" },
-      { label: "Model", command: "/model", workflow: "operate" },
-      { label: "Help", command: "/help", workflow: "operate" },
-      { label: "Configure", command: "/configure advanced", workflow: "operate" },
+      { label: "Setup", command: "/setup", workflow: "system" },
+      { label: "Doctor", command: "/doctor", workflow: "system" },
+      { label: "Model", command: "/model", workflow: "system" },
+      { label: "Help", command: "/help", workflow: "system" },
+      { label: "Configure", command: "/configure advanced", workflow: "system" },
     ];
     return setupActions.slice(0, 5);
   }
@@ -313,8 +357,8 @@ export function getQuickActionItems(context: QuickActionContext): QuickActionIte
         { label: "Portfolio", command: "/portfolio", workflow: "accounts" },
         { label: "Positions", command: "/positions", workflow: "accounts" },
         { label: "Orders", command: "/orders", workflow: "accounts" },
-        { label: "Runtime", command: "/runtime-state", workflow: "operate" },
-        { label: "Health", command: "/health", workflow: "operate" },
+        { label: "Runtime", command: "/runtime-state", workflow: "system" },
+        { label: "Health", command: "/health", workflow: "system" },
       ];
     case "desk":
     default:
@@ -333,7 +377,7 @@ export function getQuickActionItems(context: QuickActionContext): QuickActionIte
   } else if (context.mode === "ARMED") {
     actions.push({ label: "Orders", command: "/orders", workflow: "accounts" });
   } else {
-    actions.push({ label: "Doctor", command: "/doctor", workflow: "operate" });
+    actions.push({ label: "Doctor", command: "/doctor", workflow: "system" });
   }
 
   return actions.slice(0, 5);
