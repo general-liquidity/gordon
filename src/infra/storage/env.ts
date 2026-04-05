@@ -80,7 +80,6 @@ export interface EnvKeys {
   BITFINEX_API_KEY?: string;
   BITFINEX_API_SECRET?: string;
   HYPERLIQUID_PRIVATE_KEY?: string;
-  TINYFISH_API_KEY?: string;
   UNISWAP_API_KEY?: string;
   THEGRAPH_API_KEY?: string;
   GORDON_PROVIDER?: string;
@@ -136,7 +135,6 @@ export interface EnvStatus {
   hasKrakenKeys: boolean;
   hasBitfinexKeys: boolean;
   hasHyperliquidKey: boolean;
-  hasTinyfishKey: boolean;
   hasUniswapKey: boolean;
   hasGraphKey: boolean;
   hasStructuredAxiomEnabled: boolean;
@@ -248,7 +246,7 @@ const ENV_KEY_NAMES: (keyof EnvKeys)[] = [
   "COINBASE_API_KEY", "COINBASE_API_SECRET", "COINBASE_PASSPHRASE",
   "KRAKEN_API_KEY", "KRAKEN_API_SECRET",
   "BITFINEX_API_KEY", "BITFINEX_API_SECRET",
-  "HYPERLIQUID_PRIVATE_KEY", "TINYFISH_API_KEY", "UNISWAP_API_KEY", "THEGRAPH_API_KEY", "GORDON_PROVIDER", "GORDON_MODEL",
+  "HYPERLIQUID_PRIVATE_KEY", "UNISWAP_API_KEY", "THEGRAPH_API_KEY", "GORDON_PROVIDER", "GORDON_MODEL",
   "GORDON_AXIOM_STRUCTURED_ENABLED", "GORDON_AXIOM_TOKEN", "GORDON_AXIOM_HASH_SALT",
   "GORDON_AXIOM_BASE_URL", "GORDON_AXIOM_EVENTS_DATASET", "GORDON_AXIOM_AUDIT_DATASET",
   "OTEL_TRACING_ENABLED", "GORDON_TRACING_REVIEWED", "OTEL_EXPORTER_OTLP_ENDPOINT", "OTEL_EXPORTER_OTLP_HEADERS",
@@ -277,7 +275,6 @@ function buildEnvStatus(keys: EnvKeys, fileExists: boolean): EnvStatus {
     hasKrakenKeys: !!(keys.KRAKEN_API_KEY && keys.KRAKEN_API_SECRET),
     hasBitfinexKeys: !!(keys.BITFINEX_API_KEY && keys.BITFINEX_API_SECRET),
     hasHyperliquidKey: !!keys.HYPERLIQUID_PRIVATE_KEY,
-    hasTinyfishKey: !!keys.TINYFISH_API_KEY,
     hasUniswapKey: !!keys.UNISWAP_API_KEY,
     hasGraphKey: !!keys.THEGRAPH_API_KEY,
     hasStructuredAxiomEnabled: keys.GORDON_AXIOM_STRUCTURED_ENABLED === "true",
@@ -606,15 +603,6 @@ export async function createEnvFile(keys: Partial<EnvKeys>): Promise<void> {
     lines.push(formatEnvLine("HYPERLIQUID_PRIVATE_KEY", keys.HYPERLIQUID_PRIVATE_KEY));
   } else {
     lines.push("# HYPERLIQUID_PRIVATE_KEY=");
-  }
-
-  lines.push("");
-  lines.push("# Tinyfish (browser-native research and automation)");
-
-  if (keys.TINYFISH_API_KEY) {
-    lines.push(formatEnvLine("TINYFISH_API_KEY", keys.TINYFISH_API_KEY));
-  } else {
-    lines.push("# TINYFISH_API_KEY=");
   }
 
   lines.push("");

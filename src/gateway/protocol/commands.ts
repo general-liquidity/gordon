@@ -22,7 +22,6 @@ export const GatewayCommandTypeSchema = z.enum([
   "execution.start_intent",
   "autonomous.run_cycle",
   "capital.refresh",
-  "tinyfish.monitor.run",
 ]);
 
 export type GatewayCommandType = z.infer<typeof GatewayCommandTypeSchema>;
@@ -108,10 +107,6 @@ export const AutonomousRunCyclePayloadSchema = z.object({});
 
 export const CapitalRefreshPayloadSchema = z.object({});
 
-export const TinyfishMonitorRunPayloadSchema = z.object({
-  monitorId: z.string().min(1),
-});
-
 export const GatewayCommandPayloadSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("chat.send_message"), payload: ChatSendMessagePayloadSchema }),
   z.object({ type: z.literal("scan.run"), payload: ScanRunPayloadSchema }),
@@ -133,7 +128,6 @@ export const GatewayCommandPayloadSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("execution.start_intent"), payload: ExecutionStartIntentPayloadSchema }),
   z.object({ type: z.literal("autonomous.run_cycle"), payload: AutonomousRunCyclePayloadSchema }),
   z.object({ type: z.literal("capital.refresh"), payload: CapitalRefreshPayloadSchema }),
-  z.object({ type: z.literal("tinyfish.monitor.run"), payload: TinyfishMonitorRunPayloadSchema }),
 ]);
 
 export const GatewayCommandEnvelopeSchema = z.object({

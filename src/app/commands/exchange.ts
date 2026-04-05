@@ -527,6 +527,20 @@ function getExchangeSetupInstructions(type: ExchangeId): string {
    - API Key -> ROBINHOOD_API_KEY
    - API Secret -> ROBINHOOD_API_SECRET (private key)
 4. Keep your private key encrypted and never commit it`,
+    okx: `
+1. Log in to OKX and go to API > Create V5 API Key
+2. Enable "Read" + "Trade" permissions (no withdrawals)
+3. Copy the API Key, Secret Key, and Passphrase — all three are required
+4. Optional: restrict by IP allowlist`,
+    gemini: `
+OAuth 2.0 (preferred):
+  /oauth connect gemini <clientId> <clientSecret>
+  → browser login captures the access token automatically
+
+Or HMAC API keys:
+  1. Log in to Gemini and go to Settings > API
+  2. Create a new key with "Auditor" or "Trader" scopes
+  3. Copy the API Key and API Secret (Secret shown only once)`,
   };
 
   return instructions[type] || 'Follow the exchange documentation to create API keys.';

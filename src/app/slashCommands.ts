@@ -1075,7 +1075,7 @@ const LEGACY_SLASH_COMMANDS: SlashCommandSeed[] = [
     name: "workflow",
     aliases: ["wf", "flow"],
     description: "Run predefined command workflows",
-    usage: "/workflow [quick|dd|backtest-cycle|web-dd|web-monitor] <args>",
+    usage: "/workflow [quick|dd|backtest-cycle] <args>",
     category: "system",
     level: 2,
     action: "tool",

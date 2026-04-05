@@ -175,7 +175,6 @@ Return Gordon to SAFE mode.
 
 ## Provider Capability Discovery
 
-- `Tinyfish` [automation_provider / web_agent] supports 0 capability binding(s)
 - `Alpaca` [execution_venue / broker / retail_broker] supports 4 capability binding(s)
 - `E*TRADE` [execution_venue / broker / retail_broker] supports 4 capability binding(s)
 - `Interactive Brokers` [execution_venue / broker / retail_broker] supports 4 capability binding(s)

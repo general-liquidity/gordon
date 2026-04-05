@@ -326,15 +326,6 @@ function getDataAndAutomationStatuses(
 ): ProviderCredentialStatus[] {
   return [
     buildStatus(
-      "tinyfish",
-      "automation",
-      getIntegrationSurfaceMetadata("tinyfish").displayName,
-      "ops",
-      "api_key",
-      "static",
-      [resolveFieldStatus("TINYFISH_API_KEY", "Tinyfish API key", true, { envKeys, keyringKeys })],
-    ),
-    buildStatus(
       "thegraph",
       "data",
       getIntegrationSurfaceMetadata("thegraph").displayName,

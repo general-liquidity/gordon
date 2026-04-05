@@ -22,7 +22,7 @@ describe("ConversationSummarizer", () => {
 
     const result = await summarizer.summarize([
       { role: "system", content: `${PROJECT_TRUTH_MARKER}\n- Gordon supports crypto and stocks.` },
-      { role: "system", content: `${INTEGRATION_GLOSSARY_MARKER}\n- Tinyfish: Browser automation.` },
+      { role: "system", content: `${INTEGRATION_GLOSSARY_MARKER}\n- SynthData: Research analytics.` },
       { role: "user", content: "Analyze BTC." },
       { role: "assistant", content: "Working on it." },
     ]);

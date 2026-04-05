@@ -17,6 +17,7 @@
 
 export * from "./types.ts";
 export { BrokerFactory } from "./factory.ts";
+export { loadOAuthBrokerCredentials, brokerSupportsOAuth } from "./oauth-bridge.ts";
 export {
   runBrokerBenchmarks,
   validateBenchmarkReport,

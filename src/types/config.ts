@@ -20,7 +20,7 @@ export const ExchangeConfigSchema = z.object({
 /**
  * Supported exchange types for multi-exchange configuration
  */
-export const ExchangeTypeSchema = z.enum(["binance", "binance_us", "coinbase", "kraken", "bitfinex", "hyperliquid", "uniswap", "robinhood"]);
+export const ExchangeTypeSchema = z.enum(["binance", "binance_us", "coinbase", "kraken", "bitfinex", "hyperliquid", "uniswap", "robinhood", "okx", "gemini"]);
 
 /**
  * Supported stock broker types

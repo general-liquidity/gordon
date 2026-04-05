@@ -132,7 +132,7 @@ const TOOL_FAMILY_PATTERNS: Array<{ family: TaskFamily; patterns: RegExp[] }> = 
   },
   {
     family: { key: "web-automation", label: "Web automation" },
-    patterns: [/tinyfish/i, /web/i, /browser/i, /monitor/i],
+    patterns: [/web/i, /browser/i, /monitor/i],
   },
 ];
 

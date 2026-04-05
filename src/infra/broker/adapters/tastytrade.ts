@@ -95,13 +95,20 @@ export class TastytradeAdapter implements BrokerAdapter {
   private buildHeaders(initHeaders?: HeadersInit, includeAuth = true): Headers {
     const headers = new Headers(initHeaders);
     headers.set("accept", "application/json");
-    if (includeAuth && this.sessionToken) {
-      headers.set("session-token", this.sessionToken);
+    if (includeAuth) {
+      // OAuth mode: use Bearer token directly, no session needed.
+      if (this.credentials.isOAuth && this.credentials.apiKey) {
+        headers.set("authorization", `Bearer ${this.credentials.apiKey}`);
+      } else if (this.sessionToken) {
+        headers.set("session-token", this.sessionToken);
+      }
     }
     return headers;
   }
 
   private async createSession(forceRefresh = false): Promise<string> {
+    // OAuth mode skips the /sessions login — the bearer token is the auth.
+    if (this.credentials.isOAuth) return this.credentials.apiKey;
     if (this.sessionToken && !forceRefresh) return this.sessionToken;
 
     const response = await fetch(new URL("/sessions", this.baseUrl).toString(), {
@@ -156,7 +163,7 @@ export class TastytradeAdapter implements BrokerAdapter {
         headers,
       });
 
-      if (response.status === 401 && auth && allowRetry && retryOnAuth) {
+      if (response.status === 401 && auth && allowRetry && retryOnAuth && !this.credentials.isOAuth) {
         this.sessionToken = undefined;
         await this.createSession(true);
         return execute(false);

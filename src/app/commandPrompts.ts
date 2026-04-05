@@ -139,7 +139,7 @@ export function commandToPrompt(command: SlashCommand, args: string): string {
         case "new":
           return exArgs
             ? `Add a new ${exArgs} crypto venue configuration`
-            : "Which crypto execution venue would you like to add? (binance, coinbase, kraken, bitfinex, hyperliquid, uniswap, robinhood)";
+            : "Which crypto execution venue would you like to add? (binance, coinbase, kraken, bitfinex, hyperliquid, uniswap, robinhood, okx, gemini)";
         case "switch":
         case "use":
           return exArgs
@@ -519,7 +519,7 @@ export function commandToPrompt(command: SlashCommand, args: string): string {
     }
     // Workflow command
     case "workflow":
-      if (!args) return "Show available workflows. Use: /workflow quick <symbol>, /workflow dd <symbol>, /workflow backtest-cycle <strategy> <symbol>, /workflow web-dd <url> <goal...>, or /workflow web-monitor <monitorId> <schedule> <url> <goal...>";
+      if (!args) return "Show available workflows. Use: /workflow quick <symbol>, /workflow dd <symbol>, or /workflow backtest-cycle <strategy> <symbol>";
       const wfParts = args.split(/\s+/);
       const wfType = wfParts[0]?.toLowerCase();
       const wfArgs = wfParts.slice(1);
@@ -537,16 +537,8 @@ export function commandToPrompt(command: SlashCommand, args: string): string {
             return `Run backtest cycle for ${wfArgs[0]} strategy on ${wfArgs[1].toUpperCase()}: backtest -> optimize -> compare`;
           }
           return "Usage: /workflow backtest-cycle <strategy> <symbol>";
-        case "web-dd":
-          return wfArgs[0] && wfArgs[1]
-            ? `Run Tinyfish web due diligence on ${wfArgs[0]} with goal: ${wfArgs.slice(1).join(" ")}`
-            : "Usage: /workflow web-dd <url> <goal...>";
-        case "web-monitor":
-          return wfArgs[0] && wfArgs[1] && wfArgs[2] && wfArgs[3]
-            ? `Schedule Tinyfish web monitor ${wfArgs[0]} on ${wfArgs[2]} (${wfArgs[1]}) with goal: ${wfArgs.slice(3).join(" ")}`
-            : "Usage: /workflow web-monitor <monitorId> <schedule> <url> <goal...>";
         default:
-          return "Available workflows: quick, dd, backtest-cycle, web-dd, web-monitor";
+          return "Available workflows: quick, dd, backtest-cycle";
       }
     // Export command
     case "export":

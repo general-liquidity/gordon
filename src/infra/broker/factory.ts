@@ -17,6 +17,7 @@ import {
   getBrokerInclusionDecision,
   validateBrokerInclusionGate,
 } from "./inclusion-gate.ts";
+import { loadOAuthBrokerCredentials, brokerSupportsOAuth } from "./oauth-bridge.ts";
 import type { BrokerAdapter, BrokerCredentials, BrokerId } from "./types.ts";
 
 const SUPPORTED_BROKERS: BrokerId[] = [
@@ -90,6 +91,33 @@ export class BrokerFactory {
 
     this.instanceCache.set(cacheKey, broker);
     return broker;
+  }
+
+  /**
+   * Create a broker adapter, preferring OAuth tokens from the oauth-store
+   * over static API keys when the broker supports OAuth and a connection exists.
+   */
+  static async createWithAuth(
+    brokerId: BrokerId,
+    fallbackCredentials: BrokerCredentials,
+    oauthClientId?: string,
+  ): Promise<BrokerAdapter> {
+    if (brokerSupportsOAuth(brokerId)) {
+      const oauthCreds = await loadOAuthBrokerCredentials(brokerId, {
+        clientId: oauthClientId,
+        paper: fallbackCredentials.paper,
+        accountId: fallbackCredentials.accountId,
+        baseUrl: fallbackCredentials.baseUrl,
+      });
+      if (oauthCreds) {
+        return this.create(brokerId, oauthCreds);
+      }
+    }
+    return this.create(brokerId, fallbackCredentials);
+  }
+
+  static brokerSupportsOAuth(brokerId: BrokerId): boolean {
+    return brokerSupportsOAuth(brokerId);
   }
 
   static getSupportedBrokers(): BrokerId[] {

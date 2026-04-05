@@ -104,6 +104,17 @@ export {
   type KeyringCommandResult,
 } from './keyring';
 
+// OAuth Commands
+export {
+  handleOAuthCommand,
+  oauthList,
+  oauthVenues,
+  oauthConnect,
+  oauthPasteToken,
+  oauthRemove,
+  type OAuthCommandResult,
+} from './oauth';
+
 // Telemetry Commands
 export {
   handleTelemetryCommand,

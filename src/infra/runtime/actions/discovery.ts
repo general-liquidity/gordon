@@ -170,16 +170,6 @@ export async function discoverProviderCapabilities(config: GordonConfig): Promis
     });
   }
 
-  snapshots.push({
-    providerId: "tinyfish",
-    providerKind: "automation",
-    label: getIntegrationSurfaceMetadata("tinyfish").displayName,
-    supportsExecution: false,
-    capabilities: actionCapabilitiesForKind("automation"),
-    notes: ["Browser automation and web research surface."],
-    integration: getIntegrationSurfaceMetadata("tinyfish"),
-  });
-
   for (const observabilityId of ["axiom", "opentelemetry"] as const) {
     snapshots.push({
       providerId: observabilityId,

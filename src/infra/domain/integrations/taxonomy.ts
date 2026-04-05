@@ -512,12 +512,6 @@ const NON_EXECUTION_SURFACES: IntegrationSurfaceMetadata[] = [
     gordonEnabledMarkets: ["crypto"],
   },
   {
-    id: "tinyfish",
-    displayName: "Tinyfish",
-    integrationDomain: "automation_provider",
-    automationKind: "web_agent",
-  },
-  {
     id: "axiom",
     displayName: "Axiom",
     integrationDomain: "observability_provider",

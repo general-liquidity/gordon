@@ -48,6 +48,8 @@ export interface BrokerCredentials {
   oauthClientSecret?: string;
   /** Token expiry time in seconds from issuance (default 3600) */
   tokenExpiresIn?: number;
+  /** True if credentials were sourced from an OAuth flow (vs static API keys) */
+  isOAuth?: boolean;
 }
 
 /**

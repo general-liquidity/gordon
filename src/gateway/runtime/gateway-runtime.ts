@@ -45,7 +45,6 @@ import { getTrade } from "../../infra/storage/trades.ts";
 import { executeEmergencyLiquidation } from "../../core/safety/emergency-liquidation.ts";
 import { cleanupStalePositions } from "../../core/positions/cleanup.ts";
 import { getAutonomousLoopStatus, runAutonomousCycleOnce } from "../../core/autonomous-loop.ts";
-// Tinyfish monitoring removed
 import { appendActionLogEntry } from "../../infra/action-log/index.ts";
 import type { ActionLogEntryType } from "../../infra/action-log/index.ts";
 import { recordStructuredObservation } from "../../infra/platform/observability/index.ts";
@@ -662,8 +661,6 @@ export class GatewayRuntime {
         return { ran: false, reason: (err as Error).message };
       }
     });
-
-    // Tinyfish monitoring removed
 
   }
 

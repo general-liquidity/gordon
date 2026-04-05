@@ -25,8 +25,7 @@ export type GatewayCapability =
   | "learning:analyze"
   | "execution:intent"
   | "autonomous:cycle"
-  | "capital:refresh"
-  | "tinyfish:monitor";
+  | "capital:refresh";
 
 export interface GatewayPrincipal {
   id: string;
@@ -58,7 +57,6 @@ function defaultCapabilities(): Set<GatewayCapability> {
     "execution:intent",
     "autonomous:cycle",
     "capital:refresh",
-    "tinyfish:monitor",
   ]);
 }
 
@@ -148,8 +146,6 @@ export function requiredCapabilityForCommand(type: GatewayCommandType): GatewayC
       return "autonomous:cycle";
     case "capital.refresh":
       return "capital:refresh";
-    case "tinyfish.monitor.run":
-      return "tinyfish:monitor";
     default:
       return "chat:write";
   }

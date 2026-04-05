@@ -134,11 +134,6 @@ export const BitfinexSecretSchema = z
     "Bitfinex API secret must be at least 10 alphanumeric/dash/underscore characters"
   );
 
-export const TinyfishKeySchema = z
-  .string()
-  .trim()
-  .min(1, "Tinyfish API key cannot be empty");
-
 export const InceptionKeySchema = z
   .string()
   .trim()
@@ -342,7 +337,6 @@ export const EnvKeysSchema = z.object({
   BITFINEX_API_KEY: BitfinexKeySchema.optional(),
   BITFINEX_API_SECRET: BitfinexSecretSchema.optional(),
   HYPERLIQUID_PRIVATE_KEY: HyperliquidKeySchema.optional(),
-  TINYFISH_API_KEY: TinyfishKeySchema.optional(),
   HELIUS_API_KEY: HeliusKeySchema.optional(),
   MOONPAY_API_KEY: MoonPayKeySchema.optional(),
   MOONPAY_SECRET_KEY: MoonPaySecretSchema.optional(),
@@ -721,15 +715,6 @@ export function validateEnvKeys(keys: Record<string, string | undefined>): Valid
   // Validate Hyperliquid private key (single key, hex format)
   if (keys.HYPERLIQUID_PRIVATE_KEY) {
     validateApiKeyWarn("HYPERLIQUID_PRIVATE_KEY", keys.HYPERLIQUID_PRIVATE_KEY, HyperliquidKeySchema, warnings, validated);
-  }
-
-  if (keys.TINYFISH_API_KEY) {
-    const result = validateApiKey("TINYFISH_API_KEY", keys.TINYFISH_API_KEY, TinyfishKeySchema);
-    if (!result.valid) {
-      errors.push({ key: "TINYFISH_API_KEY", message: result.error! });
-    } else {
-      validated.TINYFISH_API_KEY = keys.TINYFISH_API_KEY.trim();
-    }
   }
 
   if (keys.MOONPAY_API_KEY) {

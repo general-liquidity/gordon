@@ -27,12 +27,6 @@ describe("integration taxonomy", () => {
     expect(routed.gatewayParent).toBe("dedalus");
   });
 
-  it("classifies Tinyfish as browser automation", () => {
-    const metadata = getIntegrationSurfaceMetadata("tinyfish");
-    expect(metadata.integrationDomain).toBe("automation_provider");
-    expect(metadata.automationKind).toBe("web_agent");
-  });
-
   it("classifies SynthData as a research analytics provider", () => {
     const metadata = getIntegrationSurfaceMetadata("synthdata");
     expect(metadata.integrationDomain).toBe("research_analytics_provider");

@@ -12,7 +12,7 @@ import type { Candle } from "../../types/index.ts";
 /**
  * Supported exchange identifiers
  */
-export type ExchangeId = "binance" | "binance_us" | "coinbase" | "kraken" | "bitfinex" | "hyperliquid" | "uniswap" | "robinhood" | "okx";
+export type ExchangeId = "binance" | "binance_us" | "coinbase" | "kraken" | "bitfinex" | "hyperliquid" | "uniswap" | "robinhood" | "okx" | "gemini";
 
 /**
  * Exchange credentials for authentication
@@ -26,6 +26,8 @@ export interface ExchangeCredentials {
   sandbox?: boolean;
   /** Wallet private key for DEX exchanges (e.g., Hyperliquid) */
   walletPrivateKey?: string;
+  /** OAuth 2.0 bearer access token (e.g., Gemini) — takes precedence over apiKey/apiSecret */
+  accessToken?: string;
 }
 
 /**
@@ -43,6 +45,7 @@ export const EXCHANGE_ENV_MAP: Record<ExchangeId, { key?: string; secret?: strin
   uniswap:     { key: "UNISWAP_API_KEY" },
   robinhood:   { key: "ROBINHOOD_API_KEY",    secret: "ROBINHOOD_API_SECRET" },
   okx:         { key: "OKX_API_KEY",          secret: "OKX_API_SECRET",       passphrase: "OKX_PASSPHRASE" },
+  gemini:      { key: "GEMINI_API_KEY",       secret: "GEMINI_API_SECRET" },
 };
 
 /**

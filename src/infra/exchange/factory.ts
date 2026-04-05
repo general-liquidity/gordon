@@ -13,6 +13,8 @@ import { HyperliquidAdapter } from "./adapters/hyperliquid.ts";
 import { UniswapAdapter } from "./adapters/uniswap.ts";
 import { RobinhoodAdapter } from "./adapters/robinhood.ts";
 import { OkxAdapter } from "./adapters/okx.ts";
+import { GeminiAdapter } from "./adapters/gemini.ts";
+import { loadOAuthExchangeCredentials, exchangeSupportsOAuth } from "./oauth-bridge.ts";
 
 /**
  * All supported exchange IDs with native adapters
@@ -27,6 +29,7 @@ const SUPPORTED_EXCHANGES: ExchangeId[] = [
   "uniswap",
   "robinhood",
   "okx",
+  "gemini",
 ];
 
 /**
@@ -163,6 +166,14 @@ export class ExchangeFactory {
       case "robinhood":
         exchange = new RobinhoodAdapter(credentials.apiKey, credentials.apiSecret);
         break;
+      case "gemini":
+        exchange = new GeminiAdapter({
+          accessToken: credentials.accessToken,
+          apiKey: credentials.apiKey,
+          apiSecret: credentials.apiSecret,
+          sandbox: credentials.sandbox,
+        });
+        break;
       case "okx":
         if (!credentials.passphrase) {
           throw new Error("OKX requires a passphrase in addition to API key and secret");
@@ -182,6 +193,31 @@ export class ExchangeFactory {
     this.instanceCache.set(cacheKey, exchange);
 
     return exchange;
+  }
+
+  /**
+   * Create an exchange adapter, preferring OAuth tokens from the oauth-store
+   * over static API keys when the exchange supports OAuth 2.0.
+   */
+  static async createWithAuth(
+    exchangeId: ExchangeId,
+    fallbackCredentials: ExchangeCredentials,
+    oauthClientId?: string,
+  ): Promise<Exchange> {
+    if (exchangeSupportsOAuth(exchangeId)) {
+      const oauthCreds = await loadOAuthExchangeCredentials(exchangeId, {
+        clientId: oauthClientId,
+        sandbox: fallbackCredentials.sandbox,
+      });
+      if (oauthCreds?.accessToken) {
+        return this.create(exchangeId, oauthCreds as ExchangeCredentials);
+      }
+    }
+    return this.create(exchangeId, fallbackCredentials);
+  }
+
+  static exchangeSupportsOAuth(exchangeId: ExchangeId): boolean {
+    return exchangeSupportsOAuth(exchangeId);
   }
 
   /**
