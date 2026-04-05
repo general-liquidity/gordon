@@ -158,7 +158,7 @@ function formatRuntimeState(context: GordonContext): string {
   const workflowPhase = determineWorkflowPhase(context);
   const executionReadiness = getExecutionReadiness(context);
   const lines = [
-    `- Mode: ${context.config.mode}`,
+    `- Permission mode: ${context.config.permissionMode}`,
     `- Credential profile: ${context.credentialProfile ?? "default"}`,
     `- Workflow phase: ${workflowPhase}`,
   ];

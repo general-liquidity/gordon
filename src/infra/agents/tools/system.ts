@@ -68,6 +68,7 @@ export const testConnectionTool = createTool({
       mode: "ARMED" | "SAFE";
       isArmed: boolean;
       armedUntil: string | null;
+      permissionMode?: "auto" | "ask" | "strict";
       llmConnected: boolean;
       binanceConnected: boolean;
       binancePermissions?: { read: boolean; spotTrade: boolean; withdraw: boolean } | null;
@@ -91,11 +92,11 @@ export const testConnectionTool = createTool({
 
     const config = await loadConfig().catch(() => null);
     if (config) {
-      results.mode = config.mode;
-      results.armedUntil = config.armedUntil;
-      results.isArmed = config.mode === "ARMED"
-        && !!config.armedUntil
-        && new Date(config.armedUntil).getTime() > Date.now();
+      results.permissionMode = config.permissionMode;
+      // Legacy fields retained for backward-compatible tool output.
+      results.mode = config.permissionMode === "strict" ? "SAFE" : "ARMED";
+      results.armedUntil = null;
+      results.isArmed = config.permissionMode !== "strict";
     }
 
     if (!ctx?.exchange) {

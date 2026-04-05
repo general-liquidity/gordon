@@ -104,7 +104,7 @@ export async function runThinkingPhase(
     // Build a compact context snapshot (avoid token explosion)
     const contextSnapshot = JSON.stringify(
       {
-        mode: context.config.mode,
+        permissionMode: context.config.permissionMode,
         credentialProfile: context.credentialProfile,
         exchange: context.exchange?.exchangeId,
         broker: context.broker?.brokerId,

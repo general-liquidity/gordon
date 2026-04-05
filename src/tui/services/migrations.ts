@@ -40,15 +40,15 @@ const MIGRATIONS: Migration[] = [
   },
   {
     id: "003_rename_armed_to_permission",
-    description: "Rename ARMED/DISARMED to permission mode",
+    description: "Migrate legacy ARMED/SAFE/DISARMED to permissionMode",
     migrate: (config) => {
       if (config.mode === "ARMED") {
         config.permissionMode = "auto";
-        delete config.mode;
-      } else if (config.mode === "DISARMED") {
+      } else if (config.mode === "SAFE" || config.mode === "DISARMED") {
         config.permissionMode = "ask";
-        delete config.mode;
       }
+      delete config.mode;
+      delete config.armedUntil;
       return config;
     },
   },

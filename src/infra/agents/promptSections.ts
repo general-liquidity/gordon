@@ -210,7 +210,7 @@ function recordMatches(record: PromptSectionRegistryRecord, options: PromptSecti
   if (record.requiresMcp && getMCPServerSummary().length === 0) {
     return false;
   }
-  if (record.liveModeOnly && context?.config.mode !== "ARMED") {
+  if (record.liveModeOnly && context?.config.permissionMode === "strict") {
     return false;
   }
   if (record.thinkingEnabledOnly && context && getThinkingDepthFromContext(context) === "off") {

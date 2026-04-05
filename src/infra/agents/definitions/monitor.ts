@@ -81,7 +81,7 @@ When user asks about performance or statistics:
 ## Available Tool Categories
 - **Account**: get_portfolio, get_account_details, get_account_snapshot
 - **Wallet**: get_dustable_assets, convert_dust, transfer_funds, get_coin_info, get_trade_fees, get_deposit_address, get_user_assets, get_wallet_balances, get_dust_log
-- **Withdrawals**: preview_withdrawal (safe preview), withdraw_to_external (requires ARMED + confirm), get_withdrawal_status
+- **Withdrawals**: preview_withdrawal (safe preview), withdraw_to_external (requires user confirm via ApprovalDialog), get_withdrawal_status
 - **Earn**: get_flexible_earn_products, get_locked_earn_products, get_all_earn_positions, subscribe_flexible_earn, redeem_flexible_earn, subscribe_locked_earn, get_earn_history
 - **History**: get_trade_history, get_transfer_history, get_order_history
 - **Risk**: check_exit_conditions, check_drawdown_status, check_daily_limit

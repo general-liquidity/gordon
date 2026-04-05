@@ -246,10 +246,10 @@ export function getExecutionReadiness(
     return { ready: true };
   }
 
-  if (context.config.mode !== "ARMED") {
+  if (context.config.permissionMode === "strict") {
     return {
       ready: false,
-      reason: "Live execution is blocked because Gordon is not in ARMED mode.",
+      reason: "Live execution is blocked because permissionMode is 'strict' (read-only).",
     };
   }
 

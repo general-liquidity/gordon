@@ -1,4 +1,4 @@
-import type { Mode } from "../types/index.ts";
+import type { PermissionMode } from "../types/index.ts";
 
 export type WorkspaceId = "desk" | "market" | "plan" | "lab" | "monitor";
 
@@ -33,7 +33,7 @@ export interface CommandUxMetadata {
 }
 
 export interface QuickActionContext {
-  mode: Mode;
+  permissionMode: PermissionMode;
   workspace: WorkspaceId;
   setupComplete: boolean;
   hasExchange: boolean;
@@ -374,7 +374,7 @@ export function getQuickActionItems(context: QuickActionContext): QuickActionIte
 
   if (context.hasWalletRails) {
     actions.push({ label: "Fund", command: "/fund quote", workflow: "trade" });
-  } else if (context.mode === "ARMED") {
+  } else if (context.permissionMode === "auto") {
     actions.push({ label: "Orders", command: "/orders", workflow: "accounts" });
   } else {
     actions.push({ label: "Doctor", command: "/doctor", workflow: "system" });

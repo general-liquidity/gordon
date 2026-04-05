@@ -369,10 +369,10 @@ async function stocksOrders(statusArg: string | undefined, limitArg: string | un
 async function stocksPlace(side: "buy" | "sell", args: string[]): Promise<StocksCommandResult> {
   try {
     const config = await loadConfig();
-    if (config.mode !== "ARMED") {
+    if (config.permissionMode === "strict") {
       return {
         success: false,
-        message: "System is SAFE. Use /arm before placing live broker orders.",
+        message: "permissionMode is 'strict' (read-only). Use /auto or /ask to enable trading.",
       };
     }
 

@@ -293,46 +293,41 @@ export class GatewayRuntime {
     });
 
     this.registerHandler("system.arm", async (envelope) => {
+      // Legacy endpoint — now sets permissionMode="auto" (equivalent to former ARMED).
       const payload = envelope.command.payload as { durationHours?: number; reason?: string };
       const config = await loadConfig();
-      const expiresAt = new Date(Date.now() + (payload.durationHours ?? 1) * 60 * 60 * 1000).toISOString();
-      const updated = { ...config, mode: "ARMED" as const, armedUntil: expiresAt };
+      const updated = { ...config, permissionMode: "auto" as const };
       await saveConfig(updated);
       recordStructuredObservation({
-        eventType: "system.armed",
+        eventType: "system.permission_mode_changed",
         workflow: "execution",
         source: "gateway_runtime",
         component: "GatewayRuntime",
         outcome: "success",
-        status: "armed",
-        mode: updated.mode,
-        durationMs: (payload.durationHours ?? 1) * 60 * 60 * 1000,
-        details: {
-          reason: payload.reason,
-          expiresAt,
-        },
+        status: "auto",
+        mode: updated.permissionMode,
+        details: { reason: payload.reason, previous: config.permissionMode },
       });
-      return { mode: updated.mode, armedUntil: updated.armedUntil, reason: payload.reason };
+      return { permissionMode: updated.permissionMode, reason: payload.reason };
     });
 
     this.registerHandler("system.disarm", async (envelope) => {
+      // Legacy endpoint — now sets permissionMode="ask" (per-action approval).
       const payload = envelope.command.payload as { reason?: string };
       const config = await loadConfig();
-      const updated = { ...config, mode: "SAFE" as const, armedUntil: null };
+      const updated = { ...config, permissionMode: "ask" as const };
       await saveConfig(updated);
       recordStructuredObservation({
-        eventType: "system.disarmed",
+        eventType: "system.permission_mode_changed",
         workflow: "execution",
         source: "gateway_runtime",
         component: "GatewayRuntime",
         outcome: "success",
-        status: "disarmed",
-        mode: updated.mode,
-        details: {
-          reason: payload.reason,
-        },
+        status: "ask",
+        mode: updated.permissionMode,
+        details: { reason: payload.reason, previous: config.permissionMode },
       });
-      return { mode: updated.mode, armedUntil: updated.armedUntil, reason: payload.reason };
+      return { permissionMode: updated.permissionMode, reason: payload.reason };
     });
 
     this.registerHandler("scheduler.create_task", async (envelope) => {
@@ -471,7 +466,7 @@ export class GatewayRuntime {
       if (result.open) {
         // Auto-disarm and generate cryptographic proof
         const config = await loadConfig();
-        const updated = { ...config, mode: "SAFE" as const, armedUntil: null };
+        const updated = { ...config, permissionMode: "strict" as const };
         await saveConfig(updated);
 
         const proof = generateCircuitBreakerProof(input);

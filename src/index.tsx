@@ -131,9 +131,9 @@ async function gracefulShutdown(signal: string, code: number = 0): Promise<void>
     try {
       const { loadConfig } = await import("./infra/storage/config.ts");
       const config = await loadConfig();
-      if (config.mode === "ARMED") {
-        console.log("\n[warn] System is ARMED. Open positions will continue on the exchange.");
-        console.log("       Use /disarm before exiting to return to safe mode.");
+      if (config.permissionMode === "auto") {
+        console.log("\n[warn] permissionMode is 'auto'. Open positions will continue on the exchange.");
+        console.log("       Use /ask before exiting if you want per-action approval next session.");
       }
     } catch {
       // Config may not be loadable during crash
@@ -199,7 +199,7 @@ initializeStructuredAxiom();
 
 try {
   const startupConfig = await loadConfig();
-  await emitEvent("system:started", { mode: startupConfig.mode });
+  await emitEvent("system:started", { permissionMode: startupConfig.permissionMode });
 } catch {
   // Non-critical startup observability path
 }

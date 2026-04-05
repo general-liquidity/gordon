@@ -23,7 +23,7 @@ export interface BaseEvent {
  */
 export interface SystemStartedEvent extends BaseEvent {
   type: "system:started";
-  mode: "SAFE" | "ARMED";
+  permissionMode: "auto" | "ask" | "strict";
 }
 
 export interface SystemArmedEvent extends BaseEvent {
@@ -317,8 +317,7 @@ export interface AccessControlDeniedEvent extends BaseEvent {
   tool?: string;
   toolName?: string;
   userId?: string;
-  mode?: "SAFE" | "ARMED";
-  armedUntil?: string;
+  permissionMode?: "auto" | "ask" | "strict";
 }
 
 export interface AccessControlWarningEvent extends BaseEvent {

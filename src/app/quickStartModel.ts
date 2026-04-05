@@ -1,4 +1,4 @@
-import type { Mode } from "../types/index.ts";
+import type { PermissionMode } from "../types/index.ts";
 
 export type MenuOption =
   | "chat"
@@ -21,7 +21,7 @@ export type MenuOption =
   | "chains";
 
 export function buildQuickStartRecommendedOptions(input: {
-  mode: Mode;
+  permissionMode: PermissionMode;
   setupComplete: boolean;
   hasExchange: boolean;
   hasBroker: boolean;
@@ -30,7 +30,7 @@ export function buildQuickStartRecommendedOptions(input: {
   if (!input.setupComplete || (!input.hasExchange && !input.hasBroker)) {
     return ["chat", "setup", "doctor", "help", "scan", "portfolio"];
   }
-  if (input.mode === "ARMED") {
+  if (input.permissionMode === "auto") {
     return ["chat", "scan", "orders", "positions", "preview-order", "plan"];
   }
   return [

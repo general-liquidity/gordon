@@ -303,8 +303,13 @@ export const GordonConfigSchema = z.object({
     memoryWarningThreshold: 0.8,
   }),
   modelConfig: ModelConfigSchema.optional(),
-  mode: z.enum(["SAFE", "ARMED"]).default("SAFE"),
-  armedUntil: z.string().nullable().default(null),
+  /**
+   * Permission mode — replaces legacy ARMED/SAFE toggle.
+   *   - "auto": trade tools execute without confirmation (formerly ARMED)
+   *   - "ask":  trade tools require per-action approval via ApprovalDialog (default, formerly SAFE)
+   *   - "strict": read-only — trade tools blocked entirely
+   */
+  permissionMode: z.enum(["auto", "ask", "strict"]).default("ask"),
   onboardingComplete: z.boolean().default(false),
   startupBannerMode: z.enum(["full", "quiet"]).default("full"),
   /** MCP Server configurations */
@@ -377,4 +382,6 @@ export type StrategyRuntimeConfig = z.infer<typeof StrategyRuntimeConfigSchema>;
 export type RegimeDetectionConfig = z.infer<typeof RegimeDetectionConfigSchema>;
 export type SystematicTradingConfig = z.infer<typeof SystematicTradingConfigSchema>;
 export type GordonConfig = z.infer<typeof GordonConfigSchema>;
-export type Mode = GordonConfig["mode"];
+/** Legacy alias (ARMED/SAFE removed). Kept for callers that haven't migrated. */
+export type Mode = "SAFE" | "ARMED";
+export type PermissionMode = GordonConfig["permissionMode"];

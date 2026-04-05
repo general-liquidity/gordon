@@ -194,17 +194,17 @@ async function buildMarketOrderPlan(
   }
 
   const liveExecutionReady = action.id === "trading.market_order";
-  if (context.config.mode !== "ARMED") {
+  if (context.config.permissionMode === "strict") {
     const detail = action.id === "trading.preview_market_order"
-      ? "Preview is available, but live execution is blocked until Gordon is ARMED."
-      : "Live execution requires ARMED mode.";
+      ? "Preview is available, but live execution is blocked in strict permissionMode."
+      : "Live execution requires permissionMode 'auto' or 'ask'.";
     steps.push({
-      id: "mode",
-      title: "Execution mode",
+      id: "permissionMode",
+      title: "Permission mode",
       status: liveExecutionReady ? "blocked" : "informational",
       detail,
     });
-    blockers.push("System is in SAFE mode.");
+    blockers.push("permissionMode is 'strict' (read-only).");
   } else {
     steps.push({
       id: "mode",

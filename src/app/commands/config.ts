@@ -300,10 +300,7 @@ export async function configView(): Promise<ConfigCommandResult> {
 
     // Build System section
     const systemLines = ['', '=== System ==='];
-    systemLines.push(`Mode: ${config.mode}`);
-    if (config.armedUntil) {
-      systemLines.push(`Armed Until: ${new Date(config.armedUntil).toLocaleString()}`);
-    }
+    systemLines.push(`Permission Mode: ${config.permissionMode}`);
     systemLines.push(`Onboarding Complete: ${config.onboardingComplete ? 'Yes' : 'No'}`);
     systemLines.push(`Startup Banner: ${config.startupBannerMode}`);
 

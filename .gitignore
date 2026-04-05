@@ -70,8 +70,6 @@ misc
 # Reference repos (not part of Gordon source)
 claude-code-meta/
 claude-code-meta-2/
-fintool-main/
-open-claude-code-main/
 .history/
 
 

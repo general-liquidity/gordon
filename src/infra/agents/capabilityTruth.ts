@@ -42,7 +42,7 @@ export const CAPABILITY_TRUTH_MATRIX: CapabilityTruthEntry[] = [
     label: "Live order execution",
     scope: "cross-market",
     supportedMarkets: ["crypto", "stocks"],
-    venueDependency: "active execution venue (CEX, broker, or supported protocol) in ARMED mode",
+    venueDependency: "active execution venue (CEX, broker, or supported protocol) with permissionMode not 'strict'",
     phrasingRule:
       "Use 'execution venue' as the generic term. Only say exchange, broker, or protocol when the distinction matters.",
   },

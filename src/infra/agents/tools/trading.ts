@@ -344,7 +344,7 @@ export const executePlanTool = createTool({
       return validateToolOutput(executePlanOutputSchema, { success: false, error: `Plan not found: ${planId}` }, { toolName: "execute_plan" });
     }
 
-    if (ctx.config.mode !== "ARMED") {
+    if (ctx.config.permissionMode === "strict") {
       recordStructuredObservation({
         eventType: "execution.blocked",
         workflow: "execution",
@@ -352,15 +352,15 @@ export const executePlanTool = createTool({
         component: "execute_plan",
         toolName: "execute_plan",
         outcome: "failure",
-        status: "not_armed",
-        mode: ctx.config.mode,
+        status: "strict_permission_mode",
+        mode: ctx.config.permissionMode,
         planId,
         symbol: plan.symbol,
-        reason: "Cannot execute: System is in SAFE mode. Use /arm to enable trading first.",
+        reason: "Cannot execute: permissionMode is 'strict' (read-only). Use /auto or /ask to enable trading.",
       });
       return validateToolOutput(executePlanOutputSchema, {
         success: false,
-        error: "Cannot execute: System is in SAFE mode. Use /arm to enable trading first.",
+        error: "Cannot execute: permissionMode is 'strict' (read-only). Use /auto or /ask to enable trading.",
       }, { toolName: "execute_plan" });
     }
 
@@ -387,7 +387,7 @@ export const executePlanTool = createTool({
           toolName: "execute_plan",
           outcome: "failure",
           status: "risk_rejected",
-          mode: ctx.config.mode,
+          mode: ctx.config.permissionMode,
           planId,
           symbol: plan.symbol,
           reason: riskResult.reason,
@@ -410,7 +410,7 @@ export const executePlanTool = createTool({
         toolName: "execute_plan",
         outcome: "failure",
         status: "risk_gate_failed",
-        mode: ctx.config.mode,
+        mode: ctx.config.permissionMode,
         planId,
         symbol: plan.symbol,
         reason: message,
@@ -440,7 +440,7 @@ export const executePlanTool = createTool({
         toolName: "execute_plan",
         outcome: "success",
         status: "executed",
-        mode: ctx.config.mode,
+        mode: ctx.config.permissionMode,
         planId,
         tradeId: result.trade.id,
         symbol: result.trade.symbol,
@@ -461,7 +461,7 @@ export const executePlanTool = createTool({
       toolName: "execute_plan",
       outcome: "failure",
       status: "execution_failed",
-      mode: ctx.config.mode,
+      mode: ctx.config.permissionMode,
       planId,
       symbol: plan.symbol,
       reason: result.error,

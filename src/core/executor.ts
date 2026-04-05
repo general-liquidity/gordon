@@ -297,38 +297,17 @@ export async function executePlan(
     };
   }
 
-  // Step 1: Check mode is ARMED
-  if (config.mode !== "ARMED") {
-    logger.warn("Execution blocked - system not armed");
+  // Step 1: Check permissionMode allows trade execution
+  if (config.permissionMode === "strict") {
+    logger.warn("Execution blocked - permissionMode is strict");
     return {
       success: false,
-      error: "Cannot execute: System is not in ARMED mode. Use '/arm' to enable trading.",
+      error: "Cannot execute: permissionMode is 'strict' (read-only). Use '/auto' or '/ask' to enable trading.",
       orders: [],
     };
   }
 
-  // Step 2: Check armed hasn't expired
-  if (config.armedUntil === null) {
-    return {
-      success: false,
-      error: "Cannot execute: ARMED mode has no expiration set. Please re-arm the system.",
-      orders: [],
-    };
-  }
-
-  const armedUntilDate = new Date(config.armedUntil);
-  const now = new Date();
-
-  if (armedUntilDate <= now) {
-    logger.warn("Execution blocked - armed mode expired", { armedUntil: config.armedUntil });
-    return {
-      success: false,
-      error: `Cannot execute: ARMED mode expired at ${config.armedUntil}. Please re-arm the system.`,
-      orders: [],
-    };
-  }
-
-  // Step 3: Run validator one more time with fresh data
+  // Step 2: Run validator one more time with fresh data
   const validationResult = validatePlan(plan, config, portfolio);
 
   if (!validationResult.valid) {

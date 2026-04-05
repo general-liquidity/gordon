@@ -25,17 +25,9 @@ export class TradingService {
    * Validate a plan before execution
    */
   async validatePlan(plan: Plan, config: GordonConfig, portfolioValue: number): Promise<void> {
-    // Check trading mode
-    if (config.mode !== "ARMED") {
+    // Check permissionMode allows trade execution
+    if (config.permissionMode === "strict") {
       throw new TradingModeError("SAFE", "ARMED");
-    }
-
-    // Check if armed session has expired
-    if (config.armedUntil) {
-      const expiry = new Date(config.armedUntil);
-      if (expiry < new Date()) {
-        throw new TradingModeError("SAFE", "ARMED");
-      }
     }
 
     // Check allocation limits

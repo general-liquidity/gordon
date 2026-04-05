@@ -449,7 +449,7 @@ export function createDefaultSubscriptions(
             `Stop loss: ${e.stopLoss}, Take profits: ${e.takeProfits.join(", ")}. ` +
             `Risk/reward: ${e.riskRewardRatio.toFixed(2)}, Position size: ${e.positionSizePct}%. ` +
             `Strategy: ${e.strategy}. Plan ID: ${e.planId}. ` +
-            `Review and prepare for execution (requires ARMED mode and user approval).`,
+            `Review and prepare for execution (requires user approval via ApprovalDialog).`,
           { planId: e.planId, symbol: e.symbol, trigger: "plan_ready" }
         );
       },

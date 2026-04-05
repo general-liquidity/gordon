@@ -293,7 +293,7 @@ export async function printStatusJson(): Promise<void> {
       configDir: GORDON_DIR,
       configured: envStatus.hasLLMKey,
       onboardingComplete: config.onboardingComplete,
-      mode: config.mode,
+      permissionMode: config.permissionMode,
       exchanges: config.exchanges.map((e) => ({
         id: e.id,
         type: e.type,

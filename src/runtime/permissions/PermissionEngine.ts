@@ -48,7 +48,7 @@ function buildFingerprint(tool: RuntimeToolSpec, context: GordonContext, runtime
     tool.permissionScope,
     runtimeState.runtimeId,
     runtimeState.session.threadId ?? runtimeState.session.snapshot?.threadId ?? "no-thread",
-    context.config.mode,
+    context.config.permissionMode,
   ].join(":");
 }
 
