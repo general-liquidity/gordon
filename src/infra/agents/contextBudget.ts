@@ -6,6 +6,7 @@ import type { GordonContext } from "./types.ts";
 import type { IntegrationGlossarySelection } from "./integrationGlossary.ts";
 import { determineWorkflowPhase } from "./workflowPhase.ts";
 import { composeRuntimePromptSections } from "./promptSections.ts";
+import { microcompactMessages } from "../context/microcompact.ts";
 
 export const PROJECT_TRUTH_MARKER = "[GORDON_PROJECT_TRUTH]";
 export const INTEGRATION_GLOSSARY_MARKER = "[GORDON_INTEGRATION_GLOSSARY]";
@@ -442,6 +443,15 @@ export function buildPromptEnvelope(
     role: "user",
     content: userMessage,
   });
+
+  // Microcompact: trim content of old read-only tool results to save tokens.
+  // Pass-through if the array has no compactable tool messages.
+  const mc = microcompactMessages(messages as unknown as Array<{ role: string; toolName?: string; content: unknown }>);
+  if (mc.cleared > 0) {
+    // Replace in place with the compacted version.
+    messages.length = 0;
+    for (const m of mc.messages) messages.push(m as unknown as GroundedPromptMessage);
+  }
 
   const envelope: PromptEnvelope = {
     prompt,

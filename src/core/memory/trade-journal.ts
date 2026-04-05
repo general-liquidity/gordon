@@ -9,6 +9,7 @@
  */
 
 import { createModuleLogger } from "../../infra/logger/index.ts";
+import { enhanceRankedResults } from "../../infra/memory/hybrid/index.ts";
 import type { EmbeddingProvider } from "./embeddings.ts";
 import {
   extractTokens,
@@ -19,6 +20,26 @@ import {
 } from "./store.ts";
 
 const logger = createModuleLogger("trade-journal");
+
+/**
+ * Post-process search results with temporal decay + MMR diversification.
+ * Keeps Gordon's existing BM25+embedding scoring — only re-ranks the output.
+ */
+function applyEnhancement(
+  results: MemorySearchResult[],
+  limit: number,
+): MemorySearchResult[] {
+  if (results.length <= 1) return results;
+  const ranked = results.map((r) => ({
+    id: r.entry.id,
+    content: r.entry.content,
+    score: r.score,
+    timestamp: r.entry.createdAt ? new Date(r.entry.createdAt).getTime() : null,
+    _original: r,
+  }));
+  const enhanced = enhanceRankedResults(ranked, { limit });
+  return enhanced.map((e) => e._original);
+}
 
 // ============================================================================
 // Parameter Types
@@ -263,11 +284,13 @@ export class TradeJournal {
 
     try {
       const embedding = await this.embedder.embed(query);
-      return this.store.searchHybrid(query, embedding, searchOptions);
+      const raw = await this.store.searchHybrid(query, embedding, searchOptions);
+      return applyEnhancement(raw, searchOptions.limit);
     } catch {
       // Fall back to keyword search if embedding fails
       logger.debug("Falling back to keyword search (embedding unavailable)");
-      return this.store.searchKeyword(query, searchOptions);
+      const raw = await this.store.searchKeyword(query, searchOptions);
+      return applyEnhancement(raw, searchOptions.limit);
     }
   }
 

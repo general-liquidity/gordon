@@ -161,6 +161,16 @@ Format your summary using this exact template:
 ### Important Context:
 [List any user preferences, important observations, or context that should be remembered for future messages.]
 
+### Durable User Facts (carry across sessions):
+[Distill facts worth remembering in EVERY future session, not just this one:
+- Risk tolerance and per-trade/daily/drawdown limits the user has stated
+- Position sizing rules (Kelly fraction, fixed %, max concentration)
+- Strategy preferences ("swing trader", "no leverage", "avoids meme coins")
+- Explicit exclusions/blacklists
+- Primary broker/exchange and paper vs live preference
+- Time horizon tier, capital size tier, tax jurisdiction if stated
+If nothing durable was stated, write "None in this conversation."]
+
 Keep the summary concise but don't lose critical trading information. Use bullet points for clarity.`;
 
 const SUMMARIZATION_USER_PROMPT = `Please summarize the following conversation history. Focus on preserving trading-relevant information.

@@ -27,6 +27,7 @@ import { BootScreen } from "./components/BootScreen.js";
 import { SetupWizard } from "./components/SetupWizard.js";
 import { HandoffArrow } from "./components/HandoffArrow.js";
 import { PromptInput } from "./components/PromptInput.js";
+import { defaultMessageQueue } from "../infra/runtime/messageQueue.js";
 import { VirtualMessageList } from "./components/VirtualMessageList.js";
 import { CostDisplay } from "./components/CostDisplay.js";
 
@@ -317,7 +318,17 @@ function AppInner() {
   const handleSubmit = useCallback(
     (value: string) => {
       const trimmed = value.trim();
-      if (!trimmed || isStreaming) return;
+      if (!trimmed) return;
+      if (isStreaming) {
+        // Gordon is busy — enqueue instead of dropping. Drained on idle.
+        defaultMessageQueue.enqueue({
+          text: trimmed,
+          priority: "next",
+          enqueuedAt: Date.now(),
+          source: "cli",
+        });
+        return;
+      }
 
       dispatch({ type: "SET_SHOW_HELP", show: false });
 
@@ -384,6 +395,19 @@ function AppInner() {
     },
     [isStreaming, dispatch, stateUpdater],
   );
+
+  // Drain queued user inputs when Gordon transitions from busy → idle.
+  // Messages typed while streaming get batched and re-submitted here.
+  useEffect(() => {
+    if (isStreaming) return;
+    if (defaultMessageQueue.isEmpty()) return;
+    const drained = defaultMessageQueue.dequeueAll();
+    // Combine into a single follow-up turn preserving order.
+    const combined = drained.map((m) => m.text).join("\n\n");
+    // Micro-delay so the streaming→idle state settles before re-submit.
+    const timer = setTimeout(() => handleSubmit(combined), 50);
+    return () => clearTimeout(timer);
+  }, [isStreaming, handleSubmit]);
 
   const handlePaletteSelect = useCallback(
     (item: PaletteItem) => {

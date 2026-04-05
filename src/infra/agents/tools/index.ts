@@ -348,11 +348,13 @@ import { genomeTools } from "./genome-tools.ts";
 import { protocolTools } from "../../../core/playbooks/protocol-tools.ts";
 import { multiModalChartTools } from "../../tools/chartTools.ts";
 import { evalTools } from "../../domain/evals/tools.ts";
+import { withSpillAll } from "./withSpill.ts";
 
 /**
- * All tools combined as a single object for Mastra Agent
+ * All tools combined as a single object for Mastra Agent.
+ * Wrapped with withSpillAll() so tool results > 50KB auto-spill to disk.
  */
-export const allTools = {
+const _rawAllTools = {
   ...indicatorTools,
   ...explainTools,
   ...marketTools,
@@ -416,6 +418,9 @@ export const allTools = {
   ...genomeTools,
   ...protocolTools,
 };
+
+/** Tool bundle wrapped with disk-spill for results > 50KB. */
+export const allTools = withSpillAll(_rawAllTools);
 
 /**
  * Tool counts by category (useful for debugging)
