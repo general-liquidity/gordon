@@ -18,7 +18,7 @@ describe("GatewayRuntime integration", () => {
         persistence,
         resolveContext: async ({ session }) => ({
           userId: session.resourceId ?? "user-1",
-          config: { mode: "SAFE" },
+          config: { permissionMode: "ask" },
         }) as any,
       });
 
@@ -26,7 +26,7 @@ describe("GatewayRuntime integration", () => {
         sessionRuntimeFactory,
         resolveContext: async () => ({
           userId: "user-1",
-          config: { mode: "SAFE" },
+          config: { permissionMode: "ask" },
         }) as any,
       });
 

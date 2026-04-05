@@ -197,8 +197,8 @@ export function createMockConfig(overrides: Partial<GordonConfig> = {}): GordonC
       maxSessionDurationHours: 24,
       memoryWarningThreshold: 0.8,
     },
-    mode: "SAFE",
-    armedUntil: null,
+    permissionMode: "ask",
+    
     onboardingComplete: false,
     startupBannerMode: "full",
     useKeyring: false,

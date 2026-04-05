@@ -13,7 +13,7 @@ describe("config layering helpers", () => {
           topNCoins: 50,
           defaultTimeframes: ["1h", "4h"],
         },
-        mode: "SAFE",
+        permissionMode: "ask",
       },
       {
         preferences: {
@@ -28,7 +28,7 @@ describe("config layering helpers", () => {
         topNCoins: 20,
         defaultTimeframes: ["15m"],
       },
-      mode: "SAFE",
+      permissionMode: "ask",
     });
   });
 
@@ -54,14 +54,14 @@ describe("config layering helpers", () => {
     const payload = normalizeWorkspaceConfigPayload({
       profile: "intraday",
       overrides: {
-        mode: "SAFE",
+        permissionMode: "ask",
       },
     });
 
     expect(payload).toEqual({
       profile: "intraday",
       overrides: {
-        mode: "SAFE",
+        permissionMode: "ask",
       },
     });
   });

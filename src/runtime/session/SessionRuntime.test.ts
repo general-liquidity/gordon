@@ -7,7 +7,7 @@ describe("SessionRuntime", () => {
     const factory = new SessionRuntimeFactory({
       resolveContext: async () => ({
         userId: "user-1",
-        config: { mode: "SAFE" },
+        config: { permissionMode: "ask" },
       }) as any,
     });
 

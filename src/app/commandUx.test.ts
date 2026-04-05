@@ -30,7 +30,7 @@ describe("command UX model", () => {
 
   it("prioritizes setup-oriented quick actions when Gordon is not ready", () => {
     const actions = getQuickActionItems({
-      mode: "SAFE",
+      permissionMode: "ask",
       workspace: "desk",
       setupComplete: false,
       hasExchange: false,
@@ -49,7 +49,7 @@ describe("command UX model", () => {
 
   it("surfaces funding when rails are configured and the system is ready", () => {
     const actions = getQuickActionItems({
-      mode: "SAFE",
+      permissionMode: "ask",
       workspace: "desk",
       setupComplete: true,
       hasExchange: true,
@@ -63,7 +63,7 @@ describe("command UX model", () => {
 
   it("switches suggested quick actions with the active workspace", () => {
     const actions = getQuickActionItems({
-      mode: "SAFE",
+      permissionMode: "ask",
       workspace: "lab",
       setupComplete: true,
       hasExchange: true,
@@ -82,14 +82,14 @@ describe("command UX model", () => {
 
   it("changes quick-start recommendations based on readiness", () => {
     const setupRecommendations = buildQuickStartRecommendedOptions({
-      mode: "SAFE",
+      permissionMode: "ask",
       setupComplete: false,
       hasExchange: false,
       hasBroker: false,
       hasWalletRails: false,
     });
     const readyRecommendations = buildQuickStartRecommendedOptions({
-      mode: "ARMED",
+      permissionMode: "auto",
       setupComplete: true,
       hasExchange: true,
       hasBroker: false,

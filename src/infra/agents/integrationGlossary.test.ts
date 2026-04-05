@@ -75,7 +75,7 @@ describe("integration glossary grounding", () => {
     const context = createContext({
       requestedTaskScope: "execution",
       config: GordonConfigSchema.parse({
-        mode: "ARMED",
+        permissionMode: "auto",
         modelConfig: { provider: "anthropic", model: "claude-sonnet-4-5-20250929" },
       }),
     });

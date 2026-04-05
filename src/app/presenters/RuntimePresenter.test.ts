@@ -45,8 +45,8 @@ function createMockContext(): GordonContext {
         maxSessionDurationHours: 24,
         memoryWarningThreshold: 0.8,
       },
-      mode: "SAFE",
-      armedUntil: null,
+      permissionMode: "ask",
+      
       onboardingComplete: true,
       startupBannerMode: "full",
       useKeyring: false,

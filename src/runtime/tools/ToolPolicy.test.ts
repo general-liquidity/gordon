@@ -3,10 +3,10 @@ import { GordonConfigSchema } from "../../types/index.ts";
 import type { GordonContext } from "../../infra/agents/types.ts";
 import { evaluateRuntimeToolPolicy } from "./ToolPolicy.ts";
 
-function createContext(mode: "SAFE" | "ARMED" = "SAFE"): GordonContext {
+function createContext(permissionMode: "auto" | "ask" | "strict" = "ask"): GordonContext {
   const config = GordonConfigSchema.parse({
     mode,
-    armedUntil: mode === "ARMED" ? new Date(Date.now() + 60_000).toISOString() : null,
+    
   });
   return {
     binance: null,

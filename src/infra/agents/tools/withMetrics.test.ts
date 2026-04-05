@@ -11,7 +11,7 @@ describe("withToolMetrics", () => {
     requestContext.set("broker", null);
     requestContext.set("agentRails", null);
     requestContext.set("llm", {});
-    requestContext.set("config", { mode: "SAFE", armedUntil: null });
+    requestContext.set("config", { permissionMode: "ask" });
     requestContext.set("runtime", {
       runtimeId: "app",
       evaluateToolAccess: async () => ({

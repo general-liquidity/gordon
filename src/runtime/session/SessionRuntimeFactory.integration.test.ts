@@ -17,7 +17,7 @@ describe("SessionRuntimeFactory integration", () => {
         persistence,
         resolveContext: async () => ({
           userId: "user-1",
-          config: { mode: "SAFE" },
+          config: { permissionMode: "ask" },
         }) as any,
       });
 
@@ -41,7 +41,7 @@ describe("SessionRuntimeFactory integration", () => {
         persistence,
         resolveContext: async () => ({
           userId: "user-1",
-          config: { mode: "SAFE" },
+          config: { permissionMode: "ask" },
         }) as any,
       });
 

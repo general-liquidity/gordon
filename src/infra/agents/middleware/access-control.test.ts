@@ -3,7 +3,7 @@ import { describe, expect, it } from "bun:test";
 import { checkToolAccess } from "./access-control.ts";
 import type { GordonConfig } from "../../../types/index.ts";
 
-function createConfig(mode: "ARMED" | "SAFE" = "SAFE"): GordonConfig {
+function createConfig(permissionMode: "auto" | "ask" | "strict" = "ask"): GordonConfig {
   return {
     version: "1.0.0",
     exchanges: [],
@@ -28,8 +28,7 @@ function createConfig(mode: "ARMED" | "SAFE" = "SAFE"): GordonConfig {
       maxSessionDurationHours: 24,
       memoryWarningThreshold: 0.8,
     },
-    mode,
-    armedUntil: mode === "ARMED" ? new Date(Date.now() + 60_000).toISOString() : null,
+    permissionMode,
     onboardingComplete: false,
     startupBannerMode: "full",
     useKeyring: false,
@@ -72,10 +71,24 @@ function createConfig(mode: "ARMED" | "SAFE" = "SAFE"): GordonConfig {
 }
 
 describe("checkToolAccess", () => {
-  it("allows arm_system while the system is still SAFE", async () => {
-    const result = await checkToolAccess("arm_system", createConfig("SAFE"), "test-user");
-
+  it("allows non-trade tools in ask mode", async () => {
+    const result = await checkToolAccess("set_permission_mode", createConfig("ask"), "test-user");
     expect(result.allowed).toBe(true);
-    expect(result.mode).toBe("SAFE");
+  });
+
+  it("blocks trade tools in strict mode", async () => {
+    const result = await checkToolAccess("place_order", createConfig("strict"), "test-user");
+    expect(result.allowed).toBe(false);
+    expect(result.reason).toContain("strict");
+  });
+
+  it("allows trade tools in auto mode", async () => {
+    const result = await checkToolAccess("place_order", createConfig("auto"), "test-user");
+    expect(result.allowed).toBe(true);
+  });
+
+  it("allows trade tools in ask mode (ApprovalDialog handles gating downstream)", async () => {
+    const result = await checkToolAccess("place_order", createConfig("ask"), "test-user");
+    expect(result.allowed).toBe(true);
   });
 });

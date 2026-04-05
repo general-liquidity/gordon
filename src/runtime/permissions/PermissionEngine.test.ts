@@ -15,7 +15,7 @@ function createPolicy(overrides: Partial<RuntimeToolPolicyDecision> = {}): Runti
       riskClass: "high",
       permissionScope: "livetrade.execute",
       sideEffectLevel: "execution",
-      requiresArmedMode: true,
+      requiresTradePermission: true,
       supportsStreaming: false,
       supportsBackground: false,
       idempotent: false,
@@ -30,7 +30,7 @@ function createPolicy(overrides: Partial<RuntimeToolPolicyDecision> = {}): Runti
 const context = {
   userId: "user-1",
   config: {
-    mode: "ARMED",
+    permissionMode: "auto",
   },
 } as any;
 
@@ -67,7 +67,7 @@ describe("PermissionEngine", () => {
         riskClass: "low",
         permissionScope: "portfolio.read",
         sideEffectLevel: "read",
-        requiresArmedMode: false,
+        requiresTradePermission: false,
         idempotent: true,
         auditEventType: "portfolio_read",
       },

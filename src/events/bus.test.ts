@@ -2,20 +2,19 @@ import { describe, test, expect } from "bun:test";
 import { EventBus, emitEvent, getEventBus, setEventBus } from "./bus.ts";
 import type { EventData } from "./types.ts";
 
-function systemStartedEvent(mode: "SAFE" | "ARMED" = "SAFE"): EventData<"system:started"> {
+function systemStartedEvent(permissionMode: "auto" | "ask" | "strict" = "ask"): EventData<"system:started"> {
   return {
     type: "system:started",
     timestamp: new Date().toISOString(),
-    mode,
+    permissionMode,
   };
 }
 
-function systemArmedEvent(duration = 24): EventData<"system:armed"> {
+function systemModeChangedEvent(permissionMode: "auto" | "ask" | "strict" = "auto"): EventData<"system:permission_mode_changed"> {
   return {
-    type: "system:armed",
+    type: "system:permission_mode_changed",
     timestamp: new Date().toISOString(),
-    duration,
-    expiresAt: new Date(Date.now() + duration * 60 * 60 * 1000).toISOString(),
+    permissionMode,
   };
 }
 
@@ -84,18 +83,18 @@ describe("EventBus", () => {
   test("tracks history with limit, filtering, and clear", async () => {
     const bus = new EventBus(2);
 
-    await bus.emit(systemStartedEvent("SAFE"));
-    await bus.emit(systemArmedEvent());
-    await bus.emit(systemStartedEvent("ARMED"));
+    await bus.emit(systemStartedEvent("ask"));
+    await bus.emit(systemModeChangedEvent());
+    await bus.emit(systemStartedEvent("auto"));
 
     const allHistory = bus.getHistory();
     expect(allHistory).toHaveLength(2);
-    expect(allHistory[0]?.type).toBe("system:armed");
+    expect(allHistory[0]?.type).toBe("system:permission_mode_changed");
     expect(allHistory[1]?.type).toBe("system:started");
 
     const started = bus.getHistory("system:started");
     expect(started).toHaveLength(1);
-    expect((started[0] as { mode: "SAFE" | "ARMED" }).mode).toBe("ARMED");
+    expect((started[0] as { permissionMode: "auto" | "ask" | "strict" }).permissionMode).toBe("auto");
 
     bus.clearHistory();
     expect(bus.getHistory()).toHaveLength(0);
@@ -104,19 +103,19 @@ describe("EventBus", () => {
   test("send auto-populates timestamp and type", async () => {
     const bus = new EventBus();
     let receivedType: EventData<"system:started">["type"] | null = null;
-    let receivedMode: EventData<"system:started">["mode"] | null = null;
+    let receivedMode: EventData<"system:started">["permissionMode"] | null = null;
     let hasTimestamp = false;
 
     bus.on("system:started", (event) => {
       receivedType = event.type;
-      receivedMode = event.mode;
+      receivedMode = event.permissionMode;
       hasTimestamp = typeof event.timestamp === "string";
     });
 
-    await bus.send("system:started", { mode: "SAFE" });
+    await bus.send("system:started", { permissionMode: "ask" });
 
     expect(receivedType === "system:started").toBe(true);
-    expect(receivedMode === "SAFE").toBe(true);
+    expect(receivedMode === "ask").toBe(true);
     expect(hasTimestamp).toBe(true);
   });
 
@@ -148,7 +147,7 @@ describe("default bus helpers", () => {
       called = true;
     });
 
-    await emitEvent("system:started", { mode: "SAFE" });
+    await emitEvent("system:started", { permissionMode: "ask" });
     expect(called).toBe(true);
     expect(getEventBus()).toBe(customBus);
   });

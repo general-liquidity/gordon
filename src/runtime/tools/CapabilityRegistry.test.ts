@@ -7,7 +7,7 @@ describe("CapabilityRegistry", () => {
     const spec = registry.resolveToolSpec("place_market_order");
     expect(spec.category).toBe("execution");
     expect(spec.permissionScope).toBe("livetrade.execute");
-    expect(spec.requiresArmedMode).toBe(true);
+    expect(spec.requiresTradePermission).toBe(true);
     expect(spec.workerRole).toBe("Executor");
   });
 

@@ -5,7 +5,7 @@ describe("HandoffCoordinator", () => {
   it("allows valid finance-native handoffs", () => {
     const coordinator = new HandoffCoordinator();
     const validation = coordinator.validate("Planner", "Executor", {
-      mode: "ARMED",
+      permissionMode: "auto",
       handoffBudget: {
         maxNotionalUsd: 10_000,
         expiresAt: new Date(Date.now() + 60_000).toISOString(),
@@ -16,7 +16,7 @@ describe("HandoffCoordinator", () => {
 
   it("blocks invalid handoffs", () => {
     const coordinator = new HandoffCoordinator();
-    const validation = coordinator.validate("Teacher", "Executor", { mode: "ARMED" });
+    const validation = coordinator.validate("Teacher", "Executor", { permissionMode: "auto" });
     expect(validation.valid).toBe(false);
   });
 });

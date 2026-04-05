@@ -44,7 +44,7 @@ function createContext(overrides: Partial<GordonContext> = {}): GordonContext {
     agentRails: null,
     llm: {} as GordonContext["llm"],
     config: GordonConfigSchema.parse({
-      mode: "ARMED",
+      permissionMode: "auto",
       modelConfig: { provider: "openai", model: "gpt-5.4" },
     }),
     portfolioValue: 10000,

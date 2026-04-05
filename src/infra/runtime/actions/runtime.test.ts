@@ -4,10 +4,10 @@ import { GordonConfigSchema, type GordonConfig } from "../../types/index.ts";
 import type { GordonContext } from "../agents/types.ts";
 import { evaluateToolRequestPolicy, planActionExecution } from "./runtime.ts";
 
-function createConfig(mode: "SAFE" | "ARMED" = "SAFE"): GordonConfig {
+function createConfig(permissionMode: "auto" | "ask" | "strict" = "ask"): GordonConfig {
   return GordonConfigSchema.parse({
     mode,
-    armedUntil: mode === "ARMED" ? new Date(Date.now() + 60_000).toISOString() : null,
+    
     exchanges: [{
       id: "binance-default",
       type: "binance",
@@ -102,12 +102,12 @@ describe("action runtime", () => {
       "place_market_order",
       createContext({
         requestedActionId: "trading.market_order",
-        config: createConfig("ARMED"),
+        config: createConfig("auto"),
         credentialProfile: "live",
       }),
     );
 
     expect(decision.allowed).toBeTrue();
-    expect(decision.requiresArmedMode).toBeTrue();
+    expect(decision.requiresTradePermission).toBeTrue();
   });
 });

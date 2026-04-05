@@ -10,8 +10,8 @@ describe("checkToolSecurity", () => {
       {
         userId: "user-1",
         config: {
-          mode: "SAFE",
-          armedUntil: null,
+          permissionMode: "ask",
+          
         },
         runtime: {
           runtimeId: "app",
@@ -36,8 +36,8 @@ describe("checkToolSecurity", () => {
       {
         userId: "user-1",
         config: {
-          mode: "SAFE",
-          armedUntil: null,
+          permissionMode: "ask",
+          
         },
       } as any,
     );
