@@ -9,7 +9,7 @@
 
 import { Agent } from "@mastra/core/agent";
 import { type MastraModelConfig } from "../providers/registry.ts";
-import { getMastraInstance } from "../observability/tracing.ts";
+import { getMastraInstance } from "../platform/observability/tracing.ts";
 import { determineWorkflowPhase, resolveModelForWorkflowPhase } from "./workflowPhase.ts";
 import type { GordonConfig } from "../../types/index.ts";
 import type { GordonContext } from "./types.ts";

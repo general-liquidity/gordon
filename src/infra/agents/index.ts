@@ -170,12 +170,12 @@ export {
   createSummarizer,
   createSummarizerConfigFromMemoryConfig,
   DEFAULT_SUMMARIZER_CONFIG,
-} from "../memory/index.ts";
+} from "../domain/memory/index.ts";
 export type {
   SummarizerConfig,
   TradingContext,
   SummarizationResult,
-} from "../memory/index.ts";
+} from "../domain/memory/index.ts";
 
 // MCP Plugin Integration (@mastra/mcp)
 export {
@@ -185,7 +185,7 @@ export {
   disconnectMCP,
   isMCPInitialized,
   getMCPStats,
-} from "../mcp/client.ts";
+} from "../ai/mcp/client.ts";
 
 // Reflection
 export {

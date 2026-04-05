@@ -1,11 +1,11 @@
 import type { GordonConfig } from "../../types/index.ts";
-import { BrokerFactory } from "../broker/factory.ts";
-import { ExchangeFactory } from "../exchange/factory.ts";
+import { BrokerFactory } from "../../broker/factory.ts";
+import { ExchangeFactory } from "../../exchange/factory.ts";
 import {
   getExecutionVenueMetadata,
   getIntegrationSurfaceMetadata,
-} from "../integrations/taxonomy.ts";
-import { pluginInstaller } from "../mcp/marketplace/installer.ts";
+} from "../../domain/integrations/taxonomy.ts";
+import { pluginInstaller } from "../../ai/mcp/marketplace/installer.ts";
 import { createAgentRailsRegistry } from "../rails/registry.ts";
 import { getCanonicalActions } from "./registry.ts";
 import type { CapabilitySnapshot } from "./types.ts";

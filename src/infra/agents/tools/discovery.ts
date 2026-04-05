@@ -14,9 +14,9 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
-import { formatActionPlanMarkdown, planActionExecution } from "../../actions/runtime.ts";
-import { normalizeCryptoSymbol, resolveInstrument } from "../../markets/instruments.ts";
-import { recordStructuredObservation } from "../../observability/index.ts";
+import { formatActionPlanMarkdown, planActionExecution } from "../../runtime/actions/runtime.ts";
+import { normalizeCryptoSymbol, resolveInstrument } from "../../domain/markets/instruments.ts";
+import { recordStructuredObservation } from "../../platform/observability/index.ts";
 import { getGordonContext, type MastraExecutionContext } from "./types.ts";
 import type { ExchangeExtended } from "../../exchange/types.ts";
 

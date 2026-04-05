@@ -76,4 +76,4 @@ export {
   HyperliquidConnectionError,
   HyperliquidNotSupportedError,
   createHyperliquidError,
-} from "../../errors/index.ts";
+} from "../../../../../errors/index.ts";

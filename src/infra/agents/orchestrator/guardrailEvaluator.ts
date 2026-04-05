@@ -8,9 +8,9 @@
 import {
   enforceRateLimit,
   type RateLimitResult,
-} from "../../observability/index.ts";
-import { auditLog } from "../../audit/index.ts";
-import { checkPermissionsOnInit } from "../../binance/permissions.ts";
+} from "../../platform/observability/index.ts";
+import { auditLog } from "../../platform/audit/index.ts";
+import { checkPermissionsOnInit } from "../../venues/exchange/clients/binance/permissions.ts";
 import { evaluateRuntimeToolPolicy } from "../../../runtime/tools/ToolPolicy.ts";
 import type { GordonContext } from "../types.ts";
 import type { ToolSecurityCheckResult } from "./types.ts";

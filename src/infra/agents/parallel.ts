@@ -16,7 +16,7 @@
  */
 
 import { createModuleLogger } from "../logger/index.ts";
-import { normalizeCryptoSymbol } from "../markets/instruments.ts";
+import { normalizeCryptoSymbol } from "../domain/markets/instruments.ts";
 import type { GordonContext } from "./types.ts";
 import type {
   StreamWriter,

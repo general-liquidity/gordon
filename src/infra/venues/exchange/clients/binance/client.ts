@@ -4,7 +4,7 @@
  */
 
 import { createHmac } from "crypto";
-import type { Candle } from "../../types/index.ts";
+import type { Candle } from "../../../../../types/index.ts";
 import type {
   BinanceAccountInfo,
   BinanceKline,
@@ -51,13 +51,13 @@ import type {
   BinanceEarnRedemptionRecord,
   BinanceExchangeInfo,
 } from "./types.ts";
-import { BinanceError, RateLimitError } from "../../errors/index.ts";
-import { createModuleLogger } from "../logger/index.ts";
+import { BinanceError, RateLimitError } from "../../../../../errors/index.ts";
+import { createModuleLogger } from "../../../../logger/index.ts";
 import {
   withRetry,
   CircuitBreaker,
   type RetryConfig,
-} from "../retry.ts";
+} from "../../../../retry.ts";
 
 const logger = createModuleLogger("binance");
 

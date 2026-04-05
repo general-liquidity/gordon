@@ -53,7 +53,7 @@ import {
   listBacktestHistory,
   type BacktestQueryOptions,
 } from "../../../backtest/storage.ts";
-import { getAuditLogger } from "../../audit/index.ts";
+import { getAuditLogger } from "../../platform/audit/index.ts";
 import {
   buildBacktestOperatorReport,
   buildComparisonOperatorReport,
@@ -62,9 +62,9 @@ import {
   formatOperatorReport,
   operatorReportSchema,
   processSystematicBacktest,
-} from "../../systematic/index.ts";
+} from "../../domain/systematic/index.ts";
 import { getGordonContext, type MastraExecutionContext } from "./types.ts";
-import { normalizeCryptoSymbol, normalizeStockSymbol, resolveInstrument } from "../../markets/instruments.ts";
+import { normalizeCryptoSymbol, normalizeStockSymbol, resolveInstrument } from "../../domain/markets/instruments.ts";
 
 // ============================================================================
 // Helper Functions

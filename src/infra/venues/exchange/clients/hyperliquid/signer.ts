@@ -7,8 +7,8 @@
 
 import { Wallet } from "ethers";
 import type { TypedDataDomain, TypedDataField } from "ethers";
-import { InvalidWalletError, WalletSigningError } from "../../errors/index.ts";
-import { createModuleLogger } from "../logger/index.ts";
+import { InvalidWalletError, WalletSigningError } from "../../../../../errors/index.ts";
+import { createModuleLogger } from "../../../../logger/index.ts";
 
 const logger = createModuleLogger("hyperliquid-signer");
 

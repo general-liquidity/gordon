@@ -18,7 +18,7 @@ import {
 import { runLifecycleHooks } from "../lifecycleHooks.ts";
 import { compileSubagentProfiles, isToolAllowedForAgent } from "../subagentProfiles.ts";
 import { defaultHandoffCoordinator } from "./HandoffCoordinator.ts";
-import { getDynamicToolAgentMap } from "../../routing/manager.ts";
+import { getDynamicToolAgentMap } from "../../runtime/routing/manager.ts";
 import { checkToolSecurity } from "./guardrailEvaluator.ts";
 import {
   getAgentForTool,

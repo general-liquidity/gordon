@@ -1,4 +1,4 @@
-import { executeWithLogging, getDatabase } from "../storage/database.ts";
+import { executeWithLogging, getDatabase } from "../../storage/database.ts";
 import type { TinyfishMonitorRecord, TinyfishMonitorRunRecord } from "./types.ts";
 
 interface RawMonitorRow {

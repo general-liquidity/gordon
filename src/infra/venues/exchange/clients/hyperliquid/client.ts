@@ -24,9 +24,9 @@ import {
   HyperliquidError,
   HyperliquidRateLimitError,
   WalletSigningError,
-} from "../../errors/index.ts";
-import { createModuleLogger } from "../logger/index.ts";
-import { withRetry, CircuitBreaker, type RetryConfig } from "../retry.ts";
+} from "../../../../../errors/index.ts";
+import { createModuleLogger } from "../../../../logger/index.ts";
+import { withRetry, CircuitBreaker, type RetryConfig } from "../../../../retry.ts";
 
 const logger = createModuleLogger("hyperliquid");
 

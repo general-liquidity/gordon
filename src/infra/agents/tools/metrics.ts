@@ -11,7 +11,7 @@ import {
   calculateTradeMetrics,
   calculateRiskMetrics,
   formatMetricsReport,
-} from "../../observability/index.ts";
+} from "../../platform/observability/index.ts";
 
 // ============================================================================
 // Performance Metrics Tool

@@ -27,9 +27,9 @@ import type {
   CoinbaseV2CryptoCurrency,
   CoinbaseV2SendRequest,
 } from "./types.ts";
-import { CoinbaseError, CoinbaseRateLimitError, CoinbaseAuthError } from "../../errors/index.ts";
-import { createModuleLogger } from "../logger/index.ts";
-import { withRetry, CircuitBreaker, type RetryConfig } from "../retry.ts";
+import { CoinbaseError, CoinbaseRateLimitError, CoinbaseAuthError } from "../../../../../errors/index.ts";
+import { createModuleLogger } from "../../../../logger/index.ts";
+import { withRetry, CircuitBreaker, type RetryConfig } from "../../../../retry.ts";
 
 const logger = createModuleLogger("coinbase");
 

@@ -13,7 +13,7 @@ import type { BrokerAdapter } from "../../broker/index.ts";
 import type { LLMClient } from "../../llm/index.ts";
 import type { AgentRailsRegistry } from "../../rails/index.ts";
 import type { GordonConfig } from "../../../types/index.ts";
-import { normalizeCryptoSymbol } from "../../markets/instruments.ts";
+import { normalizeCryptoSymbol } from "../../domain/markets/instruments.ts";
 import {
   createErrorContext,
   formatErrorWithContext,

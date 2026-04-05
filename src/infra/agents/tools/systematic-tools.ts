@@ -21,7 +21,7 @@ import {
   listDatasetSnapshots,
   listResearchExperiments,
   operatorReportSchema,
-} from "../../systematic/index.ts";
+} from "../../domain/systematic/index.ts";
 
 const datasetRowSchema = z.object({
   datasetId: z.string(),

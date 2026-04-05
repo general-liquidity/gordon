@@ -11,8 +11,8 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
-import { getTrade } from "../storage/trades.ts";
-import { getPlan } from "../storage/plans.ts";
+import { getTrade } from "../../storage/trades.ts";
+import { getPlan } from "../../storage/plans.ts";
 import {
   recordTradeClose,
   trackPlanRecommendation,

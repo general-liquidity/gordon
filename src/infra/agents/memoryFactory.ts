@@ -6,7 +6,7 @@
  */
 
 import { Memory } from "@mastra/memory";
-import { getFastMastraModel } from "../providers/registry.ts";
+import { getFastMastraModel } from "../runtime/providers/registry.ts";
 import { LocalEmbeddingProvider } from "../../core/memory/embeddings.ts";
 import { createMastraStorageConfig } from "./mastraStorage.ts";
 import { createModuleLogger } from "../logger/logger.ts";

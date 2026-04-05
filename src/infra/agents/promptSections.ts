@@ -6,7 +6,7 @@ import type { GordonContext } from "./types.ts";
 import { determineWorkflowPhase } from "./workflowPhase.ts";
 import { getThinkingDepthFromContext } from "./thinkingPhase.ts";
 import { getExecutionReadiness, getPlanningHandoff } from "./runtimeHarness.ts";
-import { getMCPServerSummary } from "../mcp/client.ts";
+import { getMCPServerSummary } from "../ai/mcp/client.ts";
 
 export type { PromptAgentRole };
 

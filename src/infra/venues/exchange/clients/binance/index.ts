@@ -86,7 +86,7 @@ export {
 } from "./websocket.ts";
 
 // Re-export errors for backward compatibility
-export { BinanceError, RateLimitError, BinanceAuthError, InsufficientBalanceError, InvalidSymbolError } from "../../errors/index.ts";
+export { BinanceError, RateLimitError, BinanceAuthError, InsufficientBalanceError, InvalidSymbolError } from "../../../../../errors/index.ts";
 
 // Permissions
 export {

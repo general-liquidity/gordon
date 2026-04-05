@@ -11,8 +11,8 @@
  */
 
 import { z } from "zod";
-import { getDatabase } from "../storage/database.ts";
-import { createModuleLogger } from "../logger/index.ts";
+import { getDatabase } from "../../storage/database.ts";
+import { createModuleLogger } from "../../logger/index.ts";
 import {
   getTradeOutcomes,
   getStrategyPerformance,

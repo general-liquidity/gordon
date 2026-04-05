@@ -1,8 +1,8 @@
-import type { MCPCategory } from "../mcp/types.ts";
-import { pluginInstaller } from "../mcp/marketplace/installer.ts";
-import type { GordonContext } from "../agents/types.ts";
-import { resolveInstrument } from "../markets/instruments.ts";
-import { checkExplicitExecutionAccess, requiresArmedModeForTool } from "../agents/middleware/access-control.ts";
+import type { MCPCategory } from "../../ai/mcp/types.ts";
+import { pluginInstaller } from "../../ai/mcp/marketplace/installer.ts";
+import type { GordonContext } from "../../agents/types.ts";
+import { resolveInstrument } from "../../domain/markets/instruments.ts";
+import { checkExplicitExecutionAccess, requiresArmedModeForTool } from "../../agents/middleware/access-control.ts";
 import { getCredentialSummaryForKinds } from "./credentials.ts";
 import { getActionById, getActionByToolName } from "./registry.ts";
 import type {

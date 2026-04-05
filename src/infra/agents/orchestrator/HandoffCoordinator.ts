@@ -1,6 +1,6 @@
 import { emitEvent } from "../../../events/index.ts";
 import { validateHandoffBudget } from "../../../gateway/handoffs/index.ts";
-import { recordNetworkRouting } from "../../observability/index.ts";
+import { recordNetworkRouting } from "../../platform/observability/index.ts";
 import { createModuleLogger } from "../../logger/index.ts";
 import { WorkerRegistry } from "../../../runtime/workers/WorkerRegistry.ts";
 

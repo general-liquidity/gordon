@@ -8,7 +8,7 @@
  * - Falls back to hardcoded addresses if fetch fails
  */
 
-import { Cache } from "../cache/cache.ts";
+import { Cache } from "../../platform/cache/cache.ts";
 import type { TokenInfo, RawTokenListEntry, UniswapTokenListResponse } from "./types.ts";
 import { WRAPPED_NATIVE, USDC_ADDRESSES, SUPPORTED_CHAIN_IDS } from "./types.ts";
 

@@ -24,9 +24,9 @@ import type {
   KrakenServerTime,
   KrakenSystemStatus,
 } from "./types.ts";
-import { KrakenError, KrakenRateLimitError, KrakenAuthError } from "../../errors/index.ts";
-import { createModuleLogger } from "../logger/index.ts";
-import { withRetry, CircuitBreaker, type RetryConfig } from "../retry.ts";
+import { KrakenError, KrakenRateLimitError, KrakenAuthError } from "../../../../../errors/index.ts";
+import { createModuleLogger } from "../../../../logger/index.ts";
+import { withRetry, CircuitBreaker, type RetryConfig } from "../../../../retry.ts";
 
 const logger = createModuleLogger("kraken");
 

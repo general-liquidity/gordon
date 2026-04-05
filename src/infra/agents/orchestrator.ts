@@ -38,7 +38,7 @@ import {
   recordError,
   recordAgentCall,
   type SpanContext,
-} from "../observability/index.ts";
+} from "../platform/observability/index.ts";
 import type { GordonContext } from "./types.ts";
 import {
   classifyRecoveryGuidance,
@@ -86,7 +86,7 @@ import {
   ensureMCPToolsDiscovered,
   getMCPDiscoveryIntent,
   areMCPSchemasDiscovered,
-} from "../mcp/client.ts";
+} from "../ai/mcp/client.ts";
 import type { Message } from "../llm/types.ts";
 import { resetAgents } from "./agents.ts";
 import { rebuildACEMemoryForThread, getACEMemorySnapshot } from "./aceMemory.ts";
@@ -1160,4 +1160,4 @@ export {
   type SummarizerConfig,
   type TradingContext,
   type SummarizationResult,
-} from "../memory/index.ts";
+} from "../domain/memory/index.ts";

@@ -11,13 +11,13 @@ import * as fs from "fs/promises";
 import * as path from "path";
 import type { Tool } from "@mastra/core/tools";
 
-import { pluginInstaller } from "../mcp/marketplace/installer.ts";
+import { pluginInstaller } from "../../ai/mcp/marketplace/installer.ts";
 import {
   getMCPTools,
   getMCPToolsByServer,
   reloadMCPTools,
-} from "../mcp/client.ts";
-import { resetAgents } from "../agents/agents.ts";
+} from "../../ai/mcp/client.ts";
+import { resetAgents } from "../../agents/agents.ts";
 import type { AgentAffinity, RoutingManifest, ResolvedRouting } from "./types.ts";
 
 // ============================================================================

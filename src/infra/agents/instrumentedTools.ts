@@ -71,7 +71,7 @@ import {
   systematicTools,
   withToolsMetrics,
 } from "./tools/index.ts";
-import { evalTools } from "../evals/index.ts";
+import { evalTools } from "../domain/evals/index.ts";
 
 // Singleton processor instances (shared across all agents)
 export const gordonInputGuard = new GordonInputGuard();

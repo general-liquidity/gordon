@@ -1,6 +1,6 @@
 import { createHmac, createSign, timingSafeEqual } from "node:crypto";
 
-import { createModuleLogger } from "../../logger/index.ts";
+import { createModuleLogger } from "../../../logger/index.ts";
 import type {
   AgentRailProviderStatus,
   MoonPayCurrencyLimits,

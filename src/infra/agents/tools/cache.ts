@@ -14,7 +14,7 @@
  */
 
 import { createTool, type Tool, type ToolExecutionContext } from "@mastra/core/tools";
-import { createCache } from "../../cache/cache.ts";
+import { createCache } from "../../platform/cache/cache.ts";
 import type { MastraExecutionContext } from "./types.ts";
 
 // ============================================================================

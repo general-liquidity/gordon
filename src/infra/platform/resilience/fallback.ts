@@ -4,7 +4,7 @@
  */
 
 import { Cache } from "../cache/cache.ts";
-import { createModuleLogger } from "../logger/index.ts";
+import { createModuleLogger } from "../../logger/index.ts";
 
 const logger = createModuleLogger("resilience");
 

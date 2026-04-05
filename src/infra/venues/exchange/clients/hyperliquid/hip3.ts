@@ -24,8 +24,8 @@ import type {
   HIP3OrderResult,
   HIP3DexMeta,
 } from "./hip3-types.ts";
-import { HyperliquidError } from "../../errors/index.ts";
-import { createModuleLogger } from "../logger/index.ts";
+import { HyperliquidError } from "../../../../../errors/index.ts";
+import { createModuleLogger } from "../../../../logger/index.ts";
 
 const logger = createModuleLogger("hip3");
 

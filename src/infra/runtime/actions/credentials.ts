@@ -1,16 +1,16 @@
 import { join } from "node:path";
 
 import type { GordonConfig } from "../../types/index.ts";
-import { BROKER_ENV_MAP, type BrokerId } from "../broker/types.ts";
-import { EXCHANGE_ENV_MAP, type ExchangeId } from "../exchange/types.ts";
+import { BROKER_ENV_MAP, type BrokerId } from "../../broker/types.ts";
+import { EXCHANGE_ENV_MAP, type ExchangeId } from "../../exchange/types.ts";
 import {
   getExecutionVenueMetadata,
   getIntegrationSurfaceMetadata,
-} from "../integrations/taxonomy.ts";
-import { credentialManager } from "../mcp/credentials.ts";
-import { pluginInstaller } from "../mcp/marketplace/installer.ts";
+} from "../../domain/integrations/taxonomy.ts";
+import { credentialManager } from "../../ai/mcp/credentials.ts";
+import { pluginInstaller } from "../../ai/mcp/marketplace/installer.ts";
 import { createAgentRailsRegistry } from "../rails/registry.ts";
-import { createKeyringProvider } from "../storage/keyring.ts";
+import { createKeyringProvider } from "../../storage/keyring.ts";
 import type {
   CredentialFieldStatus,
   CredentialProfile,

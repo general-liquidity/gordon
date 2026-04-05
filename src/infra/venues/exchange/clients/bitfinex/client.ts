@@ -23,9 +23,9 @@ import type {
   BitfinexOrderResponse,
   BitfinexAPIError,
 } from "./types.ts";
-import { BitfinexError, BitfinexRateLimitError, BitfinexAuthError } from "../../errors/index.ts";
-import { createModuleLogger } from "../logger/index.ts";
-import { withRetry, CircuitBreaker, type RetryConfig } from "../retry.ts";
+import { BitfinexError, BitfinexRateLimitError, BitfinexAuthError } from "../../../../../errors/index.ts";
+import { createModuleLogger } from "../../../../logger/index.ts";
+import { withRetry, CircuitBreaker, type RetryConfig } from "../../../../retry.ts";
 
 const logger = createModuleLogger("bitfinex");
 

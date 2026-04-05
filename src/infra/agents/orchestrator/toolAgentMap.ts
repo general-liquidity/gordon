@@ -5,7 +5,7 @@
  * and provides routing helpers for handoff detection.
  */
 
-import { getDynamicToolAgentMap } from "../../routing/manager.ts";
+import { getDynamicToolAgentMap } from "../../runtime/routing/manager.ts";
 import { createModuleLogger } from "../../logger/index.ts";
 import { getExecutionReadiness } from "../runtimeHarness.ts";
 import type { GordonContext } from "../types.ts";

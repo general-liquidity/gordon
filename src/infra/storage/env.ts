@@ -18,7 +18,7 @@ import {
 } from "./env-validation.ts";
 import { createKeyringProvider, KEYRING_SUPPORTED_KEYS } from "./keyring.ts";
 import { GORDON_DIR } from "./paths.ts";
-import { resetProviderRegistry } from "../providers/index.ts";
+import { resetProviderRegistry } from "../runtime/providers/index.ts";
 const GORDON_ENV_PATH = join(GORDON_DIR, ".env");
 
 // Secondary location: current working directory (for development)

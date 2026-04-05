@@ -7,8 +7,8 @@
  * - System health metrics (API latency, error rates)
  */
 
-import { createModuleLogger } from "../logger/index.ts";
-import { listTrades } from "../storage/trades.ts";
+import { createModuleLogger } from "../../logger/index.ts";
+import { listTrades } from "../../storage/trades.ts";
 import { listPlans } from "../storage/plans.ts";
 import type { Trade, Plan } from "../../types/index.ts";
 

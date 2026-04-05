@@ -6,7 +6,7 @@
  * and helps identify problematic tools.
  */
 
-import { recordToolCall } from "../../observability/metrics.ts";
+import { recordToolCall } from "../../platform/observability/metrics.ts";
 import { getGordonContext, type MastraExecutionContext } from "./types.ts";
 
 function getMastraExecutionContext(args: unknown[]): MastraExecutionContext | undefined {

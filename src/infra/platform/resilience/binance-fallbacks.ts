@@ -16,7 +16,7 @@ import {
   type FallbackOptions,
   type ResilientResult,
 } from "./fallback.ts";
-import { normalizeCryptoSymbol } from "../markets/instruments.ts";
+import { normalizeCryptoSymbol } from "../../domain/markets/instruments.ts";
 
 const BATCH_CONCURRENCY = 6;
 

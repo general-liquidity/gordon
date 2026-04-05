@@ -9,7 +9,7 @@
  * No API key required. Rate limits are generous (~500 req/min).
  */
 
-import { Cache } from "../cache/cache.ts";
+import { Cache } from "../../platform/cache/cache.ts";
 import type {
   DefiLlamaPool,
   DefiLlamaPoolsResponse,

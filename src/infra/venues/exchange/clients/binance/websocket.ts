@@ -10,8 +10,8 @@
  */
 
 import { EventEmitter } from "events";
-import { createModuleLogger } from "../logger/index.ts";
-import { recordStructuredObservation } from "../observability/index.ts";
+import { createModuleLogger } from "../../../../logger/index.ts";
+import { recordStructuredObservation } from "../../../../platform/observability/index.ts";
 
 const logger = createModuleLogger("binance-ws");
 

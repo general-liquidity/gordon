@@ -7,7 +7,7 @@ import { Agent } from "@mastra/core/agent";
 import { TokenLimiterProcessor } from "@mastra/core/processors";
 import { GordonInputGuard, GordonOutputSanitizer } from "../processors/index.ts";
 import { composeAgentInstructions } from "../promptSections.ts";
-import { getRoutingToolsForAgent } from "../../routing/manager.ts";
+import { getRoutingToolsForAgent } from "../../runtime/routing/manager.ts";
 import {
   instrumentedIndicatorTools,
   instrumentedMarketDataTools,

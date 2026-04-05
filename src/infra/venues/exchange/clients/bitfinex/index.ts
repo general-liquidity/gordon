@@ -35,4 +35,4 @@ export {
   BitfinexError,
   BitfinexRateLimitError,
   BitfinexAuthError,
-} from "../../errors/index.ts";
+} from "../../../../../errors/index.ts";

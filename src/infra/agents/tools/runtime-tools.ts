@@ -15,9 +15,9 @@ import { z } from "zod";
 import { loadBacktestResult } from "../../../backtest/storage.ts";
 import { StrategyRuntime } from "../../../core/runtime/engine.ts";
 import { AllocationStrategySchema } from "../../../core/runtime/types.ts";
-import { getAuditLogger } from "../../audit/index.ts";
+import { getAuditLogger } from "../../platform/audit/index.ts";
 import { createModuleLogger } from "../../logger/index.ts";
-import { recordStructuredObservation } from "../../observability/index.ts";
+import { recordStructuredObservation } from "../../platform/observability/index.ts";
 import {
   buildLiveBacktestDiffReport,
   buildRuntimeHealthOperatorReport,
@@ -26,7 +26,7 @@ import {
   operatorReportSchema,
   promoteStrategyProfile,
   recordSystematicOverride,
-} from "../../systematic/index.ts";
+} from "../../domain/systematic/index.ts";
 import { getGordonContext, type MastraExecutionContext } from "./types.ts";
 
 const logger = createModuleLogger("runtime-tools");

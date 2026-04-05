@@ -13,8 +13,8 @@ import * as path from "node:path";
 import * as os from "node:os";
 import * as crypto from "node:crypto";
 import * as readline from "node:readline";
-import { GORDON_DIR } from "../storage/paths.ts";
-import { VERSION } from "../../cli.ts";
+import { GORDON_DIR } from "../../storage/paths.ts";
+import { VERSION } from "../../../cli.ts";
 import {
   SUPABASE_URL,
   SUPABASE_ANON_KEY,

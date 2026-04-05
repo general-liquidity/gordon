@@ -15,7 +15,7 @@ import type {
   OpenAIErrorResponse,
 } from "./types.ts";
 import { API_ENDPOINTS, GORDON_MODELS } from "./types.ts";
-import { getLegacyClientRoute } from "../providers/registry.ts";
+import { getLegacyClientRoute } from "../../runtime/providers/registry.ts";
 
 // Default configuration values
 const DEFAULT_PROVIDER: LLMProvider = "dedalus";

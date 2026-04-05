@@ -7,8 +7,8 @@
  * Required env var: SYNTHDATA_API_KEY
  */
 
-import { withRetry } from "../retry.ts";
-import { Cache } from "../cache/cache.ts";
+import { withRetry } from "../../retry.ts";
+import { Cache } from "../../platform/cache/cache.ts";
 import {
   SYNTHDATA_ENV_KEYS,
   SYNTHDATA_BASE_URL,

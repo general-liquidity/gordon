@@ -128,7 +128,7 @@ export { multiModalChartTools } from "../../tools/chartTools.ts";
 export { sharedContextTools } from "../shared-context.ts";
 
 // Eval tools for learning from trade outcomes
-export { evalTools } from "../../evals/tools.ts";
+export { evalTools } from "../../domain/evals/tools.ts";
 
 // Tool metrics wrapper
 export { withToolMetrics, withToolsMetrics } from "./withMetrics.ts";
@@ -349,7 +349,7 @@ import { systematicTools } from "./systematic-tools.ts";
 import { genomeTools } from "./genome-tools.ts";
 import { protocolTools } from "../../../core/playbooks/protocol-tools.ts";
 import { multiModalChartTools } from "../../tools/chartTools.ts";
-import { evalTools } from "../../evals/tools.ts";
+import { evalTools } from "../../domain/evals/tools.ts";
 
 /**
  * All tools combined as a single object for Mastra Agent

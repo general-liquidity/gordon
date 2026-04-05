@@ -1,7 +1,7 @@
 import type { MarketplaceListing } from "../mcp/marketplace/types.ts";
-import { pluginInstaller } from "../mcp/marketplace/installer.ts";
+import { pluginInstaller } from "../../ai/mcp/marketplace/installer.ts";
 import type { GordonConfig } from "../../types/index.ts";
-import { getAuditLogger } from "../audit/audit-log.ts";
+import { getAuditLogger } from "../../platform/audit/audit-log.ts";
 import { createAgentRailsRegistry } from "./registry.ts";
 
 function buildHeliusListing(): MarketplaceListing {

@@ -1,7 +1,7 @@
 import type { GordonConfig } from "../../types/index.ts";
-import { discoverProviderCapabilities } from "../actions/discovery.ts";
-import { getActionById } from "../actions/registry.ts";
-import type { ActionProviderKind, ActionTaskScope, CapabilitySnapshot } from "../actions/types.ts";
+import { discoverProviderCapabilities } from "../runtime/actions/discovery.ts";
+import { getActionById } from "../runtime/actions/registry.ts";
+import type { ActionProviderKind, ActionTaskScope, CapabilitySnapshot } from "../runtime/actions/types.ts";
 import type { GordonContext } from "./types.ts";
 
 export interface IntegrationGlossaryEntry {

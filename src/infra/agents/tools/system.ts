@@ -14,7 +14,7 @@ import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
 import { getGordonContext, type MastraExecutionContext } from "./types.ts";
-import { providerRegistry, getDedalusModels, refreshDedalusModels, getActiveRoute, DIRECT_MODELS, type DirectProviderName } from "../../providers/registry.ts";
+import { providerRegistry, getDedalusModels, refreshDedalusModels, getActiveRoute, DIRECT_MODELS, type DirectProviderName } from "../../runtime/providers/registry.ts";
 import { loadConfig } from "../../storage/config.ts";
 import { getToolCacheStats, clearToolCache, pruneToolCache } from "./cache.ts";
 import {
@@ -23,7 +23,7 @@ import {
   formatAgentHealthReport,
   type PerAgentMetrics,
   type AgentHealthReport,
-} from "../../observability/index.ts";
+} from "../../platform/observability/index.ts";
 
 // NOTE: getHandoffHistory is dynamically imported to break circular dependency
 // (system.ts -> orchestrator.ts -> agents.ts -> tools/index.ts -> system.ts)

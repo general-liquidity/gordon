@@ -1,7 +1,7 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
-import { auditLog } from "../../audit/index.ts";
+import { auditLog } from "../../platform/audit/index.ts";
 import { safeAppendAudit } from "../../../gateway/store/audit-log-store.ts";
 import { listTinyfishMonitorRuns, listTinyfishMonitors } from "../../external/tinyfish/monitor-store.ts";
 import {

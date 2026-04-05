@@ -13,10 +13,10 @@ import {
   createSummarizerConfigFromMemoryConfig,
   type SummarizerConfig,
   type SummarizationResult,
-} from "../../memory/index.ts";
+} from "../../domain/memory/index.ts";
 import { runLifecycleHooks } from "../lifecycleHooks.ts";
 import type { GordonContext } from "../types.ts";
-import type { Message } from "../../llm/types.ts";
+import type { Message } from "../../ai/llm/types.ts";
 import type { ProcessingOptions } from "./types.ts";
 
 const logger = createModuleLogger("orchestrator-summarization");

@@ -10,7 +10,7 @@
  * Never tracked: exchange keys, API keys, trade amounts, PnL, symbols, PII.
  */
 
-import { VERSION } from "../../cli.ts";
+import { VERSION } from "../../../cli.ts";
 import {
   SUPABASE_URL,
   SUPABASE_ANON_KEY,

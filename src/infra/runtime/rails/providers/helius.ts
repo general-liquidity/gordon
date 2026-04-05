@@ -1,4 +1,4 @@
-import { createModuleLogger } from "../../logger/index.ts";
+import { createModuleLogger } from "../../../logger/index.ts";
 import type { ChainDataProvider, ChainTokenMetadata, ChainTransactionSummary, ChainWalletOverview } from "../types.ts";
 import type { ChainProviderConfig } from "../../../types/index.ts";
 

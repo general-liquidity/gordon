@@ -1,5 +1,5 @@
 import type { GordonConfig } from "../../types/index.ts";
-import { getFastMastraModel, getMastraModel, type MastraModelConfig } from "../providers/registry.ts";
+import { getFastMastraModel, getMastraModel, type MastraModelConfig } from "../runtime/providers/registry.ts";
 import type { GordonContext } from "./types.ts";
 import type { LLMProvider } from "../llm/types.ts";
 

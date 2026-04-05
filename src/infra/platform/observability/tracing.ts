@@ -16,7 +16,7 @@
  * Tracing also follows the user's telemetry consent state from `/telemetry enable`.
  */
 
-import { createModuleLogger } from "../logger/index.ts";
+import { createModuleLogger } from "../../logger/index.ts";
 import { isEnabled as isTelemetryConsentEnabled } from "../telemetry/telemetry.ts";
 
 const logger = createModuleLogger("tracing");

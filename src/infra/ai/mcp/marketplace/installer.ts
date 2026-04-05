@@ -19,7 +19,7 @@ import { marketplaceClient } from './registry';
 // Constants
 // ============================================================================
 
-import { getGordonDir } from '../../storage/paths.ts';
+import { getGordonDir } from '../../../storage/paths.ts';
 
 /** Default plugins directory */
 function getDefaultPluginsDir(): string {

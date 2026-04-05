@@ -44,4 +44,4 @@ export {
   KrakenInvalidPairError,
   KrakenConnectionError,
   createKrakenError,
-} from "../../errors/index.ts";
+} from "../../../../../errors/index.ts";

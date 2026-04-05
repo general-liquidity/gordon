@@ -24,7 +24,7 @@ import {
 import { createCachedTool, TOOL_CACHE_CONFIG } from "./cache.ts";
 import { calculateIndicators, detectLevels } from "../../../indicators/index.ts";
 import { detectSupportBounce, determineTrend } from "../../../core/scanner.ts";
-import { resolveInstrument } from "../../markets/instruments.ts";
+import { resolveInstrument } from "../../domain/markets/instruments.ts";
 import {
   formatScanResults,
   formatAnalysisResults,

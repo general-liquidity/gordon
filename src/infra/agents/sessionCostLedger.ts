@@ -1,5 +1,5 @@
 import { executeWithLogging, getDatabase } from "../storage/database.ts";
-import { recordStructuredSessionCost } from "../observability/index.ts";
+import { recordStructuredSessionCost } from "../platform/observability/index.ts";
 
 export interface SessionCostUsageInput {
   threadId: string;

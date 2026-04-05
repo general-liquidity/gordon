@@ -1,7 +1,7 @@
 import * as crypto from "node:crypto";
 
 import type { GordonEvent } from "../../events/types.ts";
-import { createModuleLogger } from "../logger/index.ts";
+import { createModuleLogger } from "../../logger/index.ts";
 import { isEnabled as isTelemetryConsentEnabled } from "../telemetry/telemetry.ts";
 
 const logger = createModuleLogger("axiom-structured");

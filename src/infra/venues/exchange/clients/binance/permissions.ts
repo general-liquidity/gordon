@@ -11,7 +11,7 @@
 
 import type { BinanceClient } from "./client.ts";
 import type { ExchangePermissions } from "./types.ts";
-import { createModuleLogger } from "../logger/index.ts";
+import { createModuleLogger } from "../../../../logger/index.ts";
 
 const logger = createModuleLogger("permissions");
 

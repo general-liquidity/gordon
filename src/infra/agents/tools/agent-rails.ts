@@ -1,8 +1,8 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
-import { getAuditLogger } from "../../audit/audit-log.ts";
-import { recordApiCall } from "../../observability/index.ts";
+import { getAuditLogger } from "../../platform/audit/audit-log.ts";
+import { recordApiCall } from "../../platform/observability/index.ts";
 import { getGordonContext, isArmed, type MastraExecutionContext } from "./types.ts";
 
 const agentRailStatusSchema = z.object({

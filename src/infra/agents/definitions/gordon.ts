@@ -7,8 +7,8 @@ import { Agent } from "@mastra/core/agent";
 import { TokenLimiterProcessor } from "@mastra/core/processors";
 import { composeAgentInstructions } from "../promptSections.ts";
 import { createModuleLogger } from "../../logger/logger.ts";
-import { getScopedMCPTools } from "../../mcp/client.ts";
-import { getRoutingToolsForAgent } from "../../routing/manager.ts";
+import { getScopedMCPTools } from "../../ai/mcp/client.ts";
+import { getRoutingToolsForAgent } from "../../runtime/routing/manager.ts";
 import {
   formatCapabilityTruthSummary,
   GORDON_PRODUCT_TRUTH,

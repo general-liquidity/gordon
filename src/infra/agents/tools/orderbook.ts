@@ -18,11 +18,11 @@ import { getGordonContext, isBinanceFamily, normalizeSymbol, type MastraExecutio
 import {
   resilientGetOrderBook,
   resilientGetSpread,
-} from "../../resilience/index.ts";
+} from "../../platform/resilience/index.ts";
 import type { OrderBookEntry, ExchangeExtended } from "../../exchange/types.ts";
 import { createCachedTool, TOOL_CACHE_CONFIG } from "./cache.ts";
 import { placeOCOOrders } from "../../../core/executor.ts";
-import { resolveInstrument } from "../../markets/instruments.ts";
+import { resolveInstrument } from "../../domain/markets/instruments.ts";
 
 // ============================================================================
 // Error Messages

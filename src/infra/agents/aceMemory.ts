@@ -1,12 +1,12 @@
 import { executeWithLogging, getDatabase } from "../storage/database.ts";
 import { listActionLogEntries } from "../action-log/store.ts";
-import type { Message } from "../llm/types.ts";
+import type { Message } from "../ai/llm/types.ts";
 import {
   curateMemoryBullets,
   formatMemoryBullets,
   reflectOnMessages,
   type CuratorResult,
-} from "../memory/summarizer.ts";
+} from "../domain/memory/summarizer.ts";
 
 interface ACEMemoryRow {
   threadId: string;

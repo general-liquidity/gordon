@@ -58,10 +58,10 @@ function buildPluginFingerprint(installedPlugins: Array<{ id: string; enabled: b
     .join("|");
 }
 
-function loadRoutingManager(): Promise<typeof import("../routing/manager.ts")> {
+function loadRoutingManager(): Promise<typeof import("../../runtime/routing/manager.ts")> {
   if (!_routingManagerPromise) {
     // Avoid a static import cycle with routing/manager when Bun compiles the binary.
-    _routingManagerPromise = import("../routing/manager.ts");
+    _routingManagerPromise = import("../../runtime/routing/manager.ts");
   }
 
   return _routingManagerPromise;

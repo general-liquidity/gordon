@@ -13,8 +13,8 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
 import * as crypto from "node:crypto";
-import { GORDON_DIR } from "../storage/paths.ts";
-import { VERSION } from "../../cli.ts";
+import { GORDON_DIR } from "../../storage/paths.ts";
+import { VERSION } from "../../../cli.ts";
 import type { TelemetryEvent, TelemetryEventName, TelemetryProperties } from "./events.ts";
 
 // ============================================================================

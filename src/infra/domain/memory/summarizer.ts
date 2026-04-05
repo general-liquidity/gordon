@@ -8,16 +8,16 @@
  * 3. Preserves key trading context: positions, decisions, analysis results
  */
 
-import type { Message, MessageRole } from "../llm/types.ts";
-import type { LLMClient } from "../llm/client.ts";
-import { createModuleLogger } from "../logger/index.ts";
-import { resolveLegacyModelRouteForWorkflowPhase } from "../agents/workflowPhase.ts";
+import type { Message, MessageRole } from "../../ai/llm/types.ts";
+import type { LLMClient } from "../../ai/llm/client.ts";
+import { createModuleLogger } from "../../logger/index.ts";
+import { resolveLegacyModelRouteForWorkflowPhase } from "../../agents/workflowPhase.ts";
 import {
   INTEGRATION_GLOSSARY_MARKER,
   PROJECT_TRUTH_MARKER,
   RUNTIME_STATE_MARKER,
   TOOL_CONTEXT_MARKER,
-} from "../agents/contextBudget.ts";
+} from "../../agents/contextBudget.ts";
 
 const logger = createModuleLogger("summarizer");
 

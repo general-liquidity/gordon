@@ -18,7 +18,7 @@ import {
   RegimeMetricsSchema,
   RegimeSpanSchema,
 } from "../../../core/regime/types.ts";
-import { resolveInstrument } from "../../markets/instruments.ts";
+import { resolveInstrument } from "../../domain/markets/instruments.ts";
 import { getGordonContext, normalizeSymbol, errors } from "./types.ts";
 import type { MastraExecutionContext } from "./types.ts";
 import { createModuleLogger } from "../../logger/index.ts";

@@ -11,7 +11,7 @@
 import { createModuleLogger } from "../../logger/index.ts";
 import { emitEvent } from "../../../events/index.ts";
 import { loadConfig } from "../../storage/config.ts";
-import { auditLog } from "../../audit/index.ts";
+import { auditLog } from "../../platform/audit/index.ts";
 import type { GordonConfig } from "../../../types/index.ts";
 
 const logger = createModuleLogger("access-control");

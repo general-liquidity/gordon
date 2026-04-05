@@ -1,4 +1,4 @@
-import { createModuleLogger } from "../logger/index.ts";
+import { createModuleLogger } from "../../logger/index.ts";
 import type {
   TinyfishRunRequest,
   TinyfishRunResponse,

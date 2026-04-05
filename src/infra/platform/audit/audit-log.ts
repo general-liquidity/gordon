@@ -8,8 +8,8 @@
  * Audit logs are stored in SQLite for persistence and queryability.
  */
 
-import { getDatabase, getDatabasePath } from "../storage/database.ts";
-import { createModuleLogger } from "../logger/index.ts";
+import { getDatabase, getDatabasePath } from "../../storage/database.ts";
+import { createModuleLogger } from "../../logger/index.ts";
 import { recordStructuredAuditEvent } from "../observability/index.ts";
 import { v4 as uuidv4 } from "uuid";
 

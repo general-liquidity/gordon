@@ -14,7 +14,7 @@
  * - UniswapClient instance for symbol → token address resolution
  */
 
-import { Cache } from "../cache/cache.ts";
+import { Cache } from "../../platform/cache/cache.ts";
 import { UniswapClient } from "./client.ts";
 import {
   V3_SUBGRAPH_IDS,

@@ -25,7 +25,7 @@ import {
 import { PlanSchema } from "../../../types/plan.ts";
 import { TradeSchema } from "../../../types/trade.ts";
 import { emitEvent } from "../../../events/index.ts";
-import { recordStructuredObservation } from "../../observability/index.ts";
+import { recordStructuredObservation } from "../../platform/observability/index.ts";
 import { loadConfigBundle, saveResolvedConfig } from "../../storage/config.ts";
 import { listPlans, getPlan, updatePlan, createPlan } from "../../storage/plans.ts";
 import { listTrades, getTrade } from "../../storage/trades.ts";

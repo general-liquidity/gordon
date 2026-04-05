@@ -47,4 +47,4 @@ export {
   CoinbaseInvalidProductError,
   CoinbaseConnectionError,
   createCoinbaseError,
-} from "../../errors/index.ts";
+} from "../../../../../errors/index.ts";

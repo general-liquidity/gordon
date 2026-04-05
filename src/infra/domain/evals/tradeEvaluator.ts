@@ -10,8 +10,8 @@
  */
 
 import { z } from "zod";
-import { getDatabase, withTransaction } from "../storage/database.ts";
-import { createModuleLogger } from "../logger/index.ts";
+import { getDatabase, withTransaction } from "../../storage/database.ts";
+import { createModuleLogger } from "../../logger/index.ts";
 
 const logger = createModuleLogger("trade-evaluator");
 
