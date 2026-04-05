@@ -1429,14 +1429,14 @@ const LEGACY_SLASH_COMMANDS: SlashCommandSeed[] = [
   {
     name: "synth",
     aliases: ["synthdata", "sd"],
-    description: "SynthData AI predictions — price forecasts, volatility, options, LP ranges",
-    usage: "/synth [predict|volatility|options|lp|liquidation|miners] <asset>",
+    description: "SynthData advanced — volatility, options, LP ranges, liquidation, miners (use /predict for price forecasts)",
+    usage: "/synth [volatility|options|lp|liquidation|miners] <asset>",
     category: "market",
     level: 2,
     action: "agent",
     target: "analyst",
     executionTime: "~2-5s",
-    whenToUse: "AI probabilistic predictions for BTC, ETH, SOL, XAU, SPYX, NVDAX, TSLAX, AAPLX, GOOGLX",
+    whenToUse: "SynthData features beyond price forecasting — for price forecasts use /predict",
   },
   {
     name: "predict",

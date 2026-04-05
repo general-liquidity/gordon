@@ -889,7 +889,7 @@ export function commandToPrompt(command: SlashCommand, args: string): string {
     }
     // SynthData commands
     case "synth": {
-      if (!args) return "Show me SynthData AI prediction capabilities. Supported assets: BTC, ETH, SOL, XAU, SPYX, NVDAX, TSLAX, AAPLX, GOOGLX";
+      if (!args) return "Show me SynthData advanced capabilities (volatility, options, LP, liquidation, miners). For price forecasts use /predict. Assets: BTC, ETH, SOL, XAU, SPYX, NVDAX, TSLAX, AAPLX, GOOGLX";
       const synthParts = args.split(/\s+/);
       const synthSub = synthParts[0]?.toLowerCase();
       const synthAsset = synthParts[1]?.toUpperCase();
@@ -897,9 +897,7 @@ export function commandToPrompt(command: SlashCommand, args: string): string {
         case "predict":
         case "prediction":
         case "forecast":
-          return synthAsset
-            ? `Get the AI price prediction percentiles for ${synthAsset} from SynthData. Show the probability cone with 5th to 95th percentile bands.`
-            : "Which asset to predict? Supported: BTC, ETH, SOL, XAU, SPYX, NVDAX, TSLAX, AAPLX, GOOGLX";
+          return `Use /predict ${synthAsset ?? "<asset>"} for price forecasts (the dedicated command with optional [days] horizon).`;
         case "volatility":
         case "vol":
           return synthAsset
@@ -926,8 +924,7 @@ export function commandToPrompt(command: SlashCommand, args: string): string {
             ? `Show the top AI prediction miners for ${synthAsset} from SynthData.`
             : "Show the top AI prediction miners from SynthData.";
         default:
-          // Treat first arg as asset for default predict action
-          return `Get the AI price prediction percentiles for ${(synthSub ?? "BTC").toUpperCase()} from SynthData. Show the probability cone.`;
+          return `Unknown /synth subcommand. Available: volatility, options, lp, liquidation, miners. For price forecasts use /predict ${(synthSub ?? "<asset>").toUpperCase()}.`;
       }
     }
     case "predict": {
