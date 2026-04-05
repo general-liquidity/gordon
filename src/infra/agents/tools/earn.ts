@@ -264,7 +264,7 @@ export const subscribeFlexibleTool = createTool({
   description:
     "Subscribe to a flexible earn product to start earning. " +
     "Use when user says 'start earning on USDT', 'put my BTC in earn', 'subscribe to flexible'. " +
-    "Requires ARMED mode.",
+    "Requires permissionMode not 'strict'.",
   inputSchema: z.object({
     productId: z.string().describe("Product ID from get_flexible_earn_products"),
     amount: z.number().positive().describe("Amount to subscribe"),
@@ -287,9 +287,9 @@ export const subscribeFlexibleTool = createTool({
       return errors.binanceOnly;
     }
 
-    if (ctx.config?.mode !== "ARMED") {
+    if (ctx.config?.permissionMode === "strict") {
       return {
-        error: "System must be ARMED to subscribe to earn products. Use /arm first.",
+        error: "permissionMode must not be 'strict' to subscribe to earn products. Use /auto or /ask.",
         productId,
         amount,
       };
@@ -314,7 +314,7 @@ export const redeemFlexibleTool = createTool({
   description:
     "Redeem from a flexible earn product back to wallet. " +
     "Use when user says 'redeem my USDT', 'stop earning', 'withdraw from flexible'. " +
-    "Requires ARMED mode.",
+    "Requires permissionMode not 'strict'.",
   inputSchema: z.object({
     productId: z.string().describe("Product ID from get_all_earn_positions"),
     amount: z.number().default(0).describe("Amount to redeem. Use 0 with redeemAll=true to redeem all."),
@@ -337,9 +337,9 @@ export const redeemFlexibleTool = createTool({
       return errors.binanceOnly;
     }
 
-    if (ctx.config?.mode !== "ARMED") {
+    if (ctx.config?.permissionMode === "strict") {
       return {
-        error: "System must be ARMED to redeem from earn. Use /arm first.",
+        error: "permissionMode must not be 'strict' to redeem from earn. Use /auto or /ask.",
         productId,
       };
     }
@@ -365,7 +365,7 @@ export const subscribeLockedTool = createTool({
   description:
     "Subscribe to a locked earn product for higher APY. " +
     "Use when user says 'lock my BNB', 'stake for 90 days', 'subscribe to locked'. " +
-    "Requires ARMED mode. Funds are locked for the duration.",
+    "Requires permissionMode not 'strict'. Funds are locked for the duration.",
   inputSchema: z.object({
     projectId: z.string().describe("Project ID from get_locked_earn_products"),
     amount: z.number().positive().describe("Amount to lock"),
@@ -389,9 +389,9 @@ export const subscribeLockedTool = createTool({
       return errors.binanceOnly;
     }
 
-    if (ctx.config?.mode !== "ARMED") {
+    if (ctx.config?.permissionMode === "strict") {
       return {
-        error: "System must be ARMED to subscribe to locked products. Use /arm first.",
+        error: "permissionMode must not be 'strict' to subscribe to locked products. Use /auto or /ask.",
         projectId,
         amount,
       };

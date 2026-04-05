@@ -490,22 +490,20 @@ export function handleUIMenuCommand(
       setState((prev: any) => ({ ...prev, showPalette: true }));
       return true;
     }
-    case "arm":
     case "auto": {
       setState((prev: any) => ({ ...prev, permissionMode: "auto" }));
-      addMessage(setState, "system", "Permission mode: auto \u2014 actions execute without approval. Use /ask to return to ask mode.");
+      addMessage(setState, "system", "Permission mode: auto \u2014 trades execute without per-action approval. Use /ask to return to default.");
       return true;
     }
-    case "disarm":
-    case "safe":
     case "ask": {
       setState((prev: any) => ({ ...prev, permissionMode: "ask" }));
-      addMessage(setState, "system", "Permission mode: ask \u2014 actions require per-action approval.");
+      addMessage(setState, "system", "Permission mode: ask \u2014 each trade requires approval via dialog (default).");
       return true;
     }
-    case "strict": {
+    case "strict":
+    case "readonly": {
       setState((prev: any) => ({ ...prev, permissionMode: "strict" }));
-      addMessage(setState, "system", "Permission mode: strict \u2014 every action requires approval, no 'always allow'.");
+      addMessage(setState, "system", "Permission mode: strict \u2014 read-only, all trades blocked.");
       return true;
     }
     case "setup":

@@ -74,10 +74,8 @@ export function commandToPrompt(command: SlashCommand, args: string): string {
     case "orders":
       if (STOCK_MARKET_PATTERN.test(args || "")) return "Show my open stock broker orders";
       return "Show my open orders";
-    case "arm":
     case "auto":
       return "Set permissionMode to 'auto' — trades execute without per-action approval";
-    case "disarm":
     case "ask":
       return "Set permissionMode to 'ask' — each trade requires user approval via ApprovalDialog";
     case "strict":

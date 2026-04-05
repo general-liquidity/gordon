@@ -193,14 +193,7 @@ const STATIC_TOOL_OVERRIDES: Record<string, Partial<RuntimeToolSpec>> = {
     workerRole: "Executor",
     requiresArmedMode: true,
   },
-  arm_system: {
-    category: "system",
-    permissionScope: "system.mode.write",
-    riskClass: "medium",
-    sideEffectLevel: "write",
-    workerRole: "Gordon",
-  },
-  disarm_system: {
+  set_permission_mode: {
     category: "system",
     permissionScope: "system.mode.write",
     riskClass: "medium",

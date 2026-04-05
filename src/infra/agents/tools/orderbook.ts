@@ -31,7 +31,7 @@ import { resolveInstrument } from "../../domain/markets/instruments.ts";
 const errors = {
   noExchange: { error: "No active trading venue is connected. Please run setup first." },
   notArmed: (action: string) => ({
-    error: `System must be ARMED to ${action}. Use /arm first.`,
+    error: `permissionMode must not be 'strict' to ${action}. Use /auto or /ask.`,
   }),
 };
 
@@ -390,7 +390,7 @@ export const placeOCOOrderTool = createTool({
     "On Binance this uses the native atomic OCO endpoint; on other exchanges it places " +
     "two separate orders (stop-loss + take-profit) that the monitor will coordinate. " +
     "Use for 'set stop loss and take profit', 'OCO order', 'bracket order'. " +
-    "Requires ARMED mode.",
+    "Requires permissionMode not 'strict'.",
   inputSchema: z.object({
     symbol: z.string().describe("Trading pair (e.g., 'BTCUSDT')"),
     side: z.enum(["BUY", "SELL"]).describe("Order side"),
@@ -418,9 +418,9 @@ export const placeOCOOrderTool = createTool({
       return errors.noExchange;
     }
 
-    if (ctx.config?.mode !== "ARMED") {
+    if (ctx.config?.permissionMode === "strict") {
       return {
-        error: "System must be ARMED to place OCO orders. Use /arm first.",
+        error: "permissionMode must not be 'strict' to place OCO orders. Use /auto or /ask.",
         symbol,
         side,
         quantity,
@@ -501,7 +501,7 @@ export const cancelAllOrdersTool = createTool({
   description:
     "Cancel all open orders on a symbol. Emergency function. " +
     "Use when user says 'cancel all orders', 'cancel everything on BTC', 'emergency cancel'. " +
-    "Requires ARMED mode.",
+    "Requires permissionMode not 'strict'.",
   inputSchema: z.object({
     symbol: z.string().describe("Trading pair (e.g., 'BTCUSDT')"),
   }),
@@ -524,9 +524,9 @@ export const cancelAllOrdersTool = createTool({
       return errors.noExchange;
     }
 
-    if (ctx.config?.mode !== "ARMED") {
+    if (ctx.config?.permissionMode === "strict") {
       return {
-        error: "System must be ARMED to cancel orders. Use /arm first.",
+        error: "permissionMode must not be 'strict' to cancel orders. Use /auto or /ask.",
         symbol,
       };
     }
@@ -702,7 +702,7 @@ export const placeLimitOrderTool = createTool({
   description:
     "Place a limit order at a specific price. The order will sit on the book until filled or cancelled. " +
     "Use when user says 'buy BTC at 95000', 'set a buy order at X price', 'limit buy', 'limit sell'. " +
-    "Requires ARMED mode.",
+    "Requires permissionMode not 'strict'.",
   inputSchema: z.object({
     symbol: z.string().describe("Trading pair (e.g., 'BTCUSDT')"),
     side: z.enum(["BUY", "SELL"]).describe("BUY or SELL"),
@@ -731,7 +731,7 @@ export const placeLimitOrderTool = createTool({
       return errors.noExchange;
     }
 
-    if (ctx.config?.mode !== "ARMED") {
+    if (ctx.config?.permissionMode === "strict") {
       return errors.notArmed("place limit orders");
     }
 
@@ -911,7 +911,7 @@ export const cancelOrderTool = createTool({
   description:
     "Cancel a single open order by its order ID. " +
     "Use when user says 'cancel my BTC order', 'cancel order #12345', 'remove that limit order'. " +
-    "Requires ARMED mode. For cancelling ALL orders on a symbol, use cancel_all_orders instead.",
+    "Requires permissionMode not 'strict'. For cancelling ALL orders on a symbol, use cancel_all_orders instead.",
   inputSchema: z.object({
     symbol: z.string().describe("Trading pair (e.g., 'BTCUSDT')"),
     orderId: z.number().describe("Order ID to cancel"),
@@ -929,7 +929,7 @@ export const cancelOrderTool = createTool({
       return errors.noExchange;
     }
 
-    if (ctx.config?.mode !== "ARMED") {
+    if (ctx.config?.permissionMode === "strict") {
       return errors.notArmed("cancel orders");
     }
 
@@ -1023,7 +1023,7 @@ export const cancelReplaceOrderTool = createTool({
   description:
     "Atomically cancel an existing order and replace it with a new one. " +
     "Use when user says 'replace my order', 'modify order #123', 'change order price', 'update my limit order'. " +
-    "Requires ARMED mode. Binance only.",
+    "Requires permissionMode not 'strict'. Binance only.",
   inputSchema: z.object({
     symbol: z.string().describe("Trading pair (e.g., 'BTCUSDT')"),
     cancelOrderId: z.number().describe("Order ID of the existing order to cancel"),
@@ -1055,7 +1055,7 @@ export const cancelReplaceOrderTool = createTool({
       return errors.noExchange;
     }
 
-    if (ctx.config?.mode !== "ARMED") {
+    if (ctx.config?.permissionMode === "strict") {
       return errors.notArmed("cancel and replace orders");
     }
 
@@ -1132,7 +1132,7 @@ export const cancelOrderListTool = createTool({
   description:
     "Cancel an OCO or OTO order list by its orderListId. " +
     "Use when user says 'cancel my OCO order', 'cancel order list #123'. " +
-    "Requires ARMED mode.",
+    "Requires permissionMode not 'strict'.",
   inputSchema: z.object({
     symbol: z.string().describe("Trading pair (e.g., 'BTCUSDT')"),
     orderListId: z.number().describe("The orderListId of the OCO/OTO order list to cancel"),
@@ -1154,7 +1154,7 @@ export const cancelOrderListTool = createTool({
       return errors.noExchange;
     }
 
-    if (ctx.config?.mode !== "ARMED") {
+    if (ctx.config?.permissionMode === "strict") {
       return errors.notArmed("cancel order lists");
     }
 

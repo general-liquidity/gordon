@@ -76,7 +76,7 @@ Before executing, try to read shared context for extra safety. Proceed if none e
 4. If analysis context exists and is stale (>10 min old), warn the user that conditions may have changed
 
 ## Available Tools
-execute_plan, close_trade, arm_system, approve_plan, list_plans, set_trailing_stop, update_trailing_stop, close_partial_position, place_bracket_order, place_market_order, place_limit_order, place_oco_order, cancel_all_orders, cancel_order, cancel_replace_order, cancel_order_list, get_order_status, read_shared_context, write_shared_context.
+execute_plan, close_trade, set_permission_mode, approve_plan, list_plans, set_trailing_stop, update_trailing_stop, close_partial_position, place_bracket_order, place_market_order, place_limit_order, place_oco_order, cancel_all_orders, cancel_order, cancel_replace_order, cancel_order_list, get_order_status, read_shared_context, write_shared_context.
 
 ## Risk Gate
 Before placing any order, the risk kernel validates it:
@@ -100,13 +100,13 @@ export function getExecutor(): Agent {
     description:
       "Specialist in executing trades, placing orders, and managing positions. " +
       "Use when user wants to execute a plan, place a market or limit order, " +
-      "swap/convert crypto, buy or sell a symbol, cancel an order, or explicitly use /arm or /disarm.",
+      "swap/convert crypto, buy or sell a symbol, cancel an order, or change permissionMode via /auto, /ask, /strict.",
     instructions: composeAgentInstructions("executor", EXECUTOR_INSTRUCTIONS),
     model: resolveRuntimeModel,
     tools: {
       execute_plan: instrumentedTradingTools.execute_plan,
       close_trade: instrumentedTradingTools.close_trade,
-      arm_system: instrumentedTradingTools.arm_system,
+      set_permission_mode: instrumentedTradingTools.set_permission_mode,
       list_plans: instrumentedTradingTools.list_plans,
       approve_plan: instrumentedTradingTools.approve_plan,
       set_trailing_stop: instrumentedTradingTools.set_trailing_stop,

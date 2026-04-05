@@ -159,7 +159,7 @@ export const TOOL_AGENT_MAP: Record<string, string> = {
   // tradingTools cherry-picks
   execute_plan: "Executor",
   close_trade: "Executor",
-  arm_system: "Executor",
+  set_permission_mode: "Executor",
   approve_plan: "Executor",
   set_trailing_stop: "Executor",
   update_trailing_stop: "Executor",

@@ -101,10 +101,10 @@ const approvePlanOutputSchema = z.object({
   error: z.string().optional(),
 });
 
-const armSystemOutputSchema = z.object({
+const setPermissionModeOutputSchema = z.object({
   success: z.boolean(),
-  mode: z.enum(["ARMED", "SAFE"]).optional(),
-  armedUntil: z.string().optional().nullable(),
+  permissionMode: z.enum(["auto", "ask", "strict"]).optional(),
+  previousMode: z.enum(["auto", "ask", "strict"]).optional(),
   message: z.string(),
   error: z.string().optional(),
 });
@@ -635,73 +635,49 @@ export const approvePlanTool = createTool({
 // Note: needsApproval removed - handle via guardrails in Mastra
 // ============================================================================
 
-export const armSystemTool = createTool({
-  id: "arm_system",
+export const setPermissionModeTool = createTool({
+  id: "set_permission_mode",
   description:
-    "Arm or disarm the trading system. When armed, Gordon can execute trades. " +
-    "Prefer the explicit slash commands /arm and /disarm in the terminal UI. " +
-    "Use this tool only when the user has clearly requested a mode change.",
+    "Set Gordon's permission mode. Prefer the explicit slash commands " +
+    "/auto, /ask, /strict in the terminal UI. Use this tool only when the " +
+    "user has clearly requested a mode change.\n" +
+    "- auto:   trades execute without per-action approval\n" +
+    "- ask:    each trade requires ApprovalDialog confirmation (default)\n" +
+    "- strict: read-only, all trades blocked",
   inputSchema: z.object({
-    action: z.enum(["arm", "disarm"]).describe("Whether to arm or disarm"),
-    hours: z
-      .number()
-      .min(1)
-      .max(24)
-      .default(24)
-      .describe("Hours to stay armed (max: 24)"),
+    mode: z.enum(["auto", "ask", "strict"]).describe("Permission mode to set"),
   }),
-  outputSchema: armSystemOutputSchema,
-  execute: async ({ action, hours }) => {
+  outputSchema: setPermissionModeOutputSchema,
+  execute: async ({ mode }) => {
     const resolved = await loadConfigBundle();
     const config = resolved.config;
+    const previous = config.permissionMode;
 
-    if (action === "arm") {
-      const armHours = Math.min(hours ?? 24, 24);
-      const armedUntil = new Date(Date.now() + armHours * 60 * 60 * 1000).toISOString();
+    await saveResolvedConfig({ ...config, permissionMode: mode }, resolved.layers);
+    recordStructuredObservation({
+      eventType: "system.permission_mode_changed",
+      workflow: "execution",
+      source: "agent_tool",
+      component: "set_permission_mode",
+      toolName: "set_permission_mode",
+      outcome: "success",
+      status: mode,
+      mode,
+      details: { previous },
+    });
 
-      await saveResolvedConfig({ ...config, mode: "ARMED", armedUntil }, resolved.layers);
-      recordStructuredObservation({
-        eventType: "system.armed",
-        workflow: "execution",
-        source: "agent_tool",
-        component: "arm_system",
-        toolName: "arm_system",
-        outcome: "success",
-        status: "armed",
-        mode: "ARMED",
-        durationMs: armHours * 60 * 60 * 1000,
-        details: {
-          armHours,
-          armedUntil,
-        },
-      });
+    const descriptions: Record<"auto" | "ask" | "strict", string> = {
+      auto: "Trades now execute without per-action approval.",
+      ask: "Each trade now requires approval via dialog (default).",
+      strict: "Read-only mode. All trades blocked.",
+    };
 
-      return validateToolOutput(armSystemOutputSchema, {
-        success: true,
-        mode: "ARMED" as const,
-        armedUntil,
-        message: `System armed for ${armHours} hours. Trading enabled.`,
-      }, { toolName: "arm_system" });
-    } else {
-      await saveResolvedConfig({ ...config, mode: "SAFE", armedUntil: null }, resolved.layers);
-      recordStructuredObservation({
-        eventType: "system.disarmed",
-        workflow: "execution",
-        source: "agent_tool",
-        component: "arm_system",
-        toolName: "arm_system",
-        outcome: "success",
-        status: "disarmed",
-        mode: "SAFE",
-      });
-
-      return validateToolOutput(armSystemOutputSchema, {
-        success: true,
-        mode: "SAFE" as const,
-        armedUntil: null,
-        message: "System disarmed. Trading disabled.",
-      }, { toolName: "arm_system" });
-    }
+    return validateToolOutput(setPermissionModeOutputSchema, {
+      success: true,
+      permissionMode: mode,
+      previousMode: previous,
+      message: `Permission mode set to '${mode}'. ${descriptions[mode]}`,
+    }, { toolName: "set_permission_mode" });
   },
 });
 
@@ -1168,7 +1144,7 @@ export const tradingTools = {
   close_trade: closeTradeTool,
   list_plans: listPlansTool,
   approve_plan: approvePlanTool,
-  arm_system: armSystemTool,
+  set_permission_mode: setPermissionModeTool,
   create_grid_plan: createGridPlanTool,
   set_trailing_stop: setTrailingStopTool,
   update_trailing_stop: updateTrailingStopTool,

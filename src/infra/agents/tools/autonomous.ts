@@ -30,7 +30,7 @@ import { loadConfig } from "../../storage/config.ts";
 const errors = {
   noExchange: { error: "Exchange client not connected. Please run setup first." },
   notArmed: (action: string) => ({
-    error: `System must be ARMED to ${action}. Use /arm first.`,
+    error: `permissionMode must not be 'strict' to ${action}. Use /auto or /ask to enable trading.`,
   }),
 };
 

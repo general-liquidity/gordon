@@ -437,7 +437,7 @@ export const placeBracketOrderTool = createTool({
   description:
     "Place a bracket order: market entry with automatic stop-loss and take-profit. " +
     "Use when user says 'buy BTC with stop loss and take profit', 'bracket order', 'entry with SL and TP'. " +
-    "Requires ARMED mode. Places market order then OCO for exits.",
+    "Requires permissionMode not 'strict'. Places market order then OCO for exits.",
   inputSchema: z.object({
     symbol: z.string().describe("Trading pair (e.g., 'BTCUSDT')"),
     side: z.enum(["BUY", "SELL"]).describe("Entry side"),
@@ -483,9 +483,9 @@ export const placeBracketOrderTool = createTool({
       return errors.noExchange;
     }
 
-    if (ctx.config?.mode !== "ARMED") {
+    if (ctx.config?.permissionMode === "strict") {
       return {
-        error: "System must be ARMED to place bracket orders. Use /arm first.",
+        error: "permissionMode must not be 'strict' to place bracket orders. Use /auto or /ask.",
         symbol,
         side,
         quantity,
@@ -619,7 +619,7 @@ export const placeMarketOrderTool = createTool({
     "Place a simple spot market order (buy or sell) without stop-loss or take-profit. " +
     "Use when user says 'buy USDT with my USDC', 'swap USDC to USDT', 'sell 100 BTC', " +
     "'buy $50 worth of ETH', or any simple spot conversion/purchase. " +
-    "Requires ARMED mode. Supports spending a quote amount (e.g., 'spend 54 USDC') " +
+    "Requires permissionMode not 'strict'. Supports spending a quote amount (e.g., 'spend 54 USDC') " +
     "or selling a base quantity (e.g., 'sell 0.01 BTC').",
   inputSchema: z.object({
     symbol: z.string().describe("Trading pair (e.g., 'BTCUSDT', 'USDCUSDT')"),
@@ -756,7 +756,7 @@ export const previewMarketOrderTool = createTool({
   id: "preview_market_order",
   description:
     "Preview a spot market order without placing it. " +
-    "Use before live execution to inspect readiness, live price estimates, account blockers, and ARMED-mode requirements.",
+    "Use before live execution to inspect readiness, live price estimates, account blockers, and permissionMode requirements.",
   inputSchema: z.object({
     symbol: z.string().describe("Trading pair (e.g., 'BTCUSDT', 'ETHUSDT')"),
     side: z.enum(["BUY", "SELL"]).describe("BUY or SELL"),
