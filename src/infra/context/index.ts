@@ -47,3 +47,17 @@ export {
   TokenCounter,
 } from "./runContext.ts";
 export type { RunContext } from "./runContext.ts";
+
+export {
+  projectUsage,
+  classifyUsage,
+  growthRate,
+  TokenProjector,
+  DEFAULT_PROJECTION_CONFIG,
+} from "./tokenProjection.ts";
+export type {
+  ProjectionConfig,
+  ProjectionResult,
+  TokenSample,
+  ThresholdStage,
+} from "./tokenProjection.ts";

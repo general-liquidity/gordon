@@ -1,0 +1,159 @@
+/**
+ * Hooks Engine Types
+ *
+ * Gordon's extensibility layer — users define hooks in settings to inject
+ * custom validators / logging / side-effects at key lifecycle points.
+ * Inspired by Claude Code's hook system but trading-specific.
+ *
+ * Each hook point has its own payload shape + return semantics.
+ */
+
+export type HookPoint =
+  /** Before a tool executes — can block or modify args. */
+  | "PreToolUse"
+  /** After a tool executes — can modify/transform results. */
+  | "PostToolUse"
+  /** Before context compaction runs — can veto or defer. */
+  | "PreCompact"
+  /** After context compaction — for restoring state/caches. */
+  | "PostCompact"
+  /** When a new session/conversation starts. */
+  | "SessionStart"
+  /** When the agent stops (graceful exit, error, user interrupt). */
+  | "Stop"
+  /** Before an approval prompt is shown to the user. */
+  | "PreApproval"
+  /** After user approval decision is made. */
+  | "PostApproval"
+  /** Before a trade order is placed (trading-specific). */
+  | "PreOrderPlacement"
+  /** After a trade order is placed (trading-specific). */
+  | "PostOrderPlacement";
+
+export type HookAction =
+  /** Let execution continue unchanged. */
+  | "allow"
+  /** Block execution. Payload carries the reason. */
+  | "block"
+  /** Modify the execution's args/result. Payload carries the mutation. */
+  | "modify";
+
+export interface HookResult {
+  action: HookAction;
+  /** Reason shown to user/logs when blocking. */
+  reason?: string;
+  /** New args/result when action is "modify". */
+  replacement?: unknown;
+  /** Custom metadata the hook wants to attach. */
+  metadata?: Record<string, unknown>;
+}
+
+// ============================================================================
+// Per-point payload shapes
+// ============================================================================
+
+export interface PreToolUsePayload {
+  toolName: string;
+  toolCallId: string;
+  args: unknown;
+  agentName?: string;
+}
+
+export interface PostToolUsePayload {
+  toolName: string;
+  toolCallId: string;
+  args: unknown;
+  result: unknown;
+  durationMs: number;
+  agentName?: string;
+  success: boolean;
+}
+
+export interface PreCompactPayload {
+  estimatedTokens: number;
+  threshold: number;
+  messageCount: number;
+}
+
+export interface PostCompactPayload {
+  beforeTokens: number;
+  afterTokens: number;
+  clearedCount: number;
+}
+
+export interface SessionStartPayload {
+  sessionId: string;
+  userId?: string;
+  threadId?: string;
+  configSnapshot: Record<string, unknown>;
+}
+
+export interface StopPayload {
+  reason: "user_interrupt" | "error" | "graceful" | "timeout";
+  sessionId: string;
+  error?: string;
+}
+
+export interface PreApprovalPayload {
+  action: string;
+  riskTier: "standard" | "high" | "critical";
+  rationale: string;
+  args: unknown;
+}
+
+export interface PostApprovalPayload {
+  action: string;
+  decision: "once" | "always" | "deny";
+  args: unknown;
+}
+
+export interface PreOrderPlacementPayload {
+  symbol: string;
+  side: "buy" | "sell";
+  quantity: number;
+  orderType: string;
+  notionalUsd: number;
+  brokerId?: string;
+  exchangeId?: string;
+}
+
+export interface PostOrderPlacementPayload {
+  orderId: string;
+  symbol: string;
+  side: "buy" | "sell";
+  status: string;
+  filledQty: number;
+  notionalUsd: number;
+}
+
+export type HookPayloadMap = {
+  PreToolUse: PreToolUsePayload;
+  PostToolUse: PostToolUsePayload;
+  PreCompact: PreCompactPayload;
+  PostCompact: PostCompactPayload;
+  SessionStart: SessionStartPayload;
+  Stop: StopPayload;
+  PreApproval: PreApprovalPayload;
+  PostApproval: PostApprovalPayload;
+  PreOrderPlacement: PreOrderPlacementPayload;
+  PostOrderPlacement: PostOrderPlacementPayload;
+};
+
+export type HookHandler<P extends HookPoint> = (
+  payload: HookPayloadMap[P],
+) => Promise<HookResult> | HookResult;
+
+export interface HookDefinition<P extends HookPoint = HookPoint> {
+  /** Unique hook name for logging / removal. */
+  id: string;
+  /** Hook point to attach to. */
+  point: P;
+  /** Handler function. */
+  handler: HookHandler<P>;
+  /** Execution priority (lower = runs first). Default 100. */
+  priority?: number;
+  /** Only fire for tools matching this glob (PreToolUse/PostToolUse only). */
+  toolFilter?: string | RegExp;
+  /** Source of the hook (for audit/debugging). */
+  source?: "builtin" | "user" | "project" | "plugin";
+}
