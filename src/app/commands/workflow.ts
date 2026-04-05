@@ -15,9 +15,14 @@ import { formatBacktestSummary } from "../../backtest/reporting/formatter.ts";
 import type { BacktestResult, BacktestConfig } from "../../backtest/types.ts";
 import { createStreamingWorkflow, type StreamingWorkflowResult } from "../../infra/agents/index.ts";
 import { normalizeCryptoSymbol } from "../../infra/domain/markets/instruments.ts";
-import { TinyfishClient, summarizeTinyfishResult } from "../../infra/external/tinyfish/client.ts";
-import { buildTinyfishRequest, runTinyfishResearch, scheduleTinyfishMonitor } from "../../infra/external/tinyfish/service.ts";
-import type { TinyfishSSEEvent, TinyfishRunResponse } from "../../infra/external/tinyfish/types.ts";
+// Tinyfish monitoring removed — stubs for backward compat
+class TinyfishClient { isConfigured() { return false; } }
+function summarizeTinyfishResult(_r: any): string { return "Tinyfish removed"; }
+function buildTinyfishRequest(opts: any): any { return opts; }
+async function runTinyfishResearch(..._args: any[]): Promise<any> { return { summary: "Tinyfish removed" }; }
+function scheduleTinyfishMonitor(_opts: any): any { return { id: "removed" }; }
+type TinyfishSSEEvent = { event: string; data?: unknown };
+type TinyfishRunResponse = { summary?: string; result?: any; raw?: any };
 
 // ============================================================================
 // Types

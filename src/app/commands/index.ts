@@ -82,7 +82,6 @@ export {
   handleWorkflowCommand,
   getAvailableWorkflows,
   formatWorkflowResult,
-  createTinyfishDueDiligenceStream,
   type WorkflowContext,
   type WorkflowResult,
   type WorkflowStep,

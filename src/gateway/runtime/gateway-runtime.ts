@@ -45,7 +45,7 @@ import { getTrade } from "../../infra/storage/trades.ts";
 import { executeEmergencyLiquidation } from "../../core/safety/emergency-liquidation.ts";
 import { cleanupStalePositions } from "../../core/positions/cleanup.ts";
 import { getAutonomousLoopStatus, runAutonomousCycleOnce } from "../../core/autonomous-loop.ts";
-import { executeTinyfishMonitorRun } from "../../infra/external/tinyfish/service.ts";
+// Tinyfish monitoring removed
 import { appendActionLogEntry } from "../../infra/action-log/index.ts";
 import type { ActionLogEntryType } from "../../infra/action-log/index.ts";
 import { recordStructuredObservation } from "../../infra/platform/observability/index.ts";
@@ -663,14 +663,7 @@ export class GatewayRuntime {
       }
     });
 
-    this.registerHandler("tinyfish.monitor.run", async (envelope) => {
-      const payload = envelope.command.payload as { monitorId: string };
-      return executeTinyfishMonitorRun({
-        monitorId: payload.monitorId,
-        correlationId: envelope.meta.correlationId,
-        actor: "daemon",
-      });
-    });
+    // Tinyfish monitoring removed
 
   }
 
