@@ -8,6 +8,23 @@
 export { CoinGeckoClient, getCoinGeckoClient } from "./coingecko.ts";
 export { NewsClient, getNewsClient } from "./news.ts";
 export { SECFilingsClient, getSECFilingsClient } from "./sec-filings.ts";
+export { SECInsiderClient, getSECInsiderClient } from "./sec-insider.ts";
+export type { InsiderTransaction, InsiderSummary, InsiderTransactionType } from "./sec-insider.ts";
+export { SECSegmentsClient, getSECSegmentsClient } from "./sec-segments.ts";
+export type { SegmentBreakdown, SegmentEntry } from "./sec-segments.ts";
+export {
+  screenStocks,
+  PRESETS,
+  PRESET_QUALITY_GROWTH,
+  PRESET_DIVIDEND,
+  PRESET_DEEP_VALUE,
+  PRESET_MOMENTUM,
+  SP500_TOP,
+  NASDAQ_100_SAMPLE,
+} from "./stockScreener.ts";
+export type { ScreenCriteria, ScreenResult, ScreenOptions } from "./stockScreener.ts";
+export { XSearchClient, getXSearchClient } from "./xSearch.ts";
+export type { XTweet, XSearchOptions, XSearchSummary } from "./xSearch.ts";
 export { FundamentalsClient, getFundamentalsClient } from "./fundamentals.ts";
 export { AlphaVantageClient, getAlphaVantageClient } from "./alphaVantage.ts";
 export { enrichQuoteWithLLM } from "./llmEnrichment.ts";
@@ -17,7 +34,7 @@ export { MultiSourceQuoteService } from "./multiSourceQuote.ts";
 export interface DataSourceInfo {
   id: string;
   name: string;
-  type: "price" | "news" | "filings" | "yield" | "enrichment";
+  type: "price" | "news" | "filings" | "yield" | "enrichment" | "insider" | "segments" | "screener" | "social";
   requiresApiKey: boolean;
   rateLimit: string;
   endpoint: string;
@@ -31,6 +48,10 @@ export const DATA_SOURCE_REGISTRY: DataSourceInfo[] = [
   { id: "defillama", name: "DeFiLlama", type: "yield", requiresApiKey: false, rateLimit: "unlimited", endpoint: "yields.llama.fi" },
   { id: "llm-enrichment", name: "LLM Enrichment", type: "enrichment", requiresApiKey: true, rateLimit: "per-provider", endpoint: "via LLM client" },
   { id: "alpha-vantage", name: "Alpha Vantage", type: "price", requiresApiKey: true, rateLimit: "25/day (free) or 75/min (paid)", endpoint: "www.alphavantage.co" },
+  { id: "sec-insider", name: "SEC Form 4 Insider Trades", type: "insider", requiresApiKey: false, rateLimit: "10/sec", endpoint: "data.sec.gov" },
+  { id: "sec-segments", name: "SEC XBRL Revenue Segments", type: "segments", requiresApiKey: false, rateLimit: "10/sec", endpoint: "data.sec.gov" },
+  { id: "stock-screener", name: "Fundamental Stock Screener", type: "screener", requiresApiKey: false, rateLimit: "via Yahoo Finance", endpoint: "query2.finance.yahoo.com" },
+  { id: "x-search", name: "X (Twitter) Search", type: "social", requiresApiKey: true, rateLimit: "per X API tier", endpoint: "api.twitter.com" },
 ];
 
 export function getDataSource(id: string): DataSourceInfo | undefined {
