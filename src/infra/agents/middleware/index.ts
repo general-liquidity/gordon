@@ -15,14 +15,10 @@ export {
 
 export {
   checkToolAccess,
-  checkExplicitExecutionAccess,
   createAccessControlMiddleware,
   withAccessControl,
-  requiresArmedMode,
-  requiresArmedModeForTool,
+  isTradeTool,
   isStateModifyingTool,
   getTradingTools,
-  formatRemainingTime,
-  getArmedStatus,
   type AccessControlResult,
 } from "./access-control.ts";

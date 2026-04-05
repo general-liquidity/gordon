@@ -79,8 +79,8 @@ export class HandoffCoordinator {
       };
     }
 
-    if (toAgent === "Executor" && context?.mode !== "ARMED") {
-      warnings.push("Handoff to Executor while system is not ARMED");
+    if (toAgent === "Executor" && context?.permissionMode === "strict") {
+      warnings.push("Handoff to Executor while permissionMode is 'strict' (read-only)");
     }
 
     const budgetValidation = validateHandoffBudget({

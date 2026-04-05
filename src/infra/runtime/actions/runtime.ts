@@ -2,7 +2,7 @@ import type { MCPCategory } from "../../ai/mcp/types.ts";
 import { pluginInstaller } from "../../ai/mcp/marketplace/installer.ts";
 import type { GordonContext } from "../../agents/types.ts";
 import { resolveInstrument } from "../../domain/markets/instruments.ts";
-import { checkExplicitExecutionAccess, requiresArmedModeForTool } from "../../agents/middleware/access-control.ts";
+import { checkToolAccess, isTradeTool } from "../../agents/middleware/access-control.ts";
 import { getCredentialSummaryForKinds } from "./credentials.ts";
 import { getActionById, getActionByToolName } from "./registry.ts";
 import type {
@@ -16,7 +16,7 @@ import type {
 export interface ToolRequestPolicyDecision {
   allowed: boolean;
   reason?: string;
-  requiresArmedMode: boolean;
+  requiresTradePermission: boolean;
   actionId?: string;
   providerCategory?: string;
 }
@@ -42,8 +42,9 @@ const REQUEST_ACTION_SUPPORT: Record<string, string[]> = {
   "account.portfolio": ["account.portfolio"],
   "wallet.fund": ["wallet.fund", "account.portfolio"],
   "payments.intent": ["payments.intent"],
-  "system.arm": ["system.arm"],
-  "system.disarm": ["system.disarm"],
+  "system.set_auto": ["system.set_auto"],
+  "system.set_ask": ["system.set_ask"],
+  "system.set_strict": ["system.set_strict"],
 };
 
 const REQUEST_SCOPE_MATRIX: Record<ActionTaskScope, ActionTaskScope[]> = {
@@ -207,10 +208,10 @@ async function buildMarketOrderPlan(
     blockers.push("permissionMode is 'strict' (read-only).");
   } else {
     steps.push({
-      id: "mode",
-      title: "Execution mode",
+      id: "permissionMode",
+      title: "Permission mode",
       status: "ready",
-      detail: "System is ARMED for live execution.",
+      detail: `permissionMode is '${context.config.permissionMode}' — live execution enabled.`,
     });
   }
 
@@ -363,7 +364,7 @@ export async function evaluateToolRequestPolicy(
       if (requestedAction.id === toolAction.id || supportedActions.includes(toolAction.id)) {
         return {
           allowed: true,
-          requiresArmedMode: toolAction.approvalPolicy === "armed_mode",
+          requiresTradePermission: toolAction.approvalPolicy === "trade_permission",
           actionId: toolAction.id,
         };
       }
@@ -371,7 +372,7 @@ export async function evaluateToolRequestPolicy(
       if (isRiskySideEffect(toolAction.sideEffectLevel) && !isRiskySideEffect(requestedAction.sideEffectLevel)) {
         return {
           allowed: false,
-          requiresArmedMode: toolAction.approvalPolicy === "armed_mode",
+          requiresTradePermission: toolAction.approvalPolicy === "trade_permission",
           actionId: toolAction.id,
           reason: `Requested action '${requestedAction.title}' only allows preview/read behavior, but ${toolName} mutates state or funds.`,
         };
@@ -381,7 +382,7 @@ export async function evaluateToolRequestPolicy(
     if (requestedScope && !isCompatibleTaskScope(requestedScope, toolAction.taskScope)) {
       return {
         allowed: false,
-        requiresArmedMode: toolAction.approvalPolicy === "armed_mode",
+        requiresTradePermission: toolAction.approvalPolicy === "trade_permission",
         actionId: toolAction.id,
         reason: `Tool ${toolName} is scoped to '${toolAction.taskScope}', which is outside the current '${requestedScope}' request.`,
       };
@@ -389,23 +390,23 @@ export async function evaluateToolRequestPolicy(
 
     return {
       allowed: true,
-      requiresArmedMode: toolAction.approvalPolicy === "armed_mode",
+      requiresTradePermission: toolAction.approvalPolicy === "trade_permission",
       actionId: toolAction.id,
     };
   }
 
-  const requiresArmedMode = requiresArmedModeForTool(toolName);
-  if (requestedAction && requiresArmedMode && !isRiskySideEffect(requestedAction.sideEffectLevel)) {
+  const requiresTradePermission = isTradeTool(toolName);
+  if (requestedAction && requiresTradePermission && !isRiskySideEffect(requestedAction.sideEffectLevel)) {
     return {
       allowed: false,
-      requiresArmedMode: true,
+      requiresTradePermission: true,
       reason: `Tool ${toolName} is execution-grade and is blocked during '${requestedAction.title}'.`,
     };
   }
 
   const mcpCategory = await getMcpToolCategory(toolName);
   if (!mcpCategory) {
-    return { allowed: true, requiresArmedMode };
+    return { allowed: true, requiresTradePermission };
   }
 
   const categoryScopes = MCP_SCOPE_MATRIX[mcpCategory] ?? [];
@@ -414,7 +415,7 @@ export async function evaluateToolRequestPolicy(
   if (requestedScope && !categoryScopes.includes(requestedScope)) {
     return {
       allowed: false,
-      requiresArmedMode: executionLike,
+      requiresTradePermission: executionLike,
       providerCategory: mcpCategory,
       reason: `MCP tool ${toolName} (${mcpCategory}) is outside the current '${requestedScope}' request scope.`,
     };
@@ -423,7 +424,7 @@ export async function evaluateToolRequestPolicy(
   if (requestedAction && executionLike && !isRiskySideEffect(requestedAction.sideEffectLevel)) {
     return {
       allowed: false,
-      requiresArmedMode: true,
+      requiresTradePermission: true,
       providerCategory: mcpCategory,
       reason: `Execution-class MCP tool ${toolName} is blocked during '${requestedAction.title}'.`,
     };
@@ -431,7 +432,7 @@ export async function evaluateToolRequestPolicy(
 
   return {
     allowed: true,
-    requiresArmedMode: executionLike || requiresArmedMode,
+    requiresTradePermission: executionLike || requiresTradePermission,
     providerCategory: mcpCategory,
   };
 }
@@ -446,11 +447,11 @@ export async function enforceExecutionPolicy(toolName: string, context: GordonCo
     return { allowed: false, reason: policy.reason };
   }
 
-  if (!policy.requiresArmedMode || requiresArmedModeForTool(toolName)) {
+  if (!policy.requiresTradePermission || isTradeTool(toolName)) {
     return { allowed: true };
   }
 
-  const access = await checkExplicitExecutionAccess(toolName, context.config, userId);
+  const access = await checkToolAccess(toolName, context.config, userId);
   if (!access.allowed) {
     return { allowed: false, reason: access.reason };
   }

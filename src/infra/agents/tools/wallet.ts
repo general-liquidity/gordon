@@ -28,7 +28,7 @@ const errors = {
   noExchange: { error: "Exchange client not connected. Please run setup first." },
   binanceOnly: { error: "Wallet operations are currently supported only on Binance." },
   notArmed: (action: string) => ({
-    error: `System must be ARMED to ${action}. Use /arm first.`,
+    error: `permissionMode must not be 'strict' to ${action}. Use /auto or /ask.`,
   }),
 };
 
@@ -93,7 +93,7 @@ export const convertDustTool = createTool({
   description:
     "Convert small balance assets (dust) to BNB. " +
     "Use when user says 'convert dust to BNB', 'clean up balances', or 'sweep small amounts'. " +
-    "Requires ARMED mode for actual conversion.",
+    "Requires permissionMode not 'strict' for actual conversion.",
   inputSchema: z.object({
     assets: z
       .array(z.string())
@@ -124,7 +124,7 @@ export const convertDustTool = createTool({
       return errors.binanceOnly;
     }
 
-    if (ctx.config?.mode !== "ARMED") {
+    if (ctx.config?.permissionMode === "strict") {
       return {
         ...errors.notArmed("convert dust"),
         assets: assets,
@@ -159,7 +159,7 @@ export const transferFundsTool = createTool({
   description:
     "Transfer assets between wallets (Spot, Funding, Futures, Margin). " +
     "Use when user wants to 'move funds', 'transfer to funding', 'transfer to spot'. " +
-    "Requires ARMED mode.",
+    "Requires permissionMode not 'strict'.",
   inputSchema: z.object({
     type: z
       .enum([
@@ -194,7 +194,7 @@ export const transferFundsTool = createTool({
       return errors.binanceOnly;
     }
 
-    if (ctx.config?.mode !== "ARMED") {
+    if (ctx.config?.permissionMode === "strict") {
       return {
         ...errors.notArmed("transfer funds"),
         type,
@@ -849,7 +849,7 @@ export const withdrawToExternalTool = createTool({
   id: "withdraw_to_external",
   description:
     "Execute a withdrawal to an external address (e.g., hardware wallet, cold wallet, another exchange). " +
-    "REQUIRES ARMED MODE and explicit confirm=true. This sends real funds off the exchange. " +
+    "REQUIRES permissionMode NOT STRICT and explicit confirm=true. This sends real funds off the exchange. " +
     "ALWAYS call preview_withdrawal first to show the user fees and details. Works on all supported exchanges. " +
     "Use when user confirms 'yes withdraw', 'send it', 'execute the withdrawal'.",
   inputSchema: z.object({
@@ -960,8 +960,8 @@ export const withdrawToExternalTool = createTool({
       };
     }
 
-    // Check ARMED mode
-    if (ctx.config?.mode !== "ARMED") {
+    // Check non-strict permissionMode
+    if (ctx.config?.permissionMode === "strict") {
       return {
         ...errors.notArmed("withdraw funds to an external address"),
         coin: coinUpper,

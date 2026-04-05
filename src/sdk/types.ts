@@ -89,16 +89,10 @@ export interface MonitorOptions {
   includeAlerts?: boolean;
 }
 
-/** Options for `client.arm()`. Mirrors `SystemArmPayloadSchema`. */
-export interface ArmOptions {
-  /** How long to stay armed in hours (0.25-24). Default 1. */
-  durationHours?: number;
-  /** Human-readable reason logged in the audit chain. */
-  reason?: string;
-}
-
-/** Options for `client.disarm()`. Mirrors `SystemDisarmPayloadSchema`. */
-export interface DisarmOptions {
+/** Options for `client.setPermissionMode()`. Mirrors `SystemSetPermissionModePayloadSchema`. */
+export interface SetPermissionModeOptions {
+  /** Target permissionMode. */
+  mode: "auto" | "ask" | "strict";
   /** Human-readable reason logged in the audit chain. */
   reason?: string;
 }

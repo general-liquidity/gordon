@@ -5,8 +5,7 @@ export const GatewayCommandTypeSchema = z.enum([
   "chat.send_message",
   "scan.run",
   "monitor.run_cycle",
-  "system.arm",
-  "system.disarm",
+  "system.set_permission_mode",
   "scheduler.create_task",
   "scheduler.delete_task",
   "scheduler.list_tasks",
@@ -41,12 +40,8 @@ export const MonitorRunCyclePayloadSchema = z.object({
   includeAlerts: z.boolean().default(true),
 });
 
-export const SystemArmPayloadSchema = z.object({
-  durationHours: z.number().min(0.25).max(24).default(1),
-  reason: z.string().max(512).optional(),
-});
-
-export const SystemDisarmPayloadSchema = z.object({
+export const SystemSetPermissionModePayloadSchema = z.object({
+  mode: z.enum(["auto", "ask", "strict"]),
   reason: z.string().max(512).optional(),
 });
 
@@ -111,8 +106,7 @@ export const GatewayCommandPayloadSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("chat.send_message"), payload: ChatSendMessagePayloadSchema }),
   z.object({ type: z.literal("scan.run"), payload: ScanRunPayloadSchema }),
   z.object({ type: z.literal("monitor.run_cycle"), payload: MonitorRunCyclePayloadSchema }),
-  z.object({ type: z.literal("system.arm"), payload: SystemArmPayloadSchema }),
-  z.object({ type: z.literal("system.disarm"), payload: SystemDisarmPayloadSchema }),
+  z.object({ type: z.literal("system.set_permission_mode"), payload: SystemSetPermissionModePayloadSchema }),
   z.object({ type: z.literal("scheduler.create_task"), payload: SchedulerCreateTaskPayloadSchema }),
   z.object({ type: z.literal("scheduler.delete_task"), payload: SchedulerDeleteTaskPayloadSchema }),
   z.object({ type: z.literal("scheduler.list_tasks"), payload: SchedulerListTasksPayloadSchema }),

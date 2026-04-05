@@ -69,7 +69,7 @@ export const solanaTradeTool = createTool({
     "Swap tokens on Solana via Jupiter DEX aggregation (routes through Raydium, Orca, etc. for best price). " +
     "Native SOL mint: So11111111111111111111111111111111111111112. " +
     "USDC mint: EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v. " +
-    "IMPORTANT: Always confirm the swap details with the user. Requires ARMED mode.",
+    "IMPORTANT: Always confirm the swap details with the user. Requires permissionMode not 'strict'.",
   inputSchema: z.object({
     outputMint: z
       .string()
@@ -105,7 +105,7 @@ export const solanaTransferTool = createTool({
   description:
     "Transfer SOL or SPL tokens to another Solana address. " +
     "If no mint is provided, transfers native SOL. " +
-    "IMPORTANT: Always confirm the amount and destination with the user. Requires ARMED mode.",
+    "IMPORTANT: Always confirm the amount and destination with the user. Requires permissionMode not 'strict'.",
   inputSchema: z.object({
     to: z
       .string()
@@ -132,7 +132,7 @@ export const solanaCreateLimitOrderTool = createTool({
   description:
     "Create a limit order on Jupiter. Specify input/output mints and amounts. " +
     "The order stays open until filled or cancelled. " +
-    "IMPORTANT: Confirm order details with the user. Requires ARMED mode.",
+    "IMPORTANT: Confirm order details with the user. Requires permissionMode not 'strict'.",
   inputSchema: z.object({
     inputMint: z
       .string()
@@ -168,7 +168,7 @@ export const solanaCancelLimitOrdersTool = createTool({
   id: "solana_cancel_limit_orders",
   description:
     "Cancel one or more Jupiter limit orders by their public keys. " +
-    "Requires ARMED mode.",
+    "Requires permissionMode not 'strict'.",
   inputSchema: z.object({
     orders: z
       .array(z.string())
@@ -208,7 +208,7 @@ export const solanaStakeJupTool = createTool({
   description:
     "Liquid stake SOL for jupSOL via Jupiter's staking protocol. " +
     "jupSOL earns staking rewards while remaining liquid and usable in DeFi. " +
-    "IMPORTANT: Confirm amount with the user. Requires ARMED mode.",
+    "IMPORTANT: Confirm amount with the user. Requires permissionMode not 'strict'.",
   inputSchema: z.object({
     amount: z
       .number()
@@ -242,7 +242,7 @@ export const solanaLaunchPumpfunTool = createTool({
   description:
     "Launch a new token on Pump.fun with customizable metadata and initial liquidity. " +
     "Creates a new SPL token with bonding curve mechanics. " +
-    "IMPORTANT: This creates a real token with real SOL. Confirm all details. Requires ARMED mode.",
+    "IMPORTANT: This creates a real token with real SOL. Confirm all details. Requires permissionMode not 'strict'.",
   inputSchema: z.object({
     tokenName: z
       .string()

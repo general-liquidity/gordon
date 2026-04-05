@@ -54,18 +54,17 @@ export class InvalidPlanError extends GordonError {
 }
 
 /**
- * Error when trying to execute in wrong mode
+ * Error when trying to execute while permissionMode blocks trading
  */
 export class TradingModeError extends InvalidStateError {
   constructor(
-    currentMode: "SAFE" | "ARMED",
-    requiredMode: "SAFE" | "ARMED" = "ARMED",
+    currentMode: "auto" | "ask" | "strict",
     context?: Record<string, unknown>
   ) {
     super(
-      `Cannot execute trade in ${currentMode} mode. System must be ${requiredMode}.`,
+      `Cannot execute trade: permissionMode is '${currentMode}'. Use /auto or /ask to enable trading.`,
       currentMode,
-      requiredMode,
+      "non-strict",
       context
     );
     this.name = "TradingModeError";

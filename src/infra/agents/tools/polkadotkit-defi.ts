@@ -64,7 +64,7 @@ export const polkadotSwapTokensTool = createTool({
     "Swap tokens on Hydration DEX (formerly HydraDX), the largest DEX in the Polkadot ecosystem. " +
     "Supports DOT, USDT, USDC, HDX, WETH, WBTC, and other assets listed on Hydration. " +
     "IMPORTANT: Always confirm the swap details (tokens, amount, slippage) with the user. " +
-    "Requires ARMED mode.",
+    "Requires permissionMode not 'strict'.",
   inputSchema: z.object({
     chain: z
       .string()
@@ -95,7 +95,7 @@ export const polkadotMintVdotTool = createTool({
     "Mint vDOT (voucher DOT) via Bifrost liquid staking. vDOT represents staked DOT " +
     "that earns staking rewards while remaining liquid and usable in DeFi. " +
     "Unlike nomination pool staking, vDOT has no unbonding period — you can swap it back instantly. " +
-    "IMPORTANT: Confirm amount with the user. Requires ARMED mode.",
+    "IMPORTANT: Confirm amount with the user. Requires permissionMode not 'strict'.",
   inputSchema: z.object({
     amount: z
       .string()
@@ -116,7 +116,7 @@ export const polkadotRegisterIdentityTool = createTool({
     "Register an on-chain identity on the Polkadot People Chain. " +
     "Sets a human-readable display name for your account visible across the ecosystem. " +
     "Identity registration requires a small deposit that is refunded when cleared. " +
-    "Requires ARMED mode.",
+    "Requires permissionMode not 'strict'.",
   inputSchema: z.object({
     chain: z
       .string()

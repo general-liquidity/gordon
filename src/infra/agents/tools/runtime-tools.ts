@@ -137,7 +137,7 @@ export const deployStrategyTool = createTool({
       const actor = ctx?.userId || "system";
       const config = ctx?.config;
       const executionMode = config?.systematic?.executionMode ?? "assisted";
-      const targetStatus = config?.mode === "ARMED" ? "live" : "paper";
+      const targetStatus = config?.permissionMode !== "strict" ? "live" : "paper";
       const systematicStatus = getSystematicStrategyStatus(playbook_name);
       const profile = systematicStatus.profile;
 

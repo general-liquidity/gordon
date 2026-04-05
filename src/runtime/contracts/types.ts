@@ -74,7 +74,7 @@ export interface RuntimeToolSpec {
   riskClass: RuntimeRiskClass;
   permissionScope: RuntimePermissionScope;
   sideEffectLevel: RuntimeSideEffectLevel;
-  requiresArmedMode: boolean;
+  requiresTradePermission: boolean;
   supportsStreaming: boolean;
   supportsBackground: boolean;
   idempotent: boolean;

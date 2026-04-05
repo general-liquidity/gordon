@@ -26,14 +26,11 @@ export interface SystemStartedEvent extends BaseEvent {
   permissionMode: "auto" | "ask" | "strict";
 }
 
-export interface SystemArmedEvent extends BaseEvent {
-  type: "system:armed";
-  duration: number; // hours
-  expiresAt: string;
-}
-
-export interface SystemDisarmedEvent extends BaseEvent {
-  type: "system:disarmed";
+export interface SystemPermissionModeChangedEvent extends BaseEvent {
+  type: "system:permission_mode_changed";
+  permissionMode: "auto" | "ask" | "strict";
+  previous?: "auto" | "ask" | "strict";
+  reason?: string;
 }
 
 export interface SystemErrorEvent extends BaseEvent {
@@ -508,8 +505,7 @@ export interface PositionUpdatedEvent extends BaseEvent {
  */
 export type GordonEvent =
   | SystemStartedEvent
-  | SystemArmedEvent
-  | SystemDisarmedEvent
+  | SystemPermissionModeChangedEvent
   | SystemErrorEvent
   | BinanceConnectedEvent
   | BinanceDisconnectedEvent

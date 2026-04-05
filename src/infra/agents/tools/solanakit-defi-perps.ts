@@ -74,7 +74,7 @@ export const solanaAdrenaOpenLongTool = createTool({
   id: "solana_adrena_open_long",
   description:
     "Open a leveraged long position on Adrena Protocol (Solana perpetuals). " +
-    "Requires ARMED mode. Confirm trade details with user.",
+    "Requires permissionMode not 'strict'. Confirm trade details with user.",
   inputSchema: z.object({
     price: z.number().describe("Entry price"),
     collateralAmount: z.number().describe("Collateral amount in USD"),
@@ -94,7 +94,7 @@ export const solanaAdrenaOpenShortTool = createTool({
   id: "solana_adrena_open_short",
   description:
     "Open a leveraged short position on Adrena Protocol (Solana perpetuals). " +
-    "Requires ARMED mode. Confirm trade details with user.",
+    "Requires permissionMode not 'strict'. Confirm trade details with user.",
   inputSchema: z.object({
     price: z.number().describe("Entry price"),
     collateralAmount: z.number().describe("Collateral amount in USD"),
@@ -113,7 +113,7 @@ export const solanaAdrenaOpenShortTool = createTool({
 export const solanaAdrenaCloseLongTool = createTool({
   id: "solana_adrena_close_long",
   description:
-    "Close a long position on Adrena Protocol. Requires ARMED mode.",
+    "Close a long position on Adrena Protocol. Requires permissionMode not 'strict'.",
   inputSchema: z.object({
     price: z.number().describe("Close price"),
     tradeMint: z.string().describe("Token mint address of the position"),
@@ -126,7 +126,7 @@ export const solanaAdrenaCloseLongTool = createTool({
 export const solanaAdrenaCloseShortTool = createTool({
   id: "solana_adrena_close_short",
   description:
-    "Close a short position on Adrena Protocol. Requires ARMED mode.",
+    "Close a short position on Adrena Protocol. Requires permissionMode not 'strict'.",
   inputSchema: z.object({
     price: z.number().describe("Close price"),
     tradeMint: z.string().describe("Token mint address of the position"),
@@ -144,7 +144,7 @@ export const solanaFlashOpenTradeTool = createTool({
   id: "solana_flash_open_trade",
   description:
     "Open a leveraged perpetual position on Flash.Trade (Solana). " +
-    "Supports long and short positions. Requires ARMED mode.",
+    "Supports long and short positions. Requires permissionMode not 'strict'.",
   inputSchema: z.object({
     token: z.string().describe("Token symbol to trade (e.g., 'SOL', 'BTC')"),
     side: z.enum(["long", "short"]).describe("Trade direction"),
@@ -159,7 +159,7 @@ export const solanaFlashOpenTradeTool = createTool({
 export const solanaFlashCloseTradeTool = createTool({
   id: "solana_flash_close_trade",
   description:
-    "Close a perpetual position on Flash.Trade. Requires ARMED mode.",
+    "Close a perpetual position on Flash.Trade. Requires permissionMode not 'strict'.",
   inputSchema: z.object({
     token: z.string().describe("Token symbol of the position"),
     side: z.enum(["long", "short"]).describe("Side of position to close"),
@@ -177,7 +177,7 @@ export const solanaDriftOpenPerpTool = createTool({
   id: "solana_drift_open_perp",
   description:
     "Open or close a perpetual position on Drift Protocol. " +
-    "Supports market and limit orders, long and short. Requires ARMED mode.",
+    "Supports market and limit orders, long and short. Requires permissionMode not 'strict'.",
   inputSchema: z.object({
     amount: z.number().describe("Position size in base units"),
     symbol: z.string().describe("Market symbol (e.g., 'SOL', 'BTC', 'ETH')"),
@@ -197,7 +197,7 @@ export const solanaDriftCreateAccountTool = createTool({
   id: "solana_drift_create_account",
   description:
     "Create a Drift Protocol user account with initial deposit. " +
-    "Required before trading on Drift. Requires ARMED mode.",
+    "Required before trading on Drift. Requires permissionMode not 'strict'.",
   inputSchema: z.object({
     amount: z.number().describe("Initial deposit amount"),
     symbol: z.string().describe("Token symbol to deposit (e.g., 'USDC')"),
@@ -210,7 +210,7 @@ export const solanaDriftCreateAccountTool = createTool({
 export const solanaDriftDepositTool = createTool({
   id: "solana_drift_deposit",
   description:
-    "Deposit funds into Drift Protocol account. Can also repay borrows. Requires ARMED mode.",
+    "Deposit funds into Drift Protocol account. Can also repay borrows. Requires permissionMode not 'strict'.",
   inputSchema: z.object({
     amount: z.number().describe("Amount to deposit"),
     symbol: z.string().describe("Token symbol (e.g., 'USDC', 'SOL')"),
@@ -227,7 +227,7 @@ export const solanaDriftDepositTool = createTool({
 export const solanaDriftWithdrawTool = createTool({
   id: "solana_drift_withdraw",
   description:
-    "Withdraw funds or borrow from Drift Protocol account. Requires ARMED mode.",
+    "Withdraw funds or borrow from Drift Protocol account. Requires permissionMode not 'strict'.",
   inputSchema: z.object({
     amount: z.number().describe("Amount to withdraw or borrow"),
     symbol: z.string().describe("Token symbol (e.g., 'USDC', 'SOL')"),
@@ -302,7 +302,7 @@ export const solanaDriftPerpQuoteTool = createTool({
 export const solanaDriftSpotSwapTool = createTool({
   id: "solana_drift_spot_swap",
   description:
-    "Swap tokens on Drift Protocol's spot market. Requires ARMED mode.",
+    "Swap tokens on Drift Protocol's spot market. Requires permissionMode not 'strict'.",
   inputSchema: z.object({
     fromSymbol: z.string().describe("Token to sell (e.g., 'USDC')"),
     toSymbol: z.string().describe("Token to buy (e.g., 'SOL')"),

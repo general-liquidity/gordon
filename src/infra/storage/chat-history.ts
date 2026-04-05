@@ -76,8 +76,8 @@ export interface ChatSession {
   metadata: {
     /** Gordon version */
     version: string;
-    /** Mode during session (SAFE/ARMED) */
-    mode: "SAFE" | "ARMED";
+    /** Permission mode during session */
+    permissionMode: "auto" | "ask" | "strict";
     /** Total message count */
     messageCount: number;
     /** Session duration in seconds */
@@ -194,7 +194,7 @@ export async function saveChatSession(
   messages: ChatHistoryMessage[],
   options: {
     startedAt?: Date;
-    mode?: "SAFE" | "ARMED";
+    permissionMode?: "auto" | "ask" | "strict";
     version?: string;
     threadId?: string;
     resourceId?: string;
@@ -216,7 +216,7 @@ export async function saveChatSession(
     commandsUsed: extractCommands(messages),
     metadata: {
       version: options.version || "1.0.0",
-      mode: options.mode || "SAFE",
+      permissionMode: options.permissionMode || "ask",
       messageCount: messages.length,
       durationSeconds: Math.floor((endDate.getTime() - startDate.getTime()) / 1000),
       threadId: options.threadId,

@@ -96,7 +96,7 @@ export const polkadotTransferNativeTool = createTool({
   description:
     "Transfer native tokens (DOT, KSM, WND, etc.) to another address on a Polkadot ecosystem chain. " +
     "IMPORTANT: Always confirm the amount and destination with the user before executing. " +
-    "Requires ARMED mode for safety.",
+    "Requires permissionMode not 'strict' for safety.",
   inputSchema: z.object({
     chain: z
       .string()
@@ -123,7 +123,7 @@ export const polkadotXcmTransferTool = createTool({
     "For example, transfer DOT from Polkadot relay chain to Polkadot Asset Hub, " +
     "or transfer tokens between parachains. " +
     "IMPORTANT: Always confirm the amount, source chain, destination chain, and address with the user. " +
-    "Requires ARMED mode.",
+    "Requires permissionMode not 'strict'.",
   inputSchema: z.object({
     from_chain: z
       .string()

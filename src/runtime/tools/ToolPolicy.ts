@@ -1,9 +1,8 @@
 import { auditLog } from "../../infra/platform/audit/index.ts";
 import { evaluateToolRequestPolicy } from "../../infra/runtime/actions/runtime.ts";
 import {
-  checkExplicitExecutionAccess,
   checkToolAccess,
-  requiresArmedModeForTool,
+  isTradeTool,
   type AccessControlResult,
 } from "../../infra/agents/middleware/access-control.ts";
 import type { GordonContext } from "../../infra/agents/types.ts";
@@ -87,8 +86,8 @@ export async function evaluateRuntimeToolPolicy(
     };
   }
 
-  if ((tool.requiresArmedMode || actionPolicy.requiresArmedMode) && !requiresArmedModeForTool(toolName)) {
-    accessControlResult = await checkExplicitExecutionAccess(toolName, context.config, userId);
+  if ((tool.requiresTradePermission || actionPolicy.requiresTradePermission) && !isTradeTool(toolName)) {
+    accessControlResult = await checkToolAccess(toolName, context.config, userId);
     if (!accessControlResult.allowed) {
       return {
         allowed: false,
@@ -105,7 +104,7 @@ export async function evaluateRuntimeToolPolicy(
     permissionScope: tool.permissionScope,
     approvalClass,
     sideEffectLevel: tool.sideEffectLevel,
-    requiresArmedMode: tool.requiresArmedMode,
+    requiresTradePermission: tool.requiresTradePermission,
   }, "ALLOWED");
 
   return {

@@ -209,7 +209,7 @@ export const createSwingMandateTool = createTool({
         "Implementation note:",
         mandate.signalOnly
           ? "  Gordon will keep this in signal-only mode. Opportunities are surfaced for review and approval before any execution step."
-          : "  Gordon will still respect approval and ARMED-mode requirements for any execution-capable follow-up.",
+          : "  Gordon will still respect approval and non-strict permissionMode requirements for any execution-capable follow-up.",
       ].join("\n");
 
       return { mandate, summary, validation };
@@ -227,7 +227,7 @@ export const startAutonomousModeTool = createTool({
   id: "start_autonomous_mode",
   description:
     "Start the autonomous swing trading loop with an active mandate. " +
-    "Requires ARMED mode. The loop will scan markets at the mandate's interval and " +
+    "Requires permissionMode not 'strict'. The loop will scan markets at the mandate's interval and " +
     "find opportunities within the defined constraints. " +
     "Use after creating a mandate with create_swing_mandate.",
   inputSchema: z.object({
@@ -253,7 +253,7 @@ export const startAutonomousModeTool = createTool({
     }
 
     const effectiveConfig = await loadConfig().catch(() => ctx.config);
-    if (effectiveConfig?.mode !== "ARMED") {
+    if (effectiveConfig?.permissionMode === "strict") {
       return errors.notArmed("start autonomous trading");
     }
 

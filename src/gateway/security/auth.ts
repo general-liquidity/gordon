@@ -12,7 +12,7 @@ export type GatewayCapability =
   | "chat:write"
   | "scan:run"
   | "monitor:run"
-  | "system:arm"
+  | "system:permission_mode"
   | "scheduler:write"
   | "scheduler:read"
   | "runtime:health"
@@ -43,7 +43,7 @@ function defaultCapabilities(): Set<GatewayCapability> {
     "chat:write",
     "scan:run",
     "monitor:run",
-    "system:arm",
+    "system:permission_mode",
     "scheduler:write",
     "scheduler:read",
     "runtime:health",
@@ -115,9 +115,8 @@ export function requiredCapabilityForCommand(type: GatewayCommandType): GatewayC
       return "scan:run";
     case "monitor.run_cycle":
       return "monitor:run";
-    case "system.arm":
-    case "system.disarm":
-      return "system:arm";
+    case "system.set_permission_mode":
+      return "system:permission_mode";
     case "scheduler.create_task":
     case "scheduler.delete_task":
       return "scheduler:write";

@@ -815,7 +815,7 @@ export const polygonPaymentIntentTool = createTool({
     recipient: z.string().optional(),
     description: z.string().optional(),
     expiresInMinutes: z.number().int().positive().max(1440).optional(),
-    approveSigning: z.boolean().default(false).describe("Whether to sign the payment intent. Requires ARMED mode when approvals are required."),
+    approveSigning: z.boolean().default(false).describe("Whether to sign the payment intent. Requires permissionMode not 'strict' when approvals are required."),
   }),
   outputSchema: polygonPaymentIntentSchema,
   execute: async ({ approveSigning, ...input }, execContext: MastraExecutionContext) => {
@@ -834,13 +834,13 @@ export const polygonPaymentIntentTool = createTool({
         getAuditLogger(ctx?.userId || "system").blocked(
           "POLYGON_PAYMENT_INTENT_SIGNED",
           { resource: input.resource, amountUsd: input.amountUsd },
-          "System must be ARMED before signing external payment intents.",
+          "permissionMode must not be 'strict' before signing external payment intents.",
         );
         return {
           ...intent,
           signed: false,
           approvalRequired: true,
-          error: "System must be ARMED before signing external payment intents.",
+          error: "permissionMode must not be 'strict' before signing external payment intents.",
         };
       }
 

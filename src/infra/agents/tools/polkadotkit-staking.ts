@@ -89,7 +89,7 @@ export const polkadotJoinPoolTool = createTool({
     "Join a Polkadot nomination pool by bonding tokens. This starts earning staking rewards. " +
     "The bonded amount is locked and must be unbonded before it can be transferred. " +
     "Unbonding period is ~28 days on Polkadot, ~7 days on Kusama. " +
-    "IMPORTANT: Confirm pool ID and amount with the user before executing. Requires ARMED mode.",
+    "IMPORTANT: Confirm pool ID and amount with the user before executing. Requires permissionMode not 'strict'.",
   inputSchema: z.object({
     chain: z
       .string()
@@ -111,7 +111,7 @@ export const polkadotBondExtraTool = createTool({
   description:
     "Add more bonded stake to an existing nomination pool membership. " +
     "Increases your staking rewards proportionally. " +
-    "IMPORTANT: Confirm amount with the user. Requires ARMED mode.",
+    "IMPORTANT: Confirm amount with the user. Requires permissionMode not 'strict'.",
   inputSchema: z.object({
     chain: z
       .string()
@@ -134,7 +134,7 @@ export const polkadotUnbondTool = createTool({
     "Start unbonding stake from a nomination pool. After the unbonding period " +
     "(~28 days on Polkadot, ~7 days on Kusama), use polkadot_withdraw_unbonded to claim. " +
     "Stops earning rewards on the unbonded amount immediately. " +
-    "IMPORTANT: Confirm amount. Requires ARMED mode.",
+    "IMPORTANT: Confirm amount. Requires permissionMode not 'strict'.",
   inputSchema: z.object({
     chain: z
       .string()
@@ -157,7 +157,7 @@ export const polkadotWithdrawUnbondedTool = createTool({
     "Withdraw fully unbonded stake from a nomination pool. " +
     "Only works after the unbonding period has completed. " +
     "The tokens become transferable again after withdrawal. " +
-    "Requires ARMED mode.",
+    "Requires permissionMode not 'strict'.",
   inputSchema: z.object({
     chain: z
       .string()
@@ -176,7 +176,7 @@ export const polkadotClaimRewardsTool = createTool({
   description:
     "Claim pending staking rewards from a nomination pool. " +
     "Rewards accumulate over time and must be claimed to receive them. " +
-    "Requires ARMED mode.",
+    "Requires permissionMode not 'strict'.",
   inputSchema: z.object({
     chain: z
       .string()

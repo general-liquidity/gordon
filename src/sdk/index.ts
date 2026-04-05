@@ -44,8 +44,7 @@ import type { GatewayCommandEnvelope } from "../gateway/protocol/commands.ts";
 import {
   ScanRunPayloadSchema,
   MonitorRunCyclePayloadSchema,
-  SystemArmPayloadSchema,
-  SystemDisarmPayloadSchema,
+  SystemSetPermissionModePayloadSchema,
   SchedulerCreateTaskPayloadSchema,
   SchedulerDeleteTaskPayloadSchema,
   RuntimeHealthCheckPayloadSchema,
@@ -73,8 +72,7 @@ import {
   type EventSubscription,
   type ScanOptions,
   type MonitorOptions,
-  type ArmOptions,
-  type DisarmOptions,
+  type SetPermissionModeOptions,
   type ScheduleTaskOptions,
   type HealthCheckOptions,
   type ReconcileOptions,
@@ -442,51 +440,28 @@ export class GordonSDKClient {
   }
 
   /**
-   * Arm the system for live trading.
+   * Set Gordon's permission mode.
    *
-   * @param options - Duration (0.25-24 hours) and optional reason.
+   * @param options - Target mode (auto/ask/strict) and optional reason.
    *
    * @example
    * ```typescript
-   * await client.arm({ durationHours: 4, reason: "Session start" });
+   * await client.setPermissionMode({ mode: "auto", reason: "Session start" });
+   * await client.setPermissionMode({ mode: "ask" });    // default, ApprovalDialog per trade
+   * await client.setPermissionMode({ mode: "strict" }); // read-only
    * ```
    */
-  async arm(options: ArmOptions = {}): Promise<SDKCommandResponse> {
-    const parsed = SystemArmPayloadSchema.safeParse(options);
+  async setPermissionMode(options: SetPermissionModeOptions): Promise<SDKCommandResponse> {
+    const parsed = SystemSetPermissionModePayloadSchema.safeParse(options);
     if (!parsed.success) {
       throw new ValidationError(
-        `Invalid arm options: ${parsed.error.issues.map((i) => i.message).join("; ")}`,
+        `Invalid setPermissionMode options: ${parsed.error.issues.map((i) => i.message).join("; ")}`,
         { issues: parsed.error.issues },
       );
     }
 
     return this.send({
-      type: "system.arm",
-      payload: parsed.data,
-    });
-  }
-
-  /**
-   * Disarm the system, returning to SAFE mode.
-   *
-   * @param options - Optional reason for audit trail.
-   *
-   * @example
-   * ```typescript
-   * await client.disarm({ reason: "Session over" });
-   * ```
-   */
-  async disarm(options: DisarmOptions = {}): Promise<SDKCommandResponse> {
-    const parsed = SystemDisarmPayloadSchema.safeParse(options);
-    if (!parsed.success) {
-      throw new ValidationError(
-        `Invalid disarm options: ${parsed.error.issues.map((i) => i.message).join("; ")}`,
-        { issues: parsed.error.issues },
-      );
-    }
-
-    return this.send({
-      type: "system.disarm",
+      type: "system.set_permission_mode",
       payload: parsed.data,
     });
   }

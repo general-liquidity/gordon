@@ -39,9 +39,8 @@ export const testConnectionTool = createTool({
     "Use when user asks 'test connection', 'check API', 'are my keys working?'",
   inputSchema: z.object({}),
   outputSchema: z.object({
-    mode: z.enum(["ARMED", "SAFE"]),
-    isArmed: z.boolean(),
-    armedUntil: z.string().nullable(),
+    permissionMode: z.enum(["auto", "ask", "strict"]),
+    canTradeNow: z.boolean(),
     llmConnected: z.boolean(),
     binanceConnected: z.boolean(),
     binancePermissions: z.object({
@@ -65,10 +64,8 @@ export const testConnectionTool = createTool({
     // Context is extracted from Mastra's RequestContext
     const ctx = getGordonContext(execContext);
     const results: {
-      mode: "ARMED" | "SAFE";
-      isArmed: boolean;
-      armedUntil: string | null;
-      permissionMode?: "auto" | "ask" | "strict";
+      permissionMode: "auto" | "ask" | "strict";
+      canTradeNow: boolean;
       llmConnected: boolean;
       binanceConnected: boolean;
       binancePermissions?: { read: boolean; spotTrade: boolean; withdraw: boolean } | null;
@@ -80,9 +77,8 @@ export const testConnectionTool = createTool({
       assetList?: Array<{ asset: string; free: number; locked: number }>;
       error: string | null;
     } = {
-      mode: "SAFE",
-      isArmed: false,
-      armedUntil: null,
+      permissionMode: "ask",
+      canTradeNow: true,
       llmConnected: !!ctx?.llm,
       binanceConnected: false,
       binancePermissions: null,
@@ -93,10 +89,7 @@ export const testConnectionTool = createTool({
     const config = await loadConfig().catch(() => null);
     if (config) {
       results.permissionMode = config.permissionMode;
-      // Legacy fields retained for backward-compatible tool output.
-      results.mode = config.permissionMode === "strict" ? "SAFE" : "ARMED";
-      results.armedUntil = null;
-      results.isArmed = config.permissionMode !== "strict";
+      results.canTradeNow = config.permissionMode !== "strict";
     }
 
     if (!ctx?.exchange) {

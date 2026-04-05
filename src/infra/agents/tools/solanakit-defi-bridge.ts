@@ -67,7 +67,7 @@ export const solanaDebridgeCreateOrderTool = createTool({
   description:
     "Create a cross-chain bridge order via deBridge. " +
     "Bridges tokens between Solana and EVM chains (Ethereum, Arbitrum, etc.). " +
-    "IMPORTANT: Confirm bridge details with user. Requires ARMED mode.",
+    "IMPORTANT: Confirm bridge details with user. Requires permissionMode not 'strict'.",
   inputSchema: z.object({
     srcChainId: z.string().describe("Source chain ID (e.g., '7565164' for Solana)"),
     srcChainTokenIn: z.string().describe("Source token address"),
@@ -89,7 +89,7 @@ export const solanaDebridgeCreateOrderTool = createTool({
 
 export const solanaDebridgeExecuteTool = createTool({
   id: "solana_debridge_execute",
-  description: "Execute a previously created deBridge bridge order. Requires ARMED mode.",
+  description: "Execute a previously created deBridge bridge order. Requires permissionMode not 'strict'.",
   inputSchema: z.object({
     transactionData: z.string().describe("Transaction data from create order response"),
   }),
@@ -142,7 +142,7 @@ export const solanaOkxSwapTool = createTool({
   id: "solana_okx_swap",
   description:
     "Execute a token swap via OKX DEX aggregator. " +
-    "Routes through multiple DEXes for best price. Requires ARMED mode.",
+    "Routes through multiple DEXes for best price. Requires permissionMode not 'strict'.",
   inputSchema: z.object({
     chainId: z.string().describe("Chain ID (e.g., '501' for Solana)"),
     fromTokenAddress: z.string().describe("Source token address"),

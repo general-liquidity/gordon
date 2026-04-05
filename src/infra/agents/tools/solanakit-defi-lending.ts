@@ -79,7 +79,7 @@ export const solanaLuloLendTool = createTool({
   id: "solana_lulo_lend",
   description:
     "Lend tokens via Lulo Protocol on Solana for yield. " +
-    "Lulo optimizes across multiple lending protocols for best rates. Requires ARMED mode.",
+    "Lulo optimizes across multiple lending protocols for best rates. Requires permissionMode not 'strict'.",
   inputSchema: z.object({
     mintAddress: z.string().describe("Token mint address to lend (e.g., USDC mint)"),
     amount: z.number().describe("Amount to lend in human-readable units"),
@@ -92,7 +92,7 @@ export const solanaLuloLendTool = createTool({
 export const solanaLuloWithdrawTool = createTool({
   id: "solana_lulo_withdraw",
   description:
-    "Withdraw tokens from Lulo Protocol lending position. Requires ARMED mode.",
+    "Withdraw tokens from Lulo Protocol lending position. Requires permissionMode not 'strict'.",
   inputSchema: z.object({
     mintAddress: z.string().describe("Token mint address to withdraw"),
     amount: z.number().describe("Amount to withdraw"),
@@ -122,7 +122,7 @@ export const solanaDriftLendApyTool = createTool({
 export const solanaDriftInsuranceStakeTool = createTool({
   id: "solana_drift_insurance_stake",
   description:
-    "Stake tokens in Drift Protocol's insurance fund for yield. Requires ARMED mode.",
+    "Stake tokens in Drift Protocol's insurance fund for yield. Requires permissionMode not 'strict'.",
   inputSchema: z.object({
     amount: z.number().describe("Amount to stake"),
     symbol: z.string().describe("Token symbol (e.g., 'USDC')"),
@@ -136,7 +136,7 @@ export const solanaDriftInsuranceRequestUnstakeTool = createTool({
   id: "solana_drift_insurance_request_unstake",
   description:
     "Request to unstake from Drift Protocol insurance fund. " +
-    "Initiates cooldown period before withdrawal. Requires ARMED mode.",
+    "Initiates cooldown period before withdrawal. Requires permissionMode not 'strict'.",
   inputSchema: z.object({
     amount: z.number().describe("Amount to unstake"),
     symbol: z.string().describe("Token symbol"),
@@ -149,7 +149,7 @@ export const solanaDriftInsuranceRequestUnstakeTool = createTool({
 export const solanaDriftInsuranceUnstakeTool = createTool({
   id: "solana_drift_insurance_unstake",
   description:
-    "Complete unstake from Drift insurance fund after cooldown period. Requires ARMED mode.",
+    "Complete unstake from Drift insurance fund after cooldown period. Requires permissionMode not 'strict'.",
   inputSchema: z.object({
     symbol: z.string().describe("Token symbol to unstake"),
   }),
@@ -210,7 +210,7 @@ export const solanaSanctumOwnedLstTool = createTool({
 export const solanaSanctumSwapLstTool = createTool({
   id: "solana_sanctum_swap_lst",
   description:
-    "Swap between liquid staking tokens via Sanctum (e.g., mSOL → jitoSOL). Requires ARMED mode.",
+    "Swap between liquid staking tokens via Sanctum (e.g., mSOL → jitoSOL). Requires permissionMode not 'strict'.",
   inputSchema: z.object({
     inputLstMint: z.string().describe("Input LST mint address"),
     outputLstMint: z.string().describe("Output LST mint address"),
@@ -228,7 +228,7 @@ export const solanaSanctumSwapLstTool = createTool({
 
 export const solanaSanctumAddLiquidityTool = createTool({
   id: "solana_sanctum_add_liquidity",
-  description: "Add liquidity to Sanctum's LST pool. Requires ARMED mode.",
+  description: "Add liquidity to Sanctum's LST pool. Requires permissionMode not 'strict'.",
   inputSchema: z.object({
     lstMint: z.string().describe("LST mint address"),
     amount: z.string().describe("Amount to add (as string, in base units)"),
@@ -245,7 +245,7 @@ export const solanaSanctumAddLiquidityTool = createTool({
 
 export const solanaSanctumRemoveLiquidityTool = createTool({
   id: "solana_sanctum_remove_liquidity",
-  description: "Remove liquidity from Sanctum's LST pool. Requires ARMED mode.",
+  description: "Remove liquidity from Sanctum's LST pool. Requires permissionMode not 'strict'.",
   inputSchema: z.object({
     lstMint: z.string().describe("LST mint address"),
     amount: z.string().describe("LP token amount to remove (as string)"),
@@ -267,7 +267,7 @@ export const solanaSanctumRemoveLiquidityTool = createTool({
 export const solanaSolayerStakeTool = createTool({
   id: "solana_solayer_stake",
   description:
-    "Restake SOL via Solayer Protocol for additional yield on top of staking. Requires ARMED mode.",
+    "Restake SOL via Solayer Protocol for additional yield on top of staking. Requires permissionMode not 'strict'.",
   inputSchema: z.object({
     amount: z.number().describe("Amount of SOL to restake"),
   }),
@@ -283,7 +283,7 @@ export const solanaSolayerStakeTool = createTool({
 export const solanaVoltrDepositTool = createTool({
   id: "solana_voltr_deposit",
   description:
-    "Deposit into a Voltr vault strategy for automated yield. Requires ARMED mode.",
+    "Deposit into a Voltr vault strategy for automated yield. Requires permissionMode not 'strict'.",
   inputSchema: z.object({
     depositAmount: z.string().describe("Amount to deposit (as string, in base units)"),
     vault: z.string().describe("Vault public key"),
@@ -297,7 +297,7 @@ export const solanaVoltrDepositTool = createTool({
 export const solanaVoltrWithdrawTool = createTool({
   id: "solana_voltr_withdraw",
   description:
-    "Withdraw from a Voltr vault strategy. Requires ARMED mode.",
+    "Withdraw from a Voltr vault strategy. Requires permissionMode not 'strict'.",
   inputSchema: z.object({
     withdrawAmount: z.string().describe("Amount to withdraw (as string, in base units)"),
     vault: z.string().describe("Vault public key"),
@@ -336,7 +336,7 @@ export const solanaDriftVaultInfoTool = createTool({
 
 export const solanaDriftVaultDepositTool = createTool({
   id: "solana_drift_vault_deposit",
-  description: "Deposit funds into a Drift vault. Requires ARMED mode.",
+  description: "Deposit funds into a Drift vault. Requires permissionMode not 'strict'.",
   inputSchema: z.object({
     amount: z.number().describe("Amount to deposit"),
     vault: z.string().describe("Vault name or public key"),
@@ -349,7 +349,7 @@ export const solanaDriftVaultDepositTool = createTool({
 export const solanaDriftVaultRequestWithdrawTool = createTool({
   id: "solana_drift_vault_request_withdraw",
   description:
-    "Request withdrawal from a Drift vault. Initiates cooldown period. Requires ARMED mode.",
+    "Request withdrawal from a Drift vault. Initiates cooldown period. Requires permissionMode not 'strict'.",
   inputSchema: z.object({
     amount: z.number().describe("Amount to withdraw"),
     vault: z.string().describe("Vault name or public key"),
@@ -362,7 +362,7 @@ export const solanaDriftVaultRequestWithdrawTool = createTool({
 export const solanaDriftVaultWithdrawTool = createTool({
   id: "solana_drift_vault_withdraw",
   description:
-    "Complete withdrawal from a Drift vault after cooldown period. Requires ARMED mode.",
+    "Complete withdrawal from a Drift vault after cooldown period. Requires permissionMode not 'strict'.",
   inputSchema: z.object({
     vault: z.string().describe("Vault name or public key"),
   }),

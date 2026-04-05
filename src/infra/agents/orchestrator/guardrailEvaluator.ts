@@ -23,7 +23,7 @@ import type { ToolSecurityCheckResult } from "./types.ts";
  * Check security constraints before tool execution
  *
  * This function combines:
- * - Access control (ARMED mode check for trading tools)
+ * - Access control (permissionMode check for trading tools)
  * - Rate limiting (per-agent-per-tool limits)
  *
  * @param agentName - Name of the agent making the call

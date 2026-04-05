@@ -24,7 +24,7 @@ export type ActionTaskScope =
 
 export type ActionSideEffectLevel = "none" | "preview" | "state" | "funds";
 
-export type ActionApprovalPolicy = "none" | "confirm" | "armed_mode" | "external";
+export type ActionApprovalPolicy = "none" | "confirm" | "trade_permission" | "external";
 
 export type ActionProviderKind =
   | "exchange"

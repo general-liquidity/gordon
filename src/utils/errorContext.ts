@@ -300,22 +300,26 @@ function getInvalidSymbolRecovery(
  */
 function getTradingModeRecovery(error: Error): RecoveryStep[] {
   if (error instanceof TradingModeError) {
-    if (error.currentState === "SAFE") {
+    if (error.currentState === "strict") {
       return [
         {
-          description: "Enable ARMED mode to execute trades",
-          command: "/arm",
+          description: "Set permissionMode to 'auto' — trades execute without per-action approval",
+          command: "/auto",
         },
         {
-          description: "Review your plan before arming",
+          description: "Or set to 'ask' — each trade requires approval (default)",
+          command: "/ask",
+        },
+        {
+          description: "Review your plan before enabling",
           command: "/plan",
         },
       ];
     } else {
       return [
         {
-          description: "Return to SAFE mode",
-          command: "/disarm",
+          description: "Set to strict (read-only) mode",
+          command: "/strict",
         },
       ];
     }
@@ -323,7 +327,7 @@ function getTradingModeRecovery(error: Error): RecoveryStep[] {
 
   return [
     {
-      description: "Check current trading mode",
+      description: "Check current permission mode",
       command: "/status",
     },
   ];

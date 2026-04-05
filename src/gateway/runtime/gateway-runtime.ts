@@ -292,11 +292,10 @@ export class GatewayRuntime {
       });
     });
 
-    this.registerHandler("system.arm", async (envelope) => {
-      // Legacy endpoint — now sets permissionMode="auto" (equivalent to former ARMED).
-      const payload = envelope.command.payload as { durationHours?: number; reason?: string };
+    this.registerHandler("system.set_permission_mode", async (envelope) => {
+      const payload = envelope.command.payload as { mode: "auto" | "ask" | "strict"; reason?: string };
       const config = await loadConfig();
-      const updated = { ...config, permissionMode: "auto" as const };
+      const updated = { ...config, permissionMode: payload.mode };
       await saveConfig(updated);
       recordStructuredObservation({
         eventType: "system.permission_mode_changed",
@@ -304,26 +303,7 @@ export class GatewayRuntime {
         source: "gateway_runtime",
         component: "GatewayRuntime",
         outcome: "success",
-        status: "auto",
-        mode: updated.permissionMode,
-        details: { reason: payload.reason, previous: config.permissionMode },
-      });
-      return { permissionMode: updated.permissionMode, reason: payload.reason };
-    });
-
-    this.registerHandler("system.disarm", async (envelope) => {
-      // Legacy endpoint — now sets permissionMode="ask" (per-action approval).
-      const payload = envelope.command.payload as { reason?: string };
-      const config = await loadConfig();
-      const updated = { ...config, permissionMode: "ask" as const };
-      await saveConfig(updated);
-      recordStructuredObservation({
-        eventType: "system.permission_mode_changed",
-        workflow: "execution",
-        source: "gateway_runtime",
-        component: "GatewayRuntime",
-        outcome: "success",
-        status: "ask",
+        status: payload.mode,
         mode: updated.permissionMode,
         details: { reason: payload.reason, previous: config.permissionMode },
       });

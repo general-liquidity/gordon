@@ -78,13 +78,13 @@ const portfolioOutputSchema = z.object({
   summary: z.string().optional(),
 });
 
-const armInputSchema = z.object({
-  mode: z.enum(["ARMED", "SAFE"]),
+const setPermissionModeInputSchema = z.object({
+  mode: z.enum(["auto", "ask", "strict"]),
 });
 
-const armOutputSchema = z.object({
+const setPermissionModeOutputSchema = z.object({
   success: z.boolean(),
-  mode: z.enum(["ARMED", "SAFE"]),
+  mode: z.enum(["auto", "ask", "strict"]),
 });
 
 const fundInputSchema = z.object({
@@ -282,7 +282,7 @@ export const CANONICAL_ACTIONS: ActionDefinition[] = [
     capability: "execute",
     taskScope: "execution",
     sideEffectLevel: "funds",
-    approvalPolicy: "armed_mode",
+    approvalPolicy: "trade_permission",
     dryRunSupported: true,
     providerRequirements: [{ kind: "exchange", optional: true }, { kind: "broker", optional: true }],
     rateLimitBudget: "execution",
@@ -409,8 +409,8 @@ export const CANONICAL_ACTIONS: ActionDefinition[] = [
     providerRequirements: [{ kind: "system" }],
     rateLimitBudget: "ops",
     visibility: ["interactive", "json", "agent"],
-    inputSchema: armInputSchema,
-    outputSchema: armOutputSchema,
+    inputSchema: setPermissionModeInputSchema,
+    outputSchema: setPermissionModeOutputSchema,
     ...createSlash({
       name: "auto",
       aliases: [],
@@ -439,8 +439,8 @@ export const CANONICAL_ACTIONS: ActionDefinition[] = [
     providerRequirements: [{ kind: "system" }],
     rateLimitBudget: "ops",
     visibility: ["interactive", "json", "agent"],
-    inputSchema: armInputSchema,
-    outputSchema: armOutputSchema,
+    inputSchema: setPermissionModeInputSchema,
+    outputSchema: setPermissionModeOutputSchema,
     ...createSlash({
       name: "ask",
       aliases: [],
@@ -469,8 +469,8 @@ export const CANONICAL_ACTIONS: ActionDefinition[] = [
     providerRequirements: [{ kind: "system" }],
     rateLimitBudget: "ops",
     visibility: ["interactive", "json", "agent"],
-    inputSchema: armInputSchema,
-    outputSchema: armOutputSchema,
+    inputSchema: setPermissionModeInputSchema,
+    outputSchema: setPermissionModeOutputSchema,
     ...createSlash({
       name: "strict",
       aliases: ["readonly"],

@@ -95,7 +95,7 @@ const chainlinkCCIPTransferTool = createTool({
   description:
     "Execute a cross-chain token transfer using Chainlink CCIP. " +
     "Transfers tokens between EVM chains (e.g., Ethereum -> Arbitrum). " +
-    "REQUIRES ARMED MODE. Confirm transfer details with user before executing. " +
+    "REQUIRES permissionMode NOT STRICT. Confirm transfer details with user before executing. " +
     "Flow: approve -> estimate fee -> ccipSend. Requires EVM_PRIVATE_KEY.",
   inputSchema: z.object({
     sourceChain: z

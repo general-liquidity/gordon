@@ -453,11 +453,11 @@ export function subscribeToEvents(dispatch: Dispatch): () => void {
     }),
   );
 
-  // 41. system:armed
+  // 41. system:permission_mode_changed
   unsubs.push(
-    bus.on("system:armed", (event: EventData<"system:armed">) => {
-      notify(dispatch, "system:armed", "strategy",
-        `\u25C8 System ARMED for ${event.duration}h (expires ${event.expiresAt})`,
+    bus.on("system:permission_mode_changed", (event: EventData<"system:permission_mode_changed">) => {
+      notify(dispatch, "system:permission_mode_changed", "strategy",
+        `\u25C8 permissionMode = '${event.permissionMode}'${event.previous ? ` (was '${event.previous}')` : ""}${event.reason ? ` — ${event.reason}` : ""}`,
       );
     }),
   );

@@ -27,7 +27,7 @@ export class TradingService {
   async validatePlan(plan: Plan, config: GordonConfig, portfolioValue: number): Promise<void> {
     // Check permissionMode allows trade execution
     if (config.permissionMode === "strict") {
-      throw new TradingModeError("SAFE", "ARMED");
+      throw new TradingModeError("strict");
     }
 
     // Check allocation limits

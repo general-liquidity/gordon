@@ -78,7 +78,7 @@ export const solanaOrcaOpenCenteredTool = createTool({
   id: "solana_orca_open_centered",
   description:
     "Open a centered liquidity position on an Orca Whirlpool. " +
-    "Places liquidity symmetrically around the current price. Requires ARMED mode.",
+    "Places liquidity symmetrically around the current price. Requires permissionMode not 'strict'.",
   inputSchema: z.object({
     whirlpoolAddress: z.string().describe("Whirlpool pool address"),
     priceOffsetBps: z.number().describe("Price offset from center in basis points"),
@@ -95,7 +95,7 @@ export const solanaOrcaOpenCenteredTool = createTool({
 export const solanaOrcaOpenSingleSidedTool = createTool({
   id: "solana_orca_open_single_sided",
   description:
-    "Open a single-sided liquidity position on an Orca Whirlpool. Requires ARMED mode.",
+    "Open a single-sided liquidity position on an Orca Whirlpool. Requires permissionMode not 'strict'.",
   inputSchema: z.object({
     whirlpoolAddress: z.string().describe("Whirlpool pool address"),
     distanceFromCurrentPriceBps: z.number().describe("Distance from current price in bps"),
@@ -112,7 +112,7 @@ export const solanaOrcaOpenSingleSidedTool = createTool({
 
 export const solanaOrcaClosePositionTool = createTool({
   id: "solana_orca_close_position",
-  description: "Close an Orca Whirlpool LP position and withdraw liquidity. Requires ARMED mode.",
+  description: "Close an Orca Whirlpool LP position and withdraw liquidity. Requires permissionMode not 'strict'.",
   inputSchema: z.object({
     positionMintAddress: z.string().describe("Position mint address (NFT representing the LP position)"),
   }),
@@ -124,7 +124,7 @@ export const solanaOrcaClosePositionTool = createTool({
 export const solanaOrcaCreateClmmTool = createTool({
   id: "solana_orca_create_clmm",
   description:
-    "Create a new Orca CLMM (Concentrated Liquidity Market Maker) pool. Requires ARMED mode.",
+    "Create a new Orca CLMM (Concentrated Liquidity Market Maker) pool. Requires permissionMode not 'strict'.",
   inputSchema: z.object({
     mintDeploy: z.string().describe("Deployed token mint address"),
     mintPair: z.string().describe("Paired token mint address"),
@@ -139,7 +139,7 @@ export const solanaOrcaCreateClmmTool = createTool({
 export const solanaOrcaCreateWhirlpoolTool = createTool({
   id: "solana_orca_create_whirlpool",
   description:
-    "Create a single-sided Orca Whirlpool with initial deposit. Requires ARMED mode.",
+    "Create a single-sided Orca Whirlpool with initial deposit. Requires permissionMode not 'strict'.",
   inputSchema: z.object({
     depositTokenAmount: z.number().describe("Amount of deposit token"),
     depositTokenMint: z.string().describe("Deposit token mint address"),
@@ -161,7 +161,7 @@ export const solanaOrcaCreateWhirlpoolTool = createTool({
 
 export const solanaRaydiumCreateClmmTool = createTool({
   id: "solana_raydium_create_clmm",
-  description: "Create a Raydium CLMM concentrated liquidity pool. Requires ARMED mode.",
+  description: "Create a Raydium CLMM concentrated liquidity pool. Requires permissionMode not 'strict'.",
   inputSchema: z.object({
     mint1: z.string().describe("First token mint address"),
     mint2: z.string().describe("Second token mint address"),
@@ -176,7 +176,7 @@ export const solanaRaydiumCreateClmmTool = createTool({
 
 export const solanaRaydiumCreateCpmmTool = createTool({
   id: "solana_raydium_create_cpmm",
-  description: "Create a Raydium CPMM (constant product AMM) pool. Requires ARMED mode.",
+  description: "Create a Raydium CPMM (constant product AMM) pool. Requires permissionMode not 'strict'.",
   inputSchema: z.object({
     mintA: z.string().describe("Token A mint address"),
     mintB: z.string().describe("Token B mint address"),
@@ -196,7 +196,7 @@ export const solanaRaydiumCreateCpmmTool = createTool({
 
 export const solanaMeteoraCreateDlmmTool = createTool({
   id: "solana_meteora_create_dlmm",
-  description: "Create a Meteora DLMM (Dynamic Liquidity Market Maker) pool. Requires ARMED mode.",
+  description: "Create a Meteora DLMM (Dynamic Liquidity Market Maker) pool. Requires permissionMode not 'strict'.",
   inputSchema: z.object({
     binStep: z.number().describe("Bin step size"),
     tokenAMint: z.string().describe("Token A mint address"),
@@ -219,7 +219,7 @@ export const solanaMeteoraCreateDlmmTool = createTool({
 export const solanaManifestLimitOrderTool = createTool({
   id: "solana_manifest_limit_order",
   description:
-    "Place a limit order on Manifest DEX (Solana's on-chain orderbook). Requires ARMED mode.",
+    "Place a limit order on Manifest DEX (Solana's on-chain orderbook). Requires permissionMode not 'strict'.",
   inputSchema: z.object({
     marketId: z.string().describe("Manifest market public key"),
     quantity: z.number().describe("Order quantity"),
@@ -233,7 +233,7 @@ export const solanaManifestLimitOrderTool = createTool({
 
 export const solanaManifestCancelOrdersTool = createTool({
   id: "solana_manifest_cancel_orders",
-  description: "Cancel all open orders on a Manifest DEX market. Requires ARMED mode.",
+  description: "Cancel all open orders on a Manifest DEX market. Requires permissionMode not 'strict'.",
   inputSchema: z.object({
     marketId: z.string().describe("Manifest market public key"),
   }),
@@ -244,7 +244,7 @@ export const solanaManifestCancelOrdersTool = createTool({
 
 export const solanaManifestWithdrawTool = createTool({
   id: "solana_manifest_withdraw",
-  description: "Withdraw all funds from a Manifest DEX market. Requires ARMED mode.",
+  description: "Withdraw all funds from a Manifest DEX market. Requires permissionMode not 'strict'.",
   inputSchema: z.object({
     marketId: z.string().describe("Manifest market public key"),
   }),

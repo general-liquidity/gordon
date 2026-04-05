@@ -269,7 +269,7 @@ export const agentKitSwapTool = createTool({
     "Execute a token swap on Base L2 via DEX aggregation (routes through Uniswap, Aerodrome, " +
     "SushiSwap, etc. for best price). Automatically handles Permit2 token approvals. " +
     "IMPORTANT: Always call agentkit_get_swap_price first to show the quote. " +
-    "IMPORTANT: Requires ARMED mode. Confirm amount and tokens with user before executing. " +
+    "IMPORTANT: Requires permissionMode not 'strict'. Confirm amount and tokens with user before executing. " +
     "Native ETH address: 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE. " +
     "Only works on base-mainnet or ethereum-mainnet.",
   inputSchema: z.object({

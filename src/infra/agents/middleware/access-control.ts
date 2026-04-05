@@ -1,17 +1,10 @@
 /**
- * Access Control Middleware (permissionMode-driven)
+ * Access Control Middleware (permissionMode gate)
  *
- * Legacy ARMED/SAFE gating REMOVED — replaced by config.permissionMode
- * + the ApprovalDialog flow (PermissionEngine). This file is now a thin
- * shim that translates permissionMode to the legacy access-control API
- * so the orchestrator / ToolPolicy / runtime callers still compile.
- *
- *   permissionMode="auto"   → trade tools execute without confirmation
- *   permissionMode="ask"    → ApprovalDialog gates each trade tool (DEFAULT)
- *   permissionMode="strict" → trade tools blocked entirely at this layer
- *
- * The per-action approval is handled downstream in the PermissionEngine +
- * ApprovalDialog. This middleware now only blocks "strict" mode hard-reads.
+ * Thin gate layer that blocks trade-impacting tools when
+ * `config.permissionMode === "strict"` (read-only). For "auto" and "ask"
+ * modes this layer is a pass-through — downstream ApprovalDialog /
+ * PermissionEngine handles per-action approval.
  */
 
 import { createModuleLogger } from "../../logger/index.ts";
@@ -29,21 +22,12 @@ function safeAuditBlocked(userId: string, parameters: Record<string, unknown>, r
   }
 }
 
-// ============================================================================
-// Types (legacy shape preserved for caller compatibility)
-// ============================================================================
-
 export interface AccessControlResult {
   allowed: boolean;
   reason?: string;
-  /** Legacy field — always "ARMED" now unless permissionMode is "strict". */
-  mode: "ARMED" | "SAFE";
-  /** Legacy field — no longer used for gating, always null. */
-  armedUntil?: string | null;
-  remainingTimeMs?: number;
 }
 
-/** Trade tools that permissionMode="strict" fully blocks. */
+/** Tools that require permissionMode !== "strict" to execute. */
 const TRADING_TOOLS = new Set([
   // CEX/broker order tools
   "execute_plan", "close_trade", "cancel_trade", "place_order",
@@ -85,8 +69,7 @@ const TRADING_TOOLS = new Set([
 
 const STATE_MODIFYING_TOOLS = new Set(["approve_plan"]);
 
-export function requiresArmedModeForTool(toolName: string): boolean {
-  // Legacy alias — kept for caller compat. Returns true for trade tools.
+export function isTradeTool(toolName: string): boolean {
   return TRADING_TOOLS.has(toolName);
 }
 
@@ -95,51 +78,25 @@ export function isStateModifyingTool(toolName: string): boolean {
 }
 
 /**
- * Translate permissionMode to access-control result.
- * In "auto" + "ask" modes: allowed=true (approval happens downstream).
- * In "strict" mode: blocked for any trade tool.
+ * Evaluate whether a tool may execute under the current permissionMode.
+ * Non-trade tools always pass. Trade tools are blocked only when strict.
  */
-function evaluatePermissionMode(
-  toolName: string,
-  cfg: GordonConfig,
-  userId: string,
-): AccessControlResult {
-  const mode = cfg.permissionMode ?? "ask";
-
-  if (mode === "strict" && TRADING_TOOLS.has(toolName)) {
-    const reason = `Tool ${toolName} blocked — permissionMode is "strict" (read-only)`;
-    safeAuditBlocked(userId, { toolName, permissionMode: mode }, reason);
-    logger.info("Tool blocked by strict permissionMode", { toolName, userId });
-    return { allowed: false, reason, mode: "SAFE", armedUntil: null };
-  }
-
-  // auto + ask both allow through this layer; ask defers to ApprovalDialog.
-  return { allowed: true, mode: "ARMED", armedUntil: null };
-}
-
 export async function checkToolAccess(
   toolName: string,
   config: GordonConfig | null,
   userId: string = "system",
 ): Promise<AccessControlResult> {
-  if (!config) {
-    // No config — allow (startup path); downstream layers still apply.
-    return { allowed: true, mode: "ARMED", armedUntil: null };
-  }
-  // Only apply this layer to trade tools.
-  if (!TRADING_TOOLS.has(toolName)) {
-    return { allowed: true, mode: "ARMED", armedUntil: null };
-  }
-  return evaluatePermissionMode(toolName, config, userId);
-}
+  if (!config) return { allowed: true };
+  if (!TRADING_TOOLS.has(toolName)) return { allowed: true };
 
-export async function checkExplicitExecutionAccess(
-  toolName: string,
-  config: GordonConfig | null,
-  userId: string = "system",
-): Promise<AccessControlResult> {
-  // Legacy alias — same semantics now.
-  return checkToolAccess(toolName, config, userId);
+  if (config.permissionMode === "strict") {
+    const reason = `Tool ${toolName} blocked — permissionMode is "strict" (read-only)`;
+    safeAuditBlocked(userId, { toolName, permissionMode: config.permissionMode }, reason);
+    logger.info("Tool blocked by strict permissionMode", { toolName, userId });
+    return { allowed: false, reason };
+  }
+
+  return { allowed: true };
 }
 
 export function createAccessControlMiddleware(userId: string) {
@@ -162,29 +119,6 @@ export async function withAccessControl<T>(
   return fn();
 }
 
-export function requiresArmedMode(toolName: string): boolean {
-  return requiresArmedModeForTool(toolName);
-}
-
 export function getTradingTools(): string[] {
   return [...TRADING_TOOLS];
-}
-
-export function formatRemainingTime(_remainingTimeMs: number): string {
-  return "n/a (permissionMode does not use time-based expiry)";
-}
-
-export async function getArmedStatus(): Promise<{
-  armed: boolean;
-  armedUntil: string | null;
-  remainingTimeMs: number | null;
-}> {
-  // Legacy shape — translated from permissionMode.
-  const config = await loadConfig().catch(() => null);
-  const mode = config?.permissionMode ?? "ask";
-  return {
-    armed: mode === "auto" || mode === "ask",
-    armedUntil: null,
-    remainingTimeMs: null,
-  };
 }

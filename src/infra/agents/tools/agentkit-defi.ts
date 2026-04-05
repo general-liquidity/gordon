@@ -228,7 +228,7 @@ export const moonwellDepositTool = createTool({
   id: "moonwell_deposit",
   description:
     "Deposit (supply) assets to Moonwell lending protocol on Base L2 to earn yield. " +
-    "IMPORTANT: Requires ARMED mode. Confirm amount and token with user before executing. " +
+    "IMPORTANT: Requires permissionMode not 'strict'. Confirm amount and token with user before executing. " +
     `Moonwell MToken addresses on Base mainnet: ${MOONWELL_MTOKEN_LIST}.`,
   inputSchema: z.object({
     mTokenAddress: z
@@ -255,7 +255,7 @@ export const moonwellWithdrawTool = createTool({
   id: "moonwell_withdraw",
   description:
     "Withdraw (redeem) assets from Moonwell lending protocol on Base L2. " +
-    "IMPORTANT: Requires ARMED mode. Confirm amount with user before executing. " +
+    "IMPORTANT: Requires permissionMode not 'strict'. Confirm amount with user before executing. " +
     `Moonwell MToken addresses on Base mainnet: ${MOONWELL_MTOKEN_LIST}.`,
   inputSchema: z.object({
     mTokenAddress: z
@@ -283,7 +283,7 @@ export const basenamesRegisterTool = createTool({
   description:
     "Register a Basename (.base domain) on Base L2. Basenames are ENS-compatible " +
     "human-readable names (e.g., 'gordon.base') that resolve to your wallet address. " +
-    "IMPORTANT: Requires ARMED mode. Registration costs ETH (default 0.002 ETH). " +
+    "IMPORTANT: Requires permissionMode not 'strict'. Registration costs ETH (default 0.002 ETH). " +
     "Confirm the name and cost with the user before executing.",
   inputSchema: z.object({
     basename: z

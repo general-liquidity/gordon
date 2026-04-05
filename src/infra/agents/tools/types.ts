@@ -75,7 +75,7 @@ export const errors = {
   noLLM: { error: "LLM client not connected." },
   noContext: { error: "Context not available." },
   notArmed: (action: string) => ({
-    error: `System must be ARMED to ${action}. Use /arm first.`,
+    error: `permissionMode must not be 'strict' to ${action}. Use /auto or /ask.`,
   }),
   insufficientData: (symbol: string) => ({
     error: `Insufficient data for ${symbol}. Need at least 50 candles.`,
@@ -93,7 +93,7 @@ export function normalizeSymbol(symbol: string): string {
  * Helper to check if system is armed
  */
 export function isArmed(ctx: GordonContext): boolean {
-  return ctx.config?.mode === "ARMED";
+  return ctx.config?.permissionMode !== "strict";
 }
 
 // ============================================================================

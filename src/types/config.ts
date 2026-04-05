@@ -304,9 +304,9 @@ export const GordonConfigSchema = z.object({
   }),
   modelConfig: ModelConfigSchema.optional(),
   /**
-   * Permission mode — replaces legacy ARMED/SAFE toggle.
-   *   - "auto": trade tools execute without confirmation (formerly ARMED)
-   *   - "ask":  trade tools require per-action approval via ApprovalDialog (default, formerly SAFE)
+   * Permission mode — how Gordon gates trade-impacting actions.
+   *   - "auto":   trade tools execute without per-action approval
+   *   - "ask":    each trade requires ApprovalDialog confirmation (default)
    *   - "strict": read-only — trade tools blocked entirely
    */
   permissionMode: z.enum(["auto", "ask", "strict"]).default("ask"),
@@ -382,6 +382,4 @@ export type StrategyRuntimeConfig = z.infer<typeof StrategyRuntimeConfigSchema>;
 export type RegimeDetectionConfig = z.infer<typeof RegimeDetectionConfigSchema>;
 export type SystematicTradingConfig = z.infer<typeof SystematicTradingConfigSchema>;
 export type GordonConfig = z.infer<typeof GordonConfigSchema>;
-/** Legacy alias (ARMED/SAFE removed). Kept for callers that haven't migrated. */
-export type Mode = "SAFE" | "ARMED";
 export type PermissionMode = GordonConfig["permissionMode"];

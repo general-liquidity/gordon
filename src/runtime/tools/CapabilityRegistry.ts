@@ -30,7 +30,7 @@ const STATIC_TOOL_OVERRIDES: Record<string, Partial<RuntimeToolSpec>> = {
     workerRole: "Gordon",
     supportsStreaming: true,
     supportsBackground: false,
-    requiresArmedMode: false,
+    requiresTradePermission: false,
   },
   runtime_query_message: {
     category: "runtime",
@@ -38,7 +38,7 @@ const STATIC_TOOL_OVERRIDES: Record<string, Partial<RuntimeToolSpec>> = {
     riskClass: "low",
     sideEffectLevel: "read",
     workerRole: "Gordon",
-    requiresArmedMode: false,
+    requiresTradePermission: false,
   },
   runtime_query_structured: {
     category: "runtime",
@@ -46,7 +46,7 @@ const STATIC_TOOL_OVERRIDES: Record<string, Partial<RuntimeToolSpec>> = {
     riskClass: "low",
     sideEffectLevel: "read",
     workerRole: "Gordon",
-    requiresArmedMode: false,
+    requiresTradePermission: false,
   },
   scan_market: {
     category: "market",
@@ -138,7 +138,7 @@ const STATIC_TOOL_OVERRIDES: Record<string, Partial<RuntimeToolSpec>> = {
     riskClass: "medium",
     sideEffectLevel: "read",
     workerRole: "Planner",
-    requiresArmedMode: false,
+    requiresTradePermission: false,
   },
   approve_plan: {
     category: "planning",
@@ -167,7 +167,7 @@ const STATIC_TOOL_OVERRIDES: Record<string, Partial<RuntimeToolSpec>> = {
     riskClass: "high",
     sideEffectLevel: "execution",
     workerRole: "Executor",
-    requiresArmedMode: true,
+    requiresTradePermission: true,
   },
   close_trade: {
     category: "execution",
@@ -175,7 +175,7 @@ const STATIC_TOOL_OVERRIDES: Record<string, Partial<RuntimeToolSpec>> = {
     riskClass: "high",
     sideEffectLevel: "execution",
     workerRole: "Executor",
-    requiresArmedMode: true,
+    requiresTradePermission: true,
   },
   transfer_funds: {
     category: "wallet",
@@ -183,7 +183,7 @@ const STATIC_TOOL_OVERRIDES: Record<string, Partial<RuntimeToolSpec>> = {
     riskClass: "critical",
     sideEffectLevel: "execution",
     workerRole: "Executor",
-    requiresArmedMode: true,
+    requiresTradePermission: true,
   },
   withdraw_to_external: {
     category: "wallet",
@@ -191,7 +191,7 @@ const STATIC_TOOL_OVERRIDES: Record<string, Partial<RuntimeToolSpec>> = {
     riskClass: "critical",
     sideEffectLevel: "execution",
     workerRole: "Executor",
-    requiresArmedMode: true,
+    requiresTradePermission: true,
   },
   set_permission_mode: {
     category: "system",
@@ -407,7 +407,7 @@ export class CapabilityRegistry {
     const permissionScope = inferPermissionScope(toolId, category);
     const riskClass = inferRiskClass(permissionScope, category);
     const sideEffectLevel = inferSideEffectLevel(permissionScope);
-    const requiresArmedMode = permissionScope === "livetrade.execute" || permissionScope === "transfer.execute";
+    const requiresTradePermission = permissionScope === "livetrade.execute" || permissionScope === "transfer.execute";
     const workerRole = inferWorkerRole(toolId, category, permissionScope);
 
     const base: RuntimeToolSpec = {
@@ -416,7 +416,7 @@ export class CapabilityRegistry {
       riskClass,
       permissionScope,
       sideEffectLevel,
-      requiresArmedMode,
+      requiresTradePermission,
       supportsStreaming: category === "analysis" || category === "planning",
       supportsBackground: category === "system" || category === "monitoring" || category === "market",
       idempotent: sideEffectLevel !== "execution",

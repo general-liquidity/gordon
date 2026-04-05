@@ -1076,10 +1076,10 @@ export const executeWithAlgorithmTool = createTool({
       }, { toolName: "execute_with_algorithm" });
     }
 
-    if (ctx.config?.mode !== "ARMED") {
+    if (ctx.config?.permissionMode === "strict") {
       return validateToolOutput(executeWithAlgorithmOutputSchema, {
         success: false,
-        error: "System must be ARMED to execute algorithmic orders.",
+        error: "permissionMode must not be 'strict' to execute algorithmic orders. Use /auto or /ask.",
       }, { toolName: "execute_with_algorithm" });
     }
 
