@@ -592,32 +592,50 @@ export async function handleSystemMenuCommand(
       const currentProvider = config.modelConfig?.provider ?? "openai";
       const currentModel = config.modelConfig?.model ?? "default";
 
-      // No args → handled by App.tsx (opens interactive ModelPicker)
-      // This handler only processes /model <provider> [model] quick path
+      // No args → App.tsx intercepts and opens interactive ModelPicker
       if (!args || args.trim() === "") {
-        // App.tsx intercepts /model before it reaches here, but just in case:
         addMessage(setState, "gordon",
-          `Current: ${currentProvider} / ${currentModel}\n` +
-          `Use /model to open the interactive picker, or /model <provider> <model> for quick switch.`
+          `Current: ${currentProvider} / ${currentModel}\nUse /model to open the interactive picker.`
         );
         return true;
       }
 
-      // Parse args: /model <provider> [model]
+      // ── Try alias first: /model opus, /model sonnet, /model gpt4o ──
+      const { resolveAlias } = await import("../../app/modelAliases.ts");
+      const aliasResult = resolveAlias(args.trim());
+      if (aliasResult) {
+        const updated = {
+          ...config,
+          modelConfig: {
+            ...config.modelConfig,
+            provider: aliasResult.provider as typeof currentProvider,
+            model: aliasResult.model,
+          },
+        };
+        await saveConfig(updated);
+        addMessage(setState, "gordon",
+          `\u2713 Switched to ${aliasResult.displayName}\n` +
+          `  Provider: ${currentProvider} \u2192 ${aliasResult.provider}\n` +
+          `  Model: ${currentModel} \u2192 ${aliasResult.model}`
+        );
+        return true;
+      }
+
+      // ── Try provider + model: /model anthropic claude-sonnet-4-6 ──
       const modelParts = args.trim().split(/\s+/);
       const newProvider = modelParts[0]?.toLowerCase();
       const newModel = modelParts.slice(1).join(" ") || undefined;
 
       const validProviders = ["openai", "anthropic", "google", "inception", "dedalus"];
       if (!validProviders.includes(newProvider ?? "")) {
+        // Not a known alias or provider — show help
+        const { formatAliasHelp } = await import("../../app/modelAliases.ts");
         addMessage(setState, "gordon",
-          `Unknown provider: ${newProvider}\n` +
-          `Valid providers: ${validProviders.join(", ")}`
+          `Unknown model or provider: ${args.trim()}\n\n` + formatAliasHelp()
         );
         return true;
       }
 
-      // Update config
       const updated = {
         ...config,
         modelConfig: {
@@ -630,10 +648,9 @@ export async function handleSystemMenuCommand(
 
       const displayModel = newModel ?? `${newProvider} default`;
       addMessage(setState, "gordon",
-        `Model updated:\n` +
+        `\u2713 Model updated:\n` +
         `  Provider: ${currentProvider} \u2192 ${newProvider}\n` +
-        `  Model: ${currentModel} \u2192 ${displayModel}\n\n` +
-        `Changes take effect on the next message.`
+        `  Model: ${currentModel} \u2192 ${displayModel}`
       );
       return true;
     }

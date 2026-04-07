@@ -415,9 +415,12 @@ function AppInner() {
 
       // ── Phase 15-18 slash commands ──
       if (trimmed === "/model" || trimmed === "/m" || trimmed === "/provider") {
+        // No args → open interactive picker
         setShowModelPicker(true);
         return;
       }
+      // /model <alias> with args → let menuHandler do instant alias resolution
+      // (don't intercept — falls through to handleInput → handleMenuCommand)
       if (trimmed === "/settings") {
         setShowSettings(true);
         return;
