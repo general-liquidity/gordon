@@ -48,9 +48,10 @@ const ALIASES: Record<string, ResolvedModel> = {
   "gemma-31b":        { provider: "google", model: "gemma-4-31b-it",                      displayName: "Gemma 4 31B" },
   gemma:              { provider: "google", model: "gemma-4-31b-it",                      displayName: "Gemma 4 31B" },
 
-  // ── Inception (placeholder — user will provide) ──
-  mercury:    { provider: "inception", model: "inception/mercury-coder-small-2506", displayName: "Mercury Coder" },
-  "mercury-2": { provider: "inception", model: "inception/mercury-2",               displayName: "Mercury 2" },
+  // ── Inception ──
+  mercury:      { provider: "inception", model: "mercury-2",      displayName: "Mercury 2 (128K ctx, $0.25/$0.75)" },
+  "mercury-2":  { provider: "inception", model: "mercury-2",      displayName: "Mercury 2" },
+  "mercury-edit": { provider: "inception", model: "mercury-edit-2", displayName: "Mercury Edit 2 (code editing)" },
 
   // ── Meta aliases ──
   best:       { provider: "anthropic", model: "claude-opus-4-6",   displayName: "Best (Opus 4.6)" },

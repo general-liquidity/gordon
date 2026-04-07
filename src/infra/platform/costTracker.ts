@@ -61,6 +61,9 @@ const MODEL_PRICING: Record<string, ModelPricing> = {
   "gpt-5.4-pro":       { inputPer1M: 3.00,  outputPer1M: 15.00, cacheReadPer1M: 0.30, cacheWritePer1M: 3.75 },
   "gpt-5.4-mini":      { inputPer1M: 0.75,  outputPer1M: 5.00,  cacheReadPer1M: 0.08, cacheWritePer1M: 0.94 },
   "gpt-5.4-nano":      { inputPer1M: 0.20,  outputPer1M: 1.00,  cacheReadPer1M: 0.02, cacheWritePer1M: 0.25 },
+  // Inception
+  "mercury-2":          { inputPer1M: 0.25,  outputPer1M: 0.75,  cacheReadPer1M: 0.025, cacheWritePer1M: 0.25 },
+  "mercury-edit-2":     { inputPer1M: 0.25,  outputPer1M: 0.75,  cacheReadPer1M: 0.025, cacheWritePer1M: 0.25 },
 };
 
 const DEFAULT_PRICING: ModelPricing = { inputPer1M: 3.00, outputPer1M: 15.00, cacheReadPer1M: 0.30, cacheWritePer1M: 3.75 };

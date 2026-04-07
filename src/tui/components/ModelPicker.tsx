@@ -54,8 +54,8 @@ const MODEL_OPTIONS: Record<string, ModelOption[]> = {
     { label: "Provider default", value: "__default__" },
   ],
   inception: [
-    { label: "Mercury Coder (flagship)", value: "inception/mercury-coder-small-2506" },
-    { label: "Mercury 2", value: "inception/mercury-2" },
+    { label: "Mercury 2 (fastest reasoning, 128K ctx — $0.25/$0.75)", value: "mercury-2" },
+    { label: "Mercury Edit 2 (code editing, 32K ctx — $0.25/$0.75)", value: "mercury-edit-2" },
     { label: "Provider default", value: "__default__" },
   ],
   dedalus: [
