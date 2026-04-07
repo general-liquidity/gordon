@@ -45,6 +45,16 @@ import { ContextVisualization } from "./components/ContextVisualization.js";
 import { SessionBrowser } from "./components/SessionBrowser.js";
 import { MemorySelector } from "./components/MemorySelector.js";
 import { ModelPicker } from "./components/ModelPicker.js";
+import { ThemePicker } from "./components/ThemePicker.js";
+import { ExchangePicker } from "./components/ExchangePicker.js";
+import { BrokerPicker } from "./components/BrokerPicker.js";
+import { DoctorDialog } from "./components/DoctorDialog.js";
+import { HelpBrowser } from "./components/HelpBrowser.js";
+import { ConfigEditor } from "./components/ConfigEditor.js";
+import { ThreadBrowser } from "./components/ThreadBrowser.js";
+import { JournalViewer } from "./components/JournalViewer.js";
+import { ShortcutsBrowser } from "./components/ShortcutsBrowser.js";
+import { ApprovalBrowser } from "./components/ApprovalBrowser.js";
 import { PrivacyScreen } from "./components/PrivacyScreen.js";
 import { FeedbackSurvey } from "./components/FeedbackSurvey.js";
 import { ThinkStep } from "./components/ThinkStep.js";
@@ -148,6 +158,16 @@ function AppInner() {
   const [feedbackTradeData, setFeedbackTradeData] = useState<FeedbackTradeData | null>(null);
 
   const [showModelPicker, setShowModelPicker] = useState(false);
+  const [showThemePicker, setShowThemePicker] = useState(false);
+  const [showExchangePicker, setShowExchangePicker] = useState(false);
+  const [showBrokerPicker, setShowBrokerPicker] = useState(false);
+  const [showDoctor, setShowDoctor] = useState(false);
+  const [showHelpBrowser, setShowHelpBrowser] = useState(false);
+  const [showConfigEditor, setShowConfigEditor] = useState(false);
+  const [showThreadBrowser, setShowThreadBrowser] = useState(false);
+  const [showJournal, setShowJournal] = useState(false);
+  const [showShortcuts, setShowShortcuts] = useState(false);
+  const [showApprovalBrowser, setShowApprovalBrowser] = useState(false);
 
   // ── Backend module UI toggles ──
   const [showAudit, setShowAudit] = useState(false);
@@ -415,12 +435,50 @@ function AppInner() {
 
       // ── Phase 15-18 slash commands ──
       if (trimmed === "/model" || trimmed === "/m" || trimmed === "/provider") {
-        // No args → open interactive picker
         setShowModelPicker(true);
         return;
       }
-      // /model <alias> with args → let menuHandler do instant alias resolution
-      // (don't intercept — falls through to handleInput → handleMenuCommand)
+      if (trimmed === "/theme") {
+        setShowThemePicker(true);
+        return;
+      }
+      if (trimmed === "/exchange") {
+        setShowExchangePicker(true);
+        return;
+      }
+      if (trimmed === "/broker") {
+        setShowBrokerPicker(true);
+        return;
+      }
+      if (trimmed === "/doctor") {
+        setShowDoctor(true);
+        return;
+      }
+      if (trimmed === "/help" || trimmed === "/h" || trimmed === "/commands") {
+        setShowHelpBrowser(true);
+        return;
+      }
+      if (trimmed === "/config") {
+        setShowConfigEditor(true);
+        return;
+      }
+      if (trimmed === "/threads" || trimmed === "/sessions-list") {
+        setShowThreadBrowser(true);
+        return;
+      }
+      if (trimmed === "/journal" || trimmed === "/trades") {
+        setShowJournal(true);
+        return;
+      }
+      if (trimmed === "/shortcuts" || trimmed === "/keys") {
+        setShowShortcuts(true);
+        return;
+      }
+      if (trimmed === "/runtime-approvals" || trimmed === "/approvals") {
+        setShowApprovalBrowser(true);
+        return;
+      }
+      // /model <alias>, /exchange <subcommand>, etc. with args → falls through to handlers
       if (trimmed === "/settings") {
         setShowSettings(true);
         return;
@@ -631,6 +689,81 @@ function AppInner() {
         onCancel={() => setShowModelPicker(false)}
       />
     );
+  }
+
+  // ── Interactive dialogs (Claude Code pattern: full-screen replacement) ──
+
+  if (showThemePicker) {
+    return <ThemePicker currentTheme="dark" onSelect={async (theme) => {
+      try { const { loadConfig: lc, saveConfig: sc } = await import("../infra/storage/config.ts"); const cfg = await lc(); await sc({ ...cfg, theme }); } catch {}
+      dispatch({ type: "ADD_MESSAGE", message: { id: `theme-${Date.now()}`, role: "system", content: `Theme changed to ${theme}. Restart for full effect.`, timestamp: new Date().toISOString() } });
+      setShowThemePicker(false);
+    }} onCancel={() => setShowThemePicker(false)} />;
+  }
+
+  if (showExchangePicker) {
+    return <ExchangePicker activeExchange={null} configuredExchanges={[]} onComplete={(action, exchange, creds) => {
+      dispatch({ type: "ADD_MESSAGE", message: { id: `exchange-${Date.now()}`, role: "system", content: `Exchange ${action}: ${exchange}${creds ? " (credentials saved)" : ""}`, timestamp: new Date().toISOString() } });
+      setShowExchangePicker(false);
+    }} onCancel={() => setShowExchangePicker(false)} />;
+  }
+
+  if (showBrokerPicker) {
+    return <BrokerPicker activeBroker={null} configuredBrokers={[]} onComplete={(action, broker, creds) => {
+      dispatch({ type: "ADD_MESSAGE", message: { id: `broker-${Date.now()}`, role: "system", content: `Broker ${action}: ${broker}${creds ? " (credentials saved)" : ""}`, timestamp: new Date().toISOString() } });
+      setShowBrokerPicker(false);
+    }} onCancel={() => setShowBrokerPicker(false)} />;
+  }
+
+  if (showDoctor) {
+    return <DoctorDialog checks={[
+      { id: "llm", label: "LLM Provider", status: "pass", message: "Connected" },
+      { id: "exchange", label: "Exchange", status: "warn", message: "No exchange configured", fixCommand: "/exchange", fixLabel: "Open exchange setup" },
+      { id: "broker", label: "Broker", status: "warn", message: "No broker configured", fixCommand: "/broker", fixLabel: "Open broker setup" },
+      { id: "keyring", label: "Keyring", status: "info", message: "Available but not enabled" },
+    ]} onRunFix={(cmd) => { setShowDoctor(false); handleSubmit(cmd); }} onCancel={() => setShowDoctor(false)} />;
+  }
+
+  if (showHelpBrowser) {
+    return <HelpBrowser onRunCommand={(cmd) => { setShowHelpBrowser(false); handleSubmit(cmd); }} onCancel={() => setShowHelpBrowser(false)} />;
+  }
+
+  if (showConfigEditor) {
+    return <ConfigEditor items={[
+      { key: "permissionMode", label: "Permission Mode", category: "Trading", currentValue: permissionMode ?? "ask", type: "select", options: [{ label: "auto", value: "auto" }, { label: "ask", value: "ask" }, { label: "strict", value: "strict" }], description: "How Gordon handles trade execution" },
+      { key: "startupBannerMode", label: "Startup Banner", category: "UI", currentValue: "full", type: "select", options: [{ label: "full", value: "full" }, { label: "quiet", value: "quiet" }] },
+      { key: "useKeyring", label: "Use Keyring", category: "Security", currentValue: "false", type: "boolean", description: "Store credentials in OS keyring" },
+    ]} onSave={async (key, value) => {
+      try { const { loadConfig: lc, saveConfig: sc } = await import("../infra/storage/config.ts"); const cfg = await lc(); await sc({ ...cfg, [key]: value }); } catch {}
+      dispatch({ type: "ADD_MESSAGE", message: { id: `config-${Date.now()}`, role: "system", content: `Config updated: ${key} = ${value}`, timestamp: new Date().toISOString() } });
+    }} onCancel={() => setShowConfigEditor(false)} />;
+  }
+
+  if (showThreadBrowser) {
+    return <ThreadBrowser threads={[]} activeThreadId={threadId} onSwitch={(id) => {
+      dispatch({ type: "ADD_MESSAGE", message: { id: `thread-${Date.now()}`, role: "system", content: `Switched to thread ${id}`, timestamp: new Date().toISOString() } });
+      setShowThreadBrowser(false);
+    }} onDelete={(id) => {
+      dispatch({ type: "ADD_MESSAGE", message: { id: `thread-del-${Date.now()}`, role: "system", content: `Deleted thread ${id}`, timestamp: new Date().toISOString() } });
+    }} onCancel={() => setShowThreadBrowser(false)} />;
+  }
+
+  if (showJournal) {
+    return <JournalViewer trades={[]} onCancel={() => setShowJournal(false)} />;
+  }
+
+  if (showShortcuts) {
+    return <ShortcutsBrowser onCancel={() => setShowShortcuts(false)} />;
+  }
+
+  if (showApprovalBrowser) {
+    return <ApprovalBrowser pending={[]} recent={[]} onApprove={(id, persist) => {
+      handleSubmit(`approve ${id}${persist ? " persist" : ""}`);
+      setShowApprovalBrowser(false);
+    }} onDeny={(id) => {
+      handleSubmit(`deny ${id}`);
+      setShowApprovalBrowser(false);
+    }} onCancel={() => setShowApprovalBrowser(false)} />;
   }
 
   // ── Placeholder text for PromptInput ──
