@@ -178,9 +178,9 @@ export function PromptInput({
           {visibleSlice.map((row, i) => {
             if (row.kind === "header") {
               return (
-                <Box key={`hdr-${row.text}-${i}`}>
-                  <Text dimColor bold>
-                    {" "}{row.text.toUpperCase()}
+                <Box key={`hdr-${row.text}-${i}`} marginTop={i > 0 ? 1 : 0}>
+                  <Text dimColor>
+                    {"  ── "}{row.text.toLowerCase()}{" ──"}
                   </Text>
                 </Box>
               );
@@ -199,7 +199,7 @@ export function PromptInput({
                 <Text color={isFocused ? "cyanBright" : undefined} bold={isFocused}>
                   {" "}{padded}
                 </Text>
-                <Text dimColor={!isFocused} color={isFocused ? "white" : undefined}>
+                <Text dimColor={!isFocused} color={isFocused ? "white" : undefined} wrap="truncate-end">
                   {(cmd.description ?? "").slice(0, descWidth)}
                 </Text>
               </Box>

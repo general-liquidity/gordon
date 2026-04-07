@@ -607,7 +607,7 @@ function AppInner() {
           : "";
 
   return (
-    <Box flexDirection="column" height={process.stdout.rows ?? 24}>
+    <Box flexDirection="column" minHeight={process.stdout.rows ?? 24}>
       {/* ── Header ── */}
       <GordonHeader
         permissionMode={permissionMode}
