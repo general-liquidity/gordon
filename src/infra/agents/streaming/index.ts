@@ -4,6 +4,7 @@ export {
   resetAgentEventStream,
 } from "./coordinator.ts";
 export { AgentEventStream, createEvent } from "./events.ts";
+export { bridgeStreamEvent, resetStreamBridge } from "./streamBridge.ts";
 export type {
   AgentEvent,
   AgentEventKind,

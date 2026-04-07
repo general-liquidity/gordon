@@ -61,3 +61,28 @@ export type {
   TokenSample,
   ThresholdStage,
 } from "./tokenProjection.ts";
+
+// Compaction auto-trigger (wires TokenProjector into agent loop)
+export {
+  CompactionTrigger,
+  getCompactionTrigger,
+  resetCompactionTrigger,
+} from "./compactionTrigger.ts";
+export type { CompactionAction, CompactionDecision } from "./compactionTrigger.ts";
+
+// Conversation-wide tool result budget
+export {
+  ConversationBudget,
+  getConversationBudget,
+  resetConversationBudget,
+  DEFAULT_CONVERSATION_BUDGET_CHARS,
+} from "./conversationBudget.ts";
+export type { TrackedResult, BudgetStats } from "./conversationBudget.ts";
+
+// Message tombstones for audit trail
+export {
+  recordTombstone,
+  recordTombstones,
+  countTombstones,
+} from "./tombstones.ts";
+export type { Tombstone, TombstoneReason } from "./tombstones.ts";

@@ -20,3 +20,10 @@ export type {
   RuleSource,
   EvaluateInput,
 } from "./rules.ts";
+
+// Permission decision racing (hooks ↔ ApprovalDialog)
+export {
+  racePermissionDecision,
+  quickPermissionCheck,
+} from "./racing.ts";
+export type { RaceResult, RaceOptions } from "./racing.ts";
