@@ -59,9 +59,13 @@ const MODEL_OPTIONS: Record<string, ModelOption[]> = {
     { label: "Provider default", value: "__default__" },
   ],
   dedalus: [
-    { label: "Claude Sonnet via Dedalus", value: "openai/anthropic/claude-sonnet-4-6" },
     { label: "GPT-5.4 via Dedalus", value: "openai/gpt-5.4" },
+    { label: "Claude Opus 4.6 via Dedalus", value: "openai/anthropic/claude-opus-4-6" },
+    { label: "Claude Haiku 4.5 via Dedalus", value: "openai/anthropic/claude-haiku-4-5-20251001" },
     { label: "Gemini 3.1 Pro via Dedalus", value: "openai/google/gemini-3.1-pro-preview" },
+    { label: "Grok 4.1 Fast Reasoning via Dedalus", value: "openai/xai/grok-4-1-fast-reasoning" },
+    { label: "Grok 4.1 Fast Non-Reasoning via Dedalus", value: "openai/xai/grok-4-1-fast-non-reasoning" },
+    { label: "Kimi K2.5 via Dedalus", value: "openai/moonshot/kimi-k2.5" },
     { label: "Provider default", value: "__default__" },
   ],
 };
