@@ -17,20 +17,61 @@ import {
   instrumentedSystemTools,
   instrumentedSchedulerTools,
   instrumentedAutonomousTools,
+  instrumentedIndicatorTools,
+  instrumentedMarketDataTools,
+  instrumentedMarketTools,
+  instrumentedDiscoveryTools,
+  instrumentedStrategyTools,
+  instrumentedParallelAnalysisTools,
+  instrumentedChartTools,
+  instrumentedMarketAnalysisTools,
+  instrumentedCompositionTools,
+  instrumentedMultiModalChartTools,
+  instrumentedLiquidationIntelligenceTools,
+  instrumentedPairAnalysisTools,
+  instrumentedOrderbookTools,
+  instrumentedAccountTools,
+  instrumentedPositionTools,
+  instrumentedHistoryTools,
+  instrumentedWalletTools,
+  instrumentedEarnTools,
+  instrumentedPositionTrackingTools,
+  instrumentedRiskManagementTools,
+  instrumentedCheckRiskTool,
+  instrumentedTradingTools,
+  instrumentedBacktestTools,
+  instrumentedEvalTools,
+  instrumentedStrategyGenerationTools,
+  instrumentedPlaybookTools,
+  instrumentedProtocolTools,
+  instrumentedMemoryTools,
+  instrumentedSharedContextTools,
+  instrumentedRegimeTools,
+  instrumentedBaseOnchainTools,
+  instrumentedBaseSignalTools,
+  instrumentedBaseIndexerTools,
+  instrumentedUniswapDataTools,
+  instrumentedDexSearchTools,
+  instrumentedDefillamaYieldTools,
+  instrumentedChainlinkStreamsTools,
+  instrumentedChainlinkFeedsTools,
+  instrumentedSynthDataTools,
+  instrumentedAgentKitOnchainTools,
+  instrumentedSolanaKitWalletTools,
+  instrumentedPolkadotKitAssetTools,
+  instrumentedPolkadotKitStakingTools,
+  instrumentedPolkadotKitDefiTools,
+  instrumentedAdvancedTools,
+  instrumentedSystematicTools,
+  instrumentedAuditTools,
+  instrumentedMetricsTools,
   gordonInputGuard,
   gordonOutputSanitizer,
 } from "../instrumentedTools.ts";
 import { createMemory } from "../memoryFactory.ts";
 import { resolveRuntimeModel, formatModelLabel, registerObservability } from "../agentHelpers.ts";
-import { getScanner } from "./scanner.ts";
-import { getAnalyst } from "./analyst.ts";
-import { getPlanner } from "./planner.ts";
 import { getExecutor } from "./executor.ts";
-import { getMonitor } from "./monitor.ts";
-import { getTeacher } from "./teacher.ts";
-import { getBacktester } from "./backtester.ts";
-import { getCritic } from "./critic.ts";
-import { getAuditor } from "./auditor.ts";
+import { getResearcher } from "./researcher.ts";
 
 const logger = createModuleLogger("agents");
 
@@ -77,8 +118,8 @@ ${formatCapabilityTruthSummary()}
 - Trade plans with risk sizing -> Planner
 - Strategy generation and backtesting -> Planner and Backtester
 - Order execution, simple swaps/conversions, market orders, limit orders, cancel orders, open orders -> Executor (requires permissionMode not 'strict')
-- Solana: Jupiter DEX swaps, SOL/SPL transfers, limit orders, jupSOL staking, PumpFun launches, faucet -> Executor (when SOLANA_PRIVATE_KEY is set, requires permissionMode not 'strict')
-- Solana DeFi: perpetual trading (Adrena, Flash, Drift), lending/staking (Lulo, Drift insurance, Sanctum LST, Solayer, Voltr vaults), LP management (Orca Whirlpool, Raydium, Meteora DLMM, Manifest orderbook), cross-chain bridges (deBridge, OKX DEX aggregator) -> Executor (when SOLANA_PRIVATE_KEY is set, requires permissionMode not 'strict')
+- Solana execution: Jupiter DEX swaps, SOL/SPL transfers, PumpFun, Drift perps, Adrena, Flash, lending, staking, LP management, bridges -> Executor (when SOLANA_PRIVATE_KEY is set)
+- Heavy parallel research (multi-symbol scans, backtests, deep dives) -> Researcher (spawned on-demand, read-only)
 - Solana DeFi data: Drift markets/funding/APY, Sanctum LST prices/APY/TVL, Orca LP positions, Voltr positions, deBridge chains/tokens, OKX quotes -> Analyst (when SOLANA_PRIVATE_KEY is set)
 - Portfolio, positions, earn, wallet, fund transfers, withdrawals -> Monitor
 - Solana: wallet address, SOL/token balances, network TPS, open limit orders, order history -> Monitor (when SOLANA_PRIVATE_KEY is set)
@@ -125,31 +166,113 @@ export function getGordon(): Agent {
     instructions: composeAgentInstructions("gordon", GORDON_INSTRUCTIONS),
     model,
 
-    // Sub-agents for network routing (replaces handoffs)
+    // 4-agent architecture: Gordon routes to Executor for trades, Researcher for parallel work
     agents: {
-      scanner: getScanner(),
-      analyst: getAnalyst(),
-      planner: getPlanner(),
       executor: getExecutor(),
-      monitor: getMonitor(),
-      teacher: getTeacher(),
-      backtester: getBacktester(),
-      critic: getCritic(),
-      auditor: getAuditor(),
+      researcher: getResearcher(),
     },
 
-    // Gordon only has essential routing/system tools + MCP plugin tools
+    // Gordon has ALL read-only tools directly (no routing overhead for 90% of requests)
+    // Only trade execution tools are on Executor (isolated for safety)
     tools: {
+      // System & scheduling
       ...instrumentedSystemTools,
       ...instrumentedSchedulerTools,
       ...instrumentedAutonomousTools,
+
+      // Market data & scanning (was Scanner)
+      ...instrumentedIndicatorTools,
+      ...instrumentedMarketDataTools,
+      ...instrumentedMarketTools,
+      ...instrumentedDiscoveryTools,
+      ...instrumentedStrategyTools,
+      ...instrumentedParallelAnalysisTools,
+
+      // Analysis & charting (was Analyst)
+      ...instrumentedChartTools,
+      ...instrumentedMarketAnalysisTools,
+      ...instrumentedCompositionTools,
+      ...instrumentedMultiModalChartTools,
+      ...instrumentedLiquidationIntelligenceTools,
+      ...instrumentedPairAnalysisTools,
+
+      // Orderbook reads (non-execution)
+      get_order_book: instrumentedOrderbookTools.get_order_book,
+      get_spread: instrumentedOrderbookTools.get_spread,
+      get_market_trades: instrumentedOrderbookTools.get_market_trades,
+      get_order_status: instrumentedOrderbookTools.get_order_status,
+      test_order: instrumentedOrderbookTools.test_order,
+
+      // Portfolio, account, history (was Monitor)
+      ...instrumentedAccountTools,
+      ...instrumentedPositionTools,
+      ...instrumentedHistoryTools,
+      ...instrumentedWalletTools,
+      ...instrumentedEarnTools,
+      ...instrumentedPositionTrackingTools,
+
+      // Risk assessment (was Critic — now a tool, not a separate agent)
+      ...instrumentedRiskManagementTools,
+      ...instrumentedCheckRiskTool,
+
+      // Planning & preview (was Planner)
+      list_plans: instrumentedTradingTools.list_plans,
+      preview_market_order: instrumentedDiscoveryTools.preview_market_order,
+      preview_withdrawal: instrumentedWalletTools.preview_withdrawal,
+
+      // Backtesting (was Backtester — heavy work spawns Researcher)
+      ...instrumentedBacktestTools,
+      ...instrumentedEvalTools,
+
+      // Strategy & playbooks (was Teacher + Planner)
+      ...instrumentedStrategyGenerationTools,
+      ...instrumentedPlaybookTools,
+      ...instrumentedProtocolTools,
+
+      // Memory & context
+      ...instrumentedMemoryTools,
+      ...instrumentedSharedContextTools,
+
+      // Market regime
+      ...instrumentedRegimeTools,
+
+      // On-chain reads (non-execution)
+      ...instrumentedBaseOnchainTools,
+      ...instrumentedBaseSignalTools,
+      ...instrumentedBaseIndexerTools,
+      ...instrumentedUniswapDataTools,
+      ...instrumentedDexSearchTools,
+      ...instrumentedDefillamaYieldTools,
+      ...instrumentedChainlinkStreamsTools,
+      ...instrumentedChainlinkFeedsTools,
+      ...instrumentedSynthDataTools,
+
+      // AgentKit reads
+      agentkit_get_balance: instrumentedAgentKitOnchainTools.agentkit_get_balance,
+      agentkit_get_wallet: instrumentedAgentKitOnchainTools.agentkit_get_wallet,
+      agentkit_get_swap_price: instrumentedAgentKitOnchainTools.agentkit_get_swap_price,
+
+      // Solana reads
+      ...instrumentedSolanaKitWalletTools,
+
+      // Polkadot reads
+      polkadot_check_balance: instrumentedPolkadotKitAssetTools.polkadot_check_balance,
+      polkadot_get_pool_info: instrumentedPolkadotKitStakingTools.polkadot_get_pool_info,
+      polkadot_initialize_chain: instrumentedPolkadotKitDefiTools.polkadot_initialize_chain,
+
+      // Advanced & audit (was Auditor — now just tools on Gordon)
+      ...instrumentedAdvancedTools,
+      ...instrumentedSystematicTools,
+      ...instrumentedAuditTools,
+      ...instrumentedMetricsTools,
+
+      // MCP plugin tools
       ...getScopedMCPTools({
         categories: ["data-provider", "analytics", "research", "portfolio", "utility", "infrastructure"],
       }),
-      ...getRoutingToolsForAgent("Gordon"),
     },
 
-    // Memory for network orchestration
+    // Memory for full conversation context
     memory: createMemory(),
 
     // Token limiter to prevent context window overflow in long sessions
