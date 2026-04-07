@@ -26,6 +26,7 @@ import { buildSkillMetadataSection, resolveSkillInvocation } from "../skills/ind
 import { formatMemoriesForPrompt } from "../memory/sessionMemory.ts";
 import { emitAgentEvent } from "../agents/streaming/coordinator.ts";
 import { createEvent } from "../agents/streaming/events.ts";
+import { formatFeedbackForPrompt } from "../trading/feedbackLoop.ts";
 
 // ============================================================================
 // Types
@@ -106,6 +107,10 @@ export class QueryHarness {
     // Available skills
     const skills = buildSkillMetadataSection("Gordon");
     if (skills) parts.push(skills);
+
+    // Pattern feedback (evaluation loop — strong/weak patterns)
+    const feedback = formatFeedbackForPrompt();
+    if (feedback) parts.push(feedback);
 
     // Custom append
     if (this.config.appendSystemPrompt) {

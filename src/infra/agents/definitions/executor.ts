@@ -31,6 +31,7 @@ import {
   gordonInputGuard,
   gordonOutputSanitizer,
 } from "../instrumentedTools.ts";
+import { tradingInfraTools } from "../tools/tradingInfra.ts";
 import { createSubAgentMemory } from "../memoryFactory.ts";
 import { resolveRuntimeModel, registerObservability } from "../agentHelpers.ts";
 
@@ -78,11 +79,18 @@ Before executing, try to read shared context for extra safety. Proceed if none e
 ## Available Tools
 execute_plan, close_trade, set_permission_mode, approve_plan, list_plans, set_trailing_stop, update_trailing_stop, close_partial_position, place_bracket_order, place_market_order, place_limit_order, place_oco_order, cancel_all_orders, cancel_order, cancel_replace_order, cancel_order_list, get_order_status, read_shared_context, write_shared_context.
 
-## Risk Gate
-Before placing any order, the risk kernel validates it:
-- Call **check_risk** to verify the order passes all risk checks
-- If the check adjusts position size, use the adjusted quantity
-- If the check rejects the order, inform the user and do NOT proceed
+## Risk Gate (MANDATORY — enforced by Critic)
+Before placing ANY order, you MUST:
+1. Call **classify_trade_risk** with the proposed trade details
+2. Check the returned risk tier:
+   - "low" → proceed to execution
+   - "medium" → warn the user about the top risk factors, then proceed if they confirm
+   - "high" → show full risk assessment, require explicit "proceed anyway" from user
+   - "critical" → REFUSE to execute. Show the risk assessment and suggest alternatives.
+3. Call **check_risk** to verify the order passes all additional risk checks
+4. If either check rejects, inform the user and do NOT proceed
+
+This is the Critic's risk review — it runs BEFORE every trade, not after.
 
 ## Position Tracking
 After order execution:
@@ -134,6 +142,8 @@ export function getExecutor(): Agent {
       basenames_register: instrumentedAgentKitDefiTools.basenames_register,
       ...instrumentedSharedContextTools,
       ...instrumentedCheckRiskTool,
+      // Critic (risk classifier) — MANDATORY pre-execution check
+      classify_trade_risk: tradingInfraTools.classify_trade_risk,
       list_active_positions: instrumentedPositionTrackingTools.list_active_positions,
       get_position_detail: instrumentedPositionTrackingTools.get_position_detail,
       search_memory: instrumentedMemoryTools.search_memory,

@@ -84,3 +84,13 @@ export {
   buildPrefetchTasks,
 } from "./prefetchPipeline.ts";
 export type { PrefetchTask, PrefetchTrigger } from "./prefetchPipeline.ts";
+
+// Evaluation Feedback Loop
+export {
+  recordTradeOutcome,
+  getPatternConfidence,
+  getPatternStats,
+  getAllPatternStats,
+  formatFeedbackForPrompt,
+} from "./feedbackLoop.ts";
+export type { TradeOutcome, PatternStats } from "./feedbackLoop.ts";

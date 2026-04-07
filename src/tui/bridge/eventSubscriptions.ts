@@ -143,7 +143,7 @@ export function subscribeToEvents(dispatch: Dispatch): () => void {
     }),
   );
 
-  // 9. trade:closed
+  // 9. trade:closed — also feeds the evaluation loop
   unsubs.push(
     bus.on("trade:closed", (event: EventData<"trade:closed">) => {
       const pnlSign = event.pnl >= 0 ? "+" : "";
@@ -151,6 +151,22 @@ export function subscribeToEvents(dispatch: Dispatch): () => void {
         `\u2713 Trade closed: ${event.trade.symbol} — ${event.reason} — P&L ${pnlSign}$${event.pnl.toFixed(2)} (${pnlSign}${event.pnlPercent.toFixed(1)}%)`,
       );
       dispatch({ type: "UPDATE_COST", pnl: event.pnl, pnlPercent: event.pnlPercent });
+
+      // Wire: feedback loop — record outcome for pattern confidence adjustment
+      try {
+        const { recordTradeOutcome } = require("../../infra/trading/feedbackLoop.ts") as typeof import("../../infra/trading/feedbackLoop.ts");
+        recordTradeOutcome({
+          id: `trade_${Date.now()}`,
+          pattern: (event.trade as any).strategy ?? (event.trade as any).setupType ?? "manual",
+          symbol: event.trade.symbol,
+          result: event.pnl > 0 ? "win" : event.pnl < 0 ? "loss" : "breakeven",
+          pnlUsd: event.pnl,
+          pnlPct: event.pnlPercent,
+          holdDurationMs: 0, // TODO: compute from open/close timestamps
+          closedAt: new Date().toISOString(),
+          strategy: (event.trade as any).strategy,
+        });
+      } catch { /* non-critical */ }
     }),
   );
 
