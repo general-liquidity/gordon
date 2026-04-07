@@ -15,13 +15,5 @@ export { getGordon } from "./gordon.ts";
 export { getExecutor } from "./executor.ts";
 export { getResearcher } from "./researcher.ts";
 
-// Legacy exports — kept for backward compatibility during transition.
-// These agents are no longer used in the routing network.
-export { getScanner } from "./scanner.ts";
-export { getAnalyst } from "./analyst.ts";
-export { getPlanner } from "./planner.ts";
-export { getMonitor } from "./monitor.ts";
-export { getTeacher } from "./teacher.ts";
-export { getBacktester } from "./backtester.ts";
-export { getCritic } from "./critic.ts";
-export { getAuditor } from "./auditor.ts";
+// Legacy agent files deleted. All tools merged into Gordon.
+// If any code still imports these, it should use getGordon() instead.

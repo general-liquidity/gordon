@@ -29,14 +29,9 @@ export interface RoutingCommandResult {
 }
 
 const VALID_AGENTS: AgentAffinity[] = [
-  "Scanner",
-  "Analyst",
-  "Planner",
-  "Executor",
-  "Monitor",
-  "Teacher",
-  "Backtester",
   "Gordon",
+  "Executor",
+  "Researcher",
 ];
 
 function isValidAgent(name: string): name is AgentAffinity {
@@ -84,7 +79,7 @@ export async function routingList(): Promise<RoutingCommandResult> {
  */
 export async function routingInstall(
   pluginId: string,
-  defaultAgent: AgentAffinity = "Scanner",
+  defaultAgent: AgentAffinity = "Gordon",
 ): Promise<RoutingCommandResult> {
   // Fetch from marketplace
   const listing = await marketplaceClient.getPlugin(pluginId);

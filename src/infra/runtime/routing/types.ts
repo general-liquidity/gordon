@@ -10,16 +10,18 @@
  * Valid Gordon sub-agent names that tools can be assigned to.
  */
 export type AgentAffinity =
+  | "Gordon"
+  | "Executor"
+  | "Researcher"
+  // Legacy names — kept for backward compat with existing routing configs
   | "Scanner"
   | "Analyst"
   | "Planner"
-  | "Executor"
   | "Monitor"
   | "Teacher"
   | "Backtester"
   | "Critic"
-  | "Auditor"
-  | "Gordon";
+  | "Auditor";
 
 /**
  * Per-tool agent affinity override.

@@ -27,16 +27,9 @@ import { createModuleLogger } from "../logger/logger.ts";
 import { getMemoryStats, resetSharedMemory } from "./shared-context.ts";
 import { resetSubAgentMemory } from "./memoryFactory.ts";
 import {
-  getScanner,
-  getAnalyst,
-  getPlanner,
   getExecutor,
-  getMonitor,
-  getTeacher,
-  getBacktester,
-  getCritic,
-  getAuditor,
   getGordon,
+  getResearcher,
 } from "./definitions/index.ts";
 import { setMemoryConfig, getMemoryConfig } from "./memoryConfig.ts";
 
@@ -212,50 +205,23 @@ export function autoClearIfExpired(): boolean {
  * Agents are created on first access to ensure environment is loaded
  */
 let _agents: {
-  scanner?: Agent;
-  analyst?: Agent;
-  planner?: Agent;
-  executor?: Agent;
-  monitor?: Agent;
-  teacher?: Agent;
-  backtester?: Agent;
-  critic?: Agent;
-  auditor?: Agent;
   gordon?: Agent;
+  executor?: Agent;
+  researcher?: Agent;
 } = {};
 
 /**
- * Get or create the Scanner Agent
+ * Get or create the main Gordon Agent (handles 95% of requests)
  */
-function getScannerAgent(): Agent {
-  if (!_agents.scanner) {
-    _agents.scanner = getScanner();
+function getGordonAgent(): Agent {
+  if (!_agents.gordon) {
+    _agents.gordon = getGordon();
   }
-  return _agents.scanner;
+  return _agents.gordon;
 }
 
 /**
- * Get or create the Analyst Agent
- */
-function getAnalystAgent(): Agent {
-  if (!_agents.analyst) {
-    _agents.analyst = getAnalyst();
-  }
-  return _agents.analyst;
-}
-
-/**
- * Get or create the Planner Agent
- */
-function getPlannerAgent(): Agent {
-  if (!_agents.planner) {
-    _agents.planner = getPlanner();
-  }
-  return _agents.planner;
-}
-
-/**
- * Get or create the Executor Agent
+ * Get or create the Executor Agent (isolated trade execution)
  */
 function getExecutorAgent(): Agent {
   if (!_agents.executor) {
@@ -265,102 +231,49 @@ function getExecutorAgent(): Agent {
 }
 
 /**
- * Get or create the Monitor Agent
+ * Get or create the Researcher Agent (on-demand parallel work)
  */
-function getMonitorAgent(): Agent {
-  if (!_agents.monitor) {
-    _agents.monitor = getMonitor();
+function getResearcherAgent(): Agent {
+  if (!_agents.researcher) {
+    _agents.researcher = getResearcher();
   }
-  return _agents.monitor;
-}
-
-/**
- * Get or create the Teacher Agent
- */
-function getTeacherAgent(): Agent {
-  if (!_agents.teacher) {
-    _agents.teacher = getTeacher();
-  }
-  return _agents.teacher;
-}
-
-/**
- * Get or create the Backtester Agent
- */
-function getBacktesterAgent(): Agent {
-  if (!_agents.backtester) {
-    _agents.backtester = getBacktester();
-  }
-  return _agents.backtester;
-}
-
-/**
- * Get or create the Critic Agent
- */
-function getCriticAgent(): Agent {
-  if (!_agents.critic) {
-    _agents.critic = getCritic();
-  }
-  return _agents.critic;
-}
-
-/**
- * Get or create the Auditor Agent
- */
-function getAuditorAgent(): Agent {
-  if (!_agents.auditor) {
-    _agents.auditor = getAuditor();
-  }
-  return _agents.auditor;
-}
-
-/**
- * Get or create the main Gordon Agent
- */
-function getGordonAgent(): Agent {
-  if (!_agents.gordon) {
-    _agents.gordon = getGordon();
-  }
-  return _agents.gordon;
+  return _agents.researcher;
 }
 
 // ============================================================================
-// Exported Agent Accessors
+// Exported Agent Accessors (4-Agent Architecture)
 // ============================================================================
 
-/**
- * Lazy-loaded agents - accessed via getters to ensure env is loaded first
- */
-export const scannerAgent = { get agent() { return getScannerAgent(); } };
-export const analystAgent = { get agent() { return getAnalystAgent(); } };
-export const plannerAgent = { get agent() { return getPlannerAgent(); } };
-export const executorAgent = { get agent() { return getExecutorAgent(); } };
-export const monitorAgent = { get agent() { return getMonitorAgent(); } };
-export const teacherAgent = { get agent() { return getTeacherAgent(); } };
-export const backtesterAgent = { get agent() { return getBacktesterAgent(); } };
-export const criticAgent = { get agent() { return getCriticAgent(); } };
-export const auditorAgent = { get agent() { return getAuditorAgent(); } };
-
-/**
- * Main Gordon agent - use this for all interactions
- */
+/** Main Gordon agent — use this for all interactions */
 export const gordonAgent = getGordonAgent;
 
+/** Executor agent — isolated trade execution */
+export const executorAgent = { get agent() { return getExecutorAgent(); } };
+
+/** Researcher agent — on-demand parallel work */
+export const researcherAgent = { get agent() { return getResearcherAgent(); } };
+
 /**
- * Get all agents (lazily initialized)
+ * Legacy aliases — point to Gordon since their tools are merged into Gordon.
+ * Allows old code referencing these agents to still compile.
+ */
+export const scannerAgent = { get agent() { return getGordonAgent(); } };
+export const analystAgent = { get agent() { return getGordonAgent(); } };
+export const plannerAgent = { get agent() { return getGordonAgent(); } };
+export const monitorAgent = { get agent() { return getGordonAgent(); } };
+export const teacherAgent = { get agent() { return getGordonAgent(); } };
+export const backtesterAgent = { get agent() { return getGordonAgent(); } };
+export const criticAgent = { get agent() { return getGordonAgent(); } };
+export const auditorAgent = { get agent() { return getGordonAgent(); } };
+
+/**
+ * Get all agents (4-agent architecture)
  */
 export function getAllAgents() {
   return {
     gordon: getGordonAgent(),
-    scanner: getScannerAgent(),
-    analyst: getAnalystAgent(),
-    planner: getPlannerAgent(),
     executor: getExecutorAgent(),
-    monitor: getMonitorAgent(),
-    teacher: getTeacherAgent(),
-    backtester: getBacktesterAgent(),
-    critic: getCriticAgent(),
-    auditor: getAuditorAgent(),
+    researcher: getResearcherAgent(),
   };
 }
 
