@@ -33,6 +33,8 @@ import { CostDisplay } from "./components/CostDisplay.js";
 import { updateTerminalTab, resetTerminalTab } from "./terminalTab.js";
 import { getActionsForKey, isVimModeEnabled } from "./keybindings/keybindings.js";
 import { getNotificationFolder } from "./notifications/notificationFolder.js";
+import { useFpsTracker } from "./hooks/useFpsTracker.js";
+import { useAnimationPause } from "./hooks/useAnimationClock.js";
 
 // ── Phase 15-18 Components ──
 import { SettingsDialog } from "./components/SettingsDialog.js";
@@ -122,6 +124,10 @@ function AppInner() {
   const handoffHistory = useAppState((s) => s.handoffHistory);
   const pendingApprovals = useAppState((s) => s.pendingApprovals);
   const sessionId = useAppState((s) => s.sessionId);
+
+  // ── FPS tracking + animation clock ──
+  const fpsMetrics = useFpsTracker(2000); // Report every 2s
+  const { pause: pauseAnimations, resume: resumeAnimations } = useAnimationPause();
   const threadId = useAppState((s) => s.threadId);
   const isResumedSession = useAppState((s) => s.isResumedSession);
   const tokenCount = useAppState((s) => s.tokenCount);
@@ -463,6 +469,19 @@ function AppInner() {
     });
     return () => { resetTerminalTab(); };
   }, [isStreaming, permissionMode]);
+
+  // Wire: pause animations when not streaming (user is reading, save CPU).
+  useEffect(() => {
+    if (isStreaming) resumeAnimations();
+    else pauseAnimations();
+  }, [isStreaming, pauseAnimations, resumeAnimations]);
+
+  // Wire: log FPS warning if TUI is lagging
+  useEffect(() => {
+    if (fpsMetrics.isLagging) {
+      console.warn(`[gordon] TUI lagging: ${fpsMetrics.avgFps}fps avg, ${fpsMetrics.droppedFrames} dropped`);
+    }
+  }, [fpsMetrics.isLagging, fpsMetrics.avgFps, fpsMetrics.droppedFrames]);
 
   const handlePaletteSelect = useCallback(
     (item: PaletteItem) => {
