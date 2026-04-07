@@ -280,6 +280,15 @@ export async function processToolResult(
     toolResult,
   );
 
+  // Wire: track tool result in conversation-wide budget
+  try {
+    const { getConversationBudget } = await import("../../context/conversationBudget.ts");
+    const resultStr = typeof optimizedToolResult.result === "string"
+      ? optimizedToolResult.result
+      : JSON.stringify(optimizedToolResult.result);
+    getConversationBudget().add(toolName ?? "unknown", `tc_${Date.now()}`, resultStr, 0);
+  } catch { /* non-critical */ }
+
   await runLifecycleHooks("tool_call_end", context, {
     threadId: context.threadId,
     agentName: state.currentAgent,

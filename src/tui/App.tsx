@@ -294,27 +294,65 @@ function AppInner() {
     }
   }, [ctrlC.isDoublePressed, exit]);
 
-  // ── Global keybindings ──
+  // ── Global keybindings (dynamic via keybindings.json) ──
   useInput((input, key) => {
+    // Build key string from Ink's key object
+    const parts: string[] = [];
+    if (key.ctrl) parts.push("ctrl");
+    if (key.shift || (input.length === 1 && input === input.toUpperCase() && input !== input.toLowerCase())) parts.push("shift");
+    const keyName = key.return ? "return" : key.escape ? "escape" : key.tab ? "tab"
+      : key.upArrow ? "up" : key.downArrow ? "down" : key.leftArrow ? "left" : key.rightArrow ? "right"
+      : key.pageDown ? "pagedown" : key.pageUp ? "pageup" : input.toLowerCase();
+    parts.push(keyName);
+    const keyCombo = parts.join("+");
+
+    // Resolve actions via keybinding system
+    const vimMode = isVimModeEnabled() ? "normalMode" : "always";
+    const actions = getActionsForKey(keyCombo, vimMode);
+
+    for (const action of actions) {
+      switch (action) {
+        case "interruptStream":
+          ctrlC.onPress();
+          return;
+        case "togglePalette":
+          dispatch({ type: "TOGGLE_PALETTE" });
+          return;
+        case "togglePrivacy":
+          setPrivacyMode((prev) => !prev);
+          return;
+        case "toggleEmergencyHalt":
+          setShowEmergency((prev) => !prev);
+          return;
+        case "toggleSettings":
+          setShowSettings((prev) => !prev);
+          return;
+        case "toggleExport":
+          setShowExport((prev) => !prev);
+          return;
+        case "toggleContextView":
+          setShowContext((prev) => !prev);
+          return;
+        case "toggleAutoMode":
+          dispatch({ type: "SET_PERMISSION_MODE", mode: "auto" });
+          return;
+        case "toggleStrictMode":
+          dispatch({ type: "SET_PERMISSION_MODE", mode: "strict" });
+          return;
+        case "exit":
+          exit();
+          return;
+        // Other actions handled by PromptInput or scroll components
+        default:
+          break;
+      }
+    }
+
+    // Fallback: Ctrl+C always works even if keybindings fail
     if (key.ctrl && input === "c") {
       ctrlC.onPress();
       return;
     }
-    if (key.ctrl && input === "p") {
-      // Ctrl+Shift+P → toggle privacy mode (shift detected via uppercase)
-      if (input === "P") {
-        setPrivacyMode((prev) => !prev);
-        return;
-      }
-      dispatch({ type: "TOGGLE_PALETTE" });
-      return;
-    }
-    // Ctrl+Shift+X → toggle emergency halt
-    if (key.ctrl && input === "X") {
-      setShowEmergency((prev) => !prev);
-      return;
-    }
-    // ? help disabled — conflicts with TextInput. Use /help or Ctrl+P instead.
   });
 
   // ── Handlers ──
@@ -393,6 +431,11 @@ function AppInner() {
         content: trimmed,
         timestamp: new Date().toISOString(),
       };
+      // Wire: record input to session history for Ctrl+R browsing
+      try {
+        const { recordInput } = require("./history/sessionHistory.js") as typeof import("./history/sessionHistory.js");
+        recordInput(trimmed, `session_${Date.now()}`);
+      } catch { /* non-critical */ }
       dispatch({ type: "ADD_MESSAGE", message: userMsg });
       handleInput(trimmed, stateUpdater);
     },

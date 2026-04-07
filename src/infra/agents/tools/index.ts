@@ -349,6 +349,7 @@ import { protocolTools } from "../../../core/playbooks/protocol-tools.ts";
 import { multiModalChartTools } from "../../tools/chartTools.ts";
 import { evalTools } from "../../domain/evals/tools.ts";
 import { withSpillAll } from "./withSpill.ts";
+import { tradingInfraTools } from "./tradingInfra.ts";
 
 /**
  * All tools combined as a single object for Mastra Agent.
@@ -417,6 +418,7 @@ const _rawAllTools = {
   ...systematicTools,
   ...genomeTools,
   ...protocolTools,
+  ...tradingInfraTools,
 };
 
 /** Tool bundle wrapped with disk-spill for results > 50KB. */

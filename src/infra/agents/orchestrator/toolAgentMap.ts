@@ -182,6 +182,22 @@ export const TOOL_AGENT_MAP: Record<string, string> = {
   // advancedTools cherry-picks
   verify_circuit_breaker_proof: "Executor",
 
+  // ---- Trading Infrastructure tools ----
+  // Sandbox → Planner (strategy testing, not execution)
+  create_sandbox: "Planner",
+  sandbox_trade: "Planner",
+  compare_sandboxes: "Planner",
+  list_sandboxes: "Planner",
+  // Risk classifier → Planner (pre-trade assessment)
+  classify_trade_risk: "Planner",
+  // Checkpoints → Monitor (portfolio state management)
+  save_checkpoint: "Monitor",
+  list_checkpoints: "Monitor",
+  // Market context → Analyst (data lookup)
+  get_symbol_context: "Analyst",
+  // Drift detection → Monitor (portfolio health)
+  detect_portfolio_drift: "Monitor",
+
   // ---- Monitor tools ----
   // positionTools spread
   check_positions: "Monitor",
