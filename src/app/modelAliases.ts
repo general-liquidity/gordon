@@ -23,36 +23,41 @@ export interface ResolvedModel {
  */
 const ALIASES: Record<string, ResolvedModel> = {
   // ── Anthropic ──
-  opus:       { provider: "anthropic", model: "claude-opus-4-6",           displayName: "Claude Opus 4" },
-  sonnet:     { provider: "anthropic", model: "claude-sonnet-4-6",         displayName: "Claude Sonnet 4" },
-  haiku:      { provider: "anthropic", model: "claude-haiku-4-5-20251001", displayName: "Claude Haiku 4.5" },
-  claude:     { provider: "anthropic", model: "claude-sonnet-4-6",         displayName: "Claude Sonnet 4 (default)" },
+  opus:       { provider: "anthropic", model: "claude-opus-4-6",           displayName: "Claude Opus 4.6" },
+  sonnet:     { provider: "anthropic", model: "claude-sonnet-4-6",         displayName: "Claude Sonnet 4.6" },
+  haiku:      { provider: "anthropic", model: "claude-haiku-4-5",          displayName: "Claude Haiku 4.5" },
+  claude:     { provider: "anthropic", model: "claude-sonnet-4-6",         displayName: "Claude Sonnet 4.6 (default)" },
 
   // ── OpenAI ──
-  gpt4o:      { provider: "openai", model: "gpt-4o",       displayName: "GPT-4o" },
-  "gpt-4o":   { provider: "openai", model: "gpt-4o",       displayName: "GPT-4o" },
-  gpt4omini:  { provider: "openai", model: "gpt-4o-mini",  displayName: "GPT-4o mini" },
-  "gpt-4.1":  { provider: "openai", model: "gpt-4.1",      displayName: "GPT-4.1" },
-  o3:         { provider: "openai", model: "o3",            displayName: "o3 (reasoning)" },
-  o4mini:     { provider: "openai", model: "o4-mini",       displayName: "o4-mini" },
-  "o4-mini":  { provider: "openai", model: "o4-mini",       displayName: "o4-mini" },
-  gpt:        { provider: "openai", model: "gpt-4o",        displayName: "GPT-4o (default)" },
+  "gpt-5.4":      { provider: "openai", model: "gpt-5.4",       displayName: "GPT-5.4 (1.1M ctx, $3/$15)" },
+  gpt5:           { provider: "openai", model: "gpt-5.4",       displayName: "GPT-5.4" },
+  "gpt-5.4-mini": { provider: "openai", model: "gpt-5.4-mini",  displayName: "GPT-5.4 mini (400K ctx, $0.75/$5)" },
+  gpt5mini:       { provider: "openai", model: "gpt-5.4-mini",  displayName: "GPT-5.4 mini" },
+  "gpt-5.4-nano": { provider: "openai", model: "gpt-5.4-nano",  displayName: "GPT-5.4 nano (400K ctx, $0.20/$1)" },
+  gpt5nano:       { provider: "openai", model: "gpt-5.4-nano",  displayName: "GPT-5.4 nano" },
+  "gpt-5.4-pro":  { provider: "openai", model: "gpt-5.4-pro",   displayName: "GPT-5.4 Pro (1.1M ctx)" },
+  gpt5pro:        { provider: "openai", model: "gpt-5.4-pro",   displayName: "GPT-5.4 Pro" },
+  gpt:            { provider: "openai", model: "gpt-5.4",       displayName: "GPT-5.4 (default)" },
 
   // ── Google ──
-  gemini:     { provider: "google", model: "gemini-2.5-pro",   displayName: "Gemini 2.5 Pro" },
-  "gemini-pro":   { provider: "google", model: "gemini-2.5-pro",   displayName: "Gemini 2.5 Pro" },
-  "gemini-flash": { provider: "google", model: "gemini-2.5-flash", displayName: "Gemini 2.5 Flash" },
+  gemini:             { provider: "google", model: "gemini-3.1-pro-preview",              displayName: "Gemini 3.1 Pro" },
+  "gemini-pro":       { provider: "google", model: "gemini-3.1-pro-preview",              displayName: "Gemini 3.1 Pro" },
+  "gemini-flash":     { provider: "google", model: "gemini-3.1-flash-lite-preview",       displayName: "Gemini 3.1 Flash Lite" },
+  "gemini-tools":     { provider: "google", model: "gemini-3.1-pro-preview-customtools",  displayName: "Gemini 3.1 Pro (custom tools)" },
+  "gemma-26b":        { provider: "google", model: "gemma-4-26b-it",                      displayName: "Gemma 4 26B" },
+  "gemma-31b":        { provider: "google", model: "gemma-4-31b-it",                      displayName: "Gemma 4 31B" },
+  gemma:              { provider: "google", model: "gemma-4-31b-it",                      displayName: "Gemma 4 31B" },
 
-  // ── Inception ──
+  // ── Inception (placeholder — user will provide) ──
   mercury:    { provider: "inception", model: "inception/mercury-coder-small-2506", displayName: "Mercury Coder" },
   "mercury-2": { provider: "inception", model: "inception/mercury-2",               displayName: "Mercury 2" },
 
   // ── Meta aliases ──
-  best:       { provider: "anthropic", model: "claude-opus-4-6",   displayName: "Best (Opus 4)" },
-  fast:       { provider: "anthropic", model: "claude-haiku-4-5-20251001", displayName: "Fast (Haiku 4.5)" },
-  cheap:      { provider: "openai",    model: "gpt-4o-mini",      displayName: "Cheap (GPT-4o mini)" },
-  reasoning:  { provider: "openai",    model: "o3",               displayName: "Reasoning (o3)" },
-  default:    { provider: "openai",    model: "gpt-4o",           displayName: "Default (GPT-4o)" },
+  best:       { provider: "anthropic", model: "claude-opus-4-6",   displayName: "Best (Opus 4.6)" },
+  fast:       { provider: "anthropic", model: "claude-haiku-4-5",  displayName: "Fast (Haiku 4.5)" },
+  cheap:      { provider: "openai",    model: "gpt-5.4-nano",     displayName: "Cheap (GPT-5.4 nano)" },
+  reasoning:  { provider: "openai",    model: "gpt-5.4-pro",      displayName: "Reasoning (GPT-5.4 Pro)" },
+  default:    { provider: "openai",    model: "gpt-5.4",          displayName: "Default (GPT-5.4)" },
 };
 
 /**

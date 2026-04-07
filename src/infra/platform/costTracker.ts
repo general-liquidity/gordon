@@ -52,9 +52,15 @@ interface ModelPricing {
 }
 
 const MODEL_PRICING: Record<string, ModelPricing> = {
+  // Anthropic
   "claude-opus-4-6":   { inputPer1M: 15.00, outputPer1M: 75.00, cacheReadPer1M: 1.50, cacheWritePer1M: 18.75 },
   "claude-sonnet-4-6": { inputPer1M: 3.00,  outputPer1M: 15.00, cacheReadPer1M: 0.30, cacheWritePer1M: 3.75 },
-  "claude-haiku-4-5":  { inputPer1M: 0.80,  outputPer1M: 4.00,  cacheReadPer1M: 0.08, cacheWritePer1M: 1.00 },
+  "claude-haiku-4-5":  { inputPer1M: 1.00,  outputPer1M: 5.00,  cacheReadPer1M: 0.10, cacheWritePer1M: 1.25 },
+  // OpenAI
+  "gpt-5.4":           { inputPer1M: 3.00,  outputPer1M: 15.00, cacheReadPer1M: 0.30, cacheWritePer1M: 3.75 },
+  "gpt-5.4-pro":       { inputPer1M: 3.00,  outputPer1M: 15.00, cacheReadPer1M: 0.30, cacheWritePer1M: 3.75 },
+  "gpt-5.4-mini":      { inputPer1M: 0.75,  outputPer1M: 5.00,  cacheReadPer1M: 0.08, cacheWritePer1M: 0.94 },
+  "gpt-5.4-nano":      { inputPer1M: 0.20,  outputPer1M: 1.00,  cacheReadPer1M: 0.02, cacheWritePer1M: 0.25 },
 };
 
 const DEFAULT_PRICING: ModelPricing = { inputPer1M: 3.00, outputPer1M: 15.00, cacheReadPer1M: 0.30, cacheWritePer1M: 3.75 };

@@ -33,23 +33,24 @@ const PROVIDERS: ModelOption[] = [
 
 const MODEL_OPTIONS: Record<string, ModelOption[]> = {
   openai: [
-    { label: "GPT-4o (flagship)", value: "gpt-4o" },
-    { label: "GPT-4o mini (fast)", value: "gpt-4o-mini" },
-    { label: "GPT-4.1", value: "gpt-4.1" },
-    { label: "GPT-4.1 mini", value: "gpt-4.1-mini" },
-    { label: "o3 (reasoning)", value: "o3" },
-    { label: "o4-mini (reasoning, fast)", value: "o4-mini" },
+    { label: "GPT-5.4 (flagship, 1.1M ctx — $3/$15)", value: "gpt-5.4" },
+    { label: "GPT-5.4 Pro (1.1M ctx)", value: "gpt-5.4-pro" },
+    { label: "GPT-5.4 mini (fast, 400K ctx — $0.75/$5)", value: "gpt-5.4-mini" },
+    { label: "GPT-5.4 nano (cheapest, 400K ctx — $0.20/$1)", value: "gpt-5.4-nano" },
     { label: "Provider default", value: "__default__" },
   ],
   anthropic: [
-    { label: "Claude Opus 4 (most capable)", value: "claude-opus-4-6" },
-    { label: "Claude Sonnet 4 (balanced)", value: "claude-sonnet-4-6" },
-    { label: "Claude Haiku 4.5 (fast)", value: "claude-haiku-4-5-20251001" },
+    { label: "Claude Opus 4.6 (most capable)", value: "claude-opus-4-6" },
+    { label: "Claude Sonnet 4.6 (balanced)", value: "claude-sonnet-4-6" },
+    { label: "Claude Haiku 4.5 (fast — $1/$5)", value: "claude-haiku-4-5" },
     { label: "Provider default", value: "__default__" },
   ],
   google: [
-    { label: "Gemini 2.5 Pro", value: "gemini-2.5-pro" },
-    { label: "Gemini 2.5 Flash", value: "gemini-2.5-flash" },
+    { label: "Gemini 3.1 Pro", value: "gemini-3.1-pro-preview" },
+    { label: "Gemini 3.1 Pro (custom tools)", value: "gemini-3.1-pro-preview-customtools" },
+    { label: "Gemini 3.1 Flash Lite", value: "gemini-3.1-flash-lite-preview" },
+    { label: "Gemma 4 31B", value: "gemma-4-31b-it" },
+    { label: "Gemma 4 26B", value: "gemma-4-26b-it" },
     { label: "Provider default", value: "__default__" },
   ],
   inception: [
@@ -58,9 +59,9 @@ const MODEL_OPTIONS: Record<string, ModelOption[]> = {
     { label: "Provider default", value: "__default__" },
   ],
   dedalus: [
-    { label: "Claude via Dedalus", value: "openai/anthropic/claude-sonnet-4-6" },
-    { label: "GPT-4o via Dedalus", value: "openai/gpt-4o" },
-    { label: "Gemini via Dedalus", value: "openai/google/gemini-2.5-pro" },
+    { label: "Claude Sonnet via Dedalus", value: "openai/anthropic/claude-sonnet-4-6" },
+    { label: "GPT-5.4 via Dedalus", value: "openai/gpt-5.4" },
+    { label: "Gemini 3.1 Pro via Dedalus", value: "openai/google/gemini-3.1-pro-preview" },
     { label: "Provider default", value: "__default__" },
   ],
 };
