@@ -607,7 +607,7 @@ function AppInner() {
           : "";
 
   return (
-    <Box flexDirection="column">
+    <Box flexDirection="column" height={process.stdout.rows ?? 24}>
       {/* ── Header ── */}
       <GordonHeader
         permissionMode={permissionMode}
@@ -620,7 +620,7 @@ function AppInner() {
 
       {/* ── Conversation — wrapped in PrivacyScreen ── */}
       <PrivacyScreen active={privacyMode}>
-        <Box flexDirection="column" paddingX={1}>
+        <Box flexDirection="column" flexGrow={1} justifyContent="flex-end" paddingX={1}>
           {messages.length > 0 && (
             <VirtualMessageList
               messages={messages}
