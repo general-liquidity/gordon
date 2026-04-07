@@ -7,6 +7,7 @@
 import { getEventBus } from "../../events/index.ts";
 import type { EventType, EventData } from "../../events/index.ts";
 import type { Dispatch, TuiNotification } from "../state/types.ts";
+import { getNotificationFolder } from "../notifications/notificationFolder.js";
 
 // ============================================================================
 // Helpers
@@ -21,6 +22,16 @@ function makeNotification(
   variant: TuiNotification["variant"],
   message: string,
 ): TuiNotification {
+  // Wire: also push to notification folder for fold/merge deduplication
+  try {
+    getNotificationFolder().push({
+      key: type,
+      message,
+      variant: variant as "fill" | "alert" | "strategy" | "info" | "error" | "system",
+      priority: variant === "error" ? "immediate" : "normal",
+    });
+  } catch { /* non-critical */ }
+
   return {
     id: makeId(),
     type,
@@ -448,7 +459,7 @@ export function subscribeToEvents(dispatch: Dispatch): () => void {
   unsubs.push(
     bus.on("system:started", (event: EventData<"system:started">) => {
       notify(dispatch, "system:started", "system",
-        `System started: mode ${event.mode}`,
+        `System started: permissionMode ${event.permissionMode}`,
       );
     }),
   );

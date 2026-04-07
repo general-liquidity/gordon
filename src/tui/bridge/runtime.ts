@@ -3,6 +3,8 @@ import type { SessionRuntime } from "../../runtime/session/SessionRuntime.ts";
 import { SessionRuntimeFactory } from "../../runtime/session/SessionRuntimeFactory.ts";
 import type { RuntimeApprovalRequest } from "../../runtime/contracts/types.ts";
 import type { GordonRuntimeToolAccessResult } from "../../infra/agents/types.ts";
+import { quickPermissionCheck } from "../../infra/permissions/racing.ts";
+import { getConversationBudget } from "../../infra/context/conversationBudget.ts";
 import { normalizeChatMessage, type ChatMessage } from "../../app/chatTypes.ts";
 import { buildPendingApprovalMessages } from "../../app/chatFlow.ts";
 import {
@@ -362,6 +364,31 @@ async function streamResponse(
 
           for (const approval of rawPending) {
             try {
+              // Wire: quick permission check via racing module (fast-path before risk kernel)
+              const quickResult = quickPermissionCheck([], approval.toolName, (approval as any).args);
+              if (quickResult?.decision === "allow") {
+                runtime.approvePendingRequest(approval.id, { persist: false, actor: "permission-rule" });
+                riskMessages.push({
+                  id: `rule-approve-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                  role: "system",
+                  variant: "approval" as const,
+                  content: `\u2713 Auto-approved by rule: ${approval.toolName} \u2014 ${quickResult.reason}`,
+                  timestamp: new Date().toISOString(),
+                });
+                continue;
+              }
+              if (quickResult?.decision === "deny") {
+                runtime.denyPendingRequest(approval.id, { reason: quickResult.reason, actor: "permission-rule" });
+                riskMessages.push({
+                  id: `rule-deny-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                  role: "system",
+                  variant: "approval" as const,
+                  content: `\u2717 Auto-denied by rule: ${approval.toolName} \u2014 ${quickResult.reason}`,
+                  timestamp: new Date().toISOString(),
+                });
+                continue;
+              }
+
               const accessResult = await runtime.evaluateToolAccess(
                 approval.toolName,
                 riskContext,

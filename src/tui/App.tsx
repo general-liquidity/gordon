@@ -30,6 +30,9 @@ import { PromptInput } from "./components/PromptInput.js";
 import { defaultMessageQueue } from "../infra/runtime/messageQueue.js";
 import { VirtualMessageList } from "./components/VirtualMessageList.js";
 import { CostDisplay } from "./components/CostDisplay.js";
+import { updateTerminalTab, resetTerminalTab } from "./terminalTab.js";
+import { getActionsForKey, isVimModeEnabled } from "./keybindings/keybindings.js";
+import { getNotificationFolder } from "./notifications/notificationFolder.js";
 
 // ── Phase 15-18 Components ──
 import { SettingsDialog } from "./components/SettingsDialog.js";
@@ -408,6 +411,15 @@ function AppInner() {
     const timer = setTimeout(() => handleSubmit(combined), 50);
     return () => clearTimeout(timer);
   }, [isStreaming, handleSubmit]);
+
+  // Wire: terminal tab — update tab title/badge/color based on Gordon state.
+  useEffect(() => {
+    updateTerminalTab({
+      activity: isStreaming ? "streaming" : "idle",
+      permissionMode: permissionMode as "auto" | "ask" | "strict",
+    });
+    return () => { resetTerminalTab(); };
+  }, [isStreaming, permissionMode]);
 
   const handlePaletteSelect = useCallback(
     (item: PaletteItem) => {

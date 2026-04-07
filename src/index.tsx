@@ -197,11 +197,28 @@ process.on("unhandledRejection", (reason, promise) => {
 telemetry.init();
 initializeStructuredAxiom();
 
+// Wire: parallel startup — run config + observability concurrently
 try {
-  const startupConfig = await loadConfig();
-  await emitEvent("system:started", { permissionMode: startupConfig.permissionMode });
+  const { runParallelStartup, configLoadTask, memoryLoadTask } = await import("./infra/runtime/parallelStartup.ts");
+  const { formatMemoriesForPrompt } = await import("./infra/memory/sessionMemory.ts");
+  const { setCliOverrides } = await import("./infra/config/settingsLayers.ts");
+
+  // Pass any CLI flag overrides to the 7-level settings layer
+  if ((flags as Record<string, unknown>).permissionMode) setCliOverrides({ permissionMode: (flags as Record<string, unknown>).permissionMode as string });
+
+  const startupResult = await runParallelStartup([
+    configLoadTask(() => loadConfig()),
+    memoryLoadTask(async () => formatMemoriesForPrompt()),
+  ]);
+
+  const startupConfig = startupResult.tasks.find((t) => t.id === "config")?.result as { permissionMode?: string } | undefined;
+  await emitEvent("system:started", { permissionMode: startupConfig?.permissionMode ?? "ask" });
 } catch {
-  // Non-critical startup observability path
+  // Fallback: sequential startup if parallel fails
+  try {
+    const startupConfig = await loadConfig();
+    await emitEvent("system:started", { permissionMode: startupConfig.permissionMode });
+  } catch { /* Non-critical */ }
 }
 
 // Launch the rebuilt cockpit shell

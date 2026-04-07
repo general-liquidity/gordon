@@ -313,6 +313,28 @@ export class ConversationSummarizer {
         summarizedCount: messagesToSummarize,
       });
 
+      // Wire: record tombstones for compacted messages (audit trail)
+      try {
+        const { recordTombstones } = await import("../../context/tombstones.ts");
+        const compactedContent = olderMessages
+          .filter((m) => typeof m.content === "string")
+          .map((m) => ({ role: String(m.role), content: String(m.content) }));
+        void recordTombstones(compactedContent, "full_compact");
+      } catch { /* non-critical */ }
+
+      // Wire: extract durable facts to session memory before they're lost
+      try {
+        const { parseExtractionOutput, addSessionMemory } = await import("../../memory/sessionMemory.ts");
+        // Use the "Durable User Facts" section from the summary if present
+        const durableMatch = summaryText.match(/### Durable User Facts[\s\S]*?(?=###|$)/);
+        if (durableMatch && !durableMatch[0].includes("None in this conversation")) {
+          const facts = parseExtractionOutput(
+            `[{"category":"user_fact","content":${JSON.stringify(durableMatch[0].trim())},"confidence":0.8}]`,
+          );
+          for (const fact of facts) addSessionMemory(fact);
+        }
+      } catch { /* non-critical */ }
+
       return {
         summarized: true,
         messages: summarizedMessages,

@@ -73,6 +73,11 @@ import {
 } from "./orchestrator/HandoffCoordinator.ts";
 import { createAgentRequestContext } from "./orchestrator/RequestContextFactory.ts";
 import { recordPromptUsage, resolveNormalizedUsage } from "./orchestrator/UsageTracker.ts";
+import { bridgeStreamEvent } from "./streaming/streamBridge.ts";
+import { getCompactionTrigger } from "../context/compactionTrigger.ts";
+import { getConversationBudget } from "../context/conversationBudget.ts";
+import { recordTombstone } from "../context/tombstones.ts";
+import { getCostTracker } from "../platform/costTracker.ts";
 import { toMessageStreamChunk, type MessageStreamChunk } from "./orchestrator/StreamCoordinator.ts";
 import {
   advanceReActStage,
@@ -438,6 +443,8 @@ export async function* processMessageStream(
           const { done, value } = await readStreamChunkWithAbort(reader, signal);
           if (done) break;
           const chunk = value as InternalStreamChunk;
+          // Wire: emit Gordon AgentEvent in parallel with Mastra StreamEvent
+          try { bridgeStreamEvent(chunk as any, 0); } catch { /* non-critical */ }
           yield* processFullStreamChunk(chunk, state, context);
         }
       } finally {
@@ -512,6 +519,26 @@ export async function* processMessageStream(
     await throwIfStreamAborted(signal);
     const usage = await resolveNormalizedUsage(streamObj.usage);
     recordPromptUsage(context, threadId, usage);
+
+    // Wire: compaction trigger — check token thresholds after each API response
+    try {
+      const inputToks = (usage as Record<string, unknown>).inputTokens as number ?? usage.totalTokens ?? 0;
+      const compactionDecision = getCompactionTrigger().check(inputToks);
+      if (compactionDecision.action === "warn" || compactionDecision.action === "microcompact" || compactionDecision.action === "compact") {
+        logger.info("Compaction trigger fired", { action: compactionDecision.action, stage: compactionDecision.stage, tokens: inputToks });
+      }
+    } catch { /* non-critical */ }
+
+    // Wire: per-model cost tracking
+    try {
+      const inputToks = (usage as Record<string, unknown>).inputTokens as number ?? 0;
+      const outputToks = (usage as Record<string, unknown>).outputTokens as number ?? 0;
+      getCostTracker().record({
+        modelId: context.config?.modelConfig?.model ?? "unknown",
+        inputTokens: inputToks,
+        outputTokens: outputToks,
+      });
+    } catch { /* non-critical */ }
 
     await emitEvent("agent:stream_completed", { responseLength: state.fullText.length });
     recordRequest(Date.now() - startTime, true);

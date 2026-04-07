@@ -154,6 +154,17 @@ export function microcompactMessages<T>(messages: T[]): MicrocompactResult<T> {
     const m = msg as CompactableToolMessage;
     const content = getContentString(m.content);
     tokensSaved += Math.ceil(content.length / 3.5);
+    // Wire: record tombstone for audit trail before clearing
+    try {
+      const { recordTombstone } = require("./tombstones.ts") as typeof import("./tombstones.ts");
+      void recordTombstone({
+        reason: "microcompact",
+        role: "tool",
+        content,
+        toolName: m.toolName ?? m.name,
+        toolCallId: m.toolCallId ?? m.tool_call_id,
+      });
+    } catch { /* non-critical — tombstone recording must never crash microcompact */ }
     return { ...m, content: MC_CLEARED_MARKER } as unknown as T;
   });
 
