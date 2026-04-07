@@ -127,7 +127,8 @@ export function commandToPrompt(command: SlashCommand, args: string): string {
           return "Show my current configuration settings";
       }
     case "model":
-      return "Show me the current AI model and available providers";
+      if (!args) return "Show me the current AI model and available providers";
+      return `Switch to model provider/model: ${args}`;
     case "exchange":
       if (!args) return "List my configured trading exchanges";
       const exParts = args.split(/\s+/);

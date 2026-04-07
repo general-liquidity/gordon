@@ -811,12 +811,13 @@ const LEGACY_SLASH_COMMANDS: SlashCommandSeed[] = [
   {
     name: "model",
     aliases: ["m", "provider"],
-    description: "Select AI model and provider",
-    usage: "/model",
+    description: "View or change AI model and provider",
+    usage: "/model [provider] [model]",
     category: "system",
-    level: 2,
+    level: 1,
     action: "menu",
     target: "model",
+    whenToUse: "Switch between AI providers (openai, anthropic, google, inception, dedalus) or specific models",
   },
   {
     name: "metrics",

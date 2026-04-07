@@ -4,7 +4,7 @@ import {
   formatPaginatedCommandHelp,
   commandToPrompt,
 } from "../../app/slashCommands.ts";
-import { loadConfig } from "../../infra/storage/config.ts";
+import { loadConfig, saveConfig } from "../../infra/storage/config.ts";
 import { collectDoctorReport, formatDoctorReport } from "../../app/setup-runtime.ts";
 import {
   stopAutonomousLoop,
@@ -589,10 +589,59 @@ export async function handleSystemMenuCommand(
     }
     case "model": {
       const config = await loadConfig();
+      const currentProvider = config.modelConfig?.provider ?? "openai";
+      const currentModel = config.modelConfig?.model ?? "default";
+
+      // If no args, show current + usage help
+      if (!args || args.trim() === "") {
+        addMessage(setState, "gordon",
+          `MODEL: ${currentModel}\n` +
+          `Provider: ${currentProvider}\n\n` +
+          `To change:\n` +
+          `  /model <provider>              \u2014 switch provider (keeps model default)\n` +
+          `  /model <provider> <model>      \u2014 switch provider + model\n\n` +
+          `Providers: openai, anthropic, google, inception, dedalus\n\n` +
+          `Examples:\n` +
+          `  /model anthropic               \u2014 use Claude (default model)\n` +
+          `  /model anthropic claude-sonnet-4-6\n` +
+          `  /model openai gpt-4o\n` +
+          `  /model dedalus anthropic/claude-sonnet-4-6\n` +
+          `  /model google gemini-2.5-pro`
+        );
+        return true;
+      }
+
+      // Parse args: /model <provider> [model]
+      const modelParts = args.trim().split(/\s+/);
+      const newProvider = modelParts[0]?.toLowerCase();
+      const newModel = modelParts.slice(1).join(" ") || undefined;
+
+      const validProviders = ["openai", "anthropic", "google", "inception", "dedalus"];
+      if (!validProviders.includes(newProvider ?? "")) {
+        addMessage(setState, "gordon",
+          `Unknown provider: ${newProvider}\n` +
+          `Valid providers: ${validProviders.join(", ")}`
+        );
+        return true;
+      }
+
+      // Update config
+      const updated = {
+        ...config,
+        modelConfig: {
+          ...config.modelConfig,
+          provider: newProvider as typeof currentProvider,
+          model: newModel,
+        },
+      };
+      await saveConfig(updated);
+
+      const displayModel = newModel ?? `${newProvider} default`;
       addMessage(setState, "gordon",
-        `MODEL: ${config.model ?? "default"}\n` +
-        `Provider: ${config.provider ?? "openai-compatible"}\n` +
-        `Temperature: ${config.temperature ?? "default"}`
+        `Model updated:\n` +
+        `  Provider: ${currentProvider} \u2192 ${newProvider}\n` +
+        `  Model: ${currentModel} \u2192 ${displayModel}\n\n` +
+        `Changes take effect on the next message.`
       );
       return true;
     }
