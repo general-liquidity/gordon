@@ -44,6 +44,7 @@ import { EmergencyHalt } from "./components/EmergencyHalt.js";
 import { ContextVisualization } from "./components/ContextVisualization.js";
 import { SessionBrowser } from "./components/SessionBrowser.js";
 import { MemorySelector } from "./components/MemorySelector.js";
+import { ModelPicker } from "./components/ModelPicker.js";
 import { PrivacyScreen } from "./components/PrivacyScreen.js";
 import { FeedbackSurvey } from "./components/FeedbackSurvey.js";
 import { ThinkStep } from "./components/ThinkStep.js";
@@ -145,6 +146,8 @@ function AppInner() {
   const [privacyMode, setPrivacyMode] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
   const [feedbackTradeData, setFeedbackTradeData] = useState<FeedbackTradeData | null>(null);
+
+  const [showModelPicker, setShowModelPicker] = useState(false);
 
   // ── Backend module UI toggles ──
   const [showAudit, setShowAudit] = useState(false);
@@ -411,6 +414,10 @@ function AppInner() {
       dispatch({ type: "SET_SHOW_HELP", show: false });
 
       // ── Phase 15-18 slash commands ──
+      if (trimmed === "/model" || trimmed === "/m" || trimmed === "/provider") {
+        setShowModelPicker(true);
+        return;
+      }
       if (trimmed === "/settings") {
         setShowSettings(true);
         return;
@@ -591,6 +598,34 @@ function AppInner() {
           });
         }}
         onSkip={() => dispatch({ type: "SET_SHOW_SETUP", show: false })}
+      />
+    );
+  }
+
+  // ── Model picker (interactive provider → model selector) ──
+  if (showModelPicker) {
+    return (
+      <ModelPicker
+        currentProvider={(getState() as any).modelProvider ?? "openai"}
+        currentModel={(getState() as any).modelName ?? "default"}
+        onSelect={async (provider, model) => {
+          try {
+            const { loadConfig: lc, saveConfig: sc } = await import("../infra/storage/config.ts");
+            const cfg = await lc();
+            await sc({ ...cfg, modelConfig: { ...cfg.modelConfig, provider: provider as any, model } });
+          } catch { /* best-effort */ }
+          dispatch({
+            type: "ADD_MESSAGE",
+            message: {
+              id: `model-${Date.now()}`,
+              role: "system",
+              content: `Model changed to ${provider}${model ? ` / ${model}` : " (default)"}. Takes effect on next message.`,
+              timestamp: new Date().toISOString(),
+            },
+          });
+          setShowModelPicker(false);
+        }}
+        onCancel={() => setShowModelPicker(false)}
       />
     );
   }

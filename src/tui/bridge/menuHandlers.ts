@@ -592,21 +592,13 @@ export async function handleSystemMenuCommand(
       const currentProvider = config.modelConfig?.provider ?? "openai";
       const currentModel = config.modelConfig?.model ?? "default";
 
-      // If no args, show current + usage help
+      // No args → handled by App.tsx (opens interactive ModelPicker)
+      // This handler only processes /model <provider> [model] quick path
       if (!args || args.trim() === "") {
+        // App.tsx intercepts /model before it reaches here, but just in case:
         addMessage(setState, "gordon",
-          `MODEL: ${currentModel}\n` +
-          `Provider: ${currentProvider}\n\n` +
-          `To change:\n` +
-          `  /model <provider>              \u2014 switch provider (keeps model default)\n` +
-          `  /model <provider> <model>      \u2014 switch provider + model\n\n` +
-          `Providers: openai, anthropic, google, inception, dedalus\n\n` +
-          `Examples:\n` +
-          `  /model anthropic               \u2014 use Claude (default model)\n` +
-          `  /model anthropic claude-sonnet-4-6\n` +
-          `  /model openai gpt-4o\n` +
-          `  /model dedalus anthropic/claude-sonnet-4-6\n` +
-          `  /model google gemini-2.5-pro`
+          `Current: ${currentProvider} / ${currentModel}\n` +
+          `Use /model to open the interactive picker, or /model <provider> <model> for quick switch.`
         );
         return true;
       }
