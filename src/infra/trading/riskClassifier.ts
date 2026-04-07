@@ -77,6 +77,15 @@ export interface PortfolioContext {
   recentTradeCount: number;
   /** Symbols the user has traded before. */
   tradedSymbols: Set<string>;
+  // ── Hedge fund-grade data (optional — enhances scoring when available) ──
+  /** Historical prices for the target symbol (for vol-percentile + tail risk). */
+  targetPriceHistory?: number[];
+  /** Daily returns for each existing position (for correlation check). */
+  positionReturns?: Record<string, { returns: number[]; weightPct: number }>;
+  /** Daily returns for the new symbol (for correlation check). */
+  targetReturns?: number[];
+  /** Whether the asset is crypto (365 trading days) or stock (252). */
+  isCrypto?: boolean;
 }
 
 export interface ClassifierConfig {
@@ -194,6 +203,70 @@ export function classifyTradeRisk(
     weight: 0.5,
     reason: familiar ? `Previously traded ${trade.symbol}` : `First time trading ${trade.symbol}`,
   });
+
+  // ── MANDATORY HEDGE FUND-GRADE CHECKS (when data available) ──
+
+  // 9. Volatility-percentile position sizing
+  if (portfolio.targetPriceHistory && portfolio.targetPriceHistory.length >= 60) {
+    const { computeVolatilityProfile, computeAnnualizedVol, pricesToReturns, buildVolDistribution } = require("./volatilityPositionSizing.ts") as typeof import("./volatilityPositionSizing.ts");
+    const isCrypto = portfolio.isCrypto ?? true;
+    const tradingDays = isCrypto ? 365 : 252;
+    const returns = pricesToReturns(portfolio.targetPriceHistory);
+    const currentVol = computeAnnualizedVol(returns.slice(-60), tradingDays);
+    const volDist = buildVolDistribution(portfolio.targetPriceHistory, 60, tradingDays);
+    const volProfile = computeVolatilityProfile(currentVol, volDist, config.maxPositionPct);
+
+    // Score: if proposed size exceeds vol-adjusted limit, escalate
+    const proposedPct = (trade.notionalUsd / portfolio.totalValueUsd) * 100;
+    const overageRatio = proposedPct / Math.max(1, volProfile.recommendedSizePct);
+    const volSizeScore = overageRatio > 2 ? 90 : overageRatio > 1.5 ? 70 : overageRatio > 1 ? 40 : 0;
+    dimensions.push({
+      name: "Vol-Adjusted Sizing",
+      score: volSizeScore,
+      weight: 1.6,
+      reason: `Vol regime: ${volProfile.regime} (${(currentVol * 100).toFixed(0)}% annualized). ` +
+        `Recommended max: ${volProfile.recommendedSizePct.toFixed(1)}%, proposed: ${proposedPct.toFixed(1)}%`,
+    });
+  }
+
+  // 10. Correlation with existing positions
+  if (portfolio.targetReturns && portfolio.positionReturns && Object.keys(portfolio.positionReturns).length > 0) {
+    const { checkCorrelationRisk } = require("./correlationLimits.ts") as typeof import("./correlationLimits.ts");
+    const corrCheck = checkCorrelationRisk(
+      trade.symbol,
+      portfolio.targetReturns,
+      portfolio.positionReturns,
+      (trade.notionalUsd / portfolio.totalValueUsd) * 100,
+    );
+    const corrScore = corrCheck.maxCorrelation > 0.8 ? 80
+      : corrCheck.maxCorrelation > 0.6 ? 50
+      : corrCheck.maxCorrelation > 0.4 ? 20
+      : 0;
+    dimensions.push({
+      name: "Correlation Risk",
+      score: corrScore,
+      weight: 1.4,
+      reason: `Max correlation: ${(corrCheck.maxCorrelation * 100).toFixed(0)}% with ${corrCheck.mostCorrelatedWith}` +
+        (corrCheck.concentrationWarning ? " — CONCENTRATION WARNING" : ""),
+    });
+  }
+
+  // 11. Tail risk
+  if (portfolio.targetPriceHistory && portfolio.targetPriceHistory.length >= 60) {
+    const { computeTailRisk } = require("./tailRisk.ts") as typeof import("./tailRisk.ts");
+    const tailProfile = computeTailRisk(portfolio.targetPriceHistory);
+    const tailScore = tailProfile.classification === "highly_fragile" ? 90
+      : tailProfile.classification === "fragile" ? 60
+      : tailProfile.classification === "robust" ? 20
+      : 0; // antifragile = bonus
+    dimensions.push({
+      name: "Tail Risk",
+      score: tailScore,
+      weight: 1.3,
+      reason: `${tailProfile.classification} (score: ${tailProfile.tailRiskScore.toFixed(0)}/100, ` +
+        `skew: ${tailProfile.skewness.toFixed(2)}, max DD: ${(tailProfile.maxDrawdown * 100).toFixed(0)}%)`,
+    });
+  }
 
   // Compute weighted composite
   const totalWeight = dimensions.reduce((sum, d) => sum + d.weight, 0);
