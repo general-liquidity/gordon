@@ -74,9 +74,9 @@ export function PromptInput({
     return groups;
   }, [suggestions, showSuggestions]);
 
-  // Show as many as Claude Code does — use most of the terminal height
-  // Leave 3 rows: 1 for hints bar, 1 for input line, 1 for breathing room
-  const maxVisible = Math.max(8, termRows - 3);
+  // Cap suggestion list to half terminal height so it doesn't push input off-screen.
+  // Claude Code shows suggestions above the input, capped to avoid overflow.
+  const maxVisible = Math.min(Math.max(8, Math.floor(termRows / 2)), 20);
 
   useInput((input, key) => {
     if (key.return) {

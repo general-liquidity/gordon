@@ -25,7 +25,7 @@ export function GordonHeader({
   exchangeStatus,
 }: Props) {
   const modeColor = permissionMode === "auto" ? "red" : permissionMode === "strict" ? "green" : "cyanBright";
-  const version = process.env.npm_package_version ?? "0.8";
+  const version = process.env.npm_package_version ?? process.env.GORDON_VERSION ?? "0.9";
 
   // Show the thread ID (meaningful) or fall back to session/resource ID
   const sessionDisplay = threadId
