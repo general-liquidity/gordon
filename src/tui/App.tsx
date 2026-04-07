@@ -35,6 +35,7 @@ import { getActionsForKey, isVimModeEnabled } from "./keybindings/keybindings.js
 import { getNotificationFolder } from "./notifications/notificationFolder.js";
 import { useFpsTracker } from "./hooks/useFpsTracker.js";
 import { useAnimationPause } from "./hooks/useAnimationClock.js";
+import { getNextHint, recordHintShown, incrementSessionCount, type HintContext } from "../app/onboarding/index.ts";
 
 // ── Phase 15-18 Components ──
 import { SettingsDialog } from "./components/SettingsDialog.js";
@@ -292,6 +293,36 @@ function AppInner() {
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bootPhase]);
+
+  // ── Progressive inline hints (shown on first few sessions, then hidden) ──
+  useEffect(() => {
+    if (!runtimeReady) return;
+    incrementSessionCount();
+
+    const hintContext: HintContext = {
+      sessionCount: 0, // Loaded from state inside getNextHint
+      onboardingComplete: true,
+      hasExchange: false, // TODO: pull from config
+      hasBroker: false,
+      hasGordonMd: false,
+      permissionMode: permissionMode ?? "ask",
+    };
+
+    const hint = getNextHint(hintContext);
+    if (hint) {
+      recordHintShown(hint.id);
+      dispatch({
+        type: "ADD_MESSAGE",
+        message: {
+          id: `hint-${hint.id}-${Date.now()}`,
+          role: "system" as const,
+          content: `\u2139 ${hint.message}`,
+          timestamp: new Date().toISOString(),
+        },
+      });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [runtimeReady]);
 
   // ── Ctrl+C double-press exit ──
   useEffect(() => {

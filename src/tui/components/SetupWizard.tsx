@@ -92,6 +92,53 @@ const STEPS: StepConfig[] = [
       { label: "Aggressive (5% max)", value: "aggressive" },
     ],
   },
+  // ── Permission mode selection (unique to Gordon) ──
+  {
+    section: "preferences",
+    title: "Permission Mode",
+    description: "How should Gordon handle trade execution?",
+    inputType: "select",
+    key: "permissionMode",
+    options: [
+      { label: "Ask — approve each trade via dialog (recommended)", value: "ask" },
+      { label: "Auto — execute trades without asking", value: "auto" },
+      { label: "Strict — read-only, never trade", value: "strict" },
+    ],
+  },
+  // ── Risk disclosure (critical for real-money trading) ──
+  {
+    section: "preferences",
+    title: "Risk Disclosure",
+    description:
+      "Gordon can place REAL trades with REAL money.\n" +
+      "- Always review orders before approving\n" +
+      "- Use /strict for read-only mode when exploring\n" +
+      "- Set stop losses — Gordon follows your risk rules\n" +
+      "- Start with paper trading or small sizes\n\n" +
+      "Select 'I understand' to continue:",
+    inputType: "select",
+    key: "riskAcknowledged",
+    options: [
+      { label: "I understand the risks", value: "acknowledged" },
+    ],
+  },
+  // ── Terminal keybindings awareness ──
+  {
+    section: "preferences",
+    title: "Keyboard Shortcuts",
+    description:
+      "Gordon supports custom keybindings:\n" +
+      "- Ctrl+P: Command palette\n" +
+      "- Ctrl+Y: Quick approve trade\n" +
+      "- Ctrl+N: Quick deny trade\n" +
+      "- Customize in ~/.gordon/keybindings.json\n\n" +
+      "Ready to start?",
+    inputType: "select",
+    key: "keybindingsAcknowledged",
+    options: [
+      { label: "Let's go!", value: "ready" },
+    ],
+  },
 ];
 
 export function SetupWizard({ onComplete, onSkip }: Props) {
