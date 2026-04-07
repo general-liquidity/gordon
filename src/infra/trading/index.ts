@@ -94,3 +94,41 @@ export {
   formatFeedbackForPrompt,
 } from "./feedbackLoop.ts";
 export type { TradeOutcome, PatternStats } from "./feedbackLoop.ts";
+
+// Volatility-Percentile Position Sizing
+export {
+  computePositionSize,
+  computeVolatilityProfile,
+  computeAnnualizedVol,
+  pricesToReturns,
+  buildVolDistribution,
+} from "./volatilityPositionSizing.ts";
+export type { VolatilityProfile, PositionSizeResult } from "./volatilityPositionSizing.ts";
+
+// Correlation-Adjusted Position Limits
+export {
+  checkCorrelationRisk,
+  pearsonCorrelation,
+  buildCorrelationMatrix,
+  correlationMultiplier,
+} from "./correlationLimits.ts";
+export type { CorrelationCheck } from "./correlationLimits.ts";
+
+// Scenario-Based Valuation (DCF)
+export {
+  runScenarioValuation,
+} from "./scenarioValuation.ts";
+export type { ValuationResult, ScenarioResult, DCFInputs } from "./scenarioValuation.ts";
+
+// Hurst Exponent (Regime Detection)
+export {
+  computeHurstExponent,
+  interpretHurst,
+} from "./hurstExponent.ts";
+export type { HurstAnalysis, HurstRegime } from "./hurstExponent.ts";
+
+// Tail Risk Scoring
+export {
+  computeTailRisk,
+} from "./tailRisk.ts";
+export type { TailRiskProfile } from "./tailRisk.ts";
