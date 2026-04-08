@@ -354,6 +354,30 @@ export const CLI_REGISTRY: CLIEntry[] = [
     pricing: "freemium",
     pricingNote: "Free CLI. Stripe charges 2.9% + 30¢ per transaction.",
   },
+  {
+    id: "mpp",
+    name: "Machine Payments Protocol",
+    description: "HTTP 402 agent-to-agent payments — pay per API call, tool use, or data request. The open standard for the agentic economy.",
+    npmPackage: "machine-payments-protocol",
+    bin: "mpp",
+    commands: [
+      { command: "mpp init", description: "Initialize MPP in a project" },
+      { command: "mpp pay", description: "Pay for a resource", example: "mpp pay https://api.data-provider.com/prices" },
+      { command: "mpp serve", description: "Start an MPP-enabled server (charge for your API)" },
+      { command: "mpp wallet", description: "Manage payment wallets" },
+      { command: "mpp status", description: "Check payment status and receipts" },
+      { command: "mpp config", description: "Configure payment methods (Stripe, stablecoins, Lightning)" },
+    ],
+    nativeCoverage: "none",
+    credentials: [
+      { env: "MPP_WALLET_KEY", required: true, description: "Wallet key for payments (Stripe, stablecoin, or Lightning)" },
+    ],
+    docsUrl: "https://mpp.dev/",
+    markets: ["payments", "agentic-economy"],
+    hasMCP: true,
+    pricing: "free",
+    pricingNote: "Open protocol. Transaction fees depend on payment rail (Stripe, stablecoins, Lightning).",
+  },
 ];
 
 // ============================================================================

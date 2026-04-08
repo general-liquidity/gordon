@@ -667,6 +667,19 @@
       "pricing": "freemium",
       "pricingNote": "Requires Armor NFT for API access. Solana live, multi-chain expanding.",
       "toolCount": 8
+    },
+    {
+      "id": "mpp",
+      "name": "Machine Payments Protocol",
+      "description": "HTTP 402 agent-to-agent payments — pay per API call, charge for services, settle between agents. The agentic economy standard.",
+      "category": "infrastructure",
+      "transport": "stdio",
+      "install": "npm i -g machine-payments-protocol",
+      "credentials": [{ "env": "MPP_WALLET_KEY", "required": true, "description": "Payment wallet (Stripe, stablecoin, or Lightning)" }],
+      "docsUrl": "https://mpp.dev/",
+      "pricing": "free",
+      "pricingNote": "Open protocol (Stripe + Tempo). Fees depend on payment rail.",
+      "toolCount": 6
     }
   ]
 }
