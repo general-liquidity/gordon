@@ -216,3 +216,26 @@ export type {
   BacktestScore,
   OptimizationResult,
 } from "./autoOptimizer.ts";
+
+// Optimizer Enhancements (Recursive-Improve patterns)
+export {
+  createRatchetHistory,
+  recordRatchetEntry,
+  saveRatchetHistory,
+  loadLatestRatchetHistory,
+  diagnoseFailure,
+  generateTargetedMutation,
+  initializeIslands,
+  crossPollinate,
+  getBestIsland,
+  formatIslandStatus,
+  DEFAULT_ISLAND_CONFIG,
+} from "./optimizerEnhancements.ts";
+export type {
+  RatchetEntry,
+  RatchetHistory,
+  Diagnosis,
+  WeaknessCategory,
+  Island,
+  IslandEvolutionConfig,
+} from "./optimizerEnhancements.ts";
