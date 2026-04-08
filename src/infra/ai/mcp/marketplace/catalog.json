@@ -654,6 +654,19 @@
       "pricing": "free",
       "pricingNote": "Free. Aggregates across all bridge providers for cheapest/fastest route.",
       "toolCount": 6
+    },
+    {
+      "id": "armor-crypto",
+      "name": "Armor Crypto",
+      "description": "Wallet ops, swaps, DCA, scheduled orders, limit orders, staking — single MCP for crypto agent execution.",
+      "category": "execution",
+      "transport": "stdio",
+      "install": "uvx armor-crypto-mcp@latest",
+      "credentials": [{ "env": "ARMOR_API_KEY", "required": true, "description": "From codex.armorwallet.ai (requires Armor NFT)" }],
+      "docsUrl": "https://github.com/armorwallet/armor-crypto-mcp",
+      "pricing": "freemium",
+      "pricingNote": "Requires Armor NFT for API access. Solana live, multi-chain expanding.",
+      "toolCount": 8
     }
   ]
 }
