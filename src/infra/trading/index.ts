@@ -170,3 +170,13 @@ export {
   DEFAULT_DRAWDOWN_CONFIG,
 } from "./drawdownOverlay.ts";
 export type { VolTargetConfig, DrawdownOverlayConfig, OverlayResult } from "./drawdownOverlay.ts";
+
+// Backtest Credibility Tests
+export {
+  probabilisticSharpeRatio,
+  deflatedSharpeRatio,
+  minimumTrackRecordLength,
+  combinatorialPurgedCV,
+  assessBacktestCredibility,
+} from "./backtestCredibility.ts";
+export type { SharpeCredibilityResult, CPCVResult } from "./backtestCredibility.ts";
