@@ -240,18 +240,50 @@ export async function runAutoOptimization(
   const mutationsPerIter = directive.mutationsPerIteration ?? 5;
   const startTime = Date.now();
 
+  // Import enhancements
+  const {
+    createRatchetHistory, recordRatchetEntry, saveRatchetHistory,
+    diagnoseFailure, generateTargetedMutation,
+    initializeIslands, crossPollinate, getBestIsland,
+    DEFAULT_ISLAND_CONFIG,
+  } = await import("./optimizerEnhancements.ts");
+
+  // Initialize ratchet history
+  const ratchetHistory = createRatchetHistory(directive.description);
+
+  // Initialize islands (parallel exploration)
+  const numIslands = Math.min(5, mutationsPerIter);
+  const islands = initializeIslands(initialParams, numIslands);
+  const crossPollinationInterval = DEFAULT_ISLAND_CONFIG.crossPollinationInterval;
+
   // Score the original parameters
   onProgress?.(0, 0, "Scoring original parameters...");
   const originalScore = await backtestFn(initialParams);
   const originalObjective = getObjectiveValue(originalScore, directive.objective);
 
+  // Initialize all islands with baseline score
+  for (const island of islands) {
+    try {
+      const score = await backtestFn(island.parameters);
+      island.bestScore = score;
+      island.bestObjective = getObjectiveValue(score, directive.objective);
+    } catch {
+      island.bestScore = originalScore;
+      island.bestObjective = originalObjective;
+    }
+  }
+
   let bestParams = { ...initialParams };
   let bestScore = originalScore;
   let bestObjective = originalObjective;
-  let totalBacktests = 1;
+  let totalBacktests = 1 + numIslands;
   let noImprovementStreak = 0;
   const maxNoImprovement = 10;
   const history: OptimizationResult["history"] = [];
+  let lastFailureDiagnosis: Awaited<ReturnType<typeof diagnoseFailure>> | null = null;
+
+  // Record baseline in ratchet
+  recordRatchetEntry(ratchetHistory, 0, initialParams, originalScore, "keep");
 
   let stopReason: OptimizationResult["stopReason"] = "max_iterations";
 
@@ -269,33 +301,74 @@ export async function runAutoOptimization(
     }
 
     const temperature = adaptiveTemperature(iteration, maxIterations);
-    const mutations = generateMutations(bestParams, mutationsPerIter, temperature);
     let iterationImproved = false;
 
-    onProgress?.(iteration, bestObjective, `Iteration ${iteration}/${maxIterations} (temp: ${(temperature * 100).toFixed(0)}%)`);
+    onProgress?.(iteration, bestObjective, `Iteration ${iteration}/${maxIterations} (temp: ${(temperature * 100).toFixed(0)}%, islands: ${numIslands})`);
 
-    // Test each mutation
-    for (const mutation of mutations) {
-      try {
-        const score = await backtestFn(mutation);
-        totalBacktests++;
+    // Cross-pollinate islands periodically
+    if (iteration % crossPollinationInterval === 0 && numIslands > 1) {
+      crossPollinate(islands);
+      onProgress?.(iteration, bestObjective, "Cross-pollinating islands...");
+    }
 
-        const objective = getObjectiveValue(score, directive.objective);
+    // Evolve each island
+    for (const island of islands) {
+      // Generate mutations: mix of random + targeted (if we have a diagnosis)
+      const mutations: StrategyParameters[] = [];
 
-        // Check if this is an improvement AND meets constraints
-        if (objective > bestObjective && meetsConstraints(score, directive.constraints)) {
-          bestParams = { ...mutation };
-          bestScore = score;
-          bestObjective = objective;
-          iterationImproved = true;
-          noImprovementStreak = 0;
-
-          onProgress?.(iteration, bestObjective, `Improvement! ${directive.objective}: ${bestObjective.toFixed(3)}`);
-        }
-      } catch {
-        // Backtest failed for this mutation — skip it
-        totalBacktests++;
+      if (lastFailureDiagnosis && Math.random() < 0.5) {
+        // 50% chance: use targeted mutation based on last failure diagnosis
+        mutations.push(generateTargetedMutation(island.parameters, lastFailureDiagnosis, temperature));
       }
+
+      // Fill remaining with standard mutations
+      const remaining = Math.max(1, Math.ceil(mutationsPerIter / numIslands) - mutations.length);
+      mutations.push(...generateMutations(island.parameters, remaining, temperature));
+
+      // Test each mutation for this island
+      for (const mutation of mutations) {
+        try {
+          const score = await backtestFn(mutation);
+          totalBacktests++;
+
+          const objective = getObjectiveValue(score, directive.objective);
+
+          // Check if this improves the island AND meets constraints
+          if (objective > island.bestObjective && meetsConstraints(score, directive.constraints)) {
+            const prevParams = { ...island.parameters };
+            island.parameters = { ...mutation };
+            island.bestScore = score;
+            island.bestObjective = objective;
+            island.improvements++;
+
+            // Record in ratchet as "keep"
+            recordRatchetEntry(ratchetHistory, iteration, mutation, score, "keep", prevParams);
+
+            // Check if this is globally best
+            if (objective > bestObjective) {
+              bestParams = { ...mutation };
+              bestScore = score;
+              bestObjective = objective;
+              iterationImproved = true;
+              noImprovementStreak = 0;
+              lastFailureDiagnosis = null; // Reset — we improved
+
+              onProgress?.(iteration, bestObjective, `Improvement! Island ${island.id}: ${directive.objective} ${bestObjective.toFixed(3)}`);
+            }
+          } else {
+            // Mutation made things worse — diagnose WHY
+            const mutatedKeys = Object.keys(mutation).filter((k) => mutation[k] !== island.parameters[k]);
+            lastFailureDiagnosis = diagnoseFailure(island.bestScore!, score, mutatedKeys);
+
+            // Record in ratchet as "revert"
+            recordRatchetEntry(ratchetHistory, iteration, mutation, score, "revert", island.parameters);
+          }
+        } catch {
+          totalBacktests++;
+        }
+      }
+
+      island.iterations++;
     }
 
     if (!iterationImproved) {
@@ -305,7 +378,7 @@ export async function runAutoOptimization(
     history.push({
       iteration,
       bestObjective,
-      mutationsTested: mutations.length,
+      mutationsTested: islands.reduce((s, isl) => s + Math.ceil(mutationsPerIter / numIslands), 0),
       improved: iterationImproved,
     });
   }
@@ -313,6 +386,17 @@ export async function runAutoOptimization(
   if (noImprovementStreak >= maxNoImprovement) {
     stopReason = "converged";
   }
+
+  // Final: pick the best island's parameters
+  const bestIsland = getBestIsland(islands);
+  if (bestIsland.bestObjective > bestObjective && bestIsland.bestScore) {
+    bestParams = { ...bestIsland.parameters };
+    bestScore = bestIsland.bestScore;
+    bestObjective = bestIsland.bestObjective;
+  }
+
+  // Save ratchet history to disk
+  try { saveRatchetHistory(ratchetHistory); } catch { /* non-critical */ }
 
   const durationMs = Date.now() - startTime;
   const improved = bestObjective > originalObjective;
