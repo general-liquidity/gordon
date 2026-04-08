@@ -274,6 +274,37 @@ export const CLI_REGISTRY: CLIEntry[] = [
     pricing: "freemium",
     pricingNote: "Free for local backtesting. QuantConnect cloud: free tier + paid plans from $8/mo.",
   },
+  {
+    id: "jupiter",
+    name: "Jupiter CLI",
+    description: "Official Jupiter DEX CLI — spot swaps, perps (leveraged longs/shorts), lending, prediction markets, token verification. Dominant Solana DEX aggregator.",
+    npmPackage: "@jup-ag/cli",
+    bin: "jup",
+    commands: [
+      { command: "jup swap", description: "Swap tokens via Jupiter aggregator", example: "jup swap --from SOL --to USDC --amount 1" },
+      { command: "jup portfolio", description: "View portfolio holdings" },
+      { command: "jup perps open", description: "Open leveraged position", example: "jup perps open --long SOL --size 100 --leverage 3x" },
+      { command: "jup perps close", description: "Close perpetual position" },
+      { command: "jup lend deposit", description: "Deposit into lending pool", example: "jup lend deposit --token USDC --amount 1000" },
+      { command: "jup lend withdraw", description: "Withdraw from lending" },
+      { command: "jup predict", description: "Browse prediction markets" },
+      { command: "jup predict buy", description: "Buy prediction market shares" },
+      { command: "jup vrfd check", description: "Check token verification status" },
+    ],
+    nativeCoverage: "partial",
+    nativeTools: [
+      "solana_trade", "solana_fetch_price", "solana_get_token_data",
+    ],
+    credentials: [
+      { env: "SOLANA_PRIVATE_KEY", required: true, description: "Solana wallet for execution" },
+      { env: "RPC_URL", required: false, description: "Custom Solana RPC endpoint" },
+    ],
+    docsUrl: "https://github.com/jup-ag/cli",
+    markets: ["crypto"],
+    hasMCP: false,
+    pricing: "free",
+    pricingNote: "Free. Official Jupiter CLI. Pre-v1 alpha — may have breaking changes.",
+  },
 ];
 
 // ============================================================================
