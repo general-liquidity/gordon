@@ -693,6 +693,32 @@
       "pricing": "free",
       "pricingNote": "Zero protocol fees. Backed by Coinbase, AWS, Alchemy, Cloudflare.",
       "toolCount": 5
+    },
+    {
+      "id": "ucp",
+      "name": "Universal Commerce Protocol",
+      "description": "Agentic commerce standard — product discovery, checkout, identity linking, order management. Backed by Google, Shopify, Walmart, Target.",
+      "category": "infrastructure",
+      "transport": "stdio",
+      "install": "npm i @ucp-js/sdk",
+      "credentials": [{ "env": "UCP_API_KEY", "required": true, "description": "Merchant or agent API key" }],
+      "docsUrl": "https://ucp.dev/",
+      "pricing": "free",
+      "pricingNote": "Open standard (2.5K+ stars). REST + JSON-RPC + MCP transport.",
+      "toolCount": 6
+    },
+    {
+      "id": "acp",
+      "name": "Agentic Commerce Protocol",
+      "description": "Agent-initiated purchases — checkout, tokenized payments, subscriptions. Built by Stripe + OpenAI.",
+      "category": "infrastructure",
+      "transport": "stdio",
+      "install": "npm i agentic-commerce-protocol",
+      "credentials": [{ "env": "STRIPE_API_KEY", "required": true, "description": "Stripe key for payment processing" }],
+      "docsUrl": "https://www.agenticcommerce.dev/",
+      "pricing": "free",
+      "pricingNote": "Open standard (1.3K+ stars, Apache 2.0). Stripe is first payment provider.",
+      "toolCount": 5
     }
   ]
 }
