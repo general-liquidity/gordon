@@ -204,3 +204,15 @@ export {
   DEFAULT_ORDERFLOW_CONFIG,
 } from "./orderflowDelta.ts";
 export type { OrderflowResult, DeltaBar, OHLCV, OrderflowConfig } from "./orderflowDelta.ts";
+
+// Auto-Optimizer (Self-Improving Strategies)
+export {
+  runAutoOptimization,
+  PRESET_DIRECTIVES,
+} from "./autoOptimizer.ts";
+export type {
+  OptimizationDirective,
+  StrategyParameters,
+  BacktestScore,
+  OptimizationResult,
+} from "./autoOptimizer.ts";
