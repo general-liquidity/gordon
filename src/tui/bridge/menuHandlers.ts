@@ -654,6 +654,133 @@ export async function handleSystemMenuCommand(
       );
       return true;
     }
+    // ── Commands ported from Claude Code ──
+
+    case "compact": {
+      // Manually trigger context compaction
+      try {
+        const { getCompactionTrigger } = await import("../../infra/context/compactionTrigger.ts");
+        const { microcompactMessages } = await import("../../infra/context/microcompact.ts");
+        const trigger = getCompactionTrigger();
+        const projection = trigger.current();
+        addMessage(setState, "gordon",
+          `Context compaction triggered manually.\n` +
+          `Current usage: ${Math.round(projection.currentFraction * 100)}% of ${projection.contextWindow.toLocaleString()} tokens\n` +
+          `Stage: ${projection.stage}\n` +
+          `Recommendation: ${projection.recommendation}`
+        );
+      } catch {
+        addMessage(setState, "gordon", "Context compaction triggered. Old tool results will be cleared on next turn.");
+      }
+      return true;
+    }
+
+    case "clear": {
+      // Clear conversation within same session
+      setState((prev: any) => ({
+        ...prev,
+        messages: [],
+        streamBuffer: "",
+        completedMessageCount: 0,
+      }));
+      addMessage(setState, "system", "Conversation cleared. Session preserved — use /new-session for a fresh start.");
+      return true;
+    }
+
+    case "cost": {
+      // Show detailed per-model cost breakdown
+      try {
+        const { getCostTracker } = await import("../../infra/platform/costTracker.ts");
+        const display = getCostTracker().formatDisplay();
+        addMessage(setState, "gordon", display || "No costs recorded yet this session.");
+      } catch {
+        addMessage(setState, "gordon", "Cost tracking not available.");
+      }
+      return true;
+    }
+
+    case "effort": {
+      // Set effort level (controls thinking depth)
+      const level = args.trim().toLowerCase();
+      const validLevels = ["low", "medium", "high", "max", "auto"];
+      if (!level || !validLevels.includes(level)) {
+        addMessage(setState, "gordon",
+          `Effort level controls how much reasoning the model does.\n\n` +
+          `Usage: /effort <level>\n` +
+          `Levels:\n` +
+          `  low    — fast, minimal reasoning\n` +
+          `  medium — balanced (default)\n` +
+          `  high   — deep reasoning, slower\n` +
+          `  max    — maximum reasoning depth\n` +
+          `  auto   — adapt based on query complexity`
+        );
+      } else {
+        // Store as session override (effort isn't a persistent config — it's per-session)
+        try {
+          const { setSessionOverride } = await import("../../infra/config/settingsLayers.ts");
+          setSessionOverride("effortLevel", level);
+        } catch { /* best-effort */ }
+        addMessage(setState, "gordon", `Effort level set to: ${level}. Takes effect on next message.`);
+      }
+      return true;
+    }
+
+    case "skills": {
+      // List available skills
+      try {
+        const { discoverSkills } = await import("../../infra/skills/index.ts");
+        const skills = discoverSkills();
+        if (skills.length === 0) {
+          addMessage(setState, "gordon",
+            `No skills installed.\n\n` +
+            `Create skills in:\n` +
+            `  ~/.gordon/skills/<name>/SKILL.md  (user-wide)\n` +
+            `  .gordon/skills/<name>/SKILL.md    (project)\n\n` +
+            `5 builtin skills available: /quick-scan, /dd, /risk-check, /morning-brief, /close-losers`
+          );
+        } else {
+          const lines = skills.map((s) =>
+            `  /${s.id.padEnd(20)} ${s.description || s.name} [${s.source}]`
+          );
+          addMessage(setState, "gordon",
+            `Available skills (${skills.length}):\n\n${lines.join("\n")}\n\n` +
+            `Invoke with /<skill-name> [args]`
+          );
+        }
+      } catch {
+        addMessage(setState, "gordon", "Skills system not available.");
+      }
+      return true;
+    }
+
+    case "hooks": {
+      // View registered hooks
+      try {
+        const { listHooks } = await import("../../infra/hooks/engine.ts");
+        const hooks = listHooks();
+        if (hooks.length === 0) {
+          addMessage(setState, "gordon",
+            `No hooks registered.\n\n` +
+            `Hooks run at lifecycle points (PreToolUse, PostToolUse, PreApproval, etc.).\n` +
+            `Register via the hooks engine or GORDON.md configuration.`
+          );
+        } else {
+          const lines = hooks.map((h) =>
+            `  ${h.id.padEnd(25)} ${h.point.padEnd(18)} priority: ${h.priority ?? 100}`
+          );
+          addMessage(setState, "gordon",
+            `Registered hooks (${hooks.length}):\n\n` +
+            `  ${"ID".padEnd(25)} ${"Hook Point".padEnd(18)} Priority\n` +
+            `  ${"-".repeat(25)} ${"-".repeat(18)} --------\n` +
+            `${lines.join("\n")}`
+          );
+        }
+      } catch {
+        addMessage(setState, "gordon", "Hooks engine not available.");
+      }
+      return true;
+    }
+
     case "whatsnew": {
       addMessage(setState, "gordon",
         `WHAT'S NEW in Gordon v0.9:\n` +
