@@ -758,6 +758,19 @@
       "pricing": "freemium",
       "pricingNote": "Free tier for basic research. Pro for full due diligence.",
       "toolCount": 8
+    },
+    {
+      "id": "faremeter",
+      "name": "Faremeter",
+      "description": "TypeScript SDK for x402 payments — composable libraries for agents that pay for APIs and servers that accept payments. The implementation layer for HTTP 402.",
+      "category": "infrastructure",
+      "transport": "stdio",
+      "install": "npm i @faremeter/types @faremeter/wallet-solana",
+      "credentials": [{ "env": "WALLET_PRIVATE_KEY", "required": true, "description": "Solana or EVM wallet for x402 payments" }],
+      "docsUrl": "https://docs.faremeter.xyz/",
+      "pricing": "free",
+      "pricingNote": "Open source TypeScript SDK. Built on x402 protocol. Solana + EVM wallets.",
+      "toolCount": 5
     }
   ]
 }
