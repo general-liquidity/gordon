@@ -1,6 +1,10 @@
 /**
  * Gordon SDK Client
  *
+ * STATUS: v1.1 — NOT required for v1 launch. The CLI TUI is the primary
+ * interface. This SDK is for future remote access, web UI, and programmatic
+ * control. Do not invest more until the CLI experience is validated.
+ *
  * Full-featured SDK for external developers to build trading agents on
  * Gordon's primitives. Communicates with the Gordon daemon over IPC,
  * providing typed command methods, lifecycle management with auto-reconnect,

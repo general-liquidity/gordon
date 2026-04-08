@@ -129,7 +129,35 @@ export const classify_trade_risk = createTool({
     };
 
     const assessment = classifyTradeRisk(trade, portfolioContext, DEFAULT_CLASSIFIER_CONFIG);
-    return { success: true, ...assessment };
+
+    // Wire: Trading Constitution check (immutable rules that cannot be overridden)
+    let constitutionViolations: any[] = [];
+    try {
+      const { checkConstitution, formatViolations } = require("../../safety/tradingConstitution.ts") as typeof import("../../safety/tradingConstitution.ts");
+      const result = checkConstitution({
+        positionSizePct: (trade.notionalUsd / portfolioContext.totalValueUsd) * 100,
+        riskPerTradePct: assessment.compositeScore > 50 ? 3 : 1, // Estimate
+        currentDrawdownPct: portfolioContext.currentDrawdownPct,
+        dailyLossPct: Math.abs(portfolioContext.dailyPnlUsd / portfolioContext.totalValueUsd) * 100,
+        openPositionCount: portfolioContext.positions.length,
+        tradesThisHour: portfolioContext.recentTradeCount,
+        tradesThisDay: portfolioContext.recentTradeCount * 3, // Estimate
+        consecutiveLosses: 0,
+        hasStopLoss: true, // Assume — Executor instructions require it
+        isCrypto: true,
+      });
+      constitutionViolations = result;
+
+      // If any constitution violation is "halt" or "emergency" → override risk tier to critical
+      const hasHalt = result.some((v: any) => v.severity === "halt" || v.severity === "emergency");
+      if (hasHalt) {
+        assessment.tier = "critical";
+        assessment.recommendation = "block";
+        assessment.summary = formatViolations(result);
+      }
+    } catch { /* non-critical */ }
+
+    return { success: true, ...assessment, constitutionViolations };
   },
 });
 

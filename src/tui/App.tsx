@@ -439,6 +439,25 @@ function AppInner() {
 
       dispatch({ type: "SET_SHOW_HELP", show: false });
 
+      // ─��� Injection defense: check input BEFORE it reaches the agent ──
+      try {
+        const { checkForInjection } = require("../infra/safety/injectionDefense.js") as typeof import("../infra/safety/injectionDefense.js");
+        const injectionCheck = checkForInjection(trimmed);
+        if (injectionCheck.shouldBlock) {
+          dispatch({
+            type: "ADD_MESSAGE",
+            message: {
+              id: `injection-block-${Date.now()}`,
+              role: "system",
+              variant: "error" as any,
+              content: `\u26D4 Input blocked: ${injectionCheck.reason}`,
+              timestamp: new Date().toISOString(),
+            },
+          });
+          return;
+        }
+      } catch { /* non-critical — if defense module fails, let input through */ }
+
       // ── Phase 15-18 slash commands ──
       if (trimmed === "/model" || trimmed === "/m" || trimmed === "/provider") {
         setShowModelPicker(true);

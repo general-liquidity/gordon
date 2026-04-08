@@ -20,11 +20,14 @@ export interface TypeaheadMatch {
   isSubcommand?: boolean;
 }
 
-// Pre-sort top-level commands (excluding hidden + subcommand-only entries)
+// Pre-sort top-level commands by level then workflow (excluding hidden)
+// Level 1 = beginner (core commands), Level 2 = intermediate, Level 3 = advanced
 const ALL_COMMANDS: TypeaheadMatch[] = (() => {
   const sorted = [...SLASH_COMMANDS]
     .filter((cmd) => !(cmd as any).hideFromTypeahead)
     .sort((a, b) => {
+      // Sort by level first (beginners see level 1 commands at top)
+      if (a.level !== b.level) return a.level - b.level;
       if (a.workflowOrder !== b.workflowOrder) return a.workflowOrder - b.workflowOrder;
       return a.name.localeCompare(b.name);
     });
@@ -35,8 +38,12 @@ const ALL_COMMANDS: TypeaheadMatch[] = (() => {
     aliases: cmd.aliases?.length ? cmd.aliases : undefined,
     usage: cmd.usage,
     subcommandCount: (cmd as any).subcommands?.length,
+    level: cmd.level,
   }));
 })();
+
+// Beginner-friendly subset: only level 1 commands (shown when query is empty)
+const BEGINNER_COMMANDS = ALL_COMMANDS.filter((cmd) => (cmd as any).level === 1);
 
 // Index of commands that have subcommands
 const SUBCOMMAND_PARENTS = new Map<string, { subcommands: string[]; descriptions: Record<string, string>; workflow: string }>();
@@ -84,9 +91,12 @@ export function useSlashCommandTypeahead(
       }
     }
 
-    // Empty query → show top-level commands (like Claude Code)
+    // Empty query → show beginner-friendly subset first (level 1)
+    // User can scroll to see all, or start typing to search everything
     if (!query && showAllOnEmpty) {
-      setMatches(ALL_COMMANDS.slice(0, maxResults));
+      // Show beginner commands first, then the rest — progressive disclosure
+      const progressive = [...BEGINNER_COMMANDS, ...ALL_COMMANDS.filter((cmd) => (cmd as any).level !== 1)];
+      setMatches(progressive.slice(0, maxResults));
       return;
     }
 
