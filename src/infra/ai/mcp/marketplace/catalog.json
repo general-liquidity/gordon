@@ -719,6 +719,45 @@
       "pricing": "free",
       "pricingNote": "Open standard (1.3K+ stars, Apache 2.0). Stripe is first payment provider.",
       "toolCount": 5
+    },
+    {
+      "id": "ampersend",
+      "name": "Ampersend",
+      "description": "Agent payment management on Base — spending controls, payment tracking, multi-agent treasury. Built by Edge & Node.",
+      "category": "infrastructure",
+      "transport": "stdio",
+      "install": "npm i @ampersend/sdk",
+      "credentials": [{ "env": "AMPERSEND_API_KEY", "required": true, "description": "From ampersend.ai dashboard" }],
+      "docsUrl": "https://docs.ampersend.io",
+      "pricing": "freemium",
+      "pricingNote": "Free tier available. Agent treasury management on Base.",
+      "toolCount": 6
+    },
+    {
+      "id": "siwa",
+      "name": "SIWA (Sign In With Agent)",
+      "description": "Trustless agent authentication — prove agent identity without sharing credentials. On-chain verification.",
+      "category": "infrastructure",
+      "transport": "stdio",
+      "install": "npm i @buildersgarden/siwa",
+      "credentials": [{ "env": "AGENT_PRIVATE_KEY", "required": true, "description": "Agent wallet key for signing" }],
+      "docsUrl": "https://siwa.id/docs",
+      "pricing": "free",
+      "pricingNote": "Open source. Trustless identity protocol for agentic economy.",
+      "toolCount": 4
+    },
+    {
+      "id": "herd",
+      "name": "Herd",
+      "description": "On-chain research and due diligence — contracts, transactions, wallets, risk assessment across chains.",
+      "category": "research",
+      "transport": "stdio",
+      "install": "npx -y @herd/mcp-server",
+      "credentials": [{ "env": "HERD_API_KEY", "required": false, "description": "Optional — public access with limits" }],
+      "docsUrl": "https://docs.herd.eco/herd-mcp/introduction",
+      "pricing": "freemium",
+      "pricingNote": "Free tier for basic research. Pro for full due diligence.",
+      "toolCount": 8
     }
   ]
 }
