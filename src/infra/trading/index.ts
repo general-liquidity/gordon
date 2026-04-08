@@ -239,3 +239,21 @@ export type {
   Island,
   IslandEvolutionConfig,
 } from "./optimizerEnhancements.ts";
+
+// Reflexivity Engine (Soros Theory)
+export { assessReflexivity } from "./reflexivity.ts";
+export type { ReflexivityAssessment, ReflexivityInputs, FeedbackSignal, FeedbackLoopType } from "./reflexivity.ts";
+
+// Janus Meta-Weighting (Dynamic Signal Source Weighting)
+export {
+  updateWeights,
+  detectEmergentRegime,
+  blendRecommendations,
+  runMetaWeighting,
+  DEFAULT_META_WEIGHTING_CONFIG,
+} from "./metaWeighting.ts";
+export type { SignalSource, WeightedPrediction, BlendedRecommendation, EmergentRegime, MetaWeightingResult, MetaWeightingConfig } from "./metaWeighting.ts";
+
+// Synthetic Futures Generator (Monte Carlo)
+export { generateSyntheticFutures, formatFuturesSummary } from "./syntheticFutures.ts";
+export type { AssetConfig, CorrelationPair, ScenarioEvent, FuturesConfig, FuturesResult, ScenarioType } from "./syntheticFutures.ts";
