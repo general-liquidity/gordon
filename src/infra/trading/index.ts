@@ -132,3 +132,11 @@ export {
   computeTailRisk,
 } from "./tailRisk.ts";
 export type { TailRiskProfile } from "./tailRisk.ts";
+
+// Cointegration Test (Pairs Trading)
+export {
+  testCointegration,
+  formatCointegrationResult,
+  DEFAULT_SIGNAL_CONFIG,
+} from "./cointegration.ts";
+export type { CointegrationResult, PairsTradeSignal } from "./cointegration.ts";
