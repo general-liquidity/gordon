@@ -566,6 +566,94 @@
       "pricing": "free",
       "pricingNote": "Open source (Apache 2.0). 60+ Solana actions.",
       "toolCount": 11
+    },
+    {
+      "id": "fred",
+      "name": "FRED Economic Data",
+      "description": "Federal Reserve macroeconomic data — GDP, CPI, interest rates, employment, Treasury yields, 800K+ series.",
+      "category": "data-provider",
+      "transport": "stdio",
+      "install": "uvx mcp-fredapi",
+      "credentials": [{ "env": "FRED_API_KEY", "required": true, "description": "Free key from fred.stlouisfed.org" }],
+      "docsUrl": "https://github.com/Jaldekoa/mcp-fredapi",
+      "pricing": "free",
+      "pricingNote": "Free API key. 120 req/min. 800K+ economic data series.",
+      "toolCount": 5
+    },
+    {
+      "id": "polymarket",
+      "name": "Polymarket",
+      "description": "Official prediction market MCP — market discovery, order management, positions, event resolution tracking.",
+      "category": "execution",
+      "transport": "stdio",
+      "install": "npx -y @polymarket/mcp-server",
+      "credentials": [
+        { "env": "POLYMARKET_API_KEY", "required": true },
+        { "env": "POLYMARKET_PRIVATE_KEY", "required": true, "description": "Wallet key for order execution" }
+      ],
+      "docsUrl": "https://github.com/polymarket/polymarket-mcp",
+      "pricing": "free",
+      "pricingNote": "No platform fees. Official Polymarket MCP.",
+      "toolCount": 8
+    },
+    {
+      "id": "composer",
+      "name": "Composer",
+      "description": "Systematic strategy design, cloud backtesting, multi-regime stress testing, and one-click deployment to live.",
+      "category": "analytics",
+      "transport": "stdio",
+      "install": "npx -y @composer/mcp-server",
+      "credentials": [{ "env": "COMPOSER_API_KEY", "required": true }],
+      "docsUrl": "https://github.com/composerapp/composer-mcp",
+      "pricing": "freemium",
+      "pricingNote": "Free for backtesting. Paid for live deployment.",
+      "toolCount": 6
+    },
+    {
+      "id": "kalshi",
+      "name": "Kalshi",
+      "description": "CFTC-regulated event contracts — politics, economics, weather, sports. US-regulated prediction market exchange.",
+      "category": "execution",
+      "transport": "stdio",
+      "install": "npx -y mcp-server-kalshi",
+      "credentials": [
+        { "env": "KALSHI_API_KEY", "required": true },
+        { "env": "KALSHI_PRIVATE_KEY", "required": true }
+      ],
+      "docsUrl": "https://github.com/9crusher/mcp-server-kalshi",
+      "pricing": "free",
+      "pricingNote": "No platform fees. Requires Kalshi account with API access.",
+      "toolCount": 5
+    },
+    {
+      "id": "freqtrade",
+      "name": "Freqtrade MCP",
+      "description": "Agent-controlled Freqtrade bot management — start/stop strategies, backtests, monitor trades, adjust configs.",
+      "category": "execution",
+      "transport": "stdio",
+      "install": "npx -y freqtrade-mcp",
+      "credentials": [
+        { "env": "FREQTRADE_API_URL", "required": true, "description": "URL of running Freqtrade instance" },
+        { "env": "FREQTRADE_API_USERNAME", "required": true },
+        { "env": "FREQTRADE_API_PASSWORD", "required": true }
+      ],
+      "docsUrl": "https://github.com/kukapay/freqtrade-mcp",
+      "pricing": "free",
+      "pricingNote": "Open source. Requires running Freqtrade instance.",
+      "toolCount": 8
+    },
+    {
+      "id": "lifi",
+      "name": "LI.FI",
+      "description": "Cross-chain bridge and swap aggregator — optimal routing across Stargate, Across, Hop, and 15+ bridges and DEXes.",
+      "category": "execution",
+      "transport": "stdio",
+      "install": "npx -y @lifi/mcp-server",
+      "credentials": [],
+      "docsUrl": "https://github.com/lifinance/lifi-mcp",
+      "pricing": "free",
+      "pricingNote": "Free. Aggregates across all bridge providers for cheapest/fastest route.",
+      "toolCount": 6
     }
   ]
 }
