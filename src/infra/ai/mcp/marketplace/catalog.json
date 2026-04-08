@@ -680,6 +680,19 @@
       "pricing": "free",
       "pricingNote": "Open protocol (Stripe + Tempo). Fees depend on payment rail.",
       "toolCount": 6
+    },
+    {
+      "id": "x402",
+      "name": "x402 (Coinbase)",
+      "description": "HTTP 402 internet-native payments by Coinbase — zero fees, zero wait, zero friction. USDC on Base and other stablecoins.",
+      "category": "infrastructure",
+      "transport": "stdio",
+      "install": "npx @coinbase/payments-mcp@latest --client claude-code --auto-config",
+      "credentials": [{ "env": "COINBASE_CDP_API_KEY", "required": true, "description": "Coinbase Developer Platform API key" }],
+      "docsUrl": "https://www.x402.org/",
+      "pricing": "free",
+      "pricingNote": "Zero protocol fees. Backed by Coinbase, AWS, Alchemy, Cloudflare.",
+      "toolCount": 5
     }
   ]
 }
