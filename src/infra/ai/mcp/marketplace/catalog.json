@@ -771,6 +771,19 @@
       "pricing": "free",
       "pricingNote": "Open source TypeScript SDK. Built on x402 protocol. Solana + EVM wallets.",
       "toolCount": 5
+    },
+    {
+      "id": "ens",
+      "name": "ENS (Ethereum Name Service)",
+      "description": "Name resolution for the agentic economy — resolve .eth names to addresses, reverse-lookup wallets to names, read ENS records.",
+      "category": "infrastructure",
+      "transport": "stdio",
+      "install": "npx -y mcp-server-ens",
+      "credentials": [],
+      "docsUrl": "https://github.com/justaname-id/ens-mcp-server",
+      "pricing": "free",
+      "pricingNote": "Free. No API key needed. Resolves any .eth name on-chain.",
+      "toolCount": 4
     }
   ]
 }
