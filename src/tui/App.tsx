@@ -55,6 +55,9 @@ import { ThreadBrowser } from "./components/ThreadBrowser.js";
 import { JournalViewer } from "./components/JournalViewer.js";
 import { ShortcutsBrowser } from "./components/ShortcutsBrowser.js";
 import { ApprovalBrowser } from "./components/ApprovalBrowser.js";
+import { MCPManager } from "./components/MCPManager.js";
+import { MarketplaceBrowser } from "./components/MarketplaceBrowser.js";
+import { CLIBrowser } from "./components/CLIBrowser.js";
 import { PrivacyScreen } from "./components/PrivacyScreen.js";
 import { FeedbackSurvey } from "./components/FeedbackSurvey.js";
 import { ThinkStep } from "./components/ThinkStep.js";
@@ -158,6 +161,9 @@ function AppInner() {
   const [feedbackTradeData, setFeedbackTradeData] = useState<FeedbackTradeData | null>(null);
 
   const [showModelPicker, setShowModelPicker] = useState(false);
+  const [showMCPManager, setShowMCPManager] = useState(false);
+  const [showMarketplace, setShowMarketplace] = useState(false);
+  const [showCLIBrowser, setShowCLIBrowser] = useState(false);
   const [showThemePicker, setShowThemePicker] = useState(false);
   const [showExchangePicker, setShowExchangePicker] = useState(false);
   const [showBrokerPicker, setShowBrokerPicker] = useState(false);
@@ -478,6 +484,18 @@ function AppInner() {
         setShowApprovalBrowser(true);
         return;
       }
+      if (trimmed === "/mcp" || trimmed === "/plugins") {
+        setShowMCPManager(true);
+        return;
+      }
+      if (trimmed === "/marketplace" || trimmed === "/market" || trimmed === "/store") {
+        setShowMarketplace(true);
+        return;
+      }
+      if (trimmed === "/cli" || trimmed === "/tools") {
+        setShowCLIBrowser(true);
+        return;
+      }
       // /model <alias>, /exchange <subcommand>, etc. with args → falls through to handlers
       if (trimmed === "/settings") {
         setShowSettings(true);
@@ -764,6 +782,31 @@ function AppInner() {
       handleSubmit(`deny ${id}`);
       setShowApprovalBrowser(false);
     }} onCancel={() => setShowApprovalBrowser(false)} />;
+  }
+
+  if (showMCPManager) {
+    return <MCPManager servers={[]} onAdd={(config) => {
+      dispatch({ type: "ADD_MESSAGE", message: { id: `mcp-add-${Date.now()}`, role: "system", content: `MCP server added: ${config.name} (${config.transport})`, timestamp: new Date().toISOString() } });
+      setShowMCPManager(false);
+    }} onRemove={(id) => {
+      dispatch({ type: "ADD_MESSAGE", message: { id: `mcp-rm-${Date.now()}`, role: "system", content: `MCP server removed: ${id}`, timestamp: new Date().toISOString() } });
+    }} onReconnect={(id) => {
+      dispatch({ type: "ADD_MESSAGE", message: { id: `mcp-rc-${Date.now()}`, role: "system", content: `Reconnecting MCP server: ${id}`, timestamp: new Date().toISOString() } });
+    }} onCancel={() => setShowMCPManager(false)} />;
+  }
+
+  if (showMarketplace) {
+    return <MarketplaceBrowser plugins={[]} onInstall={(pluginId, cmd) => {
+      dispatch({ type: "ADD_MESSAGE", message: { id: `mkt-${Date.now()}`, role: "system", content: `Installing ${pluginId}...\nRun: ${cmd}`, timestamp: new Date().toISOString() } });
+      setShowMarketplace(false);
+    }} onCancel={() => setShowMarketplace(false)} />;
+  }
+
+  if (showCLIBrowser) {
+    return <CLIBrowser tools={[]} onInstall={(toolId, cmd) => {
+      dispatch({ type: "ADD_MESSAGE", message: { id: `cli-${Date.now()}`, role: "system", content: `Install ${toolId}:\n${cmd}`, timestamp: new Date().toISOString() } });
+      setShowCLIBrowser(false);
+    }} onCancel={() => setShowCLIBrowser(false)} />;
   }
 
   // ── Placeholder text for PromptInput ──
