@@ -149,3 +149,10 @@ export {
   assessMarketEfficiency,
 } from "./marketEfficiency.ts";
 export type { EfficiencyTestResult, MarketEfficiencyProfile } from "./marketEfficiency.ts";
+
+// Granger Causality (Lead-Lag Prediction)
+export {
+  grangerCausalityTest,
+  bidirectionalGrangerTest,
+} from "./grangerCausality.ts";
+export type { GrangerResult, BiDirectionalGrangerResult } from "./grangerCausality.ts";
