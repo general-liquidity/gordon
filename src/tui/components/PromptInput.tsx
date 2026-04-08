@@ -48,7 +48,7 @@ export function PromptInput({
   const isSlashMode = value === "/" || (value.startsWith("/") && spaceCount <= 1);
   const slashQuery = isSlashMode ? slashContent : "";
   const suggestions = useSlashCommandTypeahead(slashQuery, {
-    maxResults: 50,
+    maxResults: 200,
     showAllOnEmpty: true,
   });
   const showSuggestions = isSlashMode && suggestions.length > 0;
@@ -74,9 +74,9 @@ export function PromptInput({
     return groups;
   }, [suggestions, showSuggestions]);
 
-  // Cap suggestion list to half terminal height so it doesn't push input off-screen.
-  // Claude Code shows suggestions above the input, capped to avoid overflow.
-  const maxVisible = Math.min(Math.max(8, Math.floor(termRows / 2)), 20);
+  // Show as many suggestions as terminal allows (up to 60% of height).
+  // User scrolls with arrow keys — all commands accessible.
+  const maxVisible = Math.min(Math.max(10, Math.floor(termRows * 0.6)), 30);
 
   useInput((input, key) => {
     if (key.return) {
