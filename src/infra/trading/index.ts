@@ -140,3 +140,12 @@ export {
   DEFAULT_SIGNAL_CONFIG,
 } from "./cointegration.ts";
 export type { CointegrationResult, PairsTradeSignal } from "./cointegration.ts";
+
+// Market Efficiency Tests (Pre-Trade Filters)
+export {
+  ljungBoxTest,
+  varianceRatioTest,
+  runsTest,
+  assessMarketEfficiency,
+} from "./marketEfficiency.ts";
+export type { EfficiencyTestResult, MarketEfficiencyProfile } from "./marketEfficiency.ts";
