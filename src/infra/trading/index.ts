@@ -180,3 +180,27 @@ export {
   assessBacktestCredibility,
 } from "./backtestCredibility.ts";
 export type { SharpeCredibilityResult, CPCVResult } from "./backtestCredibility.ts";
+
+// Kalman Filter (Adaptive Price Smoothing)
+export {
+  kalmanFilter,
+  kalmanUpdate,
+  kalmanSignal,
+  autoTuneKalman,
+  DEFAULT_KALMAN_CONFIG,
+} from "./kalmanFilter.ts";
+export type { KalmanState, KalmanConfig, KalmanResult } from "./kalmanFilter.ts";
+
+// Markov Chain Regime Detection
+export {
+  analyzeMarkovRegime,
+  DEFAULT_MARKOV_CONFIG,
+} from "./markovRegime.ts";
+export type { MarkovRegimeResult, MarkovState, TransitionMatrix, MarkovConfig } from "./markovRegime.ts";
+
+// Orderflow Delta Ladder
+export {
+  analyzeOrderflow,
+  DEFAULT_ORDERFLOW_CONFIG,
+} from "./orderflowDelta.ts";
+export type { OrderflowResult, DeltaBar, OHLCV, OrderflowConfig } from "./orderflowDelta.ts";
