@@ -156,3 +156,17 @@ export {
   bidirectionalGrangerTest,
 } from "./grangerCausality.ts";
 export type { GrangerResult, BiDirectionalGrangerResult } from "./grangerCausality.ts";
+
+// Black-Litterman Portfolio Optimization
+export { blackLitterman } from "./blackLitterman.ts";
+export type { BlackLittermanInputs, BlackLittermanResult, InvestorView } from "./blackLitterman.ts";
+
+// Volatility-Targeting + Drawdown Overlay
+export {
+  computeVolTargetScale,
+  computeDrawdownScale,
+  computeOverlay,
+  DEFAULT_VOL_TARGET_CONFIG,
+  DEFAULT_DRAWDOWN_CONFIG,
+} from "./drawdownOverlay.ts";
+export type { VolTargetConfig, DrawdownOverlayConfig, OverlayResult } from "./drawdownOverlay.ts";
