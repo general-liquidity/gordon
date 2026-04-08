@@ -34,6 +34,7 @@ import type { MastraMCPServerDefinition } from "@mastra/mcp";
 import { pluginInstaller } from "./marketplace/installer.ts";
 import { credentialManager } from "./credentials.ts";
 import type { MCPCategory, MCPServerManifest } from "./types.ts";
+import { withRetry, isServerCachedAsFailing, recordServerSuccess } from "./resilience.ts";
 
 // ============================================================================
 // State
@@ -298,11 +299,27 @@ export async function ensureMCPToolsDiscovered(serverIds?: string[]): Promise<Re
         })
       : _mcpClient!;
 
-    const discoveredTools = await client.listTools();
+    // Filter out servers cached as failing (skip them, don't waste time)
+    const activeServerIds = Object.keys(selectedServers).filter(
+      (id) => !isServerCachedAsFailing(id),
+    );
+    if (activeServerIds.length < Object.keys(selectedServers).length) {
+      const skipped = Object.keys(selectedServers).length - activeServerIds.length;
+      loggerInfo(`[MCP] Skipping ${skipped} server(s) cached as failing`);
+    }
+
+    // Discover tools with retry + backoff for each server
+    const discoveredTools = await withRetry(
+      normalizedServerIds?.[0] ?? "gordon-mcp",
+      () => client.listTools(),
+    );
     _mcpTools = {
       ...(_mcpTools ?? {}),
       ...discoveredTools,
     };
+
+    // Mark all discovered servers as healthy
+    for (const id of activeServerIds) recordServerSuccess(id);
 
     if (normalizedServerIds?.length) {
       normalizedServerIds.forEach((id) => _discoveredServerIds.add(id));
