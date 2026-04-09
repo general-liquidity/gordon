@@ -498,25 +498,38 @@ async function streamResponse(
           }));
 
           setState((prev: any) => {
-            // Persist completion badge (Claude Code: "Brewed for 3.2s · 4 tools")
+            // Persist tool call results as messages (Claude Code: tool results stay inline)
             const calls = prev.activeToolCalls ?? [];
+            const toolResultMsgs: Message[] = calls
+              .filter((c: any) => c.status !== "running")
+              .map((c: any) => ({
+                id: `tool-result-${c.id}`,
+                role: "system" as const,
+                variant: "tool" as const,
+                content: `\u25CF ${c.toolName}${c.args?.symbol ? ` ${c.args.symbol}` : ""}${c.duration ? ` ${c.duration < 1000 ? c.duration + "ms" : (c.duration / 1000).toFixed(1) + "s"}` : ""}${c.result ? `\n\u231F  ${c.result.slice(0, 200)}` : ""}`,
+                timestamp: new Date().toISOString(),
+              }));
+
+            // Completion badge with duration + token count
             const elapsed = Date.now() - chainStartTime;
             const durStr = elapsed < 1000 ? `${elapsed}ms` : `${(elapsed / 1000).toFixed(1)}s`;
+            const tokenStr = totalTokens > 0
+              ? totalTokens >= 1000 ? ` \u00b7 ${(totalTokens / 1000).toFixed(1)}K tokens` : ` \u00b7 ${totalTokens} tokens`
+              : "";
             const completionMsg: Message = {
               id: `completion-${Date.now()}`,
               role: "system" as const,
-              content: calls.length > 0
-                ? `completed in ${durStr} \u00b7 ${calls.length} tool${calls.length !== 1 ? "s" : ""}`
-                : `completed in ${durStr}`,
+              content: `completed in ${durStr}${calls.length > 0 ? ` \u00b7 ${calls.length} tool${calls.length !== 1 ? "s" : ""}` : ""}${tokenStr}`,
               variant: "system" as const,
               timestamp: new Date().toISOString(),
             };
 
             return {
             ...prev,
-            // Replace streaming message + append completion badge + risk/approval
+            // Replace streaming message + persist tool results + completion + risk/approval
             messages: [
               ...prev.messages.map((m: any) => m.id === streamingMsgId ? gordonMsg : m),
+              ...toolResultMsgs,
               completionMsg,
               ...riskMessages,
               ...approvalMsgs,
