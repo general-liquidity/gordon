@@ -1455,27 +1455,21 @@ function AppInner() {
         <QueuedCommandsNotice count={queuedCount} />
       )}
 
-      {/* ── Status bar above input — mode, positions, cost, shortcuts ── */}
+      {/* ── Status bar above input ── */}
       <Box paddingX={2} justifyContent="space-between">
         <Box gap={1}>
-          <Text color={permissionMode === "auto" ? "red" : permissionMode === "strict" ? "green" : "cyanBright"}>
-            {permissionMode}
-          </Text>
           {autonomousActive && (
-            <>
-              <Text dimColor>{"\u00b7"}</Text>
-              <Text color="magenta">{"\u25CF"} autonomous</Text>
-            </>
+            <Text color="magenta">{"\u25CF"} autonomous</Text>
           )}
           {livePositions.length > 0 && (
             <>
-              <Text dimColor>{"\u00b7"}</Text>
+              {autonomousActive && <Text dimColor>{"\u00b7"}</Text>}
               <Text>{livePositions.length} position{livePositions.length !== 1 ? "s" : ""}</Text>
             </>
           )}
           {memoryUsageRatio > 0.5 && (
             <>
-              <Text dimColor>{"\u00b7"}</Text>
+              {(autonomousActive || livePositions.length > 0) && <Text dimColor>{"\u00b7"}</Text>}
               <MemoryUsageIndicator usageRatio={memoryUsageRatio} tokenLimit={contextLimit} />
             </>
           )}
