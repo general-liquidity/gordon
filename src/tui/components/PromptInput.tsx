@@ -287,17 +287,7 @@ export function PromptInput({
             <Text dimColor>{placeholder}</Text>
           )}
         </Box>
-        <FooterHints
-          permissionMode={permissionMode}
-          activeAgentCount={activeAgentCount}
-          isStreaming={isStreaming}
-          activeAgentName={activeAgentName}
-          autonomousActive={autonomousActive}
-          autonomousStrategyCount={autonomousStrategyCount}
-          vimMode={vimMode}
-          effortLevel={effortLevel}
-          tokenBudgetRatio={tokenBudgetRatio}
-        />
+        {/* Footer hints moved above input box — status bar handles mode/cost/shortcuts */}
       </Box>
     </Box>
   );
