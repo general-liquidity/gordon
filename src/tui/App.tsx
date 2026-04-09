@@ -69,6 +69,22 @@ import { NoSelect } from "./components/NoSelect.js";
 import { QueuedCommandsNotice } from "./components/QueuedCommandsNotice.js";
 import { MemoryUsageIndicator } from "./components/MemoryUsageIndicator.js";
 import { usePromptSuggestions } from "./hooks/usePromptSuggestions.js";
+import { StashNotice } from "./components/StashNotice.js";
+import { ExitFlow } from "./components/ExitFlow.js";
+import { AwaySummary } from "./components/AwaySummary.js";
+import { PressEnterToContinue } from "./components/PressEnterToContinue.js";
+import { OrderbookView } from "./components/OrderbookView.js";
+import { AutonomousControlDialog } from "./components/AutonomousControlDialog.js";
+import { SkillExecutionViewer } from "./components/SkillExecutionViewer.js";
+import { ConstitutionPanel } from "./components/ConstitutionPanel.js";
+import { InjectionDefensePanel } from "./components/InjectionDefensePanel.js";
+import { DataSourceHealth } from "./components/DataSourceHealth.js";
+import { RiskConfigPanel } from "./components/RiskConfigPanel.js";
+import { DeFiOverviewPanel } from "./components/DeFiOverviewPanel.js";
+import { MarketOverviewPanel } from "./components/MarketOverviewPanel.js";
+import { RegimeStatusPanel } from "./components/RegimeStatusPanel.js";
+import { StatsDialog } from "./components/StatsDialog.js";
+import { GlobalSearchDialog } from "./components/GlobalSearchDialog.js";
 
 // ── Backend Module UI Components ──
 import { LivePositions, type Position } from "./components/LivePositions.js";
@@ -197,6 +213,19 @@ function AppInner() {
   const [showGenome, setShowGenome] = useState(false);
   const [showIndicators, setShowIndicators] = useState(false);
   const [showConsensus, setShowConsensus] = useState(false);
+  const [showOrderbook, setShowOrderbook] = useState(false);
+  const [showAutonomous, setShowAutonomous] = useState(false);
+  const [showSkills, setShowSkills] = useState(false);
+  const [showConstitution, setShowConstitution] = useState(false);
+  const [showInjectionDefense, setShowInjectionDefense] = useState(false);
+  const [showDataHealth, setShowDataHealth] = useState(false);
+  const [showRiskConfig, setShowRiskConfig] = useState(false);
+  const [showDefi, setShowDefi] = useState(false);
+  const [showMarketOverview, setShowMarketOverview] = useState(false);
+  const [showRegime, setShowRegime] = useState(false);
+  const [showStats, setShowStats] = useState(false);
+  const [showGlobalSearch, setShowGlobalSearch] = useState(false);
+  const [showExitFlow, setShowExitFlow] = useState(false);
   const [livePositions, setLivePositions] = useState<Position[]>([]);
   const [orderRecovery, setOrderRecovery] = useState<{
     orderId: string; symbol: string; reason: string; attempt: number; maxAttempts: number;
@@ -228,7 +257,10 @@ function AppInner() {
     showSettings || showExport || showEmergency || showContext ||
     showSessions || showMemory || showFeedback ||
     showAudit || showScheduler || showPlaybooks || showStrategies ||
-    showGenome || showIndicators || showConsensus;
+    showGenome || showIndicators || showConsensus ||
+    showOrderbook || showAutonomous || showSkills || showConstitution ||
+    showInjectionDefense || showDataHealth || showRiskConfig || showDefi ||
+    showMarketOverview || showRegime || showStats || showGlobalSearch || showExitFlow;
 
   // ── Prompt suggestions based on conversation context ──
   const promptSuggestions = usePromptSuggestions(messages, isStreaming, !!false /* hasExchange */);
@@ -590,6 +622,58 @@ function AppInner() {
       }
       if (trimmed === "/indicators") {
         setShowIndicators(true);
+        return;
+      }
+      if (trimmed === "/orderbook") {
+        setShowOrderbook(true);
+        return;
+      }
+      if (trimmed === "/autonomous") {
+        setShowAutonomous(true);
+        return;
+      }
+      if (trimmed === "/skills") {
+        setShowSkills(true);
+        return;
+      }
+      if (trimmed === "/constitution") {
+        setShowConstitution(true);
+        return;
+      }
+      if (trimmed === "/injection-defense") {
+        setShowInjectionDefense(true);
+        return;
+      }
+      if (trimmed === "/data-health") {
+        setShowDataHealth(true);
+        return;
+      }
+      if (trimmed === "/risk-config") {
+        setShowRiskConfig(true);
+        return;
+      }
+      if (trimmed === "/defi") {
+        setShowDefi(true);
+        return;
+      }
+      if (trimmed === "/market-overview") {
+        setShowMarketOverview(true);
+        return;
+      }
+      if (trimmed === "/regime") {
+        setShowRegime(true);
+        return;
+      }
+      if (trimmed === "/stats") {
+        setShowStats(true);
+        return;
+      }
+      if (trimmed === "/search") {
+        setShowGlobalSearch(true);
+        return;
+      }
+      if (trimmed === "/exit") {
+        setShowExitFlow(true);
         return;
       }
 
@@ -1122,6 +1206,61 @@ function AppInner() {
         />
       )}
 
+      {/* ── New panel dialogs ── */}
+      {showOrderbook && (
+        <OrderbookView symbol="BTC/USDT" bids={[]} asks={[]} spread={0} spreadPercent={0} onClose={() => setShowOrderbook(false)} />
+      )}
+      {showAutonomous && (
+        <AutonomousControlDialog
+          isActive={autonomousActive}
+          isPaused={false}
+          cycleCount={0}
+          opportunitiesFound={0}
+          intervalMinutes={15}
+          onAction={() => {}}
+          onClose={() => setShowAutonomous(false)}
+        />
+      )}
+      {showSkills && (
+        <SkillExecutionViewer runs={[]} onClose={() => setShowSkills(false)} />
+      )}
+      {showConstitution && (
+        <ConstitutionPanel results={[]} blockedCount={0} passedCount={0} onClose={() => setShowConstitution(false)} />
+      )}
+      {showInjectionDefense && (
+        <InjectionDefensePanel matches={[]} inputBlocked={false} inputText="" onClose={() => setShowInjectionDefense(false)} />
+      )}
+      {showDataHealth && (
+        <DataSourceHealth sources={[]} onClose={() => setShowDataHealth(false)} />
+      )}
+      {showRiskConfig && (
+        <RiskConfigPanel onClose={() => setShowRiskConfig(false)} />
+      )}
+      {showDefi && (
+        <DeFiOverviewPanel onClose={() => setShowDefi(false)} />
+      )}
+      {showMarketOverview && (
+        <MarketOverviewPanel onClose={() => setShowMarketOverview(false)} />
+      )}
+      {showRegime && (
+        <RegimeStatusPanel symbols={[]} onClose={() => setShowRegime(false)} />
+      )}
+      {showStats && (
+        <StatsDialog onClose={() => setShowStats(false)} />
+      )}
+      {showGlobalSearch && (
+        <GlobalSearchDialog messages={messages} onClose={() => setShowGlobalSearch(false)} />
+      )}
+      {showExitFlow && (
+        <ExitFlow
+          openPositionCount={0}
+          autonomousActive={autonomousActive}
+          onSaveAndExit={() => { exit(); }}
+          onExitWithoutSave={() => { exit(); }}
+          onCancel={() => setShowExitFlow(false)}
+        />
+      )}
+
       {/* ── DaemonStatus + MarketDataStatus — only show when there's something active ── */}
       {(daemonStatus.status !== "stopped" || marketFeeds.length > 0) && (
         <Box paddingX={1} gap={2}>
@@ -1189,7 +1328,10 @@ function AppInner() {
 // ============================================================================
 
 export function App() {
+  // Import ThemeProvider dynamically to avoid circular deps
+  const { ThemeProvider } = require("./themes/ThemeProvider.js");
   return (
+    <ThemeProvider>
     <SettingsProvider>
       <MemoryProvider>
         <StatsProvider>
@@ -1201,5 +1343,6 @@ export function App() {
         </StatsProvider>
       </MemoryProvider>
     </SettingsProvider>
+    </ThemeProvider>
   );
 }
