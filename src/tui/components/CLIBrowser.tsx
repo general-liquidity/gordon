@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from "react";
 import { Box, Text, useInput } from "ink";
-import { Select } from "@inkjs/ui";
+import { GordonSelect as Select } from "../design-system/GordonSelect.js";
 
 /**
  * CLIBrowser — Browse trading CLIs, check installation status

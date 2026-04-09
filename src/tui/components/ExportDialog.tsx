@@ -13,7 +13,7 @@
 
 import React, { useState, useCallback } from "react";
 import { Box, Text, useInput } from "ink";
-import { Select } from "@inkjs/ui";
+import { GordonSelect as Select } from "../design-system/GordonSelect.js";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";

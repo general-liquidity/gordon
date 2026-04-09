@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from "react";
 import { Box, Text, useInput } from "ink";
-import { Select } from "@inkjs/ui";
+import { GordonSelect as Select } from "../design-system/GordonSelect.js";
 
 /**
  * MarketplaceBrowser — Browse and install from the 47-plugin trading catalog

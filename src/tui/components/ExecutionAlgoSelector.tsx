@@ -18,7 +18,7 @@
 
 import React from "react";
 import { Box, Text } from "ink";
-import { Select } from "@inkjs/ui";
+import { GordonSelect as Select } from "../design-system/GordonSelect.js";
 
 // ============================================================================
 // Types

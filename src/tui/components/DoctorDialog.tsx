@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Box, Text, useInput } from "ink";
-import { Select } from "@inkjs/ui";
+import { GordonSelect as Select } from "../design-system/GordonSelect.js";
 
 /**
  * DoctorDialog — Actionable diagnostics with fix suggestions

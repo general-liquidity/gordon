@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from "react";
 import { Box, Text, useInput } from "ink";
-import { Select } from "@inkjs/ui";
+import { GordonSelect } from "../design-system/GordonSelect.js";
 
 /**
  * ModelPicker — Interactive 2-step model selector (Claude Code style)
@@ -114,7 +114,7 @@ export function ModelPicker({ currentProvider, currentModel, onSelect, onCancel 
           <Text bold>Step 1: Choose provider</Text>
           <Text dimColor>Which AI provider should Gordon use?</Text>
           <Box marginTop={1}>
-            <Select options={PROVIDERS} onChange={handleProviderSelect} />
+            <GordonSelect options={PROVIDERS} onChange={handleProviderSelect} />
           </Box>
         </>
       ) : (
@@ -122,7 +122,7 @@ export function ModelPicker({ currentProvider, currentModel, onSelect, onCancel 
           <Text bold>Step 2: Choose model</Text>
           <Text dimColor>Provider: {providerLabel}</Text>
           <Box marginTop={1}>
-            <Select
+            <GordonSelect
               options={MODEL_OPTIONS[selectedProvider ?? "openai"] ?? MODEL_OPTIONS.openai!}
               onChange={handleModelSelect}
             />

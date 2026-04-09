@@ -10,7 +10,7 @@
 
 import React, { useState, useEffect } from "react";
 import { Box, Text, useInput } from "ink";
-import { Select } from "@inkjs/ui";
+import { GordonSelect as Select } from "../design-system/GordonSelect.js";
 
 // ============================================================================
 // Types
