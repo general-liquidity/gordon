@@ -229,6 +229,11 @@ function getToolVerb(toolName: string): string | null {
 }
 
 export function TradingSpinner({ agentName, elapsedMs, streamLength = 0, userInput, activeToolName }: Props) {
+  // Progressive width gating: hide elements that don't fit
+  const cols = process.stdout.columns ?? 80;
+  // Token counter (smooth animation via ref)
+  const displayedTokensRef = useRef(0);
+  const estimatedTokens = Math.floor(streamLength / 4); // ~4 chars per token
   const [frame, setFrame] = useState(0);
   const [glimmerIndex, setGlimmerIndex] = useState(0);
 
@@ -285,9 +290,25 @@ export function TradingSpinner({ agentName, elapsedMs, streamLength = 0, userInp
     ? `${(elapsedMs / 1000).toFixed(0)}s`
     : "";
 
+  // Smooth token counter (Claude Code pattern: +3 small, +50 large)
+  const tokenGap = estimatedTokens - displayedTokensRef.current;
+  if (tokenGap > 0) {
+    const increment = tokenGap < 70 ? 3 : tokenGap < 200 ? Math.ceil(tokenGap * 0.15) : 50;
+    displayedTokensRef.current = Math.min(estimatedTokens, displayedTokensRef.current + increment);
+  }
+  const displayedTokens = displayedTokensRef.current;
+  const tokenStr = displayedTokens > 0
+    ? displayedTokens >= 1000 ? `${(displayedTokens / 1000).toFixed(1)}K tok` : `${displayedTokens} tok`
+    : "";
+
   // Build the shimmer text: "verb..." with light trail
   const verbWithEllipsis = `${verb}\u2026`;
   const chars = verbWithEllipsis.split("");
+
+  // Progressive width gating: hide elements on narrow terminals
+  const showElapsed = cols > 50;
+  const showTokens = cols > 70;
+  const showStall = cols > 40;
 
   return (
     <Box paddingLeft={2}>
@@ -300,13 +321,19 @@ export function TradingSpinner({ agentName, elapsedMs, streamLength = 0, userInp
           charIndex={i}
         />
       ))}
-      {elapsedStr && (
+      {showElapsed && elapsedStr && (
         <>
           <Text dimColor> {"\u00b7"} </Text>
           <Text dimColor>{elapsedStr}</Text>
         </>
       )}
-      {isStalled && (
+      {showTokens && tokenStr && (
+        <>
+          <Text dimColor> {"\u00b7"} </Text>
+          <Text dimColor>{tokenStr}</Text>
+        </>
+      )}
+      {showStall && isStalled && (
         <>
           <Text dimColor> {"\u00b7"} </Text>
           <Text color="red" dimColor>slow response</Text>

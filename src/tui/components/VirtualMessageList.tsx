@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
-import { Box, useInput } from "ink";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { Box, Text, useInput } from "ink";
 import { MessageBubble, type Message } from "./MessageBubble.js";
 import { UnseenDivider } from "./UnseenDivider.js";
 import {
@@ -97,8 +97,48 @@ export function VirtualMessageList({
     setUnseenCount(0);
   }, [scrollToBottom]);
 
+  // Message collapsing pipeline (Claude Code pattern): group consecutive tool results
+  const collapsedMessages = useMemo(() => {
+    const result: Message[] = [];
+    let toolGroup: Message[] = [];
+
+    for (const msg of messages) {
+      if (msg.variant === "tool" || msg.variant === "hook_progress") {
+        toolGroup.push(msg);
+      } else {
+        // Flush tool group
+        if (toolGroup.length > 3) {
+          result.push({
+            id: `collapsed-tools-${toolGroup[0]!.id}`,
+            role: "system",
+            content: `${toolGroup.length} tool results`,
+            variant: "compact",
+            timestamp: toolGroup[0]!.timestamp,
+          });
+        } else {
+          result.push(...toolGroup);
+        }
+        toolGroup = [];
+        result.push(msg);
+      }
+    }
+    // Flush remaining
+    if (toolGroup.length > 3) {
+      result.push({
+        id: `collapsed-tools-${toolGroup[0]!.id}`,
+        role: "system",
+        content: `${toolGroup.length} tool results`,
+        variant: "compact",
+        timestamp: toolGroup[0]!.timestamp,
+      });
+    } else {
+      result.push(...toolGroup);
+    }
+    return result;
+  }, [messages]);
+
   // Slice visible messages
-  const visibleMessages = messages.slice(startIndex, endIndex);
+  const visibleMessages = collapsedMessages.slice(startIndex, endIndex);
 
   // Message selection state — subtle background highlight
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);

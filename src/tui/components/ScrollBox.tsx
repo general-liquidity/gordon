@@ -56,10 +56,15 @@ export const ScrollBox = forwardRef<ScrollBoxHandle, Props>(function ScrollBox(
     getScrollTop: () => scrollTop,
   }));
 
-  // Sticky scroll: if was at bottom and content grew, stay at bottom
-  if (stickyScroll && wasAtBottomRef.current && scrollTop < maxScroll) {
-    // Schedule update for next render
-    setTimeout(() => updateScroll(maxScroll), 0);
+  // Sticky scroll: if was at bottom and content grew, snap immediately
+  // No setTimeout — direct state update to avoid one-frame flash (Claude Code pattern)
+  if (stickyScroll && wasAtBottomRef.current && scrollTop < maxScroll && maxScroll > 0) {
+    // Use useEffect-free approach: update ref directly, render with correct value
+    const correctedScrollTop = maxScroll;
+    if (correctedScrollTop !== scrollTop) {
+      // Schedule for next microtask to avoid setState during render
+      queueMicrotask(() => updateScroll(correctedScrollTop));
+    }
   }
 
   return (

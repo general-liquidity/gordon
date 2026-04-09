@@ -1,7 +1,8 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useRef } from "react";
 import { Box, Text, useInput, useStdout } from "ink";
 import { FooterHints } from "./FooterHints.js";
 import { useSlashCommandTypeahead, type TypeaheadMatch } from "../hooks/useSlashCommandTypeahead.js";
+import { useInputHistory } from "../hooks/useInputHistory.js";
 
 // ============================================================================
 // PromptInput — Claude Code-style compact slash command picker
@@ -47,6 +48,13 @@ export function PromptInput({
   const termCols = stdout?.columns ?? 80;
   const [value, setValue] = useState("");
   const [selectedIdx, setSelectedIdx] = useState(0);
+  const [cursorPos, setCursorPos] = useState(0);
+  const history = useInputHistory();
+  const stashedInputRef = useRef("");
+
+  // Paste detection: rapid input within 10ms = paste
+  const lastInputTimeRef = useRef(0);
+  const pasteBufferRef = useRef("");
 
   // Show suggestions when value starts with "/" — allow one space for subcommand browsing
   const slashContent = value.startsWith("/") ? value.slice(1) : "";
@@ -88,14 +96,18 @@ export function PromptInput({
     if (key.return) {
       if (showSuggestions && suggestions[selectedIdx]) {
         const cmd = suggestions[selectedIdx]!;
+        history.push(`/${cmd.name}`);
         onSubmit(`/${cmd.name}`);
         setValue("");
+        setCursorPos(0);
         setSelectedIdx(0);
       } else {
         const trimmed = value.trim();
         if (trimmed) {
+          history.push(trimmed);
           onSubmit(trimmed);
           setValue("");
+          setCursorPos(0);
           setSelectedIdx(0);
         }
       }
@@ -104,15 +116,53 @@ export function PromptInput({
 
     if (key.escape) {
       setValue("");
+      setCursorPos(0);
       setSelectedIdx(0);
+      history.reset();
+      return;
+    }
+
+    // History navigation (up/down when not in slash mode)
+    if (!showSuggestions && key.upArrow) {
+      if (!history.current) stashedInputRef.current = value;
+      const prev = history.goUp();
+      if (prev != null) { setValue(prev); setCursorPos(prev.length); }
+      return;
+    }
+    if (!showSuggestions && key.downArrow) {
+      const next = history.goDown();
+      if (next != null) { setValue(next); setCursorPos(next.length); }
+      else { setValue(stashedInputRef.current); setCursorPos(stashedInputRef.current.length); }
+      return;
+    }
+
+    // Cursor movement (left/right)
+    if (key.leftArrow) {
+      setCursorPos((p) => Math.max(0, p - 1));
+      return;
+    }
+    if (key.rightArrow) {
+      setCursorPos((p) => Math.min(value.length, p + 1));
       return;
     }
 
     if (key.backspace || key.delete) {
-      setValue((prev) => prev.slice(0, -1));
+      if (cursorPos > 0) {
+        setValue((prev) => prev.slice(0, cursorPos - 1) + prev.slice(cursorPos));
+        setCursorPos((p) => p - 1);
+      }
       setSelectedIdx(0);
       return;
     }
+
+    // Paste detection: rapid input within 5ms
+    const now = Date.now();
+    if (now - lastInputTimeRef.current < 5) {
+      pasteBufferRef.current += input;
+    } else {
+      pasteBufferRef.current = input;
+    }
+    lastInputTimeRef.current = now;
 
     if (showSuggestions) {
       if (key.upArrow) {
@@ -134,7 +184,9 @@ export function PromptInput({
     }
 
     if (input && !key.ctrl && !key.meta && !key.upArrow && !key.downArrow) {
-      setValue((prev) => prev + input);
+      // Insert at cursor position (not just append)
+      setValue((prev) => prev.slice(0, cursorPos) + input + prev.slice(cursorPos));
+      setCursorPos((p) => p + input.length);
       setSelectedIdx(0);
     }
   });
@@ -229,11 +281,18 @@ export function PromptInput({
           {value ? (
             <Text>
               {isSlashMode ? (
-                <Text color="cyanBright">{value.slice(1)}</Text>
+                <>
+                  <Text color="cyanBright">{value.slice(1, cursorPos)}</Text>
+                  <Text color="cyanBright" inverse>{value[cursorPos] ?? " "}</Text>
+                  <Text color="cyanBright">{value.slice(cursorPos + 1)}</Text>
+                </>
               ) : (
-                <Text>{value}</Text>
+                <>
+                  <Text>{value.slice(0, cursorPos)}</Text>
+                  <Text inverse>{value[cursorPos] ?? " "}</Text>
+                  <Text>{value.slice(cursorPos + 1)}</Text>
+                </>
               )}
-              <Text color="cyanBright">{"\u2588"}</Text>
             </Text>
           ) : (
             <Text dimColor>{placeholder}</Text>
