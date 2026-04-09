@@ -1455,27 +1455,18 @@ function AppInner() {
         <QueuedCommandsNotice count={queuedCount} />
       )}
 
-      {/* ── Trading status bar above input (Claude Code: permission pill + tasks + PR badge) ── */}
-      <Box paddingX={2} justifyContent="space-between">
-        <Box gap={1}>
-          <Text color={permissionMode === "auto" ? "red" : permissionMode === "strict" ? "green" : "cyanBright"}>
-            {permissionMode}
-          </Text>
+      {/* ── Trading status bar — only shows when there's active trading context ── */}
+      {(autonomousActive || livePositions.length > 0) && (
+        <Box paddingX={2}>
           {autonomousActive && (
-            <>
-              <Text dimColor>{"\u00b7"}</Text>
-              <Text color="magenta">{"\u25CF"} autonomous</Text>
-            </>
+            <Text color="magenta">{"\u25CF"} autonomous running</Text>
           )}
+          {autonomousActive && livePositions.length > 0 && <Text dimColor> {"\u00b7"} </Text>}
           {livePositions.length > 0 && (
-            <>
-              <Text dimColor>{"\u00b7"}</Text>
-              <Text>{livePositions.length} position{livePositions.length !== 1 ? "s" : ""}</Text>
-            </>
+            <Text>{livePositions.length} open position{livePositions.length !== 1 ? "s" : ""}</Text>
           )}
         </Box>
-        <Text dimColor>? shortcuts {"\u00b7"} Ctrl+P commands</Text>
-      </Box>
+      )}
 
       {/* ── Input area with border ── */}
       <Box
