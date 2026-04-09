@@ -112,8 +112,12 @@ export async function initializeRuntime(setState: StateUpdater): Promise<Session
         threadId: session.threadId ?? null,
       }));
     }
-  } catch {
-    // First run — no session to resume
+  } catch (err) {
+    // First run or corrupted session — inform user if it's a real error
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg && !msg.includes("ENOENT") && !msg.includes("not found")) {
+      addMessage(setState, "system", `Session resume failed: ${msg}`, "system");
+    }
   }
 
   // Sync state
@@ -127,8 +131,9 @@ export async function initializeRuntime(setState: StateUpdater): Promise<Session
   // Initialize tooling
   try {
     await activeRuntime.initializeTooling({ enableHotReload: true });
-  } catch {
-    // Plugins may not be configured
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    addMessage(setState, "system", `Plugin init warning: ${msg}`, "system");
   }
 
   // Start background monitoring

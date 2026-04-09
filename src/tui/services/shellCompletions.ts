@@ -5,24 +5,33 @@
 import { writeFileSync, appendFileSync, readFileSync, existsSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
+import { SLASH_COMMANDS } from "../../app/slashCommands.ts";
 
-const SUBCOMMANDS = [
-  "scan", "analyze", "plan", "trade", "positions", "help", "doctor", "config",
-  "exchange", "broker", "strategy", "backtest", "risk-config", "indicators",
-  "consensus", "market", "defi", "regime", "evolve", "strategy-builder",
-  "compact", "theme", "effort", "export", "privacy", "settings", "audit",
-  "scheduler", "playbooks", "memory", "sessions", "emergency", "context",
-  "diff", "stats", "rewind", "branch", "whatif", "sdk-init",
-];
+/**
+ * Derive completions dynamically from the canonical SLASH_COMMANDS list.
+ * Strips the leading "/" and deduplicates (commands + aliases).
+ */
+function getSubcommands(): string[] {
+  const seen = new Set<string>();
+  for (const cmd of SLASH_COMMANDS) {
+    seen.add(cmd.name);
+    for (const alias of cmd.aliases) {
+      seen.add(alias);
+    }
+  }
+  return [...seen].sort();
+}
 
 export function generateCompletions(shell: "bash" | "zsh" | "fish"): string {
+  const subcommands = getSubcommands();
+
   switch (shell) {
     case "zsh":
       return [
         "#compdef gordon",
         "_gordon() {",
         "  local -a commands",
-        `  commands=(${SUBCOMMANDS.map((c) => `'${c}'`).join(" ")})`,
+        `  commands=(${subcommands.map((c) => `'${c}'`).join(" ")})`,
         '  _describe "command" commands',
         "}",
         "compdef _gordon gordon",
@@ -31,14 +40,14 @@ export function generateCompletions(shell: "bash" | "zsh" | "fish"): string {
     case "bash":
       return [
         "_gordon_completions() {",
-        `  local commands="${SUBCOMMANDS.join(" ")}"`,
+        `  local commands="${subcommands.join(" ")}"`,
         '  COMPREPLY=($(compgen -W "$commands" -- "${COMP_WORDS[COMP_CWORD]}"))',
         "}",
         "complete -F _gordon_completions gordon",
       ].join("\n");
 
     case "fish":
-      return SUBCOMMANDS.map(
+      return subcommands.map(
         (cmd) => `complete -c gordon -a '${cmd}' -d '${cmd} command'`,
       ).join("\n");
   }

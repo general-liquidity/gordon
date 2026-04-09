@@ -38,10 +38,10 @@ interface Props {
 // Helpers
 // ============================================================================
 
-function statusConfig(status: DataSourceStatus): { icon: string; color: string } {
-  if (status === "live") return { icon: "\u25CF", color: "green" };
-  if (status === "degraded") return { icon: "\u25C8", color: "yellow" };
-  return { icon: "\u2717", color: "red" };
+function statusConfig(status: DataSourceStatus): { icon: string; color: string; label: string } {
+  if (status === "live") return { icon: "\u25CF", color: "green", label: "LIVE" };
+  if (status === "degraded") return { icon: "\u25C8", color: "yellow", label: "WARN" };
+  return { icon: "\u2717", color: "red", label: "DOWN" };
 }
 
 function typeColor(type: DataSourceType): string {
@@ -107,7 +107,7 @@ export function DataSourceHealth({ sources, onClose }: Props) {
       <Box paddingLeft={2}>
         <Box width={16}><Text bold dimColor>SOURCE</Text></Box>
         <Box width={10}><Text bold dimColor>TYPE</Text></Box>
-        <Box width={6}><Text bold dimColor>STATUS</Text></Box>
+        <Box width={10}><Text bold dimColor>STATUS</Text></Box>
         <Box width={10}><Text bold dimColor>LATENCY</Text></Box>
         <Box width={16}><Text bold dimColor>CACHE HIT</Text></Box>
         <Box width={10}><Text bold dimColor>UPDATED</Text></Box>
@@ -128,8 +128,8 @@ export function DataSourceHealth({ sources, onClose }: Props) {
                 {padRight(source.type.toUpperCase(), 10)}
               </Text>
             </Box>
-            <Box width={6}>
-              <Text color={st.color}>{st.icon}</Text>
+            <Box width={10}>
+              <Text color={st.color}>{st.icon} {st.label}</Text>
             </Box>
             <Box width={10}>
               <Text color={latencyColor(source.latencyMs)}>
