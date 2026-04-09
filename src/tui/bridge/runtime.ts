@@ -91,10 +91,24 @@ export async function initializeRuntime(setState: StateUpdater): Promise<Session
     }));
   });
 
-  // Initialize session (auto-resume)
-  try {
-    const session = await activeRuntime.initializeSession({ autoResume: true });
-    // Restore transcript if resuming
+  // Parallel initialization — session + tooling run concurrently (Claude Code pattern)
+  const sessionPromise = activeRuntime.initializeSession({ autoResume: true }).catch((err: unknown) => {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg && !msg.includes("ENOENT") && !msg.includes("not found")) {
+      addMessage(setState, "system", `Session resume failed: ${msg}`, "system");
+    }
+    return null;
+  });
+
+  const toolingPromise = activeRuntime.initializeTooling({ enableHotReload: true }).catch((err: unknown) => {
+    const msg = err instanceof Error ? err.message : String(err);
+    addMessage(setState, "system", `Plugin init warning: ${msg}`, "system");
+  });
+
+  const [session] = await Promise.all([sessionPromise, toolingPromise]);
+
+  // Restore transcript if resuming
+  if (session) {
     const transcript = activeRuntime.getTranscript();
     if (transcript.length > 0) {
       const messages: Message[] = transcript.map((entry, i) => ({
@@ -112,12 +126,6 @@ export async function initializeRuntime(setState: StateUpdater): Promise<Session
         threadId: session.threadId ?? null,
       }));
     }
-  } catch (err) {
-    // First run or corrupted session — inform user if it's a real error
-    const msg = err instanceof Error ? err.message : String(err);
-    if (msg && !msg.includes("ENOENT") && !msg.includes("not found")) {
-      addMessage(setState, "system", `Session resume failed: ${msg}`, "system");
-    }
   }
 
   // Sync state
@@ -127,14 +135,6 @@ export async function initializeRuntime(setState: StateUpdater): Promise<Session
     sessionId: runtimeState.session.resourceId ?? runtimeState.session.sessionId ?? null,
     threadId: runtimeState.session.threadId ?? null,
   }));
-
-  // Initialize tooling
-  try {
-    await activeRuntime.initializeTooling({ enableHotReload: true });
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    addMessage(setState, "system", `Plugin init warning: ${msg}`, "system");
-  }
 
   // Start background monitoring
   startBackgroundMonitoring(setState);
@@ -302,13 +302,15 @@ async function streamResponse(
           // Only update UI when visible content actually changed (new line completed)
           if (visibleContent !== lastVisibleContent) {
             lastVisibleContent = visibleContent;
-            setState((prev: any) => ({
-              ...prev,
-              streamBuffer: visibleContent,
-              messages: prev.messages.map((m: any) =>
-                m.id === streamingMsgId ? { ...m, content: visibleContent } : m
-              ),
-            }));
+            setState((prev: any) => {
+              // Direct index update instead of O(n) messages.map scan
+              const msgs = [...prev.messages];
+              const idx = msgs.length - 1; // Streaming message is always last
+              if (idx >= 0 && msgs[idx]?.id === streamingMsgId) {
+                msgs[idx] = { ...msgs[idx], content: visibleContent };
+              }
+              return { ...prev, streamBuffer: visibleContent, messages: msgs };
+            });
           }
           break;
 

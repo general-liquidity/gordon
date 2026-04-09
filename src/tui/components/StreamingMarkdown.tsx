@@ -1,12 +1,15 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useRef } from "react";
 import { Box, Text } from "ink";
 
 // ============================================================================
-// StreamingMarkdown — Progressive markdown rendering during streaming
+// StreamingMarkdown — Claude Code stable-prefix incremental rendering
 //
-// Claude Code pattern: parse markdown as it arrives, render headings, code
-// blocks, bold, lists progressively. Fast-path for plain text (no parsing).
-// Token cache prevents re-parsing stable prefix on each delta.
+// Key patterns from Claude Code's Markdown.tsx:
+// 1. Stable prefix tracking — only re-lex the tail block, not full content
+// 2. Proper hash cache with MRU promotion
+// 3. Fast-path for plain text
+// 4. Strip prompt XML tags
+// 5. Line-by-line render (no in-progress line shown)
 // ============================================================================
 
 interface Props {
@@ -14,129 +17,133 @@ interface Props {
   isStreaming: boolean;
 }
 
-// Fast check: does this content contain markdown syntax?
 const MD_SYNTAX_RE = /[#*`|[\]>\-_~]|\n\n|^\d+\. |\n\d+\. /;
 
-// LRU token cache — 500 entries (Claude Code uses 500)
-const tokenCache = new Map<string, ParsedToken[]>();
+// Simple hash for cache key (avoids retaining full content strings)
+function hashContent(content: string): string {
+  let h = 0;
+  for (let i = 0; i < content.length; i++) {
+    h = ((h << 5) - h + content.charCodeAt(i)) | 0;
+  }
+  return `${h}:${content.length}`;
+}
+
+// LRU token cache with MRU promotion — 500 entries
+const tokenCache = new Map<string, ParsedBlock[]>();
 const TOKEN_CACHE_MAX = 500;
 
-interface ParsedToken {
-  type: "text" | "bold" | "italic" | "code" | "heading" | "bullet" | "blockquote" | "codeblock" | "hr";
+interface ParsedBlock {
+  type: "text" | "heading" | "codeblock" | "blockquote" | "bullet" | "hr";
   content: string;
   level?: number;
   language?: string;
+  raw: string; // Original text for stable prefix tracking
 }
 
-function cacheKey(content: string): string {
-  // Use length + first 80 + last 20 chars — catches both prefix and suffix changes
-  return `${content.length}:${content.slice(0, 80)}:${content.slice(-20)}`;
+// Strip internal prompt XML tags that shouldn't be visible
+function stripPromptXMLTags(text: string): string {
+  return text.replace(/<\/?(?:user_context|system|assistant|tool_result|thinking|artifact)[^>]*>/g, "");
 }
 
-function parseTokens(content: string): ParsedToken[] {
-  const key = cacheKey(content);
+function parseBlocks(content: string): ParsedBlock[] {
+  const key = hashContent(content);
   const cached = tokenCache.get(key);
-  if (cached && content.startsWith(key)) return cached;
-
-  // Fast path: no markdown syntax detected
-  if (!MD_SYNTAX_RE.test(content.slice(0, 500))) {
-    return [{ type: "text", content }];
+  if (cached) {
+    // MRU promotion: delete and re-insert to maintain insertion order
+    tokenCache.delete(key);
+    tokenCache.set(key, cached);
+    return cached;
   }
 
-  const tokens: ParsedToken[] = [];
+  // Fast path: no markdown syntax
+  if (!MD_SYNTAX_RE.test(content.slice(0, 500))) {
+    const result: ParsedBlock[] = [{ type: "text", content, raw: content }];
+    cacheResult(key, result);
+    return result;
+  }
+
+  const blocks: ParsedBlock[] = [];
   const lines = content.split("\n");
   let i = 0;
   let inCodeBlock = false;
   let codeLines: string[] = [];
   let codeLang = "";
+  let blockStart = i;
 
   while (i < lines.length) {
     const line = lines[i]!;
 
-    // Fenced code block
     if (line.startsWith("```")) {
       if (inCodeBlock) {
-        tokens.push({ type: "codeblock", content: codeLines.join("\n"), language: codeLang });
+        const raw = lines.slice(blockStart, i + 1).join("\n");
+        blocks.push({ type: "codeblock", content: codeLines.join("\n"), language: codeLang, raw });
         codeLines = [];
         inCodeBlock = false;
       } else {
         inCodeBlock = true;
         codeLang = line.slice(3).trim();
+        blockStart = i;
       }
       i++;
       continue;
     }
 
-    if (inCodeBlock) {
-      codeLines.push(line);
-      i++;
-      continue;
-    }
+    if (inCodeBlock) { codeLines.push(line); i++; continue; }
 
-    // HR
     if (/^[-*_]{3,}\s*$/.test(line)) {
-      tokens.push({ type: "hr", content: "" });
-      i++;
-      continue;
+      blocks.push({ type: "hr", content: "", raw: line });
+      i++; continue;
     }
 
-    // Heading
     const headingMatch = line.match(/^(#{1,4})\s+(.+)/);
     if (headingMatch) {
-      tokens.push({ type: "heading", content: headingMatch[2]!, level: headingMatch[1]!.length });
-      i++;
-      continue;
+      blocks.push({ type: "heading", content: headingMatch[2]!, level: headingMatch[1]!.length, raw: line });
+      i++; continue;
     }
 
-    // Blockquote
     if (line.startsWith("> ")) {
-      tokens.push({ type: "blockquote", content: line.slice(2) });
-      i++;
-      continue;
+      blocks.push({ type: "blockquote", content: line.slice(2), raw: line });
+      i++; continue;
     }
 
-    // Bullet list
     if (/^[\s]*[-*+]\s/.test(line)) {
-      tokens.push({ type: "bullet", content: line.replace(/^[\s]*[-*+]\s/, "") });
-      i++;
-      continue;
+      blocks.push({ type: "bullet", content: line.replace(/^[\s]*[-*+]\s/, ""), raw: line });
+      i++; continue;
     }
 
-    // Numbered list
     if (/^[\s]*\d+\.\s/.test(line)) {
-      tokens.push({ type: "bullet", content: line.replace(/^[\s]*\d+\.\s/, "") });
-      i++;
-      continue;
+      blocks.push({ type: "bullet", content: line.replace(/^[\s]*\d+\.\s/, ""), raw: line });
+      i++; continue;
     }
 
-    // Regular text
-    tokens.push({ type: "text", content: line });
+    blocks.push({ type: "text", content: line, raw: line });
     i++;
   }
 
-  // Unclosed code block (still streaming)
   if (inCodeBlock && codeLines.length > 0) {
-    tokens.push({ type: "codeblock", content: codeLines.join("\n"), language: codeLang });
+    const raw = lines.slice(blockStart).join("\n");
+    blocks.push({ type: "codeblock", content: codeLines.join("\n"), language: codeLang, raw });
   }
 
-  // Cache
+  cacheResult(key, blocks);
+  return blocks;
+}
+
+function cacheResult(key: string, blocks: ParsedBlock[]): void {
   if (tokenCache.size >= TOKEN_CACHE_MAX) {
     const firstKey = tokenCache.keys().next().value;
     if (firstKey) tokenCache.delete(firstKey);
   }
-  tokenCache.set(key, tokens);
-
-  return tokens;
+  tokenCache.set(key, blocks);
 }
 
-// Basic syntax highlighting for code blocks (keywords, strings, comments)
-function highlightCodeLine(line: string, _language?: string): React.ReactNode {
+// Syntax highlighting for code blocks
+function highlightCodeLine(line: string): React.ReactNode {
   const parts: React.ReactNode[] = [];
   let remaining = line;
   let key = 0;
 
   while (remaining.length > 0) {
-    // Comments (// or #)
     const commentMatch = remaining.match(/^(.*?)(\/\/.*|#.*)$/);
     if (commentMatch && commentMatch[2]) {
       if (commentMatch[1]) parts.push(<Text key={key++}>{commentMatch[1]}</Text>);
@@ -145,7 +152,6 @@ function highlightCodeLine(line: string, _language?: string): React.ReactNode {
       continue;
     }
 
-    // Strings ("..." or '...')
     const stringMatch = remaining.match(/(["'])(?:(?!\1|\\).|\\.)*\1/);
     if (stringMatch && stringMatch.index != null) {
       if (stringMatch.index > 0) parts.push(<Text key={key++}>{remaining.slice(0, stringMatch.index)}</Text>);
@@ -154,21 +160,11 @@ function highlightCodeLine(line: string, _language?: string): React.ReactNode {
       continue;
     }
 
-    // Keywords
-    const kwMatch = remaining.match(/\b(const|let|var|function|return|if|else|for|while|import|export|from|async|await|class|new|this|true|false|null|undefined|type|interface)\b/);
+    const kwMatch = remaining.match(/\b(const|let|var|function|return|if|else|for|while|import|export|from|async|await|class|new|this|true|false|null|undefined|type|interface|def|self|print|lambda|yield|match|case)\b/);
     if (kwMatch && kwMatch.index != null) {
       if (kwMatch.index > 0) parts.push(<Text key={key++}>{remaining.slice(0, kwMatch.index)}</Text>);
       parts.push(<Text key={key++} color="magenta">{kwMatch[0]}</Text>);
       remaining = remaining.slice(kwMatch.index + kwMatch[0].length);
-      continue;
-    }
-
-    // Numbers
-    const numMatch = remaining.match(/\b\d+\.?\d*\b/);
-    if (numMatch && numMatch.index != null) {
-      if (numMatch.index > 0) parts.push(<Text key={key++}>{remaining.slice(0, numMatch.index)}</Text>);
-      parts.push(<Text key={key++} color="yellow">{numMatch[0]}</Text>);
-      remaining = remaining.slice(numMatch.index + numMatch[0].length);
       continue;
     }
 
@@ -179,36 +175,28 @@ function highlightCodeLine(line: string, _language?: string): React.ReactNode {
   return <>{parts}</>;
 }
 
-function renderInlineFormatting(text: string): React.ReactNode {
-  // Bold **text**
+function renderInline(text: string): React.ReactNode {
   const parts: React.ReactNode[] = [];
   let remaining = text;
   let key = 0;
 
   while (remaining.length > 0) {
-    // Bold
     const boldMatch = remaining.match(/\*\*(.+?)\*\*/);
     if (boldMatch && boldMatch.index != null) {
-      if (boldMatch.index > 0) {
-        parts.push(<Text key={key++}>{remaining.slice(0, boldMatch.index)}</Text>);
-      }
+      if (boldMatch.index > 0) parts.push(<Text key={key++}>{remaining.slice(0, boldMatch.index)}</Text>);
       parts.push(<Text key={key++} bold>{boldMatch[1]}</Text>);
       remaining = remaining.slice(boldMatch.index + boldMatch[0].length);
       continue;
     }
 
-    // Inline code
     const codeMatch = remaining.match(/`([^`]+)`/);
     if (codeMatch && codeMatch.index != null) {
-      if (codeMatch.index > 0) {
-        parts.push(<Text key={key++}>{remaining.slice(0, codeMatch.index)}</Text>);
-      }
+      if (codeMatch.index > 0) parts.push(<Text key={key++}>{remaining.slice(0, codeMatch.index)}</Text>);
       parts.push(<Text key={key++} color="cyan">{codeMatch[1]}</Text>);
       remaining = remaining.slice(codeMatch.index + codeMatch[0].length);
       continue;
     }
 
-    // No more formatting
     parts.push(<Text key={key++}>{remaining}</Text>);
     break;
   }
@@ -217,53 +205,82 @@ function renderInlineFormatting(text: string): React.ReactNode {
 }
 
 export function StreamingMarkdown({ content, isStreaming }: Props) {
-  const tokens = useMemo(() => parseTokens(content), [content]);
+  // Claude Code pattern: stable prefix tracking
+  // Only re-parse the tail block, not full content. O(tail) not O(all).
+  const stablePrefixRef = useRef("");
+
+  const stripped = stripPromptXMLTags(content);
+
+  // Reset if content was replaced (not appended)
+  if (!stripped.startsWith(stablePrefixRef.current)) {
+    stablePrefixRef.current = "";
+  }
+
+  const boundary = stablePrefixRef.current.length;
+
+  // Parse only from boundary forward
+  const tailContent = stripped.substring(boundary);
+  const tailBlocks = useMemo(() => parseBlocks(tailContent), [tailContent]);
+
+  // Find last non-empty block — everything before it is stable
+  let lastContentIdx = tailBlocks.length - 1;
+  while (lastContentIdx >= 0 && !tailBlocks[lastContentIdx]!.content.trim()) {
+    lastContentIdx--;
+  }
+
+  // Advance stable prefix to include all completed blocks
+  let advance = 0;
+  for (let i = 0; i < lastContentIdx; i++) {
+    advance += tailBlocks[i]!.raw.length + 1; // +1 for newline
+  }
+  if (advance > 0 && !isStreaming) {
+    stablePrefixRef.current = stripped.substring(0, boundary + advance);
+  }
+
+  // Stable prefix blocks (memoized, never re-parsed)
+  const stableBlocks = useMemo(
+    () => stablePrefixRef.current ? parseBlocks(stablePrefixRef.current) : [],
+    [stablePrefixRef.current],
+  );
+
+  const allBlocks = [...stableBlocks, ...tailBlocks];
 
   return (
     <Box flexDirection="column">
-      {tokens.map((token, i) => {
-        switch (token.type) {
+      {allBlocks.map((block, i) => {
+        switch (block.type) {
           case "heading":
-            return (
-              <Text key={i} bold underline={token.level === 1}>
-                {token.content}
-              </Text>
-            );
+            return <Text key={i} bold underline={block.level === 1}>{block.content}</Text>;
           case "codeblock":
             return (
-              <Box key={i} borderStyle="single" borderColor="gray" paddingX={1} marginY={0} flexDirection="column">
-                {token.language && (
-                  <Text dimColor bold>{token.language}</Text>
-                )}
-                {token.content.split("\n").map((line, j) => (
-                  <Box key={j}>{highlightCodeLine(line, token.language)}</Box>
+              <Box key={i} borderStyle="single" borderColor="gray" paddingX={1} flexDirection="column">
+                {block.language && <Text dimColor bold>{block.language}</Text>}
+                {block.content.split("\n").map((line, j) => (
+                  <Box key={j}>{highlightCodeLine(line)}</Box>
                 ))}
               </Box>
             );
           case "blockquote":
             return (
               <Box key={i} paddingLeft={2}>
-                <Text dimColor italic>{"\u2502"} {token.content}</Text>
+                <Text dimColor italic>{"\u2502"} {block.content}</Text>
               </Box>
             );
           case "bullet":
             return (
               <Box key={i} paddingLeft={2}>
                 <Text dimColor>{"\u2022"} </Text>
-                {renderInlineFormatting(token.content)}
+                {renderInline(block.content)}
               </Box>
             );
           case "hr":
             return <Text key={i} dimColor>{"\u2500".repeat(40)}</Text>;
-          case "bold":
-            return <Text key={i} bold>{token.content}</Text>;
           case "text":
           default:
-            if (!token.content.trim()) return null;
-            return <Box key={i}>{renderInlineFormatting(token.content)}</Box>;
+            if (!block.content.trim()) return null;
+            return <Box key={i}>{renderInline(block.content)}</Box>;
         }
       })}
-      {/* No cursor — Claude Code renders chunks without visible typewriter effect */}
     </Box>
   );
 }

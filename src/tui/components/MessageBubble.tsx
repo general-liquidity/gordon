@@ -130,7 +130,16 @@ const VARIANT_CONFIG: Record<string, {
   },
 };
 
-export function MessageBubble({ message }: Props) {
+// Claude Code pattern: React.memo with custom equality — only re-render when message content changes
+function areMessagePropsEqual(prev: Props, next: Props): boolean {
+  if (prev.message.id !== next.message.id) return false;
+  if (prev.message.content !== next.message.content) return false;
+  if (prev.message.streaming !== next.message.streaming) return false;
+  if (prev.message.variant !== next.message.variant) return false;
+  return true;
+}
+
+export const MessageBubble = React.memo(function MessageBubble({ message }: Props) {
   const { role, variant = "default" } = message;
 
   // Route to specialized renderers (Claude Code pattern)
@@ -227,7 +236,7 @@ export function MessageBubble({ message }: Props) {
       </Box>
     </Box>
   );
-}
+}, areMessagePropsEqual);
 
 function timeAgo(ts: string): string {
   try {
