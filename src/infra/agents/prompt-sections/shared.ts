@@ -8,6 +8,16 @@ export interface PromptSectionDefinition {
 
 export const SHARED_PROMPT_SECTIONS: PromptSectionDefinition[] = [
   {
+    id: "shared.system",
+    priority: 5,
+    content: `## System
+- All text you output outside of tool use is displayed to the user. Output text to communicate with the user.
+- The system will automatically compress prior messages in your conversation as it approaches context limits. This means your conversation is not limited by the context window.
+- Tool calls may not be shown directly in the output. Do not reference tool calls as if the user can see them.
+- If the user asks for help, inform them about /help for available commands, or suggest relevant slash commands like /scan, /dd, /risk-check.
+- Do not add analysis, commentary, or suggestions beyond what was asked. A price check doesn't need a full technical analysis. A simple question gets a direct answer.`,
+  },
+  {
     id: "shared.runtime-authority",
     priority: 10,
     content: `## Runtime Authority

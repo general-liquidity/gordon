@@ -284,19 +284,37 @@ async function streamResponse(
     }],
   }));
 
+  // Batch stream deltas — update UI every 100ms instead of every token
+  // Claude Code renders chunks, not individual tokens
+  let lastFlushTime = Date.now();
+  const FLUSH_INTERVAL_MS = 100;
+  let pendingFlush = false;
+
+  function flushStreamBuffer() {
+    pendingFlush = false;
+    setState((prev: any) => ({
+      ...prev,
+      streamBuffer: responseContent,
+      messages: prev.messages.map((m: any) =>
+        m.id === streamingMsgId ? { ...m, content: responseContent } : m
+      ),
+    }));
+    lastFlushTime = Date.now();
+  }
+
   try {
     for await (const event of runtime.streamMessage(userMessage)) {
       switch (event.type) {
         case "text_delta":
           responseContent += event.content ?? "";
-          setState((prev: any) => ({
-            ...prev,
-            streamBuffer: responseContent,
-            // Update streaming message in-place (DOM continuity — no flash/jump)
-            messages: prev.messages.map((m: any) =>
-              m.id === streamingMsgId ? { ...m, content: responseContent } : m
-            ),
-          }));
+          // Batch: only flush to UI every 100ms (renders chunks, not tokens)
+          const now = Date.now();
+          if (now - lastFlushTime >= FLUSH_INTERVAL_MS) {
+            flushStreamBuffer();
+          } else if (!pendingFlush) {
+            pendingFlush = true;
+            setTimeout(flushStreamBuffer, FLUSH_INTERVAL_MS - (now - lastFlushTime));
+          }
           break;
 
         case "agent_switch":

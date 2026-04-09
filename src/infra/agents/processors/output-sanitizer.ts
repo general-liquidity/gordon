@@ -13,6 +13,14 @@ import type {
 import type { ChunkType } from "@mastra/core/stream";
 import { checkOutputGuardrails } from "../middleware/guardrails.ts";
 
+// Strip emojis from output — trading CLI should use plain text
+// Matches most emoji ranges including emoticons, symbols, flags, skin tones
+const EMOJI_RE = /[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{FE00}-\u{FE0F}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{200D}\u{20E3}\u{E0020}-\u{E007F}]+/gu;
+
+function stripEmojis(text: string): string {
+  return text.replace(EMOJI_RE, "").replace(/\s{2,}/g, " ");
+}
+
 export class GordonOutputSanitizer
   implements Processor<"gordon-output-sanitizer">
 {
@@ -35,12 +43,21 @@ export class GordonOutputSanitizer
     const text = payload?.text;
     if (!text) return Promise.resolve(part);
 
+    // Strip emojis — Gordon is a trading CLI, not a chat app
+    const deEmojied = stripEmojis(text);
+
     // Run sanitization and return modified chunk if needed
-    return checkOutputGuardrails(text).then((check) => {
+    return checkOutputGuardrails(deEmojied).then((check) => {
       if (check.sanitized !== text && payload) {
         return {
           ...part,
           payload: { ...payload, text: check.sanitized },
+        } as ChunkType;
+      }
+      if (deEmojied !== text && payload) {
+        return {
+          ...part,
+          payload: { ...payload, text: deEmojied },
         } as ChunkType;
       }
       return part;
