@@ -1455,16 +1455,7 @@ function AppInner() {
         <QueuedCommandsNotice count={queuedCount} />
       )}
 
-      {/* ── Prompt suggestions (context-aware next actions) ── */}
-      {!isStreaming && promptSuggestions.length > 0 && (
-        <Box paddingX={2} gap={2}>
-          {promptSuggestions.map((s, i) => (
-            <Text key={i} dimColor>
-              {s.command} <Text dimColor>{s.label}</Text>
-            </Text>
-          ))}
-        </Box>
-      )}
+      {/* Suggestions removed — Tip line above conversation handles this */}
 
       {/* ── Input area with border ── */}
       <Box
