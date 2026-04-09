@@ -254,6 +254,7 @@ function AppInner() {
   const [showStats, setShowStats] = useState(false);
   const [showGlobalSearch, setShowGlobalSearch] = useState(false);
   const [showExitFlow, setShowExitFlow] = useState(false);
+  const [exampleIdx] = useState(() => Math.floor(Math.random() * 7));
   const [showBacktestWizard, setShowBacktestWizard] = useState(false);
   const [showBrokerManager, setShowBrokerManager] = useState(false);
   const [showExchangeManager, setShowExchangeManager] = useState(false);
@@ -1066,7 +1067,6 @@ function AppInner() {
     'Try "what\'s trending today?"',
     'Try "/dd BTC"',
   ];
-  const [exampleIdx] = useState(() => Math.floor(Math.random() * EXAMPLE_PROMPTS.length));
   const placeholder = isStreaming
     ? `\u25CF Gordon is working... ${elapsedFormatted}`
     : ctrlC.isPending
@@ -1076,7 +1076,7 @@ function AppInner() {
         : pendingApprovals.length > 0
           ? `${pendingApprovals.length} approval(s) pending \u2014 approve <id> or deny <id>`
           : messages.length === 0
-            ? EXAMPLE_PROMPTS[exampleIdx]!
+            ? EXAMPLE_PROMPTS[exampleIdx % EXAMPLE_PROMPTS.length]!
             : "";
 
   return (
