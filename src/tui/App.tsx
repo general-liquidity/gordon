@@ -1455,12 +1455,9 @@ function AppInner() {
         <QueuedCommandsNotice count={queuedCount} />
       )}
 
-      {/* ── Status bar above input (Codex pattern: model · context% · path) ── */}
+      {/* ── Status bar above input ── */}
       <Box paddingX={2} justifyContent="space-between">
         <Box gap={1}>
-          <Text dimColor>{process.env.GORDON_MODEL ?? "auto"}</Text>
-          <Text dimColor>{"\u00b7"}</Text>
-          <Text dimColor>{Math.round((1 - memoryUsageRatio) * 100)}% left</Text>
           {autonomousActive && (
             <>
               <Text dimColor>{"\u00b7"}</Text>

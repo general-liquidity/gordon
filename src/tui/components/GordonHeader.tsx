@@ -55,6 +55,11 @@ export function GordonHeader({
         <Text dimColor>   General Liquidity, Inc.</Text>
         <Text> </Text>
         <Box>
+          <Text dimColor>   model:     </Text>
+          <Text>{process.env.GORDON_MODEL ?? "auto"}</Text>
+          <Text dimColor>      /model to change</Text>
+        </Box>
+        <Box>
           <Text dimColor>   mode:      </Text>
           <Text color={modeColor}>{permissionMode}</Text>
           <Text dimColor>      /auto to change</Text>
