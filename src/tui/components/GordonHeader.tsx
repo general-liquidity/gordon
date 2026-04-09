@@ -16,6 +16,7 @@ interface Props {
   pnl?: number;
   positionCount?: number;
   feedCount?: number;
+  mcpWarnings?: string[];
 }
 
 export function GordonHeader({
@@ -26,6 +27,7 @@ export function GordonHeader({
   resumeMessageCount,
   toolCount = 0,
   exchangeStatus,
+  mcpWarnings = [],
 }: Props) {
   const modeColor = permissionMode === "auto" ? "red" : permissionMode === "strict" ? "green" : "rgb(52,238,176)";
   const version = process.env.npm_package_version ?? process.env.GORDON_VERSION ?? "0.9";
@@ -57,7 +59,8 @@ export function GordonHeader({
         <Box>
           <Text dimColor>   model:     </Text>
           <Text>{process.env.GORDON_MODEL ?? "auto"}</Text>
-          <Text dimColor>      /model to change</Text>
+          {process.env.GORDON_EFFORT && <Text dimColor> {process.env.GORDON_EFFORT}</Text>}
+          <Text dimColor>   /model to change</Text>
         </Box>
         <Box>
           <Text dimColor>   mode:      </Text>
@@ -79,6 +82,13 @@ export function GordonHeader({
           <Text>{toolCount} loaded</Text>
         </Box>
       </Box>
+
+      {/* MCP connection warnings (Codex pattern: visible, not swallowed) */}
+      {mcpWarnings && mcpWarnings.length > 0 && mcpWarnings.map((w, i) => (
+        <Box key={i} paddingX={1}>
+          <Text color="yellow">{"\u26A0"} {w}</Text>
+        </Box>
+      ))}
 
       <Box marginTop={1} paddingX={1}>
         <Text dimColor>Tip: Type /scan to discover opportunities, or describe what you want to trade.</Text>
