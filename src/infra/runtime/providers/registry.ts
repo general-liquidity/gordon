@@ -63,7 +63,14 @@ export interface MastraOpenAICompatibleModelConfig {
   id?: string;
 }
 
-export type MastraModelConfig = ModelString | MastraOpenAICompatibleModelConfig;
+/**
+ * MastraModelConfig can be:
+ * - A string like "openai/gpt-5.4" (Mastra's model router resolves it)
+ * - A LanguageModelV2 instance from createOpenAI() (for custom endpoints like Dedalus/Inception)
+ * - A legacy object config (kept for backward compat)
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type MastraModelConfig = ModelString | MastraOpenAICompatibleModelConfig | any;
 
 interface OpenAICompatibleProviderConfig {
   apiKeyEnvVar: "DEDALUS_API_KEY" | "INCEPTION_API_KEY";
@@ -98,11 +105,11 @@ export const DIRECT_MODELS = {
   openai: {
     flagship: "gpt-5.4-pro",
     balanced: "gpt-5.4",
-    fast: "gpt-5.4",
+    fast: "gpt-5.4-mini",
   },
   google: {
-    flagship: "gemini-3-1-pro-preview",
-    balanced: "gemini-3-1-pro-preview",
+    flagship: "gemini-3.1-pro-preview",
+    balanced: "gemini-3-pro-preview",
     fast: "gemini-3.1-flash-lite-preview",
   },
   inception: {
@@ -613,14 +620,15 @@ export class ProviderRegistry {
       : undefined;
 
     if (!provider) {
-      const preferredOrder: DirectProviderName[] = ["openai", "anthropic", "google", "inception"];
-      const available = this.getAvailableProviders();
-      provider = preferredOrder.find((candidate) => available.includes(candidate)) || available[0];
-
-      if (!provider && this.hasDedalusKey) {
+      // Prefer Dedalus when available — it's Gordon's primary multi-provider gateway
+      if (this.hasDedalusKey) {
         const dedalusDefault = this.getDedalusModelCatalog()[0]?.id || DEDALUS_MODELS[0].id;
         return this.getRouteForSelection("dedalus", dedalusDefault);
       }
+
+      const preferredOrder: DirectProviderName[] = ["openai", "anthropic", "google", "inception"];
+      const available = this.getAvailableProviders();
+      provider = preferredOrder.find((candidate) => available.includes(candidate)) || available[0];
 
       if (!provider) {
         throw new Error(
@@ -674,22 +682,27 @@ export class ProviderRegistry {
       ? this.getRouteForSelection(provider, modelId)
       : this.getDefaultRoute();
 
+    // Native providers (OpenAI, Anthropic, Google) → use Mastra's model router string
     if (!route.viaOpenAICompatibleProvider || !route.baseUrl) {
       return route.resolvedModelString;
     }
 
+    // OpenAI-compatible providers (Dedalus, Inception) → use Mastra's object format
+    // Per Mastra docs on gateway format:
+    //   Use gateway/provider/model when the remote behaves like a model gateway
+    //   and the upstream model namespace includes the provider.
+    // Dedalus expects full "openai/gpt-5.4" in the request body, so we use
+    // "dedalus/openai/gpt-5.4" as id — Mastra sends "openai/gpt-5.4" as the model name.
     const apiKey = process.env[route.apiKeyEnvVar];
     if (!apiKey) {
       throw new Error(`API key not found for provider "${route.provider}". Set ${route.apiKeyEnvVar}.`);
     }
 
     return {
-      providerId: route.provider,
-      modelId: route.transportModelId,
+      id: `${route.provider}/${route.transportModelId}`,
       url: route.baseUrl,
       apiKey,
-      id: route.modelString,
-    };
+    } as any;
   }
 
   getFastModel(): ModelString {
@@ -793,14 +806,15 @@ export class ProviderRegistry {
       : undefined;
 
     if (!provider) {
-      const preferredOrder: DirectProviderName[] = ["openai", "google", "anthropic", "inception"];
-      const available = this.getAvailableProviders();
-      provider = preferredOrder.find((candidate) => available.includes(candidate)) || available[0];
-
-      if (!provider && this.hasDedalusKey) {
+      // Prefer Dedalus for fast models too
+      if (this.hasDedalusKey) {
         const fastModel = this.getDedalusModelCatalog().find((candidate) => candidate.tier === "fast");
         if (fastModel) return this.getMastraModel("dedalus", fastModel.id);
       }
+
+      const preferredOrder: DirectProviderName[] = ["openai", "google", "anthropic", "inception"];
+      const available = this.getAvailableProviders();
+      provider = preferredOrder.find((candidate) => available.includes(candidate)) || available[0];
 
       if (!provider) {
         return this.getMastraModel();

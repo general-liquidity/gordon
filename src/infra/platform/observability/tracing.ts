@@ -338,12 +338,23 @@ export async function initializeTracing(): Promise<void> {
       },
     });
 
-    // Create minimal Mastra instance for observability wiring.
+    // Create Mastra instance with observability + storage.
+    // Storage is required for agent approval snapshots (per Mastra docs:
+    // "Configure a storage provider on your Mastra instance or you'll see
+    // a 'snapshot not found' error").
     // Agents are registered later via getMastraInstance().addAgent().
-    // This sets agent.#mastra, enabling getOrCreateSpan() to access
-    // observability and create real Mastra spans (agent_run, tool_call, etc.).
+    let storageProvider: any;
+    try {
+      const { createMastraStorageConfig } = require("../../agents/mastraStorage.ts");
+      const dbUrl = process.env.DATABASE_URL || "file:gordon.db";
+      const config = createMastraStorageConfig({ storeId: "gordon-mastra", dbUrl, enableVector: false });
+      storageProvider = config.storage;
+    } catch {
+      // Storage optional — approval snapshots won't persist but agent still works
+    }
     _mastraInstance = new Mastra({
       observability,
+      ...(storageProvider ? { storage: storageProvider } : {}),
     });
 
     tracingInitialized = true;

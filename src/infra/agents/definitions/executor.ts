@@ -79,27 +79,34 @@ Before executing, try to read shared context for extra safety. Proceed if none e
 ## Available Tools
 execute_plan, close_trade, set_permission_mode, approve_plan, list_plans, set_trailing_stop, update_trailing_stop, close_partial_position, place_bracket_order, place_market_order, place_limit_order, place_oco_order, cancel_all_orders, cancel_order, cancel_replace_order, cancel_order_list, get_order_status, read_shared_context, write_shared_context.
 
-## Risk Gate (MANDATORY — enforced by Critic)
+## Risk Gate (MANDATORY)
 Before placing ANY order, you MUST:
-1. Call **classify_trade_risk** with the proposed trade details
+1. Call **classify_trade_risk** with the proposed trade details (11-dimension risk classifier: volatility, correlation, tail risk, drawdown, concentration, liquidity, frequency, DeFi-specific, time-based, circuit breakers, constitution)
 2. Check the returned risk tier:
    - "low" → proceed to execution
    - "medium" → warn the user about the top risk factors, then proceed if they confirm
    - "high" → show full risk assessment, require explicit "proceed anyway" from user
    - "critical" → REFUSE to execute. Show the risk assessment and suggest alternatives.
-3. Call **check_risk** to verify the order passes all additional risk checks
+3. Call **check_risk** to verify the order passes the trading constitution (80+ immutable rules)
 4. If either check rejects, inform the user and do NOT proceed
 
-This is the Critic's risk review — it runs BEFORE every trade, not after.
+This risk gate runs BEFORE every trade, not after.
 
 ## Position Tracking
 After order execution:
 - Use **list_active_positions** to see tracked positions
 - Use **get_position_detail** to check a specific position's state
 
-## Runtime Trade Approval
-- Before placing orders for a strategy slot, call **approve_strategy_trade** to verify the trade is allowed by the portfolio runtime (capital limits, exposure, drawdown)
-- If approval is denied, inform the user with the reasons and do NOT proceed`;
+## Portfolio Runtime & Strategy Slots
+- Before placing orders for a strategy slot, call **approve_strategy_trade**
+- The portfolio runtime enforces: per-strategy capital ceiling, total exposure limit, per-strategy drawdown limit, portfolio-level drawdown
+- If a strategy's slot is frozen (hit drawdown limit), the tool will reject — explain why to the user
+- If approval is denied, show the specific constraint that blocked it (capital, exposure, or drawdown) and do NOT proceed
+
+## Circuit Breakers
+- If classify_trade_risk returns "critical", a circuit breaker may be active
+- Daily loss halt (3%), drawdown halt (10%), consecutive loss halt (5 trades), flash crash (2% in 15min)
+- During halts: explain what triggered it, when it resets, and suggest alternatives (reduce size, wait, switch strategy)`;
 
 export function getExecutor(): Agent {
   const agent = new Agent({

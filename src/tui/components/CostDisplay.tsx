@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Box, Text } from "ink";
 import { useStats } from "../state/StatsProvider.js";
 
@@ -14,6 +14,23 @@ import { useStats } from "../state/StatsProvider.js";
 export function CostDisplay() {
   const { stats } = useStats();
   const [elapsed, setElapsed] = useState("");
+  const [displayTokenCost, setDisplayTokenCost] = useState(stats.tokenCostUsd);
+
+  // Smooth token counter animation — use ref to avoid cascading interval restarts
+  const targetCostRef = useRef(stats.tokenCostUsd);
+  targetCostRef.current = stats.tokenCostUsd;
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setDisplayTokenCost((prev) => {
+        const gap = targetCostRef.current - prev;
+        if (Math.abs(gap) < 0.001) return prev; // Don't update if close enough
+        const increment = Math.abs(gap) < 0.05 ? 0.001 * Math.sign(gap) : gap * 0.15;
+        return prev + increment;
+      });
+    }, 50);
+    return () => clearInterval(interval);
+  }, []); // No deps — interval runs once, reads target from ref
 
   // Update elapsed time every 30 seconds
   useEffect(() => {
@@ -26,7 +43,7 @@ export function CostDisplay() {
     return () => clearInterval(timer);
   }, [stats.sessionStartTime]);
 
-  const costStr = `$${stats.tokenCostUsd.toFixed(2)} tok`;
+  const costStr = `$${displayTokenCost.toFixed(2)} tok`;
   const pnlSign = stats.tradingPnL >= 0 ? "+" : "";
   const pnlStr = `${pnlSign}$${stats.tradingPnL.toFixed(0)} P&L`;
   const pnlColor = stats.tradingPnL >= 0 ? "green" : "red";

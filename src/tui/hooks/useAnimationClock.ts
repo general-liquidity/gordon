@@ -18,10 +18,13 @@ import { getAnimationClock } from "../animations/animationClock.js";
  * The component re-renders on each tick. Use sparingly — only for
  * components that actually animate (spinners, tickers).
  */
-export function useAnimationClock(intervalMs: number = 100): number {
+export function useAnimationClock(intervalMs: number = 50): number {
   const [frame, setFrame] = useState(0);
 
   useEffect(() => {
+    // Pass 0 or negative to unsubscribe (pause animation)
+    if (intervalMs <= 0) return;
+
     const clock = getAnimationClock();
     const unsub = clock.subscribe((f) => {
       setFrame(f);

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Text } from "ink";
+import { useAnimationClock } from "../hooks/useAnimationClock.js";
 
 // ============================================================================
 // StreamingText — Word-by-word text appearance with cursor
@@ -18,17 +19,17 @@ interface Props {
 export function StreamingText({ content, isStreaming, color }: Props) {
   const [cursorVisible, setCursorVisible] = useState(true);
 
-  // Blink cursor during streaming
+  // Shared clock for cursor blink (500ms cycle = every 10th frame at 50ms)
+  const clockFrame = useAnimationClock(isStreaming ? 50 : 0);
+
   useEffect(() => {
     if (!isStreaming) {
       setCursorVisible(false);
       return;
     }
-    const interval = setInterval(() => {
-      setCursorVisible((v) => !v);
-    }, 500);
-    return () => clearInterval(interval);
-  }, [isStreaming]);
+    // Toggle every ~500ms (10 frames at 50ms)
+    setCursorVisible(Math.floor(clockFrame / 10) % 2 === 0);
+  }, [clockFrame, isStreaming]);
 
   return (
     <Text color={color}>

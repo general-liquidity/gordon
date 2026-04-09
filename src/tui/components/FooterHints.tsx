@@ -13,6 +13,12 @@ interface Props {
   activeAgentName: string | null;
   autonomousActive?: boolean;
   autonomousStrategyCount?: number;
+  /** Vim mode active */
+  vimMode?: boolean;
+  /** Effort/fast mode level */
+  effortLevel?: "low" | "medium" | "high" | "auto";
+  /** Token budget remaining (0-1 ratio) */
+  tokenBudgetRatio?: number;
 }
 
 export function FooterHints({
@@ -22,6 +28,9 @@ export function FooterHints({
   activeAgentName,
   autonomousActive = false,
   autonomousStrategyCount = 0,
+  vimMode = false,
+  effortLevel,
+  tokenBudgetRatio,
 }: Props) {
   const modeColor = permissionMode === "auto" ? "red" : permissionMode === "strict" ? "green" : "cyanBright";
 
@@ -31,7 +40,33 @@ export function FooterHints({
       {/* Mode */}
       <Text color={modeColor}>{permissionMode}</Text>
 
-      {/* Autonomous loop indicator (Phase 6) */}
+      {/* Vim mode indicator */}
+      {vimMode && (
+        <>
+          <Text dimColor> {"\u00b7"} </Text>
+          <Text color="magenta">[VIM]</Text>
+        </>
+      )}
+
+      {/* Effort/fast mode indicator */}
+      {effortLevel && effortLevel !== "auto" && (
+        <>
+          <Text dimColor> {"\u00b7"} </Text>
+          <Text color="yellow">{"\u21AF"} {effortLevel}</Text>
+        </>
+      )}
+
+      {/* Token budget indicator */}
+      {tokenBudgetRatio != null && tokenBudgetRatio < 0.3 && (
+        <>
+          <Text dimColor> {"\u00b7"} </Text>
+          <Text color={tokenBudgetRatio < 0.1 ? "red" : "yellow"}>
+            {"\u2193"} {Math.round(tokenBudgetRatio * 100)}% ctx
+          </Text>
+        </>
+      )}
+
+      {/* Autonomous loop indicator */}
       {autonomousActive && (
         <>
           <Text dimColor> {"\u00b7"} </Text>

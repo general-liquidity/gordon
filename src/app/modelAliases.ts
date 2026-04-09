@@ -54,14 +54,15 @@ const ALIASES: Record<string, ResolvedModel> = {
   "mercury-edit": { provider: "inception", model: "mercury-edit-2", displayName: "Mercury Edit 2 (code editing)" },
 
   // ── Dedalus (OpenAI-compatible router) ──
-  "dedalus-gpt":    { provider: "dedalus", model: "openai/gpt-5.4",                              displayName: "GPT-5.4 via Dedalus" },
-  "dedalus-opus":   { provider: "dedalus", model: "openai/anthropic/claude-opus-4-6",             displayName: "Opus 4.6 via Dedalus" },
-  "dedalus-haiku":  { provider: "dedalus", model: "openai/anthropic/claude-haiku-4-5-20251001",   displayName: "Haiku 4.5 via Dedalus" },
-  "dedalus-gemini": { provider: "dedalus", model: "openai/google/gemini-3.1-pro-preview",         displayName: "Gemini 3.1 Pro via Dedalus" },
-  grok:             { provider: "dedalus", model: "openai/xai/grok-4-1-fast-reasoning",           displayName: "Grok 4.1 Fast Reasoning" },
-  "grok-fast":      { provider: "dedalus", model: "openai/xai/grok-4-1-fast-reasoning",           displayName: "Grok 4.1 Fast Reasoning" },
-  "grok-nonr":      { provider: "dedalus", model: "openai/xai/grok-4-1-fast-non-reasoning",       displayName: "Grok 4.1 Fast Non-Reasoning" },
-  kimi:             { provider: "dedalus", model: "openai/moonshot/kimi-k2.5",                    displayName: "Kimi K2.5" },
+  "dedalus-gpt":    { provider: "dedalus", model: "openai/gpt-5.2",                              displayName: "GPT-5.2 via Dedalus" },
+  "dedalus-opus":   { provider: "dedalus", model: "anthropic/claude-opus-4-6",             displayName: "Opus 4.6 via Dedalus" },
+  "dedalus-sonnet": { provider: "dedalus", model: "anthropic/claude-sonnet-4-6",          displayName: "Sonnet 4.6 via Dedalus" },
+  "dedalus-haiku":  { provider: "dedalus", model: "anthropic/claude-haiku-4-5-20251001",  displayName: "Haiku 4.5 via Dedalus" },
+  "dedalus-gemini": { provider: "dedalus", model: "google/gemini-3.1-pro-preview",        displayName: "Gemini 3.1 Pro via Dedalus" },
+  grok:             { provider: "dedalus", model: "xai/grok-4-1-fast-reasoning",          displayName: "Grok 4.1 Fast Reasoning" },
+  "grok-fast":      { provider: "dedalus", model: "xai/grok-4-1-fast-reasoning",          displayName: "Grok 4.1 Fast Reasoning" },
+  "grok-nonr":      { provider: "dedalus", model: "xai/grok-4-1-fast-non-reasoning",      displayName: "Grok 4.1 Fast Non-Reasoning" },
+  kimi:             { provider: "dedalus", model: "moonshot/kimi-k2-0905-preview",        displayName: "Kimi K2" },
 
   // ── Meta aliases ──
   best:       { provider: "anthropic", model: "claude-opus-4-6",   displayName: "Best (Opus 4.6)" },

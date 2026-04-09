@@ -24,7 +24,7 @@ class AnimationClock {
   private timer: ReturnType<typeof setInterval> | null = null;
   private frame = 0;
   private paused = false;
-  private readonly baseIntervalMs = 100; // 10fps base clock
+  private readonly baseIntervalMs = 50; // 20fps base clock (Claude Code uses 50ms)
 
   /**
    * Subscribe to animation ticks.
@@ -32,7 +32,7 @@ class AnimationClock {
    * @param intervalMs - Desired interval between ticks. Default 100ms (10fps).
    * @returns Unsubscribe function.
    */
-  subscribe(callback: TickCallback, intervalMs: number = 100): () => void {
+  subscribe(callback: TickCallback, intervalMs: number = 50): () => void {
     const id = this.nextId++;
     this.subscriptions.set(id, {
       id,

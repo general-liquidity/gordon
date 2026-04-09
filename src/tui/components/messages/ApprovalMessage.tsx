@@ -1,0 +1,33 @@
+import React from "react";
+import { Box, Text } from "ink";
+import { RichContent } from "../RichContent.js";
+import { NoSelect } from "../NoSelect.js";
+import type { Message } from "../MessageBubble.js";
+
+// Approval messages: ⚠ APPROVAL [id] with action hints.
+export function ApprovalMessage({ message }: { message: Message }) {
+  return (
+    <Box flexDirection="column" marginTop={1}>
+      <Box>
+        <Text color="yellow">{"\u26A0"} </Text>
+        <Text bold color="yellow">APPROVAL</Text>
+        {message.badge && <Text color="yellow"> [{message.badge}]</Text>}
+      </Box>
+      <Box>
+        <NoSelect>{"\u231F  "}</NoSelect>
+        <Box flexDirection="column" flexGrow={1}>
+          <RichContent content={message.content} maxLines={10} />
+        </Box>
+      </Box>
+      {message.badge && (
+        <Box paddingLeft={2}>
+          <Text dimColor>
+            {"\u2192 approve "}{message.badge}
+            {"  \u2502  deny "}{message.badge}
+            {"  \u2502  approve "}{message.badge}{" persist"}
+          </Text>
+        </Box>
+      )}
+    </Box>
+  );
+}

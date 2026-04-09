@@ -1,27 +1,47 @@
 /**
- * ThinkStep — Agent reasoning display
+ * ThinkStep — Collapsible agent reasoning display (trading-adapted)
  *
- * Renders a "THINKING" badge in dimColor with agent reasoning text.
- * Shows between plan generation and plan presentation to give the
- * user visibility into the agent's thought process.
+ * Compact (default): ∴ Analyzing risk dimensions... · 3s
+ * Expanded (Ctrl+O):  Full reasoning text
+ * After complete:     ∴ analyzed for 3s
  *
- * Phase 17 of the TUI rebuild.
+ * Trading-contextual labels based on agent name.
  */
 
-import React from "react";
-import { Box, Text } from "ink";
+import React, { useState, useEffect, useRef } from "react";
+import { Box, Text, useInput } from "ink";
+import { GlimmerMessage } from "./GlimmerMessage.js";
 
 // ============================================================================
 // Types
 // ============================================================================
 
 interface Props {
-  /** The reasoning text from the agent */
   reasoning: string;
-  /** Optional agent name (e.g. "analyst", "risk-manager") */
   agentName?: string;
-  /** Whether to show elapsed time */
   elapsedMs?: number;
+  isComplete?: boolean;
+}
+
+// ============================================================================
+// Trading-contextual thinking labels
+// ============================================================================
+
+const THINKING_LABELS: Record<string, string> = {
+  gordon: "Thinking",
+  executor: "Preparing execution",
+  researcher: "Researching",
+  scanner: "Scanning markets",
+  analyst: "Analyzing charts",
+  planner: "Building trade plan",
+  monitor: "Checking positions",
+  backtester: "Running backtest",
+  critic: "Evaluating risk",
+};
+
+function getThinkingLabel(agentName?: string): string {
+  if (agentName && THINKING_LABELS[agentName]) return THINKING_LABELS[agentName]!;
+  return "Thinking";
 }
 
 // ============================================================================
@@ -33,49 +53,93 @@ function formatElapsed(ms: number): string {
   return `${(ms / 1000).toFixed(1)}s`;
 }
 
-/**
- * Truncate reasoning to a maximum number of lines for display.
- * Long reasoning is collapsed with a trailing "..." indicator.
- */
-function truncateReasoning(text: string, maxLines: number = 6): string[] {
-  const lines = text.split("\n").filter((l) => l.trim().length > 0);
-  if (lines.length <= maxLines) return lines;
-  return [...lines.slice(0, maxLines), `... (+${lines.length - maxLines} more)`];
-}
-
 // ============================================================================
 // Component
 // ============================================================================
 
-export function ThinkStep({ reasoning, agentName, elapsedMs }: Props) {
-  const lines = truncateReasoning(reasoning);
+export function ThinkStep({ reasoning, agentName, elapsedMs, isComplete = false }: Props) {
+  const [expanded, setExpanded] = useState(false);
+  const [showShimmer, setShowShimmer] = useState(false);
+  const mountTimeRef = useRef(Date.now());
 
+  // Shimmer glow starts after 3s delay (Claude Code pattern)
+  useEffect(() => {
+    if (isComplete) return;
+    const timer = setTimeout(() => setShowShimmer(true), 3000);
+    return () => clearTimeout(timer);
+  }, [isComplete]);
+
+  // Minimum 2s display before allowing collapse
+  const [minDisplayMet, setMinDisplayMet] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => setMinDisplayMet(true), 2000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Ctrl+O to toggle expand
+  useInput((input, key) => {
+    if (key.ctrl && input === "o") {
+      setExpanded((e) => !e);
+    }
+  });
+
+  const label = getThinkingLabel(agentName);
+  const elapsedStr = elapsedMs != null ? formatElapsed(elapsedMs) : "";
+
+  // After completion: "∴ analyzed for 3s"
+  if (isComplete && minDisplayMet) {
+    return (
+      <Box paddingLeft={2} marginTop={0}>
+        <Text dimColor italic>
+          {"\u2234"} {label.toLowerCase().replace(/ing$/, "ed").replace(/think$/, "thought")} for {elapsedStr}
+        </Text>
+      </Box>
+    );
+  }
+
+  // Compact mode (default)
+  if (!expanded) {
+    return (
+      <Box flexDirection="column" paddingLeft={2}>
+        <Box>
+          {showShimmer ? (
+            <GlimmerMessage text={`\u2234 ${label}\u2026`} isActive={true} />
+          ) : (
+            <Text dimColor italic>{"\u2234"} {label}{"\u2026"}</Text>
+          )}
+          {elapsedStr && (
+            <>
+              <Text dimColor> {"\u00b7"} </Text>
+              <Text dimColor>{elapsedStr}</Text>
+            </>
+          )}
+          <Text dimColor> {"\u00b7"} Ctrl+O expand</Text>
+        </Box>
+      </Box>
+    );
+  }
+
+  // Expanded mode
+  const lines = reasoning.split("\n").filter((l) => l.trim().length > 0).slice(0, 8);
   return (
-    <Box flexDirection="column" marginTop={1} paddingLeft={2}>
-      {/* Badge line */}
+    <Box flexDirection="column" paddingLeft={2}>
       <Box>
-        <Text dimColor bold inverse>{" THINKING "}</Text>
-        {agentName && (
-          <>
-            <Text dimColor> </Text>
-            <Text dimColor color="cyan">{agentName}</Text>
-          </>
-        )}
-        {elapsedMs != null && (
+        <Text dimColor italic>{"\u2234"} {label}{"\u2026"}</Text>
+        {elapsedStr && (
           <>
             <Text dimColor> {"\u00b7"} </Text>
-            <Text dimColor>{formatElapsed(elapsedMs)}</Text>
+            <Text dimColor>{elapsedStr}</Text>
           </>
         )}
+        <Text dimColor> {"\u00b7"} Ctrl+O collapse</Text>
       </Box>
-
-      {/* Reasoning text */}
-      <Box flexDirection="column" paddingLeft={2} marginTop={0}>
+      <Box flexDirection="column" paddingLeft={2}>
         {lines.map((line, i) => (
-          <Text key={i} dimColor>
-            {line}
-          </Text>
+          <Text key={i} dimColor>{line}</Text>
         ))}
+        {reasoning.split("\n").length > 8 && (
+          <Text dimColor>... (+{reasoning.split("\n").length - 8} more)</Text>
+        )}
       </Box>
     </Box>
   );

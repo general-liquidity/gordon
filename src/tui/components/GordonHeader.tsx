@@ -13,6 +13,9 @@ interface Props {
   resumeMessageCount?: number;
   toolCount?: number;
   exchangeStatus?: string;
+  pnl?: number;
+  positionCount?: number;
+  feedCount?: number;
 }
 
 export function GordonHeader({

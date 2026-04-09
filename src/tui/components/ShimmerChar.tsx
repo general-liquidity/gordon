@@ -15,7 +15,7 @@ interface Props {
   charIndex: number;
 }
 
-export function ShimmerChar({ char, glimmerIndex, charIndex }: Props) {
+export const ShimmerChar = React.memo(function ShimmerChar({ char, glimmerIndex, charIndex }: Props) {
   const distance = Math.abs(charIndex - glimmerIndex);
 
   if (distance === 0) {
@@ -35,4 +35,4 @@ export function ShimmerChar({ char, glimmerIndex, charIndex }: Props) {
   }
 
   return <Text dimColor>{char}</Text>;
-}
+});

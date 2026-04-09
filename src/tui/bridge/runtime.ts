@@ -265,13 +265,23 @@ async function streamResponse(
   let totalTokens = 0;
   let currentAgentName: string | null = null;
   let chainStartTime = Date.now();
+  const streamingMsgId = `streaming-${Date.now()}`;
 
   setState((prev: any) => ({
     ...prev,
     isStreaming: true,
     streamBuffer: "",
     activeAgents: [],
+    activeToolCalls: [],
     handoffHistory: prev.handoffHistory ?? [],
+    // Insert streaming placeholder message into the list (DOM continuity)
+    messages: [...prev.messages, {
+      id: streamingMsgId,
+      role: "gordon" as const,
+      content: "",
+      timestamp: new Date().toISOString(),
+      streaming: true,
+    }],
   }));
 
   try {
@@ -279,7 +289,14 @@ async function streamResponse(
       switch (event.type) {
         case "text_delta":
           responseContent += event.content ?? "";
-          setState((prev: any) => ({ ...prev, streamBuffer: responseContent }));
+          setState((prev: any) => ({
+            ...prev,
+            streamBuffer: responseContent,
+            // Update streaming message in-place (DOM continuity — no flash/jump)
+            messages: prev.messages.map((m: any) =>
+              m.id === streamingMsgId ? { ...m, content: responseContent } : m
+            ),
+          }));
           break;
 
         case "agent_switch":
@@ -323,7 +340,19 @@ async function streamResponse(
               const chains = [...prev.activeAgents];
               const last = chains[chains.length - 1];
               if (last) chains[chains.length - 1] = { ...last, nodes: taskTreeToNodes(taskTree) };
-              return { ...prev, activeAgents: chains };
+              // Track tool call for inline display
+              const toolCall = {
+                id: `tc-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                toolName: event.toolName!,
+                args: event.toolArgs as Record<string, unknown> | undefined,
+                status: "running" as const,
+                startedAt: Date.now(),
+              };
+              return {
+                ...prev,
+                activeAgents: chains,
+                activeToolCalls: [...(prev.activeToolCalls ?? []), toolCall],
+              };
             });
           }
           break;
@@ -334,7 +363,18 @@ async function streamResponse(
             const chains = [...prev.activeAgents];
             const last = chains[chains.length - 1];
             if (last) chains[chains.length - 1] = { ...last, nodes: taskTreeToNodes(taskTree) };
-            return { ...prev, activeAgents: chains };
+            // Update tool call status
+            const updatedCalls = (prev.activeToolCalls ?? []).map((tc: any) =>
+              tc.toolName === event.toolName && tc.status === "running"
+                ? {
+                    ...tc,
+                    status: event.error ? "error" : "success",
+                    result: event.result ? String(event.result).slice(0, 200) : undefined,
+                    duration: Date.now() - tc.startedAt,
+                  }
+                : tc,
+            );
+            return { ...prev, activeAgents: chains, activeToolCalls: updatedCalls };
           });
           break;
 
@@ -344,12 +384,14 @@ async function streamResponse(
             totalTokens = event.usage.totalTokens ?? 0;
           }
 
+          // Finalize the streaming message — no new message needed (DOM continuity)
           const gordonMsg: Message = {
-            id: `gordon-${Date.now()}`,
+            id: streamingMsgId,
             role: "gordon",
             content: responseContent,
             timestamp: new Date().toISOString(),
             agent: taskTree?.currentAgentName,
+            streaming: false,
           };
 
           // ── Phase 5: Risk kernel pre-check on pending approvals ──
@@ -442,11 +484,17 @@ async function streamResponse(
 
           setState((prev: any) => ({
             ...prev,
-            messages: [...prev.messages, gordonMsg, ...riskMessages, ...approvalMsgs],
-            completedMessageCount: prev.messages.length + 1 + riskMessages.length + approvalMsgs.length,
+            // Replace streaming message in-place + append risk/approval messages
+            messages: [
+              ...prev.messages.map((m: any) => m.id === streamingMsgId ? gordonMsg : m),
+              ...riskMessages,
+              ...approvalMsgs,
+            ],
+            completedMessageCount: prev.messages.length + riskMessages.length + approvalMsgs.length,
             streamBuffer: "",
             isStreaming: false,
             activeAgents: [],
+            activeToolCalls: [],
             handoffHistory: [],
             tokenCount: (prev.tokenCount ?? 0) + totalTokens,
             pendingApprovals: stillPending.map(mapApproval),
@@ -468,6 +516,7 @@ async function streamResponse(
             streamBuffer: "",
             isStreaming: false,
             activeAgents: [],
+            activeToolCalls: [],
           }));
           break;
         }
@@ -478,6 +527,7 @@ async function streamResponse(
             streamBuffer: "",
             isStreaming: false,
             activeAgents: [],
+            activeToolCalls: [],
           }));
           break;
       }
@@ -557,11 +607,15 @@ export function handleApprovalDecision(
 // Background monitoring (M from plan)
 // ============================================================================
 
+let _bgMonitorInterval: ReturnType<typeof setInterval> | null = null;
+
 function startBackgroundMonitoring(setState: StateUpdater): void {
   if (!activeRuntime) return;
+  // Clean up previous interval if any
+  if (_bgMonitorInterval) clearInterval(_bgMonitorInterval);
 
   // Poll background task state every 5 seconds
-  setInterval(() => {
+  _bgMonitorInterval = setInterval(() => {
     const runtime = activeRuntime;
     if (!runtime) return;
 
@@ -629,8 +683,13 @@ function createDispatchAdapter(setState: StateUpdater): (action: Action) => void
           ...prev,
           notifications: [...(prev.notifications ?? []), action.notification],
         }));
-        // Also surface as a system message so it appears in the conversation
-        addMessage(setState, "system", action.notification.message);
+        // Only surface critical trading events as conversation messages.
+        // fill = position/trade fills, alert = price/stop/guardrail, error = failures.
+        // Everything else (system, info, strategy) stays in the notification tray.
+        if (["fill", "alert", "error"].includes(action.notification.variant)) {
+          const variant = action.notification.variant === "error" ? "error" as const : undefined;
+          addMessage(setState, "system", action.notification.message, variant);
+        }
         break;
       case "DISMISS_NOTIFICATION":
         setState((prev: any) => ({

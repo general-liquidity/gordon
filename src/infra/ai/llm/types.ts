@@ -54,7 +54,7 @@ export type OpenAIModel =
  */
 export type DedalusModel =
   // OpenAI via Dedalus
-  | "openai/gpt-5.2"
+  | "openai/gpt-5.4"
   // Anthropic via Dedalus
   | "anthropic/claude-opus-4-6"
   | "anthropic/claude-sonnet-4-5-20250929"

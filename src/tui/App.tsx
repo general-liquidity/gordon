@@ -61,6 +61,11 @@ import { CLIBrowser } from "./components/CLIBrowser.js";
 import { PrivacyScreen } from "./components/PrivacyScreen.js";
 import { FeedbackSurvey } from "./components/FeedbackSurvey.js";
 import { ThinkStep } from "./components/ThinkStep.js";
+import { TradingSpinner } from "./components/TradingSpinner.js";
+import { GlimmerMessage } from "./components/GlimmerMessage.js";
+import { ToolCallInline, type ToolCallState } from "./components/ToolCallInline.js";
+import { StreamingMarkdown } from "./components/StreamingMarkdown.js";
+import { NoSelect } from "./components/NoSelect.js";
 
 // ── Backend Module UI Components ──
 import { LivePositions, type Position } from "./components/LivePositions.js";
@@ -78,11 +83,14 @@ import { TrailingStopDisplay } from "./components/TrailingStopDisplay.js";
 import { OrderRecoveryNotice } from "./components/OrderRecoveryNotice.js";
 import { MarketDataStatus } from "./components/MarketDataStatus.js";
 
+import { AlternateScreen } from "./components/AlternateScreen.js";
+
 // ── Hooks ──
 import { useDoublePress } from "./hooks/useDoublePress.js";
 import { useElapsedTime } from "./hooks/useElapsedTime.js";
 import { useTerminalSize } from "./hooks/useTerminalSize.js";
 import { useMergedCommands } from "./hooks/useMergedCommands.js";
+import { useScreenReader } from "./hooks/useScreenReader.js";
 
 // ── Bridge ──
 import { initializeRuntime, handleInput, handleApprovalDecision } from "./bridge/runtime.js";
@@ -143,6 +151,9 @@ function AppInner() {
   // ── FPS tracking + animation clock ──
   const fpsMetrics = useFpsTracker(2000); // Report every 2s
   const { pause: pauseAnimations, resume: resumeAnimations } = useAnimationPause();
+  const isScreenReaderActive = useScreenReader();
+  const vimModeActive = isVimModeEnabled();
+  const useAltScreen = process.env.GORDON_ALT_SCREEN !== "false";
   const threadId = useAppState((s) => s.threadId);
   const isResumedSession = useAppState((s) => s.isResumedSession);
   const tokenCount = useAppState((s) => s.tokenCount);
@@ -216,13 +227,14 @@ function AppInner() {
     showAudit || showScheduler || showPlaybooks || showStrategies ||
     showGenome || showIndicators || showConsensus;
 
-  // ── Determine if agent is in "thinking" mode (Planner/Critic reasoning) ──
-  const thinkingAgent = activeAgents.find(
-    (a) =>
-      a.status === "running" &&
-      (a.agentName === "planner" || a.agentName === "critic" || a.agentName === "analyst"),
-  );
+  // ── Determine if agent is in "thinking" mode (any running agent, no output yet) ──
+  const thinkingAgent = activeAgents.find((a) => a.status === "running");
   const isThinking = isStreaming && thinkingAgent != null && !streamBuffer;
+
+  // ── Track active tool calls for inline display ──
+  const [activeToolCalls, setActiveToolCalls] = useState<ToolCallState[]>([]);
+  // ── Track last user input for contextual spinner verb ──
+  const [lastUserInput, setLastUserInput] = useState("");
 
   // ── StateUpdater adapter ──
   // The runtime bridge still uses `setState(fn)` — this adapter runs
@@ -426,6 +438,7 @@ function AppInner() {
     (value: string) => {
       const trimmed = value.trim();
       if (!trimmed) return;
+      setLastUserInput(trimmed);
       if (isStreaming) {
         // Gordon is busy — enqueue instead of dropping. Drained on idle.
         defaultMessageQueue.enqueue({
@@ -711,6 +724,12 @@ function AppInner() {
             const { loadConfig: lc, saveConfig: sc } = await import("../infra/storage/config.ts");
             const cfg = await lc();
             await sc({ ...cfg, modelConfig: { ...cfg.modelConfig, provider: provider as any, model } });
+            // Update env vars so resolveRuntimeModel() picks up the change
+            process.env.GORDON_PROVIDER = provider;
+            if (model) process.env.GORDON_MODEL = model;
+            // Reset agent cache so the agent gets recreated with the new model
+            const { resetAgents } = await import("../infra/agents/agents.ts");
+            resetAgents();
           } catch { /* best-effort */ }
           dispatch({
             type: "ADD_MESSAGE",
@@ -849,6 +868,8 @@ function AppInner() {
         isResumedSession={isResumedSession}
         resumeMessageCount={isResumedSession ? messages.length : undefined}
         toolCount={5}
+        positionCount={0}
+        feedCount={0}
       />
 
       {/* ── Conversation — wrapped in PrivacyScreen ── */}
@@ -901,36 +922,29 @@ function AppInner() {
             )
           )}
 
-          {/* ThinkStep — shown during agent reasoning (Planner/Critic/Analyst) */}
-          {isThinking && thinkingAgent && (
+          {/* ThinkStep — collapsible, trading-adapted. Shows during thinking, then "analyzed for Xs" on completion */}
+          {(isThinking || (isStreaming && streamBuffer && thinkingAgent)) && thinkingAgent && (
             <ThinkStep
-              reasoning="Analyzing context and formulating response..."
+              reasoning={`Evaluating with ${thinkingAgent.agentName}...`}
               agentName={thinkingAgent.agentName}
               elapsedMs={thinkingAgent.duration}
+              isComplete={!!streamBuffer}
             />
           )}
 
-          {/* Streaming text with cursor */}
-          {isStreaming && (
-            <Box flexDirection="column" marginTop={1}>
-              <Box>
-                <Text bold color="cyanBright">GORDON</Text>
-                {activeAgentName && (
-                  <>
-                    <Text dimColor> {"\u00b7"} </Text>
-                    <WorkerBadge agent={activeAgentName} showBullet={false} />
-                  </>
-                )}
-                <Text dimColor> {elapsedFormatted}</Text>
-              </Box>
-              {streamBuffer ? (
-                <Box paddingLeft={2}>
-                  <StreamingText content={streamBuffer} isStreaming={true} />
-                </Box>
-              ) : (
-                !isThinking && <Text color="cyanBright">  {"\u25CF"} thinking...</Text>
-              )}
-            </Box>
+          {/* Inline tool calls — ● Price BTC/USDT → ⎿ $68,432 */}
+          {isStreaming && activeToolCalls.length > 0 && (
+            <ToolCallInline calls={activeToolCalls} />
+          )}
+
+          {/* Spinner — shown when streaming but no text yet and not thinking */}
+          {isStreaming && !streamBuffer && !isThinking && (
+            <TradingSpinner
+              agentName={activeAgentName ?? undefined}
+              streamLength={0}
+              userInput={lastUserInput}
+              activeToolName={activeToolCalls.find((t) => t.status === "running")?.toolName}
+            />
           )}
 
           {/* Inline help */}
@@ -1095,15 +1109,19 @@ function AppInner() {
         />
       )}
 
-      {/* ── DaemonStatus + MarketDataStatus footer hints area ── */}
-      <Box paddingX={1} gap={2}>
-        <DaemonStatus
-          status={daemonStatus.status}
-          taskCount={daemonStatus.taskCount}
-          uptime={daemonStatus.uptime}
-        />
-        <MarketDataStatus feeds={marketFeeds} />
-      </Box>
+      {/* ── DaemonStatus + MarketDataStatus — only show when there's something active ── */}
+      {(daemonStatus.status !== "stopped" || marketFeeds.length > 0) && (
+        <Box paddingX={1} gap={2}>
+          {daemonStatus.status !== "stopped" && (
+            <DaemonStatus
+              status={daemonStatus.status}
+              taskCount={daemonStatus.taskCount}
+              uptime={daemonStatus.uptime}
+            />
+          )}
+          {marketFeeds.length > 0 && <MarketDataStatus feeds={marketFeeds} />}
+        </Box>
+      )}
 
       {/* ── Input area with border (like Claude Code) ── */}
       <Box
@@ -1121,6 +1139,7 @@ function AppInner() {
           isStreaming={isStreaming}
           autonomousActive={autonomousActive}
           autonomousStrategyCount={autonomousStrategyCount}
+          vimMode={vimModeActive}
         />
         <Box justifyContent="flex-end">
           <CostDisplay />

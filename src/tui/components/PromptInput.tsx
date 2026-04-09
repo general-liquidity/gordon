@@ -21,6 +21,9 @@ interface Props {
   isStreaming: boolean;
   autonomousActive?: boolean;
   autonomousStrategyCount?: number;
+  vimMode?: boolean;
+  effortLevel?: "low" | "medium" | "high" | "auto";
+  tokenBudgetRatio?: number;
 }
 
 // Fixed width for command name column — keeps descriptions aligned
@@ -35,6 +38,9 @@ export function PromptInput({
   isStreaming,
   autonomousActive = false,
   autonomousStrategyCount = 0,
+  vimMode = false,
+  effortLevel,
+  tokenBudgetRatio,
 }: Props) {
   const { stdout } = useStdout();
   const termRows = stdout?.rows ?? 24;
@@ -240,6 +246,9 @@ export function PromptInput({
           activeAgentName={activeAgentName}
           autonomousActive={autonomousActive}
           autonomousStrategyCount={autonomousStrategyCount}
+          vimMode={vimMode}
+          effortLevel={effortLevel}
+          tokenBudgetRatio={tokenBudgetRatio}
         />
       </Box>
     </Box>

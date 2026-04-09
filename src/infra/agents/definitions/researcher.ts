@@ -63,7 +63,7 @@ export function getResearcher(): Agent {
     description:
       "On-demand parallel research agent. Spawned for background tasks like " +
       "multi-symbol scans, backtests, deep dives. Read-only — cannot trade.",
-    instructions: composeAgentInstructions("scanner" as any, RESEARCHER_INSTRUCTIONS),
+    instructions: composeAgentInstructions("researcher" as any, RESEARCHER_INSTRUCTIONS),
     model: resolveRuntimeModel,
     tools: {
       ...instrumentedIndicatorTools,

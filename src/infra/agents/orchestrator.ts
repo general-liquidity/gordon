@@ -411,39 +411,50 @@ export async function* processMessageStream(
     await throwIfStreamAborted(signal);
     reactStage = advanceReActStage(reactStage, "interrupt_checked_before_action");
 
-    const streamRequest = gordonAgent().stream(groundedPrompt.messages, {
-      requestContext,
-      ...(threadId && effectiveResourceId ? { memory: { thread: threadId, resource: effectiveResourceId } } : {}),
-      maxSteps: 20,
-      ...groundedPrompt.requestOptions,
-      ...(tracingOptions && { tracingOptions }),
-    });
+    // Per Mastra docs: `const stream = await agent.stream(messages, options)`
+    // Returns MastraModelOutput with textStream, fullStream, text (Promise<string>)
+    const streamObj = await awaitWithAbort(
+      gordonAgent().stream(groundedPrompt.messages, {
+        requestContext,
+        ...(threadId && effectiveResourceId ? { memory: { thread: threadId, resource: effectiveResourceId } } : {}),
+        maxSteps: 20,
+        ...groundedPrompt.requestOptions,
+        ...(tracingOptions && { tracingOptions }),
+        // Delegation hooks for supervisor → sub-agent routing
+        delegation: {
+          onDelegationStart: async (ctx: any) => {
+            state.currentAgent = ctx.primitiveId;
+            logger.info("Delegation to sub-agent", { agent: ctx.primitiveId });
+            return { proceed: true };
+          },
+          onDelegationComplete: async (ctx: any) => {
+            if (ctx.error) {
+              logger.warn("Delegation failed", { agent: ctx.primitiveId, error: ctx.error });
+              return { feedback: `Delegation to ${ctx.primitiveId} failed: ${ctx.error}. Try another approach.` };
+            }
+            return {};
+          },
+        },
+        onError: ({ error }: { error: Error }) => {
+          logger.error("Stream error", { error: error.message });
+        },
+      }),
+      signal,
+    );
     reactStage = advanceReActStage(reactStage, "action_started");
-    const streamResult = await awaitWithAbort(streamRequest, signal);
 
-    const streamObj = streamResult as unknown as {
-      fullStream?: ReadableStream<InternalStreamChunk>;
-      textStream?: AsyncIterable<string>;
-      text?: string | (() => Promise<string>) | Promise<string>;
-      usage?: { inputTokens?: number; outputTokens?: number; totalTokens?: number } | Promise<{ inputTokens?: number; outputTokens?: number; totalTokens?: number }>;
-    };
+    // Log available properties for debugging
+    const streamKeys = Object.keys(streamObj ?? {});
+    logger.info("Stream result keys: " + streamKeys.join(", "));
 
-    logger.debug("Stream result properties", {
-      hasFullStream: !!streamObj.fullStream,
-      hasTextStream: !!streamObj.textStream,
-      hasText: !!streamObj.text,
-      textType: typeof streamObj.text,
-    });
-
-    // ── fullStream path (complete event information) ─────────────────────
-    if (streamObj.fullStream) {
-      const reader = streamObj.fullStream.getReader();
+    // ── Primary: fullStream (rich typed events — tool calls, reasoning, agent switches) ──
+    if (streamObj?.fullStream) {
+      const reader = (streamObj.fullStream as ReadableStream<InternalStreamChunk>).getReader();
       try {
         while (true) {
           const { done, value } = await readStreamChunkWithAbort(reader, signal);
           if (done) break;
           const chunk = value as InternalStreamChunk;
-          // Wire: emit Gordon AgentEvent in parallel with Mastra StreamEvent
           try { bridgeStreamEvent(chunk as any, 0); } catch { /* non-critical */ }
           yield* processFullStreamChunk(chunk, state, context);
         }
@@ -458,38 +469,29 @@ export async function* processMessageStream(
           });
         }
       }
-    } else if (streamObj.textStream && typeof streamObj.textStream[Symbol.asyncIterator] === 'function') {
+    }
+    // ── Fallback: textStream (simple text chunks, no tool/agent events) ──
+    else if (streamObj?.textStream) {
       for await (const chunk of streamObj.textStream) {
         await throwIfStreamAborted(signal);
         const outputCheck = await checkOutputGuardrails(chunk);
         state.fullText += outputCheck.sanitized;
         yield { type: "text_delta", content: outputCheck.sanitized, agentName: state.currentAgent };
       }
-    } else if (typeof streamObj.text === 'function') {
+    }
+    // ── Last resort: text promise ───────────────────────────────────────
+    else if (streamObj?.text) {
       await throwIfStreamAborted(signal);
-      const rawText = await streamObj.text();
-      if (rawText) {
+      const rawText = typeof streamObj.text === "function"
+        ? await streamObj.text()
+        : await streamObj.text;
+      if (rawText && typeof rawText === "string" && rawText.trim()) {
         const outputCheck = await checkOutputGuardrails(rawText);
         state.fullText = outputCheck.sanitized;
         yield { type: "text_delta", content: state.fullText, agentName: state.currentAgent };
       }
-    } else if (streamObj.text instanceof Promise) {
-      await throwIfStreamAborted(signal);
-      const rawText = await streamObj.text;
-      if (rawText) {
-        const outputCheck = await checkOutputGuardrails(rawText);
-        state.fullText = outputCheck.sanitized;
-        yield { type: "text_delta", content: state.fullText, agentName: state.currentAgent };
-      }
-    } else if (typeof streamObj.text === 'string') {
-      const outputCheck = await checkOutputGuardrails(streamObj.text);
-      state.fullText = outputCheck.sanitized;
-      yield { type: "text_delta", content: state.fullText, agentName: state.currentAgent };
     } else {
-      logger.warn("No text content available in stream result", {
-        textType: typeof streamObj.text,
-        textValue: streamObj.text,
-      });
+      logger.warn("No stream content available", { keys: streamKeys.join(", ") });
     }
 
     // Final text fallback

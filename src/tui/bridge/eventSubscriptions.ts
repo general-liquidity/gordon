@@ -396,21 +396,17 @@ export function subscribeToEvents(dispatch: Dispatch): () => void {
   // Agent (8 events)
   // ────────────────────────────────────────────────────────────────────────
 
-  // 32. agent:started
+  // 32. agent:started — drives spinner state, not a chat message
   unsubs.push(
     bus.on("agent:started", (event: EventData<"agent:started">) => {
-      notify(dispatch, "agent:started", "system",
-        `Agent started: ${event.agent}${event.parent ? ` (parent: ${event.parent})` : ""}`,
-      );
+      dispatch({ type: "AGENT_SWITCH", from: "", to: event.agent });
     }),
   );
 
-  // 33. agent:completed
+  // 33. agent:completed — silent, spinner stops when stream ends
   unsubs.push(
-    bus.on("agent:completed", (event: EventData<"agent:completed">) => {
-      notify(dispatch, "agent:completed", "system",
-        `Agent completed: ${event.agent} (${event.outputLength} chars)`,
-      );
+    bus.on("agent:completed", (_event: EventData<"agent:completed">) => {
+      // No notification — the stream end handles UI state
     }),
   );
 
@@ -421,49 +417,40 @@ export function subscribeToEvents(dispatch: Dispatch): () => void {
     }),
   );
 
-  // 35. agent:handoff_ack
+  // 35. agent:handoff_ack — already shown by HandoffArrow component
   unsubs.push(
-    bus.on("agent:handoff_ack", (event: EventData<"agent:handoff_ack">) => {
-      const status = event.validated ? "\u2713" : "\u2717";
-      notify(dispatch, "agent:handoff_ack", "system",
-        `${status} Handoff ${event.handoffId}: ${event.fromAgent} \u2192 ${event.toAgent}${event.reason ? ` — ${event.reason}` : ""}`,
-      );
+    bus.on("agent:handoff_ack", (_event: EventData<"agent:handoff_ack">) => {
+      // Silent — HandoffArrow handles the visual
     }),
   );
 
-  // 36. agent:fallback
+  // 36. agent:fallback — only notify on error variant (user needs to know)
   unsubs.push(
     bus.on("agent:fallback", (event: EventData<"agent:fallback">) => {
-      notify(dispatch, "agent:fallback", "system",
-        `Agent fallback: ${event.primaryAgent} \u2192 ${event.fallbackTarget} (${event.fallbackType}) — ${event.reason}`,
+      notify(dispatch, "agent:fallback", "alert",
+        `\u26A0 Agent fallback: ${event.primaryAgent} \u2192 ${event.fallbackTarget} — ${event.reason}`,
       );
     }),
   );
 
-  // 37. agent:retry
+  // 37. agent:retry — silent unless final failure
   unsubs.push(
-    bus.on("agent:retry", (event: EventData<"agent:retry">) => {
-      notify(dispatch, "agent:retry", "system",
-        `Agent retry: ${event.agent} attempt ${event.attempt}/${event.maxAttempts} (${event.errorType}, ${event.delayMs}ms delay)`,
-      );
+    bus.on("agent:retry", (_event: EventData<"agent:retry">) => {
+      // Silent — only final failure matters to user
     }),
   );
 
-  // 38. agent:reflection
+  // 38. agent:reflection — feeds ThinkStep state, not a chat message
   unsubs.push(
-    bus.on("agent:reflection", (event: EventData<"agent:reflection">) => {
-      notify(dispatch, "agent:reflection", "system",
-        `Agent reflection: ${event.agent} — ${event.analysis.slice(0, 120)}${event.analysis.length > 120 ? "..." : ""}`,
-      );
+    bus.on("agent:reflection", (_event: EventData<"agent:reflection">) => {
+      // Silent — ThinkStep component shows thinking state visually
     }),
   );
 
-  // 39. agent:stream_completed
+  // 39. agent:stream_completed — silent, stream end drives UI state
   unsubs.push(
-    bus.on("agent:stream_completed", (event: EventData<"agent:stream_completed">) => {
-      notify(dispatch, "agent:stream_completed", "system",
-        `Stream completed: ${event.responseLength} chars`,
-      );
+    bus.on("agent:stream_completed", (_event: EventData<"agent:stream_completed">) => {
+      // Silent — no user value in "Stream completed: 0 chars"
     }),
   );
 
@@ -471,12 +458,10 @@ export function subscribeToEvents(dispatch: Dispatch): () => void {
   // System (3 events)
   // ────────────────────────────────────────────────────────────────────────
 
-  // 40. system:started
+  // 40. system:started — silent, header already shows permission mode
   unsubs.push(
-    bus.on("system:started", (event: EventData<"system:started">) => {
-      notify(dispatch, "system:started", "system",
-        `System started: permissionMode ${event.permissionMode}`,
-      );
+    bus.on("system:started", (_event: EventData<"system:started">) => {
+      // Silent — header displays permission mode
     }),
   );
 
@@ -502,12 +487,10 @@ export function subscribeToEvents(dispatch: Dispatch): () => void {
   // Exchange (3 events)
   // ────────────────────────────────────────────────────────────────────────
 
-  // 43. binance:connected
+  // 43. binance:connected — silent, feed status shows in footer
   unsubs.push(
     bus.on("binance:connected", (_event: EventData<"binance:connected">) => {
-      notify(dispatch, "binance:connected", "system",
-        `\u2713 Binance connected`,
-      );
+      // Silent — MarketDataStatus footer shows feed status
     }),
   );
 
@@ -629,12 +612,10 @@ export function subscribeToEvents(dispatch: Dispatch): () => void {
   // Memory (1 event)
   // ────────────────────────────────────────────────────────────────────────
 
-  // 55. memory:summarized
+  // 55. memory:summarized — silent background operation
   unsubs.push(
-    bus.on("memory:summarized", (event: EventData<"memory:summarized">) => {
-      notify(dispatch, "memory:summarized", "info",
-        `\u25C8 Memory summarized: ${event.originalCount} \u2192 ${event.newCount} entries (${event.summarizedCount} compacted)`,
-      );
+    bus.on("memory:summarized", (_event: EventData<"memory:summarized">) => {
+      // Silent — background housekeeping, not user-facing
     }),
   );
 
@@ -642,21 +623,17 @@ export function subscribeToEvents(dispatch: Dispatch): () => void {
   // Tools (2 events)
   // ────────────────────────────────────────────────────────────────────────
 
-  // 56. tool:started
+  // 56. tool:started — silent, AgentProgress task tree shows this visually
   unsubs.push(
-    bus.on("tool:started", (event: EventData<"tool:started">) => {
-      notify(dispatch, "tool:started", "system",
-        `Tool started: ${event.tool} (agent: ${event.agent})`,
-      );
+    bus.on("tool:started", (_event: EventData<"tool:started">) => {
+      // Silent — AgentProgress component handles tool visualization
     }),
   );
 
-  // 57. tool:completed
+  // 57. tool:completed — silent
   unsubs.push(
-    bus.on("tool:completed", (event: EventData<"tool:completed">) => {
-      notify(dispatch, "tool:completed", "system",
-        `Tool completed: ${event.tool} (agent: ${event.agent})`,
-      );
+    bus.on("tool:completed", (_event: EventData<"tool:completed">) => {
+      // Silent — AgentProgress component handles tool visualization
     }),
   );
 

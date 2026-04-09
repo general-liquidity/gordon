@@ -36,7 +36,14 @@ export function MarkdownRenderer({ content }: Props) {
 // Block-level parsing
 // ============================================================================
 
+// Token cache — 500 LRU (Claude Code pattern)
+const _blockCache = new Map<string, ParsedBlock[]>();
+const _BLOCK_CACHE_MAX = 500;
+
 function parseBlocks(content: string): ParsedBlock[] {
+  const key = `${content.length}:${content.slice(0, 80)}:${content.slice(-20)}`;
+  const cached = _blockCache.get(key);
+  if (cached) return cached;
   const lines = content.split("\n");
   const blocks: ParsedBlock[] = [];
   let i = 0;
@@ -141,6 +148,12 @@ function parseBlocks(content: string): ParsedBlock[] {
     }
   }
 
+  // Cache the result
+  if (_blockCache.size >= _BLOCK_CACHE_MAX) {
+    const firstKey = _blockCache.keys().next().value;
+    if (firstKey) _blockCache.delete(firstKey);
+  }
+  _blockCache.set(key, blocks);
   return blocks;
 }
 

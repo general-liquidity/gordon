@@ -557,12 +557,9 @@ export function classifyRecoveryGuidance(
   if (recoveryContext.emptyResponse) {
     return {
       category: "empty_response",
-      title: "No usable reply returned",
-      detail: "The run finished, but the current model or tool chain came back empty.",
-      nextSteps: [
-        "Retry once after narrowing the request.",
-        "If it repeats, switch models or check provider health.",
-      ],
+      title: "Empty response",
+      detail: "Model returned no output. Try /model to switch or retry your message.",
+      nextSteps: [],
     };
   }
 

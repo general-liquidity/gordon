@@ -100,11 +100,27 @@ export function VirtualMessageList({
   // Slice visible messages
   const visibleMessages = messages.slice(startIndex, endIndex);
 
+  // Message selection state — subtle background highlight
+  const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
+  useInput((input, key) => {
+    if (!scrollEnabled) return;
+    // Ctrl+Up/Down for message selection
+    if (key.ctrl && key.upArrow) {
+      setSelectedIdx((prev) => prev == null ? visibleMessages.length - 1 : Math.max(0, prev - 1));
+    } else if (key.ctrl && key.downArrow) {
+      setSelectedIdx((prev) => prev == null ? 0 : Math.min(visibleMessages.length - 1, prev + 1));
+    } else if (key.escape && selectedIdx != null) {
+      setSelectedIdx(null);
+    }
+  }, { isActive: scrollEnabled });
+
   return (
     <Box flexDirection="column" height={viewportHeight}>
       {/* Rendered message subset */}
-      {visibleMessages.map((msg) => (
-        <MessageBubble key={msg.id} message={msg} />
+      {visibleMessages.map((msg, i) => (
+        <Box key={msg.id} {...(i === selectedIdx ? { borderStyle: "single" as const, borderColor: "gray" } : {})}>
+          <MessageBubble message={msg} />
+        </Box>
       ))}
 
       {/* Unseen indicator */}

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Box } from "ink";
 import { ShimmerChar } from "./ShimmerChar.js";
+import { useAnimationClock } from "../hooks/useAnimationClock.js";
 
 // ============================================================================
 // GlimmerMessage — Sweeping shimmer animation across text
@@ -17,19 +18,14 @@ interface Props {
 export function GlimmerMessage({ text, isActive }: Props) {
   const [glimmerIndex, setGlimmerIndex] = useState(0);
 
+  // Use shared animation clock instead of per-component setInterval
+  const clockFrame = useAnimationClock(isActive ? 50 : 0);
+
   useEffect(() => {
     if (!isActive || text.length === 0) return;
-
-    const interval = setInterval(() => {
-      setGlimmerIndex((prev) => {
-        // Sweep across the text, then wrap around with a short gap
-        const totalLength = text.length + 4; // 4-char gap before wrapping
-        return (prev + 1) % totalLength;
-      });
-    }, 50);
-
-    return () => clearInterval(interval);
-  }, [isActive, text.length]);
+    const totalLength = text.length + 4;
+    setGlimmerIndex((prev) => (prev + 1) % totalLength);
+  }, [clockFrame, isActive, text.length]);
 
   if (!isActive) {
     // Static render — no highlight
