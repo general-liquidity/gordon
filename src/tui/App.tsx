@@ -86,6 +86,34 @@ import { RegimeStatusPanel } from "./components/RegimeStatusPanel.js";
 import { StatsDialog } from "./components/StatsDialog.js";
 import { GlobalSearchDialog } from "./components/GlobalSearchDialog.js";
 
+// ── Previously unwired components ──
+import { ActionableRiskAlerts } from "./components/ActionableRiskAlerts.js";
+import { AlgoExecutionProgress } from "./components/AlgoExecutionProgress.js";
+import { BacktestWizard } from "./components/BacktestWizard.js";
+import { BrokerManagerPanel } from "./components/BrokerManagerPanel.js";
+import { ConsensusDetailPanel } from "./components/ConsensusDetailPanel.js";
+import { ContextSuggestions } from "./components/ContextSuggestions.js";
+import { CoordinatorAgentStatus } from "./components/CoordinatorAgentStatus.js";
+import { CostThresholdDialog } from "./components/CostThresholdDialog.js";
+import { DiffDialog } from "./components/DiffDialog.js";
+import { DryRunPreview } from "./components/DryRunPreview.js";
+import { EffortIndicator } from "./components/EffortIndicator.js";
+import { ExchangeManagerPanel } from "./components/ExchangeManagerPanel.js";
+import { GenomeEvolutionPanel } from "./components/GenomeEvolutionPanel.js";
+import { HistorySearchDialog } from "./components/HistorySearchDialog.js";
+import { IdleReturnDialog } from "./components/IdleReturnDialog.js";
+import { IndicatorValueViewer } from "./components/IndicatorValueViewer.js";
+import { InsightBrowser } from "./components/InsightBrowser.js";
+import { MarketPulsePanel } from "./components/MarketPulsePanel.js";
+import { MessageSelector } from "./components/MessageSelector.js";
+import { OptimizationResults } from "./components/OptimizationResults.js";
+import { PlanEditor } from "./components/PlanEditor.js";
+import { PluginBrowser } from "./components/PluginBrowser.js";
+import { QuickOpenDialog } from "./components/QuickOpenDialog.js";
+import { ReconciliationStatus } from "./components/ReconciliationStatus.js";
+import { TaskDependencyView } from "./components/TaskDependencyView.js";
+import { WalkForwardResults } from "./components/WalkForwardResults.js";
+
 // ── Backend Module UI Components ──
 import { LivePositions, type Position } from "./components/LivePositions.js";
 import type { MutationResult } from "./components/GenomeDiffViewer.js";
@@ -226,6 +254,22 @@ function AppInner() {
   const [showStats, setShowStats] = useState(false);
   const [showGlobalSearch, setShowGlobalSearch] = useState(false);
   const [showExitFlow, setShowExitFlow] = useState(false);
+  const [showBacktestWizard, setShowBacktestWizard] = useState(false);
+  const [showBrokerManager, setShowBrokerManager] = useState(false);
+  const [showExchangeManager, setShowExchangeManager] = useState(false);
+  const [showGenomeEvolution, setShowGenomeEvolution] = useState(false);
+  const [showHistorySearch, setShowHistorySearch] = useState(false);
+  const [showIndicatorValue, setShowIndicatorValue] = useState(false);
+  const [showInsights, setShowInsights] = useState(false);
+  const [showMarketPulse, setShowMarketPulse] = useState(false);
+  const [showMessageSelector, setShowMessageSelector] = useState(false);
+  const [showOptimization, setShowOptimization] = useState(false);
+  const [showPlanEditor, setShowPlanEditor] = useState(false);
+  const [showPlugins, setShowPlugins] = useState(false);
+  const [showQuickOpen, setShowQuickOpen] = useState(false);
+  const [showReconciliation, setShowReconciliation] = useState(false);
+  const [showTaskDeps, setShowTaskDeps] = useState(false);
+  const [showWalkForward, setShowWalkForward] = useState(false);
   const [livePositions, setLivePositions] = useState<Position[]>([]);
   const [orderRecovery, setOrderRecovery] = useState<{
     orderId: string; symbol: string; reason: string; attempt: number; maxAttempts: number;
@@ -260,7 +304,11 @@ function AppInner() {
     showGenome || showIndicators || showConsensus ||
     showOrderbook || showAutonomous || showSkills || showConstitution ||
     showInjectionDefense || showDataHealth || showRiskConfig || showDefi ||
-    showMarketOverview || showRegime || showStats || showGlobalSearch || showExitFlow;
+    showMarketOverview || showRegime || showStats || showGlobalSearch || showExitFlow ||
+    showBacktestWizard || showBrokerManager || showExchangeManager || showGenomeEvolution ||
+    showHistorySearch || showIndicatorValue || showInsights || showMarketPulse ||
+    showMessageSelector || showOptimization || showPlanEditor || showPlugins ||
+    showQuickOpen || showReconciliation || showTaskDeps || showWalkForward;
 
   // ── Prompt suggestions based on conversation context ──
   const promptSuggestions = usePromptSuggestions(messages, isStreaming, !!false /* hasExchange */);
@@ -674,6 +722,70 @@ function AppInner() {
       }
       if (trimmed === "/exit") {
         setShowExitFlow(true);
+        return;
+      }
+      if (trimmed === "/backtest-wizard") {
+        setShowBacktestWizard(true);
+        return;
+      }
+      if (trimmed === "/broker-manager") {
+        setShowBrokerManager(true);
+        return;
+      }
+      if (trimmed === "/exchange-manager") {
+        setShowExchangeManager(true);
+        return;
+      }
+      if (trimmed === "/evolve" || trimmed === "/genome") {
+        setShowGenomeEvolution(true);
+        return;
+      }
+      if (trimmed === "/history-search") {
+        setShowHistorySearch(true);
+        return;
+      }
+      if (trimmed === "/indicator-detail") {
+        setShowIndicatorValue(true);
+        return;
+      }
+      if (trimmed === "/insights") {
+        setShowInsights(true);
+        return;
+      }
+      if (trimmed === "/market-pulse") {
+        setShowMarketPulse(true);
+        return;
+      }
+      if (trimmed === "/select-message") {
+        setShowMessageSelector(true);
+        return;
+      }
+      if (trimmed === "/optimization") {
+        setShowOptimization(true);
+        return;
+      }
+      if (trimmed === "/plan-editor") {
+        setShowPlanEditor(true);
+        return;
+      }
+      if (trimmed === "/plugins") {
+        setShowPlugins(true);
+        return;
+      }
+      if (trimmed === "/quick-open") {
+        setShowQuickOpen(true);
+        return;
+      }
+      if (trimmed === "/reconciliation") {
+        setShowReconciliation(true);
+        return;
+      }
+      if (trimmed === "/task-deps") {
+        setShowTaskDeps(true);
+        return;
+      }
+      if (trimmed === "/walk-forward") {
+        setShowWalkForward(true);
         return;
       }
 
@@ -1259,6 +1371,56 @@ function AppInner() {
           onExitWithoutSave={() => { exit(); }}
           onCancel={() => setShowExitFlow(false)}
         />
+      )}
+
+      {/* ── Additional panel dialogs ── */}
+      {showBacktestWizard && (
+        <BacktestWizard onClose={() => setShowBacktestWizard(false)} onSubmit={() => setShowBacktestWizard(false)} />
+      )}
+      {showBrokerManager && (
+        <BrokerManagerPanel onClose={() => setShowBrokerManager(false)} />
+      )}
+      {showExchangeManager && (
+        <ExchangeManagerPanel onClose={() => setShowExchangeManager(false)} />
+      )}
+      {showGenomeEvolution && (
+        <GenomeEvolutionPanel mutations={[]} generation={0} fitnessHistory={[]} onClose={() => setShowGenomeEvolution(false)} />
+      )}
+      {showHistorySearch && (
+        <HistorySearchDialog entries={messages.map((m, i) => ({ index: i, role: m.role, content: m.content, timestamp: m.timestamp ?? "" }))} onClose={() => setShowHistorySearch(false)} onSelect={() => setShowHistorySearch(false)} />
+      )}
+      {showIndicatorValue && (
+        <IndicatorValueViewer symbol="" indicators={{}} onClose={() => setShowIndicatorValue(false)} />
+      )}
+      {showInsights && (
+        <InsightBrowser insights={[]} onClose={() => setShowInsights(false)} />
+      )}
+      {showMarketPulse && (
+        <MarketPulsePanel pulses={[]} />
+      )}
+      {showMessageSelector && (
+        <MessageSelector messages={messages} onSelect={() => setShowMessageSelector(false)} onClose={() => setShowMessageSelector(false)} />
+      )}
+      {showOptimization && (
+        <OptimizationResults results={[]} onClose={() => setShowOptimization(false)} />
+      )}
+      {showPlanEditor && (
+        <PlanEditor plan={{}} onSave={() => setShowPlanEditor(false)} onCancel={() => setShowPlanEditor(false)} onApprove={() => setShowPlanEditor(false)} />
+      )}
+      {showPlugins && (
+        <PluginBrowser plugins={[]} onClose={() => setShowPlugins(false)} />
+      )}
+      {showQuickOpen && (
+        <QuickOpenDialog items={[]} onSelect={() => setShowQuickOpen(false)} onClose={() => setShowQuickOpen(false)} />
+      )}
+      {showReconciliation && (
+        <ReconciliationStatus status="ok" discrepancies={[]} lastRunAt={new Date().toISOString()} nextRunAt={new Date().toISOString()} onClose={() => setShowReconciliation(false)} />
+      )}
+      {showTaskDeps && (
+        <TaskDependencyView tasks={[]} onClose={() => setShowTaskDeps(false)} />
+      )}
+      {showWalkForward && (
+        <WalkForwardResults windows={[]} onClose={() => setShowWalkForward(false)} />
       )}
 
       {/* ── DaemonStatus + MarketDataStatus — only show when there's something active ── */}
