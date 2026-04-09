@@ -497,15 +497,31 @@ async function streamResponse(
             ...m,
           }));
 
-          setState((prev: any) => ({
+          setState((prev: any) => {
+            // Persist completion badge (Claude Code: "Brewed for 3.2s · 4 tools")
+            const calls = prev.activeToolCalls ?? [];
+            const elapsed = Date.now() - chainStartTime;
+            const durStr = elapsed < 1000 ? `${elapsed}ms` : `${(elapsed / 1000).toFixed(1)}s`;
+            const completionMsg: Message = {
+              id: `completion-${Date.now()}`,
+              role: "system" as const,
+              content: calls.length > 0
+                ? `completed in ${durStr} \u00b7 ${calls.length} tool${calls.length !== 1 ? "s" : ""}`
+                : `completed in ${durStr}`,
+              variant: "system" as const,
+              timestamp: new Date().toISOString(),
+            };
+
+            return {
             ...prev,
-            // Replace streaming message in-place + append risk/approval messages
+            // Replace streaming message + append completion badge + risk/approval
             messages: [
               ...prev.messages.map((m: any) => m.id === streamingMsgId ? gordonMsg : m),
+              completionMsg,
               ...riskMessages,
               ...approvalMsgs,
             ],
-            completedMessageCount: prev.messages.length + riskMessages.length + approvalMsgs.length,
+            completedMessageCount: prev.messages.length + 1 + riskMessages.length + approvalMsgs.length,
             streamBuffer: "",
             isStreaming: false,
             activeAgents: [],
@@ -513,7 +529,7 @@ async function streamResponse(
             handoffHistory: [],
             tokenCount: (prev.tokenCount ?? 0) + totalTokens,
             pendingApprovals: stillPending.map(mapApproval),
-          }));
+          };});
           break;
         }
 
