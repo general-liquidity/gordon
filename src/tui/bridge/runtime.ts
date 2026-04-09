@@ -284,36 +284,31 @@ async function streamResponse(
     }],
   }));
 
-  // Batch stream deltas — update UI every 100ms instead of every token
-  // Claude Code renders chunks, not individual tokens
-  let lastFlushTime = Date.now();
-  const FLUSH_INTERVAL_MS = 100;
-  let pendingFlush = false;
-
-  function flushStreamBuffer() {
-    pendingFlush = false;
-    setState((prev: any) => ({
-      ...prev,
-      streamBuffer: responseContent,
-      messages: prev.messages.map((m: any) =>
-        m.id === streamingMsgId ? { ...m, content: responseContent } : m
-      ),
-    }));
-    lastFlushTime = Date.now();
-  }
+  // Claude Code pattern: only show text up to the last newline.
+  // Incomplete lines are hidden — text appears LINE BY LINE, not char by char.
+  // Ink already throttles renders at 16ms (60fps), so no manual batching needed.
+  let lastVisibleContent = "";
 
   try {
     for await (const event of runtime.streamMessage(userMessage)) {
       switch (event.type) {
         case "text_delta":
           responseContent += event.content ?? "";
-          // Batch: only flush to UI every 100ms (renders chunks, not tokens)
-          const now = Date.now();
-          if (now - lastFlushTime >= FLUSH_INTERVAL_MS) {
-            flushStreamBuffer();
-          } else if (!pendingFlush) {
-            pendingFlush = true;
-            setTimeout(flushStreamBuffer, FLUSH_INTERVAL_MS - (now - lastFlushTime));
+          // Only display up to last newline — hides the in-progress line
+          const lastNewline = responseContent.lastIndexOf("\n");
+          const visibleContent = lastNewline >= 0
+            ? responseContent.substring(0, lastNewline + 1)
+            : "";
+          // Only update UI when visible content actually changed (new line completed)
+          if (visibleContent !== lastVisibleContent) {
+            lastVisibleContent = visibleContent;
+            setState((prev: any) => ({
+              ...prev,
+              streamBuffer: visibleContent,
+              messages: prev.messages.map((m: any) =>
+                m.id === streamingMsgId ? { ...m, content: visibleContent } : m
+              ),
+            }));
           }
           break;
 
