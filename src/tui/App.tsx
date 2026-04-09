@@ -1455,21 +1455,27 @@ function AppInner() {
         <QueuedCommandsNotice count={queuedCount} />
       )}
 
-      {/* ── Status bar above input ── */}
+      {/* ── Status bar above input (Codex pattern: model · context% · path) ── */}
       <Box paddingX={2} justifyContent="space-between">
         <Box gap={1}>
+          <Text dimColor>{process.env.GORDON_MODEL ?? "auto"}</Text>
+          <Text dimColor>{"\u00b7"}</Text>
+          <Text dimColor>{Math.round((1 - memoryUsageRatio) * 100)}% left</Text>
           {autonomousActive && (
-            <Text color="magenta">{"\u25CF"} autonomous</Text>
+            <>
+              <Text dimColor>{"\u00b7"}</Text>
+              <Text color="magenta">{"\u25CF"} autonomous</Text>
+            </>
           )}
           {livePositions.length > 0 && (
             <>
-              {autonomousActive && <Text dimColor>{"\u00b7"}</Text>}
+              <Text dimColor>{"\u00b7"}</Text>
               <Text>{livePositions.length} position{livePositions.length !== 1 ? "s" : ""}</Text>
             </>
           )}
-          {memoryUsageRatio > 0.5 && (
+          {memoryUsageRatio > 0.7 && (
             <>
-              {(autonomousActive || livePositions.length > 0) && <Text dimColor>{"\u00b7"}</Text>}
+              <Text dimColor>{"\u00b7"}</Text>
               <MemoryUsageIndicator usageRatio={memoryUsageRatio} tokenLimit={contextLimit} />
             </>
           )}
