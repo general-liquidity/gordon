@@ -66,6 +66,9 @@ import { GlimmerMessage } from "./components/GlimmerMessage.js";
 import { ToolCallInline, type ToolCallState } from "./components/ToolCallInline.js";
 import { StreamingMarkdown } from "./components/StreamingMarkdown.js";
 import { NoSelect } from "./components/NoSelect.js";
+import { QueuedCommandsNotice } from "./components/QueuedCommandsNotice.js";
+import { MemoryUsageIndicator } from "./components/MemoryUsageIndicator.js";
+import { usePromptSuggestions } from "./hooks/usePromptSuggestions.js";
 
 // ── Backend Module UI Components ──
 import { LivePositions, type Position } from "./components/LivePositions.js";
@@ -226,6 +229,16 @@ function AppInner() {
     showSessions || showMemory || showFeedback ||
     showAudit || showScheduler || showPlaybooks || showStrategies ||
     showGenome || showIndicators || showConsensus;
+
+  // ── Prompt suggestions based on conversation context ──
+  const promptSuggestions = usePromptSuggestions(messages, isStreaming, !!false /* hasExchange */);
+
+  // ── Queued message count ──
+  const queuedCount = defaultMessageQueue.length?.() ?? 0;
+
+  // ── Memory usage (approximate from token count) ──
+  const contextLimit = 128000; // Default context window
+  const memoryUsageRatio = (tokenCount ?? 0) / contextLimit;
 
   // ── Determine if agent is in "thinking" mode (any running agent, no output yet) ──
   const thinkingAgent = activeAgents.find((a) => a.status === "running");
@@ -1123,7 +1136,23 @@ function AppInner() {
         </Box>
       )}
 
-      {/* ── Input area with border (like Claude Code) ── */}
+      {/* ── Queued commands notice ── */}
+      {isStreaming && queuedCount > 0 && (
+        <QueuedCommandsNotice count={queuedCount} />
+      )}
+
+      {/* ── Prompt suggestions (context-aware next actions) ── */}
+      {!isStreaming && promptSuggestions.length > 0 && (
+        <Box paddingX={2} gap={2}>
+          {promptSuggestions.map((s, i) => (
+            <Text key={i} dimColor>
+              {s.command} <Text dimColor>{s.label}</Text>
+            </Text>
+          ))}
+        </Box>
+      )}
+
+      {/* ── Input area with border ── */}
       <Box
         borderStyle="round"
         borderColor="gray"
@@ -1141,7 +1170,10 @@ function AppInner() {
           autonomousStrategyCount={autonomousStrategyCount}
           vimMode={vimModeActive}
         />
-        <Box justifyContent="flex-end">
+        <Box justifyContent="space-between">
+          <Box>
+            <MemoryUsageIndicator usageRatio={memoryUsageRatio} tokenLimit={contextLimit} />
+          </Box>
           <CostDisplay />
         </Box>
       </Box>
