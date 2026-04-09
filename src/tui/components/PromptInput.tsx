@@ -147,22 +147,17 @@ export function PromptInput({
     }
 
     if (key.backspace || key.delete) {
-      if (cursorPos > 0) {
-        setValue((prev) => prev.slice(0, cursorPos - 1) + prev.slice(cursorPos));
-        setCursorPos((p) => p - 1);
-      }
+      setValue((prev) => {
+        const pos = Math.min(cursorPos, prev.length);
+        if (pos > 0) {
+          setCursorPos(pos - 1);
+          return prev.slice(0, pos - 1) + prev.slice(pos);
+        }
+        return prev;
+      });
       setSelectedIdx(0);
       return;
     }
-
-    // Paste detection: rapid input within 5ms
-    const now = Date.now();
-    if (now - lastInputTimeRef.current < 5) {
-      pasteBufferRef.current += input;
-    } else {
-      pasteBufferRef.current = input;
-    }
-    lastInputTimeRef.current = now;
 
     if (showSuggestions) {
       if (key.upArrow) {
@@ -184,8 +179,9 @@ export function PromptInput({
     }
 
     if (input && !key.ctrl && !key.meta && !key.upArrow && !key.downArrow) {
-      // Insert at cursor position (not just append)
-      setValue((prev) => prev.slice(0, cursorPos) + input + prev.slice(cursorPos));
+      // Always append to end — simple and reliable
+      // Cursor position tracking is only for display + left/right navigation
+      setValue((prev) => prev + input);
       setCursorPos((p) => p + input.length);
       setSelectedIdx(0);
     }
@@ -281,18 +277,11 @@ export function PromptInput({
           {value ? (
             <Text>
               {isSlashMode ? (
-                <>
-                  <Text color="cyanBright">{value.slice(1, cursorPos)}</Text>
-                  <Text color="cyanBright" inverse>{value[cursorPos] ?? " "}</Text>
-                  <Text color="cyanBright">{value.slice(cursorPos + 1)}</Text>
-                </>
+                <Text color="cyanBright">{value.slice(1)}</Text>
               ) : (
-                <>
-                  <Text>{value.slice(0, cursorPos)}</Text>
-                  <Text inverse>{value[cursorPos] ?? " "}</Text>
-                  <Text>{value.slice(cursorPos + 1)}</Text>
-                </>
+                <Text>{value}</Text>
               )}
+              <Text color="cyanBright">{"\u2588"}</Text>
             </Text>
           ) : (
             <Text dimColor>{placeholder}</Text>
