@@ -1056,16 +1056,28 @@ function AppInner() {
     }} onCancel={() => setShowCLIBrowser(false)} />;
   }
 
-  // ── Placeholder text for PromptInput ──
+  // ── Placeholder text for PromptInput (Claude Code: rotating example commands) ──
+  const EXAMPLE_PROMPTS = [
+    'Try "what\'s BTC doing?"',
+    'Try "scan for opportunities"',
+    'Try "check my portfolio risk"',
+    'Try "/morning-brief"',
+    'Try "analyze ETH setup"',
+    'Try "what\'s trending today?"',
+    'Try "/dd BTC"',
+  ];
+  const [exampleIdx] = useState(() => Math.floor(Math.random() * EXAMPLE_PROMPTS.length));
   const placeholder = isStreaming
-    ? `\u25CF Gordon is thinking... ${elapsedFormatted}`
+    ? `\u25CF Gordon is working... ${elapsedFormatted}`
     : ctrlC.isPending
       ? "Press Ctrl+C again to exit"
       : !runtimeReady
         ? "Initializing..."
         : pendingApprovals.length > 0
           ? `${pendingApprovals.length} approval(s) pending \u2014 approve <id> or deny <id>`
-          : "";
+          : messages.length === 0
+            ? EXAMPLE_PROMPTS[exampleIdx]!
+            : "";
 
   return (
     <Box flexDirection="column" minHeight={process.stdout.rows ?? 24}>
@@ -1084,6 +1096,48 @@ function AppInner() {
       {/* ── Conversation — wrapped in PrivacyScreen ── */}
       <PrivacyScreen active={privacyMode}>
         <Box flexDirection="column" flexGrow={1} justifyContent="flex-end" paddingX={1}>
+          {messages.length === 0 && !isStreaming && (
+            <Box flexDirection="column" flexGrow={1} justifyContent="center" alignItems="center">
+              {/* Idle welcome screen — like Claude Code's Clawd mascot + info */}
+              <Box flexDirection="column" alignItems="center" marginBottom={2}>
+                <Text color="cyanBright" bold>
+                  {`   ╱╲    `}
+                </Text>
+                <Text color="cyanBright" bold>
+                  {`  ╱  ╲   `}
+                </Text>
+                <Text color="cyanBright" bold>
+                  {` ╱ ≫≫ ╲  `}
+                </Text>
+                <Text color="cyanBright" bold>
+                  {` ╲    ╱  `}
+                </Text>
+                <Text color="cyanBright" bold>
+                  {`  ╲  ╱   `}
+                </Text>
+                <Text color="cyanBright" bold>
+                  {`   ╲╱    `}
+                </Text>
+              </Box>
+              <Text bold>Gordon CLI</Text>
+              <Text dimColor>The Frontier Trading Agent</Text>
+              <Text> </Text>
+              <Text dimColor>model: {process.env.GORDON_PROVIDER ?? "dedalus"} / {process.env.GORDON_MODEL ?? "auto"}</Text>
+              <Text dimColor>mode: {permissionMode} {"\u00b7"} {process.cwd()}</Text>
+              <Text> </Text>
+              <Box flexDirection="column" alignItems="center">
+                <Text dimColor>What would you like to trade today?</Text>
+                <Text> </Text>
+                <Text dimColor>  /scan          Discover opportunities</Text>
+                <Text dimColor>  /morning-brief  Market overview</Text>
+                <Text dimColor>  /dd [symbol]   Deep due diligence</Text>
+                <Text dimColor>  /risk-check    Assess portfolio risk</Text>
+                <Text dimColor>  /help          All commands</Text>
+                <Text> </Text>
+                <Text dimColor italic>? for shortcuts {"\u00b7"} Ctrl+P command palette {"\u00b7"} /model to switch</Text>
+              </Box>
+            </Box>
+          )}
           {messages.length > 0 && (
             <VirtualMessageList
               messages={messages}
