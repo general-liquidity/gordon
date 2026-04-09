@@ -1096,48 +1096,7 @@ function AppInner() {
       {/* ── Conversation — wrapped in PrivacyScreen ── */}
       <PrivacyScreen active={privacyMode}>
         <Box flexDirection="column" flexGrow={1} justifyContent="flex-end" paddingX={1}>
-          {messages.length === 0 && !isStreaming && (
-            <Box flexDirection="column" flexGrow={1} justifyContent="center" alignItems="center">
-              {/* Idle welcome screen — like Claude Code's Clawd mascot + info */}
-              <Box flexDirection="column" alignItems="center" marginBottom={2}>
-                <Text color="cyanBright" bold>
-                  {`   ╱╲    `}
-                </Text>
-                <Text color="cyanBright" bold>
-                  {`  ╱  ╲   `}
-                </Text>
-                <Text color="cyanBright" bold>
-                  {` ╱ ≫≫ ╲  `}
-                </Text>
-                <Text color="cyanBright" bold>
-                  {` ╲    ╱  `}
-                </Text>
-                <Text color="cyanBright" bold>
-                  {`  ╲  ╱   `}
-                </Text>
-                <Text color="cyanBright" bold>
-                  {`   ╲╱    `}
-                </Text>
-              </Box>
-              <Text bold>Gordon CLI</Text>
-              <Text dimColor>The Frontier Trading Agent</Text>
-              <Text> </Text>
-              <Text dimColor>model: {process.env.GORDON_PROVIDER ?? "dedalus"} / {process.env.GORDON_MODEL ?? "auto"}</Text>
-              <Text dimColor>mode: {permissionMode} {"\u00b7"} {process.cwd()}</Text>
-              <Text> </Text>
-              <Box flexDirection="column" alignItems="center">
-                <Text dimColor>What would you like to trade today?</Text>
-                <Text> </Text>
-                <Text dimColor>  /scan          Discover opportunities</Text>
-                <Text dimColor>  /morning-brief  Market overview</Text>
-                <Text dimColor>  /dd [symbol]   Deep due diligence</Text>
-                <Text dimColor>  /risk-check    Assess portfolio risk</Text>
-                <Text dimColor>  /help          All commands</Text>
-                <Text> </Text>
-                <Text dimColor italic>? for shortcuts {"\u00b7"} Ctrl+P command palette {"\u00b7"} /model to switch</Text>
-              </Box>
-            </Box>
-          )}
+          {/* Empty state — header box handles the branding, just show hint text */}
           {messages.length > 0 && (
             <VirtualMessageList
               messages={messages}
