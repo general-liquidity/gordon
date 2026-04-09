@@ -312,7 +312,7 @@ export function TradingSpinner({ agentName, elapsedMs, streamLength = 0, userInp
 
   return (
     <Box paddingLeft={2}>
-      <Text color={isStalled ? "red" : "cyanBright"}>{char} </Text>
+      <Text color={isStalled ? "red" : "rgb(52,238,176)"}>{char} </Text>
       {chars.map((c, i) => (
         <ShimmerChar
           key={i}

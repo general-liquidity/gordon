@@ -247,10 +247,10 @@ export function PromptInput({
 
             return (
               <Box key={cmd.name}>
-                <Text color={isFocused ? "cyanBright" : undefined}>
+                <Text color={isFocused ? "rgb(52,238,176)" : undefined}>
                   {isFocused ? " \u25B8" : "  "}
                 </Text>
-                <Text color={isFocused ? "cyanBright" : undefined} bold={isFocused}>
+                <Text color={isFocused ? "rgb(52,238,176)" : undefined} bold={isFocused}>
                   {" "}{padded}
                 </Text>
                 <Text dimColor={!isFocused} color={isFocused ? "white" : undefined} wrap="truncate-end">
@@ -272,16 +272,16 @@ export function PromptInput({
 
       {/* Input line */}
       <Box>
-        <Text color="cyanBright" bold>{promptChar} </Text>
+        <Text color="rgb(52,238,176)" bold>{promptChar} </Text>
         <Box flexGrow={1}>
           {value ? (
             <Text>
               {isSlashMode ? (
-                <Text color="cyanBright">{value.slice(1)}</Text>
+                <Text color="rgb(52,238,176)">{value.slice(1)}</Text>
               ) : (
                 <Text>{value}</Text>
               )}
-              <Text color="cyanBright">{"\u2588"}</Text>
+              <Text color="rgb(52,238,176)">{"\u2588"}</Text>
             </Text>
           ) : (
             <Text dimColor>{placeholder}</Text>

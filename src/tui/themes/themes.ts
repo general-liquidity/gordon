@@ -42,7 +42,7 @@ export interface GordonTheme {
 }
 
 const DARK_AGENTS = {
-  agentGordon: "rgb(0,220,255)", agentScanner: "rgb(0,180,220)", agentAnalyst: "rgb(80,140,255)",
+  agentGordon: "rgb(52,238,176)", agentScanner: "rgb(40,200,150)", agentAnalyst: "rgb(80,140,255)",
   agentPlanner: "rgb(180,100,255)", agentExecutor: "rgb(255,200,50)", agentMonitor: "rgb(50,200,80)",
   agentTeacher: "rgb(100,160,255)", agentBacktester: "rgb(220,120,255)", agentCritic: "rgb(255,80,80)", agentAuditor: "rgb(150,150,150)",
 };
@@ -58,18 +58,18 @@ export const DARK_THEME: GordonTheme = {
   moneyProfit: "rgb(78,186,101)", moneyLoss: "rgb(255,107,128)", moneyNeutral: "rgb(255,255,255)",
   riskSafe: "rgb(78,186,101)", riskWarning: "rgb(255,193,7)", riskDanger: "rgb(255,107,128)", riskCritical: "rgb(255,60,80)",
   signalBuy: "rgb(100,220,120)", signalSell: "rgb(255,80,100)", signalNeutral: "rgb(150,150,150)",
-  uiBrand: "rgb(0,220,255)", uiMuted: "rgb(150,150,150)", uiBorder: "rgb(100,100,100)", uiFocus: "rgb(0,220,255)", uiSelection: "rgb(80,140,255)",
+  uiBrand: "rgb(52,238,176)", uiMuted: "rgb(150,150,150)", uiBorder: "rgb(100,100,100)", uiFocus: "rgb(52,238,176)", uiSelection: "rgb(80,200,160)",
   diffAdded: "rgb(78,186,101)", diffRemoved: "rgb(255,107,128)", diffAddedWord: "rgb(100,220,120)", diffRemovedWord: "rgb(255,80,100)",
   diffAddedDimmed: "rgb(40,80,50)", diffRemovedDimmed: "rgb(80,40,50)",
   chartUp: "rgb(78,186,101)", chartDown: "rgb(255,107,128)", chartVolume: "rgb(0,180,220)", chartGrid: "rgb(80,80,80)",
-  progressFill: "rgb(0,220,255)", progressEmpty: "rgb(60,60,60)", progressWarning: "rgb(255,193,7)", progressDanger: "rgb(255,107,128)",
-  shimmerBase: "rgb(100,100,100)", shimmerHighlight: "rgb(0,220,255)",
-  shimmerBrand: "rgb(0,180,220)", shimmerBrandHighlight: "rgb(80,240,255)",
+  progressFill: "rgb(52,238,176)", progressEmpty: "rgb(60,60,60)", progressWarning: "rgb(255,193,7)", progressDanger: "rgb(255,107,128)",
+  shimmerBase: "rgb(100,100,100)", shimmerHighlight: "rgb(52,238,176)",
+  shimmerBrand: "rgb(40,200,150)", shimmerBrandHighlight: "rgb(80,255,200)",
   shimmerAgent: "rgb(100,100,100)", shimmerAgentHighlight: "rgb(180,180,200)",
   shimmerDanger: "rgb(150,40,50)", shimmerDangerHighlight: "rgb(255,80,100)",
   stallRed: "rgb(171,43,63)",
   variantFill: "rgb(78,186,101)", variantStop: "rgb(255,107,128)", variantAlert: "rgb(255,193,7)",
-  variantStrategy: "rgb(0,180,220)", variantError: "rgb(255,60,80)", variantSystem: "rgb(150,150,150)", variantAdvisor: "rgb(180,100,255)",
+  variantStrategy: "rgb(52,238,176)", variantError: "rgb(255,60,80)", variantSystem: "rgb(150,150,150)", variantAdvisor: "rgb(180,100,255)",
   userMessageBackground: "rgb(55,55,55)",
 };
 

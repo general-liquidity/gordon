@@ -27,7 +27,7 @@ export function GordonHeader({
   toolCount = 0,
   exchangeStatus,
 }: Props) {
-  const modeColor = permissionMode === "auto" ? "red" : permissionMode === "strict" ? "green" : "cyanBright";
+  const modeColor = permissionMode === "auto" ? "red" : permissionMode === "strict" ? "green" : "rgb(52,238,176)";
   const version = process.env.npm_package_version ?? process.env.GORDON_VERSION ?? "0.9";
 
   // Show the thread ID (meaningful) or fall back to session/resource ID
@@ -48,7 +48,7 @@ export function GordonHeader({
         width={56}
       >
         <Box>
-          <Text color="cyanBright" bold>{"\u226B"}  Gordon CLI</Text>
+          <Text color="rgb(52,238,176)" bold>{"\u226B"}  Gordon CLI</Text>
           <Text dimColor> (v{version})</Text>
         </Box>
         <Text>   The Frontier Trading Agent</Text>

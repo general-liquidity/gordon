@@ -34,7 +34,7 @@ export function StreamingText({ content, isStreaming, color }: Props) {
   return (
     <Text color={color}>
       {content}
-      {isStreaming && cursorVisible ? <Text color="cyanBright">{"\u2588"}</Text> : null}
+      {isStreaming && cursorVisible ? <Text color="rgb(52,238,176)">{"\u2588"}</Text> : null}
     </Text>
   );
 }

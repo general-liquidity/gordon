@@ -7,17 +7,17 @@ import { Text } from "ink";
 // ============================================================================
 
 const WORKER_COLORS: Record<string, string> = {
-  Gordon: "cyanBright",
+  Gordon: "rgb(52,238,176)",
   Scanner: "cyan",
   Analyst: "blueBright",
-  Planner: "cyanBright",
+  Planner: "rgb(52,238,176)",
   Executor: "greenBright",
   Monitor: "gray",
   Teacher: "cyan",
   Backtester: "yellow",
   Critic: "redBright",
   Auditor: "gray",
-  Coordinator: "cyanBright",
+  Coordinator: "rgb(52,238,176)",
 };
 
 interface Props {
@@ -26,7 +26,7 @@ interface Props {
 }
 
 export function WorkerBadge({ agent, showBullet = true }: Props) {
-  const color = WORKER_COLORS[agent] ?? "cyanBright";
+  const color = WORKER_COLORS[agent] ?? "rgb(52,238,176)";
   return (
     <Text color={color} bold>
       {showBullet ? "\u25CF " : ""}{agent}

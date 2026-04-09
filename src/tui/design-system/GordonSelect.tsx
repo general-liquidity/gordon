@@ -19,7 +19,7 @@ interface Props {
   focusColor?: string;
 }
 
-export function GordonSelect({ options, onChange, focusColor = "cyanBright" }: Props) {
+export function GordonSelect({ options, onChange, focusColor = "rgb(52,238,176)" }: Props) {
   const [focusIdx, setFocusIdx] = useState(0);
 
   useInput((input, key) => {
