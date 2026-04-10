@@ -57,6 +57,13 @@ import {
   baseIndexerTools,
   uniswapDataTools,
   dexSearchTools,
+  xSocialTools,
+  cdpWebhookTools,
+  cdpSqlTools,
+  cdpPolicyTools,
+  cdpOnrampTools,
+  cdpEvmMultichainTools,
+  cdpWebhookReceiverTools,
   defillamaYieldTools,
   positionTrackingTools,
   checkRiskTool,
@@ -126,6 +133,13 @@ export const instrumentedBaseSignalTools = withToolsMetrics(baseSignalTools);
 export const instrumentedBaseIndexerTools = withToolsMetrics(baseIndexerTools);
 export const instrumentedUniswapDataTools = withToolsMetrics(uniswapDataTools);
 export const instrumentedDexSearchTools = withToolsMetrics(dexSearchTools);
+export const instrumentedXSocialTools = withToolsMetrics(xSocialTools);
+export const instrumentedCdpWebhookTools = withToolsMetrics(cdpWebhookTools);
+export const instrumentedCdpSqlTools = withToolsMetrics(cdpSqlTools);
+export const instrumentedCdpPolicyTools = withToolsMetrics(cdpPolicyTools);
+export const instrumentedCdpOnrampTools = withToolsMetrics(cdpOnrampTools);
+export const instrumentedCdpEvmMultichainTools = withToolsMetrics(cdpEvmMultichainTools);
+export const instrumentedCdpWebhookReceiverTools = withToolsMetrics(cdpWebhookReceiverTools);
 export const instrumentedDefillamaYieldTools = withToolsMetrics(defillamaYieldTools);
 export const instrumentedEvalTools = withToolsMetrics(evalTools);
 export const instrumentedPositionTrackingTools = withToolsMetrics(positionTrackingTools);

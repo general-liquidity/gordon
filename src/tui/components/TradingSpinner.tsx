@@ -151,6 +151,45 @@ function getToolVerb(toolName: string): string | null {
   if (/analyze_systematic/i.test(toolName)) return "Systematic analysis";
   if (/false_breakout/i.test(toolName)) return "Detecting false breakout";
 
+  // X (Twitter) social intelligence
+  if (/search_x_sentiment|x_sentiment/i.test(toolName)) return "Reading X sentiment";
+  if (/x_trending_cashtag|trending_cashtag/i.test(toolName)) return "Finding trending cashtags";
+  if (/x_user_timeline/i.test(toolName)) return "Scanning X timeline";
+  if (/watch_x_account/i.test(toolName)) return "Watching X accounts";
+  if (/analyze_x_narrative|x_narrative/i.test(toolName)) return "Analyzing X narrative";
+  if (/search_x_by_entity/i.test(toolName)) return "Filtering X by entity";
+  if (/list_x_trading_entities/i.test(toolName)) return "Listing X entities";
+
+  // CDP (Coinbase Developer Platform)
+  if (/list_cdp_webhooks/i.test(toolName)) return "Listing CDP webhooks";
+  if (/create_cdp_webhook/i.test(toolName)) return "Creating CDP webhook";
+  if (/delete_cdp_webhook/i.test(toolName)) return "Deleting CDP webhook";
+  if (/describe_cdp_webhook_setup/i.test(toolName)) return "Explaining webhook setup";
+  if (/query_base_sql/i.test(toolName)) return "Querying Base SQL";
+  if (/get_base_top_holders/i.test(toolName)) return "Ranking Base holders";
+  if (/get_base_whale_accumulation/i.test(toolName)) return "Finding Base whales";
+  if (/describe_base_sql_schema/i.test(toolName)) return "Reading SQL schema";
+  if (/list_cdp_policies/i.test(toolName)) return "Listing CDP policies";
+  if (/get_cdp_policy/i.test(toolName)) return "Fetching CDP policy";
+  if (/create_cdp_policy/i.test(toolName)) return "Creating CDP policy";
+  if (/delete_cdp_policy/i.test(toolName)) return "Deleting CDP policy";
+  if (/get_onramp_config/i.test(toolName)) return "Loading onramp config";
+  if (/get_onramp_options/i.test(toolName)) return "Loading onramp options";
+  if (/get_onramp_quote/i.test(toolName)) return "Quoting onramp purchase";
+  if (/create_onramp_session_url/i.test(toolName)) return "Creating onramp session";
+  if (/get_onramp_transactions/i.test(toolName)) return "Loading onramp history";
+  if (/list_cdp_evm_accounts/i.test(toolName)) return "Listing CDP EVM accounts";
+  if (/list_cdp_smart_accounts/i.test(toolName)) return "Listing smart accounts";
+  if (/create_cdp_evm_account/i.test(toolName)) return "Creating EVM account";
+  if (/create_cdp_smart_account/i.test(toolName)) return "Creating smart account";
+  if (/list_cdp_token_balances/i.test(toolName)) return "Loading cross-chain balances";
+  if (/get_cdp_swap_price/i.test(toolName)) return "Quoting CDP swap";
+  if (/start_cdp_webhook_listener/i.test(toolName)) return "Starting webhook listener";
+  if (/stop_cdp_webhook_listener/i.test(toolName)) return "Stopping webhook listener";
+  if (/get_cdp_webhook_listener_status/i.test(toolName)) return "Checking listener status";
+  if (/get_recent_cdp_webhook_events/i.test(toolName)) return "Reading webhook events";
+  if (/clear_cdp_webhook_buffer/i.test(toolName)) return "Clearing webhook buffer";
+
   // DeFi & on-chain
   if (/defillama/i.test(toolName)) return "Querying DeFi Llama";
   if (/chainlink/i.test(toolName)) return "Querying Chainlink";

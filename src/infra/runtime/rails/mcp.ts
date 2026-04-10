@@ -93,8 +93,78 @@ function buildMoonPayListing(): MarketplaceListing {
   };
 }
 
+function buildCdpCliListing(): MarketplaceListing {
+  return {
+    id: "cdp-cli",
+    repository: "https://docs.cdp.coinbase.com/get-started/tools/cdp-cli",
+    verified: true,
+    officialProvider: true,
+    lastUpdated: "2026-04-10T00:00:00.000Z",
+    pricing: {
+      type: "freemium",
+      freeUsage:
+        "CDP free tier covers wallets, swaps, webhooks, policy engine, and 1000 SQL queries/month. " +
+        "Paid tiers for higher SQL and data limits.",
+    },
+    manifest: {
+      id: "cdp-cli",
+      name: "Coinbase Developer Platform CLI",
+      version: "2.0.1",
+      description:
+        "Full Coinbase Developer Platform (CDP) API surface as MCP tools: server wallets, " +
+        "smart accounts, swaps, policy engine, paymaster, webhooks, SQL API, onramp, x402. " +
+        "Tools auto-update with CDP's OpenAPI spec so new endpoints are instantly available.",
+      author: "Coinbase",
+      category: "infrastructure",
+      authentication: {
+        type: "api_key",
+        envVar: "CDP_API_KEY_ID",
+      },
+      command: "npx",
+      args: ["-y", "@coinbase/cdp-cli@latest", "mcp"],
+      tools: [
+        {
+          name: "cdp_evm_accounts_create",
+          description: "Create a new CDP-managed EVM account.",
+          inputSchema: { type: "object" },
+        },
+        {
+          name: "cdp_evm_accounts_send_transaction",
+          description: "Sign and send an EVM transaction via the CDP wallet.",
+          inputSchema: { type: "object" },
+        },
+        {
+          name: "cdp_evm_swaps_quote",
+          description: "Get a swap quote from the CDP Trade API.",
+          inputSchema: { type: "object" },
+        },
+        {
+          name: "cdp_webhooks_create",
+          description: "Create a CDP webhook subscription for Base chain events.",
+          inputSchema: { type: "object" },
+        },
+        {
+          name: "cdp_data_query_run",
+          description: "Run a SQL query against CDP's indexed Base data.",
+          inputSchema: { type: "object" },
+        },
+        {
+          name: "cdp_policies_create",
+          description: "Create a wallet policy rule (spend caps, allowlists, network restrictions).",
+          inputSchema: { type: "object" },
+        },
+      ],
+    },
+    routingManifest: {
+      pluginId: "cdp-cli",
+      defaultAgent: "Gordon",
+      alsoOnGordon: true,
+    },
+  };
+}
+
 export function getBuiltInAgentRailListings(): MarketplaceListing[] {
-  return [buildHeliusListing(), buildMoonPayListing()];
+  return [buildHeliusListing(), buildMoonPayListing(), buildCdpCliListing()];
 }
 
 function shouldInstallListing(config: GordonConfig, listingId: string): boolean {

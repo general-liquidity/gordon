@@ -79,6 +79,13 @@ export { baseSignalTools } from "./base-signals.ts";
 export { baseIndexerTools } from "./base-indexers.ts";
 export { uniswapDataTools } from "./uniswap-data.ts";
 export { dexSearchTools } from "./dex-search.ts";
+export { xSocialTools } from "./x-social.ts";
+export { cdpWebhookTools } from "./cdp-webhooks.ts";
+export { cdpSqlTools } from "./cdp-sql.ts";
+export { cdpPolicyTools } from "./cdp-policy.ts";
+export { cdpOnrampTools } from "./cdp-onramp.ts";
+export { cdpEvmMultichainTools } from "./cdp-evm-multichain.ts";
+export { cdpWebhookReceiverTools } from "./cdp-webhook-receiver.ts";
 export { defillamaYieldTools } from "./defillama-yields.ts";
 export { chainlinkStreamsTools } from "./chainlink-streams.ts";
 export { chainlinkFeedsTools } from "./chainlink-feeds.ts";
@@ -328,6 +335,13 @@ import { baseSignalTools } from "./base-signals.ts";
 import { baseIndexerTools } from "./base-indexers.ts";
 import { uniswapDataTools } from "./uniswap-data.ts";
 import { dexSearchTools } from "./dex-search.ts";
+import { xSocialTools } from "./x-social.ts";
+import { cdpWebhookTools } from "./cdp-webhooks.ts";
+import { cdpSqlTools } from "./cdp-sql.ts";
+import { cdpPolicyTools } from "./cdp-policy.ts";
+import { cdpOnrampTools } from "./cdp-onramp.ts";
+import { cdpEvmMultichainTools } from "./cdp-evm-multichain.ts";
+import { cdpWebhookReceiverTools } from "./cdp-webhook-receiver.ts";
 import { defillamaYieldTools } from "./defillama-yields.ts";
 import { chainlinkStreamsTools } from "./chainlink-streams.ts";
 import { chainlinkFeedsTools } from "./chainlink-feeds.ts";
@@ -398,6 +412,13 @@ const _rawAllTools = {
   ...baseIndexerTools,
   ...uniswapDataTools,
   ...dexSearchTools,
+  ...xSocialTools,
+  ...cdpWebhookTools,
+  ...cdpSqlTools,
+  ...cdpPolicyTools,
+  ...cdpOnrampTools,
+  ...cdpEvmMultichainTools,
+  ...cdpWebhookReceiverTools,
   ...defillamaYieldTools,
   ...chainlinkStreamsTools,
   ...chainlinkFeedsTools,
@@ -470,6 +491,13 @@ export const toolCounts = {
   baseIndexers: Object.keys(baseIndexerTools).length,
   uniswapData: Object.keys(uniswapDataTools).length,
   dexSearch: Object.keys(dexSearchTools).length,
+  xSocial: Object.keys(xSocialTools).length,
+  cdpWebhooks: Object.keys(cdpWebhookTools).length,
+  cdpSql: Object.keys(cdpSqlTools).length,
+  cdpPolicy: Object.keys(cdpPolicyTools).length,
+  cdpOnramp: Object.keys(cdpOnrampTools).length,
+  cdpEvmMultichain: Object.keys(cdpEvmMultichainTools).length,
+  cdpWebhookReceiver: Object.keys(cdpWebhookReceiverTools).length,
   defillamaYields: Object.keys(defillamaYieldTools).length,
   chainlinkStreams: Object.keys(chainlinkStreamsTools).length,
   chainlinkFeeds: Object.keys(chainlinkFeedsTools).length,

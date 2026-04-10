@@ -112,6 +112,37 @@ function getToolLabel(toolName: string): string {
   if (/whale|flowscope/i.test(toolName)) return "Whale Flow";
   if (/market_impact/i.test(toolName)) return "Impact";
 
+  // X (Twitter) social intelligence
+  if (/search_x_sentiment|x_sentiment/i.test(toolName)) return "X Sentiment";
+  if (/x_trending_cashtag|trending_cashtag/i.test(toolName)) return "X Trending";
+  if (/x_user_timeline/i.test(toolName)) return "X Timeline";
+  if (/watch_x_account/i.test(toolName)) return "X Watch";
+  if (/analyze_x_narrative|x_narrative/i.test(toolName)) return "X Narrative";
+  if (/search_x_by_entity/i.test(toolName)) return "X Entity";
+  if (/list_x_trading_entities/i.test(toolName)) return "X Entities";
+
+  // CDP (Coinbase Developer Platform)
+  if (/list_cdp_webhooks/i.test(toolName)) return "CDP Webhooks";
+  if (/create_cdp_webhook/i.test(toolName)) return "CDP Webhook Create";
+  if (/delete_cdp_webhook/i.test(toolName)) return "CDP Webhook Delete";
+  if (/describe_cdp_webhook_setup/i.test(toolName)) return "Webhook Setup";
+  if (/query_base_sql/i.test(toolName)) return "Base SQL";
+  if (/get_base_top_holders/i.test(toolName)) return "Top Holders";
+  if (/get_base_whale_accumulation/i.test(toolName)) return "Whale Accumulation";
+  if (/describe_base_sql_schema/i.test(toolName)) return "SQL Schema";
+  if (/list_cdp_policies|get_cdp_policy|create_cdp_policy|delete_cdp_policy/i.test(toolName)) return "CDP Policy";
+  if (/get_onramp_config|get_onramp_options/i.test(toolName)) return "Onramp Config";
+  if (/get_onramp_quote/i.test(toolName)) return "Onramp Quote";
+  if (/create_onramp_session_url/i.test(toolName)) return "Onramp Session";
+  if (/get_onramp_transactions/i.test(toolName)) return "Onramp History";
+  if (/list_cdp_evm_accounts|list_cdp_smart_accounts/i.test(toolName)) return "CDP Accounts";
+  if (/create_cdp_evm_account|create_cdp_smart_account/i.test(toolName)) return "CDP Account Create";
+  if (/list_cdp_token_balances/i.test(toolName)) return "CDP Balances";
+  if (/get_cdp_swap_price/i.test(toolName)) return "CDP Swap Quote";
+  if (/start_cdp_webhook_listener|stop_cdp_webhook_listener|get_cdp_webhook_listener_status/i.test(toolName)) return "Webhook Listener";
+  if (/get_recent_cdp_webhook_events/i.test(toolName)) return "Webhook Events";
+  if (/clear_cdp_webhook_buffer/i.test(toolName)) return "Webhook Buffer";
+
   // DeFi
   if (/defillama/i.test(toolName)) return "DeFi Llama";
   if (/chainlink/i.test(toolName)) return "Chainlink";
