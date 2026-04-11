@@ -143,6 +143,24 @@ function getToolLabel(toolName: string): string {
   if (/get_recent_cdp_webhook_events/i.test(toolName)) return "Webhook Events";
   if (/clear_cdp_webhook_buffer/i.test(toolName)) return "Webhook Buffer";
 
+  // Proactive mode
+  if (/start_proactive_mode|stop_proactive_mode|get_proactive_status/i.test(toolName)) return "Proactive Mode";
+  if (/list_proactive_suggestions/i.test(toolName)) return "Suggestions";
+  if (/accept_proactive_suggestion/i.test(toolName)) return "Accept";
+  if (/dismiss_proactive_suggestion/i.test(toolName)) return "Dismiss";
+  if (/suppress_proactive_category|unsuppress_proactive_category/i.test(toolName)) return "Suppression";
+  if (/get_proactive_stats/i.test(toolName)) return "Proactive Stats";
+  if (/fire_proactive_suggestion/i.test(toolName)) return "Fire Suggestion";
+  if (/configure_proactive_category|list_proactive_categories/i.test(toolName)) return "Proactive Policy";
+  if (/record_proactive_outcome/i.test(toolName)) return "Outcome";
+
+  // Backtest verdict screening
+  if (/check_backtest_preconditions/i.test(toolName)) return "Pre-Run Gate";
+  if (/screen_backtest_result/i.test(toolName)) return "Verdict";
+  if (/record_backtest_experiment/i.test(toolName)) return "Experiment Log";
+  if (/list_backtest_experiments/i.test(toolName)) return "Experiments";
+  if (/get_backtest_journal_stats/i.test(toolName)) return "Journal Stats";
+
   // DeFi
   if (/defillama/i.test(toolName)) return "DeFi Llama";
   if (/chainlink/i.test(toolName)) return "Chainlink";

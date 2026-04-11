@@ -190,6 +190,27 @@ function getToolVerb(toolName: string): string | null {
   if (/get_recent_cdp_webhook_events/i.test(toolName)) return "Reading webhook events";
   if (/clear_cdp_webhook_buffer/i.test(toolName)) return "Clearing webhook buffer";
 
+  // Proactive mode
+  if (/start_proactive_mode/i.test(toolName)) return "Starting proactive mode";
+  if (/stop_proactive_mode/i.test(toolName)) return "Stopping proactive mode";
+  if (/get_proactive_status/i.test(toolName)) return "Checking proactive status";
+  if (/list_proactive_suggestions/i.test(toolName)) return "Loading suggestions";
+  if (/accept_proactive_suggestion/i.test(toolName)) return "Accepting suggestion";
+  if (/dismiss_proactive_suggestion/i.test(toolName)) return "Dismissing suggestion";
+  if (/suppress_proactive_category|unsuppress_proactive_category/i.test(toolName)) return "Updating suppression";
+  if (/get_proactive_stats/i.test(toolName)) return "Computing proactive stats";
+  if (/fire_proactive_suggestion/i.test(toolName)) return "Firing suggestion";
+  if (/configure_proactive_category/i.test(toolName)) return "Tuning proactive policy";
+  if (/record_proactive_outcome/i.test(toolName)) return "Recording outcome";
+  if (/list_proactive_categories/i.test(toolName)) return "Listing proactive categories";
+
+  // Backtest verdict screening
+  if (/check_backtest_preconditions/i.test(toolName)) return "Checking backtest preconditions";
+  if (/screen_backtest_result/i.test(toolName)) return "Screening backtest result";
+  if (/record_backtest_experiment/i.test(toolName)) return "Recording experiment";
+  if (/list_backtest_experiments/i.test(toolName)) return "Loading experiments";
+  if (/get_backtest_journal_stats/i.test(toolName)) return "Computing journal stats";
+
   // DeFi & on-chain
   if (/defillama/i.test(toolName)) return "Querying DeFi Llama";
   if (/chainlink/i.test(toolName)) return "Querying Chainlink";

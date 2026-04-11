@@ -86,6 +86,8 @@ export { cdpPolicyTools } from "./cdp-policy.ts";
 export { cdpOnrampTools } from "./cdp-onramp.ts";
 export { cdpEvmMultichainTools } from "./cdp-evm-multichain.ts";
 export { cdpWebhookReceiverTools } from "./cdp-webhook-receiver.ts";
+export { proactiveModeTools } from "./proactive-mode.ts";
+export { backtestVerdictTools } from "./backtest-verdict.ts";
 export { defillamaYieldTools } from "./defillama-yields.ts";
 export { chainlinkStreamsTools } from "./chainlink-streams.ts";
 export { chainlinkFeedsTools } from "./chainlink-feeds.ts";
@@ -342,6 +344,8 @@ import { cdpPolicyTools } from "./cdp-policy.ts";
 import { cdpOnrampTools } from "./cdp-onramp.ts";
 import { cdpEvmMultichainTools } from "./cdp-evm-multichain.ts";
 import { cdpWebhookReceiverTools } from "./cdp-webhook-receiver.ts";
+import { proactiveModeTools } from "./proactive-mode.ts";
+import { backtestVerdictTools } from "./backtest-verdict.ts";
 import { defillamaYieldTools } from "./defillama-yields.ts";
 import { chainlinkStreamsTools } from "./chainlink-streams.ts";
 import { chainlinkFeedsTools } from "./chainlink-feeds.ts";
@@ -419,6 +423,8 @@ const _rawAllTools = {
   ...cdpOnrampTools,
   ...cdpEvmMultichainTools,
   ...cdpWebhookReceiverTools,
+  ...proactiveModeTools,
+  ...backtestVerdictTools,
   ...defillamaYieldTools,
   ...chainlinkStreamsTools,
   ...chainlinkFeedsTools,
@@ -498,6 +504,8 @@ export const toolCounts = {
   cdpOnramp: Object.keys(cdpOnrampTools).length,
   cdpEvmMultichain: Object.keys(cdpEvmMultichainTools).length,
   cdpWebhookReceiver: Object.keys(cdpWebhookReceiverTools).length,
+  proactiveMode: Object.keys(proactiveModeTools).length,
+  backtestVerdict: Object.keys(backtestVerdictTools).length,
   defillamaYields: Object.keys(defillamaYieldTools).length,
   chainlinkStreams: Object.keys(chainlinkStreamsTools).length,
   chainlinkFeeds: Object.keys(chainlinkFeedsTools).length,

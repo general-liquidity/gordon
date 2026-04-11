@@ -23,6 +23,7 @@ import { HookProgressMessage } from "./messages/HookProgressMessage.js";
 import { RateLimitMessage } from "./messages/RateLimitMessage.js";
 import { ShutdownMessage } from "./messages/ShutdownMessage.js";
 import { PasteDetectionMessage } from "./messages/PasteDetectionMessage.js";
+import { ProactiveSuggestionMessage } from "./messages/ProactiveSuggestionMessage.js";
 
 // ============================================================================
 // MessageBubble — Routes to specialized renderers by variant
@@ -35,7 +36,8 @@ export type MessageVariant =
   | "fill" | "stop" | "alert" | "strategy"
   | "error" | "compact" | "resume" | "welcome"
   | "position" | "order" | "risk_check" | "backtest" | "scan_result"
-  | "hook_progress" | "rate_limit" | "shutdown" | "paste";
+  | "hook_progress" | "rate_limit" | "shutdown" | "paste"
+  | "proactive_suggestion";
 
 export interface Message {
   id: string;
@@ -223,6 +225,11 @@ export const MessageBubble = React.memo(function MessageBubble({ message }: Prop
   // Paste detection
   if (variant === "paste") {
     return <PasteDetectionMessage message={message} />;
+  }
+
+  // Proactive suggestion — unsolicited trading suggestions from proactive mode
+  if (variant === "proactive_suggestion") {
+    return <ProactiveSuggestionMessage message={message} />;
   }
 
   // Fallback — unknown variant, render with hook

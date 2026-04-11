@@ -64,6 +64,8 @@ import {
   cdpOnrampTools,
   cdpEvmMultichainTools,
   cdpWebhookReceiverTools,
+  proactiveModeTools,
+  backtestVerdictTools,
   defillamaYieldTools,
   positionTrackingTools,
   checkRiskTool,
@@ -140,6 +142,8 @@ export const instrumentedCdpPolicyTools = withToolsMetrics(cdpPolicyTools);
 export const instrumentedCdpOnrampTools = withToolsMetrics(cdpOnrampTools);
 export const instrumentedCdpEvmMultichainTools = withToolsMetrics(cdpEvmMultichainTools);
 export const instrumentedCdpWebhookReceiverTools = withToolsMetrics(cdpWebhookReceiverTools);
+export const instrumentedProactiveModeTools = withToolsMetrics(proactiveModeTools);
+export const instrumentedBacktestVerdictTools = withToolsMetrics(backtestVerdictTools);
 export const instrumentedDefillamaYieldTools = withToolsMetrics(defillamaYieldTools);
 export const instrumentedEvalTools = withToolsMetrics(evalTools);
 export const instrumentedPositionTrackingTools = withToolsMetrics(positionTrackingTools);
