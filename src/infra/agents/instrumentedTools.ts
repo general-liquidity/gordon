@@ -66,6 +66,11 @@ import {
   cdpWebhookReceiverTools,
   proactiveModeTools,
   backtestVerdictTools,
+  finnhubTools,
+  smcPatternTools,
+  calibrationTools,
+  skillLoaderTools,
+  producerHealthTools,
   defillamaYieldTools,
   positionTrackingTools,
   checkRiskTool,
@@ -144,6 +149,11 @@ export const instrumentedCdpEvmMultichainTools = withToolsMetrics(cdpEvmMulticha
 export const instrumentedCdpWebhookReceiverTools = withToolsMetrics(cdpWebhookReceiverTools);
 export const instrumentedProactiveModeTools = withToolsMetrics(proactiveModeTools);
 export const instrumentedBacktestVerdictTools = withToolsMetrics(backtestVerdictTools);
+export const instrumentedFinnhubTools = withToolsMetrics(finnhubTools);
+export const instrumentedSmcPatternTools = withToolsMetrics(smcPatternTools);
+export const instrumentedCalibrationTools = withToolsMetrics(calibrationTools);
+export const instrumentedSkillLoaderTools = withToolsMetrics(skillLoaderTools);
+export const instrumentedProducerHealthTools = withToolsMetrics(producerHealthTools);
 export const instrumentedDefillamaYieldTools = withToolsMetrics(defillamaYieldTools);
 export const instrumentedEvalTools = withToolsMetrics(evalTools);
 export const instrumentedPositionTrackingTools = withToolsMetrics(positionTrackingTools);

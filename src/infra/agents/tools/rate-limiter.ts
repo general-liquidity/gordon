@@ -76,6 +76,130 @@ export interface RateLimitResult {
  */
 const rateLimitState = new Map<string, RateLimitState>();
 
+/**
+ * In-memory storage for rate limit state per endpoint.
+ *
+ * Complements the per-tool limiter above. Per-tool is the right layer for
+ * "user is invoking scan_market too fast"; per-endpoint is the right layer
+ * for "the underlying Binance /api/v3/klines endpoint has a 1200 weight/min
+ * limit regardless of which tool called it." Keyed by `exchange:endpoint`
+ * (e.g. "binance:klines", "coinbase:orders", "finnhub:calendar/earnings").
+ *
+ * Intentionally additive — existing tool-level limits keep working; the
+ * endpoint layer can be enforced by venue clients or HTTP interceptors.
+ */
+const endpointRateLimitState = new Map<string, RateLimitState>();
+
+/**
+ * Per-endpoint rate limit configuration. Mirrors ToolRateLimitConfig shape
+ * but keyed by a composite endpoint string so one config entry covers every
+ * tool that uses that endpoint.
+ */
+export interface EndpointRateLimitConfig {
+  cooldownMs: number;
+  maxCallsPerWindow: number;
+  windowMs: number;
+  /** Optional human-readable message when the limit is hit. */
+  rateLimitMessage?: string;
+}
+
+export const ENDPOINT_RATE_LIMITS: Record<string, EndpointRateLimitConfig> = {
+  // Finnhub free tier: 60 req/min across all endpoints
+  "finnhub:*": {
+    cooldownMs: 100,
+    maxCallsPerWindow: 55,
+    windowMs: 60_000,
+    rateLimitMessage: "Finnhub rate limit (60 req/min on free tier).",
+  },
+  // Binance public klines: per-endpoint weight limit
+  "binance:klines": {
+    cooldownMs: 50,
+    maxCallsPerWindow: 100,
+    windowMs: 60_000,
+    rateLimitMessage: "Binance klines weight limit exceeded.",
+  },
+  // Hyperliquid public info: self-imposed conservative limit
+  "hyperliquid:info": {
+    cooldownMs: 100,
+    maxCallsPerWindow: 30,
+    windowMs: 60_000,
+    rateLimitMessage: "Hyperliquid public info rate limit.",
+  },
+  // CDP platform API: conservative shared bucket
+  "cdp:*": {
+    cooldownMs: 100,
+    maxCallsPerWindow: 50,
+    windowMs: 60_000,
+    rateLimitMessage: "CDP API rate limit.",
+  },
+};
+
+/**
+ * Check whether a call to a specific endpoint is allowed. Returns the same
+ * shape as `checkRateLimit` for consistency. Uses the most specific config
+ * key first (`exchange:endpoint`), then falls back to the wildcard
+ * `exchange:*` entry.
+ */
+export function checkEndpointRateLimit(
+  exchange: string,
+  endpoint: string,
+  configOverride?: EndpointRateLimitConfig,
+): { allowed: boolean; waitTimeMs?: number; reason?: string } {
+  const key = `${exchange}:${endpoint}`;
+  const config = configOverride
+    ?? ENDPOINT_RATE_LIMITS[key]
+    ?? ENDPOINT_RATE_LIMITS[`${exchange}:*`];
+  if (!config) return { allowed: true };
+
+  const now = Date.now();
+  const state = endpointRateLimitState.get(key) ?? {
+    lastCallTime: 0,
+    callsInWindow: [],
+  } as RateLimitState;
+
+  if (state.lastCallTime > 0 && now - state.lastCallTime < config.cooldownMs) {
+    const waitTimeMs = config.cooldownMs - (now - state.lastCallTime);
+    return { allowed: false, waitTimeMs, reason: config.rateLimitMessage ?? "endpoint cooldown" };
+  }
+
+  const cutoff = now - config.windowMs;
+  const recent = state.callsInWindow.filter((t) => t >= cutoff);
+  if (recent.length >= config.maxCallsPerWindow) {
+    const oldest = recent[0] ?? now;
+    const waitTimeMs = config.windowMs - (now - oldest);
+    return { allowed: false, waitTimeMs, reason: config.rateLimitMessage ?? "endpoint window full" };
+  }
+
+  return { allowed: true };
+}
+
+/**
+ * Record a successful call to an endpoint. Callers should invoke this after
+ * a successful request so the rate-limit state stays accurate.
+ */
+export function recordEndpointCall(exchange: string, endpoint: string): void {
+  const key = `${exchange}:${endpoint}`;
+  const now = Date.now();
+  const state = endpointRateLimitState.get(key) ?? {
+    lastCallTime: 0,
+    callsInWindow: [],
+  } as RateLimitState;
+  state.lastCallTime = now;
+  state.callsInWindow.push(now);
+  const wildcardKey = `${exchange}:*`;
+  const config = ENDPOINT_RATE_LIMITS[key] ?? ENDPOINT_RATE_LIMITS[wildcardKey];
+  if (config) {
+    const cutoff = now - config.windowMs;
+    state.callsInWindow = state.callsInWindow.filter((t) => t >= cutoff);
+  }
+  endpointRateLimitState.set(key, state);
+}
+
+/** Reset per-endpoint rate limit state (for tests). */
+export function resetEndpointRateLimitState(): void {
+  endpointRateLimitState.clear();
+}
+
 // ============================================================================
 // Per-Tool Rate Limit Configuration
 // ============================================================================

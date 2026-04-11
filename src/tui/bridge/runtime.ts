@@ -314,6 +314,13 @@ async function streamResponse(
           }
           break;
 
+        case "thinking_delta":
+          setState((prev: any) => ({
+            ...prev,
+            activeThinking: (prev.activeThinking ?? "") + (event.content ?? ""),
+          }));
+          break;
+
         case "agent_switch":
           if (event.agentName) {
             const prevAgent = currentAgentName;

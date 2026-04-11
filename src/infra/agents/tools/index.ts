@@ -88,6 +88,11 @@ export { cdpEvmMultichainTools } from "./cdp-evm-multichain.ts";
 export { cdpWebhookReceiverTools } from "./cdp-webhook-receiver.ts";
 export { proactiveModeTools } from "./proactive-mode.ts";
 export { backtestVerdictTools } from "./backtest-verdict.ts";
+export { finnhubTools } from "./finnhub-tools.ts";
+export { smcPatternTools } from "./smc-pattern-tools.ts";
+export { calibrationTools } from "./calibration-tools.ts";
+export { skillLoaderTools } from "./skill-loader.ts";
+export { producerHealthTools } from "./producer-health-tool.ts";
 export { defillamaYieldTools } from "./defillama-yields.ts";
 export { chainlinkStreamsTools } from "./chainlink-streams.ts";
 export { chainlinkFeedsTools } from "./chainlink-feeds.ts";
@@ -346,6 +351,11 @@ import { cdpEvmMultichainTools } from "./cdp-evm-multichain.ts";
 import { cdpWebhookReceiverTools } from "./cdp-webhook-receiver.ts";
 import { proactiveModeTools } from "./proactive-mode.ts";
 import { backtestVerdictTools } from "./backtest-verdict.ts";
+import { finnhubTools } from "./finnhub-tools.ts";
+import { smcPatternTools } from "./smc-pattern-tools.ts";
+import { calibrationTools } from "./calibration-tools.ts";
+import { skillLoaderTools } from "./skill-loader.ts";
+import { producerHealthTools } from "./producer-health-tool.ts";
 import { defillamaYieldTools } from "./defillama-yields.ts";
 import { chainlinkStreamsTools } from "./chainlink-streams.ts";
 import { chainlinkFeedsTools } from "./chainlink-feeds.ts";
@@ -425,6 +435,11 @@ const _rawAllTools = {
   ...cdpWebhookReceiverTools,
   ...proactiveModeTools,
   ...backtestVerdictTools,
+  ...finnhubTools,
+  ...smcPatternTools,
+  ...calibrationTools,
+  ...skillLoaderTools,
+  ...producerHealthTools,
   ...defillamaYieldTools,
   ...chainlinkStreamsTools,
   ...chainlinkFeedsTools,
@@ -506,6 +521,11 @@ export const toolCounts = {
   cdpWebhookReceiver: Object.keys(cdpWebhookReceiverTools).length,
   proactiveMode: Object.keys(proactiveModeTools).length,
   backtestVerdict: Object.keys(backtestVerdictTools).length,
+  finnhub: Object.keys(finnhubTools).length,
+  smcPattern: Object.keys(smcPatternTools).length,
+  calibration: Object.keys(calibrationTools).length,
+  skillLoader: Object.keys(skillLoaderTools).length,
+  producerHealth: Object.keys(producerHealthTools).length,
   defillamaYields: Object.keys(defillamaYieldTools).length,
   chainlinkStreams: Object.keys(chainlinkStreamsTools).length,
   chainlinkFeeds: Object.keys(chainlinkFeedsTools).length,

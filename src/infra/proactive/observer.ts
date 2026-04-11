@@ -56,13 +56,18 @@ let producerUnregister: (() => void) | null = null;
 
 // Tick cadences in ms — each producer gets its own schedule
 const TICK_INTERVALS = {
-  whale_drain: 5 * 60 * 1000,      // 5 min — poll CDP webhook buffer
-  session_review: 60 * 60 * 1000,  // 1 hour — checks time of week
-  journal_prompt: 60 * 60 * 1000,  // 1 hour — checks time of day
-  portfolio_drift: 30 * 60 * 1000, // 30 min — not yet producing
-  regime_flip: 15 * 60 * 1000,     // 15 min — not yet producing
-  volatility: 10 * 60 * 1000,      // 10 min — not yet producing
-  funding: 30 * 60 * 1000,         // 30 min — not yet producing
+  whale_drain: 5 * 60 * 1000,       // 5 min — poll CDP webhook buffer
+  session_review: 60 * 60 * 1000,   // 1 hour — checks time of week
+  journal_prompt: 60 * 60 * 1000,   // 1 hour — checks time of day
+  portfolio_drift: 30 * 60 * 1000,  // 30 min — position drift check
+  regime_flip: 15 * 60 * 1000,      // 15 min — per-symbol regime polling
+  volatility: 10 * 60 * 1000,       // 10 min — ATR expansion check
+  funding: 30 * 60 * 1000,          // 30 min — perp funding scan
+  // Stock event ticks (Finnhub-driven)
+  earnings: 2 * 60 * 60 * 1000,     // 2 hours — upcoming earnings calendar
+  insider_flow: 4 * 60 * 60 * 1000, // 4 hours — insider transaction clusters
+  analyst: 6 * 60 * 60 * 1000,      // 6 hours — analyst rating shifts
+  congressional: 24 * 60 * 60 * 1000, // 24 hours — STOCK Act disclosures are already lagged
 };
 
 const lastTickAt: Partial<Record<keyof typeof TICK_INTERVALS, number>> = {};

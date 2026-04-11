@@ -33,7 +33,11 @@ export type ProactiveCategory =
   | "risk_warning"         // Drawdown, correlation, cascade risk
   | "playbook_suggest"     // New regime-matched playbook available
   | "funding_alert"        // Perp funding rate anomaly
-  | "news_event";          // News triggering position review
+  | "news_event"           // News triggering position review
+  | "earnings_approaching" // Upcoming earnings on held or watched symbol
+  | "insider_flow_alert"   // Cluster of insider buys/sells on watchlist
+  | "analyst_upgrade"      // Analyst consensus rating shift
+  | "congressional_trade"; // STOCK Act disclosure on held or watched symbol
 
 export const ALL_CATEGORIES: ProactiveCategory[] = [
   "regime_flip",
@@ -49,6 +53,10 @@ export const ALL_CATEGORIES: ProactiveCategory[] = [
   "playbook_suggest",
   "funding_alert",
   "news_event",
+  "earnings_approaching",
+  "insider_flow_alert",
+  "analyst_upgrade",
+  "congressional_trade",
 ];
 
 // ============================================================================

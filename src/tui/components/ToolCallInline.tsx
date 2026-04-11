@@ -161,6 +161,32 @@ function getToolLabel(toolName: string): string {
   if (/list_backtest_experiments/i.test(toolName)) return "Experiments";
   if (/get_backtest_journal_stats/i.test(toolName)) return "Journal Stats";
 
+  // Finnhub
+  if (/get_upcoming_earnings/i.test(toolName)) return "Earnings Calendar";
+  if (/get_earnings_estimates/i.test(toolName)) return "Earnings Estimates";
+  if (/get_economic_calendar/i.test(toolName)) return "Macro Calendar";
+  if (/get_insider_transactions/i.test(toolName)) return "Insider Trades";
+  if (/get_congressional_trading/i.test(toolName)) return "Congress Trades";
+  if (/get_analyst_ratings/i.test(toolName)) return "Analyst Ratings";
+  if (/get_sec_filings/i.test(toolName)) return "SEC Filings";
+  if (/get_news_sentiment/i.test(toolName)) return "News Sentiment";
+  if (/get_etf_holdings/i.test(toolName)) return "ETF Holdings";
+
+  // SMC patterns
+  if (/detect_smc_patterns|detect_smc_single_pattern/i.test(toolName)) return "SMC Patterns";
+
+  // Calibration
+  if (/record_confident_decision/i.test(toolName)) return "Record Decision";
+  if (/record_decision_outcome/i.test(toolName)) return "Record Outcome";
+  if (/get_calibration_stats/i.test(toolName)) return "Calibration";
+  if (/list_recent_decisions/i.test(toolName)) return "Decisions";
+
+  // Skills
+  if (/list_skills|load_skill/i.test(toolName)) return "Skill";
+
+  // Producer health
+  if (/get_producer_health/i.test(toolName)) return "Producer Health";
+
   // DeFi
   if (/defillama/i.test(toolName)) return "DeFi Llama";
   if (/chainlink/i.test(toolName)) return "Chainlink";

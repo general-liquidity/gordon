@@ -15,7 +15,16 @@ import type { Message } from "../../llm/types.ts";
  * Stream event types emitted during processing
  */
 export interface StreamEvent {
-  type: "text_delta" | "tool_call_start" | "tool_call_end" | "agent_switch" | "step_complete" | "done" | "error" | "cancelled";
+  type:
+    | "text_delta"
+    | "thinking_delta"     // LLM reasoning / chain-of-thought chunks (Vibe-Trading streaming pattern)
+    | "tool_call_start"
+    | "tool_call_end"
+    | "agent_switch"
+    | "step_complete"
+    | "done"
+    | "error"
+    | "cancelled";
   content?: string;
   toolName?: string;
   toolArgs?: Record<string, unknown>;

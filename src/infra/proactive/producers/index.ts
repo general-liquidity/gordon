@@ -18,6 +18,16 @@ import { portfolioDriftProducer } from "./portfolioDriftProducer.ts";
 import { regimeFlipProducer, resetRegimeFlipProducerState } from "./regimeFlipProducer.ts";
 import { volatilitySpikeProducer, resetVolatilitySpikeProducerState } from "./volatilitySpikeProducer.ts";
 import { fundingAlertProducer, resetFundingAlertProducerState } from "./fundingAlertProducer.ts";
+import {
+  earningsApproachingProducer,
+  insiderFlowProducer,
+  analystUpgradeProducer,
+  congressionalTradeProducer,
+  resetStockEventsProducerState,
+} from "./stockEventsProducer.ts";
+import { getProducerHealthTracker } from "../producerHealth.ts";
+import type { CandidateProducer } from "../proactiveEngine.ts";
+import type { ProactiveSuggestion } from "../types.ts";
 
 export {
   tradeEventProducer,
@@ -29,23 +39,54 @@ export {
   regimeFlipProducer,
   volatilitySpikeProducer,
   fundingAlertProducer,
+  earningsApproachingProducer,
+  insiderFlowProducer,
+  analystUpgradeProducer,
+  congressionalTradeProducer,
 };
+
+/**
+ * Wrap a producer with health tracking. Each call is recorded as a heartbeat
+ * (with candidate count), errors are captured to last-error state, and the
+ * wrapped producer preserves the original signature. Centralized so adding
+ * a producer automatically gets health tracking.
+ */
+function withHealthTracking(name: string, producer: CandidateProducer): CandidateProducer {
+  const tracker = getProducerHealthTracker();
+  tracker.registerProducer(name);
+  return async (obs): Promise<ProactiveSuggestion[]> => {
+    try {
+      const candidates = await producer(obs);
+      tracker.recordHeartbeat(name, candidates.length);
+      return candidates;
+    } catch (err) {
+      tracker.recordError(name, err instanceof Error ? err.message : String(err));
+      throw err;
+    }
+  };
+}
 
 /**
  * Register all v1 producers with the engine. Returns an unregister function
  * that removes all producers and resets their internal state.
  */
 export function registerAllProducers(engine: ProactiveEngine): () => void {
+  getProducerHealthTracker().start();
+
   const unregisterFns = [
-    engine.registerProducer(tradeEventProducer),
-    engine.registerProducer(scanOpportunityProducer),
-    engine.registerProducer(riskProducer),
-    engine.registerProducer(stopProducer),
-    engine.registerProducer(periodicProducer),
-    engine.registerProducer(portfolioDriftProducer),
-    engine.registerProducer(regimeFlipProducer),
-    engine.registerProducer(volatilitySpikeProducer),
-    engine.registerProducer(fundingAlertProducer),
+    engine.registerProducer(withHealthTracking("tradeEvent", tradeEventProducer)),
+    engine.registerProducer(withHealthTracking("scanOpportunity", scanOpportunityProducer)),
+    engine.registerProducer(withHealthTracking("risk", riskProducer)),
+    engine.registerProducer(withHealthTracking("stop", stopProducer)),
+    engine.registerProducer(withHealthTracking("periodic", periodicProducer)),
+    engine.registerProducer(withHealthTracking("portfolioDrift", portfolioDriftProducer)),
+    engine.registerProducer(withHealthTracking("regimeFlip", regimeFlipProducer)),
+    engine.registerProducer(withHealthTracking("volatilitySpike", volatilitySpikeProducer)),
+    engine.registerProducer(withHealthTracking("fundingAlert", fundingAlertProducer)),
+    engine.registerProducer(withHealthTracking("earningsApproaching", earningsApproachingProducer)),
+    engine.registerProducer(withHealthTracking("insiderFlow", insiderFlowProducer)),
+    engine.registerProducer(withHealthTracking("analystUpgrade", analystUpgradeProducer)),
+    engine.registerProducer(withHealthTracking("congressionalTrade", congressionalTradeProducer)),
   ];
 
   return () => {
@@ -55,5 +96,7 @@ export function registerAllProducers(engine: ProactiveEngine): () => void {
     resetRegimeFlipProducerState();
     resetVolatilitySpikeProducerState();
     resetFundingAlertProducerState();
+    resetStockEventsProducerState();
+    getProducerHealthTracker().stop();
   };
 }

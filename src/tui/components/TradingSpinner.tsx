@@ -211,6 +211,34 @@ function getToolVerb(toolName: string): string | null {
   if (/list_backtest_experiments/i.test(toolName)) return "Loading experiments";
   if (/get_backtest_journal_stats/i.test(toolName)) return "Computing journal stats";
 
+  // Finnhub stock events
+  if (/get_upcoming_earnings/i.test(toolName)) return "Loading earnings calendar";
+  if (/get_earnings_estimates/i.test(toolName)) return "Loading analyst estimates";
+  if (/get_economic_calendar/i.test(toolName)) return "Loading macro calendar";
+  if (/get_insider_transactions/i.test(toolName)) return "Loading insider trades";
+  if (/get_congressional_trading/i.test(toolName)) return "Loading congressional trades";
+  if (/get_analyst_ratings/i.test(toolName)) return "Loading analyst ratings";
+  if (/get_sec_filings/i.test(toolName)) return "Loading SEC filings";
+  if (/get_news_sentiment/i.test(toolName)) return "Loading news sentiment";
+  if (/get_etf_holdings/i.test(toolName)) return "Loading ETF holdings";
+
+  // SMC patterns
+  if (/detect_smc_patterns/i.test(toolName)) return "Detecting SMC patterns";
+  if (/detect_smc_single_pattern/i.test(toolName)) return "Detecting SMC pattern";
+
+  // Calibration
+  if (/record_confident_decision/i.test(toolName)) return "Recording decision";
+  if (/record_decision_outcome/i.test(toolName)) return "Recording outcome";
+  if (/get_calibration_stats/i.test(toolName)) return "Computing calibration";
+  if (/list_recent_decisions/i.test(toolName)) return "Loading decisions";
+
+  // Skills
+  if (/list_skills/i.test(toolName)) return "Listing skills";
+  if (/load_skill/i.test(toolName)) return "Loading skill";
+
+  // Producer health
+  if (/get_producer_health/i.test(toolName)) return "Checking producer health";
+
   // DeFi & on-chain
   if (/defillama/i.test(toolName)) return "Querying DeFi Llama";
   if (/chainlink/i.test(toolName)) return "Querying Chainlink";

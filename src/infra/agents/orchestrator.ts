@@ -402,6 +402,16 @@ export async function* processMessageStream(
         }
       }
     }
+    // Surface the thinking trace as a streaming event so TUI subscribers can
+    // render it inline before the first tool call — Vibe-Trading pattern of
+    // showing reasoning → tool calls → results as distinct streamed events.
+    if (_thinkingResult && !_thinkingResult.skipped && _thinkingResult.trace) {
+      yield {
+        type: "thinking_delta",
+        content: _thinkingResult.trace,
+        agentName: state.currentAgent,
+      };
+    }
     reactStage = advanceReActStage(reactStage, "thinking_complete");
     reactStage = advanceReActStage(reactStage, "ui_drained");
 

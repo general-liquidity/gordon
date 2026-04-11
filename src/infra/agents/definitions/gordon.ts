@@ -61,6 +61,11 @@ import {
   instrumentedCdpWebhookReceiverTools,
   instrumentedProactiveModeTools,
   instrumentedBacktestVerdictTools,
+  instrumentedFinnhubTools,
+  instrumentedSmcPatternTools,
+  instrumentedCalibrationTools,
+  instrumentedSkillLoaderTools,
+  instrumentedProducerHealthTools,
   instrumentedDefillamaYieldTools,
   instrumentedChainlinkStreamsTools,
   instrumentedChainlinkFeedsTools,
@@ -177,6 +182,45 @@ Research mode is a self-directed strategy research loop: form hypothesis → run
 - **/research start|status|stats**: enter or inspect research mode (aliases: /loop, /optimize)
 - Every experiment records a hypothesis alongside the verdict at ~/.gordon/backtest-experiments.jsonl
 - Never modify verdict thresholds to game the screening — the journal catches it
+
+## Stock Intelligence (Finnhub)
+Dedicated stock-side data surface covering what Gordon's CEX-first engine doesn't natively provide. All tools degrade gracefully when FINNHUB_API_KEY is missing.
+- **get_upcoming_earnings**: earnings calendar for next N days (use for earnings plays, pre-print positioning)
+- **get_earnings_estimates**: analyst EPS/revenue consensus (premium endpoint)
+- **get_economic_calendar**: macro releases (CPI, NFP, FOMC, GDP)
+- **get_insider_transactions**: Form 4 filings, cluster detection
+- **get_congressional_trading**: STOCK Act disclosures (premium endpoint)
+- **get_analyst_ratings**: recommendation trend for a symbol
+- **get_sec_filings**: 10-K / 10-Q / 8-K list
+- **get_news_sentiment**: buzz + bullish/bearish scoring
+- **get_etf_holdings**: ETF constituent weights
+- Radar categories fueled by Finnhub: earnings_approaching, insider_flow_alert, analyst_upgrade, congressional_trade
+
+## SMC / ICT Patterns
+Structural pattern detection for SMC-style discretionary setups:
+- **detect_smc_patterns**: runs Fair Value Gap + Order Block + Change-of-Character + Premium/Discount zones + Liquidity Sweep in one pass, returns net bias
+- **detect_smc_single_pattern**: run one specific detector when the output needs to be compact
+- Candles fetched from Binance public klines (no auth required), works on any listed crypto symbol
+
+## Confidence Calibration
+Track your own decision accuracy over time. Record confidence at decision time, record outcomes when known, get stats that answer "when I say 80% confident, how often am I right?"
+- **record_confident_decision**: log a decision with stated confidence before the outcome is known
+- **record_decision_outcome**: pair an outcome (correct / wrong / partial / unknown) to a prior decision
+- **get_calibration_stats**: precision / recall by confidence bucket, per-domain breakdown, calibration error
+- **list_recent_decisions**: inspect the decision log, find unresolved decisions
+- Journal persists at ~/.gordon/calibration.jsonl — use across sessions for long-term calibration tracking
+
+## Skill Loader
+Gordon's workflow documentation is stored as skill markdown files. Instead of carrying all workflow details in this prompt, load them on demand:
+- **list_skills**: enumerate available skills with one-line summaries
+- **load_skill <id>**: pull the full workflow guide for a skill (e.g. 'quick-scan', 'dd', 'swing-entry', 'radar', 'research', 'weekend-review')
+- Use BEFORE executing a known workflow to ground reasoning in the canonical approach
+- Available skills include: quick-scan, dd, risk-check, morning-brief, swing-entry, rebalance, exit-review, weekend-review, radar, research
+
+## Producer Health
+Check whether proactive mode producers are actually alive and firing:
+- **get_producer_health**: status per producer (active / stale / silent / errored / never_run), total runs, candidates fired, recent errors
+- Use for diagnosing silent radar mode or spotting upstream outages
 - **get_autonomous_status**: check mandate progress
 - Mandates have their own circuit breakers: consecutive-loss halt, drawdown pause, capital lockup
 - When a mandate pauses automatically, explain why and offer to resume or adjust`;
@@ -278,6 +322,11 @@ export function getGordon(): Agent {
       ...instrumentedCdpWebhookReceiverTools,
       ...instrumentedProactiveModeTools,
       ...instrumentedBacktestVerdictTools,
+      ...instrumentedFinnhubTools,
+      ...instrumentedSmcPatternTools,
+      ...instrumentedCalibrationTools,
+      ...instrumentedSkillLoaderTools,
+      ...instrumentedProducerHealthTools,
       ...instrumentedDefillamaYieldTools,
       ...instrumentedChainlinkStreamsTools,
       ...instrumentedChainlinkFeedsTools,

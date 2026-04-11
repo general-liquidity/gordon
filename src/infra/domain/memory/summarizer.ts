@@ -370,7 +370,15 @@ export class ConversationSummarizer {
         if (message.content.length <= truncateTo) {
           return message;
         }
-
+        // Semantic masking at the masking/pruning stages: instead of blunt
+        // truncation, drop low-salience sentences (meta-commentary, repeated
+        // acknowledgments, verbose formatting) and replace them with a
+        // [masked N tokens] marker. Full / aggressive stages still hard-
+        // truncate since those already need to shed token volume fast.
+        if (stage === "masking" || stage === "pruning") {
+          const masked = semanticMask(message.content, truncateTo);
+          return { ...message, content: masked };
+        }
         return {
           ...message,
           content: `${message.content.slice(0, truncateTo)}... [${stage} compaction truncated]`,
@@ -794,4 +802,71 @@ export function createSummarizerConfigFromMemoryConfig(memoryConfig: {
     recentMessagesToKeep,
     maxContextTokensEstimate: Math.max(6000, lastMessages * 600),
   };
+}
+
+// ============================================================================
+// Semantic masking helper (OPENDEV paper pattern)
+// ============================================================================
+
+/**
+ * Semantic masking — the masking/pruning stages of compaction drop
+ * low-salience sentences and replace them with `[masked N tokens]` markers
+ * instead of blunt truncation. Keeps the high-signal content (decisions,
+ * specific numbers, questions, errors) and compresses the filler
+ * (acknowledgments, meta-commentary, verbose headers).
+ *
+ * Heuristic salience: a sentence is high-salience if it contains:
+ *   - numbers, dollar signs, percent signs
+ *   - trading vocabulary (entry, exit, stop, target, symbol, position)
+ *   - error / warning / critical keywords
+ *   - tool call or decision markers
+ *   - questions (end with ?)
+ * Otherwise it's droppable filler.
+ */
+function semanticMask(content: string, targetLength: number): string {
+  if (content.length <= targetLength) return content;
+
+  const SALIENT_PATTERNS = [
+    /\$[0-9]/,
+    /[0-9]+(?:\.[0-9]+)?\s*%/,
+    /[0-9]{4,}/,
+    /\b(entry|exit|stop|target|position|symbol|ticker|trade|price|level|support|resistance)\b/i,
+    /\b(error|warning|critical|failed|rejected|blocked|violat)/i,
+    /\b(buy|sell|long|short|open|close|filled)\b/i,
+    /\?$/,
+    /\b(decided|concluded|recommend|suggest|propose)\b/i,
+  ];
+
+  const sentences = content.split(/(?<=[.!?])\s+/).filter((s) => s.length > 0);
+  if (sentences.length <= 2) {
+    // Too short to meaningfully mask — fall back to truncation
+    return `${content.slice(0, targetLength)}... [masked ${content.length - targetLength} tokens]`;
+  }
+
+  let kept: string[] = [];
+  let droppedCount = 0;
+  let droppedLength = 0;
+  let currentLength = 0;
+
+  for (const sentence of sentences) {
+    const isSalient = SALIENT_PATTERNS.some((re) => re.test(sentence));
+    if (isSalient || currentLength < targetLength * 0.4) {
+      kept.push(sentence);
+      currentLength += sentence.length + 1;
+    } else {
+      droppedCount += 1;
+      droppedLength += sentence.length;
+    }
+    if (currentLength > targetLength) break;
+  }
+
+  let result = kept.join(" ");
+  if (droppedCount > 0) {
+    const approxTokens = Math.round(droppedLength / 4);
+    result += ` [masked ${approxTokens} tokens across ${droppedCount} sentences]`;
+  }
+  if (result.length > targetLength + 60) {
+    result = `${result.slice(0, targetLength)}... [truncated]`;
+  }
+  return result;
 }
