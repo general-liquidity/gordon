@@ -26,6 +26,7 @@ import {
   type ProactiveCategory,
   type SuggestionOutcome,
 } from "../../proactive/index.ts";
+import { startProactiveObserver, stopProactiveObserver, isObserverRunning } from "../../proactive/observer.ts";
 
 const CATEGORY_SCHEMA = z.enum([
   "regime_flip",
@@ -58,24 +59,31 @@ export const startProactiveModeTool = createTool({
     "trading suggestions based on observed events (regime flips, whale moves, " +
     "volatility spikes, portfolio drift, etc.). Proactive mode is orthogonal " +
     "to permission mode: you can be in ask / auto / strict and still have " +
-    "proactive suggestions flowing. Starts silently — no suggestions fire " +
-    "until a trigger lands and passes the judge.",
+    "proactive suggestions flowing. Wires the producer registry and the " +
+    "event-bus observer, so suggestions start firing automatically as Gordon " +
+    "events land. Also starts a 60-second internal tick loop for time-based " +
+    "producers (session review, end-of-day journal, whale buffer drain).",
   inputSchema: z.object({}),
   outputSchema: z.object({
     started: z.boolean(),
     alreadyRunning: z.boolean().optional(),
     startedAt: z.string().nullable(),
     producerCount: z.number(),
+    observerSubscriptions: z.number(),
   }),
   execute: async () => {
     const engine = getProactiveEngine();
     const result = engine.start();
+    // Start the observer regardless — it's idempotent and ensures producers
+    // are registered even if the engine was already running.
+    const observer = startProactiveObserver();
     const status = engine.getStatus();
     return {
       started: result.started,
       alreadyRunning: result.alreadyRunning,
       startedAt: status.startedAt,
       producerCount: engine.producerCount(),
+      observerSubscriptions: observer.subscriptions,
     };
   },
 });
@@ -87,16 +95,21 @@ export const startProactiveModeTool = createTool({
 export const stopProactiveModeTool = createTool({
   id: "stop_proactive_mode",
   description:
-    "Stop Gordon's proactive mode. Clears the pending observation queue but " +
-    "preserves the suggestion history and category policy state so you can " +
-    "restart without losing your feedback ledger.",
+    "Stop Gordon's proactive mode. Unsubscribes the event-bus observer, " +
+    "clears the periodic tick loop, unregisters all producers, and stops the " +
+    "engine. Preserves the suggestion history and category policy state so " +
+    "you can restart without losing your feedback ledger.",
   inputSchema: z.object({}),
   outputSchema: z.object({
     stopped: z.boolean(),
     wasRunning: z.boolean(),
+    observerStopped: z.boolean(),
   }),
   execute: async () => {
-    return getProactiveEngine().stop();
+    const wasObserving = isObserverRunning();
+    stopProactiveObserver();
+    const result = getProactiveEngine().stop();
+    return { ...result, observerStopped: wasObserving };
   },
 });
 

@@ -1,0 +1,196 @@
+/**
+ * Proactive Observer
+ *
+ * Bridges Gordon's event bus + a periodic timer into the ProactiveEngine's
+ * observation intake. This is the layer that turns "proactive mode is
+ * running" from scaffolding into "suggestions actually fire from real
+ * events."
+ *
+ * Two observation sources:
+ *   1. Event bus subscription — any Gordon event of interest is converted
+ *      to a ProactiveObservation and fed to the engine, which dispatches
+ *      to all registered producers.
+ *   2. Periodic tick loop — a setInterval that emits synthetic observations
+ *      every 60 seconds with different eventTypes (tick_session_review,
+ *      tick_journal_prompt, tick_whale_drain, etc.) so periodic producers
+ *      have something to react to.
+ *
+ * `startProactiveObserver()` is idempotent — calling it twice returns the
+ * same teardown function. `stopProactiveObserver()` cleanly unsubscribes
+ * and clears the interval.
+ */
+
+import { getEventBus } from "../../events/index.ts";
+import type { EventType, GordonEvent } from "../../events/types.ts";
+import { createModuleLogger } from "../logger/index.ts";
+import { getProactiveEngine, type ProactiveObservation } from "./proactiveEngine.ts";
+import { registerAllProducers } from "./producers/index.ts";
+
+const logger = createModuleLogger("proactive-observer");
+
+// Events the observer subscribes to on the Gordon event bus. Each one is
+// translated into a ProactiveObservation. Kept explicit so adding/removing
+// event types is a single-place change.
+const SUBSCRIBED_EVENTS: EventType[] = [
+  "trade:closed",
+  "trade:opened",
+  "scan:opportunity",
+  "risk:rejected",
+  "autonomous:mandate_breached",
+  "alert:stop_approaching",
+  "alert:tp_hit",
+  "alert:stop_triggered",
+];
+
+// ============================================================================
+// Observer state (singleton within the process)
+// ============================================================================
+
+let unsubscribeFns: Array<() => void> = [];
+let tickHandle: ReturnType<typeof setInterval> | null = null;
+let producerUnregister: (() => void) | null = null;
+
+// Tick cadences in ms — each producer gets its own schedule
+const TICK_INTERVALS = {
+  whale_drain: 5 * 60 * 1000,      // 5 min — poll CDP webhook buffer
+  session_review: 60 * 60 * 1000,  // 1 hour — checks time of week
+  journal_prompt: 60 * 60 * 1000,  // 1 hour — checks time of day
+  portfolio_drift: 30 * 60 * 1000, // 30 min — not yet producing
+  regime_flip: 15 * 60 * 1000,     // 15 min — not yet producing
+  volatility: 10 * 60 * 1000,      // 10 min — not yet producing
+  funding: 30 * 60 * 1000,         // 30 min — not yet producing
+};
+
+const lastTickAt: Partial<Record<keyof typeof TICK_INTERVALS, number>> = {};
+
+// ============================================================================
+// Start / stop
+// ============================================================================
+
+export function startProactiveObserver(): { started: boolean; subscriptions: number } {
+  const engine = getProactiveEngine();
+
+  // Register producers first — the engine needs them before events land
+  if (!producerUnregister) {
+    producerUnregister = registerAllProducers(engine);
+  }
+
+  // Event bus subscriptions
+  if (unsubscribeFns.length === 0) {
+    const bus = getEventBus();
+    for (const evType of SUBSCRIBED_EVENTS) {
+      const unsub = bus.on(evType, (event: GordonEvent) => {
+        try {
+          const obs = eventToObservation(event);
+          if (obs) void engine.observe(obs);
+        } catch (err) {
+          logger.warn("Failed to convert event to observation", {
+            eventType: event.type,
+            err: String(err),
+          });
+        }
+      });
+      unsubscribeFns.push(unsub);
+    }
+  }
+
+  // Periodic tick loop — 60s internal heartbeat that dispatches tick
+  // observations when each category's interval elapses
+  if (!tickHandle) {
+    tickHandle = setInterval(() => {
+      const now = Date.now();
+      for (const [key, interval] of Object.entries(TICK_INTERVALS) as Array<
+        [keyof typeof TICK_INTERVALS, number]
+      >) {
+        const last = lastTickAt[key] ?? 0;
+        if (now - last < interval) continue;
+        lastTickAt[key] = now;
+        const obs: ProactiveObservation = {
+          source: "monitor_loop",
+          eventType: `tick_${key}`,
+          timestamp: now,
+        };
+        void engine.observe(obs);
+      }
+    }, 60_000);
+    // Don't let the tick loop keep the process alive
+    if (tickHandle.unref) tickHandle.unref();
+  }
+
+  logger.info("Proactive observer started", {
+    subscriptions: unsubscribeFns.length,
+    tickIntervals: Object.keys(TICK_INTERVALS).length,
+  });
+
+  return { started: true, subscriptions: unsubscribeFns.length };
+}
+
+export function stopProactiveObserver(): { stopped: boolean } {
+  for (const unsub of unsubscribeFns) {
+    try {
+      unsub();
+    } catch {
+      // Already unsubscribed or bus is down — ignore
+    }
+  }
+  unsubscribeFns = [];
+
+  if (tickHandle) {
+    clearInterval(tickHandle);
+    tickHandle = null;
+  }
+
+  if (producerUnregister) {
+    producerUnregister();
+    producerUnregister = null;
+  }
+
+  for (const key of Object.keys(lastTickAt) as Array<keyof typeof TICK_INTERVALS>) {
+    delete lastTickAt[key];
+  }
+
+  logger.info("Proactive observer stopped");
+  return { stopped: true };
+}
+
+export function isObserverRunning(): boolean {
+  return unsubscribeFns.length > 0 || tickHandle !== null;
+}
+
+// ============================================================================
+// Event → Observation conversion
+// ============================================================================
+
+function eventToObservation(event: GordonEvent): ProactiveObservation | null {
+  const ts = Date.parse(event.timestamp);
+  const timestamp = Number.isFinite(ts) ? ts : Date.now();
+
+  // Extract symbol if present — many trade/alert events carry it on
+  // different fields. Using unknown + defensive access so we don't depend
+  // on specific event shapes.
+  const raw = event as unknown as Record<string, unknown>;
+  const symbol =
+    (raw.symbol as string | undefined) ??
+    ((raw.trade as Record<string, unknown> | undefined)?.symbol as string | undefined) ??
+    ((raw.position as Record<string, unknown> | undefined)?.symbol as string | undefined);
+
+  // Extract a price / change if present for downstream producers
+  const price =
+    (raw.currentPrice as number | undefined) ??
+    (raw.price as number | undefined) ??
+    (raw.exitPrice as number | undefined);
+
+  const change =
+    (raw.pnlPercent as number | undefined) ??
+    (raw.change as number | undefined);
+
+  return {
+    source: "event_bus",
+    eventType: event.type,
+    symbol,
+    price,
+    change,
+    timestamp,
+    metadata: raw,
+  };
+}
