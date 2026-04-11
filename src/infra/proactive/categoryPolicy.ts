@@ -195,6 +195,35 @@ export class CategoryPolicyManager {
       });
     }
   }
+
+  // ---- Persistence ----
+
+  serialize(): CategoryPolicyState[] {
+    return [...this.state.values()].map((s) => ({ ...s, recentFireTimes: [...s.recentFireTimes] }));
+  }
+
+  deserialize(saved: CategoryPolicyState[]): void {
+    if (!Array.isArray(saved)) return;
+    for (const entry of saved) {
+      if (!entry || typeof entry !== "object" || !entry.category) continue;
+      const cur = this.state.get(entry.category);
+      if (!cur) continue;
+      // Preserve the current default cooldown/confidence unless the saved
+      // entry had user-tuned overrides. Saved state wins on lastFiredAt,
+      // recentFireTimes, suppressedUntil, acceptance rate.
+      this.state.set(entry.category, {
+        category: entry.category,
+        cooldownMs: typeof entry.cooldownMs === "number" ? entry.cooldownMs : cur.cooldownMs,
+        minConfidence: typeof entry.minConfidence === "number" ? entry.minConfidence : cur.minConfidence,
+        maxPerHour: typeof entry.maxPerHour === "number" ? entry.maxPerHour : cur.maxPerHour,
+        lastFiredAt: entry.lastFiredAt,
+        recentFireTimes: Array.isArray(entry.recentFireTimes) ? [...entry.recentFireTimes] : [],
+        suppressedUntil: entry.suppressedUntil,
+        acceptanceRate: typeof entry.acceptanceRate === "number" ? entry.acceptanceRate : 1.0,
+        sampleCount: typeof entry.sampleCount === "number" ? entry.sampleCount : 0,
+      });
+    }
+  }
 }
 
 // Singleton

@@ -35,19 +35,32 @@ export interface OutcomeStats {
   f1: number;
 }
 
+export interface OutcomeRecord {
+  suggestionId: string;
+  category: ProactiveCategory;
+  outcome: SuggestionOutcome;
+  at: number;
+}
+
 export class OutcomeTracker {
-  private outcomes: Array<{
-    suggestionId: string;
-    category: ProactiveCategory;
-    outcome: SuggestionOutcome;
-    at: number;
-  }> = [];
+  private outcomes: OutcomeRecord[] = [];
 
   record(suggestionId: string, category: ProactiveCategory, outcome: SuggestionOutcome): void {
     this.outcomes.push({ suggestionId, category, outcome, at: Date.now() });
     if (this.outcomes.length > 2000) {
       this.outcomes.shift();
     }
+  }
+
+  // ---- Persistence ----
+
+  serialize(): OutcomeRecord[] {
+    return this.outcomes.slice();
+  }
+
+  deserialize(saved: OutcomeRecord[]): void {
+    if (!Array.isArray(saved)) return;
+    this.outcomes = saved.slice(0, 2000);
   }
 
   /** Overall stats across all recorded outcomes. */

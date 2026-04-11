@@ -52,11 +52,11 @@ export function ProactiveSuggestionMessage({ message }: ProactiveSuggestionProps
         <RichContent content={message.content} maxLines={12} />
       </Box>
       <Box marginTop={1}>
-        <Text dimColor>/accept {id.slice(0, 10)}</Text>
+        <Text dimColor>/ack {id.slice(0, 10)}</Text>
         <Text dimColor>  {"\u00b7"}  </Text>
-        <Text dimColor>/dismiss {id.slice(0, 10)}</Text>
+        <Text dimColor>/pass {id.slice(0, 10)}</Text>
         <Text dimColor>  {"\u00b7"}  </Text>
-        <Text dimColor>/suppress {category}</Text>
+        <Text dimColor>/snooze {category}</Text>
       </Box>
     </Box>
   );

@@ -35,6 +35,7 @@ import { getActionsForKey, isVimModeEnabled } from "./keybindings/keybindings.js
 import { getNotificationFolder } from "./notifications/notificationFolder.js";
 import { useFpsTracker } from "./hooks/useFpsTracker.js";
 import { useAnimationPause } from "./hooks/useAnimationClock.js";
+import { useProactiveChatSubscription } from "./hooks/useProactiveChatSubscription.js";
 import { getNextHint, recordHintShown, incrementSessionCount, type HintContext } from "../app/onboarding/index.ts";
 
 // ── Phase 15-18 Components ──
@@ -178,6 +179,11 @@ function AppInner() {
   const dispatch = useDispatch();
   const { getState } = useAppStore();
   const { exit } = useApp();
+
+  // Subscribe to proactive:suggestion_fired events on the Gordon event bus
+  // and push them into the chat stream as proactive_suggestion messages.
+  // This is the only place that bridges radar-mode suggestions into the TUI.
+  useProactiveChatSubscription(dispatch);
 
   // ── Selectors (fine-grained subscriptions) ──
   const bootPhase = useAppState((s) => s.bootPhase);

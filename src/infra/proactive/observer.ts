@@ -25,6 +25,10 @@ import type { EventType, GordonEvent } from "../../events/types.ts";
 import { createModuleLogger } from "../logger/index.ts";
 import { getProactiveEngine, type ProactiveObservation } from "./proactiveEngine.ts";
 import { registerAllProducers } from "./producers/index.ts";
+import { getSuggestionStore } from "./suggestionStore.ts";
+import { getCategoryPolicy } from "./categoryPolicy.ts";
+import { getOutcomeTracker } from "./outcomeEvals.ts";
+import { loadProactiveState, saveProactiveStateNow, flushPendingSave } from "./persistence.ts";
 
 const logger = createModuleLogger("proactive-observer");
 
@@ -67,8 +71,32 @@ const lastTickAt: Partial<Record<keyof typeof TICK_INTERVALS, number>> = {};
 // Start / stop
 // ============================================================================
 
-export function startProactiveObserver(): { started: boolean; subscriptions: number } {
+export function startProactiveObserver(): { started: boolean; subscriptions: number; loadedFromDisk: boolean } {
   const engine = getProactiveEngine();
+
+  // Hydrate persisted state first — feedback ledger, category policy, and
+  // outcome tracker are carried across restarts so acceptance rates and
+  // auto-suppression rules accumulate historically.
+  let loadedFromDisk = false;
+  try {
+    const saved = loadProactiveState();
+    if (saved) {
+      getSuggestionStore().deserialize({
+        suggestions: saved.suggestions,
+        feedback: saved.feedback,
+      });
+      getCategoryPolicy().deserialize(saved.categoryPolicies);
+      getOutcomeTracker().deserialize(saved.outcomes);
+      loadedFromDisk = true;
+      logger.info("Hydrated proactive state from disk", {
+        suggestions: saved.suggestions.length,
+        feedback: saved.feedback.length,
+        outcomes: saved.outcomes.length,
+      });
+    }
+  } catch (err) {
+    logger.warn("Failed to hydrate proactive state — starting fresh", { err: String(err) });
+  }
 
   // Register producers first — the engine needs them before events land
   if (!producerUnregister) {
@@ -120,12 +148,32 @@ export function startProactiveObserver(): { started: boolean; subscriptions: num
   logger.info("Proactive observer started", {
     subscriptions: unsubscribeFns.length,
     tickIntervals: Object.keys(TICK_INTERVALS).length,
+    loadedFromDisk,
   });
 
-  return { started: true, subscriptions: unsubscribeFns.length };
+  return { started: true, subscriptions: unsubscribeFns.length, loadedFromDisk };
 }
 
-export function stopProactiveObserver(): { stopped: boolean } {
+export function stopProactiveObserver(): { stopped: boolean; saved: boolean } {
+  // Flush any pending debounced save + write current state synchronously
+  // so we don't lose the final session's feedback on shutdown.
+  let saved = false;
+  try {
+    const collector = () => ({
+      version: 1,
+      savedAt: new Date().toISOString(),
+      suggestions: getSuggestionStore().serialize().suggestions,
+      feedback: getSuggestionStore().serialize().feedback,
+      categoryPolicies: getCategoryPolicy().serialize(),
+      outcomes: getOutcomeTracker().serialize(),
+    });
+    flushPendingSave(collector);
+    saveProactiveStateNow(collector());
+    saved = true;
+  } catch (err) {
+    logger.warn("Failed to persist proactive state on shutdown", { err: String(err) });
+  }
+
   for (const unsub of unsubscribeFns) {
     try {
       unsub();
@@ -149,8 +197,8 @@ export function stopProactiveObserver(): { stopped: boolean } {
     delete lastTickAt[key];
   }
 
-  logger.info("Proactive observer stopped");
-  return { stopped: true };
+  logger.info("Proactive observer stopped", { saved });
+  return { stopped: true, saved };
 }
 
 export function isObserverRunning(): boolean {

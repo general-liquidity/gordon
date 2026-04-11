@@ -30,6 +30,8 @@ import { getSuggestionStore } from "./suggestionStore.ts";
 import { getCategoryPolicy } from "./categoryPolicy.ts";
 import { getOutcomeTracker, autoRecordFromStore } from "./outcomeEvals.ts";
 import { judgeCandidate } from "./proposalJudge.ts";
+import { getEventBus } from "../../events/index.ts";
+import { saveProactiveStateDebounced } from "./persistence.ts";
 
 const logger = createModuleLogger("proactive-engine");
 
@@ -166,26 +168,77 @@ export class ProactiveEngine {
       confidence: full.confidence,
     });
 
+    // Emit on the Gordon event bus so TUI chat subscribers (and anything
+    // else that wants to react) can surface the suggestion to the user.
+    // Awaited so that any synchronous subscribers (the TUI chat hook) have
+    // observed the event before fireCandidate returns — prevents races in
+    // tests and ensures the chat message lands before the next tool call.
+    try {
+      await getEventBus().send("proactive:suggestion_fired", {
+        suggestionId: full.id,
+        category: full.category,
+        title: full.title,
+        body: full.body,
+        confidence: full.confidence,
+        action: full.action,
+        operation: full.operation,
+        triggers: full.triggers as unknown as Record<string, unknown>,
+      });
+    } catch (err) {
+      logger.debug("Failed to emit proactive:suggestion_fired", { err: String(err) });
+    }
+
     return { fired: true, suggestion: full };
   }
 
   /** User accepts a pending suggestion. */
-  accept(id: string): { ok: boolean; error?: string } {
+  async accept(id: string): Promise<{ ok: boolean; error?: string }> {
     const store = getSuggestionStore();
     const updated = store.updateStatus(id, "accepted", "CD");
     if (!updated) return { ok: false, error: `suggestion ${id} not found` };
-    getOutcomeTracker().record(id, store.get(id)!.category, "CD");
+    const category = store.get(id)!.category;
+    getOutcomeTracker().record(id, category, "CD");
+    await this.emitResolved(id, category, "accepted");
+    this.schedulePersist();
     return { ok: true };
   }
 
   /** User dismisses a pending suggestion. */
-  dismiss(id: string): { ok: boolean; error?: string } {
+  async dismiss(id: string): Promise<{ ok: boolean; error?: string }> {
     const store = getSuggestionStore();
     const s = store.get(id);
     if (!s) return { ok: false, error: `suggestion ${id} not found` };
     store.updateStatus(id, "dismissed", "FA");
     getOutcomeTracker().record(id, s.category, "FA");
+    await this.emitResolved(id, s.category, "dismissed");
+    this.schedulePersist();
     return { ok: true };
+  }
+
+  private async emitResolved(suggestionId: string, category: ProactiveCategory, status: "accepted" | "dismissed" | "suppressed" | "expired"): Promise<void> {
+    try {
+      await getEventBus().send("proactive:suggestion_resolved", {
+        suggestionId,
+        category,
+        status,
+      });
+    } catch {
+      // Best-effort — the bus may not be up in tests
+    }
+  }
+
+  private schedulePersist(): void {
+    saveProactiveStateDebounced(() => {
+      const storeData = getSuggestionStore().serialize();
+      return {
+        version: 1,
+        savedAt: new Date().toISOString(),
+        suggestions: storeData.suggestions,
+        feedback: storeData.feedback,
+        categoryPolicies: getCategoryPolicy().serialize(),
+        outcomes: getOutcomeTracker().serialize(),
+      };
+    });
   }
 
   /** Record a manually-observed outcome (usually for MN/NR reporting). */

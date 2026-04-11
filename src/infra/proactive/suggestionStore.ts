@@ -19,7 +19,7 @@ import type {
 
 const MAX_STORE = 500;
 
-interface FeedbackRecord {
+export interface FeedbackRecord {
   suggestionId: string;
   category: ProactiveCategory;
   status: ProactiveStatus;
@@ -135,6 +135,20 @@ export class SuggestionStore {
       oldestAt: this.suggestions[0]?.createdAt,
       newestAt: this.suggestions[this.suggestions.length - 1]?.createdAt,
     };
+  }
+
+  // ---- Persistence ----
+
+  serialize(): { suggestions: ProactiveSuggestion[]; feedback: FeedbackRecord[] } {
+    return {
+      suggestions: this.suggestions.slice(),
+      feedback: this.feedback.slice(),
+    };
+  }
+
+  deserialize(data: { suggestions?: ProactiveSuggestion[]; feedback?: FeedbackRecord[] }): void {
+    this.suggestions = Array.isArray(data.suggestions) ? data.suggestions.slice(0, MAX_STORE) : [];
+    this.feedback = Array.isArray(data.feedback) ? data.feedback.slice(0, MAX_STORE * 2) : [];
   }
 }
 

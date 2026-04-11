@@ -501,6 +501,33 @@ export interface PositionUpdatedEvent extends BaseEvent {
 }
 
 /**
+ * Proactive mode events
+ */
+export interface ProactiveSuggestionFiredEvent extends BaseEvent {
+  type: "proactive:suggestion_fired";
+  suggestionId: string;
+  category: string;
+  title: string;
+  body: string;
+  confidence: number;
+  action?: string;
+  operation?: {
+    tool: string;
+    args: Record<string, unknown>;
+    readOnly: boolean;
+    description: string;
+  };
+  triggers?: Record<string, unknown>;
+}
+
+export interface ProactiveSuggestionResolvedEvent extends BaseEvent {
+  type: "proactive:suggestion_resolved";
+  suggestionId: string;
+  category: string;
+  status: "accepted" | "dismissed" | "suppressed" | "expired";
+}
+
+/**
  * Union type of all events
  */
 export type GordonEvent =
@@ -564,7 +591,9 @@ export type GordonEvent =
   | PositionCancelledEvent
   | PositionRejectedEvent
   | PositionReviewedEvent
-  | PositionUpdatedEvent;
+  | PositionUpdatedEvent
+  | ProactiveSuggestionFiredEvent
+  | ProactiveSuggestionResolvedEvent;
 
 /**
  * Extract event type string

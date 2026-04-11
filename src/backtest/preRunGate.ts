@@ -6,12 +6,15 @@
  * `check_leverage_hard()` pattern — fail early instead of wasting compute on
  * a known-unsafe configuration.
  *
- * The gate consults the same risk limits the runtime RiskKernel enforces,
- * so backtests can't test configurations the live system would reject.
- * Keeps the simulation honest about the constraints of actual deployment.
+ * The gate consults the live RiskKernelConfig (same limits the runtime
+ * RiskKernel enforces) so backtests can't test configurations the live
+ * system would reject. Keeps the simulation honest about the constraints
+ * of actual deployment. Env overrides to the risk config (GORDON_RISK_*
+ * env vars) automatically flow through here — no duplicated config surface.
  */
 
 import type { BacktestConfig } from "./types.ts";
+import { loadConfigFromEnv as loadRiskConfig, type RiskKernelConfig } from "../core/risk-kernel/config.ts";
 
 // ============================================================================
 // Types
@@ -46,9 +49,10 @@ export interface PreRunGateResult {
 // ============================================================================
 
 /**
- * Default gate limits matching the trading constitution's conservative
- * defaults. These can be overridden by passing explicit limits into
- * `checkBacktestPreconditions`.
+ * Default gate limits. These are used ONLY as fallbacks when the risk kernel
+ * config can't be read (e.g. in tests). The normal path uses
+ * `getGateLimitsFromRiskConfig()` which pulls live values from
+ * RiskKernelConfig — same source as the runtime RiskKernel.
  */
 export const DEFAULT_GATE_LIMITS: PreRunGateLimits = {
   maxLeverage: 3,
@@ -60,6 +64,35 @@ export const DEFAULT_GATE_LIMITS: PreRunGateLimits = {
   maxFeePct: 2,
 };
 
+/**
+ * Derive gate limits from the user's live risk kernel config. Env overrides
+ * (GORDON_RISK_MAX_LEVERAGE, GORDON_RISK_MAX_DRAWDOWN_PERCENT, etc.) are
+ * honored automatically because loadConfigFromEnv reads them itself.
+ *
+ * Fields not covered by RiskKernelConfig (window bounds, fee sanity cap)
+ * fall back to DEFAULT_GATE_LIMITS values — those are backtest-specific
+ * and don't have a live-runtime analog.
+ */
+export function getGateLimitsFromRiskConfig(override?: Partial<RiskKernelConfig>): PreRunGateLimits {
+  let risk: RiskKernelConfig;
+  try {
+    risk = loadRiskConfig(override);
+  } catch {
+    return DEFAULT_GATE_LIMITS;
+  }
+  return {
+    maxLeverage: risk.maxLeverage ?? DEFAULT_GATE_LIMITS.maxLeverage,
+    maxDrawdownCap: risk.maxDrawdownPercent ?? DEFAULT_GATE_LIMITS.maxDrawdownCap,
+    // Minimum capital isn't in the risk config — the risk config is in USD
+    // *position* size, not portfolio size. Keep the default floor.
+    minInitialCapital: DEFAULT_GATE_LIMITS.minInitialCapital,
+    maxPositionSizePct: risk.maxPositionSizePercent ?? DEFAULT_GATE_LIMITS.maxPositionSizePct,
+    minWindowDays: DEFAULT_GATE_LIMITS.minWindowDays,
+    maxWindowDays: DEFAULT_GATE_LIMITS.maxWindowDays,
+    maxFeePct: DEFAULT_GATE_LIMITS.maxFeePct,
+  };
+}
+
 // ============================================================================
 // Check
 // ============================================================================
@@ -68,10 +101,14 @@ export const DEFAULT_GATE_LIMITS: PreRunGateLimits = {
  * Run the pre-run gate against a backtest configuration. Pure function.
  * Caller decides what to do with violations — typically return the result
  * from the tool with an error field and skip the engine call.
+ *
+ * Limits default to the live risk kernel config so the gate and the
+ * runtime RiskKernel enforce the same limits. Tests and tools that need
+ * different limits can pass explicit `limits` to override.
  */
 export function checkBacktestPreconditions(
   config: Partial<BacktestConfig> & { leverage?: number },
-  limits: PreRunGateLimits = DEFAULT_GATE_LIMITS,
+  limits: PreRunGateLimits = getGateLimitsFromRiskConfig(),
 ): PreRunGateResult {
   const violations: string[] = [];
 

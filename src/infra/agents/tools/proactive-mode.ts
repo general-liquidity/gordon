@@ -238,7 +238,7 @@ export const acceptProactiveSuggestionTool = createTool({
   }),
   execute: async ({ id }) => {
     const engine = getProactiveEngine();
-    const result = engine.accept(id);
+    const result = await engine.accept(id);
     if (!result.ok) return result;
 
     const suggestion = getSuggestionStore().get(id);
@@ -271,7 +271,7 @@ export const dismissProactiveSuggestionTool = createTool({
     error: z.string().optional(),
   }),
   execute: async ({ id }) => {
-    return getProactiveEngine().dismiss(id);
+    return await getProactiveEngine().dismiss(id);
   },
 });
 
