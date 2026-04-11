@@ -273,6 +273,7 @@ export function buildCandidate(
     title,
     body,
     action: options.action,
+    operation: options.operation,
     confidence: options.confidence ?? 0.7,
     createdAt: new Date().toISOString(),
     status: "pending" as ProactiveStatus,

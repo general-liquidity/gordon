@@ -88,6 +88,26 @@ export const OUTCOME_LABELS: Record<SuggestionOutcome, string> = {
 // Suggestion object
 // ============================================================================
 
+/**
+ * Structured operation attached to a suggestion — when present, accepting
+ * the suggestion can auto-invoke this tool call. Read-only operations can
+ * execute without further confirmation; write operations should surface
+ * a preview first.
+ */
+export interface ProactiveOperation {
+  /** Tool id to invoke (must exist in Gordon's tool registry). */
+  tool: string;
+  /** Arguments to pass to the tool. */
+  args: Record<string, unknown>;
+  /**
+   * True if the operation is read-only (safe to auto-execute on accept).
+   * False means the user should preview the effect before Gordon runs it.
+   */
+  readOnly: boolean;
+  /** Short human-readable description for the preview UI. */
+  description: string;
+}
+
 export interface ProactiveSuggestion {
   /** Unique id (timestamp-based). */
   id: string;
@@ -103,6 +123,13 @@ export interface ProactiveSuggestion {
    * "Tighten stop on BTC long to $94,200".
    */
   action?: string;
+  /**
+   * Optional structured operation — a specific tool call that the user
+   * can approve with a single accept. Enables one-click resolution of
+   * common suggestions (show portfolio, run technical analysis, etc.)
+   * without the user having to construct the call manually.
+   */
+  operation?: ProactiveOperation;
   /** 0..1 confidence the suggestion is needed. Only fires above threshold. */
   confidence: number;
   /** ISO timestamp of creation. */

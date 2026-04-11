@@ -23,6 +23,10 @@ import {
   buildCandidate,
   ALL_CATEGORIES,
   OUTCOME_LABELS,
+  getActiveJudge,
+  setActiveJudge,
+  HeuristicJudge,
+  LlmJudge,
   type ProactiveCategory,
   type SuggestionOutcome,
 } from "../../proactive/index.ts";
@@ -211,16 +215,41 @@ export const acceptProactiveSuggestionTool = createTool({
     "User accepts a proactive suggestion — marks it accepted, records a " +
     "Correct-Detection outcome, and shapes future category policy (accept " +
     "rate feeds the auto-tuning logic). Pass the suggestion id from " +
-    "list_proactive_suggestions.",
+    "list_proactive_suggestions. If the suggestion carries a structured " +
+    "`operation` (tool + args), that operation is returned in the response " +
+    "so the agent can decide whether to auto-invoke it. Read-only operations " +
+    "can be auto-invoked immediately; write operations should be previewed " +
+    "with the user first.",
   inputSchema: z.object({
     id: z.string().describe("Suggestion id (from list_proactive_suggestions)."),
   }),
   outputSchema: z.object({
     ok: z.boolean(),
     error: z.string().optional(),
+    operation: z
+      .object({
+        tool: z.string(),
+        args: z.record(z.string(), z.unknown()),
+        readOnly: z.boolean(),
+        description: z.string(),
+      })
+      .optional(),
+    autoInvokable: z.boolean().optional(),
   }),
   execute: async ({ id }) => {
-    return getProactiveEngine().accept(id);
+    const engine = getProactiveEngine();
+    const result = engine.accept(id);
+    if (!result.ok) return result;
+
+    const suggestion = getSuggestionStore().get(id);
+    if (suggestion?.operation) {
+      return {
+        ok: true,
+        operation: suggestion.operation,
+        autoInvokable: suggestion.operation.readOnly,
+      };
+    }
+    return { ok: true };
   },
 });
 
@@ -540,6 +569,37 @@ export const listProactiveCategoriesTool = createTool({
 });
 
 // ============================================================================
+// 14. set_proactive_judge — swap between heuristic and LLM judge
+// ============================================================================
+
+export const setProactiveJudgeTool = createTool({
+  id: "set_proactive_judge",
+  description:
+    "Swap the active proactive judge between the heuristic (fast, rule-based, " +
+    "default) and the LLM judge (slower, uses Gordon's runtime model to " +
+    "evaluate nuance). LLM judge always runs the heuristic first as a floor, " +
+    "so policy / cooldown / duplicate rejections still apply cheaply. Use LLM " +
+    "judge when you want higher quality proactive decisions and can accept " +
+    "300-1500ms added latency per suggestion evaluation.",
+  inputSchema: z.object({
+    judge: z.enum(["heuristic", "llm"]),
+  }),
+  outputSchema: z.object({
+    active: z.string(),
+    previous: z.string(),
+  }),
+  execute: async ({ judge }) => {
+    const previous = getActiveJudge().name;
+    if (judge === "llm") {
+      setActiveJudge(new LlmJudge());
+    } else {
+      setActiveJudge(new HeuristicJudge());
+    }
+    return { active: getActiveJudge().name, previous };
+  },
+});
+
+// ============================================================================
 // Export
 // ============================================================================
 
@@ -557,4 +617,5 @@ export const proactiveModeTools = {
   configure_proactive_category: configureProactiveCategoryTool,
   record_proactive_outcome: recordProactiveOutcomeTool,
   list_proactive_categories: listProactiveCategoriesTool,
+  set_proactive_judge: setProactiveJudgeTool,
 };

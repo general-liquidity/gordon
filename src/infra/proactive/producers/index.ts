@@ -14,6 +14,10 @@ import { scanOpportunityProducer } from "./scanOpportunityProducer.ts";
 import { riskProducer } from "./riskProducer.ts";
 import { stopProducer } from "./stopProducer.ts";
 import { periodicProducer, resetPeriodicProducerState } from "./periodicProducer.ts";
+import { portfolioDriftProducer } from "./portfolioDriftProducer.ts";
+import { regimeFlipProducer, resetRegimeFlipProducerState } from "./regimeFlipProducer.ts";
+import { volatilitySpikeProducer, resetVolatilitySpikeProducerState } from "./volatilitySpikeProducer.ts";
+import { fundingAlertProducer, resetFundingAlertProducerState } from "./fundingAlertProducer.ts";
 
 export {
   tradeEventProducer,
@@ -21,6 +25,10 @@ export {
   riskProducer,
   stopProducer,
   periodicProducer,
+  portfolioDriftProducer,
+  regimeFlipProducer,
+  volatilitySpikeProducer,
+  fundingAlertProducer,
 };
 
 /**
@@ -34,11 +42,18 @@ export function registerAllProducers(engine: ProactiveEngine): () => void {
     engine.registerProducer(riskProducer),
     engine.registerProducer(stopProducer),
     engine.registerProducer(periodicProducer),
+    engine.registerProducer(portfolioDriftProducer),
+    engine.registerProducer(regimeFlipProducer),
+    engine.registerProducer(volatilitySpikeProducer),
+    engine.registerProducer(fundingAlertProducer),
   ];
 
   return () => {
     for (const fn of unregisterFns) fn();
     resetTradeEventProducerState();
     resetPeriodicProducerState();
+    resetRegimeFlipProducerState();
+    resetVolatilitySpikeProducerState();
+    resetFundingAlertProducerState();
   };
 }

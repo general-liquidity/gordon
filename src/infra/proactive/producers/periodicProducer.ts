@@ -41,13 +41,10 @@ export const periodicProducer: CandidateProducer = async (obs): Promise<Proactiv
       candidates.push(...drainWhaleBuffer());
       break;
 
-    // Scaffolded but not yet producing candidates — see file docstring
-    case "tick_portfolio_drift":
-    case "tick_regime_flip":
-    case "tick_volatility":
-    case "tick_funding":
-      return [];
-
+    // tick_portfolio_drift, tick_regime_flip, tick_volatility, tick_funding
+    // are handled by dedicated producers (portfolioDriftProducer,
+    // regimeFlipProducer, volatilitySpikeProducer, fundingAlertProducer) —
+    // this producer ignores them.
     default:
       return [];
   }

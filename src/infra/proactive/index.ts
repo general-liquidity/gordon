@@ -24,3 +24,4 @@ export {
   type ProactiveObservation,
   type CandidateProducer,
 } from "./proactiveEngine.ts";
+export { LlmJudge } from "./llmJudge.ts";
