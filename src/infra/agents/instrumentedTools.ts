@@ -67,6 +67,8 @@ import {
   proactiveModeTools,
   backtestVerdictTools,
   finnhubTools,
+  finnhubFundamentalsTools,
+  finnhubMarketsTools,
   smcPatternTools,
   calibrationTools,
   skillLoaderTools,
@@ -150,6 +152,8 @@ export const instrumentedCdpWebhookReceiverTools = withToolsMetrics(cdpWebhookRe
 export const instrumentedProactiveModeTools = withToolsMetrics(proactiveModeTools);
 export const instrumentedBacktestVerdictTools = withToolsMetrics(backtestVerdictTools);
 export const instrumentedFinnhubTools = withToolsMetrics(finnhubTools);
+export const instrumentedFinnhubFundamentalsTools = withToolsMetrics(finnhubFundamentalsTools);
+export const instrumentedFinnhubMarketsTools = withToolsMetrics(finnhubMarketsTools);
 export const instrumentedSmcPatternTools = withToolsMetrics(smcPatternTools);
 export const instrumentedCalibrationTools = withToolsMetrics(calibrationTools);
 export const instrumentedSkillLoaderTools = withToolsMetrics(skillLoaderTools);

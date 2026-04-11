@@ -89,6 +89,8 @@ export { cdpWebhookReceiverTools } from "./cdp-webhook-receiver.ts";
 export { proactiveModeTools } from "./proactive-mode.ts";
 export { backtestVerdictTools } from "./backtest-verdict.ts";
 export { finnhubTools } from "./finnhub-tools.ts";
+export { finnhubFundamentalsTools } from "./finnhub-fundamentals-tools.ts";
+export { finnhubMarketsTools } from "./finnhub-markets-tools.ts";
 export { smcPatternTools } from "./smc-pattern-tools.ts";
 export { calibrationTools } from "./calibration-tools.ts";
 export { skillLoaderTools } from "./skill-loader.ts";
@@ -352,6 +354,8 @@ import { cdpWebhookReceiverTools } from "./cdp-webhook-receiver.ts";
 import { proactiveModeTools } from "./proactive-mode.ts";
 import { backtestVerdictTools } from "./backtest-verdict.ts";
 import { finnhubTools } from "./finnhub-tools.ts";
+import { finnhubFundamentalsTools } from "./finnhub-fundamentals-tools.ts";
+import { finnhubMarketsTools } from "./finnhub-markets-tools.ts";
 import { smcPatternTools } from "./smc-pattern-tools.ts";
 import { calibrationTools } from "./calibration-tools.ts";
 import { skillLoaderTools } from "./skill-loader.ts";
@@ -436,6 +440,8 @@ const _rawAllTools = {
   ...proactiveModeTools,
   ...backtestVerdictTools,
   ...finnhubTools,
+  ...finnhubFundamentalsTools,
+  ...finnhubMarketsTools,
   ...smcPatternTools,
   ...calibrationTools,
   ...skillLoaderTools,
@@ -522,6 +528,8 @@ export const toolCounts = {
   proactiveMode: Object.keys(proactiveModeTools).length,
   backtestVerdict: Object.keys(backtestVerdictTools).length,
   finnhub: Object.keys(finnhubTools).length,
+  finnhubFundamentals: Object.keys(finnhubFundamentalsTools).length,
+  finnhubMarkets: Object.keys(finnhubMarketsTools).length,
   smcPattern: Object.keys(smcPatternTools).length,
   calibration: Object.keys(calibrationTools).length,
   skillLoader: Object.keys(skillLoaderTools).length,

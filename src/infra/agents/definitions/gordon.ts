@@ -62,6 +62,8 @@ import {
   instrumentedProactiveModeTools,
   instrumentedBacktestVerdictTools,
   instrumentedFinnhubTools,
+  instrumentedFinnhubFundamentalsTools,
+  instrumentedFinnhubMarketsTools,
   instrumentedSmcPatternTools,
   instrumentedCalibrationTools,
   instrumentedSkillLoaderTools,
@@ -184,16 +186,75 @@ Research mode is a self-directed strategy research loop: form hypothesis → run
 - Never modify verdict thresholds to game the screening — the journal catches it
 
 ## Stock Intelligence (Finnhub)
-Dedicated stock-side data surface covering what Gordon's CEX-first engine doesn't natively provide. All tools degrade gracefully when FINNHUB_API_KEY is missing.
-- **get_upcoming_earnings**: earnings calendar for next N days (use for earnings plays, pre-print positioning)
-- **get_earnings_estimates**: analyst EPS/revenue consensus (premium endpoint)
+Comprehensive data surface covering stocks, ETFs, mutual funds, indices, bonds, crypto, forex, and macro. All tools degrade gracefully when FINNHUB_API_KEY is missing. Free tier covers quotes/candles/company news/basics; premium endpoints (earnings estimates, insider sentiment, congressional trades, lobbying, patents, supply chain, transcripts, alt data) return an error on free tier.
+
+**Events & Calendar**:
+- **get_upcoming_earnings**: earnings calendar for next N days
+- **get_earnings_estimates** / **get_revenue_estimates**: analyst EPS and revenue consensus
+- **get_earnings_surprises**: historical actual vs estimate + beat rate
 - **get_economic_calendar**: macro releases (CPI, NFP, FOMC, GDP)
-- **get_insider_transactions**: Form 4 filings, cluster detection
-- **get_congressional_trading**: STOCK Act disclosures (premium endpoint)
-- **get_analyst_ratings**: recommendation trend for a symbol
+- **get_ipo_calendar**: upcoming + recent IPOs
+- **get_insider_transactions** / **get_insider_sentiment**: Form 4 filings and aggregate monthly sentiment
+- **get_congressional_trading**: STOCK Act disclosures
+
+**Fundamentals & Profile**:
+- **get_company_profile**: name, industry, market cap, shares outstanding, IPO date
+- **get_basic_financials**: P/E, P/B, P/S, margins, ROE, ROA, growth rates, beta
+- **get_financials_reported**: raw 10-K/10-Q line items
+- **get_peer_companies**: comparable tickers (industry/sector/subIndustry)
+- **get_dividends** / **get_stock_splits**: payout and split history
+- **get_esg_score**: environment, social, governance scores
+
+**Analyst & Sentiment**:
+- **get_analyst_ratings**: recommendation trend counts by period
+- **get_price_target**: target mean/median/high/low
+- **get_upgrade_downgrade**: analyst rating changes
+- **get_social_sentiment**: Reddit + Twitter mention counts and scores
+- **get_news_sentiment**: aggregate buzz + bullish/bearish percent
+- **get_company_news** / **get_market_news**: headlines, summaries, URLs
+
+**Ownership**:
+- **get_fund_ownership**: mutual fund + ETF holders
+- **get_institutional_ownership**: 13F institutional positions
+
+**Filings & Alt Data**:
 - **get_sec_filings**: 10-K / 10-Q / 8-K list
-- **get_news_sentiment**: buzz + bullish/bearish scoring
-- **get_etf_holdings**: ETF constituent weights
+- **list_earnings_transcripts** / **get_earnings_transcript**: full call transcripts
+- **get_lobbying**: federal lobbying disclosures
+- **get_usa_spending**: US government contract awards
+- **get_uspto_patents**: patent filings
+- **get_visa_applications**: H-1B / L-1 sponsorships
+- **get_supply_chain**: supplier + customer correlations
+
+**Market Data & Scanner**:
+- **get_stock_quote**: real-time quote (price, change, day range)
+- **get_stock_candles**: OHLCV history at any resolution
+- **get_stock_symbols** / **symbol_lookup**: build universes, find tickers by name
+- **get_market_status**: exchange open/closed/session
+- **get_pattern_recognition**: chart patterns (triangles, flags, H&S, etc.)
+- **get_support_resistance**: key price levels
+- **get_aggregate_signal**: buy/sell/neutral technical consensus
+
+**Funds & Indices**:
+- **get_etf_holdings** / **get_etf_profile**: ETF constituents + metadata
+- **get_etf_country_exposure** / **get_etf_sector_exposure**: geographic + sector breakdown
+- **get_mutual_fund_profile** / **get_mutual_fund_holdings**: mutual fund analysis
+- **get_mutual_fund_country_exposure** / **get_mutual_fund_sector_exposure**
+- **get_index_constituents**: S&P 500, Nasdaq-100, Dow, Russell 2000 members
+
+**Bonds & Rates**:
+- **get_bond_yield_curve**: yield series by tenor (3m, 2y, 10y, 30y)
+- **get_bond_profile**: bond metadata by ISIN
+
+**Crypto (additive to native Binance/Hyperliquid/Jupiter/Uniswap)**:
+- **get_finnhub_crypto_exchanges** / **get_finnhub_crypto_symbols**: Finnhub exchange coverage
+- **get_finnhub_crypto_candles**: historical OHLCV for cross-exchange sanity checks
+- **get_finnhub_crypto_profile**: asset metadata (supply, website, whitepaper)
+
+**Forex & Economic**:
+- **get_forex_rates**: live rates with configurable base currency
+- **list_economic_codes** / **get_economic_data**: macro indicator series
+
 - Radar categories fueled by Finnhub: earnings_approaching, insider_flow_alert, analyst_upgrade, congressional_trade
 
 ## SMC / ICT Patterns
@@ -323,6 +384,8 @@ export function getGordon(): Agent {
       ...instrumentedProactiveModeTools,
       ...instrumentedBacktestVerdictTools,
       ...instrumentedFinnhubTools,
+      ...instrumentedFinnhubFundamentalsTools,
+      ...instrumentedFinnhubMarketsTools,
       ...instrumentedSmcPatternTools,
       ...instrumentedCalibrationTools,
       ...instrumentedSkillLoaderTools,
