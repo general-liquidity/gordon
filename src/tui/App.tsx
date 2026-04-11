@@ -195,6 +195,7 @@ function AppInner() {
   const messages = useAppState((s) => s.messages);
   const isStreaming = useAppState((s) => s.isStreaming);
   const streamBuffer = useAppState((s) => s.streamBuffer);
+  const activeThinking = useAppState((s) => s.activeThinking);
   const activeAgents = useAppState((s) => s.activeAgents);
   const swarmMode = useAppState((s) => s.swarmMode);
   const handoffHistory = useAppState((s) => s.handoffHistory);
@@ -1153,7 +1154,7 @@ function AppInner() {
           {/* ThinkStep — collapsible, trading-adapted. Shows during thinking, then "analyzed for Xs" on completion */}
           {(isThinking || (isStreaming && streamBuffer && thinkingAgent)) && thinkingAgent && (
             <ThinkStep
-              reasoning={`Evaluating with ${thinkingAgent.agentName}...`}
+              reasoning={activeThinking || `Evaluating with ${thinkingAgent.agentName}...`}
               agentName={thinkingAgent.agentName}
               elapsedMs={thinkingAgent.duration}
               isComplete={!!streamBuffer}

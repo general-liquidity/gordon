@@ -271,6 +271,7 @@ async function streamResponse(
     ...prev,
     isStreaming: true,
     streamBuffer: "",
+    activeThinking: "",
     activeAgents: [],
     activeToolCalls: [],
     handoffHistory: prev.handoffHistory ?? [],

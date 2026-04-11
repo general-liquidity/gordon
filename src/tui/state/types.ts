@@ -62,6 +62,7 @@ export interface AppState {
   // Streaming
   streamBuffer: string;
   isStreaming: boolean;
+  activeThinking: string;
 
   // Agents
   activeAgents: AgentChain[];
@@ -117,6 +118,7 @@ export const INITIAL_STATE: AppState = {
   completedMessageCount: 0,
   streamBuffer: "",
   isStreaming: false,
+  activeThinking: "",
   activeAgents: [],
   swarmMode: false,
   handoffHistory: [],

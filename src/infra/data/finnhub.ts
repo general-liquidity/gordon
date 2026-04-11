@@ -19,6 +19,10 @@
 
 import { Cache } from "../platform/cache/cache.ts";
 import { createModuleLogger } from "../logger/index.ts";
+import {
+  checkEndpointRateLimit,
+  recordEndpointCall,
+} from "../agents/tools/rate-limiter.ts";
 
 const logger = createModuleLogger("finnhub");
 const BASE_URL = "https://finnhub.io/api/v1";
@@ -173,11 +177,23 @@ async function finnhubGet<T>(
   const cached = responseCache.get(cacheKey);
   if (cached !== undefined) return { ok: true, data: cached as T };
 
+  const endpointKey = path.replace(/^\//, "").split("/")[0] ?? "misc";
+  const limitCheck = checkEndpointRateLimit("finnhub", endpointKey);
+  if (!limitCheck.allowed) {
+    const waitSec = Math.ceil((limitCheck.waitTimeMs ?? 0) / 1000);
+    return {
+      ok: false,
+      status: 429,
+      error: `Finnhub rate limit: ${limitCheck.reason ?? "endpoint throttled"}${waitSec > 0 ? ` (wait ${waitSec}s)` : ""}`,
+    };
+  }
+
   try {
     const res = await fetch(url, {
       headers: { "User-Agent": "gordon-cli/0.7" },
       signal: AbortSignal.timeout(15_000),
     });
+    if (res.ok) recordEndpointCall("finnhub", endpointKey);
     if (res.status === 401 || res.status === 403) {
       return {
         ok: false,
