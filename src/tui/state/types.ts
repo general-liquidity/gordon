@@ -33,7 +33,13 @@ export interface TuiNotification {
 // Permission & Boot
 // ============================================================================
 
-export type PermissionMode = "auto" | "ask" | "strict";
+export type PermissionMode =
+  | "auto"        // Trades execute without per-action approval (only constitution + rules block)
+  | "ask"         // Each trade requires explicit user approval via ApprovalDialog
+  | "strict"      // Read-only mode; all trades blocked, analysis-only
+  | "paper"       // Paper trading only — real orders blocked, simulated fills allowed
+  | "observe"     // Pure observation — no execution of any kind, even paper trades
+  | "plan"        // Preview/planning only — can create plans but not execute them;
 
 export type BootPhase = "boot" | "ready";
 

@@ -134,33 +134,43 @@ export function createMemory(): Memory {
  * workingMemory.enabled before adding the tool). Sub-agents use our custom
  * shared_context tools for cross-agent communication instead.
  */
-let _subAgentMemory: Memory | null = null;
+/**
+ * Per-agent memory instances. Each sub-agent gets its own isolated store
+ * so Executor learns from execution outcomes and Researcher learns from
+ * analysis patterns independently. Claude Code pattern: agent-scoped
+ * persistent knowledge stores.
+ */
+const _subAgentMemories = new Map<string, Memory>();
 
-export function createSubAgentMemory(): Memory {
-  if (!_subAgentMemory) {
-    const dbUrl = process.env.DATABASE_URL || "file:gordon.db";
-    const { storage } = createMastraStorageConfig({
-      storeId: "gordon-sub-memory",
-      dbUrl,
-      enableVector: false,
-    });
-    _subAgentMemory = new Memory({
-      storage,
-      options: {
-        lastMessages: 10,
-        workingMemory: {
-          enabled: false,
-        },
+export function createSubAgentMemory(agentId?: string): Memory {
+  const key = agentId ?? "_shared";
+  const existing = _subAgentMemories.get(key);
+  if (existing) return existing;
+
+  const dbUrl = process.env.DATABASE_URL || "file:gordon.db";
+  const storeId = agentId ? `gordon-memory-${agentId}` : "gordon-sub-memory";
+  const { storage } = createMastraStorageConfig({
+    storeId,
+    dbUrl,
+    enableVector: false,
+  });
+  const mem = new Memory({
+    storage,
+    options: {
+      lastMessages: 10,
+      workingMemory: {
+        enabled: false,
       },
-    });
-  }
-  return _subAgentMemory;
+    },
+  });
+  _subAgentMemories.set(key, mem);
+  return mem;
 }
 
 /**
- * Reset the sub-agent memory singleton.
+ * Reset all sub-agent memory instances.
  * Called when the session is cleared.
  */
 export function resetSubAgentMemory(): void {
-  _subAgentMemory = null;
+  _subAgentMemories.clear();
 }

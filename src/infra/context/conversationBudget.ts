@@ -12,6 +12,7 @@
  */
 
 import { persistLargeResult, buildPersistedContent, PREVIEW_CHARS } from "./toolResultStorage.ts";
+import { getToolResultBudget } from "../agents/tools/concurrency-classification.ts";
 
 // ============================================================================
 // Configuration
@@ -69,19 +70,31 @@ export class ConversationBudget {
   }
 
   /**
-   * Track a new tool result. If the conversation budget is exceeded,
-   * trim the oldest results until we're under budget.
+   * Track a new tool result. Enforces per-family result budget (from
+   * concurrency classification) BEFORE adding to conversation budget,
+   * then enforces the global conversation budget on top.
+   *
+   * Per-family budgets (Claude Code pattern): market data gets 80K,
+   * backtests get 100K, analysis 60K, trade execution 20K, etc.
    */
   add(toolName: string, toolCallId: string, content: string, turn: number): TrackedResult {
+    // Per-family result budget: trim individual result before tracking
+    const familyBudget = getToolResultBudget(toolName);
+    let trimmedContent = content;
+    if (content.length > familyBudget) {
+      const { preview, filePath, originalSize } = persistLargeResult(toolName, toolCallId, content);
+      trimmedContent = buildPersistedContent(filePath, preview, originalSize);
+    }
+
     const entry: TrackedResult = {
       id: `tr_${this.nextId++}`,
       toolName,
       toolCallId,
-      content,
+      content: trimmedContent,
       originalSize: content.length,
       turn,
-      spilledToDisk: false,
-      trimmed: false,
+      spilledToDisk: trimmedContent !== content,
+      trimmed: trimmedContent !== content,
     };
 
     this.results.push(entry);

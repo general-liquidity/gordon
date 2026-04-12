@@ -115,7 +115,7 @@ export function getResearcher(): Agent {
       ...instrumentedEvalTools,
       ...instrumentedRegimeTools,
     },
-    memory: createSubAgentMemory(),
+    memory: createSubAgentMemory("researcher"),
     inputProcessors: [gordonInputGuard, new TokenLimiterProcessor({ limit: 32000 })],
     outputProcessors: [gordonOutputSanitizer],
   });

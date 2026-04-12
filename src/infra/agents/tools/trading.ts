@@ -16,6 +16,7 @@ import { z } from "zod";
 
 import { generatePlan } from "../../../core/planner.ts";
 import { executePlan, closeTrade, closePartialPosition } from "../../../core/executor.ts";
+import { runHooks } from "../../hooks/engine.ts";
 import { analyze } from "../../../core/analyzer.ts";
 import { calculateGridLevels } from "../../../core/grid-calculator.ts";
 import {
@@ -344,7 +345,14 @@ export const executePlanTool = createTool({
       return validateToolOutput(executePlanOutputSchema, { success: false, error: `Plan not found: ${planId}` }, { toolName: "execute_plan" });
     }
 
-    if (ctx.config.permissionMode === "strict") {
+    // Permission mode gate: block execution for read-only / non-trading modes
+    const mode = ctx.config.permissionMode;
+    if (mode === "strict" || mode === "observe" || mode === "plan") {
+      const modeLabels: Record<string, string> = {
+        strict: "read-only",
+        observe: "observation-only — no execution of any kind",
+        plan: "planning-only — can create plans but not execute them",
+      };
       recordStructuredObservation({
         eventType: "execution.blocked",
         workflow: "execution",
@@ -352,15 +360,15 @@ export const executePlanTool = createTool({
         component: "execute_plan",
         toolName: "execute_plan",
         outcome: "failure",
-        status: "strict_permission_mode",
-        mode: ctx.config.permissionMode,
+        status: `${mode}_permission_mode`,
+        mode,
         planId,
         symbol: plan.symbol,
-        reason: "Cannot execute: permissionMode is 'strict' (read-only). Use /auto or /ask to enable trading.",
+        reason: `Cannot execute: permissionMode is '${mode}' (${modeLabels[mode]}). Use /auto or /ask to enable trading.`,
       });
       return validateToolOutput(executePlanOutputSchema, {
         success: false,
-        error: "Cannot execute: permissionMode is 'strict' (read-only). Use /auto or /ask to enable trading.",
+        error: `Cannot execute: permissionMode is '${mode}' (${modeLabels[mode]}). Use /auto or /ask to enable trading.`,
       }, { toolName: "execute_plan" });
     }
 
@@ -425,11 +433,39 @@ export const executePlanTool = createTool({
       );
     }
 
+    // PreOrderPlacement hook — can block or modify the order
+    const preOrderHook = await runHooks("PreOrderPlacement", {
+      symbol: plan.symbol,
+      side: "buy" as const,
+      quantity: plan.allocation.amount / (plan.entry.price || 1),
+      orderType: plan.entry.type === "market" ? "MARKET" : "LIMIT",
+      notionalUsd: plan.allocation.amount,
+      exchangeId: ctx.exchange?.name,
+    });
+    if (preOrderHook.action === "block") {
+      return validateToolOutput(executePlanOutputSchema, {
+        success: false,
+        error: `PreOrderPlacement hook blocked: ${preOrderHook.reason}`,
+      }, { toolName: "execute_plan" });
+    }
+
     const result = await executePlan(ctx.exchange, plan, ctx.config, {
       totalValue: ctx.portfolioValue,
       availableCash: ctx.availableCash,
       openPositions: getActiveTrades().length,
     });
+
+    // PostOrderPlacement hook — fires after execution regardless of success
+    if (result.success && result.trade) {
+      runHooks("PostOrderPlacement", {
+        orderId: result.trade.id,
+        symbol: result.trade.symbol,
+        side: "buy" as const,
+        status: "filled",
+        filledQty: plan.allocation.amount / (plan.entry.price || 1),
+        notionalUsd: plan.allocation.amount,
+      }).catch(() => {}); // Fire-and-forget — don't block response
+    }
 
     if (result.success && result.trade) {
       recordStructuredObservation({
