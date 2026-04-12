@@ -104,8 +104,8 @@ const approvePlanOutputSchema = z.object({
 
 const setPermissionModeOutputSchema = z.object({
   success: z.boolean(),
-  permissionMode: z.enum(["auto", "ask", "strict"]).optional(),
-  previousMode: z.enum(["auto", "ask", "strict"]).optional(),
+  permissionMode: z.enum(["auto", "ask", "strict", "paper", "observe", "plan"]).optional(),
+  previousMode: z.enum(["auto", "ask", "strict", "paper", "observe", "plan"]).optional(),
   message: z.string(),
   error: z.string().optional(),
 });
@@ -675,13 +675,18 @@ export const setPermissionModeTool = createTool({
   id: "set_permission_mode",
   description:
     "Set Gordon's permission mode. Prefer the explicit slash commands " +
-    "/auto, /ask, /strict in the terminal UI. Use this tool only when the " +
-    "user has clearly requested a mode change.\n" +
-    "- auto:   trades execute without per-action approval\n" +
-    "- ask:    each trade requires ApprovalDialog confirmation (default)\n" +
-    "- strict: read-only, all trades blocked",
+    "/auto, /ask, /strict, /paper, /observe, /planmode in the terminal UI. " +
+    "Use this tool only when the user has clearly requested a mode change.\n" +
+    "- auto:    trades execute without per-action approval\n" +
+    "- ask:     each trade requires ApprovalDialog confirmation (default)\n" +
+    "- strict:  read-only, all trades blocked\n" +
+    "- paper:   paper trading only — real orders blocked, simulated fills allowed\n" +
+    "- observe: pure observation — no execution of any kind\n" +
+    "- plan:    planning only — create plans but cannot execute them",
   inputSchema: z.object({
-    mode: z.enum(["auto", "ask", "strict"]).describe("Permission mode to set"),
+    mode: z
+      .enum(["auto", "ask", "strict", "paper", "observe", "plan"])
+      .describe("Permission mode to set"),
   }),
   outputSchema: setPermissionModeOutputSchema,
   execute: async ({ mode }) => {
@@ -702,10 +707,13 @@ export const setPermissionModeTool = createTool({
       details: { previous },
     });
 
-    const descriptions: Record<"auto" | "ask" | "strict", string> = {
+    const descriptions: Record<"auto" | "ask" | "strict" | "paper" | "observe" | "plan", string> = {
       auto: "Trades now execute without per-action approval.",
       ask: "Each trade now requires approval via dialog (default).",
       strict: "Read-only mode. All trades blocked.",
+      paper: "Paper trading mode. Real orders blocked; simulated fills recorded.",
+      observe: "Observation mode. No execution of any kind — not even paper trades.",
+      plan: "Planning-only mode. Plans can be created but not executed.",
     };
 
     return validateToolOutput(setPermissionModeOutputSchema, {

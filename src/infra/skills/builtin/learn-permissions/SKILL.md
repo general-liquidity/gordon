@@ -10,7 +10,7 @@ Gordon has a layered safety system. Here's how it works from top to bottom.
 
 ## Permission Modes
 
-Three modes, switchable anytime:
+Six modes, switchable anytime:
 
 ### /ask (DEFAULT — recommended)
 Every trade shows an ApprovalDialog:
@@ -30,10 +30,32 @@ Read-only mode. ALL trades blocked. Use for:
 - Demo mode
 - When you're away
 
+### /paper
+Paper trading only — real orders blocked, simulated fills recorded. Use for:
+- Learning a new strategy risk-free
+- Pre-deploying a strategy before going live
+- Benchmarking strategies side-by-side without capital exposure
+- Demo recordings where you want end-to-end execution visible without real spend
+
+### /observe
+Pure observation — no execution of any kind, not even paper trades. Use for:
+- Watching market structure without any action
+- Auditing Gordon's decision making
+- Safe review when you're unsure about current mode
+- Letting Gordon talk through setups without any action surface
+
+### /planmode
+Planning only — can create plans but cannot execute them. Use for:
+- Building a playbook of trade ideas to review later
+- Preparing setups for a future session with live execution
+- Drafting strategies without risk of accidental fat-finger execution
+
 ## The Safety Stack (5 Layers)
 
 ### Layer 1: Permission Mode
-- `/strict` → blocked immediately, no further checks
+- `/strict`, `/observe` → blocked immediately, no further checks (observe also blocks paper)
+- `/planmode` → plans created but execute_plan blocked
+- `/paper` → real orders blocked but simulated fills run through the normal pipeline
 - `/auto` → skips approval dialog (but still runs risk classifier)
 - `/ask` → shows approval dialog
 

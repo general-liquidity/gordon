@@ -79,12 +79,12 @@ const portfolioOutputSchema = z.object({
 });
 
 const setPermissionModeInputSchema = z.object({
-  mode: z.enum(["auto", "ask", "strict"]),
+  mode: z.enum(["auto", "ask", "strict", "paper", "observe", "plan"]),
 });
 
 const setPermissionModeOutputSchema = z.object({
   success: z.boolean(),
-  mode: z.enum(["auto", "ask", "strict"]),
+  mode: z.enum(["auto", "ask", "strict", "paper", "observe", "plan"]),
 });
 
 const fundInputSchema = z.object({

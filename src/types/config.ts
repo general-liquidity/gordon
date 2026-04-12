@@ -305,11 +305,14 @@ export const GordonConfigSchema = z.object({
   modelConfig: ModelConfigSchema.optional(),
   /**
    * Permission mode — how Gordon gates trade-impacting actions.
-   *   - "auto":   trade tools execute without per-action approval
-   *   - "ask":    each trade requires ApprovalDialog confirmation (default)
-   *   - "strict": read-only — trade tools blocked entirely
+   *   - "auto":    trade tools execute without per-action approval
+   *   - "ask":     each trade requires ApprovalDialog confirmation (default)
+   *   - "strict":  read-only — trade tools blocked entirely
+   *   - "paper":   paper trading only — real orders blocked, simulated fills allowed
+   *   - "observe": pure observation — no execution of any kind
+   *   - "plan":    planning only — can create plans but not execute them
    */
-  permissionMode: z.enum(["auto", "ask", "strict"]).default("ask"),
+  permissionMode: z.enum(["auto", "ask", "strict", "paper", "observe", "plan"]).default("ask"),
   onboardingComplete: z.boolean().default(false),
   startupBannerMode: z.enum(["full", "quiet"]).default("full"),
   /** MCP Server configurations */

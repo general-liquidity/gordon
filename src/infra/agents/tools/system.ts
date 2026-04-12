@@ -39,7 +39,7 @@ export const testConnectionTool = createTool({
     "Use when user asks 'test connection', 'check API', 'are my keys working?'",
   inputSchema: z.object({}),
   outputSchema: z.object({
-    permissionMode: z.enum(["auto", "ask", "strict"]),
+    permissionMode: z.enum(["auto", "ask", "strict", "paper", "observe", "plan"]),
     canTradeNow: z.boolean(),
     llmConnected: z.boolean(),
     binanceConnected: z.boolean(),
