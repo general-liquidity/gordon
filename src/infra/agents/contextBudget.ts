@@ -7,6 +7,7 @@ import type { IntegrationGlossarySelection } from "./integrationGlossary.ts";
 import { determineWorkflowPhase } from "./workflowPhase.ts";
 import { composeRuntimePromptSections } from "./promptSections.ts";
 import { microcompactMessages } from "../context/microcompact.ts";
+import { getCachedPrefix, setCachedPrefix, matchesCachedPrefix } from "./sharedPrefixCache.ts";
 
 export const PROJECT_TRUTH_MARKER = "[GORDON_PROJECT_TRUTH]";
 export const INTEGRATION_GLOSSARY_MARKER = "[GORDON_INTEGRATION_GLOSSARY]";
@@ -388,11 +389,25 @@ export function buildPromptEnvelope(
     ),
   ].filter((piece) => piece.content.trim().length > 0);
 
-  const stablePrefix = contextPieces
-    .filter((piece) => piece.stable)
-    .sort((a, b) => a.priority - b.priority)
-    .map((piece) => piece.content)
-    .join("\n\n");
+  // Build stable prefix from stable context pieces. Cache per-thread so
+  // that subsequent invocations within the 5-min Anthropic cache window
+  // can reuse the byte-identical text (Claude Code fork-agent pattern
+  // for 90% prompt cache discount on parallel children).
+  const agentCacheKey = `gordon:${context.threadId ?? "default"}`;
+  const stablePrefix = (() => {
+    const candidate = contextPieces
+      .filter((piece) => piece.stable)
+      .sort((a, b) => a.priority - b.priority)
+      .map((piece) => piece.content)
+      .join("\n\n");
+    // Reuse the cached text verbatim when it matches — preserves byte-
+    // identical prefix for maximum prompt cache hit rate.
+    if (matchesCachedPrefix(agentCacheKey, candidate)) {
+      return getCachedPrefix(agentCacheKey)?.stableText ?? candidate;
+    }
+    setCachedPrefix(agentCacheKey, candidate);
+    return candidate;
+  })();
   const dynamicContextBlock = contextPieces
     .filter((piece) => !piece.stable)
     .sort((a, b) => a.priority - b.priority)

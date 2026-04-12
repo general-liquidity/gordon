@@ -13,6 +13,8 @@
 
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
+import { checkTradingPermission } from "./permissionHelpers.ts";
+import { runHooks } from "../../hooks/engine.ts";
 
 import { formatActionPlanMarkdown, planActionExecution } from "../../runtime/actions/runtime.ts";
 import { normalizeCryptoSymbol, resolveInstrument } from "../../domain/markets/instruments.ts";
@@ -483,15 +485,18 @@ export const placeBracketOrderTool = createTool({
       return errors.noExchange;
     }
 
-    if (ctx.config?.permissionMode === "strict") {
-      return {
-        error: "permissionMode must not be 'strict' to place bracket orders. Use /auto or /ask.",
-        symbol,
-        side,
-        quantity,
-        stopLossPrice,
-        takeProfitPrice,
-      };
+    {
+      const check = checkTradingPermission(ctx.config?.permissionMode, "execute");
+      if (!check.allowed) {
+        return {
+          error: check.reason ?? "Placing bracket orders not permitted under current mode",
+          symbol,
+          side,
+          quantity,
+          stopLossPrice,
+          takeProfitPrice,
+        };
+      }
     }
 
     const normalizedSymbol = normalizeCryptoSymbol(symbol);
@@ -658,6 +663,14 @@ export const placeMarketOrderTool = createTool({
       ? String(plan.preview.symbol)
       : instrument.normalizedSymbol;
 
+    // Permission gate — blocks strict/observe/plan/paper for real execution
+    {
+      const check = checkTradingPermission(ctx.config?.permissionMode, "execute");
+      if (!check.allowed) {
+        return { error: check.reason ?? "Market order not permitted under current mode" };
+      }
+    }
+
     // Risk gate: evaluate order before placement (crypto execution only today)
     if (instrument.route === "exchange" && quantity && quantity > 0) {
       try {
@@ -678,6 +691,21 @@ export const placeMarketOrderTool = createTool({
         return {
           error: `Risk check failed for market order: ${riskErr instanceof Error ? riskErr.message : String(riskErr)}`,
         };
+      }
+    }
+
+    // PreOrderPlacement hook — can block or modify the order
+    {
+      const preHook = await runHooks("PreOrderPlacement", {
+        symbol: normalizedSymbol,
+        side: side.toLowerCase() === "sell" ? "sell" : "buy",
+        quantity: quantity ?? 0,
+        orderType: "MARKET",
+        notionalUsd: quoteOrderQty ?? 0,
+        exchangeId: ctx.exchange?.exchangeId ?? ctx.broker?.id,
+      });
+      if (preHook.action === "block") {
+        return { error: `PreOrderPlacement hook blocked: ${preHook.reason}` };
       }
     }
 
@@ -732,6 +760,16 @@ export const placeMarketOrderTool = createTool({
       const executedQty = orderResult.executedQty;
       const quoteQty = orderResult.cummulativeQuoteQty;
       const avgPrice = executedQty > 0 ? quoteQty / executedQty : 0;
+
+      // PostOrderPlacement hook — fire-and-forget audit
+      runHooks("PostOrderPlacement", {
+        orderId: String(orderResult.orderId ?? ""),
+        symbol: orderResult.symbol ?? normalizedSymbol,
+        side: side.toLowerCase() === "sell" ? "sell" : "buy",
+        status: orderResult.status ?? "unknown",
+        filledQty: executedQty,
+        notionalUsd: quoteQty,
+      }).catch(() => {});
 
       return {
         success: true,

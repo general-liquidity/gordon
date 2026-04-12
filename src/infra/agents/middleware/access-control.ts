@@ -1,16 +1,22 @@
 /**
  * Access Control Middleware (permissionMode gate)
  *
- * Thin gate layer that blocks trade-impacting tools when
- * `config.permissionMode === "strict"` (read-only). For "auto" and "ask"
- * modes this layer is a pass-through — downstream ApprovalDialog /
- * PermissionEngine handles per-action approval.
+ * Central gate that blocks trade-impacting tools based on the current
+ * permission mode. Supports all six modes (auto/ask/strict/paper/observe/plan)
+ * via the shared checkTradingPermission helper — see permissionHelpers.ts
+ * for the full truth table. For "auto" and "ask" modes this layer is a
+ * pass-through — downstream ApprovalDialog / PermissionEngine handles
+ * per-action approval.
  */
 
 import { createModuleLogger } from "../../logger/index.ts";
 import { loadConfig } from "../../storage/config.ts";
 import { auditLog } from "../../platform/audit/index.ts";
 import type { GordonConfig } from "../../../types/index.ts";
+import {
+  checkTradingPermission,
+  type TradingOperationContext,
+} from "../tools/permissionHelpers.ts";
 
 const logger = createModuleLogger("access-control");
 
@@ -78,8 +84,26 @@ export function isStateModifyingTool(toolName: string): boolean {
 }
 
 /**
+ * Classify a trading tool by operation context so the permission helper can
+ * pick the right gate (execute / cancel / transfer / autonomous / plan_create
+ * / state_mutation). The mapping is coarse — exact enforcement lives in
+ * checkTradingPermission.
+ */
+function operationContextFor(toolName: string): TradingOperationContext {
+  if (toolName.startsWith("cancel_") || toolName === "cancel_order_list") return "cancel";
+  if (toolName === "withdraw_to_external" || toolName === "withdraw_from_exchange") return "transfer";
+  if (toolName === "transfer_funds") return "transfer";
+  if (toolName === "start_autonomous_mode") return "autonomous";
+  if (toolName === "approve_plan" || toolName === "create_plan") return "plan_create";
+  // Default for order placements, close_trade, execute_plan, modify_order, etc.
+  return "execute";
+}
+
+/**
  * Evaluate whether a tool may execute under the current permissionMode.
- * Non-trade tools always pass. Trade tools are blocked only when strict.
+ * Non-trade tools always pass. Trade tools delegate to checkTradingPermission
+ * which knows the truth table across all 6 modes (auto/ask/strict/paper/
+ * observe/plan).
  */
 export async function checkToolAccess(
   toolName: string,
@@ -87,12 +111,21 @@ export async function checkToolAccess(
   userId: string = "system",
 ): Promise<AccessControlResult> {
   if (!config) return { allowed: true };
-  if (!TRADING_TOOLS.has(toolName)) return { allowed: true };
+  if (!TRADING_TOOLS.has(toolName) && !STATE_MODIFYING_TOOLS.has(toolName)) {
+    return { allowed: true };
+  }
 
-  if (config.permissionMode === "strict") {
-    const reason = `Tool ${toolName} blocked — permissionMode is "strict" (read-only)`;
-    safeAuditBlocked(userId, { toolName, permissionMode: config.permissionMode }, reason);
-    logger.info("Tool blocked by strict permissionMode", { toolName, userId });
+  const operation = operationContextFor(toolName);
+  const check = checkTradingPermission(config.permissionMode, operation);
+  if (!check.allowed) {
+    const reason = `Tool ${toolName} blocked — ${check.reason}`;
+    safeAuditBlocked(userId, { toolName, permissionMode: config.permissionMode, operation }, reason);
+    logger.info("Tool blocked by permissionMode", {
+      toolName,
+      userId,
+      mode: config.permissionMode,
+      operation,
+    });
     return { allowed: false, reason };
   }
 

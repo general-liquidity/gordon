@@ -7,6 +7,7 @@ import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
 import { getGordonContext, type MastraExecutionContext } from "./types.ts";
+import { checkTradingPermission } from "./permissionHelpers.ts";
 import {
   createMandate,
   MANDATE_TIMEFRAMES,
@@ -253,8 +254,11 @@ export const startAutonomousModeTool = createTool({
     }
 
     const effectiveConfig = await loadConfig().catch(() => ctx.config);
-    if (effectiveConfig?.permissionMode === "strict") {
-      return errors.notArmed("start autonomous trading");
+    {
+      const check = checkTradingPermission(effectiveConfig?.permissionMode, "autonomous");
+      if (!check.allowed) {
+        return { error: check.reason ?? "Autonomous mode not permitted under current mode" };
+      }
     }
 
     const resolvedMandate = (mandate as SwingMandate | undefined) ?? loadMandateState();

@@ -15,6 +15,7 @@ import {
   type SummarizationResult,
 } from "../../domain/memory/index.ts";
 import { runLifecycleHooks } from "../lifecycleHooks.ts";
+import { getCompactionTrigger } from "../../context/compactionTrigger.ts";
 import type { GordonContext } from "../types.ts";
 import type { Message } from "../../ai/llm/types.ts";
 import type { ProcessingOptions } from "./types.ts";
@@ -92,15 +93,42 @@ export async function summarizeIfNeeded(
       },
     });
 
-    const result = await summarizer.summarize(messages);
+    let result;
+    try {
+      result = await summarizer.summarize(messages);
+    } catch (err) {
+      // Circuit breaker: record the failure. After 3 consecutive failures
+      // the compaction trigger returns "halt" instead of "compact" to
+      // prevent runaway summarization loops.
+      getCompactionTrigger().recordCompactFailure();
+      logger.error("Summarization failed — circuit breaker incremented", {
+        err: err instanceof Error ? err.message : String(err),
+      });
+      throw err;
+    }
 
     if (result.summarized) {
+      // Successful compaction — release the sticky latch so stages can
+      // downgrade on subsequent turns, and record the success so the
+      // circuit breaker failure counter resets.
+      const trigger = getCompactionTrigger();
+      trigger.releaseLatch();
+      // recordFullCompact also resets consecutiveCompactFailures internally
+      const beforeTokens = Math.floor(messages.length * 200); // rough pre-compact estimate
+      const afterTokens = Math.floor(result.messages.length * 200);
+      trigger.recordFullCompact(beforeTokens, afterTokens, "compacted via summarizer");
+
       // Emit event for tracking
       await emitEvent("memory:summarized", {
         originalCount: messages.length,
         newCount: result.messages.length,
         summarizedCount: result.messagesSummarized,
       });
+    } else {
+      // Summarization ran but didn't actually shrink anything — that's a
+      // soft failure. Count it so the circuit breaker eventually trips if
+      // we keep hitting this path.
+      getCompactionTrigger().recordCompactFailure();
     }
 
     await runLifecycleHooks("after_compaction", context, {

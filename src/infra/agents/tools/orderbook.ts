@@ -15,6 +15,8 @@ import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
 import { getGordonContext, isBinanceFamily, normalizeSymbol, type MastraExecutionContext } from "./types.ts";
+import { checkTradingPermission } from "./permissionHelpers.ts";
+import { runHooks } from "../../hooks/engine.ts";
 import {
   resilientGetOrderBook,
   resilientGetSpread,
@@ -418,15 +420,18 @@ export const placeOCOOrderTool = createTool({
       return errors.noExchange;
     }
 
-    if (ctx.config?.permissionMode === "strict") {
-      return {
-        error: "permissionMode must not be 'strict' to place OCO orders. Use /auto or /ask.",
-        symbol,
-        side,
-        quantity,
-        takeProfitPrice,
-        stopPrice,
-      };
+    {
+      const check = checkTradingPermission(ctx.config?.permissionMode, "execute");
+      if (!check.allowed) {
+        return {
+          error: check.reason ?? "Trading not permitted under current mode",
+          symbol,
+          side,
+          quantity,
+          takeProfitPrice,
+          stopPrice,
+        };
+      }
     }
 
     const normalizedSymbol = normalizeSymbol(symbol);
@@ -524,11 +529,14 @@ export const cancelAllOrdersTool = createTool({
       return errors.noExchange;
     }
 
-    if (ctx.config?.permissionMode === "strict") {
-      return {
-        error: "permissionMode must not be 'strict' to cancel orders. Use /auto or /ask.",
-        symbol,
-      };
+    {
+      const check = checkTradingPermission(ctx.config?.permissionMode, "cancel");
+      if (!check.allowed) {
+        return {
+          error: check.reason ?? "Cancelling orders not permitted under current mode",
+          symbol,
+        };
+      }
     }
 
     const normalizedSymbol = normalizeSymbol(symbol);
@@ -731,8 +739,11 @@ export const placeLimitOrderTool = createTool({
       return errors.noExchange;
     }
 
-    if (ctx.config?.permissionMode === "strict") {
-      return errors.notArmed("place limit orders");
+    {
+      const check = checkTradingPermission(ctx.config?.permissionMode, "execute");
+      if (!check.allowed) {
+        return { error: check.reason ?? "Placing limit orders not permitted under current mode" };
+      }
     }
 
     const normalizedSymbol = normalizeSymbol(symbol);
@@ -758,6 +769,21 @@ export const placeLimitOrderTool = createTool({
       };
     }
 
+    // PreOrderPlacement hook — can block or modify
+    {
+      const preHook = await runHooks("PreOrderPlacement", {
+        symbol: normalizedSymbol,
+        side: side.toLowerCase() === "sell" ? "sell" : "buy",
+        quantity: quantity,
+        orderType: "LIMIT",
+        notionalUsd: quantity * price,
+        exchangeId: ctx.exchange?.exchangeId,
+      });
+      if (preHook.action === "block") {
+        return { error: `PreOrderPlacement hook blocked: ${preHook.reason}` };
+      }
+    }
+
     try {
       const orderResult = await ctx.exchange.placeOrder({
         symbol: normalizedSymbol,
@@ -774,6 +800,16 @@ export const placeLimitOrderTool = createTool({
           error: `Order rejected: ${orderResult?.status ?? "unknown"}`,
         };
       }
+
+      // PostOrderPlacement hook — fire-and-forget audit
+      runHooks("PostOrderPlacement", {
+        orderId: String(orderResult.orderId ?? ""),
+        symbol: orderResult.symbol ?? normalizedSymbol,
+        side: side.toLowerCase() === "sell" ? "sell" : "buy",
+        status: orderResult.status ?? "unknown",
+        filledQty: Number(orderResult.executedQty ?? 0),
+        notionalUsd: quantity * price,
+      }).catch(() => {});
 
       return {
         success: true,
@@ -929,8 +965,11 @@ export const cancelOrderTool = createTool({
       return errors.noExchange;
     }
 
-    if (ctx.config?.permissionMode === "strict") {
-      return errors.notArmed("cancel orders");
+    {
+      const check = checkTradingPermission(ctx.config?.permissionMode, "cancel");
+      if (!check.allowed) {
+        return { error: check.reason ?? "Cancelling orders not permitted under current mode" };
+      }
     }
 
     const normalizedSymbol = normalizeSymbol(symbol);
@@ -1055,8 +1094,11 @@ export const cancelReplaceOrderTool = createTool({
       return errors.noExchange;
     }
 
-    if (ctx.config?.permissionMode === "strict") {
-      return errors.notArmed("cancel and replace orders");
+    {
+      const check = checkTradingPermission(ctx.config?.permissionMode, "execute");
+      if (!check.allowed) {
+        return { error: check.reason ?? "Cancel/replace not permitted under current mode" };
+      }
     }
 
     if (!ctx.binance || !isBinanceFamily(ctx.exchange.exchangeId)) {
@@ -1154,8 +1196,11 @@ export const cancelOrderListTool = createTool({
       return errors.noExchange;
     }
 
-    if (ctx.config?.permissionMode === "strict") {
-      return errors.notArmed("cancel order lists");
+    {
+      const check = checkTradingPermission(ctx.config?.permissionMode, "cancel");
+      if (!check.allowed) {
+        return { error: check.reason ?? "Cancelling order lists not permitted under current mode" };
+      }
     }
 
     if (!ctx.binance || !isBinanceFamily(ctx.exchange.exchangeId)) {

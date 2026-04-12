@@ -18,6 +18,7 @@ import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
 import { getGordonContext, isBinanceFamily, type MastraExecutionContext } from "./types.ts";
+import { checkTradingPermission } from "./permissionHelpers.ts";
 import type { ExchangeExtended } from "../../exchange/types.ts";
 
 // ============================================================================
@@ -124,11 +125,11 @@ export const convertDustTool = createTool({
       return errors.binanceOnly;
     }
 
-    if (ctx.config?.permissionMode === "strict") {
-      return {
-        ...errors.notArmed("convert dust"),
-        assets: assets,
-      };
+    {
+      const check = checkTradingPermission(ctx.config?.permissionMode, "state_mutation");
+      if (!check.allowed) {
+        return { error: check.reason ?? "Dust conversion not permitted under current mode", assets };
+      }
     }
 
     try {
@@ -194,13 +195,11 @@ export const transferFundsTool = createTool({
       return errors.binanceOnly;
     }
 
-    if (ctx.config?.permissionMode === "strict") {
-      return {
-        ...errors.notArmed("transfer funds"),
-        type,
-        asset,
-        amount,
-      };
+    {
+      const check = checkTradingPermission(ctx.config?.permissionMode, "transfer");
+      if (!check.allowed) {
+        return { error: check.reason ?? "Fund transfer not permitted under current mode", type, asset, amount };
+      }
     }
 
     try {
@@ -960,15 +959,18 @@ export const withdrawToExternalTool = createTool({
       };
     }
 
-    // Check non-strict permissionMode
-    if (ctx.config?.permissionMode === "strict") {
-      return {
-        ...errors.notArmed("withdraw funds to an external address"),
-        coin: coinUpper,
-        amount,
-        network: networkInfo.network,
-        address,
-      };
+    // Gate withdrawal across all permission modes
+    {
+      const check = checkTradingPermission(ctx.config?.permissionMode, "transfer");
+      if (!check.allowed) {
+        return {
+          error: check.reason ?? "Withdrawal not permitted under current mode",
+          coin: coinUpper,
+          amount,
+          network: networkInfo.network,
+          address,
+        };
+      }
     }
 
     // Check balance
