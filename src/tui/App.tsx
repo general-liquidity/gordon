@@ -25,6 +25,7 @@ import { InlineHelp } from "./components/InlineHelp.js";
 import { CommandPalette, type PaletteItem } from "./components/CommandPalette.js";
 import { BootScreen } from "./components/BootScreen.js";
 import { SetupWizard } from "./components/SetupWizard.js";
+import { PrivacyConsent, type PrivacyChoices } from "./components/PrivacyConsent.js";
 import { HandoffArrow } from "./components/HandoffArrow.js";
 import { PromptInput } from "./components/PromptInput.js";
 import { defaultMessageQueue } from "../infra/runtime/messageQueue.js";
@@ -189,6 +190,39 @@ function AppInner() {
   const bootPhase = useAppState((s) => s.bootPhase);
   const runtimeReady = useAppState((s) => s.runtimeReady);
   const showSetup = useAppState((s) => s.showSetup);
+
+  // ── First-run privacy consent gate ──
+  // Shows the PrivacyConsent component if no choice has been recorded yet.
+  // Persisted via the .telemetry state file's notifiedAt field.
+  const [needsPrivacyConsent, setNeedsPrivacyConsent] = React.useState<boolean | null>(null);
+  React.useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const { getStatus } = await import("../infra/platform/telemetry/telemetry.ts");
+        const s = getStatus();
+        // We treat anonymousId presence as "telemetry state file exists"; the
+        // real check is whether the user was ever shown the consent screen.
+        // The telemetry module exposes `notifiedAt` indirectly — if telemetry
+        // isn't enabled and notifiedAt is null, we haven't asked yet.
+        const fs = await import("node:fs");
+        const path = await import("node:path");
+        const { GORDON_DIR } = await import("../infra/storage/paths.ts");
+        const file = path.join(GORDON_DIR, ".telemetry");
+        let needsConsent = true;
+        if (fs.existsSync(file)) {
+          const raw = JSON.parse(fs.readFileSync(file, "utf-8"));
+          if (raw.notifiedAt) needsConsent = false;
+        }
+        if (!cancelled) setNeedsPrivacyConsent(needsConsent);
+      } catch {
+        if (!cancelled) setNeedsPrivacyConsent(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   const showPalette = useAppState((s) => s.showPalette);
   const showHelp = useAppState((s) => s.showHelp);
   const permissionMode = useAppState((s) => s.permissionMode);
@@ -907,6 +941,51 @@ function AppInner() {
     // Auto-advance to ready immediately
     setTimeout(() => dispatch({ type: "SET_BOOT_PHASE", phase: "ready" }), 0);
     return null;
+  }
+
+  // ── Privacy consent gate (first run only) ──
+  if (needsPrivacyConsent === true) {
+    return (
+      <PrivacyConsent
+        onComplete={async (choices: PrivacyChoices) => {
+          try {
+            const fs = await import("node:fs");
+            const path = await import("node:path");
+            const cryptoMod = await import("node:crypto");
+            const { GORDON_DIR } = await import("../infra/storage/paths.ts");
+            const telemetryStateFile = path.join(GORDON_DIR, ".telemetry");
+
+            // Read existing state to preserve anonymousId/salt
+            let state: { enabled?: boolean; anonymousId?: string; salt?: string; notifiedAt?: number | null } = {};
+            if (fs.existsSync(telemetryStateFile)) {
+              try {
+                state = JSON.parse(fs.readFileSync(telemetryStateFile, "utf-8"));
+              } catch {
+                // fall through and create fresh
+              }
+            }
+            if (!state.anonymousId) state.anonymousId = cryptoMod.randomBytes(16).toString("hex");
+            if (!state.salt) state.salt = cryptoMod.randomBytes(16).toString("hex");
+            state.enabled = choices.telemetryEnabled;
+            state.notifiedAt = Date.now();
+
+            fs.mkdirSync(GORDON_DIR, { recursive: true });
+            fs.writeFileSync(telemetryStateFile, JSON.stringify(state, null, 2), "utf-8");
+
+            // Persist research data choice into config.json
+            const { loadConfig, saveConfig } = await import("../infra/storage/config.ts");
+            const config = await loadConfig();
+            if (!config.telemetry) config.telemetry = { enabled: false, researchData: false };
+            config.telemetry.enabled = choices.telemetryEnabled;
+            config.telemetry.researchData = choices.researchDataEnabled;
+            await saveConfig(config);
+          } catch {
+            // Non-fatal — continue into Gordon even if persist failed
+          }
+          setNeedsPrivacyConsent(false);
+        }}
+      />
+    );
   }
 
   // ── Setup wizard ──

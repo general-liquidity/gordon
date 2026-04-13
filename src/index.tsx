@@ -197,6 +197,22 @@ process.on("unhandledRejection", (reason, promise) => {
 telemetry.init();
 initializeStructuredAxiom();
 
+// Initialize multi-sink event router
+try {
+  const { initSinks } = await import("./infra/platform/telemetry/sinks.ts");
+  initSinks();
+} catch {
+  // Non-fatal — telemetry already runs through legacy path
+}
+
+// Run data retention sweep at startup (best-effort, fire-and-forget)
+try {
+  const { sweepRetentionOnStartup } = await import("./infra/platform/dataRetention.ts");
+  sweepRetentionOnStartup().catch(() => {});
+} catch {
+  // Non-fatal
+}
+
 // Wire: parallel startup — run config + observability concurrently
 try {
   const { runParallelStartup, configLoadTask, memoryLoadTask } = await import("./infra/runtime/parallelStartup.ts");

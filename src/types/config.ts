@@ -319,6 +319,20 @@ export const GordonConfigSchema = z.object({
   mcpServers: z.array(MCPServerConfigSchema).default([]),
   /** Anonymous telemetry configuration (strict opt-in) */
   telemetry: TelemetryConfigSchema.default({ enabled: false, researchData: false }),
+  /**
+   * Per-session and per-day cost budgets. When `action` is "warn", crossing
+   * a threshold logs and emits a warning event but never blocks. When
+   * "halt", crossing the 100% line halts further model calls until the
+   * user resets via /cost reset or starts a new day.
+   */
+  costBudget: z
+    .object({
+      sessionUsd: z.number().nonnegative().optional(),
+      dailyUsd: z.number().nonnegative().optional(),
+      action: z.enum(["warn", "halt"]).default("warn"),
+      warnThresholds: z.array(z.number().min(0).max(1)).default([0.5, 0.75, 0.9]),
+    })
+    .default({ action: "warn", warnThresholds: [0.5, 0.75, 0.9] }),
   /** Risk management configuration (v0.7) */
   riskManagement: RiskManagementConfigSchema.default({
     mode: "enforce",

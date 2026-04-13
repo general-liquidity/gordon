@@ -12,6 +12,143 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { GORDON_DIR } from "../storage/paths.ts";
+import { createModuleLogger } from "../logger/index.ts";
+
+const costLogger = createModuleLogger("cost-budget");
+
+// ============================================================================
+// Cost Budget
+// ============================================================================
+
+/**
+ * Cost budget enforcement. Wired into CostTracker.record() so every API call
+ * triggers a check. Default thresholds emit warnings at 50 / 75 / 90% and
+ * (when action="halt") block at 100% for the session and the day.
+ */
+export interface CostBudget {
+  sessionUsd?: number;
+  dailyUsd?: number;
+  action: "warn" | "halt";
+  warnThresholds: number[];
+}
+
+export interface CostBudgetCheck {
+  withinBudget: boolean;
+  sessionFraction?: number;
+  dailyFraction?: number;
+  warning?: string;
+  halt?: boolean;
+  reason?: string;
+}
+
+let activeBudget: CostBudget | null = null;
+let dailyTotalUsd = 0;
+let dailyDateKey = todayKey();
+const warnedThresholds = new Set<string>();
+let halted = false;
+
+function todayKey(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+export function setCostBudget(budget: CostBudget | null): void {
+  activeBudget = budget;
+  warnedThresholds.clear();
+  halted = false;
+}
+
+export function getCostBudget(): CostBudget | null {
+  return activeBudget;
+}
+
+export function resetCostBudgetState(): void {
+  warnedThresholds.clear();
+  halted = false;
+  dailyTotalUsd = 0;
+  dailyDateKey = todayKey();
+}
+
+/**
+ * Check whether the current cost is within budget. Called from
+ * CostTracker.record() after each API call.
+ *
+ * Uses session totals AND a process-wide daily roll-up. The daily counter
+ * resets when the date key changes.
+ */
+export function checkCostBudget(sessionTotalUsd: number, callCostUsd: number): CostBudgetCheck {
+  if (!activeBudget) return { withinBudget: true };
+
+  // Roll over daily counter if the date changed
+  const today = todayKey();
+  if (today !== dailyDateKey) {
+    dailyDateKey = today;
+    dailyTotalUsd = 0;
+    warnedThresholds.clear();
+  }
+  dailyTotalUsd += callCostUsd;
+
+  const result: CostBudgetCheck = { withinBudget: true };
+
+  const sessionLimit = activeBudget.sessionUsd;
+  const dailyLimit = activeBudget.dailyUsd;
+  if (sessionLimit && sessionLimit > 0) {
+    result.sessionFraction = sessionTotalUsd / sessionLimit;
+  }
+  if (dailyLimit && dailyLimit > 0) {
+    result.dailyFraction = dailyTotalUsd / dailyLimit;
+  }
+
+  // Threshold warnings — fire each threshold once per scope
+  for (const threshold of activeBudget.warnThresholds) {
+    if (sessionLimit && (result.sessionFraction ?? 0) >= threshold) {
+      const key = `session:${threshold}`;
+      if (!warnedThresholds.has(key)) {
+        warnedThresholds.add(key);
+        result.warning = `Session cost at ${(threshold * 100).toFixed(0)}% of $${sessionLimit.toFixed(2)} budget ($${sessionTotalUsd.toFixed(4)})`;
+        costLogger.warn(result.warning);
+      }
+    }
+    if (dailyLimit && (result.dailyFraction ?? 0) >= threshold) {
+      const key = `daily:${today}:${threshold}`;
+      if (!warnedThresholds.has(key)) {
+        warnedThresholds.add(key);
+        result.warning = `Daily cost at ${(threshold * 100).toFixed(0)}% of $${dailyLimit.toFixed(2)} budget ($${dailyTotalUsd.toFixed(4)})`;
+        costLogger.warn(result.warning);
+      }
+    }
+  }
+
+  // Hard halt at 100% if action=halt
+  if (activeBudget.action === "halt") {
+    if (sessionLimit && (result.sessionFraction ?? 0) >= 1) {
+      result.withinBudget = false;
+      result.halt = true;
+      result.reason = `Session cost ($${sessionTotalUsd.toFixed(4)}) exceeded budget ($${sessionLimit.toFixed(2)}). Use /cost reset to continue.`;
+      halted = true;
+    }
+    if (dailyLimit && (result.dailyFraction ?? 0) >= 1) {
+      result.withinBudget = false;
+      result.halt = true;
+      result.reason = `Daily cost ($${dailyTotalUsd.toFixed(4)}) exceeded budget ($${dailyLimit.toFixed(2)}). Resets at midnight UTC.`;
+      halted = true;
+    }
+  }
+
+  return result;
+}
+
+export function isCostHalted(): boolean {
+  return halted;
+}
+
+export function clearCostHalt(): void {
+  halted = false;
+  warnedThresholds.clear();
+}
+
+export function getDailyCostUsd(): number {
+  return dailyTotalUsd;
+}
 
 // ============================================================================
 // Types
@@ -132,17 +269,25 @@ export class CostTracker {
       this.models.set(modelId, entry);
     }
 
+    const pricing = getPricing(modelId);
+    const beforeCost = entry.totalCostUsd;
+
     entry.inputTokens += inputTokens;
     entry.outputTokens += outputTokens;
     entry.cacheReadTokens += cacheRead;
     entry.cacheWriteTokens += cacheWrite;
     entry.apiCalls++;
 
-    const pricing = getPricing(modelId);
     entry.totalCostUsd = computeCost(
       pricing, entry.inputTokens, entry.outputTokens,
       entry.cacheReadTokens, entry.cacheWriteTokens,
     );
+
+    // Budget check — runs after the call, doesn't block this call but flags
+    // halts for the next one and emits warnings as thresholds cross.
+    const sessionTotal = this.snapshot().totalCostUsd;
+    const callCost = entry.totalCostUsd - beforeCost;
+    checkCostBudget(sessionTotal, callCost);
 
     return entry;
   }

@@ -8,12 +8,101 @@
  * Audit logs are stored in SQLite for persistence and queryability.
  */
 
+import * as crypto from "node:crypto";
+
 import { getDatabase, getDatabasePath } from "../../storage/database.ts";
 import { createModuleLogger } from "../../logger/index.ts";
 import { recordStructuredAuditEvent } from "../observability/index.ts";
 import { v4 as uuidv4 } from "uuid";
 
 const logger = createModuleLogger("audit");
+
+// ============================================================================
+// HMAC Signing
+// ============================================================================
+
+/**
+ * Audit entries are HMAC-SHA256 signed at insert time. The signing key
+ * defaults to a per-install random key stored in ~/.gordon/.audit-key. If
+ * GORDON_AUDIT_HMAC_KEY is set, that is used instead (useful for shared
+ * infra where the key lives in a secret manager).
+ *
+ * Tampering detection: verifyEntrySignature() recomputes the HMAC over the
+ * canonical fields (id+timestamp+userId+action+params hash+result+session+
+ * trade+plan) and compares. If they don't match, the entry was modified
+ * after insert.
+ */
+let cachedSigningKey: string | null = null;
+
+function getSigningKey(): string {
+  if (cachedSigningKey) return cachedSigningKey;
+  if (process.env.GORDON_AUDIT_HMAC_KEY) {
+    cachedSigningKey = process.env.GORDON_AUDIT_HMAC_KEY;
+    return cachedSigningKey;
+  }
+  // Fall back to a per-install key on disk
+  try {
+    const fs = require("node:fs");
+    const path = require("node:path");
+    const { GORDON_DIR } = require("../../storage/paths.ts");
+    const keyPath = path.join(GORDON_DIR, ".audit-key");
+    if (fs.existsSync(keyPath)) {
+      cachedSigningKey = fs.readFileSync(keyPath, "utf-8").trim();
+      return cachedSigningKey!;
+    }
+    fs.mkdirSync(GORDON_DIR, { recursive: true });
+    cachedSigningKey = crypto.randomBytes(32).toString("hex");
+    fs.writeFileSync(keyPath, cachedSigningKey, { mode: 0o600 });
+    return cachedSigningKey;
+  } catch {
+    // If disk is unavailable, fall back to ephemeral key (signatures
+    // won't survive process restart but signing still works for the run)
+    cachedSigningKey = crypto.randomBytes(32).toString("hex");
+    return cachedSigningKey;
+  }
+}
+
+function canonicalEntryString(entry: AuditEntry): string {
+  const paramsHash = crypto
+    .createHash("sha256")
+    .update(JSON.stringify(entry.parameters ?? {}))
+    .digest("hex");
+  return [
+    entry.id,
+    entry.timestamp,
+    entry.userId,
+    entry.action,
+    paramsHash,
+    entry.result,
+    entry.sessionId ?? "",
+    entry.tradeId ?? "",
+    entry.planId ?? "",
+  ].join("|");
+}
+
+function signEntry(entry: AuditEntry): string {
+  return crypto
+    .createHmac("sha256", getSigningKey())
+    .update(canonicalEntryString(entry))
+    .digest("hex");
+}
+
+/**
+ * Verify an audit entry's signature. Returns true if the entry hasn't been
+ * tampered with since insert. Returns false on any mismatch or error.
+ */
+export function verifyEntrySignature(entry: AuditEntry & { signature?: string | null }): boolean {
+  if (!entry.signature) return false;
+  try {
+    const expected = signEntry(entry);
+    return crypto.timingSafeEqual(
+      Buffer.from(expected, "hex"),
+      Buffer.from(entry.signature, "hex"),
+    );
+  } catch {
+    return false;
+  }
+}
 
 // ============================================================================
 // Types
@@ -129,6 +218,15 @@ function initAuditTable(): void {
     )
   `);
 
+  // Migration: add signature column for tamper detection. ALTER TABLE
+  // ADD COLUMN is idempotent-safe via try/catch since SQLite has no
+  // IF NOT EXISTS variant for this.
+  try {
+    db.run("ALTER TABLE audit_log ADD COLUMN signature TEXT");
+  } catch {
+    // Column already exists
+  }
+
   // Create indexes for common queries
   db.run("CREATE INDEX IF NOT EXISTS idx_audit_timestamp ON audit_log(timestamp)");
   db.run("CREATE INDEX IF NOT EXISTS idx_audit_userId ON audit_log(userId)");
@@ -139,6 +237,28 @@ function initAuditTable(): void {
 
   initializedDatabasePath = currentDatabasePath;
   logger.debug("Audit table initialized");
+}
+
+/**
+ * Prune audit log rows older than the given retention horizon (default
+ * 7 years). Returns the number of rows deleted. Used by the data
+ * retention sweeper at startup.
+ */
+export function pruneAuditLog(retentionDays: number): number {
+  initAuditTable();
+  const cutoffIso = new Date(Date.now() - retentionDays * 86_400_000).toISOString();
+  const db = getDatabase();
+  try {
+    const result = db.run("DELETE FROM audit_log WHERE timestamp < ?", [cutoffIso]) as { changes?: number };
+    const deleted = result?.changes ?? 0;
+    if (deleted > 0) {
+      logger.info("Audit log pruned", { rowsDeleted: deleted, retentionDays });
+    }
+    return deleted;
+  } catch (err) {
+    logger.warn("Audit log prune failed", { err: err instanceof Error ? err.message : String(err) });
+    return 0;
+  }
 }
 
 // ============================================================================
@@ -199,12 +319,15 @@ export class AuditLogger {
       metadata: options?.metadata,
     };
 
+    // Sign before insert so tampering can be detected later
+    const signature = signEntry(entry);
+
     const db = getDatabase();
     const stmt = db.prepare(`
       INSERT INTO audit_log (
         id, timestamp, userId, action, parameters, result,
-        resultDetails, ipAddress, userAgent, sessionId, tradeId, planId, metadata
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        resultDetails, ipAddress, userAgent, sessionId, tradeId, planId, metadata, signature
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     stmt.run(
@@ -220,7 +343,8 @@ export class AuditLogger {
       entry.sessionId || null,
       entry.tradeId || null,
       entry.planId || null,
-      entry.metadata ? JSON.stringify(entry.metadata) : null
+      entry.metadata ? JSON.stringify(entry.metadata) : null,
+      signature
     );
 
     logger.info("Audit entry recorded", {
