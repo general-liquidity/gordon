@@ -71,6 +71,12 @@ jobs:
       - name: Smoke test npm wrapper
         run: npm run smoke:npm-wrapper
 
+      - name: Audit npm pack contents (no source files, no .map)
+        run: node scripts/audit-npm-pack.cjs
+
+      - name: Source map guardrail (block sourcemap leak)
+        run: node scripts/check-no-sourcemaps.cjs
+
   verify-public-dist:
     name: Verify Public Dist Bundle
     needs: test
@@ -286,8 +292,21 @@ jobs:
       - name: Prepare npm wrapper
         run: npm run prepare:npm-wrapper
 
+      - name: Determine npm dist-tag
+        id: dist-tag
+        run: |
+          # Pre-release tags like v0.9.0-friends.1 publish under @friends.
+          # Stable tags like v0.9.0 publish under @latest.
+          # This keeps friend-only releases out of the default channel so
+          # `npm install -g @general-liquidity/gordon-cli` won't pick them up.
+          if echo "${{ github.ref_name }}" | grep -qE 'friends|alpha|beta|rc'; then
+            echo "tag=friends" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=latest" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Publish to npm
         working-directory: npm
-        run: npm publish --access public
+        run: npm publish --access public --tag "${{ steps.dist-tag.outputs.tag }}"
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

@@ -18,7 +18,48 @@ import {
   API_TIMEOUT_MS,
   type TelemetryEvent,
   type HeartbeatResponse,
+  type VersionPolicy,
 } from "./types.ts";
+
+// ============================================================================
+// Version Policy Capture
+// ============================================================================
+
+/**
+ * Latest version policy returned by the server. Captured on every heartbeat
+ * so the license module can enforce hard/soft version gates on the next tick.
+ */
+let latestVersionPolicy: VersionPolicy | null = null;
+const versionPolicyListeners: Array<(p: VersionPolicy) => void> = [];
+
+export function getLatestVersionPolicy(): VersionPolicy | null {
+  return latestVersionPolicy;
+}
+
+/**
+ * Register a callback that fires whenever a new version policy arrives.
+ * Used by license/index.ts to enforce immediately when the policy changes
+ * (e.g. user starts Gordon, heartbeat fires, server says minVersion=1.0.0,
+ * client is 0.9.0 → exit immediately rather than wait for next startup).
+ */
+export function onVersionPolicy(listener: (p: VersionPolicy) => void): () => void {
+  versionPolicyListeners.push(listener);
+  return () => {
+    const idx = versionPolicyListeners.indexOf(listener);
+    if (idx !== -1) versionPolicyListeners.splice(idx, 1);
+  };
+}
+
+function captureVersionPolicy(policy: VersionPolicy): void {
+  latestVersionPolicy = policy;
+  for (const listener of versionPolicyListeners) {
+    try {
+      listener(policy);
+    } catch {
+      // Listener errors must never break the heartbeat path
+    }
+  }
+}
 
 // ============================================================================
 // Constants
@@ -125,6 +166,12 @@ async function flush(): Promise<void> {
         for (const msg of data.announcements) {
           console.log(`\n  [gordon] ${msg}`);
         }
+      }
+
+      // Capture version policy — fires registered listeners which enforce
+      // hard/soft version gates and the kill switch.
+      if (data.versionPolicy) {
+        captureVersionPolicy(data.versionPolicy);
       }
     } else {
       // Re-queue on failure, respecting the cap

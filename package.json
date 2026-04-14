@@ -47,7 +47,9 @@
     "prepare:npm-wrapper": "node scripts/prepare-npm-wrapper.cjs",
     "check:npm-wrapper": "node scripts/check-npm-wrapper.cjs",
     "smoke:npm-wrapper": "node scripts/smoke-npm-wrapper.cjs",
-    "prepublishOnly": "bun run build",
+    "check:no-sourcemaps": "node scripts/check-no-sourcemaps.cjs",
+    "audit:npm-pack": "node scripts/audit-npm-pack.cjs",
+    "prepublishOnly": "bun run build && node scripts/check-no-sourcemaps.cjs",
     "test": "bun test",
     "typecheck": "tsc --noEmit",
     "postinstall": "node scripts/patch-mastra.cjs"

@@ -50,6 +50,45 @@ export interface HeartbeatRequest {
 export interface HeartbeatResponse {
   ok: boolean;
   announcements?: string[];
+  /**
+   * Server-driven version policy. Returned by the heartbeat function so
+   * that the operator can push a forced upgrade to all friends without
+   * shipping new code.
+   */
+  versionPolicy?: VersionPolicy;
+}
+
+export interface VersionPolicy {
+  /**
+   * Hard floor — clients running below this version refuse to start.
+   * Use semver string (e.g. "0.9.0"). Set to force an upgrade across
+   * all clients on their next heartbeat (within ~60s of starting).
+   */
+  minVersion?: string;
+  /**
+   * Soft floor — clients below this version show a banner suggesting
+   * an upgrade, but continue to run.
+   */
+  recommendedVersion?: string;
+  /**
+   * Emergency stop. When true, all clients exit on next heartbeat with
+   * killSwitchMessage shown to the user. Used for incident response.
+   */
+  killSwitch?: boolean;
+  /** Message shown when the kill switch fires. */
+  killSwitchMessage?: string;
+  /**
+   * ISO date — after this, any client running a version below
+   * recommendedVersion is treated as if minVersion was set. Used to
+   * stage a deprecation window without intervention.
+   */
+  deprecatedAfter?: string;
+  /**
+   * Optional upgrade command override. If set, the version policy
+   * enforcement uses this string verbatim instead of detecting the
+   * install channel. Useful when a friend installed via a custom path.
+   */
+  upgradeCommand?: string;
 }
 
 export interface TelemetryEvent {

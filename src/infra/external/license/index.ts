@@ -23,8 +23,16 @@ import {
   type LicenseFile,
   type ActivateRequest,
   type ActivateResponse,
+  type HeartbeatResponse,
+  type VersionPolicy,
 } from "./types.ts";
-import { startHeartbeat, stopHeartbeat, trackEvent } from "./telemetry.ts";
+import {
+  startHeartbeat,
+  stopHeartbeat,
+  trackEvent,
+  onVersionPolicy,
+  getLatestVersionPolicy,
+} from "./telemetry.ts";
 
 const LICENSE_FILE = path.join(GORDON_DIR, "license.json");
 const MACHINE_ID_FILE = path.join(GORDON_DIR, ".machine-id");
@@ -194,7 +202,22 @@ async function validateToken(token: string): Promise<"valid" | "revoked" | "offl
     });
 
     if (res.status === 403) return "revoked";
-    if (res.ok) return "valid";
+    if (res.ok) {
+      // Capture version policy returned by the server. The standalone
+      // heartbeat path doesn't go through telemetry.flush, so we need to
+      // parse and dispatch here too.
+      try {
+        const data = (await res.clone().json()) as HeartbeatResponse;
+        if (data?.versionPolicy) {
+          // Trigger immediate enforcement via the same path the recurring
+          // heartbeat uses.
+          enforceVersionPolicy(data.versionPolicy);
+        }
+      } catch {
+        // Non-JSON or parse error — ignore, treat as valid
+      }
+      return "valid";
+    }
 
     // 5xx = server issue, treat as offline (graceful)
     // 4xx (other than 403) = client error, also treat as offline for now
@@ -205,6 +228,115 @@ async function validateToken(token: string): Promise<"valid" | "revoked" | "offl
   } finally {
     clearTimeout(timeout);
   }
+}
+
+// ============================================================================
+// Version Policy Enforcement
+// ============================================================================
+
+/**
+ * Compare two semver-ish strings. Returns -1 if a < b, 0 if equal, 1 if a > b.
+ * Handles pre-release tags (e.g. "0.9.0-friends.1") by comparing the numeric
+ * portion first then falling back to lexicographic on the suffix.
+ */
+function compareVersions(a: string, b: string): number {
+  const cleanA = a.replace(/^v/i, "").trim();
+  const cleanB = b.replace(/^v/i, "").trim();
+  const partsA = cleanA.split(/[.-]/);
+  const partsB = cleanB.split(/[.-]/);
+  const len = Math.max(partsA.length, partsB.length);
+  for (let i = 0; i < len; i++) {
+    const pa = partsA[i] ?? "0";
+    const pb = partsB[i] ?? "0";
+    const na = parseInt(pa, 10);
+    const nb = parseInt(pb, 10);
+    if (Number.isFinite(na) && Number.isFinite(nb)) {
+      if (na !== nb) return na < nb ? -1 : 1;
+      continue;
+    }
+    if (pa !== pb) return pa < pb ? -1 : 1;
+  }
+  return 0;
+}
+
+function isVersionBelow(current: string, target: string): boolean {
+  return compareVersions(current, target) < 0;
+}
+
+/**
+ * Enforce a version policy returned by the heartbeat. Fires three kinds
+ * of action:
+ *   - killSwitch: hard exit with the operator-provided message
+ *   - minVersion violation: hard exit with upgrade instructions
+ *   - recommendedVersion violation: log a banner, continue running
+ *
+ * Also enforces deprecatedAfter: if today >= deprecatedAfter and the
+ * client is below recommendedVersion, treat as a minVersion violation.
+ */
+export function enforceVersionPolicy(policy: VersionPolicy): void {
+  // Kill switch beats everything
+  if (policy.killSwitch) {
+    const msg = policy.killSwitchMessage
+      ?? "Gordon is temporarily disabled by the operator. Please contact the team.";
+    console.error("");
+    console.error("  Gordon — emergency stop");
+    console.error("  ──────────────────────────────");
+    console.error(`  ${msg}`);
+    console.error("");
+    process.exit(1);
+  }
+
+  const upgradeHint = policy.upgradeCommand
+    ?? "gordon --upgrade";
+
+  // Hard floor — minVersion
+  if (policy.minVersion && isVersionBelow(VERSION, policy.minVersion)) {
+    console.error("");
+    console.error("  Gordon — update required");
+    console.error("  ──────────────────────────────");
+    console.error(`  Your version: ${VERSION}`);
+    console.error(`  Required:     ${policy.minVersion}`);
+    console.error("");
+    console.error(`  Run: ${upgradeHint}`);
+    console.error("");
+    process.exit(1);
+  }
+
+  // Soft floor — recommendedVersion
+  // Also escalates to hard if past deprecatedAfter
+  if (policy.recommendedVersion && isVersionBelow(VERSION, policy.recommendedVersion)) {
+    const pastDeprecation = policy.deprecatedAfter
+      && Date.now() > new Date(policy.deprecatedAfter).getTime();
+
+    if (pastDeprecation) {
+      console.error("");
+      console.error("  Gordon — version deprecated");
+      console.error("  ──────────────────────────────");
+      console.error(`  Your version (${VERSION}) is past the deprecation window`);
+      console.error(`  (deprecated after ${policy.deprecatedAfter}).`);
+      console.error("");
+      console.error(`  Run: ${upgradeHint}`);
+      console.error("");
+      process.exit(1);
+    }
+
+    // Soft warning — banner only, continue running
+    console.warn("");
+    console.warn(`  [gordon] Update recommended: ${VERSION} → ${policy.recommendedVersion}`);
+    console.warn(`  [gordon] Run: ${upgradeHint}`);
+    console.warn("");
+  }
+}
+
+/**
+ * Wire the recurring heartbeat to enforce on every policy update.
+ * Called once during checkLicense() so that policy changes mid-session
+ * (e.g. operator pushes a kill switch) take effect on the next heartbeat.
+ */
+function wireVersionPolicyListener(): void {
+  onVersionPolicy((policy) => {
+    enforceVersionPolicy(policy);
+  });
 }
 
 // ============================================================================
@@ -225,6 +357,11 @@ export async function checkLicense(): Promise<void> {
     process.exit(1);
   }
 
+  // Wire the version policy listener once so any policy returned by the
+  // recurring heartbeat is enforced immediately. Idempotent — only fires
+  // once per process via module-level state in telemetry.ts.
+  wireVersionPolicyListener();
+
   const existing = readLicense();
 
   // Case 1: No license — activation required
@@ -243,9 +380,25 @@ export async function checkLicense(): Promise<void> {
       console.log("  Activated successfully. Welcome to Gordon.");
       console.log("");
 
-      // Start heartbeat for this session
+      // Start heartbeat for this session — first heartbeat returns the
+      // current version policy and enforceVersionPolicy() is wired via
+      // the listener registered above.
       startHeartbeat(license.token);
       trackEvent("activation");
+
+      // Run an immediate validateToken on the fresh license so policy is
+      // enforced before TUI loads, not 60s later.
+      const freshStatus = await validateToken(license.token);
+      if (freshStatus === "revoked") {
+        try { fs.unlinkSync(LICENSE_FILE); } catch { /* ok */ }
+        console.error("\n  Your access was revoked immediately after activation.");
+        process.exit(1);
+      }
+
+      // If the listener hasn't fired yet but we have a captured policy,
+      // enforce it now.
+      const captured = getLatestVersionPolicy();
+      if (captured) enforceVersionPolicy(captured);
       return;
     } catch (err) {
       console.error(`\n  ${(err as Error).message}`);
@@ -254,13 +407,17 @@ export async function checkLicense(): Promise<void> {
   }
 
   // Case 2: Fresh cached token — no network needed
+  // We still kick off the recurring heartbeat so policy updates are
+  // captured within ~60s of session start.
   if (isTokenFresh(existing)) {
     startHeartbeat(existing.token);
     trackEvent("startup");
     return;
   }
 
-  // Case 3: Stale token — validate in background
+  // Case 3: Stale token — validate against server. This call captures the
+  // version policy via enforceVersionPolicy() inside validateToken on
+  // success, so a forced upgrade is enforced before TUI loads.
   const status = await validateToken(existing.token);
 
   if (status === "revoked") {

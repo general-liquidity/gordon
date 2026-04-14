@@ -32,6 +32,10 @@
   "engines": {
     "node": ">=18"
   },
+  "publishConfig": {
+    "access": "public",
+    "tag": "friends"
+  },
   "scripts": {
     "prepack": "node ../scripts/prepare-npm-wrapper.cjs",
     "postinstall": "node scripts/postinstall.cjs"
