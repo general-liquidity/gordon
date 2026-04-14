@@ -1,4 +1,4 @@
-import type { BacktestMetrics } from "../../backtest/types.ts";
+import type { BacktestMetrics } from "../../../backtest/types.ts";
 
 export type MarketFamily = "crypto" | "stocks";
 export type DatasetKind = "raw_ohlc";

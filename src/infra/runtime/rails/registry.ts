@@ -4,7 +4,7 @@ import type {
   GordonConfig,
   PaymentProviderConfig,
   WalletProviderConfig,
-} from "../../types/index.ts";
+} from "../../../types/index.ts";
 import type { AgentRailsRegistry, ChainDataProvider, PaymentProvider, WalletProvider } from "./types.ts";
 import { HeliusProvider } from "./providers/helius.ts";
 import { MoonPayProvider } from "./providers/moonpay.ts";

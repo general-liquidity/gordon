@@ -220,7 +220,7 @@ function ListRenderer({ token, level }: { token: Tokens.List; level: number }) {
     <Box flexDirection="column" paddingLeft={level === 0 ? 2 : 0}>
       {token.items.map((item: Tokens.ListItem, i: number) => {
         const bullet = token.ordered
-          ? `${(token.start ?? 1) + i}.`
+          ? `${Number(token.start ?? 1) + i}.`
           : level === 0
             ? "\u2022"
             : level === 1

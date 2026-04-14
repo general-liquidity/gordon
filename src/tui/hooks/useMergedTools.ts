@@ -34,11 +34,11 @@ export function useMergedTools(): MergedTool[] {
 
       // 1. Built-in tools from runtime registry
       try {
-        const registeredTools = runtime.getRegisteredTools();
+        const registeredTools = runtime.getRegisteredTools() as any[];
         for (const tool of registeredTools) {
           merged.push({
-            id: `builtin:${tool.name}`,
-            name: tool.name,
+            id: `builtin:${tool.name ?? tool.id}`,
+            name: tool.name ?? tool.id,
             source: "builtin",
             description: tool.description,
           });
@@ -50,7 +50,7 @@ export function useMergedTools(): MergedTool[] {
       // 2. MCP server tools
       try {
         const state = runtime.getState();
-        const mcpServers = state.tooling?.mcpServers ?? [];
+        const mcpServers = (state.tooling?.mcpServers ?? []) as any[];
         for (const server of mcpServers) {
           const serverTools = server.tools ?? [];
           for (const tool of serverTools) {
@@ -70,7 +70,7 @@ export function useMergedTools(): MergedTool[] {
       // 3. Plugin tools
       try {
         const state = runtime.getState();
-        const plugins = state.tooling?.plugins ?? [];
+        const plugins = (state.tooling?.plugins ?? []) as any[];
         for (const plugin of plugins) {
           if (!plugin.enabled) continue;
           const pluginTools = plugin.tools ?? [];

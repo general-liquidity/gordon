@@ -1,5 +1,5 @@
-import type { BacktestMetrics, BacktestResult } from "../../backtest/types.ts";
-import type { PortfolioState, StrategySlot } from "../../core/runtime/types.ts";
+import type { BacktestMetrics, BacktestResult } from "../../../backtest/types.ts";
+import type { PortfolioState, StrategySlot } from "../../../core/runtime/types.ts";
 import type {
   BiasDiagnosticSummary,
   DatasetRecord,

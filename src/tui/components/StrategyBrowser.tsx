@@ -158,12 +158,14 @@ export function StrategyBrowser({
     }
     if (key.return) {
       const idx = selectable[cursor];
+      if (idx === undefined) return;
       const entry = flatList[idx];
       if (entry?.strategy) onDeploy(entry.strategy);
       return;
     }
     if (input === " ") {
       const idx = selectable[cursor];
+      if (idx === undefined) return;
       const entry = flatList[idx];
       if (entry?.strategy) onSelect(entry.strategy);
     }

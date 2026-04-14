@@ -286,7 +286,7 @@ export async function printStatusJson(): Promise<void> {
   try {
     const envStatus = await checkEnvStatus();
     const config = await loadConfig();
-    const { getStatus: getTelemetryStatus } = await import("./infra/telemetry/index.ts");
+    const { getStatus: getTelemetryStatus } = await import("./infra/platform/telemetry/index.ts");
 
     const status = {
       version: VERSION,

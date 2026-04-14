@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 
 import { GordonConfigSchema, type GordonConfig } from "../../../types/index.ts";
-import type { GordonContext } from "../agents/types.ts";
+import type { GordonContext } from "../../agents/types.ts";
 import { evaluateToolRequestPolicy, planActionExecution } from "./runtime.ts";
 
 function createConfig(permissionMode: "auto" | "ask" | "strict" | "paper" | "observe" | "plan" = "ask"): GordonConfig {

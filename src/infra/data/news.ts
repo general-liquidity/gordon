@@ -5,7 +5,7 @@
  * Free, no API key required. Parses RSS XML with simple regex.
  */
 
-import { Cache } from "../cache/cache.ts";
+import { Cache } from "../platform/cache/cache.ts";
 import { createModuleLogger } from "../logger/index.ts";
 
 const logger = createModuleLogger("news");

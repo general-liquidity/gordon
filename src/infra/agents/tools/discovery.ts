@@ -702,7 +702,7 @@ export const placeMarketOrderTool = createTool({
         quantity: quantity ?? 0,
         orderType: "MARKET",
         notionalUsd: quoteOrderQty ?? 0,
-        exchangeId: ctx.exchange?.exchangeId ?? ctx.broker?.id,
+        exchangeId: ctx.exchange?.exchangeId ?? ctx.broker?.brokerId,
       });
       if (preHook.action === "block") {
         return { error: `PreOrderPlacement hook blocked: ${preHook.reason}` };
@@ -841,7 +841,7 @@ export const previewMarketOrderTool = createTool({
         outcome: plan.ready ? "success" : "failure",
         status: plan.ready ? "ready" : "blocked",
         symbol: normalizedSymbol,
-        mode: ctx.config?.mode,
+        mode: ctx.config?.permissionMode,
         exchange: ctx.exchange?.exchangeId,
         broker: ctx.broker?.brokerId,
         venue,
@@ -874,7 +874,7 @@ export const previewMarketOrderTool = createTool({
         outcome: "failure",
         status: "error",
         symbol: normalizedSymbol,
-        mode: ctx.config?.mode,
+        mode: ctx.config?.permissionMode,
         exchange: ctx.exchange?.exchangeId,
         broker: ctx.broker?.brokerId,
         reason: message,

@@ -143,12 +143,14 @@ export function PlaybookBrowser({
     }
     if (key.return) {
       const idx = selectable[cursor];
+      if (idx === undefined) return;
       const entry = flatList[idx];
       if (entry?.playbook) onDeploy(entry.playbook);
       return;
     }
     if (input === " ") {
       const idx = selectable[cursor];
+      if (idx === undefined) return;
       const entry = flatList[idx];
       if (entry?.playbook) onSelect(entry.playbook);
     }

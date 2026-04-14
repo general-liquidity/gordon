@@ -64,7 +64,7 @@ export const testConnectionTool = createTool({
     // Context is extracted from Mastra's RequestContext
     const ctx = getGordonContext(execContext);
     const results: {
-      permissionMode: "auto" | "ask" | "strict";
+      permissionMode: "auto" | "ask" | "strict" | "paper" | "observe" | "plan";
       canTradeNow: boolean;
       llmConnected: boolean;
       binanceConnected: boolean;

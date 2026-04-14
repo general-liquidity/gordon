@@ -1,6 +1,6 @@
 import { createModuleLogger } from "../../../logger/index.ts";
 import type { ChainDataProvider, ChainTokenMetadata, ChainTransactionSummary, ChainWalletOverview } from "../types.ts";
-import type { ChainProviderConfig } from "../../../types/index.ts";
+import type { ChainProviderConfig } from "../../../../types/index.ts";
 
 const logger = createModuleLogger("rails-helius");
 const DEFAULT_HELIUS_API_BASE = "https://mainnet.helius-rpc.com";

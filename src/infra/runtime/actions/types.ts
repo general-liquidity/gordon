@@ -1,5 +1,5 @@
 import type { ZodTypeAny } from "zod";
-import type { IntegrationSurfaceMetadata } from "../integrations/taxonomy.ts";
+import type { IntegrationSurfaceMetadata } from "../../domain/integrations/taxonomy.ts";
 
 export type ActionDomain =
   | "market"
@@ -56,7 +56,7 @@ export interface SlashActionSurface {
   usage: string;
   category: "trading" | "market" | "account" | "system" | "strategy";
   level: 1 | 2 | 3;
-  workflow?: "discover" | "analyze" | "trade" | "run" | "accounts" | "operate";
+  workflow?: "discover" | "analyze" | "trade" | "run" | "accounts" | "operate" | "monitor";
   audience?: "core" | "advanced" | "operator";
   action: "agent" | "tool" | "menu";
   target?: string;

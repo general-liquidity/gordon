@@ -12,7 +12,7 @@ const ThemeContext = createContext<{ theme: GordonTheme; setTheme: (name: string
 
 export function ThemeProvider({ children, initialTheme }: { children: ReactNode; initialTheme?: string }) {
   const [theme, setThemeState] = useState<GordonTheme>(
-    (initialTheme && THEMES[initialTheme]) ?? DARK_THEME,
+    (initialTheme ? THEMES[initialTheme] : undefined) ?? DARK_THEME,
   );
 
   const setTheme = useCallback((name: string) => {

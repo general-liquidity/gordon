@@ -1,4 +1,4 @@
-import type { GordonConfig } from "../../types/index.ts";
+import type { GordonConfig } from "../../../types/index.ts";
 import { BrokerFactory } from "../../broker/factory.ts";
 import { ExchangeFactory } from "../../exchange/factory.ts";
 import {

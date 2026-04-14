@@ -12,7 +12,7 @@
 import { createModuleLogger } from "../../logger/index.ts";
 import { getTrade, listTrades } from "../../storage/trades.ts";
 import { getPlan } from "../../storage/plans.ts";
-import type { Trade, Plan } from "../../types/index.ts";
+import type { Trade, Plan } from "../../../types/index.ts";
 import {
   recordTradeOutcome,
   trackRecommendation,

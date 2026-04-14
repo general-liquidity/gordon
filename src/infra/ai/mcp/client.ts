@@ -50,7 +50,7 @@ let _hotReloadInFlight = false;
 let _mcpServers: Record<string, MastraMCPServerDefinition> | null = null;
 let _schemasDiscovered = false;
 const _discoveredServerIds = new Set<string>();
-let _routingManagerPromise: Promise<typeof import("../routing/manager.ts")> | null = null;
+let _routingManagerPromise: Promise<typeof import("../../runtime/routing/manager.ts")> | null = null;
 
 function buildPluginFingerprint(installedPlugins: Array<{ id: string; enabled: boolean; version?: string }>): string {
   return installedPlugins

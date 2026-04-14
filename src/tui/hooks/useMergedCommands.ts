@@ -39,7 +39,7 @@ export function useMergedCommands(): MergedCommand[] {
         const state = runtime.getState();
 
         // Plugin commands
-        const plugins = state.tooling?.plugins ?? [];
+        const plugins = (state.tooling?.plugins ?? []) as any[];
         for (const plugin of plugins) {
           if (!plugin.enabled) continue;
           const commands = plugin.commands ?? [];
@@ -56,7 +56,7 @@ export function useMergedCommands(): MergedCommand[] {
         }
 
         // MCP server commands (if any expose slash-style commands)
-        const mcpServers = state.tooling?.mcpServers ?? [];
+        const mcpServers = (state.tooling?.mcpServers ?? []) as any[];
         for (const server of mcpServers) {
           const commands = server.commands ?? [];
           for (const cmd of commands) {

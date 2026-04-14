@@ -24,8 +24,8 @@ export function ProgressBar({ value, width = 20, fillColor = "cyanBright", empty
   const partialIndex = Math.round(totalEighths % 8);
   const emptyChars = Math.max(0, width - fullChars - (partialIndex > 0 ? 1 : 0));
 
-  const filled = BLOCKS[8].repeat(fullChars);
-  const partial = partialIndex > 0 ? BLOCKS[partialIndex] : "";
+  const filled = BLOCKS[8]!.repeat(fullChars);
+  const partial = partialIndex > 0 ? (BLOCKS[partialIndex] ?? "") : "";
   const empty = " ".repeat(emptyChars);
 
   return (

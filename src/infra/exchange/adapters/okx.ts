@@ -434,7 +434,7 @@ export class OkxAdapter implements Exchange {
 
   private getPrecision(sizeStr: string): number {
     if (!sizeStr || !sizeStr.includes(".")) return 0;
-    return sizeStr.split(".")[1].length;
+    return sizeStr.split(".")[1]?.length ?? 0;
   }
 
   // -------------------------------------------------------------------------
@@ -468,13 +468,13 @@ export class OkxAdapter implements Exchange {
       .reverse()
       .map(
         (c): Candle => ({
-          openTime: parseInt(c[0]),
-          open: parseFloat(c[1]),
-          high: parseFloat(c[2]),
-          low: parseFloat(c[3]),
-          close: parseFloat(c[4]),
-          volume: parseFloat(c[5]),
-          closeTime: parseInt(c[0]) + (INTERVAL_MS[interval] || 3_600_000),
+          openTime: parseInt(c[0]!),
+          open: parseFloat(c[1]!),
+          high: parseFloat(c[2]!),
+          low: parseFloat(c[3]!),
+          close: parseFloat(c[4]!),
+          volume: parseFloat(c[5]!),
+          closeTime: parseInt(c[0]!) + (INTERVAL_MS[interval] || 3_600_000),
         })
       );
   }
@@ -533,17 +533,17 @@ export class OkxAdapter implements Exchange {
 
     if (!data[0]) throw new Error(`[OKX] No order book data for ${symbol}`);
 
-    const book = data[0];
+    const book = data[0]!;
     return {
       lastUpdateId: parseInt(book.ts),
       // OKX format: [price, size, liquidatedOrders, numberOfOrders]
       bids: book.bids.map(([price, qty]) => ({
-        price: parseFloat(price),
-        quantity: parseFloat(qty),
+        price: parseFloat(price!),
+        quantity: parseFloat(qty!),
       })),
       asks: book.asks.map(([price, qty]) => ({
-        price: parseFloat(price),
-        quantity: parseFloat(qty),
+        price: parseFloat(price!),
+        quantity: parseFloat(qty!),
       })),
     };
   }
@@ -841,19 +841,19 @@ export class OkxAdapter implements Exchange {
 
   private normalizeOrder(o: Record<string, string>): Order {
     return {
-      orderId: o.ordId,
+      orderId: o.ordId!,
       clientOrderId: o.clOrdId || undefined,
-      symbol: this.fromOkxSymbol(o.instId),
+      symbol: this.fromOkxSymbol(o.instId!),
       side: (o.side?.toUpperCase() || "BUY") as OrderSide,
-      type: this.reverseMapOrderType(o.ordType),
-      status: this.mapOrderStatus(o.state),
+      type: this.reverseMapOrderType(o.ordType!),
+      status: this.mapOrderStatus(o.state!),
       price: parseFloat(o.px || o.avgPx || "0"),
       quantity: parseFloat(o.sz || "0"),
       executedQty: parseFloat(o.accFillSz || o.fillSz || "0"),
       cummulativeQuoteQty: parseFloat(o.fillNotionalUsd || "0"),
       timeInForce: o.ordType === "post_only" ? "GTC" : undefined,
-      time: parseInt(o.cTime) || undefined,
-      updateTime: parseInt(o.uTime) || undefined,
+      time: parseInt(o.cTime!) || undefined,
+      updateTime: parseInt(o.uTime!) || undefined,
       isWorking: o.state === "live" || o.state === "partially_filled",
     };
   }

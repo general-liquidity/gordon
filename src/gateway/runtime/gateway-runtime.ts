@@ -472,7 +472,7 @@ export class GatewayRuntime {
           component: "GatewayRuntime",
           outcome: "failure",
           status: "tripped",
-          mode: updated.mode,
+          mode: updated.permissionMode,
           reason: result.triggers.map((trigger) => trigger.name).join(", "),
           details: {
             autoDisarmed: true,

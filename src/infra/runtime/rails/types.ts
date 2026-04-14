@@ -4,7 +4,7 @@ import type {
   PaymentProviderConfig,
   RailAuthMode,
   WalletProviderConfig,
-} from "../../types/index.ts";
+} from "../../../types/index.ts";
 
 export type AgentRailProviderKind = "wallet" | "chain" | "payment";
 export type AgentRailProviderId = "moonpay" | "helius" | "polygon";

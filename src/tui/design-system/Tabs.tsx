@@ -27,10 +27,12 @@ export function Tabs({ tabs, activeKey, onChange, children }: Props) {
 
     if (key.leftArrow) {
       const prev = (currentIndex - 1 + tabs.length) % tabs.length;
-      onChange(tabs[prev].key);
+      const t = tabs[prev];
+      if (t) onChange(t.key);
     } else if (key.rightArrow) {
       const next = (currentIndex + 1) % tabs.length;
-      onChange(tabs[next].key);
+      const t = tabs[next];
+      if (t) onChange(t.key);
     }
   });
 

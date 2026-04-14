@@ -200,7 +200,7 @@ export function StrategyDSLEditor({ onSave, onCancel, initialStrategy }: Props) 
           </Box>
         ))}
         {currentField === "entry" && (
-          <Text dimColor paddingLeft={2}>a=add d=remove</Text>
+          <Box paddingLeft={2}><Text dimColor>a=add d=remove</Text></Box>
         )}
       </Box>
 
@@ -216,7 +216,7 @@ export function StrategyDSLEditor({ onSave, onCancel, initialStrategy }: Props) 
           </Box>
         ))}
         {currentField === "exit" && (
-          <Text dimColor paddingLeft={2}>a=add d=remove</Text>
+          <Box paddingLeft={2}><Text dimColor>a=add d=remove</Text></Box>
         )}
       </Box>
 

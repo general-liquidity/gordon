@@ -39,7 +39,7 @@ export const getStockQuoteTool = createTool({
   outputSchema: z.object({
     configured: z.boolean(),
     symbol: z.string(),
-    quote: z.record(z.any()).optional(),
+    quote: z.record(z.string(), z.any()).optional(),
     error: z.string().optional(),
   }),
   execute: async ({ symbol }) => {
@@ -173,7 +173,7 @@ export const getMarketStatusTool = createTool({
   outputSchema: z.object({
     configured: z.boolean(),
     exchange: z.string(),
-    status: z.record(z.any()).optional(),
+    status: z.record(z.string(), z.any()).optional(),
     error: z.string().optional(),
   }),
   execute: async ({ exchange }) => {
@@ -340,7 +340,7 @@ export const getAggregateSignalTool = createTool({
     configured: z.boolean(),
     symbol: z.string(),
     resolution: z.string(),
-    signal: z.record(z.any()).optional(),
+    signal: z.record(z.string(), z.any()).optional(),
     error: z.string().optional(),
   }),
   execute: async ({ symbol, resolution }) => {
@@ -376,7 +376,7 @@ export const getEtfProfileTool = createTool({
   outputSchema: z.object({
     configured: z.boolean(),
     symbol: z.string(),
-    profile: z.record(z.any()).optional(),
+    profile: z.record(z.string(), z.any()).optional(),
     error: z.string().optional(),
   }),
   execute: async ({ symbol }) => {
@@ -449,7 +449,7 @@ export const getMutualFundProfileTool = createTool({
   outputSchema: z.object({
     configured: z.boolean(),
     symbol: z.string(),
-    profile: z.record(z.any()).optional(),
+    profile: z.record(z.string(), z.any()).optional(),
     error: z.string().optional(),
   }),
   execute: async ({ symbol }) => {
@@ -602,7 +602,7 @@ export const getBondProfileTool = createTool({
   outputSchema: z.object({
     configured: z.boolean(),
     isin: z.string(),
-    profile: z.record(z.any()).optional(),
+    profile: z.record(z.string(), z.any()).optional(),
     error: z.string().optional(),
   }),
   execute: async ({ isin }) => {
@@ -725,7 +725,7 @@ export const getCryptoProfileTool = createTool({
   outputSchema: z.object({
     configured: z.boolean(),
     symbol: z.string(),
-    profile: z.record(z.any()).optional(),
+    profile: z.record(z.string(), z.any()).optional(),
     error: z.string().optional(),
   }),
   execute: async ({ symbol }) => {
@@ -752,7 +752,7 @@ export const getForexRatesTool = createTool({
   outputSchema: z.object({
     configured: z.boolean(),
     base: z.string(),
-    rates: z.record(z.number()).optional(),
+    rates: z.record(z.string(), z.number()).optional(),
     error: z.string().optional(),
   }),
   execute: async ({ base }) => {

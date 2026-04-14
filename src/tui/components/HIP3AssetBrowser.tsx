@@ -171,6 +171,7 @@ export function HIP3AssetBrowser({ onSelect, onClose }: Props) {
     }
     if (key.return) {
       const idx = selectable[cursor];
+      if (idx === undefined) return;
       const entry = flatList[idx];
       if (entry?.asset && onSelect) {
         const quote = quotes.get(entry.asset.symbol);
@@ -185,8 +186,8 @@ export function HIP3AssetBrowser({ onSelect, onClose }: Props) {
     }
   });
 
-  const selectedFlatIdx = selectable[cursor];
-  const focusedAsset = flatList[selectedFlatIdx]?.asset;
+  const selectedFlatIdx = selectable[cursor] ?? -1;
+  const focusedAsset = selectedFlatIdx >= 0 ? flatList[selectedFlatIdx]?.asset : undefined;
   const focusedQuote = focusedAsset ? quotes.get(focusedAsset.symbol) : undefined;
   const totalAssets = HIP3_ASSETS.size;
 

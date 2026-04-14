@@ -53,7 +53,7 @@ import {
   type PositionSnapshotsResult,
   type UniswapDayDatasResult,
 } from "./subgraph-types.ts";
-import type { Candle } from "../../types/index.ts";
+import type { Candle } from "../../../types/index.ts";
 import type {
   Ticker24hr,
   Trade,
@@ -62,7 +62,7 @@ import type {
   BookTicker,
   SpreadInfo,
   AvgPrice,
-} from "../exchange/types.ts";
+} from "../../exchange/types.ts";
 
 // Gateway URL
 const GRAPH_GATEWAY = "https://gateway.thegraph.com/api";

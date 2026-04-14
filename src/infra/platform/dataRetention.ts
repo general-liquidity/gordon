@@ -188,7 +188,6 @@ function sweepAuditLog(ttlDays: number, result: RetentionSweepResult): void {
   // Lazy import — keeps dataRetention free of SQLite deps when no audit DB exists
   let getDatabase: (() => unknown) | null = null;
   try {
-    // @ts-expect-error — dynamic require pattern
     getDatabase = require("../storage/database.ts").getDatabase;
   } catch {
     return; // SQLite not available — skip silently

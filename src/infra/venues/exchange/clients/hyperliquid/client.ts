@@ -517,7 +517,7 @@ export class HyperliquidClient {
       p: price,
       s: size,
       r: reduceOnly,
-      t: orderType,
+      t: orderType as HyperliquidOrderRequest["t"],
       c: cloid,
     };
 

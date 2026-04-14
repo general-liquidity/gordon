@@ -61,7 +61,7 @@ export async function initializeRuntime(setState: StateUpdater): Promise<Session
   const config = await loadConfig();
 
   runtimeFactory = new SessionRuntimeFactory({
-    resolveContext: async (options) => {
+    resolveContext: (async (options: { session: { threadId: string; resourceId: string } }) => {
       const cfg = await loadConfig();
       return {
         userId: "tui-user",
@@ -70,7 +70,7 @@ export async function initializeRuntime(setState: StateUpdater): Promise<Session
         threadId: options.session.threadId,
         resourceId: options.session.resourceId,
       };
-    },
+    }) as any,
   });
 
   const runtimeId = `tui-${Date.now()}`;
@@ -399,7 +399,7 @@ async function streamResponse(
                 ? {
                     ...tc,
                     status: event.error ? "error" : "success",
-                    result: event.result ? String(event.result).slice(0, 200) : undefined,
+                    result: event.toolResult ? String(event.toolResult).slice(0, 200) : undefined,
                     duration: Date.now() - tc.startedAt,
                   }
                 : tc,
@@ -437,7 +437,7 @@ async function streamResponse(
             runtime: undefined as never,
             threadId: undefined as string | undefined,
             resourceId: undefined as string | undefined,
-          };
+          } as any;
 
           for (const approval of rawPending) {
             try {
@@ -510,7 +510,7 @@ async function streamResponse(
           const approvalMsgs: Message[] = buildPendingApprovalMessages(stillPending).map((m) => ({
             id: `approval-${Date.now()}-${Math.random()}`,
             ...m,
-          }));
+          })) as Message[];
 
           setState((prev: any) => {
             // Persist tool call results as messages (Claude Code: tool results stay inline)

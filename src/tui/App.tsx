@@ -1063,11 +1063,11 @@ function AppInner() {
   // ── Interactive dialogs (Claude Code pattern: full-screen replacement) ──
 
   if (showThemePicker) {
-    return <ThemePicker currentTheme="dark" onSelect={async (theme) => {
-      try { const { loadConfig: lc, saveConfig: sc } = await import("../infra/storage/config.ts"); const cfg = await lc(); await sc({ ...cfg, theme }); } catch {}
+    return <ThemePicker onSelect={async (theme: string) => {
+      try { const { loadConfig: lc, saveConfig: sc } = await import("../infra/storage/config.ts"); const cfg = await lc(); await sc({ ...cfg, theme } as any); } catch {}
       dispatch({ type: "ADD_MESSAGE", message: { id: `theme-${Date.now()}`, role: "system", content: `Theme changed to ${theme}. Restart for full effect.`, timestamp: new Date().toISOString() } });
       setShowThemePicker(false);
-    }} onCancel={() => setShowThemePicker(false)} />;
+    }} onClose={() => setShowThemePicker(false)} />;
   }
 
   if (showExchangePicker) {
@@ -1186,7 +1186,7 @@ function AppInner() {
     <Box flexDirection="column" minHeight={process.stdout.rows ?? 24}>
       {/* ── Header ── */}
       <GordonHeader
-        permissionMode={permissionMode}
+        permissionMode={permissionMode as "auto" | "ask" | "strict"}
         sessionId={sessionId}
         threadId={threadId}
         isResumedSession={isResumedSession}
@@ -1299,6 +1299,7 @@ function AppInner() {
               reason={orderRecovery.reason}
               attempt={orderRecovery.attempt}
               maxAttempts={orderRecovery.maxAttempts}
+              status="retrying"
             />
           )}
 
@@ -1420,9 +1421,9 @@ function AppInner() {
           symbol="--"
           rsi={50}
           macd={{ value: 0, signal: 0, histogram: 0 }}
-          trend={{ direction: "neutral", strength: 0, ema20: 0, ema50: 0, ema200: 0 }}
-          bollinger={{ upper: 0, middle: 0, lower: 0, width: 0, percentB: 0.5 }}
-          volume={{ current: 0, average: 0, ratio: 1 }}
+          trend={{ direction: "sideways", strength: "moderate" }}
+          bollinger={{ upper: 0, middle: 0, lower: 0, price: 0 }}
+          volume={{ current: 0, average: 0 }}
         />
       )}
 
@@ -1462,22 +1463,22 @@ function AppInner() {
         <DataSourceHealth sources={[]} onClose={() => setShowDataHealth(false)} />
       )}
       {showRiskConfig && (
-        <RiskConfigPanel onClose={() => setShowRiskConfig(false)} />
+        <RiskConfigPanel checks={[]} mode={"warn"} onClose={() => setShowRiskConfig(false)} />
       )}
       {showDefi && (
         <DeFiOverviewPanel onClose={() => setShowDefi(false)} />
       )}
       {showMarketOverview && (
-        <MarketOverviewPanel onClose={() => setShowMarketOverview(false)} />
+        <MarketOverviewPanel marketScore={0} regime="" breakouts={[]} consolidations={[]} whaleAlerts={[]} onClose={() => setShowMarketOverview(false)} />
       )}
       {showRegime && (
-        <RegimeStatusPanel symbols={[]} onClose={() => setShowRegime(false)} />
+        <RegimeStatusPanel regimes={[]} onClose={() => setShowRegime(false)} />
       )}
       {showStats && (
-        <StatsDialog onClose={() => setShowStats(false)} />
+        <StatsDialog stats={{} as any} onClose={() => setShowStats(false)} />
       )}
       {showGlobalSearch && (
-        <GlobalSearchDialog messages={messages} onClose={() => setShowGlobalSearch(false)} />
+        <GlobalSearchDialog onClose={() => setShowGlobalSearch(false)} />
       )}
       {showExitFlow && (
         <ExitFlow
@@ -1491,22 +1492,22 @@ function AppInner() {
 
       {/* ── Additional panel dialogs ── */}
       {showBacktestWizard && (
-        <BacktestWizard onClose={() => setShowBacktestWizard(false)} onSubmit={() => setShowBacktestWizard(false)} />
+        <BacktestWizard strategies={[]} onRun={() => setShowBacktestWizard(false)} onCancel={() => setShowBacktestWizard(false)} />
       )}
       {showBrokerManager && (
-        <BrokerManagerPanel onClose={() => setShowBrokerManager(false)} />
+        <BrokerManagerPanel brokers={[]} onClose={() => setShowBrokerManager(false)} />
       )}
       {showExchangeManager && (
-        <ExchangeManagerPanel onClose={() => setShowExchangeManager(false)} />
+        <ExchangeManagerPanel exchanges={[]} onClose={() => setShowExchangeManager(false)} />
       )}
       {showGenomeEvolution && (
-        <GenomeEvolutionPanel mutations={[]} generation={0} fitnessHistory={[]} onClose={() => setShowGenomeEvolution(false)} />
+        <GenomeEvolutionPanel isRunning={false} generation={0} bestFitness={0} populationSize={0} mutationRate={0} variants={[]} onClose={() => setShowGenomeEvolution(false)} />
       )}
       {showHistorySearch && (
-        <HistorySearchDialog entries={messages.map((m, i) => ({ index: i, role: m.role, content: m.content, timestamp: m.timestamp ?? "" }))} onClose={() => setShowHistorySearch(false)} onSelect={() => setShowHistorySearch(false)} />
+        <HistorySearchDialog entries={messages.map((m) => ({ command: m.content, timestamp: m.timestamp ? Date.parse(m.timestamp) : Date.now() }))} onClose={() => setShowHistorySearch(false)} onSelect={() => setShowHistorySearch(false)} />
       )}
       {showIndicatorValue && (
-        <IndicatorValueViewer symbol="" indicators={{}} onClose={() => setShowIndicatorValue(false)} />
+        <IndicatorValueViewer symbol="" indicators={[]} onClose={() => setShowIndicatorValue(false)} />
       )}
       {showInsights && (
         <InsightBrowser insights={[]} onClose={() => setShowInsights(false)} />
@@ -1515,13 +1516,13 @@ function AppInner() {
         <MarketPulsePanel pulses={[]} />
       )}
       {showMessageSelector && (
-        <MessageSelector messages={messages} onSelect={() => setShowMessageSelector(false)} onClose={() => setShowMessageSelector(false)} />
+        <MessageSelector messages={messages as any} onSelect={() => setShowMessageSelector(false)} onClose={() => setShowMessageSelector(false)} />
       )}
       {showOptimization && (
-        <OptimizationResults results={[]} onClose={() => setShowOptimization(false)} />
+        <OptimizationResults results={[]} param1Name="" param2Name="" onClose={() => setShowOptimization(false)} />
       )}
       {showPlanEditor && (
-        <PlanEditor plan={{}} onSave={() => setShowPlanEditor(false)} onCancel={() => setShowPlanEditor(false)} onApprove={() => setShowPlanEditor(false)} />
+        <PlanEditor plan={{} as any} onSave={() => setShowPlanEditor(false)} onCancel={() => setShowPlanEditor(false)} onApprove={() => setShowPlanEditor(false)} />
       )}
       {showPlugins && (
         <PluginBrowser plugins={[]} onClose={() => setShowPlugins(false)} />
@@ -1536,7 +1537,7 @@ function AppInner() {
         <TaskDependencyView tasks={[]} onClose={() => setShowTaskDeps(false)} />
       )}
       {showWalkForward && (
-        <WalkForwardResults windows={[]} onClose={() => setShowWalkForward(false)} />
+        <WalkForwardResults windows={[]} overallScore={0} onClose={() => setShowWalkForward(false)} />
       )}
 
       {/* ── DaemonStatus + MarketDataStatus — only show when there's something active ── */}
@@ -1549,7 +1550,7 @@ function AppInner() {
               uptime={daemonStatus.uptime}
             />
           )}
-          {marketFeeds.length > 0 && <MarketDataStatus feeds={marketFeeds} />}
+          {marketFeeds.length > 0 && <MarketDataStatus feeds={marketFeeds as any} />}
         </Box>
       )}
 
@@ -1598,7 +1599,7 @@ function AppInner() {
         <PromptInput
           onSubmit={handleSubmit}
           placeholder={placeholder}
-          permissionMode={permissionMode}
+          permissionMode={permissionMode as "auto" | "ask" | "strict"}
           activeAgentCount={activeAgentCount}
           activeAgentName={activeAgentName}
           isStreaming={isStreaming}

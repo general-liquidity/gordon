@@ -57,7 +57,7 @@ export function groupApprovals(steps: ApprovalStep[]): ApprovalGroup[] {
   for (const [groupId, rule] of Object.entries(GROUP_RULES)) {
     const matching = steps.filter((s) => rule.tools.includes(s.toolName) && !used.has(s.id));
     if (matching.length >= 2) {
-      const maxR = matching.reduce((r, s) => maxRisk(r, s.riskLevel), "low");
+      const maxR = matching.reduce<"low" | "medium" | "high" | "critical">((r, s) => maxRisk(r, s.riskLevel), "low");
       groups.push({
         id: `group_${groupId}_${Date.now()}`,
         title: rule.title,

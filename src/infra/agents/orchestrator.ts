@@ -92,7 +92,7 @@ import {
   getMCPDiscoveryIntent,
   areMCPSchemasDiscovered,
 } from "../ai/mcp/client.ts";
-import type { Message } from "../llm/types.ts";
+import type { Message } from "../ai/llm/types.ts";
 import { resetAgents } from "./agents.ts";
 import { rebuildACEMemoryForThread, getACEMemorySnapshot } from "./aceMemory.ts";
 import {
@@ -424,7 +424,7 @@ export async function* processMessageStream(
     // Per Mastra docs: `const stream = await agent.stream(messages, options)`
     // Returns MastraModelOutput with textStream, fullStream, text (Promise<string>)
     const streamObj = await awaitWithAbort(
-      gordonAgent().stream(groundedPrompt.messages, {
+      gordonAgent().stream(groundedPrompt.messages, ({
         requestContext,
         ...(threadId && effectiveResourceId ? { memory: { thread: threadId, resource: effectiveResourceId } } : {}),
         maxSteps: 20,
@@ -445,10 +445,10 @@ export async function* processMessageStream(
             return {};
           },
         },
-        onError: ({ error }: { error: Error }) => {
-          logger.error("Stream error", { error: error.message });
+        onError: ({ error }: { error: string | Error }) => {
+          logger.error("Stream error", { error: error instanceof Error ? error.message : error });
         },
-      }),
+      } as any)),
       signal,
     );
     reactStage = advanceReActStage(reactStage, "action_started");
@@ -459,7 +459,7 @@ export async function* processMessageStream(
 
     // ── Primary: fullStream (rich typed events — tool calls, reasoning, agent switches) ──
     if (streamObj?.fullStream) {
-      const reader = (streamObj.fullStream as ReadableStream<InternalStreamChunk>).getReader();
+      const reader = (streamObj.fullStream as unknown as ReadableStream<InternalStreamChunk>).getReader();
       try {
         while (true) {
           const { done, value } = await readStreamChunkWithAbort(reader, signal);
@@ -492,8 +492,8 @@ export async function* processMessageStream(
     // ── Last resort: text promise ───────────────────────────────────────
     else if (streamObj?.text) {
       await throwIfStreamAborted(signal);
-      const rawText = typeof streamObj.text === "function"
-        ? await streamObj.text()
+      const rawText = typeof (streamObj as any).text === "function"
+        ? await (streamObj as any).text()
         : await streamObj.text;
       if (rawText && typeof rawText === "string" && rawText.trim()) {
         const outputCheck = await checkOutputGuardrails(rawText);
@@ -511,9 +511,9 @@ export async function* processMessageStream(
         await throwIfStreamAborted(signal);
         try {
           let finalText: string | undefined;
-          if (typeof streamObj.text === 'function') finalText = await streamObj.text();
-          else if (streamObj.text instanceof Promise) finalText = await streamObj.text;
-          else if (typeof streamObj.text === 'string') finalText = streamObj.text;
+          if (typeof (streamObj as any).text === 'function') finalText = await (streamObj as any).text();
+          else if ((streamObj as any).text instanceof Promise) finalText = await streamObj.text;
+          else if (typeof (streamObj as any).text === 'string') finalText = (streamObj as any).text;
 
           if (finalText && finalText.trim()) {
             const outputCheck = await checkOutputGuardrails(finalText);
@@ -534,7 +534,7 @@ export async function* processMessageStream(
 
     // Wire: compaction trigger — check token thresholds after each API response
     try {
-      const inputToks = (usage as Record<string, unknown>).inputTokens as number ?? usage.totalTokens ?? 0;
+      const inputToks = (usage as unknown as Record<string, unknown>).inputTokens as number ?? usage.totalTokens ?? 0;
       const compactionDecision = getCompactionTrigger().check(inputToks);
       if (compactionDecision.action === "warn" || compactionDecision.action === "microcompact" || compactionDecision.action === "compact") {
         logger.info("Compaction trigger fired", { action: compactionDecision.action, stage: compactionDecision.stage, tokens: inputToks });
@@ -543,8 +543,8 @@ export async function* processMessageStream(
 
     // Wire: per-model cost tracking
     try {
-      const inputToks = (usage as Record<string, unknown>).inputTokens as number ?? 0;
-      const outputToks = (usage as Record<string, unknown>).outputTokens as number ?? 0;
+      const inputToks = (usage as unknown as Record<string, unknown>).inputTokens as number ?? 0;
+      const outputToks = (usage as unknown as Record<string, unknown>).outputTokens as number ?? 0;
       getCostTracker().record({
         modelId: context.config?.modelConfig?.model ?? "unknown",
         inputTokens: inputToks,

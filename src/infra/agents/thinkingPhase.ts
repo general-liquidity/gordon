@@ -9,7 +9,7 @@
  */
 
 import type { GordonContext } from "./types.ts";
-import type { Message } from "../llm/types.ts";
+import type { Message } from "../ai/llm/types.ts";
 import {
   resolveLegacyModelRouteForWorkflowPhase,
   determineWorkflowPhase,

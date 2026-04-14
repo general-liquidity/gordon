@@ -38,8 +38,8 @@ export function installLineDiffRenderer(): () => void {
 
   const patchedWrite = function (
     chunk: string | Buffer | Uint8Array,
-    encodingOrCallback?: BufferEncoding | ((err?: Error) => void),
-    callback?: (err?: Error) => void,
+    encodingOrCallback?: BufferEncoding | ((err?: Error | null) => void),
+    callback?: (err?: Error | null) => void,
   ): boolean {
     // Only diff string writes (Ink's output)
     if (typeof chunk !== "string") {

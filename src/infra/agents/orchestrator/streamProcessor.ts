@@ -221,10 +221,10 @@ export async function handleAgentSwitch(
     toolArgs,
     handoffBudget:
       state.currentAgent === "Executor"
-        ? buildDefaultExecutorHandoffBudget(context, toolArgs)
+        ? buildDefaultExecutorHandoffBudget(context)
         : undefined,
     eventType,
-    mode: context.config?.mode,
+    mode: context.config?.permissionMode,
   });
 
   await runLifecycleHooks("agent_switch", context, {

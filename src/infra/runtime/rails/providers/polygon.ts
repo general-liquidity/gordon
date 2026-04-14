@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { Wallet } from "ethers";
 
 import type { PaymentHeadersResult, PaymentIntent, PaymentProvider, SignedPaymentIntent } from "../types.ts";
-import type { PaymentProviderConfig } from "../../../types/index.ts";
+import type { PaymentProviderConfig } from "../../../../types/index.ts";
 
 export class PolygonX402Provider implements PaymentProvider {
   readonly id = "polygon" as const;

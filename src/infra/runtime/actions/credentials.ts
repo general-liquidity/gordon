@@ -1,6 +1,6 @@
 import { join } from "node:path";
 
-import type { GordonConfig } from "../../types/index.ts";
+import type { GordonConfig } from "../../../types/index.ts";
 import { BROKER_ENV_MAP, type BrokerId } from "../../broker/types.ts";
 import { EXCHANGE_ENV_MAP, type ExchangeId } from "../../exchange/types.ts";
 import {

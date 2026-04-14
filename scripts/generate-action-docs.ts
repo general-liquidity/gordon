@@ -2,11 +2,12 @@ import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 
 import {
+  type ActionDefinition,
   discoverProviderCapabilities,
   getActionPromptExample,
   getCanonicalActions,
   getDerivedToolMetadata,
-} from "../src/infra/actions/index.ts";
+} from "../src/infra/runtime/actions/index.ts";
 import { loadConfig } from "../src/infra/storage/config.ts";
 
 async function main(): Promise<void> {
@@ -18,7 +19,7 @@ async function main(): Promise<void> {
   const generatedDir = join(process.cwd(), "docs", "generated");
   await mkdir(generatedDir, { recursive: true });
 
-  const actionPayload = actions.map((action) => ({
+  const actionPayload = actions.map((action: ActionDefinition) => ({
     id: action.id,
     title: action.title,
     description: action.description,
@@ -37,7 +38,7 @@ async function main(): Promise<void> {
     tags: action.tags ?? [],
   }));
 
-  const playbookMetadata = actions.map((action) => ({
+  const playbookMetadata = actions.map((action: ActionDefinition) => ({
     actionId: action.id,
     title: action.title,
     taskScope: action.taskScope,
@@ -66,7 +67,7 @@ async function main(): Promise<void> {
     markdownLines.push(`- Side effects: \`${action.sideEffectLevel}\``);
     markdownLines.push(`- Approval: \`${action.approvalPolicy}\``);
     markdownLines.push(`- Dry run: \`${action.dryRunSupported}\``);
-    markdownLines.push(`- Visibility: ${action.visibility.map((entry) => `\`${entry}\``).join(", ")}`);
+    markdownLines.push(`- Visibility: ${action.visibility.map((entry: string) => `\`${entry}\``).join(", ")}`);
     if (action.slash) {
       markdownLines.push(`- Slash: \`/${action.slash.name}\``);
       if (action.slash.workflow) {

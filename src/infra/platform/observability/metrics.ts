@@ -9,8 +9,8 @@
 
 import { createModuleLogger } from "../../logger/index.ts";
 import { listTrades } from "../../storage/trades.ts";
-import { listPlans } from "../storage/plans.ts";
-import type { Trade, Plan } from "../../types/index.ts";
+import { listPlans } from "../../storage/plans.ts";
+import type { Trade, Plan } from "../../../types/index.ts";
 
 const logger = createModuleLogger("metrics");
 

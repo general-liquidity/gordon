@@ -23,7 +23,7 @@ export interface GatewayDaemonHandle {
 export async function startGatewayDaemonProcess(): Promise<GatewayDaemonHandle> {
   await bootstrapV07();
   await initMCPTools().catch((err) => {
-    logger.warn("MCP tools initialization failed — MCP tools will be unavailable", err instanceof Error ? err : new Error(String(err)));
+    logger.warn("MCP tools initialization failed — MCP tools will be unavailable", { error: err instanceof Error ? err.message : String(err) });
   });
   enableMCPHotReload(5000);
 

@@ -376,7 +376,7 @@ export async function handleRuntimeMenuCommand(
     case "validate": {
       try {
         const report = await collectDoctorReport();
-        const issues = report.filter((r: any) => r.status === "fail" || r.status === "warn");
+        const issues = report.checks.filter((r: any) => r.status === "fail" || r.status === "warn");
         if (issues.length === 0) {
           addMessage(setState, "gordon", "All systems validated. No issues found.");
         } else {

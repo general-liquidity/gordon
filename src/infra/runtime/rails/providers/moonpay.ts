@@ -22,7 +22,7 @@ import type {
   WalletProvider,
   WalletSwapIntent,
 } from "../types.ts";
-import type { WalletProviderConfig } from "../../../types/index.ts";
+import type { WalletProviderConfig } from "../../../../types/index.ts";
 
 const logger = createModuleLogger("rails-moonpay");
 

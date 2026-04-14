@@ -1,6 +1,6 @@
-import type { MarketplaceListing } from "../mcp/marketplace/types.ts";
+import type { MarketplaceListing } from "../../ai/mcp/marketplace/types.ts";
 import { pluginInstaller } from "../../ai/mcp/marketplace/installer.ts";
-import type { GordonConfig } from "../../types/index.ts";
+import type { GordonConfig } from "../../../types/index.ts";
 import { getAuditLogger } from "../../platform/audit/audit-log.ts";
 import { createAgentRailsRegistry } from "./registry.ts";
 
@@ -289,7 +289,7 @@ function buildOkxOnchainosListing(): MarketplaceListing {
         "(macOS/Linux) or install.ps1 (Windows). Binary installs to ~/.local/bin/onchainos. " +
         "Uses a SEPARATE OnchainOS API key from the CEX trade credentials.",
       author: "OKX",
-      category: "data",
+      category: "data-provider",
       authentication: {
         type: "api_key",
         envVar: "OKX_API_KEY",

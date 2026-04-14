@@ -7,7 +7,7 @@
  */
 
 import { z } from "zod";
-import type { LLMClient, Message, ModelConfig } from "../llm/index.ts";
+import type { LLMClient, Message, ModelConfig } from "../ai/llm/index.ts";
 import {
   type StrategyDSL,
   StrategyDSLSchema,

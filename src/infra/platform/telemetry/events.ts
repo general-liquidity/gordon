@@ -9,7 +9,9 @@ export type TelemetryEventName =
   | "command_invoked"
   | "agent_routed"
   | "error_occurred"
-  | "feature_used";
+  | "feature_used"
+  | "uncaught_exception"
+  | "unhandled_rejection";
 
 export interface TelemetryEvent {
   event: TelemetryEventName;

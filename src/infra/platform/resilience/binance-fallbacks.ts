@@ -3,13 +3,13 @@
  * Provides resilient access to critical Binance API endpoints
  */
 
-import type { BinanceClient } from "../binance/client.ts";
+import type { BinanceClient } from "../../venues/exchange/clients/binance/client.ts";
 import type {
   BinanceOrderBook,
   BinanceBookTicker,
   BinanceTicker24hr,
   BinanceAvgPrice,
-} from "../binance/types.ts";
+} from "../../venues/exchange/clients/binance/types.ts";
 import {
   withFallback,
   withFallbackSimple,

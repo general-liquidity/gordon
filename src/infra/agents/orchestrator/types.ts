@@ -4,8 +4,8 @@
  * Extracted from orchestrator.ts to reduce file size and improve modularity.
  */
 
-import type { SummarizationResult, SummarizerConfig } from "../../memory/index.ts";
-import type { Message } from "../../llm/types.ts";
+import type { SummarizationResult, SummarizerConfig } from "../../domain/memory/index.ts";
+import type { Message } from "../../ai/llm/types.ts";
 
 // ============================================================================
 // Stream Event Types

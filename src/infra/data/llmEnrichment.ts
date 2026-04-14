@@ -6,9 +6,9 @@
  * assessment, and a short summary). Results are cached for 5 minutes.
  */
 
-import { Cache } from "../cache/cache.ts";
+import { Cache } from "../platform/cache/cache.ts";
 import { createModuleLogger } from "../logger/index.ts";
-import type { LLMClient } from "../llm/client.ts";
+import type { LLMClient } from "../ai/llm/client.ts";
 import type { Candle } from "../../types/index.ts";
 
 const logger = createModuleLogger("llm-enrichment");

@@ -41,7 +41,7 @@ export const getCompanyProfileTool = createTool({
   outputSchema: z.object({
     configured: z.boolean(),
     symbol: z.string(),
-    profile: z.record(z.any()).optional(),
+    profile: z.record(z.string(), z.any()).optional(),
     error: z.string().optional(),
   }),
   execute: async ({ symbol }) => {
@@ -69,7 +69,7 @@ export const getBasicFinancialsTool = createTool({
   outputSchema: z.object({
     configured: z.boolean(),
     symbol: z.string(),
-    metrics: z.record(z.any()).optional(),
+    metrics: z.record(z.string(), z.any()).optional(),
     error: z.string().optional(),
   }),
   execute: async ({ symbol, metric }) => {
@@ -269,7 +269,7 @@ export const getPriceTargetTool = createTool({
   outputSchema: z.object({
     configured: z.boolean(),
     symbol: z.string(),
-    target: z.record(z.any()).optional(),
+    target: z.record(z.string(), z.any()).optional(),
     error: z.string().optional(),
   }),
   execute: async ({ symbol }) => {
@@ -596,7 +596,7 @@ export const getEsgScoreTool = createTool({
   outputSchema: z.object({
     configured: z.boolean(),
     symbol: z.string(),
-    esg: z.record(z.any()).optional(),
+    esg: z.record(z.string(), z.any()).optional(),
     error: z.string().optional(),
   }),
   execute: async ({ symbol }) => {
@@ -645,7 +645,7 @@ export const getTranscriptTool = createTool({
   inputSchema: z.object({ id: z.string() }),
   outputSchema: z.object({
     configured: z.boolean(),
-    transcript: z.record(z.any()).optional(),
+    transcript: z.record(z.string(), z.any()).optional(),
     error: z.string().optional(),
   }),
   execute: async ({ id }) => {

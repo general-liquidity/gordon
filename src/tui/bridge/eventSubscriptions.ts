@@ -138,7 +138,7 @@ export function subscribeToEvents(dispatch: Dispatch): () => void {
   unsubs.push(
     bus.on("trade:opened", (event: EventData<"trade:opened">) => {
       notify(dispatch, "trade:opened", "fill",
-        `\u2713 Trade opened: ${event.trade.symbol} ${event.trade.side ?? ""}`.trim(),
+        `\u2713 Trade opened: ${event.trade.symbol} ${(event.trade as any).side ?? ""}`.trim(),
       );
     }),
   );
@@ -551,7 +551,7 @@ export function subscribeToEvents(dispatch: Dispatch): () => void {
   unsubs.push(
     bus.on("access_control:denied", (event: EventData<"access_control:denied">) => {
       notify(dispatch, "access_control:denied", "alert",
-        `\u2717 Access denied: ${event.reason}${event.toolName ?? event.tool ? ` (tool: ${event.toolName ?? event.tool})` : ""}${event.mode ? ` [${event.mode}]` : ""}`,
+        `\u2717 Access denied: ${event.reason}${event.toolName ?? event.tool ? ` (tool: ${event.toolName ?? event.tool})` : ""}${event.permissionMode ? ` [${event.permissionMode}]` : ""}`,
       );
     }),
   );

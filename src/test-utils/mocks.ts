@@ -198,7 +198,10 @@ export function createMockConfig(overrides: Partial<GordonConfig> = {}): GordonC
       memoryWarningThreshold: 0.8,
     },
     permissionMode: "ask",
-    
+    costBudget: {
+      action: "warn",
+      warnThresholds: [0.5, 0.75, 0.9],
+    },
     onboardingComplete: false,
     startupBannerMode: "full",
     useKeyring: false,

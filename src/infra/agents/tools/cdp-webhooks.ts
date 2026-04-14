@@ -115,7 +115,7 @@ export const listCdpWebhooksTool = createTool({
     return {
       configured: true,
       total: list.length,
-      webhooks: list.map(shapeWebhook),
+      webhooks: list.map((w) => shapeWebhook(w)),
     };
   },
 });

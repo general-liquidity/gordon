@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import type { BacktestTrade } from "../../backtest/types.ts";
+import type { BacktestTrade } from "../../../backtest/types.ts";
 import { formatOperatorReport } from "./operator-report.ts";
 import { buildBiasDiagnostics } from "./service.ts";
 import { createMockConfig } from "../../../test-utils/mocks.ts";

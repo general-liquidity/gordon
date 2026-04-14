@@ -8,7 +8,7 @@
 import { z } from "zod";
 
 import type { Plan } from "../../types/plan.ts";
-import type { LLMClient } from "../llm/index.ts";
+import type { LLMClient } from "../ai/llm/index.ts";
 import type { GordonContext } from "./types.ts";
 import { createModuleLogger } from "../logger/index.ts";
 import { emitEvent } from "../../events/index.ts";

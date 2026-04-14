@@ -101,7 +101,7 @@ export class LlmJudge implements ProposalJudge {
 
     try {
       const agent = getJudgeAgent();
-      const response = await agent.generate(prompt, {
+      const response = await (agent.generate as (p: string, o: Record<string, unknown>) => Promise<unknown>)(prompt, {
         temperature: 0.2,
         maxSteps: 1,
       });

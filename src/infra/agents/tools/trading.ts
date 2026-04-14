@@ -440,7 +440,7 @@ export const executePlanTool = createTool({
       quantity: plan.allocation.amount / (plan.entry.price || 1),
       orderType: plan.entry.type === "market" ? "MARKET" : "LIMIT",
       notionalUsd: plan.allocation.amount,
-      exchangeId: ctx.exchange?.name,
+      exchangeId: ctx.exchange?.exchangeId,
     });
     if (preOrderHook.action === "block") {
       return validateToolOutput(executePlanOutputSchema, {

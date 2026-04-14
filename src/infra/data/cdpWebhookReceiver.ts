@@ -114,7 +114,7 @@ class CdpWebhookReceiver {
     });
 
     return {
-      port: this.server.port,
+      port: this.server.port!,
       url: `http://localhost:${this.server.port}${this.pathPrefix}`,
     };
   }

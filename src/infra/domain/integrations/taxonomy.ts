@@ -1,5 +1,5 @@
-import type { BrokerId } from "../broker/types.ts";
-import type { ExchangeId } from "../exchange/types.ts";
+import type { BrokerId } from "../../broker/types.ts";
+import type { ExchangeId } from "../../exchange/types.ts";
 
 export type IntegrationDomain =
   | "model_provider"

@@ -145,13 +145,14 @@ export function IndicatorBrowser({ onSelect, onClose }: Props) {
     }
     if (key.return) {
       const idx = selectable[cursor];
+      if (idx === undefined) return;
       const entry = flatList[idx];
       if (entry?.indicator && onSelect) onSelect(entry.indicator);
     }
   });
 
-  const selectedFlatIdx = selectable[cursor];
-  const focusedIndicator = flatList[selectedFlatIdx]?.indicator;
+  const selectedFlatIdx = selectable[cursor] ?? -1;
+  const focusedIndicator = selectedFlatIdx >= 0 ? flatList[selectedFlatIdx]?.indicator : undefined;
 
   return (
     <Pane title="INDICATOR BROWSER" color="cyan">

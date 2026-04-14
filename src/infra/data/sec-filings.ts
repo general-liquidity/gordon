@@ -7,7 +7,7 @@
  * API docs: https://efts.sec.gov/LATEST/
  */
 
-import { Cache } from "../cache/cache.ts";
+import { Cache } from "../platform/cache/cache.ts";
 import { createModuleLogger } from "../logger/index.ts";
 
 const logger = createModuleLogger("sec-filings");
@@ -105,7 +105,7 @@ function parseHit(hit: EFTSHit, queryTicker: string): Filing {
 
   // Extract CIK from _id or file_num
   const cikMatch = src.file_num?.match(/(\d+)/);
-  const cik = cikMatch ? cikMatch[1] : "0";
+  const cik = cikMatch?.[1] ?? "0";
 
   return {
     accessionNumber: accession,

@@ -15,7 +15,7 @@ import * as path from "path";
 import * as os from "os";
 
 import { getGordonContext, normalizeSymbol, type MastraExecutionContext } from "../agents/tools/types.ts";
-import { GORDON_MODELS, type LLMProvider } from "../llm/types.ts";
+import { GORDON_MODELS, type LLMProvider } from "../ai/llm/types.ts";
 
 // ============================================================================
 // Types and Constants

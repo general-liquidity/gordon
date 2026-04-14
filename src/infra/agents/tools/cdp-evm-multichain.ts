@@ -233,7 +233,7 @@ export const createCdpSmartAccountTool = createTool({
     const client = getCdpClient();
     if (!client) return { configured: false, created: false, error: CDP_NOT_CONFIGURED_MSG };
     try {
-      const owner = (await client.evm.getAccount({ address: ownerAddress })) as unknown as Record<
+      const owner = (await client.evm.getAccount({ address: ownerAddress as `0x${string}` })) as unknown as Record<
         string,
         unknown
       >;
@@ -299,8 +299,7 @@ export const listCdpTokenBalancesTool = createTool({
       return { configured: false, address, network, error: CDP_NOT_CONFIGURED_MSG };
     }
     try {
-      const response = (await client.evm.listTokenBalances({
-        address,
+      const response = (await client.evm.listTokenBalances({ address: address as `0x${string}`,
         network: network as unknown as Parameters<typeof client.evm.listTokenBalances>[0]["network"],
       })) as unknown as {
         balances?: Array<{

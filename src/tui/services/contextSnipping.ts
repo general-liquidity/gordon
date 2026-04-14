@@ -82,11 +82,11 @@ function deduplicateReads(
 
   for (let i = 0; i < messages.length; i++) {
     const msg = messages[i];
-    if (!msg.toolName || !readPattern.test(msg.toolName)) continue;
+    if (!msg || !msg.toolName || !readPattern.test(msg.toolName)) continue;
 
     const match = msg.content.match(filePathPattern);
     if (match) {
-      latestReadIndex.set(match[0], i);
+      latestReadIndex.set(match[0]!, i);
     }
   }
 
@@ -215,12 +215,13 @@ function foldDuplicateSystemMessages(
   const result: Message[] = [];
 
   for (let i = 0; i < messages.length; i++) {
+    const msg = messages[i];
+    if (!msg) continue;
     if (i >= cutoff) {
-      result.push(messages[i]);
+      result.push(msg);
       continue;
     }
 
-    const msg = messages[i];
     const prev = result[result.length - 1];
 
     if (

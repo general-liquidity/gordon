@@ -25,7 +25,7 @@ import type { EventType, GordonEvent } from "../../events/types.ts";
 import { createModuleLogger } from "../logger/index.ts";
 import { getProactiveEngine, type ProactiveObservation } from "./proactiveEngine.ts";
 import { registerAllProducers } from "./producers/index.ts";
-import { getSuggestionStore } from "./suggestionStore.ts";
+import { getSuggestionStore, type FeedbackRecord } from "./suggestionStore.ts";
 import { getCategoryPolicy } from "./categoryPolicy.ts";
 import { getOutcomeTracker } from "./outcomeEvals.ts";
 import { loadProactiveState, saveProactiveStateNow, flushPendingSave } from "./persistence.ts";
@@ -88,7 +88,7 @@ export function startProactiveObserver(): { started: boolean; subscriptions: num
     if (saved) {
       getSuggestionStore().deserialize({
         suggestions: saved.suggestions,
-        feedback: saved.feedback,
+        feedback: saved.feedback as unknown as FeedbackRecord[],
       });
       getCategoryPolicy().deserialize(saved.categoryPolicies);
       getOutcomeTracker().deserialize(saved.outcomes);

@@ -6,12 +6,12 @@ import type { RequestContext } from "@mastra/core/request-context";
 import type { z, ZodType } from "zod";
 
 import type { GordonContext } from "../types.ts";
-import type { ActionTaskScope, CredentialProfile } from "../../actions/types.ts";
-import type { BinanceClient } from "../../binance/index.ts";
+import type { ActionTaskScope, CredentialProfile } from "../../runtime/actions/types.ts";
+import type { BinanceClient } from "../../venues/exchange/clients/binance/index.ts";
 import type { Exchange } from "../../exchange/index.ts";
 import type { BrokerAdapter } from "../../broker/index.ts";
-import type { LLMClient } from "../../llm/index.ts";
-import type { AgentRailsRegistry } from "../../rails/index.ts";
+import type { LLMClient } from "../../ai/llm/index.ts";
+import type { AgentRailsRegistry } from "../../runtime/rails/index.ts";
 import type { GordonConfig } from "../../../types/index.ts";
 import { normalizeCryptoSymbol } from "../../domain/markets/instruments.ts";
 import {

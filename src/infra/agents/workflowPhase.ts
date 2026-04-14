@@ -1,7 +1,7 @@
 import type { GordonConfig } from "../../types/index.ts";
 import { getFastMastraModel, getMastraModel, type MastraModelConfig } from "../runtime/providers/registry.ts";
 import type { GordonContext } from "./types.ts";
-import type { LLMProvider } from "../llm/types.ts";
+import type { LLMProvider } from "../ai/llm/types.ts";
 
 export type WorkflowPhase =
   | "scan"

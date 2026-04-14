@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { createHmac, generateKeyPairSync } from "node:crypto";
 
-import type { PaymentProviderConfig, WalletProviderConfig } from "../../types/index.ts";
+import type { PaymentProviderConfig, WalletProviderConfig } from "../../../types/index.ts";
 import { MoonPayProvider } from "./providers/moonpay.ts";
 import { PolygonX402Provider } from "./providers/polygon.ts";
 

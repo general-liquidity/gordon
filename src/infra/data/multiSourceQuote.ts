@@ -17,9 +17,9 @@ import {
   type Momentum,
   type VolumeAssessment,
 } from "./llmEnrichment.ts";
-import type { LLMClient } from "../llm/client.ts";
+import type { LLMClient } from "../ai/llm/client.ts";
 import type { Candle } from "../../types/index.ts";
-import { Cache } from "../cache/cache.ts";
+import { Cache } from "../platform/cache/cache.ts";
 import { createModuleLogger } from "../logger/index.ts";
 
 const logger = createModuleLogger("multi-source-quote");

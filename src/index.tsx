@@ -224,7 +224,7 @@ try {
   const { setCliOverrides } = await import("./infra/config/settingsLayers.ts");
 
   // Pass any CLI flag overrides to the 7-level settings layer
-  if ((flags as Record<string, unknown>).permissionMode) setCliOverrides({ permissionMode: (flags as Record<string, unknown>).permissionMode as string });
+  if ((flags as unknown as Record<string, unknown>).permissionMode) setCliOverrides({ permissionMode: (flags as unknown as Record<string, unknown>).permissionMode as string });
 
   const startupResult = await runParallelStartup([
     configLoadTask(() => loadConfig()),
@@ -232,12 +232,21 @@ try {
   ]);
 
   const startupConfig = startupResult.tasks.find((t) => t.id === "config")?.result as { permissionMode?: string } | undefined;
-  await emitEvent("system:started", { permissionMode: startupConfig?.permissionMode ?? "ask" });
+  const startupPermissionMode = startupConfig?.permissionMode;
+  const narrowedStartupMode: "auto" | "ask" | "strict" =
+    startupPermissionMode === "auto" || startupPermissionMode === "ask" || startupPermissionMode === "strict"
+      ? startupPermissionMode
+      : "ask";
+  await emitEvent("system:started", { permissionMode: narrowedStartupMode });
 } catch {
   // Fallback: sequential startup if parallel fails
   try {
     const startupConfig = await loadConfig();
-    await emitEvent("system:started", { permissionMode: startupConfig.permissionMode });
+    const fallbackPermissionMode: "auto" | "ask" | "strict" =
+      startupConfig.permissionMode === "auto" || startupConfig.permissionMode === "ask" || startupConfig.permissionMode === "strict"
+        ? startupConfig.permissionMode
+        : "ask";
+    await emitEvent("system:started", { permissionMode: fallbackPermissionMode });
   } catch { /* Non-critical */ }
 }
 

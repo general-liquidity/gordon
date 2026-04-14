@@ -44,7 +44,7 @@ function matchesToolFilter(filter: string | RegExp | undefined, toolName: string
 /** Register a new hook. Returns an unregister function. */
 export function registerHook<P extends HookPoint>(def: HookDefinition<P>): () => void {
   const list = registry.get(def.point) ?? [];
-  list.push({ definition: def as HookDefinition });
+  list.push({ definition: def as unknown as HookDefinition });
   sortEntries(list);
   registry.set(def.point, list);
   return () => unregisterHook(def.id);

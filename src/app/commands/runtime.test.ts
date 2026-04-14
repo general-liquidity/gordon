@@ -64,6 +64,10 @@ function createMockContext(): GordonContext {
       startupBannerMode: "full",
       useKeyring: false,
       telemetry: { enabled: false, researchData: false },
+      costBudget: {
+        action: "warn",
+        warnThresholds: [0.5, 0.75, 0.9],
+      },
       riskManagement: {
         mode: "enforce",
         maxDailyLossPercent: 3,
