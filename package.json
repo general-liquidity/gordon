@@ -39,8 +39,8 @@
   "scripts": {
     "start": "bun run --silent src/index.tsx",
     "dev": "bun --watch run src/index.tsx",
-    "build": "bun build src/entry.ts --outdir dist --target bun --external @lightprotocol/compressed-token --external @lightprotocol/stateless.js --external @solana-developers/helpers --external @galacticcouncil/api-augment/hydradx --external @galacticcouncil/api-augment/basilisk --external @polkadot-agent-kit/sdk",
-    "build:binary": "bun build src/entry.ts --compile --outfile gordon --external @lightprotocol/compressed-token --external @lightprotocol/stateless.js --external @solana-developers/helpers --external @galacticcouncil/api-augment/hydradx --external @galacticcouncil/api-augment/basilisk",
+    "build": "bun scripts/build.ts",
+    "build:binary": "bun scripts/build.ts --binary",
     "generate:actions-docs": "bun run scripts/generate-action-docs.ts",
     "test:broker-conformance": "bun test src/infra/broker/adapters/conformance.test.ts src/infra/broker/adapters/conformance.matrix.test.ts src/infra/broker/factory.extended.test.ts src/infra/broker/inclusion-gate.test.ts",
     "quality:brokers": "bun run scripts/broker-quality.ts --ci",
