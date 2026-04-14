@@ -123,6 +123,12 @@ jobs:
     needs:
       - create-source-release
     runs-on: ${{ matrix.os }}
+    # Experimental targets (windows-arm64) are allowed to fail without
+    # blocking the rest of the release. Bun's windows-aarch64 cross-compile
+    # runtime is still flaky — we've seen incomplete downloads trip CI even
+    # though the toolchain itself is fine. Mark the job as best-effort so
+    # a Bun CDN hiccup can't block the publish pipeline.
+    continue-on-error: ${{ matrix.experimental == true }}
     strategy:
       # Don't cancel siblings if one target fails — let us see which
       # targets are broken in a single CI run instead of game-of-whack-a-mole.
@@ -157,6 +163,7 @@ jobs:
           - target: windows-arm64
             os: windows-latest
             binary_name: gordon-windows-arm64.exe
+            experimental: true
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -171,14 +178,29 @@ jobs:
         run: node scripts/patch-mastra.cjs
 
       - name: Build binary
-        run: >
-          bun build --compile --target=bun-${{ matrix.target }} --outfile=${{ matrix.binary_name }}
-          --external @lightprotocol/compressed-token
-          --external @lightprotocol/stateless.js
-          --external @solana-developers/helpers
-          --external @galacticcouncil/api-augment/hydradx
-          --external @galacticcouncil/api-augment/basilisk
-          src/entry.ts
+        # Simple retry loop — Bun's cross-compile runtime download is
+        # occasionally truncated on windows-arm64, and the fix is just to
+        # try again. Up to 3 attempts with a short backoff.
+        shell: bash
+        run: |
+          set -e
+          attempt=1
+          max=3
+          until bun build --compile --target=bun-${{ matrix.target }} --outfile=${{ matrix.binary_name }} \
+            --external @lightprotocol/compressed-token \
+            --external @lightprotocol/stateless.js \
+            --external @solana-developers/helpers \
+            --external @galacticcouncil/api-augment/hydradx \
+            --external @galacticcouncil/api-augment/basilisk \
+            src/entry.ts; do
+            if [ $attempt -ge $max ]; then
+              echo "Build failed after $attempt attempts"
+              exit 1
+            fi
+            echo "Build attempt $attempt failed, retrying..."
+            attempt=$((attempt + 1))
+            sleep 10
+          done
 
       - name: Upload binary to public dist release
         shell: pwsh
