@@ -212,9 +212,28 @@ class DarwinKeyringProvider implements KeyringProvider {
 class WindowsKeyringProvider implements KeyringProvider {
   readonly platform = "Windows DPAPI";
 
+  /**
+   * Resolve a usable PowerShell binary. Prefers PowerShell Core (`pwsh`)
+   * when installed (faster, cross-version stable), falls back to legacy
+   * `powershell.exe`. Cached after first detection.
+   */
+  private static cachedShell: string | null = null;
+
+  private async resolveShell(): Promise<string | null> {
+    if (WindowsKeyringProvider.cachedShell) return WindowsKeyringProvider.cachedShell;
+    for (const candidate of ["pwsh.exe", "pwsh", "powershell.exe", "powershell"]) {
+      const result = await runCommand(candidate, ["-NoProfile", "-Command", "echo ok"]);
+      if (result.exitCode === 0 && result.stdout.includes("ok")) {
+        WindowsKeyringProvider.cachedShell = candidate;
+        return candidate;
+      }
+    }
+    return null;
+  }
+
   async isAvailable(): Promise<boolean> {
-    const result = await runCommand("powershell.exe", ["-Command", "echo ok"]);
-    return result.exitCode === 0 && result.stdout.includes("ok");
+    const shell = await this.resolveShell();
+    return shell !== null;
   }
 
   private async readStore(): Promise<Record<string, string>> {

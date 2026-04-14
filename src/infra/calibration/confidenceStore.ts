@@ -19,8 +19,8 @@
 
 import { readFileSync, appendFileSync, existsSync, mkdirSync } from "node:fs";
 import { join, dirname } from "node:path";
-import { homedir } from "node:os";
 import { createModuleLogger } from "../logger/index.ts";
+import { GORDON_DIR } from "../storage/paths.ts";
 
 const logger = createModuleLogger("calibration");
 
@@ -85,12 +85,9 @@ export interface CalibrationStats {
 // Path helpers
 // ============================================================================
 
-function getGordonHome(): string {
-  return process.env.GORDON_HOME ?? join(homedir(), ".gordon");
-}
-
 function getCalibrationPath(): string {
-  return join(getGordonHome(), "calibration.jsonl");
+  // Use GORDON_DIR which honors GORDON_HOME → XDG_CONFIG_HOME → ~/.gordon
+  return join(GORDON_DIR, "calibration.jsonl");
 }
 
 function ensureDir(): void {

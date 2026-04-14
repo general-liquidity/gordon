@@ -9,9 +9,9 @@
 
 import { readFileSync, writeFileSync, existsSync } from "fs";
 import { join } from "path";
-import { homedir } from "os";
+import { GORDON_DIR } from "../../infra/storage/paths.ts";
 
-const ALERTS_PATH = join(homedir(), ".gordon", "alerts.json");
+const ALERTS_PATH = join(GORDON_DIR, "alerts.json");
 
 export interface PriceAlert {
   id: string;

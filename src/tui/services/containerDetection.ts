@@ -16,7 +16,7 @@ export interface ContainerInfo {
 }
 
 export function detectContainer(): ContainerInfo {
-  // Check Kubernetes first (most specific)
+  // Check Kubernetes first (most specific) — env var works on all platforms
   if (process.env["KUBERNETES_SERVICE_HOST"]) {
     return {
       isContainer: true,
@@ -26,8 +26,12 @@ export function detectContainer(): ContainerInfo {
     };
   }
 
+  // Filesystem-based markers only exist on POSIX. Skip on Windows to
+  // avoid pointless fs.existsSync calls that always return false.
+  const isPosix = process.platform !== "win32";
+
   // Check Docker
-  if (existsSync("/.dockerenv")) {
+  if (isPosix && existsSync("/.dockerenv")) {
     return {
       isContainer: true,
       runtime: "docker",
@@ -37,7 +41,7 @@ export function detectContainer(): ContainerInfo {
   }
 
   // Check Podman
-  if (existsSync("/run/.containerenv")) {
+  if (isPosix && existsSync("/run/.containerenv")) {
     return {
       isContainer: true,
       runtime: "podman",
@@ -46,19 +50,21 @@ export function detectContainer(): ContainerInfo {
     };
   }
 
-  // Check cgroup for container indicators
-  try {
-    const cgroup = readFileSync("/proc/1/cgroup", "utf-8");
-    if (cgroup.includes("docker") || cgroup.includes("containerd")) {
-      return {
-        isContainer: true,
-        runtime: "docker",
-        hasNetwork: checkNetwork(),
-        hasFileSystem: true,
-      };
+  // Check cgroup for container indicators (Linux only — /proc is Linux-specific)
+  if (process.platform === "linux") {
+    try {
+      const cgroup = readFileSync("/proc/1/cgroup", "utf-8");
+      if (cgroup.includes("docker") || cgroup.includes("containerd")) {
+        return {
+          isContainer: true,
+          runtime: "docker",
+          hasNetwork: checkNetwork(),
+          hasFileSystem: true,
+        };
+      }
+    } catch {
+      // Not available — likely a hardened container or stripped /proc
     }
-  } catch {
-    // Not available — likely not Linux or no permissions
   }
 
   // Check WSL

@@ -177,10 +177,14 @@ async function gracefulShutdown(signal: string, code: number = 0): Promise<void>
   process.exit(code);
 }
 
-// Signal handlers — let Ink handle Ctrl+C (App has double-press guard)
-// Only register SIGTERM/SIGHUP for non-interactive shutdown
-process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
-process.on("SIGHUP", () => gracefulShutdown("SIGHUP"));
+// Signal handlers — let Ink handle Ctrl+C (App has double-press guard).
+// SIGTERM and SIGHUP are POSIX-only; Windows ignores them silently
+// which previously hid the fact that graceful shutdown wasn't wired
+// on Windows. Skip the handler registration entirely on win32.
+if (process.platform !== "win32") {
+  process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+  process.on("SIGHUP", () => gracefulShutdown("SIGHUP"));
+}
 
 // Uncaught exceptions exit with code 1
 process.on("uncaughtException", (error) => {

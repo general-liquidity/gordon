@@ -6,10 +6,15 @@
   "architecture": {
     "64bit": {
       "url": "https://github.com/general-liquidity/gordon-cli-dist/releases/download/v0.8.24/gordon-windows-x64.exe",
-      "hash": "3f4991ca7fdd6b17b0535042b2f9e00bf37447f2b9a21a249df31350f487a73e"
+      "hash": "3f4991ca7fdd6b17b0535042b2f9e00bf37447f2b9a21a249df31350f487a73e",
+      "pre_install": "Rename-Item -Path \"$dir\\gordon-windows-x64.exe\" -NewName \"gordon.exe\" -ErrorAction SilentlyContinue"
+    },
+    "arm64": {
+      "url": "https://github.com/general-liquidity/gordon-cli-dist/releases/download/v0.8.24/gordon-windows-arm64.exe",
+      "hash": "0000000000000000000000000000000000000000000000000000000000000000",
+      "pre_install": "Rename-Item -Path \"$dir\\gordon-windows-arm64.exe\" -NewName \"gordon.exe\" -ErrorAction SilentlyContinue"
     }
   },
-  "pre_install": "Rename-Item -Path \"$dir\\gordon-windows-x64.exe\" -NewName \"gordon.exe\" -ErrorAction SilentlyContinue",
   "bin": "gordon.exe",
   "checkver": {
     "github": "https://github.com/general-liquidity/gordon-cli-dist"
@@ -17,7 +22,10 @@
   "autoupdate": {
     "architecture": {
       "64bit": {
-        "url": "https://github.com/general-liquidity/gordon-cli-dist/releases/download/v0.8.24/gordon-windows-x64.exe"
+        "url": "https://github.com/general-liquidity/gordon-cli-dist/releases/download/v$version/gordon-windows-x64.exe"
+      },
+      "arm64": {
+        "url": "https://github.com/general-liquidity/gordon-cli-dist/releases/download/v$version/gordon-windows-arm64.exe"
       }
     }
   }

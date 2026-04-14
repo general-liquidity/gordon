@@ -406,12 +406,19 @@ export function getUncoveredCLIs(): CLIEntry[] {
 }
 
 /**
- * Check if a CLI binary is available on the system.
+ * Check if a CLI binary is available on the system. Uses `where` on
+ * Windows, `which` everywhere else — splitting by platform avoids the
+ * mixed-syntax shell command that previously broke on pure Windows
+ * (no bash) and pure POSIX (no `where`).
  */
 export async function isCLIInstalled(bin: string): Promise<boolean> {
   try {
     const { execSync } = require("child_process") as typeof import("child_process");
-    execSync(`which ${bin} 2>/dev/null || where ${bin} 2>NUL`, { stdio: "ignore" });
+    if (process.platform === "win32") {
+      execSync(`where ${bin}`, { stdio: "ignore" });
+    } else {
+      execSync(`which ${bin}`, { stdio: "ignore" });
+    }
     return true;
   } catch {
     return false;

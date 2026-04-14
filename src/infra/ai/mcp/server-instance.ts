@@ -68,11 +68,19 @@ export class LocalMCPServerInstance implements MCPServerInstance {
       // Build environment with credentials
       const env = this.buildEnvironment();
 
-      // Spawn the server process
+      // Spawn the server process. shell:true is only needed on Windows
+      // when the manifest.command is a shim (.cmd / .bat) — direct
+      // executables (.exe, raw binaries) should NOT use shell to avoid
+      // command-injection on whitespace and to keep the process tree clean.
+      const cmdLower = this.manifest.command.toLowerCase();
+      const isShim = cmdLower.endsWith(".cmd") || cmdLower.endsWith(".bat") || cmdLower.endsWith(".ps1");
+      const looksLikeShimAlias = /^(npm|npx|bun|bunx|pnpm|yarn|node|deno)$/i.test(this.manifest.command);
+      const needsShell = process.platform === "win32" && (isShim || looksLikeShimAlias);
+
       this.process = spawn(this.manifest.command, this.manifest.args || [], {
         env,
         stdio: ['pipe', 'pipe', 'pipe'],
-        shell: process.platform === 'win32',
+        shell: needsShell,
       });
 
       // Set up message handling

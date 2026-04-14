@@ -181,7 +181,11 @@ function isHomebrewPath(normalizedExec: string): boolean {
 }
 
 function isScoopPath(normalizedExec: string): boolean {
-  return normalizedExec.includes("/scoop/apps/gordon/");
+  // Case-insensitive match — Windows filesystems can mount Scoop with
+  // mixed case (e.g. C:\Users\Foo\Scoop\apps\gordon\). The previous
+  // exact-case check missed installs whose path doesn't normalize to
+  // lowercase.
+  return /\/scoop\/apps\/gordon\//i.test(normalizedExec);
 }
 
 export function detectInstallContext(options: {
@@ -388,10 +392,19 @@ async function promptForAction(latestVersion: string, updateCommand: UpdateComma
 }
 
 async function runUpdateCommand(updateCommand: UpdateCommand): Promise<boolean> {
+  // shell:true is only required on Windows when invoking .cmd/.bat shims
+  // (npm, bun, brew on win, scoop, irm-piped-to-iex). For the unix script
+  // installers (curl piped to sh) and direct binaries, we should NOT use
+  // a shell — it adds attack surface for command-injection if the command
+  // string ever flows from untrusted input.
+  const needsShell = process.platform === "win32"
+    && /\.(cmd|bat|ps1)$/i.test(updateCommand.command) === false
+    && /^(npm|bun|brew|scoop|pnpm|yarn|powershell|pwsh|irm)$/i.test(updateCommand.command);
+
   return await new Promise((resolve) => {
     const child = spawn(updateCommand.command, updateCommand.args, {
       stdio: "inherit",
-      shell: process.platform === "win32",
+      shell: needsShell,
       env: updateCommand.env ? { ...process.env, ...updateCommand.env } : process.env,
     });
 

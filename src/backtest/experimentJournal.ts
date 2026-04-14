@@ -18,8 +18,8 @@
 
 import { readFileSync, appendFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join, dirname } from "node:path";
-import { homedir } from "node:os";
 import { createModuleLogger } from "../infra/logger/index.ts";
+import { GORDON_DIR } from "../infra/storage/paths.ts";
 import type { BacktestMetrics } from "./types.ts";
 import type { BacktestVerdict } from "./verdict.ts";
 
@@ -70,14 +70,12 @@ export interface BacktestExperiment {
 // Path resolution
 // ============================================================================
 
-function getGordonHome(): string {
-  const override = process.env.GORDON_HOME;
-  if (override) return override;
-  return join(homedir(), ".gordon");
-}
-
 function getJournalPath(): string {
-  return join(getGordonHome(), "backtest-experiments.jsonl");
+  // Use GORDON_DIR which honors GORDON_HOME → XDG_CONFIG_HOME → ~/.gordon.
+  // The previous getGordonHome() helper accepted GORDON_HOME but ignored
+  // XDG_CONFIG_HOME; centralizing on GORDON_DIR fixes the split-data-dir
+  // bug for friends who set XDG_CONFIG_HOME.
+  return join(GORDON_DIR, "backtest-experiments.jsonl");
 }
 
 function ensureJournalDir(): void {

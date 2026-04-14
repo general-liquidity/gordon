@@ -18,27 +18,49 @@ function writeToClipboard(text: string): boolean {
     // Fall through
   }
 
-  // Try native clipboard commands
-  try {
-    if (process.platform === "darwin") {
+  // Try native clipboard commands. Each attempt is wrapped in its own
+  // try/catch so a missing tool on one path doesn't blow up the next
+  // fallback. Returns true on first success, false if everything fails.
+  if (process.platform === "darwin") {
+    try {
       execSync("pbcopy", { input: text, timeout: 2000 });
       return true;
-    } else if (process.platform === "win32" || process.env.WSL_DISTRO_NAME) {
+    } catch {
+      return false;
+    }
+  }
+
+  if (process.platform === "win32" || process.env.WSL_DISTRO_NAME) {
+    try {
       execSync("clip.exe", { input: text, timeout: 2000 });
       return true;
-    } else {
-      // Linux: try xclip, then xsel
-      try {
-        execSync("xclip -selection clipboard", { input: text, timeout: 2000 });
-        return true;
-      } catch {
-        execSync("xsel --clipboard --input", { input: text, timeout: 2000 });
-        return true;
-      }
+    } catch {
+      // WSL 1 may not have clip.exe in PATH; OSC 52 above already
+      // covered the modern terminal path. Nothing else to try.
+      return false;
     }
-  } catch {
-    return false;
   }
+
+  // Linux: try xclip, then xsel, then wl-copy (Wayland). Each guarded.
+  try {
+    execSync("xclip -selection clipboard", { input: text, timeout: 2000 });
+    return true;
+  } catch {
+    // xclip not installed
+  }
+  try {
+    execSync("xsel --clipboard --input", { input: text, timeout: 2000 });
+    return true;
+  } catch {
+    // xsel not installed
+  }
+  try {
+    execSync("wl-copy", { input: text, timeout: 2000 });
+    return true;
+  } catch {
+    // No Linux clipboard tool available
+  }
+  return false;
 }
 
 export function useCopyOnSelect(enabled = true) {

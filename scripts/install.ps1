@@ -59,8 +59,14 @@ function Main {
         Write-Info "Latest version: v$Version"
     }
 
-    # Only x64 binary available for Windows currently
-    $FileName = "$BinaryName-windows-x64.exe"
+    # Detect architecture so arm64 hosts (Surface Pro X, dev kits, Parallels
+    # arm64 VMs) get a native binary instead of x64-on-emulation.
+    $ArchEnum = [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture
+    if ($ArchEnum -eq [System.Runtime.InteropServices.Architecture]::Arm64) {
+        $FileName = "$BinaryName-windows-arm64.exe"
+    } else {
+        $FileName = "$BinaryName-windows-x64.exe"
+    }
     $DownloadUrl = "https://github.com/$Repo/releases/download/v$Version/$FileName"
     Write-Info "Downloading from: $DownloadUrl"
 

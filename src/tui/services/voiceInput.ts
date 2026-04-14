@@ -70,14 +70,22 @@ export class VoiceInputService {
   }
 
   private detectBackend(): "sox" | "arecord" | null {
+    // sox is cross-platform — works on macOS, Linux, and Windows
     if (this.commandExists("rec") || this.commandExists("sox")) return "sox";
-    if (this.commandExists("arecord")) return "arecord";
+    // arecord is Linux only (ALSA)
+    if (process.platform === "linux" && this.commandExists("arecord")) return "arecord";
     return null;
   }
 
+  /**
+   * Cross-platform binary detection. Uses `where` on Windows, `which`
+   * elsewhere. Previous implementation called `which` unconditionally
+   * which silently failed on Windows even when sox was installed.
+   */
   private commandExists(cmd: string): boolean {
     try {
-      execSync(`which ${cmd}`, { stdio: "ignore" });
+      const lookup = process.platform === "win32" ? "where" : "which";
+      execSync(`${lookup} ${cmd}`, { stdio: "ignore" });
       return true;
     } catch {
       return false;

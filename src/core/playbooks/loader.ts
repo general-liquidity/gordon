@@ -9,8 +9,8 @@
 
 import { readdir, stat, mkdir, watch as fsWatch } from "fs/promises";
 import { join, resolve } from "path";
-import { homedir } from "os";
 import { createModuleLogger } from "../../infra/logger/logger.ts";
+import { GORDON_DIR } from "../../infra/storage/paths.ts";
 import { PlaybookParser } from "./parser.ts";
 import { PlaybookRegistry } from "./registry.ts";
 import type { Playbook } from "./types.ts";
@@ -24,8 +24,8 @@ const log = createModuleLogger("playbook-loader");
 /** Directory containing built-in playbooks (relative to this file) */
 const BUILTIN_DIR = join(import.meta.dirname ?? __dirname, "builtin");
 
-/** User playbook directory under home */
-const USER_PLAYBOOK_DIR = join(homedir(), ".gordon", "playbooks");
+/** User playbook directory — honors GORDON_HOME / XDG_CONFIG_HOME */
+const USER_PLAYBOOK_DIR = join(GORDON_DIR, "playbooks");
 
 // ============================================================================
 // PlaybookLoader Class

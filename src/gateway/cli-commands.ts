@@ -78,9 +78,16 @@ async function runDaemonCommand(action: "start" | "run" | "stop" | "status"): Pr
       return;
     }
 
+    // Detached spawn semantics differ between Windows and POSIX:
+    //   POSIX: detached:true makes the child a process group leader so
+    //          Ctrl+C in the parent doesn't kill it.
+    //   Windows: detached:true on Windows requires windowsHide:true to
+    //          actually run hidden — otherwise a console window flashes.
+    const isWindows = process.platform === "win32";
     const child = spawn(process.execPath, buildSpawnArgs(), {
       detached: true,
       stdio: "ignore",
+      windowsHide: isWindows,
       env: {
         ...process.env,
         GORDON_DAEMON_MODE: "1",

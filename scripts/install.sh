@@ -78,6 +78,26 @@ detect_arch() {
     esac
 }
 
+# Detect Linux libc — musl needs a different binary than glibc.
+# Returns "musl" or "" (glibc / non-Linux).
+detect_libc() {
+    if [ "$(uname -s)" != "Linux" ]; then
+        echo ""
+        return
+    fi
+    if [ -f /etc/alpine-release ]; then
+        echo "musl"
+        return
+    fi
+    if command -v ldd >/dev/null 2>&1; then
+        if ldd --version 2>&1 | grep -qi musl; then
+            echo "musl"
+            return
+        fi
+    fi
+    echo ""
+}
+
 # Get the latest version from GitHub
 get_latest_version() {
     if command -v curl >/dev/null 2>&1; then
@@ -142,7 +162,12 @@ main() {
     # Detect platform
     OS=$(detect_os)
     ARCH=$(detect_arch)
-    info "Detected platform: ${OS}-${ARCH}"
+    LIBC=$(detect_libc)
+    if [ -n "$LIBC" ]; then
+        info "Detected platform: ${OS}-${ARCH}-${LIBC}"
+    else
+        info "Detected platform: ${OS}-${ARCH}"
+    fi
 
     # Get version
     if [ -n "${GORDON_VERSION:-}" ]; then
@@ -157,8 +182,13 @@ main() {
         info "Latest version: v${VERSION}"
     fi
 
-    # Construct download URL
-    DOWNLOAD_URL="https://github.com/${REPO}/releases/download/v${VERSION}/${BINARY_NAME}-${OS}-${ARCH}"
+    # Construct download URL — append -musl suffix for Alpine/musl Linux
+    if [ -n "$LIBC" ]; then
+        ASSET_NAME="${BINARY_NAME}-${OS}-${ARCH}-${LIBC}"
+    else
+        ASSET_NAME="${BINARY_NAME}-${OS}-${ARCH}"
+    fi
+    DOWNLOAD_URL="https://github.com/${REPO}/releases/download/v${VERSION}/${ASSET_NAME}"
     info "Downloading from: ${DOWNLOAD_URL}"
 
     # Create temporary directory

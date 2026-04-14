@@ -52,16 +52,54 @@ export interface OAuthFlowResult extends OAuthTokens {
   tokenUrl: string;
 }
 
-/** Open a URL in the user's default browser. */
+/**
+ * Open a URL in the user's default browser. On Linux, falls through a
+ * chain of common openers (xdg-open → gio → kde-open → wslview) before
+ * giving up — minimal Linux distros and Wayland-only setups often lack
+ * xdg-open so we can't assume it's present.
+ */
 async function openBrowser(url: string): Promise<void> {
   const { spawn } = await import("node:child_process");
   const platform = process.platform;
-  const cmd = platform === "darwin" ? "open" : platform === "win32" ? "cmd" : "xdg-open";
-  const args = platform === "win32" ? ["/c", "start", "", url] : [url];
-  try {
-    spawn(cmd, args, { detached: true, stdio: "ignore" }).unref();
-  } catch {
-    // User must open URL manually — printed by caller.
+
+  // macOS — `open` is always present
+  if (platform === "darwin") {
+    try {
+      spawn("open", [url], { detached: true, stdio: "ignore" }).unref();
+    } catch {
+      // user opens manually
+    }
+    return;
+  }
+
+  // Windows — `cmd /c start` is always present
+  if (platform === "win32") {
+    try {
+      spawn("cmd", ["/c", "start", "", url], { detached: true, stdio: "ignore" }).unref();
+    } catch {
+      // user opens manually
+    }
+    return;
+  }
+
+  // Linux / other Unix — try a chain of openers. spawn() doesn't throw
+  // until exec, so we can't catch missing-binary errors synchronously.
+  // Spawn the first candidate and rely on the user fallback in the caller.
+  const candidates = ["xdg-open", "gio", "kde-open5", "kde-open", "wslview"];
+  for (const opener of candidates) {
+    try {
+      const child = spawn(opener, opener === "gio" ? ["open", url] : [url], {
+        detached: true,
+        stdio: "ignore",
+      });
+      child.on("error", () => {
+        // Binary not found — try the next candidate
+      });
+      child.unref();
+      return;
+    } catch {
+      // spawn() rarely throws synchronously; loop to next opener
+    }
   }
 }
 

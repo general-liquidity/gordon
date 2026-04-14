@@ -124,23 +124,39 @@ jobs:
       - create-source-release
     runs-on: ${{ matrix.os }}
     strategy:
+      # Don't cancel siblings if one target fails — let us see which
+      # targets are broken in a single CI run instead of game-of-whack-a-mole.
+      fail-fast: false
       matrix:
         include:
+          # Standard glibc Linux
           - target: linux-x64
             os: ubuntu-latest
             binary_name: gordon-linux-x64
           - target: linux-arm64
             os: ubuntu-latest
             binary_name: gordon-linux-arm64
+          # Alpine / musl Linux (separate libc — glibc binaries crash on Alpine)
+          - target: linux-x64-musl
+            os: ubuntu-latest
+            binary_name: gordon-linux-x64-musl
+          - target: linux-arm64-musl
+            os: ubuntu-latest
+            binary_name: gordon-linux-arm64-musl
+          # macOS
           - target: darwin-x64
             os: macos-latest
             binary_name: gordon-darwin-x64
           - target: darwin-arm64
             os: macos-latest
             binary_name: gordon-darwin-arm64
+          # Windows — both architectures
           - target: windows-x64
             os: windows-latest
             binary_name: gordon-windows-x64.exe
+          - target: windows-arm64
+            os: windows-latest
+            binary_name: gordon-windows-arm64.exe
     steps:
       - name: Checkout
         uses: actions/checkout@v4
