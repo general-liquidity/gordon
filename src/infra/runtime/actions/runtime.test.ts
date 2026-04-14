@@ -1,13 +1,12 @@
 import { describe, expect, it } from "bun:test";
 
-import { GordonConfigSchema, type GordonConfig } from "../../types/index.ts";
+import { GordonConfigSchema, type GordonConfig } from "../../../types/index.ts";
 import type { GordonContext } from "../agents/types.ts";
 import { evaluateToolRequestPolicy, planActionExecution } from "./runtime.ts";
 
-function createConfig(permissionMode: "auto" | "ask" | "strict" = "ask"): GordonConfig {
+function createConfig(permissionMode: "auto" | "ask" | "strict" | "paper" | "observe" | "plan" = "ask"): GordonConfig {
   return GordonConfigSchema.parse({
-    mode,
-    
+    permissionMode,
     exchanges: [{
       id: "binance-default",
       type: "binance",
@@ -41,11 +40,11 @@ function createContext(overrides: Partial<GordonContext> = {}): GordonContext {
 }
 
 describe("action runtime", () => {
-  it("builds a preview plan with blockers in SAFE mode", async () => {
+  it("builds a preview plan with blockers in strict mode", async () => {
     const plan = await planActionExecution(
       "trading.preview_market_order",
       { symbol: "BTC", side: "BUY", quoteOrderQty: 100 },
-      createContext(),
+      createContext({ config: createConfig("strict") }),
     );
 
     expect(plan.actionId).toBe("trading.preview_market_order");
@@ -54,7 +53,7 @@ describe("action runtime", () => {
     expect(plan.preview?.quoteAsset).toBeUndefined();
     expect((plan.preview?.capabilities as { supportsOrderBook: boolean } | undefined)?.supportsOrderBook).toBeTrue();
     expect(plan.preview?.estimatedBaseQty).toBeGreaterThan(0);
-    expect(plan.blockers).toContain("System is in SAFE mode.");
+    expect(plan.blockers).toContain("permissionMode is 'strict' (read-only).");
     expect(plan.ready).toBeFalse();
   });
 

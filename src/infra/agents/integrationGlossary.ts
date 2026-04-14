@@ -318,7 +318,7 @@ export async function selectRelevantIntegrationGlossary(
 
   const orderedEntries = [...selected.values()]
     .sort((a, b) => a.displayName.localeCompare(b.displayName))
-    .slice(0, explicitMatches.length > 0 ? 6 : 4);
+    .slice(0, explicitMatches.length > 0 ? 10 : 4);
 
   return {
     entries: orderedEntries,

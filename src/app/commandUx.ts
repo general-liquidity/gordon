@@ -4,7 +4,7 @@ export type WorkspaceId = "desk" | "market" | "plan" | "lab" | "monitor";
 
 export type LegacyCommandCategory = "trading" | "market" | "account" | "system" | "strategy";
 export type CommandLevel = 1 | 2 | 3;
-export type WorkflowGroup = "discover" | "analyze" | "trade" | "run" | "accounts" | "monitor" | "build" | "system";
+export type WorkflowGroup = "discover" | "analyze" | "trade" | "run" | "accounts" | "monitor" | "build" | "operate";
 export type CommandAudience = "core" | "advanced" | "operator";
 
 export interface WorkflowConfigEntry {
@@ -104,9 +104,9 @@ export const WORKFLOW_CONFIG: Record<WorkflowGroup, WorkflowConfigEntry> = {
     order: 6,
     helpAliases: ["build", "extend", "automate", "mcp"],
   },
-  system: {
-    label: "System",
-    shortLabel: "System",
+  operate: {
+    label: "Operate",
+    shortLabel: "Operate",
     description: "Setup, config, sessions, runtime.",
     icon: "●",
     order: 7,
@@ -162,6 +162,9 @@ const RUN_COMMANDS = new Set([
   "autobacktest",
   "portfolio-health",
   "autonomous",
+  "runtime",
+  "systematic",
+  "dataset",
 ]);
 
 const ACCOUNT_COMMANDS = new Set([
@@ -226,7 +229,6 @@ const SYSTEM_COMMANDS = new Set([
   "summary",
   "compact",
   "name",
-  "runtime",
   "runtime-state",
   "runtime-plugins",
   "runtime-transcript",
@@ -246,7 +248,7 @@ const CATEGORY_DEFAULT_WORKFLOW: Record<LegacyCommandCategory, WorkflowGroup> = 
   trading: "trade",
   strategy: "run",
   account: "accounts",
-  system: "system",
+  system: "operate",
 };
 
 export function getAudienceFromLevel(level: CommandLevel): CommandAudience {
@@ -267,7 +269,7 @@ export function inferWorkflowGroup(command: Pick<CommandUxShape, "name" | "categ
   if (ACCOUNT_COMMANDS.has(name)) return "accounts";
   if (MONITOR_COMMANDS.has(name)) return "monitor";
   if (BUILD_COMMANDS.has(name)) return "build";
-  if (SYSTEM_COMMANDS.has(name)) return "system";
+  if (SYSTEM_COMMANDS.has(name)) return "operate";
 
   return CATEGORY_DEFAULT_WORKFLOW[command.category];
 }
@@ -316,11 +318,11 @@ export function getQuickActionItems(context: QuickActionContext): QuickActionIte
 
   if (!context.setupComplete || !hasVenue) {
     const setupActions: QuickActionItem[] = [
-      { label: "Setup", command: "/setup", workflow: "system" },
-      { label: "Doctor", command: "/doctor", workflow: "system" },
-      { label: "Model", command: "/model", workflow: "system" },
-      { label: "Help", command: "/help", workflow: "system" },
-      { label: "Configure", command: "/configure advanced", workflow: "system" },
+      { label: "Setup", command: "/setup", workflow: "operate" },
+      { label: "Doctor", command: "/doctor", workflow: "operate" },
+      { label: "Model", command: "/model", workflow: "operate" },
+      { label: "Help", command: "/help", workflow: "operate" },
+      { label: "Configure", command: "/configure advanced", workflow: "operate" },
     ];
     return setupActions.slice(0, 5);
   }
@@ -357,8 +359,8 @@ export function getQuickActionItems(context: QuickActionContext): QuickActionIte
         { label: "Portfolio", command: "/portfolio", workflow: "accounts" },
         { label: "Positions", command: "/positions", workflow: "accounts" },
         { label: "Orders", command: "/orders", workflow: "accounts" },
-        { label: "Runtime", command: "/runtime-state", workflow: "system" },
-        { label: "Health", command: "/health", workflow: "system" },
+        { label: "Runtime", command: "/runtime-state", workflow: "operate" },
+        { label: "Health", command: "/health", workflow: "operate" },
       ];
     case "desk":
     default:
@@ -377,7 +379,7 @@ export function getQuickActionItems(context: QuickActionContext): QuickActionIte
   } else if (context.permissionMode === "auto") {
     actions.push({ label: "Orders", command: "/orders", workflow: "accounts" });
   } else {
-    actions.push({ label: "Doctor", command: "/doctor", workflow: "system" });
+    actions.push({ label: "Doctor", command: "/doctor", workflow: "operate" });
   }
 
   return actions.slice(0, 5);

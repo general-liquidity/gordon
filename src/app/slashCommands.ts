@@ -96,6 +96,24 @@ export const DIRECT_MENU_TARGETS = new Set([
   "strategy-panel",
   "thread-panel",
   "log-panel",
+  "journal",
+  "gordon",
+  "mcp",
+  "clear",
+  "cli",
+  "compact",
+  "context-viz",
+  "cost",
+  "effort",
+  "skills",
+  "hooks",
+  "settings-panel",
+  "export-panel",
+  "emergency",
+  "session-browser",
+  "memory-panel",
+  "privacy",
+  "marketplace",
 ]);
 
 export const DIRECT_TOOL_TARGETS = new Set([
@@ -1447,7 +1465,7 @@ const LEGACY_SLASH_COMMANDS: SlashCommandSeed[] = [
   },
   {
     name: "action-log",
-    aliases: ["alog", "events"],
+    aliases: ["log", "alog", "events"],
     description: "Inspect typed action log entries for the current thread or daemon",
     usage: "/action-log [type|group|bookmarked|daemon|threadId] [limit]",
     category: "system",

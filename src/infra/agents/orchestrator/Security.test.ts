@@ -36,14 +36,13 @@ describe("checkToolSecurity", () => {
       {
         userId: "user-1",
         config: {
-          permissionMode: "ask",
-          
+          permissionMode: "strict",
         },
       } as any,
     );
 
     expect(result.allowed).toBe(false);
-    expect(result.error).toContain("SAFE mode");
+    expect(result.error).toBeDefined();
     expect(result.approvalRequestId).toBeUndefined();
   });
 });

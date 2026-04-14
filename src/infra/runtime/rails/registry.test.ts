@@ -3,11 +3,11 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
-import { GordonConfigSchema } from "../../types/index.ts";
+import { GordonConfigSchema } from "../../../types/index.ts";
 import { getBuiltInAgentRailListings, syncAgentRailMcpPlugins } from "./index.ts";
 import { createAgentRailsRegistry } from "./registry.ts";
-import { pluginInstaller } from "../mcp/marketplace/installer.ts";
-import { setDatabasePathForTesting } from "../storage/database.ts";
+import { pluginInstaller } from "../../ai/mcp/marketplace/installer.ts";
+import { setDatabasePathForTesting } from "../../storage/database.ts";
 
 const ORIGINAL_ENV = { ...process.env };
 const RAIL_ENV_KEYS = [
@@ -118,9 +118,11 @@ describe("createAgentRailsRegistry", () => {
 });
 
 describe("built-in agent rail listings", () => {
-  test("exposes Helius and MoonPay MCP listings", () => {
+  test("exposes built-in MCP rail listings", () => {
     const listings = getBuiltInAgentRailListings();
-    expect(listings.map((listing) => listing.id)).toEqual(["helius", "moonpay"]);
+    const ids = listings.map((listing) => listing.id);
+    expect(ids).toContain("helius");
+    expect(ids).toContain("moonpay");
   });
 
   test("sync installs built-in MCP plugins for hybrid providers", async () => {

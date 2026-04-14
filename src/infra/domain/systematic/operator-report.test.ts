@@ -3,7 +3,7 @@ import { describe, expect, it } from "bun:test";
 import type { BacktestTrade } from "../../backtest/types.ts";
 import { formatOperatorReport } from "./operator-report.ts";
 import { buildBiasDiagnostics } from "./service.ts";
-import { createMockConfig } from "../../test-utils/mocks.ts";
+import { createMockConfig } from "../../../test-utils/mocks.ts";
 
 describe("operator report formatting", () => {
   it("renders structured sections for metrics, tables, gates, diffs, and actions", () => {

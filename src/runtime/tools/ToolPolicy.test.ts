@@ -3,10 +3,9 @@ import { GordonConfigSchema } from "../../types/index.ts";
 import type { GordonContext } from "../../infra/agents/types.ts";
 import { evaluateRuntimeToolPolicy } from "./ToolPolicy.ts";
 
-function createContext(permissionMode: "auto" | "ask" | "strict" = "ask"): GordonContext {
+function createContext(permissionMode: "auto" | "ask" | "strict" | "paper" | "observe" | "plan" = "ask"): GordonContext {
   const config = GordonConfigSchema.parse({
-    mode,
-    
+    permissionMode,
   });
   return {
     binance: null,
@@ -23,15 +22,15 @@ function createContext(permissionMode: "auto" | "ask" | "strict" = "ask"): Gordo
 }
 
 describe("evaluateRuntimeToolPolicy", () => {
-  it("allows read-only market tools in SAFE mode", async () => {
-    const decision = await evaluateRuntimeToolPolicy("scan_market", createContext("SAFE"));
+  it("allows read-only market tools in strict mode", async () => {
+    const decision = await evaluateRuntimeToolPolicy("scan_market", createContext("strict"));
     expect(decision.allowed).toBe(true);
     expect(decision.tool.permissionScope).toBe("market.read");
     expect(decision.approvalClass).toBe("none");
   });
 
-  it("blocks live execution tools in SAFE mode", async () => {
-    const decision = await evaluateRuntimeToolPolicy("place_market_order", createContext("SAFE"));
+  it("blocks live execution tools in strict mode", async () => {
+    const decision = await evaluateRuntimeToolPolicy("place_market_order", createContext("strict"));
     expect(decision.allowed).toBe(false);
     expect(decision.tool.permissionScope).toBe("livetrade.execute");
     expect(decision.approvalClass).toBe("per_action");

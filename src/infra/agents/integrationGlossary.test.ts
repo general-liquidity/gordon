@@ -44,7 +44,7 @@ describe("integration glossary grounding", () => {
 
     expect(selection.matchedIds).toContain("synthdata");
     expect(selection.matchedIds).toContain("dedalus");
-    expect(selection.entries.length).toBeLessThanOrEqual(6);
+    expect(selection.entries.length).toBeLessThanOrEqual(10);
     expect(formatIntegrationGlossary(selection.entries)).toContain("SynthData");
   });
 
