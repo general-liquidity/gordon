@@ -1,119 +1,43 @@
 import React from "react";
 import { Box, Text } from "ink";
+import { marked, type Tokens, type Token } from "marked";
 import { CodeBlock } from "./CodeBlock.js";
 import { InlineTable } from "./InlineTable.js";
 
 /**
- * MarkdownRenderer — Parse and render markdown content
+ * MarkdownRenderer — CommonMark + GFM via marked, rendered to Ink.
  *
- * Supports CommonMark + GFM subset + Claude Code inline rendering:
- *   Tier A: task lists, strikethrough, OSC 8 hyperlinks, hard line breaks,
- *           table alignment + box borders
- *   Tier B: nested lists, images, escaped chars, autolinks
- *   Tier C: reference links, footnotes, HTML strip, definition lists
+ * Previously used a custom line-based parser. Replaced with marked.lexer()
+ * for full CommonMark + GFM coverage (reference links, nested emphasis,
+ * autolinks, escaped chars, strikethrough, task lists, etc.) without us
+ * reimplementing each edge case.
+ *
+ * Kept from the custom implementation:
+ *   - Module-level LRU cache (500 entries) keyed by content hash with
+ *     MRU promotion. Survives React unmount/remount.
+ *   - Fast-path plain-text detection: content with no markdown syntax
+ *     in the first 500 chars skips marked.lexer entirely.
+ *   - Wraps tables in InlineTable (Unicode box drawing, alignment,
+ *     vertical fallback) — marked only tokenizes, we render.
+ *   - OSC 8 hyperlinks for links and autolinks.
  */
 
 interface Props {
   content: string;
 }
 
-interface ParsedBlock {
-  type: "paragraph" | "heading" | "code" | "table" | "blockquote" | "list" | "hr" | "deflist" | "footnote" | "image";
-  lines: string[];
-  language?: string;
-  level?: number;
-  /** For lists: items with metadata (task state, nesting depth). */
-  items?: ListItem[];
-  /** For images: alt text + src. */
-  src?: string;
-  alt?: string;
-}
-
-interface ListItem {
-  /** Content after the marker (may contain inline markdown). */
-  content: string;
-  /** Indentation level, 0 = top-level. */
-  level: number;
-  /** Task state: undefined = not a task, false = unchecked, true = checked. */
-  checked?: boolean;
-  /** Marker type for ordered lists. */
-  ordered?: boolean;
-  /** Item number for ordered lists. */
-  number?: number;
-}
-
-interface ReferenceTable {
-  [ref: string]: { url: string; title?: string };
-}
-
-// Module-level reference link table — collected per-parse and used by
-// the inline parser to resolve [text][ref] shortcuts.
-let currentRefs: ReferenceTable = {};
-
-export function MarkdownRenderer({ content }: Props) {
-  // Strip HTML blocks (Tier C) — anything wrapped in <tag>...</tag> at
-  // block level is removed since Ink can't render HTML.
-  const cleaned = stripHtmlBlocks(content);
-  // Extract reference link definitions (Tier C): `[ref]: url "title"`
-  const { text: stripped, refs } = extractReferenceLinks(cleaned);
-  currentRefs = refs;
-
-  const blocks = parseBlocks(stripped);
-
-  return (
-    <Box flexDirection="column">
-      {blocks.map((block, i) => (
-        <BlockRenderer key={i} block={block} />
-      ))}
-    </Box>
-  );
-}
-
 // ============================================================================
-// Pre-parse helpers
+// LRU cache for tokenized content
 // ============================================================================
 
-function stripHtmlBlocks(content: string): string {
-  // Strip block-level HTML: <tag>...</tag> on its own paragraph, self-closing
-  // tags, and HTML comments. Inline HTML (inside paragraphs) is left alone.
-  return content
-    .replace(/<!--[\s\S]*?-->/g, "")
-    .replace(/^<(\w+)(\s[^>]*)?>[\s\S]*?<\/\1>$/gm, "")
-    .replace(/^<\w+(\s[^>]*)?\/>$/gm, "");
-}
+const _tokenCache = new Map<string, Token[]>();
+const _TOKEN_CACHE_MAX = 500;
 
-function extractReferenceLinks(content: string): { text: string; refs: ReferenceTable } {
-  const refs: ReferenceTable = {};
-  // Match `[ref]: url` or `[ref]: url "title"` on its own line
-  const refRe = /^\s*\[([^\]]+)\]:\s+(\S+)(?:\s+"([^"]*)")?\s*$/gm;
-  const text = content.replace(refRe, (_match, ref: string, url: string, title?: string) => {
-    refs[ref.toLowerCase()] = { url, title };
-    return ""; // remove the definition line
-  });
-  return { text, refs };
-}
-
-// ============================================================================
-// Block-level parsing
-// ============================================================================
-
-// Token cache — 500 LRU with MRU promotion (Claude Code pattern)
-// Lives at module scope so it survives component unmount/remount during
-// virtual scroll. Cache key is a proper polynomial rolling hash — the
-// previous key (length:slice(0,80):slice(-20)) collided on any two messages
-// with similar head/tail, causing frequent re-parses.
-const _blockCache = new Map<string, ParsedBlock[]>();
-const _BLOCK_CACHE_MAX = 500;
-
-// Fast regex to detect any markdown syntax in the first 500 chars —
-// if there's no match, skip the full parser and emit a single paragraph.
-// Covers: headings, bold, italic, code, pipe tables, blockquotes, lists,
-// links, HR. Matches the Claude Code detection pattern.
-const MD_SYNTAX_RE = /[#*`|\[\]>~_\-]|\n\n|^\d+\. |\n\d+\. /;
+// Fast-path regex — if the first 500 chars contain none of these, skip
+// marked entirely and emit a single paragraph token.
+const MD_SYNTAX_RE = /[#*`|\[\]>~_\\]|\n\n|^\d+\. |\n\d+\. |---|___|\*\*\*/;
 
 function hashContent(content: string): string {
-  // Polynomial rolling hash — same pattern as StreamingMarkdown.
-  // 32-bit hash + length suffix for collision resistance.
   let h = 0;
   for (let i = 0; i < content.length; i++) {
     h = ((h << 5) - h + content.charCodeAt(i)) | 0;
@@ -121,415 +45,314 @@ function hashContent(content: string): string {
   return `${h}:${content.length}`;
 }
 
-function parseBlocks(content: string): ParsedBlock[] {
+function tokenize(content: string): Token[] {
   const key = hashContent(content);
-  const cached = _blockCache.get(key);
+  const cached = _tokenCache.get(key);
   if (cached) {
-    // MRU promotion — delete and re-insert so recently used entries
-    // bubble to the tail and fresh entries evict from the head.
-    _blockCache.delete(key);
-    _blockCache.set(key, cached);
+    // MRU promotion
+    _tokenCache.delete(key);
+    _tokenCache.set(key, cached);
     return cached;
   }
 
-  // Fast-path: if the first 500 chars have no markdown syntax at all,
-  // emit a single paragraph block without the full parser. Saves ~3ms
-  // per plain-text render and covers ~95% of streaming content.
+  // Fast-path: no markdown syntax in first 500 chars
   if (!MD_SYNTAX_RE.test(content.slice(0, 500))) {
-    const lines = content.split("\n");
-    const result: ParsedBlock[] = [];
-    // Collect contiguous non-empty lines as paragraphs
-    let current: string[] = [];
-    for (const line of lines) {
-      if (line.trim() === "") {
-        if (current.length > 0) {
-          result.push({ type: "paragraph", lines: current });
-          current = [];
-        }
-      } else {
-        current.push(line);
-      }
-    }
-    if (current.length > 0) {
-      result.push({ type: "paragraph", lines: current });
-    }
+    const paragraph: Tokens.Paragraph = {
+      type: "paragraph",
+      raw: content,
+      text: content,
+      tokens: [{ type: "text", raw: content, text: content } as Tokens.Text],
+    };
+    const result: Token[] = [paragraph];
     cacheResult(key, result);
     return result;
   }
 
-  const lines = content.split("\n");
-  const blocks: ParsedBlock[] = [];
-  let i = 0;
-
-  while (i < lines.length) {
-    const line = lines[i]!;
-
-    // Fenced code block
-    const codeMatch = line.match(/^```(\w*)$/);
-    if (codeMatch) {
-      const language = codeMatch[1] || undefined;
-      const codeLines: string[] = [];
-      i++;
-      while (i < lines.length && !lines[i]!.match(/^```\s*$/)) {
-        codeLines.push(lines[i]!);
-        i++;
-      }
-      blocks.push({ type: "code", lines: codeLines, language });
-      i++; // skip closing ```
-      continue;
-    }
-
-    // Heading
-    const headingMatch = line.match(/^(#{1,6})\s+(.+)$/);
-    if (headingMatch) {
-      blocks.push({ type: "heading", lines: [headingMatch[2]!], level: headingMatch[1]!.length });
-      i++;
-      continue;
-    }
-
-    // Horizontal rule
-    if (line.match(/^\s*[-*_]{3,}\s*$/)) {
-      blocks.push({ type: "hr", lines: [] });
-      i++;
-      continue;
-    }
-
-    // Blockquote
-    if (line.startsWith("> ") || line === ">") {
-      const quoteLines: string[] = [];
-      while (i < lines.length && (lines[i]!.startsWith("> ") || lines[i] === ">")) {
-        quoteLines.push(lines[i]!.replace(/^>\s?/, ""));
-        i++;
-      }
-      blocks.push({ type: "blockquote", lines: quoteLines });
-      continue;
-    }
-
-    // Pipe table (at least 3 pipe-separated cells)
-    if (line.includes("|") && line.split("|").length >= 3) {
-      const tableLines: string[] = [];
-      while (
-        i < lines.length &&
-        lines[i]!.includes("|") &&
-        lines[i]!.split("|").length >= 3
-      ) {
-        tableLines.push(lines[i]!);
-        i++;
-      }
-      blocks.push({ type: "table", lines: tableLines });
-      continue;
-    }
-
-    // List items (unordered or ordered, with task list + nesting support)
-    if (line.match(/^\s*[-*+]\s/) || line.match(/^\s*\d+\.\s/)) {
-      const items: ListItem[] = [];
-      while (
-        i < lines.length &&
-        (lines[i]!.match(/^\s*[-*+]\s/) || lines[i]!.match(/^\s*\d+\.\s/) || lines[i]!.match(/^\s{2,}\S/))
-      ) {
-        const raw = lines[i]!;
-        // Determine indent level (2 spaces = one level)
-        const indentMatch = raw.match(/^(\s*)/);
-        const indent = indentMatch?.[1]?.length ?? 0;
-        const level = Math.floor(indent / 2);
-
-        // Unordered list item
-        const unorderedMatch = raw.match(/^\s*[-*+]\s+(.*)$/);
-        if (unorderedMatch) {
-          let content = unorderedMatch[1] ?? "";
-          // Task list detection: [ ] or [x] at start of content
-          let checked: boolean | undefined;
-          const taskMatch = content.match(/^\[([ xX])\]\s+(.*)$/);
-          if (taskMatch) {
-            checked = taskMatch[1]!.toLowerCase() === "x";
-            content = taskMatch[2] ?? "";
-          }
-          items.push({ content, level, checked });
-          i++;
-          continue;
-        }
-
-        // Ordered list item
-        const orderedMatch = raw.match(/^\s*(\d+)\.\s+(.*)$/);
-        if (orderedMatch) {
-          items.push({
-            content: orderedMatch[2] ?? "",
-            level,
-            ordered: true,
-            number: parseInt(orderedMatch[1] ?? "1", 10),
-          });
-          i++;
-          continue;
-        }
-
-        // Continuation line (indented) — append to previous item's content
-        const contMatch = raw.match(/^\s{2,}(\S.*)$/);
-        if (contMatch && items.length > 0) {
-          items[items.length - 1]!.content += " " + (contMatch[1] ?? "");
-          i++;
-          continue;
-        }
-
-        break;
-      }
-      blocks.push({ type: "list", lines: [], items });
-      continue;
-    }
-
-    // Empty line
-    if (line.trim() === "") {
-      i++;
-      continue;
-    }
-
-    // Paragraph: collect contiguous non-empty, non-special lines
-    const paraLines: string[] = [];
-    while (
-      i < lines.length &&
-      lines[i]!.trim() !== "" &&
-      !lines[i]!.match(/^```/) &&
-      !lines[i]!.match(/^#{1,6}\s/) &&
-      !lines[i]!.match(/^\s*[-*_]{3,}\s*$/) &&
-      !lines[i]!.startsWith("> ") &&
-      !(lines[i]!.includes("|") && lines[i]!.split("|").length >= 3) &&
-      !lines[i]!.match(/^\s*[-*+]\s/) &&
-      !lines[i]!.match(/^\s*\d+\.\s/)
-    ) {
-      paraLines.push(lines[i]!);
-      i++;
-    }
-    if (paraLines.length > 0) {
-      blocks.push({ type: "paragraph", lines: paraLines });
-    }
-  }
-
-  cacheResult(key, blocks);
-  return blocks;
+  // Full marked lexer — CommonMark + GFM
+  const tokens = marked.lexer(content, {
+    gfm: true, // Tables, task lists, strikethrough, autolinks
+  }) as Token[];
+  cacheResult(key, tokens);
+  return tokens;
 }
 
-function cacheResult(key: string, blocks: ParsedBlock[]): void {
-  if (_blockCache.size >= _BLOCK_CACHE_MAX) {
-    // Evict least-recently-used (insertion-order head)
-    const firstKey = _blockCache.keys().next().value;
-    if (firstKey !== undefined) _blockCache.delete(firstKey);
+function cacheResult(key: string, tokens: Token[]): void {
+  if (_tokenCache.size >= _TOKEN_CACHE_MAX) {
+    const firstKey = _tokenCache.keys().next().value;
+    if (firstKey !== undefined) _tokenCache.delete(firstKey);
   }
-  _blockCache.set(key, blocks);
+  _tokenCache.set(key, tokens);
 }
 
 // ============================================================================
-// Block renderers
+// Top-level render
 // ============================================================================
 
-function BlockRenderer({ block }: { block: ParsedBlock }) {
-  switch (block.type) {
-    case "heading":
-      return <HeadingBlock text={block.lines[0] ?? ""} level={block.level ?? 1} />;
-    case "code":
-      return <CodeBlock code={block.lines.join("\n")} language={block.language} />;
-    case "table":
-      return <InlineTable lines={block.lines} />;
-    case "blockquote":
+export function MarkdownRenderer({ content }: Props) {
+  const tokens = tokenize(content);
+  return (
+    <Box flexDirection="column">
+      {tokens.map((token, i) => (
+        <TokenRenderer key={i} token={token} />
+      ))}
+    </Box>
+  );
+}
+
+// ============================================================================
+// Token renderer
+// ============================================================================
+
+function TokenRenderer({ token }: { token: Token }) {
+  switch (token.type) {
+    case "space":
+      return null;
+
+    case "heading": {
+      const t = token as Tokens.Heading;
+      const color = t.depth === 1 ? "yellow" : undefined;
       return (
-        <Box flexDirection="column" paddingLeft={2}>
-          {block.lines.map((line, i) => (
-            <Box key={i}>
-              <Text dimColor>{"\u2502"} {line}</Text>
-            </Box>
-          ))}
+        <Box paddingLeft={2} marginTop={t.depth <= 2 ? 1 : 0}>
+          <Text bold color={color}>
+            <InlineTokens tokens={t.tokens ?? []} />
+          </Text>
         </Box>
       );
-    case "list":
-      return (
-        <Box flexDirection="column" paddingLeft={2}>
-          {(block.items ?? []).map((item, i) => {
-            // Indent per nesting level (2 spaces each)
-            const indent = " ".repeat(item.level * 2);
-            // Task list: ☐ or ☑ marker
-            if (item.checked !== undefined) {
-              const mark = item.checked ? "\u2611" : "\u2610"; // ☑ / ☐
-              return (
-                <Text key={i}>
-                  {indent}{"  "}{mark} <InlineFormatted text={item.content} />
-                </Text>
-              );
-            }
-            // Ordered list: "1." "2." etc.
-            if (item.ordered) {
-              return (
-                <Text key={i}>
-                  {indent}{"  "}{item.number ?? 1}. <InlineFormatted text={item.content} />
-                </Text>
-              );
-            }
-            // Unordered bullet
-            const bullet = item.level === 0 ? "\u2022" : item.level === 1 ? "\u25E6" : "\u25AB"; // • ◦ ▫
-            return (
-              <Text key={i}>
-                {indent}{"  "}{bullet} <InlineFormatted text={item.content} />
-              </Text>
-            );
-          })}
-        </Box>
-      );
+    }
+
+    case "code": {
+      const t = token as Tokens.Code;
+      return <CodeBlock code={t.text} language={t.lang} />;
+    }
+
     case "hr":
       return (
         <Box paddingLeft={2}>
           <Text dimColor>{"\u2500".repeat(40)}</Text>
         </Box>
       );
-    case "paragraph":
-    default:
+
+    case "blockquote": {
+      const t = token as Tokens.Blockquote;
       return (
         <Box flexDirection="column" paddingLeft={2}>
-          {block.lines.map((line, i) => {
-            // Hard line break: line ending with two spaces forces a break
-            // (GFM standard). Gordon's block renderer already puts each
-            // paragraph line on its own <Text> element, so the visible
-            // result is the same — but we trim the trailing spaces so
-            // they don't appear in the output.
-            const trimmed = line.replace(/ {2,}$/, "");
-            return <Text key={i}><InlineFormatted text={trimmed} /></Text>;
-          })}
+          {(t.tokens ?? []).map((child, i) => (
+            <Box key={i}>
+              <Text dimColor>{"\u2502"} </Text>
+              <Box flexDirection="column" flexGrow={1}>
+                <TokenRenderer token={child} />
+              </Box>
+            </Box>
+          ))}
+        </Box>
+      );
+    }
+
+    case "list": {
+      const t = token as Tokens.List;
+      return <ListRenderer token={t} level={0} />;
+    }
+
+    case "paragraph": {
+      const t = token as Tokens.Paragraph;
+      return (
+        <Box flexDirection="column" paddingLeft={2}>
+          <Text>
+            <InlineTokens tokens={t.tokens ?? []} />
+          </Text>
+        </Box>
+      );
+    }
+
+    case "table": {
+      // marked parses tables into { header, align, rows } — convert back
+      // to pipe-separated lines and delegate to InlineTable for the
+      // Unicode box border rendering we already built.
+      const t = token as Tokens.Table;
+      const lines: string[] = [];
+      lines.push("| " + t.header.map((h: Tokens.TableCell) => h.text).join(" | ") + " |");
+      lines.push("| " + t.align.map((a: string | null) => alignMarker(a)).join(" | ") + " |");
+      for (const row of t.rows) {
+        lines.push("| " + row.map((cell: Tokens.TableCell) => cell.text).join(" | ") + " |");
+      }
+      return <InlineTable lines={lines} />;
+    }
+
+    case "html":
+      // Strip HTML blocks silently — Ink can't render them
+      return null;
+
+    case "text": {
+      // Top-level text token (rare — usually inside paragraph)
+      const t = token as Tokens.Text;
+      return (
+        <Box paddingLeft={2}>
+          <Text>{t.text}</Text>
+        </Box>
+      );
+    }
+
+    default:
+      // Unknown token type (could be a GFM extension or custom token).
+      // Fall back to rendering the raw text so content isn't lost.
+      return (
+        <Box paddingLeft={2}>
+          <Text>{(token as Token & { raw?: string }).raw ?? ""}</Text>
         </Box>
       );
   }
 }
 
-function HeadingBlock({ text, level }: { text: string; level: number }) {
-  const color = level === 1 ? "yellow" : undefined;
+function alignMarker(a: string | null): string {
+  if (a === "left") return ":---";
+  if (a === "center") return ":---:";
+  if (a === "right") return "---:";
+  return "---";
+}
+
+// ============================================================================
+// List renderer with nested support + task lists
+// ============================================================================
+
+function ListRenderer({ token, level }: { token: Tokens.List; level: number }) {
+  const indent = "  ".repeat(level);
   return (
-    <Box paddingLeft={2} marginTop={level <= 2 ? 1 : 0}>
-      <Text bold color={color}>{text}</Text>
+    <Box flexDirection="column" paddingLeft={level === 0 ? 2 : 0}>
+      {token.items.map((item: Tokens.ListItem, i: number) => {
+        const bullet = token.ordered
+          ? `${(token.start ?? 1) + i}.`
+          : level === 0
+            ? "\u2022"
+            : level === 1
+              ? "\u25E6"
+              : "\u25AB";
+        const task = item.task
+          ? item.checked
+            ? "\u2611 "
+            : "\u2610 "
+          : "";
+
+        // Each item can have multiple child tokens (paragraph + nested list etc.)
+        const childTokens = item.tokens ?? [];
+        const firstParagraph = childTokens.find((t) => t.type === "paragraph" || t.type === "text");
+        const nestedLists = childTokens.filter((t): t is Tokens.List => t.type === "list");
+
+        return (
+          <Box key={i} flexDirection="column">
+            <Box>
+              <Text>
+                {indent}{"  "}{bullet} {task}
+                {firstParagraph && (firstParagraph.type === "paragraph" || firstParagraph.type === "text") ? (
+                  <InlineTokens
+                    tokens={
+                      "tokens" in firstParagraph && firstParagraph.tokens
+                        ? firstParagraph.tokens
+                        : [{ type: "text", text: (firstParagraph as Tokens.Text).text, raw: "" } as Tokens.Text]
+                    }
+                  />
+                ) : null}
+              </Text>
+            </Box>
+            {nestedLists.map((nested, j) => (
+              <ListRenderer key={`nested-${j}`} token={nested} level={level + 1} />
+            ))}
+          </Box>
+        );
+      })}
     </Box>
   );
 }
 
 // ============================================================================
-// Inline formatting — bold, italic, code, links
+// Inline token rendering
 // ============================================================================
 
-interface Segment {
-  text: string;
-  bold?: boolean;
-  italic?: boolean;
-  code?: boolean;
-  dimColor?: boolean;
-  strikethrough?: boolean;
-  /** If set, wrap the text in an OSC 8 hyperlink pointing here. */
-  href?: string;
-  /** Color override for footnotes / autolinks. */
-  color?: string;
-}
-
-function InlineFormatted({ text }: { text: string }) {
-  const segments = parseInline(text);
-
+function InlineTokens({ tokens }: { tokens: Token[] }): React.ReactElement {
   return (
     <>
-      {segments.map((seg, i) => {
-        // OSC 8 hyperlinks wrap the display text in escape sequences that
-        // modern terminals render as clickable. Terminals that don't support
-        // OSC 8 pass the text through unchanged (the escape sequences are
-        // zero-width).
-        const content = seg.href
-          ? `\u001b]8;;${seg.href}\u001b\\${seg.text}\u001b]8;;\u001b\\`
-          : seg.text;
-        return (
-          <Text
-            key={i}
-            bold={seg.bold}
-            italic={seg.italic}
-            dimColor={seg.dimColor || seg.code}
-            strikethrough={seg.strikethrough}
-            color={seg.color}
-          >
-            {content}
-          </Text>
-        );
-      })}
+      {tokens.map((token, i) => (
+        <InlineToken key={i} token={token} />
+      ))}
     </>
   );
 }
 
-function parseInline(text: string): Segment[] {
-  const segments: Segment[] = [];
-  // Inline regex — order matters, longer patterns first:
-  //   1. Escaped chars: \*, \#, \_, \~, \[, \], \(, \), \`, \\
-  //   2. **bold**, ~~strike~~
-  //   3. *italic*
-  //   4. `code`
-  //   5. [text](url) link
-  //   6. [text][ref] reference link
-  //   7. ![alt](url) inline image
-  //   8. <http://url> autolink
-  //   9. [^ref] footnote reference
-  const regex = /(\\[\*#_~\[\]()`\\])|(\*\*([^*]+?)\*\*)|(~~([^~]+?)~~)|(\*([^*]+?)\*)|(`([^`]+?)`)|(!\[([^\]]*)\]\(([^)]+)\))|(\[([^\]]+)\]\(([^)]+)\))|(\[([^\]]+)\]\[([^\]]*)\])|(\[\^([^\]]+)\])|(<(https?:\/\/[^>\s]+)>)/g;
-  let lastIndex = 0;
-  let match;
-
-  while ((match = regex.exec(text)) !== null) {
-    // Text before this match
-    if (match.index > lastIndex) {
-      segments.push({ text: text.slice(lastIndex, match.index) });
-    }
-
-    if (match[1]) {
-      // Escaped char — emit the literal char without the backslash
-      segments.push({ text: match[1].slice(1) });
-    } else if (match[3]) {
-      // **bold**
-      segments.push({ text: match[3], bold: true });
-    } else if (match[5]) {
-      // ~~strikethrough~~
-      segments.push({ text: match[5], strikethrough: true });
-    } else if (match[7]) {
-      // *italic*
-      segments.push({ text: match[7], italic: true });
-    } else if (match[9]) {
-      // `code`
-      segments.push({ text: match[9], code: true });
-    } else if (match[10]) {
-      // ![alt](url) — inline image placeholder
-      const alt = match[11] ?? "";
-      const src = match[12] ?? "";
-      segments.push({
-        text: `[image: ${alt || src.split("/").pop() || "attachment"}]`,
-        dimColor: true,
-        italic: true,
-      });
-    } else if (match[13]) {
-      // [text](url) — inline link with OSC 8 hyperlink
-      segments.push({ text: match[14]!, href: match[15], color: "cyan" });
-    } else if (match[16]) {
-      // [text][ref] — reference link, resolve from currentRefs
-      const refKey = (match[18] || match[17] || "").toLowerCase();
-      const ref = currentRefs[refKey];
-      if (ref) {
-        segments.push({ text: match[17]!, href: ref.url, color: "cyan" });
-      } else {
-        // Unresolved reference — emit as plain text
-        segments.push({ text: match[0] });
+function InlineToken({ token }: { token: Token }): React.ReactElement | null {
+  switch (token.type) {
+    case "text": {
+      const t = token as Tokens.Text;
+      // Sub-tokens for inline elements inside text (escaped chars etc.)
+      if (t.tokens && t.tokens.length > 0) {
+        return <InlineTokens tokens={t.tokens} />;
       }
-    } else if (match[19]) {
-      // [^ref] — footnote reference
-      segments.push({ text: `[${match[20]}]`, dimColor: true, color: "yellow" });
-    } else if (match[21]) {
-      // <http://url> — autolink
-      const url = match[22]!;
-      segments.push({ text: url, href: url, color: "cyan" });
+      return <Text>{t.text}</Text>;
     }
 
-    lastIndex = match.index + match[0].length;
-  }
+    case "strong": {
+      const t = token as Tokens.Strong;
+      return (
+        <Text bold>
+          <InlineTokens tokens={t.tokens ?? [{ type: "text", text: t.text, raw: "" } as Tokens.Text]} />
+        </Text>
+      );
+    }
 
-  // Remaining text
-  if (lastIndex < text.length) {
-    segments.push({ text: text.slice(lastIndex) });
-  }
+    case "em": {
+      const t = token as Tokens.Em;
+      return (
+        <Text italic>
+          <InlineTokens tokens={t.tokens ?? [{ type: "text", text: t.text, raw: "" } as Tokens.Text]} />
+        </Text>
+      );
+    }
 
-  if (segments.length === 0) {
-    segments.push({ text });
-  }
+    case "del": {
+      // GFM strikethrough
+      const t = token as Tokens.Del;
+      return (
+        <Text strikethrough>
+          <InlineTokens tokens={t.tokens ?? [{ type: "text", text: t.text, raw: "" } as Tokens.Text]} />
+        </Text>
+      );
+    }
 
-  return segments;
+    case "codespan": {
+      const t = token as Tokens.Codespan;
+      return <Text dimColor>{t.text}</Text>;
+    }
+
+    case "link": {
+      const t = token as Tokens.Link;
+      // OSC 8 hyperlink — modern terminals render as clickable
+      const displayText = t.text;
+      const wrapped = `\u001b]8;;${t.href}\u001b\\${displayText}\u001b]8;;\u001b\\`;
+      return <Text color="cyan">{wrapped}</Text>;
+    }
+
+    case "image": {
+      const t = token as Tokens.Image;
+      const alt = t.text || t.href.split("/").pop() || "image";
+      return (
+        <Text dimColor italic>
+          [image: {alt}]
+        </Text>
+      );
+    }
+
+    case "br":
+      return <Text>{"\n"}</Text>;
+
+    case "html": {
+      // Strip inline HTML silently
+      return null;
+    }
+
+    case "escape": {
+      const t = token as Tokens.Escape;
+      return <Text>{t.text}</Text>;
+    }
+
+    default:
+      return <Text>{(token as Token & { raw?: string }).raw ?? ""}</Text>;
+  }
 }

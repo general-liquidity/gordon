@@ -1,6 +1,7 @@
 import React, { useMemo } from "react";
 import { Box, Text, useStdout } from "ink";
 import { cachedStringWidth } from "../rendering/lineWidthCache.ts";
+import { BOX as SHARED_BOX } from "../rendering/stringPool.ts";
 
 /**
  * InlineTable — terminal-width-aware markdown table renderer.
@@ -27,20 +28,9 @@ const MAX_ROW_LINES = 4;
 
 type CellAlign = "left" | "center" | "right";
 
-// Unicode box drawing characters
-const BOX = {
-  topLeft: "\u250C",
-  topMid: "\u252C",
-  topRight: "\u2510",
-  midLeft: "\u251C",
-  midMid: "\u253C",
-  midRight: "\u2524",
-  botLeft: "\u2514",
-  botMid: "\u2534",
-  botRight: "\u2518",
-  horiz: "\u2500",
-  vert: "\u2502",
-};
+// Unicode box drawing characters — shared from the string pool so all
+// renderers reference the same frozen strings (V8 interning benefit).
+const BOX = SHARED_BOX;
 
 interface Props {
   lines: string[];
