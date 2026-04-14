@@ -285,32 +285,39 @@ async function streamResponse(
     }],
   }));
 
-  // Claude Code pattern: only show text up to the last newline.
-  // Incomplete lines are hidden — text appears LINE BY LINE, not char by char.
-  // Ink already throttles renders at 16ms (60fps), so no manual batching needed.
-  let lastVisibleContent = "";
+  // Claude Code pattern: accumulate text silently during streaming and only
+  // commit the full response to the message list when streaming completes
+  // ("step_complete" or "done" events). This gives a single atomic render of
+  // the whole message — no token-by-token or line-by-line jank — while the
+  // thinking indicator, tool calls, and agent chain UI still update live.
+  //
+  // The spinner + thinking + tool-call inline display at top of the chat
+  // already give the user a sense of "working" without showing partial text.
 
   try {
     for await (const event of runtime.streamMessage(userMessage)) {
       switch (event.type) {
         case "text_delta":
+          // Accumulate silently — do NOT commit to state.messages yet.
+          // The streaming placeholder message stays empty until step_complete
+          // fires. The user sees spinner + tool calls + thinking instead of
+          // partial text.
           responseContent += event.content ?? "";
-          // Only display up to last newline — hides the in-progress line
-          const lastNewline = responseContent.lastIndexOf("\n");
-          const visibleContent = lastNewline >= 0
-            ? responseContent.substring(0, lastNewline + 1)
-            : "";
-          // Only update UI when visible content actually changed (new line completed)
-          if (visibleContent !== lastVisibleContent) {
-            lastVisibleContent = visibleContent;
+          break;
+
+        case "step_complete":
+          // Commit the accumulated response content to the streaming message
+          // in one atomic update. This is the "message appears all at once"
+          // effect — the entire response is rendered as a complete markdown
+          // block instead of ticking in word-by-word.
+          if (responseContent.length > 0) {
             setState((prev: any) => {
-              // Direct index update instead of O(n) messages.map scan
               const msgs = [...prev.messages];
-              const idx = msgs.length - 1; // Streaming message is always last
+              const idx = msgs.length - 1;
               if (idx >= 0 && msgs[idx]?.id === streamingMsgId) {
-                msgs[idx] = { ...msgs[idx], content: visibleContent };
+                msgs[idx] = { ...msgs[idx], content: responseContent };
               }
-              return { ...prev, streamBuffer: visibleContent, messages: msgs };
+              return { ...prev, streamBuffer: responseContent, messages: msgs };
             });
           }
           break;

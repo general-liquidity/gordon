@@ -339,21 +339,17 @@ function RichLine({ line }: { line: string }) {
   if (line.match(/^\s*[-*]\s/)) return <Text>  {"\u2022"} {line.replace(/^\s*[-*]\s/, "")}</Text>;
   if (line.match(/^\s*\d+\.\s/)) return <Text>  {line.trimStart()}</Text>;
 
-  // Pipe-separated table rows
+  // Pipe-separated table rows — render as a single Text with padded cells.
+  // Previously used nested Box children with fixed widths that made Ink
+  // word-wrap each cell into 2-3 character columns, producing the classic
+  // multi-column-interleave glitch. The fix: join cells with spacing into
+  // one string; if the row is too wide for the terminal, Ink's own Text
+  // wrap handles it gracefully instead of per-cell flexbox collapse.
   if (line.includes("|") && line.split("|").length >= 3) {
     // Skip separator rows (---|---|---)
     if (line.match(/^\s*\|?\s*[-:]+\s*\|/)) return null;
     const cells = line.split("|").map((c) => c.trim()).filter(Boolean);
-    return (
-      <Box>
-        <Text>  </Text>
-        {cells.map((cell, i) => (
-          <Box key={i} width={Math.max(8, Math.floor(76 / cells.length))}>
-            <Text>{cell}</Text>
-          </Box>
-        ))}
-      </Box>
-    );
+    return <Text>  {cells.join("  ")}</Text>;
   }
 
   if (line.startsWith("> ")) return <Text dimColor>  {line.slice(2)}</Text>;
