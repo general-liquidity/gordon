@@ -333,9 +333,26 @@ function AppInner() {
   const { formatted: elapsedFormatted } = useElapsedTime(isStreaming);
   const paletteItems = useMergedCommands();
 
-  // ── Derived ──
-  const activeAgentCount = activeAgents.filter((c) => c.status === "running").length;
-  const activeAgentName = activeAgents.length === 1 ? (activeAgents[0]?.agentName ?? null) : null;
+  // ── Derived: memoize all activeAgents derivations in one pass ──
+  // Previously the root filtered/mapped activeAgents 3 times per render
+  // (count, name, thinkingAgent). Consolidate into one useMemo so the
+  // O(n) scan happens once and only when activeAgents actually changes.
+  const { activeAgentCount, activeAgentName, thinkingAgent } = React.useMemo(() => {
+    let running = 0;
+    let thinking: (typeof activeAgents)[number] | undefined;
+    for (const c of activeAgents) {
+      if (c.status === "running") {
+        running++;
+        if (!thinking) thinking = c;
+      }
+    }
+    return {
+      activeAgentCount: running,
+      activeAgentName: activeAgents.length === 1 ? (activeAgents[0]?.agentName ?? null) : null,
+      thinkingAgent: thinking,
+    };
+  }, [activeAgents]);
+
   const viewportHeight = Math.max(rows - CHROME_HEIGHT, 6);
 
   // Check if any dialog is open (to suppress other keybindings)
@@ -363,7 +380,7 @@ function AppInner() {
   const memoryUsageRatio = (tokenCount ?? 0) / contextLimit;
 
   // ── Determine if agent is in "thinking" mode (any running agent, no output yet) ──
-  const thinkingAgent = activeAgents.find((a) => a.status === "running");
+  // thinkingAgent already derived above in the memoized block
   const isThinking = isStreaming && thinkingAgent != null && !streamBuffer;
 
   // ── Track active tool calls for inline display ──

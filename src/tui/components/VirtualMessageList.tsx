@@ -97,7 +97,13 @@ export function VirtualMessageList({
     setUnseenCount(0);
   }, [scrollToBottom]);
 
-  // Message collapsing pipeline (Claude Code pattern): group consecutive tool results
+  // Message collapsing pipeline (Claude Code pattern): group consecutive
+  // tool results. Keyed on (messages.length, last id, last content length)
+  // instead of messages array identity — when only the last message's
+  // content changes during streaming we still hit the cache because the
+  // id is stable and the collapse structure doesn't depend on content.
+  const lastMsg = messages[messages.length - 1];
+  const collapseKey = `${messages.length}:${lastMsg?.id ?? ""}:${(lastMsg?.content ?? "").length}`;
   const collapsedMessages = useMemo(() => {
     const result: Message[] = [];
     let toolGroup: Message[] = [];
@@ -135,7 +141,8 @@ export function VirtualMessageList({
       result.push(...toolGroup);
     }
     return result;
-  }, [messages]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [collapseKey]);
 
   // Slice visible messages
   const visibleMessages = collapsedMessages.slice(startIndex, endIndex);

@@ -1,5 +1,6 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { Box, Text, useStdout } from "ink";
+import { cachedStringWidth } from "../rendering/lineWidthCache.ts";
 
 /**
  * InlineTable — terminal-width-aware markdown table renderer.
@@ -84,89 +85,100 @@ export function InlineTable({ lines }: Props) {
   const { stdout } = useStdout();
   const terminalWidth = stdout?.columns ?? 80;
 
-  const { rows, headerIdx } = parseRows(lines);
-  if (rows.length === 0) return null;
+  // Parse + layout + pre-render ALL in one useMemo. Same `lines` array +
+  // same terminal width = same output, no re-measurement per frame.
+  const rendered = useMemo(() => {
+    const { rows, headerIdx } = parseRows(lines);
+    if (rows.length === 0) return null;
 
-  // Compute natural column widths from content
-  const colCount = Math.max(...rows.map((r) => r.length));
-  const naturalWidths: number[] = [];
-  for (let c = 0; c < colCount; c++) {
-    let maxLen = 0;
-    for (const row of rows) {
-      const cellLen = (row[c] ?? "").length;
-      if (cellLen > maxLen) maxLen = cellLen;
-    }
-    naturalWidths.push(Math.max(maxLen, MIN_COLUMN_WIDTH));
-  }
-
-  // Available width for actual cell contents, minus padding + separators
-  const separatorOverhead = (colCount - 1) * BORDER_OVERHEAD_PER_COL;
-  const availableWidth = Math.max(
-    terminalWidth - LEFT_PADDING - SAFETY_MARGIN - separatorOverhead,
-    colCount * MIN_COLUMN_WIDTH,
-  );
-
-  // Scale column widths to fit. If natural fits, use natural; else scale down.
-  const naturalTotal = naturalWidths.reduce((a, b) => a + b, 0);
-  let finalWidths: number[];
-  if (naturalTotal <= availableWidth) {
-    finalWidths = naturalWidths;
-  } else {
-    const scale = availableWidth / naturalTotal;
-    finalWidths = naturalWidths.map((w) => Math.max(MIN_COLUMN_WIDTH, Math.floor(w * scale)));
-    // Correct rounding drift
-    let actualTotal = finalWidths.reduce((a, b) => a + b, 0);
-    if (actualTotal < availableWidth) {
-      // Add leftover to the widest column
-      let widestIdx = 0;
-      for (let i = 1; i < finalWidths.length; i++) {
-        if (finalWidths[i]! > finalWidths[widestIdx]!) widestIdx = i;
+    // Compute natural column widths from content, using cached string width
+    const colCount = Math.max(...rows.map((r) => r.length));
+    const naturalWidths: number[] = [];
+    for (let c = 0; c < colCount; c++) {
+      let maxLen = 0;
+      for (const row of rows) {
+        const cell = row[c] ?? "";
+        const cellLen = cachedStringWidth(cell);
+        if (cellLen > maxLen) maxLen = cellLen;
       }
-      finalWidths[widestIdx]! += availableWidth - actualTotal;
+      naturalWidths.push(Math.max(maxLen, MIN_COLUMN_WIDTH));
     }
-  }
 
-  // Decide whether to render as a table or fall back to vertical key-value.
-  // Falls back when any row would wrap to more than MAX_ROW_LINES lines —
-  // at that point the table is no longer a table, it's noise.
-  const needsVerticalFallback = rows.some((row) =>
-    row.some((cell, c) => wrapCellText(cell, finalWidths[c] ?? MIN_COLUMN_WIDTH).length > MAX_ROW_LINES),
-  );
-
-  if (needsVerticalFallback && headerIdx >= 0) {
-    return <VerticalKeyValue rows={rows} headerIdx={headerIdx} maxWidth={terminalWidth - LEFT_PADDING - SAFETY_MARGIN} />;
-  }
-
-  // Render each row as pre-computed strings. When a cell wraps to multiple
-  // lines, emit that many aligned sub-rows so the table stays aligned. All
-  // rendering is single-<Text> per line — no flexbox row boxes involved.
-  const tableLines: Array<{ text: string; bold: boolean; dim: boolean }> = [];
-
-  for (let rowIdx = 0; rowIdx < rows.length; rowIdx++) {
-    const row = rows[rowIdx]!;
-    const isHeader = headerIdx >= 0 && rowIdx <= headerIdx;
-    const wrappedCells = row.map((cell, c) =>
-      wrapCellText(cell, finalWidths[c] ?? MIN_COLUMN_WIDTH),
+    // Available width for actual cell contents, minus padding + separators
+    const separatorOverhead = (colCount - 1) * BORDER_OVERHEAD_PER_COL;
+    const availableWidth = Math.max(
+      terminalWidth - LEFT_PADDING - SAFETY_MARGIN - separatorOverhead,
+      colCount * MIN_COLUMN_WIDTH,
     );
-    const maxRowLines = Math.max(...wrappedCells.map((w) => w.length), 1);
 
-    for (let lineIdx = 0; lineIdx < maxRowLines; lineIdx++) {
-      const parts: string[] = [];
-      for (let c = 0; c < colCount; c++) {
-        const cellLine = wrappedCells[c]?.[lineIdx] ?? "";
-        parts.push(padRight(cellLine, finalWidths[c] ?? MIN_COLUMN_WIDTH));
+    // Scale column widths to fit
+    const naturalTotal = naturalWidths.reduce((a, b) => a + b, 0);
+    let finalWidths: number[];
+    if (naturalTotal <= availableWidth) {
+      finalWidths = naturalWidths;
+    } else {
+      const scale = availableWidth / naturalTotal;
+      finalWidths = naturalWidths.map((w) => Math.max(MIN_COLUMN_WIDTH, Math.floor(w * scale)));
+      let actualTotal = finalWidths.reduce((a, b) => a + b, 0);
+      if (actualTotal < availableWidth) {
+        let widestIdx = 0;
+        for (let i = 1; i < finalWidths.length; i++) {
+          if (finalWidths[i]! > finalWidths[widestIdx]!) widestIdx = i;
+        }
+        finalWidths[widestIdx]! += availableWidth - actualTotal;
       }
-      tableLines.push({
-        text: parts.join("  "),
-        bold: isHeader,
-        dim: isHeader,
-      });
     }
+
+    // Vertical fallback when cells would wrap past MAX_ROW_LINES
+    const needsVerticalFallback = rows.some((row) =>
+      row.some((cell, c) => wrapCellText(cell, finalWidths[c] ?? MIN_COLUMN_WIDTH).length > MAX_ROW_LINES),
+    );
+
+    if (needsVerticalFallback && headerIdx >= 0) {
+      return {
+        mode: "vertical" as const,
+        rows,
+        headerIdx,
+        maxWidth: terminalWidth - LEFT_PADDING - SAFETY_MARGIN,
+      };
+    }
+
+    // Pre-compute all table lines
+    const tableLines: Array<{ text: string; bold: boolean; dim: boolean }> = [];
+    for (let rowIdx = 0; rowIdx < rows.length; rowIdx++) {
+      const row = rows[rowIdx]!;
+      const isHeader = headerIdx >= 0 && rowIdx <= headerIdx;
+      const wrappedCells = row.map((cell, c) =>
+        wrapCellText(cell, finalWidths[c] ?? MIN_COLUMN_WIDTH),
+      );
+      const maxRowLines = Math.max(...wrappedCells.map((w) => w.length), 1);
+
+      for (let lineIdx = 0; lineIdx < maxRowLines; lineIdx++) {
+        const parts: string[] = [];
+        for (let c = 0; c < colCount; c++) {
+          const cellLine = wrappedCells[c]?.[lineIdx] ?? "";
+          parts.push(padRight(cellLine, finalWidths[c] ?? MIN_COLUMN_WIDTH));
+        }
+        tableLines.push({
+          text: parts.join("  "),
+          bold: isHeader,
+          dim: isHeader,
+        });
+      }
+    }
+
+    return { mode: "table" as const, tableLines };
+  }, [lines, terminalWidth]);
+
+  if (!rendered) return null;
+
+  if (rendered.mode === "vertical") {
+    return <VerticalKeyValue rows={rendered.rows} headerIdx={rendered.headerIdx} maxWidth={rendered.maxWidth} />;
   }
 
   return (
     <Box flexDirection="column" paddingLeft={LEFT_PADDING}>
-      {tableLines.map((line, i) => (
+      {rendered.tableLines.map((line, i) => (
         <Text key={i} bold={line.bold} dimColor={line.dim}>
           {line.text}
         </Text>

@@ -5,7 +5,7 @@ import { NoSelect } from "../NoSelect.js";
 import type { Message } from "../MessageBubble.js";
 
 // Tool result messages: dimmed, with ⎿ hook. Shows tool output inline.
-export function ToolResultMessage({ message }: { message: Message }) {
+function ToolResultMessageInner({ message }: { message: Message }) {
   return (
     <Box flexDirection="column" marginTop={0}>
       <Box>
@@ -17,3 +17,10 @@ export function ToolResultMessage({ message }: { message: Message }) {
     </Box>
   );
 }
+
+/** React.memo'd — tool results are immutable. */
+export const ToolResultMessage = React.memo(
+  ToolResultMessageInner,
+  (prev, next) =>
+    prev.message.id === next.message.id && prev.message.content === next.message.content,
+);

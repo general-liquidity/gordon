@@ -8,7 +8,7 @@ import type { Message } from "../MessageBubble.js";
 // Assistant (gordon) messages: ⎿ hook via MessageResponse (prevents nesting).
 // Streaming=true → StreamingMarkdown (progressive, stable prefix).
 // Streaming=false → RichContent (final parsed output).
-export function AssistantMessage({ message }: { message: Message }) {
+function AssistantMessageInner({ message }: { message: Message }) {
   return (
     <Box flexDirection="column" marginTop={1}>
       <MessageResponse>
@@ -21,3 +21,17 @@ export function AssistantMessage({ message }: { message: Message }) {
     </Box>
   );
 }
+
+/**
+ * React.memo'd — completed messages never re-render when new messages arrive
+ * because the id + content + streaming flag are all stable. Only re-renders
+ * when the streaming flag flips or the content actually changes (which for
+ * completed messages is never).
+ */
+export const AssistantMessage = React.memo(
+  AssistantMessageInner,
+  (prev, next) =>
+    prev.message.id === next.message.id &&
+    prev.message.content === next.message.content &&
+    prev.message.streaming === next.message.streaming,
+);
