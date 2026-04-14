@@ -70,12 +70,20 @@ try {
   process.exit(1);
 }
 
+// npm pack's prepack hook writes to stdout before the JSON payload,
+// so strip everything up to the first '[' before parsing.
+let jsonStart = output.indexOf("[");
+if (jsonStart === -1) jsonStart = output.indexOf("{");
+const jsonText = jsonStart >= 0 ? output.slice(jsonStart) : output;
+
 let parsed;
 try {
-  parsed = JSON.parse(output);
+  parsed = JSON.parse(jsonText);
 } catch (err) {
   console.error("[audit-npm-pack] failed to parse npm pack output");
   console.error(err.message);
+  console.error("--- raw output ---");
+  console.error(output);
   process.exit(1);
 }
 
