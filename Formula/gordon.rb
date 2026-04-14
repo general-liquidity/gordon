@@ -9,13 +9,13 @@
 class Gordon < Formula
   desc "The Frontier Trading Agent - AI-powered crypto trading CLI"
   homepage "https://gordoncli.com"
-  version "0.8.24"
+  version "0.9.0-friends.5"
   license "MIT"
 
   on_macos do
     if Hardware::CPU.arm?
       url "https://github.com/general-liquidity/gordon-cli-dist/releases/download/v#{version}/gordon-darwin-arm64"
-      sha256 "089353b3a81217c3b4c19d11bb37976b8b1f2470e92dc99e3ab29599446fed27"
+      sha256 "e3db4d8668967cf01cc9ac26936f010210b090b0fbd6590e7b6ce07b72c9cddb"
     else
       url "https://github.com/general-liquidity/gordon-cli-dist/releases/download/v#{version}/gordon-darwin-x64"
       sha256 "5919dea7824708267e4c01cb7f19201594d427a7c04bfdf67bdb6644df4c3e6f_DARWIN_X64"
