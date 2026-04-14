@@ -29,6 +29,7 @@
     "dist",
     "scripts/patch-mastra.cjs",
     "prompts",
+    "assets",
     "README.md",
     "LICENSE"
   ],

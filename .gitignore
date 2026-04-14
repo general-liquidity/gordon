@@ -70,6 +70,12 @@ misc
 # Reference repos (not part of Gordon source)
 claude-code-meta/
 claude-code-meta-2/
+claude-code-best-practice-main/
+claude-code-from-source-main/
 .history/
+
+# Scratch files (terminal dumps, working notes)
+TUI*.txt
+.tc-errors-*.txt
 
 

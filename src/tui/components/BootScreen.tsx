@@ -32,7 +32,7 @@ export function BootScreen({ onReady }: Props) {
   const [blink, setBlink] = useState(true);
 
   useEffect(() => {
-    readFile(resolve(process.cwd(), "gordon-ascii.txt"), "utf8")
+    readFile(resolve(process.cwd(), "assets/gordon-ascii.txt"), "utf8")
       .then((content) => {
         const raw = content.split("\n");
         const nonEmpty = raw.filter((l) => l.trim().length > 0);
