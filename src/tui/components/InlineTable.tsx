@@ -5,41 +5,73 @@ import { cachedStringWidth } from "../rendering/lineWidthCache.ts";
 /**
  * InlineTable — terminal-width-aware markdown table renderer.
  *
- * Claude Code's pattern: pre-compute the ASCII table as strings using the
+ * Claude Code pattern: pre-compute the ASCII table as strings using the
  * actual terminal width, then render each row as a single <Text> element.
  * Never use nested row-flexbox Boxes with fixed cell widths — Ink's flexbox
- * engine will word-wrap inside narrow cells and create the column-interleave
- * visual glitch that this component previously produced.
+ * engine will word-wrap inside narrow cells and create column-interleave
+ * visual glitches.
  *
- * Algorithm:
- *   1. Parse pipe-separated rows, strip separator rows (---|---)
- *   2. Compute per-column natural width (longest cell in column)
- *   3. Compute available width from useStdout().columns minus padding
- *   4. If natural widths fit: use them. Otherwise scale proportionally.
- *   5. If scaled widths would be below MIN_COLUMN_WIDTH: fall back to a
- *      vertical key-value format so the content is still readable.
- *   6. Render each row as one <Text> per line (no flexbox-row cells).
+ * Features:
+ *   - Unicode box drawing borders (┌─┬─┐ / ├─┼─┤ / └─┴─┘)
+ *   - Alignment parsed from the separator row (|:---|:--:|---:|)
+ *   - Headers centered, data cells left/center/right per column
+ *   - Vertical key-value fallback when the table is too wide
+ *   - Cached string width measurements
  */
 
-const MIN_COLUMN_WIDTH = 6;
+const MIN_COLUMN_WIDTH = 3;
 const SAFETY_MARGIN = 4;
 const LEFT_PADDING = 2;
-const BORDER_OVERHEAD_PER_COL = 3; // " | " between cells
+const BORDER_CHARS_PER_COL = 3; // "│ " + " " for padding inside each cell
 const MAX_ROW_LINES = 4;
+
+type CellAlign = "left" | "center" | "right";
+
+// Unicode box drawing characters
+const BOX = {
+  topLeft: "\u250C",
+  topMid: "\u252C",
+  topRight: "\u2510",
+  midLeft: "\u251C",
+  midMid: "\u253C",
+  midRight: "\u2524",
+  botLeft: "\u2514",
+  botMid: "\u2534",
+  botRight: "\u2518",
+  horiz: "\u2500",
+  vert: "\u2502",
+};
 
 interface Props {
   lines: string[];
 }
 
-function parseRows(lines: string[]): { rows: string[][]; headerIdx: number } {
+function parseRows(lines: string[]): {
+  rows: string[][];
+  headerIdx: number;
+  alignments: CellAlign[];
+} {
   const rows: string[][] = [];
   let headerIdx = -1;
+  let alignments: CellAlign[] = [];
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]!;
-    // Skip separator rows (---|---|---)
+    // Separator row — also carries alignment info via colons
     if (line.match(/^\s*\|?\s*[-:]+\s*(\|\s*[-:]+\s*)+\|?\s*$/)) {
       if (headerIdx < 0 && rows.length > 0) headerIdx = rows.length - 1;
+      // Parse alignment markers: :---  (left), :---: (center), ---: (right)
+      alignments = line
+        .split("|")
+        .map((c) => c.trim())
+        .filter((c) => c.length > 0)
+        .map((c): CellAlign => {
+          const left = c.startsWith(":");
+          const right = c.endsWith(":");
+          if (left && right) return "center";
+          if (right) return "right";
+          return "left";
+        });
       continue;
     }
     const cells = line
@@ -51,7 +83,20 @@ function parseRows(lines: string[]): { rows: string[][]; headerIdx: number } {
     }
   }
 
-  return { rows, headerIdx };
+  return { rows, headerIdx, alignments };
+}
+
+function padAligned(text: string, width: number, align: CellAlign): string {
+  const actualWidth = cachedStringWidth(text);
+  if (actualWidth >= width) return text;
+  const pad = width - actualWidth;
+  if (align === "right") return " ".repeat(pad) + text;
+  if (align === "center") {
+    const leftPad = Math.floor(pad / 2);
+    const rightPad = pad - leftPad;
+    return " ".repeat(leftPad) + text + " ".repeat(rightPad);
+  }
+  return text + " ".repeat(pad);
 }
 
 /** Split a string into lines of at most `width` characters, breaking on word
@@ -85,14 +130,18 @@ export function InlineTable({ lines }: Props) {
   const { stdout } = useStdout();
   const terminalWidth = stdout?.columns ?? 80;
 
-  // Parse + layout + pre-render ALL in one useMemo. Same `lines` array +
-  // same terminal width = same output, no re-measurement per frame.
   const rendered = useMemo(() => {
-    const { rows, headerIdx } = parseRows(lines);
+    const { rows, headerIdx, alignments } = parseRows(lines);
     if (rows.length === 0) return null;
 
-    // Compute natural column widths from content, using cached string width
     const colCount = Math.max(...rows.map((r) => r.length));
+    // Pad alignments to colCount with "left" defaults
+    const colAlign: CellAlign[] = [];
+    for (let c = 0; c < colCount; c++) {
+      colAlign.push(alignments[c] ?? "left");
+    }
+
+    // Compute natural column widths from content, using cached string width
     const naturalWidths: number[] = [];
     for (let c = 0; c < colCount; c++) {
       let maxLen = 0;
@@ -104,10 +153,12 @@ export function InlineTable({ lines }: Props) {
       naturalWidths.push(Math.max(maxLen, MIN_COLUMN_WIDTH));
     }
 
-    // Available width for actual cell contents, minus padding + separators
-    const separatorOverhead = (colCount - 1) * BORDER_OVERHEAD_PER_COL;
+    // Available width inside the table (inside the outer borders) minus
+    // the per-column padding + inner separators. Each column costs:
+    // "│ content " → 2 chars overhead. Plus 1 for the final "│".
+    const borderOverhead = colCount * 2 + 1;
     const availableWidth = Math.max(
-      terminalWidth - LEFT_PADDING - SAFETY_MARGIN - separatorOverhead,
+      terminalWidth - LEFT_PADDING - SAFETY_MARGIN - borderOverhead,
       colCount * MIN_COLUMN_WIDTH,
     );
 
@@ -143,8 +194,26 @@ export function InlineTable({ lines }: Props) {
       };
     }
 
-    // Pre-compute all table lines
-    const tableLines: Array<{ text: string; bold: boolean; dim: boolean }> = [];
+    // Border line builders
+    const buildBorder = (left: string, mid: string, right: string): string => {
+      let line = left;
+      for (let c = 0; c < colCount; c++) {
+        // +2 for the padding spaces on either side of content
+        line += BOX.horiz.repeat((finalWidths[c] ?? MIN_COLUMN_WIDTH) + 2);
+        line += c < colCount - 1 ? mid : right;
+      }
+      return line;
+    };
+
+    const topBorder = buildBorder(BOX.topLeft, BOX.topMid, BOX.topRight);
+    const headerBorder = buildBorder(BOX.midLeft, BOX.midMid, BOX.midRight);
+    const botBorder = buildBorder(BOX.botLeft, BOX.botMid, BOX.botRight);
+
+    // Pre-compute each row's visible line(s). When a cell wraps to multiple
+    // lines, emit that many sub-rows.
+    const tableLines: Array<{ text: string; bold: boolean }> = [];
+    tableLines.push({ text: topBorder, bold: false });
+
     for (let rowIdx = 0; rowIdx < rows.length; rowIdx++) {
       const row = rows[rowIdx]!;
       const isHeader = headerIdx >= 0 && rowIdx <= headerIdx;
@@ -154,18 +223,24 @@ export function InlineTable({ lines }: Props) {
       const maxRowLines = Math.max(...wrappedCells.map((w) => w.length), 1);
 
       for (let lineIdx = 0; lineIdx < maxRowLines; lineIdx++) {
-        const parts: string[] = [];
+        let rowText = BOX.vert;
         for (let c = 0; c < colCount; c++) {
           const cellLine = wrappedCells[c]?.[lineIdx] ?? "";
-          parts.push(padRight(cellLine, finalWidths[c] ?? MIN_COLUMN_WIDTH));
+          const width = finalWidths[c] ?? MIN_COLUMN_WIDTH;
+          // Headers always center, data rows use alignment from separator
+          const align: CellAlign = isHeader ? "center" : colAlign[c]!;
+          rowText += " " + padAligned(cellLine, width, align) + " " + BOX.vert;
         }
-        tableLines.push({
-          text: parts.join("  "),
-          bold: isHeader,
-          dim: isHeader,
-        });
+        tableLines.push({ text: rowText, bold: isHeader });
+      }
+
+      // Emit header border after the last header row
+      if (isHeader && rowIdx === headerIdx) {
+        tableLines.push({ text: headerBorder, bold: false });
       }
     }
+
+    tableLines.push({ text: botBorder, bold: false });
 
     return { mode: "table" as const, tableLines };
   }, [lines, terminalWidth]);
@@ -179,7 +254,7 @@ export function InlineTable({ lines }: Props) {
   return (
     <Box flexDirection="column" paddingLeft={LEFT_PADDING}>
       {rendered.tableLines.map((line, i) => (
-        <Text key={i} bold={line.bold} dimColor={line.dim}>
+        <Text key={i} bold={line.bold} dimColor={!line.bold}>
           {line.text}
         </Text>
       ))}

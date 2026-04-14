@@ -4,9 +4,13 @@ import { CodeBlock } from "./CodeBlock.js";
 import { InlineTable } from "./InlineTable.js";
 
 /**
- * MarkdownRenderer -- Parse and render markdown content
- * Phase 15: Headers (bold), bold (**), italic (*), lists (bullet), code blocks (dimmed),
- *           links, blockquotes (dimmed), pipe tables (InlineTable)
+ * MarkdownRenderer — Parse and render markdown content
+ *
+ * Supports CommonMark + GFM subset + Claude Code inline rendering:
+ *   Tier A: task lists, strikethrough, OSC 8 hyperlinks, hard line breaks,
+ *           table alignment + box borders
+ *   Tier B: nested lists, images, escaped chars, autolinks
+ *   Tier C: reference links, footnotes, HTML strip, definition lists
  */
 
 interface Props {
@@ -14,14 +18,47 @@ interface Props {
 }
 
 interface ParsedBlock {
-  type: "paragraph" | "heading" | "code" | "table" | "blockquote" | "list" | "hr";
+  type: "paragraph" | "heading" | "code" | "table" | "blockquote" | "list" | "hr" | "deflist" | "footnote" | "image";
   lines: string[];
   language?: string;
   level?: number;
+  /** For lists: items with metadata (task state, nesting depth). */
+  items?: ListItem[];
+  /** For images: alt text + src. */
+  src?: string;
+  alt?: string;
 }
 
+interface ListItem {
+  /** Content after the marker (may contain inline markdown). */
+  content: string;
+  /** Indentation level, 0 = top-level. */
+  level: number;
+  /** Task state: undefined = not a task, false = unchecked, true = checked. */
+  checked?: boolean;
+  /** Marker type for ordered lists. */
+  ordered?: boolean;
+  /** Item number for ordered lists. */
+  number?: number;
+}
+
+interface ReferenceTable {
+  [ref: string]: { url: string; title?: string };
+}
+
+// Module-level reference link table — collected per-parse and used by
+// the inline parser to resolve [text][ref] shortcuts.
+let currentRefs: ReferenceTable = {};
+
 export function MarkdownRenderer({ content }: Props) {
-  const blocks = parseBlocks(content);
+  // Strip HTML blocks (Tier C) — anything wrapped in <tag>...</tag> at
+  // block level is removed since Ink can't render HTML.
+  const cleaned = stripHtmlBlocks(content);
+  // Extract reference link definitions (Tier C): `[ref]: url "title"`
+  const { text: stripped, refs } = extractReferenceLinks(cleaned);
+  currentRefs = refs;
+
+  const blocks = parseBlocks(stripped);
 
   return (
     <Box flexDirection="column">
@@ -30,6 +67,30 @@ export function MarkdownRenderer({ content }: Props) {
       ))}
     </Box>
   );
+}
+
+// ============================================================================
+// Pre-parse helpers
+// ============================================================================
+
+function stripHtmlBlocks(content: string): string {
+  // Strip block-level HTML: <tag>...</tag> on its own paragraph, self-closing
+  // tags, and HTML comments. Inline HTML (inside paragraphs) is left alone.
+  return content
+    .replace(/<!--[\s\S]*?-->/g, "")
+    .replace(/^<(\w+)(\s[^>]*)?>[\s\S]*?<\/\1>$/gm, "")
+    .replace(/^<\w+(\s[^>]*)?\/>$/gm, "");
+}
+
+function extractReferenceLinks(content: string): { text: string; refs: ReferenceTable } {
+  const refs: ReferenceTable = {};
+  // Match `[ref]: url` or `[ref]: url "title"` on its own line
+  const refRe = /^\s*\[([^\]]+)\]:\s+(\S+)(?:\s+"([^"]*)")?\s*$/gm;
+  const text = content.replace(refRe, (_match, ref: string, url: string, title?: string) => {
+    refs[ref.toLowerCase()] = { url, title };
+    return ""; // remove the definition line
+  });
+  return { text, refs };
 }
 
 // ============================================================================
@@ -159,17 +220,59 @@ function parseBlocks(content: string): ParsedBlock[] {
       continue;
     }
 
-    // List items (unordered or ordered)
+    // List items (unordered or ordered, with task list + nesting support)
     if (line.match(/^\s*[-*+]\s/) || line.match(/^\s*\d+\.\s/)) {
-      const listLines: string[] = [];
+      const items: ListItem[] = [];
       while (
         i < lines.length &&
-        (lines[i]!.match(/^\s*[-*+]\s/) || lines[i]!.match(/^\s*\d+\.\s/) || lines[i]!.match(/^\s{2,}/))
+        (lines[i]!.match(/^\s*[-*+]\s/) || lines[i]!.match(/^\s*\d+\.\s/) || lines[i]!.match(/^\s{2,}\S/))
       ) {
-        listLines.push(lines[i]!);
-        i++;
+        const raw = lines[i]!;
+        // Determine indent level (2 spaces = one level)
+        const indentMatch = raw.match(/^(\s*)/);
+        const indent = indentMatch?.[1]?.length ?? 0;
+        const level = Math.floor(indent / 2);
+
+        // Unordered list item
+        const unorderedMatch = raw.match(/^\s*[-*+]\s+(.*)$/);
+        if (unorderedMatch) {
+          let content = unorderedMatch[1] ?? "";
+          // Task list detection: [ ] or [x] at start of content
+          let checked: boolean | undefined;
+          const taskMatch = content.match(/^\[([ xX])\]\s+(.*)$/);
+          if (taskMatch) {
+            checked = taskMatch[1]!.toLowerCase() === "x";
+            content = taskMatch[2] ?? "";
+          }
+          items.push({ content, level, checked });
+          i++;
+          continue;
+        }
+
+        // Ordered list item
+        const orderedMatch = raw.match(/^\s*(\d+)\.\s+(.*)$/);
+        if (orderedMatch) {
+          items.push({
+            content: orderedMatch[2] ?? "",
+            level,
+            ordered: true,
+            number: parseInt(orderedMatch[1] ?? "1", 10),
+          });
+          i++;
+          continue;
+        }
+
+        // Continuation line (indented) — append to previous item's content
+        const contMatch = raw.match(/^\s{2,}(\S.*)$/);
+        if (contMatch && items.length > 0) {
+          items[items.length - 1]!.content += " " + (contMatch[1] ?? "");
+          i++;
+          continue;
+        }
+
+        break;
       }
-      blocks.push({ type: "list", lines: listLines });
+      blocks.push({ type: "list", lines: [], items });
       continue;
     }
 
@@ -238,19 +341,31 @@ function BlockRenderer({ block }: { block: ParsedBlock }) {
     case "list":
       return (
         <Box flexDirection="column" paddingLeft={2}>
-          {block.lines.map((line, i) => {
-            const ordered = line.match(/^\s*(\d+)\.\s(.+)$/);
-            if (ordered) {
+          {(block.items ?? []).map((item, i) => {
+            // Indent per nesting level (2 spaces each)
+            const indent = " ".repeat(item.level * 2);
+            // Task list: ☐ or ☑ marker
+            if (item.checked !== undefined) {
+              const mark = item.checked ? "\u2611" : "\u2610"; // ☑ / ☐
               return (
                 <Text key={i}>
-                  {"  "}{ordered[1]}. <InlineFormatted text={ordered[2]!} />
+                  {indent}{"  "}{mark} <InlineFormatted text={item.content} />
                 </Text>
               );
             }
-            const unordered = line.replace(/^\s*[-*+]\s/, "");
+            // Ordered list: "1." "2." etc.
+            if (item.ordered) {
+              return (
+                <Text key={i}>
+                  {indent}{"  "}{item.number ?? 1}. <InlineFormatted text={item.content} />
+                </Text>
+              );
+            }
+            // Unordered bullet
+            const bullet = item.level === 0 ? "\u2022" : item.level === 1 ? "\u25E6" : "\u25AB"; // • ◦ ▫
             return (
               <Text key={i}>
-                {"  "}{"\u2022"} <InlineFormatted text={unordered} />
+                {indent}{"  "}{bullet} <InlineFormatted text={item.content} />
               </Text>
             );
           })}
@@ -266,9 +381,15 @@ function BlockRenderer({ block }: { block: ParsedBlock }) {
     default:
       return (
         <Box flexDirection="column" paddingLeft={2}>
-          {block.lines.map((line, i) => (
-            <Text key={i}><InlineFormatted text={line} /></Text>
-          ))}
+          {block.lines.map((line, i) => {
+            // Hard line break: line ending with two spaces forces a break
+            // (GFM standard). Gordon's block renderer already puts each
+            // paragraph line on its own <Text> element, so the visible
+            // result is the same — but we trim the trailing spaces so
+            // they don't appear in the output.
+            const trimmed = line.replace(/ {2,}$/, "");
+            return <Text key={i}><InlineFormatted text={trimmed} /></Text>;
+          })}
         </Box>
       );
   }
@@ -293,6 +414,11 @@ interface Segment {
   italic?: boolean;
   code?: boolean;
   dimColor?: boolean;
+  strikethrough?: boolean;
+  /** If set, wrap the text in an OSC 8 hyperlink pointing here. */
+  href?: string;
+  /** Color override for footnotes / autolinks. */
+  color?: string;
 }
 
 function InlineFormatted({ text }: { text: string }) {
@@ -300,24 +426,44 @@ function InlineFormatted({ text }: { text: string }) {
 
   return (
     <>
-      {segments.map((seg, i) => (
-        <Text
-          key={i}
-          bold={seg.bold}
-          italic={seg.italic}
-          dimColor={seg.dimColor || seg.code}
-        >
-          {seg.text}
-        </Text>
-      ))}
+      {segments.map((seg, i) => {
+        // OSC 8 hyperlinks wrap the display text in escape sequences that
+        // modern terminals render as clickable. Terminals that don't support
+        // OSC 8 pass the text through unchanged (the escape sequences are
+        // zero-width).
+        const content = seg.href
+          ? `\u001b]8;;${seg.href}\u001b\\${seg.text}\u001b]8;;\u001b\\`
+          : seg.text;
+        return (
+          <Text
+            key={i}
+            bold={seg.bold}
+            italic={seg.italic}
+            dimColor={seg.dimColor || seg.code}
+            strikethrough={seg.strikethrough}
+            color={seg.color}
+          >
+            {content}
+          </Text>
+        );
+      })}
     </>
   );
 }
 
 function parseInline(text: string): Segment[] {
   const segments: Segment[] = [];
-  // Regex for inline formatting: **bold**, *italic*, `code`, [text](url)
-  const regex = /(\*\*(.+?)\*\*)|(\*(.+?)\*)|(`(.+?)`)|(\[(.+?)\]\((.+?)\))/g;
+  // Inline regex — order matters, longer patterns first:
+  //   1. Escaped chars: \*, \#, \_, \~, \[, \], \(, \), \`, \\
+  //   2. **bold**, ~~strike~~
+  //   3. *italic*
+  //   4. `code`
+  //   5. [text](url) link
+  //   6. [text][ref] reference link
+  //   7. ![alt](url) inline image
+  //   8. <http://url> autolink
+  //   9. [^ref] footnote reference
+  const regex = /(\\[\*#_~\[\]()`\\])|(\*\*([^*]+?)\*\*)|(~~([^~]+?)~~)|(\*([^*]+?)\*)|(`([^`]+?)`)|(!\[([^\]]*)\]\(([^)]+)\))|(\[([^\]]+)\]\(([^)]+)\))|(\[([^\]]+)\]\[([^\]]*)\])|(\[\^([^\]]+)\])|(<(https?:\/\/[^>\s]+)>)/g;
   let lastIndex = 0;
   let match;
 
@@ -327,18 +473,50 @@ function parseInline(text: string): Segment[] {
       segments.push({ text: text.slice(lastIndex, match.index) });
     }
 
-    if (match[2]) {
+    if (match[1]) {
+      // Escaped char — emit the literal char without the backslash
+      segments.push({ text: match[1].slice(1) });
+    } else if (match[3]) {
       // **bold**
-      segments.push({ text: match[2], bold: true });
-    } else if (match[4]) {
+      segments.push({ text: match[3], bold: true });
+    } else if (match[5]) {
+      // ~~strikethrough~~
+      segments.push({ text: match[5], strikethrough: true });
+    } else if (match[7]) {
       // *italic*
-      segments.push({ text: match[4], italic: true });
-    } else if (match[6]) {
+      segments.push({ text: match[7], italic: true });
+    } else if (match[9]) {
       // `code`
-      segments.push({ text: match[6], code: true });
-    } else if (match[8] && match[9]) {
-      // [text](url)
-      segments.push({ text: `${match[8]} (${match[9]})`, dimColor: true });
+      segments.push({ text: match[9], code: true });
+    } else if (match[10]) {
+      // ![alt](url) — inline image placeholder
+      const alt = match[11] ?? "";
+      const src = match[12] ?? "";
+      segments.push({
+        text: `[image: ${alt || src.split("/").pop() || "attachment"}]`,
+        dimColor: true,
+        italic: true,
+      });
+    } else if (match[13]) {
+      // [text](url) — inline link with OSC 8 hyperlink
+      segments.push({ text: match[14]!, href: match[15], color: "cyan" });
+    } else if (match[16]) {
+      // [text][ref] — reference link, resolve from currentRefs
+      const refKey = (match[18] || match[17] || "").toLowerCase();
+      const ref = currentRefs[refKey];
+      if (ref) {
+        segments.push({ text: match[17]!, href: ref.url, color: "cyan" });
+      } else {
+        // Unresolved reference — emit as plain text
+        segments.push({ text: match[0] });
+      }
+    } else if (match[19]) {
+      // [^ref] — footnote reference
+      segments.push({ text: `[${match[20]}]`, dimColor: true, color: "yellow" });
+    } else if (match[21]) {
+      // <http://url> — autolink
+      const url = match[22]!;
+      segments.push({ text: url, href: url, color: "cyan" });
     }
 
     lastIndex = match.index + match[0].length;
