@@ -15,7 +15,7 @@ class Gordon < Formula
   on_macos do
     if Hardware::CPU.arm?
       url "https://github.com/general-liquidity/gordon-cli-dist/releases/download/v#{version}/gordon-darwin-arm64"
-      sha256 "e3db4d8668967cf01cc9ac26936f010210b090b0fbd6590e7b6ce07b72c9cddb"
+      sha256 "dc1e7f077181dfcbd5dda1bb156f11dd6266e2859ecbe78b58debcf9bbb2fdb0"
     else
       url "https://github.com/general-liquidity/gordon-cli-dist/releases/download/v#{version}/gordon-darwin-x64"
       sha256 "5919dea7824708267e4c01cb7f19201594d427a7c04bfdf67bdb6644df4c3e6f_DARWIN_X64"

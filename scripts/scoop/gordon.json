@@ -5,13 +5,13 @@
   "license": "MIT",
   "architecture": {
     "64bit": {
-      "url": "https://github.com/general-liquidity/gordon-cli-dist/releases/download/v0.9.0-friends.5/gordon-windows-x64.exe",
-      "hash": "7827a1a04223a2b6d10d2d926408b379950c33635ecbe862ae96ed6dd3fbae14",
+      "url": "https://github.com/general-liquidity/gordon-cli-dist/releases/download/v0.9.0-friends.7/gordon-windows-x64.exe",
+      "hash": "8cc476190e03463d1eafdcc4e909d8dcd27d20db95c585077ae80ecb8bafea3a",
       "pre_install": "Rename-Item -Path \"$dir\\gordon-windows-x64.exe\" -NewName \"gordon.exe\" -ErrorAction SilentlyContinue"
     },
     "arm64": {
-      "url": "https://github.com/general-liquidity/gordon-cli-dist/releases/download/v0.9.0-friends.5/gordon-windows-arm64.exe",
-      "hash": "7827a1a04223a2b6d10d2d926408b379950c33635ecbe862ae96ed6dd3fbae14",
+      "url": "https://github.com/general-liquidity/gordon-cli-dist/releases/download/v0.9.0-friends.7/gordon-windows-arm64.exe",
+      "hash": "8cc476190e03463d1eafdcc4e909d8dcd27d20db95c585077ae80ecb8bafea3a",
       "pre_install": "Rename-Item -Path \"$dir\\gordon-windows-arm64.exe\" -NewName \"gordon.exe\" -ErrorAction SilentlyContinue"
     }
   },
@@ -22,10 +22,10 @@
   "autoupdate": {
     "architecture": {
       "64bit": {
-        "url": "https://github.com/general-liquidity/gordon-cli-dist/releases/download/v0.9.0-friends.5/gordon-windows-x64.exe"
+        "url": "https://github.com/general-liquidity/gordon-cli-dist/releases/download/v0.9.0-friends.7/gordon-windows-x64.exe"
       },
       "arm64": {
-        "url": "https://github.com/general-liquidity/gordon-cli-dist/releases/download/v0.9.0-friends.5/gordon-windows-arm64.exe"
+        "url": "https://github.com/general-liquidity/gordon-cli-dist/releases/download/v0.9.0-friends.7/gordon-windows-arm64.exe"
       }
     }
   }
