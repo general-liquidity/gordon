@@ -9,7 +9,7 @@
 class Gordon < Formula
   desc "The Frontier Trading Agent - AI-powered crypto trading CLI"
   homepage "https://gordoncli.com"
-  version "0.9.0-friends.5"
+  version "0.9.0-friends.6"
   license "MIT"
 
   on_macos do
