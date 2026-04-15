@@ -14,7 +14,25 @@ import { VERSION, compareSemver } from "../cli.ts";
 const UPDATE_CHECK_FILE = path.join(GORDON_DIR, ".update-check");
 const CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
 const PACKAGE_NAME = "@general-liquidity/gordon-cli";
-const NPM_REGISTRY_URL = `https://registry.npmjs.org/${PACKAGE_NAME}/latest`;
+
+/**
+ * npm dist-tag this install is tracking. Mirrors the logic in release.yml:
+ *   v0.9.0-friends.5 → "friends"
+ *   v0.9.0-alpha.1   → "alpha"
+ *   v0.9.0-beta.2    → "beta"
+ *   v0.9.0-rc.1      → "rc"
+ *   v0.9.0           → "latest"
+ * Users stay on whatever channel they installed from, so a friends-channel
+ * install never gets silently moved to the stable channel and vice versa.
+ */
+function detectDistTag(version: string = VERSION): string {
+  const m = version.match(/-(friends|alpha|beta|rc)\./);
+  return m?.[1] ?? "latest";
+}
+
+function npmRegistryUrl(tag: string = detectDistTag()): string {
+  return `https://registry.npmjs.org/${PACKAGE_NAME}/${encodeURIComponent(tag)}`;
+}
 const PUBLIC_INSTALL_SH_URL = "https://raw.githubusercontent.com/general-liquidity/gordon-cli-dist/main/install.sh";
 const PUBLIC_INSTALL_PS1_URL = "https://raw.githubusercontent.com/general-liquidity/gordon-cli-dist/main/install.ps1";
 const NPM_WRAPPER_INSTALL_MANIFEST = "install.json";
@@ -95,7 +113,11 @@ async function fetchLatestVersion(timeoutMs: number = 1500): Promise<string | nu
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
-    const response = await fetch(NPM_REGISTRY_URL, {
+    // Query the dist-tag matching the CURRENT install's channel so friends
+    // installs check friends, alpha installs check alpha, etc. Without this
+    // fix every non-stable install would silently check the stable tag and
+    // never see channel-appropriate updates.
+    const response = await fetch(npmRegistryUrl(), {
       signal: controller.signal,
       headers: { Accept: "application/json" },
     });
@@ -251,19 +273,24 @@ export function detectInstallContext(options: {
 }
 
 export function getUpdateCommand(context: InstallContext): UpdateCommand | null {
+  // Preserve the dist-tag the user installed from. A friends-channel user
+  // running `gordon --upgrade` must stay on the friends channel — pulling
+  // @latest would cross-downgrade them to stable or error if no stable exists.
+  const tag = detectDistTag();
+  const pkgWithTag = `${PACKAGE_NAME}@${tag}`;
   switch (context.channel) {
     case "bun":
       return {
         command: "bun",
-        args: ["update", "-g", PACKAGE_NAME],
-        display: `bun update -g ${PACKAGE_NAME}`,
+        args: ["add", "-g", pkgWithTag],
+        display: `bun add -g ${pkgWithTag}`,
         publicDisplay: "gordon --upgrade",
       };
     case "npm":
       return {
         command: "npm",
-        args: ["install", "-g", `${PACKAGE_NAME}@latest`],
-        display: `npm install -g ${PACKAGE_NAME}@latest`,
+        args: ["install", "-g", pkgWithTag],
+        display: `npm install -g ${pkgWithTag}`,
         publicDisplay: "gordon --upgrade",
       };
     case "homebrew":
@@ -281,7 +308,7 @@ export function getUpdateCommand(context: InstallContext): UpdateCommand | null 
         publicDisplay: "gordon --upgrade",
       };
     case "npx": {
-      const args = ["--yes", `${PACKAGE_NAME}@latest`, "install"];
+      const args = ["--yes", pkgWithTag, "install"];
       if (context.installDir) {
         args.push("--target-dir", context.installDir);
       }
@@ -289,8 +316,8 @@ export function getUpdateCommand(context: InstallContext): UpdateCommand | null 
         command: "npx",
         args,
         display: context.installDir
-          ? `npx --yes ${PACKAGE_NAME}@latest install --target-dir "${context.installDir}"`
-          : `npx --yes ${PACKAGE_NAME}@latest install`,
+          ? `npx --yes ${pkgWithTag} install --target-dir "${context.installDir}"`
+          : `npx --yes ${pkgWithTag} install`,
         publicDisplay: "gordon --upgrade",
       };
     }

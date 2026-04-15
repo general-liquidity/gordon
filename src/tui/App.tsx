@@ -24,11 +24,14 @@ import { WorkerBadge } from "./components/WorkerBadge.js";
 import { InlineHelp } from "./components/InlineHelp.js";
 import { CommandPalette, type PaletteItem } from "./components/CommandPalette.js";
 import { BootScreen } from "./components/BootScreen.js";
-import { SetupWizard } from "./components/SetupWizard.js";
+import { SetupWizard, type SetupPreflight } from "./components/SetupWizard.js";
 import { PrivacyConsent, type PrivacyChoices } from "./components/PrivacyConsent.js";
 import { HandoffArrow } from "./components/HandoffArrow.js";
 import { PromptInput } from "./components/PromptInput.js";
 import { defaultMessageQueue } from "../infra/runtime/messageQueue.js";
+import { saveEnvKeys } from "../infra/storage/env.js";
+import { providerRegistry } from "../infra/runtime/providers/registry.js";
+import { loadConfig, saveConfig } from "../infra/storage/config.js";
 import { VirtualMessageList } from "./components/VirtualMessageList.js";
 import { CostDisplay } from "./components/CostDisplay.js";
 import { updateTerminalTab, resetTerminalTab } from "./terminalTab.js";
@@ -190,6 +193,11 @@ function AppInner() {
   const bootPhase = useAppState((s) => s.bootPhase);
   const runtimeReady = useAppState((s) => s.runtimeReady);
   const showSetup = useAppState((s) => s.showSetup);
+  const [setupPreflight, setSetupPreflight] = useState<SetupPreflight>({
+    llmProviders: [],
+    exchanges: [],
+    brokers: [],
+  });
 
   // ── First-run privacy consent gate ──
   // Shows the PrivacyConsent component if no choice has been recorded yet.
@@ -470,6 +478,46 @@ function AppInner() {
     initializeRuntime(stateUpdater)
       .then(() => {
         dispatch({ type: "SET_RUNTIME_READY", ready: true });
+        // First-run provider gate: if no LLM provider is configured, force
+        // the setup wizard open before the user can type into the chat.
+        // This replaces the silent fallthrough that used to hit the LLM
+        // layer and produce a cryptic "Provider 'openai' not configured"
+        // error on every message.
+        try {
+          const directProviders = providerRegistry.getAvailableProviders();
+          const hasDedalus = providerRegistry.hasDedalus();
+          // Pre-populate preflight with everything already configured.
+          // This lets the wizard skip steps on returning users.
+          void (async () => {
+            try {
+              const config = await loadConfig();
+              const pre: SetupPreflight = {
+                llmProviders: hasDedalus ? [...directProviders, "dedalus"] : [...directProviders],
+                exchanges: config.exchanges.map((e) => e.type),
+                brokers: config.brokers.map((b) => b.type),
+                permissionMode: config.permissionMode,
+              };
+              setSetupPreflight(pre);
+            } catch {
+              // Keep defaults if config fails to load.
+            }
+          })();
+          if (directProviders.length === 0 && !hasDedalus) {
+            dispatch({ type: "SET_SHOW_SETUP", show: true });
+            dispatch({
+              type: "ADD_MESSAGE",
+              message: {
+                id: "first-run-setup",
+                role: "system" as const,
+                content: "No LLM provider configured. Launching setup wizard — add an API key to continue.",
+                timestamp: new Date().toISOString(),
+              },
+            });
+          }
+        } catch {
+          // Non-critical — fall through to normal TUI. User will hit the
+          // existing error path if something else is broken.
+        }
       })
       .catch((err) => {
         dispatch({ type: "SET_RUNTIME_READY", ready: true });
@@ -1009,17 +1057,189 @@ function AppInner() {
   if (showSetup) {
     return (
       <SetupWizard
-        onComplete={() => {
-          dispatch({ type: "SET_SHOW_SETUP", show: false });
-          dispatch({
-            type: "ADD_MESSAGE",
-            message: {
-              id: `setup-${Date.now()}`,
-              role: "system",
-              content: "Setup complete. Try /scan to see what's moving.",
-              timestamp: new Date().toISOString(),
-            },
-          });
+        preflight={setupPreflight}
+        onComplete={(data) => {
+          // Persist everything the wizard collected: LLM key → ~/.gordon/.env,
+          // exchange/broker → config.json + ~/.gordon/.env env vars.
+          void (async () => {
+            const summary: string[] = [];
+            const errors: string[] = [];
+
+            // ── 1. LLM provider key ───────────────────────────────────────
+            const provider = data.llmProvider;
+            const llmKey = data.llmKey?.trim();
+            if (provider && llmKey) {
+              const envVarByProvider: Record<string, string> = {
+                openai: "OPENAI_API_KEY",
+                anthropic: "ANTHROPIC_API_KEY",
+                google: "GOOGLE_API_KEY",
+                inception: "INCEPTION_API_KEY",
+                dedalus: "DEDALUS_API_KEY",
+                groq: "GROQ_API_KEY",
+              };
+              const envVar = envVarByProvider[provider];
+              if (envVar) {
+                try {
+                  await saveEnvKeys({ [envVar]: llmKey } as Record<string, string>);
+                  process.env[envVar] = llmKey;
+                  providerRegistry.reset();
+                  summary.push(`${provider} key saved`);
+                } catch (err) {
+                  errors.push(`LLM key save failed: ${err instanceof Error ? err.message : String(err)}`);
+                }
+              }
+            }
+
+            // ── 2. Exchange + credentials ────────────────────────────────
+            const exchangeType = data.exchange;
+            const exchangeConflict = data.exchangeConflictAction;
+            if (
+              exchangeType &&
+              exchangeType !== "skip" &&
+              exchangeConflict !== "skip"
+            ) {
+              try {
+                const config = await loadConfig();
+                const apiKey = data.exchangeApiKey?.trim() ?? "";
+                const apiSecret = data.exchangeApiSecret?.trim() ?? "";
+                const passphrase = data.exchangePassphrase?.trim();
+                const walletKey = data.exchangeWalletKey?.trim();
+                const isWalletBased = exchangeType === "hyperliquid" || exchangeType === "uniswap";
+
+                // Conflict resolution: update existing entry in place when
+                // the user asked to update, rather than creating a duplicate.
+                const existing = config.exchanges.find((e) => e.type === exchangeType);
+                let exchangeId: string;
+                if (existing && exchangeConflict === "update") {
+                  existing.apiKey = isWalletBased ? "" : apiKey;
+                  existing.apiSecret = isWalletBased ? "" : apiSecret;
+                  if (passphrase) existing.passphrase = passphrase;
+                  if (walletKey) existing.walletPrivateKey = walletKey;
+                  exchangeId = existing.id;
+                  summary.push(`${exchangeType} credentials updated`);
+                } else {
+                  // Fresh add OR user chose "add as second account"
+                  exchangeId = exchangeType;
+                  let counter = 1;
+                  while (config.exchanges.some((e) => e.id === exchangeId)) {
+                    exchangeId = `${exchangeType}_${counter++}`;
+                  }
+                  config.exchanges.push({
+                    id: exchangeId,
+                    type: exchangeType as "binance" | "binance_us" | "coinbase" | "kraken" | "bitfinex" | "hyperliquid" | "uniswap" | "robinhood" | "okx" | "gemini",
+                    apiKey: isWalletBased ? "" : apiKey,
+                    apiSecret: isWalletBased ? "" : apiSecret,
+                    isDefault: config.exchanges.length === 0,
+                    ...(passphrase ? { passphrase } : {}),
+                    ...(walletKey ? { walletPrivateKey: walletKey } : {}),
+                  });
+                  summary.push(`${exchangeType} connected`);
+                }
+                if (!config.activeExchangeId) config.activeExchangeId = exchangeId;
+                await saveConfig(config);
+
+                // Also write the credentials to ~/.gordon/.env so the
+                // exchange client factories can restore them from env.
+                const envUpdates: Record<string, string> = {};
+                const upperType = exchangeType.toUpperCase();
+                if (!isWalletBased) {
+                  envUpdates[`${upperType}_API_KEY`] = apiKey;
+                  envUpdates[`${upperType}_API_SECRET`] = apiSecret;
+                }
+                if (passphrase) envUpdates[`${upperType}_PASSPHRASE`] = passphrase;
+                if (walletKey) envUpdates[`${upperType}_PRIVATE_KEY`] = walletKey;
+                if (Object.keys(envUpdates).length > 0) {
+                  await saveEnvKeys(envUpdates as Record<string, string>);
+                  for (const [k, v] of Object.entries(envUpdates)) process.env[k] = v;
+                }
+                // Summary already pushed inside the update/add branches above.
+              } catch (err) {
+                errors.push(`exchange save failed: ${err instanceof Error ? err.message : String(err)}`);
+              }
+            }
+
+            // ── 3. Broker + credentials ──────────────────────────────────
+            const brokerType = data.broker;
+            const brokerConflict = data.brokerConflictAction;
+            if (
+              brokerType &&
+              brokerType !== "skip" &&
+              brokerConflict !== "skip"
+            ) {
+              try {
+                const config = await loadConfig();
+                const apiKey = data.brokerApiKey?.trim() ?? "";
+                const apiSecret = data.brokerApiSecret?.trim() ?? "";
+                const paper = data.brokerPaper !== "live";
+
+                const existing = config.brokers.find((b) => b.type === brokerType);
+                let brokerId: string;
+                if (existing && brokerConflict === "update") {
+                  existing.apiKey = apiKey;
+                  existing.apiSecret = apiSecret;
+                  existing.paper = paper;
+                  brokerId = existing.id;
+                  summary.push(`${brokerType} credentials updated (${paper ? "paper" : "live"})`);
+                } else {
+                  brokerId = brokerType;
+                  let counter = 1;
+                  while (config.brokers.some((b) => b.id === brokerId)) {
+                    brokerId = `${brokerType}_${counter++}`;
+                  }
+                  config.brokers.push({
+                    id: brokerId,
+                    type: brokerType as "alpaca" | "webull" | "schwab" | "tradier" | "tradestation" | "tastytrade" | "trading212" | "etrade" | "ibkr",
+                    apiKey,
+                    apiSecret,
+                    isDefault: config.brokers.length === 0,
+                    paper,
+                  });
+                  summary.push(`${brokerType} connected (${paper ? "paper" : "live"})`);
+                }
+                if (!config.activeBrokerId) config.activeBrokerId = brokerId;
+                await saveConfig(config);
+
+                const upperType = brokerType.toUpperCase();
+                await saveEnvKeys({
+                  [`${upperType}_API_KEY`]: apiKey,
+                  [`${upperType}_API_SECRET`]: apiSecret,
+                  [`${upperType}_PAPER`]: paper ? "true" : "false",
+                } as Record<string, string>);
+                process.env[`${upperType}_API_KEY`] = apiKey;
+                process.env[`${upperType}_API_SECRET`] = apiSecret;
+                process.env[`${upperType}_PAPER`] = paper ? "true" : "false";
+              } catch (err) {
+                errors.push(`broker save failed: ${err instanceof Error ? err.message : String(err)}`);
+              }
+            }
+
+            // ── 4. Permission mode ───────────────────────────────────────
+            if (data.permissionMode) {
+              try {
+                const config = await loadConfig();
+                config.permissionMode = data.permissionMode as "auto" | "ask" | "strict";
+                await saveConfig(config);
+                summary.push(`permissionMode=${data.permissionMode}`);
+              } catch {
+                // non-critical
+              }
+            }
+
+            dispatch({ type: "SET_SHOW_SETUP", show: false });
+            const content =
+              errors.length > 0
+                ? `Setup finished with issues:\n  ${errors.join("\n  ")}\n\nSaved: ${summary.join(", ") || "nothing"}`
+                : `Setup complete — ${summary.join(", ") || "no changes"}. Try /scan to see what's moving.`;
+            dispatch({
+              type: "ADD_MESSAGE",
+              message: {
+                id: `setup-${Date.now()}`,
+                role: "system",
+                content,
+                timestamp: new Date().toISOString(),
+              },
+            });
+          })();
         }}
         onSkip={() => dispatch({ type: "SET_SHOW_SETUP", show: false })}
       />
