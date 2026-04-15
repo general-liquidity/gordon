@@ -237,6 +237,18 @@ jobs:
             --dir dist-assets \
             --pattern "gordon-*"
 
+      - name: Resolve source branch
+        run: |
+          SOURCE_BRANCH=$(git branch -r --contains "${GITHUB_SHA}" | grep -v HEAD | sed 's|origin/||' | grep '^v' | head -1 | xargs)
+          if [ -z "${SOURCE_BRANCH}" ]; then
+            SOURCE_BRANCH=$(git branch -r --contains "${GITHUB_SHA}" | grep -v HEAD | sed 's|origin/||' | head -1 | xargs)
+          fi
+          if [ -z "${SOURCE_BRANCH}" ]; then
+            SOURCE_BRANCH="main"
+          fi
+          echo "SOURCE_BRANCH=${SOURCE_BRANCH}" >> "$GITHUB_ENV"
+          git checkout "${SOURCE_BRANCH}"
+
       - name: Compute hashes and update manifests
         run: |
           VERSION_NUMBER="${VERSION#v}"
@@ -268,18 +280,6 @@ jobs:
         env:
           GORDON_NPM_VERSION: ${{ github.ref_name }}
         run: npm run prepare:npm-wrapper
-
-      - name: Resolve source branch
-        run: |
-          SOURCE_BRANCH=$(git branch -r --contains "${GITHUB_SHA}" | grep -v HEAD | sed 's|origin/||' | grep '^v' | head -1 | xargs)
-          if [ -z "${SOURCE_BRANCH}" ]; then
-            SOURCE_BRANCH=$(git branch -r --contains "${GITHUB_SHA}" | grep -v HEAD | sed 's|origin/||' | head -1 | xargs)
-          fi
-          if [ -z "${SOURCE_BRANCH}" ]; then
-            SOURCE_BRANCH="main"
-          fi
-          echo "SOURCE_BRANCH=${SOURCE_BRANCH}" >> "$GITHUB_ENV"
-          git checkout "${SOURCE_BRANCH}"
 
       - name: Commit source manifest updates
         run: |
