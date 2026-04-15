@@ -24,6 +24,13 @@ import {
   type SlashCommand,
 } from "../../app/slashCommands.ts";
 import { loadConfig, saveConfig } from "../../infra/storage/config.ts";
+import { loadEnvFile } from "../../infra/storage/env.ts";
+import { GatewayContextResolver } from "../../gateway/runtime/context.ts";
+import {
+  registerContextInvalidator,
+  refreshRuntimeCredentials,
+} from "../../infra/runtime/credentialRefresh.ts";
+export { refreshRuntimeCredentials } from "../../infra/runtime/credentialRefresh.ts";
 import { collectDoctorReport, formatDoctorReport } from "../../app/setup-runtime.ts";
 import type { Message } from "../components/MessageBubble.js";
 import type { ProgressNode } from "../components/AgentProgress.js";
@@ -50,6 +57,26 @@ import { routeToolCommand } from "./toolHandlers.js";
 
 let runtimeFactory: SessionRuntimeFactory | null = null;
 let activeRuntime: SessionRuntime | null = null;
+/**
+ * Shared context resolver — builds exchange, broker, binance, LLM, rails,
+ * and portfolio clients from config + env. Used by every GordonContext
+ * request in the TUI path so tools see the same live clients the daemon
+ * would. Previously the TUI returned a stub context with no exchange,
+ * which broke every venue-dependent tool ("Binance connected: no" even
+ * with valid keys).
+ *
+ * invalidate() is exported separately so exchange/broker commands and the
+ * setup wizard can force a fresh resolve after mutating config.
+ */
+const tuiContextResolver = new GatewayContextResolver();
+
+// Register this resolver's invalidator so refreshRuntimeCredentials (which
+// lives in infra/runtime to avoid a TUI ↔ app circular import) can fire it.
+registerContextInvalidator(() => tuiContextResolver.invalidate());
+
+export function invalidateTuiContext(): void {
+  tuiContextResolver.invalidate();
+}
 
 export type StateUpdater = (fn: (prev: any) => any) => void;
 
@@ -58,15 +85,30 @@ export type StateUpdater = (fn: (prev: any) => any) => void;
 // ============================================================================
 
 export async function initializeRuntime(setState: StateUpdater): Promise<SessionRuntime> {
+  // Load ~/.gordon/.env into process.env BEFORE anything reads provider state.
+  // Without this, providerRegistry.getAvailableProviders() sees empty env on
+  // every restart and the first-run setup wizard re-opens even though the
+  // user already saved their keys. The GatewayContextResolver also calls
+  // loadEnvFile() lazily, but the TUI's first-run gate runs before any
+  // resolve() call, so we must prime process.env here.
+  try {
+    await loadEnvFile();
+  } catch {
+    // Non-fatal — the wizard will still open on genuinely empty installs.
+  }
+
   const config = await loadConfig();
 
   runtimeFactory = new SessionRuntimeFactory({
     resolveContext: (async (options: { session: { threadId: string; resourceId: string } }) => {
-      const cfg = await loadConfig();
+      // Use the shared GatewayContextResolver so the TUI gets the same
+      // live exchange / broker / binance / LLM / rails clients the daemon
+      // path does. Without this, context.exchange is always undefined and
+      // every venue-dependent tool silently returns "not connected".
+      const base = await tuiContextResolver.resolve(options.session.threadId ?? "tui");
       return {
+        ...base,
         userId: "tui-user",
-        config: cfg,
-        runtime: undefined as never,
         threadId: options.session.threadId,
         resourceId: options.session.resourceId,
       };

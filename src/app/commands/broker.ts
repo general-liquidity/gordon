@@ -15,6 +15,7 @@ import { BrokerFactory } from "../../infra/broker/factory.ts";
 import { resolveBrokerCredentials, type BrokerId } from "../../infra/broker/types.ts";
 import type { GordonConfig, MultiBrokerConfig } from "../../types/index.ts";
 import { createModuleLogger } from "../../infra/logger/index.ts";
+import { refreshRuntimeCredentials } from "../../infra/runtime/credentialRefresh.ts";
 
 const logger = createModuleLogger("broker-commands");
 
@@ -134,7 +135,7 @@ export async function brokerSwitch(brokerId: string): Promise<BrokerCommandResul
       })),
     };
     await saveConfig(updatedConfig);
-    BrokerFactory.clearCache();
+    await refreshRuntimeCredentials();
 
     logger.info("Switched active broker", { brokerId, type: broker.type, paper: broker.paper ?? true });
 
@@ -190,6 +191,7 @@ export async function brokerRemove(brokerId: string): Promise<BrokerCommandResul
 
     const creds = resolveBrokerCredentials(broker);
     BrokerFactory.removeFromCache(broker.type, creds);
+    await refreshRuntimeCredentials();
 
     logger.info("Removed broker", { brokerId, type: broker.type });
 

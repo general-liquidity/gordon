@@ -17,6 +17,7 @@ import {
   getOAuthVenueConfig,
   type OAuthVenueId,
 } from "../../infra/auth/index.ts";
+import { refreshRuntimeCredentials } from "../../infra/runtime/credentialRefresh.ts";
 
 export interface OAuthCommandResult {
   success: boolean;
@@ -115,6 +116,11 @@ export async function oauthConnect(args: OAuthConnectArgs): Promise<OAuthCommand
       onAuthUrl: args.onAuthUrl,
     });
 
+    // Invalidate venue factory caches so the next broker/exchange call
+    // picks up the fresh OAuth bearer token instead of reusing a stale
+    // adapter built from earlier API keys.
+    await refreshRuntimeCredentials();
+
     const expiresInMin = Math.floor((result.expiresAt - Date.now()) / 60000);
     return {
       success: true,
@@ -185,6 +191,8 @@ export async function oauthPasteToken(args: {
     { useKeyring: args.useKeyring ?? true },
   );
 
+  await refreshRuntimeCredentials();
+
   const expiresInMin = Math.floor(expiresInSec / 60);
   const canRefresh = !!(args.refreshToken && (args.clientSecret || !cfg.clientAuthMethod));
   return {
@@ -199,6 +207,9 @@ export async function oauthRemove(venue: string, clientId: string): Promise<OAut
     return { success: false, message: `Unknown OAuth venue: ${venue}` };
   }
   const removed = await removeOAuthEntry(venue as OAuthVenueId, clientId);
+  if (removed) {
+    await refreshRuntimeCredentials();
+  }
   return {
     success: removed,
     message: removed

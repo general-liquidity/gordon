@@ -16,6 +16,7 @@ import { ExchangeFactory } from '../../infra/exchange/factory.ts';
 import type { ExchangeId, Exchange } from '../../infra/exchange/types.ts';
 import type { MultiExchangeConfig, GordonConfig } from '../../types/index.ts';
 import { createModuleLogger } from '../../infra/logger/index.ts';
+import { refreshRuntimeCredentials } from '../../infra/runtime/credentialRefresh.ts';
 
 const logger = createModuleLogger('exchange-commands');
 
@@ -193,8 +194,10 @@ export async function exchangeSwitch(exchangeId: string): Promise<ExchangeComman
 
     await saveConfig(updatedConfig);
 
-    // Clear the exchange factory cache to force reconnection
-    ExchangeFactory.clearCache();
+    // Force every cached client/context to rebuild against the new active
+    // exchange — clears ExchangeFactory, BrokerFactory, providerRegistry, and
+    // the TUI's GatewayContextResolver in one call.
+    await refreshRuntimeCredentials();
 
     logger.info('Switched active exchange', { exchangeId, type: exchange.type });
 
@@ -265,12 +268,14 @@ export async function exchangeRemove(exchangeId: string): Promise<ExchangeComman
 
     await saveConfig(updatedConfig);
 
-    // Clear from factory cache
+    // Clear the specific cached adapter for the removed exchange, then run
+    // a full credential refresh so every other client/context rebuilds too.
     ExchangeFactory.removeFromCache(exchange.type, {
       apiKey: exchange.apiKey,
       apiSecret: exchange.apiSecret,
       walletPrivateKey: exchange.walletPrivateKey,
     });
+    await refreshRuntimeCredentials();
 
     logger.info('Removed exchange', { exchangeId, type: exchange.type });
 

@@ -12,6 +12,7 @@ import {
 import { credentialManager } from '../../infra/ai/mcp/credentials';
 import type { MCPCategory, MCPToolDefinition } from '../../infra/ai/mcp/types';
 import { getBuiltInAgentRailListings } from '../../infra/runtime/rails/index.ts';
+import { refreshRuntimeCredentials } from '../../infra/runtime/credentialRefresh.ts';
 
 // ============================================================================
 // Showcase Data
@@ -332,6 +333,10 @@ export async function mcpInstall(pluginId: string): Promise<MCPCommandResult> {
     // Install the plugin
     const installed = await pluginInstaller.install(listing);
 
+    // Reload MCP tools so the newly installed plugin is picked up by the
+    // running runtime without a restart.
+    await refreshRuntimeCredentials({ reloadMcp: true });
+
     // Check if credentials are needed
     const needsCredentials =
       listing.manifest.authentication.type !== 'none' &&
@@ -382,6 +387,8 @@ export async function mcpUninstall(pluginId: string): Promise<MCPCommandResult> 
 
     // Also remove any stored credentials
     credentialManager.delete(pluginId);
+
+    await refreshRuntimeCredentials({ reloadMcp: true });
 
     return {
       success: true,
@@ -486,6 +493,7 @@ export async function mcpEnable(pluginId: string): Promise<MCPCommandResult> {
     }
 
     await pluginInstaller.enable(pluginId);
+    await refreshRuntimeCredentials({ reloadMcp: true });
 
     return {
       success: true,
@@ -521,6 +529,7 @@ export async function mcpDisable(pluginId: string): Promise<MCPCommandResult> {
     }
 
     await pluginInstaller.disable(pluginId);
+    await refreshRuntimeCredentials({ reloadMcp: true });
 
     return {
       success: true,

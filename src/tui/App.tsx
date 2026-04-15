@@ -32,6 +32,7 @@ import { defaultMessageQueue } from "../infra/runtime/messageQueue.js";
 import { saveEnvKeys } from "../infra/storage/env.js";
 import { providerRegistry } from "../infra/runtime/providers/registry.js";
 import { loadConfig, saveConfig } from "../infra/storage/config.js";
+import { refreshRuntimeCredentials } from "./bridge/runtime.js";
 import { VirtualMessageList } from "./components/VirtualMessageList.js";
 import { CostDisplay } from "./components/CostDisplay.js";
 import { updateTerminalTab, resetTerminalTab } from "./terminalTab.js";
@@ -1224,6 +1225,11 @@ function AppInner() {
                 // non-critical
               }
             }
+
+            // Force the runtime to re-resolve context on the next tool call
+            // so the newly saved exchange / broker / LLM actually get used
+            // without requiring a Gordon restart.
+            await refreshRuntimeCredentials();
 
             dispatch({ type: "SET_SHOW_SETUP", show: false });
             const content =
