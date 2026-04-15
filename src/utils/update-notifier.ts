@@ -25,7 +25,7 @@ const PACKAGE_NAME = "@general-liquidity/gordon-cli";
  * Users stay on whatever channel they installed from, so a friends-channel
  * install never gets silently moved to the stable channel and vice versa.
  */
-function detectDistTag(version: string = VERSION): string {
+export function detectDistTag(version: string = VERSION): string {
   const m = version.match(/-(friends|alpha|beta|rc)\./);
   return m?.[1] ?? "latest";
 }

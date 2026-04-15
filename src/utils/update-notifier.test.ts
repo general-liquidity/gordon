@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
-import { detectInstallContext, formatUpdatePromptLines, getUpdateCommand } from "./update-notifier.ts";
+import { detectDistTag, detectInstallContext, formatUpdatePromptLines, getUpdateCommand } from "./update-notifier.ts";
 
 const tempDirectories: string[] = [];
 
@@ -99,17 +99,21 @@ describe("install channel detection", () => {
 });
 
 describe("update command selection", () => {
-  it("uses the self-install path for npx-installed binaries", () => {
+  it("uses the self-install path for npx-installed binaries with the current channel's dist-tag", () => {
     const command = getUpdateCommand({
       channel: "npx",
       installDir: "/home/george/.local/bin",
     });
 
+    // The tag matches whatever channel this build was published to
+    // (friends / alpha / beta / rc / latest). Test stays correct across
+    // channels instead of being hardcoded to @latest.
+    const expectedTag = detectDistTag();
     expect(command).not.toBeNull();
     expect(command?.command).toBe("npx");
     expect(command?.args).toEqual([
       "--yes",
-      "@general-liquidity/gordon-cli@latest",
+      `@general-liquidity/gordon-cli@${expectedTag}`,
       "install",
       "--target-dir",
       "/home/george/.local/bin",
@@ -122,5 +126,14 @@ describe("update command selection", () => {
     expect(command).not.toBeNull();
     expect(command?.command).toBe("brew");
     expect(command?.args).toEqual(["upgrade", "general-liquidity/gordon-cli-dist/gordon"]);
+  });
+
+  it("detects the dist-tag from the version string", () => {
+    expect(detectDistTag("0.9.0")).toBe("latest");
+    expect(detectDistTag("0.9.0-friends.5")).toBe("friends");
+    expect(detectDistTag("0.9.0-friends.12")).toBe("friends");
+    expect(detectDistTag("0.9.0-alpha.1")).toBe("alpha");
+    expect(detectDistTag("0.9.0-beta.3")).toBe("beta");
+    expect(detectDistTag("0.9.0-rc.1")).toBe("rc");
   });
 });
