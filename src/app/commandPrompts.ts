@@ -80,6 +80,13 @@ export function commandToPrompt(command: SlashCommand, args: string): string {
       return "Set permissionMode to 'ask' — each trade requires user approval via ApprovalDialog";
     case "strict":
       return "Set permissionMode to 'strict' — read-only mode, all trades blocked";
+    case "venue":
+    case "exchange":
+    case "switch-venue":
+    case "switch-exchange":
+      return args?.trim()
+        ? `Switch the active exchange to '${args.trim()}'. Confirm the switch and show the new active venue details.`
+        : "List all configured exchanges and show which one is currently active.";
     case "paper":
       return "Set permissionMode to 'paper' — switch to paper trading mode. Real orders blocked; venue adapters switched to sandbox/testnet endpoints so strategies run end-to-end without touching real capital";
     case "live":

@@ -376,6 +376,17 @@ const LEGACY_SLASH_COMMANDS: SlashCommandSeed[] = [
   },
 
   // New Trading Commands
+  {
+    name: "venue",
+    aliases: ["exchange", "switch-venue", "switch-exchange"],
+    description: "Switch active venue or list configured exchanges",
+    usage: "/venue [exchange-id]",
+    category: "trading",
+    level: 1,
+    action: "tool",
+    target: "switch_exchange",
+    whenToUse: "Change which exchange Gordon is connected to (e.g. /venue coinbase-sandbox)",
+  },
   { name: "cancel", aliases: [], description: "Cancel open orders by ID or symbol", usage: "/cancel <symbol|orderId>", category: "trading", level: 1, action: "tool", target: "cancel_order", whenToUse: "Cancel pending orders" },
   { name: "close", aliases: [], description: "Close an open position", usage: "/close <symbol> [market|limit <price>]", category: "trading", level: 1, action: "tool", target: "close_position", whenToUse: "Close a position at market or limit price" },
   { name: "stop-loss", aliases: ["sl"], description: "Set stop-loss on a position", usage: "/stop-loss <symbol> <price>", category: "trading", level: 2, action: "tool", target: "set_stop_loss", whenToUse: "Protect position with stop-loss" },

@@ -15,7 +15,9 @@ import { z } from "zod";
 
 import { getGordonContext, type MastraExecutionContext } from "./types.ts";
 import { providerRegistry, getDedalusModels, refreshDedalusModels, getActiveRoute, DIRECT_MODELS, type DirectProviderName } from "../../runtime/providers/registry.ts";
-import { loadConfig } from "../../storage/config.ts";
+import { loadConfig, loadConfigBundle, saveResolvedConfig } from "../../storage/config.ts";
+import { ExchangeFactory } from "../../exchange/index.ts";
+import { BrokerFactory } from "../../broker/factory.ts";
 import { getToolCacheStats, clearToolCache, pruneToolCache } from "./cache.ts";
 import {
   getAgentHealthReport,
@@ -425,9 +427,91 @@ export const getAgentHealthTool = createTool({
  * System tools exported as an object for Mastra Agent
  * This is the format expected by Mastra's Agent class
  */
+// ============================================================================
+// Switch Exchange Tool
+// ============================================================================
+
+export const switchExchangeTool = createTool({
+  id: "switch_exchange",
+  description:
+    "Switch the active exchange/venue to any configured account. " +
+    "Lists available exchanges when called with no ID. " +
+    "Use when user says 'switch to Coinbase', 'use Binance testnet', 'change venue', 'switch exchange'.",
+  inputSchema: z.object({
+    exchangeId: z
+      .string()
+      .optional()
+      .describe("Exchange config ID to switch to (e.g. 'binance-live', 'coinbase-sandbox'). Omit to list available exchanges."),
+  }),
+  outputSchema: z.object({
+    success: z.boolean().optional(),
+    activeExchange: z.object({
+      id: z.string(),
+      type: z.string(),
+      sandbox: z.boolean().optional(),
+    }).optional(),
+    available: z.array(z.object({
+      id: z.string(),
+      type: z.string(),
+      sandbox: z.boolean().optional(),
+      isDefault: z.boolean().optional(),
+      active: z.boolean().optional(),
+    })).optional(),
+    message: z.string().optional(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ exchangeId }) => {
+    const resolved = await loadConfigBundle();
+    const config = resolved.config;
+    const exchanges = config.exchanges ?? [];
+
+    if (!exchangeId) {
+      const currentId = config.activeExchangeId
+        ?? exchanges.find((e) => e.isDefault)?.id
+        ?? exchanges[0]?.id;
+      return {
+        success: true,
+        available: exchanges.map((e) => ({
+          id: e.id,
+          type: e.type,
+          sandbox: e.sandbox,
+          isDefault: e.isDefault,
+          active: e.id === currentId,
+        })),
+        message: `${exchanges.length} exchange(s) configured. Current: ${currentId ?? "none"}`,
+      };
+    }
+
+    const target = exchanges.find((e) => e.id === exchangeId);
+    if (!target) {
+      const ids = exchanges.map((e) => e.id).join(", ");
+      return { error: `Exchange '${exchangeId}' not found. Available: ${ids || "none configured"}` };
+    }
+
+    await saveResolvedConfig({ ...config, activeExchangeId: exchangeId }, resolved.layers);
+
+    // Bust adapter caches so the next request picks up the new active exchange.
+    ExchangeFactory.clearCache();
+    BrokerFactory.clearCache();
+    try {
+      const { getGatewayContextResolver } = await import("../../../gateway/runtime/context.ts");
+      getGatewayContextResolver().invalidate();
+    } catch {
+      // Not running inside the gateway daemon.
+    }
+
+    return {
+      success: true,
+      activeExchange: { id: target.id, type: target.type, sandbox: target.sandbox },
+      message: `Switched to ${target.type} (${target.id})${target.sandbox ? " [sandbox]" : " [live]"}.`,
+    };
+  },
+});
+
 export const systemTools = {
   test_connection: testConnectionTool,
   get_model_info: getModelInfoTool,
   get_cache_stats: getCacheStatsTool,
   get_agent_health: getAgentHealthTool,
+  switch_exchange: switchExchangeTool,
 };
