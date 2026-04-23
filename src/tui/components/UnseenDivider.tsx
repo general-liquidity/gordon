@@ -1,11 +1,13 @@
 import React from "react";
-import { Box, Text } from "ink";
+import { Text, useStdout } from "ink";
+import { useAnimationClock } from "../hooks/useAnimationClock.js";
 
 // ============================================================================
 // UnseenDivider — "N new messages" indicator at viewport bottom
 //
 // Shown when the user has scrolled up and new messages have arrived below
-// the visible area. Clicking/pressing Enter triggers onJumpToBottom.
+// the visible area. The G key (handled by VirtualMessageList) triggers
+// onJumpToBottom — this component is purely visual.
 // ============================================================================
 
 interface Props {
@@ -13,15 +15,33 @@ interface Props {
   onJumpToBottom: () => void;
 }
 
-export function UnseenDivider({ count, onJumpToBottom }: Props) {
+export function UnseenDivider({ count }: Props) {
+  const clockFrame = useAnimationClock(500);
+  const { stdout } = useStdout();
+  const termWidth = stdout?.columns ?? 80;
+
   if (count <= 0) return null;
 
+  // Arrow blinks: solid on even frames, invisible on odd frames
+  const arrow = clockFrame % 2 === 0 ? "↓" : " ";
+
+  // Use a fixed-width pill string for dash calculation so the layout
+  // never reflows when the arrow blinks (↓ and space are both 1 column wide)
+  const pillFixed = ` ↓  ${count} new  [G] jump `;
+
+  // Side dash count: split remaining width evenly, minus 2 spaces separating dashes from pill
+  const dashCount = Math.max(0, Math.floor((termWidth - pillFixed.length - 2) / 2));
+  const dashes = "─".repeat(dashCount);
+
   return (
-    <Box justifyContent="center" marginTop={0} marginBottom={0}>
+    <Text>
+      <Text dimColor>{dashes} </Text>
       <Text color="cyanBright" bold>
-        {"\u2193"} {count} new message{count !== 1 ? "s" : ""}
+        {arrow}
       </Text>
-      <Text dimColor> {"\u2502"} press G to jump </Text>
-    </Box>
+      <Text color="cyanBright">{"  " + count + " new"}</Text>
+      <Text dimColor>{"  [G] jump "}</Text>
+      <Text dimColor>{dashes}</Text>
+    </Text>
   );
 }

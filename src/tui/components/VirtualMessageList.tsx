@@ -6,6 +6,9 @@ import {
   useVirtualScroll,
   getScrollAction,
 } from "../hooks/useVirtualScroll.js";
+import { useScrollAcceleration } from "../hooks/useScrollAcceleration.js";
+import { useTranscriptSearch } from "../hooks/useTranscriptSearch.js";
+import { SearchBar } from "./SearchBar.js";
 
 // ============================================================================
 // VirtualMessageList — Renders only visible messages via virtual scroll
@@ -88,6 +91,8 @@ export function VirtualMessageList({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [collapseKey]);
 
+  const { getAcceleratedDelta } = useScrollAcceleration();
+
   const {
     startIndex,
     endIndex,
@@ -127,6 +132,17 @@ export function VirtualMessageList({
     (input, key) => {
       if (!scrollEnabled) return;
 
+      if (key.upArrow && !key.ctrl) {
+        userScrolledUp.current = true;
+        onScroll(-getAcceleratedDelta("up", DEFAULT_ITEM_HEIGHT));
+        return;
+      }
+      if (key.downArrow && !key.ctrl) {
+        if (isAtBottom) userScrolledUp.current = false;
+        onScroll(getAcceleratedDelta("down", DEFAULT_ITEM_HEIGHT));
+        return;
+      }
+
       const action = getScrollAction(input, key, viewportHeight, DEFAULT_ITEM_HEIGHT);
       if (!action) return;
 
@@ -145,9 +161,13 @@ export function VirtualMessageList({
         if (isAtBottom) userScrolledUp.current = false;
       } else {
         // Positive delta = down, negative = up
-        if ((action.delta as number) < 0) userScrolledUp.current = true;
-        else if (isAtBottom) userScrolledUp.current = false;
-        onScroll(action.delta as number);
+        if ((action.delta as number) < 0) {
+          userScrolledUp.current = true;
+          onScroll(-getAcceleratedDelta("up", Math.abs(action.delta as number)));
+        } else {
+          if (isAtBottom) userScrolledUp.current = false;
+          onScroll(getAcceleratedDelta("down", action.delta as number));
+        }
       }
     },
     { isActive: scrollEnabled },
@@ -161,6 +181,9 @@ export function VirtualMessageList({
 
   // Slice visible messages
   const visibleMessages = collapsedMessages.slice(startIndex, endIndex);
+
+  const [searchMode, setSearchMode] = useState(false);
+  const search = useTranscriptSearch(messages);
 
   // Message selection state — subtle background highlight
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
@@ -176,6 +199,40 @@ export function VirtualMessageList({
     }
   }, { isActive: scrollEnabled });
 
+  useInput((input, key) => {
+    // "/" to enter search
+    if (input === "/" && !searchMode) {
+      setSearchMode(true);
+      return;
+    }
+    if (!searchMode) return;
+    // Escape to exit search
+    if (key.escape) {
+      setSearchMode(false);
+      search.clearSearch();
+      return;
+    }
+    // n = next match, N = prev match
+    if (input === "n") { search.navigateNext(); return; }
+    if (input === "N") { search.navigatePrev(); return; }
+    // Backspace
+    if (key.backspace || key.delete) {
+      search.setQuery(search.query.slice(0, -1));
+      return;
+    }
+    // Type character
+    if (input && input.length === 1 && !key.ctrl && !key.meta) {
+      search.setQuery(search.query + input);
+    }
+  }, { isActive: scrollEnabled });
+
+  // Auto-scroll to current search match
+  useEffect(() => {
+    if (search.currentMatch) {
+      scrollTo(search.currentMatch.messageIndex);
+    }
+  }, [search.currentMatch, scrollTo]);
+
   return (
     <Box flexDirection="column" height={viewportHeight}>
       {/* Rendered message subset */}
@@ -184,6 +241,14 @@ export function VirtualMessageList({
           <MessageBubble message={msg} />
         </Box>
       ))}
+
+      {/* Search bar */}
+      <SearchBar
+        query={search.query}
+        matchCount={search.matches.length}
+        currentMatchIndex={search.currentMatchIndex}
+        isActive={search.isActive}
+      />
 
       {/* Unseen indicator */}
       {unseenCount > 0 && !isAtBottom && (
