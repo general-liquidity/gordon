@@ -49,7 +49,7 @@ export function ProactiveSuggestionMessage({ message }: ProactiveSuggestionProps
         )}
       </Box>
       <Box marginTop={1}>
-        <RichContent content={message.content} maxLines={12} />
+        <RichContent content={message.content} />
       </Box>
       <Box marginTop={1}>
         <Text dimColor>/ack {id.slice(0, 10)}</Text>

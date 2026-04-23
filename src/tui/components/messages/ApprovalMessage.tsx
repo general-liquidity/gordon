@@ -16,7 +16,7 @@ export function ApprovalMessage({ message }: { message: Message }) {
       <Box>
         <NoSelect>{"\u231F  "}</NoSelect>
         <Box flexDirection="column" flexGrow={1}>
-          <RichContent content={message.content} maxLines={10} />
+          <RichContent content={message.content} />
         </Box>
       </Box>
       {message.badge && (

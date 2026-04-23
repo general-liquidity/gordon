@@ -11,7 +11,7 @@ function ToolResultMessageInner({ message }: { message: Message }) {
       <Box>
         <NoSelect>{"\u231F  "}</NoSelect>
         <Box flexDirection="column" flexGrow={1}>
-          <RichContent content={message.content} maxLines={5} />
+          <RichContent content={message.content} />
         </Box>
       </Box>
     </Box>

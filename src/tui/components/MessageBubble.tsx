@@ -238,7 +238,7 @@ export const MessageBubble = React.memo(function MessageBubble({ message }: Prop
       <Box>
         <NoSelect>{"\u231F  "}</NoSelect>
         <Box flexDirection="column" flexGrow={1}>
-          <RichContent content={message.content} maxLines={25} />
+          <RichContent content={message.content} />
         </Box>
       </Box>
     </Box>

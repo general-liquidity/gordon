@@ -36,7 +36,7 @@ export function TradeEventMessage({ message }: { message: Message }) {
           </>
         )}
       </Box>
-      <RichContent content={message.content} maxLines={10} />
+      <RichContent content={message.content} />
     </Box>
   );
 }

@@ -1,6 +1,5 @@
 import React from "react";
 import { Box, Text } from "ink";
-import { CollapsibleOutput } from "./CollapsibleOutput.js";
 import { DataTable, fmtNum, fmtPct, changeColor, type Column } from "./DataTable.js";
 import { InlineChart } from "./InlineChart.js";
 import { MarkdownRenderer } from "./MarkdownRenderer.js";
@@ -18,24 +17,16 @@ import { getRenderer } from "../renderers/index.js";
 
 interface Props {
   content: string;
-  maxLines?: number;
 }
 
-export function RichContent({ content, maxLines = 15 }: Props) {
+export function RichContent({ content }: Props) {
   // Try to detect and render structured JSON data
   const structured = tryParseStructuredData(content);
   if (structured) {
     return <>{structured}</>;
   }
 
-  const lines = content.split("\n");
-
-  // Long content → collapsible
-  if (lines.length > maxLines) {
-    return <CollapsibleOutput content={content} maxLines={maxLines} />;
-  }
-
-  // Phase 15: Use MarkdownRenderer for rich message formatting
+  // Full content always rendered — VirtualMessageList handles scroll.
   return <MarkdownRenderer content={content} />;
 }
 

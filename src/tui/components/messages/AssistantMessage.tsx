@@ -15,7 +15,7 @@ function AssistantMessageInner({ message }: { message: Message }) {
         {message.streaming ? (
           <StreamingMarkdown content={message.content} isStreaming={true} />
         ) : (
-          <RichContent content={message.content} maxLines={25} />
+          <RichContent content={message.content} />
         )}
       </MessageResponse>
     </Box>
