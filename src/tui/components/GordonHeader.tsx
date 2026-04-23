@@ -26,7 +26,7 @@ const MODE_COLOR: Record<PermissionMode, string> = {
   auto:    "red",
   ask:     "rgb(52,238,176)",
   strict:  "green",
-  paper:   "yellow",
+  paper:   "white",
   observe: "magenta",
   plan:    "blue",
 };
@@ -43,7 +43,8 @@ export function GordonHeader({
   compact = false,
 }: Props) {
   const modeColor = MODE_COLOR[permissionMode] ?? "rgb(52,238,176)";
-  const version = process.env.npm_package_version ?? process.env.GORDON_VERSION ?? "0.9";
+  const rawVersion = process.env.npm_package_version ?? process.env.GORDON_VERSION ?? "0.9";
+  const version = rawVersion.split("-")[0]!;
   const isPaper = permissionMode === "paper";
 
   const sessionDisplay = threadId
@@ -92,7 +93,6 @@ export function GordonHeader({
         <Box>
           <Text color="rgb(52,238,176)" bold>{"≫"}  Gordon CLI</Text>
           <Text dimColor> (v{version})</Text>
-          {isPaper && <Text color="yellow" bold>  [PAPER]</Text>}
         </Box>
         <Text>   The Frontier Trading Agent</Text>
         <Text dimColor>   General Liquidity, Inc.</Text>
