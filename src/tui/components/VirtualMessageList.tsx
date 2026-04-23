@@ -34,6 +34,11 @@ export function VirtualMessageList({
 }: Props) {
   const [unseenCount, setUnseenCount] = useState(0);
   const prevMessageCount = useRef(messages.length);
+  // True only when the user explicitly pressed an up-scroll key — suppresses
+  // auto-scroll so they can read history. Cleared when they jump to bottom.
+  const userScrolledUp = useRef(false);
+
+  const isStreaming = messages.some((m) => m.streaming);
 
   const {
     startIndex,
@@ -49,26 +54,26 @@ export function VirtualMessageList({
     overscan: 3,
   });
 
-  // Track unseen messages when not at bottom
+  // Track unseen messages when user has scrolled up
   useEffect(() => {
     const newCount = messages.length - prevMessageCount.current;
-    if (newCount > 0 && !isAtBottom) {
+    if (newCount > 0 && userScrolledUp.current) {
       setUnseenCount((prev) => prev + newCount);
     }
-    if (isAtBottom) {
+    if (!userScrolledUp.current) {
       setUnseenCount(0);
     }
     prevMessageCount.current = messages.length;
-  }, [messages.length, isAtBottom]);
+  }, [messages.length]);
 
-  // Auto-scroll to bottom on new messages OR when the last message grows
-  // (streaming text deltas update content without changing messages.length).
+  // Auto-scroll: always follow new content unless user explicitly scrolled up.
+  // During streaming the chat must follow the response like Claude Code does.
   const lastMsgContentLen = messages[messages.length - 1]?.content?.length ?? 0;
   useEffect(() => {
-    if (isAtBottom) {
+    if (!userScrolledUp.current || isStreaming) {
       scrollToBottom();
     }
-  }, [messages.length, lastMsgContentLen, isAtBottom, scrollToBottom]);
+  }, [messages.length, lastMsgContentLen, isStreaming, scrollToBottom]);
 
   // Keyboard scroll bindings
   useInput(
@@ -79,22 +84,30 @@ export function VirtualMessageList({
       if (!action) return;
 
       if (action.delta === "bottom") {
+        userScrolledUp.current = false;
         scrollToBottom();
         setUnseenCount(0);
       } else if (action.delta === "top") {
+        userScrolledUp.current = true;
         scrollTo(0);
       } else if (action.delta === "pageUp") {
+        userScrolledUp.current = true;
         onScroll(-viewportHeight);
       } else if (action.delta === "pageDown") {
         onScroll(viewportHeight);
+        if (isAtBottom) userScrolledUp.current = false;
       } else {
-        onScroll(action.delta);
+        // Positive delta = down, negative = up
+        if ((action.delta as number) < 0) userScrolledUp.current = true;
+        else if (isAtBottom) userScrolledUp.current = false;
+        onScroll(action.delta as number);
       }
     },
     { isActive: scrollEnabled },
   );
 
   const handleJumpToBottom = useCallback(() => {
+    userScrolledUp.current = false;
     scrollToBottom();
     setUnseenCount(0);
   }, [scrollToBottom]);

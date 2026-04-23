@@ -39,7 +39,9 @@ export function useVirtualScroll({
   itemHeight = 3,
   overscan = 3,
 }: VirtualScrollOptions): VirtualScrollResult {
-  const [scrollTop, setScrollTop] = useState(0);
+  // Start at the bottom so the latest messages are visible immediately.
+  // Number.MAX_SAFE_INTEGER gets clamped to maxScrollTop by all consumers.
+  const [scrollTop, setScrollTop] = useState(Number.MAX_SAFE_INTEGER);
 
   const totalHeight = totalItems * itemHeight;
   const maxScrollTop = Math.max(0, totalHeight - viewportHeight);
