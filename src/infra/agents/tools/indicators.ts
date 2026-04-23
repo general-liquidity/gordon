@@ -16,6 +16,10 @@ import { z } from "zod";
 
 import { getGordonContext, normalizeSymbol, type MastraExecutionContext } from "./types.ts";
 import { createCachedTool, TOOL_CACHE_CONFIG } from "./cache.ts";
+import type { Timeframe } from "../../../types/timeframes.ts";
+
+/** VWAP tool supports a short-timeframe subset. */
+const VWAP_TIMEFRAMES = ["1m", "5m", "15m", "1h", "4h"] as const satisfies readonly Timeframe[];
 import {
   calculateTechnicalAnalysis,
   calculateTechnicalSignals,
@@ -688,7 +692,7 @@ export const getVWAPTool = createTool({
   inputSchema: z.object({
     symbol: z.string().describe("Trading pair (e.g., 'BTCUSDT')"),
     interval: z
-      .enum(["1m", "5m", "15m", "1h", "4h"])
+      .enum(VWAP_TIMEFRAMES)
       .default("1h")
       .describe("Timeframe (VWAP works best on shorter timeframes)"),
     limit: z

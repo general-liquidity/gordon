@@ -25,6 +25,16 @@ export type BrokerId =
   | "ibkr";
 
 /**
+ * Runtime array of all supported broker IDs. Kept in sync with BrokerId via
+ * the `satisfies` constraint — the compiler errors if this drifts from the
+ * type union.
+ */
+export const BROKER_IDS = [
+  "alpaca", "webull", "schwab", "tradier", "tradestation",
+  "tastytrade", "trading212", "etrade", "ibkr",
+] as const satisfies readonly BrokerId[];
+
+/**
  * Broker credentials for authentication.
  */
 export interface BrokerCredentials {

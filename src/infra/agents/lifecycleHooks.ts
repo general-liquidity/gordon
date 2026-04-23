@@ -14,6 +14,8 @@ export type LifecycleHookStage =
   | "subagent_start"   // fired when a sub-agent begins execution
   | "subagent_stop";   // fired when a sub-agent completes or errors
 
+export type CompactionReason = "manual" | "threshold" | "overflow";
+
 export interface LifecycleHookPayload {
   threadId?: string;
   agentName?: string;
@@ -23,6 +25,23 @@ export interface LifecycleHookPayload {
   userMessage?: string;
   response?: string;
   error?: string;
+  /**
+   * Why compaction fired — populated on before_compaction / after_compaction.
+   * "threshold" = normal pressure-driven compaction, "overflow" = emergency
+   * (fill ratio at full), "manual" = user invoked /compact.
+   */
+  compactionReason?: CompactionReason;
+  /**
+   * Whether the compaction result will trigger a retry / subsequent run.
+   * Populated on after_compaction when the summarizer soft-failed (ran but
+   * didn't shrink) and the circuit-breaker will retry next turn.
+   */
+  willRetry?: boolean;
+  /**
+   * Whether the compaction was aborted mid-run (summarizer threw). Populated
+   * on after_compaction.
+   */
+  aborted?: boolean;
   payload?: Record<string, unknown>;
 }
 

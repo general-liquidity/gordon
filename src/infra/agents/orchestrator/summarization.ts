@@ -85,8 +85,18 @@ export async function summarizeIfNeeded(
       threshold: summarizer.getConfig().messageThreshold,
     });
 
+    // Decide why this compaction is firing. "overflow" means the fill ratio
+    // is already at the `full` threshold (emergency). "threshold" is the
+    // normal case. "manual" would be set by a /compact caller that provided
+    // its own reason — left as a future extension hook.
+    const pressureRatio = (messages.reduce((sum, m) => sum + Math.ceil(String(m.content).length / 4), 0))
+      / Math.max(1, summarizer.getConfig().maxContextTokensEstimate);
+    const compactionReason: "manual" | "threshold" | "overflow" =
+      pressureRatio >= 0.99 ? "overflow" : "threshold";
+
     await runLifecycleHooks("before_compaction", context, {
       threadId: context.threadId,
+      compactionReason,
       payload: {
         messageCount: messages.length,
         threshold: summarizer.getConfig().messageThreshold,
@@ -94,15 +104,28 @@ export async function summarizeIfNeeded(
     });
 
     let result;
+    let aborted = false;
     try {
       result = await summarizer.summarize(messages);
     } catch (err) {
       // Circuit breaker: record the failure. After 3 consecutive failures
       // the compaction trigger returns "halt" instead of "compact" to
       // prevent runaway summarization loops.
+      aborted = true;
       getCompactionTrigger().recordCompactFailure();
       logger.error("Summarization failed — circuit breaker incremented", {
         err: err instanceof Error ? err.message : String(err),
+      });
+      await runLifecycleHooks("after_compaction", context, {
+        threadId: context.threadId,
+        compactionReason,
+        aborted,
+        willRetry: false,
+        error: err instanceof Error ? err.message : String(err),
+        payload: {
+          summarized: false,
+          messagesSummarized: 0,
+        },
       });
       throw err;
     }
@@ -131,8 +154,15 @@ export async function summarizeIfNeeded(
       getCompactionTrigger().recordCompactFailure();
     }
 
+    // willRetry = soft failure path — summarization ran but didn't shrink,
+    // so the circuit breaker incremented and the next turn will try again.
+    const willRetry = !result.summarized && !aborted;
+
     await runLifecycleHooks("after_compaction", context, {
       threadId: context.threadId,
+      compactionReason,
+      aborted,
+      willRetry,
       payload: {
         summarized: result.summarized,
         messagesSummarized: result.messagesSummarized,

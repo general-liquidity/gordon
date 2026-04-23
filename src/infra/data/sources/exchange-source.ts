@@ -8,6 +8,7 @@
 import type { Exchange } from "../../exchange/types.ts";
 import type { Candle } from "../../../types/index.ts";
 import type { DataSource, DataSourceCapabilities, OHLCParams } from "./types.ts";
+import type { Timeframe } from "../../../types/timeframes.ts";
 import { createModuleLogger } from "../../logger/index.ts";
 
 const logger = createModuleLogger("exchange-source");
@@ -40,22 +41,10 @@ const MAX_CANDLES_PER_REQUEST = 1000;
 
 /** Default supported timeframes for exchanges */
 const DEFAULT_TIMEFRAMES = [
-  "1m",
-  "3m",
-  "5m",
-  "15m",
-  "30m",
-  "1h",
-  "2h",
-  "4h",
-  "6h",
-  "8h",
-  "12h",
-  "1d",
-  "3d",
-  "1w",
-  "1M",
-];
+  "1m", "3m", "5m", "15m", "30m",
+  "1h", "2h", "4h", "6h", "8h", "12h",
+  "1d", "3d", "1w", "1M",
+] as const satisfies readonly Timeframe[];
 
 // ============================================================================
 // ExchangeDataSource Class
@@ -115,7 +104,7 @@ export class ExchangeDataSource implements DataSource {
     this.requiresAuth = false; // Public market data doesn't require auth
 
     this.capabilities = {
-      supportedTimeframes: options.supportedTimeframes ?? DEFAULT_TIMEFRAMES,
+      supportedTimeframes: options.supportedTimeframes ?? [...DEFAULT_TIMEFRAMES],
       maxHistoricalDays: options.maxHistoricalDays ?? 365,
       realtime: true,
       exchanges: [exchange.exchangeId],

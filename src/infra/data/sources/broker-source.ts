@@ -7,8 +7,11 @@
 import type { BrokerAdapter } from "../../broker/types.ts";
 import type { DataSource, DataSourceCapabilities, OHLCParams } from "./types.ts";
 import type { Candle } from "../../../types/index.ts";
+import type { Timeframe } from "../../../types/timeframes.ts";
 
-const DEFAULT_TIMEFRAMES = ["1m", "5m", "15m", "30m", "1h", "1d"];
+const DEFAULT_TIMEFRAMES = [
+  "1m", "5m", "15m", "30m", "1h", "1d",
+] as const satisfies readonly Timeframe[];
 
 export class BrokerDataSource implements DataSource {
   readonly id: string;
@@ -32,7 +35,7 @@ export class BrokerDataSource implements DataSource {
     this.name = `${broker.displayName} Broker`;
     this.priority = options.priority ?? 15;
     this.capabilities = {
-      supportedTimeframes: options.supportedTimeframes ?? DEFAULT_TIMEFRAMES,
+      supportedTimeframes: options.supportedTimeframes ?? [...DEFAULT_TIMEFRAMES],
       maxHistoricalDays: options.maxHistoricalDays ?? 3650,
       realtime: false,
       exchanges: [broker.brokerId],

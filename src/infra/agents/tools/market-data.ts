@@ -13,6 +13,12 @@ import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
 import { getGordonContext, normalizeSymbol, type MastraExecutionContext } from "./types.ts";
+import type { Timeframe } from "../../../types/timeframes.ts";
+
+/** Candle tool supports the common trading timeframes. */
+const CANDLE_TIMEFRAMES = [
+  "1m", "5m", "15m", "30m", "1h", "4h", "1d", "1w",
+] as const satisfies readonly Timeframe[];
 import { createCachedTool, TOOL_CACHE_CONFIG } from "./cache.ts";
 
 // ============================================================================
@@ -34,7 +40,7 @@ export const getCandlesTool = createTool({
   inputSchema: z.object({
     symbol: z.string().describe("Trading pair (e.g., 'BTCUSDT', 'ETHUSDT')"),
     interval: z
-      .enum(["1m", "5m", "15m", "30m", "1h", "4h", "1d", "1w"])
+      .enum(CANDLE_TIMEFRAMES)
       .describe("Candle interval/timeframe"),
     limit: z
       .number()

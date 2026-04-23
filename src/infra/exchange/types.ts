@@ -15,6 +15,16 @@ import type { Candle } from "../../types/index.ts";
 export type ExchangeId = "binance" | "binance_us" | "coinbase" | "kraken" | "bitfinex" | "hyperliquid" | "uniswap" | "robinhood" | "okx" | "gemini";
 
 /**
+ * Runtime array of all supported exchange IDs. Kept in sync with ExchangeId
+ * via the `satisfies` constraint — the compiler errors if this drifts from
+ * the type union.
+ */
+export const EXCHANGE_IDS = [
+  "binance", "binance_us", "coinbase", "kraken", "bitfinex",
+  "hyperliquid", "uniswap", "robinhood", "okx", "gemini",
+] as const satisfies readonly ExchangeId[];
+
+/**
  * Exchange credentials for authentication
  */
 export interface ExchangeCredentials {

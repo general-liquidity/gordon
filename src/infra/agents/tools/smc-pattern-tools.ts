@@ -29,7 +29,9 @@ import {
 } from "../../../core/indicators/smc-patterns.ts";
 import { fetchRecentCandles } from "../../proactive/producers/candleFetch.ts";
 
-const TIMEFRAMES = ["5m", "15m", "30m", "1h", "4h", "1d"] as const;
+import type { Timeframe } from "../../../types/timeframes.ts";
+
+const TIMEFRAMES = ["5m", "15m", "30m", "1h", "4h", "1d"] as const satisfies readonly Timeframe[];
 
 function toOhlc(bars: Array<{ timestamp: number; open: number; high: number; low: number; close: number; volume: number }>): OHLC[] {
   return bars as OHLC[];
