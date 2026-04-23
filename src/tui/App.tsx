@@ -163,14 +163,6 @@ import { initializeRuntime, handleInput, handleApprovalDecision } from "./bridge
 //        + local useState for Phase 15-18 dialog toggles
 // ============================================================================
 
-// ── Height constants (terminal lines) ──
-// Full card (empty state): ~13 rows including tip line + marginBottom.
-// Compact bar (conversation active): 2 rows (1 content + 1 marginBottom).
-const HEADER_HEIGHT_FULL = 13;
-const HEADER_HEIGHT_COMPACT = 2;
-const INPUT_HEIGHT = 2;
-const FOOTER_HEIGHT = 1;
-
 // ── Feedback trade data shape ──
 interface FeedbackTradeData {
   tradeId: string;
@@ -355,7 +347,7 @@ function AppInner() {
   } | null>(null);
 
   // ── Custom hooks ──
-  const { rows } = useTerminalSize();
+  useTerminalSize();
   const ctrlC = useDoublePress(2000);
   const { formatted: elapsedFormatted } = useElapsedTime(isStreaming);
   const paletteItems = useMergedCommands();
@@ -379,9 +371,6 @@ function AppInner() {
       thinkingAgent: thinking,
     };
   }, [activeAgents]);
-
-  const headerHeight = messages.length > 0 ? HEADER_HEIGHT_COMPACT : HEADER_HEIGHT_FULL;
-  const viewportHeight = Math.max(rows - headerHeight - INPUT_HEIGHT - FOOTER_HEIGHT, 6);
 
   // Check if any dialog is open (to suppress other keybindings)
   const anyDialogOpen =
@@ -946,6 +935,16 @@ function AppInner() {
     return () => clearTimeout(timer);
   }, [isStreaming, handleSubmit]);
 
+  // Clear screen when the first message arrives so the full Gordon card
+  // (rendered during the empty state) doesn't linger in the scrollback.
+  const prevMsgCountRef = React.useRef(0);
+  useEffect(() => {
+    if (prevMsgCountRef.current === 0 && messages.length > 0) {
+      process.stdout.write("\x1b[2J\x1b[H");
+    }
+    prevMsgCountRef.current = messages.length;
+  }, [messages.length]);
+
   // Wire: terminal tab — update tab title/badge/color based on Gordon state.
   useEffect(() => {
     updateTerminalTab({
@@ -1461,8 +1460,7 @@ function AppInner() {
           {messages.length > 0 && (
             <VirtualMessageList
               messages={messages}
-              viewportHeight={viewportHeight}
-              scrollEnabled={!showPalette && !isStreaming && !anyDialogOpen}
+              scrollEnabled={!showPalette && !anyDialogOpen}
             />
           )}
 
@@ -1520,8 +1518,8 @@ function AppInner() {
             <ToolCallInline calls={activeToolCalls} />
           )}
 
-          {/* Spinner — shown when streaming but no text yet and not thinking */}
-          {isStreaming && !streamBuffer && !isThinking && (
+          {/* Spinner — shown during all streaming (response is hidden until complete) */}
+          {isStreaming && !isThinking && (
             <TradingSpinner
               agentName={activeAgentName ?? undefined}
               streamLength={0}
@@ -1881,18 +1879,20 @@ export function App() {
   // Import ThemeProvider dynamically to avoid circular deps
   const { ThemeProvider } = require("./themes/ThemeProvider.js");
   return (
-    <ThemeProvider>
-    <SettingsProvider>
-      <MemoryProvider>
-        <StatsProvider>
-          <NotificationsProvider>
-            <AppStateProvider>
-              <AppInner />
-            </AppStateProvider>
-          </NotificationsProvider>
-        </StatsProvider>
-      </MemoryProvider>
-    </SettingsProvider>
-    </ThemeProvider>
+    <AlternateScreen enabled={process.env.GORDON_ALT_SCREEN !== "false"}>
+      <ThemeProvider>
+      <SettingsProvider>
+        <MemoryProvider>
+          <StatsProvider>
+            <NotificationsProvider>
+              <AppStateProvider>
+                <AppInner />
+              </AppStateProvider>
+            </NotificationsProvider>
+          </StatsProvider>
+        </MemoryProvider>
+      </SettingsProvider>
+      </ThemeProvider>
+    </AlternateScreen>
   );
 }

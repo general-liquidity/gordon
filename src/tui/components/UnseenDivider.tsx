@@ -27,9 +27,8 @@ export function UnseenDivider({ count }: Props) {
 
   // Use a fixed-width pill string for dash calculation so the layout
   // never reflows when the arrow blinks (↓ and space are both 1 column wide)
-  const pillFixed = ` ↓  ${count} new  [G] jump `;
+  const pillFixed = ` ↓  ${count} new `;
 
-  // Side dash count: split remaining width evenly, minus 2 spaces separating dashes from pill
   const dashCount = Math.max(0, Math.floor((termWidth - pillFixed.length - 2) / 2));
   const dashes = "─".repeat(dashCount);
 
@@ -40,8 +39,7 @@ export function UnseenDivider({ count }: Props) {
         {arrow}
       </Text>
       <Text color="cyanBright">{"  " + count + " new"}</Text>
-      <Text dimColor>{"  [G] jump "}</Text>
-      <Text dimColor>{dashes}</Text>
+      <Text dimColor>{" " + dashes}</Text>
     </Text>
   );
 }
