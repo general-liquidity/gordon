@@ -1108,13 +1108,24 @@ function AppInner() {
             }
 
             // ── 2. Exchange + credentials ────────────────────────────────
-            const exchangeType = data.exchange;
+            const exchangeRaw = data.exchange;
             const exchangeConflict = data.exchangeConflictAction;
             if (
-              exchangeType &&
-              exchangeType !== "skip" &&
+              exchangeRaw &&
+              exchangeRaw !== "skip" &&
               exchangeConflict !== "skip"
             ) {
+              // Resolve base type and sandbox flag from wizard selection
+              // (sandbox variants: "binance-testnet", "coinbase-sandbox", etc.)
+              const isSandboxSetup =
+                exchangeRaw.includes("-testnet") ||
+                exchangeRaw.includes("-sandbox") ||
+                exchangeRaw.includes("-demo");
+              const exchangeType = isSandboxSetup
+                ? exchangeRaw.split("-")[0]! // "binance-testnet" → "binance"
+                : exchangeRaw;
+              const suggestedId = isSandboxSetup ? exchangeRaw : exchangeType;
+
               try {
                 const config = await loadConfig();
                 const apiKey = data.exchangeApiKey?.trim() ?? "";
@@ -1125,7 +1136,7 @@ function AppInner() {
 
                 // Conflict resolution: update existing entry in place when
                 // the user asked to update, rather than creating a duplicate.
-                const existing = config.exchanges.find((e) => e.type === exchangeType);
+                const existing = config.exchanges.find((e) => e.type === exchangeType && e.sandbox === isSandboxSetup);
                 let exchangeId: string;
                 if (existing && exchangeConflict === "update") {
                   existing.apiKey = isWalletBased ? "" : apiKey;
@@ -1133,24 +1144,25 @@ function AppInner() {
                   if (passphrase) existing.passphrase = passphrase;
                   if (walletKey) existing.walletPrivateKey = walletKey;
                   exchangeId = existing.id;
-                  summary.push(`${exchangeType} credentials updated`);
+                  summary.push(`${exchangeType}${isSandboxSetup ? " (sandbox)" : ""} credentials updated`);
                 } else {
                   // Fresh add OR user chose "add as second account"
-                  exchangeId = exchangeType;
+                  exchangeId = suggestedId;
                   let counter = 1;
                   while (config.exchanges.some((e) => e.id === exchangeId)) {
-                    exchangeId = `${exchangeType}_${counter++}`;
+                    exchangeId = `${suggestedId}-${counter++}`;
                   }
                   config.exchanges.push({
                     id: exchangeId,
                     type: exchangeType as "binance" | "binance_us" | "coinbase" | "kraken" | "bitfinex" | "hyperliquid" | "uniswap" | "robinhood" | "okx" | "gemini",
                     apiKey: isWalletBased ? "" : apiKey,
                     apiSecret: isWalletBased ? "" : apiSecret,
+                    sandbox: isSandboxSetup,
                     isDefault: config.exchanges.length === 0,
                     ...(passphrase ? { passphrase } : {}),
                     ...(walletKey ? { walletPrivateKey: walletKey } : {}),
                   });
-                  summary.push(`${exchangeType} connected`);
+                  summary.push(`${exchangeType}${isSandboxSetup ? " (sandbox)" : ""} connected as '${exchangeId}'`);
                 }
                 if (!config.activeExchangeId) config.activeExchangeId = exchangeId;
                 await saveConfig(config);
@@ -1313,8 +1325,8 @@ function AppInner() {
   }
 
   if (showExchangePicker) {
-    return <ExchangePicker activeExchange={null} configuredExchanges={[]} onComplete={(action, exchange, creds) => {
-      dispatch({ type: "ADD_MESSAGE", message: { id: `exchange-${Date.now()}`, role: "system", content: `Exchange ${action}: ${exchange}${creds ? " (credentials saved)" : ""}`, timestamp: new Date().toISOString() } });
+    return <ExchangePicker onComplete={(msg) => {
+      dispatch({ type: "ADD_MESSAGE", message: { id: `exchange-${Date.now()}`, role: "system", content: msg, timestamp: new Date().toISOString() } });
       setShowExchangePicker(false);
     }} onCancel={() => setShowExchangePicker(false)} />;
   }

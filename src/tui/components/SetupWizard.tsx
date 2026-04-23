@@ -102,7 +102,7 @@ const EXCHANGE_STEP: StepConfig = {
   // Dynamic options: label already-configured exchanges with a marker and
   // surface a "Keep existing" default at the top when any are set.
   dynamicOptions: (_d, p) => {
-    const base = [
+    const live = [
       { label: "Binance", value: "binance" },
       { label: "Binance US", value: "binance_us" },
       { label: "Coinbase", value: "coinbase" },
@@ -117,10 +117,19 @@ const EXCHANGE_STEP: StepConfig = {
       ...opt,
       label: p.exchanges.includes(opt.value) ? `${opt.label} (configured)` : opt.label,
     }));
+    const sandbox = [
+      { label: "─── Testnet / Paper Trading ───────────────", value: "skip" },
+      { label: "Binance Testnet  (paper, no real money)", value: "binance-testnet" },
+      { label: "Coinbase Sandbox  (paper, no real money)", value: "coinbase-sandbox" },
+      { label: "OKX Demo  (paper, no real money)", value: "okx-demo" },
+      { label: "Gemini Sandbox  (paper, no real money)", value: "gemini-sandbox" },
+      { label: "Hyperliquid Testnet  (paper, no real money)", value: "hyperliquid-testnet" },
+    ];
     const prefix = p.exchanges.length > 0
       ? [{ label: "Keep existing — don't touch exchanges", value: "skip" }]
       : [];
-    return [...prefix, ...base, ...(p.exchanges.length === 0 ? [{ label: "Skip", value: "skip" }] : [])];
+    const suffix = p.exchanges.length === 0 ? [{ label: "Skip", value: "skip" }] : [];
+    return [...prefix, ...live, ...sandbox, ...suffix];
   },
 };
 
@@ -141,10 +150,26 @@ const EXCHANGE_CONFLICT_STEP: StepConfig = {
   show: (d, p) => !!d.exchange && d.exchange !== "skip" && p.exchanges.includes(d.exchange),
 };
 
+/** Resolve base exchange type from the selected value (handles sandbox variants). */
+function baseExchangeType(d: Record<string, string>): string {
+  const v = d.exchange ?? "";
+  // Sandbox variants: "binance-testnet" → "binance", "okx-demo" → "okx", etc.
+  if (v.startsWith("binance-")) return "binance";
+  if (v.startsWith("coinbase-")) return "coinbase";
+  if (v.startsWith("okx-")) return "okx";
+  if (v.startsWith("gemini-")) return "gemini";
+  if (v.startsWith("hyperliquid-")) return "hyperliquid";
+  return v;
+}
+
+function isSandboxExchange(d: Record<string, string>): boolean {
+  const v = d.exchange ?? "";
+  return v.includes("-testnet") || v.includes("-sandbox") || v.includes("-demo");
+}
+
 /** True when the user chose an exchange AND isn't skipping the credential flow. */
 function exchangeCredsNeeded(d: Record<string, string>, _p: SetupPreflight): boolean {
   if (!d.exchange || d.exchange === "skip") return false;
-  // When a conflict resolution was requested, "skip" means keep existing.
   if (d.exchangeConflictAction === "skip") return false;
   return true;
 }
@@ -157,24 +182,26 @@ const EXCHANGE_API_KEY_STEP: StepConfig = {
   inputType: "password",
   key: "exchangeApiKey",
   placeholder: "",
-  show: (d, p) =>
-    exchangeCredsNeeded(d, p) &&
-    d.exchange !== "hyperliquid" &&
-    d.exchange !== "uniswap",
+  show: (d, p) => {
+    if (!exchangeCredsNeeded(d, p)) return false;
+    const base = baseExchangeType(d);
+    return base !== "hyperliquid" && base !== "uniswap";
+  },
 };
 
 const EXCHANGE_API_SECRET_STEP: StepConfig = {
   id: "exchange-api-secret",
   section: "exchange",
   title: "Exchange API Secret",
-  description: "Paste the exchange API secret:",
+  description: "Paste the exchange API secret (for Coinbase CDP keys: paste the full EC private key):",
   inputType: "password",
   key: "exchangeApiSecret",
   placeholder: "",
-  show: (d, p) =>
-    exchangeCredsNeeded(d, p) &&
-    d.exchange !== "hyperliquid" &&
-    d.exchange !== "uniswap",
+  show: (d, p) => {
+    if (!exchangeCredsNeeded(d, p)) return false;
+    const base = baseExchangeType(d);
+    return base !== "hyperliquid" && base !== "uniswap";
+  },
 };
 
 const EXCHANGE_PASSPHRASE_STEP: StepConfig = {
@@ -185,7 +212,11 @@ const EXCHANGE_PASSPHRASE_STEP: StepConfig = {
   inputType: "password",
   key: "exchangePassphrase",
   placeholder: "",
-  show: (d, p) => exchangeCredsNeeded(d, p) && (d.exchange === "coinbase" || d.exchange === "okx"),
+  show: (d, p) => {
+    if (!exchangeCredsNeeded(d, p)) return false;
+    const base = baseExchangeType(d);
+    return base === "coinbase" || base === "okx";
+  },
 };
 
 const EXCHANGE_WALLET_STEP: StepConfig = {
@@ -193,11 +224,15 @@ const EXCHANGE_WALLET_STEP: StepConfig = {
   section: "exchange",
   title: "Wallet Private Key",
   description:
-    "Wallet-based venues sign orders directly. Use a DEDICATED trading wallet — never your main wallet.",
+    "Wallet-based venues sign orders directly. Use a DEDICATED trading/test wallet — never your main wallet.",
   inputType: "password",
   key: "exchangeWalletKey",
   placeholder: "0x...",
-  show: (d, p) => exchangeCredsNeeded(d, p) && (d.exchange === "hyperliquid" || d.exchange === "uniswap"),
+  show: (d, p) => {
+    if (!exchangeCredsNeeded(d, p)) return false;
+    const base = baseExchangeType(d);
+    return base === "hyperliquid" || base === "uniswap";
+  },
 };
 
 const BROKER_STEP: StepConfig = {
