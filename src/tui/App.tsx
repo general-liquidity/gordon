@@ -1433,7 +1433,7 @@ function AppInner() {
             : "";
 
   return (
-    <Box flexDirection="column" minHeight={process.stdout.rows ?? 24}>
+    <Box flexDirection="column">
       {/* Boot card — written once to terminal scrollback via Static on mount.
           Stays visible at the top of the session; scrolls into history naturally
           as the conversation grows. The compact live header is always below. */}
@@ -1451,22 +1451,25 @@ function AppInner() {
         )}
       </Static>
 
-      {/* ── Compact live header — always visible in the Ink frame ── */}
-      <GordonHeader
-        permissionMode={permissionMode ?? "ask"}
-        sessionId={sessionId}
-        threadId={threadId}
-        isResumedSession={isResumedSession}
-        resumeMessageCount={isResumedSession ? messages.length : undefined}
-        toolCount={5}
-        positionCount={0}
-        feedCount={0}
-        compact={true}
-      />
+      {/* ── Compact live header — only shown once conversation starts (boot card
+           handles branding in the empty state via Static above) ── */}
+      {messages.length > 0 && (
+        <GordonHeader
+          permissionMode={permissionMode ?? "ask"}
+          sessionId={sessionId}
+          threadId={threadId}
+          isResumedSession={isResumedSession}
+          resumeMessageCount={isResumedSession ? messages.length : undefined}
+          toolCount={5}
+          positionCount={0}
+          feedCount={0}
+          compact={true}
+        />
+      )}
 
       {/* ── Conversation — wrapped in PrivacyScreen ── */}
       <PrivacyScreen active={privacyMode}>
-        <Box flexDirection="column" flexGrow={1} justifyContent="flex-end" paddingX={1}>
+        <Box flexDirection="column" paddingX={1}>
           {/* Empty state — header box handles the branding, just show hint text */}
           {messages.length > 0 && (
             <VirtualMessageList
