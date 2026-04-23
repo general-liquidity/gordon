@@ -301,6 +301,8 @@ export interface BrokerAdapter {
   readonly displayName: string;
   /** Feature/capability flags */
   readonly capabilities: BrokerCapabilities;
+  /** True when adapter is routing to a paper/sandbox environment. */
+  readonly isPaper: boolean;
 
   /** Test authenticated connectivity */
   testConnection(): Promise<boolean>;

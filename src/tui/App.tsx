@@ -947,7 +947,7 @@ function AppInner() {
   useEffect(() => {
     updateTerminalTab({
       activity: isStreaming ? "streaming" : "idle",
-      permissionMode: permissionMode as "auto" | "ask" | "strict",
+      permissionMode: permissionMode ?? "ask",
     });
     return () => { resetTerminalTab(); };
   }, [isStreaming, permissionMode]);
@@ -1234,7 +1234,7 @@ function AppInner() {
             if (data.permissionMode) {
               try {
                 const config = await loadConfig();
-                config.permissionMode = data.permissionMode as "auto" | "ask" | "strict";
+                config.permissionMode = data.permissionMode as "auto" | "ask" | "strict" | "paper" | "observe" | "plan";
                 await saveConfig(config);
                 summary.push(`permissionMode=${data.permissionMode}`);
               } catch {
@@ -1341,7 +1341,7 @@ function AppInner() {
 
   if (showConfigEditor) {
     return <ConfigEditor items={[
-      { key: "permissionMode", label: "Permission Mode", category: "Trading", currentValue: permissionMode ?? "ask", type: "select", options: [{ label: "auto", value: "auto" }, { label: "ask", value: "ask" }, { label: "strict", value: "strict" }], description: "How Gordon handles trade execution" },
+      { key: "permissionMode", label: "Permission Mode", category: "Trading", currentValue: permissionMode ?? "ask", type: "select", options: [{ label: "auto", value: "auto" }, { label: "ask", value: "ask" }, { label: "strict", value: "strict" }, { label: "paper", value: "paper" }, { label: "observe", value: "observe" }, { label: "plan", value: "plan" }], description: "How Gordon handles trade execution" },
       { key: "startupBannerMode", label: "Startup Banner", category: "UI", currentValue: "full", type: "select", options: [{ label: "full", value: "full" }, { label: "quiet", value: "quiet" }] },
       { key: "useKeyring", label: "Use Keyring", category: "Security", currentValue: "false", type: "boolean", description: "Store credentials in OS keyring" },
     ]} onSave={async (key, value) => {
@@ -1428,7 +1428,7 @@ function AppInner() {
     <Box flexDirection="column" minHeight={process.stdout.rows ?? 24}>
       {/* ── Header ── */}
       <GordonHeader
-        permissionMode={permissionMode as "auto" | "ask" | "strict"}
+        permissionMode={permissionMode ?? "ask"}
         sessionId={sessionId}
         threadId={threadId}
         isResumedSession={isResumedSession}
@@ -1841,7 +1841,7 @@ function AppInner() {
         <PromptInput
           onSubmit={handleSubmit}
           placeholder={placeholder}
-          permissionMode={permissionMode as "auto" | "ask" | "strict"}
+          permissionMode={permissionMode ?? "ask"}
           activeAgentCount={activeAgentCount}
           activeAgentName={activeAgentName}
           isStreaming={isStreaming}

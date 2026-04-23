@@ -421,7 +421,7 @@ export const placeOCOOrderTool = createTool({
     }
 
     {
-      const check = checkTradingPermission(ctx.config?.permissionMode, "execute");
+      const check = checkTradingPermission(ctx.config?.permissionMode, "execute", { sandboxActive: ctx.exchange?.isSandbox ?? ctx.broker?.isPaper });
       if (!check.allowed) {
         return {
           error: check.reason ?? "Trading not permitted under current mode",
@@ -530,7 +530,7 @@ export const cancelAllOrdersTool = createTool({
     }
 
     {
-      const check = checkTradingPermission(ctx.config?.permissionMode, "cancel");
+      const check = checkTradingPermission(ctx.config?.permissionMode, "cancel", { sandboxActive: ctx.exchange?.isSandbox ?? ctx.broker?.isPaper });
       if (!check.allowed) {
         return {
           error: check.reason ?? "Cancelling orders not permitted under current mode",
@@ -740,7 +740,7 @@ export const placeLimitOrderTool = createTool({
     }
 
     {
-      const check = checkTradingPermission(ctx.config?.permissionMode, "execute");
+      const check = checkTradingPermission(ctx.config?.permissionMode, "execute", { sandboxActive: ctx.exchange?.isSandbox ?? ctx.broker?.isPaper });
       if (!check.allowed) {
         return { error: check.reason ?? "Placing limit orders not permitted under current mode" };
       }
@@ -966,7 +966,7 @@ export const cancelOrderTool = createTool({
     }
 
     {
-      const check = checkTradingPermission(ctx.config?.permissionMode, "cancel");
+      const check = checkTradingPermission(ctx.config?.permissionMode, "cancel", { sandboxActive: ctx.exchange?.isSandbox ?? ctx.broker?.isPaper });
       if (!check.allowed) {
         return { error: check.reason ?? "Cancelling orders not permitted under current mode" };
       }
@@ -1095,7 +1095,7 @@ export const cancelReplaceOrderTool = createTool({
     }
 
     {
-      const check = checkTradingPermission(ctx.config?.permissionMode, "execute");
+      const check = checkTradingPermission(ctx.config?.permissionMode, "execute", { sandboxActive: ctx.exchange?.isSandbox ?? ctx.broker?.isPaper });
       if (!check.allowed) {
         return { error: check.reason ?? "Cancel/replace not permitted under current mode" };
       }
@@ -1197,7 +1197,7 @@ export const cancelOrderListTool = createTool({
     }
 
     {
-      const check = checkTradingPermission(ctx.config?.permissionMode, "cancel");
+      const check = checkTradingPermission(ctx.config?.permissionMode, "cancel", { sandboxActive: ctx.exchange?.isSandbox ?? ctx.broker?.isPaper });
       if (!check.allowed) {
         return { error: check.reason ?? "Cancelling order lists not permitted under current mode" };
       }

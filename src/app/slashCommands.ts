@@ -342,6 +342,17 @@ const LEGACY_SLASH_COMMANDS: SlashCommandSeed[] = [
     whenToUse: "Practice or demo — strategies run end-to-end without touching real capital",
   },
   {
+    name: "live",
+    aliases: ["real"],
+    description: "Switch back to live trading — exits paper mode, real orders enabled (ask approval required)",
+    usage: "/live",
+    category: "trading",
+    level: 2,
+    action: "tool",
+    target: "set_permission_mode",
+    whenToUse: "Return to live trading after a paper session; switches venue adapters back to live endpoints",
+  },
+  {
     name: "observe",
     aliases: ["watchonly"],
     description: "Pure observation — no execution of any kind, not even paper trades",

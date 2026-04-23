@@ -196,7 +196,7 @@ export class OkxAdapter implements Exchange {
   private readonly apiSecret: string;
   private readonly passphrase: string;
   private readonly baseUrl: string;
-  private readonly isDemo: boolean;
+  readonly isSandbox: boolean;
 
   private readonly rateLimiter = new OkxRateLimiter();
   private readonly circuitBreaker = new OkxCircuitBreaker();
@@ -208,7 +208,7 @@ export class OkxAdapter implements Exchange {
     this.apiKey = apiKey;
     this.apiSecret = apiSecret;
     this.passphrase = passphrase;
-    this.isDemo = demo;
+    this.isSandbox = demo;
     this.baseUrl = demo ? OKX_DEMO_BASE_URL : OKX_BASE_URL;
   }
 
@@ -272,7 +272,7 @@ export class OkxAdapter implements Exchange {
       "Content-Type": "application/json",
     };
 
-    if (this.isDemo) {
+    if (this.isSandbox) {
       headers["x-simulated-trading"] = "1";
     }
 
@@ -294,7 +294,7 @@ export class OkxAdapter implements Exchange {
       }
 
       const headers: Record<string, string> = { "Content-Type": "application/json" };
-      if (this.isDemo) headers["x-simulated-trading"] = "1";
+      if (this.isSandbox) headers["x-simulated-trading"] = "1";
 
       const res = await fetch(url.toString(), { headers });
       if (!res.ok) {

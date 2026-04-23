@@ -80,6 +80,7 @@ export class TastytradeAdapter implements BrokerAdapter {
   readonly displayName = "tastytrade";
   readonly capabilities = TASTYTRADE_CAPABILITIES;
 
+  readonly isPaper: boolean;
   private readonly credentials: BrokerCredentials;
   private readonly baseUrl: string;
   private accountIdCache?: string;
@@ -87,8 +88,9 @@ export class TastytradeAdapter implements BrokerAdapter {
 
   constructor(credentials: BrokerCredentials) {
     this.credentials = credentials;
+    this.isPaper = credentials.paper ?? true;
     this.baseUrl = credentials.baseUrl
-      || ((credentials.paper ?? true) ? DEFAULT_TASTYTRADE_PAPER_BASE_URL : DEFAULT_TASTYTRADE_LIVE_BASE_URL);
+      || (this.isPaper ? DEFAULT_TASTYTRADE_PAPER_BASE_URL : DEFAULT_TASTYTRADE_LIVE_BASE_URL);
     this.accountIdCache = credentials.accountId;
   }
 

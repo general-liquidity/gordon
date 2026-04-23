@@ -195,6 +195,7 @@ export class AlpacaAdapter implements BrokerAdapter {
     supportsHistoricalBars: true,
   };
 
+  readonly isPaper: boolean;
   private readonly credentials: BrokerCredentials;
   private readonly tradingBaseUrl: string;
   private readonly dataBaseUrl: string;
@@ -203,6 +204,7 @@ export class AlpacaAdapter implements BrokerAdapter {
     this.credentials = credentials;
 
     const paper = credentials.paper ?? true;
+    this.isPaper = paper;
     this.tradingBaseUrl = credentials.baseUrl
       || (paper ? DEFAULT_ALPACA_PAPER_TRADING_BASE_URL : DEFAULT_ALPACA_TRADING_BASE_URL);
     this.dataBaseUrl = credentials.dataBaseUrl

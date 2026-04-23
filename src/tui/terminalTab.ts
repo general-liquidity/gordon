@@ -100,7 +100,7 @@ export interface TabState {
   /** Current symbol being analyzed/traded. */
   symbol?: string;
   /** Permission mode. */
-  permissionMode?: "auto" | "ask" | "strict";
+  permissionMode?: "auto" | "ask" | "strict" | "paper" | "observe" | "plan";
   /** Model name (short). */
   model?: string;
 }
@@ -141,6 +141,9 @@ export function updateTerminalTab(state: TabState): void {
     // Badge shows permission mode
     const badge = state.permissionMode === "auto" ? "AUTO"
       : state.permissionMode === "strict" ? "STRICT"
+      : state.permissionMode === "paper" ? "PAPER"
+      : state.permissionMode === "observe" ? "OBS"
+      : state.permissionMode === "plan" ? "PLAN"
       : "ASK";
     setIterm2Badge(badge);
 

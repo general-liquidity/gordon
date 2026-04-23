@@ -236,6 +236,7 @@ export class WebullAdapter implements BrokerAdapter {
     supportsHistoricalBars: false,
   };
 
+  readonly isPaper: boolean;
   private readonly credentials: BrokerCredentials;
   private readonly baseUrl: string;
   private readonly dataBaseUrl: string;
@@ -248,6 +249,7 @@ export class WebullAdapter implements BrokerAdapter {
     this.credentials = credentials;
 
     const paper = credentials.paper ?? true;
+    this.isPaper = paper;
     this.baseUrl = credentials.baseUrl || (paper ? DEFAULT_WEBULL_PAPER_BASE_URL : DEFAULT_WEBULL_LIVE_BASE_URL);
     this.dataBaseUrl = credentials.dataBaseUrl || this.baseUrl;
     this.accountIdCache = credentials.accountId;

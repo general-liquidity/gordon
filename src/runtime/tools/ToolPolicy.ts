@@ -75,7 +75,8 @@ export async function evaluateRuntimeToolPolicy(
     };
   }
 
-  let accessControlResult = await checkToolAccess(toolName, context.config, userId);
+  const sandboxActive = (context.exchange as { isSandbox?: boolean } | null)?.isSandbox ?? context.broker?.isPaper ?? false;
+  let accessControlResult = await checkToolAccess(toolName, context.config, userId, { sandboxActive });
   if (!accessControlResult.allowed) {
     return {
       allowed: false,
@@ -87,7 +88,7 @@ export async function evaluateRuntimeToolPolicy(
   }
 
   if ((tool.requiresTradePermission || actionPolicy.requiresTradePermission) && !isTradeTool(toolName)) {
-    accessControlResult = await checkToolAccess(toolName, context.config, userId);
+    accessControlResult = await checkToolAccess(toolName, context.config, userId, { sandboxActive });
     if (!accessControlResult.allowed) {
       return {
         allowed: false,

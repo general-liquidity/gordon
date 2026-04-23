@@ -31,6 +31,10 @@ import { loadConfigBundle, saveResolvedConfig } from "../../storage/config.ts";
 import { listPlans, getPlan, updatePlan, createPlan } from "../../storage/plans.ts";
 import { listTrades, getTrade } from "../../storage/trades.ts";
 import { getGordonContext, normalizeSymbol, validateToolOutput, type MastraExecutionContext } from "./types.ts";
+import { checkTradingPermission } from "./permissionHelpers.ts";
+import { setSandboxOverride } from "../../runtime/sandboxOverride.ts";
+import { ExchangeFactory } from "../../exchange/index.ts";
+import { BrokerFactory } from "../../broker/factory.ts";
 import { reflectOnPlan, formatReflectionSummary } from "../reflection.ts";
 import { getTradingService } from "../../../services/trading.service.ts";
 
@@ -347,29 +351,27 @@ export const executePlanTool = createTool({
 
     // Permission mode gate: block execution for read-only / non-trading modes
     const mode = ctx.config.permissionMode;
-    if (mode === "strict" || mode === "observe" || mode === "plan") {
-      const modeLabels: Record<string, string> = {
-        strict: "read-only",
-        observe: "observation-only — no execution of any kind",
-        plan: "planning-only — can create plans but not execute them",
-      };
-      recordStructuredObservation({
-        eventType: "execution.blocked",
-        workflow: "execution",
-        source: "agent_tool",
-        component: "execute_plan",
-        toolName: "execute_plan",
-        outcome: "failure",
-        status: `${mode}_permission_mode`,
-        mode,
-        planId,
-        symbol: plan.symbol,
-        reason: `Cannot execute: permissionMode is '${mode}' (${modeLabels[mode]}). Use /auto or /ask to enable trading.`,
-      });
-      return validateToolOutput(executePlanOutputSchema, {
-        success: false,
-        error: `Cannot execute: permissionMode is '${mode}' (${modeLabels[mode]}). Use /auto or /ask to enable trading.`,
-      }, { toolName: "execute_plan" });
+    {
+      const check = checkTradingPermission(mode, "execute", { sandboxActive: ctx.exchange?.isSandbox ?? ctx.broker?.isPaper });
+      if (!check.allowed) {
+        recordStructuredObservation({
+          eventType: "execution.blocked",
+          workflow: "execution",
+          source: "agent_tool",
+          component: "execute_plan",
+          toolName: "execute_plan",
+          outcome: "failure",
+          status: `${mode}_permission_mode`,
+          mode,
+          planId,
+          symbol: plan.symbol,
+          reason: check.reason ?? `Cannot execute: permissionMode is '${mode}'.`,
+        });
+        return validateToolOutput(executePlanOutputSchema, {
+          success: false,
+          error: check.reason ?? `Cannot execute: permissionMode is '${mode}'.`,
+        }, { toolName: "execute_plan" });
+      }
     }
 
     // Risk gate: evaluate the plan's order against risk kernel
@@ -707,6 +709,20 @@ export const setPermissionModeTool = createTool({
       details: { previous },
     });
 
+    // Sync sandbox override and bust venue adapter caches so the next
+    // request in this session gets a fresh exchange/broker client.
+    const newOverride = mode === "paper" ? true : null;
+    setSandboxOverride(newOverride);
+    ExchangeFactory.clearCache();
+    BrokerFactory.clearCache();
+    // Invalidate the gateway context resolver cache if it's running.
+    try {
+      const { getGatewayContextResolver } = await import("../../../gateway/runtime/context.ts");
+      getGatewayContextResolver().invalidate();
+    } catch {
+      // Not running inside the gateway daemon — safe to ignore.
+    }
+
     const descriptions: Record<"auto" | "ask" | "strict" | "paper" | "observe" | "plan", string> = {
       auto: "Trades now execute without per-action approval.",
       ask: "Each trade now requires approval via dialog (default).",
@@ -716,11 +732,17 @@ export const setPermissionModeTool = createTool({
       plan: "Planning-only mode. Plans can be created but not executed.",
     };
 
+    const sandboxNote = mode === "paper"
+      ? " Venue adapters switched to sandbox/testnet endpoints."
+      : previous === "paper"
+      ? " Venue adapters restored to live endpoints."
+      : "";
+
     return validateToolOutput(setPermissionModeOutputSchema, {
       success: true,
       permissionMode: mode,
       previousMode: previous,
-      message: `Permission mode set to '${mode}'. ${descriptions[mode]}`,
+      message: `Permission mode set to '${mode}'. ${descriptions[mode]}${sandboxNote}`,
     }, { toolName: "set_permission_mode" });
   },
 });
@@ -1120,11 +1142,14 @@ export const executeWithAlgorithmTool = createTool({
       }, { toolName: "execute_with_algorithm" });
     }
 
-    if (ctx.config?.permissionMode === "strict") {
-      return validateToolOutput(executeWithAlgorithmOutputSchema, {
-        success: false,
-        error: "permissionMode must not be 'strict' to execute algorithmic orders. Use /auto or /ask.",
-      }, { toolName: "execute_with_algorithm" });
+    {
+      const check = checkTradingPermission(ctx.config?.permissionMode, "execute", { sandboxActive: ctx.exchange?.isSandbox ?? ctx.broker?.isPaper });
+      if (!check.allowed) {
+        return validateToolOutput(executeWithAlgorithmOutputSchema, {
+          success: false,
+          error: check.reason ?? "Algorithmic execution not permitted under current mode.",
+        }, { toolName: "execute_with_algorithm" });
+      }
     }
 
     // Normalize symbol

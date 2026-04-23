@@ -126,7 +126,7 @@ export const convertDustTool = createTool({
     }
 
     {
-      const check = checkTradingPermission(ctx.config?.permissionMode, "state_mutation");
+      const check = checkTradingPermission(ctx.config?.permissionMode, "state_mutation", { sandboxActive: ctx.exchange?.isSandbox ?? ctx.broker?.isPaper });
       if (!check.allowed) {
         return { error: check.reason ?? "Dust conversion not permitted under current mode", assets };
       }
@@ -196,7 +196,7 @@ export const transferFundsTool = createTool({
     }
 
     {
-      const check = checkTradingPermission(ctx.config?.permissionMode, "transfer");
+      const check = checkTradingPermission(ctx.config?.permissionMode, "transfer", { sandboxActive: ctx.exchange?.isSandbox ?? ctx.broker?.isPaper });
       if (!check.allowed) {
         return { error: check.reason ?? "Fund transfer not permitted under current mode", type, asset, amount };
       }
@@ -961,7 +961,7 @@ export const withdrawToExternalTool = createTool({
 
     // Gate withdrawal across all permission modes
     {
-      const check = checkTradingPermission(ctx.config?.permissionMode, "transfer");
+      const check = checkTradingPermission(ctx.config?.permissionMode, "transfer", { sandboxActive: ctx.exchange?.isSandbox ?? ctx.broker?.isPaper });
       if (!check.allowed) {
         return {
           error: check.reason ?? "Withdrawal not permitted under current mode",

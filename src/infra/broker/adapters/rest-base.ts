@@ -285,6 +285,7 @@ export class RestBrokerAdapter implements BrokerAdapter {
   readonly brokerId: BrokerId;
   readonly displayName: string;
   readonly capabilities: BrokerCapabilities;
+  readonly isPaper: boolean;
 
   protected readonly credentials: BrokerCredentials;
   private readonly config: RestBrokerAdapterConfig;
@@ -303,6 +304,7 @@ export class RestBrokerAdapter implements BrokerAdapter {
     this.capabilities = config.capabilities;
 
     const paper = credentials.paper ?? true;
+    this.isPaper = paper;
     this.baseUrl = credentials.baseUrl
       || (paper && config.defaultPaperBaseUrl ? config.defaultPaperBaseUrl : config.defaultLiveBaseUrl);
     this.dataBaseUrl = credentials.dataBaseUrl

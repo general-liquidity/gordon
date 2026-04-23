@@ -255,7 +255,7 @@ export const startAutonomousModeTool = createTool({
 
     const effectiveConfig = await loadConfig().catch(() => ctx.config);
     {
-      const check = checkTradingPermission(effectiveConfig?.permissionMode, "autonomous");
+      const check = checkTradingPermission(effectiveConfig?.permissionMode, "autonomous", { sandboxActive: ctx.exchange?.isSandbox ?? ctx.broker?.isPaper });
       if (!check.allowed) {
         return { error: check.reason ?? "Autonomous mode not permitted under current mode" };
       }

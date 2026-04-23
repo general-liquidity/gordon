@@ -16,7 +16,7 @@ import { useInputHistory } from "../hooks/useInputHistory.js";
 interface Props {
   onSubmit: (value: string) => void;
   placeholder?: string;
-  permissionMode: "auto" | "ask" | "strict";
+  permissionMode: "auto" | "ask" | "strict" | "paper" | "observe" | "plan";
   activeAgentCount: number;
   activeAgentName: string | null;
   isStreaming: boolean;

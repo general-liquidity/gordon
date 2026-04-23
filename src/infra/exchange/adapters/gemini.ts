@@ -79,6 +79,7 @@ function fromGeminiSymbol(symbol: string): string {
 export class GeminiAdapter implements Exchange {
   readonly exchangeId: ExchangeId = "gemini";
   readonly displayName = "Gemini";
+  readonly isSandbox: boolean;
 
   private client: GeminiClient;
 
@@ -88,6 +89,7 @@ export class GeminiAdapter implements Exchange {
     apiSecret?: string;
     sandbox?: boolean;
   }) {
+    this.isSandbox = config.sandbox ?? false;
     this.client = new GeminiClient(config);
   }
 

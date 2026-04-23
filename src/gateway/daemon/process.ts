@@ -2,7 +2,7 @@ import { createModuleLogger } from "../../infra/logger/index.ts";
 import { bootstrapV07 } from "../../core/bootstrap.ts";
 import { createEnvelopeMeta, type GatewayCommandType } from "../protocol/index.ts";
 import { safeAppendAudit } from "../store/audit-log-store.ts";
-import { GatewayRuntime, GatewayContextResolver } from "../runtime/index.ts";
+import { GatewayRuntime, getGatewayContextResolver } from "../runtime/index.ts";
 import { startGatewayIpcServer } from "./ipc.ts";
 import { LocalCronScheduler, computeNextRunAt } from "../scheduler/index.ts";
 import { ReconciliationLoop } from "../reconciliation/index.ts";
@@ -27,7 +27,7 @@ export async function startGatewayDaemonProcess(): Promise<GatewayDaemonHandle> 
   });
   enableMCPHotReload(5000);
 
-  const contextResolver = new GatewayContextResolver();
+  const contextResolver = getGatewayContextResolver();
   let stopSelf: (() => Promise<void>) | null = null;
   let shutdownRequested = false;
   const requestShutdown = (): void => {

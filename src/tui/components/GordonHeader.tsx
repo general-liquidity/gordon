@@ -1,12 +1,13 @@
 import React from "react";
 import { Box, Text } from "ink";
+import type { PermissionMode } from "../state/types.js";
 
 // ============================================================================
 // GordonHeader — Codex-style info box
 // ============================================================================
 
 interface Props {
-  permissionMode: "auto" | "ask" | "strict";
+  permissionMode: PermissionMode;
   sessionId: string | null;
   threadId: string | null;
   isResumedSession: boolean;
@@ -19,6 +20,15 @@ interface Props {
   mcpWarnings?: string[];
 }
 
+const MODE_COLOR: Record<PermissionMode, string> = {
+  auto:    "red",
+  ask:     "rgb(52,238,176)",
+  strict:  "green",
+  paper:   "yellow",
+  observe: "magenta",
+  plan:    "blue",
+};
+
 export function GordonHeader({
   permissionMode,
   sessionId,
@@ -29,8 +39,9 @@ export function GordonHeader({
   exchangeStatus,
   mcpWarnings = [],
 }: Props) {
-  const modeColor = permissionMode === "auto" ? "red" : permissionMode === "strict" ? "green" : "rgb(52,238,176)";
+  const modeColor = MODE_COLOR[permissionMode] ?? "rgb(52,238,176)";
   const version = process.env.npm_package_version ?? process.env.GORDON_VERSION ?? "0.9";
+  const isPaper = permissionMode === "paper";
 
   // Show the thread ID (meaningful) or fall back to session/resource ID
   const sessionDisplay = threadId
@@ -43,15 +54,16 @@ export function GordonHeader({
     <Box flexDirection="column" marginBottom={1}>
       <Box
         borderStyle="round"
-        borderColor="gray"
+        borderColor={isPaper ? "yellow" : "gray"}
         paddingX={2}
         paddingY={0}
         flexDirection="column"
         width={56}
       >
         <Box>
-          <Text color="rgb(52,238,176)" bold>{"\u226B"}  Gordon CLI</Text>
+          <Text color="rgb(52,238,176)" bold>{"≫"}  Gordon CLI</Text>
           <Text dimColor> (v{version})</Text>
+          {isPaper && <Text color="yellow" bold>  [PAPER]</Text>}
         </Box>
         <Text>   The Frontier Trading Agent</Text>
         <Text dimColor>   General Liquidity, Inc.</Text>
@@ -65,7 +77,7 @@ export function GordonHeader({
         <Box>
           <Text dimColor>   mode:      </Text>
           <Text color={modeColor}>{permissionMode}</Text>
-          <Text dimColor>      /auto to change</Text>
+          <Text dimColor>      {isPaper ? "/live to exit" : "/auto to change"}</Text>
         </Box>
         <Box>
           <Text dimColor>   session:   </Text>
@@ -74,7 +86,7 @@ export function GordonHeader({
         {exchangeStatus && (
           <Box>
             <Text dimColor>   exchange:  </Text>
-            <Text>{exchangeStatus}</Text>
+            <Text>{isPaper ? `${exchangeStatus} (sandbox)` : exchangeStatus}</Text>
           </Box>
         )}
         <Box>
@@ -86,7 +98,7 @@ export function GordonHeader({
       {/* MCP connection warnings (Codex pattern: visible, not swallowed) */}
       {mcpWarnings && mcpWarnings.length > 0 && mcpWarnings.map((w, i) => (
         <Box key={i} paddingX={1}>
-          <Text color="yellow">{"\u26A0"} {w}</Text>
+          <Text color="yellow">{"⚠"} {w}</Text>
         </Box>
       ))}
 
@@ -96,7 +108,7 @@ export function GordonHeader({
 
       {isResumedSession && resumeMessageCount != null && (
         <Box paddingX={1}>
-          <Text dimColor>{"\u21BB"} Resumed {"\u00b7"} {resumeMessageCount} messages restored</Text>
+          <Text dimColor>{"↻"} Resumed {"·"} {resumeMessageCount} messages restored</Text>
         </Box>
       )}
     </Box>

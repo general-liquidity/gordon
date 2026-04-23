@@ -80,6 +80,14 @@ export function commandToPrompt(command: SlashCommand, args: string): string {
       return "Set permissionMode to 'ask' — each trade requires user approval via ApprovalDialog";
     case "strict":
       return "Set permissionMode to 'strict' — read-only mode, all trades blocked";
+    case "paper":
+      return "Set permissionMode to 'paper' — switch to paper trading mode. Real orders blocked; venue adapters switched to sandbox/testnet endpoints so strategies run end-to-end without touching real capital";
+    case "live":
+      return "Set permissionMode to 'ask' — exit paper mode and return to live trading. Venue adapters restored to live endpoints; each trade still requires approval";
+    case "observe":
+      return "Set permissionMode to 'observe' — pure observation mode, no execution of any kind including paper trades";
+    case "planmode":
+      return "Set permissionMode to 'plan' — planning-only mode, can create plans but not execute them";
     case "portfolio":
       if (STOCK_MARKET_PATTERN.test(args || "")) return "Show my stock broker account summary";
       return "Show my portfolio";

@@ -109,6 +109,7 @@ export async function checkToolAccess(
   toolName: string,
   config: GordonConfig | null,
   userId: string = "system",
+  options: { sandboxActive?: boolean } = {},
 ): Promise<AccessControlResult> {
   if (!config) return { allowed: true };
   if (!TRADING_TOOLS.has(toolName) && !STATE_MODIFYING_TOOLS.has(toolName)) {
@@ -116,7 +117,9 @@ export async function checkToolAccess(
   }
 
   const operation = operationContextFor(toolName);
-  const check = checkTradingPermission(config.permissionMode, operation);
+  const check = checkTradingPermission(config.permissionMode, operation, {
+    sandboxActive: options.sandboxActive,
+  });
   if (!check.allowed) {
     const reason = `Tool ${toolName} blocked — ${check.reason}`;
     safeAuditBlocked(userId, { toolName, permissionMode: config.permissionMode, operation }, reason);

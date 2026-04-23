@@ -486,7 +486,7 @@ export const placeBracketOrderTool = createTool({
     }
 
     {
-      const check = checkTradingPermission(ctx.config?.permissionMode, "execute");
+      const check = checkTradingPermission(ctx.config?.permissionMode, "execute", { sandboxActive: ctx.exchange?.isSandbox ?? ctx.broker?.isPaper });
       if (!check.allowed) {
         return {
           error: check.reason ?? "Placing bracket orders not permitted under current mode",
@@ -665,7 +665,7 @@ export const placeMarketOrderTool = createTool({
 
     // Permission gate — blocks strict/observe/plan/paper for real execution
     {
-      const check = checkTradingPermission(ctx.config?.permissionMode, "execute");
+      const check = checkTradingPermission(ctx.config?.permissionMode, "execute", { sandboxActive: ctx.exchange?.isSandbox ?? ctx.broker?.isPaper });
       if (!check.allowed) {
         return { error: check.reason ?? "Market order not permitted under current mode" };
       }

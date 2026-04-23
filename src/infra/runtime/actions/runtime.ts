@@ -451,7 +451,8 @@ export async function enforceExecutionPolicy(toolName: string, context: GordonCo
     return { allowed: true };
   }
 
-  const access = await checkToolAccess(toolName, context.config, userId);
+  const sandboxActive = (context.exchange as { isSandbox?: boolean } | null)?.isSandbox ?? context.broker?.isPaper ?? false;
+  const access = await checkToolAccess(toolName, context.config, userId, { sandboxActive });
   if (!access.allowed) {
     return { allowed: false, reason: access.reason };
   }
