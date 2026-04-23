@@ -1430,23 +1430,6 @@ function AppInner() {
 
   return (
     <Box flexDirection="column">
-      {/* ── Compact live header — only shown once conversation starts.
-           The full boot card is printed to stdout in index.tsx before
-           Ink starts, so it lives in terminal history above this frame. ── */}
-      {messages.length > 0 && (
-        <GordonHeader
-          permissionMode={permissionMode ?? "ask"}
-          sessionId={sessionId}
-          threadId={threadId}
-          isResumedSession={isResumedSession}
-          resumeMessageCount={isResumedSession ? messages.length : undefined}
-          toolCount={5}
-          positionCount={0}
-          feedCount={0}
-          compact={true}
-        />
-      )}
-
       {/* ── Conversation — wrapped in PrivacyScreen ── */}
       <PrivacyScreen active={privacyMode}>
         <Box flexDirection="column" paddingX={1}>
