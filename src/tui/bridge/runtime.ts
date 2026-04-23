@@ -304,6 +304,8 @@ async function streamResponse(
 ): Promise<void> {
   let taskTree = createTaskTree({ input: userMessage });
   let responseContent = "";
+  let lastFlushTime = 0;
+  let flushPending = false;
   let totalTokens = 0;
   let currentAgentName: string | null = null;
   let chainStartTime = Date.now();
@@ -331,21 +333,38 @@ async function streamResponse(
     for await (const event of runtime.streamMessage(userMessage)) {
       switch (event.type) {
         case "text_delta": {
-          // Stream text deltas live so the message grows token-by-token,
-          // matching Claude Code behaviour. The stable-prefix optimisation in
-          // StreamingMarkdown means re-rendering is cheap — only the new tail
-          // is re-parsed on each delta.
           const chunk = event.content ?? "";
           if (chunk) {
             responseContent += chunk;
-            setState((prev: any) => {
-              const msgs = [...prev.messages];
-              const idx = msgs.length - 1;
-              if (idx >= 0 && msgs[idx]?.id === streamingMsgId) {
-                msgs[idx] = { ...msgs[idx], content: responseContent };
-              }
-              return { ...prev, streamBuffer: responseContent, messages: msgs };
-            });
+            // Debounce setState to at most one Ink redraw per 16ms frame.
+            // Accumulate chunks in responseContent; a scheduled flush picks up
+            // the latest value so no content is lost between commits.
+            const now = Date.now();
+            if (now - lastFlushTime >= 16) {
+              setState((prev: any) => {
+                const msgs = [...prev.messages];
+                const idx = msgs.length - 1;
+                if (idx >= 0 && msgs[idx]?.id === streamingMsgId) {
+                  msgs[idx] = { ...msgs[idx], content: responseContent };
+                }
+                return { ...prev, streamBuffer: responseContent, messages: msgs };
+              });
+              lastFlushTime = now;
+            } else if (!flushPending) {
+              flushPending = true;
+              setTimeout(() => {
+                flushPending = false;
+                lastFlushTime = Date.now();
+                setState((prev: any) => {
+                  const msgs = [...prev.messages];
+                  const idx = msgs.length - 1;
+                  if (idx >= 0 && msgs[idx]?.id === streamingMsgId) {
+                    msgs[idx] = { ...msgs[idx], content: responseContent };
+                  }
+                  return { ...prev, streamBuffer: responseContent, messages: msgs };
+                });
+              }, 16 - (now - lastFlushTime));
+            }
           }
           break;
         }

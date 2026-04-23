@@ -313,11 +313,11 @@ function getToolArgs(args?: Record<string, unknown>): string {
   return "";
 }
 
-const BlinkingDot = React.memo(function BlinkingDot() {
-  // Shared clock — no per-dot setInterval
-  const clockFrame = useAnimationClock(50);
-  // Toggle every ~600ms (12 frames at 50ms)
-  const visible = Math.floor(clockFrame / 12) % 2 === 0;
+const BlinkingDot = React.memo(function BlinkingDot({ active }: { active: boolean }) {
+  // Only subscribe to clock when actively running — idle dots do not need to animate
+  const clockFrame = useAnimationClock(active ? 150 : 0);
+  // Toggle every ~600ms (4 frames at 150ms)
+  const visible = active && Math.floor(clockFrame / 4) % 2 === 0;
   return <Text color="cyanBright">{visible ? "\u25CF" : " "}</Text>;
 });
 
@@ -337,7 +337,7 @@ const ToolCallRow = React.memo(function ToolCallRow({ call }: { call: ToolCallSt
     <Box flexDirection="column">
       <Box paddingLeft={2}>
         {call.status === "running" ? (
-          <BlinkingDot />
+          <BlinkingDot active={true} />
         ) : call.status === "success" ? (
           <Text color="green">{"\u25CF"}</Text>
         ) : (

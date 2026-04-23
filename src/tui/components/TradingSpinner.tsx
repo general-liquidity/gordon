@@ -400,7 +400,7 @@ export function TradingSpinner({ agentName, elapsedMs, streamLength = 0, userInp
   }, [streamLength]);
 
   // Shared animation clock — single timer for all animated components
-  const clockFrame = useAnimationClock(reducedMotion ? 1000 : 50);
+  const clockFrame = useAnimationClock(reducedMotion ? 1000 : 150);
 
   // Derive animation state from clock frame (no setInterval needed)
   useEffect(() => {
