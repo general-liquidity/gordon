@@ -935,16 +935,6 @@ function AppInner() {
     return () => clearTimeout(timer);
   }, [isStreaming, handleSubmit]);
 
-  // Clear screen when the first message arrives so the full Gordon card
-  // (rendered during the empty state) doesn't linger in the scrollback.
-  const prevMsgCountRef = React.useRef(0);
-  useEffect(() => {
-    if (prevMsgCountRef.current === 0 && messages.length > 0) {
-      process.stdout.write("\x1b[2J\x1b[H");
-    }
-    prevMsgCountRef.current = messages.length;
-  }, [messages.length]);
-
   // Wire: terminal tab — update tab title/badge/color based on Gordon state.
   useEffect(() => {
     updateTerminalTab({
@@ -1450,7 +1440,7 @@ function AppInner() {
         toolCount={5}
         positionCount={0}
         feedCount={0}
-        compact={messages.length > 0}
+        compact={true}
       />
 
       {/* ── Conversation — wrapped in PrivacyScreen ── */}
@@ -1879,20 +1869,18 @@ export function App() {
   // Import ThemeProvider dynamically to avoid circular deps
   const { ThemeProvider } = require("./themes/ThemeProvider.js");
   return (
-    <AlternateScreen enabled={process.env.GORDON_ALT_SCREEN !== "false"}>
-      <ThemeProvider>
-      <SettingsProvider>
-        <MemoryProvider>
-          <StatsProvider>
-            <NotificationsProvider>
-              <AppStateProvider>
-                <AppInner />
-              </AppStateProvider>
-            </NotificationsProvider>
-          </StatsProvider>
-        </MemoryProvider>
-      </SettingsProvider>
-      </ThemeProvider>
-    </AlternateScreen>
+    <ThemeProvider>
+    <SettingsProvider>
+      <MemoryProvider>
+        <StatsProvider>
+          <NotificationsProvider>
+            <AppStateProvider>
+              <AppInner />
+            </AppStateProvider>
+          </NotificationsProvider>
+        </StatsProvider>
+      </MemoryProvider>
+    </SettingsProvider>
+    </ThemeProvider>
   );
 }
