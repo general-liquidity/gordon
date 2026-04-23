@@ -18,18 +18,19 @@ import {
 interface Props {
   messages: Message[];
   viewportHeight: number;
-  /** Height per message row in terminal lines (default 3) */
-  itemHeight?: number;
+  /** Terminal column width, forwarded to height estimator (default 80) */
+  terminalWidth?: number;
   /** Whether input focus should be on scroll keys (disable during typing) */
   scrollEnabled?: boolean;
 }
 
+/** Fallback step size passed to getScrollAction for j/k keys (3 rows ≈ one short message) */
 const DEFAULT_ITEM_HEIGHT = 3;
 
 export function VirtualMessageList({
   messages,
   viewportHeight,
-  itemHeight = DEFAULT_ITEM_HEIGHT,
+  terminalWidth = 80,
   scrollEnabled = true,
 }: Props) {
   const [unseenCount, setUnseenCount] = useState(0);
@@ -39,78 +40,6 @@ export function VirtualMessageList({
   const userScrolledUp = useRef(false);
 
   const isStreaming = messages.some((m) => m.streaming);
-
-  const {
-    startIndex,
-    endIndex,
-    isAtBottom,
-    scrollToBottom,
-    scrollTo,
-    onScroll,
-  } = useVirtualScroll({
-    totalItems: messages.length,
-    viewportHeight,
-    itemHeight,
-    overscan: 3,
-  });
-
-  // Track unseen messages when user has scrolled up
-  useEffect(() => {
-    const newCount = messages.length - prevMessageCount.current;
-    if (newCount > 0 && userScrolledUp.current) {
-      setUnseenCount((prev) => prev + newCount);
-    }
-    if (!userScrolledUp.current) {
-      setUnseenCount(0);
-    }
-    prevMessageCount.current = messages.length;
-  }, [messages.length]);
-
-  // Auto-scroll: always follow new content unless user explicitly scrolled up.
-  // During streaming the chat must follow the response like Claude Code does.
-  const lastMsgContentLen = messages[messages.length - 1]?.content?.length ?? 0;
-  useEffect(() => {
-    if (!userScrolledUp.current || isStreaming) {
-      scrollToBottom();
-    }
-  }, [messages.length, lastMsgContentLen, isStreaming, scrollToBottom]);
-
-  // Keyboard scroll bindings
-  useInput(
-    (input, key) => {
-      if (!scrollEnabled) return;
-
-      const action = getScrollAction(input, key, viewportHeight, itemHeight);
-      if (!action) return;
-
-      if (action.delta === "bottom") {
-        userScrolledUp.current = false;
-        scrollToBottom();
-        setUnseenCount(0);
-      } else if (action.delta === "top") {
-        userScrolledUp.current = true;
-        scrollTo(0);
-      } else if (action.delta === "pageUp") {
-        userScrolledUp.current = true;
-        onScroll(-viewportHeight);
-      } else if (action.delta === "pageDown") {
-        onScroll(viewportHeight);
-        if (isAtBottom) userScrolledUp.current = false;
-      } else {
-        // Positive delta = down, negative = up
-        if ((action.delta as number) < 0) userScrolledUp.current = true;
-        else if (isAtBottom) userScrolledUp.current = false;
-        onScroll(action.delta as number);
-      }
-    },
-    { isActive: scrollEnabled },
-  );
-
-  const handleJumpToBottom = useCallback(() => {
-    userScrolledUp.current = false;
-    scrollToBottom();
-    setUnseenCount(0);
-  }, [scrollToBottom]);
 
   // Message collapsing pipeline (Claude Code pattern): group consecutive
   // tool results. Keyed on (messages.length, last id, last content length)
@@ -158,6 +87,77 @@ export function VirtualMessageList({
     return result;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [collapseKey]);
+
+  const {
+    startIndex,
+    endIndex,
+    isAtBottom,
+    scrollToBottom,
+    scrollTo,
+    onScroll,
+  } = useVirtualScroll({
+    items: collapsedMessages,
+    viewportHeight,
+    terminalWidth,
+  });
+
+  // Track unseen messages when user has scrolled up
+  useEffect(() => {
+    const newCount = messages.length - prevMessageCount.current;
+    if (newCount > 0 && userScrolledUp.current) {
+      setUnseenCount((prev) => prev + newCount);
+    }
+    if (!userScrolledUp.current) {
+      setUnseenCount(0);
+    }
+    prevMessageCount.current = messages.length;
+  }, [messages.length]);
+
+  // Auto-scroll: always follow new content unless user explicitly scrolled up.
+  // During streaming the chat must follow the response like Claude Code does.
+  const lastMsgContentLen = messages[messages.length - 1]?.content?.length ?? 0;
+  useEffect(() => {
+    if (!userScrolledUp.current || isStreaming) {
+      scrollToBottom();
+    }
+  }, [messages.length, lastMsgContentLen, isStreaming, scrollToBottom]);
+
+  // Keyboard scroll bindings
+  useInput(
+    (input, key) => {
+      if (!scrollEnabled) return;
+
+      const action = getScrollAction(input, key, viewportHeight, DEFAULT_ITEM_HEIGHT);
+      if (!action) return;
+
+      if (action.delta === "bottom") {
+        userScrolledUp.current = false;
+        scrollToBottom();
+        setUnseenCount(0);
+      } else if (action.delta === "top") {
+        userScrolledUp.current = true;
+        scrollTo(0);
+      } else if (action.delta === "pageUp") {
+        userScrolledUp.current = true;
+        onScroll(-viewportHeight);
+      } else if (action.delta === "pageDown") {
+        onScroll(viewportHeight);
+        if (isAtBottom) userScrolledUp.current = false;
+      } else {
+        // Positive delta = down, negative = up
+        if ((action.delta as number) < 0) userScrolledUp.current = true;
+        else if (isAtBottom) userScrolledUp.current = false;
+        onScroll(action.delta as number);
+      }
+    },
+    { isActive: scrollEnabled },
+  );
+
+  const handleJumpToBottom = useCallback(() => {
+    userScrolledUp.current = false;
+    scrollToBottom();
+    setUnseenCount(0);
+  }, [scrollToBottom]);
 
   // Slice visible messages
   const visibleMessages = collapsedMessages.slice(startIndex, endIndex);

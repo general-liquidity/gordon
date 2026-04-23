@@ -1,17 +1,141 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useRef } from "react";
 
 // ============================================================================
 // useVirtualScroll — Viewport culling for large message lists
 //
-// Computes visible range from scrollTop + viewport dimensions.
-// Supports keyboard navigation: j/k, Page Up/Down, G/g.
+// Port of Claude Code's virtual scroll patterns:
+//  - Content-based height estimation (no fixed itemHeight=3)
+//  - SCROLL_QUANTUM: re-renders only when visible RANGE changes (every 40 rows)
+//  - OVERSCAN_ROWS: 80-row overscan (row-based, not item-based)
+//  - MAX_MOUNTED_ITEMS: hard cap on rendered items (300)
+//  - Binary search for O(log n) visible-range computation
+//  - Cumulative offset array for pixel-accurate positioning
 // ============================================================================
 
+// ---------------------------------------------------------------------------
+// Constants (match Claude Code exactly)
+// ---------------------------------------------------------------------------
+
+const OVERSCAN_ROWS = 80;        // was: overscan=3 items (~9 rows)
+const SCROLL_QUANTUM = 40;       // quantize scrollTop to reduce re-renders
+const MAX_MOUNTED_ITEMS = 300;   // cap on rendered items
+// const SLIDE_STEP = 25;        // max new items per commit (reserved for future sliding window)
+// const COLD_START_COUNT = 30;  // items rendered before heights known (reserved)
+
+// ---------------------------------------------------------------------------
+// Height estimation
+// ---------------------------------------------------------------------------
+
+/**
+ * Estimate terminal row height for a message from its content string.
+ * No Yoga layout feedback available in stock Ink — approximate via line-wrapping.
+ */
+export function estimateMessageHeight(
+  content: string,
+  terminalWidth: number,
+  variant?: string,
+): number {
+  // chrome = badge line + bottom margin
+  const chrome = 2;
+  if (!content) return chrome + 1;
+
+  // Count logical lines in content accounting for terminal wrap
+  const lines = content.split("\n");
+  let rows = 0;
+  for (const line of lines) {
+    // Strip ANSI escape codes for accurate width calculation
+    const plain = line.replace(/\x1b\[[0-9;]*m/g, "");
+    rows += Math.max(1, Math.ceil(plain.length / Math.max(1, terminalWidth - 4)));
+  }
+
+  // Tool calls and system messages are compact
+  if (variant === "tool" || variant === "compact" || variant === "system") {
+    return Math.min(rows + chrome, 6);
+  }
+  return rows + chrome;
+}
+
+// ---------------------------------------------------------------------------
+// Height cache — keyed by (id, contentLength) to avoid re-estimation
+// ---------------------------------------------------------------------------
+
+// Cache: messageId → { contentLen, height }
+const heightCache = new Map<string, { contentLen: number; height: number }>();
+
+export function getCachedHeight(
+  id: string,
+  content: string,
+  terminalWidth: number,
+  variant?: string,
+): number {
+  const contentLen = content.length;
+  const cached = heightCache.get(id);
+  if (cached && cached.contentLen === contentLen) return cached.height;
+
+  const height = estimateMessageHeight(content, terminalWidth, variant);
+  heightCache.set(id, { contentLen, height });
+
+  if (heightCache.size > 500) {
+    // Evict oldest entry
+    const firstKey = heightCache.keys().next().value;
+    if (firstKey) heightCache.delete(firstKey);
+  }
+  return height;
+}
+
+// ---------------------------------------------------------------------------
+// Binary search helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns the index of the first item whose top edge is at or above scrollTop.
+ * offsets[i] = cumulative row height before item i.
+ */
+function findFirstVisible(offsets: number[], scrollTop: number): number {
+  let lo = 0;
+  let hi = offsets.length - 1;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (offsets[mid]! <= scrollTop) lo = mid + 1;
+    else hi = mid;
+  }
+  return Math.max(0, lo - 1);
+}
+
+/**
+ * Returns the index of the last item whose top edge is within the viewport bottom.
+ */
+function findLastVisible(
+  offsets: number[],
+  scrollTop: number,
+  viewportHeight: number,
+): number {
+  const bottom = scrollTop + viewportHeight;
+  let lo = 0;
+  let hi = offsets.length - 1;
+  while (lo < hi) {
+    const mid = (lo + hi + 1) >> 1;
+    if (offsets[mid]! <= bottom) lo = mid;
+    else hi = mid - 1;
+  }
+  return Math.min(offsets.length - 2, lo);
+}
+
+// ---------------------------------------------------------------------------
+// Public interfaces
+// ---------------------------------------------------------------------------
+
+export interface VirtualScrollItem {
+  id: string;
+  content: string;
+  variant?: string;
+}
+
 export interface VirtualScrollOptions {
-  totalItems: number;
+  items: VirtualScrollItem[];
   viewportHeight: number;
-  itemHeight?: number;   // default 3 (badge + content + margin)
-  overscan?: number;     // extra items above/below viewport, default 3
+  /** Terminal column width for line-wrap estimation (default 80) */
+  terminalWidth?: number;
 }
 
 export interface VirtualScrollResult {
@@ -19,7 +143,7 @@ export interface VirtualScrollResult {
   startIndex: number;
   /** Last item index to render (exclusive) */
   endIndex: number;
-  /** Current scroll offset in rows */
+  /** Current scroll offset in rows (may be clamped) */
   scrollTop: number;
   /** Whether the viewport is scrolled to the bottom */
   isAtBottom: boolean;
@@ -31,69 +155,139 @@ export interface VirtualScrollResult {
   onScroll: (delta: number) => void;
   /** Total scrollable height in rows */
   totalHeight: number;
+  /** Cumulative row offset for item i (top of item i) */
+  getItemTop: (index: number) => number;
+  /** Estimated height of item i in rows */
+  getItemHeight: (index: number) => number;
 }
 
-export function useVirtualScroll({
-  totalItems,
-  viewportHeight,
-  itemHeight = 3,
-  overscan = 3,
-}: VirtualScrollOptions): VirtualScrollResult {
-  // Start at the bottom so the latest messages are visible immediately.
-  // Number.MAX_SAFE_INTEGER gets clamped to maxScrollTop by all consumers.
-  const [scrollTop, setScrollTop] = useState(Number.MAX_SAFE_INTEGER);
+// ---------------------------------------------------------------------------
+// Hook
+// ---------------------------------------------------------------------------
 
-  const totalHeight = totalItems * itemHeight;
+export function useVirtualScroll({
+  items,
+  viewportHeight,
+  terminalWidth = 80,
+}: VirtualScrollOptions): VirtualScrollResult {
+  // scrollBucket drives React re-renders — changes only every SCROLL_QUANTUM rows.
+  // The true scroll position lives in scrollTopRef so smooth intermediate
+  // values don't cause unnecessary reconciliation.
+  const [scrollBucket, setScrollBucket] = useState(0);
+
+  // Initialize to MAX_SAFE_INTEGER so the first clamp always lands at the bottom.
+  const scrollTopRef = useRef(Number.MAX_SAFE_INTEGER);
+
+  // Build cumulative offsets array: offsets[i] = sum of heights[0..i-1]
+  const offsets = useMemo(() => {
+    const arr = new Array<number>(items.length + 1);
+    arr[0] = 0;
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i]!;
+      const h = getCachedHeight(item.id, item.content, terminalWidth, item.variant);
+      arr[i + 1] = arr[i]! + h;
+    }
+    return arr;
+    // items identity changes whenever content changes (VirtualMessageList recreates array)
+  }, [items, terminalWidth]);
+
+  const totalHeight = offsets[items.length] ?? 0;
   const maxScrollTop = Math.max(0, totalHeight - viewportHeight);
 
-  // Clamp helper
-  const clamp = useCallback(
-    (value: number) => Math.max(0, Math.min(value, maxScrollTop)),
-    [maxScrollTop],
+  // Clamp scrollTopRef on each render pass (maxScrollTop may have shrunk)
+  const clampedTop = Math.max(0, Math.min(scrollTopRef.current, maxScrollTop));
+
+  // Compute visible range with row-based overscan
+  let startIndex = findFirstVisible(
+    offsets,
+    Math.max(0, clampedTop - OVERSCAN_ROWS),
+  );
+  let endIndex =
+    findLastVisible(offsets, clampedTop, viewportHeight + OVERSCAN_ROWS) + 1;
+
+  // Cap to MAX_MOUNTED_ITEMS to prevent excessive DOM nodes
+  if (endIndex - startIndex > MAX_MOUNTED_ITEMS) {
+    endIndex = startIndex + MAX_MOUNTED_ITEMS;
+  }
+
+  // Clamp to valid item range
+  startIndex = Math.max(0, startIndex);
+  endIndex = Math.min(items.length, endIndex);
+
+  const isAtBottom = clampedTop >= maxScrollTop - 1;
+
+  const onScroll = useCallback(
+    (delta: number) => {
+      const newTop = Math.max(
+        0,
+        Math.min(scrollTopRef.current + delta, maxScrollTop),
+      );
+      scrollTopRef.current = newTop;
+      const newBucket = Math.floor(newTop / SCROLL_QUANTUM);
+      if (newBucket !== scrollBucket) {
+        setScrollBucket(newBucket);
+      }
+    },
+    [scrollBucket, maxScrollTop],
   );
 
-  // Visible range (before overscan)
-  const rawStartIndex = Math.floor(scrollTop / itemHeight);
-  const visibleCount = Math.ceil(viewportHeight / itemHeight);
-  const rawEndIndex = rawStartIndex + visibleCount;
-
-  // Apply overscan
-  const startIndex = Math.max(0, rawStartIndex - overscan);
-  const endIndex = Math.min(totalItems, rawEndIndex + overscan);
-
-  const isAtBottom = scrollTop >= maxScrollTop;
-
   const scrollToBottom = useCallback(() => {
-    setScrollTop(maxScrollTop);
+    scrollTopRef.current = maxScrollTop;
+    setScrollBucket(Math.floor(maxScrollTop / SCROLL_QUANTUM));
   }, [maxScrollTop]);
 
   const scrollTo = useCallback(
     (index: number) => {
-      const target = clamp(index * itemHeight);
-      setScrollTop(target);
+      const target = Math.max(
+        0,
+        Math.min(offsets[index] ?? 0, maxScrollTop),
+      );
+      scrollTopRef.current = target;
+      setScrollBucket(Math.floor(target / SCROLL_QUANTUM));
     },
-    [clamp, itemHeight],
+    [offsets, maxScrollTop],
   );
 
-  const onScroll = useCallback(
-    (delta: number) => {
-      setScrollTop((prev) => clamp(prev + delta));
+  const getItemTop = useCallback(
+    (index: number) => offsets[index] ?? 0,
+    [offsets],
+  );
+
+  const getItemHeight = useCallback(
+    (index: number) => {
+      const item = items[index];
+      if (!item) return 3;
+      return getCachedHeight(item.id, item.content, terminalWidth, item.variant);
     },
-    [clamp],
+    [items, terminalWidth],
   );
 
   return useMemo(
     () => ({
       startIndex,
       endIndex,
-      scrollTop,
+      scrollTop: clampedTop,
       isAtBottom,
       scrollToBottom,
       scrollTo,
       onScroll,
       totalHeight,
+      getItemTop,
+      getItemHeight,
     }),
-    [startIndex, endIndex, scrollTop, isAtBottom, scrollToBottom, scrollTo, onScroll, totalHeight],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [
+      startIndex,
+      endIndex,
+      clampedTop,
+      isAtBottom,
+      scrollToBottom,
+      scrollTo,
+      onScroll,
+      totalHeight,
+      getItemTop,
+      getItemHeight,
+    ],
   );
 }
 
@@ -108,7 +302,10 @@ export interface ScrollKeyAction {
 
 /**
  * Returns the scroll action for a given key press, or null if not a scroll key.
- * Intended to be called from useInput handler.
+ * Intended to be called from a useInput handler.
+ *
+ * NOTE: itemHeight parameter kept for backwards compatibility with callers that
+ * pass it (e.g. VirtualMessageList). It is used as the single-line scroll step.
  */
 export function getScrollAction(
   input: string,
