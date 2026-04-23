@@ -397,14 +397,14 @@ export function TradingSpinner({ agentName, elapsedMs, streamLength = 0, userInp
   }
 
   // Shared animation clock — single timer for all animated components
-  const clockFrame = useAnimationClock(reducedMotion ? 1000 : 150);
+  const clockFrame = useAnimationClock(reducedMotion ? 1000 : 16);
 
   // Derive all animation state directly from clockFrame — no useEffect, no double-render
   const frame = reducedMotion
     ? clockFrame % 2
-    : clockFrame % ALL_FRAMES.length;
+    : Math.floor(clockFrame / 9) % ALL_FRAMES.length;
   const verbLen = verb.length + 4;
-  const glimmerIndex = clockFrame % verbLen;
+  const glimmerIndex = Math.floor(clockFrame / 9) % verbLen;
   const timeSinceGrowth = Date.now() - lastGrowthRef.current;
   if (timeSinceGrowth > 3000) {
     const target = Math.min(1, (timeSinceGrowth - 3000) / 2000);

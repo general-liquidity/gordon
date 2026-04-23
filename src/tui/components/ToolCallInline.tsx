@@ -315,9 +315,9 @@ function getToolArgs(args?: Record<string, unknown>): string {
 
 const BlinkingDot = React.memo(function BlinkingDot({ active }: { active: boolean }) {
   // Only subscribe to clock when actively running — idle dots do not need to animate
-  const clockFrame = useAnimationClock(active ? 150 : 0);
-  // Toggle every ~600ms (4 frames at 150ms)
-  const visible = active && Math.floor(clockFrame / 4) % 2 === 0;
+  const clockFrame = useAnimationClock(active ? 16 : 0);
+  // Toggle every ~600ms (37 frames at 16ms)
+  const visible = active && Math.floor(clockFrame / 37) % 2 === 0;
   return <Text color="cyanBright">{visible ? "\u25CF" : " "}</Text>;
 });
 
