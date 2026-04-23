@@ -85,7 +85,14 @@ export function commandToPrompt(command: SlashCommand, args: string): string {
     case "switch-exchange":
       return args?.trim()
         ? `Switch the active exchange to '${args.trim()}'. Confirm the switch and show the new active venue details.`
-        : "List all configured exchanges and show which one is currently active.";
+        : "List all configured exchanges and show which one is currently active. Clearly mark which are sandbox/testnet vs live.";
+    case "exchange-paper":
+    case "venue-paper":
+    case "sandbox":
+      return "Switch to the first configured sandbox or testnet exchange (sandbox: true). Show which venue was selected and remind the user to also type /paper to enable paper trading mode.";
+    case "exchange-live":
+    case "venue-live":
+      return "Switch to the primary live exchange (sandbox: false, isDefault: true or first live entry). Confirm the switch and show the active venue.";
     case "paper":
       return "Set permissionMode to 'paper' — switch to paper trading mode. Real orders blocked; venue adapters switched to sandbox/testnet endpoints so strategies run end-to-end without touching real capital";
     case "live":
