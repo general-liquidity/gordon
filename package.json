@@ -53,7 +53,7 @@
     "prepublishOnly": "bun run build && node scripts/check-no-sourcemaps.cjs",
     "test": "bun test",
     "typecheck": "tsc --noEmit",
-    "postinstall": "node scripts/patch-mastra.cjs"
+    "postinstall": "node scripts/patch-mastra.cjs && node scripts/patch-ink.cjs"
   },
   "devDependencies": {
     "@types/asciichart": "^1.5.8",

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useRef, useMemo } from "react";
 import { Box, Text } from "ink";
 import { ShimmerChar } from "./ShimmerChar.js";
 import { useAnimationClock } from "../hooks/useAnimationClock.js";
@@ -372,9 +372,6 @@ export function TradingSpinner({ agentName, elapsedMs, streamLength = 0, userInp
   // Token counter (smooth animation via ref)
   const displayedTokensRef = useRef(0);
   const estimatedTokens = Math.floor(streamLength / 4); // ~4 chars per token
-  const [frame, setFrame] = useState(0);
-  const [glimmerIndex, setGlimmerIndex] = useState(0);
-
   // Verb priority: active tool > user input inference > agent name > generic
   // Memoized — regex runs only when inputs change, not every 50ms render
   const verb = useMemo(() =>
@@ -386,39 +383,36 @@ export function TradingSpinner({ agentName, elapsedMs, streamLength = 0, userInp
 
   const reducedMotion = typeof process !== "undefined" && process.env.GORDON_REDUCED_MOTION === "true";
 
-  // Stall detection
+  // Stall detection — refs only, no state (no extra render needed)
   const lastLengthRef = useRef(streamLength);
   const lastGrowthRef = useRef(Date.now());
-  const [stallIntensity, setStallIntensity] = useState(0);
+  // Track stall smoothing across renders using a ref (not state — no re-render needed)
+  const stallRef = useRef(0);
 
-  useEffect(() => {
-    if (streamLength > lastLengthRef.current) {
-      lastLengthRef.current = streamLength;
-      lastGrowthRef.current = Date.now();
-      setStallIntensity(0);
-    }
-  }, [streamLength]);
+  // Update growth tracking when stream advances (pure side-effect, no render needed)
+  if (streamLength > lastLengthRef.current) {
+    lastLengthRef.current = streamLength;
+    lastGrowthRef.current = Date.now();
+    stallRef.current = 0;
+  }
 
   // Shared animation clock — single timer for all animated components
   const clockFrame = useAnimationClock(reducedMotion ? 1000 : 150);
 
-  // Derive animation state from clock frame (no setInterval needed)
-  useEffect(() => {
-    if (reducedMotion) {
-      setFrame((f) => (f + 1) % 2);
-      return;
-    }
-    setFrame((f) => (f + 1) % ALL_FRAMES.length);
-    const verbLen = verb.length + 4;
-    setGlimmerIndex((g) => (g + 1) % verbLen);
-    const timeSinceGrowth = Date.now() - lastGrowthRef.current;
-    if (timeSinceGrowth > 3000) {
-      setStallIntensity((prev) => {
-        const target = Math.min(1, (timeSinceGrowth - 3000) / 2000);
-        return prev + (target - prev) * 0.1;
-      });
-    }
-  }, [clockFrame, verb.length, reducedMotion]);
+  // Derive all animation state directly from clockFrame — no useEffect, no double-render
+  const frame = reducedMotion
+    ? clockFrame % 2
+    : clockFrame % ALL_FRAMES.length;
+  const verbLen = verb.length + 4;
+  const glimmerIndex = clockFrame % verbLen;
+  const timeSinceGrowth = Date.now() - lastGrowthRef.current;
+  if (timeSinceGrowth > 3000) {
+    const target = Math.min(1, (timeSinceGrowth - 3000) / 2000);
+    stallRef.current = stallRef.current + (target - stallRef.current) * 0.1;
+  } else {
+    stallRef.current = 0;
+  }
+  const stallIntensity = stallRef.current;
 
   const char = reducedMotion
     ? (frame % 2 === 0 ? "\u25CF" : " ")

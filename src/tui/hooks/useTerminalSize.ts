@@ -9,6 +9,7 @@
  */
 
 import { useState, useEffect } from "react";
+import { resetLineDiffCache } from "../rendering/LineDiffRenderer.js";
 
 export interface TerminalSize {
   /** Terminal width in columns */
@@ -51,6 +52,10 @@ export function useTerminalSize(): TerminalSize {
     const onResize = () => {
       if (debounceTimer) clearTimeout(debounceTimer);
       debounceTimer = setTimeout(() => {
+        // Clear stale line diffs before layout recomputes — without this,
+        // incrementalRendering may skip rewriting lines whose content
+        // hasn't changed but whose position has shifted after resize.
+        resetLineDiffCache();
         setSize(getTerminalSize());
         debounceTimer = null;
       }, RESIZE_DEBOUNCE_MS);

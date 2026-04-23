@@ -336,11 +336,12 @@ async function streamResponse(
           const chunk = event.content ?? "";
           if (chunk) {
             responseContent += chunk;
-            // Debounce setState to at most one Ink redraw per 16ms frame.
+            // 100ms matches Claude Code's STREAM_EVENT_FLUSH_INTERVAL_MS
+            // Debounce setState to at most one Ink redraw per 100ms batch.
             // Accumulate chunks in responseContent; a scheduled flush picks up
             // the latest value so no content is lost between commits.
             const now = Date.now();
-            if (now - lastFlushTime >= 16) {
+            if (now - lastFlushTime >= 100) {
               setState((prev: any) => {
                 const msgs = [...prev.messages];
                 const idx = msgs.length - 1;
@@ -363,7 +364,7 @@ async function streamResponse(
                   }
                   return { ...prev, streamBuffer: responseContent, messages: msgs };
                 });
-              }, 16 - (now - lastFlushTime));
+              }, 100 - (now - lastFlushTime));
             }
           }
           break;
