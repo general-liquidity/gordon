@@ -190,3 +190,75 @@ if (!fs.existsSync(logUpdatePath)) {
     }
   }
 }
+
+// ============================================================================
+// Patch 3: charCache — tokenization memoization across frames (output.js)
+//
+// Ink's Output.get() calls tokenize(line) + styledCharsFromTokens(line) for
+// every line on every render, even when lines haven't changed. Since a new
+// Output instance is created each frame, there is no built-in caching.
+//
+// Claude Code's Ink fork holds a static Map<string, ClusteredChar[]> on the
+// Output class — Output._charCache — so tokenization results survive across
+// frame instances. Most lines are stable between renders, giving near-zero
+// cost for unchanged content.
+//
+// Cache key  : the transformed line string (after transformer application)
+// Cache value: the ClusteredChar[] array from styledCharsFromTokens(tokenize(line))
+// Eviction   : clear() when size exceeds 16 384 entries (same cap as Claude Code)
+//
+// Patch location: inside the `write` operation loop in Output.get(), on the
+// line that calls styledCharsFromTokens(tokenize(line)).
+// ============================================================================
+
+const outputJsPath = path.resolve(__dirname, "..", "node_modules", "ink", "build", "output.js");
+
+if (!fs.existsSync(outputJsPath)) {
+  warn("[patch-ink] WARNING: output.js not found at " + outputJsPath + " — skipping charCache patch.");
+} else {
+  let outputContent = fs.readFileSync(outputJsPath, "utf8");
+
+  // Idempotency check
+  if (outputContent.includes("charCache")) {
+    log("[patch-ink] output.js already has charCache patch — skipping.");
+  } else {
+    // Target: the single line that performs tokenize + styledCharsFromTokens.
+    // Actual line from Ink 6.6.0 output.js (4 spaces indent inside a for-of loop):
+    //   "                    const characters = styledCharsFromTokens(tokenize(line));"
+    const needle = "                    const characters = styledCharsFromTokens(tokenize(line));";
+
+    if (!outputContent.includes(needle)) {
+      warn("[patch-ink] WARNING: Could not find tokenize/styledCharsFromTokens line in output.js.");
+      warn("[patch-ink] The file may have been updated — inspect node_modules/ink/build/output.js manually.");
+    } else {
+      // Replacement: wrap the expensive call in a static charCache lookup.
+      // We preserve the same variable name `characters` so the rest of the
+      // loop body is untouched.
+      const indent = "                    ";
+      const replacement = [
+        indent + "// charCache: persist tokenized+styled chars across frames (patch-ink.cjs)",
+        indent + "// Cap at 16 384 entries to prevent unbounded growth — same as Claude Code.",
+        indent + "if (!Output._charCache) Output._charCache = new Map();",
+        indent + "let characters = Output._charCache.get(line);",
+        indent + "if (!characters) {",
+        indent + "    characters = styledCharsFromTokens(tokenize(line));",
+        indent + "    Output._charCache.set(line, characters);",
+        indent + "    if (Output._charCache.size > 16384) Output._charCache.clear();",
+        indent + "}",
+      ].join("\n");
+
+      const crlf3 = outputContent.includes("\r\n");
+      const patchedOutput = outputContent.replace(
+        needle,
+        crlf3 ? replacement.replace(/\n/g, "\r\n") : replacement,
+      );
+
+      if (!patchedOutput.includes("charCache")) {
+        warn("[patch-ink] WARNING: charCache patch may have failed — charCache not found after replacement.");
+      } else {
+        fs.writeFileSync(outputJsPath, patchedOutput, "utf8");
+        console.log("[patch-ink] Patched output.js — charCache tokenization memoization applied.");
+      }
+    }
+  }
+}
