@@ -3,7 +3,7 @@
  * Handles authenticated and public API requests to Coinbase
  */
 
-import { createHmac } from "crypto";
+import { createHmac, createSign, randomBytes } from "crypto";
 import type {
   CoinbaseAccount,
   CoinbaseAccountsResponse,
@@ -49,6 +49,12 @@ const apiCircuitBreaker = new CircuitBreaker({
 // Coinbase API base URLs
 const COINBASE_LIVE_URL = "https://api.coinbase.com";
 const COINBASE_SANDBOX_URL = "https://api-sandbox.coinbase.com";
+const COINBASE_LIVE_HOST = "api.coinbase.com";
+const COINBASE_SANDBOX_HOST = "api-sandbox.coinbase.com";
+
+function base64url(buf: Buffer): string {
+  return buf.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
+}
 
 // Coinbase Primary API v2 version header
 const CB_API_VERSION = "2024-02-01";
@@ -79,15 +85,21 @@ export class CoinbaseClient {
   private apiSecret: string;
   private passphrase: string;
   private readonly baseUrl: string;
+  private readonly host: string;
   readonly isSandbox: boolean;
   private rateLimitState: RateLimitState;
+  // True when apiSecret is a CDP EC private key (JWT auth), false for legacy HMAC auth.
+  private readonly useJWT: boolean;
 
   constructor(apiKey: string, apiSecret: string, passphrase: string, sandbox: boolean = false) {
     this.apiKey = apiKey;
-    this.apiSecret = apiSecret;
+    // Normalize escaped newlines that may come from env var storage.
+    this.apiSecret = apiSecret.replace(/\\n/g, "\n");
     this.passphrase = passphrase;
     this.isSandbox = sandbox;
     this.baseUrl = sandbox ? COINBASE_SANDBOX_URL : COINBASE_LIVE_URL;
+    this.host = sandbox ? COINBASE_SANDBOX_HOST : COINBASE_LIVE_HOST;
+    this.useJWT = apiSecret.includes("BEGIN EC PRIVATE KEY") || apiSecret.includes("BEGIN PRIVATE KEY");
     this.rateLimitState = {
       requestCount: 0,
       lastReset: Date.now(),
@@ -97,7 +109,7 @@ export class CoinbaseClient {
   }
 
   /**
-   * Generate HMAC SHA256 signature for authenticated requests
+   * Generate HMAC SHA256 signature for legacy API key auth.
    * Coinbase signature: HMAC_SHA256(timestamp + method + requestPath + body, secret)
    */
   private sign(timestamp: string, method: string, requestPath: string, body: string = ""): string {
@@ -105,6 +117,55 @@ export class CoinbaseClient {
     return createHmac("sha256", this.apiSecret)
       .update(message)
       .digest("base64");
+  }
+
+  /**
+   * Build a CDP JWT for Advanced Trade API authentication (ES256).
+   * Required when credentials use an EC private key instead of HMAC secret.
+   * Spec: https://docs.cdp.coinbase.com/advanced-trade/docs/rest-api-auth
+   */
+  private buildJWT(method: string, path: string): string {
+    const nonce = randomBytes(16).toString("hex");
+    const now = Math.floor(Date.now() / 1000);
+
+    const header = base64url(Buffer.from(JSON.stringify({
+      alg: "ES256",
+      typ: "JWT",
+      kid: this.apiKey,
+      nonce,
+    })));
+
+    const payload = base64url(Buffer.from(JSON.stringify({
+      iss: "cdp",
+      sub: this.apiKey,
+      nbf: now,
+      exp: now + 120,
+      uri: `${method} ${this.host}${path}`,
+    })));
+
+    const signingInput = `${header}.${payload}`;
+    const signer = createSign("SHA256");
+    signer.update(signingInput);
+    // ieee-p1363 produces raw r||s format required by JWT ES256 (not DER).
+    const sig = signer.sign({ key: this.apiSecret, dsaEncoding: "ieee-p1363" });
+
+    return `${signingInput}.${base64url(sig)}`;
+  }
+
+  private authHeaders(method: string, endpoint: string, bodyStr: string): Record<string, string> {
+    if (this.useJWT) {
+      return {
+        "Authorization": `Bearer ${this.buildJWT(method, endpoint)}`,
+        "Content-Type": "application/json",
+      };
+    }
+    const timestamp = Math.floor(Date.now() / 1000).toString();
+    return {
+      "CB-ACCESS-KEY": this.apiKey,
+      "CB-ACCESS-SIGN": this.sign(timestamp, method, endpoint, bodyStr),
+      "CB-ACCESS-TIMESTAMP": timestamp,
+      "Content-Type": "application/json",
+    };
   }
 
   /**
@@ -236,16 +297,8 @@ export class CoinbaseClient {
     this.rateLimitState.requestCount++;
 
     return withRetry(async () => {
-      const timestamp = Math.floor(Date.now() / 1000).toString();
       const bodyStr = body ? JSON.stringify(body) : "";
-      const signature = this.sign(timestamp, method, endpoint, bodyStr);
-
-      const headers: Record<string, string> = {
-        "CB-ACCESS-KEY": this.apiKey,
-        "CB-ACCESS-SIGN": signature,
-        "CB-ACCESS-TIMESTAMP": timestamp,
-        "Content-Type": "application/json",
-      };
+      const headers = this.authHeaders(method, endpoint, bodyStr);
 
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 10000);
@@ -349,16 +402,10 @@ export class CoinbaseClient {
     this.rateLimitState.requestCount++;
 
     return withRetry(async () => {
-      const timestamp = Math.floor(Date.now() / 1000).toString();
       const bodyStr = body ? JSON.stringify(body) : "";
-      const signature = this.sign(timestamp, method, endpoint, bodyStr);
-
       const headers: Record<string, string> = {
-        "CB-ACCESS-KEY": this.apiKey,
-        "CB-ACCESS-SIGN": signature,
-        "CB-ACCESS-TIMESTAMP": timestamp,
+        ...this.authHeaders(method, endpoint, bodyStr),
         "CB-VERSION": CB_API_VERSION,
-        "Content-Type": "application/json",
       };
 
       const controller = new AbortController();
