@@ -48,49 +48,145 @@ if (!fs.existsSync(inkPath)) {
 
 const content = fs.readFileSync(inkPath, "utf8");
 
-// Idempotency check — if already patched, do nothing.
+// Idempotency check — only apply if not already patched.
 if (content.includes("deferredRender")) {
-  log("[patch-ink] Already patched — skipping.");
-  process.exit(0);
+  log("[patch-ink] ink.js already patched (queueMicrotask) — skipping.");
+} else {
+  // Detect line ending style
+  const crlf = content.includes("\r\n");
+  const eol = crlf ? "\r\n" : "\n";
+
+  const indent8 = "        ";
+  const indent12 = "            ";
+  const indent16 = "                ";
+
+  // Build needle and replacement using detected line endings
+  const needle = [
+    indent8 + "this.rootNode.onRender = unthrottled",
+    indent12 + "? this.onRender",
+    indent12 + ": throttle(this.onRender, renderThrottleMs, {",
+    indent16 + "leading: true,",
+    indent16 + "trailing: true,",
+    indent12 + "});",
+  ].join(eol);
+
+  const replacement = [
+    indent8 + "// queueMicrotask defers the paint to after React's layout phase",
+    indent8 + "// (useLayoutEffect / ref attach) so cursor declarations commit before",
+    indent8 + "// the terminal write. Same pattern as Claude Code's Ink fork.",
+    indent8 + "const deferredRender = () => queueMicrotask(this.onRender.bind(this));",
+    indent8 + "this.rootNode.onRender = unthrottled",
+    indent12 + "? this.onRender",
+    indent12 + ": throttle(deferredRender, renderThrottleMs, {",
+    indent16 + "leading: true,",
+    indent16 + "trailing: true,",
+    indent12 + "});",
+  ].join(eol);
+
+  if (!content.includes(needle)) {
+    warn("[patch-ink] WARNING: Could not find the target onRender pattern in ink.js.");
+    warn("[patch-ink] The file may have been updated — inspect node_modules/ink/build/ink.js manually.");
+  } else {
+    const patched = content.replace(needle, replacement);
+    fs.writeFileSync(inkPath, patched, "utf8");
+    console.log("[patch-ink] Patched ink.js — queueMicrotask render deferral applied.");
+  }
 }
 
-// Detect line ending style
-const crlf = content.includes("\r\n");
-const eol = crlf ? "\r\n" : "\n";
+// ============================================================================
+// Patch 2: BSU/ESU synchronized output in log-update.js
+//
+// Wraps every frame write in Begin/End Synchronized Update escape sequences
+// so the terminal composites the frame atomically — eliminating partial-frame
+// flicker (visual tearing) on supported terminals.
+//
+// BSU: \x1b[?2026h  (DEC private mode 2026 — Begin Synchronized Update)
+// ESU: \x1b[?2026l  (End Synchronized Update)
+//
+// Supported terminals: iTerm2, WezTerm, Ghostty, kitty, foot, Contour,
+//                      Windows Terminal (WT_SESSION env var).
+// Unsupported terminals silently ignore these sequences — safe to always send.
+//
+// The createIncremental render path (active when incrementalRendering: true)
+// has two frame-writing stream.write() calls. We wrap both.
+// ============================================================================
 
-const indent8 = "        ";
-const indent12 = "            ";
-const indent16 = "                ";
+const logUpdatePath = path.resolve(__dirname, "..", "node_modules", "ink", "build", "log-update.js");
 
-// Build needle and replacement using detected line endings
-const needle = [
-  indent8 + "this.rootNode.onRender = unthrottled",
-  indent12 + "? this.onRender",
-  indent12 + ": throttle(this.onRender, renderThrottleMs, {",
-  indent16 + "leading: true,",
-  indent16 + "trailing: true,",
-  indent12 + "});",
-].join(eol);
+if (!fs.existsSync(logUpdatePath)) {
+  warn("[patch-ink] WARNING: log-update.js not found at " + logUpdatePath + " — skipping BSU/ESU patch.");
+} else {
+  let logUpdateContent = fs.readFileSync(logUpdatePath, "utf8");
 
-const replacement = [
-  indent8 + "// queueMicrotask defers the paint to after React's layout phase",
-  indent8 + "// (useLayoutEffect / ref attach) so cursor declarations commit before",
-  indent8 + "// the terminal write. Same pattern as Claude Code's Ink fork.",
-  indent8 + "const deferredRender = () => queueMicrotask(this.onRender.bind(this));",
-  indent8 + "this.rootNode.onRender = unthrottled",
-  indent12 + "? this.onRender",
-  indent12 + ": throttle(deferredRender, renderThrottleMs, {",
-  indent16 + "leading: true,",
-  indent16 + "trailing: true,",
-  indent12 + "});",
-].join(eol);
+  // Idempotency check
+  if (logUpdateContent.includes("BSU_ESU_SYNC")) {
+    log("[patch-ink] log-update.js already has BSU/ESU patch — skipping.");
+  } else {
+    // Detect terminal support at patch time using the same heuristic as
+    // LineDiffRenderer.ts and syncOutput.ts so all paths agree.
+    // We emit the detection as inline JS so it runs at module load time
+    // (the patched file is loaded fresh by Node on each CLI invocation).
+    const syncDetectBlock = [
+      "// BSU_ESU_SYNC — synchronized output support (patch-ink.cjs)",
+      "const __BSU = '\\x1b[?2026h';",
+      "const __ESU = '\\x1b[?2026l';",
+      "const __syncSupported = (function() {",
+      "  try {",
+      "    const term = process.env.TERM_PROGRAM ?? '';",
+      "    return /iTerm|WezTerm|Ghostty|kitty|foot|Contour/i.test(term) || !!process.env.WT_SESSION;",
+      "  } catch { return false; }",
+      "})();",
+    ].join("\n");
 
-if (!content.includes(needle)) {
-  warn("[patch-ink] WARNING: Could not find the target onRender pattern in ink.js.");
-  warn("[patch-ink] The file may have been updated — inspect node_modules/ink/build/ink.js manually.");
-  process.exit(0);
+    // Insert the detection block right before the createStandard declaration.
+    const createStandardDecl = "const createStandard = (stream, { showCursor = false } = {}) => {";
+    if (!logUpdateContent.includes(createStandardDecl)) {
+      warn("[patch-ink] WARNING: Could not find createStandard declaration in log-update.js — skipping BSU/ESU patch.");
+    } else {
+      logUpdateContent = logUpdateContent.replace(
+        createStandardDecl,
+        syncDetectBlock + "\n" + createStandardDecl,
+      );
+
+      // Wrap the two frame-writing stream.write() calls in createIncremental.
+      //
+      // Target 1 (first-frame / blank-frame path):
+      //   stream.write(ansiEscapes.eraseLines(previousCount) + output);
+      const target1 = "            stream.write(ansiEscapes.eraseLines(previousCount) + output);";
+      const replacement1 = [
+        "            if (__syncSupported) stream.write(__BSU);",
+        "            stream.write(ansiEscapes.eraseLines(previousCount) + output);",
+        "            if (__syncSupported) stream.write(__ESU);",
+      ].join("\n");
+
+      // Target 2 (incremental diff buffer path):
+      //   stream.write(buffer.join(''));
+      const target2 = "        stream.write(buffer.join(''));";
+      const replacement2 = [
+        "        if (__syncSupported) stream.write(__BSU);",
+        "        stream.write(buffer.join(''));",
+        "        if (__syncSupported) stream.write(__ESU);",
+      ].join("\n");
+
+      const crlf2 = logUpdateContent.includes("\r\n");
+      if (crlf2) {
+        // Normalize targets/replacements to CRLF if the file uses CRLF
+        // (Windows). This keeps the patch robust across OSes.
+        logUpdateContent = logUpdateContent
+          .replace(target1, replacement1.replace(/\n/g, "\r\n"))
+          .replace(target2, replacement2.replace(/\n/g, "\r\n"));
+      } else {
+        logUpdateContent = logUpdateContent
+          .replace(target1, replacement1)
+          .replace(target2, replacement2);
+      }
+
+      if (!logUpdateContent.includes("__syncSupported")) {
+        warn("[patch-ink] WARNING: BSU/ESU patch may have failed — __syncSupported not found after replacement.");
+      } else {
+        fs.writeFileSync(logUpdatePath, logUpdateContent, "utf8");
+        console.log("[patch-ink] Patched log-update.js — BSU/ESU synchronized output applied.");
+      }
+    }
+  }
 }
-
-const patched = content.replace(needle, replacement);
-fs.writeFileSync(inkPath, patched, "utf8");
-console.log("[patch-ink] Patched ink.js — queueMicrotask render deferral applied.");
