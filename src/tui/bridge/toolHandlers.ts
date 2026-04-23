@@ -13,9 +13,16 @@ import {
   handleTelemetryCommand,
   handleContextCommand,
 } from "../../app/commands/index.ts";
+import { handlePermissionModeCommand } from "../../app/commands/permissionMode.ts";
 
 // ============================================================================
 // Tool Command Router
+//
+// Commands that return a non-null result here are handled DIRECTLY — no model
+// call. Only return null if the command genuinely needs the agent's reasoning.
+//
+// Rule: config mutations (permission mode, exchange switch, key mgmt) are
+// always direct. Market queries, analysis, planning → null → agent.
 // ============================================================================
 
 export async function routeToolCommand(
@@ -26,18 +33,31 @@ export async function routeToolCommand(
   const argsArray = args.split(/\s+/).filter(Boolean);
 
   switch (command.name) {
-    case "mcp": return handleMCPCommand(argsArray);
-    case "config": return handleConfigCommand(args);
+    // ── Config mutations — NEVER go through the model ──────────────────────
+    case "paper":    return handlePermissionModeCommand("paper");
+    case "live":     return handlePermissionModeCommand("ask");   // exit paper → ask
+    case "auto":     return handlePermissionModeCommand("auto");
+    case "ask":      return handlePermissionModeCommand("ask");
+    case "strict":   return handlePermissionModeCommand("strict");
+    case "observe":  return handlePermissionModeCommand("observe");
+    case "planmode": return handlePermissionModeCommand("plan");
+
+    // ── Exchange / broker management — direct handlers ──────────────────────
+    case "mcp":      return handleMCPCommand(argsArray);
+    case "config":   return handleConfigCommand(args);
     case "exchange": return handleExchangeCommand(args);
-    case "broker": return handleBrokerCommand(args);
-    case "stocks": return handleStocksCommand(args);
-    case "strategy":
-    case "gen": return handleStrategyCommand(args);
-    case "workflow": return handleWorkflowCommand(args, {} as never);
-    case "export": return handleExportCommand(args, {} as never);
-    case "keyring": return handleKeyringCommand(args);
+    case "broker":   return handleBrokerCommand(args);
+    case "stocks":   return handleStocksCommand(args);
+    case "keyring":  return handleKeyringCommand(args);
     case "telemetry": return handleTelemetryCommand(args);
-    case "context": return handleContextCommand(args);
+    case "context":  return handleContextCommand(args);
+
+    // ── Strategy / workflow — direct handlers (no LLM needed for CRUD) ─────
+    case "strategy":
+    case "gen":      return handleStrategyCommand(args);
+    case "workflow": return handleWorkflowCommand(args, {} as never);
+    case "export":   return handleExportCommand(args, {} as never);
+
     default:
       // No explicit handler — return null to signal fallback to agent
       return null;

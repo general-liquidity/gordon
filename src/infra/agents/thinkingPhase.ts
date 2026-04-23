@@ -53,7 +53,9 @@ const SKIP_PHASES = new Set(["scan", "ops", "compaction"]);
 
 /**
  * Determine thinking depth from context configuration or env.
- * Defaults to "low" for analysis/planning phases, "off" for fast phases.
+ * Default is "off" — a separate pre-call adds ~2-8s to every response with
+ * minimal benefit for most queries. Enable via GORDON_THINKING_DEPTH env var
+ * or `thinkingDepth` in config for complex analysis/planning sessions.
  */
 export function getThinkingDepthFromContext(context: GordonContext): ThinkingDepth {
   // Explicit config override
@@ -65,13 +67,7 @@ export function getThinkingDepthFromContext(context: GordonContext): ThinkingDep
     return requested;
   }
 
-  // Phase-based default
-  const phase = determineWorkflowPhase(context);
-  if (SKIP_PHASES.has(phase)) {
-    return "off";
-  }
-
-  return "low";
+  return "off";
 }
 
 /**

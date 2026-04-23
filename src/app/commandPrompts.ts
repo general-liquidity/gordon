@@ -74,33 +74,31 @@ export function commandToPrompt(command: SlashCommand, args: string): string {
     case "orders":
       if (STOCK_MARKET_PATTERN.test(args || "")) return "Show my open stock broker orders";
       return "Show my open orders";
+    // NOTE: auto/ask/strict/paper/live/observe/planmode are handled DIRECTLY by
+    // toolHandlers.ts (handlePermissionModeCommand) and never reach commandToPrompt.
+    // These fallback cases exist only for safety — should not fire in normal use.
     case "auto":
       return "Set permissionMode to 'auto' — trades execute without per-action approval";
     case "ask":
       return "Set permissionMode to 'ask' — each trade requires user approval via ApprovalDialog";
     case "strict":
       return "Set permissionMode to 'strict' — read-only mode, all trades blocked";
+    case "paper":
+      return "Set permissionMode to 'paper'";
+    case "live":
+      return "Set permissionMode to 'ask' — exit paper mode";
+    case "observe":
+      return "Set permissionMode to 'observe' — pure observation mode";
+    case "planmode":
+      return "Set permissionMode to 'plan' — planning-only mode";
+    // NOTE: exchange is also handled directly by toolHandlers.ts → handleExchangeCommand.
+    // commandToPrompt fallback only used if routeToolCommand returns null (shouldn't happen).
     case "exchange":
     case "venue":
     case "switch-exchange":
       return args?.trim()
         ? `Switch the active exchange to '${args.trim()}'. Confirm the switch and show the new active venue details.`
         : "List all configured exchanges and show which one is currently active. Clearly mark which are sandbox/testnet vs live.";
-    case "exchange-paper":
-    case "venue-paper":
-    case "sandbox":
-      return "Switch to the first configured sandbox or testnet exchange (sandbox: true). Show which venue was selected and remind the user to also type /paper to enable paper trading mode.";
-    case "exchange-live":
-    case "venue-live":
-      return "Switch to the primary live exchange (sandbox: false, isDefault: true or first live entry). Confirm the switch and show the active venue.";
-    case "paper":
-      return "Set permissionMode to 'paper' — switch to paper trading mode. Real orders blocked; venue adapters switched to sandbox/testnet endpoints so strategies run end-to-end without touching real capital";
-    case "live":
-      return "Set permissionMode to 'ask' — exit paper mode and return to live trading. Venue adapters restored to live endpoints; each trade still requires approval";
-    case "observe":
-      return "Set permissionMode to 'observe' — pure observation mode, no execution of any kind including paper trades";
-    case "planmode":
-      return "Set permissionMode to 'plan' — planning-only mode, can create plans but not execute them";
     case "portfolio":
       if (STOCK_MARKET_PATTERN.test(args || "")) return "Show my stock broker account summary";
       return "Show my portfolio";

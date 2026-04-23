@@ -419,17 +419,44 @@ export async function handleBrokerCommand(args: string): Promise<string> {
       result = await brokerStatus();
       break;
 
+    case "setup":
+    case "paper":
+    case "sandbox": {
+      const brokerType = subArgs[0]?.toLowerCase() as BrokerId | undefined;
+      const paperGuides: Partial<Record<BrokerId, string>> = {
+        alpaca: `ALPACA PAPER TRADING\n1. Sign up at alpaca.markets (paper account is free)\n2. In the Alpaca dashboard, go to Paper Trading > API Keys > Generate\n3. Copy the Key ID and Secret Key\n4. Gordon config: { type: "alpaca", apiKey: "...", apiSecret: "...", paper: true }\n5. Endpoint: https://paper-api.alpaca.markets`,
+        tradier: `TRADIER SANDBOX\n1. Register at developer.tradier.com (sandbox is separate from brokerage)\n2. Create an app and generate a Sandbox Access Token\n3. Gordon config: { type: "tradier", apiKey: "<sandbox-token>", paper: true }\n4. Endpoint: https://sandbox.tradier.com/v1`,
+        tastytrade: `TASTYTRADE CERTIFICATION\n1. Log in to tastytrade (certif environment uses same credentials)\n2. Gordon config: { type: "tastytrade", apiKey: "<email>", apiSecret: "<password>", paper: true }\n3. Endpoint: https://api.cert.tastyworks.com\n4. Note: cert environment is periodically reset`,
+        tradestation: `TRADESTATION SIMULATION\n1. Sign in to your TradeStation developer account\n2. Use the same API Key + Secret (sim routing is configured server-side)\n3. Gordon config: { type: "tradestation", apiKey: "...", apiSecret: "...", paper: true }\n4. Endpoint: https://sim.api.tradestation.com/v3`,
+        trading212: `TRADING 212 PRACTICE\n1. Open the Trading 212 app > Invest > Practice\n2. Go to Profile > Account Settings > API > Create\n3. Gordon config: { type: "trading212", apiKey: "...", paper: true }\n4. Practice account is pre-funded with virtual money`,
+        ibkr: `INTERACTIVE BROKERS PAPER\n1. In IBKR TWS/Client Portal, request a paper trading account (Account Management)\n2. Run Client Portal Gateway pointed at your paper account\n3. Gordon config: { type: "ibkr", paper: true } — same API, different accountId\n4. Endpoint: http://127.0.0.1:5000 (local gateway)\n5. Set IBKR_PAPER=true or paper: true in config`,
+        schwab: `SCHWAB SANDBOX\n1. Create an app at developer.schwab.com\n2. In app settings, enable "Paper Trading" / sandbox environment\n3. Gordon config: { type: "schwab", apiKey: "...", apiSecret: "...", paper: true }`,
+      };
+      if (brokerType && paperGuides[brokerType]) {
+        result = { success: true, message: paperGuides[brokerType]! };
+      } else {
+        const supported = Object.keys(paperGuides).join(", ");
+        result = {
+          success: true,
+          message: `Stock Broker Paper Trading Setup\n\nBrokers with paper/sandbox support:\n  alpaca      — Paper API (paper-api.alpaca.markets)\n  tradier     — Sandbox (sandbox.tradier.com)\n  tastytrade  — Cert environment (api.cert.tastyworks.com)\n  tradestation — Simulation (sim.api.tradestation.com)\n  trading212  — Practice account\n  ibkr        — Paper trading account (TWS)\n  schwab      — Developer sandbox\n\nUsage: /broker setup <type>\nExample: /broker setup alpaca`,
+        };
+      }
+      break;
+    }
+
     case "help":
       result = {
         success: true,
         message: `Broker Management Commands:
   /broker list              - List configured brokers
   /broker add <type>        - Add a new broker
+  /broker setup <type>      - Show paper/sandbox credential guide
   /broker switch <id>       - Switch active broker
   /broker remove <id>       - Remove a broker
   /broker status            - Check broker connection status
 
 Supported broker types: ${BrokerFactory.getSupportedBrokers().join(", ")}
+Paper trading: alpaca, tradier, tastytrade, tradestation, trading212, ibkr, schwab
 
 Aliases: /brokers`,
       };

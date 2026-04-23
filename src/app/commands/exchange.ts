@@ -93,12 +93,12 @@ export async function exchangeList(): Promise<ExchangeCommandResult> {
 
 /**
  * Add a new exchange configuration
- * Usage: /exchange add <type>
+ * Usage: /exchange add <type> [--sandbox]
  *
- * Note: This returns information about what's needed. The actual setup
- * should be handled by the setup wizard UI.
+ * Returns the credentials needed and setup instructions.
+ * The actual credential entry is done via /setup or the SetupWizard UI.
  */
-export async function exchangeAdd(exchangeType: string): Promise<ExchangeCommandResult> {
+export async function exchangeAdd(exchangeType: string, sandbox = false): Promise<ExchangeCommandResult> {
   try {
     // Validate exchange type
     if (!ExchangeFactory.isSupported(exchangeType)) {
@@ -113,45 +113,43 @@ export async function exchangeAdd(exchangeType: string): Promise<ExchangeCommand
     const type = exchangeType as ExchangeId;
     const config = await loadConfig();
 
-    // Check if this type already exists
-    const existingOfType = config.exchanges.filter((ex) => ex.type === type);
-
-    // Generate a unique ID
-    const baseId: string = type;
-    let id: string = baseId;
+    // Generate a unique ID — append -testnet / -sandbox suffix for paper accounts
+    const baseId = sandbox ? `${type}-testnet` : type;
+    let id = baseId;
     let counter = 1;
     while (config.exchanges.some((ex) => ex.id === id)) {
-      id = `${baseId}_${counter}`;
+      id = `${baseId}-${counter}`;
       counter++;
     }
 
-    // Determine what credentials are needed
+    const existingOfType = config.exchanges.filter((ex) => ex.type === type);
     const needsPassphrase = type === 'coinbase';
     const needsWallet = isWalletBasedExchange(type);
     const hasNativeAdapter = ExchangeFactory.hasNativeAdapter(type);
 
-    // Build required fields based on auth type
     const requiredFields = needsWallet
       ? ['walletPrivateKey']
       : ['apiKey', 'apiSecret', ...(needsPassphrase ? ['passphrase'] : [])];
 
+    const label = sandbox ? `${type} (testnet/sandbox)` : type;
     const authMessage = needsWallet
-      ? `Ready to add ${type} exchange. Please provide wallet private key.`
-      : `Ready to add ${type} exchange. Please provide API credentials.`;
+      ? `Ready to add ${label}. Please provide wallet private key.`
+      : `Ready to add ${label}. Please provide API credentials.`;
 
     return {
       success: true,
       message: authMessage,
       data: {
         exchangeType: type,
+        sandbox,
         suggestedId: id,
         existingCount: existingOfType.length,
         needsPassphrase,
         needsWallet,
         hasNativeAdapter,
         requiredFields,
-        optionalFields: needsWallet ? [] : ['sandbox'],
-        instructions: getExchangeSetupInstructions(type),
+        optionalFields: needsWallet ? [] : (sandbox ? [] : ['sandbox']),
+        instructions: getExchangeSetupInstructions(type, sandbox),
       },
     };
   } catch (error) {
@@ -487,18 +485,69 @@ function isWalletBasedExchange(type: ExchangeId): boolean {
   return type === 'hyperliquid' || type === 'uniswap';
 }
 
-function getExchangeSetupInstructions(type: ExchangeId): string {
-  const instructions: Record<ExchangeId, string> = {
+function getExchangeSetupInstructions(type: ExchangeId, sandbox = false): string {
+  const sandboxInstructions: Partial<Record<ExchangeId, string>> = {
+    binance: `
+BINANCE TESTNET (paper trading, no real money)
+1. Go to testnet.binance.vision and register/log in
+2. Under API Management, generate an API key — testnet keys are issued instantly
+3. The testnet auto-funds your account with virtual BTC, ETH, BNB, etc.
+4. Set sandbox: true in the exchange config; Gordon will route to testnet.binance.vision
+5. Endpoint: https://testnet.binance.vision`,
+
+    coinbase: `
+COINBASE ADVANCED TRADE SANDBOX
+Option A — Legacy REST (API Key + Secret + Passphrase):
+  1. Register at sandbox.pro.coinbase.com (separate account from live)
+  2. Go to Settings > API Keys and create a key with Trade permissions
+  3. Save the API Key, Secret, and Passphrase (shown once)
+
+Option B — CDP Advanced Trade (EC private key, recommended):
+  1. Go to cdp.coinbase.com > API Keys > Create API Key
+  2. Select "Advanced Trade" scope on the sandbox environment
+  3. Download the JSON — apiKey = organizations/{org}/apiKeys/{key}, apiSecret = PEM private key`,
+
+    okx: `
+OKX DEMO ACCOUNT (paper trading)
+1. Log in to OKX and go to API > Create V5 API Key
+2. Enable "Read" + "Trade" permissions
+3. In the Gordon config, set sandbox: true — Gordon sends x-simulated-trading: 1 header
+4. Demo balance is auto-funded on first use`,
+
+    gemini: `
+GEMINI SANDBOX
+1. Register at exchange.sandbox.gemini.com (separate from live)
+2. Go to Settings > API and create a key with "Trader" scope
+3. Use the sandbox API Key and Secret — same format as live
+4. Endpoint: https://api.sandbox.gemini.com`,
+
+    hyperliquid: `
+HYPERLIQUID TESTNET
+1. Generate a new Ethereum wallet (or use an existing test wallet)
+2. Export the private key — same format as live (0x-prefixed hex)
+3. Deposit test USDC from the Hyperliquid testnet faucet
+4. Gordon routes to testnet.hyperliquid.xyz when sandbox: true
+5. Endpoint: https://api.hyperliquid-testnet.xyz`,
+
+    kraken: `
+KRAKEN DEMO (Beta)
+1. Register a separate demo account at demo.kraken.com
+2. Go to Security > API and create an API key with "Query" + "Trade" permissions
+3. Copy the API Key and Private Key
+4. Note: Kraken demo is not available in all regions`,
+  };
+
+  const liveInstructions: Record<ExchangeId, string> = {
     binance: `
 1. Log in to Binance and go to API Management
 2. Create a new API key with "Enable Reading" and optionally "Enable Spot Trading"
 3. Copy the API Key and Secret Key (Secret is shown only once!)
 4. Optional: Add your IP to the whitelist for extra security`,
     coinbase: `
-1. Log in to Coinbase Pro and go to Settings > API
-2. Create a new API key with appropriate permissions
-3. Copy the API Key, Secret, and Passphrase
-4. Note: Coinbase requires all three credentials`,
+1. Log in to Coinbase and go to API Keys (cdp.coinbase.com)
+2. Create a new key with "Advanced Trade" scope
+3. Download the JSON — apiKey is the organizations/.../apiKeys/... path, apiSecret is the EC private key (PEM)
+4. For legacy REST: use API Key + Secret + Passphrase from exchange.coinbase.com > Settings > API`,
     kraken: `
 1. Log in to Kraken and go to Settings > API
 2. Create a new API key with desired permissions
@@ -548,7 +597,10 @@ Or HMAC API keys:
   3. Copy the API Key and API Secret (Secret shown only once)`,
   };
 
-  return instructions[type] || 'Follow the exchange documentation to create API keys.';
+  if (sandbox) {
+    return sandboxInstructions[type] ?? `No dedicated testnet for ${type}. Check the exchange docs for a sandbox or demo environment.`;
+  }
+  return liveInstructions[type] ?? 'Follow the exchange documentation to create API keys.';
 }
 
 // ============================================================================
@@ -559,12 +611,26 @@ Or HMAC API keys:
  * Handle exchange command routing
  * @param args - Full arguments string (e.g., "list", "add binance", "switch binance_1")
  */
+/** Known subcommands — anything else is treated as an exchange ID to switch to. */
+const EXCHANGE_SUBCOMMANDS = new Set([
+  'list', 'ls', 'add', 'new', 'switch', 'use', 'select',
+  'remove', 'delete', 'rm', 'status', 'check', 'compare',
+  'cmp', 'prices', 'help', 'setup', 'paper', 'sandbox',
+]);
+
 export async function handleExchangeCommand(args: string): Promise<string> {
   const parts = args.trim().split(/\s+/);
   const subcommand = parts[0]?.toLowerCase() ?? 'list';
   const subArgs = parts.slice(1);
 
   let result: ExchangeCommandResult;
+
+  // If the first token doesn't match any known subcommand, treat it as a
+  // direct exchange ID to switch to (e.g. "/exchange binance-testnet").
+  if (subcommand && !EXCHANGE_SUBCOMMANDS.has(subcommand)) {
+    result = await exchangeSwitch(subcommand);
+    return formatExchangeResult(result);
+  }
 
   switch (subcommand) {
     case 'list':
@@ -578,10 +644,11 @@ export async function handleExchangeCommand(args: string): Promise<string> {
       if (subArgs.length === 0 || !subArgs[0]) {
         result = {
           success: false,
-          message: `Usage: /exchange add <type>\nSupported types: ${ExchangeFactory.getSupportedExchanges().join(', ')}`,
+          message: `Usage: /exchange add <type> [--sandbox]\nSupported types: ${ExchangeFactory.getSupportedExchanges().join(', ')}\n\nFor testnet/paper setups: /exchange add binance --sandbox`,
         };
       } else {
-        result = await exchangeAdd(subArgs[0]);
+        const isSandbox = subArgs.includes('--sandbox') || subArgs.includes('--paper') || subArgs.includes('--testnet');
+        result = await exchangeAdd(subArgs[0], isSandbox);
       }
       break;
 
@@ -622,18 +689,39 @@ export async function handleExchangeCommand(args: string): Promise<string> {
       result = await exchangeCompare(subArgs.join(' '));
       break;
 
+    case 'setup':
+    case 'paper':
+    case 'sandbox': {
+      // /exchange setup <type>  or  /exchange paper <type>
+      const sandboxType = subArgs[0]?.toLowerCase();
+      if (!sandboxType) {
+        result = {
+          success: true,
+          message: `Paper/Testnet Setup — which exchange?\n\nSupported sandbox venues:\n  binance   → Binance Testnet (testnet.binance.vision)\n  coinbase  → Coinbase Advanced Trade Sandbox (cdp.coinbase.com)\n  okx       → OKX Demo Account\n  gemini    → Gemini Sandbox\n  hyperliquid → Hyperliquid Testnet\n  kraken    → Kraken Demo\n\nUsage: /exchange setup <type>\nExample: /exchange setup binance`,
+        };
+      } else {
+        result = await exchangeAdd(sandboxType, true);
+      }
+      break;
+    }
+
     case 'help':
       result = {
         success: true,
         message: `Exchange Management Commands:
   /exchange list                - List configured exchanges
-  /exchange add <type>          - Add a new exchange
+  /exchange add <type>          - Add a live exchange
+  /exchange add <type> --sandbox  - Add sandbox/testnet (paper trading)
+  /exchange setup <type>        - Setup guide for testnet/paper exchanges
   /exchange switch <id>         - Switch active exchange
+  /exchange <id>                - Shortcut: switch directly by ID
   /exchange remove <id>         - Remove an exchange
   /exchange status              - Check connection status
   /exchange compare <symbol>    - Compare prices across exchanges
 
 Supported exchange types: ${ExchangeFactory.getSupportedExchanges().join(', ')}
+
+Paper trading venues: binance (testnet), coinbase (sandbox), okx (demo), gemini (sandbox), hyperliquid (testnet), kraken (demo)
 
 Aliases: /ex, /exchanges`,
       };
