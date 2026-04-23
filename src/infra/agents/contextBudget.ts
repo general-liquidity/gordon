@@ -422,6 +422,11 @@ export function buildPromptEnvelope(
 
   const requestOptions: Record<string, unknown> = {};
 
+  // NOTE: a `providerCacheHints("anthropic")` helper is available at
+  // src/infra/ai/llm/providerCaching.ts — but its return type doesn't
+  // cleanly assign into Mastra's strict `SharedV2ProviderOptions` without
+  // a cast. Keeping the inline literal here preserves strict typing; new
+  // callsites outside Mastra's typed flow should prefer the helper.
   const providerOptions = report.cache.supported && isAnthropicProvider(report.cache.provider)
     ? { anthropic: { cacheControl: { type: "ephemeral" as const } } }
     : undefined;

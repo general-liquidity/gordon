@@ -154,6 +154,21 @@ export function recordVenueFailure(context: GordonContext): void {
   const state = getOrCreateReminderState(key);
   state.venueFailureCount += 1;
   state.lastVenueFailure = Date.now();
+
+  // Fire an alert once per failure-count threshold per thread. The existing
+  // reminder at count ≥ 2 (below, in evaluateReminders) is an in-conversation
+  // hint; this alert is the operator-facing signal that the bus/TUI renders.
+  if (state.venueFailureCount === 3 || state.venueFailureCount === 6) {
+    void import("../platform/observability/alertEmitter.ts").then((m) => {
+      void m.emitAlert({
+        level: state.venueFailureCount >= 6 ? "critical" : "warning",
+        category: "venue",
+        message: `Venue failures crossed ${state.venueFailureCount} in this session.`,
+        context: { threadKey: key, failureCount: state.venueFailureCount },
+        dedupeKey: `venue-failure:${key}:${state.venueFailureCount}`,
+      });
+    }).catch(() => { /* alert emission is best-effort */ });
+  }
 }
 
 export function resetReminderState(context: GordonContext): void {

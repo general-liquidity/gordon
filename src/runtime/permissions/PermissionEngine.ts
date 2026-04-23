@@ -65,6 +65,25 @@ export class ToolApprovalDeniedError extends Error {
   }
 }
 
+/**
+ * Opt-in helper for callers that want "blocked" permission evaluations to
+ * surface as a thrown error (with rule context) rather than as a status
+ * field they must inspect. Existing `evaluate()` callers keep the
+ * return-state semantics; callers on critical paths (e.g. order submission)
+ * can wrap the result in `assertNotDenied` to fail loud.
+ *
+ * Non-blocked results pass through unchanged.
+ */
+export function assertNotDenied(
+  evaluation: PermissionEvaluation,
+  toolName: string,
+): PermissionEvaluation {
+  if (evaluation.status === "blocked" && evaluation.rule?.decision === "deny") {
+    throw new ToolApprovalDeniedError(toolName, evaluation.rule, evaluation.reason);
+  }
+  return evaluation;
+}
+
 // ---------------------------------------------------------------------------
 // Wildcard matching helper (item 2)
 // ---------------------------------------------------------------------------

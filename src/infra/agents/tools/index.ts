@@ -382,6 +382,7 @@ import { multiModalChartTools } from "../../tools/chartTools.ts";
 import { evalTools } from "../../domain/evals/tools.ts";
 import { withSpillAll } from "./withSpill.ts";
 import { tradingInfraTools } from "./tradingInfra.ts";
+import { venueRoutingTools } from "./venue-routing.ts";
 
 /**
  * All tools combined as a single object for Mastra Agent.
@@ -397,6 +398,7 @@ const _rawAllTools = {
   ...earnTools,
   ...chartTools,
   ...orderbookTools,
+  ...venueRoutingTools,
   ...walletTools,
   ...discoveryTools,
   ...historyTools,

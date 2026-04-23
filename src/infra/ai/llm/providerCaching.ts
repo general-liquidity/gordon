@@ -35,7 +35,9 @@ import type { DirectProviderName } from "../../runtime/providers/registry.ts";
 
 /**
  * AI SDK `providerOptions` shape. Each provider reads its own key; keys
- * for other providers are ignored.
+ * for other providers are ignored. The index signature matches Mastra's
+ * `SharedV2ProviderOptions` so this type is assignable into `ModelMessage`
+ * payloads without casts.
  */
 export interface AiSdkProviderOptions {
   anthropic?: {
@@ -43,6 +45,7 @@ export interface AiSdkProviderOptions {
   };
   openai?: Record<string, unknown>;
   google?: Record<string, unknown>;
+  [provider: string]: Record<string, unknown> | undefined;
 }
 
 /**

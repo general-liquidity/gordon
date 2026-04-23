@@ -474,8 +474,19 @@ export const displayComparisonChartTool = createTool({
 
       const intervalLabel = interval === "1h" ? "hours" : interval === "4h" ? "4h periods" : "days";
 
+      // Cap the rendered ASCII chart — multi-symbol comparisons at long
+      // periods can blow past 6KB. The utility preserves HEAD and TAIL
+      // windows so the agent still sees the start and end of the series.
+      const rawChart = `\n${chart}\n`;
+      const { capWithRollingWindow } = await import("./rollingWindow.ts");
+      const capped = await capWithRollingWindow(rawChart, {
+        label: `comparison-chart-${interval}`,
+        maxChars: 4000,
+        spillToDisk: false,
+      });
+
       return {
-        chart: `\n${chart}\n`,
+        chart: capped.output,
         legend,
         timeRange: `Last ${periods} ${intervalLabel}`,
         note: "Y-axis shows % change from start of period",

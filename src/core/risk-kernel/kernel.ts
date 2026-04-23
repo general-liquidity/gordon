@@ -206,14 +206,20 @@ export class RiskKernel {
     // Emit event
     this.emitDecision(decision);
 
-    // Audit log (fire and forget)
+    // Audit log (fire and forget). If the caller threaded a decisionTrace
+    // into order.metadata (via `withDecisionTrace`), pull it out and pass
+    // it alongside so reasoning chains persist without a schema change.
     const auditId = `ra_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const decisionTrace = order.metadata?.decisionTrace as
+      | Record<string, unknown>
+      | undefined;
     this.auditLog.log({
       id: auditId,
       timestamp: decision.timestamp,
       order,
       decision,
       portfolioSnapshot: context,
+      ...(decisionTrace ? { decisionTrace } : {}),
     }).catch((err) => {
       logger.error("Failed to write audit log", err as Error);
     });

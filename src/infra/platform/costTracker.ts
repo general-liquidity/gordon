@@ -13,6 +13,24 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { GORDON_DIR } from "../storage/paths.ts";
 import { createModuleLogger } from "../logger/index.ts";
+import { emitAlert } from "./observability/alertEmitter.ts";
+
+async function emitCostAlert(args: {
+  threshold: number;
+  kind: "session" | "daily";
+  total: number;
+  limit: number;
+  key: string;
+}): Promise<void> {
+  const level = args.threshold >= 0.9 ? "critical" : "warning";
+  await emitAlert({
+    level,
+    category: "cost",
+    message: `${args.kind === "session" ? "Session" : "Daily"} cost at ${(args.threshold * 100).toFixed(0)}% of $${args.limit.toFixed(2)} budget ($${args.total.toFixed(4)})`,
+    context: { kind: args.kind, threshold: args.threshold, total: args.total, limit: args.limit },
+    dedupeKey: `cost:${args.key}`,
+  });
+}
 
 const costLogger = createModuleLogger("cost-budget");
 
@@ -106,6 +124,7 @@ export function checkCostBudget(sessionTotalUsd: number, callCostUsd: number): C
         warnedThresholds.add(key);
         result.warning = `Session cost at ${(threshold * 100).toFixed(0)}% of $${sessionLimit.toFixed(2)} budget ($${sessionTotalUsd.toFixed(4)})`;
         costLogger.warn(result.warning);
+        void emitCostAlert({ threshold, kind: "session", total: sessionTotalUsd, limit: sessionLimit, key });
       }
     }
     if (dailyLimit && (result.dailyFraction ?? 0) >= threshold) {
@@ -114,6 +133,7 @@ export function checkCostBudget(sessionTotalUsd: number, callCostUsd: number): C
         warnedThresholds.add(key);
         result.warning = `Daily cost at ${(threshold * 100).toFixed(0)}% of $${dailyLimit.toFixed(2)} budget ($${dailyTotalUsd.toFixed(4)})`;
         costLogger.warn(result.warning);
+        void emitCostAlert({ threshold, kind: "daily", total: dailyTotalUsd, limit: dailyLimit, key });
       }
     }
   }
