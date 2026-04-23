@@ -42,6 +42,9 @@ export const ScrollBox = forwardRef<ScrollBoxHandle, Props>(function ScrollBox(
     (newValue: number) => {
       const clamped = clamp(newValue);
       setScrollTop(clamped);
+      // Clear Ink's incremental frame cache so this scroll frame does a full repaint,
+      // preventing text bleed from the marginTop position shift confusing the line-diff.
+      (globalThis as any).__inkClearIncrementalOutput?.();
       wasAtBottomRef.current = clamped >= maxScroll;
       onScroll?.(clamped);
     },

@@ -83,6 +83,17 @@ export function getCachedHeight(
   return height;
 }
 
+/**
+ * Called after render to update the height cache with actual Yoga-measured heights.
+ * Only updates entries where the measured height differs from the estimate.
+ */
+export function reportMeasuredHeight(id: string, measuredHeight: number): void {
+  const cached = heightCache.get(id);
+  if (cached && cached.height !== measuredHeight) {
+    heightCache.set(id, { contentLen: cached.contentLen, height: measuredHeight });
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Binary search helpers
 // ---------------------------------------------------------------------------

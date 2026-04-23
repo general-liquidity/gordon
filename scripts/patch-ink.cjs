@@ -584,3 +584,274 @@ if (!require("fs").existsSync(renderNodePath)) {
     }
   }
 }
+
+// ============================================================================
+// Patch 6: CLEAR_INCREMENTAL_CACHE — global hook to reset incremental render
+//          state in log-update.js (createIncremental)
+//
+// Problem: incrementalRendering: true conflicts with ScrollBox's marginTop
+// scroll mechanism. When scrollTop changes, all rendered line positions shift
+// simultaneously. Ink's line-diff compares the new frame against the previous
+// frame's line array, which now misaligns by scrollTop rows — writing content
+// to wrong terminal rows (text bleed).
+//
+// Fix: Expose global.__inkClearIncrementalOutput() from inside createIncremental
+// so ScrollBox can call it whenever scrollTop changes, forcing a full repaint
+// for that scroll frame (resetting previousLines and previousOutput to empty).
+// Normal (non-scroll) frames still benefit from the incremental line-diff.
+//
+// Target: inside createIncremental, after the `let previousOutput = '';` and
+//         `let hasHiddenCursor = false;` declarations.
+// Insert: global.__inkClearIncrementalOutput setter that resets previousLines
+//         and previousOutput to their initial empty values.
+// ============================================================================
+
+const logUpdatePath6 = require("path").resolve(__dirname, "..", "node_modules", "ink", "build", "log-update.js");
+
+if (!require("fs").existsSync(logUpdatePath6)) {
+  warn("[patch-ink] WARNING: log-update.js not found at " + logUpdatePath6 + " — skipping CLEAR_INCREMENTAL_CACHE patch.");
+} else {
+  let logUpdate6Content = require("fs").readFileSync(logUpdatePath6, "utf8");
+
+  // Idempotency check
+  if (logUpdate6Content.includes("CLEAR_INCREMENTAL_CACHE")) {
+    log("[patch-ink] log-update.js already has CLEAR_INCREMENTAL_CACHE patch — skipping.");
+  } else {
+    const crlf6 = logUpdate6Content.includes("\r\n");
+    const eol6 = crlf6 ? "\r\n" : "\n";
+
+    // Needle: the three variable declarations that open createIncremental's closure.
+    // These are guaranteed to be present (and unique) in stock Ink 6.x log-update.js.
+    const needle6 = [
+      "    let previousLines = [];",
+      "    let previousOutput = '';",
+      "    let hasHiddenCursor = false;",
+    ].join(eol6);
+
+    const replacement6 = [
+      "    let previousLines = [];",
+      "    let previousOutput = '';",
+      "    let hasHiddenCursor = false;",
+      "    // CLEAR_INCREMENTAL_CACHE: allow external callers (e.g. ScrollBox) to reset",
+      "    // the incremental line-diff state so the next frame does a full repaint.",
+      "    // Called whenever marginTop shifts so the line-diff doesn't misalign rows.",
+      "    global.__inkClearIncrementalOutput = () => { previousLines = []; previousOutput = ''; };",
+    ].join(eol6);
+
+    if (!logUpdate6Content.includes(needle6)) {
+      warn("[patch-ink] WARNING: Could not find previousLines/previousOutput/hasHiddenCursor declarations in createIncremental (log-update.js).");
+      warn("[patch-ink] The file may have been updated — inspect node_modules/ink/build/log-update.js manually.");
+    } else {
+      const patched6 = logUpdate6Content.replace(needle6, replacement6);
+      require("fs").writeFileSync(logUpdatePath6, patched6, "utf8");
+      console.log("[patch-ink] Patched log-update.js — CLEAR_INCREMENTAL_CACHE global hook applied.");
+    }
+  }
+}
+
+// ============================================================================
+// Patch 7: YOGA_MEASURE_REGISTRY — global Yoga node registry in reconciler.js
+//
+// After each render cycle the virtual scroll system needs the actual Yoga-
+// computed height of each visible message Box so it can correct the heuristic
+// height estimates held in heightCache.  Stock Ink exposes no public API for
+// this, but every ink-box DOM node carries a `yogaNode` reference whose
+// `getComputedHeight()` method returns the final layout value.
+//
+// We instrument three reconciler hooks to maintain a global registry that maps
+// an arbitrary string ID (passed via the `data-measure-id` prop) to its Ink
+// DOM node:
+//
+//   createInstance  — register node when it is first created with the prop
+//   commitUpdate    — update registration when the prop changes value
+//   removeChild /
+//   removeChildFromContainer — clean up when the node is unmounted
+//
+// We also install two global helpers at module load time:
+//
+//   global.__inkNodeRegistry        — the Map<id, node> registry itself
+//   global.__inkGetMeasuredHeight   — function(id) → number | null
+//
+// VirtualMessageList.tsx passes `data-measure-id={msg.id}` on each visible
+// Box wrapper and calls __inkGetMeasuredHeight from a post-render useEffect.
+//
+// Idempotency sentinel: YOGA_MEASURE_REGISTRY
+// ============================================================================
+
+const reconcilerPath7 = require("path").resolve(__dirname, "..", "node_modules", "ink", "build", "reconciler.js");
+
+if (!require("fs").existsSync(reconcilerPath7)) {
+  warn("[patch-ink] WARNING: reconciler.js not found — skipping YOGA_MEASURE_REGISTRY patch.");
+} else {
+  let rec7Content = require("fs").readFileSync(reconcilerPath7, "utf8");
+
+  if (rec7Content.includes("YOGA_MEASURE_REGISTRY")) {
+    log("[patch-ink] reconciler.js already has YOGA_MEASURE_REGISTRY patch — skipping.");
+  } else {
+    const crlf7 = rec7Content.includes("\r\n");
+    const eol7 = crlf7 ? "\r\n" : "\n";
+
+    // ── Global registry + helper — injected once at module level ─────────────
+    // Target: the very first line of the file (the process import), so we
+    // prepend the registry setup before any reconciler code runs.
+    // We locate the import statement as a safe unique anchor.
+    const globalRegistryBlock = [
+      "// YOGA_MEASURE_REGISTRY: global Yoga node registry for virtual-scroll height feedback (patch-ink.cjs)",
+      "global.__inkNodeRegistry = global.__inkNodeRegistry || {};",
+      "global.__inkGetMeasuredHeight = function(id) {",
+      "  var node = global.__inkNodeRegistry && global.__inkNodeRegistry[id];",
+      "  if (!node || !node.yogaNode) return null;",
+      "  try { return node.yogaNode.getComputedHeight(); } catch (e) { return null; }",
+      "};",
+    ].join(eol7);
+
+    const importLine = "import process from 'node:process';";
+    if (!rec7Content.includes(importLine)) {
+      warn("[patch-ink] WARNING: Could not find 'import process' in reconciler.js — YOGA_MEASURE_REGISTRY global block skipped.");
+    } else {
+      rec7Content = rec7Content.replace(
+        importLine,
+        importLine + eol7 + globalRegistryBlock,
+      );
+    }
+
+    // ── createInstance: register node when data-measure-id prop is present ───
+    // Target: the closing `return node;` of createInstance.
+    // The DIRTY_TRACKING patch (Patch 4) already added `node.dirty = true;`
+    // before the closing `return node;`, so our anchor is the final two lines
+    // of the createInstance body that exist after all prop loops.
+    //
+    // Actual lines (after Patch 4 has run):
+    //         setAttribute(node, key, value);
+    //     }
+    // }
+    // return node;
+    // },
+    // createTextInstance
+    //
+    // We target the `return node;\n    },\n    createTextInstance` sequence.
+    const createInstanceReturnNeedle = [
+      "        return node;",
+      "    },",
+      "    createTextInstance(text, _root, hostContext) {",
+    ].join(eol7);
+
+    const createInstanceReturnReplacement = [
+      "        // YOGA_MEASURE_REGISTRY: register node when data-measure-id prop is present",
+      "        if (newProps['data-measure-id'] != null) {",
+      "            global.__inkNodeRegistry[newProps['data-measure-id']] = node;",
+      "        }",
+      "        return node;",
+      "    },",
+      "    createTextInstance(text, _root, hostContext) {",
+    ].join(eol7);
+
+    if (!rec7Content.includes(createInstanceReturnNeedle)) {
+      warn("[patch-ink] WARNING: Could not find createInstance return in reconciler.js — createInstance registry patch skipped.");
+    } else {
+      rec7Content = rec7Content.replace(createInstanceReturnNeedle, createInstanceReturnReplacement);
+    }
+
+    // ── commitUpdate: update registry when data-measure-id changes ───────────
+    // Target: the DIRTY_TRACKING block at the end of commitUpdate, specifically
+    // the ancestor-walk line followed by `},\n    commitTextUpdate`.
+    //
+    // Actual lines (after Patch 4):
+    //         node.dirty = true;
+    //         let _dirtyAncestor = node.parentNode;
+    //         while (_dirtyAncestor) { _dirtyAncestor.dirty = true; _dirtyAncestor = _dirtyAncestor.parentNode; }
+    //     },
+    //     commitTextUpdate(node, _oldText, newText) {
+    const commitUpdateDirtyNeedle = [
+      "        // DIRTY_TRACKING: props changed — mark node and ancestors dirty",
+      "        node.dirty = true;",
+      "        let _dirtyAncestor = node.parentNode;",
+      "        while (_dirtyAncestor) { _dirtyAncestor.dirty = true; _dirtyAncestor = _dirtyAncestor.parentNode; }",
+      "    },",
+      "    commitTextUpdate(node, _oldText, newText) {",
+    ].join(eol7);
+
+    const commitUpdateDirtyReplacement = [
+      "        // DIRTY_TRACKING: props changed — mark node and ancestors dirty",
+      "        node.dirty = true;",
+      "        let _dirtyAncestor = node.parentNode;",
+      "        while (_dirtyAncestor) { _dirtyAncestor.dirty = true; _dirtyAncestor = _dirtyAncestor.parentNode; }",
+      "        // YOGA_MEASURE_REGISTRY: keep registry in sync when data-measure-id changes",
+      "        if (newProps['data-measure-id'] != null) {",
+      "            global.__inkNodeRegistry[newProps['data-measure-id']] = node;",
+      "        } else if (oldProps['data-measure-id'] != null) {",
+      "            delete global.__inkNodeRegistry[oldProps['data-measure-id']];",
+      "        }",
+      "    },",
+      "    commitTextUpdate(node, _oldText, newText) {",
+    ].join(eol7);
+
+    if (!rec7Content.includes(commitUpdateDirtyNeedle)) {
+      warn("[patch-ink] WARNING: Could not find DIRTY_TRACKING block in commitUpdate (reconciler.js) — commitUpdate registry patch skipped.");
+    } else {
+      rec7Content = rec7Content.replace(commitUpdateDirtyNeedle, commitUpdateDirtyReplacement);
+    }
+
+    // ── removeChild: clean up registry on unmount ────────────────────────────
+    // Target: the removeChild handler body.
+    //     removeChild(node, removeNode) {
+    //         removeChildNode(node, removeNode);
+    //         cleanupYogaNode(removeNode.yogaNode);
+    //     },
+    const removeChildNeedle = [
+      "    removeChild(node, removeNode) {",
+      "        removeChildNode(node, removeNode);",
+      "        cleanupYogaNode(removeNode.yogaNode);",
+      "    },",
+    ].join(eol7);
+
+    const removeChildReplacement = [
+      "    removeChild(node, removeNode) {",
+      "        removeChildNode(node, removeNode);",
+      "        cleanupYogaNode(removeNode.yogaNode);",
+      "        // YOGA_MEASURE_REGISTRY: remove from registry on unmount",
+      "        if (removeNode['data-measure-id'] != null) {",
+      "            delete global.__inkNodeRegistry[removeNode['data-measure-id']];",
+      "        }",
+      "    },",
+    ].join(eol7);
+
+    if (!rec7Content.includes(removeChildNeedle)) {
+      warn("[patch-ink] WARNING: Could not find removeChild block in reconciler.js — removeChild registry patch skipped.");
+    } else {
+      rec7Content = rec7Content.replace(removeChildNeedle, removeChildReplacement);
+    }
+
+    // ── removeChildFromContainer: same cleanup for root-level removal ─────────
+    //     removeChildFromContainer(node, removeNode) {
+    //         removeChildNode(node, removeNode);
+    //         cleanupYogaNode(removeNode.yogaNode);
+    //     },
+    const removeFromContainerNeedle = [
+      "    removeChildFromContainer(node, removeNode) {",
+      "        removeChildNode(node, removeNode);",
+      "        cleanupYogaNode(removeNode.yogaNode);",
+      "    },",
+    ].join(eol7);
+
+    const removeFromContainerReplacement = [
+      "    removeChildFromContainer(node, removeNode) {",
+      "        removeChildNode(node, removeNode);",
+      "        cleanupYogaNode(removeNode.yogaNode);",
+      "        // YOGA_MEASURE_REGISTRY: remove from registry on container unmount",
+      "        if (removeNode['data-measure-id'] != null) {",
+      "            delete global.__inkNodeRegistry[removeNode['data-measure-id']];",
+      "        }",
+      "    },",
+    ].join(eol7);
+
+    if (!rec7Content.includes(removeFromContainerNeedle)) {
+      warn("[patch-ink] WARNING: Could not find removeChildFromContainer block in reconciler.js — removeChildFromContainer registry patch skipped.");
+    } else {
+      rec7Content = rec7Content.replace(removeFromContainerNeedle, removeFromContainerReplacement);
+    }
+
+    require("fs").writeFileSync(reconcilerPath7, rec7Content, "utf8");
+    console.log("[patch-ink] Patched reconciler.js — YOGA_MEASURE_REGISTRY global node registry applied.");
+  }
+}

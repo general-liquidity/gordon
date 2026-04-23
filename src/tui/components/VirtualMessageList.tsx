@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo, useDeferredValue } from "react";
-import { Box, Text, useInput } from "ink";
+import { Box, Text, useInput, Static } from "ink";
 import { MessageBubble, type Message } from "./MessageBubble.js";
 import { UnseenDivider } from "./UnseenDivider.js";
 import {
   useVirtualScroll,
   getScrollAction,
+  reportMeasuredHeight,
 } from "../hooks/useVirtualScroll.js";
 import { useScrollAcceleration } from "../hooks/useScrollAcceleration.js";
 import { useTranscriptSearch } from "../hooks/useTranscriptSearch.js";
@@ -30,6 +31,9 @@ interface Props {
 /** Fallback step size passed to getScrollAction for j/k keys (3 rows ≈ one short message) */
 const DEFAULT_ITEM_HEIGHT = 3;
 
+/** Messages older than this many items are committed to <Static> and never re-rendered */
+const LIVE_WINDOW_SIZE = 200;
+
 export function VirtualMessageList({
   messages,
   viewportHeight,
@@ -41,6 +45,7 @@ export function VirtualMessageList({
   // True only when the user explicitly pressed an up-scroll key — suppresses
   // auto-scroll so they can read history. Cleared when they jump to bottom.
   const userScrolledUp = useRef(false);
+  const commitCursorRef = useRef(0);
 
   const isStreaming = messages.some((m) => m.streaming);
 
@@ -93,6 +98,16 @@ export function VirtualMessageList({
 
   const deferredMessages = useDeferredValue(collapsedMessages);
 
+  // Advance commitCursor monotonically — committed messages go to <Static> (rendered once, never again)
+  const stableCount = deferredMessages.filter(m => !m.streaming).length;
+  const candidateCursor = Math.max(0, stableCount - LIVE_WINDOW_SIZE);
+  if (candidateCursor > commitCursorRef.current) {
+    commitCursorRef.current = candidateCursor;
+  }
+  const commitCursor = commitCursorRef.current;
+  const staticMessages = deferredMessages.slice(0, commitCursor);
+  const liveMessages = deferredMessages.slice(commitCursor);
+
   const { getAcceleratedDelta } = useScrollAcceleration();
 
   const {
@@ -103,7 +118,7 @@ export function VirtualMessageList({
     scrollTo,
     onScroll,
   } = useVirtualScroll({
-    items: deferredMessages,
+    items: liveMessages,
     viewportHeight,
     terminalWidth,
   });
@@ -182,7 +197,19 @@ export function VirtualMessageList({
   }, [scrollToBottom]);
 
   // Slice visible messages
-  const visibleMessages = deferredMessages.slice(startIndex, endIndex);
+  const visibleMessages = liveMessages.slice(startIndex, endIndex);
+
+  // Post-render: collect actual Yoga heights for visible messages and feed back
+  // into the height cache to improve virtual scroll accuracy over time.
+  useEffect(() => {
+    if (typeof (globalThis as any).__inkGetMeasuredHeight !== 'function') return;
+    for (const msg of visibleMessages) {
+      const h = (globalThis as any).__inkGetMeasuredHeight(msg.id);
+      if (h != null && h > 0) {
+        reportMeasuredHeight(msg.id, h);
+      }
+    }
+  });
 
   const [searchMode, setSearchMode] = useState(false);
   const search = useTranscriptSearch(messages);
@@ -231,19 +258,31 @@ export function VirtualMessageList({
   // Auto-scroll to current search match
   useEffect(() => {
     if (search.currentMatch) {
-      scrollTo(search.currentMatch.messageIndex);
+      const liveIdx = search.currentMatch.messageIndex - commitCursor;
+      if (liveIdx >= 0) {
+        scrollTo(liveIdx);
+      }
+      // If liveIdx < 0, match is in static zone — user must use terminal scroll buffer
     }
-  }, [search.currentMatch, scrollTo]);
+  }, [search.currentMatch, scrollTo, commitCursor]);
 
   return (
     <Box flexDirection="column" height={viewportHeight}>
-      {/* Rendered message subset */}
+      {/* Committed past messages — rendered once by Ink, never repainted */}
+      {staticMessages.length > 0 && (
+        <Static items={staticMessages}>
+          {(msg) => <MessageBubble key={msg.id} message={msg} />}
+        </Static>
+      )}
+
+      {/* Live window — virtual scroll over last LIVE_WINDOW_SIZE messages */}
       {visibleMessages.map((msg, i) => {
         const isSelected = i === selectedIdx;
         const isSearchMatch = !isSelected && search.currentMatch?.messageId === msg.id;
         return (
           <Box
             key={msg.id}
+            {...({'data-measure-id': msg.id} as any)}
             {...(isSelected
               ? { borderStyle: "single" as const, borderColor: "gray" }
               : isSearchMatch
