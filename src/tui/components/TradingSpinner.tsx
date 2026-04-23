@@ -2,6 +2,8 @@ import React, { useRef, useMemo } from "react";
 import { Box, Text } from "ink";
 import { ShimmerChar } from "./ShimmerChar.js";
 import { useAnimationClock } from "../hooks/useAnimationClock.js";
+import { TeammateSpinnerTree } from "./TeammateSpinnerTree.js";
+import type { AgentTask } from "./TeammateSpinnerTree.js";
 
 // ============================================================================
 // TradingSpinner — Animated spinner with glimmer shimmer + stall detection
@@ -42,6 +44,16 @@ interface Props {
   userInput?: string;
   /** Currently running tool name — overrides verb when active */
   activeToolName?: string;
+  /**
+   * Context window usage ratio (0–1). When provided and cols > 80, appends
+   * "· N% ctx" to the spinner line. Yellow when > 70%, red when > 90%.
+   */
+  contextBudgetRatio?: number;
+  /**
+   * Active agent tasks for multi-agent runs. When 2+ entries are present,
+   * renders a TeammateSpinnerTree below the main spinner line.
+   */
+  agents?: AgentTask[];
 }
 
 // Infer verb from user input — what are they actually asking for?
@@ -366,7 +378,7 @@ function getToolVerb(toolName: string): string | null {
   return null;
 }
 
-export function TradingSpinner({ agentName, elapsedMs, streamLength = 0, userInput, activeToolName }: Props) {
+export function TradingSpinner({ agentName, elapsedMs, streamLength = 0, userInput, activeToolName, contextBudgetRatio, agents }: Props) {
   // Progressive width gating: hide elements that don't fit
   const cols = process.stdout.columns ?? 80;
   // Token counter (smooth animation via ref)
@@ -441,35 +453,53 @@ export function TradingSpinner({ agentName, elapsedMs, streamLength = 0, userInp
   const showElapsed = cols > 50;
   const showTokens = cols > 70;
   const showStall = cols > 40;
+  const showContextBudget = cols > 80 && contextBudgetRatio != null;
+
+  // Context budget display
+  const ctxPct = contextBudgetRatio != null ? Math.round(contextBudgetRatio * 100) : 0;
+  const ctxColor = ctxPct >= 90 ? "red" : ctxPct >= 70 ? "yellow" : undefined;
+
+  const showAgentTree = (agents?.length ?? 0) >= 2;
 
   return (
-    <Box paddingLeft={2}>
-      <Text color={isStalled ? "red" : "rgb(52,238,176)"}>{char} </Text>
-      {chars.map((c, i) => (
-        <ShimmerChar
-          key={i}
-          char={c}
-          glimmerIndex={isStalled ? -10 : glimmerIndex}
-          charIndex={i}
-        />
-      ))}
-      {showElapsed && elapsedStr && (
-        <>
-          <Text dimColor> {"\u00b7"} </Text>
-          <Text dimColor>{elapsedStr}</Text>
-        </>
-      )}
-      {showTokens && tokenStr && (
-        <>
-          <Text dimColor> {"\u00b7"} </Text>
-          <Text dimColor>{tokenStr}</Text>
-        </>
-      )}
-      {showStall && isStalled && (
-        <>
-          <Text dimColor> {"\u00b7"} </Text>
-          <Text color="red" dimColor>slow response</Text>
-        </>
+    <Box flexDirection="column">
+      <Box paddingLeft={2}>
+        <Text color={isStalled ? "red" : "rgb(52,238,176)"}>{char} </Text>
+        {chars.map((c, i) => (
+          <ShimmerChar
+            key={i}
+            char={c}
+            glimmerIndex={isStalled ? -10 : glimmerIndex}
+            charIndex={i}
+          />
+        ))}
+        {showElapsed && elapsedStr && (
+          <>
+            <Text dimColor> {"\u00b7"} </Text>
+            <Text dimColor>{elapsedStr}</Text>
+          </>
+        )}
+        {showTokens && tokenStr && (
+          <>
+            <Text dimColor> {"\u00b7"} </Text>
+            <Text dimColor>{tokenStr}</Text>
+          </>
+        )}
+        {showStall && isStalled && (
+          <>
+            <Text dimColor> {"\u00b7"} </Text>
+            <Text color="red" dimColor>slow response</Text>
+          </>
+        )}
+        {showContextBudget && (
+          <>
+            <Text dimColor> {"\u00b7"} </Text>
+            <Text color={ctxColor}>{ctxPct}% ctx</Text>
+          </>
+        )}
+      </Box>
+      {showAgentTree && agents && (
+        <TeammateSpinnerTree agents={agents} />
       )}
     </Box>
   );

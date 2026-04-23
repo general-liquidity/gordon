@@ -309,6 +309,7 @@ async function streamResponse(
   let totalTokens = 0;
   let currentAgentName: string | null = null;
   let chainStartTime = Date.now();
+  let lastEventWasToolEnd = false;
   const streamingMsgId = `streaming-${Date.now()}`;
 
   setState((prev: any) => ({
@@ -335,6 +336,10 @@ async function streamResponse(
         case "text_delta": {
           const chunk = event.content ?? "";
           if (chunk) {
+            if (lastEventWasToolEnd && responseContent.length > 0 && !responseContent.endsWith("\n")) {
+              responseContent += "\n\n";
+            }
+            lastEventWasToolEnd = false;
             responseContent += chunk;
             // 100ms matches Claude Code's STREAM_EVENT_FLUSH_INTERVAL_MS
             // Debounce setState to at most one Ink redraw per 100ms batch.
@@ -451,6 +456,7 @@ async function streamResponse(
           break;
 
         case "tool_call_end":
+          lastEventWasToolEnd = true;
           taskTree = recordTaskTreeToolEnd(taskTree, event.toolName) ?? taskTree;
           setState((prev: any) => {
             const chains = [...prev.activeAgents];

@@ -24,6 +24,18 @@ import { RateLimitMessage } from "./messages/RateLimitMessage.js";
 import { ShutdownMessage } from "./messages/ShutdownMessage.js";
 import { PasteDetectionMessage } from "./messages/PasteDetectionMessage.js";
 import { ProactiveSuggestionMessage } from "./messages/ProactiveSuggestionMessage.js";
+import { AssistantThinkingMessage } from "./messages/AssistantThinkingMessage.js";
+import { AssistantRedactedThinkingMessage } from "./messages/AssistantRedactedThinkingMessage.js";
+import { InterruptedMessage } from "./messages/InterruptedMessage.js";
+import { CompactBoundaryMessage } from "./messages/CompactBoundaryMessage.js";
+import { UserToolSuccessMessage } from "./messages/UserToolSuccessMessage.js";
+import { UserToolErrorMessage } from "./messages/UserToolErrorMessage.js";
+import { UserToolCanceledMessage } from "./messages/UserToolCanceledMessage.js";
+import { UserToolRejectMessage } from "./messages/UserToolRejectMessage.js";
+import { RejectedPlanMessage } from "./messages/RejectedPlanMessage.js";
+import { TaskAssignmentMessage } from "./messages/TaskAssignmentMessage.js";
+import { PlanApprovalMessage } from "./messages/PlanApprovalMessage.js";
+import { AdvisorMessage } from "./messages/AdvisorMessage.js";
 
 // ============================================================================
 // MessageBubble — Routes to specialized renderers by variant
@@ -37,7 +49,10 @@ export type MessageVariant =
   | "error" | "compact" | "resume" | "welcome"
   | "position" | "order" | "risk_check" | "backtest" | "scan_result"
   | "hook_progress" | "rate_limit" | "shutdown" | "paste"
-  | "proactive_suggestion";
+  | "proactive_suggestion"
+  | "thinking" | "redacted_thinking" | "interrupted" | "compact_boundary"
+  | "tool_success" | "tool_error" | "tool_canceled" | "tool_reject"
+  | "rejected_plan" | "task_assignment" | "plan_approval" | "advisor";
 
 export interface Message {
   id: string;
@@ -231,6 +246,30 @@ export const MessageBubble = React.memo(function MessageBubble({ message }: Prop
   if (variant === "proactive_suggestion") {
     return <ProactiveSuggestionMessage message={message} />;
   }
+
+  // Extended thinking variants
+  if (variant === "thinking") return <AssistantThinkingMessage message={message} />;
+  if (variant === "redacted_thinking") return <AssistantRedactedThinkingMessage message={message} />;
+
+  // Interrupt
+  if (variant === "interrupted") return <InterruptedMessage message={message} />;
+
+  // Compaction boundary separator
+  if (variant === "compact_boundary") return <CompactBoundaryMessage message={message} />;
+
+  // Tool outcome variants
+  if (variant === "tool_success") return <UserToolSuccessMessage message={message} />;
+  if (variant === "tool_error") return <UserToolErrorMessage message={message} />;
+  if (variant === "tool_canceled") return <UserToolCanceledMessage message={message} />;
+  if (variant === "tool_reject") return <UserToolRejectMessage message={message} />;
+
+  // Plan lifecycle variants
+  if (variant === "rejected_plan") return <RejectedPlanMessage message={message} />;
+  if (variant === "task_assignment") return <TaskAssignmentMessage message={message} />;
+  if (variant === "plan_approval") return <PlanApprovalMessage message={message} />;
+
+  // Advisory / proactive tips
+  if (variant === "advisor") return <AdvisorMessage message={message} />;
 
   // Fallback — unknown variant, render with hook
   return (

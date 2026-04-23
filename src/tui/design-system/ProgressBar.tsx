@@ -4,7 +4,8 @@ import { Text } from "ink";
 // ============================================================================
 // ProgressBar — Unicode block progress indicator
 //
-// Uses 9-level sub-character blocks for smooth appearance:
+// precision="char" (default): whole-character fill, no partial blocks
+// precision="block": 8-level sub-character precision using Unicode block elements
 //   [' ', '▏', '▎', '▍', '▌', '▋', '▊', '▉', '█']
 // ============================================================================
 
@@ -13,20 +14,44 @@ interface Props {
   width?: number;
   fillColor?: string;
   emptyColor?: string;
+  /** "char" = whole-character fill (default). "block" = 8-level sub-character precision. */
+  precision?: "block" | "char";
 }
 
-const BLOCKS = [" ", "\u258F", "\u258E", "\u258D", "\u258C", "\u258B", "\u258A", "\u2589", "\u2588"];
+const BLOCKS = [" ", "▏", "▎", "▍", "▌", "▋", "▊", "▉", "█"];
 
-export function ProgressBar({ value, width = 20, fillColor = "cyanBright", emptyColor }: Props) {
+export function ProgressBar({
+  value,
+  width = 20,
+  fillColor = "cyanBright",
+  emptyColor,
+  precision = "char",
+}: Props) {
   const clamped = Math.max(0, Math.min(1, value));
-  const totalEighths = clamped * width * 8;
-  const fullChars = Math.floor(totalEighths / 8);
-  const partialIndex = Math.round(totalEighths % 8);
-  const emptyChars = Math.max(0, width - fullChars - (partialIndex > 0 ? 1 : 0));
 
-  const filled = BLOCKS[8]!.repeat(fullChars);
-  const partial = partialIndex > 0 ? (BLOCKS[partialIndex] ?? "") : "";
-  const empty = " ".repeat(emptyChars);
+  let filled: string;
+  let partial: string;
+  let empty: string;
+
+  if (precision === "block") {
+    // 8-level sub-character precision
+    const totalEighths = clamped * width * 8;
+    const fullChars = Math.floor(totalEighths / 8);
+    const partialIndex = Math.round(totalEighths % 8);
+    const emptyChars = Math.max(0, width - fullChars - (partialIndex > 0 ? 1 : 0));
+
+    filled = (BLOCKS[8] ?? "█").repeat(fullChars);
+    partial = partialIndex > 0 ? (BLOCKS[partialIndex] ?? "") : "";
+    empty = " ".repeat(emptyChars);
+  } else {
+    // Whole-character fill (default "char" behavior)
+    const fullChars = Math.round(clamped * width);
+    const emptyChars = width - fullChars;
+
+    filled = (BLOCKS[8] ?? "█").repeat(fullChars);
+    partial = "";
+    empty = " ".repeat(emptyChars);
+  }
 
   return (
     <Text>

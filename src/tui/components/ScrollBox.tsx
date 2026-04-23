@@ -9,32 +9,61 @@ import { Box } from "ink";
 // ============================================================================
 
 export interface ScrollBoxHandle {
+  // Core scroll controls
   scrollTo: (y: number) => void;
   scrollBy: (delta: number) => void;
   scrollToBottom: () => void;
   isAtBottom: () => boolean;
   getScrollTop: () => number;
+
+  // Dimensions
+  getScrollHeight: () => number;
+  getFreshScrollHeight: () => number;
+  getViewportHeight: () => number;
+  getViewportTop: () => number;
+
+  // Subscription
+  subscribe: (listener: (scrollTop: number) => void) => () => void;
+
+  // Clamping override
+  setClampBounds: (min: number, max: number) => void;
+
+  // Element targeting
+  scrollToElement: (measureId: string) => void;
 }
 
 interface Props {
   height: number;
   stickyScroll?: boolean;
   onScroll?: (scrollTop: number) => void;
+  onScrollChange?: (scrollTop: number) => void;
   children: ReactNode;
   totalContentHeight?: number;
 }
 
 export const ScrollBox = forwardRef<ScrollBoxHandle, Props>(function ScrollBox(
-  { height, stickyScroll = true, onScroll, children, totalContentHeight = 0 },
+  { height, stickyScroll = true, onScroll, onScrollChange, children, totalContentHeight = 0 },
   ref,
 ) {
   const [scrollTop, setScrollTop] = useState(0);
   const wasAtBottomRef = useRef(true);
 
+  // Subscription listeners
+  const listenersRef = useRef<Set<(scrollTop: number) => void>>(new Set());
+
+  // Clamp bounds override — null means use default [0, maxScroll]
+  const clampBoundsRef = useRef<{ min: number; max: number } | null>(null);
+
   const maxScroll = Math.max(0, totalContentHeight - height);
 
   const clamp = useCallback(
-    (value: number) => Math.max(0, Math.min(value, maxScroll)),
+    (value: number) => {
+      if (clampBoundsRef.current !== null) {
+        const { min, max } = clampBoundsRef.current;
+        return Math.max(min, Math.min(value, max));
+      }
+      return Math.max(0, Math.min(value, maxScroll));
+    },
     [maxScroll],
   );
 
@@ -47,16 +76,68 @@ export const ScrollBox = forwardRef<ScrollBoxHandle, Props>(function ScrollBox(
       (globalThis as any).__inkClearIncrementalOutput?.();
       wasAtBottomRef.current = clamped >= maxScroll;
       onScroll?.(clamped);
+      onScrollChange?.(clamped);
+      // Notify all subscribers
+      listenersRef.current.forEach((listener) => listener(clamped));
     },
-    [clamp, maxScroll, onScroll],
+    [clamp, maxScroll, onScroll, onScrollChange],
   );
 
   useImperativeHandle(ref, () => ({
+    // --- Existing ---
     scrollTo: (y: number) => updateScroll(y),
     scrollBy: (delta: number) => updateScroll(scrollTop + delta),
     scrollToBottom: () => updateScroll(maxScroll),
     isAtBottom: () => scrollTop >= maxScroll,
     getScrollTop: () => scrollTop,
+
+    // --- Dimensions ---
+    getScrollHeight: () => totalContentHeight,
+    getFreshScrollHeight: () => totalContentHeight,
+    getViewportHeight: () => height,
+    getViewportTop: () => scrollTop,
+
+    // --- Subscription ---
+    subscribe: (listener: (scrollTop: number) => void) => {
+      listenersRef.current.add(listener);
+      return () => {
+        listenersRef.current.delete(listener);
+      };
+    },
+
+    // --- Clamp override ---
+    setClampBounds: (min: number, max: number) => {
+      clampBoundsRef.current = { min, max };
+    },
+
+    // --- Element targeting ---
+    scrollToElement: (measureId: string) => {
+      try {
+        const registry = (globalThis as any).__inkNodeRegistry;
+        if (!registry || !registry[measureId]) {
+          updateScroll(0);
+          return;
+        }
+        const node = registry[measureId];
+        if (!node?.yogaNode) {
+          updateScroll(0);
+          return;
+        }
+        // Walk up yoga node tree accumulating top offsets
+        let offset = 0;
+        let current = node.yogaNode;
+        while (current) {
+          const layout = current.getComputedLayout?.();
+          if (layout) {
+            offset += layout.top ?? 0;
+          }
+          current = current.getParent?.();
+        }
+        updateScroll(offset);
+      } catch {
+        updateScroll(0);
+      }
+    },
   }));
 
   // Sticky scroll: if was at bottom and content grew, snap immediately

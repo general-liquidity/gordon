@@ -5,7 +5,7 @@ import type { Message } from "../MessageBubble.js";
 // System messages: single dim line, no badge. Minimal footprint.
 function SystemMessageInner({ message }: { message: Message }) {
   return (
-    <Box marginTop={0} paddingLeft={2}>
+    <Box marginTop={1} paddingLeft={2}>
       <Text dimColor>{message.content}</Text>
     </Box>
   );
