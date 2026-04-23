@@ -44,8 +44,8 @@ const apiCircuitBreaker = new CircuitBreaker({
 });
 
 // Hyperliquid API endpoints
-const INFO_URL = "https://api.hyperliquid.xyz/info";
-const EXCHANGE_URL = "https://api.hyperliquid.xyz/exchange";
+const MAINNET_BASE_URL = "https://api.hyperliquid.xyz";
+const TESTNET_BASE_URL = "https://api.hyperliquid-testnet.xyz";
 
 // Rate limit tracking
 interface RateLimitState {
@@ -71,9 +71,16 @@ const RATE_LIMIT_CONFIG = {
 export class HyperliquidClient {
   private signer: HyperliquidSigner;
   private rateLimitState: RateLimitState;
+  private readonly infoUrl: string;
+  private readonly exchangeUrl: string;
+  readonly isTestnet: boolean;
 
-  constructor(privateKey: string) {
+  constructor(privateKey: string, sandbox: boolean = false) {
     this.signer = new HyperliquidSigner(privateKey);
+    this.isTestnet = sandbox;
+    const base = sandbox ? TESTNET_BASE_URL : MAINNET_BASE_URL;
+    this.infoUrl = `${base}/info`;
+    this.exchangeUrl = `${base}/exchange`;
     this.rateLimitState = {
       requestCount: 0,
       lastReset: Date.now(),
@@ -213,7 +220,7 @@ export class HyperliquidClient {
       const timeoutId = setTimeout(() => controller.abort(), 10000);
 
       try {
-        const response = await fetch(INFO_URL, {
+        const response = await fetch(this.infoUrl, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -275,7 +282,7 @@ export class HyperliquidClient {
       const timeoutId = setTimeout(() => controller.abort(), 10000);
 
       try {
-        const response = await fetch(EXCHANGE_URL, {
+        const response = await fetch(this.exchangeUrl, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -626,7 +633,7 @@ export class HyperliquidClient {
     const timeoutId = setTimeout(() => controller.abort(), 15000);
 
     try {
-      const response = await fetch(EXCHANGE_URL, {
+      const response = await fetch(this.exchangeUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),

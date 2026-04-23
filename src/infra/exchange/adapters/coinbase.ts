@@ -39,9 +39,11 @@ export class CoinbaseAdapter implements Exchange {
 
   readonly exchangeId: ExchangeId = "coinbase";
   readonly displayName = "Coinbase";
+  readonly isSandbox: boolean;
 
-  constructor(apiKey: string, apiSecret: string, passphrase: string) {
-    this.client = new CoinbaseClient(apiKey, apiSecret, passphrase);
+  constructor(apiKey: string, apiSecret: string, passphrase: string, sandbox?: boolean) {
+    this.isSandbox = Boolean(sandbox);
+    this.client = new CoinbaseClient(apiKey, apiSecret, passphrase, this.isSandbox);
   }
 
   // -------------------------------------------------------------------------

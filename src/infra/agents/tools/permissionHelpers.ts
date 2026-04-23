@@ -52,13 +52,16 @@ const MODE_LABELS: Record<PermissionMode, string> = {
 /**
  * Check whether a trading operation is allowed under the current permission mode.
  *
- * Note: paper mode currently blocks all real execution because the paper trading
- * engine is not yet wired. When it lands, this helper can be updated to route
- * paper-mode calls through the paper engine instead of blocking.
+ * When the active venue adapter is in sandbox/testnet mode (e.g. Binance
+ * testnet, Hyperliquid testnet, OKX demo), paper mode allows execution —
+ * orders are sent to fake-money infrastructure. Pass `options.sandboxActive`
+ * from the caller so this helper can make that call. Paper mode still
+ * blocks when no sandbox adapter is active.
  */
 export function checkTradingPermission(
   mode: PermissionMode | undefined,
   operation: TradingOperationContext,
+  options: { sandboxActive?: boolean } = {},
 ): PermissionCheck {
   const m = mode ?? "ask";
   const label = MODE_LABELS[m] ?? m;
@@ -85,14 +88,17 @@ export function checkTradingPermission(
     };
   }
 
-  // paper mode blocks real writes until a paper engine is wired
+  // paper mode — allow execution when active venue is on a sandbox/testnet;
+  // block otherwise (no local paper-fill engine for non-sandbox adapters).
   if (m === "paper") {
-    // plan_create is fine in paper mode — planning doesn't touch state
     if (operation === "plan_create") return { allowed: true, modeLabel: label };
+    if (options.sandboxActive) {
+      return { allowed: true, modeLabel: `${label} (sandbox)` };
+    }
     return {
       allowed: false,
       modeLabel: label,
-      reason: `Cannot ${operationLabel(operation)}: permissionMode is 'paper' (paper trading — real orders blocked; paper execution engine not yet wired). Use /auto or /ask for real trading.`,
+      reason: `Cannot ${operationLabel(operation)}: permissionMode is 'paper' but the active venue is not a sandbox/testnet adapter. Connect a venue with sandbox credentials (Binance testnet, Hyperliquid testnet, OKX demo) or switch to /auto / /ask.`,
     };
   }
 

@@ -15,6 +15,7 @@ import { RobinhoodAdapter } from "./adapters/robinhood.ts";
 import { OkxAdapter } from "./adapters/okx.ts";
 import { GeminiAdapter } from "./adapters/gemini.ts";
 import { loadOAuthExchangeCredentials, exchangeSupportsOAuth } from "./oauth-bridge.ts";
+import { assertSandboxSupported } from "./sandboxSupport.ts";
 
 /**
  * All supported exchange IDs with native adapters
@@ -113,6 +114,11 @@ export class ExchangeFactory {
       );
     }
 
+    // Guard: refuse to construct a sandbox adapter for a venue that doesn't
+    // offer sandbox/paper trading. Fails fast with a clear hint rather than
+    // silently routing to production.
+    assertSandboxSupported(exchangeId, Boolean(credentials.sandbox));
+
     // Check cache
     const cacheKey = getCacheKey(exchangeId, credentials);
     const cached = this.instanceCache.get(cacheKey);
@@ -125,7 +131,7 @@ export class ExchangeFactory {
 
     switch (exchangeId) {
       case "binance":
-        exchange = new BinanceAdapter(credentials.apiKey, credentials.apiSecret);
+        exchange = new BinanceAdapter(credentials.apiKey, credentials.apiSecret, credentials.sandbox);
         break;
       case "binance_us":
         exchange = new BinanceUSAdapter(credentials.apiKey, credentials.apiSecret);
@@ -137,20 +143,21 @@ export class ExchangeFactory {
         exchange = new CoinbaseAdapter(
           credentials.apiKey,
           credentials.apiSecret,
-          credentials.passphrase
+          credentials.passphrase,
+          credentials.sandbox,
         );
         break;
       case "kraken":
         exchange = new KrakenAdapter(credentials.apiKey, credentials.apiSecret);
         break;
       case "bitfinex":
-        exchange = new BitfinexAdapter(credentials.apiKey, credentials.apiSecret);
+        exchange = new BitfinexAdapter(credentials.apiKey, credentials.apiSecret, credentials.sandbox);
         break;
       case "hyperliquid":
         if (!credentials.walletPrivateKey) {
           throw new Error("Hyperliquid requires a wallet private key for authentication");
         }
-        exchange = new HyperliquidAdapter(credentials.walletPrivateKey);
+        exchange = new HyperliquidAdapter(credentials.walletPrivateKey, credentials.sandbox);
         break;
       case "uniswap":
         if (!credentials.apiKey) {

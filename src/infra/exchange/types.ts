@@ -430,6 +430,15 @@ export interface Exchange {
   /** Human-readable exchange name */
   readonly displayName: string;
 
+  /**
+   * True when the adapter is routed to a sandbox/testnet environment.
+   * Optional for backwards-compat — adapters that don't declare it are
+   * treated as live. Callers can rely on this to unblock paper-mode
+   * execution: a live-blocked operation is safe when it's going to
+   * fake-money infrastructure.
+   */
+  readonly isSandbox?: boolean;
+
   // -------------------------------------------------------------------------
   // Connection
   // -------------------------------------------------------------------------

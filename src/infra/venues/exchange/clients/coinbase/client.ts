@@ -46,8 +46,9 @@ const apiCircuitBreaker = new CircuitBreaker({
   resetTimeoutMs: 30000,
 });
 
-// Coinbase API base URL
-const BASE_URL = "https://api.coinbase.com";
+// Coinbase API base URLs
+const COINBASE_LIVE_URL = "https://api.coinbase.com";
+const COINBASE_SANDBOX_URL = "https://api-sandbox.coinbase.com";
 
 // Coinbase Primary API v2 version header
 const CB_API_VERSION = "2024-02-01";
@@ -77,12 +78,16 @@ export class CoinbaseClient {
   private apiKey: string;
   private apiSecret: string;
   private passphrase: string;
+  private readonly baseUrl: string;
+  readonly isSandbox: boolean;
   private rateLimitState: RateLimitState;
 
-  constructor(apiKey: string, apiSecret: string, passphrase: string) {
+  constructor(apiKey: string, apiSecret: string, passphrase: string, sandbox: boolean = false) {
     this.apiKey = apiKey;
     this.apiSecret = apiSecret;
     this.passphrase = passphrase;
+    this.isSandbox = sandbox;
+    this.baseUrl = sandbox ? COINBASE_SANDBOX_URL : COINBASE_LIVE_URL;
     this.rateLimitState = {
       requestCount: 0,
       lastReset: Date.now(),
@@ -246,7 +251,7 @@ export class CoinbaseClient {
       const timeoutId = setTimeout(() => controller.abort(), 10000);
 
       try {
-        const response = await fetch(`${BASE_URL}${endpoint}`, {
+        const response = await fetch(`${this.baseUrl}${endpoint}`, {
           method,
           headers,
           body: body ? bodyStr : undefined,
@@ -296,7 +301,7 @@ export class CoinbaseClient {
       const timeoutId = setTimeout(() => controller.abort(), 10000);
 
       try {
-        const response = await fetch(`${BASE_URL}${endpoint}`, {
+        const response = await fetch(`${this.baseUrl}${endpoint}`, {
           method: "GET",
           headers: {
             "Content-Type": "application/json",
@@ -360,7 +365,7 @@ export class CoinbaseClient {
       const timeoutId = setTimeout(() => controller.abort(), 10000);
 
       try {
-        const response = await fetch(`${BASE_URL}${endpoint}`, {
+        const response = await fetch(`${this.baseUrl}${endpoint}`, {
           method,
           headers,
           body: body ? bodyStr : undefined,

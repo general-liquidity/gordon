@@ -35,16 +35,32 @@ import type { Candle } from "../../../types/index.ts";
  * the abstract Exchange interface, enabling multi-exchange support
  * without modifying the original implementation.
  */
+/**
+ * Binance Spot Testnet URL — fake-money sandbox. Separate API keys issued
+ * from https://testnet.binance.vision; keys are preserved across monthly
+ * data resets.
+ */
+const BINANCE_TESTNET_URL = "https://testnet.binance.vision";
+
 export class BinanceAdapter implements Exchange {
   protected client: BinanceClient;
+  readonly isSandbox: boolean;
 
   readonly exchangeId: ExchangeId = "binance";
   readonly displayName: string = "Binance";
 
-  constructor(apiKeyOrClient: string | BinanceClient, apiSecret?: string) {
-    this.client = typeof apiKeyOrClient === "string"
-      ? new BinanceClient(apiKeyOrClient, apiSecret!)
-      : apiKeyOrClient;
+  constructor(
+    apiKeyOrClient: string | BinanceClient,
+    apiSecret?: string,
+    sandbox?: boolean,
+  ) {
+    this.isSandbox = Boolean(sandbox);
+    if (typeof apiKeyOrClient === "string") {
+      const baseUrl = this.isSandbox ? BINANCE_TESTNET_URL : undefined;
+      this.client = new BinanceClient(apiKeyOrClient, apiSecret!, baseUrl);
+    } else {
+      this.client = apiKeyOrClient;
+    }
   }
 
   /**

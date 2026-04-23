@@ -39,8 +39,17 @@ export class BitfinexAdapter implements Exchange {
 
   readonly exchangeId: ExchangeId = "bitfinex";
   readonly displayName = "Bitfinex";
+  /**
+   * Bitfinex paper trading doesn't use a separate URL — it's credential-based.
+   * Users issue a paper-trading subaccount in the Bitfinex UI and pass those
+   * keys with `sandbox: true`. The adapter just surfaces the flag so callers
+   * (permission helpers, decision-trace recorders) know the venue is
+   * fake-money even though the underlying URL is production.
+   */
+  readonly isSandbox: boolean;
 
-  constructor(apiKey: string, apiSecret: string) {
+  constructor(apiKey: string, apiSecret: string, sandbox?: boolean) {
+    this.isSandbox = Boolean(sandbox);
     this.client = new BitfinexClient(apiKey, apiSecret);
   }
 

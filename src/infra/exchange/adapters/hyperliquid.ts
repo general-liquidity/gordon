@@ -47,12 +47,14 @@ export class HyperliquidAdapter implements Exchange {
   private client: HyperliquidClient;
   private assetIndexMap: Map<string, number> = new Map();
   private assetNameMap: Map<number, string> = new Map();
+  readonly isSandbox: boolean;
 
   readonly exchangeId: ExchangeId = "hyperliquid";
   readonly displayName = "Hyperliquid";
 
-  constructor(walletPrivateKey: string) {
-    this.client = new HyperliquidClient(walletPrivateKey);
+  constructor(walletPrivateKey: string, sandbox?: boolean) {
+    this.isSandbox = Boolean(sandbox);
+    this.client = new HyperliquidClient(walletPrivateKey, this.isSandbox);
   }
 
   /**
