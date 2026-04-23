@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { Box, Text, Spacer, useInput, useApp } from "ink";
+import { Box, Text, Spacer, useInput, useApp, Static } from "ink";
 
 // ── Providers ──
 import { SettingsProvider } from "./state/SettingsProvider.js";
@@ -170,6 +170,10 @@ interface FeedbackTradeData {
   pnl?: number;
   pnlPercent?: number;
 }
+
+// Rendered once to terminal scrollback via <Static> on first AppInner mount.
+// Bump the id string to force a re-render for users on cached sessions.
+const BOOT_CARD: Array<{ id: string }> = [{ id: "gordon-boot-v1" }];
 
 /**
  * AppInner — The core UI, mounted inside the provider tree.
@@ -1430,7 +1434,24 @@ function AppInner() {
 
   return (
     <Box flexDirection="column" minHeight={process.stdout.rows ?? 24}>
-      {/* ── Header ── */}
+      {/* Boot card — written once to terminal scrollback via Static on mount.
+          Stays visible at the top of the session; scrolls into history naturally
+          as the conversation grows. The compact live header is always below. */}
+      <Static items={BOOT_CARD}>
+        {(_item) => (
+          <GordonHeader
+            key="gordon-boot"
+            permissionMode={permissionMode ?? "ask"}
+            sessionId={sessionId}
+            threadId={threadId}
+            isResumedSession={isResumedSession}
+            toolCount={5}
+            compact={false}
+          />
+        )}
+      </Static>
+
+      {/* ── Compact live header — always visible in the Ink frame ── */}
       <GordonHeader
         permissionMode={permissionMode ?? "ask"}
         sessionId={sessionId}
