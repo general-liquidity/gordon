@@ -367,6 +367,28 @@ export interface MemorySummarizedEvent extends BaseEvent {
 }
 
 /**
+ * Fires alongside `memory:summarized` when the compaction produced
+ * structured metadata (venues/strategies/indicators/etc). Separate event so
+ * subscribers that only care about metadata don't have to parse the base
+ * summarization event.
+ */
+export interface MemoryCompactedDetailsEvent extends BaseEvent {
+  type: "memory:compacted_details";
+  stage: string;
+  iterative: boolean;
+  messagesFolded: number;
+  symbols: string[];
+  venues: string[];
+  strategies: string[];
+  indicators: string[];
+  chartPatterns: string[];
+  timeframes: string[];
+  researchArtifacts: string[];
+  mandates: string[];
+  approvals: string[];
+}
+
+/**
  * Autonomous loop events
  */
 export interface AutonomousStartedEvent extends BaseEvent {
@@ -575,6 +597,7 @@ export type GordonEvent =
   | SchedulerScanCompletedEvent
   | SchedulerScanFailedEvent
   | MemorySummarizedEvent
+  | MemoryCompactedDetailsEvent
   | AutonomousStartedEvent
   | AutonomousStoppedEvent
   | AutonomousPausedEvent

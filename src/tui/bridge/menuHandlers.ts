@@ -270,6 +270,27 @@ export async function handleRuntimeMenuCommand(
       addMessage(setState, "gordon", result ? `Approved: ${result.toolName}` : `No pending approval: ${parts[0]}`);
       return true;
     }
+    case "runtime-rules": {
+      const rules = runtime.listApprovalRules();
+      if (rules.length === 0) {
+        addMessage(setState, "gordon", "No approval rules configured.");
+        return true;
+      }
+      const lines: string[] = ["ACTIVE RULES:"];
+      for (const r of rules) {
+        const target = r.toolName
+          ? r.toolName
+          : r.toolNamePattern
+            ? `pattern=${r.toolNamePattern}`
+            : r.permissionScope
+              ? `scope=${r.permissionScope}`
+              : "*";
+        const expires = r.expiresAt ? ` expires=${r.expiresAt.slice(0, 10)}` : "";
+        lines.push(`  ${r.decision === "allow" ? "✓" : "✗"} ${target} [${r.scope}]${expires} (by ${r.createdBy})`);
+      }
+      addMessage(setState, "gordon", lines.join("\n"));
+      return true;
+    }
     case "runtime-deny": {
       if (!args) { addMessage(setState, "system", "Usage: /runtime-deny <id> [reason]"); return true; }
       const parts = args.split(/\s+/);

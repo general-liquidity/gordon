@@ -186,6 +186,10 @@ export class SessionRuntime {
     return this.permissionEngine.listPending();
   }
 
+  listApprovalRules() {
+    return this.permissionEngine.listRules();
+  }
+
   getRecentApprovals(limit?: number): RuntimeApprovalRequest[] {
     return this.permissionEngine.listRecent(limit);
   }

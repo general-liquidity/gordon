@@ -189,6 +189,13 @@ export interface RuntimeApprovalRequest {
 export interface RuntimeApprovalRule {
   id: string;
   toolName?: string;
+  /**
+   * Glob pattern that matches tool IDs. Supports `*` as a multi-char wildcard
+   * and `?` as a single-char wildcard. Specific `toolName` matches always win
+   * over pattern matches; among equally-specific rules, the most recently
+   * created rule wins. Example: `"kraken_*"`, `"mcp_research_*"`.
+   */
+  toolNamePattern?: string;
   permissionScope?: RuntimePermissionScope;
   decision: "allow" | "deny";
   scope: "session" | "persistent";

@@ -42,6 +42,60 @@ export class ToolApprovalRequiredError extends Error {
   }
 }
 
+/**
+ * Structured denial error. Carries the matching rule so downstream surfaces
+ * (audit trail, /context output, user-facing messaging) can explain *why*
+ * the tool was denied — e.g. "denied by rule 'kraken_*' created 2026-03-12".
+ * Inspired by opencode's permission/index.ts:89-111 denial-with-context.
+ */
+export class ToolApprovalDeniedError extends Error {
+  readonly toolName: string;
+  readonly rule?: RuntimeApprovalRule;
+  readonly reason?: string;
+
+  constructor(toolName: string, rule?: RuntimeApprovalRule, reason?: string) {
+    const ruleHint = rule
+      ? ` (matched rule ${rule.id}${rule.toolNamePattern ? ` pattern="${rule.toolNamePattern}"` : ""})`
+      : "";
+    super(reason ?? `Tool "${toolName}" is denied by policy${ruleHint}.`);
+    this.name = "ToolApprovalDeniedError";
+    this.toolName = toolName;
+    this.rule = rule;
+    this.reason = reason;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Wildcard matching helper (item 2)
+// ---------------------------------------------------------------------------
+
+/**
+ * Convert a glob-style pattern (`*` multi-char, `?` single-char) into a
+ * regex anchored at both ends. Other regex metacharacters are escaped so
+ * they match literally.
+ */
+function globToRegex(pattern: string): RegExp {
+  const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, "\\$&");
+  const body = escaped.replace(/\*/g, ".*").replace(/\?/g, ".");
+  return new RegExp(`^${body}$`);
+}
+
+function matchesRule(tool: RuntimeToolSpec, toolName: string, rule: RuntimeApprovalRule, now: number): boolean {
+  if (rule.expiresAt && new Date(rule.expiresAt).getTime() <= now) return false;
+  if (rule.permissionScope && rule.permissionScope !== tool.permissionScope) return false;
+  if (rule.toolName && rule.toolName !== toolName) return false;
+  if (rule.toolNamePattern && !globToRegex(rule.toolNamePattern).test(toolName)) return false;
+  // Rule with no toolName and no pattern = wildcard-all under its permissionScope (or all if no scope).
+  return true;
+}
+
+/** A rule is "specific" if it names the tool exactly; patterns rank below. */
+function ruleSpecificity(rule: RuntimeApprovalRule): number {
+  if (rule.toolName) return 2;
+  if (rule.toolNamePattern) return 1;
+  return 0; // scope-only or catch-all
+}
+
 function buildFingerprint(tool: RuntimeToolSpec, context: GordonContext, runtimeState: ReturnType<RuntimeStore["getState"]>): string {
   return [
     tool.id,
@@ -319,7 +373,19 @@ export class PermissionEngine {
 
   deny(
     requestId: string,
-    options: { actor?: string; persist?: boolean; scope?: RuntimeApprovalRule["scope"]; reason?: string } = {},
+    options: {
+      actor?: string;
+      persist?: boolean;
+      scope?: RuntimeApprovalRule["scope"];
+      reason?: string;
+      /**
+       * Cascade the denial to every other pending request that shares the
+       * same `permissionScope`. Avoids re-prompting the user for each
+       * dependent tool call after a parent decision is rejected.
+       * Inspired by opencode's session-scoped cascade (permission/index.ts:229-245).
+       */
+      cascade?: boolean;
+    } = {},
   ): RuntimeApprovalRequest | null {
     const state = this.runtimeStore.getState();
     const pending = state.approvals.pending.find((entry) => entry.id === requestId);
@@ -349,6 +415,27 @@ export class PermissionEngine {
     }
 
     this.resolvePendingRequest(denied);
+
+    if (options.cascade) {
+      // Re-read state (resolvePendingRequest mutated it) and cascade-deny
+      // every remaining pending request that shares the same scope.
+      const after = this.runtimeStore.getState();
+      const targets = after.approvals.pending.filter(
+        (entry) => entry.id !== requestId && entry.permissionScope === pending.permissionScope,
+      );
+      for (const target of targets) {
+        const cascaded: RuntimeApprovalRequest = {
+          ...target,
+          status: "denied",
+          actor: options.actor ?? "human",
+          decisionSource: "human",
+          reason: `Cascaded from ${requestId}: ${options.reason ?? pending.reason ?? "denied"}`,
+          decidedAt: new Date().toISOString(),
+        };
+        this.resolvePendingRequest(cascaded);
+      }
+    }
+
     return denied;
   }
 
@@ -423,18 +510,14 @@ export class PermissionEngine {
     rules: RuntimeApprovalRule[],
   ): RuntimeApprovalRule | null {
     const now = Date.now();
-    for (const rule of rules) {
-      if (rule.expiresAt && new Date(rule.expiresAt).getTime() <= now) {
-        continue;
-      }
-      if (rule.toolName && rule.toolName !== toolName) {
-        continue;
-      }
-      if (rule.permissionScope && rule.permissionScope !== tool.permissionScope) {
-        continue;
-      }
-      return rule;
-    }
-    return null;
+    const candidates = rules.filter((rule) => matchesRule(tool, toolName, rule, now));
+    if (candidates.length === 0) return null;
+    // Specificity wins; newest rule breaks ties (createdAt descending).
+    candidates.sort((a, b) => {
+      const specDiff = ruleSpecificity(b) - ruleSpecificity(a);
+      if (specDiff !== 0) return specDiff;
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
+    return candidates[0] ?? null;
   }
 }

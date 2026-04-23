@@ -147,6 +147,28 @@ export async function summarizeIfNeeded(
         newCount: result.messages.length,
         summarizedCount: result.messagesSummarized,
       });
+
+      // Also emit structured metadata (venues, strategies, indicators, …)
+      // when the summarizer produced CompactionDetails. Subscribers can use
+      // this to surface "last compaction touched Binance + momentum + 1h"
+      // without having to re-parse the summary text.
+      if (result.compactionDetails) {
+        const d = result.compactionDetails;
+        await emitEvent("memory:compacted_details", {
+          stage: result.compactionStage ?? "unknown",
+          iterative: d.iterative,
+          messagesFolded: d.messagesFolded,
+          symbols: d.symbols,
+          venues: d.venues,
+          strategies: d.strategies,
+          indicators: d.indicators,
+          chartPatterns: d.chartPatterns,
+          timeframes: d.timeframes,
+          researchArtifacts: d.researchArtifacts,
+          mandates: d.mandates,
+          approvals: d.approvals,
+        });
+      }
     } else {
       // Summarization ran but didn't actually shrink anything — that's a
       // soft failure. Count it so the circuit breaker eventually trips if
