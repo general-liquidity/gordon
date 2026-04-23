@@ -18,6 +18,8 @@ interface Props {
   positionCount?: number;
   feedCount?: number;
   mcpWarnings?: string[];
+  /** When true, render a compact 1-line status bar instead of the full card. */
+  compact?: boolean;
 }
 
 const MODE_COLOR: Record<PermissionMode, string> = {
@@ -38,18 +40,45 @@ export function GordonHeader({
   toolCount = 0,
   exchangeStatus,
   mcpWarnings = [],
+  compact = false,
 }: Props) {
   const modeColor = MODE_COLOR[permissionMode] ?? "rgb(52,238,176)";
   const version = process.env.npm_package_version ?? process.env.GORDON_VERSION ?? "0.9";
   const isPaper = permissionMode === "paper";
 
-  // Show the thread ID (meaningful) or fall back to session/resource ID
   const sessionDisplay = threadId
-    ? threadId.slice(0, 32)
+    ? threadId.slice(0, 24)
     : sessionId
-    ? sessionId.slice(0, 32)
+    ? sessionId.slice(0, 24)
     : "initializing...";
 
+  // Compact mode: single status line that doesn't eat viewport space.
+  // Shown once conversation starts so the full card doesn't crowd messages.
+  if (compact) {
+    const model = process.env.GORDON_MODEL ?? "auto";
+    const modelShort = model.length > 30 ? model.slice(0, 28) + "…" : model;
+    return (
+      <Box paddingX={1} marginBottom={1}>
+        <Text color="rgb(52,238,176)" bold>{"≫"} </Text>
+        <Text dimColor>Gordon</Text>
+        <Text dimColor>  ·  </Text>
+        <Text color={modeColor}>{permissionMode}</Text>
+        {isPaper && <Text color="yellow" bold> [PAPER]</Text>}
+        <Text dimColor>  ·  </Text>
+        <Text dimColor>{modelShort}</Text>
+        <Text dimColor>  ·  </Text>
+        <Text dimColor>{sessionDisplay}</Text>
+        {exchangeStatus && (
+          <>
+            <Text dimColor>  ·  </Text>
+            <Text dimColor>{exchangeStatus}</Text>
+          </>
+        )}
+      </Box>
+    );
+  }
+
+  // Full card — empty state only
   return (
     <Box flexDirection="column" marginBottom={1}>
       <Box
@@ -95,7 +124,6 @@ export function GordonHeader({
         </Box>
       </Box>
 
-      {/* MCP connection warnings (Codex pattern: visible, not swallowed) */}
       {mcpWarnings && mcpWarnings.length > 0 && mcpWarnings.map((w, i) => (
         <Box key={i} paddingX={1}>
           <Text color="yellow">{"⚠"} {w}</Text>

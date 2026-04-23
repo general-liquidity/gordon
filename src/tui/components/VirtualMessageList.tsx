@@ -123,24 +123,29 @@ export function VirtualMessageList({
     terminalWidth,
   });
 
-  // Track unseen messages when user has scrolled up
+  // Track unseen messages when user has scrolled up.
+  // Streaming always clears the unseen count — you're following live content.
   useEffect(() => {
     const newCount = messages.length - prevMessageCount.current;
-    if (newCount > 0 && userScrolledUp.current) {
+    if (newCount > 0 && userScrolledUp.current && !isStreaming) {
       setUnseenCount((prev) => prev + newCount);
     }
-    if (!userScrolledUp.current) {
+    if (!userScrolledUp.current || isStreaming) {
       setUnseenCount(0);
     }
     prevMessageCount.current = messages.length;
-  }, [messages.length]);
+  }, [messages.length, isStreaming]);
 
   // Auto-scroll: always follow new content unless user explicitly scrolled up.
   // During streaming the chat must follow the response like Claude Code does.
+  // Streaming also resets userScrolledUp so the unseen indicator clears.
   const lastMsgContentLen = messages[messages.length - 1]?.content?.length ?? 0;
   useEffect(() => {
     if (!userScrolledUp.current || isStreaming) {
       scrollToBottom();
+      if (isStreaming) {
+        userScrolledUp.current = false;
+      }
     }
   }, [messages.length, lastMsgContentLen, isStreaming, scrollToBottom]);
 

@@ -168,12 +168,14 @@ function TokenRenderer({ token }: { token: Token }) {
       // marked parses tables into { header, align, rows } — convert back
       // to pipe-separated lines and delegate to InlineTable for the
       // Unicode box border rendering we already built.
+      // Use tokensToPlainText on cell.tokens (not cell.text) so inline
+      // markdown like **bold** is stripped rather than rendered as stars.
       const t = token as Tokens.Table;
       const lines: string[] = [];
-      lines.push("| " + t.header.map((h: Tokens.TableCell) => h.text).join(" | ") + " |");
+      lines.push("| " + t.header.map((h: Tokens.TableCell) => tokensToPlainText(h.tokens ?? [])).join(" | ") + " |");
       lines.push("| " + t.align.map((a: string | null) => alignMarker(a)).join(" | ") + " |");
       for (const row of t.rows) {
-        lines.push("| " + row.map((cell: Tokens.TableCell) => cell.text).join(" | ") + " |");
+        lines.push("| " + row.map((cell: Tokens.TableCell) => tokensToPlainText(cell.tokens ?? [])).join(" | ") + " |");
       }
       return <InlineTable lines={lines} />;
     }
@@ -208,6 +210,22 @@ function alignMarker(a: string | null): string {
   if (a === "center") return ":---:";
   if (a === "right") return "---:";
   return "---";
+}
+
+// Walk a token tree and extract plain text — used for table cells where the
+// InlineTable renderer expects raw strings, not Ink elements.
+function tokensToPlainText(tokens: Token[]): string {
+  return tokens
+    .map((t) => {
+      if (t.type === "text") return (t as Tokens.Text).text;
+      if (t.type === "codespan") return (t as Tokens.Codespan).text;
+      if (t.type === "strong") return tokensToPlainText((t as Tokens.Strong).tokens ?? []);
+      if (t.type === "em") return tokensToPlainText((t as Tokens.Em).tokens ?? []);
+      if (t.type === "del") return tokensToPlainText((t as Tokens.Del).tokens ?? []);
+      if (t.type === "br") return " ";
+      return (t as Token & { text?: string; raw?: string }).text ?? (t as Token & { raw?: string }).raw ?? "";
+    })
+    .join("");
 }
 
 // ============================================================================

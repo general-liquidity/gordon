@@ -164,10 +164,12 @@ import { initializeRuntime, handleInput, handleApprovalDecision } from "./bridge
 // ============================================================================
 
 // ── Height constants (terminal lines) ──
-const HEADER_HEIGHT = 6;
+// Full card (empty state): ~13 rows including tip line + marginBottom.
+// Compact bar (conversation active): 2 rows (1 content + 1 marginBottom).
+const HEADER_HEIGHT_FULL = 13;
+const HEADER_HEIGHT_COMPACT = 2;
 const INPUT_HEIGHT = 2;
 const FOOTER_HEIGHT = 1;
-const CHROME_HEIGHT = HEADER_HEIGHT + INPUT_HEIGHT + FOOTER_HEIGHT;
 
 // ── Feedback trade data shape ──
 interface FeedbackTradeData {
@@ -378,7 +380,8 @@ function AppInner() {
     };
   }, [activeAgents]);
 
-  const viewportHeight = Math.max(rows - CHROME_HEIGHT, 6);
+  const headerHeight = messages.length > 0 ? HEADER_HEIGHT_COMPACT : HEADER_HEIGHT_FULL;
+  const viewportHeight = Math.max(rows - headerHeight - INPUT_HEIGHT - FOOTER_HEIGHT, 6);
 
   // Check if any dialog is open (to suppress other keybindings)
   const anyDialogOpen =
@@ -1448,6 +1451,7 @@ function AppInner() {
         toolCount={5}
         positionCount={0}
         feedCount={0}
+        compact={messages.length > 0}
       />
 
       {/* ── Conversation — wrapped in PrivacyScreen ── */}
