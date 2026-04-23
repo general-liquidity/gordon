@@ -61,12 +61,14 @@ export function VirtualMessageList({
     prevMessageCount.current = messages.length;
   }, [messages.length, isAtBottom]);
 
-  // Auto-scroll to bottom when new messages arrive and already at bottom
+  // Auto-scroll to bottom on new messages OR when the last message grows
+  // (streaming text deltas update content without changing messages.length).
+  const lastMsgContentLen = messages[messages.length - 1]?.content?.length ?? 0;
   useEffect(() => {
     if (isAtBottom) {
       scrollToBottom();
     }
-  }, [messages.length, isAtBottom, scrollToBottom]);
+  }, [messages.length, lastMsgContentLen, isAtBottom, scrollToBottom]);
 
   // Keyboard scroll bindings
   useInput(

@@ -327,31 +327,32 @@ async function streamResponse(
     }],
   }));
 
-  // Claude Code pattern: accumulate text silently during streaming and only
-  // commit the full response to the message list when streaming completes
-  // ("step_complete" or "done" events). This gives a single atomic render of
-  // the whole message — no token-by-token or line-by-line jank — while the
-  // thinking indicator, tool calls, and agent chain UI still update live.
-  //
-  // The spinner + thinking + tool-call inline display at top of the chat
-  // already give the user a sense of "working" without showing partial text.
-
   try {
     for await (const event of runtime.streamMessage(userMessage)) {
       switch (event.type) {
-        case "text_delta":
-          // Accumulate silently — do NOT commit to state.messages yet.
-          // The streaming placeholder message stays empty until step_complete
-          // fires. The user sees spinner + tool calls + thinking instead of
-          // partial text.
-          responseContent += event.content ?? "";
+        case "text_delta": {
+          // Stream text deltas live so the message grows token-by-token,
+          // matching Claude Code behaviour. The stable-prefix optimisation in
+          // StreamingMarkdown means re-rendering is cheap — only the new tail
+          // is re-parsed on each delta.
+          const chunk = event.content ?? "";
+          if (chunk) {
+            responseContent += chunk;
+            setState((prev: any) => {
+              const msgs = [...prev.messages];
+              const idx = msgs.length - 1;
+              if (idx >= 0 && msgs[idx]?.id === streamingMsgId) {
+                msgs[idx] = { ...msgs[idx], content: responseContent };
+              }
+              return { ...prev, streamBuffer: responseContent, messages: msgs };
+            });
+          }
           break;
+        }
 
         case "step_complete":
-          // Commit the accumulated response content to the streaming message
-          // in one atomic update. This is the "message appears all at once"
-          // effect — the entire response is rendered as a complete markdown
-          // block instead of ticking in word-by-word.
+          // Final commit — ensures message content is fully in sync after
+          // the step completes (handles edge cases where last delta missed).
           if (responseContent.length > 0) {
             setState((prev: any) => {
               const msgs = [...prev.messages];
