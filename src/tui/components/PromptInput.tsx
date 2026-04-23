@@ -93,6 +93,13 @@ export function PromptInput({
   const maxVisible = Math.min(Math.max(10, Math.floor(termRows * 0.6)), 30);
 
   useInput((input, key) => {
+    // Shift+Enter: insert newline instead of submitting
+    if (key.return && key.shift) {
+      setValue((prev) => prev + "\n");
+      setCursorPos((p) => p + 1);
+      return;
+    }
+
     if (key.return) {
       if (showSuggestions && suggestions[selectedIdx]) {
         const cmd = suggestions[selectedIdx]!;
@@ -218,7 +225,8 @@ export function PromptInput({
   // Description width = terminal width - pointer(3) - "/" - cmd name - padding
   const descWidth = Math.max(20, termCols - 3 - 1 - CMD_COL_WIDTH - 4);
 
-  const promptChar = isSlashMode ? "/" : "\u276F";
+  const isBashMode = value.startsWith("!");
+  const promptChar = isBashMode ? "$" : isSlashMode ? "/" : "\u276F";
 
   return (
     <Box flexDirection="column">
@@ -276,7 +284,9 @@ export function PromptInput({
         <Box flexGrow={1}>
           {value ? (
             <Text>
-              {isSlashMode ? (
+              {isBashMode ? (
+                <Text color="yellow">{value.slice(1)}</Text>
+              ) : isSlashMode ? (
                 <Text color="rgb(52,238,176)">{value.slice(1)}</Text>
               ) : (
                 <Text>{value}</Text>

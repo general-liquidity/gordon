@@ -8,16 +8,27 @@ import type { Message } from "../MessageBubble.js";
 // Assistant (gordon) messages: ⎿ hook via MessageResponse (prevents nesting).
 // Streaming=true → StreamingMarkdown (progressive, stable prefix).
 // Streaming=false → RichContent (final parsed output).
+// The ⎿ hook is skipped when content is empty/whitespace to avoid orphan hook lines.
 function AssistantMessageInner({ message }: { message: Message }) {
+  const hasContent = message.content.trim().length > 0;
+
+  if (hasContent) {
+    return (
+      <Box flexDirection="column" marginTop={1}>
+        <MessageResponse>
+          {message.streaming ? (
+            <StreamingMarkdown content={message.content} isStreaming={true} />
+          ) : (
+            <RichContent content={message.content} />
+          )}
+        </MessageResponse>
+      </Box>
+    );
+  }
+
   return (
     <Box flexDirection="column" marginTop={1}>
-      <MessageResponse>
-        {message.streaming ? (
-          <StreamingMarkdown content={message.content} isStreaming={true} />
-        ) : (
-          <RichContent content={message.content} />
-        )}
-      </MessageResponse>
+      <StreamingMarkdown content={message.content} isStreaming={true} />
     </Box>
   );
 }

@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useRef } from "react";
+import { useSyncExternalStore, useCallback, useMemo, useRef } from "react";
 
 // ============================================================================
 // useVirtualScroll — Viewport culling for large message lists
@@ -162,6 +162,33 @@ export interface VirtualScrollResult {
 }
 
 // ---------------------------------------------------------------------------
+// Scroll store — useSyncExternalStore-compatible external state
+// ---------------------------------------------------------------------------
+
+interface ScrollStore {
+  subscribe: (cb: () => void) => () => void;
+  getSnapshot: () => number;           // returns quantized bucket
+  setScrollTop: (top: number, max: number) => void;
+  getRaw: () => number;
+}
+
+function createScrollStore(initialRaw: number): ScrollStore {
+  let raw = initialRaw;
+  let bucket = Math.floor(initialRaw / SCROLL_QUANTUM);
+  const subs = new Set<() => void>();
+  return {
+    subscribe(cb) { subs.add(cb); return () => subs.delete(cb); },
+    getSnapshot() { return bucket; },
+    setScrollTop(top, max) {
+      raw = Math.max(0, Math.min(top, max));
+      const b = Math.floor(raw / SCROLL_QUANTUM);
+      if (b !== bucket) { bucket = b; subs.forEach(fn => fn()); }
+    },
+    getRaw() { return raw; },
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Hook
 // ---------------------------------------------------------------------------
 
@@ -170,13 +197,12 @@ export function useVirtualScroll({
   viewportHeight,
   terminalWidth = 80,
 }: VirtualScrollOptions): VirtualScrollResult {
-  // scrollBucket drives React re-renders — changes only every SCROLL_QUANTUM rows.
-  // The true scroll position lives in scrollTopRef so smooth intermediate
-  // values don't cause unnecessary reconciliation.
-  const [scrollBucket, setScrollBucket] = useState(0);
-
-  // Initialize to MAX_SAFE_INTEGER so the first clamp always lands at the bottom.
-  const scrollTopRef = useRef(Number.MAX_SAFE_INTEGER);
+  // store drives React re-renders — notifies subscribers only when the
+  // quantized bucket changes (every SCROLL_QUANTUM rows). Raw position is
+  // read directly from store.getRaw() so intermediate values are free.
+  const store = useRef<ScrollStore | null>(null);
+  if (!store.current) store.current = createScrollStore(Number.MAX_SAFE_INTEGER);
+  useSyncExternalStore(store.current.subscribe, store.current.getSnapshot);
 
   // Build cumulative offsets array: offsets[i] = sum of heights[0..i-1]
   const offsets = useMemo(() => {
@@ -194,8 +220,8 @@ export function useVirtualScroll({
   const totalHeight = offsets[items.length] ?? 0;
   const maxScrollTop = Math.max(0, totalHeight - viewportHeight);
 
-  // Clamp scrollTopRef on each render pass (maxScrollTop may have shrunk)
-  const clampedTop = Math.max(0, Math.min(scrollTopRef.current, maxScrollTop));
+  // Clamp raw scroll position on each render pass (maxScrollTop may have shrunk)
+  const clampedTop = Math.max(0, Math.min(store.current.getRaw(), maxScrollTop));
 
   // Compute visible range with row-based overscan
   let startIndex = findFirstVisible(
@@ -218,32 +244,19 @@ export function useVirtualScroll({
 
   const onScroll = useCallback(
     (delta: number) => {
-      const newTop = Math.max(
-        0,
-        Math.min(scrollTopRef.current + delta, maxScrollTop),
-      );
-      scrollTopRef.current = newTop;
-      const newBucket = Math.floor(newTop / SCROLL_QUANTUM);
-      if (newBucket !== scrollBucket) {
-        setScrollBucket(newBucket);
-      }
+      store.current!.setScrollTop(store.current!.getRaw() + delta, maxScrollTop);
     },
-    [scrollBucket, maxScrollTop],
+    [maxScrollTop],
   );
 
   const scrollToBottom = useCallback(() => {
-    scrollTopRef.current = maxScrollTop;
-    setScrollBucket(Math.floor(maxScrollTop / SCROLL_QUANTUM));
+    store.current!.setScrollTop(maxScrollTop, maxScrollTop);
   }, [maxScrollTop]);
 
   const scrollTo = useCallback(
     (index: number) => {
-      const target = Math.max(
-        0,
-        Math.min(offsets[index] ?? 0, maxScrollTop),
-      );
-      scrollTopRef.current = target;
-      setScrollBucket(Math.floor(target / SCROLL_QUANTUM));
+      const target = Math.max(0, Math.min(offsets[index] ?? 0, maxScrollTop));
+      store.current!.setScrollTop(target, maxScrollTop);
     },
     [offsets, maxScrollTop],
   );

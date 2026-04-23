@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useRef, useMemo, useDeferredValue } from "react";
 import { Box, Text, useInput } from "ink";
 import { MessageBubble, type Message } from "./MessageBubble.js";
 import { UnseenDivider } from "./UnseenDivider.js";
@@ -91,6 +91,8 @@ export function VirtualMessageList({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [collapseKey]);
 
+  const deferredMessages = useDeferredValue(collapsedMessages);
+
   const { getAcceleratedDelta } = useScrollAcceleration();
 
   const {
@@ -101,7 +103,7 @@ export function VirtualMessageList({
     scrollTo,
     onScroll,
   } = useVirtualScroll({
-    items: collapsedMessages,
+    items: deferredMessages,
     viewportHeight,
     terminalWidth,
   });
@@ -180,7 +182,7 @@ export function VirtualMessageList({
   }, [scrollToBottom]);
 
   // Slice visible messages
-  const visibleMessages = collapsedMessages.slice(startIndex, endIndex);
+  const visibleMessages = deferredMessages.slice(startIndex, endIndex);
 
   const [searchMode, setSearchMode] = useState(false);
   const search = useTranscriptSearch(messages);
@@ -236,11 +238,22 @@ export function VirtualMessageList({
   return (
     <Box flexDirection="column" height={viewportHeight}>
       {/* Rendered message subset */}
-      {visibleMessages.map((msg, i) => (
-        <Box key={msg.id} {...(i === selectedIdx ? { borderStyle: "single" as const, borderColor: "gray" } : {})}>
-          <MessageBubble message={msg} />
-        </Box>
-      ))}
+      {visibleMessages.map((msg, i) => {
+        const isSelected = i === selectedIdx;
+        const isSearchMatch = !isSelected && search.currentMatch?.messageId === msg.id;
+        return (
+          <Box
+            key={msg.id}
+            {...(isSelected
+              ? { borderStyle: "single" as const, borderColor: "gray" }
+              : isSearchMatch
+                ? { borderStyle: "single" as const, borderColor: "yellow" }
+                : {})}
+          >
+            <MessageBubble message={msg} />
+          </Box>
+        );
+      })}
 
       {/* Search bar */}
       <SearchBar
