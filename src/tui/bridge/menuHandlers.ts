@@ -270,6 +270,31 @@ export async function handleRuntimeMenuCommand(
       addMessage(setState, "gordon", result ? `Approved: ${result.toolName}` : `No pending approval: ${parts[0]}`);
       return true;
     }
+    case "runtime-deny-all": {
+      const scope = args.trim() || undefined;
+      // Validate scope against known RuntimePermissionScope values; otherwise
+      // treat as unscoped so a typo just denies everything (safe default).
+      const validScopes = new Set([
+        "market.read", "analysis.run", "portfolio.read",
+        "papertrade.execute", "livetrade.execute", "transfer.execute",
+        "wallet.write", "system.mode.write", "runtime.background.write",
+        "plugin.install", "mcp.connect",
+      ]);
+      const resolvedScope = scope && validScopes.has(scope) ? scope : undefined;
+      const denied = runtime.denyAllPending({
+        scope: resolvedScope as any,
+        reason: `Bulk-denied via /deny-all${resolvedScope ? ` scope=${resolvedScope}` : ""}`,
+      });
+      const scopeHint = resolvedScope
+        ? ` (scope=${resolvedScope})`
+        : scope
+          ? ` (scope "${scope}" unknown — denied all)`
+          : "";
+      addMessage(setState, "gordon", denied > 0
+        ? `Denied ${denied} pending request${denied === 1 ? "" : "s"}${scopeHint}.`
+        : `No pending approvals to deny${scopeHint}.`);
+      return true;
+    }
     case "runtime-rules": {
       const rules = runtime.listApprovalRules();
       if (rules.length === 0) {

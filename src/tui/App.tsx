@@ -41,6 +41,7 @@ import { getNotificationFolder } from "./notifications/notificationFolder.js";
 import { useFpsTracker } from "./hooks/useFpsTracker.js";
 import { useAnimationPause } from "./hooks/useAnimationClock.js";
 import { useProactiveChatSubscription } from "./hooks/useProactiveChatSubscription.js";
+import { useAlertSubscription } from "./state/useAlertSubscription.js";
 import { getNextHint, recordHintShown, incrementSessionCount, type HintContext } from "../app/onboarding/index.ts";
 
 // ── Phase 15-18 Components ──
@@ -189,6 +190,21 @@ function AppInner() {
   // and push them into the chat stream as proactive_suggestion messages.
   // This is the only place that bridges radar-mode suggestions into the TUI.
   useProactiveChatSubscription(dispatch);
+
+  // Bridge `alert:fired` events (from emitAlert) into the TUI notification
+  // queue. Info → info variant; warning → alert variant; critical → error.
+  useAlertSubscription();
+
+  // Mirror warning/critical alerts to the audit log so they survive TUI
+  // restarts and reach daemons running without a UI. Idempotent — safe to
+  // invoke on every mount.
+  React.useEffect(() => {
+    let stop: (() => void) | undefined;
+    void import("../infra/platform/observability/alertAuditMirror.ts").then((m) => {
+      stop = m.startAlertAuditMirror();
+    });
+    return () => { stop?.(); };
+  }, []);
 
   // ── Selectors (fine-grained subscriptions) ──
   const bootPhase = useAppState((s) => s.bootPhase);

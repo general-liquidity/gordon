@@ -190,6 +190,14 @@ export interface OpenAIRequestBody {
   temperature: number;
   max_tokens: number;
   response_format?: { type: "json_object" | "text" };
+  /**
+   * OpenAI-compatible endpoints (vLLM, LiteLLM, Dedalus, etc.) often forward
+   * extension params to the underlying model. We use `extra_body` to smuggle
+   * provider-specific hints such as Anthropic prompt-cache markers. Whether
+   * the active gateway forwards it is provider-dependent — runtime testing
+   * required to confirm cache hits.
+   */
+  extra_body?: Record<string, unknown>;
 }
 
 /**

@@ -60,6 +60,13 @@ export interface RiskAuditEntry {
   order: OrderRequest;
   decision: RiskDecision;
   portfolioSnapshot: PortfolioContext;
+  /**
+   * Optional structured reasoning record — which agent chain made this
+   * call, what tools ran, what the LLM's rationale was, and which plan
+   * (if any) sanctioned it. Lives in OrderRequest.metadata via the shared
+   * DecisionTrace helper (`withDecisionTrace`) when callers include it.
+   */
+  decisionTrace?: Record<string, unknown>;
 }
 
 // ============================================================================
@@ -131,6 +138,20 @@ export class RiskAuditLog {
       ensureTable();
       const db = getDatabase();
 
+      // If a decisionTrace was supplied, fold it into order.metadata so the
+      // reasoning chain persists alongside the order record without needing
+      // a schema change. Downstream readers can extract via
+      // `readDecisionTrace(order.metadata)`.
+      const orderForStorage = entry.decisionTrace
+        ? {
+            ...entry.order,
+            metadata: {
+              ...(entry.order.metadata ?? {}),
+              decisionTrace: entry.decisionTrace,
+            },
+          }
+        : entry.order;
+
       const sql = `INSERT INTO risk_audit (id, timestamp, symbol, side, action, approved, order_data, decision_data, portfolio_snapshot, agent_id, strategy_id)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
@@ -144,7 +165,7 @@ export class RiskAuditLog {
             entry.order.side,
             entry.decision.action,
             entry.decision.approved ? 1 : 0,
-            JSON.stringify(entry.order),
+            JSON.stringify(orderForStorage),
             JSON.stringify(entry.decision),
             JSON.stringify(entry.portfolioSnapshot),
             entry.order.agentId,

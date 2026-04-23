@@ -169,7 +169,8 @@ export class LLMClient {
     model: string,
     temperature: number,
     maxTokens: number,
-    jsonMode: boolean = false
+    jsonMode: boolean = false,
+    extraBody?: Record<string, unknown>,
   ): OpenAIRequestBody {
     const body: OpenAIRequestBody = {
       model,
@@ -180,6 +181,10 @@ export class LLMClient {
 
     if (jsonMode) {
       body.response_format = { type: "json_object" };
+    }
+
+    if (extraBody && Object.keys(extraBody).length > 0) {
+      body.extra_body = extraBody;
     }
 
     return body;
@@ -296,7 +301,20 @@ export class LLMClient {
    */
   async chatWithConfig(
     messages: Message[],
-    config: ModelConfig
+    config: ModelConfig,
+    options: {
+      /**
+       * Anthropic-style system content blocks with cache_control markers.
+       * When provided, forwarded via `extra_body.system_blocks` so the
+       * OpenAI-compatible gateway (Dedalus/vLLM/LiteLLM) can pass them
+       * through to the underlying Anthropic model for prompt caching.
+       */
+      systemBlocks?: Array<{
+        type: "text";
+        text: string;
+        cache_control?: { type: "ephemeral" };
+      }>;
+    } = {},
   ): Promise<LLMResponse> {
     if (messages.length === 0) {
       throw new Error("Messages array cannot be empty");
@@ -307,7 +325,12 @@ export class LLMClient {
     const temperature = config.temperature ?? this.defaultTemperature;
     const maxTokens = config.maxTokens ?? this.defaultMaxTokens;
 
-    const body = this.buildRequestBody(messages, model, temperature, maxTokens);
+    const extraBody: Record<string, unknown> = {};
+    if (options.systemBlocks && options.systemBlocks.length > 0) {
+      extraBody.system_blocks = options.systemBlocks;
+    }
+
+    const body = this.buildRequestBody(messages, model, temperature, maxTokens, false, extraBody);
     const response = await this.makeRequest(provider, body);
     return this.parseResponse(response, provider);
   }

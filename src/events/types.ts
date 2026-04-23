@@ -372,6 +372,24 @@ export interface MemorySummarizedEvent extends BaseEvent {
  * subscribers that only care about metadata don't have to parse the base
  * summarization event.
  */
+/**
+ * Operator-facing alert. Fires when a passive metric crosses a meaningful
+ * threshold or a subsystem needs operator attention. Subscribers decide how
+ * to route (console/webhook/Slack/email) — the bus is transport-agnostic.
+ */
+export interface AlertFiredEvent extends BaseEvent {
+  type: "alert:fired";
+  level: "info" | "warning" | "critical";
+  /** Category for filtering ("cost", "venue", "mandate", "error", …). */
+  category: string;
+  /** Short human-readable message. */
+  message: string;
+  /** Optional structured context for the subscriber to render. */
+  context?: Record<string, unknown>;
+  /** Deduplication key — emitters can use this to throttle. */
+  dedupeKey?: string;
+}
+
 export interface MemoryCompactedDetailsEvent extends BaseEvent {
   type: "memory:compacted_details";
   stage: string;
@@ -598,6 +616,7 @@ export type GordonEvent =
   | SchedulerScanFailedEvent
   | MemorySummarizedEvent
   | MemoryCompactedDetailsEvent
+  | AlertFiredEvent
   | AutonomousStartedEvent
   | AutonomousStoppedEvent
   | AutonomousPausedEvent

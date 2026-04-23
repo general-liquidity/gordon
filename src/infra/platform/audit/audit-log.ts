@@ -144,7 +144,9 @@ export type AuditAction =
   | "POLYGON_PAYMENT_INTENT_SIGNED"
   | "SYSTEMATIC_VALIDATION"
   | "SYSTEMATIC_OVERRIDE"
-  | "SYSTEMATIC_PROMOTION";
+  | "SYSTEMATIC_PROMOTION"
+  | "ALERT_WARNING"
+  | "ALERT_CRITICAL";
 
 /**
  * Result status of an audited action

@@ -190,6 +190,14 @@ export class SessionRuntime {
     return this.permissionEngine.listRules();
   }
 
+  denyAllPending(options: { scope?: RuntimeApprovalRequest["permissionScope"]; reason?: string } = {}): number {
+    return this.permissionEngine.denyAll({
+      scope: options.scope,
+      actor: "user",
+      reason: options.reason,
+    });
+  }
+
   getRecentApprovals(limit?: number): RuntimeApprovalRequest[] {
     return this.permissionEngine.listRecent(limit);
   }

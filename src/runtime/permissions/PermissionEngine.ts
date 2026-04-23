@@ -439,6 +439,29 @@ export class PermissionEngine {
     return denied;
   }
 
+  /**
+   * Bulk-deny every pending request. Optionally filter by permissionScope —
+   * e.g. `denyAll({ scope: "trading" })` clears only trading-risk approvals.
+   * Returns the count of requests denied.
+   */
+  denyAll(options: {
+    scope?: RuntimeApprovalRequest["permissionScope"];
+    actor?: string;
+    reason?: string;
+  } = {}): number {
+    const state = this.runtimeStore.getState();
+    const targets = state.approvals.pending.filter(
+      (entry) => !options.scope || entry.permissionScope === options.scope,
+    );
+    for (const target of targets) {
+      this.deny(target.id, {
+        actor: options.actor ?? "user",
+        reason: options.reason ?? "Bulk denied via /deny-all",
+      });
+    }
+    return targets.length;
+  }
+
   private queueRequest(
     toolName: string,
     tool: RuntimeToolSpec,
