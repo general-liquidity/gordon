@@ -15,6 +15,8 @@ import { PassThrough } from "node:stream";
 import { render } from "./render.ts";
 import Box from "./components/Box.ts";
 import Text from "./components/Text.ts";
+import useApp from "./hooks/use-app.ts";
+import useStdout from "./hooks/use-stdout.ts";
 
 const originalEnv = process.env["GORDON_CUSTOM_RENDER"];
 
@@ -125,6 +127,44 @@ describe("render() integration", () => {
         const logIdx = stdout.captured.indexOf("intercepted-log");
         const frameIdx = stdout.captured.lastIndexOf("frame-content");
         expect(logIdx).toBeLessThan(frameIdx);
+      } finally {
+        instance.unmount();
+      }
+    });
+
+    test("useApp context is available — exit() triggers unmount", async () => {
+      const stdout = createMockStdout();
+      const captured: { exit?: () => void } = {};
+      const Consumer: React.FC = () => {
+        const { exit } = useApp();
+        captured.exit = exit;
+        return React.createElement(Text, null, "app-consumer");
+      };
+      const tree = React.createElement(Consumer);
+      const instance = render(tree, { stdout, patchConsole: false, exitOnCtrlC: false });
+      // Hook must have received the context (non-null exit function).
+      expect(typeof captured.exit).toBe("function");
+      expect(stdout.captured).toContain("app-consumer");
+      // exit() should resolve waitUntilExit without us calling unmount.
+      const exitPromise = instance.waitUntilExit();
+      captured.exit?.();
+      await exitPromise;
+      expect(true).toBe(true);
+    });
+
+    test("useStdout context is available — returns our stdout stream", () => {
+      const stdout = createMockStdout();
+      const captured: { stdout?: NodeJS.WriteStream } = {};
+      const Consumer: React.FC = () => {
+        const { stdout: s } = useStdout();
+        captured.stdout = s;
+        return React.createElement(Text, null, "stdout-consumer");
+      };
+      const tree = React.createElement(Consumer);
+      const instance = render(tree, { stdout, patchConsole: false, exitOnCtrlC: false });
+      try {
+        // The hook must have received our mock stdout, not process.stdout.
+        expect(captured.stdout).toBe(stdout);
       } finally {
         instance.unmount();
       }
