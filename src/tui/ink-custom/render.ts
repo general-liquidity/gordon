@@ -19,11 +19,21 @@
 // paid by vanilla ink (react-reconciler, yoga-layout) so there is no
 // measurable startup penalty for the fallback code path.
 
-import type { ReactNode } from "react";
+import React, { type ReactNode } from "react";
 import process from "node:process";
-import { render as inkRender } from "ink";
+import {
+  render as inkRender,
+  useApp as inkUseApp,
+  useStdin as inkUseStdin,
+  useStdout as inkUseStdout,
+  useStderr as inkUseStderr,
+} from "ink";
 import { startCustomRender } from "./customRender.ts";
 import { loadLabsFlagsIntoEnv } from "./loadLabsFlags.ts";
+import OurAppContext from "./contexts/AppContext.ts";
+import OurStdinContext from "./contexts/StdinContext.ts";
+import OurStdoutContext from "./contexts/StdoutContext.ts";
+import OurStderrContext from "./contexts/StderrContext.ts";
 
 // Merge persisted experimental flags into process.env at module load.
 // Env var wins over persisted; persisted wins over unset. Idempotent.
@@ -176,11 +186,50 @@ function resolveOptions(options?: NodeJS.WriteStream | RenderOptions): Required<
 }
 
 /**
+ * Vanilla-Ink context bridge.
+ *
+ * Sits inside Ink's App provider tree, reads Ink's contexts via Ink's hooks,
+ * and re-provides the same values to OUR owned contexts. Required because
+ * after the A3 import swap, every consumer's `useApp` / `useInput` /
+ * `useStdout` / `useStderr` resolves to our shims, which read from owned
+ * contexts (`./contexts/*`). Ink's own App populates Ink's contexts, not
+ * ours — without this bridge, raw mode never enables, the input
+ * EventEmitter is the empty default, and `exit()` is a no-op.
+ *
+ * The four context shapes were ported 1-to-1 from Ink, so plumbing the
+ * values straight through is type-safe.
+ */
+function VanillaInkContextBridge({ children }: { children: ReactNode }): React.ReactElement {
+  const app = inkUseApp();
+  const stdin = inkUseStdin();
+  const stdout = inkUseStdout();
+  const stderr = inkUseStderr();
+  return React.createElement(
+    OurAppContext.Provider,
+    { value: app },
+    React.createElement(
+      OurStdinContext.Provider,
+      { value: stdin },
+      React.createElement(
+        OurStdoutContext.Provider,
+        { value: stdout },
+        React.createElement(
+          OurStderrContext.Provider,
+          { value: stderr },
+          children,
+        ),
+      ),
+    ),
+  );
+}
+
+/**
  * Mount a component and start rendering.
  *
- * Phase A2 (Lane 1): the custom renderer is the default. See
- * `shouldUseCustomRenderer()` above for the conditions that fall back to
- * vanilla Ink.
+ * After the A2 rollback the custom renderer is opt-in (`GORDON_CUSTOM_RENDER=1`).
+ * The vanilla-Ink path wraps the user tree in VanillaInkContextBridge so our
+ * hook shims see populated owned contexts. The custom path's owned App
+ * populates them directly, no bridge needed.
  */
 export const render = (
   node: ReactNode,
@@ -196,7 +245,8 @@ export const render = (
   ) {
     return startCustomRender(node, resolved);
   }
-  return inkRender(node, options as NodeJS.WriteStream | undefined) as Instance;
+  const bridged = React.createElement(VanillaInkContextBridge, null, node);
+  return inkRender(bridged, options as NodeJS.WriteStream | undefined) as Instance;
 };
 
 export default render;
