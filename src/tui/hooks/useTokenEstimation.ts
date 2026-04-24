@@ -1,7 +1,13 @@
-import { useState, useCallback } from "react";
+import { useCallback } from "react";
 
-// Token estimation — predict cost before expensive API calls
-// Trading context: backtests, deep scans, multi-symbol analysis
+// Token estimation — predict cost before expensive API calls.
+// Trading context: backtests, deep scans, multi-symbol analysis.
+//
+// IMPORTANT: `estimate()` is a PURE FUNCTION (no state updates). Callers
+// may invoke it during render to derive a display value. A prior version
+// stored the last result in useState, which caused an infinite re-render
+// loop when PromptInput called estimate(value) every render to show the
+// inline "~N tokens" hint.
 
 interface TokenEstimate {
   estimatedTokens: number;
@@ -19,8 +25,6 @@ const COST_PER_1K: Record<string, number> = {
 };
 
 export function useTokenEstimation() {
-  const [lastEstimate, setLastEstimate] = useState<TokenEstimate | null>(null);
-
   const estimate = useCallback((
     inputText: string,
     provider: string = "dedalus",
@@ -45,10 +49,8 @@ export function useTokenEstimation() {
         ? `Estimated cost: ~$${estimatedCostUsd.toFixed(2)}`
         : null;
 
-    const result = { estimatedTokens: totalTokens, estimatedCostUsd, warning };
-    setLastEstimate(result);
-    return result;
+    return { estimatedTokens: totalTokens, estimatedCostUsd, warning };
   }, []);
 
-  return { estimate, lastEstimate };
+  return { estimate };
 }
