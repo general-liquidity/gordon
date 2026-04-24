@@ -116,6 +116,9 @@ export const DIRECT_MENU_TARGETS = new Set([
   "memory-panel",
   "privacy",
   "marketplace",
+  "hip3",
+  "review-trade",
+  "debate",
 ]);
 
 export const DIRECT_TOOL_TARGETS = new Set([
@@ -1888,6 +1891,45 @@ const LEGACY_SLASH_COMMANDS: SlashCommandSeed[] = [
     level: 1,
     action: "menu",
     target: "journal",
+  },
+
+  // HIP-3 builder-perp browser (Hyperliquid: stocks, commodities, indices)
+  {
+    name: "hip3",
+    aliases: ["hyperliquid-perps", "builder-perps"],
+    description: "Browse Hyperliquid HIP-3 perps — stocks, commodities, indices",
+    usage: "/hip3",
+    category: "market",
+    level: 2,
+    action: "menu",
+    target: "hip3",
+    whenToUse: "Browse builder-deployed perps (TSLA, GOLD, USA500) with live quotes",
+  },
+
+  // Counterfactual / "what if I had exited here?" — fallback when trade:closed doesn't auto-open
+  {
+    name: "review-trade",
+    aliases: ["whatif", "counterfactual"],
+    description: "What-if analysis on the most recent closed trade",
+    usage: "/review-trade",
+    category: "trading",
+    level: 2,
+    action: "menu",
+    target: "review-trade",
+    whenToUse: "See alternative exit scenarios vs. your actual exit",
+  },
+
+  // Agent debate viewer — manual fallback (no debate:* events on the bus yet)
+  {
+    name: "debate",
+    aliases: ["deliberation", "debate-view"],
+    description: "View the last agent debate (bull vs bear / risk panel)",
+    usage: "/debate",
+    category: "strategy",
+    level: 2,
+    action: "menu",
+    target: "debate",
+    whenToUse: "Inspect the most recent multi-agent deliberation output",
   },
 ];
 

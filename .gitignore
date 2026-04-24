@@ -59,7 +59,7 @@ gordon-charm.exe
 supabase/.temp
 
 # Website repos (separate git repos)
-general-liquidity-website
+# general-liquidity-website
 gordon-cli-website
 website
 

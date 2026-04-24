@@ -123,6 +123,9 @@ import { TaskDependencyView } from "./components/TaskDependencyView.js";
 import { WalkForwardResults } from "./components/WalkForwardResults.js";
 import { PlanDiff, type PlanVersion } from "./components/PlanDiff.js";
 import { PostTradeFeedback } from "./components/PostTradeFeedback.js";
+import { HIP3AssetBrowser } from "./components/HIP3AssetBrowser.js";
+import { CounterfactualPanel, type TradeOutcome, type Scenario } from "./components/CounterfactualPanel.js";
+import { DebateViewer, type DebateViewerData } from "./components/DebateViewer.js";
 
 // ── Backend Module UI Components ──
 import { LivePositions, type Position } from "./components/LivePositions.js";
@@ -175,6 +178,20 @@ interface FeedbackTradeData {
 }
 
 /**
+ * DebateViewerOverlay — wraps DebateViewer with Esc-dismiss.
+ * DebateViewer has no onClose prop, so we attach key handling here.
+ */
+function DebateViewerOverlay({ data, onClose }: { data: DebateViewerData; onClose: () => void }) {
+  useInput((_input, key) => { if (key.escape) onClose(); });
+  return (
+    <Box flexDirection="column">
+      <DebateViewer data={data} />
+      <Box paddingX={2}><Text dimColor>Press Esc to dismiss.</Text></Box>
+    </Box>
+  );
+}
+
+/**
  * AppInner — The core UI, mounted inside the provider tree.
  * Reads all state via useAppState selectors and dispatches via useDispatch.
  */
@@ -199,6 +216,7 @@ function AppInner() {
     let unsubRate: (() => void) | undefined;
     let unsubPlan: (() => void) | undefined;
     let unsubTrade: (() => void) | undefined;
+    let unsubTradeClosed: (() => void) | undefined;
     void import("../events/index.ts").then((m) => {
       const bus = m.getEventBus();
       unsubRate = bus.on("binance:rate_limit", (event) => {
@@ -231,8 +249,39 @@ function AppInner() {
         const desc = `${side || "TRADE"} ${qty || ""} ${t.symbol ?? ""}${price ? ` @ $${price.toFixed(2)}` : ""}`.trim();
         setPostTradeFeedback(desc);
       });
+      // Wire CounterfactualPanel: auto-overlay "what if" scenarios on trade:closed
+      unsubTradeClosed = bus.on("trade:closed", (event) => {
+        const t: any = event.trade ?? {};
+        const entry = Number(t.averageEntry ?? t.entries?.[0]?.price ?? 0);
+        const exits = Array.isArray(t.exits) ? t.exits : [];
+        const exit = Number(exits[exits.length - 1]?.price ?? entry);
+        if (!entry || !exit) return; // skip if we don't have prices
+        const side = entry <= exit ? "long" : (Number(event.pnl) >= 0 ? "long" : "short");
+        const trade: TradeOutcome = {
+          symbol: String(t.symbol ?? "?"),
+          side,
+          entryPrice: entry,
+          exitPrice: exit,
+          pnl: Number(event.pnl ?? 0),
+          pnlPercent: Number(event.pnlPercent ?? 0),
+        };
+        // Synthesize 3 alternate exits from actual exit price
+        const scale = (mult: number) => exit * mult;
+        const mkScenario = (description: string, altExit: number): Scenario => {
+          const dir = side === "long" ? 1 : -1;
+          const altPct = ((altExit - entry) / entry) * 100 * dir;
+          const altPnl = trade.pnl === 0 ? 0 : trade.pnl * (altPct / (trade.pnlPercent || altPct || 1));
+          return { description, alternateExit: altExit, alternatePnl: altPnl, alternatePnlPercent: altPct };
+        };
+        const scenarios: Scenario[] = [
+          mkScenario("Exit 1% earlier", scale(side === "long" ? 0.99 : 1.01)),
+          mkScenario("Held to +2%", scale(side === "long" ? 1.02 : 0.98)),
+          mkScenario("Exit at entry (BE)", entry),
+        ];
+        setCounterfactual({ trade, scenarios });
+      });
     });
-    return () => { unsubRate?.(); unsubPlan?.(); unsubTrade?.(); };
+    return () => { unsubRate?.(); unsubPlan?.(); unsubTrade?.(); unsubTradeClosed?.(); };
   }, [rateLimit]);
 
   // Mirror warning/critical alerts to the audit log so they survive TUI
@@ -331,6 +380,15 @@ function AppInner() {
 
   // PostTradeFeedback overlay — shown when trade:opened fires (order fill).
   const [postTradeFeedback, setPostTradeFeedback] = useState<string | null>(null);
+
+  // HIP3AssetBrowser overlay — opened via /hip3 slash command.
+  const [showHIP3, setShowHIP3] = useState(false);
+
+  // CounterfactualPanel overlay — auto-shown on trade:closed (or /review-trade fallback).
+  const [counterfactual, setCounterfactual] = useState<{ trade: TradeOutcome; scenarios: Scenario[] } | null>(null);
+
+  // DebateViewer overlay — shown via /debate (no debate:* events on the bus yet).
+  const [debateView, setDebateView] = useState<DebateViewerData | null>(null);
 
   const [showModelPicker, setShowModelPicker] = useState(false);
   const [showMCPManager, setShowMCPManager] = useState(false);
@@ -438,7 +496,8 @@ function AppInner() {
     showBacktestWizard || showBrokerManager || showExchangeManager || showGenomeEvolution ||
     showHistorySearch || showIndicatorValue || showInsights || showMarketPulse ||
     showMessageSelector || showOptimization || showPlanEditor || showPlugins ||
-    showQuickOpen || showReconciliation || showTaskDeps || showWalkForward;
+    showQuickOpen || showReconciliation || showTaskDeps || showWalkForward ||
+    !!counterfactual || !!debateView;
 
   // ── Prompt suggestions based on conversation context ──
   const promptSuggestions = usePromptSuggestions(messages, isStreaming, !!false /* hasExchange */);
@@ -958,6 +1017,46 @@ function AppInner() {
         setShowWalkForward(true);
         return;
       }
+      // HIP-3 builder-perp browser (Hyperliquid stocks/commodities/indices)
+      if (trimmed === "/hip3" || trimmed === "/hyperliquid-perps" || trimmed === "/builder-perps") {
+        setShowHIP3(true);
+        return;
+      }
+      // Review last closed trade — fallback when no trade:closed has been observed this session
+      if (trimmed === "/review-trade" || trimmed === "/whatif" || trimmed === "/counterfactual") {
+        if (!counterfactual) {
+          dispatch({
+            type: "ADD_MESSAGE",
+            message: {
+              id: `review-trade-${Date.now()}`,
+              role: "system",
+              content: "No closed trade observed this session. Run a trade first, or close one to see what-if analysis.",
+              timestamp: new Date().toISOString(),
+            },
+          });
+        } else {
+          // Re-open the auto-populated overlay
+          setCounterfactual({ ...counterfactual });
+        }
+        return;
+      }
+      // Debate viewer — manual open; no debate:* events on the bus, so show empty state if none captured
+      if (trimmed === "/debate" || trimmed === "/deliberation" || trimmed === "/debate-view") {
+        if (!debateView) {
+          dispatch({
+            type: "ADD_MESSAGE",
+            message: {
+              id: `debate-${Date.now()}`,
+              role: "system",
+              content: "No debate captured yet. Debate view will populate once a multi-agent deliberation runs.",
+              timestamp: new Date().toISOString(),
+            },
+          });
+        } else {
+          setDebateView({ ...debateView });
+        }
+        return;
+      }
 
       const userMsg: Message = {
         id: `user-${Date.now()}`,
@@ -1460,6 +1559,17 @@ function AppInner() {
     }} onCancel={() => setShowCLIBrowser(false)} />;
   }
 
+  // HIP-3 asset browser — full-screen picker like ExchangePicker
+  if (showHIP3) {
+    return <HIP3AssetBrowser
+      onSelect={(req) => {
+        dispatch({ type: "ADD_MESSAGE", message: { id: `hip3-${Date.now()}`, role: "system", content: `HIP-3 selected: ${req.symbol} @ $${req.price.toFixed(2)} · ${req.builder}/${req.collateral} · ${req.maxLeverage}x`, timestamp: new Date().toISOString() } });
+        setShowHIP3(false);
+      }}
+      onClose={() => setShowHIP3(false)}
+    />;
+  }
+
   // ── Placeholder text for PromptInput (Claude Code: rotating example commands) ──
   const EXAMPLE_PROMPTS = [
     'Try "what\'s BTC doing?"',
@@ -1682,6 +1792,20 @@ function AppInner() {
           onRate={() => setPostTradeFeedback(null)}
           onSkip={() => setPostTradeFeedback(null)}
         />
+      )}
+
+      {/* Auto-shown counterfactual on trade:closed — dismiss on Esc */}
+      {counterfactual && (
+        <CounterfactualPanel
+          trade={counterfactual.trade}
+          scenarios={counterfactual.scenarios}
+          onClose={() => setCounterfactual(null)}
+        />
+      )}
+
+      {/* Debate viewer — manual via /debate. Wrap to handle Esc dismissal since component has no onClose. */}
+      {debateView && (
+        <DebateViewerOverlay data={debateView} onClose={() => setDebateView(null)} />
       )}
 
       {/* Rate-limit banner — auto-clears when resetMs elapses */}
