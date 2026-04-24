@@ -101,13 +101,23 @@ function resolveOptions(options?: NodeJS.WriteStream | RenderOptions): Required<
 
 /**
  * Mount a component and start rendering.
+ *
+ * Accessibility fallback: if `isScreenReaderEnabled` (either passed explicitly
+ * or via `INK_SCREEN_READER=true` env), route through vanilla Ink even when
+ * `GORDON_CUSTOM_RENDER=1`. The custom pipeline has no line-based a11y
+ * emission path yet — vanilla Ink's text-dump fallback is the right answer
+ * for assistive tech until the custom renderer grows its own.
  */
 export const render = (
   node: ReactNode,
   options?: NodeJS.WriteStream | RenderOptions,
 ): Instance => {
   if (isCustomRenderEnabled()) {
-    return startCustomRender(node, resolveOptions(options));
+    const resolved = resolveOptions(options);
+    if (resolved.isScreenReaderEnabled) {
+      return inkRender(node, options as NodeJS.WriteStream | undefined) as Instance;
+    }
+    return startCustomRender(node, resolved);
   }
   return inkRender(node, options as NodeJS.WriteStream | undefined) as Instance;
 };
