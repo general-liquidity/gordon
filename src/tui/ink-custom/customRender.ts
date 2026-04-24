@@ -76,7 +76,7 @@ import { createStylePool } from "./stylePool.ts";
 import { createCharPool } from "./charPool.ts";
 import { createFrameBuffer } from "./framebuffer.ts";
 import { createSyncTerminal } from "./syncTerminal.ts";
-import { createAnsiPatcher } from "./renderPipeline.ts";
+import { createAnsiPatcher, createRelativeAnsiPatcher } from "./renderPipeline.ts";
 import { diffCells } from "./cellDiff.ts";
 import { renderNodeToOutput, renderStaticNodeToAnsi } from "./renderNodeToOutput.ts";
 import { createHyperlinkPool } from "./hyperlinkPool.ts";
@@ -112,10 +112,31 @@ export function startCustomRender(node: ReactNode, options: Required<RenderOptio
   const cursorDeclaration = createCursorDeclarationManager();
   const syncTerm = createSyncTerminal();
   const ansiPatcher = createAnsiPatcher();
+  // Main-screen-safe incremental transport. Emits relative cursor movements
+  // (CUU/CUD/CUF) anchored to the previous frame's footprint. Only used when
+  // the patch list is small AND no geometry/static changes require a full
+  // rewrite. The existing absolute-CUP `ansiPatcher` is retained for parity
+  // but is currently unused by the render loop — kept so alt-screen activation
+  // in a future phase can reuse it without re-plumbing.
+  const relativePatcher = createRelativeAnsiPatcher();
+  // Patch-count threshold above which we fall back to full-frame rewrite.
+  // A small incremental emission is cheaper than an erase-then-reprint; a
+  // large one is not, and the risk of drift from terminal-specific cursor
+  // quirks grows with patch count. 40 patches covers most in-place edits
+  // (typed characters, spinner ticks, small status updates) while keeping
+  // large repaints on the proven full-rewrite path.
+  const INCREMENTAL_PATCH_THRESHOLD = 40;
+  void ansiPatcher;
 
   let isUnmounted = false;
   let lastPaintedAnsi = "";
   let lastPrintedHeight = 0;
+  // Track the width the last full repaint was sized to. A width change
+  // invalidates the incremental patch path — existing cells on screen sit
+  // at different column offsets than the diff assumes — so any resize
+  // forces a full rewrite next paint. Height changes are detected via
+  // `lastPrintedHeight` drift against the current fullAnsi row count.
+  let lastPrintedWidth = 0;
   let migrationHandle: MigrationSchedulerHandle | null = null;
   // Cumulative bytes already scrolled into history via <Static>. Ink's
   // Static component passes only the new items each render, so every
@@ -194,15 +215,21 @@ export function startCustomRender(node: ReactNode, options: Required<RenderOptio
       const width = rootNode.yogaNode.getComputedWidth();
       const height = Math.max(1, rootNode.yogaNode.getComputedHeight());
 
-      // Resize frame buffer if terminal size changed.
-      if (frameBuffer.width !== width || frameBuffer.height !== height) {
+      // Resize frame buffer if terminal size changed. Remember whether a
+      // resize happened this tick so the subsequent-paint branch can force
+      // a full rewrite instead of attempting incremental patches — after a
+      // resize the front/back buffers share no meaningful cell-level overlap
+      // with what's already on screen.
+      const sizeChanged =
+        frameBuffer.width !== width || frameBuffer.height !== height;
+      if (sizeChanged) {
         frameBuffer.resize(width, height);
       }
 
       // Paint into OutputTarget -> back buffer.
       const output = createOutputTarget(width, height);
       renderNodeToOutput(rootNode, output, { skipStaticElements: true });
-      output.paintInto(frameBuffer.back, charPool, stylePool);
+      output.paintInto(frameBuffer.back, charPool, stylePool, hyperlinkPool);
 
       // Phase 3 — compute `<Static>` delta. Because Ink's Static component
       // only passes items that haven't been rendered yet (it slices items
@@ -212,17 +239,10 @@ export function startCustomRender(node: ReactNode, options: Required<RenderOptio
       // check can catch misuse where callers mutate already-emitted items.
       const staticAnsi = renderStaticNodeToAnsi(rootNode);
 
-      // Compute patch list so pool churn is exercised every frame (validates
-      // the diff hot path even when transport uses full rewrites).
-      // TODO(incremental-patches): the current transport is a full-frame
-      // rewrite (eraseLines + reprint) because absolute-CUP patches only work
-      // in alt-screen mode, and Gordon runs main-screen. Safe incremental
-      // emission needs either (a) an alt-screen-only activation gate, or (b)
-      // a relative-cursor AnsiPatcher variant (CUU + \r + CUD + CUF). Until
-      // one of those lands, the patches produced here are intentionally
-      // discarded in favor of the tear-free full-frame approach below.
+      // Compute the patch list from front (on-screen) vs back (just painted).
+      // The subsequent-paint branch below uses it to decide between the
+      // incremental relative-cursor transport and the full-frame rewrite.
       const patches = diffCells(frameBuffer.front, frameBuffer.back, stylePool, charPool);
-      void ansiPatcher.write(patches, stylePool, charPool);
       frameBuffer.swap();
 
       const fullAnsi = output.toAnsiString();
@@ -244,6 +264,7 @@ export function startCustomRender(node: ReactNode, options: Required<RenderOptio
       if (lastPaintedAnsi.length === 0) {
         lastPaintedAnsi = fullAnsi;
         lastPrintedHeight = Math.max(1, fullAnsi.split("\n").length);
+        lastPrintedWidth = width;
         if (hasStatic) emittedStaticAnsi += staticAnsi + "\n";
         writeToStdout(
           syncTerm.wrapFrame(
@@ -256,17 +277,57 @@ export function startCustomRender(node: ReactNode, options: Required<RenderOptio
 
       // Subsequent frames: if nothing changed AND no new static tail,
       // skip. If only static changed, we still need to erase + emit.
-      if (!hasStatic && fullAnsi === lastPaintedAnsi) {
+      if (!hasStatic && fullAnsi === lastPaintedAnsi && patches.length === 0) {
         options.onRender?.({ renderTime: performance.now() - startTime });
         return;
       }
+
+      // Incremental transport. Emit relative-cursor patches in place of a
+      // full rewrite when:
+      //   * no <Static> delta this tick (static changes emit ABOVE the frame,
+      //     which requires the erase-then-reprint pattern so newly-scrolled
+      //     content lands in history behind the reprinted live region),
+      //   * no size change (width/height drift makes cell-level diffs
+      //     meaningless — on-screen cells no longer align with buffer cells),
+      //   * a non-empty but small patch list (below the tuned threshold —
+      //     beyond it a full rewrite ties or beats patch emission and has
+      //     a proven-correct transport), AND
+      //   * the fullAnsi row count matches lastPrintedHeight (guards against
+      //     a layout change that didn't trigger a resize but reshaped the
+      //     frame's vertical footprint, e.g. content wrapping flip).
+      const nextHeight = Math.max(1, fullAnsi.split("\n").length);
+      const canIncremental =
+        !hasStatic &&
+        !sizeChanged &&
+        patches.length > 0 &&
+        patches.length < INCREMENTAL_PATCH_THRESHOLD &&
+        nextHeight === lastPrintedHeight &&
+        width === lastPrintedWidth;
+
+      if (canIncremental) {
+        const body = relativePatcher.write(
+          patches,
+          stylePool,
+          charPool,
+          lastPrintedHeight,
+        );
+        writeToStdout(syncTerm.wrapFrame(body + cursorAnsi));
+        // Geometry unchanged — lastPrintedHeight and lastPrintedWidth stay
+        // the same. Update lastPaintedAnsi so the next-tick skip check can
+        // match when the caller reruns an identical frame.
+        lastPaintedAnsi = fullAnsi;
+        options.onRender?.({ renderTime: performance.now() - startTime });
+        return;
+      }
+
       const erase = lastPrintedHeight > 0 ? ansiEscapes.eraseLines(lastPrintedHeight) : "";
       if (hasStatic) emittedStaticAnsi += staticAnsi + "\n";
       writeToStdout(
         syncTerm.wrapFrame(erase + staticEmit + fullAnsi + "\n" + cursorAnsi),
       );
       lastPaintedAnsi = fullAnsi;
-      lastPrintedHeight = Math.max(1, fullAnsi.split("\n").length);
+      lastPrintedHeight = nextHeight;
+      lastPrintedWidth = width;
       options.onRender?.({ renderTime: performance.now() - startTime });
     } finally {
       isRendering = false;

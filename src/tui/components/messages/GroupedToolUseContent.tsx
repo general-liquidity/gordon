@@ -22,7 +22,7 @@ function statusIcon(status: ToolEntry["status"]): { icon: string; color: string 
   }
 }
 
-export function GroupedToolUseContent({ tools, onExpand }: Props) {
+export const GroupedToolUseContent = React.memo(function GroupedToolUseContent({ tools, onExpand }: Props) {
   const n = tools.length;
 
   return (
@@ -45,4 +45,4 @@ export function GroupedToolUseContent({ tools, onExpand }: Props) {
       )}
     </Box>
   );
-}
+});

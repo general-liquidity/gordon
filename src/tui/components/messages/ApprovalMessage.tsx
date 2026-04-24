@@ -5,7 +5,7 @@ import { NoSelect } from "../NoSelect.js";
 import type { Message } from "../MessageBubble.js";
 
 // Approval messages: ⚠ APPROVAL [id] with action hints.
-export function ApprovalMessage({ message }: { message: Message }) {
+export const ApprovalMessage = React.memo(function ApprovalMessage({ message }: { message: Message }) {
   return (
     <Box flexDirection="column" marginTop={1}>
       <Box>
@@ -30,4 +30,4 @@ export function ApprovalMessage({ message }: { message: Message }) {
       )}
     </Box>
   );
-}
+});

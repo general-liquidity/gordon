@@ -4,7 +4,7 @@ import type { Message } from "../MessageBubble.js";
 
 // Rate limit: shows when API or exchange throttles requests
 // Trading context: exchange rate limits are critical — they can prevent order execution
-export function RateLimitMessage({ message }: { message: Message }) {
+export const RateLimitMessage = React.memo(function RateLimitMessage({ message }: { message: Message }) {
   return (
     <Box marginTop={1}>
       <Box paddingLeft={2}>
@@ -15,4 +15,4 @@ export function RateLimitMessage({ message }: { message: Message }) {
       </Box>
     </Box>
   );
-}
+});

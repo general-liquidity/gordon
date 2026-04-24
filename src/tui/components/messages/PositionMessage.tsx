@@ -3,7 +3,7 @@ import { Box, Text } from "ink";
 import type { Message } from "../MessageBubble.js";
 
 // Position lifecycle: opened, closed, updated — shows symbol, side, P&L
-export function PositionMessage({ message }: { message: Message }) {
+export const PositionMessage = React.memo(function PositionMessage({ message }: { message: Message }) {
   // Parse structured content if available
   const isClose = message.content.includes("closed") || message.content.includes("P&L");
   const icon = isClose ? "\u25C8" : "\u25CF";
@@ -23,4 +23,4 @@ export function PositionMessage({ message }: { message: Message }) {
       </Box>
     </Box>
   );
-}
+});

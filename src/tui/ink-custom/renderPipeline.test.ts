@@ -2,6 +2,7 @@ import { describe, test, expect } from "bun:test";
 import {
   createAnsiPatcher,
   createPatchEmitter,
+  createRelativeAnsiPatcher,
   type DiffFn,
 } from "./renderPipeline.ts";
 import type {
@@ -318,5 +319,163 @@ describe("createAnsiPatcher", () => {
     // Red 'a', then reset before the empty-style run, then 'b', then no
     // trailing reset (styleUsed was cleared on the transition).
     expect(out).toBe("\x1b[1;1H\x1b[31ma\x1b[0mb");
+  });
+});
+
+describe("createRelativeAnsiPatcher", () => {
+  test("empty patch list yields empty string", () => {
+    const patcher = createRelativeAnsiPatcher();
+    expect(patcher.write([], makeMockStylePool(), makeMockCharPool(), 3)).toBe(
+      "",
+    );
+  });
+
+  test("single patch at (y=0, x=0) with previousFrameHeight=3 emits pull-back + content + restore", () => {
+    // Emission walk:
+    //   * Pull-back: cursorUp(4) + \r lands at frame top-left anchor.
+    //   * Patch (y=0, x=0): already at anchor, no cursor move. styleId=-1,
+    //     no SGR. Write "X". Cursor now at col 1 of row 0 (relative).
+    //   * Restore: downBy = (3+1) - 0 = 4 → cursorDown(4) + \r puts us back
+    //     on the "line below frame" invariant at col 0.
+    const styles = makeMockStylePool();
+    const chars = makeMockCharPool();
+    const patcher = createRelativeAnsiPatcher();
+    const out = patcher.write(
+      [{ x: 0, y: 0, content: "X", visualWidth: 1, styleId: -1 }],
+      styles,
+      chars,
+      3,
+    );
+    expect(out).toBe("\x1b[4A\rX\x1b[4B\r");
+  });
+
+  test("two patches on same row separated by gap emits cursorForward(gap)", () => {
+    // Patch A at (y=1, x=2) "aa" (visualWidth=2). After write: cursor at
+    // (row=1, col=4). Patch B at (y=1, x=5) "bb". Gap in column space:
+    // 5 - 4 = 1 → cursorForward(1) before writing "bb".
+    const styles = makeMockStylePool();
+    const chars = makeMockCharPool();
+    const patcher = createRelativeAnsiPatcher();
+    const patches: Patch[] = [
+      { x: 2, y: 1, content: "aa", visualWidth: 2, styleId: -1 },
+      { x: 5, y: 1, content: "bb", visualWidth: 2, styleId: -1 },
+    ];
+    const out = patcher.write(patches, styles, chars, 3);
+    // Walk:
+    //   Pull-back: \x1b[4A + \r
+    //   Patch A cross-row (rowDelta=1): \x1b[1B + \r + \x1b[2C + "aa"
+    //   Patch B same-row (colDelta=1): \x1b[1C + "bb"
+    //   Restore (downBy = 4 - 1 = 3): \x1b[3B + \r
+    expect(out).toBe("\x1b[4A\r\x1b[1B\r\x1b[2Caa\x1b[1Cbb\x1b[3B\r");
+  });
+
+  test("two patches on different rows emits cursorDown(rowDelta) + \\r + cursorForward(x)", () => {
+    // Patch A at (y=0, x=0) "a" — no movement from anchor, write "a".
+    // Patch B at (y=2, x=4) "b" — rowDelta=2 → cursorDown(2) + \r +
+    // cursorForward(4) + "b". Restore downBy = 4 - 2 = 2.
+    const styles = makeMockStylePool();
+    const chars = makeMockCharPool();
+    const patcher = createRelativeAnsiPatcher();
+    const patches: Patch[] = [
+      { x: 0, y: 0, content: "a", visualWidth: 1, styleId: -1 },
+      { x: 4, y: 2, content: "b", visualWidth: 1, styleId: -1 },
+    ];
+    const out = patcher.write(patches, styles, chars, 3);
+    expect(out).toBe("\x1b[4A\ra\x1b[2B\r\x1b[4Cb\x1b[2B\r");
+  });
+
+  test("adjacent same-row patches do not emit cursor movement between them", () => {
+    // Patch A at (y=0, x=0) "ab" (visualWidth=2). Cursor ends at col 2.
+    // Patch B at (y=0, x=2) "cd" — colDelta = 0, no cursor move.
+    const styles = makeMockStylePool();
+    const chars = makeMockCharPool();
+    const patcher = createRelativeAnsiPatcher();
+    const patches: Patch[] = [
+      { x: 0, y: 0, content: "ab", visualWidth: 2, styleId: -1 },
+      { x: 2, y: 0, content: "cd", visualWidth: 2, styleId: -1 },
+    ];
+    const out = patcher.write(patches, styles, chars, 3);
+    // No CSI sequence should appear between "ab" and "cd".
+    expect(out).toBe("\x1b[4A\rabcd\x1b[4B\r");
+  });
+
+  test("sorts out-of-order patches by (y, x) before emitting", () => {
+    const styles = makeMockStylePool();
+    const chars = makeMockCharPool();
+    const patcher = createRelativeAnsiPatcher();
+    // Intentionally reversed.
+    const patches: Patch[] = [
+      { x: 4, y: 2, content: "b", visualWidth: 1, styleId: -1 },
+      { x: 0, y: 0, content: "a", visualWidth: 1, styleId: -1 },
+    ];
+    const out = patcher.write(patches, styles, chars, 3);
+    // Same as the cross-row test above — sort puts 'a' first.
+    expect(out).toBe("\x1b[4A\ra\x1b[2B\r\x1b[4Cb\x1b[2B\r");
+  });
+
+  test("emits style sequences with reset between styles (same semantics as absolute patcher)", () => {
+    const styles: StylePool = {
+      intern: () => 1,
+      get(id: number) {
+        if (id === 1) return "\x1b[31m";
+        if (id === 2) return "\x1b[32m";
+        return undefined;
+      },
+      size: 2,
+      capacity: 256,
+      stats: () => ({ size: 2, capacity: 256 }),
+      reset: () => {},
+    };
+    const chars = makeMockCharPool();
+    const patches: Patch[] = [
+      { x: 0, y: 0, content: "a", visualWidth: 1, styleId: 1 },
+      { x: 1, y: 0, content: "b", visualWidth: 1, styleId: 2 },
+    ];
+    const patcher = createRelativeAnsiPatcher();
+    const out = patcher.write(patches, styles, chars, 3);
+    // Walk:
+    //   Pull-back \x1b[4A\r
+    //   Patch A (y=0, x=0): no cursor move, styleId=1 → emit "\x1b[31m",
+    //     write "a". styleUsed=true.
+    //   Patch B (y=0, x=1): colDelta=0 (a was 1 cell wide, currentCol=1).
+    //     styleId=2 → reset + emit "\x1b[32m", write "b".
+    //   Trailing reset since styleUsed.
+    //   Restore \x1b[4B\r.
+    expect(out).toBe("\x1b[4A\r\x1b[31ma\x1b[0m\x1b[32mb\x1b[0m\x1b[4B\r");
+  });
+
+  test("previousFrameHeight=0 edge case still emits \\r anchor and restore", () => {
+    // When the previous frame was 0 rows (e.g., first incremental paint on
+    // top of an empty frame), pull-back is 0+1 = 1 line. Still emit cursor
+    // movements — this matches the contract that callers always start with
+    // cursor on "line below frame" even if the frame was empty.
+    const styles = makeMockStylePool();
+    const chars = makeMockCharPool();
+    const patcher = createRelativeAnsiPatcher();
+    const out = patcher.write(
+      [{ x: 0, y: 0, content: "X", visualWidth: 1, styleId: -1 }],
+      styles,
+      chars,
+      0,
+    );
+    // Pull-back = 1: \x1b[1A + \r. Restore downBy = 1: \x1b[1B + \r.
+    expect(out).toBe("\x1b[1A\rX\x1b[1B\r");
+  });
+
+  test("negative previousFrameHeight is clamped defensively", () => {
+    // Defensive path — caller bug passing a negative height shouldn't crash
+    // or emit a malformed CSI. Pull-back clamps to 0, no cursorUp emitted.
+    const styles = makeMockStylePool();
+    const chars = makeMockCharPool();
+    const patcher = createRelativeAnsiPatcher();
+    const out = patcher.write(
+      [{ x: 0, y: 0, content: "X", visualWidth: 1, styleId: -1 }],
+      styles,
+      chars,
+      -5,
+    );
+    // pullBack = 0 → no cursorUp, but still \r. Restore downBy = 0 → no
+    // cursorDown, still \r.
+    expect(out).toBe("\rX\r");
   });
 });

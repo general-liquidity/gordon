@@ -3,7 +3,7 @@ import { Box, Text } from "ink";
 import type { Message } from "../MessageBubble.js";
 
 // Backtest results: Sharpe, PSR, win rate, drawdown summary
-export function BacktestMessage({ message }: { message: Message }) {
+export const BacktestMessage = React.memo(function BacktestMessage({ message }: { message: Message }) {
   return (
     <Box flexDirection="column" marginTop={1}>
       <Box>
@@ -25,4 +25,4 @@ export function BacktestMessage({ message }: { message: Message }) {
       </Box>
     </Box>
   );
-}
+});

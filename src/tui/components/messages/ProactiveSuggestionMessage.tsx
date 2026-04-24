@@ -29,7 +29,7 @@ interface ProactiveSuggestionProps {
   message: Message;
 }
 
-export function ProactiveSuggestionMessage({ message }: ProactiveSuggestionProps) {
+export const ProactiveSuggestionMessage = React.memo(function ProactiveSuggestionMessage({ message }: ProactiveSuggestionProps) {
   const category = message.badge?.split(":")[0] ?? "default";
   const id = message.badge?.split(":")[1] ?? "";
   const confidence = message.badge?.split(":")[2] ?? "";
@@ -60,4 +60,4 @@ export function ProactiveSuggestionMessage({ message }: ProactiveSuggestionProps
       </Box>
     </Box>
   );
-}
+});

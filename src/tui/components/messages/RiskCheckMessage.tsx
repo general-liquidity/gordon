@@ -3,7 +3,7 @@ import { Box, Text } from "ink";
 import type { Message } from "../MessageBubble.js";
 
 // Risk classifier result: 11 dimensions, pass/fail with score
-export function RiskCheckMessage({ message }: { message: Message }) {
+export const RiskCheckMessage = React.memo(function RiskCheckMessage({ message }: { message: Message }) {
   const isPassing = message.content.includes("PASS") || message.content.includes("approved") || message.content.includes("pass");
   const icon = isPassing ? "\u2713" : "\u2717";
   const color = isPassing ? "green" : "red";
@@ -28,4 +28,4 @@ export function RiskCheckMessage({ message }: { message: Message }) {
       </Box>
     </Box>
   );
-}
+});

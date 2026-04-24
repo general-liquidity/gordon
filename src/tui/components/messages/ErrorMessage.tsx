@@ -3,7 +3,7 @@ import { Box, Text } from "ink";
 import type { Message } from "../MessageBubble.js";
 
 // Error messages: ✗ error — single line, red, concise.
-export function ErrorMessage({ message }: { message: Message }) {
+export const ErrorMessage = React.memo(function ErrorMessage({ message }: { message: Message }) {
   return (
     <Box flexDirection="column" marginTop={1}>
       <Box>
@@ -15,4 +15,4 @@ export function ErrorMessage({ message }: { message: Message }) {
       </Box>
     </Box>
   );
-}
+});

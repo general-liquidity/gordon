@@ -15,7 +15,7 @@ interface Props {
 
 const MAX_VISIBLE_LINES = 12;
 
-export function CollapsedReadSearchContent({
+export const CollapsedReadSearchContent = React.memo(function CollapsedReadSearchContent({
   summary,
   lineCount,
   onExpand,
@@ -55,4 +55,4 @@ export function CollapsedReadSearchContent({
       </Box>
     </Box>
   );
-}
+});

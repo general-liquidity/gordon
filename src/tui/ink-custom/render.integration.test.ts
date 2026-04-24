@@ -320,5 +320,56 @@ describe("render() integration", () => {
         instance.unmount();
       }
     });
+
+    // Incremental relative-cursor transport: when a rerender produces a
+    // small in-place diff (no <Static> delta, same width/height), the
+    // render loop should emit relative cursor movements (CUU/CUD/CUF or
+    // \r) rather than an absolute-CUP full-frame rewrite.
+    //
+    // We assert the POST-rerender tail of stdout contains at least one
+    // relative cursor sequence and does NOT contain an absolute CUP
+    // sequence (CSI row ; col H). We don't assert on the exact patch
+    // content — cellDiff merges same-style runs, so which bytes make it
+    // into the emitted patch list depends on internal buffer layout. The
+    // load-bearing signal is: relative sequences present, absolute CUP
+    // absent.
+    test("rerender emits relative cursor movements, not absolute CUP", () => {
+      const stdout = createMockStdout();
+      const instance = render(React.createElement(Text, null, "initial"), {
+        stdout,
+        patchConsole: false,
+        exitOnCtrlC: false,
+      });
+      try {
+        // Mark the boundary between first-paint output and rerender output.
+        // Everything captured after this point is the incremental emission
+        // (or a full-frame fallback, which the assertion below would catch).
+        const beforeRerender = stdout.captured.length;
+        instance.rerender(React.createElement(Text, null, "modified"));
+        const rerenderTail = stdout.captured.slice(beforeRerender);
+
+        // Relative cursor sequences we expect from the new transport:
+        //   CUU = CSI n A, CUD = CSI n B, CUF = CSI n C, plus \r.
+        const hasRelative =
+          /\x1b\[\d+A/.test(rerenderTail) ||
+          /\x1b\[\d+B/.test(rerenderTail) ||
+          /\x1b\[\d+C/.test(rerenderTail) ||
+          rerenderTail.includes("\r");
+        // Absolute CUP = CSI row ; col H — what the old full-rewrite path
+        // would emit via toAnsiString-with-absolute-positioning. Our
+        // full-rewrite path actually uses eraseLines + plain text (no
+        // CUP), so the primary assertion is on hasRelative; absence of
+        // CUP here is a consistency check.
+        const hasAbsoluteCup = /\x1b\[\d+;\d+H/.test(rerenderTail);
+
+        expect(hasRelative).toBe(true);
+        expect(hasAbsoluteCup).toBe(false);
+        // Sanity: the rerender must have caused SOME output — an empty
+        // tail would mean the render loop incorrectly deduped the change.
+        expect(rerenderTail.length).toBeGreaterThan(0);
+      } finally {
+        instance.unmount();
+      }
+    });
   });
 });

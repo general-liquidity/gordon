@@ -3,7 +3,7 @@ import { Box, Text } from "ink";
 import type { Message } from "../MessageBubble.js";
 
 // Compact/resume messages: single dim line with icon.
-export function CompactMessage({ message }: { message: Message }) {
+export const CompactMessage = React.memo(function CompactMessage({ message }: { message: Message }) {
   const isResume = message.variant === "resume";
   const icon = isResume ? "\u21BB" : "\u273B";
   const label = isResume ? "session resumed" : "conversation compacted";
@@ -14,4 +14,4 @@ export function CompactMessage({ message }: { message: Message }) {
       {message.content && <Text dimColor> {"\u00b7"} {message.content}</Text>}
     </Box>
   );
-}
+});

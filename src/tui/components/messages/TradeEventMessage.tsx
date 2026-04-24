@@ -14,7 +14,7 @@ const TRADE_CONFIGS: Record<string, { icon: string; color: string; label: string
   strategy: { icon: "\u25C8", color: "cyanBright", label: "STRATEGY" },
 };
 
-export function TradeEventMessage({ message }: { message: Message }) {
+export const TradeEventMessage = React.memo(function TradeEventMessage({ message }: { message: Message }) {
   const variant = message.variant ?? "fill";
   const config = TRADE_CONFIGS[variant] ?? TRADE_CONFIGS.fill!;
   const showTimestamp = message.timestamp
@@ -39,7 +39,7 @@ export function TradeEventMessage({ message }: { message: Message }) {
       <RichContent content={message.content} />
     </Box>
   );
-}
+});
 
 function timeAgo(ts: string): string {
   try {

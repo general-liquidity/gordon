@@ -42,7 +42,7 @@ function splitByQuery(text: string, query: string): Segment[] {
   return segments;
 }
 
-export function HighlightedThinkingText({ text, query }: Props) {
+export const HighlightedThinkingText = React.memo(function HighlightedThinkingText({ text, query }: Props) {
   if (!query) {
     return (
       <Box>
@@ -64,4 +64,4 @@ export function HighlightedThinkingText({ text, query }: Props) {
       )}
     </Box>
   );
-}
+});

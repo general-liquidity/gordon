@@ -3,7 +3,7 @@ import { Box, Text } from "ink";
 import type { Message } from "../MessageBubble.js";
 
 // Order events: placed, filled, cancelled, rejected
-export function OrderMessage({ message }: { message: Message }) {
+export const OrderMessage = React.memo(function OrderMessage({ message }: { message: Message }) {
   const isFill = message.content.includes("filled") || message.content.includes("executed");
   const isCancel = message.content.includes("cancel");
   const isReject = message.content.includes("reject");
@@ -23,4 +23,4 @@ export function OrderMessage({ message }: { message: Message }) {
       </Box>
     </Box>
   );
-}
+});

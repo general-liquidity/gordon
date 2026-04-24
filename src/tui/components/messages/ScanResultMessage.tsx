@@ -3,7 +3,7 @@ import { Box, Text } from "ink";
 import type { Message } from "../MessageBubble.js";
 
 // Scan results: opportunities found, ranked by confidence
-export function ScanResultMessage({ message }: { message: Message }) {
+export const ScanResultMessage = React.memo(function ScanResultMessage({ message }: { message: Message }) {
   return (
     <Box flexDirection="column" marginTop={1}>
       <Box>
@@ -30,4 +30,4 @@ export function ScanResultMessage({ message }: { message: Message }) {
       </Box>
     </Box>
   );
-}
+});

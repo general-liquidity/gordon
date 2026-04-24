@@ -365,7 +365,7 @@ const ToolCallRow = React.memo(function ToolCallRow({ call }: { call: ToolCallSt
   );
 });
 
-export function ToolCallInline({ calls }: Props) {
+export const ToolCallInline = React.memo(function ToolCallInline({ calls }: Props) {
   // Group completed calls when 4+ are done — collapse into summary
   const [expanded, setExpanded] = useState(false);
   // Drill-down detail dialog for the most recent tool call
@@ -436,4 +436,4 @@ export function ToolCallInline({ calls }: Props) {
       )}
     </Box>
   );
-}
+});

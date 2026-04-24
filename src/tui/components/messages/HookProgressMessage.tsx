@@ -5,7 +5,7 @@ import type { Message } from "../MessageBubble.js";
 // Hook progress: shows lifecycle hook execution inline
 // e.g., "Running PreTrade hook… constitution check"
 // Trading context: constitution checks, risk hooks, position limits
-export function HookProgressMessage({ message }: { message: Message }) {
+export const HookProgressMessage = React.memo(function HookProgressMessage({ message }: { message: Message }) {
   const isRunning = message.content.includes("running") || message.content.includes("Running");
   return (
     <Box paddingLeft={2}>
@@ -16,4 +16,4 @@ export function HookProgressMessage({ message }: { message: Message }) {
       <Text dimColor> {message.content}</Text>
     </Box>
   );
-}
+});
