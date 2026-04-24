@@ -81,6 +81,59 @@ function readBootConfig(): { model: string; permissionMode: string; sessionDispl
   }
 }
 
+/**
+ * Tip scheduler — picks the tip with the longest time since last shown.
+ * Reads/writes ~/.gordon/tipHistory.json synchronously. Mirrors Claude Code's
+ * tipScheduler.selectTipWithLongestTimeSinceShown() pattern (without the
+ * context filters — every tip is eligible for now).
+ */
+function pickTip(tips: readonly string[]): string {
+  const fallback = () => tips[Math.floor(Math.random() * tips.length)]!;
+  try {
+    const gordonDir =
+      process.env.GORDON_HOME ??
+      (process.env.XDG_CONFIG_HOME ? path.join(process.env.XDG_CONFIG_HOME, "gordon") : path.join(os.homedir(), ".gordon"));
+    const historyPath = path.join(gordonDir, "tipHistory.json");
+
+    let lastShown: Record<string, number> = {};
+    let sessionCount = 0;
+    if (fs.existsSync(historyPath)) {
+      try {
+        const parsed = JSON.parse(fs.readFileSync(historyPath, "utf-8")) as {
+          lastShown?: Record<string, number>;
+          sessionCount?: number;
+        };
+        lastShown = parsed.lastShown ?? {};
+        sessionCount = parsed.sessionCount ?? 0;
+      } catch { /* corrupt file → start fresh */ }
+    }
+    sessionCount += 1;
+
+    // Pick the tip with the oldest lastShown (never-shown tips win with 0)
+    let bestIdx = 0;
+    let bestAge = -1;
+    for (let i = 0; i < tips.length; i++) {
+      const seen = lastShown[String(i)] ?? 0; // 0 = never shown
+      const age = sessionCount - seen;
+      if (age > bestAge) {
+        bestAge = age;
+        bestIdx = i;
+      }
+    }
+
+    // Record this session and persist
+    lastShown[String(bestIdx)] = sessionCount;
+    try {
+      if (!fs.existsSync(gordonDir)) fs.mkdirSync(gordonDir, { recursive: true });
+      fs.writeFileSync(historyPath, JSON.stringify({ lastShown, sessionCount }, null, 2));
+    } catch { /* read-only fs → tip still shown, just not tracked */ }
+
+    return tips[bestIdx]!;
+  } catch {
+    return fallback();
+  }
+}
+
 const TIPS = [
   'Type /scan to discover opportunities across all connected venues.',
   'Use /morning-brief for a market overview before your first trade.',
@@ -170,7 +223,7 @@ function printBootCard(): void {
   const dirAvail = INNER - 14;
   const dirDisplay = cwd.length > dirAvail ? "…" + cwd.slice(-(dirAvail - 1)) : cwd;
 
-  const tip = TIPS[Math.floor(Math.random() * TIPS.length)]!;
+  const tip = pickTip(TIPS);
 
   const lines = [
     `${G}╭${"─".repeat(INNER)}╮${R}`,

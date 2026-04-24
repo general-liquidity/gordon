@@ -3,6 +3,14 @@ import { Box, Text, useInput, useStdout } from "ink";
 import { FooterHints } from "./FooterHints.js";
 import { useSlashCommandTypeahead, type TypeaheadMatch } from "../hooks/useSlashCommandTypeahead.js";
 import { useInputHistory } from "../hooks/useInputHistory.js";
+import {
+  VimMode,
+  INITIAL_VIM_STATE,
+  transition as vimTransition,
+  applyMotion as vimApplyMotion,
+  applyOperator as vimApplyOperator,
+  type VimState,
+} from "../vim/index.js";
 
 // ============================================================================
 // PromptInput — Claude Code-style compact slash command picker
@@ -49,6 +57,7 @@ export function PromptInput({
   const [value, setValue] = useState("");
   const [selectedIdx, setSelectedIdx] = useState(0);
   const [cursorPos, setCursorPos] = useState(0);
+  const [vimState, setVimState] = useState<VimState>(INITIAL_VIM_STATE);
   const history = useInputHistory();
   const stashedInputRef = useRef("");
 
@@ -93,6 +102,36 @@ export function PromptInput({
   const maxVisible = Math.min(Math.max(10, Math.floor(termRows * 0.6)), 30);
 
   useInput((input, key) => {
+    // Vim mode routing — intercept keys when vim is enabled and we're not in Insert mode.
+    // Enter/Ctrl+C always pass through (REPL convention: Enter submits in any mode).
+    if (vimMode && vimState.mode !== VimMode.Insert && !key.return && !key.ctrl) {
+      const vimKey = key.escape ? "escape" : (input || "");
+      if (!vimKey) return;
+      const result = vimTransition(vimState, vimKey, key.ctrl ?? false, key.shift ?? false);
+      if (result.action) {
+        const a = result.action;
+        if (a.type === "insert" && a.motion) {
+          const newCursor = vimApplyMotion(value, cursorPos, a.motion, a.count ?? 1);
+          setCursorPos(newCursor);
+        } else if (a.type === "delete" || a.type === "change" || a.type === "yank") {
+          const op = a.type === "delete" ? "d" : a.type === "change" ? "c" : "y";
+          const r = vimApplyOperator(value, cursorPos, op, a.motion ?? "l", a.count ?? 1);
+          setValue(r.newText);
+          setCursorPos(r.newCursor);
+        }
+      }
+      setVimState(result.newState);
+      return;
+    }
+
+    // Insert-mode Escape: transition to Normal without clearing the buffer
+    if (vimMode && vimState.mode === VimMode.Insert && key.escape) {
+      setVimState({ ...vimState, mode: VimMode.Normal, count: null, pendingOperator: null });
+      // Keep cursor inside the buffer in Normal mode (cursor lives on a char, not past end)
+      if (cursorPos >= value.length && value.length > 0) setCursorPos(value.length - 1);
+      return;
+    }
+
     // Shift+Enter: insert newline instead of submitting
     if (key.return && key.shift) {
       setValue((prev) => prev + "\n");
@@ -186,10 +225,15 @@ export function PromptInput({
     }
 
     if (input && !key.ctrl && !key.meta && !key.upArrow && !key.downArrow) {
-      // Always append to end — simple and reliable
-      // Cursor position tracking is only for display + left/right navigation
-      setValue((prev) => prev + input);
-      setCursorPos((p) => p + input.length);
+      if (vimMode) {
+        // Vim: insert at cursor position so h/l/w/b/etc. actually move insertion point
+        setValue((prev) => prev.slice(0, cursorPos) + input + prev.slice(cursorPos));
+        setCursorPos((p) => p + input.length);
+      } else {
+        // Non-vim: append to end (existing behavior, cursor is cosmetic)
+        setValue((prev) => prev + input);
+        setCursorPos((p) => p + input.length);
+      }
       setSelectedIdx(0);
     }
   });
@@ -226,7 +270,16 @@ export function PromptInput({
   const descWidth = Math.max(20, termCols - 3 - 1 - CMD_COL_WIDTH - 4);
 
   const isBashMode = value.startsWith("!");
-  const promptChar = isBashMode ? "$" : isSlashMode ? "/" : "\u276F";
+  const isVimNormal = vimMode && vimState.mode === VimMode.Normal;
+  const isVimVisual = vimMode && vimState.mode === VimMode.Visual;
+  const promptChar = isVimNormal ? "N"
+    : isVimVisual ? "V"
+    : isBashMode ? "$"
+    : isSlashMode ? "/"
+    : "\u276F";
+  const promptColor = isVimNormal ? "yellow"
+    : isVimVisual ? "magenta"
+    : "rgb(52,238,176)";
 
   return (
     <Box flexDirection="column">
@@ -280,7 +333,7 @@ export function PromptInput({
 
       {/* Input line */}
       <Box>
-        <Text color="rgb(52,238,176)" bold>{promptChar} </Text>
+        <Text color={promptColor} bold>{promptChar} </Text>
         <Box flexGrow={1}>
           {value ? (
             <Text>
