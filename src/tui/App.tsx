@@ -41,6 +41,7 @@ import { getNotificationFolder } from "./notifications/notificationFolder.js";
 import { useFpsTracker } from "./hooks/useFpsTracker.js";
 import { useAnimationPause } from "./hooks/useAnimationClock.js";
 import { useProactiveChatSubscription } from "./hooks/useProactiveChatSubscription.js";
+import { useRateLimitNotification } from "./hooks/useRateLimitNotification.js";
 import { useAlertSubscription } from "./state/useAlertSubscription.js";
 import { getNextHint, recordHintShown, incrementSessionCount, type HintContext } from "../app/onboarding/index.ts";
 
@@ -120,6 +121,8 @@ import { QuickOpenDialog } from "./components/QuickOpenDialog.js";
 import { ReconciliationStatus } from "./components/ReconciliationStatus.js";
 import { TaskDependencyView } from "./components/TaskDependencyView.js";
 import { WalkForwardResults } from "./components/WalkForwardResults.js";
+import { PlanDiff, type PlanVersion } from "./components/PlanDiff.js";
+import { PostTradeFeedback } from "./components/PostTradeFeedback.js";
 
 // ── Backend Module UI Components ──
 import { LivePositions, type Position } from "./components/LivePositions.js";
@@ -188,6 +191,49 @@ function AppInner() {
   // Bridge `alert:fired` events (from emitAlert) into the TUI notification
   // queue. Info → info variant; warning → alert variant; critical → error.
   useAlertSubscription();
+
+  // Rate limit notification — records binance:rate_limit and surfaces a
+  // dismissible inline banner while throttled.
+  const rateLimit = useRateLimitNotification();
+  React.useEffect(() => {
+    let unsubRate: (() => void) | undefined;
+    let unsubPlan: (() => void) | undefined;
+    let unsubTrade: (() => void) | undefined;
+    void import("../events/index.ts").then((m) => {
+      const bus = m.getEventBus();
+      unsubRate = bus.on("binance:rate_limit", (event) => {
+        rateLimit.recordRateLimit("binance", event.weight, event.limit, 60_000);
+      });
+      // Wire PlanDiff: diff successive plan:created for same symbol
+      unsubPlan = bus.on("plan:created", (event) => {
+        const p: any = event.plan ?? {};
+        const symbol = String(p.symbol ?? p.id ?? "unknown");
+        const tp = Array.isArray(p.takeProfit) && p.takeProfit.length > 0 ? Number(p.takeProfit[0]?.price ?? 0) : 0;
+        const current: PlanVersion = {
+          version: Date.now(),
+          entry: Number(p.entry?.price ?? 0),
+          stopLoss: Number(p.stopLoss?.price ?? 0),
+          takeProfit: tp,
+          sizeUsd: Number(p.allocation?.amount ?? 0),
+          confidence: Number(p.confidence ?? 0),
+          reasoning: typeof p.reasoning === "string" ? p.reasoning : undefined,
+        };
+        const prev = prevPlansRef.current.get(symbol);
+        prevPlansRef.current.set(symbol, current);
+        if (prev) setPlanDiff({ previous: prev, current });
+      });
+      // Wire PostTradeFeedback: prompt after order fill (trade:opened)
+      unsubTrade = bus.on("trade:opened", (event) => {
+        const t: any = event.trade ?? {};
+        const side = String(t.side ?? "").toUpperCase();
+        const qty = Number(t.entries?.[0]?.quantity ?? t.quantity ?? 0);
+        const price = Number(t.averageEntry ?? t.entries?.[0]?.price ?? 0);
+        const desc = `${side || "TRADE"} ${qty || ""} ${t.symbol ?? ""}${price ? ` @ $${price.toFixed(2)}` : ""}`.trim();
+        setPostTradeFeedback(desc);
+      });
+    });
+    return () => { unsubRate?.(); unsubPlan?.(); unsubTrade?.(); };
+  }, [rateLimit]);
 
   // Mirror warning/critical alerts to the audit log so they survive TUI
   // restarts and reach daemons running without a UI. Idempotent — safe to
@@ -277,6 +323,14 @@ function AppInner() {
   const [privacyMode, setPrivacyMode] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
   const [feedbackTradeData, setFeedbackTradeData] = useState<FeedbackTradeData | null>(null);
+
+  // PlanDiff overlay — auto-shown when a second plan:created fires for the
+  // same symbol and any numeric field changed. Previous snapshot kept per symbol.
+  const [planDiff, setPlanDiff] = useState<{ previous: PlanVersion; current: PlanVersion } | null>(null);
+  const prevPlansRef = React.useRef<Map<string, PlanVersion>>(new Map());
+
+  // PostTradeFeedback overlay — shown when trade:opened fires (order fill).
+  const [postTradeFeedback, setPostTradeFeedback] = useState<string | null>(null);
 
   const [showModelPicker, setShowModelPicker] = useState(false);
   const [showMCPManager, setShowMCPManager] = useState(false);
@@ -1614,6 +1668,29 @@ function AppInner() {
           onComplete={handleFeedbackComplete}
           onSkip={handleFeedbackComplete}
         />
+      )}
+
+      {/* Auto-shown plan revision diff */}
+      {planDiff && (
+        <PlanDiff previous={planDiff.previous} current={planDiff.current} />
+      )}
+
+      {/* Post-trade rating prompt — dismiss on rate or skip */}
+      {postTradeFeedback && (
+        <PostTradeFeedback
+          tradeDescription={postTradeFeedback}
+          onRate={() => setPostTradeFeedback(null)}
+          onSkip={() => setPostTradeFeedback(null)}
+        />
+      )}
+
+      {/* Rate-limit banner — auto-clears when resetMs elapses */}
+      {rateLimit.isThrottled && rateLimit.latestEvent && (
+        <Box paddingX={2}>
+          <Text color="yellow">
+            {"⚠"} Rate limit: {rateLimit.latestEvent.provider} {rateLimit.latestEvent.weight}/{rateLimit.latestEvent.limit}
+          </Text>
+        </Box>
       )}
 
       {/* ── Backend module dialog overlays ── */}

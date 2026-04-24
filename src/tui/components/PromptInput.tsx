@@ -3,6 +3,9 @@ import { Box, Text, useInput, useStdout } from "ink";
 import { FooterHints } from "./FooterHints.js";
 import { useSlashCommandTypeahead, type TypeaheadMatch } from "../hooks/useSlashCommandTypeahead.js";
 import { useInputHistory } from "../hooks/useInputHistory.js";
+import { useImagePaste } from "../hooks/useImagePaste.js";
+import { useTokenEstimation } from "../hooks/useTokenEstimation.js";
+import { TokenWarning } from "./TokenWarning.js";
 import {
   VimMode,
   INITIAL_VIM_STATE,
@@ -64,6 +67,17 @@ export function PromptInput({
   // Paste detection: rapid input within 10ms = paste
   const lastInputTimeRef = useRef(0);
   const pasteBufferRef = useRef("");
+
+  // Image paste: swaps pasted image path/clipboard blob for a reference token
+  const imagePaste = useImagePaste((imagePath: string) => {
+    const id = imagePath.split(/[\\/]/).pop()?.replace(/\.[^.]+$/, "").slice(-8) ?? "img";
+    setValue((prev) => prev + `[image:${id}] `);
+    setCursorPos((p) => p + `[image:${id}] `.length);
+  });
+
+  // Token estimation: rough cost preview shown inline below the input
+  const { estimate } = useTokenEstimation();
+  const tokenEstimate = value.trim() ? estimate(value) : null;
 
   // Show suggestions when value starts with "/" — allow one space for subcommand browsing
   const slashContent = value.startsWith("/") ? value.slice(1) : "";
@@ -225,6 +239,11 @@ export function PromptInput({
     }
 
     if (input && !key.ctrl && !key.meta && !key.upArrow && !key.downArrow) {
+      // Intercept pasted image paths/clipboard images before they land in the buffer
+      if (input.length > 4 && imagePaste.handlePastedText(input)) {
+        setSelectedIdx(0);
+        return;
+      }
       if (vimMode) {
         // Vim: insert at cursor position so h/l/w/b/etc. actually move insertion point
         setValue((prev) => prev.slice(0, cursorPos) + input + prev.slice(cursorPos));
@@ -331,6 +350,11 @@ export function PromptInput({
         </Box>
       )}
 
+      {/* Context-pressure warning rendered above the input line when >= 70% */}
+      {typeof tokenBudgetRatio === "number" && tokenBudgetRatio >= 0.7 && (
+        <TokenWarning usedTokens={Math.round(tokenBudgetRatio * 100)} maxTokens={100} />
+      )}
+
       {/* Input line */}
       <Box>
         <Text color={promptColor} bold>{promptChar} </Text>
@@ -364,6 +388,9 @@ export function PromptInput({
             <Text dimColor>{placeholder}</Text>
           )}
         </Box>
+        {tokenEstimate && (
+          <Text dimColor> ~{tokenEstimate.estimatedTokens} tokens</Text>
+        )}
         {/* Footer hints moved above input box — status bar handles mode/cost/shortcuts */}
       </Box>
     </Box>

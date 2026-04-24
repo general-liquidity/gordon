@@ -99,6 +99,41 @@ export async function initializeRuntime(setState: StateUpdater): Promise<Session
 
   const config = await loadConfig();
 
+  // ── Optional background services (ALL default-OFF; gated behind env flags) ──
+  // Each service is wrapped in try/catch so a failing background service
+  // never breaks TUI boot. Skipped services (marketPulse, debateMode) have
+  // no lifecycle — they are pure utilities invoked on-demand elsewhere.
+  try {
+    // GORDON_AUTODREAM_ENABLED=true — periodic memory consolidation (24h gated internally)
+    if (process.env.GORDON_AUTODREAM_ENABLED === "true") {
+      const { AutoDreamManager } = await import("../services/autoDream.js");
+      const dream = new AutoDreamManager();
+      void dream.checkAndConsolidate(0, null).catch(() => {});
+    }
+  } catch (err) {
+    console.error("[runtime] autoDream init failed:", err instanceof Error ? err.message : err);
+  }
+  try {
+    // GORDON_REFLECTION_ENABLED=true — warm post-trade reflection store from disk
+    if (process.env.GORDON_REFLECTION_ENABLED === "true") {
+      const { getReflectionStore } = await import("../services/tradeReflection.js");
+      getReflectionStore();
+    }
+  } catch (err) {
+    console.error("[runtime] tradeReflection init failed:", err instanceof Error ? err.message : err);
+  }
+  try {
+    // GORDON_DENIAL_MEMORY_ENABLED=true — warm denial-audit memory from disk
+    if (process.env.GORDON_DENIAL_MEMORY_ENABLED === "true") {
+      const { getDenialMemory } = await import("../services/denialMemory.js");
+      getDenialMemory();
+    }
+  } catch (err) {
+    console.error("[runtime] denialMemory init failed:", err instanceof Error ? err.message : err);
+  }
+  // marketPulse (scanMarketPulse) and debateMode (runDebate) are pure on-demand
+  // utilities with no lifecycle — no start() to wire; invoked where needed.
+
   runtimeFactory = new SessionRuntimeFactory({
     resolveContext: (async (options: { session: { threadId: string; resourceId: string } }) => {
       // Use the shared GatewayContextResolver so the TUI gets the same

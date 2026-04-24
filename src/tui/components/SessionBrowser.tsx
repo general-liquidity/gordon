@@ -10,6 +10,7 @@
 
 import React, { useState, useMemo } from "react";
 import { Box, Text, useInput } from "ink";
+import { SessionPreview } from "./SessionPreview.js";
 
 // ============================================================================
 // Types
@@ -124,7 +125,11 @@ export function SessionBrowser({ sessions, onSelect, onClose }: Props) {
   const COL_PNL = 12;
   const COL_DUR = 10;
 
+  // Currently-focused session drives the side preview
+  const focused = sorted[selectedIndex];
+
   return (
+    <Box flexDirection="row">
     <Box
       flexDirection="column"
       borderStyle="round"
@@ -192,6 +197,21 @@ export function SessionBrowser({ sessions, onSelect, onClose }: Props) {
       <Text dimColor>
         {"\u2191\u2193"} navigate {"\u00b7"} Enter resume {"\u00b7"} Esc close
       </Text>
+    </Box>
+    {focused && (
+      <Box marginLeft={1}>
+        <SessionPreview
+          preview={{
+            openPositions: 0,
+            pnlUsd: focused.pnl,
+            lastActivity: focused.endedAt ?? focused.startedAt,
+            messageCount: focused.messageCount,
+          }}
+          onResume={() => onSelect(focused.sessionId)}
+          onClose={onClose}
+        />
+      </Box>
+    )}
     </Box>
   );
 }

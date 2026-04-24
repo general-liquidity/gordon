@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { Box, Text, useInput } from "ink";
 import { useAnimationClock } from "../hooks/useAnimationClock.js";
+import { ToolExecutionDetailDialog } from "./ToolExecutionDetailDialog.js";
 
 // ============================================================================
 // ToolCallInline — Inline tool execution display (Claude Code pattern)
@@ -365,19 +366,44 @@ const ToolCallRow = React.memo(function ToolCallRow({ call }: { call: ToolCallSt
 });
 
 export function ToolCallInline({ calls }: Props) {
-  if (calls.length === 0) return null;
-
   // Group completed calls when 4+ are done — collapse into summary
   const [expanded, setExpanded] = useState(false);
+  // Drill-down detail dialog for the most recent tool call
+  const [showDetail, setShowDetail] = useState(false);
   const completed = calls.filter((c) => c.status !== "running");
   const running = calls.filter((c) => c.status === "running");
   const shouldCollapse = completed.length >= 4 && !expanded;
+  const latest = calls[calls.length - 1];
 
   useInput((input, key) => {
     if (key.ctrl && input === "o" && completed.length >= 4) {
       setExpanded((e) => !e);
+      return;
+    }
+    if ((input === "d" || input === "D") && latest && !showDetail) {
+      setShowDetail(true);
     }
   });
+
+  if (calls.length === 0) return null;
+
+  // Drill-down dialog takes over the render when opened
+  if (showDetail && latest) {
+    return (
+      <ToolExecutionDetailDialog
+        execution={{
+          id: latest.id,
+          toolName: latest.toolName,
+          args: latest.args ?? {},
+          result: latest.result,
+          status: latest.status,
+          startedAt: latest.startedAt,
+          endedAt: latest.duration != null ? latest.startedAt + latest.duration : undefined,
+        }}
+        onClose={() => setShowDetail(false)}
+      />
+    );
+  }
 
   if (shouldCollapse) {
     const totalDuration = completed.reduce((sum, c) => sum + (c.duration ?? 0), 0);
@@ -389,7 +415,7 @@ export function ToolCallInline({ calls }: Props) {
           <Text dimColor> {completed.length} tools completed</Text>
           {errors > 0 && <Text color="red"> ({errors} failed)</Text>}
           <Text dimColor> · {totalDuration < 1000 ? `${totalDuration}ms` : `${(totalDuration / 1000).toFixed(1)}s`}</Text>
-          <Text dimColor> · Ctrl+O expand</Text>
+          <Text dimColor> · Ctrl+O expand · d details</Text>
         </Box>
         {running.map((call) => (
           <ToolCallRow key={call.id} call={call} />
@@ -403,6 +429,11 @@ export function ToolCallInline({ calls }: Props) {
       {calls.map((call) => (
         <ToolCallRow key={call.id} call={call} />
       ))}
+      {latest && (
+        <Box paddingLeft={2}>
+          <Text dimColor>[press d for details]</Text>
+        </Box>
+      )}
     </Box>
   );
 }
