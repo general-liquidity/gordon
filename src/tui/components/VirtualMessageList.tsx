@@ -4,6 +4,7 @@ import { MessageBubble, type Message } from "./MessageBubble.js";
 import { UnseenDivider } from "./UnseenDivider.js";
 import { useTranscriptSearch } from "../hooks/useTranscriptSearch.js";
 import { SearchBar } from "./SearchBar.js";
+import { OffscreenFreeze } from "./OffscreenFreeze.js";
 
 // ============================================================================
 // VirtualMessageList — Static scrollback + live tail
@@ -144,8 +145,10 @@ export function VirtualMessageList({ messages, scrollEnabled = true }: Props) {
       )}
 
       {/* Live tail — last LIVE_TAIL stable messages + any streaming message */}
-      {liveMessages.map((msg) => {
+      {liveMessages.map((msg, idx) => {
         const isSearchMatch = search.currentMatch?.messageId === msg.id;
+        // Freeze all but the actively-animating message to prevent offscreen repaints
+        const isActive = isStreaming ? !!msg.streaming : idx === liveMessages.length - 1;
         return (
           <Box
             key={msg.id}
@@ -153,7 +156,9 @@ export function VirtualMessageList({ messages, scrollEnabled = true }: Props) {
               ? { borderStyle: "single" as const, borderColor: "yellow" }
               : {})}
           >
-            <MessageBubble message={msg} />
+            <OffscreenFreeze frozen={!isActive}>
+              <MessageBubble message={msg} />
+            </OffscreenFreeze>
           </Box>
         );
       })}

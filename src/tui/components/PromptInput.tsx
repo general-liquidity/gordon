@@ -335,18 +335,32 @@ export function PromptInput({
       <Box>
         <Text color={promptColor} bold>{promptChar} </Text>
         <Box flexGrow={1}>
-          {value ? (
-            <Text>
-              {isBashMode ? (
-                <Text color="yellow">{value.slice(1)}</Text>
-              ) : isSlashMode ? (
-                <Text color="rgb(52,238,176)">{value.slice(1)}</Text>
-              ) : (
-                <Text>{value}</Text>
-              )}
-              <Text color="rgb(52,238,176)">{"\u2588"}</Text>
-            </Text>
-          ) : (
+          {value ? (() => {
+            // Split display text around cursor; prefix-mode strips leading char and shifts cursor
+            const displayText = (isBashMode || isSlashMode) ? value.slice(1) : value;
+            const adjCursor = (isBashMode || isSlashMode) ? Math.max(0, cursorPos - 1) : cursorPos;
+            const left = displayText.slice(0, adjCursor);
+            const cursorChar = adjCursor < displayText.length ? displayText[adjCursor]! : " ";
+            const right = adjCursor < displayText.length ? displayText.slice(adjCursor + 1) : "";
+            const textColor = isBashMode ? "yellow" : isSlashMode ? "rgb(52,238,176)" : undefined;
+            const useBlockCursor = !(isVimNormal || isVimVisual);
+            return (
+              <Text>
+                <Text color={textColor}>{left}</Text>
+                {useBlockCursor ? (
+                  <>
+                    <Text color="rgb(52,238,176)">{"\u2588"}</Text>
+                    <Text color={textColor}>{right}</Text>
+                  </>
+                ) : (
+                  <>
+                    <Text color={textColor} inverse>{cursorChar}</Text>
+                    <Text color={textColor}>{right}</Text>
+                  </>
+                )}
+              </Text>
+            );
+          })() : (
             <Text dimColor>{placeholder}</Text>
           )}
         </Box>

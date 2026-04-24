@@ -1,5 +1,7 @@
 import React, { useMemo, useRef } from "react";
 import { Box, Text } from "ink";
+import { CodeBlock } from "./CodeBlock";
+import { TerminalLink } from "./TerminalLink";
 
 // ============================================================================
 // StreamingMarkdown — Claude Code stable-prefix incremental rendering
@@ -137,44 +139,6 @@ function cacheResult(key: string, blocks: ParsedBlock[]): void {
   tokenCache.set(key, blocks);
 }
 
-// Syntax highlighting for code blocks
-function highlightCodeLine(line: string): React.ReactNode {
-  const parts: React.ReactNode[] = [];
-  let remaining = line;
-  let key = 0;
-
-  while (remaining.length > 0) {
-    const commentMatch = remaining.match(/^(.*?)(\/\/.*|#.*)$/);
-    if (commentMatch && commentMatch[2]) {
-      if (commentMatch[1]) parts.push(<Text key={key++}>{commentMatch[1]}</Text>);
-      parts.push(<Text key={key++} dimColor>{commentMatch[2]}</Text>);
-      remaining = "";
-      continue;
-    }
-
-    const stringMatch = remaining.match(/(["'])(?:(?!\1|\\).|\\.)*\1/);
-    if (stringMatch && stringMatch.index != null) {
-      if (stringMatch.index > 0) parts.push(<Text key={key++}>{remaining.slice(0, stringMatch.index)}</Text>);
-      parts.push(<Text key={key++} color="green">{stringMatch[0]}</Text>);
-      remaining = remaining.slice(stringMatch.index + stringMatch[0].length);
-      continue;
-    }
-
-    const kwMatch = remaining.match(/\b(const|let|var|function|return|if|else|for|while|import|export|from|async|await|class|new|this|true|false|null|undefined|type|interface|def|self|print|lambda|yield|match|case)\b/);
-    if (kwMatch && kwMatch.index != null) {
-      if (kwMatch.index > 0) parts.push(<Text key={key++}>{remaining.slice(0, kwMatch.index)}</Text>);
-      parts.push(<Text key={key++} color="magenta">{kwMatch[0]}</Text>);
-      remaining = remaining.slice(kwMatch.index + kwMatch[0].length);
-      continue;
-    }
-
-    parts.push(<Text key={key++}>{remaining}</Text>);
-    break;
-  }
-
-  return <>{parts}</>;
-}
-
 function renderInline(text: string): React.ReactNode {
   const parts: React.ReactNode[] = [];
   let remaining = text;
@@ -186,6 +150,15 @@ function renderInline(text: string): React.ReactNode {
       if (boldMatch.index > 0) parts.push(<Text key={key++}>{remaining.slice(0, boldMatch.index)}</Text>);
       parts.push(<Text key={key++} bold>{boldMatch[1]}</Text>);
       remaining = remaining.slice(boldMatch.index + boldMatch[0].length);
+      continue;
+    }
+
+    // URL detection — wrap with TerminalLink for OSC 8 clickable hyperlinks
+    const urlMatch = remaining.match(/https?:\/\/[^\s<>"')]+/);
+    if (urlMatch && urlMatch.index != null) {
+      if (urlMatch.index > 0) parts.push(<Text key={key++}>{remaining.slice(0, urlMatch.index)}</Text>);
+      parts.push(<TerminalLink key={key++} url={urlMatch[0]} color="cyan">{urlMatch[0]}</TerminalLink>);
+      remaining = remaining.slice(urlMatch.index + urlMatch[0].length);
       continue;
     }
 
@@ -252,14 +225,8 @@ export function StreamingMarkdown({ content, isStreaming }: Props) {
           case "heading":
             return <Text key={i} bold underline={block.level === 1}>{block.content}</Text>;
           case "codeblock":
-            return (
-              <Box key={i} borderStyle="single" borderColor="gray" paddingX={1} flexDirection="column">
-                {block.language && <Text dimColor bold>{block.language}</Text>}
-                {block.content.split("\n").map((line, j) => (
-                  <Box key={j}>{highlightCodeLine(line)}</Box>
-                ))}
-              </Box>
-            );
+            // Delegate to CodeBlock for cli-highlight-powered syntax rendering
+            return <CodeBlock key={i} code={block.content} language={block.language} />;
           case "blockquote":
             return (
               <Box key={i} paddingLeft={2}>
