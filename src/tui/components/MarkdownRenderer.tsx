@@ -34,8 +34,63 @@ const _tokenCache = new Map<string, Token[]>();
 const _TOKEN_CACHE_MAX = 500;
 
 // Fast-path regex — if the first 500 chars contain none of these, skip
-// marked entirely and emit a single paragraph token.
-const MD_SYNTAX_RE = /[#*`|\[\]>~_\\]|\n\n|^\d+\. |\n\d+\. |---|___|\*\*\*/;
+// marked entirely and emit a single paragraph token. Box-drawing corners
+// are included so ASCII-box content doesn't bypass detection.
+const MD_SYNTAX_RE = /[#*`|\[\]>~_\\┌└╔╚╭╰]|\n\n|^\d+\. |\n\d+\. |---|___|\*\*\*/;
+
+// ASCII-box detection: LLMs emit visual boxes drawn with Unicode
+// box-drawing characters (often lopsided — top + side bars + bottom, no
+// right border). We split them out of the content stream BEFORE marked
+// sees them, so each box renders as a real Ink <Box borderStyle> that
+// spans available width, and the surrounding markdown still parses
+// normally.
+const ASCII_BOX_TOP = /^\s*[┌╔╭][─━═-]/;
+const ASCII_BOX_BOTTOM = /^\s*[└╚╰][─━═-]/;
+const ASCII_BOX_SIDE = /^\s*[│║|]\s?/;
+
+type Segment =
+  | { kind: "markdown"; content: string }
+  | { kind: "box"; lines: string[] };
+
+function splitAsciiBoxes(content: string): Segment[] {
+  const lines = content.split("\n");
+  const segments: Segment[] = [];
+  let buffer: string[] = [];
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i]!;
+    if (ASCII_BOX_TOP.test(line)) {
+      // Look ahead for matching bottom
+      let end = -1;
+      for (let j = i + 1; j < lines.length; j++) {
+        if (ASCII_BOX_BOTTOM.test(lines[j]!)) {
+          end = j;
+          break;
+        }
+      }
+      if (end > i) {
+        // Flush text buffer
+        if (buffer.length > 0) {
+          segments.push({ kind: "markdown", content: buffer.join("\n") });
+          buffer = [];
+        }
+        // Strip side-bars from inner lines
+        const inner = lines
+          .slice(i + 1, end)
+          .map((l) => l.replace(ASCII_BOX_SIDE, ""));
+        segments.push({ kind: "box", lines: inner });
+        i = end + 1;
+        continue;
+      }
+    }
+    buffer.push(line);
+    i++;
+  }
+  if (buffer.length > 0) {
+    segments.push({ kind: "markdown", content: buffer.join("\n") });
+  }
+  return segments;
+}
 
 function hashContent(content: string): string {
   let h = 0;
@@ -89,13 +144,42 @@ function cacheResult(key: string, tokens: Token[]): void {
 // ============================================================================
 
 export function MarkdownRenderer({ content }: Props) {
-  const tokens = tokenize(content);
+  // Pre-split ASCII boxes so each one renders as a real Ink Box instead
+  // of getting smushed through marked's paragraph tokenizer. The
+  // surrounding markdown segments still go through the normal pipeline.
+  const segments = splitAsciiBoxes(content);
   return (
     <Box flexDirection="column">
+      {segments.map((seg, i) =>
+        seg.kind === "box" ? (
+          <Box
+            key={i}
+            flexDirection="column"
+            borderStyle="round"
+            borderColor="gray"
+            paddingX={1}
+            marginY={0}
+          >
+            {seg.lines.map((line, j) => (
+              <Text key={j}>{line}</Text>
+            ))}
+          </Box>
+        ) : (
+          <MarkdownSegment key={i} content={seg.content} />
+        ),
+      )}
+    </Box>
+  );
+}
+
+function MarkdownSegment({ content }: { content: string }) {
+  const tokens = tokenize(content);
+  return (
+    <>
       {tokens.map((token, i) => (
         <TokenRenderer key={i} token={token} />
       ))}
-    </Box>
+    </>
   );
 }
 
