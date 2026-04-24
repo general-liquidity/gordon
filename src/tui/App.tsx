@@ -39,6 +39,11 @@ import { updateTerminalTab, resetTerminalTab } from "./terminalTab.js";
 import { getActionsForKey, isVimModeEnabled } from "./keybindings/keybindings.js";
 import { getNotificationFolder } from "./notifications/notificationFolder.js";
 import { useFpsTracker } from "./hooks/useFpsTracker.js";
+import {
+  getPerformanceMonitor,
+  installStdoutTap,
+  resetPerformanceMonitor,
+} from "./diagnostics/performanceMonitor.js";
 import { useAnimationPause } from "./hooks/useAnimationClock.js";
 import { useProactiveChatSubscription } from "./hooks/useProactiveChatSubscription.js";
 import { useRateLimitNotification } from "./hooks/useRateLimitNotification.js";
@@ -203,6 +208,9 @@ function DebateViewerOverlay({ data, onClose }: { data: DebateViewerData; onClos
 function AppInner() {
   const dispatch = useDispatch();
   const { getState } = useAppStore();
+  // Separate handle for perf instrumentation — avoids mutating the shape of
+  // the destructure above (which is read throughout the component).
+  const perfStore = useAppStore();
   const { exit } = useApp();
 
   // Boot-time config error: render a dialog instead of crashing the process.
@@ -409,6 +417,39 @@ function AppInner() {
   // ── FPS tracking + animation clock ──
   const fpsMetrics = useFpsTracker(2000); // Report every 2s
   const { pause: pauseAnimations, resume: resumeAnimations } = useAnimationPause();
+
+  // ── Phase 5 reconciler baseline — opt-in only when GORDON_PERF_LOG is set ──
+  // Subscribes to the underlying store (bypassing the React render loop) and
+  // taps `process.stdout.write` to record frame-time + cell-churn for the
+  // custom reconciler comparison. Zero-cost when the env var is unset: the
+  // early return fires once at mount and nothing downstream runs.
+  useEffect(() => {
+    const flushPath = process.env.GORDON_PERF_LOG;
+    if (!flushPath) return; // zero-cost path
+
+    const monitor = getPerformanceMonitor();
+    monitor.start({ flushPath });
+    const uninstallTap = installStdoutTap(monitor);
+
+    // Track message-count deltas via the store's native subscribe() so the
+    // perf counter reflects real dispatches, not just React commits.
+    let lastMessageCount = perfStore.getState().messages.length;
+    const unsubscribe = perfStore.subscribe(() => {
+      const next = perfStore.getState().messages.length;
+      if (next !== lastMessageCount) {
+        monitor.recordRender(next, "ADD_MESSAGE");
+        lastMessageCount = next;
+      }
+    });
+
+    return () => {
+      unsubscribe();
+      uninstallTap();
+      monitor.stop();
+      resetPerformanceMonitor();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const isScreenReaderActive = useScreenReader();
   const vimModeActive = isVimModeEnabled();
   const useAltScreen = process.env.GORDON_ALT_SCREEN !== "false";
