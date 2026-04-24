@@ -106,5 +106,40 @@ describe("render() integration", () => {
       await exitPromise; // should resolve, not hang
       expect(true).toBe(true);
     });
+
+    test("patchConsole routes console.log above the live frame", () => {
+      const stdout = createMockStdout();
+      const tree = React.createElement(Text, null, "frame-content");
+      const instance = render(tree, { stdout, patchConsole: true, exitOnCtrlC: false });
+      try {
+        // Clear captured output so we only see post-mount writes.
+        stdout.captured = "";
+        console.log("intercepted-log");
+        // The message should have been written to our stdout (not the real
+        // terminal) and be followed by a reprinted frame containing our text.
+        expect(stdout.captured).toContain("intercepted-log");
+        expect(stdout.captured).toContain("frame-content");
+        // Erase-lines ANSI sequence should appear before the console text
+        // so the live frame is cleared first. `\x1b[` + some digits + `F` is
+        // the cursor-up-and-home sequence ansi-escapes uses.
+        const logIdx = stdout.captured.indexOf("intercepted-log");
+        const frameIdx = stdout.captured.lastIndexOf("frame-content");
+        expect(logIdx).toBeLessThan(frameIdx);
+      } finally {
+        instance.unmount();
+      }
+    });
+
+    test("patchConsole cleanup restores original console.log", () => {
+      const stdout = createMockStdout();
+      const originalLog = console.log;
+      const tree = React.createElement(Text, null, "x");
+      const instance = render(tree, { stdout, patchConsole: true, exitOnCtrlC: false });
+      // While mounted, console.log should NOT be the original (it's patched).
+      expect(console.log).not.toBe(originalLog);
+      instance.unmount();
+      // After unmount, restoration should have kicked in.
+      expect(console.log).toBe(originalLog);
+    });
   });
 });
