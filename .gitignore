@@ -79,3 +79,8 @@ TUI*.txt
 .tc-errors-*.txt
 
 
+
+# Sibling product directories — pitch docs and marketing sites
+docs/pitch/
+general-liquidity-web-v2/
+general-liquidity-website/
