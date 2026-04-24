@@ -37,6 +37,8 @@
  */
 
 // Migrated tools
+// Mid-task user elicitation (wired to SideQuestionManager + TUI dialogs)
+export { askUserTools, askUserTool } from "./askUser.ts";
 export { indicatorTools } from "./indicators.ts";
 export { explainTools } from "./explain.ts";
 export { marketTools } from "./market.ts";

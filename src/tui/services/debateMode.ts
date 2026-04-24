@@ -12,6 +12,8 @@
 //
 // Output: Full visible reasoning chain so user can audit the decision.
 
+import { emitEvent } from "../../events/bus.ts";
+
 export type DebateRole =
   | "bull"
   | "bear"
@@ -206,6 +208,14 @@ export async function runDebate(
   const startTime = Date.now();
   const cfg = { maxInvestmentRounds: 2, maxRiskRounds: 1, ...config };
 
+  // Emit start event for TUI/observers (DebateViewer, notifications, etc.)
+  const debateId = crypto.randomUUID();
+  void emitEvent("debate:started", {
+    debateId,
+    topic: symbol,
+    participants: ["bull", "bear", "manager", "aggressive", "conservative", "neutral", "portfolio_manager"],
+  });
+
   const investmentDebate: InvestmentDebate = {
     symbol,
     context,
@@ -335,6 +345,21 @@ export async function runDebate(
       .concat(riskDebate.rounds)
       .reduce((s, r) => s + r.confidence, 0) /
     (investmentDebate.rounds.length + riskDebate.rounds.length);
+
+  // Flatten the structured debate into a transcript for the resolved event
+  const transcript: Array<{ speaker: string; argument: string }> = [
+    ...investmentDebate.rounds.map((r) => ({ speaker: r.role, argument: r.argument })),
+    ...(managerResp ? [{ speaker: "manager", argument: managerResp.conclusion ?? "" }] : []),
+    ...riskDebate.rounds.map((r) => ({ speaker: r.role, argument: r.argument })),
+    { speaker: "portfolio_manager", argument: pmResp.reasoning ?? "" },
+  ];
+
+  void emitEvent("debate:resolved", {
+    debateId,
+    topic: symbol,
+    transcript,
+    conclusion: pmResp.reasoning ?? "",
+  });
 
   return {
     symbol,

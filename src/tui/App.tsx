@@ -59,6 +59,8 @@ import { BrokerPicker } from "./components/BrokerPicker.js";
 import { DoctorDialog } from "./components/DoctorDialog.js";
 import { HelpBrowser } from "./components/HelpBrowser.js";
 import { ConfigEditor } from "./components/ConfigEditor.js";
+import { InvalidConfigDialog } from "./components/InvalidConfigDialog.js";
+import { InvalidSettingsDialog } from "./components/InvalidSettingsDialog.js";
 import { ThreadBrowser } from "./components/ThreadBrowser.js";
 import { JournalViewer } from "./components/JournalViewer.js";
 import { ShortcutsBrowser } from "./components/ShortcutsBrowser.js";
@@ -125,7 +127,10 @@ import { PlanDiff, type PlanVersion } from "./components/PlanDiff.js";
 import { PostTradeFeedback } from "./components/PostTradeFeedback.js";
 import { HIP3AssetBrowser } from "./components/HIP3AssetBrowser.js";
 import { CounterfactualPanel, type TradeOutcome, type Scenario } from "./components/CounterfactualPanel.js";
-import { DebateViewer, type DebateViewerData } from "./components/DebateViewer.js";
+import { DebateViewer, type DebateViewerData, type DebateRole } from "./components/DebateViewer.js";
+import { SideQuestionDialog } from "./components/SideQuestionDialog.js";
+import { ElicitationDialog, type FormField } from "./components/ElicitationDialog.js";
+import type { SideQuestion } from "./services/sideQuestion.js";
 
 // ── Backend Module UI Components ──
 import { LivePositions, type Position } from "./components/LivePositions.js";
@@ -200,6 +205,16 @@ function AppInner() {
   const { getState } = useAppStore();
   const { exit } = useApp();
 
+  // Boot-time config error: render a dialog instead of crashing the process.
+  const configErrorType = process.env.GORDON_CONFIG_ERROR_TYPE;
+  const configErrorMsg = process.env.GORDON_CONFIG_ERROR_MSG ?? "Unknown config error";
+  if (configErrorType === "syntax") {
+    return <InvalidConfigDialog errors={[configErrorMsg]} onClose={() => exit()} />;
+  }
+  if (configErrorType === "settings") {
+    return <InvalidSettingsDialog errors={[configErrorMsg]} onClose={() => exit()} />;
+  }
+
   // Subscribe to proactive:suggestion_fired events on the Gordon event bus
   // and push them into the chat stream as proactive_suggestion messages.
   // This is the only place that bridges radar-mode suggestions into the TUI.
@@ -217,6 +232,8 @@ function AppInner() {
     let unsubPlan: (() => void) | undefined;
     let unsubTrade: (() => void) | undefined;
     let unsubTradeClosed: (() => void) | undefined;
+    let unsubDebate: (() => void) | undefined;
+    let unsubElicit: (() => void) | undefined;
     void import("../events/index.ts").then((m) => {
       const bus = m.getEventBus();
       unsubRate = bus.on("binance:rate_limit", (event) => {
@@ -280,8 +297,47 @@ function AppInner() {
         ];
         setCounterfactual({ trade, scenarios });
       });
+      // Wire DebateViewer: populate overlay from debate:resolved events (runDebate emits these)
+      unsubDebate = bus.on("debate:resolved", (event) => {
+        const transcript = event.transcript ?? [];
+        // Map the flat transcript into DebateViewer's investment/risk shape
+        const roleOf = (speaker: string): DebateRole => {
+          const s = speaker.toLowerCase();
+          if (s.includes("bull")) return "bull";
+          if (s.includes("bear")) return "bear";
+          if (s.includes("aggressive")) return "aggressive";
+          if (s.includes("conservative")) return "conservative";
+          if (s.includes("neutral")) return "neutral";
+          if (s.includes("portfolio")) return "portfolio_manager";
+          if (s.includes("manager")) return "manager";
+          return "neutral";
+        };
+        const investmentRounds: DebateViewerData["investmentRounds"] = [];
+        const riskRounds: DebateViewerData["riskRounds"] = [];
+        transcript.forEach((t, i) => {
+          const role = roleOf(t.speaker);
+          const entry = { roundNumber: i + 1, role, argument: t.argument, keyPoints: [], confidence: 5 };
+          if (role === "bull" || role === "bear" || role === "manager") investmentRounds.push(entry);
+          else riskRounds.push(entry);
+        });
+        setDebateView({
+          symbol: event.topic,
+          investmentRounds,
+          riskRounds,
+          finalDecision: { action: "HOLD", confidence: 5, reasoning: event.conclusion ?? "" },
+        });
+      });
+      // Wire elicitation dialog: an agent asked a question mid-task
+      unsubElicit = bus.on("agent:elicitation_requested", (event) => {
+        setElicitationRequest({
+          requestId: event.requestId,
+          prompt: event.prompt,
+          options: event.options,
+          kind: event.kind,
+        });
+      });
     });
-    return () => { unsubRate?.(); unsubPlan?.(); unsubTrade?.(); unsubTradeClosed?.(); };
+    return () => { unsubRate?.(); unsubPlan?.(); unsubTrade?.(); unsubTradeClosed?.(); unsubDebate?.(); unsubElicit?.(); };
   }, [rateLimit]);
 
   // Mirror warning/critical alerts to the audit log so they survive TUI
@@ -387,8 +443,17 @@ function AppInner() {
   // CounterfactualPanel overlay — auto-shown on trade:closed (or /review-trade fallback).
   const [counterfactual, setCounterfactual] = useState<{ trade: TradeOutcome; scenarios: Scenario[] } | null>(null);
 
-  // DebateViewer overlay — shown via /debate (no debate:* events on the bus yet).
+  // DebateViewer overlay — populated from debate:resolved events (see useEffect above).
   const [debateView, setDebateView] = useState<DebateViewerData | null>(null);
+
+  // Elicitation overlay — shown when an agent calls the ask_user tool.
+  // Cleared when the user answers (which emits agent:elicitation_answered).
+  const [elicitationRequest, setElicitationRequest] = useState<{
+    requestId: string;
+    prompt: string;
+    options?: Array<{ value: string; label: string }>;
+    kind: "choice" | "text" | "confirm";
+  } | null>(null);
 
   const [showModelPicker, setShowModelPicker] = useState(false);
   const [showMCPManager, setShowMCPManager] = useState(false);
@@ -497,7 +562,7 @@ function AppInner() {
     showHistorySearch || showIndicatorValue || showInsights || showMarketPulse ||
     showMessageSelector || showOptimization || showPlanEditor || showPlugins ||
     showQuickOpen || showReconciliation || showTaskDeps || showWalkForward ||
-    !!counterfactual || !!debateView;
+    !!counterfactual || !!debateView || !!elicitationRequest;
 
   // ── Prompt suggestions based on conversation context ──
   const promptSuggestions = usePromptSuggestions(messages, isStreaming, !!false /* hasExchange */);
@@ -1807,6 +1872,45 @@ function AppInner() {
       {debateView && (
         <DebateViewerOverlay data={debateView} onClose={() => setDebateView(null)} />
       )}
+
+      {/* Elicitation dialog — shown when an agent calls ask_user. Emits agent:elicitation_answered on answer. */}
+      {elicitationRequest && (() => {
+        const answer = (response: string) => {
+          void import("../events/index.ts").then((m) => {
+            void m.emitEvent("agent:elicitation_answered", {
+              requestId: elicitationRequest.requestId,
+              answer: response,
+            });
+          });
+          setElicitationRequest(null);
+        };
+        const dismiss = () => answer(""); // empty answer signals dismissal
+        if (elicitationRequest.kind === "choice" || elicitationRequest.kind === "confirm") {
+          const opts = elicitationRequest.kind === "confirm"
+            ? ["Yes", "No"]
+            : (elicitationRequest.options ?? []).map((o) => o.label);
+          const sq: SideQuestion = {
+            id: elicitationRequest.requestId,
+            question: elicitationRequest.prompt,
+            options: opts.length > 0 ? opts : undefined,
+            context: "",
+            kind: elicitationRequest.kind,
+          };
+          return <SideQuestionDialog question={sq} onAnswer={answer} onDismiss={dismiss} />;
+        }
+        // "text" kind → ElicitationDialog with a single text field
+        const fields: FormField[] = [
+          { id: "answer", label: elicitationRequest.prompt, type: "text", required: true },
+        ];
+        return (
+          <ElicitationDialog
+            title="Agent Question"
+            fields={fields}
+            onSubmit={(values) => answer(String(values.answer ?? ""))}
+            onCancel={dismiss}
+          />
+        );
+      })()}
 
       {/* Rate-limit banner — auto-clears when resetMs elapses */}
       {rateLimit.isThrottled && rateLimit.latestEvent && (

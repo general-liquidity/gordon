@@ -541,6 +541,43 @@ export interface PositionUpdatedEvent extends BaseEvent {
 }
 
 /**
+ * Agent elicitation events — mid-task request for user clarification.
+ * Agent emits `agent:elicitation_requested`; TUI answers with `agent:elicitation_answered`
+ * carrying the same `requestId`.
+ */
+export interface AgentElicitationRequestedEvent extends BaseEvent {
+  type: "agent:elicitation_requested";
+  requestId: string;
+  prompt: string;
+  options?: Array<{ value: string; label: string }>;
+  kind: "choice" | "text" | "confirm";
+}
+
+export interface AgentElicitationAnsweredEvent extends BaseEvent {
+  type: "agent:elicitation_answered";
+  requestId: string;
+  answer: string;
+}
+
+/**
+ * Debate events — fired by runDebate() when adversarial reasoning runs.
+ */
+export interface DebateStartedEvent extends BaseEvent {
+  type: "debate:started";
+  debateId: string;
+  topic: string;
+  participants: string[];
+}
+
+export interface DebateResolvedEvent extends BaseEvent {
+  type: "debate:resolved";
+  debateId: string;
+  topic: string;
+  transcript: Array<{ speaker: string; argument: string }>;
+  conclusion: string;
+}
+
+/**
  * Proactive mode events
  */
 export interface ProactiveSuggestionFiredEvent extends BaseEvent {
@@ -635,7 +672,11 @@ export type GordonEvent =
   | PositionReviewedEvent
   | PositionUpdatedEvent
   | ProactiveSuggestionFiredEvent
-  | ProactiveSuggestionResolvedEvent;
+  | ProactiveSuggestionResolvedEvent
+  | AgentElicitationRequestedEvent
+  | AgentElicitationAnsweredEvent
+  | DebateStartedEvent
+  | DebateResolvedEvent;
 
 /**
  * Extract event type string

@@ -638,6 +638,49 @@ export function subscribeToEvents(dispatch: Dispatch): () => void {
   );
 
   // ────────────────────────────────────────────────────────────────────────
+  // Elicitation (2 events) — App.tsx owns the dialog state; we surface a
+  // notification so the user sees a pending question even behind overlays.
+  // ────────────────────────────────────────────────────────────────────────
+
+  // 58. agent:elicitation_requested
+  unsubs.push(
+    bus.on("agent:elicitation_requested", (event: EventData<"agent:elicitation_requested">) => {
+      notify(dispatch, "agent:elicitation_requested", "info",
+        `◈ Agent asks: ${event.prompt}`,
+      );
+    }),
+  );
+
+  // 59. agent:elicitation_answered — silent, the awaiting tool resumes itself
+  unsubs.push(
+    bus.on("agent:elicitation_answered", (_event: EventData<"agent:elicitation_answered">) => {
+      // Silent — SideQuestionManager resolves the pending ask() promise
+    }),
+  );
+
+  // ────────────────────────────────────────────────────────────────────────
+  // Debate (2 events) — App.tsx owns the DebateViewer state
+  // ────────────────────────────────────────────────────────────────────────
+
+  // 60. debate:started
+  unsubs.push(
+    bus.on("debate:started", (event: EventData<"debate:started">) => {
+      notify(dispatch, "debate:started", "strategy",
+        `◈ Debate started: ${event.topic} (${event.participants.join(", ")})`,
+      );
+    }),
+  );
+
+  // 61. debate:resolved
+  unsubs.push(
+    bus.on("debate:resolved", (event: EventData<"debate:resolved">) => {
+      notify(dispatch, "debate:resolved", "strategy",
+        `✓ Debate resolved: ${event.topic} → ${event.conclusion.slice(0, 80)}`,
+      );
+    }),
+  );
+
+  // ────────────────────────────────────────────────────────────────────────
   // Return combined unsubscribe function
   // ────────────────────────────────────────────────────────────────────────
 

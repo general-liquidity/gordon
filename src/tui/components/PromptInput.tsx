@@ -5,6 +5,8 @@ import { useSlashCommandTypeahead, type TypeaheadMatch } from "../hooks/useSlash
 import { useInputHistory } from "../hooks/useInputHistory.js";
 import { useImagePaste } from "../hooks/useImagePaste.js";
 import { useTokenEstimation } from "../hooks/useTokenEstimation.js";
+import { useDeclaredCursor } from "../hooks/useDeclaredCursor.js";
+import { graphemeCount, graphemeToCodeUnit } from "../utils/graphemes.js";
 import { TokenWarning } from "./TokenWarning.js";
 import {
   VimMode,
@@ -71,8 +73,11 @@ export function PromptInput({
   // Image paste: swaps pasted image path/clipboard blob for a reference token
   const imagePaste = useImagePaste((imagePath: string) => {
     const id = imagePath.split(/[\\/]/).pop()?.replace(/\.[^.]+$/, "").slice(-8) ?? "img";
-    setValue((prev) => prev + `[image:${id}] `);
-    setCursorPos((p) => p + `[image:${id}] `.length);
+    const token = `[image:${id}] `;
+    setValue((prev) => prev + token);
+    // Image-ref token is ASCII, so grapheme count === code-unit length, but
+    // use the helper to keep the invariant explicit.
+    setCursorPos((p) => p + graphemeCount(token));
   });
 
   // Token estimation: rough cost preview shown inline below the input
@@ -141,12 +146,14 @@ export function PromptInput({
     // Insert-mode Escape: transition to Normal without clearing the buffer
     if (vimMode && vimState.mode === VimMode.Insert && key.escape) {
       setVimState({ ...vimState, mode: VimMode.Normal, count: null, pendingOperator: null });
-      // Keep cursor inside the buffer in Normal mode (cursor lives on a char, not past end)
-      if (cursorPos >= value.length && value.length > 0) setCursorPos(value.length - 1);
+      // Keep cursor inside the buffer in Normal mode (cursor lives on a
+      // grapheme, not past end). graphemeCount handles CJK / emoji correctly.
+      const gLen = graphemeCount(value);
+      if (cursorPos >= gLen && gLen > 0) setCursorPos(gLen - 1);
       return;
     }
 
-    // Shift+Enter: insert newline instead of submitting
+    // Shift+Enter: insert newline instead of submitting (newline is 1 grapheme)
     if (key.return && key.shift) {
       setValue((prev) => prev + "\n");
       setCursorPos((p) => p + 1);
@@ -186,32 +193,42 @@ export function PromptInput({
     if (!showSuggestions && key.upArrow) {
       if (!history.current) stashedInputRef.current = value;
       const prev = history.goUp();
-      if (prev != null) { setValue(prev); setCursorPos(prev.length); }
+      if (prev != null) { setValue(prev); setCursorPos(graphemeCount(prev)); }
       return;
     }
     if (!showSuggestions && key.downArrow) {
       const next = history.goDown();
-      if (next != null) { setValue(next); setCursorPos(next.length); }
-      else { setValue(stashedInputRef.current); setCursorPos(stashedInputRef.current.length); }
+      if (next != null) { setValue(next); setCursorPos(graphemeCount(next)); }
+      else {
+        setValue(stashedInputRef.current);
+        setCursorPos(graphemeCount(stashedInputRef.current));
+      }
       return;
     }
 
-    // Cursor movement (left/right)
+    // Cursor movement (left/right) — grapheme-aware. One keystroke = one
+    // visible character, even if the char is an emoji or CJK glyph.
     if (key.leftArrow) {
       setCursorPos((p) => Math.max(0, p - 1));
       return;
     }
     if (key.rightArrow) {
-      setCursorPos((p) => Math.min(value.length, p + 1));
+      const gLen = graphemeCount(value);
+      setCursorPos((p) => Math.min(gLen, p + 1));
       return;
     }
 
     if (key.backspace || key.delete) {
       setValue((prev) => {
-        const pos = Math.min(cursorPos, prev.length);
+        const gLen = graphemeCount(prev);
+        const pos = Math.min(cursorPos, gLen);
         if (pos > 0) {
           setCursorPos(pos - 1);
-          return prev.slice(0, pos - 1) + prev.slice(pos);
+          // Slice by code units at the grapheme boundaries so we remove the
+          // whole cluster (a single emoji / CJK char), not half a surrogate.
+          const leftCode = graphemeToCodeUnit(prev, pos - 1);
+          const rightCode = graphemeToCodeUnit(prev, pos);
+          return prev.slice(0, leftCode) + prev.slice(rightCode);
         }
         return prev;
       });
@@ -244,14 +261,19 @@ export function PromptInput({
         setSelectedIdx(0);
         return;
       }
+      const inputGraphemes = graphemeCount(input);
       if (vimMode) {
-        // Vim: insert at cursor position so h/l/w/b/etc. actually move insertion point
-        setValue((prev) => prev.slice(0, cursorPos) + input + prev.slice(cursorPos));
-        setCursorPos((p) => p + input.length);
+        // Vim: insert at cursor position so h/l/w/b/etc. actually move
+        // insertion point. Slice by code units at the grapheme boundary.
+        setValue((prev) => {
+          const insertAt = graphemeToCodeUnit(prev, cursorPos);
+          return prev.slice(0, insertAt) + input + prev.slice(insertAt);
+        });
+        setCursorPos((p) => p + inputGraphemes);
       } else {
         // Non-vim: append to end (existing behavior, cursor is cosmetic)
         setValue((prev) => prev + input);
-        setCursorPos((p) => p + input.length);
+        setCursorPos((p) => p + inputGraphemes);
       }
       setSelectedIdx(0);
     }
@@ -359,32 +381,16 @@ export function PromptInput({
       <Box>
         <Text color={promptColor} bold>{promptChar} </Text>
         <Box flexGrow={1}>
-          {value ? (() => {
-            // Split display text around cursor; prefix-mode strips leading char and shifts cursor
-            const displayText = (isBashMode || isSlashMode) ? value.slice(1) : value;
-            const adjCursor = (isBashMode || isSlashMode) ? Math.max(0, cursorPos - 1) : cursorPos;
-            const left = displayText.slice(0, adjCursor);
-            const cursorChar = adjCursor < displayText.length ? displayText[adjCursor]! : " ";
-            const right = adjCursor < displayText.length ? displayText.slice(adjCursor + 1) : "";
-            const textColor = isBashMode ? "yellow" : isSlashMode ? "rgb(52,238,176)" : undefined;
-            const useBlockCursor = !(isVimNormal || isVimVisual);
-            return (
-              <Text>
-                <Text color={textColor}>{left}</Text>
-                {useBlockCursor ? (
-                  <>
-                    <Text color="rgb(52,238,176)">{"\u2588"}</Text>
-                    <Text color={textColor}>{right}</Text>
-                  </>
-                ) : (
-                  <>
-                    <Text color={textColor} inverse>{cursorChar}</Text>
-                    <Text color={textColor}>{right}</Text>
-                  </>
-                )}
-              </Text>
-            );
-          })() : (
+          {value ? (
+            <PromptDisplay
+              value={value}
+              cursorPos={cursorPos}
+              isBashMode={isBashMode}
+              isSlashMode={isSlashMode}
+              isVimNormal={isVimNormal}
+              isVimVisual={isVimVisual}
+            />
+          ) : (
             <Text dimColor>{placeholder}</Text>
           )}
         </Box>
@@ -394,5 +400,66 @@ export function PromptInput({
         {/* Footer hints moved above input box — status bar handles mode/cost/shortcuts */}
       </Box>
     </Box>
+  );
+}
+
+// ----------------------------------------------------------------------------
+// PromptDisplay — renders the input buffer with a grapheme-aware cursor.
+//
+// Splits into left / cursor / right segments using code-unit indices derived
+// from the grapheme cursor position. The left segment's visual width (CJK/
+// emoji counted as 2 columns each) implicitly places the cursor at the right
+// terminal column without manual padding: Ink's flex layout flows children
+// in order, and each <Text> occupies its natural display width.
+// ----------------------------------------------------------------------------
+interface PromptDisplayProps {
+  value: string;
+  cursorPos: number;
+  isBashMode: boolean;
+  isSlashMode: boolean;
+  isVimNormal: boolean;
+  isVimVisual: boolean;
+}
+
+function PromptDisplay({
+  value,
+  cursorPos,
+  isBashMode,
+  isSlashMode,
+  isVimNormal,
+  isVimVisual,
+}: PromptDisplayProps) {
+  // Prefix modes (/ and !) strip the leading character from the display and
+  // shift the displayed cursor left by one grapheme. The leading char is a
+  // single ASCII byte, so grapheme-shift and code-unit-shift coincide.
+  const prefixMode = isBashMode || isSlashMode;
+  const displayText = prefixMode ? value.slice(1) : value;
+  const adjCursor = prefixMode ? Math.max(0, cursorPos - 1) : cursorPos;
+
+  const { leftCodeUnit, rightCodeUnit, charAtCursor } = useDeclaredCursor(
+    displayText,
+    adjCursor,
+  );
+  const left = displayText.slice(0, leftCodeUnit);
+  const right = displayText.slice(rightCodeUnit);
+
+  const textColor = isBashMode ? "yellow" : isSlashMode ? "rgb(52,238,176)" : undefined;
+  const useBlockCursor = !(isVimNormal || isVimVisual);
+
+  return (
+    <Text>
+      <Text color={textColor}>{left}</Text>
+      {useBlockCursor ? (
+        <>
+          <Text color="rgb(52,238,176)">{"█"}</Text>
+          <Text color={textColor}>{right}</Text>
+        </>
+      ) : (
+        <>
+          <Text color={textColor} inverse>{charAtCursor}</Text>
+          <Text color={textColor}>{right}</Text>
+        </>
+      )}
+    </Text>
   );
 }

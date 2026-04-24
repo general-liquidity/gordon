@@ -26,6 +26,8 @@ interface Props {
   preview: SessionPreview;
   onResume: () => void;
   onClose: () => void;
+  /** When true, skip the internal R/N/Esc keybindings (parent owns input). */
+  embedded?: boolean;
 }
 
 // ============================================================================
@@ -57,7 +59,7 @@ function formatPnl(pnl: number): string {
 // Component
 // ============================================================================
 
-export function SessionPreview({ preview, onResume, onClose }: Props) {
+export function SessionPreview({ preview, onResume, onClose, embedded = false }: Props) {
   useInput((input, key) => {
     if (key.escape || input === "n" || input === "N") {
       onClose();
@@ -66,7 +68,7 @@ export function SessionPreview({ preview, onResume, onClose }: Props) {
     if (input === "r" || input === "R") {
       onResume();
     }
-  });
+  }, { isActive: !embedded });
 
   const lastAgent = preview.lastAgent ?? "Gordon";
   const hasPnl = preview.pnlUsd != null;

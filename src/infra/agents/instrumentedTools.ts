@@ -9,6 +9,7 @@
 
 import { GordonInputGuard, GordonOutputSanitizer } from "./processors/index.ts";
 import {
+  askUserTools,
   indicatorTools,
   explainTools,
   marketTools,
@@ -94,6 +95,7 @@ export const gordonInputGuard = new GordonInputGuard();
 export const gordonOutputSanitizer = new GordonOutputSanitizer();
 
 // Instrumented tool collections
+export const instrumentedAskUserTools = withToolsMetrics(askUserTools);
 export const instrumentedIndicatorTools = withToolsMetrics(indicatorTools);
 export const instrumentedExplainTools = withToolsMetrics(explainTools);
 export const instrumentedMarketTools = withToolsMetrics(marketTools);

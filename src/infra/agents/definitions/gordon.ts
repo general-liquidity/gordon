@@ -14,6 +14,7 @@ import {
   GORDON_PRODUCT_TRUTH,
 } from "../capabilityTruth.ts";
 import {
+  instrumentedAskUserTools,
   instrumentedSystemTools,
   instrumentedSchedulerTools,
   instrumentedAutonomousTools,
@@ -327,6 +328,8 @@ export function getGordon(): Agent {
     // Gordon has ALL read-only tools directly (no routing overhead for 90% of requests)
     // Only trade execution tools are on Executor (isolated for safety)
     tools: {
+      // Mid-task user elicitation (pauses and awaits answer via TUI dialog)
+      ...instrumentedAskUserTools,
       // System & scheduling
       ...instrumentedSystemTools,
       ...instrumentedSchedulerTools,

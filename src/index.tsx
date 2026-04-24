@@ -217,6 +217,15 @@ try {
   // Non-fatal
 }
 
+// Classify config-load failures into a TUI-visible sentinel instead of crashing.
+function classifyConfigError(err: unknown): "syntax" | "settings" | null {
+  if (!err || typeof err !== "object") return null;
+  if (err instanceof SyntaxError) return "syntax";
+  const e = err as { name?: string; issues?: unknown };
+  if (e.name === "ZodError" || Array.isArray(e.issues)) return "settings";
+  return null;
+}
+
 // Wire: parallel startup — run config + observability concurrently
 try {
   const { runParallelStartup, configLoadTask, memoryLoadTask } = await import("./infra/runtime/parallelStartup.ts");
@@ -231,14 +240,28 @@ try {
     memoryLoadTask(async () => formatMemoriesForPrompt()),
   ]);
 
-  const startupConfig = startupResult.tasks.find((t) => t.id === "config")?.result as { permissionMode?: string } | undefined;
+  const configTask = startupResult.tasks.find((t) => t.id === "config");
+  if (configTask && !configTask.success) {
+    const kind = classifyConfigError(configTask.error);
+    if (kind) {
+      process.env.GORDON_CONFIG_ERROR_TYPE = kind;
+      process.env.GORDON_CONFIG_ERROR_MSG = String(configTask.error ?? "Unknown config error");
+    }
+  }
+
+  const startupConfig = configTask?.result as { permissionMode?: string } | undefined;
   const startupPermissionMode = startupConfig?.permissionMode;
   const narrowedStartupMode: "auto" | "ask" | "strict" =
     startupPermissionMode === "auto" || startupPermissionMode === "ask" || startupPermissionMode === "strict"
       ? startupPermissionMode
       : "ask";
   await emitEvent("system:started", { permissionMode: narrowedStartupMode });
-} catch {
+} catch (err) {
+  const kind = classifyConfigError(err);
+  if (kind) {
+    process.env.GORDON_CONFIG_ERROR_TYPE = kind;
+    process.env.GORDON_CONFIG_ERROR_MSG = err instanceof Error ? err.message : String(err);
+  }
   // Fallback: sequential startup if parallel fails
   try {
     const startupConfig = await loadConfig();
@@ -247,7 +270,13 @@ try {
         ? startupConfig.permissionMode
         : "ask";
     await emitEvent("system:started", { permissionMode: fallbackPermissionMode });
-  } catch { /* Non-critical */ }
+  } catch (err2) {
+    const k2 = classifyConfigError(err2);
+    if (k2 && !process.env.GORDON_CONFIG_ERROR_TYPE) {
+      process.env.GORDON_CONFIG_ERROR_TYPE = k2;
+      process.env.GORDON_CONFIG_ERROR_MSG = err2 instanceof Error ? err2.message : String(err2);
+    }
+  }
 }
 
 // Launch the rebuilt cockpit shell

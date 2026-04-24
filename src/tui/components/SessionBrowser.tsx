@@ -209,6 +209,7 @@ export function SessionBrowser({ sessions, onSelect, onClose }: Props) {
           }}
           onResume={() => onSelect(focused.sessionId)}
           onClose={onClose}
+          embedded
         />
       </Box>
     )}
