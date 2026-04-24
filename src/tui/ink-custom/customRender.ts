@@ -24,9 +24,10 @@
 //   * Phase 4 — hyperlink pool, selection overlay, cursor declaration are
 //     all allocated; cursor declaration emits; the other two are staged
 //     for the patch transport.
-//   * Phase 6 — pool-migration scheduler runs behind
-//     `GORDON_POOL_MIGRATION_ENABLED=true` (default off), interval
-//     configurable via `GORDON_POOL_MIGRATION_INTERVAL_MS` (default 5 min).
+//   * Phase 6 — pool-migration scheduler runs by default whenever the
+//     custom renderer is active. Override via `GORDON_POOL_MIGRATION_ENABLED=false`
+//     to disable (benchmarking cold pools), interval configurable via
+//     `GORDON_POOL_MIGRATION_INTERVAL_MS` (default 5 min).
 //
 // What now works (Phase 1+):
 //   * `useInput`, `useApp`, `useStdout`, `useStderr`, `useFocus` all work
@@ -428,12 +429,16 @@ export function startCustomRender(node: ReactNode, options: Required<RenderOptio
 
   render(node);
 
-  // Phase 6 — start the pool-migration scheduler behind an env flag. Off
-  // by default; flipping it on runs a rebase every N ms so long-running
-  // sessions can't grow the char/style/hyperlink pools unbounded. The
-  // callback is wrapped so a migration throw only logs — the render loop
-  // keeps going on stale-but-valid pools.
-  if (process.env["GORDON_POOL_MIGRATION_ENABLED"] === "true") {
+  // Phase 6 — start the pool-migration scheduler. Default ON whenever the
+  // custom renderer is active (Claude Code runs this unconditionally so
+  // long sessions don't leak pool entries). `GORDON_POOL_MIGRATION_ENABLED`
+  // still exists as an explicit override — set to "false" to disable
+  // (useful for benchmarking a single cold pool vs. migrated pools), or
+  // to "true" to force on. The callback is wrapped so a migration throw
+  // only logs — the render loop keeps going on stale-but-valid pools.
+  const migrationFlag = process.env["GORDON_POOL_MIGRATION_ENABLED"];
+  const migrationEnabled = migrationFlag === "false" ? false : true;
+  if (migrationEnabled) {
     try {
       const intervalRaw = process.env["GORDON_POOL_MIGRATION_INTERVAL_MS"];
       const parsed = intervalRaw ? Number(intervalRaw) : NaN;
