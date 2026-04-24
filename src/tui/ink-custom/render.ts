@@ -91,13 +91,16 @@ export type Instance = {
 /**
  * Decide whether to drive a render through the custom pipeline.
  *
- * Default ON. Returns false when ANY of the documented fallback conditions
- * apply. When a fallback fires, this also writes one terse line to stderr
- * describing the reason — kept short so it doesn't dominate startup output
- * but visible enough for users to tell which renderer they got.
+ * **DEFAULT OFF as of the rendering-bug rollback.** The custom pipeline
+ * is opt-in via `GORDON_CUSTOM_RENDER=1`. Real-world testing surfaced cell
+ * interleaving / cursor-positioning bugs (visible as scrambled text on
+ * mount) that aren't reproduced by the unit tests. Until those land a
+ * runtime fix, vanilla Ink remains the production renderer.
  *
- * `notice` is captured into the closure of the returned helper so we only
- * emit ONE line per process. A second render() call doesn't re-warn.
+ * The fallback-condition logic is preserved for the opt-in path: even
+ * when a user sets the flag, dumb terminals / tmux / non-TTY / screen
+ * reader still route to vanilla Ink. One stderr line per process when
+ * a fallback overrides an opt-in.
  */
 let fallbackNoticeEmitted = false;
 function emitFallbackNotice(stderr: NodeJS.WriteStream, reason: string): void {
@@ -116,31 +119,25 @@ export function shouldUseCustomRenderer(
   isScreenReaderEnabled: boolean,
 ): boolean {
   const flag = process.env["GORDON_CUSTOM_RENDER"];
-  // Explicit opt-out wins over every other consideration.
-  if (flag === "0" || flag === "false") {
-    emitFallbackNotice(resolvedStderr, "GORDON_CUSTOM_RENDER opt-out");
+  // Default OFF: only enabled by explicit opt-in.
+  if (flag !== "1" && flag !== "true") {
     return false;
   }
-  // Screen reader: vanilla Ink's text-dump emit is the only a11y path today.
+  // Even with explicit opt-in, hard fallback conditions still force vanilla.
   if (isScreenReaderEnabled) {
     emitFallbackNotice(resolvedStderr, "screen reader enabled");
     return false;
   }
-  // Non-TTY stdout (pipe, redirect, CI without a tty): plain text only.
   if (resolvedStdout.isTTY === false) {
     emitFallbackNotice(resolvedStderr, "stdout is not a TTY");
     return false;
   }
-  // TERM=dumb: emulator doesn't process ANSI; the custom pipeline would
-  // dump escape sequences as visible garbage.
   if (process.env["TERM"] === "dumb") {
     emitFallbackNotice(resolvedStderr, "TERM=dumb");
     return false;
   }
-  // tmux/screen: the multiplexer strips DEC sync-output BSU/ESU pairs the
-  // syncTerminal helper depends on, breaking our atomic-frame guarantee.
-  // Vanilla Ink's per-line emit is safer until we negotiate a sync-aware
-  // path through the multiplexer.
+  // tmux/screen strip DEC sync-output BSU/ESU pairs that the syncTerminal
+  // helper depends on, breaking our atomic-frame guarantee.
   if (process.env["TMUX"]) {
     emitFallbackNotice(resolvedStderr, "tmux detected");
     return false;

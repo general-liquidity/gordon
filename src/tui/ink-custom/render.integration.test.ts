@@ -95,13 +95,12 @@ describe("render() integration", () => {
     }
   });
 
-  describe("default ON: custom pipeline", () => {
+  describe("opt-in (GORDON_CUSTOM_RENDER=1): custom pipeline", () => {
     beforeEach(() => {
-      // Default-on flag flip (Phase A2). Tests that previously needed the
-      // explicit "1" flag now run without setting the env at all — but we
-      // delete it explicitly so a stale "0"/"false" from a sibling test
-      // doesn't bleed in via process.env.
-      delete process.env["GORDON_CUSTOM_RENDER"];
+      // A2 default-on was rolled back after real-world rendering bugs (cell
+      // interleaving / cursor desync visible on mount). Tests now set the
+      // explicit opt-in flag.
+      process.env["GORDON_CUSTOM_RENDER"] = "1";
     });
 
     test("mounts and writes expected text to stdout", () => {
@@ -448,37 +447,48 @@ describe("render() integration", () => {
       _resetFallbackNoticeForTests();
     });
 
-    test("default (no env, TTY stdout, no a11y): returns true, no notice", () => {
+    test("default (no env): returns false (default-off), no notice", () => {
+      const stderr = fakeStderr();
+      const result = shouldUseCustomRenderer(ttyStdout(), stderr, false);
+      expect(result).toBe(false);
+      // No notice on the default-off path — only fallbacks-overriding-opt-in emit.
+      expect(stderr.captured).toBe("");
+    });
+
+    test("GORDON_CUSTOM_RENDER=0: returns false, no notice", () => {
+      process.env["GORDON_CUSTOM_RENDER"] = "0";
+      const stderr = fakeStderr();
+      const result = shouldUseCustomRenderer(ttyStdout(), stderr, false);
+      expect(result).toBe(false);
+      expect(stderr.captured).toBe("");
+    });
+
+    test("GORDON_CUSTOM_RENDER=false: returns false, no notice", () => {
+      process.env["GORDON_CUSTOM_RENDER"] = "false";
+      const stderr = fakeStderr();
+      const result = shouldUseCustomRenderer(ttyStdout(), stderr, false);
+      expect(result).toBe(false);
+      expect(stderr.captured).toBe("");
+    });
+
+    test("opt-in (=1) on TTY no-a11y: returns true, no notice", () => {
+      process.env["GORDON_CUSTOM_RENDER"] = "1";
       const stderr = fakeStderr();
       const result = shouldUseCustomRenderer(ttyStdout(), stderr, false);
       expect(result).toBe(true);
       expect(stderr.captured).toBe("");
     });
 
-    test("GORDON_CUSTOM_RENDER=0: returns false, opt-out notice", () => {
-      process.env["GORDON_CUSTOM_RENDER"] = "0";
-      const stderr = fakeStderr();
-      const result = shouldUseCustomRenderer(ttyStdout(), stderr, false);
-      expect(result).toBe(false);
-      expect(stderr.captured).toContain("GORDON_CUSTOM_RENDER opt-out");
-    });
-
-    test("GORDON_CUSTOM_RENDER=false: returns false, opt-out notice", () => {
-      process.env["GORDON_CUSTOM_RENDER"] = "false";
-      const stderr = fakeStderr();
-      const result = shouldUseCustomRenderer(ttyStdout(), stderr, false);
-      expect(result).toBe(false);
-      expect(stderr.captured).toContain("GORDON_CUSTOM_RENDER opt-out");
-    });
-
-    test("isScreenReaderEnabled=true: returns false, screen-reader notice", () => {
+    test("opt-in + isScreenReaderEnabled: returns false, screen-reader notice", () => {
+      process.env["GORDON_CUSTOM_RENDER"] = "1";
       const stderr = fakeStderr();
       const result = shouldUseCustomRenderer(ttyStdout(), stderr, true);
       expect(result).toBe(false);
       expect(stderr.captured).toContain("screen reader enabled");
     });
 
-    test("non-TTY stdout: returns false, isTTY notice", () => {
+    test("opt-in + non-TTY stdout: returns false, isTTY notice", () => {
+      process.env["GORDON_CUSTOM_RENDER"] = "1";
       const stderr = fakeStderr();
       const stdout = new PassThrough() as unknown as NodeJS.WriteStream;
       (stdout as unknown as { isTTY: boolean }).isTTY = false;
@@ -487,7 +497,8 @@ describe("render() integration", () => {
       expect(stderr.captured).toContain("not a TTY");
     });
 
-    test("TERM=dumb: returns false, TERM=dumb notice", () => {
+    test("opt-in + TERM=dumb: returns false, TERM=dumb notice", () => {
+      process.env["GORDON_CUSTOM_RENDER"] = "1";
       process.env["TERM"] = "dumb";
       const stderr = fakeStderr();
       const result = shouldUseCustomRenderer(ttyStdout(), stderr, false);
@@ -495,7 +506,8 @@ describe("render() integration", () => {
       expect(stderr.captured).toContain("TERM=dumb");
     });
 
-    test("TMUX set: returns false, tmux notice", () => {
+    test("opt-in + TMUX: returns false, tmux notice", () => {
+      process.env["GORDON_CUSTOM_RENDER"] = "1";
       process.env["TMUX"] = "/tmp/tmux-1000/default,12345,0";
       const stderr = fakeStderr();
       const result = shouldUseCustomRenderer(ttyStdout(), stderr, false);
@@ -503,7 +515,8 @@ describe("render() integration", () => {
       expect(stderr.captured).toContain("tmux detected");
     });
 
-    test("STY set: returns false, screen notice", () => {
+    test("opt-in + STY: returns false, screen notice", () => {
+      process.env["GORDON_CUSTOM_RENDER"] = "1";
       process.env["STY"] = "12345.pts-0.host";
       const stderr = fakeStderr();
       const result = shouldUseCustomRenderer(ttyStdout(), stderr, false);
@@ -511,23 +524,14 @@ describe("render() integration", () => {
       expect(stderr.captured).toContain("screen detected");
     });
 
-    test("notice is process-once: second fallback call does NOT re-emit", () => {
+    test("opt-in fallback notice is process-once", () => {
+      process.env["GORDON_CUSTOM_RENDER"] = "1";
       process.env["TERM"] = "dumb";
       const stderr = fakeStderr();
       shouldUseCustomRenderer(ttyStdout(), stderr, false);
       const lengthAfterFirst = stderr.captured.length;
-      // A second invocation under any fallback path must not re-emit.
       shouldUseCustomRenderer(ttyStdout(), stderr, false);
       expect(stderr.captured.length).toBe(lengthAfterFirst);
-    });
-
-    test("opt-out is checked first (wins over isScreenReaderEnabled)", () => {
-      process.env["GORDON_CUSTOM_RENDER"] = "0";
-      const stderr = fakeStderr();
-      shouldUseCustomRenderer(ttyStdout(), stderr, true);
-      // The reason in the notice should be the opt-out, not the a11y branch.
-      expect(stderr.captured).toContain("GORDON_CUSTOM_RENDER opt-out");
-      expect(stderr.captured).not.toContain("screen reader");
     });
   });
 });
