@@ -1,9 +1,20 @@
-// useStdout — Phase 0 re-export shim.
+// useStdout — owned port of ink/build/hooks/use-stdout.ts.
 //
-// Exposes the stdout WriteStream Gordon is rendering into. Phase 1 keeps the
-// same shape ({ stdout, write }) but the `write` helper will go through the
-// custom renderer's "reserved area" logic so external writes don't tear the
-// live paint region.
+// Reads from the owned StdoutContext (`../contexts/StdoutContext.ts`),
+// populated by App.tsx. See hooks/use-app.ts for why the ink re-export
+// shim had to go.
 
-import { useStdout } from "ink";
+import { useContext } from "react";
+import StdoutContext from "../contexts/StdoutContext.ts";
+
+/**
+ * React hook exposing the stdout WriteStream Ink is rendering into,
+ * plus a `write()` helper that goes through the renderer's reserved-area
+ * logic so external writes don't tear the live paint.
+ *
+ * ```tsx
+ * const { stdout, write } = useStdout();
+ * ```
+ */
+const useStdout = () => useContext(StdoutContext);
 export default useStdout;

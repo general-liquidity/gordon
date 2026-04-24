@@ -1,18 +1,33 @@
 // render — entry point with env-flag-gated custom pipeline.
 //
-// Default (GORDON_CUSTOM_RENDER unset or != "1"): delegate to vanilla Ink.
-// Activated (GORDON_CUSTOM_RENDER=1): route through `customRender.ts`,
-// which drives the Phase 1-6 cell-buffer pipeline.
+// Default (Lane 1 / Phase A2): the custom renderer runs unless an explicit
+// opt-out or an environment-driven fallback condition forces vanilla Ink.
+// Fallbacks force vanilla when:
+//   * `GORDON_CUSTOM_RENDER=0|false` (explicit opt-out)
+//   * `TERM=dumb` (no ANSI processing — escape sequences would render as
+//     literal text)
+//   * `$TMUX` or `$STY` set (inside tmux/screen — DEC sync-output BSU/ESU
+//     gets stripped by the multiplexer, so our wrapFrame() guarantee
+//     no longer holds; vanilla Ink's line-based emit is safer)
+//   * `INK_SCREEN_READER=true` or `isScreenReaderEnabled` option set
+//     (custom pipeline has no a11y emission path yet)
+//   * `process.stdout.isTTY === false` (pipe/redirect; no need for the
+//     ANSI-paint pipeline, plain text is correct)
 //
 // `customRender` is statically imported so the hot path at call time is a
 // single branch. The transitive cost of loading the pipeline is already
 // paid by vanilla ink (react-reconciler, yoga-layout) so there is no
-// measurable startup penalty for the flag-off code path.
+// measurable startup penalty for the fallback code path.
 
 import type { ReactNode } from "react";
 import process from "node:process";
 import { render as inkRender } from "ink";
 import { startCustomRender } from "./customRender.ts";
+import { loadLabsFlagsIntoEnv } from "./loadLabsFlags.ts";
+
+// Merge persisted experimental flags into process.env at module load.
+// Env var wins over persisted; persisted wins over unset. Idempotent.
+loadLabsFlagsIntoEnv();
 
 /**
  * Cell range for selection overlays (reconciler Phase 4).
@@ -73,9 +88,73 @@ export type Instance = {
   clearSelection?: () => void;
 };
 
-/** Check whether the custom renderer should be used. */
-function isCustomRenderEnabled(): boolean {
-  return process.env["GORDON_CUSTOM_RENDER"] === "1";
+/**
+ * Decide whether to drive a render through the custom pipeline.
+ *
+ * Default ON. Returns false when ANY of the documented fallback conditions
+ * apply. When a fallback fires, this also writes one terse line to stderr
+ * describing the reason — kept short so it doesn't dominate startup output
+ * but visible enough for users to tell which renderer they got.
+ *
+ * `notice` is captured into the closure of the returned helper so we only
+ * emit ONE line per process. A second render() call doesn't re-warn.
+ */
+let fallbackNoticeEmitted = false;
+function emitFallbackNotice(stderr: NodeJS.WriteStream, reason: string): void {
+  if (fallbackNoticeEmitted) return;
+  fallbackNoticeEmitted = true;
+  try {
+    stderr.write(`[gordon] using vanilla Ink renderer (${reason})\n`);
+  } catch {
+    // swallow — startup must never throw on a stderr write
+  }
+}
+
+export function shouldUseCustomRenderer(
+  resolvedStdout: NodeJS.WriteStream,
+  resolvedStderr: NodeJS.WriteStream,
+  isScreenReaderEnabled: boolean,
+): boolean {
+  const flag = process.env["GORDON_CUSTOM_RENDER"];
+  // Explicit opt-out wins over every other consideration.
+  if (flag === "0" || flag === "false") {
+    emitFallbackNotice(resolvedStderr, "GORDON_CUSTOM_RENDER opt-out");
+    return false;
+  }
+  // Screen reader: vanilla Ink's text-dump emit is the only a11y path today.
+  if (isScreenReaderEnabled) {
+    emitFallbackNotice(resolvedStderr, "screen reader enabled");
+    return false;
+  }
+  // Non-TTY stdout (pipe, redirect, CI without a tty): plain text only.
+  if (resolvedStdout.isTTY === false) {
+    emitFallbackNotice(resolvedStderr, "stdout is not a TTY");
+    return false;
+  }
+  // TERM=dumb: emulator doesn't process ANSI; the custom pipeline would
+  // dump escape sequences as visible garbage.
+  if (process.env["TERM"] === "dumb") {
+    emitFallbackNotice(resolvedStderr, "TERM=dumb");
+    return false;
+  }
+  // tmux/screen: the multiplexer strips DEC sync-output BSU/ESU pairs the
+  // syncTerminal helper depends on, breaking our atomic-frame guarantee.
+  // Vanilla Ink's per-line emit is safer until we negotiate a sync-aware
+  // path through the multiplexer.
+  if (process.env["TMUX"]) {
+    emitFallbackNotice(resolvedStderr, "tmux detected");
+    return false;
+  }
+  if (process.env["STY"]) {
+    emitFallbackNotice(resolvedStderr, "screen detected");
+    return false;
+  }
+  return true;
+}
+
+/** @internal — for tests that need to reset the once-only fallback notice. */
+export function _resetFallbackNoticeForTests(): void {
+  fallbackNoticeEmitted = false;
 }
 
 /** Normalize options: coerce stream-only arg to an object. */
@@ -102,21 +181,22 @@ function resolveOptions(options?: NodeJS.WriteStream | RenderOptions): Required<
 /**
  * Mount a component and start rendering.
  *
- * Accessibility fallback: if `isScreenReaderEnabled` (either passed explicitly
- * or via `INK_SCREEN_READER=true` env), route through vanilla Ink even when
- * `GORDON_CUSTOM_RENDER=1`. The custom pipeline has no line-based a11y
- * emission path yet — vanilla Ink's text-dump fallback is the right answer
- * for assistive tech until the custom renderer grows its own.
+ * Phase A2 (Lane 1): the custom renderer is the default. See
+ * `shouldUseCustomRenderer()` above for the conditions that fall back to
+ * vanilla Ink.
  */
 export const render = (
   node: ReactNode,
   options?: NodeJS.WriteStream | RenderOptions,
 ): Instance => {
-  if (isCustomRenderEnabled()) {
-    const resolved = resolveOptions(options);
-    if (resolved.isScreenReaderEnabled) {
-      return inkRender(node, options as NodeJS.WriteStream | undefined) as Instance;
-    }
+  const resolved = resolveOptions(options);
+  if (
+    shouldUseCustomRenderer(
+      resolved.stdout,
+      resolved.stderr,
+      resolved.isScreenReaderEnabled,
+    )
+  ) {
     return startCustomRender(node, resolved);
   }
   return inkRender(node, options as NodeJS.WriteStream | undefined) as Instance;

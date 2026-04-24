@@ -1,17 +1,21 @@
-// useInput — Phase 0 re-export shim.
+// useInput — owned port of ink/build/hooks/use-input.ts.
 //
-// Delegates to `ink`'s useInput. The Key type is vendored inline (see below)
-// so Gordon's TypeScript surface doesn't depend on ink's generated d.ts.
-// Phase 1 replaces this with a direct readline listener that emits the same
-// Key shape.
+// Subscribes to the `input` event on the owned StdinContext's EventEmitter
+// (populated by App's handleReadable), parses the chunk via our owned
+// parse-keypress, synthesizes the Key object, and invokes the consumer's
+// handler inside a reconciler.batchedUpdates() boundary so multiple state
+// updates during one key event commit in a single render.
+//
+// The Key shape is vendored here (identical to ink's Key) so consumers
+// can continue to use `import { type Key } from '.../ink-custom'`.
 
-import { useInput } from "ink";
+import { useEffect } from "react";
+import parseKeypress, { nonAlphanumericKeys } from "../parse-keypress.ts";
+import reconciler from "../reconciler.ts";
+import useStdin from "./use-stdin.ts";
 
 /**
  * Information about a key that was pressed.
- *
- * This type is vendored (identical shape to `ink`'s Key) so that Phase 1+
- * can own it without a breaking change to consumers.
  */
 export type Key = {
   upArrow: boolean;
@@ -30,6 +34,78 @@ export type Key = {
   backspace: boolean;
   delete: boolean;
   meta: boolean;
+};
+
+type InputHandler = (input: string, key: Key) => void;
+
+interface UseInputOptions {
+  readonly isActive?: boolean;
+}
+
+const useInput = (inputHandler: InputHandler, options: UseInputOptions = {}): void => {
+  // eslint-disable-next-line @typescript-eslint/naming-convention
+  const { stdin, setRawMode, internal_exitOnCtrlC, internal_eventEmitter } = useStdin();
+
+  useEffect(() => {
+    if (options.isActive === false) return;
+    setRawMode(true);
+    return () => {
+      setRawMode(false);
+    };
+  }, [options.isActive, setRawMode]);
+
+  useEffect(() => {
+    if (options.isActive === false) return;
+
+    const handleData = (data: Buffer | string): void => {
+      const keypress = parseKeypress(data);
+      const key: Key = {
+        upArrow: keypress.name === "up",
+        downArrow: keypress.name === "down",
+        leftArrow: keypress.name === "left",
+        rightArrow: keypress.name === "right",
+        pageDown: keypress.name === "pagedown",
+        pageUp: keypress.name === "pageup",
+        home: keypress.name === "home",
+        end: keypress.name === "end",
+        return: keypress.name === "return",
+        escape: keypress.name === "escape",
+        ctrl: keypress.ctrl,
+        shift: keypress.shift,
+        tab: keypress.name === "tab",
+        backspace: keypress.name === "backspace",
+        delete: keypress.name === "delete",
+        // parseKeypress parses [A (meta+up) as meta=false + option=true;
+        // treat any of {meta, escape, option} as meta so consumers match ink's behavior.
+        meta: keypress.meta || keypress.name === "escape" || keypress.option,
+      };
+
+      let input = keypress.ctrl ? keypress.name : keypress.sequence;
+      if (nonAlphanumericKeys.includes(keypress.name)) {
+        input = "";
+      }
+      // Strip leading ESC if still present (ink legacy quirk).
+      if (input.startsWith("")) {
+        input = input.slice(1);
+      }
+      if (input.length === 1 && typeof input[0] === "string" && /[A-Z]/.test(input[0])) {
+        key.shift = true;
+      }
+
+      // If the app is handling Ctrl+C itself, let the input handler see it.
+      if (!(input === "c" && key.ctrl) || !internal_exitOnCtrlC) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (reconciler as any).batchedUpdates(() => {
+          inputHandler(input, key);
+        });
+      }
+    };
+
+    internal_eventEmitter?.on("input", handleData);
+    return () => {
+      internal_eventEmitter?.removeListener("input", handleData);
+    };
+  }, [options.isActive, stdin, internal_exitOnCtrlC, inputHandler, internal_eventEmitter]);
 };
 
 export default useInput;

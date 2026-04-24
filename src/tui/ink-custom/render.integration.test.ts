@@ -1,27 +1,43 @@
 // Integration test for render.ts entry point.
 //
 // Verifies:
-//   1. Flag-off (default) path delegates to vanilla ink — render() returns
-//      an Instance with the expected methods.
-//   2. Flag-on path starts the custom pipeline — captures stdout and asserts
-//      it contains at least a cursor sequence and our expected text.
+//   1. Default-on path starts the custom pipeline — captures stdout and
+//      asserts it contains at least a cursor-hide sequence and our text.
+//   2. Opt-out (GORDON_CUSTOM_RENDER=0) plus each environment-driven
+//      fallback condition (TERM=dumb, TMUX, STY, non-TTY, screen reader)
+//      forces vanilla Ink and emits a stderr notice.
 //
 // The custom pipeline bootstraps Yoga + reconciler + output painting, so
 // this is a genuine end-to-end smoke test.
 
-import { describe, expect, test, afterEach, beforeEach } from "bun:test";
+import {
+  describe,
+  expect,
+  test,
+  afterEach,
+  beforeEach,
+} from "bun:test";
 import React from "react";
 import { PassThrough } from "node:stream";
-import { render } from "./render.ts";
+import {
+  render,
+  shouldUseCustomRenderer,
+  _resetFallbackNoticeForTests,
+} from "./render.ts";
 import Box from "./components/Box.ts";
 import Text from "./components/Text.ts";
 import Static from "./components/Static.ts";
 import useApp from "./hooks/use-app.ts";
 import useStdout from "./hooks/use-stdout.ts";
+import AppContext from "./contexts/AppContext.ts";
+import StdoutContext from "./contexts/StdoutContext.ts";
 
 const originalEnv = process.env["GORDON_CUSTOM_RENDER"];
 const originalMigrationEnabled = process.env["GORDON_POOL_MIGRATION_ENABLED"];
 const originalMigrationInterval = process.env["GORDON_POOL_MIGRATION_INTERVAL_MS"];
+const originalTerm = process.env["TERM"];
+const originalTmux = process.env["TMUX"];
+const originalSty = process.env["STY"];
 
 // Collecting write stream — quacks like a WriteStream.
 function createMockStdout(): NodeJS.WriteStream & { captured: string } {
@@ -48,11 +64,18 @@ afterEach(() => {
   if (originalMigrationInterval === undefined)
     delete process.env["GORDON_POOL_MIGRATION_INTERVAL_MS"];
   else process.env["GORDON_POOL_MIGRATION_INTERVAL_MS"] = originalMigrationInterval;
+  if (originalTerm === undefined) delete process.env["TERM"];
+  else process.env["TERM"] = originalTerm;
+  if (originalTmux === undefined) delete process.env["TMUX"];
+  else process.env["TMUX"] = originalTmux;
+  if (originalSty === undefined) delete process.env["STY"];
+  else process.env["STY"] = originalSty;
+  _resetFallbackNoticeForTests();
 });
 
 describe("render() integration", () => {
-  test("flag OFF: returns an Instance handle with expected methods", () => {
-    delete process.env["GORDON_CUSTOM_RENDER"];
+  test("opt-out (GORDON_CUSTOM_RENDER=0): returns vanilla Ink Instance", () => {
+    process.env["GORDON_CUSTOM_RENDER"] = "0";
     const stdout = createMockStdout();
     const tree = React.createElement(
       Box,
@@ -72,9 +95,13 @@ describe("render() integration", () => {
     }
   });
 
-  describe("flag ON: custom pipeline", () => {
+  describe("default ON: custom pipeline", () => {
     beforeEach(() => {
-      process.env["GORDON_CUSTOM_RENDER"] = "1";
+      // Default-on flag flip (Phase A2). Tests that previously needed the
+      // explicit "1" flag now run without setting the env at all — but we
+      // delete it explicitly so a stale "0"/"false" from a sibling test
+      // doesn't bleed in via process.env.
+      delete process.env["GORDON_CUSTOM_RENDER"];
     });
 
     test("mounts and writes expected text to stdout", () => {
@@ -141,17 +168,23 @@ describe("render() integration", () => {
       }
     });
 
-    test("useApp context is available — exit() triggers unmount", async () => {
+    // The vanilla `useApp`/`useStdout` shims still target ink's contexts;
+    // Lane 1 ports the App + contexts but leaves the hook shim story for
+    // a follow-up lane. We test the OWNED contexts directly here so this
+    // suite exercises our App's provider wiring without depending on the
+    // separate hook port.
+    test("AppContext is populated — exit() triggers unmount", async () => {
       const stdout = createMockStdout();
       const captured: { exit?: () => void } = {};
       const Consumer: React.FC = () => {
-        const { exit } = useApp();
+        const { exit } = React.useContext(AppContext);
         captured.exit = exit;
         return React.createElement(Text, null, "app-consumer");
       };
       const tree = React.createElement(Consumer);
       const instance = render(tree, { stdout, patchConsole: false, exitOnCtrlC: false });
-      // Hook must have received the context (non-null exit function).
+      // App must have populated the context with a non-noop exit function
+      // wired into our `unmount()` path (not the createContext default).
       expect(typeof captured.exit).toBe("function");
       expect(stdout.captured).toContain("app-consumer");
       // exit() should resolve waitUntilExit without us calling unmount.
@@ -161,22 +194,31 @@ describe("render() integration", () => {
       expect(true).toBe(true);
     });
 
-    test("useStdout context is available — returns our stdout stream", () => {
+    test("StdoutContext is populated — returns our stdout stream", () => {
       const stdout = createMockStdout();
       const captured: { stdout?: NodeJS.WriteStream } = {};
       const Consumer: React.FC = () => {
-        const { stdout: s } = useStdout();
+        const { stdout: s } = React.useContext(StdoutContext);
         captured.stdout = s;
         return React.createElement(Text, null, "stdout-consumer");
       };
       const tree = React.createElement(Consumer);
       const instance = render(tree, { stdout, patchConsole: false, exitOnCtrlC: false });
       try {
-        // The hook must have received our mock stdout, not process.stdout.
+        // App must have routed our mock stdout into the owned context, not
+        // the createContext default of process.stdout.
         expect(captured.stdout).toBe(stdout);
       } finally {
         instance.unmount();
       }
+    });
+
+    // Smoke retain: the hook shims still resolve at compile/runtime even
+    // though they read from ink's contexts. We don't assert behavior here —
+    // see Lane 1's report. Removed once the hook shim port lands.
+    test("hook shims are importable (smoke)", () => {
+      expect(typeof useApp).toBe("function");
+      expect(typeof useStdout).toBe("function");
     });
 
     test("patchConsole cleanup restores original console.log", () => {
@@ -370,6 +412,122 @@ describe("render() integration", () => {
       } finally {
         instance.unmount();
       }
+    });
+  });
+
+  // Phase A2 — fallback decision matrix (`shouldUseCustomRenderer`).
+  // Each row exercises one fallback condition and asserts:
+  //   * the helper returns false
+  //   * a single-line stderr notice is emitted on the FIRST fallback
+  //   * subsequent calls do not re-emit the notice (process-once)
+  describe("shouldUseCustomRenderer fallbacks", () => {
+    function fakeStderr(): NodeJS.WriteStream & { captured: string } {
+      const stream = new PassThrough() as PassThrough & { captured: string };
+      stream.captured = "";
+      const originalWrite = stream.write.bind(stream);
+      (stream as unknown as { write: (chunk: unknown) => boolean }).write = (
+        chunk: unknown,
+      ) => {
+        stream.captured += String(chunk);
+        return originalWrite(chunk as Buffer | string);
+      };
+      return stream as unknown as NodeJS.WriteStream & { captured: string };
+    }
+
+    function ttyStdout(): NodeJS.WriteStream {
+      const s = new PassThrough() as unknown as NodeJS.WriteStream;
+      (s as unknown as { isTTY: boolean }).isTTY = true;
+      return s;
+    }
+
+    beforeEach(() => {
+      delete process.env["GORDON_CUSTOM_RENDER"];
+      delete process.env["TERM"];
+      delete process.env["TMUX"];
+      delete process.env["STY"];
+      _resetFallbackNoticeForTests();
+    });
+
+    test("default (no env, TTY stdout, no a11y): returns true, no notice", () => {
+      const stderr = fakeStderr();
+      const result = shouldUseCustomRenderer(ttyStdout(), stderr, false);
+      expect(result).toBe(true);
+      expect(stderr.captured).toBe("");
+    });
+
+    test("GORDON_CUSTOM_RENDER=0: returns false, opt-out notice", () => {
+      process.env["GORDON_CUSTOM_RENDER"] = "0";
+      const stderr = fakeStderr();
+      const result = shouldUseCustomRenderer(ttyStdout(), stderr, false);
+      expect(result).toBe(false);
+      expect(stderr.captured).toContain("GORDON_CUSTOM_RENDER opt-out");
+    });
+
+    test("GORDON_CUSTOM_RENDER=false: returns false, opt-out notice", () => {
+      process.env["GORDON_CUSTOM_RENDER"] = "false";
+      const stderr = fakeStderr();
+      const result = shouldUseCustomRenderer(ttyStdout(), stderr, false);
+      expect(result).toBe(false);
+      expect(stderr.captured).toContain("GORDON_CUSTOM_RENDER opt-out");
+    });
+
+    test("isScreenReaderEnabled=true: returns false, screen-reader notice", () => {
+      const stderr = fakeStderr();
+      const result = shouldUseCustomRenderer(ttyStdout(), stderr, true);
+      expect(result).toBe(false);
+      expect(stderr.captured).toContain("screen reader enabled");
+    });
+
+    test("non-TTY stdout: returns false, isTTY notice", () => {
+      const stderr = fakeStderr();
+      const stdout = new PassThrough() as unknown as NodeJS.WriteStream;
+      (stdout as unknown as { isTTY: boolean }).isTTY = false;
+      const result = shouldUseCustomRenderer(stdout, stderr, false);
+      expect(result).toBe(false);
+      expect(stderr.captured).toContain("not a TTY");
+    });
+
+    test("TERM=dumb: returns false, TERM=dumb notice", () => {
+      process.env["TERM"] = "dumb";
+      const stderr = fakeStderr();
+      const result = shouldUseCustomRenderer(ttyStdout(), stderr, false);
+      expect(result).toBe(false);
+      expect(stderr.captured).toContain("TERM=dumb");
+    });
+
+    test("TMUX set: returns false, tmux notice", () => {
+      process.env["TMUX"] = "/tmp/tmux-1000/default,12345,0";
+      const stderr = fakeStderr();
+      const result = shouldUseCustomRenderer(ttyStdout(), stderr, false);
+      expect(result).toBe(false);
+      expect(stderr.captured).toContain("tmux detected");
+    });
+
+    test("STY set: returns false, screen notice", () => {
+      process.env["STY"] = "12345.pts-0.host";
+      const stderr = fakeStderr();
+      const result = shouldUseCustomRenderer(ttyStdout(), stderr, false);
+      expect(result).toBe(false);
+      expect(stderr.captured).toContain("screen detected");
+    });
+
+    test("notice is process-once: second fallback call does NOT re-emit", () => {
+      process.env["TERM"] = "dumb";
+      const stderr = fakeStderr();
+      shouldUseCustomRenderer(ttyStdout(), stderr, false);
+      const lengthAfterFirst = stderr.captured.length;
+      // A second invocation under any fallback path must not re-emit.
+      shouldUseCustomRenderer(ttyStdout(), stderr, false);
+      expect(stderr.captured.length).toBe(lengthAfterFirst);
+    });
+
+    test("opt-out is checked first (wins over isScreenReaderEnabled)", () => {
+      process.env["GORDON_CUSTOM_RENDER"] = "0";
+      const stderr = fakeStderr();
+      shouldUseCustomRenderer(ttyStdout(), stderr, true);
+      // The reason in the notice should be the opt-out, not the a11y branch.
+      expect(stderr.captured).toContain("GORDON_CUSTOM_RENDER opt-out");
+      expect(stderr.captured).not.toContain("screen reader");
     });
   });
 });

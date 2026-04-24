@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import { createCellBuffer } from "./cellBuffer.ts";
-import { diffCells } from "./cellDiff.ts";
+import { createDamageTracker, diffCells } from "./cellDiff.ts";
 import { createCharPool } from "./charPool.ts";
 import { createStylePool } from "./stylePool.ts";
 import { CELL_DIRTY_BIT } from "./internal/contracts.ts";
@@ -173,5 +173,175 @@ describe("diffCells", () => {
     const a = createCellBuffer(2, 2);
     const b = createCellBuffer(3, 2);
     expect(() => diffCells(a, b, sp, cp)).toThrow();
+  });
+});
+
+describe("diffCells damage rectangle", () => {
+  test("first call with tracker performs a full scan and records the box", () => {
+    const sp = createStylePool();
+    const cp = createCharPool();
+    const prev = createCellBuffer(20, 10);
+    const curr = createCellBuffer(20, 10);
+    // Paint a small change at (5,3) -> (7,3).
+    for (let x = 5; x <= 7; x++) curr.set(x, 3, cp.intern("x"), 0, 0);
+
+    const tracker = createDamageTracker();
+    expect(tracker.mustFullScan).toBe(true);
+    const patches = diffCells(prev, curr, sp, cp, tracker);
+    expect(patches.length).toBe(1);
+    expect(tracker.box).not.toBeNull();
+    expect(tracker.box).toEqual({ minY: 3, maxY: 3, minX: 5, maxX: 7 });
+    expect(tracker.mustFullScan).toBe(false);
+  });
+
+  test("second call with change INSIDE prior box uses fast path correctly", () => {
+    const sp = createStylePool();
+    const cp = createCharPool();
+    const prev = createCellBuffer(20, 10);
+    const curr = createCellBuffer(20, 10);
+    const tracker = createDamageTracker();
+
+    // Frame 1: change row 5 cols 4-7.
+    for (let x = 4; x <= 7; x++) curr.set(x, 5, cp.intern("a"), 0, 0);
+    diffCells(prev, curr, sp, cp, tracker);
+    // Promote curr -> prev for next frame (simulate swap).
+    prev.copyFrom(curr);
+    curr.clear();
+    // Frame 2: keep frame 1 content; change a single cell on row 5, col 6.
+    for (let x = 4; x <= 7; x++) curr.set(x, 5, cp.intern("a"), 0, 0);
+    curr.set(6, 5, cp.intern("b"), 0, 0);
+
+    const patches = diffCells(prev, curr, sp, cp, tracker);
+    expect(patches.length).toBe(1);
+    expect(patches[0]!.x).toBe(6);
+    expect(patches[0]!.y).toBe(5);
+    expect(patches[0]!.content).toBe("b");
+    expect(tracker.box).toEqual({ minY: 5, maxY: 5, minX: 6, maxX: 6 });
+  });
+
+  test("change OUTSIDE prior box trips sentinel and falls back to full scan", () => {
+    const sp = createStylePool();
+    const cp = createCharPool();
+    const prev = createCellBuffer(30, 20);
+    const curr = createCellBuffer(30, 20);
+    const tracker = createDamageTracker();
+
+    // Frame 1: change at row 2, col 5.
+    curr.set(5, 2, cp.intern("a"), 0, 0);
+    diffCells(prev, curr, sp, cp, tracker);
+    expect(tracker.box).toEqual({ minY: 2, maxY: 2, minX: 5, maxX: 5 });
+
+    prev.copyFrom(curr);
+    curr.clear();
+    // Frame 2: keep prior content + add a change FAR outside the box at (15,18).
+    curr.set(5, 2, cp.intern("a"), 0, 0);
+    curr.set(15, 18, cp.intern("z"), 0, 0);
+
+    const patches = diffCells(prev, curr, sp, cp, tracker);
+    // Sentinel trip causes full scan; the only NEW change is at row 18.
+    // Row 2 already matches prev so no patch from there.
+    expect(patches.length).toBe(1);
+    expect(patches[0]!.x).toBe(15);
+    expect(patches[0]!.y).toBe(18);
+    // Tracker should now reflect the new damage box.
+    expect(tracker.box).toEqual({ minY: 18, maxY: 18, minX: 15, maxX: 15 });
+  });
+
+  test("no-change frame after a clean frame returns O(1) once box is empty", () => {
+    const sp = createStylePool();
+    const cp = createCharPool();
+    const prev = createCellBuffer(40, 25);
+    const curr = createCellBuffer(40, 25);
+    const tracker = createDamageTracker();
+
+    // Frame 1: no changes (both empty).
+    let patches = diffCells(prev, curr, sp, cp, tracker);
+    expect(patches).toEqual([]);
+    // Tracker should record an "empty" box (minY > maxY).
+    expect(tracker.box).not.toBeNull();
+    expect(tracker.box!.minY).toBeGreaterThan(tracker.box!.maxY);
+
+    // Frame 2: still no changes.
+    patches = diffCells(prev, curr, sp, cp, tracker);
+    expect(patches).toEqual([]);
+  });
+
+  test("expansion within 1-row margin is captured by fast path", () => {
+    const sp = createStylePool();
+    const cp = createCharPool();
+    const prev = createCellBuffer(20, 10);
+    const curr = createCellBuffer(20, 10);
+    const tracker = createDamageTracker();
+
+    // Frame 1: change on row 5.
+    curr.set(2, 5, cp.intern("a"), 0, 0);
+    diffCells(prev, curr, sp, cp, tracker);
+
+    prev.copyFrom(curr);
+    curr.clear();
+    // Frame 2: same on row 5, plus a NEW change on row 6 (within +1 margin).
+    curr.set(2, 5, cp.intern("a"), 0, 0);
+    curr.set(3, 6, cp.intern("b"), 0, 0);
+
+    const patches = diffCells(prev, curr, sp, cp, tracker);
+    expect(patches.length).toBe(1);
+    expect(patches[0]!.y).toBe(6);
+    // New box covers both rows even though we only emitted one patch.
+    expect(tracker.box).toEqual({ minY: 6, maxY: 6, minX: 3, maxX: 3 });
+  });
+
+  test("invalidate() forces a full scan on the next call", () => {
+    const sp = createStylePool();
+    const cp = createCharPool();
+    const prev = createCellBuffer(10, 10);
+    const curr = createCellBuffer(10, 10);
+    const tracker = createDamageTracker();
+
+    curr.set(0, 0, cp.intern("a"), 0, 0);
+    diffCells(prev, curr, sp, cp, tracker);
+    expect(tracker.mustFullScan).toBe(false);
+    tracker.invalidate();
+    expect(tracker.mustFullScan).toBe(true);
+    expect(tracker.box).toBeNull();
+  });
+
+  test("backward compatibility: omitting tracker still works", () => {
+    const sp = createStylePool();
+    const cp = createCharPool();
+    const prev = createCellBuffer(5, 2);
+    const curr = createCellBuffer(5, 2);
+    curr.set(1, 0, cp.intern("a"), 0, 0);
+    const patches = diffCells(prev, curr, sp, cp);
+    expect(patches.length).toBe(1);
+  });
+
+  test("scan limited to box: cells outside box are not visited (correctness)", () => {
+    // To prove the walker stays in the box, seed prev and curr with
+    // identical content everywhere except inside the prior box. If the
+    // walker accidentally walks the whole buffer it would still produce
+    // the same patches in this case, so this is purely a correctness
+    // check (not a perf test). Perf is implicit — the loop body short-
+    // circuits cleanly on equal cells.
+    const sp = createStylePool();
+    const cp = createCharPool();
+    const prev = createCellBuffer(50, 30);
+    const curr = createCellBuffer(50, 30);
+    const tracker = createDamageTracker();
+
+    // Frame 1: localized change.
+    for (let x = 10; x < 14; x++) curr.set(x, 5, cp.intern("a"), 0, 0);
+    diffCells(prev, curr, sp, cp, tracker);
+
+    prev.copyFrom(curr);
+    curr.clear();
+    // Frame 2: identical except inside the prior box.
+    for (let x = 10; x < 14; x++) curr.set(x, 5, cp.intern("a"), 0, 0);
+    curr.set(11, 5, cp.intern("Z"), 0, 0);
+
+    const patches = diffCells(prev, curr, sp, cp, tracker);
+    expect(patches.length).toBe(1);
+    expect(patches[0]!.x).toBe(11);
+    expect(patches[0]!.y).toBe(5);
+    expect(patches[0]!.content).toBe("Z");
   });
 });

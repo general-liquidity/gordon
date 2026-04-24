@@ -4,8 +4,13 @@ import { App } from "./App.js";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
+import { loadLabsFlagsIntoEnv } from "./ink-custom/loadLabsFlags.js";
 
 export async function startGordonTUI(): Promise<void> {
+  // Merge persisted experimental flags from ~/.gordon/labs.json into process.env.
+  // Env var wins over persisted; persisted wins over unset. Must run before
+  // any module reads process.env.GORDON_CUSTOM_RENDER (etc).
+  loadLabsFlagsIntoEnv();
   // Take over the terminal: clear screen so Gordon fills the viewport cleanly,
   // then print the full boot card once. Ink renders its live frame below those
   // lines. As the conversation grows the boot card naturally scrolls into

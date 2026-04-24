@@ -73,6 +73,7 @@ import { ApprovalBrowser } from "./components/ApprovalBrowser.js";
 import { MCPManager } from "./components/MCPManager.js";
 import { MarketplaceBrowser } from "./components/MarketplaceBrowser.js";
 import { CLIBrowser } from "./components/CLIBrowser.js";
+import { LabsPanel } from "./components/LabsPanel.js";
 import { PrivacyScreen } from "./components/PrivacyScreen.js";
 import { FeedbackSurvey } from "./components/FeedbackSurvey.js";
 import { ThinkStep } from "./components/ThinkStep.js";
@@ -199,6 +200,33 @@ function DebateViewerOverlay({ data, onClose }: { data: DebateViewerData; onClos
       <Box paddingX={2}><Text dimColor>Press Esc to dismiss.</Text></Box>
     </Box>
   );
+}
+
+/**
+ * Format a PerfSnapshot for inline rendering as a system message body.
+ * Concise, ≤ 8 lines — matches /perf command spec.
+ */
+function formatPerfSnapshot(
+  snap: ReturnType<ReturnType<typeof getPerformanceMonitor>["snapshot"]>,
+  flushPath: string | null,
+  status: "running" | "idle" | "stopped",
+): string {
+  const h = snap.frameHistogram;
+  const fmt = (n: number) => (n >= 10 ? n.toFixed(1) : n.toFixed(2));
+  const mb = (n: number) => `${(n / (1024 * 1024)).toFixed(0)}MB`;
+  const lines: string[] = [];
+  lines.push(`Performance snapshot (${status}; last ${h.samples} samples):`);
+  lines.push(`  Frame time:  p50=${fmt(h.p50Ms)}ms  p95=${fmt(h.p95Ms)}ms  p99=${fmt(h.p99Ms)}ms`);
+  lines.push(`  Mean write:  ${fmt(h.meanWriteMs)}ms`);
+  lines.push(`  Byte churn:  ~${Math.round(h.meanBytes)} bytes/frame`);
+  if (snap.latestMemory) {
+    lines.push(`  Memory:      heap=${mb(snap.latestMemory.heapUsed)}  rss=${mb(snap.latestMemory.rss)}`);
+  } else {
+    lines.push(`  Memory:      (no samples yet)`);
+  }
+  lines.push(`  Renders:     ${snap.totalRenders} total  /  ${snap.totalFrames} frames`);
+  lines.push(`  Log:         ${flushPath ?? "(no flush path; use /perf start <path>)"}`);
+  return lines.join("\n");
 }
 
 /**
@@ -515,6 +543,7 @@ function AppInner() {
   const [showJournal, setShowJournal] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [showApprovalBrowser, setShowApprovalBrowser] = useState(false);
+  const [showLabs, setShowLabs] = useState(false);
 
   // ── Backend module UI toggles ──
   const [showAudit, setShowAudit] = useState(false);
@@ -1169,6 +1198,54 @@ function AppInner() {
         return;
       }
 
+      // ── /perf — performance monitor (Phase 5 reconciler diagnostics) ──
+      if (trimmed === "/perf" || trimmed.startsWith("/perf ")) {
+        const sub = (trimmed.split(/\s+/)[1] ?? "report").toLowerCase();
+        const arg = trimmed.split(/\s+/).slice(2).join(" ").trim();
+        const monitor = getPerformanceMonitor();
+        let body = "";
+        if (sub === "start") {
+          const path = arg || `/tmp/gordon-perf-${Date.now()}.jsonl`;
+          if (monitor.isRunning()) {
+            body = `Performance monitor already running. Log: ${monitor.getFlushPath() ?? "(none)"}\nUse /perf stop first to switch paths.`;
+          } else {
+            installStdoutTap(monitor);
+            monitor.start({ flushPath: path });
+            body = `Performance monitor started.\nLog: ${path}\nUse /perf report for inline summary, /perf stop to flush + finalize.`;
+          }
+        } else if (sub === "stop") {
+          if (!monitor.isRunning()) {
+            body = "Performance monitor is not running.";
+          } else {
+            const snap = monitor.snapshot();
+            const flushPath = monitor.getFlushPath();
+            monitor.stop();
+            body = formatPerfSnapshot(snap, flushPath, "stopped");
+          }
+        } else if (sub === "report") {
+          const snap = monitor.snapshot();
+          body = formatPerfSnapshot(snap, monitor.getFlushPath(), monitor.isRunning() ? "running" : "idle");
+        } else {
+          body = "Usage: /perf [start [path] | stop | report]";
+        }
+        dispatch({
+          type: "ADD_MESSAGE",
+          message: {
+            id: `perf-${Date.now()}`,
+            role: "system",
+            content: body,
+            timestamp: new Date().toISOString(),
+          },
+        });
+        return;
+      }
+
+      // ── /labs — experimental flag manager ──
+      if (trimmed === "/labs" || trimmed === "/experiments" || trimmed === "/flags") {
+        setShowLabs(true);
+        return;
+      }
+
       const userMsg: Message = {
         id: `user-${Date.now()}`,
         role: "user",
@@ -1585,6 +1662,13 @@ function AppInner() {
       dispatch({ type: "ADD_MESSAGE", message: { id: `exchange-${Date.now()}`, role: "system", content: msg, timestamp: new Date().toISOString() } });
       setShowExchangePicker(false);
     }} onCancel={() => setShowExchangePicker(false)} />;
+  }
+
+  if (showLabs) {
+    return <LabsPanel onComplete={(msg) => {
+      dispatch({ type: "ADD_MESSAGE", message: { id: `labs-${Date.now()}`, role: "system", content: msg, timestamp: new Date().toISOString() } });
+      setShowLabs(false);
+    }} onCancel={() => setShowLabs(false)} />;
   }
 
   if (showBrokerPicker) {

@@ -119,6 +119,8 @@ export const DIRECT_MENU_TARGETS = new Set([
   "hip3",
   "review-trade",
   "debate",
+  "perf",
+  "labs",
 ]);
 
 export const DIRECT_TOOL_TARGETS = new Set([
@@ -1930,6 +1932,38 @@ const LEGACY_SLASH_COMMANDS: SlashCommandSeed[] = [
     action: "menu",
     target: "debate",
     whenToUse: "Inspect the most recent multi-agent deliberation output",
+  },
+
+  // ── Performance monitor (Phase 5 reconciler diagnostics) ──
+  {
+    name: "perf",
+    aliases: ["performance-monitor", "perf-monitor"],
+    description: "Performance monitor — start/stop/report TUI frame-time + memory diagnostics",
+    usage: "/perf [start [path] | stop | report]",
+    category: "system",
+    level: 3,
+    action: "menu",
+    target: "perf",
+    subcommands: ["start", "stop", "report"],
+    subcommandDescriptions: {
+      start: "Begin perf collection (default path: /tmp/gordon-perf-{ts}.jsonl)",
+      stop: "Flush + report file path + inline summary (p50/p95/p99 frame-time)",
+      report: "Inline report of current rolling snapshot (no flush)",
+    },
+    whenToUse: "Profile TUI frame-time, byte churn, and memory; compare reconciler vs baseline",
+  },
+
+  // ── Experimental flag manager ──
+  {
+    name: "labs",
+    aliases: ["experiments", "flags"],
+    description: "Toggle experimental opt-in flags (custom renderer, autodream, reflection, ...)",
+    usage: "/labs",
+    category: "system",
+    level: 3,
+    action: "menu",
+    target: "labs",
+    whenToUse: "Manage experimental opt-in features; some require restart to take effect",
   },
 ];
 
