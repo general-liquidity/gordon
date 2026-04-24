@@ -11,6 +11,7 @@ import indentString from "indent-string";
 import type { DOMElement, TextNode } from "./dom.ts";
 import type { Styles } from "./styles.ts";
 import type { OutputTarget } from "./outputTarget.ts";
+import { createOutputTarget } from "./outputTarget.ts";
 import { squashTextNodes } from "./domRuntime.ts";
 import renderBackground from "./renderBackground.ts";
 import renderBorder from "./renderBorder.ts";
@@ -142,6 +143,48 @@ export function renderNodeToOutput(
   }
   // Silence unused-variable lint for TextNode type import.
   void (null as TextNode | null);
+}
+
+/**
+ * Render the `<Static>` subtree (rootNode.staticNode) to a plain ANSI
+ * string. Mirrors ink's renderer.js staticOutput branch:
+ *   - Fresh OutputTarget sized to the staticNode's computed dimensions.
+ *   - Walk the staticNode subtree with skipStaticElements=false so the
+ *     static-marked children actually paint.
+ *   - Return toAnsiString() — no cell-buffer, no pools, no diff.
+ *
+ * Returns `""` if rootNode has no staticNode, or the staticNode has no
+ * yogaNode / zero dimensions. The caller treats empty as "nothing new to
+ * scroll into history this render."
+ *
+ * This is called alongside the main-frame render; the reconciler's
+ * `Static` component only emits items that haven't been rendered yet,
+ * so the returned ANSI is already the "new-items delta" for this tick.
+ */
+export function renderStaticNodeToAnsi(rootNode: DOMElement): string {
+  const staticNode = rootNode.staticNode;
+  if (!staticNode) return "";
+  const yogaNode = staticNode.yogaNode;
+  if (!yogaNode) return "";
+  // Empty children → nothing to emit. Short-circuit before we allocate a
+  // grid and paint blank rows that would still tokenize as "\n"-joined
+  // whitespace (which the caller would misinterpret as a non-empty delta).
+  if (staticNode.childNodes.length === 0) return "";
+
+  const width = Math.max(1, yogaNode.getComputedWidth());
+  const height = Math.max(1, yogaNode.getComputedHeight());
+
+  const output = createOutputTarget(width, height);
+  renderNodeToOutput(staticNode, output, { skipStaticElements: false });
+  const ansi = output.toAnsiString();
+
+  // toAnsiString() produces one entry per row joined with "\n"; rows with
+  // no painted content rstrip to "". Strip trailing empty rows so the
+  // caller can treat an empty-string result as "no delta" without having
+  // to parse the grid. An all-blank result becomes "".
+  const trimmed = ansi.replace(/\n+$/u, "");
+  if (trimmed.length === 0) return "";
+  return trimmed;
 }
 
 export default renderNodeToOutput;

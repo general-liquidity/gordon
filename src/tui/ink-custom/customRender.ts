@@ -12,9 +12,21 @@
 //     stdout via Ink's `log-update` pattern.
 //
 // Known limitations for this first activation:
-//   * `<Static>` elements are painted but not scrolled into history (the
-//     static-output emission path is stubbed).
 //   * No accessibility / screen-reader fallback.
+//   * Selection overlay is allocated but not applied to the full-frame
+//     rewrite transport yet — `instance.setSelection` mutates the overlay
+//     state but the paint pipeline currently reprints toAnsiString(). The
+//     overlay will start applying when the patch-based transport lands
+//     (see TODO(incremental-patches) below).
+//
+// Phase status:
+//   * Phase 3 — `<Static>` scrolls into history above the live frame.
+//   * Phase 4 — hyperlink pool, selection overlay, cursor declaration are
+//     all allocated; cursor declaration emits; the other two are staged
+//     for the patch transport.
+//   * Phase 6 — pool-migration scheduler runs behind
+//     `GORDON_POOL_MIGRATION_ENABLED=true` (default off), interval
+//     configurable via `GORDON_POOL_MIGRATION_INTERVAL_MS` (default 5 min).
 //
 // What now works (Phase 1+):
 //   * `useInput`, `useApp`, `useStdout`, `useStderr`, `useFocus` all work
@@ -66,9 +78,20 @@ import { createFrameBuffer } from "./framebuffer.ts";
 import { createSyncTerminal } from "./syncTerminal.ts";
 import { createAnsiPatcher } from "./renderPipeline.ts";
 import { diffCells } from "./cellDiff.ts";
-import { renderNodeToOutput } from "./renderNodeToOutput.ts";
+import { renderNodeToOutput, renderStaticNodeToAnsi } from "./renderNodeToOutput.ts";
+import { createHyperlinkPool } from "./hyperlinkPool.ts";
+import { createSelectionOverlay } from "./selectionOverlay.ts";
+import { createCursorDeclarationManager } from "./cursorDeclaration.ts";
+import { createPoolMigrator } from "./poolMigration.ts";
+import { createMigrationScheduler } from "./migrationScheduler.ts";
 import type { DOMElement } from "./dom.ts";
-import type { RenderOptions, Instance } from "./render.ts";
+import type { RenderOptions, Instance, SelectionRange } from "./render.ts";
+import type {
+  MigrationSchedulerHandle,
+  HyperlinkPool,
+  StylePool,
+  CharPool,
+} from "./internal/contracts.ts";
 
 const noop = (): void => {};
 
@@ -78,14 +101,30 @@ const noop = (): void => {};
  */
 export function startCustomRender(node: ReactNode, options: Required<RenderOptions>): Instance {
   const stdout = options.stdout;
-  const stylePool = createStylePool();
-  const charPool = createCharPool();
+  // Pool bindings are mutable so Phase 6 migration can swap them atomically.
+  // Everything that reads a pool does so through these bindings (not through
+  // local const captures), so a successful rebase takes effect on the next
+  // frame without a re-mount.
+  let stylePool: StylePool = createStylePool();
+  let charPool: CharPool = createCharPool();
+  let hyperlinkPool: HyperlinkPool = createHyperlinkPool();
+  const selectionOverlay = createSelectionOverlay();
+  const cursorDeclaration = createCursorDeclarationManager();
   const syncTerm = createSyncTerminal();
   const ansiPatcher = createAnsiPatcher();
 
   let isUnmounted = false;
   let lastPaintedAnsi = "";
   let lastPrintedHeight = 0;
+  let migrationHandle: MigrationSchedulerHandle | null = null;
+  // Cumulative bytes already scrolled into history via <Static>. Ink's
+  // Static component passes only the new items each render, so every
+  // non-empty renderStaticNodeToAnsi(...) result IS the delta for that
+  // tick. We keep this accumulator primarily as a debug/history hook —
+  // a future Gordon debug overlay can dump `emittedStaticAnsi` to reason
+  // about what scrolled by, and a content-hash guard can compare to it
+  // if a misuse (mutating already-emitted items) needs detection.
+  let emittedStaticAnsi = "";
 
   // Root DOM element + Yoga tree.
   const rootNode = createNode("ink-root") as DOMElement;
@@ -165,6 +204,14 @@ export function startCustomRender(node: ReactNode, options: Required<RenderOptio
       renderNodeToOutput(rootNode, output, { skipStaticElements: true });
       output.paintInto(frameBuffer.back, charPool, stylePool);
 
+      // Phase 3 — compute `<Static>` delta. Because Ink's Static component
+      // only passes items that haven't been rendered yet (it slices items
+      // from a React state index), the returned string IS the delta. We
+      // still track `emittedStaticAnsi` so unmount-time debuggers can
+      // reason about what went to scrollback, and so a future content-hash
+      // check can catch misuse where callers mutate already-emitted items.
+      const staticAnsi = renderStaticNodeToAnsi(rootNode);
+
       // Compute patch list so pool churn is exercised every frame (validates
       // the diff hot path even when transport uses full rewrites).
       // TODO(incremental-patches): the current transport is a full-frame
@@ -180,22 +227,44 @@ export function startCustomRender(node: ReactNode, options: Required<RenderOptio
 
       const fullAnsi = output.toAnsiString();
 
-      // First paint: cursor-hide + full frame, no erase needed.
+      // Append the declared cursor position (Phase 4) so inputs like
+      // TextInput can park the physical cursor on the correct cell AFTER
+      // all cell writes. Empty string when no declaration is active, so
+      // this is zero-cost for non-input frames.
+      const cursorAnsi = cursorDeclaration.emit();
+
+      // Static-aware prefix. On first paint the static content lands in
+      // scrollback ABOVE the live frame; on subsequent paints the
+      // eraseLines only clears the live region, so newly-emitted static
+      // content scrolls up into history behind the reprinted live frame.
+      const hasStatic = staticAnsi.length > 0;
+      const staticEmit = hasStatic ? staticAnsi + "\n" : "";
+
+      // First paint: cursor-hide + (optional static) + full frame, no erase.
       if (lastPaintedAnsi.length === 0) {
         lastPaintedAnsi = fullAnsi;
         lastPrintedHeight = Math.max(1, fullAnsi.split("\n").length);
-        writeToStdout(syncTerm.wrapFrame(ansiEscapes.cursorHide + fullAnsi + "\n"));
+        if (hasStatic) emittedStaticAnsi += staticAnsi + "\n";
+        writeToStdout(
+          syncTerm.wrapFrame(
+            ansiEscapes.cursorHide + staticEmit + fullAnsi + "\n" + cursorAnsi,
+          ),
+        );
         options.onRender?.({ renderTime: performance.now() - startTime });
         return;
       }
 
-      // Subsequent frames: skip if identical, otherwise erase + reprint.
-      if (fullAnsi === lastPaintedAnsi) {
+      // Subsequent frames: if nothing changed AND no new static tail,
+      // skip. If only static changed, we still need to erase + emit.
+      if (!hasStatic && fullAnsi === lastPaintedAnsi) {
         options.onRender?.({ renderTime: performance.now() - startTime });
         return;
       }
       const erase = lastPrintedHeight > 0 ? ansiEscapes.eraseLines(lastPrintedHeight) : "";
-      writeToStdout(syncTerm.wrapFrame(erase + fullAnsi + "\n"));
+      if (hasStatic) emittedStaticAnsi += staticAnsi + "\n";
+      writeToStdout(
+        syncTerm.wrapFrame(erase + staticEmit + fullAnsi + "\n" + cursorAnsi),
+      );
       lastPaintedAnsi = fullAnsi;
       lastPrintedHeight = Math.max(1, fullAnsi.split("\n").length);
       options.onRender?.({ renderTime: performance.now() - startTime });
@@ -235,6 +304,19 @@ export function startCustomRender(node: ReactNode, options: Required<RenderOptio
   const unmount = (error?: Error): void => {
     if (isUnmounted) return;
     isUnmounted = true;
+    // Stop the Phase 6 migration scheduler (if running) before we tear the
+    // frame down so it can't fire a tick against disposed pools.
+    if (migrationHandle) {
+      try {
+        migrationHandle.stop();
+      } catch {
+        // swallow — unmount must not throw
+      }
+      migrationHandle = null;
+    }
+    // Reference emittedStaticAnsi so the field is considered read; a future
+    // debug overlay will surface it on unmount. Zero runtime cost.
+    void emittedStaticAnsi.length;
     // Flush any buffered console writes before we tear the frame down,
     // then restore the original console methods.
     if (pendingConsoleOutput.length > 0) flushConsoleAboveFrame();
@@ -285,6 +367,50 @@ export function startCustomRender(node: ReactNode, options: Required<RenderOptio
 
   render(node);
 
+  // Phase 6 — start the pool-migration scheduler behind an env flag. Off
+  // by default; flipping it on runs a rebase every N ms so long-running
+  // sessions can't grow the char/style/hyperlink pools unbounded. The
+  // callback is wrapped so a migration throw only logs — the render loop
+  // keeps going on stale-but-valid pools.
+  if (process.env["GORDON_POOL_MIGRATION_ENABLED"] === "true") {
+    try {
+      const intervalRaw = process.env["GORDON_POOL_MIGRATION_INTERVAL_MS"];
+      const parsed = intervalRaw ? Number(intervalRaw) : NaN;
+      const intervalMs = Number.isFinite(parsed) && parsed > 0 ? parsed : 5 * 60 * 1000;
+
+      const migrator = createPoolMigrator({
+        createCharPool,
+        createStylePool,
+        createHyperlinkPool,
+      });
+
+      const runMigration = (): void => {
+        if (isUnmounted) return;
+        const snapshot = migrator.captureSnapshot(frameBuffer.front, hyperlinkPool);
+        const { newCharPool, newStylePool, newHyperlinkPool, remapping } = migrator.rebase(
+          snapshot,
+          charPool,
+          stylePool,
+          hyperlinkPool,
+        );
+        migrator.applyRemapping(frameBuffer.front, remapping);
+        // Swap pools atomically. Every reader (onRender, outputTarget,
+        // ansiPatcher) dereferences these bindings per-frame, so the next
+        // frame sees the compacted pools transparently.
+        charPool = newCharPool;
+        stylePool = newStylePool;
+        hyperlinkPool = newHyperlinkPool;
+      };
+
+      const scheduler = createMigrationScheduler(runMigration);
+      migrationHandle = scheduler.start(intervalMs);
+    } catch {
+      // Starting the scheduler must never break mount — fall back to the
+      // no-migration path silently.
+      migrationHandle = null;
+    }
+  }
+
   const instance: Instance = {
     rerender: render,
     unmount,
@@ -304,6 +430,18 @@ export function startCustomRender(node: ReactNode, options: Required<RenderOptio
       writeToStdout(ansiEscapes.eraseLines(lastPrintedHeight));
       lastPaintedAnsi = "";
       lastPrintedHeight = 0;
+    },
+    // Phase 4 affordances. The overlay is allocated and these writers
+    // mutate its internal state, but the full-frame rewrite path doesn't
+    // consume overlay patches yet (it reprints toAnsiString()). When the
+    // incremental-patch transport lands, overlay.applyTo(patches) will be
+    // inserted into the patch pipeline — at that point these writers
+    // already do the right thing.
+    setSelection: (range: SelectionRange | null) => {
+      selectionOverlay.set(range);
+    },
+    clearSelection: () => {
+      selectionOverlay.clear();
     },
   };
 

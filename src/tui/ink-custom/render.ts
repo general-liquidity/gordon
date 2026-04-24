@@ -15,6 +15,17 @@ import { render as inkRender } from "ink";
 import { startCustomRender } from "./customRender.ts";
 
 /**
+ * Cell range for selection overlays (reconciler Phase 4).
+ * Rows/cols are 0-indexed; both endpoints are inclusive.
+ */
+export type SelectionRange = {
+  startRow: number;
+  startCol: number;
+  endRow: number;
+  endCol: number;
+};
+
+/**
  * Options accepted by `render()`. Identical shape to ink's RenderOptions,
  * vendored here so the custom renderer can own this surface.
  */
@@ -42,7 +53,8 @@ export type RenderOptions = {
 };
 
 /**
- * Handle returned from `render()`. Mirrors ink's Instance shape.
+ * Handle returned from `render()`. Mirrors ink's Instance shape, plus
+ * custom-render-only affordances (selection overlay control).
  */
 export type Instance = {
   rerender: (node: ReactNode) => void;
@@ -50,6 +62,15 @@ export type Instance = {
   waitUntilExit: () => Promise<void>;
   cleanup: () => void;
   clear: () => void;
+  /**
+   * Set a selection range (custom renderer only; no-op under vanilla ink).
+   * Currently scaffolding — the overlay is allocated but not yet applied to
+   * the full-frame rewrite path. Wiring lands when patch-based emission is
+   * activated. @internal
+   */
+  setSelection?: (range: SelectionRange | null) => void;
+  /** Clear any active selection. @see setSelection */
+  clearSelection?: () => void;
 };
 
 /** Check whether the custom renderer should be used. */
