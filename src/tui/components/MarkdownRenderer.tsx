@@ -46,7 +46,36 @@ const MD_SYNTAX_RE = /[#*`|\[\]>~_\\┌└╔╚╭╰]|\n\n|^\d+\. |\n\d+\. |--
 // normally.
 const ASCII_BOX_TOP = /^\s*[┌╔╭][─━═-]/;
 const ASCII_BOX_BOTTOM = /^\s*[└╚╰][─━═-]/;
-const ASCII_BOX_SIDE = /^\s*[│║|]\s?/;
+// Inner-line side bars. Strip BOTH a leading `│ ` AND a trailing ` │` so
+// double-bordered boxes (LLMs sometimes emit symmetric borders on every
+// content line) don't bleed the right glyph into the rendered text.
+const ASCII_BOX_SIDE_LEAD = /^\s*[│║|]\s?/;
+const ASCII_BOX_SIDE_TRAIL = /\s*[│║|]\s*$/;
+
+function stripBoxSide(line: string): string {
+  return line.replace(ASCII_BOX_SIDE_LEAD, "").replace(ASCII_BOX_SIDE_TRAIL, "");
+}
+
+/**
+ * Parse a single line of text into marked's inline tokens (bold, italic,
+ * code, link, etc.) so box content keeps its formatting. We run marked's
+ * block lexer on a one-line string; if the first token is a paragraph,
+ * its `.tokens` array IS the inline tokens. Falls back to a bare text
+ * token if the line resists tokenization.
+ */
+function lineToInlineTokens(line: string): Token[] {
+  if (!line.trim()) return [{ type: "text", text: " ", raw: " " } as Tokens.Text];
+  try {
+    const tokens = marked.lexer(line, { gfm: true });
+    const first = tokens[0];
+    if (first && first.type === "paragraph") {
+      return (first as Tokens.Paragraph).tokens ?? [];
+    }
+  } catch {
+    // fall through
+  }
+  return [{ type: "text", text: line, raw: line } as Tokens.Text];
+}
 
 type Segment =
   | { kind: "markdown"; content: string }
@@ -74,10 +103,8 @@ function splitAsciiBoxes(content: string): Segment[] {
           segments.push({ kind: "markdown", content: buffer.join("\n") });
           buffer = [];
         }
-        // Strip side-bars from inner lines
-        const inner = lines
-          .slice(i + 1, end)
-          .map((l) => l.replace(ASCII_BOX_SIDE, ""));
+        // Strip side-bars from inner lines (both leading and trailing)
+        const inner = lines.slice(i + 1, end).map(stripBoxSide);
         segments.push({ kind: "box", lines: inner });
         i = end + 1;
         continue;
@@ -161,7 +188,9 @@ export function MarkdownRenderer({ content }: Props) {
             marginY={0}
           >
             {seg.lines.map((line, j) => (
-              <Text key={j}>{line}</Text>
+              <Text key={j}>
+                <InlineTokens tokens={lineToInlineTokens(line)} />
+              </Text>
             ))}
           </Box>
         ) : (
