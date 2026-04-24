@@ -19,7 +19,10 @@ interface Props {
   isStreaming: boolean;
 }
 
-const MD_SYNTAX_RE = /[#*`|[\]>\-_~]|\n\n|^\d+\. |\n\d+\. /;
+// Fast-path detector: any of these markers means we need full parsing.
+// Includes box-drawing corner glyphs so ASCII-box patterns don't bypass
+// the parser via the plain-text shortcut.
+const MD_SYNTAX_RE = /[#*`|[\]>\-_~┌└╔╚╭╰]|\n\n|^\d+\. |\n\d+\. /;
 
 // Simple hash for cache key (avoids retaining full content strings)
 function hashContent(content: string): string {
@@ -35,12 +38,22 @@ const tokenCache = new Map<string, ParsedBlock[]>();
 const TOKEN_CACHE_MAX = 500;
 
 interface ParsedBlock {
-  type: "text" | "heading" | "codeblock" | "blockquote" | "bullet" | "hr";
+  type: "text" | "heading" | "codeblock" | "blockquote" | "bullet" | "hr" | "ascii_box";
   content: string;
   level?: number;
   language?: string;
   raw: string; // Original text for stable prefix tracking
 }
+
+// ASCII-box detection: LLMs frequently emit boxes drawn with Unicode
+// box-drawing characters as visual cues for examples / option groups.
+// Often lopsided (┌─…top, │ …middle, └─…bottom — no right border). We
+// detect the pattern and render with a real Ink <Box borderStyle> that
+// spans the available width and looks consistent with the rest of the
+// frame, instead of dumping the raw glyphs inline.
+const ASCII_BOX_TOP = /^\s*[┌╔╭][─━═-]/;
+const ASCII_BOX_BOTTOM = /^\s*[└╚╰][─━═-]/;
+const ASCII_BOX_SIDE = /^\s*[│║|]\s?/;
 
 // Strip internal prompt XML tags that shouldn't be visible
 function stripPromptXMLTags(text: string): string {
@@ -91,6 +104,30 @@ function parseBlocks(content: string): ParsedBlock[] {
     }
 
     if (inCodeBlock) { codeLines.push(line); i++; continue; }
+
+    // ASCII box: scan forward for the closing └─… line; everything between
+    // is the box content (with the leading │ stripped).
+    if (ASCII_BOX_TOP.test(line)) {
+      const start = i;
+      let end = -1;
+      for (let j = i + 1; j < lines.length; j++) {
+        if (ASCII_BOX_BOTTOM.test(lines[j]!)) {
+          end = j;
+          break;
+        }
+      }
+      if (end > start) {
+        const inner = lines
+          .slice(start + 1, end)
+          .map((l) => l.replace(ASCII_BOX_SIDE, "")) // strip leading │ + optional space
+          .join("\n");
+        const raw = lines.slice(start, end + 1).join("\n");
+        blocks.push({ type: "ascii_box", content: inner, raw });
+        i = end + 1;
+        continue;
+      }
+      // No closing line found — fall through, render the ┌─ line as text.
+    }
 
     if (/^[-*_]{3,}\s*$/.test(line)) {
       blocks.push({ type: "hr", content: "", raw: line });
@@ -242,6 +279,24 @@ export function StreamingMarkdown({ content, isStreaming }: Props) {
             );
           case "hr":
             return <Text key={i} dimColor>{"\u2500".repeat(40)}</Text>;
+          case "ascii_box":
+            // Render the LLM's ASCII-box pattern as a real bordered Box
+            // that spans the available flex width. The original lopsided
+            // \u250c\u2500/\u2502/\u2514\u2500 glyphs are dropped \u2014 Ink draws a proper border.
+            return (
+              <Box
+                key={i}
+                flexDirection="column"
+                borderStyle="round"
+                borderColor="gray"
+                paddingX={1}
+                marginY={0}
+              >
+                {block.content.split("\n").map((line, j) => (
+                  <Box key={j}>{renderInline(line)}</Box>
+                ))}
+              </Box>
+            );
           case "text":
           default:
             if (!block.content.trim()) return null;
