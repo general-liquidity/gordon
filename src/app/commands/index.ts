@@ -126,3 +126,9 @@ export {
   handleContextCommand,
   type ContextCommandResult,
 } from './context';
+
+// Cache audit diagnostic command
+export {
+  handleCacheAuditCommand,
+  type CacheAuditCommandResult,
+} from './cacheAudit';

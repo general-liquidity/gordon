@@ -35,6 +35,12 @@ import { pluginInstaller } from "./marketplace/installer.ts";
 import { credentialManager } from "./credentials.ts";
 import type { MCPCategory, MCPServerManifest } from "./types.ts";
 import { withRetry, isServerCachedAsFailing, recordServerSuccess } from "./resilience.ts";
+import {
+  loadDiscoveryCache,
+  saveDiscoveryCache,
+  buildDescriptorsFromLiveTools,
+  type CachedToolDescriptor,
+} from "./discoveryCache.ts";
 
 // ============================================================================
 // State
@@ -50,6 +56,10 @@ let _hotReloadInFlight = false;
 let _mcpServers: Record<string, MastraMCPServerDefinition> | null = null;
 let _schemasDiscovered = false;
 const _discoveredServerIds = new Set<string>();
+/** Cached descriptors loaded from disk before first live discovery. Used for
+ * fast bootstrap diagnostics + lazy-discovery decisions. */
+let _cachedToolDescriptors: Record<string, CachedToolDescriptor> = {};
+let _backgroundRefreshScheduled = false;
 let _routingManagerPromise: Promise<typeof import("../../runtime/routing/manager.ts")> | null = null;
 
 function buildPluginFingerprint(installedPlugins: Array<{ id: string; enabled: boolean; version?: string }>): string {
@@ -217,6 +227,25 @@ export async function initMCPTools(): Promise<Record<string, Tool>> {
       const serverCount = Object.keys(servers).length;
       loggerInfo(`[MCP] Ready ${serverCount} plugin(s) for lazy tool discovery`);
 
+      // Phase 1: load on-disk cache so the user sees a tool count immediately.
+      // The cache is metadata-only; a live MCPClient connection is still
+      // required before any tool can actually execute. The cache primarily
+      // accelerates the "what tools do I have?" UX path.
+      try {
+        const loadResult = await loadDiscoveryCache(_lastPluginFingerprint ?? "");
+        if (loadResult.cache && loadResult.fresh) {
+          _cachedToolDescriptors = loadResult.cache.tools;
+          loggerInfo(
+            `[MCP] Loaded ${Object.keys(_cachedToolDescriptors).length} cached tool descriptor(s) (${Math.round(loadResult.ageMs / 60000)}m old)`,
+          );
+        } else if (loadResult.cache) {
+          _cachedToolDescriptors = loadResult.cache.tools;
+          loggerInfo(`[MCP] Stale cache (${loadResult.reason}); will refresh in background`);
+        }
+      } catch {
+        // Cache load is best-effort.
+      }
+
       return _mcpTools;
     } catch (error) {
       console.error("[MCP] Failed to initialize MCP tools:", (error as Error).message);
@@ -334,6 +363,16 @@ export async function ensureMCPToolsDiscovered(serverIds?: string[]): Promise<Re
     }
     loggerInfo(`[MCP] Loaded ${Object.keys(discoveredTools).length} tool(s) on demand`);
 
+    // Persist the discovered tool names + descriptions for fast cold starts.
+    // Fire-and-forget — cache writes never block the request path.
+    try {
+      const descriptors = buildDescriptorsFromLiveTools(_mcpTools);
+      _cachedToolDescriptors = descriptors;
+      void saveDiscoveryCache(_lastPluginFingerprint ?? "", descriptors);
+    } catch {
+      // Cache write failure is non-fatal.
+    }
+
     await syncRoutingIfInitialized();
 
     return _mcpTools;
@@ -368,6 +407,48 @@ export async function reloadMCPTools(): Promise<Record<string, Tool>> {
  */
 export function getMCPTools(): Record<string, Tool> {
   return _mcpTools ?? {};
+}
+
+/**
+ * Get the descriptor map loaded from the on-disk discovery cache.
+ *
+ * Unlike getMCPTools(), this returns metadata only — name, server, optional
+ * description — and is populated immediately at init time without a live
+ * MCPClient connection. Used for cold-start UX (showing the user what
+ * tools will be available before discovery completes).
+ */
+export function getCachedToolDescriptors(): Record<string, CachedToolDescriptor> {
+  return _cachedToolDescriptors;
+}
+
+/**
+ * Phase 2 of lazy discovery: kick a background refresh of the discovery
+ * cache once the first response has been delivered.
+ *
+ * Idempotent — only one refresh runs per process even if called multiple times.
+ * Use this after the first user-visible response so the next session has a
+ * fresh cache without delaying the current request.
+ */
+export function scheduleBackgroundDiscoveryRefresh(): void {
+  if (_backgroundRefreshScheduled) return;
+  if (_schemasDiscovered) return; // already up to date
+  if (!_mcpServers || Object.keys(_mcpServers).length === 0) return;
+  _backgroundRefreshScheduled = true;
+
+  // Defer to the next tick so we don't block whatever just yielded the
+  // first response. setImmediate isn't available in all runtimes Bun
+  // bundles, so use setTimeout(0) for portability.
+  setTimeout(() => {
+    void ensureMCPToolsDiscovered()
+      .catch((err) => {
+        if (process.env.GORDON_STARTUP_QUIET !== "1") {
+          console.warn("[MCP] Background discovery refresh failed:", (err as Error).message);
+        }
+      })
+      .finally(() => {
+        _backgroundRefreshScheduled = false;
+      });
+  }, 0);
 }
 
 export function getScopedMCPTools(options?: {
@@ -513,6 +594,8 @@ export async function disconnectMCP(): Promise<void> {
   _mcpServers = null;
   _schemasDiscovered = false;
   _discoveredServerIds.clear();
+  _cachedToolDescriptors = {};
+  _backgroundRefreshScheduled = false;
 }
 
 /**

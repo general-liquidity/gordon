@@ -39,7 +39,9 @@
   },
   "scripts": {
     "start": "bun run --silent src/index.tsx",
+    "start:compiled": "GORDON_REACT_COMPILER=1 bun run --silent src/index.tsx",
     "dev": "bun --watch run src/index.tsx",
+    "dev:compiled": "GORDON_REACT_COMPILER=1 bun --watch run src/index.tsx",
     "build": "bun scripts/build.ts",
     "build:binary": "bun scripts/build.ts --binary",
     "generate:actions-docs": "bun run scripts/generate-action-docs.ts",

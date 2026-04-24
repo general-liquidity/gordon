@@ -26,6 +26,9 @@ export { default as Spacer } from "./components/Spacer.ts";
 export type { Key } from "./hooks/use-input.ts";
 export { default as useInput } from "./hooks/use-input.ts";
 
+export type { MouseEvent, MouseHandler } from "./hooks/use-mouse.ts";
+export { default as useMouse } from "./hooks/use-mouse.ts";
+
 export { default as useApp } from "./hooks/use-app.ts";
 
 export { default as useStdout } from "./hooks/use-stdout.ts";

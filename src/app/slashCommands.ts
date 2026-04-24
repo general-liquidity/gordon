@@ -1652,6 +1652,17 @@ const LEGACY_SLASH_COMMANDS: SlashCommandSeed[] = [
     target: "context",
     whenToUse: "Inspect how Gordon grounded the last request and how much prompt budget it used",
   },
+  {
+    name: "cache-audit",
+    aliases: ["cacheaudit", "ca"],
+    description: "Audit prompt-cache wiring on the last request (provider markers, prefix size, hashes)",
+    usage: "/cache-audit",
+    category: "system",
+    level: 3,
+    action: "tool",
+    target: "cache-audit",
+    whenToUse: "Diagnose low cache hit rate or verify provider-aware caching is wired correctly",
+  },
 
   // Bug Report
   {

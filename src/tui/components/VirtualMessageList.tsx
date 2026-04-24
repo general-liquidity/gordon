@@ -1,10 +1,15 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { Box, Static, useInput } from "ink";
+import { Box, Static, useInput, type DOMElement } from "ink";
 import { MessageBubble, type Message } from "./MessageBubble.js";
 import { UnseenDivider } from "./UnseenDivider.js";
 import { useTranscriptSearch } from "../hooks/useTranscriptSearch.js";
 import { SearchBar } from "./SearchBar.js";
 import { OffscreenFreeze } from "./OffscreenFreeze.js";
+import useMouse, { type MouseEvent } from "../ink-custom/hooks/use-mouse.js";
+import { createScrollBox, type ScrollBox } from "../ink-custom/scrollBox.js";
+
+/** Lines per wheel-tick. Matches the muscle memory of most pagers. */
+const WHEEL_STEP = 3;
 
 // ============================================================================
 // VirtualMessageList — Static scrollback + live tail
@@ -135,8 +140,51 @@ export function VirtualMessageList({ messages, scrollEnabled = true }: Props) {
     setUnseenCount(0);
   }, []);
 
+  // ---------------------------------------------------------------------
+  // Mouse-wheel scrolling.
+  //
+  // We attach a ref to the live-tail Box, lazily build a ScrollBox handle
+  // for it on first wheel event, and dispatch deltas through that handle.
+  // The handle mutates `scrollTop` directly on the DOM node (no React
+  // state) and coalesces markDirty calls into one microtask — at most one
+  // render per burst regardless of wheel velocity.
+  //
+  // Re-render safety:
+  //   - scrollContainerRef is a useRef (stable identity).
+  //   - scrollBoxRef caches the ScrollBox handle so we don't build a new
+  //     one per event.
+  //   - The mouse handler reads/writes refs only; no setState during the
+  //     handler body.
+  // ---------------------------------------------------------------------
+  const scrollContainerRef = useRef<DOMElement | null>(null);
+  const scrollBoxRef = useRef<ScrollBox | null>(null);
+
+  const getScrollBox = useCallback((): ScrollBox | null => {
+    if (scrollBoxRef.current) return scrollBoxRef.current;
+    const node = scrollContainerRef.current;
+    if (!node) return null;
+    // DOMElement from "ink" is structurally compatible with ink-custom's
+    // DOMElement (createScrollBox only touches `attributes` + optional
+    // `yogaNode.markDirty`). Cast through unknown for type-checker peace.
+    scrollBoxRef.current = createScrollBox(node as unknown as Parameters<typeof createScrollBox>[0]);
+    return scrollBoxRef.current;
+  }, []);
+
+  useMouse(
+    (event: MouseEvent) => {
+      if (event.button === "wheel-up") {
+        const box = getScrollBox();
+        if (box) box.scrollBy(-WHEEL_STEP);
+      } else if (event.button === "wheel-down") {
+        const box = getScrollBox();
+        if (box) box.scrollBy(WHEEL_STEP);
+      }
+    },
+    { isActive: scrollEnabled },
+  );
+
   return (
-    <Box flexDirection="column">
+    <Box flexDirection="column" ref={scrollContainerRef}>
       {/* Past messages — written once into terminal scrollback, never re-rendered */}
       {staticMessages.length > 0 && (
         <Static items={staticMessages}>

@@ -34,6 +34,11 @@ import StdoutContext from "../contexts/StdoutContext.ts";
 import StderrContext from "../contexts/StderrContext.ts";
 import FocusContext from "../contexts/FocusContext.ts";
 import ErrorOverview from "./ErrorOverview.ts";
+import {
+  parseMouseSequence,
+  MOUSE_ENABLE,
+  MOUSE_DISABLE,
+} from "../parse-mouse.ts";
 
 const tab = "\t";
 // eslint-disable-next-line no-control-regex
@@ -84,6 +89,13 @@ export default class App extends PureComponent<Props, State> {
 
   // eslint-disable-next-line @typescript-eslint/naming-convention
   internal_eventEmitter = new EventEmitter();
+
+  // True iff we wrote MOUSE_ENABLE on mount and still owe a MOUSE_DISABLE
+  // on unmount. We only enable when stdout is a TTY and the user has not
+  // opted into screen-reader mode (screen readers can choke on bracketed
+  // mouse-mode bytes leaking into the line buffer, plus the events would
+  // be ignored anyway).
+  mouseModeActive = false;
 
   // Determines if TTY is supported on the provided stdin.
   isRawModeSupported(): boolean {
@@ -155,13 +167,53 @@ export default class App extends PureComponent<Props, State> {
 
   override componentDidMount(): void {
     cliCursor.hide(this.props.stdout);
+    this.enableMouseMode();
   }
 
   override componentWillUnmount(): void {
     cliCursor.show(this.props.stdout);
+    this.disableMouseMode();
     // ignore calling setRawMode on a stdin handle that doesn't support it
     if (this.isRawModeSupported()) {
       this.handleSetRawMode(false);
+    }
+  }
+
+  /** Returns true if any common screen-reader env var is set. Mirrors
+   *  the logic in `useScreenReader` so we don't pull a React hook into
+   *  this class component. */
+  isScreenReaderActive(): boolean {
+    const env = process.env;
+    return (
+      env["ACCESSIBILITY_ENABLED"] === "true" ||
+      env["SCREEN_READER"] === "true" ||
+      env["GORDON_SCREEN_READER"] === "true" ||
+      env["VOICE_OVER_ENABLED"] === "1" ||
+      env["NARRATOR_RUNNING"] === "1"
+    );
+  }
+
+  enableMouseMode(): void {
+    if (this.mouseModeActive) return;
+    if (!this.props.stdin?.isTTY) return;
+    if (!this.props.stdout?.isTTY) return;
+    if (this.isScreenReaderActive()) return;
+    try {
+      this.props.stdout.write(MOUSE_ENABLE);
+      this.mouseModeActive = true;
+    } catch {
+      // Some stdout impls (e.g. pipe-backed) reject writes mid-shutdown.
+      // Mouse is non-essential — silently degrade.
+    }
+  }
+
+  disableMouseMode(): void {
+    if (!this.mouseModeActive) return;
+    this.mouseModeActive = false;
+    try {
+      this.props.stdout.write(MOUSE_DISABLE);
+    } catch {
+      // See enableMouseMode — best-effort.
     }
   }
 
@@ -205,9 +257,38 @@ export default class App extends PureComponent<Props, State> {
     let chunk: string | null;
     // Drain everything currently buffered, dispatching each chunk.
     while ((chunk = this.props.stdin.read() as string | null) !== null) {
+      this.dispatchChunk(chunk);
+    }
+  };
+
+  /**
+   * Split a raw stdin chunk into mouse events and keypress bytes.
+   *
+   * Mouse mode (when active) emits CSI sequences starting with `\x1b[<`.
+   * We peel those off the front of the buffer and emit them as `mouse`
+   * events on the internal emitter. Anything that isn't a complete mouse
+   * sequence falls through to the existing keypress path so we never
+   * lose bytes — a partial mouse sequence at end-of-chunk would emit as
+   * keypress, which is benign for downstream consumers.
+   */
+  dispatchChunk = (chunk: string): void => {
+    if (!this.mouseModeActive) {
       this.handleInput(chunk);
       this.internal_eventEmitter.emit("input", chunk);
+      return;
     }
+    let remaining = chunk;
+    while (remaining.length > 0 && remaining.startsWith("\x1b[<")) {
+      const { event, consumed } = parseMouseSequence(remaining);
+      if (consumed === 0) break;
+      if (event) {
+        this.internal_eventEmitter.emit("mouse", event);
+      }
+      remaining = remaining.slice(consumed);
+    }
+    if (remaining.length === 0) return;
+    this.handleInput(remaining);
+    this.internal_eventEmitter.emit("input", remaining);
   };
 
   handleInput = (input: string): void => {

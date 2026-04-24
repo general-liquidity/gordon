@@ -1,0 +1,10 @@
+# Bun runtime configuration for Gordon CLI.
+#
+# `preload` runs before any application code — see
+# src/tui/ink-custom/buildCompilerPlugin.ts for what it does. The
+# preload module is a no-op unless GORDON_REACT_COMPILER=1, so leaving
+# this entry in by default has no effect on normal builds.
+preload = ["./src/tui/ink-custom/buildCompilerPlugin.ts"]
+
+[test]
+preload = ["./src/tui/ink-custom/buildCompilerPlugin.ts"]

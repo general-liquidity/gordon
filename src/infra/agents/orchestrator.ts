@@ -52,6 +52,8 @@ import { determineWorkflowPhase } from "./workflowPhase.ts";
 import {
   runThinkingPhase,
   getThinkingDepthFromContext,
+  shouldRunToolFreeThinking,
+  prependThinkingTrace,
   type ThinkingResult,
 } from "./thinkingPhase.ts";
 import { runCritiquePhase } from "./critiquePhase.ts";
@@ -91,7 +93,9 @@ import {
   ensureMCPToolsDiscovered,
   getMCPDiscoveryIntent,
   areMCPSchemasDiscovered,
+  scheduleBackgroundDiscoveryRefresh,
 } from "../ai/mcp/client.ts";
+import { captureAuditedRequest } from "./promptCacheAudit.ts";
 import type { Message } from "../ai/llm/types.ts";
 import { resetAgents } from "./agents.ts";
 import { rebuildACEMemoryForThread, getACEMemorySnapshot } from "./aceMemory.ts";
@@ -288,6 +292,11 @@ async function buildGroundedPrompt(
   requestContext.set("activeIntegrationIds", envelope.report.activeIntegrationIds);
   requestContext.set("promptContextReport", envelope.report);
   requestContext.set("promptCacheMetadata", envelope.report.cache);
+  // Capture the assembled messages so /cache-audit can introspect them
+  // out-of-band without re-running the prompt build pipeline.
+  try {
+    captureAuditedRequest(messageValidation.messages, envelope.report.provider, context.threadId);
+  } catch { /* non-critical diagnostic */ }
   requestContext.set("workflowPhase", envelope.report.workflowPhase);
   requestContext.set("executionReadiness", envelope.report.executionReadiness);
   requestContext.set("transcriptValidation", transcriptValidation);
@@ -386,20 +395,42 @@ export async function* processMessageStream(
 
   try {
     const groundedPrompt = await buildGroundedPrompt(userMessage, context, requestContext);
+    // Mutable view used when the tool-free thinking gate prepends its trace.
+    let groundedMessages = groundedPrompt.messages;
     let reactStage: ReActStage = "compaction_checked";
     await throwIfStreamAborted(signal);
     reactStage = advanceReActStage(reactStage, "interrupt_checked_before_thinking");
 
     // ── Thinking phase ──────────────────────────────────────────────────────
+    // Two activation paths:
+    //   1. thinkingDepth (legacy, in-config) — runs at any depth ≥ low
+    //   2. GORDON_TOOL_FREE_THINKING flag — runs only above complexity threshold
+    // Both end up calling runThinkingPhase; the flag path additionally prepends
+    // the trace to the action-phase messages so the tool-enabled call sees the
+    // reasoning verbatim instead of just emitting a thinking_delta event.
     let _thinkingResult: ThinkingResult | null = null;
     const _thinkingDepth = getThinkingDepthFromContext(context);
-    if (_thinkingDepth !== "off") {
-      _thinkingResult = await runThinkingPhase(userMessage, [], context, _thinkingDepth);
-      if (_thinkingDepth === "high" && _thinkingResult && !_thinkingResult.skipped && _thinkingResult.trace) {
+    const _toolFreeGate = shouldRunToolFreeThinking(userMessage, context);
+    const _depthForRun: typeof _thinkingDepth =
+      _thinkingDepth !== "off" ? _thinkingDepth : (_toolFreeGate.run ? "medium" : "off");
+    if (_depthForRun !== "off") {
+      _thinkingResult = await runThinkingPhase(userMessage, [], context, _depthForRun);
+      if (_depthForRun === "high" && _thinkingResult && !_thinkingResult.skipped && _thinkingResult.trace) {
         const _critique = await runCritiquePhase(_thinkingResult.trace, userMessage, context);
         if (_critique && _critique !== "Reasoning is sound.") {
           _thinkingResult = { ..._thinkingResult, trace: `${_thinkingResult.trace}\n[Critique]: ${_critique}` };
         }
+      }
+      // When the flag is on, also prepend the trace to the messages array so
+      // the tool-enabled action call has explicit reasoning to act on.
+      if (_toolFreeGate.run && _thinkingResult && !_thinkingResult.skipped && _thinkingResult.trace) {
+        groundedMessages = prependThinkingTrace(groundedMessages, _thinkingResult.trace);
+        logger.info("Tool-free thinking active", {
+          reason: _toolFreeGate.reason,
+          thinkingDurationMs: _thinkingResult.thinkingDurationMs,
+          gateDurationMs: _thinkingResult.gateDurationMs,
+          traceLength: _thinkingResult.trace.length,
+        });
       }
     }
     // Surface the thinking trace as a streaming event so TUI subscribers can
@@ -424,7 +455,7 @@ export async function* processMessageStream(
     // Per Mastra docs: `const stream = await agent.stream(messages, options)`
     // Returns MastraModelOutput with textStream, fullStream, text (Promise<string>)
     const streamObj = await awaitWithAbort(
-      gordonAgent().stream(groundedPrompt.messages, ({
+      gordonAgent().stream(groundedMessages, ({
         requestContext,
         ...(threadId && effectiveResourceId ? { memory: { thread: threadId, resource: effectiveResourceId } } : {}),
         maxSteps: 20,
@@ -582,6 +613,9 @@ export async function* processMessageStream(
 
     yield { type: "done", content: state.fullText, usage, agentName: state.currentAgent };
     reactStage = advanceReActStage(reactStage, "response_dispatched");
+    // Phase 2 lazy MCP discovery — refresh cache in background AFTER the
+    // first user-visible response so subsequent cold starts are fast.
+    try { scheduleBackgroundDiscoveryRefresh(); } catch { /* best-effort */ }
     await finalizeAfterRequest(context, {
       threadId: threadId ?? context.threadId,
       agentName: state.currentAgent,

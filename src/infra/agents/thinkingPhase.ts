@@ -30,6 +30,70 @@ export interface ThinkingResult {
   tokensUsed?: number;
   skipped: boolean;
   skipReason?: string;
+  /** Wall-clock duration of the tool-free thinking LLM call (ms). */
+  thinkingDurationMs?: number;
+  /** Wall-clock duration of the gate evaluation (ms). */
+  gateDurationMs?: number;
+}
+
+/**
+ * Decide whether a request should trigger the dedicated tool-free thinking
+ * pre-pass. Used as the gate when GORDON_TOOL_FREE_THINKING is enabled — the
+ * paper's "thinking phase" only fires for non-trivial requests so we don't
+ * pay 2-8s on routine asks.
+ *
+ * Triggers (any of):
+ *   - User message > 200 characters
+ *   - thinkingDepth is "medium" or "high" (explicitly opted in)
+ *   - phase is planning, execution, or critique (high-stakes)
+ */
+export function shouldRunToolFreeThinking(
+  userMessage: string,
+  context: GordonContext,
+): { run: boolean; reason: string } {
+  const flag = process.env.GORDON_TOOL_FREE_THINKING === "true";
+  if (!flag) {
+    return { run: false, reason: "GORDON_TOOL_FREE_THINKING flag not enabled" };
+  }
+  if (typeof userMessage === "string" && userMessage.length > 200) {
+    return { run: true, reason: "user message > 200 chars" };
+  }
+  const depth = (context.config as Record<string, unknown>).thinkingDepth as ThinkingDepth | undefined
+    ?? (process.env.GORDON_THINKING_DEPTH as ThinkingDepth | undefined);
+  if (depth === "medium" || depth === "high") {
+    return { run: true, reason: `thinkingDepth=${depth}` };
+  }
+  const phase = determineWorkflowPhase(context);
+  if (phase === "planning" || phase === "execution" || phase === "critique") {
+    return { run: true, reason: `phase=${phase}` };
+  }
+  return { run: false, reason: "below complexity threshold" };
+}
+
+/**
+ * Prepend a thinking trace into the messages bound for the tool-enabled
+ * action LLM call. The trace is added as a system message so the action
+ * model treats it as authoritative reasoning context.
+ *
+ * Returns the messages array unchanged when the trace is empty.
+ */
+export function prependThinkingTrace<T extends { role: string; content: unknown }>(
+  messages: T[],
+  trace: string,
+): T[] {
+  const trimmed = trace?.trim();
+  if (!trimmed) return messages;
+  const block = `[GORDON_THINKING_TRACE]\n${trimmed}`;
+  // Insert AFTER existing system messages so the trace sits next to other
+  // grounding context, but before any user/assistant turns.
+  let lastSystemIdx = -1;
+  for (let i = 0; i < messages.length; i++) {
+    if (messages[i]?.role === "system") lastSystemIdx = i;
+    else break;
+  }
+  const insertAt = lastSystemIdx + 1;
+  const traceMessage = { role: "system", content: block } as unknown as T;
+  return [...messages.slice(0, insertAt), traceMessage, ...messages.slice(insertAt)];
 }
 
 // ============================================================================
@@ -84,16 +148,31 @@ export async function runThinkingPhase(
   context: GordonContext,
   depth: ThinkingDepth,
 ): Promise<ThinkingResult> {
+  const gateStart = Date.now();
   if (depth === "off") {
-    return { trace: "", depth, skipped: true, skipReason: "thinking disabled" };
+    return {
+      trace: "",
+      depth,
+      skipped: true,
+      skipReason: "thinking disabled",
+      gateDurationMs: Date.now() - gateStart,
+    };
   }
 
   // Auto-skip for fast phases even if depth was explicitly set
   const phase = determineWorkflowPhase(context);
   if (SKIP_PHASES.has(phase)) {
-    return { trace: "", depth, skipped: true, skipReason: `phase ${phase} does not benefit from thinking` };
+    return {
+      trace: "",
+      depth,
+      skipped: true,
+      skipReason: `phase ${phase} does not benefit from thinking`,
+      gateDurationMs: Date.now() - gateStart,
+    };
   }
+  const gateDurationMs = Date.now() - gateStart;
 
+  const callStart = Date.now();
   try {
     const route = resolveLegacyModelRouteForWorkflowPhase("compaction"); // fast model
 
@@ -139,11 +218,14 @@ export async function runThinkingPhase(
     );
 
     const trace = response.content?.trim() ?? "";
+    const thinkingDurationMs = Date.now() - callStart;
     logger.debug("Thinking phase complete", {
       depth,
       phase,
       traceLength: trace.length,
       tokensUsed: response.usage?.totalTokens,
+      thinkingDurationMs,
+      gateDurationMs,
     });
 
     return {
@@ -151,10 +233,19 @@ export async function runThinkingPhase(
       depth,
       tokensUsed: response.usage?.totalTokens,
       skipped: false,
+      thinkingDurationMs,
+      gateDurationMs,
     };
   } catch (error) {
     const message = (error as Error).message ?? String(error);
     logger.warn("Thinking phase failed, continuing without trace", { error: message });
-    return { trace: "", depth, skipped: true, skipReason: message };
+    return {
+      trace: "",
+      depth,
+      skipped: true,
+      skipReason: message,
+      thinkingDurationMs: Date.now() - callStart,
+      gateDurationMs,
+    };
   }
 }

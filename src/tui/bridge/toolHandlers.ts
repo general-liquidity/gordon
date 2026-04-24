@@ -12,6 +12,7 @@ import {
   handleKeyringCommand,
   handleTelemetryCommand,
   handleContextCommand,
+  handleCacheAuditCommand,
 } from "../../app/commands/index.ts";
 import { handlePermissionModeCommand } from "../../app/commands/permissionMode.ts";
 
@@ -51,6 +52,7 @@ export async function routeToolCommand(
     case "keyring":  return handleKeyringCommand(args);
     case "telemetry": return handleTelemetryCommand(args);
     case "context":  return handleContextCommand(args);
+    case "cache-audit": return handleCacheAuditCommand(args);
 
     // ── Strategy / workflow — direct handlers (no LLM needed for CRUD) ─────
     case "strategy":
