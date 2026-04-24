@@ -32,13 +32,24 @@ interface Props {
 /**
  * Stable messages to keep visible in the Ink-managed live area.
  *
- * Kept small (was 4) because each Ink re-render erases-and-reprints the
- * whole live frame. With long markdown responses, 4 messages × multi-line
- * = a frame that exceeds the terminal viewport, which makes the terminal
- * autoscroll on every render. Two messages keeps the live frame compact;
- * older content lives in scrollback via <Static>.
+ * Was 4, then 2. Now 0 — the streaming message is the ONLY thing in the
+ * live frame; every completed message gets committed to <Static>
+ * immediately so it lives in terminal scrollback above the live frame.
+ *
+ * Why zero: the live frame's height drives Ink's eraseLines+reprint
+ * radius. Whenever a long markdown answer (e.g. backtest help) lands in
+ * the live tail, the frame becomes tall, and any subsequent re-render
+ * (input keystroke, animation tick, anything) yanks the terminal
+ * viewport back down to the frame's bottom — undoing the user's scroll
+ * up to read earlier outputs. Keeping the live frame at 1 row (just the
+ * input) means scrollback stays stable while the user reads history.
+ *
+ * Trade-off: there's no "live area" showing the most-recent assistant
+ * message hovering above the input. The user reads it as the response
+ * streams, then it scrolls into history naturally on completion. This
+ * matches the Codex / Claude Code chat pattern.
  */
-const LIVE_TAIL = 2;
+const LIVE_TAIL = 0;
 
 export function VirtualMessageList({ messages, scrollEnabled = true }: Props) {
   const isStreaming = messages.some((m) => m.streaming);

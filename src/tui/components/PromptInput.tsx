@@ -5,7 +5,6 @@ import { useSlashCommandTypeahead, type TypeaheadMatch } from "../hooks/useSlash
 import { useInputHistory } from "../hooks/useInputHistory.js";
 import { useImagePaste } from "../hooks/useImagePaste.js";
 import { useDeclaredCursor } from "../hooks/useDeclaredCursor.js";
-import { useAnimationClock } from "../hooks/useAnimationClock.js";
 import { graphemeCount, graphemeToCodeUnit } from "../utils/graphemes.js";
 import { TokenWarning } from "./TokenWarning.js";
 import {
@@ -488,24 +487,24 @@ function PromptDisplay({
   const textColor = isBashMode ? "yellow" : isSlashMode ? "rgb(52,238,176)" : undefined;
   const useBlockCursor = !(isVimNormal || isVimVisual);
 
-  // Cursor blink — 500ms cadence (matches typical terminal cursor).
-  // Insert mode: block alternates with space. Vim Normal/Visual: inverse
-  // glyph alternates with non-inverse so the highlight pulses without
-  // hiding the underlying character.
-  const blinkFrame = useAnimationClock(500);
-  const cursorOn = blinkFrame % 2 === 0;
+  // Cursor is rendered statically (no blink). A blink animation forced a
+  // full-frame redraw on every tick under vanilla Ink, which made the
+  // terminal viewport snap back to the live frame after the user
+  // scrolled up to read history. Trade-off: no blink, but stable scroll.
+  // The block / inverse styling makes the position obvious without
+  // animation.
 
   return (
     <Text>
       <Text color={textColor}>{left}</Text>
       {useBlockCursor ? (
         <>
-          <Text color="rgb(52,238,176)">{cursorOn ? "█" : " "}</Text>
+          <Text color="rgb(52,238,176)">{"█"}</Text>
           <Text color={textColor}>{right}</Text>
         </>
       ) : (
         <>
-          <Text color={textColor} inverse={cursorOn}>{charAtCursor}</Text>
+          <Text color={textColor} inverse>{charAtCursor}</Text>
           <Text color={textColor}>{right}</Text>
         </>
       )}
