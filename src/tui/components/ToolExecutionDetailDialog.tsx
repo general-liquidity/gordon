@@ -1,5 +1,5 @@
 import React from "react";
-import { Box, Text, useInput } from "ink";
+import { Box, Text, useInput } from "../ink-custom";
 
 // ============================================================================
 // ToolExecutionDetailDialog — Full detail view for a single tool execution

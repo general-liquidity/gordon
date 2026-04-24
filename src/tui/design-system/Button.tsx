@@ -1,5 +1,5 @@
 import React from "react";
-import { Text, useInput } from "ink";
+import { Text, useInput } from "../ink-custom";
 
 // ============================================================================
 // Button — Focusable button with Enter/Space activation

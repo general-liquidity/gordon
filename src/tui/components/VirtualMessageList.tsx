@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { Box, Static, useInput, type DOMElement } from "ink";
+import { Box, Static, useInput, type DOMElement } from "../ink-custom";
 import { MessageBubble, type Message } from "./MessageBubble.js";
 import { UnseenDivider } from "./UnseenDivider.js";
 import { useTranscriptSearch } from "../hooks/useTranscriptSearch.js";
@@ -163,7 +163,7 @@ export function VirtualMessageList({ messages, scrollEnabled = true }: Props) {
     if (scrollBoxRef.current) return scrollBoxRef.current;
     const node = scrollContainerRef.current;
     if (!node) return null;
-    // DOMElement from "ink" is structurally compatible with ink-custom's
+    // DOMElement from "../ink-custom" is structurally compatible with ink-custom's
     // DOMElement (createScrollBox only touches `attributes` + optional
     // `yogaNode.markDirty`). Cast through unknown for type-checker peace.
     scrollBoxRef.current = createScrollBox(node as unknown as Parameters<typeof createScrollBox>[0]);

@@ -8,7 +8,7 @@
  */
 
 import React, { createContext, useContext, type ReactNode } from "react";
-import { Text } from "ink";
+import { Text } from "../ink-custom";
 
 // ============================================================================
 // Dollar masking regex

@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Box, Text, useInput } from "ink";
+import { Box, Text, useInput } from "../ink-custom";
 
 // ============================================================================
 // SelectMulti — Multi-select list with checkbox toggles

@@ -9,7 +9,7 @@
  */
 
 import React from "react";
-import { Box, Text, useInput } from "ink";
+import { Box, Text, useInput } from "../ink-custom";
 
 // ============================================================================
 // Types

@@ -10,7 +10,7 @@
  */
 
 import React, { useState, useMemo } from "react";
-import { Box, Text } from "ink";
+import { Box, Text } from "../ink-custom";
 import { useMemory, type MemoryType, type MemoryEntry } from "../state/MemoryProvider.js";
 
 // ============================================================================

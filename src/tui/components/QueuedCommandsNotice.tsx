@@ -1,5 +1,5 @@
 import React from "react";
-import { Box, Text } from "ink";
+import { Box, Text } from "../ink-custom";
 
 // Queued commands display — shows when user types while Gordon is streaming
 interface Props {

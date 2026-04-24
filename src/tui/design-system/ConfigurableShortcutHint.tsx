@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Text } from "ink";
+import { Text } from "../ink-custom";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { homedir } from "node:os";

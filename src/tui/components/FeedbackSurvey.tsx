@@ -9,7 +9,7 @@
  */
 
 import React, { useState, useCallback } from "react";
-import { Box, Text, useInput } from "ink";
+import { Box, Text, useInput } from "../ink-custom";
 import { Select, TextInput } from "@inkjs/ui";
 import * as fs from "node:fs";
 import * as path from "node:path";

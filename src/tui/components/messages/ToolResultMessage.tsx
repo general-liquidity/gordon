@@ -1,5 +1,5 @@
 import React from "react";
-import { Box, Text } from "ink";
+import { Box, Text } from "../../ink-custom";
 import { RichContent } from "../RichContent.js";
 import { NoSelect } from "../NoSelect.js";
 import type { Message } from "../MessageBubble.js";

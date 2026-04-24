@@ -1,5 +1,5 @@
 import React, { createContext, useContext, type ReactNode } from "react";
-import { Box } from "ink";
+import { Box } from "../ink-custom";
 import { NoSelect } from "./NoSelect.js";
 
 // ============================================================================

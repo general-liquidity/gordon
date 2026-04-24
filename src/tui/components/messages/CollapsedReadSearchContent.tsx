@@ -1,5 +1,5 @@
 import React from "react";
-import { Box, Text } from "ink";
+import { Box, Text } from "../../ink-custom";
 
 // CollapsedReadSearchContent — collapsible view for large search/scan results.
 // Collapsed: ⎿ {summary} · {N} lines [E] expand

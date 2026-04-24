@@ -1,5 +1,5 @@
 import React from "react";
-import { Box, Text } from "ink";
+import { Box, Text } from "../ink-custom";
 import { Pane } from "../design-system/Pane.js";
 
 export interface CalibrationBucket {

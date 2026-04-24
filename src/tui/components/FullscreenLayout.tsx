@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useRef, type ReactNode } from "react";
-import { Box, Text, useStdout } from "ink";
+import { Box, Text, useStdout } from "../ink-custom";
 import type { ScrollBoxHandle } from "./ScrollBox.js";
 
 // ============================================================================

@@ -1,5 +1,5 @@
 import React from "react";
-import { Box, Text } from "ink";
+import { Box, Text } from "../ink-custom";
 
 // ============================================================================
 // DataTable — Ticker-grade inline table (NO borders, aligned columns)

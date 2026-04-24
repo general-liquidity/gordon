@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Box, Text } from "ink";
+import { Box, Text } from "../ink-custom";
 import { getSprite } from "./sprites.js";
 import { RARITY_COLORS, MOOD_COLORS, type Companion, type Mood } from "./types.js";
 

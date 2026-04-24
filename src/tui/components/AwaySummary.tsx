@@ -1,5 +1,5 @@
 import React from "react";
-import { Box, Text } from "ink";
+import { Box, Text } from "../ink-custom";
 
 // Away summary — shows what happened while user was idle/away
 // "While you were away: BTC +2.3%, ETH -1.1%, 1 stop hit"

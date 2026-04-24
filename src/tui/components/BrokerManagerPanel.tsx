@@ -8,7 +8,7 @@
  */
 
 import React, { useState } from "react";
-import { Box, Text, useInput } from "ink";
+import { Box, Text, useInput } from "../ink-custom";
 import { Pane } from "../design-system/Pane.js";
 
 // ============================================================================

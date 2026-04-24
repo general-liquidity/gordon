@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { Box, Text, useInput } from "ink";
+import { Box, Text, useInput } from "../ink-custom";
 import { useAnimationClock } from "../hooks/useAnimationClock.js";
 import { ToolExecutionDetailDialog } from "./ToolExecutionDetailDialog.js";
 

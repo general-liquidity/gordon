@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useRef, useMemo, useCallback, type ReactNode } from "react";
-import { useInput } from "ink";
+import { useInput } from "../ink-custom";
 import { KeyContext, type KeybindingAction, type ParsedKeystroke } from "./types.js";
 import { KeybindingResolver } from "./resolver.js";
 import { DEFAULT_BINDINGS } from "./defaultBindings.js";

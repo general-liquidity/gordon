@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef } from "react";
-import { Box, Text, useInput, useStdout } from "ink";
+import { Box, Text, useInput, useStdout } from "../ink-custom";
 import { FooterHints } from "./FooterHints.js";
 import { useSlashCommandTypeahead, type TypeaheadMatch } from "../hooks/useSlashCommandTypeahead.js";
 import { useInputHistory } from "../hooks/useInputHistory.js";

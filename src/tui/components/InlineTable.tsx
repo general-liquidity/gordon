@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { Box, Text, useStdout } from "ink";
+import { Box, Text, useStdout } from "../ink-custom";
 import { cachedStringWidth } from "../rendering/lineWidthCache.ts";
 import { BOX as SHARED_BOX } from "../rendering/stringPool.ts";
 

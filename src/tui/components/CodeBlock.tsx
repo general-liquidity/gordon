@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Box, Text } from "ink";
+import { Box, Text } from "../ink-custom";
 
 /**
  * CodeBlock — Code display with language label, dimmed border, and

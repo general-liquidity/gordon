@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useImperativeHandle, useRef, forwardRef, type ReactNode } from "react";
-import { Box } from "ink";
+import { Box } from "../ink-custom";
 
 // ============================================================================
 // ScrollBox — Scroll container with imperative API

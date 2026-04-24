@@ -1,5 +1,5 @@
 import React from "react";
-import { Box, type BoxProps } from "ink";
+import { Box, type BoxProps } from "../ink-custom";
 
 // ============================================================================
 // ThemedBox — Box with semantic color tokens

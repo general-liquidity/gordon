@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from "react";
-import { Box, Text, useInput } from "ink";
+import { Box, Text, useInput } from "../ink-custom";
 import { Select, TextInput } from "@inkjs/ui";
 import { loadConfig, saveConfig } from "../../infra/storage/config.ts";
 import { exchangeSwitch } from "../../app/commands/exchange.ts";

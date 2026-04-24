@@ -1,5 +1,5 @@
 import React from "react";
-import { Box, Text } from "ink";
+import { Box, Text } from "../ink-custom";
 
 // ============================================================================
 // TeammateSpinnerLine — Single agent task line in the spinner tree

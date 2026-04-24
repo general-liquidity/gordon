@@ -1,5 +1,5 @@
 import React from "react";
-import { Text, type TextProps } from "ink";
+import { Text, type TextProps } from "../ink-custom";
 
 // ============================================================================
 // ThemedText — Text with semantic tone colours

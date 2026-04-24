@@ -1,5 +1,5 @@
 import React from "react";
-import { Box, Text, useInput } from "ink";
+import { Box, Text, useInput } from "../ink-custom";
 
 // Press Enter to continue — for critical trading confirmations
 // Used before: emergency halt execution, large order confirmation, session exit

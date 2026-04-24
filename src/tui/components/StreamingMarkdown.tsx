@@ -1,5 +1,5 @@
 import React, { useMemo, useRef } from "react";
-import { Box, Text } from "ink";
+import { Box, Text } from "../ink-custom";
 import { CodeBlock } from "./CodeBlock";
 import { TerminalLink } from "./TerminalLink";
 

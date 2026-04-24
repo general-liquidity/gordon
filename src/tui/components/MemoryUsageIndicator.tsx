@@ -1,5 +1,5 @@
 import React from "react";
-import { Text } from "ink";
+import { Text } from "../ink-custom";
 
 // Memory usage indicator — shows context window fill percentage
 // Appears in footer when > 50% full, turns red when > 90%

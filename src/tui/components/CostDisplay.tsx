@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Box, Text } from "ink";
+import { Box, Text } from "../ink-custom";
 import { useStats } from "../state/StatsProvider.js";
 
 // ============================================================================

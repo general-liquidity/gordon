@@ -13,7 +13,7 @@
  */
 
 import React, { useState, useCallback } from "react";
-import { Box, Text } from "ink";
+import { Box, Text } from "../ink-custom";
 import { DataTable, fmtNum, changeColor, type Column } from "./DataTable.js";
 import {
   useEventBusSubscriptions,

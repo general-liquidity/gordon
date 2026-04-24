@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Box, Text, useInput } from "ink";
+import { Box, Text, useInput } from "../ink-custom";
 
 // ============================================================================
 // CoordinatorAgentStatus — Live panel showing background agent workers

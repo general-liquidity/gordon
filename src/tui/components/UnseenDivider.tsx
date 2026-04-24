@@ -1,5 +1,5 @@
 import React from "react";
-import { Text, useStdout } from "ink";
+import { Text, useStdout } from "../ink-custom";
 import { useAnimationClock } from "../hooks/useAnimationClock.js";
 
 // ============================================================================

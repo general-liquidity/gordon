@@ -1,5 +1,5 @@
 import React from "react";
-import { Box, Text } from "ink";
+import { Box, Text } from "../ink-custom";
 
 // ============================================================================
 // ToolActivityList — Inline tool call activity renderer (no borders)

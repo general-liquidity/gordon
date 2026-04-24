@@ -1,5 +1,5 @@
 import React from "react";
-import { Box, Text, useInput } from "ink";
+import { Box, Text, useInput } from "../ink-custom";
 
 // ============================================================================
 // MessageActions — Per-message context menu (Shift+Up to activate)

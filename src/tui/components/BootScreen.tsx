@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { Box, Text, useInput, useStdout } from "ink";
+import { Box, Text, useInput, useStdout } from "../ink-custom";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 

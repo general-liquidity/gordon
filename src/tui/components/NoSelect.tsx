@@ -1,5 +1,5 @@
 import React from "react";
-import { Text } from "ink";
+import { Text } from "../ink-custom";
 
 // ============================================================================
 // NoSelect — Prevents terminal text selection of decorative characters

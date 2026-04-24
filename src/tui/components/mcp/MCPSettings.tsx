@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Box, Text, useInput } from "ink";
+import { Box, Text, useInput } from "../../ink-custom";
 import { Button } from "../../design-system/Button.js";
 import { Divider } from "../Divider.js";
 

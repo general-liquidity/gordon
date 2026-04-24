@@ -1,5 +1,5 @@
 import React from "react";
-import { Box } from "ink";
+import { Box } from "../../ink-custom";
 import { RichContent } from "../RichContent.js";
 import { StreamingMarkdown } from "../StreamingMarkdown.js";
 import { MessageResponse } from "../MessageResponseContext.js";

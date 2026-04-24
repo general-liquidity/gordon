@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Box, measureElement } from "ink";
+import { Box, measureElement } from "../ink-custom";
 
 // ============================================================================
 // Ratchet — Prevents layout bounce + offscreen optimization

@@ -1,5 +1,5 @@
 import React from "react";
-import { Text } from "ink";
+import { Text } from "../ink-custom";
 
 // Stash notice — shows when input is stashed during history navigation
 interface Props {

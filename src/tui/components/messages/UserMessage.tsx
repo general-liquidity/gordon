@@ -1,5 +1,5 @@
 import React from "react";
-import { Box, Text } from "ink";
+import { Box, Text } from "../../ink-custom";
 import type { Message } from "../MessageBubble.js";
 
 // User messages: Claude Code-style ">" prefix, no background box.

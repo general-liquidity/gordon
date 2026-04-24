@@ -1,5 +1,5 @@
 import React from "react";
-import { Box, Text } from "ink";
+import { Box, Text } from "../ink-custom";
 import { marked, type Tokens, type Token } from "marked";
 import { CodeBlock } from "./CodeBlock.js";
 import { InlineTable } from "./InlineTable.js";

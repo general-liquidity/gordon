@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Box } from "ink";
+import { Box } from "../ink-custom";
 import { ShimmerChar } from "./ShimmerChar.js";
 import { useAnimationClock } from "../hooks/useAnimationClock.js";
 

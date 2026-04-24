@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Box, Text, useInput } from "ink";
+import { Box, Text, useInput } from "../ink-custom";
 import { getResolvedBindings, type KeyBinding } from "../keybindings/keybindings.js";
 
 /**

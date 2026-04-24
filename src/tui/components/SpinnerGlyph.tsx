@@ -1,5 +1,5 @@
 import React from "react";
-import { Text } from "ink";
+import { Text } from "../ink-custom";
 
 // ============================================================================
 // SpinnerGlyph — Low-level animated spinner glyph (single rotating character)

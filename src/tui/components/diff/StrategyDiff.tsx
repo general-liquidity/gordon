@@ -1,5 +1,5 @@
 import React from "react";
-import { Box, Text } from "ink";
+import { Box, Text } from "../../ink-custom";
 import { parseDiff } from "./colorDiff.js";
 import type { DiffLine } from "./colorDiff.js";
 

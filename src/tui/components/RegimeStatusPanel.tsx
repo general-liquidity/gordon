@@ -8,7 +8,7 @@
  */
 
 import React from "react";
-import { Box, Text, useInput } from "ink";
+import { Box, Text, useInput } from "../ink-custom";
 import { Pane } from "../design-system/Pane.js";
 import { ProgressBar } from "../design-system/ProgressBar.js";
 

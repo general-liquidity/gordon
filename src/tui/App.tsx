@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { Box, Text, Spacer, useInput, useApp } from "ink";
+import { Box, Text, Spacer, useInput, useApp } from "./ink-custom";
 
 // ── Providers ──
 import { SettingsProvider } from "./state/SettingsProvider.js";

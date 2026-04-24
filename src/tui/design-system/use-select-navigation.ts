@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useInput } from "ink";
+import { useInput } from "../ink-custom";
 
 // ============================================================================
 // useSelectNavigation — Arrow-key navigation with wrap-around and Enter-to-select

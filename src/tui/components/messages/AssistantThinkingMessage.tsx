@@ -1,5 +1,5 @@
 import React from "react";
-import { Box } from "ink";
+import { Box } from "../../ink-custom";
 import { ThinkStep } from "../ThinkStep.js";
 import type { Message } from "../MessageBubble.js";
 

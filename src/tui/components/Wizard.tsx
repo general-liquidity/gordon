@@ -1,5 +1,5 @@
 import React, { useState, type ReactNode } from "react";
-import { Box, Text, useInput } from "ink";
+import { Box, Text, useInput } from "../ink-custom";
 
 // ============================================================================
 // Wizard — Multi-step flow with data collection and back-navigation

@@ -1,5 +1,5 @@
 import React from "react";
-import { Box, Text, useStdout } from "ink";
+import { Box, Text, useStdout } from "../../ink-custom";
 import type { Message } from "../MessageBubble.js";
 
 // CompactBoundaryMessage — separator line shown when the conversation is compacted.

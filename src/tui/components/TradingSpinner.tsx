@@ -1,5 +1,5 @@
 import React, { useRef, useMemo } from "react";
-import { Box, Text } from "ink";
+import { Box, Text } from "../ink-custom";
 import { ShimmerChar } from "./ShimmerChar.js";
 import { useAnimationClock } from "../hooks/useAnimationClock.js";
 import { TeammateSpinnerTree } from "./TeammateSpinnerTree.js";

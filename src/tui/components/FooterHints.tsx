@@ -1,5 +1,5 @@
 import React from "react";
-import { Box, Text, Spacer } from "ink";
+import { Box, Text, Spacer } from "../ink-custom";
 
 // ============================================================================
 // FooterHints — Right-aligned hints on the input line

@@ -1,5 +1,5 @@
 import React from "react";
-import { Box, Text } from "ink";
+import { Box, Text } from "../../ink-custom";
 
 // GroupedToolUseContent — shows multiple consecutive tool calls grouped in one line.
 // Icons: ✓ green success, ✗ red error, ● cyan running.

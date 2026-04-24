@@ -1,5 +1,5 @@
 import React from "react";
-import { Text } from "ink";
+import { Text } from "../ink-custom";
 
 // ============================================================================
 // TerminalLink — Clickable hyperlinks in the terminal

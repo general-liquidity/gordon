@@ -1,5 +1,5 @@
 import React, { type ReactNode } from "react";
-import { Box, Text, useInput, useStdout } from "ink";
+import { Box, Text, useInput, useStdout } from "../ink-custom";
 
 // ============================================================================
 // Dialog — Modal dialog wrapper with border, title, and key handling

@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from "react";
-import { Box, Text, useInput } from "ink";
+import { Box, Text, useInput } from "../ink-custom";
 
 // ============================================================================
 // QuickOpenDialog — Ctrl+Shift+P fuzzy finder for strategies, playbooks,

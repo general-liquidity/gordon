@@ -1,5 +1,5 @@
 import React from "react";
-import { Box, Text } from "ink";
+import { Box, Text } from "../../ink-custom";
 
 // HighlightedThinkingText — thinking text with optional search query highlights.
 // Match segments: bold yellow inverse.

@@ -19,7 +19,7 @@
  */
 
 import React from "react";
-import { Box, Text, useStdout } from "ink";
+import { Box, Text, useStdout } from "../ink-custom";
 
 // ============================================================================
 // Types

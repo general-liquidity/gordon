@@ -6,7 +6,7 @@
  */
 
 import React from "react";
-import { Box, Text } from "ink";
+import { Box, Text } from "../ink-custom";
 
 // ============================================================================
 // Types

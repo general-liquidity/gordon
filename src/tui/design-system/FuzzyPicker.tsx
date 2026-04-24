@@ -1,5 +1,5 @@
 import React, { useState, useMemo, type ReactNode } from "react";
-import { Box, Text, useInput, useStdout } from "ink";
+import { Box, Text, useInput, useStdout } from "../ink-custom";
 
 // ============================================================================
 // FuzzyPicker — Searchable list picker with preview pane

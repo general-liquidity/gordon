@@ -1,5 +1,5 @@
 import React from "react";
-import { render } from "ink";
+import { render } from "./ink-custom";
 import { App } from "./App.js";
 import * as fs from "node:fs";
 import * as path from "node:path";

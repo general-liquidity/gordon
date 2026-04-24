@@ -1,5 +1,5 @@
 import React from "react";
-import { Box } from "ink";
+import { Box } from "../ink-custom";
 import { DataTable, fmtPct, type Column } from "../components/DataTable.js";
 import { InlineChart } from "../components/InlineChart.js";
 

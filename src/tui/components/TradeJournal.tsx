@@ -9,7 +9,7 @@
  */
 
 import React, { useState, useEffect, useCallback } from "react";
-import { Box, Text } from "ink";
+import { Box, Text } from "../ink-custom";
 import { useMemory } from "../state/MemoryProvider.js";
 
 // ============================================================================
