@@ -60,7 +60,7 @@
     "@types/asciichart": "^1.5.8",
     "@types/bun": "latest",
     "@types/node": "^25.1.0",
-    "babel-plugin-react-compiler": "^19.1.0",
+    "babel-plugin-react-compiler": "^1.0.0",
     "react-devtools-core": "^6.1.5",
     "shadcn": "^3.8.3"
   },
