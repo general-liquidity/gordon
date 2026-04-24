@@ -4,8 +4,8 @@ import { FooterHints } from "./FooterHints.js";
 import { useSlashCommandTypeahead, type TypeaheadMatch } from "../hooks/useSlashCommandTypeahead.js";
 import { useInputHistory } from "../hooks/useInputHistory.js";
 import { useImagePaste } from "../hooks/useImagePaste.js";
-import { useTokenEstimation } from "../hooks/useTokenEstimation.js";
 import { useDeclaredCursor } from "../hooks/useDeclaredCursor.js";
+import { useAnimationClock } from "../hooks/useAnimationClock.js";
 import { graphemeCount, graphemeToCodeUnit } from "../utils/graphemes.js";
 import { TokenWarning } from "./TokenWarning.js";
 import {
@@ -124,9 +124,10 @@ export function PromptInput({
     setCursorPos((p) => p + graphemeCount(token));
   });
 
-  // Token estimation: rough cost preview shown inline below the input
-  const { estimate } = useTokenEstimation();
-  const tokenEstimate = value.trim() ? estimate(value) : null;
+  // Token cost-awareness lives in the footer's CostDisplay (token cost +
+  // P&L + trade count). useTokenEstimation hook is still available at
+  // src/tui/hooks/useTokenEstimation.ts for callers that want a pre-submit
+  // estimate (e.g. slash-command handlers gating expensive operations).
 
   // Show suggestions when value starts with "/" — allow one space for subcommand browsing
   const slashContent = value.startsWith("/") ? value.slice(1) : "";
@@ -438,9 +439,6 @@ export function PromptInput({
             <Text dimColor>{placeholder}</Text>
           )}
         </Box>
-        {tokenEstimate && (
-          <Text dimColor> ~{tokenEstimate.estimatedTokens} tokens</Text>
-        )}
         {/* Footer hints moved above input box — status bar handles mode/cost/shortcuts */}
       </Box>
     </Box>
@@ -490,17 +488,24 @@ function PromptDisplay({
   const textColor = isBashMode ? "yellow" : isSlashMode ? "rgb(52,238,176)" : undefined;
   const useBlockCursor = !(isVimNormal || isVimVisual);
 
+  // Cursor blink — 500ms cadence (matches typical terminal cursor).
+  // Insert mode: block alternates with space. Vim Normal/Visual: inverse
+  // glyph alternates with non-inverse so the highlight pulses without
+  // hiding the underlying character.
+  const blinkFrame = useAnimationClock(500);
+  const cursorOn = blinkFrame % 2 === 0;
+
   return (
     <Text>
       <Text color={textColor}>{left}</Text>
       {useBlockCursor ? (
         <>
-          <Text color="rgb(52,238,176)">{"█"}</Text>
+          <Text color="rgb(52,238,176)">{cursorOn ? "█" : " "}</Text>
           <Text color={textColor}>{right}</Text>
         </>
       ) : (
         <>
-          <Text color={textColor} inverse>{charAtCursor}</Text>
+          <Text color={textColor} inverse={cursorOn}>{charAtCursor}</Text>
           <Text color={textColor}>{right}</Text>
         </>
       )}

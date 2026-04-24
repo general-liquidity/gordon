@@ -1,7 +1,6 @@
-import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import React, { useState, useCallback, useRef, useMemo } from "react";
 import { Box, Static, useInput, type DOMElement } from "../ink-custom";
 import { MessageBubble, type Message } from "./MessageBubble.js";
-import { UnseenDivider } from "./UnseenDivider.js";
 import { useTranscriptSearch } from "../hooks/useTranscriptSearch.js";
 import { SearchBar } from "./SearchBar.js";
 import { OffscreenFreeze } from "./OffscreenFreeze.js";
@@ -30,12 +29,18 @@ interface Props {
   scrollEnabled?: boolean;
 }
 
-/** Stable messages to keep visible in the Ink-managed live area */
-const LIVE_TAIL = 4;
+/**
+ * Stable messages to keep visible in the Ink-managed live area.
+ *
+ * Kept small (was 4) because each Ink re-render erases-and-reprints the
+ * whole live frame. With long markdown responses, 4 messages × multi-line
+ * = a frame that exceeds the terminal viewport, which makes the terminal
+ * autoscroll on every render. Two messages keeps the live frame compact;
+ * older content lives in scrollback via <Static>.
+ */
+const LIVE_TAIL = 2;
 
 export function VirtualMessageList({ messages, scrollEnabled = true }: Props) {
-  const [unseenCount, setUnseenCount] = useState(0);
-  const prevMessageCount = useRef(messages.length);
   const isStreaming = messages.some((m) => m.streaming);
 
   // Only show completed messages — streaming ones are invisible until done.
@@ -96,17 +101,6 @@ export function VirtualMessageList({ messages, scrollEnabled = true }: Props) {
   const staticMessages = collapsedMessages.slice(0, commitCursor);
   const liveMessages = collapsedMessages.slice(commitCursor);
 
-  // Unseen count — increments when new completed messages arrive;
-  // clears as soon as streaming begins (a response is in progress).
-  useEffect(() => {
-    const newCount = completedMessages.length - prevMessageCount.current;
-    if (newCount > 0 && !isStreaming) {
-      setUnseenCount((prev) => prev + newCount);
-    }
-    if (isStreaming) setUnseenCount(0);
-    prevMessageCount.current = completedMessages.length;
-  }, [completedMessages.length, isStreaming]);
-
   // Transcript search — "/" to enter, n/N to navigate, Esc to exit
   const [searchMode, setSearchMode] = useState(false);
   const search = useTranscriptSearch(completedMessages);
@@ -135,10 +129,6 @@ export function VirtualMessageList({ messages, scrollEnabled = true }: Props) {
     },
     { isActive: scrollEnabled },
   );
-
-  const handleJumpToBottom = useCallback(() => {
-    setUnseenCount(0);
-  }, []);
 
   // ---------------------------------------------------------------------
   // Mouse-wheel scrolling.
@@ -218,9 +208,6 @@ export function VirtualMessageList({ messages, scrollEnabled = true }: Props) {
         isActive={search.isActive}
       />
 
-      {unseenCount > 0 && (
-        <UnseenDivider count={unseenCount} onJumpToBottom={handleJumpToBottom} />
-      )}
     </Box>
   );
 }
