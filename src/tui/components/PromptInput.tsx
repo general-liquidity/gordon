@@ -24,6 +24,50 @@ import {
 //   /command    Description text here
 // No aliases clutter. Full descriptions visible. Tight rows.
 // Arrow keys scroll, Tab completes, Enter selects.
+//
+// ----------------------------------------------------------------------------
+// CJK Phase 4 — IME preedit (DEFERRED, see research note below)
+// ----------------------------------------------------------------------------
+// Phases 1–3 delivered grapheme-aware cursor, vim motions, and column-accurate
+// rendering for committed CJK / emoji text. Phase 4 was scoped to render the
+// IME composing text underlined until the user confirms it with Enter/Space.
+//
+// Research (Apr 2026) conclusively shows IME preedit is NOT exposed to the
+// CLI process on any major platform:
+//   - Ink's `useInput` parses raw keypresses (node_modules/ink/build/hooks/
+//     use-input.js) with zero composition/preedit awareness.
+//   - macOS Terminal.app / iTerm2: the IME candidate window is an OS layer
+//     above the terminal; stdin only sees committed code points.
+//   - Windows Terminal + ConPTY: IME preedit is rendered by the terminal as
+//     an overlay; the TUI process receives nothing until commit. See
+//     openai/codex#4870 — Codex CLI has the mirror problem (re-render flicker
+//     over the OS IME overlay) and no fix exists because there is no
+//     composition-state escape sequence to parse.
+//   - WezTerm: pre-edit/on-the-spot IME "isn't working" (wezterm#3411). The
+//     `ime_preedit_rendering` option controls WezTerm's own rendering, not
+//     a stdin protocol.
+//   - No standardized escape sequence for IME preedit exists. OSC 133 is
+//     shell integration (FinalTerm prompt markers), unrelated to IME. The
+//     Kitty keyboard protocol reports key events only, no composition.
+//
+// Evaluated fallbacks and rejected both:
+//   (A) Rapid-character heuristic. Gordon already uses a 10ms window for
+//       paste detection (lastInputTimeRef). A preedit heuristic on top would
+//       misclassify fast ASCII typing as composition, adding a ~500ms commit
+//       delay and spurious underline styling for 99% of users while giving
+//       CJK users a broken experience (characters on macOS arrive already
+//       committed — there is no composing state to catch).
+//   (B) Escape-sequence parser. No real terminal emits preedit sequences, so
+//       a parser would be dead code. OSC 133 is the wrong spec for this.
+//
+// Gordon's existing grapheme-aware rendering already gives CJK / IME users
+// the correct committed-text experience (see PromptDisplay below). Whatever
+// the terminal+OS IME do during composition is out of our control; once
+// text commits, we render it correctly at 2-column visual width with the
+// grapheme-aware cursor.
+//
+// Revisit if and when a terminal protocol for preedit emerges — likely via
+// the Kitty keyboard protocol extension pathway.
 // ============================================================================
 
 interface Props {
