@@ -346,7 +346,12 @@ function AppInner() {
       });
     });
     return () => { unsubRate?.(); unsubPlan?.(); unsubTrade?.(); unsubTradeClosed?.(); unsubDebate?.(); unsubElicit?.(); };
-  }, [rateLimit]);
+    // Empty deps: rateLimit.recordRateLimit is useCallback-stable and all
+    // setState dispatchers are guaranteed stable by React. Using [rateLimit]
+    // caused re-subscribe on every render (rateLimit is a fresh object
+    // literal per render) which in turn re-fired handlers → infinite loop.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Mirror warning/critical alerts to the audit log so they survive TUI
   // restarts and reach daemons running without a UI. Idempotent — safe to
