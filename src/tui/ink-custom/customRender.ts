@@ -104,15 +104,23 @@ export function startCustomRender(node: ReactNode, options: Required<RenderOptio
     renderNodeToOutput(rootNode, output, { skipStaticElements: true });
     output.paintInto(frameBuffer.back, charPool, stylePool);
 
-    // Compute patch list, serialize to ANSI.
+    // Compute patch list so pool churn is exercised every frame (validates
+    // the diff hot path even when transport uses full rewrites).
+    // TODO(incremental-patches): the current transport is a full-frame
+    // rewrite (eraseLines + reprint) because absolute-CUP patches only work
+    // in alt-screen mode, and Gordon runs main-screen. Safe incremental
+    // emission needs either (a) an alt-screen-only activation gate, or (b)
+    // a relative-cursor AnsiPatcher variant (CUU + \r + CUD + CUF). Until
+    // one of those lands, the patches produced here are intentionally
+    // discarded in favor of the tear-free full-frame approach below.
     const patches = diffCells(frameBuffer.front, frameBuffer.back, stylePool, charPool);
-    const frameAnsi = ansiPatcher.write(patches, stylePool, charPool);
+    void ansiPatcher.write(patches, stylePool, charPool);
     frameBuffer.swap();
 
-    // First-paint fast path: output the full ANSI string from the target.
-    // This is what gets written on the very first render (front was blank).
+    const fullAnsi = output.toAnsiString();
+
+    // First paint: cursor-hide + full frame, no erase needed.
     if (lastPaintedAnsi.length === 0) {
-      const fullAnsi = output.toAnsiString();
       lastPaintedAnsi = fullAnsi;
       lastPrintedHeight = Math.max(1, fullAnsi.split("\n").length);
       writeToStdout(syncTerm.wrapFrame(ansiEscapes.cursorHide + fullAnsi + "\n"));
@@ -120,12 +128,7 @@ export function startCustomRender(node: ReactNode, options: Required<RenderOptio
       return;
     }
 
-    // Subsequent frames: erase previous height, reprint full frame.
-    // The patch list isn't strictly necessary for this naive transport, but
-    // we compute + flush it so pool churn is exercised on every frame.
-    void patches;
-    void frameAnsi;
-    const fullAnsi = output.toAnsiString();
+    // Subsequent frames: skip if identical, otherwise erase + reprint.
     if (fullAnsi === lastPaintedAnsi) {
       options.onRender?.({ renderTime: performance.now() - startTime });
       return;

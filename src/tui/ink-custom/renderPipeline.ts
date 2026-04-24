@@ -193,9 +193,16 @@ export function createAnsiPatcher(): AnsiPatcher {
         // Style change. `styleId === -1` means neutral — no SGR emitted.
         if (patch.styleId >= 0 && patch.styleId !== lastStyleId) {
           const seq = stylePool.get(patch.styleId);
-          if (seq !== undefined) {
+          if (seq !== undefined && seq.length > 0) {
+            // Reset any previous style before applying the new one so
+            // attributes (bold/dim/color) from the old style don't bleed.
+            if (styleUsed) out += SGR_RESET;
             out += seq;
             styleUsed = true;
+          } else if (styleUsed && (seq === undefined || seq.length === 0)) {
+            // Switching from a styled run to a neutral run — reset once.
+            out += SGR_RESET;
+            styleUsed = false;
           }
           lastStyleId = patch.styleId;
         }

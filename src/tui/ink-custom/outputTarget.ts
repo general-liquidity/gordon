@@ -85,21 +85,11 @@ function cacheStyledChars(line: string): StyledChar[] {
 }
 
 function styledCharToAnsi(character: StyledChar): string {
-  // Serialize a single StyledChar back to an ANSI run: style codes, then
-  // glyph, then close codes. This lets us store a self-contained ANSI
-  // "style string" in stylePool for each unique style combination.
-  const openers = character.styles.map((s) => s.code).join("");
-  return openers;
-}
-
-function styledCharCloser(character: StyledChar): string {
-  // Reset codes for this character's styles, in reverse order.
-  let out = "";
-  for (let i = character.styles.length - 1; i >= 0; i--) {
-    const st = character.styles[i];
-    if (st) out += st.endCode;
-  }
-  return out;
+  // Serialize a StyledChar's opening SGR codes into a single string.
+  // Close codes are NOT stored — AnsiPatcher emits SGR_RESET between style
+  // changes and at end-of-frame, which is simpler and cheaper than tracking
+  // per-style closers.
+  return character.styles.map((s) => s.code).join("");
 }
 
 export function createOutputTarget(width: number, height: number): OutputTarget {
@@ -207,9 +197,7 @@ export function createOutputTarget(width: number, height: number): OutputTarget 
               continue;
             }
             const visualWidth = Math.max(1, stringWidth(ch.value));
-            const styleAnsi = styledCharToAnsi(ch);
-            const resetCloser = styledCharCloser(ch);
-            const styleId = stylePool.intern(styleAnsi + "\x00" + resetCloser);
+            const styleId = stylePool.intern(styledCharToAnsi(ch));
             const charId = charPool.intern(ch.value);
             const widthBits: CellWidth = visualWidth > 1 ? 1 : 1;
             buffer.set(offsetX, targetY, charId, styleId, widthBits);

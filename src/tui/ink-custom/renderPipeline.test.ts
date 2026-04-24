@@ -294,10 +294,29 @@ describe("createAnsiPatcher", () => {
       { x: 2, y: 0, content: "c", visualWidth: 1, styleId: 2 },
     ];
     const out = createAnsiPatcher().write(patches, styles, chars);
-    // 'a' with red, 'b' inline (no new SGR, cursor continues), 'c' after
-    // cursor + green. Because 'b' starts exactly where 'a' ends (x=1 after
-    // a width-1 'a' at x=0), no cursor move is emitted. Same for 'c' at
-    // x=2 after 'b' ends at x=2.
-    expect(out).toBe("\x1b[1;1H\x1b[31mab\x1b[32mc\x1b[0m");
+    // 'a' with red, 'b' inline (no new SGR, cursor continues). When 'c''s
+    // style changes from red to green, SGR_RESET is emitted first so the
+    // red attributes don't bleed into anything downstream.
+    expect(out).toBe("\x1b[1;1H\x1b[31mab\x1b[0m\x1b[32mc\x1b[0m");
+  });
+
+  test("emits SGR_RESET when transitioning from styled to neutral run", () => {
+    const styles: StylePool = {
+      intern: () => 1,
+      get: (id: number) => (id === 1 ? "\x1b[31m" : id === 2 ? "" : undefined),
+      size: 2,
+      capacity: 256,
+      stats: () => ({ size: 2, capacity: 256 }),
+      reset: () => {},
+    };
+    const chars = makeMockCharPool();
+    const patches: Patch[] = [
+      { x: 0, y: 0, content: "a", visualWidth: 1, styleId: 1 }, // red
+      { x: 1, y: 0, content: "b", visualWidth: 1, styleId: 2 }, // neutral (empty style)
+    ];
+    const out = createAnsiPatcher().write(patches, styles, chars);
+    // Red 'a', then reset before the empty-style run, then 'b', then no
+    // trailing reset (styleUsed was cleared on the transition).
+    expect(out).toBe("\x1b[1;1H\x1b[31ma\x1b[0mb");
   });
 });
