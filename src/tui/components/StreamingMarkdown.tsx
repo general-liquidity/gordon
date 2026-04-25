@@ -187,10 +187,10 @@ function renderInline(text: string): React.ReactNode {
     const codeMatch = remaining.match(/`([^`]+)`/);
     if (codeMatch && codeMatch.index != null) {
       if (codeMatch.index > 0) key = pushPlain(parts, key, remaining.slice(0, codeMatch.index));
-      // Amber for ticker/tool/function names — matches MarkdownRenderer's
-      // codespan and InlineTable's header color so streaming → completed
-      // transitions and tables share one accent.
-      parts.push(<Text key={key++} color={PALETTE.amber}>{codeMatch[1]}</Text>);
+      // Tan for function / strategy / parameter IDs — distinct from the
+      // amber used by table headers / H2 so backticked names don't blend
+      // with section emphasis. Matches MarkdownRenderer codespan.
+      parts.push(<Text key={key++} color={PALETTE.tan}>{codeMatch[1]}</Text>);
       remaining = remaining.slice(codeMatch.index + codeMatch[0].length);
       continue;
     }

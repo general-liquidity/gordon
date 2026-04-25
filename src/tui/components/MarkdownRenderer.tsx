@@ -233,7 +233,6 @@ const ANSI_RESET = ANSI.reset;
 const ANSI_BOLD = ANSI.bold;
 const ANSI_ITALIC = ANSI.italic;
 const ANSI_STRIKE = ANSI.strike;
-const ANSI_AMBER = ANSI.amber;
 const ANSI_PLATINUM = ANSI.platinum;
 
 // Like tokensToPlainText but emits ANSI escape codes for inline formatting
@@ -262,7 +261,7 @@ function colorSignedNumbersAnsi(text: string): string {
 }
 
 /** Map a palette hex color to its matching 24-bit ANSI escape. Falls
- *  back to green so embedded colors never print raw hex into the cell. */
+ *  back to platinum so embedded colors never print raw hex into the cell. */
 function paletteToAnsi(hex: string): string {
   if (hex === PALETTE.red) return ANSI.red;
   if (hex === PALETTE.green) return ANSI.green;
@@ -270,14 +269,17 @@ function paletteToAnsi(hex: string): string {
   if (hex === PALETTE.gold) return ANSI.gold;
   if (hex === PALETTE.platinum) return ANSI.platinum;
   if (hex === PALETTE.ash) return ANSI.ash;
-  return ANSI.green;
+  if (hex === PALETTE.mustard) return ANSI.mustard;
+  if (hex === PALETTE.tan) return ANSI.tan;
+  if (hex === PALETTE.emerald) return ANSI.emerald;
+  return ANSI.platinum;
 }
 
 function tokensToAnsiText(tokens: Token[]): string {
   return tokens
     .map((t) => {
       if (t.type === "text") return colorSignedNumbersAnsi((t as Tokens.Text).text);
-      if (t.type === "codespan") return ANSI_AMBER + (t as Tokens.Codespan).text + ANSI_RESET;
+      if (t.type === "codespan") return ANSI.tan + (t as Tokens.Codespan).text + ANSI_RESET;
       if (t.type === "strong") return ANSI_BOLD + tokensToAnsiText((t as Tokens.Strong).tokens ?? []) + ANSI_RESET;
       if (t.type === "em") return ANSI_ITALIC + tokensToAnsiText((t as Tokens.Em).tokens ?? []) + ANSI_RESET;
       if (t.type === "del") return ANSI_STRIKE + tokensToAnsiText((t as Tokens.Del).tokens ?? []) + ANSI_RESET;
@@ -435,12 +437,12 @@ function InlineToken({ token }: { token: Token }): React.ReactElement | null {
     }
 
     case "codespan": {
-      // Amber for ticker / tool / function names — same accent the
-      // table-header row uses, matches Bloomberg's amber-on-black field
-      // labels. Applied identically in StreamingMarkdown so streaming
-      // and completed renders look the same.
+      // Tan for function / strategy / parameter IDs — distinct from the
+      // amber used by H2 / table headers, so backticked names don't
+      // visually merge with section emphasis. Same color in
+      // StreamingMarkdown for stable streaming → completed transitions.
       const t = token as Tokens.Codespan;
-      return <Text color={PALETTE.amber}>{t.text}</Text>;
+      return <Text color={PALETTE.tan}>{t.text}</Text>;
     }
 
     case "link": {
