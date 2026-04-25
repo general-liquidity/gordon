@@ -129,14 +129,21 @@ import {
 const logger = createModuleLogger("orchestrator");
 
 /**
- * Cap on Mastra agent output tokens per call. Without this, Mastra defaults
- * to the model's `maxOutputTokensForModel` (e.g. 100000 for Claude Haiku 4.5)
- * which Dedalus's Anthropic backend rejects on non-streaming requests with
- * "streaming_required" — flooding the console with 400s on every fast-tier
- * call (compaction, scan, ops phases). 16384 is plenty for any single
- * agent response and stays well under every provider's non-stream limit.
+ * Per-call output-token caps. Without these, Mastra defaults to the model's
+ * full catalog max (e.g. 100000 for Claude Haiku 4.5), and Dedalus's
+ * Anthropic backend rejects non-streaming requests above ~21K with
+ * "streaming_required" — producing a wave of 400s during fast-tier calls
+ * (compaction, scan, ops phases use Haiku via Dedalus regardless of which
+ * main model the user picked).
+ *
+ * - STREAM cap is generous (65536) since streaming requests don't hit the
+ *   provider threshold, and we want long agent responses to render fully.
+ * - GENERATE cap stays under the Anthropic non-stream threshold (~21333)
+ *   since the only generate() callers are structured-output and
+ *   simple-message paths that don't need very long responses.
  */
-const MAX_OUTPUT_TOKENS = 16384;
+const MAX_OUTPUT_TOKENS_STREAM = 65536;
+const MAX_OUTPUT_TOKENS_GENERATE = 16384;
 
 // ============================================================================
 // Lifecycle Session Management
@@ -469,7 +476,7 @@ export async function* processMessageStream(
         requestContext,
         ...(threadId && effectiveResourceId ? { memory: { thread: threadId, resource: effectiveResourceId } } : {}),
         maxSteps: 20,
-        modelSettings: { maxOutputTokens: MAX_OUTPUT_TOKENS },
+        modelSettings: { maxOutputTokens: MAX_OUTPUT_TOKENS_STREAM },
         ...groundedPrompt.requestOptions,
         ...(tracingOptions && { tracingOptions }),
         // Delegation hooks for supervisor → sub-agent routing
@@ -833,7 +840,7 @@ export async function processStructuredMessage<T extends Record<string, unknown>
       requestContext,
       ...(threadId && effectiveResourceId ? { memory: { thread: threadId, resource: effectiveResourceId } } : {}),
       maxSteps: 20,
-      modelSettings: { maxOutputTokens: MAX_OUTPUT_TOKENS },
+      modelSettings: { maxOutputTokens: MAX_OUTPUT_TOKENS_GENERATE },
       structuredOutput: { schema },
       ...groundedPrompt.requestOptions,
       ...(tracingOptions && { tracingOptions }),
@@ -957,7 +964,7 @@ export async function processMessage(
       requestContext,
       ...(threadId && effectiveResourceId ? { memory: { thread: threadId, resource: effectiveResourceId } } : {}),
       maxSteps: 20,
-      modelSettings: { maxOutputTokens: MAX_OUTPUT_TOKENS },
+      modelSettings: { maxOutputTokens: MAX_OUTPUT_TOKENS_GENERATE },
       ...groundedPrompt.requestOptions,
       ...(tracingOptions && { tracingOptions }),
     });
@@ -1017,7 +1024,7 @@ export async function processSimpleMessage(
     const result = await gordonAgent().generate(groundedPrompt.messages, {
       requestContext,
       maxSteps: 5,
-      modelSettings: { maxOutputTokens: MAX_OUTPUT_TOKENS },
+      modelSettings: { maxOutputTokens: MAX_OUTPUT_TOKENS_GENERATE },
       ...groundedPrompt.requestOptions,
       ...(tracingOptions && { tracingOptions }),
     });
