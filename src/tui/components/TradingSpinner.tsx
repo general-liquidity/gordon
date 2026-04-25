@@ -2,6 +2,7 @@ import React, { useRef, useMemo } from "react";
 import { Box, Text } from "../ink-custom";
 import { ShimmerChar } from "./ShimmerChar.js";
 import { useAnimationClock } from "../hooks/useAnimationClock.js";
+import { formatElapsed } from "../hooks/useElapsedTime.js";
 import { TeammateSpinnerTree } from "./TeammateSpinnerTree.js";
 import type { AgentTask } from "./TeammateSpinnerTree.js";
 
@@ -430,8 +431,11 @@ export function TradingSpinner({ agentName, elapsedMs, streamLength = 0, userInp
     ? (frame % 2 === 0 ? "\u25CF" : " ")
     : (ALL_FRAMES[Math.floor(frame / 2.4) % ALL_FRAMES.length] ?? "\u00B7");
   const isStalled = stallIntensity > 0.3;
+  // Match Claude Code's formatDuration: "5s" / "1m 23s" / "2h 15m" so
+  // long-running operations don't keep climbing as a four-digit-second
+  // count. Falls back to empty string under the 1-second threshold.
   const elapsedStr = elapsedMs != null && elapsedMs >= 1000
-    ? `${(elapsedMs / 1000).toFixed(0)}s`
+    ? formatElapsed(elapsedMs / 1000)
     : "";
 
   // Smooth token counter (Claude Code pattern: +3 small, +50 large)
@@ -462,7 +466,7 @@ export function TradingSpinner({ agentName, elapsedMs, streamLength = 0, userInp
   const showAgentTree = (agents?.length ?? 0) >= 2;
 
   return (
-    <Box flexDirection="column">
+    <Box flexDirection="column" marginTop={1}>
       <Box paddingLeft={2}>
         <Text color={isStalled ? "red" : "rgb(52,238,176)"}>{char} </Text>
         {chars.map((c, i) => (

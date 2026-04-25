@@ -60,7 +60,29 @@ export function useElapsedTime(isActive: boolean): ElapsedTimeResult {
     startTimeRef.current = isActive ? Date.now() : null;
   }, [isActive]);
 
-  const formatted = `${elapsed.toFixed(1)}s`;
+  const formatted = formatElapsed(elapsed);
 
   return { elapsed, formatted, reset };
+}
+
+/**
+ * Format elapsed seconds the same way Claude Code formats durations:
+ *  - <60s    → "5s", "23s", "0s"
+ *  - >=60s   → "1m 45s", "12m 3s"
+ *  - >=3600s → "1h 5m", "2h 0m"
+ *
+ * No decimals once we cross 1s — long-running operations don't need
+ * sub-second precision.
+ */
+export function formatElapsed(seconds: number): string {
+  if (seconds < 1) return `${seconds.toFixed(1)}s`;
+  if (seconds < 60) return `${Math.floor(seconds)}s`;
+  if (seconds < 3600) {
+    const m = Math.floor(seconds / 60);
+    const s = Math.floor(seconds % 60);
+    return s === 0 ? `${m}m` : `${m}m ${s}s`;
+  }
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  return m === 0 ? `${h}h` : `${h}h ${m}m`;
 }

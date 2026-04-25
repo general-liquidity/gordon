@@ -601,7 +601,7 @@ function AppInner() {
   // ── Custom hooks ──
   useTerminalSize();
   const ctrlC = useDoublePress(2000);
-  const { formatted: elapsedFormatted } = useElapsedTime(isStreaming);
+  const { elapsed: elapsedSeconds } = useElapsedTime(isStreaming);
   const paletteItems = useMergedCommands();
 
   // ── Derived: memoize all activeAgents derivations in one pass ──
@@ -1776,7 +1776,7 @@ function AppInner() {
     'Try "/dd BTC"',
   ];
   const placeholder = isStreaming
-    ? `\u25CF Gordon is working... ${elapsedFormatted}`
+    ? ""
     : ctrlC.isPending
       ? "Press Ctrl+C again to exit"
       : !runtimeReady
@@ -1854,13 +1854,16 @@ function AppInner() {
             <ToolCallInline calls={activeToolCalls} />
           )}
 
-          {/* Spinner — shown during all streaming (response is hidden until complete) */}
+          {/* Spinner — shown during all streaming. Carries the elapsed
+              timer so users see it ramp up next to the verb (Claude Code
+              pattern: 'Cogitating · 23s · 1.2K tok'). */}
           {isStreaming && !isThinking && (
             <TradingSpinner
               agentName={activeAgentName ?? undefined}
               streamLength={0}
               userInput={lastUserInput}
               activeToolName={activeToolCalls.find((t) => t.status === "running")?.toolName}
+              elapsedMs={elapsedSeconds * 1000}
             />
           )}
 
@@ -2230,8 +2233,6 @@ function AppInner() {
       {/* ── Status bar above input (Codex pattern: model · % left · trading status) ── */}
       <Box paddingX={2} justifyContent="space-between">
         <Box gap={1}>
-          <Text dimColor>{process.env.GORDON_MODEL ?? "auto"}</Text>
-          <Text dimColor>{"\u00b7"}</Text>
           <Text color={memoryUsageRatio > 0.9 ? "red" : memoryUsageRatio > 0.7 ? "yellow" : undefined} dimColor={memoryUsageRatio <= 0.7}>{Math.round((1 - memoryUsageRatio) * 100)}% left</Text>
           {autonomousActive && (
             <>

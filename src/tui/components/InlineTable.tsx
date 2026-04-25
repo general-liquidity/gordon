@@ -261,7 +261,7 @@ export function InlineTable({ lines }: Props) {
         const isBorder = line.kind === "border";
         const isHeader = line.bold;
         return (
-          <Text key={i} bold={isHeader} color={isHeader ? PALETTE.amber : undefined} dimColor={isBorder}>
+          <Text key={i} bold={isHeader} color={isHeader ? PALETTE.mustard : undefined} dimColor={isBorder}>
             {line.text}
           </Text>
         );

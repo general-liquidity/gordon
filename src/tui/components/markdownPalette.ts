@@ -141,12 +141,14 @@ export const DOWN_ARROW_RE = /(?:↓↓?|↘|🔴)\s*(?:\d[\d,]*(?:\.\d+)?%?)?/g
  *  read as neutral, distinct from the green/red of vertical arrows. */
 export const SIDE_ARROW_RE = /[→←↔➜]/g;
 
-/** Well-known indicator / metric labels that should highlight in amber
- *  when used as a label (followed by colon). Captures only the label
- *  itself so the value stays in default color (or gets covered by the
- *  signed-number / range pass on top). */
+/** Well-known indicator / metric / parameter names. Match standalone in
+ *  text (e.g. "RSI resets to 45") AND when followed by a colon
+ *  ("RSI: 50.2"). Originally we required the colon — that made every
+ *  mid-sentence "RSI" or "MACD" stay un-colored, which is exactly the
+ *  thing that should be highlighted as a tool / domain term. The set is
+ *  technical enough that false positives are rare in trading prose. */
 export const INDICATOR_LABEL_RE =
-  /\b(?:RSI|MACD|EMA|SMA|ATR|ADX|VWAP|MFI|OBV|CMF|Bollinger|Ichimoku|Stochastic|Supertrend|FVG|ICT|SMC|Fibonacci|Sharpe|Sortino|Calmar|Stop[\s\-]?Loss|Take[\s\-]?Profit|Entry|Exit|Target|Risk|Reward|Position|Leverage|Spread|Direction)\s*(?=:)/gi;
+  /\b(?:RSI|MACD|EMA|SMA|ATR|ADX|VWAP|MFI|OBV|CMF|Bollinger|Ichimoku|Stochastic|Supertrend|FVG|ICT|SMC|Fibonacci|Sharpe|Sortino|Calmar|Stop[\s\-]?Loss|Take[\s\-]?Profit|Take[\s\-]?Profit|Entry|Exit|Target|Risk|Reward|Position|Leverage|Spread|Direction)\b/g;
 
 /** snake_case identifiers — function / strategy / parameter names. The
  *  LLM frequently emits these without backticks (volume_surge,
