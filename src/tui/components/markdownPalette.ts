@@ -29,11 +29,10 @@ export const PALETTE = {
   /** Function / strategy / parameter IDs (codespan) — warm tan, distinct
    *  from amber so backticked names don't blend with H2 / headers. */
   tan: "#D2B48C",
-  /** Tradeable assets — crypto + stock tickers. Bronze metallic so the
-   *  asset name reads as "instrument" rather than "positive number" —
-   *  green/red are reserved for direction and outcome. Replaces the
-   *  earlier emerald which made the screen too green. */
-  bronze: "#CD7F32",
+  /** Tradeable assets — crypto + stock tickers. Pale ice so the asset
+   *  name reads as "instrument" rather than "positive number" — green
+   *  and red stay reserved for direction and outcome. */
+  ice: "#CBF3F0",
   /** Standard prices and $-prefixed amounts that aren't deltas. Calm
    *  cream so a wall of dollar amounts doesn't compete with green/red. */
   cream: "#F5DEB3",
@@ -63,7 +62,7 @@ export const ANSI = {
   red: ansi24(PALETTE.red),
   mustard: ansi24(PALETTE.mustard),
   tan: ansi24(PALETTE.tan),
-  bronze: ansi24(PALETTE.bronze),
+  ice: ansi24(PALETTE.ice),
   cream: ansi24(PALETTE.cream),
 } as const;
 
@@ -342,7 +341,7 @@ export function findColorHits(text: string): ColorHit[] {
     const fiat = m[2];
     if (!asset || !fiat) continue;
     const assetStart = m.index!;
-    hits.push({ start: assetStart, end: assetStart + asset.length, color: PALETTE.bronze, prio: 5 });
+    hits.push({ start: assetStart, end: assetStart + asset.length, color: PALETTE.ice, prio: 5 });
     const fiatStart = assetStart + asset.length;
     hits.push({ start: fiatStart, end: fiatStart + fiat.length, color: PALETTE.platinum, prio: 5 });
   }
@@ -352,12 +351,12 @@ export function findColorHits(text: string): ColorHit[] {
     const ticker = m[1];
     if (!ticker) continue;
     const tickerStart = m.index! + 1; // skip the '$'
-    hits.push({ start: tickerStart, end: tickerStart + ticker.length, color: PALETTE.bronze, prio: 5 });
+    hits.push({ start: tickerStart, end: tickerStart + ticker.length, color: PALETTE.ice, prio: 5 });
   }
   // Standalone tickers from the runtime registry (BTC, ETH, AAPL, ...
   // populated from API responses).
   for (const r of findRegisteredTickers(text)) {
-    hits.push({ start: r.start, end: r.end, color: PALETTE.bronze, prio: 5 });
+    hits.push({ start: r.start, end: r.end, color: PALETTE.ice, prio: 5 });
   }
   pushAll(FIAT_RE, text, PALETTE.platinum, 5, hits);
   pushAll(TIMEFRAME_RE, text, PALETTE.mustard, 5, hits);
