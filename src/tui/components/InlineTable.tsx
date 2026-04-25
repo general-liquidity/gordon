@@ -2,6 +2,7 @@ import React, { useMemo } from "react";
 import { Box, Text, useStdout } from "../ink-custom";
 import { cachedStringWidth } from "../rendering/lineWidthCache.ts";
 import { BOX as SHARED_BOX } from "../rendering/stringPool.ts";
+import { PALETTE } from "./markdownPalette.ts";
 
 /**
  * InlineTable — terminal-width-aware markdown table renderer.
@@ -260,7 +261,7 @@ export function InlineTable({ lines }: Props) {
         const isBorder = line.kind === "border";
         const isHeader = line.bold;
         return (
-          <Text key={i} bold={isHeader} color={isHeader ? "cyanBright" : undefined} dimColor={isBorder}>
+          <Text key={i} bold={isHeader} color={isHeader ? PALETTE.amber : undefined} dimColor={isBorder}>
             {line.text}
           </Text>
         );

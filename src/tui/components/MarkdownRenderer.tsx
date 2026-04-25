@@ -3,6 +3,7 @@ import { Box, Text } from "../ink-custom";
 import { marked, type Tokens, type Token } from "marked";
 import { CodeBlock } from "./CodeBlock.js";
 import { InlineTable } from "./InlineTable.js";
+import { PALETTE, ANSI, headingColor } from "./markdownPalette.js";
 
 /**
  * MarkdownRenderer — CommonMark + GFM via marked, rendered to Ink.
@@ -109,20 +110,13 @@ function TokenRenderer({ token }: { token: Token }) {
       return null;
 
     case "heading": {
-      // Per-level color pass for visual hierarchy. Each level gets its own
-      // accent so multi-section help/explanations read as a clear outline
-      // instead of a wall of bold text. H1 is rare; H2/H3 are most common
-      // in tool/agent output and are the ones that drive the "color across
-      // the response" feel users expect from a markdown renderer.
+      // Bloomberg/Wall-Street palette — H1 gold, H2 amber, H3 platinum,
+      // H4+ ash. Each level keeps bold; H1 also underlines. Avoids
+      // cyan/magenta which read as "tech UI" rather than "trading desk".
       const t = token as Tokens.Heading;
-      const color =
-        t.depth === 1 ? "yellow"
-          : t.depth === 2 ? "cyanBright"
-          : t.depth === 3 ? "magentaBright"
-          : "greenBright";
       return (
         <Box paddingLeft={2} marginTop={t.depth <= 2 ? 1 : 0}>
-          <Text bold color={color} underline={t.depth === 1}>
+          <Text bold color={headingColor(t.depth)} underline={t.depth === 1}>
             <InlineTokens tokens={t.tokens ?? []} />
           </Text>
         </Box>
@@ -233,13 +227,14 @@ function alignMarker(a: string | null): string {
 // ANSI escape sequences for inline formatting inside table cells.
 // Kept minimal so generated strings stay greppable and the width cache's
 // ANSI stripper continues to recognize them.
-const ANSI_RESET = "\x1b[0m";
-const ANSI_BOLD = "\x1b[1m";
-const ANSI_ITALIC = "\x1b[3m";
-const ANSI_STRIKE = "\x1b[9m";
-// blueBright (\x1b[94m) — matches Claude Code's "permission" theme color
-// used for codespans across all 19+ Claude Code source repos.
-const ANSI_BLUE_BRIGHT = "\x1b[94m";
+// ANSI escapes pulled from the shared palette so table cells render in
+// the same colors the React paths use.
+const ANSI_RESET = ANSI.reset;
+const ANSI_BOLD = ANSI.bold;
+const ANSI_ITALIC = ANSI.italic;
+const ANSI_STRIKE = ANSI.strike;
+const ANSI_AMBER = ANSI.amber;
+const ANSI_PLATINUM = ANSI.platinum;
 
 // Like tokensToPlainText but emits ANSI escape codes for inline formatting
 // so codespans render in cyan and bold text stays bold inside cells.
@@ -249,13 +244,13 @@ function tokensToAnsiText(tokens: Token[]): string {
   return tokens
     .map((t) => {
       if (t.type === "text") return (t as Tokens.Text).text;
-      if (t.type === "codespan") return ANSI_BLUE_BRIGHT + (t as Tokens.Codespan).text + ANSI_RESET;
+      if (t.type === "codespan") return ANSI_AMBER + (t as Tokens.Codespan).text + ANSI_RESET;
       if (t.type === "strong") return ANSI_BOLD + tokensToAnsiText((t as Tokens.Strong).tokens ?? []) + ANSI_RESET;
       if (t.type === "em") return ANSI_ITALIC + tokensToAnsiText((t as Tokens.Em).tokens ?? []) + ANSI_RESET;
       if (t.type === "del") return ANSI_STRIKE + tokensToAnsiText((t as Tokens.Del).tokens ?? []) + ANSI_RESET;
       if (t.type === "link") {
         const link = t as Tokens.Link;
-        return `\x1b]8;;${link.href}\x1b\\${ANSI_BLUE_BRIGHT}${link.text}${ANSI_RESET}\x1b]8;;\x1b\\`;
+        return `\x1b]8;;${link.href}\x1b\\${ANSI_PLATINUM}${link.text}${ANSI_RESET}\x1b]8;;\x1b\\`;
       }
       if (t.type === "br") return " ";
       return (t as Token & { text?: string; raw?: string }).text ?? (t as Token & { raw?: string }).raw ?? "";
@@ -386,12 +381,12 @@ function InlineToken({ token }: { token: Token }): React.ReactElement | null {
     }
 
     case "codespan": {
-      // blueBright matches Claude Code's "permission" theme color (the
-      // light blue-purple they use everywhere for backtick code spans).
-      // Applied identically in StreamingMarkdown so streaming and
-      // completed renders look the same.
+      // Amber for ticker / tool / function names — same accent the
+      // table-header row uses, matches Bloomberg's amber-on-black field
+      // labels. Applied identically in StreamingMarkdown so streaming
+      // and completed renders look the same.
       const t = token as Tokens.Codespan;
-      return <Text color="blueBright">{t.text}</Text>;
+      return <Text color={PALETTE.amber}>{t.text}</Text>;
     }
 
     case "link": {
@@ -399,7 +394,7 @@ function InlineToken({ token }: { token: Token }): React.ReactElement | null {
       // OSC 8 hyperlink — modern terminals render as clickable
       const displayText = t.text;
       const wrapped = `\u001b]8;;${t.href}\u001b\\${displayText}\u001b]8;;\u001b\\`;
-      return <Text color="cyan">{wrapped}</Text>;
+      return <Text color={PALETTE.platinum} underline>{wrapped}</Text>;
     }
 
     case "image": {
