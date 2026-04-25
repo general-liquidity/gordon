@@ -76,6 +76,77 @@ function shouldClamp(url: string): boolean {
  * over cap, and return the re-serialized body. Returns null when no
  * change is needed so the caller can skip the rebuild.
  */
+/**
+ * Cloak Dedalus error noise from stdout / stderr so demos and live
+ * sessions don't get interrupted by 400-stack-trace dumps. The errors
+ * themselves are still recoverable upstream — Mastra retries or falls
+ * back. We just stop them from drowning the terminal.
+ *
+ * Honors GORDON_SHOW_DEDALUS_ERRORS=1 — set that to debug.
+ *
+ * Patterns suppressed:
+ *  - "Upstream LLM API error from dedalus"
+ *  - "AI_APICallError" payload blocks naming dedaluslabs.ai
+ *  - bare "{ error: APICallError" trace blocks for the same provider
+ */
+const DEDALUS_NOISE_PATTERNS = [
+  /Upstream LLM API error from dedalus/,
+  /api\.dedaluslabs\.ai/,
+  /AI_APICallError\b[\s\S]{0,200}dedalus/i,
+];
+
+let dedalusBufferActive = false;
+
+function isDedalusNoise(line: string): boolean {
+  if (process.env.GORDON_SHOW_DEDALUS_ERRORS === "1") return false;
+  return DEDALUS_NOISE_PATTERNS.some((re) => re.test(line));
+}
+
+let logsCloaked = false;
+
+export function cloakDedalusErrors(): void {
+  if (logsCloaked) return;
+  logsCloaked = true;
+
+  // Wrap process.stderr.write — pino / Mastra error logs land here.
+  // Dedalus errors arrive as multi-line JSON dumps; once we see a
+  // dedalus signature we drop subsequent lines until a blank-ish line
+  // closes the block, so the entire trace is suppressed cohesively.
+  const originalStderrWrite = process.stderr.write.bind(process.stderr);
+  process.stderr.write = ((chunk: any, ...rest: any[]) => {
+    try {
+      const str = typeof chunk === "string" ? chunk : chunk?.toString?.("utf8") ?? "";
+      if (isDedalusNoise(str)) {
+        dedalusBufferActive = true;
+        return true;
+      }
+      if (dedalusBufferActive) {
+        // Continue suppressing until we see a top-level close brace on
+        // its own line (end of the JSON dump) or the buffer drains.
+        if (/^\s*\}\s*$/.test(str.trim())) dedalusBufferActive = false;
+        return true;
+      }
+    } catch {
+      // Never break stderr because of a filter hiccup.
+    }
+    return originalStderrWrite(chunk as any, ...rest);
+  }) as typeof process.stderr.write;
+
+  // Wrap console.error too — some Mastra paths use it directly.
+  const originalConsoleError = console.error.bind(console);
+  console.error = (...args: unknown[]) => {
+    try {
+      const joined = args
+        .map((a) => (typeof a === "string" ? a : (a as any)?.message ?? JSON.stringify(a)))
+        .join(" ");
+      if (isDedalusNoise(joined)) return;
+    } catch {
+      // fall through
+    }
+    originalConsoleError(...args);
+  };
+}
+
 function clampMaxTokensInBody(body: string): string | null {
   let parsed: unknown;
   try {

@@ -4,8 +4,12 @@
 // Patches global fetch so Mastra-internal routing-agent calls (which
 // don't inherit our agent-level defaultOptions / defaultNetworkOptions)
 // can't blow the non-streaming threshold and 400 the user. Idempotent.
-import { installDedalusMaxTokensGuard } from "./infra/runtime/dedalusMaxTokensGuard.ts";
+// Also cloaks the noisy "Upstream LLM API error from dedalus" stack
+// dumps so demos / live sessions don't get interrupted — set
+// GORDON_SHOW_DEDALUS_ERRORS=1 to see them again while debugging.
+import { installDedalusMaxTokensGuard, cloakDedalusErrors } from "./infra/runtime/dedalusMaxTokensGuard.ts";
 installDedalusMaxTokensGuard();
+cloakDedalusErrors();
 
 import {
   parseCommand,
