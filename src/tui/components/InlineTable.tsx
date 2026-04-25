@@ -89,11 +89,21 @@ function padAligned(text: string, width: number, align: CellAlign): string {
   return text + " ".repeat(pad);
 }
 
-/** Split a string into lines of at most `width` characters, breaking on word
- *  boundaries when possible and hard-breaking long words. */
+/** Split a string into lines of at most `width` visible columns, breaking on
+ *  word boundaries when possible and hard-breaking long words.
+ *
+ *  Cells may contain ANSI escape sequences (table cells embed cyan/bold codes
+ *  for inline-markdown formatting). We measure visible width via
+ *  cachedStringWidth, and if a cell already contains ANSI we never split it —
+ *  slicing through an escape sequence would corrupt the codes. The visible
+ *  fit is what determines whether wrap is needed at all. */
 function wrapCellText(text: string, width: number): string[] {
   if (width <= 0) return [text];
-  if (text.length <= width) return [text];
+  if (cachedStringWidth(text) <= width) return [text];
+  // Bail on splitting ANSI-bearing cells — leave the text as one line and
+  // let the column scaler handle the overflow. Slicing here would break
+  // escape sequences and bleed colors into adjacent cells.
+  if (text.indexOf("\x1b") >= 0) return [text];
 
   const out: string[] = [];
   let remaining = text.trim();
@@ -201,8 +211,8 @@ export function InlineTable({ lines }: Props) {
 
     // Pre-compute each row's visible line(s). When a cell wraps to multiple
     // lines, emit that many sub-rows.
-    const tableLines: Array<{ text: string; bold: boolean }> = [];
-    tableLines.push({ text: topBorder, bold: false });
+    const tableLines: Array<{ text: string; bold: boolean; kind: "border" | "row" }> = [];
+    tableLines.push({ text: topBorder, bold: false, kind: "border" });
 
     for (let rowIdx = 0; rowIdx < rows.length; rowIdx++) {
       const row = rows[rowIdx]!;
@@ -221,16 +231,16 @@ export function InlineTable({ lines }: Props) {
           const align: CellAlign = isHeader ? "center" : colAlign[c]!;
           rowText += " " + padAligned(cellLine, width, align) + " " + BOX.vert;
         }
-        tableLines.push({ text: rowText, bold: isHeader });
+        tableLines.push({ text: rowText, bold: isHeader, kind: "row" });
       }
 
       // Emit header border after the last header row
       if (isHeader && rowIdx === headerIdx) {
-        tableLines.push({ text: headerBorder, bold: false });
+        tableLines.push({ text: headerBorder, bold: false, kind: "border" });
       }
     }
 
-    tableLines.push({ text: botBorder, bold: false });
+    tableLines.push({ text: botBorder, bold: false, kind: "border" });
 
     return { mode: "table" as const, tableLines };
   }, [lines, terminalWidth]);
@@ -243,11 +253,18 @@ export function InlineTable({ lines }: Props) {
 
   return (
     <Box flexDirection="column" paddingLeft={LEFT_PADDING}>
-      {rendered.tableLines.map((line, i) => (
-        <Text key={i} bold={line.bold} dimColor={!line.bold}>
-          {line.text}
-        </Text>
-      ))}
+      {rendered.tableLines.map((line, i) => {
+        // Borders stay dim so they recede; headers are bold/cyan; data rows
+        // render in default terminal color so chalk/ANSI codes embedded by
+        // the caller (or by upstream inline-token formatting) survive.
+        const isBorder = line.kind === "border";
+        const isHeader = line.bold;
+        return (
+          <Text key={i} bold={isHeader} color={isHeader ? "cyan" : undefined} dimColor={isBorder}>
+            {line.text}
+          </Text>
+        );
+      })}
     </Box>
   );
 }

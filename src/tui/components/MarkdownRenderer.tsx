@@ -281,14 +281,23 @@ function TokenRenderer({ token }: { token: Token }) {
       // marked parses tables into { header, align, rows } — convert back
       // to pipe-separated lines and delegate to InlineTable for the
       // Unicode box border rendering we already built.
-      // Use tokensToPlainText on cell.tokens (not cell.text) so inline
-      // markdown like **bold** is stripped rather than rendered as stars.
+      //
+      // Use tokensToAnsiText (not raw text) so inline markdown like
+      // `code` and **bold** become ANSI escape sequences embedded in the
+      // cell strings. The width cache strips ANSI before measuring, so
+      // alignment math stays correct, and Ink's <Text> passes the codes
+      // through to the terminal — bringing back per-word color inside
+      // tables (cyan for `tool_name`, bold for **emphasis**).
       const t = token as Tokens.Table;
       const lines: string[] = [];
+      // Header: plain text only — InlineTable wraps the whole header line
+      // in bold+cyan, and embedded ANSI resets inside would terminate that
+      // wrapper mid-cell. Data rows: ANSI-formatted so codespans/bold/em
+      // keep their per-word color.
       lines.push("| " + t.header.map((h: Tokens.TableCell) => tokensToPlainText(h.tokens ?? [])).join(" | ") + " |");
       lines.push("| " + t.align.map((a: string | null) => alignMarker(a)).join(" | ") + " |");
       for (const row of t.rows) {
-        lines.push("| " + row.map((cell: Tokens.TableCell) => tokensToPlainText(cell.tokens ?? [])).join(" | ") + " |");
+        lines.push("| " + row.map((cell: Tokens.TableCell) => tokensToAnsiText(cell.tokens ?? [])).join(" | ") + " |");
       }
       return <InlineTable lines={lines} />;
     }
@@ -323,6 +332,37 @@ function alignMarker(a: string | null): string {
   if (a === "center") return ":---:";
   if (a === "right") return "---:";
   return "---";
+}
+
+// ANSI escape sequences for inline formatting inside table cells.
+// Kept minimal so generated strings stay greppable and the width cache's
+// ANSI stripper continues to recognize them.
+const ANSI_RESET = "\x1b[0m";
+const ANSI_BOLD = "\x1b[1m";
+const ANSI_ITALIC = "\x1b[3m";
+const ANSI_STRIKE = "\x1b[9m";
+const ANSI_CYAN = "\x1b[36m";
+
+// Like tokensToPlainText but emits ANSI escape codes for inline formatting
+// so codespans render in cyan and bold text stays bold inside cells.
+// The width cache strips ANSI before measuring, so column alignment stays
+// correct.
+function tokensToAnsiText(tokens: Token[]): string {
+  return tokens
+    .map((t) => {
+      if (t.type === "text") return (t as Tokens.Text).text;
+      if (t.type === "codespan") return ANSI_CYAN + (t as Tokens.Codespan).text + ANSI_RESET;
+      if (t.type === "strong") return ANSI_BOLD + tokensToAnsiText((t as Tokens.Strong).tokens ?? []) + ANSI_RESET;
+      if (t.type === "em") return ANSI_ITALIC + tokensToAnsiText((t as Tokens.Em).tokens ?? []) + ANSI_RESET;
+      if (t.type === "del") return ANSI_STRIKE + tokensToAnsiText((t as Tokens.Del).tokens ?? []) + ANSI_RESET;
+      if (t.type === "link") {
+        const link = t as Tokens.Link;
+        return `\x1b]8;;${link.href}\x1b\\${ANSI_CYAN}${link.text}${ANSI_RESET}\x1b]8;;\x1b\\`;
+      }
+      if (t.type === "br") return " ";
+      return (t as Token & { text?: string; raw?: string }).text ?? (t as Token & { raw?: string }).raw ?? "";
+    })
+    .join("");
 }
 
 // Walk a token tree and extract plain text — used for table cells where the
@@ -448,8 +488,11 @@ function InlineToken({ token }: { token: Token }): React.ReactElement | null {
     }
 
     case "codespan": {
+      // Cyan matches StreamingMarkdown so backtick-wrapped tool/function
+      // names (`run_backtest`, `strategy_iterate`, etc.) keep their accent
+      // color across both streaming and completed render paths.
       const t = token as Tokens.Codespan;
-      return <Text dimColor>{t.text}</Text>;
+      return <Text color="cyan">{t.text}</Text>;
     }
 
     case "link": {
