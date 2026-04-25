@@ -421,7 +421,11 @@ export function PromptInput({
         <TokenWarning usedTokens={Math.round(tokenBudgetRatio * 100)} maxTokens={100} />
       )}
 
-      {/* Input line */}
+      {/* Input line. When the buffer is empty and we're not streaming we
+          show a placeholder; when streaming we show only the static
+          block cursor so the user sees their cursor position even while
+          the model is working (Claude Code pattern — cursor never
+          disappears once the input is focused). */}
       <Box>
         <Text color={promptColor} bold>{promptChar} </Text>
         <Box flexGrow={1}>
@@ -434,6 +438,8 @@ export function PromptInput({
               isVimNormal={isVimNormal}
               isVimVisual={isVimVisual}
             />
+          ) : isStreaming ? (
+            <Text color="rgb(52,238,176)">{"█"}</Text>
           ) : (
             <Text dimColor>{placeholder}</Text>
           )}

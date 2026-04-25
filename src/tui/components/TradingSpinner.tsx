@@ -466,7 +466,10 @@ export function TradingSpinner({ agentName, elapsedMs, streamLength = 0, userInp
   const showAgentTree = (agents?.length ?? 0) >= 2;
 
   return (
-    <Box flexDirection="column" marginTop={1}>
+    // Blank line above and below — matches Claude Code's
+    // SpinnerAnimationRow which sits in its own breathing room above
+    // the input chrome (marginTop=1) and below the prior message tail.
+    <Box flexDirection="column" marginTop={1} marginBottom={1}>
       <Box paddingLeft={2}>
         <Text color={isStalled ? "red" : "rgb(52,238,176)"}>{char} </Text>
         {chars.map((c, i) => (

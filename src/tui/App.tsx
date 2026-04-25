@@ -26,7 +26,9 @@ import { CommandPalette, type PaletteItem } from "./components/CommandPalette.js
 import { BootScreen } from "./components/BootScreen.js";
 import { SetupWizard, type SetupPreflight } from "./components/SetupWizard.js";
 import { PrivacyConsent, type PrivacyChoices } from "./components/PrivacyConsent.js";
-import { HandoffArrow } from "./components/HandoffArrow.js";
+// HandoffArrow no longer rendered inline (suppress routing noise) — keep
+// import out so we don't carry dead deps.
+// import { HandoffArrow } from "./components/HandoffArrow.js";
 import { PromptInput } from "./components/PromptInput.js";
 import { defaultMessageQueue } from "../infra/runtime/messageQueue.js";
 import { saveEnvKeys } from "../infra/storage/env.js";
@@ -1805,13 +1807,11 @@ function AppInner() {
             <ApprovalDialog key={a.id} approval={a} onDecision={handleApproval} />
           ))}
 
-          {/* Handoff arrows */}
-          {isStreaming && handoffHistory.length > 0 && (
-            <HandoffArrow
-              from={handoffHistory[handoffHistory.length - 1]!.from}
-              to={handoffHistory[handoffHistory.length - 1]!.to}
-            />
-          )}
+          {/* Handoff arrows — suppressed. Claude Code doesn't surface
+              internal routing ('→ Handing off to gordon') to the user;
+              it's noise that breaks the conversational frame. The
+              handoff is still recorded in handoffHistory for the
+              SwarmTree / AgentProgress views when those are active. */}
 
           {/* Agent progress (parallel chains) or swarm tree */}
           {isStreaming && activeAgents.length > 0 && (

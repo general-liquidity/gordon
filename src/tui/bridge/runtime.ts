@@ -629,31 +629,25 @@ async function streamResponse(
                 timestamp: new Date().toISOString(),
               }));
 
-            // Completion badge with duration + token count
-            const elapsed = Date.now() - chainStartTime;
-            const durStr = elapsed < 1000 ? `${elapsed}ms` : `${(elapsed / 1000).toFixed(1)}s`;
-            const tokenStr = totalTokens > 0
-              ? totalTokens >= 1000 ? ` \u00b7 ${(totalTokens / 1000).toFixed(1)}K tokens` : ` \u00b7 ${totalTokens} tokens`
-              : "";
-            const completionMsg: Message = {
-              id: `completion-${Date.now()}`,
-              role: "system" as const,
-              content: `completed in ${durStr}${calls.length > 0 ? ` \u00b7 ${calls.length} tool${calls.length !== 1 ? "s" : ""}` : ""}${tokenStr}`,
-              variant: "system" as const,
-              timestamp: new Date().toISOString(),
-            };
+            // Completion stats are no longer surfaced as a separate
+            // system message. Duration + token count are visible during
+            // the stream via TradingSpinner; emitting another row after
+            // completion duplicated the info on top of the bottom
+            // status bar (which already shows context budget / cost /
+            // session age) and made the two appear stacked when they
+            // should read as one line. Cleaner: status bar is the
+            // single live indicator.
 
             return {
             ...prev,
-            // Replace streaming message + persist tool results + completion + risk/approval
+            // Replace streaming message + persist tool results + risk/approval
             messages: [
               ...prev.messages.map((m: any) => m.id === streamingMsgId ? gordonMsg : m),
               ...toolResultMsgs,
-              completionMsg,
               ...riskMessages,
               ...approvalMsgs,
             ],
-            completedMessageCount: prev.messages.length + 1 + riskMessages.length + approvalMsgs.length,
+            completedMessageCount: prev.messages.length + riskMessages.length + approvalMsgs.length,
             streamBuffer: "",
             isStreaming: false,
             activeAgents: [],
