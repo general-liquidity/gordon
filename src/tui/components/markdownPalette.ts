@@ -105,25 +105,72 @@ export function deltaAnsi(sign: string): string {
   return sign === "-" ? ANSI.red : ANSI.green;
 }
 
+/** Status tokens — green when present, red when absent or failing. */
+export const POSITIVE_TOKEN_RE =
+  /\b(?:PASS(?:ED)?|OK|APPROVED|ELIGIBLE|HEALTHY|ACTIVE|GREEN|VALID|SUCCESS|WIN|WON|FILLED)\b/g;
+export const NEGATIVE_TOKEN_RE =
+  /\b(?:FAIL(?:ED)?|FAILURE|WARN(?:ING)?|BLOCKED|REJECTED|DISCARD(?:ED)?|HALTED|STALE|ERROR|ERRORED|RED|INVALID|LOST|MISSED|CANCELED|CANCELLED|TIMEOUT)\b/g;
+
+/** Direction tokens — long/buy = green, short/sell = red. Word-boundary
+ *  so "Bollinger" doesn't match "long". Case-sensitive isn't required;
+ *  we use case-insensitive but anchor on \b. */
+export const LONG_TOKEN_RE = /\b(?:LONG|BUY|BUYS?|BOUGHT|GOING LONG|BULLISH)\b/gi;
+export const SHORT_TOKEN_RE = /\b(?:SHORT|SELL|SELLS?|SOLD|GOING SHORT|BEARISH)\b/gi;
+
+/** Up / down arrows immediately followed by an optional number. The
+ *  whole match (arrow + number) gets colored together. */
+export const UP_ARROW_RE = /(?:↑↑?|↗|🟢)\s*(?:\d[\d,]*(?:\.\d+)?%?)?/g;
+export const DOWN_ARROW_RE = /(?:↓↓?|↘|🔴)\s*(?:\d[\d,]*(?:\.\d+)?%?)?/g;
+
+/** Well-known indicator / metric labels that should highlight in amber
+ *  when used as a label (followed by colon). Captures only the label
+ *  itself so the value stays in default color (or gets covered by the
+ *  signed-number / range pass on top). */
+export const INDICATOR_LABEL_RE =
+  /\b(?:RSI|MACD|EMA|SMA|ATR|ADX|VWAP|MFI|OBV|CMF|Bollinger|Ichimoku|Stochastic|Supertrend|FVG|ICT|SMC|Fibonacci|Sharpe|Sortino|Calmar|Stop[\s\-]?Loss|Take[\s\-]?Profit|Entry|Exit|Target|Risk|Reward|Position|Leverage|Spread|Direction)\s*(?=:)/gi;
+
 /**
- * Locate every span of plain text that should render green or red.
- * Combines three sources in priority order:
- *   1. Sign-prefixed numbers (highest priority — explicit sign always wins)
- *   2. Numbers/ranges following negative labels  → red
- *   3. Numbers/ranges following positive labels  → green
+ * Locate every span of plain text that should render in a non-default
+ * color. Sources combined in priority order:
  *
- * When sources overlap (e.g. "Total Return: -0.86%" — POSITIVE_LABEL
- * captures "-0.86%" green AND SIGNED captures "-0.86%" red), the
- * higher-priority hit wins so the explicit sign always reflects reality.
+ *   prio 0 — Sign-prefixed numbers           → green / red (explicit)
+ *   prio 1 — Numbers after negative labels   → red
+ *   prio 2 — Numbers after positive labels   → green
+ *   prio 3 — PASS / WARN / FAIL tokens       → green / red
+ *   prio 3 — LONG / SHORT direction tokens   → green / red
+ *   prio 3 — Up / down arrows (+ number)     → green / red
+ *   prio 4 — Known indicator labels          → amber
+ *
+ * Lower prio wins on overlap. The explicit sign always reflects reality,
+ * even when surrounded by an optimistic positive label.
  */
 export interface ColorHit {
   start: number;
   end: number;
   color: string;
 }
+function pushAll(
+  re: RegExp,
+  text: string,
+  color: string,
+  prio: number,
+  hits: Array<ColorHit & { prio: number }>,
+  groupIdx = 0,
+): void {
+  re.lastIndex = 0;
+  for (const m of text.matchAll(re)) {
+    const grp = groupIdx === 0 ? m[0] : m[groupIdx];
+    if (!grp) continue;
+    const grpStart =
+      groupIdx === 0 ? m.index! : m.index! + m[0].lastIndexOf(grp);
+    hits.push({ start: grpStart, end: grpStart + grp.length, color, prio });
+  }
+}
+
 export function findColorHits(text: string): ColorHit[] {
   const hits: Array<ColorHit & { prio: number }> = [];
 
+  // prio 0 — explicit sign always wins
   SIGNED_NUMBER_RE.lastIndex = 0;
   for (const m of text.matchAll(SIGNED_NUMBER_RE)) {
     hits.push({
@@ -133,20 +180,21 @@ export function findColorHits(text: string): ColorHit[] {
       prio: 0,
     });
   }
-  NEGATIVE_LABEL_RE.lastIndex = 0;
-  for (const m of text.matchAll(NEGATIVE_LABEL_RE)) {
-    const grp = m[1];
-    if (!grp) continue;
-    const grpStart = m.index! + m[0].lastIndexOf(grp);
-    hits.push({ start: grpStart, end: grpStart + grp.length, color: PALETTE.red, prio: 1 });
-  }
-  POSITIVE_LABEL_RE.lastIndex = 0;
-  for (const m of text.matchAll(POSITIVE_LABEL_RE)) {
-    const grp = m[1];
-    if (!grp) continue;
-    const grpStart = m.index! + m[0].lastIndexOf(grp);
-    hits.push({ start: grpStart, end: grpStart + grp.length, color: PALETTE.green, prio: 2 });
-  }
+
+  // prio 1/2 — labeled metrics (numbers after win-rate / drawdown / etc.)
+  pushAll(NEGATIVE_LABEL_RE, text, PALETTE.red, 1, hits, 1);
+  pushAll(POSITIVE_LABEL_RE, text, PALETTE.green, 2, hits, 1);
+
+  // prio 3 — PASS/WARN, LONG/SHORT, ↑/↓ arrows
+  pushAll(POSITIVE_TOKEN_RE, text, PALETTE.green, 3, hits);
+  pushAll(NEGATIVE_TOKEN_RE, text, PALETTE.red, 3, hits);
+  pushAll(LONG_TOKEN_RE, text, PALETTE.green, 3, hits);
+  pushAll(SHORT_TOKEN_RE, text, PALETTE.red, 3, hits);
+  pushAll(UP_ARROW_RE, text, PALETTE.green, 3, hits);
+  pushAll(DOWN_ARROW_RE, text, PALETTE.red, 3, hits);
+
+  // prio 4 — well-known indicator labels (RSI:, MACD:, etc.) in amber
+  pushAll(INDICATOR_LABEL_RE, text, PALETTE.amber, 4, hits);
 
   // Sort by start asc, prio asc — lower prio wins on ties.
   hits.sort((a, b) => a.start - b.start || a.prio - b.prio);

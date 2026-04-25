@@ -85,11 +85,15 @@ export function CodeBlock({ code, language }: Props) {
       </Box>
 
       {/* Code lines. When cli-highlight has run, lines contain ANSI escapes
-          that Ink's Text component renders transparently. */}
+          that Ink's Text component renders transparently. The pre-highlight
+          state used to dimColor the lines, which made step-walkthroughs
+          render as gray text \u2014 render in default terminal color instead so
+          the content reads with the same weight as the rest of the
+          response, even before cli-highlight loads. */}
       {lines.map((line, i) => (
         <Box key={i}>
           <Text dimColor>{"\u2502"} </Text>
-          {highlighted ? <Text>{line}</Text> : <Text dimColor>{line}</Text>}
+          <Text>{line}</Text>
         </Box>
       ))}
 

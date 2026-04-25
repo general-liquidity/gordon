@@ -254,12 +254,23 @@ function colorSignedNumbersAnsi(text: string): string {
   let cursor = 0;
   for (const h of hits) {
     if (h.start > cursor) out += text.slice(cursor, h.start);
-    const ansiColor = h.color === PALETTE.red ? ANSI.red : ANSI.green;
-    out += ansiColor + text.slice(h.start, h.end) + ANSI_RESET;
+    out += paletteToAnsi(h.color) + text.slice(h.start, h.end) + ANSI_RESET;
     cursor = h.end;
   }
   if (cursor < text.length) out += text.slice(cursor);
   return out;
+}
+
+/** Map a palette hex color to its matching 24-bit ANSI escape. Falls
+ *  back to green so embedded colors never print raw hex into the cell. */
+function paletteToAnsi(hex: string): string {
+  if (hex === PALETTE.red) return ANSI.red;
+  if (hex === PALETTE.green) return ANSI.green;
+  if (hex === PALETTE.amber) return ANSI.amber;
+  if (hex === PALETTE.gold) return ANSI.gold;
+  if (hex === PALETTE.platinum) return ANSI.platinum;
+  if (hex === PALETTE.ash) return ANSI.ash;
+  return ANSI.green;
 }
 
 function tokensToAnsiText(tokens: Token[]): string {
