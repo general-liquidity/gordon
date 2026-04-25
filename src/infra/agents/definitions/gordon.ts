@@ -92,6 +92,26 @@ import { getResearcher } from "./researcher.ts";
 
 const logger = createModuleLogger("agents");
 
+/**
+ * Cold-tier tools — niche integrations that pad the JSON-schema budget but
+ * aren't on the hot path for crypto-first / scan / DD / backtest flows.
+ *
+ * Mastra has no native `defer_loading` (Claude Code's pattern). Instead we
+ * conditionally include or strip these groups at agent-creation time based
+ * on `GORDON_TOOL_TIER`:
+ *   - "all"  (default) — keep every tool group registered (legacy behavior).
+ *   - "hot"            — strip the cold tier; users access these flows via
+ *                        the Researcher sub-agent transfer or by switching
+ *                        to GORDON_TOOL_TIER=all explicitly.
+ *
+ * Even at default we drop the heaviest groups when the env flag is set —
+ * use this knob during demos / long sessions where the 200k context
+ * ceiling matters more than full coverage of every integration.
+ */
+function isHotTierOnly(): boolean {
+  return process.env.GORDON_TOOL_TIER === "hot";
+}
+
 const GORDON_INSTRUCTIONS = `You are Gordon, an AI trading assistant for crypto and stocks, built by General Liquidity, Inc.
 
 ## Identity
@@ -419,31 +439,42 @@ export function getGordon(): Agent {
       // Market regime
       ...instrumentedRegimeTools,
 
-      // On-chain reads (non-execution)
+      // On-chain reads (non-execution) — Base / Uniswap stay hot since
+      // Base is a primary L2 surface for the trading flow.
       ...instrumentedBaseOnchainTools,
       ...instrumentedBaseSignalTools,
       ...instrumentedBaseIndexerTools,
       ...instrumentedUniswapDataTools,
       ...instrumentedDexSearchTools,
       ...instrumentedXSocialTools,
-      ...instrumentedCdpWebhookTools,
-      ...instrumentedCdpSqlTools,
-      ...instrumentedCdpPolicyTools,
-      ...instrumentedCdpOnrampTools,
-      ...instrumentedCdpEvmMultichainTools,
-      ...instrumentedCdpWebhookReceiverTools,
+
+      // CDP integration — cold tier (niche; not in scan/DD/backtest flow).
+      ...(isHotTierOnly() ? {} : instrumentedCdpWebhookTools),
+      ...(isHotTierOnly() ? {} : instrumentedCdpSqlTools),
+      ...(isHotTierOnly() ? {} : instrumentedCdpPolicyTools),
+      ...(isHotTierOnly() ? {} : instrumentedCdpOnrampTools),
+      ...(isHotTierOnly() ? {} : instrumentedCdpEvmMultichainTools),
+      ...(isHotTierOnly() ? {} : instrumentedCdpWebhookReceiverTools),
+
       ...instrumentedProactiveModeTools,
       ...instrumentedBacktestVerdictTools,
+
+      // Finnhub — only the basic stock tools stay hot. Fundamentals (deep
+      // company data, alt data, congressional trades, lobbying, transcripts)
+      // are cold; users hit them via /research start when needed.
       ...instrumentedFinnhubTools,
-      ...instrumentedFinnhubFundamentalsTools,
+      ...(isHotTierOnly() ? {} : instrumentedFinnhubFundamentalsTools),
       ...instrumentedFinnhubMarketsTools,
+
       ...instrumentedSmcPatternTools,
       ...instrumentedCalibrationTools,
       ...instrumentedSkillLoaderTools,
       ...instrumentedProducerHealthTools,
-      ...instrumentedDefillamaYieldTools,
-      ...instrumentedChainlinkStreamsTools,
-      ...instrumentedChainlinkFeedsTools,
+
+      // DefiLlama yields and Chainlink — cold tier (specialized data feeds).
+      ...(isHotTierOnly() ? {} : instrumentedDefillamaYieldTools),
+      ...(isHotTierOnly() ? {} : instrumentedChainlinkStreamsTools),
+      ...(isHotTierOnly() ? {} : instrumentedChainlinkFeedsTools),
       ...instrumentedSynthDataTools,
 
       // AgentKit reads
@@ -451,13 +482,17 @@ export function getGordon(): Agent {
       agentkit_get_wallet: instrumentedAgentKitOnchainTools.agentkit_get_wallet,
       agentkit_get_swap_price: instrumentedAgentKitOnchainTools.agentkit_get_swap_price,
 
-      // Solana reads
-      ...instrumentedSolanaKitWalletTools,
+      // Solana wallet kit — cold tier (Jupiter/Drift/Orca tools mostly).
+      ...(isHotTierOnly() ? {} : instrumentedSolanaKitWalletTools),
 
-      // Polkadot reads
-      polkadot_check_balance: instrumentedPolkadotKitAssetTools.polkadot_check_balance,
-      polkadot_get_pool_info: instrumentedPolkadotKitStakingTools.polkadot_get_pool_info,
-      polkadot_initialize_chain: instrumentedPolkadotKitDefiTools.polkadot_initialize_chain,
+      // Polkadot reads — cold tier (very niche).
+      ...(isHotTierOnly()
+        ? {}
+        : {
+            polkadot_check_balance: instrumentedPolkadotKitAssetTools.polkadot_check_balance,
+            polkadot_get_pool_info: instrumentedPolkadotKitStakingTools.polkadot_get_pool_info,
+            polkadot_initialize_chain: instrumentedPolkadotKitDefiTools.polkadot_initialize_chain,
+          }),
 
       // Advanced & audit (was Auditor — now just tools on Gordon)
       ...instrumentedAdvancedTools,

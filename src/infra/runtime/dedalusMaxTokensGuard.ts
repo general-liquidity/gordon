@@ -47,8 +47,14 @@ export function installDedalusMaxTokensGuard(): void {
         const body = init.body;
         if (typeof body === "string") {
           const clamped = clampMaxTokensInBody(body);
-          if (clamped !== null) {
-            return originalFetch(input, { ...init, body: clamped });
+          const finalBody = clamped !== null ? clamped : body;
+          // Layer the anthropic-beta header on top so the API itself
+          // strips old tool_result and thinking blocks in-band before the
+          // model reads them. Only sent when the request body names an
+          // Anthropic-flavored model.
+          const headers = maybeAddAnthropicBetas(init.headers, finalBody);
+          if (clamped !== null || headers !== init.headers) {
+            return originalFetch(input, { ...init, body: finalBody, headers });
           }
         }
       }
@@ -145,6 +151,47 @@ export function cloakDedalusErrors(): void {
     }
     originalConsoleError(...args);
   };
+}
+
+/**
+ * Anthropic in-band context-management betas (Claude Code parity):
+ *  - clear_tool_uses_20250919: API strips Bash/Grep/Read/WebFetch tool_result
+ *    bodies in old turns when the prompt approaches the ceiling. No round-
+ *    trip cost — happens before the model reads the request.
+ *  - clear_thinking_20251015: API strips old thinking blocks for models that
+ *    expose them, preserving only the most recent few.
+ *
+ * Honors GORDON_DISABLE_ANTHROPIC_BETAS=1 to opt out for debugging. */
+const ANTHROPIC_BETAS = "clear_tool_uses_20250919,clear_thinking_20251015";
+
+function maybeAddAnthropicBetas(
+  existing: HeadersInit | undefined,
+  body: string,
+): HeadersInit | undefined {
+  if (process.env.GORDON_DISABLE_ANTHROPIC_BETAS === "1") return existing;
+  if (!isAnthropicBody(body)) return existing;
+
+  const headers = new Headers(existing ?? {});
+  // If the caller already set anthropic-beta, append; otherwise create it.
+  const prev = headers.get("anthropic-beta");
+  const merged = prev && prev.length > 0 ? `${prev},${ANTHROPIC_BETAS}` : ANTHROPIC_BETAS;
+  headers.set("anthropic-beta", merged);
+  return headers;
+}
+
+/** Cheap body sniff — only returns true when the model name looks like an
+ *  Anthropic Claude model. Avoids paying for full JSON parse on every
+ *  request (we reparse for clamp anyway, but only when needed). */
+function isAnthropicBody(body: string): boolean {
+  // Quick string prefilter so we don't JSON.parse every request body.
+  if (!body.includes("anthropic") && !body.includes("claude")) return false;
+  try {
+    const parsed = JSON.parse(body) as { model?: unknown };
+    const model = typeof parsed.model === "string" ? parsed.model.toLowerCase() : "";
+    return model.includes("anthropic/") || model.includes("claude");
+  } catch {
+    return false;
+  }
 }
 
 function clampMaxTokensInBody(body: string): string | null {

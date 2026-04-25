@@ -236,12 +236,45 @@ export interface SummarizationResult {
 
 export type CompactionStage = "masking" | "pruning" | "aggressive" | "full";
 
-/** Compaction pressure thresholds (fraction of max context budget used, per OPENDEV paper §2.3.6) */
+/**
+ * Compaction pressure thresholds.
+ *
+ * History: pure ratios (0.70 / 0.80 / 0.90 / 0.99 of `maxContextTokensEstimate`)
+ * per the OPENDEV paper §2.3.6. Worked at small contexts but got sluggish at
+ * 200k+: each percent slot represents 2k tokens of slack, and the gap between
+ * 90% and 99% is ~20k tokens — easily blown by a single tool-result heavy turn.
+ *
+ * Per the Claude Code audit: their auto-compact triggers at an absolute
+ * 13k-token buffer below the model ceiling, with a 20k-token warning band.
+ * Predictable across context sizes.
+ *
+ * Hybrid strategy: keep the four stages and the ratio fallback for the
+ * small-context path, but ALSO compute absolute-buffer thresholds from
+ * the model ceiling and pick the WORSE of the two. The full-stage trip
+ * line in particular always fires by 13k below ceiling regardless of ratio.
+ */
 export const COMPACTION_PRESSURE_THRESHOLDS = {
   masking: 0.70,    // 70% — warn and begin gentle masking
   pruning: 0.80,    // 80% — observation masking, preserve 6 recent
   aggressive: 0.90, // 90% — aggressive masking, preserve 3 recent
   full: 0.99,       // 99% — full LLM summary generation
+} as const;
+
+/**
+ * Absolute-buffer thresholds (Claude Code parity). Evaluated as
+ * `usedTokens > ceiling - BUFFER`. When the ceiling is large the absolute
+ * buffer kicks in earlier than the ratio, which is exactly what we want
+ * for 200k contexts.
+ */
+export const COMPACTION_ABSOLUTE_BUFFERS = {
+  /** First gentle pass — 60k below ceiling. */
+  masking: 60_000,
+  /** Moderate trim — 40k below ceiling. */
+  pruning: 40_000,
+  /** Aggressive — 25k below ceiling. */
+  aggressive: 25_000,
+  /** Force full LLM summary — 13k below ceiling (Claude Code's auto-compact line). */
+  full: 13_000,
 } as const;
 
 /** Recent observation counts to preserve per stage (paper §2.3.6) */
@@ -255,12 +288,37 @@ export const RECENT_OBSERVATIONS_TO_KEEP: Record<CompactionStage, number> = {
 /**
  * Determine compaction stage from token-pressure ratio (0–1).
  * Preferred over message-count heuristics when token budget is known.
+ *
+ * Pass `usedTokens` and `maxTokens` for the absolute-buffer check too —
+ * we pick the stricter of the ratio-based and absolute-buffer stages so
+ * 200k contexts trigger summary at 13k from ceiling (~6% slack) rather
+ * than waiting for 99% (~2k slack — too late on a heavy tool-result turn).
  */
-export function determineCompactionStageFromPressure(contextFillRatio: number): CompactionStage {
-  if (contextFillRatio >= COMPACTION_PRESSURE_THRESHOLDS.full) return "full";
-  if (contextFillRatio >= COMPACTION_PRESSURE_THRESHOLDS.aggressive) return "aggressive";
-  if (contextFillRatio >= COMPACTION_PRESSURE_THRESHOLDS.pruning) return "pruning";
-  return "masking";
+export function determineCompactionStageFromPressure(
+  contextFillRatio: number,
+  usedTokens?: number,
+  maxTokens?: number,
+): CompactionStage {
+  // Ratio-based stage (legacy path, still drives small contexts).
+  let ratioStage: CompactionStage = "masking";
+  if (contextFillRatio >= COMPACTION_PRESSURE_THRESHOLDS.full) ratioStage = "full";
+  else if (contextFillRatio >= COMPACTION_PRESSURE_THRESHOLDS.aggressive) ratioStage = "aggressive";
+  else if (contextFillRatio >= COMPACTION_PRESSURE_THRESHOLDS.pruning) ratioStage = "pruning";
+
+  // Absolute-buffer stage (Claude Code parity, dominant on large contexts).
+  let absoluteStage: CompactionStage | null = null;
+  if (typeof usedTokens === "number" && typeof maxTokens === "number" && maxTokens > 0) {
+    const headroom = maxTokens - usedTokens;
+    if (headroom <= COMPACTION_ABSOLUTE_BUFFERS.full) absoluteStage = "full";
+    else if (headroom <= COMPACTION_ABSOLUTE_BUFFERS.aggressive) absoluteStage = "aggressive";
+    else if (headroom <= COMPACTION_ABSOLUTE_BUFFERS.pruning) absoluteStage = "pruning";
+    else if (headroom <= COMPACTION_ABSOLUTE_BUFFERS.masking) absoluteStage = "masking";
+  }
+
+  // Pick the stricter (most aggressive) stage between the two signals.
+  const order: CompactionStage[] = ["masking", "pruning", "aggressive", "full"];
+  if (!absoluteStage) return ratioStage;
+  return order.indexOf(absoluteStage) > order.indexOf(ratioStage) ? absoluteStage : ratioStage;
 }
 
 // ============================================================================
@@ -399,7 +457,12 @@ export class ConversationSummarizer {
 
     const messagesToSummarize = messages.length - this.config.recentMessagesToKeep;
     const contextFillRatio = this.estimateContextFillRatio(messages);
-    const compactionStage = determineCompactionStageFromPressure(contextFillRatio);
+    const usedTokens = this.estimateMessageTokens(messages);
+    const compactionStage = determineCompactionStageFromPressure(
+      contextFillRatio,
+      usedTokens,
+      this.config.maxContextTokensEstimate,
+    );
     logger.info("Starting conversation summarization", {
       totalMessages: messages.length,
       messagesToSummarize,

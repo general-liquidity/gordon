@@ -1,11 +1,20 @@
 /**
  * Patch Mastra's Agent Network for Gordon compatibility.
  *
- * Patch 1: Sub-agent conversation history
- *   Mastra hardcodes `lastMessages: 0` for sub-agents in network routing,
- *   which strips all conversation context. This patch changes it to 10
- *   so sub-agents can see recent messages and understand follow-up requests
- *   like "check whale activity" after analyzing DUSKUSDT.
+ * Patch 1: Sub-agent conversation history (DISABLED — was lastMessages 0 → 10).
+ *   Originally we patched Mastra's hardcoded `lastMessages: 0` to 10 for
+ *   sub-agents so they could see follow-up context. The unintended consequence
+ *   was that every routing-agent + sub-agent call carried 10 turns × heavy
+ *   tool-call payloads, blowing the 200k context ceiling after ~50 chat
+ *   turns ("prompt is too long: 206062 tokens > 200000 maximum").
+ *
+ *   Per Claude Code's audited pattern: send all messages until compaction
+ *   fires; don't artificially window. Mastra's 0-default + Gordon's
+ *   compaction layer + the new clear_tool_uses_20250919 beta on Anthropic
+ *   together replace what this patch was hacking around.
+ *
+ *   Leaving the code path here so the patch is greppable and reversible —
+ *   we just no longer mutate the Mastra binary.
  *
  * Patch 2: OpenAI-compatible provider support (Dedalus)
  *   Mastra hardcodes `.responses(modelId)` for the openai case, which hits
@@ -64,30 +73,21 @@ function findChunkFiles(contentPattern) {
 }
 
 // ============================================================================
-// Patch 1: Sub-agent lastMessages: 0 → 10
+// Patch 1: Sub-agent lastMessages — DISABLED (see header). Keep stub for
+// reversibility: revert any prior `lastMessages: 10` mutation back to the
+// Mastra default of 0 in case a previous postinstall already mutated the
+// dist files.
 // ============================================================================
 
-const lastMessagesNeedle = "            lastMessages: 0";
-const lastMessagesReplacement = "            lastMessages: 10";
-
-const lastMessagesFiles = findChunkFiles(lastMessagesNeedle);
-if (lastMessagesFiles.length === 0) {
-  // Check if already patched
-  const alreadyPatched = findChunkFiles(lastMessagesReplacement);
-  if (alreadyPatched.length > 0) {
-    log(`[patch-mastra] lastMessages already patched (${alreadyPatched.length} files)`);
-  } else {
-    warn(`[patch-mastra] WARNING: lastMessages pattern not found in any chunk file`);
-  }
-}
-
-for (const filePath of lastMessagesFiles) {
+const STALE_LAST_MESSAGES_NEEDLE = "            lastMessages: 10";
+const MASTRA_DEFAULT = "            lastMessages: 0";
+const staleFiles = findChunkFiles(STALE_LAST_MESSAGES_NEEDLE);
+for (const filePath of staleFiles) {
   let content = fs.readFileSync(filePath, "utf8");
-  content = content.replaceAll(lastMessagesNeedle, lastMessagesReplacement);
+  content = content.replaceAll(STALE_LAST_MESSAGES_NEEDLE, MASTRA_DEFAULT);
   fs.writeFileSync(filePath, content, "utf8");
-  const count = (content.match(/lastMessages: 10/g) || []).length;
   const name = path.relative(path.resolve(__dirname, ".."), filePath);
-  log(`[patch-mastra] Patched lastMessages in ${name} (${count} occurrences)`);
+  log(`[patch-mastra] Reverted stale lastMessages mutation in ${name} → 0 (Mastra default)`);
   totalPatched++;
 }
 
