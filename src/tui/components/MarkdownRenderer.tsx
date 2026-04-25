@@ -34,90 +34,8 @@ const _tokenCache = new Map<string, Token[]>();
 const _TOKEN_CACHE_MAX = 500;
 
 // Fast-path regex — if the first 500 chars contain none of these, skip
-// marked entirely and emit a single paragraph token. Box-drawing corners
-// are included so ASCII-box content doesn't bypass detection.
-const MD_SYNTAX_RE = /[#*`|\[\]>~_\\┌└╔╚╭╰]|\n\n|^\d+\. |\n\d+\. |---|___|\*\*\*/;
-
-// ASCII-box detection: LLMs emit visual boxes drawn with Unicode
-// box-drawing characters (often lopsided — top + side bars + bottom, no
-// right border). We split them out of the content stream BEFORE marked
-// sees them, so each box renders as a real Ink <Box borderStyle> that
-// spans available width, and the surrounding markdown still parses
-// normally.
-const ASCII_BOX_TOP = /^\s*[┌╔╭][─━═-]/;
-const ASCII_BOX_BOTTOM = /^\s*[└╚╰][─━═-]/;
-// Inner-line side bars. Strip BOTH a leading `│ ` AND a trailing ` │` so
-// double-bordered boxes (LLMs sometimes emit symmetric borders on every
-// content line) don't bleed the right glyph into the rendered text.
-const ASCII_BOX_SIDE_LEAD = /^\s*[│║|]\s?/;
-const ASCII_BOX_SIDE_TRAIL = /\s*[│║|]\s*$/;
-
-function stripBoxSide(line: string): string {
-  return line.replace(ASCII_BOX_SIDE_LEAD, "").replace(ASCII_BOX_SIDE_TRAIL, "");
-}
-
-/**
- * Parse a single line of text into marked's inline tokens (bold, italic,
- * code, link, etc.) so box content keeps its formatting. We run marked's
- * block lexer on a one-line string; if the first token is a paragraph,
- * its `.tokens` array IS the inline tokens. Falls back to a bare text
- * token if the line resists tokenization.
- */
-function lineToInlineTokens(line: string): Token[] {
-  if (!line.trim()) return [{ type: "text", text: " ", raw: " " } as Tokens.Text];
-  try {
-    const tokens = marked.lexer(line, { gfm: true });
-    const first = tokens[0];
-    if (first && first.type === "paragraph") {
-      return (first as Tokens.Paragraph).tokens ?? [];
-    }
-  } catch {
-    // fall through
-  }
-  return [{ type: "text", text: line, raw: line } as Tokens.Text];
-}
-
-type Segment =
-  | { kind: "markdown"; content: string }
-  | { kind: "box"; lines: string[] };
-
-function splitAsciiBoxes(content: string): Segment[] {
-  const lines = content.split("\n");
-  const segments: Segment[] = [];
-  let buffer: string[] = [];
-  let i = 0;
-  while (i < lines.length) {
-    const line = lines[i]!;
-    if (ASCII_BOX_TOP.test(line)) {
-      // Look ahead for matching bottom
-      let end = -1;
-      for (let j = i + 1; j < lines.length; j++) {
-        if (ASCII_BOX_BOTTOM.test(lines[j]!)) {
-          end = j;
-          break;
-        }
-      }
-      if (end > i) {
-        // Flush text buffer
-        if (buffer.length > 0) {
-          segments.push({ kind: "markdown", content: buffer.join("\n") });
-          buffer = [];
-        }
-        // Strip side-bars from inner lines (both leading and trailing)
-        const inner = lines.slice(i + 1, end).map(stripBoxSide);
-        segments.push({ kind: "box", lines: inner });
-        i = end + 1;
-        continue;
-      }
-    }
-    buffer.push(line);
-    i++;
-  }
-  if (buffer.length > 0) {
-    segments.push({ kind: "markdown", content: buffer.join("\n") });
-  }
-  return segments;
-}
+// marked entirely and emit a single paragraph token.
+const MD_SYNTAX_RE = /[#*`|\[\]>~_\\]|\n\n|^\d+\. |\n\d+\. |---|___|\*\*\*/;
 
 function hashContent(content: string): string {
   let h = 0;
@@ -171,44 +89,13 @@ function cacheResult(key: string, tokens: Token[]): void {
 // ============================================================================
 
 export function MarkdownRenderer({ content }: Props) {
-  // Pre-split ASCII boxes so each one renders as a real Ink Box instead
-  // of getting smushed through marked's paragraph tokenizer. The
-  // surrounding markdown segments still go through the normal pipeline.
-  const segments = splitAsciiBoxes(content);
-  return (
-    <Box flexDirection="column">
-      {segments.map((seg, i) =>
-        seg.kind === "box" ? (
-          <Box
-            key={i}
-            flexDirection="column"
-            borderStyle="round"
-            borderColor="gray"
-            paddingX={1}
-            marginY={0}
-          >
-            {seg.lines.map((line, j) => (
-              <Text key={j}>
-                <InlineTokens tokens={lineToInlineTokens(line)} />
-              </Text>
-            ))}
-          </Box>
-        ) : (
-          <MarkdownSegment key={i} content={seg.content} />
-        ),
-      )}
-    </Box>
-  );
-}
-
-function MarkdownSegment({ content }: { content: string }) {
   const tokens = tokenize(content);
   return (
-    <>
+    <Box flexDirection="column">
       {tokens.map((token, i) => (
         <TokenRenderer key={i} token={token} />
       ))}
-    </>
+    </Box>
   );
 }
 
