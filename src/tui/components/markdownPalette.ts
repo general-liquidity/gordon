@@ -64,6 +64,37 @@ export const ANSI = {
  */
 export const SIGNED_NUMBER_RE = /(?<![\w\-])[+\-]\$?\d[\d,]*(?:\.\d+)?%?/g;
 
+/** Single number — optionally signed, optionally $, optionally %. */
+const NUM = "[+\\-]?\\$?\\d[\\d,]*(?:\\.\\d+)?%?";
+/** Number or range. Range connector is hyphen, en-dash, or "to". */
+const NUM_RANGE = `${NUM}(?:\\s*(?:[\\-–]|to)\\s*${NUM})?`;
+/**
+ * Separator between label and number. Allows an optional " range" word
+ * so "Drawdown range: 5-12%" matches the same as "Drawdown: 5-12%".
+ * Also tolerates whitespace, colons, equals, and parens.
+ */
+const SEP = "(?:\\s+range)?[\\s:=()]+";
+
+/**
+ * Labels whose value should render green: win rate, total return,
+ * gain, profit, etc. Matches the keyword + separator + number-or-range
+ * and captures the number-or-range in group 1.
+ */
+export const POSITIVE_LABEL_RE = new RegExp(
+  `\\b(?:win[\\s\\-]?rate|win range|hit[\\s\\-]?rate|success[\\s\\-]?rate|accuracy|total return|gain|profit|target|upside|return)\\b${SEP}(${NUM_RANGE})`,
+  "gi",
+);
+
+/**
+ * Labels whose value should render red: loss rate, drawdown, miss rate,
+ * decline, etc. Same shape as POSITIVE_LABEL_RE — group 1 is the
+ * number-or-range to color.
+ */
+export const NEGATIVE_LABEL_RE = new RegExp(
+  `\\b(?:loss[\\s\\-]?rate|loss range|miss[\\s\\-]?rate|failure[\\s\\-]?rate|max[\\s\\-]?(?:dd|drawdown)|drawdown|max[\\s\\-]?loss|stop[\\s\\-]?loss|downside|decline|drop|loss)\\b${SEP}(${NUM_RANGE})`,
+  "gi",
+);
+
 /** Pick green (positive) or red (negative) based on the sign char. */
 export function deltaColor(sign: string): string {
   return sign === "-" ? PALETTE.red : PALETTE.green;
@@ -72,6 +103,63 @@ export function deltaColor(sign: string): string {
 /** ANSI variant of deltaColor — for embedded escapes in table cells. */
 export function deltaAnsi(sign: string): string {
   return sign === "-" ? ANSI.red : ANSI.green;
+}
+
+/**
+ * Locate every span of plain text that should render green or red.
+ * Combines three sources in priority order:
+ *   1. Sign-prefixed numbers (highest priority — explicit sign always wins)
+ *   2. Numbers/ranges following negative labels  → red
+ *   3. Numbers/ranges following positive labels  → green
+ *
+ * When sources overlap (e.g. "Total Return: -0.86%" — POSITIVE_LABEL
+ * captures "-0.86%" green AND SIGNED captures "-0.86%" red), the
+ * higher-priority hit wins so the explicit sign always reflects reality.
+ */
+export interface ColorHit {
+  start: number;
+  end: number;
+  color: string;
+}
+export function findColorHits(text: string): ColorHit[] {
+  const hits: Array<ColorHit & { prio: number }> = [];
+
+  SIGNED_NUMBER_RE.lastIndex = 0;
+  for (const m of text.matchAll(SIGNED_NUMBER_RE)) {
+    hits.push({
+      start: m.index!,
+      end: m.index! + m[0].length,
+      color: deltaColor(m[0][0]!),
+      prio: 0,
+    });
+  }
+  NEGATIVE_LABEL_RE.lastIndex = 0;
+  for (const m of text.matchAll(NEGATIVE_LABEL_RE)) {
+    const grp = m[1];
+    if (!grp) continue;
+    const grpStart = m.index! + m[0].lastIndexOf(grp);
+    hits.push({ start: grpStart, end: grpStart + grp.length, color: PALETTE.red, prio: 1 });
+  }
+  POSITIVE_LABEL_RE.lastIndex = 0;
+  for (const m of text.matchAll(POSITIVE_LABEL_RE)) {
+    const grp = m[1];
+    if (!grp) continue;
+    const grpStart = m.index! + m[0].lastIndexOf(grp);
+    hits.push({ start: grpStart, end: grpStart + grp.length, color: PALETTE.green, prio: 2 });
+  }
+
+  // Sort by start asc, prio asc — lower prio wins on ties.
+  hits.sort((a, b) => a.start - b.start || a.prio - b.prio);
+  // Drop any hit overlapping an earlier (already-emitted) one.
+  const out: ColorHit[] = [];
+  let lastEnd = 0;
+  for (const h of hits) {
+    if (h.start >= lastEnd) {
+      out.push({ start: h.start, end: h.end, color: h.color });
+      lastEnd = h.end;
+    }
+  }
+  return out;
 }
 
 /** Heading color by depth (1–6). Levels 5–6 collapse to platinum. */

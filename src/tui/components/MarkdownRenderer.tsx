@@ -3,7 +3,7 @@ import { Box, Text } from "../ink-custom";
 import { marked, type Tokens, type Token } from "marked";
 import { CodeBlock } from "./CodeBlock.js";
 import { InlineTable } from "./InlineTable.js";
-import { PALETTE, ANSI, headingColor, SIGNED_NUMBER_RE, deltaColor, deltaAnsi } from "./markdownPalette.js";
+import { PALETTE, ANSI, headingColor, findColorHits } from "./markdownPalette.js";
 
 /**
  * MarkdownRenderer — CommonMark + GFM via marked, rendered to Ink.
@@ -241,14 +241,25 @@ const ANSI_PLATINUM = ANSI.platinum;
 // The width cache strips ANSI before measuring, so column alignment stays
 // correct.
 /**
- * Wrap signed numeric literals in green/red ANSI inside a plain string.
- * Used by table-cell rendering where the line is already a single string.
+ * Wrap green/red color spans inside a plain table-cell string. Sources
+ * include signed numbers, plus number-or-range values following positive
+ * labels (win rate, return, etc.) and negative labels (drawdown, loss
+ * rate, etc.). Single function for table cells where the line is already
+ * a single string.
  */
 function colorSignedNumbersAnsi(text: string): string {
-  return text.replace(SIGNED_NUMBER_RE, (m) => {
-    const sign = m[0]!;
-    return deltaAnsi(sign) + m + ANSI_RESET;
-  });
+  const hits = findColorHits(text);
+  if (hits.length === 0) return text;
+  let out = "";
+  let cursor = 0;
+  for (const h of hits) {
+    if (h.start > cursor) out += text.slice(cursor, h.start);
+    const ansiColor = h.color === PALETTE.red ? ANSI.red : ANSI.green;
+    out += ansiColor + text.slice(h.start, h.end) + ANSI_RESET;
+    cursor = h.end;
+  }
+  if (cursor < text.length) out += text.slice(cursor);
+  return out;
 }
 
 function tokensToAnsiText(tokens: Token[]): string {
@@ -353,23 +364,22 @@ function InlineTokens({ tokens }: { tokens: Token[] }): React.ReactElement {
 }
 
 /**
- * Split plain text on signed numeric literals and render each match in
- * red (negative) or green (positive). Returns a fragment so it slots
- * into any <Text> parent the same way a raw string would.
+ * Split plain text on color hits — signed numbers + labeled win-rate /
+ * loss-rate / drawdown / range values — and render each in green/red.
+ * Returns a fragment so it slots into any <Text> parent the same way a
+ * raw string would.
  */
 function renderTextWithDeltas(text: string): React.ReactElement {
+  const hits = findColorHits(text);
+  if (hits.length === 0) return <Text>{text}</Text>;
   const parts: React.ReactNode[] = [];
   let last = 0;
   let key = 0;
-  // Reset lastIndex defensively — SIGNED_NUMBER_RE is module-scoped.
-  SIGNED_NUMBER_RE.lastIndex = 0;
-  let m: RegExpExecArray | null;
-  while ((m = SIGNED_NUMBER_RE.exec(text)) !== null) {
-    if (m.index > last) parts.push(<Text key={key++}>{text.slice(last, m.index)}</Text>);
-    parts.push(<Text key={key++} color={deltaColor(m[0]![0]!)}>{m[0]}</Text>);
-    last = m.index + m[0].length;
+  for (const h of hits) {
+    if (h.start > last) parts.push(<Text key={key++}>{text.slice(last, h.start)}</Text>);
+    parts.push(<Text key={key++} color={h.color}>{text.slice(h.start, h.end)}</Text>);
+    last = h.end;
   }
-  if (last === 0) return <Text>{text}</Text>;
   if (last < text.length) parts.push(<Text key={key++}>{text.slice(last)}</Text>);
   return <>{parts}</>;
 }

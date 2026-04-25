@@ -2,7 +2,7 @@ import React, { useMemo, useRef } from "react";
 import { Box, Text } from "../ink-custom";
 import { CodeBlock } from "./CodeBlock";
 import { TerminalLink } from "./TerminalLink";
-import { PALETTE, headingColor, SIGNED_NUMBER_RE, deltaColor } from "./markdownPalette.js";
+import { PALETTE, headingColor, findColorHits } from "./markdownPalette.js";
 
 // ============================================================================
 // StreamingMarkdown — Claude Code stable-prefix incremental rendering
@@ -141,23 +141,23 @@ function cacheResult(key: string, blocks: ParsedBlock[]): void {
   tokenCache.set(key, blocks);
 }
 
-/** Push plain text into the parts list, splitting on signed numbers so
- *  +pct/-pct render in green/red. Plain segments stay as raw <Text>. */
+/** Push plain text into the parts list, splitting on color hits so
+ *  signed deltas, win-rate values, drawdowns, and ranges within those
+ *  contexts render in green/red. Plain segments stay as raw <Text>. */
 function pushPlain(parts: React.ReactNode[], keyStart: number, text: string): number {
   let key = keyStart;
-  let last = 0;
-  SIGNED_NUMBER_RE.lastIndex = 0;
-  let m: RegExpExecArray | null;
-  while ((m = SIGNED_NUMBER_RE.exec(text)) !== null) {
-    if (m.index > last) parts.push(<Text key={key++}>{text.slice(last, m.index)}</Text>);
-    parts.push(<Text key={key++} color={deltaColor(m[0]![0]!)}>{m[0]}</Text>);
-    last = m.index + m[0].length;
-  }
-  if (last === 0) {
+  const hits = findColorHits(text);
+  if (hits.length === 0) {
     parts.push(<Text key={key++}>{text}</Text>);
-  } else if (last < text.length) {
-    parts.push(<Text key={key++}>{text.slice(last)}</Text>);
+    return key;
   }
+  let last = 0;
+  for (const h of hits) {
+    if (h.start > last) parts.push(<Text key={key++}>{text.slice(last, h.start)}</Text>);
+    parts.push(<Text key={key++} color={h.color}>{text.slice(h.start, h.end)}</Text>);
+    last = h.end;
+  }
+  if (last < text.length) parts.push(<Text key={key++}>{text.slice(last)}</Text>);
   return key;
 }
 
