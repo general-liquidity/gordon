@@ -130,9 +130,10 @@ export function GordonHeader({
         </Box>
       ))}
 
-      <Box marginTop={1} paddingX={1}>
-        <Text dimColor>Tip: Type /scan to discover opportunities, or describe what you want to trade.</Text>
-      </Box>
+      {/* The rotating "Tip:" line above the header is printed by
+          src/tui/index.tsx:245 BEFORE React mounts (one tip per
+          startup). Don't duplicate a hardcoded second one inside the
+          rendered header — the user just sees the same word twice. */}
 
       {isResumedSession && resumeMessageCount != null && (
         <Box paddingX={1}>
