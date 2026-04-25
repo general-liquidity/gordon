@@ -333,12 +333,19 @@ export function getGordon(): Agent {
     instructions: composeAgentInstructions("gordon", GORDON_INSTRUCTIONS),
     model,
 
-    // Cap maxOutputTokens for ALL internal calls (network routing, sub-agent
-    // transfers, structured output). Without this, Mastra defaults to the
-    // model's catalog max (e.g. 100000 for Haiku 4.5) and Dedalus's
-    // Anthropic backend rejects non-streaming requests above ~21K with
-    // "streaming_required" 400s during fast-tier phases.
+    // Cap maxOutputTokens for ALL internal calls. Without this, Mastra
+    // defaults to the model's catalog max (e.g. 100000 for Haiku 4.5) and
+    // Dedalus's Anthropic backend rejects non-streaming requests above
+    // ~21K with "streaming_required" 400s during fast-tier phases.
+    //
+    // BOTH paths need their own cap field — Mastra has separate option
+    // pipelines for generate/stream vs network() multi-agent routing:
+    //   - defaultOptions → consumed by getDefaultOptions() for
+    //     generate/stream/resumeGenerate
+    //   - defaultNetworkOptions → consumed by getDefaultNetworkOptions()
+    //     for network() (the /scan multi-agent path)
     defaultOptions: { modelSettings: { maxOutputTokens: 16384 } },
+    defaultNetworkOptions: { modelSettings: { maxOutputTokens: 16384 } },
 
     // 4-agent architecture: Gordon routes to Executor for trades, Researcher for parallel work
     agents: {
