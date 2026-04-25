@@ -2254,7 +2254,7 @@ function AppInner() {
       )}
 
       {/* ── Status bar above input (Codex pattern: model · % left · trading status) ── */}
-      <Box paddingX={2} justifyContent="space-between">
+      <Box paddingX={2} marginY={1} justifyContent="space-between">
         <Box gap={1}>
           <Text color={memoryUsageRatio > 0.9 ? "red" : memoryUsageRatio > 0.7 ? "yellow" : undefined} dimColor={memoryUsageRatio <= 0.7}>{Math.round((1 - memoryUsageRatio) * 100)}% left</Text>
           {liveContextTokens > 0 && (

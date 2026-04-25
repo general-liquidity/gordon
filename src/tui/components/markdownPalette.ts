@@ -36,6 +36,14 @@ export const PALETTE = {
   /** Standard prices and $-prefixed amounts that aren't deltas. Calm
    *  cream so a wall of dollar amounts doesn't compete with green/red. */
   cream: "#F5DEB3",
+  /** Slash commands — a soft sage so /scan, /dd, /tutorial sit in their
+   *  own color lane separate from snake_case function IDs (tan). Same
+   *  family (warm, low saturation) so they still read as "handles" but
+   *  don't blend together in a sentence that mentions both. */
+  sage: "#A4C9A4",
+  /** Top-level (H1) headings. Distinct from amber so we don't have two
+   *  near-identical orange bands fighting for attention. */
+  champagne: "#F1E5AC",
 } as const;
 
 /** ANSI 24-bit escape for embedding palette colors inside string-typed
@@ -64,6 +72,8 @@ export const ANSI = {
   tan: ansi24(PALETTE.tan),
   ice: ansi24(PALETTE.ice),
   cream: ansi24(PALETTE.cream),
+  sage: ansi24(PALETTE.sage),
+  champagne: ansi24(PALETTE.champagne),
 } as const;
 
 /**
@@ -78,7 +88,22 @@ export const ANSI = {
  * `g` so the regex is reusable across calls; we always reset .lastIndex
  * with .exec or use String.matchAll.
  */
-export const SIGNED_NUMBER_RE = /(?<![\w\-])[+\-]\$?\d[\d,]*(?:\.\d+)?%?/g;
+/**
+ * Sign-prefixed numbers, optionally followed by a range tail (hyphen /
+ * en-dash / 'to' + second number) and optional unit (%/mo, /yr, K, M, B).
+ *
+ * Examples that match as a single span:
+ *   +54.5%
+ *   -0.83%
+ *   +$300-1,000/mo  ← range with currency, second half no sign needed
+ *   -$50 to -$100   ← range with explicit second sign
+ *   +25% – 50%
+ *
+ * Whole match takes the FIRST sign's color (range of profits → green
+ * even if the second number lacks a sign).
+ */
+export const SIGNED_NUMBER_RE =
+  /(?<![\w\-])[+\-]\$?\d[\d,]*(?:\.\d+)?%?(?:\s*(?:[\-–]|to)\s*[+\-]?\$?\d[\d,]*(?:\.\d+)?%?)?(?:\/(?:mo|yr|wk|d|hr|h))?/g;
 
 /** Single number — optionally signed, optionally $, optionally %. */
 const NUM = "[+\\-]?\\$?\\d[\\d,]*(?:\\.\\d+)?%?";
@@ -171,11 +196,13 @@ export const RISK_LOW_RE = new RegExp(`${RISK_PRECEDED}\\bLow\\b`, "gm");
 export const RISK_MEDIUM_RE = new RegExp(`${RISK_PRECEDED}\\bMedium\\b`, "gm");
 export const RISK_HIGH_RE = new RegExp(`${RISK_PRECEDED}\\bHigh\\b`, "gm");
 
-/** Timeframes: 1m, 5m, 15m, 30m, 1h, 2h, 4h, 6h, 12h, 1d, 1D, 1w, 1W.
- *  Lookbehind rejects matches preceded by a digit or '$' so "$630M",
- *  "1.5M", "1.2h" don't get mis-coloured as timeframes. "M" is omitted
- *  as a suffix because it doubles as the magnitude suffix for millions. */
-export const TIMEFRAME_RE = /(?<![\d$.])\b\d{1,3}(?:m|h|d|D|w|W)\b/g;
+/** Timeframes — short form (1m / 5m / 15m / 1h / 4h / 1D / 1w) AND long
+ *  form (15 min / 1 hour / 2 hours / 3 days / 5 weeks). Lookbehind
+ *  rejects digit-/dollar-/dot- prefix so "$630M", "1.5M", "1.2h" don't
+ *  mis-color. "M" is omitted as a short suffix because it doubles as
+ *  the magnitude suffix for millions. */
+export const TIMEFRAME_RE =
+  /(?<![\d$.])\b\d{1,3}(?:\s*(?:m|h|d|D|w|W)|\s*(?:min(?:ute)?s?|hour?s?|day?s?|week?s?|month?s?|year?s?|sec(?:ond)?s?))\b/g;
 
 /**
  * Fiat / stablecoin suffixes used by exchange pair conventions
@@ -350,7 +377,7 @@ export function findColorHits(text: string): ColorHit[] {
   // family as backticked codespans). Catches volume_surge, /tutorial,
   // and similar when the LLM omits backticks.
   pushAll(SNAKE_CASE_RE, text, PALETTE.tan, 4, hits);
-  pushAll(SLASH_COMMAND_RE, text, PALETTE.tan, 4, hits);
+  pushAll(SLASH_COMMAND_RE, text, PALETTE.sage, 4, hits);
 
   // prio 5 — symbols, timeframes, prices. Pair detection runs first so
   // its halves take precedence over standalone registered tickers /
@@ -397,11 +424,25 @@ export function findColorHits(text: string): ColorHit[] {
   return out;
 }
 
-/** Heading color by depth (1–6). Levels 5–6 collapse to platinum. */
+/**
+ * Heading color by depth (1–6). Tuned to avoid stacking three orange-
+ * adjacent tones (gold, amber, mustard) on top of each other — the
+ * earlier palette had H1 gold, H2 amber, AND mustard on table headers,
+ * which made the screen feel dominated by yellow/orange. New scheme:
+ *
+ *   H1 → gold      (loud — top sections, used sparingly)
+ *   H2 → champagne (warm cream — distinct from amber and from H1 gold)
+ *   H3 → platinum  (silver bold — quiet sub-sub)
+ *   H4+→ ash       (grey bold — minor)
+ *
+ * Amber moves off headings entirely and becomes the indicator-label
+ * accent (RSI:, MACD:, Stop Loss:); table headers stay mustard. This
+ * gives five differentiated tiers in different families.
+ */
 export function headingColor(depth: number): string {
   switch (depth) {
     case 1: return PALETTE.gold;
-    case 2: return PALETTE.amber;
+    case 2: return PALETTE.champagne;
     case 3: return PALETTE.platinum;
     default: return PALETTE.ash;
   }

@@ -518,13 +518,16 @@ async function streamResponse(
           if (event.usage) {
             totalTokens = event.usage.totalTokens ?? 0;
             // Tokens currently sitting in the context window — what
-            // Claude Code shows in its status line. Sum of fresh input,
-            // cache read (re-used), and cache creation (newly cached).
+            // Claude Code shows in its status line. Mastra normalizes
+            // usage to {promptTokens, completionTokens, totalTokens}
+            // (cache breakdown is rolled into promptTokens), so the
+            // input figure IS promptTokens. Fall back to inputTokens
+            // for any provider that exposes it directly.
             const u = event.usage as unknown as Record<string, number | undefined>;
             inputTokens =
-              (u.inputTokens ?? u.promptTokens ?? 0) +
-              (u.cacheReadInputTokens ?? u.cache_read_input_tokens ?? 0) +
-              (u.cacheCreationInputTokens ?? u.cache_creation_input_tokens ?? 0);
+              u.promptTokens ??
+              u.inputTokens ??
+              ((u.cacheReadInputTokens ?? 0) + (u.cacheCreationInputTokens ?? 0));
           }
 
           // Finalize the streaming message — no new message needed (DOM continuity)
