@@ -4,6 +4,7 @@
  */
 
 import { CoinbaseClient } from "../../venues/exchange/clients/coinbase/index.ts";
+import { registerExchangeInfoSymbols } from "./_symbolRegistration.ts";
 import type {
   Exchange,
   ExchangeId,
@@ -82,7 +83,7 @@ export class CoinbaseAdapter implements Exchange {
 
   async getExchangeInfo(): Promise<ExchangeInfo> {
     const products = await this.client.getProducts();
-    return {
+    const result: ExchangeInfo = {
       timezone: "UTC",
       serverTime: Date.now(),
       symbols: products
@@ -116,6 +117,8 @@ export class CoinbaseAdapter implements Exchange {
           })
         ),
     };
+    registerExchangeInfoSymbols(result);
+    return result;
   }
 
   private getPrecision(increment: string): number {

@@ -4,6 +4,7 @@
  */
 
 import { KrakenClient, KrakenError } from "../../venues/exchange/clients/kraken/index.ts";
+import { registerExchangeInfoSymbols } from "./_symbolRegistration.ts";
 import type {
   Exchange,
   ExchangeId,
@@ -136,7 +137,7 @@ export class KrakenAdapter implements Exchange {
       this.client.getAssetPairs(),
     ]);
 
-    return {
+    const result: ExchangeInfo = {
       timezone: "UTC",
       serverTime: time.unixtime * 1000,
       symbols: Object.entries(pairs).map(
@@ -167,6 +168,8 @@ export class KrakenAdapter implements Exchange {
         })
       ),
     };
+    registerExchangeInfoSymbols(result);
+    return result;
   }
 
   // -------------------------------------------------------------------------

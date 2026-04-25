@@ -12,6 +12,7 @@
  */
 
 import { createHmac } from "crypto";
+import { registerExchangeInfoSymbols } from "./_symbolRegistration.ts";
 import type {
   Exchange,
   ExchangeId,
@@ -402,7 +403,7 @@ export class OkxAdapter implements Exchange {
 
     const serverTime = timeData[0] ? parseInt(timeData[0].ts) : Date.now();
 
-    return {
+    const result: ExchangeInfo = {
       timezone: "UTC",
       serverTime,
       symbols: instruments.map(
@@ -430,6 +431,8 @@ export class OkxAdapter implements Exchange {
         })
       ),
     };
+    registerExchangeInfoSymbols(result);
+    return result;
   }
 
   private getPrecision(sizeStr: string): number {

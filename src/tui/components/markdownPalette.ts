@@ -29,9 +29,11 @@ export const PALETTE = {
   /** Function / strategy / parameter IDs (codespan) — warm tan, distinct
    *  from amber so backticked names don't blend with H2 / headers. */
   tan: "#D2B48C",
-  /** Crypto tickers (BTC, ETH, SOL...) — emerald, separate from delta green
-   *  so symbols read as "asset names" not "positive numbers". */
-  emerald: "#50C878",
+  /** Tradeable assets — crypto + stock tickers. Bronze metallic so the
+   *  asset name reads as "instrument" rather than "positive number" —
+   *  green/red are reserved for direction and outcome. Replaces the
+   *  earlier emerald which made the screen too green. */
+  bronze: "#CD7F32",
   /** Standard prices and $-prefixed amounts that aren't deltas. Calm
    *  cream so a wall of dollar amounts doesn't compete with green/red. */
   cream: "#F5DEB3",
@@ -61,7 +63,7 @@ export const ANSI = {
   red: ansi24(PALETTE.red),
   mustard: ansi24(PALETTE.mustard),
   tan: ansi24(PALETTE.tan),
-  emerald: ansi24(PALETTE.emerald),
+  bronze: ansi24(PALETTE.bronze),
   cream: ansi24(PALETTE.cream),
 } as const;
 
@@ -136,6 +138,9 @@ export const SHORT_TOKEN_RE = /\b(?:SHORT|SELL|SELLS?|SOLD|GOING SHORT|BEARISH)\
  *  whole match (arrow + number) gets colored together. */
 export const UP_ARROW_RE = /(?:↑↑?|↗|🟢)\s*(?:\d[\d,]*(?:\.\d+)?%?)?/g;
 export const DOWN_ARROW_RE = /(?:↓↓?|↘|🔴)\s*(?:\d[\d,]*(?:\.\d+)?%?)?/g;
+/** Sideways arrows — stable / continuation / no-change. Platinum so they
+ *  read as neutral, distinct from the green/red of vertical arrows. */
+export const SIDE_ARROW_RE = /[→←↔➜]/g;
 
 /** Well-known indicator / metric labels that should highlight in amber
  *  when used as a label (followed by colon). Captures only the label
@@ -190,6 +195,13 @@ export const DOLLAR_TICKER_RE = /\$([A-Z]{1,10})\b/g;
  *  Sign-prefixed amounts are caught by SIGNED_NUMBER_RE earlier in the
  *  pipeline and stay green/red. */
 export const PRICE_RE = /(?<![\w])\$\d[\d,]*(?:\.\d+)?[KMB]?\b/g;
+
+/** Plain percentages: `39%`, `58%`, `1.2%` — any unsigned percent.
+ *  Sign-prefixed deltas (+39%, -1.2%) are caught earlier and stay
+ *  green/red; labeled values (Win Rate: 60%) are caught by the label
+ *  pass and win on overlap. This catches the leftover plain values like
+ *  "ASTER 39%" or "0.62%" inside a sentence. */
+export const PERCENT_RE = /(?<![\w\-+.])\d+(?:\.\d+)?%/g;
 
 // ============================================================================
 // Runtime symbol registry
@@ -313,6 +325,7 @@ export function findColorHits(text: string): ColorHit[] {
   pushAll(SHORT_TOKEN_RE, text, PALETTE.red, 3, hits);
   pushAll(UP_ARROW_RE, text, PALETTE.green, 3, hits);
   pushAll(DOWN_ARROW_RE, text, PALETTE.red, 3, hits);
+  pushAll(SIDE_ARROW_RE, text, PALETTE.platinum, 3, hits);
   pushAll(RISK_LOW_RE, text, PALETTE.green, 3, hits);
   pushAll(RISK_MEDIUM_RE, text, PALETTE.mustard, 3, hits);
   pushAll(RISK_HIGH_RE, text, PALETTE.red, 3, hits);
@@ -329,7 +342,7 @@ export function findColorHits(text: string): ColorHit[] {
     const fiat = m[2];
     if (!asset || !fiat) continue;
     const assetStart = m.index!;
-    hits.push({ start: assetStart, end: assetStart + asset.length, color: PALETTE.emerald, prio: 5 });
+    hits.push({ start: assetStart, end: assetStart + asset.length, color: PALETTE.bronze, prio: 5 });
     const fiatStart = assetStart + asset.length;
     hits.push({ start: fiatStart, end: fiatStart + fiat.length, color: PALETTE.platinum, prio: 5 });
   }
@@ -339,16 +352,17 @@ export function findColorHits(text: string): ColorHit[] {
     const ticker = m[1];
     if (!ticker) continue;
     const tickerStart = m.index! + 1; // skip the '$'
-    hits.push({ start: tickerStart, end: tickerStart + ticker.length, color: PALETTE.emerald, prio: 5 });
+    hits.push({ start: tickerStart, end: tickerStart + ticker.length, color: PALETTE.bronze, prio: 5 });
   }
   // Standalone tickers from the runtime registry (BTC, ETH, AAPL, ...
   // populated from API responses).
   for (const r of findRegisteredTickers(text)) {
-    hits.push({ start: r.start, end: r.end, color: PALETTE.emerald, prio: 5 });
+    hits.push({ start: r.start, end: r.end, color: PALETTE.bronze, prio: 5 });
   }
   pushAll(FIAT_RE, text, PALETTE.platinum, 5, hits);
   pushAll(TIMEFRAME_RE, text, PALETTE.mustard, 5, hits);
   pushAll(PRICE_RE, text, PALETTE.cream, 5, hits);
+  pushAll(PERCENT_RE, text, PALETTE.cream, 5, hits);
 
   // Sort by start asc, prio asc — lower prio wins on ties.
   hits.sort((a, b) => a.start - b.start || a.prio - b.prio);

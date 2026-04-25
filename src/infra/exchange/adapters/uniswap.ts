@@ -18,6 +18,7 @@
  */
 
 import { UniswapClient } from "../../protocols/uniswap/index.ts";
+import { registerExchangeInfoSymbols } from "./_symbolRegistration.ts";
 import { UniswapSubgraph } from "../../protocols/uniswap/subgraph.ts";
 import { SUPPORTED_CHAIN_IDS, CHAIN_NAMES, isUniswapXRouting } from "../../protocols/uniswap/types.ts";
 import type {
@@ -92,11 +93,13 @@ export class UniswapAdapter implements Exchange {
       filters: [],
     }));
 
-    return {
+    const result: ExchangeInfo = {
       timezone: "UTC",
       serverTime: Date.now(),
       symbols,
     };
+    registerExchangeInfoSymbols(result);
+    return result;
   }
 
   // -------------------------------------------------------------------------

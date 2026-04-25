@@ -4,6 +4,7 @@
  */
 
 import { BitfinexClient } from "../../venues/exchange/clients/bitfinex/index.ts";
+import { registerExchangeInfoSymbols } from "./_symbolRegistration.ts";
 import type {
   Exchange,
   ExchangeId,
@@ -89,7 +90,7 @@ export class BitfinexAdapter implements Exchange {
       symbolDetails.map((d) => [d.pair.toUpperCase(), d])
     );
 
-    return {
+    const result: ExchangeInfo = {
       timezone: "UTC",
       serverTime: Date.now(),
       symbols: symbols.map((pair): SymbolInfo => {
@@ -129,6 +130,8 @@ export class BitfinexAdapter implements Exchange {
         };
       }),
     };
+    registerExchangeInfoSymbols(result);
+    return result;
   }
 
   // -------------------------------------------------------------------------

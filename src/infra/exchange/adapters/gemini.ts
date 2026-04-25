@@ -6,6 +6,7 @@
  */
 
 import { GeminiClient } from "../../venues/exchange/clients/gemini/index.ts";
+import { registerExchangeInfoSymbols } from "./_symbolRegistration.ts";
 import type {
   GeminiOrder,
   GeminiNewOrderRequest,
@@ -101,7 +102,7 @@ export class GeminiAdapter implements Exchange {
 
   async getExchangeInfo(): Promise<ExchangeInfo> {
     const symbols = await this.client.getSymbols();
-    return {
+    const result: ExchangeInfo = {
       timezone: "UTC",
       serverTime: Date.now(),
       symbols: symbols.map((sym): SymbolInfo => {
@@ -130,6 +131,8 @@ export class GeminiAdapter implements Exchange {
         };
       }),
     };
+    registerExchangeInfoSymbols(result);
+    return result;
   }
 
   // ──────────────────────────── Market data ────────────────────────────

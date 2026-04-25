@@ -7,6 +7,7 @@
  */
 
 import { HyperliquidClient } from "../../venues/exchange/clients/hyperliquid/index.ts";
+import { registerExchangeInfoSymbols } from "./_symbolRegistration.ts";
 import { HyperliquidNotSupportedError } from "../../../errors/index.ts";
 import type {
   Exchange,
@@ -115,11 +116,11 @@ export class HyperliquidAdapter implements Exchange {
   async getExchangeInfo(): Promise<ExchangeInfo> {
     const meta = await this.client.getMeta();
 
-    return {
+    const result: ExchangeInfo = {
       timezone: "UTC",
       serverTime: Date.now(),
       symbols: meta.universe.map(
-        (asset, index): SymbolInfo => ({
+        (asset, _index): SymbolInfo => ({
           symbol: this.normalizeSymbol(asset.name),
           status: "online",
           baseAsset: asset.name,
@@ -141,6 +142,8 @@ export class HyperliquidAdapter implements Exchange {
         })
       ),
     };
+    registerExchangeInfoSymbols(result);
+    return result;
   }
 
   // -------------------------------------------------------------------------

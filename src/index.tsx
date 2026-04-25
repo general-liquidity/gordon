@@ -1,5 +1,12 @@
 #!/usr/bin/env bun
 
+// Install the Dedalus max_tokens guard before any LLM module loads.
+// Patches global fetch so Mastra-internal routing-agent calls (which
+// don't inherit our agent-level defaultOptions / defaultNetworkOptions)
+// can't blow the non-streaming threshold and 400 the user. Idempotent.
+import { installDedalusMaxTokensGuard } from "./infra/runtime/dedalusMaxTokensGuard.ts";
+installDedalusMaxTokensGuard();
+
 import {
   parseCommand,
   parseFlags,

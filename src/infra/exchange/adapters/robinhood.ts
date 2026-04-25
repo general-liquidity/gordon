@@ -4,6 +4,7 @@
  */
 
 import { createPrivateKey, sign as cryptoSign, randomUUID, type KeyObject } from "node:crypto";
+import { registerExchangeInfoSymbols } from "./_symbolRegistration.ts";
 import type {
   Exchange,
   ExchangeId,
@@ -457,11 +458,13 @@ export class RobinhoodAdapter implements Exchange {
       };
     });
 
-    return {
+    const result: ExchangeInfo = {
       timezone: "UTC",
       serverTime: Date.now(),
       symbols,
     };
+    registerExchangeInfoSymbols(result);
+    return result;
   }
 
   // -------------------------------------------------------------------------

@@ -4,7 +4,7 @@
  */
 
 import { BinanceClient } from "../../venues/exchange/clients/binance/index.ts";
-import { registerSymbols } from "../../../tui/components/markdownPalette.ts";
+import { registerExchangeInfoSymbols } from "./_symbolRegistration.ts";
 import type {
   Exchange,
   ExchangeId,
@@ -82,10 +82,7 @@ export class BinanceAdapter implements Exchange {
 
   async getExchangeInfo(): Promise<ExchangeInfo> {
     const info = await this.client.getExchangeInfo();
-    // Populate the markdown ticker registry so any symbol Binance lists
-    // colors correctly when mentioned in chat — no hardcoded universe.
-    registerSymbols(info.symbols.flatMap((s) => [s.baseAsset, s.quoteAsset]));
-    return {
+    const result: ExchangeInfo = {
       timezone: info.timezone,
       serverTime: info.serverTime,
       symbols: info.symbols.map(
@@ -103,6 +100,8 @@ export class BinanceAdapter implements Exchange {
         })
       ),
     };
+    registerExchangeInfoSymbols(result);
+    return result;
   }
 
   // -------------------------------------------------------------------------
