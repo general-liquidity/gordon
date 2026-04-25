@@ -41,9 +41,17 @@ export const PALETTE = {
    *  family (warm, low saturation) so they still read as "handles" but
    *  don't blend together in a sentence that mentions both. */
   sage: "#A4C9A4",
-  /** Top-level (H1) headings. Distinct from amber so we don't have two
-   *  near-identical orange bands fighting for attention. */
+  /** (Reserved — was used for H2 before it moved to bold whiteBright.
+   *  Kept in the palette in case a future caller wants a warm cream
+   *  tone distinct from prices/cream and percentages/peach.) */
   champagne: "#F1E5AC",
+  /** Plain percentages (39%, 0.62%) that aren't deltas. Warm pale
+   *  peach so they read as quantities, distinct from cream prices and
+   *  red/green deltas. */
+  peach: "#FFCBA4",
+  /** Timeframes (1h, 4h, 1D, 15 min, 4-5 years). Warm desaturated tan,
+   *  distinct from mustard table headers and from peach percentages. */
+  khaki: "#C3B091",
 } as const;
 
 /** ANSI 24-bit escape for embedding palette colors inside string-typed
@@ -74,6 +82,8 @@ export const ANSI = {
   cream: ansi24(PALETTE.cream),
   sage: ansi24(PALETTE.sage),
   champagne: ansi24(PALETTE.champagne),
+  peach: ansi24(PALETTE.peach),
+  khaki: ansi24(PALETTE.khaki),
 } as const;
 
 /**
@@ -196,13 +206,15 @@ export const RISK_LOW_RE = new RegExp(`${RISK_PRECEDED}\\bLow\\b`, "gm");
 export const RISK_MEDIUM_RE = new RegExp(`${RISK_PRECEDED}\\bMedium\\b`, "gm");
 export const RISK_HIGH_RE = new RegExp(`${RISK_PRECEDED}\\bHigh\\b`, "gm");
 
-/** Timeframes — short form (1m / 5m / 15m / 1h / 4h / 1D / 1w) AND long
- *  form (15 min / 1 hour / 2 hours / 3 days / 5 weeks). Lookbehind
- *  rejects digit-/dollar-/dot- prefix so "$630M", "1.5M", "1.2h" don't
- *  mis-color. "M" is omitted as a short suffix because it doubles as
- *  the magnitude suffix for millions. */
+/** Timeframes — short form (1m / 5m / 15m / 1h / 4h / 1D / 1w), long form
+ *  (15 min / 1 hour / 2 hours / 3 days / 5 weeks), and ranges
+ *  (4-5 years / 1-2 hours / 30-45 min). Whole range is one match.
+ *
+ *  Lookbehind rejects digit-/dollar-/dot- prefix so '$630M', '1.5M',
+ *  '1.2h' don't mis-color. 'M' is omitted as a short suffix because it
+ *  doubles as the magnitude suffix for millions. */
 export const TIMEFRAME_RE =
-  /(?<![\d$.])\b\d{1,3}(?:\s*(?:m|h|d|D|w|W)|\s*(?:min(?:ute)?s?|hour?s?|day?s?|week?s?|month?s?|year?s?|sec(?:ond)?s?))\b/g;
+  /(?<![\d$.])\b\d{1,3}(?:\s*[\-–]\s*\d{1,3})?(?:\s*(?:m|h|d|D|w|W)|\s*(?:min(?:ute)?s?|hour?s?|day?s?|week?s?|month?s?|year?s?|sec(?:ond)?s?))\b/g;
 
 /**
  * Fiat / stablecoin suffixes used by exchange pair conventions
@@ -406,9 +418,9 @@ export function findColorHits(text: string): ColorHit[] {
     hits.push({ start: r.start, end: r.end, color: PALETTE.ice, prio: 5 });
   }
   pushAll(FIAT_RE, text, PALETTE.platinum, 5, hits);
-  pushAll(TIMEFRAME_RE, text, PALETTE.mustard, 5, hits);
+  pushAll(TIMEFRAME_RE, text, PALETTE.khaki, 5, hits);
   pushAll(PRICE_RE, text, PALETTE.cream, 5, hits);
-  pushAll(PERCENT_RE, text, PALETTE.cream, 5, hits);
+  pushAll(PERCENT_RE, text, PALETTE.peach, 5, hits);
 
   // Sort by start asc, prio asc — lower prio wins on ties.
   hits.sort((a, b) => a.start - b.start || a.prio - b.prio);
@@ -425,24 +437,20 @@ export function findColorHits(text: string): ColorHit[] {
 }
 
 /**
- * Heading color by depth (1–6). Tuned to avoid stacking three orange-
- * adjacent tones (gold, amber, mustard) on top of each other — the
- * earlier palette had H1 gold, H2 amber, AND mustard on table headers,
- * which made the screen feel dominated by yellow/orange. New scheme:
+ * Heading color by depth (1–6). H2 used to be amber and then champagne,
+ * both of which blended with the warm tones used for prices, indicator
+ * labels, and table headers. Switched to bright white (no warm hue) so
+ * H2 reads as "structure" rather than "another yellow accent".
  *
- *   H1 → gold      (loud — top sections, used sparingly)
- *   H2 → champagne (warm cream — distinct from amber and from H1 gold)
- *   H3 → platinum  (silver bold — quiet sub-sub)
- *   H4+→ ash       (grey bold — minor)
- *
- * Amber moves off headings entirely and becomes the indicator-label
- * accent (RSI:, MACD:, Stop Loss:); table headers stay mustard. This
- * gives five differentiated tiers in different families.
+ *   H1 → gold        (loud — top sections, used sparingly)
+ *   H2 → whiteBright (bold bright white — structural, color-free)
+ *   H3 → platinum    (silver bold — quiet sub-sub)
+ *   H4+→ ash         (grey bold — minor)
  */
 export function headingColor(depth: number): string {
   switch (depth) {
     case 1: return PALETTE.gold;
-    case 2: return PALETTE.champagne;
+    case 2: return "whiteBright";
     case 3: return PALETTE.platinum;
     default: return PALETTE.ash;
   }

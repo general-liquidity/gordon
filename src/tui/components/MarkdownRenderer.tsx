@@ -275,6 +275,8 @@ function paletteToAnsi(hex: string): string {
   if (hex === PALETTE.cream) return ANSI.cream;
   if (hex === PALETTE.sage) return ANSI.sage;
   if (hex === PALETTE.champagne) return ANSI.champagne;
+  if (hex === PALETTE.peach) return ANSI.peach;
+  if (hex === PALETTE.khaki) return ANSI.khaki;
   return ANSI.platinum;
 }
 
