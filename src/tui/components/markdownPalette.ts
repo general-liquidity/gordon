@@ -148,6 +148,19 @@ export const SIDE_ARROW_RE = /[→←↔➜]/g;
 export const INDICATOR_LABEL_RE =
   /\b(?:RSI|MACD|EMA|SMA|ATR|ADX|VWAP|MFI|OBV|CMF|Bollinger|Ichimoku|Stochastic|Supertrend|FVG|ICT|SMC|Fibonacci|Sharpe|Sortino|Calmar|Stop[\s\-]?Loss|Take[\s\-]?Profit|Entry|Exit|Target|Risk|Reward|Position|Leverage|Spread|Direction)\s*(?=:)/gi;
 
+/** snake_case identifiers — function / strategy / parameter names. The
+ *  LLM frequently emits these without backticks (volume_surge,
+ *  bollinger_bounce, run_backtest), and we want them to read as
+ *  invokable handles. Requires at least one underscore so plain words
+ *  don't match. Lowercase-only so SCREAMING_CASE constants stay neutral. */
+export const SNAKE_CASE_RE = /\b[a-z][a-z0-9]*(?:_[a-z0-9]+)+\b/g;
+
+/** Slash commands — /scan, /dd, /tutorial, /research start. Matched only
+ *  when '/' is preceded by whitespace or start-of-line, so URL paths
+ *  ("https://x.com/path") and option flags inside command lines don't
+ *  get hijacked. */
+export const SLASH_COMMAND_RE = /(?<=^|\s)\/[a-z][a-z0-9_-]*/gm;
+
 /** Risk level tokens. Match only when isolated — preceded by "Risk" or
  *  a table cell separator, otherwise common words like "low volatility"
  *  or "high probability" would over-color. */
@@ -331,6 +344,11 @@ export function findColorHits(text: string): ColorHit[] {
 
   // prio 4 — known indicator labels (RSI:, MACD:, etc.) in amber
   pushAll(INDICATOR_LABEL_RE, text, PALETTE.amber, 4, hits);
+  // prio 4 — snake_case identifiers and slash commands in tan (same
+  // family as backticked codespans). Catches volume_surge, /tutorial,
+  // and similar when the LLM omits backticks.
+  pushAll(SNAKE_CASE_RE, text, PALETTE.tan, 4, hits);
+  pushAll(SLASH_COMMAND_RE, text, PALETTE.tan, 4, hits);
 
   // prio 5 — symbols, timeframes, prices. Pair detection runs first so
   // its halves take precedence over standalone registered tickers /
