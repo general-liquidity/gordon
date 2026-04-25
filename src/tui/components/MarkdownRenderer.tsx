@@ -3,7 +3,7 @@ import { Box, Text } from "../ink-custom";
 import { marked, type Tokens, type Token } from "marked";
 import { CodeBlock } from "./CodeBlock.js";
 import { InlineTable } from "./InlineTable.js";
-import { PALETTE, ANSI, headingColor } from "./markdownPalette.js";
+import { PALETTE, ANSI, headingColor, SIGNED_NUMBER_RE, deltaColor, deltaAnsi } from "./markdownPalette.js";
 
 /**
  * MarkdownRenderer — CommonMark + GFM via marked, rendered to Ink.
@@ -240,10 +240,21 @@ const ANSI_PLATINUM = ANSI.platinum;
 // so codespans render in cyan and bold text stays bold inside cells.
 // The width cache strips ANSI before measuring, so column alignment stays
 // correct.
+/**
+ * Wrap signed numeric literals in green/red ANSI inside a plain string.
+ * Used by table-cell rendering where the line is already a single string.
+ */
+function colorSignedNumbersAnsi(text: string): string {
+  return text.replace(SIGNED_NUMBER_RE, (m) => {
+    const sign = m[0]!;
+    return deltaAnsi(sign) + m + ANSI_RESET;
+  });
+}
+
 function tokensToAnsiText(tokens: Token[]): string {
   return tokens
     .map((t) => {
-      if (t.type === "text") return (t as Tokens.Text).text;
+      if (t.type === "text") return colorSignedNumbersAnsi((t as Tokens.Text).text);
       if (t.type === "codespan") return ANSI_AMBER + (t as Tokens.Codespan).text + ANSI_RESET;
       if (t.type === "strong") return ANSI_BOLD + tokensToAnsiText((t as Tokens.Strong).tokens ?? []) + ANSI_RESET;
       if (t.type === "em") return ANSI_ITALIC + tokensToAnsiText((t as Tokens.Em).tokens ?? []) + ANSI_RESET;
@@ -341,6 +352,28 @@ function InlineTokens({ tokens }: { tokens: Token[] }): React.ReactElement {
   );
 }
 
+/**
+ * Split plain text on signed numeric literals and render each match in
+ * red (negative) or green (positive). Returns a fragment so it slots
+ * into any <Text> parent the same way a raw string would.
+ */
+function renderTextWithDeltas(text: string): React.ReactElement {
+  const parts: React.ReactNode[] = [];
+  let last = 0;
+  let key = 0;
+  // Reset lastIndex defensively — SIGNED_NUMBER_RE is module-scoped.
+  SIGNED_NUMBER_RE.lastIndex = 0;
+  let m: RegExpExecArray | null;
+  while ((m = SIGNED_NUMBER_RE.exec(text)) !== null) {
+    if (m.index > last) parts.push(<Text key={key++}>{text.slice(last, m.index)}</Text>);
+    parts.push(<Text key={key++} color={deltaColor(m[0]![0]!)}>{m[0]}</Text>);
+    last = m.index + m[0].length;
+  }
+  if (last === 0) return <Text>{text}</Text>;
+  if (last < text.length) parts.push(<Text key={key++}>{text.slice(last)}</Text>);
+  return <>{parts}</>;
+}
+
 function InlineToken({ token }: { token: Token }): React.ReactElement | null {
   switch (token.type) {
     case "text": {
@@ -349,7 +382,7 @@ function InlineToken({ token }: { token: Token }): React.ReactElement | null {
       if (t.tokens && t.tokens.length > 0) {
         return <InlineTokens tokens={t.tokens} />;
       }
-      return <Text>{t.text}</Text>;
+      return renderTextWithDeltas(t.text);
     }
 
     case "strong": {

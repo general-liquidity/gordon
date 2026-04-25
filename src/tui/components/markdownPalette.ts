@@ -20,6 +20,10 @@ export const PALETTE = {
   platinum: "#E5E4E2",
   /** Ambient ornaments: borders, blockquote bars, horizontal rules. */
   ash: "#888888",
+  /** Positive deltas: +pct, +$amount, gains. */
+  green: "#00C853",
+  /** Negative deltas: -pct, -$amount, losses, drawdowns. */
+  red: "#FF3B30",
 } as const;
 
 /** ANSI 24-bit escape for embedding palette colors inside string-typed
@@ -42,7 +46,33 @@ export const ANSI = {
   amber: ansi24(PALETTE.amber),
   platinum: ansi24(PALETTE.platinum),
   ash: ansi24(PALETTE.ash),
+  green: ansi24(PALETTE.green),
+  red: ansi24(PALETTE.red),
 } as const;
+
+/**
+ * Match signed numeric literals: +54.5%, -0.83%, -1.49, +$100, -$50.5,
+ * +0.022. Used for green/red delta coloring inside markdown text.
+ *
+ * Lookbehind rejects matches preceded by a word char or another dash, so
+ * neither a range like "10-20%" nor a hyphenated word like "co-author"
+ * is mis-coloured. Lookahead requires a digit after the optional $, so
+ * the sign always ends up attached to a real number.
+ *
+ * `g` so the regex is reusable across calls; we always reset .lastIndex
+ * with .exec or use String.matchAll.
+ */
+export const SIGNED_NUMBER_RE = /(?<![\w\-])[+\-]\$?\d[\d,]*(?:\.\d+)?%?/g;
+
+/** Pick green (positive) or red (negative) based on the sign char. */
+export function deltaColor(sign: string): string {
+  return sign === "-" ? PALETTE.red : PALETTE.green;
+}
+
+/** ANSI variant of deltaColor — for embedded escapes in table cells. */
+export function deltaAnsi(sign: string): string {
+  return sign === "-" ? ANSI.red : ANSI.green;
+}
 
 /** Heading color by depth (1–6). Levels 5–6 collapse to platinum. */
 export function headingColor(depth: number): string {

@@ -2,7 +2,7 @@ import React, { useMemo, useRef } from "react";
 import { Box, Text } from "../ink-custom";
 import { CodeBlock } from "./CodeBlock";
 import { TerminalLink } from "./TerminalLink";
-import { PALETTE, headingColor } from "./markdownPalette.js";
+import { PALETTE, headingColor, SIGNED_NUMBER_RE, deltaColor } from "./markdownPalette.js";
 
 // ============================================================================
 // StreamingMarkdown — Claude Code stable-prefix incremental rendering
@@ -141,6 +141,26 @@ function cacheResult(key: string, blocks: ParsedBlock[]): void {
   tokenCache.set(key, blocks);
 }
 
+/** Push plain text into the parts list, splitting on signed numbers so
+ *  +pct/-pct render in green/red. Plain segments stay as raw <Text>. */
+function pushPlain(parts: React.ReactNode[], keyStart: number, text: string): number {
+  let key = keyStart;
+  let last = 0;
+  SIGNED_NUMBER_RE.lastIndex = 0;
+  let m: RegExpExecArray | null;
+  while ((m = SIGNED_NUMBER_RE.exec(text)) !== null) {
+    if (m.index > last) parts.push(<Text key={key++}>{text.slice(last, m.index)}</Text>);
+    parts.push(<Text key={key++} color={deltaColor(m[0]![0]!)}>{m[0]}</Text>);
+    last = m.index + m[0].length;
+  }
+  if (last === 0) {
+    parts.push(<Text key={key++}>{text}</Text>);
+  } else if (last < text.length) {
+    parts.push(<Text key={key++}>{text.slice(last)}</Text>);
+  }
+  return key;
+}
+
 function renderInline(text: string): React.ReactNode {
   const parts: React.ReactNode[] = [];
   let remaining = text;
@@ -149,7 +169,7 @@ function renderInline(text: string): React.ReactNode {
   while (remaining.length > 0) {
     const boldMatch = remaining.match(/\*\*(.+?)\*\*/);
     if (boldMatch && boldMatch.index != null) {
-      if (boldMatch.index > 0) parts.push(<Text key={key++}>{remaining.slice(0, boldMatch.index)}</Text>);
+      if (boldMatch.index > 0) key = pushPlain(parts, key, remaining.slice(0, boldMatch.index));
       parts.push(<Text key={key++} bold>{boldMatch[1]}</Text>);
       remaining = remaining.slice(boldMatch.index + boldMatch[0].length);
       continue;
@@ -158,7 +178,7 @@ function renderInline(text: string): React.ReactNode {
     // URL detection — wrap with TerminalLink for OSC 8 clickable hyperlinks
     const urlMatch = remaining.match(/https?:\/\/[^\s<>"')]+/);
     if (urlMatch && urlMatch.index != null) {
-      if (urlMatch.index > 0) parts.push(<Text key={key++}>{remaining.slice(0, urlMatch.index)}</Text>);
+      if (urlMatch.index > 0) key = pushPlain(parts, key, remaining.slice(0, urlMatch.index));
       parts.push(<TerminalLink key={key++} url={urlMatch[0]} color={PALETTE.platinum}>{urlMatch[0]}</TerminalLink>);
       remaining = remaining.slice(urlMatch.index + urlMatch[0].length);
       continue;
@@ -166,16 +186,16 @@ function renderInline(text: string): React.ReactNode {
 
     const codeMatch = remaining.match(/`([^`]+)`/);
     if (codeMatch && codeMatch.index != null) {
-      if (codeMatch.index > 0) parts.push(<Text key={key++}>{remaining.slice(0, codeMatch.index)}</Text>);
+      if (codeMatch.index > 0) key = pushPlain(parts, key, remaining.slice(0, codeMatch.index));
       // Amber for ticker/tool/function names — matches MarkdownRenderer's
-    // codespan and InlineTable's header color so streaming → completed
-    // transitions and tables share one accent.
-    parts.push(<Text key={key++} color={PALETTE.amber}>{codeMatch[1]}</Text>);
+      // codespan and InlineTable's header color so streaming → completed
+      // transitions and tables share one accent.
+      parts.push(<Text key={key++} color={PALETTE.amber}>{codeMatch[1]}</Text>);
       remaining = remaining.slice(codeMatch.index + codeMatch[0].length);
       continue;
     }
 
-    parts.push(<Text key={key++}>{remaining}</Text>);
+    key = pushPlain(parts, key, remaining);
     break;
   }
 
