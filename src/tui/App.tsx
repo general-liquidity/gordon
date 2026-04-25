@@ -160,7 +160,20 @@ import { AlternateScreen } from "./components/AlternateScreen.js";
 
 // ── Hooks ──
 import { useDoublePress } from "./hooks/useDoublePress.js";
-import { useElapsedTime } from "./hooks/useElapsedTime.js";
+import { useElapsedTime, formatElapsed } from "./hooks/useElapsedTime.js";
+
+/** Format a millisecond duration the same way the spinner does. */
+function formatElapsedMs(ms: number): string {
+  return formatElapsed(ms / 1000);
+}
+
+/** Compact token-count formatter — '432', '12.4K', '1.8M'. Used in the
+ *  status line for both context tokens and last-turn tokens. */
+function formatTokenCount(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+  return `${Math.round(n)}`;
+}
 import { useTerminalSize } from "./hooks/useTerminalSize.js";
 import { useMergedCommands } from "./hooks/useMergedCommands.js";
 import { useScreenReader } from "./hooks/useScreenReader.js";
@@ -491,6 +504,9 @@ function AppInner() {
   const threadId = useAppState((s) => s.threadId);
   const isResumedSession = useAppState((s) => s.isResumedSession);
   const tokenCount = useAppState((s) => s.tokenCount);
+  const contextTokens = useAppState((s) => s.contextTokens);
+  const lastTurnDurationMs = useAppState((s) => s.lastTurnDurationMs);
+  const lastTurnTokens = useAppState((s) => s.lastTurnTokens);
   const autonomousActive = useAppState((s) => s.autonomousActive);
   const autonomousStrategyCount = useAppState((s) => s.autonomousStrategyCount);
 
@@ -647,9 +663,16 @@ function AppInner() {
   // ── Queued message count ──
   const queuedCount = defaultMessageQueue.length?.() ?? 0;
 
-  // ── Memory usage (approximate from token count) ──
-  const contextLimit = 128000; // Default context window
-  const memoryUsageRatio = (tokenCount ?? 0) / contextLimit;
+  // ── Context budget. Claude Code parity: percentage reflects the
+  // current request's input + cache footprint, NOT cumulative session
+  // spend. 200k matches the Anthropic Claude default (Opus / Sonnet);
+  // override via GORDON_CONTEXT_LIMIT for other providers. ──
+  const contextLimit = Number.parseInt(process.env.GORDON_CONTEXT_LIMIT ?? "", 10) || 200_000;
+  // Use contextTokens (from-last-turn) when we have it; fall back to
+  // cumulative on cold start so the bar still moves before the first
+  // turn lands.
+  const liveContextTokens = contextTokens > 0 ? contextTokens : (tokenCount ?? 0);
+  const memoryUsageRatio = liveContextTokens / contextLimit;
 
   // ── Determine if agent is in "thinking" mode (any running agent, no output yet) ──
   // thinkingAgent already derived above in the memoized block
@@ -2234,6 +2257,24 @@ function AppInner() {
       <Box paddingX={2} justifyContent="space-between">
         <Box gap={1}>
           <Text color={memoryUsageRatio > 0.9 ? "red" : memoryUsageRatio > 0.7 ? "yellow" : undefined} dimColor={memoryUsageRatio <= 0.7}>{Math.round((1 - memoryUsageRatio) * 100)}% left</Text>
+          {liveContextTokens > 0 && (
+            <>
+              <Text dimColor>{"·"}</Text>
+              <Text dimColor>{formatTokenCount(liveContextTokens)} ctx</Text>
+            </>
+          )}
+          {lastTurnDurationMs > 0 && (
+            <>
+              <Text dimColor>{"·"}</Text>
+              <Text dimColor>{formatElapsedMs(lastTurnDurationMs)}</Text>
+              {lastTurnTokens > 0 && (
+                <>
+                  <Text dimColor>{"·"}</Text>
+                  <Text dimColor>{formatTokenCount(lastTurnTokens)} tok</Text>
+                </>
+              )}
+            </>
+          )}
           {autonomousActive && (
             <>
               <Text dimColor>{"\u00b7"}</Text>

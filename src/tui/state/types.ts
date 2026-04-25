@@ -84,7 +84,18 @@ export interface AppState {
   isResumedSession: boolean;
 
   // Cost / tokens
+  /** Cumulative session tokens (sum of completion + prompt across all turns).
+   *  Used for /cost-style accounting, NOT for the percentage display. */
   tokenCount: number;
+  /** Tokens currently sitting in the context window — input + cache_read +
+   *  cache_creation from the most recent API call. This is the figure
+   *  Claude Code shows in its status line: it represents 'how full is the
+   *  context right now', not 'how much have we spent total'. */
+  contextTokens: number;
+  /** Wall-clock duration of the most recent turn, in milliseconds. */
+  lastTurnDurationMs: number;
+  /** Tokens emitted by the most recent turn (output + tool deltas). */
+  lastTurnTokens: number;
   cost: number;
 
   // Background
@@ -133,6 +144,9 @@ export const INITIAL_STATE: AppState = {
   threadId: null,
   isResumedSession: false,
   tokenCount: 0,
+  contextTokens: 0,
+  lastTurnDurationMs: 0,
+  lastTurnTokens: 0,
   cost: 0,
   backgroundTasks: [],
   notifications: [],

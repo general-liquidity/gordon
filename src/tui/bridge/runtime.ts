@@ -342,6 +342,7 @@ async function streamResponse(
   let lastFlushTime = 0;
   let flushPending = false;
   let totalTokens = 0;
+  let inputTokens = 0;
   let currentAgentName: string | null = null;
   let chainStartTime = Date.now();
   let lastEventWasToolEnd = false;
@@ -516,6 +517,14 @@ async function streamResponse(
           taskTree = completeTaskTree(taskTree) ?? taskTree;
           if (event.usage) {
             totalTokens = event.usage.totalTokens ?? 0;
+            // Tokens currently sitting in the context window — what
+            // Claude Code shows in its status line. Sum of fresh input,
+            // cache read (re-used), and cache creation (newly cached).
+            const u = event.usage as unknown as Record<string, number | undefined>;
+            inputTokens =
+              (u.inputTokens ?? u.promptTokens ?? 0) +
+              (u.cacheReadInputTokens ?? u.cache_read_input_tokens ?? 0) +
+              (u.cacheCreationInputTokens ?? u.cache_creation_input_tokens ?? 0);
           }
 
           // Finalize the streaming message — no new message needed (DOM continuity)
@@ -654,6 +663,12 @@ async function streamResponse(
             activeToolCalls: [],
             handoffHistory: [],
             tokenCount: (prev.tokenCount ?? 0) + totalTokens,
+            // Current-context budget — the Claude Code parity figure.
+            // Falls back to cumulative when the provider didn't report
+            // input tokens explicitly.
+            contextTokens: inputTokens > 0 ? inputTokens : (prev.contextTokens ?? 0) + totalTokens,
+            lastTurnDurationMs: Date.now() - chainStartTime,
+            lastTurnTokens: totalTokens,
             pendingApprovals: stillPending.map(mapApproval),
           };});
           break;
