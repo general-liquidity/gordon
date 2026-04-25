@@ -202,7 +202,10 @@ function renderInline(text: string): React.ReactNode {
     const codeMatch = remaining.match(/`([^`]+)`/);
     if (codeMatch && codeMatch.index != null) {
       if (codeMatch.index > 0) parts.push(<Text key={key++}>{remaining.slice(0, codeMatch.index)}</Text>);
-      parts.push(<Text key={key++} color="cyan">{codeMatch[1]}</Text>);
+      // blueBright matches Claude Code's "permission" theme color and the
+    // completed-message MarkdownRenderer so streaming → completed
+    // transitions don't change the codespan accent.
+    parts.push(<Text key={key++} color="blueBright">{codeMatch[1]}</Text>);
       remaining = remaining.slice(codeMatch.index + codeMatch[0].length);
       continue;
     }
@@ -259,8 +262,20 @@ export function StreamingMarkdown({ content, isStreaming }: Props) {
     <Box flexDirection="column">
       {allBlocks.map((block, i) => {
         switch (block.type) {
-          case "heading":
-            return <Text key={i} bold underline={block.level === 1}>{block.content}</Text>;
+          case "heading": {
+            // Per-level color hierarchy. Mirrors MarkdownRenderer so the
+            // streaming and completed views render identically.
+            const headingColor =
+              block.level === 1 ? "yellow"
+                : block.level === 2 ? "cyanBright"
+                : block.level === 3 ? "magentaBright"
+                : "greenBright";
+            return (
+              <Text key={i} bold color={headingColor} underline={block.level === 1}>
+                {block.content}
+              </Text>
+            );
+          }
           case "codeblock":
             // Delegate to CodeBlock for cli-highlight-powered syntax rendering
             return <CodeBlock key={i} code={block.content} language={block.language} />;
