@@ -83,17 +83,24 @@ function shouldClamp(url: string): boolean {
  * change is needed so the caller can skip the rebuild.
  */
 /**
- * Cloak Dedalus error noise from stdout / stderr so demos and live
+ * Cloak upstream-API error noise from stdout / stderr so demos and live
  * sessions don't get interrupted by 400-stack-trace dumps. The errors
- * themselves are still recoverable upstream — Mastra retries or falls
- * back. We just stop them from drowning the terminal.
+ * themselves are still recoverable upstream — Mastra retries, the
+ * exchange clients fall back, etc. We just stop them from drowning the
+ * terminal.
  *
- * Honors GORDON_SHOW_DEDALUS_ERRORS=1 — set that to debug.
+ * Two opt-out env knobs:
+ *   GORDON_SHOW_DEDALUS_ERRORS=1   — show LLM provider errors again
+ *   GORDON_SHOW_BINANCE_ERRORS=1   — show Binance / exchange errors again
  *
- * Patterns suppressed:
- *  - "Upstream LLM API error from dedalus"
- *  - "AI_APICallError" payload blocks naming dedaluslabs.ai
- *  - bare "{ error: APICallError" trace blocks for the same provider
+ * Categories (independently togglable):
+ *  - DEDALUS: 'Upstream LLM API error from dedalus', api.dedaluslabs.ai,
+ *    AI_APICallError trace blocks naming the same provider.
+ *  - BINANCE: '[time] ERROR/WARN' lines from the Binance client logger
+ *    (endpoint URLs containing api.binance.com / fapi.binance.com /
+ *    testnet.binance.vision, the literal 'Public API request failed' /
+ *    'Signed API request failed' / 'WebSocket' / 'Rate limit' verbs the
+ *    binance client emits, and Binance error codes -10xx/-11xx/-20xx).
  */
 const DEDALUS_NOISE_PATTERNS = [
   /Upstream LLM API error from dedalus/,
@@ -101,11 +108,29 @@ const DEDALUS_NOISE_PATTERNS = [
   /AI_APICallError\b[\s\S]{0,200}dedalus/i,
 ];
 
-let dedalusBufferActive = false;
+const BINANCE_NOISE_PATTERNS = [
+  /api\.binance\.com|fapi\.binance\.com|testnet\.binance\.vision/i,
+  /Public API request failed|Signed API request failed/,
+  /Failed to get spot balances|Failed to get funding balances|Test order failed/,
+  /Rate limit critical - approaching Binance limit/,
+  // Binance error codes (signed numeric: -1003 too many requests, -2010
+  // insufficient balance, etc.). Match in JSON-context contexts emitted
+  // by our logger ("code":-1003) to avoid false-positives in prose.
+  /"code":-1\d{3}|"code":-2\d{3}|"msg":"[^"]*Binance/i,
+  // WebSocket noise from the binance client.
+  /WebSocket connection failed|WebSocket disconnected|Reconnect attempt failed|Pong timeout/,
+];
 
-function isDedalusNoise(line: string): boolean {
-  if (process.env.GORDON_SHOW_DEDALUS_ERRORS === "1") return false;
-  return DEDALUS_NOISE_PATTERNS.some((re) => re.test(line));
+let bufferActive = false;
+
+function isUpstreamNoise(line: string): boolean {
+  if (process.env.GORDON_SHOW_DEDALUS_ERRORS !== "1") {
+    if (DEDALUS_NOISE_PATTERNS.some((re) => re.test(line))) return true;
+  }
+  if (process.env.GORDON_SHOW_BINANCE_ERRORS !== "1") {
+    if (BINANCE_NOISE_PATTERNS.some((re) => re.test(line))) return true;
+  }
+  return false;
 }
 
 let logsCloaked = false;
@@ -122,14 +147,14 @@ export function cloakDedalusErrors(): void {
   process.stderr.write = ((chunk: any, ...rest: any[]) => {
     try {
       const str = typeof chunk === "string" ? chunk : chunk?.toString?.("utf8") ?? "";
-      if (isDedalusNoise(str)) {
-        dedalusBufferActive = true;
+      if (isUpstreamNoise(str)) {
+        bufferActive = true;
         return true;
       }
-      if (dedalusBufferActive) {
+      if (bufferActive) {
         // Continue suppressing until we see a top-level close brace on
         // its own line (end of the JSON dump) or the buffer drains.
-        if (/^\s*\}\s*$/.test(str.trim())) dedalusBufferActive = false;
+        if (/^\s*\}\s*$/.test(str.trim())) bufferActive = false;
         return true;
       }
     } catch {
@@ -145,7 +170,7 @@ export function cloakDedalusErrors(): void {
       const joined = args
         .map((a) => (typeof a === "string" ? a : (a as any)?.message ?? JSON.stringify(a)))
         .join(" ");
-      if (isDedalusNoise(joined)) return;
+      if (isUpstreamNoise(joined)) return;
     } catch {
       // fall through
     }
