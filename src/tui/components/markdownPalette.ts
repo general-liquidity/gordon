@@ -32,6 +32,9 @@ export const PALETTE = {
   /** Crypto tickers (BTC, ETH, SOL...) — emerald, separate from delta green
    *  so symbols read as "asset names" not "positive numbers". */
   emerald: "#50C878",
+  /** Standard prices and $-prefixed amounts that aren't deltas. Calm
+   *  cream so a wall of dollar amounts doesn't compete with green/red. */
+  cream: "#F5DEB3",
 } as const;
 
 /** ANSI 24-bit escape for embedding palette colors inside string-typed
@@ -59,6 +62,7 @@ export const ANSI = {
   mustard: ansi24(PALETTE.mustard),
   tan: ansi24(PALETTE.tan),
   emerald: ansi24(PALETTE.emerald),
+  cream: ansi24(PALETTE.cream),
 } as const;
 
 /**
@@ -154,51 +158,97 @@ export const RISK_HIGH_RE = new RegExp(`${RISK_PRECEDED}\\bHigh\\b`, "gm");
  *  as a suffix because it doubles as the magnitude suffix for millions. */
 export const TIMEFRAME_RE = /(?<![\d$.])\b\d{1,3}(?:m|h|d|D|w|W)\b/g;
 
-/** Crypto tickers, conservative whitelist. These are the symbols that
- *  reliably appear as standalone tickers in trading discourse. Pair
- *  detection (BTCUSDT etc.) is handled by PAIR_RE separately so we don't
- *  match "BTC" twice when it's part of "BTCUSDT". */
-const CRYPTO_LIST = [
-  "BTC", "ETH", "SOL", "BNB", "XRP", "DOGE", "TRX", "ADA", "LTC", "ETC",
-  "AVAX", "DOT", "ATOM", "LINK", "UNI", "AAVE", "MATIC", "POL", "NEAR",
-  "ARB", "OP", "SUI", "APT", "ICP", "FIL", "VET", "ALGO", "HBAR", "INJ",
-  "TIA", "SEI", "STRK", "PYTH", "JUP", "WIF", "BONK", "PEPE", "SHIB",
-  "FLOKI", "BCH", "BSV", "XLM", "XMR", "DASH", "ZEC", "EOS", "TRX",
-  "AXS", "APE", "GALA", "ALICE", "SLP", "RONIN", "SAND", "MANA",
-  "HYPER", "ZBT", "API3", "ASTER", "SAHARA", "ENJ", "CHIP", "RNDR",
-  "GRT", "FTM", "RUNE", "KAS", "TON", "ORDI", "SATS",
-];
-const FIAT_LIST = ["USDT", "USDC", "FDUSD", "TUSD", "BUSD", "USD", "EUR", "GBP", "JPY", "DAI"];
+/**
+ * Fiat / stablecoin suffixes used by exchange pair conventions
+ * (BTCUSDT, ETHEUR, SOLDAI, ...). Small, stable, market-wide list —
+ * unlike the crypto / stock universe these don't change weekly.
+ *
+ * Order matters for the regex engine's alternation backtracking — list
+ * longer fiats first so e.g. USDT wins over USD when scanning BTCUSDT.
+ */
+const FIAT_LIST = ["USDT", "USDC", "FDUSD", "TUSD", "BUSD", "USD", "EUR", "GBP", "JPY", "TRY", "INR", "KRW", "DAI"];
 
-/** Common stock tickers — colored same as crypto since they fill the
- *  same role (tradeable asset). Conservative list to keep false positives
- *  low. Add tickers here as users name them. */
-const STOCK_LIST = [
-  "AAPL", "NVDA", "MSFT", "GOOGL", "GOOG", "AMZN", "META", "TSLA", "NFLX",
-  "AMD", "INTC", "IBM", "ORCL", "CSCO", "CRM", "ADBE", "PYPL", "AVGO",
-  "QCOM", "TXN", "COIN", "MSTR", "MARA", "RIOT", "HOOD", "PLTR",
-  "JPM", "BAC", "GS", "MS", "WFC", "C", "BLK", "BX",
-  "SPY", "QQQ", "IWM", "DIA", "VOO", "VTI", "ARKK", "GLD", "SLV", "TLT",
-];
-
-export const STOCK_RE = new RegExp(`\\b(${STOCK_LIST.join("|")})\\b`, "g");
-
-/** Pair like BTCUSDT — split into crypto + fiat halves so each half
- *  colors in its own bucket. Captures: 1=crypto, 2=fiat. */
+/** Pair like BTCUSDT — generic prefix `[A-Z]{2,10}` + known fiat suffix.
+ *  No hardcoded crypto list, so any new asset the API surfaces colors
+ *  correctly without a code change. Captures: 1=asset, 2=fiat. */
 export const PAIR_RE = new RegExp(
-  `\\b(${CRYPTO_LIST.join("|")})(${FIAT_LIST.join("|")})\\b`,
+  `\\b([A-Z]{2,10}?)(${FIAT_LIST.join("|")})\\b`,
   "g",
 );
-/** Standalone crypto ticker not followed by a fiat suffix. */
-export const CRYPTO_RE = new RegExp(
-  `\\b(${CRYPTO_LIST.join("|")})\\b(?!(?:${FIAT_LIST.join("|")})\\b)`,
-  "g",
-);
-/** Standalone fiat ticker not preceded by a crypto prefix. */
+
+/** Standalone fiat tokens (USD, USDT, ...) not part of a pair suffix. */
 export const FIAT_RE = new RegExp(
-  `(?<!\\b(?:${CRYPTO_LIST.join("|")}))\\b(${FIAT_LIST.join("|")})\\b`,
+  `(?<![A-Z])\\b(${FIAT_LIST.join("|")})\\b`,
   "g",
 );
+
+/** Cash-tag tickers — `$BTC`, `$AAPL`, etc. Catches whatever the user
+ *  or LLM types regardless of the registry. Captures group 1 = ticker. */
+export const DOLLAR_TICKER_RE = /\$([A-Z]{1,10})\b/g;
+
+/** Plain prices: `$77,820`, `$1.5M`, `$2,313` — any unsigned `$amount`.
+ *  Sign-prefixed amounts are caught by SIGNED_NUMBER_RE earlier in the
+ *  pipeline and stay green/red. */
+export const PRICE_RE = /(?<![\w])\$\d[\d,]*(?:\.\d+)?[KMB]?\b/g;
+
+// ============================================================================
+// Runtime symbol registry
+// ============================================================================
+
+/**
+ * Tickers registered at runtime by API consumers (Binance market list,
+ * Finnhub symbol search, etc). Lets us color any ticker the platform
+ * actually surfaces without maintaining a hardcoded universe.
+ *
+ * Modules that fetch symbol catalogs should call `registerSymbols(...)`
+ * during startup or after each API response. The set is mutated in
+ * place — no event subscription needed.
+ *
+ * The seed below is intentionally tiny — just the few names that show
+ * up in cold-start onboarding before any API call has populated the
+ * registry. Production usage should backfill the registry from the
+ * actual exchange / broker.
+ */
+const SYMBOL_REGISTRY = new Set<string>([
+  "BTC", "ETH", "SOL", "BNB", "XRP", "USD", "AAPL", "NVDA", "SPY",
+]);
+
+/** Add tickers to the runtime registry. Idempotent, case-normalized. */
+export function registerSymbols(symbols: Iterable<string>): void {
+  for (const s of symbols) {
+    if (typeof s !== "string") continue;
+    const norm = s.trim().toUpperCase();
+    if (/^[A-Z]{1,10}$/.test(norm)) SYMBOL_REGISTRY.add(norm);
+  }
+}
+
+/** Read the current registry — for tests / debugging only. Mutating
+ *  this set directly is unsupported; use registerSymbols. */
+export function listRegisteredSymbols(): string[] {
+  return [...SYMBOL_REGISTRY].sort();
+}
+
+/** Match standalone registered tickers in text. We rebuild the regex
+ *  on each call so registry additions take effect immediately — the
+ *  registry is small and findColorHits already does linear-ish work, so
+ *  the rebuild cost is negligible. */
+function findRegisteredTickers(text: string): Array<{ start: number; end: number }> {
+  if (SYMBOL_REGISTRY.size === 0) return [];
+  // Stable-sort by length desc so longer registered tickers (e.g. ETHF)
+  // win over shorter prefixes (ETH).
+  const sorted = [...SYMBOL_REGISTRY].sort((a, b) => b.length - a.length);
+  const re = new RegExp(
+    // Negative lookahead for fiat suffix so PAIR_RE owns `BTCUSDT` and
+    // we don't double-color the asset half.
+    `(?<![A-Z])\\b(${sorted.join("|")})\\b(?!(?:${FIAT_LIST.join("|")})\\b)`,
+    "g",
+  );
+  const out: Array<{ start: number; end: number }> = [];
+  for (const m of text.matchAll(re)) {
+    out.push({ start: m.index!, end: m.index! + m[0].length });
+  }
+  return out;
+}
 
 /**
  * Locate every span of plain text that should render in a non-default
@@ -270,23 +320,35 @@ export function findColorHits(text: string): ColorHit[] {
   // prio 4 — known indicator labels (RSI:, MACD:, etc.) in amber
   pushAll(INDICATOR_LABEL_RE, text, PALETTE.amber, 4, hits);
 
-  // prio 5 — symbols and timeframes. Pair detection runs first so its
-  // halves take precedence over standalone CRYPTO_RE/FIAT_RE for pairs
-  // like BTCUSDT.
+  // prio 5 — symbols, timeframes, prices. Pair detection runs first so
+  // its halves take precedence over standalone registered tickers /
+  // FIAT_RE for compounds like BTCUSDT.
   PAIR_RE.lastIndex = 0;
   for (const m of text.matchAll(PAIR_RE)) {
-    const crypto = m[1];
+    const asset = m[1];
     const fiat = m[2];
-    if (!crypto || !fiat) continue;
-    const cryptoStart = m.index!;
-    hits.push({ start: cryptoStart, end: cryptoStart + crypto.length, color: PALETTE.emerald, prio: 5 });
-    const fiatStart = cryptoStart + crypto.length;
+    if (!asset || !fiat) continue;
+    const assetStart = m.index!;
+    hits.push({ start: assetStart, end: assetStart + asset.length, color: PALETTE.emerald, prio: 5 });
+    const fiatStart = assetStart + asset.length;
     hits.push({ start: fiatStart, end: fiatStart + fiat.length, color: PALETTE.platinum, prio: 5 });
   }
-  pushAll(CRYPTO_RE, text, PALETTE.emerald, 5, hits);
-  pushAll(STOCK_RE, text, PALETTE.emerald, 5, hits);
+  // $-prefixed ticker like $BTC, $AAPL — works regardless of registry.
+  DOLLAR_TICKER_RE.lastIndex = 0;
+  for (const m of text.matchAll(DOLLAR_TICKER_RE)) {
+    const ticker = m[1];
+    if (!ticker) continue;
+    const tickerStart = m.index! + 1; // skip the '$'
+    hits.push({ start: tickerStart, end: tickerStart + ticker.length, color: PALETTE.emerald, prio: 5 });
+  }
+  // Standalone tickers from the runtime registry (BTC, ETH, AAPL, ...
+  // populated from API responses).
+  for (const r of findRegisteredTickers(text)) {
+    hits.push({ start: r.start, end: r.end, color: PALETTE.emerald, prio: 5 });
+  }
   pushAll(FIAT_RE, text, PALETTE.platinum, 5, hits);
   pushAll(TIMEFRAME_RE, text, PALETTE.mustard, 5, hits);
+  pushAll(PRICE_RE, text, PALETTE.cream, 5, hits);
 
   // Sort by start asc, prio asc — lower prio wins on ties.
   hits.sort((a, b) => a.start - b.start || a.prio - b.prio);

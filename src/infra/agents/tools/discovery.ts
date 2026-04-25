@@ -19,6 +19,7 @@ import { runHooks } from "../../hooks/engine.ts";
 import { formatActionPlanMarkdown, planActionExecution } from "../../runtime/actions/runtime.ts";
 import { normalizeCryptoSymbol, resolveInstrument } from "../../domain/markets/instruments.ts";
 import { recordStructuredObservation } from "../../platform/observability/index.ts";
+import { registerSymbols } from "../../../tui/components/markdownPalette.ts";
 import { getGordonContext, type MastraExecutionContext } from "./types.ts";
 import type { ExchangeExtended } from "../../exchange/types.ts";
 
@@ -115,6 +116,9 @@ export const getTrendingTokensTool = createTool({
 
     try {
       const tickers = await ctx.exchange.get24hrTickers();
+      // Backfill the markdown ticker registry from whatever the exchange
+      // actually surfaces — base asset before the USDT/USDC/... suffix.
+      registerSymbols(tickers.map((t) => t.symbol.replace(/(USDT|USDC|FDUSD|TUSD|BUSD|USD|EUR|GBP|JPY)$/, "")));
 
       // Skip leveraged tokens and stablecoins
       const skipPatterns = ["UP", "DOWN", "BEAR", "BULL", "USDC", "BUSD", "TUSD", "USDP", "FDUSD", "DAI"];
@@ -259,6 +263,9 @@ export const getHighVolumeTokensTool = createTool({
 
     try {
       const tickers = await ctx.exchange.get24hrTickers();
+      // Backfill the markdown ticker registry from whatever the exchange
+      // actually surfaces — base asset before the USDT/USDC/... suffix.
+      registerSymbols(tickers.map((t) => t.symbol.replace(/(USDT|USDC|FDUSD|TUSD|BUSD|USD|EUR|GBP|JPY)$/, "")));
 
       // Skip leveraged tokens
       const skipPatterns = ["UP", "DOWN", "BEAR", "BULL"];

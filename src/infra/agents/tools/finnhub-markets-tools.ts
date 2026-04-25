@@ -18,6 +18,7 @@ import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
 import { finnhub, isFinnhubConfigured, FINNHUB_NOT_CONFIGURED_MSG } from "../../data/finnhub.ts";
+import { registerSymbols } from "../../../tui/components/markdownPalette.ts";
 
 function unconfigured<T extends Record<string, unknown>>(extra: T): T & { configured: false; error: string } {
   return { ...extra, configured: false as const, error: FINNHUB_NOT_CONFIGURED_MSG };
@@ -46,6 +47,9 @@ export const getStockQuoteTool = createTool({
     if (!isFinnhubConfigured()) return unconfigured({ symbol });
     const quote = await finnhub.getStockQuote(symbol);
     if (!quote) return { configured: true, symbol, error: "No quote data" };
+    // Whatever stock the user looks up enters the markdown ticker
+    // registry so subsequent mentions in chat color emerald.
+    registerSymbols([symbol]);
     return { configured: true, symbol, quote: quote as unknown as Record<string, unknown> };
   },
 });
