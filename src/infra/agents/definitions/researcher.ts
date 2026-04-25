@@ -81,6 +81,7 @@ export function getResearcher(): Agent {
       "multi-symbol scans, backtests, deep dives. Read-only — cannot trade.",
     instructions: composeAgentInstructions("researcher" as any, RESEARCHER_INSTRUCTIONS),
     model: resolveRuntimeModel,
+    defaultOptions: { modelSettings: { maxOutputTokens: 16384 } },
     tools: {
       ...instrumentedIndicatorTools,
       ...instrumentedMarketDataTools,

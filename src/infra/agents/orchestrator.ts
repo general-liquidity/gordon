@@ -897,6 +897,7 @@ export async function* processWithNetwork(
       requestContext,
       ...(threadId && effectiveResourceId ? { memory: { thread: threadId, resource: effectiveResourceId } } : {}),
       maxSteps: 30,
+      modelSettings: { maxOutputTokens: MAX_OUTPUT_TOKENS_GENERATE },
       ...groundedPrompt.requestOptions,
       ...(tracingOptions && { tracingOptions }),
     });

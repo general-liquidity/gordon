@@ -1,8 +1,6 @@
-import React, { useState, useCallback, useRef, useMemo } from "react";
-import { Box, Static, useInput, type DOMElement } from "../ink-custom";
+import React, { useCallback, useRef, useMemo } from "react";
+import { Box, Static, type DOMElement } from "../ink-custom";
 import { MessageBubble, type Message } from "./MessageBubble.js";
-import { useTranscriptSearch } from "../hooks/useTranscriptSearch.js";
-import { SearchBar } from "./SearchBar.js";
 import { OffscreenFreeze } from "./OffscreenFreeze.js";
 import useMouse, { type MouseEvent } from "../ink-custom/hooks/use-mouse.js";
 import { createScrollBox, type ScrollBox } from "../ink-custom/scrollBox.js";
@@ -20,13 +18,12 @@ const WHEEL_STEP = 3;
 // terminal without height estimation or overflow.
 //
 // History access: terminal scroll (mouse wheel / Shift+PgUp).
-// In-session search: press "?" to search across all messages
-// ("/" is reserved for slash commands).
+// History access: terminal scroll only.
 // ============================================================================
 
 interface Props {
   messages: Message[];
-  /** Whether search key bindings should be active */
+  /** Reserved — currently unused since transcript search was removed. */
   scrollEnabled?: boolean;
 }
 
@@ -113,38 +110,6 @@ export function VirtualMessageList({ messages, scrollEnabled = true }: Props) {
   const staticMessages = collapsedMessages.slice(0, commitCursor);
   const liveMessages = collapsedMessages.slice(commitCursor);
 
-  // Transcript search — "?" to enter, n/N to navigate, Esc to exit.
-  // "/" is reserved for slash commands (modern TUI convention — Claude Code,
-  // Slack, Discord). Using "/" here would intercept every "/research" or
-  // "/quick-scan" the user types and turn it into a search query.
-  const [searchMode, setSearchMode] = useState(false);
-  const search = useTranscriptSearch(completedMessages);
-
-  useInput(
-    (input, key) => {
-      if (input === "?" && !searchMode) {
-        setSearchMode(true);
-        return;
-      }
-      if (!searchMode) return;
-      if (key.escape) {
-        setSearchMode(false);
-        search.clearSearch();
-        return;
-      }
-      if (input === "n") { search.navigateNext(); return; }
-      if (input === "N") { search.navigatePrev(); return; }
-      if (key.backspace || key.delete) {
-        search.setQuery(search.query.slice(0, -1));
-        return;
-      }
-      if (input && input.length === 1 && !key.ctrl && !key.meta) {
-        search.setQuery(search.query + input);
-      }
-    },
-    { isActive: scrollEnabled },
-  );
-
   // ---------------------------------------------------------------------
   // Mouse-wheel scrolling.
   //
@@ -199,30 +164,16 @@ export function VirtualMessageList({ messages, scrollEnabled = true }: Props) {
 
       {/* Live tail — last LIVE_TAIL stable messages + any streaming message */}
       {liveMessages.map((msg, idx) => {
-        const isSearchMatch = search.currentMatch?.messageId === msg.id;
         // Freeze all but the actively-animating message to prevent offscreen repaints
         const isActive = isStreaming ? !!msg.streaming : idx === liveMessages.length - 1;
         return (
-          <Box
-            key={msg.id}
-            {...(isSearchMatch
-              ? { borderStyle: "single" as const, borderColor: "yellow" }
-              : {})}
-          >
+          <Box key={msg.id}>
             <OffscreenFreeze frozen={!isActive}>
               <MessageBubble message={msg} />
             </OffscreenFreeze>
           </Box>
         );
       })}
-
-      <SearchBar
-        query={search.query}
-        matchCount={search.matches.length}
-        currentMatchIndex={search.currentMatchIndex}
-        isActive={search.isActive}
-      />
-
     </Box>
   );
 }

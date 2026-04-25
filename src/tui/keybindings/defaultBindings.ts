@@ -36,9 +36,6 @@ export const DEFAULT_BINDINGS: KeyBinding[] = [
   bind("shift+g", "scroll-bottom", KeyContext.Scroll),
   bind("ctrl+d", "page-down", KeyContext.Scroll),
   bind("ctrl+u", "page-up", KeyContext.Scroll),
-  bind("?", "search-transcript", KeyContext.Scroll),
-  bind("n", "next-match", KeyContext.Scroll),
-  bind("shift+n", "prev-match", KeyContext.Scroll),
 
   // Order Entry
   bind("ctrl+shift+b", "buy-market", KeyContext.OrderEntry),

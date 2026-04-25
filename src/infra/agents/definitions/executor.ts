@@ -118,6 +118,7 @@ export function getExecutor(): Agent {
       "swap/convert crypto, buy or sell a symbol, cancel an order, or change permissionMode via /auto, /ask, /strict.",
     instructions: composeAgentInstructions("executor", EXECUTOR_INSTRUCTIONS),
     model: resolveRuntimeModel,
+    defaultOptions: { modelSettings: { maxOutputTokens: 16384 } },
     tools: {
       execute_plan: instrumentedTradingTools.execute_plan,
       close_trade: instrumentedTradingTools.close_trade,
