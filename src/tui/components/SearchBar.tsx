@@ -12,7 +12,7 @@ export function SearchBar({ query, matchCount, currentMatchIndex, isActive }: Pr
   if (!isActive) return null;
   return (
     <Box borderStyle="round" borderColor="yellow" paddingX={1}>
-      <Text color="yellow">{"/"}</Text>
+      <Text color="yellow">{"?"}</Text>
       <Text>{query}</Text>
       <Text dimColor>
         {"  "}

@@ -128,6 +128,16 @@ import {
 
 const logger = createModuleLogger("orchestrator");
 
+/**
+ * Cap on Mastra agent output tokens per call. Without this, Mastra defaults
+ * to the model's `maxOutputTokensForModel` (e.g. 100000 for Claude Haiku 4.5)
+ * which Dedalus's Anthropic backend rejects on non-streaming requests with
+ * "streaming_required" — flooding the console with 400s on every fast-tier
+ * call (compaction, scan, ops phases). 16384 is plenty for any single
+ * agent response and stays well under every provider's non-stream limit.
+ */
+const MAX_OUTPUT_TOKENS = 16384;
+
 // ============================================================================
 // Lifecycle Session Management
 // ============================================================================
@@ -459,6 +469,7 @@ export async function* processMessageStream(
         requestContext,
         ...(threadId && effectiveResourceId ? { memory: { thread: threadId, resource: effectiveResourceId } } : {}),
         maxSteps: 20,
+        modelSettings: { maxOutputTokens: MAX_OUTPUT_TOKENS },
         ...groundedPrompt.requestOptions,
         ...(tracingOptions && { tracingOptions }),
         // Delegation hooks for supervisor → sub-agent routing
@@ -822,6 +833,7 @@ export async function processStructuredMessage<T extends Record<string, unknown>
       requestContext,
       ...(threadId && effectiveResourceId ? { memory: { thread: threadId, resource: effectiveResourceId } } : {}),
       maxSteps: 20,
+      modelSettings: { maxOutputTokens: MAX_OUTPUT_TOKENS },
       structuredOutput: { schema },
       ...groundedPrompt.requestOptions,
       ...(tracingOptions && { tracingOptions }),
@@ -945,6 +957,7 @@ export async function processMessage(
       requestContext,
       ...(threadId && effectiveResourceId ? { memory: { thread: threadId, resource: effectiveResourceId } } : {}),
       maxSteps: 20,
+      modelSettings: { maxOutputTokens: MAX_OUTPUT_TOKENS },
       ...groundedPrompt.requestOptions,
       ...(tracingOptions && { tracingOptions }),
     });
@@ -1004,6 +1017,7 @@ export async function processSimpleMessage(
     const result = await gordonAgent().generate(groundedPrompt.messages, {
       requestContext,
       maxSteps: 5,
+      modelSettings: { maxOutputTokens: MAX_OUTPUT_TOKENS },
       ...groundedPrompt.requestOptions,
       ...(tracingOptions && { tracingOptions }),
     });

@@ -20,7 +20,8 @@ const WHEEL_STEP = 3;
 // terminal without height estimation or overflow.
 //
 // History access: terminal scroll (mouse wheel / Shift+PgUp).
-// In-session search: press "/" to search across all messages.
+// In-session search: press "?" to search across all messages
+// ("/" is reserved for slash commands).
 // ============================================================================
 
 interface Props {
@@ -112,13 +113,16 @@ export function VirtualMessageList({ messages, scrollEnabled = true }: Props) {
   const staticMessages = collapsedMessages.slice(0, commitCursor);
   const liveMessages = collapsedMessages.slice(commitCursor);
 
-  // Transcript search — "/" to enter, n/N to navigate, Esc to exit
+  // Transcript search — "?" to enter, n/N to navigate, Esc to exit.
+  // "/" is reserved for slash commands (modern TUI convention — Claude Code,
+  // Slack, Discord). Using "/" here would intercept every "/research" or
+  // "/quick-scan" the user types and turn it into a search query.
   const [searchMode, setSearchMode] = useState(false);
   const search = useTranscriptSearch(completedMessages);
 
   useInput(
     (input, key) => {
-      if (input === "/" && !searchMode) {
+      if (input === "?" && !searchMode) {
         setSearchMode(true);
         return;
       }
