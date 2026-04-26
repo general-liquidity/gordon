@@ -22,6 +22,7 @@ import {
   instrumentedMarketDataTools,
   instrumentedMarketTools,
   instrumentedDiscoveryTools,
+  instrumentedExecutionCostTools,
   instrumentedStrategyTools,
   instrumentedParallelAnalysisTools,
   instrumentedChartTools,
@@ -421,6 +422,7 @@ export function getGordon(): Agent {
       // Planning & preview (was Planner)
       list_plans: instrumentedTradingTools.list_plans,
       preview_market_order: instrumentedDiscoveryTools.preview_market_order,
+      compare_execution_cost: instrumentedExecutionCostTools.compare_execution_cost,
       preview_withdrawal: instrumentedWalletTools.preview_withdrawal,
 
       // Backtesting (was Backtester — heavy work spawns Researcher)
