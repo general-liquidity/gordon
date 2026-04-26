@@ -382,6 +382,31 @@ export interface MemorySummarizedEvent extends BaseEvent {
 }
 
 /**
+ * Per-call cost delta. Emitted by CostTracker.record() each time an API
+ * call's usage is folded into the session ledger. Subscribers (TUI,
+ * audit log) can show running spend per response without polling the
+ * snapshot. Inspired by Aider's live token/cost display during a turn.
+ */
+export interface CostTurnDeltaEvent extends BaseEvent {
+  type: "cost:turn_delta";
+  /** Canonical model ID the call hit. */
+  modelId: string;
+  /** Friendly model name for display, falls back to modelId. */
+  displayName: string;
+  /** USD cost of just this single call. */
+  callCostUsd: number;
+  /** USD running total across all models for this session after the call. */
+  sessionTotalUsd: number;
+  /** Token counts for THIS call only (not session totals). */
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheWriteTokens: number;
+  /** Session ID — useful when a process tracks multiple sessions. */
+  sessionId: string;
+}
+
+/**
  * Fires alongside `memory:summarized` when the compaction produced
  * structured metadata (venues/strategies/indicators/etc). Separate event so
  * subscribers that only care about metadata don't have to parse the base
@@ -669,6 +694,7 @@ export type GordonEvent =
   | MemorySummarizingEvent
   | MemorySummarizedEvent
   | MemoryCompactedDetailsEvent
+  | CostTurnDeltaEvent
   | AlertFiredEvent
   | AutonomousStartedEvent
   | AutonomousStoppedEvent

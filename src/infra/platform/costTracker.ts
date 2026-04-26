@@ -14,6 +14,7 @@ import { join } from "node:path";
 import { GORDON_DIR } from "../storage/paths.ts";
 import { createModuleLogger } from "../logger/index.ts";
 import { emitAlert } from "./observability/alertEmitter.ts";
+import { emitEvent } from "../../events/index.ts";
 
 async function emitCostAlert(args: {
   threshold: number;
@@ -308,6 +309,21 @@ export class CostTracker {
     const sessionTotal = this.snapshot().totalCostUsd;
     const callCost = entry.totalCostUsd - beforeCost;
     checkCostBudget(sessionTotal, callCost);
+
+    // Live per-call cost emission — TUIs can render running spend
+    // without polling the snapshot. Fire-and-forget; failures here
+    // never affect the recording path.
+    void emitEvent("cost:turn_delta", {
+      modelId,
+      displayName: entry.displayName,
+      callCostUsd: callCost,
+      sessionTotalUsd: sessionTotal,
+      inputTokens,
+      outputTokens,
+      cacheReadTokens: cacheRead,
+      cacheWriteTokens: cacheWrite,
+      sessionId: this.sessionId,
+    }).catch(() => {});
 
     return entry;
   }
