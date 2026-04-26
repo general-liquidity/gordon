@@ -6,7 +6,16 @@
  * to enforce custom risk rules, log events, or veto operations.
  */
 
-export { registerHook, unregisterHook, listHooks, clearHooks, runHooks, emitHook } from "./engine.ts";
+export {
+  registerHook,
+  unregisterHook,
+  listHooks,
+  clearHooks,
+  runHooks,
+  emitHook,
+  setHookStatusListener,
+} from "./engine.ts";
+export type { HookStatusEvent } from "./engine.ts";
 export type {
   HookPoint,
   HookAction,

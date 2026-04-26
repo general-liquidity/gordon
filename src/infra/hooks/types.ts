@@ -156,4 +156,23 @@ export interface HookDefinition<P extends HookPoint = HookPoint> {
   toolFilter?: string | RegExp;
   /** Source of the hook (for audit/debugging). */
   source?: "builtin" | "user" | "project" | "plugin";
+  /**
+   * Async-rewake mode (Claude Code v2.1.72+ pattern): the engine kicks off
+   * this hook in parallel with other hooks at the same point, but still
+   * awaits its result before the overall decision is returned. A failing
+   * async-rewake hook surfaces a "block" decision exactly like a sync hook
+   * would — the only difference is wall-clock time when multiple slow
+   * hooks share a point.
+   *
+   * Use for compliance / audit / external risk-check calls that take
+   * hundreds of ms and don't depend on each other but DO need to gate
+   * tool execution on failure.
+   */
+  asyncRewake?: boolean;
+  /**
+   * Short text shown in the UI / logged while this hook is executing.
+   * Used to give the user feedback during slow hooks ("Verifying with
+   * compliance API…"). Free-form, kept under ~80 chars in practice.
+   */
+  statusMessage?: string;
 }
