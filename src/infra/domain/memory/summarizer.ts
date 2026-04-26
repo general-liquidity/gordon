@@ -22,6 +22,7 @@ import { EXCHANGE_IDS } from "../../exchange/types.ts";
 import { BROKER_IDS } from "../../broker/types.ts";
 import { STRATEGY_IDS } from "../../../strategies/types.ts";
 import { TIMEFRAME_IDS } from "../../../types/timeframes.ts";
+import { collapseContext } from "./contextCollapse.ts";
 
 const logger = createModuleLogger("summarizer");
 
@@ -80,6 +81,7 @@ export const DEFAULT_RECENT_TOKEN_BUDGET_BY_STAGE: Record<CompactionStage, numbe
   masking: 5000,
   pruning: 3500,
   aggressive: 2000,
+  collapse: 1600,
   full: 1200,
 };
 
@@ -234,7 +236,7 @@ export interface SummarizationResult {
   compactionDetails?: CompactionDetails;
 }
 
-export type CompactionStage = "masking" | "pruning" | "aggressive" | "full";
+export type CompactionStage = "masking" | "pruning" | "aggressive" | "collapse" | "full";
 
 /**
  * Compaction pressure thresholds.
@@ -257,6 +259,7 @@ export const COMPACTION_PRESSURE_THRESHOLDS = {
   masking: 0.70,    // 70% — warn and begin gentle masking
   pruning: 0.80,    // 80% — observation masking, preserve 6 recent
   aggressive: 0.90, // 90% — aggressive masking, preserve 3 recent
+  collapse: 0.94,   // 94% — non-destructive read-time projection of stale tool results
   full: 0.99,       // 99% — full LLM summary generation
 } as const;
 
@@ -273,6 +276,8 @@ export const COMPACTION_ABSOLUTE_BUFFERS = {
   pruning: 40_000,
   /** Aggressive — 25k below ceiling. */
   aggressive: 25_000,
+  /** Read-time collapse of stale tool results — 18k below ceiling. */
+  collapse: 18_000,
   /** Force full LLM summary — 13k below ceiling (Claude Code's auto-compact line). */
   full: 13_000,
 } as const;
@@ -282,6 +287,7 @@ export const RECENT_OBSERVATIONS_TO_KEEP: Record<CompactionStage, number> = {
   masking: 6,
   pruning: 6,
   aggressive: 3,
+  collapse: 3,
   full: 3,
 };
 
@@ -302,6 +308,7 @@ export function determineCompactionStageFromPressure(
   // Ratio-based stage (legacy path, still drives small contexts).
   let ratioStage: CompactionStage = "masking";
   if (contextFillRatio >= COMPACTION_PRESSURE_THRESHOLDS.full) ratioStage = "full";
+  else if (contextFillRatio >= COMPACTION_PRESSURE_THRESHOLDS.collapse) ratioStage = "collapse";
   else if (contextFillRatio >= COMPACTION_PRESSURE_THRESHOLDS.aggressive) ratioStage = "aggressive";
   else if (contextFillRatio >= COMPACTION_PRESSURE_THRESHOLDS.pruning) ratioStage = "pruning";
 
@@ -310,13 +317,14 @@ export function determineCompactionStageFromPressure(
   if (typeof usedTokens === "number" && typeof maxTokens === "number" && maxTokens > 0) {
     const headroom = maxTokens - usedTokens;
     if (headroom <= COMPACTION_ABSOLUTE_BUFFERS.full) absoluteStage = "full";
+    else if (headroom <= COMPACTION_ABSOLUTE_BUFFERS.collapse) absoluteStage = "collapse";
     else if (headroom <= COMPACTION_ABSOLUTE_BUFFERS.aggressive) absoluteStage = "aggressive";
     else if (headroom <= COMPACTION_ABSOLUTE_BUFFERS.pruning) absoluteStage = "pruning";
     else if (headroom <= COMPACTION_ABSOLUTE_BUFFERS.masking) absoluteStage = "masking";
   }
 
   // Pick the stricter (most aggressive) stage between the two signals.
-  const order: CompactionStage[] = ["masking", "pruning", "aggressive", "full"];
+  const order: CompactionStage[] = ["masking", "pruning", "aggressive", "collapse", "full"];
   if (!absoluteStage) return ratioStage;
   return order.indexOf(absoluteStage) > order.indexOf(ratioStage) ? absoluteStage : ratioStage;
 }
@@ -475,6 +483,25 @@ export class ConversationSummarizer {
       // Preserve stable system context outside compaction across the full message list.
       const preservedStableMessages = messages.filter((message) => this.isStableContextMessage(message));
       const nonStableMessages = messages.filter((message) => !this.isStableContextMessage(message));
+
+      // Stage 4 (collapse) — non-destructive read-time projection. Stale
+      // tool-result-ish payloads become hashed placeholders that can be
+      // reinflated on demand. Skips the LLM summary path entirely; cheaper
+      // than `full` and reversible. Sits between aggressive (90%) and full
+      // (99%) so we drain the easy wins before paying for an LLM call.
+      if (compactionStage === "collapse") {
+        const collapseResult = collapseContext(nonStableMessages, {
+          recentMessagesToKeep: this.getRecentMessagesToKeepForStage("collapse"),
+          minLengthToCollapse: 1500,
+        });
+        return {
+          summarized: collapseResult.collapsedBlocks.length > 0,
+          messages: [...preservedStableMessages, ...collapseResult.projected],
+          messagesSummarized: collapseResult.collapsedBlocks.length,
+          compactionStage: "collapse",
+          contextFillRatio,
+        };
+      }
 
       // Iterative merge (item 2 from pi-mono audit): if the non-stable history
       // already contains a prior compaction summary, fold new messages INTO it
