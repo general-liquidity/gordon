@@ -42,6 +42,23 @@
       "toolCount": 16
     },
     {
+      "id": "quantconnect",
+      "name": "QuantConnect",
+      "description": "Institutional algo-trading platform — write strategies, backtest with full options chains and 100+ indicators, deploy to live trading on QuantConnect Cloud.",
+      "category": "execution",
+      "transport": "stdio",
+      "install": "docker run -i --rm -e QUANTCONNECT_USER_ID -e QUANTCONNECT_API_TOKEN -e AGENT_NAME quantconnect/mcp-server",
+      "credentials": [
+        { "env": "QUANTCONNECT_USER_ID", "required": true, "description": "QuantConnect user ID — find in account settings" },
+        { "env": "QUANTCONNECT_API_TOKEN", "required": true, "description": "QuantConnect API token — request via account settings → Request API Token" },
+        { "env": "AGENT_NAME", "required": false, "description": "Identifier for this Gordon session in QC's request logs. Defaults to 'gordon'." }
+      ],
+      "docsUrl": "https://github.com/QuantConnect/mcp-server",
+      "pricing": "freemium",
+      "pricingNote": "Open source MCP (Apache 2.0). Free QC tier covers small backtests; paid tiers add live trading + larger compute.",
+      "toolCount": 64
+    },
+    {
       "id": "coingecko",
       "name": "CoinGecko",
       "description": "Crypto market data — prices, charts, market cap, volume, trending coins.",

@@ -148,6 +148,37 @@ export const CLI_REGISTRY: CLIEntry[] = [
     pricingNote: "Open source (Apache 2.0). Self-hosted.",
   },
   {
+    id: "lean-cli",
+    name: "Lean CLI",
+    description:
+      "Official QuantConnect CLI for running the Lean algorithmic-trading engine locally and against QC Cloud. " +
+      "Supports backtests, optimization, live trading, and project sync — institutional-grade backtesting beyond " +
+      "Gordon's built-in engine (full options chains, 100+ indicators, multi-asset universe selection).",
+    installCommand: "pip install lean",
+    bin: "lean",
+    commands: [
+      { command: "lean init", description: "Initialize a new Lean project in the current directory" },
+      { command: "lean backtest", description: "Run a backtest locally", example: "lean backtest \"My Project\"" },
+      { command: "lean live deploy", description: "Deploy a strategy to live trading" },
+      { command: "lean optimize", description: "Run a parameter optimization" },
+      { command: "lean cloud push", description: "Sync local project to QuantConnect Cloud" },
+      { command: "lean cloud pull", description: "Pull a cloud project locally" },
+      { command: "lean cloud backtest", description: "Run a backtest in QC Cloud" },
+      { command: "lean research", description: "Open the Jupyter research environment" },
+      { command: "lean report", description: "Generate an HTML/PDF report from backtest results" },
+    ],
+    nativeCoverage: "none",
+    credentials: [
+      { env: "QUANTCONNECT_USER_ID", required: false, description: "Required only for cloud commands (lean cloud *)" },
+      { env: "QUANTCONNECT_API_TOKEN", required: false, description: "Required only for cloud commands" },
+    ],
+    docsUrl: "https://www.quantconnect.com/docs/v2/lean-cli",
+    markets: ["crypto", "equities", "futures", "forex", "options"],
+    hasMCP: true,
+    pricing: "freemium",
+    pricingNote: "CLI is free + open source (Apache 2.0). Local backtests free; QC Cloud has paid tiers for live trading and large datasets. Pairs with the 'quantconnect' MCP server for AI-driven strategy authoring.",
+  },
+  {
     id: "alpaca-cli",
     name: "Alpaca CLI",
     description: "Commission-free stock, ETF, options, and crypto trading from the terminal.",
