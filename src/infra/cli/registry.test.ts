@@ -33,9 +33,23 @@ describe("CLI_REGISTRY", () => {
     expect(cmds.some((c) => c.includes("wallet"))).toBe(true);
   });
 
-  it("formatCLIRegistryForPrompt mentions binance-cli for LLM injection", () => {
+  it("includes the 'skills' CLI — canonical installer for skill packs (binance-skills-hub uses it)", () => {
+    const skills = getCLI("skills");
+    expect(skills).toBeDefined();
+    expect(skills?.bin).toBe("skills");
+    expect(skills?.npmPackage).toBe("skills");
+    const cmds = skills?.commands.map((c) => c.command) ?? [];
+    expect(cmds.some((c) => c.includes("skills add"))).toBe(true);
+    // The example for 'skills add' should reference Binance's hub so the
+    // LLM has the canonical install line ready when the user asks.
+    const addCmd = skills?.commands.find((c) => c.command.includes("add"));
+    expect(addCmd?.example).toContain("binance/binance-skills-hub");
+  });
+
+  it("formatCLIRegistryForPrompt mentions both binance-cli and skills for LLM injection", () => {
     const block = formatCLIRegistryForPrompt();
     expect(block).toContain("[GORDON_AVAILABLE_CLIS]");
     expect(block).toContain("binance-cli");
+    expect(block).toContain("skills");
   });
 });

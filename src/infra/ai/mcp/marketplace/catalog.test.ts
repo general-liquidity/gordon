@@ -61,14 +61,13 @@ describe("marketplace catalog", () => {
     expect(missing).toEqual([]);
   });
 
-  it("lists binance-skills-hub under research (the docs fetcher belongs here)", () => {
-    const skills = cat.plugins.find((p) => p.id === "binance-skills-hub");
-    expect(skills).toBeDefined();
-    expect(skills?.category).toBe("research");
-  });
-
-  it("does NOT list binance-cli — that's a raw CLI, lives in src/infra/cli/registry.ts", () => {
+  it("does NOT list binance-cli — raw CLI, lives in src/infra/cli/registry.ts", () => {
     const cli = cat.plugins.find((p) => p.id === "binance-cli");
     expect(cli).toBeUndefined();
+  });
+
+  it("does NOT list binance-skills-hub — installed via the 'skills' CLI (registered in src/infra/cli/registry.ts), not wrapped as an MCP server", () => {
+    const skills = cat.plugins.find((p) => p.id === "binance-skills-hub");
+    expect(skills).toBeUndefined();
   });
 });

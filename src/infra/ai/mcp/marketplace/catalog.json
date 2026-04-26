@@ -890,21 +890,6 @@
       "pricing": "free",
       "pricingNote": "Free. Community-maintained. Swap + price + pool tracking MCPs available.",
       "toolCount": 10
-    },
-    {
-      "id": "binance-skills-hub",
-      "name": "Binance Skills Hub",
-      "description": "Fetches and caches skill manifests from github.com/binance/binance-skills-hub (MIT) — canonical Binance product docs covering spot, futures, options, margin, copy-trading, web3 smart-money signals, token info, and more. Use to ground LLM responses in authoritative Binance documentation.",
-      "category": "research",
-      "transport": "stdio",
-      "install": "bun run wrappers/binance-skills-mcp/index.ts",
-      "credentials": [
-        { "env": "GORDON_BINANCE_SKILLS_CACHE", "required": false, "description": "Override the default cache directory (~/.gordon/binance-skills/)." }
-      ],
-      "docsUrl": "https://github.com/binance/binance-skills-hub",
-      "pricing": "free",
-      "pricingNote": "Free. MIT-licensed fetch + cache wrapper around Binance's open skills marketplace.",
-      "toolCount": 2
     }
   ]
 }
