@@ -1,176 +1,228 @@
 /**
  * Execution-cost comparison tool.
  *
- * Estimates the effective fill cost of a market order before placing it
- * — walks the live order book to compute slippage, applies the taker
- * fee, and returns a breakdown with all the numbers a trader needs to
- * decide.
+ * Estimates the effective fill cost of a market order BEFORE placing
+ * it. Walks the live order book of one or more venues, applies the
+ * taker fee, computes slippage, and returns either a single-venue
+ * breakdown OR a multi-venue ranking with savings-vs-best.
  *
- * Output is structured so a future multi-venue extension (fetching
- * public order books from Coinbase / Kraken / OKX without requiring
- * credentials per venue) can plug straight into compareVenues() —
- * the algorithm doesn't change, only how many books we feed it.
+ * Default venue list: Binance, Coinbase, Kraken, OKX (all public
+ * read-only — no credentials required). USD conversion for non-USD-
+ * quoted pairs is handled via the configured exchange's price oracle.
  *
- * Inspired by the public-knowledge approach in Binance's
- * crypto-trade-analyzer; this is a clean-room TS implementation
- * compatible with our commercial license.
+ * Inspired by the public algorithm in Binance's crypto-trade-analyzer.
+ * Implementation is clean-room (the math is public exchange-
+ * microstructure knowledge) and license-clean for commercial use.
  */
 
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
-import { computeCost, compareVenues, type CostInput } from "../../exchange/orderBookCost.ts";
+import {
+  computeCost,
+  compareVenues,
+  type CostInput,
+} from "../../exchange/orderBookCost.ts";
+import {
+  PUBLIC_VENUES,
+  fetchPublicBooks,
+  isUsdQuote,
+  splitSymbol,
+  type PublicVenue,
+} from "../../exchange/publicOrderBooks.ts";
 import { getGordonContext, type MastraExecutionContext } from "./types.ts";
 
-/** Conservative spot-trading taker fee that covers 90% of users (Binance
- *  base 0.1%, Coinbase 0.6%, Kraken 0.4%). Each venue can override this
- *  via `feeBps` input. We don't try to look up VIP tiers — that's data
- *  we don't reliably have, and surfacing a tier-aware estimate when we
- *  don't actually know the user's tier would be misleading. */
-const DEFAULT_TAKER_BPS = 10;
+const VENUE_ENUM = ["binance", "coinbase", "kraken", "okx"] as const;
+const ALL_VENUES: PublicVenue[] = [...VENUE_ENUM];
 
 export const compareExecutionCostTool = createTool({
   id: "compare_execution_cost",
   description:
-    "Estimate the effective fill cost of a market order on the connected " +
-    "exchange BEFORE placing it. Walks the live order book to surface " +
-    "slippage, fee, effective price, and all-in cost. Use this to " +
-    "validate that a trade size makes sense given current depth — " +
-    "an order that crosses 5+ levels is a sign the venue may be too " +
-    "thin for the requested size.",
+    "Estimate the effective fill cost of a market order BEFORE placing " +
+    "it. Walks live order books across one or more venues (Binance, " +
+    "Coinbase, Kraken, OKX by default — all public, no auth needed) and " +
+    "ranks them by all-in cost. Use to validate a trade size against " +
+    "current depth and to surface the cheapest venue for the user. " +
+    "Output includes effective price, slippage in bps, fee, and " +
+    "savings-vs-best so callers can show a 'Binance vs Coinbase vs " +
+    "Kraken' comparison row.",
   inputSchema: z.object({
-    symbol: z.string().describe("Trading pair, e.g. BTCUSDT"),
+    symbol: z.string().describe("Trading pair, e.g. BTCUSDT or BTC-USD"),
     side: z.enum(["buy", "sell"]),
     sizeBase: z.number().positive().describe("Trade size in base asset units (e.g. 0.5 BTC)"),
-    feeBps: z
-      .number()
-      .nonnegative()
+    venues: z
+      .array(z.enum(VENUE_ENUM))
       .optional()
       .describe(
-        "Taker fee in basis points. Defaults to 10 bps (0.1%) which matches " +
-        "Binance spot. Override for venues with different fees (e.g. 60 for " +
-        "Coinbase advanced taker).",
+        "Venues to compare. Default: all four (Binance, Coinbase, " +
+        "Kraken, OKX). Pass a single venue to skip cross-venue fetches.",
       ),
     referenceBasis: z
       .enum(["best", "mid"])
       .optional()
-      .describe(
-        "Where the reference price comes from for slippage calculation. " +
-        "'best' = top of the relevant book side (default); 'mid' = midpoint " +
-        "of best bid/ask. Mid is fairer for tight books, best for wide ones.",
-      ),
-    /** Order-book depth to fetch — more levels = more accurate for large
-     *  trades, but the venue may cap the response. */
+      .describe("Slippage reference: 'best' (top of book) or 'mid' (midpoint). Default 'best'."),
     bookLevels: z.number().int().positive().max(5000).optional(),
+    /** Optional fee override applied to ALL venues — usually leave unset
+     *  so per-venue baselines (Binance 10 bps, Coinbase 60, Kraken 26,
+     *  OKX 10) drive the math. */
+    feeBpsOverride: z.number().nonnegative().optional(),
   }),
   outputSchema: z.object({
-    venue: z.string(),
     symbol: z.string(),
     side: z.string(),
     sizeBase: z.number(),
-    effectivePrice: z.number(),
-    referencePrice: z.number(),
-    slippageBps: z.number(),
-    slippageQuote: z.number(),
-    feeQuote: z.number(),
-    notionalQuote: z.number(),
-    allInQuote: z.number(),
-    levelsConsumed: z.number(),
-    /** Human-readable summary line ready to drop into a markdown response. */
+    quoteAsset: z.string().optional(),
+    usdPerQuote: z.number().optional(),
+    /** Sorted best-to-worst on the all-in metric. */
+    ranked: z.array(
+      z.object({
+        venue: z.string(),
+        effectivePrice: z.number(),
+        referencePrice: z.number(),
+        slippageBps: z.number(),
+        slippageQuote: z.number(),
+        feeQuote: z.number(),
+        feeBps: z.number(),
+        notionalQuote: z.number(),
+        allInQuote: z.number(),
+        allInUsd: z.number().optional(),
+        savingsVsBestQuote: z.number(),
+        savingsVsBestUsd: z.number().optional(),
+        levelsConsumed: z.number(),
+      }),
+    ),
+    errors: z.array(z.object({ venue: z.string(), error: z.string() })),
+    /** Human-readable single-line summary the LLM can drop straight into
+     *  a markdown response. */
     summary: z.string(),
-    error: z.string().optional(),
   }),
   execute: async (
     {
       symbol,
       side,
       sizeBase,
-      feeBps,
+      venues,
       referenceBasis,
       bookLevels,
+      feeBpsOverride,
     }: {
       symbol: string;
       side: "buy" | "sell";
       sizeBase: number;
-      feeBps?: number;
+      venues?: PublicVenue[];
       referenceBasis?: "best" | "mid";
       bookLevels?: number;
+      feeBpsOverride?: number;
     },
     execContext: MastraExecutionContext,
   ) => {
-    const ctx = getGordonContext(execContext);
-    if (!ctx?.exchange) {
-      return {
-        venue: "exchange",
-        symbol,
-        side,
-        sizeBase,
-        effectivePrice: 0,
-        referencePrice: 0,
-        slippageBps: 0,
-        slippageQuote: 0,
-        feeQuote: 0,
-        notionalQuote: 0,
-        allInQuote: 0,
-        levelsConsumed: 0,
-        summary: "",
-        error: "No exchange connected. Configure a venue with /configure exchange.",
-      };
+    const requested = (venues && venues.length > 0 ? venues : ALL_VENUES) as PublicVenue[];
+    const split = splitSymbol(symbol);
+    const quoteAsset = split?.quote;
+
+    // USD conversion. Stables are 1:1; non-stable quotes get converted
+    // via the connected exchange's price oracle when possible.
+    let usdPerQuote: number | undefined = quoteAsset && isUsdQuote(quoteAsset) ? 1 : undefined;
+    if (!usdPerQuote && quoteAsset) {
+      try {
+        const ctx = getGordonContext(execContext);
+        if (ctx?.exchange) {
+          // Try fetching the live price of the quote asset against USDT.
+          const ex = ctx.exchange as { getPrice?: (sym: string) => Promise<number> };
+          if (typeof ex.getPrice === "function") {
+            usdPerQuote = await ex.getPrice(`${quoteAsset}USDT`).catch(() => undefined);
+          }
+        }
+      } catch {
+        // Non-fatal — leave undefined so the output skips USD figures
+        // rather than surfacing a misleading number.
+      }
     }
-    const venue =
-      (execContext?.requestContext?.get("exchangeId") as string | undefined) ?? "exchange";
-    try {
-      const book = await ctx.exchange.getOrderBook(symbol, bookLevels ?? 100);
-      const taker = (feeBps ?? DEFAULT_TAKER_BPS) / 10_000;
-      const breakdown = computeCost({
-        venue,
-        book,
+
+    const fetched = await fetchPublicBooks(symbol, requested, bookLevels ?? 100);
+
+    const errors: Array<{ venue: string; error: string }> = [];
+    const inputs: CostInput[] = [];
+
+    for (const r of fetched) {
+      if (!r.book) {
+        errors.push({ venue: r.label, error: r.error ?? "Symbol not listed" });
+        continue;
+      }
+      const fee = (feeBpsOverride ?? r.takerBps) / 10_000;
+      inputs.push({
+        venue: r.label,
+        book: r.book,
         side,
         sizeBase,
-        fee: { taker },
+        fee: { taker: fee },
         referenceBasis,
       });
-      const slippageBps = Math.round(breakdown.slippageRate * 10_000);
-      const summary =
-        `${venue} · ${side.toUpperCase()} ${sizeBase} ${symbol} → ` +
-        `effective ${breakdown.effectivePrice.toFixed(4)} ` +
-        `(ref ${breakdown.referencePrice.toFixed(4)}, slip ${slippageBps} bps), ` +
-        `fee ${breakdown.feeQuote.toFixed(4)}, ` +
-        `${side === "buy" ? "all-in cost" : "net proceeds"} ${breakdown.allInQuote.toFixed(4)} ` +
-        `(${breakdown.levelsConsumed} level${breakdown.levelsConsumed !== 1 ? "s" : ""} consumed)`;
+    }
+
+    if (inputs.length === 0) {
       return {
-        venue,
         symbol,
         side,
         sizeBase,
-        effectivePrice: breakdown.effectivePrice,
-        referencePrice: breakdown.referencePrice,
-        slippageBps,
-        slippageQuote: breakdown.slippageQuote,
-        feeQuote: breakdown.feeQuote,
-        notionalQuote: breakdown.notionalQuote,
-        allInQuote: breakdown.allInQuote,
-        levelsConsumed: breakdown.levelsConsumed,
-        summary,
-      };
-    } catch (e) {
-      return {
-        venue,
-        symbol,
-        side,
-        sizeBase,
-        effectivePrice: 0,
-        referencePrice: 0,
-        slippageBps: 0,
-        slippageQuote: 0,
-        feeQuote: 0,
-        notionalQuote: 0,
-        allInQuote: 0,
-        levelsConsumed: 0,
-        summary: "",
-        error: e instanceof Error ? e.message : String(e),
+        quoteAsset,
+        usdPerQuote,
+        ranked: [],
+        errors,
+        summary: `No venue could price ${side.toUpperCase()} ${sizeBase} ${symbol}.`,
       };
     }
+
+    // Single-venue path bypasses compareVenues so we don't pay the sort
+    // overhead for one item — but the structure stays the same for
+    // callers.
+    let ranked = inputs.length === 1
+      ? [computeCost(inputs[0]!)]
+      : compareVenues(inputs).ranked;
+    const buyMode = side === "buy";
+    const best = ranked[0]!.allInQuote;
+
+    const venueFeeBps: Record<string, number> = {};
+    for (const inp of inputs) venueFeeBps[inp.venue] = inp.fee.taker * 10_000;
+
+    const enriched = ranked.map((b) => {
+      const savings = buyMode ? b.allInQuote - best : best - b.allInQuote;
+      const allInUsd = usdPerQuote ? b.allInQuote * usdPerQuote : undefined;
+      const savingsUsd = usdPerQuote ? savings * usdPerQuote : undefined;
+      return {
+        venue: b.venue,
+        effectivePrice: b.effectivePrice,
+        referencePrice: b.referencePrice,
+        slippageBps: Math.round(b.slippageRate * 10_000),
+        slippageQuote: b.slippageQuote,
+        feeQuote: b.feeQuote,
+        feeBps: Math.round(venueFeeBps[b.venue] ?? 0),
+        notionalQuote: b.notionalQuote,
+        allInQuote: b.allInQuote,
+        allInUsd,
+        savingsVsBestQuote: savings,
+        savingsVsBestUsd: savingsUsd,
+        levelsConsumed: b.levelsConsumed,
+      };
+    });
+
+    const top = enriched[0]!;
+    const ladder = enriched.map((r) => `${r.venue} ${r.allInQuote.toFixed(4)}${quoteAsset ?? ""}`).join(" · ");
+    const summary =
+      `${side.toUpperCase()} ${sizeBase} ${symbol} → cheapest: ${top.venue} ` +
+      `(eff ${top.effectivePrice.toFixed(4)}, slip ${top.slippageBps} bps, ` +
+      `fee ${top.feeBps} bps). All-in: ${ladder}.`;
+
+    return {
+      symbol,
+      side,
+      sizeBase,
+      quoteAsset,
+      usdPerQuote,
+      ranked: enriched,
+      errors,
+      summary,
+    };
   },
 });
 
@@ -178,8 +230,5 @@ export const executionCostTools = {
   compare_execution_cost: compareExecutionCostTool,
 } as const;
 
-// Re-export the comparison helper so other tools (e.g. a future
-// multi-venue scanner) can reuse the shared algorithm without an extra
-// indirection.
 export { compareVenues, computeCost } from "../../exchange/orderBookCost.ts";
 export type { CostInput };
