@@ -83,6 +83,49 @@ export interface Playbook {
 
   /** Path to the source .md file (if loaded from disk) */
   filePath?: string;
+
+  /**
+   * Sub-playbooks that this playbook composes. Inspired by Goose's
+   * sub-recipe pattern: a playbook can declare references to other
+   * playbooks with parameter overrides, letting traders build
+   * higher-level strategies out of lower-level building blocks.
+   *
+   * Example: a "swing-into-trend" playbook references the canonical
+   * "trend-following" playbook with `{ horizonHours: 96 }` and
+   * "swing-entry" with `{ rsiThreshold: 30 }`.
+   *
+   * Resolved at load time via `resolveSubPlaybooks()` — the resolver
+   * detects cycles, validates parameter shapes, and returns a flat
+   * dependency tree. Optional — most playbooks won't have any.
+   */
+  subPlaybooks?: SubPlaybookReference[];
+}
+
+// ============================================================================
+// Sub-playbook composition
+// ============================================================================
+
+/**
+ * Reference from a parent playbook to a child playbook with parameter
+ * overrides. Resolved by playbook loader at load time.
+ */
+export interface SubPlaybookReference {
+  /** ID of the playbook to compose. Must resolve in the registry. */
+  playbookId: string;
+  /**
+   * Parameter overrides — flat key/value pairs the child playbook can
+   * substitute into its trigger / execution / management thresholds.
+   * Schema is intentionally loose so each playbook validates its own
+   * parameters at execution time.
+   */
+  parameters?: Record<string, string | number | boolean>;
+  /**
+   * Optional alias for this sub-playbook within the parent's narrative.
+   * Used when the same child is composed twice with different
+   * parameters (e.g. "fast-entry" + "slow-entry" both pointing at
+   * the same canonical "rsi-entry" playbook).
+   */
+  alias?: string;
 }
 
 // ============================================================================
