@@ -73,6 +73,7 @@ import {
   instrumentedDefillamaYieldTools,
   instrumentedNewsTools,
   instrumentedStockNewsTools,
+  instrumentedStrategyRecipeTools,
   instrumentedChainlinkStreamsTools,
   instrumentedChainlinkFeedsTools,
   instrumentedSynthDataTools,
@@ -489,6 +490,11 @@ export function getGordon(): Agent {
       // Stock news headlines (Yahoo + EDGAR + Finnhub) — hot tier, free
       // RSS sources plus the existing Finnhub aggregator.
       ...instrumentedStockNewsTools,
+
+      // Strategy recipe primitives (regime-RSI, bounce counter, signal
+      // gate, max-exposure timeout) — pure helpers the LLM can compose
+      // into custom playbooks.
+      ...instrumentedStrategyRecipeTools,
 
       // DefiLlama yields and Chainlink — cold tier (specialized data feeds).
       ...(isHotTierOnly() ? {} : instrumentedDefillamaYieldTools),

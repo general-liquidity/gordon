@@ -77,6 +77,7 @@ import {
   defillamaYieldTools,
   newsTools,
   stockNewsTools,
+  strategyRecipeTools,
   positionTrackingTools,
   checkRiskTool,
   memoryTools,
@@ -169,6 +170,7 @@ export const instrumentedProducerHealthTools = withToolsMetrics(producerHealthTo
 export const instrumentedDefillamaYieldTools = withToolsMetrics(defillamaYieldTools);
 export const instrumentedNewsTools = withToolsMetrics(newsTools);
 export const instrumentedStockNewsTools = withToolsMetrics(stockNewsTools);
+export const instrumentedStrategyRecipeTools = withToolsMetrics(strategyRecipeTools);
 export const instrumentedEvalTools = withToolsMetrics(evalTools);
 export const instrumentedPositionTrackingTools = withToolsMetrics(positionTrackingTools);
 export const instrumentedMemoryTools = withToolsMetrics(memoryTools);

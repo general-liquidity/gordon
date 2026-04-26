@@ -100,6 +100,7 @@ export { producerHealthTools } from "./producer-health-tool.ts";
 export { defillamaYieldTools } from "./defillama-yields.ts";
 export { newsTools } from "./news.ts";
 export { stockNewsTools } from "./stockNews.ts";
+export { strategyRecipeTools } from "./strategy-recipes.ts";
 export { chainlinkStreamsTools } from "./chainlink-streams.ts";
 export { chainlinkFeedsTools } from "./chainlink-feeds.ts";
 export { chainlinkCCIPTools } from "./chainlink-ccip.ts";
@@ -367,6 +368,7 @@ import { producerHealthTools } from "./producer-health-tool.ts";
 import { defillamaYieldTools } from "./defillama-yields.ts";
 import { newsTools } from "./news.ts";
 import { stockNewsTools } from "./stockNews.ts";
+import { strategyRecipeTools } from "./strategy-recipes.ts";
 import { chainlinkStreamsTools } from "./chainlink-streams.ts";
 import { chainlinkFeedsTools } from "./chainlink-feeds.ts";
 import { chainlinkCCIPTools } from "./chainlink-ccip.ts";
@@ -457,6 +459,7 @@ const _rawAllTools = {
   ...defillamaYieldTools,
   ...newsTools,
   ...stockNewsTools,
+  ...strategyRecipeTools,
   ...chainlinkStreamsTools,
   ...chainlinkFeedsTools,
   ...chainlinkCCIPTools,
@@ -547,6 +550,7 @@ export const toolCounts = {
   defillamaYields: Object.keys(defillamaYieldTools).length,
   news: Object.keys(newsTools).length,
   stockNews: Object.keys(stockNewsTools).length,
+  strategyRecipes: Object.keys(strategyRecipeTools).length,
   chainlinkStreams: Object.keys(chainlinkStreamsTools).length,
   chainlinkFeeds: Object.keys(chainlinkFeedsTools).length,
   chainlinkCCIP: Object.keys(chainlinkCCIPTools).length,
