@@ -11,17 +11,31 @@ import { z } from "zod";
 import { fetchHeadlines, type NewsSource } from "../../news/cryptoHeadlines.ts";
 import { scoreSentiment, aggregateSentiment } from "../../news/sentiment.ts";
 
-const SOURCE_ENUM = ["coindesk", "cointelegraph", "decrypt"] as const;
+const SOURCE_ENUM = [
+  "coindesk",
+  "cointelegraph",
+  "decrypt",
+  "theblock",
+  "blockworks",
+  "dlnews",
+  "cryptoslate",
+  "cryptobriefing",
+  "bitcoinmagazine",
+  "beincrypto",
+  "thedefiant",
+  "protos",
+] as const;
 
 export const getCryptoNewsHeadlinesTool = createTool({
   id: "get_crypto_news_headlines",
   description:
-    "Fetch recent cryptocurrency news headlines from public RSS feeds " +
-    "(CoinDesk, Cointelegraph, Decrypt — no API key required) and score " +
-    "each title for bullish / bearish / neutral sentiment. Use to answer " +
-    "'what's happening with BTC right now?' style questions, or before " +
-    "placing a trade to check for recent regulatory / hack / partnership " +
-    "news that could shift the thesis.",
+    "Fetch recent cryptocurrency news headlines from 12 public RSS feeds " +
+    "(CoinDesk, Cointelegraph, Decrypt, The Block, Blockworks, DLNews, " +
+    "CryptoSlate, CryptoBriefing, Bitcoin Magazine, BeInCrypto, The Defiant, " +
+    "Protos — no API key required) and score each title for bullish / " +
+    "bearish / neutral sentiment. Use to answer 'what's happening with BTC " +
+    "right now?' style questions, or before placing a trade to check for " +
+    "recent regulatory / hack / partnership news that could shift the thesis.",
   inputSchema: z.object({
     query: z
       .string()

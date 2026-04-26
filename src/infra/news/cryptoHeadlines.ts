@@ -17,7 +17,19 @@
 
 import type { Sentiment } from "./sentiment.ts";
 
-export type NewsSource = "coindesk" | "cointelegraph" | "decrypt";
+export type NewsSource =
+  | "coindesk"
+  | "cointelegraph"
+  | "decrypt"
+  | "theblock"
+  | "blockworks"
+  | "dlnews"
+  | "cryptoslate"
+  | "cryptobriefing"
+  | "bitcoinmagazine"
+  | "beincrypto"
+  | "thedefiant"
+  | "protos";
 
 export interface NewsHeadline {
   /** Source slug. */
@@ -44,6 +56,15 @@ const SOURCES: Record<NewsSource, SourceConfig> = {
   coindesk: { url: "https://www.coindesk.com/arc/outboundfeeds/rss/" },
   cointelegraph: { url: "https://cointelegraph.com/rss" },
   decrypt: { url: "https://decrypt.co/feed" },
+  theblock: { url: "https://www.theblock.co/rss.xml" },
+  blockworks: { url: "https://blockworks.com/feed/rss" },
+  dlnews: { url: "https://www.dlnews.com/arc/outboundfeeds/rss/" },
+  cryptoslate: { url: "https://cryptoslate.com/feed/" },
+  cryptobriefing: { url: "https://cryptobriefing.com/feed/" },
+  bitcoinmagazine: { url: "https://bitcoinmagazine.com/feed" },
+  beincrypto: { url: "https://beincrypto.com/feed/" },
+  thedefiant: { url: "https://thedefiant.io/api/feed" },
+  protos: { url: "https://protos.com/feed/" },
 };
 
 const CACHE_TTL_MS = 5 * 60 * 1000;
