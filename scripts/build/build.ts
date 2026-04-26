@@ -25,7 +25,7 @@ const EXTERNALS = [
   "@polkadot-agent-kit/sdk",
 ];
 
-const ROOT = resolve(import.meta.dirname, "..");
+const ROOT = resolve(import.meta.dirname, "..", "..");
 const ENTRY = resolve(ROOT, "src/entry.ts");
 
 const args = process.argv.slice(2);

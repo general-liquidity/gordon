@@ -44,7 +44,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Prepare public dist bundle
-        run: node scripts/prepare-public-dist.cjs --out-dir .public-dist
+        run: node scripts/build/prepare-public-dist.cjs --out-dir .public-dist
 
       - name: Verify public dist bundle
         run: |

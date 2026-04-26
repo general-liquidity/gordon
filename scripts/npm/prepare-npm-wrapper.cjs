@@ -1,7 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 
-const rootDirectory = path.resolve(__dirname, "..");
+const rootDirectory = path.resolve(__dirname, "..", "..");
 const rootPackagePath = path.join(rootDirectory, "package.json");
 const wrapperDirectory = path.join(rootDirectory, "npm");
 const wrapperPackagePath = path.join(wrapperDirectory, "package.json");

@@ -39,7 +39,7 @@ function warn(message) {
   console.warn(message);
 }
 
-const inkPath = path.resolve(__dirname, "..", "node_modules", "ink", "build", "ink.js");
+const inkPath = path.resolve(__dirname, "..", "..", "node_modules", "ink", "build", "ink.js");
 
 if (!fs.existsSync(inkPath)) {
   warn("[patch-ink] WARNING: ink.js not found at " + inkPath + " — skipping.");
@@ -111,7 +111,7 @@ if (content.includes("deferredRender")) {
 // has two frame-writing stream.write() calls. We wrap both.
 // ============================================================================
 
-const logUpdatePath = path.resolve(__dirname, "..", "node_modules", "ink", "build", "log-update.js");
+const logUpdatePath = path.resolve(__dirname, "..", "..", "node_modules", "ink", "build", "log-update.js");
 
 if (!fs.existsSync(logUpdatePath)) {
   warn("[patch-ink] WARNING: log-update.js not found at " + logUpdatePath + " — skipping BSU/ESU patch.");
@@ -211,7 +211,7 @@ if (!fs.existsSync(logUpdatePath)) {
 // line that calls styledCharsFromTokens(tokenize(line)).
 // ============================================================================
 
-const outputJsPath = path.resolve(__dirname, "..", "node_modules", "ink", "build", "output.js");
+const outputJsPath = path.resolve(__dirname, "..", "..", "node_modules", "ink", "build", "output.js");
 
 if (!fs.existsSync(outputJsPath)) {
   warn("[patch-ink] WARNING: output.js not found at " + outputJsPath + " — skipping charCache patch.");
@@ -286,7 +286,7 @@ if (!fs.existsSync(outputJsPath)) {
 // clean ink-text nodes.
 // ============================================================================
 
-const reconcilerPath = require("path").resolve(__dirname, "..", "node_modules", "ink", "build", "reconciler.js");
+const reconcilerPath = require("path").resolve(__dirname, "..", "..", "node_modules", "ink", "build", "reconciler.js");
 
 if (!require("fs").existsSync(reconcilerPath)) {
   warn("[patch-ink] WARNING: reconciler.js not found at " + reconcilerPath + " — skipping dirty-tracking patch.");
@@ -425,7 +425,7 @@ if (!require("fs").existsSync(reconcilerPath)) {
 // that Claude Code's fork also applies.
 // ============================================================================
 
-const renderNodePath = require("path").resolve(__dirname, "..", "node_modules", "ink", "build", "render-node-to-output.js");
+const renderNodePath = require("path").resolve(__dirname, "..", "..", "node_modules", "ink", "build", "render-node-to-output.js");
 
 if (!require("fs").existsSync(renderNodePath)) {
   warn("[patch-ink] WARNING: render-node-to-output.js not found — skipping blit patch.");
@@ -606,7 +606,7 @@ if (!require("fs").existsSync(renderNodePath)) {
 //         and previousOutput to their initial empty values.
 // ============================================================================
 
-const logUpdatePath6 = require("path").resolve(__dirname, "..", "node_modules", "ink", "build", "log-update.js");
+const logUpdatePath6 = require("path").resolve(__dirname, "..", "..", "node_modules", "ink", "build", "log-update.js");
 
 if (!require("fs").existsSync(logUpdatePath6)) {
   warn("[patch-ink] WARNING: log-update.js not found at " + logUpdatePath6 + " — skipping CLEAR_INCREMENTAL_CACHE patch.");
@@ -678,7 +678,7 @@ if (!require("fs").existsSync(logUpdatePath6)) {
 // Idempotency sentinel: YOGA_MEASURE_REGISTRY
 // ============================================================================
 
-const reconcilerPath7 = require("path").resolve(__dirname, "..", "node_modules", "ink", "build", "reconciler.js");
+const reconcilerPath7 = require("path").resolve(__dirname, "..", "..", "node_modules", "ink", "build", "reconciler.js");
 
 if (!require("fs").existsSync(reconcilerPath7)) {
   warn("[patch-ink] WARNING: reconciler.js not found — skipping YOGA_MEASURE_REGISTRY patch.");

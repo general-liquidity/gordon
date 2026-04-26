@@ -1,0 +1,62 @@
+# scripts/
+
+Build, package, install, and dev-tooling scripts. Organized by purpose:
+
+```
+scripts/
+├── build/          Build pipeline (run by `bun run build` and CI)
+├── npm/            npm wrapper packaging + audits
+├── patches/        Postinstall patches for upstream packages
+├── dev/            Developer-only utilities (one-off audits, doc generation)
+├── install.sh      Public Linux/macOS installer (referenced by README curl URL — do NOT move)
+├── install.ps1     Public Windows installer
+└── scoop/          Scoop manifest (release pipeline edits gordon.json — do NOT move)
+```
+
+## build/
+
+| File | What it does |
+|---|---|
+| `build.ts` | `bun run build` — compiles `src/` to `dist/`. `--binary` produces a single executable. |
+| `prepare-public-dist.cjs` | Copies the build output into a public-distribution layout for the npm wrapper. Used by CI. |
+| `check-no-sourcemaps.cjs` | Asserts no `.map` files leaked into `dist/` or `npm/`. Runs in `prepublishOnly`. |
+
+## npm/
+
+| File | What it does |
+|---|---|
+| `prepare-npm-wrapper.cjs` | Builds the thin `@general-liquidity/gordon-cli` npm package that downloads the platform binary on install. |
+| `check-npm-wrapper.cjs` | Schema-checks the generated wrapper before publish. |
+| `smoke-npm-wrapper.cjs` | Installs the packed wrapper into a clean dir and exercises `gordon --version`. |
+| `audit-npm-pack.cjs` | Runs `npm pack --dry-run` + asserts only the whitelisted files ship. |
+
+## patches/
+
+| File | What it does |
+|---|---|
+| `patch-mastra.cjs` | Postinstall: reverts Mastra's hardcoded `lastMessages: 0` for sub-agents (→ 0, the framework default), shims OpenAI `.responses()` → `createOpenAICompatible` for Dedalus, stubs empty `@solana/rpc-parsed-types`, and patches `@solana-agent-kit/plugin-token` named CJS imports. |
+| `patch-ink.cjs` | Postinstall: wraps Ink's render scheduler in `queueMicrotask()` (Claude Code's fork pattern) so React's layout phase commits before the terminal write. |
+
+Both run automatically via `npm install` → `package.json` postinstall hook.
+
+## dev/
+
+| File | What it does |
+|---|---|
+| `broker-quality.ts` | Conformance + capability matrix audit across all broker adapters. CI runs `--ci` mode. |
+| `generate-action-docs.ts` | Generates `docs/generated/actions.md` from the canonical action registry. |
+| `sweep-react-compiler.ts` | Compiles every `.tsx` under `src/` through the React Compiler, reports bail-outs. Used to verify Phase 5 zero-bail-out invariant. |
+| `smoke-react-compiler.ts` | Tiny end-to-end Babel-pipeline check that the compiler emits its memoization fingerprint. |
+
+## Conventions
+
+- Every script resolves the project root via `path.resolve(__dirname, "..", "..")` (or `import.meta.dirname` for ESM). The two `..`s are because each script sits one level deeper than the project root.
+- `.cjs` for postinstall + npm-wrapper tools (Node guaranteed at install time).
+- `.ts` for everything Bun-native.
+
+## Adding a new script
+
+1. Pick the right subdir (or top-level for public-install scripts).
+2. Resolve the project root with `path.resolve(__dirname, "..", "..")`.
+3. Wire it into `package.json` `scripts` block with the full subpath.
+4. If it runs in CI, also add to `.github/workflows/{ci,release}.yml`.

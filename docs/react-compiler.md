@@ -148,7 +148,7 @@ mode the process is running in.
 ## Phase 5.1 sweep result (2026-04-25)
 
 A full sweep of every `.tsx` file under `src/` was run via
-`scripts/sweep-react-compiler.ts`. Each file was passed through the
+`scripts/dev/sweep-react-compiler.ts`. Each file was passed through the
 exact Babel pipeline the Bun plugin uses.
 
 | Status | Count |
@@ -169,19 +169,19 @@ If future work introduces a violation, run the sweep again to surface
 it:
 
 ```
-bun run scripts/sweep-react-compiler.ts --verbose
+bun run scripts/dev/sweep-react-compiler.ts --verbose
 ```
 
 ## Smoke test
 
 A minimal end-to-end Babel-pipeline check lives at
-`scripts/smoke-react-compiler.ts`. It compiles a tiny synthetic
+`scripts/dev/smoke-react-compiler.ts`. It compiles a tiny synthetic
 component and asserts the output contains `react/compiler-runtime` and
 the `_c(...)` cache-hook call the compiler emits. Run with `--force`
 or `GORDON_REACT_COMPILER=1` set:
 
 ```
-bun run scripts/smoke-react-compiler.ts --force
+bun run scripts/dev/smoke-react-compiler.ts --force
 ```
 
 Expected output: `[smoke] PASS — React Compiler emitted memoized

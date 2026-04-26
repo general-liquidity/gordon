@@ -203,8 +203,8 @@ If a friend leaks their license code or shares the package with someone:
 
 This shouldn't happen because:
 - `package.json` `files` field whitelists only the wrapper files
-- `scripts/check-no-sourcemaps.cjs` runs in `prepublishOnly` and CI
-- `scripts/audit-npm-pack.cjs` runs in CI before publish
+- `scripts/build/check-no-sourcemaps.cjs` runs in `prepublishOnly` and CI
+- `scripts/npm/audit-npm-pack.cjs` runs in CI before publish
 
 If somehow it does:
 1. `npm unpublish @general-liquidity/gordon-cli@<bad-version>` (within 72h)

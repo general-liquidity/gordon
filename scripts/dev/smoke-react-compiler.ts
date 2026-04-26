@@ -5,8 +5,8 @@
  * the Bun plugin uses and asserts the compiler emits its
  * fingerprint (a `react.memo_cache_sentinel` import) into the output.
  *
- *   GORDON_REACT_COMPILER=1 bun scripts/smoke-react-compiler.ts  → PASS
- *   GORDON_REACT_COMPILER=0 bun scripts/smoke-react-compiler.ts  → SKIP
+ *   GORDON_REACT_COMPILER=1 bun scripts/dev/smoke-react-compiler.ts  → PASS
+ *   GORDON_REACT_COMPILER=0 bun scripts/dev/smoke-react-compiler.ts  → SKIP
  */
 
 const ACTIVE =

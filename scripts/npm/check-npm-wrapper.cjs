@@ -1,7 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 
-const rootDirectory = path.resolve(__dirname, "..");
+const rootDirectory = path.resolve(__dirname, "..", "..");
 const rootPkg = JSON.parse(fs.readFileSync(path.join(rootDirectory, "package.json"), "utf8"));
 const wrapperDirectory = path.join(rootDirectory, "npm");
 const wrapperPkg = JSON.parse(fs.readFileSync(path.join(wrapperDirectory, "package.json"), "utf8"));

@@ -26,7 +26,7 @@ jobs:
         run: bun install
 
       - name: Patch Bun-incompatible dependencies
-        run: node scripts/patch-mastra.cjs
+        run: node scripts/patches/patch-mastra.cjs
 
       - name: Run tests
         run: bun test
@@ -72,10 +72,10 @@ jobs:
         run: npm run smoke:npm-wrapper
 
       - name: Audit npm pack contents (no source files, no .map)
-        run: node scripts/audit-npm-pack.cjs
+        run: node scripts/npm/audit-npm-pack.cjs
 
       - name: Source map guardrail (block sourcemap leak)
-        run: node scripts/check-no-sourcemaps.cjs
+        run: node scripts/build/check-no-sourcemaps.cjs
 
   verify-public-dist:
     name: Verify Public Dist Bundle
@@ -86,7 +86,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Prepare public dist bundle
-        run: node scripts/prepare-public-dist.cjs --out-dir .public-dist
+        run: node scripts/build/prepare-public-dist.cjs --out-dir .public-dist
 
       - name: Verify public dist bundle
         run: |
@@ -175,7 +175,7 @@ jobs:
         run: bun install
 
       - name: Patch Bun-incompatible dependencies
-        run: node scripts/patch-mastra.cjs
+        run: node scripts/patches/patch-mastra.cjs
 
       - name: Build binary
         # Simple retry loop — Bun's cross-compile runtime download is
@@ -297,7 +297,7 @@ jobs:
           path: public-dist
 
       - name: Prepare public dist repo contents
-        run: node scripts/prepare-public-dist.cjs --out-dir public-dist
+        run: node scripts/build/prepare-public-dist.cjs --out-dir public-dist
 
       - name: Commit public dist repo updates
         working-directory: public-dist

@@ -2,7 +2,7 @@ const fs = require("fs");
 const path = require("path");
 const { spawnSync } = require("child_process");
 
-const rootDirectory = path.resolve(__dirname, "..");
+const rootDirectory = path.resolve(__dirname, "..", "..");
 const wrapperDirectory = path.join(rootDirectory, "npm");
 const cacheDirectory = path.join(rootDirectory, ".npm-cache");
 const smokeDirectory = path.join(rootDirectory, ".package-smoke");

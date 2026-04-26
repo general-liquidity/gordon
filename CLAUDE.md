@@ -36,7 +36,7 @@ It is **not** a coding agent. Most patterns from Claude Code's coding-agent desi
 | `src/app/slashCommands.ts` | Slash command definitions (programmatic, not markdown) |
 | `src/tui/` | Ink-based custom TUI with framebuffer + vim mode |
 | `src/events/market-events.ts` | Event bus types — `strategy:plan_ready` lives here |
-| `scripts/patch-mastra.cjs` | Postinstall patch for Mastra `lastMessages` cap on sub-agents |
+| `scripts/patches/patch-mastra.cjs` | Postinstall patch for Mastra `lastMessages` cap on sub-agents |
 | `.claude/skills/` | Built-in user-level skills (loaded via skill-loader tool) |
 
 ## Memory system
@@ -56,7 +56,7 @@ Persistent memory lives at `~/.claude/projects/C--Users-adria-Downloads-gordon-c
 - **Compaction thresholds:** 70/80/90/99% pressure → masking / pruning / aggressive / full summary. Recent observations preserved 6/6/3/3.
 - **Permissions:** Never restored on resume — trust is re-established per session. `riskClassifier` returns `auto_approve | prompt_user | require_confirmation | block`. Trust-trajectory hook short-circuits the human-required queue for tools the user has approved consistently, but a hard deny-list (`place_order`, `execute_trade`, `cancel_order`, `wallet_transfer`, …) bypasses trust scoring.
 - **Routing agent:** Don't over-prompt. Adding "Routing Rules" to GORDON_INSTRUCTIONS breaks tool-call routing — Mastra's built-in routing prompt does it correctly.
-- **Sub-agents:** Mastra hardcodes `lastMessages: 0` for sub-agents — patched to 10 via `scripts/patch-mastra.cjs`. Sub-agents need `workingMemory: { enabled: false }` to prevent `updateWorkingMemory` injection crash.
+- **Sub-agents:** Mastra hardcodes `lastMessages: 0` for sub-agents — patched to 10 via `scripts/patches/patch-mastra.cjs`. Sub-agents need `workingMemory: { enabled: false }` to prevent `updateWorkingMemory` injection crash.
 
 ## Ground rules for changes
 

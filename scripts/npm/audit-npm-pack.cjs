@@ -18,7 +18,7 @@ const { execSync } = require("node:child_process");
 const fs = require("node:fs");
 const path = require("node:path");
 
-const NPM_DIR = path.resolve(__dirname, "..", "npm");
+const NPM_DIR = path.resolve(__dirname, "..", "..", "npm");
 
 if (!fs.existsSync(NPM_DIR)) {
   console.error("[audit-npm-pack] npm/ directory not found");

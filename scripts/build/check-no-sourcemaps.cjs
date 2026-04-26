@@ -22,7 +22,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 
-const ROOT = path.resolve(__dirname, "..");
+const ROOT = path.resolve(__dirname, "..", "..");
 const DIRECTORIES_TO_CHECK = [
   path.join(ROOT, "dist"),
   path.join(ROOT, "npm", "lib"),

@@ -6,14 +6,14 @@
  *   - the first ~20 bail-out reasons grouped by message.
  *
  * Usage:
- *   bun scripts/sweep-react-compiler.ts            # walks src/, prints summary
- *   bun scripts/sweep-react-compiler.ts --verbose  # also prints per-file errors
+ *   bun scripts/dev/sweep-react-compiler.ts            # walks src/, prints summary
+ *   bun scripts/dev/sweep-react-compiler.ts --verbose  # also prints per-file errors
  */
 
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 
-const ROOT = resolve(import.meta.dirname, "..");
+const ROOT = resolve(import.meta.dirname, "..", "..");
 const SRC = resolve(ROOT, "src");
 const VERBOSE = process.argv.includes("--verbose");
 

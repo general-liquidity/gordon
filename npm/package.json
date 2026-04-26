@@ -37,7 +37,7 @@
     "tag": "friends"
   },
   "scripts": {
-    "prepack": "node ../scripts/prepare-npm-wrapper.cjs",
+    "prepack": "node ../scripts/npm/prepare-npm-wrapper.cjs",
     "postinstall": "node scripts/postinstall.cjs"
   }
 }

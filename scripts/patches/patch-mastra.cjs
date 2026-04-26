@@ -44,7 +44,7 @@ const path = require("path");
 let totalPatched = 0;
 const verbose = process.argv.includes("--verbose") || process.env.PATCH_MASTRA_VERBOSE === "1";
 
-const distDir = path.resolve(__dirname, "..", "node_modules/@mastra/core/dist");
+const distDir = path.resolve(__dirname, "..", "..", "node_modules/@mastra/core/dist");
 
 function log(message) {
   if (verbose) {
@@ -86,7 +86,7 @@ for (const filePath of staleFiles) {
   let content = fs.readFileSync(filePath, "utf8");
   content = content.replaceAll(STALE_LAST_MESSAGES_NEEDLE, MASTRA_DEFAULT);
   fs.writeFileSync(filePath, content, "utf8");
-  const name = path.relative(path.resolve(__dirname, ".."), filePath);
+  const name = path.relative(path.resolve(__dirname, "..", ".."), filePath);
   log(`[patch-mastra] Reverted stale lastMessages mutation in ${name} → 0 (Mastra default)`);
   totalPatched++;
 }
@@ -105,7 +105,7 @@ const responsesFiles = findChunkFiles(".responses(modelId)");
 
 for (const filePath of responsesFiles) {
   let content = fs.readFileSync(filePath, "utf8");
-  const name = path.relative(path.resolve(__dirname, ".."), filePath);
+  const name = path.relative(path.resolve(__dirname, "..", ".."), filePath);
   const isCjs = filePath.endsWith(".cjs");
 
   // Detect the CJS chunk prefix (e.g., "chunkSH4PCZ3X_cjs.")
@@ -168,7 +168,7 @@ if (responsesFiles.length === 0) {
 // Patch 3: @solana/rpc-parsed-types empty CJS stub → module.exports = {}
 // ============================================================================
 
-const nodeModulesDir = path.resolve(__dirname, "..", "node_modules");
+const nodeModulesDir = path.resolve(__dirname, "..", "..", "node_modules");
 const solanaStubReplacement = `'use strict';\n\nmodule.exports = {};\n`;
 
 function findRpcParsedTypesCjsFiles() {
@@ -201,7 +201,7 @@ for (const filePath of findRpcParsedTypesCjsFiles()) {
 
   fs.writeFileSync(filePath, solanaStubReplacement, "utf8");
   totalPatched++;
-  log(`[patch-mastra] Patched empty rpc-parsed-types stub in ${path.relative(path.resolve(__dirname, ".."), filePath)}`);
+  log(`[patch-mastra] Patched empty rpc-parsed-types stub in ${path.relative(path.resolve(__dirname, "..", ".."), filePath)}`);
 }
 
 // ============================================================================
@@ -210,6 +210,7 @@ for (const filePath of findRpcParsedTypesCjsFiles()) {
 
 const pluginTokenDistPath = path.resolve(
   __dirname,
+  "..",
   "..",
   "node_modules/@solana-agent-kit/plugin-token/dist/index.js",
 );

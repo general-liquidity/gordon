@@ -1,11 +1,11 @@
 const fs = require("fs");
 const path = require("path");
 
-const rootDirectory = path.resolve(__dirname, "..");
+const rootDirectory = path.resolve(__dirname, "..", "..");
 const outputFlagIndex = process.argv.indexOf("--out-dir");
 
 if (outputFlagIndex < 0 || !process.argv[outputFlagIndex + 1]) {
-  throw new Error('Usage: node scripts/prepare-public-dist.cjs --out-dir <directory>');
+  throw new Error('Usage: node scripts/build/prepare-public-dist.cjs --out-dir <directory>');
 }
 
 const outputDirectory = path.resolve(process.argv[outputFlagIndex + 1]);
