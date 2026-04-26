@@ -63,6 +63,7 @@ const TICK_INTERVALS = {
   regime_flip: 15 * 60 * 1000,      // 15 min — per-symbol regime polling
   volatility: 10 * 60 * 1000,       // 10 min — ATR expansion check
   funding: 30 * 60 * 1000,          // 30 min — perp funding scan
+  news_event: 10 * 60 * 1000,       // 10 min — RSS headline polling
   // Stock event ticks (Finnhub-driven)
   earnings: 2 * 60 * 60 * 1000,     // 2 hours — upcoming earnings calendar
   insider_flow: 4 * 60 * 60 * 1000, // 4 hours — insider transaction clusters

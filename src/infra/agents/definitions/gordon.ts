@@ -71,6 +71,7 @@ import {
   instrumentedSkillLoaderTools,
   instrumentedProducerHealthTools,
   instrumentedDefillamaYieldTools,
+  instrumentedNewsTools,
   instrumentedChainlinkStreamsTools,
   instrumentedChainlinkFeedsTools,
   instrumentedSynthDataTools,
@@ -478,6 +479,11 @@ export function getGordon(): Agent {
       ...instrumentedCalibrationTools,
       ...instrumentedSkillLoaderTools,
       ...instrumentedProducerHealthTools,
+
+      // Crypto news headlines + sentiment — hot tier (cheap, no API key,
+      // useful for any "what's happening with X?" question and feeds the
+      // news_event radar producer).
+      ...instrumentedNewsTools,
 
       // DefiLlama yields and Chainlink — cold tier (specialized data feeds).
       ...(isHotTierOnly() ? {} : instrumentedDefillamaYieldTools),

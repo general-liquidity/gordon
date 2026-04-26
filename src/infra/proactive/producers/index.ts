@@ -18,6 +18,7 @@ import { portfolioDriftProducer } from "./portfolioDriftProducer.ts";
 import { regimeFlipProducer, resetRegimeFlipProducerState } from "./regimeFlipProducer.ts";
 import { volatilitySpikeProducer, resetVolatilitySpikeProducerState } from "./volatilitySpikeProducer.ts";
 import { fundingAlertProducer, resetFundingAlertProducerState } from "./fundingAlertProducer.ts";
+import { newsEventProducer, resetNewsEventProducerState } from "./newsEventProducer.ts";
 import {
   earningsApproachingProducer,
   insiderFlowProducer,
@@ -39,6 +40,7 @@ export {
   regimeFlipProducer,
   volatilitySpikeProducer,
   fundingAlertProducer,
+  newsEventProducer,
   earningsApproachingProducer,
   insiderFlowProducer,
   analystUpgradeProducer,
@@ -83,6 +85,7 @@ export function registerAllProducers(engine: ProactiveEngine): () => void {
     engine.registerProducer(withHealthTracking("regimeFlip", regimeFlipProducer)),
     engine.registerProducer(withHealthTracking("volatilitySpike", volatilitySpikeProducer)),
     engine.registerProducer(withHealthTracking("fundingAlert", fundingAlertProducer)),
+    engine.registerProducer(withHealthTracking("newsEvent", newsEventProducer)),
     engine.registerProducer(withHealthTracking("earningsApproaching", earningsApproachingProducer)),
     engine.registerProducer(withHealthTracking("insiderFlow", insiderFlowProducer)),
     engine.registerProducer(withHealthTracking("analystUpgrade", analystUpgradeProducer)),
@@ -96,6 +99,7 @@ export function registerAllProducers(engine: ProactiveEngine): () => void {
     resetRegimeFlipProducerState();
     resetVolatilitySpikeProducerState();
     resetFundingAlertProducerState();
+    resetNewsEventProducerState();
     resetStockEventsProducerState();
     getProducerHealthTracker().stop();
   };
