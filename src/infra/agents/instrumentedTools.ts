@@ -90,6 +90,9 @@ import {
 } from "./tools/index.ts";
 import { evalTools } from "../domain/evals/index.ts";
 import { executionCostTools } from "./tools/execution-cost.ts";
+// Binance Skills Hub + binance-cli moved to MCP marketplace listings —
+// see src/infra/ai/mcp/marketplace/catalog.json (binance-cli, binance-
+// skills-hub) and wrappers/{binance-cli-mcp,binance-skills-mcp}.
 
 // Singleton processor instances (shared across all agents)
 export const gordonInputGuard = new GordonInputGuard();

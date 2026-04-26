@@ -423,6 +423,12 @@ export function getGordon(): Agent {
       list_plans: instrumentedTradingTools.list_plans,
       preview_market_order: instrumentedDiscoveryTools.preview_market_order,
       compare_execution_cost: instrumentedExecutionCostTools.compare_execution_cost,
+
+      // Binance Skills Hub + binance-cli are now exposed via the MCP
+      // marketplace (src/infra/ai/mcp/marketplace/catalog.json) instead
+      // of being hardcoded into Gordon's tool bundle. Users discover
+      // them through /mcp and install on demand. The wrappers live in
+      // wrappers/binance-skills-mcp/ and wrappers/binance-cli-mcp/.
       preview_withdrawal: instrumentedWalletTools.preview_withdrawal,
 
       // Backtesting (was Backtester — heavy work spawns Researcher)
