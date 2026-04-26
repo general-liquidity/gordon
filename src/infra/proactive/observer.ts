@@ -64,6 +64,7 @@ const TICK_INTERVALS = {
   volatility: 10 * 60 * 1000,       // 10 min — ATR expansion check
   funding: 30 * 60 * 1000,          // 30 min — perp funding scan
   news_event: 10 * 60 * 1000,       // 10 min — RSS headline polling
+  stock_news_event: 15 * 60 * 1000, // 15 min — stock RSS + EDGAR + Finnhub
   // Stock event ticks (Finnhub-driven)
   earnings: 2 * 60 * 60 * 1000,     // 2 hours — upcoming earnings calendar
   insider_flow: 4 * 60 * 60 * 1000, // 4 hours — insider transaction clusters

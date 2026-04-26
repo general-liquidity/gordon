@@ -76,6 +76,7 @@ import {
   producerHealthTools,
   defillamaYieldTools,
   newsTools,
+  stockNewsTools,
   positionTrackingTools,
   checkRiskTool,
   memoryTools,
@@ -167,6 +168,7 @@ export const instrumentedSkillLoaderTools = withToolsMetrics(skillLoaderTools);
 export const instrumentedProducerHealthTools = withToolsMetrics(producerHealthTools);
 export const instrumentedDefillamaYieldTools = withToolsMetrics(defillamaYieldTools);
 export const instrumentedNewsTools = withToolsMetrics(newsTools);
+export const instrumentedStockNewsTools = withToolsMetrics(stockNewsTools);
 export const instrumentedEvalTools = withToolsMetrics(evalTools);
 export const instrumentedPositionTrackingTools = withToolsMetrics(positionTrackingTools);
 export const instrumentedMemoryTools = withToolsMetrics(memoryTools);

@@ -72,6 +72,7 @@ import {
   instrumentedProducerHealthTools,
   instrumentedDefillamaYieldTools,
   instrumentedNewsTools,
+  instrumentedStockNewsTools,
   instrumentedChainlinkStreamsTools,
   instrumentedChainlinkFeedsTools,
   instrumentedSynthDataTools,
@@ -484,6 +485,10 @@ export function getGordon(): Agent {
       // useful for any "what's happening with X?" question and feeds the
       // news_event radar producer).
       ...instrumentedNewsTools,
+
+      // Stock news headlines (Yahoo + EDGAR + Finnhub) — hot tier, free
+      // RSS sources plus the existing Finnhub aggregator.
+      ...instrumentedStockNewsTools,
 
       // DefiLlama yields and Chainlink — cold tier (specialized data feeds).
       ...(isHotTierOnly() ? {} : instrumentedDefillamaYieldTools),
