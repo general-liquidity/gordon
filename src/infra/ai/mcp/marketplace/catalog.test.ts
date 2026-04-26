@@ -61,12 +61,14 @@ describe("marketplace catalog", () => {
     expect(missing).toEqual([]);
   });
 
-  it("includes the new Binance entries in the right categories", () => {
-    const cli = cat.plugins.find((p) => p.id === "binance-cli");
+  it("lists binance-skills-hub under research (the docs fetcher belongs here)", () => {
     const skills = cat.plugins.find((p) => p.id === "binance-skills-hub");
-    expect(cli).toBeDefined();
-    expect(cli?.category).toBe("exchange");
     expect(skills).toBeDefined();
     expect(skills?.category).toBe("research");
+  });
+
+  it("does NOT list binance-cli — that's a raw CLI, lives in src/infra/cli/registry.ts", () => {
+    const cli = cat.plugins.find((p) => p.id === "binance-cli");
+    expect(cli).toBeUndefined();
   });
 });

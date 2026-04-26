@@ -892,24 +892,6 @@
       "toolCount": 10
     },
     {
-      "id": "binance-cli",
-      "name": "Binance CLI",
-      "description": "Wraps the official @binance/binance-cli — full Binance product surface (spot, futures, options, margin, copy-trading, earn, convert, sub-account, VIP loan, mining, gift cards, 50+ endpoints) as a single MCP tool. Mutating subcommands gated behind GORDON_BINANCE_CLI_WRITE=1.",
-      "category": "exchange",
-      "transport": "stdio",
-      "install": "bun run wrappers/binance-cli-mcp/index.ts",
-      "credentials": [
-        { "env": "BINANCE_API_KEY", "required": false, "description": "Set via 'binance-cli profile create' or env var. Read-only queries can run unauthenticated." },
-        { "env": "BINANCE_SECRET_KEY", "required": false, "description": "Pair with BINANCE_API_KEY for authenticated calls." },
-        { "env": "BINANCE_API_ENV", "required": false, "description": "prod | demo | testnet (default: prod)" },
-        { "env": "GORDON_BINANCE_CLI_WRITE", "required": false, "description": "Set to '1' to allow mutating commands (orders, transfers, withdrawals). Read-only by default." }
-      ],
-      "docsUrl": "https://github.com/binance/binance-cli",
-      "pricing": "free",
-      "pricingNote": "Free. MIT-licensed wrapper around the official Binance CLI (also free).",
-      "toolCount": 1
-    },
-    {
       "id": "binance-skills-hub",
       "name": "Binance Skills Hub",
       "description": "Fetches and caches skill manifests from github.com/binance/binance-skills-hub (MIT) — canonical Binance product docs covering spot, futures, options, margin, copy-trading, web3 smart-money signals, token info, and more. Use to ground LLM responses in authoritative Binance documentation.",
