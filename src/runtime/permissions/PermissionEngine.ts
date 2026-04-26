@@ -179,6 +179,24 @@ export class PermissionEngine {
     };
   }
 
+  /**
+   * Register a hook that runs before any previously-registered hooks
+   * (including the default classifier). Used by the trust-trajectory
+   * layer so consistently-approved tools can short-circuit the
+   * human-required queue.
+   */
+  prependHook(
+    hook: (input: PermissionHookInput) => PermissionHookDecision | Promise<PermissionHookDecision>,
+  ): () => void {
+    this.hooks.unshift(hook);
+    return () => {
+      const index = this.hooks.indexOf(hook);
+      if (index >= 0) {
+        this.hooks.splice(index, 1);
+      }
+    };
+  }
+
   listPending(): RuntimeApprovalRequest[] {
     return [...this.runtimeStore.getState().approvals.pending];
   }
