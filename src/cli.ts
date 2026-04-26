@@ -37,6 +37,10 @@ export interface CLIFlags {
   cleanup: boolean;
   uninstall: boolean;
   upgrade: boolean;
+  /** Run a single prompt with no TUI; print response to stdout and exit. */
+  headless: boolean;
+  /** Suppress the stderr event-log when running headless. */
+  quiet: boolean;
 }
 
 export type ParsedCLICommand =
@@ -66,6 +70,8 @@ const LONG_FLAGS: Record<string, keyof CLIFlags> = {
   "--cleanup": "cleanup",
   "--uninstall": "uninstall",
   "--upgrade": "upgrade",
+  "--headless": "headless",
+  "--quiet": "quiet",
 };
 
 export function parseFlags(): CLIFlags {
@@ -80,6 +86,8 @@ export function parseFlags(): CLIFlags {
     cleanup: false,
     uninstall: false,
     upgrade: false,
+    headless: false,
+    quiet: false,
   };
 
   for (const arg of args) {
@@ -222,6 +230,8 @@ FLAGS
       --cleanup    Remove stale sessions, caches, and temp files
       --uninstall  Remove all Gordon data (~/.gordon) and exit
       --upgrade    Upgrade Gordon using the current install channel and exit
+      --headless   Run a single prompt with no TUI; print response to stdout and exit
+      --quiet      Suppress event-log on stderr (use with --headless)
 
   Short flags can be grouped: -dv = --debug --version
 

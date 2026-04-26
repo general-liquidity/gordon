@@ -103,6 +103,14 @@ export async function summarizeIfNeeded(
       },
     });
 
+    // Lifecycle event — pairs with memory:summarized at the end so
+    // TUI subscribers can render a "compacting…" spinner during the
+    // LLM call.
+    await emitEvent("memory:summarizing", {
+      reason: compactionReason,
+      messageCount: messages.length,
+    });
+
     let result;
     let aborted = false;
     try {

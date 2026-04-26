@@ -359,6 +359,21 @@ export interface SchedulerScanFailedEvent extends BaseEvent {
 /**
  * Memory events
  */
+/**
+ * Fires before compaction begins so subscribers (TUI, audit log) can
+ * show progress UI during the LLM call. Pairs with `memory:summarized`
+ * which fires on success — together they bracket a compaction lifecycle.
+ */
+export interface MemorySummarizingEvent extends BaseEvent {
+  type: "memory:summarizing";
+  /** Why compaction is firing — set by the caller. */
+  reason: "manual" | "threshold" | "overflow";
+  /** Pre-compaction message count. */
+  messageCount: number;
+  /** Stage the trigger expects to run (informational). */
+  expectedStage?: string;
+}
+
 export interface MemorySummarizedEvent extends BaseEvent {
   type: "memory:summarized";
   originalCount: number;
@@ -651,6 +666,7 @@ export type GordonEvent =
   | SchedulerStoppedEvent
   | SchedulerScanCompletedEvent
   | SchedulerScanFailedEvent
+  | MemorySummarizingEvent
   | MemorySummarizedEvent
   | MemoryCompactedDetailsEvent
   | AlertFiredEvent

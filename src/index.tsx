@@ -59,6 +59,22 @@ if (flags.cleanup) {
   process.exit(0);
 }
 
+if (flags.headless) {
+  // Quiet stdout-only mode for cron / pipeline use. Pass anything after
+  // the `--headless` flag (and other recognised flags) as the prompt.
+  const promptArgs = process.argv.slice(2).filter((a) =>
+    a !== "--headless" &&
+    a !== "--quiet" &&
+    a !== "--debug" &&
+    a !== "--no-color" &&
+    a !== "--plain" &&
+    !a.startsWith("-"),
+  );
+  const { runHeadlessAndPrint } = await import("./app/headless.ts");
+  const code = await runHeadlessAndPrint(promptArgs, flags.quiet);
+  process.exit(code);
+}
+
 if (flags.uninstall) {
   await runUninstall();
   process.exit(0);
