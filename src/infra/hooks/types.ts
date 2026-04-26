@@ -28,7 +28,12 @@ export type HookPoint =
   /** Before a trade order is placed (trading-specific). */
   | "PreOrderPlacement"
   /** After a trade order is placed (trading-specific). */
-  | "PostOrderPlacement";
+  | "PostOrderPlacement"
+  /** When a subagent starts running. Lets plugins react to executor /
+   *  researcher / fork lifecycle without polling. */
+  | "SubagentStart"
+  /** When a subagent stops (success or failure). */
+  | "SubagentStop";
 
 export type HookAction =
   /** Let execution continue unchanged. */
@@ -126,6 +131,37 @@ export interface PostOrderPlacementPayload {
   notionalUsd: number;
 }
 
+export interface SubagentStartPayload {
+  /** Stable ID for the subagent run — joins SubagentStart/Stop pairs. */
+  subagentId: string;
+  /** Logical agent type — e.g. "executor", "researcher", "fork:btc-analysis". */
+  subagentType: string;
+  /** Parent agent's name, when known. */
+  parentAgent?: string;
+  /** Brief description of the task the subagent was spawned for. */
+  task?: string;
+  /** Wall-clock when the subagent was spawned. */
+  startedAt: number;
+}
+
+export interface SubagentStopPayload {
+  subagentId: string;
+  subagentType: string;
+  parentAgent?: string;
+  /** Wall-clock when the subagent stopped. */
+  stoppedAt: number;
+  /** Outcome — caller decides which one fits. */
+  status: "completed" | "failed" | "aborted" | "timeout";
+  /** Wall-clock duration of the run (ms). */
+  durationMs: number;
+  /** Optional structured result the subagent returned. */
+  result?: unknown;
+  /** Failure reason when status is failed/aborted/timeout. */
+  error?: string;
+  /** Token usage if available — keep raw for downstream cost rollups. */
+  tokensUsed?: { input?: number; output?: number; total?: number };
+}
+
 export type HookPayloadMap = {
   PreToolUse: PreToolUsePayload;
   PostToolUse: PostToolUsePayload;
@@ -137,6 +173,8 @@ export type HookPayloadMap = {
   PostApproval: PostApprovalPayload;
   PreOrderPlacement: PreOrderPlacementPayload;
   PostOrderPlacement: PostOrderPlacementPayload;
+  SubagentStart: SubagentStartPayload;
+  SubagentStop: SubagentStopPayload;
 };
 
 export type HookHandler<P extends HookPoint> = (

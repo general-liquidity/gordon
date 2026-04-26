@@ -169,6 +169,65 @@ describe("runHooks — asyncRewake mode", () => {
   });
 });
 
+describe("Subagent lifecycle hooks", () => {
+  beforeEach(() => {
+    clearHooks();
+    setHookStatusListener(null);
+  });
+
+  it("fires SubagentStart hooks with the typed payload", async () => {
+    const seen: Array<{ subagentId: string; subagentType: string; task?: string }> = [];
+    registerHook({
+      id: "log-start",
+      point: "SubagentStart",
+      handler: (p) => {
+        seen.push({ subagentId: p.subagentId, subagentType: p.subagentType, task: p.task });
+        return { action: "allow" };
+      },
+    });
+    await runHooks("SubagentStart", {
+      subagentId: "exec-1",
+      subagentType: "executor",
+      parentAgent: "gordon",
+      task: "place BTC long",
+      startedAt: 1700000000000,
+    });
+    expect(seen).toEqual([
+      { subagentId: "exec-1", subagentType: "executor", task: "place BTC long" },
+    ]);
+  });
+
+  it("fires SubagentStop hooks and lets them block on bad outcomes", async () => {
+    registerHook({
+      id: "veto-on-failure",
+      point: "SubagentStop",
+      handler: (p) =>
+        p.status === "failed"
+          ? { action: "block", reason: `subagent ${p.subagentId} failed: ${p.error}` }
+          : { action: "allow" },
+    });
+    const ok = await runHooks("SubagentStop", {
+      subagentId: "exec-2",
+      subagentType: "executor",
+      stoppedAt: 1700000000010,
+      status: "completed",
+      durationMs: 10,
+    });
+    expect(ok.action).toBe("allow");
+
+    const bad = await runHooks("SubagentStop", {
+      subagentId: "exec-3",
+      subagentType: "executor",
+      stoppedAt: 1700000000010,
+      status: "failed",
+      durationMs: 10,
+      error: "timeout reaching broker",
+    });
+    expect(bad.action).toBe("block");
+    expect(bad.reason).toContain("timeout reaching broker");
+  });
+});
+
 describe("statusMessage listener", () => {
   beforeEach(() => {
     clearHooks();
