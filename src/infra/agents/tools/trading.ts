@@ -319,7 +319,10 @@ export const executePlanTool = createTool({
     planId: z.string().describe("The ID of the plan to execute"),
     rationale: z
       .string()
-      .min(10)
+      .min(10, {
+        message:
+          "rationale must be at least 10 characters. Articulate the SPECIFIC reason this execution is correct right now — not 'user said so' but the concrete trigger (e.g. 'User confirmed plan, BTC broke entry trigger at 100050, no regime conflict'). If you cannot articulate why, do not execute — call report_blocked instead.",
+      })
       .describe(
         "One-sentence reason this execution is correct right now (e.g. 'User confirmed plan, BTC broke entry trigger at 100050, no regime conflict')",
       ),

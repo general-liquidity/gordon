@@ -514,7 +514,10 @@ export const cancelAllOrdersTool = createTool({
     symbol: z.string().describe("Trading pair (e.g., 'BTCUSDT')"),
     rationale: z
       .string()
-      .min(10)
+      .min(10, {
+        message:
+          "rationale must be at least 10 characters. Mass cancel is destructive — articulate the SPECIFIC trigger (regime flip, hack news, mandate breach, explicit user request). 'cleanup' or 'safety' is not enough. If you cannot articulate why, do not call — surface the ambiguity instead.",
+      })
       .describe("One-sentence reason for cancelling ALL orders on this symbol (e.g. 'User requested emergency cancel after regime flip')"),
   }),
   outputSchema: z.object({
@@ -973,7 +976,10 @@ export const cancelOrderTool = createTool({
     orderId: z.number().describe("Order ID to cancel"),
     rationale: z
       .string()
-      .min(10)
+      .min(10, {
+        message:
+          "rationale must be at least 10 characters. Name the SPECIFIC reason this order should be cancelled — invalidation event, sizing breach, user request. 'replacing it' is not a reason — describe what's different about the new context.",
+      })
       .describe("One-sentence reason for cancelling this order (e.g. 'Stop moved invalidated by trend change')"),
   }),
   outputSchema: z.object({
@@ -1110,7 +1116,10 @@ export const cancelReplaceOrderTool = createTool({
     timeInForce: z.enum(["GTC", "IOC", "FOK"]).default("GTC").describe("Time in force for the new order"),
     rationale: z
       .string()
-      .min(10)
+      .min(10, {
+        message:
+          "rationale must be at least 10 characters. Cancel-replace is two destructive actions — articulate why the OLD order should die AND why the NEW order is correct. 'price changed' is insufficient — name the concrete trigger and the new entry/exit basis.",
+      })
       .describe("One-sentence reason for replacing this order (e.g. 'Better entry price available after pullback to 99800')"),
   }),
   outputSchema: z.object({
@@ -1234,7 +1243,10 @@ export const cancelOrderListTool = createTool({
     orderListId: z.number().describe("The orderListId of the OCO/OTO order list to cancel"),
     rationale: z
       .string()
-      .min(10)
+      .min(10, {
+        message:
+          "rationale must be at least 10 characters. OCO/OTO lists cancel both legs — articulate why BOTH legs are invalid, not just one. If only one leg is invalid, cancel that single order instead of the whole list.",
+      })
       .describe("One-sentence reason for cancelling this OCO/OTO list (e.g. 'Both legs invalidated by funding flip')"),
   }),
   outputSchema: z.object({

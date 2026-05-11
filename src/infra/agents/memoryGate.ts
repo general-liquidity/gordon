@@ -38,6 +38,40 @@ export const MAX_WORKING_MEMORY_CHARS = 2200;
 const TRUNCATION_MARKER = "\n[...truncated to hot-tier cap]";
 const DEFER_FLAG_ENV = "GORDON_DEFER_WORKING_MEMORY";
 
+/**
+ * Sensitive working-memory field markers. When a write changes content under
+ * any of these field labels, we log a structured warning so the user can
+ * audit whether the change was intentional. This is detection, not
+ * blocking — false positives would break legitimate user-driven updates
+ * ("I'm switching to Coinbase"). The signal is most useful when reviewing
+ * the audit log for sessions where the agent ingested untrusted content
+ * (news, MCP outputs) that could have triggered an unsolicited update.
+ *
+ * Borrowed from the "Building Real-World Agents" pillar 2 prescription:
+ * detect state poisoning by watching for changes to high-trust fields.
+ */
+const SENSITIVE_FIELD_MARKERS: readonly string[] = [
+  "Max Risk Per Trade",
+  "Max Portfolio Allocation Per Position",
+  "Risk Tolerance",
+  "Default Execution Venue",
+  "Account Type",
+  "Base Currency",
+  "Primary Market Focus",
+];
+
+/**
+ * Patterns the content of an update SHOULD NOT match. Adversarial
+ * prompt-injection payloads frequently include classic markers ("ignore
+ * prior instructions", "system:", new email addresses appearing under
+ * fields that weren't email-shaped). Defensive: log + flag, never block.
+ */
+const SUSPICIOUS_PATTERNS: ReadonlyArray<{ name: string; pattern: RegExp }> = [
+  { name: "ignore-instructions", pattern: /ignore (prior|previous|all) instructions/i },
+  { name: "embedded-system-role", pattern: /\bsystem\s*:\s*you (are|must)/i },
+  { name: "unexpected-email", pattern: /\b[a-zA-Z0-9._%+-]+@(?!gmail\.com|outlook\.com|icloud\.com|protonmail\.com|hotmail\.com|yahoo\.com)[a-zA-Z0-9.-]+\.(xyz|top|tk|click|pw)\b/ },
+];
+
 interface UpdateWorkingMemoryParams {
   threadId: string;
   resourceId: string;
@@ -54,6 +88,60 @@ interface DeferredWrite {
 
 const _pendingByMemory = new WeakMap<Memory, Map<string, DeferredWrite>>();
 const _originalByMemory = new WeakMap<Memory, UpdateWorkingMemoryFn>();
+
+/**
+ * Last-seen working-memory value per (Memory, threadId, resourceId) key.
+ * Used to diff incoming writes against the prior state so the gate can
+ * detect sensitive-field changes. Kept in-process only — survives across
+ * writes within a session, resets on process restart.
+ */
+const _lastWorkingMemoryByKey = new WeakMap<Memory, Map<string, string>>();
+
+export interface SensitiveChange {
+  /** The field label that contains the sensitive marker. */
+  field: string;
+  /** Previous line content (or null if newly added). */
+  before: string | null;
+  /** New line content. */
+  after: string;
+  /** Suspicious-pattern names matched against the new value, if any. */
+  flaggedPatterns: string[];
+}
+
+/**
+ * Diff two working-memory snapshots and surface changes to sensitive
+ * fields. Heuristic line-based — looks for marker substrings ("Max Risk
+ * Per Trade") and compares values on the line. Both null and equal values
+ * are skipped (no change to report).
+ */
+export function detectSensitiveFieldChanges(
+  before: string | null,
+  after: string,
+): SensitiveChange[] {
+  const beforeLines = (before ?? "").split("\n");
+  const afterLines = after.split("\n");
+  const changes: SensitiveChange[] = [];
+
+  for (const marker of SENSITIVE_FIELD_MARKERS) {
+    const beforeLine = beforeLines.find((l) => l.includes(marker)) ?? null;
+    const afterLine = afterLines.find((l) => l.includes(marker)) ?? null;
+    if (afterLine === null) continue;
+    if (beforeLine === afterLine) continue;
+
+    const flagged = SUSPICIOUS_PATTERNS
+      .filter((p) => p.pattern.test(afterLine))
+      .map((p) => p.name);
+
+    changes.push({
+      field: marker,
+      before: beforeLine,
+      after: afterLine,
+      flaggedPatterns: flagged,
+    });
+  }
+
+  return changes;
+}
 
 export function isDeferralEnabled(): boolean {
   return process.env[DEFER_FLAG_ENV] === "1";
@@ -99,6 +187,32 @@ export function wrapMemoryWithGate<M extends Memory>(
       ...params,
       workingMemory: truncatedValue,
     };
+
+    // Sensitive-field-change detection. Pull the prior snapshot (if any)
+    // for this thread+resource key, diff against the incoming value, and
+    // log structured warnings for sensitive-field changes. Never blocks
+    // the write — the user retains agency to update via legitimate paths.
+    let lastByKey = _lastWorkingMemoryByKey.get(memory);
+    if (!lastByKey) {
+      lastByKey = new Map();
+      _lastWorkingMemoryByKey.set(memory, lastByKey);
+    }
+    const memKey = bufferKey(finalParams);
+    const previousValue = lastByKey.get(memKey) ?? null;
+    const sensitiveChanges = detectSensitiveFieldChanges(previousValue, truncatedValue);
+    for (const change of sensitiveChanges) {
+      const flagSuffix = change.flaggedPatterns.length > 0
+        ? ` ⚠ suspicious patterns: ${change.flaggedPatterns.join(", ")}`
+        : "";
+      logger.warn("Working-memory sensitive field changed", {
+        threadId: finalParams.threadId,
+        field: change.field,
+        before: change.before,
+        after: change.after,
+        flagSuffix,
+      });
+    }
+    lastByKey.set(memKey, truncatedValue);
 
     const defer = options.defer ?? isDeferralEnabled();
     if (defer) {
@@ -208,4 +322,8 @@ export function _resetMemoryGateForTests(memory: Memory): void {
     _originalByMemory.delete(memory);
   }
   _pendingByMemory.delete(memory);
+  _lastWorkingMemoryByKey.delete(memory);
 }
+
+/** Test/debug helper — surface the sensitive-field marker list. */
+export const _SENSITIVE_FIELD_MARKERS_FOR_TESTS = SENSITIVE_FIELD_MARKERS;
