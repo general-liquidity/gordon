@@ -58,6 +58,23 @@ Persistent memory lives at `~/.claude/projects/C--Users-adria-Downloads-gordon-c
 - **Routing agent:** Don't over-prompt. Adding "Routing Rules" to GORDON_INSTRUCTIONS breaks tool-call routing — Mastra's built-in routing prompt does it correctly.
 - **Sub-agents:** Mastra hardcodes `lastMessages: 0` for sub-agents — patched to 10 via `scripts/patches/patch-mastra.cjs`. Sub-agents need `workingMemory: { enabled: false }` to prevent `updateWorkingMemory` injection crash.
 
+## Wiring feature flags (off by default)
+
+Recent primitives ship wired but cold. Each flag activates one layer; the wrapper falls back to passthrough when unset. Combine freely.
+
+| Env flag | Activates |
+|---|---|
+| `GORDON_TOOL_OUTPUT_FILTERS=1` | Semantic compression of `get_candles` / `get_orderbook` / `scan_market` via `withOutputFiltering` |
+| `GORDON_TOOL_RESULT_CACHE=1` | `withResultCache` — cached tool results return `{ status: "unchanged", ... }` delta envelope on hit |
+| `GORDON_EXTENDED_THINKING=1` | Anthropic native `budget_tokens` per workflow phase (analysis=low, planning/execution=medium, critique=high) |
+| `GORDON_AGENT_LIST_ATTACHMENT=1` | Emit agent list as separate system attachment instead of bloating tool schema |
+| `GORDON_RECOVERY_TIERS=1` | Doom-loop detection escalates Notify → Redirect → ForceStop (safety-critical tools fast-track) |
+| `GORDON_TOOL_DEFERRAL=1` | Hide deferred tools from model schema until activated; ~50% schema-token savings |
+| `GORDON_REMINDERS=1` | Inject turn-cadence reminders (daily loss limit, mandate scope, open positions) into autonomous loop prompts |
+| `GORDON_PERMISSION_BUBBLE=1` | Tag fork-originated permission requests with `[fork X]` UI prefix |
+
+Combine for stack: each flag is independent. Recommended bring-up order once evals exist: filters + cache first (zero-risk additive), then extended thinking, then deferral / agent list, then reminders / recovery / bubble.
+
 ## Ground rules for changes
 
 1. **Bug fixes don't get refactors.** Three similar lines beat a premature abstraction.
