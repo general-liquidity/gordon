@@ -132,3 +132,156 @@ describe("ACE Reflector pattern detection", () => {
     expect(out.entriesAnalyzed).toBeGreaterThanOrEqual(0);
   });
 });
+
+// Synthetic ActionLogEntry — minimum shape the Reflector reads.
+type AnyEntry = {
+  id: string;
+  entryType: string;
+  title: string;
+  content: string;
+  payload: Record<string, unknown>;
+  bookmarked: boolean;
+  createdAt: string;
+};
+
+function makeEntry(partial: Partial<AnyEntry>): AnyEntry {
+  return {
+    id: "test-id",
+    entryType: "run_status",
+    title: "",
+    content: "",
+    payload: {},
+    bookmarked: false,
+    createdAt: new Date().toISOString(),
+    ...partial,
+  };
+}
+
+describe("ACE Reflector — agent_self_block rule", () => {
+  it("matches a report_blocked-shaped run_status entry with intent + blocker", async () => {
+    const { _applyPatternRulesForTest } = await import("./Reflector.ts");
+    const entry = makeEntry({
+      entryType: "run_status",
+      title: "Agent reported blocked (severity: high)",
+      content: 'Agent reported blocked while attempting: "place BTC long". Blocker: risk classifier blocks all variants because drawdown is at 4.8% of 5% cap.',
+      payload: {
+        intent: "place BTC long after user confirmed plan",
+        blocker: "risk classifier blocks all variants because drawdown is at 4.8% of 5% cap",
+        severity: "high",
+      },
+    });
+    const matches = _applyPatternRulesForTest(entry as never);
+    const selfBlock = matches.find((m) => m.category === "agent_self_block");
+    expect(selfBlock).toBeDefined();
+    expect(selfBlock?.text).toContain("place BTC long");
+  });
+
+  it("does not match run_status entries that aren't block reports", async () => {
+    const { _applyPatternRulesForTest } = await import("./Reflector.ts");
+    const entry = makeEntry({
+      entryType: "run_status",
+      title: "Scan completed",
+      content: "Scanned 50 symbols, found 3 setups",
+      payload: {},
+    });
+    const matches = _applyPatternRulesForTest(entry as never);
+    expect(matches.find((m) => m.category === "agent_self_block")).toBeUndefined();
+  });
+
+  it("falls back to a generic message when payload lacks intent/blocker", async () => {
+    const { _applyPatternRulesForTest } = await import("./Reflector.ts");
+    const entry = makeEntry({
+      entryType: "run_status",
+      title: "Agent reported blocked (severity: medium)",
+      content: "Agent reported blocked on some task.",
+      payload: {},
+    });
+    const matches = _applyPatternRulesForTest(entry as never);
+    const selfBlock = matches.find((m) => m.category === "agent_self_block");
+    expect(selfBlock).toBeDefined();
+    expect(selfBlock?.text).toContain("escalate via report_blocked");
+  });
+});
+
+describe("ACE Reflector — approved_plan_rationale rule", () => {
+  it("matches execution_result entries with a substantive rationale", async () => {
+    const { _applyPatternRulesForTest } = await import("./Reflector.ts");
+    const entry = makeEntry({
+      entryType: "execution_result",
+      title: "BTCUSDT executed",
+      content: "Plan p1 executed cleanly on BTCUSDT. User rationale: Breakout above 100K confirmed with volume, plan stops sit below structural level.",
+      payload: {
+        planId: "p1",
+        symbol: "BTCUSDT",
+        rationale: "Breakout above 100K confirmed with volume, plan stops sit below structural level",
+      },
+    });
+    const matches = _applyPatternRulesForTest(entry as never);
+    const approved = matches.find((m) => m.category === "approved_plan_rationale");
+    expect(approved).toBeDefined();
+    expect(approved?.text).toContain("BTCUSDT");
+    expect(approved?.text).toContain("Breakout above 100K");
+  });
+
+  it("does not match when rationale is missing or trivially short", async () => {
+    const { _applyPatternRulesForTest } = await import("./Reflector.ts");
+    const entry = makeEntry({
+      entryType: "execution_result",
+      title: "BTC executed",
+      content: "Plan executed",
+      payload: { rationale: "ok" }, // too short (<10 chars)
+    });
+    const matches = _applyPatternRulesForTest(entry as never);
+    expect(matches.find((m) => m.category === "approved_plan_rationale")).toBeUndefined();
+  });
+
+  it("does not match execution_result entries that indicate failure", async () => {
+    const { _applyPatternRulesForTest } = await import("./Reflector.ts");
+    const entry = makeEntry({
+      entryType: "execution_result",
+      title: "BTC execution rejected",
+      content: "Plan failed: risk gate blocked the trade. User rationale: test",
+      payload: { rationale: "tried to push through the risk gate" },
+    });
+    const matches = _applyPatternRulesForTest(entry as never);
+    expect(matches.find((m) => m.category === "approved_plan_rationale")).toBeUndefined();
+  });
+
+  it("ignores entries with the wrong entryType", async () => {
+    const { _applyPatternRulesForTest } = await import("./Reflector.ts");
+    const entry = makeEntry({
+      entryType: "tool_result",
+      title: "Something",
+      content: "Some content",
+      payload: { rationale: "a meaningful rationale here that's long enough" },
+    });
+    const matches = _applyPatternRulesForTest(entry as never);
+    expect(matches.find((m) => m.category === "approved_plan_rationale")).toBeUndefined();
+  });
+});
+
+describe("ACE Reflector — existing rules still match", () => {
+  it("execution_success still fires on a clean fill", async () => {
+    const { _applyPatternRulesForTest } = await import("./Reflector.ts");
+    const entry = makeEntry({
+      entryType: "execution_result",
+      title: "ETHUSDT executed",
+      content: "Order filled successfully",
+      payload: { symbol: "ETHUSDT" },
+    });
+    const matches = _applyPatternRulesForTest(entry as never);
+    expect(matches.find((m) => m.category === "execution_success")).toBeDefined();
+  });
+
+  it("execution_failure still fires on a rejected execution", async () => {
+    const { _applyPatternRulesForTest } = await import("./Reflector.ts");
+    const entry = makeEntry({
+      entryType: "execution_result",
+      title: "Execution rejected",
+      content: "Order rejected: insufficient balance",
+      payload: { venue: "binance" },
+    });
+    const matches = _applyPatternRulesForTest(entry as never);
+    expect(matches.find((m) => m.category === "execution_failure")).toBeDefined();
+  });
+});

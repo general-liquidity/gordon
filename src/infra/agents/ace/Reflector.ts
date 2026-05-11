@@ -30,7 +30,9 @@ export interface ACELessonCandidate {
     | "strategy_decay"
     | "risk_event"
     | "user_preference"
-    | "operational";
+    | "operational"
+    | "agent_self_block"
+    | "approved_plan_rationale";
   /** Number of distinct historical events that support this lesson */
   evidenceCount: number;
   /** First seen timestamp (ms epoch) */
@@ -141,6 +143,42 @@ const PATTERN_RULES: Array<{
       return `Operator-level change observed (${e.entryType}) — confirm the change is reflected in the active session.`;
     },
   },
+  {
+    // Bridges report_blocked → ACE. The agent-feedback tool emits a
+    // run_status entry titled "Agent reported blocked (severity: X)" with
+    // intent + blocker text in the content. When this recurs, ACE should
+    // surface the pattern so future sessions either avoid the trap or
+    // escalate earlier instead of retrying the same approach.
+    category: "agent_self_block",
+    match: (e) => {
+      if (e.entryType !== "run_status") return null;
+      const text = `${e.title} ${e.content}`.toLowerCase();
+      if (!/(reported blocked|agent.*stuck|self.?block)/.test(text)) return null;
+      const intent = (e.payload?.intent as string | undefined)?.trim();
+      const blocker = (e.payload?.blocker as string | undefined)?.trim();
+      if (intent && blocker) {
+        return `Agent has previously hit blockers on similar intents (e.g. "${intent.slice(0, 80)}" — blocker: "${blocker.slice(0, 80)}"). Surface this constraint earlier instead of retrying the same approach.`;
+      }
+      return "Agent has self-reported being blocked on a similar pattern before — escalate via report_blocked sooner rather than retrying.";
+    },
+  },
+  {
+    // Bridges execute_plan rationale → ACE. When execute_plan succeeds it
+    // appends an action_log entry containing the user-articulated rationale
+    // in both content (text-searchable) and payload (structured). Captures
+    // the *kinds of rationales* the user has previously approved, which is
+    // higher-signal than the generic "executions have completed cleanly".
+    category: "approved_plan_rationale",
+    match: (e) => {
+      if (e.entryType !== "execution_result") return null;
+      const rationale = (e.payload?.rationale as string | undefined)?.trim();
+      if (!rationale || rationale.length < 10) return null;
+      const text = `${e.title} ${e.content}`.toLowerCase();
+      if (/fail|reject|block/.test(text)) return null;
+      const symbol = (e.payload?.symbol as string | undefined) ?? "the asset";
+      return `User has previously approved similar ${symbol} plans by articulating reasoning like "${rationale.slice(0, 100)}". Confirm comparable conditions hold before proposing the next entry.`;
+    },
+  },
 ];
 
 function dedupeKey(text: string): string {
@@ -199,4 +237,20 @@ export function runReflector(input: ReflectorInput = {}): ReflectorOutput {
 
   const candidates = [...buckets.values()].sort((a, b) => b.evidenceCount - a.evidenceCount);
   return { candidates, entriesAnalyzed: entries.length, generatedAt };
+}
+
+/**
+ * Apply every pattern rule to a single action log entry. Returns the
+ * matched lesson texts paired with their category. Used by tests to verify
+ * individual rule behavior without spinning up the action-log store.
+ */
+export function _applyPatternRulesForTest(
+  entry: ActionLogEntry,
+): Array<{ category: ACELessonCandidate["category"]; text: string }> {
+  const out: Array<{ category: ACELessonCandidate["category"]; text: string }> = [];
+  for (const rule of PATTERN_RULES) {
+    const text = rule.match(entry);
+    if (text) out.push({ category: rule.category, text });
+  }
+  return out;
 }

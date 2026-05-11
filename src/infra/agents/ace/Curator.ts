@@ -44,8 +44,15 @@ const CATEGORY_BASE_SCORE: Record<ACELessonCandidate["category"], number> = {
   risk_event: 0.95,
   execution_failure: 0.85,
   strategy_decay: 0.80,
-  venue_quirk: 0.70,
+  // Self-reported agent blocks are high-signal — the agent explicitly named
+  // intent + blocker, which is more actionable than inferring from a tool
+  // failure. Score above execution_failure so these surface early.
+  agent_self_block: 0.88,
   user_preference: 0.75,
+  // User-articulated rationales accompanying approved plans — strong
+  // positive signal but specific to the exact context, so weight modestly.
+  approved_plan_rationale: 0.72,
+  venue_quirk: 0.70,
   execution_success: 0.55,
   operational: 0.50,
 };

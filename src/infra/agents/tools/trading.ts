@@ -27,6 +27,7 @@ import { PlanSchema } from "../../../types/plan.ts";
 import { TradeSchema } from "../../../types/trade.ts";
 import { emitEvent } from "../../../events/index.ts";
 import { recordStructuredObservation } from "../../platform/observability/index.ts";
+import { appendActionLogEntry } from "../../action-log/index.ts";
 import { loadConfigBundle, saveResolvedConfig } from "../../storage/config.ts";
 import { listPlans, getPlan, updatePlan, createPlan } from "../../storage/plans.ts";
 import { listTrades, getTrade } from "../../storage/trades.ts";
@@ -506,6 +507,26 @@ export const executePlanTool = createTool({
         symbol: result.trade.symbol,
         actionCount: result.orders.length,
       });
+      // Bridge rationale + approval signal into the action log so ACE
+      // Reflector can extract patterns from approved-execution events.
+      // Wrapped: action-log writes go through SQLite and shouldn't break
+      // execution if storage is misconfigured.
+      try {
+        appendActionLogEntry({
+          entryType: "execution_result",
+          title: `${result.trade.symbol} executed`,
+          content: `Plan ${planId} executed cleanly on ${result.trade.symbol}. User rationale: ${rationale}`,
+          payload: {
+            planId,
+            tradeId: result.trade.id,
+            symbol: result.trade.symbol,
+            rationale,
+            orderCount: result.orders.length,
+          },
+        });
+      } catch {
+        // Non-critical — structured observation already captured this.
+      }
       return validateToolOutput(executePlanOutputSchema, {
         success: true,
         trade: result.trade,

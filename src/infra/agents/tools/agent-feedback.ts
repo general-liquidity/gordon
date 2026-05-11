@@ -33,6 +33,7 @@ import { dirname, join } from "node:path";
 import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 
 import { recordStructuredObservation } from "../../platform/observability/index.ts";
+import { appendActionLogEntry } from "../../action-log/index.ts";
 import { createModuleLogger } from "../../logger/index.ts";
 
 const logger = createModuleLogger("agent-feedback");
@@ -173,6 +174,26 @@ export const reportBlockedTool = createTool({
         persisted: result.written,
       },
     });
+
+    // Bridge into the action log so ACE Reflector can extract self-block
+    // patterns. The new agent_self_block rule keys on "reported blocked"
+    // markers in title + blocker text in content.
+    try {
+      appendActionLogEntry({
+        entryType: "run_status",
+        title: `Agent reported blocked (severity: ${severity})`,
+        content: `Agent reported blocked while attempting: "${intent}". Blocker: ${blocker}. Approaches tried: ${approachesTried.join("; ")}.${suggestedNext ? ` Suggested next: ${suggestedNext}.` : ""}`,
+        payload: {
+          intent,
+          blocker,
+          approachesTried: [...approachesTried],
+          suggestedNext,
+          severity,
+        },
+      });
+    } catch {
+      // Non-critical — JSONL persistence + structured observation already covered.
+    }
 
     return {
       acknowledged: true,
