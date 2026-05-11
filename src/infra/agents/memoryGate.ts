@@ -97,6 +97,80 @@ const _originalByMemory = new WeakMap<Memory, UpdateWorkingMemoryFn>();
  */
 const _lastWorkingMemoryByKey = new WeakMap<Memory, Map<string, string>>();
 
+/**
+ * Per-key provenance — the source of the last write. Default for all
+ * Mastra-mediated writes is "llm_assertion" since the LLM's auto-injected
+ * updateWorkingMemory tool doesn't carry source context. Higher-level
+ * callers (setup wizard, explicit user commands) can call
+ * `recordTrustedProvenance()` BEFORE their write to mark it as trusted.
+ *
+ * This is documentation-as-infrastructure: it declares that LLM-driven
+ * writes are untrusted by default. The actual privilege boundary would
+ * require patching Mastra to inject source on every call — that's a
+ * follow-up. For now, the provenance map drives logging only.
+ */
+export type ProvenanceSource =
+  | "llm_assertion"
+  | "user_verified"
+  | "system_init"
+  | "oauth"
+  | "setup_wizard"
+  | "explicit_command";
+
+const TRUSTED_SOURCES: ReadonlySet<ProvenanceSource> = new Set([
+  "user_verified",
+  "system_init",
+  "oauth",
+  "setup_wizard",
+  "explicit_command",
+]);
+
+const _provenanceByKey = new WeakMap<Memory, Map<string, ProvenanceSource>>();
+const _pendingTrustedWrite = new WeakMap<Memory, Map<string, ProvenanceSource>>();
+
+/**
+ * Mark the NEXT write to (memory, threadId, resourceId) as coming from
+ * a trusted source. Must be called immediately before the corresponding
+ * updateWorkingMemory call. Idempotent — calling twice queues only the
+ * most recent source.
+ *
+ * Typical use:
+ *   recordTrustedProvenance(memory, threadId, resourceId, "setup_wizard");
+ *   await memory.updateWorkingMemory({ threadId, resourceId, workingMemory: newValue });
+ */
+export function recordTrustedProvenance(
+  memory: Memory,
+  threadId: string,
+  resourceId: string,
+  source: ProvenanceSource,
+): void {
+  let pending = _pendingTrustedWrite.get(memory);
+  if (!pending) {
+    pending = new Map();
+    _pendingTrustedWrite.set(memory, pending);
+  }
+  pending.set(`${threadId}::${resourceId}`, source);
+}
+
+/**
+ * Read the recorded provenance for the last write to a given key.
+ * Returns "llm_assertion" (default untrusted source) when no write has
+ * happened yet. Useful for diagnostics + the doctor engine.
+ */
+export function getProvenance(
+  memory: Memory,
+  threadId: string,
+  resourceId: string,
+): ProvenanceSource {
+  const map = _provenanceByKey.get(memory);
+  if (!map) return "llm_assertion";
+  return map.get(`${threadId}::${resourceId}`) ?? "llm_assertion";
+}
+
+export function isTrustedSource(source: ProvenanceSource): boolean {
+  return TRUSTED_SOURCES.has(source);
+}
+
 export interface SensitiveChange {
   /** The field label that contains the sensitive marker. */
   field: string;
@@ -188,10 +262,13 @@ export function wrapMemoryWithGate<M extends Memory>(
       workingMemory: truncatedValue,
     };
 
-    // Sensitive-field-change detection. Pull the prior snapshot (if any)
-    // for this thread+resource key, diff against the incoming value, and
-    // log structured warnings for sensitive-field changes. Never blocks
-    // the write — the user retains agency to update via legitimate paths.
+    // Sensitive-field-change detection + provenance tracking. Pull the
+    // prior snapshot (if any) for this thread+resource key, diff against
+    // the incoming value, and log structured warnings for sensitive-
+    // field changes. Resolve the source: if a higher-level caller pre-
+    // registered trusted provenance via recordTrustedProvenance(), use
+    // that; otherwise default to "llm_assertion". Never blocks the write
+    // — the user retains agency to update via legitimate paths.
     let lastByKey = _lastWorkingMemoryByKey.get(memory);
     if (!lastByKey) {
       lastByKey = new Map();
@@ -199,16 +276,35 @@ export function wrapMemoryWithGate<M extends Memory>(
     }
     const memKey = bufferKey(finalParams);
     const previousValue = lastByKey.get(memKey) ?? null;
+
+    // Resolve source from pending trusted-provenance map; consume it
+    // (one-shot) so subsequent writes default back to llm_assertion.
+    const pendingMap = _pendingTrustedWrite.get(memory);
+    const explicitSource = pendingMap?.get(memKey);
+    const source: ProvenanceSource = explicitSource ?? "llm_assertion";
+    if (pendingMap && explicitSource) pendingMap.delete(memKey);
+
+    // Persist provenance for this key.
+    let provenanceMap = _provenanceByKey.get(memory);
+    if (!provenanceMap) {
+      provenanceMap = new Map();
+      _provenanceByKey.set(memory, provenanceMap);
+    }
+    provenanceMap.set(memKey, source);
+
     const sensitiveChanges = detectSensitiveFieldChanges(previousValue, truncatedValue);
     for (const change of sensitiveChanges) {
       const flagSuffix = change.flaggedPatterns.length > 0
         ? ` ⚠ suspicious patterns: ${change.flaggedPatterns.join(", ")}`
         : "";
+      const trustSuffix = isTrustedSource(source) ? "" : " (UNTRUSTED source — review)";
       logger.warn("Working-memory sensitive field changed", {
         threadId: finalParams.threadId,
         field: change.field,
         before: change.before,
         after: change.after,
+        source,
+        trustSuffix,
         flagSuffix,
       });
     }
@@ -323,6 +419,8 @@ export function _resetMemoryGateForTests(memory: Memory): void {
   }
   _pendingByMemory.delete(memory);
   _lastWorkingMemoryByKey.delete(memory);
+  _provenanceByKey.delete(memory);
+  _pendingTrustedWrite.delete(memory);
 }
 
 /** Test/debug helper — surface the sensitive-field marker list. */

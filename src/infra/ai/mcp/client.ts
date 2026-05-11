@@ -41,6 +41,81 @@ import {
   buildDescriptorsFromLiveTools,
   type CachedToolDescriptor,
 } from "./discoveryCache.ts";
+import { wrapUntrustedContent } from "../../security/untrustedContent.ts";
+
+// ============================================================================
+// MCP output wrapping
+// ============================================================================
+
+/**
+ * Wrap an MCP tool so its outputs arrive at the agent inside untrusted-
+ * content markers. MCP servers return content the agent didn't generate
+ * and didn't see at compile time — any text in the response could carry
+ * an indirect prompt-injection payload. The wrapper makes the boundary
+ * explicit at the content layer (Mastra's `role: "tool"` is the
+ * structural layer).
+ *
+ * Conservative behavior:
+ *   - String results: wrapped verbatim
+ *   - Object results with `content` array (MCP protocol shape): each
+ *     text item's `text` is wrapped, structure preserved
+ *   - Other shapes: passed through unchanged with a sidecar
+ *     `_externalSource` marker so the agent still gets the signal
+ *
+ * Idempotent — calling on an already-wrapped tool is a no-op via the
+ * presence of the `_externalSource` marker.
+ */
+function wrapMCPToolForUntrustedContent(tool: Tool, sourceName: string): Tool {
+  const original = tool as unknown as {
+    execute?: (...args: unknown[]) => unknown | Promise<unknown>;
+  };
+  if (typeof original.execute !== "function") return tool;
+  const originalExecute = original.execute.bind(original);
+  const sourceLabel = `mcp:${sourceName}`;
+
+  const wrappedExecute = async (...args: unknown[]): Promise<unknown> => {
+    const result = await originalExecute(...args);
+    if (typeof result === "string") {
+      return wrapUntrustedContent(result, sourceLabel);
+    }
+    if (result && typeof result === "object") {
+      const obj = result as Record<string, unknown>;
+      // Already wrapped — pass through
+      if (obj._externalSource === sourceLabel) return obj;
+      // MCP protocol content array — wrap each text item
+      if (Array.isArray(obj.content)) {
+        const wrappedContent = (obj.content as unknown[]).map((item) => {
+          if (
+            item &&
+            typeof item === "object" &&
+            (item as { type?: string }).type === "text" &&
+            typeof (item as { text?: unknown }).text === "string"
+          ) {
+            return {
+              ...(item as Record<string, unknown>),
+              text: wrapUntrustedContent(
+                (item as { text: string }).text,
+                sourceLabel,
+              ),
+            };
+          }
+          return item;
+        });
+        return { ...obj, content: wrappedContent, _externalSource: sourceLabel };
+      }
+      // Other object shape — add sidecar marker without mutating data
+      return { ...obj, _externalSource: sourceLabel };
+    }
+    return result;
+  };
+
+  // Return a new Tool object with the wrapped execute. Keeps every other
+  // property (id, description, inputSchema, etc.) untouched.
+  return {
+    ...(tool as unknown as Record<string, unknown>),
+    execute: wrappedExecute,
+  } as unknown as Tool;
+}
 
 // ============================================================================
 // State
@@ -342,9 +417,18 @@ export async function ensureMCPToolsDiscovered(serverIds?: string[]): Promise<Re
       normalizedServerIds?.[0] ?? "gordon-mcp",
       () => client.listTools(),
     );
+    // Wrap each MCP tool's output in untrusted-content markers. MCP
+    // servers return arbitrary text the agent didn't generate; treat
+    // every response as external content. Defense-in-depth alongside
+    // the MCP marketplace's integrity check (which verifies install-
+    // time signatures but not runtime output content).
+    const wrappedTools: Record<string, Tool> = {};
+    for (const [name, tool] of Object.entries(discoveredTools)) {
+      wrappedTools[name] = wrapMCPToolForUntrustedContent(tool, name);
+    }
     _mcpTools = {
       ...(_mcpTools ?? {}),
-      ...discoveredTools,
+      ...wrappedTools,
     };
 
     // Mark all discovered servers as healthy

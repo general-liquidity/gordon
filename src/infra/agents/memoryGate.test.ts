@@ -4,8 +4,11 @@ import {
   detectSensitiveFieldChanges,
   discardDeferredWorkingMemoryWrites,
   flushDeferredWorkingMemoryWrites,
+  getProvenance,
   inspectDeferredWorkingMemory,
   isDeferralEnabled,
+  isTrustedSource,
+  recordTrustedProvenance,
   truncateWorkingMemoryValue,
   wrapMemoryWithGate,
   _resetMemoryGateForTests,
@@ -267,6 +270,67 @@ describe("memoryGate", () => {
       expect(_SENSITIVE_FIELD_MARKERS_FOR_TESTS.length).toBeGreaterThan(3);
       expect(_SENSITIVE_FIELD_MARKERS_FOR_TESTS).toContain("Max Risk Per Trade");
       expect(_SENSITIVE_FIELD_MARKERS_FOR_TESTS).toContain("Default Execution Venue");
+    });
+  });
+
+  describe("provenance tracking", () => {
+    it("defaults to llm_assertion source for writes without explicit provenance", async () => {
+      const { memory } = makeFakeMemory();
+      wrapMemoryWithGate(memory);
+      await (memory as unknown as { updateWorkingMemory: (p: FakeMemoryRecord) => Promise<void> })
+        .updateWorkingMemory({ threadId: "t1", resourceId: "r1", workingMemory: "x" });
+      expect(getProvenance(memory, "t1", "r1")).toBe("llm_assertion");
+      _resetMemoryGateForTests(memory);
+    });
+
+    it("records explicit trusted provenance when pre-registered", async () => {
+      const { memory } = makeFakeMemory();
+      wrapMemoryWithGate(memory);
+      recordTrustedProvenance(memory, "t1", "r1", "setup_wizard");
+      await (memory as unknown as { updateWorkingMemory: (p: FakeMemoryRecord) => Promise<void> })
+        .updateWorkingMemory({ threadId: "t1", resourceId: "r1", workingMemory: "x" });
+      expect(getProvenance(memory, "t1", "r1")).toBe("setup_wizard");
+      _resetMemoryGateForTests(memory);
+    });
+
+    it("consumes pending provenance — subsequent writes default back to llm_assertion", async () => {
+      const { memory } = makeFakeMemory();
+      wrapMemoryWithGate(memory);
+      recordTrustedProvenance(memory, "t1", "r1", "user_verified");
+      await (memory as unknown as { updateWorkingMemory: (p: FakeMemoryRecord) => Promise<void> })
+        .updateWorkingMemory({ threadId: "t1", resourceId: "r1", workingMemory: "first" });
+      expect(getProvenance(memory, "t1", "r1")).toBe("user_verified");
+      await (memory as unknown as { updateWorkingMemory: (p: FakeMemoryRecord) => Promise<void> })
+        .updateWorkingMemory({ threadId: "t1", resourceId: "r1", workingMemory: "second" });
+      expect(getProvenance(memory, "t1", "r1")).toBe("llm_assertion");
+      _resetMemoryGateForTests(memory);
+    });
+
+    it("isTrustedSource classifies correctly", () => {
+      expect(isTrustedSource("llm_assertion")).toBe(false);
+      expect(isTrustedSource("user_verified")).toBe(true);
+      expect(isTrustedSource("system_init")).toBe(true);
+      expect(isTrustedSource("oauth")).toBe(true);
+      expect(isTrustedSource("setup_wizard")).toBe(true);
+      expect(isTrustedSource("explicit_command")).toBe(true);
+    });
+
+    it("getProvenance returns llm_assertion when no writes have occurred", () => {
+      const { memory } = makeFakeMemory();
+      expect(getProvenance(memory, "untouched-t", "untouched-r")).toBe("llm_assertion");
+    });
+
+    it("provenance is per-key — different threads/resources track independently", async () => {
+      const { memory } = makeFakeMemory();
+      wrapMemoryWithGate(memory);
+      recordTrustedProvenance(memory, "t1", "r1", "oauth");
+      await (memory as unknown as { updateWorkingMemory: (p: FakeMemoryRecord) => Promise<void> })
+        .updateWorkingMemory({ threadId: "t1", resourceId: "r1", workingMemory: "a" });
+      await (memory as unknown as { updateWorkingMemory: (p: FakeMemoryRecord) => Promise<void> })
+        .updateWorkingMemory({ threadId: "t2", resourceId: "r2", workingMemory: "b" });
+      expect(getProvenance(memory, "t1", "r1")).toBe("oauth");
+      expect(getProvenance(memory, "t2", "r2")).toBe("llm_assertion");
+      _resetMemoryGateForTests(memory);
     });
   });
 });
