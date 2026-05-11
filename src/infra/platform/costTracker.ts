@@ -194,6 +194,18 @@ export interface CostSnapshot {
   models: Record<string, ModelCostEntry>;
   totalInputTokens: number;
   totalOutputTokens: number;
+  /**
+   * Tokens re-read from prompt-cache across all models. When this dominates
+   * totalInput + totalOutput, the agent is paying to replay large historical
+   * context every call rather than process new input — the failure mode the
+   * "OpenClaw money-saving" analysis identified (cacheRead = 79% of total
+   * tokens in their worst case). Surface this explicitly so operators can
+   * notice the pattern before the bill arrives.
+   */
+  totalCacheReadTokens: number;
+  totalCacheWriteTokens: number;
+  /** cacheRead / (input + output + cacheRead + cacheWrite). 0 when total = 0. */
+  cacheReadPercentage: number;
   totalCostUsd: number;
   totalApiCalls: number;
 }
@@ -333,15 +345,21 @@ export class CostTracker {
    */
   snapshot(): CostSnapshot {
     const models: Record<string, ModelCostEntry> = {};
-    let totalInput = 0, totalOutput = 0, totalCost = 0, totalCalls = 0;
+    let totalInput = 0, totalOutput = 0, totalCacheRead = 0, totalCacheWrite = 0;
+    let totalCost = 0, totalCalls = 0;
 
     for (const [id, entry] of this.models) {
       models[id] = { ...entry };
       totalInput += entry.inputTokens;
       totalOutput += entry.outputTokens;
+      totalCacheRead += entry.cacheReadTokens;
+      totalCacheWrite += entry.cacheWriteTokens;
       totalCost += entry.totalCostUsd;
       totalCalls += entry.apiCalls;
     }
+
+    const grandTotal = totalInput + totalOutput + totalCacheRead + totalCacheWrite;
+    const cacheReadPct = grandTotal > 0 ? totalCacheRead / grandTotal : 0;
 
     return {
       sessionId: this.sessionId,
@@ -351,6 +369,9 @@ export class CostTracker {
       models,
       totalInputTokens: totalInput,
       totalOutputTokens: totalOutput,
+      totalCacheReadTokens: totalCacheRead,
+      totalCacheWriteTokens: totalCacheWrite,
+      cacheReadPercentage: Number(cacheReadPct.toFixed(4)),
       totalCostUsd: totalCost,
       totalApiCalls: totalCalls,
     };
@@ -363,6 +384,15 @@ export class CostTracker {
     const snap = this.snapshot();
     const lines: string[] = [];
     lines.push(`Session cost: $${snap.totalCostUsd.toFixed(4)} | ${snap.totalApiCalls} calls | ${Math.round(snap.durationMs / 1000)}s`);
+
+    // Surface cacheRead pressure. When this percentage trends above ~50%, the
+    // agent is paying primarily to replay historical context. Above ~70% (the
+    // OpenClaw failure case) is a context-bloat signal worth investigating.
+    const cachePct = Math.round(snap.cacheReadPercentage * 100);
+    if (snap.totalCacheReadTokens > 0) {
+      const flag = cachePct >= 70 ? " ⚠ context-bloat suspected" : cachePct >= 50 ? " (cache-heavy)" : "";
+      lines.push(`  cacheRead: ${snap.totalCacheReadTokens.toLocaleString()} tokens (${cachePct}% of total)${flag}`);
+    }
 
     for (const entry of Object.values(snap.models)) {
       const pct = snap.totalCostUsd > 0 ? Math.round((entry.totalCostUsd / snap.totalCostUsd) * 100) : 0;
