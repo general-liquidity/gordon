@@ -12,12 +12,27 @@ import { createMastraStorageConfig } from "./mastraStorage.ts";
 import { createModuleLogger } from "../logger/logger.ts";
 import { WORKING_MEMORY_LABELS } from "./capabilityTruth.ts";
 import { getMemoryConfig } from "./memoryConfig.ts";
+import { wrapMemoryWithGate, MAX_WORKING_MEMORY_CHARS } from "./memoryGate.ts";
 
 const logger = createModuleLogger("agents");
 
 /**
- * Working memory template for trading context
- * Maintains persistent state across conversations
+ * Working-memory template — Hermes hot-tier discipline.
+ *
+ * Holds ONLY durable trader-profile fields (risk preferences, venue,
+ * account type, market focus). Session-state fields — Current Focus,
+ * Active Analysis, Pending Decisions, Recent Wins/Losses — were
+ * removed: per the "Reverse-Engineering Memory" article, those are
+ * exactly the categories that turn working memory into context rot.
+ * The Hermes rule: "Save user preferences, environment facts,
+ * recurring corrections, stable conventions. Do not save task progress,
+ * session outcomes, temporary TODO state."
+ *
+ * Session-state lives in working state (Mastra thread messages, the
+ * orchestrator's stream context), NOT in the always-injected hot tier.
+ *
+ * Total filled length must stay under MAX_WORKING_MEMORY_CHARS (2200).
+ * The memoryGate enforces this on write.
  */
 const WORKING_MEMORY_TEMPLATE = `
 # Trader Profile
@@ -45,12 +60,6 @@ const WORKING_MEMORY_TEMPLATE = `
 - ${WORKING_MEMORY_LABELS.accountType}: (spot/margin/futures/cash)
 - ${WORKING_MEMORY_LABELS.marketFocus}
 - ${WORKING_MEMORY_LABELS.baseCurrency}
-
-## Session State
-- Current Focus:
-- Active Analysis:
-- Pending Decisions:
-- Recent Wins/Losses:
 `;
 
 function createMastraLocalEmbedder() {
@@ -67,7 +76,16 @@ function createMastraLocalEmbedder() {
 
 /**
  * Create the full memory instance for the main Gordon agent.
- * Features semantic recall, working memory, and observational memory.
+ *
+ * Hot tier (always-injected): durable trader-profile working memory,
+ * char-capped at MAX_WORKING_MEMORY_CHARS via memoryGate.
+ *
+ * Cold tier (tool-invoked only): vector storage is attached, but
+ * `semanticRecall` is disabled — the model issues cold-recall queries
+ * explicitly through the tools in memory-tools.ts.
+ *
+ * Background: observationalMemory still runs (observation + reflection
+ * passes) so session summaries accumulate for later retrieval.
  */
 export function createMemory(): Memory {
   const _memoryConfig = getMemoryConfig();
@@ -82,23 +100,23 @@ export function createMemory(): Memory {
   });
 
   const lastMessages = _memoryConfig.lastMessages;
-  logger.info("Creating memory", { lastMessages, mode });
+  logger.info("Creating memory", {
+    lastMessages,
+    mode,
+    hotTierCap: MAX_WORKING_MEMORY_CHARS,
+  });
 
-  return new Memory({
+  // Semantic recall is explicitly disabled (Hermes pattern: cold recall
+  // must go through tools, not ambient injection). Vector storage is
+  // still attached so `searchMemoryTool` and friends in memory-tools.ts
+  // can issue scoped queries on demand.
+  const mem = new Memory({
     storage,
     vector,
     embedder: vector ? createMastraLocalEmbedder() : undefined,
     options: {
       lastMessages,
-      semanticRecall: vector
-        ? {
-          topK: 5,
-          messageRange: {
-            before: 3,
-            after: 2,
-          },
-        }
-        : false,
+      semanticRecall: false,
       workingMemory: {
         enabled: true,
         template: WORKING_MEMORY_TEMPLATE,
@@ -121,6 +139,8 @@ export function createMemory(): Memory {
       },
     },
   });
+
+  return wrapMemoryWithGate(mem);
 }
 
 /**
@@ -163,8 +183,9 @@ export function createSubAgentMemory(agentId?: string): Memory {
       },
     },
   });
-  _subAgentMemories.set(key, mem);
-  return mem;
+  const wrapped = wrapMemoryWithGate(mem);
+  _subAgentMemories.set(key, wrapped);
+  return wrapped;
 }
 
 /**

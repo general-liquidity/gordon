@@ -45,6 +45,14 @@ Persistent memory lives at `~/.claude/projects/C--Users-adria-Downloads-gordon-c
 
 **Critical invariant** captured there: **before claiming Gordon is missing a feature, grep the codebase first.** This has been wrong twice (pre-trade safety classifier, plan mode — both already shipped). External-design comparisons (Claude Code papers, OPENDEV, Gekko) tend to surface false-positive gaps. Verify file paths before listing anything as missing.
 
+**Hot-tier discipline (Hermes pattern).** Working memory is the only memory layer injected into every prompt — keep it small, durable, and stable:
+- `WORKING_MEMORY_TEMPLATE` in `memoryFactory.ts` holds ONLY durable trader-profile fields (risk prefs, venue, account type, market focus). Session state lives in the thread, not the hot tier.
+- Hot-tier writes are capped at `MAX_WORKING_MEMORY_CHARS = 2200` by `memoryGate.ts` (truncates on write, never throws). Matches Hermes's MEMORY.md cap.
+- **Semantic recall is disabled by default.** Cold recall goes through `searchMemoryTool` / `getMemoryContextTool` / `getLessonsTool` (memory-tools.ts) — model-decides, not ambient injection.
+- Optional `GORDON_DEFER_WORKING_MEMORY=1` buffers mid-session writes to preserve prompt-cache stability; flush via `flushDeferredWorkingMemoryWrites(memory)` at session boundaries (`/clear`, post-compression, thread close). Last-write-wins per (threadId, resourceId).
+
+Why: the "Reverse-Engineering Memory" pattern survey identifies "always-inject" working memory as the dominant failure mode (ChatGPT taxonomy). Gordon previously held session-state fields in the always-injected tier; those have been removed.
+
 ## Key conventions
 
 - **Commits:** Conventional-commit prefix. Do **NOT** add `Co-Authored-By: Claude` to commit messages.
