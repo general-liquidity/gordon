@@ -35,7 +35,14 @@ export async function runCritiquePhase(
   }
 
   try {
-    const route = resolveLegacyModelRouteForWorkflowPhase("compaction");
+    // Use the main model for critique, not the fast one. Cognition's
+    // "What's Actually Working" follow-up to "Don't Build Multi-Agents"
+    // found that clean-context reviewers catch significantly more bugs
+    // (~2/PR, 58% severe) when the reviewer is at least as capable as
+    // the writer. Clean context alone isn't enough — capable + clean.
+    // Critique only fires when thinkingDepth === "high" (explicit opt-in
+    // for high-stakes work), so the cost increase is gated.
+    const route = resolveLegacyModelRouteForWorkflowPhase("critique");
 
     const userContent = `Thinking trace:\n${thinkingTrace}\n\nUser request: ${userMessage.slice(0, 300)}`;
 
