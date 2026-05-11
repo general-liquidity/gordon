@@ -122,6 +122,9 @@ export { aceTools } from "./ace-tools.ts";
 // Agent self-feedback tool (report_blocked)
 export { agentFeedbackTools } from "./agent-feedback.ts";
 
+// Anti-trap tools (record_user_thesis, record_supervision_outcome)
+export { antiTrapTools } from "./anti-trap.ts";
+
 // Playbook tools (v0.7)
 export { playbookTools } from "./playbook-tools.ts";
 
@@ -385,6 +388,7 @@ import { checkRiskTool } from "./risk-gate.ts";
 import { memoryTools } from "./memory-tools.ts";
 import { aceTools } from "./ace-tools.ts";
 import { agentFeedbackTools } from "./agent-feedback.ts";
+import { antiTrapTools } from "./anti-trap.ts";
 import { playbookTools } from "./playbook-tools.ts";
 import { playbookBacktestTools } from "./backtest-tools.ts";
 import { runtimeTools } from "./runtime-tools.ts";
@@ -480,6 +484,7 @@ const _rawAllTools = {
   ...memoryTools,
   ...aceTools,
   ...agentFeedbackTools,
+  ...antiTrapTools,
   ...playbookTools,
   ...playbookBacktestTools,
   ...runtimeTools,

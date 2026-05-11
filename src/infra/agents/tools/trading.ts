@@ -38,6 +38,13 @@ import { ExchangeFactory } from "../../exchange/index.ts";
 import { BrokerFactory } from "../../broker/factory.ts";
 import { reflectOnPlan, formatReflectionSummary } from "../reflection.ts";
 import { getTradingService } from "../../../services/trading.service.ts";
+import {
+  recordUserThesis,
+  requiresUserThesis,
+  getUserThesis,
+  computeThesisDivergence,
+  verifyAcksFromWarnings,
+} from "../../safety/index.ts";
 
 // ============================================================================
 // Error Messages
@@ -326,9 +333,15 @@ export const executePlanTool = createTool({
       .describe(
         "One-sentence reason this execution is correct right now (e.g. 'User confirmed plan, BTC broke entry trigger at 100050, no regime conflict')",
       ),
+    acknowledgedRisks: z
+      .array(z.string())
+      .optional()
+      .describe(
+        "When GORDON_RISK_ACK is enabled and the risk gate raises warnings, provide one substantive (>=20 chars) acknowledgement per warning explaining why each specific risk is acceptable. Anti-rubber-stamp gate.",
+      ),
   }),
   outputSchema: executePlanOutputSchema,
-  execute: async ({ planId, rationale }, execContext: MastraExecutionContext) => {
+  execute: async ({ planId, rationale, acknowledgedRisks }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
     if (!ctx?.exchange) {
       recordStructuredObservation({
@@ -374,6 +387,44 @@ export const executePlanTool = createTool({
       symbol: plan.symbol,
       details: { rationale },
     });
+
+    // Explain-before-execute gate (GORDON_EXPLAIN_FIRST)
+    const thesisReq = requiresUserThesis(planId);
+    if (thesisReq.required) {
+      recordStructuredObservation({
+        eventType: "execution.blocked",
+        workflow: "execution",
+        source: "agent_tool",
+        component: "execute_plan",
+        toolName: "execute_plan",
+        outcome: "failure",
+        status: "explain_first_missing_thesis",
+        planId,
+        symbol: plan.symbol,
+        reason: thesisReq.reason ?? "User thesis required",
+      });
+      return validateToolOutput(executePlanOutputSchema, {
+        success: false,
+        error: thesisReq.reason ?? "User thesis required before execution.",
+      }, { toolName: "execute_plan" });
+    }
+    const thesis = getUserThesis(planId);
+    if (thesis) {
+      recordStructuredObservation({
+        eventType: "execution.thesis_observed",
+        workflow: "execution",
+        source: "agent_tool",
+        component: "execute_plan",
+        toolName: "execute_plan",
+        outcome: "info",
+        planId,
+        symbol: plan.symbol,
+        details: {
+          thesis: thesis.thesis,
+          divergenceFromRationale: computeThesisDivergence(thesis.thesis, rationale),
+        },
+      });
+    }
 
     // Permission mode gate: block execution for read-only / non-trading modes
     const mode = ctx.config.permissionMode;
@@ -434,6 +485,36 @@ export const executePlanTool = createTool({
         return validateToolOutput(executePlanOutputSchema, {
           success: false,
           error: `Risk kernel rejected this trade: ${riskResult.reason}`,
+        }, { toolName: "execute_plan" });
+      }
+
+      // Risk acknowledgement gate (GORDON_RISK_ACK)
+      const ackResult = verifyAcksFromWarnings(
+        acknowledgedRisks ?? [],
+        riskResult.warnings,
+      );
+      if (!ackResult.ok) {
+        recordStructuredObservation({
+          eventType: "execution.blocked",
+          workflow: "execution",
+          source: "agent_tool",
+          component: "execute_plan",
+          toolName: "execute_plan",
+          outcome: "failure",
+          status: "risk_ack_insufficient",
+          mode: ctx.config.permissionMode,
+          planId,
+          symbol: plan.symbol,
+          reason: ackResult.reason,
+          details: {
+            warnings: riskResult.warnings,
+            providedAcks: acknowledgedRisks ?? [],
+            missingAcks: ackResult.missing,
+          },
+        });
+        return validateToolOutput(executePlanOutputSchema, {
+          success: false,
+          error: ackResult.reason ?? "Risk acknowledgement insufficient.",
         }, { toolName: "execute_plan" });
       }
     } catch (riskErr) {
