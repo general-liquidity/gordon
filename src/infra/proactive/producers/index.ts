@@ -50,17 +50,50 @@ export {
 };
 
 /**
- * Wrap a producer with health tracking. Each call is recorded as a heartbeat
- * (with candidate count), errors are captured to last-error state, and the
- * wrapped producer preserves the original signature. Centralized so adding
- * a producer automatically gets health tracking.
+ * Per-producer wall-clock cap. One slow HTTP fetch (e.g. Finnhub stalling
+ * on watchlist iteration) used to block the entire tick because the engine
+ * awaits each producer sequentially. 15s lets normal RSS scans + multi-
+ * symbol fetches complete; anything past that gets aborted so the next
+ * producer can run.
+ */
+const PRODUCER_TIMEOUT_MS = 15_000;
+
+function runWithTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(
+      () => reject(new Error(`producer ${label} timed out after ${ms}ms`)),
+      ms,
+    );
+    p.then(
+      (v) => {
+        clearTimeout(timer);
+        resolve(v);
+      },
+      (err) => {
+        clearTimeout(timer);
+        reject(err);
+      },
+    );
+  });
+}
+
+/**
+ * Wrap a producer with health tracking + a per-call wall-clock cap. Each
+ * call is recorded as a heartbeat (with candidate count), errors AND
+ * timeouts are captured to last-error state, and the wrapped producer
+ * preserves the original signature. Centralized so adding a producer
+ * automatically gets both health tracking and timeout protection.
  */
 function withHealthTracking(name: string, producer: CandidateProducer): CandidateProducer {
   const tracker = getProducerHealthTracker();
   tracker.registerProducer(name);
   return async (obs): Promise<ProactiveSuggestion[]> => {
     try {
-      const candidates = await producer(obs);
+      const candidates = await runWithTimeout(
+        Promise.resolve(producer(obs)),
+        PRODUCER_TIMEOUT_MS,
+        name,
+      );
       tracker.recordHeartbeat(name, candidates.length);
       return candidates;
     } catch (err) {
@@ -69,6 +102,8 @@ function withHealthTracking(name: string, producer: CandidateProducer): Candidat
     }
   };
 }
+
+export { runWithTimeout, PRODUCER_TIMEOUT_MS };
 
 /**
  * Register all v1 producers with the engine. Returns an unregister function

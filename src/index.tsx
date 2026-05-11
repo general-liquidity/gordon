@@ -195,6 +195,17 @@ async function gracefulShutdown(signal: string, code: number = 0): Promise<void>
   }
 
   try {
+    const { stopProactiveObserver, isObserverRunning } = await import(
+      "./infra/proactive/observer.ts"
+    );
+    if (isObserverRunning()) {
+      stopProactiveObserver();
+    }
+  } catch {
+    // Non-critical — observer may not have been started this session
+  }
+
+  try {
     closeDatabase();
   } catch (error) {
     console.error("Error during shutdown:", error);

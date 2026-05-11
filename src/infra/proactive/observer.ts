@@ -74,6 +74,14 @@ const TICK_INTERVALS = {
 
 const lastTickAt: Partial<Record<keyof typeof TICK_INTERVALS, number>> = {};
 
+const TICK_LOOP_INTERVAL_MS = 60_000;
+// If `setInterval` fires after more than this gap, treat it as a system-
+// wake event (laptop closed for hours, suspend/resume) and reset the
+// schedule rather than dumping every overdue tick into the engine queue
+// at once. Heuristic: > 2× the loop interval = abnormal.
+const CLOCK_JUMP_THRESHOLD_MS = TICK_LOOP_INTERVAL_MS * 2;
+let lastTickLoopAt = 0;
+
 // ============================================================================
 // Start / stop
 // ============================================================================
@@ -132,8 +140,27 @@ export function startProactiveObserver(): { started: boolean; subscriptions: num
   // Periodic tick loop — 60s internal heartbeat that dispatches tick
   // observations when each category's interval elapses
   if (!tickHandle) {
+    lastTickLoopAt = Date.now();
     tickHandle = setInterval(() => {
       const now = Date.now();
+      const sinceLastLoop = now - lastTickLoopAt;
+      lastTickLoopAt = now;
+
+      // Detect system-wake / clock jump (laptop closed, suspend/resume).
+      // Without this guard, every category whose interval elapsed during
+      // the sleep window fires on the same iteration — flooding the
+      // engine queue with stale ticks the moment the user comes back.
+      if (sinceLastLoop > CLOCK_JUMP_THRESHOLD_MS) {
+        logger.info("Detected clock jump — resetting tick schedule", {
+          sinceLastLoopMs: sinceLastLoop,
+          thresholdMs: CLOCK_JUMP_THRESHOLD_MS,
+        });
+        for (const key of Object.keys(TICK_INTERVALS) as Array<keyof typeof TICK_INTERVALS>) {
+          lastTickAt[key] = now;
+        }
+        return;
+      }
+
       for (const [key, interval] of Object.entries(TICK_INTERVALS) as Array<
         [keyof typeof TICK_INTERVALS, number]
       >) {
@@ -147,7 +174,7 @@ export function startProactiveObserver(): { started: boolean; subscriptions: num
         };
         void engine.observe(obs);
       }
-    }, 60_000);
+    }, TICK_LOOP_INTERVAL_MS);
     // Don't let the tick loop keep the process alive
     if (tickHandle.unref) tickHandle.unref();
   }
@@ -194,6 +221,7 @@ export function stopProactiveObserver(): { stopped: boolean; saved: boolean } {
     clearInterval(tickHandle);
     tickHandle = null;
   }
+  lastTickLoopAt = 0;
 
   if (producerUnregister) {
     producerUnregister();
