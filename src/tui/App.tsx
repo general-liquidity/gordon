@@ -64,6 +64,7 @@ import { ThemePicker } from "./components/ThemePicker.js";
 import { ExchangePicker } from "./components/ExchangePicker.js";
 import { BrokerPicker } from "./components/BrokerPicker.js";
 import { DoctorDialog } from "./components/DoctorDialog.js";
+import { runDoctorChecks } from "../infra/diagnostics/doctor.ts";
 import { HelpBrowser } from "./components/HelpBrowser.js";
 import { ConfigEditor } from "./components/ConfigEditor.js";
 import { InvalidConfigDialog } from "./components/InvalidConfigDialog.js";
@@ -1704,12 +1705,7 @@ function AppInner() {
   }
 
   if (showDoctor) {
-    return <DoctorDialog checks={[
-      { id: "llm", label: "LLM Provider", status: "pass", message: "Connected" },
-      { id: "exchange", label: "Exchange", status: "warn", message: "No exchange configured", fixCommand: "/exchange", fixLabel: "Open exchange setup" },
-      { id: "broker", label: "Broker", status: "warn", message: "No broker configured", fixCommand: "/broker", fixLabel: "Open broker setup" },
-      { id: "keyring", label: "Keyring", status: "info", message: "Available but not enabled" },
-    ]} onRunFix={(cmd) => { setShowDoctor(false); handleSubmit(cmd); }} onCancel={() => setShowDoctor(false)} />;
+    return <DoctorDialog checks={runDoctorChecks()} onRunFix={(cmd) => { setShowDoctor(false); handleSubmit(cmd); }} onCancel={() => setShowDoctor(false)} />;
   }
 
   if (showHelpBrowser) {

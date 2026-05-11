@@ -1,0 +1,209 @@
+import { describe, it, expect, beforeEach, afterEach } from "bun:test";
+import { mkdtempSync, rmSync, writeFileSync, existsSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+import { runDoctorChecks, _internal } from "./doctor.ts";
+import { clearCostHalt } from "../platform/costTracker.ts";
+
+const FLAG_BUDGET = "GORDON_COST_BUDGET_USD";
+const ACE_PATH_ENV = "GORDON_ACE_LESSONS_PATH";
+const REVIEW_QUEUE_ENV = "GORDON_EVAL_REVIEW_QUEUE_PATH";
+const FEEDBACK_ENV = "GORDON_AGENT_FEEDBACK_PATH";
+const DB_ENV = "DATABASE_URL";
+const VDB_ENV = "VECTOR_DATABASE_URL";
+
+let tempDir: string;
+
+function setEnv(name: string, value: string): void {
+  process.env[name] = value;
+}
+
+function unsetEnv(name: string): void {
+  delete process.env[name];
+}
+
+beforeEach(() => {
+  tempDir = mkdtempSync(join(tmpdir(), "gordon-doctor-test-"));
+  clearCostHalt();
+});
+
+afterEach(() => {
+  unsetEnv(ACE_PATH_ENV);
+  unsetEnv(REVIEW_QUEUE_ENV);
+  unsetEnv(FEEDBACK_ENV);
+  unsetEnv(DB_ENV);
+  unsetEnv(VDB_ENV);
+  unsetEnv(FLAG_BUDGET);
+  clearCostHalt();
+  if (existsSync(tempDir)) {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+describe("doctor.runDoctorChecks", () => {
+  it("returns an array of checks with required fields", () => {
+    const results = runDoctorChecks();
+    expect(results.length).toBeGreaterThan(5);
+    for (const check of results) {
+      expect(typeof check.id).toBe("string");
+      expect(typeof check.label).toBe("string");
+      expect(["pass", "warn", "fail", "info"]).toContain(check.status);
+      expect(typeof check.message).toBe("string");
+    }
+  });
+
+  it("returns results in a stable order", () => {
+    const a = runDoctorChecks();
+    const b = runDoctorChecks();
+    expect(a.map((c) => c.id)).toEqual(b.map((c) => c.id));
+  });
+});
+
+describe("doctor — safety deny-list check", () => {
+  it("passes when canonical patterns recognized", () => {
+    const check = _internal.checkSafetyDenyList();
+    expect(check.id).toBe("safety-deny-list");
+    expect(check.status).toBe("pass");
+  });
+});
+
+describe("doctor — hot-tier cap check", () => {
+  it("passes at the Hermes default of 2200", () => {
+    const check = _internal.checkHotTierCap();
+    expect(check.id).toBe("hot-tier-cap");
+    expect(check.status).toBe("pass");
+    expect(check.message).toContain("2200");
+  });
+});
+
+describe("doctor — cost halt check", () => {
+  it("passes when not halted", () => {
+    clearCostHalt();
+    const check = _internal.checkCostHaltState();
+    expect(check.status).toBe("pass");
+    expect(check.fixCommand).toBeUndefined();
+  });
+});
+
+describe("doctor — ACE lessons file check", () => {
+  it("returns info when file is missing", () => {
+    setEnv(ACE_PATH_ENV, join(tempDir, "missing.json"));
+    const check = _internal.checkAceLessonsFile();
+    expect(check.id).toBe("ace-lessons");
+    expect(check.status).toBe("info");
+  });
+
+  it("passes when file is valid JSON with lessons array", () => {
+    const path = join(tempDir, "ace-lessons.json");
+    writeFileSync(path, JSON.stringify({ version: 1, lessons: [{ id: "a" }, { id: "b" }] }));
+    setEnv(ACE_PATH_ENV, path);
+    const check = _internal.checkAceLessonsFile();
+    expect(check.status).toBe("pass");
+    expect(check.message).toContain("2 lessons");
+  });
+
+  it("warns when file is valid JSON but missing lessons array", () => {
+    const path = join(tempDir, "ace-lessons.json");
+    writeFileSync(path, JSON.stringify({ version: 1 }));
+    setEnv(ACE_PATH_ENV, path);
+    const check = _internal.checkAceLessonsFile();
+    expect(check.status).toBe("warn");
+  });
+
+  it("fails when file is unparseable", () => {
+    const path = join(tempDir, "ace-lessons.json");
+    writeFileSync(path, "{not valid json");
+    setEnv(ACE_PATH_ENV, path);
+    const check = _internal.checkAceLessonsFile();
+    expect(check.status).toBe("fail");
+  });
+});
+
+describe("doctor — JSONL integrity check", () => {
+  it("returns info when file is missing", () => {
+    const check = _internal.checkJsonlIntegrity(
+      "test-id",
+      "Test label",
+      join(tempDir, "missing.jsonl"),
+      "Nothing yet.",
+    );
+    expect(check.status).toBe("info");
+    expect(check.message).toContain("Nothing yet.");
+  });
+
+  it("passes when all lines parse", () => {
+    const path = join(tempDir, "good.jsonl");
+    writeFileSync(path, '{"a":1}\n{"b":2}\n{"c":3}\n');
+    const check = _internal.checkJsonlIntegrity("test", "Test", path, "missing");
+    expect(check.status).toBe("pass");
+    expect(check.message).toContain("3 entries");
+  });
+
+  it("warns when some lines malformed", () => {
+    const path = join(tempDir, "mixed.jsonl");
+    writeFileSync(path, '{"a":1}\nthis is not json\n{"c":3}\n');
+    const check = _internal.checkJsonlIntegrity("test", "Test", path, "missing");
+    expect(check.status).toBe("warn");
+    expect(check.message).toContain("malformed");
+  });
+
+  it("ignores blank lines", () => {
+    const path = join(tempDir, "blank.jsonl");
+    writeFileSync(path, '{"a":1}\n\n\n{"c":3}\n');
+    const check = _internal.checkJsonlIntegrity("test", "Test", path, "missing");
+    expect(check.status).toBe("pass");
+    expect(check.message).toContain("2 entries");
+  });
+});
+
+describe("doctor — Mastra/vector storage checks", () => {
+  it("Mastra storage check returns info when file missing", () => {
+    setEnv(DB_ENV, `file:${join(tempDir, "nope.db")}`);
+    const check = _internal.checkMastraStorage();
+    expect(check.id).toBe("mastra-db");
+    expect(check.status).toBe("info");
+  });
+
+  it("Mastra storage check passes for present non-empty file", () => {
+    const path = join(tempDir, "gordon.db");
+    writeFileSync(path, "fake sqlite content");
+    setEnv(DB_ENV, `file:${path}`);
+    const check = _internal.checkMastraStorage();
+    expect(check.status).toBe("pass");
+  });
+
+  it("Mastra storage check warns when file exists but empty", () => {
+    const path = join(tempDir, "empty.db");
+    writeFileSync(path, "");
+    setEnv(DB_ENV, `file:${path}`);
+    const check = _internal.checkMastraStorage();
+    expect(check.status).toBe("warn");
+  });
+
+  it("Vector storage check returns info when missing", () => {
+    setEnv(VDB_ENV, `file:${join(tempDir, "nope-vec.db")}`);
+    const check = _internal.checkVectorStorage();
+    expect(check.id).toBe("vector-db");
+    expect(check.status).toBe("info");
+  });
+
+  it("path resolvers strip the file: prefix", () => {
+    setEnv(DB_ENV, `file:${join(tempDir, "x.db")}`);
+    setEnv(VDB_ENV, `file:${join(tempDir, "y.db")}`);
+    expect(_internal.resolveMastraStoragePath()).toBe(join(tempDir, "x.db"));
+    expect(_internal.resolveVectorStoragePath()).toBe(join(tempDir, "y.db"));
+  });
+});
+
+describe("doctor — cache-read pressure check", () => {
+  it("returns info when no calls recorded yet", () => {
+    // Default tracker state has no calls — this test runs against the
+    // singleton, so its status is "info" or "pass" depending on
+    // whether any test earlier in the run recorded a call. Tolerate
+    // both — the assertion is that it doesn't fail outright.
+    const check = _internal.checkCacheReadPressure();
+    expect(check.id).toBe("cache-read-pressure");
+    expect(["pass", "info"]).toContain(check.status);
+  });
+});
