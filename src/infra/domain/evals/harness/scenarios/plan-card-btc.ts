@@ -21,6 +21,7 @@ import type { EvalScenario } from "../types.ts";
 export const planCardBtc: EvalScenario = {
   id: "plan-card-btc",
   tags: ["plan-card", "btc", "conditional-entry"],
+  category: "planning",
   systemPrompt: [
     "You are Gordon, an institutional-grade trading agent.",
     "When asked to create a trade plan, you produce structured plans with:",

@@ -14,11 +14,22 @@
  * tolerate more noise from the judge.
  */
 
+import { appendToReviewQueue, defaultReviewQueuePath } from "./reviewQueue.ts";
+import type { ReviewQueueEntry } from "./reviewQueue.ts";
 import type { RegressionReport, VariantRunResult } from "./types.ts";
 
 export interface DetectOptions {
   /** Minimum score drop (baseline - candidate) to count as a regression. Default 0.05. */
   toleranceDelta?: number;
+  /**
+   * When set, regressions are also appended to the review queue (a
+   * local JSONL file at `~/.gordon/eval-failures.jsonl` by default).
+   * Borrowed from CREAO Harness: a score with no ticket is dashboard
+   * noise. Pass `true` for the default path, or a custom path string.
+   */
+  writeReviewQueue?: boolean | string;
+  /** Optional metadata stamped onto each review-queue entry. */
+  reviewQueueMetadata?: Record<string, string | number | boolean>;
 }
 
 /**
@@ -67,6 +78,23 @@ export function detectRegressions(
   // Sort: worst regressions first, biggest improvements first.
   regressions.sort((a, b) => a.delta - b.delta);
   improvements.sort((a, b) => b.delta - a.delta);
+
+  if (options.writeReviewQueue && regressions.length > 0) {
+    const path =
+      typeof options.writeReviewQueue === "string"
+        ? options.writeReviewQueue
+        : defaultReviewQueuePath();
+    const entries: ReviewQueueEntry[] = regressions.map((r) => ({
+      scenarioId: r.scenarioId,
+      baselineLabel: baseline.variantLabel,
+      candidateLabel: candidate.variantLabel,
+      baselineScore: r.baselineScore,
+      candidateScore: r.candidateScore,
+      delta: r.delta,
+      metadata: options.reviewQueueMetadata,
+    }));
+    appendToReviewQueue(entries, path);
+  }
 
   return {
     baselineLabel: baseline.variantLabel,

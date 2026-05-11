@@ -26,6 +26,7 @@ import { createLLMClientFromEnv } from "../../../ai/llm/client.ts";
 import type { LLMClient } from "../../../ai/llm/client.ts";
 import type { Message } from "../../../ai/llm/types.ts";
 import { createModuleLogger } from "../../../logger/index.ts";
+import { getCategoryRubric } from "./categoryRubrics.ts";
 import type {
   EvalScenario,
   EvalTrajectory,
@@ -151,7 +152,7 @@ export async function judgeTrajectories(
   };
 }
 
-function buildJudgePrompt(
+export function buildJudgePrompt(
   scenario: EvalScenario,
   trajectories: ReadonlyArray<EvalTrajectory>,
 ): string {
@@ -161,10 +162,21 @@ function buildJudgePrompt(
     "Rank the trajectories below from best to worst based on how well each follows the agent's system prompt and answers the user input. Return JSON only.",
   );
   lines.push("");
+  lines.push("# Grading principle");
+  lines.push(
+    "Focus on OUTPUT QUALITY, not path efficiency. Different trajectories may take different paths to the same goal — that is fine. Score based on whether the final answer satisfies the user's request and the rubric, not on whether the path was the most direct. Penalize unusual paths ONLY when they degrade the final answer.",
+  );
+  lines.push("");
   lines.push("# Agent system prompt (the rubric)");
   lines.push("```");
   lines.push(scenario.systemPrompt);
   lines.push("```");
+  const categoryRubric = getCategoryRubric(scenario.category);
+  if (categoryRubric) {
+    lines.push("");
+    lines.push(`# Category rubric — ${scenario.category}`);
+    lines.push(categoryRubric);
+  }
   if (scenario.extraRubric) {
     lines.push("");
     lines.push("# Extra evaluation criteria");
@@ -279,8 +291,19 @@ function errMessage(err: unknown): string {
 export interface MockJudgeOptions {
   /** Map from scenarioId → array of (trajId, score). */
   responses: Record<string, Array<{ id: string; score: number; explanation?: string }>>;
+  /**
+   * Optional per-model overrides. When the judge call's `config.model`
+   * appears in this map, those responses win over the default ones.
+   * Used by panel tests to differentiate per-judge scores.
+   */
+  byModel?: Record<
+    string,
+    Record<string, Array<{ id: string; score: number; explanation?: string }>>
+  >;
   /** Set true to make the mock throw on call. */
   throwOnCall?: boolean;
+  /** Set to throw only when the call's model matches this string. */
+  throwForModel?: string;
 }
 
 /**
@@ -292,21 +315,20 @@ export function buildMockJudgeClient(options: MockJudgeOptions): LLMClient {
     chatWithJSON: async <T>(
       messages: Message[],
       _schema: z.ZodSchema<T>,
-      _config?: unknown,
+      config?: unknown,
     ): Promise<T> => {
+      const model = (config as { model?: string } | undefined)?.model;
       if (options.throwOnCall) {
         throw new Error("mock judge: configured to throw");
       }
-      // Extract scenarioId from the user message; tests embed it as
-      // a fenced block via buildJudgePrompt. We just look up by the
-      // first response set we have.
+      if (options.throwForModel && model === options.throwForModel) {
+        throw new Error(`mock judge: configured to throw for model ${model}`);
+      }
       const userMsg = messages.find((m) => m.role === "user")?.content ?? "";
-      const scenarioKey = Object.keys(options.responses).find((k) =>
-        userMsg.includes(k),
-      );
-      const set = scenarioKey
-        ? options.responses[scenarioKey]
-        : Object.values(options.responses)[0];
+      const modelMap = model && options.byModel ? options.byModel[model] : undefined;
+      const sourceMap = modelMap ?? options.responses;
+      const scenarioKey = Object.keys(sourceMap).find((k) => userMsg.includes(k));
+      const set = scenarioKey ? sourceMap[scenarioKey] : Object.values(sourceMap)[0];
       if (!set) throw new Error("mock judge: no responses configured");
       const payload = {
         scores: set.map((s) => ({

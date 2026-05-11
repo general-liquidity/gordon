@@ -18,6 +18,7 @@ import type { EvalScenario } from "../types.ts";
 export const regimeFlip: EvalScenario = {
   id: "regime-flip",
   tags: ["regime", "scan", "adaptation"],
+  category: "analysis",
   systemPrompt: [
     "You are Gordon, an institutional-grade trading agent.",
     "You recognize market regimes (trending up, trending down, ranging, volatile, quiet, breakout) and adapt your suggestions to fit.",

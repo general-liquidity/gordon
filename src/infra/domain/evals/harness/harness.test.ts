@@ -1,13 +1,24 @@
-import { describe, it, expect } from "bun:test";
+import { describe, it, expect, afterEach } from "bun:test";
+import { mkdtempSync, rmSync, existsSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
+  ALL_CATEGORIES,
   ALL_SCENARIOS,
   ALL_SCENARIO_IDS,
+  appendToReviewQueue,
+  buildJudgePrompt,
   buildMockJudgeClient,
+  CATEGORY_RUBRICS,
+  DEFAULT_PANEL,
   detectRegressions,
   formatRegressionReport,
+  getCategoryRubric,
   getScenarioById,
   judgeTrajectories,
+  judgeTrajectoriesPanel,
   planCardBtc,
+  readReviewQueue,
   regimeFlip,
   riskGate,
   runEvalSuite,
@@ -348,5 +359,397 @@ describe("detectRegressions", () => {
     const report = detectRegressions(baseline, candidate);
     const formatted = formatRegressionReport(report);
     expect(formatted).toContain("PASS");
+  });
+});
+
+describe("category rubrics", () => {
+  it("ships the 6 trading categories", () => {
+    expect(ALL_CATEGORIES.length).toBe(6);
+    expect(ALL_CATEGORIES).toContain("planning");
+    expect(ALL_CATEGORIES).toContain("analysis");
+    expect(ALL_CATEGORIES).toContain("recovery");
+  });
+
+  it("every category has a non-empty rubric", () => {
+    for (const c of ALL_CATEGORIES) {
+      const rubric = CATEGORY_RUBRICS[c];
+      expect(rubric.length).toBeGreaterThan(50);
+      expect(rubric).toContain("Red flags");
+      expect(rubric).toContain("Good signals");
+    }
+  });
+
+  it("getCategoryRubric resolves known categories and returns undefined for unset", () => {
+    expect(getCategoryRubric("planning")).toBe(CATEGORY_RUBRICS.planning);
+    expect(getCategoryRubric(undefined)).toBeUndefined();
+  });
+
+  it("each shipped scenario declares a category", () => {
+    for (const s of ALL_SCENARIOS) {
+      expect(s.category).toBeDefined();
+      expect(ALL_CATEGORIES).toContain(s.category!);
+    }
+  });
+
+  it("buildJudgePrompt injects the category rubric when category is set", () => {
+    const scenario: EvalScenario = {
+      id: "cat-test",
+      tags: [],
+      category: "planning",
+      systemPrompt: "agent prompt body",
+      userInput: "user wants a plan",
+    };
+    const trajectories: EvalTrajectory[] = [
+      { id: "a", messages: [{ role: "assistant", content: "x" }] },
+      { id: "b", messages: [{ role: "assistant", content: "y" }] },
+    ];
+    const prompt = buildJudgePrompt(scenario, trajectories);
+    expect(prompt).toContain("Category rubric — planning");
+    expect(prompt).toContain("**Planning rubric**");
+  });
+
+  it("buildJudgePrompt omits category rubric when category is unset", () => {
+    const scenario: EvalScenario = {
+      id: "no-cat",
+      tags: [],
+      systemPrompt: "agent prompt",
+      userInput: "user input",
+    };
+    const trajectories: EvalTrajectory[] = [
+      { id: "a", messages: [{ role: "assistant", content: "x" }] },
+      { id: "b", messages: [{ role: "assistant", content: "y" }] },
+    ];
+    const prompt = buildJudgePrompt(scenario, trajectories);
+    expect(prompt).not.toContain("Category rubric");
+  });
+
+  it("buildJudgePrompt embeds the outcome-over-trajectory framing", () => {
+    const scenario: EvalScenario = {
+      id: "framing",
+      tags: [],
+      systemPrompt: "x",
+      userInput: "y",
+    };
+    const trajectories: EvalTrajectory[] = [
+      { id: "a", messages: [{ role: "assistant", content: "x" }] },
+      { id: "b", messages: [{ role: "assistant", content: "y" }] },
+    ];
+    const prompt = buildJudgePrompt(scenario, trajectories);
+    expect(prompt).toContain("OUTPUT QUALITY, not path efficiency");
+  });
+});
+
+describe("judgeTrajectoriesPanel", () => {
+  const scenario: EvalScenario = {
+    id: "panel-test",
+    tags: [],
+    systemPrompt: "be helpful",
+    userInput: "hello",
+  };
+
+  function makeTraj(id: string, content: string): EvalTrajectory {
+    return {
+      id,
+      messages: [{ role: "assistant", content }],
+    };
+  }
+
+  it("ships a 3-judge default panel from 3 families", () => {
+    expect(DEFAULT_PANEL.length).toBe(3);
+    expect(DEFAULT_PANEL.some((m) => m.startsWith("anthropic/"))).toBe(true);
+    expect(DEFAULT_PANEL.some((m) => m.startsWith("openai/"))).toBe(true);
+    expect(DEFAULT_PANEL.some((m) => m.startsWith("google/"))).toBe(true);
+  });
+
+  it("averages scores across surviving judges", async () => {
+    // Same response per judge — verifies the averaging mechanic returns
+    // the expected mean (which equals the single-judge value here).
+    const client = buildMockJudgeClient({
+      responses: {
+        "panel-test": [
+          { id: "a", score: 0.6 },
+          { id: "b", score: 0.4 },
+        ],
+      },
+    });
+    const result = await judgeTrajectoriesPanel(
+      {
+        scenario,
+        trajectories: [makeTraj("a", "x"), makeTraj("b", "y")],
+      },
+      { client, panel: ["anthropic/test", "openai/test", "google/test"] },
+    );
+    expect(result.quorum).toBe(3);
+    expect(result.panel.length).toBe(3);
+    expect(result.consensus.length).toBe(2);
+    const aRow = result.consensus.find((c) => c.id === "a")!;
+    expect(aRow.score).toBeCloseTo(0.6, 3);
+    expect(aRow.rank).toBe(1);
+  });
+
+  it("differentiates scores per model via byModel and averages", async () => {
+    const client = buildMockJudgeClient({
+      responses: {
+        "panel-test": [{ id: "a", score: 0.5 }, { id: "b", score: 0.5 }],
+      },
+      byModel: {
+        "anthropic/test": {
+          "panel-test": [{ id: "a", score: 0.9 }, { id: "b", score: 0.2 }],
+        },
+        "openai/test": {
+          "panel-test": [{ id: "a", score: 0.8 }, { id: "b", score: 0.3 }],
+        },
+        "google/test": {
+          "panel-test": [{ id: "a", score: 0.7 }, { id: "b", score: 0.4 }],
+        },
+      },
+    });
+    const result = await judgeTrajectoriesPanel(
+      {
+        scenario,
+        trajectories: [makeTraj("a", "x"), makeTraj("b", "y")],
+      },
+      { client, panel: ["anthropic/test", "openai/test", "google/test"] },
+    );
+    expect(result.quorum).toBe(3);
+    const aRow = result.consensus.find((c) => c.id === "a")!;
+    const bRow = result.consensus.find((c) => c.id === "b")!;
+    expect(aRow.score).toBeCloseTo((0.9 + 0.8 + 0.7) / 3, 3);
+    expect(bRow.score).toBeCloseTo((0.2 + 0.3 + 0.4) / 3, 3);
+    expect(aRow.rank).toBe(1);
+    expect(bRow.rank).toBe(2);
+    // Explanation should mention each judge model.
+    expect(aRow.explanation).toContain("anthropic/test");
+    expect(aRow.explanation).toContain("openai/test");
+  });
+
+  it("drops a failing judge and proceeds with quorum-1", async () => {
+    const client = buildMockJudgeClient({
+      responses: {
+        "panel-test": [{ id: "a", score: 0.7 }, { id: "b", score: 0.3 }],
+      },
+      throwForModel: "openai/test",
+    });
+    const result = await judgeTrajectoriesPanel(
+      {
+        scenario,
+        trajectories: [makeTraj("a", "x"), makeTraj("b", "y")],
+      },
+      { client, panel: ["anthropic/test", "openai/test", "google/test"] },
+    );
+    expect(result.quorum).toBe(2);
+    expect(result.panel.length).toBe(3);
+    const failedEntry = result.panel.find((p) => p.judgeModel === "openai/test")!;
+    expect(failedEntry.failed).toBeDefined();
+    // Consensus still produced.
+    const aRow = result.consensus.find((c) => c.id === "a")!;
+    expect(aRow.score).toBeCloseTo(0.7, 3);
+  });
+
+  it("returns fallback consensus when every judge fails", async () => {
+    const client = buildMockJudgeClient({
+      responses: {},
+      throwOnCall: true,
+    });
+    const result = await judgeTrajectoriesPanel(
+      {
+        scenario,
+        trajectories: [makeTraj("a", "x"), makeTraj("b", "y")],
+      },
+      { client, panel: ["x/1", "x/2", "x/3"] },
+    );
+    expect(result.quorum).toBe(0);
+    expect(result.consensus.every((c) => c.score === 0.5)).toBe(true);
+    expect(result.panel.every((p) => p.failed)).toBe(true);
+  });
+
+  it("returns empty result for zero trajectories", async () => {
+    const result = await judgeTrajectoriesPanel({
+      scenario,
+      trajectories: [],
+    });
+    expect(result.consensus).toEqual([]);
+    expect(result.panel).toEqual([]);
+  });
+
+  it("runEvalSuite routes through panel when panelOptions is set", async () => {
+    const client = buildMockJudgeClient({
+      responses: {
+        "plan-card-btc": [
+          { id: "good", score: 0.9 },
+          { id: "bad", score: 0.2 },
+        ],
+        "regime-flip": [
+          { id: "good", score: 0.85 },
+          { id: "bad", score: 0.3 },
+        ],
+        "risk-gate": [
+          { id: "good", score: 0.95 },
+          { id: "bad", score: 0.15 },
+        ],
+      },
+    });
+    function buildVariant(label: string): RunVariantInput {
+      const map = new Map<string, EvalTrajectory>();
+      for (const s of ALL_SCENARIOS) {
+        map.set(s.id, {
+          id: label,
+          messages: [{ role: "assistant", content: `${label} for ${s.id}` }],
+        });
+      }
+      return { variantLabel: label, trajectoriesByScenario: map };
+    }
+    const result = await runEvalSuite({
+      scenarios: ALL_SCENARIOS,
+      variants: [buildVariant("good"), buildVariant("bad")],
+      panelOptions: { client, panel: ["a/1", "a/2"] },
+    });
+    expect(result.results.length).toBe(2);
+    const good = result.results.find((r) => r.variantLabel === "good")!;
+    expect(good.judgeModel.startsWith("panel(")).toBe(true);
+    expect(good.aggregate).toBeGreaterThan(0.8);
+  });
+});
+
+describe("review queue", () => {
+  let tmpDir: string | undefined;
+  const cleanup: string[] = [];
+
+  afterEach(() => {
+    for (const d of cleanup) {
+      try {
+        rmSync(d, { recursive: true, force: true });
+      } catch {
+        // Best-effort cleanup.
+      }
+    }
+    cleanup.length = 0;
+    tmpDir = undefined;
+  });
+
+  function tmpPath(): string {
+    tmpDir = mkdtempSync(join(tmpdir(), "gordon-eval-queue-"));
+    cleanup.push(tmpDir);
+    return join(tmpDir, "queue.jsonl");
+  }
+
+  it("appendToReviewQueue creates the file and writes JSONL", () => {
+    const path = tmpPath();
+    const result = appendToReviewQueue(
+      [
+        {
+          scenarioId: "x",
+          baselineLabel: "b",
+          candidateLabel: "c",
+          baselineScore: 0.8,
+          candidateScore: 0.5,
+          delta: -0.3,
+        },
+      ],
+      path,
+    );
+    expect(result.written).toBe(1);
+    expect(existsSync(path)).toBe(true);
+  });
+
+  it("appendToReviewQueue is idempotent and appends, not overwrites", () => {
+    const path = tmpPath();
+    appendToReviewQueue(
+      [
+        {
+          scenarioId: "x",
+          baselineLabel: "b",
+          candidateLabel: "c",
+          baselineScore: 0.8,
+          candidateScore: 0.5,
+          delta: -0.3,
+        },
+      ],
+      path,
+    );
+    appendToReviewQueue(
+      [
+        {
+          scenarioId: "y",
+          baselineLabel: "b",
+          candidateLabel: "c",
+          baselineScore: 0.7,
+          candidateScore: 0.4,
+          delta: -0.3,
+        },
+      ],
+      path,
+    );
+    const back = readReviewQueue(path);
+    expect(back.length).toBe(2);
+    // readReviewQueue returns newest-first.
+    expect(back[0]?.scenarioId).toBe("y");
+    expect(back[1]?.scenarioId).toBe("x");
+  });
+
+  it("appendToReviewQueue handles empty input gracefully", () => {
+    const path = tmpPath();
+    const result = appendToReviewQueue([], path);
+    expect(result.written).toBe(0);
+    expect(existsSync(path)).toBe(false);
+  });
+
+  it("readReviewQueue returns [] when file is missing", () => {
+    const back = readReviewQueue(join(tmpdir(), "definitely-not-a-real-eval-queue.jsonl"));
+    expect(back).toEqual([]);
+  });
+
+  it("detectRegressions writes to the queue when writeReviewQueue is a path", () => {
+    const path = tmpPath();
+    const baseline: VariantRunResult = {
+      variantLabel: "baseline",
+      judgeModel: "test",
+      ranAt: "2026-05-11T00:00:00Z",
+      perScenario: [
+        { scenarioId: "x", score: 0.9, rank: 1, explanation: "" },
+      ],
+      aggregate: 0.9,
+      winCount: 1,
+      scenarioCount: 1,
+    };
+    const candidate: VariantRunResult = {
+      ...baseline,
+      variantLabel: "candidate",
+      perScenario: [
+        { scenarioId: "x", score: 0.4, rank: 1, explanation: "" },
+      ],
+      aggregate: 0.4,
+    };
+    const report = detectRegressions(baseline, candidate, {
+      writeReviewQueue: path,
+      reviewQueueMetadata: { promptHash: "abc123" },
+    });
+    expect(report.hasBlockingRegression).toBe(true);
+    const back = readReviewQueue(path);
+    expect(back.length).toBe(1);
+    expect(back[0]?.scenarioId).toBe("x");
+    expect(back[0]?.delta).toBeCloseTo(-0.5, 3);
+    expect(back[0]?.metadata?.promptHash).toBe("abc123");
+  });
+
+  it("detectRegressions does NOT write when there are no regressions", () => {
+    const path = tmpPath();
+    const baseline: VariantRunResult = {
+      variantLabel: "baseline",
+      judgeModel: "test",
+      ranAt: "2026-05-11T00:00:00Z",
+      perScenario: [{ scenarioId: "x", score: 0.5, rank: 1, explanation: "" }],
+      aggregate: 0.5,
+      winCount: 1,
+      scenarioCount: 1,
+    };
+    const candidate: VariantRunResult = {
+      ...baseline,
+      variantLabel: "candidate",
+      perScenario: [{ scenarioId: "x", score: 0.55, rank: 1, explanation: "" }],
+      aggregate: 0.55,
+    };
+    detectRegressions(baseline, candidate, { writeReviewQueue: path });
+    expect(existsSync(path)).toBe(false);
   });
 });

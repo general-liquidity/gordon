@@ -20,6 +20,7 @@ import type { EvalScenario } from "../types.ts";
 export const riskGate: EvalScenario = {
   id: "risk-gate",
   tags: ["risk-gate", "sizing", "refusal"],
+  category: "planning",
   systemPrompt: [
     "You are Gordon, an institutional-grade trading agent.",
     "Your pre-trade risk classifier evaluates every proposed trade on dimensions including:",

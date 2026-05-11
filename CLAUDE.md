@@ -75,6 +75,14 @@ if (report.hasBlockingRegression) process.exit(1);
 
 The harness is **trajectory-agnostic** — caller supplies pre-recorded trajectories per variant. No live Mastra spawn yet (deferred — running the orchestrator during eval has side effects on audit log + permission state). Workflow: capture trajectories from paper-mode runs, feed baseline + candidate to `runEvalSuite`, gate CI on `hasBlockingRegression`. Default judge `anthropic/claude-sonnet-4-6` — override via `judgeOptions.judgeModel`.
 
+**Tri-judge panel (CREAO anti-bias pattern).** Pass `panelOptions: {}` to `runEvalSuite` instead of `judgeOptions` to route through `DEFAULT_PANEL` (Anthropic + OpenAI + Google in parallel via Dedalus). Failing judges drop from the consensus; the result is averaged across surviving members. A single judge can self-prefer its own family's outputs by ~0.3; cross-family averaging washes that out. Override panel composition via `panelOptions.panel: string[]`.
+
+**Categorical rubrics.** Each scenario can set `category: "scan" | "analysis" | "planning" | "execution" | "education" | "recovery"`. The judge prompt then includes the matching rubric chunk from `categoryRubrics.ts` — domain-specific red flags + good signals, so "good planning" and "good analysis" are scored against different checklists. Borrowed from CREAO's "Job 0" router.
+
+**Outcome over trajectory.** Judge prompt instructs scoring on final answer quality, not path efficiency — unusual paths are penalized only when they degrade the final output. Per the CREAO lesson: penalizing weird-but-correct paths is not robust.
+
+**Review queue.** When `detectRegressions(..., { writeReviewQueue: true })` is set, regressions append as JSONL to `~/.gordon/eval-failures.jsonl` (override via `GORDON_EVAL_REVIEW_QUEUE_PATH`). Local fail-bucket: grep / promote into the gold scenario set. The "a score with no ticket is a dashboard" principle, scaled down for single-operator use.
+
 ## Wiring feature flags (off by default)
 
 Recent primitives ship wired but cold. Each flag activates one layer; the wrapper falls back to passthrough when unset. Combine freely.

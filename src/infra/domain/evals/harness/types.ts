@@ -16,6 +16,22 @@
 import type { Message } from "../../../ai/llm/types.ts";
 
 /**
+ * Eval category — borrowed from CREAO's "Job 0 Categorical Router". The
+ * judge sees a category-conditioned rubric so a "good planning answer"
+ * and a "good analysis answer" are evaluated against different red flags.
+ *
+ * Compressed from CREAO's 12 to Gordon's 6: trading agents don't span
+ * creative-writing / app-building / etc.
+ */
+export type EvalCategory =
+  | "scan"
+  | "analysis"
+  | "planning"
+  | "execution"
+  | "education"
+  | "recovery";
+
+/**
  * A scenario is a fixed test case: system prompt + user input + tags.
  * Hand-curated and version-controlled — these define what "good
  * behavior" means for Gordon. Initial set is small; grow as evidence
@@ -36,6 +52,8 @@ export interface EvalScenario {
   notes?: string;
   /** Optional explicit rubric the judge layers ON TOP OF the system prompt. */
   extraRubric?: string;
+  /** Optional eval category — drives category-conditioned rubric. */
+  category?: EvalCategory;
 }
 
 /**
@@ -81,6 +99,35 @@ export interface JudgeRequest {
   judgeModel?: string;
   /** When true, prefix each trajectory's content with its id in the prompt. */
   includeIds?: boolean;
+}
+
+/**
+ * Per-judge entry in a panel result. `failed` is set when the judge
+ * call threw or returned malformed JSON; that judge is dropped from
+ * the consensus average.
+ */
+export interface PanelJudgeEntry {
+  judgeModel: string;
+  scored: ReadonlyArray<ScoredTrajectory>;
+  durationMs: number;
+  failed?: { reason: string };
+}
+
+/**
+ * Tri-judge panel result — borrowed from CREAO's anti-bias setup. Runs
+ * N judges from different model families concurrently, averages
+ * surviving scores. Consensus is the mean across surviving judges.
+ */
+export interface PanelJudgeResult {
+  scenarioId: string;
+  /** One entry per panel member, including failed ones (for audit). */
+  panel: ReadonlyArray<PanelJudgeEntry>;
+  /** Consensus ranking — average score across surviving judges. */
+  consensus: ReadonlyArray<ScoredTrajectory>;
+  /** Number of judges that returned a usable score. */
+  quorum: number;
+  /** Wall-clock from kickoff to last judge return (ms). */
+  durationMs: number;
 }
 
 /**

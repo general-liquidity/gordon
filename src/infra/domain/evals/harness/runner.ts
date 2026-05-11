@@ -18,6 +18,8 @@
 
 import { judgeTrajectories } from "./trajectoryJudge.ts";
 import type { JudgeOptions } from "./trajectoryJudge.ts";
+import { judgeTrajectoriesPanel } from "./panelJudge.ts";
+import type { PanelJudgeOptions } from "./panelJudge.ts";
 import type { EvalScenario, EvalTrajectory, VariantRunResult } from "./types.ts";
 
 export interface RunVariantInput {
@@ -40,6 +42,13 @@ export interface RunSuiteInput {
   /** At least 2 variants required for relative ranking to be meaningful. */
   variants: ReadonlyArray<RunVariantInput>;
   judgeOptions?: JudgeOptions;
+  /**
+   * When set, runner uses the tri-judge panel instead of a single judge.
+   * Pass `{}` to use `DEFAULT_PANEL`, or `{ panel: [...] }` to override
+   * the panel composition. Quorum (number of surviving judges) is
+   * carried into `VariantRunResult.perScenario[].quorum`.
+   */
+  panelOptions?: PanelJudgeOptions;
 }
 
 export interface RunSuiteResult {
@@ -89,21 +98,41 @@ export async function runEvalSuite(input: RunSuiteInput): Promise<RunSuiteResult
       continue;
     }
 
-    const judgeResult = await judgeTrajectories(
-      { scenario, trajectories },
-      input.judgeOptions,
-    );
-    judgeModelSeen = judgeResult.judgeModel;
-
-    for (const scored of judgeResult.scored) {
-      const bucket = perVariantScenarios.get(scored.id);
-      if (!bucket) continue;
-      bucket.push({
-        scenarioId: scenario.id,
-        score: scored.score,
-        rank: scored.rank,
-        explanation: scored.explanation,
-      });
+    if (input.panelOptions) {
+      const panelResult = await judgeTrajectoriesPanel(
+        { scenario, trajectories },
+        input.panelOptions,
+      );
+      judgeModelSeen =
+        panelResult.panel.length > 0
+          ? `panel(${panelResult.panel.map((p) => p.judgeModel).join(",")})`
+          : "panel(empty)";
+      for (const scored of panelResult.consensus) {
+        const bucket = perVariantScenarios.get(scored.id);
+        if (!bucket) continue;
+        bucket.push({
+          scenarioId: scenario.id,
+          score: scored.score,
+          rank: scored.rank,
+          explanation: scored.explanation,
+        });
+      }
+    } else {
+      const judgeResult = await judgeTrajectories(
+        { scenario, trajectories },
+        input.judgeOptions,
+      );
+      judgeModelSeen = judgeResult.judgeModel;
+      for (const scored of judgeResult.scored) {
+        const bucket = perVariantScenarios.get(scored.id);
+        if (!bucket) continue;
+        bucket.push({
+          scenarioId: scenario.id,
+          score: scored.score,
+          rank: scored.rank,
+          explanation: scored.explanation,
+        });
+      }
     }
   }
 
