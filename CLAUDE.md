@@ -58,6 +58,23 @@ Persistent memory lives at `~/.claude/projects/C--Users-adria-Downloads-gordon-c
 - **Routing agent:** Don't over-prompt. Adding "Routing Rules" to GORDON_INSTRUCTIONS breaks tool-call routing — Mastra's built-in routing prompt does it correctly.
 - **Sub-agents:** Mastra hardcodes `lastMessages: 0` for sub-agents — patched to 10 via `scripts/patches/patch-mastra.cjs`. Sub-agents need `workingMemory: { enabled: false }` to prevent `updateWorkingMemory` injection crash.
 
+## Eval harness
+
+`src/infra/domain/evals/harness/` — RULER-pattern LLM-as-judge for agent quality. Three hand-curated scenarios shipped (plan-card-btc / regime-flip / risk-gate); grow as production traces surface failure modes. Distinct from `evals/tradeEvaluator.ts` which scores realized PnL after-the-fact.
+
+```ts
+import { runEvalSuite, detectRegressions, ALL_SCENARIOS } from "./infra/domain/evals/harness";
+
+const result = await runEvalSuite({
+  scenarios: ALL_SCENARIOS,
+  variants: [baselineTrajectories, candidateTrajectories],
+});
+const report = detectRegressions(result.results[0], result.results[1]);
+if (report.hasBlockingRegression) process.exit(1);
+```
+
+The harness is **trajectory-agnostic** — caller supplies pre-recorded trajectories per variant. No live Mastra spawn yet (deferred — running the orchestrator during eval has side effects on audit log + permission state). Workflow: capture trajectories from paper-mode runs, feed baseline + candidate to `runEvalSuite`, gate CI on `hasBlockingRegression`. Default judge `anthropic/claude-sonnet-4-6` — override via `judgeOptions.judgeModel`.
+
 ## Wiring feature flags (off by default)
 
 Recent primitives ship wired but cold. Each flag activates one layer; the wrapper falls back to passthrough when unset. Combine freely.
