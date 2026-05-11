@@ -80,3 +80,59 @@ export {
   withReadOnlyFallback,
 } from "./localFallback.ts";
 export type { ProviderHealth, FallbackEnvelope } from "./localFallback.ts";
+
+// Asset-class inference helper (shared by anti-rot gates)
+export { inferAssetClassFromVenue } from "./assetClassInference.ts";
+export type { InferredAssetClass } from "./assetClassInference.ts";
+
+// Trading universe scope sentinel
+export {
+  EMPTY_UNIVERSE,
+  isUniverseEnabled,
+  defaultUniversePath,
+  loadUniverse,
+  saveUniverse,
+  checkUniverse,
+} from "./tradingUniverse.ts";
+export type {
+  TradingUniverse,
+  UniverseCheckInput,
+  UniverseCheckResult,
+} from "./tradingUniverse.ts";
+
+// Portfolio coherence vs. running thesis
+export {
+  isCoherenceEnabled,
+  getCoherenceThreshold,
+  defaultThesisPath,
+  loadRunningThesis,
+  saveRunningThesis,
+  clearRunningThesis,
+  scoreCoherence,
+  gateCoherence,
+} from "./thesisCoherence.ts";
+export type {
+  ThesisBias,
+  ThesisHorizon,
+  RunningThesis,
+  PlanShape as ThesisPlanShape,
+  CoherenceScore,
+  CoherenceGateResult,
+} from "./thesisCoherence.ts";
+
+// Per-strategy mandate decomposition
+export {
+  isStrategyMandatesEnabled,
+  defaultMandatesPath,
+  loadMandates,
+  saveMandates,
+  selectMandateForPlan,
+  gateAgainstMandate,
+} from "./strategyMandates.ts";
+export type {
+  StrategyMandate,
+  MandateMatchInput,
+  MandateBudgetState,
+  MandateGateInput,
+  MandateGateResult,
+} from "./strategyMandates.ts";

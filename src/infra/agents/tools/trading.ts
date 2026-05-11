@@ -44,6 +44,10 @@ import {
   getUserThesis,
   computeThesisDivergence,
   verifyAcksFromWarnings,
+  checkUniverse,
+  gateCoherence,
+  gateAgainstMandate,
+  inferAssetClassFromVenue,
 } from "../../safety/index.ts";
 
 // ============================================================================
@@ -424,6 +428,105 @@ export const executePlanTool = createTool({
           divergenceFromRationale: computeThesisDivergence(thesis.thesis, rationale),
         },
       });
+    }
+
+    // Anti-rot gates (artifact-rot defenses translated from k10s.dev's
+    // "I'm going back to writing code by hand" — universe scope sentinel,
+    // thesis coherence, per-strategy mandate). All inert without flags.
+    const venue = ctx.exchange?.exchangeId;
+    const inferredAssetClass = inferAssetClassFromVenue(venue);
+
+    // (a) Trading universe scope sentinel
+    const universeResult = checkUniverse({
+      symbol: plan.symbol,
+      assetClass: inferredAssetClass !== "unknown" ? inferredAssetClass : undefined,
+      venue,
+    });
+    if (!universeResult.allowed) {
+      recordStructuredObservation({
+        eventType: "execution.blocked",
+        workflow: "execution",
+        source: "agent_tool",
+        component: "execute_plan",
+        toolName: "execute_plan",
+        outcome: "failure",
+        status: "outside_trading_universe",
+        planId,
+        symbol: plan.symbol,
+        reason: universeResult.reason,
+        details: { violations: universeResult.violations },
+      });
+      return validateToolOutput(executePlanOutputSchema, {
+        success: false,
+        error: universeResult.reason ?? "Plan outside declared trading universe.",
+      }, { toolName: "execute_plan" });
+    }
+
+    // (b) Portfolio coherence with running thesis
+    const coherenceResult = gateCoherence({
+      direction: plan.direction,
+      assetClass: inferredAssetClass !== "unknown" ? inferredAssetClass : undefined,
+    });
+    if (!coherenceResult.ok) {
+      recordStructuredObservation({
+        eventType: "execution.blocked",
+        workflow: "execution",
+        source: "agent_tool",
+        component: "execute_plan",
+        toolName: "execute_plan",
+        outcome: "failure",
+        status: "thesis_coherence_insufficient",
+        planId,
+        symbol: plan.symbol,
+        reason: coherenceResult.reason,
+        details: {
+          score: coherenceResult.score,
+          threshold: coherenceResult.threshold,
+          failures: coherenceResult.failures,
+        },
+      });
+      return validateToolOutput(executePlanOutputSchema, {
+        success: false,
+        error: coherenceResult.reason ?? "Plan coherence below threshold.",
+      }, { toolName: "execute_plan" });
+    }
+
+    // (c) Per-strategy mandate gate (uses current portfolio state for budget check)
+    const mandateResult = gateAgainstMandate(
+      {
+        assetClass: inferredAssetClass !== "unknown" ? inferredAssetClass : undefined,
+        venue,
+        strategyTag: plan.strategy,
+        proposedPositionPct: plan.allocation.percentOfPortfolio,
+      },
+      {
+        // Budget approximations from live state; refined as positions
+        // are tagged to mandates in future iterations.
+        currentOpenPositions: getActiveTrades().length,
+        currentAllocationPct: 0,
+      },
+    );
+    if (!mandateResult.ok) {
+      recordStructuredObservation({
+        eventType: "execution.blocked",
+        workflow: "execution",
+        source: "agent_tool",
+        component: "execute_plan",
+        toolName: "execute_plan",
+        outcome: "failure",
+        status: "strategy_mandate_violation",
+        planId,
+        symbol: plan.symbol,
+        reason: mandateResult.reason,
+        details: {
+          mandateId: mandateResult.mandate?.id,
+          violations: mandateResult.violations,
+        },
+      });
+      return validateToolOutput(executePlanOutputSchema, {
+        success: false,
+        error: mandateResult.reason ?? "Plan violates strategy mandate.",
+      }, { toolName: "execute_plan" });
     }
 
     // Permission mode gate: block execution for read-only / non-trading modes
