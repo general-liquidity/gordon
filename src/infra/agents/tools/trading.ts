@@ -311,12 +311,20 @@ export const executePlanTool = createTool({
   id: "execute_plan",
   description:
     "Execute an approved trading plan by placing orders on the active exchange. " +
-    "IMPORTANT: This places real orders with real money. Only use after user confirms the plan.",
+    "IMPORTANT: This places real orders with real money. Only use after user confirms the plan. " +
+    "You MUST provide a one-sentence `rationale` (>=10 chars) stating why this execution is correct right now — " +
+    "the rationale is recorded in the audit log for post-hoc review.",
   inputSchema: z.object({
     planId: z.string().describe("The ID of the plan to execute"),
+    rationale: z
+      .string()
+      .min(10)
+      .describe(
+        "One-sentence reason this execution is correct right now (e.g. 'User confirmed plan, BTC broke entry trigger at 100050, no regime conflict')",
+      ),
   }),
   outputSchema: executePlanOutputSchema,
-  execute: async ({ planId }, execContext: MastraExecutionContext) => {
+  execute: async ({ planId, rationale }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
     if (!ctx?.exchange) {
       recordStructuredObservation({
@@ -329,6 +337,7 @@ export const executePlanTool = createTool({
         status: "exchange_missing",
         planId,
         reason: errors.noExchange.error,
+        details: { rationale },
       });
       return validateToolOutput(executePlanOutputSchema, { ...errors.noExchange, success: false }, { toolName: "execute_plan" });
     }
@@ -345,9 +354,22 @@ export const executePlanTool = createTool({
         status: "plan_missing",
         planId,
         reason: `Plan not found: ${planId}`,
+        details: { rationale },
       });
       return validateToolOutput(executePlanOutputSchema, { success: false, error: `Plan not found: ${planId}` }, { toolName: "execute_plan" });
     }
+
+    recordStructuredObservation({
+      eventType: "execution.rationale_recorded",
+      workflow: "execution",
+      source: "agent_tool",
+      component: "execute_plan",
+      toolName: "execute_plan",
+      outcome: "info",
+      planId,
+      symbol: plan.symbol,
+      details: { rationale },
+    });
 
     // Permission mode gate: block execution for read-only / non-trading modes
     const mode = ctx.config.permissionMode;

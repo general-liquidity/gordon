@@ -17,6 +17,7 @@ import { z } from "zod";
 import { getGordonContext, isBinanceFamily, normalizeSymbol, type MastraExecutionContext } from "./types.ts";
 import { checkTradingPermission } from "./permissionHelpers.ts";
 import { runHooks } from "../../hooks/engine.ts";
+import { recordStructuredObservation } from "../../platform/observability/index.ts";
 import {
   resilientGetOrderBook,
   resilientGetSpread,
@@ -506,9 +507,15 @@ export const cancelAllOrdersTool = createTool({
   description:
     "Cancel all open orders on a symbol. Emergency function. " +
     "Use when user says 'cancel all orders', 'cancel everything on BTC', 'emergency cancel'. " +
-    "Requires permissionMode not 'strict'.",
+    "Requires permissionMode not 'strict'. " +
+    "You MUST provide a one-sentence `rationale` (>=10 chars) stating why mass cancellation is correct — " +
+    "the rationale is recorded in the audit log for post-hoc review.",
   inputSchema: z.object({
     symbol: z.string().describe("Trading pair (e.g., 'BTCUSDT')"),
+    rationale: z
+      .string()
+      .min(10)
+      .describe("One-sentence reason for cancelling ALL orders on this symbol (e.g. 'User requested emergency cancel after regime flip')"),
   }),
   outputSchema: z.object({
     success: z.boolean().optional(),
@@ -523,7 +530,7 @@ export const cancelAllOrdersTool = createTool({
     symbol: z.string().optional(),
     error: z.string().optional(),
   }),
-  execute: async ({ symbol }, execContext: MastraExecutionContext) => {
+  execute: async ({ symbol, rationale }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
     if (!ctx?.exchange) {
       return errors.noExchange;
@@ -540,6 +547,17 @@ export const cancelAllOrdersTool = createTool({
     }
 
     const normalizedSymbol = normalizeSymbol(symbol);
+
+    recordStructuredObservation({
+      eventType: "cancel.rationale_recorded",
+      workflow: "execution",
+      source: "agent_tool",
+      component: "cancel_all_orders",
+      toolName: "cancel_all_orders",
+      outcome: "info",
+      symbol: normalizedSymbol,
+      details: { rationale },
+    });
 
     try {
       const cancelled = await ctx.exchange.cancelAllOrders(normalizedSymbol);
@@ -947,10 +965,16 @@ export const cancelOrderTool = createTool({
   description:
     "Cancel a single open order by its order ID. " +
     "Use when user says 'cancel my BTC order', 'cancel order #12345', 'remove that limit order'. " +
-    "Requires permissionMode not 'strict'. For cancelling ALL orders on a symbol, use cancel_all_orders instead.",
+    "Requires permissionMode not 'strict'. For cancelling ALL orders on a symbol, use cancel_all_orders instead. " +
+    "You MUST provide a one-sentence `rationale` (>=10 chars) stating why this cancellation is correct — " +
+    "the rationale is recorded in the audit log for post-hoc review.",
   inputSchema: z.object({
     symbol: z.string().describe("Trading pair (e.g., 'BTCUSDT')"),
     orderId: z.number().describe("Order ID to cancel"),
+    rationale: z
+      .string()
+      .min(10)
+      .describe("One-sentence reason for cancelling this order (e.g. 'Stop moved invalidated by trend change')"),
   }),
   outputSchema: z.object({
     success: z.boolean().optional(),
@@ -959,7 +983,7 @@ export const cancelOrderTool = createTool({
     symbol: z.string().optional(),
     error: z.string().optional(),
   }),
-  execute: async ({ symbol, orderId }, execContext: MastraExecutionContext) => {
+  execute: async ({ symbol, orderId, rationale }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
     if (!ctx?.exchange) {
       return errors.noExchange;
@@ -973,6 +997,17 @@ export const cancelOrderTool = createTool({
     }
 
     const normalizedSymbol = normalizeSymbol(symbol);
+
+    recordStructuredObservation({
+      eventType: "cancel.rationale_recorded",
+      workflow: "execution",
+      source: "agent_tool",
+      component: "cancel_order",
+      toolName: "cancel_order",
+      outcome: "info",
+      symbol: normalizedSymbol,
+      details: { rationale, orderId },
+    });
 
     try {
       await ctx.exchange.cancelOrder(normalizedSymbol, String(orderId));
@@ -1062,7 +1097,9 @@ export const cancelReplaceOrderTool = createTool({
   description:
     "Atomically cancel an existing order and replace it with a new one. " +
     "Use when user says 'replace my order', 'modify order #123', 'change order price', 'update my limit order'. " +
-    "Requires permissionMode not 'strict'. Binance only.",
+    "Requires permissionMode not 'strict'. Binance only. " +
+    "You MUST provide a one-sentence `rationale` (>=10 chars) stating why the replacement is correct — " +
+    "the rationale is recorded in the audit log for post-hoc review.",
   inputSchema: z.object({
     symbol: z.string().describe("Trading pair (e.g., 'BTCUSDT')"),
     cancelOrderId: z.number().describe("Order ID of the existing order to cancel"),
@@ -1071,6 +1108,10 @@ export const cancelReplaceOrderTool = createTool({
     quantity: z.number().positive().describe("Quantity for the new order"),
     price: z.number().optional().describe("Price for the new order (required for LIMIT orders)"),
     timeInForce: z.enum(["GTC", "IOC", "FOK"]).default("GTC").describe("Time in force for the new order"),
+    rationale: z
+      .string()
+      .min(10)
+      .describe("One-sentence reason for replacing this order (e.g. 'Better entry price available after pullback to 99800')"),
   }),
   outputSchema: z.object({
     success: z.boolean().optional(),
@@ -1088,7 +1129,7 @@ export const cancelReplaceOrderTool = createTool({
     }).optional(),
     error: z.string().optional(),
   }),
-  execute: async ({ symbol, cancelOrderId, side, type, quantity, price, timeInForce }, execContext: MastraExecutionContext) => {
+  execute: async ({ symbol, cancelOrderId, side, type, quantity, price, timeInForce, rationale }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
     if (!ctx?.exchange) {
       return errors.noExchange;
@@ -1106,6 +1147,17 @@ export const cancelReplaceOrderTool = createTool({
     }
 
     const normalizedSymbol = normalizeSymbol(symbol);
+
+    recordStructuredObservation({
+      eventType: "cancel_replace.rationale_recorded",
+      workflow: "execution",
+      source: "agent_tool",
+      component: "cancel_replace_order",
+      toolName: "cancel_replace_order",
+      outcome: "info",
+      symbol: normalizedSymbol,
+      details: { rationale, cancelOrderId, side, type },
+    });
 
     // Risk gate: evaluate the replacement order before placement
     try {
@@ -1174,10 +1226,16 @@ export const cancelOrderListTool = createTool({
   description:
     "Cancel an OCO or OTO order list by its orderListId. " +
     "Use when user says 'cancel my OCO order', 'cancel order list #123'. " +
-    "Requires permissionMode not 'strict'.",
+    "Requires permissionMode not 'strict'. " +
+    "You MUST provide a one-sentence `rationale` (>=10 chars) stating why this cancellation is correct — " +
+    "the rationale is recorded in the audit log for post-hoc review.",
   inputSchema: z.object({
     symbol: z.string().describe("Trading pair (e.g., 'BTCUSDT')"),
     orderListId: z.number().describe("The orderListId of the OCO/OTO order list to cancel"),
+    rationale: z
+      .string()
+      .min(10)
+      .describe("One-sentence reason for cancelling this OCO/OTO list (e.g. 'Both legs invalidated by funding flip')"),
   }),
   outputSchema: z.object({
     success: z.boolean().optional(),
@@ -1190,7 +1248,7 @@ export const cancelOrderListTool = createTool({
     })).optional(),
     error: z.string().optional(),
   }),
-  execute: async ({ symbol, orderListId }, execContext: MastraExecutionContext) => {
+  execute: async ({ symbol, orderListId, rationale }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
     if (!ctx?.exchange) {
       return errors.noExchange;
@@ -1208,6 +1266,17 @@ export const cancelOrderListTool = createTool({
     }
 
     const normalizedSymbol = normalizeSymbol(symbol);
+
+    recordStructuredObservation({
+      eventType: "cancel.rationale_recorded",
+      workflow: "execution",
+      source: "agent_tool",
+      component: "cancel_order_list",
+      toolName: "cancel_order_list",
+      outcome: "info",
+      symbol: normalizedSymbol,
+      details: { rationale, orderListId },
+    });
 
     try {
       const result = await ctx.binance.cancelOrderList(normalizedSymbol, orderListId);

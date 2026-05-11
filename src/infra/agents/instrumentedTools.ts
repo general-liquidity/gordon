@@ -82,6 +82,7 @@ import {
   checkRiskTool,
   memoryTools,
   aceTools,
+  agentFeedbackTools,
   playbookTools,
   playbookBacktestTools,
   auditTools,
@@ -176,6 +177,7 @@ export const instrumentedEvalTools = withToolsMetrics(evalTools);
 export const instrumentedPositionTrackingTools = withToolsMetrics(positionTrackingTools);
 export const instrumentedMemoryTools = withToolsMetrics(memoryTools);
 export const instrumentedACETools = withToolsMetrics(aceTools);
+export const instrumentedAgentFeedbackTools = withToolsMetrics(agentFeedbackTools);
 export const instrumentedPlaybookTools = withToolsMetrics(playbookTools);
 export const instrumentedPlaybookBacktestTools = withToolsMetrics(playbookBacktestTools);
 export const instrumentedAuditTools = withToolsMetrics(auditTools);

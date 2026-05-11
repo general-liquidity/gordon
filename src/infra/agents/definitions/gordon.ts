@@ -48,6 +48,7 @@ import {
   instrumentedProtocolTools,
   instrumentedMemoryTools,
   instrumentedACETools,
+  instrumentedAgentFeedbackTools,
   instrumentedSharedContextTools,
   instrumentedRegimeTools,
   instrumentedBaseOnchainTools,
@@ -447,6 +448,7 @@ export function getGordon(): Agent {
       // Memory & context
       ...instrumentedMemoryTools,
       ...instrumentedACETools,
+      ...instrumentedAgentFeedbackTools,
       ...instrumentedSharedContextTools,
 
       // Market regime
