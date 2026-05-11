@@ -7,6 +7,7 @@ import { determineWorkflowPhase } from "./workflowPhase.ts";
 import { getThinkingDepthFromContext } from "./thinkingPhase.ts";
 import { getExecutionReadiness, getPlanningHandoff } from "./runtimeHarness.ts";
 import { getMCPServerSummary } from "../ai/mcp/client.ts";
+import { formatACELessonsForPrompt, isACEEnabled, loadACELessons } from "./ace/index.ts";
 
 export type { PromptAgentRole };
 
@@ -77,6 +78,19 @@ const fallbackSectionContent = new Map<string, string | (() => string)>([
     `## External Tool Surface
 - External MCP plugin servers are available.
 - Prefer native Gordon tools first, and only lean on MCP-backed tools when the request clearly targets plugin or external-tool capabilities.`,
+  ],
+  [
+    // Dynamic section — ACE (Agentic Context Engineering) lessons accumulated
+    // across prior sessions. When GORDON_ACE_ENABLED is off, or no lessons
+    // have been curated yet, returns "" so the section is filtered out by
+    // composeAgentInstructions' .filter(Boolean). When enabled, the lesson
+    // block is loaded once per (role, scope, provider, …) cache key — stable
+    // within a session, refreshes on next session start.
+    "shared.ace-lessons",
+    () => {
+      if (!isACEEnabled()) return "";
+      return formatACELessonsForPrompt(loadACELessons());
+    },
   ],
 ]);
 

@@ -1905,6 +1905,17 @@ const LEGACY_SLASH_COMMANDS: SlashCommandSeed[] = [
     action: "menu",
     target: "journal",
   },
+  {
+    name: "reflect",
+    aliases: ["ace", "lessons"],
+    description: "Distill recent action log into accumulated lessons (ACE)",
+    usage: "/reflect [lookback]",
+    category: "trading",
+    level: 2,
+    action: "tool",
+    target: "run_ace_cycle",
+    whenToUse: "After a notable session, recovery event, or to refresh cross-session lessons",
+  },
 
   // HIP-3 builder-perp browser (Hyperliquid: stocks, commodities, indices)
   {

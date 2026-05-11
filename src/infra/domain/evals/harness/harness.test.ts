@@ -41,11 +41,12 @@ function makeTraj(id: string, content: string): EvalTrajectory {
 }
 
 describe("scenarios catalog", () => {
-  it("ships the three initial scenarios", () => {
-    expect(ALL_SCENARIOS.length).toBe(3);
+  it("ships the four initial scenarios", () => {
+    expect(ALL_SCENARIOS.length).toBe(4);
     expect(ALL_SCENARIO_IDS).toContain("plan-card-btc");
     expect(ALL_SCENARIO_IDS).toContain("regime-flip");
     expect(ALL_SCENARIO_IDS).toContain("risk-gate");
+    expect(ALL_SCENARIO_IDS).toContain("ace-recall");
   });
 
   it("each scenario has the required fields", () => {
@@ -220,6 +221,10 @@ describe("runEvalSuite", () => {
           { id: "good", score: 0.95 },
           { id: "bad", score: 0.15 },
         ],
+        "ace-recall": [
+          { id: "good", score: 0.88 },
+          { id: "bad", score: 0.25 },
+        ],
       },
     });
     const result = await runEvalSuite({
@@ -231,9 +236,9 @@ describe("runEvalSuite", () => {
     const good = result.results.find((r) => r.variantLabel === "good")!;
     const bad = result.results.find((r) => r.variantLabel === "bad")!;
     expect(good.aggregate).toBeGreaterThan(bad.aggregate);
-    expect(good.winCount).toBe(3);
+    expect(good.winCount).toBe(4);
     expect(bad.winCount).toBe(0);
-    expect(good.scenarioCount).toBe(3);
+    expect(good.scenarioCount).toBe(4);
   });
 
   it("skips scenarios where any variant is missing a trajectory", async () => {
@@ -246,6 +251,10 @@ describe("runEvalSuite", () => {
           { id: "full", score: 0.6 },
         ],
         "risk-gate": [
+          { id: "partial", score: 0.5 },
+          { id: "full", score: 0.6 },
+        ],
+        "ace-recall": [
           { id: "partial", score: 0.5 },
           { id: "full", score: 0.6 },
         ],
@@ -586,6 +595,10 @@ describe("judgeTrajectoriesPanel", () => {
         "risk-gate": [
           { id: "good", score: 0.95 },
           { id: "bad", score: 0.15 },
+        ],
+        "ace-recall": [
+          { id: "good", score: 0.88 },
+          { id: "bad", score: 0.25 },
         ],
       },
     });

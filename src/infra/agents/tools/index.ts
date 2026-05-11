@@ -116,6 +116,9 @@ export { checkRiskTool, evaluateOrderRisk } from "./risk-gate.ts";
 // Memory tools (v0.7)
 export { memoryTools } from "./memory-tools.ts";
 
+// ACE (Agentic Context Engineering) tools
+export { aceTools } from "./ace-tools.ts";
+
 // Playbook tools (v0.7)
 export { playbookTools } from "./playbook-tools.ts";
 
@@ -377,6 +380,7 @@ import { agentRailsTools } from "./agent-rails.ts";
 import { positionTrackingTools } from "./position-tracking.ts";
 import { checkRiskTool } from "./risk-gate.ts";
 import { memoryTools } from "./memory-tools.ts";
+import { aceTools } from "./ace-tools.ts";
 import { playbookTools } from "./playbook-tools.ts";
 import { playbookBacktestTools } from "./backtest-tools.ts";
 import { runtimeTools } from "./runtime-tools.ts";
@@ -470,6 +474,7 @@ const _rawAllTools = {
   ...positionTrackingTools,
   check_risk: checkRiskTool,
   ...memoryTools,
+  ...aceTools,
   ...playbookTools,
   ...playbookBacktestTools,
   ...runtimeTools,
@@ -561,6 +566,7 @@ export const toolCounts = {
   positionTracking: Object.keys(positionTrackingTools).length,
   riskGate: 1, // checkRiskTool
   memory: Object.keys(memoryTools).length,
+  ace: Object.keys(aceTools).length,
   playbook: Object.keys(playbookTools).length,
   playbookBacktest: Object.keys(playbookBacktestTools).length,
   runtime: Object.keys(runtimeTools).length,

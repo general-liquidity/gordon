@@ -4,6 +4,7 @@
   { "id": "shared.execution-safety", "file": "shared.execution-safety.md", "mount": "instructions", "priority": 30, "stable": true },
   { "id": "shared.recovery-discipline", "file": "shared.recovery-discipline.md", "mount": "instructions", "priority": 40, "stable": true },
   { "id": "shared.wording", "file": "shared.wording.md", "mount": "instructions", "priority": 50, "stable": true },
+  { "id": "shared.ace-lessons", "file": "shared.ace-lessons.md", "mount": "instructions", "priority": 75, "stable": false },
 
   { "id": "role.gordon.orchestration", "file": "role.gordon.orchestration.md", "mount": "instructions", "priority": 100, "stable": true, "roles": ["gordon"] },
   { "id": "role.scanner.discovery", "file": "role.scanner.discovery.md", "mount": "instructions", "priority": 100, "stable": true, "roles": ["scanner"] },

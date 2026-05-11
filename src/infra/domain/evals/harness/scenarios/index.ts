@@ -16,14 +16,16 @@
 import { planCardBtc } from "./plan-card-btc.ts";
 import { regimeFlip } from "./regime-flip.ts";
 import { riskGate } from "./risk-gate.ts";
+import { aceRecall } from "./ace-recall.ts";
 import type { EvalScenario } from "../types.ts";
 
-export { planCardBtc, regimeFlip, riskGate };
+export { planCardBtc, regimeFlip, riskGate, aceRecall };
 
 export const ALL_SCENARIOS: ReadonlyArray<EvalScenario> = [
   planCardBtc,
   regimeFlip,
   riskGate,
+  aceRecall,
 ];
 
 export const ALL_SCENARIO_IDS: ReadonlyArray<string> = ALL_SCENARIOS.map(

@@ -81,6 +81,7 @@ import {
   positionTrackingTools,
   checkRiskTool,
   memoryTools,
+  aceTools,
   playbookTools,
   playbookBacktestTools,
   auditTools,
@@ -174,6 +175,7 @@ export const instrumentedStrategyRecipeTools = withToolsMetrics(strategyRecipeTo
 export const instrumentedEvalTools = withToolsMetrics(evalTools);
 export const instrumentedPositionTrackingTools = withToolsMetrics(positionTrackingTools);
 export const instrumentedMemoryTools = withToolsMetrics(memoryTools);
+export const instrumentedACETools = withToolsMetrics(aceTools);
 export const instrumentedPlaybookTools = withToolsMetrics(playbookTools);
 export const instrumentedPlaybookBacktestTools = withToolsMetrics(playbookBacktestTools);
 export const instrumentedAuditTools = withToolsMetrics(auditTools);

@@ -105,6 +105,7 @@ Recent primitives ship wired but cold. Each flag activates one layer; the wrappe
 | `GORDON_TOOL_DEFERRAL=1` | Hide deferred tools from model schema until activated; ~50% schema-token savings |
 | `GORDON_REMINDERS=1` | Inject turn-cadence reminders (daily loss limit, mandate scope, open positions) into autonomous loop prompts |
 | `GORDON_PERMISSION_BUBBLE=1` | Tag fork-originated permission requests with `[fork X]` UI prefix |
+| `GORDON_ACE_ENABLED=true` | Activate ACE (Agentic Context Engineering): `/reflect` distills the action log into lessons, injected into the system prompt of future sessions via `shared.ace-lessons` |
 
 Combine for stack: each flag is independent. Recommended bring-up order once evals exist: filters + cache first (zero-risk additive), then extended thinking, then deferral / agent list, then reminders / recovery / bubble.
 

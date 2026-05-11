@@ -71,6 +71,7 @@ export {
   planCardBtc,
   regimeFlip,
   riskGate,
+  aceRecall,
   scenariosByTag,
   getScenarioById,
 } from "./scenarios/index.ts";
