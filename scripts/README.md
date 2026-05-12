@@ -83,3 +83,42 @@ either reverts (config edit, IOC files appearing in the tree), the
 checks surface a warn/fail. See:
 - https://docs.npmjs.com/cli/v11/using-npm/config#min-release-age
 - https://www.stepsecurity.io/blog/mini-shai-hulud-is-back-a-self-spreading-supply-chain-attack-hits-the-npm-ecosystem
+
+### Publish-flow hardening
+
+3. **CI dep audit** — `.github/workflows/ci.yml` runs `bun audit
+   --audit-level=critical` on every PR + main push. Surfaces critical
+   advisories in the transitive tree before merge. Tighten to `high`
+   then `moderate` once the noise floor is understood for Gordon's
+   dep set.
+4. **SLSA provenance on publish** — `.github/workflows/release.yml`
+   has `permissions: id-token: write` on the `publish-npm` job and
+   passes `--provenance` to `npm publish`. Each release tarball gets
+   a Sigstore attestation tying it to this specific workflow run, so
+   downstream installers can verify authenticity via
+   `npm audit signatures`.
+
+### Maintainer-account hygiene (manual, npmjs.com web UI)
+
+These can't be enforced from code — they're npm-account settings the
+maintainer must apply directly. Critical after the TeamPCP worm
+specifically searched for `bypass_2fa: true` tokens:
+
+- **Enable 2FA on the npm account** at npmjs.com → Account Settings.
+  Required for publishing anyway since November 2025. Pick
+  "Authorization and writes" (default) — NOT "Authorization only".
+- **Never create a token with `bypass_2fa: true`.** The worm
+  enumerated tokens via `registry.npmjs.org/-/npm/v1/tokens` and
+  filtered for `bypass_2fa === true` specifically; a 2FA-required
+  token is structurally unusable to this attack class.
+- **Use granular access tokens** scoped to a single package or scope
+  with read-only access unless write is genuinely needed.
+  `legacy` tokens were removed November 2025; use granular only.
+- **Migrate to trusted publishing** once stable. Requires npmjs.com
+  package settings → "Trusted Publisher" → GitHub Actions →
+  workflow filename `release.yml`. After the trust binding is
+  configured, set "Require two-factor authentication and disallow
+  tokens" in package settings to eliminate token-based publish
+  entirely. The `id-token: write` permission is already wired in
+  `release.yml`, so the migration is npmjs.com side only.
+  See: https://docs.npmjs.com/trusted-publishers

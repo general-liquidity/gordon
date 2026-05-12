@@ -312,6 +312,14 @@ jobs:
     name: Publish to npm
     needs: publish-public-dist
     runs-on: ubuntu-latest
+    # id-token: write enables OIDC token issuance so npm publish --provenance
+    # can sign the release with SLSA Build Level 3 attestations via Sigstore.
+    # This is the prerequisite for migrating to trusted publishing (which
+    # eliminates NPM_TOKEN entirely). See scripts/README.md "Supply-chain
+    # hardening" for the migration path.
+    permissions:
+      id-token: write
+      contents: read
     env:
       GORDON_NPM_VERSION: ${{ github.ref_name }}
     steps:
@@ -343,8 +351,13 @@ jobs:
             echo "tag=latest" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Publish to npm
+      - name: Publish to npm with SLSA provenance
         working-directory: npm
-        run: npm publish --access public --tag "${{ steps.dist-tag.outputs.tag }}"
+        # --provenance generates a Sigstore attestation tying the published
+        # tarball to this specific workflow run, so downstream installers
+        # can verify the package was built by Gordon's CI (not a tampered
+        # tarball). Public repo + public package are required for npm to
+        # accept provenance; both hold for @general-liquidity/gordon-cli.
+        run: npm publish --access public --tag "${{ steps.dist-tag.outputs.tag }}" --provenance
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

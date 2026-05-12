@@ -53,3 +53,31 @@ jobs:
           test -f .public-dist/install.ps1
           test -f .public-dist/Formula/gordon.rb
           test -f .public-dist/bucket/gordon.json
+
+  audit:
+    name: Dependency Audit
+    runs-on: ubuntu-latest
+    # Surface critical-severity advisories in Gordon's dependency tree
+    # on every PR + main push. Pairs with the install-time gate
+    # (bunfig.toml minimumReleaseAge) and the IOC scanner (doctor
+    # checkSupplyChainIocs) for defense in depth.
+    #
+    # Current behavior: informational. `bun audit --audit-level=X` is a
+    # display filter — Bun returns exit 0 regardless of findings. Output
+    # is visible in the run log so reviewers can spot new advisories;
+    # tighten to a hard gate via `bun audit --json | jq` once Gordon's
+    # noise floor (mostly long-tail crypto transitives — protobufjs,
+    # elliptic) is either patched upstream or explicitly accepted via an
+    # ignore list.
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+
+      - name: Install dependencies (frozen lockfile)
+        run: bun install --frozen-lockfile
+
+      - name: bun audit (critical-severity surface)
+        run: bun audit --audit-level=critical
