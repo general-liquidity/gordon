@@ -463,6 +463,140 @@ function checkMcpMarketplaceCatalog(
 }
 
 /**
+ * `bunfig.toml` declares `minimumReleaseAge` for install-time
+ * supply-chain defense. Required after the May-2026 TanStack worm
+ * (TeamPCP Mini Shai-Hulud): npm refuses to install package versions
+ * published less than 48h ago, covering the community-detection
+ * window for malicious publishes. If a config edit silently drops the
+ * gate, this check surfaces it. See scripts/README.md "Supply-chain
+ * hardening" for context.
+ */
+function checkInstallReleaseAge(
+  bunfigPath: string = resolve(process.cwd(), "bunfig.toml"),
+): DiagnosticCheck {
+  const MIN_SECONDS = 86_400; // 24h is the floor we'll tolerate
+  if (!existsSync(bunfigPath)) {
+    return {
+      id: "install-release-age",
+      label: "Install release-age gate",
+      status: "warn",
+      message: `bunfig.toml not present — no minimumReleaseAge gate on installs.`,
+    };
+  }
+  try {
+    const raw = readFileSync(bunfigPath, "utf8");
+    // Tolerant of TOML formatting variants: `minimumReleaseAge = 172800`,
+    // `minimumReleaseAge=172800`, single-line table, etc. We don't pull
+    // in a TOML parser for one field.
+    const match = raw.match(/minimumReleaseAge\s*=\s*(\d+)/);
+    if (!match) {
+      return {
+        id: "install-release-age",
+        label: "Install release-age gate",
+        status: "warn",
+        message: "bunfig.toml has no minimumReleaseAge — installs will pull versions published seconds ago. See scripts/README.md.",
+      };
+    }
+    const secs = Number(match[1]);
+    if (!Number.isFinite(secs) || secs < MIN_SECONDS) {
+      return {
+        id: "install-release-age",
+        label: "Install release-age gate",
+        status: "warn",
+        message: `minimumReleaseAge=${secs}s is below 24h floor. Restore to >=172800 (48h) per scripts/README.md.`,
+      };
+    }
+    const hours = Math.round(secs / 3600);
+    return {
+      id: "install-release-age",
+      label: "Install release-age gate",
+      status: "pass",
+      message: `minimumReleaseAge=${secs}s (~${hours}h) — installs reject fresh publishes.`,
+    };
+  } catch (err) {
+    return {
+      id: "install-release-age",
+      label: "Install release-age gate",
+      status: "fail",
+      message: `Cannot read ${bunfigPath}: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
+}
+
+/**
+ * Scan the project tree for IOC artifacts left by the May-2026
+ * TanStack worm and similar npm supply-chain attacks: malware payload
+ * files (router_init.js, router_runtime.js), persistence setup scripts
+ * (.claude/setup.mjs, .vscode/setup.mjs), and Claude Code SessionStart
+ * hooks pointing at external setup scripts. Detects post-compromise
+ * residue even if the originally-installed package has since been
+ * removed.
+ */
+function checkSupplyChainIocs(
+  projectRoot: string = process.cwd(),
+): DiagnosticCheck {
+  const ioc_files = [
+    "router_init.js",
+    "router_runtime.js",
+    ".claude/setup.mjs",
+    ".vscode/setup.mjs",
+    ".claude/router_runtime.js",
+  ];
+  const found: string[] = [];
+  for (const rel of ioc_files) {
+    const abs = join(projectRoot, rel);
+    if (existsSync(abs)) found.push(rel);
+  }
+
+  // Inspect project + user-level .claude/settings.json for the
+  // SessionStart→setup.mjs hook pattern.
+  const settingsPaths = [
+    join(projectRoot, ".claude", "settings.json"),
+    join(homedir(), ".claude", "settings.json"),
+  ];
+  const taintedSettings: string[] = [];
+  for (const sp of settingsPaths) {
+    if (!existsSync(sp)) continue;
+    try {
+      const raw = readFileSync(sp, "utf8");
+      const parsed = JSON.parse(raw) as { hooks?: { SessionStart?: unknown } };
+      if (!parsed || typeof parsed !== "object") continue;
+      const hooks = parsed.hooks;
+      if (!hooks || typeof hooks !== "object") continue;
+      const sessionStart = (hooks as { SessionStart?: unknown }).SessionStart;
+      if (!sessionStart) continue;
+      // Stringify and look for the worm's signature: a command that
+      // shells out to setup.mjs under .vscode or .claude.
+      const serialized = JSON.stringify(sessionStart);
+      if (/(\.vscode|\.claude)[\\/]setup\.mjs/.test(serialized)) {
+        taintedSettings.push(sp);
+      }
+    } catch {
+      // unparseable settings.json — let the dedicated ace-lessons /
+      // other checks surface that. Don't flag from here.
+    }
+  }
+
+  if (found.length === 0 && taintedSettings.length === 0) {
+    return {
+      id: "supply-chain-iocs",
+      label: "Supply-chain IOC scan",
+      status: "pass",
+      message: "No known malware payload files or SessionStart hooks present.",
+    };
+  }
+  const parts: string[] = [];
+  if (found.length > 0) parts.push(`IOC files: ${found.join(", ")}`);
+  if (taintedSettings.length > 0) parts.push(`tainted settings.json: ${taintedSettings.join(", ")}`);
+  return {
+    id: "supply-chain-iocs",
+    label: "Supply-chain IOC scan",
+    status: "fail",
+    message: `Possible compromise residue detected. ${parts.join("; ")}. Quarantine the machine, revoke tokens, audit ~/.local/bin and OS-level services.`,
+  };
+}
+
+/**
  * critiquePhase routing still uses the "critique" workflow phase, not
  * the "compaction" phase. Regression defense for commit b2f537fd: the
  * critique pass was previously routed to the fast model via
@@ -557,6 +691,8 @@ export function runDoctorChecks(): DiagnosticCheck[] {
     checkMastraPatchApplied(),
     checkMcpMarketplaceCatalog(),
     checkCritiquePhaseRouting(),
+    checkInstallReleaseAge(),
+    checkSupplyChainIocs(),
   ];
 }
 
@@ -574,6 +710,8 @@ export const _internal = {
   checkMastraPatchApplied,
   checkMcpMarketplaceCatalog,
   checkCritiquePhaseRouting,
+  checkInstallReleaseAge,
+  checkSupplyChainIocs,
   resolveMastraStoragePath,
   resolveVectorStoragePath,
 };

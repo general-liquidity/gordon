@@ -60,3 +60,26 @@ Both run automatically via `npm install` → `package.json` postinstall hook.
 2. Resolve the project root with `path.resolve(__dirname, "..", "..")`.
 3. Wire it into `package.json` `scripts` block with the full subpath.
 4. If it runs in CI, also add to `.github/workflows/{ci,release}.yml`.
+
+## Supply-chain hardening
+
+Two install-time gates defend against npm worm attacks (TeamPCP's
+Mini Shai-Hulud, 2026-05; SLSA-attested malicious tarballs):
+
+1. **`bunfig.toml` `[install] minimumReleaseAge = 172800`** — Bun
+   refuses to install any package version published less than 48h ago.
+   Covers the typical community-detection horizon for malicious
+   publishes. Do not lower this without a specific reason.
+2. **`package.json` `overrides`** pins the 4 `@tanstack/*` packages
+   currently in Gordon's transitive tree to versions verified outside
+   the May-2026 compromised range (carlini's reproducible list noted
+   `query*` and `virtual*` packages as clean). When upgrading these
+   intentionally, cross-check the target version against any active
+   advisory list before bumping.
+
+Doctor (`src/infra/diagnostics/doctor.ts`) re-asserts both gates each
+session via `checkInstallReleaseAge` and `checkSupplyChainIocs`. If
+either reverts (config edit, IOC files appearing in the tree), the
+checks surface a warn/fail. See:
+- https://docs.npmjs.com/cli/v11/using-npm/config#min-release-age
+- https://www.stepsecurity.io/blog/mini-shai-hulud-is-back-a-self-spreading-supply-chain-attack-hits-the-npm-ecosystem

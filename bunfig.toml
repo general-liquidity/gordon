@@ -8,3 +8,13 @@ preload = ["./src/tui/ink-custom/buildCompilerPlugin.ts"]
 
 [test]
 preload = ["./src/tui/ink-custom/buildCompilerPlugin.ts"]
+
+# Supply-chain defense: refuse to install any npm package version
+# released less than 48h ago. Window covers the typical detection
+# horizon for community-flagged malicious publishes. Triggered by the
+# 2026-05 TanStack worm (42 packages, 84 malicious versions, signed
+# SLSA provenance — defenders couldn't tell from the cert alone).
+# Mitigation guidance: https://docs.npmjs.com/cli/v11/using-npm/config#min-release-age
+# 172800 seconds = 48 hours.
+[install]
+minimumReleaseAge = 172800
