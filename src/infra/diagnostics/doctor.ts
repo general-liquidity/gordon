@@ -557,7 +557,7 @@ function checkTrustedDependencies(
         label: "Bun trustedDependencies allowlist",
         status: "pass",
         message:
-          "No trustedDependencies declared — Bun's default no-lifecycle-script behavior is intact (structurally blocks the TanStack worm attack vector).",
+          "No trustedDependencies declared — Bun's default no-lifecycle-script behavior is intact (structurally blocks the TanStack worm attack vector). Note: Bun's built-in default allowlist still runs lifecycle scripts for the top ~500 npm packages (esbuild, sharp, node-gyp, etc.); explicit trustedDependencies only matters for adding to that.",
       };
     }
     if (!Array.isArray(td)) {

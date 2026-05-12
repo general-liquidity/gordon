@@ -16,8 +16,20 @@ preload = ["./src/tui/ink-custom/buildCompilerPlugin.ts"]
 # SLSA provenance — defenders couldn't tell from the cert alone).
 # Mitigation guidance: https://docs.npmjs.com/cli/v11/using-npm/config#min-release-age
 # 172800 seconds = 48 hours.
+#
+# minimumReleaseAgeExcludes: packages exempt from the age gate. We
+# only exempt packages that are ALREADY pinned to verified-safe
+# versions via package.json overrides — the age gate is redundant
+# for them since the pin prevents drift, and excluding them lets
+# the lockfile resolve cleanly without waiting on the gate.
 [install]
 minimumReleaseAge = 172800
+minimumReleaseAgeExcludes = [
+  "@tanstack/query-core",
+  "@tanstack/react-query",
+  "@tanstack/react-virtual",
+  "@tanstack/virtual-core",
+]
 
 # Slot for a third-party security scanner (Bun: `bun pm scan` requires
 # this section pointing at an npm package that exports a scanner

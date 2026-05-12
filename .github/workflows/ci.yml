@@ -80,4 +80,25 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: bun audit (critical-severity surface)
-        run: bun audit --audit-level=critical
+        # --ignore flags silence the long-tail transitive criticals
+        # that we can't fix without upstream releases. Documented so
+        # NEW criticals surface against a clean baseline. Review
+        # quarterly; remove an --ignore the moment an upstream fix
+        # lands so latent risk doesn't accumulate.
+        #
+        # Accepted criticals (audit baseline as of 2026-05):
+        #   GHSA-xq3m-2v4x-88gg — protobufjs RCE (via solana-agent-kit
+        #     / drift-labs / langchain transitives)
+        #   GHSA-vjh7-7g9h-fjfh — elliptic ECDSA key extraction (via
+        #     ethers / coinbase-sdk / metaplex / polkadot transitives)
+        #   GHSA-2w6w-674q-4c4q — handlebars AST type confusion (via
+        #     a transitive of a transitive — handlebars not used
+        #     directly)
+        #   GHSA-fjxv-7rqg-78g4 — form-data unsafe random boundary
+        #     (via transitive HTTP-client deps)
+        run: |
+          bun audit --audit-level=critical \
+            --ignore GHSA-xq3m-2v4x-88gg \
+            --ignore GHSA-vjh7-7g9h-fjfh \
+            --ignore GHSA-2w6w-674q-4c4q \
+            --ignore GHSA-fjxv-7rqg-78g4

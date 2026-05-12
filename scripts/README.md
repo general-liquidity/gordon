@@ -76,9 +76,19 @@ Mini Shai-Hulud, 2026-05; SLSA-attested malicious tarballs):
    `@tanstack/setup` git dep — that script CANNOT fire under Bun
    without an explicit trust grant. Do not add anything to
    `trustedDependencies` without verifying the package, and prefer
-   `bun add --trust <pkg>` (deliberate, audited) over hand-editing
+   `bun pm trust <pkg>` (deliberate, audited) over hand-editing
    the field. `checkTrustedDependencies` doctor check warns if any
    entries exist so trust additions stay reviewed.
+
+   Bun ships a built-in default allowlist of ~500 popular packages
+   that DO get to run lifecycle scripts (esbuild, sharp, node-gyp,
+   etc.) — see https://github.com/oven-sh/bun/blob/main/src/install/default-trusted-dependencies.txt
+   for the canonical list. This list only applies to packages installed
+   from npm; for `file:`, `link:`, `git:`, or `github:` deps, lifecycle
+   scripts NEVER run without explicit trustedDependencies entry, even
+   if the package name matches the default list. This is precisely the
+   defense that would have blocked the TanStack worm's `github:` git-URL
+   smuggle even if the user had `@tanstack/setup` in trustedDependencies.
 1. **`bunfig.toml` `[install] minimumReleaseAge = 172800`** — Bun
    refuses to install any package version published less than 48h ago.
    Covers the typical community-detection horizon for malicious
@@ -221,6 +231,37 @@ npm audit signatures
 This checks Sigstore signatures + SLSA provenance attestations and
 returns non-zero if any installed package shows tampering. Pairs
 with the SBOM at the release page: cross-reference package hashes.
+
+### Bun-native primitives worth knowing
+
+These aren't shipped defenses, but Bun gives us primitives that could
+sharpen Gordon's security posture if we ever need them:
+
+- **`Bun.secrets`** — OS-native credential storage backed by macOS
+  Keychain, Linux libsecret, Windows Credential Manager. Currently
+  Gordon reads exchange API keys from `.env` files (plaintext on
+  disk). Migrating sensitive credentials to `Bun.secrets` would
+  encrypt them at rest via the OS credential manager and isolate
+  them per user account. Experimental API right now; useful for
+  local-dev paths. Not yet appropriate for production deployment
+  secrets — env vars remain the standard there.
+- **`bun pm trust <pkg>`** — the audited way to add a package to
+  `trustedDependencies`. Always prefer this over hand-editing the
+  field; the CLI path forces a review prompt.
+- **`bun ci`** — alias for `bun install --frozen-lockfile`. Use in
+  CI/CD pipelines where the lockfile must not drift.
+- **`bun audit --ignore <advisory-id>`** — silence specific known
+  advisories. Gordon's `ci.yml` audit step uses this for the four
+  long-tail crypto-transitive criticals (protobufjs, elliptic) that
+  can't be fixed without upstream releases.
+- **`bun patch` / `bun patch --commit`** — git-friendly persistent
+  dependency patching. Future replacement for `scripts/patches/`
+  if Mastra/Ink patches become persistent rather than postinstall.
+- **`[install.security] scanner = "<pkg>"`** — third-party security
+  scanner plugin slot in `bunfig.toml`. Bun's own template at
+  https://github.com/oven-sh/security-scanner-template. Not yet
+  picked; each scanner is itself a supply-chain trust decision
+  (runs install-time code), so deliberate choice required.
 
 ### Incident response
 
