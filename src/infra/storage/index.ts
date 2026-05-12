@@ -2,7 +2,7 @@
 export { GORDON_DIR, getGordonDir } from "./paths.ts";
 
 // Configuration management
-export { CONFIG_PATH, loadConfig, saveConfig } from "./config.ts";
+export { CONFIG_PATH, loadConfig, saveConfig } from "./config/config.ts";
 
 // Config migration
 export {
@@ -19,7 +19,7 @@ export {
   type ConfigVersion,
   type Migration,
   type MigrationFn,
-} from "./config-migration.ts";
+} from "./config/config-migration.ts";
 
 // Environment file management
 export {
@@ -30,7 +30,7 @@ export {
   createEnvFile,
   type EnvKeys,
   type EnvStatus,
-} from "./env.ts";
+} from "./config/env.ts";
 
 // Database management
 export {
@@ -70,13 +70,13 @@ export {
 } from "./backup.ts";
 
 // Plan CRUD operations
-export { createPlan, getPlan, updatePlan, listPlans } from "./plans.ts";
+export { createPlan, getPlan, updatePlan, listPlans } from "./entities/plans.ts";
 
 // Trade CRUD operations
-export { createTrade, getTrade, updateTrade, listTrades } from "./trades.ts";
+export { createTrade, getTrade, updateTrade, listTrades } from "./entities/trades.ts";
 
 // Event logging
-export { logEvent, getEvents } from "./events.ts";
+export { logEvent, getEvents } from "./entities/events.ts";
 
 // Chat history persistence
 export {
@@ -92,7 +92,7 @@ export {
   type ChatHistoryMessage,
   type ChatSession,
   type ChatSessionSummary,
-} from "./chat-history.ts";
+} from "./entities/chat-history.ts";
 
 // Session management for Mastra agent memory
 export {
@@ -109,4 +109,4 @@ export {
   generateThreadId,
   type SessionState,
   type SessionInfo,
-} from "./session.ts";
+} from "./entities/session.ts";

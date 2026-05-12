@@ -3,7 +3,7 @@ import { withResultCache, withResultCacheAll } from "./withResultCache.ts";
 import {
   _resetDefaultToolResultCacheForTests,
   getDefaultToolResultCache,
-} from "../toolResultCache.ts";
+} from "../tooling/toolResultCache.ts";
 
 const FLAG = "GORDON_TOOL_RESULT_CACHE";
 

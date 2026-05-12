@@ -19,7 +19,7 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
-import { cdpRequest, isCdpConfigured, CDP_NOT_CONFIGURED_MSG } from "../../data/cdpRest.ts";
+import { cdpRequest, isCdpConfigured, CDP_NOT_CONFIGURED_MSG } from "../../data/providers/cdpRest.ts";
 
 const WEBHOOK_EVENT_TYPES = [
   "erc20_transfer",

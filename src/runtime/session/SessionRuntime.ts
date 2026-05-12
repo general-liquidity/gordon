@@ -5,7 +5,7 @@ import type {
   GordonRuntimeToolAccessResult,
 } from "../../infra/agents/types.ts";
 import type { StreamEvent } from "../../infra/agents/orchestrator.ts";
-import type { SessionInfo } from "../../infra/storage/session.ts";
+import type { SessionInfo } from "../../infra/storage/entities/session.ts";
 import type {
   RuntimeApprovalRequest,
   RuntimeHistoryResult,

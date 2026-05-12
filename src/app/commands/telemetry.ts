@@ -1,7 +1,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 
-import { loadConfig, saveConfig } from "../../infra/storage/config.ts";
+import { loadConfig, saveConfig } from "../../infra/storage/config/config.ts";
 import { GORDON_DIR } from "../../infra/storage/paths.ts";
 import {
   getStructuredAxiomPrivacyStatus,

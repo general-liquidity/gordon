@@ -16,7 +16,7 @@ import {
   loadGeneratedStrategy,
   getGeneratedStrategyBacktest,
   type GeneratedStrategySummary,
-} from '../../infra/storage/generated-strategies.ts';
+} from '../../infra/storage/entities/generated-strategies.ts';
 import { createModuleLogger } from '../../infra/logger/index.ts';
 import { playbookRegistry } from '../../core/playbooks/index.ts';
 import type { Playbook } from '../../core/playbooks/index.ts';

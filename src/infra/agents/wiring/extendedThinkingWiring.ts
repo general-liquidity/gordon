@@ -17,9 +17,9 @@
  * directly, so depth selection is workflow-aware.
  */
 
-import { providerOptionsForDepth } from "../extendedThinking.ts";
-import type { WorkflowPhase } from "../workflowPhase.ts";
-import type { ThinkingDepth } from "../thinkingPhase.ts";
+import { providerOptionsForDepth } from "../cognition/extendedThinking.ts";
+import type { WorkflowPhase } from "../cognition/workflowPhase.ts";
+import type { ThinkingDepth } from "../cognition/thinkingPhase.ts";
 
 const FLAG_ENV = "GORDON_EXTENDED_THINKING";
 

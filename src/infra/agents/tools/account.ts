@@ -13,7 +13,7 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
-import { listTrades } from "../../storage/trades.ts";
+import { listTrades } from "../../storage/entities/trades.ts";
 import { getGordonContext, isBinanceFamily, type MastraExecutionContext } from "./types.ts";
 
 // ============================================================================

@@ -3,7 +3,7 @@
  * CLI commands for managing OS keyring secure key storage
  */
 
-import { loadConfig, saveConfig } from "../../infra/storage/config.ts";
+import { loadConfig, saveConfig } from "../../infra/storage/config/config.ts";
 import {
   createKeyringProvider,
   KEYRING_SUPPORTED_KEYS,

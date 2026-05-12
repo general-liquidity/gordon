@@ -5,13 +5,13 @@
 // Sources: CoinGecko, Google News, SEC EDGAR, LLM enrichment, multi-source quotes.
 // ============================================================================
 
-export { CoinGeckoClient, getCoinGeckoClient } from "./coingecko.ts";
-export { NewsClient, getNewsClient } from "./news.ts";
-export { SECFilingsClient, getSECFilingsClient } from "./sec-filings.ts";
-export { SECInsiderClient, getSECInsiderClient } from "./sec-insider.ts";
-export type { InsiderTransaction, InsiderSummary, InsiderTransactionType } from "./sec-insider.ts";
-export { SECSegmentsClient, getSECSegmentsClient } from "./sec-segments.ts";
-export type { SegmentBreakdown, SegmentEntry } from "./sec-segments.ts";
+export { CoinGeckoClient, getCoinGeckoClient } from "./providers/coingecko.ts";
+export { NewsClient, getNewsClient } from "./providers/news.ts";
+export { SECFilingsClient, getSECFilingsClient } from "./providers/sec-filings.ts";
+export { SECInsiderClient, getSECInsiderClient } from "./providers/sec-insider.ts";
+export type { InsiderTransaction, InsiderSummary, InsiderTransactionType } from "./providers/sec-insider.ts";
+export { SECSegmentsClient, getSECSegmentsClient } from "./providers/sec-segments.ts";
+export type { SegmentBreakdown, SegmentEntry } from "./providers/sec-segments.ts";
 export {
   screenStocks,
   PRESETS,
@@ -21,14 +21,14 @@ export {
   PRESET_MOMENTUM,
   SP500_TOP,
   NASDAQ_100_SAMPLE,
-} from "./stockScreener.ts";
-export type { ScreenCriteria, ScreenResult, ScreenOptions } from "./stockScreener.ts";
-export { XSearchClient, getXSearchClient } from "./xSearch.ts";
-export type { XTweet, XSearchOptions, XSearchSummary } from "./xSearch.ts";
-export { FundamentalsClient, getFundamentalsClient } from "./fundamentals.ts";
-export { AlphaVantageClient, getAlphaVantageClient } from "./alphaVantage.ts";
-export { enrichQuoteWithLLM } from "./llmEnrichment.ts";
-export { MultiSourceQuoteService } from "./multiSourceQuote.ts";
+} from "./providers/stockScreener.ts";
+export type { ScreenCriteria, ScreenResult, ScreenOptions } from "./providers/stockScreener.ts";
+export { XSearchClient, getXSearchClient } from "./providers/xSearch.ts";
+export type { XTweet, XSearchOptions, XSearchSummary } from "./providers/xSearch.ts";
+export { FundamentalsClient, getFundamentalsClient } from "./providers/fundamentals.ts";
+export { AlphaVantageClient, getAlphaVantageClient } from "./providers/alphaVantage.ts";
+export { enrichQuoteWithLLM } from "./enrichment/llmEnrichment.ts";
+export { MultiSourceQuoteService } from "./providers/multiSourceQuote.ts";
 
 // Data source registry for discovery and health monitoring
 export interface DataSourceInfo {

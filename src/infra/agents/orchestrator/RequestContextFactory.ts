@@ -1,7 +1,7 @@
 import { RequestContext } from "@mastra/core/request-context";
 import type { GordonContext } from "../types.ts";
-import { determineWorkflowPhase } from "../workflowPhase.ts";
-import { getExecutionReadiness } from "../runtimeHarness.ts";
+import { determineWorkflowPhase } from "../cognition/workflowPhase.ts";
+import { getExecutionReadiness } from "../harness/runtimeHarness.ts";
 
 export function createAgentRequestContext(
   context: GordonContext,

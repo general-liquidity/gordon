@@ -27,7 +27,7 @@
 import { ExchangeFactory } from "../exchange/factory.ts";
 import { BrokerFactory } from "../broker/factory.ts";
 import { providerRegistry } from "./providers/registry.ts";
-import { loadEnvFile } from "../storage/env.ts";
+import { loadEnvFile } from "../storage/config/env.ts";
 
 type Invalidator = () => void;
 

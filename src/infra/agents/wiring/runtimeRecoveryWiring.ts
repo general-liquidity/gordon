@@ -18,7 +18,7 @@ import {
   newRecoveryState,
   type RecoveryDecision,
   type RecoveryState,
-} from "../runtimeRecovery.ts";
+} from "../harness/runtimeRecovery.ts";
 
 const FLAG_ENV = "GORDON_RECOVERY_TIERS";
 

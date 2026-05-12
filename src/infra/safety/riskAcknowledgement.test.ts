@@ -5,7 +5,7 @@ import {
   topWeightedDimensions,
   verifyRiskAcknowledgement,
 } from "./riskAcknowledgement.ts";
-import type { RiskAssessment } from "../trading/riskClassifier.ts";
+import type { RiskAssessment } from "../trading/risk/riskClassifier.ts";
 
 function buildAssessment(
   tier: RiskAssessment["tier"],

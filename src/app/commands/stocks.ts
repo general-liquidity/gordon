@@ -11,10 +11,10 @@
  * - /stocks sell <symbol> <qty> [market|limit <price>] [day|gtc|ioc|fok]
  */
 
-import { loadConfig } from "../../infra/storage/config.ts";
+import { loadConfig } from "../../infra/storage/config/config.ts";
 import { BrokerFactory } from "../../infra/broker/factory.ts";
 import { resolveBrokerCredentials, type BrokerAdapter, type BrokerId, type BrokerTimeInForce } from "../../infra/broker/types.ts";
-import { checkEnvStatus } from "../../infra/storage/env.ts";
+import { checkEnvStatus } from "../../infra/storage/config/env.ts";
 
 interface ActiveBrokerResolution {
   broker: BrokerAdapter;

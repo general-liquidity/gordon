@@ -10,8 +10,8 @@
  *   DataSourceManager,
  *   ExchangeDataSource,
  *   getDataSourceManager,
- * } from "./infra/data/sources";
- * import { BinanceAdapter } from "./infra/exchange";
+ * } from "./";
+ * import { BinanceAdapter } from "../../exchange";
  *
  * // Setup
  * const manager = getDataSourceManager();

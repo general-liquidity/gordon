@@ -1,7 +1,7 @@
 import { createModuleLogger } from "../../infra/logger/index.ts";
-import { loadConfig } from "../../infra/storage/config.ts";
-import { checkEnvStatus, loadEnvFile } from "../../infra/storage/env.ts";
-import { getCurrentSession } from "../../infra/storage/session.ts";
+import { loadConfig } from "../../infra/storage/config/config.ts";
+import { checkEnvStatus, loadEnvFile } from "../../infra/storage/config/env.ts";
+import { getCurrentSession } from "../../infra/storage/entities/session.ts";
 import { createLLMClientFromEnv } from "../../infra/ai/llm/index.ts";
 import { BinanceClient } from "../../infra/venues/exchange/clients/binance/index.ts";
 import { BinanceAdapter, ExchangeFactory, type Exchange } from "../../infra/exchange/index.ts";

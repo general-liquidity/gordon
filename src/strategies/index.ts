@@ -5,7 +5,7 @@
  * Strategies are automatically registered on import.
  *
  * Usage:
- *   import { strategyRegistry, STRATEGY_IDS } from "./strategies/index.ts";
+ *   import { strategyRegistry, STRATEGY_IDS } from "./index.ts";
  *
  *   // List all strategies
  *   const strategies = strategyRegistry.listStrategies();

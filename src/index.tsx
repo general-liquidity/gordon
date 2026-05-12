@@ -139,7 +139,7 @@ await checkLicense();
 import { startGordonTUI } from "./tui/index.js";
 import { closeDatabase } from "./infra/storage/database.ts";
 import { emitEvent } from "./events/index.ts";
-import { loadConfig } from "./infra/storage/config.ts";
+import { loadConfig } from "./infra/storage/config/config.ts";
 import {
   initializeStructuredAxiom,
   shutdownStructuredAxiom,
@@ -156,7 +156,7 @@ async function gracefulShutdown(signal: string, code: number = 0): Promise<void>
   if (signal === "SIGINT") {
     // Warn about active positions on Ctrl-C
     try {
-      const { loadConfig } = await import("./infra/storage/config.ts");
+      const { loadConfig } = await import("./infra/storage/config/config.ts");
       const config = await loadConfig();
       if (config.permissionMode === "auto") {
         console.log("\n[warn] permissionMode is 'auto'. Open positions will continue on the exchange.");

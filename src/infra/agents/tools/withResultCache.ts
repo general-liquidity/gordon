@@ -17,7 +17,7 @@
  * (3-15s for market reads).
  */
 
-import { getDefaultToolResultCache } from "../toolResultCache.ts";
+import { getDefaultToolResultCache } from "../tooling/toolResultCache.ts";
 import { createModuleLogger } from "../../logger/index.ts";
 
 const logger = createModuleLogger("with-result-cache");

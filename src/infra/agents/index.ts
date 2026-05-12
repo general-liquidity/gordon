@@ -145,7 +145,7 @@ export {
   generateThreadId,
   getMemory,
   resetMemory,
-} from "./memory.ts";
+} from "./memory/memory.ts";
 
 // Thread Management (for "what if" scenario branching)
 export {
@@ -156,12 +156,12 @@ export {
   switchThread,
   updateThreadLabel,
   ensureThreadRegistered,
-} from "./threadManager.ts";
+} from "./memory/threadManager.ts";
 export type {
   ThreadInfo,
   CloneResult,
   SwitchResult,
-} from "./threadManager.ts";
+} from "./memory/threadManager.ts";
 
 // Memory Summarization
 export {
@@ -195,5 +195,5 @@ export {
   reflectWithLLM,
   quickValidatePlan,
   formatReflectionSummary,
-} from "./reflection.ts";
-export type { ReflectionResult, ReflectionOptions } from "./reflection.ts";
+} from "./cognition/reflection.ts";
+export type { ReflectionResult, ReflectionOptions } from "./cognition/reflection.ts";

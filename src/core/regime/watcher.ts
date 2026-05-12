@@ -12,8 +12,8 @@ import type { Exchange } from "../../infra/exchange/types.ts";
 import { RegimeDetector } from "./detector.ts";
 import type { MarketRegime, RegimeSignal } from "./types.ts";
 import { StrategyRuntime } from "../runtime/engine.ts";
-import { listTrades } from "../../infra/storage/trades.ts";
-import { logEvent } from "../../infra/storage/events.ts";
+import { listTrades } from "../../infra/storage/entities/trades.ts";
+import { logEvent } from "../../infra/storage/entities/events.ts";
 import { createModuleLogger } from "../../infra/logger/index.ts";
 
 const logger = createModuleLogger("regime-watcher");

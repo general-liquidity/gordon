@@ -11,7 +11,7 @@
  * - /exchange compare <symbol> - Compare prices across exchanges
  */
 
-import { loadConfig, saveConfig } from '../../infra/storage/config.ts';
+import { loadConfig, saveConfig } from '../../infra/storage/config/config.ts';
 import { ExchangeFactory } from '../../infra/exchange/factory.ts';
 import type { ExchangeId, Exchange } from '../../infra/exchange/types.ts';
 import type { MultiExchangeConfig, GordonConfig } from '../../types/index.ts';

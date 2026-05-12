@@ -11,9 +11,9 @@
  */
 
 import type { Exchange } from "../infra/exchange/types.ts";
-import { listTrades, updateTrade } from "../infra/storage/trades.ts";
-import { getPlan } from "../infra/storage/plans.ts";
-import { logEvent } from "../infra/storage/events.ts";
+import { listTrades, updateTrade } from "../infra/storage/entities/trades.ts";
+import { getPlan } from "../infra/storage/entities/plans.ts";
+import { logEvent } from "../infra/storage/entities/events.ts";
 import { createModuleLogger } from "../infra/logger/index.ts";
 import type { Trade, EntryFill, ExitFill } from "../types/index.ts";
 import { extractOrderOwnerKey } from "../core/orders/order-recovery.ts";

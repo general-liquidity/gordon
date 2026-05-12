@@ -9,7 +9,7 @@ import type { Exchange } from "../../infra/exchange/index.ts";
 import { calculateIndicators, detectLevels } from "../../indicators/index.ts";
 import { createModuleLogger } from "../../infra/logger/index.ts";
 import { emitEvent } from "../../events/index.ts";
-import { logScanOpportunity } from "../../infra/storage/events.ts";
+import { logScanOpportunity } from "../../infra/storage/entities/events.ts";
 import type {
   CoinAnalysis,
   ScanResult,

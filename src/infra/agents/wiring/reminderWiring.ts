@@ -18,7 +18,7 @@ import {
   dailyLossLimitReminder,
   mandateScopeReminder,
   openPositionsReminder,
-} from "../reminderScheduler.ts";
+} from "../reminders/reminderScheduler.ts";
 
 const FLAG_ENV = "GORDON_REMINDERS";
 

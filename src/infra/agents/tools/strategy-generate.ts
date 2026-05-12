@@ -13,7 +13,7 @@ import {
   createStrategyGenerator,
 } from "../strategy-generator.ts";
 import { getGordonContext, normalizeSymbol, type MastraExecutionContext } from "./types.ts";
-import { saveGeneratedStrategy } from "../../storage/generated-strategies.ts";
+import { saveGeneratedStrategy } from "../../storage/entities/generated-strategies.ts";
 
 // ============================================================================
 // Input/Output Schemas

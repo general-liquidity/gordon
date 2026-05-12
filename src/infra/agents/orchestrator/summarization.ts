@@ -14,7 +14,7 @@ import {
   type SummarizerConfig,
   type SummarizationResult,
 } from "../../domain/memory/index.ts";
-import { runLifecycleHooks } from "../lifecycleHooks.ts";
+import { runLifecycleHooks } from "../harness/lifecycleHooks.ts";
 import { getCompactionTrigger } from "../../context/compactionTrigger.ts";
 import type { GordonContext } from "../types.ts";
 import type { Message } from "../../ai/llm/types.ts";

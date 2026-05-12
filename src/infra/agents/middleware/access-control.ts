@@ -10,7 +10,7 @@
  */
 
 import { createModuleLogger } from "../../logger/index.ts";
-import { loadConfig } from "../../storage/config.ts";
+import { loadConfig } from "../../storage/config/config.ts";
 import { auditLog } from "../../platform/audit/index.ts";
 import type { GordonConfig } from "../../../types/index.ts";
 import {

@@ -23,8 +23,8 @@ import {
   formatPaginatedCommandHelp,
   type SlashCommand,
 } from "../../app/slash/slashCommands.ts";
-import { loadConfig, saveConfig } from "../../infra/storage/config.ts";
-import { loadEnvFile } from "../../infra/storage/env.ts";
+import { loadConfig, saveConfig } from "../../infra/storage/config/config.ts";
+import { loadEnvFile } from "../../infra/storage/config/env.ts";
 import { GatewayContextResolver } from "../../gateway/runtime/context.ts";
 import {
   registerContextInvalidator,

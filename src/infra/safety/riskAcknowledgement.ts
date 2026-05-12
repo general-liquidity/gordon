@@ -10,7 +10,7 @@
  * Only gates medium+ tier assessments; low-tier trades pass through.
  */
 
-import type { RiskAssessment, RiskDimension } from "../trading/riskClassifier.ts";
+import type { RiskAssessment, RiskDimension } from "../trading/risk/riskClassifier.ts";
 
 export function isRiskAckEnabled(
   env: NodeJS.ProcessEnv = process.env,

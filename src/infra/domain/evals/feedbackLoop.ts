@@ -10,8 +10,8 @@
  */
 
 import { createModuleLogger } from "../../logger/index.ts";
-import { getTrade, listTrades } from "../../storage/trades.ts";
-import { getPlan } from "../../storage/plans.ts";
+import { getTrade, listTrades } from "../../storage/entities/trades.ts";
+import { getPlan } from "../../storage/entities/plans.ts";
 import type { Trade, Plan } from "../../../types/index.ts";
 import {
   recordTradeOutcome,

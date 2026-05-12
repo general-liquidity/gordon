@@ -1,5 +1,5 @@
 import { createModuleLogger } from "../../infra/logger/index.ts";
-import { loadConfig, saveConfig } from "../../infra/storage/config.ts";
+import { loadConfig, saveConfig } from "../../infra/storage/config/config.ts";
 import { getSchemaByName } from "../../infra/agents/schemas/index.ts";
 import { z } from "zod";
 import type { GordonContext } from "../../infra/agents/types.ts";
@@ -41,7 +41,7 @@ import { EvolutionLoop } from "../../core/genome/evolution-loop.ts";
 import { FeedbackLoop } from "../../core/learning/feedback-loop.ts";
 import { ExecutionSessionManager } from "../../core/execution/session-manager.ts";
 import { parseExecutionIntent } from "../../core/execution/intent-parser.ts";
-import { getTrade } from "../../infra/storage/trades.ts";
+import { getTrade } from "../../infra/storage/entities/trades.ts";
 import { executeEmergencyLiquidation } from "../../core/safety/emergency-liquidation.ts";
 import { cleanupStalePositions } from "../../core/positions/cleanup.ts";
 import { getAutonomousLoopStatus, runAutonomousCycleOnce } from "../../core/pipeline/autonomous-loop.ts";

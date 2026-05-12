@@ -17,7 +17,7 @@ import {
   loadGeneratedStrategy,
   saveGeneratedStrategy,
   getGeneratedStrategyBacktest,
-} from "../../storage/generated-strategies.ts";
+} from "../../storage/entities/generated-strategies.ts";
 
 // ============================================================================
 // Input/Output Schemas

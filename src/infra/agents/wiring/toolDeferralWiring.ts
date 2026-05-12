@@ -20,7 +20,7 @@ import {
   ToolDeferralRegistry,
   classifyToolNames,
   DEFAULT_CORE_TOOL_NAMES,
-} from "../toolDeferral.ts";
+} from "../tooling/toolDeferral.ts";
 
 const FLAG_ENV = "GORDON_TOOL_DEFERRAL";
 

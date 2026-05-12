@@ -4,7 +4,7 @@
  * These are config mutations, not queries; the model should never be called.
  */
 
-import { loadConfig, saveConfig } from "../../infra/storage/config.ts";
+import { loadConfig, saveConfig } from "../../infra/storage/config/config.ts";
 import { setSandboxOverride } from "../../infra/runtime/sandboxOverride.ts";
 import { ExchangeFactory } from "../../infra/exchange/factory.ts";
 import { BrokerFactory } from "../../infra/broker/index.ts";

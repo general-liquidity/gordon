@@ -9,9 +9,9 @@
  */
 
 import type { Exchange, OrderParams } from "../../infra/exchange/index.ts";
-import { listTrades, updateTrade } from "../../infra/storage/trades.ts";
-import { logEvent } from "../../infra/storage/events.ts";
-import { getPlan } from "../../infra/storage/plans.ts";
+import { listTrades, updateTrade } from "../../infra/storage/entities/trades.ts";
+import { logEvent } from "../../infra/storage/entities/events.ts";
+import { getPlan } from "../../infra/storage/entities/plans.ts";
 import { createModuleLogger } from "../../infra/logger/index.ts";
 import { emitEvent } from "../../events/index.ts";
 import type { Trade, Plan, ExitFill, EntryFill } from "../../types/index.ts";

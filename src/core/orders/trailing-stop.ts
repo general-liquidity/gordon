@@ -14,9 +14,9 @@
 import { EventEmitter } from "events";
 import type { Exchange, OrderParams, Order } from "../../infra/exchange/index.ts";
 import { calculateATR } from "../indicators/atr.ts";
-import { getTrade, updateTrade } from "../../infra/storage/trades.ts";
-import { getPlan, updatePlan } from "../../infra/storage/plans.ts";
-import { logEvent } from "../../infra/storage/events.ts";
+import { getTrade, updateTrade } from "../../infra/storage/entities/trades.ts";
+import { getPlan, updatePlan } from "../../infra/storage/entities/plans.ts";
+import { logEvent } from "../../infra/storage/entities/events.ts";
 import { createModuleLogger } from "../../infra/logger/index.ts";
 import { emitEvent } from "../../events/index.ts";
 import type { Trade, Plan, ExitFill } from "../../types/index.ts";

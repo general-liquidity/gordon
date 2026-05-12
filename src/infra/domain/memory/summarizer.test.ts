@@ -4,7 +4,7 @@ import { ConversationSummarizer } from "./summarizer.ts";
 import {
   INTEGRATION_GLOSSARY_MARKER,
   PROJECT_TRUTH_MARKER,
-} from "../../agents/contextBudget.ts";
+} from "../../agents/context/contextBudget.ts";
 
 describe("ConversationSummarizer", () => {
   it("preserves stable project-truth and glossary messages outside compaction", async () => {

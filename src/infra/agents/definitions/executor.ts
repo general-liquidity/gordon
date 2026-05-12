@@ -5,7 +5,7 @@
 
 import { Agent } from "@mastra/core/agent";
 import { TokenLimiterProcessor } from "@mastra/core/processors";
-import { composeAgentInstructions } from "../promptSections.ts";
+import { composeAgentInstructions } from "../context/promptSections.ts";
 import { getRoutingToolsForAgent } from "../../runtime/routing/manager.ts";
 import {
   instrumentedTradingTools,
@@ -30,9 +30,9 @@ import {
   instrumentedChainlinkCCIPTools,
   gordonInputGuard,
   gordonOutputSanitizer,
-} from "../instrumentedTools.ts";
+} from "../tooling/instrumentedTools.ts";
 import { tradingInfraTools } from "../tools/tradingInfra.ts";
-import { createSubAgentMemory } from "../memoryFactory.ts";
+import { createSubAgentMemory } from "../memory/memoryFactory.ts";
 import { resolveRuntimeModel, registerObservability } from "../agentHelpers.ts";
 
 const EXECUTOR_INSTRUCTIONS = `You are Gordon's trade executor agent.

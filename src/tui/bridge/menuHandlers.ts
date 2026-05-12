@@ -4,7 +4,7 @@ import {
   formatPaginatedCommandHelp,
   commandToPrompt,
 } from "../../app/slash/slashCommands.ts";
-import { loadConfig, saveConfig } from "../../infra/storage/config.ts";
+import { loadConfig, saveConfig } from "../../infra/storage/config/config.ts";
 import { collectDoctorReport, formatDoctorReport } from "../../app/setup/setup-runtime.ts";
 import {
   stopAutonomousLoop,

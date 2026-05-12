@@ -24,14 +24,14 @@
 
 import { Agent } from "@mastra/core/agent";
 import { createModuleLogger } from "../logger/logger.ts";
-import { getMemoryStats, resetSharedMemory } from "./shared-context.ts";
-import { resetSubAgentMemory } from "./memoryFactory.ts";
+import { getMemoryStats, resetSharedMemory } from "./context/shared-context.ts";
+import { resetSubAgentMemory } from "./memory/memoryFactory.ts";
 import {
   getExecutor,
   getGordon,
   getResearcher,
 } from "./definitions/index.ts";
-import { setMemoryConfig, getMemoryConfig } from "./memoryConfig.ts";
+import { setMemoryConfig, getMemoryConfig } from "./memory/memoryConfig.ts";
 
 // Re-export memory config functions for backward compatibility
 export { setMemoryConfig, getMemoryConfig };

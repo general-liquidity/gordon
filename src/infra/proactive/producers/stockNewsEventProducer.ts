@@ -21,7 +21,7 @@ import type { CandidateProducer } from "../proactiveEngine.ts";
 import { buildCandidate } from "../proactiveEngine.ts";
 import type { ProactiveSuggestion } from "../types.ts";
 import { createModuleLogger } from "../../logger/index.ts";
-import { finnhub, isFinnhubConfigured } from "../../data/finnhub.ts";
+import { finnhub, isFinnhubConfigured } from "../../data/providers/finnhub.ts";
 import { fetchStockHeadlines, type StockHeadline } from "../../news/stockHeadlines.ts";
 import { scoreSentiment, type SentimentScore } from "../../news/sentiment.ts";
 

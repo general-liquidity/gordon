@@ -13,7 +13,7 @@
 import { Agent } from "@mastra/core/agent";
 import { TokenLimiterProcessor } from "@mastra/core/processors";
 import { GordonInputGuard, GordonOutputSanitizer } from "../processors/index.ts";
-import { composeAgentInstructions } from "../promptSections.ts";
+import { composeAgentInstructions } from "../context/promptSections.ts";
 import {
   instrumentedIndicatorTools,
   instrumentedMarketDataTools,
@@ -49,8 +49,8 @@ import {
   instrumentedRegimeTools,
   gordonInputGuard,
   gordonOutputSanitizer,
-} from "../instrumentedTools.ts";
-import { createSubAgentMemory } from "../memoryFactory.ts";
+} from "../tooling/instrumentedTools.ts";
+import { createSubAgentMemory } from "../memory/memoryFactory.ts";
 import { resolveRuntimeModel, registerObservability } from "../agentHelpers.ts";
 
 const RESEARCHER_INSTRUCTIONS = `You are a Researcher agent within Gordon, a trading CLI.

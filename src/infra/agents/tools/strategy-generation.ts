@@ -20,7 +20,7 @@ import {
   countGeneratedStrategies,
   deleteGeneratedStrategy,
   type GeneratedStrategyQueryOptions,
-} from "../../storage/generated-strategies.ts";
+} from "../../storage/entities/generated-strategies.ts";
 
 // ============================================================================
 // List Generated Strategies Tool

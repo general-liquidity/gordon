@@ -14,7 +14,7 @@ import { z } from "zod";
 
 import { scan } from "../../../core/pipeline/scanner.ts";
 import { analyze } from "../../../core/pipeline/analyzer.ts";
-import { getHistoricalOpportunities, getOpportunitySummary } from "../../storage/events.ts";
+import { getHistoricalOpportunities, getOpportunitySummary } from "../../storage/entities/events.ts";
 import {
   getGordonContext,
   validateToolOutput,

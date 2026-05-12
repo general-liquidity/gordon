@@ -13,17 +13,17 @@ import {
   getSandbox,
   listSandboxes,
   compareSandboxes,
-} from "../../trading/strategySandbox.ts";
+} from "../../trading/ops/strategySandbox.ts";
 import {
   classifyTradeRisk,
   DEFAULT_CLASSIFIER_CONFIG,
-} from "../../trading/riskClassifier.ts";
+} from "../../trading/risk/riskClassifier.ts";
 import {
   saveCheckpoint,
   listCheckpoints,
   getLatestCheckpoint,
   formatCheckpoint,
-} from "../../trading/strategyCheckpoint.ts";
+} from "../../trading/ops/strategyCheckpoint.ts";
 import {
   createRebalanceCycle,
   startStep,
@@ -31,8 +31,8 @@ import {
   failStep,
   detectDrift,
   formatCycleStatus,
-} from "../../trading/autoRebalance.ts";
-import { getMarketContext, formatSymbolHover } from "../../trading/marketContext.ts";
+} from "../../trading/portfolio/autoRebalance.ts";
+import { getMarketContext, formatSymbolHover } from "../../trading/signals/marketContext.ts";
 
 // ============================================================================
 // Strategy Sandbox Tools

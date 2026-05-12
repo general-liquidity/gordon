@@ -23,7 +23,7 @@
  */
 
 import { createLLMClientFromEnv } from "../../infra/ai/llm/client.ts";
-import { loadConfig } from "../../infra/storage/config.ts";
+import { loadConfig } from "../../infra/storage/config/config.ts";
 import { buildAppGordonContext } from "../../gateway/ui/context.ts";
 import { processSimpleMessage } from "../../infra/agents/orchestrator.ts";
 import { getEventBus } from "../../events/bus.ts";

@@ -1,4 +1,4 @@
-import type { ThreadInfo } from "../agents/threadManager.ts";
+import type { ThreadInfo } from "../agents/memory/threadManager.ts";
 import type { ActionLogEntry } from "./types.ts";
 
 function shorten(value: string, maxLength: number): string {

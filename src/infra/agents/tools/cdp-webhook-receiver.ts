@@ -17,7 +17,7 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
-import { getCdpWebhookReceiver } from "../../data/cdpWebhookReceiver.ts";
+import { getCdpWebhookReceiver } from "../../data/providers/cdpWebhookReceiver.ts";
 
 // ============================================================================
 // 1. start_cdp_webhook_listener

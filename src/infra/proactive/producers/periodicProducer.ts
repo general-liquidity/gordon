@@ -22,7 +22,7 @@
 import type { CandidateProducer } from "../proactiveEngine.ts";
 import { buildCandidate } from "../proactiveEngine.ts";
 import type { ProactiveSuggestion } from "../types.ts";
-import { getCdpWebhookReceiver } from "../../data/cdpWebhookReceiver.ts";
+import { getCdpWebhookReceiver } from "../../data/providers/cdpWebhookReceiver.ts";
 
 export const periodicProducer: CandidateProducer = async (obs): Promise<ProactiveSuggestion[]> => {
   if (obs.source !== "monitor_loop") return [];

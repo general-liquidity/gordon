@@ -18,7 +18,7 @@ import { gordonAgent } from "./agents.ts";
 import {
   buildPromptEnvelope,
   type GroundedPromptMessage,
-} from "./contextBudget.ts";
+} from "./context/contextBudget.ts";
 import {
   formatIntegrationGlossary,
   selectRelevantIntegrationGlossary,
@@ -47,27 +47,27 @@ import {
   getPlanningHandoff,
   resetLoopSignals,
   resetReminderState,
-} from "./runtimeHarness.ts";
-import { determineWorkflowPhase } from "./workflowPhase.ts";
+} from "./harness/runtimeHarness.ts";
+import { determineWorkflowPhase } from "./cognition/workflowPhase.ts";
 import {
   runThinkingPhase,
   getThinkingDepthFromContext,
   shouldRunToolFreeThinking,
   prependThinkingTrace,
   type ThinkingResult,
-} from "./thinkingPhase.ts";
-import { runCritiquePhase } from "./critiquePhase.ts";
+} from "./cognition/thinkingPhase.ts";
+import { runCritiquePhase } from "./cognition/critiquePhase.ts";
 import {
   validateAndRepairTranscript,
   formatTranscriptRepairBlock,
   validateAndRepairModelMessages,
-} from "./transcriptValidator.ts";
+} from "./cognition/transcriptValidator.ts";
 import {
   runLifecycleHooks,
   startLifecycleSession,
   endLifecycleSession,
   type LifecycleHookPayload,
-} from "./lifecycleHooks.ts";
+} from "./harness/lifecycleHooks.ts";
 import {
   defaultHandoffCoordinator,
   type HandoffRecord,
@@ -95,10 +95,10 @@ import {
   areMCPSchemasDiscovered,
   scheduleBackgroundDiscoveryRefresh,
 } from "../ai/mcp/client.ts";
-import { captureAuditedRequest } from "./promptCacheAudit.ts";
+import { captureAuditedRequest } from "./context/promptCacheAudit.ts";
 import type { Message } from "../ai/llm/types.ts";
 import { resetAgents } from "./agents.ts";
-import { rebuildACEMemoryForThread, getACEMemorySnapshot } from "./aceMemory.ts";
+import { rebuildACEMemoryForThread, getACEMemorySnapshot } from "./memory/aceMemory.ts";
 import {
   type StreamWriter,
   type StreamingResult,
@@ -107,7 +107,7 @@ import {
   createChunk,
   createEndChunk,
   createErrorChunk,
-} from "./streamWriter.ts";
+} from "./streaming/streamWriter.ts";
 
 // ── Extracted modules ──────────────────────────────────────────────────────
 import {

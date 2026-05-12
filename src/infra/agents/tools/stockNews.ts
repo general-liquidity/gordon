@@ -15,7 +15,7 @@ import {
   type StockHeadline,
 } from "../../news/stockHeadlines.ts";
 import { scoreSentiment, aggregateSentiment } from "../../news/sentiment.ts";
-import { finnhub, isFinnhubConfigured } from "../../data/finnhub.ts";
+import { finnhub, isFinnhubConfigured } from "../../data/providers/finnhub.ts";
 import { wrapUntrustedContent } from "../../security/untrustedContent.ts";
 
 const SOURCE_ENUM = ["yahoo", "edgar", "finnhub"] as const;

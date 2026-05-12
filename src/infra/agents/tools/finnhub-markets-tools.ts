@@ -17,7 +17,7 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
-import { finnhub, isFinnhubConfigured, FINNHUB_NOT_CONFIGURED_MSG } from "../../data/finnhub.ts";
+import { finnhub, isFinnhubConfigured, FINNHUB_NOT_CONFIGURED_MSG } from "../../data/providers/finnhub.ts";
 import { registerSymbols } from "../../../tui/components/markdownPalette.ts";
 
 function unconfigured<T extends Record<string, unknown>>(extra: T): T & { configured: false; error: string } {

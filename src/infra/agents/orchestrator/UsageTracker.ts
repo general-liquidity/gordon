@@ -1,4 +1,4 @@
-import { attachCumulativeUsageToPromptReport, attachUsageToPromptReport } from "../contextBudget.ts";
+import { attachCumulativeUsageToPromptReport, attachUsageToPromptReport } from "../context/contextBudget.ts";
 import { recordSessionCostUsage } from "../sessionCostLedger.ts";
 import type { GordonContext } from "../types.ts";
 

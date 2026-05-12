@@ -4,7 +4,7 @@ import {
   resumeSession,
   startNewSession,
   type SessionInfo,
-} from "../../infra/storage/session.ts";
+} from "../../infra/storage/entities/session.ts";
 import type { RuntimeSessionSnapshot } from "../contracts/types.ts";
 
 export class SessionController {

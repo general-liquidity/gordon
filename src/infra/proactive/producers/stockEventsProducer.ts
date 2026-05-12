@@ -19,7 +19,7 @@ import type { CandidateProducer } from "../proactiveEngine.ts";
 import { buildCandidate } from "../proactiveEngine.ts";
 import type { ProactiveSuggestion } from "../types.ts";
 import { createModuleLogger } from "../../logger/index.ts";
-import { finnhub, isFinnhubConfigured } from "../../data/finnhub.ts";
+import { finnhub, isFinnhubConfigured } from "../../data/providers/finnhub.ts";
 
 const logger = createModuleLogger("stock-events-producer");
 

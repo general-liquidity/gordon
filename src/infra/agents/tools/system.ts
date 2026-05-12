@@ -15,7 +15,7 @@ import { z } from "zod";
 
 import { getGordonContext, type MastraExecutionContext } from "./types.ts";
 import { providerRegistry, getDedalusModels, refreshDedalusModels, getActiveRoute, DIRECT_MODELS, type DirectProviderName } from "../../runtime/providers/registry.ts";
-import { loadConfig, loadConfigBundle, saveResolvedConfig } from "../../storage/config.ts";
+import { loadConfig, loadConfigBundle, saveResolvedConfig } from "../../storage/config/config.ts";
 import { ExchangeFactory } from "../../exchange/index.ts";
 import { BrokerFactory } from "../../broker/factory.ts";
 import { getToolCacheStats, clearToolCache, pruneToolCache } from "./cache.ts";

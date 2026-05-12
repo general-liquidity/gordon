@@ -13,7 +13,7 @@
  *   interpretDSL,
  *   saveStrategy,
  *   loadStrategy,
- * } from "./strategies/dsl/index.ts";
+ * } from "./index.ts";
  *
  * // Define a strategy using the DSL
  * const myStrategy = {

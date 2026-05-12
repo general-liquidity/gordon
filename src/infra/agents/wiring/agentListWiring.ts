@@ -17,7 +17,7 @@ import {
   shouldRefreshAgentList,
   type AgentListAttachment,
   type AgentListEntry,
-} from "../agentListAttachment.ts";
+} from "../context/agentListAttachment.ts";
 
 const FLAG_ENV = "GORDON_AGENT_LIST_ATTACHMENT";
 

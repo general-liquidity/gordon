@@ -26,7 +26,7 @@ import { buildSkillMetadataSection, resolveSkillInvocation } from "../skills/ind
 import { formatMemoriesForPrompt } from "../memory/sessionMemory.ts";
 import { emitAgentEvent } from "../agents/streaming/coordinator.ts";
 import { createEvent } from "../agents/streaming/events.ts";
-import { formatFeedbackForPrompt } from "../trading/feedbackLoop.ts";
+import { formatFeedbackForPrompt } from "../trading/ops/feedbackLoop.ts";
 
 // ============================================================================
 // Types

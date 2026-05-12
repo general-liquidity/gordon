@@ -154,7 +154,7 @@ export { protocolTools } from "../../../core/playbooks/protocol-tools.ts";
 export { multiModalChartTools } from "../../tools/chartTools.ts";
 
 // Shared context tools for cross-agent memory
-export { sharedContextTools } from "../shared-context.ts";
+export { sharedContextTools } from "../context/shared-context.ts";
 
 // Eval tools for learning from trade outcomes
 export { evalTools } from "../../domain/evals/tools.ts";

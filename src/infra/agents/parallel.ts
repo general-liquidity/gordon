@@ -26,7 +26,7 @@ import type {
   ResultData,
   AnalysisChunk,
   StreamingResult,
-} from "./streamWriter.ts";
+} from "./streaming/streamWriter.ts";
 import {
   createChunk,
   createProgressChunk,
@@ -36,7 +36,7 @@ import {
   createEndChunk,
   createHeartbeatChunk,
   createStreamingPipeline,
-} from "./streamWriter.ts";
+} from "./streaming/streamWriter.ts";
 
 const logger = createModuleLogger("parallel");
 
@@ -1569,4 +1569,4 @@ export {
   CallbackStreamWriter,
   MultiplexStreamWriter,
   TransformStreamWriter,
-} from "./streamWriter.ts";
+} from "./streaming/streamWriter.ts";

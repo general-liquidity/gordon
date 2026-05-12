@@ -14,9 +14,9 @@ import {
   recordToolCallFingerprint,
   registerPlanningArtifactFromResult,
   resetLoopSignals,
-} from "../runtimeHarness.ts";
-import { runLifecycleHooks } from "../lifecycleHooks.ts";
-import { compileSubagentProfiles, isToolAllowedForAgent } from "../subagentProfiles.ts";
+} from "../harness/runtimeHarness.ts";
+import { runLifecycleHooks } from "../harness/lifecycleHooks.ts";
+import { compileSubagentProfiles, isToolAllowedForAgent } from "../harness/subagentProfiles.ts";
 import { defaultHandoffCoordinator } from "./HandoffCoordinator.ts";
 import { getDynamicToolAgentMap } from "../../runtime/routing/manager.ts";
 import { checkToolSecurity } from "./guardrailEvaluator.ts";

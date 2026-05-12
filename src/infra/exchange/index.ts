@@ -17,7 +17,7 @@
  *
  * @example
  * ```typescript
- * import { ExchangeFactory, type Exchange } from './infra/exchange';
+ * import { ExchangeFactory, type Exchange } from './';
  *
  * // Create exchange instance using factory (recommended)
  * const exchange: Exchange = ExchangeFactory.create('binance', {

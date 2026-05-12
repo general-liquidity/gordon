@@ -11,13 +11,13 @@
 import type { Message, MessageRole } from "../../ai/llm/types.ts";
 import type { LLMClient } from "../../ai/llm/client.ts";
 import { createModuleLogger } from "../../logger/index.ts";
-import { resolveLegacyModelRouteForWorkflowPhase } from "../../agents/workflowPhase.ts";
+import { resolveLegacyModelRouteForWorkflowPhase } from "../../agents/cognition/workflowPhase.ts";
 import {
   INTEGRATION_GLOSSARY_MARKER,
   PROJECT_TRUTH_MARKER,
   RUNTIME_STATE_MARKER,
   TOOL_CONTEXT_MARKER,
-} from "../../agents/contextBudget.ts";
+} from "../../agents/context/contextBudget.ts";
 import { EXCHANGE_IDS } from "../../exchange/types.ts";
 import { BROKER_IDS } from "../../broker/types.ts";
 import { STRATEGY_IDS } from "../../../strategies/types.ts";

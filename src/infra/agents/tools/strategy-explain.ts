@@ -8,7 +8,7 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
-import { loadGeneratedStrategy, getGeneratedStrategyBacktest } from "../../storage/generated-strategies.ts";
+import { loadGeneratedStrategy, getGeneratedStrategyBacktest } from "../../storage/entities/generated-strategies.ts";
 import type { StrategyDSL, SignalRule, Condition, StopLoss, TakeProfit } from "../../../strategies/dsl/schema.ts";
 import { getGordonContext, type MastraExecutionContext } from "./types.ts";
 

@@ -31,9 +31,9 @@ import { PrivacyConsent, type PrivacyChoices } from "./components/PrivacyConsent
 // import { HandoffArrow } from "./components/HandoffArrow.js";
 import { PromptInput } from "./components/PromptInput.js";
 import { defaultMessageQueue } from "../infra/runtime/messageQueue.js";
-import { saveEnvKeys } from "../infra/storage/env.js";
+import { saveEnvKeys } from "../infra/storage/config/env.ts";
 import { providerRegistry } from "../infra/runtime/providers/registry.js";
-import { loadConfig, saveConfig } from "../infra/storage/config.js";
+import { loadConfig, saveConfig } from "../infra/storage/config/config.js";
 import { refreshRuntimeCredentials } from "./bridge/runtime.js";
 import { VirtualMessageList } from "./components/VirtualMessageList.js";
 import { CostDisplay } from "./components/CostDisplay.js";
@@ -1414,7 +1414,7 @@ function AppInner() {
             fs.writeFileSync(telemetryStateFile, JSON.stringify(state, null, 2), "utf-8");
 
             // Persist research data choice into config.json
-            const { loadConfig, saveConfig } = await import("../infra/storage/config.ts");
+            const { loadConfig, saveConfig } = await import("../infra/storage/config/config.ts");
             const config = await loadConfig();
             if (!config.telemetry) config.telemetry = { enabled: false, researchData: false };
             config.telemetry.enabled = choices.telemetryEnabled;
@@ -1647,7 +1647,7 @@ function AppInner() {
         currentModel={(getState() as any).modelName ?? "default"}
         onSelect={async (provider, model) => {
           try {
-            const { loadConfig: lc, saveConfig: sc } = await import("../infra/storage/config.ts");
+            const { loadConfig: lc, saveConfig: sc } = await import("../infra/storage/config/config.ts");
             const cfg = await lc();
             await sc({ ...cfg, modelConfig: { ...cfg.modelConfig, provider: provider as any, model } });
             // Update env vars so resolveRuntimeModel() picks up the change
@@ -1677,7 +1677,7 @@ function AppInner() {
 
   if (showThemePicker) {
     return <ThemePicker onSelect={async (theme: string) => {
-      try { const { loadConfig: lc, saveConfig: sc } = await import("../infra/storage/config.ts"); const cfg = await lc(); await sc({ ...cfg, theme } as any); } catch {}
+      try { const { loadConfig: lc, saveConfig: sc } = await import("../infra/storage/config/config.ts"); const cfg = await lc(); await sc({ ...cfg, theme } as any); } catch {}
       dispatch({ type: "ADD_MESSAGE", message: { id: `theme-${Date.now()}`, role: "system", content: `Theme changed to ${theme}. Restart for full effect.`, timestamp: new Date().toISOString() } });
       setShowThemePicker(false);
     }} onClose={() => setShowThemePicker(false)} />;
@@ -1718,7 +1718,7 @@ function AppInner() {
       { key: "startupBannerMode", label: "Startup Banner", category: "UI", currentValue: "full", type: "select", options: [{ label: "full", value: "full" }, { label: "quiet", value: "quiet" }] },
       { key: "useKeyring", label: "Use Keyring", category: "Security", currentValue: "false", type: "boolean", description: "Store credentials in OS keyring" },
     ]} onSave={async (key, value) => {
-      try { const { loadConfig: lc, saveConfig: sc } = await import("../infra/storage/config.ts"); const cfg = await lc(); await sc({ ...cfg, [key]: value }); } catch {}
+      try { const { loadConfig: lc, saveConfig: sc } = await import("../infra/storage/config/config.ts"); const cfg = await lc(); await sc({ ...cfg, [key]: value }); } catch {}
       dispatch({ type: "ADD_MESSAGE", message: { id: `config-${Date.now()}`, role: "system", content: `Config updated: ${key} = ${value}`, timestamp: new Date().toISOString() } });
     }} onCancel={() => setShowConfigEditor(false)} />;
   }

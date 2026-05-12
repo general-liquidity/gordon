@@ -22,7 +22,7 @@ import {
   getAutonomousLoopStatus,
 } from "../../../core/pipeline/autonomous-loop.ts";
 import { loadMandateState, saveMandateState } from "../../../core/lifecycle/session-persistence.ts";
-import { loadConfig } from "../../storage/config.ts";
+import { loadConfig } from "../../storage/config/config.ts";
 
 // ============================================================================
 // Error Messages

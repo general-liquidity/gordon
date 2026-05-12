@@ -9,7 +9,7 @@
 
 import { getDynamicToolAgentMap } from "../../runtime/routing/manager.ts";
 import { createModuleLogger } from "../../logger/index.ts";
-import { getExecutionReadiness } from "../runtimeHarness.ts";
+import { getExecutionReadiness } from "../harness/runtimeHarness.ts";
 import type { GordonContext } from "../types.ts";
 
 const logger = createModuleLogger("orchestrator-tool-map");

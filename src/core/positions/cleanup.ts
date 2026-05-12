@@ -9,7 +9,7 @@
  */
 
 import { createModuleLogger } from "../../infra/logger/index.ts";
-import { logEvent } from "../../infra/storage/events.ts";
+import { logEvent } from "../../infra/storage/entities/events.ts";
 import { getPositionStore } from "./store.ts";
 import type { PositionState } from "./types.ts";
 

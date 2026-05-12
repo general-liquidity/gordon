@@ -10,7 +10,7 @@ import { GORDON_DIR } from "../infra/storage/paths.ts";
 import type { ScanResult, CoinAnalysis } from "../types/market.ts";
 import type { DetailedAnalysis } from "../core/pipeline/analyzer.ts";
 import type { BacktestResult, BacktestMetrics } from "../backtest/types.ts";
-import type { ChatSession } from "../infra/storage/chat-history.ts";
+import type { ChatSession } from "../infra/storage/entities/chat-history.ts";
 
 // ============================================================================
 // Types

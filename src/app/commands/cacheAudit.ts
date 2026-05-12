@@ -2,7 +2,7 @@ import {
   auditCacheBlocks,
   formatCacheBlockAudit,
   getLatestAuditedRequest,
-} from "../../infra/agents/promptCacheAudit.ts";
+} from "../../infra/agents/context/promptCacheAudit.ts";
 
 export interface CacheAuditCommandResult {
   success: boolean;

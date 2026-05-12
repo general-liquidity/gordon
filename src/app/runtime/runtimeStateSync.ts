@@ -1,4 +1,4 @@
-import type { SessionInfo } from "../../infra/storage/session.ts";
+import type { SessionInfo } from "../../infra/storage/entities/session.ts";
 import type { RuntimeSessionState } from "../../runtime/state/SessionState.ts";
 import type { RuntimeInspectorViewModel } from "../presenters/RuntimePresenter.ts";
 

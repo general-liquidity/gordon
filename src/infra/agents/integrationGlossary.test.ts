@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 
 import { GordonConfigSchema } from "../../types/config.ts";
-import { buildPromptEnvelope, clearPromptContextReports } from "./contextBudget.ts";
+import { buildPromptEnvelope, clearPromptContextReports } from "./context/contextBudget.ts";
 import {
   formatIntegrationGlossary,
   getCanonicalIntegrationGlossary,

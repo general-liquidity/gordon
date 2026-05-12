@@ -14,7 +14,7 @@ import type { Trade } from "../../types/index.ts";
 import { CounterfactualAnalyzer } from "./counterfactual-analyzer.ts";
 import { saveReport, getRecurringInsights } from "./insight-store.ts";
 import { createModuleLogger } from "../../infra/logger/index.ts";
-import { logEvent } from "../../infra/storage/events.ts";
+import { logEvent } from "../../infra/storage/entities/events.ts";
 import { GenomeManager } from "../genome/manager.ts";
 import { saveSuggestion } from "../genome/store.ts";
 import type { Mutation } from "../genome/types.ts";

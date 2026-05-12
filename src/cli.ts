@@ -290,8 +290,8 @@ export function printVersion(): void {
 }
 
 export async function printStatusJson(): Promise<void> {
-  const { checkEnvStatus } = await import("./infra/storage/env.ts");
-  const { loadConfig } = await import("./infra/storage/config.ts");
+  const { checkEnvStatus } = await import("./infra/storage/config/env.ts");
+  const { loadConfig } = await import("./infra/storage/config/config.ts");
 
   try {
     const envStatus = await checkEnvStatus();
@@ -344,7 +344,7 @@ export async function runCleanup(): Promise<void> {
 
   // Clean old chat sessions
   try {
-    const { cleanupOldSessions } = await import("./infra/storage/chat-history.ts");
+    const { cleanupOldSessions } = await import("./infra/storage/entities/chat-history.ts");
     const result = await cleanupOldSessions({ keepDays: 30 });
     if (result.deleted > 0) {
       console.log(`  Removed ${result.deleted} chat sessions older than 30 days`);
@@ -368,7 +368,7 @@ export async function runCleanup(): Promise<void> {
 
   // Prune config backups
   try {
-    const { pruneConfigBackups } = await import("./infra/storage/config-migration.ts");
+    const { pruneConfigBackups } = await import("./infra/storage/config/config-migration.ts");
     const pruned = await pruneConfigBackups(5);
     if (pruned > 0) {
       console.log(`  Pruned ${pruned} old config backups`);

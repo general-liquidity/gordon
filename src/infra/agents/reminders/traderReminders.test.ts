@@ -12,7 +12,7 @@ import {
   recordVenueFailure,
   resetReminderState,
   resetLoopSignals,
-} from "../runtimeHarness.ts";
+} from "../harness/runtimeHarness.ts";
 import type { GordonContext } from "../types.ts";
 import {
   TRADER_REMINDER_CATEGORIES,

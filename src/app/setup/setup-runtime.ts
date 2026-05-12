@@ -1,6 +1,6 @@
 import { createKeyringProvider, KEYRING_SUPPORTED_KEYS } from "../../infra/storage/keyring.ts";
-import { checkEnvStatus, createEnvFile, saveEnvKeys, type EnvKeys } from "../../infra/storage/env.ts";
-import { loadConfig, saveConfig } from "../../infra/storage/config.ts";
+import { checkEnvStatus, createEnvFile, saveEnvKeys, type EnvKeys } from "../../infra/storage/config/env.ts";
+import { loadConfig, saveConfig } from "../../infra/storage/config/config.ts";
 import { getProviderCredentialStatuses, type ProviderCredentialStatus } from "../../infra/runtime/actions/index.ts";
 import { BROKER_ENV_MAP, type BrokerId } from "../../infra/broker/types.ts";
 import { EXCHANGE_ENV_MAP, type ExchangeId } from "../../infra/exchange/types.ts";

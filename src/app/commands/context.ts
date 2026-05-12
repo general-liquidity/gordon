@@ -1,7 +1,7 @@
 import {
   formatPromptContextReport,
   getLatestPromptContextReport,
-} from "../../infra/agents/contextBudget.ts";
+} from "../../infra/agents/context/contextBudget.ts";
 import { getEventBus, type EventData } from "../../events/index.ts";
 
 export interface ContextCommandResult {

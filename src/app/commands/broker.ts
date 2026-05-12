@@ -10,7 +10,7 @@
  * - /broker status           - Show connection status for all
  */
 
-import { loadConfig, saveConfig } from "../../infra/storage/config.ts";
+import { loadConfig, saveConfig } from "../../infra/storage/config/config.ts";
 import { BrokerFactory } from "../../infra/broker/factory.ts";
 import { resolveBrokerCredentials, type BrokerId } from "../../infra/broker/types.ts";
 import type { GordonConfig, MultiBrokerConfig } from "../../types/index.ts";

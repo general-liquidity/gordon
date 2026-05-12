@@ -154,7 +154,7 @@ export function subscribeToEvents(dispatch: Dispatch): () => void {
 
       // Wire: feedback loop — record outcome for pattern confidence adjustment
       try {
-        const { recordTradeOutcome } = require("../../infra/trading/feedbackLoop.ts") as typeof import("../../infra/trading/feedbackLoop.ts");
+        const { recordTradeOutcome } = require("../../infra/trading/feedbackLoop.ts") as typeof import("../../infra/trading/ops/feedbackLoop.ts");
         recordTradeOutcome({
           id: `trade_${Date.now()}`,
           pattern: (event.trade as any).strategy ?? (event.trade as any).setupType ?? "manual",

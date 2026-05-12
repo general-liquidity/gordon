@@ -28,15 +28,15 @@ import { TradeSchema } from "../../../types/trade.ts";
 import { emitEvent } from "../../../events/index.ts";
 import { recordStructuredObservation } from "../../platform/observability/index.ts";
 import { appendActionLogEntry } from "../../action-log/index.ts";
-import { loadConfigBundle, saveResolvedConfig } from "../../storage/config.ts";
-import { listPlans, getPlan, updatePlan, createPlan } from "../../storage/plans.ts";
-import { listTrades, getTrade } from "../../storage/trades.ts";
+import { loadConfigBundle, saveResolvedConfig } from "../../storage/config/config.ts";
+import { listPlans, getPlan, updatePlan, createPlan } from "../../storage/entities/plans.ts";
+import { listTrades, getTrade } from "../../storage/entities/trades.ts";
 import { getGordonContext, normalizeSymbol, validateToolOutput, type MastraExecutionContext } from "./types.ts";
 import { checkTradingPermission } from "./permissionHelpers.ts";
 import { setSandboxOverride } from "../../runtime/sandboxOverride.ts";
 import { ExchangeFactory } from "../../exchange/index.ts";
 import { BrokerFactory } from "../../broker/factory.ts";
-import { reflectOnPlan, formatReflectionSummary } from "../reflection.ts";
+import { reflectOnPlan, formatReflectionSummary } from "../cognition/reflection.ts";
 import { getTradingService } from "../../../services/trading.service.ts";
 import {
   recordUserThesis,

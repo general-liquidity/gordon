@@ -11,8 +11,8 @@
  */
 
 import { createModuleLogger } from "../../infra/logger/index.ts";
-import { logEvent } from "../../infra/storage/events.ts";
-import { listTrades } from "../../infra/storage/trades.ts";
+import { logEvent } from "../../infra/storage/entities/events.ts";
+import { listTrades } from "../../infra/storage/entities/trades.ts";
 import type { Exchange } from "../../infra/exchange/types.ts";
 import { GenomeManager } from "./manager.ts";
 import { PlaybookMutator } from "./mutator.ts";

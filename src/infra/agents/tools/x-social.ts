@@ -16,13 +16,13 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
-import { getXSearchClient, summarizeTweets, type XTweet } from "../../data/xSearch.ts";
+import { getXSearchClient, summarizeTweets, type XTweet } from "../../data/providers/xSearch.ts";
 import {
   resolveXContext,
   listXEntitySymbols,
   type XContextAnnotation,
   type XAnnotationCategory,
-} from "../../data/xContextAnnotations.ts";
+} from "../../data/providers/xContextAnnotations.ts";
 
 // ============================================================================
 // Shared helpers

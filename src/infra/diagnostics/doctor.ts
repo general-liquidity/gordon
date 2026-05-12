@@ -30,7 +30,7 @@ import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
 import { isCostHalted, getCostTracker } from "../platform/costTracker.ts";
-import { MAX_WORKING_MEMORY_CHARS } from "../agents/memoryGate.ts";
+import { MAX_WORKING_MEMORY_CHARS } from "../agents/memory/memoryGate.ts";
 import { isSafetyCritical } from "../../runtime/permissions/trustTrajectory.ts";
 import { getACELessonsPath } from "../agents/ace/index.ts";
 import { defaultReviewQueuePath } from "../domain/evals/harness/reviewQueue.ts";

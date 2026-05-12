@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect } from "react";
 import { Box, Text, useInput } from "../ink-custom";
 import { Select, TextInput } from "@inkjs/ui";
-import { loadConfig, saveConfig } from "../../infra/storage/config.ts";
+import { loadConfig, saveConfig } from "../../infra/storage/config/config.ts";
 import { exchangeSwitch } from "../../app/commands/exchange.ts";
 import { ExchangeFactory } from "../../infra/exchange/factory.ts";
 import { refreshRuntimeCredentials } from "../../infra/runtime/credentialRefresh.ts";

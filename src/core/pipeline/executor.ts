@@ -14,9 +14,9 @@
 import type { Exchange, Order, OrderParams, ExchangeExtended, OCOOrderParams } from "../../infra/exchange/index.ts";
 import { BinanceAdapter } from "../../infra/exchange/index.ts";
 import { validatePlan } from "./validator.ts";
-import { createTrade, updateTrade, getTrade, listTrades } from "../../infra/storage/trades.ts";
-import { updatePlan, listPlans, getPlan } from "../../infra/storage/plans.ts";
-import { logEvent } from "../../infra/storage/events.ts";
+import { createTrade, updateTrade, getTrade, listTrades } from "../../infra/storage/entities/trades.ts";
+import { updatePlan, listPlans, getPlan } from "../../infra/storage/entities/plans.ts";
+import { logEvent } from "../../infra/storage/entities/events.ts";
 import { createModuleLogger } from "../../infra/logger/index.ts";
 import { emitEvent } from "../../events/index.ts";
 import {

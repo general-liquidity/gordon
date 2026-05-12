@@ -5,7 +5,7 @@
 
 import { Agent } from "@mastra/core/agent";
 import { TokenLimiterProcessor } from "@mastra/core/processors";
-import { composeAgentInstructions } from "../promptSections.ts";
+import { composeAgentInstructions } from "../context/promptSections.ts";
 import { createModuleLogger } from "../../logger/logger.ts";
 import { getScopedMCPTools } from "../../ai/mcp/client.ts";
 import { getRoutingToolsForAgent } from "../../runtime/routing/manager.ts";
@@ -90,8 +90,8 @@ import {
   instrumentedMetricsTools,
   gordonInputGuard,
   gordonOutputSanitizer,
-} from "../instrumentedTools.ts";
-import { createMemory } from "../memoryFactory.ts";
+} from "../tooling/instrumentedTools.ts";
+import { createMemory } from "../memory/memoryFactory.ts";
 import { resolveRuntimeModel, formatModelLabel, registerObservability } from "../agentHelpers.ts";
 import { getExecutor } from "./executor.ts";
 import { getResearcher } from "./researcher.ts";
