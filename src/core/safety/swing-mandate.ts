@@ -3,7 +3,7 @@
  * Defines constraints and rules for autonomous swing trading sessions
  */
 
-import { createModuleLogger } from "../infra/logger/index.ts";
+import { createModuleLogger } from "../../infra/logger/index.ts";
 
 const logger = createModuleLogger("swing-mandate");
 

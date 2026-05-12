@@ -5,8 +5,8 @@
  * Purely deterministic - no AI involved.
  */
 
-import type { Level } from "../types/index.ts";
-import type { GridConfig } from "../types/plan.ts";
+import type { Level } from "../../types/index.ts";
+import type { GridConfig } from "../../types/plan.ts";
 
 // Types
 export interface GridCalculationInput {

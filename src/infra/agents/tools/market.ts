@@ -12,8 +12,8 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
-import { scan } from "../../../core/scanner.ts";
-import { analyze } from "../../../core/analyzer.ts";
+import { scan } from "../../../core/pipeline/scanner.ts";
+import { analyze } from "../../../core/pipeline/analyzer.ts";
 import { getHistoricalOpportunities, getOpportunitySummary } from "../../storage/events.ts";
 import {
   getGordonContext,
@@ -23,7 +23,7 @@ import {
 } from "./types.ts";
 import { createCachedTool, TOOL_CACHE_CONFIG } from "./cache.ts";
 import { calculateIndicators, detectLevels } from "../../../indicators/index.ts";
-import { detectSupportBounce, determineTrend } from "../../../core/scanner.ts";
+import { detectSupportBounce, determineTrend } from "../../../core/pipeline/scanner.ts";
 import { resolveInstrument } from "../../domain/markets/instruments.ts";
 import {
   formatScanResults,

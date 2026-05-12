@@ -3,25 +3,25 @@
  * Runs Scanner→Analyst pipeline on schedule within mandate constraints
  */
 
-import { createModuleLogger } from "../infra/logger/index.ts";
-import { emitEvent } from "../events/index.ts";
-import type { Exchange } from "../infra/exchange/index.ts";
-import type { MandateTimeframe, SwingMandate } from "./swing-mandate.ts";
+import { createModuleLogger } from "../../infra/logger/index.ts";
+import { emitEvent } from "../../events/index.ts";
+import type { Exchange } from "../../infra/exchange/index.ts";
+import type { MandateTimeframe, SwingMandate } from "../safety/swing-mandate.ts";
 import {
   saveSessionState,
   updateHeartbeat,
   saveMandateState,
   clearMandateState,
   type PersistedSessionState,
-} from "./session-persistence.ts";
+} from "../lifecycle/session-persistence.ts";
 import {
   isMandateExpired,
   isMandateBreached,
   validateMandate,
-} from "./swing-mandate.ts";
+} from "../safety/swing-mandate.ts";
 import type { ScanOptions } from "./scanner.ts";
-import type { CoinAnalysis } from "../types/index.ts";
-import { runSharedScan } from "./market-data-coordinator.ts";
+import type { CoinAnalysis } from "../../types/index.ts";
+import { runSharedScan } from "../lifecycle/market-data-coordinator.ts";
 
 const logger = createModuleLogger("autonomous-loop");
 

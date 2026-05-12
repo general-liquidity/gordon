@@ -25,7 +25,7 @@ import {
 } from "../../platform/resilience/index.ts";
 import type { OrderBookEntry, ExchangeExtended } from "../../exchange/types.ts";
 import { createCachedTool, TOOL_CACHE_CONFIG } from "./cache.ts";
-import { placeOCOOrders } from "../../../core/executor.ts";
+import { placeOCOOrders } from "../../../core/pipeline/executor.ts";
 import { resolveInstrument } from "../../domain/markets/instruments.ts";
 
 // ============================================================================

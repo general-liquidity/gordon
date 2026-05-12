@@ -6,7 +6,7 @@
  *
  * Usage:
  * ```ts
- * import { strategyRuntime } from "../core/runtime/index.ts";
+ * import { strategyRuntime } from "./index.ts";
  *
  * // Set total capital
  * strategyRuntime.setTotalCapital(10000);

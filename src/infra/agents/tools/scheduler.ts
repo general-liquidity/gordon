@@ -17,7 +17,7 @@ import {
   startScheduler,
   stopScheduler,
   getSchedulerStatus,
-} from "../../../core/scheduler.ts";
+} from "../../../core/lifecycle/scheduler.ts";
 import { getGordonContext, type MastraExecutionContext } from "./types.ts";
 
 // ============================================================================

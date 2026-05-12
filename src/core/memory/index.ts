@@ -8,7 +8,7 @@
  *
  * Usage:
  * ```typescript
- * import { getMemoryManager } from "./core/memory";
+ * import { getMemoryManager } from "./";
  *
  * const memory = await getMemoryManager();
  *

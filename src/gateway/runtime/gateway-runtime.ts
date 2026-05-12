@@ -44,7 +44,7 @@ import { parseExecutionIntent } from "../../core/execution/intent-parser.ts";
 import { getTrade } from "../../infra/storage/trades.ts";
 import { executeEmergencyLiquidation } from "../../core/safety/emergency-liquidation.ts";
 import { cleanupStalePositions } from "../../core/positions/cleanup.ts";
-import { getAutonomousLoopStatus, runAutonomousCycleOnce } from "../../core/autonomous-loop.ts";
+import { getAutonomousLoopStatus, runAutonomousCycleOnce } from "../../core/pipeline/autonomous-loop.ts";
 import { appendActionLogEntry } from "../../infra/action-log/index.ts";
 import type { ActionLogEntryType } from "../../infra/action-log/index.ts";
 import { recordStructuredObservation } from "../../infra/platform/observability/index.ts";

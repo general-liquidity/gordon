@@ -5,11 +5,11 @@
  * and opportunity notifications.
  */
 
-import type { Exchange } from "../infra/exchange/index.ts";
-import type { ScanOptions } from "./scanner.ts";
-import { createModuleLogger } from "../infra/logger/index.ts";
-import { emitEvent } from "../events/index.ts";
-import type { CoinAnalysis } from "../types/index.ts";
+import type { Exchange } from "../../infra/exchange/index.ts";
+import type { ScanOptions } from "../pipeline/scanner.ts";
+import { createModuleLogger } from "../../infra/logger/index.ts";
+import { emitEvent } from "../../events/index.ts";
+import type { CoinAnalysis } from "../../types/index.ts";
 import { runSharedScan } from "./market-data-coordinator.ts";
 
 const logger = createModuleLogger("scheduler");

@@ -16,7 +16,7 @@ import { getPlan } from "../infra/storage/plans.ts";
 import { logEvent } from "../infra/storage/events.ts";
 import { createModuleLogger } from "../infra/logger/index.ts";
 import type { Trade, EntryFill, ExitFill } from "../types/index.ts";
-import { extractOrderOwnerKey } from "../core/order-recovery.ts";
+import { extractOrderOwnerKey } from "../core/orders/order-recovery.ts";
 import { StrategyRuntime } from "../core/runtime/engine.ts";
 import { FeedbackLoop } from "../core/learning/feedback-loop.ts";
 import type { ReconciliationResult } from "./reconciliation.service.ts";

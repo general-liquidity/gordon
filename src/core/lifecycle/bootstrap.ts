@@ -6,7 +6,7 @@
  * does not prevent the others from starting.
  *
  * Usage:
- *   import { bootstrapV07 } from "./core/bootstrap.ts";
+ *   import { bootstrapV07 } from "./bootstrap.ts";
  *
  *   const result = await bootstrapV07();
  *   // result.memory, result.playbooks, result.positionStore, result.subscriptionRegistry
@@ -15,25 +15,25 @@
  * exchange connection which is established later in App.tsx.
  */
 
-import { getMemoryManager, type MemoryManager } from "./memory/index.ts";
+import { getMemoryManager, type MemoryManager } from "../memory/index.ts";
 import {
   PlaybookParser,
   PlaybookLoader,
   playbookRegistry,
   type PlaybookRegistry,
-} from "./playbooks/index.ts";
-import { getPositionStore, type PositionStore } from "./positions/index.ts";
-import { initAuditTables } from "./audit/index.ts";
-import { initPlaybookBacktestTable } from "./backtesting/index.ts";
-import { initRuntimeTables } from "./runtime/index.ts";
-import { getDatabase } from "../infra/storage/index.ts";
-import { getEventBus } from "../events/index.ts";
+} from "../playbooks/index.ts";
+import { getPositionStore, type PositionStore } from "../positions/index.ts";
+import { initAuditTables } from "../audit/index.ts";
+import { initPlaybookBacktestTable } from "../backtesting/index.ts";
+import { initRuntimeTables } from "../runtime/index.ts";
+import { getDatabase } from "../../infra/storage/index.ts";
+import { getEventBus } from "../../events/index.ts";
 import {
   getSubscriptionRegistry,
   createDefaultSubscriptions,
   type AgentSubscriptionRegistry,
-} from "../events/index.ts";
-import { createModuleLogger } from "../infra/logger/index.ts";
+} from "../../events/index.ts";
+import { createModuleLogger } from "../../infra/logger/index.ts";
 
 const logger = createModuleLogger("bootstrap");
 

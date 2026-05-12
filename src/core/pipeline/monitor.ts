@@ -8,19 +8,19 @@
  * Optionally supports real-time WebSocket updates for faster detection.
  */
 
-import type { Exchange, OrderParams } from "../infra/exchange/index.ts";
-import { listTrades, updateTrade } from "../infra/storage/trades.ts";
-import { logEvent } from "../infra/storage/events.ts";
-import { getPlan } from "../infra/storage/plans.ts";
-import { createModuleLogger } from "../infra/logger/index.ts";
-import { emitEvent } from "../events/index.ts";
-import type { Trade, Plan, ExitFill, EntryFill } from "../types/index.ts";
+import type { Exchange, OrderParams } from "../../infra/exchange/index.ts";
+import { listTrades, updateTrade } from "../../infra/storage/trades.ts";
+import { logEvent } from "../../infra/storage/events.ts";
+import { getPlan } from "../../infra/storage/plans.ts";
+import { createModuleLogger } from "../../infra/logger/index.ts";
+import { emitEvent } from "../../events/index.ts";
+import type { Trade, Plan, ExitFill, EntryFill } from "../../types/index.ts";
 import {
   BinanceWebSocket,
   type TickerUpdate,
-} from "../infra/venues/exchange/clients/binance/websocket.ts";
+} from "../../infra/venues/exchange/clients/binance/websocket.ts";
 import { cleanupExpiredPlans } from "./executor.ts";
-import { getTrailingStopTracker } from "./trailing-stop.ts";
+import { getTrailingStopTracker } from "../orders/trailing-stop.ts";
 
 const logger = createModuleLogger("monitor");
 

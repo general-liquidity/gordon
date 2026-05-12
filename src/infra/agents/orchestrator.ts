@@ -1060,14 +1060,14 @@ export async function processSimpleMessage(
 export async function quickScan(context: GordonContext) {
   const { exchange, config } = context;
   if (!exchange) throw new Error("Exchange client not connected");
-  const { scan } = await import("../../core/scanner.ts");
+  const { scan } = await import("../../core/pipeline/scanner.ts");
   return scan(exchange, { topN: config.preferences.topNCoins, timeframes: config.preferences.defaultTimeframes });
 }
 
 export async function quickCheckPositions(context: GordonContext) {
   const { exchange } = context;
   if (!exchange) throw new Error("Exchange client not connected");
-  const { runMonitorCycle } = await import("../../core/monitor.ts");
+  const { runMonitorCycle } = await import("../../core/pipeline/monitor.ts");
   return runMonitorCycle(exchange);
 }
 

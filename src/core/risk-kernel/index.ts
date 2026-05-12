@@ -6,7 +6,7 @@
  *
  * Usage:
  * ```ts
- * import { riskKernel } from "../core/risk-kernel/index.ts";
+ * import { riskKernel } from "./index.ts";
  *
  * const decision = await riskKernel.evaluate(order, portfolioContext);
  * if (!decision.approved) {

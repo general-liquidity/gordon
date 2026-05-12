@@ -7,8 +7,8 @@
  * - Recovery of trades after crashes/disconnections
  */
 
-import type { BinanceClient } from "../infra/venues/exchange/clients/binance/client.ts";
-import type { OrderStatus } from "../infra/venues/exchange/clients/binance/types.ts";
+import type { BinanceClient } from "../../infra/venues/exchange/clients/binance/client.ts";
+import type { OrderStatus } from "../../infra/venues/exchange/clients/binance/types.ts";
 
 // Order type for recovery operations
 interface Order {
@@ -25,7 +25,7 @@ interface Order {
   time: number;
   updateTime: number;
 }
-import { createModuleLogger } from "../infra/logger/index.ts";
+import { createModuleLogger } from "../../infra/logger/index.ts";
 
 const logger = createModuleLogger("order-recovery");
 

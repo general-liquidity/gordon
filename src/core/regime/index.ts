@@ -5,7 +5,7 @@
  * using technical indicators on OHLCV candle data.
  *
  * Usage:
- *   import { RegimeDetector } from "./core/regime/index.ts";
+ *   import { RegimeDetector } from "./index.ts";
  *
  *   const detector = RegimeDetector.getInstance();
  *   const signal = detector.detectRegime(candles, "BTCUSDT", "1h");

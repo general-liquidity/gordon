@@ -3,10 +3,10 @@
  * Persists Gordon session state to disk for long-running sessions and crash recovery
  */
 
-import { createModuleLogger } from "../infra/logger/index.ts";
+import { createModuleLogger } from "../../infra/logger/index.ts";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { getGordonDir } from "../infra/storage/paths.ts";
+import { getGordonDir } from "../../infra/storage/paths.ts";
 
 const logger = createModuleLogger("session-persistence");
 let persistenceDirOverride: string | null = null;
@@ -114,7 +114,7 @@ export function isStaleSession(state: PersistedSessionState, maxAgeMs: number = 
 // Mandate Persistence
 // ============================================================================
 
-import type { SwingMandate } from "./swing-mandate.ts";
+import type { SwingMandate } from "../safety/swing-mandate.ts";
 
 export function saveMandateState(mandate: SwingMandate): void {
   try {

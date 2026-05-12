@@ -5,11 +5,11 @@
  * Fully deterministic - no AI involved.
  */
 
-import type { Exchange } from "../infra/exchange/index.ts";
-import { calculateIndicators, detectLevels } from "../indicators/index.ts";
-import { createModuleLogger } from "../infra/logger/index.ts";
-import { emitEvent } from "../events/index.ts";
-import { logScanOpportunity } from "../infra/storage/events.ts";
+import type { Exchange } from "../../infra/exchange/index.ts";
+import { calculateIndicators, detectLevels } from "../../indicators/index.ts";
+import { createModuleLogger } from "../../infra/logger/index.ts";
+import { emitEvent } from "../../events/index.ts";
+import { logScanOpportunity } from "../../infra/storage/events.ts";
 import type {
   CoinAnalysis,
   ScanResult,
@@ -19,7 +19,7 @@ import type {
   Trend,
   Bias,
   Risk,
-} from "../types/index.ts";
+} from "../../types/index.ts";
 
 const logger = createModuleLogger("scanner");
 const SCAN_CONCURRENCY = 6;

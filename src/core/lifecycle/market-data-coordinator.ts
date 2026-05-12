@@ -1,8 +1,8 @@
-import type { Exchange } from "../infra/exchange/index.ts";
-import { createModuleLogger } from "../infra/logger/index.ts";
-import { runMonitorCycle, type MonitorResult } from "./monitor.ts";
-import { scan, type ScanOptions } from "./scanner.ts";
-import type { ScanResult } from "../types/index.ts";
+import type { Exchange } from "../../infra/exchange/index.ts";
+import { createModuleLogger } from "../../infra/logger/index.ts";
+import { runMonitorCycle, type MonitorResult } from "../pipeline/monitor.ts";
+import { scan, type ScanOptions } from "../pipeline/scanner.ts";
+import type { ScanResult } from "../../types/index.ts";
 
 const logger = createModuleLogger("market-data-coordinator");
 

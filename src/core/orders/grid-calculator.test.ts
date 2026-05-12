@@ -1,6 +1,6 @@
 import { describe, it, expect } from "bun:test";
 import { calculatePyramidWeights, calculateEqualWeights, calculateGridLevels } from "./grid-calculator.ts";
-import type { Level } from "../types/index.ts";
+import type { Level } from "../../types/index.ts";
 
 describe("grid-calculator", () => {
   describe("calculatePyramidWeights", () => {

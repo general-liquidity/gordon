@@ -5,10 +5,10 @@
  * No AI involved - purely technical indicator and level analysis.
  */
 
-import type { Exchange } from "../infra/exchange/index.ts";
-import { calculateIndicators, detectLevels } from "../indicators/index.ts";
-import type { CoinAnalysis, Level, Candle, Indicators, Trend, Bias, Risk } from "../types/index.ts";
-import { createModuleLogger } from "../infra/logger/index.ts";
+import type { Exchange } from "../../infra/exchange/index.ts";
+import { calculateIndicators, detectLevels } from "../../indicators/index.ts";
+import type { CoinAnalysis, Level, Candle, Indicators, Trend, Bias, Risk } from "../../types/index.ts";
+import { createModuleLogger } from "../../infra/logger/index.ts";
 
 const logger = createModuleLogger("analyzer");
 

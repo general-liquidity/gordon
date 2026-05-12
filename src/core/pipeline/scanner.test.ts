@@ -11,8 +11,8 @@ import {
   createMockCandles,
   createMockIndicators,
   createMockLevel,
-} from "../test-utils/mocks.ts";
-import type { Candle, Indicators, Level } from "../types/index.ts";
+} from "../../test-utils/mocks.ts";
+import type { Candle, Indicators, Level } from "../../types/index.ts";
 
 describe("determineTrend", () => {
   test("returns 'range' for empty candle array", () => {

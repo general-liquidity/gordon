@@ -11,28 +11,28 @@
  * - Permission validation before trading
  */
 
-import type { Exchange, Order, OrderParams, ExchangeExtended, OCOOrderParams } from "../infra/exchange/index.ts";
-import { BinanceAdapter } from "../infra/exchange/index.ts";
+import type { Exchange, Order, OrderParams, ExchangeExtended, OCOOrderParams } from "../../infra/exchange/index.ts";
+import { BinanceAdapter } from "../../infra/exchange/index.ts";
 import { validatePlan } from "./validator.ts";
-import { createTrade, updateTrade, getTrade, listTrades } from "../infra/storage/trades.ts";
-import { updatePlan, listPlans, getPlan } from "../infra/storage/plans.ts";
-import { logEvent } from "../infra/storage/events.ts";
-import { createModuleLogger } from "../infra/logger/index.ts";
-import { emitEvent } from "../events/index.ts";
+import { createTrade, updateTrade, getTrade, listTrades } from "../../infra/storage/trades.ts";
+import { updatePlan, listPlans, getPlan } from "../../infra/storage/plans.ts";
+import { logEvent } from "../../infra/storage/events.ts";
+import { createModuleLogger } from "../../infra/logger/index.ts";
+import { emitEvent } from "../../events/index.ts";
 import {
   TradingModeError,
   InvalidPlanError,
   isGordonError,
-} from "../errors/index.ts";
-import { auditLog } from "../infra/platform/audit/index.ts";
-import { validateOperation } from "../infra/venues/exchange/clients/binance/permissions.ts";
+} from "../../errors/index.ts";
+import { auditLog } from "../../infra/platform/audit/index.ts";
+import { validateOperation } from "../../infra/venues/exchange/clients/binance/permissions.ts";
 import type {
   Plan,
   Trade,
   GordonConfig,
   EntryFill,
   ExitFill,
-} from "../types/index.ts";
+} from "../../types/index.ts";
 
 const logger = createModuleLogger("executor");
 

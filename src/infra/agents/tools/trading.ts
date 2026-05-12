@@ -14,15 +14,15 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
-import { generatePlan } from "../../../core/planner.ts";
-import { executePlan, closeTrade, closePartialPosition } from "../../../core/executor.ts";
+import { generatePlan } from "../../../core/pipeline/planner.ts";
+import { executePlan, closeTrade, closePartialPosition } from "../../../core/pipeline/executor.ts";
 import { runHooks } from "../../hooks/engine.ts";
-import { analyze } from "../../../core/analyzer.ts";
-import { calculateGridLevels } from "../../../core/grid-calculator.ts";
+import { analyze } from "../../../core/pipeline/analyzer.ts";
+import { calculateGridLevels } from "../../../core/orders/grid-calculator.ts";
 import {
   getTrailingStopTracker,
   type TrailingStopConfig,
-} from "../../../core/trailing-stop.ts";
+} from "../../../core/orders/trailing-stop.ts";
 import { PlanSchema } from "../../../types/plan.ts";
 import { TradeSchema } from "../../../types/trade.ts";
 import { emitEvent } from "../../../events/index.ts";

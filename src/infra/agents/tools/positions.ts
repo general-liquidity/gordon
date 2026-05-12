@@ -13,7 +13,7 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
-import { runMonitorCycle, type MonitorResult } from "../../../core/monitor.ts";
+import { runMonitorCycle, type MonitorResult } from "../../../core/pipeline/monitor.ts";
 import { getGordonContext, validateToolOutput, type MastraExecutionContext } from "./types.ts";
 
 // ============================================================================

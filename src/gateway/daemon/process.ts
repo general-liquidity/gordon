@@ -1,5 +1,5 @@
 import { createModuleLogger } from "../../infra/logger/index.ts";
-import { bootstrapV07 } from "../../core/bootstrap.ts";
+import { bootstrapV07 } from "../../core/lifecycle/bootstrap.ts";
 import { createEnvelopeMeta, type GatewayCommandType } from "../protocol/index.ts";
 import { safeAppendAudit } from "../store/audit-log-store.ts";
 import { GatewayRuntime, getGatewayContextResolver } from "../runtime/index.ts";

@@ -1,5 +1,5 @@
-import type { Plan, GordonConfig } from "../types/index.ts";
-import { isValidTradingSymbol } from "../infra/domain/markets/instruments.ts";
+import type { Plan, GordonConfig } from "../../types/index.ts";
+import { isValidTradingSymbol } from "../../infra/domain/markets/instruments.ts";
 
 /**
  * Result of plan validation

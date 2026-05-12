@@ -5,9 +5,9 @@
  * decisions, and plans in plain language.
  */
 
-import { LLMClient, loadPrompt, buildMessages } from "../infra/ai/llm/index.ts";
-import type { Plan, Trade, CoinAnalysis } from "../types/index.ts";
-import { createModuleLogger } from "../infra/logger/index.ts";
+import { LLMClient, loadPrompt, buildMessages } from "../../infra/ai/llm/index.ts";
+import type { Plan, Trade, CoinAnalysis } from "../../types/index.ts";
+import { createModuleLogger } from "../../infra/logger/index.ts";
 
 const logger = createModuleLogger("explainer");
 

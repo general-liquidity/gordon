@@ -22,8 +22,8 @@ import {
   type ParallelOptions,
 } from "../parallel.ts";
 import { getGordonContext, normalizeSymbol, validateToolOutput, type MastraExecutionContext } from "./types.ts";
-import { scan } from "../../../core/scanner.ts";
-import { analyze } from "../../../core/analyzer.ts";
+import { scan } from "../../../core/pipeline/scanner.ts";
+import { analyze } from "../../../core/pipeline/analyzer.ts";
 
 // ============================================================================
 // Error Messages

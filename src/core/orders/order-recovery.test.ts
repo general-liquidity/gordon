@@ -1,5 +1,5 @@
 import { describe, test, expect } from "bun:test";
-import type { BinanceClient } from "../infra/venues/exchange/clients/binance/client.ts";
+import type { BinanceClient } from "../../infra/venues/exchange/clients/binance/client.ts";
 import {
   extractOrderOwnerKey,
   scanForOrphanedOrders,

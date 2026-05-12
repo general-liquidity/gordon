@@ -6,8 +6,8 @@
 import type { Exchange } from "../../infra/exchange/index.ts";
 import type { LLMClient } from "../../infra/ai/llm/index.ts";
 import type { GordonConfig } from "../../types/index.ts";
-import { scan } from "../../core/scanner.ts";
-import { analyze, type DetailedAnalysis } from "../../core/analyzer.ts";
+import { scan } from "../../core/pipeline/scanner.ts";
+import { analyze, type DetailedAnalysis } from "../../core/pipeline/analyzer.ts";
 import { strategyRegistry, type StrategyId } from "../../strategies/index.ts";
 import { runBacktest } from "../../backtest/engine.ts";
 import { fetchHistoricalData } from "../../backtest/data/historical.ts";

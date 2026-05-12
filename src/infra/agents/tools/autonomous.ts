@@ -13,15 +13,15 @@ import {
   MANDATE_TIMEFRAMES,
   validateMandate,
   type SwingMandate,
-} from "../../../core/swing-mandate.ts";
+} from "../../../core/safety/swing-mandate.ts";
 import {
   startAutonomousLoop,
   stopAutonomousLoop,
   pauseAutonomousLoop,
   resumeAutonomousLoop,
   getAutonomousLoopStatus,
-} from "../../../core/autonomous-loop.ts";
-import { loadMandateState, saveMandateState } from "../../../core/session-persistence.ts";
+} from "../../../core/pipeline/autonomous-loop.ts";
+import { loadMandateState, saveMandateState } from "../../../core/lifecycle/session-persistence.ts";
 import { loadConfig } from "../../storage/config.ts";
 
 // ============================================================================

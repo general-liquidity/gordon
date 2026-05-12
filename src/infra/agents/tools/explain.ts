@@ -14,7 +14,7 @@ import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
 import { getGordonContext, type MastraExecutionContext } from "./types.ts";
-import { explain, getPresetExplanation } from "../../../core/explainer.ts";
+import { explain, getPresetExplanation } from "../../../core/pipeline/explainer.ts";
 
 // ============================================================================
 // Error Messages

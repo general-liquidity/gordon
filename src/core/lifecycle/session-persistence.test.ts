@@ -21,7 +21,7 @@ import {
   setSessionPersistenceDirForTesting,
   type PersistedSessionState,
 } from "./session-persistence.ts";
-import { createMandate } from "./swing-mandate.ts";
+import { createMandate } from "../safety/swing-mandate.ts";
 
 let tempGordonDir = "";
 

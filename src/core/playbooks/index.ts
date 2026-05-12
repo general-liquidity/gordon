@@ -11,7 +11,7 @@
  *     PlaybookLoader,
  *     PlaybookPromptGenerator,
  *     playbookRegistry,
- *   } from "./core/playbooks/index.ts";
+ *   } from "./index.ts";
  *
  *   // Load all built-in playbooks
  *   const loader = new PlaybookLoader(new PlaybookParser(), playbookRegistry);
@@ -25,8 +25,8 @@
  *   const scannerPrompt = gen.generateForScanner(pb);
  *
  *   // Validate against the formal protocol
- *   import { validatePlaybook } from "./core/playbooks/index.ts";
- *   import { playbookToProtocol } from "./core/playbooks/index.ts";
+ *   import { validatePlaybook } from "./index.ts";
+ *   import { playbookToProtocol } from "./index.ts";
  *   const protocol = playbookToProtocol(pb);
  *   const result = validatePlaybook(protocol);
  */

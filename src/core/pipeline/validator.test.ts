@@ -14,8 +14,8 @@ import {
   createMockPlan,
   createMockConfig,
   createMockPortfolio,
-} from "../test-utils/mocks.ts";
-import type { Plan } from "../types/index.ts";
+} from "../../test-utils/mocks.ts";
+import type { Plan } from "../../types/index.ts";
 
 describe("calculateRiskReward", () => {
   test("returns 0 for market orders with null entry price", () => {
