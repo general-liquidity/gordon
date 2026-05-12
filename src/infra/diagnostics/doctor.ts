@@ -25,9 +25,9 @@
  *     (regression defense from commit b2f537fd)
  */
 
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 
 import { isCostHalted, getCostTracker } from "../platform/costTracker.ts";
 import { MAX_WORKING_MEMORY_CHARS } from "../agents/memoryGate.ts";
@@ -346,6 +346,179 @@ function checkGordonHomeDir(): DiagnosticCheck {
 }
 
 // ============================================================================
+// Deferred checks now wired (see file header)
+// ============================================================================
+
+/**
+ * Mastra `lastMessages` postinstall revert is still applied.
+ *
+ * The patch script reverts stale `lastMessages: 10` mutations back to
+ * Mastra's default of 0 (see `scripts/patches/patch-mastra.cjs` — Patch 1
+ * was disabled because the 10-message window blew the 200k context
+ * ceiling). If a chunk file in node_modules still contains the stale
+ * value, the postinstall didn't run on this install — surfacing a hard
+ * fail so the user can re-run `npm run postinstall` before sub-agents
+ * start carrying 10× tool-call payloads.
+ */
+function checkMastraPatchApplied(
+  distDir: string = resolve(process.cwd(), "node_modules", "@mastra", "core", "dist"),
+): DiagnosticCheck {
+  if (!existsSync(distDir)) {
+    return {
+      id: "mastra-patch",
+      label: "Mastra lastMessages patch",
+      status: "info",
+      message: `${distDir} not present — Mastra not installed or path differs.`,
+    };
+  }
+  const STALE = "lastMessages: 10";
+  let staleFiles = 0;
+  try {
+    const entries = readdirSync(distDir);
+    for (const f of entries) {
+      if (!/^chunk-.+\.(js|cjs)$/.test(f)) continue;
+      try {
+        const content = readFileSync(join(distDir, f), "utf8");
+        if (content.includes(STALE)) staleFiles += 1;
+      } catch {
+        // unreadable chunk — skip
+      }
+    }
+  } catch (err) {
+    return {
+      id: "mastra-patch",
+      label: "Mastra lastMessages patch",
+      status: "fail",
+      message: `Could not scan ${distDir}: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
+  if (staleFiles > 0) {
+    return {
+      id: "mastra-patch",
+      label: "Mastra lastMessages patch",
+      status: "fail",
+      message: `${staleFiles} chunk file(s) still contain stale 'lastMessages: 10'. Sub-agent context will blow the 200k window. Run npm run postinstall.`,
+      fixCommand: "npm run postinstall",
+      fixLabel: "Re-run postinstall patches",
+    };
+  }
+  return {
+    id: "mastra-patch",
+    label: "Mastra lastMessages patch",
+    status: "pass",
+    message: "No stale lastMessages: 10 mutations found in @mastra/core dist chunks.",
+  };
+}
+
+/**
+ * MCP marketplace catalog is parseable + non-empty. The catalog file
+ * (`src/infra/ai/mcp/marketplace/catalog.json`) is the curated registry
+ * the marketplace surface reads from. If it gets corrupted, malformed,
+ * or empty, every MCP install gets ambiguous failures. Reporting count
+ * + lastUpdated lets the user see at a glance whether the catalog is
+ * fresh and intact.
+ */
+function checkMcpMarketplaceCatalog(
+  catalogPath: string = resolve(process.cwd(), "src", "infra", "ai", "mcp", "marketplace", "catalog.json"),
+): DiagnosticCheck {
+  if (!existsSync(catalogPath)) {
+    return {
+      id: "mcp-catalog",
+      label: "MCP marketplace catalog",
+      status: "warn",
+      message: `${catalogPath} not present — MCP marketplace will surface zero servers.`,
+    };
+  }
+  try {
+    const raw = readFileSync(catalogPath, "utf8");
+    const parsed = JSON.parse(raw) as {
+      version?: string;
+      lastUpdated?: string;
+      plugins?: unknown[];
+    };
+    const count = Array.isArray(parsed.plugins) ? parsed.plugins.length : 0;
+    if (count === 0) {
+      return {
+        id: "mcp-catalog",
+        label: "MCP marketplace catalog",
+        status: "warn",
+        message: "Catalog parses but lists zero plugins.",
+      };
+    }
+    const updated = parsed.lastUpdated ? ` (lastUpdated ${parsed.lastUpdated})` : "";
+    return {
+      id: "mcp-catalog",
+      label: "MCP marketplace catalog",
+      status: "pass",
+      message: `${count} plugin(s) registered${updated}.`,
+    };
+  } catch (err) {
+    return {
+      id: "mcp-catalog",
+      label: "MCP marketplace catalog",
+      status: "fail",
+      message: `${catalogPath} unparseable: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
+}
+
+/**
+ * critiquePhase routing still uses the "critique" workflow phase, not
+ * the "compaction" phase. Regression defense for commit b2f537fd: the
+ * critique pass was previously routed to the fast model via
+ * "compaction" — Cognition's "What's Actually Working" finding required
+ * a clean-context + capable reviewer to catch the most bugs. If a
+ * refactor accidentally reverts the routing, this check surfaces it
+ * before the next high-stakes critique misses regressions.
+ */
+function checkCritiquePhaseRouting(
+  critiquePhasePath: string = resolve(process.cwd(), "src", "infra", "agents", "critiquePhase.ts"),
+): DiagnosticCheck {
+  if (!existsSync(critiquePhasePath)) {
+    return {
+      id: "critique-routing",
+      label: "Critique-phase model routing",
+      status: "info",
+      message: `${critiquePhasePath} not present — running from compiled build, source check skipped.`,
+    };
+  }
+  try {
+    const src = readFileSync(critiquePhasePath, "utf8");
+    const usesCritique = src.includes('resolveLegacyModelRouteForWorkflowPhase("critique")');
+    const usesCompaction = src.includes('resolveLegacyModelRouteForWorkflowPhase("compaction")');
+    if (usesCompaction && !usesCritique) {
+      return {
+        id: "critique-routing",
+        label: "Critique-phase model routing",
+        status: "fail",
+        message: "critiquePhase.ts routes through 'compaction' (fast model) — regression of commit b2f537fd. Critique needs main-model capability + clean context.",
+      };
+    }
+    if (!usesCritique) {
+      return {
+        id: "critique-routing",
+        label: "Critique-phase model routing",
+        status: "warn",
+        message: "critiquePhase.ts doesn't reference resolveLegacyModelRouteForWorkflowPhase('critique') — file may have been refactored. Verify routing manually.",
+      };
+    }
+    return {
+      id: "critique-routing",
+      label: "Critique-phase model routing",
+      status: "pass",
+      message: "critiquePhase.ts routes through 'critique' phase (main model).",
+    };
+  } catch (err) {
+    return {
+      id: "critique-routing",
+      label: "Critique-phase model routing",
+      status: "fail",
+      message: `Cannot read ${critiquePhasePath}: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
+}
+
+// ============================================================================
 // Public API
 // ============================================================================
 
@@ -381,6 +554,9 @@ export function runDoctorChecks(): DiagnosticCheck[] {
     checkCacheReadPressure(),
     checkSafetyDenyList(),
     checkHotTierCap(),
+    checkMastraPatchApplied(),
+    checkMcpMarketplaceCatalog(),
+    checkCritiquePhaseRouting(),
   ];
 }
 
@@ -395,6 +571,9 @@ export const _internal = {
   checkSafetyDenyList,
   checkHotTierCap,
   checkGordonHomeDir,
+  checkMastraPatchApplied,
+  checkMcpMarketplaceCatalog,
+  checkCritiquePhaseRouting,
   resolveMastraStoragePath,
   resolveVectorStoragePath,
 };

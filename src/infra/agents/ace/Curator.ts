@@ -52,6 +52,11 @@ const CATEGORY_BASE_SCORE: Record<ACELessonCandidate["category"], number> = {
   // User-articulated rationales accompanying approved plans — strong
   // positive signal but specific to the exact context, so weight modestly.
   approved_plan_rationale: 0.72,
+  // Cancel rationales — the user named a specific reason to exit. Slightly
+  // higher than approved_plan_rationale because invalidation events tend
+  // to recur and are higher-leverage to surface ("we exited TSLA earnings
+  // for X reason; don't re-enter under the same conditions").
+  cancel_rationale: 0.74,
   venue_quirk: 0.70,
   execution_success: 0.55,
   operational: 0.50,

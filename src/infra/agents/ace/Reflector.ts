@@ -32,7 +32,8 @@ export interface ACELessonCandidate {
     | "user_preference"
     | "operational"
     | "agent_self_block"
-    | "approved_plan_rationale";
+    | "approved_plan_rationale"
+    | "cancel_rationale";
   /** Number of distinct historical events that support this lesson */
   evidenceCount: number;
   /** First seen timestamp (ms epoch) */
@@ -177,6 +178,25 @@ const PATTERN_RULES: Array<{
       if (/fail|reject|block/.test(text)) return null;
       const symbol = (e.payload?.symbol as string | undefined) ?? "the asset";
       return `User has previously approved similar ${symbol} plans by articulating reasoning like "${rationale.slice(0, 100)}". Confirm comparable conditions hold before proposing the next entry.`;
+    },
+  },
+  {
+    // Bridges cancel_* tool rationales → ACE. Mirrors approved_plan_rationale
+    // but for cancellations: cancel_order / cancel_all_orders /
+    // cancel_replace_order / cancel_order_list all append an
+    // execution_result entry with payload.kind === "cancel" and the
+    // verbatim rationale in payload.rationale. Captures the *kinds of
+    // reasons* the user has previously cited for cancellation, so future
+    // sessions can pattern-match before re-entering a setup that was just
+    // exited for an articulated reason.
+    category: "cancel_rationale",
+    match: (e) => {
+      if (e.entryType !== "execution_result") return null;
+      if (e.payload?.kind !== "cancel") return null;
+      const rationale = (e.payload?.rationale as string | undefined)?.trim();
+      if (!rationale || rationale.length < 10) return null;
+      const symbol = (e.payload?.symbol as string | undefined) ?? "the asset";
+      return `User has previously cancelled ${symbol} orders citing reasons like "${rationale.slice(0, 100)}". Before re-entering, confirm the original invalidation no longer holds.`;
     },
   },
 ];

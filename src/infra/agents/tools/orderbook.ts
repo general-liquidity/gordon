@@ -18,6 +18,7 @@ import { getGordonContext, isBinanceFamily, normalizeSymbol, type MastraExecutio
 import { checkTradingPermission } from "./permissionHelpers.ts";
 import { runHooks } from "../../hooks/engine.ts";
 import { recordStructuredObservation } from "../../platform/observability/index.ts";
+import { appendActionLogEntry } from "../../action-log/index.ts";
 import {
   resilientGetOrderBook,
   resilientGetSpread,
@@ -561,6 +562,16 @@ export const cancelAllOrdersTool = createTool({
       symbol: normalizedSymbol,
       details: { rationale },
     });
+    try {
+      appendActionLogEntry({
+        entryType: "execution_result",
+        title: `Cancel all orders ${normalizedSymbol}`,
+        content: `Cancellation rationale: ${rationale}`,
+        payload: { kind: "cancel", tool: "cancel_all_orders", symbol: normalizedSymbol, rationale },
+      });
+    } catch {
+      // Storage failures must not block the cancellation itself.
+    }
 
     try {
       const cancelled = await ctx.exchange.cancelAllOrders(normalizedSymbol);
@@ -1014,6 +1025,16 @@ export const cancelOrderTool = createTool({
       symbol: normalizedSymbol,
       details: { rationale, orderId },
     });
+    try {
+      appendActionLogEntry({
+        entryType: "execution_result",
+        title: `Cancel order ${normalizedSymbol} #${orderId}`,
+        content: `Cancellation rationale: ${rationale}`,
+        payload: { kind: "cancel", tool: "cancel_order", symbol: normalizedSymbol, orderId, rationale },
+      });
+    } catch {
+      // Storage failures must not block the cancellation itself.
+    }
 
     try {
       await ctx.exchange.cancelOrder(normalizedSymbol, String(orderId));
@@ -1167,6 +1188,16 @@ export const cancelReplaceOrderTool = createTool({
       symbol: normalizedSymbol,
       details: { rationale, cancelOrderId, side, type },
     });
+    try {
+      appendActionLogEntry({
+        entryType: "execution_result",
+        title: `Cancel/replace ${normalizedSymbol} #${cancelOrderId}`,
+        content: `Cancellation rationale: ${rationale}`,
+        payload: { kind: "cancel", tool: "cancel_replace_order", symbol: normalizedSymbol, cancelOrderId, side, type, rationale },
+      });
+    } catch {
+      // Storage failures must not block the cancellation itself.
+    }
 
     // Risk gate: evaluate the replacement order before placement
     try {
@@ -1289,6 +1320,16 @@ export const cancelOrderListTool = createTool({
       symbol: normalizedSymbol,
       details: { rationale, orderListId },
     });
+    try {
+      appendActionLogEntry({
+        entryType: "execution_result",
+        title: `Cancel order list ${normalizedSymbol} #${orderListId}`,
+        content: `Cancellation rationale: ${rationale}`,
+        payload: { kind: "cancel", tool: "cancel_order_list", symbol: normalizedSymbol, orderListId, rationale },
+      });
+    } catch {
+      // Storage failures must not block the cancellation itself.
+    }
 
     try {
       const result = await ctx.binance.cancelOrderList(normalizedSymbol, orderListId);

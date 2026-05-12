@@ -47,6 +47,15 @@ export interface StructuredObservationInput {
   source?: string;
   component?: string;
   status?: string;
+  /**
+   * For `execution.blocked` events: whether the block is due to a
+   * harness gate (controllable — worth fixing in our code) or an
+   * environment / external-state failure (uncontrollable — out of
+   * harness scope). Lets the eval review queue filter regressions
+   * worth fixing from environment noise. See HALO Terminal-Bench
+   * note in `infra/observability/blockedClassification.ts`.
+   */
+  controllability?: "controllable" | "uncontrollable";
   step?: string;
   mode?: string;
   provider?: string;

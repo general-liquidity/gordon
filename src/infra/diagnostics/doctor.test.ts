@@ -207,3 +207,97 @@ describe("doctor — cache-read pressure check", () => {
     expect(["pass", "info"]).toContain(check.status);
   });
 });
+
+describe("doctor — Mastra patch check", () => {
+  it("returns info when dist dir not present", () => {
+    const check = _internal.checkMastraPatchApplied(join(tempDir, "no-mastra"));
+    expect(check.id).toBe("mastra-patch");
+    expect(check.status).toBe("info");
+  });
+
+  it("passes when no chunk files contain stale lastMessages: 10", () => {
+    writeFileSync(join(tempDir, "chunk-clean.js"), "module.exports = { lastMessages: 0 };");
+    const check = _internal.checkMastraPatchApplied(tempDir);
+    expect(check.id).toBe("mastra-patch");
+    expect(check.status).toBe("pass");
+  });
+
+  it("fails when a chunk file still has stale lastMessages: 10", () => {
+    writeFileSync(join(tempDir, "chunk-stale.js"), "module.exports = { lastMessages: 10 };");
+    const check = _internal.checkMastraPatchApplied(tempDir);
+    expect(check.id).toBe("mastra-patch");
+    expect(check.status).toBe("fail");
+    expect(check.fixCommand).toBe("npm run postinstall");
+  });
+
+  it("ignores non-chunk files in the dist dir", () => {
+    writeFileSync(join(tempDir, "README.md"), "lastMessages: 10 in docs is fine");
+    writeFileSync(join(tempDir, "chunk-clean.js"), "ok");
+    const check = _internal.checkMastraPatchApplied(tempDir);
+    expect(check.status).toBe("pass");
+  });
+});
+
+describe("doctor — MCP marketplace catalog check", () => {
+  it("warns when file is missing", () => {
+    const check = _internal.checkMcpMarketplaceCatalog(join(tempDir, "missing.json"));
+    expect(check.id).toBe("mcp-catalog");
+    expect(check.status).toBe("warn");
+  });
+
+  it("passes when catalog has plugins array", () => {
+    const path = join(tempDir, "catalog.json");
+    writeFileSync(path, JSON.stringify({
+      version: "1.0.0",
+      lastUpdated: "2026-05-12T00:00:00.000Z",
+      plugins: [{ id: "a" }, { id: "b" }, { id: "c" }],
+    }));
+    const check = _internal.checkMcpMarketplaceCatalog(path);
+    expect(check.status).toBe("pass");
+    expect(check.message).toContain("3 plugin");
+  });
+
+  it("warns when plugins array is empty", () => {
+    const path = join(tempDir, "catalog.json");
+    writeFileSync(path, JSON.stringify({ plugins: [] }));
+    const check = _internal.checkMcpMarketplaceCatalog(path);
+    expect(check.status).toBe("warn");
+  });
+
+  it("fails when catalog is unparseable", () => {
+    const path = join(tempDir, "catalog.json");
+    writeFileSync(path, "not json");
+    const check = _internal.checkMcpMarketplaceCatalog(path);
+    expect(check.status).toBe("fail");
+  });
+});
+
+describe("doctor — critique-phase routing check", () => {
+  it("returns info when source file not present", () => {
+    const check = _internal.checkCritiquePhaseRouting(join(tempDir, "no-critique.ts"));
+    expect(check.id).toBe("critique-routing");
+    expect(check.status).toBe("info");
+  });
+
+  it("passes when source uses 'critique' phase", () => {
+    const path = join(tempDir, "critiquePhase.ts");
+    writeFileSync(path, `const route = resolveLegacyModelRouteForWorkflowPhase("critique");`);
+    const check = _internal.checkCritiquePhaseRouting(path);
+    expect(check.status).toBe("pass");
+  });
+
+  it("fails when source reverted to 'compaction' phase", () => {
+    const path = join(tempDir, "critiquePhase.ts");
+    writeFileSync(path, `const route = resolveLegacyModelRouteForWorkflowPhase("compaction");`);
+    const check = _internal.checkCritiquePhaseRouting(path);
+    expect(check.status).toBe("fail");
+    expect(check.message).toContain("compaction");
+  });
+
+  it("warns when no recognizable routing line is present", () => {
+    const path = join(tempDir, "critiquePhase.ts");
+    writeFileSync(path, `// the file was refactored entirely`);
+    const check = _internal.checkCritiquePhaseRouting(path);
+    expect(check.status).toBe("warn");
+  });
+});
