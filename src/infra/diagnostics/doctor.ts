@@ -25,7 +25,7 @@
  *     (regression defense from commit b2f537fd)
  */
 
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync, writeFileSync, mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
@@ -899,6 +899,8 @@ export function runDoctorChecks(): DiagnosticCheck[] {
     checkSuspiciousOptionalDependencies(),
     checkTrustedDependencies(),
     checkUntrustedLifecycleScripts(),
+    checkAuditAdvisories(),
+    checkLockfileDrift(),
   ];
 }
 
@@ -994,6 +996,261 @@ function spawnSyncBunPm(): UntrustedSpawnResult | null {
   }
 }
 
+// ----------------------------------------------------------------------------
+// bun audit --json — structured advisory check
+// ----------------------------------------------------------------------------
+
+/**
+ * Run `bun audit --json --audit-level=high` and report any advisories
+ * that are NOT on Gordon's accepted-criticals ignore list (mirrored
+ * from .github/workflows/ci.yml). The CI gate is informational by
+ * design — Bun returns exit 0 regardless — so this doctor check is the
+ * place we actually compare current advisories against the baseline
+ * and surface new ones.
+ */
+const ACCEPTED_ADVISORY_IDS = new Set([
+  "GHSA-xq3m-2v4x-88gg", // protobufjs RCE
+  "GHSA-vjh7-7g9h-fjfh", // elliptic ECDSA key extraction
+  "GHSA-2w6w-674q-4c4q", // handlebars AST type confusion
+  "GHSA-fjxv-7rqg-78g4", // form-data unsafe random boundary
+]);
+
+interface AdvisorySpawnResult {
+  output: string;
+  error: string | null;
+}
+
+function spawnSyncBunAuditJson(): AdvisorySpawnResult | null {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { spawnSync } = require("node:child_process") as typeof import("node:child_process");
+    const res = spawnSync("bun", ["audit", "--json", "--audit-level=high"], {
+      cwd: process.cwd(),
+      encoding: "utf8",
+      timeout: 15000,
+      windowsHide: true,
+      maxBuffer: 8 * 1024 * 1024,
+    });
+    if (res.error && (res.error as NodeJS.ErrnoException).code === "ENOENT") {
+      return null;
+    }
+    if (res.error) {
+      return { output: "", error: res.error.message };
+    }
+    return { output: res.stdout ?? "", error: null };
+  } catch (err) {
+    return { output: "", error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+function checkAuditAdvisories(
+  spawnFn: typeof spawnSyncBunAuditJson = spawnSyncBunAuditJson,
+): DiagnosticCheck {
+  const result = spawnFn();
+  if (result === null) {
+    return {
+      id: "audit-advisories",
+      label: "bun audit advisory delta",
+      status: "info",
+      message: "bun CLI not available — skipping `bun audit --json` check.",
+    };
+  }
+  if (result.error) {
+    return {
+      id: "audit-advisories",
+      label: "bun audit advisory delta",
+      status: "info",
+      message: `Could not run \`bun audit --json\`: ${result.error}`,
+    };
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(result.output);
+  } catch {
+    return {
+      id: "audit-advisories",
+      label: "bun audit advisory delta",
+      status: "info",
+      message: "bun audit JSON output was not parseable (likely empty when no advisories present).",
+    };
+  }
+  // Bun's npm-audit JSON shape mirrors npm: { advisories: { <id>: { ... } } }
+  // or under .vulnerabilities depending on the registry. Try both.
+  const advisoryMap: Record<string, unknown> = {};
+  const root = parsed as { advisories?: Record<string, unknown>; vulnerabilities?: Record<string, unknown> };
+  if (root && typeof root === "object") {
+    if (root.advisories && typeof root.advisories === "object") Object.assign(advisoryMap, root.advisories);
+    if (root.vulnerabilities && typeof root.vulnerabilities === "object") Object.assign(advisoryMap, root.vulnerabilities);
+  }
+
+  const newAdvisories: Array<{ id: string; severity: string; module: string }> = [];
+  for (const [_idKey, adv] of Object.entries(advisoryMap)) {
+    if (!adv || typeof adv !== "object") continue;
+    const a = adv as { id?: string | number; github_advisory_id?: string; ghsa?: string; severity?: string; module_name?: string; name?: string };
+    const ghsa = a.github_advisory_id ?? a.ghsa ?? (typeof a.id === "string" ? a.id : undefined);
+    if (ghsa && ACCEPTED_ADVISORY_IDS.has(ghsa)) continue;
+    const severity = a.severity ?? "unknown";
+    if (severity !== "high" && severity !== "critical") continue;
+    newAdvisories.push({
+      id: ghsa ?? "(unknown)",
+      severity,
+      module: a.module_name ?? a.name ?? "(unknown)",
+    });
+  }
+
+  if (newAdvisories.length === 0) {
+    return {
+      id: "audit-advisories",
+      label: "bun audit advisory delta",
+      status: "pass",
+      message: "No high/critical advisories outside the accepted-baseline ignore list.",
+    };
+  }
+  const preview = newAdvisories
+    .slice(0, 5)
+    .map((a) => `${a.module} (${a.severity}, ${a.id})`)
+    .join(", ");
+  const extra = newAdvisories.length > 5 ? ` (+${newAdvisories.length - 5} more)` : "";
+  return {
+    id: "audit-advisories",
+    label: "bun audit advisory delta",
+    status: "warn",
+    message:
+      `${newAdvisories.length} high/critical advisor(y/ies) NOT on Gordon's accepted-baseline list: ${preview}${extra}. ` +
+      `Run \`bun audit --audit-level=high\` for details; bump the affected dep or add the GHSA to the accepted list in doctor.ts + ci.yml.`,
+  };
+}
+
+// ----------------------------------------------------------------------------
+// bun pm hash — lockfile drift check
+// ----------------------------------------------------------------------------
+
+interface LockfileHashResult {
+  output: string;
+  error: string | null;
+}
+
+function spawnSyncBunPmHash(): LockfileHashResult | null {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { spawnSync } = require("node:child_process") as typeof import("node:child_process");
+    const res = spawnSync("bun", ["pm", "hash"], {
+      cwd: process.cwd(),
+      encoding: "utf8",
+      timeout: 4000,
+      windowsHide: true,
+    });
+    if (res.error && (res.error as NodeJS.ErrnoException).code === "ENOENT") {
+      return null;
+    }
+    if (res.error) {
+      return { output: "", error: res.error.message };
+    }
+    return { output: (res.stdout ?? "").trim(), error: null };
+  } catch (err) {
+    return { output: "", error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+/**
+ * Detect drift between the current `bun.lock` and the last hash Gordon
+ * saw. `bun pm hash` produces a deterministic hash of the lockfile.
+ * Storing it under ~/.gordon/last-lockfile-hash gives the operator a
+ * tripwire: if `bun install` mutates the lockfile unexpectedly (e.g.
+ * a stale registry token or wrong `BUN_CONFIG_TOKEN` causing fallback
+ * resolution), the next doctor run flags it.
+ *
+ * First-run behavior: no baseline exists → record the current hash
+ * and report `info`. Subsequent runs compare and warn on mismatch.
+ * Operator confirms intentional drift by deleting the baseline file
+ * (or rerunning the doctor with GORDON_LOCKFILE_HASH_RESET=1).
+ */
+function checkLockfileDrift(
+  spawnFn: typeof spawnSyncBunPmHash = spawnSyncBunPmHash,
+  baselinePath: string = join(homedir(), ".gordon", "last-lockfile-hash"),
+): DiagnosticCheck {
+  const result = spawnFn();
+  if (result === null) {
+    return {
+      id: "lockfile-drift",
+      label: "Lockfile hash drift",
+      status: "info",
+      message: "bun CLI not available — skipping `bun pm hash` check.",
+    };
+  }
+  if (result.error) {
+    return {
+      id: "lockfile-drift",
+      label: "Lockfile hash drift",
+      status: "info",
+      message: `Could not run \`bun pm hash\`: ${result.error}`,
+    };
+  }
+  const currentHash = result.output;
+  if (!currentHash || currentHash.length < 8) {
+    return {
+      id: "lockfile-drift",
+      label: "Lockfile hash drift",
+      status: "info",
+      message: "`bun pm hash` returned no hash — bun.lock may be absent.",
+    };
+  }
+
+  const reset = process.env.GORDON_LOCKFILE_HASH_RESET === "1";
+  if (reset || !existsSync(baselinePath)) {
+    try {
+      mkdirSync(dirname(baselinePath), { recursive: true });
+      writeFileSync(baselinePath, currentHash, "utf8");
+    } catch (err) {
+      return {
+        id: "lockfile-drift",
+        label: "Lockfile hash drift",
+        status: "info",
+        message: `Could not record baseline lockfile hash: ${err instanceof Error ? err.message : String(err)}`,
+      };
+    }
+    return {
+      id: "lockfile-drift",
+      label: "Lockfile hash drift",
+      status: reset ? "pass" : "info",
+      message: reset
+        ? `Baseline reset; recorded ${currentHash.slice(0, 16)}…`
+        : `First run — recorded baseline hash ${currentHash.slice(0, 16)}… at ${baselinePath}.`,
+    };
+  }
+
+  let baseline = "";
+  try {
+    baseline = readFileSync(baselinePath, "utf8").trim();
+  } catch (err) {
+    return {
+      id: "lockfile-drift",
+      label: "Lockfile hash drift",
+      status: "info",
+      message: `Could not read baseline lockfile hash: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
+
+  if (baseline === currentHash) {
+    return {
+      id: "lockfile-drift",
+      label: "Lockfile hash drift",
+      status: "pass",
+      message: `bun.lock hash unchanged since last doctor run (${currentHash.slice(0, 16)}…).`,
+    };
+  }
+
+  return {
+    id: "lockfile-drift",
+    label: "Lockfile hash drift",
+    status: "warn",
+    message:
+      `bun.lock hash changed: ${baseline.slice(0, 16)}… → ${currentHash.slice(0, 16)}…. ` +
+      `If this drift was intentional (\`bun install\`, \`bun add\`, etc.), confirm by setting GORDON_LOCKFILE_HASH_RESET=1 and re-running the doctor. ` +
+      `Unexpected drift may indicate a stale registry token forcing fallback resolution or an automated process mutating the lockfile.`,
+  };
+}
+
 // Test helpers — keep checks individually exportable for targeted unit tests.
 export const _internal = {
   checkCostHaltState,
@@ -1013,6 +1270,8 @@ export const _internal = {
   checkSuspiciousOptionalDependencies,
   checkTrustedDependencies,
   checkUntrustedLifecycleScripts,
+  checkAuditAdvisories,
+  checkLockfileDrift,
   resolveMastraStoragePath,
   resolveVectorStoragePath,
 };

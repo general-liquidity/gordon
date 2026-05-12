@@ -26,6 +26,16 @@ describe("createKeyringProvider", () => {
 
   test("returns correct provider for current platform", () => {
     const provider = createKeyringProvider();
+    // Bun.secrets — when available on this runtime — is preferred over
+    // the CLI-subprocess providers because it's native and avoids a
+    // fork/exec per credential read. The platform string for the
+    // native path is "Bun.secrets (<process.platform>)".
+    const nativePlatform = `Bun.secrets (${process.platform})`;
+    if (provider.platform === nativePlatform) {
+      // Native provider — nothing more to assert. Other tests cover
+      // its read/write surface against the OS keychain proxy mock.
+      return;
+    }
     switch (process.platform) {
       case "darwin":
         expect(provider.platform).toBe("macOS Keychain");
@@ -38,6 +48,21 @@ describe("createKeyringProvider", () => {
         break;
       default:
         expect(provider.platform).toBe("none");
+    }
+  });
+
+  test("falls back to CLI provider when GORDON_KEYRING_LEGACY=1", () => {
+    const prev = process.env.GORDON_KEYRING_LEGACY;
+    process.env.GORDON_KEYRING_LEGACY = "1";
+    try {
+      resetKeyringProvider();
+      const provider = createKeyringProvider();
+      // Should never be the Bun.secrets-prefixed string in legacy mode.
+      expect(provider.platform.startsWith("Bun.secrets")).toBe(false);
+    } finally {
+      if (prev === undefined) delete process.env.GORDON_KEYRING_LEGACY;
+      else process.env.GORDON_KEYRING_LEGACY = prev;
+      resetKeyringProvider();
     }
   });
 

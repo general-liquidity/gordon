@@ -33,7 +33,8 @@ jobs:
         uses: oven-sh/setup-bun@v1
 
       - name: Install dependencies (frozen lockfile)
-        run: bun install --frozen-lockfile
+        # `bun ci` is the idiomatic alias for `bun install --frozen-lockfile`.
+        run: bun ci
 
       - name: Validate scenario bundle
         run: |
@@ -62,9 +63,13 @@ jobs:
           '
 
       - name: Run harness unit tests
-        run: bun test src/infra/domain/evals/harness/
+        # --randomize surfaces order-dependent flakiness across the
+        # harness's fixture-loading and shared-context paths. Free
+        # signal in CI; deterministic locally via `--seed=<value>` if
+        # a flake is found.
+        run: bun test --randomize src/infra/domain/evals/harness/
 
       - name: Run safety + ACE unit tests (regression net)
         run: |
-          bun test src/infra/safety/
-          bun test src/infra/agents/ace/
+          bun test --randomize src/infra/safety/
+          bun test --randomize src/infra/agents/ace/

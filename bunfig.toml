@@ -31,12 +31,28 @@ minimumReleaseAgeExcludes = [
   "@tanstack/virtual-core",
 ]
 
-# Slot for a third-party security scanner (Bun: `bun pm scan` requires
-# this section pointing at an npm package that exports a scanner
-# object — e.g. @socketsecurity/cli or similar). Left commented out
-# pending a deliberate choice of scanner. Don't enable a scanner
-# blindly: each scanner runs install-time code against the lockfile,
-# which is itself a supply-chain trust decision.
+# Slot for a security scanner. The repo ships a minimal scanner at
+# scripts/security/gordon-security-scanner.cjs that wraps the same
+# checks the doctor's `suspicious-optional-deps` and IOC scans
+# perform, plus the credential-pattern check from
+# scripts/npm/audit-npm-pack-content.cjs. It's warn-only — no
+# advisory blocks an install — so opting in is safe.
+#
+# Enabling requires a small package wrapper (Bun's scanner API expects
+# an npm package, not a path). Tracked separately; left commented
+# until that wrapper ships. Don't point this at a third-party
+# scanner blindly: each scanner runs install-time code against the
+# lockfile, which is itself a supply-chain trust decision.
 #
 # [install.security]
-# scanner = "<package-name>"
+# scanner = "@general-liquidity/gordon-security-scanner"
+
+# Run-time configuration applied to `bun run` / `bun script.ts` invocations.
+[run]
+# Kill all child processes when Bun exits — including when the parent
+# Bun process is SIGKILL'd. Linux/macOS only (no-op on Windows). This
+# matters for Gordon because the TUI may spawn long-lived processes
+# (MCP servers, broker subscriptions) that should not outlive the
+# CLI session. Without this, a force-quit of the TUI can leave
+# orphaned subscriptions consuming exchange API quota.
+noOrphans = true

@@ -373,6 +373,132 @@ class LinuxKeyringProvider implements KeyringProvider {
 }
 
 // ---------------------------------------------------------------------------
+// Bun.secrets — native bindings to the OS credential manager
+// ---------------------------------------------------------------------------
+//
+// `Bun.secrets` (added in Bun 1.2) is a native cross-platform wrapper over
+// the same OS facilities the CLI-subprocess providers above use:
+//   - macOS:   Keychain Services
+//   - Linux:   libsecret (GNOME Keyring / KWallet / etc.)
+//   - Windows: Windows Credential Manager (DPAPI under the hood)
+//
+// Compared to the subprocess providers, the native API:
+//   - Skips fork/exec of `security` / `secret-tool` / `powershell` per call
+//     — credential reads on the hot path go from ~50ms+ to sub-millisecond.
+//   - Zeroes the password memory after use (documented behavior).
+//   - Returns null cleanly when a credential is missing (no exit-code dance).
+//
+// We add it as a preferred provider but keep the CLI-based providers as
+// fallback: Bun.secrets is documented as experimental and may not exist on
+// older Bun runtimes that Gordon binary builds support. Feature-detect at
+// construction and fall through if absent.
+
+interface BunSecretsApi {
+  get(opts: { service: string; name: string }): Promise<string | null>;
+  set(opts: { service: string; name: string; value: string }): Promise<void>;
+  delete(opts: { service: string; name: string }): Promise<boolean>;
+}
+
+function tryGetBunSecrets(): BunSecretsApi | null {
+  const bun = (globalThis as { Bun?: { secrets?: unknown } }).Bun;
+  const secrets = bun?.secrets;
+  if (!secrets || typeof secrets !== "object") return null;
+  const api = secrets as Partial<BunSecretsApi>;
+  if (typeof api.get !== "function" || typeof api.set !== "function" || typeof api.delete !== "function") {
+    return null;
+  }
+  return api as BunSecretsApi;
+}
+
+class BunSecretsKeyringProvider implements KeyringProvider {
+  readonly platform: string;
+  private readonly api: BunSecretsApi;
+  // List API doesn't exist on Bun.secrets, so we shadow-track keys in a
+  // sidecar index file. Reads still go straight to the OS keychain — the
+  // index is only consulted by .list() and may legitimately drift if the
+  // user adds entries via Keychain Access / seahorse / Credential Manager
+  // directly. Documented limitation.
+  private readonly indexPath: string;
+
+  constructor(api: BunSecretsApi) {
+    this.api = api;
+    this.platform = `Bun.secrets (${process.platform})`;
+    this.indexPath = join(GORDON_DIR, "keyring-index.json");
+  }
+
+  async isAvailable(): Promise<boolean> {
+    // We've already feature-detected the API in the factory; just confirm
+    // the platform's secret service is actually reachable by attempting a
+    // benign read. A throw here means libsecret isn't running, etc., and
+    // the factory should fall back to a CLI provider.
+    try {
+      await this.api.get({ service: SERVICE_NAME, name: "__gordon_probe__" });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  async get(key: string): Promise<string | null> {
+    try {
+      return await this.api.get({ service: SERVICE_NAME, name: key });
+    } catch {
+      return null;
+    }
+  }
+
+  async set(key: string, value: string): Promise<void> {
+    await this.api.set({ service: SERVICE_NAME, name: key, value });
+    await this.addToIndex(key);
+  }
+
+  async delete(key: string): Promise<boolean> {
+    let deleted = false;
+    try {
+      deleted = await this.api.delete({ service: SERVICE_NAME, name: key });
+    } catch {
+      deleted = false;
+    }
+    await this.removeFromIndex(key);
+    return deleted;
+  }
+
+  async list(): Promise<string[]> {
+    return await this.readIndex();
+  }
+
+  private async readIndex(): Promise<string[]> {
+    if (!existsSync(this.indexPath)) return [];
+    try {
+      const parsed = (await Bun.file(this.indexPath).json()) as unknown;
+      if (Array.isArray(parsed)) return parsed.filter((v): v is string => typeof v === "string");
+      return [];
+    } catch {
+      return [];
+    }
+  }
+
+  private async writeIndex(keys: string[]): Promise<void> {
+    await mkdir(GORDON_DIR, { recursive: true });
+    await Bun.write(this.indexPath, JSON.stringify(Array.from(new Set(keys)).sort(), null, 2));
+  }
+
+  private async addToIndex(key: string): Promise<void> {
+    const keys = await this.readIndex();
+    if (keys.includes(key)) return;
+    keys.push(key);
+    await this.writeIndex(keys);
+  }
+
+  private async removeFromIndex(key: string): Promise<void> {
+    const keys = await this.readIndex();
+    const filtered = keys.filter((k) => k !== key);
+    if (filtered.length === keys.length) return;
+    await this.writeIndex(filtered);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Null fallback
 // ---------------------------------------------------------------------------
 
@@ -404,6 +530,17 @@ let _cachedProvider: KeyringProvider | null = null;
 
 export function createKeyringProvider(): KeyringProvider {
   if (_cachedProvider) return _cachedProvider;
+
+  // Prefer Bun.secrets when present — native bindings, no subprocess per
+  // call. Set GORDON_KEYRING_LEGACY=1 to force the CLI-subprocess
+  // providers (used by the unit test that exercises the legacy path).
+  if (process.env.GORDON_KEYRING_LEGACY !== "1") {
+    const bunSecrets = tryGetBunSecrets();
+    if (bunSecrets) {
+      _cachedProvider = new BunSecretsKeyringProvider(bunSecrets);
+      return _cachedProvider;
+    }
+  }
 
   switch (process.platform) {
     case "darwin":

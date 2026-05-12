@@ -53,11 +53,20 @@ describe("doctor.runDoctorChecks", () => {
     }
   });
 
-  it("returns results in a stable order", () => {
-    const a = runDoctorChecks();
-    const b = runDoctorChecks();
-    expect(a.map((c) => c.id)).toEqual(b.map((c) => c.id));
-  });
+  it(
+    "returns results in a stable order",
+    () => {
+      const a = runDoctorChecks();
+      const b = runDoctorChecks();
+      expect(a.map((c) => c.id)).toEqual(b.map((c) => c.id));
+    },
+    // checkAuditAdvisories shells out to `bun audit --json` against the
+    // npm registry — can take 10-15s on a cold cache. The doctor runs
+    // every check in sequence, so the integration test needs a longer
+    // budget than the default 5s. Individual checks have their own
+    // unit-test mocks that don't hit the network.
+    60_000,
+  );
 });
 
 describe("doctor — safety deny-list check", () => {
@@ -576,5 +585,99 @@ describe("checkUntrustedLifecycleScripts", () => {
     }));
     expect(check.status).toBe("info");
     expect(check.message).toContain("spawn failed");
+  });
+});
+
+describe("checkAuditAdvisories", () => {
+  it("reports info when bun CLI is unavailable", () => {
+    const check = _internal.checkAuditAdvisories(() => null);
+    expect(check.status).toBe("info");
+  });
+
+  it("passes when only accepted-baseline advisories are present", () => {
+    const json = JSON.stringify({
+      advisories: {
+        "1": { github_advisory_id: "GHSA-xq3m-2v4x-88gg", severity: "critical", module_name: "protobufjs" },
+        "2": { github_advisory_id: "GHSA-vjh7-7g9h-fjfh", severity: "critical", module_name: "elliptic" },
+      },
+    });
+    const check = _internal.checkAuditAdvisories(() => ({ output: json, error: null }));
+    expect(check.status).toBe("pass");
+  });
+
+  it("warns when a high/critical advisory outside the baseline appears", () => {
+    const json = JSON.stringify({
+      advisories: {
+        "1": { github_advisory_id: "GHSA-xq3m-2v4x-88gg", severity: "critical", module_name: "protobufjs" },
+        "2": { github_advisory_id: "GHSA-new-advisory-xyz", severity: "high", module_name: "some-dep" },
+      },
+    });
+    const check = _internal.checkAuditAdvisories(() => ({ output: json, error: null }));
+    expect(check.status).toBe("warn");
+    expect(check.message).toContain("some-dep");
+    expect(check.message).toContain("GHSA-new-advisory-xyz");
+  });
+
+  it("ignores low/moderate severities", () => {
+    const json = JSON.stringify({
+      advisories: {
+        "1": { github_advisory_id: "GHSA-low-thing", severity: "moderate", module_name: "low-dep" },
+      },
+    });
+    const check = _internal.checkAuditAdvisories(() => ({ output: json, error: null }));
+    expect(check.status).toBe("pass");
+  });
+
+  it("handles unparseable JSON gracefully", () => {
+    const check = _internal.checkAuditAdvisories(() => ({ output: "not-json", error: null }));
+    expect(check.status).toBe("info");
+  });
+});
+
+describe("checkLockfileDrift", () => {
+  it("reports info when bun CLI is unavailable", () => {
+    const check = _internal.checkLockfileDrift(() => null, join(tempDir, "baseline.txt"));
+    expect(check.status).toBe("info");
+  });
+
+  it("records a baseline on first run and reports info", () => {
+    const baseline = join(tempDir, "baseline.txt");
+    const check = _internal.checkLockfileDrift(
+      () => ({ output: "abc123def456", error: null }),
+      baseline,
+    );
+    expect(check.status).toBe("info");
+    expect(existsSync(baseline)).toBe(true);
+  });
+
+  it("passes when hash matches recorded baseline", () => {
+    const baseline = join(tempDir, "baseline.txt");
+    writeFileSync(baseline, "abc123def456");
+    const check = _internal.checkLockfileDrift(
+      () => ({ output: "abc123def456", error: null }),
+      baseline,
+    );
+    expect(check.status).toBe("pass");
+  });
+
+  it("warns when current hash differs from baseline", () => {
+    const baseline = join(tempDir, "baseline.txt");
+    writeFileSync(baseline, "old-hash-1111");
+    const check = _internal.checkLockfileDrift(
+      () => ({ output: "new-hash-2222", error: null }),
+      baseline,
+    );
+    expect(check.status).toBe("warn");
+    expect(check.message).toContain("old-hash-1111");
+    expect(check.message).toContain("new-hash-2222");
+  });
+
+  it("returns info when bun pm hash output is empty", () => {
+    const baseline = join(tempDir, "baseline.txt");
+    const check = _internal.checkLockfileDrift(
+      () => ({ output: "", error: null }),
+      baseline,
+    );
+    expect(check.status).toBe("info");
   });
 });

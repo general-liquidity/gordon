@@ -77,7 +77,9 @@ jobs:
         uses: oven-sh/setup-bun@v1
 
       - name: Install dependencies (frozen lockfile)
-        run: bun install --frozen-lockfile
+        # `bun ci` is the idiomatic alias for `bun install --frozen-lockfile`
+        # introduced in Bun 1.2. Same semantics; reads better.
+        run: bun ci
 
       - name: bun audit (critical-severity surface)
         # --ignore flags silence the long-tail transitive criticals
@@ -102,3 +104,22 @@ jobs:
             --ignore GHSA-vjh7-7g9h-fjfh \
             --ignore GHSA-2w6w-674q-4c4q \
             --ignore GHSA-fjxv-7rqg-78g4
+
+      - name: bun audit (high-severity surface, informational)
+        # Second pass at the lower `high` threshold. Informational only —
+        # the noise floor is wider here (more long-tail transitive crypto
+        # libraries). Surfaces high-severity advisories that haven't been
+        # explicitly accepted so they don't sit invisible until they
+        # become criticals. Exit code ignored.
+        continue-on-error: true
+        run: |
+          bun audit --audit-level=high \
+            --ignore GHSA-xq3m-2v4x-88gg \
+            --ignore GHSA-vjh7-7g9h-fjfh \
+            --ignore GHSA-2w6w-674q-4c4q \
+            --ignore GHSA-fjxv-7rqg-78g4
+
+      - name: Security scanner self-test
+        # Ensure the bunfig-wired scanner still catches its own rule set.
+        # Runs in <1s and catches regressions in the IOC list.
+        run: node scripts/security/gordon-security-scanner.cjs --self-test
