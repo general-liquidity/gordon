@@ -524,6 +524,138 @@ function checkInstallReleaseAge(
 }
 
 /**
+ * Scan installed-package manifests for the TanStack worm's distinctive
+ * attack signature: an `optionalDependencies` entry pointing at a git
+ * URL (the worm smuggled `@tanstack/setup": "github:tanstack/router#..."`
+ * into compromised tarballs to trigger a `prepare` lifecycle script
+ * during npm install). Legitimate packages almost never declare git-URL
+ * optionalDependencies — finding one in the installed tree is a strong
+ * compromise signal regardless of which package was poisoned.
+ */
+function checkSuspiciousOptionalDependencies(
+  nodeModulesRoot: string = resolve(process.cwd(), "node_modules"),
+): DiagnosticCheck {
+  if (!existsSync(nodeModulesRoot)) {
+    return {
+      id: "suspicious-optional-deps",
+      label: "Suspicious optionalDependencies scan",
+      status: "info",
+      message: `${nodeModulesRoot} not present — install hasn't run yet.`,
+    };
+  }
+  const GIT_URL_PATTERN = /^(?:git[+@:]|github:|https?:\/\/.*\.git|.*#[a-f0-9]{40,})/i;
+  // Hard bounds so the scan never blows the doctor latency budget. A
+  // real Gordon node_modules has ~1k entries; cap + time budget keeps
+  // worst-case scan under 1.5s even on cold caches. Early-exits on
+  // first finding so a confirmed compromise surfaces immediately.
+  const MAX_MANIFESTS = 1500;
+  const TIME_BUDGET_MS = 1500;
+  const startedAt = Date.now();
+  const flagged: Array<{ pkg: string; dep: string; url: string }> = [];
+  let scanned = 0;
+  let truncated = false;
+
+  let entries: string[];
+  try {
+    entries = readdirSync(nodeModulesRoot);
+  } catch {
+    return {
+      id: "suspicious-optional-deps",
+      label: "Suspicious optionalDependencies scan",
+      status: "info",
+      message: `Cannot read ${nodeModulesRoot}; skipping scan.`,
+    };
+  }
+
+  const overBudget = (): boolean => {
+    if (scanned >= MAX_MANIFESTS) return true;
+    if (Date.now() - startedAt > TIME_BUDGET_MS) return true;
+    return false;
+  };
+
+  const inspect = (manifestPath: string, displayName: string): boolean => {
+    if (!existsSync(manifestPath)) return false;
+    scanned += 1;
+    try {
+      const raw = readFileSync(manifestPath, "utf8");
+      const parsed = JSON.parse(raw) as { optionalDependencies?: Record<string, string> };
+      const od = parsed?.optionalDependencies;
+      if (!od || typeof od !== "object") return false;
+      for (const [dep, url] of Object.entries(od)) {
+        if (typeof url !== "string") continue;
+        if (GIT_URL_PATTERN.test(url)) {
+          flagged.push({ pkg: displayName, dep, url });
+          return true; // signal: short-circuit allowed
+        }
+      }
+    } catch {
+      // unreadable / unparseable manifest — skip
+    }
+    return false;
+  };
+
+  outer: for (const entry of entries) {
+    if (entry.startsWith(".")) continue;
+    if (overBudget()) {
+      truncated = true;
+      break;
+    }
+    if (entry.startsWith("@")) {
+      try {
+        const scopeDir = join(nodeModulesRoot, entry);
+        for (const inner of readdirSync(scopeDir)) {
+          if (inner.startsWith(".")) continue;
+          if (overBudget()) {
+            truncated = true;
+            break outer;
+          }
+          if (inspect(join(scopeDir, inner, "package.json"), `${entry}/${inner}`)) {
+            break outer; // first finding wins
+          }
+        }
+      } catch {
+        // ignore
+      }
+    } else {
+      if (inspect(join(nodeModulesRoot, entry, "package.json"), entry)) {
+        break outer; // first finding wins
+      }
+    }
+  }
+
+  if (flagged.length > 0) {
+    const sample = flagged
+      .slice(0, 3)
+      .map((f) => `${f.pkg} → ${f.dep}: ${f.url.slice(0, 80)}`)
+      .join(" | ");
+    return {
+      id: "suspicious-optional-deps",
+      label: "Suspicious optionalDependencies scan",
+      status: "fail",
+      message:
+        `${flagged.length} installed package(s) declare optionalDependencies via git URL — ` +
+        `matches TeamPCP Mini Shai-Hulud worm payload signature. ` +
+        `First: ${sample}. ` +
+        `Quarantine the machine; do not run npm/bun install again until these manifests are inspected.`,
+    };
+  }
+  if (truncated) {
+    return {
+      id: "suspicious-optional-deps",
+      label: "Suspicious optionalDependencies scan",
+      status: "info",
+      message: `${scanned} manifests scanned (budget hit, ${MAX_MANIFESTS} cap / ${TIME_BUDGET_MS}ms). No suspicious entries in scanned subset.`,
+    };
+  }
+  return {
+    id: "suspicious-optional-deps",
+    label: "Suspicious optionalDependencies scan",
+    status: "pass",
+    message: `${scanned} manifests scanned, no git-URL optionalDependencies found.`,
+  };
+}
+
+/**
  * Scan the project tree for IOC artifacts left by the May-2026
  * TanStack worm and similar npm supply-chain attacks: malware payload
  * files (router_init.js, router_runtime.js), persistence setup scripts
@@ -693,6 +825,7 @@ export function runDoctorChecks(): DiagnosticCheck[] {
     checkCritiquePhaseRouting(),
     checkInstallReleaseAge(),
     checkSupplyChainIocs(),
+    checkSuspiciousOptionalDependencies(),
   ];
 }
 
@@ -712,6 +845,7 @@ export const _internal = {
   checkCritiquePhaseRouting,
   checkInstallReleaseAge,
   checkSupplyChainIocs,
+  checkSuspiciousOptionalDependencies,
   resolveMastraStoragePath,
   resolveVectorStoragePath,
 };

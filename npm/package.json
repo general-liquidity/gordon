@@ -34,7 +34,8 @@
   },
   "publishConfig": {
     "access": "public",
-    "tag": "friends"
+    "tag": "friends",
+    "provenance": true
   },
   "scripts": {
     "prepack": "node ../scripts/npm/prepare-npm-wrapper.cjs",

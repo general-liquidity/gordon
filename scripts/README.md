@@ -107,13 +107,28 @@ specifically searched for `bypass_2fa: true` tokens:
 - **Enable 2FA on the npm account** at npmjs.com → Account Settings.
   Required for publishing anyway since November 2025. Pick
   "Authorization and writes" (default) — NOT "Authorization only".
+- **Link a GitHub account for 2FA recovery** at npmjs.com → Account
+  Settings → "Linked Accounts & Recovery Option" → Link with GitHub.
+  Save the recovery codes in a password manager — these are the only
+  way to recover the account if the 2FA device is lost.
+- **Set per-package MFA to `automation`** on the published package:
+  `npm access set mfa=automation @general-liquidity/gordon-cli`.
+  Forces every publish (interactive or token-based) to use either
+  trusted-publisher OIDC or a granular automation-class token. Default
+  `none` allows any token to publish — the worm's exact attack vector.
 - **Never create a token with `bypass_2fa: true`.** The worm
   enumerated tokens via `registry.npmjs.org/-/npm/v1/tokens` and
   filtered for `bypass_2fa === true` specifically; a 2FA-required
   token is structurally unusable to this attack class.
+- **Lock CI tokens by IP CIDR.** When creating an npm token for CI,
+  pass `--cidr=<github-actions-ip-range>` (see GitHub's published
+  Actions IP ranges at `https://api.github.com/meta`). Stolen tokens
+  used outside this range get rejected at the registry.
 - **Use granular access tokens** scoped to a single package or scope
-  with read-only access unless write is genuinely needed.
-  `legacy` tokens were removed November 2025; use granular only.
+  with read-only access unless write is genuinely needed
+  (`npm token create --read-only` or
+  `--packages-and-scopes-permission=read-only`). `legacy` tokens were
+  removed November 2025; use granular only.
 - **Migrate to trusted publishing** once stable. Requires npmjs.com
   package settings → "Trusted Publisher" → GitHub Actions →
   workflow filename `release.yml`. After the trust binding is
@@ -122,3 +137,22 @@ specifically searched for `bypass_2fa: true` tokens:
   entirely. The `id-token: write` permission is already wired in
   `release.yml`, so the migration is npmjs.com side only.
   See: https://docs.npmjs.com/trusted-publishers
+
+### Provenance enforced in `npm/package.json`
+
+`npm/package.json` has `"publishConfig": { "provenance": true }` so
+provenance generation is locked at the package level — even if a
+release-time `--provenance` CLI flag is dropped by mistake, npm will
+still require the OIDC token and emit a Sigstore attestation. Pairs
+with the `id-token: write` permission in `release.yml`.
+
+### Compromise detection (one more doctor check)
+
+`checkSuspiciousOptionalDependencies` scans every installed manifest
+under `node_modules/**/package.json` for `optionalDependencies`
+entries pointing at git URLs — the exact attack signature the
+TanStack worm used to smuggle `@tanstack/setup": "github:tanstack/router#79ac49ee..."`
+into compromised tarballs and trigger a malicious `prepare` lifecycle
+script. Legitimate packages almost never declare git-URL
+optionalDependencies; finding one is a strong compromise signal
+regardless of which dependency was poisoned.

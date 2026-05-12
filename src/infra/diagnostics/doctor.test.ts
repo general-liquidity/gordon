@@ -401,3 +401,82 @@ describe("doctor — supply-chain IOC scan", () => {
     expect(check.status).toBe("pass");
   });
 });
+
+describe("doctor — suspicious optionalDependencies scan", () => {
+  it("returns info when node_modules is missing", () => {
+    const check = _internal.checkSuspiciousOptionalDependencies(join(tempDir, "no-node-modules"));
+    expect(check.id).toBe("suspicious-optional-deps");
+    expect(check.status).toBe("info");
+  });
+
+  it("passes on a clean node_modules", () => {
+    const fs = require("node:fs");
+    fs.mkdirSync(join(tempDir, "node_modules", "lodash"), { recursive: true });
+    writeFileSync(
+      join(tempDir, "node_modules", "lodash", "package.json"),
+      JSON.stringify({ name: "lodash", version: "4.17.21" }),
+    );
+    const check = _internal.checkSuspiciousOptionalDependencies(join(tempDir, "node_modules"));
+    expect(check.status).toBe("pass");
+    expect(check.message).toContain("1 manifests scanned");
+  });
+
+  it("fails on TanStack worm signature (github: URL in optionalDependencies)", () => {
+    const fs = require("node:fs");
+    fs.mkdirSync(join(tempDir, "node_modules", "@tanstack", "router-core"), { recursive: true });
+    writeFileSync(
+      join(tempDir, "node_modules", "@tanstack", "router-core", "package.json"),
+      JSON.stringify({
+        name: "@tanstack/router-core",
+        version: "1.169.8",
+        optionalDependencies: {
+          "@tanstack/setup": "github:tanstack/router#79ac49eedf774dd4b0cfa308722bc463cfe5885c",
+        },
+      }),
+    );
+    const check = _internal.checkSuspiciousOptionalDependencies(join(tempDir, "node_modules"));
+    expect(check.status).toBe("fail");
+    expect(check.message).toContain("@tanstack/router-core");
+    expect(check.message).toContain("Mini Shai-Hulud");
+  });
+
+  it("fails on git:// URLs too", () => {
+    const fs = require("node:fs");
+    fs.mkdirSync(join(tempDir, "node_modules", "evil-pkg"), { recursive: true });
+    writeFileSync(
+      join(tempDir, "node_modules", "evil-pkg", "package.json"),
+      JSON.stringify({
+        name: "evil-pkg",
+        version: "1.0.0",
+        optionalDependencies: { trojan: "git+https://attacker.example.com/repo.git" },
+      }),
+    );
+    const check = _internal.checkSuspiciousOptionalDependencies(join(tempDir, "node_modules"));
+    expect(check.status).toBe("fail");
+    expect(check.message).toContain("evil-pkg");
+  });
+
+  it("ignores legitimate version-range optionalDependencies", () => {
+    const fs = require("node:fs");
+    fs.mkdirSync(join(tempDir, "node_modules", "legit-pkg"), { recursive: true });
+    writeFileSync(
+      join(tempDir, "node_modules", "legit-pkg", "package.json"),
+      JSON.stringify({
+        name: "legit-pkg",
+        version: "1.0.0",
+        optionalDependencies: { fsevents: "^2.3.0", "node-gyp": "~9.0.0" },
+      }),
+    );
+    const check = _internal.checkSuspiciousOptionalDependencies(join(tempDir, "node_modules"));
+    expect(check.status).toBe("pass");
+  });
+
+  it("tolerates malformed package.json files", () => {
+    const fs = require("node:fs");
+    fs.mkdirSync(join(tempDir, "node_modules", "broken-pkg"), { recursive: true });
+    writeFileSync(join(tempDir, "node_modules", "broken-pkg", "package.json"), "not-json{");
+    const check = _internal.checkSuspiciousOptionalDependencies(join(tempDir, "node_modules"));
+    // Should not throw; the broken manifest is just skipped
+    expect(check.id).toBe("suspicious-optional-deps");
+  });
+});
