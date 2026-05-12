@@ -18,3 +18,13 @@ preload = ["./src/tui/ink-custom/buildCompilerPlugin.ts"]
 # 172800 seconds = 48 hours.
 [install]
 minimumReleaseAge = 172800
+
+# Slot for a third-party security scanner (Bun: `bun pm scan` requires
+# this section pointing at an npm package that exports a scanner
+# object — e.g. @socketsecurity/cli or similar). Left commented out
+# pending a deliberate choice of scanner. Don't enable a scanner
+# blindly: each scanner runs install-time code against the lockfile,
+# which is itself a supply-chain trust decision.
+#
+# [install.security]
+# scanner = "<package-name>"

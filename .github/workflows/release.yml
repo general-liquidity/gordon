@@ -77,6 +77,17 @@ jobs:
       - name: Source map guardrail (block sourcemap leak)
         run: node scripts/build/check-no-sourcemaps.cjs
 
+      - name: Verify registry signatures on wrapper deps (informational)
+        # `npm audit signatures` verifies Sigstore signatures + SLSA
+        # provenance attestations on installed packages. Informational
+        # (continue-on-error) until upstream deps fully adopt signed
+        # publishes — for now, surfaces visibility without breaking
+        # the release. See: docs.npmjs.com/viewing-package-provenance
+        if: matrix.os == 'ubuntu-latest'
+        continue-on-error: true
+        working-directory: npm
+        run: npm audit signatures
+
   verify-public-dist:
     name: Verify Public Dist Bundle
     needs: test
@@ -104,10 +115,21 @@ jobs:
       - verify-public-dist
     runs-on: ubuntu-latest
     steps:
+      - name: Generate CycloneDX SBOM
+        # Software Bill of Materials attached to every release. Lets
+        # downstream consumers verify Gordon's full dependency tree by
+        # cryptographic hash, trace upstream sources, and audit the
+        # supply chain offline. CycloneDX 1.5 JSON format.
+        # See: docs.npmjs.com/cli/v11/commands/npm-sbom
+        run: |
+          npm install --package-lock-only --ignore-scripts
+          node scripts/dev/generate-sbom.cjs --output gordon-sbom.json
+
       - name: Create or update GitHub Release
         uses: softprops/action-gh-release@v1
         with:
           generate_release_notes: true
+          files: gordon-sbom.json
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
