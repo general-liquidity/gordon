@@ -1,6 +1,6 @@
 import React from "react";
 import { Box, Text } from "../ink-custom";
-import { timeAgo } from "../components/DataTable.js";
+import { timeAgo } from "../components/charts/DataTable.tsx";
 
 /**
  * NewsRenderer -- Financial news items display

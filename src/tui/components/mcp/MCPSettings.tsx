@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Box, Text, useInput } from "../../ink-custom";
 import { Button } from "../../design-system/Button.js";
-import { Divider } from "../Divider.js";
+import { Divider } from "../layout/Divider.tsx";
 
 // ============================================================================
 // MCPSettings — View and light-edit settings for one MCP server

@@ -1,6 +1,6 @@
 import React from "react";
 import { Box, Text } from "../../ink-custom";
-import type { Message } from "../MessageBubble.js";
+import type { Message } from "./MessageBubble.tsx";
 
 // AssistantRedactedThinkingMessage — compact "thinking redacted" indicator.
 // Small and unobtrusive; shown when extended thinking output is redacted.

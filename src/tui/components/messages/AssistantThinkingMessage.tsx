@@ -1,7 +1,7 @@
 import React from "react";
 import { Box } from "../../ink-custom";
-import { ThinkStep } from "../ThinkStep.js";
-import type { Message } from "../MessageBubble.js";
+import { ThinkStep } from "../status/ThinkStep.tsx";
+import type { Message } from "./MessageBubble.tsx";
 
 // AssistantThinkingMessage — wraps ThinkStep as a proper message variant.
 // Extracts elapsed time from message.metadata.elapsed if present.

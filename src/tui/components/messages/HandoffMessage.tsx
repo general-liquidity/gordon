@@ -1,6 +1,6 @@
 import React from "react";
 import { Box, Text } from "../../ink-custom";
-import type { Message } from "../MessageBubble.js";
+import type { Message } from "./MessageBubble.tsx";
 
 // Handoff messages: → agent — agent routing transitions.
 export const HandoffMessage = React.memo(function HandoffMessage({ message }: { message: Message }) {

@@ -1,6 +1,6 @@
 import React from "react";
 import { Box, Text } from "../ink-custom";
-import { fmtNum } from "../components/DataTable.js";
+import { fmtNum } from "../components/charts/DataTable.tsx";
 
 /**
  * LiquidationRenderer -- Cascading liquidation levels with size bars

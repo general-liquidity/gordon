@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Box, Text, useInput } from "../../ink-custom";
 import { GordonSelect as Select } from "../../design-system/GordonSelect.js";
-import { Divider } from "../Divider.js";
+import { Divider } from "../layout/Divider.tsx";
 
 // ============================================================================
 // TradeExecutionPermissionRequest — Approval dialog for actual trade orders

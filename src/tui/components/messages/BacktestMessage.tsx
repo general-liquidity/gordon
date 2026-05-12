@@ -1,6 +1,6 @@
 import React from "react";
 import { Box, Text } from "../../ink-custom";
-import type { Message } from "../MessageBubble.js";
+import type { Message } from "./MessageBubble.tsx";
 
 // Backtest results: Sharpe, PSR, win rate, drawdown summary
 export const BacktestMessage = React.memo(function BacktestMessage({ message }: { message: Message }) {

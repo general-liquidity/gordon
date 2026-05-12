@@ -1,7 +1,7 @@
 import React from "react";
 import { Box, Text } from "../ink-custom";
-import { DataTable, type Column } from "../components/DataTable.js";
-import { InlineChart } from "../components/InlineChart.js";
+import { DataTable, type Column } from "../components/charts/DataTable.tsx";
+import { InlineChart } from "../components/charts/InlineChart.tsx";
 
 /**
  * AnalysisRenderer -- Technical analysis view

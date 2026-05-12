@@ -1,7 +1,7 @@
 import React from "react";
 import { Box } from "../ink-custom";
-import { DataTable, fmtPct, type Column } from "../components/DataTable.js";
-import { InlineChart } from "../components/InlineChart.js";
+import { DataTable, fmtPct, type Column } from "../components/charts/DataTable.tsx";
+import { InlineChart } from "../components/charts/InlineChart.tsx";
 
 /**
  * BacktestRenderer -- Backtest metrics DataTable + InlineChart equity curve

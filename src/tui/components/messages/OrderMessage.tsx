@@ -1,6 +1,6 @@
 import React from "react";
 import { Box, Text } from "../../ink-custom";
-import type { Message } from "../MessageBubble.js";
+import type { Message } from "./MessageBubble.tsx";
 
 // Order events: placed, filled, cancelled, rejected
 export const OrderMessage = React.memo(function OrderMessage({ message }: { message: Message }) {

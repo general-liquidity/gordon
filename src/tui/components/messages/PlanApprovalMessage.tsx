@@ -1,6 +1,6 @@
 import React from "react";
 import { Box, Text } from "../../ink-custom";
-import type { Message } from "../MessageBubble.js";
+import type { Message } from "./MessageBubble.tsx";
 
 // PlanApprovalMessage — plan ready for human review.
 // Renders a cyanBright-bordered box:

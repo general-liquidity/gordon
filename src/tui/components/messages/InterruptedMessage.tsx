@@ -1,6 +1,6 @@
 import React from "react";
 import { Box, Text } from "../../ink-custom";
-import type { Message } from "../MessageBubble.js";
+import type { Message } from "./MessageBubble.tsx";
 
 // InterruptedMessage — shown when user presses Ctrl+C to interrupt Gordon.
 function InterruptedMessageInner({ message: _ }: { message: Message }) {

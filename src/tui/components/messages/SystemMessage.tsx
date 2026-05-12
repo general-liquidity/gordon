@@ -1,6 +1,6 @@
 import React from "react";
 import { Box, Text } from "../../ink-custom";
-import type { Message } from "../MessageBubble.js";
+import type { Message } from "./MessageBubble.tsx";
 
 // System messages: single dim line, no badge. Minimal footprint.
 function SystemMessageInner({ message }: { message: Message }) {

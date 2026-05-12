@@ -1,6 +1,6 @@
 import React from "react";
 import { Box, Text } from "../../ink-custom";
-import type { Message } from "../MessageBubble.js";
+import type { Message } from "./MessageBubble.tsx";
 
 // UserToolSuccessMessage — successful tool execution result.
 // Renders: ⎿ ✓ {content}

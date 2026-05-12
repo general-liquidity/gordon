@@ -1,6 +1,6 @@
 import React from "react";
 import { Box, Text } from "../../ink-custom";
-import type { Message } from "../MessageBubble.js";
+import type { Message } from "./MessageBubble.tsx";
 
 // Rate limit: shows when API or exchange throttles requests
 // Trading context: exchange rate limits are critical — they can prevent order execution

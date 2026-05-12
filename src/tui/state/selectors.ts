@@ -13,9 +13,9 @@
  */
 
 import type { AppState, PermissionMode, BootPhase, BackgroundTask, TuiNotification } from "./types.js";
-import type { Message } from "../components/MessageBubble.js";
-import type { AgentChain, HandoffEvent } from "../components/AgentProgress.js";
-import type { ApprovalRequest } from "../components/ApprovalDialog.js";
+import type { Message } from "../components/messages/MessageBubble.tsx";
+import type { AgentChain, HandoffEvent } from "../components/status/AgentProgress.tsx";
+import type { ApprovalRequest } from "../components/dialogs/ApprovalDialog.tsx";
 
 // ============================================================================
 // Memoization helper

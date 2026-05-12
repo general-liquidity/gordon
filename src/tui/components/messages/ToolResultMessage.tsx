@@ -1,8 +1,8 @@
 import React from "react";
 import { Box, Text } from "../../ink-custom";
-import { RichContent } from "../RichContent.js";
-import { NoSelect } from "../NoSelect.js";
-import type { Message } from "../MessageBubble.js";
+import { RichContent } from "./RichContent.tsx";
+import { NoSelect } from "../layout/NoSelect.tsx";
+import type { Message } from "./MessageBubble.tsx";
 
 // Tool result messages: dimmed, with ⎿ hook. Shows tool output inline.
 function ToolResultMessageInner({ message }: { message: Message }) {

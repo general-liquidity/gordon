@@ -32,9 +32,9 @@ import {
 } from "../../infra/runtime/credentialRefresh.ts";
 export { refreshRuntimeCredentials } from "../../infra/runtime/credentialRefresh.ts";
 import { collectDoctorReport, formatDoctorReport } from "../../app/setup/setup-runtime.ts";
-import type { Message } from "../components/MessageBubble.js";
-import type { ProgressNode } from "../components/AgentProgress.js";
-import type { ApprovalRequest } from "../components/ApprovalDialog.js";
+import type { Message } from "../components/messages/MessageBubble.tsx";
+import type { ProgressNode } from "../components/status/AgentProgress.tsx";
+import type { ApprovalRequest } from "../components/dialogs/ApprovalDialog.tsx";
 import { getRuntimeApprovalShortId } from "../../app/runtime/runtimeApprovalId.ts";
 import { subscribeToEvents } from "./eventSubscriptions.js";
 import type { Action, TuiNotification } from "../state/types.js";
@@ -106,7 +106,7 @@ export async function initializeRuntime(setState: StateUpdater): Promise<Session
   try {
     // GORDON_AUTODREAM_ENABLED=true — periodic memory consolidation (24h gated internally)
     if (process.env.GORDON_AUTODREAM_ENABLED === "true") {
-      const { AutoDreamManager } = await import("../services/autoDream.js");
+      const { AutoDreamManager } = await import("../services/workflow/autoDream.ts");
       const dream = new AutoDreamManager();
       void dream.checkAndConsolidate(0, null).catch(() => {});
     }
@@ -116,7 +116,7 @@ export async function initializeRuntime(setState: StateUpdater): Promise<Session
   try {
     // GORDON_REFLECTION_ENABLED=true — warm post-trade reflection store from disk
     if (process.env.GORDON_REFLECTION_ENABLED === "true") {
-      const { getReflectionStore } = await import("../services/tradeReflection.js");
+      const { getReflectionStore } = await import("../services/workflow/tradeReflection.ts");
       getReflectionStore();
     }
   } catch (err) {
@@ -125,7 +125,7 @@ export async function initializeRuntime(setState: StateUpdater): Promise<Session
   try {
     // GORDON_DENIAL_MEMORY_ENABLED=true — warm denial-audit memory from disk
     if (process.env.GORDON_DENIAL_MEMORY_ENABLED === "true") {
-      const { getDenialMemory } = await import("../services/denialMemory.js");
+      const { getDenialMemory } = await import("../services/memory/denialMemory.ts");
       getDenialMemory();
     }
   } catch (err) {

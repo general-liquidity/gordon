@@ -5,7 +5,7 @@ import {
   fmtPct,
   changeColor,
   type Column,
-} from "../components/DataTable.js";
+} from "../components/charts/DataTable.tsx";
 
 /**
  * StrategyRenderer -- Strategy overview table

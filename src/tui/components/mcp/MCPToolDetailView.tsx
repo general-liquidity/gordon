@@ -1,6 +1,6 @@
 import React from "react";
 import { Box, Text, useInput } from "../../ink-custom";
-import { Divider } from "../Divider.js";
+import { Divider } from "../layout/Divider.tsx";
 
 // ============================================================================
 // MCPToolDetailView — Full detail for one MCP tool

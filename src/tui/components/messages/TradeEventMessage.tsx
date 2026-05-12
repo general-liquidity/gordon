@@ -1,8 +1,8 @@
 import React from "react";
 import { Box, Text } from "../../ink-custom";
-import { RichContent } from "../RichContent.js";
-import { Byline } from "../Byline.js";
-import type { Message } from "../MessageBubble.js";
+import { RichContent } from "./RichContent.tsx";
+import { Byline } from "../layout/Byline.tsx";
+import type { Message } from "./MessageBubble.tsx";
 
 // Trade event messages: FILLED, STOP, ALERT — prominent badges with icons.
 // These are money events — the user's trade journal.

@@ -1,7 +1,7 @@
 import React from "react";
 import { Box, Text } from "../../ink-custom";
-import { RichContent } from "../RichContent.js";
-import type { Message } from "../MessageBubble.js";
+import { RichContent } from "./RichContent.tsx";
+import type { Message } from "./MessageBubble.tsx";
 
 // Proactive suggestion card: Gordon's unsolicited suggestions when proactive
 // mode is enabled. Visually distinct from trade events — these are

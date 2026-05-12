@@ -1,6 +1,6 @@
 import React from "react";
 import { Box, Text } from "../../ink-custom";
-import type { Message } from "../MessageBubble.js";
+import type { Message } from "./MessageBubble.tsx";
 
 // Position lifecycle: opened, closed, updated — shows symbol, side, P&L
 export const PositionMessage = React.memo(function PositionMessage({ message }: { message: Message }) {

@@ -4,7 +4,7 @@
 // Uses OSC 52 clipboard + native pbcopy/xclip/clip.exe fallback.
 // ============================================================================
 
-import { writeToClipboard } from "../hooks/useCopyOnSelect.js";
+import { writeToClipboard } from "../hooks/input/useCopyOnSelect.ts";
 
 interface Message {
   role?: string;

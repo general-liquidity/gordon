@@ -1,6 +1,6 @@
 import React from "react";
 import { Box, Text } from "../../ink-custom";
-import type { Message } from "../MessageBubble.js";
+import type { Message } from "./MessageBubble.tsx";
 
 // Paste detection: shows when user pastes large content
 // Trading context: pasted addresses, tx hashes, trade logs

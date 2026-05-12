@@ -1,6 +1,6 @@
 import React from "react";
 import { Box, Text } from "../../ink-custom";
-import type { Message } from "../MessageBubble.js";
+import type { Message } from "./MessageBubble.tsx";
 
 // RejectedPlanMessage — a plan that failed risk/approval review.
 // Renders a red-bordered compact notice:

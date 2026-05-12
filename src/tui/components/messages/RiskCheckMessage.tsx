@@ -1,6 +1,6 @@
 import React from "react";
 import { Box, Text } from "../../ink-custom";
-import type { Message } from "../MessageBubble.js";
+import type { Message } from "./MessageBubble.tsx";
 
 // Risk classifier result: 11 dimensions, pass/fail with score
 export const RiskCheckMessage = React.memo(function RiskCheckMessage({ message }: { message: Message }) {

@@ -9,7 +9,7 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
-import { sideQuestionManager } from "../../../../../tui/services/sideQuestion.ts";
+import { sideQuestionManager } from "../../../../../tui/services/suggestions/sideQuestion.ts";
 
 export const askUserTool = createTool({
   id: "ask_user",

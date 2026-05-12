@@ -1,9 +1,9 @@
 import React from "react";
 import { Box } from "../../ink-custom";
-import { RichContent } from "../RichContent.js";
-import { StreamingMarkdown } from "../StreamingMarkdown.js";
-import { MessageResponse } from "../MessageResponseContext.js";
-import type { Message } from "../MessageBubble.js";
+import { RichContent } from "./RichContent.tsx";
+import { StreamingMarkdown } from "./StreamingMarkdown.tsx";
+import { MessageResponse } from "./MessageResponseContext.tsx";
+import type { Message } from "./MessageBubble.tsx";
 
 // Assistant (gordon) messages: ⎿ hook via MessageResponse (prevents nesting).
 // Streaming=true → StreamingMarkdown (progressive, stable prefix).

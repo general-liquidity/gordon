@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Box, Text, useInput } from "../../ink-custom";
-import { Divider } from "../Divider.js";
+import { Divider } from "../layout/Divider.tsx";
 
 // ============================================================================
 // MCPRemoteServerMenu — Step-by-step form to add a remote HTTP/SSE MCP server

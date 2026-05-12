@@ -1,6 +1,6 @@
 import React from "react";
 import { Box, Text } from "../../ink-custom";
-import type { Message } from "../MessageBubble.js";
+import type { Message } from "./MessageBubble.tsx";
 
 // TaskAssignmentMessage — delegation event to a sub-agent.
 // Renders: → Delegated to {agent}: {content}

@@ -1,6 +1,6 @@
 import React from "react";
 import { Box, Text } from "../ink-custom";
-import { InlineChart } from "../components/InlineChart.js";
+import { InlineChart } from "../components/charts/InlineChart.tsx";
 
 /**
  * MarketAnalysisRenderer -- Deep / ensemble / multi-timeframe analysis

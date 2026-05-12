@@ -10,7 +10,7 @@
 
 import React from "react";
 import { Box, Text } from "../ink-custom";
-import { DataTable, fmtNum, type Column } from "../components/DataTable.js";
+import { DataTable, fmtNum, type Column } from "../components/charts/DataTable.tsx";
 
 // ============================================================================
 // Types

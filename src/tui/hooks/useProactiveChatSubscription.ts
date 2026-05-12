@@ -19,7 +19,7 @@
 import { useEffect } from "react";
 import type { Dispatch } from "react";
 import { getEventBus } from "../../events/index.js";
-import type { Message } from "../components/MessageBubble.js";
+import type { Message } from "../components/messages/MessageBubble.tsx";
 
 type AddMessageAction = { type: "ADD_MESSAGE"; message: Message };
 

@@ -19,7 +19,7 @@ import { runHooks } from "../../../hooks/engine.ts";
 import { formatActionPlanMarkdown, planActionExecution } from "../../../runtime/actions/runtime.ts";
 import { normalizeCryptoSymbol, resolveInstrument } from "../../../domain/markets/instruments.ts";
 import { recordStructuredObservation } from "../../../platform/observability/index.ts";
-import { registerSymbols } from "../../../../tui/components/markdownPalette.ts";
+import { registerSymbols } from "../../../../tui/components/messages/markdownPalette.ts";
 import { getGordonContext, type MastraExecutionContext } from "../types.ts";
 import type { ExchangeExtended } from "../../../exchange/types.ts";
 

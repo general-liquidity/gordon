@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Box, useInput } from "../ink-custom";
 import { SearchBox } from "../design-system/SearchBox.js";
-import type { ScrollBoxHandle } from "./ScrollBox.js";
+import type { ScrollBoxHandle } from "./layout/ScrollBox.tsx";
 import { useOverlayState } from "../context/overlayContext.js";
 
 // ============================================================================

@@ -5,7 +5,7 @@ import {
   fmtPct,
   changeColor,
   type Column,
-} from "../components/DataTable.js";
+} from "../components/charts/DataTable.tsx";
 
 /**
  * PositionRenderer -- Open positions table with colored PNL + summary row

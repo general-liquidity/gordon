@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import type { Message } from "../components/MessageBubble.js";
+import type { Message } from "../components/messages/MessageBubble.tsx";
 
 // Prompt suggestions — suggest next action based on conversation context
 // Trading-adapted: suggests /scan, /dd, /risk-check based on what happened

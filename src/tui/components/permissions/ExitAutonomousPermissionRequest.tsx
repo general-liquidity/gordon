@@ -1,7 +1,7 @@
 import React from "react";
 import { Box, Text } from "../../ink-custom";
 import { GordonSelect as Select } from "../../design-system/GordonSelect.js";
-import { Divider } from "../Divider.js";
+import { Divider } from "../layout/Divider.tsx";
 
 // ============================================================================
 // ExitAutonomousPermissionRequest — Simple confirmation to leave autonomous mode

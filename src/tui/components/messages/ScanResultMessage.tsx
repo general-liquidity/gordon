@@ -1,6 +1,6 @@
 import React from "react";
 import { Box, Text } from "../../ink-custom";
-import type { Message } from "../MessageBubble.js";
+import type { Message } from "./MessageBubble.tsx";
 
 // Scan results: opportunities found, ranked by confidence
 export const ScanResultMessage = React.memo(function ScanResultMessage({ message }: { message: Message }) {

@@ -1,6 +1,6 @@
 import React from "react";
 import { Box, Text } from "../../ink-custom";
-import type { Message } from "../MessageBubble.js";
+import type { Message } from "./MessageBubble.tsx";
 
 // Compact/resume messages: single dim line with icon.
 export const CompactMessage = React.memo(function CompactMessage({ message }: { message: Message }) {

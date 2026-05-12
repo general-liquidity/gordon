@@ -14,7 +14,7 @@ import {
 } from "../../core/pipeline/autonomous-loop.ts";
 import { handleTelemetryCommand, handleContextCommand } from "../../app/commands/index.ts";
 import { getRuntimeApprovalShortId } from "../../app/runtime/runtimeApprovalId.ts";
-import type { Message } from "../components/MessageBubble.js";
+import type { Message } from "../components/messages/MessageBubble.tsx";
 import type { StateUpdater } from "./runtime.js";
 
 // ============================================================================

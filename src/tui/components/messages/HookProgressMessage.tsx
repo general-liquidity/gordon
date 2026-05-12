@@ -1,6 +1,6 @@
 import React from "react";
 import { Box, Text } from "../../ink-custom";
-import type { Message } from "../MessageBubble.js";
+import type { Message } from "./MessageBubble.tsx";
 
 // Hook progress: shows lifecycle hook execution inline
 // e.g., "Running PreTrade hook… constitution check"

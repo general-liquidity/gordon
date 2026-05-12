@@ -1,6 +1,6 @@
 import React from "react";
 import { Box, Text, useStdout } from "../../ink-custom";
-import type { Message } from "../MessageBubble.js";
+import type { Message } from "./MessageBubble.tsx";
 
 // CompactBoundaryMessage — separator line shown when the conversation is compacted.
 // Renders a centered label flanked by dim dashes:

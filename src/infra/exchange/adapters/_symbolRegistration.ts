@@ -6,7 +6,7 @@
  */
 
 import type { ExchangeInfo } from "../types.ts";
-import { registerSymbols } from "../../../tui/components/markdownPalette.ts";
+import { registerSymbols } from "../../../tui/components/messages/markdownPalette.ts";
 
 export function registerExchangeInfoSymbols(info: ExchangeInfo): void {
   registerSymbols(info.symbols.flatMap((s) => [s.baseAsset, s.quoteAsset]));

@@ -4,7 +4,7 @@ import {
   DataTable,
   timeAgo,
   type Column,
-} from "../components/DataTable.js";
+} from "../components/charts/DataTable.tsx";
 
 /**
  * SECFilingRenderer -- SEC filing search results table

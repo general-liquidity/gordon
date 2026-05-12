@@ -1,7 +1,7 @@
 import React from "react";
 import { Box, Text, useInput } from "../../ink-custom";
-import { useAnimationClock } from "../../hooks/useAnimationClock.js";
-import { Divider } from "../Divider.js";
+import { useAnimationClock } from "../../hooks/animation/useAnimationClock.ts";
+import { Divider } from "../layout/Divider.tsx";
 
 // ============================================================================
 // MCPReconnect — Animated reconnection status for a failing MCP server

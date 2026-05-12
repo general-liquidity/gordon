@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Box, Text, useInput } from "../../ink-custom";
 import { GordonSelect as Select } from "../../design-system/GordonSelect.js";
-import { Divider } from "../Divider.js";
+import { Divider } from "../layout/Divider.tsx";
 
 // ============================================================================
 // MCPAgentServerMenu — Assign MCP servers to specific Gordon sub-agents

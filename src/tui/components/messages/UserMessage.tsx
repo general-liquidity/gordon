@@ -1,6 +1,6 @@
 import React from "react";
 import { Box, Text } from "../../ink-custom";
-import type { Message } from "../MessageBubble.js";
+import type { Message } from "./MessageBubble.tsx";
 
 // User messages: Claude Code style — green ">" prefix, content rendered
 // in default terminal color (NOT dimColor — that turned every prompt
