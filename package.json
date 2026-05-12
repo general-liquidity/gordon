@@ -52,6 +52,7 @@
     "smoke:npm-wrapper": "node scripts/npm/smoke-npm-wrapper.cjs",
     "check:no-sourcemaps": "node scripts/build/check-no-sourcemaps.cjs",
     "audit:npm-pack": "node scripts/npm/audit-npm-pack.cjs",
+    "audit:npm-pack-content": "node scripts/npm/audit-npm-pack-content.cjs",
     "prepublishOnly": "bun run build && node scripts/build/check-no-sourcemaps.cjs",
     "test": "bun test",
     "typecheck": "tsc --noEmit",

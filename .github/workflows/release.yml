@@ -74,6 +74,16 @@ jobs:
       - name: Audit npm pack contents (no source files, no .map)
         run: node scripts/npm/audit-npm-pack.cjs
 
+      - name: Audit npm pack content for credential leaks
+        # Greps every would-be-published file for npm tokens, GitHub
+        # PATs, AWS access keys, Stripe secrets, Vault tokens, PEM
+        # private keys, Slack/GitLab/Google/Anthropic/OpenAI API
+        # keys. Complements audit-npm-pack.cjs (file whitelist) with
+        # a content-pattern check on what does ship. Recommended by
+        # npm's publishing guides as a pre-publish safeguard.
+        if: matrix.os == 'ubuntu-latest'
+        run: node scripts/npm/audit-npm-pack-content.cjs
+
       - name: Source map guardrail (block sourcemap leak)
         run: node scripts/build/check-no-sourcemaps.cjs
 

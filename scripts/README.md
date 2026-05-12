@@ -29,6 +29,7 @@ scripts/
 | `check-npm-wrapper.cjs` | Schema-checks the generated wrapper before publish. |
 | `smoke-npm-wrapper.cjs` | Installs the packed wrapper into a clean dir and exercises `gordon --version`. |
 | `audit-npm-pack.cjs` | Runs `npm pack --dry-run` + asserts only the whitelisted files ship. |
+| `audit-npm-pack-content.cjs` | Greps every would-be-published file for credential patterns (npm/GitHub/AWS/Stripe/Vault/Slack/GitLab/Google/Anthropic/OpenAI tokens + PEM/OpenSSH private keys). Complements the file-list audit with content-pattern detection. Self-tests with `--self-test`. |
 
 ## patches/
 
@@ -168,6 +169,27 @@ into compromised tarballs and trigger a malicious `prepare` lifecycle
 script. Legitimate packages almost never declare git-URL
 optionalDependencies; finding one is a strong compromise signal
 regardless of which dependency was poisoned.
+
+### Pre-publish content scan
+
+`scripts/npm/audit-npm-pack-content.cjs` greps every would-be-published
+file for credential patterns and fails the release on any match.
+Triggered by npm's own publishing guidance: *"Publishing sensitive
+information to the registry can harm your users, compromise your
+development infrastructure, be expensive to fix, and put you at risk
+of legal action."* This is defense-in-depth on top of
+`audit-npm-pack.cjs` (which audits the file *list*) — the content scan
+catches accidental credential inlining into otherwise-allowed files
+(e.g., a token baked into `bin/gordon.cjs` or a JS bundle in `lib/`).
+
+Patterns covered: npm tokens, GitHub PATs (`ghp_`/`gho_`/`ghu_`/
+`ghs_`/`ghr_`), AWS access keys (AKIA/ASIA), HashiCorp Vault tokens,
+Stripe live + restricted-live secrets, OpenSSH + PEM private keys,
+Slack tokens (xox*), GitLab PATs, Google API keys (AIza), Anthropic
+API keys (sk-ant-*), OpenAI API keys (sk-/sk-proj-).
+
+Run locally: `npm run audit:npm-pack-content`. Validate patterns
+without scanning: `node scripts/npm/audit-npm-pack-content.cjs --self-test`.
 
 ### Release artifacts
 
