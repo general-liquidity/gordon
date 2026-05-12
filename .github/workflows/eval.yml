@@ -1,0 +1,70 @@
+name: Eval Harness
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - v*
+
+jobs:
+  scenarios:
+    name: Bundled scenarios sanity
+    runs-on: ubuntu-latest
+    # Validates that the eval-harness scenario set is well-formed and
+    # importable. Does NOT run live trajectories yet — that needs the
+    # live-Mastra-trajectory generation work (deferred; orchestrator
+    # has side effects on audit log + permission state that need
+    # isolated-shadow-mode wiring before CI can run them safely).
+    #
+    # Pass criteria for this stage: every scenario imports cleanly,
+    # has the required fields (id, tags, systemPrompt, userInput),
+    # ids are unique, and the adversarial subset is non-empty. This
+    # catches schema regressions, import-path drift, and accidental
+    # scenario deletion in PRs.
+    #
+    # Tighten to a hard pass/fail gate on judged-trajectory eval
+    # results once live trajectories ship.
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+
+      - name: Install dependencies (frozen lockfile)
+        run: bun install --frozen-lockfile
+
+      - name: Validate scenario bundle
+        run: |
+          bun -e '
+            import { ALL_SCENARIOS, ADVERSARIAL_SCENARIOS } from "./src/infra/domain/evals/harness/scenarios/index.ts";
+
+            const errors = [];
+            const seen = new Set();
+            for (const s of ALL_SCENARIOS) {
+              if (!s.id || typeof s.id !== "string") errors.push("scenario missing id");
+              if (seen.has(s.id)) errors.push(`duplicate scenario id: ${s.id}`);
+              seen.add(s.id);
+              if (!Array.isArray(s.tags) || s.tags.length === 0) errors.push(`${s.id}: empty tags`);
+              if (!s.systemPrompt || s.systemPrompt.length < 20) errors.push(`${s.id}: systemPrompt too short`);
+              if (!s.userInput || s.userInput.length < 5) errors.push(`${s.id}: userInput too short`);
+            }
+            if (ADVERSARIAL_SCENARIOS.length < 5) {
+              errors.push(`adversarial scenario set has ${ADVERSARIAL_SCENARIOS.length} entries; expected >=5`);
+            }
+            if (errors.length > 0) {
+              console.error("Eval scenario validation FAILED:");
+              for (const e of errors) console.error("  - " + e);
+              process.exit(1);
+            }
+            console.log(`Eval scenario validation PASS — ${ALL_SCENARIOS.length} scenarios (${ADVERSARIAL_SCENARIOS.length} adversarial).`);
+          '
+
+      - name: Run harness unit tests
+        run: bun test src/infra/domain/evals/harness/
+
+      - name: Run safety + ACE unit tests (regression net)
+        run: |
+          bun test src/infra/safety/
+          bun test src/infra/agents/ace/

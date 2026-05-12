@@ -57,6 +57,11 @@ const CATEGORY_BASE_SCORE: Record<ACELessonCandidate["category"], number> = {
   // to recur and are higher-leverage to surface ("we exited TSLA earnings
   // for X reason; don't re-enter under the same conditions").
   cancel_rationale: 0.74,
+  // Aggregate cross-session patterns (Sentra + HALO). Score in between
+  // approved_plan and cancel — these are meta-observations about the
+  // user's running behavior, high-signal but inherently noisier than
+  // per-event rules because the threshold logic makes inferences.
+  aggregate_pattern: 0.73,
   venue_quirk: 0.70,
   execution_success: 0.55,
   operational: 0.50,

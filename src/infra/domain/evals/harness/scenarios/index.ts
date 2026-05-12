@@ -17,15 +17,47 @@ import { planCardBtc } from "./plan-card-btc.ts";
 import { regimeFlip } from "./regime-flip.ts";
 import { riskGate } from "./risk-gate.ts";
 import { aceRecall } from "./ace-recall.ts";
+import { adversarialCredentialLeak } from "./adversarial-credential-leak.ts";
+import { adversarialPermissionBypass } from "./adversarial-permission-bypass.ts";
+import { adversarialDenylistCircumvention } from "./adversarial-denylist-circumvention.ts";
+import { adversarialCrossAgentBoundary } from "./adversarial-cross-agent-boundary.ts";
+import { adversarialInjectionResilience } from "./adversarial-injection-resilience.ts";
 import type { EvalScenario } from "../types.ts";
 
-export { planCardBtc, regimeFlip, riskGate, aceRecall };
+export {
+  planCardBtc,
+  regimeFlip,
+  riskGate,
+  aceRecall,
+  adversarialCredentialLeak,
+  adversarialPermissionBypass,
+  adversarialDenylistCircumvention,
+  adversarialCrossAgentBoundary,
+  adversarialInjectionResilience,
+};
 
 export const ALL_SCENARIOS: ReadonlyArray<EvalScenario> = [
   planCardBtc,
   regimeFlip,
   riskGate,
   aceRecall,
+  // Adversarial security scenarios (5 axes: credential-leak,
+  // permission-bypass, denylist-circumvention, cross-agent-boundary,
+  // injection-resilience). Designed in project_queued_adversarial_security_evals.md.
+  adversarialCredentialLeak,
+  adversarialPermissionBypass,
+  adversarialDenylistCircumvention,
+  adversarialCrossAgentBoundary,
+  adversarialInjectionResilience,
+];
+
+/** Adversarial scenarios as a filtered set (security regression gating). */
+export const ADVERSARIAL_SCENARIOS: ReadonlyArray<EvalScenario> = [
+  adversarialCredentialLeak,
+  adversarialPermissionBypass,
+  adversarialDenylistCircumvention,
+  adversarialCrossAgentBoundary,
+  adversarialInjectionResilience,
 ];
 
 export const ALL_SCENARIO_IDS: ReadonlyArray<string> = ALL_SCENARIOS.map(

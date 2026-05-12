@@ -33,7 +33,8 @@ export interface ACELessonCandidate {
     | "operational"
     | "agent_self_block"
     | "approved_plan_rationale"
-    | "cancel_rationale";
+    | "cancel_rationale"
+    | "aggregate_pattern";
   /** Number of distinct historical events that support this lesson */
   evidenceCount: number;
   /** First seen timestamp (ms epoch) */
@@ -205,6 +206,190 @@ function dedupeKey(text: string): string {
   return text.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim().slice(0, 80);
 }
 
+// ============================================================================
+// Aggregate pattern rules — see across-session patterns invisible per-trace
+// ============================================================================
+//
+// The Sentra "company brain" framing + HALO's Terminal-Bench finding converged
+// on the same insight: some patterns only exist when you look at the trace
+// corpus as a whole, not one entry at a time. The per-entry PATTERN_RULES
+// above can't detect "user has cancelled 4 orders citing 'changed my mind'
+// across 3 different symbols this week" because each individual cancel
+// looks reasonable in isolation.
+//
+// AggregatePatternRule operates on the full entry array. Each rule returns
+// zero or more lesson candidates with their own evidence counts. Aggregate
+// rules should be conservative — only emit when the pattern is statistically
+// meaningful (sample-size floor + ratio threshold), or they'll spam.
+
+export interface AggregateCandidate {
+  text: string;
+  firstSeenAt: number;
+  lastSeenAt: number;
+  evidenceCount: number;
+}
+
+type AggregatePatternRule = {
+  category: ACELessonCandidate["category"];
+  match: (entries: ReadonlyArray<ActionLogEntry>) => AggregateCandidate[];
+};
+
+const BROAD_EXPLORATION_TOOLS = new Set([
+  "scan_market",
+  "get_candles",
+  "get_orderbook",
+  "get_trending_tokens",
+  "search_packages",
+  "list_markets",
+  "list_open_orders",
+  "list_trades",
+]);
+
+const MIN_SESSIONS_FOR_AGGREGATE = 3;
+
+function bucketBySession(
+  entries: ReadonlyArray<ActionLogEntry>,
+): Map<string, ActionLogEntry[]> {
+  const sessions = new Map<string, ActionLogEntry[]>();
+  for (const e of entries) {
+    const sid = e.sessionId ?? e.threadId ?? "default";
+    let list = sessions.get(sid);
+    if (!list) {
+      list = [];
+      sessions.set(sid, list);
+    }
+    list.push(e);
+  }
+  return sessions;
+}
+
+function entryTimestamp(e: ActionLogEntry): number {
+  const t = Date.parse(e.createdAt);
+  return Number.isFinite(t) ? t : Date.now();
+}
+
+const AGGREGATE_PATTERN_RULES: ReadonlyArray<AggregatePatternRule> = [
+  // Rule: first-action breadth. If the first tool call across recent
+  // sessions falls into the broad-exploration set >40% of the time, the
+  // agent is defaulting to wide scans before narrowing — HALO's exact
+  // Terminal-Bench finding ("first command too generic"). Surface as a
+  // meta-lesson so future sessions consider starting targeted.
+  {
+    category: "aggregate_pattern",
+    match: (entries) => {
+      const sessions = bucketBySession(entries);
+      if (sessions.size < MIN_SESSIONS_FOR_AGGREGATE) return [];
+
+      let broadFirst = 0;
+      let totalWithTool = 0;
+      let firstTs = Number.POSITIVE_INFINITY;
+      let lastTs = Number.NEGATIVE_INFINITY;
+
+      for (const sessEntries of sessions.values()) {
+        const sorted = [...sessEntries].sort(
+          (a, b) => entryTimestamp(a) - entryTimestamp(b),
+        );
+        const firstTool = sorted.find((e) => e.entryType === "tool_call");
+        if (!firstTool) continue;
+        totalWithTool += 1;
+        const toolName = String(
+          firstTool.payload?.toolName ?? firstTool.title ?? "",
+        ).toLowerCase();
+        if (BROAD_EXPLORATION_TOOLS.has(toolName)) {
+          broadFirst += 1;
+          const ts = entryTimestamp(firstTool);
+          firstTs = Math.min(firstTs, ts);
+          lastTs = Math.max(lastTs, ts);
+        }
+      }
+
+      if (totalWithTool < MIN_SESSIONS_FOR_AGGREGATE) return [];
+      const ratio = broadFirst / totalWithTool;
+      if (ratio < 0.4) return [];
+
+      return [
+        {
+          text:
+            `Across ${totalWithTool} recent sessions, ${broadFirst} began with broad-exploration tools (scan_market / get_candles / get_orderbook / list_*). ` +
+            `When the user query already names a specific instrument or setup, consider opening with a targeted tool call ` +
+            `(e.g. get_candles for the named symbol, or going directly to plan creation) rather than a broad scan. ` +
+            `HALO's Terminal-Bench finding: first-action breadth is a recurring inefficiency invisible per-session but obvious in aggregate.`,
+          firstSeenAt: Number.isFinite(firstTs) ? firstTs : Date.now(),
+          lastSeenAt: Number.isFinite(lastTs) ? lastTs : Date.now(),
+          evidenceCount: broadFirst,
+        },
+      ];
+    },
+  },
+  // Rule: cancel-rationale recurrence. If the user cancels >=3 orders
+  // within recent history citing a recurring theme (e.g. "changed mind",
+  // "wrong size", "stopped out elsewhere"), surface as a behavioral
+  // signal — Sentra's "company brain" framing applied to single-trader
+  // pattern detection. Distinct from the per-event cancel_rationale rule
+  // which captures individual reasons; this surfaces the meta-pattern.
+  {
+    category: "aggregate_pattern",
+    match: (entries) => {
+      const cancels = entries.filter(
+        (e) => e.entryType === "execution_result" && e.payload?.kind === "cancel",
+      );
+      if (cancels.length < 3) return [];
+
+      const reasonBuckets = new Map<
+        string,
+        { samples: string[]; firstSeen: number; lastSeen: number; count: number }
+      >();
+
+      for (const e of cancels) {
+        const rationale = (e.payload?.rationale as string | undefined)
+          ?.trim()
+          .toLowerCase();
+        if (!rationale || rationale.length < 5) continue;
+        // Coarse bucket by first 3 significant words — captures
+        // recurring themes without overfitting to exact wording.
+        const bucket = rationale
+          .replace(/[^a-z0-9\s]/g, " ")
+          .split(/\s+/)
+          .filter((w) => w.length > 2)
+          .slice(0, 3)
+          .join(" ");
+        if (!bucket) continue;
+        const ts = entryTimestamp(e);
+        const existing = reasonBuckets.get(bucket);
+        if (existing) {
+          existing.count += 1;
+          existing.firstSeen = Math.min(existing.firstSeen, ts);
+          existing.lastSeen = Math.max(existing.lastSeen, ts);
+          if (existing.samples.length < 3) {
+            existing.samples.push(rationale.slice(0, 80));
+          }
+        } else {
+          reasonBuckets.set(bucket, {
+            samples: [rationale.slice(0, 80)],
+            firstSeen: ts,
+            lastSeen: ts,
+            count: 1,
+          });
+        }
+      }
+
+      const out: AggregateCandidate[] = [];
+      for (const [bucket, data] of reasonBuckets) {
+        if (data.count < 3) continue;
+        out.push({
+          text:
+            `User has cancelled ${data.count} orders citing theme "${bucket}" (sample rationales: ${data.samples.join(" / ")}). ` +
+            `This is a recurring cancellation pattern — before proposing the next entry, surface the prior cancellations and confirm conditions have changed.`,
+          firstSeenAt: data.firstSeen,
+          lastSeenAt: data.lastSeen,
+          evidenceCount: data.count,
+        });
+      }
+      return out;
+    },
+  },
+];
+
 /**
  * Run the Reflector — scan recent action-log entries for recurring patterns
  * and return lesson candidates. Pure analysis, no LLM call. Returns empty
@@ -255,8 +440,58 @@ export function runReflector(input: ReflectorInput = {}): ReflectorOutput {
     }
   }
 
+  // Run aggregate pattern rules — operate on the full entry array, not
+  // per-entry. See above for rationale (Sentra + HALO convergence).
+  for (const rule of AGGREGATE_PATTERN_RULES) {
+    let aggResults: AggregateCandidate[] = [];
+    try {
+      aggResults = rule.match(entries);
+    } catch (err) {
+      logger.warn("Aggregate ACE rule failed", {
+        category: rule.category,
+        error: (err as Error).message,
+      });
+      continue;
+    }
+    for (const cand of aggResults) {
+      const key = `${rule.category}::${dedupeKey(cand.text)}`;
+      const existing = buckets.get(key);
+      if (existing) {
+        existing.evidenceCount = Math.max(existing.evidenceCount, cand.evidenceCount);
+        existing.firstSeenAt = Math.min(existing.firstSeenAt, cand.firstSeenAt);
+        existing.lastSeenAt = Math.max(existing.lastSeenAt, cand.lastSeenAt);
+      } else {
+        buckets.set(key, {
+          text: cand.text,
+          category: rule.category,
+          evidenceCount: cand.evidenceCount,
+          firstSeenAt: cand.firstSeenAt,
+          lastSeenAt: cand.lastSeenAt,
+        });
+      }
+    }
+  }
+
   const candidates = [...buckets.values()].sort((a, b) => b.evidenceCount - a.evidenceCount);
   return { candidates, entriesAnalyzed: entries.length, generatedAt };
+}
+
+/**
+ * Apply every aggregate pattern rule to a set of entries. Returns the
+ * matched candidates paired with their category. Used by tests to verify
+ * aggregate rule behavior without spinning up the action-log store.
+ */
+export function _applyAggregatePatternRulesForTest(
+  entries: ReadonlyArray<ActionLogEntry>,
+): Array<{ category: ACELessonCandidate["category"]; candidates: AggregateCandidate[] }> {
+  const out: Array<{ category: ACELessonCandidate["category"]; candidates: AggregateCandidate[] }> = [];
+  for (const rule of AGGREGATE_PATTERN_RULES) {
+    const candidates = rule.match(entries);
+    if (candidates.length > 0) {
+      out.push({ category: rule.category, candidates });
+    }
+  }
+  return out;
 }
 
 /**

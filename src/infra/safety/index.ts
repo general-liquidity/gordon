@@ -129,6 +129,17 @@ export {
   selectMandateForPlan,
   gateAgainstMandate,
 } from "./strategyMandates.ts";
+
+// Trader behavior pattern detector (cross-session pattern surfacing)
+export {
+  isTraderBehaviorEnabled,
+  detectTraderBehaviorPatterns,
+} from "./traderBehaviorPatterns.ts";
+export type {
+  BehaviorPatternKind,
+  BehaviorPattern,
+  TraderBehaviorReport,
+} from "./traderBehaviorPatterns.ts";
 export type {
   StrategyMandate,
   MandateMatchInput,
