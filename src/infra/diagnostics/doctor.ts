@@ -898,7 +898,100 @@ export function runDoctorChecks(): DiagnosticCheck[] {
     checkSupplyChainIocs(),
     checkSuspiciousOptionalDependencies(),
     checkTrustedDependencies(),
+    checkUntrustedLifecycleScripts(),
   ];
+}
+
+/**
+ * Surface packages in the installed tree that wanted to run install-time
+ * lifecycle scripts but were blocked by Bun's default no-lifecycle-script
+ * policy. `bun pm untrusted` lists exactly these — packages whose
+ * `preinstall` / `install` / `postinstall` / `prepare` scripts Bun
+ * refused to execute. Showing them here is an audit prompt: each one is
+ * a deliberate decision waiting to be made (leave blocked, or `bun pm
+ * trust <name>` after review). The TanStack worm pattern relied on a
+ * `prepare` script firing during install; Bun's default blocked it, but
+ * an operator who blanket-trusts everything to suppress warnings would
+ * have re-opened the vector. Surfacing the list keeps the trust
+ * decision deliberate rather than implicit.
+ */
+function checkUntrustedLifecycleScripts(
+  spawnFn: typeof spawnSyncBunPm = spawnSyncBunPm,
+): DiagnosticCheck {
+  const result = spawnFn();
+  if (result === null) {
+    return {
+      id: "untrusted-lifecycle-scripts",
+      label: "Untrusted lifecycle-script packages",
+      status: "info",
+      message: "bun CLI not available — skipping `bun pm untrusted` scan.",
+    };
+  }
+  if (result.error) {
+    return {
+      id: "untrusted-lifecycle-scripts",
+      label: "Untrusted lifecycle-script packages",
+      status: "info",
+      message: `Could not run \`bun pm untrusted\`: ${result.error}`,
+    };
+  }
+  const lines = result.output
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0 && !/^bun pm/i.test(l));
+  // bun pm untrusted prints a header line + one entry per package when
+  // there are entries; emits nothing or a "no blocked..." message when
+  // clean. Treat the absence of package-looking tokens as clean.
+  const pkgLines = lines.filter((l) => /^[@a-zA-Z0-9][\w./@-]*$/.test(l));
+  if (pkgLines.length === 0) {
+    return {
+      id: "untrusted-lifecycle-scripts",
+      label: "Untrusted lifecycle-script packages",
+      status: "pass",
+      message: "No packages with blocked lifecycle scripts in the install tree.",
+    };
+  }
+  const preview = pkgLines.slice(0, 8).join(", ");
+  const extra = pkgLines.length > 8 ? ` (+${pkgLines.length - 8} more)` : "";
+  return {
+    id: "untrusted-lifecycle-scripts",
+    label: "Untrusted lifecycle-script packages",
+    status: "warn",
+    message:
+      `${pkgLines.length} package(s) had install-time lifecycle scripts blocked by Bun: ${preview}${extra}. ` +
+      `Review each — run \`bun pm trust <name>\` only after auditing the script. ` +
+      `Blanket-trusting these to silence the warning re-opens the lifecycle-script attack vector that Bun's default closes.`,
+  };
+}
+
+interface UntrustedSpawnResult {
+  output: string;
+  error: string | null;
+}
+
+function spawnSyncBunPm(): UntrustedSpawnResult | null {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { spawnSync } = require("node:child_process") as typeof import("node:child_process");
+    const res = spawnSync("bun", ["pm", "untrusted"], {
+      cwd: process.cwd(),
+      encoding: "utf8",
+      timeout: 4000,
+      windowsHide: true,
+    });
+    if (res.error && (res.error as NodeJS.ErrnoException).code === "ENOENT") {
+      return null;
+    }
+    if (res.error) {
+      return { output: "", error: res.error.message };
+    }
+    return {
+      output: `${res.stdout ?? ""}\n${res.stderr ?? ""}`,
+      error: null,
+    };
+  } catch (err) {
+    return { output: "", error: err instanceof Error ? err.message : String(err) };
+  }
 }
 
 // Test helpers — keep checks individually exportable for targeted unit tests.
@@ -919,6 +1012,7 @@ export const _internal = {
   checkSupplyChainIocs,
   checkSuspiciousOptionalDependencies,
   checkTrustedDependencies,
+  checkUntrustedLifecycleScripts,
   resolveMastraStoragePath,
   resolveVectorStoragePath,
 };

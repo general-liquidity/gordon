@@ -533,3 +533,48 @@ describe("doctor — trustedDependencies allowlist check", () => {
     expect(check.status).toBe("fail");
   });
 });
+
+describe("checkUntrustedLifecycleScripts", () => {
+  it("reports info when bun CLI is unavailable", () => {
+    const check = _internal.checkUntrustedLifecycleScripts(() => null);
+    expect(check.status).toBe("info");
+    expect(check.message.toLowerCase()).toContain("bun");
+  });
+
+  it("passes when bun pm untrusted output has no package entries", () => {
+    const check = _internal.checkUntrustedLifecycleScripts(() => ({
+      output: "0 packages with blocked scripts.\n",
+      error: null,
+    }));
+    expect(check.status).toBe("pass");
+  });
+
+  it("warns when bun pm untrusted lists at least one package", () => {
+    const check = _internal.checkUntrustedLifecycleScripts(() => ({
+      output: "@some/package\nesbuild\nsharp\n",
+      error: null,
+    }));
+    expect(check.status).toBe("warn");
+    expect(check.message).toContain("@some/package");
+    expect(check.message).toContain("bun pm trust");
+  });
+
+  it("truncates the displayed list when more than 8 packages are blocked", () => {
+    const many = Array.from({ length: 12 }, (_, i) => `pkg-${i}`).join("\n");
+    const check = _internal.checkUntrustedLifecycleScripts(() => ({
+      output: many,
+      error: null,
+    }));
+    expect(check.status).toBe("warn");
+    expect(check.message).toContain("+4 more");
+  });
+
+  it("returns info when spawn error reported", () => {
+    const check = _internal.checkUntrustedLifecycleScripts(() => ({
+      output: "",
+      error: "spawn failed",
+    }));
+    expect(check.status).toBe("info");
+    expect(check.message).toContain("spawn failed");
+  });
+});
