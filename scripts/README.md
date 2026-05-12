@@ -63,9 +63,21 @@ Both run automatically via `npm install` → `package.json` postinstall hook.
 
 ## Supply-chain hardening
 
-Two install-time gates defend against npm worm attacks (TeamPCP's
+Three install-time defenses against npm worm attacks (TeamPCP's
 Mini Shai-Hulud, 2026-05; SLSA-attested malicious tarballs):
 
+0. **Bun's default no-lifecycle-script behavior** — this is the single
+   strongest defense Gordon has, and it's free by virtue of running
+   on Bun. Bun does NOT execute dependency `preinstall` / `install` /
+   `postinstall` / `prepare` lifecycle scripts unless the package is
+   explicitly in `trustedDependencies`. The TanStack worm's attack
+   vector was a malicious `prepare` script on a smuggled
+   `@tanstack/setup` git dep — that script CANNOT fire under Bun
+   without an explicit trust grant. Do not add anything to
+   `trustedDependencies` without verifying the package, and prefer
+   `bun add --trust <pkg>` (deliberate, audited) over hand-editing
+   the field. `checkTrustedDependencies` doctor check warns if any
+   entries exist so trust additions stay reviewed.
 1. **`bunfig.toml` `[install] minimumReleaseAge = 172800`** — Bun
    refuses to install any package version published less than 48h ago.
    Covers the typical community-detection horizon for malicious

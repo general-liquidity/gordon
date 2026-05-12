@@ -524,6 +524,77 @@ function checkInstallReleaseAge(
 }
 
 /**
+ * Audit the `trustedDependencies` allowlist in Gordon's own
+ * package.json. Bun's default behavior is to NOT run dependency
+ * lifecycle scripts (preinstall / install / postinstall / prepare)
+ * unless the package is explicitly listed in trustedDependencies.
+ * That default structurally blocks the TanStack worm's attack vector
+ * (the malicious `prepare` script on the smuggled `@tanstack/setup`
+ * git dep) — it can't fire without trust. Each entry added to
+ * trustedDependencies is a deliberate decision to grant install-time
+ * code execution to a third-party package and should be reviewed.
+ * Warn (not fail) when any entries exist so a contributor doesn't
+ * silently expand the trust surface.
+ */
+function checkTrustedDependencies(
+  packageJsonPath: string = resolve(process.cwd(), "package.json"),
+): DiagnosticCheck {
+  if (!existsSync(packageJsonPath)) {
+    return {
+      id: "trusted-deps",
+      label: "Bun trustedDependencies allowlist",
+      status: "info",
+      message: `${packageJsonPath} not present; skipping check.`,
+    };
+  }
+  try {
+    const raw = readFileSync(packageJsonPath, "utf8");
+    const parsed = JSON.parse(raw) as { trustedDependencies?: unknown };
+    const td = parsed.trustedDependencies;
+    if (!td) {
+      return {
+        id: "trusted-deps",
+        label: "Bun trustedDependencies allowlist",
+        status: "pass",
+        message:
+          "No trustedDependencies declared — Bun's default no-lifecycle-script behavior is intact (structurally blocks the TanStack worm attack vector).",
+      };
+    }
+    if (!Array.isArray(td)) {
+      return {
+        id: "trusted-deps",
+        label: "Bun trustedDependencies allowlist",
+        status: "warn",
+        message: "trustedDependencies is present but not an array — check package.json shape.",
+      };
+    }
+    if (td.length === 0) {
+      return {
+        id: "trusted-deps",
+        label: "Bun trustedDependencies allowlist",
+        status: "pass",
+        message: "trustedDependencies present but empty — Bun defaults intact.",
+      };
+    }
+    return {
+      id: "trusted-deps",
+      label: "Bun trustedDependencies allowlist",
+      status: "warn",
+      message:
+        `${td.length} package(s) in trustedDependencies (${(td as string[]).slice(0, 5).join(", ")}). ` +
+        `Each entry grants install-time code execution rights. Verify each is justified — these bypass Bun's default no-lifecycle-script defense.`,
+    };
+  } catch (err) {
+    return {
+      id: "trusted-deps",
+      label: "Bun trustedDependencies allowlist",
+      status: "fail",
+      message: `Cannot read/parse ${packageJsonPath}: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
+}
+
+/**
  * Scan installed-package manifests for the TanStack worm's distinctive
  * attack signature: an `optionalDependencies` entry pointing at a git
  * URL (the worm smuggled `@tanstack/setup": "github:tanstack/router#..."`
@@ -826,6 +897,7 @@ export function runDoctorChecks(): DiagnosticCheck[] {
     checkInstallReleaseAge(),
     checkSupplyChainIocs(),
     checkSuspiciousOptionalDependencies(),
+    checkTrustedDependencies(),
   ];
 }
 
@@ -846,6 +918,7 @@ export const _internal = {
   checkInstallReleaseAge,
   checkSupplyChainIocs,
   checkSuspiciousOptionalDependencies,
+  checkTrustedDependencies,
   resolveMastraStoragePath,
   resolveVectorStoragePath,
 };

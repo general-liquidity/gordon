@@ -480,3 +480,56 @@ describe("doctor — suspicious optionalDependencies scan", () => {
     expect(check.id).toBe("suspicious-optional-deps");
   });
 });
+
+describe("doctor — trustedDependencies allowlist check", () => {
+  it("returns info when package.json is missing", () => {
+    const check = _internal.checkTrustedDependencies(join(tempDir, "missing.json"));
+    expect(check.id).toBe("trusted-deps");
+    expect(check.status).toBe("info");
+  });
+
+  it("passes when no trustedDependencies field exists", () => {
+    const path = join(tempDir, "package.json");
+    writeFileSync(path, JSON.stringify({ name: "x", version: "1.0.0" }));
+    const check = _internal.checkTrustedDependencies(path);
+    expect(check.status).toBe("pass");
+    expect(check.message).toContain("no-lifecycle-script");
+  });
+
+  it("passes when trustedDependencies is empty", () => {
+    const path = join(tempDir, "package.json");
+    writeFileSync(path, JSON.stringify({ name: "x", version: "1.0.0", trustedDependencies: [] }));
+    const check = _internal.checkTrustedDependencies(path);
+    expect(check.status).toBe("pass");
+  });
+
+  it("warns when entries exist", () => {
+    const path = join(tempDir, "package.json");
+    writeFileSync(
+      path,
+      JSON.stringify({
+        name: "x",
+        version: "1.0.0",
+        trustedDependencies: ["esbuild", "sharp", "node-gyp"],
+      }),
+    );
+    const check = _internal.checkTrustedDependencies(path);
+    expect(check.status).toBe("warn");
+    expect(check.message).toContain("3 package");
+    expect(check.message).toContain("install-time code execution");
+  });
+
+  it("warns when shape is wrong (not an array)", () => {
+    const path = join(tempDir, "package.json");
+    writeFileSync(path, JSON.stringify({ name: "x", version: "1.0.0", trustedDependencies: "esbuild" }));
+    const check = _internal.checkTrustedDependencies(path);
+    expect(check.status).toBe("warn");
+  });
+
+  it("fails on malformed package.json", () => {
+    const path = join(tempDir, "package.json");
+    writeFileSync(path, "not-json{");
+    const check = _internal.checkTrustedDependencies(path);
+    expect(check.status).toBe("fail");
+  });
+});
