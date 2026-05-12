@@ -17,19 +17,19 @@
 
 export * from "./types.ts";
 export { BrokerFactory } from "./factory.ts";
-export { loadOAuthBrokerCredentials, brokerSupportsOAuth } from "./oauth-bridge.ts";
+export { loadOAuthBrokerCredentials, brokerSupportsOAuth } from "./auth/oauth-bridge.ts";
 export {
   runBrokerBenchmarks,
   validateBenchmarkReport,
   formatBenchmarkSummary,
-} from "./benchmarks.ts";
+} from "./quality/benchmarks.ts";
 export {
   BROKER_INCLUSION_GATE,
   getBrokerInclusionDecision,
   getFailedCriteria,
   validateBrokerInclusionGate,
   assertBrokerPassesInclusionGate,
-} from "./inclusion-gate.ts";
+} from "./quality/inclusion-gate.ts";
 export { AlpacaAdapter } from "./adapters/alpaca.ts";
 export { WebullAdapter } from "./adapters/webull.ts";
 export { SchwabAdapter } from "./adapters/schwab.ts";

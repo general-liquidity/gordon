@@ -14,8 +14,8 @@
  * regime again.
  */
 
-import type { CandidateProducer } from "../proactiveEngine.ts";
-import { buildCandidate } from "../proactiveEngine.ts";
+import type { CandidateProducer } from "../engine/proactiveEngine.ts";
+import { buildCandidate } from "../engine/proactiveEngine.ts";
 import type { ProactiveSuggestion } from "../types.ts";
 import { createModuleLogger } from "../../logger/index.ts";
 import { fetchRecentCandles, resolveMonitoredSymbols } from "./candleFetch.ts";

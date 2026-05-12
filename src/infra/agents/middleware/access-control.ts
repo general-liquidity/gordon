@@ -16,7 +16,7 @@ import type { GordonConfig } from "../../../types/index.ts";
 import {
   checkTradingPermission,
   type TradingOperationContext,
-} from "../tools/permissionHelpers.ts";
+} from "../tools/runtime/permissionHelpers.ts";
 
 const logger = createModuleLogger("access-control");
 

@@ -15,7 +15,7 @@
 
 import { RegimeDetector } from "../regime/detector.ts";
 import { StrategyRuntime } from "../runtime/engine.ts";
-import { evaluateOrderRisk } from "../../infra/agents/tools/risk-gate.ts";
+import { evaluateOrderRisk } from "../../infra/agents/tools/trading/risk-gate.ts";
 import type { GordonContext } from "../../infra/agents/types.ts";
 import { createModuleLogger } from "../../infra/logger/index.ts";
 import { saveConsensusResult } from "./store.ts";

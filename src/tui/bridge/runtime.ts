@@ -4,7 +4,7 @@ import { SessionRuntimeFactory } from "../../runtime/session/SessionRuntimeFacto
 import type { RuntimeApprovalRequest } from "../../runtime/contracts/types.ts";
 import type { GordonRuntimeToolAccessResult } from "../../infra/agents/types.ts";
 import { quickPermissionCheck } from "../../infra/permissions/racing.ts";
-import { getConversationBudget } from "../../infra/context/conversationBudget.ts";
+import { getConversationBudget } from "../../infra/context/budgeting/conversationBudget.ts";
 import { normalizeChatMessage, type ChatMessage } from "../../app/chat/chatTypes.ts";
 import { buildPendingApprovalMessages } from "../../app/chat/chatFlow.ts";
 import {

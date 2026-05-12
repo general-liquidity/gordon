@@ -16,8 +16,8 @@ import {
   assertBrokerPassesInclusionGate,
   getBrokerInclusionDecision,
   validateBrokerInclusionGate,
-} from "./inclusion-gate.ts";
-import { loadOAuthBrokerCredentials, brokerSupportsOAuth } from "./oauth-bridge.ts";
+} from "./quality/inclusion-gate.ts";
+import { loadOAuthBrokerCredentials, brokerSupportsOAuth } from "./auth/oauth-bridge.ts";
 import type { BrokerAdapter, BrokerCredentials, BrokerId } from "./types.ts";
 
 const SUPPORTED_BROKERS: BrokerId[] = [

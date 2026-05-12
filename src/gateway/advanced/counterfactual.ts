@@ -1,5 +1,5 @@
 import type { GordonContext } from "../../infra/agents/tools/types.ts";
-import { evaluateOrderRisk } from "../../infra/agents/tools/risk-gate.ts";
+import { evaluateOrderRisk } from "../../infra/agents/tools/trading/risk-gate.ts";
 
 export interface CounterfactualOrder {
   symbol: string;

@@ -599,7 +599,7 @@ export class ConversationSummarizer {
 
       // Wire: record tombstones for compacted messages (audit trail)
       try {
-        const { recordTombstones } = await import("../../context/tombstones.ts");
+        const { recordTombstones } = await import("../../context/compaction/tombstones.ts");
         const compactedContent = olderMessages
           .filter((m) => typeof m.content === "string")
           .map((m) => ({ role: String(m.role), content: String(m.content) }));

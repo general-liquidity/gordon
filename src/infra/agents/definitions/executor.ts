@@ -31,7 +31,7 @@ import {
   gordonInputGuard,
   gordonOutputSanitizer,
 } from "../tooling/instrumentedTools.ts";
-import { tradingInfraTools } from "../tools/tradingInfra.ts";
+import { tradingInfraTools } from "../tools/runtime/tradingInfra.ts";
 import { createSubAgentMemory } from "../memory/memoryFactory.ts";
 import { resolveRuntimeModel, registerObservability } from "../agentHelpers.ts";
 

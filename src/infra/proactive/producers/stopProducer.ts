@@ -10,8 +10,8 @@
  * could be extended to suggest a post-stop review / journal entry.
  */
 
-import type { CandidateProducer } from "../proactiveEngine.ts";
-import { buildCandidate } from "../proactiveEngine.ts";
+import type { CandidateProducer } from "../engine/proactiveEngine.ts";
+import { buildCandidate } from "../engine/proactiveEngine.ts";
 import type { ProactiveSuggestion } from "../types.ts";
 
 export const stopProducer: CandidateProducer = (obs): ProactiveSuggestion[] => {

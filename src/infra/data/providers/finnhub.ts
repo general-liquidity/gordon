@@ -22,7 +22,7 @@ import { createModuleLogger } from "../../logger/index.ts";
 import {
   checkEndpointRateLimit,
   recordEndpointCall,
-} from "../../agents/tools/rate-limiter.ts";
+} from "../../agents/tools/runtime/rate-limiter.ts";
 
 const logger = createModuleLogger("finnhub");
 const BASE_URL = "https://finnhub.io/api/v1";

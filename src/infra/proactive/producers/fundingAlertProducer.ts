@@ -16,8 +16,8 @@
  * meaningful change (sign flip, or ±5 percentage points of annualized rate).
  */
 
-import type { CandidateProducer } from "../proactiveEngine.ts";
-import { buildCandidate } from "../proactiveEngine.ts";
+import type { CandidateProducer } from "../engine/proactiveEngine.ts";
+import { buildCandidate } from "../engine/proactiveEngine.ts";
 import type { ProactiveSuggestion } from "../types.ts";
 import { createModuleLogger } from "../../logger/index.ts";
 

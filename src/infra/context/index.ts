@@ -16,11 +16,11 @@ export {
   COUNT_TRIGGER_THRESHOLD,
   COUNT_KEEP_RECENT,
   TOKEN_TRIGGER_THRESHOLD,
-} from "./microcompact.ts";
+} from "./compaction/microcompact.ts";
 export type {
   CompactableToolMessage,
   MicrocompactResult,
-} from "./microcompact.ts";
+} from "./compaction/microcompact.ts";
 
 // Memory flush merged into existing conversation summarizer —
 // see src/infra/domain/memory/summarizer.ts ("Durable User Facts" section).
@@ -54,21 +54,21 @@ export {
   growthRate,
   TokenProjector,
   DEFAULT_PROJECTION_CONFIG,
-} from "./tokenProjection.ts";
+} from "./budgeting/tokenProjection.ts";
 export type {
   ProjectionConfig,
   ProjectionResult,
   TokenSample,
   ThresholdStage,
-} from "./tokenProjection.ts";
+} from "./budgeting/tokenProjection.ts";
 
 // Compaction auto-trigger (wires TokenProjector into agent loop)
 export {
   CompactionTrigger,
   getCompactionTrigger,
   resetCompactionTrigger,
-} from "./compactionTrigger.ts";
-export type { CompactionAction, CompactionDecision } from "./compactionTrigger.ts";
+} from "./compaction/compactionTrigger.ts";
+export type { CompactionAction, CompactionDecision } from "./compaction/compactionTrigger.ts";
 
 // Conversation-wide tool result budget
 export {
@@ -76,13 +76,13 @@ export {
   getConversationBudget,
   resetConversationBudget,
   DEFAULT_CONVERSATION_BUDGET_CHARS,
-} from "./conversationBudget.ts";
-export type { TrackedResult, BudgetStats } from "./conversationBudget.ts";
+} from "./budgeting/conversationBudget.ts";
+export type { TrackedResult, BudgetStats } from "./budgeting/conversationBudget.ts";
 
 // Message tombstones for audit trail
 export {
   recordTombstone,
   recordTombstones,
   countTombstones,
-} from "./tombstones.ts";
-export type { Tombstone, TombstoneReason } from "./tombstones.ts";
+} from "./compaction/tombstones.ts";
+export type { Tombstone, TombstoneReason } from "./compaction/tombstones.ts";

@@ -2,7 +2,7 @@ import {
   formatBenchmarkSummary,
   runBrokerBenchmarks,
   validateBenchmarkReport,
-} from "../../src/infra/broker/benchmarks.ts";
+} from "../../src/infra/broker/quality/benchmarks.ts";
 
 function hasArg(flag: string): boolean {
   return process.argv.includes(flag);

@@ -76,9 +76,9 @@ import {
 import { createAgentRequestContext } from "./orchestrator/RequestContextFactory.ts";
 import { recordPromptUsage, resolveNormalizedUsage } from "./orchestrator/UsageTracker.ts";
 import { bridgeStreamEvent } from "./streaming/streamBridge.ts";
-import { getCompactionTrigger } from "../context/compactionTrigger.ts";
-import { getConversationBudget } from "../context/conversationBudget.ts";
-import { recordTombstone } from "../context/tombstones.ts";
+import { getCompactionTrigger } from "../context/compaction/compactionTrigger.ts";
+import { getConversationBudget } from "../context/budgeting/conversationBudget.ts";
+import { recordTombstone } from "../context/compaction/tombstones.ts";
 import { getCostTracker } from "../platform/costTracker.ts";
 import { toMessageStreamChunk, type MessageStreamChunk } from "./orchestrator/StreamCoordinator.ts";
 import {

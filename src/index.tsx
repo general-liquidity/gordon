@@ -196,7 +196,7 @@ async function gracefulShutdown(signal: string, code: number = 0): Promise<void>
 
   try {
     const { stopProactiveObserver, isObserverRunning } = await import(
-      "./infra/proactive/observer.ts"
+      "./infra/proactive/engine/observer.ts"
     );
     if (isObserverRunning()) {
       stopProactiveObserver();

@@ -34,7 +34,7 @@ import { MAX_WORKING_MEMORY_CHARS } from "../agents/memory/memoryGate.ts";
 import { isSafetyCritical } from "../../runtime/permissions/trustTrajectory.ts";
 import { getACELessonsPath } from "../agents/ace/index.ts";
 import { defaultReviewQueuePath } from "../domain/evals/harness/reviewQueue.ts";
-import { defaultAgentFeedbackPath } from "../agents/tools/agent-feedback.ts";
+import { defaultAgentFeedbackPath } from "../agents/tools/runtime/agent-feedback.ts";
 
 export interface DiagnosticCheck {
   id: string;

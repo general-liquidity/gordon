@@ -705,8 +705,8 @@ export async function handleSystemMenuCommand(
     case "compact": {
       // Manually trigger context compaction
       try {
-        const { getCompactionTrigger } = await import("../../infra/context/compactionTrigger.ts");
-        const { microcompactMessages } = await import("../../infra/context/microcompact.ts");
+        const { getCompactionTrigger } = await import("../../infra/context/compaction/compactionTrigger.ts");
+        const { microcompactMessages } = await import("../../infra/context/compaction/microcompact.ts");
         const trigger = getCompactionTrigger();
         const projection = trigger.current();
         addMessage(setState, "gordon",

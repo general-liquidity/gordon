@@ -8,7 +8,7 @@
 
 import { Buffer } from "node:buffer";
 import type { Candle } from "../../../types/index.ts";
-import { TokenManager, type TokenConfig } from "../tokenRefresh.ts";
+import { TokenManager, type TokenConfig } from "../auth/tokenRefresh.ts";
 import type {
   BrokerAdapter,
   BrokerAccount,

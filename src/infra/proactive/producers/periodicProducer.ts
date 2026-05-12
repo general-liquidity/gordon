@@ -19,8 +19,8 @@
  * work can fill them in.
  */
 
-import type { CandidateProducer } from "../proactiveEngine.ts";
-import { buildCandidate } from "../proactiveEngine.ts";
+import type { CandidateProducer } from "../engine/proactiveEngine.ts";
+import { buildCandidate } from "../engine/proactiveEngine.ts";
 import type { ProactiveSuggestion } from "../types.ts";
 import { getCdpWebhookReceiver } from "../../data/providers/cdpWebhookReceiver.ts";
 

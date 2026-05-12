@@ -16,8 +16,8 @@
  */
 
 import type { GordonConfig } from "../../types/config.ts";
-import { getCompactionTrigger, type CompactionDecision } from "../context/compactionTrigger.ts";
-import { getConversationBudget } from "../context/conversationBudget.ts";
+import { getCompactionTrigger, type CompactionDecision } from "../context/compaction/compactionTrigger.ts";
+import { getConversationBudget } from "../context/budgeting/conversationBudget.ts";
 import { getCostTracker } from "../platform/costTracker.ts";
 import { runHooks } from "../hooks/engine.ts";
 import { quickPermissionCheck } from "../permissions/racing.ts";

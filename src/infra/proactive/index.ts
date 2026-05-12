@@ -6,9 +6,9 @@
  */
 
 export * from "./types.ts";
-export { getSuggestionStore, SuggestionStore } from "./suggestionStore.ts";
-export { getCategoryPolicy, CategoryPolicyManager } from "./categoryPolicy.ts";
-export { getOutcomeTracker, OutcomeTracker, autoRecordFromStore } from "./outcomeEvals.ts";
+export { getSuggestionStore, SuggestionStore } from "./storage/suggestionStore.ts";
+export { getCategoryPolicy, CategoryPolicyManager } from "./judges/categoryPolicy.ts";
+export { getOutcomeTracker, OutcomeTracker, autoRecordFromStore } from "./judges/outcomeEvals.ts";
 export {
   getActiveJudge,
   setActiveJudge,
@@ -16,12 +16,12 @@ export {
   HeuristicJudge,
   type ProposalJudge,
   type JudgeVerdict,
-} from "./proposalJudge.ts";
+} from "./judges/proposalJudge.ts";
 export {
   getProactiveEngine,
   ProactiveEngine,
   buildCandidate,
   type ProactiveObservation,
   type CandidateProducer,
-} from "./proactiveEngine.ts";
-export { LlmJudge } from "./llmJudge.ts";
+} from "./engine/proactiveEngine.ts";
+export { LlmJudge } from "./judges/llmJudge.ts";

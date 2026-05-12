@@ -8,7 +8,7 @@
  * clean teardown.
  */
 
-import type { ProactiveEngine } from "../proactiveEngine.ts";
+import type { ProactiveEngine } from "../engine/proactiveEngine.ts";
 import { tradeEventProducer, resetTradeEventProducerState } from "./tradeEventProducer.ts";
 import { scanOpportunityProducer } from "./scanOpportunityProducer.ts";
 import { riskProducer } from "./riskProducer.ts";
@@ -27,8 +27,8 @@ import {
   congressionalTradeProducer,
   resetStockEventsProducerState,
 } from "./stockEventsProducer.ts";
-import { getProducerHealthTracker } from "../producerHealth.ts";
-import type { CandidateProducer } from "../proactiveEngine.ts";
+import { getProducerHealthTracker } from "../engine/producerHealth.ts";
+import type { CandidateProducer } from "../engine/proactiveEngine.ts";
 import type { ProactiveSuggestion } from "../types.ts";
 
 export {

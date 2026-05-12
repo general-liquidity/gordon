@@ -17,8 +17,8 @@
  * same article doesn't re-fire across ticks.
  */
 
-import type { CandidateProducer } from "../proactiveEngine.ts";
-import { buildCandidate } from "../proactiveEngine.ts";
+import type { CandidateProducer } from "../engine/proactiveEngine.ts";
+import { buildCandidate } from "../engine/proactiveEngine.ts";
 import type { ProactiveSuggestion } from "../types.ts";
 import { createModuleLogger } from "../../logger/index.ts";
 import { finnhub, isFinnhubConfigured } from "../../data/providers/finnhub.ts";

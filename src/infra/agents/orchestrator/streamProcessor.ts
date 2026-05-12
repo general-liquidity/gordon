@@ -282,7 +282,7 @@ export async function processToolResult(
 
   // Wire: track tool result in conversation-wide budget
   try {
-    const { getConversationBudget } = await import("../../context/conversationBudget.ts");
+    const { getConversationBudget } = await import("../../context/budgeting/conversationBudget.ts");
     const resultStr = typeof optimizedToolResult.result === "string"
       ? optimizedToolResult.result
       : JSON.stringify(optimizedToolResult.result);

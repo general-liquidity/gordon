@@ -6,7 +6,7 @@ import type { GordonContext } from "../types.ts";
 import type { IntegrationGlossarySelection } from "../integrationGlossary.ts";
 import { determineWorkflowPhase } from "../cognition/workflowPhase.ts";
 import { composeRuntimePromptSections } from "./promptSections.ts";
-import { microcompactMessages } from "../../context/microcompact.ts";
+import { microcompactMessages } from "../../context/compaction/microcompact.ts";
 import { getCachedPrefix, setCachedPrefix, matchesCachedPrefix } from "./sharedPrefixCache.ts";
 
 export const PROJECT_TRUTH_MARKER = "[GORDON_PROJECT_TRUTH]";
