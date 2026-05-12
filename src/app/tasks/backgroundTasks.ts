@@ -1,4 +1,4 @@
-import type { SchedulerTaskRecord } from "../gateway/store/scheduler-store.ts";
+import type { SchedulerTaskRecord } from "../../gateway/store/scheduler-store.ts";
 import type { TaskTreeNode, TaskTreeState } from "./taskTree.ts";
 
 export interface BackgroundAutonomousStatus {

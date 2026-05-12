@@ -8,7 +8,7 @@
  */
 
 import { useState, useEffect, useRef } from "react";
-import { SLASH_COMMANDS } from "../../app/slashCommands.ts";
+import { SLASH_COMMANDS } from "../../app/slash/slashCommands.ts";
 
 export interface TypeaheadMatch {
   name: string;

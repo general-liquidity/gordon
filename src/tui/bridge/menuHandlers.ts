@@ -1,11 +1,11 @@
 import type { SessionRuntime } from "../../runtime/session/SessionRuntime.ts";
-import type { SlashCommand } from "../../app/slashCommands.ts";
+import type { SlashCommand } from "../../app/slash/slashCommands.ts";
 import {
   formatPaginatedCommandHelp,
   commandToPrompt,
-} from "../../app/slashCommands.ts";
+} from "../../app/slash/slashCommands.ts";
 import { loadConfig, saveConfig } from "../../infra/storage/config.ts";
-import { collectDoctorReport, formatDoctorReport } from "../../app/setup-runtime.ts";
+import { collectDoctorReport, formatDoctorReport } from "../../app/setup/setup-runtime.ts";
 import {
   stopAutonomousLoop,
   pauseAutonomousLoop,
@@ -13,7 +13,7 @@ import {
   getAutonomousLoopStatus,
 } from "../../core/autonomous-loop.ts";
 import { handleTelemetryCommand, handleContextCommand } from "../../app/commands/index.ts";
-import { getRuntimeApprovalShortId } from "../../app/runtimeApprovalId.ts";
+import { getRuntimeApprovalShortId } from "../../app/runtime/runtimeApprovalId.ts";
 import type { Message } from "../components/MessageBubble.js";
 import type { StateUpdater } from "./runtime.js";
 
@@ -647,7 +647,7 @@ export async function handleSystemMenuCommand(
       }
 
       // ── Try alias first: /model opus, /model sonnet, /model gpt4o ──
-      const { resolveAlias } = await import("../../app/modelAliases.ts");
+      const { resolveAlias } = await import("../../app/models/modelAliases.ts");
       const aliasResult = resolveAlias(args.trim());
       if (aliasResult) {
         const updated = {
@@ -675,7 +675,7 @@ export async function handleSystemMenuCommand(
       const validProviders = ["openai", "anthropic", "google", "inception", "dedalus"];
       if (!validProviders.includes(newProvider ?? "")) {
         // Not a known alias or provider — show help
-        const { formatAliasHelp } = await import("../../app/modelAliases.ts");
+        const { formatAliasHelp } = await import("../../app/models/modelAliases.ts");
         addMessage(setState, "gordon",
           `Unknown model or provider: ${args.trim()}\n\n` + formatAliasHelp()
         );

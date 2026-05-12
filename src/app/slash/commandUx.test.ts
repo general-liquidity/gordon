@@ -2,7 +2,7 @@ import { describe, expect, it } from "bun:test";
 
 import {
   buildQuickStartRecommendedOptions,
-} from "./quickStartModel.ts";
+} from "../models/quickStartModel.ts";
 import {
   getQuickActionItems,
   normalizeCommandUx,

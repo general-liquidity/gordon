@@ -1,4 +1,4 @@
-import type { PermissionMode } from "../types/index.ts";
+import type { PermissionMode } from "../../types/index.ts";
 
 export type WorkspaceId = "desk" | "market" | "plan" | "lab" | "monitor";
 

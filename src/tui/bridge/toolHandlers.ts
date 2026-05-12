@@ -1,5 +1,5 @@
 import type { SessionRuntime } from "../../runtime/session/SessionRuntime.ts";
-import type { SlashCommand } from "../../app/slashCommands.ts";
+import type { SlashCommand } from "../../app/slash/slashCommands.ts";
 import {
   handleMCPCommand,
   handleConfigCommand,

@@ -1,5 +1,5 @@
 import type { SessionRuntime } from "../../runtime/index.ts";
-import { getRuntimeApprovalShortId } from "../runtimeApprovalId.ts";
+import { getRuntimeApprovalShortId } from "../runtime/runtimeApprovalId.ts";
 import { createRuntimeInspectorViewModel, formatRuntimeInspectorSummary } from "../presenters/RuntimePresenter.ts";
 
 function parsePositiveInt(value: string | undefined, fallback: number): number {

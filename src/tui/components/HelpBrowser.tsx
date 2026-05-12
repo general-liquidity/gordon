@@ -3,7 +3,7 @@ import { Box, Text, useInput } from "../ink-custom";
 import {
   SLASH_COMMANDS,
   type SlashCommand,
-} from "../../app/slashCommands.ts";
+} from "../../app/slash/slashCommands.ts";
 
 /**
  * HelpBrowser — Searchable command browser with categories

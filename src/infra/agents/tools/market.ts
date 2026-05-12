@@ -29,7 +29,7 @@ import {
   formatScanResults,
   formatAnalysisResults,
   formatCurrency,
-} from "../../../app/resultFormatting.ts";
+} from "../../../app/presenters/resultFormatting.ts";
 
 // ============================================================================
 // Error Messages

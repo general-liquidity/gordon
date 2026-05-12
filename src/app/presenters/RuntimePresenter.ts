@@ -2,7 +2,7 @@ import type { SessionRuntime } from "../../runtime/index.ts";
 import type { RuntimeApprovalRequest, RuntimeBridgeSession, RuntimeTranscriptEntry } from "../../runtime/contracts/types.ts";
 import type { RuntimeSessionState } from "../../runtime/state/SessionState.ts";
 import type { HandoffArtifact, WorkerScratchpadEntry } from "../../runtime/workers/HandoffArtifact.ts";
-import { getRuntimeApprovalShortId } from "../runtimeApprovalId.ts";
+import { getRuntimeApprovalShortId } from "../runtime/runtimeApprovalId.ts";
 
 export interface RuntimeInspectorViewModel {
   sessionId?: string;

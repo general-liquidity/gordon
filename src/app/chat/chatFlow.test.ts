@@ -5,7 +5,7 @@ import {
   hasConversationMomentum,
   shouldShowInlineQuickActions,
 } from "./chatFlow.ts";
-import type { RuntimeApprovalRequest } from "../runtime/contracts/types.ts";
+import type { RuntimeApprovalRequest } from "../../runtime/contracts/types.ts";
 
 function createApproval(overrides: Partial<RuntimeApprovalRequest> = {}): RuntimeApprovalRequest {
   return {

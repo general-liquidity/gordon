@@ -50,7 +50,7 @@ import { useAnimationPause } from "./hooks/useAnimationClock.js";
 import { useProactiveChatSubscription } from "./hooks/useProactiveChatSubscription.js";
 import { useRateLimitNotification } from "./hooks/useRateLimitNotification.js";
 import { useAlertSubscription } from "./state/useAlertSubscription.js";
-import { getNextHint, recordHintShown, incrementSessionCount, type HintContext } from "../app/onboarding/index.ts";
+import { getNextHint, recordHintShown, incrementSessionCount, type HintContext } from "../app/setup/onboarding/index.ts";
 
 // ── Phase 15-18 Components ──
 import { SettingsDialog } from "./components/SettingsDialog.js";

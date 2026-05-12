@@ -1,22 +1,22 @@
-import { createKeyringProvider, KEYRING_SUPPORTED_KEYS } from "../infra/storage/keyring.ts";
-import { checkEnvStatus, createEnvFile, saveEnvKeys, type EnvKeys } from "../infra/storage/env.ts";
-import { loadConfig, saveConfig } from "../infra/storage/config.ts";
-import { getProviderCredentialStatuses, type ProviderCredentialStatus } from "../infra/runtime/actions/index.ts";
-import { BROKER_ENV_MAP, type BrokerId } from "../infra/broker/types.ts";
-import { EXCHANGE_ENV_MAP, type ExchangeId } from "../infra/exchange/types.ts";
-import { pluginInstaller } from "../infra/ai/mcp/marketplace/installer.ts";
+import { createKeyringProvider, KEYRING_SUPPORTED_KEYS } from "../../infra/storage/keyring.ts";
+import { checkEnvStatus, createEnvFile, saveEnvKeys, type EnvKeys } from "../../infra/storage/env.ts";
+import { loadConfig, saveConfig } from "../../infra/storage/config.ts";
+import { getProviderCredentialStatuses, type ProviderCredentialStatus } from "../../infra/runtime/actions/index.ts";
+import { BROKER_ENV_MAP, type BrokerId } from "../../infra/broker/types.ts";
+import { EXCHANGE_ENV_MAP, type ExchangeId } from "../../infra/exchange/types.ts";
+import { pluginInstaller } from "../../infra/ai/mcp/marketplace/installer.ts";
 import {
   getStructuredAxiomPrivacyStatus,
   getTracingConfig,
   recordStructuredObservation,
-} from "../infra/platform/observability/index.ts";
-import { getExecutionVenueMetadata, getIntegrationSurfaceMetadata } from "../infra/domain/integrations/index.ts";
+} from "../../infra/platform/observability/index.ts";
+import { getExecutionVenueMetadata, getIntegrationSurfaceMetadata } from "../../infra/domain/integrations/index.ts";
 import type {
   GordonConfig,
   MultiBrokerConfig,
   MultiExchangeConfig,
   Preferences,
-} from "../types/index.ts";
+} from "../../types/index.ts";
 import { parseSetupWizardMode, type SetupWizardMode } from "./setup-flow.ts";
 
 type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };

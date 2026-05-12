@@ -5,7 +5,7 @@
 import { writeFileSync, appendFileSync, readFileSync, existsSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
-import { SLASH_COMMANDS } from "../../app/slashCommands.ts";
+import { SLASH_COMMANDS } from "../../app/slash/slashCommands.ts";
 
 /**
  * Derive completions dynamically from the canonical SLASH_COMMANDS list.

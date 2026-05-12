@@ -3,8 +3,8 @@
  * Converts slash commands into natural language prompts for the agent
  */
 
-import { buildGeneratedPrompt } from "../infra/runtime/actions/surfaces.ts";
-import { BrokerFactory } from "../infra/broker/index.ts";
+import { buildGeneratedPrompt } from "../../infra/runtime/actions/surfaces.ts";
+import { BrokerFactory } from "../../infra/broker/index.ts";
 import type { SlashCommand } from "./slashCommands.ts";
 
 const BROKER_TOKENS = BrokerFactory.getSupportedBrokers();

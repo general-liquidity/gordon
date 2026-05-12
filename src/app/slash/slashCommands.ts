@@ -6,7 +6,7 @@
 import {
   getGeneratedSlashCommands,
   mergeSlashCommands,
-} from "../infra/runtime/actions/surfaces.ts";
+} from "../../infra/runtime/actions/surfaces.ts";
 import {
   type CommandAudience,
   type LegacyCommandCategory,

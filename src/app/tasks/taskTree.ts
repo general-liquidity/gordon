@@ -1,4 +1,4 @@
-import { getActionById, getActionByToolName } from "../infra/runtime/actions/index.ts";
+import { getActionById, getActionByToolName } from "../../infra/runtime/actions/index.ts";
 
 export type TaskTreeNodeStatus =
   | "pending"

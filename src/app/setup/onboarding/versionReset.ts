@@ -10,7 +10,7 @@
 
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
-import { GORDON_DIR } from "../../infra/storage/paths.ts";
+import { GORDON_DIR } from "../../../infra/storage/paths.ts";
 
 const ONBOARDING_STATE_FILE = join(GORDON_DIR, "onboarding-state.json");
 

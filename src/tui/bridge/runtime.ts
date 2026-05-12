@@ -5,8 +5,8 @@ import type { RuntimeApprovalRequest } from "../../runtime/contracts/types.ts";
 import type { GordonRuntimeToolAccessResult } from "../../infra/agents/types.ts";
 import { quickPermissionCheck } from "../../infra/permissions/racing.ts";
 import { getConversationBudget } from "../../infra/context/conversationBudget.ts";
-import { normalizeChatMessage, type ChatMessage } from "../../app/chatTypes.ts";
-import { buildPendingApprovalMessages } from "../../app/chatFlow.ts";
+import { normalizeChatMessage, type ChatMessage } from "../../app/chat/chatTypes.ts";
+import { buildPendingApprovalMessages } from "../../app/chat/chatFlow.ts";
 import {
   createTaskTree,
   recordTaskTreeAgentSwitch,
@@ -15,14 +15,14 @@ import {
   completeTaskTree,
   failTaskTree,
   type TaskTreeState,
-} from "../../app/taskTree.ts";
+} from "../../app/tasks/taskTree.ts";
 import {
   parseSlashCommand,
   commandToPrompt,
   SLASH_COMMANDS,
   formatPaginatedCommandHelp,
   type SlashCommand,
-} from "../../app/slashCommands.ts";
+} from "../../app/slash/slashCommands.ts";
 import { loadConfig, saveConfig } from "../../infra/storage/config.ts";
 import { loadEnvFile } from "../../infra/storage/env.ts";
 import { GatewayContextResolver } from "../../gateway/runtime/context.ts";
@@ -31,11 +31,11 @@ import {
   refreshRuntimeCredentials,
 } from "../../infra/runtime/credentialRefresh.ts";
 export { refreshRuntimeCredentials } from "../../infra/runtime/credentialRefresh.ts";
-import { collectDoctorReport, formatDoctorReport } from "../../app/setup-runtime.ts";
+import { collectDoctorReport, formatDoctorReport } from "../../app/setup/setup-runtime.ts";
 import type { Message } from "../components/MessageBubble.js";
 import type { ProgressNode } from "../components/AgentProgress.js";
 import type { ApprovalRequest } from "../components/ApprovalDialog.js";
-import { getRuntimeApprovalShortId } from "../../app/runtimeApprovalId.ts";
+import { getRuntimeApprovalShortId } from "../../app/runtime/runtimeApprovalId.ts";
 import { subscribeToEvents } from "./eventSubscriptions.js";
 import type { Action, TuiNotification } from "../state/types.js";
 

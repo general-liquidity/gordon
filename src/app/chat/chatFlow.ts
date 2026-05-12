@@ -1,6 +1,6 @@
-import type { RuntimeApprovalRequest } from "../runtime/contracts/types.ts";
+import type { RuntimeApprovalRequest } from "../../runtime/contracts/types.ts";
 import type { ChatMessage } from "./chatTypes.ts";
-import { getRuntimeApprovalShortId } from "./runtimeApprovalId.ts";
+import { getRuntimeApprovalShortId } from "../runtime/runtimeApprovalId.ts";
 
 function formatApprovalTimestamp(value: string): string {
   const parsed = new Date(value);

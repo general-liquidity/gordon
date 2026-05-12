@@ -14,8 +14,8 @@ import {
   doctorReportToJson,
   formatDoctorReport,
   parseBootstrapArgs,
-} from "../app/setup-runtime.ts";
-import { parseSetupWizardSection } from "../app/setup-flow.ts";
+} from "../app/setup/setup-runtime.ts";
+import { parseSetupWizardSection } from "../app/setup/setup-flow.ts";
 
 export interface CLICommandResult {
   exit: boolean;

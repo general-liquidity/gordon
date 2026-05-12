@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useMemo } from "react";
 import { Box, Text, useInput } from "../ink-custom";
 import { Select, TextInput } from "@inkjs/ui";
-import type { SetupWizardSection } from "../../app/setup-flow.ts";
+import type { SetupWizardSection } from "../../app/setup/setup-flow.ts";
 
 // ============================================================================
 // SetupWizard — Multi-step onboarding flow

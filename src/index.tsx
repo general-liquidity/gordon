@@ -70,7 +70,7 @@ if (flags.headless) {
     a !== "--plain" &&
     !a.startsWith("-"),
   );
-  const { runHeadlessAndPrint } = await import("./app/headless.ts");
+  const { runHeadlessAndPrint } = await import("./app/models/headless.ts");
   const code = await runHeadlessAndPrint(promptArgs, flags.quiet);
   process.exit(code);
 }

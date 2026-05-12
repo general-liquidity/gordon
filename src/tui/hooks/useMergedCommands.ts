@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { SLASH_COMMANDS } from "../../app/slashCommands.js";
+import { SLASH_COMMANDS } from "../../app/slash/slashCommands.ts";
 import type { PaletteItem } from "../components/CommandPalette.js";
 import { getRuntime } from "../bridge/runtime.js";
 
