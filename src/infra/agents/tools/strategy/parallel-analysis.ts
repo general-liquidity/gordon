@@ -447,7 +447,7 @@ export const parallelDeepAnalysisTool = createTool({
     const normalizedSymbol = normalizeSymbol(symbol);
 
     // Import and use the existing runFullAnalysis which already runs in parallel
-    const { runFullAnalysis } = await import("../runtime/composition.ts");
+    const { runFullAnalysis } = await import("../runtime/flow/composition.ts");
     const fullAnalysisResult = await runFullAnalysis(normalizedSymbol, execContext);
 
     const duration = Date.now() - startTime;

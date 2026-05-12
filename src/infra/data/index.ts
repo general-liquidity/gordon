@@ -7,11 +7,11 @@
 
 export { CoinGeckoClient, getCoinGeckoClient } from "./providers/coingecko.ts";
 export { NewsClient, getNewsClient } from "./providers/news.ts";
-export { SECFilingsClient, getSECFilingsClient } from "./providers/sec-filings.ts";
-export { SECInsiderClient, getSECInsiderClient } from "./providers/sec-insider.ts";
-export type { InsiderTransaction, InsiderSummary, InsiderTransactionType } from "./providers/sec-insider.ts";
-export { SECSegmentsClient, getSECSegmentsClient } from "./providers/sec-segments.ts";
-export type { SegmentBreakdown, SegmentEntry } from "./providers/sec-segments.ts";
+export { SECFilingsClient, getSECFilingsClient } from "./providers/sec/sec-filings.ts";
+export { SECInsiderClient, getSECInsiderClient } from "./providers/sec/sec-insider.ts";
+export type { InsiderTransaction, InsiderSummary, InsiderTransactionType } from "./providers/sec/sec-insider.ts";
+export { SECSegmentsClient, getSECSegmentsClient } from "./providers/sec/sec-segments.ts";
+export type { SegmentBreakdown, SegmentEntry } from "./providers/sec/sec-segments.ts";
 export {
   screenStocks,
   PRESETS,
@@ -23,8 +23,8 @@ export {
   NASDAQ_100_SAMPLE,
 } from "./providers/stockScreener.ts";
 export type { ScreenCriteria, ScreenResult, ScreenOptions } from "./providers/stockScreener.ts";
-export { XSearchClient, getXSearchClient } from "./providers/xSearch.ts";
-export type { XTweet, XSearchOptions, XSearchSummary } from "./providers/xSearch.ts";
+export { XSearchClient, getXSearchClient } from "./providers/social/xSearch.ts";
+export type { XTweet, XSearchOptions, XSearchSummary } from "./providers/social/xSearch.ts";
 export { FundamentalsClient, getFundamentalsClient } from "./providers/fundamentals.ts";
 export { AlphaVantageClient, getAlphaVantageClient } from "./providers/alphaVantage.ts";
 export { enrichQuoteWithLLM } from "./enrichment/llmEnrichment.ts";

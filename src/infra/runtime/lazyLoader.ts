@@ -141,11 +141,11 @@ export const lazyGemini = lazy(() => import("../exchange/adapters/gemini.ts"));
 export const lazyOAuth = lazy(() => import("../auth/oauth-flow.ts"));
 
 /** Lazy SEC data sources. */
-export const lazySECInsider = lazy(() => import("../data/providers/sec-insider.ts"));
-export const lazySECSegments = lazy(() => import("../data/providers/sec-segments.ts"));
+export const lazySECInsider = lazy(() => import("../data/providers/sec/sec-insider.ts"));
+export const lazySECSegments = lazy(() => import("../data/providers/sec/sec-segments.ts"));
 
 /** Lazy X Search. */
-export const lazyXSearch = lazy(() => import("../data/providers/xSearch.ts"));
+export const lazyXSearch = lazy(() => import("../data/providers/social/xSearch.ts"));
 
 /** Lazy stock screener. */
 export const lazyStockScreener = lazy(() => import("../data/providers/stockScreener.ts"));

@@ -478,7 +478,7 @@ export const displayComparisonChartTool = createTool({
       // periods can blow past 6KB. The utility preserves HEAD and TAIL
       // windows so the agent still sees the start and end of the series.
       const rawChart = `\n${chart}\n`;
-      const { capWithRollingWindow } = await import("../runtime/rollingWindow.ts");
+      const { capWithRollingWindow } = await import("../runtime/rate/rollingWindow.ts");
       const capped = await capWithRollingWindow(rawChart, {
         label: `comparison-chart-${interval}`,
         maxChars: 4000,

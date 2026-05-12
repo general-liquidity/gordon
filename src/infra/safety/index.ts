@@ -20,19 +20,19 @@ export {
   checkConstitution,
   passesConstitution,
   formatViolations,
-} from "./tradingConstitution.ts";
-export type { ConstitutionViolation } from "./tradingConstitution.ts";
+} from "./defense/tradingConstitution.ts";
+export type { ConstitutionViolation } from "./defense/tradingConstitution.ts";
 
 // Prompt Injection Defense
 export {
   checkForInjection,
   shouldBlockInput,
-} from "./injectionDefense.ts";
+} from "./defense/injectionDefense.ts";
 export type {
   InjectionCheckResult,
   InjectionMatch,
   InjectionCategory,
-} from "./injectionDefense.ts";
+} from "./defense/injectionDefense.ts";
 
 // Explain-before-execute mode
 export {
@@ -42,8 +42,8 @@ export {
   clearUserThesis,
   requiresUserThesis,
   computeThesisDivergence,
-} from "./explainFirstMode.ts";
-export type { UserThesis, ThesisRequirement } from "./explainFirstMode.ts";
+} from "./anti-trap/explainFirstMode.ts";
+export type { UserThesis, ThesisRequirement } from "./anti-trap/explainFirstMode.ts";
 
 // Supervision-rust calibration check
 export {
@@ -56,13 +56,13 @@ export {
   newSupervisionRecord,
   recordSupervisionResult,
   readSupervisionScore,
-} from "./supervisionRust.ts";
+} from "./anti-trap/supervisionRust.ts";
 export type {
   FlawType,
   SupervisionFlaw,
   SupervisionRecord,
   SupervisionScore,
-} from "./supervisionRust.ts";
+} from "./anti-trap/supervisionRust.ts";
 
 // Risk-acknowledgement gate
 export {
@@ -70,16 +70,16 @@ export {
   topWeightedDimensions,
   verifyRiskAcknowledgement,
   verifyAcksFromWarnings,
-} from "./riskAcknowledgement.ts";
-export type { AcknowledgementResult } from "./riskAcknowledgement.ts";
+} from "./anti-trap/riskAcknowledgement.ts";
+export type { AcknowledgementResult } from "./anti-trap/riskAcknowledgement.ts";
 
 // Local-fallback for read-only tools
 export {
   isLocalFallbackEnabled,
   checkProviderHealth,
   withReadOnlyFallback,
-} from "./localFallback.ts";
-export type { ProviderHealth, FallbackEnvelope } from "./localFallback.ts";
+} from "./anti-trap/localFallback.ts";
+export type { ProviderHealth, FallbackEnvelope } from "./anti-trap/localFallback.ts";
 
 // Asset-class inference helper (shared by anti-rot gates)
 export { inferAssetClassFromVenue } from "./assetClassInference.ts";
@@ -93,12 +93,12 @@ export {
   loadUniverse,
   saveUniverse,
   checkUniverse,
-} from "./tradingUniverse.ts";
+} from "./anti-rot/tradingUniverse.ts";
 export type {
   TradingUniverse,
   UniverseCheckInput,
   UniverseCheckResult,
-} from "./tradingUniverse.ts";
+} from "./anti-rot/tradingUniverse.ts";
 
 // Portfolio coherence vs. running thesis
 export {
@@ -110,7 +110,7 @@ export {
   clearRunningThesis,
   scoreCoherence,
   gateCoherence,
-} from "./thesisCoherence.ts";
+} from "./anti-rot/thesisCoherence.ts";
 export type {
   ThesisBias,
   ThesisHorizon,
@@ -118,7 +118,7 @@ export type {
   PlanShape as ThesisPlanShape,
   CoherenceScore,
   CoherenceGateResult,
-} from "./thesisCoherence.ts";
+} from "./anti-rot/thesisCoherence.ts";
 
 // Per-strategy mandate decomposition
 export {
@@ -128,22 +128,22 @@ export {
   saveMandates,
   selectMandateForPlan,
   gateAgainstMandate,
-} from "./strategyMandates.ts";
+} from "./anti-rot/strategyMandates.ts";
 
 // Trader behavior pattern detector (cross-session pattern surfacing)
 export {
   isTraderBehaviorEnabled,
   detectTraderBehaviorPatterns,
-} from "./traderBehaviorPatterns.ts";
+} from "./anti-rot/traderBehaviorPatterns.ts";
 export type {
   BehaviorPatternKind,
   BehaviorPattern,
   TraderBehaviorReport,
-} from "./traderBehaviorPatterns.ts";
+} from "./anti-rot/traderBehaviorPatterns.ts";
 export type {
   StrategyMandate,
   MandateMatchInput,
   MandateBudgetState,
   MandateGateInput,
   MandateGateResult,
-} from "./strategyMandates.ts";
+} from "./anti-rot/strategyMandates.ts";

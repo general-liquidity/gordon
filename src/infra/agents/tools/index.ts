@@ -38,74 +38,74 @@
 
 // Migrated tools
 // Mid-task user elicitation (wired to SideQuestionManager + TUI dialogs)
-export { askUserTools, askUserTool } from "./runtime/askUser.ts";
+export { askUserTools, askUserTool } from "./runtime/flow/askUser.ts";
 export { indicatorTools } from "./market/indicators.ts";
 export { explainTools } from "./strategy/explain.ts";
 export { marketTools } from "./market/market.ts";
 export { positionTools } from "./account/positions.ts";
-export { schedulerTools } from "./runtime/scheduler.ts";
-export { systemTools } from "./runtime/system.ts";
+export { schedulerTools } from "./runtime/lifecycle/scheduler.ts";
+export { systemTools } from "./runtime/flow/system.ts";
 export { earnTools } from "./account/earn.ts";
 export { chartTools } from "./market/charts.ts";
 export { orderbookTools } from "./market/orderbook.ts";
 export { walletTools } from "./trading/wallet.ts";
 export { discoveryTools } from "./news/discovery.ts";
-export { historyTools } from "./runtime/history.ts";
+export { historyTools } from "./runtime/flow/history.ts";
 export { accountTools } from "./account/account.ts";
 export { tradingTools } from "./trading/trading.ts";
 export { marketAnalysisTools } from "./market/market-analysis.ts";
 export { riskManagementTools } from "./trading/risk-management.ts";
 export { strategyTools } from "./strategy/strategies.ts";
-export { strategyGenerationTools } from "./strategy/strategy-generation.ts";
+export { strategyGenerationTools } from "./strategy/generation/strategy-generation.ts";
 export { metricsTools } from "./strategy/metrics.ts";
-export { compositionTools } from "./runtime/composition.ts";
-export { backtestTools } from "./strategy/backtest.ts";
+export { compositionTools } from "./runtime/flow/composition.ts";
+export { backtestTools } from "./strategy/backtest/backtest.ts";
 export { parallelAnalysisTools } from "./strategy/parallel-analysis.ts";
 export { marketDataTools } from "./market/market-data.ts";
 export { liquidationIntelligenceTools } from "./trading/liquidation-intelligence.ts";
 export { pairAnalysisTools } from "./market/pair-analysis.ts";
-export { autonomousTools } from "./runtime/autonomous.ts";
-export { baseOnchainTools } from "./onchain/base-onchain.ts";
-export { agentKitOnchainTools } from "./onchain/agentkit-onchain.ts";
-export { agentKitDefiTools } from "./onchain/agentkit-defi.ts";
-export { polkadotKitAssetTools } from "./onchain/polkadotkit-assets.ts";
-export { polkadotKitStakingTools } from "./onchain/polkadotkit-staking.ts";
-export { polkadotKitDefiTools } from "./onchain/polkadotkit-defi.ts";
-export { solanaKitWalletTools } from "./onchain/solanakit-wallet.ts";
-export { solanaKitTradingTools } from "./onchain/solanakit-trading.ts";
-export { solanaKitDefiPerpsTools } from "./onchain/solanakit-defi-perps.ts";
-export { solanaKitDefiLendingTools } from "./onchain/solanakit-defi-lending.ts";
-export { solanaKitDefiPoolsTools } from "./onchain/solanakit-defi-pools.ts";
-export { solanaKitDefiBridgeTools } from "./onchain/solanakit-defi-bridge.ts";
-export { baseSignalTools } from "./onchain/base-signals.ts";
-export { baseIndexerTools } from "./onchain/base-indexers.ts";
-export { uniswapDataTools } from "./onchain/uniswap-data.ts";
+export { autonomousTools } from "./runtime/meta/autonomous.ts";
+export { baseOnchainTools } from "./onchain/base/base-onchain.ts";
+export { agentKitOnchainTools } from "./onchain/agentkit/agentkit-onchain.ts";
+export { agentKitDefiTools } from "./onchain/agentkit/agentkit-defi.ts";
+export { polkadotKitAssetTools } from "./onchain/polkadotkit/polkadotkit-assets.ts";
+export { polkadotKitStakingTools } from "./onchain/polkadotkit/polkadotkit-staking.ts";
+export { polkadotKitDefiTools } from "./onchain/polkadotkit/polkadotkit-defi.ts";
+export { solanaKitWalletTools } from "./onchain/solanakit/solanakit-wallet.ts";
+export { solanaKitTradingTools } from "./onchain/solanakit/solanakit-trading.ts";
+export { solanaKitDefiPerpsTools } from "./onchain/solanakit/solanakit-defi-perps.ts";
+export { solanaKitDefiLendingTools } from "./onchain/solanakit/solanakit-defi-lending.ts";
+export { solanaKitDefiPoolsTools } from "./onchain/solanakit/solanakit-defi-pools.ts";
+export { solanaKitDefiBridgeTools } from "./onchain/solanakit/solanakit-defi-bridge.ts";
+export { baseSignalTools } from "./onchain/base/base-signals.ts";
+export { baseIndexerTools } from "./onchain/base/base-indexers.ts";
+export { uniswapDataTools } from "./onchain/dex/uniswap-data.ts";
 export { dexSearchTools } from "./news/dex-search.ts";
 export { xSocialTools } from "./news/x-social.ts";
-export { cdpWebhookTools } from "./onchain/cdp-webhooks.ts";
-export { cdpSqlTools } from "./onchain/cdp-sql.ts";
-export { cdpPolicyTools } from "./onchain/cdp-policy.ts";
-export { cdpOnrampTools } from "./onchain/cdp-onramp.ts";
-export { cdpEvmMultichainTools } from "./onchain/cdp-evm-multichain.ts";
-export { cdpWebhookReceiverTools } from "./onchain/cdp-webhook-receiver.ts";
-export { proactiveModeTools } from "./runtime/proactive-mode.ts";
-export { backtestVerdictTools } from "./strategy/backtest-verdict.ts";
+export { cdpWebhookTools } from "./onchain/cdp/cdp-webhooks.ts";
+export { cdpSqlTools } from "./onchain/cdp/cdp-sql.ts";
+export { cdpPolicyTools } from "./onchain/cdp/cdp-policy.ts";
+export { cdpOnrampTools } from "./onchain/cdp/cdp-onramp.ts";
+export { cdpEvmMultichainTools } from "./onchain/cdp/cdp-evm-multichain.ts";
+export { cdpWebhookReceiverTools } from "./onchain/cdp/cdp-webhook-receiver.ts";
+export { proactiveModeTools } from "./runtime/flow/proactive-mode.ts";
+export { backtestVerdictTools } from "./strategy/backtest/backtest-verdict.ts";
 export { finnhubTools } from "./providers/finnhub-tools.ts";
 export { finnhubFundamentalsTools } from "./providers/finnhub-fundamentals-tools.ts";
 export { finnhubMarketsTools } from "./providers/finnhub-markets-tools.ts";
 export { smcPatternTools } from "./market/smc-pattern-tools.ts";
-export { calibrationTools } from "./runtime/calibration-tools.ts";
-export { skillLoaderTools } from "./runtime/skill-loader.ts";
-export { producerHealthTools } from "./runtime/producer-health-tool.ts";
-export { defillamaYieldTools } from "./onchain/defillama-yields.ts";
+export { calibrationTools } from "./runtime/meta/calibration-tools.ts";
+export { skillLoaderTools } from "./runtime/lifecycle/skill-loader.ts";
+export { producerHealthTools } from "./runtime/lifecycle/producer-health-tool.ts";
+export { defillamaYieldTools } from "./onchain/dex/defillama-yields.ts";
 export { newsTools } from "./news/news.ts";
 export { stockNewsTools } from "./news/stockNews.ts";
-export { strategyRecipeTools } from "./strategy/strategy-recipes.ts";
-export { chainlinkStreamsTools } from "./onchain/chainlink-streams.ts";
-export { chainlinkFeedsTools } from "./onchain/chainlink-feeds.ts";
-export { chainlinkCCIPTools } from "./onchain/chainlink-ccip.ts";
+export { strategyRecipeTools } from "./strategy/generation/strategy-recipes.ts";
+export { chainlinkStreamsTools } from "./onchain/chainlink/chainlink-streams.ts";
+export { chainlinkFeedsTools } from "./onchain/chainlink/chainlink-feeds.ts";
+export { chainlinkCCIPTools } from "./onchain/chainlink/chainlink-ccip.ts";
 export { synthDataTools } from "./providers/synthdata.ts";
-export { agentRailsTools } from "./runtime/agent-rails.ts";
+export { agentRailsTools } from "./runtime/meta/agent-rails.ts";
 
 // Position tracking tools (v0.7)
 export { positionTrackingTools } from "./account/position-tracking.ts";
@@ -114,38 +114,38 @@ export { positionTrackingTools } from "./account/position-tracking.ts";
 export { checkRiskTool, evaluateOrderRisk } from "./trading/risk-gate.ts";
 
 // Memory tools (v0.7)
-export { memoryTools } from "./runtime/memory-tools.ts";
+export { memoryTools } from "./runtime/meta/memory-tools.ts";
 
 // ACE (Agentic Context Engineering) tools
-export { aceTools } from "./runtime/ace-tools.ts";
+export { aceTools } from "./runtime/meta/ace-tools.ts";
 
 // Agent self-feedback tool (report_blocked)
-export { agentFeedbackTools } from "./runtime/agent-feedback.ts";
+export { agentFeedbackTools } from "./runtime/meta/agent-feedback.ts";
 
 // Anti-trap tools (record_user_thesis, record_supervision_outcome)
-export { antiTrapTools } from "./runtime/anti-trap.ts";
+export { antiTrapTools } from "./runtime/meta/anti-trap.ts";
 
 // Playbook tools (v0.7)
-export { playbookTools } from "./runtime/playbook-tools.ts";
+export { playbookTools } from "./runtime/meta/playbook-tools.ts";
 
 // Playbook backtest tools (v0.7)
-export { playbookBacktestTools } from "./strategy/backtest-tools.ts";
+export { playbookBacktestTools } from "./strategy/backtest/backtest-tools.ts";
 
 // Runtime tools (v0.7) -- composable strategy runtime
-export { runtimeTools } from "./runtime/runtime-tools.ts";
+export { runtimeTools } from "./runtime/flow/runtime-tools.ts";
 
 // Regime detection tools (v0.7)
 export { regimeTools } from "./market/regime-tools.ts";
 
 // Audit tools (v0.7) -- agent decision traceability
-export { auditTools } from "./runtime/audit-tools.ts";
+export { auditTools } from "./runtime/meta/audit-tools.ts";
 
 // Advanced tools (Phase 3) -- execution twin, proofs, regime memory
-export { advancedTools } from "./runtime/advanced-tools.ts";
+export { advancedTools } from "./runtime/flow/advanced-tools.ts";
 export { systematicTools } from "./strategy/systematic-tools.ts";
 
 // Genome tools (v0.75) -- playbook evolution, A/B experiments, mutation suggestions
-export { genomeTools } from "./runtime/genome-tools.ts";
+export { genomeTools } from "./runtime/meta/genome-tools.ts";
 
 // Protocol tools (v0.7) -- playbook protocol validation/export/import/comparison
 export { protocolTools } from "../../../core/playbooks/protocol-tools.ts";
@@ -179,7 +179,7 @@ export {
   type ToolChain,
   type ParallelToolSpec,
   type ConditionFn,
-} from "./runtime/composition.ts";
+} from "./runtime/flow/composition.ts";
 
 // Tool caching utilities
 export {
@@ -224,7 +224,7 @@ export {
   type ValidationResult,
   type ToolValidationConfig,
   type ToolExecutor as ValidationToolExecutor,
-} from "./runtime/validation.ts";
+} from "./runtime/flow/validation.ts";
 
 // ============================================================================
 // Timeout Handling Utilities
@@ -242,7 +242,7 @@ export {
   type ToolTimeoutConfig,
   type TimeoutResult,
   type ToolExecutor as TimeoutToolExecutor,
-} from "./runtime/timeout.ts";
+} from "./runtime/rate/timeout.ts";
 
 // ============================================================================
 // Error Translation Utilities
@@ -264,7 +264,7 @@ export {
   type BinanceApiError,
   type TranslatedError,
   type ErrorCategory,
-} from "./runtime/error-translator.ts";
+} from "./runtime/flow/error-translator.ts";
 
 // ============================================================================
 // Rate Limiting Utilities
@@ -285,7 +285,7 @@ export {
   type ToolRateLimitConfig,
   type RateLimitResult,
   type ToolExecutor as RateLimitToolExecutor,
-} from "./runtime/rate-limiter.ts";
+} from "./runtime/rate/rate-limiter.ts";
 
 // ============================================================================
 // Pagination Utilities
@@ -320,83 +320,83 @@ import { indicatorTools } from "./market/indicators.ts";
 import { explainTools } from "./strategy/explain.ts";
 import { marketTools } from "./market/market.ts";
 import { positionTools } from "./account/positions.ts";
-import { schedulerTools } from "./runtime/scheduler.ts";
-import { systemTools } from "./runtime/system.ts";
+import { schedulerTools } from "./runtime/lifecycle/scheduler.ts";
+import { systemTools } from "./runtime/flow/system.ts";
 import { earnTools } from "./account/earn.ts";
 import { chartTools } from "./market/charts.ts";
 import { orderbookTools } from "./market/orderbook.ts";
 import { walletTools } from "./trading/wallet.ts";
 import { discoveryTools } from "./news/discovery.ts";
-import { historyTools } from "./runtime/history.ts";
+import { historyTools } from "./runtime/flow/history.ts";
 import { accountTools } from "./account/account.ts";
 import { tradingTools } from "./trading/trading.ts";
 import { marketAnalysisTools } from "./market/market-analysis.ts";
 import { riskManagementTools } from "./trading/risk-management.ts";
 import { strategyTools } from "./strategy/strategies.ts";
-import { strategyGenerationTools } from "./strategy/strategy-generation.ts";
+import { strategyGenerationTools } from "./strategy/generation/strategy-generation.ts";
 import { metricsTools } from "./strategy/metrics.ts";
-import { compositionTools } from "./runtime/composition.ts";
-import { backtestTools } from "./strategy/backtest.ts";
+import { compositionTools } from "./runtime/flow/composition.ts";
+import { backtestTools } from "./strategy/backtest/backtest.ts";
 import { parallelAnalysisTools } from "./strategy/parallel-analysis.ts";
 import { marketDataTools } from "./market/market-data.ts";
 import { liquidationIntelligenceTools } from "./trading/liquidation-intelligence.ts";
 import { pairAnalysisTools } from "./market/pair-analysis.ts";
-import { autonomousTools } from "./runtime/autonomous.ts";
-import { baseOnchainTools } from "./onchain/base-onchain.ts";
-import { agentKitOnchainTools } from "./onchain/agentkit-onchain.ts";
-import { agentKitDefiTools } from "./onchain/agentkit-defi.ts";
-import { polkadotKitAssetTools } from "./onchain/polkadotkit-assets.ts";
-import { polkadotKitStakingTools } from "./onchain/polkadotkit-staking.ts";
-import { polkadotKitDefiTools } from "./onchain/polkadotkit-defi.ts";
-import { solanaKitWalletTools } from "./onchain/solanakit-wallet.ts";
-import { solanaKitTradingTools } from "./onchain/solanakit-trading.ts";
-import { solanaKitDefiPerpsTools } from "./onchain/solanakit-defi-perps.ts";
-import { solanaKitDefiLendingTools } from "./onchain/solanakit-defi-lending.ts";
-import { solanaKitDefiPoolsTools } from "./onchain/solanakit-defi-pools.ts";
-import { solanaKitDefiBridgeTools } from "./onchain/solanakit-defi-bridge.ts";
-import { baseSignalTools } from "./onchain/base-signals.ts";
-import { baseIndexerTools } from "./onchain/base-indexers.ts";
-import { uniswapDataTools } from "./onchain/uniswap-data.ts";
+import { autonomousTools } from "./runtime/meta/autonomous.ts";
+import { baseOnchainTools } from "./onchain/base/base-onchain.ts";
+import { agentKitOnchainTools } from "./onchain/agentkit/agentkit-onchain.ts";
+import { agentKitDefiTools } from "./onchain/agentkit/agentkit-defi.ts";
+import { polkadotKitAssetTools } from "./onchain/polkadotkit/polkadotkit-assets.ts";
+import { polkadotKitStakingTools } from "./onchain/polkadotkit/polkadotkit-staking.ts";
+import { polkadotKitDefiTools } from "./onchain/polkadotkit/polkadotkit-defi.ts";
+import { solanaKitWalletTools } from "./onchain/solanakit/solanakit-wallet.ts";
+import { solanaKitTradingTools } from "./onchain/solanakit/solanakit-trading.ts";
+import { solanaKitDefiPerpsTools } from "./onchain/solanakit/solanakit-defi-perps.ts";
+import { solanaKitDefiLendingTools } from "./onchain/solanakit/solanakit-defi-lending.ts";
+import { solanaKitDefiPoolsTools } from "./onchain/solanakit/solanakit-defi-pools.ts";
+import { solanaKitDefiBridgeTools } from "./onchain/solanakit/solanakit-defi-bridge.ts";
+import { baseSignalTools } from "./onchain/base/base-signals.ts";
+import { baseIndexerTools } from "./onchain/base/base-indexers.ts";
+import { uniswapDataTools } from "./onchain/dex/uniswap-data.ts";
 import { dexSearchTools } from "./news/dex-search.ts";
 import { xSocialTools } from "./news/x-social.ts";
-import { cdpWebhookTools } from "./onchain/cdp-webhooks.ts";
-import { cdpSqlTools } from "./onchain/cdp-sql.ts";
-import { cdpPolicyTools } from "./onchain/cdp-policy.ts";
-import { cdpOnrampTools } from "./onchain/cdp-onramp.ts";
-import { cdpEvmMultichainTools } from "./onchain/cdp-evm-multichain.ts";
-import { cdpWebhookReceiverTools } from "./onchain/cdp-webhook-receiver.ts";
-import { proactiveModeTools } from "./runtime/proactive-mode.ts";
-import { backtestVerdictTools } from "./strategy/backtest-verdict.ts";
+import { cdpWebhookTools } from "./onchain/cdp/cdp-webhooks.ts";
+import { cdpSqlTools } from "./onchain/cdp/cdp-sql.ts";
+import { cdpPolicyTools } from "./onchain/cdp/cdp-policy.ts";
+import { cdpOnrampTools } from "./onchain/cdp/cdp-onramp.ts";
+import { cdpEvmMultichainTools } from "./onchain/cdp/cdp-evm-multichain.ts";
+import { cdpWebhookReceiverTools } from "./onchain/cdp/cdp-webhook-receiver.ts";
+import { proactiveModeTools } from "./runtime/flow/proactive-mode.ts";
+import { backtestVerdictTools } from "./strategy/backtest/backtest-verdict.ts";
 import { finnhubTools } from "./providers/finnhub-tools.ts";
 import { finnhubFundamentalsTools } from "./providers/finnhub-fundamentals-tools.ts";
 import { finnhubMarketsTools } from "./providers/finnhub-markets-tools.ts";
 import { smcPatternTools } from "./market/smc-pattern-tools.ts";
-import { calibrationTools } from "./runtime/calibration-tools.ts";
-import { skillLoaderTools } from "./runtime/skill-loader.ts";
-import { producerHealthTools } from "./runtime/producer-health-tool.ts";
-import { defillamaYieldTools } from "./onchain/defillama-yields.ts";
+import { calibrationTools } from "./runtime/meta/calibration-tools.ts";
+import { skillLoaderTools } from "./runtime/lifecycle/skill-loader.ts";
+import { producerHealthTools } from "./runtime/lifecycle/producer-health-tool.ts";
+import { defillamaYieldTools } from "./onchain/dex/defillama-yields.ts";
 import { newsTools } from "./news/news.ts";
 import { stockNewsTools } from "./news/stockNews.ts";
-import { strategyRecipeTools } from "./strategy/strategy-recipes.ts";
-import { chainlinkStreamsTools } from "./onchain/chainlink-streams.ts";
-import { chainlinkFeedsTools } from "./onchain/chainlink-feeds.ts";
-import { chainlinkCCIPTools } from "./onchain/chainlink-ccip.ts";
+import { strategyRecipeTools } from "./strategy/generation/strategy-recipes.ts";
+import { chainlinkStreamsTools } from "./onchain/chainlink/chainlink-streams.ts";
+import { chainlinkFeedsTools } from "./onchain/chainlink/chainlink-feeds.ts";
+import { chainlinkCCIPTools } from "./onchain/chainlink/chainlink-ccip.ts";
 import { synthDataTools } from "./providers/synthdata.ts";
-import { agentRailsTools } from "./runtime/agent-rails.ts";
+import { agentRailsTools } from "./runtime/meta/agent-rails.ts";
 import { positionTrackingTools } from "./account/position-tracking.ts";
 import { checkRiskTool } from "./trading/risk-gate.ts";
-import { memoryTools } from "./runtime/memory-tools.ts";
-import { aceTools } from "./runtime/ace-tools.ts";
-import { agentFeedbackTools } from "./runtime/agent-feedback.ts";
-import { antiTrapTools } from "./runtime/anti-trap.ts";
-import { playbookTools } from "./runtime/playbook-tools.ts";
-import { playbookBacktestTools } from "./strategy/backtest-tools.ts";
-import { runtimeTools } from "./runtime/runtime-tools.ts";
+import { memoryTools } from "./runtime/meta/memory-tools.ts";
+import { aceTools } from "./runtime/meta/ace-tools.ts";
+import { agentFeedbackTools } from "./runtime/meta/agent-feedback.ts";
+import { antiTrapTools } from "./runtime/meta/anti-trap.ts";
+import { playbookTools } from "./runtime/meta/playbook-tools.ts";
+import { playbookBacktestTools } from "./strategy/backtest/backtest-tools.ts";
+import { runtimeTools } from "./runtime/flow/runtime-tools.ts";
 import { regimeTools } from "./market/regime-tools.ts";
-import { auditTools } from "./runtime/audit-tools.ts";
-import { advancedTools } from "./runtime/advanced-tools.ts";
+import { auditTools } from "./runtime/meta/audit-tools.ts";
+import { advancedTools } from "./runtime/flow/advanced-tools.ts";
 import { systematicTools } from "./strategy/systematic-tools.ts";
-import { genomeTools } from "./runtime/genome-tools.ts";
+import { genomeTools } from "./runtime/meta/genome-tools.ts";
 import { protocolTools } from "../../../core/playbooks/protocol-tools.ts";
 import { multiModalChartTools } from "../../tools/chartTools.ts";
 import { evalTools } from "../../domain/evals/tools.ts";
@@ -595,10 +595,10 @@ export const toolCounts = {
 // ============================================================================
 
 import type { MastraExecutionContext } from "./types.ts";
-import { withValidation, TOOL_VALIDATION_CONFIG } from "./runtime/validation.ts";
-import { withTimeout, TOOL_TIMEOUT_CONFIG } from "./runtime/timeout.ts";
-import { withRateLimit, TOOL_RATE_LIMITS } from "./runtime/rate-limiter.ts";
-import { translateError, createErrorResponse } from "./runtime/error-translator.ts";
+import { withValidation, TOOL_VALIDATION_CONFIG } from "./runtime/flow/validation.ts";
+import { withTimeout, TOOL_TIMEOUT_CONFIG } from "./runtime/rate/timeout.ts";
+import { withRateLimit, TOOL_RATE_LIMITS } from "./runtime/rate/rate-limiter.ts";
+import { translateError, createErrorResponse } from "./runtime/flow/error-translator.ts";
 
 /**
  * Tool executor function signature

@@ -12,7 +12,7 @@
  */
 
 import { persistLargeResult, buildPersistedContent, PREVIEW_CHARS } from "../toolResultStorage.ts";
-import { getToolResultBudget } from "../../agents/tools/runtime/concurrency-classification.ts";
+import { getToolResultBudget } from "../../agents/tools/runtime/rate/concurrency-classification.ts";
 
 // ============================================================================
 // Configuration

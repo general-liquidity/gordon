@@ -9,24 +9,24 @@
  */
 
 import type { ProactiveEngine } from "../engine/proactiveEngine.ts";
-import { tradeEventProducer, resetTradeEventProducerState } from "./tradeEventProducer.ts";
-import { scanOpportunityProducer } from "./scanOpportunityProducer.ts";
-import { riskProducer } from "./riskProducer.ts";
-import { stopProducer } from "./stopProducer.ts";
+import { tradeEventProducer, resetTradeEventProducerState } from "./events/tradeEventProducer.ts";
+import { scanOpportunityProducer } from "./signals/scanOpportunityProducer.ts";
+import { riskProducer } from "./risk/riskProducer.ts";
+import { stopProducer } from "./risk/stopProducer.ts";
 import { periodicProducer, resetPeriodicProducerState } from "./periodicProducer.ts";
-import { portfolioDriftProducer } from "./portfolioDriftProducer.ts";
-import { regimeFlipProducer, resetRegimeFlipProducerState } from "./regimeFlipProducer.ts";
-import { volatilitySpikeProducer, resetVolatilitySpikeProducerState } from "./volatilitySpikeProducer.ts";
-import { fundingAlertProducer, resetFundingAlertProducerState } from "./fundingAlertProducer.ts";
-import { newsEventProducer, resetNewsEventProducerState } from "./newsEventProducer.ts";
-import { stockNewsEventProducer, resetStockNewsEventProducerState } from "./stockNewsEventProducer.ts";
+import { portfolioDriftProducer } from "./risk/portfolioDriftProducer.ts";
+import { regimeFlipProducer, resetRegimeFlipProducerState } from "./signals/regimeFlipProducer.ts";
+import { volatilitySpikeProducer, resetVolatilitySpikeProducerState } from "./signals/volatilitySpikeProducer.ts";
+import { fundingAlertProducer, resetFundingAlertProducerState } from "./signals/fundingAlertProducer.ts";
+import { newsEventProducer, resetNewsEventProducerState } from "./events/newsEventProducer.ts";
+import { stockNewsEventProducer, resetStockNewsEventProducerState } from "./events/stockNewsEventProducer.ts";
 import {
   earningsApproachingProducer,
   insiderFlowProducer,
   analystUpgradeProducer,
   congressionalTradeProducer,
   resetStockEventsProducerState,
-} from "./stockEventsProducer.ts";
+} from "./events/stockEventsProducer.ts";
 import { getProducerHealthTracker } from "../engine/producerHealth.ts";
 import type { CandidateProducer } from "../engine/proactiveEngine.ts";
 import type { ProactiveSuggestion } from "../types.ts";

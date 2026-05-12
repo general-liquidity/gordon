@@ -942,7 +942,7 @@ function AppInner() {
 
       // ─��� Injection defense: check input BEFORE it reaches the agent ──
       try {
-        const { checkForInjection } = require("../infra/safety/injectionDefense.js") as typeof import("../infra/safety/injectionDefense.js");
+        const { checkForInjection } = require("../infra/safety/injectionDefense.js") as typeof import("../infra/safety/defense/injectionDefense.ts");
         const injectionCheck = checkForInjection(trimmed);
         if (injectionCheck.shouldBlock) {
           dispatch({

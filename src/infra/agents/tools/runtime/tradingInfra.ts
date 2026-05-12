@@ -133,7 +133,7 @@ export const classify_trade_risk = createTool({
     // Wire: Trading Constitution check (immutable rules that cannot be overridden)
     let constitutionViolations: any[] = [];
     try {
-      const { checkConstitution, formatViolations } = require("../../safety/tradingConstitution.ts") as typeof import("../../../safety/tradingConstitution.ts");
+      const { checkConstitution, formatViolations } = require("../../safety/tradingConstitution.ts") as typeof import("../../../safety/defense/tradingConstitution.ts");
       const result = checkConstitution({
         positionSizePct: (trade.notionalUsd / portfolioContext.totalValueUsd) * 100,
         riskPerTradePct: assessment.compositeScore > 50 ? 3 : 1, // Estimate
