@@ -12,7 +12,7 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
-import { loadBacktestResult } from "../../../backtest/storage.ts";
+import { loadBacktestResult } from "../../../backtest/persistence/storage.ts";
 import { StrategyRuntime } from "../../../core/runtime/engine.ts";
 import { AllocationStrategySchema } from "../../../core/runtime/types.ts";
 import { getAuditLogger } from "../../platform/audit/index.ts";

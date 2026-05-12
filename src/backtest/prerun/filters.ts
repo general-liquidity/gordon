@@ -2,7 +2,7 @@
  * Backtest Data Filtering Utilities
  */
 
-import type { OHLC } from "./types.ts";
+import type { OHLC } from "../types.ts";
 
 function parseTimeToMinutes(timeStr: string): number {
   const [hours, minutes] = timeStr.split(":").map((part) => Number(part));

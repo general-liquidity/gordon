@@ -6,17 +6,17 @@
  * and validates on out-of-sample test data.
  */
 
-import type { Strategy } from "../strategies/types.ts";
+import type { Strategy } from "../../strategies/types.ts";
 import type {
   OHLC,
   BacktestMetrics,
   BacktestEngineResult,
   ParameterSet,
   BacktestParams,
-} from "./types.ts";
-import { DEFAULT_BACKTEST_PARAMS } from "./types.ts";
-import { runBacktest } from "./engine.ts";
-import { createModuleLogger } from "../infra/logger/index.ts";
+} from "../types.ts";
+import { DEFAULT_BACKTEST_PARAMS } from "../types.ts";
+import { runBacktest } from "../engine.ts";
+import { createModuleLogger } from "../../infra/logger/index.ts";
 
 const logger = createModuleLogger("walk-forward");
 

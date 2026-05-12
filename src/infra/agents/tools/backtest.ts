@@ -35,24 +35,24 @@ import {
   compareBacktestResults,
   findBestStrategy,
   rankStrategiesByMetric,
-} from "../../../backtest/analysis.ts";
+} from "../../../backtest/analysis/analysis.ts";
 import {
   exportResultsJson,
   exportResultsCsv,
   generateHtmlReport,
 } from "../../../backtest/reporting/export.ts";
-import { filterExcludeMonths, filterMarketHours, filterFirstLastHour } from "../../../backtest/filters.ts";
-import { analyzeAlphaDecay } from "../../../backtest/alpha-decay.ts";
+import { filterExcludeMonths, filterMarketHours, filterFirstLastHour } from "../../../backtest/prerun/filters.ts";
+import { analyzeAlphaDecay } from "../../../backtest/analysis/alpha-decay.ts";
 import { generateBacktestChart } from "../../../backtest/plotting.ts";
-import { walkForwardTest, type WalkForwardConfig } from "../../../backtest/walk-forward.ts";
-import { runMonteCarloSimulation, type MonteCarloConfig } from "../../../backtest/monte-carlo.ts";
+import { walkForwardTest, type WalkForwardConfig } from "../../../backtest/analysis/walk-forward.ts";
+import { runMonteCarloSimulation, type MonteCarloConfig } from "../../../backtest/analysis/monte-carlo.ts";
 import { detectOverfitting } from "../../../backtest/optimization/overfitting.ts";
 import {
   saveBacktestResult,
   loadBacktestResult,
   listBacktestHistory,
   type BacktestQueryOptions,
-} from "../../../backtest/storage.ts";
+} from "../../../backtest/persistence/storage.ts";
 import { getAuditLogger } from "../../platform/audit/index.ts";
 import {
   buildBacktestOperatorReport,

@@ -20,7 +20,7 @@
  * the auto-optimizer's decisions more robust.
  */
 
-import type { BacktestMetrics } from "./types.ts";
+import type { BacktestMetrics } from "../types.ts";
 
 // ============================================================================
 // Types

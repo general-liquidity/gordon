@@ -4,7 +4,7 @@
  * Native analysis helpers that mirror the MCP backtesting server utilities.
  */
 
-import type { BacktestResult, BacktestMetrics } from "./types.ts";
+import type { BacktestResult, BacktestMetrics } from "../types.ts";
 
 export interface BacktestAnalysisResult {
   strategy: string;

@@ -6,9 +6,9 @@
  * strategy robustness under different trade orderings.
  */
 
-import type { Trade, BacktestMetrics, BacktestParams } from "./types.ts";
-import { DEFAULT_BACKTEST_PARAMS } from "./types.ts";
-import { createModuleLogger } from "../infra/logger/index.ts";
+import type { Trade, BacktestMetrics, BacktestParams } from "../types.ts";
+import { DEFAULT_BACKTEST_PARAMS } from "../types.ts";
+import { createModuleLogger } from "../../infra/logger/index.ts";
 
 const logger = createModuleLogger("monte-carlo");
 

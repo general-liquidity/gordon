@@ -6,7 +6,7 @@
  * backtestable, and publishable trading strategy definitions.
  */
 
-import type { BacktestSummary } from "../../backtest/storage.ts";
+import type { BacktestSummary } from "../../backtest/persistence/storage.ts";
 
 // ============================================================================
 // Core Playbook Interface

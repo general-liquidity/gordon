@@ -26,18 +26,18 @@ import {
   DEFAULT_VERDICT_THRESHOLDS,
   STRICT_VERDICT_THRESHOLDS,
   type BacktestVerdict,
-} from "../../../backtest/verdict.ts";
+} from "../../../backtest/analysis/verdict.ts";
 import {
   checkBacktestPreconditions,
   DEFAULT_GATE_LIMITS,
   mergeGateLimits,
-} from "../../../backtest/preRunGate.ts";
+} from "../../../backtest/prerun/preRunGate.ts";
 import {
   recordExperiment,
   listExperiments,
   getJournalStats,
   summarizeMetrics,
-} from "../../../backtest/experimentJournal.ts";
+} from "../../../backtest/persistence/experimentJournal.ts";
 import type { BacktestMetrics } from "../../../backtest/types.ts";
 
 // ============================================================================

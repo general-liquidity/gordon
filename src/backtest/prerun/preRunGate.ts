@@ -13,8 +13,8 @@
  * env vars) automatically flow through here — no duplicated config surface.
  */
 
-import type { BacktestConfig } from "./types.ts";
-import { loadConfigFromEnv as loadRiskConfig, type RiskKernelConfig } from "../core/risk-kernel/config.ts";
+import type { BacktestConfig } from "../types.ts";
+import { loadConfigFromEnv as loadRiskConfig, type RiskKernelConfig } from "../../core/risk-kernel/config.ts";
 
 // ============================================================================
 // Types

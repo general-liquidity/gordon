@@ -4,7 +4,7 @@ import path from "path";
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
-import { loadBacktestResult } from "../../../backtest/storage.ts";
+import { loadBacktestResult } from "../../../backtest/persistence/storage.ts";
 import {
   buildSystematicPortfolioSummary,
   buildDatasetInventoryReport,

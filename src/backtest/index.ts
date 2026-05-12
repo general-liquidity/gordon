@@ -12,7 +12,7 @@
  *   calculateAllMetrics,
  *   type BacktestResult,
  *   type OptimizationResult,
- * } from './backtest';
+ * } from './';
  * ```
  */
 
@@ -119,9 +119,9 @@ export * from "./data/historical.ts";
 // Analysis & Utilities
 // ============================================================================
 
-export * from "./analysis.ts";
-export * from "./filters.ts";
-export * from "./alpha-decay.ts";
+export * from "./analysis/analysis.ts";
+export * from "./prerun/filters.ts";
+export * from "./analysis/alpha-decay.ts";
 export * from "./plotting.ts";
 
 // ============================================================================
@@ -153,7 +153,7 @@ export {
   type WalkForwardProgress,
   type WalkForwardWindow,
   type WalkForwardResult,
-} from "./walk-forward.ts";
+} from "./analysis/walk-forward.ts";
 
 // ============================================================================
 // Monte Carlo Simulation Exports
@@ -168,7 +168,7 @@ export {
   type ConfidenceInterval,
   type MetricDistribution,
   type MonteCarloResult,
-} from "./monte-carlo.ts";
+} from "./analysis/monte-carlo.ts";
 
 // ============================================================================
 // Result Storage Exports
@@ -189,4 +189,4 @@ export {
   type BacktestQueryOptions,
   type BacktestSummary,
   type StorageOperationResult,
-} from "./storage.ts";
+} from "./persistence/storage.ts";

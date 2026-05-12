@@ -18,10 +18,10 @@
 
 import { readFileSync, appendFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join, dirname } from "node:path";
-import { createModuleLogger } from "../infra/logger/index.ts";
-import { GORDON_DIR } from "../infra/storage/paths.ts";
-import type { BacktestMetrics } from "./types.ts";
-import type { BacktestVerdict } from "./verdict.ts";
+import { createModuleLogger } from "../../infra/logger/index.ts";
+import { GORDON_DIR } from "../../infra/storage/paths.ts";
+import type { BacktestMetrics } from "../types.ts";
+import type { BacktestVerdict } from "../analysis/verdict.ts";
 
 const logger = createModuleLogger("backtest-journal");
 

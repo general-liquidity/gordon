@@ -13,7 +13,7 @@
  *   RandomSearchOptimizer,
  *   type ParameterRanges,
  *   type ParameterDistributions
- * } from './optimization';
+ * } from './';
  *
  * // Grid search for small parameter spaces
  * const gridOptimizer = new GridSearchOptimizer(engine, strategy, data);
