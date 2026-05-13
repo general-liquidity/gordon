@@ -348,6 +348,39 @@ export function wrapMemoryWithGate<M extends Memory>(
  * Call at session boundaries: explicit `/clear`, compaction completion,
  * thread close. Never mid-turn — that defeats the purpose.
  */
+/**
+ * Last-flush bookkeeping. The clean-state gate (L12) needs to know
+ * whether working-memory was flushed during the current session to
+ * decide if a clean exit is possible. We track the most-recent flush
+ * timestamp + count globally (Map keyed by Memory instance is too
+ * coupled for callers that don't hold the instance).
+ *
+ * `null` means "never flushed in this process." The gate treats that
+ * as inconclusive — paired with deferred writes disabled, it still
+ * means session memory is on disk.
+ */
+let _lastFlushAt: number | null = null;
+let _totalFlushed = 0;
+
+export function getLastWorkingMemoryFlush(): {
+  flushedAt: number | null;
+  totalEntriesFlushed: number;
+} {
+  return { flushedAt: _lastFlushAt, totalEntriesFlushed: _totalFlushed };
+}
+
+/**
+ * Indicates whether the current process is in a state where the next
+ * session can reasonably expect working memory to be on disk:
+ *   - DEFER flag NOT set → writes go straight through Mastra → always durable
+ *   - DEFER flag set + at least one flush has happened → flushed at flush time
+ *   - DEFER flag set + no flush yet → buffer may hold writes → not durable
+ */
+export function isWorkingMemoryDurable(env: NodeJS.ProcessEnv = process.env): boolean {
+  if (env[DEFER_FLAG_ENV] !== "1") return true;
+  return _lastFlushAt !== null;
+}
+
 export async function flushDeferredWorkingMemoryWrites(
   memory: Memory,
 ): Promise<number> {
@@ -374,6 +407,8 @@ export async function flushDeferredWorkingMemoryWrites(
     }
   }
   logger.info("Flushed deferred working-memory writes", { count: flushed });
+  _lastFlushAt = Date.now();
+  _totalFlushed += flushed;
   return flushed;
 }
 

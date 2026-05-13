@@ -197,3 +197,22 @@ export type {
   SessionProgressSignal,
   GateEligibleCheckId,
 } from "./cleanStateGate.ts";
+
+// Three-layer termination (L9 + L10 port)
+export {
+  isTerminationLayersEnabled,
+  checkPreTrade,
+  checkRuntime,
+  checkSystemConfirmation,
+  runTerminationLayers,
+  terminationToPayload,
+} from "../trading/ops/terminationLayers.ts";
+export type {
+  LayerStatus,
+  LayerResult,
+  TerminationResult,
+  PreTradeInput,
+  RuntimeInput,
+  SystemConfirmationInput,
+  TerminationCheckInput,
+} from "../trading/ops/terminationLayers.ts";

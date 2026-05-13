@@ -500,3 +500,22 @@ export function getAutonomousLoopStatus(): {
     nextCycleTime,
   };
 }
+
+/**
+ * Read-only inspector for the in-flight sprint contract (if any).
+ * Used by surfaces that want to render the contract + current
+ * actuals (e.g. /sprint-status command). Returns null when no
+ * contract is active (loop not running, or GORDON_SPRINT_CONTRACT off).
+ */
+export function getCurrentSprintContractView(): {
+  contract: SprintContract;
+  symbolsTouched: string[];
+  cycleCount: number;
+} | null {
+  if (!loopState.sprintContract) return null;
+  return {
+    contract: loopState.sprintContract,
+    symbolsTouched: Array.from(loopState.symbolsTouched),
+    cycleCount: loopState.cycleCount,
+  };
+}

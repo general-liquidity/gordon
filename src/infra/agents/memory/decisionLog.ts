@@ -1,0 +1,191 @@
+/**
+ * Decisions Log (GORDON_DECISIONS_LOG).
+ *
+ * Ports L05 from learn-harness-engineering — captures the *in-flight*
+ * reasoning behind a choice ("why X over Y") at the moment the choice
+ * is made. Distinct from ACE's lessons (those are after-the-fact
+ * pattern distillation; this is point-in-time intent).
+ *
+ * Persisted as JSONL at ~/.gordon/decisions.jsonl. The format is
+ * append-only — never rewritten — so it can be tailed by humans and
+ * machine-parsed line-by-line.
+ *
+ * Read paths support filtering by threadId, symbol, and time window
+ * so a new session can pull the previous session's decisions to seed
+ * working memory ("last session chose mandate X because Y").
+ *
+ * Default-off via GORDON_DECISIONS_LOG=1. Module exports a no-op
+ * `recordDecision` when disabled so call sites don't need their own
+ * guards.
+ */
+
+import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { dirname, join } from "node:path";
+
+export type DecisionCategory =
+  | "plan"
+  | "mandate"
+  | "risk-override"
+  | "venue"
+  | "strategy"
+  | "entry-timing"
+  | "exit"
+  | "other";
+
+export interface DecisionEntry {
+  /** Stable ID for cross-referencing in action log. */
+  id: string;
+  recordedAt: string;
+  threadId?: string;
+  sessionId?: string;
+  category: DecisionCategory;
+  /** Brief context — what was being decided about. */
+  context: string;
+  /** Selected choice. */
+  selected: string;
+  /** Alternatives the agent considered. Free-text labels. */
+  alternatives: string[];
+  /** Why the selected option won. */
+  rationale: string;
+  /** Optional symbol(s) this decision is scoped to. */
+  symbols?: string[];
+  /** Optional reference to a related plan / position / action-log entry. */
+  refs?: Record<string, string>;
+}
+
+export interface RecordDecisionInput {
+  category: DecisionCategory;
+  context: string;
+  selected: string;
+  alternatives?: string[];
+  rationale: string;
+  threadId?: string;
+  sessionId?: string;
+  symbols?: string[];
+  refs?: Record<string, string>;
+}
+
+export function isDecisionsLogEnabled(
+  env: NodeJS.ProcessEnv = process.env,
+): boolean {
+  return env.GORDON_DECISIONS_LOG === "1" || env.GORDON_DECISIONS_LOG === "true";
+}
+
+export function defaultDecisionsLogPath(
+  env: NodeJS.ProcessEnv = process.env,
+): string {
+  return env.GORDON_DECISIONS_LOG_PATH || join(homedir(), ".gordon", "decisions.jsonl");
+}
+
+function newDecisionId(): string {
+  return `dec-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+/**
+ * Append a decision to the log. No-op when the flag is off.
+ * Returns the recorded entry (or null when disabled) so callers can
+ * include the ID in their own observations.
+ */
+export function recordDecision(
+  input: RecordDecisionInput,
+  env: NodeJS.ProcessEnv = process.env,
+  path: string = defaultDecisionsLogPath(env),
+): DecisionEntry | null {
+  if (!isDecisionsLogEnabled(env)) return null;
+  const entry: DecisionEntry = {
+    id: newDecisionId(),
+    recordedAt: new Date().toISOString(),
+    threadId: input.threadId,
+    sessionId: input.sessionId,
+    category: input.category,
+    context: input.context,
+    selected: input.selected,
+    alternatives: input.alternatives ?? [],
+    rationale: input.rationale,
+    symbols: input.symbols,
+    refs: input.refs,
+  };
+  try {
+    mkdirSync(dirname(path), { recursive: true });
+    appendFileSync(path, JSON.stringify(entry) + "\n", "utf8");
+  } catch {
+    // Best-effort: don't break the calling code path if the disk write
+    // fails. The decision is still expressed in the call site's own
+    // observation stream.
+  }
+  return entry;
+}
+
+export interface ReadDecisionsOptions {
+  /** Filter to decisions recorded at-or-after this ISO timestamp. */
+  since?: string;
+  /** Filter to decisions from this thread. */
+  threadId?: string;
+  /** Filter to decisions involving this symbol. */
+  symbol?: string;
+  /** Filter to one or more categories. */
+  categories?: DecisionCategory[];
+  /** Maximum number of entries to return (most recent first). */
+  limit?: number;
+}
+
+/**
+ * Read decisions from the log with optional filters. Tolerant of
+ * malformed lines (skipped silently). Returns most-recent-first.
+ */
+export function readDecisions(
+  options: ReadDecisionsOptions = {},
+  env: NodeJS.ProcessEnv = process.env,
+  path: string = defaultDecisionsLogPath(env),
+): DecisionEntry[] {
+  if (!existsSync(path)) return [];
+  let content: string;
+  try {
+    content = readFileSync(path, "utf8");
+  } catch {
+    return [];
+  }
+  const out: DecisionEntry[] = [];
+  const sinceMs = options.since ? new Date(options.since).getTime() : -Infinity;
+  const categorySet = options.categories ? new Set<DecisionCategory>(options.categories) : null;
+  for (const line of content.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    let parsed: DecisionEntry;
+    try {
+      parsed = JSON.parse(trimmed) as DecisionEntry;
+    } catch {
+      continue;
+    }
+    if (!parsed || typeof parsed !== "object" || !parsed.id) continue;
+    if (sinceMs > -Infinity && new Date(parsed.recordedAt).getTime() < sinceMs) continue;
+    if (options.threadId && parsed.threadId !== options.threadId) continue;
+    if (categorySet && !categorySet.has(parsed.category)) continue;
+    if (options.symbol) {
+      const symbols = parsed.symbols ?? [];
+      if (!symbols.includes(options.symbol)) continue;
+    }
+    out.push(parsed);
+  }
+  out.sort((a, b) => b.recordedAt.localeCompare(a.recordedAt));
+  if (options.limit && out.length > options.limit) return out.slice(0, options.limit);
+  return out;
+}
+
+/**
+ * Compact human-readable summary suitable for seeding working memory
+ * at session start. One line per decision, newest first.
+ */
+export function summarizeDecisionsForResume(
+  decisions: DecisionEntry[],
+  maxLines: number = 10,
+): string {
+  if (decisions.length === 0) return "";
+  const lines = decisions.slice(0, maxLines).map((d) => {
+    const date = d.recordedAt.slice(0, 10);
+    const sym = d.symbols?.length ? ` [${d.symbols.join(",")}]` : "";
+    return `${date}${sym} ${d.category}: chose ${d.selected} — ${d.rationale}`;
+  });
+  return lines.join("\n");
+}

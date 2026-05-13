@@ -17,6 +17,7 @@ import {
   hasOverrideAcknowledgement,
   gateResultToPayload,
 } from "../../../infra/safety/cleanStateGate.ts";
+import { isWorkingMemoryDurable } from "../../../infra/agents/memory/memoryGate.ts";
 
 type CleanupFn = () => void | Promise<void>;
 
@@ -60,8 +61,11 @@ async function performShutdown(signal: string): Promise<void> {
         // assume the cleanup handlers above did their job and report
         // optimistic values. The doctor checks themselves still
         // surface real artifact/startup problems.
+        // Real working-memory signal — true when defer flag is off OR
+        // a flush has happened. action-log + orphan-plans remain
+        // optimistic (real signals would couple to those subsystems).
         const result = runCleanStateGate(checks, {
-          workingMemoryFlushed: true,
+          workingMemoryFlushed: isWorkingMemoryDurable(),
           actionLogHasEntries: true,
           noOrphanPlans: true,
         });
