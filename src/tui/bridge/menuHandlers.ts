@@ -12,6 +12,16 @@ import {
   resumeAutonomousLoop,
   getAutonomousLoopStatus,
 } from "../../core/pipeline/autonomous-loop.ts";
+import {
+  createGoalState,
+  loadActiveGoal,
+  persistGoalState,
+  pauseGoal,
+  resumeGoal,
+  clearGoal,
+  formatGoalState,
+  isGoalModeEnabled,
+} from "../../core/pipeline/goalMode.ts";
 import { handleTelemetryCommand, handleContextCommand } from "../../app/commands/index.ts";
 import { getRuntimeApprovalShortId } from "../../app/runtime/runtimeApprovalId.ts";
 import type { Message } from "../components/messages/MessageBubble.tsx";
@@ -980,4 +990,102 @@ export async function handleAutonomousMenuCommand(
       return true;
     }
   }
+}
+
+// ============================================================================
+// Goal-mode menu commands: /goal, /goal-status, /pause-goal, /goal-clear
+// ============================================================================
+
+export async function handleGoalMenuCommand(
+  target: string,
+  args: string,
+  setState: StateUpdater,
+): Promise<boolean> {
+  if (
+    target !== "goal" &&
+    target !== "goal-status" &&
+    target !== "pause-goal" &&
+    target !== "goal-clear"
+  ) {
+    return false;
+  }
+
+  if (!isGoalModeEnabled()) {
+    addMessage(
+      setState,
+      "system",
+      "Goal mode is disabled. Set GORDON_GOAL_MODE=1 to enable.",
+    );
+    return true;
+  }
+
+  switch (target) {
+    case "goal": {
+      const text = args.trim();
+      if (!text) {
+        addMessage(
+          setState,
+          "system",
+          "Usage: /goal <work> until <measurable end> without <constraints>\n" +
+            "Example: /goal trade ETH until Sharpe >= 1.5 without leverage above 2x",
+        );
+        return true;
+      }
+      const existing = loadActiveGoal();
+      if (existing && existing.status === "active") {
+        addMessage(
+          setState,
+          "system",
+          "An active goal already exists. Use /goal-clear before setting a new one.\n\n" +
+            formatGoalState(existing),
+        );
+        return true;
+      }
+      const state = createGoalState(text);
+      persistGoalState(state);
+      addMessage(setState, "gordon", "◈ Goal set.\n\n" + formatGoalState(state));
+      return true;
+    }
+    case "goal-status": {
+      const state = loadActiveGoal();
+      if (!state) {
+        addMessage(setState, "system", "No active goal. Use /goal to set one.");
+        return true;
+      }
+      addMessage(setState, "gordon", formatGoalState(state));
+      return true;
+    }
+    case "pause-goal": {
+      const state = loadActiveGoal();
+      if (!state) {
+        addMessage(setState, "system", "No active goal to pause.");
+        return true;
+      }
+      if (state.status === "active") {
+        persistGoalState(pauseGoal(state));
+        addMessage(setState, "gordon", "◈ Goal paused.");
+      } else if (state.status === "paused") {
+        persistGoalState(resumeGoal(state));
+        addMessage(setState, "gordon", "◈ Goal resumed.");
+      } else {
+        addMessage(
+          setState,
+          "system",
+          `Goal is ${state.status}; nothing to pause/resume.`,
+        );
+      }
+      return true;
+    }
+    case "goal-clear": {
+      const state = loadActiveGoal();
+      if (!state) {
+        addMessage(setState, "system", "No active goal to clear.");
+        return true;
+      }
+      persistGoalState(clearGoal(state));
+      addMessage(setState, "gordon", "◈ Goal cleared.");
+      return true;
+    }
+  }
+  return false;
 }

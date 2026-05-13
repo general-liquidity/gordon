@@ -43,6 +43,7 @@ import type { Action, TuiNotification } from "../state/types.js";
 import {
   handleSessionMenuCommand,
   handleThreadMenuCommand,
+  handleGoalMenuCommand,
   handleRuntimeMenuCommand,
   handleWorkspaceMenuCommand,
   handleUIMenuCommand,
@@ -316,6 +317,7 @@ async function handleMenuCommand(
   if (handleUIMenuCommand(resolved, args, setState)) return;
   if (await handleSystemMenuCommand(resolved, args, setState, runtime)) return;
   if (await handleAutonomousMenuCommand(resolved, args, setState, runtime, command, streamResponse)) return;
+  if (await handleGoalMenuCommand(resolved, args, setState)) return;
 
   // Portfolio — delegates to agent
   if (resolved === "portfolio") {

@@ -25,6 +25,17 @@ import {
   contractToPayload,
   type SprintContract,
 } from "../../infra/safety/sprintContract.ts";
+import {
+  isGoalModeEnabled,
+  loadActiveGoal,
+  scoreGoal,
+  recordGoalProgress,
+  appendProgressLog,
+  persistGoalState,
+  isGoalComplete,
+  failGoal,
+  type GoalObservation,
+} from "./goalMode.ts";
 import type { ScanOptions } from "./scanner.ts";
 import type { CoinAnalysis } from "../../types/index.ts";
 import { runSharedScan } from "../lifecycle/market-data-coordinator.ts";
@@ -277,6 +288,46 @@ async function runCycle(): Promise<CycleReport | null> {
       mandateStatus: mandate.status,
       nextCycleAt: nextCycleAt.toISOString(),
     };
+
+    // Goal-mode integration: if an active goal is loaded, score this
+    // cycle against it. Score what we can observe at cycle time
+    // (elapsed-hours and trade-count proxies); other metrics (Sharpe,
+    // drawdown) score as "not observed this cycle" honestly. If the
+    // goal terminates here (achieved/failed/cleared), stop the loop.
+    if (isGoalModeEnabled()) {
+      try {
+        const goal = loadActiveGoal();
+        if (goal && goal.status === "active") {
+          const startedAt = Date.parse(goal.startedAt);
+          const elapsedHours = Number.isFinite(startedAt)
+            ? (Date.now() - startedAt) / 3_600_000
+            : undefined;
+          const violations: string[] = [];
+          if (isMandateBreached(mandate)) violations.push("mandate breached");
+          const observation: GoalObservation = {
+            elapsedHours,
+            trades: opportunities.length,
+            constraintViolations: violations,
+          };
+          const score = scoreGoal(goal.parsedGoal, observation, goal.iterations + 1);
+          const next = recordGoalProgress(goal, score);
+          appendProgressLog(next, score);
+          persistGoalState(next);
+          if (isGoalComplete(next)) {
+            logger.info("Goal complete — stopping autonomous loop", {
+              goalId: next.id,
+              status: next.status,
+              progressPct: score.progressPct,
+            });
+            loopState.isRunning = false;
+          }
+        }
+      } catch (goalError) {
+        logger.warn("Goal-mode scoring failed for this cycle", {
+          error: goalError instanceof Error ? goalError.message : String(goalError),
+        });
+      }
+    }
 
     onCycleComplete?.(report);
 

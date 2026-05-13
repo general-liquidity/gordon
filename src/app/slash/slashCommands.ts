@@ -121,6 +121,10 @@ export const DIRECT_MENU_TARGETS = new Set([
   "debate",
   "perf",
   "labs",
+  "goal",
+  "goal-status",
+  "pause-goal",
+  "goal-clear",
 ]);
 
 export const DIRECT_TOOL_TARGETS = new Set([
@@ -1600,6 +1604,49 @@ const LEGACY_SLASH_COMMANDS: SlashCommandSeed[] = [
     target: "gordon",
     executionTime: "~2-5s",
     whenToUse: "Automated trading with risk mandates over hours/days",
+  },
+
+  // Goal mode (the /goal pattern)
+  {
+    name: "goal",
+    aliases: [],
+    description: "Set an autonomous goal with measurable end state and constraints",
+    usage: "/goal <work> until <measurable end> without <constraints>",
+    category: "trading",
+    level: 2,
+    action: "menu",
+    target: "goal",
+    whenToUse: "Long-running autonomous work toward a quantitative target (Sharpe, win rate, trade count, drawdown, time horizon, or checklist).",
+  },
+  {
+    name: "goal-status",
+    aliases: ["goal-info"],
+    description: "Show the active goal, its progress, and last score",
+    usage: "/goal-status",
+    category: "trading",
+    level: 2,
+    action: "menu",
+    target: "goal-status",
+  },
+  {
+    name: "pause-goal",
+    aliases: ["goal-pause", "resume-goal"],
+    description: "Toggle pause/resume on the active goal",
+    usage: "/pause-goal",
+    category: "trading",
+    level: 2,
+    action: "menu",
+    target: "pause-goal",
+  },
+  {
+    name: "goal-clear",
+    aliases: ["clear-goal"],
+    description: "Clear the active goal",
+    usage: "/goal-clear",
+    category: "trading",
+    level: 2,
+    action: "menu",
+    target: "goal-clear",
   },
 
   // Keyring
