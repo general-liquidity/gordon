@@ -198,6 +198,24 @@ export type {
   GateEligibleCheckId,
 } from "./cleanStateGate.ts";
 
+// WIP-limit gate (L7 port)
+export {
+  isWipLimitEnabled,
+  readWipLimitsFromEnv,
+  gatePlan,
+  createWipRegistry,
+  wipResultToPayload,
+  DEFAULT_LIMITS as WIP_DEFAULT_LIMITS,
+} from "./wipLimit.ts";
+export type {
+  WipLimits,
+  ActivePlan,
+  WipGateInput,
+  WipGateResult,
+  WipGateReasonKind,
+  WipRegistry,
+} from "./wipLimit.ts";
+
 // Three-layer termination (L9 + L10 port)
 export {
   isTerminationLayersEnabled,
