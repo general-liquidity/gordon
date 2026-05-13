@@ -147,3 +147,53 @@ export type {
   MandateGateInput,
   MandateGateResult,
 } from "./anti-rot/strategyMandates.ts";
+
+// Sprint contract (pre-session scope alignment, L11 port)
+export {
+  isSprintContractEnabled,
+  createSprintContract,
+  compareWithActuals,
+  contractToPayload,
+  diffToPayload,
+} from "./sprintContract.ts";
+export type {
+  SprintContract,
+  SprintContractDraft,
+  SprintActuals,
+  ContractDiff,
+} from "./sprintContract.ts";
+
+// Plan rubric (6-dimension evaluator rubric, L11 template port)
+export {
+  isPlanRubricEnabled,
+  rubricTotal,
+  rubricVerdict,
+  blockingDimensions,
+  compareRubrics,
+  emptyRubric,
+  rubricToPayload,
+  formatRubric,
+  RUBRIC_DIMENSIONS,
+} from "./planRubric.ts";
+export type {
+  PlanRubric,
+  RubricScore,
+  RubricVerdict,
+  RubricDimension,
+  RubricDelta,
+} from "./planRubric.ts";
+
+// Clean-state gate (session-end enforcement, L12 port)
+export {
+  isCleanStateGateEnabled,
+  runCleanStateGate,
+  hasOverrideAcknowledgement,
+  gateResultToPayload,
+  GATE_ELIGIBLE_CHECK_IDS,
+} from "./cleanStateGate.ts";
+export type {
+  CleanStateVerdict,
+  CleanStateGateResult,
+  SessionProgressSignal,
+  GateEligibleCheckId,
+} from "./cleanStateGate.ts";
