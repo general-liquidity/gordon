@@ -19,6 +19,12 @@ import {
   isMandateBreached,
   validateMandate,
 } from "../safety/swing-mandate.ts";
+import {
+  isSprintContractEnabled,
+  createSprintContract,
+  contractToPayload,
+  type SprintContract,
+} from "../../infra/safety/sprintContract.ts";
 import type { ScanOptions } from "./scanner.ts";
 import type { CoinAnalysis } from "../../types/index.ts";
 import { runSharedScan } from "../lifecycle/market-data-coordinator.ts";
@@ -79,6 +85,10 @@ interface LoopState {
   cycleCount: number;
   lastCycleTime: Date | null;
   totalOpportunities: number;
+  /** Sprint contract recorded at loop start when GORDON_SPRINT_CONTRACT=1. */
+  sprintContract: SprintContract | null;
+  /** Symbols actually scanned/touched during this loop run (for contract diff). */
+  symbolsTouched: Set<string>;
 }
 
 let loopState: LoopState = {
@@ -92,6 +102,8 @@ let loopState: LoopState = {
   cycleCount: 0,
   lastCycleTime: null,
   totalOpportunities: 0,
+  sprintContract: null,
+  symbolsTouched: new Set<string>(),
 };
 let cycleInFlight: Promise<CycleReport | null> | null = null;
 
@@ -226,6 +238,9 @@ async function runCycle(): Promise<CycleReport | null> {
 
     // Notify on each opportunity
     for (const opp of opportunities) {
+      // Track for sprint-contract diff (no-op when contract not active).
+      loopState.symbolsTouched.add(opp.symbol);
+
       const report: OpportunityReport = {
         symbol: opp.symbol,
         direction: resolveOpportunityDirection(mandate, opp),
@@ -298,6 +313,33 @@ export function startAutonomousLoop(config: AutonomousLoopConfig): { success: bo
   loopState.isPaused = false;
   loopState.cycleCount = 0;
   loopState.totalOpportunities = 0;
+  loopState.symbolsTouched = new Set<string>();
+  loopState.sprintContract = null;
+
+  // Sprint contract: when GORDON_SPRINT_CONTRACT=1, record the loop's
+  // scope (mandate symbols + venues) and verification standards
+  // (mandate drawdown ceiling + min-confidence). The contract is the
+  // pre-session statement of intent; the actuals at stopAutonomousLoop
+  // are emitted alongside so an operator can compute the diff
+  // post-hoc via `compareWithActuals`. Default-off — flag-gated.
+  if (isSprintContractEnabled()) {
+    const exchangeId = (config.exchange as { id?: string } | undefined)?.id;
+    loopState.sprintContract = createSprintContract({
+      scope: {
+        symbols: config.mandate.symbols ?? [],
+        venues: exchangeId ? [exchangeId] : [],
+        strategies: [],
+      },
+      verificationStandards: [
+        `min confidence above ${config.mandate.minConfidence}`,
+        `max drawdown within ${config.mandate.maxDrawdown}%`,
+        `mandate ${config.mandate.id} not breached`,
+      ],
+      exclusions: [`no trading outside mandate ${config.mandate.id}`],
+      intent: `autonomous loop on mandate ${config.mandate.id}`,
+    });
+    logger.info("Sprint contract recorded", contractToPayload(loopState.sprintContract));
+  }
 
   const intervalMs = config.mandate.scanIntervalMinutes * 60 * 1000;
 
@@ -373,6 +415,23 @@ export function stopAutonomousLoop(reason?: string): void {
   if (loopState.mandate && loopState.mandate.status !== "completed") {
     loopState.mandate.status = "cancelled";
     saveMandateState(loopState.mandate);
+  }
+
+  // Sprint contract: at loop stop, log the actuals so an operator can
+  // compute the diff post-hoc. We don't compute the diff inline
+  // because the contract's verification standards are free-text and
+  // the loop itself doesn't know whether PnL-bound standards were met
+  // — that judgment belongs to a downstream evaluator with access to
+  // realized PnL + mandate-breach signals.
+  if (loopState.sprintContract) {
+    logger.info("Sprint contract resolved", {
+      kind: "sprint.contract_actuals",
+      contractId: loopState.sprintContract.contractId,
+      symbolsTouched: Array.from(loopState.symbolsTouched),
+      reason: reason ?? "explicit stop",
+      cyclesCompleted: loopState.cycleCount,
+    });
+    loopState.sprintContract = null;
   }
 
   loopState.isRunning = false;
