@@ -124,6 +124,24 @@ export * from "./prerun/filters.ts";
 export * from "./analysis/alpha-decay.ts";
 export * from "./plotting.ts";
 
+// Capacity sweep + realistic cost model
+export {
+  realisticCostBps,
+  capacitySweep,
+  capacityToPayload,
+  DEFAULT_VENUES,
+  DEFAULT_COST_PARAMS,
+} from "./analysis/marketImpact.ts";
+export type {
+  CostModelParams,
+  VenueParams,
+  CostBreakdownInput,
+  CostBreakdown,
+  CapacitySweepInput,
+  CapacityPoint,
+  CapacityCurve,
+} from "./analysis/marketImpact.ts";
+
 // ============================================================================
 // Reporting Exports
 // ============================================================================
@@ -141,6 +159,12 @@ export {
   exportResultsCsv,
   generateHtmlReport,
 } from "./reporting/export.ts";
+
+// ============================================================================
+// Feature Pipeline (leakage-proof feature builder)
+// ============================================================================
+
+export * from "./features/index.ts";
 
 // ============================================================================
 // Walk-Forward Testing Exports

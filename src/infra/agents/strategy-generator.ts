@@ -21,9 +21,28 @@ import { fetchHistoricalData } from "../../backtest/data/historical.ts";
 import type { Exchange } from "../exchange/index.ts";
 import { createModuleLogger } from "../logger/index.ts";
 import { DSLStrategyAdapter } from "../../strategies/dsl/adapter.ts";
+import {
+  validateStrategyCode,
+  isStrategyCodeValidatorEnabled,
+} from "../trading/ops/strategyCodeValidator.ts";
+import {
+  recordAttempt,
+  dynamicDeflatedThreshold,
+  isMultipleTestingTrackerEnabled,
+} from "../trading/ops/multipleTestingTracker.ts";
+import { capacitySweep } from "../../backtest/analysis/marketImpact.ts";
 
 const logger = createModuleLogger("strategy-generator");
 export const BACKTEST_NOT_PERFORMED_WARNING = "Backtest not performed - exchange client unavailable";
+
+/** Fast stable hash for use as a multiple-testing codeHash. */
+function quickHashDsl(s: string): string {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) {
+    h = ((h << 5) - h + s.charCodeAt(i)) | 0;
+  }
+  return Math.abs(h).toString(16).padStart(8, "0");
+}
 
 // ============================================================================
 // Types
@@ -49,6 +68,19 @@ export interface GenerationOptions {
   minWinRate?: number;
   /** Maximum drawdown threshold */
   maxDrawdown?: number;
+  /**
+   * Average daily volume (in same units as intended order size) for
+   * the symbol being backtested. When supplied, the generator computes
+   * a capacity sweep alongside the backtest — answering "at what size
+   * does this strategy stop working?" Optional.
+   */
+  adv?: number;
+  /**
+   * Estimated daily turnover as a fraction of position (0..1). Used
+   * with `adv` for the capacity sweep. Default 0.2 (a fifth of the
+   * position rebalanced per day on average).
+   */
+  turnoverPerDay?: number;
 }
 
 /**
@@ -166,6 +198,21 @@ export class StrategyGeneratorAgent {
         continue;
       }
 
+      // Q2: defensive anti-pattern scan over the DSL serialization.
+      // Catches expression-string anti-patterns (e.g. "signal * returns" without
+      // shift) that survive DSL schema validation but would still imply a
+      // leakage-prone strategy. Warn-only — DSL schema is the primary gate.
+      if (isStrategyCodeValidatorEnabled()) {
+        const codeScan = validateStrategyCode(JSON.stringify(strategy));
+        if (codeScan.violations.length > 0) {
+          logger.warn("strategy DSL anti-pattern scan", {
+            block: codeScan.countsBySeverity.block,
+            warn: codeScan.countsBySeverity.warn,
+            firstViolations: codeScan.violations.slice(0, 3).map((v) => v.rule.id),
+          });
+        }
+      }
+
       // Run backtest if we have exchange client
       if (this.exchange) {
         try {
@@ -176,6 +223,60 @@ export class StrategyGeneratorAgent {
             metrics.sharpeRatio >= minSharpe &&
             metrics.winRate >= minWinRate &&
             metrics.maxDrawdown <= maxDrawdown;
+
+          // Q3: when ADV is supplied, compute a capacity sweep alongside
+          // the backtest. Surfaces "this Sharpe holds at $X, not $Y".
+          if (options.adv !== undefined && options.adv > 0) {
+            try {
+              const periodsPerYear = 252;
+              const grossReturnAnn = metrics.sharpeRatio * (metrics.volatility ?? 0);
+              const volFraction = (metrics.volatility ?? 0) / Math.sqrt(periodsPerYear);
+              if (metrics.volatility && metrics.volatility > 0) {
+                const curve = capacitySweep({
+                  grossSharpe: metrics.sharpeRatio,
+                  grossReturnAnn,
+                  volAnn: metrics.volatility,
+                  adv: options.adv,
+                  vol: volFraction,
+                  turnoverPerDay: options.turnoverPerDay ?? 0.2,
+                });
+                logger.info("capacity sweep", {
+                  capacityAtMinSharpe: curve.capacityAtMinSharpe,
+                  minSharpe: curve.minSharpe,
+                  points: curve.points.length,
+                });
+              }
+            } catch (e) {
+              logger.warn("capacity sweep failed", {
+                error: e instanceof Error ? e.message : String(e),
+              });
+            }
+          }
+
+          // Q4: log this iteration as a multiple-testing attempt and surface
+          // the dynamic DSR verdict alongside the static thresholds.
+          if (isMultipleTestingTrackerEnabled()) {
+            const family = `${intent.style}/${options.symbol}`;
+            const codeHash = quickHashDsl(JSON.stringify(strategy));
+            recordAttempt({
+              family,
+              codeHash,
+              observedSharpe: metrics.sharpeRatio,
+              verdict: meetsThresholds ? "accepted" : "rejected",
+            });
+            const dsr = dynamicDeflatedThreshold({
+              family,
+              observedSharpeAnnualized: metrics.sharpeRatio,
+              periods: options.backtestDays,
+            });
+            logger.info("multi-test DSR", {
+              family,
+              trialCount: dsr.trialCount,
+              dsrPValue: Number(dsr.dsrPValue.toFixed(4)),
+              dynamicPasses: dsr.passes,
+              staticPasses: meetsThresholds,
+            });
+          }
 
           if (meetsThresholds || iterations >= maxIterations) {
             logger.info("Strategy generation complete", {
