@@ -350,6 +350,64 @@ fixes needed before CI can be made strict.
 
 ---
 
+## Quant research credibility — backtest hardening
+
+Ported from the AI-Quant article (https://github.com/zostaff/ai-quant-researcher). Most of the article's stack (PSR, DSR, CPCV, walk-forward, performance metrics, kill-switch) was already in Gordon — see `src/infra/trading/ops/backtestCredibility.ts` (363 LOC), `src/backtest/analysis/walk-forward.ts` (646 LOC), `src/backtest/metrics.ts` (771 LOC), `src/backtest/engine.ts` (1107 LOC), `src/core/safety/emergency-liquidation.ts`, `src/gateway/circuit-breakers/`. These four are the gaps that did not already exist.
+
+### Q1. `featurePipeline.ts` — leakage-proof feature builder
+
+**Module:** `src/backtest/features/featurePipeline.ts`
+**Flag:** none — the pipeline is just a primitive; use or don't
+**Status:** Module + tests ship. Pure-TS, generic over row type.
+
+**Wire point:** any caller building features for `engine.ts`. Replace ad-hoc `array.slice` + `for` loops with `new FeaturePipeline().add(...).transform(data)`. Built-ins: `momentum`, `realizedVol`, `zscore`, `range`.
+
+**What's needed:** Existing signal recipes in `src/core/strategies/recipes/` could be re-expressed in terms of `FeaturePipeline` rather than direct indexing, which structurally rules out look-ahead. Migration is per-recipe and non-breaking.
+
+**Risk:** Low. Pure compute, no I/O.
+**Acceptance:** A representative recipe ported to FeaturePipeline produces identical backtest results to the hand-coded version, with the additional property that the function literally cannot see future bars.
+
+### Q2. `strategyCodeValidator.ts` — anti-pattern scanner for LLM-generated strategy code
+
+**Module:** `src/infra/trading/ops/strategyCodeValidator.ts`
+**Flag:** `GORDON_STRATEGY_CODE_VALIDATOR` (default off)
+**Status:** Module + tests ship. Regex-based scanner with 10 default rules covering 6 leakage families (centered windows, missing shift, full-sample normalization, survivorship, restated fundamentals, future references). Block vs warn severity.
+
+**Wire point:** `strategySandbox.ts` — call `validateStrategyCode(code)` BEFORE executing LLM-generated strategy code. If `!passes`, refuse to run with the aggregated `blockingFixInstruction`.
+
+**What's needed:** Add the validate-gate before the existing sandbox invocation. Optionally surface warn-level violations as advisories without blocking.
+
+**Risk:** Low. Lexical scan, no execution. False positives are possible (suppressible via `suppressRuleIds`).
+**Acceptance:** A known-leaky strategy (e.g. `signal[i] * returns[i]` without shift) is rejected before the sandbox runs.
+
+### Q3. `marketImpact.ts` — realistic cost model + capacity sweep
+
+**Module:** `src/backtest/analysis/marketImpact.ts`
+**Flag:** none — module-level
+**Status:** Module + tests ship. `realisticCostBps(...)` decomposes cost into half-spread + sqrt-impact + venue fee. `capacitySweep(...)` sweeps order size against ADV and returns the largest size where net Sharpe stays above a threshold.
+
+**Wire point:** Research-side companion to `engine.ts`. Call `capacitySweep` on any backtest result before declaring a strategy ready — the capacity number is what determines whether the strategy is real or fits inside its own backtest's slippage.
+
+**What's needed:** Use it in a `/capacity` slash command or in the eval-harness reporting layer.
+
+**Risk:** Low. Pure compute.
+**Acceptance:** A strategy reported as Sharpe 2.0 at $100k notional has its capacity-at-Sharpe-0.5 reported alongside, surfacing the "works at $100k, breaks at $5M" reality.
+
+### Q4. `multipleTestingTracker.ts` — DSR with dynamic trial-count bar
+
+**Module:** `src/infra/trading/ops/multipleTestingTracker.ts`
+**Flag:** `GORDON_MULTIPLE_TESTING_TRACKER` (default off)
+**Status:** Module + tests ship. JSONL persistence at `~/.gordon/strategy-attempts.jsonl`. `recordAttempt`, `readAttempts`, `countTrials` (distinct codeHashes per family), `dynamicDeflatedThreshold` extends the per-strategy DSR in `backtestCredibility.ts` to a per-portfolio-of-attempts test.
+
+**Wire point:** Wherever strategies are generated and backtested in a loop — `src/infra/agents/tools/strategy/backtest/backtest.ts` is the obvious one. Call `recordAttempt` after each backtest with a stable `codeHash`. Call `dynamicDeflatedThreshold` instead of the static DSR in `backtestCredibility.ts` when the call site can identify a family.
+
+**What's needed:** Define strategy families (e.g. "momentum/equities", "mean-reversion/crypto"). Pass `family` + `codeHash` to every recordAttempt + threshold call.
+
+**Risk:** Medium. The dynamic threshold is *correct* but stricter — strategies that pass static DSR at attempt #1 may fail dynamic DSR at attempt #1000. That's the point.
+**Acceptance:** Running 100 known-noise random strategies through the loop causes the dynamic threshold to reject all of them; running a known-good strategy at the same family produces a passing verdict.
+
+---
+
 ## Parked (depends on signal not yet available)
 
 ### P1. Verified Completion Rate (VCR)
