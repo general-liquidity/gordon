@@ -400,6 +400,27 @@ Ported from the AI-Quant article (https://github.com/zostaff/ai-quant-researcher
 
 ---
 
+## Goal mode — `/goal` pattern
+
+Trading-domain port of the `/goal` slash command Codex, Claude Code, and Hermes have all shipped in 2026. The user supplies one line — `/goal <work> until <measurable end state> without <constraints>` — and an autonomous loop runs toward the goal until met, paused, or failed.
+
+### G1. `goalMode.ts` — parse, score, persist
+
+**Module:** `src/core/pipeline/goalMode.ts`
+**Flag:** `GORDON_GOAL_MODE` (default off)
+**Status:** Module + tests ship. Pure functions for parsing (Sharpe / win rate / drawdown / trade count / time horizon / checklist / custom end states), scoring per iteration, lifecycle transitions (active / paused / achieved / failed / cleared), and persistence to `~/.gordon/goal-state.json` plus a human-readable `~/.gordon/goal-progress.md` log.
+
+**Wire points (all deferred):**
+1. **Slash command surface.** Add `/goal <text>`, `/goal-status`, `/pause`, `/goal-clear` to `src/app/slash/slashCommands.ts`. Each command maps to one of `createGoalState` / `formatGoalState` / `pauseGoal` / `clearGoal`. Persist via `persistGoalState` after every mutation.
+2. **Autonomous-loop integration.** In `src/core/pipeline/autonomous-loop.ts`'s cycle callback, when a goal is active: build a `GoalObservation` from the cycle's metrics (Sharpe from backtest, trades from session count, drawdown from portfolio state, constraint violations from risk classifier), call `scoreGoal` + `recordGoalProgress`, then `appendProgressLog`. If `isGoalComplete`, stop the loop. If the doom-loop detector fires, call `failGoal`.
+3. **TUI surface.** `formatGoalState` already returns a renderable summary; a status panel in the TUI calls it each cycle.
+
+**Risk:** Low at module level. Goal-mode does NOT bypass termination layers, risk classifier, or permission engine — those remain authoritative for trade safety. Goal mode is about progress tracking, not execution permission.
+
+**Acceptance when fully wired:** `/goal trade ETH until Sharpe >= 1.5 without leverage above 2x` parses cleanly; the autonomous loop runs cycles, scores each, appends to `goal-progress.md`, and stops when end-state is met OR a constraint is violated OR the user types `/goal-clear`.
+
+---
+
 ## Parked (depends on signal not yet available)
 
 ### P1. Verified Completion Rate (VCR)
