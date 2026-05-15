@@ -33,6 +33,16 @@ import {
   GORDON_DEFAULT_BASELINE,
   type SafetyConfig,
 } from "../../infra/safety/safetyConfigGuard.ts";
+import {
+  isNetworkAllowlistEnabled,
+  listAllowedHosts,
+  getAllowlistMode,
+} from "../../infra/safety/networkAllowlist.ts";
+import {
+  isFilesystemWriteGuardEnabled,
+  listAllowedPaths,
+  getGuardMode,
+} from "../../infra/safety/filesystemWriteGuard.ts";
 import type { DoctorCheck } from "./setup-runtime.ts";
 
 // --- A2 ----------------------------------------------------------------------
@@ -196,4 +206,37 @@ export function collectSafetyBaselineChecks(input: CurrentSafetyConfigInput): Do
     severity: v.severity === "block" ? "error" : "warn",
     message: `${v.message} fix: ${v.fixInstruction}`,
   }));
+}
+
+// --- Network allowlist + filesystem write guard (sandbox-style checks) ------
+
+/**
+ * Surface the network-allowlist + filesystem-write-guard configurations
+ * in the doctor report when the corresponding flags are on. Observation
+ * only — these primitives are caller-invoked at runtime; doctor just
+ * reports that the policy is active.
+ */
+export function collectSandboxChecks(): DoctorCheck[] {
+  const checks: DoctorCheck[] = [];
+  if (isNetworkAllowlistEnabled()) {
+    const hosts = listAllowedHosts().length;
+    const mode = getAllowlistMode();
+    checks.push({
+      id: "sandbox.network_allowlist",
+      ok: true,
+      severity: "info",
+      message: `Network allowlist active in ${mode} mode (${hosts} hosts).`,
+    });
+  }
+  if (isFilesystemWriteGuardEnabled()) {
+    const paths = listAllowedPaths().length;
+    const mode = getGuardMode();
+    checks.push({
+      id: "sandbox.filesystem_write_guard",
+      ok: true,
+      severity: "info",
+      message: `Filesystem write guard active in ${mode} mode (${paths} allowed path prefixes).`,
+    });
+  }
+  return checks;
 }

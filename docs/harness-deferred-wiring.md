@@ -560,6 +560,34 @@ Ported from Anthropic's "How we built our multi-agent research system" (2026). T
 
 ---
 
+## Sandbox + tool hygiene (Anthropic sandboxing + OpenHands + Anthropic tool-design ports)
+
+### S1. `networkAllowlist.ts` — outbound domain allowlist ✅ wired (doctor surface)
+
+**Module:** `src/infra/safety/networkAllowlist.ts`
+**Flag:** `GORDON_NETWORK_ALLOWLIST`. Mode env: `GORDON_NETWORK_ALLOWLIST_MODE` = `warn | block` (default `warn`).
+**Status:** Module + tests ship. `checkOutbound({ url, caller })` returns `{ allowed, host, matchedRule, reason, mode }`. `enforceOutbound` throws `BlockedOutboundError` in block mode. `GORDON_DEFAULT_ALLOWLIST` covers Gordon's canonical hosts (LLM providers, crypto exchanges, equity brokers, on-chain RPCs, observability backends, localhost). `addAllowedHost` for runtime extension.
+
+**Wired:** doctor report surfaces `sandbox.network_allowlist` info-check when the flag is on, showing mode + host count. Per-tool enforcement is caller-driven — wrap HTTP-client calls with `enforceOutbound({ url, caller: toolName })`. Auto-wiring into Gordon's HTTP clients is a separate hot-path PR.
+
+### S2. `filesystemWriteGuard.ts` — path-write allowlist ✅ wired (doctor surface)
+
+**Module:** `src/infra/safety/filesystemWriteGuard.ts`
+**Flag:** `GORDON_FILESYSTEM_WRITE_GUARD`. Mode env: `GORDON_FILESYSTEM_WRITE_GUARD_MODE` = `warn | block`.
+**Status:** Module + tests ship. Defaults allow `~/.gordon/*`, `/tmp/gordon-*`, and the current working directory (mirroring Claude Code's cwd rule). `checkWrite({ path, caller })` + `enforceWrite` for block mode + `BlockedWriteError`. `addAllowedPath` for runtime extension.
+
+**Wired:** doctor report surfaces `sandbox.filesystem_write_guard` when the flag is on, showing mode + allowed-path count. Per-write enforcement is caller-driven — wrap `writeFile` / `appendFile` calls with `enforceWrite({ path, caller })`.
+
+### S3. `toolDesignLinter.ts` — static analysis on the tool registry ✅ wired (importable)
+
+**Module:** `src/infra/diagnostics/toolDesignLinter.ts`
+**Flag:** `GORDON_TOOL_DESIGN_LINTER`
+**Status:** Module + tests ship. Rules encode Anthropic's "Writing Tools for Agents" anti-patterns: namespacing (no shared prefix), generic params (`id`/`user`/`data`), description-length minimum (≥20 chars), missing `response_format` enum on large-output tools, low-level identifier exposure (`uuid`/`mime_type`). `lintTool` for single, `lintToolRegistry` for batch.
+
+**Wire surface (caller-driven):** import `lintToolRegistry` from `src/infra/diagnostics/toolDesignLinter`, feed it Gordon's actual `ToolDescriptor[]` (extracted from Mastra tool defs), surface findings in a `/lint-tools` slash command or CI script. Auto-extraction of Gordon's tool registry into `ToolDescriptor` form is its own focused PR.
+
+---
+
 ## Parked (depends on signal not yet available)
 
 ### P1. Verified Completion Rate (VCR)
