@@ -21,6 +21,10 @@ export type HookPoint =
   | "SessionStart"
   /** When the agent stops (graceful exit, error, user interrupt). */
   | "Stop"
+  /** Before a user prompt is dispatched to the model — inspect, route, or block. */
+  | "UserPromptSubmit"
+  /** When the session ends — flush logs, archive handoff, emit final span. */
+  | "SessionEnd"
   /** Before an approval prompt is shown to the user. */
   | "PreApproval"
   /** After user approval decision is made. */
@@ -99,6 +103,34 @@ export interface StopPayload {
   error?: string;
 }
 
+export interface UserPromptSubmitPayload {
+  /** Raw prompt text the user submitted. */
+  prompt: string;
+  /** Thread id, when available. */
+  threadId?: string;
+  /** Session id. */
+  sessionId: string;
+  /** ISO timestamp of submission. */
+  submittedAt: string;
+  /** Optional source (cli / tui / api / slash-command-expansion). */
+  source?: "cli" | "tui" | "api" | "slash-command" | "external";
+}
+
+export interface SessionEndPayload {
+  sessionId: string;
+  threadId?: string;
+  /** Why the session ended. */
+  reason: "user_quit" | "timeout" | "error" | "graceful" | "external_signal";
+  /** ISO timestamp. */
+  endedAt: string;
+  /** Total turns in the session, if tracked. */
+  turnCount?: number;
+  /** Total tool calls, if tracked. */
+  toolCallCount?: number;
+  /** Free-form summary the engine has assembled. */
+  summary?: string;
+}
+
 export interface PreApprovalPayload {
   action: string;
   riskTier: "standard" | "high" | "critical";
@@ -175,6 +207,8 @@ export type HookPayloadMap = {
   PostOrderPlacement: PostOrderPlacementPayload;
   SubagentStart: SubagentStartPayload;
   SubagentStop: SubagentStopPayload;
+  UserPromptSubmit: UserPromptSubmitPayload;
+  SessionEnd: SessionEndPayload;
 };
 
 export type HookHandler<P extends HookPoint> = (

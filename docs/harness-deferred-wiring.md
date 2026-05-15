@@ -632,6 +632,37 @@ The "12 Factor Agents" article (HumanLayer, 2026) maps 7 of 12 factors directly 
 
 ---
 
+## Hook extensibility (dabit3/agent-hooks-in-depth port)
+
+Three additions from the dabit3 hook patterns. The seven example hooks in the demo repo (protect-paths, quality-gate, stop-if-quality-failed, command-policy, session-context, session-end-audit, prompt-router) all map to existing Gordon primitives under different names. The genuinely new contributions are at the lifecycle / runner layer.
+
+### H1. `UserPromptSubmit` hook type ✅ added
+
+**File:** `src/infra/hooks/types.ts`
+**Status:** Type added to `HookPoint` union; `UserPromptSubmitPayload` interface defined (prompt text, threadId, sessionId, submittedAt, source); registered in `HookPayloadMap`. Use cases for trading: inject portfolio context into routing decisions before the model sees the prompt; block known-bad inputs at the boundary; pre-process slash-command-style inputs with mandate scope.
+
+### H2. `SessionEnd` hook type ✅ added
+
+**File:** `src/infra/hooks/types.ts`
+**Status:** Type added to `HookPoint` union; `SessionEndPayload` interface defined (sessionId, threadId, reason, endedAt, turnCount, toolCallCount, summary); registered in `HookPayloadMap`. Use cases for trading: flush daily PnL summary, emit OTel session-end span, archive session-handoff.
+
+**Engine dispatch wire (deferred):** the hook engine's emit path needs to fire these two new events at the right runtime moments. Type-level integration is complete; emission sites are in `runtime/session/SessionRuntime` (UserPromptSubmit on user-input dispatch) and `gracefulShutdown.ts` (SessionEnd). Both are focused follow-up PRs.
+
+### H3. `externalHookRunner.ts` — invoke shell scripts at lifecycle points ✅ wired (importable primitive)
+
+**Module:** `src/infra/hooks/externalHookRunner.ts`
+**Flag:** `GORDON_EXTERNAL_HOOK_RUNNER`
+**Status:** Module + tests ship. `runExternalHook(config, payload)` spawns an external command handler, writes the JSON payload to stdin, captures exit code + stderr + stdout, and produces a structured `HookResult`. Wire-protocol (matches dabit3): exit 0 → allow, exit 2 → block with stderr as reason, any other non-zero → block (fail-closed), valid JSON on stdout → parsed `HookResult` overrides the exit-code decision. Timeout-as-block defaults 5s. Supports args + env-var passthrough.
+
+**Wired:** Importable from `src/infra/hooks/externalHookRunner`. Hook engine integration is the natural next step — extend `HookDefinition` to support an external-script flavor that delegates to `runExternalHook`. Right now operators with custom policy needs (e.g. "block all orders within 2h of a CPI release") can call this primitive directly from a `HookHandler` they register.
+
+**Trading scenarios covered in test:**
+- Pre-order CPI-release check — operator wires a shell script that reads `CPI_TODAY` env var and blocks orders when set
+- Modify-action support — handler returns `{"action":"modify","replacement":{"qty":0.05}}` to scale down quantity
+- Metadata propagation — handler returns `{"action":"allow","metadata":{"reviewedBy":"compliance"}}` for audit trail
+
+---
+
 ## Parked (depends on signal not yet available)
 
 ### P1. Verified Completion Rate (VCR)
