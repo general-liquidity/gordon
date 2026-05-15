@@ -480,6 +480,44 @@ Ported from Anthropic's "Effective harnesses for long-running agents" (2026). Th
 
 ---
 
+## Anthropic harness-design port (GAN evaluator pattern)
+
+Ported from Anthropic's "Harness Design for Long-Running Application Development" (2026). Coding-specific bits (Playwright self-verification, the three-agent full-stack architecture) deliberately skipped — Gordon's trading domain doesn't render UIs. The four primitives below are the trading-applicable ones.
+
+### V1. `adversarialEvaluator.ts` — combat self-evaluation bias
+
+**Module:** `src/infra/agents/cognition/adversarialEvaluator.ts`
+**Flag:** `GORDON_ADVERSARIAL_EVALUATOR`
+**Status:** Module + tests ship. `buildAdversarialPrompt` wraps an existing evaluator prompt with the "assume broken until proven otherwise" framing Anthropic uses. `acceptIfAdversarial` is the gate — a `passed: true` verdict is only honoured when the review identifies ≥3 failure modes across ≥2 categories AND (for failed verdicts) has at least one finding at the required severity. A passing review that found zero issues is rejected as "insufficiently adversarial."
+
+**Wire points (deferred):** integrate into `critiquePhase.ts` so the HIGH-thinking critique pass runs through the gate; integrate into `planRubric` consumers so passing-rubric verdicts must also clear the adversarial threshold.
+
+### V2. `evaluatorCalibration.ts` — few-shot anchoring to reduce score drift
+
+**Module:** `src/infra/agents/cognition/evaluatorCalibration.ts`
+**Flag:** `GORDON_EVALUATOR_CALIBRATION`
+**Status:** Module + tests ship. JSONL persistence at `~/.gordon/evaluator-calibration.jsonl`. `registerCalibrationExample` adds a gold-standard input → expected-score example. `selectRelevantExamples` picks top-K by tag overlap (+2) + keyword match (+1), with recency as tiebreaker. `buildCalibrationBlock` formats few-shot examples for splicing into evaluator system prompts. `detectDrift` compares the evaluator's actual score on a known input against the gold answer per-dimension.
+
+**Wire points (deferred):** plug `buildCalibrationBlock` into the evaluator-prompt builders in `critiquePhase.ts` and `planRubric.ts`; run `detectDrift` periodically against the calibration set to detect when prompt or model changes have shifted scoring.
+
+### V3. `contextAnxietyDetector.ts` — premature wrap-up detection
+
+**Module:** `src/infra/agents/harness/contextAnxietyDetector.ts`
+**Flag:** `GORDON_CONTEXT_ANXIETY_DETECTOR`
+**Status:** Module + tests ship. Four heuristic signals: wrap-up phrases ("to summarize", "in conclusion", "wrapping up") mid-task, context self-references ("running low on context", "to save tokens"), sharp output-length drop relative to baseline, tool-call density drop. Aggregate anxiety score with breadth bonus when multiple signal types fire. Recommendation routing: self-ref → force clean context; wrap-up → interrupt before summary settles.
+
+**Wire points (deferred):** call `detectAnxiety(recentTurns)` in `orchestrator.ts` per turn; on `isAnxious=true` either (a) inject a "you have plenty of context" assertion + continue, or (b) signal the operator. Pair with `runtimeHarness.ts`'s doom-loop detector since both monitor the same agent stream.
+
+### V4. `sprintContractNegotiation.ts` — agent-negotiated contracts (extends T1)
+
+**Module:** `src/infra/safety/sprintContractNegotiation.ts`
+**Flag:** `GORDON_SPRINT_CONTRACT_NEGOTIATION`
+**Status:** Module + tests ship. Extends T1's operator-authored sprint contract with the Anthropic generator/evaluator negotiation step. `runNegotiation(hooks, intent, opts)` runs propose → review → revise rounds; terminates on `accept`, `reject`, or `maxRounds` exhaustion. Caller-supplied Proposer + Reviewer hooks (same posture as `harnessEvolution`). The accepted draft is the input to existing `createSprintContract` — this module does not duplicate persistence.
+
+**Wire points (deferred):** invoke before `createSprintContract` when an operator wants the contract drafted by an agent rather than typed by hand. The Proposer hook wraps an executor-style agent; the Reviewer hook wraps a researcher-style or critique-style agent.
+
+---
+
 ## Parked (depends on signal not yet available)
 
 ### P1. Verified Completion Rate (VCR)
