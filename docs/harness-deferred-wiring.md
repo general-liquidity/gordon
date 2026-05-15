@@ -442,6 +442,44 @@ Trading-domain port of Algorithm 1 from Seong/Yin/Zhang/Shi — "The Last Harnes
 
 ---
 
+## Anthropic effective-harnesses port (trading-domain)
+
+Ported from Anthropic's "Effective harnesses for long-running agents" (2026). The article shipped a Claude.ai clone at 200-feature scale; we mirror the shape of the primitives that don't already exist in Gordon and adapt them to trading.
+
+### A1. `tradingFeatureList.ts` — JSON contract with `passes: bool` and edit-only-passes enforcement
+
+**Module:** `src/infra/trading/ops/tradingFeatureList.ts`
+**Flag:** `GORDON_TRADING_FEATURE_LIST` (default off)
+**Status:** Module + tests ship. JSON schema mirrors Anthropic: `{ id, category, description, steps[], priority, passes, paperModeVerifiedAt, failedAt, failedReason }`. Categories tuned for trading: `venue | analysis | execution | risk | monitoring | operational`. The `applyEdit` function rejects any diff that mutates a non-mutable field (only `passes` + the three timestamp/reason fields can change). Adds and removes are also rejected.
+
+**Wire points (deferred):** load the list at autonomous-loop start; call `pickHighestPriority` to choose the next capability to work on; flip `passes` via `markPass` after paper-mode verification. Slash command `/features` for inspection.
+
+### A2. `initializerAgent.ts` — one-shot first-session marker state machine
+
+**Module:** `src/infra/agents/initializerAgent.ts`
+**Flag:** `GORDON_INITIALIZER_AGENT` (default off)
+**Status:** Module + tests ship. Marker file at `~/.gordon/initialized.json` with `{ initializedAt, version, configHash, artifactsWritten }`. `runInitializer(payload)` is a no-op on subsequent calls unless `force=true`. Module is the state machine only — caller writes the actual artifacts (sprint contract, mandate, feature list) before calling.
+
+**Wire points (deferred):** call `isInitialized()` at session start; if false, run a one-shot initializer routine (caller-defined) that produces an initial sprint contract / mandate / trading feature list, then `runInitializer(payload)`. Subsequent sessions skip the routine entirely.
+
+### A3. `initProbe.ts` — E2E boot probes that exercise Gordon's runtime
+
+**Module:** `src/infra/diagnostics/initProbe.ts`
+**Flag:** `GORDON_INIT_PROBE` (default off)
+**Status:** Module + tests ship. Goes deeper than `agentReadiness.ts` (B2): readiness checks that components exist; init-probe runs them end-to-end. `runInitProbes(probes, opts)` is caller-supplied — the primitive orchestrates, captures per-probe timing + errors, aggregates verdicts + red-pen fix instructions. Supports `failFast` and per-id skip.
+
+**Wire points (deferred):** in `setup-runtime.ts`, define a default probe set (venue connectivity, permission-engine boot, riskClassifier verdict on synthetic plan, terminationLayers verdict on synthetic inputs, safety-file writability, kill-switch dry-fire) and call `runInitProbes` before the first agent action. Fail closed.
+
+### A4. `safetyConfigGuard.ts` — "unacceptable to weaken safety" enforcement
+
+**Module:** `src/infra/safety/safetyConfigGuard.ts`
+**Flag:** `GORDON_SAFETY_CONFIG_GUARD` (default off)
+**Status:** Module + tests ship. Validates a current `SafetyConfig` against a baseline. Blocks on: deny-list shrinkage, maxPositionUsd raised, maxLeverage raised, dailyLossLimitPct raised, killSwitch disabled, allowedSymbols expanded. `GORDON_DEFAULT_BASELINE` mirrors the deny-list from CLAUDE.md + the trading-constitution defaults. `validateDiff(prev, next)` for in-flight modification gating.
+
+**Wire points (deferred):** call `validateAgainstBaseline` at session start (after `agentReadiness`); call `validateDiff` before persisting any config mutation proposed by the agent. Block on any `severity: "block"` violation.
+
+---
+
 ## Parked (depends on signal not yet available)
 
 ### P1. Verified Completion Rate (VCR)
