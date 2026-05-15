@@ -43,6 +43,17 @@ import {
   listAllowedPaths,
   getGuardMode,
 } from "../../infra/safety/filesystemWriteGuard.ts";
+import {
+  isKvCacheMetricEnabled,
+  readCacheCalls,
+  summarizeHitRate,
+} from "../../infra/agents/runtime/kvCacheHitMetric.ts";
+import {
+  isClaudeMdLinterEnabled,
+  lintClaudeMd,
+} from "../../infra/diagnostics/claudeMdLinter.ts";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import type { DoctorCheck } from "./setup-runtime.ts";
 
 // --- A2 ----------------------------------------------------------------------
@@ -237,6 +248,73 @@ export function collectSandboxChecks(): DoctorCheck[] {
       severity: "info",
       message: `Filesystem write guard active in ${mode} mode (${paths} allowed path prefixes).`,
     });
+  }
+  return checks;
+}
+
+// --- KV-cache hit-rate metric + CLAUDE.md linter ----------------------------
+
+/**
+ * Surface the KV-cache hit-rate over the last 100 recorded calls when
+ * the metric is enabled. Manus calls this "the single most important
+ * metric for a production-stage AI agent" — surfacing it makes the
+ * 10x cost lever visible.
+ */
+export function collectKvCacheCheck(): DoctorCheck[] {
+  if (!isKvCacheMetricEnabled()) return [];
+  try {
+    const calls = readCacheCalls({ limit: 100 });
+    if (calls.length === 0) {
+      return [
+        {
+          id: "kv_cache.hit_rate",
+          ok: true,
+          severity: "info",
+          message: "KV-cache metric enabled but no calls recorded yet.",
+        },
+      ];
+    }
+    const s = summarizeHitRate(calls);
+    return [
+      {
+        id: "kv_cache.hit_rate",
+        ok: true,
+        severity: s.hitRate >= 0.5 ? "info" : "warn",
+        message: `KV-cache hit rate ${(s.hitRate * 100).toFixed(1)}% over last ${s.windowSize} calls; estimated savings $${s.estimatedSavingsUsd.toFixed(2)}.`,
+      },
+    ];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Lint the project's CLAUDE.md when the linter is enabled. Reports
+ * line count, instruction count, and any per-rule findings (code-style
+ * guidance in prompts, exhaustive command lists, large code snippets).
+ */
+export function collectClaudeMdLintChecks(repoRoot: string = process.cwd()): DoctorCheck[] {
+  if (!isClaudeMdLinterEnabled()) return [];
+  const checks: DoctorCheck[] = [];
+  for (const candidate of ["CLAUDE.md", "AGENTS.md"]) {
+    const path = resolve(repoRoot, candidate);
+    if (!existsSync(path)) continue;
+    try {
+      const content = readFileSync(path, "utf8");
+      const report = lintClaudeMd(content, { path: candidate });
+      checks.push({
+        id: `claude_md_lint.${candidate}`,
+        ok: report.passes,
+        severity: report.countsBySeverity.error > 0
+          ? "error"
+          : report.countsBySeverity.warn > 0
+            ? "warn"
+            : "info",
+        message: `${candidate}: ${report.totalLines} lines, ~${report.estimatedInstructions} instructions, ${report.findings.length} finding(s).`,
+      });
+    } catch {
+      // skip unreadable
+    }
   }
   return checks;
 }

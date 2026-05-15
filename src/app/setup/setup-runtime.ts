@@ -507,13 +507,22 @@ export async function collectDoctorReport(configInput?: GordonConfig): Promise<D
     nextActions.push("Run `/telemetry enable` if you want reviewed OTEL tracing to activate for this install.");
   }
 
-  // Harness wires (A3 + A4 + sandbox): cold by default, surface in doctor report when flags are on.
+  // Harness wires (A3 + A4 + sandbox + kv-cache + claude.md linter):
+  // cold by default, surface in doctor report when their flags are on.
   try {
-    const { collectInitProbeChecks, collectSafetyBaselineChecks, collectSandboxChecks } = await import("./harness-checks.ts");
+    const {
+      collectInitProbeChecks,
+      collectSafetyBaselineChecks,
+      collectSandboxChecks,
+      collectKvCacheCheck,
+      collectClaudeMdLintChecks,
+    } = await import("./harness-checks.ts");
     const probeChecks = await collectInitProbeChecks();
     const safetyChecks = collectSafetyBaselineChecks({});
     const sandboxChecks = collectSandboxChecks();
-    checks.push(...probeChecks, ...safetyChecks, ...sandboxChecks);
+    const kvCacheChecks = collectKvCacheCheck();
+    const claudeMdChecks = collectClaudeMdLintChecks();
+    checks.push(...probeChecks, ...safetyChecks, ...sandboxChecks, ...kvCacheChecks, ...claudeMdChecks);
   } catch {
     // harness-checks failures must not break the doctor report
   }

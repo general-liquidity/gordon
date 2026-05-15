@@ -588,6 +588,32 @@ Ported from Anthropic's "How we built our multi-agent research system" (2026). T
 
 ---
 
+## Context engineering port (Manus + HumanLayer + Anthropic context articles)
+
+Four primitives ported from the seven-article batch on context engineering. The rest validated Gordon's existing architecture (compaction, sub-agents, file-as-memory, append-only) or are pure-philosophy pieces (Fowler "Context Engineering for Coding Agents").
+
+### C1. `kvCacheHitMetric.ts` — measure the 10x lever ✅ wired (doctor surface)
+
+**Module:** `src/infra/agents/runtime/kvCacheHitMetric.ts`. Flag `GORDON_KV_CACHE_METRIC`.
+**Status:** Module + tests ship. `recordCacheCall` appends one record per LLM call to `~/.gordon/kv-cache-metrics.jsonl`. `summarizeHitRate` computes hit rate + cached-token ratio + estimated USD savings (using the Manus anchor: cached tokens cost 1/10 of uncached, so each cached token saves 90% of the uncached price). Doctor surface in `harness-checks.ts:collectKvCacheCheck` reports hit rate over last 100 calls when the flag is on. **Per-call recording is caller-driven** — wrap LLM-client calls and record (hit, cachedTokens, totalInputTokens) on response. Auto-wiring into `sharedPrefixCache.ts` is a focused follow-up PR.
+
+### C2. `silentToolResultFormatter.ts` — `run_silent`-style ✓/✗ formatting ✅ wired (barrel)
+
+**Module:** `src/infra/agents/runtime/silentToolResultFormatter.ts`. Flag `GORDON_SILENT_TOOL_FORMATTER`.
+**Status:** Module + tests ship via the runtime barrel (`src/infra/agents/runtime/index.ts`). `formatSilent({ description, output, exitCode })` collapses success to `✓ description` and shows full output on failure. `formatSilentPipeline` chains multiple steps. Extends R2's filter posture for the specific case where a tool produces exit-code + output. Trading-domain wire: verification scripts, paper-mode runs, reconciliation reports. Caller-driven invocation.
+
+### C3. `claudeMdLinter.ts` — static analysis on agent-instruction markdown ✅ wired (doctor surface)
+
+**Module:** `src/infra/diagnostics/claudeMdLinter.ts`. Flag `GORDON_CLAUDE_MD_LINTER`.
+**Status:** Module + tests ship. Rules encode HumanLayer's "Writing a Good CLAUDE.md" guidance: line count (warn >300, error >500), estimated instruction count (warn >200), code-style guidance in prompt (warn — "never send an LLM to do a linter's job"), exhaustive command lists (info), large code snippets (info). Doctor surface lints `CLAUDE.md` and `AGENTS.md` at the repo root when the flag is on; findings surface as `claude_md_lint.*` checks.
+
+### C4. `recitationCheckpoint.ts` — combat lost-in-the-middle on long runs ✅ wired (barrel + cadence helper)
+
+**Module:** `src/infra/agents/harness/recitationCheckpoint.ts`. Flag `GORDON_RECITATION_CHECKPOINT`.
+**Status:** Module + tests ship. `shouldRecite({ currentTurn, currentToolCalls, state })` gates by cadence (default every 8 turns OR every 20 tool calls). `markRecited` returns the updated state. `buildRecitationBlock({ goal, progressLines, blockers, checklist })` formats a `todo.md`-style reminder Manus uses to push active state to the end of context. Wire surface: in the autonomous-loop cycle, when goal-mode is active and the cadence threshold is hit, append the recitation block to the agent's next prompt and `markRecited` the state. Caller-driven because goal-mode state lives in a separate module.
+
+---
+
 ## Parked (depends on signal not yet available)
 
 ### P1. Verified Completion Rate (VCR)

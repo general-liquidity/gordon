@@ -38,3 +38,29 @@ export type {
   FilterOptions,
   FilterResult,
 } from "./errorOnlyOutputFilter.ts";
+
+export {
+  isKvCacheMetricEnabled,
+  defaultKvCacheMetricPath,
+  recordCacheCall,
+  readCacheCalls,
+  summarizeHitRate,
+  formatHitRateSummary,
+  summaryToPayload as kvCacheSummaryToPayload,
+} from "./kvCacheHitMetric.ts";
+export type {
+  CacheCallRecord,
+  CacheHitRateSummary,
+  RecordCallInput,
+} from "./kvCacheHitMetric.ts";
+
+export {
+  isSilentToolFormatterEnabled,
+  formatSilent,
+  formatSilentPipeline,
+  resultToPayload as silentResultToPayload,
+} from "./silentToolResultFormatter.ts";
+export type {
+  SilentFormatInput,
+  SilentFormatResult,
+} from "./silentToolResultFormatter.ts";
