@@ -518,6 +518,26 @@ Ported from Anthropic's "Harness Design for Long-Running Application Development
 
 ---
 
+## Durable execution + back-pressure (Inngest + HumanLayer ports)
+
+### R1. `durableStep.ts` — checkpoint-and-replay
+
+**Module:** `src/infra/agents/runtime/durableStep.ts`
+**Flag:** `GORDON_DURABLE_STEP`
+**Status:** Module + tests ship. `executeStep({ stepId, input, fn })` persists input hash + result to `~/.gordon/durable-steps.jsonl` keyed by stable `stepId`. On replay (same `stepId` + same `inputHash`), returns the cached result without re-executing `fn`. Input-hash mismatch is treated as a *new* step (cache miss). Failed steps are NOT replayed from cache — re-executes so transient failures can recover. Includes in-flight dedupe via in-memory promise registry (closest Gordon gets to Inngest's singleton concurrency without a separate primitive).
+
+**Wire points (deferred):** wrap each agent tool call in `executeStep` so mid-flight crash + restart resumes from last completed call; wrap each autonomous-loop cycle so partial cycles don't re-execute from scratch.
+
+### R2. `errorOnlyOutputFilter.ts` — surface only errors
+
+**Module:** `src/infra/agents/runtime/errorOnlyOutputFilter.ts`
+**Flag:** `GORDON_ERROR_ONLY_FILTER`
+**Status:** Module + tests ship. Line-level success/error classification with priority-resolved rules. `DEFAULT_ERROR_PATTERNS` covers `Error|FAIL|Exception` keywords, broker-reject vocabulary (`reject|denied|insufficient|timeout`), failure glyphs (✗/❌), stack-trace frames, and exception class names. Suppress rules for `passed|OK|✓` + test-summary `N passing`. `contextBefore` / `contextAfter` keep N lines of context around each surfaced line so "what was being attempted?" survives. `maxLines` cap prevents runaway error logs from re-flooding context. `filterOutputForAgent` collapses all-success runs to a single OK line.
+
+**Wire points (deferred):** wire into `runtimeHarness.ts`'s per-tool offload path so noisy verification/test/reconciliation tool output gets filtered before reaching the agent. Per-tool default-action override (default `suppress` for noisy families like reconciliation; `surface` for plan-card output).
+
+---
+
 ## Parked (depends on signal not yet available)
 
 ### P1. Verified Completion Rate (VCR)
