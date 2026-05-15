@@ -1,4 +1,8 @@
 import { formatCapabilityTruthSummary, GORDON_PRODUCT_TRUTH } from "../capabilityTruth.ts";
+import {
+  isEffortCalibrationEnabled,
+  buildCalibrationBlock,
+} from "../cognition/effortCalibration.ts";
 
 export interface PromptSectionDefinition {
   id: string;
@@ -37,6 +41,14 @@ export const SHARED_PROMPT_SECTIONS: PromptSectionDefinition[] = [
 - Separate planning from execution.
 - Keep planning read-only until there is explicit preview/plan evidence and the runtime says execution is ready.
 - If runtime guidance says execution is blocked, explain the blocker instead of improvising around it.`,
+  },
+  {
+    id: "shared.effort-calibration",
+    priority: 35,
+    content: () =>
+      isEffortCalibrationEnabled()
+        ? buildCalibrationBlock("normal") // default to normal; callers can override per-task
+        : "",
   },
   {
     id: "shared.recovery-discipline",

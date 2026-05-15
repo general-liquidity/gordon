@@ -538,6 +538,28 @@ Ported from Anthropic's "Harness Design for Long-Running Application Development
 
 ---
 
+## Anthropic multi-agent research-system port
+
+Ported from Anthropic's "How we built our multi-agent research system" (2026). Two trading-applicable patterns; the rest of the article validates Gordon's existing architecture (orchestrator-worker, parallel subagents, memory persistence, structured task descriptions).
+
+### MA1. `citationAgent.ts` — evidence-trail manifest for recommendations ✅ wired (barrel + export)
+
+**Module:** `src/infra/agents/cognition/citationAgent.ts`
+**Flag:** `GORDON_CITATION_AGENT`
+**Status:** Module + tests ship. Exposed via `src/infra/agents/cognition/index.ts` barrel. `buildCitationManifest({ recommendationId, claims, evidence })` links each claim string to ranked tool-call evidence via ticker / indicator / numeric / token overlap. `detectUnsupportedClaims` surfaces claims with zero evidence — the "agent made this up" cases. Persistence at `~/.gordon/citation-manifests.jsonl`.
+
+**Honest wire surface (deferred to callers):** the planner/executor at the point of plan finalization. The caller has the recent tool-call list in structured form (action log entries with toolName + observations); wrap `buildCitationManifest` around that. Not auto-wired because Gordon's action-log → citation-evidence bridge is its own focused PR (translate JSONL action-log entries into `EvidenceRef`s).
+
+### MA2. `effortCalibration.ts` — calibrate effort to query complexity ✅ wired
+
+**Module:** `src/infra/agents/cognition/effortCalibration.ts`
+**Flag:** `GORDON_EFFORT_CALIBRATION`
+**Status:** Module + tests ship. `classifyComplexity(hints)` maps task signals (task text, fanout, isRouting, isLiveExecution, isMultiStep) to `trivial | normal | deep`. `budgetFor(level)` returns token/subagent-fanout/tool-call/reasoning-depth budgets. `buildCalibrationBlock(level, taskType?)` formats a prompt block ready to splice. Anthropic's fix for "agent spawned 50 subagents for trivial query" — trivial budget is 0 subagent fanout, deep is up to 5 (capped well below 50).
+
+**Wired:** `src/infra/agents/prompt-sections/shared.ts` now includes a `shared.effort-calibration` section (priority 35) that emits `buildCalibrationBlock("normal")` when `GORDON_EFFORT_CALIBRATION=1`. Every agent that consumes shared prompt sections sees the calibration block by default. Per-task overrides (call `buildCalibrationBlock("deep")` when classifying a live-execution task as deep) are caller-driven.
+
+---
+
 ## Parked (depends on signal not yet available)
 
 ### P1. Verified Completion Rate (VCR)
