@@ -520,21 +520,21 @@ Ported from Anthropic's "Harness Design for Long-Running Application Development
 
 ## Durable execution + back-pressure (Inngest + HumanLayer ports)
 
-### R1. `durableStep.ts` — checkpoint-and-replay
+### R1. `durableStep.ts` — checkpoint-and-replay ✅ wired (barrel + export)
 
 **Module:** `src/infra/agents/runtime/durableStep.ts`
 **Flag:** `GORDON_DURABLE_STEP`
 **Status:** Module + tests ship. `executeStep({ stepId, input, fn })` persists input hash + result to `~/.gordon/durable-steps.jsonl` keyed by stable `stepId`. On replay (same `stepId` + same `inputHash`), returns the cached result without re-executing `fn`. Input-hash mismatch is treated as a *new* step (cache miss). Failed steps are NOT replayed from cache — re-executes so transient failures can recover. Includes in-flight dedupe via in-memory promise registry (closest Gordon gets to Inngest's singleton concurrency without a separate primitive).
 
-**Wire points (deferred):** wrap each agent tool call in `executeStep` so mid-flight crash + restart resumes from last completed call; wrap each autonomous-loop cycle so partial cycles don't re-execute from scratch.
+**Wired:** Exported via `src/infra/agents/runtime/index.ts` barrel — callers do `import { executeStep } from "src/infra/agents/runtime"`. The autonomous-loop cycle is NOT wrapped because cycles have side effects (scan + emit + record) that don't roundtrip cleanly through cache-and-replay. Honest wire surfaces (deferred to callers): historical data fetches in `src/backtest/data/historical.ts`, backtest runs in `src/backtest/engine.ts`, risk classifier on a synthetic plan in `src/infra/trading/riskClassifier.ts`, news sentiment classification — all deterministic given input. Wrap each with `executeStep({ stepId: stableHash(input), input, fn })` for crash-recovery + repeated-call dedupe.
 
-### R2. `errorOnlyOutputFilter.ts` — surface only errors
+### R2. `errorOnlyOutputFilter.ts` — surface only errors ✅ wired
 
 **Module:** `src/infra/agents/runtime/errorOnlyOutputFilter.ts`
 **Flag:** `GORDON_ERROR_ONLY_FILTER`
 **Status:** Module + tests ship. Line-level success/error classification with priority-resolved rules. `DEFAULT_ERROR_PATTERNS` covers `Error|FAIL|Exception` keywords, broker-reject vocabulary (`reject|denied|insufficient|timeout`), failure glyphs (✗/❌), stack-trace frames, and exception class names. Suppress rules for `passed|OK|✓` + test-summary `N passing`. `contextBefore` / `contextAfter` keep N lines of context around each surfaced line so "what was being attempted?" survives. `maxLines` cap prevents runaway error logs from re-flooding context. `filterOutputForAgent` collapses all-success runs to a single OK line.
 
-**Wire points (deferred):** wire into `runtimeHarness.ts`'s per-tool offload path so noisy verification/test/reconciliation tool output gets filtered before reaching the agent. Per-tool default-action override (default `suppress` for noisy families like reconciliation; `surface` for plan-card output).
+**Wired:** `src/infra/agents/harness/runtimeHarness.ts:optimizeToolResultForContext` now runs `filterOutputForAgent` before the byte-limit check when (a) `GORDON_ERROR_ONLY_FILTER=1` and (b) the tool name is in a conservative allow-list (`run_test`, `run_verification`, `run_typecheck`, `run_lint`, `reconcile_position`, `reconcile_orders`, `validate_strategy`, `verify_plan`, `check_balances`). Market-data and strategy tools are NOT filtered — the agent needs the full signal there. Filter uses `contextBefore=2, contextAfter=1` so error messages keep their "what was being attempted?" context. Filter failures fall through to raw result — they cannot break the tool-result path.
 
 ---
 

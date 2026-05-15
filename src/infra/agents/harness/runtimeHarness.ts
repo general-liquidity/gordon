@@ -686,6 +686,24 @@ function extractPlanningTasks(result: unknown, toolName: string): string[] {
   return [...new Set(tasks)];
 }
 
+/**
+ * Tool name patterns whose output is known to be noisy/verbose and benefits
+ * from error-only filtering when GORDON_ERROR_ONLY_FILTER is on. Conservative
+ * allow-list — filtering anything market-data or strategy-related is wrong
+ * because the agent needs the full signal, not just errors.
+ */
+const ERROR_ONLY_FILTERABLE_TOOLS = new Set<string>([
+  "run_test",
+  "run_verification",
+  "run_typecheck",
+  "run_lint",
+  "reconcile_position",
+  "reconcile_orders",
+  "validate_strategy",
+  "verify_plan",
+  "check_balances",
+]);
+
 export async function optimizeToolResultForContext(
   context: GordonContext,
   toolName: string,
@@ -696,6 +714,22 @@ export async function optimizeToolResultForContext(
     serialized = typeof result === "string" ? result : JSON.stringify(result, null, 2);
   } catch {
     serialized = String(result);
+  }
+
+  // R2 wire: when the error-only filter flag is on AND this tool is in
+  // the conservative filterable allow-list, run the filter first so
+  // success-only output collapses to a single OK line and only error
+  // lines reach the agent. Failures here must not break the path —
+  // catch and fall through to the raw result.
+  try {
+    const { isErrorOnlyFilterEnabled, filterOutputForAgent } = await import(
+      "../runtime/errorOnlyOutputFilter.ts"
+    );
+    if (isErrorOnlyFilterEnabled() && ERROR_ONLY_FILTERABLE_TOOLS.has(toolName)) {
+      serialized = filterOutputForAgent(serialized, { contextBefore: 2, contextAfter: 1 });
+    }
+  } catch {
+    // filter unavailable — fall through with raw result
   }
 
   const bytes = Buffer.byteLength(serialized, "utf8");
