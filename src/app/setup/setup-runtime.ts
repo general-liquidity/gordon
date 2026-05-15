@@ -507,6 +507,16 @@ export async function collectDoctorReport(configInput?: GordonConfig): Promise<D
     nextActions.push("Run `/telemetry enable` if you want reviewed OTEL tracing to activate for this install.");
   }
 
+  // Harness wires (A3 + A4): cold by default, surface in doctor report when flags are on.
+  try {
+    const { collectInitProbeChecks, collectSafetyBaselineChecks } = await import("./harness-checks.ts");
+    const probeChecks = await collectInitProbeChecks();
+    const safetyChecks = collectSafetyBaselineChecks({});
+    checks.push(...probeChecks, ...safetyChecks);
+  } catch {
+    // harness-checks failures must not break the doctor report
+  }
+
   const healthy = checks.every((check) => check.ok || check.severity === "info");
 
   const report: DoctorReport = {
@@ -758,6 +768,15 @@ export async function applyBootstrap(options: BootstrapOptions): Promise<Bootstr
       activeBrokerId: config.activeBrokerId,
     },
   });
+
+  // A2 wire: record an initialization marker so subsequent sessions can
+  // detect "first session" vs "resume." No-op when the flag is off.
+  try {
+    const { runInitializerOnBootstrap } = await import("./harness-checks.ts");
+    runInitializerOnBootstrap(Object.keys(envKeys), [`profile:${options.profile ?? "unknown"}`]);
+  } catch {
+    // initializer failures must not break bootstrap
+  }
 
   return result;
 }

@@ -446,7 +446,7 @@ Trading-domain port of Algorithm 1 from Seong/Yin/Zhang/Shi — "The Last Harnes
 
 Ported from Anthropic's "Effective harnesses for long-running agents" (2026). The article shipped a Claude.ai clone at 200-feature scale; we mirror the shape of the primitives that don't already exist in Gordon and adapt them to trading.
 
-### A1. `tradingFeatureList.ts` — JSON contract with `passes: bool` and edit-only-passes enforcement
+### A1. `tradingFeatureList.ts` — JSON contract with `passes: bool` and edit-only-passes enforcement ✅ wired
 
 **Module:** `src/infra/trading/ops/tradingFeatureList.ts`
 **Flag:** `GORDON_TRADING_FEATURE_LIST` (default off)
@@ -454,7 +454,7 @@ Ported from Anthropic's "Effective harnesses for long-running agents" (2026). Th
 
 **Wire points (deferred):** load the list at autonomous-loop start; call `pickHighestPriority` to choose the next capability to work on; flip `passes` via `markPass` after paper-mode verification. Slash command `/features` for inspection.
 
-### A2. `initializerAgent.ts` — one-shot first-session marker state machine
+### A2. `initializerAgent.ts` — one-shot first-session marker state machine ✅ wired
 
 **Module:** `src/infra/agents/initializerAgent.ts`
 **Flag:** `GORDON_INITIALIZER_AGENT` (default off)
@@ -462,7 +462,7 @@ Ported from Anthropic's "Effective harnesses for long-running agents" (2026). Th
 
 **Wire points (deferred):** call `isInitialized()` at session start; if false, run a one-shot initializer routine (caller-defined) that produces an initial sprint contract / mandate / trading feature list, then `runInitializer(payload)`. Subsequent sessions skip the routine entirely.
 
-### A3. `initProbe.ts` — E2E boot probes that exercise Gordon's runtime
+### A3. `initProbe.ts` — E2E boot probes that exercise Gordon's runtime ✅ wired
 
 **Module:** `src/infra/diagnostics/initProbe.ts`
 **Flag:** `GORDON_INIT_PROBE` (default off)
@@ -470,7 +470,7 @@ Ported from Anthropic's "Effective harnesses for long-running agents" (2026). Th
 
 **Wire points (deferred):** in `setup-runtime.ts`, define a default probe set (venue connectivity, permission-engine boot, riskClassifier verdict on synthetic plan, terminationLayers verdict on synthetic inputs, safety-file writability, kill-switch dry-fire) and call `runInitProbes` before the first agent action. Fail closed.
 
-### A4. `safetyConfigGuard.ts` — "unacceptable to weaken safety" enforcement
+### A4. `safetyConfigGuard.ts` — "unacceptable to weaken safety" enforcement ✅ wired
 
 **Module:** `src/infra/safety/safetyConfigGuard.ts`
 **Flag:** `GORDON_SAFETY_CONFIG_GUARD` (default off)

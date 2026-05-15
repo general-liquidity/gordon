@@ -44,6 +44,7 @@ import {
   handleSessionMenuCommand,
   handleThreadMenuCommand,
   handleGoalMenuCommand,
+  handleFeatureListMenuCommand,
   handleRuntimeMenuCommand,
   handleWorkspaceMenuCommand,
   handleUIMenuCommand,
@@ -318,6 +319,7 @@ async function handleMenuCommand(
   if (await handleSystemMenuCommand(resolved, args, setState, runtime)) return;
   if (await handleAutonomousMenuCommand(resolved, args, setState, runtime, command, streamResponse)) return;
   if (await handleGoalMenuCommand(resolved, args, setState)) return;
+  if (await handleFeatureListMenuCommand(resolved, args, setState)) return;
 
   // Portfolio — delegates to agent
   if (resolved === "portfolio") {

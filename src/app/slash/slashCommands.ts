@@ -125,6 +125,8 @@ export const DIRECT_MENU_TARGETS = new Set([
   "goal-status",
   "pause-goal",
   "goal-clear",
+  "features",
+  "features-next",
 ]);
 
 export const DIRECT_TOOL_TARGETS = new Set([
@@ -1647,6 +1649,28 @@ const LEGACY_SLASH_COMMANDS: SlashCommandSeed[] = [
     level: 2,
     action: "menu",
     target: "goal-clear",
+  },
+
+  // Trading feature list (Anthropic effective-harnesses port — A1)
+  {
+    name: "features",
+    aliases: ["feature-list", "fl"],
+    description: "Show the trading feature list (passing / total + next priority)",
+    usage: "/features",
+    category: "trading",
+    level: 2,
+    action: "menu",
+    target: "features",
+  },
+  {
+    name: "features-next",
+    aliases: ["fnext"],
+    description: "Show the next-priority feature the agent should work on",
+    usage: "/features-next",
+    category: "trading",
+    level: 2,
+    action: "menu",
+    target: "features-next",
   },
 
   // Keyring

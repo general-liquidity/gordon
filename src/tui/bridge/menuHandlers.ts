@@ -22,6 +22,12 @@ import {
   formatGoalState,
   isGoalModeEnabled,
 } from "../../core/pipeline/goalMode.ts";
+import {
+  isTradingFeatureListEnabled,
+  loadFeatureList,
+  formatFeatureList,
+  pickHighestPriority,
+} from "../../infra/trading/ops/tradingFeatureList.ts";
 import { handleTelemetryCommand, handleContextCommand } from "../../app/commands/index.ts";
 import { getRuntimeApprovalShortId } from "../../app/runtime/runtimeApprovalId.ts";
 import type { Message } from "../components/messages/MessageBubble.tsx";
@@ -1088,4 +1094,57 @@ export async function handleGoalMenuCommand(
     }
   }
   return false;
+}
+
+// ============================================================================
+// Trading feature-list menu commands: /features, /features-next
+// ============================================================================
+
+export async function handleFeatureListMenuCommand(
+  target: string,
+  _args: string,
+  setState: StateUpdater,
+): Promise<boolean> {
+  if (target !== "features" && target !== "features-next") return false;
+
+  if (!isTradingFeatureListEnabled()) {
+    addMessage(
+      setState,
+      "system",
+      "Trading feature list is disabled. Set GORDON_TRADING_FEATURE_LIST=1 to enable.",
+    );
+    return true;
+  }
+
+  const list = loadFeatureList();
+  if (!list) {
+    addMessage(
+      setState,
+      "system",
+      "No feature list found at ~/.gordon/feature-list.json. Seed one to begin.",
+    );
+    return true;
+  }
+
+  if (target === "features") {
+    addMessage(setState, "gordon", formatFeatureList(list));
+    return true;
+  }
+
+  // features-next
+  const next = pickHighestPriority(list);
+  if (!next) {
+    addMessage(setState, "gordon", "All features passing.");
+    return true;
+  }
+  const lines = [
+    `Next: [${next.category}] ${next.description} (priority ${next.priority})`,
+    "Steps:",
+    ...next.steps.map((s, i) => `  ${i + 1}. ${s}`),
+  ];
+  if (next.failedReason) {
+    lines.push(`Last failure: ${next.failedReason}`);
+  }
+  addMessage(setState, "gordon", lines.join("\n"));
+  return true;
 }

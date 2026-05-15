@@ -36,6 +36,11 @@ import {
   failGoal,
   type GoalObservation,
 } from "./goalMode.ts";
+import {
+  isTradingFeatureListEnabled,
+  loadFeatureList,
+  pickHighestPriority,
+} from "../../infra/trading/ops/tradingFeatureList.ts";
 import type { ScanOptions } from "./scanner.ts";
 import type { CoinAnalysis } from "../../types/index.ts";
 import { runSharedScan } from "../lifecycle/market-data-coordinator.ts";
@@ -325,6 +330,30 @@ async function runCycle(): Promise<CycleReport | null> {
       } catch (goalError) {
         logger.warn("Goal-mode scoring failed for this cycle", {
           error: goalError instanceof Error ? goalError.message : String(goalError),
+        });
+      }
+    }
+
+    // A1 wire: surface the next-priority feature from the trading feature
+    // list when the flag is on. Observation-only — does not change cycle
+    // behavior, just logs what the agent should pick up next.
+    if (isTradingFeatureListEnabled()) {
+      try {
+        const list = loadFeatureList();
+        if (list) {
+          const next = pickHighestPriority(list);
+          if (next) {
+            logger.info("feature-list next priority", {
+              id: next.id,
+              category: next.category,
+              priority: next.priority,
+              description: next.description,
+            });
+          }
+        }
+      } catch (flErr) {
+        logger.warn("feature-list lookup failed", {
+          error: flErr instanceof Error ? flErr.message : String(flErr),
         });
       }
     }
