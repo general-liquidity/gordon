@@ -28,6 +28,14 @@ import {
   formatFeatureList,
   pickHighestPriority,
 } from "../../infra/trading/ops/tradingFeatureList.ts";
+import {
+  isHumanInputToolEnabled,
+  listPending,
+  answerRequest,
+  formatPending,
+  RequestNotFoundError,
+  RequestNotPendingError,
+} from "../../infra/agents/runtime/humanInputTool.ts";
 import { handleTelemetryCommand, handleContextCommand } from "../../app/commands/index.ts";
 import { getRuntimeApprovalShortId } from "../../app/runtime/runtimeApprovalId.ts";
 import type { Message } from "../components/messages/MessageBubble.tsx";
@@ -1148,3 +1156,75 @@ export async function handleFeatureListMenuCommand(
   addMessage(setState, "gordon", lines.join("\n"));
   return true;
 }
+
+// ============================================================================
+// Human-input tool menu commands: /pending, /answer
+// ============================================================================
+
+export async function handleHumanInputMenuCommand(
+  target: string,
+  args: string,
+  setState: StateUpdater,
+): Promise<boolean> {
+  if (target !== "pending" && target !== "answer") return false;
+
+  if (!isHumanInputToolEnabled()) {
+    addMessage(
+      setState,
+      "system",
+      "Human-input tool is disabled. Set GORDON_HUMAN_INPUT_TOOL=1 to enable.",
+    );
+    return true;
+  }
+
+  if (target === "pending") {
+    const pending = listPending();
+    addMessage(setState, "gordon", formatPending(pending));
+    return true;
+  }
+
+  // /answer <request-id> <text>
+  const trimmed = args.trim();
+  if (!trimmed) {
+    addMessage(
+      setState,
+      "system",
+      "Usage: /answer <request-id> <text>\nUse /pending to list open requests.",
+    );
+    return true;
+  }
+  const firstSpace = trimmed.indexOf(" ");
+  if (firstSpace === -1) {
+    addMessage(setState, "system", "Usage: /answer <request-id> <text>");
+    return true;
+  }
+  const requestId = trimmed.slice(0, firstSpace);
+  const answer = trimmed.slice(firstSpace + 1).trim();
+  if (!answer) {
+    addMessage(setState, "system", "Answer text cannot be empty.");
+    return true;
+  }
+
+  try {
+    const resp = answerRequest(requestId, answer);
+    addMessage(
+      setState,
+      "gordon",
+      `◈ Answer recorded for ${resp.requestId} at ${resp.answeredAt}.`,
+    );
+  } catch (err) {
+    if (err instanceof RequestNotFoundError) {
+      addMessage(setState, "system", `No pending request with id "${requestId}".`);
+    } else if (err instanceof RequestNotPendingError) {
+      addMessage(setState, "system", err.message);
+    } else {
+      addMessage(
+        setState,
+        "system",
+        `Failed to record answer: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  }
+  return true;
+}
+

@@ -614,6 +614,24 @@ Four primitives ported from the seven-article batch on context engineering. The 
 
 ---
 
+## 12-Factor Agents port
+
+The "12 Factor Agents" article (HumanLayer, 2026) maps 7 of 12 factors directly to Gordon's existing architecture. Of the remaining 5, only F7 yields a self-contained primitive worth building; F3/F11/F12 are refactors or product features, not harness primitives.
+
+### F7. `humanInputTool.ts` — agent asks operator content questions ✅ wired (slash commands)
+
+**Module:** `src/infra/agents/runtime/humanInputTool.ts`
+**Flag:** `GORDON_HUMAN_INPUT_TOOL`
+**Status:** Module + tests ship. Distinct from `PermissionEngine` (safety gates) — this asks *content* questions: "close ETH or hold?", "two strategies tied on backtest — pick one", "this trade hits mandate edge — confirm?". `createRequest` opens a pending question; `waitForAnswer` returns a Promise that resolves on operator answer (with optional timeout). Survives session boundary via JSONL at `~/.gordon/human-input-requests.jsonl` — a question opened in session A can be answered in session B.
+
+**Wired:**
+- Slash commands `/pending` (list open questions) and `/answer <request-id> <text>` (resolve a question) in `slashCommands.ts`.
+- New `handleHumanInputMenuCommand` in `menuHandlers.ts` routed via `runtime.ts` dispatcher.
+- `GORDON_HUMAN_INPUT_TOOL` flag enforcement at the handler boundary.
+- Wire to agent-side (registering as a Mastra tool the agent can call) is deferred — that's a focused PR that touches the tool registry.
+
+---
+
 ## Parked (depends on signal not yet available)
 
 ### P1. Verified Completion Rate (VCR)

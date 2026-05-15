@@ -127,6 +127,8 @@ export const DIRECT_MENU_TARGETS = new Set([
   "goal-clear",
   "features",
   "features-next",
+  "pending",
+  "answer",
 ]);
 
 export const DIRECT_TOOL_TARGETS = new Set([
@@ -1671,6 +1673,28 @@ const LEGACY_SLASH_COMMANDS: SlashCommandSeed[] = [
     level: 2,
     action: "menu",
     target: "features-next",
+  },
+
+  // Human input tool (12-Factor F7)
+  {
+    name: "pending",
+    aliases: ["questions", "asks"],
+    description: "List pending human-input requests the agent is waiting on",
+    usage: "/pending",
+    category: "trading",
+    level: 2,
+    action: "menu",
+    target: "pending",
+  },
+  {
+    name: "answer",
+    aliases: ["reply"],
+    description: "Answer a pending human-input request (/answer <request-id> <text>)",
+    usage: "/answer <request-id> <text>",
+    category: "trading",
+    level: 2,
+    action: "menu",
+    target: "answer",
   },
 
   // Keyring
