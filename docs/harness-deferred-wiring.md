@@ -421,6 +421,27 @@ Trading-domain port of the `/goal` slash command Codex, Claude Code, and Hermes 
 
 ---
 
+## Harness evolution (inner-loop primitive)
+
+Trading-domain port of Algorithm 1 from Seong/Yin/Zhang/Shi — "The Last Harness You'll Ever Build" (arXiv 2604.21003v3). The paper proposes a two-level framework; this section captures the **inner loop only**. The meta-loop is parked (see P3).
+
+### H1. `harnessEvolution.ts` — inner-loop primitive
+
+**Module:** `src/infra/agents/harness-evolution/harnessEvolution.ts`
+**Flag:** `GORDON_HARNESS_EVOLUTION` (default off)
+**Status:** Module + tests ship. Pure-functional `runHarnessEvolutionLoop(initialHarness, hooks, task, opts)` with caller-supplied `BlueprintHooks` (`execute` / `evaluate` / `evolve`). Five-subsystem `HarnessConfig` mirrors Gordon's CLAUDE.md framing (instructions / tools / environment / state / feedback). Convergence on `passed=true` + optional `targetScore`; early-stop on `patience`; full iteration history persisted as JSONL at `~/.gordon/harness-evolution.jsonl`.
+
+**Wire points (all deferred):**
+1. **Hook implementations.** Build three Gordon-native hooks: (a) `execute` runs the executor agent with the harness's prompts + tool whitelist + env flags; (b) `evaluate` calls `critiquePhase.ts` + `planRubric.ts` for score + diagnostics + `terminationLayers.ts` for pass/fail; (c) `evolve` calls the ACE Reflector→Curator (`src/infra/agents/ace/`) to propose harness mutations from history.
+2. **Slash command** `/evolve <task>` — entry point that runs the loop with Gordon's default hooks.
+3. **Action-log integration.** Emit `resultToPayload` per loop completion + per-iteration records.
+
+**Risk:** Module-level zero — pure compute with caller-supplied hooks. At wire time: medium because evolved harnesses can change prompts/tools/flags, and the loop will explore configurations the operator never authorised. Mitigation: evolved harnesses still go through Gordon's safety stack (riskClassifier / terminationLayers / permissionEngine) at execution time. The loop optimises the *config*, not the *execution permission*.
+
+**Acceptance reached at module level:** 31 tests cover convergence, max-iterations, patience, best-tracking, error capture, persistence, input isolation, and callback hooks. Loop never throws; all hook errors are captured into the history record with `terminationReason="error"`.
+
+---
+
 ## Parked (depends on signal not yet available)
 
 ### P1. Verified Completion Rate (VCR)
@@ -448,6 +469,16 @@ Requires:
 
 Parked alongside P1. When both unblock, this is the highest-leverage
 build remaining.
+
+### P3. Meta-Evolution Loop (Algorithm 2 from arXiv 2604.21003v3)
+
+The outer loop that learns a blueprint Λ across a meta-training set 𝒯_train so a single learned blueprint converges fast on any new task.
+
+Parked for two reasons:
+1. The paper itself has **no experimental results** — Section 3.3 defines the evaluation metric but never runs it. Building a meta-loop on top of unvalidated theory is the AI-quant article's "amplifier of statistical garbage" pattern.
+2. Gordon has no 𝒯_train — a validated benchmark set of trading tasks. Same dependency that parks VCR (P1) and the ablation runner (P2).
+
+When P1/P2 unblock and the paper publishes results, revisit. The inner-loop primitive (H1) is the necessary precursor and is already shipped.
 
 ---
 
