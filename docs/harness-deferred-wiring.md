@@ -761,6 +761,27 @@ After 1-2 weeks of paper-mode data, compare L1 verdicts against actual outcomes.
 
 ---
 
+## Anti-rot trio — already-shipped guards, deferred wiring
+
+The three anti-rot guards (`a4244f95`, pre-dates this spec) ship with flags, tests, and exports, but no non-test code invokes the evaluators. `terminationLayers.ts:77-99` is plumbing-ready — it accepts `thesisCoherenceOk` and `mandateScopeOk` as inputs of the pre-trade check — but `agent-subscriptions.ts:478` currently hardcodes `thesisCoherenceOk: null` and `mandateScopeOk: true`, defeating the gate. Same "shipped, ⚠ not invoked" shape as TM1–TM3.
+
+### AR1. `thesisCoherence.ts` ✅ shipped, ⚠ not invoked
+
+**Module:** `src/infra/safety/anti-rot/thesisCoherence.ts`. Flag `GORDON_THESIS_COHERENCE` + threshold `GORDON_THESIS_COHERENCE_THRESHOLD`.
+**Status:** `scoreCoherence` + `gateCoherence` + persistent `RunningThesis` loader exist. **No call site** — the L1 wire in `agent-subscriptions.ts:478` passes `null`. Wire point: in the plan_ready subscription, load the running thesis (`loadRunningThesis`), call `gateCoherence(plan, thesis, threshold)`, pass the boolean into `checkPreTrade.thesisCoherenceOk`. ~half-day. The persistence layer expects callers to write/maintain the running thesis — that's a separate UX surface (slash command `/thesis set`, autonomous-loop update on regime flip).
+
+### AR2. `tradingUniverse.ts` ✅ shipped, ⚠ not invoked
+
+**Module:** `src/infra/safety/anti-rot/tradingUniverse.ts`. Flag `GORDON_TRADING_UNIVERSE` + path `GORDON_TRADING_UNIVERSE_PATH`.
+**Status:** `checkUniverse({ symbol, assetClass })` + persistent universe loader exist. **No call site** — `mandateScopeOk: true` is hardcoded in the L1 wire. Wire point: same handler, `loadUniverse()` + `checkUniverse({ symbol: plan.symbol, assetClass: inferAssetClass(plan.symbol) })`, pass `result.allowed` into `checkPreTrade.mandateScopeOk`. ~half-day. Universe persistence is operator-managed (`/universe add BTCUSDT crypto` or similar).
+
+### AR3. `traderBehaviorPatterns.ts` ✅ shipped, ⚠ not invoked
+
+**Module:** `src/infra/safety/anti-rot/traderBehaviorPatterns.ts`. Flag `GORDON_TRADER_BEHAVIOR_PATTERNS`.
+**Status:** `detectTraderBehaviorPatterns` over recent decisions returns a report of patterns (revenge-trading, over-trading, drift, etc.). **No call site** — runs nowhere in production. Different shape from AR1/AR2: this is a *post-hoc observation*, not a pre-trade gate. Two reasonable wire points: (a) call after each `recordDecision` and feed high-severity patterns into the next plan_ready's adversarial findings (composes with `applyAdversarialDowngrade`), or (b) run on a session-end hook and surface to operator. ~1-2 days. Pair with TM3 (lifecycle stages) since the pattern detector reads recent decisions and would benefit from stage tagging.
+
+---
+
 ## Parked (depends on signal not yet available)
 
 ### P1. Verified Completion Rate (VCR)
