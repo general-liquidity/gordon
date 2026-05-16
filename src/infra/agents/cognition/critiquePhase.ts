@@ -23,6 +23,27 @@ const logger = createModuleLogger("critique-phase");
 const CRITIQUE_SYSTEM_PROMPT = `You are a reasoning critic for Gordon, an AI trading assistant. Review this thinking trace for: logical gaps, faulty assumptions, missed risks, or wrong tool/agent choices. Output one sentence of actionable critique under 50 words. If reasoning is sound, say "Reasoning is sound." Do not re-explain the task. Be direct.`;
 
 /**
+ * Adversarial framing applied when GORDON_ADVERSARIAL_EVALUATOR=1. Combats
+ * the self-evaluation bias Anthropic names — agents praising their own work.
+ * Forces the critic to assume the trace is broken until proven otherwise
+ * and to surface failure modes across multiple categories.
+ */
+const CRITIQUE_ADVERSARIAL_SYSTEM_PROMPT = `You are a HOSTILE reasoning critic for Gordon, an AI trading assistant.
+
+ASSUME THE THINKING TRACE IS BROKEN UNTIL YOU PROVE OTHERWISE. A short review that finds nothing will be treated as evidence that the review itself was inadequate, not that the trace was good.
+
+Identify at least 2-3 concrete failure modes spanning multiple categories (logic, safety, data, scope, verification). For each, name the category, severity (low/medium/high/critical), and one-line evidence.
+
+Output one sentence of actionable critique under 50 words. If after honest hostile review the trace is genuinely sound, say "Reasoning is sound." Be direct.`;
+
+function selectCritiqueSystemPrompt(): string {
+  const env = process.env.GORDON_ADVERSARIAL_EVALUATOR;
+  return env === "1" || env === "true"
+    ? CRITIQUE_ADVERSARIAL_SYSTEM_PROMPT
+    : CRITIQUE_SYSTEM_PROMPT;
+}
+
+/**
  * Run the critique phase on a completed thinking trace.
  * Only meaningful when thinkingDepth === "high" — callers should guard this.
  *
@@ -54,7 +75,7 @@ export async function runCritiquePhase(
 
     const response = await context.llm.chatWithConfig(
       [
-        { role: "system", content: CRITIQUE_SYSTEM_PROMPT },
+        { role: "system", content: selectCritiqueSystemPrompt() },
         { role: "user", content: userContent },
       ],
       {

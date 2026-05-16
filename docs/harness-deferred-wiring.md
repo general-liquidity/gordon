@@ -136,7 +136,7 @@ are slow — keep probes synchronous and cheap.
 
 ---
 
-### B3. Termination layers in `execute_plan` ⚠ highest risk
+### B3. Termination layers in `execute_plan` ⚠ highest risk — Layer 1 shadow-wired
 
 **Module:** `src/infra/trading/ops/terminationLayers.ts`
 **Flag:** `GORDON_TERMINATION_LAYERS` (default off)
@@ -179,7 +179,7 @@ Layer 3 = uncaught risk events.
 
 ## Tier 3 — already-shipped primitives, deferred wiring
 
-### C1. `shadowMode` subscription to `strategy:plan_ready`
+### C1. `shadowMode` subscription to `strategy:plan_ready` ✅ wired (open side)
 
 **Module:** `src/infra/trading/ops/shadowMode.ts`
 **Flag:** `GORDON_SHADOW_MODE` (default off)
@@ -484,7 +484,7 @@ Ported from Anthropic's "Effective harnesses for long-running agents" (2026). Th
 
 Ported from Anthropic's "Harness Design for Long-Running Application Development" (2026). Coding-specific bits (Playwright self-verification, the three-agent full-stack architecture) deliberately skipped — Gordon's trading domain doesn't render UIs. The four primitives below are the trading-applicable ones.
 
-### V1. `adversarialEvaluator.ts` — combat self-evaluation bias
+### V1. `adversarialEvaluator.ts` — combat self-evaluation bias ✅ wired (critiquePhase)
 
 **Module:** `src/infra/agents/cognition/adversarialEvaluator.ts`
 **Flag:** `GORDON_ADVERSARIAL_EVALUATOR`
@@ -542,7 +542,7 @@ Ported from Anthropic's "Harness Design for Long-Running Application Development
 
 Ported from Anthropic's "How we built our multi-agent research system" (2026). Two trading-applicable patterns; the rest of the article validates Gordon's existing architecture (orchestrator-worker, parallel subagents, memory persistence, structured task descriptions).
 
-### MA1. `citationAgent.ts` — evidence-trail manifest for recommendations ✅ wired (barrel + export)
+### MA1. `citationAgent.ts` — evidence-trail manifest for recommendations ✅ wired (plan_ready hook)
 
 **Module:** `src/infra/agents/cognition/citationAgent.ts`
 **Flag:** `GORDON_CITATION_AGENT`

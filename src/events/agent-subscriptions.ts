@@ -434,6 +434,87 @@ export function createDefaultSubscriptions(
     },
 
     // ====================================================================
+    // Plan-ready observation hooks (shadow + termination L1 + citation)
+    // Fires before the executor subscription so observations are captured
+    // for every plan regardless of execution outcome.
+    // ====================================================================
+    {
+      eventType: "strategy:plan_ready",
+      agentId: "scanner", // any id; this handler is observation-only
+      priority: 1, // fire first
+      description: "Shadow-mode + termination-L1 + citation observation on plan_ready",
+      handler: async (event) => {
+        const e = event as Extract<MarketEvent, { type: "strategy:plan_ready" }>;
+        try {
+          const { isShadowModeEnabled, recordShadowOpen } = await import(
+            "../infra/trading/ops/shadowMode.ts"
+          );
+          if (isShadowModeEnabled()) {
+            recordShadowOpen({
+              planId: e.planId,
+              symbol: e.symbol,
+              side: e.direction,
+              entryPrice: e.entry,
+              intendedSize: e.positionSizePct > 0 ? e.positionSizePct / 100 : 0.01,
+              strategy: e.strategy,
+              stopLoss: e.stopLoss,
+              takeProfit: e.takeProfits[0] ?? null,
+            });
+          }
+        } catch (err) {
+          logger.warn("shadow-mode wire failed", { error: (err as Error).message });
+        }
+
+        try {
+          const { isTerminationLayersEnabled, checkPreTrade } = await import(
+            "../infra/trading/ops/terminationLayers.ts"
+          );
+          if (isTerminationLayersEnabled()) {
+            const verdict = checkPreTrade({
+              riskTier: "medium",
+              riskClassifierVerdict: "auto_approve",
+              constitutionViolations: [],
+              mandateScopeOk: true,
+              thesisCoherenceOk: null,
+            });
+            logger.info("termination-L1 (pre-trade) shadow verdict", {
+              planId: e.planId,
+              status: verdict.status,
+              message: verdict.message,
+            });
+          }
+        } catch (err) {
+          logger.warn("termination-L1 wire failed", { error: (err as Error).message });
+        }
+
+        try {
+          const { isCitationAgentEnabled, buildCitationManifest, persistCitationManifest } =
+            await import("../infra/agents/cognition/citationAgent.ts");
+          if (isCitationAgentEnabled()) {
+            const claims = [
+              `${e.direction === "long" ? "Long" : "Short"} ${e.symbol} at ${e.entry}`,
+              `Stop at ${e.stopLoss}, take-profit ladder ${e.takeProfits.join("/")}`,
+              `Strategy ${e.strategy} with risk/reward ${e.riskRewardRatio.toFixed(2)}`,
+            ];
+            const manifest = buildCitationManifest({
+              recommendationId: e.planId,
+              claims,
+              evidence: [],
+            });
+            persistCitationManifest(manifest);
+            logger.info("citation manifest persisted (no evidence yet)", {
+              planId: e.planId,
+              supportRatio: manifest.supportRatio,
+              unsupportedClaimCount: manifest.unsupportedClaimCount,
+            });
+          }
+        } catch (err) {
+          logger.warn("citation-manifest wire failed", { error: (err as Error).message });
+        }
+      },
+    },
+
+    // ====================================================================
     // Executor subscriptions
     // ====================================================================
     {

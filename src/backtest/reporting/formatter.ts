@@ -5,6 +5,7 @@
  * into human-readable markdown tables for display.
  */
 
+import { assessBacktestCredibility } from "../../infra/trading/ops/backtestCredibility.ts";
 import type {
   BacktestResult,
   OptimizationResult,
@@ -426,5 +427,27 @@ export function formatParameters(params: ParameterSet): string {
  */
 export function formatBacktestSummary(result: BacktestResult): string {
   const { metrics, config } = result;
-  return `${result.strategyName} on ${config.symbol} (${config.timeframe}): ${formatPercent(metrics.totalReturn)} return, ${formatPercent(metrics.winRate * 100)} win rate, Sharpe ${formatNumber(metrics.sharpeRatio)}, Max DD ${formatPercent(metrics.maxDrawdown * -1)}`;
+  const base = `${result.strategyName} on ${config.symbol} (${config.timeframe}): ${formatPercent(metrics.totalReturn)} return, ${formatPercent(metrics.winRate * 100)} win rate, Sharpe ${formatNumber(metrics.sharpeRatio)}, Max DD ${formatPercent(metrics.maxDrawdown * -1)}`;
+
+  // Surface backtest credibility (PSR / DSR / minTRL) when at least
+  // a handful of trades exist. Sharpe alone is the leaderboard number;
+  // PSR + DSR are the "is this real?" answer.
+  try {
+    if (result.trades && result.trades.length >= 10) {
+      const returns: number[] = result.trades.map((t) => {
+        if (t.entryPrice <= 0) return 0;
+        const raw = (t.exitPrice - t.entryPrice) / t.entryPrice;
+        return t.side === "LONG" ? raw : -raw;
+      });
+      const credibility = assessBacktestCredibility(returns, 1, 365);
+      const psr = `${(credibility.psr * 100).toFixed(0)}% ${credibility.psrSignificant ? "✓" : "✗"}`;
+      const dsr = `${(credibility.deflatedSharpe * 100).toFixed(0)}% ${credibility.dsrSignificant ? "✓" : "✗"}`;
+      const verdict = credibility.credible ? "credible" : "NOT credible";
+      return `${base}\n  Credibility: PSR ${psr}, DSR ${dsr}, ${verdict}`;
+    }
+  } catch {
+    // credibility helpers can throw on degenerate input — never break the summary
+  }
+
+  return base;
 }
