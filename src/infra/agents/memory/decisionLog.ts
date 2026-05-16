@@ -33,6 +33,21 @@ export type DecisionCategory =
   | "exit"
   | "other";
 
+/**
+ * Lifecycle stage of a trade. From TraderMorin's article: post-trade
+ * review precision requires knowing *where* in the trade lifecycle the
+ * decision was made, so mistakes can be clustered by stage.
+ */
+export type TradeLifecycleStage =
+  /** Pre-trade: market outlook, plan creation, sizing, confluence scoring. */
+  | "planning"
+  /** Order entry: timing, scaling, broker selection, fill management. */
+  | "execution"
+  /** In-trade: stop adjustments, partial closes, scaling in/out. */
+  | "management"
+  /** Trade end: full close, post-trade review, journaling. */
+  | "closure";
+
 export interface DecisionEntry {
   /** Stable ID for cross-referencing in action log. */
   id: string;
@@ -40,6 +55,12 @@ export interface DecisionEntry {
   threadId?: string;
   sessionId?: string;
   category: DecisionCategory;
+  /**
+   * Trade lifecycle stage. Optional for backward compatibility — pre-stage
+   * entries remain readable. Set explicitly going forward so post-trade
+   * review can answer "where do my mistakes cluster?"
+   */
+  stage?: TradeLifecycleStage;
   /** Brief context — what was being decided about. */
   context: string;
   /** Selected choice. */
@@ -56,6 +77,7 @@ export interface DecisionEntry {
 
 export interface RecordDecisionInput {
   category: DecisionCategory;
+  stage?: TradeLifecycleStage;
   context: string;
   selected: string;
   alternatives?: string[];
@@ -99,6 +121,7 @@ export function recordDecision(
     threadId: input.threadId,
     sessionId: input.sessionId,
     category: input.category,
+    stage: input.stage,
     context: input.context,
     selected: input.selected,
     alternatives: input.alternatives ?? [],
@@ -185,7 +208,74 @@ export function summarizeDecisionsForResume(
   const lines = decisions.slice(0, maxLines).map((d) => {
     const date = d.recordedAt.slice(0, 10);
     const sym = d.symbols?.length ? ` [${d.symbols.join(",")}]` : "";
-    return `${date}${sym} ${d.category}: chose ${d.selected} — ${d.rationale}`;
+    const stage = d.stage ? `@${d.stage}` : "";
+    return `${date}${sym} ${d.category}${stage}: chose ${d.selected} — ${d.rationale}`;
   });
+  return lines.join("\n");
+}
+
+/**
+ * Group decisions by trade-lifecycle stage. Returns counts + sample
+ * rationales per stage. Useful for the post-trade review pattern from
+ * TraderMorin's article: cluster mistakes by where they happen in the
+ * lifecycle so the operator knows whether to refine entry, management,
+ * or closure discipline.
+ */
+export interface DecisionsByStageReport {
+  totalCount: number;
+  withStage: number;
+  withoutStage: number;
+  byStage: Record<TradeLifecycleStage, {
+    count: number;
+    categories: Record<DecisionCategory, number>;
+    sampleContexts: string[];
+  }>;
+}
+
+export function groupDecisionsByStage(decisions: readonly DecisionEntry[]): DecisionsByStageReport {
+  const byStage: Record<TradeLifecycleStage, { count: number; categories: Record<DecisionCategory, number>; sampleContexts: string[] }> = {
+    planning: { count: 0, categories: {} as Record<DecisionCategory, number>, sampleContexts: [] },
+    execution: { count: 0, categories: {} as Record<DecisionCategory, number>, sampleContexts: [] },
+    management: { count: 0, categories: {} as Record<DecisionCategory, number>, sampleContexts: [] },
+    closure: { count: 0, categories: {} as Record<DecisionCategory, number>, sampleContexts: [] },
+  };
+  let withStage = 0;
+  let withoutStage = 0;
+  for (const d of decisions) {
+    if (!d.stage) {
+      withoutStage += 1;
+      continue;
+    }
+    withStage += 1;
+    const bucket = byStage[d.stage];
+    bucket.count += 1;
+    bucket.categories[d.category] = (bucket.categories[d.category] ?? 0) + 1;
+    if (bucket.sampleContexts.length < 3) bucket.sampleContexts.push(d.context);
+  }
+  return {
+    totalCount: decisions.length,
+    withStage,
+    withoutStage,
+    byStage,
+  };
+}
+
+export function formatStageReport(report: DecisionsByStageReport): string {
+  const lines: string[] = [];
+  lines.push(`Decisions by stage (${report.withStage} stage-tagged / ${report.totalCount} total):`);
+  for (const stage of ["planning", "execution", "management", "closure"] as TradeLifecycleStage[]) {
+    const bucket = report.byStage[stage];
+    if (bucket.count === 0) continue;
+    const cats = Object.entries(bucket.categories)
+      .map(([cat, n]) => `${cat}=${n}`)
+      .join(", ");
+    lines.push(`  ${stage}: ${bucket.count} decisions${cats ? ` (${cats})` : ""}`);
+    for (const ctx of bucket.sampleContexts) {
+      lines.push(`    • ${ctx}`);
+    }
+  }
+  if (report.withoutStage > 0) {
+    lines.push(`  (${report.withoutStage} decisions without stage tag)`);
+  }
   return lines.join("\n");
 }
