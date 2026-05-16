@@ -663,6 +663,104 @@ Three additions from the dabit3 hook patterns. The seven example hooks in the de
 
 ---
 
+## TraderMorin workflow port — remaining gaps
+
+Three primitives from the trader's 5-step workflow shipped in commit `261c1592`. The wires + skipped items are tracked here.
+
+### TM1. `confluenceScorer.ts` ✅ shipped, ⚠ not invoked
+
+**Module:** `src/infra/trading/ops/confluenceScorer.ts`. Flag `GORDON_CONFLUENCE_SCORER`.
+**Status:** Primitive + tests + composability with adversarialEvaluator. **No call site yet** — currently nothing in Gordon invokes `scoreConfluences` on a generated plan and feeds the tier into risk sizing. Wire point: in `planner.ts` (or wherever plans get finalized into `strategy:plan_ready` events), enumerate the active confluences for the symbol (divergence detector + regime fit + key-level proximity + EMA alignment), build `ConfluenceObservation[]`, call `scoreConfluences`, multiply base risk by `riskMultiplier`, attach tier to the emitted plan. ~1 week of focused work, all in the planner path.
+
+### TM2. `executionPlaybook.ts` ✅ shipped, ⚠ not invoked
+
+**Module:** `src/infra/trading/ops/executionPlaybook.ts`. Flag `GORDON_EXECUTION_PLAYBOOK`.
+**Status:** Primitive + 5 built-in playbooks + tests. **No call site yet** — Gordon's executor today is single-shot at the broker layer. Wire points (in priority order):
+1. Plan field: extend `PlanReadyEvent` with optional `executionPlaybookId: string`.
+2. Planner picks a playbook based on the trading playbook (mean-reversion → `scaled-thirds`, breakout → `breakout-confirm`, etc.).
+3. Executor consults `attachExecution` to resolve absolute prices, then schedules N broker orders instead of 1.
+4. Position-management layer honors the exit ladder + stop rules.
+
+Item 4 is the biggest sub-piece — Gordon doesn't currently have a position-management loop that adjusts stops or fires partial closes. Pair this with termination Layer 3 wiring (post-fill reconciliation), since both touch the same execution-state machine.
+
+### TM3. `decisionLog` lifecycle stages ✅ field added, ⚠ no callers populate it
+
+**Module:** `src/infra/agents/memory/decisionLog.ts`.
+**Status:** Optional `stage: TradeLifecycleStage` added to `DecisionEntry`. `groupDecisionsByStage` + `formatStageReport` exist. **No existing `recordDecision` callsite populates `stage`** — all pre-this-PR decisions remain unstaged (which the report tolerates). Wire point: every existing/future `recordDecision` call gets a stage tag based on where in the trade lifecycle it fired. The natural mapping:
+- Planner / risk-classifier verdicts → `"planning"`
+- Order placement / cancel / scale-in decisions → `"execution"`
+- Stop adjustments / partial closes / scale-out → `"management"`
+- Final close + post-trade review → `"closure"`
+
+~2-3 hours of grep-and-tag work across existing callsites. Low risk.
+
+### Items deliberately skipped from the article
+
+- **TPO / market-profile indicators (1E).** Niche, big indicator build, useful only to traders running market-profile theory. Revisit if a user explicitly asks.
+- **Emotion journaling during trade lifecycle (5A).** `humanInputTool` (just wired) is the right substrate — Gordon could prompt mid-trade "how are you feeling about this?" — but turning it into a workflow assumes Gordon owns the human's full trading day, a product-shape decision not yet made.
+- **Morning briefing assembly (1A + 1C + 1D combined).** UI/aggregation work. The components exist (regime detector, Finnhub econ, indicators); the gap is a daily-routine surface. Wait until there's a daily-summary product surface to assemble against.
+- **Key-levels persistent watchlist (1D).** Overlaps with what indicators already compute; surfacing differently is mostly UX, not a missing primitive.
+- **Position-sizing "Why?" enforcement field (3B).** The citation-manifest pipeline (wired at plan_ready) covers the spirit at the plan level. Per-field rationale enforcement would be overkill given that.
+- **Pro-Trend / Counter-Trend explicit checklist (1A).** Already implicit in `regime` detector + plan rationale. No primitive needed; could be surfaced as a plan-card section.
+
+---
+
+## Mercury "batteries included" gaps
+
+From the Mercury Agent piece (cosmicstack-labs, 2026) gap analysis. Gordon has the safety/governance batteries (more than Mercury describes) but is missing several generalist capability batteries. These remain for super-agent scope; trading-only operators can mostly skip.
+
+### MB1. Generic `fetch_url` tool ❌ not built
+
+Required for: news pulls beyond current sources, on-chain reads via arbitrary RPC, public-API access for trade-relevant data, bank-OAuth callbacks (when expanding scope). Should consult `networkAllowlist` (already shipped) before each call so the safety wire activates automatically. ~1 day to build. Defer until first concrete trading need arises (news ingest expansion is the likely trigger).
+
+### MB2. Generic `schedule_task` primitive ❌ not built
+
+Recurring user intents: "rebalance every Friday at close," "tax-loss-harvest review in November," "settle the AWS subscription on the 1st." Distinct from `autonomous-loop`'s mandate-driven schedule. A small primitive: `scheduleTask({ id, cron, taskPrompt, scope })` + a tick loop that fires queued tasks at their cron time. ~3 days. Defer until traders ask for non-mandate scheduling.
+
+### MB3. Unified status / control surfaces ⚠ partial
+
+`/status` (aggregating cycle + mandate + active goal + pending human-input + shadow verdicts + KV-cache hit rate), `/tasks` (open features + decisions + pending), `/budget` (with hard enforcement on `kvCacheHitMetric`, not just observability), `/progress` (autonomous-loop visibility). Mercury's argument: the data is already tracked, just not surfaced as one place. Slash commands exist for some (`/features`, `/goal-status`, `/pending`) but no consolidated overview. ~2-3 days.
+
+### MB4. Budget enforcement (not just metric) ⚠ partial
+
+`kvCacheHitMetric` (shipped) is observation-only. Add a hard daily-USD cap that triggers `auto-concise` behavior (force shorter responses + skip optional sub-agent calls) when threshold hit. Mercury enforces; Gordon currently observes. Same flag — promote to enforcement. ~2 days.
+
+### MB5. Telegram / mobile surface ❌ not built — deferred hard
+
+Multi-week build. CLI/TUI-only is fine for development; super-agent / wider-distribution mode needs mobile entry-point. Wait for traction signal first. The webhook trigger pattern (12-Factor F11) sets up the substrate when bandwidth permits.
+
+### MB6. Aggressive default memory ❌ deliberate philosophical choice
+
+Mercury auto-extracts and persists memory aggressively. Gordon's Hermes pattern (per CLAUDE.md memory note) keeps working memory minimal — semantic recall disabled by default; cold recall via model-decides `searchMemoryTool` / `getMemoryContextTool` / `getLessonsTool`. This is the "broad memory makes agents worse" finding from the Hermes ChatGPT-taxonomy survey. **Not a gap — a deliberate choice.** For super-agent scope, the cold layer gets more entries (positions + bills + subscriptions etc.) but the always-inject layer stays small.
+
+---
+
+## Remaining wires from the 5-wire batch (commit `1c8209ef`)
+
+The 5 wires shipped earlier in this session were observation-only at the plan_ready hook. Each has a follow-up wire that completes the loop.
+
+### W1. Shadow-mode close-side worker ⚠ open side wired, close side missing
+
+`recordShadowOpen` fires on every `plan_ready` event. Without a close-side reconciliation worker, shadow fills accumulate forever as "open" — no hypothetical-PnL data ever materializes. Background worker polls current market price for open shadow fills, calls `recordShadowClose` when stop/target/timeout hit. ~3 days. **This is the most important follow-up of the entire shipped set** — without it, the most important company-level signal ("do Gordon's plans beat market in the alternate universe?") can't be computed.
+
+### W2. Citation evidence enrichment (action-log → EvidenceRef adapter) ⚠ pipeline wired, no evidence
+
+`buildCitationManifest` is called on every `plan_ready` event, but the `evidence: []` array is empty (we synthesize claims from plan fields, nothing else). The adapter that walks the recent action-log entries for the plan's symbol + time window and emits `EvidenceRef[]` is the missing piece. ~3 days. After it ships, every previously-recorded manifest is back-fillable.
+
+### W3. Termination layers L2 + L3 ⚠ L1 wired in shadow, L2+L3 deferred
+
+L1 (pre-trade) observation wired at plan_ready. L2 (runtime ack/reject) needs the broker-ack callback hook — fires when an order submission returns. L3 (system-confirmation) needs post-fill reconciliation data — fires after fill report arrives. Both touch Gordon's actual execution path, which today is leaner than a full broker-ack lifecycle. Pair with TM2 (executionPlaybook wiring) since both need the same execution-state machine.
+
+### W4. Promotion of L1 from shadow to enforcing ⏳ data-blocked
+
+After 1-2 weeks of paper-mode data, compare L1 verdicts against actual outcomes. If catch rate is high and false-positive rate is low, promote to enforcing (block trades when L1 fails). Pure config flip in `agent-subscriptions.ts` once the data justifies it.
+
+### W5. Adversarial critique calibration ⏳ data-blocked
+
+`adversarialEvaluator` is active in `critiquePhase` when flag is on. Compare critique-pass / critique-fail rate before vs after the adversarial flag flip. If the new framing catches more real issues, it stays default-on; if it just produces noise, it gets gated to high-stakes-only.
+
+---
+
 ## Parked (depends on signal not yet available)
 
 ### P1. Verified Completion Rate (VCR)
