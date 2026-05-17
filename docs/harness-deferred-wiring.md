@@ -761,6 +761,37 @@ After 1-2 weeks of paper-mode data, compare L1 verdicts against actual outcomes.
 
 ---
 
+## Ryan Wright port (Wave 1 — survival math)
+
+From Ryan Wright's *The Art and Business of Professional Trading* (Wiley 2026). Wave 1 ports four math/state primitives that fill genuine gaps in Gordon's sizing + survival surface. All cold behind flags, same pattern as confluenceScorer + executionPlaybook.
+
+### WW1. `pathDependentSizer.ts` ✅ shipped, ⚠ not invoked
+
+**Module:** `src/infra/trading/ops/pathDependentSizer.ts`. Flag `GORDON_PATH_DEPENDENT_SIZER`.
+**Status:** Ch 9 Type I/II/III tier system + Ch 16 Protocol 5 sizing matrix (cold/neutral/hot performance state). Anti-Martingale is structural (Type II variable component = 10% of YTD profits, collapses to zero in drawdown). Type III requires positive YTD. Cold state blocks Type I. Absolute cap 5% adjusted RC. Replicates Wright's WTI crude example end-to-end in tests. **No call site yet** — planner currently sizes via `riskClassifier`'s 11-dimension scoring. Wire point: planner picks `tier` from confluence score (A* → III, A → II, B/C → I), reads `initialRiskCapital` + `ytdPnL` from session state, classifies performance state from recent decisions + equity peak, calls `sizePosition(...)`, attaches `positionUnits` to plan. Pair with TM1 (confluenceScorer) — they compose cleanly. ~1 week.
+
+### WW2. `absorbingBarrier.ts` ✅ shipped, ⚠ not invoked
+
+**Module:** `src/infra/safety/absorbingBarrier.ts`. Flag `GORDON_ABSORBING_BARRIER`.
+**Status:** Ch 13 three-barrier classifier (broker margin / prop-firm trailing / psychological tilt). Outputs distance in BOTH dollars and R-units with 5-tier alert level (ok/watch/warn/warn/breached at thresholds 10/5/2/0 R). `shouldBlockNewTrades` returns true at warn-or-worse. **No call site yet** — Gordon's existing `GORDON_RISK_DAILY_LOSS_USD` covers the broker barrier implicitly, but prop-firm trailing and psychological tilt are unsurfaced. Wire point: pre-trade subscription in `agent-subscriptions.ts` calls `distanceToBarriers(...)`, feeds `shouldBlockNewTrades` into the L1 termination input (replacing the hardcoded `mandateScopeOk: true`). Surfaces nearest-barrier R-units to plan card. ~3-4 days.
+
+### WW3. `volatilityDrag.ts` ✅ shipped, ⚠ not invoked
+
+**Module:** `src/infra/trading/ops/volatilityDrag.ts`. Flag `GORDON_VOLATILITY_DRAG`.
+**Status:** Ch 13 geometric-vs-arithmetic math: `R_geo = R_arith - σ²/2`, recovery-return table, leverage privilege gate (Sharpe ≥ 1.5 default, dynamic max-leverage suggestion based on observed DD vs tolerance), strategy comparison (surgeon-vs-gunslinger). Pure compute, no persistence. **No call site yet** — backtest reporting in `formatter.ts` shows raw returns without drag breakdown. Wire point: extend `formatBacktestSummary` to compute σ from trades and append "Arithmetic 30%, geometric 22% (drag 8%, σ=40%)" line. Also surface `leveragePrivilege` verdict to the backtest summary so users know whether they've earned leverage. ~2-3 days. Composes with Q4 multipleTestingTracker (DSR/PSR), not duplicative.
+
+### WW4. `frictionTracker.ts` ✅ shipped, ⚠ no producers yet
+
+**Module:** `src/infra/trading/ops/frictionTracker.ts`. Flag `GORDON_FRICTION_TRACKER` + path `GORDON_FRICTION_TRACKER_PATH`. Persists to `~/.gordon/friction.jsonl`.
+**Status:** Ch 6 + Ch 16 Protocol 3 three-component friction model (explicit / implicit / psychological). 9 kinds auto-classified to components. `auditFriction` produces verdict with Wright's 20%-of-gross fail threshold (warn at 10%). **No producers wired yet** — Gordon has `marketImpact.ts` (Q3) which models the implicit half theoretically but doesn't record realized slippage. Wire points: (a) order-execution path records `slippage` event with `planned_fill - actual_fill` after fill confirmation; (b) cancel/modify-stop tool records `moved_stop` event with diff; (c) executor records `hesitation` event when `order_send_time - signal_emit_time` > threshold. Monthly audit surface via slash command. ~1 week total across all three producers.
+
+### Wave 2 + 3 deferred
+
+Wave 2 (operator-facing): `dailyDecisionJournal`, `debriefMatrix`, `preExecKillList`, `convictionCalibrationGate` — not yet started.
+Wave 3 (opportunistic): Operator's Equation scorer, Weekly Regime Check, Shannon's Demon rebalancer — defer until Wave 2 surfaces signal.
+
+---
+
 ## Anti-rot trio — already-shipped guards, deferred wiring
 
 The three anti-rot guards (`a4244f95`, pre-dates this spec) ship with flags, tests, and exports, but no non-test code invokes the evaluators. `terminationLayers.ts:77-99` is plumbing-ready — it accepts `thesisCoherenceOk` and `mandateScopeOk` as inputs of the pre-trade check — but `agent-subscriptions.ts:478` currently hardcodes `thesisCoherenceOk: null` and `mandateScopeOk: true`, defeating the gate. Same "shipped, ⚠ not invoked" shape as TM1–TM3.
