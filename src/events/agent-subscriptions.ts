@@ -11,6 +11,7 @@
  */
 
 import { createModuleLogger } from "../infra/logger/index.ts";
+import { recordStructuredObservation } from "../infra/platform/observability/structured.ts";
 import { EventBus, getEventBus } from "./bus.ts";
 import type { MarketEventType, MarketEvent } from "./market-events.ts";
 import type { EventType } from "./types.ts";
@@ -311,6 +312,34 @@ export class AgentSubscriptionRegistry {
  * @param registry - The registry to get the invoker from
  * @returns Array of AgentSubscription definitions
  */
+/**
+ * Emit a shadow-verdict observation to BOTH the application logger
+ * (for human-readable trace in console / log file) AND to Axiom via
+ * recordStructuredObservation (for queryable history).
+ *
+ * Closing the gap from the harness-assessment doc §3.1: shadow verdicts
+ * weren't reaching Axiom because they were going to logger.info only.
+ * Every WW shadow wire that calls this helper now feeds the
+ * calibration-data pipeline.
+ */
+function shadowVerdict(
+  component: string,
+  eventType: string,
+  outcome: "success" | "failure" | "info" | "cancelled",
+  details: Record<string, unknown>,
+): void {
+  logger.info(`${component} shadow verdict`, details);
+  recordStructuredObservation({
+    eventType,
+    workflow: "execution",
+    source: "event_handler",
+    component: "agent_subscriptions",
+    status: component,
+    outcome,
+    details,
+  });
+}
+
 export function createDefaultSubscriptions(
   registry: AgentSubscriptionRegistry
 ): AgentSubscription[] {
@@ -477,11 +506,12 @@ export function createDefaultSubscriptions(
               mandateScopeOk: true,
               thesisCoherenceOk: null,
             });
-            logger.info("termination-L1 (pre-trade) shadow verdict", {
-              planId: e.planId,
-              status: verdict.status,
-              message: verdict.message,
-            });
+            shadowVerdict(
+              "termination_layer_1",
+              "trading.termination_l1.shadow",
+              verdict.status === "pass" ? "info" : "failure",
+              { planId: e.planId, status: verdict.status, message: verdict.message },
+            );
           }
         } catch (err) {
           logger.warn("termination-L1 wire failed", { error: (err as Error).message });
@@ -506,14 +536,20 @@ export function createDefaultSubscriptions(
                 psychologicalTiltUsd: psychTilt > 0 ? psychTilt : undefined,
                 baseRiskPerTradeUsd: baseR > 0 ? baseR : undefined,
               });
-              logger.info("absorbing-barrier shadow verdict", {
-                planId: e.planId,
-                nearest: barriers.nearest,
-                nearestRUnits: Number.isFinite(barriers.nearestRUnits)
-                  ? Number(barriers.nearestRUnits.toFixed(2))
-                  : null,
-                wouldBlock: shouldBlockNewTrades(barriers),
-              });
+              const wouldBlock = shouldBlockNewTrades(barriers);
+              shadowVerdict(
+                "absorbing_barrier",
+                "trading.absorbing_barrier.shadow",
+                wouldBlock ? "failure" : "info",
+                {
+                  planId: e.planId,
+                  nearest: barriers.nearest,
+                  nearestRUnits: Number.isFinite(barriers.nearestRUnits)
+                    ? Number(barriers.nearestRUnits.toFixed(2))
+                    : null,
+                  wouldBlock,
+                },
+              );
             }
           }
         } catch (err) {
@@ -540,14 +576,19 @@ export function createDefaultSubscriptions(
                 entryPrice: e.entry,
                 stopPrice: e.stopLoss,
               });
-              logger.info("path-dependent-sizer shadow verdict", {
-                planId: e.planId,
-                state,
-                tierDollarRisk: result.tierDollarRisk,
-                finalDollarRisk: result.finalDollarRisk,
-                positionUnits: Number(result.positionUnits.toFixed(6)),
-                rejected: result.rejected,
-              });
+              shadowVerdict(
+                "path_dependent_sizer",
+                "trading.path_dependent_sizer.shadow",
+                result.rejected ? "failure" : "info",
+                {
+                  planId: e.planId,
+                  state,
+                  tierDollarRisk: result.tierDollarRisk,
+                  finalDollarRisk: result.finalDollarRisk,
+                  positionUnits: Number(result.positionUnits.toFixed(6)),
+                  rejected: result.rejected,
+                },
+              );
             }
           }
         } catch (err) {
@@ -611,11 +652,12 @@ export function createDefaultSubscriptions(
               movedStop: process.env.GORDON_OPERATOR_MOVED_STOP === "1",
               scaredMoney: process.env.GORDON_OPERATOR_SCARED_MONEY === "1",
             });
-            logger.info("pre-exec-kill-list shadow verdict", {
-              planId: e.planId,
-              pass: result.pass,
-              blockers: result.blockers,
-            });
+            shadowVerdict(
+              "pre_exec_kill_list",
+              "trading.pre_exec_kill_list.shadow",
+              result.pass ? "info" : "failure",
+              { planId: e.planId, pass: result.pass, blockers: result.blockers },
+            );
           }
         } catch (err) {
           logger.warn("pre-exec-kill-list wire failed", { error: (err as Error).message });
@@ -651,13 +693,18 @@ export function createDefaultSubscriptions(
               }
             }
             const calibration = evaluateCalibration({ trades });
-            logger.info("conviction-calibration shadow verdict", {
-              planId: e.planId,
-              status: calibration.status,
-              tradesSeen: calibration.tradesSeen,
-              pearsonR: calibration.pearsonR,
-              allowsConvictionSizing: calibration.allowsConvictionSizing,
-            });
+            shadowVerdict(
+              "conviction_calibration",
+              "trading.conviction_calibration.shadow",
+              calibration.allowsConvictionSizing ? "info" : "failure",
+              {
+                planId: e.planId,
+                status: calibration.status,
+                tradesSeen: calibration.tradesSeen,
+                pearsonR: calibration.pearsonR,
+                allowsConvictionSizing: calibration.allowsConvictionSizing,
+              },
+            );
           }
         } catch (err) {
           logger.warn("conviction-calibration wire failed", { error: (err as Error).message });

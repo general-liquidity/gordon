@@ -301,6 +301,17 @@ const LEGACY_SLASH_COMMANDS: SlashCommandSeed[] = [
     target: "check_positions",
   },
   {
+    name: "status",
+    aliases: ["overview", "snap"],
+    description: "Unified snapshot: equity, session PnL, recent debriefs, friction, active flags",
+    usage: "/status [windowHours]",
+    category: "trading",
+    level: 1,
+    action: "tool",
+    target: "status_overview",
+    whenToUse: "Operator wants a single-glance view of where Gordon stands right now",
+  },
+  {
     name: "orders",
     aliases: ["o"],
     description: "View open orders across crypto or stocks",

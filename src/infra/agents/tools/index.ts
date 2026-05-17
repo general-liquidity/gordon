@@ -125,6 +125,9 @@ export { agentFeedbackTools } from "./runtime/meta/agent-feedback.ts";
 // Anti-trap tools (record_user_thesis, record_supervision_outcome)
 export { antiTrapTools } from "./runtime/meta/anti-trap.ts";
 
+// Status overview tool (/status slash command target)
+export { statusTools } from "./runtime/statusOverview.ts";
+
 // Playbook tools (v0.7)
 export { playbookTools } from "./runtime/meta/playbook-tools.ts";
 
@@ -389,6 +392,7 @@ import { memoryTools } from "./runtime/meta/memory-tools.ts";
 import { aceTools } from "./runtime/meta/ace-tools.ts";
 import { agentFeedbackTools } from "./runtime/meta/agent-feedback.ts";
 import { antiTrapTools } from "./runtime/meta/anti-trap.ts";
+import { statusTools } from "./runtime/statusOverview.ts";
 import { playbookTools } from "./runtime/meta/playbook-tools.ts";
 import { playbookBacktestTools } from "./strategy/backtest/backtest-tools.ts";
 import { runtimeTools } from "./runtime/flow/runtime-tools.ts";
@@ -485,6 +489,7 @@ const _rawAllTools = {
   ...aceTools,
   ...agentFeedbackTools,
   ...antiTrapTools,
+  ...statusTools,
   ...playbookTools,
   ...playbookBacktestTools,
   ...runtimeTools,
