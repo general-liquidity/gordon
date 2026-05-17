@@ -312,6 +312,31 @@ const LEGACY_SLASH_COMMANDS: SlashCommandSeed[] = [
     whenToUse: "Operator wants a single-glance view of where Gordon stands right now",
   },
   {
+    name: "shadow",
+    aliases: ["sim", "second-opinion"],
+    description:
+      "Run a hypothetical trade through Gordon's full pre-trade chain (no orders placed)",
+    usage: "/shadow long BTC at 65000 stop 63000 targets 67000 70000",
+    category: "trading",
+    level: 1,
+    action: "tool",
+    target: "shadow_plan",
+    whenToUse:
+      "User wants Gordon as a second opinion on a trade idea — runs marginal participant, edge attribution, risk bundle, sizer, barriers, kill list, liquidity map without placing orders",
+  },
+  {
+    name: "rate",
+    aliases: ["feedback"],
+    description: "Rate the most recent Gordon response (+ / -) — drives quality calibration",
+    usage: "/rate +|-  [comment]",
+    category: "system",
+    level: 1,
+    action: "tool",
+    target: "rate_response",
+    whenToUse:
+      "User wants to record explicit feedback on the most recent shadow plan or response",
+  },
+  {
     name: "orders",
     aliases: ["o"],
     description: "View open orders across crypto or stocks",

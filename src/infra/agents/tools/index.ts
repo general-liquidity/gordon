@@ -128,6 +128,10 @@ export { antiTrapTools } from "./runtime/meta/anti-trap.ts";
 // Status overview tool (/status slash command target)
 export { statusTools } from "./runtime/statusOverview.ts";
 
+// Shadow plan + feedback rating tools (/shadow + /rate slash commands)
+export { shadowPlanTools } from "./runtime/shadowPlan.ts";
+export { feedbackRatingTools } from "./runtime/feedbackRating.ts";
+
 // Playbook tools (v0.7)
 export { playbookTools } from "./runtime/meta/playbook-tools.ts";
 
@@ -393,6 +397,8 @@ import { aceTools } from "./runtime/meta/ace-tools.ts";
 import { agentFeedbackTools } from "./runtime/meta/agent-feedback.ts";
 import { antiTrapTools } from "./runtime/meta/anti-trap.ts";
 import { statusTools } from "./runtime/statusOverview.ts";
+import { shadowPlanTools } from "./runtime/shadowPlan.ts";
+import { feedbackRatingTools } from "./runtime/feedbackRating.ts";
 import { playbookTools } from "./runtime/meta/playbook-tools.ts";
 import { playbookBacktestTools } from "./strategy/backtest/backtest-tools.ts";
 import { runtimeTools } from "./runtime/flow/runtime-tools.ts";
@@ -490,6 +496,8 @@ const _rawAllTools = {
   ...agentFeedbackTools,
   ...antiTrapTools,
   ...statusTools,
+  ...shadowPlanTools,
+  ...feedbackRatingTools,
   ...playbookTools,
   ...playbookBacktestTools,
   ...runtimeTools,
