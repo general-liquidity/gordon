@@ -27,6 +27,11 @@ import {
   isOperatorEquationEnabled,
   evaluateOperatorEquation,
 } from "../../infra/trading/ops/operatorEquation.ts";
+import {
+  isBacktestTaxEnabled,
+  applyBacktestTax,
+  expectedRAfterTax,
+} from "../../infra/trading/ops/backtestTax.ts";
 import type {
   BacktestResult,
   OptimizationResult,
@@ -516,6 +521,20 @@ export function formatBacktestSummary(result: BacktestResult): string {
           frictionR,
         });
         extra += `\n  Operator equation: EV ${r.expectedValueR.toFixed(2)}R × exp ${(r.optimalExposureFraction * 100).toFixed(2)}% − fric ${r.frictionR.toFixed(3)}R = ${r.performanceR.toFixed(4)}R (${r.failureMode})`;
+      }
+
+      if (isBacktestTaxEnabled() && metrics.totalTrades > 0) {
+        const wins = metrics.winningTrades;
+        const losses = metrics.losingTrades;
+        const winRate = wins / Math.max(wins + losses, 1);
+        const payoff = metrics.averageWin > 0 && metrics.averageLoss !== 0
+          ? metrics.averageWin / Math.abs(metrics.averageLoss)
+          : 0;
+        if (winRate > 0 && payoff > 0) {
+          const taxed = applyBacktestTax({ stats: { winRate, payoffRatio: payoff } });
+          const evAfter = expectedRAfterTax(taxed);
+          extra += `\n  Backtest tax: win ${(taxed.rawWinRate * 100).toFixed(1)}%→${(taxed.winRate * 100).toFixed(1)}%, payoff ${taxed.rawPayoffRatio.toFixed(2)}→${taxed.payoffRatio.toFixed(2)}, taxed EV ${evAfter.toFixed(3)}R`;
+        }
       }
     }
   } catch {

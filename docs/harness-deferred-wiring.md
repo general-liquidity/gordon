@@ -858,6 +858,18 @@ Plus WW9 `operatorEquation` wired into `formatBacktestSummary` (EV × Exposure �
 
 All shadow-mode wires log verdicts; promotion to enforcing waits for paper-mode data validation per the same pattern as WW2/WW7/WW8.
 
+### Closing-the-last-5% batch (WW23–WW25) — implicit primitives surfaced as modules
+
+After full chapter scan, 3 implicit Wright primitives were called out as missing-as-separate-modules. Built + wired:
+
+| WW | Module | Source | Wired? |
+|---|---|---|---|
+| WW23 | `dailyRollup.ts` | Ch 2 — 12-12 framework (Donnelly) | ✅ `system:session_start` handler — aggregates last 24h decisionLog + debriefMatrix + frictionTracker, emits reinforce/fix recommendations + toxic-alpha alarm |
+| WW24 | `backtestTax.ts` | Ch 9 — backtest-tax discount | ✅ `formatBacktestSummary` — applies 15%/25% default discount, emits taxed EV alongside raw stats |
+| WW25 | `traderArchetype.ts` | Ch 8 — flaw audit (3 archetypes) | ✅ plan_ready — env-driven 9 behavior booleans (`GORDON_TRADER_HESITATES` / `_CHASES` / `_PARALYSIS` / `_BORED` / `_INVENTS` / `_FAST_CLICK` / `_VISCERAL` / `_CROWD` / `_MOODY`) → archetype + recommended guardrails |
+
+This closes the Wright port. 25 modules across 17 chapters + 6 explicit skips. Every load-bearing primitive identified in the book is now shipped, tested, and wired (or explicitly cold with documented data-blocking dependency).
+
 ---
 
 ## Anti-rot trio — already-shipped guards, deferred wiring

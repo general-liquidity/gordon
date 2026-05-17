@@ -841,6 +841,33 @@ export function createDefaultSubscriptions(
         }
 
         try {
+          const { isTraderArchetypeEnabled, classifyTrader } = await import(
+            "../infra/trading/ops/traderArchetype.ts"
+          );
+          if (isTraderArchetypeEnabled()) {
+            const result = classifyTrader({
+              hesitatesAtEntry: process.env.GORDON_TRADER_HESITATES === "1",
+              chasesAfterMissed: process.env.GORDON_TRADER_CHASES === "1",
+              analysisParalysis: process.env.GORDON_TRADER_PARALYSIS === "1",
+              tradesOutOfBoredom: process.env.GORDON_TRADER_BORED === "1",
+              inventsSetups: process.env.GORDON_TRADER_INVENTS === "1",
+              fastClickReflex: process.env.GORDON_TRADER_FAST_CLICK === "1",
+              visceralReaction: process.env.GORDON_TRADER_VISCERAL === "1",
+              follwsCrowdPanic: process.env.GORDON_TRADER_CROWD === "1",
+              moodLeaksIntoPnl: process.env.GORDON_TRADER_MOODY === "1",
+            });
+            logger.info("trader-archetype shadow verdict", {
+              planId: e.planId,
+              archetype: result.archetype,
+              confidence: Number(result.confidence.toFixed(3)),
+              guardrailCount: result.recommendedGuardrails.length,
+            });
+          }
+        } catch (err) {
+          logger.warn("trader-archetype wire failed", { error: (err as Error).message });
+        }
+
+        try {
           const { isLiquidityMapperEnabled, mapLiquidity } = await import(
             "../infra/trading/ops/liquidityMapper.ts"
           );
@@ -1114,6 +1141,49 @@ export function createDefaultSubscriptions(
             `Compare results with previous runs and flag any degradation.`,
           { jobId: e.jobId, jobName: e.jobName, trigger: "cron_tick" }
         );
+      },
+    },
+
+    // ====================================================================
+    // Daily rollup on session start (WW23 — Wright Ch 2 12-12 framework)
+    // ====================================================================
+    {
+      eventType: "system:session_start",
+      agentId: "teacher",
+      priority: 5,
+      description: "Aggregate last 24h decisionLog + debriefMatrix + frictionTracker into rollup",
+      handler: async () => {
+        try {
+          const { isDailyRollupEnabled, buildRollup, formatRollup } = await import(
+            "../infra/trading/ops/dailyRollup.ts"
+          );
+          if (!isDailyRollupEnabled()) return;
+          const { defaultDecisionsLogPath } = await import(
+            "../infra/agents/memory/decisionLog.ts"
+          );
+          const { defaultDebriefPath } = await import(
+            "../infra/trading/ops/debriefMatrix.ts"
+          );
+          const { defaultFrictionLogPath } = await import(
+            "../infra/trading/ops/frictionTracker.ts"
+          );
+          const summary = buildRollup({
+            decisionsPath: defaultDecisionsLogPath(),
+            debriefsPath: defaultDebriefPath(),
+            frictionPath: defaultFrictionLogPath(),
+          });
+          logger.info("daily-rollup at session start", {
+            decisionCount: summary.decisionCount,
+            debriefCounts: summary.debriefCounts,
+            frictionUsdTotal: Number(summary.frictionUsdTotal.toFixed(2)),
+            toxicAlphaWarning: summary.toxicAlphaWarning,
+            reinforcementCount: summary.reinforcements.length,
+            fixCount: summary.fixes.length,
+            summary: formatRollup(summary),
+          });
+        } catch (err) {
+          logger.warn("daily-rollup wire failed", { error: (err as Error).message });
+        }
       },
     },
   ];
