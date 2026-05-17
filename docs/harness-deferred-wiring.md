@@ -830,28 +830,33 @@ From Ryan Wright's *The Art and Business of Professional Trading* (Wiley 2026). 
 **Status:** Ch 13 periodic rebalance-to-target primitive. Computes deltaUsd per allocation given current values + target weights. `simulateDoubleHalfPath` reproduces Wright's exact 12.5% example. Pure compute.
 **Wire point:** specialty primitive — most useful for the user-managed portfolio surface (carry strategies, sideways crypto exposure with USD cash leg). Wire point: scheduled rebalance cron that reads positions from broker, computes trades, posts to operator for approval. No automatic execution — Wright explicitly says the demon dies if you cross an absorbing barrier mid-cycle, so pair with WW2 absorbingBarrier as a precondition gate. ~1 week including portfolio-state plumbing. Lower priority than WW1-WW10.
 
-### Gap-fill batch (WW12–WW22) — primitives from previously-unscanned chapters
+### Gap-fill batch (WW12–WW22) — wired in shadow mode
 
-The original scan covered 6 of 17 chapters (1, 6, 9, 13, 15, 16). A full second-pass scan of the remaining 11 chapters surfaced these additional concrete primitives, all shipped behind flags with no callers yet:
+11 additional primitives surfaced from the full second-pass scan of Wright's book. All shipped behind flags. Wires landed via `agent-subscriptions.ts` plan_ready handler + `formatBacktestSummary` extension.
 
-- **WW12 `performanceDecomposition.ts`** (Ch 11): `Return = Beta + Factors + Alpha` with 4-class verdict (skill / factor_harvester / leveraged_beta / noise). Replicates Wright's worked example and Archegos diagnosis. Flag `GORDON_PERFORMANCE_DECOMPOSITION`.
-- **WW13 `riskBundleAuditor.ts`** (Ch 10): 8-category Yes/No/Neutral pre-trade audit (thesis/market/sector/liquidity/execution/correlation/gap/operational). Forces unbundling. Flag `GORDON_RISK_BUNDLE_AUDITOR`.
-- **WW14 `hurstExponent.ts`** (Ch 14): R/S analysis. H<0.45 mean-reverting, H>0.55 trending. Pure math regime sensor. Flag `GORDON_HURST_EXPONENT`.
-- **WW15 `marginalParticipantClassifier.ts`** (Ch 1/7/12): typical/opportunity/uncertain classifier with 15 driver kinds. Load-bearing Wright thesis. Flag `GORDON_MARGINAL_PARTICIPANT`.
-- **WW16 `edgeAttribution.ts`** (Ch 7): BAIT framework + Lebron's 5-min test. Forces explicit counterparty + constraint + edge-type articulation. Flag `GORDON_EDGE_ATTRIBUTION`.
-- **WW17 `streakCircuitBreaker.ts`** (Ch 8/9): Rule of Three (3 consecutive losses → 60m cooldown) + streak governor (50% size at threshold-1). Flag `GORDON_STREAK_CIRCUIT_BREAKER`.
-- **WW18 `giveBackStop.ts`** (Ch 8): 50% rule on session HWM + outlier-territory position decay at 2σ above avg daily win. Flag `GORDON_GIVE_BACK_STOP`.
-- **WW19 `adverseSelectionDetector.ts`** (Ch 3): fast-fill + post-fill adverse move = toxic flow detector. Tracks per-fill verdict + aggregate fraction. Flag `GORDON_ADVERSE_SELECTION`.
-- **WW20 `correlationRegimeMonitor.ts`** (Ch 14): pairwise correlation matrix → diverse/elevated/crisis. Catches 60/40 obituary scenarios. Flag `GORDON_CORRELATION_REGIME`.
-- **WW21 `liquidityMapper.ts`** (Ch 12): stop-cluster zone identifier producing the `liquidity_pool` ConfluenceKind. Flag `GORDON_LIQUIDITY_MAPPER`.
-- **WW22 `edgeDecayMonitor.ts`** (Ch 7): rolling expectancy vs baseline → stable/degraded/retire verdict. Flag `GORDON_EDGE_DECAY`.
+| WW | Module | Wired? | Wire surface |
+|---|---|---|---|
+| WW12 | `performanceDecomposition.ts` | ✅ | `formatBacktestSummary` — emits beta+factors+alpha breakdown when `GORDON_BENCHMARK_RETURN` + `GORDON_PORTFOLIO_BETA` env set |
+| WW13 | `riskBundleAuditor.ts` | ✅ | plan_ready — auto-populates 8 categories, logs verdict |
+| WW14 | `hurstExponent.ts` | ✅ | `formatBacktestSummary` — H + regime appended when ≥64 trades |
+| WW15 | `marginalParticipantClassifier.ts` | ✅ | plan_ready — reads `GORDON_MARGINAL_DRIVERS` + `GORDON_VIX_ZSCORE` + `GORDON_CORRELATION_ZSCORE` env, logs typical/opportunity/uncertain verdict |
+| WW16 | `edgeAttribution.ts` | ✅ | plan_ready — reads `GORDON_EDGE_TYPE`/`_COUNTERPARTY`/`_CONSTRAINT`/`_ARTICULATION` env, falls back to auto-articulation from plan fields |
+| WW17 | `streakCircuitBreaker.ts` | ✅ | plan_ready — reads last 10 debriefMatrix entries (WW6) to derive win/loss/scratch sequence, logs state + would-block verdict |
+| WW18 | `giveBackStop.ts` | ✅ | plan_ready — reads `GORDON_SESSION_START_EQUITY_USD` + `_SESSION_HWM_USD` + `_CURRENT_EQUITY_USD` env, logs session state |
+| WW19 | `adverseSelectionDetector.ts` | ⚠ cold | Needs fill-event capture (order submit time + post-fill mid) outside current event taxonomy |
+| WW20 | `correlationRegimeMonitor.ts` | ⚠ cold | Needs multi-symbol return matrix — no producer at plan_ready scope |
+| WW21 | `liquidityMapper.ts` | ✅ | plan_ready — synthesizes structural levels from plan stop + take-profit ladder, logs nearest zones above/below |
+| WW22 | `edgeDecayMonitor.ts` | ✅ | `formatBacktestSummary` — recent vs baseline expectancy verdict when ≥60 trades |
 
-Wire points (all deferred to a future wiring pass):
-- marginalParticipantClassifier + edgeAttribution + riskBundleAuditor compose as a pre-trade triad on plan_ready
-- hurstExponent + correlationRegimeMonitor feed WW10 weeklyRegimeCheck enrichment
-- liquidityMapper produces `liquidity_pool` ConfluenceKind for TM1 confluenceScorer
-- streakCircuitBreaker + giveBackStop wire alongside WW2 absorbingBarrier as session-state monitors
-- performanceDecomposition + edgeDecayMonitor extend the backtest summary alongside WW3 volatilityDrag
+Plus WW9 `operatorEquation` wired into `formatBacktestSummary` (EV × Exposure − Friction line when flag on).
+
+**Still cold (data-blocked, not Wright-port-scope):**
+- WW4 frictionTracker producers — need executor instrumentation (planned-vs-actual fill capture, hesitation latency measurement, stop-modification hook)
+- WW11 shannonsDemonRebalancer — needs portfolio-state plumbing
+- WW19 adverseSelectionDetector — needs fill-event capture
+- WW20 correlationRegimeMonitor — needs multi-symbol return matrix
+
+All shadow-mode wires log verdicts; promotion to enforcing waits for paper-mode data validation per the same pattern as WW2/WW7/WW8.
 
 ---
 

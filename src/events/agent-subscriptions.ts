@@ -664,6 +664,222 @@ export function createDefaultSubscriptions(
         }
 
         try {
+          const { isRiskBundleAuditorEnabled, auditRiskBundle } = await import(
+            "../infra/trading/ops/riskBundleAuditor.ts"
+          );
+          if (isRiskBundleAuditorEnabled()) {
+            const stopDistance = Math.abs(e.entry - e.stopLoss);
+            const result = auditRiskBundle({
+              items: [
+                { category: "thesis", tag: "yes", reason: `${e.strategy} signal` },
+                { category: "market", tag: "neutral" },
+                { category: "sector", tag: "neutral" },
+                { category: "liquidity", tag: "yes", reason: "liquid instrument" },
+                { category: "execution", tag: "neutral" },
+                { category: "correlation", tag: "neutral" },
+                {
+                  category: "gap",
+                  tag: stopDistance > 0 ? "neutral" : "no",
+                  hedge: stopDistance > 0 ? undefined : "no stop set — flat overnight",
+                },
+                { category: "operational", tag: "neutral" },
+              ],
+            });
+            logger.info("risk-bundle-auditor shadow verdict", {
+              planId: e.planId,
+              verdict: result.verdict,
+              blockerCount: result.blockers.length,
+              paidCount: result.paidRisks.length,
+            });
+          }
+        } catch (err) {
+          logger.warn("risk-bundle-auditor wire failed", { error: (err as Error).message });
+        }
+
+        try {
+          const { isMarginalParticipantEnabled, classifyMarginalParticipant } = await import(
+            "../infra/trading/ops/marginalParticipantClassifier.ts"
+          );
+          if (isMarginalParticipantEnabled()) {
+            const driverList = (process.env.GORDON_MARGINAL_DRIVERS ?? "")
+              .split(",")
+              .map((s) => s.trim())
+              .filter(Boolean) as Array<
+                "index_reconstitution" | "month_end_rebalance" | "vix_spike" | "margin_call_cascade"
+              >;
+            const vixZ = Number(process.env.GORDON_VIX_ZSCORE ?? "NaN");
+            const corrZ = Number(process.env.GORDON_CORRELATION_ZSCORE ?? "NaN");
+            const result = classifyMarginalParticipant({
+              drivers: driverList,
+              vixZScore: Number.isFinite(vixZ) ? vixZ : undefined,
+              correlationZScore: Number.isFinite(corrZ) ? corrZ : undefined,
+            });
+            logger.info("marginal-participant shadow verdict", {
+              planId: e.planId,
+              marginal: result.marginal,
+              confidence: Number(result.confidence.toFixed(3)),
+              drivers: result.drivers,
+            });
+          }
+        } catch (err) {
+          logger.warn("marginal-participant wire failed", { error: (err as Error).message });
+        }
+
+        try {
+          const { isEdgeAttributionEnabled, attributeEdge } = await import(
+            "../infra/trading/ops/edgeAttribution.ts"
+          );
+          if (isEdgeAttributionEnabled()) {
+            const edgeType = (process.env.GORDON_EDGE_TYPE ?? "structural") as
+              | "behavioral" | "analytical" | "informational" | "structural";
+            const result = attributeEdge({
+              edgeType,
+              counterparty: process.env.GORDON_EDGE_COUNTERPARTY ?? `consensus on ${e.symbol}`,
+              constraint: process.env.GORDON_EDGE_CONSTRAINT ?? "uniformed flow taking the other side",
+              edgeArticulation:
+                process.env.GORDON_EDGE_ARTICULATION ??
+                `${e.strategy} setup on ${e.symbol} ${e.direction} entry ${e.entry} stop ${e.stopLoss} target ladder ${e.takeProfits.join("/")} with risk-reward ${e.riskRewardRatio.toFixed(2)}`,
+            });
+            logger.info("edge-attribution shadow verdict", {
+              planId: e.planId,
+              verdict: result.verdict,
+              edgeType: result.edgeType,
+              passesFiveMinTest: result.passesFiveMinTest,
+            });
+          }
+        } catch (err) {
+          logger.warn("edge-attribution wire failed", { error: (err as Error).message });
+        }
+
+        try {
+          const { isStreakCircuitBreakerEnabled, evaluateCircuit, shouldBlockTrade } =
+            await import("../infra/trading/ops/streakCircuitBreaker.ts");
+          if (isStreakCircuitBreakerEnabled()) {
+            const fs = await import("node:fs");
+            const { defaultDebriefPath } = await import(
+              "../infra/trading/ops/debriefMatrix.ts"
+            );
+            const path = defaultDebriefPath();
+            const recent: Array<"win" | "loss" | "scratch"> = [];
+            if (fs.existsSync(path)) {
+              const raw = fs.readFileSync(path, "utf8");
+              const lines = raw.split("\n").filter((l) => l.trim()).slice(-10).reverse();
+              for (const line of lines) {
+                try {
+                  const row = JSON.parse(line) as { pnlUsd?: number };
+                  const pnl = row.pnlUsd ?? 0;
+                  recent.push(pnl > 0 ? "win" : pnl < 0 ? "loss" : "scratch");
+                } catch {
+                  /* skip */
+                }
+              }
+            }
+            const lastTrippedMs = Number(process.env.GORDON_STREAK_LAST_TRIPPED_MS ?? 0);
+            const result = evaluateCircuit({
+              recentResults: recent,
+              lastTrippedAtMs: lastTrippedMs > 0 ? lastTrippedMs : undefined,
+              nowMs: Date.now(),
+            });
+            logger.info("streak-circuit-breaker shadow verdict", {
+              planId: e.planId,
+              state: result.state,
+              consecutiveLosses: result.consecutiveLosses,
+              sizeReductionActive: result.sizeReductionActive,
+              wouldBlock: shouldBlockTrade(result),
+            });
+          }
+        } catch (err) {
+          logger.warn("streak-circuit-breaker wire failed", { error: (err as Error).message });
+        }
+
+        try {
+          const { isGiveBackStopEnabled, evaluateGiveBack } = await import(
+            "../infra/trading/ops/giveBackStop.ts"
+          );
+          if (isGiveBackStopEnabled()) {
+            const startEq = Number(process.env.GORDON_SESSION_START_EQUITY_USD ?? 0);
+            const hwm = Number(process.env.GORDON_SESSION_HWM_USD ?? 0);
+            const cur = Number(process.env.GORDON_CURRENT_EQUITY_USD ?? 0);
+            if (startEq > 0 && hwm >= startEq && cur > 0) {
+              const result = evaluateGiveBack({
+                sessionStartEquityUsd: startEq,
+                sessionHighWaterMarkUsd: hwm,
+                currentEquityUsd: cur,
+              });
+              logger.info("give-back-stop shadow verdict", {
+                planId: e.planId,
+                state: result.state,
+                sessionPnl: Number(result.sessionPnlUsd.toFixed(2)),
+                hwmPnl: Number(result.sessionHighWaterPnlUsd.toFixed(2)),
+                sizeMultiplier: result.positionSizeMultiplier,
+              });
+            }
+          }
+        } catch (err) {
+          logger.warn("give-back-stop wire failed", { error: (err as Error).message });
+        }
+
+        try {
+          const { isWeeklyRegimeCheckEnabled, evaluateRegimeCheck, classifyVolatilityLevel } =
+            await import("../infra/trading/ops/weeklyRegimeCheck.ts");
+          if (isWeeklyRegimeCheckEnabled()) {
+            const regime = (process.env.GORDON_CURRENT_REGIME ?? "ranging") as
+              | "trending_up" | "trending_down" | "ranging" | "volatile" | "quiet" | "breakout";
+            const volIndex = Number(process.env.GORDON_VOLATILITY_INDEX ?? 20);
+            const volLevel = classifyVolatilityLevel(volIndex);
+            const result = evaluateRegimeCheck({ regime, volatility: volLevel });
+            logger.info("weekly-regime-check shadow verdict", {
+              planId: e.planId,
+              regime,
+              volLevel,
+              quadrant: result.quadrant,
+              sizingMultiplier: result.sizingMultiplier,
+            });
+          }
+        } catch (err) {
+          logger.warn("weekly-regime-check wire failed", { error: (err as Error).message });
+        }
+
+        try {
+          const { isLiquidityMapperEnabled, mapLiquidity } = await import(
+            "../infra/trading/ops/liquidityMapper.ts"
+          );
+          if (isLiquidityMapperEnabled()) {
+            const stopBuffer = Math.abs(e.entry - e.stopLoss) * 0.1;
+            const result = mapLiquidity({
+              currentPrice: e.entry,
+              stopBufferPriceUnits: stopBuffer,
+              levels: [
+                {
+                  price: e.stopLoss,
+                  kind: e.direction === "long" ? "support" : "resistance",
+                  testCount: 1,
+                  label: "plan stop",
+                },
+                ...e.takeProfits.map((tp, i) => ({
+                  price: tp,
+                  kind: (e.direction === "long" ? "resistance" : "support") as
+                    | "support" | "resistance",
+                  testCount: 1,
+                  label: `target ${i + 1}`,
+                })),
+              ],
+            });
+            logger.info("liquidity-mapper shadow verdict", {
+              planId: e.planId,
+              nearestBelow: result.nearestBelow
+                ? { price: result.nearestBelow.price, strength: result.nearestBelow.strength }
+                : null,
+              nearestAbove: result.nearestAbove
+                ? { price: result.nearestAbove.price, strength: result.nearestAbove.strength }
+                : null,
+            });
+          }
+        } catch (err) {
+          logger.warn("liquidity-mapper wire failed", { error: (err as Error).message });
+        }
+
+        try {
           const { isCitationAgentEnabled, buildCitationManifest, persistCitationManifest } =
             await import("../infra/agents/cognition/citationAgent.ts");
           if (isCitationAgentEnabled()) {

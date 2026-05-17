@@ -11,6 +11,22 @@ import {
   geometricFromArithmetic,
   volatilityDrag,
 } from "../../infra/trading/ops/volatilityDrag.ts";
+import {
+  isHurstExponentEnabled,
+  calculateHurst,
+} from "../../infra/trading/ops/hurstExponent.ts";
+import {
+  isPerformanceDecompositionEnabled,
+  decomposeReturns,
+} from "../../infra/trading/ops/performanceDecomposition.ts";
+import {
+  isEdgeDecayEnabled,
+  evaluateDecay,
+} from "../../infra/trading/ops/edgeDecayMonitor.ts";
+import {
+  isOperatorEquationEnabled,
+  evaluateOperatorEquation,
+} from "../../infra/trading/ops/operatorEquation.ts";
 import type {
   BacktestResult,
   OptimizationResult,
@@ -451,17 +467,55 @@ export function formatBacktestSummary(result: BacktestResult): string {
       const verdict = credibility.credible ? "credible" : "NOT credible";
       extra += `\n  Credibility: PSR ${psr}, DSR ${dsr}, ${verdict}`;
 
+      const mean = returns.reduce((s, r) => s + r, 0) / returns.length;
+      const variance =
+        returns.reduce((s, r) => s + (r - mean) * (r - mean), 0) / returns.length;
+      const sigma = Math.sqrt(variance);
+
       if (isVolatilityDragEnabled()) {
-        const mean = returns.reduce((s, r) => s + r, 0) / returns.length;
-        const variance =
-          returns.reduce((s, r) => s + (r - mean) * (r - mean), 0) / returns.length;
-        const sigma = Math.sqrt(variance);
         const periodsPerYear = 365;
         const arith = mean * periodsPerYear;
         const annualizedSigma = sigma * Math.sqrt(periodsPerYear);
         const drag = volatilityDrag(annualizedSigma);
         const geo = geometricFromArithmetic(arith, annualizedSigma);
         extra += `\n  Drag: arith ${(arith * 100).toFixed(1)}% → geo ${(geo * 100).toFixed(1)}% (σ=${(annualizedSigma * 100).toFixed(1)}%, drag ${(drag * 100).toFixed(1)}%)`;
+      }
+
+      if (isHurstExponentEnabled() && returns.length >= 64) {
+        const h = calculateHurst(returns);
+        extra += `\n  Hurst: ${h.hurst.toFixed(3)} → ${h.regime}${h.reliable ? "" : " (low confidence)"}`;
+      }
+
+      if (isPerformanceDecompositionEnabled()) {
+        const marketReturn = Number(process.env.GORDON_BENCHMARK_RETURN ?? "NaN");
+        const marketBeta = Number(process.env.GORDON_PORTFOLIO_BETA ?? "NaN");
+        if (Number.isFinite(marketReturn) && Number.isFinite(marketBeta)) {
+          const d = decomposeReturns({
+            totalReturn: metrics.totalReturn / 100,
+            marketReturn,
+            marketBeta,
+            factors: [],
+          });
+          extra += `\n  Decomposition: beta ${(d.betaContribution * 100).toFixed(1)}% + factors ${(d.factorTotal * 100).toFixed(1)}% + alpha ${(d.alpha * 100).toFixed(1)}% → ${d.verdict}`;
+        }
+      }
+
+      if (isEdgeDecayEnabled() && returns.length >= 60) {
+        const rMultiples = returns.map((r) => r / Math.max(sigma, 1e-6));
+        const decay = evaluateDecay({ setupId: result.strategyName, rMultiples });
+        extra += `\n  Edge decay: recent ${decay.recentExpectancy.toFixed(2)}R vs baseline ${decay.baselineExpectancy.toFixed(2)}R → ${decay.state}`;
+      }
+
+      if (isOperatorEquationEnabled()) {
+        const evR = mean / Math.max(sigma, 1e-6);
+        const exposure = Number(process.env.GORDON_BASE_RISK_PCT ?? 0.01);
+        const frictionR = Number(process.env.GORDON_FRICTION_R ?? 0.001);
+        const r = evaluateOperatorEquation({
+          expectedValueR: evR,
+          optimalExposureFraction: exposure,
+          frictionR,
+        });
+        extra += `\n  Operator equation: EV ${r.expectedValueR.toFixed(2)}R × exp ${(r.optimalExposureFraction * 100).toFixed(2)}% − fric ${r.frictionR.toFixed(3)}R = ${r.performanceR.toFixed(4)}R (${r.failureMode})`;
       }
     }
   } catch {
