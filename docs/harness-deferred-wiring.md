@@ -770,24 +770,49 @@ From Ryan Wright's *The Art and Business of Professional Trading* (Wiley 2026). 
 **Module:** `src/infra/trading/ops/pathDependentSizer.ts`. Flag `GORDON_PATH_DEPENDENT_SIZER`.
 **Status:** Ch 9 Type I/II/III tier system + Ch 16 Protocol 5 sizing matrix (cold/neutral/hot performance state). Anti-Martingale is structural (Type II variable component = 10% of YTD profits, collapses to zero in drawdown). Type III requires positive YTD. Cold state blocks Type I. Absolute cap 5% adjusted RC. Replicates Wright's WTI crude example end-to-end in tests. **No call site yet** — planner currently sizes via `riskClassifier`'s 11-dimension scoring. Wire point: planner picks `tier` from confluence score (A* → III, A → II, B/C → I), reads `initialRiskCapital` + `ytdPnL` from session state, classifies performance state from recent decisions + equity peak, calls `sizePosition(...)`, attaches `positionUnits` to plan. Pair with TM1 (confluenceScorer) — they compose cleanly. ~1 week.
 
-### WW2. `absorbingBarrier.ts` ✅ shipped, ⚠ not invoked
+### WW2. `absorbingBarrier.ts` ✅ shipped, ✅ wired (shadow mode)
 
 **Module:** `src/infra/safety/absorbingBarrier.ts`. Flag `GORDON_ABSORBING_BARRIER`.
-**Status:** Ch 13 three-barrier classifier (broker margin / prop-firm trailing / psychological tilt). Outputs distance in BOTH dollars and R-units with 5-tier alert level (ok/watch/warn/warn/breached at thresholds 10/5/2/0 R). `shouldBlockNewTrades` returns true at warn-or-worse. **No call site yet** — Gordon's existing `GORDON_RISK_DAILY_LOSS_USD` covers the broker barrier implicitly, but prop-firm trailing and psychological tilt are unsurfaced. Wire point: pre-trade subscription in `agent-subscriptions.ts` calls `distanceToBarriers(...)`, feeds `shouldBlockNewTrades` into the L1 termination input (replacing the hardcoded `mandateScopeOk: true`). Surfaces nearest-barrier R-units to plan card. ~3-4 days.
+**Status:** Ch 13 three-barrier classifier (broker margin / prop-firm trailing / psychological tilt). Outputs distance in BOTH dollars and R-units with 5-tier alert level. `shouldBlockNewTrades` returns true at warn-or-worse.
+**Wire:** plan_ready subscription in `agent-subscriptions.ts` calls `distanceToBarriers` alongside the existing L1 shadow verdict. Inputs read from env (`GORDON_CURRENT_EQUITY_USD`, `GORDON_EQUITY_HIGH_WATER_MARK_USD`, `GORDON_PROP_FIRM_TRAILING_DD_USD`, `GORDON_PSYCHOLOGICAL_TILT_USD`, `GORDON_BASE_R_PER_TRADE_USD`). Logs `wouldBlock` + nearest-barrier R-units. Currently observational — promotion to enforcing (pipe `shouldBlockNewTrades` directly into `checkPreTrade.mandateScopeOk`) is data-blocked, waiting for paper-mode runs to validate the calibration.
 
-### WW3. `volatilityDrag.ts` ✅ shipped, ⚠ not invoked
+### WW3. `volatilityDrag.ts` ✅ shipped, ✅ wired
 
 **Module:** `src/infra/trading/ops/volatilityDrag.ts`. Flag `GORDON_VOLATILITY_DRAG`.
-**Status:** Ch 13 geometric-vs-arithmetic math: `R_geo = R_arith - σ²/2`, recovery-return table, leverage privilege gate (Sharpe ≥ 1.5 default, dynamic max-leverage suggestion based on observed DD vs tolerance), strategy comparison (surgeon-vs-gunslinger). Pure compute, no persistence. **No call site yet** — backtest reporting in `formatter.ts` shows raw returns without drag breakdown. Wire point: extend `formatBacktestSummary` to compute σ from trades and append "Arithmetic 30%, geometric 22% (drag 8%, σ=40%)" line. Also surface `leveragePrivilege` verdict to the backtest summary so users know whether they've earned leverage. ~2-3 days. Composes with Q4 multipleTestingTracker (DSR/PSR), not duplicative.
+**Status:** Ch 13 geometric-vs-arithmetic math: `R_geo = R_arith - σ²/2`, recovery-return table, leverage privilege gate (Sharpe ≥ 1.5 default), strategy comparison (surgeon-vs-gunslinger). Pure compute.
+**Wire:** `formatBacktestSummary` in `reporting/formatter.ts` computes σ from per-trade returns and appends `Drag: arith 30% → geo 22% (σ=40%, drag 8%)` line when ≥10 trades AND flag on. Composes with Q4 multipleTestingTracker (DSR/PSR) on the same summary block, not duplicative. Leverage-privilege output not yet surfaced — defer until backtest summary needs the additional line.
 
 ### WW4. `frictionTracker.ts` ✅ shipped, ⚠ no producers yet
 
 **Module:** `src/infra/trading/ops/frictionTracker.ts`. Flag `GORDON_FRICTION_TRACKER` + path `GORDON_FRICTION_TRACKER_PATH`. Persists to `~/.gordon/friction.jsonl`.
 **Status:** Ch 6 + Ch 16 Protocol 3 three-component friction model (explicit / implicit / psychological). 9 kinds auto-classified to components. `auditFriction` produces verdict with Wright's 20%-of-gross fail threshold (warn at 10%). **No producers wired yet** — Gordon has `marketImpact.ts` (Q3) which models the implicit half theoretically but doesn't record realized slippage. Wire points: (a) order-execution path records `slippage` event with `planned_fill - actual_fill` after fill confirmation; (b) cancel/modify-stop tool records `moved_stop` event with diff; (c) executor records `hesitation` event when `order_send_time - signal_emit_time` > threshold. Monthly audit surface via slash command. ~1 week total across all three producers.
 
-### Wave 2 + 3 deferred
+### WW5. `dailyDecisionJournal.ts` ✅ shipped, ⚠ no producer yet
 
-Wave 2 (operator-facing): `dailyDecisionJournal`, `debriefMatrix`, `preExecKillList`, `convictionCalibrationGate` — not yet started.
+**Module:** `src/infra/trading/ops/dailyDecisionJournal.ts`. Flag `GORDON_DECISION_JOURNAL` + path `GORDON_DECISION_JOURNAL_PATH` (default `~/.gordon/decision-journal.jsonl`).
+**Status:** Ch 16 Protocol 1 structured pre-trade form: Thesis (narrative/trigger/invalidation) + Math (free capital / risk% / stop distance / position units) + 5-Q pre-mortem (B-setup trap, tilt, event risk, liquidity trap, correlation blind spot). `evaluateVerdict` returns go/no-go + structured blockers. JSONL persistence.
+**Wire point:** planner emits a journal entry per plan_ready event. Either (a) operator fills the form via slash command, gated on go-verdict before order send, OR (b) Gordon auto-populates thesis/math from the plan and prompts the operator only on pre-mortem (lower friction, higher adoption). Composes with TM3 by mirroring into decisionLog at `stage="planning"`. ~3-4 days for wiring once UX surface is chosen.
+
+### WW6. `debriefMatrix.ts` ✅ shipped, ⚠ no producer yet
+
+**Module:** `src/infra/trading/ops/debriefMatrix.ts`. Flag `GORDON_DEBRIEF_MATRIX` + path `GORDON_DEBRIEF_MATRIX_PATH` (default `~/.gordon/debriefs.jsonl`).
+**Status:** Ch 15 process-score × outcome-score → 4-quadrant classifier (deserved_success / bad_luck / dumb_luck / poetic_justice) with prescribed action per quadrant. `aggregateQuadrants` exposes a `toxicAlphaAlarm` flag when dumb-luck wins exceed 20% of total wins — direct port of Wright's "hate bad profits" loop.
+**Wire point:** post-trade flow records debrief after every close (auto-prompts operator for 1-10 scores). Surfaces toxic-alpha alarm to weekly review summary. Composes with TM3 by mirroring into decisionLog at `stage="closure"`, and with `evals/tradeEvaluator` (PnL ensemble) as a complementary operator-state dimension. ~3 days for executor + UX wiring.
+
+### WW7. `preExecKillList.ts` ✅ shipped, ⚠ not invoked
+
+**Module:** `src/infra/trading/ops/preExecKillList.ts`. Flag `GORDON_PRE_EXEC_KILL_LIST`.
+**Status:** Ch 16 Protocol 6 five-question gate (bored / angry / rushing / moved-stop / scared-money). `runKillList` returns `{ pass, blockers, reasons }`. Pure compute, no persistence by design — the point is the friction of the check.
+**Wire point:** sits AS the L0 operator-state layer before existing L1 pre-trade safety check in `agent-subscriptions.ts`. Sources for the 5 booleans: `bored` via session-idle detection (no signals processed for > N minutes but operator opening positions anyway); `angry` via debriefMatrix recent-streak feed; `rushing` via plan-emit-to-order-send latency below threshold; `movedStop` via tracking stop modifications on existing positions; `scaredMoney` via configured `GORDON_PSYCHOLOGICAL_TILT_USD` vs current position size. ~1 week to wire all 5 inputs cleanly.
+
+### WW8. `convictionCalibrationGate.ts` ✅ shipped, ⚠ not invoked
+
+**Module:** `src/infra/trading/ops/convictionCalibrationGate.ts`. Flag `GORDON_CONVICTION_CALIBRATION`.
+**Status:** Ch 9 mandate — forces flat 1R sizing until 100+ trades show Pearson r ≥ 0.30 between conviction rating and realized R-multiple. Status categories: `insufficient_data` / `uncorrelated` / `negatively_correlated` / `calibrated`. `clampTierToCalibration("II", result)` returns "I" when uncalibrated. Negatively-correlated case is highlighted because Wright is explicit it's worse than no signal.
+**Wire point:** sits in front of WW1 pathDependentSizer — planner reads recent decisionLog/debriefMatrix entries, builds `CalibrationTrade[]`, calls `evaluateCalibration`, clamps requested tier before calling `sizePosition`. Composes with WW6 (debriefMatrix is the natural source of (conviction, realizedR) tuples). ~3 days once decisionLog has populated `stage` fields (TM3).
+
+### Wave 3 deferred
+
 Wave 3 (opportunistic): Operator's Equation scorer, Weekly Regime Check, Shannon's Demon rebalancer — defer until Wave 2 surfaces signal.
 
 ---

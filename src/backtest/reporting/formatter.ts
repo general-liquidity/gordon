@@ -6,6 +6,11 @@
  */
 
 import { assessBacktestCredibility } from "../../infra/trading/ops/backtestCredibility.ts";
+import {
+  isVolatilityDragEnabled,
+  geometricFromArithmetic,
+  volatilityDrag,
+} from "../../infra/trading/ops/volatilityDrag.ts";
 import type {
   BacktestResult,
   OptimizationResult,
@@ -432,6 +437,7 @@ export function formatBacktestSummary(result: BacktestResult): string {
   // Surface backtest credibility (PSR / DSR / minTRL) when at least
   // a handful of trades exist. Sharpe alone is the leaderboard number;
   // PSR + DSR are the "is this real?" answer.
+  let extra = "";
   try {
     if (result.trades && result.trades.length >= 10) {
       const returns: number[] = result.trades.map((t) => {
@@ -443,11 +449,24 @@ export function formatBacktestSummary(result: BacktestResult): string {
       const psr = `${(credibility.psr * 100).toFixed(0)}% ${credibility.psrSignificant ? "✓" : "✗"}`;
       const dsr = `${(credibility.deflatedSharpe * 100).toFixed(0)}% ${credibility.dsrSignificant ? "✓" : "✗"}`;
       const verdict = credibility.credible ? "credible" : "NOT credible";
-      return `${base}\n  Credibility: PSR ${psr}, DSR ${dsr}, ${verdict}`;
+      extra += `\n  Credibility: PSR ${psr}, DSR ${dsr}, ${verdict}`;
+
+      if (isVolatilityDragEnabled()) {
+        const mean = returns.reduce((s, r) => s + r, 0) / returns.length;
+        const variance =
+          returns.reduce((s, r) => s + (r - mean) * (r - mean), 0) / returns.length;
+        const sigma = Math.sqrt(variance);
+        const periodsPerYear = 365;
+        const arith = mean * periodsPerYear;
+        const annualizedSigma = sigma * Math.sqrt(periodsPerYear);
+        const drag = volatilityDrag(annualizedSigma);
+        const geo = geometricFromArithmetic(arith, annualizedSigma);
+        extra += `\n  Drag: arith ${(arith * 100).toFixed(1)}% → geo ${(geo * 100).toFixed(1)}% (σ=${(annualizedSigma * 100).toFixed(1)}%, drag ${(drag * 100).toFixed(1)}%)`;
+      }
     }
   } catch {
-    // credibility helpers can throw on degenerate input — never break the summary
+    // credibility / drag helpers can throw on degenerate input — never break the summary
   }
 
-  return base;
+  return extra ? `${base}${extra}` : base;
 }

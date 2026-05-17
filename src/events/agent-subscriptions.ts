@@ -488,6 +488,39 @@ export function createDefaultSubscriptions(
         }
 
         try {
+          const { isAbsorbingBarrierEnabled, distanceToBarriers, shouldBlockNewTrades } =
+            await import("../infra/safety/absorbingBarrier.ts");
+          if (isAbsorbingBarrierEnabled()) {
+            const currentEquity = Number(process.env.GORDON_CURRENT_EQUITY_USD ?? 0);
+            const dailyLossBudget = Number(process.env.GORDON_RISK_DAILY_LOSS_USD ?? 0);
+            const propFirmTrailingDd = Number(process.env.GORDON_PROP_FIRM_TRAILING_DD_USD ?? 0);
+            const psychTilt = Number(process.env.GORDON_PSYCHOLOGICAL_TILT_USD ?? 0);
+            const equityHwm = Number(process.env.GORDON_EQUITY_HIGH_WATER_MARK_USD ?? 0);
+            const baseR = Number(process.env.GORDON_BASE_R_PER_TRADE_USD ?? 0);
+            if (currentEquity > 0) {
+              const barriers = distanceToBarriers({
+                currentEquity,
+                equityHighWaterMark: equityHwm > 0 ? equityHwm : undefined,
+                dailyLossBudgetUsd: dailyLossBudget > 0 ? dailyLossBudget : undefined,
+                propFirmTrailingDdUsd: propFirmTrailingDd > 0 ? propFirmTrailingDd : undefined,
+                psychologicalTiltUsd: psychTilt > 0 ? psychTilt : undefined,
+                baseRiskPerTradeUsd: baseR > 0 ? baseR : undefined,
+              });
+              logger.info("absorbing-barrier shadow verdict", {
+                planId: e.planId,
+                nearest: barriers.nearest,
+                nearestRUnits: Number.isFinite(barriers.nearestRUnits)
+                  ? Number(barriers.nearestRUnits.toFixed(2))
+                  : null,
+                wouldBlock: shouldBlockNewTrades(barriers),
+              });
+            }
+          }
+        } catch (err) {
+          logger.warn("absorbing-barrier wire failed", { error: (err as Error).message });
+        }
+
+        try {
           const { isCitationAgentEnabled, buildCitationManifest, persistCitationManifest } =
             await import("../infra/agents/cognition/citationAgent.ts");
           if (isCitationAgentEnabled()) {
