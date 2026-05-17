@@ -521,6 +521,149 @@ export function createDefaultSubscriptions(
         }
 
         try {
+          const { isPathDependentSizerEnabled, sizePosition, classifyPerformanceState } =
+            await import("../infra/trading/ops/pathDependentSizer.ts");
+          if (isPathDependentSizerEnabled()) {
+            const initialRC = Number(process.env.GORDON_INITIAL_RISK_CAPITAL_USD ?? 0);
+            const ytdPnL = Number(process.env.GORDON_YTD_PNL_USD ?? 0);
+            const equityFracOfPeak = Number(process.env.GORDON_EQUITY_FRACTION_OF_PEAK ?? 1);
+            if (initialRC > 0) {
+              const state = classifyPerformanceState({
+                equityFractionOfPeak: equityFracOfPeak,
+                recentTradeResults: [],
+              });
+              const result = sizePosition({
+                initialRiskCapital: initialRC,
+                ytdPnL,
+                tier: "I",
+                performanceState: state,
+                entryPrice: e.entry,
+                stopPrice: e.stopLoss,
+              });
+              logger.info("path-dependent-sizer shadow verdict", {
+                planId: e.planId,
+                state,
+                tierDollarRisk: result.tierDollarRisk,
+                finalDollarRisk: result.finalDollarRisk,
+                positionUnits: Number(result.positionUnits.toFixed(6)),
+                rejected: result.rejected,
+              });
+            }
+          }
+        } catch (err) {
+          logger.warn("path-dependent-sizer wire failed", { error: (err as Error).message });
+        }
+
+        try {
+          const { isDecisionJournalEnabled, recordJournalEntry } = await import(
+            "../infra/trading/ops/dailyDecisionJournal.ts"
+          );
+          if (isDecisionJournalEnabled()) {
+            const stopDistance = Math.abs(e.entry - e.stopLoss);
+            const riskPercent = e.positionSizePct > 0 ? e.positionSizePct / 100 : 0.01;
+            const freeCapital = Number(process.env.GORDON_FREE_CAPITAL_USD ?? 0);
+            const dollarRiskBudget = freeCapital * riskPercent;
+            const entry = recordJournalEntry({
+              symbol: e.symbol,
+              direction: e.direction,
+              tradeId: e.planId,
+              thesis: {
+                narrative: `${e.strategy} signal: ${e.direction} ${e.symbol} at ${e.entry}`,
+                trigger: `Auto-populated from plan_ready event (planId ${e.planId})`,
+                invalidation: `Stop at ${e.stopLoss} — risk/reward ${e.riskRewardRatio.toFixed(2)}`,
+              },
+              math: {
+                freeCapitalUsd: freeCapital,
+                riskPercent,
+                dollarRiskBudget,
+                stopDistance,
+                positionUnits: stopDistance > 0 ? dollarRiskBudget / stopDistance : 0,
+              },
+              preMortem: {
+                bSetupTrap: false,
+                tiltCheck: false,
+                eventRisk: false,
+                liquidityTrap: false,
+                correlationBlindSpot: false,
+              },
+            });
+            if (entry) {
+              logger.info("decision-journal entry recorded", {
+                planId: e.planId,
+                verdict: entry.verdict,
+                blockerCount: entry.blockers.length,
+              });
+            }
+          }
+        } catch (err) {
+          logger.warn("decision-journal wire failed", { error: (err as Error).message });
+        }
+
+        try {
+          const { isPreExecKillListEnabled, runKillList } = await import(
+            "../infra/trading/ops/preExecKillList.ts"
+          );
+          if (isPreExecKillListEnabled()) {
+            const result = runKillList({
+              bored: process.env.GORDON_OPERATOR_BORED === "1",
+              angry: process.env.GORDON_OPERATOR_ANGRY === "1",
+              rushing: process.env.GORDON_OPERATOR_RUSHING === "1",
+              movedStop: process.env.GORDON_OPERATOR_MOVED_STOP === "1",
+              scaredMoney: process.env.GORDON_OPERATOR_SCARED_MONEY === "1",
+            });
+            logger.info("pre-exec-kill-list shadow verdict", {
+              planId: e.planId,
+              pass: result.pass,
+              blockers: result.blockers,
+            });
+          }
+        } catch (err) {
+          logger.warn("pre-exec-kill-list wire failed", { error: (err as Error).message });
+        }
+
+        try {
+          const { isConvictionCalibrationEnabled, evaluateCalibration } = await import(
+            "../infra/trading/ops/convictionCalibrationGate.ts"
+          );
+          const { isDecisionsLogEnabled, defaultDecisionsLogPath } = await import(
+            "../infra/agents/memory/decisionLog.ts"
+          );
+          if (isConvictionCalibrationEnabled() && isDecisionsLogEnabled()) {
+            const fs = await import("node:fs");
+            const path = defaultDecisionsLogPath();
+            const trades: Array<{ convictionRating: number; rMultiple: number }> = [];
+            if (fs.existsSync(path)) {
+              const raw = fs.readFileSync(path, "utf8");
+              for (const line of raw.split("\n")) {
+                if (!line.trim()) continue;
+                try {
+                  const row = JSON.parse(line) as {
+                    context?: { convictionRating?: number; rMultiple?: number };
+                  };
+                  const conviction = row.context?.convictionRating;
+                  const r = row.context?.rMultiple;
+                  if (typeof conviction === "number" && typeof r === "number") {
+                    trades.push({ convictionRating: conviction, rMultiple: r });
+                  }
+                } catch {
+                  /* skip */
+                }
+              }
+            }
+            const calibration = evaluateCalibration({ trades });
+            logger.info("conviction-calibration shadow verdict", {
+              planId: e.planId,
+              status: calibration.status,
+              tradesSeen: calibration.tradesSeen,
+              pearsonR: calibration.pearsonR,
+              allowsConvictionSizing: calibration.allowsConvictionSizing,
+            });
+          }
+        } catch (err) {
+          logger.warn("conviction-calibration wire failed", { error: (err as Error).message });
+        }
+
+        try {
           const { isCitationAgentEnabled, buildCitationManifest, persistCitationManifest } =
             await import("../infra/agents/cognition/citationAgent.ts");
           if (isCitationAgentEnabled()) {
@@ -684,6 +827,49 @@ export function createDefaultSubscriptions(
             `Provide a brief post-trade review with lessons learned.`,
           { symbol: e.symbol, pnl: e.realizedPnl, reason: e.reason, trigger: "position_closed" }
         );
+
+        try {
+          const { isDebriefMatrixEnabled, recordDebrief } = await import(
+            "../infra/trading/ops/debriefMatrix.ts"
+          );
+          if (isDebriefMatrixEnabled()) {
+            // Auto-debrief: process_score is high when the close reason is
+            // a plan-defined exit (stop_loss, take_profit), low when the
+            // operator force-closed or the broker liquidated. Outcome_score
+            // tracks realized PnL sign + magnitude into a 1-10 scale.
+            const planFollowed =
+              e.reason === "stop_loss" ||
+              e.reason === "take_profit" ||
+              e.reason === "trailing_stop";
+            const processScore = planFollowed ? 8 : 4;
+            const pnlPct = e.realizedPnlPercent;
+            let outcomeScore = 5;
+            if (pnlPct >= 5) outcomeScore = 9;
+            else if (pnlPct >= 1) outcomeScore = 7;
+            else if (pnlPct >= 0) outcomeScore = 6;
+            else if (pnlPct >= -1) outcomeScore = 4;
+            else if (pnlPct >= -5) outcomeScore = 2;
+            else outcomeScore = 1;
+
+            const debrief = recordDebrief({
+              tradeId: e.tradeId ?? `${e.symbol}-${e.holdDurationMs}`,
+              symbol: e.symbol,
+              pnlUsd: e.realizedPnl,
+              processScore,
+              outcomeScore,
+              notes: `auto-debrief: close reason=${e.reason}`,
+            });
+            if (debrief) {
+              logger.info("debrief-matrix entry recorded", {
+                symbol: e.symbol,
+                quadrant: debrief.quadrant,
+                action: debrief.action,
+              });
+            }
+          }
+        } catch (err) {
+          logger.warn("debrief-matrix wire failed", { error: (err as Error).message });
+        }
       },
     },
 
