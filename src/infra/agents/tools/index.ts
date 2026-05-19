@@ -162,6 +162,11 @@ export { bootstrapTools } from "./runtime/bootstrapDiagnostic.ts";
 export { volScaledSizingTools } from "./runtime/volScaledSizingDiagnostic.ts";
 export { directionalEdgeTestTools } from "./runtime/directionalEdgeTestDiagnostic.ts";
 
+// Kissell TCA primitives — institutional credibility surface (Pro edition).
+// Agent-callable; no slash commands until breadcrumbs land (see harness-deferred-wiring.md).
+export { implementationShortfallTools } from "./runtime/implementationShortfallDiagnostic.ts";
+export { efficientTradingFrontierTools } from "./runtime/efficientTradingFrontierDiagnostic.ts";
+
 // Playbook tools (v0.7)
 export { playbookTools } from "./runtime/meta/playbook-tools.ts";
 
@@ -440,6 +445,8 @@ import { tripleScreenTools } from "./runtime/tripleScreenDiagnostic.ts";
 import { bootstrapTools } from "./runtime/bootstrapDiagnostic.ts";
 import { volScaledSizingTools } from "./runtime/volScaledSizingDiagnostic.ts";
 import { directionalEdgeTestTools } from "./runtime/directionalEdgeTestDiagnostic.ts";
+import { implementationShortfallTools } from "./runtime/implementationShortfallDiagnostic.ts";
+import { efficientTradingFrontierTools } from "./runtime/efficientTradingFrontierDiagnostic.ts";
 import { playbookTools } from "./runtime/meta/playbook-tools.ts";
 import { playbookBacktestTools } from "./strategy/backtest/backtest-tools.ts";
 import { runtimeTools } from "./runtime/flow/runtime-tools.ts";
@@ -550,6 +557,8 @@ const _rawAllTools = {
   ...bootstrapTools,
   ...volScaledSizingTools,
   ...directionalEdgeTestTools,
+  ...implementationShortfallTools,
+  ...efficientTradingFrontierTools,
   ...playbookTools,
   ...playbookBacktestTools,
   ...runtimeTools,

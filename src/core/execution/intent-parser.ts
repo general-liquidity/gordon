@@ -12,11 +12,13 @@ import type {
   TWAPConfig,
   VWAPConfig,
   IcebergConfig,
+  POVConfig,
 } from "./algorithms/types.ts";
 import {
   DEFAULT_TWAP_CONFIG,
   DEFAULT_VWAP_CONFIG,
   DEFAULT_ICEBERG_CONFIG,
+  DEFAULT_POV_CONFIG,
 } from "./algorithms/types.ts";
 
 // ============================================================================
@@ -59,6 +61,14 @@ function detectAlgorithm(text: string): AlgorithmHint {
   }
   if (lower.includes("iceberg") || lower.includes("ice berg")) {
     return { algorithm: "ICEBERG", confidence: 1.0, keywords: ["iceberg"] };
+  }
+  if (
+    lower.includes("pov") ||
+    lower.includes("percentage of volume") ||
+    lower.includes("percent of volume") ||
+    lower.includes("participation rate")
+  ) {
+    return { algorithm: "POV", confidence: 1.0, keywords: ["pov"] };
   }
 
   // Behavioral keywords (lower confidence)
@@ -104,7 +114,7 @@ export function parseExecutionIntent(
   const hint = detectAlgorithm(text);
   const duration = parseDuration(text);
 
-  let config: TWAPConfig | VWAPConfig | IcebergConfig;
+  let config: TWAPConfig | VWAPConfig | IcebergConfig | POVConfig;
 
   switch (hint.algorithm) {
     case "TWAP": {
@@ -126,6 +136,13 @@ export function parseExecutionIntent(
     }
     case "ICEBERG": {
       config = { ...DEFAULT_ICEBERG_CONFIG };
+      break;
+    }
+    case "POV": {
+      config = {
+        ...DEFAULT_POV_CONFIG,
+        maxDurationMs: duration ?? DEFAULT_POV_CONFIG.maxDurationMs,
+      };
       break;
     }
   }
@@ -159,6 +176,10 @@ export function describeIntent(intent: ExecutionIntent): string {
     case "ICEBERG": {
       const cfg = config as IcebergConfig;
       return `Iceberg ${side} ${totalQuantity} ${symbol} (${(cfg.showRatio * 100).toFixed(0)}% visible)`;
+    }
+    case "POV": {
+      const cfg = config as POVConfig;
+      return `POV ${side} ${totalQuantity} ${symbol} at ${cfg.targetParticipationRate}% (cap ${cfg.maxParticipationRate}%)`;
     }
   }
 }

@@ -4,6 +4,8 @@ import {
   realisticCostBps,
   capacitySweep,
   capacityToPayload,
+  efficientTradingFrontier,
+  efficientTradingFrontierToPayload,
   DEFAULT_VENUES,
   DEFAULT_COST_PARAMS,
 } from "./marketImpact.ts";
@@ -222,5 +224,86 @@ describe("capacityToPayload", () => {
     const p = capacityToPayload(curve);
     expect(p.kind).toBe("capacity.sweep_recorded");
     expect(p.pointCount).toBe(curve.points.length);
+  });
+});
+
+describe("efficientTradingFrontier", () => {
+  const base = {
+    orderSize: 10_000,
+    adv: 1_000_000,
+    vol: 0.02,
+  };
+
+  it("expected impact decreases monotonically as horizon grows", () => {
+    const f = efficientTradingFrontier({
+      ...base,
+      horizonDays: [0.1, 0.5, 1, 2, 5],
+    });
+    for (let i = 1; i < f.points.length; i++) {
+      expect(f.points[i]!.expectedImpactBps).toBeLessThan(f.points[i - 1]!.expectedImpactBps);
+    }
+  });
+
+  it("timing risk increases monotonically as horizon grows", () => {
+    const f = efficientTradingFrontier({
+      ...base,
+      horizonDays: [0.1, 0.5, 1, 2, 5],
+    });
+    for (let i = 1; i < f.points.length; i++) {
+      expect(f.points[i]!.timingRiskBps).toBeGreaterThan(f.points[i - 1]!.timingRiskBps);
+    }
+  });
+
+  it("optimal horizon under high risk aversion is shorter than under low", () => {
+    const patient = efficientTradingFrontier({ ...base, riskAversion: 0.01 });
+    const urgent = efficientTradingFrontier({ ...base, riskAversion: 100 });
+    // High λ penalizes timing risk → prefers shorter horizon.
+    expect(urgent.optimalHorizonDays).toBeLessThanOrEqual(patient.optimalHorizonDays);
+  });
+
+  it("participation rate scales 1/horizon for fixed size", () => {
+    const f = efficientTradingFrontier({
+      ...base,
+      horizonDays: [1, 2],
+    });
+    // Half the duration → double the participation
+    expect(f.points[0]!.participationRate / f.points[1]!.participationRate).toBeCloseTo(2, 4);
+  });
+
+  it("orderSizeAdvFraction is correct", () => {
+    const f = efficientTradingFrontier({ ...base });
+    expect(f.orderSizeAdvFraction).toBeCloseTo(0.01, 6);
+  });
+
+  it("rejects non-positive orderSize", () => {
+    expect(() => efficientTradingFrontier({ ...base, orderSize: 0 })).toThrow();
+  });
+
+  it("rejects non-positive adv", () => {
+    expect(() => efficientTradingFrontier({ ...base, adv: 0 })).toThrow();
+  });
+
+  it("rejects non-positive horizon entries", () => {
+    expect(() =>
+      efficientTradingFrontier({ ...base, horizonDays: [0.1, 0, 1] }),
+    ).toThrow();
+  });
+});
+
+describe("efficientTradingFrontierToPayload", () => {
+  it("emits stable shape", () => {
+    const f = efficientTradingFrontier({
+      orderSize: 10_000,
+      adv: 1_000_000,
+      vol: 0.02,
+    });
+    const p = efficientTradingFrontierToPayload(f) as {
+      kind: string;
+      optimalHorizonDays: number;
+      pointCount: number;
+    };
+    expect(p.kind).toBe("efficient_trading_frontier.computed");
+    expect(p.optimalHorizonDays).toBe(f.optimalHorizonDays);
+    expect(p.pointCount).toBe(f.points.length);
   });
 });

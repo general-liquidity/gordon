@@ -225,3 +225,151 @@ export function capacityToPayload(curve: CapacityCurve): Record<string, unknown>
     })),
   };
 }
+
+// ============================================================================
+// Efficient Trading Frontier (Kissell ch. 14-15 / Almgren-Chriss)
+// ============================================================================
+//
+// For a *fixed* order size, longer execution horizons reduce expected
+// market impact (lower participation rate per slot → smaller per-trade
+// price push) but increase timing risk (variance of mid-price drift
+// over the longer window). The trader's optimal horizon depends on
+// risk aversion λ.
+//
+// Expected impact cost (bps), Almgren-Chriss style:
+//   E[impact] ≈ impactCoef * sqrt(participationRate) * 100
+//   where participationRate = orderSize / (adv * horizonDays)
+//
+// Timing risk (bps, one stdev of price drift over the horizon):
+//   σ[drift] ≈ vol * sqrt(horizonDays / daysPerYear) * 1e4
+//
+// Total cost objective:
+//   J(T) = E[impact](T) + λ * σ[drift](T)
+//
+// The frontier is the parametric curve {(σ, E[impact]) : T > 0}; the
+// optimal horizon under risk aversion λ minimizes J(T).
+
+export interface FrontierInput {
+  /** Order size to execute (same units as ADV). */
+  orderSize: number;
+  /** Average daily volume in same units. */
+  adv: number;
+  /** Realized intraday vol as a fraction (e.g. 0.02 = 2% daily). */
+  vol: number;
+  /** Annualized vol — used to convert horizon-σ to bps. Default = vol * sqrt(daysPerYear). */
+  volAnn?: number;
+  /** Risk aversion λ — weight on timing risk in the objective. Default 1. */
+  riskAversion?: number;
+  /** Horizon points (in days) to evaluate. Default 0.05, 0.1, 0.25, 0.5, 1, 2, 5, 10. */
+  horizonDays?: number[];
+  /** Days per year for annualization. Default 252. */
+  daysPerYear?: number;
+  /** Venue id or override params. */
+  venue?: string | VenueParams;
+  /** Cost-model params. Default DEFAULT_COST_PARAMS. */
+  costParams?: CostModelParams;
+}
+
+export interface FrontierPoint {
+  horizonDays: number;
+  participationRate: number;
+  expectedImpactBps: number;
+  /** One-stdev of price drift over the horizon, in bps. */
+  timingRiskBps: number;
+  /** Half-spread + venue + impact, in bps. */
+  expectedCostBps: number;
+  /** J = expectedCost + λ * timingRisk. */
+  totalObjectiveBps: number;
+}
+
+export interface EfficientTradingFrontier {
+  points: FrontierPoint[];
+  /** Horizon (days) that minimizes the cost-risk objective J. */
+  optimalHorizonDays: number;
+  /** Risk aversion used. */
+  riskAversion: number;
+  /** orderSize / adv — useful for capacity callouts. */
+  orderSizeAdvFraction: number;
+}
+
+const DEFAULT_HORIZON_DAYS: number[] = [0.05, 0.1, 0.25, 0.5, 1, 2, 5, 10];
+
+/**
+ * Sweep execution horizons for a fixed order size and return the
+ * cost-vs-timing-risk frontier plus the horizon that minimizes the
+ * weighted objective J(T) = impact(T) + λ * σ(T).
+ *
+ * Concrete shape used in fund TCA: rendered as a curve with horizon
+ * on x-axis, expected cost on y-axis (impact line) plus a one-stdev
+ * timing-risk band. The minimizer of J is the "patient" point; the
+ * far-left horizon is the "aggressive" point.
+ */
+export function efficientTradingFrontier(input: FrontierInput): EfficientTradingFrontier {
+  if (input.orderSize <= 0) throw new Error("orderSize must be > 0");
+  if (input.adv <= 0) throw new Error("adv must be > 0");
+  if (input.vol < 0) throw new Error("vol must be >= 0");
+
+  const horizons = input.horizonDays ?? DEFAULT_HORIZON_DAYS;
+  const daysPerYear = input.daysPerYear ?? 252;
+  const lambda = input.riskAversion ?? 1;
+  const volAnn = input.volAnn ?? input.vol * Math.sqrt(daysPerYear);
+  const costParams = input.costParams ?? DEFAULT_COST_PARAMS;
+  const venueBps = resolveVenue(input.venue, costParams);
+
+  const orderSizeAdvFraction = input.orderSize / input.adv;
+  const halfSpreadBps = (costParams.baseSpreadBps + costParams.spreadVolCoef * input.vol) / 2;
+
+  const points: FrontierPoint[] = horizons.map((T) => {
+    if (T <= 0) throw new Error(`horizonDays entries must be > 0 (got ${T})`);
+    const participationRate = input.orderSize / (input.adv * T);
+    const expectedImpactBps =
+      costParams.impactCoef * Math.sqrt(participationRate) * 100;
+    const timingRiskBps = volAnn * Math.sqrt(T / daysPerYear) * 1e4;
+    const expectedCostBps = halfSpreadBps + expectedImpactBps + venueBps;
+    const totalObjectiveBps = expectedCostBps + lambda * timingRiskBps;
+    return {
+      horizonDays: T,
+      participationRate,
+      expectedImpactBps,
+      timingRiskBps,
+      expectedCostBps,
+      totalObjectiveBps,
+    };
+  });
+
+  let optimalHorizonDays = points[0]!.horizonDays;
+  let bestObjective = points[0]!.totalObjectiveBps;
+  for (const p of points) {
+    if (p.totalObjectiveBps < bestObjective) {
+      bestObjective = p.totalObjectiveBps;
+      optimalHorizonDays = p.horizonDays;
+    }
+  }
+
+  return {
+    points,
+    optimalHorizonDays,
+    riskAversion: lambda,
+    orderSizeAdvFraction,
+  };
+}
+
+export function efficientTradingFrontierToPayload(
+  frontier: EfficientTradingFrontier,
+): Record<string, unknown> {
+  return {
+    kind: "efficient_trading_frontier.computed",
+    optimalHorizonDays: frontier.optimalHorizonDays,
+    riskAversion: frontier.riskAversion,
+    orderSizeAdvFraction: Number(frontier.orderSizeAdvFraction.toFixed(6)),
+    pointCount: frontier.points.length,
+    points: frontier.points.map((p) => ({
+      horizonDays: p.horizonDays,
+      participationRate: Number(p.participationRate.toFixed(6)),
+      expectedImpactBps: Number(p.expectedImpactBps.toFixed(2)),
+      timingRiskBps: Number(p.timingRiskBps.toFixed(2)),
+      expectedCostBps: Number(p.expectedCostBps.toFixed(2)),
+      totalObjectiveBps: Number(p.totalObjectiveBps.toFixed(2)),
+    })),
+  };
+}

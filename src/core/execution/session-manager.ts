@@ -11,17 +11,20 @@ import { createModuleLogger } from "../../infra/logger/index.ts";
 import { TWAPExecutor } from "./algorithms/twap.ts";
 import { VWAPExecutor } from "./algorithms/vwap.ts";
 import { IcebergExecutor } from "./algorithms/iceberg.ts";
+import { POVExecutor } from "./algorithms/pov.ts";
 import type {
   ExecutionIntent,
   ExecutionSession,
   TWAPConfig,
   VWAPConfig,
   IcebergConfig,
+  POVConfig,
 } from "./algorithms/types.ts";
 import {
   DEFAULT_TWAP_CONFIG,
   DEFAULT_VWAP_CONFIG,
   DEFAULT_ICEBERG_CONFIG,
+  DEFAULT_POV_CONFIG,
 } from "./algorithms/types.ts";
 
 const logger = createModuleLogger("execution-session-manager");
@@ -31,7 +34,7 @@ export class ExecutionSessionManager {
 
   private activeSessions = new Map<string, {
     session: ExecutionSession;
-    executor: TWAPExecutor | VWAPExecutor | IcebergExecutor;
+    executor: TWAPExecutor | VWAPExecutor | IcebergExecutor | POVExecutor;
   }>();
   private completedSessions: ExecutionSession[] = [];
 
@@ -76,7 +79,7 @@ export class ExecutionSessionManager {
       }
     };
 
-    let executor: TWAPExecutor | VWAPExecutor | IcebergExecutor;
+    let executor: TWAPExecutor | VWAPExecutor | IcebergExecutor | POVExecutor;
 
     switch (intent.algorithm) {
       case "TWAP": {
@@ -92,6 +95,11 @@ export class ExecutionSessionManager {
       case "ICEBERG": {
         const config: IcebergConfig = { ...DEFAULT_ICEBERG_CONFIG, ...intent.config as Partial<IcebergConfig> };
         executor = new IcebergExecutor(session, exchange, config, onComplete);
+        break;
+      }
+      case "POV": {
+        const config: POVConfig = { ...DEFAULT_POV_CONFIG, ...intent.config as Partial<POVConfig> };
+        executor = new POVExecutor(session, exchange, config, onComplete);
         break;
       }
     }

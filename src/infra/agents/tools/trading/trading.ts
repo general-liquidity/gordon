@@ -1361,17 +1361,18 @@ const executeWithAlgorithmOutputSchema = z.object({
 export const executeWithAlgorithmTool = createTool({
   id: "execute_with_algorithm",
   description:
-    "Execute a large order using an algorithmic execution strategy (TWAP, VWAP, or Iceberg). " +
+    "Execute a large order using an algorithmic execution strategy (TWAP, VWAP, Iceberg, or POV). " +
     "Use when the user wants to buy/sell slowly, minimize market impact, hide order size, " +
-    "or explicitly requests TWAP/VWAP/Iceberg. Examples: 'buy 1 BTC slowly over 4 hours', " +
-    "'accumulate ETH matching volume', 'sell without moving the market'.",
+    "track a target participation rate of the tape, or explicitly requests TWAP/VWAP/Iceberg/POV. " +
+    "Examples: 'buy 1 BTC slowly over 4 hours', 'accumulate ETH matching volume', " +
+    "'sell without moving the market', 'POV 10% of volume up to 2 BTC'.",
   inputSchema: z.object({
     symbol: z.string().describe("Trading pair symbol (e.g., 'BTCUSDT')"),
     side: z.enum(["BUY", "SELL"]).describe("Order side"),
     quantity: z.number().describe("Total quantity to execute"),
-    algorithm: z.enum(["TWAP", "VWAP", "ICEBERG"]).optional().describe("Execution algorithm (auto-detected if not specified)"),
-    description: z.string().optional().describe("Natural language description for algorithm detection (e.g., 'slowly over 4 hours')"),
-    durationMs: z.number().optional().describe("Duration in milliseconds for TWAP/VWAP"),
+    algorithm: z.enum(["TWAP", "VWAP", "ICEBERG", "POV"]).optional().describe("Execution algorithm (auto-detected if not specified)"),
+    description: z.string().optional().describe("Natural language description for algorithm detection (e.g., 'slowly over 4 hours', '10% of volume')"),
+    durationMs: z.number().optional().describe("Duration in milliseconds for TWAP/VWAP, or max duration for POV"),
   }),
   outputSchema: executeWithAlgorithmOutputSchema,
   execute: async ({ symbol, side, quantity, algorithm, description, durationMs }, execContext: MastraExecutionContext) => {
@@ -1412,6 +1413,8 @@ export const executeWithAlgorithmTool = createTool({
     // Override duration if specified
     if (durationMs && "durationMs" in intent.config) {
       (intent.config as { durationMs: number }).durationMs = durationMs;
+    } else if (durationMs && "maxDurationMs" in intent.config) {
+      (intent.config as { maxDurationMs: number }).maxDurationMs = durationMs;
     }
 
     try {

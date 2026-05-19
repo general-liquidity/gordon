@@ -1212,6 +1212,66 @@ When P1/P2 unblock and the paper publishes results, revisit. The inner-loop prim
 
 ---
 
+## Kissell TCA port (KS1–KS5)
+
+Source: Kissell, "Algorithmic Trading Methods" (Academic Press, 2nd ed., 2020), chapters 3, 14-15, 18. Triggered by the dual-edition strategy shift (see `project_dual_edition_strategy.md`): the institutional credibility surface needs canonical TCA vocabulary in the feature matrix even when the retail user doesn't touch it. Three primitives shipped; the remaining wires depend on event-schema or customer-data preconditions.
+
+### KS1. Implementation Shortfall decomposition
+
+**Status:** ✅ shipped — `src/infra/trading/quant/implementationShortfall.ts` + test. Mastra tool wrapper at `src/infra/agents/tools/runtime/implementationShortfallDiagnostic.ts`. Agent-callable as `compute_implementation_shortfall`.
+
+### KS2. POV execution algorithm
+
+**Status:** ✅ shipped — `src/core/execution/algorithms/pov.ts`. Wired into `types.ts` enum + `POVConfig` + `DEFAULT_POV_CONFIG`, dispatched by `session-manager.ts`, exported from `index.ts`, detected by `intent-parser.ts` keyword scan ("pov", "percentage of volume", "participation rate"). Surfaced through the existing `execute_with_algorithm` tool (POV added to the algorithm enum + description). No separate diagnostic tool — POV is an *execution* primitive, not a *compute* primitive.
+
+### KS3. Efficient Trading Frontier
+
+**Status:** ✅ shipped — `efficientTradingFrontier` in `src/backtest/analysis/marketImpact.ts` + tests. Mastra tool wrapper at `src/infra/agents/tools/runtime/efficientTradingFrontierDiagnostic.ts`. Agent-callable as `compute_efficient_trading_frontier`. Sweeps execution horizons for a fixed order size and returns the Almgren-Chriss cost-vs-timing-risk curve plus the horizon that minimizes `J = impact + λ·timing_risk`.
+
+### KS4. Plan-lifecycle TCA breadcrumbs (precondition for /tca slash command)
+
+**Status:** not built. KS1 (Implementation Shortfall) is plumbed as a pure-compute primitive — it accepts decision price, arrival price, fill VWAP, and close price as inputs. The agent can supply these today only if it derives them at call time (e.g. last-tick price as decision-price proxy). The institutional version requires real breadcrumbs.
+
+**Wire point:**
+- `src/events/market-events.ts` `strategy:plan_ready` event — add `decisionPriceSnapshot: { price: number; bid: number; ask: number; capturedAt: ISO8601 }` field.
+- `src/runtime/permissions/PermissionEngine.ts` order-submit path — capture `arrivalPriceSnapshot: { price: number; bid: number; ask: number; capturedAt: ISO8601 }` at the moment the order leaves the permission gate.
+- Persist both alongside the order record (`frictionTracker` or order log — verify the right surface before wiring).
+- New helper at `src/infra/trading/quant/loadShortfallInputs.ts` that resolves a closed-trade id to a fully-populated `ImplementationShortfallInput` (decision, arrival, fills VWAP, close, qty decided, qty filled, fees) by joining `plan_ready` snapshot + permission-gate snapshot + frictionTracker fills + market close.
+
+**Gating:** non-trivial event-schema change. Land behind a flag (`GORDON_TCA_BREADCRUMBS`) and validate with one design partner before turning on by default. Approx 3-5 days of careful work — touches plan event, permission engine, friction tracker, and persistence layer; risk surface is "are we double-snapshotting and skewing the IS decomposition by 1-2 bps".
+
+### KS5. `/tca` slash command (gated on KS4)
+
+**Status:** not built. Deliberately deferred. Adding it before KS4 ships would force the operator to type seven numerical arguments (decision/arrival/fill/close + qty decided/filled + fees), which violates the slash-command discipline (slash commands work best when the agent can auto-fill context).
+
+**Wire point:** after KS4 lands, add `/tca [tradeId]` to `src/app/slash/slashCommands.ts`. With no argument: target the most recently closed trade. Tool agent resolves trade id → `loadShortfallInputs` → `compute_implementation_shortfall` → narrative output with the four-bucket breakdown and dominant-bucket callout.
+
+**Gating:** depends entirely on KS4. Without breadcrumbs, this is a parameter dumping ground that nobody types. With breadcrumbs, it's a strong demo moment for fund prospects ("show me where my edge leaked on that BTC exit").
+
+### KS6. Pretrade-of-pretrades calibration loop
+
+**Status:** not built, deferred until real customer order volume exists. Pretrade-of-pretrades is the meta-analysis that compares forecasted execution cost (from `realisticCostBps` + `efficientTradingFrontier`) against realized IS (from KS1 once KS4 is live), per venue / per regime / per size bucket — detecting model drift in the cost forecast.
+
+**Wire point:** scheduled job that reads the trade log + the IS decomposition log, joins them on order-id, and reports forecast-vs-realized cost deltas grouped by (venue, regime, advFraction bucket). Alarm at 2σ drift. Likely lives next to `calibrationTools.ts` once the order log has 100+ trades to fit against.
+
+**Gating:** real customer order log. Building this for paper-mode synthetic flow gives misleading calibration — paper mode doesn't carry the realistic adversarial-fill component that production fills do. Park until a design partner has ~30 days of realized trades.
+
+### KS7. FIX connectivity (institutional execution protocol)
+
+**Status:** not built. Mentioned in `project_dual_edition_strategy.md` as a known fund-diligence gap. Every institutional OMS speaks FIX 4.2/4.4/5.0 SP2; Gordon's retail-broker integrations don't. Not buildable speculatively — different fund prospects use different FIX gateways (Goldman SIGMA-X, MS Speedway, IB FIX CTCI, custom prime-broker gateways), and each requires session-config + cert exchange.
+
+**Wire point:** after first design-partner LOI specifies their FIX gateway. Wrap one specific gateway as a new `Exchange` interface implementation under `src/infra/exchange/fix/`. Don't generalize the abstraction layer until two gateways are integrated. Likely 4-6 weeks per gateway including session-tuning.
+
+**Gating:** LOI + named gateway from a specific prospect. Speculative build = wasted effort because the gateway-specific quirks are the actual work.
+
+### Sequencing recommendation (Kissell stack)
+
+KS1-KS3 shipped together in the institutional-credibility-primitives commit. KS4 is the highest-value next wire — unblocks both KS5 and KS6, and is the breadcrumb foundation for any real TCA story to a fund prospect. KS7 is gated on commercial signal. KS6 is gated on customer data signal. KS5 is purely UX sugar on top of KS4.
+
+If a fund design-partner conversation surfaces, prioritize: **KS4 → KS5 → KS7 (their gateway only) → KS6 (after 30 days of fills)**.
+
+---
+
 ## How to use this doc
 
 When you (or a future session) want to wire one of these:
