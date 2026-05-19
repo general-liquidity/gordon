@@ -361,6 +361,30 @@ const LEGACY_SLASH_COMMANDS: SlashCommandSeed[] = [
       "User wants a live current-state beta + uncertainty band instead of a 60-day OLS average — for hedge sizing, factor decomposition, or beta-aware signals",
   },
   {
+    name: "range-vol",
+    aliases: ["parkinson", "garman-klass"],
+    description: "Compute Parkinson + Garman-Klass annualized volatility from OHLC bars (tighter than close-to-close)",
+    usage: "/range-vol",
+    category: "trading",
+    level: 1,
+    action: "tool",
+    target: "compute_range_volatility",
+    whenToUse:
+      "User wants a short-window volatility estimate where close-to-close is too noisy — range estimators are ~7× more efficient at the same bar count",
+  },
+  {
+    name: "pca-concentration",
+    aliases: ["pca", "concentration"],
+    description: "Run PCA on strategy returns to detect hidden-factor concentration (catches diversified-looking but single-bet books)",
+    usage: "/pca-concentration",
+    category: "system",
+    level: 1,
+    action: "tool",
+    target: "compute_pca_concentration",
+    whenToUse:
+      "User wants to know whether multiple strategies in the book are independently exposed to the same hidden factor — complement to /effective-n",
+  },
+  {
     name: "orders",
     aliases: ["o"],
     description: "View open orders across crypto or stocks",

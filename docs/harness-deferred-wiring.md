@@ -1018,6 +1018,25 @@ Surfaced by a gap-analysis pass over four reverse-engineered Claude Code source 
 
 ---
 
+## ai-quant-researcher port (AQ1–AQ2)
+
+Surfaced by a gap-analysis pass over the `ai-quant-researcher-main` Python project. Most items either don't apply (Python sandboxing, Jupyter notebooks) or are already shipped (kill switches, walk-forward, overfitting detection, leakage validation, deflated Sharpe). Three items downgraded: meta-labeling (worth a follow-up batch on its own), cross-sectional portfolio engine (waits for multi-instrument book state Gordon doesn't have), TCA with calibrated fills (needs realized fill data from live trading).
+
+### AQ1. `rangeVolatility.ts` ✅ shipped, ✅ wired
+**Module:** `src/infra/trading/quant/rangeVolatility.ts`. Flag `GORDON_RANGE_VOLATILITY`.
+**Status:** Parkinson (1980) + Garman-Klass (1980) range-based annualized volatility estimators on OHLC bars. Roughly 7× more efficient than close-to-close at the same bar frequency. Returns Parkinson + GK + close-to-close + efficiency-gain ratio. Assumes continuous price path with no overnight gaps (matches crypto; usable on equities with a caveat). 11 tests covering GBM-vol recovery, efficiency gain, annualization scaling, invalid-bar skipping, edge cases.
+**Wire:** `compute_range_volatility` Mastra tool registered in `src/infra/agents/tools/index.ts`; `/range-vol` slash command (aliases `/parkinson`, `/garman-klass`). Emits structured observation `range_volatility.requested`. Tool accepts OHLC bars + optional `periodsPerYear`.
+**Future composition:** WW3 volatilityDrag computes σ from close-only sample stddev — AQ1's GK is a tighter replacement at the same lookback. Regime detector's vol classifier could use AQ1 instead of realized vol from the equity curve. KF2 kalmanVolatility filters log-variance over time; AQ1 is the spot estimator, complementary not redundant.
+
+### AQ2. `pcaConcentration.ts` ✅ shipped, ✅ wired
+**Module:** `src/infra/trading/quant/pcaConcentration.ts`. Flag `GORDON_PCA_CONCENTRATION`.
+**Status:** PCA on strategy return covariance matrix. Verdict (`diverse` / `concentrated` / `critical`) based on PC1 explained-variance ratio (default thresholds 0.5 / 0.75). Reports eigenvalues, explained-variance ratios, cumulative-explained, top-loading strategies on PC1, and high-correlation pairs. Jacobi eigendecomposition for symmetric covariance. 11 tests covering diverse-vs-concentrated discrimination, eigenvalue properties, threshold sensitivity, edge cases.
+**Wire:** `compute_pca_concentration` Mastra tool; `/pca-concentration` slash command (aliases `/pca`, `/concentration`). Emits `pca_concentration.requested` observation with verdict-driven outcome (`failure` for critical, `info` for concentrated, `success` for diverse). Tool accepts strategy return series + configurable thresholds.
+**Why this matters:** complement to SC3 effectiveN. effectiveN counts independent signals via correlation-matrix participation ratio; pcaConcentration checks whether one PC absorbs most variance even when pairwise correlations look fine. Two strategies with r ≈ 0 can both load heavily on PC1 — independently exposed to the same hidden factor (long crypto beta, short USD, momentum). PCA catches that; effectiveN doesn't.
+**Future composition:** wire into the strategy-acceptance gate alongside SC3 + multipleTestingTracker. Reject "diversified" books that are actually critical-concentration single-factor bets. When Gordon gains multi-strategy book-state tracking, this becomes a continuous monitor rather than an operator-invoked diagnostic.
+
+---
+
 ## Production-engineering bar (PE1–PE12)
 
 Surfaced by the "Missing Engineering Stack for Production AI Agents" piece. Maps the 4-primitive checklist (tokens / skills / security / trust) onto items Gordon doesn't yet have. The first two primitives are already ~90% in place (sharedPrefixCache, model routing, structured outputs, plan-then-execute, small idempotent tools); the security and trust columns surface most of the gaps below. None of these are core capability work — all are production-readiness plumbing. Relevant primarily if Gordon pursues the enterprise / regulated-finance / agent-firm-treasury positioning the strategic articles point at.

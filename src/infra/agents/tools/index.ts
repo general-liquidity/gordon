@@ -138,6 +138,12 @@ export { effectiveNTools } from "./runtime/effectiveNDiagnostic.ts";
 // Kalman beta diagnostic tool (/kalman-beta slash command)
 export { kalmanBetaTools } from "./runtime/kalmanBetaDiagnostic.ts";
 
+// Range volatility diagnostic tool (/range-vol slash command)
+export { rangeVolatilityTools } from "./runtime/rangeVolatilityDiagnostic.ts";
+
+// PCA concentration diagnostic tool (/pca-concentration slash command)
+export { pcaConcentrationTools } from "./runtime/pcaConcentrationDiagnostic.ts";
+
 // Playbook tools (v0.7)
 export { playbookTools } from "./runtime/meta/playbook-tools.ts";
 
@@ -407,6 +413,8 @@ import { shadowPlanTools } from "./runtime/shadowPlan.ts";
 import { feedbackRatingTools } from "./runtime/feedbackRating.ts";
 import { effectiveNTools } from "./runtime/effectiveNDiagnostic.ts";
 import { kalmanBetaTools } from "./runtime/kalmanBetaDiagnostic.ts";
+import { rangeVolatilityTools } from "./runtime/rangeVolatilityDiagnostic.ts";
+import { pcaConcentrationTools } from "./runtime/pcaConcentrationDiagnostic.ts";
 import { playbookTools } from "./runtime/meta/playbook-tools.ts";
 import { playbookBacktestTools } from "./strategy/backtest/backtest-tools.ts";
 import { runtimeTools } from "./runtime/flow/runtime-tools.ts";
@@ -508,6 +516,8 @@ const _rawAllTools = {
   ...feedbackRatingTools,
   ...effectiveNTools,
   ...kalmanBetaTools,
+  ...rangeVolatilityTools,
+  ...pcaConcentrationTools,
   ...playbookTools,
   ...playbookBacktestTools,
   ...runtimeTools,
