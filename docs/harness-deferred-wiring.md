@@ -947,6 +947,12 @@ Surfaced by the "How Hedge Funds Use The Kalman Filter" article. Two specific ap
 
 Beyond the code: KF1 + KF2 make explicit the pattern Gordon's harness already implements implicitly. Several existing primitives are hidden-state estimators using non-Kalman math — WW14 hurstExponent (market memory), WW20 correlationRegimeMonitor (correlation regime), WW10 weeklyRegimeCheck (regime quadrant), WW15 marginalParticipantClassifier (counterparty type). The Kalman filter is the canonical and provably-optimal solution to the same class of problem. Positioning move: describe Gordon as a hidden-state estimation substrate, with KF1/KF2 as the literal demonstrators of the framing.
 
+### HMM upgrade to `markovRegime.ts` — debated design choice, not a gap
+
+Surfaced when the Jurafsky & Martin (2026 draft) HMM appendix was reviewed alongside Gordon's existing `src/infra/trading/quant/markovRegime.ts`. Gordon's module uses a **visible-state Markov chain** (Bull / Neutral / Bear are classified directly from observable price/return features), estimates the transition matrix from observed state-sequence frequencies with Laplace smoothing, and produces signals like `stay / reversal_likely / transition_uncertain`. It deliberately does NOT use Forward / Viterbi / Baum-Welch (Forward-Backward).
+
+The HMM machinery would matter only if a true *hidden* regime were modeled: emission distributions per state, joint estimation of transitions + emissions via Baum-Welch, regime-estimate smoothing via Forward-Backward. That's a different design, not strictly an upgrade. The quant literature is mixed — HMM regime detectors over-fit easily with 3+ states, and the visible-state simplification is defensible (fewer free parameters, interpretable, easier to debug, better fit for the operator-shadow use case). **Do not file as a deferred build.** If a future session proposes "upgrade markovRegime to a real HMM with Baum-Welch," the answer is: only if the operator-shadow / fund-prospect use case develops a need to recover a genuinely hidden regime variable — which it has not.
+
 ---
 
 ## Microstructure / quote-stuffing detection (MS1–MS12)
