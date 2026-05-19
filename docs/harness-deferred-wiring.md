@@ -1337,6 +1337,39 @@ CJ1–CJ4 shipped together in the institutional-credibility-primitives second-pa
 
 If a fund design-partner conversation surfaces, the CJ stack sits alongside KS1–KS3 as the "we have the canonical quant-finance vocabulary" credibility evidence.
 
+### Verified non-gaps from the same lecture series
+
+The Drissi 2024 lecture notes cover two signal-construction primitives in Sec 7.4 (imbalance) and Sec 7.5 (order flow) that the CJ framework consumes as drift signals. Verify-before-claim grep against Gordon confirmed both are **already shipped** under different names — no CJ port needed:
+
+- **Order-book imbalance signal** (Sec 7.4): `src/infra/trading/signals/manufacturedImbalance.ts` computes L2 bid/ask depth imbalance with OBI thresholds + manipulation-detection state machine. Subsumes the basic instantaneous imbalance signal Cartea-Jaimungal Sec 7.4 describes and extends it with phase-tracking for manipulation patterns.
+- **Signed order flow signal** (Sec 7.5): `src/infra/trading/signals/orderflowDelta.ts` computes signed delta (buy_volume − sell_volume), cumulative delta, and delta ratio. This IS the Cartea-Jaimungal "order flow imbalance" signal from Sec 7.5.
+
+These are the natural drift-signal producers for CJ1 (`compute_cartea_jaimungal_signal_speed`) when a future execution-algo consumer wires the pipeline end-to-end.
+
+### CJ5. Nonlinear-impact optimal trading
+
+**Status:** not built. Source: Drissi Sec 6 / Cartea-Jaimungal-Penalva ch. 6 / Gatheral (2010). Extends Almgren-Chriss to general concave impact functions (sqrt, power-law). Closed-form trajectory only exists for specific impact shapes (linear, sqrt); arbitrary concave impact requires numerical solution of a Bolza problem with Legendre-Fenchel transforms.
+
+**Wire point:** new primitive at `src/infra/trading/quant/nonlinearImpactTrading.ts`. ~150–250 LOC depending on whether closed-form (sqrt case only) or numerical (general). Function signature mirrors CJ1: takes order size, horizon, impact-curve parameters, risk aversion; returns trajectory.
+
+**Gating:** no execution-algo consumer in Gordon today (TWAP/VWAP/POV/Iceberg/CJ1 baseline are sufficient for current customers). The general numerical case requires choosing default impact-curve parameters, which without customer-flow calibration is arbitrary. The closed-form sqrt case is closer in usefulness to KS3 (efficient trading frontier already uses sqrt impact) than to its own new primitive. Build when a design partner specifies a non-sqrt impact curve they need to optimize against.
+
+### CJ6. Optimal venue split (Laruelle-Lehalle-Pagès)
+
+**Status:** not built. Source: Drissi Sec 2 / Laruelle, Lehalle & Pagès (2011) "Optimal split of orders across liquidity pools: a stochastic algorithm approach," SIAM Journal on Financial Mathematics. Splits a parent order across N venues to minimize expected execution cost given per-venue liquidity profiles (arrival rates, depth distributions).
+
+**Wire point:** new primitive at `src/infra/trading/quant/optimalVenueSplit.ts`. ~150–200 LOC. Strict generalization of Gordon's existing `compare_venues` tool which picks best single venue based on top-of-book price + fee.
+
+**Gating:** missing upstream data. The optimizer needs per-venue liquidity profile estimates (arrival-rate λ_v, depth-distribution F_v) which Gordon doesn't currently track structurally — its venue surface is top-of-book quote comparison, not flow modeling. Building the optimizer before the profile-estimation layer exists is cart-before-horse: the optimizer would consume arbitrary defaults and produce plausible-looking splits that don't reflect real per-venue dynamics. Wire when an institutional customer needs multi-venue execution AND Gordon's venue layer has accumulated enough flow-history per venue to fit profiles.
+
+### CJ7. Multi-asset basket optimal liquidation
+
+**Status:** not built. Source: Drissi Sec 11 / Schied, Schöneborn & Tehranchi (2010) "Optimal basket liquidation for CARA investors is deterministic," Applied Mathematical Finance. Closed-form for linear-cost basket execution with cross-impact between assets. The matrix Riccati version covers cross-impact + correlation.
+
+**Wire point:** new primitive at `src/infra/trading/quant/optimalBasketLiquidation.ts`. ~200–300 LOC. Pure compute; takes basket positions vector, covariance matrix, cross-impact matrix, horizon, risk aversion; returns per-asset trading-speed trajectories.
+
+**Gating:** same as MM and KS8 — no portfolio-construction consumer in Gordon. Gordon trades one symbol at a time per plan; there is no multi-asset basket execution layer. The ICP per `project_dual_edition_strategy.md` (sub-$2B systematic funds, discretionary PMs, research copilots) doesn't currently run institutional baskets requiring cross-impact-aware liquidation. Build when a basket-execution design partner specifies their factor model + cross-impact covariance shape.
+
 ---
 
 ## Market-making primitives (MM1) — deferred pending design partner
