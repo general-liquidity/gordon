@@ -32,6 +32,10 @@ import {
   empiricalKelly,
 } from "../../infra/trading/quant/empiricalKelly.ts";
 import {
+  isKalmanVolatilityEnabled,
+  kalmanVolatility,
+} from "../../infra/trading/quant/kalmanVolatility.ts";
+import {
   isBacktestTaxEnabled,
   applyBacktestTax,
   expectedRAfterTax,
@@ -539,6 +543,11 @@ export function formatBacktestSummary(result: BacktestResult): string {
           const evAfter = expectedRAfterTax(taxed);
           extra += `\n  Backtest tax: win ${(taxed.rawWinRate * 100).toFixed(1)}%→${(taxed.winRate * 100).toFixed(1)}%, payoff ${taxed.rawPayoffRatio.toFixed(2)}→${taxed.payoffRatio.toFixed(2)}, taxed EV ${evAfter.toFixed(3)}R`;
         }
+      }
+
+      if (isKalmanVolatilityEnabled() && returns.length >= 60) {
+        const kv = kalmanVolatility({ returns, q: 0.1, r: 1.0 });
+        extra += `\n  Kalman vol: current ${(kv.currentAnnualVol * 100).toFixed(1)}% annualized, range [${(kv.minAnnualVol * 100).toFixed(1)}%, ${(kv.maxAnnualVol * 100).toFixed(1)}%]`;
       }
 
       if (isEmpiricalKellyEnabled() && metrics.totalTrades >= 10) {

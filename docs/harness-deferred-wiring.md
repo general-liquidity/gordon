@@ -925,6 +925,30 @@ SC3 + SC4 ship now because neither needs realized-outcome data — SC3 computes 
 
 ---
 
+## Kalman hidden-state estimation (KF1–KF2)
+
+Surfaced by the "How Hedge Funds Use The Kalman Filter" article. Two specific applications of the Kalman math beyond Gordon's existing generic `kalmanFilter.ts` (which does univariate price smoothing). Both ship now — they consume raw price data Gordon already has, not realized-outcome data.
+
+### KF1. `kalmanBeta.ts` ✅ shipped, ✅ wired
+
+**Module:** `src/infra/trading/quant/kalmanBeta.ts`. Flag `GORDON_KALMAN_BETA`.
+**Status:** time-varying regression coefficient between asset and market returns via Kalman filter with time-varying H = market return. Replaces OLS-over-fixed-window with live current-state beta + one-sigma uncertainty band. 11 tests covering constant-beta recovery, time-varying step-change tracking, uncertainty band shrinkage, boundary cases, range reporting.
+**Wire:** exposed as `compute_kalman_beta` Mastra tool registered in `src/infra/agents/tools/index.ts`; `/kalman-beta` (aliases `/dynbeta`, `/kbeta`) slash command. Tool accepts asset + market return series, returns current beta, sigma, and range. Emits structured observation `kalman_beta.requested`.
+**Future composition:** WW12 performanceDecomposition currently takes a static `marketBeta` input — KF1's `currentBeta` is the natural producer for that value when running on live data.
+
+### KF2. `kalmanVolatility.ts` ✅ shipped, ✅ wired
+
+**Module:** `src/infra/trading/quant/kalmanVolatility.ts`. Flag `GORDON_KALMAN_VOLATILITY`.
+**Status:** log-variance state-space filter with bias correction for E[log(χ²(1))] = −1.27. Replaces backward-looking GARCH/EWMA/rolling-realized with current-state annualized vol estimate. Configurable Q controls responsiveness; periodsPerYear configurable for non-daily frequencies. 10 tests covering low/high vol recovery, regime-shift tracking, Q-responsiveness behavior, boundary cases.
+**Wire:** `formatBacktestSummary` in `reporting/formatter.ts` emits `Kalman vol: current X% annualized, range [Y%, Z%]` when ≥60 trades AND `GORDON_KALMAN_VOLATILITY=1`. Sits alongside drag / decomposition / decay / backtest-tax / empirical-kelly on the same summary block.
+**Future composition:** WW3 volatilityDrag computes σ from raw sample stddev — KF2's `currentAnnualVol` is the time-varying replacement. SC4 empiricalKelly's bootstrap could condition on KF2's vol estimate for vol-targeted Kelly sizing.
+
+### Hidden-state-estimation framing
+
+Beyond the code: KF1 + KF2 make explicit the pattern Gordon's harness already implements implicitly. Several existing primitives are hidden-state estimators using non-Kalman math — WW14 hurstExponent (market memory), WW20 correlationRegimeMonitor (correlation regime), WW10 weeklyRegimeCheck (regime quadrant), WW15 marginalParticipantClassifier (counterparty type). The Kalman filter is the canonical and provably-optimal solution to the same class of problem. Positioning move: describe Gordon as a hidden-state estimation substrate, with KF1/KF2 as the literal demonstrators of the framing.
+
+---
+
 ## Production-engineering bar (PE1–PE12)
 
 Surfaced by the "Missing Engineering Stack for Production AI Agents" piece. Maps the 4-primitive checklist (tokens / skills / security / trust) onto items Gordon doesn't yet have. The first two primitives are already ~90% in place (sharedPrefixCache, model routing, structured outputs, plan-then-execute, small idempotent tools); the security and trust columns surface most of the gaps below. None of these are core capability work — all are production-readiness plumbing. Relevant primarily if Gordon pursues the enterprise / regulated-finance / agent-firm-treasury positioning the strategic articles point at.

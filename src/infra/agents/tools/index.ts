@@ -135,6 +135,9 @@ export { feedbackRatingTools } from "./runtime/feedbackRating.ts";
 // Effective-N diagnostic tool (/effective-n slash command)
 export { effectiveNTools } from "./runtime/effectiveNDiagnostic.ts";
 
+// Kalman beta diagnostic tool (/kalman-beta slash command)
+export { kalmanBetaTools } from "./runtime/kalmanBetaDiagnostic.ts";
+
 // Playbook tools (v0.7)
 export { playbookTools } from "./runtime/meta/playbook-tools.ts";
 
@@ -403,6 +406,7 @@ import { statusTools } from "./runtime/statusOverview.ts";
 import { shadowPlanTools } from "./runtime/shadowPlan.ts";
 import { feedbackRatingTools } from "./runtime/feedbackRating.ts";
 import { effectiveNTools } from "./runtime/effectiveNDiagnostic.ts";
+import { kalmanBetaTools } from "./runtime/kalmanBetaDiagnostic.ts";
 import { playbookTools } from "./runtime/meta/playbook-tools.ts";
 import { playbookBacktestTools } from "./strategy/backtest/backtest-tools.ts";
 import { runtimeTools } from "./runtime/flow/runtime-tools.ts";
@@ -503,6 +507,7 @@ const _rawAllTools = {
   ...shadowPlanTools,
   ...feedbackRatingTools,
   ...effectiveNTools,
+  ...kalmanBetaTools,
   ...playbookTools,
   ...playbookBacktestTools,
   ...runtimeTools,

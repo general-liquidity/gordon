@@ -349,6 +349,18 @@ const LEGACY_SLASH_COMMANDS: SlashCommandSeed[] = [
       "User wants to know how many independent gates a chain of N signals actually represents (participation-ratio diagnostic)",
   },
   {
+    name: "kalman-beta",
+    aliases: ["dynbeta", "kbeta"],
+    description: "Estimate time-varying beta between asset and market returns via Kalman filter (hedge-fund-grade alternative to OLS)",
+    usage: "/kalman-beta",
+    category: "trading",
+    level: 1,
+    action: "tool",
+    target: "compute_kalman_beta",
+    whenToUse:
+      "User wants a live current-state beta + uncertainty band instead of a 60-day OLS average — for hedge sizing, factor decomposition, or beta-aware signals",
+  },
+  {
     name: "orders",
     aliases: ["o"],
     description: "View open orders across crypto or stocks",
