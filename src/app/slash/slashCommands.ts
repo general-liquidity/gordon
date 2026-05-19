@@ -337,6 +337,18 @@ const LEGACY_SLASH_COMMANDS: SlashCommandSeed[] = [
       "User wants to record explicit feedback on the most recent shadow plan or response",
   },
   {
+    name: "effective-n",
+    aliases: ["effn"],
+    description: "Compute effective independent signal count from a correlation matrix or raw signal series",
+    usage: "/effective-n",
+    category: "system",
+    level: 1,
+    action: "tool",
+    target: "compute_effective_n",
+    whenToUse:
+      "User wants to know how many independent gates a chain of N signals actually represents (participation-ratio diagnostic)",
+  },
+  {
     name: "orders",
     aliases: ["o"],
     description: "View open orders across crypto or stocks",

@@ -132,6 +132,9 @@ export { statusTools } from "./runtime/statusOverview.ts";
 export { shadowPlanTools } from "./runtime/shadowPlan.ts";
 export { feedbackRatingTools } from "./runtime/feedbackRating.ts";
 
+// Effective-N diagnostic tool (/effective-n slash command)
+export { effectiveNTools } from "./runtime/effectiveNDiagnostic.ts";
+
 // Playbook tools (v0.7)
 export { playbookTools } from "./runtime/meta/playbook-tools.ts";
 
@@ -399,6 +402,7 @@ import { antiTrapTools } from "./runtime/meta/anti-trap.ts";
 import { statusTools } from "./runtime/statusOverview.ts";
 import { shadowPlanTools } from "./runtime/shadowPlan.ts";
 import { feedbackRatingTools } from "./runtime/feedbackRating.ts";
+import { effectiveNTools } from "./runtime/effectiveNDiagnostic.ts";
 import { playbookTools } from "./runtime/meta/playbook-tools.ts";
 import { playbookBacktestTools } from "./strategy/backtest/backtest-tools.ts";
 import { runtimeTools } from "./runtime/flow/runtime-tools.ts";
@@ -498,6 +502,7 @@ const _rawAllTools = {
   ...statusTools,
   ...shadowPlanTools,
   ...feedbackRatingTools,
+  ...effectiveNTools,
   ...playbookTools,
   ...playbookBacktestTools,
   ...runtimeTools,

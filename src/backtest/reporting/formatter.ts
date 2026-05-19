@@ -28,6 +28,10 @@ import {
   evaluateOperatorEquation,
 } from "../../infra/trading/ops/operatorEquation.ts";
 import {
+  isEmpiricalKellyEnabled,
+  empiricalKelly,
+} from "../../infra/trading/quant/empiricalKelly.ts";
+import {
   isBacktestTaxEnabled,
   applyBacktestTax,
   expectedRAfterTax,
@@ -534,6 +538,24 @@ export function formatBacktestSummary(result: BacktestResult): string {
           const taxed = applyBacktestTax({ stats: { winRate, payoffRatio: payoff } });
           const evAfter = expectedRAfterTax(taxed);
           extra += `\n  Backtest tax: win ${(taxed.rawWinRate * 100).toFixed(1)}%→${(taxed.winRate * 100).toFixed(1)}%, payoff ${taxed.rawPayoffRatio.toFixed(2)}→${taxed.payoffRatio.toFixed(2)}, taxed EV ${evAfter.toFixed(3)}R`;
+        }
+      }
+
+      if (isEmpiricalKellyEnabled() && metrics.totalTrades >= 10) {
+        const wins = metrics.winningTrades;
+        const losses = metrics.losingTrades;
+        const winRate = wins / Math.max(wins + losses, 1);
+        const payoff = metrics.averageWin > 0 && metrics.averageLoss !== 0
+          ? metrics.averageWin / Math.abs(metrics.averageLoss)
+          : 0;
+        if (winRate > 0 && payoff > 0) {
+          const ek = empiricalKelly({
+            winRate,
+            payoffRatio: payoff,
+            historicalReturns: returns,
+            bootstrapSamples: Math.min(5000, returns.length * 100),
+          });
+          extra += `\n  Empirical Kelly: f_kelly ${(ek.fKelly * 100).toFixed(2)}% → f_empirical ${(ek.fEmpirical * 100).toFixed(2)}% (CV ${Number.isFinite(ek.cvEdge) ? ek.cvEdge.toFixed(2) : "∞"}, uncertainty ${ek.edgeUncertainty})`;
         }
       }
     }

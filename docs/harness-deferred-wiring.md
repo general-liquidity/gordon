@@ -893,6 +893,38 @@ The three anti-rot guards (`a4244f95`, pre-dates this spec) ship with flags, tes
 
 ---
 
+## Quant signal combination (SC1–SC4)
+
+Surfaced by the "IR = IC × √N" article. Four primitives that upgrade Gordon's signal-combination math from naive count to participation-ratio + bootstrap-uncertainty discipline. Sequenced by data readiness:
+
+### SC1. `signalCombinationEngine.ts` ⏳ planned (data-blocked)
+
+**Module path:** `src/infra/trading/quant/signalCombination.ts` (not yet built). Flag `GORDON_SIGNAL_COMBINATION`.
+**Status:** the article's 11-step pipeline (serial demean → normalize → cross-sectional demean → regress for independent residuals → weight by independent edge / sigma → normalize to unit weights). Replaces TM1's naive confluence count with proper independent-residual weighting. **Needs ≥40 closed trades per signal to compute meaningful regression** — gated on paper-mode realized-outcome data. ~1 week once data exists.
+
+### SC2. `informationCoefficient.ts` ⏳ planned (data-blocked)
+
+**Module path:** `src/infra/trading/quant/informationCoefficient.ts` (not yet built). Flag `GORDON_IC_TRACKER`.
+**Status:** rolling Pearson correlation per signal between prediction strength at fire-time and realized R-multiple. Same data dependency as SC1 — gated on TM3 stage population + paper-mode outcomes. ~3 days once data exists.
+
+### SC3. `effectiveN.ts` ✅ shipped, ✅ wired
+
+**Module:** `src/infra/trading/quant/effectiveN.ts`. Flag `GORDON_EFFECTIVE_N`.
+**Status:** participation-ratio + simple-approximation formulas; Jacobi eigenvalue solver for symmetric correlation matrices; pairwise redundant-pair detection with configurable threshold; raw signal series → correlation matrix convenience. 21 tests covering orthogonal / identical / mixed / negative-correlation / 12-primitive-chain scenarios.
+**Wire:** exposed as `compute_effective_n` tool registered in `src/infra/agents/tools/index.ts`; `/effective-n` (alias `/effn`) slash command in `src/app/slash/slashCommands.ts`. Tool accepts either a correlation matrix or raw signal series; emits structured observation `effective_n.requested`. Operator-callable today on any data they provide.
+
+### SC4. `empiricalKelly.ts` ✅ shipped, ✅ wired
+
+**Module:** `src/infra/trading/quant/empiricalKelly.ts`. Flag `GORDON_EMPIRICAL_KELLY`.
+**Status:** standard Kelly + bootstrap-resampling for edge variance; 4-class uncertainty classification (low / medium / high / untradable at CV ≥ 1); deterministic via LCG seed; complementary to WW24 backtestTax (heuristic) — both shrink raw estimates from different angles. 18 tests covering Kelly correctness across (p, b) combinations, uncertainty shrink behavior, seed determinism, boundary cases.
+**Wire:** `formatBacktestSummary` in `reporting/formatter.ts` emits `Empirical Kelly: f_kelly X% → f_empirical Y% (CV Z, uncertainty K)` line when ≥10 trades AND `GORDON_EMPIRICAL_KELLY=1`. Composes with the existing drag / decomposition / decay / backtest-tax lines on the same summary block.
+
+### Composition note
+
+SC3 + SC4 ship now because neither needs realized-outcome data — SC3 computes from any correlation matrix (synthetic or live), SC4 computes from existing backtest returns. SC2 + SC1 wait for paper-mode runs to produce paired (prediction, realized R-multiple) tuples, which gates the per-signal IC measurement that SC1's combination engine depends on.
+
+---
+
 ## Production-engineering bar (PE1–PE12)
 
 Surfaced by the "Missing Engineering Stack for Production AI Agents" piece. Maps the 4-primitive checklist (tokens / skills / security / trust) onto items Gordon doesn't yet have. The first two primitives are already ~90% in place (sharedPrefixCache, model routing, structured outputs, plan-then-execute, small idempotent tools); the security and trust columns surface most of the gaps below. None of these are core capability work — all are production-readiness plumbing. Relevant primarily if Gordon pursues the enterprise / regulated-finance / agent-firm-treasury positioning the strategic articles point at.
