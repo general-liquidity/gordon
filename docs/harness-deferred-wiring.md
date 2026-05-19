@@ -1308,6 +1308,8 @@ K's variants live at `K's trading-bot.data.h:842-864` (3 forms: BBO, wBBO, rwBBO
 
 Inventory-skewed quoting (Avellaneda-Stoikov-style position-feedback loop), 7-mode quote dispatcher (Top/Mid/Join/Depth/etc.), multi-timescale EWMA bank. All textbook MM material from K. Gating: **named crypto-native MM design partner.** Speculative build is wasted effort because K's tactical parameters (spread widths, position divergences, refresh cadences) don't generalize — they're calibrated per-venue-per-pair against a specific customer's flow. None of these surface for fund-diligence credibility either; TradFi funds don't ask "do you do market making" of an OMS/research vendor.
 
+**Adjacent disciplines surveyed, no portable primitives surfaced:** cross-venue spread arbitrage (WolfBot's `src/Arbitrage/Strategies/Spread.ts` is naive 2-leg; Gordon already has `atomicExecution.ts` with rollback + `crossVenueDivergence.ts` signal, both more sophisticated) and triangular arbitrage (TriangularArbitrage repo uses hardcoded-triplet enumeration with stubbed trading logic, not graph-based cycle detection). Same gating as MM2-MM4: arb-firm design partner specifies their own cycle-detection and execution semantics; no point caching a generic primitive that won't match their flow.
+
 ---
 
 ## How to use this doc
