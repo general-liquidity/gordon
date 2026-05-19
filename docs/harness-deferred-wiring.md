@@ -1264,11 +1264,49 @@ Source: Kissell, "Algorithmic Trading Methods" (Academic Press, 2nd ed., 2020), 
 
 **Gating:** LOI + named gateway from a specific prospect. Speculative build = wasted effort because the gateway-specific quirks are the actual work.
 
+### KS8. Almgren-Chriss closed-form optimal liquidation trajectory
+
+**Status:** not built. Considered immediately after KS3 (Efficient Trading Frontier) shipped; deferred for lack of a consumer. The closed-form gives `x(t)` for `t ∈ [0, T]` — the shares-to-trade-at-time-t schedule that minimizes `E[cost] + λ·Var[cost]` under linear permanent + temporary impact. Complements KS3 (which picks `T*`) by picking the slice shape *within* `T*`.
+
+**Wire point:** new pure-compute primitive in `src/infra/trading/quant/almgrenChrissTrajectory.ts`. ~150 LOC + test. Function signature: takes order size, horizon T, risk aversion λ, impact + vol parameters; returns `Array<{ t: number; sharesRemaining: number; sliceQuantity: number }>`.
+
+**Gating:** **no consumer in Gordon today.** None of the existing execution algos (TWAP=uniform, VWAP=historical profile, POV=adaptive on realized tape, Iceberg=non-temporal) ride a parametric trajectory. Building speculatively = museum piece. Only wire when an execution algo is added that consumes a trajectory input — e.g. a future "AC" execution mode that follows the closed-form schedule, or a backtest tool that compares realized vs AC-optimal cost. ~150 LOC build + ~50 LOC consumer; do them together.
+
 ### Sequencing recommendation (Kissell stack)
 
-KS1-KS3 shipped together in the institutional-credibility-primitives commit. KS4 is the highest-value next wire — unblocks both KS5 and KS6, and is the breadcrumb foundation for any real TCA story to a fund prospect. KS7 is gated on commercial signal. KS6 is gated on customer data signal. KS5 is purely UX sugar on top of KS4.
+KS1-KS3 shipped together in the institutional-credibility-primitives commit. KS4 is the highest-value next wire — unblocks both KS5 and KS6, and is the breadcrumb foundation for any real TCA story to a fund prospect. KS7 is gated on commercial signal. KS6 is gated on customer data signal. KS5 is purely UX sugar on top of KS4. KS8 is gated on an execution-algo consumer.
 
 If a fund design-partner conversation surfaces, prioritize: **KS4 → KS5 → KS7 (their gateway only) → KS6 (after 30 days of fills)**.
+
+---
+
+## Market-making primitives (MM1) — deferred pending design partner
+
+Surfaced by the K (ctubio's Krypto-trading-bot) survey, which is a textbook C++ market-making engine forked from tribeca/HRP. K bundles fair-value microprice estimators, inventory-skewed quoting, multi-timescale EWMA bank, and 7 quote-mode dispatchers. None of these belong in Gordon today — the dual-edition ICP (sub-$2B systematic funds, smaller multi-strats, discretionary PMs) doesn't run continuous two-way quotes, so the entire engine is speculative without a crypto-native MM design partner (Wintermute / GSR / smaller DeFi MM firms). One sub-primitive (microprice) is structurally distinct enough to track separately because it has a *plausible* non-MM consumer.
+
+### MM1. Microprice / weighted fair-value estimator
+
+**Status:** not built. Verified absent — `grep` for `microprice|wMid|volumeWeightedMid|sizeWeightedMid` across `src/` returns zero hits. Gordon's orderbook tools (`src/infra/agents/tools/market/orderbook.ts`, `src/infra/exchange/orderbook/`) compute top-of-book mid only.
+
+**What it is:** three pure-compute variants on a level-1/2 orderbook —
+- `mid = (bid + ask) / 2` (already present implicitly)
+- `vwMid = (bidSize * ask + askSize * bid) / (bidSize + askSize)` (size-weighted; pulls mid toward the thicker side)
+- `wMid = sum over levels (size_i * price_i) / sum sizes` (volume-weighted across N levels)
+
+K's variants live at `K's trading-bot.data.h:842-864` (3 forms: BBO, wBBO, rwBBO). Textbook Glosten-Milgrom / standard MM practice; not novel.
+
+**Wire point:** new primitive at `src/infra/trading/quant/microprice.ts`. ~60 LOC + test. Stateless function over a `LevelBook` shape Gordon already has.
+
+**Plausible consumers:**
+1. **IS decomposition's arrival price** (once KS4 breadcrumbs land) — `arrivalPrice` is the price observed when the order hit the market. Microprice is a better reference than top-of-book mid because it reflects the depth on the side the order is consuming. Consumer dependency: KS4.
+2. **A future market-making engine** (MM2-MM4 below) — but that's gated on a design-partner ask.
+3. **Slippage estimate refinement** in `frictionTracker` — replace `(bid+ask)/2` with microprice in fill-quality scoring. Tiny improvement; not urgent.
+
+**Gating:** identical pattern to KS8 — easy to build, no urgent consumer. Build it when KS4 lands (then the arrival-price refinement becomes the consumer) OR when a crypto-MM customer surfaces. Until then it's a museum piece.
+
+### MM2-MM4 (cold — full MM engine)
+
+Inventory-skewed quoting (Avellaneda-Stoikov-style position-feedback loop), 7-mode quote dispatcher (Top/Mid/Join/Depth/etc.), multi-timescale EWMA bank. All textbook MM material from K. Gating: **named crypto-native MM design partner.** Speculative build is wasted effort because K's tactical parameters (spread widths, position divergences, refresh cadences) don't generalize — they're calibrated per-venue-per-pair against a specific customer's flow. None of these surface for fund-diligence credibility either; TradFi funds don't ask "do you do market making" of an OMS/research vendor.
 
 ---
 
