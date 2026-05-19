@@ -1006,6 +1006,18 @@ MS1–MS5 are signal producers; MS6–MS7 are consumers; MS10–MS12 are safety 
 
 ---
 
+## Claude Code source-dump port (CC1)
+
+Surfaced by a gap-analysis pass over four reverse-engineered Claude Code source dumps (`claude-code-source-code-full-main`, `claude-code-working-main`, `claude-multimodel-main`, `open-claude-code-main`). Most items either don't apply to trading (file-edit tools, LSP, IDE bridge, ad-hoc coordinator team-spawning) or are already shipped (hooks, permissions, slash commands, multi-agent, memory, compaction, doom-loop, plugin manager, skills, proactive radar, eval harness). Three items downgraded to "not yet": remote session manager (speculative — needs distributed deployment first), policy limits (waits for second user), migrations system (overhead until persistent-data drift).
+
+### CC1. `structuredOutputEnforcement.ts` ✅ shipped
+**Module:** `src/infra/hooks/structuredOutputEnforcement.ts`. Flag `GORDON_STRUCTURED_OUTPUT_ENFORCEMENT`.
+**Status:** Zod-schema validation as a hook. Two factories: `createPostToolOutputSchemaHook` validates tool results, `createPreToolInputSchemaHook` validates tool inputs. On mismatch, blocks by default; with `repromptInsteadOfBlock: true`, modifies the payload with a structured reprompt the orchestrator can feed back to the model. Standalone `validateStructuredOutput(value, schema)` helper available for non-hook callsites (plan-card emitters, risk verdicts, kill-list payloads). 15 tests covering validation correctness, hook gating, modify-vs-block semantics, custom extractors, regex filters, and failure observers.
+**Pattern port:** maps Claude Code's `registerStructuredOutputEnforcement` (utils/hooks/hookHelpers.ts) onto Gordon's hook engine. Claude Code uses a `SyntheticOutputTool` + Stop hook to verify the agent called a typed completion tool; Gordon uses Zod-schema validation at PostToolUse / PreToolUse since trading payloads already have strict typed shapes everywhere.
+**Future composition:** apply to high-stakes tool emitters — `execute_plan` rationale, plan_ready cards, structured backtest summaries — where a malformed payload propagating into the order layer is worse than a refusal. Use `repromptInsteadOfBlock` for advisory paths (e.g. researcher-agent outputs) where the orchestrator can retry; use plain block for execution paths.
+
+---
+
 ## Production-engineering bar (PE1–PE12)
 
 Surfaced by the "Missing Engineering Stack for Production AI Agents" piece. Maps the 4-primitive checklist (tokens / skills / security / trust) onto items Gordon doesn't yet have. The first two primitives are already ~90% in place (sharedPrefixCache, model routing, structured outputs, plan-then-execute, small idempotent tools); the security and trust columns surface most of the gaps below. None of these are core capability work — all are production-readiness plumbing. Relevant primarily if Gordon pursues the enterprise / regulated-finance / agent-firm-treasury positioning the strategic articles point at.
