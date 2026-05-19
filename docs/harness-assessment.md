@@ -225,6 +225,21 @@ This asymmetry is a consequence of Gordon's history (focus on signal-generation 
 
 **Estimated effort:** ~3–4 weeks for a proper order-state machine + position-management loop. Pair with WW4 producers and TM2 wiring.
 
+### 3.9 Production-engineering bar gap (PE1–PE12 in deferred-wiring spec)
+
+Surfaced by the "Missing Engineering Stack for Production AI Agents" piece. Maps the production-readiness checklist onto items Gordon doesn't yet have. The first two checklist primitives (tokens, skills composition) are ~90% in place; security and trust columns surface most of the gaps. Tracked in detail as PE1–PE12 in `docs/harness-deferred-wiring.md`.
+
+The 12 items group into four areas:
+
+- **Distribution surface.** Agent-native MCP server (PE1), per-agent OAuth tokens replacing env credentials (PE2), supply-chain attestation (PE4) — making Gordon reachable and verifiable by external agents and regulated reviewers.
+- **Security plumbing.** Output content classifier scanning tool calls pre-execution for exfil patterns (PE3), DefenseClaw integration wrapping Skills Scanner / MCP Scanner / CodeGuard / Guardrail Proxy around the runtime (PE10).
+- **Trust telemetry.** Drift detection on embeddings + behavioral metrics (PE5), behavioral canary harness running daily adversarial probes (PE6), integrity-chained Merkle audit log anchored to immutable storage (PE7), composite TrustScore rollup (PE8), OpenTelemetry GenAI semconv emission (PE9).
+- **Compliance + structure.** TrustModel.ai GRC overlay mapping to NIST AI RMF / ISO 42001 / EU AI Act / SOC 2 / FedRAMP (PE11), skills refactor to trigger/action/restriction triples for safer policy evolution (PE12).
+
+**Estimated effort:** PE9 is hours; PE4, PE12 are 3 days each; PE3, PE7, PE8 are ~1 week each; PE2, PE5, PE6, PE10, PE11 are 1-2 weeks each; PE1 (MCP server) is 1-2 weeks and already on the critical path. Roughly 8-12 weeks total if pursued in full.
+
+**Relevance gate:** these items are required only if Gordon pursues the enterprise / regulated-finance / agent-firm-treasury positioning the strategic articles point at. For retail-only operator-shadow product, most are over-engineering at the current usage stage. Pick the lane before building.
+
 ---
 
 ## 4. Realistic sequencing

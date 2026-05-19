@@ -893,6 +893,76 @@ The three anti-rot guards (`a4244f95`, pre-dates this spec) ship with flags, tes
 
 ---
 
+## Production-engineering bar (PE1–PE12)
+
+Surfaced by the "Missing Engineering Stack for Production AI Agents" piece. Maps the 4-primitive checklist (tokens / skills / security / trust) onto items Gordon doesn't yet have. The first two primitives are already ~90% in place (sharedPrefixCache, model routing, structured outputs, plan-then-execute, small idempotent tools); the security and trust columns surface most of the gaps below. None of these are core capability work — all are production-readiness plumbing. Relevant primarily if Gordon pursues the enterprise / regulated-finance / agent-firm-treasury positioning the strategic articles point at.
+
+### PE1. MCP server (agent-native distribution surface)
+
+**Status:** not built. Already tracked across MB-series (Mercury batteries) and Vellum article notes.
+**Wire point:** expose `shadow_plan`, `status_overview`, `rate_response` (and eventually the rest of the runtime tools) via an MCP server with StreamableHTTP transport. List on MCP marketplace, Claude Desktop integration, Cursor, skills.sh. ~1-2 weeks.
+
+### PE2. Per-agent OAuth tokens + per-session scoping
+
+**Status:** Gordon's credentials are env-based (provider API keys via `GORDON_*_API_KEY`). No per-agent identity, no per-session scoping, no OAuth 2.1 + PKCE flow.
+**Wire point:** introduce a token-issuance layer keyed on agent identity. Per-tool principal scoping. Keychain storage (libsecret / Keychain / DPAPI — partial via `GORDON_KEYRING_LEGACY`). Required precondition for exposing Gordon to multiple external agents safely. ~1 week.
+
+### PE3. Output content classifier (pre-execution exfil scan)
+
+**Status:** not built. networkAllowlist + filesystemWriteGuard catch some surfaces; nothing scans the *content* of outbound tool calls.
+**Wire point:** small LLM (Haiku-class) running over each tool call before execution, flagging known exfil patterns — suspicious destinations, base64 blobs, sensitive-field references, prompt-injection echoes. ~3-5 days.
+
+### PE4. Supply-chain attestation (SLSA L3 + sigstore + distroless)
+
+**Status:** Gordon ships as a Bun-runtime CLI; no signing of artifacts, no SBOM emitted, no provenance attestation.
+**Wire point:** add sigstore signing to release pipeline, distroless container images for any hosted variant, SBOM into artifact registry, cosign-verified deploys. Mostly CI/CD work. ~3 days.
+
+### PE5. Drift detection (embeddings + behavioral)
+
+**Status:** not built.
+**Wire point:** track cosine distance of input embeddings from a reference centroid; track behavioral metrics (tool-call mix, escalation rate, refund rate equivalent → cancel rate, average size, rejection rate at each gate). Alarm at 2σ. Composes naturally with WW22 edgeDecayMonitor on the trading side. ~1 week.
+
+### PE6. Behavioral canary harness
+
+**Status:** 5 scenarios queued in `project_queued_adversarial_security_evals.md` memory note (credential-leak / permission-bypass / deny-list-circumvention / cross-agent-tool-boundary / injection-resilience). Not yet implemented.
+**Wire point:** scheduled job firing the canary inputs daily through the agent stack, recording pass rate. Add new attack classes to the canary set as they appear in the wild. Composes with existing eval harness in `src/infra/domain/evals/`. ~1 week.
+
+### PE7. Integrity-chained audit log + immutable anchoring
+
+**Status:** Gordon emits structured observations to Axiom and has `GORDON_AUDIT_HMAC_KEY` for per-event HMAC. No hash chain across events; no anchoring to immutable storage.
+**Wire point:** chain each audit event's hash to the previous (Merkle structure), periodically anchor the head into S3 Object Lock / GCS Bucket Lock. Required for the "what did the agent do at 14:22 UTC on March 12" guarantee that regulated audits demand. ~1 week.
+
+### PE8. Composite TrustScore rollup
+
+**Status:** not built. The underlying signals (eval pass rate, HITL approval rate, gate verdict counts, structured observation streams) all exist; no rolled-up score per agent / per skill / per day.
+**Wire point:** scheduled aggregator that joins eval pass rate × drift score × canary survival × HITL approval rate × shadow-vs-realized agreement into a single weighted TrustScore. Per-agent, per-skill, per-day. ~3-5 days. The score is operationally meaningful only if its underlying signals are queryable — so PE5 + PE6 + PE7 are precursors.
+
+### PE9. OpenTelemetry GenAI semconv
+
+**Status:** Gordon emits OTel tracing via `src/infra/platform/observability/tracing.ts`. Does not yet emit standard `gen_ai.*` span attributes (`gen_ai.system`, `gen_ai.request.model`, `gen_ai.usage.input_tokens`, `gen_ai.response.model`, etc).
+**Wire point:** decorate existing model-call spans with the standard semconv attributes. Hours of work. Makes Gordon's traces compatible with every enterprise OTel-backend out of the box. Pure pluses.
+
+### PE10. Cisco DefenseClaw integration
+
+**Status:** not integrated. DefenseClaw shipped March 23, 2026 from RSAC keynote — Apache 2.0, four components (Skills Scanner, MCP Scanner, CodeGuard, Guardrail Proxy). Go gateway sidecar + Python CLI + TypeScript plugin for OpenClaw framework.
+**Wire point:** wrap DefenseClaw around `place_order` and the deny-first permission engine. Skills Scanner over Gordon's 11 markdown playbooks. MCP Scanner over PE1's MCP server when it ships. CodeGuard in CI. Guardrail Proxy in front of the agent runtime. ~1 week including ops. Highest-leverage single integration for credibly enterprise-grade positioning.
+
+### PE11. TrustModel.ai GRC overlay
+
+**Status:** not integrated.
+**Wire point:** feed Gordon's existing structured observations into TrustModel.ai's control library. Produces auditor-ready reports against NIST AI RMF, ISO 42001, EU AI Act Article-by-Article, SOC 2, FedRAMP. Only useful if pursuing the regulated-finance angle. Likely 1-2 weeks for clean integration. Lower priority than PE10.
+
+### PE12. Skills refactor to trigger/action/restriction triples
+
+**Status:** `src/infra/agents/skills/` contains 11 markdown playbooks (best-practices, dd, exit-review, morning-brief, quick-scan, radar, rebalance, research, risk-check, swing-entry, weekend-review). They function as skill fragments but aren't in the `{ trigger, action, restriction }` shape the article proposes.
+**Wire point:** convert each playbook to a JSON triple. Version per skill. Attach eval suites per skill. Enables swapping policies (e.g. "refund window changed from 30 to 60 days") without re-blessing the entire agent. ~3-5 days for the eleven existing playbooks; ongoing for new ones.
+
+### Sequencing recommendation
+
+If the enterprise/regulated lane is chosen, prioritize: **PE9 (hours), PE1 (already on critical path), PE10 (highest single-integration leverage), PE7 (audit integrity), PE8 (TrustScore needs PE5+PE6+PE7 to be meaningful)**. PE2 / PE3 / PE4 / PE5 / PE6 / PE11 / PE12 fill in over the following 1-2 months. If retail-only is chosen, none of these are required for the immediate product — they become noise until usage justifies them.
+
+---
+
 ## Parked (depends on signal not yet available)
 
 ### P1. Verified Completion Rate (VCR)
