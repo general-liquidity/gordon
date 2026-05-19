@@ -4,14 +4,14 @@
 
 **Audited:** 184 unique slash commands across `src/app/slash/slashCommands.ts` (2 commands appear twice in the source — see Duplicates section).
 
-**Headline numbers:**
-- **Keep as-is:** 89 commands
+**Headline numbers (revised after post-audit verification):**
+- **Keep as-is:** 89 commands + 8 originally tagged retire that proved load-bearing = ~97
 - **Merge into another command:** 29
 - **Convert to subcommand of an existing top-level:** 36
-- **Retire entirely:** 20
+- **Retire / hide:** 1 verified (`/settings-panel` only — the original "retire 20" was wrong, see §3)
 - **Investigate further (need operator input):** 12 (see Open Questions)
 
-If executed, the top-level slash menu shrinks from 184 → roughly **70-80 commands** (89 keepers + ~10-15 new top-level "noun" commands that absorb the verb explosions). Tool registry shrinks correspondingly.
+**Realistic top-line:** if Phase A+B+C executed end-to-end, the visible typeahead menu shrinks from 184 → roughly **120-130 commands** (not 70-80 as originally estimated). The aggressive retire-bucket assumption was wrong; the verb-explosion subcommand collapse remains the biggest legitimate win.
 
 ---
 
@@ -94,25 +94,27 @@ Pick one canonical, retire the other(s).
 
 ---
 
-## 3. Cosmetic / debug / panel openers → retire
+## 3. Cosmetic / debug / panel openers — RE-EVALUATED POST-AUDIT
 
-These either duplicate `/menu` panels or are developer-only tooling that doesn't belong on a daily operator's slash menu.
+**Correction applied 2026-05-19.** The original retire-bucket recommendations were based on command names alone, not on grep-verified implementations. After investigating each candidate's call graph, **8 of 9 have real working code** and retiring them would orphan implementations. The single defensible retire candidate is `/settings-panel`.
 
-| Retire | Reason | Migration |
-|---|---|---|
-| `/theme` | Cosmetic | Move into `/config theme` |
-| `/shortcuts` | Help reference | Keep at user discretion; arguably keep |
-| `/cache` | Debug-only | Move into `/doctor cache` |
-| `/cache-audit` | Debug-only | Move into `/doctor cache audit` |
-| `/perf` | Developer profiling | Move into `/doctor perf` |
-| `/settings-panel` | Duplicate `/configure` | Retire |
-| `/export-panel` | Duplicate `/export` | Retire |
-| `/memory-panel` | Settings submenu | Move into `/configure memory` |
-| `/context-viz` | Visualization panel | Move into `/context viz` subcommand |
-| `/hip3` | HyperLiquid v3 builder-perps; niche | Retire unless operator confirms usage |
-| `/debate` | Agent debate viewer; rare | Investigate; likely retire |
+| Candidate | Original verdict | Post-audit finding | Final action |
+|---|---|---|---|
+| `/theme` | retire | Real `ThemePicker` overlay + `SettingsDialog` integration; daily-driver dark/light flip | **KEEP** |
+| `/shortcuts` | retire | Help reference; harmless | **KEEP** |
+| `/cache` | retire | Working tool `get_cache_stats` with real cache stats; level 3 (advanced) so not in default view | **KEEP** |
+| `/cache-audit` | retire | Working diagnostic in `app/commands/cacheAudit.ts` + orchestrator wiring | **KEEP** |
+| `/perf` | retire | Subcommand-based perf monitor with `/perf start \| stop \| report` plus `LabsPanel.tsx` consumer | **KEEP** |
+| `/settings-panel` | retire | Genuinely redundant with `/configure` (same settings entry point) | **HIDE** (executed) |
+| `/export-panel` | retire | Distinct GUI panel from `/export` (which is a tool); both surfaces useful | **KEEP** |
+| `/memory-panel` | retire | Memory selector overlay, distinct from `/context` | **KEEP** |
+| `/context-viz` | retire | Context-budget visualization panel; investigate before touching | **KEEP** |
+| `/hip3` | retire | Backs the entire Hyperliquid HIP-3 perp browser (`HIP3AssetBrowser` + `hip3.ts` venue client) | **KEEP** |
+| `/debate` | retire | `DebateViewer` overlay + `debate:resolved` bus listener; infrastructure exists, event emitter is WIP | **KEEP** |
 
-**Retire subtotal: -7 to -11 top-level commands.**
+**Lesson:** the correct pruning lens is "what breaks if I retire this?" — not "does this sound niche?" Level 3 (advanced) categorization is the filter that keeps these out of the operator's default typeahead view; further pruning here orphans working code paths.
+
+**Retire subtotal (revised): -1 top-level command** (`/settings-panel` hidden via `hideFromTypeahead: true`).
 
 ---
 

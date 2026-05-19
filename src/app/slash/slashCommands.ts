@@ -2121,11 +2121,12 @@ const LEGACY_SLASH_COMMANDS: SlashCommandSeed[] = [
     name: "settings-panel",
     aliases: [],
     description: "Open the settings panel",
-    usage: "/settings-panel",
+    usage: "/settings-panel (prefer /configure)",
     category: "system",
     level: 1,
     action: "menu",
     target: "settings-panel",
+    hideFromTypeahead: true,
   },
   {
     name: "export-panel",
