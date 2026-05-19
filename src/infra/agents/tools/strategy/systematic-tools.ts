@@ -13,6 +13,7 @@ import {
   buildLifecycleReport,
   buildPortfolioOperatorReport,
   buildStrategyStatusReport,
+  detectFamilyClustering,
   formatOperatorReport,
   getDatasetSnapshot,
   getSystematicStrategyStatus,
@@ -314,7 +315,8 @@ export const getDatasetSnapshotTool = createTool({
 export const listResearchExperimentsTool = createTool({
   id: "list_research_experiments",
   description:
-    "List systematic research experiments and validation hypotheses for a strategy or across all strategies.",
+    "List systematic research experiments and validation hypotheses for a strategy or across all strategies. " +
+    "Also surfaces a family-diversity hint when recent experiments cluster in one strategy family (suggests exploration alternatives).",
   inputSchema: z.object({
     strategyId: z.string().optional(),
     limit: z.number().min(1).max(50).default(20),
@@ -332,10 +334,22 @@ export const listResearchExperimentsTool = createTool({
     })),
     operatorReport: operatorReportSchema.optional(),
     formattedSummary: z.string().optional(),
+    diversityHint: z
+      .object({
+        dominantFamily: z.string(),
+        saturation: z.number(),
+        suggestedAlternatives: z.array(z.string()),
+        windowSize: z.number(),
+      })
+      .nullable(),
   }),
   execute: async ({ strategyId, limit }) => {
     const experiments = listResearchExperiments(strategyId).slice(0, limit);
     const operatorReport = buildExperimentsReport({ experiments });
+    // Family-diversity hint: chronological order matters, so reverse the
+    // updatedAt-desc list to oldest-first before scanning the tail.
+    const chronological = [...experiments].reverse();
+    const diversityHint = detectFamilyClustering(chronological);
     return {
       experiments: experiments.map((experiment) => ({
         experimentId: experiment.experimentId,
@@ -349,6 +363,7 @@ export const listResearchExperimentsTool = createTool({
       })),
       operatorReport,
       formattedSummary: formatOperatorReport(operatorReport),
+      diversityHint,
     };
   },
 });
