@@ -53,6 +53,16 @@ export interface DetectorInput {
    * Caller picks based on instrument volatility.
    */
   adverseMoveThreshold?: number;
+  /**
+   * MS6: optional microstructure-toxicity prior observed JUST BEFORE the
+   * fill (from MS1 microstructureToxicity). Range 0..1. When elevated,
+   * post-fill adverse moves are more likely manipulation than fundamental
+   * news — the detector promotes neutral→adversely_selected when this
+   * prior is above the manipulation threshold.
+   */
+  toxicityPriorBeforeFill?: number;
+  /** Threshold above which a neutral fast-fill is upgraded. Default 0.6. */
+  toxicityManipulationThreshold?: number;
 }
 
 export interface DetectorResult {
@@ -61,15 +71,19 @@ export interface DetectorResult {
   postFillMove: number;
   wasFastFill: boolean;
   wasAdverseMove: boolean;
+  toxicityPrior?: number;
+  manipulationUpgraded: boolean;
   reason: string;
 }
 
 const DEFAULT_FAST_FILL_SECONDS = 2;
 const DEFAULT_ADVERSE_MOVE = 0.005;
+const DEFAULT_TOXICITY_MANIPULATION = 0.6;
 
 export function detectAdverseSelection(input: DetectorInput): DetectorResult {
   const fastFillMs = (input.fastFillSeconds ?? DEFAULT_FAST_FILL_SECONDS) * 1000;
   const adverseThreshold = input.adverseMoveThreshold ?? DEFAULT_ADVERSE_MOVE;
+  const toxicityThreshold = input.toxicityManipulationThreshold ?? DEFAULT_TOXICITY_MANIPULATION;
   const fill = input.fill;
 
   const latency = fill.filledAtMs - fill.orderSubmittedAtMs;
@@ -79,11 +93,19 @@ export function detectAdverseSelection(input: DetectorInput): DetectorResult {
   const adverseMove = fill.side === "buy" ? -move : move;
   const wasAdverse = adverseMove >= adverseThreshold;
 
+  const tox = input.toxicityPriorBeforeFill;
+  const highToxicity = typeof tox === "number" && tox >= toxicityThreshold;
+
   let verdict: FillVerdict;
   let reason: string;
+  let upgraded = false;
   if (wasFast && wasAdverse) {
     verdict = "adversely_selected";
     reason = `Fast fill (${latency}ms) with ${adverseMove.toFixed(4)} adverse move — toxic flow`;
+  } else if (wasFast && highToxicity) {
+    verdict = "adversely_selected";
+    upgraded = true;
+    reason = `Fast fill with elevated pre-fill toxicity ${tox!.toFixed(2)} — promoted from neutral`;
   } else if (wasFast || wasAdverse) {
     verdict = "neutral";
     reason = wasFast
@@ -100,6 +122,8 @@ export function detectAdverseSelection(input: DetectorInput): DetectorResult {
     postFillMove: adverseMove,
     wasFastFill: wasFast,
     wasAdverseMove: wasAdverse,
+    toxicityPrior: tox,
+    manipulationUpgraded: upgraded,
     reason,
   };
 }

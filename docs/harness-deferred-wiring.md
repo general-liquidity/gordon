@@ -949,6 +949,63 @@ Beyond the code: KF1 + KF2 make explicit the pattern Gordon's harness already im
 
 ---
 
+## Microstructure / quote-stuffing detection (MS1–MS12)
+
+Surfaced by the "Quote Stuffing in 2026" piece. The article enumerates the manipulation patterns and the defensive-architecture controls a serious trading environment has to satisfy. Items split by data dependency: MS1–MS7 and MS10–MS12 are L2-buildable (top-of-book depth + cross-venue mids); MS8–MS9 require full L3 order-by-order feeds and are explicitly parked.
+
+### MS1. `microstructureToxicity.ts` ✅ shipped, ✅ wired
+**Module:** `src/infra/trading/signals/microstructureToxicity.ts`. Flag `GORDON_MICROSTRUCTURE_TOXICITY`.
+**Status:** composite scorer rolling up MS3 + MS4 + MS5 + displayed half-life + depth turnover. Outputs continuous [0,1] score + regime (`quiet`/`elevated`/`active`). Configurable thresholds.
+**Wire:** MS7 consumes via shadow chain.
+
+### MS2. `manipulationContext.ts` ✅ shipped, ✅ wired
+**Module:** `src/infra/trading/signals/manipulationContext.ts`. Flag `GORDON_MANIPULATION_CONTEXT`.
+**Status:** maps toxicity regime → trade posture (`trade_normal` / `size_down` / `refuse`) with size multiplier. Identifies dominant driver.
+**Wire:** MS7 shadow chain folds posture into blocker set; `refuse` → no_go.
+
+### MS3. `crossVenueDivergence.ts` ✅ shipped
+**Module:** `src/infra/trading/signals/crossVenueDivergence.ts`. Flag `GORDON_CROSS_VENUE_DIVERGENCE`.
+**Status:** rolling cross-venue mid divergence + quote-vs-execution flip detection. Inputs L2 quotes + trades per venue.
+
+### MS4. `manufacturedImbalance.ts` ✅ shipped
+**Module:** `src/infra/trading/signals/manufacturedImbalance.ts`. Flag `GORDON_MANUFACTURED_IMBALANCE`.
+**Status:** buildup→peak→vanish OBI signature detection at L2. Verdict: `clean` / `suspicious` / `manufactured` with confidence.
+
+### MS5. `touchDynamics.ts` ✅ shipped
+**Module:** `src/infra/trading/signals/touchDynamics.ts`. Flag `GORDON_TOUCH_DYNAMICS`.
+**Status:** touch-level update rate, size flicker CV, spread volatility, mid jitter. State: `quiet` / `elevated` / `hot`.
+
+### MS6. WW19 adverseSelectionDetector + microstructure prior ✅ shipped
+**Module:** `src/infra/trading/ops/adverseSelectionDetector.ts` — extended.
+**Status:** accepts optional `toxicityPriorBeforeFill` + `toxicityManipulationThreshold`. When toxicity is high (≥0.6 default) before a fast fill, the verdict is promoted from `neutral` → `adversely_selected` with `manipulationUpgraded=true`. Captures the article's claim that fast fills against elevated microstructure noise are manipulation evidence even when the post-fill move hasn't yet materialized.
+
+### MS7. preTradeMicrostructureGate via shadow chain ✅ shipped
+**Module:** `src/infra/trading/ops/shadowChain.ts` — extended with optional `microstructureToxicity` input.
+**Status:** when caller supplies a `ToxicityResult`, the chain runs `classifyManipulationContext` and folds the posture into the blocker set. `refuse` is a hard blocker → no_go. `size_down` is a soft caution. Markdown summary surfaces the regime and dominant driver. Structured observation captures `microstructureRegime` + `microstructurePosture`.
+
+### MS8. Quote lifetime distribution — **L3 required, parked**
+Needs per-message order-by-order events with append/cancel/modify timestamps. Not available from standard L2 feeds.
+
+### MS9. Cancel-to-fill ratio — **L3 required, parked**
+Same data dependency as MS8. Requires order-event stream, not just top-of-book.
+
+### MS10. `preTradeRateControls.ts` ✅ shipped
+**Module:** `src/infra/safety/preTradeRateControls.ts`. Flag `GORDON_PRETRADE_RATE_CONTROLS`.
+**Status:** sliding-window rate limits for messages/sec, cancels/sec, modifications/sec, order-to-trade ratio, open orders per instrument. Designed to be called BEFORE outbound order submit. Conservative retail-trader defaults.
+
+### MS11. `killSwitches.ts` ✅ shipped
+**Module:** `src/infra/safety/killSwitches.ts`. Flag `GORDON_KILL_SWITCHES`.
+**Status:** 8-scope kill-switch hierarchy (`strategy → trader → account → client → instrument → venue → gateway → firm`). `tripKillSwitch` / `resetKillSwitch` / `resetAllKillSwitches` / `isExecutionAllowed` / `listTrippedSwitches`. Composes with permission engine.
+
+### MS12. `lifecycleReconstruction.ts` ✅ shipped
+**Module:** `src/infra/diagnostics/lifecycleReconstruction.ts`. Flag `GORDON_LIFECYCLE_RECONSTRUCTION`.
+**Status:** per-correlation-id forensic timeline reconstruction from already-flowing audit events. Detects 5 anomalies: rapid_cancel_after_submit, excessive_modifications, cancel_without_intermediate_fill, missing_permission_check, fill_before_submit_event. Surfaces toxicity hints when patterns match quote-stuffing or layered-stuffing signatures.
+
+### Microstructure framing
+MS1–MS5 are signal producers; MS6–MS7 are consumers; MS10–MS12 are safety + forensics. The set covers the L2-achievable half of the article's checklist. MS8–MS9 stay parked until Gordon ingests an L3 venue feed (no current plan — retail-trader scope doesn't justify the data cost).
+
+---
+
 ## Production-engineering bar (PE1–PE12)
 
 Surfaced by the "Missing Engineering Stack for Production AI Agents" piece. Maps the 4-primitive checklist (tokens / skills / security / trust) onto items Gordon doesn't yet have. The first two primitives are already ~90% in place (sharedPrefixCache, model routing, structured outputs, plan-then-execute, small idempotent tools); the security and trust columns surface most of the gaps below. None of these are core capability work — all are production-readiness plumbing. Relevant primarily if Gordon pursues the enterprise / regulated-finance / agent-firm-treasury positioning the strategic articles point at.

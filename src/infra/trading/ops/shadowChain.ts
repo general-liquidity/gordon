@@ -43,6 +43,9 @@ import { evaluateCircuit } from "./streakCircuitBreaker.ts";
 import type { StreakResult } from "./streakCircuitBreaker.ts";
 import { evaluateGiveBack } from "./giveBackStop.ts";
 import type { GiveBackResult } from "./giveBackStop.ts";
+import { classifyManipulationContext } from "../signals/manipulationContext.ts";
+import type { ManipulationContextResult } from "../signals/manipulationContext.ts";
+import type { ToxicityResult } from "../signals/microstructureToxicity.ts";
 import { recordStructuredObservation } from "../../platform/observability/structured.ts";
 
 export interface ShadowPlanInput {
@@ -60,6 +63,13 @@ export interface ShadowPlanInput {
   tier?: TradeTier;
   /** Operator-supplied edge type. Defaults to "structural". */
   edgeType?: EdgeType;
+  /**
+   * MS7: optional pre-computed microstructure toxicity. When provided,
+   * the chain runs manipulationContext and folds the verdict into the
+   * blocker set: `refuse` is a hard blocker, `size_down` is a soft
+   * warning the markdown surfaces.
+   */
+  microstructureToxicity?: ToxicityResult;
 }
 
 export interface ShadowPlanResult {
@@ -75,6 +85,7 @@ export interface ShadowPlanResult {
   liquidity: LiquidityMapResult;
   streak: StreakResult | null;
   giveBack: GiveBackResult | null;
+  manipulationContext: ManipulationContextResult | null;
   overallVerdict: "go" | "caution" | "no_go";
   blockers: string[];
   summary: string;
@@ -92,6 +103,7 @@ function aggregateVerdict(
   killList: KillListResult,
   streak: StreakResult | null,
   giveBack: GiveBackResult | null,
+  manipulation: ManipulationContextResult | null,
 ): { verdict: "go" | "caution" | "no_go"; blockers: string[] } {
   const blockers: string[] = [];
   if (edge.verdict === "no_edge") blockers.push("No identifiable edge");
@@ -107,6 +119,15 @@ function aggregateVerdict(
   if (giveBack && giveBack.state === "triggered") {
     blockers.push("Give-back stop triggered — flatten the session");
   }
+  if (manipulation && manipulation.shouldRefuse) {
+    blockers.push(
+      `Microstructure manipulation regime: ${manipulation.reasoning}`,
+    );
+  } else if (manipulation && manipulation.posture === "size_down") {
+    blockers.push(
+      `Microstructure elevated: ${manipulation.reasoning}`,
+    );
+  }
 
   if (blockers.length === 0) return { verdict: "go", blockers };
 
@@ -116,7 +137,8 @@ function aggregateVerdict(
       b.includes("Absorbing barrier") ||
       b.includes("Give-back") ||
       b.includes("tripped") ||
-      b.includes("No identifiable edge"),
+      b.includes("No identifiable edge") ||
+      b.includes("manipulation regime"),
   );
   return { verdict: hardBlockers.length > 0 ? "no_go" : "caution", blockers };
 }
@@ -159,6 +181,11 @@ function formatMarkdown(result: ShadowPlanResult): string {
   }
   if (result.giveBack) {
     lines.push(`- **Give-back**: ${result.giveBack.state} (session PnL $${result.giveBack.sessionPnlUsd.toFixed(0)})`);
+  }
+  if (result.manipulationContext) {
+    lines.push(
+      `- **Microstructure**: ${result.manipulationContext.regime} → ${result.manipulationContext.posture} (score ${result.manipulationContext.toxicityScore.toFixed(2)})`,
+    );
   }
   if (result.liquidity.nearestBelow || result.liquidity.nearestAbove) {
     lines.push("- **Liquidity map**:");
@@ -293,6 +320,10 @@ export function runShadowChain(input: ShadowPlanInput): ShadowPlanResult {
     });
   }
 
+  const manipulationContext = input.microstructureToxicity
+    ? classifyManipulationContext(input.microstructureToxicity)
+    : null;
+
   const { verdict, blockers } = aggregateVerdict(
     edgeAttribution,
     riskBundle,
@@ -301,6 +332,7 @@ export function runShadowChain(input: ShadowPlanInput): ShadowPlanResult {
     killList,
     streak,
     giveBack,
+    manipulationContext,
   );
 
   const result: ShadowPlanResult = {
@@ -316,6 +348,7 @@ export function runShadowChain(input: ShadowPlanInput): ShadowPlanResult {
     liquidity,
     streak,
     giveBack,
+    manipulationContext,
     overallVerdict: verdict,
     blockers,
     summary: "",
@@ -340,6 +373,8 @@ export function runShadowChain(input: ShadowPlanInput): ShadowPlanResult {
       bundleVerdict: riskBundle.verdict,
       sizerRejected: sizer?.rejected ?? null,
       killListPass: killList.pass,
+      microstructureRegime: manipulationContext?.regime ?? null,
+      microstructurePosture: manipulationContext?.posture ?? null,
     },
   });
 

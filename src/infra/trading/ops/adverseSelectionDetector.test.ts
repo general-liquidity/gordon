@@ -146,6 +146,55 @@ describe("aggregateFills", () => {
   });
 });
 
+describe("detectAdverseSelection — MS6 microstructure toxicity prior", () => {
+  it("high pre-fill toxicity upgrades neutral fast-fill to adversely_selected", () => {
+    const r = detectAdverseSelection({
+      fill: {
+        orderSubmittedAtMs: 1000,
+        filledAtMs: 1100,
+        side: "buy",
+        fillPrice: 100,
+        midPriceAtSubmit: 100,
+        midPriceAfterWindow: 100.1,
+      },
+      toxicityPriorBeforeFill: 0.75,
+    });
+    expect(r.verdict).toBe("adversely_selected");
+    expect(r.manipulationUpgraded).toBe(true);
+  });
+
+  it("low toxicity prior doesn't upgrade", () => {
+    const r = detectAdverseSelection({
+      fill: {
+        orderSubmittedAtMs: 1000,
+        filledAtMs: 1100,
+        side: "buy",
+        fillPrice: 100,
+        midPriceAtSubmit: 100,
+        midPriceAfterWindow: 100.1,
+      },
+      toxicityPriorBeforeFill: 0.2,
+    });
+    expect(r.verdict).toBe("neutral");
+    expect(r.manipulationUpgraded).toBe(false);
+  });
+
+  it("toxicity prior doesn't change clean verdict", () => {
+    const r = detectAdverseSelection({
+      fill: {
+        orderSubmittedAtMs: 1000,
+        filledAtMs: 30_000,
+        side: "buy",
+        fillPrice: 100,
+        midPriceAtSubmit: 100,
+        midPriceAfterWindow: 100.1,
+      },
+      toxicityPriorBeforeFill: 0.9,
+    });
+    expect(r.verdict).toBe("clean");
+  });
+});
+
 describe("detectorToPayload", () => {
   it("emits stable shape", () => {
     const r = detectAdverseSelection({
