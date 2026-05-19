@@ -153,6 +153,11 @@ export { kaufmanAdaptiveMaTools } from "./runtime/kaufmanAdaptiveMaDiagnostic.ts
 export { marketProfileTools } from "./runtime/marketProfileDiagnostic.ts";
 export { tripleScreenTools } from "./runtime/tripleScreenDiagnostic.ts";
 
+// Autoresearch port — bootstrap fragility, vol-scaled sizing, research-loop decision engine.
+export { bootstrapTools } from "./runtime/bootstrapDiagnostic.ts";
+export { volScaledSizingTools } from "./runtime/volScaledSizingDiagnostic.ts";
+export { researchLoopTools } from "./runtime/researchLoopDiagnostic.ts";
+
 // Playbook tools (v0.7)
 export { playbookTools } from "./runtime/meta/playbook-tools.ts";
 
@@ -428,6 +433,9 @@ import { efficiencyRatioTools } from "./runtime/efficiencyRatioDiagnostic.ts";
 import { kaufmanAdaptiveMaTools } from "./runtime/kaufmanAdaptiveMaDiagnostic.ts";
 import { marketProfileTools } from "./runtime/marketProfileDiagnostic.ts";
 import { tripleScreenTools } from "./runtime/tripleScreenDiagnostic.ts";
+import { bootstrapTools } from "./runtime/bootstrapDiagnostic.ts";
+import { volScaledSizingTools } from "./runtime/volScaledSizingDiagnostic.ts";
+import { researchLoopTools } from "./runtime/researchLoopDiagnostic.ts";
 import { playbookTools } from "./runtime/meta/playbook-tools.ts";
 import { playbookBacktestTools } from "./strategy/backtest/backtest-tools.ts";
 import { runtimeTools } from "./runtime/flow/runtime-tools.ts";
@@ -535,6 +543,9 @@ const _rawAllTools = {
   ...kaufmanAdaptiveMaTools,
   ...marketProfileTools,
   ...tripleScreenTools,
+  ...bootstrapTools,
+  ...volScaledSizingTools,
+  ...researchLoopTools,
   ...playbookTools,
   ...playbookBacktestTools,
   ...runtimeTools,

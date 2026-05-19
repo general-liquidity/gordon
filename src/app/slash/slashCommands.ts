@@ -433,6 +433,30 @@ const LEGACY_SLASH_COMMANDS: SlashCommandSeed[] = [
       "User wants a multi-timeframe entry composition gate — refuses late entries against the trend",
   },
   {
+    name: "bootstrap",
+    aliases: ["fragility", "block-bootstrap"],
+    description: "Stationary block-bootstrap fragility test on a return series — robustness check on Sharpe + drawdown",
+    usage: "/bootstrap",
+    category: "trading",
+    level: 1,
+    action: "tool",
+    target: "compute_stationary_bootstrap",
+    whenToUse:
+      "User wants to know how fragile a strategy's reported Sharpe is — bootstrap resamples build a confidence band on the metric",
+  },
+  {
+    name: "vol-size",
+    aliases: ["vol-sizing", "size-vol"],
+    description: "Map a volatility level to a position multiplier (scale_up or scale_down) with refuse-above guard",
+    usage: "/vol-size",
+    category: "trading",
+    level: 1,
+    action: "tool",
+    target: "compute_vol_scaled_sizing",
+    whenToUse:
+      "User wants discrete contract/size multiplier from a vol estimate — last step of the sizing chain before order submission",
+  },
+  {
     name: "orders",
     aliases: ["o"],
     description: "View open orders across crypto or stocks",
