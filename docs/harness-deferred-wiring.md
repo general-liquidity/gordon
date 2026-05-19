@@ -1037,6 +1037,71 @@ Surfaced by a gap-analysis pass over the `ai-quant-researcher-main` Python proje
 
 ---
 
+## Kaufman TSaM port (TS1–TS14)
+
+Surfaced by reading Perry Kaufman's *Trading Systems and Methods* 5th edition (full book). Most of the book covers material Gordon already has; this batch is the subset of chapter 9–20 primitives that grep-verified absent and have plausible trading-domain consumers. All modules cold (flag-gated) by default. Wiring (tools / slash commands / formatBacktestSummary integration) deferred to a follow-up pass when concrete consumers surface.
+
+### TS1. `efficiencyRatio.ts` ✅ shipped, ❌ unwired
+**Module:** `src/infra/trading/quant/efficiencyRatio.ts`. Flag `GORDON_EFFICIENCY_RATIO`.
+Standalone trendiness gauge. `|net change| / Σ|individual changes|` over a configurable window. Classifies regime (trending / mixed / choppy). Building block for TS2 KAMA; also useful on its own as a regime-detector input.
+
+### TS2. `kaufmanAdaptiveMA.ts` ✅ shipped, ❌ unwired
+**Module:** `src/infra/trading/quant/kaufmanAdaptiveMA.ts`. Flag `GORDON_KAUFMAN_ADAPTIVE_MA`.
+The book's namesake. EMA with a smoothing constant that varies each period: `sc = [ER × (fastSC − slowSC) + slowSC]²`. Default fast 2-period / slow 30-period. Squaring collapses the slow end into ~900-period flat behaviour, producing KAMA's signature "stop and wait" lag during noisy regimes. Outputs full KAMA series + trend direction + trend-change index.
+
+### TS3. `marketProfile.ts` ✅ shipped, ❌ unwired
+**Module:** `src/infra/trading/quant/marketProfile.ts`. Flag `GORDON_MARKET_PROFILE`.
+Steidlmayer's TPO / value-area construction. Distinct from Gordon's existing volume-profile (`src/core/indicators/volume-profile.ts`) — Market Profile measures *time* at price (TPO letters), volume-profile measures *volume* at price. Reports POC, value-area high/low (70% default), day-type (normal / trending / non-trending), POC skew.
+
+### TS4. `tripleScreen.ts` ✅ shipped, ❌ unwired
+**Module:** `src/infra/trading/quant/tripleScreen.ts`. Flag `GORDON_TRIPLE_SCREEN`.
+Elder's three-frame composition gate. Caller supplies major-trend direction (long frame), oscillator state (mid frame), and entry trigger (short frame); module returns long-entry / short-entry / wait / no-trade with the blocking screen identified. Pure composition primitive — no signal calculations of its own.
+
+### TS5. `fisherTransform.ts` ✅ shipped, ❌ unwired
+**Module:** `src/infra/trading/quant/fisherTransform.ts`. Flag `GORDON_FISHER_TRANSFORM`.
+Maps non-Gaussian price distribution onto an approximately Gaussian one, producing sharper turning points than RSI/stochastic. Includes both Fisher Transform (price → bipolar) and Inverse Fisher Transform (RSI-shaped input → bipolar [-1, +1] snap-extreme oscillator).
+
+### TS6. `hilbertTransform.ts` ✅ shipped, ❌ unwired
+**Module:** `src/infra/trading/quant/hilbertTransform.ts`. Flag `GORDON_HILBERT_TRANSFORM`.
+Ehlers's 7-tap truncated Hilbert Transform for instantaneous phase extraction with minimal lag. Outputs Quadrature, InPhase, phase angle in degrees, and a cyclic/non-cyclic verdict from advancing-phase monotonicity over the last few bars.
+
+### TS7. `vidya.ts` ✅ shipped, ❌ unwired
+**Module:** `src/infra/trading/quant/vidya.ts`. Flag `GORDON_VIDYA`.
+Chande's Variable Index Dynamic Average. Effective smoothing constant scales with `stdev(returns, fast) / stdev(returns, slow)` — higher relative volatility → slower trend. Alternative to KAMA with a different "what does adaptive mean" theory (vol ratio vs. trendiness ratio).
+
+### TS8/9. `elderMomentum.ts` ✅ shipped, ❌ unwired
+**Module:** `src/infra/trading/quant/elderMomentum.ts`. Flag `GORDON_ELDER_MOMENTUM`.
+Force Index (`volume · (close − prevClose)`, EMA-smoothed) and Elder-Ray (`Bull Power = High − EMA`, `Bear Power = Low − EMA`). Both are middle-frame oscillators in Elder's Triple Screen, so a future wire would route them into TS4.
+
+### TS10. `trix.ts` ✅ shipped, ❌ unwired
+**Module:** `src/infra/trading/quant/trix.ts`. Flag `GORDON_TRIX`.
+Triple Exponential Smoothing with rate-of-change. Three cascaded EMAs followed by `(E3[t] − E3[t-1]) / E3[t-1]`. Signal-line crossover (3-period MA of TRIX) generates entries.
+
+### TS11. `divergenceIndex.ts` ✅ shipped, ❌ unwired
+**Module:** `src/infra/trading/quant/divergenceIndex.ts`. Flag `GORDON_DIVERGENCE_INDEX`.
+Appel's volatility-adjusted MACD variant. Numerator is `fastMA − slowMA`; denominator is variance of price changes over the slow period; stdev-scaled bands self-adjust to volatility. Bands track DI's own volatility, so false-signal rate stays roughly constant across regimes.
+
+### TS12. `kstIndex.ts` ✅ shipped, ❌ unwired
+**Module:** `src/infra/trading/quant/kstIndex.ts`. Flag `GORDON_KST_INDEX`.
+Pring's Know Sure Thing: four smoothed rates-of-change at progressively longer horizons (default 10/15/20/30), weighted 1/2/3/4, summed. Signal line is the 9-period MA of KST. Designed to capture intermediate-horizon momentum while filtering high-frequency noise.
+
+### TS13. `hedgeFundReplication.ts` ✅ shipped, ❌ unwired
+**Module:** `src/infra/trading/quant/hedgeFundReplication.ts`. Flag `GORDON_HEDGE_FUND_REPLICATION`.
+Constrained OLS that recovers the allocation weights minimizing tracking error against a target return series. Returns weights, tracking-error stdev, R², and residuals. Detects singular factor matrices and refuses with a `singular` reason. Useful when Gordon wants to mimic a published-track fund or sector basket.
+
+### TS14. `seasonalPattern.ts` ✅ shipped, ❌ unwired
+**Module:** `src/infra/trading/quant/seasonalPattern.ts`. Flag `GORDON_SEASONAL_PATTERN`.
+Aggregates daily returns by calendar bucket (month, weekday) and reports per-bucket mean / stdev / fraction-up / 95% CI. Companion `computeHolidayEffect` scans pre/post-holiday windows around a supplied calendar. Output is intentionally honest about sample-size limits — buckets with < 5 samples are excluded from the strongest-bias scan.
+
+### TS15. `mesaSpectrum.ts` ✅ shipped, ❌ unwired
+**Module:** `src/infra/trading/quant/mesaSpectrum.ts`. Flag `GORDON_MESA_SPECTRUM`.
+Maximum Entropy Spectral Analysis via Burg's autoregressive method. Fits an AR(p) model to a (mean-detrended) price series, then computes power at a grid of candidate periods. Returns the dominant period and a peak-strength ratio (peak / median power) so callers can judge whether the input is genuinely cyclic. Works on small samples (~16-50 bars) where Fourier methods fail.
+
+### TSaM framing
+TS1–TS2 are the Kaufman-signature adaptive pair (efficiency ratio → KAMA). TS3–TS4 are Steidlmayer's Market Profile and Elder's Triple Screen — frameworks Gordon could compose its existing signal primitives into. TS5–TS12 are standard momentum / oscillator / adaptive-MA additions. TS13–TS15 are Ehlers/regression cycle and fund-mimic primitives. Everything ships cold; the next pass exposes the highest-utility subset (TS1+TS2 expected) as tools / slash commands / `formatBacktestSummary` lines.
+
+---
+
 ## Production-engineering bar (PE1–PE12)
 
 Surfaced by the "Missing Engineering Stack for Production AI Agents" piece. Maps the 4-primitive checklist (tokens / skills / security / trust) onto items Gordon doesn't yet have. The first two primitives are already ~90% in place (sharedPrefixCache, model routing, structured outputs, plan-then-execute, small idempotent tools); the security and trust columns surface most of the gaps below. None of these are core capability work — all are production-readiness plumbing. Relevant primarily if Gordon pursues the enterprise / regulated-finance / agent-firm-treasury positioning the strategic articles point at.
