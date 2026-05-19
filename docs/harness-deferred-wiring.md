@@ -1286,6 +1286,59 @@ If a fund design-partner conversation surfaces, prioritize: **KS4 → KS5 → KS
 
 ---
 
+## Cartea-Jaimungal-Penalva optimal execution (CJ1–CJ4)
+
+Source: Cartea, Jaimungal & Penalva, *Algorithmic and High-Frequency Trading* (CUP, 2015), reinforced by Drissi's HT 2024 Oxford lecture notes. The canonical academic stack for stochastic-optimal-control execution. Four pure-compute primitives shipped to expand Gordon's institutional credibility surface alongside KS1–KS3. Same gating logic as MM1: no current execution-algo consumer in Gordon, but the primitives are mathematically self-contained, agent-callable as diagnostics, and would compose into a future "CJ execution mode" if a design partner asks.
+
+All four follow the same shape as the KS series: pure-compute module + test + Mastra tool wrapper registered in `src/infra/agents/tools/index.ts`. No slash commands — same discipline as KS / MM.
+
+### CJ1. Cartea-Jaimungal signal-driven execution speed ✅ shipped
+
+**Module:** `src/infra/trading/quant/carteaJaimungalSignal.ts`. Flag `GORDON_CARTEA_JAIMUNGAL_SIGNAL`.
+**What:** Closed-form optimal trading speed ν*(t, q, μ) for a parent order with constant drift signal μ, linear impact k, and optional Almgren-Chriss-style running penalty φ. Reduces to TWAP when φ=0, μ=0. For BUY orders, positive drift speeds up execution; for SELL orders, positive drift slows it down. Speed floored at zero (no reversal of parent intent).
+**Mastra tool:** `compute_cartea_jaimungal_signal_speed` in `src/infra/agents/tools/runtime/carteaJaimungalSignalDiagnostic.ts`.
+**Test coverage:** 12 tests — validation, TWAP reduction (φ=0, μ=0), AC reduction (φ>0, μ=0), drift directionality across 4 (side × drift-sign) combinations, terminal-time pressure, drift floor at zero speed, payload shape.
+**Plausible consumer:** future "CJ execution mode" alongside TWAP/VWAP/POV/Iceberg that accepts a drift estimate from the signal layer (Kalman beta, regime detector, market profile) and outputs a parametric trade schedule. Not wired today.
+
+### CJ2. Transient impact (Obizhaeva-Wang) ✅ shipped
+
+**Module:** `src/infra/trading/quant/transientImpact.ts`. Flag `GORDON_TRANSIENT_IMPACT`.
+**What:** Computes residual transient + permanent market impact at current time given a fill history and an exponential-decay half-life. Generalizes Gordon's existing permanent sqrt-impact in `marketImpact.ts` to a decaying-impact model. Pedigree: Obizhaeva & Wang (2013).
+**Mastra tool:** `compute_transient_impact` in `src/infra/agents/tools/runtime/transientImpactDiagnostic.ts`.
+**Test coverage:** 16 tests — validation, empty history, single fill at t=now / age=halfLife / age=2·halfLife, sign symmetry, additivity, permanent component non-decay, effective fill count, decay rate identity.
+**Plausible consumer:** more realistic cost model for `marketImpact.ts` capacity sweeps + efficient trading frontier when a customer's actual fill log is available. Could also slot into IS decomposition's market-impact bucket (KS1) for higher fidelity.
+
+### CJ3. Optimal limit-order depth ✅ shipped
+
+**Module:** `src/infra/trading/quant/optimalLimitDepth.ts`. Flag `GORDON_OPTIMAL_LIMIT_DEPTH`.
+**What:** Closed-form optimal posting depth δ*(t, q) for an execution problem with exponential fill intensity λ(δ) = A·exp(−κ·δ) and terminal inventory penalty α. Returns the depth that balances fill probability against per-fill profit. Pedigree: Guéant-Lehalle-Fernandez-Tapia (2012), synthesized in Cartea-Jaimungal-Penalva ch. 7.
+**Mastra tool:** `compute_optimal_limit_depth` in `src/infra/agents/tools/runtime/optimalLimitDepthDiagnostic.ts`.
+**Test coverage:** 11 tests — validation, output positivity, higher-inventory-tighter-depth, longer-horizon-wider-depth, higher-penalty-tighter-depth, q=1 boundary, lambda-ratio identity, payload shape.
+**Plausible consumer:** next to Iceberg as a depth-aware limit-order mode. Not wired today; would need a new execution-algo entry in `core/execution/algorithms/`.
+
+### CJ4. Optimal pairs trading on cointegrated spread ✅ shipped
+
+**Module:** `src/infra/trading/quant/optimalPairsTrading.ts`. Flag `GORDON_OPTIMAL_PAIRS_TRADING`.
+**What:** Long-horizon stationary optimal trading speed ν*(q, X) = −A·q − B·(X − μ) for pairs trading on an OU mean-reverting spread. A and B come from the algebraic Riccati equation (T→∞ stationary limit chosen for closed-form determinism; full time-dependent matrix-Riccati version is the explicit deferral). Pedigree: Drissi (2022) SSRN + Cartea-Jaimungal-Penalva ch. 12.
+**Mastra tool:** `compute_optimal_pairs_trading` in `src/infra/agents/tools/runtime/optimalPairsTradingDiagnostic.ts`.
+**Test coverage:** 13 tests — validation, equilibrium-zero-trade, spread-response signs (X>μ sells, X<μ buys), linearity in deviation, inventory reversion (q>0 unwinds long, q<0 unwinds short), inventory half-life, θ-sensitivity, γ-sensitivity, payload shape.
+**Plausible consumer:** Gordon already has cointegration detection (`cointegration.ts`) but no execution layer for pairs. This primitive consumes (θ, μ, σ) from the existing detector and produces the optimal trading speed.
+
+### Note on parameter-sensitivity surprises
+
+CJ4's response to the impact coefficient k is non-monotonic in the naively-expected direction. With my closed-form, A = k · (−θ + √(θ² + 4γσ²/k)) / 2 is monotonically increasing in k from 0 up to its asymptote γσ²/θ. B = θ / (2A/k + θ) goes from 0 (at k→0) to 1 (at k→∞). The intuition "higher impact → trade slower → smaller A" is wrong because of the coupling between the cost-of-trading and the value-of-inventory-reduction. This is a feature of the stationary-Riccati formulation, not a bug. Tests deliberately avoid k-directional assertions and verify θ- and γ-monotonicity instead, which are clean.
+
+### Sequencing recommendation (CJ stack)
+
+CJ1–CJ4 shipped together in the institutional-credibility-primitives second-pass commit. All four are cold (no current consumer in Gordon). The natural next wires, in order of payoff:
+1. **CJ2 → IS decomposition refinement** — when KS4 (TCA breadcrumbs) lands, use CJ2 to give a more realistic decaying-impact estimate inside the market-impact bucket of IS.
+2. **CJ4 → pairs-trading playbook** — Gordon's `pairAnalysisTools` could route through `compute_optimal_pairs_trading` once a cointegrated pair is identified to produce an actionable trading speed.
+3. **CJ1 + CJ3 → new "CJ execution mode"** alongside TWAP/VWAP/POV/Iceberg. Speculative until an institutional design partner requests stochastic-control-derived execution.
+
+If a fund design-partner conversation surfaces, the CJ stack sits alongside KS1–KS3 as the "we have the canonical quant-finance vocabulary" credibility evidence.
+
+---
+
 ## Market-making primitives (MM1) — deferred pending design partner
 
 Surfaced by the K (ctubio's Krypto-trading-bot) survey, which is a textbook C++ market-making engine forked from tribeca/HRP. K bundles fair-value microprice estimators, inventory-skewed quoting, multi-timescale EWMA bank, and 7 quote-mode dispatchers. None of these belong in Gordon today — the dual-edition ICP (sub-$2B systematic funds, smaller multi-strats, discretionary PMs) doesn't run continuous two-way quotes, so the entire engine is speculative without a crypto-native MM design partner (Wintermute / GSR / smaller DeFi MM firms). One sub-primitive (microprice) is structurally distinct enough to track separately because it has a *plausible* non-MM consumer.

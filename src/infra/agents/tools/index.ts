@@ -167,6 +167,14 @@ export { directionalEdgeTestTools } from "./runtime/directionalEdgeTestDiagnosti
 export { implementationShortfallTools } from "./runtime/implementationShortfallDiagnostic.ts";
 export { efficientTradingFrontierTools } from "./runtime/efficientTradingFrontierDiagnostic.ts";
 
+// Cartea-Jaimungal-Penalva optimal execution primitives (CJ1-CJ4).
+// Stochastic-control execution layer above operator-shadow's current needs.
+// Agent-callable; no slash commands. Pedigree: Cartea/Jaimungal/Penalva (2015) + Drissi (2024).
+export { carteaJaimungalSignalTools } from "./runtime/carteaJaimungalSignalDiagnostic.ts";
+export { transientImpactTools } from "./runtime/transientImpactDiagnostic.ts";
+export { optimalLimitDepthTools } from "./runtime/optimalLimitDepthDiagnostic.ts";
+export { optimalPairsTradingTools } from "./runtime/optimalPairsTradingDiagnostic.ts";
+
 // Playbook tools (v0.7)
 export { playbookTools } from "./runtime/meta/playbook-tools.ts";
 
@@ -447,6 +455,10 @@ import { volScaledSizingTools } from "./runtime/volScaledSizingDiagnostic.ts";
 import { directionalEdgeTestTools } from "./runtime/directionalEdgeTestDiagnostic.ts";
 import { implementationShortfallTools } from "./runtime/implementationShortfallDiagnostic.ts";
 import { efficientTradingFrontierTools } from "./runtime/efficientTradingFrontierDiagnostic.ts";
+import { carteaJaimungalSignalTools } from "./runtime/carteaJaimungalSignalDiagnostic.ts";
+import { transientImpactTools } from "./runtime/transientImpactDiagnostic.ts";
+import { optimalLimitDepthTools } from "./runtime/optimalLimitDepthDiagnostic.ts";
+import { optimalPairsTradingTools } from "./runtime/optimalPairsTradingDiagnostic.ts";
 import { playbookTools } from "./runtime/meta/playbook-tools.ts";
 import { playbookBacktestTools } from "./strategy/backtest/backtest-tools.ts";
 import { runtimeTools } from "./runtime/flow/runtime-tools.ts";
@@ -559,6 +571,10 @@ const _rawAllTools = {
   ...directionalEdgeTestTools,
   ...implementationShortfallTools,
   ...efficientTradingFrontierTools,
+  ...carteaJaimungalSignalTools,
+  ...transientImpactTools,
+  ...optimalLimitDepthTools,
+  ...optimalPairsTradingTools,
   ...playbookTools,
   ...playbookBacktestTools,
   ...runtimeTools,
