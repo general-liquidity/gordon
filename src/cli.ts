@@ -224,7 +224,8 @@ FLAGS
   -h, --help       Show help and exit
   -v, --version    Show version and exit
   -d, --debug      Enable debug logging (verbose output)
-      --json       Output system status as JSON and exit
+      --json       Output system status as JSON and exit (or, with --headless,
+                   emit the headless result as a single-line JSON report)
       --plain      Disable colors and formatting
       --no-color   Disable colors (also respects NO_COLOR env var)
       --cleanup    Remove stale sessions, caches, and temp files

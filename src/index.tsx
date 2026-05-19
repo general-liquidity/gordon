@@ -49,7 +49,10 @@ if (flags.version) {
   process.exit(0);
 }
 
-if (flags.json) {
+// --json alone prints the status overview; --json combined with --headless
+// switches the headless runner into structured-output mode instead. Check
+// headless first so the combined flag set routes correctly.
+if (flags.json && !flags.headless) {
   await printStatusJson();
   process.exit(0);
 }
@@ -62,16 +65,9 @@ if (flags.cleanup) {
 if (flags.headless) {
   // Quiet stdout-only mode for cron / pipeline use. Pass anything after
   // the `--headless` flag (and other recognised flags) as the prompt.
-  const promptArgs = process.argv.slice(2).filter((a) =>
-    a !== "--headless" &&
-    a !== "--quiet" &&
-    a !== "--debug" &&
-    a !== "--no-color" &&
-    a !== "--plain" &&
-    !a.startsWith("-"),
-  );
+  const promptArgs = process.argv.slice(2).filter((a) => !a.startsWith("-"));
   const { runHeadlessAndPrint } = await import("./app/models/headless.ts");
-  const code = await runHeadlessAndPrint(promptArgs, flags.quiet);
+  const code = await runHeadlessAndPrint(promptArgs, flags.quiet, flags.json);
   process.exit(code);
 }
 

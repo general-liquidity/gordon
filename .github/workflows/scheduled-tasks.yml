@@ -1,0 +1,109 @@
+# Scheduled Gordon Tasks — cron-driven unattended runs.
+#
+# TEMPLATE — uncomment the `schedule:` block and customize the matrix to
+# turn this into a live cron pipeline. As shipped, only the manual
+# `workflow_dispatch` trigger is active so a fresh checkout never starts
+# making LLM calls on a schedule without an explicit opt-in.
+#
+# Each matrix entry runs `gordon --headless --json --quiet "<prompt>"` and
+# uploads the structured JSON report as a workflow artifact. The JSON
+# shape is stable (see HEADLESS_REPORT_SCHEMA_VERSION in
+# src/app/models/headless.ts) — pipe through `jq` or feed to a follow-up
+# job.
+#
+# SAFETY CAVEATS — READ BEFORE ENABLING:
+#   1. CI runners are stateless. Any GORDON_* secret you reference must
+#      be configured in repo settings → Secrets → Actions. The workflow
+#      does NOT inject broker/exchange keys by default.
+#   2. Live order placement should stay OFF in CI unless you have
+#      explicitly hardened the credentials path. The placeholder env
+#      below sets `GORDON_PAPER_MODE=1` to keep the agent in paper-only
+#      mode regardless of prompt content.
+#   3. If you add real-money tools, ensure the prompts only invoke
+#      read-only tools (scans, briefs, regime checks) and that
+#      `place_order` / `execute_trade` / `cancel_order` remain in the
+#      permission engine's safety-critical deny-list.
+#   4. Token cost is per-run × matrix-size × cron-frequency. A 6-task
+#      matrix at hourly cadence is ~144 runs/day. Budget accordingly.
+
+name: Scheduled Tasks
+
+on:
+  # schedule:
+  #   # Daily 06:30 UTC morning brief. Edit cron to taste. Avoid :00 — GitHub
+  #   # queues thousands of cron jobs on the hour, which delays execution.
+  #   - cron: "30 6 * * *"
+  workflow_dispatch:
+    inputs:
+      task:
+        description: "Task id to run (defaults to all in the matrix)"
+        required: false
+        default: ""
+
+jobs:
+  run:
+    name: Run scheduled Gordon task
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        task:
+          - id: morning-brief
+            prompt: "Give me a 5-bullet morning brief: BTC + ETH regime, top 3 movers in the last 24h, any news worth flagging."
+          - id: regime-watch
+            prompt: "Check the current market regime across BTC, ETH, SOL. Flag any regime flips since yesterday."
+          - id: risk-snapshot
+            prompt: "Compute Kalman vol on BTC + ETH, run effective-N on the active signal set, and summarize the current risk posture."
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+
+      - name: Install dependencies (frozen lockfile)
+        run: bun ci
+
+      - name: Skip if dispatched task does not match
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.task != '' && github.event.inputs.task != matrix.task.id
+        run: |
+          echo "Skipping ${{ matrix.task.id }} — workflow_dispatch requested ${{ github.event.inputs.task }}"
+          exit 0
+
+      - name: Run Gordon headless
+        id: gordon
+        env:
+          # Paper-mode is non-negotiable in CI. Override at your own risk.
+          GORDON_PAPER_MODE: "1"
+          # Provider keys — populate via repo secrets. Missing keys cause
+          # graceful failures (exitCode 1) rather than CI breakage.
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          DEDALUS_API_KEY: ${{ secrets.DEDALUS_API_KEY }}
+          # Suppress interactive update prompts in CI.
+          GORDON_STARTUP_QUIET: "1"
+          NO_COLOR: "1"
+        run: |
+          set -o pipefail
+          mkdir -p reports
+          REPORT="reports/${{ matrix.task.id }}.json"
+          # Pipe stderr to a sidecar log so the structured JSON on stdout
+          # stays clean for downstream parsing.
+          bun src/index.tsx --headless --json --quiet "${{ matrix.task.prompt }}" \
+            > "$REPORT" \
+            2> "reports/${{ matrix.task.id }}.stderr.log"
+          EXIT=$?
+          echo "report=$REPORT" >> "$GITHUB_OUTPUT"
+          # Surface the exitCode + duration into the workflow log for at-a-glance triage.
+          jq -r '"task=\(.threadId) exit=\(.exitCode) duration_ms=\(.durationMs)"' "$REPORT" || cat "$REPORT"
+          exit $EXIT
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gordon-report-${{ matrix.task.id }}-${{ github.run_id }}
+          path: reports/
+          retention-days: 14
