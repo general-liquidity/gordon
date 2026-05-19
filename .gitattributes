@@ -1,0 +1,104 @@
+# Gordon repo — line-ending + diff policy.
+# Purpose: silence the LF↔CRLF normalization warnings that fire on every
+# commit when the working tree mixes Windows-checkout (CRLF) with
+# repo-stored LF. Also keeps shell scripts executable on Linux/macOS even
+# when committed from Windows.
+
+# Default: detect text vs binary automatically; store text as LF in the repo.
+* text=auto eol=lf
+
+# Source / config / docs — explicit text, repo LF, OS-native on checkout where applicable.
+*.ts        text eol=lf
+*.tsx       text eol=lf
+*.js        text eol=lf
+*.jsx       text eol=lf
+*.cjs       text eol=lf
+*.mjs       text eol=lf
+*.json      text eol=lf
+*.jsonc     text eol=lf
+*.yml       text eol=lf
+*.yaml      text eol=lf
+*.toml      text eol=lf
+*.md        text eol=lf
+*.mdx       text eol=lf
+*.html      text eol=lf
+*.css       text eol=lf
+*.scss      text eol=lf
+*.svg       text eol=lf
+*.xml       text eol=lf
+*.txt       text eol=lf
+*.csv       text eol=lf
+*.tsv       text eol=lf
+
+# Shell scripts MUST be LF — Bash/zsh treat CRLF as a syntax error on the shebang line.
+*.sh        text eol=lf
+*.bash      text eol=lf
+*.zsh       text eol=lf
+*.fish      text eol=lf
+
+# PowerShell tolerates both, but standardize on LF.
+*.ps1       text eol=lf
+*.psm1      text eol=lf
+*.psd1      text eol=lf
+
+# Windows batch files MUST be CRLF — cmd.exe mis-parses LF-only .bat files.
+*.bat       text eol=crlf
+*.cmd       text eol=crlf
+
+# Reg files MUST be CRLF for regedit import.
+*.reg       text eol=crlf
+
+# Lock files — generated, suppress GitHub language-stats noise, but keep diff-able.
+bun.lock        text eol=lf linguist-generated=true
+package-lock.json text eol=lf linguist-generated=true
+pnpm-lock.yaml  text eol=lf linguist-generated=true
+yarn.lock       text eol=lf linguist-generated=true
+
+# Vendored / generated areas — exclude from language stats and PR diffs.
+docs/**             linguist-documentation=true
+node_modules/**     linguist-vendored=true
+**/*.min.js         linguist-generated=true
+**/*.min.css        linguist-generated=true
+**/*.map            linguist-generated=true
+**/dist/**          linguist-generated=true
+**/build/**         linguist-generated=true
+
+# Binary assets — no diff, no EOL conversion.
+*.png       binary
+*.jpg       binary
+*.jpeg      binary
+*.gif       binary
+*.webp      binary
+*.ico       binary
+*.bmp       binary
+*.tiff      binary
+*.pdf       binary
+*.zip       binary
+*.gz        binary
+*.tgz       binary
+*.tar       binary
+*.bz2       binary
+*.7z        binary
+*.rar       binary
+*.exe       binary
+*.dll       binary
+*.so        binary
+*.dylib     binary
+*.node      binary
+*.wasm      binary
+*.ttf       binary
+*.otf       binary
+*.woff      binary
+*.woff2     binary
+*.eot       binary
+*.mp3       binary
+*.mp4       binary
+*.mov       binary
+*.webm      binary
+*.flac      binary
+*.wav       binary
+
+# Treat .env and credential templates as text but mark sensitive in diffs.
+.env*       text eol=lf
+*.pem       text eol=lf
+*.key       text eol=lf
