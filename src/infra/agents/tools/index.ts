@@ -144,6 +144,15 @@ export { rangeVolatilityTools } from "./runtime/rangeVolatilityDiagnostic.ts";
 // PCA concentration diagnostic tool (/pca-concentration slash command)
 export { pcaConcentrationTools } from "./runtime/pcaConcentrationDiagnostic.ts";
 
+// Kaufman TSaM port — 4 wired diagnostics (TS1-TS4).
+// TS5-TS15 modules ship as cold quant primitives in src/infra/trading/quant/
+// only — no tool surface, no slash command. Import the function directly
+// when a real consumer surfaces. See docs/harness-deferred-wiring.md.
+export { efficiencyRatioTools } from "./runtime/efficiencyRatioDiagnostic.ts";
+export { kaufmanAdaptiveMaTools } from "./runtime/kaufmanAdaptiveMaDiagnostic.ts";
+export { marketProfileTools } from "./runtime/marketProfileDiagnostic.ts";
+export { tripleScreenTools } from "./runtime/tripleScreenDiagnostic.ts";
+
 // Playbook tools (v0.7)
 export { playbookTools } from "./runtime/meta/playbook-tools.ts";
 
@@ -415,6 +424,10 @@ import { effectiveNTools } from "./runtime/effectiveNDiagnostic.ts";
 import { kalmanBetaTools } from "./runtime/kalmanBetaDiagnostic.ts";
 import { rangeVolatilityTools } from "./runtime/rangeVolatilityDiagnostic.ts";
 import { pcaConcentrationTools } from "./runtime/pcaConcentrationDiagnostic.ts";
+import { efficiencyRatioTools } from "./runtime/efficiencyRatioDiagnostic.ts";
+import { kaufmanAdaptiveMaTools } from "./runtime/kaufmanAdaptiveMaDiagnostic.ts";
+import { marketProfileTools } from "./runtime/marketProfileDiagnostic.ts";
+import { tripleScreenTools } from "./runtime/tripleScreenDiagnostic.ts";
 import { playbookTools } from "./runtime/meta/playbook-tools.ts";
 import { playbookBacktestTools } from "./strategy/backtest/backtest-tools.ts";
 import { runtimeTools } from "./runtime/flow/runtime-tools.ts";
@@ -518,6 +531,10 @@ const _rawAllTools = {
   ...kalmanBetaTools,
   ...rangeVolatilityTools,
   ...pcaConcentrationTools,
+  ...efficiencyRatioTools,
+  ...kaufmanAdaptiveMaTools,
+  ...marketProfileTools,
+  ...tripleScreenTools,
   ...playbookTools,
   ...playbookBacktestTools,
   ...runtimeTools,
