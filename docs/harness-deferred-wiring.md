@@ -1410,6 +1410,36 @@ If the operator wants to formalize TM1+TM2 as auto-execute hooks (not just advis
 
 ---
 
+## Druckenmiller sizing discipline (D1–D2)
+
+Source: Stanley Druckenmiller (multiple interviews; via Soros). Two complementary asymmetric-sizing primitives capturing the same lesson from opposite sides — bet big when hot (D1), never bet big to get even (D2). Companion to the TM1–TM3 trade-management primitives: TM addresses lifecycle exits, D addresses sizing entries.
+
+Both ship with **informational mode as default**: the primitive returns the observation (suggested multiplier, revenge-trade detection) but does NOT auto-apply. The operator (or downstream sizing chain) explicitly opts into "active" mode to escalate. This is deliberate — automated size-up on recent winning streaks has tilt-amplification risk, and automated blocks on flagged trades need explicit operator buy-in before they're load-bearing.
+
+### D1. Hot-streak sizing multiplier ✅ shipped
+
+**Module:** `src/infra/trading/quant/hotStreakSizer.ts`. Flag `GORDON_HOT_STREAK_SIZER`.
+**What:** Takes recent realized P&L (caller-defined window — last N trades, trailing 30d, etc.), returns streak classification (`hot` / `neutral_positive` / `neutral_negative` / `cold`) and a suggested multiplier (linear-interp from 1.0× at hotThreshold to maxMultiplier at 2× hotThreshold). Defaults: hot ≥ +20%, cool ≤ −5%, max 1.5×, cold 0.5×.
+**Mastra tool:** `evaluate_hot_streak_sizing` in `runtime/hotStreakSizerDiagnostic.ts`.
+**Test coverage:** 18 tests — validation, classification edges, multiplier linear-interp, cap behavior, cold-zero-refuse, informational vs active mode.
+**Informational-default rationale:** Druckenmiller's frame works for him because of decades of pattern recognition. Gordon recommending "size up because you've been winning" can encode confirmation bias into the operator's process if applied automatically. Informational mode lets the agent surface the observation without making the decision.
+
+### D2. Revenge-trade guard ✅ shipped
+
+**Module:** `src/infra/trading/quant/revengeTradeGuard.ts`. Flag `GORDON_REVENGE_TRADE_GUARD`.
+**What:** Detects post-loss size escalation. Returns `revengeTradeDetected = true` when BOTH (a) the prior closed trade was a loss AND (b) the currently-proposed plan size is ≥ baseline × sizeIncreaseThreshold (default 1.5). Informational mode returns `flag`; active mode returns `block`.
+**Mastra tool:** `evaluate_revenge_trade_guard` in `runtime/revengeTradeGuardDiagnostic.ts`.
+**Test coverage:** 16 tests — validation, detection logic across (size, prior-PnL) combinations, mode behavior, custom threshold sensitivity.
+**Composition:** Sits next to the existing anti-trap surface in `src/infra/safety/anti-trap/` (`explainFirstMode`, `riskAcknowledgement`, `supervisionRust`) and complements `swing-mandate.ts`'s consecutive-loss stop. Those are coarse-grained; D2 is the targeted detector for the specific size-escalation pattern Druckenmiller calls a "death sentence."
+
+### Wire-point recommendation
+
+D2 is the higher-priority of the pair to flip from informational to active: it guards against a known failure mode (post-loss tilt), and its `block` mode would slot into the permission engine alongside the existing deny-list and risk classifier. D1 should stay informational unless an operator specifically asks for automated size-up — recency-bias amplification is the failure mode to avoid.
+
+If an operator wants to wire D2 into active enforcement, the natural hook is `src/runtime/permissions/PermissionEngine.ts` — register a hook that calls `evaluate_revenge_trade_guard` with `mode: "active"` and refuses plans that come back with `recommendedAction: "block"`. Same pattern as the existing risk-classifier integration.
+
+---
+
 ## Market-making primitives (MM1) — deferred pending design partner
 
 Surfaced by the K (ctubio's Krypto-trading-bot) survey, which is a textbook C++ market-making engine forked from tribeca/HRP. K bundles fair-value microprice estimators, inventory-skewed quoting, multi-timescale EWMA bank, and 7 quote-mode dispatchers. None of these belong in Gordon today — the dual-edition ICP (sub-$2B systematic funds, smaller multi-strats, discretionary PMs) doesn't run continuous two-way quotes, so the entire engine is speculative without a crypto-native MM design partner (Wintermute / GSR / smaller DeFi MM firms). One sub-primitive (microprice) is structurally distinct enough to track separately because it has a *plausible* non-MM consumer.

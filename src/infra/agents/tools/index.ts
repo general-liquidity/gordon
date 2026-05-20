@@ -182,6 +182,12 @@ export { faeFtaCutTools } from "./runtime/faeFtaCutDiagnostic.ts";
 export { timeBasedExitTools } from "./runtime/timeBasedExitDiagnostic.ts";
 export { marketBreadthBiasTools } from "./runtime/marketBreadthBiasDiagnostic.ts";
 
+// Druckenmiller sizing-discipline primitives (D1-D2).
+// Asymmetric sizing: bet big when hot (D1), never bet big to get even (D2).
+// Both informational-mode by default — observation, not auto-sizing.
+export { hotStreakSizerTools } from "./runtime/hotStreakSizerDiagnostic.ts";
+export { revengeTradeGuardTools } from "./runtime/revengeTradeGuardDiagnostic.ts";
+
 // Playbook tools (v0.7)
 export { playbookTools } from "./runtime/meta/playbook-tools.ts";
 
@@ -469,6 +475,8 @@ import { optimalPairsTradingTools } from "./runtime/optimalPairsTradingDiagnosti
 import { faeFtaCutTools } from "./runtime/faeFtaCutDiagnostic.ts";
 import { timeBasedExitTools } from "./runtime/timeBasedExitDiagnostic.ts";
 import { marketBreadthBiasTools } from "./runtime/marketBreadthBiasDiagnostic.ts";
+import { hotStreakSizerTools } from "./runtime/hotStreakSizerDiagnostic.ts";
+import { revengeTradeGuardTools } from "./runtime/revengeTradeGuardDiagnostic.ts";
 import { playbookTools } from "./runtime/meta/playbook-tools.ts";
 import { playbookBacktestTools } from "./strategy/backtest/backtest-tools.ts";
 import { runtimeTools } from "./runtime/flow/runtime-tools.ts";
@@ -588,6 +596,8 @@ const _rawAllTools = {
   ...faeFtaCutTools,
   ...timeBasedExitTools,
   ...marketBreadthBiasTools,
+  ...hotStreakSizerTools,
+  ...revengeTradeGuardTools,
   ...playbookTools,
   ...playbookBacktestTools,
   ...runtimeTools,
