@@ -206,6 +206,11 @@ export { goalDeferredActionsTools } from "./runtime/goalDeferredActionsDiagnosti
 // detection for data-mining framing. Companion to per-plan recordUserThesis.
 export { strategyEdgeThesisTools } from "./runtime/strategyEdgeThesisDiagnostic.ts";
 
+// HR1 — Multi-instrument optimal hedge ratio. Variance-minimizing hedge weights
+// for hedging a position X with a basket of K candidates. Generalizes KF1
+// (kalmanBeta) from single-instrument to multi-instrument hedging.
+export { multiInstrumentHedgeRatioTools } from "./runtime/multiInstrumentHedgeRatioDiagnostic.ts";
+
 // Playbook tools (v0.7)
 export { playbookTools } from "./runtime/meta/playbook-tools.ts";
 
@@ -502,6 +507,7 @@ import { goalDraftTools } from "./runtime/goalDraftDiagnostic.ts";
 import { goalMandateLinkTools } from "./runtime/goalMandateLinkDiagnostic.ts";
 import { goalDeferredActionsTools } from "./runtime/goalDeferredActionsDiagnostic.ts";
 import { strategyEdgeThesisTools } from "./runtime/strategyEdgeThesisDiagnostic.ts";
+import { multiInstrumentHedgeRatioTools } from "./runtime/multiInstrumentHedgeRatioDiagnostic.ts";
 import { playbookTools } from "./runtime/meta/playbook-tools.ts";
 import { playbookBacktestTools } from "./strategy/backtest/backtest-tools.ts";
 import { runtimeTools } from "./runtime/flow/runtime-tools.ts";
@@ -630,6 +636,7 @@ const _rawAllTools = {
   ...goalMandateLinkTools,
   ...goalDeferredActionsTools,
   ...strategyEdgeThesisTools,
+  ...multiInstrumentHedgeRatioTools,
   ...playbookTools,
   ...playbookBacktestTools,
   ...runtimeTools,

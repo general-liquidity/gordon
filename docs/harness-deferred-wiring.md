@@ -1599,6 +1599,31 @@ Mode discipline: informational by default (operator-shadow workflow), active whe
 
 ---
 
+## Multi-instrument hedge-ratio primitive (HR1)
+
+Surfaced by re-evaluating the Phynance (Kakushadze 2014/15) §26 optimal-hedge-ratio section against Gordon's actual quant surface. Most of Phynance (Black-Scholes, Greeks, HJM, Vasicek, CIR, BGM, quantos) is orthogonal to Gordon's frame (no options, no fixed income), and most of the foundational apparatus (variance-ratio + runs + Ljung-Box martingale tests, single-instrument time-varying beta, cointegration, stationary bootstrap, sign-randomization edge test) is already shipped. The matrix-case optimal hedge ratio was the one genuinely uncovered candidate aligned with Gordon's quant frame.
+
+### HR1. Multi-instrument optimal hedge ratio ✅ shipped
+
+**Module:** `src/infra/trading/quant/multiInstrumentHedgeRatio.ts`. Flag `GORDON_MULTI_INSTRUMENT_HEDGE_RATIO`.
+**What:** Given a position's return series X and K candidate hedge instruments' return series {Y_1, ..., Y_K}, computes the variance-minimizing hedge weights h* = Σ_Y⁻¹ · Σ_XY (equivalent to OLS regression coefficients of X on Y). Returns hedge weights, residual + position variance, variance reduction (R²), and condition number of Σ_Y.
+**Mastra tool:** `compute_multi_instrument_hedge_ratio` in `runtime/multiInstrumentHedgeRatioDiagnostic.ts`.
+**Test coverage:** 20 tests — validation (length mismatch, NaN/Inf, candidateNames length, negative ridge), K=1 case (perfect linear relationship → weight matches slope, uncorrelated → ~0, matches manual Cov/Var ratio), K>1 cases (decomposed regression recovers coefficients), default Y_1/Y_2 naming, collinearity handling (perfect → throws with helpful message; near-collinear → ridge stabilizes; condition-number flagged), output structure invariants (residualVariance ≤ positionVariance, both non-negative).
+**Implementation:** Gauss-Jordan inversion with partial pivoting for the K×K matrix. Robust for K ≤ ~30. Ridge regularization parameter handles ill-conditioned cases without external dependencies. Condition-number estimate flags marginal (κ > 1e3) and unstable (κ > 1e6) cases.
+**Generalizes:** KF1 `kalmanBeta` (single-instrument time-varying beta) → multi-instrument static hedge ratio. KF1 remains the primitive for the single-instrument time-varying case; HR1 is the multi-instrument static case.
+**Plausible consumers:**
+- Operator with a long crypto position wants to compute the optimal hedge weights across {ETH, SOL, equity-correlated proxy}
+- Beta-neutralization in long/short setups with multiple potential beta hedges
+- Pre-trade hedge sizing when single-instrument kalmanBeta isn't enough
+- Risk classifier could call HR1 to recommend hedge mixes given current exposures
+- Future Markowitz/portfolio-construction layer (when ICP signals warrant) would compose HR1 as the constrained-weight degenerate case
+
+### Why this isn't full Markowitz
+
+HR1 is a *degenerate* mean-variance problem: position weight on X is fixed at 1, hedge weights on Y are free, objective is residual-variance minimization (no expected-return term). Full Markowitz (free weights across all assets, mean-variance objective, possibly constraints) remains deferred per the dual-edition memo — same gate as MM2-MM4, CJ7, SC4 (copulas for multi-asset tail dependence). HR1 ships now because the *single position + K hedge candidates* case is operator-relevant at Gordon's current ICP without committing to full portfolio construction.
+
+---
+
 ## Market-making primitives (MM1) — deferred pending design partner
 
 Surfaced by the K (ctubio's Krypto-trading-bot) survey, which is a textbook C++ market-making engine forked from tribeca/HRP. K bundles fair-value microprice estimators, inventory-skewed quoting, multi-timescale EWMA bank, and 7 quote-mode dispatchers. None of these belong in Gordon today — the dual-edition ICP (sub-$2B systematic funds, smaller multi-strats, discretionary PMs) doesn't run continuous two-way quotes, so the entire engine is speculative without a crypto-native MM design partner (Wintermute / GSR / smaller DeFi MM firms). One sub-primitive (microprice) is structurally distinct enough to track separately because it has a *plausible* non-MM consumer.
