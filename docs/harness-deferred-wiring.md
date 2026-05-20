@@ -1559,6 +1559,46 @@ Out of scope for the GE1-GE3 commit because each requires touching `goalMode.ts`
 
 ---
 
+## Strategy economic-thesis capture (ET1)
+
+Source: prop-trading discipline article on the difference between patterns and edges (Strimpel framing). Companion to the existing `recordUserThesis` in `src/infra/safety/anti-trap/explainFirstMode.ts` — that one is per-plan and session-scoped; ET1 is strategy-level and persistent.
+
+### ET1. Strategy economic-thesis capture ✅ shipped
+
+**Module:** `src/infra/safety/anti-trap/strategyEdgeThesis.ts`. Flag `GORDON_STRATEGY_EDGE_THESIS`.
+**What:** Four-field structured capture of the economic mechanism behind a strategy:
+1. `inefficiencyDescription` (≥30 chars) — what mispricing the strategy exploits
+2. `counterpartyIdentification` (≥20 chars) — who is on the other side
+3. `counterpartyConstraint` (≥20 chars) — why they consistently act that way
+4. `persistenceRationale` (≥20 chars) — why the inefficiency isn't arbitraged away
+
+Anti-pattern phrase detection runs over all four fields. Flags include framing like "worked historically", "backtest showed", "data mining", "trial and error", "looked good in backtest", "worked in the past", "purely empirical", "just a pattern we noticed". Match against any of these produces structured warnings.
+
+**Mode:** `informational` (default) → warnings produce `advisory_warning` status with the thesis still recorded; `active` → warnings produce `invalid` status with record withheld until rewritten.
+
+**Output:** A SHA-256 hash over the canonical concatenation of fields. Downstream consumers (backtest pipeline, strategy registry, ACE Reflector) can stamp this hash onto results so any analytical output traces back to the thesis the operator wrote BEFORE running it.
+
+**Mastra tool:** `capture_strategy_edge_thesis` in `runtime/strategyEdgeThesisDiagnostic.ts`.
+**Test coverage:** 27 tests — validation (4 min-length thresholds + empty strategyId), clean-thesis valid status, deterministic hash, hash-differs-on-change, all 9 anti-pattern phrases individually detected, multiple-anti-patterns surfaced together, informational vs active mode behavior, reasoning text quality (hash prefix in valid, rewrite-guidance in invalid, reflection prompt in advisory).
+
+**Distinct from existing surface:**
+- `recordUserThesis` (`explainFirstMode.ts`) — per-PLAN, captures reasoning for a specific trade setup
+- `marginalParticipantClassifier` (WW15) — runtime detection of counterparty types from signals (downstream consumer of strategy thesis)
+- `edgeAttribution.ts` — post-hoc P&L attribution to known factors
+- ET1 — pre-backtest, strategy-level, operator-authored, with anti-pattern enforcement
+
+### Wire-point recommendations
+
+ET1 ships as a standalone primitive that does NOT touch the backtest pipeline or strategy registry directly. The natural enhancement wire-ups for a future pass:
+- Strategy registry: require a valid (or advisory_warning) thesis hash before a strategy can be persisted
+- Backtest pipeline: warn/refuse when running a backtest for a strategy that has no thesis
+- ACE Reflector: when distilling lessons, include the thesis hash so realized outcomes can be reasoned about against the original economic claim
+- Pro-tier institutional pitch: the thesis hash IS the audit-lineage artifact — "every analytical output traces back to a written economic mechanism"
+
+Mode discipline: informational by default (operator-shadow workflow), active when the operator explicitly opts into pre-backtest gating.
+
+---
+
 ## Market-making primitives (MM1) — deferred pending design partner
 
 Surfaced by the K (ctubio's Krypto-trading-bot) survey, which is a textbook C++ market-making engine forked from tribeca/HRP. K bundles fair-value microprice estimators, inventory-skewed quoting, multi-timescale EWMA bank, and 7 quote-mode dispatchers. None of these belong in Gordon today — the dual-edition ICP (sub-$2B systematic funds, smaller multi-strats, discretionary PMs) doesn't run continuous two-way quotes, so the entire engine is speculative without a crypto-native MM design partner (Wintermute / GSR / smaller DeFi MM firms). One sub-primitive (microprice) is structurally distinct enough to track separately because it has a *plausible* non-MM consumer.

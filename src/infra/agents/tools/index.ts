@@ -201,6 +201,11 @@ export { goalDraftTools } from "./runtime/goalDraftDiagnostic.ts";
 export { goalMandateLinkTools } from "./runtime/goalMandateLinkDiagnostic.ts";
 export { goalDeferredActionsTools } from "./runtime/goalDeferredActionsDiagnostic.ts";
 
+// ET1 — Strategy economic-thesis capture. Anti-trap primitive: forces explicit
+// economic-mechanism articulation before backtest/deployment, with anti-pattern
+// detection for data-mining framing. Companion to per-plan recordUserThesis.
+export { strategyEdgeThesisTools } from "./runtime/strategyEdgeThesisDiagnostic.ts";
+
 // Playbook tools (v0.7)
 export { playbookTools } from "./runtime/meta/playbook-tools.ts";
 
@@ -496,6 +501,7 @@ import { levelFreshnessTools } from "./runtime/levelFreshnessDiagnostic.ts";
 import { goalDraftTools } from "./runtime/goalDraftDiagnostic.ts";
 import { goalMandateLinkTools } from "./runtime/goalMandateLinkDiagnostic.ts";
 import { goalDeferredActionsTools } from "./runtime/goalDeferredActionsDiagnostic.ts";
+import { strategyEdgeThesisTools } from "./runtime/strategyEdgeThesisDiagnostic.ts";
 import { playbookTools } from "./runtime/meta/playbook-tools.ts";
 import { playbookBacktestTools } from "./strategy/backtest/backtest-tools.ts";
 import { runtimeTools } from "./runtime/flow/runtime-tools.ts";
@@ -623,6 +629,7 @@ const _rawAllTools = {
   ...goalDraftTools,
   ...goalMandateLinkTools,
   ...goalDeferredActionsTools,
+  ...strategyEdgeThesisTools,
   ...playbookTools,
   ...playbookBacktestTools,
   ...runtimeTools,
