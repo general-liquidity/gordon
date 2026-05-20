@@ -217,6 +217,11 @@ export { multiInstrumentHedgeRatioTools } from "./runtime/multiInstrumentHedgeRa
 // contract pattern from AHE.
 export { decisionObservabilityTools } from "./runtime/decisionObservabilityDiagnostic.ts";
 
+// PF1 — Pareto frontier tracker. Multi-objective non-dominated set
+// computation. Generalizes single-objective best-selection. Pairs with
+// DEC1 vector predictions, harnessEvolution multi-objective selection.
+export { paretoFrontierTools } from "./runtime/paretoFrontierDiagnostic.ts";
+
 // Playbook tools (v0.7)
 export { playbookTools } from "./runtime/meta/playbook-tools.ts";
 
@@ -515,6 +520,7 @@ import { goalDeferredActionsTools } from "./runtime/goalDeferredActionsDiagnosti
 import { strategyEdgeThesisTools } from "./runtime/strategyEdgeThesisDiagnostic.ts";
 import { multiInstrumentHedgeRatioTools } from "./runtime/multiInstrumentHedgeRatioDiagnostic.ts";
 import { decisionObservabilityTools } from "./runtime/decisionObservabilityDiagnostic.ts";
+import { paretoFrontierTools } from "./runtime/paretoFrontierDiagnostic.ts";
 import { playbookTools } from "./runtime/meta/playbook-tools.ts";
 import { playbookBacktestTools } from "./strategy/backtest/backtest-tools.ts";
 import { runtimeTools } from "./runtime/flow/runtime-tools.ts";
@@ -645,6 +651,7 @@ const _rawAllTools = {
   ...strategyEdgeThesisTools,
   ...multiInstrumentHedgeRatioTools,
   ...decisionObservabilityTools,
+  ...paretoFrontierTools,
   ...playbookTools,
   ...playbookBacktestTools,
   ...runtimeTools,

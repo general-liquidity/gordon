@@ -1703,6 +1703,30 @@ Inventory-skewed quoting (Avellaneda-Stoikov-style position-feedback loop), 7-mo
 
 ---
 
+## PF1 — Pareto frontier tracker
+
+**Status:** built, not wired into consumers. Module: `src/infra/trading/quant/paretoFrontier.ts` + `paretoFrontier.test.ts`. Agent wrapper: `src/infra/agents/tools/runtime/paretoFrontierDiagnostic.ts` (tool id `compute_pareto_frontier`).
+
+**What it is:** pure-compute multi-objective dominance check. Given N candidates with K numeric objectives each + a per-objective direction (`maximize` / `minimize`), returns the non-dominated set (the Pareto frontier), the dominated set, and a `dominationMap` listing every dominator of every candidate. Two helpers exposed:
+- `dominates(a, b, dirs)` — strict (≥ on all, > on at least one)
+- `weaklyDominates(a, b, dirs)` — non-strict (≥ on all)
+
+O(N²·K). Fine for the candidate-set sizes Gordon actually compares (handfuls to low hundreds).
+
+**Why it exists.** Inspired by Meta-Harness paper (arXiv 2603.28052v1) — when an agent's harness has multiple legitimate objectives (Sharpe vs drawdown, accuracy vs context-cost, score vs latency), collapsing to a single weighted score loses information and bakes in someone's weighting bias. The Pareto frontier preserves the tradeoff structure.
+
+**Plausible consumers (none wired yet):**
+1. **`harnessEvolution`** — currently selects parent candidates by a scalar fitness. Replacing the parent-selection step with frontier membership keeps high-Sharpe-but-high-DD and low-DD-but-modest-Sharpe candidates alive simultaneously instead of one collapsing the other.
+2. **ACE Curator scoring** — lessons are currently ranked by score alone. (score, context-cost, evidence-count) on the frontier surfaces lessons that are slightly worse but materially cheaper to inject.
+3. **DEC1 verification with vector predictions** — when a stamped edit predicts multiple metric improvements, "verified" should mean the realized vector *weakly dominates* the predicted threshold vector. `weaklyDominates` already lives in PF1 for exactly this.
+4. **Strategy comparison surfaces** — `compareStrategies` / `evaluateBacktest` callsites that today print a table of metrics could mark frontier members so the operator sees which strategies are not Pareto-dominated.
+
+**Wire point:** none yet — this is the canonical "primitive built ahead of consumer" deferred entry. Wire on signal: first time `harnessEvolution` produces a candidate-set diverse on >1 axis, or first time a Curator decision feels like "wrong lesson kept", reach for PF1.
+
+**Gating:** zero risk to build (pure function), nontrivial risk to wire prematurely (changes selection semantics in evolution / curation paths). Don't wire opportunistically — wait for a failure mode that scalar collapse explains.
+
+---
+
 ## How to use this doc
 
 When you (or a future session) want to wire one of these:
