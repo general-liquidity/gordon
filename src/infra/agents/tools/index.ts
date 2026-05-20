@@ -175,6 +175,13 @@ export { transientImpactTools } from "./runtime/transientImpactDiagnostic.ts";
 export { optimalLimitDepthTools } from "./runtime/optimalLimitDepthDiagnostic.ts";
 export { optimalPairsTradingTools } from "./runtime/optimalPairsTradingDiagnostic.ts";
 
+// Trade-management primitives (TM1-TM3). Pragmatic prop-trading discipline:
+// FTA early-cut, time-based exit, market-breadth directional bias.
+// Agent-callable; direct operator-shadow value.
+export { faeFtaCutTools } from "./runtime/faeFtaCutDiagnostic.ts";
+export { timeBasedExitTools } from "./runtime/timeBasedExitDiagnostic.ts";
+export { marketBreadthBiasTools } from "./runtime/marketBreadthBiasDiagnostic.ts";
+
 // Playbook tools (v0.7)
 export { playbookTools } from "./runtime/meta/playbook-tools.ts";
 
@@ -459,6 +466,9 @@ import { carteaJaimungalSignalTools } from "./runtime/carteaJaimungalSignalDiagn
 import { transientImpactTools } from "./runtime/transientImpactDiagnostic.ts";
 import { optimalLimitDepthTools } from "./runtime/optimalLimitDepthDiagnostic.ts";
 import { optimalPairsTradingTools } from "./runtime/optimalPairsTradingDiagnostic.ts";
+import { faeFtaCutTools } from "./runtime/faeFtaCutDiagnostic.ts";
+import { timeBasedExitTools } from "./runtime/timeBasedExitDiagnostic.ts";
+import { marketBreadthBiasTools } from "./runtime/marketBreadthBiasDiagnostic.ts";
 import { playbookTools } from "./runtime/meta/playbook-tools.ts";
 import { playbookBacktestTools } from "./strategy/backtest/backtest-tools.ts";
 import { runtimeTools } from "./runtime/flow/runtime-tools.ts";
@@ -575,6 +585,9 @@ const _rawAllTools = {
   ...transientImpactTools,
   ...optimalLimitDepthTools,
   ...optimalPairsTradingTools,
+  ...faeFtaCutTools,
+  ...timeBasedExitTools,
+  ...marketBreadthBiasTools,
   ...playbookTools,
   ...playbookBacktestTools,
   ...runtimeTools,

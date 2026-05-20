@@ -1372,6 +1372,44 @@ These are the natural drift-signal producers for CJ1 (`compute_cartea_jaimungal_
 
 ---
 
+## Trade-management primitives (TM1–TM3) — pragmatic prop-trading discipline
+
+Source: Spicy (2025) "My Mean-Reversion Trading Strategy" article — 8-year crypto former prop-trader writing about reversal trading on 1-minute timeframes. Three small, pragmatic primitives extracted (after verify-before-claim ruled out the rest of the article — regime classification, swing detection, playbook patterns, and trader-specific quality heuristics were all either already in Gordon or too trader-specific to bake in as primitives).
+
+These differ from CJ/KS/MM in two ways: (a) **direct operator-shadow value** rather than institutional credibility — they address well-known retail/prop failure modes (staying in losers, no market context); (b) **plausible immediate consumers exist** — open positions need lifecycle management; pre-plan checks need market context. Not speculative-museum-piece tier.
+
+### TM1. MAE/MFE tracker + FTA early-cut decision ✅ shipped
+
+**Module:** `src/infra/trading/quant/faeFtaCut.ts`. Flag `GORDON_FAE_FTA_CUT`.
+**What:** Computes current excursion in R units, MAE/MFE from optional priceHistory, returns hold/cut verdict based on FTA threshold. FTA ("First Trouble Area") is a price level on the way to the stoploss; if a candle closes through it the trade is behaving worse than typical winners → cut early. Calibration of the FTA threshold should come from observed MAE of historical winners (Gordon's backtest tracks MAE/MFE per trade).
+**Mastra tool:** `evaluate_fta_early_cut` in `src/infra/agents/tools/runtime/faeFtaCutDiagnostic.ts`.
+**Test coverage:** 16 tests — validation, BUY/SELL R-unit math symmetry, FTA threshold edges (-0.4R vs -0.5R), MAE/MFE from priceHistory, no-history fallback, payload shape.
+**Plausible consumer:** agent calls during the open-position lifecycle (typically on candle close) to recommend early exit. Slots naturally into the existing position-management workflow.
+
+### TM2. Time-based early-exit decision ✅ shipped
+
+**Module:** `src/infra/trading/quant/timeBasedExit.ts`. Flag `GORDON_TIME_BASED_EXIT`.
+**What:** Takes time-in-trade and average winning-trade duration; returns cut/hold based on a threshold multiplier (default 5×). Catches "outlier" trades sitting open way longer than the strategy's normal winners — abnormal duration is a strong signal that the thesis has gone stale.
+**Mastra tool:** `evaluate_time_based_exit` in `src/infra/agents/tools/runtime/timeBasedExitDiagnostic.ts`.
+**Test coverage:** 11 tests — validation, verdict logic at/above/below threshold, default multiplier, unit-agnostic invariant.
+**Plausible consumer:** same as TM1 — agent calls during open-position lifecycle. Pairs naturally with TM1 for a two-axis "cut early" decision (excursion AND duration).
+
+### TM3. Market breadth directional bias ✅ shipped
+
+**Module:** `src/infra/trading/quant/marketBreadthBias.ts`. Flag `GORDON_MARKET_BREADTH_BIAS`.
+**What:** Takes a basket of recent returns across the trading universe, computes positive/negative fraction with configurable thresholds, returns bullish/bearish/balanced classification + breadth statistics (mean, median, flat count). Operator pattern: balanced day → standard quality filters; directional day → relax quality on the bias side, tighten on the counter-bias side.
+**Mastra tool:** `compute_market_breadth_bias` in `src/infra/agents/tools/runtime/marketBreadthBiasDiagnostic.ts`.
+**Test coverage:** 16 tests — validation, classification at default thresholds, custom thresholds (looser/stricter), flat-threshold logic, mean/median statistics.
+**Plausible consumer:** pre-plan context check before opening a new position; future slash command candidate (`/breadth` or similar) since this is operator-direct enough to warrant typed invocation if the workflow matures.
+
+### Sequencing recommendation (TM stack)
+
+TM1+TM2 are natural lifecycle pair — wire both into the same hook that fires on candle close during open positions. TM3 is a one-shot context check, wired into the pre-plan workflow (and potentially a slash command if operators end up calling it interactively). All three are zero-risk additive — they're advisory/diagnostic tools that surface verdicts; the existing permission engine + risk classifier remain authoritative on actual position-close decisions.
+
+If the operator wants to formalize TM1+TM2 as auto-execute hooks (not just advisory), the wire point is `src/infra/hooks/` — define a PostFillTick lifecycle hook that runs the FTA + duration checks and emits an `early_exit_recommendation` event. The execution layer can subscribe and act on it, or it can stay advisory and surface in the TUI. Default to advisory until at least one operator has used the diagnostic verdicts manually and confirmed they catch the right kinds of trades.
+
+---
+
 ## Market-making primitives (MM1) — deferred pending design partner
 
 Surfaced by the K (ctubio's Krypto-trading-bot) survey, which is a textbook C++ market-making engine forked from tribeca/HRP. K bundles fair-value microprice estimators, inventory-skewed quoting, multi-timescale EWMA bank, and 7 quote-mode dispatchers. None of these belong in Gordon today — the dual-edition ICP (sub-$2B systematic funds, smaller multi-strats, discretionary PMs) doesn't run continuous two-way quotes, so the entire engine is speculative without a crypto-native MM design partner (Wintermute / GSR / smaller DeFi MM firms). One sub-primitive (microprice) is structurally distinct enough to track separately because it has a *plausible* non-MM consumer.
