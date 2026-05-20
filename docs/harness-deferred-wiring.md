@@ -1727,6 +1727,31 @@ O(N²·K). Fine for the candidate-set sizes Gordon actually compares (handfuls t
 
 ---
 
+## TL1 — Trendline detection (peel-off + OLS)
+
+**Status:** built, not wired into consumers. Module: `src/infra/trading/quant/trendlineDetection.ts` + `trendlineDetection.test.ts`. Agent wrapper: `src/infra/agents/tools/runtime/trendlineDetectionDiagnostic.ts` (tool id `detect_trendlines`).
+
+**What it is:** pure-compute upper + lower trendline extraction over a series of price bars. Two methods:
+- `peel_off` (default): iteratively fit OLS through highs (or lows), drop bars on the wrong side of the line, refit until the inlier set stabilizes or hits `minInliers`. The retained bars form an envelope; the regression through them is the trendline. Inspired by the `indicators_26.trend_lines` technique from Moon Dev's flag-continuation backtest, fixed to use the same series for fit *and* intercept (the original mixed highs for the peel iterations and closes for the final fit — a unit-inconsistency bug).
+- `ols`: plain ordinary-least-squares fit through highs/lows. Returns a general-trend best-fit line, not an envelope. Useful for slope-as-state regime features.
+
+Returns slope (Δprice/bar), intercept, r², inlier count, touch count (bars where `|price − line| ≤ touchTolerance · |line|`), and start/end line values for both upper and lower.
+
+**Why not RANSAC.** Trendlines are an *envelope* problem (find a line that bounds prices from above/below), not a *robust-fit* problem (find a line points mostly lie on). RANSAC needs an arbitrary inlier threshold and adds non-determinism without solving the envelope-bounding property. Peel-off enforces the envelope constraint by construction.
+
+**Plausible consumers (none wired):**
+1. **`chartTools` VLM analysis** — overlay computed trendlines so the VLM sees structural slope/resistance rather than only candle pixels. Today the VLM has to infer trend structure visually; TL1 hands it the explicit numbers.
+2. **`strategyEdgeThesis` (ET1)** — theses like "breakout above 14-day resistance trendline" need a concrete computed reference for verification.
+3. **`levelFreshness` (LV2)** — currently tracks *horizontal* levels. Sloped trendlines are the natural extension; same freshness-decay logic with `level(t) = slope·t + intercept` substituted for the constant.
+4. **`timeBasedExit` (TM2)** — could trigger on price returning to a regression-derived trendline rather than (or in addition to) elapsed-time.
+5. **Regime detector / `marketProfile`** — trendline slope as a state feature for trending-vs-range classification.
+
+**Wire point:** none yet. Same posture as PF1 — primitive built ahead of consumer, wire on signal. First time the VLM misses a structural breakout / breakdown that a computed trendline would have flagged, reach for TL1.
+
+**Gating:** zero risk to build (pure function). Wiring into `chartTools` is the cheapest first consumer (additive overlay, doesn't change behavior). Wiring into `levelFreshness` is more invasive (changes the level-tracking data model from constants to lines).
+
+---
+
 ## How to use this doc
 
 When you (or a future session) want to wire one of these:

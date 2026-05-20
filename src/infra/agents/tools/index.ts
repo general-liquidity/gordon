@@ -221,6 +221,11 @@ export { decisionObservabilityTools } from "./runtime/decisionObservabilityDiagn
 // computation. Generalizes single-objective best-selection. Pairs with
 // DEC1 vector predictions, harnessEvolution multi-objective selection.
 export { paretoFrontierTools } from "./runtime/paretoFrontierDiagnostic.ts";
+// Trendline detection diagnostic (TL1) — peel-off envelope or OLS best-fit
+// trendlines for upper/lower price series. Returns slope/intercept/r²/touches/
+// endpoints. Plausible consumers: chartTools VLM overlay, strategyEdgeThesis,
+// levelFreshness sloped extension, timeBasedExit, regime slope feature.
+export { trendlineDetectionTools } from "./runtime/trendlineDetectionDiagnostic.ts";
 
 // Playbook tools (v0.7)
 export { playbookTools } from "./runtime/meta/playbook-tools.ts";
@@ -521,6 +526,7 @@ import { strategyEdgeThesisTools } from "./runtime/strategyEdgeThesisDiagnostic.
 import { multiInstrumentHedgeRatioTools } from "./runtime/multiInstrumentHedgeRatioDiagnostic.ts";
 import { decisionObservabilityTools } from "./runtime/decisionObservabilityDiagnostic.ts";
 import { paretoFrontierTools } from "./runtime/paretoFrontierDiagnostic.ts";
+import { trendlineDetectionTools } from "./runtime/trendlineDetectionDiagnostic.ts";
 import { playbookTools } from "./runtime/meta/playbook-tools.ts";
 import { playbookBacktestTools } from "./strategy/backtest/backtest-tools.ts";
 import { runtimeTools } from "./runtime/flow/runtime-tools.ts";
@@ -652,6 +658,7 @@ const _rawAllTools = {
   ...multiInstrumentHedgeRatioTools,
   ...decisionObservabilityTools,
   ...paretoFrontierTools,
+  ...trendlineDetectionTools,
   ...playbookTools,
   ...playbookBacktestTools,
   ...runtimeTools,
