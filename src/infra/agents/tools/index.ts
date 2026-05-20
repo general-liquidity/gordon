@@ -188,6 +188,9 @@ export { marketBreadthBiasTools } from "./runtime/marketBreadthBiasDiagnostic.ts
 export { hotStreakSizerTools } from "./runtime/hotStreakSizerDiagnostic.ts";
 export { revengeTradeGuardTools } from "./runtime/revengeTradeGuardDiagnostic.ts";
 
+// Brier score — calibration metric for probability-emitting components.
+export { brierScoreTools } from "./runtime/brierScoreDiagnostic.ts";
+
 // Playbook tools (v0.7)
 export { playbookTools } from "./runtime/meta/playbook-tools.ts";
 
@@ -477,6 +480,7 @@ import { timeBasedExitTools } from "./runtime/timeBasedExitDiagnostic.ts";
 import { marketBreadthBiasTools } from "./runtime/marketBreadthBiasDiagnostic.ts";
 import { hotStreakSizerTools } from "./runtime/hotStreakSizerDiagnostic.ts";
 import { revengeTradeGuardTools } from "./runtime/revengeTradeGuardDiagnostic.ts";
+import { brierScoreTools } from "./runtime/brierScoreDiagnostic.ts";
 import { playbookTools } from "./runtime/meta/playbook-tools.ts";
 import { playbookBacktestTools } from "./strategy/backtest/backtest-tools.ts";
 import { runtimeTools } from "./runtime/flow/runtime-tools.ts";
@@ -598,6 +602,7 @@ const _rawAllTools = {
   ...marketBreadthBiasTools,
   ...hotStreakSizerTools,
   ...revengeTradeGuardTools,
+  ...brierScoreTools,
   ...playbookTools,
   ...playbookBacktestTools,
   ...runtimeTools,

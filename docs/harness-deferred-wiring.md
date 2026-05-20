@@ -1440,6 +1440,49 @@ If an operator wants to wire D2 into active enforcement, the natural hook is `sr
 
 ---
 
+## Simulation & calibration primitives (SC1–SC4)
+
+Source: "How to Simulate Like a Quant Desk" article (covers Monte Carlo, importance sampling, sequential Monte Carlo / particle filters, variance reduction, copulas, agent-based market simulation). Verify-before-claim against Gordon's existing surface: one real gap shipped (Brier score), three real gaps deferred with explicit gating, two patterns ruled out as wrong-domain or already-covered.
+
+### SC1. Brier score — calibration metric ✅ shipped
+
+**Module:** `src/infra/trading/quant/brierScore.ts`. Flag `GORDON_BRIER_SCORE`.
+**What:** Mean squared error between predicted probabilities and binary outcomes, plus skill score vs baseline (default = base rate / climatology) and a calibration classification (excellent < 0.10, good < 0.20, marginal < 0.25, poor ≥ 0.25). Reference values from the prediction-market literature: 538 / Economist hit 0.06–0.12 on presidential races.
+**Mastra tool:** `compute_brier_score` in `runtime/brierScoreDiagnostic.ts`.
+**Test coverage:** 19 tests — validation, extremes (perfect/wrong/noise floor), boolean coercion, classification thresholds, skill-score sign across (predictions, baseline) combinations, base-rate computation.
+**Plausible consumers:**
+- `markovRegime.ts` confidence + transition probabilities scored against realized state transitions
+- D1 hot-streak classifications scored against realized strategy outcomes
+- ACE Reflector calibration-drift surfacing (degrading Brier score on regime predictions surfaces as a lesson)
+- Any future probability-emitting tool (regime probabilities, signal-strength outputs, etc.)
+
+### SC2. Sequential Monte Carlo / particle filter — deferred
+
+**Status:** not built. Same design-choice gate as the HMM upgrade to `markovRegime.ts`. Gordon's deliberate choice is visible-state Markov classification rather than hidden-state inference; committing to a particle filter moves in the opposite direction. The article's framing (election-night live updating) is interesting but Gordon's existing Kalman filter (KF1 kalmanBeta, KF2 kalmanVolatility) handles linear-Gaussian cases, and the visible-state markovRegime handles discrete-state cases. Particle filter sits in the non-linear / non-Gaussian middle ground with no current consumer.
+
+**Wire point if needed later:** `src/infra/trading/quant/particleFilter.ts`, ~200–300 LOC for bootstrap filter with systematic resampling. Build when a Gordon use case specifically requires latent-state inference outside Kalman's linear-Gaussian assumptions AND the visible-state simplification has been ruled out for that specific application.
+
+### SC3. Importance sampling for rare-event Monte Carlo — deferred
+
+**Status:** not built. Gordon's `src/infra/trading/risk/tailRisk.ts` already covers the primary tail-risk surface parametrically (VaR / Expected Shortfall). IS-based Monte Carlo would offer higher-fidelity simulation-based tail probability estimation (e.g., 100–10,000× variance reduction for events at the 0.3% tail), but the existing parametric surface adequately serves the operator-shadow use case. The marginal value is "more accurate rare-event probability from simulation" rather than a new capability.
+
+**Wire point if needed later:** `src/infra/trading/quant/importanceSampling.ts` with exponential tilting (Lundberg equation for the tilt parameter). Build when a customer specifically asks for simulation-based tail probability estimation that the parametric approach can't deliver — e.g., path-dependent tail estimates, or strategies with non-Gaussian return distributions where parametric VaR is unreliable.
+
+### SC4. Copulas for multi-asset tail dependence — deferred
+
+**Status:** not built. Gaussian / Student-t / Clayton / Gumbel / vine copulas for multi-asset dependency structure with tail-dependence modeling. Real gap — Gordon's `cointegration.ts` handles bivariate cointegration but no copula-based joint distribution modeling. The article's 2008-Gaussian-copula-failure framing is correct: linear correlation misses tail-co-movement, which is the failure mode that matters most for portfolios.
+
+**Status of gating:** Same gate as MM2-MM4 (full market-making engine) and CJ7 (multi-asset basket liquidation). Gordon's dual-edition ICP per `project_dual_edition_strategy.md` is single-asset/single-pair operator-shadow, not portfolio construction. Copulas only become relevant when a fund design partner brings a multi-asset portfolio that needs joint distribution modeling.
+
+**Wire point if needed later:** `src/infra/trading/quant/copulas.ts` with at minimum Gaussian + Student-t (covers ~90% of fund use cases); Clayton / Gumbel / vine on demand. Build when a portfolio-construction or multi-asset basket-execution design partner specifies their factor model + dependency requirements.
+
+### Ruled out (not deferred)
+
+- **Monte Carlo variance reduction (antithetic / control variates / stratified)**: the article applies these to *path-simulation* Monte Carlo. Gordon's `backtest/analysis/monte-carlo.ts` is *trade-shuffling* (block-bootstrap-style), not path-simulation. The variance-reduction techniques don't naturally fit the existing domain. Skip.
+- **Agent-based market simulation (zero-intelligence agents, LMSR, Kyle)**: prediction-market / market-making domain. Not Gordon's frame.
+
+---
+
 ## Market-making primitives (MM1) — deferred pending design partner
 
 Surfaced by the K (ctubio's Krypto-trading-bot) survey, which is a textbook C++ market-making engine forked from tribeca/HRP. K bundles fair-value microprice estimators, inventory-skewed quoting, multi-timescale EWMA bank, and 7 quote-mode dispatchers. None of these belong in Gordon today — the dual-edition ICP (sub-$2B systematic funds, smaller multi-strats, discretionary PMs) doesn't run continuous two-way quotes, so the entire engine is speculative without a crypto-native MM design partner (Wintermute / GSR / smaller DeFi MM firms). One sub-primitive (microprice) is structurally distinct enough to track separately because it has a *plausible* non-MM consumer.
