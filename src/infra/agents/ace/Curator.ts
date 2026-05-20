@@ -17,9 +17,12 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createModuleLogger } from "../../logger/index.ts";
 import {
   isACEEnabled,
+  mergeEvidenceIds,
   type ACELessonCandidate,
   type ReflectorOutput,
 } from "./Reflector.ts";
+import { listActionLogEntries } from "../../action-log/store.ts";
+import type { ActionLogEntry } from "../../action-log/types.ts";
 
 const logger = createModuleLogger("ace-curator");
 
@@ -148,6 +151,12 @@ export function runCurator(reflectorOutput: ReflectorOutput): ACELessonStore {
         firstSeenAt: Math.min(existing.firstSeenAt, candidate.firstSeenAt),
         lastSeenAt: Math.max(existing.lastSeenAt, candidate.lastSeenAt),
         curatedAt: now,
+        // EXO1 drill-down linkage — set-union with cap (newest evidence
+        // surfaces last; the cap keeps the lesson record bounded).
+        evidenceEntryIds: mergeEvidenceIds(
+          existing.evidenceEntryIds ?? [],
+          candidate.evidenceEntryIds ?? [],
+        ),
       };
       merged.score = scoreLesson(merged);
       byId.set(id, merged);
@@ -157,6 +166,7 @@ export function runCurator(reflectorOutput: ReflectorOutput): ACELessonStore {
         id,
         score: scoreLesson(candidate),
         curatedAt: now,
+        evidenceEntryIds: candidate.evidenceEntryIds ?? [],
       });
     }
   }
@@ -184,6 +194,51 @@ export function runCurator(reflectorOutput: ReflectorOutput): ACELessonStore {
   }
 
   return updated;
+}
+
+/**
+ * EXO1 drill-down — load the raw action-log entries that produced a lesson.
+ *
+ * Reads the curated lesson by id, pulls its evidenceEntryIds, and resolves
+ * each id through the action-log store. Missing ids (entries that aged out
+ * of the log) are returned as null in the result so the caller can see the
+ * attribution gap explicitly. Returns null when the lesson itself isn't
+ * found.
+ *
+ * Designed for the "why does this lesson exist?" diagnostic — agent or
+ * operator inspects a curated lesson and wants the concrete raw evidence
+ * without re-running the Reflector.
+ */
+export function loadLessonEvidence(
+  lessonOrId: string | ACELesson,
+): { lesson: ACELesson; entries: Array<ActionLogEntry | null> } | null {
+  const store = loadACELessons();
+  const lesson =
+    typeof lessonOrId === "string"
+      ? store.lessons.find((l) => l.id === lessonOrId)
+      : lessonOrId;
+  if (!lesson) return null;
+
+  const ids = lesson.evidenceEntryIds ?? [];
+  if (ids.length === 0) return { lesson, entries: [] };
+
+  // Fetch a generous slice of recent action-log entries and index by id.
+  // This avoids a per-id round-trip; the action-log store doesn't expose
+  // a get-by-id query directly.
+  let recent: ActionLogEntry[] = [];
+  try {
+    recent = listActionLogEntries({ limit: 10_000 });
+  } catch (error) {
+    logger.warn("Failed to read action log for lesson evidence", {
+      error: (error as Error).message,
+      lessonId: lesson.id,
+    });
+    return { lesson, entries: ids.map(() => null) };
+  }
+  const byId = new Map<string, ActionLogEntry>();
+  for (const entry of recent) byId.set(entry.id, entry);
+  const entries = ids.map((id) => byId.get(id) ?? null);
+  return { lesson, entries };
 }
 
 /**

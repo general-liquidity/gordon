@@ -41,7 +41,19 @@ export interface ACELessonCandidate {
   firstSeenAt: number;
   /** Last seen timestamp (ms epoch) */
   lastSeenAt: number;
+  /**
+   * Action-log entry ids that produced this lesson (EXO1 — drill-down
+   * linkage). Capped at MAX_EVIDENCE_IDS so the lesson record stays
+   * bounded. Per-entry rules push the entry that matched; aggregate
+   * rules may supply their own ids via AggregateCandidate.evidenceEntryIds
+   * or leave empty when no single-entry attribution is meaningful.
+   */
+  evidenceEntryIds: string[];
 }
+
+/** Cap on retained evidence ids per lesson. Keeps lesson records bounded
+ *  while still allowing meaningful drill-down sampling. */
+export const MAX_EVIDENCE_IDS = 25;
 
 export interface ReflectorInput {
   /** Limit the analysis window to the last N action-log entries */
@@ -227,6 +239,33 @@ export interface AggregateCandidate {
   firstSeenAt: number;
   lastSeenAt: number;
   evidenceCount: number;
+  /**
+   * Optional drill-down evidence ids. Aggregate rules may supply a
+   * sample of the action-log entries that drove the pattern; the
+   * Reflector caps the merged list at MAX_EVIDENCE_IDS. Leaving this
+   * empty is acceptable when no per-entry attribution is meaningful.
+   */
+  evidenceEntryIds?: string[];
+}
+
+/**
+ * Merge a new entry id into the existing list with cap. Preserves order
+ * (first-seen first) and de-duplicates. Exported for test reuse.
+ */
+export function mergeEvidenceIds(
+  existing: ReadonlyArray<string>,
+  incoming: ReadonlyArray<string>,
+  cap: number = MAX_EVIDENCE_IDS,
+): string[] {
+  const seen = new Set<string>(existing);
+  const out: string[] = [...existing];
+  for (const id of incoming) {
+    if (seen.has(id)) continue;
+    if (out.length >= cap) break;
+    seen.add(id);
+    out.push(id);
+  }
+  return out;
 }
 
 type AggregatePatternRule = {
@@ -428,6 +467,7 @@ export function runReflector(input: ReflectorInput = {}): ReflectorOutput {
         existing.evidenceCount += 1;
         existing.firstSeenAt = Math.min(existing.firstSeenAt, tsMs);
         existing.lastSeenAt = Math.max(existing.lastSeenAt, tsMs);
+        existing.evidenceEntryIds = mergeEvidenceIds(existing.evidenceEntryIds, [entry.id]);
       } else {
         buckets.set(key, {
           text,
@@ -435,6 +475,7 @@ export function runReflector(input: ReflectorInput = {}): ReflectorOutput {
           evidenceCount: 1,
           firstSeenAt: tsMs,
           lastSeenAt: tsMs,
+          evidenceEntryIds: [entry.id],
         });
       }
     }
@@ -456,10 +497,14 @@ export function runReflector(input: ReflectorInput = {}): ReflectorOutput {
     for (const cand of aggResults) {
       const key = `${rule.category}::${dedupeKey(cand.text)}`;
       const existing = buckets.get(key);
+      const candIds = cand.evidenceEntryIds ?? [];
       if (existing) {
         existing.evidenceCount = Math.max(existing.evidenceCount, cand.evidenceCount);
         existing.firstSeenAt = Math.min(existing.firstSeenAt, cand.firstSeenAt);
         existing.lastSeenAt = Math.max(existing.lastSeenAt, cand.lastSeenAt);
+        if (candIds.length > 0) {
+          existing.evidenceEntryIds = mergeEvidenceIds(existing.evidenceEntryIds, candIds);
+        }
       } else {
         buckets.set(key, {
           text: cand.text,
@@ -467,6 +512,7 @@ export function runReflector(input: ReflectorInput = {}): ReflectorOutput {
           evidenceCount: cand.evidenceCount,
           firstSeenAt: cand.firstSeenAt,
           lastSeenAt: cand.lastSeenAt,
+          evidenceEntryIds: candIds.slice(0, MAX_EVIDENCE_IDS),
         });
       }
     }

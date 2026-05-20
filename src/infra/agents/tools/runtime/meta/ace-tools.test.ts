@@ -33,6 +33,7 @@ function seedLesson(text: string, category: string): void {
         evidenceCount: 1,
         firstSeenAt: Date.now(),
         lastSeenAt: Date.now(),
+        evidenceEntryIds: [],
       },
     ],
     entriesAnalyzed: 1,

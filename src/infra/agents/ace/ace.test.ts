@@ -48,6 +48,7 @@ function makeOutput(text: string, category: string): ReflectorOutput {
         evidenceCount: 1,
         firstSeenAt: Date.now(),
         lastSeenAt: Date.now(),
+        evidenceEntryIds: [],
       },
     ],
     entriesAnalyzed: 1,

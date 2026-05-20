@@ -211,6 +211,12 @@ export { strategyEdgeThesisTools } from "./runtime/strategyEdgeThesisDiagnostic.
 // (kalmanBeta) from single-instrument to multi-instrument hedging.
 export { multiInstrumentHedgeRatioTools } from "./runtime/multiInstrumentHedgeRatioDiagnostic.ts";
 
+// DEC1 — Decision observability. Stamps any structured edit (ACE lesson,
+// harness change) with a self-declared prediction at edit-time; later
+// verification compares predicted vs realized over a window. Falsifiable-
+// contract pattern from AHE.
+export { decisionObservabilityTools } from "./runtime/decisionObservabilityDiagnostic.ts";
+
 // Playbook tools (v0.7)
 export { playbookTools } from "./runtime/meta/playbook-tools.ts";
 
@@ -508,6 +514,7 @@ import { goalMandateLinkTools } from "./runtime/goalMandateLinkDiagnostic.ts";
 import { goalDeferredActionsTools } from "./runtime/goalDeferredActionsDiagnostic.ts";
 import { strategyEdgeThesisTools } from "./runtime/strategyEdgeThesisDiagnostic.ts";
 import { multiInstrumentHedgeRatioTools } from "./runtime/multiInstrumentHedgeRatioDiagnostic.ts";
+import { decisionObservabilityTools } from "./runtime/decisionObservabilityDiagnostic.ts";
 import { playbookTools } from "./runtime/meta/playbook-tools.ts";
 import { playbookBacktestTools } from "./strategy/backtest/backtest-tools.ts";
 import { runtimeTools } from "./runtime/flow/runtime-tools.ts";
@@ -637,6 +644,7 @@ const _rawAllTools = {
   ...goalDeferredActionsTools,
   ...strategyEdgeThesisTools,
   ...multiInstrumentHedgeRatioTools,
+  ...decisionObservabilityTools,
   ...playbookTools,
   ...playbookBacktestTools,
   ...runtimeTools,

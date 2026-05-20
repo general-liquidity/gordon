@@ -10,6 +10,8 @@
 export {
   isACEEnabled,
   runReflector,
+  mergeEvidenceIds,
+  MAX_EVIDENCE_IDS,
   type ACELessonCandidate,
   type ReflectorInput,
   type ReflectorOutput,
@@ -20,6 +22,7 @@ export {
   loadACELessons,
   formatACELessonsForPrompt,
   getACELessonsPath,
+  loadLessonEvidence,
   type ACELesson,
   type ACELessonStore,
 } from "./Curator.ts";

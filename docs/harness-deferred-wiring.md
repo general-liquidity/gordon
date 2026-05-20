@@ -1624,6 +1624,53 @@ HR1 is a *degenerate* mean-variance problem: position weight on X is fixed at 1,
 
 ---
 
+## Observability pillars for ACE / harnessEvolution (EXO1 + DEC1)
+
+Surfaced by the AHE paper (arXiv 2604.25850v4) which formalizes three observability pillars for agent-driven harness evolution: component observability (✅ already present in Gordon — every primitive is a file with tests, the wiring doc catalogs them), experience observability (PARTIAL — addressed by EXO1), and decision observability (ABSENT — addressed by DEC1).
+
+### EXO1. Action-log evidence linkage in ACE lessons ✅ shipped
+
+**What:** Each `ACELessonCandidate` and `ACELesson` now carries an `evidenceEntryIds: string[]` field listing the raw action-log entry IDs that produced the lesson. Per-entry pattern rules push the matching entry's ID; aggregate pattern rules can optionally supply IDs via `AggregateCandidate.evidenceEntryIds`. Set union with a `MAX_EVIDENCE_IDS = 25` cap keeps lesson records bounded across merges.
+**Modules touched:**
+- `src/infra/agents/ace/Reflector.ts` — added `evidenceEntryIds` to `ACELessonCandidate`, added optional field on `AggregateCandidate`, added `mergeEvidenceIds` helper + cap constant, updated `runReflector` loop to populate IDs
+- `src/infra/agents/ace/Curator.ts` — preserves the field on lesson merge via `mergeEvidenceIds`, adds `loadLessonEvidence(lessonOrId)` drill-down helper that resolves IDs back through the action-log store
+- `src/infra/agents/ace/index.ts` — re-exports the new helpers
+**Backward compatibility:** legacy `ace-lessons.json` records without the field load as `evidenceEntryIds: []` (no migration step needed).
+**Test impact:** existing ACE tests (29 total across `ace.test.ts` + `ace-tools.test.ts`) updated with the new field; all green.
+**Plausible consumer:** the "why does this lesson exist?" diagnostic — agent or operator inspects a curated lesson and pulls the raw entries that produced it without re-running pattern extraction. Slots naturally into a future `/ace explain <lessonId>` slash command.
+
+### DEC1. Decision observability — self-declared prediction + verification ✅ shipped
+
+**Module:** `src/infra/safety/anti-trap/decisionObservability.ts`. Flag `GORDON_DECISION_OBSERVABILITY`.
+**What:** Stamps any structured edit (ACE-distilled lesson, `harnessEvolution` config change, skill/rule adjustment) with a self-declared prediction at edit-time. A verification step compares predicted vs realized over the declared window, returning verified / failed / still_pending. Includes optional contract-tampering detection by recomputing the SHA-256 contract hash from supplied original inputs.
+
+**Surface:**
+- `stampEditPrediction(input)` → `StampedEditRecord` with `editId`, `editKind` (`ace_lesson | harness_edit | config_change | skill_update | rule_adjustment | other`), `editDescription`, `prediction` (metric, direction, expectedDelta, baseline, verificationWindow), `predictedThreshold`, `contractHash`, `status: "pending"`
+- `verifyEditPrediction({ stamped, observedValue, windowElapsed, originalStampInput? })` → result with `status`, `directionCorrect`, `magnitudeMet`, `contractIntact`
+- `serializeStampedRecord` / `parseStampedRecord` for JSONL persistence
+
+**Mastra tools:** `stamp_edit_prediction` + `verify_edit_prediction` in `runtime/decisionObservabilityDiagnostic.ts`.
+
+**Test coverage:** 29 tests — validation (editId, description length, metric, expectedDelta sign, baseline, window n/integer, ISO timestamp), predictedThreshold computation for both directions, deterministic + tamper-sensitive contract hash, status verdicts (still_pending / verified / failed by direction and magnitude), contract-tampering detection, JSONL round-trip, payload shapes.
+
+**Discipline boundary:** DEC1 does NOT perform automatic revert. The caller (ACE Curator, harnessEvolution loop, operator) knows how to undo their own structured edit; this primitive's job is to produce the verdict, not act on it. This is the safety boundary the AHE paper acknowledges: "self-attribution is reliable for fixes but blind to regressions" — DEC1 makes the verdict visible, the caller decides whether to trust it.
+
+**Plausible consumers:**
+- ACE Curator: when a high-score lesson is added, stamp a prediction (e.g., "this lesson should improve win rate by ≥3pp over next 30 trades"). Verify after window. Failed predictions surface as candidates for retirement/refinement.
+- harnessEvolution Algorithm-1: each H^(k) edit gets a stamped prediction tied to the evaluator metric. Failed predictions can trigger automatic rollback to H^(k-1) (caller-specific logic).
+- Manual operator edits to config / mandate / strategy: stamp at edit-time, verify after the operator-specified window. Catches well-intentioned tweaks that didn't actually help.
+
+### Sequencing recommendation
+
+EXO1 ships invisibly (existing ACE flow continues; new field is populated but unused unless a consumer calls `loadLessonEvidence`). DEC1 ships as standalone primitive — neither ACE Curator nor harnessEvolution automatically call it yet. Wire-ups for a future pass:
+- ACE Curator: optionally stamp a prediction when adding a lesson (operator opt-in via flag)
+- harnessEvolution: stamp+verify each iteration's edit; integrate with the existing `best-so-far` selection
+- Manual workflow: `/edit-prediction stamp …` and `/edit-prediction verify …` slash commands
+
+These wire-ups are out of scope for the EXO1+DEC1 commit — they require touching `Curator.ts` write path and `harnessEvolution.ts` iteration loop. Ship the primitives first; integrate when an operator workflow validates the standalone shape.
+
+---
+
 ## Market-making primitives (MM1) — deferred pending design partner
 
 Surfaced by the K (ctubio's Krypto-trading-bot) survey, which is a textbook C++ market-making engine forked from tribeca/HRP. K bundles fair-value microprice estimators, inventory-skewed quoting, multi-timescale EWMA bank, and 7 quote-mode dispatchers. None of these belong in Gordon today — the dual-edition ICP (sub-$2B systematic funds, smaller multi-strats, discretionary PMs) doesn't run continuous two-way quotes, so the entire engine is speculative without a crypto-native MM design partner (Wintermute / GSR / smaller DeFi MM firms). One sub-primitive (microprice) is structurally distinct enough to track separately because it has a *plausible* non-MM consumer.
