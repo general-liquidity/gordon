@@ -1483,6 +1483,38 @@ Source: "How to Simulate Like a Quant Desk" article (covers Monte Carlo, importa
 
 ---
 
+## Level + volume tactical primitives (LV1–LV2)
+
+Source: ZCT 2025 articles (Volume Analysis Masterclass + Zero Complexity S/R). Two pragmatic tactical primitives extracted; the rest of the articles (volume color philosophy, 3-pattern volume scorer, simple multi-timeframe H/L extractor, approach-style classifier) ruled out via verify-before-claim — either too trader-specific (same 3-variable heuristic framework rejected from Spicy's articles) or redundant with Gordon's existing more-comprehensive surface (supply-demand-zones, order-blocks, fibonacci, camarilla, smc-patterns already cover level extraction).
+
+### LV1. USD-denominated rolling liquidity gate ✅ shipped
+
+**Module:** `src/infra/trading/quant/usdVolumeGate.ts`. Flag `GORDON_USD_VOLUME_GATE`.
+**What:** Filters symbols by USD-denominated rolling volume rather than raw contract count. Computes per-candle USD volume (close × volume), rolls a configurable-MA (default 60), classifies tradeable/skip vs configurable USD threshold (default $100K — ZCT's convention for Binance 1m crypto perps; tune per venue/timeframe).
+**Mastra tool:** `evaluate_usd_volume_gate` in `runtime/usdVolumeGateDiagnostic.ts`.
+**Test coverage:** 16 tests — validation, USD computation correctness (the price-vs-contracts equivalence test), threshold edges, MA window behavior, defaults.
+**Plausible consumer:** Gordon's discovery/scanner pre-scan gate. Existing `minVolume` filter in `discovery.ts` is a single-point check; LV1 adds the rolling MA + USD-denominated dimension. Operator-shadow direct value: slippage from illiquid symbols silently drains every downstream statistical edge.
+
+### LV2. Level freshness classifier ✅ shipped
+
+**Module:** `src/infra/trading/quant/levelFreshness.ts`. Flag `GORDON_LEVEL_FRESHNESS`.
+**What:** Counts touches of a price level within a recent window (default 6h, default 0.1% tolerance) and classifies fresh (0–1 touches) vs recycled (2+ touches). Touch definition: candle [low, high] range overlaps with band [level·(1−tol), level·(1+tol)].
+**Mastra tool:** `evaluate_level_freshness` in `runtime/levelFreshnessDiagnostic.ts`.
+**Test coverage:** 22 tests — validation, touch detection (overlap edges, wick grazes, custom tolerance), window filtering, default window-end behavior, classification at edge counts, custom recycled threshold.
+**Plausible consumer:** any of Gordon's level-producing tools (`supply-demand-zones.ts`, `order-blocks.ts`, `fibonacci.ts`, `camarilla.ts`, `smc-patterns.ts`, future `marketProfile` extensions) can compose with LV2 to grade individual levels. Fresh → momentum/breakout setup territory; recycled → mean-reversion territory. Operator-shadow direct value: distinguishing fresh from recycled is a manual judgment call traders make constantly; a parameterized classifier surfaces it as a consistent observable.
+
+### Sequencing recommendation (LV stack)
+
+LV1 is a pre-scan gate (universe filtering). LV2 is a per-level grader (composes with existing level-extraction tools). Natural workflow:
+1. Universe scan → filter by LV1 (USD volume gate) → keep tradeable symbols only
+2. For each tradeable symbol, extract levels via existing tools (supply-demand-zones, order-blocks, etc.)
+3. For each candidate level, grade with LV2 (freshness) → routes setup type
+4. Combine with TM3 (market-breadth bias) for directional context
+
+Together with TM1-TM3 + D1-D2 + SC1, this completes the "pragmatic prop-trading discipline" surface in Gordon: liquidity filter (LV1) → level grading (LV2) → directional context (TM3) → sizing (D1) → revenge guard (D2) → in-flight management (TM1+TM2) → post-trade calibration (SC1 Brier on probabilistic outputs).
+
+---
+
 ## Market-making primitives (MM1) — deferred pending design partner
 
 Surfaced by the K (ctubio's Krypto-trading-bot) survey, which is a textbook C++ market-making engine forked from tribeca/HRP. K bundles fair-value microprice estimators, inventory-skewed quoting, multi-timescale EWMA bank, and 7 quote-mode dispatchers. None of these belong in Gordon today — the dual-edition ICP (sub-$2B systematic funds, smaller multi-strats, discretionary PMs) doesn't run continuous two-way quotes, so the entire engine is speculative without a crypto-native MM design partner (Wintermute / GSR / smaller DeFi MM firms). One sub-primitive (microprice) is structurally distinct enough to track separately because it has a *plausible* non-MM consumer.

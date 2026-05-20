@@ -191,6 +191,10 @@ export { revengeTradeGuardTools } from "./runtime/revengeTradeGuardDiagnostic.ts
 // Brier score — calibration metric for probability-emitting components.
 export { brierScoreTools } from "./runtime/brierScoreDiagnostic.ts";
 
+// Level-volume tactical primitives (LV1-LV2). Liquidity gate + level freshness.
+export { usdVolumeGateTools } from "./runtime/usdVolumeGateDiagnostic.ts";
+export { levelFreshnessTools } from "./runtime/levelFreshnessDiagnostic.ts";
+
 // Playbook tools (v0.7)
 export { playbookTools } from "./runtime/meta/playbook-tools.ts";
 
@@ -481,6 +485,8 @@ import { marketBreadthBiasTools } from "./runtime/marketBreadthBiasDiagnostic.ts
 import { hotStreakSizerTools } from "./runtime/hotStreakSizerDiagnostic.ts";
 import { revengeTradeGuardTools } from "./runtime/revengeTradeGuardDiagnostic.ts";
 import { brierScoreTools } from "./runtime/brierScoreDiagnostic.ts";
+import { usdVolumeGateTools } from "./runtime/usdVolumeGateDiagnostic.ts";
+import { levelFreshnessTools } from "./runtime/levelFreshnessDiagnostic.ts";
 import { playbookTools } from "./runtime/meta/playbook-tools.ts";
 import { playbookBacktestTools } from "./strategy/backtest/backtest-tools.ts";
 import { runtimeTools } from "./runtime/flow/runtime-tools.ts";
@@ -603,6 +609,8 @@ const _rawAllTools = {
   ...hotStreakSizerTools,
   ...revengeTradeGuardTools,
   ...brierScoreTools,
+  ...usdVolumeGateTools,
+  ...levelFreshnessTools,
   ...playbookTools,
   ...playbookBacktestTools,
   ...runtimeTools,
