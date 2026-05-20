@@ -195,6 +195,12 @@ export { brierScoreTools } from "./runtime/brierScoreDiagnostic.ts";
 export { usdVolumeGateTools } from "./runtime/usdVolumeGateDiagnostic.ts";
 export { levelFreshnessTools } from "./runtime/levelFreshnessDiagnostic.ts";
 
+// Goal-engineering primitives (GE1-GE3). Drafter + mandate linkage + deferred-actions log.
+// Companion to the existing /goal command in src/core/pipeline/goalMode.ts.
+export { goalDraftTools } from "./runtime/goalDraftDiagnostic.ts";
+export { goalMandateLinkTools } from "./runtime/goalMandateLinkDiagnostic.ts";
+export { goalDeferredActionsTools } from "./runtime/goalDeferredActionsDiagnostic.ts";
+
 // Playbook tools (v0.7)
 export { playbookTools } from "./runtime/meta/playbook-tools.ts";
 
@@ -487,6 +493,9 @@ import { revengeTradeGuardTools } from "./runtime/revengeTradeGuardDiagnostic.ts
 import { brierScoreTools } from "./runtime/brierScoreDiagnostic.ts";
 import { usdVolumeGateTools } from "./runtime/usdVolumeGateDiagnostic.ts";
 import { levelFreshnessTools } from "./runtime/levelFreshnessDiagnostic.ts";
+import { goalDraftTools } from "./runtime/goalDraftDiagnostic.ts";
+import { goalMandateLinkTools } from "./runtime/goalMandateLinkDiagnostic.ts";
+import { goalDeferredActionsTools } from "./runtime/goalDeferredActionsDiagnostic.ts";
 import { playbookTools } from "./runtime/meta/playbook-tools.ts";
 import { playbookBacktestTools } from "./strategy/backtest/backtest-tools.ts";
 import { runtimeTools } from "./runtime/flow/runtime-tools.ts";
@@ -611,6 +620,9 @@ const _rawAllTools = {
   ...brierScoreTools,
   ...usdVolumeGateTools,
   ...levelFreshnessTools,
+  ...goalDraftTools,
+  ...goalMandateLinkTools,
+  ...goalDeferredActionsTools,
   ...playbookTools,
   ...playbookBacktestTools,
   ...runtimeTools,

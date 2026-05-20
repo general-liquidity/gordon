@@ -1515,6 +1515,50 @@ Together with TM1-TM3 + D1-D2 + SC1, this completes the "pragmatic prop-trading 
 
 ---
 
+## Goal-engineering primitives (GE1–GE3)
+
+Surfaced by Greg Ceccarelli's "Goal Engineering" article (paired markdown goal+rider docs for autonomous coding work). Most of the article (11-phase TDD loop with named depth tests, posture as multi-bullet section, files-not-fields discipline, validation checklist) is either coding-agent-specific or already shipped in Gordon under different names — see `src/core/pipeline/goalMode.ts` which explicitly identifies as "trading-domain port of the `/goal` pattern that Codex, Claude Code, and Hermes have all shipped in 2026." Three primitives translated cleanly into Gordon's trading frame.
+
+### GE1. Goal drafter ✅ shipped
+
+**Module:** `src/core/pipeline/goalDraft.ts`. Flag `GORDON_GOAL_DRAFT`.
+**What:** Turns a vague operator intent ("make money this week") into a measurable goal in Gordon's existing parser grammar (`X until Y without Z`). Heuristic keyword detection maps intent to end-state vocabulary (`sharpe | winrate | trades | drawdown_under | checklist`); thresholds are derived from caller-supplied recent stats with a conservative improvement factor (e.g., Sharpe × 1.2 capped at 2.0; winrate + 5pp capped at 70%; drawdown × 0.8 for tighter cap; trade count × 2). Defaults to Sharpe when no keyword matches. Confidence rating reports how well the proposal could be grounded (high = keyword + stats, medium = one, low = neither).
+**Mastra tool:** `compose_goal_draft` in `runtime/goalDraftDiagnostic.ts`.
+**Test coverage:** 23 tests — validation, keyword detection for all 5 end-state types, threshold grounding (with and without recent stats), confidence levels across (keyword, stats) combinations, constraint passthrough, composed text grammar, horizon detection.
+**Behavior:** This tool does NOT set the goal. The operator reviews and uses `/goal <composed text>` to set it via the existing slash command.
+**Plausible consumer:** the existing `/goal` slash command could grow a `draft` sub-verb that calls this with context from observation history.
+
+### GE2. Goal-mandate linkage ✅ shipped
+
+**Module:** `src/core/pipeline/goalMandateLink.ts`. Flag `GORDON_GOAL_MANDATE_LINK`.
+**What:** Computes a SHA-256 hash + ISO snapshot timestamp + byte length of the active-mandate file at goal-set time, so the goal state can record which constraint set was in effect. Also exposes `detectMandateDrift(prior, current)` to flag whether the mandate was edited between when the goal was set and now (useful when resuming a paused goal).
+**Mastra tool:** `link_goal_to_mandate` in `runtime/goalMandateLinkDiagnostic.ts`. Reads the mandate file and computes the link; optional `priorLink` input triggers drift detection.
+**Test coverage:** 12 tests — validation, hash equivalence + difference, known SHA-256 vector for empty string, UTF-8 byte length, default snapshot timestamp, drift detection across path/content variations.
+**Plausible consumer:** `createGoalState` in `goalMode.ts` — when adding `linkedMandate?: MandateLink` as a field, call this to populate it at construction. Out of scope for this commit (would require touching `goalMode.ts` itself); shipped as a standalone primitive available when that wire-up happens.
+
+### GE3. Per-goal deferred-actions log ✅ shipped
+
+**Module:** `src/core/pipeline/goalDeferredActions.ts`. Flag `GORDON_GOAL_DEFERRED_ACTIONS`.
+**What:** Trading-domain port of the article's `V1-CANDIDATES.md` overflow valve, scoped to active goals. During a `/goal` session the operator surfaces an action or observation worth revisiting later but explicitly out of scope for the current goal — categorized as `feature | investigation | data | observation | strategy | other`. Persists to `~/.gordon/goal-deferred.jsonl` (overridable via `GORDON_GOAL_DEFERRED_PATH`).
+**Mastra tools:** `record_goal_deferred_action` (append) + `list_goal_deferred_actions` (filter by goalId / category / time window / tag) in `runtime/goalDeferredActionsDiagnostic.ts`.
+**Test coverage:** 21 tests — validation (min-length thresholds for action/rationale), defaults, filter semantics (AND across criteria), JSONL round-trip with re-validation, payload preview truncation.
+**Distinction from existing channels:**
+- `harness-deferred-wiring.md` = Gordon's own development-deferred items (developer-authored)
+- `agent-feedback.jsonl` = agent self-signaled stuck states
+- `MEMORY.md` = durable cross-session learnings
+- GE3 = operator-authored, per-goal, ephemeral (cleared with the goal it was scoped to)
+
+### Sequencing notes
+
+GE1+GE2+GE3 ship as standalone primitives. They don't modify `goalMode.ts` directly (the existing `/goal` command continues to work unchanged). Natural wire-up points for a future enhancement pass:
+- GE1 wired as a `/goal draft <intent>` sub-verb in `slashCommands.ts`
+- GE2 called inside `createGoalState` to stamp the link into `GoalState`
+- GE3 surfaced via a `/goal-deferred record/list` sub-verb
+
+Out of scope for the GE1-GE3 commit because each requires touching `goalMode.ts` or the slash dispatcher; should be added once an operator workflow validates the standalone primitives.
+
+---
+
 ## Market-making primitives (MM1) — deferred pending design partner
 
 Surfaced by the K (ctubio's Krypto-trading-bot) survey, which is a textbook C++ market-making engine forked from tribeca/HRP. K bundles fair-value microprice estimators, inventory-skewed quoting, multi-timescale EWMA bank, and 7 quote-mode dispatchers. None of these belong in Gordon today — the dual-edition ICP (sub-$2B systematic funds, smaller multi-strats, discretionary PMs) doesn't run continuous two-way quotes, so the entire engine is speculative without a crypto-native MM design partner (Wintermute / GSR / smaller DeFi MM firms). One sub-primitive (microprice) is structurally distinct enough to track separately because it has a *plausible* non-MM consumer.
