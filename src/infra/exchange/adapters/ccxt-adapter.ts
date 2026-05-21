@@ -50,6 +50,7 @@ import ccxt, {
   RateLimitExceeded,
 } from "ccxt";
 
+import { randomUUID } from "node:crypto";
 import type {
   Exchange,
   ExchangeExtended,
@@ -76,6 +77,15 @@ import type {
   WithdrawalResult,
   WithdrawalInfo,
   ExchangeWebSocket,
+  ExchangeDerivatives,
+  ExchangeMargin,
+  ExchangeAccountManagement,
+  ExchangeOrderManagement,
+  Position,
+  PositionSide,
+  MarginMode,
+  FundingRate,
+  FundingHistoryEntry,
 } from "../types.ts";
 import type { Candle } from "../../../types/index.ts";
 import { CcxtWebSocketImpl } from "./ccxt-websocket.ts";
@@ -260,7 +270,72 @@ function resolveCcxtClass(subId: string): new (config: Record<string, unknown>) 
   return klass as new (config: Record<string, unknown>) => CcxtBase;
 }
 
-export class CcxtAdapter implements ExchangeExtended {
+// ---------------------------------------------------------------------------
+// Client-order-id generation
+// ---------------------------------------------------------------------------
+
+/**
+ * Generate an idempotent client-order-id when the caller doesn't supply one.
+ *
+ * Per CCXT's order-creation guidance + Gordon's safety stack: every
+ * placeOrder call should carry a clientOrderId so retries (network blip,
+ * doom-loop, manual retry) are dedupable at the exchange. Without it,
+ * the same intent can produce two orders.
+ *
+ * Format: `gordon-<16-hex>` — within most exchanges' 32-char clientOrderId
+ * limit (Binance's is 36; Bybit, OKX, Kraken all 32+).
+ */
+function generateClientOrderId(): string {
+  return `gordon-${randomUUID().replace(/-/g, "").slice(0, 16)}`;
+}
+
+// ---------------------------------------------------------------------------
+// Position mapping
+// ---------------------------------------------------------------------------
+
+function ccxtPositionToPosition(p: Record<string, unknown>): Position {
+  const sideRaw = String(p.side ?? "long").toLowerCase();
+  const marginModeRaw = String(p.marginMode ?? "cross").toLowerCase();
+  return {
+    symbol: String(p.symbol ?? ""),
+    side: sideRaw === "short" ? "short" : "long",
+    contracts: Number(p.contracts ?? 0),
+    contractSize: Number(p.contractSize ?? 1),
+    entryPrice: Number(p.entryPrice ?? 0),
+    markPrice: Number(p.markPrice ?? 0),
+    notional: Number(p.notional ?? 0),
+    leverage: Number(p.leverage ?? 1),
+    liquidationPrice: p.liquidationPrice !== undefined && p.liquidationPrice !== null
+      ? Number(p.liquidationPrice)
+      : null,
+    marginMode: marginModeRaw === "isolated" ? "isolated" : "cross",
+    unrealizedPnl: Number(p.unrealizedPnl ?? 0),
+    percentage: Number(p.percentage ?? 0),
+    timestamp: Number(p.timestamp ?? Date.now()),
+  };
+}
+
+function ccxtFundingRateToFundingRate(f: Record<string, unknown>): FundingRate {
+  return {
+    symbol: String(f.symbol ?? ""),
+    fundingRate: Number(f.fundingRate ?? 0),
+    nextFundingRate: f.nextFundingRate !== undefined && f.nextFundingRate !== null
+      ? Number(f.nextFundingRate)
+      : null,
+    nextFundingTimestamp: f.nextFundingTimestamp !== undefined && f.nextFundingTimestamp !== null
+      ? Number(f.nextFundingTimestamp)
+      : null,
+    timestamp: Number(f.timestamp ?? Date.now()),
+  };
+}
+
+export class CcxtAdapter
+  implements
+    ExchangeExtended,
+    ExchangeDerivatives,
+    ExchangeMargin,
+    ExchangeAccountManagement,
+    ExchangeOrderManagement {
   protected client: CcxtBase;
   readonly exchangeId: ExchangeId;
   readonly displayName: string;
@@ -603,12 +678,42 @@ export class CcxtAdapter implements ExchangeExtended {
       const ccxtType = mapOrderTypeToCcxt(params.type);
       const side = params.side.toLowerCase() as "buy" | "sell";
       const symbol = toCcxtSymbol(params.symbol);
-      const amount = params.quantity ?? 0;
-      const price = params.price;
-      const ccxtParams: Record<string, unknown> = {};
+
+      // Precision normalization — CCXT v4 guidance: callers must normalize
+      // quantity + price to each exchange's lot-size / tick-size / min-notional
+      // before submission. Sending raw operator numbers triggers REJECTED
+      // orders or silent rounding. The helpers below noop gracefully when
+      // markets aren't loaded yet, so callers don't have to remember to
+      // loadMarkets() first.
+      let amount = params.quantity ?? 0;
+      let price = params.price;
+      try {
+        const markets = (this.client as unknown as { markets?: Record<string, unknown> }).markets;
+        if (!markets || Object.keys(markets).length === 0) {
+          await this.client.loadMarkets();
+        }
+        const c = this.client as unknown as {
+          amountToPrecision: (symbol: string, amount: number) => string;
+          priceToPrecision: (symbol: string, price: number) => string;
+        };
+        if (amount > 0) amount = Number(c.amountToPrecision(symbol, amount));
+        if (price !== undefined && price > 0) price = Number(c.priceToPrecision(symbol, price));
+      } catch {
+        // Markets not loadable or symbol unknown — fall through with raw
+        // numbers. CCXT will surface a clearer InvalidOrder error if the
+        // exchange rejects them, which the agent loop can route around.
+      }
+
+      // Idempotent retries — auto-generate a clientOrderId when caller
+      // doesn't supply one. Without this, network blips or doom-loop
+      // retries can place duplicate orders. (Bug fix vs the first CCXT
+      // adapter commit.)
+      const clientOrderId = params.newClientOrderId ?? generateClientOrderId();
+
+      const ccxtParams: Record<string, unknown> = { clientOrderId };
       if (params.stopPrice !== undefined) ccxtParams.stopPrice = params.stopPrice;
       if (params.timeInForce) ccxtParams.timeInForce = params.timeInForce;
-      if (params.newClientOrderId) ccxtParams.clientOrderId = params.newClientOrderId;
+
       const order = await this.client.createOrder(symbol, ccxtType, side, amount, price, ccxtParams);
       return ccxtOrderToOrder(order as unknown as Record<string, unknown>);
     });
@@ -799,6 +904,354 @@ export class CcxtAdapter implements ExchangeExtended {
         fee: fee?.cost !== undefined ? Number(fee.cost) : 0,
         status: String(rr.status ?? "pending"),
       };
+    });
+  }
+
+  // -------------------------------------------------------------------------
+  // ExchangeDerivatives — perps, futures, options
+  // -------------------------------------------------------------------------
+
+  async fetchFundingRate(symbol: string): Promise<FundingRate> {
+    return this.withCallTracking(async () => {
+      const ccxtClient = this.client as unknown as {
+        fetchFundingRate: (s: string) => Promise<unknown>;
+      };
+      const f = await ccxtClient.fetchFundingRate(toCcxtSymbol(symbol));
+      return ccxtFundingRateToFundingRate(f as Record<string, unknown>);
+    });
+  }
+
+  async fetchFundingRates(symbols?: string[]): Promise<FundingRate[]> {
+    return this.withCallTracking(async () => {
+      const ccxtClient = this.client as unknown as {
+        fetchFundingRates: (s?: string[]) => Promise<Record<string, unknown>>;
+      };
+      const ccxtSymbols = symbols?.map(toCcxtSymbol);
+      const rates = await ccxtClient.fetchFundingRates(ccxtSymbols);
+      return Object.values(rates).map((r) => ccxtFundingRateToFundingRate(r as Record<string, unknown>));
+    });
+  }
+
+  async fetchFundingHistory(
+    symbol: string,
+    since?: number,
+    limit = 100,
+  ): Promise<FundingHistoryEntry[]> {
+    return this.withCallTracking(async () => {
+      const ccxtClient = this.client as unknown as {
+        fetchFundingHistory: (s: string, since?: number, limit?: number) => Promise<unknown[]>;
+      };
+      const entries = await ccxtClient.fetchFundingHistory(toCcxtSymbol(symbol), since, limit);
+      return entries.map((e) => {
+        const ee = e as Record<string, unknown>;
+        return {
+          symbol: String(ee.symbol ?? ""),
+          amount: Number(ee.amount ?? 0),
+          currency: String(ee.code ?? ee.currency ?? ""),
+          timestamp: Number(ee.timestamp ?? 0),
+        };
+      });
+    });
+  }
+
+  async setLeverage(leverage: number, symbol: string): Promise<void> {
+    await this.withCallTracking(async () => {
+      const ccxtClient = this.client as unknown as {
+        setLeverage: (l: number, s: string) => Promise<unknown>;
+      };
+      await ccxtClient.setLeverage(leverage, toCcxtSymbol(symbol));
+    });
+  }
+
+  async setMarginMode(mode: MarginMode, symbol: string): Promise<void> {
+    await this.withCallTracking(async () => {
+      const ccxtClient = this.client as unknown as {
+        setMarginMode: (m: string, s: string) => Promise<unknown>;
+      };
+      await ccxtClient.setMarginMode(mode, toCcxtSymbol(symbol));
+    });
+  }
+
+  async fetchPosition(symbol: string): Promise<Position | null> {
+    return this.withCallTracking(async () => {
+      const ccxtClient = this.client as unknown as {
+        fetchPosition: (s: string) => Promise<unknown>;
+      };
+      const p = await ccxtClient.fetchPosition(toCcxtSymbol(symbol));
+      if (!p) return null;
+      return ccxtPositionToPosition(p as Record<string, unknown>);
+    });
+  }
+
+  async fetchPositions(symbols?: string[]): Promise<Position[]> {
+    return this.withCallTracking(async () => {
+      const ccxtClient = this.client as unknown as {
+        fetchPositions: (s?: string[]) => Promise<unknown[]>;
+      };
+      const ccxtSymbols = symbols?.map(toCcxtSymbol);
+      const positions = await ccxtClient.fetchPositions(ccxtSymbols);
+      return positions.map((p) => ccxtPositionToPosition(p as Record<string, unknown>));
+    });
+  }
+
+  async closePosition(symbol: string): Promise<Order> {
+    return this.withCallTracking(async () => {
+      const ccxtClient = this.client as unknown as {
+        closePosition?: (s: string) => Promise<unknown>;
+      };
+      if (typeof ccxtClient.closePosition === "function") {
+        const o = await ccxtClient.closePosition(toCcxtSymbol(symbol));
+        return ccxtOrderToOrder(o as Record<string, unknown>);
+      }
+      // Fallback: fetch position, place opposite-side market order for the
+      // full contracts amount. Most CCXT exchanges support this path.
+      const pos = await this.fetchPosition(symbol);
+      if (!pos || pos.contracts === 0) {
+        throw new Error(`No open position to close for ${symbol}`);
+      }
+      const closeSide = pos.side === "long" ? "SELL" : "BUY";
+      return this.placeOrder({
+        symbol,
+        side: closeSide,
+        type: "MARKET",
+        quantity: Math.abs(pos.contracts),
+      });
+    });
+  }
+
+  // -------------------------------------------------------------------------
+  // ExchangeMargin — borrow/repay/add-margin
+  // -------------------------------------------------------------------------
+
+  async addMargin(symbol: string, amount: number): Promise<{ symbol: string; amount: number }> {
+    return this.withCallTracking(async () => {
+      const ccxtClient = this.client as unknown as {
+        addMargin: (s: string, a: number) => Promise<unknown>;
+      };
+      const result = await ccxtClient.addMargin(toCcxtSymbol(symbol), amount);
+      const r = result as Record<string, unknown>;
+      return { symbol: String(r.symbol ?? symbol), amount: Number(r.amount ?? amount) };
+    });
+  }
+
+  async borrowCrossMargin(currency: string, amount: number): Promise<{ id: string; amount: number }> {
+    return this.withCallTracking(async () => {
+      const ccxtClient = this.client as unknown as {
+        borrowCrossMargin: (c: string, a: number) => Promise<unknown>;
+      };
+      const result = await ccxtClient.borrowCrossMargin(currency, amount);
+      const r = result as Record<string, unknown>;
+      return { id: String(r.id ?? ""), amount: Number(r.amount ?? amount) };
+    });
+  }
+
+  async borrowIsolatedMargin(
+    symbol: string,
+    currency: string,
+    amount: number,
+  ): Promise<{ id: string; amount: number }> {
+    return this.withCallTracking(async () => {
+      const ccxtClient = this.client as unknown as {
+        borrowIsolatedMargin: (s: string, c: string, a: number) => Promise<unknown>;
+      };
+      const result = await ccxtClient.borrowIsolatedMargin(toCcxtSymbol(symbol), currency, amount);
+      const r = result as Record<string, unknown>;
+      return { id: String(r.id ?? ""), amount: Number(r.amount ?? amount) };
+    });
+  }
+
+  async repayMargin(
+    currency: string,
+    amount: number,
+    symbol?: string,
+  ): Promise<{ id: string; amount: number }> {
+    return this.withCallTracking(async () => {
+      const ccxtClient = this.client as unknown as {
+        repayMargin: (c: string, a: number, s?: string) => Promise<unknown>;
+      };
+      const result = await ccxtClient.repayMargin(
+        currency,
+        amount,
+        symbol ? toCcxtSymbol(symbol) : undefined,
+      );
+      const r = result as Record<string, unknown>;
+      return { id: String(r.id ?? ""), amount: Number(r.amount ?? amount) };
+    });
+  }
+
+  // -------------------------------------------------------------------------
+  // ExchangeAccountManagement — sub-accounts + transfers
+  // -------------------------------------------------------------------------
+
+  async fetchAccounts(): Promise<Array<{ id: string; type: string; code?: string }>> {
+    return this.withCallTracking(async () => {
+      const ccxtClient = this.client as unknown as {
+        fetchAccounts: () => Promise<unknown[]>;
+      };
+      const accounts = await ccxtClient.fetchAccounts();
+      return accounts.map((a) => {
+        const aa = a as Record<string, unknown>;
+        return {
+          id: String(aa.id ?? ""),
+          type: String(aa.type ?? "spot"),
+          code: aa.code ? String(aa.code) : undefined,
+        };
+      });
+    });
+  }
+
+  async transfer(
+    currency: string,
+    amount: number,
+    fromAccount: string,
+    toAccount: string,
+  ): Promise<{ id: string; status: string }> {
+    return this.withCallTracking(async () => {
+      const ccxtClient = this.client as unknown as {
+        transfer: (c: string, a: number, f: string, t: string) => Promise<unknown>;
+      };
+      const result = await ccxtClient.transfer(currency, amount, fromAccount, toAccount);
+      const r = result as Record<string, unknown>;
+      return { id: String(r.id ?? ""), status: String(r.status ?? "pending") };
+    });
+  }
+
+  // -------------------------------------------------------------------------
+  // ExchangeOrderManagement — edit + batch
+  // -------------------------------------------------------------------------
+
+  async editOrder(orderId: string, params: OrderParams): Promise<Order> {
+    return this.withCallTracking(async () => {
+      const ccxtClient = this.client as unknown as {
+        editOrder: (
+          id: string,
+          symbol: string,
+          type: string,
+          side: string,
+          amount?: number,
+          price?: number,
+          params?: Record<string, unknown>,
+        ) => Promise<unknown>;
+      };
+      const ccxtType = mapOrderTypeToCcxt(params.type);
+      const side = params.side.toLowerCase() as "buy" | "sell";
+      const symbol = toCcxtSymbol(params.symbol);
+      const result = await ccxtClient.editOrder(
+        orderId,
+        symbol,
+        ccxtType,
+        side,
+        params.quantity,
+        params.price,
+        {},
+      );
+      return ccxtOrderToOrder(result as Record<string, unknown>);
+    });
+  }
+
+  async createOrders(orders: OrderParams[]): Promise<Order[]> {
+    return this.withCallTracking(async () => {
+      const ccxtClient = this.client as unknown as {
+        createOrders?: (orders: Array<Record<string, unknown>>) => Promise<unknown[]>;
+      };
+      // Use native batch if the exchange supports it; fall back to
+      // sequential placeOrder calls otherwise. (Many CCXT exchanges
+      // implement createOrders, but not all.)
+      if (typeof ccxtClient.createOrders === "function") {
+        const ccxtOrders = orders.map((o) => ({
+          symbol: toCcxtSymbol(o.symbol),
+          type: mapOrderTypeToCcxt(o.type),
+          side: o.side.toLowerCase(),
+          amount: o.quantity,
+          price: o.price,
+          params: {
+            ...(o.stopPrice !== undefined ? { stopPrice: o.stopPrice } : {}),
+            ...(o.timeInForce ? { timeInForce: o.timeInForce } : {}),
+            clientOrderId: o.newClientOrderId ?? generateClientOrderId(),
+          },
+        }));
+        const results = await ccxtClient.createOrders(ccxtOrders);
+        return results.map((r) => ccxtOrderToOrder(r as Record<string, unknown>));
+      }
+      const placed: Order[] = [];
+      for (const o of orders) {
+        placed.push(await this.placeOrder(o));
+      }
+      return placed;
+    });
+  }
+
+  async cancelOrders(orderIds: string[], symbol: string): Promise<void> {
+    await this.withCallTracking(async () => {
+      const ccxtSymbol = toCcxtSymbol(symbol);
+      const ccxtClient = this.client as unknown as {
+        cancelOrders?: (ids: string[], symbol?: string) => Promise<unknown>;
+      };
+      if (typeof ccxtClient.cancelOrders === "function") {
+        await ccxtClient.cancelOrders(orderIds, ccxtSymbol);
+        return;
+      }
+      // Sequential fallback
+      for (const id of orderIds) {
+        await this.client.cancelOrder(id, ccxtSymbol);
+      }
+    });
+  }
+
+  // -------------------------------------------------------------------------
+  // Capability introspection
+  // -------------------------------------------------------------------------
+
+  /**
+   * Return the exchange's `.features` object — CCXT's per-method capability
+   * map. Useful for "does this exchange support X?" checks before calling
+   * a method that might throw NotSupported.
+   *
+   * Example: adapter.supports("fetchPositions") returns true iff the
+   * underlying CCXT exchange implements fetchPositions.
+   */
+  getFeatures(): Record<string, unknown> | undefined {
+    return (this.client as unknown as { features?: Record<string, unknown> }).features;
+  }
+
+  /**
+   * Check whether the underlying CCXT exchange supports a unified method.
+   * Reads CCXT's `.has` map.
+   */
+  supports(method: string): boolean {
+    const has = (this.client as unknown as { has?: Record<string, unknown> }).has;
+    return Boolean(has?.[method]);
+  }
+
+  // -------------------------------------------------------------------------
+  // Pagination — explicit since/until support beyond Gordon's base Exchange interface
+  // -------------------------------------------------------------------------
+
+  async fetchTradeHistoryPaginated(
+    symbol: string,
+    since?: number,
+    limit?: number,
+    until?: number,
+  ): Promise<Trade[]> {
+    return this.withCallTracking(async () => {
+      const ccxtParams: Record<string, unknown> = {};
+      if (until !== undefined) ccxtParams.until = until;
+      const trades = await this.client.fetchMyTrades(toCcxtSymbol(symbol), since, limit, ccxtParams);
+      return trades.map((t) => ccxtTradeToTrade(t as unknown as Record<string, unknown>));
+    });
+  }
+
+  async fetchOrderHistoryPaginated(
+    symbol: string,
+    since?: number,
+    limit?: number,
+    until?: number,
+  ): Promise<Order[]> {
+    return this.withCallTracking(async () => {
+      const ccxtParams: Record<string, unknown> = {};
+      if (until !== undefined) ccxtParams.until = until;
+      const orders = await this.client.fetchClosedOrders(toCcxtSymbol(symbol), since, limit, ccxtParams);
+      return orders.map((o) => ccxtOrderToOrder(o as unknown as Record<string, unknown>));
     });
   }
 

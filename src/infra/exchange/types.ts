@@ -632,6 +632,128 @@ export interface Exchange {
   resetCircuitBreaker(): void;
 }
 
+// ============================================================================
+// Derivatives Types (CCXT-aligned)
+// ============================================================================
+
+/**
+ * Position side — long for buy-and-hold derivatives exposure, short for sell-first.
+ */
+export type PositionSide = "long" | "short";
+
+/**
+ * Margin mode for derivatives. Isolated caps loss to the position's own
+ * margin; cross shares the entire account's margin pool.
+ */
+export type MarginMode = "isolated" | "cross";
+
+/**
+ * Open position on a perpetual / future / option contract.
+ *
+ * Field semantics follow CCXT's unified Position structure:
+ * https://docs.ccxt.com/#/Manual?id=position-structure
+ */
+export interface Position {
+  symbol: string;
+  side: PositionSide;
+  contracts: number;
+  contractSize: number;
+  entryPrice: number;
+  markPrice: number;
+  notional: number;
+  leverage: number;
+  liquidationPrice: number | null;
+  marginMode: MarginMode;
+  unrealizedPnl: number;
+  /** Unrealized P&L as a percentage of position margin. */
+  percentage: number;
+  timestamp: number;
+}
+
+/**
+ * Current funding rate snapshot for a perp symbol.
+ *
+ * Field semantics follow CCXT's unified funding-rate structure.
+ */
+export interface FundingRate {
+  symbol: string;
+  fundingRate: number;
+  /** Next forecast funding rate (when the exchange exposes it). */
+  nextFundingRate: number | null;
+  nextFundingTimestamp: number | null;
+  timestamp: number;
+}
+
+/**
+ * Historical funding-rate accrual entry — usually one entry per funding
+ * interval the account was open for.
+ */
+export interface FundingHistoryEntry {
+  symbol: string;
+  amount: number;
+  currency: string;
+  timestamp: number;
+}
+
+// ============================================================================
+// Optional capability interfaces — implemented by exchanges that support them.
+// Gordon's native adapters may opt into these as separate work; CCXT-routed
+// adapters cover all 107 exchanges' worth of these surfaces via the unified API.
+// ============================================================================
+
+/**
+ * Derivatives surface — perps, futures, options. Covers funding rate
+ * reads, position management, leverage + margin-mode configuration, and
+ * atomic position-close.
+ */
+export interface ExchangeDerivatives {
+  fetchFundingRate(symbol: string): Promise<FundingRate>;
+  fetchFundingRates(symbols?: string[]): Promise<FundingRate[]>;
+  fetchFundingHistory(symbol: string, since?: number, limit?: number): Promise<FundingHistoryEntry[]>;
+  setLeverage(leverage: number, symbol: string): Promise<void>;
+  setMarginMode(mode: MarginMode, symbol: string): Promise<void>;
+  fetchPosition(symbol: string): Promise<Position | null>;
+  fetchPositions(symbols?: string[]): Promise<Position[]>;
+  closePosition(symbol: string): Promise<Order>;
+}
+
+/**
+ * Margin trading surface — borrow, repay, and add-margin-to-position
+ * operations. Cross vs isolated covered explicitly.
+ */
+export interface ExchangeMargin {
+  addMargin(symbol: string, amount: number): Promise<{ symbol: string; amount: number }>;
+  borrowCrossMargin(currency: string, amount: number): Promise<{ id: string; amount: number }>;
+  borrowIsolatedMargin(symbol: string, currency: string, amount: number): Promise<{ id: string; amount: number }>;
+  repayMargin(currency: string, amount: number, symbol?: string): Promise<{ id: string; amount: number }>;
+}
+
+/**
+ * Account management — sub-accounts + inter-account transfers (spot ↔
+ * futures, main ↔ subaccount, etc.). Used for funds movement that doesn't
+ * touch the broader withdraw surface.
+ */
+export interface ExchangeAccountManagement {
+  fetchAccounts(): Promise<Array<{ id: string; type: string; code?: string }>>;
+  transfer(
+    currency: string,
+    amount: number,
+    fromAccount: string,
+    toAccount: string,
+  ): Promise<{ id: string; status: string }>;
+}
+
+/**
+ * Advanced order management beyond place/cancel — edit, batch, and TWAP.
+ * Most exchanges support `editOrder` (often cheaper than cancel+re-place);
+ * batch ops vary widely; TWAP is niche.
+ */
+export interface ExchangeOrderManagement {
+  editOrder(orderId: string, params: OrderParams): Promise<Order>;
+  createOrders(orders: OrderParams[]): Promise<Order[]>;
+  cancelOrders(orderIds: string[], symbol: string): Promise<void>;
+}
+
 /**
  * Optional extended features that some exchanges support
  */

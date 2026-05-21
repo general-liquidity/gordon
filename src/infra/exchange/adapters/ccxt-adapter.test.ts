@@ -384,3 +384,385 @@ describe("ExchangeId routing — ccxt:* prefix", () => {
     expect(extractCcxtSubId("ccxt:bybit")).toBe("bybit");
   });
 });
+
+// =================== Tier 1 safety patches ===================
+
+describe("CcxtAdapter — precision normalization (safety)", () => {
+  it("placeOrder normalizes amount + price via CCXT's precision helpers", async () => {
+    let receivedAmount: number | undefined;
+    let receivedPrice: number | undefined;
+    const mock = makeMockClient({
+      markets: { "BTC/USDT": { precision: { amount: 6, price: 2 } } },
+      loadMarkets: async () => ({ "BTC/USDT": {} }),
+      amountToPrecision: (_symbol: string, amount: number) => amount.toFixed(6),
+      priceToPrecision: (_symbol: string, price: number) => price.toFixed(2),
+      createOrder: async (
+        symbol: string,
+        type: string,
+        side: string,
+        amount: number,
+        price?: number,
+      ) => {
+        receivedAmount = amount;
+        receivedPrice = price;
+        return {
+          id: "ord-1",
+          symbol,
+          type,
+          side,
+          amount,
+          price,
+          status: "open",
+          filled: 0,
+          cost: 0,
+        };
+      },
+    });
+    const adapter = CcxtAdapter.__forTesting("binance", mock);
+    await adapter.placeOrder({
+      symbol: "BTCUSDT",
+      side: "BUY",
+      type: "LIMIT",
+      quantity: 0.123456789,
+      price: 50000.999,
+    });
+    expect(receivedAmount).toBe(0.123457);
+    expect(receivedPrice).toBe(50001);
+  });
+
+  it("placeOrder auto-generates a clientOrderId when caller doesn't supply", async () => {
+    let receivedParams: Record<string, unknown> | undefined;
+    const mock = makeMockClient({
+      markets: { "BTC/USDT": {} },
+      loadMarkets: async () => ({ "BTC/USDT": {} }),
+      amountToPrecision: (_s: string, a: number) => String(a),
+      priceToPrecision: (_s: string, p: number) => String(p),
+      createOrder: async (
+        symbol: string,
+        type: string,
+        side: string,
+        amount: number,
+        price: number | undefined,
+        params?: Record<string, unknown>,
+      ) => {
+        receivedParams = params;
+        return {
+          id: "ord-1",
+          symbol,
+          type,
+          side,
+          amount,
+          price,
+          status: "open",
+          filled: 0,
+          cost: 0,
+        };
+      },
+    });
+    const adapter = CcxtAdapter.__forTesting("binance", mock);
+    await adapter.placeOrder({
+      symbol: "BTCUSDT",
+      side: "BUY",
+      type: "LIMIT",
+      quantity: 0.1,
+      price: 50000,
+    });
+    expect(receivedParams?.clientOrderId).toBeDefined();
+    expect(String(receivedParams?.clientOrderId)).toMatch(/^gordon-[0-9a-f]{16}$/);
+  });
+
+  it("placeOrder uses caller-supplied clientOrderId when present", async () => {
+    let receivedParams: Record<string, unknown> | undefined;
+    const mock = makeMockClient({
+      markets: { "BTC/USDT": {} },
+      loadMarkets: async () => ({ "BTC/USDT": {} }),
+      amountToPrecision: (_s: string, a: number) => String(a),
+      priceToPrecision: (_s: string, p: number) => String(p),
+      createOrder: async (
+        symbol: string,
+        type: string,
+        side: string,
+        amount: number,
+        price: number | undefined,
+        params?: Record<string, unknown>,
+      ) => {
+        receivedParams = params;
+        return {
+          id: "ord-1",
+          symbol,
+          type,
+          side,
+          amount,
+          price,
+          status: "open",
+          filled: 0,
+          cost: 0,
+        };
+      },
+    });
+    const adapter = CcxtAdapter.__forTesting("binance", mock);
+    await adapter.placeOrder({
+      symbol: "BTCUSDT",
+      side: "BUY",
+      type: "LIMIT",
+      quantity: 0.1,
+      price: 50000,
+      newClientOrderId: "my-custom-id-123",
+    });
+    expect(receivedParams?.clientOrderId).toBe("my-custom-id-123");
+  });
+});
+
+// =================== Tier 3 derivatives + margin + account + order-mgmt ===================
+
+describe("CcxtAdapter — derivatives (ExchangeDerivatives)", () => {
+  it("fetchFundingRate maps response", async () => {
+    const mock = makeMockClient({
+      fetchFundingRate: async (_symbol: string) => ({
+        symbol: "BTC/USDT:USDT",
+        fundingRate: 0.0001,
+        nextFundingRate: 0.00012,
+        nextFundingTimestamp: 1700000000000,
+        timestamp: 1699999000000,
+      }),
+    });
+    const adapter = CcxtAdapter.__forTesting("bybit", mock);
+    const r = await adapter.fetchFundingRate("BTCUSDT");
+    expect(r.fundingRate).toBe(0.0001);
+    expect(r.nextFundingRate).toBe(0.00012);
+  });
+
+  it("fetchPositions maps each position", async () => {
+    const mock = makeMockClient({
+      fetchPositions: async () => [
+        {
+          symbol: "BTC/USDT:USDT",
+          side: "long",
+          contracts: 0.5,
+          contractSize: 1,
+          entryPrice: 50000,
+          markPrice: 51000,
+          notional: 25500,
+          leverage: 10,
+          liquidationPrice: 45000,
+          marginMode: "isolated",
+          unrealizedPnl: 500,
+          percentage: 2.0,
+          timestamp: Date.now(),
+        },
+      ],
+    });
+    const adapter = CcxtAdapter.__forTesting("bybit", mock);
+    const positions = await adapter.fetchPositions();
+    expect(positions).toHaveLength(1);
+    expect(positions[0]!.side).toBe("long");
+    expect(positions[0]!.leverage).toBe(10);
+    expect(positions[0]!.marginMode).toBe("isolated");
+    expect(positions[0]!.unrealizedPnl).toBe(500);
+  });
+
+  it("fetchPosition returns null when none open", async () => {
+    const mock = makeMockClient({
+      fetchPosition: async () => null,
+    });
+    const adapter = CcxtAdapter.__forTesting("bybit", mock);
+    const p = await adapter.fetchPosition("BTCUSDT");
+    expect(p).toBeNull();
+  });
+
+  it("setLeverage + setMarginMode call through", async () => {
+    let leverageCall: { l?: number; s?: string } = {};
+    let modeCall: { m?: string; s?: string } = {};
+    const mock = makeMockClient({
+      setLeverage: async (l: number, s: string) => {
+        leverageCall = { l, s };
+      },
+      setMarginMode: async (m: string, s: string) => {
+        modeCall = { m, s };
+      },
+    });
+    const adapter = CcxtAdapter.__forTesting("bybit", mock);
+    await adapter.setLeverage(10, "BTCUSDT");
+    expect(leverageCall.l).toBe(10);
+    expect(leverageCall.s).toBe("BTC/USDT");
+    await adapter.setMarginMode("isolated", "BTCUSDT");
+    expect(modeCall.m).toBe("isolated");
+    expect(modeCall.s).toBe("BTC/USDT");
+  });
+
+  it("closePosition falls back to opposite-side market order when no native support", async () => {
+    let placedSide: string | undefined;
+    let placedAmount: number | undefined;
+    const mock = makeMockClient({
+      fetchPosition: async () => ({
+        symbol: "BTC/USDT:USDT",
+        side: "long",
+        contracts: 0.5,
+        contractSize: 1,
+        entryPrice: 50000,
+        markPrice: 51000,
+        notional: 25500,
+        leverage: 10,
+        liquidationPrice: 45000,
+        marginMode: "isolated",
+        unrealizedPnl: 500,
+        percentage: 2.0,
+        timestamp: Date.now(),
+      }),
+      markets: { "BTC/USDT": {} },
+      loadMarkets: async () => ({ "BTC/USDT": {} }),
+      amountToPrecision: (_s: string, a: number) => String(a),
+      priceToPrecision: (_s: string, p: number) => String(p),
+      createOrder: async (symbol: string, type: string, side: string, amount: number) => {
+        placedSide = side;
+        placedAmount = amount;
+        return { id: "close-1", symbol, type, side, amount, status: "closed", filled: amount, cost: 0 };
+      },
+    });
+    const adapter = CcxtAdapter.__forTesting("bybit", mock);
+    await adapter.closePosition("BTCUSDT");
+    expect(placedSide).toBe("sell");
+    expect(placedAmount).toBe(0.5);
+  });
+});
+
+describe("CcxtAdapter — margin (ExchangeMargin)", () => {
+  it("borrowCrossMargin calls through", async () => {
+    let received: { c?: string; a?: number } = {};
+    const mock = makeMockClient({
+      borrowCrossMargin: async (c: string, a: number) => {
+        received = { c, a };
+        return { id: "loan-1", amount: a };
+      },
+    });
+    const adapter = CcxtAdapter.__forTesting("bybit", mock);
+    const r = await adapter.borrowCrossMargin("USDT", 1000);
+    expect(received.c).toBe("USDT");
+    expect(received.a).toBe(1000);
+    expect(r.id).toBe("loan-1");
+    expect(r.amount).toBe(1000);
+  });
+
+  it("repayMargin includes symbol when supplied", async () => {
+    let received: { c?: string; a?: number; s?: string } = {};
+    const mock = makeMockClient({
+      repayMargin: async (c: string, a: number, s?: string) => {
+        received = { c, a, s };
+        return { id: "repay-1", amount: a };
+      },
+    });
+    const adapter = CcxtAdapter.__forTesting("bybit", mock);
+    await adapter.repayMargin("USDT", 500, "BTCUSDT");
+    expect(received.s).toBe("BTC/USDT");
+  });
+});
+
+describe("CcxtAdapter — account management", () => {
+  it("transfer calls through", async () => {
+    let received: { c?: string; a?: number; f?: string; t?: string } = {};
+    const mock = makeMockClient({
+      transfer: async (c: string, a: number, f: string, t: string) => {
+        received = { c, a, f, t };
+        return { id: "tx-1", status: "ok" };
+      },
+    });
+    const adapter = CcxtAdapter.__forTesting("bybit", mock);
+    const r = await adapter.transfer("USDT", 1000, "spot", "swap");
+    expect(received.f).toBe("spot");
+    expect(received.t).toBe("swap");
+    expect(r.id).toBe("tx-1");
+    expect(r.status).toBe("ok");
+  });
+});
+
+describe("CcxtAdapter — order management", () => {
+  it("createOrders uses native batch when available", async () => {
+    let receivedBatch: unknown[] | undefined;
+    const mock = makeMockClient({
+      markets: { "BTC/USDT": {}, "ETH/USDT": {} },
+      loadMarkets: async () => ({ "BTC/USDT": {}, "ETH/USDT": {} }),
+      amountToPrecision: (_s: string, a: number) => String(a),
+      priceToPrecision: (_s: string, p: number) => String(p),
+      createOrders: async (orders: unknown[]) => {
+        receivedBatch = orders;
+        return orders.map((_, i) => ({
+          id: `batch-${i}`,
+          symbol: "BTC/USDT",
+          side: "buy",
+          type: "limit",
+          status: "open",
+          price: 50000,
+          amount: 0.1,
+          filled: 0,
+          cost: 0,
+        }));
+      },
+    });
+    const adapter = CcxtAdapter.__forTesting("bybit", mock);
+    const results = await adapter.createOrders([
+      { symbol: "BTCUSDT", side: "BUY", type: "LIMIT", quantity: 0.1, price: 50000 },
+      { symbol: "ETHUSDT", side: "BUY", type: "LIMIT", quantity: 1, price: 3000 },
+    ]);
+    expect(receivedBatch?.length).toBe(2);
+    expect(results).toHaveLength(2);
+  });
+
+  it("createOrders falls back to sequential when native unavailable", async () => {
+    let createCalls = 0;
+    const mock = makeMockClient({
+      markets: { "BTC/USDT": {} },
+      loadMarkets: async () => ({ "BTC/USDT": {} }),
+      amountToPrecision: (_s: string, a: number) => String(a),
+      priceToPrecision: (_s: string, p: number) => String(p),
+      createOrder: async (symbol: string, type: string, side: string, amount: number) => {
+        createCalls++;
+        return { id: `seq-${createCalls}`, symbol, type, side, amount, status: "open", filled: 0, cost: 0 };
+      },
+    });
+    const adapter = CcxtAdapter.__forTesting("bybit", mock);
+    await adapter.createOrders([
+      { symbol: "BTCUSDT", side: "BUY", type: "LIMIT", quantity: 0.1, price: 50000 },
+      { symbol: "BTCUSDT", side: "SELL", type: "LIMIT", quantity: 0.1, price: 60000 },
+    ]);
+    expect(createCalls).toBe(2);
+  });
+
+  it("cancelOrders uses native batch when available", async () => {
+    let receivedIds: string[] | undefined;
+    const mock = makeMockClient({
+      cancelOrders: async (ids: string[]) => {
+        receivedIds = ids;
+        return {};
+      },
+    });
+    const adapter = CcxtAdapter.__forTesting("bybit", mock);
+    await adapter.cancelOrders(["1", "2", "3"], "BTCUSDT");
+    expect(receivedIds).toEqual(["1", "2", "3"]);
+  });
+});
+
+// =================== capability introspection ===================
+
+describe("CcxtAdapter — capability introspection", () => {
+  it("supports() reads CCXT's .has map", () => {
+    const mock = {
+      ...(makeMockClient() as Record<string, unknown>),
+      has: { fetchPositions: true, fetchFundingRate: false, withdraw: true },
+    };
+    const adapter = CcxtAdapter.__forTesting("bybit", mock);
+    expect(adapter.supports("fetchPositions")).toBe(true);
+    expect(adapter.supports("fetchFundingRate")).toBe(false);
+    expect(adapter.supports("withdraw")).toBe(true);
+    expect(adapter.supports("nonexistent")).toBe(false);
+  });
+
+  it("getFeatures returns the .features object", () => {
+    const features = { spot: { createOrder: { triggerPrice: true } } };
+    const mock = {
+      ...(makeMockClient() as Record<string, unknown>),
+      features,
+    };
+    const adapter = CcxtAdapter.__forTesting("bybit", mock);
+    expect(adapter.getFeatures()).toEqual(features);
+  });
+});
