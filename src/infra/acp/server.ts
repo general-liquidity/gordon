@@ -108,6 +108,15 @@ import {
   extractMultimodalPrompt,
   type MultimodalAttachment,
 } from "./content-translator.ts";
+import { installAcpPermissionHook } from "./permission-hook.ts";
+import { probeBudgetHalt, budgetSignalToStopReason } from "./token-budget.ts";
+import {
+  createAcpMcpClient,
+  closeAcpMcpClient,
+  getAcpMcpClient,
+} from "./mcp-spinup.ts";
+import { getSessionMcpServers } from "./mcp-bridge.ts";
+import { renderInlineTextPrompt, resolveVisionPath } from "./llm-vision.ts";
 
 // ---------------------------------------------------------------------------
 // Session state
@@ -293,6 +302,16 @@ export class GordonAcpAgent implements Agent {
     // v3: capture editor-forwarded MCP servers + reset per-session usage
     captureSessionMcpServers(sessionId, params.mcpServers);
     resetSessionUsage(sessionId);
+    // v3.5: spin up Mastra MCP client for the forwarded servers so tools
+    // are discovered. Tool registration with the executor agent is v3.6
+    // (requires dynamic-tool-registry support on the Mastra agent
+    // wrapper). The client is held per session and torn down on close.
+    const forwarded = getSessionMcpServers(sessionId);
+    if (forwarded.length > 0) {
+      // fire-and-forget — failure during MCP spin-up shouldn't block
+      // newSession from completing; the agent still runs with native tools.
+      void createAcpMcpClient(sessionId, forwarded);
+    }
     return { sessionId };
   }
 
@@ -310,6 +329,11 @@ export class GordonAcpAgent implements Agent {
     // v3: capture forwarded MCP servers + reset usage on resumed session
     captureSessionMcpServers(params.sessionId, params.mcpServers);
     resetSessionUsage(params.sessionId);
+    // v3.5: spin up MCP client for the (possibly different) forwarded set
+    const forwarded = getSessionMcpServers(params.sessionId);
+    if (forwarded.length > 0) {
+      void createAcpMcpClient(params.sessionId, forwarded);
+    }
     return {};
   }
 
@@ -332,8 +356,44 @@ export class GordonAcpAgent implements Agent {
 
     // v3: extract multimodal content — text + image/audio/resource attachments
     const multimodal = extractMultimodalPrompt(params);
-    const promptText = multimodal.text;
+    // v3.5: vision-LLM routing — inline-text mode wraps attachments as
+    // textual descriptors prepended to the prompt. content-block mode
+    // (deferred to v3.6) passes attachments verbatim to vision LLMs.
+    const visionPath = resolveVisionPath();
+    const promptText =
+      visionPath === "inline"
+        ? renderInlineTextPrompt(multimodal.text, multimodal.attachments)
+        : multimodal.text;
     const userTurn = { role: "user" as const, content: promptText };
+
+    // v3.5: token-budget probe at turn entry — if the cost tracker
+    // signals halt before the LLM even runs, return the appropriate
+    // stop reason without consuming budget.
+    const preTurnBudget = await probeBudgetHalt();
+    if (preTurnBudget.halt) {
+      const budgetStop = budgetSignalToStopReason(preTurnBudget);
+      if (budgetStop) {
+        return { stopReason: budgetStop };
+      }
+    }
+
+    // v3.5: install ACP permission hook so non-safety-critical tool
+    // gates surface as interactive editor prompts. Uninstalled in
+    // finally to avoid leaking across sessions.
+    let uninstallPermissionHook: (() => void) | null = null;
+    try {
+      const mod = await import("../../runtime/permissions/PermissionEngine.ts");
+      const engine = (mod as { getDefaultPermissionEngine?: () => unknown })
+        .getDefaultPermissionEngine?.();
+      if (engine && typeof (engine as { prependHook?: unknown }).prependHook === "function") {
+        uninstallPermissionHook = installAcpPermissionHook(
+          engine as Parameters<typeof installAcpPermissionHook>[0],
+          { sessionId: params.sessionId, connection: this.connection },
+        );
+      }
+    } catch {
+      // PermissionEngine not initialized in this process (test mode etc.) — skip
+    }
 
     try {
       const result = await this.promptHandler({
@@ -365,10 +425,25 @@ export class GordonAcpAgent implements Agent {
         }
       }
 
+      // v3.5: post-turn budget probe — if the cost tracker signaled
+      // halt during the turn, override end_turn with max_tokens.
+      if (result.stopReason === "end_turn") {
+        const postTurnBudget = await probeBudgetHalt();
+        if (postTurnBudget.halt) {
+          const budgetStop = budgetSignalToStopReason(postTurnBudget);
+          if (budgetStop) {
+            return { stopReason: budgetStop };
+          }
+        }
+      }
+
       return { stopReason: result.stopReason };
     } finally {
       if (session.pendingPrompt === controller) {
         session.pendingPrompt = null;
+      }
+      if (uninstallPermissionHook) {
+        try { uninstallPermissionHook(); } catch { /* non-fatal */ }
       }
     }
   }
@@ -380,7 +455,7 @@ export class GordonAcpAgent implements Agent {
 }
 
 // ---------------------------------------------------------------------------
-// Re-exports — v3 surface used by tests + downstream callers
+// Re-exports — v3 + v3.5 surface used by tests + downstream callers
 // ---------------------------------------------------------------------------
 
 export { requestAcpPermission, type GordonAcpPermissionVerdict } from "./permission-bridge.ts";
@@ -388,6 +463,21 @@ export { emitUsageUpdate, getSessionUsage, resetSessionUsage } from "./usage-tra
 export { captureSessionMcpServers, getSessionMcpServers } from "./mcp-bridge.ts";
 export { readTextFileViaAcp, writeTextFileViaAcp } from "./fs-bridge.ts";
 export { extractMultimodalPrompt, type MultimodalAttachment } from "./content-translator.ts";
+// v3.5
+export { installAcpPermissionHook } from "./permission-hook.ts";
+export { probeBudgetHalt, budgetSignalToStopReason } from "./token-budget.ts";
+export { createAcpMcpClient, getAcpMcpClient, closeAcpMcpClient, listAcpMcpTools } from "./mcp-spinup.ts";
+export {
+  resolveVisionPath,
+  renderInlineTextPrompt,
+  describeAttachment,
+  toAnthropicContentBlocks,
+  toOpenAIContentParts,
+  VISION_PATH_ENV,
+  type VisionPath,
+  type AnthropicContentBlock,
+  type OpenAIContentPart,
+} from "./llm-vision.ts";
 
 // ---------------------------------------------------------------------------
 // Helpers

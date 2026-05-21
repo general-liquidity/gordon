@@ -14,6 +14,13 @@
 import { loadConfig, saveConfig } from '../../infra/storage/config/config.ts';
 import { ExchangeFactory } from '../../infra/exchange/factory.ts';
 import type { ExchangeId, Exchange } from '../../infra/exchange/types.ts';
+import { isCcxtExchangeId } from '../../infra/exchange/types.ts';
+import {
+  ccxtExchangeRequiresPassphrase,
+  ccxtExchangeRequiresWallet,
+  getCcxtSetupInstructions,
+  getCcxtHelpFragment,
+} from '../../infra/exchange/ccxt-ux.ts';
 import type { MultiExchangeConfig, GordonConfig } from '../../types/index.ts';
 import { createModuleLogger } from '../../infra/logger/index.ts';
 import { refreshRuntimeCredentials } from '../../infra/runtime/credentialRefresh.ts';
@@ -123,8 +130,8 @@ export async function exchangeAdd(exchangeType: string, sandbox = false): Promis
     }
 
     const existingOfType = config.exchanges.filter((ex) => ex.type === type);
-    const needsPassphrase = type === 'coinbase';
-    const needsWallet = isWalletBasedExchange(type);
+    const needsPassphrase = type === 'coinbase' || ccxtExchangeRequiresPassphrase(type);
+    const needsWallet = isWalletBasedExchange(type) || ccxtExchangeRequiresWallet(type);
     const hasNativeAdapter = ExchangeFactory.hasNativeAdapter(type);
 
     const requiredFields = needsWallet
@@ -482,10 +489,16 @@ export async function exchangeCompare(symbol: string): Promise<ExchangeCommandRe
  * Check if an exchange uses wallet-based authentication
  */
 function isWalletBasedExchange(type: ExchangeId): boolean {
+  if (isCcxtExchangeId(type)) return ccxtExchangeRequiresWallet(type);
   return type === 'hyperliquid' || type === 'uniswap';
 }
 
 function getExchangeSetupInstructions(type: ExchangeId, sandbox = false): string {
+  // CCXT-routed exchanges have a generic instruction template (107
+  // exchanges, can't hand-roll a block per venue).
+  if (isCcxtExchangeId(type)) {
+    return getCcxtSetupInstructions(type, sandbox);
+  }
   const sandboxInstructions: Partial<Record<ExchangeId, string>> = {
     binance: `
 BINANCE TESTNET (paper trading, no real money)
@@ -644,7 +657,7 @@ export async function handleExchangeCommand(args: string): Promise<string> {
       if (subArgs.length === 0 || !subArgs[0]) {
         result = {
           success: false,
-          message: `Usage: /exchange add <type> [--sandbox]\nSupported types: ${ExchangeFactory.getSupportedExchanges().join(', ')}\n\nFor testnet/paper setups: /exchange add binance --sandbox`,
+          message: `Usage: /exchange add <type> [--sandbox]\nNative types: ${ExchangeFactory.getSupportedExchanges().join(', ')}\n\nCCXT-routed (107 exchanges): ccxt:bybit, ccxt:kucoin, ccxt:mexc, ccxt:crypto_com, ccxt:<any-ccxt-sub-id>\n\nFor testnet/paper setups: /exchange add binance --sandbox`,
         };
       } else {
         const isSandbox = subArgs.includes('--sandbox') || subArgs.includes('--paper') || subArgs.includes('--testnet');
@@ -697,7 +710,7 @@ export async function handleExchangeCommand(args: string): Promise<string> {
       if (!sandboxType) {
         result = {
           success: true,
-          message: `Paper/Testnet Setup — which exchange?\n\nSupported sandbox venues:\n  binance   → Binance Testnet (testnet.binance.vision)\n  coinbase  → Coinbase Advanced Trade Sandbox (cdp.coinbase.com)\n  okx       → OKX Demo Account\n  gemini    → Gemini Sandbox\n  hyperliquid → Hyperliquid Testnet\n  kraken    → Kraken Demo\n\nUsage: /exchange setup <type>\nExample: /exchange setup binance`,
+          message: `Paper/Testnet Setup — which exchange?\n\nSupported sandbox venues:\n  binance   → Binance Testnet (testnet.binance.vision)\n  coinbase  → Coinbase Advanced Trade Sandbox (cdp.coinbase.com)\n  okx       → OKX Demo Account\n  gemini    → Gemini Sandbox\n  hyperliquid → Hyperliquid Testnet\n  kraken    → Kraken Demo\n  ccxt:<sub-id> → CCXT setSandboxMode(true) — works on ~30 of CCXT's 107 exchanges; others silently no-op\n\nUsage: /exchange setup <type>\nExample: /exchange setup binance  OR  /exchange setup ccxt:bybit`,
         };
       } else {
         result = await exchangeAdd(sandboxType, true);
@@ -719,9 +732,11 @@ export async function handleExchangeCommand(args: string): Promise<string> {
   /exchange status              - Check connection status
   /exchange compare <symbol>    - Compare prices across exchanges
 
-Supported exchange types: ${ExchangeFactory.getSupportedExchanges().join(', ')}
+Native exchange types: ${ExchangeFactory.getSupportedExchanges().join(', ')}
 
 Paper trading venues: binance (testnet), coinbase (sandbox), okx (demo), gemini (sandbox), hyperliquid (testnet), kraken (demo)
+
+${getCcxtHelpFragment()}
 
 Aliases: /ex, /exchanges`,
       };

@@ -65,12 +65,19 @@ The editor drives the lifecycle:
 - **v3: token usage reporting** — `emitUsageUpdate` accumulates per-session totals + emits `usage_update` notifications with cumulative `promptTokens` / `completionTokens` / `totalTokens` / optional `costUsd`
 - **v3: initialize advertises `image: true`, `audio: true`** so editors will forward multimodal content items
 
-## What's DEFERRED to v3.5
+## V3.5 (shipped)
 
-- **Trust-trajectory persistence**: `allow_always` / `reject_always` outcomes from the ACP permission prompt currently inform Gordon's verdict but don't yet update `trustTrajectory` to auto-apply on subsequent calls. The `persist` flag in `GordonAcpPermissionVerdict` carries the intent.
-- **Gordon-side MCP-client spinup**: v3 captures + exposes editor-forwarded MCP server configs but doesn't yet instantiate Mastra MCP clients per server + register their tools with the agent registry. Tools currently see Gordon's own MCP-consumed tools, not the editor-forwarded ones.
-- **Multimodal LLM routing**: image/audio attachments are preserved in the `MultimodalAttachment[]` channel but the default prompt handler still passes only text to the LLM. Vision-capable models would receive the attachments verbatim with a small update to the handler.
-- **Permission-bridge wired to the tool execution path**: `requestAcpPermission` exists as a helper but Gordon's PermissionEngine isn't yet rerouted to call it. Tool calls that Gordon's internal gate would block still surface as failed `tool_call_update` notifications rather than interactive permission prompts. The bridge is ready; the runtime hookup is the missing piece.
+- **Permission hook wired to PermissionEngine.** `installAcpPermissionHook` registers via `prependHook` per prompt turn. Non-safety-critical tools that would otherwise need approval surface as interactive ACP `request_permission` prompts in the editor. Safety-critical tools (place_order, execute_plan, etc.) still hit Gordon's hard deny-list — editor approval is too thin a gate for those. Hook uninstalls in the finally block.
+- **Trust-trajectory persistence.** `allow_always` / `reject_always` outcomes record into `trustTrajectory` so subsequent calls short-circuit at the trust layer rather than re-prompting.
+- **Mastra MCP-client spin-up.** `createAcpMcpClient` instantiates a `@mastra/mcp` MCPClient at `newSession` / `loadSession` using the editor-forwarded `mcpServers` array. Stdio + HTTP + SSE transports supported; acp-type and unrecognized variants skip silently. `listAcpMcpTools(sessionId)` exposes discovered tools to the prompt handler. Full executor-agent dynamic tool registration is the remaining v3.6 piece.
+- **Vision-LLM routing — inline text path.** `extractMultimodalPrompt` returns `{ text, attachments }`; the default handler routes through `renderInlineTextPrompt` which prepends short attachment descriptors (`[image: image/png, ~12KB]`) before the user prompt so the LLM has context even on text-only models. `toAnthropicContentBlocks` / `toOpenAIContentParts` ready-to-use translators are exported for the v3.6 flip when Gordon's LLM client gains content-block support. Set `GORDON_ACP_VISION_PATH=blocks` to opt into the v3.6 path once it ships.
+- **Token-budget stop reasons.** `probeBudgetHalt` checks Gordon's cost tracker before AND after each prompt. When the daily budget is exhausted (or max-iterations signal arrives), the prompt returns `max_tokens` / `max_turn_requests` stop reasons so the editor knows to halt cleanly instead of looking like the agent stopped mid-thought.
+
+## V3.6+ (deferred)
+
+- **Executor-agent dynamic tool registration** from session-scoped MCP clients. v3.5 spins up the client; routing its tools into the agent surface needs Mastra-wrapper changes.
+- **LLM client content-block support.** Right now Gordon's LLM client accepts `Message[] = { role, content: string }`. v3.6 widens to accept content blocks so the `blocks` vision path becomes the default.
+- **Mastra-level token budget signals.** Gordon's iteration budget can fire mid-turn; surfacing that as `max_turn_requests` requires a signal channel from the orchestrator the ACP server can listen to.
 
 ## Pitfalls
 
