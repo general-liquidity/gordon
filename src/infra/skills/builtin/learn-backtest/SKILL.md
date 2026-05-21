@@ -1,6 +1,6 @@
 ---
 name: learn-backtest
-description: How to backtest strategies and validate results with credibility tests. When user asks "how do I backtest?", "is this backtest real?", "what's a credible Sharpe?", or about backtest validation
+description: How to backtest strategies and validate results with credibility tests including PSR, DSR, minTRL, CPCV, and Monte Carlo Permutation Test. When user asks "how do I backtest?", "is this backtest real?", "what's a credible Sharpe?", "MCPT", "permutation test", or about backtest validation
 tags: [learning, backtest, validation, credibility]
 user-invocable: true
 ---
@@ -26,7 +26,7 @@ A Sharpe of 2.0 looks amazing. But:
 - Are returns normally distributed? (Fat tails distort Sharpe)
 - Does it work out-of-sample? (Overfitting)
 
-## Gordon's 4 Credibility Tests
+## Gordon's 5 Credibility Tests
 
 After every backtest, run these to check if the result is real:
 
@@ -49,6 +49,14 @@ After every backtest, run these to check if the result is real:
 - Splits data into folds, tests each as out-of-sample
 - Purge gap prevents data leakage between train and test
 - PBO (Probability of Backtest Overfitting) > 50% → likely overfit
+
+### 5. Monte Carlo Permutation Test (MCPT)
+- Shuffles bars to destroy ordering while preserving marginal stats
+- Re-runs your optimizer on each shuffle → null-distribution of profit factors
+- Real PF must beat 99% of permutations (p < 0.01) to be statistically real
+- Catches data-mining bias that PSR/DSR/CPCV can miss
+- See `src/infra/trading/quant/mcpt.ts` and `barPermutation.ts`
+- Source: Masters (2020), Phosphen (2026)
 
 ## How to Use
 
