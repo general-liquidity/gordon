@@ -281,6 +281,17 @@ const LEGACY_SLASH_COMMANDS: SlashCommandSeed[] = [
     target: "planner",
   },
   {
+    name: "history",
+    aliases: ["ledger", "h"],
+    description: "Review the trade ledger (recent executions with rationale + state delta)",
+    usage: "/history [symbol] [limit] | /history show <id>",
+    category: "trading",
+    level: 1,
+    action: "tool",
+    target: "get_trade_history",
+    whenToUse: "Look back at execute_plan outcomes by symbol or fetch one record by id",
+  },
+  {
     name: "grid",
     aliases: ["g"],
     description: "Create a grid entry plan with multiple buy levels",

@@ -28,6 +28,7 @@ import { TradeSchema } from "../../../../types/trade.ts";
 import { emitEvent } from "../../../../events/index.ts";
 import { recordStructuredObservation } from "../../../platform/observability/index.ts";
 import { appendActionLogEntry } from "../../../action-log/index.ts";
+import { appendExecutionRecordFresh, isTradeLedgerEnabled, readExecutionRecords, getExecutionRecord, executionRecordToPayload } from "../../../safety/tradeLedger.ts";
 import { loadConfigBundle, saveResolvedConfig } from "../../../storage/config/config.ts";
 import { listPlans, getPlan, updatePlan, createPlan } from "../../../storage/entities/plans.ts";
 import { listTrades, getTrade } from "../../../storage/entities/trades.ts";
@@ -725,6 +726,38 @@ export const executePlanTool = createTool({
       } catch {
         // Non-critical — structured observation already captured this.
       }
+
+      // Trade ledger append (GORDON_TRADE_LEDGER). Projection of successful
+      // execute_plan outcomes into ~/.gordon/trade-ledger.jsonl for /history
+      // navigation. State snapshots are placeholder-empty for now — a future
+      // wire can capture pre/post account state via ctx.exchange.
+      if (isTradeLedgerEnabled()) {
+        try {
+          const trade = result.trade;
+          await appendExecutionRecordFresh({
+            planId,
+            symbol: trade.symbol,
+            rationale,
+            acknowledgedRisks,
+            operations: [{
+              action: "place_order" as const,
+              symbol: trade.symbol,
+              side: plan.direction === "long" ? "buy" as const : "sell" as const,
+              qty: plan.entry?.price ? plan.allocation.amount / plan.entry.price : undefined,
+              price: plan.entry?.price ?? undefined,
+              metadata: { tradeId: trade.id, planId },
+            }],
+            results: [{
+              operationIndex: 0,
+              status: "filled" as const,
+              brokerOrderId: trade.id,
+            }],
+          });
+        } catch {
+          // Non-critical — broker has canonical truth, ledger is local nav.
+        }
+      }
+
       return validateToolOutput(executePlanOutputSchema, {
         success: true,
         trade: result.trade,
@@ -1451,6 +1484,69 @@ export const executeWithAlgorithmTool = createTool({
  * Trading tools exported as an object for Mastra Agent
  * This is the format expected by Mastra's Agent class
  */
+// ============================================================================
+// Trade History (Ledger Navigation Tool)
+// ============================================================================
+
+const getTradeHistoryOutputSchema = z.object({
+  success: z.boolean(),
+  mode: z.enum(["list", "single", "empty"]),
+  count: z.number().optional(),
+  records: z.array(z.record(z.string(), z.unknown())).optional(),
+  record: z.record(z.string(), z.unknown()).optional(),
+  error: z.string().optional(),
+});
+
+export const getTradeHistoryTool = createTool({
+  id: "get_trade_history",
+  description:
+    "Navigate the trade ledger — recent execution records appended by execute_plan. " +
+    "Returns a list by default; pass `recordId` to fetch one full record envelope " +
+    "(including rationale, operations, results, and any state snapshots). Filter " +
+    "by `symbol` and bound with `limit` (default 10).",
+  inputSchema: z.object({
+    recordId: z.string().optional().describe("Fetch one specific record by id."),
+    symbol: z.string().optional().describe("Filter to records for this symbol."),
+    limit: z.number().int().positive().max(100).optional().describe("Max records to return (default 10)."),
+  }),
+  outputSchema: getTradeHistoryOutputSchema,
+  execute: async ({ recordId, symbol, limit }) => {
+    try {
+      if (recordId) {
+        const rec = await getExecutionRecord(recordId);
+        if (!rec) {
+          return validateToolOutput(getTradeHistoryOutputSchema, {
+            success: true,
+            mode: "empty" as const,
+            error: `No record with id ${recordId}`,
+          }, { toolName: "get_trade_history" });
+        }
+        return validateToolOutput(getTradeHistoryOutputSchema, {
+          success: true,
+          mode: "single" as const,
+          record: executionRecordToPayload(rec),
+        }, { toolName: "get_trade_history" });
+      }
+      const records = await readExecutionRecords({
+        symbol,
+        limit: limit ?? 10,
+      });
+      return validateToolOutput(getTradeHistoryOutputSchema, {
+        success: true,
+        mode: records.length === 0 ? "empty" as const : "list" as const,
+        count: records.length,
+        records: records.map(executionRecordToPayload),
+      }, { toolName: "get_trade_history" });
+    } catch (error) {
+      return validateToolOutput(getTradeHistoryOutputSchema, {
+        success: false,
+        mode: "empty" as const,
+        error: (error as Error).message,
+      }, { toolName: "get_trade_history" });
+    }
+  },
+});
+
 export const tradingTools = {
   create_plan: createPlanTool,
   execute_plan: executePlanTool,
@@ -1463,4 +1559,5 @@ export const tradingTools = {
   update_trailing_stop: updateTrailingStopTool,
   close_partial_position: closePartialPositionTool,
   execute_with_algorithm: executeWithAlgorithmTool,
+  get_trade_history: getTradeHistoryTool,
 };
