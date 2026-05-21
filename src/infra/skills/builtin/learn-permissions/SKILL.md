@@ -1,7 +1,6 @@
 ---
 name: learn-permissions
-description: How Gordon's permission system works — modes, rules, risk classifier, and approval flow
-when_to_use: When user asks "why did this need approval?", "permission modes", "how do I allow X?", or about the safety/approval system
+description: How Gordon's permission system works — modes, rules, risk classifier, and approval flow. When user asks "why did this need approval?", "permission modes", "how do I allow X?", or about the safety/approval system
 tags: [learning, permissions, safety, approval]
 user-invocable: true
 ---

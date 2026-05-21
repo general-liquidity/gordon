@@ -1,7 +1,6 @@
 ---
 name: learn-calibration
-description: Gordon's confidence calibration system — track whether your stated confidence matches actual accuracy
-when_to_use: When user asks about calibration, decision tracking, confidence stats, or "when I say X% confident, how often am I right?"
+description: Gordon's confidence calibration system — track whether your stated confidence matches actual accuracy. When user asks about calibration, decision tracking, confidence stats, or "when I say X% confident, how often am I right?"
 tags: [learning, calibration, confidence, decision-quality]
 user-invocable: true
 ---

@@ -1,7 +1,6 @@
 ---
 name: learn-memory
-description: How Gordon remembers — session memory, trade journal, GORDON.md, and durable facts
-when_to_use: When user asks "what do you remember?", "how do you persist context?", "what's GORDON.md?", or about Gordon's memory layers
+description: How Gordon remembers — session memory, trade journal, GORDON.md, and durable facts. When user asks "what do you remember?", "how do you persist context?", "what's GORDON.md?", or about Gordon's memory layers
 tags: [learning, memory, persistence, config]
 user-invocable: true
 ---

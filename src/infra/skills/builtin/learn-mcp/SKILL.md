@@ -1,7 +1,6 @@
 ---
 name: learn-mcp
-description: Learn how to browse the marketplace and install trading plugins
-when_to_use: When user asks "what MCP servers can I add?", "install a plugin", "browse marketplace", or about extending Gordon via Model Context Protocol
+description: Learn how to browse the marketplace and install trading plugins. When user asks "what MCP servers can I add?", "install a plugin", "browse marketplace", or about extending Gordon via Model Context Protocol
 tags: [learning, mcp, marketplace, plugins]
 user-invocable: true
 ---

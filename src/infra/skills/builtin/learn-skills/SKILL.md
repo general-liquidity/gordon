@@ -1,12 +1,11 @@
 ---
 name: learn-skills
-description: How to author Gordon skills following Anthropic's official SKILL.md standard — frontmatter, triggers, progressive disclosure
-when_to_use: When user asks "how do I make a skill?", "SKILL.md format", "build a custom workflow", "skill frontmatter", or about authoring Gordon skills
+description: How to author Gordon skills following Anthropic's official SKILL.md standard — single-field description with WHAT + WHEN + triggers, progressive disclosure. When user asks "how do I make a skill?", "SKILL.md format", "build a custom workflow", "skill frontmatter", or about authoring Gordon skills
 tags: [learning, skills, customization, anthropic-standard]
 user-invocable: true
 ---
 
-Skills are reusable trading workflows you write in markdown. Gordon loads them automatically when their `when_to_use` matches what the user is doing.
+Skills are reusable trading workflows you write in markdown. Gordon loads them automatically when their `description` matches what the user is doing.
 
 ## What is a Skill?
 
@@ -27,8 +26,7 @@ Gordon's skill loader follows the official Anthropic Agent Skills standard. Five
 ```markdown
 ---
 name: swing-check
-description: Walk through swing trade entry criteria before opening a position
-when_to_use: When user says "swing entry on X", "check before swing trade", or wants a pre-trade checklist
+description: Walk through swing trade entry criteria before opening a position. When user says "swing entry on X", "check before swing trade", or wants a pre-trade checklist
 arguments: [symbol]
 tags: [swing, risk, checklist]
 user-invocable: true
@@ -47,24 +45,28 @@ Before opening a swing trade on {symbol}:
 If all checks pass, show me the trade plan. If not, explain what's missing.
 ```
 
-## The two fields that decide if your skill ever runs
+## The one field that decides if your skill ever runs
 
-`description` (the WHAT) and `when_to_use` (the WHEN) are how Claude decides whether to load your skill. Get them wrong and the skill exists but is invisible.
+`description` is how Claude decides whether to load your skill. Get it wrong and the skill exists but is invisible.
+
+Per the Anthropic standard, `description` must contain three things in one field:
+
+`[WHAT it does] + [WHEN to use it] + [literal user trigger phrases]`
 
 **Bad descriptions (real examples from Anthropic's guide):**
 - "Helps with projects." — too vague
 - "Creates sophisticated multi-page documentation systems." — missing triggers
 - "Implements the Project entity model with hierarchical relationships." — too technical
 
-**Good descriptions follow:** `[What it does] + [When to use it] + [Key capabilities]`
+**Good descriptions** combine all three pieces in a single field. Compare:
 
-**Good `when_to_use` follows:** literal phrases users would actually say, in quotes.
-
-Compare:
-- ❌ "When user wants risk analysis" (topic keywords)
-- ✅ "When user asks 'am I too concentrated?', 'what's my exposure?', or wants a portfolio risk overview" (literal phrases)
+- ❌ "Portfolio risk assessment" (WHAT only — no WHEN, no triggers)
+- ❌ "When user wants risk analysis" (WHEN only — no WHAT)
+- ✅ "Portfolio risk assessment — check exposure, concentration, and drawdown status. When user asks 'am I too concentrated?', 'what's my exposure?', or 'how risky is my portfolio?'" (all three in one field)
 
 Quoted user phrases dramatically improve trigger reliability. Look at `learn-calibration` and `tutorial` in Gordon's builtin skills for in-repo examples.
+
+> **Schema note:** Earlier versions of Gordon used a separate `when_to_use` field. That schema has been migrated. The loader now only parses `description` — any `when_to_use` field in your SKILL.md is ignored. Put the WHEN content inside `description`, after a period.
 
 ## Where to Save Skills
 
@@ -79,8 +81,7 @@ Override order: **project > user > builtin** (same skill name).
 | Field | Required | Purpose |
 |---|---|---|
 | `name` | yes | What you type after `/`; must match folder name; kebab-case |
-| `description` | yes | The WHAT; surfaced in `/skills` list and typeahead; under 1024 chars |
-| `when_to_use` | recommended | The WHEN; quoted user phrases dramatically improve triggering |
+| `description` | yes | The WHAT + WHEN + triggers in one field; under 1024 chars |
 | `arguments` | optional | Placeholders like `{symbol}` that get replaced |
 | `tags` | optional | For organization; affects search/filter |
 | `user-invocable` | optional | Set `false` to hide from `/` menu (model-only) |

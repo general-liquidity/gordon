@@ -1,7 +1,6 @@
 ---
 name: learn-analysis
-description: Gordon's quantitative modules explained — from Hurst exponent to Black-Litterman
-when_to_use: When user asks "what analysis tools do you have?", "explain Hurst", "what's PSR?", or about a specific quantitative module
+description: Gordon's quantitative modules explained — from Hurst exponent to Black-Litterman. When user asks "what analysis tools do you have?", "explain Hurst", "what's PSR?", or about a specific quantitative module
 tags: [learning, analysis, quant, modules]
 user-invocable: true
 ---

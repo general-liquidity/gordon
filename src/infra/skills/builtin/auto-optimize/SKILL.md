@@ -1,7 +1,6 @@
 ---
 name: auto-optimize
-description: Autonomous strategy optimization — Gordon improves your strategy parameters overnight
-when_to_use: When user says "optimize my strategy", "tune parameters", "run optimization overnight", or wants autonomous strategy improvement
+description: Autonomous strategy optimization — Gordon improves your strategy parameters overnight. When user says "optimize my strategy", "tune parameters", "run optimization overnight", or wants autonomous strategy improvement
 arguments: [strategy, symbol]
 tags: [optimization, autonomous, strategy, backtest]
 user-invocable: true

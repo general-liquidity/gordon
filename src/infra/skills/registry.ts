@@ -140,11 +140,10 @@ export function buildSkillMetadataSection(agentName: string = "Gordon"): string 
 
   const lines = ["[GORDON_AVAILABLE_SKILLS]"];
   for (const skill of skills) {
-    // Concatenate description (WHAT) + whenToUse (WHEN) so the agent's
-    // trigger heuristic sees both. Previously this was an OR-fallback,
-    // which silently dropped whenToUse whenever description was non-empty.
-    const desc = [skill.description, skill.whenToUse].filter(Boolean).join(" — ");
-    lines.push(`- /${skill.id}: ${desc}`);
+    // Single-field description per Anthropic Agent Skills standard.
+    // Author is responsible for combining WHAT + WHEN + triggers in
+    // the description field directly.
+    lines.push(`- /${skill.id}: ${skill.description}`);
   }
   return lines.join("\n") + "\n";
 }

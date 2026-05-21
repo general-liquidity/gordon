@@ -1,7 +1,6 @@
 ---
 name: learn-commands
-description: Complete guide to Gordon's slash commands organized by category
-when_to_use: When user asks "what commands exist?", "what can you do?", "list slash commands", or wants a command reference
+description: Complete guide to Gordon's slash commands organized by category. When user asks "what commands exist?", "what can you do?", "list slash commands", or wants a command reference
 tags: [learning, commands, reference]
 user-invocable: true
 ---

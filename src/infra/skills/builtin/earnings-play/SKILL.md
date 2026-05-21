@@ -1,7 +1,6 @@
 ---
 name: earnings-play
-description: Pre-earnings analysis — fundamentals, historical moves, implied volatility, and trade plan
-when_to_use: When user says "trade earnings", "when does X report?", "earnings play on X", "pre-earnings setup", or wants implied vol analysis around earnings
+description: Pre-earnings analysis — fundamentals, historical moves, implied volatility, and trade plan. When user says "trade earnings", "when does X report?", "earnings play on X", "pre-earnings setup", or wants implied vol analysis around earnings
 arguments: [symbol]
 tags: [earnings, fundamentals, event, stocks]
 user-invocable: true

@@ -1,7 +1,6 @@
 ---
 name: quick-scan
-description: Fast market scan — top movers, trending coins, and actionable setups in 30 seconds
-when_to_use: When user says "what's pumping?", "top movers", "quick scan", "anything interesting?", or wants a fast market snapshot
+description: Fast market scan — top movers, trending coins, and actionable setups in 30 seconds. When user says "what's pumping?", "top movers", "quick scan", "anything interesting?", or wants a fast market snapshot
 arguments: [market]
 argument-hint: "crypto" or "stocks" (default: crypto)
 tags: [market, scan, discovery]

@@ -1,7 +1,6 @@
 ---
 name: learn-risk
-description: Learn how Gordon's 11-dimension risk classifier protects your capital
-when_to_use: When user asks "how does risk work?", "what's the risk classifier?", "why did my trade get blocked?", or about capital protection
+description: Learn how Gordon's 11-dimension risk classifier protects your capital. When user asks "how does risk work?", "what's the risk classifier?", "why did my trade get blocked?", or about capital protection
 tags: [learning, risk, safety]
 user-invocable: true
 ---

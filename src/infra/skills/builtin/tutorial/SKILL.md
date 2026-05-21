@@ -1,7 +1,6 @@
 ---
 name: tutorial
-description: Interactive walkthrough — learn Gordon by doing. Scan, analyze, plan, and trade step by step.
-when_to_use: When user is new to Gordon, asks "how does this work?", "show me around", or "tutorial"
+description: Interactive walkthrough — learn Gordon by doing. Scan, analyze, plan, and trade step by step. When user is new to Gordon, asks "how does this work?", "show me around", or "tutorial"
 tags: [learning, onboarding, tutorial]
 user-invocable: true
 ---

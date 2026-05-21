@@ -11,9 +11,13 @@
 
 export interface SkillFrontmatter {
   name?: string;
+  /**
+   * Single combined description: WHAT the skill does + WHEN to use it +
+   * literal user trigger phrases. Per Anthropic Agent Skills standard.
+   * Authors should write the WHEN content inline rather than in a
+   * separate field; the loader does not parse a `when_to_use` field.
+   */
   description?: string;
-  /** When the model should auto-invoke this skill. */
-  whenToUse?: string;
   /** Argument names the skill accepts. */
   arguments?: string | string[];
   /** Hint text shown in typeahead. */
@@ -41,10 +45,8 @@ export interface Skill {
   id: string;
   /** Display name (from frontmatter or directory name). */
   name: string;
-  /** Description for help/typeahead. */
+  /** Combined description (WHAT + WHEN + triggers). */
   description: string;
-  /** When the model should use this skill. */
-  whenToUse?: string;
   /** The prompt template body (markdown after frontmatter). */
   body: string;
   /** Parsed frontmatter. */

@@ -1,7 +1,6 @@
 ---
 name: learn-config
-description: How to configure Gordon — GORDON.md, settings layers, keybindings, and model aliases
-when_to_use: When user asks "how do I configure Gordon?", "where's GORDON.md?", "how do I change settings?", or about customization and keybindings
+description: How to configure Gordon — GORDON.md, settings layers, keybindings, and model aliases. When user asks "how do I configure Gordon?", "where's GORDON.md?", "how do I change settings?", or about customization and keybindings
 tags: [learning, config, settings, customization]
 user-invocable: true
 ---

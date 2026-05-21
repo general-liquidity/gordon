@@ -1,7 +1,6 @@
 ---
 name: swing-entry
-description: Complete swing trade entry checklist — regime detection through position sizing to order placement
-when_to_use: When user says "enter swing on X", "full setup check", "build a swing position", "complete entry checklist", or wants thorough swing trade workflow
+description: Complete swing trade entry checklist — regime detection through position sizing to order placement. When user says "enter swing on X", "full setup check", "build a swing position", "complete entry checklist", or wants thorough swing trade workflow
 arguments: [symbol]
 tags: [swing, entry, checklist, execution]
 user-invocable: true

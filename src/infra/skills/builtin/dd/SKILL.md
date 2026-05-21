@@ -1,7 +1,6 @@
 ---
 name: dd
-description: Full due diligence on a symbol — technicals, fundamentals, risk, and trade plan
-when_to_use: When user says "do DD on X", "deep dive X", "full analysis on X", "tell me everything about X", or wants thorough due diligence before trading
+description: Full due diligence on a symbol — technicals, fundamentals, risk, and trade plan. When user says "do DD on X", "deep dive X", "full analysis on X", "tell me everything about X", or wants thorough due diligence before trading
 arguments: [symbol]
 argument-hint: Symbol to analyze (e.g., BTC, ETH, AAPL)
 tags: [analysis, planning, risk]

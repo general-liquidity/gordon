@@ -1,7 +1,6 @@
 ---
 name: learn-finnhub
-description: Gordon's Finnhub integration — tools covering stocks, ETFs, mutual funds, indices, bonds, crypto, forex, and macro data
-when_to_use: When user asks "what stock data do you have?", "fundamentals on X?", "earnings calendar?", "analyst ratings on X", or about Finnhub integration
+description: Gordon's Finnhub integration — tools covering stocks, ETFs, mutual funds, indices, bonds, crypto, forex, and macro data. When user asks "what stock data do you have?", "fundamentals on X?", "earnings calendar?", "analyst ratings on X", or about Finnhub integration
 tags: [learning, finnhub, stocks, fundamentals, macro]
 user-invocable: true
 ---

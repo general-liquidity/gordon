@@ -45,7 +45,6 @@ function toFrontmatter(raw: Record<string, unknown>): SkillFrontmatter {
   return {
     name: raw.name as string | undefined,
     description: raw.description as string | undefined,
-    whenToUse: (raw.when_to_use ?? raw.whenToUse) as string | undefined,
     arguments: raw.arguments as string | string[] | undefined,
     argumentHint: (raw["argument-hint"] ?? raw.argumentHint) as string | undefined,
     allowedTools: (raw["allowed-tools"] ?? raw.allowedTools) as string[] | undefined,
@@ -76,7 +75,6 @@ export function loadSkillFromFile(filePath: string, source: SkillSource): Skill 
       id,
       name: fm.name ?? dirName,
       description: fm.description ?? "",
-      whenToUse: fm.whenToUse,
       body,
       frontmatter: fm,
       source,
