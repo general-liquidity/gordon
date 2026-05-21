@@ -95,6 +95,7 @@
     "@mastra/memory": "^1.4.0",
     "@mastra/observability": "^1.2.0",
     "@mastra/otel-exporter": "^1.0.2",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "@polkadot-agent-kit/sdk": "^2.1.5",
     "@rezi-ui/native": "^0.1.0-alpha.60",
     "@rezi-ui/node": "^0.1.0-alpha.60",
