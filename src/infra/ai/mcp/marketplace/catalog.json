@@ -907,6 +907,20 @@
       "pricing": "free",
       "pricingNote": "Free. Community-maintained. Swap + price + pool tracking MCPs available.",
       "toolCount": 10
+    },
+    {
+      "id": "openbb-workspace",
+      "name": "OpenBB Workspace MCP",
+      "description": "Bridge to OpenBB Workspace's browser session — inspect dashboards, fetch widget data, create widgets, manage tabs, register backends, instantiate apps. Local sidecar runs on 127.0.0.1:8787; binds only to localhost. Requires an active OpenBB Workspace browser session (pro.openbb.co or Enterprise self-hosted).",
+      "category": "research",
+      "transport": "http",
+      "endpoint": "http://127.0.0.1:8787/mcp",
+      "install": "curl -LsSf https://raw.githubusercontent.com/OpenBB-finance/workspace-mcp/main/scripts/run.sh | sh",
+      "credentials": [],
+      "docsUrl": "https://docs.openbb.co/agents/workspace-mcp-overview",
+      "pricing": "free",
+      "pricingNote": "Bridge is open-source + free. OpenBB Workspace itself: free tier at pro.openbb.co (cloud) or Enterprise paid (on-prem / private-cloud). Sidecar treats any connected client as trusted with read + mutation access to Workspace state — only connect locally on trusted machines.",
+      "toolCount": 18
     }
   ]
 }
