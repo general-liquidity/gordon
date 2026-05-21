@@ -15,6 +15,7 @@ import {
   determineWorkflowPhase,
 } from "./workflowPhase.ts";
 import { createModuleLogger } from "../../logger/index.ts";
+import { recordPhaseLLMCost } from "../../platform/costTracker.ts";
 
 const logger = createModuleLogger("thinking-phase");
 
@@ -222,6 +223,7 @@ export async function runThinkingPhase(
       },
     );
 
+    recordPhaseLLMCost(response.usage, route.model);
     const trace = response.content?.trim() ?? "";
     const thinkingDurationMs = Date.now() - callStart;
     logger.debug("Thinking phase complete", {

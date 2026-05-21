@@ -1,5 +1,11 @@
 import { describe, it, expect, beforeEach } from "bun:test";
-import { CostTracker, resetCostBudgetState } from "./costTracker.ts";
+import {
+  CostTracker,
+  resetCostBudgetState,
+  resetCostTracker,
+  getCostTracker,
+  recordPhaseLLMCost,
+} from "./costTracker.ts";
 import { getEventBus } from "../../events/bus.ts";
 import type { GordonEvent } from "../../events/types.ts";
 
@@ -205,5 +211,58 @@ describe("CostTracker — snapshot cacheRead visibility", () => {
     });
     const output = tracker.formatDisplay();
     expect(output).not.toContain("cacheRead:");
+  });
+});
+
+describe("recordPhaseLLMCost — workflow-phase cost recording", () => {
+  beforeEach(() => {
+    resetCostTracker();
+    resetCostBudgetState();
+  });
+
+  it("records token usage on the global tracker", () => {
+    const tracker = getCostTracker("phase-test-1");
+    recordPhaseLLMCost(
+      { promptTokens: 1000, completionTokens: 200 },
+      "claude-sonnet-4-5",
+    );
+    const snapshot = tracker.snapshot();
+    expect(snapshot.totalInputTokens).toBe(1000);
+    expect(snapshot.totalOutputTokens).toBe(200);
+    expect(snapshot.totalApiCalls).toBe(1);
+  });
+
+  it("uses 'unknown' when modelId is empty", () => {
+    const tracker = getCostTracker("phase-test-2");
+    recordPhaseLLMCost({ promptTokens: 50, completionTokens: 10 }, "");
+    const snapshot = tracker.snapshot();
+    expect(Object.keys(snapshot.models)).toContain("unknown");
+  });
+
+  it("no-ops when usage is undefined", () => {
+    const tracker = getCostTracker("phase-test-3");
+    recordPhaseLLMCost(undefined, "claude-sonnet-4-5");
+    const snapshot = tracker.snapshot();
+    expect(snapshot.totalApiCalls).toBe(0);
+  });
+
+  it("treats missing promptTokens / completionTokens as 0", () => {
+    const tracker = getCostTracker("phase-test-4");
+    recordPhaseLLMCost({}, "claude-sonnet-4-5");
+    const snapshot = tracker.snapshot();
+    expect(snapshot.totalInputTokens).toBe(0);
+    expect(snapshot.totalOutputTokens).toBe(0);
+    expect(snapshot.totalApiCalls).toBe(1); // still records the call
+  });
+
+  it("accumulates across multiple phase calls under the same model", () => {
+    const tracker = getCostTracker("phase-test-5");
+    recordPhaseLLMCost({ promptTokens: 500, completionTokens: 100 }, "claude-haiku-4-5");
+    recordPhaseLLMCost({ promptTokens: 800, completionTokens: 150 }, "claude-haiku-4-5");
+    recordPhaseLLMCost({ promptTokens: 200, completionTokens: 50 }, "claude-haiku-4-5");
+    const snapshot = tracker.snapshot();
+    expect(snapshot.totalInputTokens).toBe(1500);
+    expect(snapshot.totalOutputTokens).toBe(300);
+    expect(snapshot.totalApiCalls).toBe(3);
   });
 });

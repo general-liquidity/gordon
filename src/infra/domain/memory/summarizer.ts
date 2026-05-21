@@ -12,6 +12,7 @@ import type { Message, MessageRole } from "../../ai/llm/types.ts";
 import type { LLMClient } from "../../ai/llm/client.ts";
 import { createModuleLogger } from "../../logger/index.ts";
 import { resolveLegacyModelRouteForWorkflowPhase } from "../../agents/cognition/workflowPhase.ts";
+import { recordPhaseLLMCost } from "../../platform/costTracker.ts";
 import {
   INTEGRATION_GLOSSARY_MARKER,
   PROJECT_TRUTH_MARKER,
@@ -728,6 +729,7 @@ export class ConversationSummarizer {
       maxTokens: this.config.maxSummaryTokens,
     });
 
+    recordPhaseLLMCost(response.usage, route.model);
     return response.content;
   }
 
@@ -923,6 +925,7 @@ export class ConversationSummarizer {
       maxTokens: this.config.maxSummaryTokens,
     });
 
+    recordPhaseLLMCost(response.usage, route.model);
     return response.content;
   }
 

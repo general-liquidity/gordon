@@ -447,3 +447,36 @@ export function getCostTracker(sessionId?: string): CostTracker {
 export function resetCostTracker(): void {
   instance = null;
 }
+
+/**
+ * Record cost from a workflow-phase LLM call (compaction summarizer,
+ * critique phase, tool-free thinking phase) that doesn't go through the
+ * main orchestrator path.
+ *
+ * Closes the gap named in the Speakeasy framework comparison (May 2026)
+ * where Mastra's "background compression calls" land outside agent
+ * tracking — Gordon's `summarizer.ts`, `critiquePhase.ts`, and
+ * `thinkingPhase.ts` all fire `llm.chatWithConfig` directly. Without
+ * this helper their tokens stay invisible to `/cost`, the daily budget,
+ * and the cost:turn_delta event stream.
+ *
+ * Uses a structural `usage` type to avoid pulling `LLMResponse` from
+ * the `ai/llm/types.ts` module (would invert the platform/ → ai/llm
+ * layering). All errors swallowed — cost recording must never break a
+ * workflow phase.
+ */
+export function recordPhaseLLMCost(
+  usage: { promptTokens?: number; completionTokens?: number } | undefined,
+  modelId: string,
+): void {
+  if (!usage) return;
+  try {
+    getCostTracker().record({
+      modelId: modelId || "unknown",
+      inputTokens: usage.promptTokens ?? 0,
+      outputTokens: usage.completionTokens ?? 0,
+    });
+  } catch {
+    /* non-critical — cost recording must not break workflow phases */
+  }
+}

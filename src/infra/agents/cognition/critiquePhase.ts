@@ -11,6 +11,7 @@
 import type { GordonContext } from "../types.ts";
 import { resolveLegacyModelRouteForWorkflowPhase } from "./workflowPhase.ts";
 import { createModuleLogger } from "../../logger/index.ts";
+import { recordPhaseLLMCost } from "../../platform/costTracker.ts";
 import {
   isPlanRubricEnabled,
   emptyRubric,
@@ -86,6 +87,7 @@ export async function runCritiquePhase(
       },
     );
 
+    recordPhaseLLMCost(response.usage, route.model);
     const critique = response.content?.trim() ?? "";
     logger.debug("Critique phase complete", { critiqueLength: critique.length });
     return critique;
@@ -159,6 +161,7 @@ export async function runCritiqueWithRubric(
       },
     );
 
+    recordPhaseLLMCost(response.usage, route.model);
     const raw = response.content?.trim() ?? "";
     const parsed = parseCritiqueRubricJson(raw);
     if (!parsed) {
