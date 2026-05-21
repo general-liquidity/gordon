@@ -8,6 +8,7 @@
 
 import { recordToolCall } from "../../../platform/observability/metrics.ts";
 import { getGordonContext, type MastraExecutionContext } from "../types.ts";
+import { withResultSanitizer } from "./withResultSanitizer.ts";
 
 function getMastraExecutionContext(args: unknown[]): MastraExecutionContext | undefined {
   for (const arg of args) {
@@ -131,7 +132,12 @@ export function withToolsMetrics<T extends Record<string, { id: string; execute?
   const wrapped = {} as Record<string, unknown>;
 
   for (const [key, tool] of Object.entries(tools)) {
-    wrapped[key] = withToolMetrics(tool);
+    // Compose sanitizer (inner) + metrics (outer). Sanitizer runs first
+    // so injection patterns in tool results are redacted before metrics
+    // sees them; metrics records hit/miss accurately on the sanitized
+    // value. When GORDON_TOOL_RESULT_SANITIZE=0, withResultSanitizer is
+    // a pass-through and the original tool reference is returned.
+    wrapped[key] = withToolMetrics(withResultSanitizer(tool));
   }
 
   return wrapped as T;

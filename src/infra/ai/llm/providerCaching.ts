@@ -11,7 +11,9 @@
  *                to the system/message blocks that should be cached. A
  *                minimum of ~1024 input tokens is required for the cache
  *                breakpoint to take effect; shorter prefixes are silently
- *                uncached.
+ *                uncached. Supports two TTLs: default 5min (cheaper) and
+ *                opt-in 1h (survives `/clear` + short breaks, but cache
+ *                writes cost ~2x base input price per Anthropic pricing).
  *
  *  OpenAI      — AUTOMATIC. As long as the prefix of consecutive requests
  *                is byte-identical and ≥1024 tokens, OpenAI caches it
@@ -29,9 +31,46 @@
  *
  * For the Dedalus path, see `extra_body.system_blocks` wired in client.ts
  * — that's the OpenAI-compatible gateway pass-through.
+ *
+ * Cache TTL knob (GORDON_PROMPT_CACHE_TTL):
+ *
+ *   "5m" (default)  — Anthropic's default 5-minute ephemeral cache. Cheaper
+ *                     on writes (1x base input price for cache_creation).
+ *                     Right for active sessions where consecutive turns
+ *                     happen within minutes of each other.
+ *
+ *   "1h"            — Anthropic's extended 1-hour cache. Cache writes cost
+ *                     ~2x base input price, but reads stay at 0.1x. Right
+ *                     when operators frequently `/clear` and resume within
+ *                     an hour — the cache survives across sessions, saving
+ *                     full prefix reprocessing on the next `/new`. The
+ *                     cost-tracker's daily-budget event stream surfaces
+ *                     whether the 2x write cost is paying for itself.
+ *
+ * Adopted from Hermes Agent's v0.14 "cross-session 1h Claude prompt cache"
+ * pattern. Default 5m keeps Gordon cost-conservative; operators opt in to
+ * 1h when their usage pattern justifies it.
  */
 
 import type { DirectProviderName } from "../../runtime/providers/registry.ts";
+
+export const PROMPT_CACHE_TTL_ENV = "GORDON_PROMPT_CACHE_TTL";
+
+export type PromptCacheTtl = "5m" | "1h";
+
+/**
+ * Resolve the active cache TTL from environment. Accepts "5m" / "5min" /
+ * "300s" → "5m"; "1h" / "60m" / "3600s" → "1h"; anything else → "5m"
+ * default.
+ */
+export function resolvePromptCacheTtl(
+  env: NodeJS.ProcessEnv = process.env,
+): PromptCacheTtl {
+  const raw = env[PROMPT_CACHE_TTL_ENV]?.toLowerCase().trim();
+  if (!raw) return "5m";
+  if (raw === "1h" || raw === "60m" || raw === "3600s") return "1h";
+  return "5m";
+}
 
 /**
  * AI SDK `providerOptions` shape. Each provider reads its own key; keys
@@ -41,7 +80,7 @@ import type { DirectProviderName } from "../../runtime/providers/registry.ts";
  */
 export interface AiSdkProviderOptions {
   anthropic?: {
-    cacheControl?: { type: "ephemeral" };
+    cacheControl?: { type: "ephemeral"; ttl?: "5m" | "1h" };
   };
   openai?: Record<string, unknown>;
   google?: Record<string, unknown>;
@@ -54,13 +93,25 @@ export interface AiSdkProviderOptions {
  *
  * Returns `undefined` when the provider either has automatic caching (no
  * action needed) or requires a different API entirely.
+ *
+ * @param provider — the active LLM provider
+ * @param ttl      — cache TTL (5m default, 1h opt-in). Resolved from
+ *                   `GORDON_PROMPT_CACHE_TTL` env if not passed.
  */
-export function providerCacheHints(provider: DirectProviderName): AiSdkProviderOptions | undefined {
+export function providerCacheHints(
+  provider: DirectProviderName,
+  ttl: PromptCacheTtl = resolvePromptCacheTtl(),
+): AiSdkProviderOptions | undefined {
   switch (provider) {
-    case "anthropic":
-      return {
-        anthropic: { cacheControl: { type: "ephemeral" } },
-      };
+    case "anthropic": {
+      // Default 5m: omit ttl field entirely so the wire payload matches the
+      // pre-knob shape (Anthropic's ephemeral default is 5min). Only attach
+      // `ttl: "1h"` when explicitly opted in — keeps the cost-conservative
+      // path byte-identical to historical requests.
+      const cacheControl: { type: "ephemeral"; ttl?: "1h" } = { type: "ephemeral" };
+      if (ttl === "1h") cacheControl.ttl = "1h";
+      return { anthropic: { cacheControl } };
+    }
     case "openai":
     case "inception":
       // Automatic — stable prefix is cached transparently when ≥1024 tokens.
@@ -86,8 +137,9 @@ export function providerCacheHints(provider: DirectProviderName): AiSdkProviderO
 export function withProviderCacheHints<T extends Record<string, unknown>>(
   message: T,
   provider: DirectProviderName,
+  ttl: PromptCacheTtl = resolvePromptCacheTtl(),
 ): T {
-  const hints = providerCacheHints(provider);
+  const hints = providerCacheHints(provider, ttl);
   if (!hints) return message;
   const existing = (message.providerOptions ?? {}) as AiSdkProviderOptions;
   return {
