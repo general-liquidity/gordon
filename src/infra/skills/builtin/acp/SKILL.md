@@ -39,9 +39,9 @@ The editor drives the lifecycle:
 - `end_turn` — LLM finished, no more model requests
 - `cancelled` — `cancel` notification arrived OR re-prompt aborted the prior turn
 - `refusal` — Gordon errored out mid-turn; used in v1 in lieu of a generic "error" reason
-- `max_tokens` / `max_turn_requests` — not yet emitted in v2 (deferred to v3 with `usage_update`)
+- `max_tokens` / `max_turn_requests` — v3 emits `usage_update` notifications with cumulative totals; the editor can apply its own thresholds. Gordon doesn't return these stop reasons itself yet (deferred — needs Mastra-level token-budget signal).
 
-## What's WIRED (v2)
+## What's WIRED (v3)
 
 - Full protocol layer (initialize / authenticate / newSession / loadSession / setSessionMode / prompt / cancel)
 - `processMessageStream` orchestrator — executor + researcher handoffs, thinking phase, compaction, guardrails, full Mastra agent loop
@@ -58,14 +58,19 @@ The editor drives the lifecycle:
 - Session persistence to `~/.gordon/acp-sessions/<id>.jsonl` (one JSON-per-line, append-only, survives partial process crashes)
 - Cancelled turns NOT persisted — re-prompting starts fresh
 - `loadSession` rehydrates history from disk so editors can resume conversations across restarts
+- **v3: `session/request_permission` bridge** (`requestAcpPermission` helper) — emits the 4-option prompt (allow_once / allow_always / reject_once / reject_always), maps outcomes to Gordon verdicts (`approve` / `reject` / `cancelled` with persist flag)
+- **v3: editor-forwarded MCP servers** captured from `newSession` / `loadSession` `mcpServers` parameter, queryable via `getSessionMcpServers(sessionId)`
+- **v3: editor `fs/read_text_file` + `fs/write_text_file`** routed through `readTextFileViaAcp` / `writeTextFileViaAcp` helpers — prefer editor-fs when capable, fall back to Node fs on failure
+- **v3: multimodal content** — image / audio / resource items extracted via `extractMultimodalPrompt`, attachments preserved for downstream multimodal LLM passing, text channel still carries placeholder markers for text-only routing
+- **v3: token usage reporting** — `emitUsageUpdate` accumulates per-session totals + emits `usage_update` notifications with cumulative `promptTokens` / `completionTokens` / `totalTokens` / optional `costUsd`
+- **v3: initialize advertises `image: true`, `audio: true`** so editors will forward multimodal content items
 
-## What's DEFERRED to v3
+## What's DEFERRED to v3.5
 
-- `session/request_permission` bridged to Gordon's `riskClassifier` + `trustTrajectory` — currently permission gates stay internal to Gordon, surfaced to the editor as tool-call failures only
-- Editor's `fs/read_text_file`, `fs/write_text_file` consumed by Gordon as context for agentic file work
-- Editor-forwarded MCP servers (via the `mcpCapabilities.http` channel) consumed by Gordon at the tool layer
-- Image / audio content items
-- Token usage reporting via `usage_update`
+- **Trust-trajectory persistence**: `allow_always` / `reject_always` outcomes from the ACP permission prompt currently inform Gordon's verdict but don't yet update `trustTrajectory` to auto-apply on subsequent calls. The `persist` flag in `GordonAcpPermissionVerdict` carries the intent.
+- **Gordon-side MCP-client spinup**: v3 captures + exposes editor-forwarded MCP server configs but doesn't yet instantiate Mastra MCP clients per server + register their tools with the agent registry. Tools currently see Gordon's own MCP-consumed tools, not the editor-forwarded ones.
+- **Multimodal LLM routing**: image/audio attachments are preserved in the `MultimodalAttachment[]` channel but the default prompt handler still passes only text to the LLM. Vision-capable models would receive the attachments verbatim with a small update to the handler.
+- **Permission-bridge wired to the tool execution path**: `requestAcpPermission` exists as a helper but Gordon's PermissionEngine isn't yet rerouted to call it. Tool calls that Gordon's internal gate would block still surface as failed `tool_call_update` notifications rather than interactive permission prompts. The bridge is ready; the runtime hookup is the missing piece.
 
 ## Pitfalls
 

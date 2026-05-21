@@ -95,6 +95,19 @@ import {
   loadSessionTurns,
   sessionExists,
 } from "./sessions.ts";
+import {
+  captureSessionMcpServers,
+  dropSessionMcpServers,
+} from "./mcp-bridge.ts";
+import {
+  resetSessionUsage,
+  dropSessionUsage,
+  emitUsageUpdate,
+} from "./usage-tracker.ts";
+import {
+  extractMultimodalPrompt,
+  type MultimodalAttachment,
+} from "./content-translator.ts";
 
 // ---------------------------------------------------------------------------
 // Session state
@@ -120,6 +133,13 @@ interface SessionState {
 export interface PromptHandlerResult {
   stopReason: "end_turn" | "cancelled" | "refusal";
   assistantText: string;
+  /** Optional token delta for the turn — emitted as usage_update when present. */
+  usage?: {
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens?: number;
+    costUsd?: number;
+  };
 }
 
 /**
@@ -134,6 +154,8 @@ export interface PromptHandlerResult {
 export type PromptHandler = (args: {
   sessionId: string;
   prompt: string;
+  /** Non-text attachments (image/audio/resource) from the multimodal prompt. */
+  attachments?: MultimodalAttachment[];
   history: Array<{ role: "user" | "assistant"; content: string }>;
   signal: AbortSignal;
   connection: AgentSideConnection;
@@ -232,13 +254,18 @@ export class GordonAcpAgent implements Agent {
   }
 
   async initialize(_params: InitializeRequest): Promise<InitializeResponse> {
+    // v3 surface: enable image/audio prompt items so the editor will
+    // forward them — Gordon collects them via `extractMultimodalPrompt`
+    // and surfaces them to handlers as `attachments`. Full vision-LLM
+    // wiring is downstream of the handler signature, not the protocol
+    // declaration.
     return {
       protocolVersion: PROTOCOL_VERSION,
       agentCapabilities: {
         loadSession: true,
         promptCapabilities: {
-          image: false,
-          audio: false,
+          image: true,
+          audio: true,
           embeddedContext: true,
         },
         mcpCapabilities: {
@@ -257,12 +284,15 @@ export class GordonAcpAgent implements Agent {
     return {};
   }
 
-  async newSession(_params: NewSessionRequest): Promise<NewSessionResponse> {
+  async newSession(params: NewSessionRequest): Promise<NewSessionResponse> {
     const sessionId = newSessionId();
     this.sessions.set(sessionId, {
       pendingPrompt: null,
       history: [],
     });
+    // v3: capture editor-forwarded MCP servers + reset per-session usage
+    captureSessionMcpServers(sessionId, params.mcpServers);
+    resetSessionUsage(sessionId);
     return { sessionId };
   }
 
@@ -277,6 +307,9 @@ export class GordonAcpAgent implements Agent {
       pendingPrompt: null,
       history: turns.map((t) => ({ role: t.role, content: t.content })),
     });
+    // v3: capture forwarded MCP servers + reset usage on resumed session
+    captureSessionMcpServers(params.sessionId, params.mcpServers);
+    resetSessionUsage(params.sessionId);
     return {};
   }
 
@@ -297,13 +330,16 @@ export class GordonAcpAgent implements Agent {
     const controller = new AbortController();
     session.pendingPrompt = controller;
 
-    const promptText = extractPromptText(params);
+    // v3: extract multimodal content — text + image/audio/resource attachments
+    const multimodal = extractMultimodalPrompt(params);
+    const promptText = multimodal.text;
     const userTurn = { role: "user" as const, content: promptText };
 
     try {
       const result = await this.promptHandler({
         sessionId: params.sessionId,
         prompt: promptText,
+        attachments: multimodal.attachments,
         history: session.history,
         signal: controller.signal,
         connection: this.connection,
@@ -318,6 +354,15 @@ export class GordonAcpAgent implements Agent {
         const ts = Date.now();
         appendSessionTurn(params.sessionId, { ...userTurn, ts });
         appendSessionTurn(params.sessionId, { ...assistantTurn, ts });
+      }
+
+      // v3: emit usage_update if the handler reported token deltas
+      if (result.usage) {
+        try {
+          await emitUsageUpdate(this.connection, params.sessionId, result.usage);
+        } catch {
+          // Non-fatal — usage tracking shouldn't break the turn
+        }
       }
 
       return { stopReason: result.stopReason };
@@ -335,6 +380,16 @@ export class GordonAcpAgent implements Agent {
 }
 
 // ---------------------------------------------------------------------------
+// Re-exports — v3 surface used by tests + downstream callers
+// ---------------------------------------------------------------------------
+
+export { requestAcpPermission, type GordonAcpPermissionVerdict } from "./permission-bridge.ts";
+export { emitUsageUpdate, getSessionUsage, resetSessionUsage } from "./usage-tracker.ts";
+export { captureSessionMcpServers, getSessionMcpServers } from "./mcp-bridge.ts";
+export { readTextFileViaAcp, writeTextFileViaAcp } from "./fs-bridge.ts";
+export { extractMultimodalPrompt, type MultimodalAttachment } from "./content-translator.ts";
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
@@ -348,30 +403,9 @@ function newSessionId(): string {
     .join("");
 }
 
-/**
- * ACP PromptRequest contains a `prompt` array of content items. For v1
- * we flatten to text — image/audio handling lands in v2 when
- * promptCapabilities.image becomes true.
- */
-function extractPromptText(params: PromptRequest): string {
-  if (!params.prompt || !Array.isArray(params.prompt)) return "";
-  const texts: string[] = [];
-  for (const item of params.prompt) {
-    if (typeof item === "string") {
-      texts.push(item);
-      continue;
-    }
-    if (item && typeof item === "object") {
-      const obj = item as Record<string, unknown>;
-      if (obj.type === "text" && typeof obj.text === "string") {
-        texts.push(obj.text);
-      } else if (obj.type === "resource_link" && typeof obj.uri === "string") {
-        texts.push(`[file: ${obj.uri}]`);
-      }
-    }
-  }
-  return texts.join("\n");
-}
+// v3: extractPromptText replaced by extractMultimodalPrompt (re-exported above).
+// The wrapper-and-flatten path still exists internally via the
+// MultimodalPrompt.text field returned from extractMultimodalPrompt.
 
 // ---------------------------------------------------------------------------
 // Entry point — for the `gordon acp` CLI / `bun run` invocation
