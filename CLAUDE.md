@@ -16,7 +16,7 @@ It is **not** a coding agent. Most patterns from Claude Code's coding-agent desi
 | `src/infra/agents/tools/` | All Mastra tools, organized by domain (market, account, trading, news, …) |
 | `src/infra/agents/instrumentedTools.ts` | Single registration point — wraps every tool with metrics + spill |
 | `src/infra/agents/orchestrator.ts` | Stream processing, handoff tracking, TOOL_AGENT_MAP |
-| `src/infra/agents/sharedPrefixCache.ts` | Anthropic prompt-cache reuse across sub-agents |
+| `src/infra/agents/context/sharedPrefixCache.ts` | Anthropic prompt-cache reuse across sub-agents (see also `context/promptCacheAudit.ts`, `ai/llm/providerCaching.ts`, `runtime/kvCacheHitMetric.ts`) |
 | `src/infra/agents/thinkingPhase.ts` | Tool-free pre-action reasoning pass (separate LLM call) |
 | `src/infra/agents/extendedThinking.ts` | In-band Anthropic native `budget_tokens` helper |
 | `src/infra/agents/critiquePhase.ts` | Critique/refine pass at HIGH thinking depth |
