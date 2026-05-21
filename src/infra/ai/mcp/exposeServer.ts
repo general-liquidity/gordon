@@ -49,6 +49,9 @@
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { registerGordonResources } from "./resources.ts";
+import { registerGordonPrompts } from "./prompts.ts";
+import { buildTaskAnnotations } from "./tasks.ts";
 import type { ZodObject, ZodRawShape } from "zod";
 
 export const MCP_EXPOSE_FLAG_ENV = "GORDON_MCP_EXPOSE_SERVER";
@@ -144,11 +147,27 @@ export interface ExposeServerOptions {
    * tight allow-lists; defaults to "expose everything not denied".
    */
   allowList?: ReadonlyArray<string>;
+  /**
+   * v2: register Gordon's read-only resources alongside tools. Defaults
+   * to true. Operators can disable for minimal-surface deployments.
+   */
+  includeResources?: boolean;
+  /**
+   * v2: register Gordon's bundled skills as MCP prompts. Defaults to
+   * true. Disable for minimal-surface deployments.
+   */
+  includePrompts?: boolean;
 }
 
 export interface ExposureSummary {
   exposed: string[];
   denied: { id: string; reason: string }[];
+  /** v2: resource URIs registered alongside tools. */
+  resources?: string[];
+  /** v2: prompt names registered (one per bundled skill). */
+  prompts?: number;
+  /** v2: tools annotated with `execution.taskSupport`. */
+  taskAnnotations?: { required: number; optional: number };
 }
 
 // -------------------- adapter --------------------
@@ -244,18 +263,47 @@ export function buildGordonMcpServer(
 
   const { exposable, summary } = filterExposableTools(registry, options);
 
+  let requiredTaskCount = 0;
+  let optionalTaskCount = 0;
+
   for (const tool of exposable) {
     const fieldShape = tool.inputSchema.shape;
+    const taskAnnotations = buildTaskAnnotations(tool.id);
+    if (taskAnnotations?.execution?.taskSupport === "required") requiredTaskCount++;
+    if (taskAnnotations?.execution?.taskSupport === "optional") optionalTaskCount++;
+
+    // The SDK's typed registerTool config doesn't yet expose the
+    // `execution` field (v2025-11-25 spec is newer than the SDK types).
+    // Cast through unknown so the field lands on the wire; the SDK
+    // serializes unknown keys passthrough on the JSON-RPC envelope.
+    const config: Record<string, unknown> = {
+      description: tool.description,
+      inputSchema: fieldShape as Record<string, never>,
+    };
+    if (taskAnnotations) {
+      config.execution = taskAnnotations.execution;
+    }
     server.registerTool(
       tool.id,
-      {
-        description: tool.description,
-        inputSchema: fieldShape as Record<string, never>,
-      },
+      config as Parameters<typeof server.registerTool>[1],
       async (input: Record<string, unknown>) =>
         invokeAndAdapt(tool, input, options.execContext),
     );
   }
+
+  // v2: resources + prompts + task annotation accounting
+  let resourceSummary: { count: number; resources: string[] } = { count: 0, resources: [] };
+  let promptSummary: { count: number; prompts: Array<{ name: string }> } = { count: 0, prompts: [] };
+  if (options.includeResources !== false) {
+    resourceSummary = registerGordonResources(server);
+  }
+  if (options.includePrompts !== false) {
+    promptSummary = registerGordonPrompts(server);
+  }
+
+  summary.resources = resourceSummary.resources;
+  summary.prompts = promptSummary.count;
+  summary.taskAnnotations = { required: requiredTaskCount, optional: optionalTaskCount };
 
   return { server, summary };
 }
