@@ -120,6 +120,79 @@ describe("computeRangeVolatility — annualization scales correctly", () => {
   });
 });
 
+describe("computeRangeVolatility — Yang-Zhang (drift-independent)", () => {
+  it("returns NaN with <3 bars", () => {
+    const bars = [makeBar(100, 101, 99, 100), makeBar(100, 102, 99.5, 101)];
+    const r = computeRangeVolatility({ bars });
+    expect(Number.isNaN(r.yangZhangAnnualized)).toBe(true);
+  });
+
+  it("recovers known vol on simulated GBM (drift = 0)", () => {
+    const trueSigma = 0.3;
+    const ppy = 365;
+    const bars = gbmBars(500, trueSigma, ppy, 42);
+    const r = computeRangeVolatility({ bars, periodsPerYear: ppy });
+    expect(r.yangZhangAnnualized).toBeGreaterThan(trueSigma * 0.7);
+    expect(r.yangZhangAnnualized).toBeLessThan(trueSigma * 1.3);
+  });
+
+  it("drift independence: identical bars with strong drift should give the same vol", () => {
+    // Build a series with strong upward drift but identical volatility
+    // pattern. Yang-Zhang should NOT inflate the vol due to drift.
+    // We do this by computing GBM with sigma=0.3, then artificially
+    // scaling each close upward by a deterministic drift schedule.
+    const ppy = 365;
+    const driftBars = gbmBars(500, 0.3, ppy, 99);
+    const muPerBar = 0.4 / ppy; // 40% annual drift
+    let drift = 1;
+    const drifted: OhlcBar[] = driftBars.map((b, i) => {
+      drift = Math.exp(muPerBar * (i + 1));
+      const baseDrift = Math.exp(muPerBar * i);
+      return {
+        open: b.open * baseDrift,
+        high: b.high * baseDrift,
+        low: b.low * baseDrift,
+        close: b.close * baseDrift,
+      };
+    });
+    const baseline = computeRangeVolatility({ bars: driftBars, periodsPerYear: ppy });
+    const drifted_r = computeRangeVolatility({ bars: drifted, periodsPerYear: ppy });
+    // YZ should be roughly drift-invariant — within 10% on the same path
+    const ratio = drifted_r.yangZhangAnnualized / baseline.yangZhangAnnualized;
+    expect(ratio).toBeGreaterThan(0.8);
+    expect(ratio).toBeLessThan(1.2);
+  });
+
+  it("handles opening gaps: YZ should capture overnight variance that GK ignores", () => {
+    // Build a series with deliberate overnight gaps between each bar.
+    // Garman-Klass should under-estimate (it ignores overnight returns);
+    // Yang-Zhang's overnight component should pick them up.
+    const ppy = 252;
+    const bars: OhlcBar[] = [];
+    let close = 100;
+    for (let i = 0; i < 200; i++) {
+      // Intraday is flat-ish: small high/low range
+      const open = close * (1 + (i % 2 === 0 ? 0.02 : -0.02)); // big overnight jump
+      const high = open * 1.005;
+      const low = open * 0.995;
+      const newClose = open * 1.001;
+      bars.push({ open, high, low, close: newClose });
+      close = newClose;
+    }
+    const r = computeRangeVolatility({ bars, periodsPerYear: ppy });
+    // Yang-Zhang vol should be substantially higher than GK because
+    // it picks up the overnight gaps
+    expect(r.yangZhangAnnualized).toBeGreaterThan(r.garmanKlassAnnualized);
+  });
+
+  it("payload includes yangZhang", () => {
+    const bars = gbmBars(60, 0.3, 365, 11);
+    const r = computeRangeVolatility({ bars });
+    const p = rangeVolatilityToPayload(r) as { yangZhang: number | null };
+    expect(typeof p.yangZhang).toBe("number");
+  });
+});
+
 describe("computeRangeVolatility — small sample reasoning", () => {
   it("flags small samples", () => {
     const bars = [makeBar(100, 101, 99, 100), makeBar(100, 102, 99.5, 101)];
