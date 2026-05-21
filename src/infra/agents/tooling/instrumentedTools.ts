@@ -92,6 +92,7 @@ import {
   advancedTools,
   systematicTools,
   withToolsMetrics,
+  peerTools,
 } from "../tools/index.ts";
 import { evalTools } from "../../domain/evals/index.ts";
 import { executionCostTools } from "../tools/trading/execution-cost.ts";
@@ -119,6 +120,7 @@ export const instrumentedDiscoveryTools = withToolsMetrics(discoveryTools);
 export const instrumentedHistoryTools = withToolsMetrics(historyTools);
 export const instrumentedAccountTools = withToolsMetrics(accountTools);
 export const instrumentedTradingTools = withToolsMetrics(tradingTools);
+export const instrumentedPeerTools = withToolsMetrics(peerTools);
 export const instrumentedMarketAnalysisTools = withToolsMetrics(marketAnalysisTools);
 export const instrumentedLiquidationIntelligenceTools = withToolsMetrics(liquidationIntelligenceTools);
 export const instrumentedRiskManagementTools = withToolsMetrics(riskManagementTools);

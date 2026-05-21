@@ -53,6 +53,7 @@ export { discoveryTools } from "./news/discovery.ts";
 export { historyTools } from "./runtime/flow/history.ts";
 export { accountTools } from "./account/account.ts";
 export { tradingTools } from "./trading/trading.ts";
+export { peerTools } from "./peer/peer.ts";
 export { marketAnalysisTools } from "./market/market-analysis.ts";
 export { riskManagementTools } from "./trading/risk-management.ts";
 export { strategyTools } from "./strategy/strategies.ts";

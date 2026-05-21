@@ -9,6 +9,7 @@ import { composeAgentInstructions } from "../context/promptSections.ts";
 import { getRoutingToolsForAgent } from "../../runtime/routing/manager.ts";
 import {
   instrumentedTradingTools,
+  instrumentedPeerTools,
   instrumentedDiscoveryTools,
   instrumentedOrderbookTools,
   instrumentedAgentKitOnchainTools,
@@ -128,6 +129,7 @@ export function getExecutor(): Agent {
       set_trailing_stop: instrumentedTradingTools.set_trailing_stop,
       update_trailing_stop: instrumentedTradingTools.update_trailing_stop,
       close_partial_position: instrumentedTradingTools.close_partial_position,
+      delegate_to_peer: instrumentedPeerTools.delegate_to_peer,
       place_bracket_order: instrumentedDiscoveryTools.place_bracket_order,
       preview_market_order: instrumentedDiscoveryTools.preview_market_order,
       place_market_order: instrumentedDiscoveryTools.place_market_order,

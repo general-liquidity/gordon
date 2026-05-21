@@ -292,6 +292,17 @@ const LEGACY_SLASH_COMMANDS: SlashCommandSeed[] = [
     whenToUse: "Look back at execute_plan outcomes by symbol or fetch one record by id",
   },
   {
+    name: "delegate",
+    aliases: ["deleg"],
+    description: "Delegate a task to an external peer agent (cursor, warp)",
+    usage: "/delegate <peer> <prompt>",
+    category: "system",
+    level: 2,
+    action: "tool",
+    target: "delegate_to_peer",
+    whenToUse: "Hand off non-trading work to a coding agent (cursor) or cloud runner (warp)",
+  },
+  {
     name: "grid",
     aliases: ["g"],
     description: "Create a grid entry plan with multiple buy levels",
