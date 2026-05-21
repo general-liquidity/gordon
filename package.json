@@ -41,6 +41,7 @@
     "start": "bun run --silent src/index.tsx",
     "start:compiled": "GORDON_REACT_COMPILER=1 bun run --silent src/index.tsx",
     "dev": "bun --watch run src/index.tsx",
+    "acp": "bun run src/app/acp-entry.ts",
     "dev:compiled": "GORDON_REACT_COMPILER=1 bun --watch run src/index.tsx",
     "build": "bun scripts/build/build.ts",
     "build:binary": "bun scripts/build/build.ts --binary",
@@ -80,6 +81,7 @@
     "@tanstack/virtual-core": "3.13.18"
   },
   "dependencies": {
+    "@agentclientprotocol/sdk": "^0.22.1",
     "@ai-sdk/anthropic": "^1.0.0",
     "@ai-sdk/google": "^1.0.0",
     "@ai-sdk/openai": "^1.0.0",
