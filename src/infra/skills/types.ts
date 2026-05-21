@@ -38,6 +38,33 @@ export interface SkillFrontmatter {
   tags?: string[];
   /** Version string. */
   version?: string;
+  /**
+   * License name or reference to a bundled license file (agentskills.io spec).
+   * Optional. Useful when skills are published as standalone packages.
+   */
+  license?: string;
+  /**
+   * Environment requirements (intended product, system packages, network
+   * access). Max 500 chars per agentskills.io spec. Optional.
+   */
+  compatibility?: string;
+  /**
+   * Arbitrary key-value map per agentskills.io spec. Clients can store
+   * additional properties (author, version, last-updated, etc.) here.
+   * Nested object parsing supported in the loader.
+   */
+  metadata?: Record<string, string>;
+}
+
+/**
+ * Severity-tagged validation issue for a skill against the agentskills.io
+ * formal spec. ERRORs cause the loader to skip the skill; WARNINGs are
+ * logged but the skill still loads.
+ */
+export interface SkillValidationIssue {
+  severity: "error" | "warning";
+  field: string;
+  message: string;
 }
 
 export interface Skill {
@@ -55,6 +82,12 @@ export interface Skill {
   source: SkillSource;
   /** Full file path. */
   filePath: string;
+  /**
+   * Non-blocking validation warnings against the agentskills.io spec.
+   * ERRORs would have prevented loading; only WARN-level issues land here.
+   * Empty array means fully compliant.
+   */
+  validationWarnings?: SkillValidationIssue[];
 }
 
 export type SkillSource =
