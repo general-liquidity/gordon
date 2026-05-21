@@ -26,37 +26,46 @@ When Gordon is running in ACP mode (`bun acp` entry point, spawned as a subproce
 The editor drives the lifecycle:
 
 1. **Spawns Gordon** as a subprocess with stdio piped
-2. **`initialize`** — capability + version negotiation. Gordon declares: `loadSession: false`, `promptCapabilities.embeddedContext: true`, `mcpCapabilities: { http: true, sse: true }`
+2. **`initialize`** — capability + version negotiation. Gordon declares: `loadSession: true`, `promptCapabilities.embeddedContext: true`, `mcpCapabilities: { http: true, sse: true }`
 3. **`authenticate`** — no-op for Gordon (env-based provider keys)
 4. **`newSession`** — Gordon mints a 32-hex-char sessionId, fresh history map
-5. **`prompt`** — repeats per user turn. Gordon streams `agent_message_chunk` notifications via `session/update`, returns `stopReason` when done
-6. **`cancel`** — editor signals user pressed stop. Gordon aborts the in-flight prompt
-7. **Process exit** — editor closes stdin
+5. **`loadSession`** — Gordon rehydrates a previously-persisted session from `~/.gordon/acp-sessions/<id>.jsonl`
+6. **`prompt`** — repeats per user turn. Gordon routes through `processMessageStream` (full multi-agent orchestrator); each StreamEvent becomes one or more `session/update` notifications via `StreamTranslator`. Returns `stopReason` when done
+7. **`cancel`** — editor signals user pressed stop. Gordon aborts the in-flight prompt
+8. **Process exit** — editor closes stdin
 
 ## Stop reasons
 
 - `end_turn` — LLM finished, no more model requests
 - `cancelled` — `cancel` notification arrived OR re-prompt aborted the prior turn
 - `refusal` — Gordon errored out mid-turn; used in v1 in lieu of a generic "error" reason
-- `max_tokens` / `max_turn_requests` — not yet emitted in v1 (no token tracking in the ACP path)
+- `max_tokens` / `max_turn_requests` — not yet emitted in v2 (deferred to v3 with `usage_update`)
 
-## What's WIRED in v1
+## What's WIRED (v2)
 
-- Protocol layer (initialize / authenticate / newSession / prompt / cancel)
-- LLM text streaming as `agent_message_chunk` updates
-- Conversation history per session
-- Permission outcomes consumed (selected / cancelled)
-- Resource links in prompts surface as `[file: <uri>]` placeholders
+- Full protocol layer (initialize / authenticate / newSession / loadSession / setSessionMode / prompt / cancel)
+- `processMessageStream` orchestrator — executor + researcher handoffs, thinking phase, compaction, guardrails, full Mastra agent loop
+- `StreamTranslator` maps every Gordon StreamEvent to the right ACP `sessionUpdate` discriminator:
+  - `text_delta` → `agent_message_chunk`
+  - `thinking_delta` → `agent_thought_chunk`
+  - `tool_call_start` → `tool_call` (status pending, kind classified from tool-name prefix)
+  - `tool_call_end` → `tool_call_update` (status completed | failed; raw output forwarded)
+  - `agent_switch` → informational `agent_thought_chunk` ("[handoff → executor]")
+  - `done` → end_turn stop reason
+  - `cancelled` → cancelled stop reason
+  - `error` → error chunk + refusal stop reason
+- Tool-kind classification follows ACP's enum (`read` / `edit` / `delete` / `move` / `search` / `execute` / `think` / `fetch` / `switch_mode` / `other`) via a tool-name prefix heuristic
+- Session persistence to `~/.gordon/acp-sessions/<id>.jsonl` (one JSON-per-line, append-only, survives partial process crashes)
+- Cancelled turns NOT persisted — re-prompting starts fresh
+- `loadSession` rehydrates history from disk so editors can resume conversations across restarts
 
-## What's DEFERRED to v2
+## What's DEFERRED to v3
 
-- Full `processMessageStream` integration (multi-agent orchestrator with executor + researcher handoffs)
-- Tool calls bridged to ACP `tool_call` + `tool_call_update` notifications
-- `session/request_permission` bridged to Gordon's `riskClassifier` + `trustTrajectory`
-- Editor's `fs/read_text_file`, `fs/write_text_file` consumed for context
-- Session persistence (the `loadSession` capability is currently `false`)
+- `session/request_permission` bridged to Gordon's `riskClassifier` + `trustTrajectory` — currently permission gates stay internal to Gordon, surfaced to the editor as tool-call failures only
+- Editor's `fs/read_text_file`, `fs/write_text_file` consumed by Gordon as context for agentic file work
+- Editor-forwarded MCP servers (via the `mcpCapabilities.http` channel) consumed by Gordon at the tool layer
 - Image / audio content items
-- Token usage reporting
+- Token usage reporting via `usage_update`
 
 ## Pitfalls
 
@@ -70,7 +79,7 @@ The editor drives the lifecycle:
 
 5. **Capability lies are caught.** If Gordon's initialize says `promptCapabilities.image: false` but Gordon accidentally tries to handle image content, the editor may have already filtered it. Don't claim capabilities you don't implement.
 
-6. **Session history is in-memory.** No persistence across process restarts. `loadSession: false` in initialize confirms this to the editor; calling `loadSession` throws.
+6. **Session history persists to disk.** `~/.gordon/acp-sessions/<id>.jsonl`, append-only JSONL. Override the directory via `GORDON_ACP_SESSIONS_PATH`. The editor can call `loadSession` with any previously-seen sessionId to resume; missing sessions throw.
 
 ## Verification
 

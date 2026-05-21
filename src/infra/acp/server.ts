@@ -87,7 +87,14 @@ import {
   type LoadSessionResponse,
 } from "@agentclientprotocol/sdk";
 import { Readable, Writable } from "node:stream";
-import { createLLMClientFromEnv, type LLMClient } from "../ai/llm/index.ts";
+import { processMessageStream } from "../agents/orchestrator.ts";
+import { getAcpGordonContext } from "./context.ts";
+import { StreamTranslator } from "./stream-translator.ts";
+import {
+  appendSessionTurn,
+  loadSessionTurns,
+  sessionExists,
+} from "./sessions.ts";
 
 // ---------------------------------------------------------------------------
 // Session state
@@ -105,33 +112,101 @@ interface SessionState {
 // ---------------------------------------------------------------------------
 
 /**
- * Internal hook for testing: given user text + history, produce text chunks
- * for the agent to stream. Production wires this to Gordon's LLM client.
+ * Result of a prompt turn from the handler's perspective. Holds the
+ * stop reason + the assistant text that should be persisted to session
+ * history. Notifications are sent by the handler directly via the
+ * AgentSideConnection passed in.
  */
-export type PromptHandler = (
-  prompt: string,
-  history: Array<{ role: "user" | "assistant"; content: string }>,
-  signal: AbortSignal,
-) => AsyncGenerator<string, void, void>;
+export interface PromptHandlerResult {
+  stopReason: "end_turn" | "cancelled" | "refusal";
+  assistantText: string;
+}
 
 /**
- * Default prompt handler — uses Gordon's LLM client.
+ * Handler for a single prompt turn. Implementations call
+ * `connection.sessionUpdate(...)` for each notification they want to
+ * emit, and return the stop reason + accumulated assistant text.
  *
- * V1: makes a single non-streaming LLM call, returns the full result as
- * one chunk. V2 will switch to streaming once the orchestrator's
- * processMessageStream is wired up — at that point chunks correspond to
- * real text deltas from the underlying provider.
+ * Production wires this to `processMessageStream` + `StreamTranslator`
+ * (defaultPromptHandler below). Tests inject simpler handlers that
+ * exercise specific protocol paths without spinning up the orchestrator.
  */
-function defaultPromptHandler(llm: LLMClient): PromptHandler {
-  return async function* (prompt, history, signal) {
-    if (signal.aborted) return;
-    const messages = [
-      ...history.map((h) => ({ role: h.role, content: h.content })),
-      { role: "user" as const, content: prompt },
-    ];
-    const response = await llm.chat(messages);
-    if (signal.aborted) return;
-    yield response.content;
+export type PromptHandler = (args: {
+  sessionId: string;
+  prompt: string;
+  history: Array<{ role: "user" | "assistant"; content: string }>;
+  signal: AbortSignal;
+  connection: AgentSideConnection;
+}) => Promise<PromptHandlerResult>;
+
+/**
+ * Default production prompt handler.
+ *
+ * Routes through Gordon's full multi-agent orchestrator
+ * (processMessageStream) so the ACP-spawned Gordon gets:
+ *   - executor + researcher agent handoffs
+ *   - tool calls with permission flow
+ *   - thinking phase
+ *   - cost tracking
+ *   - all middleware (compaction, guardrails, etc.)
+ *
+ * Each StreamEvent translates to one or more ACP notifications via
+ * StreamTranslator. Terminal events (done / cancelled / error) end the
+ * loop with the matching stop reason.
+ */
+function defaultPromptHandler(): PromptHandler {
+  return async function defaultHandler({
+    sessionId,
+    prompt,
+    history: _history,
+    signal,
+    connection,
+  }): Promise<PromptHandlerResult> {
+    const context = await getAcpGordonContext();
+    // Use the ACP sessionId as the Mastra threadId so conversations
+    // resume correctly when loadSession is honored.
+    const threadId = `acp-${sessionId}`;
+    const resourceId = `acp-${sessionId}`;
+    const translator = new StreamTranslator();
+    let assistantText = "";
+    let stopReason: PromptHandlerResult["stopReason"] = "end_turn";
+
+    try {
+      for await (const event of processMessageStream(prompt, context, threadId, resourceId, { signal })) {
+        if (signal.aborted) {
+          stopReason = "cancelled";
+          break;
+        }
+        const translated = translator.translate(event);
+        for (const update of translated.updates) {
+          await connection.sessionUpdate({
+            sessionId,
+            update: update as Parameters<typeof connection.sessionUpdate>[0]["update"],
+          });
+        }
+        if (translated.textForHistory) assistantText += translated.textForHistory;
+        if (translated.stop) {
+          stopReason = translated.stop;
+          break;
+        }
+      }
+    } catch (err) {
+      if (signal.aborted) {
+        stopReason = "cancelled";
+      } else {
+        const msg = err instanceof Error ? err.message : String(err);
+        await connection.sessionUpdate({
+          sessionId,
+          update: {
+            sessionUpdate: "agent_message_chunk",
+            content: { type: "text", text: `[gordon error] ${msg}` },
+          },
+        });
+        stopReason = "refusal";
+      }
+    }
+
+    return { stopReason, assistantText };
   };
 }
 
@@ -153,19 +228,14 @@ export class GordonAcpAgent implements Agent {
 
   constructor(connection: AgentSideConnection, options: GordonAcpAgentOptions = {}) {
     this.connection = connection;
-    if (options.promptHandler) {
-      this.promptHandler = options.promptHandler;
-    } else {
-      const llm = createLLMClientFromEnv();
-      this.promptHandler = defaultPromptHandler(llm);
-    }
+    this.promptHandler = options.promptHandler ?? defaultPromptHandler();
   }
 
   async initialize(_params: InitializeRequest): Promise<InitializeResponse> {
     return {
       protocolVersion: PROTOCOL_VERSION,
       agentCapabilities: {
-        loadSession: false,
+        loadSession: true,
         promptCapabilities: {
           image: false,
           audio: false,
@@ -196,11 +266,18 @@ export class GordonAcpAgent implements Agent {
     return { sessionId };
   }
 
-  async loadSession(_params: LoadSessionRequest): Promise<LoadSessionResponse> {
-    // V1: loadSession capability disabled in initialize; this is a
-    // safety net in case the client calls anyway. The SDK type requires
-    // implementation; we throw to make the misuse explicit.
-    throw new Error("loadSession not supported in v1 — set agentCapabilities.loadSession=false");
+  async loadSession(params: LoadSessionRequest): Promise<LoadSessionResponse> {
+    // V2: rehydrate session history from disk so the editor's session
+    // chooser can resume conversations across process restarts.
+    if (!sessionExists(params.sessionId)) {
+      throw new Error(`Session ${params.sessionId} not found on disk`);
+    }
+    const turns = loadSessionTurns(params.sessionId);
+    this.sessions.set(params.sessionId, {
+      pendingPrompt: null,
+      history: turns.map((t) => ({ role: t.role, content: t.content })),
+    });
+    return {};
   }
 
   async setSessionMode(_params: SetSessionModeRequest): Promise<SetSessionModeResponse> {
@@ -221,49 +298,29 @@ export class GordonAcpAgent implements Agent {
     session.pendingPrompt = controller;
 
     const promptText = extractPromptText(params);
+    const userTurn = { role: "user" as const, content: promptText };
 
     try {
-      let assistantText = "";
-      for await (const chunk of this.promptHandler(promptText, session.history, controller.signal)) {
-        if (controller.signal.aborted) {
-          return { stopReason: "cancelled" };
-        }
-        assistantText += chunk;
-        await this.connection.sessionUpdate({
-          sessionId: params.sessionId,
-          update: {
-            sessionUpdate: "agent_message_chunk",
-            content: {
-              type: "text",
-              text: chunk,
-            },
-          },
-        });
-      }
-
-      session.history.push({ role: "user", content: promptText });
-      session.history.push({ role: "assistant", content: assistantText });
-
-      return { stopReason: "end_turn" };
-    } catch (err) {
-      if (controller.signal.aborted) {
-        return { stopReason: "cancelled" };
-      }
-      // Surface error as a refusal — the SDK doesn't have a generic
-      // "error" stop reason; refusal is the closest fit when the agent
-      // genuinely can't continue.
-      const errMsg = err instanceof Error ? err.message : String(err);
-      await this.connection.sessionUpdate({
+      const result = await this.promptHandler({
         sessionId: params.sessionId,
-        update: {
-          sessionUpdate: "agent_message_chunk",
-          content: {
-            type: "text",
-            text: `[gordon error] ${errMsg}`,
-          },
-        },
+        prompt: promptText,
+        history: session.history,
+        signal: controller.signal,
+        connection: this.connection,
       });
-      return { stopReason: "refusal" };
+
+      // Persist + update in-memory only on non-cancelled completion;
+      // cancelled turns are dropped so re-prompting starts fresh.
+      if (result.stopReason !== "cancelled") {
+        const assistantTurn = { role: "assistant" as const, content: result.assistantText };
+        session.history.push(userTurn);
+        session.history.push(assistantTurn);
+        const ts = Date.now();
+        appendSessionTurn(params.sessionId, { ...userTurn, ts });
+        appendSessionTurn(params.sessionId, { ...assistantTurn, ts });
+      }
+
+      return { stopReason: result.stopReason };
     } finally {
       if (session.pendingPrompt === controller) {
         session.pendingPrompt = null;
