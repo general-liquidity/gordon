@@ -1,7 +1,7 @@
 ---
 name: learn-portfolio
 description: Portfolio management tools — diff, sandbox, Black-Litterman, rebalancing, and checkpoints
-when_to_use: When user asks about portfolio management, allocation, rebalancing, or portfolio optimization
+when_to_use: When user asks "what portfolio tools?", "how do I rebalance?", "explain Black-Litterman", or about portfolio management
 tags: [learning, portfolio, allocation, optimization]
 user-invocable: true
 ---

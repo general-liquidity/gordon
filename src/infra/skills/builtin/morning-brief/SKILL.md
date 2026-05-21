@@ -1,7 +1,7 @@
 ---
 name: morning-brief
 description: Daily morning trading brief — overnight moves, key levels, and today's plan
-when_to_use: When user starts their trading day and wants a summary
+when_to_use: When user says "good morning", "what happened overnight", "morning brief", "today's plan", or starts their trading day and wants a daily summary
 tags: [daily, routine, planning]
 user-invocable: true
 ---

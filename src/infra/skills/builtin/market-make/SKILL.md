@@ -1,7 +1,7 @@
 ---
 name: market-make
 description: Set up a market making strategy — place bid/ask quotes around mid-price to earn the spread
-when_to_use: When user wants to market make, provide liquidity, earn spread, or set up bid/ask quotes on a CEX
+when_to_use: When user says "market make X", "provide liquidity on CEX", "earn the spread", or wants to set up bid/ask quotes
 arguments: [symbol]
 tags: [market-making, liquidity, spread, advanced]
 user-invocable: true

@@ -1,7 +1,7 @@
 ---
 name: risk-check
 description: Portfolio risk assessment — check exposure, concentration, and drawdown status
-when_to_use: When user wants to understand their current risk profile
+when_to_use: When user asks "am I too concentrated?", "what's my exposure?", "how risky is my portfolio?", "current risk", or wants a portfolio risk overview
 tags: [risk, portfolio, monitoring]
 user-invocable: true
 ---

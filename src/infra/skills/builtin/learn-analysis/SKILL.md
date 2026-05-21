@@ -1,12 +1,12 @@
 ---
 name: learn-analysis
-description: Gordon's 22 quantitative modules explained — from Hurst exponent to Black-Litterman
-when_to_use: When user asks about quantitative analysis, what analytical tools Gordon has, or wants to understand a specific module
+description: Gordon's quantitative modules explained — from Hurst exponent to Black-Litterman
+when_to_use: When user asks "what analysis tools do you have?", "explain Hurst", "what's PSR?", or about a specific quantitative module
 tags: [learning, analysis, quant, modules]
 user-invocable: true
 ---
 
-Gordon has 22 quantitative modules. Here's what each one does and when to use it.
+Gordon has many quantitative modules. Here's what the main ones do and when to use them.
 
 ## Pre-Trade Filters (Is this worth trading?)
 

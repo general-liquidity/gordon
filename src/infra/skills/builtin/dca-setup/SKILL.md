@@ -1,7 +1,7 @@
 ---
 name: dca-setup
 description: Set up dollar-cost averaging — recurring buys with smart timing
-when_to_use: When user wants to DCA, accumulate, or set up recurring buys
+when_to_use: When user says "DCA into X", "set up recurring buys", "accumulate gradually", "ladder in", or wants dollar-cost averaging
 arguments: [symbol]
 tags: [dca, accumulate, recurring, long-term]
 user-invocable: true

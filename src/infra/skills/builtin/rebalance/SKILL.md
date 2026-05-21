@@ -1,7 +1,7 @@
 ---
 name: rebalance
 description: Portfolio rebalance workflow — check drift, compute target allocation, execute
-when_to_use: When user wants to rebalance portfolio, check allocation drift, or adjust weights
+when_to_use: When user says "rebalance my portfolio", "check drift", "adjust weights", "rebalance to target", or wants portfolio rebalancing
 tags: [portfolio, rebalance, allocation]
 user-invocable: true
 ---

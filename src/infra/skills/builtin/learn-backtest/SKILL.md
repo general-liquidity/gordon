@@ -1,7 +1,7 @@
 ---
 name: learn-backtest
 description: How to backtest strategies and validate results with credibility tests
-when_to_use: When user asks about backtesting, strategy validation, or wants to know if a backtest is trustworthy
+when_to_use: When user asks "how do I backtest?", "is this backtest real?", "what's a credible Sharpe?", or about backtest validation
 tags: [learning, backtest, validation, credibility]
 user-invocable: true
 ---

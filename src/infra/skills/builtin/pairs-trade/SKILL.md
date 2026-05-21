@@ -1,7 +1,7 @@
 ---
 name: pairs-trade
 description: Full pairs trading workflow — from cointegration test to entry signal
-when_to_use: When user wants to trade a pair, spread trade, or do statistical arbitrage
+when_to_use: When user says "pair X and Y", "spread trade", "stat arb on X and Y", "cointegration test", or wants pairs trading workflow
 arguments: [symbolA, symbolB]
 tags: [pairs, stat-arb, cointegration, spread]
 user-invocable: true

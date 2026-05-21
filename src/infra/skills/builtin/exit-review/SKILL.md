@@ -1,7 +1,7 @@
 ---
 name: exit-review
 description: Review all open positions — which to hold, trim, or close based on current conditions
-when_to_use: When user wants to review positions, decide what to close, or clean up portfolio
+when_to_use: When user says "review my positions", "what should I close?", "clean up my book", or wants to assess all open trades
 tags: [review, exit, positions, cleanup]
 user-invocable: true
 ---

@@ -1,7 +1,7 @@
 ---
 name: learn-hooks
 description: How to use lifecycle hooks for custom trading rules and automation
-when_to_use: When user asks about hooks, custom rules, automation, or event-driven behavior
+when_to_use: When user asks "how do I add a hook?", "custom rules", "event automation", "PreToolUse", "PreOrderPlacement", or about lifecycle hooks
 tags: [learning, hooks, automation, customization]
 user-invocable: true
 ---

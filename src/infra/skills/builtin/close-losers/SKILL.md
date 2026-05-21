@@ -1,7 +1,7 @@
 ---
 name: close-losers
 description: Review and close losing positions that have hit stop levels
-when_to_use: When user wants to cut losses on underperforming positions
+when_to_use: When user says "review my losers", "cut losses", "kill the bleeders", "close underperformers", or wants to trim positions in drawdown
 tags: [execution, risk, cleanup]
 user-invocable: true
 context: inline

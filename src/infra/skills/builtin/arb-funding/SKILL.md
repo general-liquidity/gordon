@@ -1,7 +1,7 @@
 ---
 name: arb-funding
 description: Funding rate arbitrage — earn funding payments by going long spot + short perps (or vice versa)
-when_to_use: When user asks about funding rate arbitrage, basis trade, cash-and-carry, or earning yield from perps
+when_to_use: When user mentions funding arbitrage, says "basis trade", "cash-and-carry", "farm funding", or wants to earn yield from perpetuals
 arguments: [symbol]
 tags: [arbitrage, funding, perps, yield, advanced]
 user-invocable: true

@@ -1,25 +1,34 @@
 ---
 name: learn-skills
-description: Learn how to create custom SKILL.md trading workflows
-when_to_use: When user asks about skills, custom workflows, or wants to create their own
-tags: [learning, skills, customization]
+description: How to author Gordon skills following Anthropic's official SKILL.md standard — frontmatter, triggers, progressive disclosure
+when_to_use: When user asks "how do I make a skill?", "SKILL.md format", "build a custom workflow", "skill frontmatter", or about authoring Gordon skills
+tags: [learning, skills, customization, anthropic-standard]
 user-invocable: true
 ---
 
-Skills are reusable trading workflows you write in markdown. Gordon loads them automatically.
+Skills are reusable trading workflows you write in markdown. Gordon loads them automatically when their `when_to_use` matches what the user is doing.
 
 ## What is a Skill?
 
 A SKILL.md file = YAML frontmatter + markdown instructions. When you type `/skill-name`, Gordon follows the instructions using its tools.
 
-## Example: Create a Swing Entry Checklist
+## Anthropic's hard requirements (don't skip)
 
-Show the user this example:
+Gordon's skill loader follows the official Anthropic Agent Skills standard. Five rules are non-negotiable:
+
+1. **File name must be exactly `SKILL.md`** (case-sensitive). Not `skill.md`, not `SKILL.MD`.
+2. **Folder name must be kebab-case.** `my-cool-skill` ✅. Not `MyCoolSkill`, not `my_cool_skill`, not `My Cool Skill`.
+3. **No `README.md` inside the skill folder.** All docs go in `SKILL.md` or `references/`. (A repo-level README for human readers is fine — that's outside the skill folder.)
+4. **Frontmatter must have `---` delimiters** above and below the YAML block.
+5. **`name` field must match folder name exactly** and cannot contain `claude` or `anthropic` (reserved).
+
+## Example: Create a Swing Entry Checklist
 
 ```markdown
 ---
 name: swing-check
 description: Walk through swing trade entry criteria before opening a position
+when_to_use: When user says "swing entry on X", "check before swing trade", or wants a pre-trade checklist
 arguments: [symbol]
 tags: [swing, risk, checklist]
 user-invocable: true
@@ -38,26 +47,64 @@ Before opening a swing trade on {symbol}:
 If all checks pass, show me the trade plan. If not, explain what's missing.
 ```
 
+## The two fields that decide if your skill ever runs
+
+`description` (the WHAT) and `when_to_use` (the WHEN) are how Claude decides whether to load your skill. Get them wrong and the skill exists but is invisible.
+
+**Bad descriptions (real examples from Anthropic's guide):**
+- "Helps with projects." — too vague
+- "Creates sophisticated multi-page documentation systems." — missing triggers
+- "Implements the Project entity model with hierarchical relationships." — too technical
+
+**Good descriptions follow:** `[What it does] + [When to use it] + [Key capabilities]`
+
+**Good `when_to_use` follows:** literal phrases users would actually say, in quotes.
+
+Compare:
+- ❌ "When user wants risk analysis" (topic keywords)
+- ✅ "When user asks 'am I too concentrated?', 'what's my exposure?', or wants a portfolio risk overview" (literal phrases)
+
+Quoted user phrases dramatically improve trigger reliability. Look at `learn-calibration` and `tutorial` in Gordon's builtin skills for in-repo examples.
+
 ## Where to Save Skills
 
-Explain the 3 locations:
-- **Builtin**: Ship with Gordon (you can't edit these)
-- **User**: `~/.gordon/skills/my-skill/SKILL.md` — available in all projects
-- **Project**: `.gordon/skills/my-skill/SKILL.md` — project-specific
+- **Builtin**: `src/infra/skills/builtin/<name>/SKILL.md` — ship with Gordon (read-only for users)
+- **User**: `~/.gordon/skills/<name>/SKILL.md` — available in all your projects
+- **Project**: `.gordon/skills/<name>/SKILL.md` — project-specific
 
-Project overrides user overrides builtin (same skill name).
+Override order: **project > user > builtin** (same skill name).
 
 ## Frontmatter Options
 
-Walk through the key fields:
-- `name` — what you type after `/`
-- `description` — shown in `/skills` list and typeahead
-- `arguments` — placeholders like `{symbol}` that get replaced
-- `when_to_use` — when Gordon should suggest this skill
-- `tags` — for organization
-- `user-invocable` — set to false to hide from `/` menu (model-only)
-- `context: fork` — run in a separate sub-agent (for heavy tasks)
+| Field | Required | Purpose |
+|---|---|---|
+| `name` | yes | What you type after `/`; must match folder name; kebab-case |
+| `description` | yes | The WHAT; surfaced in `/skills` list and typeahead; under 1024 chars |
+| `when_to_use` | recommended | The WHEN; quoted user phrases dramatically improve triggering |
+| `arguments` | optional | Placeholders like `{symbol}` that get replaced |
+| `tags` | optional | For organization; affects search/filter |
+| `user-invocable` | optional | Set `false` to hide from `/` menu (model-only) |
+| `context: fork` | optional | Run in a separate sub-agent (heavy/long-running tasks) |
+
+## Forbidden in frontmatter
+
+- XML angle brackets (`<` or `>`) — security restriction (frontmatter is injected into Claude's system prompt)
+- Skills named with `claude` or `anthropic` prefix (reserved)
+- Bodies over ~5000 words (split detail into `references/` instead — progressive disclosure)
+
+## Progressive disclosure
+
+Keep `SKILL.md` focused on the core workflow. If you need long reference content (API patterns, error codes, examples), put it in `references/` files and link from `SKILL.md`. Claude loads referenced content only when needed, saving tokens.
+
+```
+swing-check/
+├── SKILL.md              # Core workflow (concise)
+├── references/
+│   └── risk-rules.md     # Detail only loaded when relevant
+└── scripts/
+    └── validate_size.py  # Optional executable helper
+```
 
 ## Try It
 
-"Want to create a skill right now? Tell me what trading workflow you repeat often, and I'll write the SKILL.md for you."
+"Want to create a skill right now? Tell me what trading workflow you repeat often, and I'll write the SKILL.md for you — following the Anthropic standard so it triggers reliably and works in any Claude surface."

@@ -1,7 +1,7 @@
 ---
 name: learn-execution
 description: How orders flow through Gordon — from plan to risk check to approval to atomic execution
-when_to_use: When user asks how order execution works, what happens when they approve a trade, or how the execution pipeline functions
+when_to_use: When user asks "how does execution work?", "what happens when I approve?", "explain the trade pipeline", or about order flow
 tags: [learning, execution, orders, pipeline]
 user-invocable: true
 ---

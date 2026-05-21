@@ -1,7 +1,7 @@
 ---
 name: learn-agents
 description: How Gordon's 4-agent architecture works — Gordon, Executor, Researcher, and Critic
-when_to_use: When user asks about agents, how routing works, why Gordon sometimes hands off to Executor
+when_to_use: When user asks "how does Gordon work?", "what are the agents?", "why did Executor handle this?", or about routing between agents
 tags: [learning, agents, architecture]
 user-invocable: true
 ---

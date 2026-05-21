@@ -1,12 +1,12 @@
 ---
 name: learn-commands
-description: Complete guide to Gordon's 135+ slash commands organized by category
-when_to_use: When user asks what commands are available, wants a command reference, or needs help finding a specific command
+description: Complete guide to Gordon's slash commands organized by category
+when_to_use: When user asks "what commands exist?", "what can you do?", "list slash commands", or wants a command reference
 tags: [learning, commands, reference]
 user-invocable: true
 ---
 
-Gordon has 135+ slash commands. Here's how they're organized.
+Gordon has many slash commands. Here's how they're organized.
 
 ## Command Categories
 

@@ -1,7 +1,7 @@
 ---
 name: weekend-review
 description: Weekly performance review — P&L, lessons learned, and next week's plan
-when_to_use: When user wants a weekly review, performance summary, or to plan next week
+when_to_use: When user says "weekly review", "weekend recap", "plan next week", "this week's P&L", or wants weekly performance summary
 tags: [review, weekly, performance, planning]
 user-invocable: true
 ---

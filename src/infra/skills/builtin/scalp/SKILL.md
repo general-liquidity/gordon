@@ -1,7 +1,7 @@
 ---
 name: scalp
 description: Quick scalp workflow — orderflow + Kalman filter + tight stops for fast in-and-out trades
-when_to_use: When user wants a quick scalp trade, intraday momentum, or fast entry/exit
+when_to_use: When user says "scalp X", "quick trade on X", "intraday momentum", "fast entry/exit", or wants a fast in-and-out trade
 arguments: [symbol]
 tags: [scalp, intraday, fast, orderflow]
 user-invocable: true

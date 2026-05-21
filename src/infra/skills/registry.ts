@@ -140,7 +140,10 @@ export function buildSkillMetadataSection(agentName: string = "Gordon"): string 
 
   const lines = ["[GORDON_AVAILABLE_SKILLS]"];
   for (const skill of skills) {
-    const desc = skill.description || skill.whenToUse || "";
+    // Concatenate description (WHAT) + whenToUse (WHEN) so the agent's
+    // trigger heuristic sees both. Previously this was an OR-fallback,
+    // which silently dropped whenToUse whenever description was non-empty.
+    const desc = [skill.description, skill.whenToUse].filter(Boolean).join(" — ");
     lines.push(`- /${skill.id}: ${desc}`);
   }
   return lines.join("\n") + "\n";

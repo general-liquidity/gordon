@@ -1,12 +1,12 @@
 ---
 name: learn-finnhub
-description: Gordon's Finnhub integration — 59 tools covering stocks, ETFs, mutual funds, indices, bonds, crypto, forex, and macro data
-when_to_use: When user asks about Finnhub, stock data, fundamentals, earnings, analyst data, ETF holdings, or any premium financial data
+description: Gordon's Finnhub integration — tools covering stocks, ETFs, mutual funds, indices, bonds, crypto, forex, and macro data
+when_to_use: When user asks "what stock data do you have?", "fundamentals on X?", "earnings calendar?", "analyst ratings on X", or about Finnhub integration
 tags: [learning, finnhub, stocks, fundamentals, macro]
 user-invocable: true
 ---
 
-Gordon has 59 Finnhub-backed tools — the most comprehensive stock/macro coverage of any CEX-first trading CLI. All tools degrade gracefully when FINNHUB_API_KEY isn't set (returns `configured: false` with a BYOK diagnostic).
+Gordon has many Finnhub-backed tools — the most comprehensive stock/macro coverage of any CEX-first trading CLI. All tools degrade gracefully when FINNHUB_API_KEY isn't set (returns `configured: false` with a BYOK diagnostic).
 
 ## Setup
 

@@ -1,7 +1,7 @@
 ---
 name: liquidity-provide
 description: Provide liquidity to a DEX pool — analyze pool, calculate impermanent loss risk, deposit, and monitor
-when_to_use: When user wants to provide liquidity, LP, earn fees from a DEX pool, or manage an LP position
+when_to_use: When user says "LP on X", "provide liquidity to pool", "earn DEX fees", or wants to manage an LP position with IL tracking
 arguments: [pool]
 tags: [liquidity, defi, pool, yield, advanced]
 user-invocable: true
