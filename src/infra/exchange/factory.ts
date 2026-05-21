@@ -3,7 +3,9 @@
  * Creates and caches exchange adapter instances
  */
 
-import type { Exchange, ExchangeId, ExchangeCredentials } from "./types.ts";
+import type { Exchange, ExchangeId, NativeExchangeId, ExchangeCredentials } from "./types.ts";
+import { isCcxtExchangeId, extractCcxtSubId } from "./types.ts";
+import { CcxtAdapter } from "./adapters/ccxt-adapter.ts";
 import { BinanceAdapter } from "./adapters/binance.ts";
 import { BinanceUSAdapter } from "./adapters/binance-us.ts";
 import { CoinbaseAdapter } from "./adapters/coinbase.ts";
@@ -18,9 +20,14 @@ import { loadOAuthExchangeCredentials, exchangeSupportsOAuth } from "./oauth-bri
 import { assertSandboxSupported } from "./sandboxSupport.ts";
 
 /**
- * All supported exchange IDs with native adapters
+ * All native exchange IDs with hand-tuned adapters. CCXT-routed exchange
+ * IDs (`ccxt:*`) are NOT listed here — they're handled separately by
+ * branching on `isCcxtExchangeId()` before the switch statement below.
+ * Per operator spec: CCXT is an *alternative* to natives, not a fallback.
+ * Both can be active for the same underlying exchange (e.g. `binance`
+ * vs `ccxt:binance`).
  */
-const SUPPORTED_EXCHANGES: ExchangeId[] = [
+const SUPPORTED_EXCHANGES: NativeExchangeId[] = [
   "binance",
   "binance_us",
   "coinbase",
@@ -107,10 +114,34 @@ export class ExchangeFactory {
    * @throws Error if exchange is not supported
    */
   static create(exchangeId: ExchangeId, credentials: ExchangeCredentials): Exchange {
-    // Validate exchange is supported
-    if (!SUPPORTED_EXCHANGES.includes(exchangeId)) {
+    // CCXT-routed exchange — alternative path covering 107 exchanges via
+    // a single unified adapter. Always tried BEFORE the native switch so
+    // operators who explicitly choose `ccxt:*` get that adapter even
+    // when the underlying exchange (e.g. binance) has a native option.
+    if (isCcxtExchangeId(exchangeId)) {
+      assertSandboxSupported(exchangeId, Boolean(credentials.sandbox));
+      const cacheKey = getCacheKey(exchangeId, credentials);
+      const cached = this.instanceCache.get(cacheKey);
+      if (cached) return cached;
+      const subId = extractCcxtSubId(exchangeId);
+      const exchange = new CcxtAdapter(
+        subId,
+        {
+          apiKey: credentials.apiKey,
+          apiSecret: credentials.apiSecret,
+          passphrase: credentials.passphrase,
+          walletPrivateKey: credentials.walletPrivateKey,
+        },
+        credentials.sandbox,
+      );
+      this.instanceCache.set(cacheKey, exchange);
+      return exchange;
+    }
+
+    // Native adapter path
+    if (!SUPPORTED_EXCHANGES.includes(exchangeId as NativeExchangeId)) {
       throw new Error(
-        `Unsupported exchange: ${exchangeId}. Supported exchanges: ${SUPPORTED_EXCHANGES.join(", ")}`
+        `Unsupported exchange: ${exchangeId}. Supported natives: ${SUPPORTED_EXCHANGES.join(", ")}. Or use ccxt:<sub-id> for any of CCXT's 107 exchanges.`
       );
     }
 
@@ -129,7 +160,7 @@ export class ExchangeFactory {
     // Create appropriate adapter
     let exchange: Exchange;
 
-    switch (exchangeId) {
+    switch (exchangeId as NativeExchangeId) {
       case "binance":
         exchange = new BinanceAdapter(credentials.apiKey, credentials.apiSecret, credentials.sandbox);
         break;
@@ -243,18 +274,17 @@ export class ExchangeFactory {
    * @returns true if the exchange is supported
    */
   static isSupported(exchangeId: string): exchangeId is ExchangeId {
-    return SUPPORTED_EXCHANGES.includes(exchangeId as ExchangeId);
+    if (isCcxtExchangeId(exchangeId)) return true;
+    return SUPPORTED_EXCHANGES.includes(exchangeId as NativeExchangeId);
   }
 
   /**
-   * Check if an exchange uses a native adapter
-   * All supported exchanges now use native adapters
-   *
-   * @param exchangeId - Exchange ID to check
-   * @returns true if the exchange is supported (all have native adapters)
+   * Check if an exchange uses a native (hand-tuned) adapter. CCXT-routed
+   * IDs return false — they're handled via the CcxtAdapter unified path.
    */
   static hasNativeAdapter(exchangeId: ExchangeId): boolean {
-    return SUPPORTED_EXCHANGES.includes(exchangeId);
+    if (isCcxtExchangeId(exchangeId)) return false;
+    return SUPPORTED_EXCHANGES.includes(exchangeId as NativeExchangeId);
   }
 
   /**

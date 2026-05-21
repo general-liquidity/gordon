@@ -2,7 +2,15 @@ import { join } from "node:path";
 
 import type { GordonConfig } from "../../../types/index.ts";
 import { BROKER_ENV_MAP, type BrokerId } from "../../broker/types.ts";
-import { EXCHANGE_ENV_MAP, type ExchangeId } from "../../exchange/types.ts";
+import {
+  EXCHANGE_ENV_MAP,
+  ccxtEnvNames,
+  isCcxtExchangeId,
+  extractCcxtSubId,
+  type ExchangeId,
+  type CcxtExchangeId,
+  type NativeExchangeId,
+} from "../../exchange/types.ts";
 import {
   getExecutionVenueMetadata,
   getIntegrationSurfaceMetadata,
@@ -174,7 +182,14 @@ function getExchangeStatuses(
   keyringKeys: Set<string>,
 ): ProviderCredentialStatus[] {
   return config.exchanges.map((exchange) => {
-    const envMap = EXCHANGE_ENV_MAP[exchange.type as ExchangeId];
+    // CCXT exchanges have a different env pattern (CCXT_<UPPER>_*).
+    // For the credential-status view, surface those env names instead.
+    const envMap = isCcxtExchangeId(exchange.type as ExchangeId)
+      ? (() => {
+          const e = ccxtEnvNames(extractCcxtSubId(exchange.type as CcxtExchangeId));
+          return { key: e.key, secret: e.secret, passphrase: e.passphrase, wallet: e.walletKey };
+        })()
+      : EXCHANGE_ENV_MAP[exchange.type as NativeExchangeId];
     const fields: CredentialFieldStatus[] = [];
     if (envMap?.key) {
       fields.push(resolveFieldStatus(envMap.key, "API key", true, {

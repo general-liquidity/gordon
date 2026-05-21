@@ -10,19 +10,64 @@ import type { Candle } from "../../types/index.ts";
 // ============================================================================
 
 /**
- * Supported exchange identifiers
+ * Native exchange identifiers — exchanges Gordon has hand-tuned adapters for.
  */
-export type ExchangeId = "binance" | "binance_us" | "coinbase" | "kraken" | "bitfinex" | "hyperliquid" | "uniswap" | "robinhood" | "okx" | "gemini";
+export type NativeExchangeId =
+  | "binance"
+  | "binance_us"
+  | "coinbase"
+  | "kraken"
+  | "bitfinex"
+  | "hyperliquid"
+  | "uniswap"
+  | "robinhood"
+  | "okx"
+  | "gemini";
 
 /**
- * Runtime array of all supported exchange IDs. Kept in sync with ExchangeId
+ * CCXT-routed exchange identifiers — `ccxt:<ccxt-sub-id>` for any of the
+ * 107 exchanges CCXT supports. Operators choose this when they want the
+ * CCXT unified API instead of a hand-tuned native adapter (including for
+ * the 10 natives — both options coexist).
+ *
+ * Examples: `"ccxt:binance"`, `"ccxt:bybit"`, `"ccxt:kucoin"`, `"ccxt:mexc"`.
+ *
+ * The factory routes any id starting with `ccxt:` to `CcxtAdapter` with
+ * the sub-id passed through.
+ */
+export type CcxtExchangeId = `ccxt:${string}`;
+
+/**
+ * Union of all exchange identifiers Gordon's factory can construct.
+ * Natives + the CCXT-prefixed long-tail.
+ */
+export type ExchangeId = NativeExchangeId | CcxtExchangeId;
+
+/**
+ * Type guard: native (hand-tuned) vs CCXT-routed.
+ */
+export function isCcxtExchangeId(id: string): id is CcxtExchangeId {
+  return id.startsWith("ccxt:");
+}
+
+/**
+ * Runtime array of native exchange IDs. Kept in sync with NativeExchangeId
  * via the `satisfies` constraint — the compiler errors if this drifts from
- * the type union.
+ * the type union. CCXT IDs are not enumerable at compile time (107 of them,
+ * and the set may grow with CCXT updates) so they're not part of this list.
  */
 export const EXCHANGE_IDS = [
   "binance", "binance_us", "coinbase", "kraken", "bitfinex",
   "hyperliquid", "uniswap", "robinhood", "okx", "gemini",
-] as const satisfies readonly ExchangeId[];
+] as const satisfies readonly NativeExchangeId[];
+
+/**
+ * Extract the CCXT sub-id from a `ccxt:*` exchange id.
+ * Example: `extractCcxtSubId("ccxt:bybit") === "bybit"`.
+ */
+export function extractCcxtSubId(id: CcxtExchangeId): string {
+  return id.slice("ccxt:".length);
+}
 
 /**
  * Exchange credentials for authentication
@@ -45,7 +90,7 @@ export interface ExchangeCredentials {
  * Used by saveConfiguration to persist all exchange keys to .env,
  * and by resolveExchangeCredentials to restore them from process.env.
  */
-export const EXCHANGE_ENV_MAP: Record<ExchangeId, { key?: string; secret?: string; passphrase?: string; wallet?: string }> = {
+export const EXCHANGE_ENV_MAP: Record<NativeExchangeId, { key?: string; secret?: string; passphrase?: string; wallet?: string }> = {
   binance:     { key: "BINANCE_API_KEY",     secret: "BINANCE_API_SECRET" },
   binance_us:  { key: "BINANCE_US_API_KEY",  secret: "BINANCE_US_API_SECRET" },
   coinbase:    { key: "COINBASE_API_KEY",     secret: "COINBASE_API_SECRET",   passphrase: "COINBASE_PASSPHRASE" },
@@ -62,11 +107,50 @@ export const EXCHANGE_ENV_MAP: Record<ExchangeId, { key?: string; secret?: strin
  * Resolve exchange credentials, preferring process.env over config values.
  * Config may store "***" placeholders; this resolves them from env.
  */
+/**
+ * Build CCXT-side env var names for a given ccxt sub-id. Operators set
+ * `CCXT_<UPPER>_API_KEY`, `CCXT_<UPPER>_API_SECRET`, etc. per exchange.
+ * Adopting a uniform pattern avoids exploding `EXCHANGE_ENV_MAP` to 107 entries.
+ */
+export function ccxtEnvNames(ccxtSubId: string): {
+  key: string;
+  secret: string;
+  passphrase: string;
+  walletKey: string;
+  walletAddress: string;
+} {
+  const upper = ccxtSubId.toUpperCase().replace(/[^A-Z0-9]/g, "_");
+  return {
+    key: `CCXT_${upper}_API_KEY`,
+    secret: `CCXT_${upper}_API_SECRET`,
+    passphrase: `CCXT_${upper}_PASSPHRASE`,
+    walletKey: `CCXT_${upper}_WALLET_PRIVATE_KEY`,
+    walletAddress: `CCXT_${upper}_WALLET_ADDRESS`,
+  };
+}
+
 export function resolveExchangeCredentials(
   config: { type: string; apiKey: string; apiSecret: string; passphrase?: string; walletPrivateKey?: string; sandbox?: boolean },
 ): ExchangeCredentials {
+  // CCXT exchanges use their own env var pattern (CCXT_<UPPER>_*) instead
+  // of the per-exchange EXCHANGE_ENV_MAP.
+  if (isCcxtExchangeId(config.type as ExchangeId)) {
+    const subId = extractCcxtSubId(config.type as CcxtExchangeId);
+    const envs = ccxtEnvNames(subId);
+    const isRedacted = (v: string | undefined) => !v || v === "***";
+    let apiKey = config.apiKey;
+    let apiSecret = config.apiSecret;
+    let passphrase = config.passphrase;
+    let walletPrivateKey = config.walletPrivateKey;
+    if (isRedacted(apiKey)) apiKey = process.env[envs.key] || "";
+    if (isRedacted(apiSecret)) apiSecret = process.env[envs.secret] || "";
+    if (isRedacted(passphrase)) passphrase = process.env[envs.passphrase] || undefined;
+    if (isRedacted(walletPrivateKey)) walletPrivateKey = process.env[envs.walletKey] || undefined;
+    return { apiKey, apiSecret, passphrase, sandbox: config.sandbox, walletPrivateKey };
+  }
+
   const envMap = config.type in EXCHANGE_ENV_MAP
-    ? EXCHANGE_ENV_MAP[config.type as ExchangeId]
+    ? EXCHANGE_ENV_MAP[config.type as NativeExchangeId]
     : undefined;
   const isRedacted = (v: string | undefined) => !v || v === "***";
 

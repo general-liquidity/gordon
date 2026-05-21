@@ -22,7 +22,8 @@
  *                      integration that isn't a URL swap)
  */
 
-import type { ExchangeId } from "./types.ts";
+import type { ExchangeId, NativeExchangeId } from "./types.ts";
+import { isCcxtExchangeId } from "./types.ts";
 
 export type SandboxKind = "testnet_url" | "demo_header" | "credential" | "unsupported";
 
@@ -34,7 +35,7 @@ export interface SandboxSupportEntry {
   docs?: string;
 }
 
-export const EXCHANGE_SANDBOX_SUPPORT: Record<ExchangeId, SandboxSupportEntry> = {
+export const EXCHANGE_SANDBOX_SUPPORT: Record<NativeExchangeId, SandboxSupportEntry> = {
   binance: {
     kind: "testnet_url",
     docs: "https://testnet.binance.vision — separate API keys required",
@@ -101,7 +102,11 @@ export class SandboxNotSupportedError extends Error {
  */
 export function assertSandboxSupported(exchangeId: ExchangeId, sandboxRequested: boolean): void {
   if (!sandboxRequested) return;
-  const entry = EXCHANGE_SANDBOX_SUPPORT[exchangeId];
+  // CCXT-routed exchanges defer to CCXT's own per-exchange sandbox capability
+  // detection at adapter construct time — we don't precheck here because the
+  // matrix is large + maintained upstream.
+  if (isCcxtExchangeId(exchangeId)) return;
+  const entry = EXCHANGE_SANDBOX_SUPPORT[exchangeId as NativeExchangeId];
   if (entry.kind === "unsupported") {
     throw new SandboxNotSupportedError(exchangeId, entry.notSupportedHint);
   }
@@ -109,15 +114,24 @@ export function assertSandboxSupported(exchangeId: ExchangeId, sandboxRequested:
 
 /**
  * Is this exchange able to run in sandbox mode?
+ *
+ * For native exchanges: consults the static support matrix.
+ * For CCXT-routed exchanges: returns true optimistically — actual sandbox
+ * availability is resolved by CCXT at adapter construct time. Some CCXT
+ * exchanges silently no-op on `setSandboxMode(true)` rather than throwing.
  */
 export function isSandboxSupported(exchangeId: ExchangeId): boolean {
-  return EXCHANGE_SANDBOX_SUPPORT[exchangeId].kind !== "unsupported";
+  if (isCcxtExchangeId(exchangeId)) return true;
+  return EXCHANGE_SANDBOX_SUPPORT[exchangeId as NativeExchangeId].kind !== "unsupported";
 }
 
 /**
- * List of every ExchangeId that supports some form of sandbox. Useful for
- * diagnostic surfaces ("which venues can I paper-trade on?").
+ * List of every NATIVE ExchangeId that supports some form of sandbox. CCXT
+ * IDs are excluded because the set is unbounded — query CCXT directly for
+ * per-exchange sandbox availability.
  */
-export function listSandboxSupported(): ExchangeId[] {
-  return (Object.keys(EXCHANGE_SANDBOX_SUPPORT) as ExchangeId[]).filter(isSandboxSupported);
+export function listSandboxSupported(): NativeExchangeId[] {
+  return (Object.keys(EXCHANGE_SANDBOX_SUPPORT) as NativeExchangeId[]).filter(
+    (id) => EXCHANGE_SANDBOX_SUPPORT[id].kind !== "unsupported",
+  );
 }

@@ -3,7 +3,14 @@ import { checkEnvStatus, createEnvFile, saveEnvKeys, type EnvKeys } from "../../
 import { loadConfig, saveConfig } from "../../infra/storage/config/config.ts";
 import { getProviderCredentialStatuses, type ProviderCredentialStatus } from "../../infra/runtime/actions/index.ts";
 import { BROKER_ENV_MAP, type BrokerId } from "../../infra/broker/types.ts";
-import { EXCHANGE_ENV_MAP, type ExchangeId } from "../../infra/exchange/types.ts";
+import {
+  EXCHANGE_ENV_MAP,
+  ccxtEnvNames,
+  isCcxtExchangeId,
+  extractCcxtSubId,
+  type ExchangeId,
+  type NativeExchangeId,
+} from "../../infra/exchange/types.ts";
 import { pluginInstaller } from "../../infra/ai/mcp/marketplace/installer.ts";
 import {
   getStructuredAxiomPrivacyStatus,
@@ -433,7 +440,7 @@ export async function collectDoctorReport(configInput?: GordonConfig): Promise<D
       ok: Boolean(activeExchange),
       severity: activeExchange ? "info" : "warn",
       message: activeExchange
-        ? `Active execution venue: ${getExecutionVenueMetadata(activeExchange.type).displayName}.`
+        ? `Active execution venue: ${getExecutionVenueMetadata(activeExchange.type as ExchangeId).displayName}.`
         : "No active exchange is configured.",
     },
     {
@@ -657,14 +664,37 @@ export async function applyBootstrap(options: BootstrapOptions): Promise<Bootstr
   }
 
   if (options.exchange) {
-    const envMap = EXCHANGE_ENV_MAP[options.exchange];
-    setEnvKey(envKeys, envMap.key as keyof EnvKeys | undefined, options.exchangeKey);
-    setEnvKey(envKeys, envMap.secret as keyof EnvKeys | undefined, options.exchangeSecret);
-    setEnvKey(envKeys, envMap.passphrase as keyof EnvKeys | undefined, options.exchangePassphrase);
-    setEnvKey(envKeys, envMap.wallet as keyof EnvKeys | undefined, options.exchangeWallet);
+    // CCXT-routed exchanges use the CCXT_<UPPER>_* env pattern instead of
+    // the per-native EXCHANGE_ENV_MAP. The credential-resolver in
+    // `infra/exchange/types.ts` (`resolveExchangeCredentials`) reads them
+    // at adapter construct time.
+    if (isCcxtExchangeId(options.exchange)) {
+      const subId = extractCcxtSubId(options.exchange);
+      const envs = ccxtEnvNames(subId);
+      setEnvKey(envKeys, envs.key as keyof EnvKeys, options.exchangeKey);
+      setEnvKey(envKeys, envs.secret as keyof EnvKeys, options.exchangeSecret);
+      setEnvKey(envKeys, envs.passphrase as keyof EnvKeys, options.exchangePassphrase);
+      setEnvKey(envKeys, envs.walletKey as keyof EnvKeys, options.exchangeWallet);
+    } else {
+      const envMap = EXCHANGE_ENV_MAP[options.exchange as NativeExchangeId];
+      setEnvKey(envKeys, envMap.key as keyof EnvKeys | undefined, options.exchangeKey);
+      setEnvKey(envKeys, envMap.secret as keyof EnvKeys | undefined, options.exchangeSecret);
+      setEnvKey(envKeys, envMap.passphrase as keyof EnvKeys | undefined, options.exchangePassphrase);
+      setEnvKey(envKeys, envMap.wallet as keyof EnvKeys | undefined, options.exchangeWallet);
+    }
+    // Both CCXT and native exchanges that use API keys store "***" placeholders
+    // here; the credential resolver swaps them out for the real values from env
+    // at adapter construct time. Wallet-only natives (hyperliquid, uniswap)
+    // store "" instead — checked against the native env map.
+    const usesApiKey = isCcxtExchangeId(options.exchange)
+      ? Boolean(options.exchangeKey)
+      : Boolean(EXCHANGE_ENV_MAP[options.exchange as NativeExchangeId].key);
+    const usesApiSecret = isCcxtExchangeId(options.exchange)
+      ? Boolean(options.exchangeSecret)
+      : Boolean(EXCHANGE_ENV_MAP[options.exchange as NativeExchangeId].secret);
     config = upsertExchange(config, options.exchange, {
-      apiKey: envMap.key ? "***" : "",
-      apiSecret: envMap.secret ? "***" : "",
+      apiKey: usesApiKey ? "***" : "",
+      apiSecret: usesApiSecret ? "***" : "",
       passphrase: options.exchangePassphrase ? "***" : undefined,
       walletPrivateKey: options.exchangeWallet ? "***" : undefined,
       sandbox: false,

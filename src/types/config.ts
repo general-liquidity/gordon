@@ -20,7 +20,27 @@ export const ExchangeConfigSchema = z.object({
 /**
  * Supported exchange types for multi-exchange configuration
  */
-export const ExchangeTypeSchema = z.enum(["binance", "binance_us", "coinbase", "kraken", "bitfinex", "hyperliquid", "uniswap", "robinhood", "okx", "gemini"]);
+/**
+ * Exchange type schema. Accepts the 10 native exchanges OR a `ccxt:<sub-id>`
+ * pattern routed through the CCXT unified adapter.
+ *
+ * Uses `z.custom<>` to preserve the precise type union at z.infer level — a
+ * naive `z.union([z.enum([...]), z.string().regex(...)])` would collapse the
+ * inferred type to `string`, losing the literal-narrowing that downstream
+ * consumers depend on.
+ */
+const NATIVE_EXCHANGE_TYPES = ["binance", "binance_us", "coinbase", "kraken", "bitfinex", "hyperliquid", "uniswap", "robinhood", "okx", "gemini"] as const;
+const CCXT_TYPE_PATTERN = /^ccxt:[a-z0-9_]+$/;
+export const ExchangeTypeSchema = z.custom<
+  | "binance" | "binance_us" | "coinbase" | "kraken" | "bitfinex"
+  | "hyperliquid" | "uniswap" | "robinhood" | "okx" | "gemini"
+  | `ccxt:${string}`
+>((val) => {
+  if (typeof val !== "string") return false;
+  if ((NATIVE_EXCHANGE_TYPES as readonly string[]).includes(val)) return true;
+  if (CCXT_TYPE_PATTERN.test(val)) return true;
+  return false;
+}, "Must be a native exchange id or 'ccxt:<lowercase-sub-id>' (e.g. 'ccxt:bybit', 'ccxt:kucoin')");
 
 /**
  * Supported stock broker types
