@@ -3,6 +3,8 @@ name: learn-skills
 description: How to author Gordon skills following Anthropic's official SKILL.md standard — single-field description with WHAT + WHEN + triggers, progressive disclosure. When user asks "how do I make a skill?", "SKILL.md format", "build a custom workflow", "skill frontmatter", or about authoring Gordon skills
 tags: [learning, skills, customization, anthropic-standard]
 user-invocable: true
+status: active
+last-reviewed: 2026-05-23
 ---
 
 Skills are reusable trading workflows you write in markdown. Gordon loads them automatically when their `description` matches what the user is doing.

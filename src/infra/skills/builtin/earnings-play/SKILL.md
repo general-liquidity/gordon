@@ -4,6 +4,8 @@ description: Pre-earnings analysis — fundamentals, historical moves, implied v
 arguments: [symbol]
 tags: [earnings, fundamentals, event, stocks]
 user-invocable: true
+status: active
+last-reviewed: 2026-05-23
 ---
 
 Run a complete pre-earnings analysis for {symbol}.

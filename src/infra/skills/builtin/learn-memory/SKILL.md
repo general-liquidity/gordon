@@ -3,6 +3,8 @@ name: learn-memory
 description: How Gordon remembers — session memory, trade journal, GORDON.md, and durable facts. When user asks "what do you remember?", "how do you persist context?", "what's GORDON.md?", or about Gordon's memory layers
 tags: [learning, memory, persistence, config]
 user-invocable: true
+status: active
+last-reviewed: 2026-05-23
 ---
 
 Gordon has 4 layers of memory. Let me explain each one.

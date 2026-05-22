@@ -53,6 +53,14 @@ const logger = createModuleLogger("skill-loader");
 const NAME_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 const MAX_NAME_LEN = 64;
 const MAX_DESCRIPTION_LEN = 1024;
+
+/**
+ * Reserved skill names that collide with namespace slash commands.
+ * Skills matching these names are rejected by the loader so that
+ * /skills audit (etc.) routes to the management surface and not a
+ * shadowing user skill.
+ */
+const RESERVED_SKILL_NAMES = new Set(["skills"]);
 const MAX_COMPATIBILITY_LEN = 500;
 
 // ============================================================================
@@ -225,6 +233,13 @@ export function validateSkillFrontmatter(
         severity: "error",
         field: "name",
         message: `'${fm.name}' does not match parent directory '${parentDirName}'`,
+      });
+    }
+    if (RESERVED_SKILL_NAMES.has(fm.name)) {
+      issues.push({
+        severity: "error",
+        field: "name",
+        message: `'${fm.name}' is reserved — collides with the /${fm.name} namespace slash command`,
       });
     }
   }

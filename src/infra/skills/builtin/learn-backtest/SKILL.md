@@ -3,6 +3,8 @@ name: learn-backtest
 description: How to backtest strategies and validate results with credibility tests including PSR, DSR, minTRL, CPCV, and Monte Carlo Permutation Test. When user asks "how do I backtest?", "is this backtest real?", "what's a credible Sharpe?", "MCPT", "permutation test", or about backtest validation
 tags: [learning, backtest, validation, credibility]
 user-invocable: true
+status: active
+last-reviewed: 2026-05-23
 ---
 
 Backtesting tells you how a strategy WOULD have performed. But most backtests lie. Here's how to do it right.

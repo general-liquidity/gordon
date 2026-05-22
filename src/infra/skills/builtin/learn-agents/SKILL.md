@@ -3,6 +3,8 @@ name: learn-agents
 description: How Gordon's 4-agent architecture works — Gordon, Executor, Researcher, and Critic. When user asks "how does Gordon work?", "what are the agents?", "why did Executor handle this?", or about routing between agents
 tags: [learning, agents, architecture]
 user-invocable: true
+status: active
+last-reviewed: 2026-05-23
 ---
 
 Gordon uses 4 agents. Here's how they work and why.

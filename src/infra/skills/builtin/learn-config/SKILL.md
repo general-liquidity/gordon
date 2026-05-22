@@ -3,6 +3,8 @@ name: learn-config
 description: How to configure Gordon — GORDON.md, settings layers, keybindings, and model aliases. When user asks "how do I configure Gordon?", "where's GORDON.md?", "how do I change settings?", or about customization and keybindings
 tags: [learning, config, settings, customization]
 user-invocable: true
+status: active
+last-reviewed: 2026-05-23
 ---
 
 Gordon has multiple configuration layers. Here's how they work.

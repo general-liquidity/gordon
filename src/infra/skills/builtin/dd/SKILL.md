@@ -5,6 +5,8 @@ arguments: [symbol]
 argument-hint: Symbol to analyze (e.g., BTC, ETH, AAPL)
 tags: [analysis, planning, risk]
 user-invocable: true
+status: active
+last-reviewed: 2026-05-23
 ---
 
 Run full due diligence on {symbol}:

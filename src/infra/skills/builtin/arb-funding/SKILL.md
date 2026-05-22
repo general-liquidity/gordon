@@ -4,6 +4,8 @@ description: Funding rate arbitrage — earn funding payments by going long spot
 arguments: [symbol]
 tags: [arbitrage, funding, perps, yield, advanced]
 user-invocable: true
+status: active
+last-reviewed: 2026-05-23
 ---
 
 Analyze and set up a funding rate arbitrage for {symbol}.

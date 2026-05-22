@@ -4,6 +4,8 @@ description: Complete swing trade entry checklist — regime detection through p
 arguments: [symbol]
 tags: [swing, entry, checklist, execution]
 user-invocable: true
+status: active
+last-reviewed: 2026-05-23
 ---
 
 Run the full swing entry checklist for {symbol}. Do NOT skip any step.

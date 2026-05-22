@@ -3,6 +3,8 @@ name: learn-calibration
 description: Gordon's confidence calibration system — track whether your stated confidence matches actual accuracy. When user asks about calibration, decision tracking, confidence stats, or "when I say X% confident, how often am I right?"
 tags: [learning, calibration, confidence, decision-quality]
 user-invocable: true
+status: active
+last-reviewed: 2026-05-23
 ---
 
 Calibration measures the gap between your *stated* confidence and your *actual* accuracy. When you say "80% confident," are you right 80% of the time? Most traders are overconfident at the high end and underconfident at the low end. Calibration makes this visible over hundreds of decisions.

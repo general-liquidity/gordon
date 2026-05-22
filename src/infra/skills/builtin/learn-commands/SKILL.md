@@ -3,6 +3,8 @@ name: learn-commands
 description: Complete guide to Gordon's slash commands organized by category. When user asks "what commands exist?", "what can you do?", "list slash commands", or wants a command reference
 tags: [learning, commands, reference]
 user-invocable: true
+status: active
+last-reviewed: 2026-05-23
 ---
 
 Gordon has many slash commands. Here's how they're organized.

@@ -4,6 +4,8 @@ description: Review and close losing positions that have hit stop levels. When u
 tags: [execution, risk, cleanup]
 user-invocable: true
 context: inline
+status: active
+last-reviewed: 2026-05-23
 ---
 
 Review all my open positions and identify losers:

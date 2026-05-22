@@ -4,6 +4,8 @@ description: Provide liquidity to a DEX pool — analyze pool, calculate imperma
 arguments: [pool]
 tags: [liquidity, defi, pool, yield, advanced]
 user-invocable: true
+status: active
+last-reviewed: 2026-05-23
 ---
 
 Analyze and manage a liquidity provision for {pool}.

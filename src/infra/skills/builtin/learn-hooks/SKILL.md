@@ -3,6 +3,8 @@ name: learn-hooks
 description: How to use lifecycle hooks for custom trading rules and automation. When user asks "how do I add a hook?", "custom rules", "event automation", "PreToolUse", "PreOrderPlacement", or about lifecycle hooks
 tags: [learning, hooks, automation, customization]
 user-invocable: true
+status: active
+last-reviewed: 2026-05-23
 ---
 
 Hooks let you inject custom rules at key points in Gordon's lifecycle. They're how you enforce trading policies without modifying code.

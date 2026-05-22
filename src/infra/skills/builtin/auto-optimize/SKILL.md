@@ -4,6 +4,8 @@ description: Autonomous strategy optimization — Gordon improves your strategy 
 arguments: [strategy, symbol]
 tags: [optimization, autonomous, strategy, backtest]
 user-invocable: true
+status: active
+last-reviewed: 2026-05-23
 ---
 
 Let's set up autonomous optimization for your {strategy} strategy on {symbol}.

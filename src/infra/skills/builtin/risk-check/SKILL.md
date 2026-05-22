@@ -3,6 +3,8 @@ name: risk-check
 description: Portfolio risk assessment — check exposure, concentration, and drawdown status. When user asks "am I too concentrated?", "what's my exposure?", "how risky is my portfolio?", "current risk", or wants a portfolio risk overview
 tags: [risk, portfolio, monitoring]
 user-invocable: true
+status: active
+last-reviewed: 2026-05-23
 ---
 
 Run a comprehensive risk check on my current portfolio:

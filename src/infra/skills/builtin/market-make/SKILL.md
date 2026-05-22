@@ -4,6 +4,8 @@ description: Set up a market making strategy — place bid/ask quotes around mid
 arguments: [symbol]
 tags: [market-making, liquidity, spread, advanced]
 user-invocable: true
+status: active
+last-reviewed: 2026-05-23
 ---
 
 Set up a market making strategy for {symbol}. This uses Hummingbot via MCP or manual order placement.

@@ -4,6 +4,8 @@ description: Quick scalp workflow — orderflow + Kalman filter + tight stops fo
 arguments: [symbol]
 tags: [scalp, intraday, fast, orderflow]
 user-invocable: true
+status: active
+last-reviewed: 2026-05-23
 ---
 
 Run a quick scalp analysis for {symbol}. Speed matters — be concise.

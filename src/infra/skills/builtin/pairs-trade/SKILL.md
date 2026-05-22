@@ -4,6 +4,8 @@ description: Full pairs trading workflow — from cointegration test to entry si
 arguments: [symbolA, symbolB]
 tags: [pairs, stat-arb, cointegration, spread]
 user-invocable: true
+status: active
+last-reviewed: 2026-05-23
 ---
 
 Run the complete pairs trading analysis for {symbolA} / {symbolB}.

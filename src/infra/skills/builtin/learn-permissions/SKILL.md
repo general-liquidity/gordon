@@ -3,6 +3,8 @@ name: learn-permissions
 description: How Gordon's permission system works — modes, rules, risk classifier, and approval flow. When user asks "why did this need approval?", "permission modes", "how do I allow X?", or about the safety/approval system
 tags: [learning, permissions, safety, approval]
 user-invocable: true
+status: active
+last-reviewed: 2026-05-23
 ---
 
 Gordon has a layered safety system. Here's how it works from top to bottom.

@@ -4,6 +4,8 @@ description: Set up dollar-cost averaging — recurring buys with smart timing. 
 arguments: [symbol]
 tags: [dca, accumulate, recurring, long-term]
 user-invocable: true
+status: active
+last-reviewed: 2026-05-23
 ---
 
 Set up a DCA plan for {symbol}.

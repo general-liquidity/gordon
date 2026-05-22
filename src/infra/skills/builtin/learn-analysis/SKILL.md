@@ -3,6 +3,8 @@ name: learn-analysis
 description: Gordon's quantitative modules explained — from Hurst exponent to Black-Litterman. When user asks "what analysis tools do you have?", "explain Hurst", "what's PSR?", or about a specific quantitative module
 tags: [learning, analysis, quant, modules]
 user-invocable: true
+status: active
+last-reviewed: 2026-05-23
 ---
 
 Gordon has many quantitative modules. Here's what the main ones do and when to use them.

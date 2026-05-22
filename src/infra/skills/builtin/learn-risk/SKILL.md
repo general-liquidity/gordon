@@ -3,6 +3,8 @@ name: learn-risk
 description: Learn how Gordon's 11-dimension risk classifier protects your capital. When user asks "how does risk work?", "what's the risk classifier?", "why did my trade get blocked?", or about capital protection
 tags: [learning, risk, safety]
 user-invocable: true
+status: active
+last-reviewed: 2026-05-23
 ---
 
 Let me explain how Gordon keeps your capital safe. Every trade goes through an 11-dimension risk check BEFORE execution — no exceptions.

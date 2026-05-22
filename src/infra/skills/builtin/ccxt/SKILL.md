@@ -7,6 +7,8 @@ metadata:
   author: Gordon
   version: "1.0"
   upstream: https://docs.ccxt.com/
+status: active
+last-reviewed: 2026-05-23
 ---
 
 # CCXT Skill

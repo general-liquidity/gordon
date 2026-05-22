@@ -3,6 +3,8 @@ name: weekend-review
 description: Weekly performance review — P&L, lessons learned, and next week's plan. When user says "weekly review", "weekend recap", "plan next week", "this week's P&L", or wants weekly performance summary
 tags: [review, weekly, performance, planning]
 user-invocable: true
+status: active
+last-reviewed: 2026-05-23
 ---
 
 Run my weekly trading review. Be honest — don't sugarcoat results.

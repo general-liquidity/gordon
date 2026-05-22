@@ -3,6 +3,8 @@ name: learn-portfolio
 description: Portfolio management tools — diff, sandbox, Black-Litterman, rebalancing, and checkpoints. When user asks "what portfolio tools?", "how do I rebalance?", "explain Black-Litterman", or about portfolio management
 tags: [learning, portfolio, allocation, optimization]
 user-invocable: true
+status: active
+last-reviewed: 2026-05-23
 ---
 
 Gordon has 5 portfolio-level tools that go beyond individual trades.

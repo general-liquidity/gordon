@@ -3,6 +3,8 @@ name: rebalance
 description: Portfolio rebalance workflow — check drift, compute target allocation, execute. When user says "rebalance my portfolio", "check drift", "adjust weights", "rebalance to target", or wants portfolio rebalancing
 tags: [portfolio, rebalance, allocation]
 user-invocable: true
+status: active
+last-reviewed: 2026-05-23
 ---
 
 Run the full rebalance workflow on my portfolio.

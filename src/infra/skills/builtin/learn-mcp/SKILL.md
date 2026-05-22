@@ -3,6 +3,8 @@ name: learn-mcp
 description: Learn how to browse the marketplace and install trading plugins. When user asks "what MCP servers can I add?", "install a plugin", "browse marketplace", or about extending Gordon via Model Context Protocol
 tags: [learning, mcp, marketplace, plugins]
 user-invocable: true
+status: active
+last-reviewed: 2026-05-23
 ---
 
 Gordon has a curated marketplace of 47 trading plugins. Let me show you how it works.

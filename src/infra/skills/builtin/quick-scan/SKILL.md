@@ -5,6 +5,8 @@ arguments: [market]
 argument-hint: "crypto" or "stocks" (default: crypto)
 tags: [market, scan, discovery]
 user-invocable: true
+status: active
+last-reviewed: 2026-05-23
 ---
 
 Give me a fast market snapshot:

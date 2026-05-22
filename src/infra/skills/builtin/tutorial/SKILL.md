@@ -3,6 +3,8 @@ name: tutorial
 description: Interactive walkthrough — learn Gordon by doing. Scan, analyze, plan, and trade step by step. When user is new to Gordon, asks "how does this work?", "show me around", or "tutorial"
 tags: [learning, onboarding, tutorial]
 user-invocable: true
+status: active
+last-reviewed: 2026-05-23
 ---
 
 Welcome to Gordon! Let's learn by doing. I'll walk you through the core workflow.

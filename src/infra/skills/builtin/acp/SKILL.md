@@ -7,6 +7,8 @@ metadata:
   author: Gordon
   version: "1.0"
   upstream: https://agentclientprotocol.com/
+status: active
+last-reviewed: 2026-05-23
 ---
 
 # ACP Skill
