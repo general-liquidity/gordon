@@ -2303,6 +2303,83 @@ N+1th alert in a cascade may be the real one.
 deduplication. Not before — premature deduplication is worse than
 no deduplication.
 
+### S25. Investigation / fork orchestrator integration
+
+**Module:** `src/infra/agents/investigation.ts` +
+`src/infra/agents/contextFork.ts` (primitives shipped in commit
+`1f1d5c3d`).
+
+**Status:** Primitives ship dependency-injected with unit tests.
+Orchestrator does NOT yet decide when to delegate to an
+investigation vs. running tools inline.
+
+**What's needed:** Heuristic + plumbing in `orchestrator.ts` that
+detects "this looks like a read-only multi-step investigation"
+and routes through `runInvestigation` instead of consuming the
+orchestrator's own context. Candidate signals:
+- Task description matches "scan", "find", "research", "analyze
+  X across N", "summarize"
+- Expected tool calls > offload-threshold from `runtimeHarness.ts`
+- Operator explicit `/investigate <task>` slash command
+
+**Risk:** Medium. Wrong heuristic → unnecessary sub-agent overhead
+(extra prompt-cache warm-up, extra LLM call). Right heuristic →
+substantial context savings on long autonomous loops.
+
+**Revive on:** Operator session crosses the context-compaction
+threshold from inline tool work that would have fit cleanly into
+an investigation hand-off.
+
+### S26. Context-timeline TUI surface
+
+**Module:** `src/infra/agents/contextTimeline.ts` (data layer
+shipped in commit `1f1d5c3d`); TUI consumer not yet wired.
+
+**Status:** Registry + snapshot + formatter exist. Surface lives
+only as text; no operator-visible visualization in the live TUI.
+
+**What's needed:**
+- TUI component that subscribes to a periodic `captureContext
+  Timeline()` poll (e.g., every 1s during autonomous loops)
+- Render active agents as a tree (parent → child) with token
+  budget bars
+- Optional `/timeline` slash command for one-shot text rendering
+  (uses `formatContextTimeline` already shipped)
+
+**Risk:** Low — UI-only, registry data is read-only.
+
+**Revive on:** Operator running long autonomous loops where
+context-pressure debugging would benefit from real-time visibility.
+
+### S27. Agent-step adapter from Mastra orchestrator
+
+**Module would live in:** `src/infra/agents/mastraAgentStepAdapter.ts`.
+**Memory:** N/A — implementation wiring.
+
+**Status:** Not started. The `runInvestigation` + `forkContext`
+primitives take an `agentStep` callable injected by the caller.
+Tests use a scripted mock; runtime needs a real adapter that calls
+into Mastra's agent loop with the correct tool subset + message
+history.
+
+**What's needed:**
+- Construct a Mastra agent on the fly with the supplied tool
+  subset (filtered against Gordon's tool catalog)
+- Run one round of the loop with the supplied messages
+- Translate Mastra's stream events back into the
+  `InvestigationAgentStepOutput` shape
+- Honor cache-prefix sharing via `sharedPrefixCache.ts` so
+  sub-agents are cheap on input tokens
+- Wire `recordAgentStart` / `recordAgentProgress` / `recordAgentEnd`
+  around the call
+
+**Risk:** Medium. Mastra-version-coupled — adapter likely needs to
+track Mastra release cadence. Patched `lastMessages: 10` discipline
+must hold for sub-agents.
+
+**Revive on:** S25 lights up. Until then this adapter has no
+caller.
+
 ---
 
 ## Index of related memory entries
