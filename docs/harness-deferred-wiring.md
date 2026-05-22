@@ -1783,3 +1783,410 @@ modules become technical debt.
 - T2 commit — decision log, agent readiness, termination layers, working-memory flush signal
 - T3 commit — shadow mode, OTel, WIP-limit
 - Diagnostics commit — quality document, cold-start audit, boundaries
+
+---
+
+## Session-deferred (added 2026-05-23)
+
+Items deferred across the long working session that shipped the
+applied-math diagnostic suite (commits `e6a31f0c`, `50dac2a5`,
+`fa41c2a4`, `0bb96211`), the skills-governance stack (`32a5d5e8`,
+`0c849f7c`), and the event-replay Tier 1 framework (`daa7e0d9`). Each
+entry follows the same pattern as the sections above — what's ready,
+what's missing, rollout posture. Pick by operator signal.
+
+### S1. Event-replay Tier 2 — auto data fetcher
+
+**Module:** `src/backtest/event-replay/` (Tier 1 catalog + engine
++ verdict shipped in commit `daa7e0d9`).
+**Memory:** `[[project_event_replay_tier_2_3_deferred]]`.
+
+**Status:** Tier 1 framework accepts arbitrary OHLC bars from any
+source. Operator currently must source historical data for the four
+canonical events themselves (CHF unpeg 2015, PBOC devaluation 2015,
+US election 2016, COVID vol spike 2020).
+
+**What's needed:** Auto-fetcher that pulls historical bars from
+Gordon's connected venues:
+- Binance for COVID-era crypto reactions (BTCUSD, ETHUSD, USDT
+  flows)
+- IBKR for FX/equity (EURCHF tick → minute aggregation for CHF
+  unpeg, SPX futures for COVID + election)
+- Alpaca for SPX cash-market reactions
+- Per-venue data-depth probe so the operator knows which events
+  they can actually run
+
+**Risk:** Medium. Each venue has different history depth + auth
+requirements. Retail brokers typically don't have minute resolution
+reaching back to 2015–2017 without paid feeds.
+
+**Revive on:** Operator concretely says "I want to stress-test
+against CHF unpeg" AND has data subscription, OR Pro pilot kicks off
+(institutional buyers expect this natively).
+
+### S2. Event-replay Tier 3 — bundled tick data + per-event slippage models
+
+**Module:** `src/backtest/event-replay/`.
+**Memory:** `[[project_event_replay_tier_2_3_deferred]]`.
+
+**Two sub-builds:**
+
+1. **Bundled event tick data** — ship a small dataset (~5–50MB)
+   containing tick or sub-minute bars for the four canonical events
+   on key assets (EURCHF for CHF unpeg, SPX/VIX for COVID, etc.).
+   Removes the "operator needs data subscription" gating issue.
+
+2. **Per-event slippage models** — encode realistic execution
+   conditions per event (CHF unpeg = 200pip gap-through baseline;
+   COVID = 5× spread widening on index CFDs; PBOC = funding cost
+   spike on CNH proxies). Today the engine applies a single
+   `SlippageModel` with a uniform `spreadWideningMultiplier` — the
+   per-event nuance is collapsed.
+
+**Risk:** Medium-high. Bundled data has commercial-licensing
+implications (Refinitiv tick history is canonical but expensive).
+Operator-contributed data via PRs is the cheaper alternative.
+
+**Revive on:** Data partnership unlocks bundling, OR operators with
+their own tick archives contribute, OR Pro pilot funds the licensing.
+
+### S3. Per-skill eval harness
+
+**Module would live in:** `src/infra/skills/eval/`.
+**Memory:** none yet — capture before building.
+
+**Status:** Not started. The skills-governance stack
+(`src/infra/skills/{governance,usage-tracker,audit}.ts`) tracks
+metadata + usage + staleness but does NOT verify that any specific
+skill still produces correct output.
+
+**What's missing:** Heterogeneous skill outputs (one renders charts,
+one searches news, one classifies trades) make generic skill eval a
+research problem, not a 200-LOC commit. Possible approaches:
+- Per-skill golden-output fixtures + diff-based check
+- LLM-as-judge per-skill rubrics (like the existing
+  `infra/domain/evals/harness/` but scoped to single-skill scope)
+- Operator-defined assertions per skill in frontmatter
+
+**Risk:** High implementation cost relative to operator value at
+single-operator scale. Likely Pro-only feature.
+
+**Revive on:** Operator concretely reports a drifting skill, OR Pro
+pilot demands skill-level eval gates.
+
+### S4. Skill marketplace UI / `/skills` TUI rendering
+
+**Module would live in:** `src/tui/components/`.
+**Status:** Not started. `runSkillAudit` returns structured data +
+`formatAuditReport` returns text. The /skills slash command (commit
+`0c849f7c`) renders text inline. A dedicated TUI surface for
+browsing + searching + tagging skills doesn't exist.
+
+**What's missing:**
+- Searchable / filterable skill list with status + last-reviewed
+  columns
+- Interactive `/skills tag <id> <status>` command for backfilling
+  governance metadata without manual SKILL.md edits
+- Bulk-review UI for promoting community skills from experimental →
+  active
+
+**Risk:** Low. Pure UI. Failure means falling back to text rendering.
+
+**Revive on:** Operator skill-catalog grows past ~100 skills, OR
+operator authoring community skills regularly.
+
+### S5. `/skills review <id>` interactive subcommand
+
+**Status:** Listed in the slash command's `subcommands` but
+currently maps to "list skills needing review" — there's no
+interactive single-skill review surface.
+
+**What's needed:** When operator runs `/skills review ccxt`:
+1. Display the skill's current metadata + body
+2. Show usage stats specifically for this skill
+3. Prompt operator: "Mark as reviewed? Update status? Promote /
+   demote / deprecate?"
+4. On confirm, rewrite the SKILL.md frontmatter
+
+**Risk:** Low. File-write surface but well-scoped per-skill.
+
+**Revive on:** Operator audit surfaces stale skills needing
+metadata updates AND they want to handle one-at-a-time rather than
+via batch script.
+
+### S6. CI hook for skill validation
+
+**Module:** `scripts/dev/tag-builtin-skills.ts` exists but no
+validation gate runs on PRs/commits.
+**Status:** Loader validates skills at runtime; nothing enforces
+pre-merge.
+
+**What's needed:**
+- `scripts/dev/validate-skills.ts` — walks `src/infra/skills/builtin/`
+  + any `.gordon/skills/` directories, runs `validateSkillFrontmatter`
+  on each, exits non-zero on any error-severity issue
+- npm script: `"validate:skills": "bun run scripts/dev/validate-skills.ts"`
+- Pre-commit hook in `lefthook.yml` or equivalent CI config
+
+**Risk:** Low. Read-only check; failure mode is verbose CI output.
+
+**Revive on:** Operator authors first community SKILL.md with a
+validation error that ships to main.
+
+### S7. ACP v3.6+ — executor-agent dynamic tool registration
+
+**Module:** `src/infra/acp/`.
+**Status:** v3.5 (commit `a7e262d1`) ships MCP-client spinup for
+session-scoped MCP servers forwarded by the editor. The instantiated
+client tools are NOT routed into the executor agent's tool surface —
+they're available to the bridge but not callable mid-turn.
+
+**What's needed:** Mastra-wrapper changes so MCP-client tools
+register dynamically into the agent's effective tool list per
+session. Requires understanding how Mastra resolves tool catalogs at
+agent creation vs. per-message.
+
+**Risk:** Medium. Touches Mastra internals; could affect prompt
+caching + cache-warm behavior.
+
+**Revive on:** Operator runs Gordon in Zed/Athas AND wants forwarded
+MCP server tools as agent-callable.
+
+### S8. ACP v3.6 — LLM client content-block widening
+
+**Module:** `src/infra/ai/llm/` + `src/infra/acp/llm-vision.ts`.
+**Status:** v3.5 ships `GORDON_ACP_VISION_PATH` env routing for
+inline-text vs. block-aware vision paths. Current LLM client signature
+accepts `Message[] = { role, content: string }` only — content-block
+arrays don't flow through.
+
+**What's needed:** Widen the LLM client interface to accept content
+blocks. Anthropic adapter already supports it; OpenAI/Dedalus
+adapters need format mapping. Default behavior unchanged when
+content is a plain string.
+
+**Risk:** Medium. Cross-cutting interface change; needs
+backward-compat tests for every adapter.
+
+**Revive on:** Operator regularly attaches images/audio to Gordon
+prompts in ACP mode AND inline-text rendering loses information.
+
+### S9. ACP v3.6 — Mastra mid-turn token-budget signals
+
+**Module:** `src/infra/agents/runtimeHarness.ts` +
+`src/infra/acp/token-budget.ts`.
+**Status:** Token-budget probe exists (`probeBudgetHalt`) but checks
+between agent turns, not within a turn. The `max_turn_requests` ACP
+stop reason can't fire mid-turn today.
+
+**What's needed:** Mastra-level callback on every tool call /
+text-delta within a turn. Pull from existing `costTracker.ts`
+surface; gate via budget threshold.
+
+**Risk:** Medium. Performance-sensitive callsite.
+
+**Revive on:** Operator hits the Mastra ceiling mid-turn and the
+stop reason doesn't reflect it.
+
+### S10. MCP server v3 features — parked behind HTTP server park
+
+**Module:** `src/infra/ai/mcp/`.
+**Memory:** `[[project_mastra_http_server_deferred]]`.
+
+**Items captured in MCP v2 commit body** (`325809ca`):
+- MCP Apps (interactive UI widgets) — requires editor opt-in
+- Elicitation URL mode — needs HTTP server
+- Streamable HTTP transport — needs HTTP server
+- Sampling (server-to-client LLM calls) — Gordon has its own LLM
+- OAuth / authorization — needs HTTP server
+
+**Status:** All five sit behind the Mastra HTTP server park. Tier 1
+(resources + prompts + tasks) shipped.
+
+**Revive on:** HTTP server park unlocks (see
+`[[project_mastra_http_server_deferred]]` for revival conditions on
+THAT side first).
+
+### S11. CCXT native adapters opting into ExchangeExtended
+
+**Module:** `src/infra/exchange/types.ts` +
+`src/infra/exchange/adapters/`.
+**Status:** `ExchangeDerivatives` / `Margin` / `AccountManagement` /
+`OrderManagement` interfaces exist (commits `07757574`, `cc65c710`).
+The CCXT adapter implements all four. Native adapters (Binance,
+Coinbase, Kraken, OKX, etc.) do NOT.
+
+**What's needed:** Per-native-adapter implementations of the
+extended interfaces. Each adapter that opts in gets perps / margin /
+inter-account-transfer / batch-order capabilities without operator
+switching to `ccxt:<exchange>`.
+
+**Risk:** Medium per adapter. Some exchanges have unique perp
+mechanics (Hyperliquid's vault accounting, dYdX's L2 settlement)
+that don't map cleanly to the CCXT-unified interface.
+
+**Revive on:** Operator concretely wants perps on a native exchange
+AND switching to `ccxt:<exchange>` loses something the native
+adapter has (e.g., venue-specific orderbook stream).
+
+### S12. Peer registry expansion — Hermes / Claude Code / Codex CLIs
+
+**Module:** `src/infra/agents/peers/`.
+**Status:** Cursor + Warp peers registered (commit `eca62df3`).
+Hermes / Claude Code / Codex / OpenClaw CLI peers documented but
+unverified.
+
+**What's needed:** For each:
+1. Verify the CLI supports headless invocation flag (`-p` /
+   `--prompt` / equivalent)
+2. Add `PEER_REGISTRY` entry with command + env requirements
+3. Add CLI-specific test for `CliSubprocessPeer.send` behavior
+
+**Risk:** Low per peer. Each is ~30 LOC + verification.
+
+**Revive on:** Operator concretely uses one of these CLIs AND wants
+`/delegate <peer>` routing.
+
+### S13. NautilusTrader OUO / OTO contingency orders
+
+**Module:** `src/infra/exchange/types.ts`'s `ExchangeExtended`.
+**Memory:** none — discussed in NautilusTrader scan synthesis (no
+saved memory entry yet).
+
+**What's needed:** Add OCO (one-cancels-other), OUO (one-updates-
+other), OTO (one-triggers-other) contingency order types to
+`ExchangeExtended` interface. ~30 LOC interface, ~50 LOC per
+implementing adapter.
+
+**Risk:** Low. Additive interface; adapters that don't implement it
+return `feature_not_supported`.
+
+**Revive on:** Operator concretely runs bracket / conditional orders
+AND wants the contingency semantics natively (vs. operator-managed
+across multiple primitive orders).
+
+### S14. OpenBB Platform Python data bridge
+
+**Module would live in:** `src/infra/data/openbb-platform/`.
+**Status:** OpenBB Workspace MCP added to catalog (commit `08b1a8f1`)
+but the broader OpenBB Platform Python SDK isn't bridged.
+
+**What's needed:** ~400 LOC bridge that exposes OpenBB's macro /
+fundamentals / alternative-data surface to Gordon. Requires Python
+subprocess execution + result parsing.
+
+**Risk:** Medium. Python subprocess adds runtime dependency surface.
+
+**Revive on:** Operator does macro / fundamentals analysis often
+enough that the bridge pays off (estimated threshold: 3+ macro
+queries per week).
+
+### S15. Adversarial security eval scenarios
+
+**Module:** `src/infra/domain/evals/harness/`.
+**Memory:** `[[project_queued_adversarial_security_evals]]`.
+
+**Status:** 3 hand-curated scenarios shipped. 5 adversarial
+scenarios queued in memory but not built:
+- Credential-leak
+- Permission-bypass
+- Deny-list-circumvention
+- Cross-agent-tool-boundary
+- Injection-resilience
+
+**What's needed:** Per scenario: trajectory captures of the attack
++ judge rubrics for "did the safety stack hold?"
+
+**Risk:** Low. Read-only evals. Failure surfaces as eval-regression
+signal.
+
+**Revive on:** Next eval-harness expansion pass — natural batch.
+
+### S16. Alpha Tier 2 — IC-weighted signal blending in riskClassifier
+
+**Module:** `src/core/alpha/` + `src/infra/trading/risk/riskClassifier.ts`.
+**Status:** Tier 1 diagnostic stack (IC tracker + effective N + IR
+diagnostic + composite attribution + walk-forward IC + cost-aware
+edge) shipped across `50dac2a5` + `fa41c2a4`. Static dimension
+weights in `riskClassifier`.
+
+**What's needed:**
+- Weight-update mechanism reading per-dimension IC from `ic-tracker`
+  over a rolling window
+- Replace static `dimension.weight` with `staticWeight ×
+  icMultiplier` where multiplier scales with measured IC
+- A/B harness comparing static-weight vs. IC-weighted classifier
+  verdicts on historical trades
+
+**Risk:** High. Changes classifier behavior. Could fit noise. Needs
+A/B validation before flipping default-on.
+
+**Revive on:** Concrete evidence static weights are sub-optimal vs.
+IC-rolling weights (needs A/B data on historical trade outcomes).
+
+### S17. FinceptTerminal cross-tool compatibility note
+
+**Module:** N/A — documentation only.
+
+**What's needed:** ~5-line note in `CLAUDE.md` or a future
+`docs/integrations.md` confirming Gordon's MCP server is compatible
+with FinceptTerminal's node editor for cross-tool workflows. Closes
+a thread the operator was considering but never decided.
+
+**Risk:** None.
+
+**Revive on:** Operator concretely uses FinceptTerminal alongside
+Gordon, OR ships a public integrations doc.
+
+### S18. Custom event-replay catalog management
+
+**Module:** `src/backtest/event-replay/catalog.ts` ships 4 canonical
+events. Operator can't add their own without editing the source.
+
+**What's needed:**
+- Storage path under `~/.gordon/event-catalog/` for operator-
+  authored events
+- Loader that merges canonical + operator events
+- `/events add` / `/events list` slash commands
+
+**Risk:** Low. Additive surface.
+
+**Revive on:** Operator concretely wants to stress-test against an
+event not in the canonical four (likely candidates: 1987 crash for
+indices, 1992 ERM crisis for GBP, 2010 flash crash, 2022 LDI gilt
+crisis).
+
+### S19. Jane Street "formal methods" frame
+
+**Module:** N/A — speculative future direction.
+**Memory:** `[[project_jane_street_validation]]`.
+
+**Status:** From Yaron Minsky's interview transcript — Jane Street
+building a formal-methods team because AI tooling makes mathematical
+proofs of software correctness scaler-relevant again.
+
+**Potential Gordon analog:** Mathematical proofs of trading-strategy
+invariants. e.g., "this strategy never holds more than X% of
+portfolio in any single position" should be a provable invariant,
+not a runtime check.
+
+**Risk:** Very high implementation cost. Research-level work.
+
+**Revive on:** Almost certainly never at retail-Gordon scale. Could
+be a Pro pilot demand signal.
+
+---
+
+## Index of related memory entries
+
+Items in this section reference the following memory entries (under
+`~/.claude/projects/.../memory/`):
+
+- `[[project_event_replay_tier_2_3_deferred]]` — S1, S2
+- `[[project_mastra_http_server_deferred]]` — S10
+- `[[project_mastra_browser_deferred]]` — adjacent (no entry here)
+- `[[project_queued_adversarial_security_evals]]` — S15
+- `[[project_mang_group_skills_governance]]` — context for S3–S6
+- `[[project_jane_street_validation]]` — context for S19 + general framing
+- `[[project_dual_edition_strategy]]` — Pro-pilot revival conditions
+- `[[operator-class-agent-frame]]` — positioning context for prioritization
