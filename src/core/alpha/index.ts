@@ -58,3 +58,29 @@ export {
   coefficientOfVariation,
   mean,
 } from "./helpers.ts";
+
+export {
+  computeMarginalContribution,
+  equityCurveToReturns,
+  type MarginalContribution,
+  type MarginalContributionVerdict,
+  type MarginalContributionOptions,
+  type DrawdownOverlapAnalysis,
+} from "./marginal-contribution.ts";
+
+export {
+  optimizePortfolio,
+  type PortfolioOptimizerInput,
+  type OptimalPortfolio,
+  type OptimizationObjective,
+} from "./portfolio-optimizer.ts";
+
+export {
+  transpose,
+  multiply,
+  multiplyVector,
+  dot,
+  invert,
+  shrinkToDiagonal,
+  computeCovarianceMatrix,
+} from "./matrix.ts";
