@@ -2175,6 +2175,63 @@ not a runtime check.
 **Revive on:** Almost certainly never at retail-Gordon scale. Could
 be a Pro pilot demand signal.
 
+### S20. Workspace snapshot pattern for training data
+
+**Module would live in:** `src/infra/safety/workspaceSnapshot.ts`.
+**Memory:** `[[project_jane_street_dev_tools]]`.
+
+**Status:** Not started. Adapted from John Kzi's Jane Street AID
+talk — they capture developer workstation state every 20 seconds
++ build status, then mine green→red→green patterns as isolated-
+change training data.
+
+**Potential Gordon analog:** Snapshot session state at intervals
+(active plan, open positions, recent trades, market context) +
+operator-decision events (plan approved / rejected, trade executed
+/ cancelled). Mine the same green→red→green pattern: where did the
+operator have a workflow that broke and then was fixed? That's an
+isolated-decision training example.
+
+**What's needed:**
+- Snapshot writer with operator-tunable interval (default 20s)
+- Pattern miner that walks snapshots looking for state transitions
+  matching "broke → fixed"
+- Privacy guard — operator-controlled retention + auto-truncation
+
+**Risk:** Medium. Data volume can grow fast; needs retention policy.
+
+**Revive on:** Gordon training a custom operator model (only
+meaningful at Pro pilot scale OR with explicit model-fine-tuning
+roadmap).
+
+### S21. CES unification — single Strategy Evaluation Service primitive
+
+**Module would live in:** `src/backtest/evaluation-service/`.
+**Memory:** `[[project_jane_street_dev_tools]]`.
+
+**Status:** Gordon has three modules with the same pattern (warm
+state → apply candidate → check verdict → report metrics):
+- `src/infra/domain/evals/harness/` (RULER eval for agent quality)
+- `src/backtest/engine.ts` (backtest engine)
+- `src/backtest/event-replay/engine.ts` (historical-break replay)
+
+John Kzi's "CES" framing identifies this as a generic primitive
+worth unifying. Unifying = bookkeeping, not new capability.
+
+**What unification would deliver:**
+- Single `EvaluationService` interface with `warmState`,
+  `applyCandidate`, `verdict`, `reportMetrics` method shape
+- Shared infrastructure for worker pooling, candidate scheduling,
+  result aggregation
+- Easier to add new evaluators (e.g., signal-evaluator, strategy-
+  variant-evaluator) without re-implementing the harness
+
+**Risk:** Low — refactor of existing modules.
+
+**Revive on:** When Gordon adds a fourth evaluator and the
+duplication becomes painful. Until then, three modules with similar
+shapes is cheaper than premature unification.
+
 ---
 
 ## Index of related memory entries
