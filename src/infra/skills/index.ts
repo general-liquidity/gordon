@@ -25,4 +25,39 @@ export type {
   SkillFrontmatter,
   SkillSource,
   SkillInvocation,
+  SkillStatus,
+  SkillValidationIssue,
 } from "./types.ts";
+
+// ── Governance ────────────────────────────────────────────────
+export {
+  assessSkillStaleness,
+  skillStatus,
+  summarizeSkillStatuses,
+  skillsNeedingReview,
+  type StalenessVerdict,
+  type SkillStalenessOptions,
+  type SkillStalenessResult,
+  type SkillStatusBreakdown,
+} from "./governance.ts";
+
+// ── Usage tracking ────────────────────────────────────────────
+export {
+  recordSkillUsage,
+  readSkillUsage,
+  getSkillUsageStats,
+  neverInvokedSkills,
+  defaultSkillUsagePath,
+  type SkillUsageRecord,
+  type SkillUsageStats,
+  type UsageReadOptions,
+} from "./usage-tracker.ts";
+
+// ── Audit ─────────────────────────────────────────────────────
+export {
+  runSkillAudit,
+  formatAuditReport,
+  type AuditVerdict,
+  type SkillAuditReport,
+  type AuditOptions,
+} from "./audit.ts";

@@ -172,6 +172,10 @@ function toFrontmatter(raw: Record<string, unknown>): SkillFrontmatter {
     license: raw.license as string | undefined,
     compatibility: raw.compatibility as string | undefined,
     metadata: raw.metadata as Record<string, string> | undefined,
+    status: raw.status as "active" | "experimental" | "deprecated" | undefined,
+    owner: raw.owner as string | undefined,
+    lastReviewed: (raw["last-reviewed"] ?? raw.lastReviewed) as string | undefined,
+    created: raw.created as string | undefined,
   };
 }
 
@@ -257,6 +261,35 @@ export function validateSkillFrontmatter(
         field: "compatibility",
         message: `length ${fm.compatibility.length} > spec max ${MAX_COMPATIBILITY_LEN}`,
       });
+    }
+  }
+
+  // Governance fields (all warning-only — never block loading)
+
+  if (fm.status !== undefined) {
+    const validStatuses = ["active", "experimental", "deprecated"];
+    if (!validStatuses.includes(fm.status)) {
+      issues.push({
+        severity: "warning",
+        field: "status",
+        message: `'${fm.status}' is not one of ${validStatuses.join(" / ")}`,
+      });
+    }
+  }
+
+  for (const [field, value] of [
+    ["lastReviewed", fm.lastReviewed],
+    ["created", fm.created],
+  ] as const) {
+    if (value !== undefined) {
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) {
+        issues.push({
+          severity: "warning",
+          field,
+          message: `'${value}' is not a valid ISO-8601 date`,
+        });
+      }
     }
   }
 

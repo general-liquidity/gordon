@@ -54,7 +54,32 @@ export interface SkillFrontmatter {
    * Nested object parsing supported in the loader.
    */
   metadata?: Record<string, string>;
+
+  // ────────────────────────────────────────────────────────────────
+  // Governance fields (all optional, default-tolerant)
+  //
+  // Inspired by Mang Group's institutional skill-governance pattern.
+  // None of these block loading — skills missing them default to
+  // `experimental` + no review date, which the audit surface
+  // highlights so the operator can backfill the governance metadata
+  // as they review skills.
+  // ────────────────────────────────────────────────────────────────
+
+  /**
+   * Lifecycle status. `active` = trusted/maintained; `experimental` =
+   * default for new/unreviewed skills; `deprecated` = retain but
+   * surface in audit as candidates for removal.
+   */
+  status?: SkillStatus;
+  /** Skill owner — operator name, team, or "shared". Cosmetic but useful in audit reports. */
+  owner?: string;
+  /** ISO-8601 date string of the last operator review. Drives the staleness gate in audit. */
+  lastReviewed?: string;
+  /** ISO-8601 date string of skill creation. Useful for sorting / "added since" queries. */
+  created?: string;
 }
+
+export type SkillStatus = "active" | "experimental" | "deprecated";
 
 /**
  * Severity-tagged validation issue for a skill against the agentskills.io

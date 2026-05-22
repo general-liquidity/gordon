@@ -13,6 +13,7 @@
 import { join, resolve } from "node:path";
 import { GORDON_DIR } from "../storage/paths.ts";
 import { discoverSkillsFromDir } from "./loader.ts";
+import { recordSkillUsage } from "./usage-tracker.ts";
 import type { Skill, SkillSource, SkillInvocation } from "./types.ts";
 
 // ============================================================================
@@ -99,9 +100,16 @@ export function listUserInvocableSkills(): Skill[] {
  * Resolve a skill invocation: find the skill, substitute arguments,
  * and return the prompt to send to the agent.
  */
-export function resolveSkillInvocation(skillName: string, args: string): SkillInvocation | null {
+export function resolveSkillInvocation(
+  skillName: string,
+  args: string,
+  source: "user" | "agent" | "test" = "user",
+): SkillInvocation | null {
   const skill = getSkill(skillName);
   if (!skill) return null;
+
+  // Record usage — silent on failure, gated by GORDON_SKILL_USAGE_DISABLED
+  recordSkillUsage(skill.id, source);
 
   // Substitute arguments into the body
   let prompt = skill.body;
