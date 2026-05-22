@@ -2232,6 +2232,77 @@ worth unifying. Unifying = bookkeeping, not new capability.
 duplication becomes painful. Until then, three modules with similar
 shapes is cheaper than premature unification.
 
+### S22. "What changed" tool — incident debugging surface
+
+**Module would live in:** `src/app/slash/commands/whatChanged.ts`.
+**Memory:** `[[project_jane_street_production_engineering]]`.
+
+**Status:** Not started. Jane Street has a tool called "what
+changed" — type in a system name, get back binary changes + config
+changes + metadata changes during incident response.
+
+**What's needed:**
+- Slash command `/changed <module-or-path>` that aggregates:
+  - Recent git commits touching the path
+  - Recent config diffs (env vars, `.gordon/` config files)
+  - Recent skill metadata changes (lastReviewed updates)
+  - Recent trade-ledger entries scoped to the affected module
+- Filter by time window (default 24h)
+- Operator-readable timeline output
+
+**Risk:** Low. Mostly UX over `git log` + existing JSONL ledgers.
+
+**Revive on:** First operator incident where "what changed in
+Gordon today?" takes > 5 minutes to answer manually.
+
+### S23. Pre-market readiness check — automated pre-deployment audit
+
+**Module would live in:** `src/infra/safety/readinessCheck.ts`.
+**Memory:** `[[project_jane_street_production_engineering]]`.
+
+**Status:** Not started. Mark's incident postmortem question:
+"Could we have caught this 20 minutes earlier with pre-open
+trading or other alerting?"
+
+**What's needed:** Automated audit before live trading session:
+- Skills validation: `runSkillAudit` returns `clean`
+- Backtest health: last backtest result has no `too_good_to_be_true`
+  verdicts via `checkTooGoodToBeTrue`
+- Event-replay verdict: most-recent canonical-event replay verdict
+  is `pass` for the strategy about to deploy
+- Required configs: all expected env vars + `.gordon/` config files
+  present + non-empty
+- Exchange health probe: ping each configured venue, log latency
+- Verdict: `ready` / `needs_attention` / `block_deployment`
+
+**Risk:** Low. Read-only check; failure mode is verbose output the
+operator reads before opening the live session.
+
+**Revive on:** Operator starts running live sessions regularly (Pro
+pilot or daily-trader operator profile).
+
+### S24. Cascade-alert deduplication
+
+**Module would live in:** `src/infra/safety/alertDedup.ts`.
+**Memory:** `[[project_jane_street_production_engineering]]`.
+
+**Status:** Not started. Mark explicitly admitted Jane Street
+doesn't solve this well: "If anyone's solved it, talk to me
+afterwards." Symptom-based alerting mitigates the problem but
+doesn't eliminate it.
+
+**What's needed:** When N similar alerts fire within a time window,
+collapse them into one notification with a `repeated × N` suffix.
+Same-source same-symptom alerts get aggregated; orthogonal alerts
+still fire independently.
+
+**Risk:** Medium. Aggregation logic itself can hide signal — the
+N+1th alert in a cascade may be the real one.
+
+**Revive on:** Operator hits real-world cascade scenario and wants
+deduplication. Not before — premature deduplication is worse than
+no deduplication.
+
 ---
 
 ## Index of related memory entries

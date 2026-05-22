@@ -84,3 +84,14 @@ export {
   shrinkToDiagonal,
   computeCovarianceMatrix,
 } from "./matrix.ts";
+
+export {
+  checkTooGoodToBeTrue,
+  formatTooGoodCheck,
+  type TooGoodCheckInput,
+  type TooGoodCheckOptions,
+  type TooGoodCheckResult,
+  type TooGoodVerdict,
+  type TooGoodSeverity,
+  type TrippedCheck,
+} from "./too-good-check.ts";
