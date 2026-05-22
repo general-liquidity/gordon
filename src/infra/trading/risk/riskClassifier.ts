@@ -86,6 +86,23 @@ export interface PortfolioContext {
   targetReturns?: number[];
   /** Whether the asset is crypto (365 trading days) or stock (252). */
   isCrypto?: boolean;
+  /**
+   * Optional regime-transition snapshot from `calculateMarkovRegime` (or
+   * any equivalent regime model). When supplied, the classifier scores
+   * the probability of a regime shift away from the current state —
+   * high shift probability means the matrix's "stay" probability is
+   * weak, so the operator's existing edge assumption may not hold.
+   *
+   *   probShift ∈ [0, 1] = 1 - probability of staying in current state
+   *   matrixStability indicates whether the transition matrix is itself
+   *   trustworthy (drifting / unstable matrices reduce the weight of
+   *   any signal derived from them).
+   */
+  regimeTransition?: {
+    probShift: number;
+    currentState: "bull" | "neutral" | "bear";
+    matrixStability?: "stable" | "drifting" | "unstable" | "insufficient_data";
+  };
 }
 
 export interface ClassifierConfig {
@@ -101,6 +118,13 @@ export interface ClassifierConfig {
   volatilityMultiplier?: number;
   /** Current market hours state. */
   isMarketHours?: boolean;
+  /**
+   * Regime-transition probability above which the classifier escalates
+   * the verdict (default 0.30 — i.e. when the matrix says there's a
+   * >30% chance of leaving the current state, treat the trade as if the
+   * operator's regime-based edge assumption is fragile).
+   */
+  regimeTransitionThreshold?: number;
 }
 
 export const DEFAULT_CLASSIFIER_CONFIG: ClassifierConfig = {
@@ -110,6 +134,7 @@ export const DEFAULT_CLASSIFIER_CONFIG: ClassifierConfig = {
   maxTradesPerHour: 10,
   volatilityMultiplier: 1.0,
   isMarketHours: true,
+  regimeTransitionThreshold: 0.30,
 };
 
 // ============================================================================
@@ -248,6 +273,45 @@ export function classifyTradeRisk(
       weight: 1.4,
       reason: `Max correlation: ${(corrCheck.maxCorrelation * 100).toFixed(0)}% with ${corrCheck.mostCorrelatedWith}` +
         (corrCheck.concentrationWarning ? " — CONCENTRATION WARNING" : ""),
+    });
+  }
+
+  // 12. Regime-transition risk — escalate when the Markov matrix says
+  // the current regime is fragile (high probability of flipping) OR
+  // when the matrix itself is unstable (chi-square test rejects
+  // stationarity). Either signal means the operator's regime-based
+  // edge assumption shouldn't get the usual auto-approval discount.
+  if (portfolio.regimeTransition) {
+    const rt = portfolio.regimeTransition;
+    const threshold = config.regimeTransitionThreshold ?? 0.30;
+    const probShift = Math.max(0, Math.min(1, rt.probShift));
+
+    // Base score from shift probability above threshold
+    let regimeScore = probShift > threshold
+      ? Math.min(80, ((probShift - threshold) / (1 - threshold)) * 80)
+      : 0;
+
+    // Matrix-stability multiplier: drifting → +20, unstable → +40,
+    // insufficient_data → +10 (signal too weak to trust either way)
+    let stabilityNote = "";
+    if (rt.matrixStability === "drifting") {
+      regimeScore = Math.min(100, regimeScore + 20);
+      stabilityNote = ", transition matrix is DRIFTING";
+    } else if (rt.matrixStability === "unstable") {
+      regimeScore = Math.min(100, regimeScore + 40);
+      stabilityNote = ", transition matrix is UNSTABLE — discard inferences";
+    } else if (rt.matrixStability === "insufficient_data") {
+      regimeScore = Math.min(100, regimeScore + 10);
+      stabilityNote = ", insufficient data for stability check";
+    }
+
+    dimensions.push({
+      name: "Regime Transition Risk",
+      score: regimeScore,
+      weight: 1.2,
+      reason:
+        `Current state ${rt.currentState}, shift probability ${(probShift * 100).toFixed(0)}% ` +
+        `(threshold ${(threshold * 100).toFixed(0)}%)${stabilityNote}`,
     });
   }
 

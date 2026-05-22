@@ -8,6 +8,21 @@
 
 import type { Candle } from "./types.ts";
 
+export interface MatrixStability {
+  /** Pearson chi-square statistic comparing first-half vs second-half transition counts. */
+  chiSquare: number;
+  /** Degrees of freedom — (rows × cols) where row sum > 0 in either half. */
+  degreesOfFreedom: number;
+  /** Two-sided p-value (approximate, computed from a chi-square reference table). */
+  pValue: number;
+  /** Sample size used for each half. */
+  sampleSizePerHalf: number;
+  /** Stability verdict — `stable` (p > 0.10), `drifting` (0.01 < p ≤ 0.10), `unstable` (p ≤ 0.01). */
+  verdict: "stable" | "drifting" | "unstable" | "insufficient_data";
+  /** Frobenius distance between first-half and second-half matrices (raw matrix-shift magnitude). */
+  frobeniusDistance: number;
+}
+
 export interface MarkovRegimeResult {
   /** Current regime: 1 (bull), 0 (neutral), -1 (bear) */
   regime: number;
@@ -31,6 +46,14 @@ export interface MarkovRegimeResult {
   prevRegime: "bull" | "neutral" | "bear";
   /** Interpretation string */
   interpretation: string;
+  /**
+   * Stability diagnostic for the transition matrix. Splits the lookback
+   * window in half, builds a matrix from each half, and chi-square tests
+   * whether the transition probabilities are stationary. When `unstable`
+   * the matrix is fitting noise — downstream Kelly sizing on its
+   * probabilities should be discounted or refused.
+   */
+  stability: MatrixStability;
 }
 
 const STATE_MAP: Record<number, number> = { [-1]: 0, 0: 1, 1: 2 };
@@ -172,6 +195,14 @@ export function calculateMarkovRegime(
       transition: false,
       prevRegime: "neutral",
       interpretation: "Insufficient data for Markov regime detection",
+      stability: {
+        chiSquare: 0,
+        degreesOfFreedom: 0,
+        pValue: 1,
+        sampleSizePerHalf: 0,
+        verdict: "insufficient_data",
+        frobeniusDistance: 0,
+      },
     };
   }
 
@@ -202,6 +233,7 @@ export function calculateMarkovRegime(
   // Build transition matrix from recent lookback window
   const recentStates = regimes.slice(-lookback);
   const transitionMatrix = buildTransitionMatrix(recentStates);
+  const stability = assessMatrixStability(recentStates);
 
   // Current and previous regime
   const currentRegime = regimes[regimes.length - 1]!;
@@ -245,6 +277,175 @@ export function calculateMarkovRegime(
     transition,
     prevRegime: prevRegimeLabel,
     interpretation,
+    stability,
+  };
+}
+
+// ============================================================================
+// Transition-matrix stability diagnostic
+// ============================================================================
+
+/**
+ * Chi-square critical values for the 0.10 and 0.01 significance levels at
+ * df = 1..9 (covers 3×3 matrix with up to 9 cells). Pre-tabulated so we
+ * don't need a stats library. From standard chi-square tables.
+ */
+const CHI2_CRIT_010: Record<number, number> = {
+  1: 2.706, 2: 4.605, 3: 6.251, 4: 7.779, 5: 9.236,
+  6: 10.645, 7: 12.017, 8: 13.362, 9: 14.684,
+};
+const CHI2_CRIT_001: Record<number, number> = {
+  1: 6.635, 2: 9.210, 3: 11.345, 4: 13.277, 5: 15.086,
+  6: 16.812, 7: 18.475, 8: 20.090, 9: 21.666,
+};
+
+/**
+ * Approximate two-sided p-value from a chi-square statistic + df. Linear
+ * interpolation between the 0.10 and 0.01 cutoffs; outside that band we
+ * return the boundary value (close enough for "stable / drifting /
+ * unstable" classification — we don't need exact p).
+ */
+function approxChiSquarePValue(chi2: number, df: number): number {
+  const crit10 = CHI2_CRIT_010[df];
+  const crit01 = CHI2_CRIT_001[df];
+  if (crit10 === undefined || crit01 === undefined) return 0.5;
+  if (chi2 < crit10) {
+    // p > 0.10 — return a representative value
+    return 0.10 + (crit10 - chi2) / crit10 * 0.40; // scales toward 0.50 as chi2 → 0
+  }
+  if (chi2 > crit01) {
+    // p < 0.01 — return a small value
+    return Math.max(0.0001, 0.01 * (crit01 / Math.max(chi2, crit01)));
+  }
+  // Linear interpolation between 0.01 and 0.10
+  const t = (chi2 - crit10) / (crit01 - crit10);
+  return 0.10 - t * 0.09;
+}
+
+function countTransitions(
+  states: number[],
+  laplaceAlpha: number = 0,
+): number[][] {
+  const counts: number[][] = [
+    [laplaceAlpha, laplaceAlpha, laplaceAlpha],
+    [laplaceAlpha, laplaceAlpha, laplaceAlpha],
+    [laplaceAlpha, laplaceAlpha, laplaceAlpha],
+  ];
+  for (let i = 0; i < states.length - 1; i++) {
+    const from = STATE_MAP[states[i]!];
+    const to = STATE_MAP[states[i + 1]!];
+    if (from !== undefined && to !== undefined) {
+      counts[from]![to!]! += 1;
+    }
+  }
+  return counts;
+}
+
+function frobeniusDistance(a: number[][], b: number[][]): number {
+  let sumSq = 0;
+  for (let i = 0; i < 3; i++) {
+    for (let j = 0; j < 3; j++) {
+      const d = (a[i]?.[j] ?? 0) - (b[i]?.[j] ?? 0);
+      sumSq += d * d;
+    }
+  }
+  return Math.sqrt(sumSq);
+}
+
+/**
+ * Assess whether the transition matrix is stationary by splitting the
+ * state series in half and chi-square testing the two empirical
+ * transition tables.
+ *
+ * H0: rows of the transition matrix are identically distributed across
+ * the two halves (stationary process).
+ *
+ * H1: at least one row distribution differs (regime structure drifted).
+ *
+ * Returns `insufficient_data` when fewer than 20 transitions are
+ * available per half (chi-square approximation breaks down with sparse
+ * cells).
+ */
+export function assessMatrixStability(states: number[]): MatrixStability {
+  const minPerHalf = 20;
+  if (states.length < minPerHalf * 2 + 2) {
+    return {
+      chiSquare: 0,
+      degreesOfFreedom: 0,
+      pValue: 1,
+      sampleSizePerHalf: Math.floor((states.length - 1) / 2),
+      verdict: "insufficient_data",
+      frobeniusDistance: 0,
+    };
+  }
+
+  const mid = Math.floor(states.length / 2);
+  const firstHalf = states.slice(0, mid + 1);
+  const secondHalf = states.slice(mid);
+
+  const obs1 = countTransitions(firstHalf);
+  const obs2 = countTransitions(secondHalf);
+
+  // Build normalized matrices for Frobenius distance reporting
+  const norm = (counts: number[][]): number[][] =>
+    counts.map((row) => {
+      const sum = row.reduce((a, b) => a + b, 0);
+      return sum > 0 ? row.map((v) => v / sum) : row.map(() => 0);
+    });
+  const frob = frobeniusDistance(norm(obs1), norm(obs2));
+
+  // Pearson chi-square per row: sum over cells of (obs1 + obs2)
+  // expected based on pooled row distribution.
+  let chiSquare = 0;
+  let df = 0;
+  for (let i = 0; i < 3; i++) {
+    const row1 = obs1[i]!;
+    const row2 = obs2[i]!;
+    const n1 = row1.reduce((a, b) => a + b, 0);
+    const n2 = row2.reduce((a, b) => a + b, 0);
+    if (n1 === 0 || n2 === 0) continue;
+
+    const nonZeroCols: number[] = [];
+    for (let j = 0; j < 3; j++) {
+      const total = (row1[j] ?? 0) + (row2[j] ?? 0);
+      if (total > 0) nonZeroCols.push(j);
+    }
+    if (nonZeroCols.length < 2) continue;
+
+    for (const j of nonZeroCols) {
+      const o1 = row1[j] ?? 0;
+      const o2 = row2[j] ?? 0;
+      const colTotal = o1 + o2;
+      const e1 = (n1 * colTotal) / (n1 + n2);
+      const e2 = (n2 * colTotal) / (n1 + n2);
+      if (e1 > 0) chiSquare += ((o1 - e1) ** 2) / e1;
+      if (e2 > 0) chiSquare += ((o2 - e2) ** 2) / e2;
+    }
+    df += nonZeroCols.length - 1;
+  }
+
+  if (df < 1) {
+    return {
+      chiSquare: 0,
+      degreesOfFreedom: 0,
+      pValue: 1,
+      sampleSizePerHalf: mid,
+      verdict: "insufficient_data",
+      frobeniusDistance: frob,
+    };
+  }
+
+  const pValue = approxChiSquarePValue(chiSquare, df);
+  const verdict: MatrixStability["verdict"] =
+    pValue > 0.10 ? "stable" : pValue > 0.01 ? "drifting" : "unstable";
+
+  return {
+    chiSquare: parseFloat(chiSquare.toFixed(3)),
+    degreesOfFreedom: df,
+    pValue: parseFloat(pValue.toFixed(4)),
+    sampleSizePerHalf: mid,
+    verdict,
+    frobeniusDistance: parseFloat(frob.toFixed(4)),
   };
 }
 

@@ -26,6 +26,23 @@ export interface KellyResult {
   adjustedPercent: number; // Capped at 25%
   positionSize: number; // Dollar amount
   recommendation: string;
+  /**
+   * Set when the caller supplied a non-zero `transactionCostBps`. Records
+   * the cost adjustment applied to avgWin / avgLoss before Kelly was
+   * computed, so the audit trail shows whether the size reflects gross
+   * or net edge.
+   */
+  costAdjustment?: {
+    transactionCostBps: number;
+    rawWin: number;
+    rawLoss: number;
+    netWin: number;
+    netLoss: number;
+    /** Kelly % using uncorrected gross edge — surfaced so callers can see what they would have sized at if costs were ignored. */
+    grossKellyPercent: number;
+    /** True when the cost adjustment flipped the trade from positive- to negative-expectancy. */
+    flipsToNegative: boolean;
+  };
 }
 
 export interface VolatilityAdjustedResult {
@@ -100,12 +117,22 @@ export class PositionSizer {
    *   W = Win rate (0-1)
    *   L = Loss rate (1 - W)
    *   R = Win/Loss ratio (avg win / avg loss)
+   *
+   * When `transactionCostBps` is supplied, costs are subtracted from
+   * avgWin and added to avgLoss BEFORE Kelly is computed. A round-trip
+   * trade incurs the cost twice (enter + exit), so the deduction is
+   * 2 × bps / 10_000 against each return. If the cost adjustment flips
+   * the edge from positive to negative, Kelly returns 0 — the cost
+   * adjustment then surfaces this in the audit field, so the operator
+   * can see they would have sized into a negative-expectancy trade
+   * without the deduction.
    */
   calculateWithKelly(
     balance: number,
     winRate: number,
     avgWin: number,
-    avgLoss: number
+    avgLoss: number,
+    transactionCostBps: number = 0,
   ): KellyResult {
     try {
       if (avgLoss === 0 || winRate <= 0 || winRate >= 1) {
@@ -117,23 +144,47 @@ export class PositionSizer {
         };
       }
 
-      const winLossRatio = Math.abs(avgWin / avgLoss);
-      const lossRate = 1 - winRate;
+      // Compute the gross-edge Kelly as a reference point (what an
+      // operator would have sized at if they ignored costs).
+      const grossWinLossRatio = Math.abs(avgWin / avgLoss);
+      const grossKelly = (winRate * (grossWinLossRatio + 1) - 1) / grossWinLossRatio;
 
-      // Kelly formula: (W * R - L) / R = (W * (R + 1) - 1) / R
-      const kellyPercent = (winRate * (winLossRatio + 1) - 1) / winLossRatio;
+      // Cost-aware adjustment — each round trip eats 2 × bps off the
+      // edge. The cost adjustment is applied to absolute return magnitudes
+      // (avgWin is positive, avgLoss is positive-magnitude).
+      const costFraction = (Math.max(0, transactionCostBps) * 2) / 10_000;
+      const netWin = Math.max(0, avgWin - costFraction);
+      const netLoss = avgLoss + costFraction; // costs add to loss magnitude
+
+      let kellyPercent: number;
+      let flipsToNegative = false;
+      if (netWin <= 0 || netLoss <= 0) {
+        kellyPercent = 0;
+        flipsToNegative = grossKelly > 0;
+      } else {
+        const winLossRatio = Math.abs(netWin / netLoss);
+        kellyPercent = (winRate * (winLossRatio + 1) - 1) / winLossRatio;
+        flipsToNegative = grossKelly > 0 && kellyPercent <= 0;
+      }
 
       // Cap at 25% (half-Kelly is common practice for safety)
       const adjustedPercent = Math.max(0, Math.min(kellyPercent, 0.25));
       const positionSize = balance * adjustedPercent;
 
       let recommendation: string;
-      if (kellyPercent <= 0) {
+      if (flipsToNegative) {
+        recommendation =
+          `Cost-adjusted edge is negative (cost ${transactionCostBps}bps round-trip) - ` +
+          `gross Kelly was ${(grossKelly * 100).toFixed(1)}% but costs flip it to no-trade`;
+      } else if (kellyPercent <= 0) {
         recommendation = "Kelly suggests no position - edge is negative";
       } else if (kellyPercent > 0.25) {
         recommendation = `Full Kelly is ${(kellyPercent * 100).toFixed(1)}% - using capped 25%`;
       } else {
-        recommendation = `Kelly sizing: ${(kellyPercent * 100).toFixed(1)}% of balance`;
+        recommendation =
+          transactionCostBps > 0
+            ? `Cost-adjusted Kelly: ${(kellyPercent * 100).toFixed(1)}% (gross would have been ${(grossKelly * 100).toFixed(1)}%)`
+            : `Kelly sizing: ${(kellyPercent * 100).toFixed(1)}% of balance`;
       }
 
       return {
@@ -141,6 +192,17 @@ export class PositionSizer {
         adjustedPercent: adjustedPercent * 100,
         positionSize,
         recommendation,
+        ...(transactionCostBps > 0 && {
+          costAdjustment: {
+            transactionCostBps,
+            rawWin: avgWin,
+            rawLoss: avgLoss,
+            netWin,
+            netLoss,
+            grossKellyPercent: grossKelly * 100,
+            flipsToNegative,
+          },
+        }),
       };
     } catch (error) {
       logger.error("Error calculating Kelly size", error as Error);
