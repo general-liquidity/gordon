@@ -18,7 +18,16 @@ export {
   type IcSnapshot,
   type IcVerdict,
   type IcOptions,
+  type EdgeDiagnostic,
 } from "./ic-tracker.ts";
+
+export {
+  walkForwardIc,
+  type WalkForwardIcResult,
+  type WalkForwardIcOptions,
+  type WalkForwardVerdict,
+  type WalkForwardWindow,
+} from "./walk-forward-ic.ts";
 
 export {
   computeEffectiveN,

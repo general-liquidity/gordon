@@ -34,6 +34,45 @@ import {
   mean,
 } from "./helpers.ts";
 
+/**
+ * Implied-edge breakdown from a measured IC + transaction-cost
+ * assumption. Pearson IC is invariant to a constant return shift —
+ * subtracting cost from every return does NOT change the correlation.
+ * The honest cost surface is therefore an edge breakdown, not a
+ * cost-adjusted IC.
+ *
+ * Math (all values are return units per observation unless stated):
+ *
+ *   impliedGrossEdgePerObs = IC × σ_return      (Grinold-Kahn implied
+ *                                                  edge when signal is
+ *                                                  unit-variance)
+ *   impliedNetEdgePerObs    = grossEdge - 2 × costFraction
+ *                                                  (round trip: cost
+ *                                                  hits on entry + exit)
+ *   breakevenCostBps        = impliedGrossEdgeBps / 2
+ *                                                  (cost level at which
+ *                                                  net edge crosses zero)
+ *
+ * "Bps" fields are expressed in basis points (× 10_000). The operator
+ * reads breakevenCostBps as "this signal dies above this cost" — a
+ * direct answer the post's framework didn't address.
+ */
+export interface EdgeDiagnostic {
+  transactionCostBps: number;
+  /** Standard deviation of forward returns (in return units). */
+  returnStd: number;
+  /** Implied gross edge per observation (return units). */
+  impliedGrossEdgePerObs: number;
+  /** Same, expressed in basis points. */
+  impliedGrossEdgeBps: number;
+  /** Net edge after 2 × transactionCostBps (round-trip), basis points. */
+  impliedNetEdgeBps: number;
+  /** Cost above which the gross edge no longer survives. */
+  breakevenCostBps: number;
+  /** True when net edge > 0 at the supplied transactionCostBps. */
+  isPositiveAfterCosts: boolean;
+}
+
 export type IcVerdict =
   | "active"
   | "decaying"
@@ -54,6 +93,14 @@ export interface IcOptions {
   instabilityCvThreshold?: number;
   /** Decay-slope threshold (per sub-window). Below this → decaying. Default -0.005. */
   decaySlopeThreshold?: number;
+  /**
+   * Round-trip transaction cost in basis points. When > 0, the
+   * snapshot includes an `edge` breakdown (gross / net / breakeven).
+   * Pearson IC itself is unchanged — it is invariant to a constant
+   * shift in returns. The operator-meaningful cost answer is the
+   * edge surface, not a re-correlated IC.
+   */
+  transactionCostBps?: number;
 }
 
 export interface IcSnapshot {
@@ -74,6 +121,12 @@ export interface IcSnapshot {
   trendSlope: number;
   /** Approximate 95% CI half-width for the point IC (1.96 × SE). */
   ic95HalfWidth: number;
+  /**
+   * Implied-edge breakdown including cost adjustment. Present only
+   * when `transactionCostBps > 0` was supplied (otherwise the
+   * operator was asking for IC-only).
+   */
+  edge?: EdgeDiagnostic;
   /** Operator-facing verdict. */
   verdict: IcVerdict;
   /** Human-readable summary. */
@@ -87,6 +140,7 @@ const DEFAULT_OPTIONS: Required<IcOptions> = {
   activeThreshold: 0.05,
   instabilityCvThreshold: 1.0,
   decaySlopeThreshold: -0.005,
+  transactionCostBps: 0,
 };
 
 /**
@@ -227,6 +281,33 @@ export function trackIc(
     verdict = "noise";
   }
 
+  // Cost-aware edge breakdown — Pearson IC is invariant to a constant
+  // shift, so we don't recompute IC. Instead we surface the implied
+  // per-observation edge gross + net + breakeven cost. This is the
+  // honest answer to "does this signal survive my transaction costs?"
+  let edge: EdgeDiagnostic | undefined;
+  if (opts.transactionCostBps > 0) {
+    const returnStd = sampleStd(forwardReturns);
+    const impliedGrossEdgePerObs = overallIc * returnStd;
+    const impliedGrossEdgeBps = impliedGrossEdgePerObs * 10_000;
+    const impliedNetEdgeBps = impliedGrossEdgeBps - 2 * opts.transactionCostBps;
+    const breakevenCostBps = Math.abs(impliedGrossEdgeBps) / 2;
+    edge = {
+      transactionCostBps: opts.transactionCostBps,
+      returnStd,
+      impliedGrossEdgePerObs,
+      impliedGrossEdgeBps,
+      impliedNetEdgeBps,
+      breakevenCostBps,
+      isPositiveAfterCosts: impliedNetEdgeBps > 0,
+    };
+  }
+
+  const edgeSuffix = edge
+    ? `, gross ${edge.impliedGrossEdgeBps.toFixed(1)}bps → net ${edge.impliedNetEdgeBps.toFixed(1)}bps ` +
+      `(breakeven ${edge.breakevenCostBps.toFixed(1)}bps)`
+    : "";
+
   return {
     signalName,
     ic: overallIc,
@@ -237,10 +318,11 @@ export function trackIc(
     cvIc: cv,
     trendSlope: slope,
     ic95HalfWidth: ic95,
+    edge,
     verdict,
     summary:
       `${signalName}: IC ${overallIc.toFixed(3)} ± ${ic95.toFixed(3)} ` +
       `(sub-window CV ${Number.isFinite(cv) ? cv.toFixed(2) : "∞"}, ` +
-      `slope ${slope.toFixed(4)}/window) → ${verdict}`,
+      `slope ${slope.toFixed(4)}/window${edgeSuffix}) → ${verdict}`,
   };
 }
