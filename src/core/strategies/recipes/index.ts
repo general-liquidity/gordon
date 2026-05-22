@@ -55,6 +55,16 @@ export {
   type MaxExposureState,
 } from "./maxExposureTimeout.ts";
 
+export {
+  evaluateAtrBreakout,
+  DEFAULT_ATR_BREAKOUT_SETTINGS,
+  type AtrBreakoutInput,
+  type AtrBreakoutSettings,
+  type AtrBreakoutResult,
+  type AtrBreakoutLevels,
+  type AtrBreakoutVerdict,
+} from "./atrBreakout.ts";
+
 import type { MarketRegime } from "../../regime/types.ts";
 import { regimeRsiSignal, type RegimeRsiSettings } from "./regimeRsi.ts";
 import { applyBounceCounter, type BounceCounterState } from "./bounceCounter.ts";
