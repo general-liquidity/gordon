@@ -16,6 +16,11 @@ import {
 } from "./workflowPhase.ts";
 import { createModuleLogger } from "../../logger/index.ts";
 import { recordPhaseLLMCost } from "../../platform/costTracker.ts";
+import {
+  withTimelineEntry,
+  generateTimelineAgentId,
+  estimateTokensFromMessages,
+} from "../wiring/timelineWiring.ts";
 
 const logger = createModuleLogger("thinking-phase");
 
@@ -149,6 +154,25 @@ export function getThinkingDepthFromContext(context: GordonContext): ThinkingDep
  * @param depth - Thinking depth level
  */
 export async function runThinkingPhase(
+  userMessage: string,
+  recentMessages: Message[],
+  context: GordonContext,
+  depth: ThinkingDepth,
+): Promise<ThinkingResult> {
+  return withTimelineEntry(
+    {
+      agentId: generateTimelineAgentId("thinking"),
+      agentName: `thinking@${depth}`,
+      agentType: "thinking",
+      initialTokens: estimateTokensFromMessages(
+        recentMessages.map((m) => ({ content: String(m.content) })),
+      ),
+    },
+    () => runThinkingPhaseInner(userMessage, recentMessages, context, depth),
+  );
+}
+
+async function runThinkingPhaseInner(
   userMessage: string,
   recentMessages: Message[],
   context: GordonContext,

@@ -18,6 +18,11 @@ import {
   type PlanRubric,
   type RubricScore,
 } from "../../safety/planRubric.ts";
+import {
+  withTimelineEntry,
+  generateTimelineAgentId,
+  estimateTokensFromMessages,
+} from "../wiring/timelineWiring.ts";
 
 const logger = createModuleLogger("critique-phase");
 
@@ -61,7 +66,22 @@ export async function runCritiquePhase(
   if (!thinkingTrace.trim()) {
     return "";
   }
+  return withTimelineEntry(
+    {
+      agentId: generateTimelineAgentId("critique"),
+      agentName: "critique",
+      agentType: "critique",
+      initialTokens: estimateTokensFromMessages([{ content: thinkingTrace }]),
+    },
+    () => runCritiquePhaseInner(thinkingTrace, userMessage, context),
+  );
+}
 
+async function runCritiquePhaseInner(
+  thinkingTrace: string,
+  userMessage: string,
+  context: GordonContext,
+): Promise<string> {
   try {
     // Use the main model for critique, not the fast one. Cognition's
     // "What's Actually Working" follow-up to "Don't Build Multi-Agents"
