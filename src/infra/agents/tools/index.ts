@@ -53,6 +53,7 @@ export { discoveryTools } from "./news/discovery.ts";
 export { historyTools } from "./runtime/flow/history.ts";
 export { skillsTools } from "./runtime/flow/skillsManagement.ts";
 export { investigationTools } from "./runtime/flow/investigationTool.ts";
+export { executionDisciplineTools } from "./runtime/flow/executionDiscipline.ts";
 export { accountTools } from "./account/account.ts";
 export { tradingTools } from "./trading/trading.ts";
 export { peerTools } from "./peer/peer.ts";
@@ -435,6 +436,7 @@ import { discoveryTools } from "./news/discovery.ts";
 import { historyTools } from "./runtime/flow/history.ts";
 import { skillsTools } from "./runtime/flow/skillsManagement.ts";
 import { investigationTools } from "./runtime/flow/investigationTool.ts";
+import { executionDisciplineTools } from "./runtime/flow/executionDiscipline.ts";
 import { accountTools } from "./account/account.ts";
 import { tradingTools } from "./trading/trading.ts";
 import { marketAnalysisTools } from "./market/market-analysis.ts";
@@ -567,6 +569,7 @@ const _rawAllTools = {
   ...historyTools,
   ...skillsTools,
   ...investigationTools,
+  ...executionDisciplineTools,
   ...accountTools,
   ...tradingTools,
   ...marketAnalysisTools,
@@ -699,6 +702,7 @@ export const toolCounts = {
   history: Object.keys(historyTools).length,
   skills: Object.keys(skillsTools).length,
   investigation: Object.keys(investigationTools).length,
+  executionDiscipline: Object.keys(executionDisciplineTools).length,
   account: Object.keys(accountTools).length,
   trading: Object.keys(tradingTools).length,
   marketAnalysis: Object.keys(marketAnalysisTools).length,

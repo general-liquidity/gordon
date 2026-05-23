@@ -103,9 +103,11 @@ export const list_sandboxes = createTool({
 export const classify_trade_risk = createTool({
   id: "classify_trade_risk",
   description:
-    "Score a proposed trade across 8 risk dimensions and return a risk tier. " +
+    "Score a proposed trade across 13 risk dimensions and return a risk tier. " +
     "Use BEFORE placing any trade to assess position size, concentration, " +
-    "drawdown proximity, volatility, and more. Returns auto_approve/prompt_user/block.",
+    "drawdown proximity, volatility, regime transition, venue MEV exposure, and more. " +
+    "Returns auto_approve/prompt_user/block. Pass venue (e.g. 'binance', 'uniswap', " +
+    "'ccxt:bybit', 'cow_swap') to surface venue-specific MEV/sniping exposure.",
   inputSchema: z.object({
     symbol: z.string(),
     side: z.enum(["BUY", "SELL"]),
@@ -113,10 +115,22 @@ export const classify_trade_risk = createTool({
     price: z.number().positive(),
     notionalUsd: z.number().positive(),
     orderType: z.enum(["MARKET", "LIMIT", "STOP"]).default("MARKET"),
+    venue: z
+      .string()
+      .optional()
+      .describe(
+        "Venue id (native: 'binance', 'uniswap', 'hyperliquid', etc.; CCXT: 'ccxt:bybit'; " +
+          "MEV-protected: 'cow_swap'). When supplied, the 13th risk dimension (Venue MEV " +
+          "Exposure) is included in the verdict.",
+      ),
   }),
   execute: async (trade, execContext) => {
+    const { classifyVenue } = require("../../../trading/risk/venueMevExposure.ts") as typeof import(
+      "../../../trading/risk/venueMevExposure.ts"
+    );
+
     // Build a minimal portfolio context from available data
-    const portfolioContext = {
+    const portfolioContext: Parameters<typeof classifyTradeRisk>[1] = {
       totalValueUsd: 100_000, // TODO: pull from real portfolio
       cashUsd: 50_000,
       positions: [],
@@ -126,6 +140,10 @@ export const classify_trade_risk = createTool({
       currentDrawdownPct: 0,
       recentTradeCount: 0,
       tradedSymbols: new Set<string>(),
+      // Auto-populate venue MEV exposure when venue supplied — Budish
+      // market-design discipline: surface the structural sniping/MEV
+      // tax baked into the chosen venue.
+      ...(trade.venue && { venueMevExposure: classifyVenue(trade.venue) }),
     };
 
     const assessment = classifyTradeRisk(trade, portfolioContext, DEFAULT_CLASSIFIER_CONFIG);
