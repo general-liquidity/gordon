@@ -358,3 +358,25 @@ export {
   type ThresholdSimulation,
   type ConvictionVerdict,
 } from "./conviction-filtered-expectancy.ts";
+
+export {
+  rankIbsCrossSectional,
+  formatIbsCrossSectional,
+  type IbsBar,
+  type IbsCrossSectionalOptions,
+  type IbsCrossSectionalResult,
+  type RankedIbsAsset,
+  type IbsPosition,
+  type IbsVerdict,
+} from "./ibs-cross-sectional.ts";
+
+export {
+  sizeCrossSectionalContrarian,
+  formatCrossSectionalContrarian,
+  type ContrarianAsset,
+  type CrossSectionalContrarianOptions,
+  type CrossSectionalContrarianResult,
+  type ContrarianWeight,
+  type ContrarianVerdict,
+  type VolatilityWeighting,
+} from "./cross-sectional-contrarian.ts";

@@ -279,6 +279,15 @@ export { signalReweightingTools } from "./runtime/signalReweightingDiagnostic.ts
 // constraint-identifier (EV-component decomposition).
 export { convictionFilteredExpectancyTools } from "./runtime/convictionFilteredExpectancyDiagnostic.ts";
 
+// LV25-LV26 — Kakushadze-Serur "151 Trading Strategies" primitives.
+// IBS cross-sectional ranker (§4.4 — single-bar mean-reversion intensity,
+// (close-low)/(high-low), bottom-decile = oversold longs / top-decile =
+// overbought shorts) + cross-sectional contrarian sizer (§10.3 — continuous
+// dollar-neutral weights wi ∝ -(R_i - R_mean)/σ_i, the inverse direction
+// of LV-ranked cross-sectional momentum).
+export { ibsCrossSectionalTools } from "./runtime/ibsCrossSectionalDiagnostic.ts";
+export { crossSectionalContrarianTools } from "./runtime/crossSectionalContrarianDiagnostic.ts";
+
 // Goal-engineering primitives (GE1-GE3). Drafter + mandate linkage + deferred-actions log.
 // Companion to the existing /goal command in src/core/pipeline/goalMode.ts.
 export { goalDraftTools } from "./runtime/goalDraftDiagnostic.ts";
@@ -628,6 +637,8 @@ import { tailConditionalHedgeTools } from "./runtime/tailConditionalHedgeDiagnos
 import { aggressionRatioTools } from "./runtime/aggressionRatioDiagnostic.ts";
 import { signalReweightingTools } from "./runtime/signalReweightingDiagnostic.ts";
 import { convictionFilteredExpectancyTools } from "./runtime/convictionFilteredExpectancyDiagnostic.ts";
+import { ibsCrossSectionalTools } from "./runtime/ibsCrossSectionalDiagnostic.ts";
+import { crossSectionalContrarianTools } from "./runtime/crossSectionalContrarianDiagnostic.ts";
 import { levelFreshnessTools } from "./runtime/levelFreshnessDiagnostic.ts";
 import { goalDraftTools } from "./runtime/goalDraftDiagnostic.ts";
 import { goalMandateLinkTools } from "./runtime/goalMandateLinkDiagnostic.ts";
@@ -786,6 +797,8 @@ const _rawAllTools = {
   ...aggressionRatioTools,
   ...signalReweightingTools,
   ...convictionFilteredExpectancyTools,
+  ...ibsCrossSectionalTools,
+  ...crossSectionalContrarianTools,
   ...levelFreshnessTools,
   ...goalDraftTools,
   ...goalMandateLinkTools,
