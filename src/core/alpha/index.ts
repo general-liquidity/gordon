@@ -86,6 +86,19 @@ export {
 } from "./matrix.ts";
 
 export {
+  estimateExpectedReturn,
+  formatExpectedReturn,
+  DEFAULT_EQUITY_REGIME_ADJUSTMENTS,
+  type ExpectedReturnInput,
+  type ExpectedReturnResult,
+  type ExpectedReturnMethodResult,
+  type ExpectedReturnRegime,
+  type ValuationInput,
+  type ValuationMetricType,
+  type RegimeAdjustment,
+} from "./expected-return.ts";
+
+export {
   checkTooGoodToBeTrue,
   formatTooGoodCheck,
   type TooGoodCheckInput,
