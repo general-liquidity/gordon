@@ -119,6 +119,33 @@ export interface PortfolioContext {
     score: number;
     reason: string;
   };
+  /**
+   * Optional fake-liquidity verdict from `analyzeFakeLiquidity`. When
+   * supplied, classifier penalizes trades into symbols where the book
+   * appears wash-traded — headline volume passes the threshold gate
+   * but per-candle move-per-dollar shows outlier-heavy contamination.
+   * Spicy's "huge move on no volume" tell, formalized.
+   */
+  fakeLiquidity?: {
+    verdict: "real_liquidity" | "suspicious" | "fake_liquidity" | "insufficient_data";
+    outlierFraction: number;
+  };
+  /**
+   * Optional margin-of-error grade from `computeMarginOfError`. When
+   * supplied, classifier folds the environment-fit verdict into the
+   * composite — fully out-of-sync trades (Grade C) get a hard penalty,
+   * A+ defensive-only trades get a smaller one, in-sync (B) gets a
+   * discount. The grade also feeds suggested sizing downstream.
+   */
+  marginOfError?: {
+    grade: "A+" | "A" | "B" | "C";
+    rawScore: number;
+    recommendation:
+      | "take_aggressively"
+      | "take_normally"
+      | "take_only_high_quality"
+      | "skip";
+  };
 }
 
 export interface ClassifierConfig {
@@ -343,6 +370,51 @@ export function classifyTradeRisk(
       reason:
         `Current state ${rt.currentState}, shift probability ${(probShift * 100).toFixed(0)}% ` +
         `(threshold ${(threshold * 100).toFixed(0)}%)${stabilityNote}`,
+    });
+  }
+
+  // 14. Fake-liquidity penalty — headline volume can be wash-traded.
+  // usdVolumeGate filters by SIZE; this filters by realness-of-book.
+  // Outlier-heavy windows (Spicy's "huge move on no volume") mean
+  // slippage will eat any edge regardless of sizing.
+  if (portfolio.fakeLiquidity) {
+    const fl = portfolio.fakeLiquidity;
+    let fakeScore = 0;
+    let reason = `Book verdict: ${fl.verdict}`;
+    if (fl.verdict === "fake_liquidity") {
+      fakeScore = 85;
+      reason += ` (outlier fraction ${(fl.outlierFraction * 100).toFixed(1)}% — wash-trading suspected)`;
+    } else if (fl.verdict === "suspicious") {
+      fakeScore = 45;
+      reason += ` (outlier fraction ${(fl.outlierFraction * 100).toFixed(1)}%)`;
+    } else if (fl.verdict === "insufficient_data") {
+      fakeScore = 15;
+      reason += " — insufficient candles for verdict";
+    }
+    dimensions.push({
+      name: "Fake Liquidity",
+      score: fakeScore,
+      weight: 1.5,
+      reason,
+    });
+  }
+
+  // 15. Margin-of-Error — environment fit. Out-of-sync trades (wrong
+  // direction or wrong strategy type for the regime) carry a higher
+  // execution-quality risk regardless of their fundamental thesis.
+  // In-sync trades get a small discount on the composite.
+  if (portfolio.marginOfError) {
+    const moe = portfolio.marginOfError;
+    let moeScore = 0;
+    if (moe.grade === "C") moeScore = 80;
+    else if (moe.grade === "A+") moeScore = 35;
+    else if (moe.grade === "A") moeScore = moe.rawScore === 0 ? 15 : 0;
+    else moeScore = 0; // B = fully in-sync → no penalty
+    dimensions.push({
+      name: "Margin of Error",
+      score: moeScore,
+      weight: 1.1,
+      reason: `Grade ${moe.grade} (raw ${moe.rawScore >= 0 ? "+" : ""}${moe.rawScore}) → ${moe.recommendation}`,
     });
   }
 

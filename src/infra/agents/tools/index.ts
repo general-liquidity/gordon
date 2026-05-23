@@ -200,6 +200,13 @@ export { brierScoreTools } from "./runtime/brierScoreDiagnostic.ts";
 export { usdVolumeGateTools } from "./runtime/usdVolumeGateDiagnostic.ts";
 export { levelFreshnessTools } from "./runtime/levelFreshnessDiagnostic.ts";
 
+// LV3-LV6 — Spicy article extraction. Volume-trend verdict, fake-liquidity
+// detector, in-trade volume exhaustion, and margin-of-error scoring.
+export { volumeTrendTools } from "./runtime/volumeTrendDiagnostic.ts";
+export { fakeLiquidityTools } from "./runtime/fakeLiquidityDiagnostic.ts";
+export { volumeExhaustionTools } from "./runtime/volumeExhaustionDiagnostic.ts";
+export { marginOfErrorTools } from "./runtime/marginOfErrorDiagnostic.ts";
+
 // Goal-engineering primitives (GE1-GE3). Drafter + mandate linkage + deferred-actions log.
 // Companion to the existing /goal command in src/core/pipeline/goalMode.ts.
 export { goalDraftTools } from "./runtime/goalDraftDiagnostic.ts";
@@ -527,6 +534,10 @@ import { hotStreakSizerTools } from "./runtime/hotStreakSizerDiagnostic.ts";
 import { revengeTradeGuardTools } from "./runtime/revengeTradeGuardDiagnostic.ts";
 import { brierScoreTools } from "./runtime/brierScoreDiagnostic.ts";
 import { usdVolumeGateTools } from "./runtime/usdVolumeGateDiagnostic.ts";
+import { volumeTrendTools } from "./runtime/volumeTrendDiagnostic.ts";
+import { fakeLiquidityTools } from "./runtime/fakeLiquidityDiagnostic.ts";
+import { volumeExhaustionTools } from "./runtime/volumeExhaustionDiagnostic.ts";
+import { marginOfErrorTools } from "./runtime/marginOfErrorDiagnostic.ts";
 import { levelFreshnessTools } from "./runtime/levelFreshnessDiagnostic.ts";
 import { goalDraftTools } from "./runtime/goalDraftDiagnostic.ts";
 import { goalMandateLinkTools } from "./runtime/goalMandateLinkDiagnostic.ts";
@@ -663,6 +674,10 @@ const _rawAllTools = {
   ...revengeTradeGuardTools,
   ...brierScoreTools,
   ...usdVolumeGateTools,
+  ...volumeTrendTools,
+  ...fakeLiquidityTools,
+  ...volumeExhaustionTools,
+  ...marginOfErrorTools,
   ...levelFreshnessTools,
   ...goalDraftTools,
   ...goalMandateLinkTools,
