@@ -214,3 +214,31 @@ export {
   type StreakDetectorResult,
   type ExhaustionVerdict,
 } from "./streak-detector.ts";
+
+export {
+  analyzeVcpContraction,
+  formatVcpContraction,
+  type VcpCandle,
+  type VcpOptions,
+  type VcpResult,
+  type VcpVerdict,
+} from "./vcp-contraction.ts";
+
+export {
+  classifyMaProximity,
+  formatMaProximity,
+  type MaProximityInput,
+  type MaProximityResult,
+  type SurfingMa,
+  type RrTier,
+} from "./ma-proximity.ts";
+
+export {
+  detectHighestVolume,
+  formatHighestVolume,
+  type HveCandle,
+  type HveOptions,
+  type HveResult,
+  type HveVerdict,
+  type HveConviction,
+} from "./highest-volume-ever.ts";

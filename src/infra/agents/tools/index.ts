@@ -220,6 +220,13 @@ export { tradeConsistencyTools } from "./runtime/tradeConsistencyDiagnostic.ts";
 // hotStreakSizer (PnL streak) — this one operates on PRICE bars.
 export { streakDetectorTools } from "./runtime/streakDetectorDiagnostic.ts";
 
+// LV10-LV12 — Qullamaggie momentum-breakout primitives.
+// VCP-style multi-day contraction detector + MA-proximity surf
+// classifier + Highest-Volume-Ever institutional-conviction signal.
+export { vcpContractionTools } from "./runtime/vcpContractionDiagnostic.ts";
+export { maProximityTools } from "./runtime/maProximityDiagnostic.ts";
+export { highestVolumeEverTools } from "./runtime/highestVolumeEverDiagnostic.ts";
+
 // Goal-engineering primitives (GE1-GE3). Drafter + mandate linkage + deferred-actions log.
 // Companion to the existing /goal command in src/core/pipeline/goalMode.ts.
 export { goalDraftTools } from "./runtime/goalDraftDiagnostic.ts";
@@ -554,6 +561,9 @@ import { marginOfErrorTools } from "./runtime/marginOfErrorDiagnostic.ts";
 import { constraintIdentifierTools } from "./runtime/constraintIdentifierDiagnostic.ts";
 import { tradeConsistencyTools } from "./runtime/tradeConsistencyDiagnostic.ts";
 import { streakDetectorTools } from "./runtime/streakDetectorDiagnostic.ts";
+import { vcpContractionTools } from "./runtime/vcpContractionDiagnostic.ts";
+import { maProximityTools } from "./runtime/maProximityDiagnostic.ts";
+import { highestVolumeEverTools } from "./runtime/highestVolumeEverDiagnostic.ts";
 import { levelFreshnessTools } from "./runtime/levelFreshnessDiagnostic.ts";
 import { goalDraftTools } from "./runtime/goalDraftDiagnostic.ts";
 import { goalMandateLinkTools } from "./runtime/goalMandateLinkDiagnostic.ts";
@@ -697,6 +707,9 @@ const _rawAllTools = {
   ...constraintIdentifierTools,
   ...tradeConsistencyTools,
   ...streakDetectorTools,
+  ...vcpContractionTools,
+  ...maProximityTools,
+  ...highestVolumeEverTools,
   ...levelFreshnessTools,
   ...goalDraftTools,
   ...goalMandateLinkTools,

@@ -2497,6 +2497,77 @@ block usable by the agent independent of any tier-2 strategy file,
 OR an honest grep audit of the existing tier-2 strategies shows the
 Connors shape isn't already there as a reusable function.
 
+### S34. MAU&R (Moving-Average Undercut & Rally) Pattern Detector
+
+**Module would live in:** `src/core/alpha/mau-and-r.ts` (plus
+diagnostic wrapper if wired).
+**Memory:** Qullamaggie playbook — tightest-stop entry in the surf
+hierarchy ("MA undercut + snap back" = up to 8:1 R:R baseline,
+47:1 in the SNDK 50-SMA example).
+
+**Status:** Not started. Intraday pattern: price undercuts the rising
+MA (10/21/50), volume DRIES UP on the undercut, then snaps back above
+the MA before the close. Operator enters at the snap-back with stop
+just below the undercut wick.
+
+**What's needed:**
+- Intraday bar stream (or daily bars with intraday-low data)
+- Three-step state machine: armed (price approaching MA from above)
+  → undercut (intraday low below MA, volume below window-baseline)
+  → snapped (close ≥ MA after the undercut)
+- Optional confirmation: volume on the snap-back must be ≥ N×
+  undercut-bar volume (institutional reclaim signature)
+- Composes with `classify_ma_proximity` (the MAU&R is the highest-
+  R:R entry on whichever MA the symbol is surfing)
+
+**Risk:** Medium. Likely overlaps `bounceCounter.ts`, several tier-2
+strategy files, and the existing FAE/FTA infrastructure. Worth a
+grep audit BEFORE building — the value-add over what already exists
+may be marginal once the existing pieces are stitched together.
+
+**Revive on:** Honest grep audit confirms the MAU&R shape isn't
+already reachable through existing primitives, OR operator
+specifically wants this as a standalone agent-callable tool for
+intraday execution.
+
+### S35. Campaign Tracker
+
+**Module would live in:** `src/infra/safety/campaignTracker.ts`
+(plus trade-ledger schema extension).
+**Memory:** Qullamaggie playbook — "Campaigning Winners" framing
+(HVE entry → trim → reload on MA pullback → add on new base → ride
+through earnings → final close-below-10-SMA exit). Single
+multi-entry trade lifecycle that aggregates R metrics across the
+entire campaign rather than per-fill.
+
+**Status:** Not started. Gordon's trade ledger tracks individual
+executions; nothing yet aggregates multi-entry, multi-trim sequences
+on the same symbol into a campaign view.
+
+**What's needed:**
+- Trade-ledger schema extension: optional `campaignId` field on
+  ExecutionRecord, linking fills to a parent campaign
+- Campaign state machine: started → active → partially-trimmed →
+  re-added → closed
+- Aggregate R computation: initial-entry-relative R, cumulative
+  realized R across all trims, current open R on the residual
+- Add-point validation: composes with the rules in the Qullamaggie
+  playbook (first pullback to rising 10/21, MAU&R, 50-SMA MAU&R,
+  new tight base, century mark, 2nd earnings beat, HV1→HVE staircase)
+- Composes with `expectancy-by-tag` (tag campaigns by playbook so
+  per-campaign expectancy can be measured separately from per-trade)
+
+**Risk:** Higher. The implementation is straightforward but the
+trade-ledger schema change ripples through every downstream
+consumer (expectancy-by-tag, audit JSONL, position tracker,
+risk classifier). Worth doing only when the operator has enough
+multi-entry campaigns in the ledger to make the analytics useful.
+
+**Revive on:** Operator has run ≥ 5 multi-entry campaigns AND
+expressed that single-trade analytics no longer answer their
+"how did this name actually do?" questions. Until then,
+per-trade analytics + manual tagging are adequate.
+
 ### S30. CoW Swap MCP catalog entry
 
 **Module would live in:** `src/infra/ai/mcp/marketplace/catalog.json`.
