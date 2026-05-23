@@ -131,3 +131,56 @@ export {
   type TooGoodSeverity,
   type TrippedCheck,
 } from "./too-good-check.ts";
+
+export {
+  analyzeVolumeTrend,
+  formatVolumeTrend,
+  type VolumeTrendCandle,
+  type VolumeTrendOptions,
+  type VolumeTrendResult,
+  type VolumeTrendVerdict,
+  type VolumeDirection,
+  type VolumeIntensity,
+} from "./volume-trend.ts";
+
+export {
+  analyzeFakeLiquidity,
+  formatFakeLiquidity,
+  type FakeLiquidityCandle,
+  type FakeLiquidityOptions,
+  type FakeLiquidityResult,
+  type FakeLiquidityVerdict,
+  type CandleEfficiency,
+} from "./fake-liquidity.ts";
+
+export {
+  detectVolumeExhaustion,
+  formatVolumeExhaustion,
+  type VolumeExhaustionInput,
+  type VolumeExhaustionResult,
+  type ExhaustionStrategy,
+  type ExhaustionSeverity,
+  type ExhaustionAction,
+} from "./volume-exhaustion.ts";
+
+export {
+  computeMarginOfError,
+  formatMarginOfError,
+  type MarginOfErrorInput,
+  type MarginOfErrorResult,
+  type DirectionalBias,
+  type StructuralBias,
+  type StrategyDirection,
+  type StrategyType,
+  type TradeGrade,
+  type MarginRecommendation,
+} from "./margin-of-error.ts";
+
+export {
+  computeRegimeDetectionLag,
+  formatRegimeLag,
+  type RegimeTransition,
+  type RegimeLagOptions,
+  type RegimeLagResult,
+  type MatchedTransition,
+} from "./regime-detection-lag.ts";
