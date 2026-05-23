@@ -2396,6 +2396,32 @@ to non-urgent execution.
 **Revive on:** Operator runs autonomous loop that generates basket
 orders OR Pro pilot needs portfolio-rebalance internal crossing.
 
+### S31. Bias-aligned position sizing in position-sizer.ts
+
+**Module:** Extension of `src/core/risk-management/position-sizer.ts`.
+**Memory:** N/A — implementation gap from intraday-trader thread.
+
+**Status:** Not started. Discretionary trader pattern: when the
+strategy's expected behavior matches the current regime, bet larger;
+when out of sync, bet smaller. Gordon's `position-sizer.ts`
+currently considers Kelly + cost-aware Kelly but does NOT modulate
+size based on strategy-regime alignment.
+
+**What's needed:**
+- New input field `regimeAlignment: "aligned" | "neutral" | "misaligned"` on `KellyResult` callers
+- Multiplier table (operator-tunable, default `aligned: 1.25, neutral: 1.0, misaligned: 0.5`)
+- Apply multiplier after Kelly cap, before final position size
+- Audit-trail entry recording the alignment decision + multiplier
+
+**Risk:** Medium. Requires the caller to declare strategy-vs-regime
+alignment, which is operator-side judgment. Default-on would be
+risky; should be opt-in via env flag or explicit caller field.
+
+**Revive on:** Operator concretely declares strategy regime
+preferences AND demonstrates that misaligned-regime trades
+underperform the operator's aligned-regime trades by a meaningful
+margin (use the existing `expectancy-by-tag` for this measurement).
+
 ### S30. CoW Swap MCP catalog entry
 
 **Module would live in:** `src/infra/ai/mcp/marketplace/catalog.json`.

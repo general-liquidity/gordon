@@ -86,6 +86,18 @@ export {
 } from "./matrix.ts";
 
 export {
+  analyzeReversalTiming,
+  detectReversals,
+  formatReversalTiming,
+  type Bar,
+  type ReversalKind,
+  type ReversalPoint,
+  type ReversalTimingOptions,
+  type ReversalTimingResult,
+  type MatchedReversal,
+} from "./reversal-timing.ts";
+
+export {
   analyzeCalendarEffect,
   formatCalendarEffect,
   type CalendarReturn,
