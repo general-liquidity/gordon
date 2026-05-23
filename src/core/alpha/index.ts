@@ -86,6 +86,17 @@ export {
 } from "./matrix.ts";
 
 export {
+  analyzeCalendarEffect,
+  formatCalendarEffect,
+  type CalendarReturn,
+  type CalendarEffectOptions,
+  type CalendarEffectReport,
+  type CalendarSegmenter,
+  type SegmentStats,
+  type SegmentSignificanceTier,
+} from "./calendar-effect.ts";
+
+export {
   estimateExpectedReturn,
   formatExpectedReturn,
   DEFAULT_EQUITY_REGIME_ADJUSTMENTS,
