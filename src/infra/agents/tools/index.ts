@@ -256,6 +256,14 @@ export { wipeoutCapSizerTools } from "./runtime/wipeoutCapSizerDiagnostic.ts";
 // drawdown.
 export { strategyClaimVerifierTools } from "./runtime/strategyClaimVerifierDiagnostic.ts";
 
+// LV20-LV21 — Matt's market-making primitives. Avellaneda-Stoikov
+// inventory-adjusted spread (two-sided maker quoting with inventory
+// skew) + tail-conditional hedge classifier (peace-time vs
+// crisis-time correlation, Matt's "Treasuries hedge until they
+// really really don't" point).
+export { inventoryAdjustedSpreadTools } from "./runtime/inventoryAdjustedSpreadDiagnostic.ts";
+export { tailConditionalHedgeTools } from "./runtime/tailConditionalHedgeDiagnostic.ts";
+
 // Goal-engineering primitives (GE1-GE3). Drafter + mandate linkage + deferred-actions log.
 // Companion to the existing /goal command in src/core/pipeline/goalMode.ts.
 export { goalDraftTools } from "./runtime/goalDraftDiagnostic.ts";
@@ -600,6 +608,8 @@ import { darkPoolAdverseSelectionTools } from "./runtime/darkPoolAdverseSelectio
 import { crossSectionalMomentumTools } from "./runtime/crossSectionalMomentumDiagnostic.ts";
 import { wipeoutCapSizerTools } from "./runtime/wipeoutCapSizerDiagnostic.ts";
 import { strategyClaimVerifierTools } from "./runtime/strategyClaimVerifierDiagnostic.ts";
+import { inventoryAdjustedSpreadTools } from "./runtime/inventoryAdjustedSpreadDiagnostic.ts";
+import { tailConditionalHedgeTools } from "./runtime/tailConditionalHedgeDiagnostic.ts";
 import { levelFreshnessTools } from "./runtime/levelFreshnessDiagnostic.ts";
 import { goalDraftTools } from "./runtime/goalDraftDiagnostic.ts";
 import { goalMandateLinkTools } from "./runtime/goalMandateLinkDiagnostic.ts";
@@ -753,6 +763,8 @@ const _rawAllTools = {
   ...crossSectionalMomentumTools,
   ...wipeoutCapSizerTools,
   ...strategyClaimVerifierTools,
+  ...inventoryAdjustedSpreadTools,
+  ...tailConditionalHedgeTools,
   ...levelFreshnessTools,
   ...goalDraftTools,
   ...goalMandateLinkTools,

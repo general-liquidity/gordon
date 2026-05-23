@@ -2568,6 +2568,42 @@ expressed that single-trade analytics no longer answer their
 "how did this name actually do?" questions. Until then,
 per-trade analytics + manual tagging are adequate.
 
+### S39. Sparse-Trading Fair-Value Inferrer
+
+**Module would live in:** `src/core/alpha/sparse-fair-value.ts`
+(plus diagnostic wrapper if wired).
+**Memory:** Matt (TD muni market-making) podcast — pricing a bond
+that trades once every three weeks requires k-NN-style regression
+over feature vectors of comparable instruments that DO trade.
+
+**Status:** Not started. Operator-input checklist primitive: for a
+target instrument with feature vector + a corpus of recently-traded
+comparable instruments with their own feature vectors + recent trade
+prices, infer the target's fair value via weighted nearest-neighbor
+regression. Returns point estimate + confidence interval based on
+neighbor count and feature distance.
+
+**What's needed:**
+- Feature-vector format (operator-supplied per instrument)
+- Distance metric (Euclidean / cosine / categorical-aware)
+- Weighting kernel (Gaussian / inverse-distance / nearest-k)
+- Confidence interval from neighbor dispersion
+- Composes with `strategy-claim-verifier` (operator can audit whether
+  the inferrer's fair-value predictions actually came true on
+  subsequent trades)
+
+**Risk:** Borderline as a primitive. The math is essentially generic
+k-NN regression; the value-add depends entirely on the operator's
+feature engineering. Could feel close to a "tabular regression"
+primitive rather than something Gordon-specific.
+
+**Revive on:** Operator faces a concrete illiquid-instrument
+pricing problem (small-cap stocks, niche tokens, OTC instruments,
+private-credit-like assets) AND has prepared feature vectors for
+the comparable set. Until then, this is generic tabular regression
+that any operator can do externally and feed into Gordon's
+audit primitives.
+
 ### S36. Two-Stage SMT Composition
 
 **Module would live in:** `src/core/alpha/two-stage-smt.ts` (plus

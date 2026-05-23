@@ -311,3 +311,21 @@ export {
   type ClaimVerdict,
   type OverallVerdict,
 } from "./strategy-claim-verifier.ts";
+
+export {
+  computeInventoryAdjustedSpread,
+  formatInventoryAdjustedSpread,
+  type InventoryAdjustedSpreadInput,
+  type InventoryAdjustedSpreadResult,
+  type SpreadVerdict,
+} from "./inventory-adjusted-spread.ts";
+
+export {
+  classifyTailConditionalHedges,
+  formatTailConditionalHedge,
+  type HedgeCandidate,
+  type TailConditionalHedgeInput,
+  type TailConditionalHedgeResult,
+  type HedgeClassification,
+  type HedgeReliability,
+} from "./tail-conditional-hedge.ts";
