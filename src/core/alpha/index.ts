@@ -184,3 +184,23 @@ export {
   type RegimeLagResult,
   type MatchedTransition,
 } from "./regime-detection-lag.ts";
+
+export {
+  identifyConstraint,
+  formatConstraint,
+  type EvComponent,
+  type EvComponentTarget,
+  type ConstraintIdentifierInput,
+  type ConstraintIdentifierResult,
+  type ComponentDeficit,
+} from "./constraint-identifier.ts";
+
+export {
+  computeTradeConsistency,
+  formatTradeConsistency,
+  type TradeExecution,
+  type TradeConsistencyOptions,
+  type TradeConsistencyResult,
+  type ConsistencyVerdict,
+  type SubscoreBreakdown,
+} from "./trade-consistency.ts";

@@ -2422,6 +2422,46 @@ preferences AND demonstrates that misaligned-regime trades
 underperform the operator's aligned-regime trades by a meaningful
 margin (use the existing `expectancy-by-tag` for this measurement).
 
+### S32. Rule-Break Detector
+
+**Module would live in:** `src/core/alpha/rule-break-detector.ts`
+(plus an agent-callable diagnostic wrapper if wired).
+**Memory:** Spicy's "Reverse-Engineered Profitable Trading" article —
+Stage 2 first improvement-process step: "find every trade where you
+broke the rules of your strategy."
+
+**Status:** Not started. Companion to the just-shipped
+`trade-consistency.ts` and `constraint-identifier.ts`. While
+`trade-consistency` measures self-consistency across recent trades
+(do they look the same?), the rule-break detector compares actual
+execution against the declared playbook rules (are they doing what
+the playbook says?). Two different questions.
+
+**What's needed:**
+- A stable playbook-rule schema: declared entry trigger, declared
+  stop placement rule (e.g. "swing low + N ticks"), declared target
+  derivation, declared session/timeframe constraints.
+- Per-trade compliance check: did the trigger condition actually fire
+  at entry? Was the stop within tolerance of the rule? Was the target
+  derived from the rule?
+- Output: per-trade `pass | fail` + per-rule break-rate over rolling
+  window + dominant rule-break category.
+- Composes with `constraint-identifier`: if the dominant constraint
+  is win-rate but the rule-break rate is high, the constraint isn't
+  edge — it's discipline.
+
+**Risk:** Medium. Hinges on a playbook-rule format that doesn't
+exist yet — Gordon has playbooks as markdown + strategy recipes as
+TypeScript classes, but neither exposes the predicates in a form
+the detector can mechanically diff against. Premature build before
+the schema stabilizes will produce a brittle detector.
+
+**Revive on:** Playbook-rule format stabilizes enough to be parseable
+by a deterministic check, OR the operator explicitly declares the
+rule predicates for a single playbook as a pilot. Honest reading:
+this likely arrives alongside the broader "playbooks-as-code"
+initiative, not standalone.
+
 ### S30. CoW Swap MCP catalog entry
 
 **Module would live in:** `src/infra/ai/mcp/marketplace/catalog.json`.
