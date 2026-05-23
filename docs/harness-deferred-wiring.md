@@ -2568,6 +2568,41 @@ expressed that single-trade analytics no longer answer their
 "how did this name actually do?" questions. Until then,
 per-trade analytics + manual tagging are adequate.
 
+### S36. Two-Stage SMT Composition
+
+**Module would live in:** `src/core/alpha/two-stage-smt.ts` (plus
+diagnostic wrapper if wired).
+**Memory:** ICT-derived "two-stage SMT" concept — HTF level-anchored
+SMT divergence + displacement away from the level + LTF confirmation
+(either another SMT or a PSP) → composite reversal verdict.
+
+**Status:** Not started. The two component primitives shipped in
+commit feat(alpha): smt-divergence + psp-detector. This S36 is the
+orchestration wrapper that chains them into a two-stage state
+machine: armed (HTF SMT printed) → displaced (price moved away from
+swept level) → confirmed (LTF SMT or PSP printed) → reversal_in_play.
+
+**What's needed:**
+- State machine with the four stages above
+- HTF window inputs (daily/weekly OHLC windows) + level inputs
+- Displacement check — price moved ≥ N×ADR away from the swept level
+  within M bars after the HTF sweep
+- LTF SMT or PSP confirmation — composes with the two shipped tools
+- Output: stage label + aggregate confidence verdict + recommended
+  entry / stop / target geometry
+
+**Risk:** Low. Both component primitives are already in core/alpha.
+The composition is mostly orchestration glue with no new math.
+Defer-reason is sequencing: better to let operators use the two
+component primitives independently first and see whether the
+two-stage chain actually adds edge over single-stage SMT/PSP.
+
+**Revive on:** Operator has accumulated logs from single-stage
+`analyze_smt_divergence` and `detect_psp` calls AND has data showing
+that two-stage chains have measurably higher signal quality than
+single-stage. Alternatively, revive when operator explicitly wants
+the composition as a single tool call for ergonomics.
+
 ### S30. CoW Swap MCP catalog entry
 
 **Module would live in:** `src/infra/ai/mcp/marketplace/catalog.json`.

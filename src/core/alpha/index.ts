@@ -242,3 +242,25 @@ export {
   type HveVerdict,
   type HveConviction,
 } from "./highest-volume-ever.ts";
+
+export {
+  analyzeSmtDivergence,
+  formatSmtDivergence,
+  type AssetSnapshot,
+  type SmtDivergenceOptions,
+  type SmtDivergenceResult,
+  type SmtVerdict,
+  type PerAssetSweepStatus,
+} from "./smt-divergence.ts";
+
+export {
+  detectPsp,
+  formatPsp,
+  type PspBar,
+  type PspOptions,
+  type PspResult,
+  type PspVerdict,
+  type PspAssetStatus,
+  type BarDirection,
+  type MajorityDirection,
+} from "./psp-detector.ts";

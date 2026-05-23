@@ -227,6 +227,13 @@ export { vcpContractionTools } from "./runtime/vcpContractionDiagnostic.ts";
 export { maProximityTools } from "./runtime/maProximityDiagnostic.ts";
 export { highestVolumeEverTools } from "./runtime/highestVolumeEverDiagnostic.ts";
 
+// LV13-LV14 — Cross-asset N-asset divergence primitives. Multi-asset
+// level-anchored sweep test (SMT) + same-bar one-vs-rest close
+// divergence (PSP). Distinct from the single-asset liquidity-sweep
+// detector in smc-patterns.
+export { smtDivergenceTools } from "./runtime/smtDivergenceDiagnostic.ts";
+export { pspDetectorTools } from "./runtime/pspDetectorDiagnostic.ts";
+
 // Goal-engineering primitives (GE1-GE3). Drafter + mandate linkage + deferred-actions log.
 // Companion to the existing /goal command in src/core/pipeline/goalMode.ts.
 export { goalDraftTools } from "./runtime/goalDraftDiagnostic.ts";
@@ -564,6 +571,8 @@ import { streakDetectorTools } from "./runtime/streakDetectorDiagnostic.ts";
 import { vcpContractionTools } from "./runtime/vcpContractionDiagnostic.ts";
 import { maProximityTools } from "./runtime/maProximityDiagnostic.ts";
 import { highestVolumeEverTools } from "./runtime/highestVolumeEverDiagnostic.ts";
+import { smtDivergenceTools } from "./runtime/smtDivergenceDiagnostic.ts";
+import { pspDetectorTools } from "./runtime/pspDetectorDiagnostic.ts";
 import { levelFreshnessTools } from "./runtime/levelFreshnessDiagnostic.ts";
 import { goalDraftTools } from "./runtime/goalDraftDiagnostic.ts";
 import { goalMandateLinkTools } from "./runtime/goalMandateLinkDiagnostic.ts";
@@ -710,6 +719,8 @@ const _rawAllTools = {
   ...vcpContractionTools,
   ...maProximityTools,
   ...highestVolumeEverTools,
+  ...smtDivergenceTools,
+  ...pspDetectorTools,
   ...levelFreshnessTools,
   ...goalDraftTools,
   ...goalMandateLinkTools,
