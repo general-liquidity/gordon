@@ -329,3 +329,22 @@ export {
   type HedgeClassification,
   type HedgeReliability,
 } from "./tail-conditional-hedge.ts";
+
+export {
+  computeAggressionRatio,
+  formatAggressionRatio,
+  type TakerVolumeBar,
+  type AggressionRatioOptions,
+  type AggressionRatioResult,
+  type AggressionVerdict,
+} from "./aggression-ratio.ts";
+
+export {
+  reweightSignals,
+  formatSignalReweighting,
+  type SignalPerformance,
+  type SignalReweightingOptions,
+  type SignalReweightingResult,
+  type SignalWeightAssignment,
+  type ReweightingVerdict,
+} from "./signal-recency-reweighting.ts";

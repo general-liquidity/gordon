@@ -264,6 +264,14 @@ export { strategyClaimVerifierTools } from "./runtime/strategyClaimVerifierDiagn
 export { inventoryAdjustedSpreadTools } from "./runtime/inventoryAdjustedSpreadDiagnostic.ts";
 export { tailConditionalHedgeTools } from "./runtime/tailConditionalHedgeDiagnostic.ts";
 
+// LV22-LV23 — Scott (HyperTrend) crypto primitives. Market-order
+// aggression ratio (EMA of taker buys / sells from exchange APIs,
+// publicly-known sharp-2.5 signal) + signal-recency reweighting
+// helper (Scott's 6-month → 1-month signal-performance correlation
+// = 0.13 default reweighting strength).
+export { aggressionRatioTools } from "./runtime/aggressionRatioDiagnostic.ts";
+export { signalReweightingTools } from "./runtime/signalReweightingDiagnostic.ts";
+
 // Goal-engineering primitives (GE1-GE3). Drafter + mandate linkage + deferred-actions log.
 // Companion to the existing /goal command in src/core/pipeline/goalMode.ts.
 export { goalDraftTools } from "./runtime/goalDraftDiagnostic.ts";
@@ -610,6 +618,8 @@ import { wipeoutCapSizerTools } from "./runtime/wipeoutCapSizerDiagnostic.ts";
 import { strategyClaimVerifierTools } from "./runtime/strategyClaimVerifierDiagnostic.ts";
 import { inventoryAdjustedSpreadTools } from "./runtime/inventoryAdjustedSpreadDiagnostic.ts";
 import { tailConditionalHedgeTools } from "./runtime/tailConditionalHedgeDiagnostic.ts";
+import { aggressionRatioTools } from "./runtime/aggressionRatioDiagnostic.ts";
+import { signalReweightingTools } from "./runtime/signalReweightingDiagnostic.ts";
 import { levelFreshnessTools } from "./runtime/levelFreshnessDiagnostic.ts";
 import { goalDraftTools } from "./runtime/goalDraftDiagnostic.ts";
 import { goalMandateLinkTools } from "./runtime/goalMandateLinkDiagnostic.ts";
@@ -765,6 +775,8 @@ const _rawAllTools = {
   ...strategyClaimVerifierTools,
   ...inventoryAdjustedSpreadTools,
   ...tailConditionalHedgeTools,
+  ...aggressionRatioTools,
+  ...signalReweightingTools,
   ...levelFreshnessTools,
   ...goalDraftTools,
   ...goalMandateLinkTools,
