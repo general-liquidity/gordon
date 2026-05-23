@@ -272,6 +272,13 @@ export { tailConditionalHedgeTools } from "./runtime/tailConditionalHedgeDiagnos
 export { aggressionRatioTools } from "./runtime/aggressionRatioDiagnostic.ts";
 export { signalReweightingTools } from "./runtime/signalReweightingDiagnostic.ts";
 
+// LV24 — Conviction-Filtered Expectancy. "Hidden edge buried in
+// noise" — find the optimal conviction threshold that maximizes
+// hypothetical PnL given a trade ledger + per-trade conviction
+// scores. Distinct from expectancy-by-tag (categorical) and
+// constraint-identifier (EV-component decomposition).
+export { convictionFilteredExpectancyTools } from "./runtime/convictionFilteredExpectancyDiagnostic.ts";
+
 // Goal-engineering primitives (GE1-GE3). Drafter + mandate linkage + deferred-actions log.
 // Companion to the existing /goal command in src/core/pipeline/goalMode.ts.
 export { goalDraftTools } from "./runtime/goalDraftDiagnostic.ts";
@@ -620,6 +627,7 @@ import { inventoryAdjustedSpreadTools } from "./runtime/inventoryAdjustedSpreadD
 import { tailConditionalHedgeTools } from "./runtime/tailConditionalHedgeDiagnostic.ts";
 import { aggressionRatioTools } from "./runtime/aggressionRatioDiagnostic.ts";
 import { signalReweightingTools } from "./runtime/signalReweightingDiagnostic.ts";
+import { convictionFilteredExpectancyTools } from "./runtime/convictionFilteredExpectancyDiagnostic.ts";
 import { levelFreshnessTools } from "./runtime/levelFreshnessDiagnostic.ts";
 import { goalDraftTools } from "./runtime/goalDraftDiagnostic.ts";
 import { goalMandateLinkTools } from "./runtime/goalMandateLinkDiagnostic.ts";
@@ -777,6 +785,7 @@ const _rawAllTools = {
   ...tailConditionalHedgeTools,
   ...aggressionRatioTools,
   ...signalReweightingTools,
+  ...convictionFilteredExpectancyTools,
   ...levelFreshnessTools,
   ...goalDraftTools,
   ...goalMandateLinkTools,

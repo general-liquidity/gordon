@@ -348,3 +348,13 @@ export {
   type SignalWeightAssignment,
   type ReweightingVerdict,
 } from "./signal-recency-reweighting.ts";
+
+export {
+  simulateConvictionFilteredExpectancy,
+  formatConvictionFilteredExpectancy,
+  type TradeRecord,
+  type ConvictionFilteredExpectancyOptions,
+  type ConvictionFilteredExpectancyResult,
+  type ThresholdSimulation,
+  type ConvictionVerdict,
+} from "./conviction-filtered-expectancy.ts";
