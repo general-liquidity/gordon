@@ -2462,6 +2462,41 @@ rule predicates for a single playbook as a pilot. Honest reading:
 this likely arrives alongside the broader "playbooks-as-code"
 initiative, not standalone.
 
+### S33. RSI Pullback-In-Trend Signal Primitive
+
+**Module would live in:** `src/core/alpha/rsi-pullback-in-trend.ts`
+(plus agent-callable diagnostic wrapper if wired).
+**Memory:** Quantified-Strategies "RSI 30-50 Zone for Swing Trading"
+article (Connors-style: RSI(5) crosses below 30 in an uptrend → long
+→ exit at RSI=50).
+
+**Status:** Not started. Looks partly covered by existing tier-2
+strategies (`ema-rsi-crossover.ts`, `mfi-divergence-confluence.ts`,
+`bollinger-bounce.ts`) but those are end-to-end strategies, not
+composable primitives. A clean Connors-shape primitive would emit:
+- pullbackArmed (RSI entered the 30-50 band in an uptrend)
+- pullbackComplete (RSI reaching the configured exit level, e.g. 50)
+- pullbackInvalidated (trend filter flipped while pullback active)
+
+**What's needed:**
+- Trend filter input (caller supplies; usually MA-cross or regime
+  classifier output — Gordon has both)
+- RSI(N) computation (already in `core/indicators`)
+- State machine with armed → complete | invalidated transitions
+- Composes with `margin-of-error` (in-sync long only when bias is
+  long-favoring + structural is trending)
+
+**Risk:** Low. The math is standard; the gap is just packaging.
+The risk is REDUNDANCY: this overlaps materially with several
+existing tier-2 strategies and may not justify a fresh primitive
+unless the composability gain is concrete (e.g. wanting to use the
+signal in an agent tool independent of any specific strategy).
+
+**Revive on:** Operator wants RSI-pullback as a composable building
+block usable by the agent independent of any tier-2 strategy file,
+OR an honest grep audit of the existing tier-2 strategies shows the
+Connors shape isn't already there as a reusable function.
+
 ### S30. CoW Swap MCP catalog entry
 
 **Module would live in:** `src/infra/ai/mcp/marketplace/catalog.json`.

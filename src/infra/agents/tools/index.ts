@@ -214,6 +214,12 @@ export { marginOfErrorTools } from "./runtime/marginOfErrorDiagnostic.ts";
 export { constraintIdentifierTools } from "./runtime/constraintIdentifierDiagnostic.ts";
 export { tradeConsistencyTools } from "./runtime/tradeConsistencyDiagnostic.ts";
 
+// LV9 — Connors-style consecutive-bar streak detector with
+// historical-percentile exhaustion verdict + fade direction.
+// Distinct from streakCircuitBreaker (loss streak) and
+// hotStreakSizer (PnL streak) — this one operates on PRICE bars.
+export { streakDetectorTools } from "./runtime/streakDetectorDiagnostic.ts";
+
 // Goal-engineering primitives (GE1-GE3). Drafter + mandate linkage + deferred-actions log.
 // Companion to the existing /goal command in src/core/pipeline/goalMode.ts.
 export { goalDraftTools } from "./runtime/goalDraftDiagnostic.ts";
@@ -547,6 +553,7 @@ import { volumeExhaustionTools } from "./runtime/volumeExhaustionDiagnostic.ts";
 import { marginOfErrorTools } from "./runtime/marginOfErrorDiagnostic.ts";
 import { constraintIdentifierTools } from "./runtime/constraintIdentifierDiagnostic.ts";
 import { tradeConsistencyTools } from "./runtime/tradeConsistencyDiagnostic.ts";
+import { streakDetectorTools } from "./runtime/streakDetectorDiagnostic.ts";
 import { levelFreshnessTools } from "./runtime/levelFreshnessDiagnostic.ts";
 import { goalDraftTools } from "./runtime/goalDraftDiagnostic.ts";
 import { goalMandateLinkTools } from "./runtime/goalMandateLinkDiagnostic.ts";
@@ -689,6 +696,7 @@ const _rawAllTools = {
   ...marginOfErrorTools,
   ...constraintIdentifierTools,
   ...tradeConsistencyTools,
+  ...streakDetectorTools,
   ...levelFreshnessTools,
   ...goalDraftTools,
   ...goalMandateLinkTools,

@@ -204,3 +204,13 @@ export {
   type ConsistencyVerdict,
   type SubscoreBreakdown,
 } from "./trade-consistency.ts";
+
+export {
+  detectStreak,
+  formatStreak,
+  type StreakBar,
+  type StreakDirection,
+  type StreakDetectorOptions,
+  type StreakDetectorResult,
+  type ExhaustionVerdict,
+} from "./streak-detector.ts";
