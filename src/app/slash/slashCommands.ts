@@ -365,6 +365,17 @@ const LEGACY_SLASH_COMMANDS: SlashCommandSeed[] = [
     whenToUse: "Before submitting a non-urgent order — see if waiting for the opening/closing cross (or CoW Swap batch) is worth it",
   },
   {
+    name: "components",
+    aliases: ["composability", "comp"],
+    description: "Audit Gordon's pluggability — LLM providers, exchanges, skills, MCP servers, peer agents, recipes, risk dimensions, alpha diagnostics, audit layers",
+    usage: "/components (defaults to structured) | /components text",
+    category: "system",
+    level: 2,
+    action: "tool",
+    target: "composability_audit",
+    whenToUse: "When operator wants to see what's swappable, what alternatives exist, or demonstrate Gordon's open-harness composability vs vertically-integrated frontier-lab services",
+  },
+  {
     name: "grid",
     aliases: ["g"],
     description: "Create a grid entry plan with multiple buy levels",

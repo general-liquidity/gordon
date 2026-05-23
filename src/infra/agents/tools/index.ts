@@ -54,6 +54,7 @@ export { historyTools } from "./runtime/flow/history.ts";
 export { skillsTools } from "./runtime/flow/skillsManagement.ts";
 export { investigationTools } from "./runtime/flow/investigationTool.ts";
 export { executionDisciplineTools } from "./runtime/flow/executionDiscipline.ts";
+export { composabilityTools } from "./runtime/flow/composabilityTool.ts";
 export { accountTools } from "./account/account.ts";
 export { tradingTools } from "./trading/trading.ts";
 export { peerTools } from "./peer/peer.ts";
@@ -437,6 +438,7 @@ import { historyTools } from "./runtime/flow/history.ts";
 import { skillsTools } from "./runtime/flow/skillsManagement.ts";
 import { investigationTools } from "./runtime/flow/investigationTool.ts";
 import { executionDisciplineTools } from "./runtime/flow/executionDiscipline.ts";
+import { composabilityTools } from "./runtime/flow/composabilityTool.ts";
 import { accountTools } from "./account/account.ts";
 import { tradingTools } from "./trading/trading.ts";
 import { marketAnalysisTools } from "./market/market-analysis.ts";
@@ -570,6 +572,7 @@ const _rawAllTools = {
   ...skillsTools,
   ...investigationTools,
   ...executionDisciplineTools,
+  ...composabilityTools,
   ...accountTools,
   ...tradingTools,
   ...marketAnalysisTools,
@@ -703,6 +706,7 @@ export const toolCounts = {
   skills: Object.keys(skillsTools).length,
   investigation: Object.keys(investigationTools).length,
   executionDiscipline: Object.keys(executionDisciplineTools).length,
+  composability: Object.keys(composabilityTools).length,
   account: Object.keys(accountTools).length,
   trading: Object.keys(tradingTools).length,
   marketAnalysis: Object.keys(marketAnalysisTools).length,
