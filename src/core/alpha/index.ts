@@ -264,3 +264,20 @@ export {
   type BarDirection,
   type MajorityDirection,
 } from "./psp-detector.ts";
+
+export {
+  estimateLatencyCost,
+  formatLatencyCost,
+  type LatencyCostInput,
+  type LatencyCostResult,
+  type LatencyCostVerdict,
+} from "./latency-cost.ts";
+
+export {
+  scoreDarkPoolAdverseSelection,
+  formatDarkPoolAdverseSelection,
+  type DarkPoolFill,
+  type DarkPoolAdverseSelectionOptions,
+  type DarkPoolAdverseSelectionResult,
+  type DarkPoolVerdict,
+} from "./dark-pool-adverse-selection.ts";

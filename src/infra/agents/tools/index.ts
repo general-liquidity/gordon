@@ -234,6 +234,14 @@ export { highestVolumeEverTools } from "./runtime/highestVolumeEverDiagnostic.ts
 export { smtDivergenceTools } from "./runtime/smtDivergenceDiagnostic.ts";
 export { pspDetectorTools } from "./runtime/pspDetectorDiagnostic.ts";
 
+// LV15-LV16 — Moallemi-style microstructure primitives. Quantitative
+// latency-cost estimator + venue-level dark-pool adverse-selection
+// scorer. Mechanically validate Gordon's positioning above the
+// latency tier + measure whether dark-venue "free mid-market" is
+// actually free or eaten by implicit adverse-selection fee.
+export { latencyCostTools } from "./runtime/latencyCostDiagnostic.ts";
+export { darkPoolAdverseSelectionTools } from "./runtime/darkPoolAdverseSelectionDiagnostic.ts";
+
 // Goal-engineering primitives (GE1-GE3). Drafter + mandate linkage + deferred-actions log.
 // Companion to the existing /goal command in src/core/pipeline/goalMode.ts.
 export { goalDraftTools } from "./runtime/goalDraftDiagnostic.ts";
@@ -573,6 +581,8 @@ import { maProximityTools } from "./runtime/maProximityDiagnostic.ts";
 import { highestVolumeEverTools } from "./runtime/highestVolumeEverDiagnostic.ts";
 import { smtDivergenceTools } from "./runtime/smtDivergenceDiagnostic.ts";
 import { pspDetectorTools } from "./runtime/pspDetectorDiagnostic.ts";
+import { latencyCostTools } from "./runtime/latencyCostDiagnostic.ts";
+import { darkPoolAdverseSelectionTools } from "./runtime/darkPoolAdverseSelectionDiagnostic.ts";
 import { levelFreshnessTools } from "./runtime/levelFreshnessDiagnostic.ts";
 import { goalDraftTools } from "./runtime/goalDraftDiagnostic.ts";
 import { goalMandateLinkTools } from "./runtime/goalMandateLinkDiagnostic.ts";
@@ -721,6 +731,8 @@ const _rawAllTools = {
   ...highestVolumeEverTools,
   ...smtDivergenceTools,
   ...pspDetectorTools,
+  ...latencyCostTools,
+  ...darkPoolAdverseSelectionTools,
   ...levelFreshnessTools,
   ...goalDraftTools,
   ...goalMandateLinkTools,
