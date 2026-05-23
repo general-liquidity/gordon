@@ -249,6 +249,13 @@ export { darkPoolAdverseSelectionTools } from "./runtime/darkPoolAdverseSelectio
 export { crossSectionalMomentumTools } from "./runtime/crossSectionalMomentumDiagnostic.ts";
 export { wipeoutCapSizerTools } from "./runtime/wipeoutCapSizerDiagnostic.ts";
 
+// LV19 — Tom's allocator-deconstruction test: strategy-claim
+// verifier. Inverse of composite-attribution — given a return
+// series + claims, test consistency. Catches hidden beta,
+// misrepresented gamma posture, inflated Sharpe, understated
+// drawdown.
+export { strategyClaimVerifierTools } from "./runtime/strategyClaimVerifierDiagnostic.ts";
+
 // Goal-engineering primitives (GE1-GE3). Drafter + mandate linkage + deferred-actions log.
 // Companion to the existing /goal command in src/core/pipeline/goalMode.ts.
 export { goalDraftTools } from "./runtime/goalDraftDiagnostic.ts";
@@ -592,6 +599,7 @@ import { latencyCostTools } from "./runtime/latencyCostDiagnostic.ts";
 import { darkPoolAdverseSelectionTools } from "./runtime/darkPoolAdverseSelectionDiagnostic.ts";
 import { crossSectionalMomentumTools } from "./runtime/crossSectionalMomentumDiagnostic.ts";
 import { wipeoutCapSizerTools } from "./runtime/wipeoutCapSizerDiagnostic.ts";
+import { strategyClaimVerifierTools } from "./runtime/strategyClaimVerifierDiagnostic.ts";
 import { levelFreshnessTools } from "./runtime/levelFreshnessDiagnostic.ts";
 import { goalDraftTools } from "./runtime/goalDraftDiagnostic.ts";
 import { goalMandateLinkTools } from "./runtime/goalMandateLinkDiagnostic.ts";
@@ -744,6 +752,7 @@ const _rawAllTools = {
   ...darkPoolAdverseSelectionTools,
   ...crossSectionalMomentumTools,
   ...wipeoutCapSizerTools,
+  ...strategyClaimVerifierTools,
   ...levelFreshnessTools,
   ...goalDraftTools,
   ...goalMandateLinkTools,

@@ -300,3 +300,14 @@ export {
   type WipeoutCapResult,
   type SizingVerdict,
 } from "./wipeout-cap-sizer.ts";
+
+export {
+  verifyStrategyClaims,
+  formatStrategyClaimVerification,
+  type StrategyClaim,
+  type StrategyClaimVerifierInput,
+  type StrategyClaimVerifierResult,
+  type ClaimCheckResult,
+  type ClaimVerdict,
+  type OverallVerdict,
+} from "./strategy-claim-verifier.ts";
