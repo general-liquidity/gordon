@@ -2351,6 +2351,69 @@ only as text; no operator-visible visualization in the live TUI.
 **Revive on:** Operator running long autonomous loops where
 context-pressure debugging would benefit from real-time visibility.
 
+### S28. Venue MEV-exposure auto-population in pre-trade flow
+
+**Module:** `src/infra/trading/risk/venueMevExposure.ts` (shipped) +
+`riskClassifier.ts` 13th dimension (wired).
+**Memory:** `[[project_budish_market_design.md]]`.
+
+**Status:** The primitive + classifier dimension ship. Callers must
+manually pass `venueMevExposure` in the `PortfolioContext` for the
+dimension to fire. The execute_plan flow doesn't yet auto-populate
+it from the trade's resolved venue.
+
+**What's needed:** In `execute_plan` (or the upstream planner), look
+up `classifyVenue(trade.venue)` and inject the result into the
+classifier context. ~20 LOC.
+
+**Risk:** Low. Read-only lookup, dimension is additive.
+
+**Revive on:** First operator trades a DEX/AMM venue and asks why
+the riskClassifier didn't flag MEV exposure.
+
+### S29. Internal-batch + auction-deferral consumer integration
+
+**Modules:** `src/infra/trading/execution/internalBatch.ts` +
+`src/infra/trading/execution/auctionWindow.ts` (both shipped).
+**Memory:** `[[project_budish_market_design.md]]`.
+
+**Status:** Pure-function primitives ship. No caller in the
+execute_plan or autonomous-loop flow consumes them yet.
+
+**What's needed:** Two integration points:
+- Before submitting a multi-order batch to external venues, run
+  `computeInternalBatch(orders)` and replace external orders with the
+  residuals. Audit each internal crossing.
+- For non-urgent orders, call `suggestAuctionDeferral(venue, options)`;
+  when shouldDefer is true, schedule the order for the auction time
+  instead of immediate execution.
+
+**Risk:** Medium. Internal-batch netting changes the execution
+semantics — operator may want bookkeeping where the original orders
+are visible. Auction-deferral changes timing — operator must opt in
+to non-urgent execution.
+
+**Revive on:** Operator runs autonomous loop that generates basket
+orders OR Pro pilot needs portfolio-rebalance internal crossing.
+
+### S30. CoW Swap MCP catalog entry
+
+**Module would live in:** `src/infra/ai/mcp/marketplace/catalog.json`.
+**Memory:** `[[project_budish_market_design.md]]`.
+
+**Status:** Not started. CoW Swap is the canonical MEV-protected
+swap aggregator (Budish is a technical advisor). Adding it to
+Gordon's MCP marketplace lets the operator route swaps through a
+venue that classifies as `protected` in the MEV-exposure dimension.
+
+**What's needed:** ~30 LOC catalog entry following the same shape
+as the OpenBB Workspace MCP entry shipped in commit `08b1a8f1`.
+
+**Risk:** Trivial. Read-only catalog addition.
+
+**Revive on:** Operator does swaps and wants explicit MEV-protected
+routing.
+
 ### S27. Agent-step adapter from Mastra orchestrator
 
 **Module would live in:** `src/infra/agents/mastraAgentStepAdapter.ts`.

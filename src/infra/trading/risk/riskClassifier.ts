@@ -103,6 +103,22 @@ export interface PortfolioContext {
     currentState: "bull" | "neutral" | "bear";
     matrixStability?: "stable" | "drifting" | "unstable" | "insufficient_data";
   };
+  /**
+   * Optional MEV-exposure classification for the venue this trade will
+   * route through. Per Budish's market-design analysis: continuous-LOB
+   * venues carry a structural sniping tax; crypto adds a mempool layer
+   * (DEXes) where sandwich and frontrun attacks are documented. When
+   * supplied, classifier surfaces the exposure as a dimension so the
+   * operator sees the cost they're paying invisibly.
+   *
+   * Construct via `classifyVenue(venueId)` or `buildVenueMevExposure(tier)`
+   * from `./venueMevExposure.ts`.
+   */
+  venueMevExposure?: {
+    tier: "low" | "medium" | "high" | "protected" | "unknown";
+    score: number;
+    reason: string;
+  };
 }
 
 export interface ClassifierConfig {
@@ -273,6 +289,21 @@ export function classifyTradeRisk(
       weight: 1.4,
       reason: `Max correlation: ${(corrCheck.maxCorrelation * 100).toFixed(0)}% with ${corrCheck.mostCorrelatedWith}` +
         (corrCheck.concentrationWarning ? " — CONCENTRATION WARNING" : ""),
+    });
+  }
+
+  // 13. Venue MEV exposure — surface the structural sniping/MEV tax
+  // baked into the venue's market design. Per Budish's analysis: every
+  // continuous-LOB venue has a sniping tax; public-mempool venues
+  // (DEXes) add a sandwich/frontrun layer on top. Operator sees the
+  // exposure so they can route around it (CoW Swap, MEV-protected RPC).
+  if (portfolio.venueMevExposure) {
+    const mev = portfolio.venueMevExposure;
+    dimensions.push({
+      name: "Venue MEV Exposure",
+      score: Math.max(0, Math.min(100, mev.score)),
+      weight: 1.0,
+      reason: `Venue tier: ${mev.tier} — ${mev.reason}`,
     });
   }
 
