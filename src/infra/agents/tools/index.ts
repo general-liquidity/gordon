@@ -207,6 +207,13 @@ export { fakeLiquidityTools } from "./runtime/fakeLiquidityDiagnostic.ts";
 export { volumeExhaustionTools } from "./runtime/volumeExhaustionDiagnostic.ts";
 export { marginOfErrorTools } from "./runtime/marginOfErrorDiagnostic.ts";
 
+// LV7-LV8 — Retrospective coaching primitives from Spicy's
+// rate-of-learning + reverse-engineered-profitability articles.
+// EV-component bottleneck identifier + per-trade execution
+// consistency scorer.
+export { constraintIdentifierTools } from "./runtime/constraintIdentifierDiagnostic.ts";
+export { tradeConsistencyTools } from "./runtime/tradeConsistencyDiagnostic.ts";
+
 // Goal-engineering primitives (GE1-GE3). Drafter + mandate linkage + deferred-actions log.
 // Companion to the existing /goal command in src/core/pipeline/goalMode.ts.
 export { goalDraftTools } from "./runtime/goalDraftDiagnostic.ts";
@@ -538,6 +545,8 @@ import { volumeTrendTools } from "./runtime/volumeTrendDiagnostic.ts";
 import { fakeLiquidityTools } from "./runtime/fakeLiquidityDiagnostic.ts";
 import { volumeExhaustionTools } from "./runtime/volumeExhaustionDiagnostic.ts";
 import { marginOfErrorTools } from "./runtime/marginOfErrorDiagnostic.ts";
+import { constraintIdentifierTools } from "./runtime/constraintIdentifierDiagnostic.ts";
+import { tradeConsistencyTools } from "./runtime/tradeConsistencyDiagnostic.ts";
 import { levelFreshnessTools } from "./runtime/levelFreshnessDiagnostic.ts";
 import { goalDraftTools } from "./runtime/goalDraftDiagnostic.ts";
 import { goalMandateLinkTools } from "./runtime/goalMandateLinkDiagnostic.ts";
@@ -678,6 +687,8 @@ const _rawAllTools = {
   ...fakeLiquidityTools,
   ...volumeExhaustionTools,
   ...marginOfErrorTools,
+  ...constraintIdentifierTools,
+  ...tradeConsistencyTools,
   ...levelFreshnessTools,
   ...goalDraftTools,
   ...goalMandateLinkTools,
