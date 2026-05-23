@@ -242,6 +242,13 @@ export { pspDetectorTools } from "./runtime/pspDetectorDiagnostic.ts";
 export { latencyCostTools } from "./runtime/latencyCostDiagnostic.ts";
 export { darkPoolAdverseSelectionTools } from "./runtime/darkPoolAdverseSelectionDiagnostic.ts";
 
+// LV17-LV18 — Drogan/Starkiller-style basket + sizing primitives.
+// Cross-sectional momentum ranker (top/bottom percentile by return)
+// + wipeout-cap position sizer (failure-probability-bounded worst-
+// case loss). Distinct from Kelly sizing in position-sizer.ts.
+export { crossSectionalMomentumTools } from "./runtime/crossSectionalMomentumDiagnostic.ts";
+export { wipeoutCapSizerTools } from "./runtime/wipeoutCapSizerDiagnostic.ts";
+
 // Goal-engineering primitives (GE1-GE3). Drafter + mandate linkage + deferred-actions log.
 // Companion to the existing /goal command in src/core/pipeline/goalMode.ts.
 export { goalDraftTools } from "./runtime/goalDraftDiagnostic.ts";
@@ -583,6 +590,8 @@ import { smtDivergenceTools } from "./runtime/smtDivergenceDiagnostic.ts";
 import { pspDetectorTools } from "./runtime/pspDetectorDiagnostic.ts";
 import { latencyCostTools } from "./runtime/latencyCostDiagnostic.ts";
 import { darkPoolAdverseSelectionTools } from "./runtime/darkPoolAdverseSelectionDiagnostic.ts";
+import { crossSectionalMomentumTools } from "./runtime/crossSectionalMomentumDiagnostic.ts";
+import { wipeoutCapSizerTools } from "./runtime/wipeoutCapSizerDiagnostic.ts";
 import { levelFreshnessTools } from "./runtime/levelFreshnessDiagnostic.ts";
 import { goalDraftTools } from "./runtime/goalDraftDiagnostic.ts";
 import { goalMandateLinkTools } from "./runtime/goalMandateLinkDiagnostic.ts";
@@ -733,6 +742,8 @@ const _rawAllTools = {
   ...pspDetectorTools,
   ...latencyCostTools,
   ...darkPoolAdverseSelectionTools,
+  ...crossSectionalMomentumTools,
+  ...wipeoutCapSizerTools,
   ...levelFreshnessTools,
   ...goalDraftTools,
   ...goalMandateLinkTools,

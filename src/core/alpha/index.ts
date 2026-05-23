@@ -281,3 +281,22 @@ export {
   type DarkPoolAdverseSelectionResult,
   type DarkPoolVerdict,
 } from "./dark-pool-adverse-selection.ts";
+
+export {
+  rankCrossSectionalMomentum,
+  formatCrossSectionalMomentum,
+  type AssetReturnSeries,
+  type CrossSectionalMomentumOptions,
+  type CrossSectionalMomentumResult,
+  type RankedAsset,
+  type RankPosition,
+  type MomentumVerdict,
+} from "./cross-sectional-momentum.ts";
+
+export {
+  sizeWithWipeoutCap,
+  formatWipeoutCap,
+  type WipeoutCapInput,
+  type WipeoutCapResult,
+  type SizingVerdict,
+} from "./wipeout-cap-sizer.ts";

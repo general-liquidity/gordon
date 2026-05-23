@@ -2603,6 +2603,72 @@ that two-stage chains have measurably higher signal quality than
 single-stage. Alternatively, revive when operator explicitly wants
 the composition as a single tool call for ergonomics.
 
+### S37. Token-Unlock Schedule Analyzer
+
+**Module would live in:** `src/core/alpha/token-unlock-analyzer.ts`
+(plus diagnostic wrapper if wired).
+**Memory:** Drogan / Starkiller framing — "every time tokens pump,
+there are more tokens trying to exit into those pumps because of
+the unlock schedule. Understanding the unlock schedule + where you
+are in it is a source of alpha on both the long-filtering and the
+short-side."
+
+**Status:** Not started. Requires per-token unlock schedule data +
+dilution analysis. Outputs: % of total supply already unlocked, %
+unlocking within the next N days/weeks, dilution-pressure verdict
+(low / moderate / high / extreme). Composes with `cross-sectional-
+momentum` (filter out long basket members under heavy unlock pressure)
+and `detect_streak` (extreme upside streaks during heavy unlock =
+short candidate).
+
+**What's needed:**
+- Unlock-schedule data input shape (operator supplies per-token
+  schedule; primitive doesn't fetch data)
+- Window analysis: current % unlocked, % unlocking next 30/90 days
+- Dilution-pressure verdict bands
+- Output composes with momentum-ranker basket filtering
+
+**Risk:** Low. The math is straightforward; the gap is the data
+ingestion path. Most operators don't have clean per-token unlock
+schedules wired into Gordon's data pipeline.
+
+**Revive on:** Operator has unlock-schedule data wired into Gordon
+or explicitly wants the primitive as a checklist tool with manually-
+supplied schedules.
+
+### S38. Yield-Source Sustainability Classifier
+
+**Module would live in:** `src/core/alpha/yield-source-classifier.ts`
+(plus diagnostic wrapper if wired).
+**Memory:** Drogan / Starkiller framing — "no magic money trees; you
+need to know where the yield comes from + how long it lasts."
+Categorizes yield sources by sustainability + dependence on external
+incentives.
+
+**Status:** Not started. Operator-input checklist primitive: for a
+given DeFi yield opportunity, classify the source as one of:
+incentivized (governance-token rewards / external bribes),
+structural (fees from real economic activity), arbitrage (basis,
+funding, cross-venue spreads), lending (collateralized lending
+spread), or hybrid. Output: sustainability verdict + estimated
+half-life of incentive + dependency map.
+
+**What's needed:**
+- Taxonomy of yield-source types
+- Per-type sustainability heuristics (e.g. incentivized = decays
+  with token-emission schedule + market valuation of governance
+  token; structural = sustainable while underlying activity exists)
+- Composability with operator's yield-tracking ledger
+
+**Risk:** Low primitive itself; depends on operator-supplied
+classification (it's a structured taxonomy, not a derivation).
+Could be more useful as a skill / checklist than a primitive.
+
+**Revive on:** Operator explicitly building a multi-protocol DeFi
+yield book and wants structured sustainability scoring across N
+positions, OR Pro-pilot operator needs this as a structured input
+to a yield-book report.
+
 ### S30. CoW Swap MCP catalog entry
 
 **Module would live in:** `src/infra/ai/mcp/marketplace/catalog.json`.
