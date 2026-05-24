@@ -469,3 +469,12 @@ export {
   type LayerCheck,
   type GateVerdict,
 } from "./pre-trade-risk-gate.ts";
+
+export {
+  verifyHiddenBeta,
+  formatHiddenBetaVerifier,
+  type HiddenBetaVerifierInput,
+  type HiddenBetaVerifierResult,
+  type FactorBetaCheck,
+  type HiddenBetaVerdict,
+} from "./hidden-beta-verifier.ts";

@@ -330,6 +330,13 @@ export { maeStopCalibratorTools } from "./runtime/maeStopCalibratorDiagnostic.ts
 // Pedigree: institutional hedge-fund risk practice (2026 essay).
 export { preTradeRiskGateTools } from "./runtime/preTradeRiskGateDiagnostic.ts";
 
+// LV35 — Hidden Beta Verifier. Multi-factor OLS regression of a claimed-
+// neutral portfolio against an operator-supplied factor universe; flags
+// factors with |β| above threshold + emits per-factor leak summary.
+// Operationalizes the "dirty carry trap" — vol-targeting + dollar-
+// neutrality ≠ beta-neutrality. Delegates math to hedgeFundReplication.
+export { hiddenBetaVerifierTools } from "./runtime/hiddenBetaVerifierDiagnostic.ts";
+
 // Goal-engineering primitives (GE1-GE3). Drafter + mandate linkage + deferred-actions log.
 // Companion to the existing /goal command in src/core/pipeline/goalMode.ts.
 export { goalDraftTools } from "./runtime/goalDraftDiagnostic.ts";
@@ -689,6 +696,7 @@ import { maCrossoverCleannessTools } from "./runtime/maCrossoverCleannessDiagnos
 import { volumePatternEdgeTools } from "./runtime/volumePatternEdgeDiagnostic.ts";
 import { maeStopCalibratorTools } from "./runtime/maeStopCalibratorDiagnostic.ts";
 import { preTradeRiskGateTools } from "./runtime/preTradeRiskGateDiagnostic.ts";
+import { hiddenBetaVerifierTools } from "./runtime/hiddenBetaVerifierDiagnostic.ts";
 import { levelFreshnessTools } from "./runtime/levelFreshnessDiagnostic.ts";
 import { goalDraftTools } from "./runtime/goalDraftDiagnostic.ts";
 import { goalMandateLinkTools } from "./runtime/goalMandateLinkDiagnostic.ts";
@@ -857,6 +865,7 @@ const _rawAllTools = {
   ...volumePatternEdgeTools,
   ...maeStopCalibratorTools,
   ...preTradeRiskGateTools,
+  ...hiddenBetaVerifierTools,
   ...levelFreshnessTools,
   ...goalDraftTools,
   ...goalMandateLinkTools,
