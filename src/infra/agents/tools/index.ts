@@ -351,6 +351,15 @@ export { fatTailCredibilityTools } from "./runtime/fatTailCredibilityDiagnostic.
 // algo trader 2026 volatility-targeting video.
 export { volTargetSizerTools } from "./runtime/volTargetSizerDiagnostic.ts";
 
+// LV38 — FIP (Frog-in-the-Pan) Momentum Quality Scorer. Path-smoothness
+// of momentum: FIP = sign(return) × (N_neg − N_pos) / T. Smooth diffusion
+// of positive information (smooth_momentum) correlates with continuation;
+// spiky concentrated returns (spiky_momentum) tend to mean-revert. Two
+// assets with identical 50% YoY returns can differ structurally on this
+// axis. Pedigree: Frazzini–Quan–Israel–Moskowitz; Gray & Vogel
+// *Quantitative Momentum*.
+export { fipMomentumQualityTools } from "./runtime/fipMomentumQualityDiagnostic.ts";
+
 // Goal-engineering primitives (GE1-GE3). Drafter + mandate linkage + deferred-actions log.
 // Companion to the existing /goal command in src/core/pipeline/goalMode.ts.
 export { goalDraftTools } from "./runtime/goalDraftDiagnostic.ts";
@@ -713,6 +722,7 @@ import { preTradeRiskGateTools } from "./runtime/preTradeRiskGateDiagnostic.ts";
 import { hiddenBetaVerifierTools } from "./runtime/hiddenBetaVerifierDiagnostic.ts";
 import { fatTailCredibilityTools } from "./runtime/fatTailCredibilityDiagnostic.ts";
 import { volTargetSizerTools } from "./runtime/volTargetSizerDiagnostic.ts";
+import { fipMomentumQualityTools } from "./runtime/fipMomentumQualityDiagnostic.ts";
 import { levelFreshnessTools } from "./runtime/levelFreshnessDiagnostic.ts";
 import { goalDraftTools } from "./runtime/goalDraftDiagnostic.ts";
 import { goalMandateLinkTools } from "./runtime/goalMandateLinkDiagnostic.ts";
@@ -884,6 +894,7 @@ const _rawAllTools = {
   ...hiddenBetaVerifierTools,
   ...fatTailCredibilityTools,
   ...volTargetSizerTools,
+  ...fipMomentumQualityTools,
   ...levelFreshnessTools,
   ...goalDraftTools,
   ...goalMandateLinkTools,

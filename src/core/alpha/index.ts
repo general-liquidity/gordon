@@ -496,3 +496,14 @@ export {
   type VolTargetSizerResult,
   type VolTargetVerdict,
 } from "./vol-target-sizer.ts";
+
+export {
+  scoreFipMomentum,
+  formatFipMomentum,
+  type FipAsset,
+  type FipMomentumOptions,
+  type FipMomentumResult,
+  type FipAssetResult,
+  type FipQuality,
+  type FipVerdict,
+} from "./fip-momentum-quality.ts";
