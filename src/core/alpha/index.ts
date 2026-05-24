@@ -487,3 +487,12 @@ export {
   type FatTailClass,
   type HillEstimatePoint,
 } from "./fat-tail-credibility.ts";
+
+export {
+  sizeWithVolTarget,
+  formatVolTargetSizer,
+  type VolTargetSizerInput,
+  type VolTargetSizerOptions,
+  type VolTargetSizerResult,
+  type VolTargetVerdict,
+} from "./vol-target-sizer.ts";

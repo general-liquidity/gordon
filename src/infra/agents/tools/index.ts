@@ -344,6 +344,13 @@ export { hiddenBetaVerifierTools } from "./runtime/hiddenBetaVerifierDiagnostic.
 // inference UNDERESTIMATES required sample size by 10× to 100× or more.
 export { fatTailCredibilityTools } from "./runtime/fatTailCredibilityDiagnostic.ts";
 
+// LV37 — Continuous Vol-Target Sizer. Robert-Carver-style target_vol /
+// current_vol with leverage cap, leverage floor, and no-trade band on
+// rebalancing. Companion to the existing discrete volScaledSizing
+// (1×/2×/3× band-multiplier). Pedigree: Carver "Systematic Trading";
+// algo trader 2026 volatility-targeting video.
+export { volTargetSizerTools } from "./runtime/volTargetSizerDiagnostic.ts";
+
 // Goal-engineering primitives (GE1-GE3). Drafter + mandate linkage + deferred-actions log.
 // Companion to the existing /goal command in src/core/pipeline/goalMode.ts.
 export { goalDraftTools } from "./runtime/goalDraftDiagnostic.ts";
@@ -705,6 +712,7 @@ import { maeStopCalibratorTools } from "./runtime/maeStopCalibratorDiagnostic.ts
 import { preTradeRiskGateTools } from "./runtime/preTradeRiskGateDiagnostic.ts";
 import { hiddenBetaVerifierTools } from "./runtime/hiddenBetaVerifierDiagnostic.ts";
 import { fatTailCredibilityTools } from "./runtime/fatTailCredibilityDiagnostic.ts";
+import { volTargetSizerTools } from "./runtime/volTargetSizerDiagnostic.ts";
 import { levelFreshnessTools } from "./runtime/levelFreshnessDiagnostic.ts";
 import { goalDraftTools } from "./runtime/goalDraftDiagnostic.ts";
 import { goalMandateLinkTools } from "./runtime/goalMandateLinkDiagnostic.ts";
@@ -875,6 +883,7 @@ const _rawAllTools = {
   ...preTradeRiskGateTools,
   ...hiddenBetaVerifierTools,
   ...fatTailCredibilityTools,
+  ...volTargetSizerTools,
   ...levelFreshnessTools,
   ...goalDraftTools,
   ...goalMandateLinkTools,
