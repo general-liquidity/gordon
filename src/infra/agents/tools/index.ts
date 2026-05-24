@@ -322,6 +322,14 @@ export { volumePatternEdgeTools } from "./runtime/volumePatternEdgeDiagnostic.ts
 // Marfatia popularization.
 export { maeStopCalibratorTools } from "./runtime/maeStopCalibratorDiagnostic.ts";
 
+// LV34 — Pre-Trade Risk Layer Gate. Institutional 4-layer composite
+// (position size / correlation cluster / sector aggregate / multi-window
+// drawdown) enforced BEFORE every trade. Returns layered pass/fail +
+// composite verdict; data_gap supersedes silent allow. Companion to
+// riskClassifier (11-dim audit) and correlationLimits (pairwise multiplier).
+// Pedigree: institutional hedge-fund risk practice (2026 essay).
+export { preTradeRiskGateTools } from "./runtime/preTradeRiskGateDiagnostic.ts";
+
 // Goal-engineering primitives (GE1-GE3). Drafter + mandate linkage + deferred-actions log.
 // Companion to the existing /goal command in src/core/pipeline/goalMode.ts.
 export { goalDraftTools } from "./runtime/goalDraftDiagnostic.ts";
@@ -680,6 +688,7 @@ import { breakoutFailureRegimeTools } from "./runtime/breakoutFailureRegimeDiagn
 import { maCrossoverCleannessTools } from "./runtime/maCrossoverCleannessDiagnostic.ts";
 import { volumePatternEdgeTools } from "./runtime/volumePatternEdgeDiagnostic.ts";
 import { maeStopCalibratorTools } from "./runtime/maeStopCalibratorDiagnostic.ts";
+import { preTradeRiskGateTools } from "./runtime/preTradeRiskGateDiagnostic.ts";
 import { levelFreshnessTools } from "./runtime/levelFreshnessDiagnostic.ts";
 import { goalDraftTools } from "./runtime/goalDraftDiagnostic.ts";
 import { goalMandateLinkTools } from "./runtime/goalMandateLinkDiagnostic.ts";
@@ -847,6 +856,7 @@ const _rawAllTools = {
   ...maCrossoverCleannessTools,
   ...volumePatternEdgeTools,
   ...maeStopCalibratorTools,
+  ...preTradeRiskGateTools,
   ...levelFreshnessTools,
   ...goalDraftTools,
   ...goalMandateLinkTools,

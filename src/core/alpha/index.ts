@@ -455,3 +455,17 @@ export {
   type ExcursionDistribution,
   type PerTradeExcursion,
 } from "./mae-stop-calibrator.ts";
+
+export {
+  checkPreTradeRiskGate,
+  formatPreTradeRiskGate,
+  type TradeSide,
+  type TradeProposal,
+  type ExistingPosition,
+  type PreTradeRiskGateOptions,
+  type PreTradeRiskGateResult,
+  type LayerName,
+  type LayerStatus,
+  type LayerCheck,
+  type GateVerdict,
+} from "./pre-trade-risk-gate.ts";
