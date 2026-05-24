@@ -422,3 +422,24 @@ export {
   type BreakoutFailureRegimeResult,
   type BreakoutFailureRegimeVerdict,
 } from "./breakout-failure-regime.ts";
+
+export {
+  classifyMaCrossoverCleanness,
+  formatMaCrossoverCleanness,
+  type MaCrossoverBar,
+  type MaCrossoverOptions,
+  type MaCrossoverResult,
+  type MaDirection,
+  type TrendCleanness,
+  type EdgeActivation,
+} from "./ma-crossover-cleanness.ts";
+
+export {
+  classifyVolumePatternEdge,
+  formatVolumePatternEdge,
+  type VolumePatternBar,
+  type VolumePatternOptions,
+  type VolumePatternResult,
+  type VolumePattern,
+  type VolumeEdge,
+} from "./volume-pattern-edge.ts";

@@ -304,6 +304,15 @@ export { fillQualityProbeTools } from "./runtime/fillQualityProbeDiagnostic.ts";
 export { stallCutTrackerTools } from "./runtime/stallCutTrackerDiagnostic.ts";
 export { breakoutFailureRegimeTools } from "./runtime/breakoutFailureRegimeDiagnostic.ts";
 
+// LV31-LV32 — Koroush AK / ZCT 2025 primitives. MA-crossover cleanness
+// classifier (SMMA-cross counting + terminal-slope → clean/messy/chop
+// verdict → momentum/MR edge activation) and volume-pattern edge classifier
+// (increasing/flat/spike → momentum/MR/reversal edge mapping). Companions
+// to existing LV1 (usdVolumeGate) and LV2 (levelFreshness) from the same
+// pedigree family.
+export { maCrossoverCleannessTools } from "./runtime/maCrossoverCleannessDiagnostic.ts";
+export { volumePatternEdgeTools } from "./runtime/volumePatternEdgeDiagnostic.ts";
+
 // Goal-engineering primitives (GE1-GE3). Drafter + mandate linkage + deferred-actions log.
 // Companion to the existing /goal command in src/core/pipeline/goalMode.ts.
 export { goalDraftTools } from "./runtime/goalDraftDiagnostic.ts";
@@ -659,6 +668,8 @@ import { institutionalFootprintTools } from "./runtime/institutionalFootprintDia
 import { fillQualityProbeTools } from "./runtime/fillQualityProbeDiagnostic.ts";
 import { stallCutTrackerTools } from "./runtime/stallCutTrackerDiagnostic.ts";
 import { breakoutFailureRegimeTools } from "./runtime/breakoutFailureRegimeDiagnostic.ts";
+import { maCrossoverCleannessTools } from "./runtime/maCrossoverCleannessDiagnostic.ts";
+import { volumePatternEdgeTools } from "./runtime/volumePatternEdgeDiagnostic.ts";
 import { levelFreshnessTools } from "./runtime/levelFreshnessDiagnostic.ts";
 import { goalDraftTools } from "./runtime/goalDraftDiagnostic.ts";
 import { goalMandateLinkTools } from "./runtime/goalMandateLinkDiagnostic.ts";
@@ -823,6 +834,8 @@ const _rawAllTools = {
   ...fillQualityProbeTools,
   ...stallCutTrackerTools,
   ...breakoutFailureRegimeTools,
+  ...maCrossoverCleannessTools,
+  ...volumePatternEdgeTools,
   ...levelFreshnessTools,
   ...goalDraftTools,
   ...goalMandateLinkTools,
