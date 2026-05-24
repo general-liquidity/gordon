@@ -390,3 +390,35 @@ export {
   type InstitutionalFootprintVerdict,
   type AxisCheck,
 } from "./institutional-footprint.ts";
+
+export {
+  analyzeFillQualityProbe,
+  formatFillQualityProbe,
+  type ProbeSide,
+  type FillQualityProbeInput,
+  type FillQualityProbeOptions,
+  type FillQualityProbeResult,
+  type FillQualityVerdict,
+  type AxisScore,
+} from "./fill-quality-probe.ts";
+
+export {
+  analyzeStallCut,
+  formatStallCut,
+  type PositionSide,
+  type StallBar,
+  type StallCutInput,
+  type StallCutOptions,
+  type StallCutResult,
+  type StallVerdict,
+} from "./stall-cut-tracker.ts";
+
+export {
+  analyzeBreakoutFailureRegime,
+  formatBreakoutFailureRegime,
+  type BreakoutOutcome,
+  type BreakoutEvent,
+  type BreakoutFailureRegimeOptions,
+  type BreakoutFailureRegimeResult,
+  type BreakoutFailureRegimeVerdict,
+} from "./breakout-failure-regime.ts";

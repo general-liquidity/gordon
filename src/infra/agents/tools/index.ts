@@ -295,6 +295,15 @@ export { crossSectionalContrarianTools } from "./runtime/crossSectionalContraria
 // not a buy signal.
 export { institutionalFootprintTools } from "./runtime/institutionalFootprintDiagnostic.ts";
 
+// LV28-LV30 — Dan Zanger / Kyna Kosling primitives. Fill-quality probe
+// (Livermore-style probing → supply/demand barometer from completeness +
+// slippage + latency), stall-cut tracker (post-entry "is this acting
+// right?" diagnostic — composes with timeBasedExit), and breakout-failure-
+// rate regime (detects bear-like market before index drawdown confirms).
+export { fillQualityProbeTools } from "./runtime/fillQualityProbeDiagnostic.ts";
+export { stallCutTrackerTools } from "./runtime/stallCutTrackerDiagnostic.ts";
+export { breakoutFailureRegimeTools } from "./runtime/breakoutFailureRegimeDiagnostic.ts";
+
 // Goal-engineering primitives (GE1-GE3). Drafter + mandate linkage + deferred-actions log.
 // Companion to the existing /goal command in src/core/pipeline/goalMode.ts.
 export { goalDraftTools } from "./runtime/goalDraftDiagnostic.ts";
@@ -647,6 +656,9 @@ import { convictionFilteredExpectancyTools } from "./runtime/convictionFilteredE
 import { ibsCrossSectionalTools } from "./runtime/ibsCrossSectionalDiagnostic.ts";
 import { crossSectionalContrarianTools } from "./runtime/crossSectionalContrarianDiagnostic.ts";
 import { institutionalFootprintTools } from "./runtime/institutionalFootprintDiagnostic.ts";
+import { fillQualityProbeTools } from "./runtime/fillQualityProbeDiagnostic.ts";
+import { stallCutTrackerTools } from "./runtime/stallCutTrackerDiagnostic.ts";
+import { breakoutFailureRegimeTools } from "./runtime/breakoutFailureRegimeDiagnostic.ts";
 import { levelFreshnessTools } from "./runtime/levelFreshnessDiagnostic.ts";
 import { goalDraftTools } from "./runtime/goalDraftDiagnostic.ts";
 import { goalMandateLinkTools } from "./runtime/goalMandateLinkDiagnostic.ts";
@@ -808,6 +820,9 @@ const _rawAllTools = {
   ...ibsCrossSectionalTools,
   ...crossSectionalContrarianTools,
   ...institutionalFootprintTools,
+  ...fillQualityProbeTools,
+  ...stallCutTrackerTools,
+  ...breakoutFailureRegimeTools,
   ...levelFreshnessTools,
   ...goalDraftTools,
   ...goalMandateLinkTools,
