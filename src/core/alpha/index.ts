@@ -380,3 +380,13 @@ export {
   type ContrarianVerdict,
   type VolatilityWeighting,
 } from "./cross-sectional-contrarian.ts";
+
+export {
+  analyzeInstitutionalFootprint,
+  formatInstitutionalFootprint,
+  type InstitutionalFootprintBar,
+  type InstitutionalFootprintOptions,
+  type InstitutionalFootprintResult,
+  type InstitutionalFootprintVerdict,
+  type AxisCheck,
+} from "./institutional-footprint.ts";

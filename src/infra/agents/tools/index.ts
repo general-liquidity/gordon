@@ -288,6 +288,13 @@ export { convictionFilteredExpectancyTools } from "./runtime/convictionFilteredE
 export { ibsCrossSectionalTools } from "./runtime/ibsCrossSectionalDiagnostic.ts";
 export { crossSectionalContrarianTools } from "./runtime/crossSectionalContrarianDiagnostic.ts";
 
+// LV27 — Institutional Footprint detector (Haseeb / Minervini / O'Neil
+// stage-2 accumulation signature). Composite that fires only when 5 axes
+// align in the same window: consecutive elevated volume + bounded run
+// magnitude + signal bar + shallow tight base + holds 21-SMA. Diagnostic,
+// not a buy signal.
+export { institutionalFootprintTools } from "./runtime/institutionalFootprintDiagnostic.ts";
+
 // Goal-engineering primitives (GE1-GE3). Drafter + mandate linkage + deferred-actions log.
 // Companion to the existing /goal command in src/core/pipeline/goalMode.ts.
 export { goalDraftTools } from "./runtime/goalDraftDiagnostic.ts";
@@ -639,6 +646,7 @@ import { signalReweightingTools } from "./runtime/signalReweightingDiagnostic.ts
 import { convictionFilteredExpectancyTools } from "./runtime/convictionFilteredExpectancyDiagnostic.ts";
 import { ibsCrossSectionalTools } from "./runtime/ibsCrossSectionalDiagnostic.ts";
 import { crossSectionalContrarianTools } from "./runtime/crossSectionalContrarianDiagnostic.ts";
+import { institutionalFootprintTools } from "./runtime/institutionalFootprintDiagnostic.ts";
 import { levelFreshnessTools } from "./runtime/levelFreshnessDiagnostic.ts";
 import { goalDraftTools } from "./runtime/goalDraftDiagnostic.ts";
 import { goalMandateLinkTools } from "./runtime/goalMandateLinkDiagnostic.ts";
@@ -799,6 +807,7 @@ const _rawAllTools = {
   ...convictionFilteredExpectancyTools,
   ...ibsCrossSectionalTools,
   ...crossSectionalContrarianTools,
+  ...institutionalFootprintTools,
   ...levelFreshnessTools,
   ...goalDraftTools,
   ...goalMandateLinkTools,
