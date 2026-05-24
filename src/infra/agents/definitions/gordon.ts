@@ -98,6 +98,11 @@ import {
   getHarnessSuffixForModel,
   isHarnessProfilesEnabled,
 } from "../profiles/harnessProfile.ts";
+import { getSubagentProfileRegistry } from "../profiles/subagentProfileRegistry.ts";
+import {
+  buildTaskDispatchTool,
+  shouldRegisterTaskDispatchTool,
+} from "../tools/runtime/lifecycle/task-dispatch.ts";
 import { getExecutor } from "./executor.ts";
 import { getResearcher } from "./researcher.ts";
 
@@ -352,6 +357,28 @@ Check whether proactive mode producers are actually alive and firing:
 - Mandates have their own circuit breakers: consecutive-loss halt, drawdown pause, capital lockup
 - When a mandate pauses automatically, explain why and offer to resume or adjust`;
 
+/**
+ * FW7 — Build the delegate_to_subagent tool entry (or empty record).
+ *
+ * Returns `{}` when no profiles are configured AND the dynamic-subagents
+ * flag is off. Otherwise registers the tool with a lazy read-only tool
+ * registry resolver. The dispatcher receives an empty registry at
+ * construction time; for the live filtering we rely on operator profiles
+ * to enumerate the exact tool ids they need — execution tools are
+ * blocked regardless of registry contents.
+ */
+function buildTaskDispatchToolIfEnabled(): Record<string, unknown> {
+  const profiles = getSubagentProfileRegistry();
+  if (!shouldRegisterTaskDispatchTool(profiles)) return {};
+  // Pass an empty registry — the filter will fall back to recognizing
+  // execution-tool patterns from the deny-list (so safety is preserved).
+  // Operators get unmatched warnings for non-existent tools, which is
+  // the correct behavior at config-validation time.
+  return {
+    delegate_to_subagent: buildTaskDispatchTool(profiles, {}),
+  };
+}
+
 export function getGordon(): Agent {
   // FW6: resolve initial model with orchestrator role for logging label;
   // the live resolver passed to Agent uses createModelResolver("orchestrator")
@@ -546,6 +573,14 @@ export function getGordon(): Agent {
       ...getScopedMCPTools({
         categories: ["data-provider", "analytics", "research", "portfolio", "utility", "infrastructure"],
       }),
+
+      // FW7 — operator-authored subagent delegation. The tool is only
+      // registered when there's something to delegate to (operator has
+      // .claude/subagents/*.json configured) OR when GORDON_DYNAMIC_SUBAGENTS=1.
+      // The dispatcher resolves the read-only tool registry lazily at
+      // dispatch time so it always reflects the live Gordon tool set
+      // (including MCP-discovered tools that arrive after construction).
+      ...buildTaskDispatchToolIfEnabled(),
     },
 
     // Memory for full conversation context
