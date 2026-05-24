@@ -5,7 +5,7 @@
 
 import { Agent } from "@mastra/core/agent";
 import { TokenLimiterProcessor } from "@mastra/core/processors";
-import { composeAgentInstructions } from "../context/promptSections.ts";
+import { composeAgentInstructionsWithSlots } from "../context/promptSections.ts";
 import { getRoutingToolsForAgent } from "../../runtime/routing/manager.ts";
 import {
   instrumentedTradingTools,
@@ -118,7 +118,9 @@ export function getExecutor(): Agent {
       "Specialist in executing trades, placing orders, and managing positions. " +
       "Use when user wants to execute a plan, place a market or limit order, " +
       "swap/convert crypto, buy or sell a symbol, cancel an order, or change permissionMode via /auto, /ask, /strict.",
-    instructions: composeAgentInstructions("executor", EXECUTOR_INSTRUCTIONS),
+    instructions: composeAgentInstructionsWithSlots("executor", {
+      user: EXECUTOR_INSTRUCTIONS,
+    }),
     model: createModelResolver("executor"),
     defaultOptions: { modelSettings: { maxOutputTokens: 16384 } },
     tools: {

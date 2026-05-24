@@ -13,7 +13,7 @@
 import { Agent } from "@mastra/core/agent";
 import { TokenLimiterProcessor } from "@mastra/core/processors";
 import { GordonInputGuard, GordonOutputSanitizer } from "../processors/index.ts";
-import { composeAgentInstructions } from "../context/promptSections.ts";
+import { composeAgentInstructionsWithSlots } from "../context/promptSections.ts";
 import {
   instrumentedIndicatorTools,
   instrumentedMarketDataTools,
@@ -80,7 +80,9 @@ export function getResearcher(): Agent {
     description:
       "On-demand parallel research agent. Spawned for background tasks like " +
       "multi-symbol scans, backtests, deep dives. Read-only — cannot trade.",
-    instructions: composeAgentInstructions("researcher" as any, RESEARCHER_INSTRUCTIONS),
+    instructions: composeAgentInstructionsWithSlots("researcher" as any, {
+      user: RESEARCHER_INSTRUCTIONS,
+    }),
     model: createModelResolver("researcher"),
     defaultOptions: { modelSettings: { maxOutputTokens: 16384 } },
     tools: {

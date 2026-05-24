@@ -17,6 +17,68 @@ import { ScratchpadStore } from "../workers/ScratchpadStore.ts";
 import { WorkerRegistry } from "../workers/WorkerRegistry.ts";
 import { SessionController } from "./SessionController.ts";
 import { SessionRuntime } from "./SessionRuntime.ts";
+import { loadOperatorSettings } from "../permissions/settingsLoader.ts";
+import { createModuleLogger } from "../../infra/logger/logger.ts";
+
+const factoryLogger = createModuleLogger("session-runtime-factory");
+
+/**
+ * FW5b — Feature flag controlling whether operator-authored .claude/settings.json
+ * interruptOn rules are loaded at runtime construction. Default off; flip on
+ * once the operator's settings.json has been authored and reviewed.
+ */
+const OPERATOR_SETTINGS_FLAG = "GORDON_OPERATOR_SETTINGS";
+
+function isOperatorSettingsEnabled(): boolean {
+  return (
+    process.env[OPERATOR_SETTINGS_FLAG] === "1" ||
+    process.env[OPERATOR_SETTINGS_FLAG] === "true"
+  );
+}
+
+/**
+ * FW5b — Apply operator-authored interruptOn rules from .claude/settings.json
+ * to a freshly-constructed runtime store. Called after hydration so persisted
+ * approval state stays intact; settings rules are appended (not replaced) on
+ * top, letting PermissionEngine's specificity ranking resolve overlaps.
+ *
+ * No-op when the OPERATOR_SETTINGS flag is off. Failures are logged but
+ * non-fatal — runtime construction never blocks on settings loading.
+ */
+function applyOperatorSettings(runtimeStore: RuntimeStore, runtimeId: string): void {
+  if (!isOperatorSettingsEnabled()) return;
+  try {
+    const result = loadOperatorSettings();
+    if (result.rules.length === 0 && result.warnings.length === 0) {
+      return;
+    }
+    if (result.warnings.length > 0) {
+      factoryLogger.warn("Operator settings load warnings", {
+        runtimeId,
+        warnings: result.warnings,
+        sources: result.sources,
+      });
+    }
+    if (result.rules.length > 0) {
+      const existing = runtimeStore.getState().approvals.rules;
+      runtimeStore.setApprovalState({
+        rules: [...existing, ...result.rules],
+      });
+      factoryLogger.info("Applied operator interruptOn rules", {
+        runtimeId,
+        added: result.rules.length,
+        sources: result.sources
+          .filter((s) => s.found && s.parsed && s.hadInterruptOn)
+          .map((s) => `${s.origin}:${s.accepted}`),
+      });
+    }
+  } catch (err) {
+    factoryLogger.error("Failed to apply operator settings", {
+      runtimeId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
 
 export interface SessionRuntimeFactoryDeps {
   resolveContext: (options: RuntimeResolveContextOptions) => Promise<GordonContext>;
@@ -92,6 +154,11 @@ export class SessionRuntimeFactory {
         scratchpad: persisted.scratchpad,
       });
     }
+
+    // FW5b — apply operator-authored interruptOn rules from
+    // .claude/settings.json on top of hydrated state. Behind
+    // GORDON_OPERATOR_SETTINGS flag; no-op until enabled.
+    applyOperatorSettings(runtimeStore, runtimeId);
 
     const schedulePersist = () => {
       const existingTimer = this.persistTimers.get(runtimeId);

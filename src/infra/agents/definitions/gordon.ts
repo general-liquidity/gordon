@@ -5,7 +5,7 @@
 
 import { Agent } from "@mastra/core/agent";
 import { TokenLimiterProcessor } from "@mastra/core/processors";
-import { composeAgentInstructions } from "../context/promptSections.ts";
+import { composeAgentInstructionsWithSlots } from "../context/promptSections.ts";
 import { createModuleLogger } from "../../logger/logger.ts";
 import { getScopedMCPTools } from "../../ai/mcp/client.ts";
 import { getRoutingToolsForAgent } from "../../runtime/routing/manager.ts";
@@ -360,7 +360,9 @@ export function getGordon(): Agent {
     id: "gordon",
     name: "Gordon",
     description: GORDON_PRODUCT_TRUTH.headline,
-    instructions: composeAgentInstructions("gordon", GORDON_INSTRUCTIONS),
+    instructions: composeAgentInstructionsWithSlots("gordon", {
+      user: GORDON_INSTRUCTIONS,
+    }),
     model: createModelResolver("orchestrator"),
 
     // Cap maxOutputTokens for ALL internal calls. Without this, Mastra

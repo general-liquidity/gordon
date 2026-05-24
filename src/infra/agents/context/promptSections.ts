@@ -273,6 +273,92 @@ export function composeAgentInstructions(
   return [...sections, legacyInstructions.trim()].join("\n\n");
 }
 
+/**
+ * FW2a — Slot-aware prompt composer (Deep Agents parity, additive layer).
+ *
+ * Explicit four-slot model for callers who want full control over the
+ * prompt structure:
+ *
+ *   - USER   : caller-supplied instructions (the existing legacy
+ *               instructions block; e.g. EXECUTOR_INSTRUCTIONS body)
+ *   - BASE   : registry-driven sections rendered for the role/context
+ *               (workflow-phase, provider, exchange-specific, etc.)
+ *               This is the existing templated registry — unchanged.
+ *   - CUSTOM : caller-supplied OVERRIDE that REPLACES the BASE registry
+ *               output entirely. Useful for compaction agents or short-
+ *               context sub-agents where the full BASE is too heavy.
+ *   - SUFFIX : model-specific tuning appended last. E.g. Claude-specific
+ *               extended-thinking encouragement, OpenAI tool-schema
+ *               reminders. Filled in by FW3 harness profiles eventually.
+ *
+ * Assembly order (matches Gordon's existing convention, NOT Deep Agents'):
+ *
+ *   BASE_OR_CUSTOM → USER → SUFFIX
+ *
+ * Joined by `\n\n`. Gordon's pre-FW2a default is BASE → USER (no SUFFIX,
+ * no CUSTOM); this function is behavior-identical when called with only
+ * the `user` slot.
+ *
+ * Note: Deep Agents puts USER first ("caller text precedes SDK/profile
+ * content"). Gordon's long-standing convention is registry sections
+ * FIRST (they establish role + context invariants), then legacy/user
+ * instructions. Keeping Gordon's order avoids invalidating eval-harness
+ * baselines and KV-cache hit rates. Callers who want USER-first can
+ * supply CUSTOM to bypass BASE and prepend USER explicitly.
+ *
+ * @param role  Agent role for registry section filtering (executor/researcher/gordon)
+ * @param slots Slot content. `user` required; others optional.
+ * @param options Render options (context, etc.)
+ */
+export function composeAgentInstructionsWithSlots(
+  role: PromptAgentRole,
+  slots: {
+    /** USER slot — caller-supplied instructions (the agent's core prompt body). */
+    user: string;
+    /**
+     * CUSTOM slot — when supplied, replaces the registry-driven BASE
+     * sections entirely. Use sparingly; the BASE registry encodes
+     * runtime invariants (workflow phase, MCP discovery, etc.) that
+     * most agents need.
+     */
+    custom?: string;
+    /**
+     * SUFFIX slot — appended last for model-specific tuning. Filled in
+     * by FW3 harness profiles in a future session.
+     */
+    suffix?: string;
+  },
+  options: PromptSectionRenderOptions = {},
+): string {
+  const parts: string[] = [];
+
+  // BASE or CUSTOM — registry-driven sections unless caller supplies
+  // a non-empty CUSTOM. Empty/whitespace CUSTOM falls back to BASE so
+  // callers can pass `custom: ""` to opt into the slot-aware path
+  // without changing default behavior.
+  const customTrim = slots.custom != null ? slots.custom.trim() : "";
+  if (customTrim.length > 0) {
+    parts.push(customTrim);
+  } else {
+    const sections = getSectionsForMount("instructions", { ...options, role })
+      .map((record) => loadSectionContent(record, { ...options, role }))
+      .filter(Boolean);
+    parts.push(...sections);
+  }
+
+  // USER slot — required, always.
+  const userTrim = slots.user.trim();
+  if (userTrim.length > 0) parts.push(userTrim);
+
+  // SUFFIX slot — appended last when supplied.
+  if (slots.suffix !== undefined && slots.suffix !== null) {
+    const suffixTrim = slots.suffix.trim();
+    if (suffixTrim.length > 0) parts.push(suffixTrim);
+  }
+
+  return parts.join("\n\n");
+}
+
 export function composeRuntimePromptSections(context: GordonContext): ConditionalPromptSection[] {
   return getSectionsForMount("context", { context })
     .map((record) => ({
