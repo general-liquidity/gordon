@@ -478,3 +478,12 @@ export {
   type FactorBetaCheck,
   type HiddenBetaVerdict,
 } from "./hidden-beta-verifier.ts";
+
+export {
+  estimateFatTailCredibility,
+  formatFatTailCredibility,
+  type FatTailCredibilityInput,
+  type FatTailCredibilityResult,
+  type FatTailClass,
+  type HillEstimatePoint,
+} from "./fat-tail-credibility.ts";

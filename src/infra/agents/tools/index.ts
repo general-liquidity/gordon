@@ -337,6 +337,13 @@ export { preTradeRiskGateTools } from "./runtime/preTradeRiskGateDiagnostic.ts";
 // neutrality ≠ beta-neutrality. Delegates math to hedgeFundReplication.
 export { hiddenBetaVerifierTools } from "./runtime/hiddenBetaVerifierDiagnostic.ts";
 
+// LV36 — Fat-Tail Credibility Adjuster. Hill tail-index estimator + Taleb's
+// sample-size multiplier. Companion to infra/trading/ops/backtestCredibility
+// (PSR/DSR/minTRL/CPCV — Gaussian-derived): supplies the correction
+// multiplier for heavy-tailed return distributions where the Gaussian
+// inference UNDERESTIMATES required sample size by 10× to 100× or more.
+export { fatTailCredibilityTools } from "./runtime/fatTailCredibilityDiagnostic.ts";
+
 // Goal-engineering primitives (GE1-GE3). Drafter + mandate linkage + deferred-actions log.
 // Companion to the existing /goal command in src/core/pipeline/goalMode.ts.
 export { goalDraftTools } from "./runtime/goalDraftDiagnostic.ts";
@@ -697,6 +704,7 @@ import { volumePatternEdgeTools } from "./runtime/volumePatternEdgeDiagnostic.ts
 import { maeStopCalibratorTools } from "./runtime/maeStopCalibratorDiagnostic.ts";
 import { preTradeRiskGateTools } from "./runtime/preTradeRiskGateDiagnostic.ts";
 import { hiddenBetaVerifierTools } from "./runtime/hiddenBetaVerifierDiagnostic.ts";
+import { fatTailCredibilityTools } from "./runtime/fatTailCredibilityDiagnostic.ts";
 import { levelFreshnessTools } from "./runtime/levelFreshnessDiagnostic.ts";
 import { goalDraftTools } from "./runtime/goalDraftDiagnostic.ts";
 import { goalMandateLinkTools } from "./runtime/goalMandateLinkDiagnostic.ts";
@@ -866,6 +874,7 @@ const _rawAllTools = {
   ...maeStopCalibratorTools,
   ...preTradeRiskGateTools,
   ...hiddenBetaVerifierTools,
+  ...fatTailCredibilityTools,
   ...levelFreshnessTools,
   ...goalDraftTools,
   ...goalMandateLinkTools,
