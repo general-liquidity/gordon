@@ -49,6 +49,7 @@ import {
   instrumentedRegimeTools,
   gordonInputGuard,
   gordonOutputSanitizer,
+  gordonToolCallReconciler,
 } from "../tooling/instrumentedTools.ts";
 import { createSubAgentMemory } from "../memory/memoryFactory.ts";
 import { createModelResolver, registerObservability } from "../agentHelpers.ts";
@@ -117,7 +118,7 @@ export function getResearcher(): Agent {
       ...instrumentedRegimeTools,
     },
     memory: createSubAgentMemory("researcher"),
-    inputProcessors: [gordonInputGuard, new TokenLimiterProcessor({ limit: 32000 })],
+    inputProcessors: [gordonToolCallReconciler, gordonInputGuard, new TokenLimiterProcessor({ limit: 32000 })],
     outputProcessors: [gordonOutputSanitizer],
   });
   registerObservability(agent);

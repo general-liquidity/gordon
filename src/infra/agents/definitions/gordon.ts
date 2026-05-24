@@ -89,6 +89,7 @@ import {
   instrumentedAuditTools,
   instrumentedMetricsTools,
   gordonInputGuard,
+  gordonToolCallReconciler,
   gordonOutputSanitizer,
 } from "../tooling/instrumentedTools.ts";
 import { createMemory } from "../memory/memoryFactory.ts";
@@ -542,7 +543,7 @@ export function getGordon(): Agent {
     memory: createMemory(),
 
     // Token limiter to prevent context window overflow in long sessions
-    inputProcessors: [gordonInputGuard, new TokenLimiterProcessor({ limit: 64000 })],
+    inputProcessors: [gordonToolCallReconciler, gordonInputGuard, new TokenLimiterProcessor({ limit: 64000 })],
     outputProcessors: [gordonOutputSanitizer],
   });
   registerObservability(agent);

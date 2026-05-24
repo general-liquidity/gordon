@@ -31,6 +31,7 @@ import {
   instrumentedChainlinkCCIPTools,
   gordonInputGuard,
   gordonOutputSanitizer,
+  gordonToolCallReconciler,
 } from "../tooling/instrumentedTools.ts";
 import { tradingInfraTools } from "../tools/runtime/tradingInfra.ts";
 import { createSubAgentMemory } from "../memory/memoryFactory.ts";
@@ -220,7 +221,7 @@ export function getExecutor(): Agent {
       ...getRoutingToolsForAgent("Executor"),
     },
     memory: createSubAgentMemory("executor"),
-    inputProcessors: [gordonInputGuard, new TokenLimiterProcessor({ limit: 32000 })],
+    inputProcessors: [gordonToolCallReconciler, gordonInputGuard, new TokenLimiterProcessor({ limit: 32000 })],
     outputProcessors: [gordonOutputSanitizer],
   });
   registerObservability(agent);

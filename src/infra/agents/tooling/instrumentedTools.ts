@@ -7,7 +7,7 @@
  * Also re-exports the shared processor instances (gordonInputGuard, gordonOutputSanitizer).
  */
 
-import { GordonInputGuard, GordonOutputSanitizer } from "../processors/index.ts";
+import { GordonInputGuard, GordonOutputSanitizer, GordonToolCallReconciler } from "../processors/index.ts";
 import {
   askUserTools,
   indicatorTools,
@@ -103,6 +103,13 @@ import { executionCostTools } from "../tools/trading/execution-cost.ts";
 // Singleton processor instances (shared across all agents)
 export const gordonInputGuard = new GordonInputGuard();
 export const gordonOutputSanitizer = new GordonOutputSanitizer();
+/**
+ * FW1 — pre-turn tool-call reconciler. No-op unless
+ * GORDON_TOOLCALL_RECONCILER env flag is set. Wired into each agent's
+ * inputProcessors array BEFORE gordonInputGuard so structural repair
+ * happens before content guardrails see the messages.
+ */
+export const gordonToolCallReconciler = new GordonToolCallReconciler();
 
 // Instrumented tool collections
 export const instrumentedAskUserTools = withToolsMetrics(askUserTools);
