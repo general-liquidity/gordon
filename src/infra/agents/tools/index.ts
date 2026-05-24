@@ -371,6 +371,15 @@ export { fipMomentumQualityTools } from "./runtime/fipMomentumQualityDiagnostic.
 // vol-target-sizer (LV37) or volScaledSizing.
 export { ensembleSignalCombinerTools } from "./runtime/ensembleSignalCombinerDiagnostic.ts";
 
+// LV40 — Delta-Price Divergence Detector. Order-flow exhaustion classifier:
+// compares signed price-change vs cumulative-delta over a lookback. Price
+// up + delta down/negative = BUYER exhaustion (bearish reversal candidate).
+// Price down + delta up/positive = SELLER exhaustion (bullish reversal
+// candidate). Pedigree: Mati Conti 2026; standard prop-trading order-flow
+// analysis. Distinct from delta-ladder (raw indicator) and sellers-exhaustion
+// (volume-climax strategy). Composes with ensemble-signal-combiner (LV39).
+export { deltaPriceDivergenceTools } from "./runtime/deltaPriceDivergenceDiagnostic.ts";
+
 // Goal-engineering primitives (GE1-GE3). Drafter + mandate linkage + deferred-actions log.
 // Companion to the existing /goal command in src/core/pipeline/goalMode.ts.
 export { goalDraftTools } from "./runtime/goalDraftDiagnostic.ts";
@@ -735,6 +744,7 @@ import { fatTailCredibilityTools } from "./runtime/fatTailCredibilityDiagnostic.
 import { volTargetSizerTools } from "./runtime/volTargetSizerDiagnostic.ts";
 import { fipMomentumQualityTools } from "./runtime/fipMomentumQualityDiagnostic.ts";
 import { ensembleSignalCombinerTools } from "./runtime/ensembleSignalCombinerDiagnostic.ts";
+import { deltaPriceDivergenceTools } from "./runtime/deltaPriceDivergenceDiagnostic.ts";
 import { levelFreshnessTools } from "./runtime/levelFreshnessDiagnostic.ts";
 import { goalDraftTools } from "./runtime/goalDraftDiagnostic.ts";
 import { goalMandateLinkTools } from "./runtime/goalMandateLinkDiagnostic.ts";
@@ -908,6 +918,7 @@ const _rawAllTools = {
   ...volTargetSizerTools,
   ...fipMomentumQualityTools,
   ...ensembleSignalCombinerTools,
+  ...deltaPriceDivergenceTools,
   ...levelFreshnessTools,
   ...goalDraftTools,
   ...goalMandateLinkTools,

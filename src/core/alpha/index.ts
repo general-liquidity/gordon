@@ -518,3 +518,14 @@ export {
   type EnsembleDirection,
   type EnsembleVerdict,
 } from "./ensemble-signal-combiner.ts";
+
+export {
+  detectDeltaPriceDivergence,
+  formatDeltaPriceDivergence,
+  type DeltaPriceBar,
+  type DeltaPriceDivergenceOptions,
+  type DeltaPriceDivergenceResult,
+  type DeltaDirection,
+  type DivergenceType,
+  type DeltaDivergenceVerdict,
+} from "./delta-price-divergence.ts";
