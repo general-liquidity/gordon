@@ -55,11 +55,12 @@ describe("FW7 — buildTaskDispatchTool", () => {
     expect(tool.description).not.toContain("dead-role");
   });
 
-  test("unknown role returns refused without dispatching", async () => {
-    const tool = buildTaskDispatchTool(
-      new Map([[PROFILE_A.name, PROFILE_A]]),
-      FAKE_TOOL_REGISTRY,
-    );
+  test("unknown role returns refused without dispatching (defense-in-depth path)", async () => {
+    // After Patch 1, the zod enum rejects unknown roles at the schema
+    // layer. This test uses an empty profile map so the schema falls
+    // back to z.string() and the execute()'s defensive branch is
+    // reachable — keeps the defense-in-depth behavior under test.
+    const tool = buildTaskDispatchTool(new Map(), FAKE_TOOL_REGISTRY);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const result = await (tool.execute as any)({
       role: "ghost-role",
@@ -100,6 +101,62 @@ describe("FW7 — buildTaskDispatchTool", () => {
     } finally {
       if (previous !== undefined) process.env.GORDON_DYNAMIC_SUBAGENTS = previous;
     }
+  });
+});
+
+describe("Patch 1 — role schema is a zod enum", () => {
+  test("role schema enumerates profile names when non-empty", () => {
+    const tool = buildTaskDispatchTool(
+      new Map([
+        [PROFILE_A.name, PROFILE_A],
+        [PROFILE_B.name, PROFILE_B],
+      ]),
+      FAKE_TOOL_REGISTRY,
+    );
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const inputSchema = (tool as any).inputSchema as { shape: { role: any } };
+    const roleSchema = inputSchema.shape.role;
+    // zod enum exposes `.options` (or `._def.values`) — accept either
+    const enumValues =
+      roleSchema._def?.values ??
+      roleSchema.options ??
+      roleSchema._def?.entries;
+    expect(enumValues).toBeDefined();
+    const set = new Set<string>(Array.isArray(enumValues) ? enumValues : Object.values(enumValues ?? {}));
+    expect(set.has("analyst-a")).toBe(true);
+    expect(set.has("analyst-b")).toBe(true);
+  });
+
+  test("deprecated profiles excluded from role enum", () => {
+    const tool = buildTaskDispatchTool(
+      new Map([
+        [PROFILE_A.name, PROFILE_A],
+        ["dead", { ...PROFILE_A, name: "dead", status: "deprecated" as const }],
+      ]),
+      FAKE_TOOL_REGISTRY,
+    );
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const inputSchema = (tool as any).inputSchema as { shape: { role: any } };
+    const roleSchema = inputSchema.shape.role;
+    const enumValues =
+      roleSchema._def?.values ??
+      roleSchema.options ??
+      roleSchema._def?.entries;
+    const set = new Set<string>(Array.isArray(enumValues) ? enumValues : Object.values(enumValues ?? {}));
+    expect(set.has("analyst-a")).toBe(true);
+    expect(set.has("dead")).toBe(false);
+  });
+
+  test("empty profile map falls back to z.string()", () => {
+    const tool = buildTaskDispatchTool(new Map(), FAKE_TOOL_REGISTRY);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const inputSchema = (tool as any).inputSchema as { shape: { role: any } };
+    const roleSchema = inputSchema.shape.role;
+    // string schema does NOT have an enum-style .options/.values
+    // (it has _def.typeName === "ZodString").
+    const def = roleSchema._def;
+    const typeName = def?.typeName ?? def?.type;
+    expect(typeName === "ZodString" || typeName === "string").toBe(true);
   });
 });
 

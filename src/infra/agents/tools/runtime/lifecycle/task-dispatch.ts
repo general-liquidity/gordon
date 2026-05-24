@@ -71,16 +71,31 @@ export function buildTaskDispatchTool(
     "completed/failed status + summary + result.",
   ].join("\n");
 
+  // Patch 1 — Role schema is a zod enum drawn from active profile
+  // names so the model cannot emit a tool call referencing a
+  // nonexistent role. Falls back to z.string() ONLY when the active
+  // set is empty (which the caller's shouldRegisterTaskDispatchTool
+  // gate already prevents, but we keep the fallback for type-safety in
+  // unit-test scenarios where tests construct the tool with an empty
+  // profile map directly).
+  const roleNames = activeProfiles.map((p) => p.name);
+  const roleSchema =
+    roleNames.length > 0
+      ? z.enum(roleNames as [string, ...string[]]).describe(
+          "Profile name — must be one of the configured subagent roles. Schema-narrowed so the model cannot hallucinate.",
+        )
+      : z
+          .string()
+          .min(1)
+          .describe(
+            "Profile name — (no profiles configured at tool-build time).",
+          );
+
   return createTool({
     id: "delegate_to_subagent",
     description,
     inputSchema: z.object({
-      role: z
-        .string()
-        .min(1)
-        .describe(
-          "Profile name — must match one of the available roles listed in the tool description.",
-        ),
+      role: roleSchema,
       task: z
         .string()
         .min(1)

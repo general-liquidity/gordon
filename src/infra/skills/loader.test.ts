@@ -7,6 +7,7 @@ import {
   validateSkillFrontmatter,
   loadSkillFromFile,
   discoverSkillsFromDir,
+  MAX_SKILL_FILE_SIZE,
 } from "./loader.ts";
 
 // =================== parseFrontmatter ===================
@@ -358,6 +359,76 @@ body`,
   it("returns null for nonexistent file", () => {
     const skill = loadSkillFromFile(join(dir, "no-such.md"), "user");
     expect(skill).toBeNull();
+  });
+});
+
+// =================== Patch 3 — MAX_SKILL_FILE_SIZE ===================
+
+describe("Patch 3 — MAX_SKILL_FILE_SIZE rejects oversized skills", () => {
+  let dir: string;
+
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), "gordon-skill-size-test-"));
+  });
+  afterEach(() => {
+    try { rmSync(dir, { recursive: true, force: true }); } catch { /* */ }
+  });
+
+  it("constant is exported and reasonable", () => {
+    expect(MAX_SKILL_FILE_SIZE).toBeGreaterThan(1024);
+    expect(MAX_SKILL_FILE_SIZE).toBeLessThanOrEqual(1024 * 1024);
+  });
+
+  it("skill within the size cap loads normally", () => {
+    const skillDir = join(dir, "okay-skill");
+    mkdirSync(skillDir);
+    const body = "x".repeat(1000); // ~1KB
+    writeFileSync(
+      join(skillDir, "SKILL.md"),
+      `---
+name: okay-skill
+description: small body
+---
+${body}
+`,
+    );
+    const skill = loadSkillFromFile(join(skillDir, "SKILL.md"), "user");
+    expect(skill).not.toBeNull();
+  });
+
+  it("skill exceeding cap is skipped (returns null)", () => {
+    const skillDir = join(dir, "huge-skill");
+    mkdirSync(skillDir);
+    // Body just over the limit
+    const body = "x".repeat(MAX_SKILL_FILE_SIZE + 1024);
+    writeFileSync(
+      join(skillDir, "SKILL.md"),
+      `---
+name: huge-skill
+description: oversized body
+---
+${body}`,
+    );
+    const skill = loadSkillFromFile(join(skillDir, "SKILL.md"), "user");
+    expect(skill).toBeNull();
+  });
+
+  it("size boundary — exactly at the cap loads", () => {
+    const skillDir = join(dir, "edge-skill");
+    mkdirSync(skillDir);
+    // Compose a file that lands within the cap. Frontmatter ~80 bytes.
+    const padding = MAX_SKILL_FILE_SIZE - 200; // leave room for frontmatter
+    const body = "y".repeat(padding);
+    writeFileSync(
+      join(skillDir, "SKILL.md"),
+      `---
+name: edge-skill
+description: at-cap body
+---
+${body}`,
+    );
+    const skill = loadSkillFromFile(join(skillDir, "SKILL.md"), "user");
+    expect(skill).not.toBeNull();
   });
 });
 

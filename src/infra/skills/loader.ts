@@ -63,6 +63,18 @@ const MAX_DESCRIPTION_LEN = 1024;
 const RESERVED_SKILL_NAMES = new Set(["skills"]);
 const MAX_COMPATIBILITY_LEN = 500;
 
+/**
+ * Patch 3 — Hard upper bound on SKILL.md file size. Mirrors the
+ * MAX_SKILL_FILE_SIZE constant Deep Agents enforces. Files larger than
+ * this are rejected pre-parse to bound memory + token cost (a 500KB
+ * SKILL.md indicates either a packaging mistake or a malicious payload).
+ *
+ * 64KB is conservative — Gordon's own bundled skills are all well under
+ * 8KB. Operators who legitimately need a bigger skill should split it
+ * into multiple skills with cross-references.
+ */
+export const MAX_SKILL_FILE_SIZE = 64 * 1024;
+
 // ============================================================================
 // YAML Frontmatter Parser
 // ============================================================================
@@ -318,6 +330,25 @@ export function validateSkillFrontmatter(
 export function loadSkillFromFile(filePath: string, source: SkillSource): Skill | null {
   if (!existsSync(filePath)) return null;
   try {
+    // Patch 3 — Reject oversized skills pre-read. Reading a 100MB
+    // SKILL.md into memory just to discard it after frontmatter parse
+    // is a real DoS surface in multi-tenant scenarios.
+    let fileSize: number | undefined;
+    try {
+      fileSize = statSync(filePath).size;
+    } catch {
+      // statSync failed — fall through to readFileSync which will emit
+      // its own error; preserves prior behavior on missing/permission cases.
+    }
+    if (fileSize !== undefined && fileSize > MAX_SKILL_FILE_SIZE) {
+      logger.warn("Skipping oversized skill", {
+        filePath,
+        source,
+        sizeBytes: fileSize,
+        maxBytes: MAX_SKILL_FILE_SIZE,
+      });
+      return null;
+    }
     const raw = readFileSync(filePath, "utf-8");
     const { frontmatter, body } = parseFrontmatter(raw);
     const fm = toFrontmatter(frontmatter);

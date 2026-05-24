@@ -13,17 +13,21 @@
 
 import { loadSubagentProfiles } from "./subagentProfileLoader.ts";
 import type { SubagentProfile } from "./subagentProfile.ts";
+import { applyGeneralPurposeFallback } from "./generalPurposeProfile.ts";
 
 let cachedRegistry: ReadonlyMap<string, SubagentProfile> | undefined;
 
 /**
  * Initialize the registry from disk. Idempotent — subsequent calls
  * return the cached set. Tests use `_resetSubagentProfileRegistry`.
+ *
+ * Applies the general-purpose fallback (Patch 2) when operator profiles
+ * are empty and the fallback isn't opt-out via env.
  */
 export function getSubagentProfileRegistry(): ReadonlyMap<string, SubagentProfile> {
   if (cachedRegistry) return cachedRegistry;
   const loaded = loadSubagentProfiles();
-  cachedRegistry = loaded.profiles;
+  cachedRegistry = applyGeneralPurposeFallback(loaded.profiles);
   return cachedRegistry;
 }
 
