@@ -507,3 +507,14 @@ export {
   type FipQuality,
   type FipVerdict,
 } from "./fip-momentum-quality.ts";
+
+export {
+  combineEnsembleSignals,
+  formatEnsembleSignal,
+  type EnsembleSignal,
+  type EnsembleCombinerOptions,
+  type EnsembleSignalResult,
+  type PerSourceContribution,
+  type EnsembleDirection,
+  type EnsembleVerdict,
+} from "./ensemble-signal-combiner.ts";

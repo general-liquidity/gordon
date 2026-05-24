@@ -360,6 +360,17 @@ export { volTargetSizerTools } from "./runtime/volTargetSizerDiagnostic.ts";
 // *Quantitative Momentum*.
 export { fipMomentumQualityTools } from "./runtime/fipMomentumQualityDiagnostic.ts";
 
+// LV39 — Ensemble Signal Combiner. Weighted aggregation of N directional
+// signals in [-1, +1] into one composite for continuous position sizing.
+// Adds an agreement diagnostic that catches fragile ensembles where one
+// big-weight source overwhelms many opposing sources. Pedigree: López de
+// Prado *Advances in Financial Machine Learning* (weak-learner → strong-
+// learner ensembles). Designed to consume the directional outputs of
+// other Gordon primitives (cross-sectional-momentum, fip-momentum-quality,
+// aggression-ratio, ma-crossover-cleanness, volume-pattern-edge) and feed
+// vol-target-sizer (LV37) or volScaledSizing.
+export { ensembleSignalCombinerTools } from "./runtime/ensembleSignalCombinerDiagnostic.ts";
+
 // Goal-engineering primitives (GE1-GE3). Drafter + mandate linkage + deferred-actions log.
 // Companion to the existing /goal command in src/core/pipeline/goalMode.ts.
 export { goalDraftTools } from "./runtime/goalDraftDiagnostic.ts";
@@ -723,6 +734,7 @@ import { hiddenBetaVerifierTools } from "./runtime/hiddenBetaVerifierDiagnostic.
 import { fatTailCredibilityTools } from "./runtime/fatTailCredibilityDiagnostic.ts";
 import { volTargetSizerTools } from "./runtime/volTargetSizerDiagnostic.ts";
 import { fipMomentumQualityTools } from "./runtime/fipMomentumQualityDiagnostic.ts";
+import { ensembleSignalCombinerTools } from "./runtime/ensembleSignalCombinerDiagnostic.ts";
 import { levelFreshnessTools } from "./runtime/levelFreshnessDiagnostic.ts";
 import { goalDraftTools } from "./runtime/goalDraftDiagnostic.ts";
 import { goalMandateLinkTools } from "./runtime/goalMandateLinkDiagnostic.ts";
@@ -895,6 +907,7 @@ const _rawAllTools = {
   ...fatTailCredibilityTools,
   ...volTargetSizerTools,
   ...fipMomentumQualityTools,
+  ...ensembleSignalCombinerTools,
   ...levelFreshnessTools,
   ...goalDraftTools,
   ...goalMandateLinkTools,
