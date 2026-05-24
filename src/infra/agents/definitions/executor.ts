@@ -34,7 +34,7 @@ import {
 } from "../tooling/instrumentedTools.ts";
 import { tradingInfraTools } from "../tools/runtime/tradingInfra.ts";
 import { createSubAgentMemory } from "../memory/memoryFactory.ts";
-import { resolveRuntimeModel, registerObservability } from "../agentHelpers.ts";
+import { createModelResolver, registerObservability } from "../agentHelpers.ts";
 
 const EXECUTOR_INSTRUCTIONS = `You are Gordon's trade executor agent.
 
@@ -118,7 +118,7 @@ export function getExecutor(): Agent {
       "Use when user wants to execute a plan, place a market or limit order, " +
       "swap/convert crypto, buy or sell a symbol, cancel an order, or change permissionMode via /auto, /ask, /strict.",
     instructions: composeAgentInstructions("executor", EXECUTOR_INSTRUCTIONS),
-    model: resolveRuntimeModel,
+    model: createModelResolver("executor"),
     defaultOptions: { modelSettings: { maxOutputTokens: 16384 } },
     tools: {
       execute_plan: instrumentedTradingTools.execute_plan,

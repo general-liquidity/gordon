@@ -51,7 +51,7 @@ import {
   gordonOutputSanitizer,
 } from "../tooling/instrumentedTools.ts";
 import { createSubAgentMemory } from "../memory/memoryFactory.ts";
-import { resolveRuntimeModel, registerObservability } from "../agentHelpers.ts";
+import { createModelResolver, registerObservability } from "../agentHelpers.ts";
 
 const RESEARCHER_INSTRUCTIONS = `You are a Researcher agent within Gordon, a trading CLI.
 
@@ -80,7 +80,7 @@ export function getResearcher(): Agent {
       "On-demand parallel research agent. Spawned for background tasks like " +
       "multi-symbol scans, backtests, deep dives. Read-only — cannot trade.",
     instructions: composeAgentInstructions("researcher" as any, RESEARCHER_INSTRUCTIONS),
-    model: resolveRuntimeModel,
+    model: createModelResolver("researcher"),
     defaultOptions: { modelSettings: { maxOutputTokens: 16384 } },
     tools: {
       ...instrumentedIndicatorTools,

@@ -92,7 +92,7 @@ import {
   gordonOutputSanitizer,
 } from "../tooling/instrumentedTools.ts";
 import { createMemory } from "../memory/memoryFactory.ts";
-import { resolveRuntimeModel, formatModelLabel, registerObservability } from "../agentHelpers.ts";
+import { createModelResolver, resolveRuntimeModel, formatModelLabel, registerObservability } from "../agentHelpers.ts";
 import { getExecutor } from "./executor.ts";
 import { getResearcher } from "./researcher.ts";
 
@@ -348,8 +348,11 @@ Check whether proactive mode producers are actually alive and firing:
 - When a mandate pauses automatically, explain why and offer to resume or adjust`;
 
 export function getGordon(): Agent {
-  const model = resolveRuntimeModel();
-  const modelLabel = formatModelLabel(model);
+  // FW6: resolve initial model with orchestrator role for logging label;
+  // the live resolver passed to Agent uses createModelResolver("orchestrator")
+  // so per-turn resolution honors GORDON_MODEL_ORCHESTRATOR.
+  const initialModel = resolveRuntimeModel(undefined, "orchestrator");
+  const modelLabel = formatModelLabel(initialModel);
   logger.info("Initializing agent", { model: modelLabel });
 
   const agent = new Agent({
@@ -357,7 +360,7 @@ export function getGordon(): Agent {
     name: "Gordon",
     description: GORDON_PRODUCT_TRUTH.headline,
     instructions: composeAgentInstructions("gordon", GORDON_INSTRUCTIONS),
-    model,
+    model: createModelResolver("orchestrator"),
 
     // Cap maxOutputTokens for ALL internal calls. Without this, Mastra
     // defaults to the model's catalog max (e.g. 100000 for Haiku 4.5) and
