@@ -313,6 +313,15 @@ export { breakoutFailureRegimeTools } from "./runtime/breakoutFailureRegimeDiagn
 export { maCrossoverCleannessTools } from "./runtime/maCrossoverCleannessDiagnostic.ts";
 export { volumePatternEdgeTools } from "./runtime/volumePatternEdgeDiagnostic.ts";
 
+// LV33 — MAE Stop Calibrator. Closes Gordon's MAE/FTA loop: consumes a
+// closed-trade ledger, computes winner-MAE distribution, recommends an
+// empirical tight stop (P95 default) + counterfactual (winners preserved
+// / losers cut earlier / saved fraction). Companion to TM1 faeFtaCut
+// (LIVE decision tool that consumes the threshold this primitive produces).
+// Pedigree: Sweeney 1990s MAE/MFE → Tom Dante → Kyna Kosling / Jaimin
+// Marfatia popularization.
+export { maeStopCalibratorTools } from "./runtime/maeStopCalibratorDiagnostic.ts";
+
 // Goal-engineering primitives (GE1-GE3). Drafter + mandate linkage + deferred-actions log.
 // Companion to the existing /goal command in src/core/pipeline/goalMode.ts.
 export { goalDraftTools } from "./runtime/goalDraftDiagnostic.ts";
@@ -670,6 +679,7 @@ import { stallCutTrackerTools } from "./runtime/stallCutTrackerDiagnostic.ts";
 import { breakoutFailureRegimeTools } from "./runtime/breakoutFailureRegimeDiagnostic.ts";
 import { maCrossoverCleannessTools } from "./runtime/maCrossoverCleannessDiagnostic.ts";
 import { volumePatternEdgeTools } from "./runtime/volumePatternEdgeDiagnostic.ts";
+import { maeStopCalibratorTools } from "./runtime/maeStopCalibratorDiagnostic.ts";
 import { levelFreshnessTools } from "./runtime/levelFreshnessDiagnostic.ts";
 import { goalDraftTools } from "./runtime/goalDraftDiagnostic.ts";
 import { goalMandateLinkTools } from "./runtime/goalMandateLinkDiagnostic.ts";
@@ -836,6 +846,7 @@ const _rawAllTools = {
   ...breakoutFailureRegimeTools,
   ...maCrossoverCleannessTools,
   ...volumePatternEdgeTools,
+  ...maeStopCalibratorTools,
   ...levelFreshnessTools,
   ...goalDraftTools,
   ...goalMandateLinkTools,
