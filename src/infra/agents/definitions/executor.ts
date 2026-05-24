@@ -35,7 +35,11 @@ import {
 } from "../tooling/instrumentedTools.ts";
 import { tradingInfraTools } from "../tools/runtime/tradingInfra.ts";
 import { createSubAgentMemory } from "../memory/memoryFactory.ts";
-import { createModelResolver, registerObservability } from "../agentHelpers.ts";
+import { createModelResolver, registerObservability, resolveRuntimeModel } from "../agentHelpers.ts";
+import {
+  getHarnessSuffixForModel,
+  isHarnessProfilesEnabled,
+} from "../profiles/harnessProfile.ts";
 
 const EXECUTOR_INSTRUCTIONS = `You are Gordon's trade executor agent.
 
@@ -120,6 +124,9 @@ export function getExecutor(): Agent {
       "swap/convert crypto, buy or sell a symbol, cancel an order, or change permissionMode via /auto, /ask, /strict.",
     instructions: composeAgentInstructionsWithSlots("executor", {
       user: EXECUTOR_INSTRUCTIONS,
+      suffix: isHarnessProfilesEnabled()
+        ? getHarnessSuffixForModel(resolveRuntimeModel(undefined, "executor"))
+        : undefined,
     }),
     model: createModelResolver("executor"),
     defaultOptions: { modelSettings: { maxOutputTokens: 16384 } },

@@ -41,6 +41,8 @@ export interface StreamChunk {
   payload?: {
     agentId?: string;
     toolName?: string;
+    /** Mastra/AI-SDK supplies the tool call id on tool-call and tool-result chunks. */
+    toolCallId?: string;
     text?: string;
     args?: Record<string, unknown>;
     result?: unknown;
@@ -66,6 +68,14 @@ export function getCompiledSubagentProfiles() {
 /**
  * Mutable state passed through stream event processing.
  * Tracks the current active agent and accumulated text.
+ *
+ * `pendingToolCalls` (FW1 emitter): tracks tool-call ids the model has
+ * emitted into the message array but for which a tool-result chunk has
+ * not yet arrived. On stream cancellation or error, the orchestrator
+ * iterates this map and emits `reportToolCallInterruption(id, reason)`
+ * so the next turn's reconciler can synthesize matching tool_result
+ * blocks. Cleared at construction; entries added in `processToolCallChunk`
+ * and removed in `processToolResult`.
  */
 export interface StreamProcessingState {
   currentAgent: string | undefined;
@@ -75,6 +85,10 @@ export interface StreamProcessingState {
     result: unknown;
     agent: string | undefined;
   } | null;
+  pendingToolCalls: Map<
+    string,
+    { toolName: string; startedAt: number; agent: string | undefined }
+  >;
 }
 
 // ============================================================================

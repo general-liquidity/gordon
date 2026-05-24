@@ -52,7 +52,11 @@ import {
   gordonToolCallReconciler,
 } from "../tooling/instrumentedTools.ts";
 import { createSubAgentMemory } from "../memory/memoryFactory.ts";
-import { createModelResolver, registerObservability } from "../agentHelpers.ts";
+import { createModelResolver, registerObservability, resolveRuntimeModel } from "../agentHelpers.ts";
+import {
+  getHarnessSuffixForModel,
+  isHarnessProfilesEnabled,
+} from "../profiles/harnessProfile.ts";
 
 const RESEARCHER_INSTRUCTIONS = `You are a Researcher agent within Gordon, a trading CLI.
 
@@ -82,6 +86,9 @@ export function getResearcher(): Agent {
       "multi-symbol scans, backtests, deep dives. Read-only — cannot trade.",
     instructions: composeAgentInstructionsWithSlots("researcher" as any, {
       user: RESEARCHER_INSTRUCTIONS,
+      suffix: isHarnessProfilesEnabled()
+        ? getHarnessSuffixForModel(resolveRuntimeModel(undefined, "researcher"))
+        : undefined,
     }),
     model: createModelResolver("researcher"),
     defaultOptions: { modelSettings: { maxOutputTokens: 16384 } },

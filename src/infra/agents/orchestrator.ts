@@ -125,6 +125,8 @@ import {
   type StreamChunk as InternalStreamChunk,
   type StreamProcessingState,
 } from "./orchestrator/streamProcessor.ts";
+import { reportToolCallInterruption } from "./processors/toolcall-reconciler.ts";
+import type { InterruptionReason } from "./runtime/toolCallReconciler.ts";
 
 const logger = createModuleLogger("orchestrator");
 
@@ -406,6 +408,7 @@ export async function* processMessageStream(
     currentAgent: undefined,
     fullText: "",
     lastSubAgentToolResult: null,
+    pendingToolCalls: new Map(),
   };
 
   const requestContext = createRequestContext(context);
@@ -644,6 +647,23 @@ export async function* processMessageStream(
     reactStage = advanceReActStage(reactStage, "persisted");
 
   } catch (err) {
+    // FW1 emitter — report any in-flight tool calls so the next turn's
+    // reconciler synthesizes matching tool_result blocks. Reason is
+    // derived from the error type so the synthesized result carries
+    // useful attribution ("user_cancelled" / "exception" / "unknown").
+    if (state.pendingToolCalls.size > 0) {
+      const reason: InterruptionReason =
+        err instanceof StreamCancelledError ? "cancelled" : "unknown";
+      for (const [callId, entry] of state.pendingToolCalls) {
+        reportToolCallInterruption(callId, reason, {
+          toolName: entry.toolName,
+          agent: entry.agent,
+          startedAt: entry.startedAt,
+        });
+      }
+      state.pendingToolCalls.clear();
+    }
+
     if (err instanceof StreamCancelledError) {
       logger.info("Streaming cancelled by user", { messageLength: userMessage.length });
       yield { type: "cancelled", content: err.message };
@@ -695,11 +715,20 @@ async function* processFullStreamChunk(
 
     case "tool-call":
       if (chunk.payload?.toolName) {
-        yield* processToolCallChunk(chunk.payload.toolName, chunk.payload.args, state, context);
+        yield* processToolCallChunk(
+          chunk.payload.toolName,
+          chunk.payload.args,
+          state,
+          context,
+          chunk.payload.toolCallId,
+        );
       }
       break;
 
     case "tool-result":
+      if (chunk.payload?.toolCallId) {
+        state.pendingToolCalls.delete(chunk.payload.toolCallId);
+      }
       yield await processToolResult(chunk.payload?.toolName, chunk.payload?.result, state, context);
       break;
 
@@ -737,6 +766,7 @@ async function* processToolCallChunk(
   toolArgs: Record<string, unknown> | undefined,
   state: StreamProcessingState,
   context: GordonContext,
+  toolCallId?: string,
 ): AsyncGenerator<StreamEvent, void> {
   const detectedAgent = getAgentForTool(toolName);
 
@@ -760,6 +790,16 @@ async function* processToolCallChunk(
   if (hookResult.blocked) {
     yield { type: "error", error: hookResult.reason ?? `Tool blocked before start: ${toolName}` };
     return;
+  }
+
+  // FW1 emitter: register pending tool call so a downstream error/cancel
+  // can report it to the reconciler. Cleared in processToolResult.
+  if (toolCallId) {
+    state.pendingToolCalls.set(toolCallId, {
+      toolName,
+      startedAt: Date.now(),
+      agent: state.currentAgent,
+    });
   }
 
   yield { type: "tool_call_start", toolName, toolArgs, agentName: state.currentAgent };
@@ -807,8 +847,21 @@ async function* processAgentExecutionEvent(
       return;
     }
 
+    // FW1 emitter: register pending tool call for the agent-execution path too.
+    const subAgentToolCallId = innerPayload.payload.toolCallId;
+    if (subAgentToolCallId) {
+      state.pendingToolCalls.set(subAgentToolCallId, {
+        toolName,
+        startedAt: Date.now(),
+        agent: state.currentAgent,
+      });
+    }
+
     yield { type: "tool_call_start", toolName, toolArgs: innerPayload.payload.args, agentName: state.currentAgent };
   } else if (innerType === "tool-result") {
+    if (innerPayload?.payload?.toolCallId) {
+      state.pendingToolCalls.delete(innerPayload.payload.toolCallId);
+    }
     yield await processToolResult(innerPayload?.payload?.toolName, innerPayload?.payload?.result, state, context);
   }
 }

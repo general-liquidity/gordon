@@ -94,6 +94,10 @@ import {
 } from "../tooling/instrumentedTools.ts";
 import { createMemory } from "../memory/memoryFactory.ts";
 import { createModelResolver, resolveRuntimeModel, formatModelLabel, registerObservability } from "../agentHelpers.ts";
+import {
+  getHarnessSuffixForModel,
+  isHarnessProfilesEnabled,
+} from "../profiles/harnessProfile.ts";
 import { getExecutor } from "./executor.ts";
 import { getResearcher } from "./researcher.ts";
 
@@ -362,6 +366,9 @@ export function getGordon(): Agent {
     description: GORDON_PRODUCT_TRUTH.headline,
     instructions: composeAgentInstructionsWithSlots("gordon", {
       user: GORDON_INSTRUCTIONS,
+      suffix: isHarnessProfilesEnabled()
+        ? getHarnessSuffixForModel(initialModel)
+        : undefined,
     }),
     model: createModelResolver("orchestrator"),
 
