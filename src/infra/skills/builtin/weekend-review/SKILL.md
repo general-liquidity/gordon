@@ -30,6 +30,21 @@ Check the feedback loop data:
 - Was I properly sized? (Any trades too large for the volatility?)
 - Correlation exposure: was I too concentrated?
 
+## Section 3b: System Adherence
+Call **get_adherence_report** (default 7-day window) and surface the
+structured numbers — this is the reproduction-vs-deviation axis,
+distinct from the P&L outcomes above:
+- Trades executed this week: <tradesExecuted>
+- Rule-overrides recorded: <overrides>
+- Deviation rate: <deviationRate %>
+- Severity breakdown: <bySeverity.block / require_confirmation / prompt_user>
+- For each override, surface the action + symbol + rationale so the
+  operator can review whether the override decisions were defensible
+- If deviation rate > 20% OR any block-tier overrides exist, flag for
+  process review. The point of having rules is reproducing them; high
+  deviation means either the rules are wrong or the operator is fighting
+  the system.
+
 ## Section 4: Market Regime
 - What was the dominant regime this week? (trending/ranging/volatile)
 - Did it change mid-week?

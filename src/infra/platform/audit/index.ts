@@ -19,3 +19,14 @@ export {
   type AuditEntry,
   type AuditQueryOptions,
 } from "./audit-log.ts";
+
+export {
+  recordRuleOverride,
+  getAdherenceReport,
+  summarizeAdherenceReport,
+  type RuleOverrideSeverity,
+  type RuleOverrideParameters,
+  type AdherenceWindow,
+  type AdherenceOverrideRecord,
+  type AdherenceReport,
+} from "./ruleOverride.ts";

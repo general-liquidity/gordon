@@ -71,6 +71,7 @@ import {
   instrumentedSmcPatternTools,
   instrumentedCalibrationTools,
   instrumentedSkillLoaderTools,
+  instrumentedAdherenceTools,
   instrumentedProducerHealthTools,
   instrumentedDefillamaYieldTools,
   instrumentedNewsTools,
@@ -524,6 +525,10 @@ export function getGordon(): Agent {
       ...instrumentedSmcPatternTools,
       ...instrumentedCalibrationTools,
       ...instrumentedSkillLoaderTools,
+      // Gaps 1 + 2 — per-trade rule-override audit + adherence aggregator.
+      // Gordon (orchestrator) gets both: record for cases where Gordon
+      // itself runs the approval flow, query for /weekend-review.
+      ...instrumentedAdherenceTools,
       ...instrumentedProducerHealthTools,
 
       // Crypto news headlines + sentiment — hot tier (cheap, no API key,

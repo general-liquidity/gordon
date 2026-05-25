@@ -146,7 +146,13 @@ export type AuditAction =
   | "SYSTEMATIC_OVERRIDE"
   | "SYSTEMATIC_PROMOTION"
   | "ALERT_WARNING"
-  | "ALERT_CRITICAL";
+  | "ALERT_CRITICAL"
+  // Per-trade rule-override event (Gap 1). Emitted when the operator
+  // approves a trade despite classify_trade_risk returning a
+  // non-auto-approve recommendation (prompt_user / require_confirmation
+  // / block). Distinct from SYSTEMATIC_OVERRIDE, which is strategy-
+  // lifecycle level (force-promote paper→live, etc.).
+  | "RULE_OVERRIDE";
 
 /**
  * Result status of an audited action

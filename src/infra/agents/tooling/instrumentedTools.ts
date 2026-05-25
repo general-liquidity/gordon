@@ -73,6 +73,7 @@ import {
   smcPatternTools,
   calibrationTools,
   skillLoaderTools,
+  adherenceTools,
   producerHealthTools,
   defillamaYieldTools,
   newsTools,
@@ -177,6 +178,7 @@ export const instrumentedFinnhubMarketsTools = withToolsMetrics(finnhubMarketsTo
 export const instrumentedSmcPatternTools = withToolsMetrics(smcPatternTools);
 export const instrumentedCalibrationTools = withToolsMetrics(calibrationTools);
 export const instrumentedSkillLoaderTools = withToolsMetrics(skillLoaderTools);
+export const instrumentedAdherenceTools = withToolsMetrics(adherenceTools);
 export const instrumentedProducerHealthTools = withToolsMetrics(producerHealthTools);
 export const instrumentedDefillamaYieldTools = withToolsMetrics(defillamaYieldTools);
 export const instrumentedNewsTools = withToolsMetrics(newsTools);

@@ -101,6 +101,7 @@ export { finnhubMarketsTools } from "./providers/finnhub-markets-tools.ts";
 export { smcPatternTools } from "./market/smc-pattern-tools.ts";
 export { calibrationTools } from "./runtime/meta/calibration-tools.ts";
 export { skillLoaderTools } from "./runtime/lifecycle/skill-loader.ts";
+export { adherenceTools } from "./runtime/adherence.ts";
 export { producerHealthTools } from "./runtime/lifecycle/producer-health-tool.ts";
 export { defillamaYieldTools } from "./onchain/dex/defillama-yields.ts";
 export { newsTools } from "./news/news.ts";

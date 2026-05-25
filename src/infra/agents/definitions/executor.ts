@@ -16,6 +16,7 @@ import {
   instrumentedAgentKitDefiTools,
   instrumentedSharedContextTools,
   instrumentedCheckRiskTool,
+  instrumentedAdherenceTools,
   instrumentedPositionTrackingTools,
   instrumentedMemoryTools,
   instrumentedRuntimeTools,
@@ -98,6 +99,19 @@ Before placing ANY order, you MUST:
 
 This risk gate runs BEFORE every trade, not after.
 
+## Rule-Override Logging (MANDATORY)
+If classify_trade_risk returned recommendation !== "auto_approve" AND you proceed
+anyway because the operator approved, you MUST call **record_rule_override**
+BEFORE placing the order. Required fields:
+- action: the tool you're about to call ("place_market_order", "execute_plan", …)
+- originalRecommendation: what classify_trade_risk returned ("prompt_user" / "require_confirmation" / "block")
+- originalTier: the tier ("medium" / "high" / "critical")
+- rationale: ≥10 chars explaining why the operator approved despite the recommendation
+
+This is non-negotiable. Adherence reporting depends on these events being
+captured at decision time, not reconstructed later. Skip the order if you
+cannot get a rationale from the operator.
+
 ## Position Tracking
 After order execution:
 - Use **list_active_positions** to see tracked positions
@@ -164,6 +178,11 @@ export function getExecutor(): Agent {
       ...instrumentedCheckRiskTool,
       // Critic (risk classifier) — MANDATORY pre-execution check
       classify_trade_risk: tradingInfraTools.classify_trade_risk,
+      // Gap 1 — per-trade rule-override emit. Executor calls this
+      // whenever it proceeds with an order despite classify_trade_risk
+      // returning recommendation !== 'auto_approve' AND the operator
+      // approved anyway. Required min-10-char rationale.
+      record_rule_override: instrumentedAdherenceTools.record_rule_override,
       list_active_positions: instrumentedPositionTrackingTools.list_active_positions,
       get_position_detail: instrumentedPositionTrackingTools.get_position_detail,
       search_memory: instrumentedMemoryTools.search_memory,
