@@ -77,6 +77,7 @@ import {
   quoteVerifyTools,
   diagnosticTools,
   microstructureTools,
+  institutionalAiTools,
   producerHealthTools,
   defillamaYieldTools,
   newsTools,
@@ -185,6 +186,7 @@ export const instrumentedAdherenceTools = withToolsMetrics(adherenceTools);
 export const instrumentedQuoteVerifyTools = withToolsMetrics(quoteVerifyTools);
 export const instrumentedDiagnosticTools = withToolsMetrics(diagnosticTools);
 export const instrumentedMicrostructureTools = withToolsMetrics(microstructureTools);
+export const instrumentedInstitutionalAiTools = withToolsMetrics(institutionalAiTools);
 export const instrumentedProducerHealthTools = withToolsMetrics(producerHealthTools);
 export const instrumentedDefillamaYieldTools = withToolsMetrics(defillamaYieldTools);
 export const instrumentedNewsTools = withToolsMetrics(newsTools);

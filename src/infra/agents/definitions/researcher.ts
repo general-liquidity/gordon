@@ -45,6 +45,7 @@ import {
   instrumentedQuoteVerifyTools,
   instrumentedDiagnosticTools,
   instrumentedMicrostructureTools,
+  instrumentedInstitutionalAiTools,
   instrumentedProducerHealthTools,
   instrumentedSharedContextTools,
   instrumentedMemoryTools,
@@ -135,6 +136,11 @@ export function getResearcher(): Agent {
       // analysis tasks come in (microprice for fair-value estimation,
       // inventory-adjusted price for sizing-bias analysis).
       ...instrumentedMicrostructureTools,
+      // Institutional-AI patterns — Researcher uses earnings-signal
+      // validator during transcript analysis, crowd-positioning verdict
+      // during regime/setup analysis. (Discipline audit is also exposed
+      // but typically called by Gordon during /weekend-review.)
+      ...instrumentedInstitutionalAiTools,
       ...instrumentedProducerHealthTools,
       ...instrumentedSharedContextTools,
       ...instrumentedMemoryTools,

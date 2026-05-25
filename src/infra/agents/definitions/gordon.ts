@@ -75,6 +75,7 @@ import {
   instrumentedQuoteVerifyTools,
   instrumentedDiagnosticTools,
   instrumentedMicrostructureTools,
+  instrumentedInstitutionalAiTools,
   instrumentedProducerHealthTools,
   instrumentedDefillamaYieldTools,
   instrumentedNewsTools,
@@ -545,6 +546,12 @@ export function getGordon(): Agent {
       // value estimator that conditions on book imbalance + spread)
       // and Avellaneda-Stoikov inventory-adjusted reference price.
       ...instrumentedMicrostructureTools,
+      // Institutional-AI patterns translated to Gordon's domain:
+      // earnings-signal validator (structured extraction + hallucinated-
+      // quote detection), discipline audit (7 prop-trading failure modes),
+      // crowd-positioning verdict (Shapiro framing on funding + OI +
+      // sentiment + liquidation signals).
+      ...instrumentedInstitutionalAiTools,
       ...instrumentedProducerHealthTools,
 
       // Crypto news headlines + sentiment — hot tier (cheap, no API key,
