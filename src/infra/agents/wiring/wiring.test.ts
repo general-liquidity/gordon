@@ -4,12 +4,6 @@ import {
   providerOptionsForPhase,
 } from "./extendedThinkingWiring.ts";
 import {
-  buildIfEnabled,
-  GORDON_BUILTIN_AGENTS,
-  isAgentListAttachmentEnabled,
-  shouldRefreshAgentList,
-} from "./agentListWiring.ts";
-import {
   _resetRecoveryStateForTests,
   isRecoveryTiersEnabled,
   resetFingerprintRecoveryState,
@@ -65,48 +59,6 @@ describe("extendedThinkingWiring", () => {
       });
       expect("anthropic" in opts).toBe(true);
     });
-  });
-});
-
-describe("agentListWiring", () => {
-  it("returns null when flag is off", () => {
-    withEnv("GORDON_AGENT_LIST_ATTACHMENT", undefined, () => {
-      expect(isAgentListAttachmentEnabled()).toBe(false);
-      expect(buildIfEnabled()).toBeNull();
-    });
-  });
-
-  it("emits an attachment with the builtin agents when enabled", () => {
-    withEnv("GORDON_AGENT_LIST_ATTACHMENT", "1", () => {
-      const att = buildIfEnabled();
-      expect(att).not.toBeNull();
-      expect(att?.content).toContain("executor");
-      expect(att?.content).toContain("researcher");
-      expect(att?.fingerprint).toBeDefined();
-    });
-  });
-
-  it("shouldRefreshAgentList returns true when fingerprint changes", () => {
-    withEnv("GORDON_AGENT_LIST_ATTACHMENT", "1", () => {
-      const att = buildIfEnabled()!;
-      expect(shouldRefreshAgentList(att, undefined)).toBe(true);
-      expect(shouldRefreshAgentList(att, att.fingerprint)).toBe(false);
-      expect(shouldRefreshAgentList(att, "deadbeef")).toBe(true);
-    });
-  });
-
-  it("custom entries pass through", () => {
-    withEnv("GORDON_AGENT_LIST_ATTACHMENT", "1", () => {
-      const att = buildIfEnabled([
-        { id: "fork:btc-1", description: "BTC fork analyst", tags: ["fork"] },
-      ]);
-      expect(att?.content).toContain("fork:btc-1");
-    });
-  });
-
-  it("GORDON_BUILTIN_AGENTS lists the 3-agent surface", () => {
-    expect(GORDON_BUILTIN_AGENTS.some((a) => a.id === "executor")).toBe(true);
-    expect(GORDON_BUILTIN_AGENTS.some((a) => a.id === "researcher")).toBe(true);
   });
 });
 

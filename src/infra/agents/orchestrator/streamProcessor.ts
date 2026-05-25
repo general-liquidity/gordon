@@ -20,6 +20,7 @@ import { compileSubagentProfiles, isToolAllowedForAgent } from "../harness/subag
 import { defaultHandoffCoordinator } from "./HandoffCoordinator.ts";
 import { getDynamicToolAgentMap } from "../../runtime/routing/manager.ts";
 import { checkToolSecurity } from "./guardrailEvaluator.ts";
+import { tryRecover } from "../wiring/runtimeRecoveryWiring.ts";
 import {
   getAgentForTool,
   buildDefaultExecutorHandoffBudget,
@@ -119,6 +120,43 @@ export async function validateToolCall(
   const loopState = recordToolCallFingerprint(context, toolName, toolArgs ?? {});
   if (loopState.blocked) {
     resetLoopSignals(context);
+    // Recovery-tier escalation (Notify → Redirect → ForceStop) when
+    // GORDON_RECOVERY_TIERS is on. When off, tryRecover returns null
+    // and we fall through to the legacy block behavior unchanged.
+    const recoveryDecision = tryRecover({
+      fingerprint: loopState.fingerprint ?? `${toolName}:${JSON.stringify(toolArgs ?? {})}`,
+      toolName,
+    });
+    if (recoveryDecision?.action === "notify") {
+      // Notify only — return an informational event but don't block.
+      return {
+        allowed: true,
+        event: {
+          type: "text_delta",
+          content: `[recovery:notify] ${recoveryDecision.reminder ?? `Possible loop on ${toolName}.`}`,
+          agentName: currentAgent,
+        },
+      };
+    }
+    if (recoveryDecision?.action === "redirect") {
+      return {
+        allowed: false,
+        shouldReturn: true,
+        event: {
+          type: "error",
+          error: formatRecoveryGuidance({
+            category: "policy_block",
+            title: "Tool loop — redirect tier",
+            detail: recoveryDecision.reminder ?? `${toolName} repeated; redirecting.`,
+            nextSteps: [
+              "Try a different approach to the same question — same tool with same args won't help.",
+              "Consider asking the user for clarification rather than re-querying.",
+            ],
+          }),
+        },
+      };
+    }
+    // ForceStop (default tier-3 OR legacy block when wiring disabled).
     return {
       allowed: false,
       shouldReturn: true,

@@ -94,6 +94,18 @@ The harness is **trajectory-agnostic** — caller supplies pre-recorded trajecto
 
 **Review queue.** When `detectRegressions(..., { writeReviewQueue: true })` is set, regressions append as JSONL to `~/.gordon/eval-failures.jsonl` (override via `GORDON_EVAL_REVIEW_QUEUE_PATH`). Local fail-bucket: grep / promote into the gold scenario set. The "a score with no ticket is a dashboard" principle, scaled down for single-operator use.
 
+## Tool tier convention (MANDATORY for new tools)
+
+Every new `instrumentedXTools` registration added to `gordon.ts`, `executor.ts`, or `researcher.ts` MUST declare its tier. Three options:
+
+- **Hot** (default — always loaded): plain `...instrumentedXTools` spread. Use ONLY for tools needed in routine scan / DD / risk-check / portfolio-monitor flows. Hot tier pays schema-token cost on every turn.
+- **Cold** (loaded when `isHotTierOnly()` returns false): wrap with `...(isHotTierOnly() ? {} : instrumentedXTools)`. Use for niche / specialist tools (backtesting, deep research, alt-data, regulatory-jurisdiction-specific writes). Excluded when operator sets `GORDON_TOOL_TIER=hot`.
+- **Skill** (loaded on demand via `list_skills` / `load_skill`): do NOT register in agent tools. Move workflow guidance to a SKILL.md under `src/infra/skills/builtin/`.
+
+**The rule of thumb:** if a tool is invoked < 10% of the time in normal operation, it does not belong in hot tier. The audit at `scripts/dev/check_tool_tiers.ts` (run via `bun run scripts/dev/check_tool_tiers.ts`) flags new spreads in the three agent files that aren't tier-gated. PRs that add hot-tier tools without justification should be rejected.
+
+Why this matters: Gordon's schema is already at 405 tools / ~45K tokens. Past published guidance for tool-selection accuracy (~30-50 tools per Anthropic/OpenAI), but mitigated by Anthropic prompt caching + the tier system. The convention exists to prevent further accretion without thought.
+
 ## Wiring feature flags (off by default)
 
 Recent primitives ship wired but cold. Each flag activates one layer; the wrapper falls back to passthrough when unset. Combine freely.

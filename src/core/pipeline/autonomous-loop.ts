@@ -25,6 +25,7 @@ import {
   contractToPayload,
   type SprintContract,
 } from "../../infra/safety/sprintContract.ts";
+import { tickAndCollectReminders } from "../../infra/agents/wiring/reminderWiring.ts";
 import {
   isGoalModeEnabled,
   loadActiveGoal,
@@ -216,6 +217,20 @@ async function runCycle(): Promise<CycleReport | null> {
 
   loopState.cycleCount++;
   const cycleNum = loopState.cycleCount;
+
+  // Turn-cadence reminders for the autonomous loop. Returns [] when
+  // GORDON_REMINDERS is off so the rest of the cycle is unchanged.
+  // Reminders surface daily-loss limit, mandate-scope drift, and open
+  // position count when their cadences fire.
+  const dueReminders = tickAndCollectReminders();
+  if (dueReminders.length > 0) {
+    logger.info("Autonomous-cycle reminders due", {
+      count: dueReminders.length,
+      cycleNum,
+      mandateId: mandate.id,
+      reminders: dueReminders,
+    });
+  }
 
   logger.info(`Running autonomous cycle #${cycleNum}`, {
     mandateId: mandate.id,

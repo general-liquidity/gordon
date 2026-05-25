@@ -49,6 +49,7 @@ import {
   resetReminderState,
 } from "./harness/runtimeHarness.ts";
 import { determineWorkflowPhase } from "./cognition/workflowPhase.ts";
+import { providerOptionsForPhase } from "./wiring/extendedThinkingWiring.ts";
 import {
   runThinkingPhase,
   getThinkingDepthFromContext,
@@ -474,12 +475,18 @@ export async function* processMessageStream(
 
     // Per Mastra docs: `const stream = await agent.stream(messages, options)`
     // Returns MastraModelOutput with textStream, fullStream, text (Promise<string>)
+    // Extended-thinking providerOptions are spliced in when GORDON_EXTENDED_THINKING
+    // is set; returns {} otherwise so the call shape is identical when off.
+    const extendedThinkingOpts = providerOptionsForPhase(workflowPhase, {
+      maxTokens: MAX_OUTPUT_TOKENS_STREAM,
+    });
     const streamObj = await awaitWithAbort(
       gordonAgent().stream(groundedMessages, ({
         requestContext,
         ...(threadId && effectiveResourceId ? { memory: { thread: threadId, resource: effectiveResourceId } } : {}),
         maxSteps: 20,
         modelSettings: { maxOutputTokens: MAX_OUTPUT_TOKENS_STREAM },
+        ...(Object.keys(extendedThinkingOpts).length > 0 ? { providerOptions: extendedThinkingOpts } : {}),
         ...groundedPrompt.requestOptions,
         ...(tracingOptions && { tracingOptions }),
         // Delegation hooks for supervisor → sub-agent routing
