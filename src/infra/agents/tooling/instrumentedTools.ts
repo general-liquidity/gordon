@@ -76,6 +76,7 @@ import {
   adherenceTools,
   quoteVerifyTools,
   diagnosticTools,
+  microstructureTools,
   producerHealthTools,
   defillamaYieldTools,
   newsTools,
@@ -183,6 +184,7 @@ export const instrumentedSkillLoaderTools = withToolsMetrics(skillLoaderTools);
 export const instrumentedAdherenceTools = withToolsMetrics(adherenceTools);
 export const instrumentedQuoteVerifyTools = withToolsMetrics(quoteVerifyTools);
 export const instrumentedDiagnosticTools = withToolsMetrics(diagnosticTools);
+export const instrumentedMicrostructureTools = withToolsMetrics(microstructureTools);
 export const instrumentedProducerHealthTools = withToolsMetrics(producerHealthTools);
 export const instrumentedDefillamaYieldTools = withToolsMetrics(defillamaYieldTools);
 export const instrumentedNewsTools = withToolsMetrics(newsTools);

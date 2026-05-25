@@ -44,6 +44,7 @@ import {
   instrumentedSkillLoaderTools,
   instrumentedQuoteVerifyTools,
   instrumentedDiagnosticTools,
+  instrumentedMicrostructureTools,
   instrumentedProducerHealthTools,
   instrumentedSharedContextTools,
   instrumentedMemoryTools,
@@ -130,6 +131,10 @@ export function getResearcher(): Agent {
       // analyze P&L distributions, vol calibration, and correlation
       // breakdowns when delegated research tasks request them.
       ...instrumentedDiagnosticTools,
+      // Microstructure primitives — Researcher uses these when book-
+      // analysis tasks come in (microprice for fair-value estimation,
+      // inventory-adjusted price for sizing-bias analysis).
+      ...instrumentedMicrostructureTools,
       ...instrumentedProducerHealthTools,
       ...instrumentedSharedContextTools,
       ...instrumentedMemoryTools,

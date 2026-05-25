@@ -74,6 +74,7 @@ import {
   instrumentedAdherenceTools,
   instrumentedQuoteVerifyTools,
   instrumentedDiagnosticTools,
+  instrumentedMicrostructureTools,
   instrumentedProducerHealthTools,
   instrumentedDefillamaYieldTools,
   instrumentedNewsTools,
@@ -540,6 +541,10 @@ export function getGordon(): Agent {
       // volatility-forecast calibration (IV-vs-RV analog), correlation
       // breakdown detector (dispersion-signal analog).
       ...instrumentedDiagnosticTools,
+      // Market-microstructure primitives — Stoikov microprice (fair-
+      // value estimator that conditions on book imbalance + spread)
+      // and Avellaneda-Stoikov inventory-adjusted reference price.
+      ...instrumentedMicrostructureTools,
       ...instrumentedProducerHealthTools,
 
       // Crypto news headlines + sentiment — hot tier (cheap, no API key,
