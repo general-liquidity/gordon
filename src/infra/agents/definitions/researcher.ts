@@ -42,6 +42,7 @@ import {
   instrumentedSmcPatternTools,
   instrumentedCalibrationTools,
   instrumentedSkillLoaderTools,
+  instrumentedQuoteVerifyTools,
   instrumentedProducerHealthTools,
   instrumentedSharedContextTools,
   instrumentedMemoryTools,
@@ -120,6 +121,10 @@ export function getResearcher(): Agent {
       ...instrumentedSmcPatternTools,
       ...instrumentedCalibrationTools,
       ...instrumentedSkillLoaderTools,
+      // Anti-hallucination quote verification (reverse-quant port). The
+      // Researcher extracts quoted snippets from external text; this
+      // tool lets it self-check before stating quotes as fact.
+      ...instrumentedQuoteVerifyTools,
       ...instrumentedProducerHealthTools,
       ...instrumentedSharedContextTools,
       ...instrumentedMemoryTools,

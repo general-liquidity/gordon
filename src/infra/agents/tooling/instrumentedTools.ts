@@ -74,6 +74,7 @@ import {
   calibrationTools,
   skillLoaderTools,
   adherenceTools,
+  quoteVerifyTools,
   producerHealthTools,
   defillamaYieldTools,
   newsTools,
@@ -179,6 +180,7 @@ export const instrumentedSmcPatternTools = withToolsMetrics(smcPatternTools);
 export const instrumentedCalibrationTools = withToolsMetrics(calibrationTools);
 export const instrumentedSkillLoaderTools = withToolsMetrics(skillLoaderTools);
 export const instrumentedAdherenceTools = withToolsMetrics(adherenceTools);
+export const instrumentedQuoteVerifyTools = withToolsMetrics(quoteVerifyTools);
 export const instrumentedProducerHealthTools = withToolsMetrics(producerHealthTools);
 export const instrumentedDefillamaYieldTools = withToolsMetrics(defillamaYieldTools);
 export const instrumentedNewsTools = withToolsMetrics(newsTools);

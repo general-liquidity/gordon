@@ -72,6 +72,7 @@ import {
   instrumentedCalibrationTools,
   instrumentedSkillLoaderTools,
   instrumentedAdherenceTools,
+  instrumentedQuoteVerifyTools,
   instrumentedProducerHealthTools,
   instrumentedDefillamaYieldTools,
   instrumentedNewsTools,
@@ -529,6 +530,10 @@ export function getGordon(): Agent {
       // Gordon (orchestrator) gets both: record for cases where Gordon
       // itself runs the approval flow, query for /weekend-review.
       ...instrumentedAdherenceTools,
+      // Anti-hallucination quote verification — ported from reverse-quant
+      // provenance.verify_quote. Gordon calls this before persisting any
+      // "the article says X" claim extracted from news / SEC / transcripts.
+      ...instrumentedQuoteVerifyTools,
       ...instrumentedProducerHealthTools,
 
       // Crypto news headlines + sentiment — hot tier (cheap, no API key,

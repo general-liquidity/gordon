@@ -44,6 +44,7 @@
  */
 
 import { createModuleLogger } from "../../../logger/index.ts";
+import { redactValues } from "../../../platform/observability/valueRedaction.ts";
 
 const logger = createModuleLogger("tool-result-sanitizer");
 
@@ -134,6 +135,20 @@ export function sanitizeToolContent(content: string): SanitizeResult {
       detected.push({ pattern: description, count: matches.length });
       sanitized = sanitized.replace(pattern, REDACTION_MARKER);
     }
+  }
+
+  // Value-level secret redaction (ported from reverse-quant). Tool
+  // results may contain credential-shaped strings — broker error
+  // messages, news scrape content, third-party API responses. These
+  // would otherwise land in the next turn's context unredacted. Runs
+  // AFTER injection-pattern redaction so the marker text we just
+  // inserted isn't itself scanned for secret shapes.
+  const valueRedaction = redactValues(sanitized);
+  if (valueRedaction.matched.length > 0) {
+    for (const name of valueRedaction.matched) {
+      detected.push({ pattern: `secret:${name}`, count: 1 });
+    }
+    sanitized = valueRedaction.text;
   }
 
   return {
