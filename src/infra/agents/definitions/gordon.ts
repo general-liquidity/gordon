@@ -73,6 +73,7 @@ import {
   instrumentedSkillLoaderTools,
   instrumentedAdherenceTools,
   instrumentedQuoteVerifyTools,
+  instrumentedDiagnosticTools,
   instrumentedProducerHealthTools,
   instrumentedDefillamaYieldTools,
   instrumentedNewsTools,
@@ -534,6 +535,11 @@ export function getGordon(): Agent {
       // provenance.verify_quote. Gordon calls this before persisting any
       // "the article says X" claim extracted from news / SEC / transcripts.
       ...instrumentedQuoteVerifyTools,
+      // Diagnostic primitives translated from options-trading concepts to
+      // spot/perp domain: P&L distribution shape (convexity verdict),
+      // volatility-forecast calibration (IV-vs-RV analog), correlation
+      // breakdown detector (dispersion-signal analog).
+      ...instrumentedDiagnosticTools,
       ...instrumentedProducerHealthTools,
 
       // Crypto news headlines + sentiment — hot tier (cheap, no API key,

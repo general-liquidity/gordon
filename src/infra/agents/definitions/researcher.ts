@@ -43,6 +43,7 @@ import {
   instrumentedCalibrationTools,
   instrumentedSkillLoaderTools,
   instrumentedQuoteVerifyTools,
+  instrumentedDiagnosticTools,
   instrumentedProducerHealthTools,
   instrumentedSharedContextTools,
   instrumentedMemoryTools,
@@ -125,6 +126,10 @@ export function getResearcher(): Agent {
       // Researcher extracts quoted snippets from external text; this
       // tool lets it self-check before stating quotes as fact.
       ...instrumentedQuoteVerifyTools,
+      // Diagnostic primitives — Researcher exposes these so it can
+      // analyze P&L distributions, vol calibration, and correlation
+      // breakdowns when delegated research tasks request them.
+      ...instrumentedDiagnosticTools,
       ...instrumentedProducerHealthTools,
       ...instrumentedSharedContextTools,
       ...instrumentedMemoryTools,

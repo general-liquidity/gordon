@@ -103,6 +103,7 @@ export { calibrationTools } from "./runtime/meta/calibration-tools.ts";
 export { skillLoaderTools } from "./runtime/lifecycle/skill-loader.ts";
 export { adherenceTools } from "./runtime/adherence.ts";
 export { quoteVerifyTools } from "./runtime/quoteVerify.ts";
+export { diagnosticTools } from "./runtime/diagnostics.ts";
 export { producerHealthTools } from "./runtime/lifecycle/producer-health-tool.ts";
 export { defillamaYieldTools } from "./onchain/dex/defillama-yields.ts";
 export { newsTools } from "./news/news.ts";
