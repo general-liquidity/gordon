@@ -24,6 +24,11 @@ import {
 } from "../trading/trading.ts";
 import { checkRiskTool as legacyCheckRisk } from "../trading/risk-gate.ts";
 import { runBacktestTool as legacyRunBacktest } from "../strategy/backtest/backtest.ts";
+import {
+  recordBacktestRun,
+  getBacktestRun,
+  detectDrift,
+} from "../../../data/backtestSnapshots.ts";
 import { auditLog } from "../../../platform/audit/index.ts";
 import { getMemoryManager } from "../../../../core/memory/index.ts";
 import { hasRecentSymbolObservation } from "../../observation/symbolObservationTracker.ts";
@@ -663,6 +668,21 @@ export const backtestTool = createTool({
     "This is the ATOMIC backtest primitive — for comparison across strategies,",
     "parameter optimization, regime-conditional analysis, use the",
     "`backtest-validate` skill which composes multiple backtest calls.",
+    "",
+    "Reproducibility (ArcticDB-inspired snapshots):",
+    "",
+    "Every run is recorded as a snapshot with the inputs (strategy,",
+    "symbol, timeframe, window, params) + result + an inputs hash. The",
+    "returned `runId` is the durable handle.",
+    "",
+    "  - `replayRunId`: re-run with the SAME inputs as a prior snapshot",
+    "    and compare against the stored result. Drift in Sharpe / win",
+    "    rate / trade count surfaces either a venue restatement (data",
+    "    changed under us) or a strategy-code regression. Output adds a",
+    "    `drift` block when this is set.",
+    "  - `comparedToRunId`: take the prior run's inputs AS-IS but apply",
+    "    CURRENT params on top. Use to isolate parameter-tuning effects",
+    "    from data effects.",
   ].join("\n"),
   inputSchema: z.object({
     strategyId: z.string().describe("Strategy slot ID or playbook name (e.g. 'support_bounce')."),
@@ -673,12 +693,33 @@ export const backtestTool = createTool({
     days: z.number().int().positive().optional().describe("Lookback days when start/end omitted. Default 90."),
     initialCapitalUsd: z.number().positive().optional().describe("Default 10000."),
     market: z.enum(["auto", "crypto", "stocks"]).optional().describe("Default 'auto'."),
+    replayRunId: z
+      .string()
+      .optional()
+      .describe(
+        "Re-run an earlier snapshot. All other input fields are overridden by the stored snapshot's inputs; only the result is recomputed. Drift detection runs automatically.",
+      ),
+    comparedToRunId: z
+      .string()
+      .optional()
+      .describe(
+        "Inherit window + strategyId + symbol from this snapshot, but use the CURRENT params from this call. Use to A/B parameter changes against a frozen data window.",
+      ),
   }),
   outputSchema: z.object({
+    runId: z.string(),
+    inputsHash: z.string(),
     metrics: z.unknown(),
     equityCurve: z.array(z.number()).optional(),
     trades: z.array(z.unknown()).optional(),
     summary: z.string(),
+    drift: z
+      .object({
+        hasDrift: z.boolean(),
+        deltas: z.record(z.string(), z.union([z.number(), z.null()])),
+        interpretation: z.string(),
+      })
+      .optional(),
   }),
   execute: async (
     args: {
@@ -690,27 +731,74 @@ export const backtestTool = createTool({
       days?: number;
       initialCapitalUsd?: number;
       market?: "auto" | "crypto" | "stocks";
+      replayRunId?: string;
+      comparedToRunId?: string;
     },
     execContext?: MastraExecutionContext,
   ) => {
+    // If a prior runId is referenced, pull its frozen inputs. replayRunId
+    // overrides the whole input bundle; comparedToRunId only inherits
+    // window + strategy + symbol (params come from THIS call).
+    let strategyId = args.strategyId;
+    let symbol = args.symbol;
+    let timeframe = args.timeframe ?? "4h";
+    let startDate = args.startDate;
+    let endDate = args.endDate;
+    let days = args.days;
+    let storedSnapshotResult: unknown | null = null;
+
+    if (args.replayRunId) {
+      const prior = getBacktestRun(args.replayRunId);
+      if (!prior) {
+        return {
+          runId: args.replayRunId,
+          inputsHash: "",
+          metrics: { error: `replayRunId not found: ${args.replayRunId}` },
+          summary: `replayRunId not found: ${args.replayRunId}`,
+        };
+      }
+      strategyId = prior.strategyId;
+      symbol = prior.symbol;
+      timeframe = prior.timeframe;
+      startDate = new Date(prior.fromTs).toISOString();
+      endDate = new Date(prior.toTs).toISOString();
+      days = undefined;
+      storedSnapshotResult = prior.result;
+    } else if (args.comparedToRunId) {
+      const prior = getBacktestRun(args.comparedToRunId);
+      if (!prior) {
+        return {
+          runId: args.comparedToRunId,
+          inputsHash: "",
+          metrics: { error: `comparedToRunId not found: ${args.comparedToRunId}` },
+          summary: `comparedToRunId not found: ${args.comparedToRunId}`,
+        };
+      }
+      symbol = prior.symbol;
+      timeframe = prior.timeframe;
+      startDate = new Date(prior.fromTs).toISOString();
+      endDate = new Date(prior.toTs).toISOString();
+      days = undefined;
+      storedSnapshotResult = prior.result;
+    }
+
     // Calendar dates take precedence over day count when both could resolve.
-    // The legacy runBacktestTool now accepts startTime/endTime epoch-ms; pass
-    // them through to preserve calendar fidelity (walk-forward windows that
-    // depend on exact dates need this).
-    const hasCalendarRange = Boolean(args.startDate && args.endDate);
+    const hasCalendarRange = Boolean(startDate && endDate);
+    const initialCapital = args.initialCapitalUsd ?? 10000;
+    const commission = 0.001;
     const result = (await (legacyRunBacktest.execute as any)(
       {
-        symbol: args.symbol,
-        strategyId: args.strategyId,
+        symbol,
+        strategyId,
         market: args.market ?? "auto",
-        timeframe: args.timeframe ?? "4h",
-        days: hasCalendarRange ? undefined : args.days ?? 90,
+        timeframe,
+        days: hasCalendarRange ? undefined : days ?? 90,
         ...(hasCalendarRange && {
-          startTime: new Date(args.startDate as string).getTime(),
-          endTime: new Date(args.endDate as string).getTime(),
+          startTime: new Date(startDate as string).getTime(),
+          endTime: new Date(endDate as string).getTime(),
         }),
-        initialCapital: args.initialCapitalUsd ?? 10000,
-        commission: 0.001,
+        initialCapital,
+        commission,
       },
       execContext,
     )) as {
@@ -720,10 +808,62 @@ export const backtestTool = createTool({
       error?: string;
     };
 
-    return {
+    // Resolve the actual ms-epoch window used for the snapshot.
+    const fromTs = hasCalendarRange
+      ? new Date(startDate as string).getTime()
+      : Date.now() - (days ?? 90) * 24 * 60 * 60 * 1000;
+    const toTs = hasCalendarRange ? new Date(endDate as string).getTime() : Date.now();
+
+    // Record the snapshot before returning. Even error results are
+    // recorded — surfaces "this strategy errors on this data" as part
+    // of audit trail. Failures here don't surface to caller.
+    let runId = "";
+    let inputsHash = "";
+    try {
+      const snap = recordBacktestRun({
+        strategyId,
+        symbol,
+        timeframe,
+        fromTs,
+        toTs,
+        params: { initialCapital, commission, market: args.market ?? "auto" },
+        result: result.result ?? { error: result.error },
+      });
+      runId = snap.runId;
+      inputsHash = snap.inputsHash;
+    } catch {
+      // Snapshot write failure is non-fatal — return the result.
+    }
+
+    const out: {
+      runId: string;
+      inputsHash: string;
+      metrics: unknown;
+      summary: string;
+      drift?: {
+        hasDrift: boolean;
+        deltas: Record<string, number | null>;
+        interpretation: string;
+      };
+    } = {
+      runId,
+      inputsHash,
       metrics: result.result ?? {},
       summary: result.summary ?? result.formattedSummary ?? result.error ?? "Backtest complete.",
     };
+
+    if (storedSnapshotResult !== null) {
+      const drift = detectDrift(storedSnapshotResult, result.result ?? {});
+      out.drift = {
+        hasDrift: drift.hasDrift,
+        deltas: Object.fromEntries(
+          Object.entries(drift.deltas).map(([k, v]) => [k, v ?? null]),
+        ),
+        interpretation: drift.interpretation,
+      };
+    }
+
+    return out;
   },
 });
 
