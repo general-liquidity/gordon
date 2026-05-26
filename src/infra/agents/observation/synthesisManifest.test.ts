@@ -6,10 +6,12 @@ import {
 } from "./symbolObservationTracker.ts";
 import { _resetCacheForTests } from "../../news/cryptoHeadlines.ts";
 import { unlinkSync, existsSync, writeFileSync, mkdirSync } from "node:fs";
-import { dirname } from "node:path";
+import { dirname, join } from "node:path";
+import { tmpdir } from "node:os";
 
-// Use a scratch lessons file so tests don't touch the real ~/.gordon path.
-const scratchLessonsPath = `${process.cwd()}/.tmp-synthesis-lessons-${process.pid}.json`;
+// Use a scratch lessons file in the OS tmpdir so tests don't touch
+// the real ~/.gordon path AND don't clutter the project working dir.
+const scratchLessonsPath = join(tmpdir(), `gordon-synthesis-lessons-${process.pid}.json`);
 const previousLessonsPath = process.env.GORDON_ACE_LESSONS_PATH;
 
 function writeLessons(lessons: Array<{ id: string; text: string; curatedAt?: string }>): void {

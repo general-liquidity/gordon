@@ -12,9 +12,13 @@ import {
   closeDatabase,
 } from "../storage/database.ts";
 import { unlinkSync, existsSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
-// Fresh DB per test — Windows holds WAL/SHM file handles briefly after
-// close, so reusing one path across tests races the OS unlink.
+// Fresh DB per test in the OS tmpdir — Windows holds WAL/SHM file
+// handles briefly after close, so reusing one path across tests races
+// the OS unlink. Using tmpdir() also keeps the project working
+// directory clean.
 let testCounter = 0;
 let currentDbPath = "";
 const cleanupPaths = new Set<string>();
@@ -37,7 +41,7 @@ function bar(openTime: number, base = 100, vol = 1_000): CachedCandle {
 
 beforeEach(() => {
   testCounter++;
-  currentDbPath = `${process.cwd()}/.tmp-ohlcv-${process.pid}-${testCounter}.db`;
+  currentDbPath = join(tmpdir(), `gordon-ohlcv-${process.pid}-${testCounter}.db`);
   cleanupPaths.add(currentDbPath);
   setDatabasePathForTesting(currentDbPath);
   _resetCacheForTests();
