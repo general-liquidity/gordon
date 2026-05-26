@@ -249,3 +249,16 @@ export function _resetCacheForTests(): void {
 export function _peekCacheForTests(src: NewsSource): NewsHeadline[] | undefined {
   return cache.get(src)?.headlines;
 }
+
+/** Read whatever headlines are currently cached across all sources without
+ *  triggering any network fetch. Returns an empty array when the cache is
+ *  cold. Callers that need fresh headlines should still use fetchHeadlines —
+ *  this is the read-only escape hatch for synthesis snapshots that must NOT
+ *  do I/O on hot paths (plan creation, manifest builders). */
+export function peekCachedHeadlines(): NewsHeadline[] {
+  const all: NewsHeadline[] = [];
+  for (const entry of cache.values()) {
+    all.push(...entry.headlines);
+  }
+  return all;
+}

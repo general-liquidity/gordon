@@ -103,6 +103,41 @@ export const PlanSchema = z.object({
    */
   routingPolicy: z.enum(["maker_first", "any"]).optional(),
 
+  /**
+   * Snapshot of the synthesis inputs present at plan creation. Captures
+   * the active regime, recent in-cache news, observation count on the
+   * symbol, and ACE lesson IDs that mentioned the symbol. Process-local
+   * by design — the value answers "what did THIS session see when it
+   * decided to enter?" so a journal-review can replay the void around
+   * the decision. Optional + best-effort: any subsystem can be null on
+   * cold start. Not a backtest input; a provenance artifact.
+   */
+  synthesisManifest: z
+    .object({
+      capturedAt: z.number(),
+      symbol: z.string(),
+      regime: z
+        .object({
+          label: z.string(),
+          confidence: z.number(),
+          timeframe: z.string(),
+        })
+        .nullable(),
+      news: z
+        .object({
+          headlinesCount: z.number(),
+          netSentiment: z.number(),
+          windowHoursApprox: z.number(),
+          topBullish: z.string().optional(),
+          topBearish: z.string().optional(),
+        })
+        .nullable(),
+      observationCount: z.number(),
+      observationWindowMs: z.number(),
+      matchedLessonIds: z.array(z.string()),
+    })
+    .optional(),
+
   status: z.enum(["DRAFT", "APPROVED", "EXECUTING", "CLOSED", "CANCELLED"]),
 });
 

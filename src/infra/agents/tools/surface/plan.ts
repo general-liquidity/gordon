@@ -27,6 +27,7 @@ import { runBacktestTool as legacyRunBacktest } from "../strategy/backtest/backt
 import { auditLog } from "../../../platform/audit/index.ts";
 import { getMemoryManager } from "../../../../core/memory/index.ts";
 import { hasRecentSymbolObservation } from "../../observation/symbolObservationTracker.ts";
+import { buildSynthesisManifest, summarizeManifest } from "../../observation/synthesisManifest.ts";
 
 /** Same shape as analytics.ts withPortfolioOverride — wrap the
  *  RequestContext so reads of portfolioValue / availableCash return the
@@ -156,6 +157,12 @@ export const createPlanTool = createTool({
       const ctx = getGordonContext(execContext);
       const portfolioValue = Math.max(ctx?.portfolioValue ?? args.sizeUsd, args.sizeUsd);
       const allocationPercent = args.sizeUsd / portfolioValue;
+      // Snapshot the synthesis inputs present right NOW for this symbol —
+      // active regime, in-cache news, observation count, matched ACE
+      // lessons. Cheap, no I/O. Captures the "edge in the void" inputs
+      // that converged on this decision; later journal review replays
+      // them.
+      const synthesisManifest = buildSynthesisManifest(args.symbol);
       // Map surface explicit spec to the Plan shape stored in SQLite.
       // Direction collapses sell→short with inverted stop semantics handled
       // downstream; strategy defaults to support_bounce since these plans are
@@ -186,6 +193,7 @@ export const createPlanTool = createTool({
         // wants taker behavior without further gating.
         routingPolicy: args.routingPolicy ?? "maker_first",
         ...(args.mentalState && { mentalState: args.mentalState }),
+        synthesisManifest,
         status: "DRAFT",
         expiresAt: args.timeHorizonHours
           ? new Date(Date.now() + args.timeHorizonHours * 60 * 60 * 1000).toISOString()
@@ -200,30 +208,40 @@ export const createPlanTool = createTool({
         { resultDetails: args.rationale, planId: plan.id },
       );
 
-      // Mirror mental-state into the trade journal so /journal surfaces it
-      // inline alongside other observations. Fire-and-forget — a journal
-      // failure must not break plan creation.
+      // Mirror mental-state + synthesis manifest into the trade journal so
+      // /journal surfaces both inline alongside other observations. Fire-
+      // and-forget — a journal failure must not break plan creation. The
+      // manifest line is the "void replay": which inputs converged on this
+      // decision (regime, news, observation count, lessons matched).
+      const observationLines: string[] = [];
       if (args.mentalState) {
         const m = args.mentalState;
-        const parts = [
+        const mentalParts = [
           m.mood ? `mood: ${m.mood}` : null,
           typeof m.confidence === "number" ? `confidence: ${m.confidence}/10` : null,
           typeof m.focus === "number" ? `focus: ${m.focus}/10` : null,
           m.note ? `note: ${m.note}` : null,
         ].filter(Boolean);
-        if (parts.length > 0) {
-          getMemoryManager()
-            .then((mgr) =>
-              mgr.journal.recordObservation({
-                symbol: args.symbol.toUpperCase(),
-                observation: `Mental state at plan ${plan.id}: ${parts.join("; ")}`,
-                conditions: `${args.side} setup, ${args.entryPrice ? "limit" : "market"} entry, $${args.sizeUsd} size`,
-              }),
-            )
-            .catch(() => {
-              // Journal mirroring is best-effort; never propagate.
-            });
+        if (mentalParts.length > 0) {
+          observationLines.push(`Mental state at plan ${plan.id}: ${mentalParts.join("; ")}`);
         }
+      }
+      const manifestSummary = summarizeManifest(synthesisManifest);
+      if (manifestSummary) {
+        observationLines.push(`Synthesis at plan ${plan.id}: ${manifestSummary}`);
+      }
+      if (observationLines.length > 0) {
+        getMemoryManager()
+          .then((mgr) =>
+            mgr.journal.recordObservation({
+              symbol: args.symbol.toUpperCase(),
+              observation: observationLines.join("\n"),
+              conditions: `${args.side} setup, ${args.entryPrice ? "limit" : "market"} entry, $${args.sizeUsd} size`,
+            }),
+          )
+          .catch(() => {
+            // Journal mirroring is best-effort; never propagate.
+          });
       }
 
       return { success: true, planId: plan.id, plan };
