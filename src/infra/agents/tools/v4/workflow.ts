@@ -2,17 +2,23 @@
  * V4 Workflow + Delegation Tools — 4 tools.
  *
  *   - skill              → meta-tool, workflow knowledge loader
- *   - delegate_subagent  → FW7 subagent dispatch
+ *   - delegate_subagent  → FW7 subagent dispatch (read-only)
  *   - ask_user           → operator elicitation
- *   - schedule_task      → autonomous-loop / proactive radar / cron
+ *   - schedule_task      → autonomous-loop / proactive radar / cron mandates
  *
- * `skill` is the ONE meta-tool in V4 (besides compute_*) — workflow
- * recipes loaded on demand. Matches Vibe-Trading + Anthropic's
- * progressive disclosure pattern.
+ * Wires `skill` and `ask_user` through existing handlers. `delegate_subagent`
+ * and `schedule_task` defer to runtime-resolved dispatchers — those exist
+ * but are constructed conditionally per agent, so we leave shape-faithful
+ * stubs here pending dedicated wiring.
  */
 
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
+import {
+  listSkillsTool as legacyListSkills,
+  loadSkillTool as legacyLoadSkill,
+} from "../runtime/lifecycle/skill-loader.ts";
+import { askUserTool as legacyAskUser } from "../runtime/flow/askUser.ts";
 import type { MastraExecutionContext } from "../types.ts";
 
 // ============================================================================
@@ -53,14 +59,23 @@ export const skillTool = createTool({
   }),
   execute: async (
     args: { action: "list" | "load"; id?: string; filter?: string },
-    _execContext?: MastraExecutionContext,
+    execContext?: MastraExecutionContext,
   ) => {
-    // Stub — proper implementation calls into existing skill-loader.ts.
-    return {
-      action: args.action,
-      skills: args.action === "list" ? [] : undefined,
-      skill: args.action === "load" ? null : undefined,
-    };
+    if (args.action === "list") {
+      const result = (await (legacyListSkills.execute as any)(
+        { filter: args.filter },
+        execContext,
+      )) as { skills?: unknown[]; error?: string };
+      return { action: "list", skills: result.skills ?? [], error: result.error };
+    }
+    if (!args.id) {
+      return { action: "load", error: "id is required when action='load'." };
+    }
+    const result = (await (legacyLoadSkill.execute as any)(
+      { id: args.id },
+      execContext,
+    )) as { skill?: unknown; error?: string };
+    return { action: "load", skill: result.skill, error: result.error };
   },
 });
 
@@ -99,12 +114,15 @@ export const delegateSubagentTool = createTool({
     args: { role: string; task: string },
     _execContext?: MastraExecutionContext,
   ) => {
-    // Stub — proper implementation routes through the existing FW7
-    // dispatcher (task-dispatch.ts).
+    // The legacy task-dispatch tool is constructed lazily per agent — it
+    // can't be statically imported and called from here without breaking
+    // its tool-registry resolution semantics. V4 surface continues to
+    // surface the legacy `dispatch_task` tool alongside this one until
+    // the dispatcher is refactored to allow standalone invocation.
     return {
       status: "disabled" as const,
       subagentId: "n/a",
-      summary: "V4 delegate_subagent — wire to existing task-dispatch.ts",
+      summary: `delegate_subagent stub — use the registered dispatch_task tool from the agent surface for role='${args.role}'.`,
     };
   },
 });
@@ -139,11 +157,15 @@ export const askUserTool = createTool({
   }),
   execute: async (
     args: { question: string; options?: string[]; context?: string },
-    _execContext?: MastraExecutionContext,
+    execContext?: MastraExecutionContext,
   ) => {
-    // Stub — proper implementation routes through the existing askUserTools.
+    const result = (await (legacyAskUser.execute as any)(
+      { question: args.question, options: args.options, context: args.context },
+      execContext,
+    )) as { answer?: string; dismissed?: boolean };
     return {
-      answer: "[V4 ask_user — wire to existing askUserTools]",
+      answer: result.answer ?? "",
+      cancelled: result.dismissed,
     };
   },
 });
@@ -186,11 +208,14 @@ export const scheduleTaskTool = createTool({
     args: { action: string; mandateId?: string; spec?: unknown },
     _execContext?: MastraExecutionContext,
   ) => {
-    // Stub — proper implementation routes to swing-mandate / autonomous-loop.
+    // Mandate / scheduler primitives are spread across swing-mandate,
+    // autonomous-loop, scheduler tools and proactive-mode tools. Unified
+    // dispatch needs a single facade module — pending. V4 surface continues
+    // to expose the legacy scheduler tools alongside this one.
     return {
-      success: true,
+      success: false,
       action: args.action,
-      mandates: args.action === "list" ? [] : undefined,
+      error: "schedule_task stub — use the legacy scheduler / mandate tools from the agent surface.",
     };
   },
 });

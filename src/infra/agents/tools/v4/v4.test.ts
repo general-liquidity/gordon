@@ -139,52 +139,44 @@ describe("V4 tools — schema sanity", () => {
   });
 });
 
-describe("V4 tools — stub execution does not throw", () => {
-  test("each tool's stub execute runs cleanly without context", async () => {
+describe("V4 tools — input schema accepts canonical examples", () => {
+  test("each tool's inputSchema parses a representative payload", () => {
+    const inputs: Record<string, unknown> = {
+      get_market_data: { dataType: "price", symbol: "BTC/USDT" },
+      get_account_state: {},
+      get_portfolio: {},
+      get_news: {},
+      get_fundamentals: { ticker: "AAPL", metric: "profile" },
+      compute_indicator: { indicator: "rsi", symbol: "BTC/USDT" },
+      compute_regime: { symbol: "BTC/USDT" },
+      compute_risk: { symbol: "BTC/USDT", side: "buy", notionalUsd: 1000 },
+      compute_microstructure: { operation: "microprice", params: {} },
+      create_plan: {
+        symbol: "BTC/USDT",
+        side: "buy",
+        stopLossPrice: 50000,
+        sizeUsd: 1000,
+        rationale: "valid test rationale",
+      },
+      verify_plan: { planId: "plan-x" },
+      approve_plan: { planId: "plan-x", rationale: "valid test rationale" },
+      execute_plan: { planId: "plan-x", rationale: "valid test rationale" },
+      cancel: { target: "order", id: "ord-1", symbol: "BTC/USDT", reason: "valid test reason" },
+      backtest: { strategyId: "support_bounce", symbol: "BTC/USDT" },
+      memory_search: { query: "trend" },
+      memory_write: { kind: "note", content: "hello" },
+      audit_event: { action: "OBSERVATION", summary: "test" },
+      skill: { action: "list" },
+      delegate_subagent: { role: "general-purpose", task: "test task" },
+      ask_user: { question: "test?" },
+      schedule_task: { action: "list" },
+    };
+
     for (const [id, tool] of Object.entries(v4Tools)) {
-      // Build a minimum-valid input for each tool's schema. zod's parse
-      // with .default()-less schemas means we provide concrete values.
-      const inputs: Record<string, unknown> = {
-        get_market_data: { dataType: "price", symbol: "BTC/USDT" },
-        get_account_state: {},
-        get_portfolio: {},
-        get_news: {},
-        get_fundamentals: { ticker: "AAPL", metric: "profile" },
-        compute_indicator: { indicator: "rsi", symbol: "BTC/USDT" },
-        compute_regime: { symbol: "BTC/USDT" },
-        compute_risk: { symbol: "BTC/USDT", side: "buy", notionalUsd: 1000 },
-        compute_microstructure: { operation: "microprice", params: {} },
-        create_plan: {
-          symbol: "BTC/USDT",
-          side: "buy",
-          stopLossPrice: 50000,
-          sizeUsd: 1000,
-          rationale: "valid test rationale",
-        },
-        verify_plan: { planId: "plan-x" },
-        approve_plan: { planId: "plan-x", rationale: "valid test rationale" },
-        execute_plan: { planId: "plan-x" },
-        cancel: { target: "order", id: "ord-1", reason: "valid test reason" },
-        backtest: {
-          symbol: "BTC/USDT",
-          startDate: "2024-01-01",
-          endDate: "2024-06-01",
-        },
-        memory_search: { query: "trend" },
-        memory_write: { kind: "note", content: "hello" },
-        audit_event: { action: "OBSERVATION", summary: "test" },
-        skill: { action: "list" },
-        delegate_subagent: { role: "general-purpose", task: "test task" },
-        ask_user: { question: "test?" },
-        schedule_task: { action: "list" },
-      };
-
       const input = inputs[id];
-      expect(input, `missing test input for ${id}`).toBeDefined();
-
-      // Stubs should not throw — they return placeholder payloads.
-      const result = await (tool.execute as any)(input, undefined);
-      expect(result, `${id} returned no result`).toBeDefined();
+      expect(input).toBeDefined();
+      const parsed = (tool.inputSchema as any).safeParse(input);
+      expect(parsed.success).toBe(true);
     }
   });
 });

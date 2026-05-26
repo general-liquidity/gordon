@@ -1,24 +1,55 @@
 /**
  * V4 Analytics Tools — 4 compute tools.
  *
- *   - compute_indicator        — dispatcher over ~50 indicator operations
+ *   - compute_indicator        — dispatcher over ~30 indicator operations
  *   - compute_regime           — market regime classification
  *   - compute_risk             — 11-dim risk classifier
- *   - compute_microstructure   — dispatcher over microprice / correlation /
- *                                positioning / vol-calibration / etc.
+ *   - compute_microstructure   — dispatcher over microprice / inventory /
+ *                                correlation / vol-calibration / etc.
  *
  * `compute_indicator` and `compute_microstructure` are the only V4 tools
  * that use the dispatcher-over-discriminator pattern. They're justified
- * because each has a closed, well-named operation namespace (operator
- * says "RSI" → indicator="rsi"; the discriminator IS the routing signal).
- *
- * `compute_regime` and `compute_risk` are single-purpose typed tools
- * because each has one canonical operation.
+ * because each has a closed, well-named operation namespace.
  */
 
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
-import type { MastraExecutionContext } from "../types.ts";
+import { getGordonContext, type MastraExecutionContext } from "../types.ts";
+import {
+  calculateRSI,
+  calculateMACD,
+  calculateBollingerBands,
+  calculateATR,
+  calculateEMA,
+  calculateSMA,
+  calculateIchimoku,
+  calculateSupertrend,
+  calculateADX,
+  calculateVWAP,
+  calculateMFI,
+  calculateStochasticRSI,
+  calculateFibonacci,
+  calculateCamarillaPivots,
+  calculateParabolicSAR,
+  calculateKalmanFilter,
+  calculateMarkovRegime,
+  calculateElliottWave,
+  calculateOrderBlocks,
+  calculateFVG,
+  calculateSupplyDemandZones,
+  calculateNadarayaWatson,
+  calculateDivergence,
+  calculateFalseBreakout,
+  calculateSqueezeMomentum,
+  calculateAMS,
+  calculateAO,
+  calculateDeltaLadder,
+  calculateFlowScope,
+  type Candle as IndicatorCandle,
+} from "../../../../core/indicators/index.ts";
+import { RegimeDetector } from "../../../../core/regime/index.ts";
+import { checkRiskTool as legacyCheckRisk } from "../trading/risk-gate.ts";
+import { computeMicropriceTool as legacyMicroprice, computeInventoryAdjustedPriceTool as legacyInventoryAdjusted } from "../runtime/microstructure.ts";
 
 // ============================================================================
 // compute_indicator
@@ -35,7 +66,6 @@ const INDICATOR_NAMES = [
   "supertrend",
   "adx",
   "vwap",
-  "obv",
   "mfi",
   "stochastic",
   "fibonacci",
@@ -47,35 +77,112 @@ const INDICATOR_NAMES = [
   "order_blocks",
   "fvg",
   "supply_demand_zones",
-  "linear_regression",
-  "kaufman_adaptive_ma",
-  "fractal",
-  "wae",
-  "flowscope",
+  "nadaraya_watson",
   "divergence",
   "false_breakout",
   "squeeze_momentum",
   "angled_market_structure",
-  "nadaraya_watson",
-  "delta_ladder",
   "awesome_oscillator",
+  "delta_ladder",
+  "flowscope",
 ] as const;
+
+function dispatchIndicator(
+  indicator: string,
+  candles: IndicatorCandle[],
+  params: Record<string, unknown> = {},
+): unknown {
+  const closes = candles.map((c) => c.close);
+
+  switch (indicator) {
+    case "rsi":
+      return calculateRSI(closes, (params.period as number) ?? 14);
+    case "macd":
+      return calculateMACD(
+        closes,
+        (params.fast as number) ?? 12,
+        (params.slow as number) ?? 26,
+        (params.signal as number) ?? 9,
+      );
+    case "bollinger":
+      return calculateBollingerBands(
+        closes,
+        (params.period as number) ?? 20,
+        (params.stdDev as number) ?? 2,
+      );
+    case "atr":
+      return calculateATR(candles, (params.period as number) ?? 14);
+    case "ema":
+      return calculateEMA(closes, (params.period as number) ?? 20);
+    case "sma":
+      return calculateSMA(closes, (params.period as number) ?? 20);
+    case "ichimoku":
+      return calculateIchimoku(candles);
+    case "supertrend":
+      return calculateSupertrend(candles);
+    case "adx":
+      return calculateADX(candles, (params.period as number) ?? 14);
+    case "vwap":
+      return calculateVWAP(candles);
+    case "mfi":
+      return calculateMFI(candles, (params.period as number) ?? 14);
+    case "stochastic":
+      return calculateStochasticRSI(closes);
+    case "fibonacci":
+      return calculateFibonacci(candles);
+    case "camarilla_pivots":
+      return calculateCamarillaPivots(candles);
+    case "parabolic_sar":
+      return calculateParabolicSAR(candles);
+    case "kalman":
+      return calculateKalmanFilter(candles);
+    case "markov_regime":
+      return calculateMarkovRegime(candles);
+    case "elliott_wave":
+      return calculateElliottWave(candles);
+    case "order_blocks":
+      return calculateOrderBlocks(candles);
+    case "fvg":
+      return calculateFVG(candles);
+    case "supply_demand_zones":
+      return calculateSupplyDemandZones(candles);
+    case "nadaraya_watson":
+      return calculateNadarayaWatson(candles);
+    case "divergence":
+      return calculateDivergence(candles);
+    case "false_breakout":
+      return calculateFalseBreakout(candles);
+    case "squeeze_momentum":
+      return calculateSqueezeMomentum(candles);
+    case "angled_market_structure":
+      return calculateAMS(candles);
+    case "awesome_oscillator":
+      return calculateAO(candles);
+    case "delta_ladder":
+      return calculateDeltaLadder(candles);
+    case "flowscope":
+      return calculateFlowScope(candles);
+    default:
+      return { error: `Unknown indicator: ${indicator}` };
+  }
+}
 
 export const computeIndicatorTool = createTool({
   id: "compute_indicator",
   description: [
-    "Compute a technical indicator for a symbol. One tool covers ~30+",
+    "Compute a technical indicator for a symbol. One tool covers ~30",
     "indicators; pick via the `indicator` field.",
     "",
     "Standard momentum/trend: rsi, macd, bollinger, atr, ema, sma, adx, vwap",
-    "Oscillators: stochastic, obv, mfi, awesome_oscillator",
+    "Oscillators: stochastic, mfi, awesome_oscillator",
     "Levels: fibonacci, camarilla_pivots, supply_demand_zones, order_blocks, fvg",
-    "Trend systems: ichimoku, supertrend, parabolic_sar, kaufman_adaptive_ma",
-    "Stats: kalman, linear_regression, nadaraya_watson, markov_regime",
+    "Trend systems: ichimoku, supertrend, parabolic_sar",
+    "Stats: kalman, nadaraya_watson, markov_regime",
     "SMC patterns: divergence, false_breakout, squeeze_momentum, angled_market_structure",
-    "Advanced: elliott_wave, fractal, wae, flowscope, delta_ladder",
+    "Advanced: elliott_wave, delta_ladder, flowscope",
     "",
-    "If `bars` is omitted, fetch internally. Pass `bars` to skip the fetch.",
+    "Internally fetches candles via the connected exchange. Pass `bars` to",
+    "control the lookback window (default 200).",
     "",
     "Examples:",
     "  compute_indicator({ indicator: 'rsi', symbol: 'BTC/USDT', timeframe: '1h', params: { period: 14 } })",
@@ -118,18 +225,44 @@ export const computeIndicatorTool = createTool({
       params?: Record<string, unknown>;
       bars?: number;
     },
-    _execContext?: MastraExecutionContext,
+    execContext?: MastraExecutionContext,
   ) => {
-    // Stub dispatch — proper implementation imports from src/core/indicators/*
-    // and runs the appropriate library function on fetched candles. Returns
-    // a structured payload with the indicator value(s) + metadata.
-    return {
-      indicator: args.indicator,
-      symbol: args.symbol,
-      timeframe: args.timeframe ?? "1h",
-      result: { note: `V4 ${args.indicator} dispatcher pending — wire to src/core/indicators/${args.indicator}.ts` },
-      computedAt: new Date().toISOString(),
-    };
+    const ctx = getGordonContext(execContext);
+    const exchange = ctx?.exchange;
+    const computedAt = new Date().toISOString();
+    if (!exchange) {
+      return {
+        indicator: args.indicator,
+        symbol: args.symbol,
+        timeframe: args.timeframe ?? "1h",
+        result: { error: "No exchange connected." },
+        computedAt,
+      };
+    }
+    try {
+      const candles = await exchange.getCandles(
+        args.symbol,
+        args.timeframe ?? "1h",
+        args.bars ?? 200,
+      );
+      const result = dispatchIndicator(args.indicator, candles as IndicatorCandle[], args.params ?? {});
+      return {
+        indicator: args.indicator,
+        symbol: args.symbol,
+        timeframe: args.timeframe ?? "1h",
+        result,
+        metadata: { barCount: candles.length },
+        computedAt,
+      };
+    } catch (err) {
+      return {
+        indicator: args.indicator,
+        symbol: args.symbol,
+        timeframe: args.timeframe ?? "1h",
+        result: { error: err instanceof Error ? err.message : String(err) },
+        computedAt,
+      };
+    }
   },
 });
 
@@ -172,14 +305,38 @@ export const computeRegimeTool = createTool({
   }),
   execute: async (
     args: { symbol: string; timeframe?: string; lookbackBars?: number },
-    _execContext?: MastraExecutionContext,
+    execContext?: MastraExecutionContext,
   ) => {
-    return {
-      symbol: args.symbol,
-      regime: "unknown",
-      confidence: 0,
-      metadata: { note: "V4 regime dispatcher pending — wire to regime detector at src/core/regime/" },
-    };
+    const ctx = getGordonContext(execContext);
+    const exchange = ctx?.exchange;
+    if (!exchange) {
+      return { symbol: args.symbol, regime: "unknown", confidence: 0, metadata: { error: "No exchange connected." } };
+    }
+    try {
+      const candles = await exchange.getCandles(
+        args.symbol,
+        args.timeframe ?? "1h",
+        args.lookbackBars ?? 200,
+      );
+      const signal = RegimeDetector.getInstance().detectRegime(
+        candles as unknown as Parameters<typeof RegimeDetector.prototype.detectRegime>[0],
+        args.symbol,
+        args.timeframe ?? "1h",
+      );
+      return {
+        symbol: args.symbol,
+        regime: signal.regime,
+        confidence: signal.confidence,
+        metadata: { metrics: signal.metrics, timestamp: signal.timestamp },
+      };
+    } catch (err) {
+      return {
+        symbol: args.symbol,
+        regime: "unknown",
+        confidence: 0,
+        metadata: { error: err instanceof Error ? err.message : String(err) },
+      };
+    }
   },
 });
 
@@ -227,13 +384,63 @@ export const computeRiskTool = createTool({
       leverage?: number;
       timeHorizonHours?: number;
     },
-    _execContext?: MastraExecutionContext,
+    execContext?: MastraExecutionContext,
   ) => {
+    const ctx = getGordonContext(execContext);
+    const exchange = ctx?.exchange;
+    let price = 1;
+    try {
+      if (exchange) price = await exchange.getPrice(args.symbol);
+    } catch {
+      // fall through with price=1 — risk-gate's sizing logic handles this.
+    }
+    const quantity = args.notionalUsd / Math.max(price, 1e-9);
+
+    const result = (await (legacyCheckRisk.execute as any)(
+      {
+        symbol: args.symbol,
+        side: args.side === "buy" ? "BUY" : "SELL",
+        type: "MARKET",
+        quantity,
+        price,
+      },
+      execContext,
+    )) as {
+      approved?: boolean;
+      reason?: string;
+      warnings?: string[];
+      consensus?: { decision: string; score: number };
+      error?: string;
+    };
+
+    const approved = result.approved === true;
+    const warnings = result.warnings ?? [];
+    const hasCritical = warnings.some((w) => /critical|block|forbidden/i.test(w));
+    const tier: "low" | "medium" | "high" | "critical" = result.error
+      ? "critical"
+      : hasCritical
+        ? "critical"
+        : !approved
+          ? "high"
+          : warnings.length > 0
+            ? "medium"
+            : "low";
+    const recommendation: "auto_approve" | "prompt_user" | "require_confirmation" | "block" =
+      tier === "critical" || result.error
+        ? "block"
+        : !approved
+          ? "require_confirmation"
+          : tier === "medium"
+            ? "prompt_user"
+            : "auto_approve";
+
     return {
-      tier: "low" as const,
-      recommendation: "prompt_user" as const,
-      compositeScore: 0,
-      summary: "V4 risk dispatcher pending — wire to src/infra/trading/risk/riskClassifier.ts",
+      tier,
+      recommendation,
+      compositeScore: result.consensus?.score ?? (approved ? 0.7 : 0.3),
+      dimensionScores: undefined,
+      constitutionViolations: warnings as unknown[],
+      summary: result.reason ?? result.error ?? (approved ? "Risk gate passed." : "Risk gate flagged."),
     };
   },
 });
@@ -274,8 +481,8 @@ export const computeMicrostructureTool = createTool({
     "  - 'discipline_audit'           — score behavior against 7 failure modes",
     "  - 'adherence_report'           — trades-followed vs rule-overridden",
     "",
-    "Inputs are operation-specific; see params schema per op. Returns typed",
-    "results matching the underlying primitive's contract.",
+    "Inputs are operation-specific; pass them via the `params` field. See the",
+    "per-operation handler module for exact schema.",
   ].join("\n"),
   inputSchema: z.object({
     operation: z.enum(MICROSTRUCTURE_OPS),
@@ -291,18 +498,38 @@ export const computeMicrostructureTool = createTool({
   }),
   execute: async (
     args: { operation: string; params: Record<string, unknown> },
-    _execContext?: MastraExecutionContext,
+    execContext?: MastraExecutionContext,
   ) => {
-    // Stub — proper dispatch table routes each operation to its existing
-    // handler module: compute("microprice", ...) → src/core/alpha/microprice.ts,
-    // compute("correlation_breakdown", ...) → src/core/alpha/correlationBreakdown.ts,
-    // compute("discipline_audit", ...) → src/infra/platform/audit/disciplineAudit.ts,
-    // etc. Returns placeholder until wired.
-    return {
-      operation: args.operation,
-      result: { note: `V4 microstructure dispatcher pending — wire to ${args.operation} handler` },
-      computedAt: new Date().toISOString(),
-    };
+    const computedAt = new Date().toISOString();
+    try {
+      if (args.operation === "microprice") {
+        const r = (await (legacyMicroprice.execute as any)(args.params, execContext)) as unknown;
+        return { operation: "microprice", result: r, computedAt };
+      }
+      if (args.operation === "inventory_adjusted_price") {
+        const r = (await (legacyInventoryAdjusted.execute as any)(args.params, execContext)) as unknown;
+        return { operation: "inventory_adjusted_price", result: r, computedAt };
+      }
+      // correlation_breakdown / vol_forecast_calibration / pnl_distribution_shape
+      // / crowd_positioning / earnings_signal / discipline_audit / adherence_report
+      // are registered in the legacy surface under their own tool IDs (diagnostic-
+      // tools / institutional-ai / adherence). Until the V4 dispatch table maps
+      // each one, return a clear pointer rather than a silent failure.
+      return {
+        operation: args.operation,
+        result: {
+          deferred: true,
+          message: `Use the legacy '${args.operation}' tool from the agent surface until V4 wires this op.`,
+        },
+        computedAt,
+      };
+    } catch (err) {
+      return {
+        operation: args.operation,
+        result: { error: err instanceof Error ? err.message : String(err) },
+        computedAt,
+      };
+    }
   },
 });
 

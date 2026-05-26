@@ -2,20 +2,29 @@
  * V4 Plan + Execution Tools — 6 typed tools.
  *
  *   - create_plan   → Plan (typed entry/exit/stop/size + rationale)
- *   - verify_plan   → VerifyResult (risk classifier + constitution + permission)
+ *   - verify_plan   → VerifyResult (risk classifier + permission)
  *   - approve_plan  → ApprovalResult (rationale-required override path)
- *   - execute_plan  → ExecutionResult (dispatches Executor subagent)
+ *   - execute_plan  → ExecutionResult (dispatches Executor)
  *   - cancel        → CancelResult (orders or positions)
- *   - backtest      → BacktestResult (atomic walk-forward simulation)
+ *   - backtest      → BacktestResult
  *
- * These are EXPLICIT typed tools — not meta-dispatched. Each one is a
- * regulatory-critical state mutation; per-tool permission scoping +
- * audit specificity outweighs schema-cost savings.
+ * Each tool is regulatory-critical state mutation — per-tool permission
+ * scoping + audit specificity outweighs schema-cost savings.
  */
 
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
-import type { MastraExecutionContext } from "../types.ts";
+import { getGordonContext, type MastraExecutionContext } from "../types.ts";
+import { createPlan as dbCreatePlan, getPlan as dbGetPlan } from "../../../storage/entities/plans.ts";
+import {
+  approvePlanTool as legacyApprovePlan,
+  executePlanTool as legacyExecutePlan,
+  closeTradeTool as legacyCloseTrade,
+  closePartialPositionTool as legacyClosePartial,
+} from "../trading/trading.ts";
+import { checkRiskTool as legacyCheckRisk } from "../trading/risk-gate.ts";
+import { runBacktestTool as legacyRunBacktest } from "../strategy/backtest/backtest.ts";
+import { auditLog } from "../../../platform/audit/index.ts";
 
 // ============================================================================
 // create_plan
@@ -62,15 +71,57 @@ export const createPlanTool = createTool({
       strategySlot?: string;
       timeHorizonHours?: number;
     },
-    _execContext?: MastraExecutionContext,
+    execContext?: MastraExecutionContext,
   ) => {
-    // Stub — proper implementation calls into trading.ts createPlan handler.
-    const planId = `plan-${Date.now().toString(36)}`;
-    return {
-      success: true,
-      planId,
-      plan: { id: planId, ...args, status: "DRAFT", createdAt: new Date().toISOString() },
-    };
+    try {
+      const ctx = getGordonContext(execContext);
+      const portfolioValue = Math.max(ctx?.portfolioValue ?? args.sizeUsd, args.sizeUsd);
+      const allocationPercent = args.sizeUsd / portfolioValue;
+      // Map V4 explicit spec to the Plan shape stored in SQLite. Direction
+      // collapses sell→long with inverted stop semantics handled downstream;
+      // strategy defaults to support_bounce since V4 plans are operator-spec'd
+      // not strategy-driven (the strategy slot is metadata, not generator).
+      const plan = dbCreatePlan({
+        symbol: args.symbol,
+        direction: args.side === "buy" ? "long" : "short",
+        strategy: "support_bounce",
+        allocation: {
+          currency: "USDT",
+          amount: args.sizeUsd,
+          percentOfPortfolio: allocationPercent,
+        },
+        entry: {
+          type: args.entryPrice ? "limit" : "market",
+          price: args.entryPrice ?? null,
+        },
+        dca: null,
+        grid: null,
+        stopLoss: { price: args.stopLossPrice },
+        takeProfit: args.takeProfitPrice
+          ? [{ price: args.takeProfitPrice, percentToSell: 1 }]
+          : [],
+        reasoning: args.rationale,
+        status: "DRAFT",
+        expiresAt: args.timeHorizonHours
+          ? new Date(Date.now() + args.timeHorizonHours * 60 * 60 * 1000).toISOString()
+          : undefined,
+      });
+
+      auditLog.record(
+        "operator",
+        "CREATE_PLAN" as Parameters<typeof auditLog.record>[1],
+        { ...args },
+        "SUCCESS",
+        { resultDetails: args.rationale, planId: plan.id },
+      );
+
+      return { success: true, planId: plan.id, plan };
+    } catch (err) {
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : String(err),
+      };
+    }
   },
 });
 
@@ -81,10 +132,9 @@ export const createPlanTool = createTool({
 export const verifyPlanTool = createTool({
   id: "verify_plan",
   description: [
-    "Run the full safety stack on a Plan: 11-dim risk classifier +",
-    "trading constitution (80+ rules) + permission engine + venue/account",
-    "feasibility. Returns approve / conditional / reject + structured",
-    "reasons.",
+    "Run the safety stack on a Plan: 11-dim risk classifier + permission",
+    "engine + venue/account feasibility. Returns approve / conditional /",
+    "reject + structured reasons.",
     "",
     "MANDATORY before approve_plan + execute_plan. Plans that haven't been",
     "verified should never reach execution.",
@@ -102,15 +152,66 @@ export const verifyPlanTool = createTool({
   }),
   execute: async (
     args: { planId: string },
-    _execContext?: MastraExecutionContext,
+    execContext?: MastraExecutionContext,
   ) => {
+    const plan = dbGetPlan(args.planId);
+    if (!plan) {
+      return {
+        planId: args.planId,
+        verdict: "reject" as const,
+        riskTier: "critical" as const,
+        constitutionViolations: [],
+        recommendation: "block",
+        summary: `Plan not found: ${args.planId}`,
+      };
+    }
+    const ctx = getGordonContext(execContext);
+    const quantity =
+      plan.allocation.amount /
+      Math.max(plan.entry.price ?? (await ctx?.exchange?.getPrice(plan.symbol).catch(() => 1)) ?? 1, 1e-9);
+    const result = (await (legacyCheckRisk.execute as any)(
+      {
+        symbol: plan.symbol,
+        side: plan.direction === "long" ? "BUY" : "SELL",
+        type: plan.entry.type === "limit" ? "LIMIT" : "MARKET",
+        quantity,
+        price: plan.entry.price,
+        stopLoss: plan.stopLoss.price,
+        takeProfit: plan.takeProfit.map((tp: { price: number }) => tp.price),
+      },
+      execContext,
+    )) as {
+      approved?: boolean;
+      reason?: string;
+      warnings?: string[];
+      error?: string;
+    };
+
+    const approved = result.approved === true;
+    const warnings = result.warnings ?? [];
+    const verdict: "approve" | "conditional" | "reject" = result.error
+      ? "reject"
+      : approved
+        ? warnings.length === 0
+          ? "approve"
+          : "conditional"
+        : "reject";
+    const tier: "low" | "medium" | "high" | "critical" = result.error
+      ? "critical"
+      : approved
+        ? warnings.length === 0
+          ? "low"
+          : "medium"
+        : "high";
+
     return {
       planId: args.planId,
-      verdict: "conditional" as const,
-      riskTier: "medium" as const,
-      constitutionViolations: [],
-      recommendation: "prompt_user",
-      summary: "V4 verify_plan dispatcher pending — wire to risk-gate.ts + tradingConstitution.ts",
+      verdict,
+      riskTier: tier,
+      constitutionViolations: warnings as unknown[],
+      recommendation:
+        verdict === "approve" ? "auto_approve" : verdict === "conditional" ? "prompt_user" : "block",
+      summary: result.reason ?? result.error ?? "Verify complete.",
     };
   },
 });
@@ -147,13 +248,37 @@ export const approvePlanTool = createTool({
   }),
   execute: async (
     args: { planId: string; rationale: string; overrideVerifyVerdict?: boolean },
-    _execContext?: MastraExecutionContext,
+    execContext?: MastraExecutionContext,
   ) => {
-    return {
-      success: true,
-      planId: args.planId,
-      overrideRecorded: args.overrideVerifyVerdict ?? false,
-    };
+    try {
+      const result = (await (legacyApprovePlan.execute as any)(
+        { planId: args.planId },
+        execContext,
+      )) as { success?: boolean; error?: string };
+
+      if (args.overrideVerifyVerdict) {
+        auditLog.record(
+          "operator",
+          "RULE_OVERRIDE" as Parameters<typeof auditLog.record>[1],
+          { planId: args.planId, scope: "verify_plan", rationale: args.rationale },
+          "SUCCESS",
+          { resultDetails: `Override approve_plan: ${args.rationale}`, planId: args.planId },
+        );
+      }
+
+      return {
+        success: Boolean(result.success ?? !result.error),
+        planId: args.planId,
+        overrideRecorded: args.overrideVerifyVerdict ?? false,
+        error: result.error,
+      };
+    } catch (err) {
+      return {
+        success: false,
+        planId: args.planId,
+        error: err instanceof Error ? err.message : String(err),
+      };
+    }
   },
 });
 
@@ -164,18 +289,23 @@ export const approvePlanTool = createTool({
 export const executePlanTool = createTool({
   id: "execute_plan",
   description: [
-    "Execute an APPROVED Plan: dispatch Executor subagent which places",
-    "the actual venue-specific orders (place_market_order, place_limit_order,",
+    "Execute an APPROVED Plan: dispatch Executor which places the actual",
+    "venue-specific orders (place_market_order, place_limit_order,",
     "place_bracket_order, etc.).",
     "",
-    "Returns the dispatched execution result. Audit log captures the full",
-    "Plan → Verify → Approve → Execute chain for provenance.",
+    "Audit log captures the full Plan → Verify → Approve → Execute chain",
+    "for provenance.",
     "",
-    "Plan must be in APPROVED state. Calling on a DRAFT plan returns",
-    "an error.",
+    "Plan must be in APPROVED state. Calling on a DRAFT plan returns an error.",
   ].join("\n"),
   inputSchema: z.object({
     planId: z.string(),
+    rationale: z
+      .string()
+      .min(10)
+      .describe(
+        "One-sentence reason this execution is correct right now (e.g. 'User confirmed plan, BTC broke entry trigger at 100050').",
+      ),
   }),
   outputSchema: z.object({
     success: z.boolean(),
@@ -185,14 +315,32 @@ export const executePlanTool = createTool({
     error: z.string().optional(),
   }),
   execute: async (
-    args: { planId: string },
-    _execContext?: MastraExecutionContext,
+    args: { planId: string; rationale: string },
+    execContext?: MastraExecutionContext,
   ) => {
-    return {
-      success: true,
-      planId: args.planId,
-      orders: [],
-    };
+    try {
+      const result = (await (legacyExecutePlan.execute as any)(
+        { planId: args.planId, rationale: args.rationale },
+        execContext,
+      )) as {
+        success?: boolean;
+        error?: string;
+        orders?: unknown[];
+      };
+      return {
+        success: Boolean(result.success ?? !result.error),
+        planId: args.planId,
+        orders: result.orders ?? [],
+        executionResult: result,
+        error: result.error,
+      };
+    } catch (err) {
+      return {
+        success: false,
+        planId: args.planId,
+        error: err instanceof Error ? err.message : String(err),
+      };
+    }
   },
 });
 
@@ -206,17 +354,17 @@ export const cancelTool = createTool({
     "Cancel orders or close positions. One tool for both — pick via target.",
     "",
     "target values:",
-    "  - 'order'        — cancel a specific open order by ID",
+    "  - 'order'        — cancel a specific open order by ID (requires id + symbol)",
     "  - 'all_orders'   — cancel ALL open orders for symbol (emergency)",
-    "  - 'position'     — close a specific position (market exit)",
-    "  - 'partial'      — partial position close (specify percentPct)",
+    "  - 'position'     — close a specific trade/position (market exit, requires tradeId in id)",
+    "  - 'partial'      — partial position close (specify percentPct + tradeId in id)",
     "",
     "Required: reason (≥10 chars) for audit trail.",
   ].join("\n"),
   inputSchema: z.object({
     target: z.enum(["order", "all_orders", "position", "partial"]),
-    id: z.string().optional().describe("Order/position ID for single-target operations."),
-    symbol: z.string().optional().describe("Required for all_orders target."),
+    id: z.string().optional().describe("Order or trade ID for single-target operations."),
+    symbol: z.string().optional().describe("Required for 'order' and 'all_orders' targets."),
     percentPct: z.number().min(1).max(99).optional().describe("Percent to close for 'partial' target."),
     reason: z.string().min(10),
   }),
@@ -234,13 +382,77 @@ export const cancelTool = createTool({
       percentPct?: number;
       reason: string;
     },
-    _execContext?: MastraExecutionContext,
+    execContext?: MastraExecutionContext,
   ) => {
-    return {
-      success: true,
-      target: args.target,
-      cancelled: [],
-    };
+    const ctx = getGordonContext(execContext);
+    try {
+      switch (args.target) {
+        case "order": {
+          if (!ctx?.exchange) return { success: false, target: args.target, error: "No exchange connected." };
+          if (!args.id || !args.symbol) {
+            return { success: false, target: args.target, error: "Both `id` and `symbol` are required for target='order'." };
+          }
+          await ctx.exchange.cancelOrder(args.symbol, args.id);
+          auditLog.record(
+            "operator",
+            "CANCEL_ORDER" as Parameters<typeof auditLog.record>[1],
+            { orderId: args.id, symbol: args.symbol, reason: args.reason },
+            "SUCCESS",
+            { resultDetails: args.reason },
+          );
+          return { success: true, target: "order", cancelled: [{ orderId: args.id, symbol: args.symbol }] };
+        }
+        case "all_orders": {
+          if (!ctx?.exchange) return { success: false, target: args.target, error: "No exchange connected." };
+          if (!args.symbol) {
+            return { success: false, target: args.target, error: "`symbol` is required for target='all_orders'." };
+          }
+          const cancelled = await ctx.exchange.cancelAllOrders(args.symbol);
+          auditLog.record(
+            "operator",
+            "CANCEL_ALL_ORDERS" as Parameters<typeof auditLog.record>[1],
+            { symbol: args.symbol, reason: args.reason, count: cancelled.length },
+            "SUCCESS",
+            { resultDetails: args.reason },
+          );
+          return { success: true, target: "all_orders", cancelled };
+        }
+        case "position": {
+          if (!args.id) return { success: false, target: args.target, error: "`id` (tradeId) required." };
+          const r = (await (legacyCloseTrade.execute as any)(
+            { tradeId: args.id, reason: "MANUAL" },
+            execContext,
+          )) as { success?: boolean; error?: string; pnl?: number };
+          return {
+            success: Boolean(r.success),
+            target: "position",
+            cancelled: r.success ? [{ tradeId: args.id, pnl: r.pnl }] : [],
+            error: r.error,
+          };
+        }
+        case "partial": {
+          if (!args.id) return { success: false, target: args.target, error: "`id` (tradeId) required." };
+          if (!args.percentPct)
+            return { success: false, target: args.target, error: "`percentPct` required for partial close." };
+          const r = (await (legacyClosePartial.execute as any)(
+            { tradeId: args.id, percentage: args.percentPct / 100, reason: "MANUAL" },
+            execContext,
+          )) as { success?: boolean; error?: string };
+          return {
+            success: Boolean(r.success),
+            target: "partial",
+            cancelled: r.success ? [{ tradeId: args.id, percent: args.percentPct }] : [],
+            error: r.error,
+          };
+        }
+      }
+    } catch (err) {
+      return {
+        success: false,
+        target: args.target,
+        error: err instanceof Error ? err.message : String(err),
+      };
+    }
   },
 });
 
@@ -259,14 +471,14 @@ export const backtestTool = createTool({
     "`backtest-validate` skill which composes multiple backtest calls.",
   ].join("\n"),
   inputSchema: z.object({
-    strategyId: z.string().optional().describe("Strategy slot ID or playbook name."),
-    strategySpec: z.unknown().optional().describe("Inline strategy spec if not using a saved one."),
+    strategyId: z.string().describe("Strategy slot ID or playbook name (e.g. 'support_bounce')."),
     symbol: z.string(),
     timeframe: z.enum(["15m", "30m", "1h", "4h", "1d"]).optional(),
-    startDate: z.string().describe("ISO date — e.g. '2024-01-01'."),
-    endDate: z.string(),
+    startDate: z.string().optional().describe("ISO date — supersedes `days` when provided."),
+    endDate: z.string().optional(),
+    days: z.number().int().positive().optional().describe("Lookback days when start/end omitted. Default 90."),
     initialCapitalUsd: z.number().positive().optional().describe("Default 10000."),
-    walkForward: z.boolean().optional().describe("Default true."),
+    market: z.enum(["auto", "crypto", "stocks"]).optional().describe("Default 'auto'."),
   }),
   outputSchema: z.object({
     metrics: z.unknown(),
@@ -276,20 +488,46 @@ export const backtestTool = createTool({
   }),
   execute: async (
     args: {
-      strategyId?: string;
-      strategySpec?: unknown;
+      strategyId: string;
       symbol: string;
       timeframe?: string;
-      startDate: string;
-      endDate: string;
+      startDate?: string;
+      endDate?: string;
+      days?: number;
       initialCapitalUsd?: number;
-      walkForward?: boolean;
+      market?: "auto" | "crypto" | "stocks";
     },
-    _execContext?: MastraExecutionContext,
+    execContext?: MastraExecutionContext,
   ) => {
+    // Map V4 date-range args to the legacy `days` shape (the engine is
+    // day-count-driven; calendar dates collapse to a span).
+    let days = args.days ?? 90;
+    if (args.startDate && args.endDate) {
+      const ms = new Date(args.endDate).getTime() - new Date(args.startDate).getTime();
+      const computed = Math.max(1, Math.floor(ms / (24 * 60 * 60 * 1000)));
+      days = computed;
+    }
+    const result = (await (legacyRunBacktest.execute as any)(
+      {
+        symbol: args.symbol,
+        strategyId: args.strategyId,
+        market: args.market ?? "auto",
+        timeframe: args.timeframe ?? "4h",
+        days,
+        initialCapital: args.initialCapitalUsd ?? 10000,
+        commission: 0.001,
+      },
+      execContext,
+    )) as {
+      result?: unknown;
+      summary?: string;
+      formattedSummary?: string;
+      error?: string;
+    };
+
     return {
-      metrics: { sharpe: 0, sortino: 0, maxDrawdown: 0, winRate: 0, profitFactor: 0 },
-      summary: "V4 backtest dispatcher pending — wire to src/backtest/ engine",
+      metrics: result.result ?? {},
+      summary: result.summary ?? result.formattedSummary ?? result.error ?? "Backtest complete.",
     };
   },
 });

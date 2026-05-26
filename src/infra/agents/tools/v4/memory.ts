@@ -1,19 +1,22 @@
 /**
  * V4 Memory + Audit Tools — 3 explicit typed tools.
  *
- *   - memory_search  → query persistent memory (FTS-style)
- *   - memory_write   → append durable trader-profile / lesson record
+ *   - memory_search  → query persistent memory (FTS + semantic)
+ *   - memory_write   → append observation / lesson / preference / watchlist / note
  *   - audit_event    → signed append-only provenance event
  *
- * Memory reads collapse INTO get_market_data... no, that's wrong.
- * Memory is its own namespace (operator profile, lessons, watchlists,
- * strategy library), not market state. Kept distinct from `query` patterns.
+ * Wired through existing memory-tools handlers + auditLog facade.
  */
 
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 import { auditLog } from "../../../platform/audit/index.ts";
 import type { AuditAction } from "../../../platform/audit/index.ts";
+import {
+  searchMemoryTool as legacySearchMemory,
+  recordObservationTool as legacyRecordObservation,
+  recordInsightTool as legacyRecordInsight,
+} from "../runtime/meta/memory-tools.ts";
 import type { MastraExecutionContext } from "../types.ts";
 
 // ============================================================================
@@ -37,23 +40,27 @@ export const memorySearchTool = createTool({
       .enum(["all", "lessons", "profile", "watchlist", "strategy"])
       .optional()
       .describe("Restrict search to a memory scope. Default 'all'."),
-    limit: z.number().int().positive().optional().describe("Max records. Default 10."),
+    limit: z.number().int().positive().max(20).optional().describe("Max records. Default 10."),
   }),
   outputSchema: z.object({
     query: z.string(),
     records: z.array(z.unknown()),
     totalFound: z.number(),
+    error: z.string().optional(),
   }),
   execute: async (
     args: { query: string; scope?: string; limit?: number },
-    _execContext?: MastraExecutionContext,
+    execContext?: MastraExecutionContext,
   ) => {
-    // Stub — proper implementation calls into memoryTools.search_memory
-    // handler. Returns empty results until wired.
+    const result = (await (legacySearchMemory.execute as any)(
+      { query: args.query, limit: args.limit ?? 10 },
+      execContext,
+    )) as { results: unknown[]; count: number; error?: string };
     return {
       query: args.query,
-      records: [],
-      totalFound: 0,
+      records: result.results ?? [],
+      totalFound: result.count ?? 0,
+      error: result.error,
     };
   },
 });
@@ -69,7 +76,7 @@ export const memoryWriteTool = createTool({
     "patterns, operator preferences that should survive across sessions.",
     "",
     "kind values:",
-    "  - 'lesson'      → learning extracted from a trade outcome",
+    "  - 'lesson'      → learning extracted from a trade outcome (insight)",
     "  - 'observation' → market state worth remembering",
     "  - 'preference' → operator preference (risk level, venue, asset class)",
     "  - 'watchlist'   → symbol to track + reason",
@@ -91,14 +98,47 @@ export const memoryWriteTool = createTool({
   }),
   execute: async (
     args: { kind: string; content: string; symbol?: string; tags?: string[] },
-    _execContext?: MastraExecutionContext,
+    execContext?: MastraExecutionContext,
   ) => {
-    // Stub — proper implementation calls into memoryTools.record_observation
-    // / record_insight handlers. Returns success placeholder until wired.
-    return {
-      success: true,
-      recordId: `mem-${Date.now().toString(36)}`,
-    };
+    // Lessons + preferences route to the insight channel (long-term);
+    // observations / watchlist / notes go to the observation channel.
+    const useInsight = args.kind === "lesson" || args.kind === "preference";
+    try {
+      if (useInsight) {
+        const result = (await (legacyRecordInsight.execute as any)(
+          {
+            content: args.content,
+            confidence: 0.8,
+            symbol: args.symbol,
+            tags: args.tags,
+          },
+          execContext,
+        )) as { success?: boolean; id?: string; error?: string };
+        return {
+          success: Boolean(result.success ?? !result.error),
+          recordId: result.id,
+          error: result.error,
+        };
+      }
+      const result = (await (legacyRecordObservation.execute as any)(
+        {
+          symbol: args.symbol ?? "GENERAL",
+          observation: args.content,
+          conditions: args.tags?.join(", ") ?? "",
+        },
+        execContext,
+      )) as { success?: boolean; id?: string; error?: string };
+      return {
+        success: Boolean(result.success ?? !result.error),
+        recordId: result.id,
+        error: result.error,
+      };
+    } catch (err) {
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : String(err),
+      };
+    }
   },
 });
 
@@ -117,12 +157,11 @@ export const auditEventTool = createTool({
     "The audit log is append-only, HMAC-signed, tamper-detectable. Events",
     "are queryable later via the discipline audit + adherence reporting.",
     "",
-    "Common eventType values:",
-    "  - 'decision.plan_created' → recorded plan creation rationale",
-    "  - 'decision.regime_pivot' → regime shift response",
-    "  - 'decision.size_adjustment' → position sizing override + reason",
-    "  - 'observation.<topic>'   → market state worth auditing",
-    "  - 'reflection.<topic>'    → post-trade reflection",
+    "Common action values:",
+    "  - 'CREATE_PLAN' / 'EXECUTE_PLAN' / 'CLOSE_TRADE'",
+    "  - 'OBSERVATION'   → market state worth auditing",
+    "  - 'BACKTEST_VALIDATED' / 'REGIME_RESPONSE'",
+    "  - 'STRATEGY_DRAFTED' / 'RULE_OVERRIDE'",
     "",
     "For rule overrides specifically, use record_rule_override tool which",
     "enforces rationale-min-length + structured override metadata.",

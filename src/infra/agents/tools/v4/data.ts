@@ -26,6 +26,17 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 import { getGordonContext, type MastraExecutionContext } from "../types.ts";
+import { getCryptoNewsHeadlinesTool as legacyCryptoNews } from "../news/news.ts";
+import { getStockNewsHeadlinesTool as legacyStockNews } from "../news/stockNews.ts";
+import {
+  getCompanyProfileTool as legacyProfile,
+  getBasicFinancialsTool as legacyBasicFinancials,
+  getFinancialsReportedTool as legacyFinancialsReported,
+  getEarningsSurprisesTool as legacyEarningsSurprises,
+  getRevenueEstimatesTool as legacyRevenueEstimates,
+  getUpgradeDowngradeTool as legacyUpgradeDowngrade,
+  getInsiderSentimentTool as legacyInsiderSentiment,
+} from "../providers/finnhub-fundamentals-tools.ts";
 
 // ============================================================================
 // get_market_data
@@ -287,16 +298,51 @@ export const getNewsTool = createTool({
       sinceMinutes?: number;
       limit?: number;
     },
-    _execContext?: MastraExecutionContext,
+    execContext?: MastraExecutionContext,
   ) => {
-    // Stub for now — proper implementation routes to news + stock-news +
-    // finnhub markets fetchers. Returns empty array to keep the surface
-    // contract intact until the news dispatcher is wired.
-    return {
-      source: args.source ?? "all",
-      items: [],
-      fetchedAt: new Date().toISOString(),
-    };
+    const fetchedAt = new Date().toISOString();
+    const source = args.source ?? "all";
+    const hoursBack = args.sinceMinutes ? Math.ceil(args.sinceMinutes / 60) : undefined;
+
+    try {
+      if (source === "crypto" || source === "all") {
+        const result = (await (legacyCryptoNews.execute as any)(
+          { query: args.symbol, hoursBack, limit: args.limit },
+          execContext,
+        )) as { headlines?: unknown[]; aggregate?: unknown; summary?: string };
+        if (source === "crypto") {
+          return { source: "crypto", items: result.headlines ?? [], fetchedAt };
+        }
+      }
+      if (source === "stocks" || source === "edgar" || source === "all") {
+        const ticker = (args.symbol ?? "SPY").toUpperCase();
+        const stockSources = source === "edgar" ? (["edgar"] as const) : undefined;
+        const result = (await (legacyStockNews.execute as any)(
+          {
+            tickers: [ticker],
+            hoursBack,
+            sources: stockSources,
+            limit: args.limit,
+          },
+          execContext,
+        )) as { headlines?: unknown[] };
+        return { source, items: result.headlines ?? [], fetchedAt };
+      }
+      // earnings source — no dedicated headline fetcher; route to stock news
+      // filtered by EDGAR + Finnhub which covers earnings releases.
+      const ticker = (args.symbol ?? "SPY").toUpperCase();
+      const earnResult = (await (legacyStockNews.execute as any)(
+        { tickers: [ticker], hoursBack, limit: args.limit },
+        execContext,
+      )) as { headlines?: unknown[] };
+      return { source: "earnings", items: earnResult.headlines ?? [], fetchedAt };
+    } catch (err) {
+      return {
+        source,
+        items: [],
+        fetchedAt,
+      };
+    }
   },
 });
 
@@ -344,16 +390,61 @@ export const getFundamentalsTool = createTool({
   }),
   execute: async (
     args: { ticker: string; metric: string },
-    _execContext?: MastraExecutionContext,
+    execContext?: MastraExecutionContext,
   ) => {
-    // Stub — proper implementation dispatches to the finnhub-fundamentals
-    // handler functions. Returns an empty payload until wired.
-    return {
-      ticker: args.ticker,
-      metric: args.metric,
-      data: { note: "V4 fundamentals dispatcher pending — wire to finnhubFundamentalsTools handlers" },
-      fetchedAt: new Date().toISOString(),
-    };
+    const fetchedAt = new Date().toISOString();
+    const symbol = args.ticker.toUpperCase();
+    try {
+      switch (args.metric) {
+        case "profile": {
+          const r = (await (legacyProfile.execute as any)({ symbol }, execContext)) as unknown;
+          return { ticker: symbol, metric: "profile", data: r, fetchedAt };
+        }
+        case "income":
+        case "balance":
+        case "cashflow": {
+          const freq =
+            args.metric === "income"
+              ? "annual"
+              : args.metric === "balance"
+                ? "annual"
+                : "annual";
+          const r = (await (legacyFinancialsReported.execute as any)(
+            { symbol, freq },
+            execContext,
+          )) as unknown;
+          return { ticker: symbol, metric: args.metric, data: r, fetchedAt };
+        }
+        case "estimates": {
+          const r = (await (legacyRevenueEstimates.execute as any)({ symbol }, execContext)) as unknown;
+          return { ticker: symbol, metric: "estimates", data: r, fetchedAt };
+        }
+        case "earnings": {
+          const r = (await (legacyEarningsSurprises.execute as any)({ symbol }, execContext)) as unknown;
+          return { ticker: symbol, metric: "earnings", data: r, fetchedAt };
+        }
+        case "analysts": {
+          const r = (await (legacyUpgradeDowngrade.execute as any)({ symbol }, execContext)) as unknown;
+          return { ticker: symbol, metric: "analysts", data: r, fetchedAt };
+        }
+        case "insider": {
+          const r = (await (legacyInsiderSentiment.execute as any)({ symbol }, execContext)) as unknown;
+          return { ticker: symbol, metric: "insider", data: r, fetchedAt };
+        }
+        default: {
+          // Fall back to basic financials for any unrecognized metric.
+          const r = (await (legacyBasicFinancials.execute as any)({ symbol }, execContext)) as unknown;
+          return { ticker: symbol, metric: args.metric, data: r, fetchedAt };
+        }
+      }
+    } catch (err) {
+      return {
+        ticker: symbol,
+        metric: args.metric,
+        data: { error: err instanceof Error ? err.message : String(err) },
+        fetchedAt,
+      };
+    }
   },
 });
 
