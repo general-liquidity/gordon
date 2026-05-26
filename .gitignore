@@ -37,7 +37,11 @@ npm/LICENSE
 # Finder (MacOS) folder config
 .DS_Store
 
-.claude
+.claude/*
+# ...but ship the operator-opt-in subagent profiles we maintain in-repo.
+# These load only when GORDON_DYNAMIC_SUBAGENTS=1; the operator gets them
+# as a starting catalog instead of having to hand-author from scratch.
+!.claude/subagents/
 
 # Local databases
 *.db
