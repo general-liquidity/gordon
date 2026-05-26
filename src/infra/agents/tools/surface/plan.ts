@@ -26,6 +26,7 @@ import { checkRiskTool as legacyCheckRisk } from "../trading/risk-gate.ts";
 import { runBacktestTool as legacyRunBacktest } from "../strategy/backtest/backtest.ts";
 import { auditLog } from "../../../platform/audit/index.ts";
 import { getMemoryManager } from "../../../../core/memory/index.ts";
+import { hasRecentSymbolObservation } from "../../observation/symbolObservationTracker.ts";
 
 /** Same shape as analytics.ts withPortfolioOverride — wrap the
  *  RequestContext so reads of portfolioValue / availableCash return the
@@ -322,6 +323,17 @@ export const verifyPlanTool = createTool({
     if (routingConflict) {
       warnings.push(
         "ROUTING_VIOLATION: plan has routingPolicy='maker_first' but entry.type='market' — crossing the spread surrenders the +1.12% maker edge (Becker 2026, 72.1M trades). Convert to a limit entry, or approve with overrideVerifyVerdict=true to accept the taker tax.",
+      );
+    }
+
+    // Source-chain check: did this session actually fetch data for the
+    // plan's symbol in the last 4h? Soft warning, not a block — the
+    // operator may have looked at the data in a different way (chart on
+    // another screen, prior session, etc.). Flag so they can confirm
+    // they're not building a plan on a stale memory of prices.
+    if (!hasRecentSymbolObservation(plan.symbol)) {
+      warnings.push(
+        `SOURCE_UNVERIFIED: no data tools have observed ${plan.symbol} in this session's last 4 hours. The plan's rationale may be working from stale prices. Run get_market_data, compute_indicator, or compute_regime on ${plan.symbol} to refresh and re-verify.`,
       );
     }
 

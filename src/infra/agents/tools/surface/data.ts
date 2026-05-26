@@ -21,6 +21,7 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 import { getGordonContext, type MastraExecutionContext } from "../types.ts";
+import { recordSymbolObservation } from "../../observation/symbolObservationTracker.ts";
 import { getCryptoNewsHeadlinesTool as legacyCryptoNews } from "../news/news.ts";
 import { getStockNewsHeadlinesTool as legacyStockNews } from "../news/stockNews.ts";
 import {
@@ -94,6 +95,7 @@ export const getMarketDataTool = createTool({
     },
     execContext?: MastraExecutionContext,
   ) => {
+    recordSymbolObservation(args.symbol);
     const ctx = getGordonContext(execContext);
     const exchange = ctx?.exchange;
     if (!exchange) {
@@ -295,6 +297,7 @@ export const getNewsTool = createTool({
     },
     execContext?: MastraExecutionContext,
   ) => {
+    if (args.symbol) recordSymbolObservation(args.symbol);
     const fetchedAt = new Date().toISOString();
     const source = args.source ?? "all";
     const hoursBack = args.sinceMinutes ? Math.ceil(args.sinceMinutes / 60) : undefined;
@@ -387,6 +390,7 @@ export const getFundamentalsTool = createTool({
     args: { ticker: string; metric: string },
     execContext?: MastraExecutionContext,
   ) => {
+    recordSymbolObservation(args.ticker);
     const fetchedAt = new Date().toISOString();
     const symbol = args.ticker.toUpperCase();
     try {

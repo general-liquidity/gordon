@@ -51,6 +51,7 @@ import {
 } from "../../../../core/indicators/index.ts";
 import { RegimeDetector } from "../../../../core/regime/index.ts";
 import { checkRiskTool as legacyCheckRisk } from "../trading/risk-gate.ts";
+import { recordSymbolObservation } from "../../observation/symbolObservationTracker.ts";
 import {
   computeMicropriceTool as legacyMicroprice,
   computeInventoryAdjustedPriceTool as legacyInventoryAdjusted,
@@ -83,6 +84,13 @@ async function maybeAutoCollect(
 ): Promise<Record<string, unknown> | { error: string }> {
   const ctx = getGordonContext(execContext);
   const exchange = ctx?.exchange;
+  // Any auto-collect path that names a symbol counts as an observation —
+  // these are the cases where compute_microstructure goes to the exchange
+  // for candles or book state on the operator's behalf.
+  if (typeof params.symbol === "string") recordSymbolObservation(params.symbol);
+  if (Array.isArray(params.symbols)) {
+    for (const s of params.symbols) if (typeof s === "string") recordSymbolObservation(s);
+  }
 
   if (operation === "microprice") {
     if (Array.isArray(params.snapshots)) return params;
@@ -492,6 +500,7 @@ export const computeIndicatorTool = createTool({
     },
     execContext?: MastraExecutionContext,
   ) => {
+    recordSymbolObservation(args.symbol);
     const ctx = getGordonContext(execContext);
     const exchange = ctx?.exchange;
     const computedAt = new Date().toISOString();
@@ -572,6 +581,7 @@ export const computeRegimeTool = createTool({
     args: { symbol: string; timeframe?: string; lookbackBars?: number },
     execContext?: MastraExecutionContext,
   ) => {
+    recordSymbolObservation(args.symbol);
     const ctx = getGordonContext(execContext);
     const exchange = ctx?.exchange;
     if (!exchange) {
@@ -659,6 +669,7 @@ export const computeRiskTool = createTool({
     },
     execContext?: MastraExecutionContext,
   ) => {
+    recordSymbolObservation(args.symbol);
     const ctx = getGordonContext(execContext);
     const exchange = ctx?.exchange;
     let price = 1;
