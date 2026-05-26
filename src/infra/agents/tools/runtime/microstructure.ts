@@ -30,6 +30,7 @@ import {
 import { monteCarloPath, summarizeMonteCarloPath } from "../../../../core/alpha/monteCarloPath.ts";
 import { kellySize } from "../../../../core/alpha/kellySize.ts";
 import { computeMarketMemory } from "../../../../core/alpha/marketMemory.ts";
+import { computeDcf } from "../../../../core/alpha/dcf.ts";
 
 // ============================================================================
 // compute_microprice
@@ -419,10 +420,64 @@ export const computeMarketMemoryTool = createTool({
   },
 });
 
+// ============================================================================
+// compute_dcf
+// ============================================================================
+
+export const computeDcfTool = createTool({
+  id: "compute_dcf",
+  description: [
+    "Discounted Cash Flow intrinsic-value calc. Two-stage model:",
+    "explicit FCF projections + Gordon-growth terminal value, both",
+    "discounted by WACC.",
+    "",
+    "Inputs:",
+    "  - fcfProjections: number[] — FCF per period (year 1, 2, 3, ...)",
+    "  - netCash: cash - debt at t=0 (added to enterprise value)",
+    "  - sharesOutstanding: diluted; defaults to 1 (returns equity value)",
+    "  - base: { wacc, terminalGrowthPct } — required",
+    "  - bear / bull: optional alternate cases for sensitivity band",
+    "",
+    "Output: per-case price-per-share, EV, equity value, terminal-",
+    "fraction, plus a 5x5 sensitivity grid (+/-100bps on WACC + growth).",
+    "",
+    "Constraint: WACC > terminalGrowthPct (otherwise terminal value",
+    "diverges — the tool throws rather than return Infinity).",
+    "",
+    "Not for: cyclical businesses where terminal dominates, pre-revenue",
+    "firms with negative FCF, or anything where the operator hasn't",
+    "validated the projections externally first.",
+  ].join("\n"),
+  inputSchema: z.object({
+    fcfProjections: z.array(z.number()).min(1),
+    netCash: z.number(),
+    sharesOutstanding: z.number().positive().optional(),
+    base: z.object({
+      wacc: z.number().positive(),
+      terminalGrowthPct: z.number(),
+    }),
+    bear: z
+      .object({ wacc: z.number().positive(), terminalGrowthPct: z.number() })
+      .optional(),
+    bull: z
+      .object({ wacc: z.number().positive(), terminalGrowthPct: z.number() })
+      .optional(),
+  }),
+  outputSchema: z.object({
+    base: z.unknown(),
+    bear: z.unknown().nullable(),
+    bull: z.unknown().nullable(),
+    sensitivity: z.array(z.unknown()),
+    interpretation: z.string(),
+  }),
+  execute: async (input) => computeDcf(input),
+});
+
 export const microstructureTools = {
   compute_microprice: computeMicropriceTool,
   compute_inventory_adjusted_price: computeInventoryAdjustedPriceTool,
   compute_monte_carlo_path: computeMonteCarloPathTool,
   compute_kelly_size: computeKellySizeTool,
   compute_market_memory: computeMarketMemoryTool,
+  compute_dcf: computeDcfTool,
 };

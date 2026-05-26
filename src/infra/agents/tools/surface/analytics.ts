@@ -62,6 +62,7 @@ import {
   computeMonteCarloPathTool as legacyMonteCarloPath,
   computeKellySizeTool as legacyKellySize,
   computeMarketMemoryTool as legacyMarketMemory,
+  computeDcfTool as legacyDcf,
 } from "../runtime/microstructure.ts";
 import {
   detectCorrelationBreakdownTool as legacyCorrelationBreakdown,
@@ -789,6 +790,7 @@ const MICROSTRUCTURE_OPS = [
   "monte_carlo_path",
   "kelly_size",
   "market_memory",
+  "dcf",
 ] as const;
 
 export const computeMicrostructureTool = createTool({
@@ -840,6 +842,11 @@ export const computeMicrostructureTool = createTool({
     "                              Simulates N forward price paths. Returns terminal mean/stddev, p05/p25/p50/p75/p95",
     "                              quantiles, and P(terminal ≥ level) for each requested exceedance level. Use for scenario",
     "                              analysis or to derive winProbability inputs for kelly_size.",
+    "    - 'dcf'                — params: { fcfProjections: number[], netCash, sharesOutstanding?, base: { wacc, terminalGrowthPct }, bear?, bull? }",
+    "                              Two-stage DCF: explicit FCF + Gordon-growth terminal. Returns per-case price-per-share",
+    "                              + 5x5 sensitivity grid over WACC and terminal-growth. Operator MUST supply validated",
+    "                              FCF projections — Gordon does not forecast cash flows itself.",
+    "",
     "    - 'market_memory'      — direct: { prices[], nSurrogates?, minWindow?, vrHorizons?, pValueCutoff? }",
     "                              shortcut: { symbol, timeframe?, lookbackBars?, nSurrogates?, vrHorizons? }",
     "                              Diagnoses what KIND of memory the series has on this horizon: 'trending',",
@@ -884,6 +891,7 @@ export const computeMicrostructureTool = createTool({
       monte_carlo_path: legacyMonteCarloPath,
       kelly_size: legacyKellySize,
       market_memory: legacyMarketMemory,
+      dcf: legacyDcf,
     };
     try {
       const handler = dispatchTable[args.operation];
