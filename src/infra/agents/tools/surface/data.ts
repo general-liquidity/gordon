@@ -24,6 +24,7 @@ import { getGordonContext, type MastraExecutionContext } from "../types.ts";
 import { recordSymbolObservation } from "../../observation/symbolObservationTracker.ts";
 import { getCryptoNewsHeadlinesTool as legacyCryptoNews } from "../news/news.ts";
 import { getStockNewsHeadlinesTool as legacyStockNews } from "../news/stockNews.ts";
+import { filterByAsOf } from "./retrieval-helpers.ts";
 import {
   getCompanyProfileTool as legacyProfile,
   getBasicFinancialsTool as legacyBasicFinancials,
@@ -282,11 +283,18 @@ export const getNewsTool = createTool({
       .optional()
       .describe("Headlines from the last N minutes. Default 240 (4h)."),
     limit: z.number().int().positive().optional().describe("Max items. Default 25."),
+    asOf: z
+      .string()
+      .optional()
+      .describe(
+        "ISO timestamp. When set, drops headlines published AFTER this time. Use for 'what news was visible at time Y?' replay questions. Headlines without a parseable publishedAt are preserved (lenient).",
+      ),
   }),
   outputSchema: z.object({
     source: z.string(),
     items: z.array(z.unknown()),
     fetchedAt: z.string(),
+    asOfApplied: z.boolean(),
   }),
   execute: async (
     args: {
@@ -294,6 +302,7 @@ export const getNewsTool = createTool({
       symbol?: string;
       sinceMinutes?: number;
       limit?: number;
+      asOf?: string;
     },
     execContext?: MastraExecutionContext,
   ) => {
@@ -302,6 +311,22 @@ export const getNewsTool = createTool({
     const source = args.source ?? "all";
     const hoursBack = args.sinceMinutes ? Math.ceil(args.sinceMinutes / 60) : undefined;
 
+    // Headlines come back with publishedAt (crypto) or sometimes a different
+    // field shape (stocks). The filter is lenient — anything missing a
+    // timestamp is preserved rather than silently dropped.
+    const applyAsOf = (items: unknown[]): unknown[] => {
+      if (!args.asOf) return items;
+      return filterByAsOf(
+        items as Array<Record<string, unknown>>,
+        args.asOf,
+        (r) =>
+          (r.publishedAt as string | undefined) ??
+          (r.published_at as string | undefined) ??
+          (r.datetime as string | undefined) ??
+          (r.timestamp as string | number | undefined),
+      );
+    };
+
     try {
       if (source === "crypto" || source === "all") {
         const result = (await (legacyCryptoNews.execute as any)(
@@ -309,7 +334,12 @@ export const getNewsTool = createTool({
           execContext,
         )) as { headlines?: unknown[]; aggregate?: unknown; summary?: string };
         if (source === "crypto") {
-          return { source: "crypto", items: result.headlines ?? [], fetchedAt };
+          return {
+            source: "crypto",
+            items: applyAsOf(result.headlines ?? []),
+            fetchedAt,
+            asOfApplied: Boolean(args.asOf),
+          };
         }
       }
       if (source === "stocks" || source === "edgar" || source === "all") {
@@ -324,7 +354,12 @@ export const getNewsTool = createTool({
           },
           execContext,
         )) as { headlines?: unknown[] };
-        return { source, items: result.headlines ?? [], fetchedAt };
+        return {
+          source,
+          items: applyAsOf(result.headlines ?? []),
+          fetchedAt,
+          asOfApplied: Boolean(args.asOf),
+        };
       }
       // earnings source — no dedicated headline fetcher; route to stock news
       // filtered by EDGAR + Finnhub which covers earnings releases.
@@ -333,12 +368,18 @@ export const getNewsTool = createTool({
         { tickers: [ticker], hoursBack, limit: args.limit },
         execContext,
       )) as { headlines?: unknown[] };
-      return { source: "earnings", items: earnResult.headlines ?? [], fetchedAt };
-    } catch (err) {
+      return {
+        source: "earnings",
+        items: applyAsOf(earnResult.headlines ?? []),
+        fetchedAt,
+        asOfApplied: Boolean(args.asOf),
+      };
+    } catch (_err) {
       return {
         source,
         items: [],
         fetchedAt,
+        asOfApplied: Boolean(args.asOf),
       };
     }
   },

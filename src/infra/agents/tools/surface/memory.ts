@@ -13,15 +13,55 @@ import { z } from "zod";
 import { auditLog } from "../../../platform/audit/index.ts";
 import type { AuditAction } from "../../../platform/audit/index.ts";
 import {
-  searchMemoryTool as legacySearchMemory,
   recordObservationTool as legacyRecordObservation,
   recordInsightTool as legacyRecordInsight,
 } from "../runtime/meta/memory-tools.ts";
 import type { MastraExecutionContext } from "../types.ts";
+import { getMemoryManager } from "../../../../core/memory/index.ts";
+import {
+  filterByAsOf,
+  isThinEvidence,
+  classifyEvidenceQuality,
+  mergeAndDedupe,
+  type EvidenceQuality,
+} from "./retrieval-helpers.ts";
 
 // ============================================================================
 // memory_search
 // ============================================================================
+
+function formatAgeFromIso(iso: string | undefined | null): string {
+  if (!iso) return "unknown";
+  const ts = Date.parse(iso);
+  if (!Number.isFinite(ts)) return "unknown";
+  const minutes = (Date.now() - ts) / 60_000;
+  if (minutes < 1) return "<1m";
+  if (minutes < 60) return `${Math.floor(minutes)}m`;
+  if (minutes < 60 * 24) return `${Math.floor(minutes / 60)}h`;
+  return `${Math.floor(minutes / (60 * 24))}d`;
+}
+
+interface FlattenedRecord {
+  content: string;
+  type: string;
+  score: number;
+  age: string;
+  createdAt: string | undefined;
+  symbols: string[] | undefined;
+  id: string | undefined;
+}
+
+function flatten(results: Array<{ entry: { id?: string; content: string; type: string; createdAt?: string; symbols?: string[] }; score: number }>): FlattenedRecord[] {
+  return results.map((r) => ({
+    id: r.entry.id,
+    content: r.entry.content,
+    type: r.entry.type,
+    score: Math.round(r.score * 100) / 100,
+    age: formatAgeFromIso(r.entry.createdAt),
+    createdAt: r.entry.createdAt,
+    symbols: r.entry.symbols,
+  }));
+}
 
 export const memorySearchTool = createTool({
   id: "memory_search",
@@ -33,6 +73,21 @@ export const memorySearchTool = createTool({
     "Use BEFORE making decisions to check if there's prior context on the",
     "symbol / pattern / regime. Returns up to `limit` records sorted by",
     "relevance.",
+    "",
+    "Two patterns from the Quarq Agent comparison (OSS, Apache 2.0) are",
+    "supported:",
+    "",
+    "  - `asOf`: ISO timestamp. Constrain results to memories created at",
+    "    or before this time. Use for 'what did we know about X at time Y?'",
+    "    questions and post-trade replay accuracy. Leave unset for the",
+    "    default 'all current memory' behavior.",
+    "",
+    "  - `mode`: 'standard' (one pass, default limit), 'deep' (one pass,",
+    "    larger limit for aggregation / timeline queries), or 'auto'",
+    "    (default — run standard first; if evidence is thin, automatically",
+    "    expand with a deep second pass and merge results). The output's",
+    "    `evidenceQuality` field reports whether retrieval was rich /",
+    "    thin / expanded.",
   ].join("\n"),
   inputSchema: z.object({
     query: z.string().min(1).describe("Search query — symbol, concept, lesson keyword."),
@@ -41,27 +96,79 @@ export const memorySearchTool = createTool({
       .optional()
       .describe("Restrict search to a memory scope. Default 'all'."),
     limit: z.number().int().positive().max(20).optional().describe("Max records. Default 10."),
+    asOf: z
+      .string()
+      .optional()
+      .describe(
+        "ISO timestamp (e.g. '2026-05-20T14:00:00Z'). Drops records created AFTER this time. Use for replay / 'what did we know when' questions.",
+      ),
+    mode: z
+      .enum(["standard", "deep", "auto"])
+      .optional()
+      .describe(
+        "Retrieval mode. 'standard'=single pass. 'deep'=larger single pass for aggregation. 'auto' (default)=try standard first, fall back to deep if results are thin.",
+      ),
   }),
   outputSchema: z.object({
     query: z.string(),
     records: z.array(z.unknown()),
     totalFound: z.number(),
+    evidenceQuality: z.enum(["rich", "thin", "expanded"]),
+    asOfApplied: z.boolean(),
     error: z.string().optional(),
   }),
   execute: async (
-    args: { query: string; scope?: string; limit?: number },
-    execContext?: MastraExecutionContext,
+    args: { query: string; scope?: string; limit?: number; asOf?: string; mode?: "standard" | "deep" | "auto" },
+    _execContext?: MastraExecutionContext,
   ) => {
-    const result = (await (legacySearchMemory.execute as any)(
-      { query: args.query, limit: args.limit ?? 10 },
-      execContext,
-    )) as { results: unknown[]; count: number; error?: string };
-    return {
-      query: args.query,
-      records: result.results ?? [],
-      totalFound: result.count ?? 0,
-      error: result.error,
-    };
+    const baseLimit = args.limit ?? 10;
+    const deepLimit = Math.min(20, baseLimit * 2);
+    const mode = args.mode ?? "auto";
+
+    try {
+      const manager = await getMemoryManager();
+
+      // First pass — standard limit unless caller asked for deep upfront.
+      const firstLimit = mode === "deep" ? deepLimit : baseLimit;
+      const firstRaw = await manager.journal.search(args.query, { limit: firstLimit });
+      const firstFiltered = filterByAsOf(flatten(firstRaw), args.asOf, (r) => r.createdAt);
+
+      let merged: FlattenedRecord[] = firstFiltered;
+      let expanded = false;
+
+      // Auto mode: if first pass evidence is thin, run a deep second pass
+      // and merge + dedupe. Bypasses second pass when caller already asked
+      // for "deep" (one pass is the contract) or "standard" (no fallback).
+      if (mode === "auto" && isThinEvidence(firstFiltered)) {
+        const secondRaw = await manager.journal.search(args.query, { limit: deepLimit });
+        const secondFiltered = filterByAsOf(flatten(secondRaw), args.asOf, (r) => r.createdAt);
+        merged = mergeAndDedupe(firstFiltered as unknown as Array<Record<string, unknown>>, secondFiltered as unknown as Array<Record<string, unknown>>) as unknown as FlattenedRecord[];
+        expanded = merged.length > firstFiltered.length;
+      }
+
+      const evidenceQuality: EvidenceQuality = classifyEvidenceQuality(
+        firstFiltered.length,
+        merged.length,
+        expanded,
+      );
+
+      return {
+        query: args.query,
+        records: merged,
+        totalFound: merged.length,
+        evidenceQuality,
+        asOfApplied: Boolean(args.asOf),
+      };
+    } catch (err) {
+      return {
+        query: args.query,
+        records: [],
+        totalFound: 0,
+        evidenceQuality: "thin" as const,
+        asOfApplied: Boolean(args.asOf),
+        error: err instanceof Error ? err.message : String(err),
+      };
+    }
   },
 });
 
