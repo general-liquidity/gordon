@@ -15,22 +15,22 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 import {
-  listSkillsTool as legacyListSkills,
-  loadSkillTool as legacyLoadSkill,
+  listSkillsTool as implListSkills,
+  loadSkillTool as implLoadSkill,
 } from "../runtime/lifecycle/skill-loader.ts";
-import { askUserTool as legacyAskUser } from "../runtime/flow/askUser.ts";
+import { askUserTool as implAskUser } from "../runtime/flow/askUser.ts";
 import { getSubagentProfileRegistry } from "../../profiles/subagentProfileRegistry.ts";
 import {
   dispatchSubagentTask,
   isDynamicSubagentsEnabled,
 } from "../../profiles/subagentDispatcher.ts";
 import {
-  createSwingMandateTool as legacyCreateSwingMandate,
-  startAutonomousModeTool as legacyStartAutonomous,
-  stopAutonomousModeTool as legacyStopAutonomous,
-  getAutonomousStatusTool as legacyAutonomousStatus,
-  pauseAutonomousModeTool as legacyPauseAutonomous,
-  resumeAutonomousModeTool as legacyResumeAutonomous,
+  createSwingMandateTool as implCreateSwingMandate,
+  startAutonomousModeTool as implStartAutonomous,
+  stopAutonomousModeTool as implStopAutonomous,
+  getAutonomousStatusTool as implAutonomousStatus,
+  pauseAutonomousModeTool as implPauseAutonomous,
+  resumeAutonomousModeTool as implResumeAutonomous,
 } from "../runtime/meta/autonomous.ts";
 import type { MastraExecutionContext } from "../types.ts";
 
@@ -75,7 +75,7 @@ export const skillTool = createTool({
     execContext?: MastraExecutionContext,
   ) => {
     if (args.action === "list") {
-      const result = (await (legacyListSkills.execute as any)(
+      const result = (await (implListSkills.execute as any)(
         { filter: args.filter },
         execContext,
       )) as { skills?: unknown[]; error?: string };
@@ -84,7 +84,7 @@ export const skillTool = createTool({
     if (!args.id) {
       return { action: "load", error: "id is required when action='load'." };
     }
-    const result = (await (legacyLoadSkill.execute as any)(
+    const result = (await (implLoadSkill.execute as any)(
       { id: args.id },
       execContext,
     )) as { skill?: unknown; error?: string };
@@ -188,7 +188,7 @@ export const askUserTool = createTool({
     args: { question: string; options?: string[]; context?: string },
     execContext?: MastraExecutionContext,
   ) => {
-    const result = (await (legacyAskUser.execute as any)(
+    const result = (await (implAskUser.execute as any)(
       { question: args.question, options: args.options, context: args.context },
       execContext,
     )) as { answer?: string; dismissed?: boolean };
@@ -247,15 +247,15 @@ export const scheduleTaskTool = createTool({
           const spec = (args.spec as Record<string, unknown> | undefined) ?? {};
           const kind = (spec.kind as string | undefined) ?? "swing";
           if (kind === "autonomous") {
-            const r = (await (legacyStartAutonomous.execute as any)(spec, execContext)) as unknown;
+            const r = (await (implStartAutonomous.execute as any)(spec, execContext)) as unknown;
             return { success: true, action: "create", mandate: r };
           }
-          const r = (await (legacyCreateSwingMandate.execute as any)(spec, execContext)) as unknown;
+          const r = (await (implCreateSwingMandate.execute as any)(spec, execContext)) as unknown;
           return { success: true, action: "create", mandate: r };
         }
         case "list":
         case "status": {
-          const r = (await (legacyAutonomousStatus.execute as any)({}, execContext)) as {
+          const r = (await (implAutonomousStatus.execute as any)({}, execContext)) as {
             mandates?: unknown[];
           };
           return {
@@ -266,21 +266,21 @@ export const scheduleTaskTool = createTool({
           };
         }
         case "pause": {
-          const r = (await (legacyPauseAutonomous.execute as any)(
+          const r = (await (implPauseAutonomous.execute as any)(
             { mandateId: args.mandateId },
             execContext,
           )) as { error?: string };
           return { success: !r.error, action: "pause", mandate: r, error: r.error };
         }
         case "resume": {
-          const r = (await (legacyResumeAutonomous.execute as any)(
+          const r = (await (implResumeAutonomous.execute as any)(
             { mandateId: args.mandateId },
             execContext,
           )) as { error?: string };
           return { success: !r.error, action: "resume", mandate: r, error: r.error };
         }
         case "stop": {
-          const r = (await (legacyStopAutonomous.execute as any)(
+          const r = (await (implStopAutonomous.execute as any)(
             { mandateId: args.mandateId },
             execContext,
           )) as { error?: string };

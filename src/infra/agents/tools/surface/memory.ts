@@ -13,8 +13,8 @@ import { z } from "zod";
 import { auditLog } from "../../../platform/audit/index.ts";
 import type { AuditAction } from "../../../platform/audit/index.ts";
 import {
-  recordObservationTool as legacyRecordObservation,
-  recordInsightTool as legacyRecordInsight,
+  recordObservationTool as implRecordObservation,
+  recordInsightTool as implRecordInsight,
 } from "../runtime/meta/memory-tools.ts";
 import type { MastraExecutionContext } from "../types.ts";
 import { getMemoryManager } from "../../../../core/memory/index.ts";
@@ -212,7 +212,7 @@ export const memoryWriteTool = createTool({
     const useInsight = args.kind === "lesson" || args.kind === "preference";
     try {
       if (useInsight) {
-        const result = (await (legacyRecordInsight.execute as any)(
+        const result = (await (implRecordInsight.execute as any)(
           {
             content: args.content,
             confidence: 0.8,
@@ -227,7 +227,7 @@ export const memoryWriteTool = createTool({
           error: result.error,
         };
       }
-      const result = (await (legacyRecordObservation.execute as any)(
+      const result = (await (implRecordObservation.execute as any)(
         {
           symbol: args.symbol ?? "GENERAL",
           observation: args.content,

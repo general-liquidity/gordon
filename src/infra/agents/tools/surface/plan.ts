@@ -17,13 +17,13 @@ import { z } from "zod";
 import { getGordonContext, type MastraExecutionContext } from "../types.ts";
 import { createPlan as dbCreatePlan, getPlan as dbGetPlan } from "../../../storage/entities/plans.ts";
 import {
-  approvePlanTool as legacyApprovePlan,
-  executePlanTool as legacyExecutePlan,
-  closeTradeTool as legacyCloseTrade,
-  closePartialPositionTool as legacyClosePartial,
+  approvePlanTool as implApprovePlan,
+  executePlanTool as implExecutePlan,
+  closeTradeTool as implCloseTrade,
+  closePartialPositionTool as implClosePartial,
 } from "../trading/trading.ts";
-import { checkRiskTool as legacyCheckRisk } from "../trading/risk-gate.ts";
-import { runBacktestTool as legacyRunBacktest } from "../strategy/backtest/backtest.ts";
+import { checkRiskTool as implCheckRisk } from "../trading/risk-gate.ts";
+import { runBacktestTool as implRunBacktest } from "../strategy/backtest/backtest.ts";
 import {
   recordBacktestRun,
   getBacktestRun,
@@ -317,7 +317,7 @@ export const verifyPlanTool = createTool({
     const proxiedExecContext = args.portfolioOverrideUsd
       ? verifyPlanPortfolioProxy(execContext, args.portfolioOverrideUsd)
       : execContext;
-    const result = (await (legacyCheckRisk.execute as any)(
+    const result = (await (implCheckRisk.execute as any)(
       {
         symbol: plan.symbol,
         side: plan.direction === "long" ? "BUY" : "SELL",
@@ -424,7 +424,7 @@ export const approvePlanTool = createTool({
     execContext?: MastraExecutionContext,
   ) => {
     try {
-      const result = (await (legacyApprovePlan.execute as any)(
+      const result = (await (implApprovePlan.execute as any)(
         { planId: args.planId },
         execContext,
       )) as { success?: boolean; error?: string };
@@ -492,7 +492,7 @@ export const executePlanTool = createTool({
     execContext?: MastraExecutionContext,
   ) => {
     try {
-      const result = (await (legacyExecutePlan.execute as any)(
+      const result = (await (implExecutePlan.execute as any)(
         { planId: args.planId, rationale: args.rationale },
         execContext,
       )) as {
@@ -609,7 +609,7 @@ export const cancelTool = createTool({
         }
         case "position": {
           if (!args.id) return { success: false, target: args.target, error: "`id` (tradeId) required." };
-          const r = (await (legacyCloseTrade.execute as any)(
+          const r = (await (implCloseTrade.execute as any)(
             { tradeId: args.id, reason: "MANUAL" },
             execContext,
           )) as { success?: boolean; error?: string; pnl?: number };
@@ -624,7 +624,7 @@ export const cancelTool = createTool({
           if (!args.id) return { success: false, target: args.target, error: "`id` (tradeId) required." };
           if (!args.percentPct)
             return { success: false, target: args.target, error: "`percentPct` required for partial close." };
-          const r = (await (legacyClosePartial.execute as any)(
+          const r = (await (implClosePartial.execute as any)(
             { tradeId: args.id, percentage: args.percentPct / 100, reason: "MANUAL" },
             execContext,
           )) as { success?: boolean; error?: string };
@@ -786,7 +786,7 @@ export const backtestTool = createTool({
     const hasCalendarRange = Boolean(startDate && endDate);
     const initialCapital = args.initialCapitalUsd ?? 10000;
     const commission = 0.001;
-    const result = (await (legacyRunBacktest.execute as any)(
+    const result = (await (implRunBacktest.execute as any)(
       {
         symbol,
         strategyId,

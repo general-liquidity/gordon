@@ -54,27 +54,27 @@ import {
   type Candle as IndicatorCandle,
 } from "../../../../core/indicators/index.ts";
 import { RegimeDetector } from "../../../../core/regime/index.ts";
-import { checkRiskTool as legacyCheckRisk } from "../trading/risk-gate.ts";
+import { checkRiskTool as implCheckRisk } from "../trading/risk-gate.ts";
 import { recordSymbolObservation } from "../../observation/symbolObservationTracker.ts";
 import {
-  computeMicropriceTool as legacyMicroprice,
-  computeInventoryAdjustedPriceTool as legacyInventoryAdjusted,
-  computeMonteCarloPathTool as legacyMonteCarloPath,
-  computeKellySizeTool as legacyKellySize,
-  computeMarketMemoryTool as legacyMarketMemory,
-  computeDcfTool as legacyDcf,
+  computeMicropriceTool as implMicroprice,
+  computeInventoryAdjustedPriceTool as implInventoryAdjusted,
+  computeMonteCarloPathTool as implMonteCarloPath,
+  computeKellySizeTool as implKellySize,
+  computeMarketMemoryTool as implMarketMemory,
+  computeDcfTool as implDcf,
 } from "../runtime/microstructure.ts";
 import {
-  detectCorrelationBreakdownTool as legacyCorrelationBreakdown,
-  getVolForecastCalibrationTool as legacyVolForecast,
-  getPnlDistributionShapeTool as legacyPnlShape,
+  detectCorrelationBreakdownTool as implCorrelationBreakdown,
+  getVolForecastCalibrationTool as implVolForecast,
+  getPnlDistributionShapeTool as implPnlShape,
 } from "../runtime/diagnostics.ts";
 import {
-  validateEarningsSignalTool as legacyEarningsSignal,
-  getDisciplineAuditTool as legacyDisciplineAudit,
-  computeCrowdPositioningVerdictTool as legacyCrowdPositioning,
+  validateEarningsSignalTool as implEarningsSignal,
+  getDisciplineAuditTool as implDisciplineAudit,
+  computeCrowdPositioningVerdictTool as implCrowdPositioning,
 } from "../runtime/institutionalAi.ts";
-import { getAdherenceReportTool as legacyAdherenceReport } from "../runtime/adherence.ts";
+import { getAdherenceReportTool as implAdherenceReport } from "../runtime/adherence.ts";
 
 /** Auto-collect bridge for the three microstructure ops whose direct
  *  inputs (snapshots[], mid+inventory+vol+horizon, ReturnSeries[]) are
@@ -724,7 +724,7 @@ export const computeRiskTool = createTool({
       ? withPortfolioOverride(execContext, args.portfolioOverrideUsd)
       : execContext;
 
-    const result = (await (legacyCheckRisk.execute as any)(
+    const result = (await (implCheckRisk.execute as any)(
       {
         symbol: args.symbol,
         side: args.side === "buy" ? "BUY" : "SELL",
@@ -879,19 +879,19 @@ export const computeMicrostructureTool = createTool({
   ) => {
     const computedAt = new Date().toISOString();
     const dispatchTable: Record<string, { execute?: unknown }> = {
-      microprice: legacyMicroprice,
-      inventory_adjusted_price: legacyInventoryAdjusted,
-      correlation_breakdown: legacyCorrelationBreakdown,
-      vol_forecast_calibration: legacyVolForecast,
-      pnl_distribution_shape: legacyPnlShape,
-      crowd_positioning: legacyCrowdPositioning,
-      earnings_signal: legacyEarningsSignal,
-      discipline_audit: legacyDisciplineAudit,
-      adherence_report: legacyAdherenceReport,
-      monte_carlo_path: legacyMonteCarloPath,
-      kelly_size: legacyKellySize,
-      market_memory: legacyMarketMemory,
-      dcf: legacyDcf,
+      microprice: implMicroprice,
+      inventory_adjusted_price: implInventoryAdjusted,
+      correlation_breakdown: implCorrelationBreakdown,
+      vol_forecast_calibration: implVolForecast,
+      pnl_distribution_shape: implPnlShape,
+      crowd_positioning: implCrowdPositioning,
+      earnings_signal: implEarningsSignal,
+      discipline_audit: implDisciplineAudit,
+      adherence_report: implAdherenceReport,
+      monte_carlo_path: implMonteCarloPath,
+      kelly_size: implKellySize,
+      market_memory: implMarketMemory,
+      dcf: implDcf,
     };
     try {
       const handler = dispatchTable[args.operation];

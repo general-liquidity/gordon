@@ -22,8 +22,8 @@ import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 import { getGordonContext, type MastraExecutionContext } from "../types.ts";
 import { recordSymbolObservation } from "../../observation/symbolObservationTracker.ts";
-import { getCryptoNewsHeadlinesTool as legacyCryptoNews } from "../news/news.ts";
-import { getStockNewsHeadlinesTool as legacyStockNews } from "../news/stockNews.ts";
+import { getCryptoNewsHeadlinesTool as implCryptoNews } from "../news/news.ts";
+import { getStockNewsHeadlinesTool as implStockNews } from "../news/stockNews.ts";
 import { filterByAsOf } from "./retrieval-helpers.ts";
 import { upsertCandles, readCandles, type CachedCandle } from "../../../data/ohlcvCache.ts";
 import {
@@ -32,13 +32,13 @@ import {
   type OrderbookLevel,
 } from "../../../data/orderbookCache.ts";
 import {
-  getCompanyProfileTool as legacyProfile,
-  getBasicFinancialsTool as legacyBasicFinancials,
-  getFinancialsReportedTool as legacyFinancialsReported,
-  getEarningsSurprisesTool as legacyEarningsSurprises,
-  getRevenueEstimatesTool as legacyRevenueEstimates,
-  getUpgradeDowngradeTool as legacyUpgradeDowngrade,
-  getInsiderSentimentTool as legacyInsiderSentiment,
+  getCompanyProfileTool as implProfile,
+  getBasicFinancialsTool as implBasicFinancials,
+  getFinancialsReportedTool as implFinancialsReported,
+  getEarningsSurprisesTool as implEarningsSurprises,
+  getRevenueEstimatesTool as implRevenueEstimates,
+  getUpgradeDowngradeTool as implUpgradeDowngrade,
+  getInsiderSentimentTool as implInsiderSentiment,
 } from "../providers/finnhub-fundamentals-tools.ts";
 
 // ============================================================================
@@ -413,7 +413,7 @@ export const getNewsTool = createTool({
 
     try {
       if (source === "crypto" || source === "all") {
-        const result = (await (legacyCryptoNews.execute as any)(
+        const result = (await (implCryptoNews.execute as any)(
           { query: args.symbol, hoursBack, limit: args.limit },
           execContext,
         )) as { headlines?: unknown[]; aggregate?: unknown; summary?: string };
@@ -429,7 +429,7 @@ export const getNewsTool = createTool({
       if (source === "stocks" || source === "edgar" || source === "all") {
         const ticker = (args.symbol ?? "SPY").toUpperCase();
         const stockSources = source === "edgar" ? (["edgar"] as const) : undefined;
-        const result = (await (legacyStockNews.execute as any)(
+        const result = (await (implStockNews.execute as any)(
           {
             tickers: [ticker],
             hoursBack,
@@ -448,7 +448,7 @@ export const getNewsTool = createTool({
       // earnings source — no dedicated headline fetcher; route to stock news
       // filtered by EDGAR + Finnhub which covers earnings releases.
       const ticker = (args.symbol ?? "SPY").toUpperCase();
-      const earnResult = (await (legacyStockNews.execute as any)(
+      const earnResult = (await (implStockNews.execute as any)(
         { tickers: [ticker], hoursBack, limit: args.limit },
         execContext,
       )) as { headlines?: unknown[] };
@@ -521,7 +521,7 @@ export const getFundamentalsTool = createTool({
     try {
       switch (args.metric) {
         case "profile": {
-          const r = (await (legacyProfile.execute as any)({ symbol }, execContext)) as unknown;
+          const r = (await (implProfile.execute as any)({ symbol }, execContext)) as unknown;
           return { ticker: symbol, metric: "profile", data: r, fetchedAt };
         }
         case "income":
@@ -533,31 +533,31 @@ export const getFundamentalsTool = createTool({
               : args.metric === "balance"
                 ? "annual"
                 : "annual";
-          const r = (await (legacyFinancialsReported.execute as any)(
+          const r = (await (implFinancialsReported.execute as any)(
             { symbol, freq },
             execContext,
           )) as unknown;
           return { ticker: symbol, metric: args.metric, data: r, fetchedAt };
         }
         case "estimates": {
-          const r = (await (legacyRevenueEstimates.execute as any)({ symbol }, execContext)) as unknown;
+          const r = (await (implRevenueEstimates.execute as any)({ symbol }, execContext)) as unknown;
           return { ticker: symbol, metric: "estimates", data: r, fetchedAt };
         }
         case "earnings": {
-          const r = (await (legacyEarningsSurprises.execute as any)({ symbol }, execContext)) as unknown;
+          const r = (await (implEarningsSurprises.execute as any)({ symbol }, execContext)) as unknown;
           return { ticker: symbol, metric: "earnings", data: r, fetchedAt };
         }
         case "analysts": {
-          const r = (await (legacyUpgradeDowngrade.execute as any)({ symbol }, execContext)) as unknown;
+          const r = (await (implUpgradeDowngrade.execute as any)({ symbol }, execContext)) as unknown;
           return { ticker: symbol, metric: "analysts", data: r, fetchedAt };
         }
         case "insider": {
-          const r = (await (legacyInsiderSentiment.execute as any)({ symbol }, execContext)) as unknown;
+          const r = (await (implInsiderSentiment.execute as any)({ symbol }, execContext)) as unknown;
           return { ticker: symbol, metric: "insider", data: r, fetchedAt };
         }
         default: {
           // Fall back to basic financials for any unrecognized metric.
-          const r = (await (legacyBasicFinancials.execute as any)({ symbol }, execContext)) as unknown;
+          const r = (await (implBasicFinancials.execute as any)({ symbol }, execContext)) as unknown;
           return { ticker: symbol, metric: args.metric, data: r, fetchedAt };
         }
       }
