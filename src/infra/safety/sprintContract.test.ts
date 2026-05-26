@@ -1,20 +1,11 @@
 import { describe, it, expect } from "bun:test";
 
 import {
-  isSprintContractEnabled,
   createSprintContract,
   compareWithActuals,
   contractToPayload,
   diffToPayload,
 } from "./sprintContract.ts";
-
-describe("isSprintContractEnabled", () => {
-  it("respects the flag", () => {
-    expect(isSprintContractEnabled({})).toBe(false);
-    expect(isSprintContractEnabled({ GORDON_SPRINT_CONTRACT: "1" })).toBe(true);
-    expect(isSprintContractEnabled({ GORDON_SPRINT_CONTRACT: "true" })).toBe(true);
-  });
-});
 
 describe("createSprintContract", () => {
   it("normalizes empty drafts to empty arrays", () => {

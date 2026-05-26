@@ -64,11 +64,6 @@ export interface ContractDiff {
   verdict: "clean" | "drift" | "violation";
 }
 
-export function isSprintContractEnabled(
-  env: NodeJS.ProcessEnv = process.env,
-): boolean {
-  return env.GORDON_SPRINT_CONTRACT === "1" || env.GORDON_SPRINT_CONTRACT === "true";
-}
 
 function newContractId(): string {
   return `sprint-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;

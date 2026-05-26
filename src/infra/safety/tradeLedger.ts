@@ -47,7 +47,6 @@ import { existsSync, mkdirSync } from "node:fs";
 import { appendFile, readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { GORDON_DIR } from "../storage/paths.ts";
-import type { EvidenceBundle } from "./evidenceBundle.ts";
 
 export const TRADE_LEDGER_FLAG_ENV = "GORDON_TRADE_LEDGER";
 export const TRADE_LEDGER_PATH_ENV = "GORDON_TRADE_LEDGER_PATH";
@@ -134,7 +133,6 @@ export interface ExecutionRecord {
   results: ExecutionResult[];
   stateBefore?: AccountSnapshot;
   stateAfter?: AccountSnapshot;
-  evidenceBundles?: EvidenceBundle[];
   /**
    * Tamper-evidence-lite: sha-256 of the canonical record body (excluding
    * the field itself). Detects accidental mutation of the JSONL file but
@@ -156,7 +154,6 @@ export interface ExecutionRecordInput {
   results: ExecutionResult[];
   stateBefore?: AccountSnapshot;
   stateAfter?: AccountSnapshot;
-  evidenceBundles?: EvidenceBundle[];
   /** Override recordId (for tests + deterministic replay). Defaults to randomUUID(). */
   recordIdOverride?: string;
 }
@@ -191,7 +188,6 @@ export function buildExecutionRecord(input: ExecutionRecordInput): ExecutionReco
     results: [...input.results],
     stateBefore: input.stateBefore,
     stateAfter: input.stateAfter,
-    evidenceBundles: input.evidenceBundles,
   };
 
   const bodyHash = computeBodyHash(body);

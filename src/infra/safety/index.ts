@@ -150,7 +150,6 @@ export type {
 
 // Sprint contract (pre-session scope alignment, L11 port)
 export {
-  isSprintContractEnabled,
   createSprintContract,
   compareWithActuals,
   contractToPayload,

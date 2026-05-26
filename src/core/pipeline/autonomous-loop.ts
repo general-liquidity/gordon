@@ -20,7 +20,6 @@ import {
   validateMandate,
 } from "../safety/swing-mandate.ts";
 import {
-  isSprintContractEnabled,
   createSprintContract,
   contractToPayload,
   type SprintContract,
@@ -416,25 +415,23 @@ export function startAutonomousLoop(config: AutonomousLoopConfig): { success: bo
   // (mandate drawdown ceiling + min-confidence). The contract is the
   // pre-session statement of intent; the actuals at stopAutonomousLoop
   // are emitted alongside so an operator can compute the diff
-  // post-hoc via `compareWithActuals`. Default-off — flag-gated.
-  if (isSprintContractEnabled()) {
-    const exchangeId = (config.exchange as { id?: string } | undefined)?.id;
-    loopState.sprintContract = createSprintContract({
-      scope: {
-        symbols: config.mandate.symbols ?? [],
-        venues: exchangeId ? [exchangeId] : [],
-        strategies: [],
-      },
-      verificationStandards: [
-        `min confidence above ${config.mandate.minConfidence}`,
-        `max drawdown within ${config.mandate.maxDrawdown}%`,
-        `mandate ${config.mandate.id} not breached`,
-      ],
-      exclusions: [`no trading outside mandate ${config.mandate.id}`],
-      intent: `autonomous loop on mandate ${config.mandate.id}`,
-    });
-    logger.info("Sprint contract recorded", contractToPayload(loopState.sprintContract));
-  }
+  // post-hoc via `compareWithActuals`.
+  const exchangeId = (config.exchange as { id?: string } | undefined)?.id;
+  loopState.sprintContract = createSprintContract({
+    scope: {
+      symbols: config.mandate.symbols ?? [],
+      venues: exchangeId ? [exchangeId] : [],
+      strategies: [],
+    },
+    verificationStandards: [
+      `min confidence above ${config.mandate.minConfidence}`,
+      `max drawdown within ${config.mandate.maxDrawdown}%`,
+      `mandate ${config.mandate.id} not breached`,
+    ],
+    exclusions: [`no trading outside mandate ${config.mandate.id}`],
+    intent: `autonomous loop on mandate ${config.mandate.id}`,
+  });
+  logger.info("Sprint contract recorded", contractToPayload(loopState.sprintContract));
 
   const intervalMs = config.mandate.scanIntervalMinutes * 60 * 1000;
 
