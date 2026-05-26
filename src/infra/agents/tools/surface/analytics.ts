@@ -49,7 +49,12 @@ import {
 } from "../../../../core/indicators/index.ts";
 import { RegimeDetector } from "../../../../core/regime/index.ts";
 import { checkRiskTool as legacyCheckRisk } from "../trading/risk-gate.ts";
-import { computeMicropriceTool as legacyMicroprice, computeInventoryAdjustedPriceTool as legacyInventoryAdjusted } from "../runtime/microstructure.ts";
+import {
+  computeMicropriceTool as legacyMicroprice,
+  computeInventoryAdjustedPriceTool as legacyInventoryAdjusted,
+  computeMonteCarloPathTool as legacyMonteCarloPath,
+  computeKellySizeTool as legacyKellySize,
+} from "../runtime/microstructure.ts";
 import {
   detectCorrelationBreakdownTool as legacyCorrelationBreakdown,
   getVolForecastCalibrationTool as legacyVolForecast,
@@ -213,6 +218,30 @@ async function maybeAutoCollect(
       series: aligned,
       ...(typeof params.tailWindow === "number" && { tailWindow: params.tailWindow }),
       ...(typeof params.baselineWindow === "number" && { baselineWindow: params.baselineWindow }),
+    };
+  }
+
+  if (operation === "monte_carlo_path") {
+    if (Array.isArray(params.prices)) return params;
+    const symbol = typeof params.symbol === "string" ? params.symbol : null;
+    if (!symbol) return params;
+    if (!exchange) return { error: "auto-collect monte_carlo_path: no exchange connected" };
+    const horizonBars = typeof params.horizonBars === "number" ? params.horizonBars : null;
+    if (!horizonBars) return { error: "auto-collect monte_carlo_path: horizonBars is required" };
+    const timeframe = (typeof params.timeframe === "string" ? params.timeframe : "1h") as string;
+    const lookbackBars = typeof params.lookbackBars === "number" ? params.lookbackBars : 200;
+    const candles = await exchange.getCandles(symbol, timeframe, lookbackBars);
+    const prices = candles.map((c) => c.close);
+    if (prices.length < 20) {
+      return { error: `auto-collect monte_carlo_path: only ${prices.length} candles — need ≥ 20` };
+    }
+    return {
+      prices,
+      horizonBars,
+      ...(typeof params.nSims === "number" && { nSims: params.nSims }),
+      ...(typeof params.model === "string" && { model: params.model }),
+      ...(typeof params.nStates === "number" && { nStates: params.nStates }),
+      ...(Array.isArray(params.exceedanceLevels) && { exceedanceLevels: params.exceedanceLevels }),
     };
   }
 
@@ -667,6 +696,8 @@ const MICROSTRUCTURE_OPS = [
   "earnings_signal",
   "discipline_audit",
   "adherence_report",
+  "monte_carlo_path",
+  "kelly_size",
 ] as const;
 
 export const computeMicrostructureTool = createTool({
@@ -707,6 +738,17 @@ export const computeMicrostructureTool = createTool({
     "  Self-contained (LLM can invoke directly):",
     "    - 'discipline_audit'   — params: { startTime?, endTime?, userId?, maxTradesPerDay?, maxDistinctSlots?, emotionalProximityMs? }",
     "    - 'adherence_report'   — params: { startTime?, endTime?, userId? }",
+    "    - 'kelly_size'         — params: { winProbability, bankrollUsd, payoutRatio, mode?: 'rr'|'binary', fractionMultiplier? }",
+    "                              Pure math, default quarter-Kelly. Returns fullKelly%, recommended%, positionUsd, edgeBps.",
+    "                              For trade plans use mode='rr' with payoutRatio = R-multiple (e.g. 2.0 for 2R target / 1R stop).",
+    "                              For prediction-market contracts use mode='binary' with payoutRatio = (1 − price) / price.",
+    "",
+    "  With auto-collect shortcut (pass `symbol` and the tool fetches candles):",
+    "    - 'monte_carlo_path'   — direct: { prices[], horizonBars, nSims?, model?, nStates?, exceedanceLevels? }",
+    "                              shortcut: { symbol, horizonBars, timeframe?, lookbackBars?, nSims?, model?, exceedanceLevels? }",
+    "                              Simulates N forward price paths. Returns terminal mean/stddev, p05/p25/p50/p75/p95",
+    "                              quantiles, and P(terminal ≥ level) for each requested exceedance level. Use for scenario",
+    "                              analysis or to derive winProbability inputs for kelly_size.",
     "",
     "IMPORTANT: discipline_audit and adherence_report respect startTime+endTime",
     "ISO strings. When the operator asks for 'last 24h' or 'today', YOU must",
@@ -740,6 +782,8 @@ export const computeMicrostructureTool = createTool({
       earnings_signal: legacyEarningsSignal,
       discipline_audit: legacyDisciplineAudit,
       adherence_report: legacyAdherenceReport,
+      monte_carlo_path: legacyMonteCarloPath,
+      kelly_size: legacyKellySize,
     };
     try {
       const handler = dispatchTable[args.operation];

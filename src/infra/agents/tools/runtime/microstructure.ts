@@ -27,6 +27,8 @@ import {
   inventoryAwareSizeMultiplier,
   summarizeInventoryAdjustment,
 } from "../../../trading/risk/inventoryAdjustedPrice.ts";
+import { monteCarloPath, summarizeMonteCarloPath } from "../../../../core/alpha/monteCarloPath.ts";
+import { kellySize } from "../../../../core/alpha/kellySize.ts";
 
 // ============================================================================
 // compute_microprice
@@ -250,10 +252,113 @@ export const computeInventoryAdjustedPriceTool = createTool({
 });
 
 // ============================================================================
+// compute_monte_carlo_path
+// ============================================================================
+
+export const computeMonteCarloPathTool = createTool({
+  id: "compute_monte_carlo_path",
+  description: [
+    "Simulate N forward price paths from a recent price series and return",
+    "the terminal-price distribution + exceedance probabilities. Two model",
+    "modes: 'markov' (state-conditional returns from observed transitions —",
+    "captures regime persistence) and 'gbm' (Gaussian iid log returns —",
+    "memoryless baseline).",
+    "",
+    "Use for scenario analysis ('what's P(BTC > 80k in 30 bars)?'),",
+    "for Kelly inputs (winProbability via exceedance), and to size around",
+    "calibrated terminal distributions instead of point forecasts.",
+    "",
+    "Honest caveats: Markov on returns assumes the next-return distribution",
+    "depends only on the current return bucket — violated during regime",
+    "shifts. GBM understates crypto tail risk (log-normal isn't fat enough).",
+    "Treat as a sizing aid, not a forecast.",
+  ].join("\n"),
+  inputSchema: z.object({
+    prices: z.array(z.number()).min(2).describe("Price history, oldest → newest. ≥ 60 points recommended."),
+    horizonBars: z.number().int().min(1).max(2000).describe("Bars to project forward."),
+    nSims: z.number().int().min(100).max(100_000).optional().describe("Default 10000."),
+    model: z.enum(["markov", "gbm"]).optional().describe("Default 'markov'."),
+    nStates: z.number().int().min(2).max(50).optional().describe("Return-discretization buckets for Markov. Default 10."),
+    exceedanceLevels: z.array(z.number()).optional().describe("Prices for P(terminal ≥ level) reporting."),
+  }),
+  outputSchema: z.object({
+    summary: z.string(),
+    model: z.enum(["markov", "gbm"]),
+    startPrice: z.number(),
+    horizonBars: z.number(),
+    nSims: z.number(),
+    meanTerminal: z.number(),
+    stddevTerminal: z.number(),
+    quantiles: z.object({
+      p05: z.number(),
+      p25: z.number(),
+      p50: z.number(),
+      p75: z.number(),
+      p95: z.number(),
+    }),
+    exceedance: z.array(
+      z.object({ level: z.number(), probability: z.number() }),
+    ),
+    metadata: z.object({
+      fittedMu: z.number(),
+      fittedSigma: z.number(),
+      reliability: z.enum(["low", "medium", "high"]),
+    }),
+  }),
+  execute: async (input) => {
+    const result = monteCarloPath(input);
+    return { summary: summarizeMonteCarloPath(result), ...result };
+  },
+});
+
+// ============================================================================
+// compute_kelly_size
+// ============================================================================
+
+export const computeKellySizeTool = createTool({
+  id: "compute_kelly_size",
+  description: [
+    "Fractional Kelly position sizing. Two modes:",
+    "",
+    "  'rr' (default, for trade plans): payoutRatio = win/loss R-multiple.",
+    "       e.g. 2.0 means target wins 2R, stop loses 1R.",
+    "",
+    "  'binary' (prediction-market style): payoutRatio = (1 − price) / price.",
+    "       For a contract at 42¢ paying $1: b = 0.58/0.42 ≈ 1.38.",
+    "",
+    "Default multiplier is 0.25 (quarter-Kelly) — the professional standard.",
+    "Full Kelly maximizes long-run growth on paper but its finite-sample",
+    "drawdowns are punishing and a single bad p estimate is catastrophic.",
+    "",
+    "Returns recommended dollar size, full-Kelly fraction, edge in bps,",
+    "and a verdict label. Does NOT enforce concentration caps — downstream",
+    "risk-gate may reduce further.",
+  ].join("\n"),
+  inputSchema: z.object({
+    winProbability: z.number().min(0).max(1),
+    bankrollUsd: z.number().positive(),
+    payoutRatio: z.number().positive(),
+    mode: z.enum(["binary", "rr"]).optional(),
+    fractionMultiplier: z.number().min(0).max(1).optional().describe("Default 0.25 (quarter-Kelly)."),
+  }),
+  outputSchema: z.object({
+    summary: z.string(),
+    fullKellyFraction: z.number(),
+    recommendedFraction: z.number(),
+    positionUsd: z.number(),
+    edgeBps: z.number(),
+    verdict: z.enum(["skip", "small", "normal", "large", "all-in"]),
+  }),
+  execute: async (input) => kellySize(input),
+});
+
+// ============================================================================
 // Export
 // ============================================================================
 
 export const microstructureTools = {
   compute_microprice: computeMicropriceTool,
   compute_inventory_adjusted_price: computeInventoryAdjustedPriceTool,
+  compute_monte_carlo_path: computeMonteCarloPathTool,
+  compute_kelly_size: computeKellySizeTool,
 };

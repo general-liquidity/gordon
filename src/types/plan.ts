@@ -74,6 +74,18 @@ export const PlanSchema = z.object({
 
   reasoning: z.string(),
 
+  /**
+   * Order routing policy. `maker_first` (default) keeps Gordon on the
+   * passive side of the spread — fills wait, but the operator captures
+   * the maker rebate / avoids the taker tax (Becker's 72.1M-trade
+   * empirical edge: makers +1.12% vs takers −1.12%). `any` allows
+   * crossing the spread without operator override. Enforced inside
+   * verify_plan / execute_plan: a maker_first plan with entry.type=
+   * "market" surfaces as a verify_plan violation that must be
+   * acknowledged explicitly before approve_plan succeeds.
+   */
+  routingPolicy: z.enum(["maker_first", "any"]).optional(),
+
   status: z.enum(["DRAFT", "APPROVED", "EXECUTING", "CLOSED", "CANCELLED"]),
 });
 

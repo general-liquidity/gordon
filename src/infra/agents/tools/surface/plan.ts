@@ -92,6 +92,12 @@ export const createPlanTool = createTool({
       .optional()
       .describe("Strategy taxonomy for audit + adherence. Defaults to 'support_bounce' when unset; pick the closest match."),
     timeHorizonHours: z.number().positive().optional(),
+    routingPolicy: z
+      .enum(["maker_first", "any"])
+      .optional()
+      .describe(
+        "Order routing. 'maker_first' (default) waits for a passive fill — captures the +1.12% maker edge and avoids the −1.12% taker tax (Becker 72.1M-trade study). 'any' allows market orders without further confirmation. With maker_first + market entry, verify_plan flags it; operator must approve_plan with overrideVerifyVerdict=true to proceed.",
+      ),
   }),
   outputSchema: z.object({
     success: z.boolean(),
@@ -123,6 +129,7 @@ export const createPlanTool = createTool({
         | "engulfing_pattern"
         | "grid_entry";
       timeHorizonHours?: number;
+      routingPolicy?: "maker_first" | "any";
     },
     execContext?: MastraExecutionContext,
   ) => {
@@ -130,10 +137,11 @@ export const createPlanTool = createTool({
       const ctx = getGordonContext(execContext);
       const portfolioValue = Math.max(ctx?.portfolioValue ?? args.sizeUsd, args.sizeUsd);
       const allocationPercent = args.sizeUsd / portfolioValue;
-      // Map V4 explicit spec to the Plan shape stored in SQLite. Direction
-      // collapses sell→long with inverted stop semantics handled downstream;
-      // strategy defaults to support_bounce since V4 plans are operator-spec'd
-      // not strategy-driven (the strategy slot is metadata, not generator).
+      // Map surface explicit spec to the Plan shape stored in SQLite.
+      // Direction collapses sell→short with inverted stop semantics handled
+      // downstream; strategy defaults to support_bounce since these plans are
+      // operator-spec'd not strategy-driven (the strategy slot is metadata,
+      // not generator).
       const plan = dbCreatePlan({
         symbol: args.symbol,
         direction: args.side === "buy" ? "long" : "short",
@@ -154,6 +162,10 @@ export const createPlanTool = createTool({
           ? [{ price: args.takeProfitPrice, percentToSell: 1 }]
           : [],
         reasoning: args.rationale,
+        // Default maker_first so operators get the +1.12% maker edge by
+        // default. Explicit "any" lets the LLM signal that the operator
+        // wants taker behavior without further gating.
+        routingPolicy: args.routingPolicy ?? "maker_first",
         status: "DRAFT",
         expiresAt: args.timeHorizonHours
           ? new Date(Date.now() + args.timeHorizonHours * 60 * 60 * 1000).toISOString()
@@ -254,20 +266,34 @@ export const verifyPlanTool = createTool({
     };
 
     const approved = result.approved === true;
-    const warnings = result.warnings ?? [];
+    const warnings = [...(result.warnings ?? [])];
+
+    // Maker-first routing check: surface a violation when policy is
+    // maker_first AND entry.type is market. Operator must approve_plan
+    // with overrideVerifyVerdict=true to accept the taker tax.
+    const planRoutingPolicy = (plan as { routingPolicy?: "maker_first" | "any" }).routingPolicy ?? "maker_first";
+    const routingConflict =
+      planRoutingPolicy === "maker_first" && plan.entry.type === "market";
+    if (routingConflict) {
+      warnings.push(
+        "ROUTING_VIOLATION: plan has routingPolicy='maker_first' but entry.type='market' — crossing the spread surrenders the +1.12% maker edge (Becker 2026, 72.1M trades). Convert to a limit entry, or approve with overrideVerifyVerdict=true to accept the taker tax.",
+      );
+    }
+
+    const hasWarnings = warnings.length > 0;
     const verdict: "approve" | "conditional" | "reject" = result.error
       ? "reject"
       : approved
-        ? warnings.length === 0
-          ? "approve"
-          : "conditional"
+        ? hasWarnings
+          ? "conditional"
+          : "approve"
         : "reject";
     const tier: "low" | "medium" | "high" | "critical" = result.error
       ? "critical"
       : approved
-        ? warnings.length === 0
-          ? "low"
-          : "medium"
+        ? hasWarnings
+          ? "medium"
+          : "low"
         : "high";
 
     return {
@@ -277,7 +303,7 @@ export const verifyPlanTool = createTool({
       constitutionViolations: warnings as unknown[],
       recommendation:
         verdict === "approve" ? "auto_approve" : verdict === "conditional" ? "prompt_user" : "block",
-      summary: result.reason ?? result.error ?? "Verify complete.",
+      summary: result.reason ?? result.error ?? (routingConflict ? "Routing-policy conflict — see warnings." : "Verify complete."),
     };
   },
 });
