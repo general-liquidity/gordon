@@ -63,6 +63,10 @@ import {
   computeKellySizeTool as implKellySize,
   computeMarketMemoryTool as implMarketMemory,
   computeDcfTool as implDcf,
+  computeVsRandomTool as implVsRandom,
+  computeSignalPoolTool as implSignalPool,
+  computePortfolioCombineTool as implPortfolioCombine,
+  computeSyntheticAugmentTool as implSyntheticAugment,
 } from "../runtime/microstructure.ts";
 import {
   detectCorrelationBreakdownTool as implCorrelationBreakdown,
@@ -791,6 +795,10 @@ const MICROSTRUCTURE_OPS = [
   "kelly_size",
   "market_memory",
   "dcf",
+  "vs_random",
+  "signal_pool",
+  "portfolio_combine",
+  "synthetic_augment",
 ] as const;
 
 export const computeMicrostructureTool = createTool({
@@ -847,6 +855,22 @@ export const computeMicrostructureTool = createTool({
     "                              + 5x5 sensitivity grid over WACC and terminal-growth. Operator MUST supply validated",
     "                              FCF projections — Gordon does not forecast cash flows itself.",
     "",
+    "    - 'vs_random'          — params: { closes: number[], actualFitness, fitness: 'sharpe'|'profit_factor'|'win_rate'|'total_return', exposureRate, nRandom?, seed? }",
+    "                              Woodriff's 'beat best-of-random' filter. Generates N random-signal strategies on the same",
+    "                              series, returns actual vs best random + verdict (pass/borderline/fail). Distinct from MCPT.",
+    "",
+    "    - 'signal_pool'        — params: { signals: Array<boolean[]|number[]>, threshold? }",
+    "                              Ensemble voting across N indicator outputs. Per-bar fraction-true + fired flag + aggregate stats.",
+    "                              Use for parameter sweeps or context aggregation across different indicator kinds.",
+    "",
+    "    - 'portfolio_combine'  — params: { equityCurves: number[][], weights?, rebalanceCadence?: 'never'|'daily'|'weekly'|'monthly', txCostBps? }",
+    "                              Combine N equity curves + Parrondo/Shannon rebalancing premium test. Reports whether the",
+    "                              combined geometric mean beats the weighted-component geometric (the rebalancing premium).",
+    "",
+    "    - 'synthetic_augment'  — params: { method: 'shift_bars'|'mcp_permute'|'noise_bands', candles: Candle[], params: { ... method-specific ... } }",
+    "                              Generate alternate-reality candle series for backtest robustness. Distinct from",
+    "                              monte_carlo_path which produces FORWARD paths; this one augments HISTORICAL data.",
+    "",
     "    - 'market_memory'      — direct: { prices[], nSurrogates?, minWindow?, vrHorizons?, pValueCutoff? }",
     "                              shortcut: { symbol, timeframe?, lookbackBars?, nSurrogates?, vrHorizons? }",
     "                              Diagnoses what KIND of memory the series has on this horizon: 'trending',",
@@ -892,6 +916,10 @@ export const computeMicrostructureTool = createTool({
       kelly_size: implKellySize,
       market_memory: implMarketMemory,
       dcf: implDcf,
+      vs_random: implVsRandom,
+      signal_pool: implSignalPool,
+      portfolio_combine: implPortfolioCombine,
+      synthetic_augment: implSyntheticAugment,
     };
     try {
       const handler = dispatchTable[args.operation];

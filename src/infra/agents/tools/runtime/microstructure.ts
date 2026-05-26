@@ -31,6 +31,15 @@ import { monteCarloPath, summarizeMonteCarloPath } from "../../../../core/alpha/
 import { kellySize } from "../../../../core/alpha/kellySize.ts";
 import { computeMarketMemory } from "../../../../core/alpha/marketMemory.ts";
 import { computeDcf } from "../../../../core/alpha/dcf.ts";
+import { computeVsRandom } from "../../../../core/alpha/vsRandom.ts";
+import { computeSignalPool } from "../../../../core/alpha/signalPool.ts";
+import { computePortfolioCombine } from "../../../../core/alpha/portfolioCombine.ts";
+import {
+  shiftBars,
+  mcpPermute,
+  addNoiseBands,
+  type Candle as AugCandle,
+} from "../../../../core/alpha/syntheticAugmentation.ts";
 
 // ============================================================================
 // compute_microprice
@@ -473,6 +482,198 @@ export const computeDcfTool = createTool({
   execute: async (input) => computeDcf(input),
 });
 
+// ============================================================================
+// compute_vs_random
+// ============================================================================
+
+export const computeVsRandomTool = createTool({
+  id: "compute_vs_random",
+  description: [
+    "Vs Random benchmarking (Woodriff / Build Alpha). Generates N",
+    "random-signal strategies on the same candle series, computes",
+    "fitness on each, returns the actual strategy's percentile + a",
+    "pass/borderline/fail verdict.",
+    "",
+    "Distinct from MCPT: this asks 'could a random strategy on the same",
+    "data plausibly do this well?'. MCPT asks 'is the path-dependent",
+    "edge real?'. Both questions matter.",
+    "",
+    "Pass criteria: actual must beat the BEST random, not the average.",
+    "Generating enough random strategies guarantees some look good —",
+    "we benchmark against the survivor of N tries.",
+  ].join("\n"),
+  inputSchema: z.object({
+    closes: z.array(z.number()).min(2),
+    actualFitness: z.number(),
+    fitness: z.enum(["sharpe", "profit_factor", "win_rate", "total_return"]),
+    exposureRate: z.number().min(0).max(1),
+    nRandom: z.number().int().positive().optional(),
+    seed: z.number().int().optional(),
+  }),
+  outputSchema: z.object({
+    actualFitness: z.number(),
+    bestRandomFitness: z.number(),
+    meanRandomFitness: z.number(),
+    percentile: z.number(),
+    verdict: z.enum(["pass", "borderline", "fail"]),
+    nRandom: z.number(),
+    interpretation: z.string(),
+  }),
+  execute: async (input) => computeVsRandom(input),
+});
+
+// ============================================================================
+// compute_signal_pool
+// ============================================================================
+
+export const computeSignalPoolTool = createTool({
+  id: "compute_signal_pool",
+  description: [
+    "Ensemble voting across N boolean indicator outputs. Pool the same",
+    "indicator across parameter sweeps (parameter-risk reduction) OR",
+    "different indicator KINDS (context aggregation). Per-bar output",
+    "is the fraction of signals true; the fired flag is set when",
+    "fraction >= threshold.",
+    "",
+    "Most individual indicators barely carry edge alone in noisy",
+    "markets. A vote across N weak signals can be informative when",
+    "the components are genuinely orthogonal.",
+  ].join("\n"),
+  inputSchema: z.object({
+    signals: z.array(z.array(z.union([z.boolean(), z.number()]))),
+    threshold: z.number().min(0).max(1).optional(),
+  }),
+  outputSchema: z.object({
+    fractions: z.array(z.number()),
+    fired: z.array(z.boolean()),
+    barCount: z.number(),
+    signalCount: z.number(),
+    firedCount: z.number(),
+    meanFraction: z.number(),
+    threshold: z.number(),
+  }),
+  execute: async (input) =>
+    computeSignalPool({
+      signals: input.signals as Array<boolean[]> | Array<number[]>,
+      threshold: input.threshold,
+    }),
+});
+
+// ============================================================================
+// compute_portfolio_combine
+// ============================================================================
+
+export const computePortfolioCombineTool = createTool({
+  id: "compute_portfolio_combine",
+  description: [
+    "Combine N strategy equity curves into a portfolio, optionally",
+    "rebalancing periodically. Reports the combined curve + the",
+    "Parrondo / Shannon rebalancing premium (does the combined",
+    "geometric mean beat the weighted geometric of components?).",
+    "",
+    "Uncorrelated components + rebalancing can flip a portfolio of",
+    "losers into a winner. High-correlation portfolios get no benefit.",
+    "Frequent rebalancing on a clear-winner portfolio acts like a",
+    "'sell your best idea' tax — verify on your real curves.",
+  ].join("\n"),
+  inputSchema: z.object({
+    equityCurves: z.array(z.array(z.number()).min(2)),
+    weights: z.array(z.number()).optional(),
+    rebalanceCadence: z.enum(["never", "daily", "weekly", "monthly"]).optional(),
+    txCostBps: z.number().min(0).optional(),
+  }),
+  outputSchema: z.object({
+    combinedEquity: z.array(z.number()),
+    finalEquity: z.number(),
+    geometricMeanReturn: z.number(),
+    arithmeticMeanReturn: z.number(),
+    volatility: z.number(),
+    weightedGeometricComponent: z.number(),
+    rebalancingPremium: z.number(),
+    hasParrondo: z.boolean(),
+    rebalanceEvents: z.number(),
+    totalTxCost: z.number(),
+  }),
+  execute: async (input) => computePortfolioCombine(input),
+});
+
+// ============================================================================
+// compute_synthetic_augment
+// ============================================================================
+
+export const computeSyntheticAugmentTool = createTool({
+  id: "compute_synthetic_augment",
+  description: [
+    "Generate alternate-reality candle series from real history for",
+    "backtest robustness. Three methods:",
+    "",
+    "  - 'shift_bars'    — re-aggregate every N consecutive bars into",
+    "                      one synthetic bar. Tests bar-boundary",
+    "                      sensitivity. params: { offsetBars: 2+ }",
+    "  - 'mcp_permute'   — Masters' Monte Carlo Permutation. Shuffles",
+    "                      intra-bar log-deltas; preserves marginal",
+    "                      statistics, destroys temporal patterns.",
+    "                      params: { seed: number }",
+    "  - 'noise_bands'   — inject block-level vol noise into bar H-L",
+    "                      ranges. Tests ATR sensitivity without",
+    "                      changing trajectory shape. params: { volPct: 0..1, seed: number }",
+    "",
+    "Distinct from compute_monte_carlo_path which generates FORWARD",
+    "paths (Cholesky MC for stress). This module augments HISTORICAL",
+    "data for in-sample / walk-forward robustness.",
+  ].join("\n"),
+  inputSchema: z.object({
+    method: z.enum(["shift_bars", "mcp_permute", "noise_bands"]),
+    candles: z.array(
+      z.object({
+        open: z.number(),
+        high: z.number(),
+        low: z.number(),
+        close: z.number(),
+        volume: z.number().optional(),
+        openTime: z.number().optional(),
+        closeTime: z.number().optional(),
+      }),
+    ),
+    params: z.record(z.string(), z.unknown()).optional(),
+  }),
+  outputSchema: z.object({
+    method: z.string(),
+    candles: z.array(z.unknown()),
+    inputBarCount: z.number(),
+    outputBarCount: z.number(),
+  }),
+  execute: async (input) => {
+    const candles = input.candles as AugCandle[];
+    const params = (input.params ?? {}) as Record<string, unknown>;
+    let out: AugCandle[];
+    switch (input.method) {
+      case "shift_bars": {
+        const offsetBars = typeof params.offsetBars === "number" ? params.offsetBars : 2;
+        out = shiftBars(candles, offsetBars);
+        break;
+      }
+      case "mcp_permute": {
+        const seed = typeof params.seed === "number" ? params.seed : Date.now() & 0xffffffff;
+        out = mcpPermute(candles, seed);
+        break;
+      }
+      case "noise_bands": {
+        const volPct = typeof params.volPct === "number" ? params.volPct : 0.1;
+        const seed = typeof params.seed === "number" ? params.seed : Date.now() & 0xffffffff;
+        out = addNoiseBands(candles, volPct, seed);
+        break;
+      }
+    }
+    return {
+      method: input.method,
+      candles: out,
+      inputBarCount: candles.length,
+      outputBarCount: out.length,
+    };
+  },
+});
+
 export const microstructureTools = {
   compute_microprice: computeMicropriceTool,
   compute_inventory_adjusted_price: computeInventoryAdjustedPriceTool,
@@ -480,4 +681,8 @@ export const microstructureTools = {
   compute_kelly_size: computeKellySizeTool,
   compute_market_memory: computeMarketMemoryTool,
   compute_dcf: computeDcfTool,
+  compute_vs_random: computeVsRandomTool,
+  compute_signal_pool: computeSignalPoolTool,
+  compute_portfolio_combine: computePortfolioCombineTool,
+  compute_synthetic_augment: computeSyntheticAugmentTool,
 };
