@@ -7,10 +7,42 @@
  */
 
 import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { GORDON_DIR } from "../paths.ts";
-const SESSION_FILE = join(GORDON_DIR, "session.json");
+
+// SESSION_FILE is computed via a getter so tests can swap the path
+// per-test via setSessionPathForTesting. Production callers see the
+// usual ~/.gordon/session.json behavior.
+let sessionFileOverride: string | null = null;
+function sessionFilePath(): string {
+  return sessionFileOverride ?? join(GORDON_DIR, "session.json");
+}
+
+/** Test-only seam — swap the on-disk session path for isolated tests.
+ *  Pass `null` to restore the production path. */
+export function setSessionPathForTesting(path: string | null): void {
+  sessionFileOverride = path;
+}
+
+/**
+ * Per-thread record. Stored in the `threads` array so the operator can
+ * list, switch, and fork past conversations — not just resume the most
+ * recent one. Pattern from claude-code-from-scratch s17 (MIT).
+ */
+export interface ThreadRecord {
+  /** Thread ID — the same string used by Mastra for memory namespacing. */
+  threadId: string;
+  /** When this thread was first opened. */
+  startedAt: string;
+  /** Last time a message was added to this thread. */
+  lastActiveAt: string;
+  /** Operator-supplied human-readable label. Optional; defaults to ''. */
+  title: string;
+  /** Source thread when this one was forked from an existing thread.
+   *  null for original threads. */
+  forkedFrom: string | null;
+}
 
 /**
  * Session state persisted to disk
@@ -26,6 +58,10 @@ export interface SessionState {
   lastActiveAt: string;
   /** Total number of sessions created */
   sessionCount: number;
+  /** All threads tracked locally. May be empty in legacy installs that
+   *  predate multi-thread tracking — the migration path fills it in
+   *  lazily when threads are touched. Sorted by lastActiveAt desc. */
+  threads?: ThreadRecord[];
 }
 
 /**
@@ -39,10 +75,12 @@ export interface SessionInfo {
 }
 
 /**
- * Ensure the gordon directory exists
+ * Ensure the parent directory of the session file exists.
+ * Uses sessionFilePath() so tests with overridden paths also pre-create
+ * the right scratch dir.
  */
 async function ensureGordonDir(): Promise<void> {
-  await mkdir(GORDON_DIR, { recursive: true });
+  await mkdir(dirname(sessionFilePath()), { recursive: true });
 }
 
 /**
@@ -85,7 +123,7 @@ export async function loadSessionState(): Promise<SessionState> {
   await ensureGordonDir();
 
   try {
-    const content = await readFile(SESSION_FILE, "utf-8");
+    const content = await readFile(sessionFilePath(), "utf-8");
     const state = JSON.parse(content) as SessionState;
 
     // Validate required fields
@@ -110,7 +148,27 @@ export async function loadSessionState(): Promise<SessionState> {
  */
 export async function saveSessionState(state: SessionState): Promise<void> {
   await ensureGordonDir();
-  await writeFile(SESSION_FILE, JSON.stringify(state, null, 2), "utf-8");
+  await writeFile(sessionFilePath(), JSON.stringify(state, null, 2), "utf-8");
+}
+
+/**
+ * Add or update a thread record in the SessionState. Idempotent on
+ * threadId. Defensive — accepts SessionStates that don't yet have the
+ * `threads` field (older session.json files) and creates it on first
+ * write.
+ */
+function upsertThreadRecord(state: SessionState, record: ThreadRecord): void {
+  if (!state.threads) state.threads = [];
+  const existing = state.threads.findIndex((t) => t.threadId === record.threadId);
+  if (existing >= 0) {
+    state.threads[existing] = { ...state.threads[existing], ...record };
+  } else {
+    state.threads.push(record);
+  }
+  // Keep newest-first ordering — cheap for the small N we expect.
+  state.threads.sort(
+    (a, b) => Date.parse(b.lastActiveAt) - Date.parse(a.lastActiveAt),
+  );
 }
 
 /**
@@ -146,6 +204,14 @@ export async function initializeSession(options: {
     state.threadId = threadId;
     state.threadStartedAt = new Date().toISOString();
     state.sessionCount += 1;
+
+    upsertThreadRecord(state, {
+      threadId,
+      startedAt: state.threadStartedAt,
+      lastActiveAt: state.threadStartedAt,
+      title: "",
+      forkedFrom: null,
+    });
   } else {
     // Resume existing thread
     threadId = state.threadId!;
@@ -154,6 +220,20 @@ export async function initializeSession(options: {
 
   // Update last active time
   state.lastActiveAt = new Date().toISOString();
+  if (state.threadId) {
+    // Touch the current thread's lastActiveAt in the threads list too.
+    const startedAt =
+      state.threads?.find((t) => t.threadId === state.threadId)?.startedAt ??
+      state.threadStartedAt ??
+      new Date().toISOString();
+    upsertThreadRecord(state, {
+      threadId: state.threadId,
+      startedAt,
+      lastActiveAt: state.lastActiveAt,
+      title: state.threads?.find((t) => t.threadId === state.threadId)?.title ?? "",
+      forkedFrom: state.threads?.find((t) => t.threadId === state.threadId)?.forkedFrom ?? null,
+    });
+  }
 
   await saveSessionState(state);
 
@@ -163,6 +243,98 @@ export async function initializeSession(options: {
     isNewSession,
     previousThreadId: isNewSession ? previousThreadId : null,
   };
+}
+
+/**
+ * List all locally-tracked threads, newest first. Returns an empty
+ * array when no threads have been opened yet on this install.
+ */
+export async function listThreads(): Promise<ThreadRecord[]> {
+  const state = await loadSessionState();
+  return [...(state.threads ?? [])];
+}
+
+/**
+ * Fork from an existing thread. Creates a new threadId that records
+ * the source via `forkedFrom`. Does NOT copy Mastra's conversation
+ * memory — the caller is responsible for asking Mastra to seed the new
+ * thread from the source (typically the orchestrator does this on
+ * first turn of the new thread). What this function DOES do is:
+ *
+ *   - Generate a new threadId
+ *   - Create a ThreadRecord with forkedFrom set
+ *   - Switch the active threadId to the new one
+ *
+ * Use case: "I want to explore an alternate path from this point in
+ * the conversation without losing the original thread."
+ */
+export async function forkThread(sourceThreadId: string, title = ""): Promise<SessionInfo> {
+  const state = await loadSessionState();
+  const source = state.threads?.find((t) => t.threadId === sourceThreadId);
+  if (!source) {
+    throw new Error(`Cannot fork: thread ${sourceThreadId} not found in local registry`);
+  }
+  const newThreadId = generateThreadId(state.resourceId);
+  const now = new Date().toISOString();
+  const previousThreadId = state.threadId;
+  state.threadId = newThreadId;
+  state.threadStartedAt = now;
+  state.lastActiveAt = now;
+  state.sessionCount += 1;
+  upsertThreadRecord(state, {
+    threadId: newThreadId,
+    startedAt: now,
+    lastActiveAt: now,
+    title,
+    forkedFrom: sourceThreadId,
+  });
+  await saveSessionState(state);
+  return {
+    resourceId: state.resourceId,
+    threadId: newThreadId,
+    isNewSession: true,
+    previousThreadId,
+  };
+}
+
+/**
+ * Switch the active thread to one already in the local registry.
+ * Returns null when the threadId is unknown. Operator-facing — they
+ * pick from `listThreads()` and switch by id.
+ */
+export async function switchThread(threadId: string): Promise<SessionInfo | null> {
+  const state = await loadSessionState();
+  const target = state.threads?.find((t) => t.threadId === threadId);
+  if (!target) return null;
+  const previousThreadId = state.threadId;
+  state.threadId = threadId;
+  state.threadStartedAt = target.startedAt;
+  state.lastActiveAt = new Date().toISOString();
+  upsertThreadRecord(state, {
+    ...target,
+    lastActiveAt: state.lastActiveAt,
+  });
+  await saveSessionState(state);
+  return {
+    resourceId: state.resourceId,
+    threadId,
+    isNewSession: false,
+    previousThreadId,
+  };
+}
+
+/**
+ * Set a human-readable title on a thread. Returns true on success,
+ * false if the threadId is unknown.
+ */
+export async function setThreadTitle(threadId: string, title: string): Promise<boolean> {
+  const state = await loadSessionState();
+  const target = state.threads?.find((t) => t.threadId === threadId);
+  if (!target) return false;
+  target.title = title.trim();
+  state.lastActiveAt = new Date().toISOString();
+  await saveSessionState(state);
+  return true;
 }
 
 /**
