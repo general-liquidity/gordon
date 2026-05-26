@@ -1821,10 +1821,17 @@ function AppInner() {
             />
           )}
 
-          {/* Pending approvals (inline) */}
-          {pendingApprovals.map((a) => (
-            <ApprovalDialog key={a.id} approval={a} onDecision={handleApproval} />
-          ))}
+          {/* Pending approvals — render only the first one to avoid
+              multiple useInput listeners catching the same Enter keypress.
+              When the first is decided it leaves the list and the next
+              auto-renders. */}
+          {pendingApprovals[0] ? (
+            <ApprovalDialog
+              key={pendingApprovals[0].id}
+              approval={pendingApprovals[0]}
+              onDecision={handleApproval}
+            />
+          ) : null}
 
           {/* Handoff arrows — suppressed. Claude Code doesn't surface
               internal routing ('→ Handing off to gordon') to the user;

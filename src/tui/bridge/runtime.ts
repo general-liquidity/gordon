@@ -241,9 +241,19 @@ export async function handleInput(
   const runtime = activeRuntime;
   if (!runtime) return;
 
-  // Approval shorthand
+  // Approval shorthand — only when the second token looks like an
+  // approval request id (short hex/uuid-ish or matches a pending id).
+  // Without this gate, "approve this plan" would be parsed as
+  // approve(requestId="this") and short-circuit the LLM path. Natural-
+  // language approval intent should flow to the agent so it can call
+  // approve_plan(planId, rationale) instead.
   if (input.startsWith("approve ") || input.startsWith("deny ")) {
-    return handleApproval(input, setState, runtime);
+    const parts = input.split(/\s+/);
+    const candidate = parts[1] ?? "";
+    if (looksLikeApprovalId(candidate, runtime)) {
+      return handleApproval(input, setState, runtime);
+    }
+    // Fall through to agent — user meant "approve <something natural>".
   }
 
   // Slash command
@@ -727,6 +737,31 @@ async function streamResponse(
 // ============================================================================
 // Approval handling
 // ============================================================================
+
+/** Heuristic — does `candidate` plausibly identify a pending approval?
+ *  Approval ids are UUID-ish (hex with dashes) or short hex slugs. Natural
+ *  language tokens like "this", "the", "my", "plan" should NOT match.
+ *  Falls back to checking the live pending-approval list for an exact match. */
+function looksLikeApprovalId(candidate: string, runtime: SessionRuntime): boolean {
+  if (!candidate) return false;
+  // Live match: any current pending approval whose id startsWith this token.
+  try {
+    const state = runtime.getState();
+    const pending = (state as { approvals?: { pending?: Array<{ id: string }> } })
+      .approvals?.pending ?? [];
+    if (pending.some((p) => p.id === candidate || p.id.startsWith(candidate))) {
+      return true;
+    }
+  } catch {
+    // Ignore — fall through to shape heuristic.
+  }
+  // Shape heuristic: UUID (8-4-4-4-12) or hex run of >= 6 chars.
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(candidate)) {
+    return true;
+  }
+  if (/^[0-9a-f]{6,}$/i.test(candidate)) return true;
+  return false;
+}
 
 async function handleApproval(
   input: string,

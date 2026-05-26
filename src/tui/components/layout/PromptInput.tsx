@@ -306,19 +306,14 @@ export function PromptInput({
         return;
       }
       const inputGraphemes = graphemeCount(input);
-      if (vimMode) {
-        // Vim: insert at cursor position so h/l/w/b/etc. actually move
-        // insertion point. Slice by code units at the grapheme boundary.
-        setValue((prev) => {
-          const insertAt = graphemeToCodeUnit(prev, cursorPos);
-          return prev.slice(0, insertAt) + input + prev.slice(insertAt);
-        });
-        setCursorPos((p) => p + inputGraphemes);
-      } else {
-        // Non-vim: append to end (existing behavior, cursor is cosmetic)
-        setValue((prev) => prev + input);
-        setCursorPos((p) => p + inputGraphemes);
-      }
+      // Always insert at cursor position. Left/right-arrow navigation must
+      // produce real edits at the caret, not append-to-end. Slice by code
+      // units at the grapheme boundary so we don't split surrogate pairs.
+      setValue((prev) => {
+        const insertAt = graphemeToCodeUnit(prev, Math.min(cursorPos, graphemeCount(prev)));
+        return prev.slice(0, insertAt) + input + prev.slice(insertAt);
+      });
+      setCursorPos((p) => p + inputGraphemes);
       setSelectedIdx(0);
     }
   });

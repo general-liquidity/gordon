@@ -21,15 +21,24 @@ interface Props {
 
 export function GordonSelect({ options, onChange, focusColor = "rgb(52,238,176)" }: Props) {
   const [focusIdx, setFocusIdx] = useState(0);
+  // Guard against double-fire when multiple Selects mount simultaneously
+  // (every mounted useInput listener responds to a single Enter keypress).
+  // Once a decision is dispatched, freeze this listener so subsequent
+  // keypresses go to the next live Select (if any).
+  const [decided, setDecided] = useState(false);
 
-  useInput((input, key) => {
+  useInput((_input, key) => {
+    if (decided) return;
     if (key.upArrow) {
       setFocusIdx((i) => (i > 0 ? i - 1 : options.length - 1));
     } else if (key.downArrow) {
       setFocusIdx((i) => (i < options.length - 1 ? i + 1 : 0));
     } else if (key.return) {
       const selected = options[focusIdx];
-      if (selected) onChange(selected.value);
+      if (selected) {
+        setDecided(true);
+        onChange(selected.value);
+      }
     }
   });
 

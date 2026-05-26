@@ -26,6 +26,31 @@ import { checkRiskTool as legacyCheckRisk } from "../trading/risk-gate.ts";
 import { runBacktestTool as legacyRunBacktest } from "../strategy/backtest/backtest.ts";
 import { auditLog } from "../../../platform/audit/index.ts";
 
+/** Same shape as analytics.ts withPortfolioOverride — wrap the
+ *  RequestContext so reads of portfolioValue / availableCash return the
+ *  override. Duplicated here to keep V4 files self-contained; the
+ *  alternative is a shared utility, which we'll extract if a third
+ *  caller appears. */
+function verifyPlanPortfolioProxy(
+  execContext: MastraExecutionContext | undefined,
+  overrideUsd: number,
+): MastraExecutionContext | undefined {
+  if (!execContext?.requestContext) return execContext;
+  const original = execContext.requestContext;
+  const proxied = new Proxy(original, {
+    get(target, prop, receiver) {
+      if (prop === "get") {
+        return (key: string) => {
+          if (key === "portfolioValue" || key === "availableCash") return overrideUsd;
+          return Reflect.get(target, "get").call(target, key);
+        };
+      }
+      return Reflect.get(target, prop, receiver);
+    },
+  });
+  return { ...execContext, requestContext: proxied };
+}
+
 // ============================================================================
 // create_plan
 // ============================================================================
@@ -50,6 +75,22 @@ export const createPlanTool = createTool({
     venue: z.string().optional(),
     rationale: z.string().min(10).describe("Why this trade — min 10 chars for audit."),
     strategySlot: z.string().optional().describe("Strategy slot ID if part of an active strategy."),
+    strategy: z
+      .enum([
+        "support_bounce",
+        "bollinger_bounce",
+        "sma_crossover",
+        "volume_surge",
+        "vwap_bounce",
+        "consolidation_pop",
+        "adx_trend",
+        "ema_rsi_crossover",
+        "relative_strength",
+        "engulfing_pattern",
+        "grid_entry",
+      ])
+      .optional()
+      .describe("Strategy taxonomy for audit + adherence. Defaults to 'support_bounce' when unset; pick the closest match."),
     timeHorizonHours: z.number().positive().optional(),
   }),
   outputSchema: z.object({
@@ -69,6 +110,18 @@ export const createPlanTool = createTool({
       venue?: string;
       rationale: string;
       strategySlot?: string;
+      strategy?:
+        | "support_bounce"
+        | "bollinger_bounce"
+        | "sma_crossover"
+        | "volume_surge"
+        | "vwap_bounce"
+        | "consolidation_pop"
+        | "adx_trend"
+        | "ema_rsi_crossover"
+        | "relative_strength"
+        | "engulfing_pattern"
+        | "grid_entry";
       timeHorizonHours?: number;
     },
     execContext?: MastraExecutionContext,
@@ -84,7 +137,7 @@ export const createPlanTool = createTool({
       const plan = dbCreatePlan({
         symbol: args.symbol,
         direction: args.side === "buy" ? "long" : "short",
-        strategy: "support_bounce",
+        strategy: args.strategy ?? "support_bounce",
         allocation: {
           currency: "USDT",
           amount: args.sizeUsd,
@@ -141,6 +194,13 @@ export const verifyPlanTool = createTool({
   ].join("\n"),
   inputSchema: z.object({
     planId: z.string(),
+    portfolioOverrideUsd: z
+      .number()
+      .positive()
+      .optional()
+      .describe(
+        "If set, evaluate risk against this hypothetical portfolio value instead of the live exchange balance. Use for 'verify the plan on a $X account' reasoning without switching modes.",
+      ),
   }),
   outputSchema: z.object({
     planId: z.string(),
@@ -151,7 +211,7 @@ export const verifyPlanTool = createTool({
     summary: z.string(),
   }),
   execute: async (
-    args: { planId: string },
+    args: { planId: string; portfolioOverrideUsd?: number },
     execContext?: MastraExecutionContext,
   ) => {
     const plan = dbGetPlan(args.planId);
@@ -169,6 +229,12 @@ export const verifyPlanTool = createTool({
     const quantity =
       plan.allocation.amount /
       Math.max(plan.entry.price ?? (await ctx?.exchange?.getPrice(plan.symbol).catch(() => 1)) ?? 1, 1e-9);
+    // When the operator asked for a hypothetical-portfolio evaluation,
+    // shadow the live ctx.portfolioValue / availableCash via the same
+    // proxy compute_risk uses.
+    const proxiedExecContext = args.portfolioOverrideUsd
+      ? verifyPlanPortfolioProxy(execContext, args.portfolioOverrideUsd)
+      : execContext;
     const result = (await (legacyCheckRisk.execute as any)(
       {
         symbol: plan.symbol,
@@ -179,7 +245,7 @@ export const verifyPlanTool = createTool({
         stopLoss: plan.stopLoss.price,
         takeProfit: plan.takeProfit.map((tp: { price: number }) => tp.price),
       },
-      execContext,
+      proxiedExecContext,
     )) as {
       approved?: boolean;
       reason?: string;
@@ -361,13 +427,30 @@ export const cancelTool = createTool({
     "",
     "Required: reason (≥10 chars) for audit trail.",
   ].join("\n"),
-  inputSchema: z.object({
-    target: z.enum(["order", "all_orders", "position", "partial"]),
-    id: z.string().optional().describe("Order or trade ID for single-target operations."),
-    symbol: z.string().optional().describe("Required for 'order' and 'all_orders' targets."),
-    percentPct: z.number().min(1).max(99).optional().describe("Percent to close for 'partial' target."),
-    reason: z.string().min(10),
-  }),
+  inputSchema: z
+    .object({
+      target: z.enum(["order", "all_orders", "position", "partial"]),
+      id: z.string().optional().describe("Order or trade ID for single-target operations."),
+      symbol: z.string().optional().describe("Required for 'order' and 'all_orders' targets."),
+      percentPct: z.number().min(1).max(99).optional().describe("Percent to close for 'partial' target."),
+      reason: z.string().min(10),
+    })
+    .refine(
+      (v) => v.target !== "all_orders" || typeof v.symbol === "string",
+      { message: "`symbol` is required when target='all_orders'.", path: ["symbol"] },
+    )
+    .refine(
+      (v) => v.target !== "order" || (typeof v.id === "string" && typeof v.symbol === "string"),
+      { message: "`id` and `symbol` are both required when target='order'.", path: ["id"] },
+    )
+    .refine(
+      (v) => (v.target !== "position" && v.target !== "partial") || typeof v.id === "string",
+      { message: "`id` (tradeId) is required when target='position' or 'partial'.", path: ["id"] },
+    )
+    .refine(
+      (v) => v.target !== "partial" || typeof v.percentPct === "number",
+      { message: "`percentPct` is required when target='partial'.", path: ["percentPct"] },
+    ),
   outputSchema: z.object({
     success: z.boolean(),
     target: z.string(),

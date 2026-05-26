@@ -62,6 +62,30 @@ import {
 } from "../runtime/institutionalAi.ts";
 import { getAdherenceReportTool as legacyAdherenceReport } from "../runtime/adherence.ts";
 
+/** Wrap an execution context's RequestContext so reads of portfolioValue
+ *  / availableCash return the operator-supplied override instead of the
+ *  live exchange balance. Used by compute_risk + verify_plan to support
+ *  hypothetical-portfolio reasoning without flipping into paper mode. */
+function withPortfolioOverride(
+  execContext: MastraExecutionContext | undefined,
+  overrideUsd: number,
+): MastraExecutionContext | undefined {
+  if (!execContext?.requestContext) return execContext;
+  const original = execContext.requestContext;
+  const proxied = new Proxy(original, {
+    get(target, prop, receiver) {
+      if (prop === "get") {
+        return (key: string) => {
+          if (key === "portfolioValue" || key === "availableCash") return overrideUsd;
+          return Reflect.get(target, "get").call(target, key);
+        };
+      }
+      return Reflect.get(target, prop, receiver);
+    },
+  });
+  return { ...execContext, requestContext: proxied };
+}
+
 // ============================================================================
 // compute_indicator
 // ============================================================================
@@ -377,6 +401,13 @@ export const computeRiskTool = createTool({
     venue: z.string().optional(),
     leverage: z.number().positive().optional().describe("Default 1 (spot)."),
     timeHorizonHours: z.number().positive().optional(),
+    portfolioOverrideUsd: z
+      .number()
+      .positive()
+      .optional()
+      .describe(
+        "If set, evaluate risk against this hypothetical portfolio value instead of the live exchange balance. Use when the operator asks 'what if I had $X' or for paper-mode reasoning without flipping modes.",
+      ),
   }),
   outputSchema: z.object({
     tier: z.enum(["low", "medium", "high", "critical"]),
@@ -394,6 +425,7 @@ export const computeRiskTool = createTool({
       venue?: string;
       leverage?: number;
       timeHorizonHours?: number;
+      portfolioOverrideUsd?: number;
     },
     execContext?: MastraExecutionContext,
   ) => {
@@ -407,6 +439,14 @@ export const computeRiskTool = createTool({
     }
     const quantity = args.notionalUsd / Math.max(price, 1e-9);
 
+    // Synthetic RequestContext: when portfolioOverrideUsd is set, build a
+    // shallow proxy that returns the override for portfolioValue/availableCash
+    // so the legacy classifier evaluates against the hypothetical, not the
+    // live exchange balance.
+    const proxiedExecContext = args.portfolioOverrideUsd
+      ? withPortfolioOverride(execContext, args.portfolioOverrideUsd)
+      : execContext;
+
     const result = (await (legacyCheckRisk.execute as any)(
       {
         symbol: args.symbol,
@@ -415,7 +455,7 @@ export const computeRiskTool = createTool({
         quantity,
         price,
       },
-      execContext,
+      proxiedExecContext,
     )) as {
       approved?: boolean;
       reason?: string;
@@ -481,19 +521,27 @@ export const computeMicrostructureTool = createTool({
     "P&L distribution shape, crowd-positioning verdict (Shapiro), earnings",
     "signal validation, discipline audit, adherence report.",
     "",
-    "operation values:",
-    "  - 'microprice'                 — fair-value estimator (needs book history)",
-    "  - 'inventory_adjusted_price'   — AS reservation price for sizing bias",
-    "  - 'correlation_breakdown'      — cross-symbol correlation z-score",
-    "  - 'vol_forecast_calibration'   — bias/MAE/RMSE on past vol forecasts",
-    "  - 'pnl_distribution_shape'     — convexity verdict over trade P&Ls",
-    "  - 'crowd_positioning'          — Shapiro framing on funding/OI/sentiment",
-    "  - 'earnings_signal'            — validate structured earnings signal",
-    "  - 'discipline_audit'           — score behavior against 7 failure modes",
-    "  - 'adherence_report'           — trades-followed vs rule-overridden",
+    "operation values + their params:",
     "",
-    "Inputs are operation-specific; pass them via the `params` field. See the",
-    "per-operation handler module for exact schema.",
+    "  Data-pipelined (need pre-collected inputs — not directly LLM-invocable",
+    "  in a single turn; let the microstructure-dive skill drive these or pass",
+    "  the data explicitly):",
+    "    - 'microprice'                — params: { snapshots[], tickSize }",
+    "    - 'inventory_adjusted_price'  — params: { mid, inventory, volatility, horizon }",
+    "    - 'correlation_breakdown'     — params: { series: ReturnSeries[] }",
+    "    - 'vol_forecast_calibration'  — params: { source?, horizon?, symbol?, startTime?, endTime? }",
+    "    - 'pnl_distribution_shape'    — params: { pnls: number[] }",
+    "    - 'crowd_positioning'         — params: { fundingRateAnnualized?, fundingRateZ?, openInterestChange?, sentimentScore?, recentLiquidationImbalance? }",
+    "    - 'earnings_signal'           — params: { candidate, transcript? }",
+    "",
+    "  Self-contained (LLM can invoke directly):",
+    "    - 'discipline_audit'   — params: { startTime?, endTime?, userId?, maxTradesPerDay?, maxDistinctSlots?, emotionalProximityMs? }",
+    "    - 'adherence_report'   — params: { startTime?, endTime?, userId? }",
+    "",
+    "IMPORTANT: discipline_audit and adherence_report respect startTime+endTime",
+    "ISO strings. When the operator asks for 'last 24h' or 'today', YOU must",
+    "convert that to absolute ISO timestamps and pass them in params — the tool",
+    "does NOT auto-narrow. Without params it defaults to a 7-day window.",
   ].join("\n"),
   inputSchema: z.object({
     operation: z.enum(MICROSTRUCTURE_OPS),

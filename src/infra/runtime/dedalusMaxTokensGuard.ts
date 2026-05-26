@@ -23,10 +23,22 @@
 
 const DEDALUS_HOSTS = new Set(["api.dedaluslabs.ai"]);
 
-/** Anthropic via Dedalus rejects non-streaming above ~21333 tokens. We
- *  pick 16384 to stay comfortably under that ceiling while still allowing
- *  long structured-output / generate responses. */
-const NON_STREAM_CAP = 16384;
+/** Per-host hard ceiling on max_tokens. Mastra sometimes sends the
+ *  model's catalog max (100K for Haiku, etc.) which exceeds what some
+ *  upstream providers accept. Clamp at the host boundary.
+ *
+ *  - dedaluslabs: 16384 for non-streaming (Anthropic backend rejects > ~21333)
+ *  - inceptionlabs: 50000 (Mercury API hard cap; rejects > 50000) */
+const HOST_CAPS: Record<string, number> = {
+  "api.dedaluslabs.ai": 16384,
+  "api.inceptionlabs.ai": 50000,
+};
+
+const KNOWN_HOSTS = new Set(Object.keys(HOST_CAPS));
+
+/** Backwards-compat constant for code paths that referenced the prior
+ *  single-cap design. Equal to the Dedalus cap. */
+const NON_STREAM_CAP = HOST_CAPS["api.dedaluslabs.ai"]!;
 
 let installed = false;
 
@@ -43,10 +55,14 @@ export function installDedalusMaxTokensGuard(): void {
   ): Promise<Response> {
     try {
       const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
-      if (url && shouldClamp(url) && init?.body && (!init.method || init.method.toUpperCase() === "POST")) {
+      const cap = url ? capForUrl(url) : undefined;
+      if (cap !== undefined && init?.body && (!init.method || init.method.toUpperCase() === "POST")) {
         const body = init.body;
         if (typeof body === "string") {
-          const clamped = clampMaxTokensInBody(body);
+          // Dedalus only enforces the cap on NON-streaming calls; Inception
+          // enforces it always. Pass exemption flag accordingly.
+          const isDedalus = url!.includes("dedaluslabs.ai");
+          const clamped = clampMaxTokensInBody(body, cap, isDedalus);
           const finalBody = clamped !== null ? clamped : body;
           // Layer the anthropic-beta header on top so the API itself
           // strips old tool_result and thinking blocks in-band before the
@@ -69,11 +85,20 @@ export function installDedalusMaxTokensGuard(): void {
 }
 
 function shouldClamp(url: string): boolean {
+  return capForUrl(url) !== undefined;
+}
+
+/** Return the per-host max_tokens cap for a given completion URL, or
+ *  undefined if the host isn't tracked. Both Dedalus and Inception use
+ *  OpenAI-compatible `/v1/chat/completions` paths. */
+function capForUrl(url: string): number | undefined {
   try {
     const u = new URL(url);
-    return DEDALUS_HOSTS.has(u.host) && u.pathname.endsWith("/chat/completions");
+    if (!KNOWN_HOSTS.has(u.host)) return undefined;
+    if (!u.pathname.endsWith("/chat/completions")) return undefined;
+    return HOST_CAPS[u.host];
   } catch {
-    return false;
+    return undefined;
   }
 }
 
@@ -219,7 +244,11 @@ function isAnthropicBody(body: string): boolean {
   }
 }
 
-function clampMaxTokensInBody(body: string): string | null {
+function clampMaxTokensInBody(
+  body: string,
+  cap: number = NON_STREAM_CAP,
+  exemptStreaming: boolean = true,
+): string | null {
   let parsed: unknown;
   try {
     parsed = JSON.parse(body);
@@ -229,13 +258,13 @@ function clampMaxTokensInBody(body: string): string | null {
   if (!parsed || typeof parsed !== "object") return null;
   const obj = parsed as Record<string, unknown>;
 
-  // Streaming requests are exempt — Dedalus's threshold only applies to
-  // non-streaming completion calls.
-  if (obj.stream === true) return null;
+  // Dedalus only applies the cap to non-streaming calls; Inception
+  // enforces it for both. Caller decides via exemptStreaming.
+  if (exemptStreaming && obj.stream === true) return null;
 
   const max = obj.max_tokens;
-  if (typeof max !== "number" || max <= NON_STREAM_CAP) return null;
+  if (typeof max !== "number" || max <= cap) return null;
 
-  obj.max_tokens = NON_STREAM_CAP;
+  obj.max_tokens = cap;
   return JSON.stringify(obj);
 }
