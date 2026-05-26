@@ -50,6 +50,17 @@ import {
 import { RegimeDetector } from "../../../../core/regime/index.ts";
 import { checkRiskTool as legacyCheckRisk } from "../trading/risk-gate.ts";
 import { computeMicropriceTool as legacyMicroprice, computeInventoryAdjustedPriceTool as legacyInventoryAdjusted } from "../runtime/microstructure.ts";
+import {
+  detectCorrelationBreakdownTool as legacyCorrelationBreakdown,
+  getVolForecastCalibrationTool as legacyVolForecast,
+  getPnlDistributionShapeTool as legacyPnlShape,
+} from "../runtime/diagnostics.ts";
+import {
+  validateEarningsSignalTool as legacyEarningsSignal,
+  getDisciplineAuditTool as legacyDisciplineAudit,
+  computeCrowdPositioningVerdictTool as legacyCrowdPositioning,
+} from "../runtime/institutionalAi.ts";
+import { getAdherenceReportTool as legacyAdherenceReport } from "../runtime/adherence.ts";
 
 // ============================================================================
 // compute_indicator
@@ -501,28 +512,28 @@ export const computeMicrostructureTool = createTool({
     execContext?: MastraExecutionContext,
   ) => {
     const computedAt = new Date().toISOString();
+    const dispatchTable: Record<string, { execute?: unknown }> = {
+      microprice: legacyMicroprice,
+      inventory_adjusted_price: legacyInventoryAdjusted,
+      correlation_breakdown: legacyCorrelationBreakdown,
+      vol_forecast_calibration: legacyVolForecast,
+      pnl_distribution_shape: legacyPnlShape,
+      crowd_positioning: legacyCrowdPositioning,
+      earnings_signal: legacyEarningsSignal,
+      discipline_audit: legacyDisciplineAudit,
+      adherence_report: legacyAdherenceReport,
+    };
     try {
-      if (args.operation === "microprice") {
-        const r = (await (legacyMicroprice.execute as any)(args.params, execContext)) as unknown;
-        return { operation: "microprice", result: r, computedAt };
+      const handler = dispatchTable[args.operation];
+      if (!handler) {
+        return {
+          operation: args.operation,
+          result: { error: `Unknown microstructure operation: ${args.operation}` },
+          computedAt,
+        };
       }
-      if (args.operation === "inventory_adjusted_price") {
-        const r = (await (legacyInventoryAdjusted.execute as any)(args.params, execContext)) as unknown;
-        return { operation: "inventory_adjusted_price", result: r, computedAt };
-      }
-      // correlation_breakdown / vol_forecast_calibration / pnl_distribution_shape
-      // / crowd_positioning / earnings_signal / discipline_audit / adherence_report
-      // are registered in the legacy surface under their own tool IDs (diagnostic-
-      // tools / institutional-ai / adherence). Until the V4 dispatch table maps
-      // each one, return a clear pointer rather than a silent failure.
-      return {
-        operation: args.operation,
-        result: {
-          deferred: true,
-          message: `Use the legacy '${args.operation}' tool from the agent surface until V4 wires this op.`,
-        },
-        computedAt,
-      };
+      const r = (await (handler.execute as any)(args.params, execContext)) as unknown;
+      return { operation: args.operation, result: r, computedAt };
     } catch (err) {
       return {
         operation: args.operation,

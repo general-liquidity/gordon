@@ -19,6 +19,19 @@ import {
   loadSkillTool as legacyLoadSkill,
 } from "../runtime/lifecycle/skill-loader.ts";
 import { askUserTool as legacyAskUser } from "../runtime/flow/askUser.ts";
+import { getSubagentProfileRegistry } from "../../profiles/subagentProfileRegistry.ts";
+import {
+  dispatchSubagentTask,
+  isDynamicSubagentsEnabled,
+} from "../../profiles/subagentDispatcher.ts";
+import {
+  createSwingMandateTool as legacyCreateSwingMandate,
+  startAutonomousModeTool as legacyStartAutonomous,
+  stopAutonomousModeTool as legacyStopAutonomous,
+  getAutonomousStatusTool as legacyAutonomousStatus,
+  pauseAutonomousModeTool as legacyPauseAutonomous,
+  resumeAutonomousModeTool as legacyResumeAutonomous,
+} from "../runtime/meta/autonomous.ts";
 import type { MastraExecutionContext } from "../types.ts";
 
 // ============================================================================
@@ -114,15 +127,30 @@ export const delegateSubagentTool = createTool({
     args: { role: string; task: string },
     _execContext?: MastraExecutionContext,
   ) => {
-    // The legacy task-dispatch tool is constructed lazily per agent — it
-    // can't be statically imported and called from here without breaking
-    // its tool-registry resolution semantics. V4 surface continues to
-    // surface the legacy `dispatch_task` tool alongside this one until
-    // the dispatcher is refactored to allow standalone invocation.
+    if (!isDynamicSubagentsEnabled()) {
+      return {
+        status: "disabled" as const,
+        subagentId: "n/a",
+        summary: "Subagent dispatch disabled — set GORDON_DYNAMIC_SUBAGENTS=1 to enable.",
+      };
+    }
+    const profile = getSubagentProfileRegistry().get(args.role);
+    if (!profile) {
+      const available = [...getSubagentProfileRegistry().keys()].join(", ");
+      const summary = `Unknown role '${args.role}'. Available: ${available || "(none)"}`;
+      return { status: "refused" as const, subagentId: "n/a", summary, error: summary };
+    }
+    // Empty readOnlyToolRegistry — V4 subagent dispatch runs the profile's
+    // intrinsic tool set without parent-tool passthrough. The full passthrough
+    // path lives in the legacy `delegate_to_subagent` tool, which has closure
+    // over the live tool registry at construction time.
+    const result = await dispatchSubagentTask(profile, args.task, {});
     return {
-      status: "disabled" as const,
-      subagentId: "n/a",
-      summary: `delegate_subagent stub — use the registered dispatch_task tool from the agent surface for role='${args.role}'.`,
+      status: result.status,
+      subagentId: result.subagentId,
+      summary: result.notification,
+      ...(result.text !== undefined && { result: result.text }),
+      ...(result.error !== undefined && { error: result.error }),
     };
   },
 });
@@ -206,17 +234,67 @@ export const scheduleTaskTool = createTool({
   }),
   execute: async (
     args: { action: string; mandateId?: string; spec?: unknown },
-    _execContext?: MastraExecutionContext,
+    execContext?: MastraExecutionContext,
   ) => {
-    // Mandate / scheduler primitives are spread across swing-mandate,
-    // autonomous-loop, scheduler tools and proactive-mode tools. Unified
-    // dispatch needs a single facade module — pending. V4 surface continues
-    // to expose the legacy scheduler tools alongside this one.
-    return {
-      success: false,
-      action: args.action,
-      error: "schedule_task stub — use the legacy scheduler / mandate tools from the agent surface.",
-    };
+    try {
+      switch (args.action) {
+        case "create": {
+          // Two creation paths: a Plan-mode signal scanner (createSwingMandate)
+          // and the orchestrated autonomous loop (startAutonomousMode). Pick
+          // by spec.kind — defaults to swing mandate (signal-only) since
+          // that's the safer default.
+          const spec = (args.spec as Record<string, unknown> | undefined) ?? {};
+          const kind = (spec.kind as string | undefined) ?? "swing";
+          if (kind === "autonomous") {
+            const r = (await (legacyStartAutonomous.execute as any)(spec, execContext)) as unknown;
+            return { success: true, action: "create", mandate: r };
+          }
+          const r = (await (legacyCreateSwingMandate.execute as any)(spec, execContext)) as unknown;
+          return { success: true, action: "create", mandate: r };
+        }
+        case "list":
+        case "status": {
+          const r = (await (legacyAutonomousStatus.execute as any)({}, execContext)) as {
+            mandates?: unknown[];
+          };
+          return {
+            success: true,
+            action: args.action,
+            mandate: r,
+            mandates: r.mandates ?? [r],
+          };
+        }
+        case "pause": {
+          const r = (await (legacyPauseAutonomous.execute as any)(
+            { mandateId: args.mandateId },
+            execContext,
+          )) as { error?: string };
+          return { success: !r.error, action: "pause", mandate: r, error: r.error };
+        }
+        case "resume": {
+          const r = (await (legacyResumeAutonomous.execute as any)(
+            { mandateId: args.mandateId },
+            execContext,
+          )) as { error?: string };
+          return { success: !r.error, action: "resume", mandate: r, error: r.error };
+        }
+        case "stop": {
+          const r = (await (legacyStopAutonomous.execute as any)(
+            { mandateId: args.mandateId },
+            execContext,
+          )) as { error?: string };
+          return { success: !r.error, action: "stop", mandate: r, error: r.error };
+        }
+        default:
+          return { success: false, action: args.action, error: `Unknown action: ${args.action}` };
+      }
+    } catch (err) {
+      return {
+        success: false,
+        action: args.action,
+        error: err instanceof Error ? err.message : String(err),
+      };
+    }
   },
 });
 
