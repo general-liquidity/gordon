@@ -1,9 +1,9 @@
-import { describe, expect, test, beforeEach, afterEach } from "bun:test";
-import { v4Tools, V4_TOOL_IDS, getV4Tools, isV4Active } from "./index.ts";
+import { describe, expect, test } from "bun:test";
+import { agentTools, AGENT_TOOL_IDS } from "./index.ts";
 
-describe("V4 tool surface — registry", () => {
+describe("Agent tool surface — registry", () => {
   test("exposes exactly 22 tools", () => {
-    expect(V4_TOOL_IDS.length).toBe(22);
+    expect(AGENT_TOOL_IDS.length).toBe(22);
   });
 
   test("each expected tool ID is present", () => {
@@ -37,54 +37,21 @@ describe("V4 tool surface — registry", () => {
       "schedule_task",
     ];
 
-    const ids = [...V4_TOOL_IDS] as string[];
+    const ids = [...AGENT_TOOL_IDS] as string[];
     for (const id of expected) {
       expect(ids.includes(id)).toBe(true);
     }
   });
 
   test("no duplicate tool IDs", () => {
-    const ids = new Set(V4_TOOL_IDS);
-    expect(ids.size).toBe(V4_TOOL_IDS.length);
+    const ids = new Set(AGENT_TOOL_IDS);
+    expect(ids.size).toBe(AGENT_TOOL_IDS.length);
   });
 });
 
-describe("V4 tool surface — feature flag", () => {
-  const originalFlag = process.env.GORDON_V4_TOOLS;
-
-  beforeEach(() => {
-    delete process.env.GORDON_V4_TOOLS;
-  });
-
-  afterEach(() => {
-    if (originalFlag === undefined) delete process.env.GORDON_V4_TOOLS;
-    else process.env.GORDON_V4_TOOLS = originalFlag;
-  });
-
-  test("getV4Tools returns empty object when flag unset", () => {
-    expect(Object.keys(getV4Tools())).toHaveLength(0);
-    expect(isV4Active()).toBe(false);
-  });
-
-  test("getV4Tools returns full surface when flag=1", () => {
-    process.env.GORDON_V4_TOOLS = "1";
-    expect(Object.keys(getV4Tools())).toHaveLength(22);
-    expect(isV4Active()).toBe(true);
-  });
-
-  test("getV4Tools returns empty for flag=0 or other values", () => {
-    process.env.GORDON_V4_TOOLS = "0";
-    expect(Object.keys(getV4Tools())).toHaveLength(0);
-    expect(isV4Active()).toBe(false);
-
-    process.env.GORDON_V4_TOOLS = "true";
-    expect(Object.keys(getV4Tools())).toHaveLength(0);
-  });
-});
-
-describe("V4 tools — schema sanity", () => {
+describe("Agent tools — schema sanity", () => {
   test("every tool has id, description, inputSchema, outputSchema, execute", () => {
-    for (const [id, tool] of Object.entries(v4Tools)) {
+    for (const [id, tool] of Object.entries(agentTools)) {
       expect(tool.id as string).toBe(id);
       expect(typeof tool.description).toBe("string");
       expect((tool.description as string).length).toBeGreaterThan(60);
@@ -96,7 +63,7 @@ describe("V4 tools — schema sanity", () => {
 
   test("safety-critical tools require rationale/reason", () => {
     // create_plan requires rationale
-    const createPlan = v4Tools.create_plan;
+    const createPlan = agentTools.create_plan;
     const planResult = (createPlan.inputSchema as any).safeParse({
       symbol: "BTC/USDT",
       side: "buy",
@@ -107,7 +74,7 @@ describe("V4 tools — schema sanity", () => {
     expect(planResult.success).toBe(false);
 
     // approve_plan requires rationale
-    const approvePlan = v4Tools.approve_plan;
+    const approvePlan = agentTools.approve_plan;
     const approveResult = (approvePlan.inputSchema as any).safeParse({
       planId: "plan-123",
       rationale: "short",
@@ -115,7 +82,7 @@ describe("V4 tools — schema sanity", () => {
     expect(approveResult.success).toBe(false);
 
     // cancel requires reason
-    const cancel = v4Tools.cancel;
+    const cancel = agentTools.cancel;
     const cancelResult = (cancel.inputSchema as any).safeParse({
       target: "order",
       reason: "short",
@@ -124,7 +91,7 @@ describe("V4 tools — schema sanity", () => {
   });
 
   test("compute_indicator enforces closed indicator enum", () => {
-    const tool = v4Tools.compute_indicator;
+    const tool = agentTools.compute_indicator;
     const ok = (tool.inputSchema as any).safeParse({
       indicator: "rsi",
       symbol: "BTC/USDT",
@@ -139,7 +106,7 @@ describe("V4 tools — schema sanity", () => {
   });
 });
 
-describe("V4 tools — input schema accepts canonical examples", () => {
+describe("Agent tools — input schema accepts canonical examples", () => {
   test("each tool's inputSchema parses a representative payload", () => {
     const inputs: Record<string, unknown> = {
       get_market_data: { dataType: "price", symbol: "BTC/USDT" },
@@ -172,7 +139,7 @@ describe("V4 tools — input schema accepts canonical examples", () => {
       schedule_task: { action: "list" },
     };
 
-    for (const [id, tool] of Object.entries(v4Tools)) {
+    for (const [id, tool] of Object.entries(agentTools)) {
       const input = inputs[id];
       expect(input).toBeDefined();
       const parsed = (tool.inputSchema as any).safeParse(input);

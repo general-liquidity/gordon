@@ -773,7 +773,7 @@ export const computeMicrostructureTool = createTool({
   },
 });
 
-export const v4AnalyticsTools = {
+export const analyticsTools = {
   compute_indicator: computeIndicatorTool,
   compute_regime: computeRegimeTool,
   compute_risk: computeRiskTool,

@@ -299,7 +299,7 @@ export const scheduleTaskTool = createTool({
   },
 });
 
-export const v4WorkflowTools = {
+export const workflowTools = {
   skill: skillTool,
   delegate_subagent: delegateSubagentTool,
   ask_user: askUserTool,

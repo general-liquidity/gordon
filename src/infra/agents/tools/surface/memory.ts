@@ -213,7 +213,7 @@ export const auditEventTool = createTool({
   },
 });
 
-export const v4MemoryTools = {
+export const memoryTools = {
   memory_search: memorySearchTool,
   memory_write: memoryWriteTool,
   audit_event: auditEventTool,

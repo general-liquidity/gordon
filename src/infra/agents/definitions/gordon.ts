@@ -14,43 +14,14 @@ import {
   GORDON_PRODUCT_TRUTH,
 } from "../capabilityTruth.ts";
 import {
-  instrumentedAskUserTools,
+  // System + observability + meta utilities (no surface-tool equivalent).
   instrumentedSystemTools,
-  instrumentedSchedulerTools,
-  instrumentedAutonomousTools,
-  instrumentedIndicatorTools,
-  instrumentedMarketDataTools,
-  instrumentedMarketTools,
-  instrumentedDiscoveryTools,
-  instrumentedExecutionCostTools,
-  instrumentedStrategyTools,
-  instrumentedParallelAnalysisTools,
-  instrumentedChartTools,
-  instrumentedMarketAnalysisTools,
-  instrumentedCompositionTools,
-  instrumentedMultiModalChartTools,
-  instrumentedLiquidationIntelligenceTools,
-  instrumentedPairAnalysisTools,
-  instrumentedOrderbookTools,
-  instrumentedAccountTools,
-  instrumentedPositionTools,
-  instrumentedHistoryTools,
-  instrumentedWalletTools,
-  instrumentedEarnTools,
-  instrumentedPositionTrackingTools,
-  instrumentedRiskManagementTools,
-  instrumentedCheckRiskTool,
-  instrumentedTradingTools,
-  instrumentedBacktestTools,
-  instrumentedEvalTools,
-  instrumentedStrategyGenerationTools,
-  instrumentedPlaybookTools,
-  instrumentedProtocolTools,
-  instrumentedMemoryTools,
-  instrumentedACETools,
   instrumentedAgentFeedbackTools,
-  instrumentedSharedContextTools,
-  instrumentedRegimeTools,
+  instrumentedMultiModalChartTools,
+  instrumentedQuoteVerifyTools,
+  instrumentedProducerHealthTools,
+  // Integration tier — venue feeds + on-chain reads. Coexist with the
+  // canonical surface; not covered by it.
   instrumentedBaseOnchainTools,
   instrumentedBaseSignalTools,
   instrumentedBaseIndexerTools,
@@ -63,24 +34,10 @@ import {
   instrumentedCdpOnrampTools,
   instrumentedCdpEvmMultichainTools,
   instrumentedCdpWebhookReceiverTools,
-  instrumentedProactiveModeTools,
-  instrumentedBacktestVerdictTools,
   instrumentedFinnhubTools,
   instrumentedFinnhubFundamentalsTools,
   instrumentedFinnhubMarketsTools,
-  instrumentedSmcPatternTools,
-  instrumentedCalibrationTools,
-  instrumentedSkillLoaderTools,
-  instrumentedAdherenceTools,
-  instrumentedQuoteVerifyTools,
-  instrumentedDiagnosticTools,
-  instrumentedMicrostructureTools,
-  instrumentedInstitutionalAiTools,
-  instrumentedProducerHealthTools,
   instrumentedDefillamaYieldTools,
-  instrumentedNewsTools,
-  instrumentedStockNewsTools,
-  instrumentedStrategyRecipeTools,
   instrumentedChainlinkStreamsTools,
   instrumentedChainlinkFeedsTools,
   instrumentedSynthDataTools,
@@ -89,10 +46,6 @@ import {
   instrumentedPolkadotKitAssetTools,
   instrumentedPolkadotKitStakingTools,
   instrumentedPolkadotKitDefiTools,
-  instrumentedAdvancedTools,
-  instrumentedSystematicTools,
-  instrumentedAuditTools,
-  instrumentedMetricsTools,
   gordonInputGuard,
   gordonToolCallReconciler,
   gordonOutputSanitizer,
@@ -110,7 +63,7 @@ import {
 } from "../tools/runtime/lifecycle/task-dispatch.ts";
 import { getExecutor } from "./executor.ts";
 import { getResearcher } from "./researcher.ts";
-import { getV4Tools, isV4Active } from "../tools/v4/index.ts";
+import { agentTools } from "../tools/surface/index.ts";
 
 const logger = createModuleLogger("agents");
 
@@ -425,98 +378,32 @@ export function getGordon(): Agent {
       researcher: getResearcher(),
     },
 
-    // Gordon has ALL read-only tools directly (no routing overhead for 90% of requests)
-    // Only trade execution tools are on Executor (isolated for safety).
-    //
-    // V4 gating: when GORDON_V4_TOOLS=1, the legacy generalized-trading-
-    // infra spreads are excluded — V4's 22-tool surface stands in for them.
-    // Integration tools (Base / Uniswap / DexSearch / XSocial / AgentKit /
-    // Solana / Polkadot / CDP / Chainlink / Defillama / MCP / Finnhub
-    // fundamentals) stay regardless — V4 doesn't replace venue-specific
-    // data feeds or on-chain reads. The legacy task-dispatch and the
-    // executor handoffs also stay (V4 plan/exec route through them).
+    // Gordon's tool surface =
+    //   agentTools (canonical 22-tool generalized-trading surface)
+    //   + always-on system / observability / vision / quote-verify tools
+    //   + integration tools (venue + on-chain feeds Base / Uniswap /
+    //     DexSearch / X-social / CDP / Finnhub / Chainlink / Defillama /
+    //     AgentKit / Solana / Polkadot / MCP)
+    //   + FW7 task-dispatch
+    // The legacy 405-tool surface lives on as implementation modules
+    // that agentTools delegates into — they're not exposed to the LLM
+    // directly. If you ever need to surface a legacy tool by name,
+    // re-spread it here explicitly with a justification comment.
     tools: {
-      // Mid-task user elicitation (V4: ask_user)
-      ...(isV4Active() ? {} : instrumentedAskUserTools),
-      // System info (always on — Gordon needs basic introspection)
+      // System info + agent self-feedback (no generalized-surface equivalent)
       ...instrumentedSystemTools,
-      // Scheduling / autonomous (V4: schedule_task)
-      ...(isV4Active() ? {} : instrumentedSchedulerTools),
-      ...(isV4Active() ? {} : instrumentedAutonomousTools),
-
-      // Market data & scanning (V4: get_market_data, compute_indicator)
-      ...(isV4Active() ? {} : instrumentedIndicatorTools),
-      ...(isV4Active() ? {} : instrumentedMarketDataTools),
-      ...(isV4Active() ? {} : instrumentedMarketTools),
-      ...(isV4Active() ? {} : instrumentedDiscoveryTools),
-      ...(isV4Active() ? {} : instrumentedStrategyTools),
-      ...(isV4Active() ? {} : instrumentedParallelAnalysisTools),
-
-      // Analysis & charting — V4 covers indicator/regime; chart + multimodal
-      // stay on legacy surface (vision tools not in V4).
-      ...(isV4Active() ? {} : instrumentedChartTools),
-      ...(isV4Active() ? {} : instrumentedMarketAnalysisTools),
-      ...(isV4Active() ? {} : instrumentedCompositionTools),
-      ...instrumentedMultiModalChartTools,
-      ...(isV4Active() ? {} : instrumentedLiquidationIntelligenceTools),
-      ...(isV4Active() ? {} : instrumentedPairAnalysisTools),
-
-      // Orderbook reads (V4: get_market_data with dataType='orderbook')
-      ...(isV4Active()
-        ? {}
-        : {
-            get_order_book: instrumentedOrderbookTools.get_order_book,
-            get_spread: instrumentedOrderbookTools.get_spread,
-            get_market_trades: instrumentedOrderbookTools.get_market_trades,
-            get_order_status: instrumentedOrderbookTools.get_order_status,
-            test_order: instrumentedOrderbookTools.test_order,
-          }),
-
-      // Portfolio / account / history (V4: get_account_state, get_portfolio)
-      ...(isV4Active() ? {} : instrumentedAccountTools),
-      ...(isV4Active() ? {} : instrumentedPositionTools),
-      ...(isV4Active() ? {} : instrumentedHistoryTools),
-      ...(isV4Active() ? {} : instrumentedWalletTools),
-      ...(isV4Active() ? {} : instrumentedEarnTools),
-      ...(isV4Active() ? {} : instrumentedPositionTrackingTools),
-
-      // Risk assessment (V4: compute_risk + verify_plan)
-      ...(isV4Active() ? {} : instrumentedRiskManagementTools),
-      ...(isV4Active() ? {} : instrumentedCheckRiskTool),
-
-      // Planning & preview (V4: create_plan / verify_plan / approve_plan / execute_plan)
-      ...(isV4Active()
-        ? {}
-        : {
-            list_plans: instrumentedTradingTools.list_plans,
-            preview_market_order: instrumentedDiscoveryTools.preview_market_order,
-            compare_execution_cost: instrumentedExecutionCostTools.compare_execution_cost,
-            preview_withdrawal: instrumentedWalletTools.preview_withdrawal,
-          }),
-
-      // Backtesting (V4: backtest)
-      ...(isV4Active() ? {} : instrumentedBacktestTools),
-      ...(isV4Active() ? {} : instrumentedEvalTools),
-
-      // Strategy & playbooks (V4: strategy-build skill)
-      ...(isV4Active() ? {} : instrumentedStrategyGenerationTools),
-      ...(isV4Active() ? {} : instrumentedPlaybookTools),
-      ...(isV4Active() ? {} : instrumentedProtocolTools),
-
-      // Memory & context (V4: memory_search, memory_write, audit_event)
-      ...(isV4Active() ? {} : instrumentedMemoryTools),
-      ...(isV4Active() ? {} : instrumentedACETools),
-      // Agent self-feedback — kept on legacy + V4 (no V4 equivalent for
-      // structured stuck-state reporting; this is a meta-tool the agent
-      // calls before the doom-loop detector trips).
       ...instrumentedAgentFeedbackTools,
-      ...(isV4Active() ? {} : instrumentedSharedContextTools),
 
-      // Market regime (V4: compute_regime)
-      ...(isV4Active() ? {} : instrumentedRegimeTools),
+      // Vision tools — not in the generalized surface.
+      ...instrumentedMultiModalChartTools,
 
-      // On-chain reads — INTEGRATION tier. Stay regardless of V4 (V4 has
-      // no equivalent for Base / Uniswap / dex-search / social feeds).
+      // Anti-hallucination quote verification — meta utility, no surface tool.
+      ...instrumentedQuoteVerifyTools,
+
+      // Producer health — observability, no surface tool.
+      ...instrumentedProducerHealthTools,
+
+      // On-chain reads — INTEGRATION tier. Always on.
       ...instrumentedBaseOnchainTools,
       ...instrumentedBaseSignalTools,
       ...instrumentedBaseIndexerTools,
@@ -524,7 +411,7 @@ export function getGordon(): Agent {
       ...instrumentedDexSearchTools,
       ...instrumentedXSocialTools,
 
-      // CDP integration — INTEGRATION tier. Cold-gated already.
+      // CDP integration — INTEGRATION tier. Cold-gated.
       ...(isHotTierOnly() ? {} : instrumentedCdpWebhookTools),
       ...(isHotTierOnly() ? {} : instrumentedCdpSqlTools),
       ...(isHotTierOnly() ? {} : instrumentedCdpPolicyTools),
@@ -532,41 +419,12 @@ export function getGordon(): Agent {
       ...(isHotTierOnly() ? {} : instrumentedCdpEvmMultichainTools),
       ...(isHotTierOnly() ? {} : instrumentedCdpWebhookReceiverTools),
 
-      // Proactive radar (V4: schedule_task list/status)
-      ...(isV4Active() ? {} : instrumentedProactiveModeTools),
-      ...(isV4Active() ? {} : instrumentedBacktestVerdictTools),
-
-      // Finnhub — INTEGRATION tier. Hot stock tools cover what V4
-      // get_fundamentals delegates to; keep regardless.
+      // Finnhub — INTEGRATION tier.
       ...instrumentedFinnhubTools,
       ...(isHotTierOnly() ? {} : instrumentedFinnhubFundamentalsTools),
       ...instrumentedFinnhubMarketsTools,
 
-      // SMC + calibration (V4: compute_indicator, compute_microstructure)
-      ...(isV4Active() ? {} : instrumentedSmcPatternTools),
-      ...(isV4Active() ? {} : instrumentedCalibrationTools),
-      // Skill loader (V4: skill)
-      ...(isV4Active() ? {} : instrumentedSkillLoaderTools),
-      // Adherence + audit (V4: compute_microstructure adherence_report + audit_event)
-      ...(isV4Active() ? {} : instrumentedAdherenceTools),
-      // Quote verification — kept on both (anti-hallucination is meta;
-      // V4 doesn't have an equivalent).
-      ...instrumentedQuoteVerifyTools,
-      // Diagnostic / microstructure / institutional-AI primitives (V4: compute_microstructure)
-      ...(isV4Active() ? {} : instrumentedDiagnosticTools),
-      ...(isV4Active() ? {} : instrumentedMicrostructureTools),
-      ...(isV4Active() ? {} : instrumentedInstitutionalAiTools),
-      // Producer health — system observability, keep on both.
-      ...instrumentedProducerHealthTools,
-
-      // News (V4: get_news)
-      ...(isV4Active() ? {} : instrumentedNewsTools),
-      ...(isV4Active() ? {} : instrumentedStockNewsTools),
-
-      // Strategy recipes (V4: strategy-build skill)
-      ...(isV4Active() ? {} : instrumentedStrategyRecipeTools),
-
-      // DefiLlama / Chainlink — INTEGRATION tier.
+      // DefiLlama / Chainlink — INTEGRATION tier. Cold-gated.
       ...(isHotTierOnly() ? {} : instrumentedDefillamaYieldTools),
       ...(isHotTierOnly() ? {} : instrumentedChainlinkStreamsTools),
       ...(isHotTierOnly() ? {} : instrumentedChainlinkFeedsTools),
@@ -577,7 +435,7 @@ export function getGordon(): Agent {
       agentkit_get_wallet: instrumentedAgentKitOnchainTools.agentkit_get_wallet,
       agentkit_get_swap_price: instrumentedAgentKitOnchainTools.agentkit_get_swap_price,
 
-      // Solana / Polkadot — INTEGRATION tier.
+      // Solana / Polkadot — INTEGRATION tier. Cold-gated.
       ...(isHotTierOnly() ? {} : instrumentedSolanaKitWalletTools),
       ...(isHotTierOnly()
         ? {}
@@ -587,26 +445,20 @@ export function getGordon(): Agent {
             polkadot_initialize_chain: instrumentedPolkadotKitDefiTools.polkadot_initialize_chain,
           }),
 
-      // Advanced & audit (V4: audit_event covers most provenance use)
-      ...(isV4Active() ? {} : instrumentedAdvancedTools),
-      ...(isV4Active() ? {} : instrumentedSystematicTools),
-      ...(isV4Active() ? {} : instrumentedAuditTools),
-      ...(isV4Active() ? {} : instrumentedMetricsTools),
-
       // MCP plugin tools — external, never gated.
       ...getScopedMCPTools({
         categories: ["data-provider", "analytics", "research", "portfolio", "utility", "infrastructure"],
       }),
 
-      // FW7 — operator-authored subagent delegation. V4's delegate_subagent
-      // is a parallel surface; the legacy tool keeps full passthrough access
-      // to Gordon's live tool registry. Operators on V4 can still call the
-      // legacy tool by name if they configured profiles.
+      // FW7 — operator-authored subagent delegation. Surface-level
+      // delegate_subagent calls dispatchSubagentTask directly with an
+      // empty parent-tool registry; the legacy `delegate_to_subagent`
+      // tool kept here has full passthrough to Gordon's live registry.
       ...buildTaskDispatchToolIfEnabled(),
 
-      // V4 meta-tool surface — 22 minimalistic tools. Spread last so its
-      // tool IDs win on any (theoretical) collision with legacy names.
-      ...getV4Tools(),
+      // Canonical 22-tool agent surface — spread last so its tool IDs
+      // win on any collision with integration spreads above.
+      ...agentTools,
     },
 
     // Memory for full conversation context

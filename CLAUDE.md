@@ -121,13 +121,12 @@ Recent primitives ship wired but cold. Each flag activates one layer; the wrappe
 | `GORDON_REMINDERS=1` | Inject turn-cadence reminders (daily loss limit, mandate scope, open positions) into autonomous loop prompts |
 | `GORDON_PERMISSION_BUBBLE=1` | Tag fork-originated permission requests with `[fork X]` UI prefix |
 | `GORDON_ACE_ENABLED=true` | Activate ACE (Agentic Context Engineering): `/reflect` distills the action log into lessons, injected into the system prompt of future sessions via `shared.ace-lessons` |
-| `GORDON_V4_TOOLS=1` | Activate the V4 minimalist tool surface (22 tools) on the orchestrator + researcher. Collapses ~40 legacy generalized-trading spreads; integration tools (Base / CDP / Solana / Polkadot / Finnhub / Chainlink / Defillama / AgentKit / MCP / X-social) and the executor stay regardless. See `src/infra/agents/tools/v4/`. |
 
 Combine for stack: each flag is independent. Recommended bring-up order once evals exist: filters + cache first (zero-risk additive), then extended thinking, then deferral / agent list, then reminders / recovery / bubble.
 
-## V4 meta-tool surface
+## Agent tool surface
 
-V4 is a 22-tool minimalist surface for the generalized trading infra (data, analytics, plan/exec, memory, workflow). It coexists with the legacy 405-tool surface; activate by setting `GORDON_V4_TOOLS=1`. Source: `src/infra/agents/tools/v4/` — 5 files grouped by domain plus `index.ts` registry + `v4.test.ts`.
+Gordon's orchestrator + researcher expose a canonical 22-tool surface for generalized trading infra (data, analytics, plan/exec, memory, workflow). Source: `src/infra/agents/tools/surface/` — 5 files grouped by domain plus `index.ts` registry + `surface.test.ts`. Integration tools (Base / CDP / Solana / Polkadot / Finnhub / Chainlink / Defillama / AgentKit / MCP / X-social) coexist as separate spreads since they cover venue-specific data feeds.
 
 Tool layout (22 total):
 - **data (5)**: `get_market_data`, `get_account_state`, `get_portfolio`, `get_news`, `get_fundamentals`
@@ -138,11 +137,11 @@ Tool layout (22 total):
 
 Only 2 meta-dispatchers (`compute_indicator`, `compute_microstructure`) — everything else is a single-purpose typed tool per the Dexter/Claude-Code preference for explicit-over-meta on safety-critical surfaces.
 
-Safety semantics preserved: V4 doesn't re-implement risk classifier / signed audit / deny-list / trading constitution. Each V4 tool calls into the existing handler module — rationale-required on `create_plan` / `approve_plan` / `execute_plan` / `cancel`, full 11-dim risk gate inside `verify_plan`, signed audit log on every write.
+Safety semantics: surface tools don't re-implement risk classifier / signed audit / deny-list / trading constitution. Each tool calls into the existing handler module — rationale-required on `create_plan` / `approve_plan` / `execute_plan` / `cancel`, full 11-dim risk gate inside `verify_plan`, signed audit log on every write.
 
-Skills aligned with V4: `backtest-validate`, `strategy-build`, `regime-shift`, `microstructure-dive`, `crowd-trapped`, `filing-analysis`, `recovery-trade` are authored against V4 tool names. Existing 35+ skills are mostly natural-language workflows that work on either surface; `learn-*` documentation skills intentionally retain legacy names.
+Skills aligned with the surface: `backtest-validate`, `strategy-build`, `regime-shift`, `microstructure-dive`, `crowd-trapped`, `filing-analysis`, `recovery-trade` are authored against surface tool names. Existing 35+ skills are mostly natural-language workflows; `learn-*` documentation skills intentionally retain legacy tool names since they explain the broader implementation modules.
 
-Gating: when `GORDON_V4_TOOLS=1`, `gordon.ts` and `researcher.ts` exclude their V4-replaced legacy spreads. `executor.ts` is untouched — V4's plan/exec dispatchers delegate venue-specific orders through executor's existing tools. The flag is reversible: `GORDON_V4_TOOLS=0` restores byte-identical legacy behavior.
+The legacy generalized-trading tool modules (calculate_rsi, getCandles, etc.) remain in the codebase as implementation; the surface delegates into them via thin wrappers. If you ever need to surface a legacy tool by name on the agent, re-spread it explicitly in `gordon.ts` with a justification comment.
 
 ## Ground rules for changes
 

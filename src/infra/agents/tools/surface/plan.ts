@@ -625,7 +625,7 @@ export const backtestTool = createTool({
   },
 });
 
-export const v4PlanTools = {
+export const planTools = {
   create_plan: createPlanTool,
   verify_plan: verifyPlanTool,
   approve_plan: approvePlanTool,

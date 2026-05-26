@@ -1,10 +1,10 @@
 /**
- * V4 Data Tools — 5 explicit typed tools for state reads.
+ * Data Tools — 5 explicit typed tools for state reads.
  *
- * Replaces ~100+ scattered get_* tools in the current 405-tool surface
- * by funneling each domain through one named tool. Each tool has a
- * tight zod schema, returns a typed result, and dispatches internally
- * to existing handler logic.
+ * Funnels each read domain through one named tool with a tight zod
+ * schema and typed result. Dispatches internally to existing handler
+ * logic (legacy tool modules remain as implementation; this surface
+ * is the agent-facing facade).
  *
  * Tools:
  *   - get_market_data    — candles, prices, orderbook, ticker
@@ -13,14 +13,9 @@
  *   - get_news           — news feed, optionally filtered
  *   - get_fundamentals   — stock fundamentals (Finnhub-backed)
  *
- * Design notes:
- *   - These are TOOLS, not meta-dispatchers. Each one has a clear
- *     single purpose, sharp description, and one input shape.
- *   - The "discriminator inside a tool" pattern (e.g., get_market_data's
- *     `dataType` field) is acceptable because the dispatch is closed
- *     and well-bounded — not the "compute(op, args)" generic meta.
- *   - V4 tools don't yet replace existing tools — they live alongside
- *     them, gated by GORDON_V4_TOOLS=1.
+ * Design note: the "discriminator inside a tool" pattern (e.g.,
+ * get_market_data's `dataType` field) is acceptable because the dispatch
+ * is closed and well-bounded — not the "compute(op, args)" generic meta.
  */
 
 import { createTool } from "@mastra/core/tools";
@@ -448,7 +443,7 @@ export const getFundamentalsTool = createTool({
   },
 });
 
-export const v4DataTools = {
+export const dataTools = {
   get_market_data: getMarketDataTool,
   get_account_state: getAccountStateTool,
   get_portfolio: getPortfolioTool,
