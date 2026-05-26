@@ -546,8 +546,17 @@ export const cancelTool = createTool({
 export const backtestTool = createTool({
   id: "backtest",
   description: [
-    "Run a backtest on a strategy spec. Walk-forward by default. Returns",
-    "key metrics (Sharpe, Sortino, max drawdown, win rate, profit factor).",
+    "Run a backtest on a strategy spec. Returns key metrics (Sharpe, Sortino,",
+    "max drawdown, win rate, profit factor).",
+    "",
+    "Two ways to bound the window — pick one:",
+    "  - Calendar: pass startDate + endDate as ISO strings (e.g. '2024-01-01').",
+    "    Preserves exact calendar alignment, useful for regime-specific or",
+    "    walk-forward windows tied to real dates.",
+    "  - Day-count: pass `days` (default 90). Simpler, but loses calendar",
+    "    fidelity (e.g. can't isolate Q1-2024 cleanly).",
+    "",
+    "Calendar args take precedence when both are present.",
     "",
     "This is the ATOMIC backtest primitive — for comparison across strategies,",
     "parameter optimization, regime-conditional analysis, use the",
@@ -582,21 +591,22 @@ export const backtestTool = createTool({
     },
     execContext?: MastraExecutionContext,
   ) => {
-    // Map V4 date-range args to the legacy `days` shape (the engine is
-    // day-count-driven; calendar dates collapse to a span).
-    let days = args.days ?? 90;
-    if (args.startDate && args.endDate) {
-      const ms = new Date(args.endDate).getTime() - new Date(args.startDate).getTime();
-      const computed = Math.max(1, Math.floor(ms / (24 * 60 * 60 * 1000)));
-      days = computed;
-    }
+    // Calendar dates take precedence over day count when both could resolve.
+    // The legacy runBacktestTool now accepts startTime/endTime epoch-ms; pass
+    // them through to preserve calendar fidelity (walk-forward windows that
+    // depend on exact dates need this).
+    const hasCalendarRange = Boolean(args.startDate && args.endDate);
     const result = (await (legacyRunBacktest.execute as any)(
       {
         symbol: args.symbol,
         strategyId: args.strategyId,
         market: args.market ?? "auto",
         timeframe: args.timeframe ?? "4h",
-        days,
+        days: hasCalendarRange ? undefined : args.days ?? 90,
+        ...(hasCalendarRange && {
+          startTime: new Date(args.startDate as string).getTime(),
+          endTime: new Date(args.endDate as string).getTime(),
+        }),
         initialCapital: args.initialCapitalUsd ?? 10000,
         commission: 0.001,
       },

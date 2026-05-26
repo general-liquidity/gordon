@@ -62,6 +62,163 @@ import {
 } from "../runtime/institutionalAi.ts";
 import { getAdherenceReportTool as legacyAdherenceReport } from "../runtime/adherence.ts";
 
+/** Auto-collect bridge for the three microstructure ops whose direct
+ *  inputs (snapshots[], mid+inventory+vol+horizon, ReturnSeries[]) are
+ *  too data-heavy for an LLM to assemble in one turn. When the operator
+ *  passes a symbol-shaped shortcut, gather the required data from the
+ *  exchange first and return the rewritten params object. When the
+ *  direct inputs are already present, return them unchanged. */
+async function maybeAutoCollect(
+  operation: string,
+  params: Record<string, unknown>,
+  execContext: MastraExecutionContext | undefined,
+): Promise<Record<string, unknown> | { error: string }> {
+  const ctx = getGordonContext(execContext);
+  const exchange = ctx?.exchange;
+
+  if (operation === "microprice") {
+    if (Array.isArray(params.snapshots)) return params;
+    const symbol = typeof params.symbol === "string" ? params.symbol : null;
+    if (!symbol) return params;
+    if (!exchange) return { error: "auto-collect microprice: no exchange connected" };
+    const durationSec = typeof params.durationSec === "number" ? params.durationSec : 30;
+    const intervalMs = typeof params.intervalMs === "number" ? params.intervalMs : 250;
+    const snapshots: Array<{
+      mid: number;
+      bid: number;
+      ask: number;
+      bidVolume: number;
+      askVolume: number;
+      timestamp: number;
+    }> = [];
+    const start = Date.now();
+    const deadline = start + durationSec * 1000;
+    let inferredTickSize: number | null = null;
+    while (Date.now() < deadline) {
+      try {
+        const book = await exchange.getOrderBook(symbol, 5);
+        const bids = book.bids ?? [];
+        const asks = book.asks ?? [];
+        const bestBid = bids[0];
+        const bestAsk = asks[0];
+        if (bestBid && bestAsk) {
+          const bid = bestBid.price;
+          const ask = bestAsk.price;
+          const bidVolume = bestBid.quantity;
+          const askVolume = bestAsk.quantity;
+          snapshots.push({
+            mid: (bid + ask) / 2,
+            bid,
+            ask,
+            bidVolume,
+            askVolume,
+            timestamp: Date.now(),
+          });
+          // Infer tick from spread of any snapshot where bid < ask cleanly.
+          if (inferredTickSize === null && ask > bid) {
+            inferredTickSize = +(ask - bid).toFixed(8);
+          }
+        }
+      } catch {
+        // Skip transient failures; keep collecting.
+      }
+      await new Promise((r) => setTimeout(r, intervalMs));
+    }
+    if (snapshots.length < 5) {
+      return { error: `auto-collect microprice: only ${snapshots.length} snapshots gathered — increase durationSec` };
+    }
+    const tickSize =
+      typeof params.tickSize === "number" && params.tickSize > 0
+        ? params.tickSize
+        : inferredTickSize ?? 0.01;
+    return {
+      snapshots,
+      tickSize,
+      ...(typeof params.imbalanceBuckets === "number" && { imbalanceBuckets: params.imbalanceBuckets }),
+      ...(typeof params.maxSpreadTicks === "number" && { maxSpreadTicks: params.maxSpreadTicks }),
+      ...(typeof params.iterations === "number" && { iterations: params.iterations }),
+    };
+  }
+
+  if (operation === "inventory_adjusted_price") {
+    if (typeof params.mid === "number" && typeof params.inventory === "number") return params;
+    const symbol = typeof params.symbol === "string" ? params.symbol : null;
+    if (!symbol) return params;
+    if (!exchange) return { error: "auto-collect inventory_adjusted_price: no exchange connected" };
+    const price = await exchange.getPrice(symbol);
+    // ATR-derived volatility on 1h candles; convert ATR/price to a per-bar
+    // fractional vol, then annualize roughly for a normalized horizon unit.
+    const candles = await exchange.getCandles(symbol, "1h", 100);
+    const closes = candles.map((c) => c.close);
+    let atr = 0;
+    if (candles.length > 14) {
+      let trSum = 0;
+      for (let i = 1; i < candles.length; i++) {
+        const c = candles[i]!;
+        const prev = candles[i - 1]!;
+        const tr = Math.max(c.high - c.low, Math.abs(c.high - prev.close), Math.abs(c.low - prev.close));
+        trSum += tr;
+      }
+      atr = trSum / Math.max(candles.length - 1, 1);
+    }
+    const lastClose = closes[closes.length - 1] ?? price;
+    const volatility = lastClose > 0 ? Math.max(atr / lastClose, 1e-5) : 0.01;
+    const positionUsd = typeof params.positionUsd === "number" ? params.positionUsd : 0;
+    const portfolioUsd = Math.max(ctx?.portfolioValue ?? 1, 1);
+    const inventory = positionUsd / portfolioUsd; // -1..+1
+    const horizonHours = typeof params.horizonHours === "number" ? params.horizonHours : 1;
+    const horizon = horizonHours / 24; // express in days, matches per-day vol unit
+    return {
+      mid: price,
+      inventory,
+      volatility,
+      horizon,
+      ...(typeof params.riskAversion === "number" && { riskAversion: params.riskAversion }),
+      ...(typeof params.intendedSide === "number" && { intendedSide: params.intendedSide }),
+    };
+  }
+
+  if (operation === "correlation_breakdown") {
+    if (Array.isArray(params.series)) return params;
+    const symbols = Array.isArray(params.symbols)
+      ? (params.symbols.filter((s) => typeof s === "string") as string[])
+      : null;
+    if (!symbols || symbols.length < 2) return params;
+    if (!exchange) return { error: "auto-collect correlation_breakdown: no exchange connected" };
+    const timeframe = (typeof params.timeframe === "string" ? params.timeframe : "1h") as string;
+    const lookbackBars = typeof params.lookbackBars === "number" ? params.lookbackBars : 200;
+    const seriesEntries = await Promise.all(
+      symbols.map(async (symbol) => {
+        const candles = await exchange.getCandles(symbol, timeframe, lookbackBars);
+        const closes = candles.map((c) => c.close);
+        const returns: number[] = [];
+        for (let i = 1; i < closes.length; i++) {
+          const prev = closes[i - 1]!;
+          const curr = closes[i]!;
+          if (prev > 0 && curr > 0) returns.push(Math.log(curr / prev));
+        }
+        return { symbol, returns };
+      }),
+    );
+    const minLen = Math.min(...seriesEntries.map((s) => s.returns.length));
+    if (minLen < 2) {
+      return { error: "auto-collect correlation_breakdown: insufficient aligned returns" };
+    }
+    // Align to common tail length.
+    const aligned = seriesEntries.map((s) => ({
+      symbol: s.symbol,
+      returns: s.returns.slice(s.returns.length - minLen),
+    }));
+    return {
+      series: aligned,
+      ...(typeof params.tailWindow === "number" && { tailWindow: params.tailWindow }),
+      ...(typeof params.baselineWindow === "number" && { baselineWindow: params.baselineWindow }),
+    };
+  }
+
+  return params;
+}
+
 /** Wrap an execution context's RequestContext so reads of portfolioValue
  *  / availableCash return the operator-supplied override instead of the
  *  live exchange balance. Used by compute_risk + verify_plan to support
@@ -523,12 +680,25 @@ export const computeMicrostructureTool = createTool({
     "",
     "operation values + their params:",
     "",
-    "  Data-pipelined (need pre-collected inputs — not directly LLM-invocable",
-    "  in a single turn; let the microstructure-dive skill drive these or pass",
-    "  the data explicitly):",
-    "    - 'microprice'                — params: { snapshots[], tickSize }",
-    "    - 'inventory_adjusted_price'  — params: { mid, inventory, volatility, horizon }",
-    "    - 'correlation_breakdown'     — params: { series: ReturnSeries[] }",
+    "  With auto-collect shortcut (pass `symbol` and the tool will gather",
+    "  required data from the live exchange before running the computation):",
+    "    - 'microprice'                — direct: { snapshots[], tickSize }",
+    "                                    shortcut: { symbol, durationSec?, intervalMs?, tickSize? }",
+    "                                    Shortcut polls the orderbook for ~durationSec",
+    "                                    (default 30) at intervalMs cadence (default 250).",
+    "                                    Blocks the agent stream while collecting — be",
+    "                                    explicit with the operator that it will pause.",
+    "    - 'inventory_adjusted_price'  — direct: { mid, inventory, volatility, horizon }",
+    "                                    shortcut: { symbol, positionUsd?, horizonHours? }",
+    "                                    Auto-derives mid from price + volatility from ATR.",
+    "                                    inventory defaults to 0 (no position) unless",
+    "                                    positionUsd is set; sign indicates long/short.",
+    "    - 'correlation_breakdown'     — direct: { series: ReturnSeries[] }",
+    "                                    shortcut: { symbols: string[], timeframe?, lookbackBars? }",
+    "                                    Fetches candles for each symbol and builds aligned",
+    "                                    log-return series automatically.",
+    "",
+    "  Direct-input only (no auto-collect):",
     "    - 'vol_forecast_calibration'  — params: { source?, horizon?, symbol?, startTime?, endTime? }",
     "    - 'pnl_distribution_shape'    — params: { pnls: number[] }",
     "    - 'crowd_positioning'         — params: { fundingRateAnnualized?, fundingRateZ?, openInterestChange?, sentimentScore?, recentLiquidationImbalance? }",
@@ -580,7 +750,18 @@ export const computeMicrostructureTool = createTool({
           computedAt,
         };
       }
-      const r = (await (handler.execute as any)(args.params, execContext)) as unknown;
+      // Auto-collect shortcut: when the LLM passes a symbol-based payload
+      // for an op that normally requires pre-collected data, gather what's
+      // needed from the live exchange first, then call the underlying tool.
+      const params = await maybeAutoCollect(
+        args.operation,
+        args.params,
+        execContext,
+      );
+      if ("error" in params) {
+        return { operation: args.operation, result: params, computedAt };
+      }
+      const r = (await (handler.execute as any)(params, execContext)) as unknown;
       return { operation: args.operation, result: r, computedAt };
     } catch (err) {
       return {

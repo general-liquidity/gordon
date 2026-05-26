@@ -399,7 +399,19 @@ export const runBacktestTool = createTool({
     strategyId: z.string().describe("Strategy ID (e.g., 'support_bounce')"),
     market: z.enum(["auto", "crypto", "stocks"]).default("auto").describe("Market family to backtest against"),
     timeframe: z.string().default("4h").describe("Candle timeframe"),
-    days: z.number().default(90).describe("Number of days to backtest"),
+    days: z.number().default(90).describe("Number of days to backtest. Ignored when startTime/endTime are set."),
+    startTime: z
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe("Window start in epoch milliseconds. Pair with endTime for a calendar-bounded backtest (overrides days)."),
+    endTime: z
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe("Window end in epoch milliseconds. Pair with startTime."),
     initialCapital: z.number().default(10000).describe("Starting capital in USDT"),
     commission: z.number().default(0.001).describe("Commission rate (0.001 = 0.1%)"),
   }),
@@ -415,7 +427,7 @@ export const runBacktestTool = createTool({
     error: z.string().optional(),
   }),
   execute: async (
-    { symbol, strategyId, market, timeframe, days, initialCapital, commission },
+    { symbol, strategyId, market, timeframe, days, startTime, endTime, initialCapital, commission },
     execContext: MastraExecutionContext
   ) => {
     const ctx = getGordonContext(execContext);
@@ -429,11 +441,19 @@ export const runBacktestTool = createTool({
       const executionStart = Date.now();
       const realism = buildSimulationRealismProfile(ctx?.config);
 
+      // Calendar-bounded backtest takes precedence over days; if start/end are
+      // provided, fetch the range and recompute `days` for downstream metadata
+      // / config so they stay coherent.
+      const useDateRange = typeof startTime === "number" && typeof endTime === "number";
+      const effectiveDays = useDateRange
+        ? Math.max(1, Math.floor((endTime - startTime) / (24 * 60 * 60 * 1000)))
+        : days;
+
       const { data: ohlcData, metadata } = await fetchHistoricalSeries(ctx, {
         symbol,
         timeframe,
         market,
-        days,
+        ...(useDateRange ? { startTime, endTime } : { days }),
       });
 
       if (ohlcData.length < 100) {
@@ -444,7 +464,7 @@ export const runBacktestTool = createTool({
         strategyId,
         metadata.symbol,
         timeframe,
-        days,
+        effectiveDays,
         initialCapital,
         commission,
         realism,
