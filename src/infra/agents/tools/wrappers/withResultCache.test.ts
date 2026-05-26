@@ -1,11 +1,9 @@
-import { describe, it, expect, beforeEach, afterEach } from "bun:test";
+import { describe, it, expect, beforeEach } from "bun:test";
 import { withResultCache, withResultCacheAll } from "./withResultCache.ts";
 import {
   _resetDefaultToolResultCacheForTests,
   getDefaultToolResultCache,
 } from "../../tooling/toolResultCache.ts";
-
-const FLAG = "GORDON_TOOL_RESULT_CACHE";
 
 interface MockTool {
   id: string;
@@ -31,31 +29,11 @@ async function callTool(t: MockTool, args: unknown, ctx: unknown): Promise<unkno
 }
 
 describe("withResultCache", () => {
-  const prev = process.env[FLAG];
   beforeEach(() => {
-    delete process.env[FLAG];
     _resetDefaultToolResultCacheForTests();
-  });
-  afterEach(() => {
-    if (prev === undefined) delete process.env[FLAG];
-    else process.env[FLAG] = prev;
-  });
-
-  it("passes through unchanged when flag is off (cache never consulted)", async () => {
-    let calls = 0;
-    const tool = withResultCache(
-      makeTool("get_price", () => {
-        calls++;
-        return { price: 50000 };
-      }),
-    );
-    await callTool(tool, { symbol: "BTC" }, { threadId: "t1" });
-    await callTool(tool, { symbol: "BTC" }, { threadId: "t1" });
-    expect(calls).toBe(2);
   });
 
   it("returns a cached delta envelope on second call within TTL", async () => {
-    process.env[FLAG] = "1";
     let calls = 0;
     const tool = withResultCache(
       makeTool("get_price", () => {
@@ -71,7 +49,6 @@ describe("withResultCache", () => {
   });
 
   it("session keys isolate cache (different threadId = cache miss)", async () => {
-    process.env[FLAG] = "1";
     let calls = 0;
     const tool = withResultCache(
       makeTool("get_price", () => {
@@ -85,7 +62,6 @@ describe("withResultCache", () => {
   });
 
   it("different args isolate cache", async () => {
-    process.env[FLAG] = "1";
     let calls = 0;
     const tool = withResultCache(
       makeTool("get_price", (args) => {
@@ -99,7 +75,6 @@ describe("withResultCache", () => {
   });
 
   it("does NOT cache error envelopes", async () => {
-    process.env[FLAG] = "1";
     let calls = 0;
     const tool = withResultCache(
       makeTool("get_price", () => {
@@ -118,7 +93,6 @@ describe("withResultCache", () => {
   });
 
   it("withResultCacheAll wraps every tool in a bundle", async () => {
-    process.env[FLAG] = "1";
     let priceCalls = 0;
     let tickerCalls = 0;
     const bundle = withResultCacheAll({
@@ -140,7 +114,6 @@ describe("withResultCache", () => {
   });
 
   it("falls back to original execute() when cache.lookup throws", async () => {
-    process.env[FLAG] = "1";
     const cache = getDefaultToolResultCache();
     const origLookup = cache.lookup.bind(cache);
     cache.lookup = (() => {

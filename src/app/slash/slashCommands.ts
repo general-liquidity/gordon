@@ -1243,6 +1243,16 @@ const LEGACY_SLASH_COMMANDS: SlashCommandSeed[] = [
     target: "doctor",
   },
   {
+    name: "flags",
+    aliases: ["behavior", "feature-flags"],
+    description: "Show or toggle Gordon's opt-in behavior flags (ACE, subagents, memory deferral, supervision rate, compaction stage)",
+    usage: "/flags [set <name> <value>]",
+    category: "system",
+    level: 2,
+    action: "agent",
+    whenToUse: "Inspect the 5 remaining opt-in behavior flags or change them for the current session. Persistent changes require editing .env.",
+  },
+  {
     name: "config",
     aliases: ["settings", "prefs"],
     description: "View and quick-edit configuration settings",

@@ -120,14 +120,12 @@ export async function validateToolCall(
   const loopState = recordToolCallFingerprint(context, toolName, toolArgs ?? {});
   if (loopState.blocked) {
     resetLoopSignals(context);
-    // Recovery-tier escalation (Notify → Redirect → ForceStop) when
-    // GORDON_RECOVERY_TIERS is on. When off, tryRecover returns null
-    // and we fall through to the legacy block behavior unchanged.
+    // Recovery-tier escalation: Notify → Redirect → ForceStop.
     const recoveryDecision = tryRecover({
       fingerprint: loopState.fingerprint ?? `${toolName}:${JSON.stringify(toolArgs ?? {})}`,
       toolName,
     });
-    if (recoveryDecision?.action === "notify") {
+    if (recoveryDecision.action === "notify") {
       // Notify only — return an informational event but don't block.
       return {
         allowed: true,
@@ -138,7 +136,7 @@ export async function validateToolCall(
         },
       };
     }
-    if (recoveryDecision?.action === "redirect") {
+    if (recoveryDecision.action === "redirect") {
       return {
         allowed: false,
         shouldReturn: true,

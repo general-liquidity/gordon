@@ -1,16 +1,11 @@
 /**
  * Runtime-recovery wiring — integrates the typed RecoveryAction tiers
- * (Notify / Redirect / ForceStop) with whatever doom-loop detector
- * the harness uses.
+ * (Notify / Redirect / ForceStop) with the doom-loop detector.
  *
- * Activation: `GORDON_RECOVERY_TIERS` env flag. When off, callers
- * see `null` from `tryRecover()` and fall through to whatever
- * behavior existed before — no tier escalation, no inserted reminder,
- * no forced halt. This keeps the wiring cold-shippable.
- *
- * The wiring keeps its own RecoveryState per-fingerprint so tier
- * counters survive across calls. State is process-local and reset on
- * test boundaries via `_resetRecoveryStateForTests`.
+ * Always on. Caller threads the returned decision into its handling —
+ * inject the `reminder` text into the next prompt on Redirect; halt
+ * agent on ForceStop. Per-fingerprint state is process-local and reset
+ * on test boundaries via `_resetRecoveryStateForTests`.
  */
 
 import {
@@ -20,14 +15,8 @@ import {
   type RecoveryState,
 } from "../harness/runtimeRecovery.ts";
 
-const FLAG_ENV = "GORDON_RECOVERY_TIERS";
-
 // Per-fingerprint state map. Cleared per process; not persisted.
 const stateByFingerprint: Map<string, RecoveryState> = new Map();
-
-export function isRecoveryTiersEnabled(): boolean {
-  return process.env[FLAG_ENV] === "1";
-}
 
 export interface RecoveryInputForWiring {
   fingerprint: string;
@@ -36,14 +25,10 @@ export interface RecoveryInputForWiring {
 }
 
 /**
- * Called when the existing doom-loop detector reports a hit.
- * Returns the recovery decision when flag is on, otherwise null.
- * Caller threads the decision into its handling — e.g., inject the
- * `reminder` text into the next prompt on Redirect; halt agent on
- * ForceStop.
+ * Called when the doom-loop detector reports a hit. Returns the recovery
+ * decision the caller should apply (Notify / Redirect / ForceStop).
  */
-export function tryRecover(input: RecoveryInputForWiring): RecoveryDecision | null {
-  if (!isRecoveryTiersEnabled()) return null;
+export function tryRecover(input: RecoveryInputForWiring): RecoveryDecision {
   const prior = stateByFingerprint.get(input.fingerprint) ?? newRecoveryState();
   const decision = decideRecovery({
     state: prior,

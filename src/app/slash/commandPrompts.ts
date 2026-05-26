@@ -22,6 +22,20 @@ export function commandToPrompt(command: SlashCommand, args: string): string {
   }
 
   switch (command.name) {
+    case "flags": {
+      const trimmed = args.trim();
+      if (!trimmed || trimmed === "list") {
+        return "Call manage_flags with action='list' and show me the current state of each opt-in behavior flag in a table. For each, indicate whether it's on, its raw value, and a one-line summary of what enabling it does. Note that persistent changes require editing .env in the project root.";
+      }
+      if (trimmed.startsWith("set ")) {
+        const rest = trimmed.slice(4).trim();
+        const parts = rest.split(/\s+/);
+        const flagName = parts[0] ?? "";
+        const flagValue = parts.slice(1).join(" ");
+        return `Call manage_flags with action='set', name='${flagName}', value='${flagValue}'. Then confirm the change and remind me that the new value is for this session only — to persist, I need to add it to .env.`;
+      }
+      return `Call manage_flags with action='list' first, then interpret this instruction in the context of those flags: "${trimmed}". If the operator is asking to enable/disable a specific flag, call manage_flags with action='set' accordingly.`;
+    }
     case "scan":
       return "Scan the market for trading opportunities across multiple coins (~10-30s depending on market size)";
     case "trending":

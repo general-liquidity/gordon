@@ -106,23 +106,23 @@ Every new `instrumentedXTools` registration added to `gordon.ts`, `executor.ts`,
 
 Why this matters: Gordon's schema is already at 405 tools / ~45K tokens. Past published guidance for tool-selection accuracy (~30-50 tools per Anthropic/OpenAI), but mitigated by Anthropic prompt caching + the tier system. The convention exists to prevent further accretion without thought.
 
-## Wiring feature flags (off by default)
+## Behavior flags (opt-in only)
 
-Recent primitives ship wired but cold. Each flag activates one layer; the wrapper falls back to passthrough when unset. Combine freely.
+Most behavior primitives are now defaults-on as part of the core architecture. The remaining flags genuinely require operator opt-in — either because they write across sessions, change spawn behavior, or are calibrated thresholds the operator may want to tune.
 
 | Env flag | Activates |
 |---|---|
-| `GORDON_TOOL_OUTPUT_FILTERS=1` | Semantic compression of `get_candles` / `get_orderbook` / `scan_market` via `withOutputFiltering` |
-| `GORDON_TOOL_RESULT_CACHE=1` | `withResultCache` — cached tool results return `{ status: "unchanged", ... }` delta envelope on hit |
-| `GORDON_EXTENDED_THINKING=1` | Anthropic native `budget_tokens` per workflow phase (analysis=low, planning/execution=medium, critique=high) |
-| `GORDON_AGENT_LIST_ATTACHMENT=1` | Emit agent list as separate system attachment instead of bloating tool schema |
-| `GORDON_RECOVERY_TIERS=1` | Doom-loop detection escalates Notify → Redirect → ForceStop (safety-critical tools fast-track) |
-| `GORDON_TOOL_DEFERRAL=1` | Hide deferred tools from model schema until activated; ~50% schema-token savings |
-| `GORDON_REMINDERS=1` | Inject turn-cadence reminders (daily loss limit, mandate scope, open positions) into autonomous loop prompts |
-| `GORDON_PERMISSION_BUBBLE=1` | Tag fork-originated permission requests with `[fork X]` UI prefix |
-| `GORDON_ACE_ENABLED=true` | Activate ACE (Agentic Context Engineering): `/reflect` distills the action log into lessons, injected into the system prompt of future sessions via `shared.ace-lessons` |
+| `GORDON_ACE_ENABLED=true` | Activate ACE (Agentic Context Engineering): `/reflect` distills the action log into lessons, injected into the system prompt of future sessions via `shared.ace-lessons`. Writes to system prompt across sessions — opt-in for safety. |
+| `GORDON_DYNAMIC_SUBAGENTS=1` | Enable the FW7 `delegate_subagent` dispatcher. Requires operator-authored `.claude/subagents/*.json` profiles. Sensitive because subagents spawn fresh agent instances. |
+| `GORDON_DEFER_WORKING_MEMORY=1` | Buffer mid-session working-memory writes to preserve prompt-cache stability; flush at session boundaries. Performance trade-off — see Hot-tier discipline section. |
+| `GORDON_SUPERVISION_RUST_RATE` | Periodic flawed-plan injection rate (0–1). Calibrated threshold; default off, operators set their own cadence. |
+| `GORDON_COMPACTION_STAGE` | Force a specific compaction stage during debugging. Read-only override; not a feature gate. |
 
-Combine for stack: each flag is independent. Recommended bring-up order once evals exist: filters + cache first (zero-risk additive), then extended thinking, then deferral / agent list, then reminders / recovery / bubble.
+Use `/flags` in the TUI to see the current state of these and toggle them at runtime.
+
+Defaults-on (previously flagged, now part of the architecture): result-cache delta envelopes, semantic output filtering, extended thinking by workflow phase, recovery-tier escalation, autonomous-loop reminders, kill switches, network allowlist (warn mode), filesystem write guard (warn mode), trade ledger, plan rubric, bar-permutation test, WIP-limit gate, boundary check, clean-state gate, init probe, lifecycle reconstruction, family-diversity detector, all microstructure detectors (touch dynamics, microstructure toxicity, MEV detection, manufactured imbalance, manipulation context, cross-venue divergence, ATR progression), session memory, artifact index, tool context, risk-ack, explain-first.
+
+Deleted features (their gates were never validated and the modules are gone): tool deferral, evidence bundle, sprint contract / negotiation, context-anxiety detector, cold-start audit, agent readiness gate, quality document, recitation checkpoint, initializer agent, harness evolution, claude-md linter, tool-design linter, memory bullets, agent-list attachment, permission bubble.
 
 ## Agent tool surface
 

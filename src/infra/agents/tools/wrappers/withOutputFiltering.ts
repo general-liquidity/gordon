@@ -27,7 +27,7 @@ interface ToolLike {
 }
 
 function isEnabled(): boolean {
-  return process.env.GORDON_TOOL_OUTPUT_FILTERS === "1";
+  return true;
 }
 
 /**

@@ -1,7 +1,5 @@
-import { describe, it, expect, beforeEach, afterEach } from "bun:test";
+import { describe, it, expect } from "bun:test";
 import { withOutputFiltering, withOutputFilteringAll } from "./withOutputFiltering.ts";
-
-const FLAG = "GORDON_TOOL_OUTPUT_FILTERS";
 
 function makeCandlesPayload(n: number) {
   return Array.from({ length: n }, (_, i) => ({
@@ -28,24 +26,7 @@ function makeTool(id: string, payload: unknown): MockTool {
 }
 
 describe("withOutputFiltering", () => {
-  const prev = process.env[FLAG];
-  beforeEach(() => {
-    delete process.env[FLAG];
-  });
-  afterEach(() => {
-    if (prev === undefined) delete process.env[FLAG];
-    else process.env[FLAG] = prev;
-  });
-
-  it("passes through unchanged when flag is off", async () => {
-    const payload = makeCandlesPayload(200);
-    const tool = withOutputFiltering(makeTool("get_candles", payload));
-    const result = await tool.execute!();
-    expect(result).toBe(payload);
-  });
-
-  it("applies the registered filter when flag is on", async () => {
-    process.env[FLAG] = "1";
+  it("applies the registered filter to large payloads", async () => {
     const payload = makeCandlesPayload(200);
     const tool = withOutputFiltering(makeTool("get_candles", payload));
     const result = await tool.execute!();
@@ -54,7 +35,6 @@ describe("withOutputFiltering", () => {
   });
 
   it("does NOT mutate tools that have no registered filter", async () => {
-    process.env[FLAG] = "1";
     const payload = { whatever: "data" };
     const tool = withOutputFiltering(makeTool("unknown_tool", payload));
     const result = await tool.execute!();
@@ -62,7 +42,6 @@ describe("withOutputFiltering", () => {
   });
 
   it("falls back to raw result when filter would not shrink output", async () => {
-    process.env[FLAG] = "1";
     // Small candle array — filter passes through anyway, so identity is preserved.
     const payload = makeCandlesPayload(10);
     const tool = withOutputFiltering(makeTool("get_candles", payload));
@@ -71,7 +50,6 @@ describe("withOutputFiltering", () => {
   });
 
   it("falls back to raw result on filter exception", async () => {
-    process.env[FLAG] = "1";
     // Pass a value that confuses the filter; dispatcher should passthrough
     // (defensive default — never throw to the agent).
     const payload = { broken: "shape", but: "valid" };
@@ -86,7 +64,6 @@ describe("withOutputFiltering", () => {
   });
 
   it("withOutputFilteringAll wraps every tool in a bundle", async () => {
-    process.env[FLAG] = "1";
     const bundle = {
       get_candles: makeTool("get_candles", makeCandlesPayload(200)),
       foo: makeTool("foo", { x: 1 }),

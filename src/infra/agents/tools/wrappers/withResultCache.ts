@@ -35,7 +35,7 @@ interface MaybeMastraCtx {
 }
 
 function isEnabled(): boolean {
-  return process.env.GORDON_TOOL_RESULT_CACHE === "1";
+  return true;
 }
 
 function deriveSessionKey(ctx: MaybeMastraCtx | undefined): string {

@@ -17,12 +17,6 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 
 import {
-  isInitializerAgentEnabled,
-  isInitialized,
-  runInitializer,
-  hashInitConfig,
-} from "../../infra/agents/initializerAgent.ts";
-import {
   isInitProbeEnabled,
   runInitProbes,
   type Probe,
@@ -48,10 +42,6 @@ import {
   readCacheCalls,
   summarizeHitRate,
 } from "../../infra/agents/runtime/kvCacheHitMetric.ts";
-import {
-  isClaudeMdLinterEnabled,
-  lintClaudeMd,
-} from "../../infra/diagnostics/claudeMdLinter.ts";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import type { DoctorCheck } from "./setup-runtime.ts";
@@ -71,19 +61,12 @@ export interface InitializerRunSummary {
  * sessions skip the routine.
  */
 export function runInitializerOnBootstrap(
-  artifactsWritten: readonly string[],
-  notes: readonly string[] = [],
+  _artifactsWritten: readonly string[],
+  _notes: readonly string[] = [],
 ): InitializerRunSummary {
-  if (!isInitializerAgentEnabled()) {
-    return { ran: false, reason: "flag_off", configHash: null };
-  }
-  const configHash = hashInitConfig({ artifacts: [...artifactsWritten], notes: [...notes] });
-  const result = runInitializer({
-    configHash,
-    artifactsWritten: [...artifactsWritten],
-    notes: [...notes],
-  });
-  return { ran: result.ran, reason: result.reason, configHash };
+  // Initializer agent feature deleted — bootstrap is handled by setup-runtime
+  // directly. Function kept as a no-op for the single caller's interface.
+  return { ran: false, reason: "deleted", configHash: null };
 }
 
 // --- A3 ----------------------------------------------------------------------
@@ -293,28 +276,8 @@ export function collectKvCacheCheck(): DoctorCheck[] {
  * line count, instruction count, and any per-rule findings (code-style
  * guidance in prompts, exhaustive command lists, large code snippets).
  */
-export function collectClaudeMdLintChecks(repoRoot: string = process.cwd()): DoctorCheck[] {
-  if (!isClaudeMdLinterEnabled()) return [];
-  const checks: DoctorCheck[] = [];
-  for (const candidate of ["CLAUDE.md", "AGENTS.md"]) {
-    const path = resolve(repoRoot, candidate);
-    if (!existsSync(path)) continue;
-    try {
-      const content = readFileSync(path, "utf8");
-      const report = lintClaudeMd(content, { path: candidate });
-      checks.push({
-        id: `claude_md_lint.${candidate}`,
-        ok: report.passes,
-        severity: report.countsBySeverity.error > 0
-          ? "error"
-          : report.countsBySeverity.warn > 0
-            ? "warn"
-            : "info",
-        message: `${candidate}: ${report.totalLines} lines, ~${report.estimatedInstructions} instructions, ${report.findings.length} finding(s).`,
-      });
-    } catch {
-      // skip unreadable
-    }
-  }
-  return checks;
+export function collectClaudeMdLintChecks(_repoRoot: string = process.cwd()): DoctorCheck[] {
+  // claudeMdLinter feature deleted — return no checks. Doctor still surfaces
+  // file existence via other probes.
+  return [];
 }

@@ -508,10 +508,124 @@ export const switchExchangeTool = createTool({
   },
 });
 
+// ============================================================================
+// Behavior-flag inspector + toggle
+// ============================================================================
+
+const KEEPER_FLAGS = [
+  {
+    name: "GORDON_ACE_ENABLED",
+    description:
+      "ACE (Agentic Context Engineering): /reflect distills the action log into lessons, injected into the system prompt of future sessions. Writes across sessions — opt-in for safety.",
+    truthy: ["true", "1", "yes", "on"],
+  },
+  {
+    name: "GORDON_DYNAMIC_SUBAGENTS",
+    description:
+      "Enables the FW7 delegate_subagent dispatcher. Requires operator-authored .claude/subagents/*.json profiles.",
+    truthy: ["1", "true"],
+  },
+  {
+    name: "GORDON_DEFER_WORKING_MEMORY",
+    description:
+      "Buffer mid-session working-memory writes to preserve prompt-cache stability; flush at session boundaries.",
+    truthy: ["1", "true"],
+  },
+  {
+    name: "GORDON_SUPERVISION_RUST_RATE",
+    description:
+      "Periodic flawed-plan injection rate (0–1). Calibrated threshold; operators set their own cadence.",
+    truthy: [],
+  },
+  {
+    name: "GORDON_COMPACTION_STAGE",
+    description:
+      "Force a specific compaction stage during debugging. Values: 'masking' | 'pruning' | 'aggressive' | 'full'.",
+    truthy: [],
+  },
+] as const;
+
+function flagIsOn(name: string, truthy: ReadonlyArray<string>): boolean {
+  const raw = process.env[name];
+  if (raw === undefined || raw === "") return false;
+  if (truthy.length === 0) return true; // value-flags: any set value is "on"
+  return truthy.includes(raw.toLowerCase());
+}
+
+export const manageFlagsTool = createTool({
+  id: "manage_flags",
+  description: [
+    "Inspect or toggle Gordon's opt-in behavior flags at runtime. Five flags",
+    "remain explicit (everything else is defaults-on as part of the architecture):",
+    "  - GORDON_ACE_ENABLED            — cross-session lesson injection",
+    "  - GORDON_DYNAMIC_SUBAGENTS      — FW7 subagent dispatch",
+    "  - GORDON_DEFER_WORKING_MEMORY   — prompt-cache-friendly memory writes",
+    "  - GORDON_SUPERVISION_RUST_RATE  — flawed-plan calibration rate",
+    "  - GORDON_COMPACTION_STAGE       — debug override of compaction stage",
+    "",
+    "action='list' returns the current state of each. action='set' mutates",
+    "process.env for the current process only — restart loses the change.",
+    "For persistent changes, edit .env in the project root.",
+  ].join("\n"),
+  inputSchema: z.object({
+    action: z.enum(["list", "set"]),
+    name: z.string().optional().describe("Required when action='set'."),
+    value: z.string().optional().describe("Required when action='set'. Use empty string to unset."),
+  }),
+  outputSchema: z.object({
+    flags: z
+      .array(
+        z.object({
+          name: z.string(),
+          on: z.boolean(),
+          value: z.string().optional(),
+          description: z.string(),
+        }),
+      )
+      .optional(),
+    changed: z
+      .object({
+        name: z.string(),
+        previous: z.string().optional(),
+        current: z.string().optional(),
+      })
+      .optional(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ action, name, value }) => {
+    if (action === "list") {
+      return {
+        flags: KEEPER_FLAGS.map((f) => ({
+          name: f.name,
+          on: flagIsOn(f.name, f.truthy),
+          value: process.env[f.name],
+          description: f.description,
+        })),
+      };
+    }
+    if (!name) {
+      return { error: "`name` is required when action='set'." };
+    }
+    if (!KEEPER_FLAGS.some((f) => f.name === name)) {
+      return {
+        error: `Unknown flag '${name}'. Use action='list' to see the 5 supported flags.`,
+      };
+    }
+    const previous = process.env[name];
+    if (value === undefined || value === "") {
+      delete process.env[name];
+      return { changed: { name, previous, current: undefined } };
+    }
+    process.env[name] = value;
+    return { changed: { name, previous, current: value } };
+  },
+});
+
 export const systemTools = {
   test_connection: testConnectionTool,
   get_model_info: getModelInfoTool,
   get_cache_stats: getCacheStatsTool,
   get_agent_health: getAgentHealthTool,
   switch_exchange: switchExchangeTool,
+  manage_flags: manageFlagsTool,
 };
