@@ -164,3 +164,15 @@ export type { TrimStateResult, TrimStateParams } from "./trim-state.ts";
 // Resistance-tests — count how many times a level has rejected price
 export { calculateResistanceTests } from "./resistance-tests.ts";
 export type { ResistanceTestsResult, ResistanceTestsParams } from "./resistance-tests.ts";
+
+// Candlestick patterns — 12 canonical 1/2/3-bar shapes
+export {
+  detectCandlestickPatterns,
+  ALL_CANDLESTICK_PATTERNS,
+} from "./candlestick-patterns.ts";
+export type {
+  CandlestickPatternName,
+  CandlestickMatch,
+  CandlestickPatternsResult,
+  CandlestickPatternsParams,
+} from "./candlestick-patterns.ts";

@@ -49,6 +49,8 @@ import {
   calculateUndercutRally,
   calculateTrimState,
   calculateResistanceTests,
+  detectCandlestickPatterns,
+  type CandlestickPatternName,
   type Candle as IndicatorCandle,
 } from "../../../../core/indicators/index.ts";
 import { RegimeDetector } from "../../../../core/regime/index.ts";
@@ -347,6 +349,7 @@ const INDICATOR_NAMES = [
   "undercut_rally",
   "trim_state",
   "resistance_tests",
+  "candlestick_patterns",
 ] as const;
 
 function dispatchIndicator(
@@ -453,6 +456,17 @@ function dispatchIndicator(
         ...(typeof params.minBarsBetweenTests === "number" && { minBarsBetweenTests: params.minBarsBetweenTests }),
       });
     }
+    case "candlestick_patterns":
+      return detectCandlestickPatterns(candles, {
+        ...(Array.isArray(params.patterns) && {
+          patterns: (params.patterns as unknown[]).filter(
+            (p): p is CandlestickPatternName => typeof p === "string",
+          ) as CandlestickPatternName[],
+        }),
+        ...(typeof params.windowBars === "number" && { windowBars: params.windowBars }),
+        ...(typeof params.dojiBodyThresholdPct === "number" && { dojiBodyThresholdPct: params.dojiBodyThresholdPct }),
+        ...(typeof params.shadowToBodyRatio === "number" && { shadowToBodyRatio: params.shadowToBodyRatio }),
+      });
     default:
       return { error: `Unknown indicator: ${indicator}` };
   }
@@ -472,6 +486,7 @@ export const computeIndicatorTool = createTool({
     "SMC patterns: divergence, false_breakout, squeeze_momentum, angled_market_structure",
     "Setup detection: tight_consolidation (bull-flag / pennant scorer), undercut_rally (shakeout-and-reclaim)",
     "Exit coaching: trim_state (momentum-swing 8/21/50 EMA trail ladder), resistance_tests (count level rejections + confidence)",
+    "Candlestick patterns: candlestick_patterns (harami / engulfing / hammer / shooting_star / doji / morning_star / evening_star / piercing_line / dark_cloud_cover / inside_bar)",
     "Advanced: elliott_wave, delta_ladder, flowscope",
     "",
     "Internally fetches candles via the connected exchange. Pass `bars` to",
