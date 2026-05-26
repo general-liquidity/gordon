@@ -23,8 +23,31 @@ import {
 } from "./Reflector.ts";
 import { listActionLogEntries } from "../../action-log/store.ts";
 import type { ActionLogEntry } from "../../action-log/types.ts";
+import { recordRepropose, rejectedIds } from "./RejectedBuffer.ts";
 
 const logger = createModuleLogger("ace-curator");
+
+/**
+ * Per-cycle cap on the number of NEW lessons accepted from a single
+ * Reflector pass. SkillOpt calls this the "textual learning rate" —
+ * without a cap, the loop becomes ad-hoc prompt rewriting. Existing
+ * lesson merges (refreshing evidence on an already-curated lesson) do
+ * NOT count against the budget; only brand-new lessons do.
+ *
+ * Default 4 per the paper. Override via GORDON_ACE_EDIT_BUDGET when an
+ * operator deliberately wants a wider ingest window (e.g. after a long
+ * gap with no /reflect run).
+ */
+const DEFAULT_EDIT_BUDGET = 4;
+
+function getEditBudget(): number {
+  const raw = process.env.GORDON_ACE_EDIT_BUDGET;
+  if (raw && raw.trim()) {
+    const parsed = Number(raw);
+    if (Number.isFinite(parsed) && parsed > 0) return Math.floor(parsed);
+  }
+  return DEFAULT_EDIT_BUDGET;
+}
 
 export interface ACELesson extends ACELessonCandidate {
   /** Stable id derived from category + dedupe key */
@@ -140,11 +163,31 @@ export function runCurator(reflectorOutput: ReflectorOutput): ACELessonStore {
   }
 
   const now = new Date().toISOString();
+  const rejected = rejectedIds();
+  const reproposedRejected: string[] = [];
 
-  for (const candidate of reflectorOutput.candidates) {
+  // Pre-score candidates so when we hit the edit budget, the cap takes
+  // the highest-scoring NEW lessons rather than the first N encountered.
+  const scoredCandidates = reflectorOutput.candidates.map((candidate) => {
     const id = lessonId(candidate.category, candidate.text);
+    return { id, candidate, score: scoreLesson(candidate) };
+  });
+  scoredCandidates.sort((a, b) => b.score - a.score);
+
+  const editBudget = getEditBudget();
+  let newAdded = 0;
+
+  for (const { id, candidate } of scoredCandidates) {
+    // Rejected lessons never re-enter the store. Track repropose count so
+    // the operator can see what the Reflector keeps proposing.
+    if (rejected.has(id)) {
+      reproposedRejected.push(id);
+      continue;
+    }
     const existing = byId.get(id);
     if (existing) {
+      // Merges of already-curated lessons don't count against the edit
+      // budget — they're refreshes, not new procedural rules.
       const merged: ACELesson = {
         ...existing,
         evidenceCount: existing.evidenceCount + candidate.evidenceCount,
@@ -161,6 +204,9 @@ export function runCurator(reflectorOutput: ReflectorOutput): ACELessonStore {
       merged.score = scoreLesson(merged);
       byId.set(id, merged);
     } else {
+      // New lessons are budgeted. SkillOpt's "textual learning rate" —
+      // takes only the top-N candidates this cycle.
+      if (newAdded >= editBudget) continue;
       byId.set(id, {
         ...candidate,
         id,
@@ -168,7 +214,14 @@ export function runCurator(reflectorOutput: ReflectorOutput): ACELessonStore {
         curatedAt: now,
         evidenceEntryIds: candidate.evidenceEntryIds ?? [],
       });
+      newAdded++;
     }
+  }
+
+  // Record any rejected lessons the Reflector tried to re-propose so the
+  // operator can see when the model keeps wanting to surface them.
+  if (reproposedRejected.length > 0) {
+    recordRepropose(reproposedRejected);
   }
 
   const ranked = [...byId.values()]
