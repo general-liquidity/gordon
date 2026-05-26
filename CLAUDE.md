@@ -145,11 +145,14 @@ The legacy generalized-trading tool modules (calculate_rsi, getCandles, etc.) re
 
 ## Ground rules for changes
 
-1. **Bug fixes don't get refactors.** Three similar lines beat a premature abstraction.
+1. **Bug fixes don't get refactors.** Three similar lines beat a premature abstraction. Don't change/remove comments or code you don't sufficiently understand, even if orthogonal to the task — Karpathy's "orthogonal damage" failure mode. Every changed line should trace to the task.
 2. **No comments unless the WHY is non-obvious.** Don't narrate the WHAT — the code shows that.
 3. **No backwards-compatibility shims** unless explicitly requested. If something is unused, delete it.
 4. **No error handling for impossible states** — trust internal code; only validate at system boundaries.
 5. **Confirm before risky actions** (force pushes, destructive git ops, large refactors). Local edits are free; shared-state changes need the user.
+6. **Surface assumptions before coding.** Multiple interpretations of a task get listed, not picked silently. If a test's success depends on math you haven't validated (synthetic data calibration, threshold values, sample-size effects), prototype the math first. "It will probably work" is a tell.
+7. **Translate vague tasks into verifiable success criteria.** "Fix the bug" → "write a failing test, make it pass." "Add feature X" → "tsc clean + N/N tests pass + tier lint clean + surface count verified." Loop on failures; don't work around them. Soft criteria ("schema validates and the file loads") are necessary but not sufficient on their own — name what would actually count as done.
+8. **Use Edit, not sed-on-code.** Even when a change looks repetitive across a file, an explicit Edit per region beats a regex that can structurally mangle the file. Sed is fine for config / docs; for source, default to Edit.
 
 ## How to find what you need
 
