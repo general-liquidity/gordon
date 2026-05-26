@@ -27,6 +27,11 @@ import { getStockNewsHeadlinesTool as legacyStockNews } from "../news/stockNews.
 import { filterByAsOf } from "./retrieval-helpers.ts";
 import { upsertCandles, readCandles, type CachedCandle } from "../../../data/ohlcvCache.ts";
 import {
+  upsertOrderbookSnapshot,
+  readOrderbookSnapshot,
+  type OrderbookLevel,
+} from "../../../data/orderbookCache.ts";
+import {
   getCompanyProfileTool as legacyProfile,
   getBasicFinancialsTool as legacyBasicFinancials,
   getFinancialsReportedTool as legacyFinancialsReported,
@@ -83,7 +88,7 @@ export const getMarketDataTool = createTool({
       .string()
       .optional()
       .describe(
-        "ISO timestamp. For dataType='candles' ONLY: read from the local OHLCV cache, returning only bars whose stored_at <= asOf. Use for replay accuracy — 'what candles did Gordon have for BTC/USDT at 14:30 last Tuesday?'. When set, no live exchange fetch is performed; a cache miss returns an empty array. Other dataTypes ignore this field.",
+        "ISO timestamp. For dataType='candles' or 'orderbook': read from the local cache, returning only rows whose stored_at <= asOf. Use for replay — 'what was the chart / book at time T?'. When set, no live exchange fetch is performed; a cache miss returns empty data. Other dataTypes ignore this field.",
       ),
   }),
   outputSchema: z.object({
@@ -130,6 +135,22 @@ export const getMarketDataTool = createTool({
       };
     }
 
+    // asOf-mode for orderbook: same pattern as candles. Returns the
+    // single most-recent book snapshot whose stored_at <= asOf.
+    if (args.dataType === "orderbook" && args.asOf) {
+      const cutoff = Date.parse(args.asOf);
+      const cached = Number.isFinite(cutoff)
+        ? readOrderbookSnapshot(venue, args.symbol, { asOfStoredAt: cutoff })
+        : null;
+      return {
+        dataType: "orderbook",
+        symbol: args.symbol,
+        data: cached ? { bids: cached.bids, asks: cached.asks, takenAt: cached.takenAt } : null,
+        fetchedAt: new Date().toISOString(),
+        cacheSource: cached ? ("cache" as const) : ("live+cache-miss" as const),
+      };
+    }
+
     if (!exchange) {
       return {
         dataType: args.dataType,
@@ -169,7 +190,27 @@ export const getMarketDataTool = createTool({
         }
         case "orderbook": {
           const book = await exchange.getOrderBook(args.symbol, args.depth ?? args.limit ?? 20);
-          return { dataType: "orderbook", symbol: args.symbol, data: book, fetchedAt };
+          // Fire-and-forget snapshot write. Cache failure never breaks
+          // the live read. takenAt = now (the venue doesn't surface
+          // its own timestamp for orderbook reads).
+          try {
+            upsertOrderbookSnapshot({
+              venue,
+              symbol: args.symbol,
+              takenAt: Date.now(),
+              bids: (book?.bids ?? []) as OrderbookLevel[],
+              asks: (book?.asks ?? []) as OrderbookLevel[],
+            });
+          } catch {
+            // Cache write failure is acceptable.
+          }
+          return {
+            dataType: "orderbook",
+            symbol: args.symbol,
+            data: book,
+            fetchedAt,
+            cacheSource: "live" as const,
+          };
         }
         case "ticker": {
           const tickers = await exchange.get24hrTickers();
