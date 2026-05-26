@@ -45,6 +45,8 @@ import {
   calculateAO,
   calculateDeltaLadder,
   calculateFlowScope,
+  calculateTightConsolidation,
+  calculateUndercutRally,
   type Candle as IndicatorCandle,
 } from "../../../../core/indicators/index.ts";
 import { RegimeDetector } from "../../../../core/regime/index.ts";
@@ -331,6 +333,8 @@ const INDICATOR_NAMES = [
   "awesome_oscillator",
   "delta_ladder",
   "flowscope",
+  "tight_consolidation",
+  "undercut_rally",
 ] as const;
 
 function dispatchIndicator(
@@ -408,6 +412,20 @@ function dispatchIndicator(
       return calculateDeltaLadder(candles);
     case "flowscope":
       return calculateFlowScope(candles);
+    case "tight_consolidation":
+      return calculateTightConsolidation(candles, {
+        ...(typeof params.window === "number" && { window: params.window }),
+        ...(typeof params.maxRangePct === "number" && { maxRangePct: params.maxRangePct }),
+        ...(typeof params.minDays === "number" && { minDays: params.minDays }),
+      });
+    case "undercut_rally":
+      return calculateUndercutRally(candles, {
+        ...(typeof params.srLookback === "number" && { srLookback: params.srLookback }),
+        ...(typeof params.reclaimWindow === "number" && { reclaimWindow: params.reclaimWindow }),
+        ...(typeof params.breakdownThresholdPct === "number" && { breakdownThresholdPct: params.breakdownThresholdPct }),
+        ...(typeof params.reclaimMargin === "number" && { reclaimMargin: params.reclaimMargin }),
+        ...(typeof params.volumeMult === "number" && { volumeMult: params.volumeMult }),
+      });
     default:
       return { error: `Unknown indicator: ${indicator}` };
   }
@@ -425,6 +443,7 @@ export const computeIndicatorTool = createTool({
     "Trend systems: ichimoku, supertrend, parabolic_sar",
     "Stats: kalman, nadaraya_watson, markov_regime",
     "SMC patterns: divergence, false_breakout, squeeze_momentum, angled_market_structure",
+    "Setup detection: tight_consolidation (bull-flag / pennant scorer), undercut_rally (shakeout-and-reclaim)",
     "Advanced: elliott_wave, delta_ladder, flowscope",
     "",
     "Internally fetches candles via the connected exchange. Pass `bars` to",

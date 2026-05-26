@@ -148,3 +148,11 @@ export type { TMRPattern, TMRResult } from "./three-mountains-rivers.ts";
 // Delta Ladder
 export { calculateDeltaLadder } from "./delta-ladder.ts";
 export type { DeltaLevel, DeltaLadderResult } from "./delta-ladder.ts";
+
+// Tight Consolidation (bull-flag / pennant / wedge)
+export { calculateTightConsolidation } from "./tight-consolidation.ts";
+export type { TightConsolidationResult, TightConsolidationParams } from "./tight-consolidation.ts";
+
+// Undercut-and-Rally
+export { calculateUndercutRally } from "./undercut-rally.ts";
+export type { UndercutRallyResult, UndercutRallyParams } from "./undercut-rally.ts";
