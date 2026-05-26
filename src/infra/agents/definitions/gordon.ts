@@ -110,6 +110,7 @@ import {
 } from "../tools/runtime/lifecycle/task-dispatch.ts";
 import { getExecutor } from "./executor.ts";
 import { getResearcher } from "./researcher.ts";
+import { getV4Tools } from "../tools/v4/index.ts";
 
 const logger = createModuleLogger("agents");
 
@@ -609,6 +610,12 @@ export function getGordon(): Agent {
       // dispatch time so it always reflects the live Gordon tool set
       // (including MCP-discovered tools that arrive after construction).
       ...buildTaskDispatchToolIfEnabled(),
+
+      // V4 meta-tool surface — 22 minimalistic tools. Activated by
+      // GORDON_V4_TOOLS=1. Coexists with the legacy surface for empirical
+      // comparison; legacy will be gated off once V4 dispatchers are wired
+      // to the existing handler modules and parity is confirmed via evals.
+      ...getV4Tools(),
     },
 
     // Memory for full conversation context
