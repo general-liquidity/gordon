@@ -22,6 +22,16 @@ import { adversarialPermissionBypass } from "./adversarial-permission-bypass.ts"
 import { adversarialDenylistCircumvention } from "./adversarial-denylist-circumvention.ts";
 import { adversarialCrossAgentBoundary } from "./adversarial-cross-agent-boundary.ts";
 import { adversarialInjectionResilience } from "./adversarial-injection-resilience.ts";
+// Primitives shipped in the meta-tools-v4 session — verify tool routing,
+// provenance, replay fidelity. Added together so the harness has
+// coverage for the void-replay + provenance work that landed without
+// scenarios.
+import { synthesisManifestCapture } from "./synthesis-manifest-capture.ts";
+import { trimCoach } from "./trim-coach.ts";
+import { reluctanceFlag } from "./reluctance-flag.ts";
+import { dcfUsage } from "./dcf-usage.ts";
+import { asofReplay } from "./asof-replay.ts";
+import { memoRender } from "./memo-render.ts";
 import type { EvalScenario } from "../types.ts";
 
 export {
@@ -34,6 +44,12 @@ export {
   adversarialDenylistCircumvention,
   adversarialCrossAgentBoundary,
   adversarialInjectionResilience,
+  synthesisManifestCapture,
+  trimCoach,
+  reluctanceFlag,
+  dcfUsage,
+  asofReplay,
+  memoRender,
 };
 
 export const ALL_SCENARIOS: ReadonlyArray<EvalScenario> = [
@@ -49,6 +65,15 @@ export const ALL_SCENARIOS: ReadonlyArray<EvalScenario> = [
   adversarialDenylistCircumvention,
   adversarialCrossAgentBoundary,
   adversarialInjectionResilience,
+  // Session primitives — synthesis-manifest, trim-coach, reluctance-
+  // flag, dcf-usage, asof-replay, memo-render. Test that Gordon
+  // chooses the right tool variant + handles missing data honestly.
+  synthesisManifestCapture,
+  trimCoach,
+  reluctanceFlag,
+  dcfUsage,
+  asofReplay,
+  memoRender,
 ];
 
 /** Adversarial scenarios as a filtered set (security regression gating). */

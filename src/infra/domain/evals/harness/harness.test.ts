@@ -41,12 +41,21 @@ function makeTraj(id: string, content: string): EvalTrajectory {
 }
 
 describe("scenarios catalog", () => {
-  it("ships the four initial scenarios", () => {
-    expect(ALL_SCENARIOS.length).toBe(4);
+  it("ships the expected scenario set (4 core + 5 adversarial + 6 session)", () => {
+    // 15 = 4 core (plan-card-btc, regime-flip, risk-gate, ace-recall) +
+    //      5 adversarial (cred-leak, perm-bypass, denylist, cross-agent, injection) +
+    //      6 session primitives (synthesis-manifest, trim-coach,
+    //      reluctance-flag, dcf-usage, asof-replay, memo-render).
+    // Bump this assertion when adding scenarios so silent additions
+    // get a deliberate code review.
+    expect(ALL_SCENARIOS.length).toBe(15);
     expect(ALL_SCENARIO_IDS).toContain("plan-card-btc");
     expect(ALL_SCENARIO_IDS).toContain("regime-flip");
     expect(ALL_SCENARIO_IDS).toContain("risk-gate");
     expect(ALL_SCENARIO_IDS).toContain("ace-recall");
+    expect(ALL_SCENARIO_IDS).toContain("synthesis-manifest-capture");
+    expect(ALL_SCENARIO_IDS).toContain("trim-coach");
+    expect(ALL_SCENARIO_IDS).toContain("memo-render");
   });
 
   it("each scenario has the required fields", () => {
@@ -207,6 +216,20 @@ describe("runEvalSuite", () => {
   });
 
   it("scores every scenario for every variant", async () => {
+    // Pin to the 4 scenarios the mock provides explicit responses for —
+    // ALL_SCENARIOS has grown to 15 (4 core + 5 adversarial + 6 session
+    // primitives) and the mock would have to enumerate every one. The
+    // test's actual subject is the suite-runner shape, not the full
+    // catalog; the catalog count is asserted separately above.
+    const pinnedIds = ["plan-card-btc", "regime-flip", "risk-gate", "ace-recall"];
+    const pinnedScenarios = ALL_SCENARIOS.filter((s) => pinnedIds.includes(s.id));
+    const buildPinnedVariant = (label: string): RunVariantInput => {
+      const map = new Map<string, EvalTrajectory>();
+      for (const s of pinnedScenarios) {
+        map.set(s.id, makeTraj(label, `response from ${label} for ${s.id}`));
+      }
+      return { variantLabel: label, trajectoriesByScenario: map };
+    };
     const client = buildMockJudgeClient({
       responses: {
         "plan-card-btc": [
@@ -228,8 +251,8 @@ describe("runEvalSuite", () => {
       },
     });
     const result = await runEvalSuite({
-      scenarios,
-      variants: [buildVariant("good", 1), buildVariant("bad", 0)],
+      scenarios: pinnedScenarios,
+      variants: [buildPinnedVariant("good"), buildPinnedVariant("bad")],
       judgeOptions: { client },
     });
     expect(result.results.length).toBe(2);
