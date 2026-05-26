@@ -5,7 +5,16 @@
 
 import { buildGeneratedPrompt } from "../../infra/runtime/actions/surfaces.ts";
 import { BrokerFactory } from "../../infra/broker/index.ts";
+import { getSkillSlashCommandIds } from "../../infra/skills/slashCommands.ts";
 import type { SlashCommand } from "./slashCommands.ts";
+
+// Cache the skill-id set on first call. Discovery is memoized by registry.ts
+// so this just dedups a Set construction.
+let SKILL_ID_SET: Set<string> | null = null;
+function isSkillSlashCommand(name: string): boolean {
+  if (SKILL_ID_SET === null) SKILL_ID_SET = getSkillSlashCommandIds();
+  return SKILL_ID_SET.has(name);
+}
 
 const BROKER_TOKENS = BrokerFactory.getSupportedBrokers();
 const STOCK_MARKET_TOKENS = ["stock", "stocks", "equity", "equities", ...BROKER_TOKENS];
@@ -1006,7 +1015,18 @@ export function commandToPrompt(command: SlashCommand, args: string): string {
       if (simSub) return `Simulate: ${args}. Show projected outcomes before executing.`;
       return "Simulate pending orders before execution. Show projected fills, slippage, and impact analysis.";
     }
-    default:
+    default: {
+      // Skill-derived slash commands: route through the `skill` tool. The
+      // agent loads the SKILL.md recipe and then composes the surface tools
+      // per the recipe.
+      if (isSkillSlashCommand(command.name)) {
+        const trimmed = args.trim();
+        if (trimmed) {
+          return `Use the ${command.name} skill with arguments: ${trimmed}. Call skill({ action: 'load', id: '${command.name}' }) first to get the recipe, then follow it.`;
+        }
+        return `Use the ${command.name} skill. Call skill({ action: 'load', id: '${command.name}' }) first to get the recipe, then follow it.`;
+      }
       return args || command.description;
+    }
   }
 }

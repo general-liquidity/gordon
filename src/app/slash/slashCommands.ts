@@ -7,6 +7,7 @@ import {
   getGeneratedSlashCommands,
   mergeSlashCommands,
 } from "../../infra/runtime/actions/surfaces.ts";
+import { getSkillSlashCommands } from "../../infra/skills/slashCommands.ts";
 import {
   type CommandAudience,
   type LegacyCommandCategory,
@@ -2419,10 +2420,18 @@ function normalizeSlashCommandRuntime(command: SlashCommand): SlashCommand {
   return command;
 }
 
+// Skill-derived slash commands are appended LAST in the legacy bucket so any
+// explicitly-defined legacy command with the same name wins (mergeSlashCommands
+// is "first seen wins" within each bucket).
+const LEGACY_PLUS_SKILLS: SlashCommandSeed[] = [
+  ...LEGACY_SLASH_COMMANDS,
+  ...(getSkillSlashCommands() as SlashCommandSeed[]),
+];
+
 export const SLASH_COMMANDS: SlashCommand[] = sortCommandsForPresentation(
   mergeSlashCommands(
     getGeneratedSlashCommands() as SlashCommandSeed[],
-    LEGACY_SLASH_COMMANDS,
+    LEGACY_PLUS_SKILLS,
   )
     .map((command) => normalizeCommandUx(command))
     .map((command) => normalizeSlashCommandRuntime(command))
