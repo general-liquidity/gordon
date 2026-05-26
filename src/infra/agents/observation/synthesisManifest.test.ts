@@ -141,6 +141,7 @@ describe("summarizeManifest", () => {
       observationCount: 5,
       observationWindowMs: 4 * 60 * 60 * 1000,
       matchedLessonIds: ["op::a", "op::b"],
+      candleSnapshotRef: null,
     });
     expect(summary).toContain("regime: trending_up");
     expect(summary).toContain("news: 3 hdl");

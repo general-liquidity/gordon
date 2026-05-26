@@ -25,6 +25,7 @@ import { recordSymbolObservation } from "../../observation/symbolObservationTrac
 import { getCryptoNewsHeadlinesTool as legacyCryptoNews } from "../news/news.ts";
 import { getStockNewsHeadlinesTool as legacyStockNews } from "../news/stockNews.ts";
 import { filterByAsOf } from "./retrieval-helpers.ts";
+import { upsertCandles, readCandles, type CachedCandle } from "../../../data/ohlcvCache.ts";
 import {
   getCompanyProfileTool as legacyProfile,
   getBasicFinancialsTool as legacyBasicFinancials,
@@ -78,6 +79,12 @@ export const getMarketDataTool = createTool({
       .positive()
       .optional()
       .describe("Alias for limit on orderbook."),
+    asOf: z
+      .string()
+      .optional()
+      .describe(
+        "ISO timestamp. For dataType='candles' ONLY: read from the local OHLCV cache, returning only bars whose stored_at <= asOf. Use for replay accuracy — 'what candles did Gordon have for BTC/USDT at 14:30 last Tuesday?'. When set, no live exchange fetch is performed; a cache miss returns an empty array. Other dataTypes ignore this field.",
+      ),
   }),
   outputSchema: z.object({
     dataType: z.string(),
@@ -85,6 +92,7 @@ export const getMarketDataTool = createTool({
     timeframe: z.string().optional(),
     data: z.unknown(),
     fetchedAt: z.string(),
+    cacheSource: z.enum(["live", "cache", "live+cache-miss"]).optional(),
   }),
   execute: async (
     args: {
@@ -93,12 +101,35 @@ export const getMarketDataTool = createTool({
       timeframe?: "1m" | "5m" | "15m" | "30m" | "1h" | "4h" | "1d" | "1w";
       limit?: number;
       depth?: number;
+      asOf?: string;
     },
     execContext?: MastraExecutionContext,
   ) => {
     recordSymbolObservation(args.symbol);
     const ctx = getGordonContext(execContext);
     const exchange = ctx?.exchange;
+    const venue = exchange?.exchangeId ?? "unknown";
+
+    // asOf-mode for candles: bypass exchange entirely, read from cache
+    // with the as-of-stored-at cutoff. No live fallback — the call is a
+    // historical query, returning nothing is the correct answer when
+    // the cache hasn't seen this slice yet.
+    if (args.dataType === "candles" && args.asOf) {
+      const tf = args.timeframe ?? "1h";
+      const cutoff = Date.parse(args.asOf);
+      const cached = Number.isFinite(cutoff)
+        ? readCandles(venue, args.symbol, tf, { asOfStoredAt: cutoff, limit: args.limit ?? 100 })
+        : [];
+      return {
+        dataType: "candles",
+        symbol: args.symbol,
+        timeframe: tf,
+        data: cached,
+        fetchedAt: new Date().toISOString(),
+        cacheSource: cached.length > 0 ? ("cache" as const) : ("live+cache-miss" as const),
+      };
+    }
+
     if (!exchange) {
       return {
         dataType: args.dataType,
@@ -113,12 +144,24 @@ export const getMarketDataTool = createTool({
     try {
       switch (args.dataType) {
         case "candles": {
-          const candles = await exchange.getCandles(
-            args.symbol,
-            args.timeframe ?? "1h",
-            args.limit ?? 100,
-          );
-          return { dataType: "candles", symbol: args.symbol, timeframe: args.timeframe ?? "1h", data: candles, fetchedAt };
+          const tf = args.timeframe ?? "1h";
+          const candles = await exchange.getCandles(args.symbol, tf, args.limit ?? 100);
+          // Fire-and-forget cache write. A cache failure must NEVER
+          // break the live read. Wrapped in try/catch — never throws.
+          try {
+            upsertCandles(venue, args.symbol, tf, candles as unknown as CachedCandle[]);
+          } catch {
+            // Cache write failure is acceptable; the live data has
+            // already been returned upstream.
+          }
+          return {
+            dataType: "candles",
+            symbol: args.symbol,
+            timeframe: tf,
+            data: candles,
+            fetchedAt,
+            cacheSource: "live" as const,
+          };
         }
         case "price": {
           const price = await exchange.getPrice(args.symbol);

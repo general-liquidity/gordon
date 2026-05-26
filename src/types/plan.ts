@@ -135,6 +135,17 @@ export const PlanSchema = z.object({
       observationCount: z.number(),
       observationWindowMs: z.number(),
       matchedLessonIds: z.array(z.string()),
+      candleSnapshotRef: z
+        .object({
+          venue: z.string(),
+          symbol: z.string(),
+          timeframe: z.string(),
+          fromTs: z.number(),
+          toTs: z.number(),
+          asOfStoredAt: z.number(),
+          barCount: z.number(),
+        })
+        .nullable(),
     })
     .optional(),
 

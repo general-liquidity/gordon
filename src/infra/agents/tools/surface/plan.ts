@@ -159,10 +159,11 @@ export const createPlanTool = createTool({
       const allocationPercent = args.sizeUsd / portfolioValue;
       // Snapshot the synthesis inputs present right NOW for this symbol —
       // active regime, in-cache news, observation count, matched ACE
-      // lessons. Cheap, no I/O. Captures the "edge in the void" inputs
-      // that converged on this decision; later journal review replays
-      // them.
-      const synthesisManifest = buildSynthesisManifest(args.symbol);
+      // lessons, plus a pointer into the local OHLCV cache so /replay-
+      // decision can reconstruct the exact analyst view later. Cheap,
+      // no I/O.
+      const venue = ctx?.exchange?.exchangeId;
+      const synthesisManifest = buildSynthesisManifest(args.symbol, { venue });
       // Map surface explicit spec to the Plan shape stored in SQLite.
       // Direction collapses sell→short with inverted stop semantics handled
       // downstream; strategy defaults to support_bounce since these plans are

@@ -24,6 +24,7 @@ import { scoreSentiment, aggregateSentiment, type Sentiment } from "../../news/s
 import { RegimeDetector } from "../../../core/regime/index.ts";
 import { loadACELessons } from "../ace/Curator.ts";
 import { getSymbolObservationCount } from "./symbolObservationTracker.ts";
+import { readCandles } from "../../data/ohlcvCache.ts";
 
 const DEFAULT_OBSERVATION_WINDOW_MS = 4 * 60 * 60 * 1000; // 4h
 const MAX_MATCHED_LESSON_IDS = 8;
@@ -54,6 +55,23 @@ export interface SynthesisManifest {
   /** ACE lesson IDs whose text mentions the symbol or its base token.
    *  Capped at MAX_MATCHED_LESSON_IDS — most-recently-updated first. */
   matchedLessonIds: string[];
+  /**
+   * Pointer into the local OHLCV cache so a future /replay-decision
+   * skill can reconstruct the exact candle window the LLM saw at plan
+   * creation. Null when no cached candles exist for this symbol — the
+   * cache is populated lazily on get_market_data calls, so plans whose
+   * data was never read through Gordon (operator pasted a chart, etc.)
+   * won't carry a ref.
+   */
+  candleSnapshotRef: {
+    venue: string;
+    symbol: string;
+    timeframe: string;
+    fromTs: number;
+    toTs: number;
+    asOfStoredAt: number;
+    barCount: number;
+  } | null;
 }
 
 /** Normalize "BTC/USDT" → ["BTC/USDT", "BTCUSDT", "BTC"] for fuzzy text
@@ -147,21 +165,57 @@ function tryMatchedLessons(tokens: string[]): string[] {
   return matched;
 }
 
+function tryCandleSnapshotRef(
+  symbol: string,
+  venue: string | undefined,
+  capturedAt: number,
+  timeframe: string,
+): SynthesisManifest["candleSnapshotRef"] {
+  if (!venue) return null;
+  try {
+    const rows = readCandles(venue, symbol, timeframe, { asOfStoredAt: capturedAt });
+    if (rows.length === 0) return null;
+    return {
+      venue,
+      symbol,
+      timeframe,
+      fromTs: rows[0]!.openTime,
+      toTs: rows[rows.length - 1]!.openTime,
+      asOfStoredAt: capturedAt,
+      barCount: rows.length,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export interface BuildManifestOptions {
+  observationWindowMs?: number;
+  /** Venue for the candle-snapshot ref. When omitted, no ref is captured. */
+  venue?: string;
+  /** Timeframe to snapshot. Default '1h' — the operator can override
+   *  via a future caller if the plan is built off a different timeframe. */
+  candleTimeframe?: string;
+}
+
 export function buildSynthesisManifest(
   symbol: string,
-  options: { observationWindowMs?: number } = {},
+  options: BuildManifestOptions = {},
 ): SynthesisManifest {
   const windowMs = options.observationWindowMs ?? DEFAULT_OBSERVATION_WINDOW_MS;
   const normalized = symbol.trim().toUpperCase();
   const tokens = symbolTokens(normalized);
+  const capturedAt = Date.now();
+  const timeframe = options.candleTimeframe ?? "1h";
   return {
-    capturedAt: Date.now(),
+    capturedAt,
     symbol: normalized,
     regime: tryRegime(normalized),
     news: tryNews(tokens),
     observationCount: getSymbolObservationCount(normalized, windowMs),
     observationWindowMs: windowMs,
     matchedLessonIds: tryMatchedLessons(tokens),
+    candleSnapshotRef: tryCandleSnapshotRef(normalized, options.venue, capturedAt, timeframe),
   };
 }
 
@@ -176,5 +230,6 @@ export function summarizeManifest(m: SynthesisManifest): string {
   }
   parts.push(`obs: ${m.observationCount}`);
   if (m.matchedLessonIds.length) parts.push(`lessons: ${m.matchedLessonIds.length}`);
+  if (m.candleSnapshotRef) parts.push(`candles: ${m.candleSnapshotRef.barCount}@${m.candleSnapshotRef.timeframe}`);
   return parts.join(" | ");
 }
