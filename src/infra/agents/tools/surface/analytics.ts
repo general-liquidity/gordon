@@ -47,6 +47,8 @@ import {
   calculateFlowScope,
   calculateTightConsolidation,
   calculateUndercutRally,
+  calculateTrimState,
+  calculateResistanceTests,
   type Candle as IndicatorCandle,
 } from "../../../../core/indicators/index.ts";
 import { RegimeDetector } from "../../../../core/regime/index.ts";
@@ -343,6 +345,8 @@ const INDICATOR_NAMES = [
   "flowscope",
   "tight_consolidation",
   "undercut_rally",
+  "trim_state",
+  "resistance_tests",
 ] as const;
 
 function dispatchIndicator(
@@ -434,6 +438,21 @@ function dispatchIndicator(
         ...(typeof params.reclaimMargin === "number" && { reclaimMargin: params.reclaimMargin }),
         ...(typeof params.volumeMult === "number" && { volumeMult: params.volumeMult }),
       });
+    case "trim_state":
+      return calculateTrimState(candles, {
+        ...(typeof params.entryBarIndex === "number" && { entryBarIndex: params.entryBarIndex }),
+        ...(typeof params.firstResistanceLevel === "number" && { firstResistanceLevel: params.firstResistanceLevel }),
+      });
+    case "resistance_tests": {
+      const level = typeof params.level === "number" ? params.level : NaN;
+      return calculateResistanceTests(candles, level, {
+        ...(typeof params.tolerancePct === "number" && { tolerancePct: params.tolerancePct }),
+        ...(typeof params.windowBars === "number" && { windowBars: params.windowBars }),
+        ...(typeof params.minRejectionPct === "number" && { minRejectionPct: params.minRejectionPct }),
+        ...(typeof params.rejectionWindow === "number" && { rejectionWindow: params.rejectionWindow }),
+        ...(typeof params.minBarsBetweenTests === "number" && { minBarsBetweenTests: params.minBarsBetweenTests }),
+      });
+    }
     default:
       return { error: `Unknown indicator: ${indicator}` };
   }
@@ -452,6 +471,7 @@ export const computeIndicatorTool = createTool({
     "Stats: kalman, nadaraya_watson, markov_regime",
     "SMC patterns: divergence, false_breakout, squeeze_momentum, angled_market_structure",
     "Setup detection: tight_consolidation (bull-flag / pennant scorer), undercut_rally (shakeout-and-reclaim)",
+    "Exit coaching: trim_state (momentum-swing 8/21/50 EMA trail ladder), resistance_tests (count level rejections + confidence)",
     "Advanced: elliott_wave, delta_ladder, flowscope",
     "",
     "Internally fetches candles via the connected exchange. Pass `bars` to",

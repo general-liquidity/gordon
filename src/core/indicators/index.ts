@@ -156,3 +156,11 @@ export type { TightConsolidationResult, TightConsolidationParams } from "./tight
 // Undercut-and-Rally
 export { calculateUndercutRally } from "./undercut-rally.ts";
 export type { UndercutRallyResult, UndercutRallyParams } from "./undercut-rally.ts";
+
+// Trim-state — coach for the momentum-swing trim ladder (8/21/50 EMA trail)
+export { calculateTrimState } from "./trim-state.ts";
+export type { TrimStateResult, TrimStateParams } from "./trim-state.ts";
+
+// Resistance-tests — count how many times a level has rejected price
+export { calculateResistanceTests } from "./resistance-tests.ts";
+export type { ResistanceTestsResult, ResistanceTestsParams } from "./resistance-tests.ts";
