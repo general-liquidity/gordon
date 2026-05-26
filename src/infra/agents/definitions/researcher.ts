@@ -57,6 +57,7 @@ import {
 } from "../tooling/instrumentedTools.ts";
 import { createSubAgentMemory } from "../memory/memoryFactory.ts";
 import { createModelResolver, registerObservability, resolveRuntimeModel } from "../agentHelpers.ts";
+import { getV4Tools, isV4Active } from "../tools/v4/index.ts";
 import {
   getHarnessSuffixForModel,
   isHarnessProfilesEnabled,
@@ -96,19 +97,27 @@ export function getResearcher(): Agent {
     }),
     model: createModelResolver("researcher"),
     defaultOptions: { modelSettings: { maxOutputTokens: 16384 } },
+    // V4 gating: same pattern as Gordon — legacy analytical surface
+    // collapses to V4's 22 tools; integration data feeds + quote-verify
+    // stay regardless.
     tools: {
-      ...instrumentedIndicatorTools,
-      ...instrumentedMarketDataTools,
-      ...instrumentedMarketTools,
-      ...instrumentedDiscoveryTools,
-      ...instrumentedStrategyTools,
-      ...instrumentedParallelAnalysisTools,
-      ...instrumentedBacktestTools,
-      ...instrumentedChartTools,
-      ...instrumentedMarketAnalysisTools,
-      ...instrumentedCompositionTools,
-      ...instrumentedLiquidationIntelligenceTools,
-      ...instrumentedPairAnalysisTools,
+      // Indicators / market / scanning (V4: compute_indicator, get_market_data)
+      ...(isV4Active() ? {} : instrumentedIndicatorTools),
+      ...(isV4Active() ? {} : instrumentedMarketDataTools),
+      ...(isV4Active() ? {} : instrumentedMarketTools),
+      ...(isV4Active() ? {} : instrumentedDiscoveryTools),
+      ...(isV4Active() ? {} : instrumentedStrategyTools),
+      ...(isV4Active() ? {} : instrumentedParallelAnalysisTools),
+      // Backtest / eval (V4: backtest)
+      ...(isV4Active() ? {} : instrumentedBacktestTools),
+      // Charts / analysis (V4: compute_indicator covers most)
+      ...(isV4Active() ? {} : instrumentedChartTools),
+      ...(isV4Active() ? {} : instrumentedMarketAnalysisTools),
+      ...(isV4Active() ? {} : instrumentedCompositionTools),
+      ...(isV4Active() ? {} : instrumentedLiquidationIntelligenceTools),
+      ...(isV4Active() ? {} : instrumentedPairAnalysisTools),
+
+      // INTEGRATION tier — stays regardless of V4.
       ...instrumentedXSocialTools,
       ...instrumentedCdpWebhookTools,
       ...instrumentedCdpSqlTools,
@@ -116,36 +125,42 @@ export function getResearcher(): Agent {
       ...instrumentedCdpOnrampTools,
       ...instrumentedCdpEvmMultichainTools,
       ...instrumentedCdpWebhookReceiverTools,
-      ...instrumentedProactiveModeTools,
-      ...instrumentedBacktestVerdictTools,
+
+      // Proactive radar (V4: schedule_task)
+      ...(isV4Active() ? {} : instrumentedProactiveModeTools),
+      ...(isV4Active() ? {} : instrumentedBacktestVerdictTools),
+
+      // Finnhub — INTEGRATION tier.
       ...instrumentedFinnhubTools,
       ...instrumentedFinnhubFundamentalsTools,
       ...instrumentedFinnhubMarketsTools,
-      ...instrumentedSmcPatternTools,
-      ...instrumentedCalibrationTools,
-      ...instrumentedSkillLoaderTools,
-      // Anti-hallucination quote verification (reverse-quant port). The
-      // Researcher extracts quoted snippets from external text; this
-      // tool lets it self-check before stating quotes as fact.
+
+      // SMC + calibration (V4: compute_indicator, compute_microstructure)
+      ...(isV4Active() ? {} : instrumentedSmcPatternTools),
+      ...(isV4Active() ? {} : instrumentedCalibrationTools),
+      // Skill loader (V4: skill)
+      ...(isV4Active() ? {} : instrumentedSkillLoaderTools),
+      // Anti-hallucination quote verification — stays regardless.
       ...instrumentedQuoteVerifyTools,
-      // Diagnostic primitives — Researcher exposes these so it can
-      // analyze P&L distributions, vol calibration, and correlation
-      // breakdowns when delegated research tasks request them.
-      ...instrumentedDiagnosticTools,
-      // Microstructure primitives — Researcher uses these when book-
-      // analysis tasks come in (microprice for fair-value estimation,
-      // inventory-adjusted price for sizing-bias analysis).
-      ...instrumentedMicrostructureTools,
-      // Institutional-AI patterns — Researcher uses earnings-signal
-      // validator during transcript analysis, crowd-positioning verdict
-      // during regime/setup analysis. (Discipline audit is also exposed
-      // but typically called by Gordon during /weekend-review.)
-      ...instrumentedInstitutionalAiTools,
+      // Diagnostic / microstructure / institutional-AI (V4: compute_microstructure)
+      ...(isV4Active() ? {} : instrumentedDiagnosticTools),
+      ...(isV4Active() ? {} : instrumentedMicrostructureTools),
+      ...(isV4Active() ? {} : instrumentedInstitutionalAiTools),
+      // Producer health — system observability, stays regardless.
       ...instrumentedProducerHealthTools,
-      ...instrumentedSharedContextTools,
-      ...instrumentedMemoryTools,
-      ...instrumentedEvalTools,
-      ...instrumentedRegimeTools,
+      // Shared context / memory (V4: memory_search, memory_write)
+      ...(isV4Active() ? {} : instrumentedSharedContextTools),
+      ...(isV4Active() ? {} : instrumentedMemoryTools),
+      ...(isV4Active() ? {} : instrumentedEvalTools),
+      // Regime detection (V4: compute_regime)
+      ...(isV4Active() ? {} : instrumentedRegimeTools),
+
+      // V4 meta-tool surface — researcher inherits the same read-only
+      // V4 surface (Gordon's tools minus execute_plan/approve_plan/cancel
+      // is conceptually the researcher's natural set; for now the full
+      // V4 set is spread and Mastra's runtime tool-filtering enforces
+      // read-only at the subagent boundary).
+      ...getV4Tools(),
     },
     memory: createSubAgentMemory("researcher"),
     inputProcessors: [gordonToolCallReconciler, gordonInputGuard, new TokenLimiterProcessor({ limit: 32000 })],

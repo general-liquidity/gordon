@@ -110,7 +110,7 @@ import {
 } from "../tools/runtime/lifecycle/task-dispatch.ts";
 import { getExecutor } from "./executor.ts";
 import { getResearcher } from "./researcher.ts";
-import { getV4Tools } from "../tools/v4/index.ts";
+import { getV4Tools, isV4Active } from "../tools/v4/index.ts";
 
 const logger = createModuleLogger("agents");
 
@@ -426,82 +426,97 @@ export function getGordon(): Agent {
     },
 
     // Gordon has ALL read-only tools directly (no routing overhead for 90% of requests)
-    // Only trade execution tools are on Executor (isolated for safety)
+    // Only trade execution tools are on Executor (isolated for safety).
+    //
+    // V4 gating: when GORDON_V4_TOOLS=1, the legacy generalized-trading-
+    // infra spreads are excluded — V4's 22-tool surface stands in for them.
+    // Integration tools (Base / Uniswap / DexSearch / XSocial / AgentKit /
+    // Solana / Polkadot / CDP / Chainlink / Defillama / MCP / Finnhub
+    // fundamentals) stay regardless — V4 doesn't replace venue-specific
+    // data feeds or on-chain reads. The legacy task-dispatch and the
+    // executor handoffs also stay (V4 plan/exec route through them).
     tools: {
-      // Mid-task user elicitation (pauses and awaits answer via TUI dialog)
-      ...instrumentedAskUserTools,
-      // System & scheduling
+      // Mid-task user elicitation (V4: ask_user)
+      ...(isV4Active() ? {} : instrumentedAskUserTools),
+      // System info (always on — Gordon needs basic introspection)
       ...instrumentedSystemTools,
-      ...instrumentedSchedulerTools,
-      ...instrumentedAutonomousTools,
+      // Scheduling / autonomous (V4: schedule_task)
+      ...(isV4Active() ? {} : instrumentedSchedulerTools),
+      ...(isV4Active() ? {} : instrumentedAutonomousTools),
 
-      // Market data & scanning (was Scanner)
-      ...instrumentedIndicatorTools,
-      ...instrumentedMarketDataTools,
-      ...instrumentedMarketTools,
-      ...instrumentedDiscoveryTools,
-      ...instrumentedStrategyTools,
-      ...instrumentedParallelAnalysisTools,
+      // Market data & scanning (V4: get_market_data, compute_indicator)
+      ...(isV4Active() ? {} : instrumentedIndicatorTools),
+      ...(isV4Active() ? {} : instrumentedMarketDataTools),
+      ...(isV4Active() ? {} : instrumentedMarketTools),
+      ...(isV4Active() ? {} : instrumentedDiscoveryTools),
+      ...(isV4Active() ? {} : instrumentedStrategyTools),
+      ...(isV4Active() ? {} : instrumentedParallelAnalysisTools),
 
-      // Analysis & charting (was Analyst)
-      ...instrumentedChartTools,
-      ...instrumentedMarketAnalysisTools,
-      ...instrumentedCompositionTools,
+      // Analysis & charting — V4 covers indicator/regime; chart + multimodal
+      // stay on legacy surface (vision tools not in V4).
+      ...(isV4Active() ? {} : instrumentedChartTools),
+      ...(isV4Active() ? {} : instrumentedMarketAnalysisTools),
+      ...(isV4Active() ? {} : instrumentedCompositionTools),
       ...instrumentedMultiModalChartTools,
-      ...instrumentedLiquidationIntelligenceTools,
-      ...instrumentedPairAnalysisTools,
+      ...(isV4Active() ? {} : instrumentedLiquidationIntelligenceTools),
+      ...(isV4Active() ? {} : instrumentedPairAnalysisTools),
 
-      // Orderbook reads (non-execution)
-      get_order_book: instrumentedOrderbookTools.get_order_book,
-      get_spread: instrumentedOrderbookTools.get_spread,
-      get_market_trades: instrumentedOrderbookTools.get_market_trades,
-      get_order_status: instrumentedOrderbookTools.get_order_status,
-      test_order: instrumentedOrderbookTools.test_order,
+      // Orderbook reads (V4: get_market_data with dataType='orderbook')
+      ...(isV4Active()
+        ? {}
+        : {
+            get_order_book: instrumentedOrderbookTools.get_order_book,
+            get_spread: instrumentedOrderbookTools.get_spread,
+            get_market_trades: instrumentedOrderbookTools.get_market_trades,
+            get_order_status: instrumentedOrderbookTools.get_order_status,
+            test_order: instrumentedOrderbookTools.test_order,
+          }),
 
-      // Portfolio, account, history (was Monitor)
-      ...instrumentedAccountTools,
-      ...instrumentedPositionTools,
-      ...instrumentedHistoryTools,
-      ...instrumentedWalletTools,
-      ...instrumentedEarnTools,
-      ...instrumentedPositionTrackingTools,
+      // Portfolio / account / history (V4: get_account_state, get_portfolio)
+      ...(isV4Active() ? {} : instrumentedAccountTools),
+      ...(isV4Active() ? {} : instrumentedPositionTools),
+      ...(isV4Active() ? {} : instrumentedHistoryTools),
+      ...(isV4Active() ? {} : instrumentedWalletTools),
+      ...(isV4Active() ? {} : instrumentedEarnTools),
+      ...(isV4Active() ? {} : instrumentedPositionTrackingTools),
 
-      // Risk assessment (was Critic — now a tool, not a separate agent)
-      ...instrumentedRiskManagementTools,
-      ...instrumentedCheckRiskTool,
+      // Risk assessment (V4: compute_risk + verify_plan)
+      ...(isV4Active() ? {} : instrumentedRiskManagementTools),
+      ...(isV4Active() ? {} : instrumentedCheckRiskTool),
 
-      // Planning & preview (was Planner)
-      list_plans: instrumentedTradingTools.list_plans,
-      preview_market_order: instrumentedDiscoveryTools.preview_market_order,
-      compare_execution_cost: instrumentedExecutionCostTools.compare_execution_cost,
+      // Planning & preview (V4: create_plan / verify_plan / approve_plan / execute_plan)
+      ...(isV4Active()
+        ? {}
+        : {
+            list_plans: instrumentedTradingTools.list_plans,
+            preview_market_order: instrumentedDiscoveryTools.preview_market_order,
+            compare_execution_cost: instrumentedExecutionCostTools.compare_execution_cost,
+            preview_withdrawal: instrumentedWalletTools.preview_withdrawal,
+          }),
 
-      // Binance Skills Hub + binance-cli are now exposed via the MCP
-      // marketplace (src/infra/ai/mcp/marketplace/catalog.json) instead
-      // of being hardcoded into Gordon's tool bundle. Users discover
-      // them through /mcp and install on demand. The wrappers live in
-      // wrappers/binance-skills-mcp/ and wrappers/binance-cli-mcp/.
-      preview_withdrawal: instrumentedWalletTools.preview_withdrawal,
+      // Backtesting (V4: backtest)
+      ...(isV4Active() ? {} : instrumentedBacktestTools),
+      ...(isV4Active() ? {} : instrumentedEvalTools),
 
-      // Backtesting (was Backtester — heavy work spawns Researcher)
-      ...instrumentedBacktestTools,
-      ...instrumentedEvalTools,
+      // Strategy & playbooks (V4: strategy-build skill)
+      ...(isV4Active() ? {} : instrumentedStrategyGenerationTools),
+      ...(isV4Active() ? {} : instrumentedPlaybookTools),
+      ...(isV4Active() ? {} : instrumentedProtocolTools),
 
-      // Strategy & playbooks (was Teacher + Planner)
-      ...instrumentedStrategyGenerationTools,
-      ...instrumentedPlaybookTools,
-      ...instrumentedProtocolTools,
-
-      // Memory & context
-      ...instrumentedMemoryTools,
-      ...instrumentedACETools,
+      // Memory & context (V4: memory_search, memory_write, audit_event)
+      ...(isV4Active() ? {} : instrumentedMemoryTools),
+      ...(isV4Active() ? {} : instrumentedACETools),
+      // Agent self-feedback — kept on legacy + V4 (no V4 equivalent for
+      // structured stuck-state reporting; this is a meta-tool the agent
+      // calls before the doom-loop detector trips).
       ...instrumentedAgentFeedbackTools,
-      ...instrumentedSharedContextTools,
+      ...(isV4Active() ? {} : instrumentedSharedContextTools),
 
-      // Market regime
-      ...instrumentedRegimeTools,
+      // Market regime (V4: compute_regime)
+      ...(isV4Active() ? {} : instrumentedRegimeTools),
 
-      // On-chain reads (non-execution) — Base / Uniswap stay hot since
-      // Base is a primary L2 surface for the trading flow.
+      // On-chain reads — INTEGRATION tier. Stay regardless of V4 (V4 has
+      // no equivalent for Base / Uniswap / dex-search / social feeds).
       ...instrumentedBaseOnchainTools,
       ...instrumentedBaseSignalTools,
       ...instrumentedBaseIndexerTools,
@@ -509,7 +524,7 @@ export function getGordon(): Agent {
       ...instrumentedDexSearchTools,
       ...instrumentedXSocialTools,
 
-      // CDP integration — cold tier (niche; not in scan/DD/backtest flow).
+      // CDP integration — INTEGRATION tier. Cold-gated already.
       ...(isHotTierOnly() ? {} : instrumentedCdpWebhookTools),
       ...(isHotTierOnly() ? {} : instrumentedCdpSqlTools),
       ...(isHotTierOnly() ? {} : instrumentedCdpPolicyTools),
@@ -517,73 +532,53 @@ export function getGordon(): Agent {
       ...(isHotTierOnly() ? {} : instrumentedCdpEvmMultichainTools),
       ...(isHotTierOnly() ? {} : instrumentedCdpWebhookReceiverTools),
 
-      ...instrumentedProactiveModeTools,
-      ...instrumentedBacktestVerdictTools,
+      // Proactive radar (V4: schedule_task list/status)
+      ...(isV4Active() ? {} : instrumentedProactiveModeTools),
+      ...(isV4Active() ? {} : instrumentedBacktestVerdictTools),
 
-      // Finnhub — only the basic stock tools stay hot. Fundamentals (deep
-      // company data, alt data, congressional trades, lobbying, transcripts)
-      // are cold; users hit them via /research start when needed.
+      // Finnhub — INTEGRATION tier. Hot stock tools cover what V4
+      // get_fundamentals delegates to; keep regardless.
       ...instrumentedFinnhubTools,
       ...(isHotTierOnly() ? {} : instrumentedFinnhubFundamentalsTools),
       ...instrumentedFinnhubMarketsTools,
 
-      ...instrumentedSmcPatternTools,
-      ...instrumentedCalibrationTools,
-      ...instrumentedSkillLoaderTools,
-      // Gaps 1 + 2 — per-trade rule-override audit + adherence aggregator.
-      // Gordon (orchestrator) gets both: record for cases where Gordon
-      // itself runs the approval flow, query for /weekend-review.
-      ...instrumentedAdherenceTools,
-      // Anti-hallucination quote verification — ported from reverse-quant
-      // provenance.verify_quote. Gordon calls this before persisting any
-      // "the article says X" claim extracted from news / SEC / transcripts.
+      // SMC + calibration (V4: compute_indicator, compute_microstructure)
+      ...(isV4Active() ? {} : instrumentedSmcPatternTools),
+      ...(isV4Active() ? {} : instrumentedCalibrationTools),
+      // Skill loader (V4: skill)
+      ...(isV4Active() ? {} : instrumentedSkillLoaderTools),
+      // Adherence + audit (V4: compute_microstructure adherence_report + audit_event)
+      ...(isV4Active() ? {} : instrumentedAdherenceTools),
+      // Quote verification — kept on both (anti-hallucination is meta;
+      // V4 doesn't have an equivalent).
       ...instrumentedQuoteVerifyTools,
-      // Diagnostic primitives translated from options-trading concepts to
-      // spot/perp domain: P&L distribution shape (convexity verdict),
-      // volatility-forecast calibration (IV-vs-RV analog), correlation
-      // breakdown detector (dispersion-signal analog).
-      ...instrumentedDiagnosticTools,
-      // Market-microstructure primitives — Stoikov microprice (fair-
-      // value estimator that conditions on book imbalance + spread)
-      // and Avellaneda-Stoikov inventory-adjusted reference price.
-      ...instrumentedMicrostructureTools,
-      // Institutional-AI patterns translated to Gordon's domain:
-      // earnings-signal validator (structured extraction + hallucinated-
-      // quote detection), discipline audit (7 prop-trading failure modes),
-      // crowd-positioning verdict (Shapiro framing on funding + OI +
-      // sentiment + liquidation signals).
-      ...instrumentedInstitutionalAiTools,
+      // Diagnostic / microstructure / institutional-AI primitives (V4: compute_microstructure)
+      ...(isV4Active() ? {} : instrumentedDiagnosticTools),
+      ...(isV4Active() ? {} : instrumentedMicrostructureTools),
+      ...(isV4Active() ? {} : instrumentedInstitutionalAiTools),
+      // Producer health — system observability, keep on both.
       ...instrumentedProducerHealthTools,
 
-      // Crypto news headlines + sentiment — hot tier (cheap, no API key,
-      // useful for any "what's happening with X?" question and feeds the
-      // news_event radar producer).
-      ...instrumentedNewsTools,
+      // News (V4: get_news)
+      ...(isV4Active() ? {} : instrumentedNewsTools),
+      ...(isV4Active() ? {} : instrumentedStockNewsTools),
 
-      // Stock news headlines (Yahoo + EDGAR + Finnhub) — hot tier, free
-      // RSS sources plus the existing Finnhub aggregator.
-      ...instrumentedStockNewsTools,
+      // Strategy recipes (V4: strategy-build skill)
+      ...(isV4Active() ? {} : instrumentedStrategyRecipeTools),
 
-      // Strategy recipe primitives (regime-RSI, bounce counter, signal
-      // gate, max-exposure timeout) — pure helpers the LLM can compose
-      // into custom playbooks.
-      ...instrumentedStrategyRecipeTools,
-
-      // DefiLlama yields and Chainlink — cold tier (specialized data feeds).
+      // DefiLlama / Chainlink — INTEGRATION tier.
       ...(isHotTierOnly() ? {} : instrumentedDefillamaYieldTools),
       ...(isHotTierOnly() ? {} : instrumentedChainlinkStreamsTools),
       ...(isHotTierOnly() ? {} : instrumentedChainlinkFeedsTools),
       ...instrumentedSynthDataTools,
 
-      // AgentKit reads
+      // AgentKit reads — INTEGRATION tier.
       agentkit_get_balance: instrumentedAgentKitOnchainTools.agentkit_get_balance,
       agentkit_get_wallet: instrumentedAgentKitOnchainTools.agentkit_get_wallet,
       agentkit_get_swap_price: instrumentedAgentKitOnchainTools.agentkit_get_swap_price,
 
-      // Solana wallet kit — cold tier (Jupiter/Drift/Orca tools mostly).
+      // Solana / Polkadot — INTEGRATION tier.
       ...(isHotTierOnly() ? {} : instrumentedSolanaKitWalletTools),
-
-      // Polkadot reads — cold tier (very niche).
       ...(isHotTierOnly()
         ? {}
         : {
@@ -592,29 +587,25 @@ export function getGordon(): Agent {
             polkadot_initialize_chain: instrumentedPolkadotKitDefiTools.polkadot_initialize_chain,
           }),
 
-      // Advanced & audit (was Auditor — now just tools on Gordon)
-      ...instrumentedAdvancedTools,
-      ...instrumentedSystematicTools,
-      ...instrumentedAuditTools,
-      ...instrumentedMetricsTools,
+      // Advanced & audit (V4: audit_event covers most provenance use)
+      ...(isV4Active() ? {} : instrumentedAdvancedTools),
+      ...(isV4Active() ? {} : instrumentedSystematicTools),
+      ...(isV4Active() ? {} : instrumentedAuditTools),
+      ...(isV4Active() ? {} : instrumentedMetricsTools),
 
-      // MCP plugin tools
+      // MCP plugin tools — external, never gated.
       ...getScopedMCPTools({
         categories: ["data-provider", "analytics", "research", "portfolio", "utility", "infrastructure"],
       }),
 
-      // FW7 — operator-authored subagent delegation. The tool is only
-      // registered when there's something to delegate to (operator has
-      // .claude/subagents/*.json configured) OR when GORDON_DYNAMIC_SUBAGENTS=1.
-      // The dispatcher resolves the read-only tool registry lazily at
-      // dispatch time so it always reflects the live Gordon tool set
-      // (including MCP-discovered tools that arrive after construction).
+      // FW7 — operator-authored subagent delegation. V4's delegate_subagent
+      // is a parallel surface; the legacy tool keeps full passthrough access
+      // to Gordon's live tool registry. Operators on V4 can still call the
+      // legacy tool by name if they configured profiles.
       ...buildTaskDispatchToolIfEnabled(),
 
-      // V4 meta-tool surface — 22 minimalistic tools. Activated by
-      // GORDON_V4_TOOLS=1. Coexists with the legacy surface for empirical
-      // comparison; legacy will be gated off once V4 dispatchers are wired
-      // to the existing handler modules and parity is confirmed via evals.
+      // V4 meta-tool surface — 22 minimalistic tools. Spread last so its
+      // tool IDs win on any (theoretical) collision with legacy names.
       ...getV4Tools(),
     },
 
