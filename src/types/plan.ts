@@ -72,6 +72,23 @@ export const PlanSchema = z.object({
 
   takeProfit: z.array(TakeProfitLevelSchema),
 
+  /**
+   * Optional operator mental-state capture at plan time. Soft signal that
+   * compounds across sessions: once 30+ plans carry this, the discipline
+   * audit can correlate emotional state with realized outcomes (do
+   * anxious entries underperform calm ones for THIS operator). On plan
+   * creation the field is also mirrored into the trade journal as an
+   * observation entry so `/journal` surfaces it inline.
+   */
+  mentalState: z
+    .object({
+      confidence: z.number().min(1).max(10).optional(),
+      focus: z.number().min(1).max(10).optional(),
+      mood: z.enum(["calm", "anxious", "frustrated", "neutral", "overconfident"]).optional(),
+      note: z.string().optional(),
+    })
+    .optional(),
+
   reasoning: z.string(),
 
   /**

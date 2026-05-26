@@ -29,6 +29,7 @@ import {
 } from "../../../trading/risk/inventoryAdjustedPrice.ts";
 import { monteCarloPath, summarizeMonteCarloPath } from "../../../../core/alpha/monteCarloPath.ts";
 import { kellySize } from "../../../../core/alpha/kellySize.ts";
+import { computeMarketMemory } from "../../../../core/alpha/marketMemory.ts";
 
 // ============================================================================
 // compute_microprice
@@ -356,9 +357,72 @@ export const computeKellySizeTool = createTool({
 // Export
 // ============================================================================
 
+// ============================================================================
+// compute_market_memory
+// ============================================================================
+
+export const computeMarketMemoryTool = createTool({
+  id: "compute_market_memory",
+  description: [
+    "Diagnose what KIND of memory a price series has on this horizon —",
+    "trending, mean-reverting, or random walk. Use this BEFORE picking a",
+    "strategy class: a momentum/breakout system requires persistence, a",
+    "mean-reversion system requires anti-persistence, and a random-walk",
+    "verdict says the daily-path strategy isn't the right tool.",
+    "",
+    "Complements compute_regime. Regime classifies the CURRENT state of",
+    "the market (trending_up, ranging, ...). market_memory classifies the",
+    "TYPE of memory the market carries — i.e. which strategy class can",
+    "have edge on it at all.",
+    "",
+    "Pipeline:",
+    "  - R/S Hurst with Anis-Lloyd small-sample bias correction",
+    "  - Surrogate permutation test for significance (tests against the",
+    "    shuffled null, not against 0.5, so the estimator's own bias",
+    "    cancels out of the comparison)",
+    "  - Lo-MacKinlay variance-ratio profile (q ∈ {2,5,10,20}) with",
+    "    heteroskedasticity-robust z, so volatility clustering can't",
+    "    fake a memory reading",
+    "",
+    "Decision rule: significance gate from p-value; direction from",
+    "corrected H; horizon shape from VR profile. Reliability is 'low'",
+    "below 100 returns, 'high' above 500.",
+  ].join("\n"),
+  inputSchema: z.object({
+    prices: z.array(z.number()).min(16).describe("Price series, oldest → newest. ≥ 60 strongly recommended."),
+    nSurrogates: z.number().int().min(100).max(5000).optional().describe("Default 1000."),
+    minWindow: z.number().int().min(2).max(50).optional().describe("Smallest R/S window. Default 8."),
+    vrHorizons: z.array(z.number().int().positive()).optional().describe("Variance-ratio horizons. Default [2, 5, 10, 20]."),
+    pValueCutoff: z.number().min(0).max(1).optional().describe("Significance gate. Default 0.05."),
+  }),
+  outputSchema: z.object({
+    summary: z.string(),
+    nReturns: z.number(),
+    hurst: z.number(),
+    hurstCorrected: z.number(),
+    surrogateP: z.number(),
+    nullMean: z.number(),
+    varianceRatio: z.array(
+      z.object({
+        horizon: z.number(),
+        ratio: z.number(),
+        zScore: z.number(),
+        pValue: z.number(),
+      }),
+    ),
+    verdict: z.enum(["trending", "mean_reverting", "random_walk"]),
+    reliability: z.enum(["low", "medium", "high"]),
+  }),
+  execute: async (input) => {
+    const r = computeMarketMemory(input);
+    return r;
+  },
+});
+
 export const microstructureTools = {
   compute_microprice: computeMicropriceTool,
   compute_inventory_adjusted_price: computeInventoryAdjustedPriceTool,
   compute_monte_carlo_path: computeMonteCarloPathTool,
   compute_kelly_size: computeKellySizeTool,
+  compute_market_memory: computeMarketMemoryTool,
 };

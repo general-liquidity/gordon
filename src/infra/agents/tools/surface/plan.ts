@@ -25,6 +25,7 @@ import {
 import { checkRiskTool as legacyCheckRisk } from "../trading/risk-gate.ts";
 import { runBacktestTool as legacyRunBacktest } from "../strategy/backtest/backtest.ts";
 import { auditLog } from "../../../platform/audit/index.ts";
+import { getMemoryManager } from "../../../../core/memory/index.ts";
 
 /** Same shape as analytics.ts withPortfolioOverride — wrap the
  *  RequestContext so reads of portfolioValue / availableCash return the
@@ -98,6 +99,17 @@ export const createPlanTool = createTool({
       .describe(
         "Order routing. 'maker_first' (default) waits for a passive fill — captures the +1.12% maker edge and avoids the −1.12% taker tax (Becker 72.1M-trade study). 'any' allows market orders without further confirmation. With maker_first + market entry, verify_plan flags it; operator must approve_plan with overrideVerifyVerdict=true to proceed.",
       ),
+    mentalState: z
+      .object({
+        confidence: z.number().min(1).max(10).optional().describe("Subjective confidence in the setup. 1=hopeful, 10=screaming-edge."),
+        focus: z.number().min(1).max(10).optional().describe("Operator's current focus level."),
+        mood: z.enum(["calm", "anxious", "frustrated", "neutral", "overconfident"]).optional(),
+        note: z.string().optional().describe("Free-form context — recent loss, fatigue, external pressure."),
+      })
+      .optional()
+      .describe(
+        "Optional operator mental-state snapshot at plan time. Persists on the plan record AND mirrors into the trade journal so /journal surfaces it. After 30+ plans the discipline audit can correlate emotional state with realized outcomes. Skip unless the operator volunteered this information; never fabricate values.",
+      ),
   }),
   outputSchema: z.object({
     success: z.boolean(),
@@ -130,6 +142,12 @@ export const createPlanTool = createTool({
         | "grid_entry";
       timeHorizonHours?: number;
       routingPolicy?: "maker_first" | "any";
+      mentalState?: {
+        confidence?: number;
+        focus?: number;
+        mood?: "calm" | "anxious" | "frustrated" | "neutral" | "overconfident";
+        note?: string;
+      };
     },
     execContext?: MastraExecutionContext,
   ) => {
@@ -166,6 +184,7 @@ export const createPlanTool = createTool({
         // default. Explicit "any" lets the LLM signal that the operator
         // wants taker behavior without further gating.
         routingPolicy: args.routingPolicy ?? "maker_first",
+        ...(args.mentalState && { mentalState: args.mentalState }),
         status: "DRAFT",
         expiresAt: args.timeHorizonHours
           ? new Date(Date.now() + args.timeHorizonHours * 60 * 60 * 1000).toISOString()
@@ -179,6 +198,32 @@ export const createPlanTool = createTool({
         "SUCCESS",
         { resultDetails: args.rationale, planId: plan.id },
       );
+
+      // Mirror mental-state into the trade journal so /journal surfaces it
+      // inline alongside other observations. Fire-and-forget — a journal
+      // failure must not break plan creation.
+      if (args.mentalState) {
+        const m = args.mentalState;
+        const parts = [
+          m.mood ? `mood: ${m.mood}` : null,
+          typeof m.confidence === "number" ? `confidence: ${m.confidence}/10` : null,
+          typeof m.focus === "number" ? `focus: ${m.focus}/10` : null,
+          m.note ? `note: ${m.note}` : null,
+        ].filter(Boolean);
+        if (parts.length > 0) {
+          getMemoryManager()
+            .then((mgr) =>
+              mgr.journal.recordObservation({
+                symbol: args.symbol.toUpperCase(),
+                observation: `Mental state at plan ${plan.id}: ${parts.join("; ")}`,
+                conditions: `${args.side} setup, ${args.entryPrice ? "limit" : "market"} entry, $${args.sizeUsd} size`,
+              }),
+            )
+            .catch(() => {
+              // Journal mirroring is best-effort; never propagate.
+            });
+        }
+      }
 
       return { success: true, planId: plan.id, plan };
     } catch (err) {

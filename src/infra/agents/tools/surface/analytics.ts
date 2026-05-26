@@ -54,6 +54,7 @@ import {
   computeInventoryAdjustedPriceTool as legacyInventoryAdjusted,
   computeMonteCarloPathTool as legacyMonteCarloPath,
   computeKellySizeTool as legacyKellySize,
+  computeMarketMemoryTool as legacyMarketMemory,
 } from "../runtime/microstructure.ts";
 import {
   detectCorrelationBreakdownTool as legacyCorrelationBreakdown,
@@ -242,6 +243,30 @@ async function maybeAutoCollect(
       ...(typeof params.model === "string" && { model: params.model }),
       ...(typeof params.nStates === "number" && { nStates: params.nStates }),
       ...(Array.isArray(params.exceedanceLevels) && { exceedanceLevels: params.exceedanceLevels }),
+    };
+  }
+
+  if (operation === "market_memory") {
+    if (Array.isArray(params.prices)) return params;
+    const symbol = typeof params.symbol === "string" ? params.symbol : null;
+    if (!symbol) return params;
+    if (!exchange) return { error: "auto-collect market_memory: no exchange connected" };
+    const timeframe = (typeof params.timeframe === "string" ? params.timeframe : "1d") as string;
+    // ≥ 500 returns recommended for "high" reliability. 600 candles is a
+    // reasonable default — enough power, not so much that we slow down
+    // a typical scan.
+    const lookbackBars = typeof params.lookbackBars === "number" ? params.lookbackBars : 600;
+    const candles = await exchange.getCandles(symbol, timeframe, lookbackBars);
+    const prices = candles.map((c) => c.close);
+    if (prices.length < 60) {
+      return { error: `auto-collect market_memory: only ${prices.length} candles — need ≥ 60 for a meaningful Hurst estimate` };
+    }
+    return {
+      prices,
+      ...(typeof params.nSurrogates === "number" && { nSurrogates: params.nSurrogates }),
+      ...(typeof params.minWindow === "number" && { minWindow: params.minWindow }),
+      ...(Array.isArray(params.vrHorizons) && { vrHorizons: params.vrHorizons }),
+      ...(typeof params.pValueCutoff === "number" && { pValueCutoff: params.pValueCutoff }),
     };
   }
 
@@ -698,6 +723,7 @@ const MICROSTRUCTURE_OPS = [
   "adherence_report",
   "monte_carlo_path",
   "kelly_size",
+  "market_memory",
 ] as const;
 
 export const computeMicrostructureTool = createTool({
@@ -749,6 +775,14 @@ export const computeMicrostructureTool = createTool({
     "                              Simulates N forward price paths. Returns terminal mean/stddev, p05/p25/p50/p75/p95",
     "                              quantiles, and P(terminal ≥ level) for each requested exceedance level. Use for scenario",
     "                              analysis or to derive winProbability inputs for kelly_size.",
+    "    - 'market_memory'      — direct: { prices[], nSurrogates?, minWindow?, vrHorizons?, pValueCutoff? }",
+    "                              shortcut: { symbol, timeframe?, lookbackBars?, nSurrogates?, vrHorizons? }",
+    "                              Diagnoses what KIND of memory the series has on this horizon: 'trending',",
+    "                              'mean_reverting', or 'random_walk'. Use BEFORE picking a strategy class.",
+    "                              Returns Hurst (raw + Anis-Lloyd-corrected), surrogate-test p-value, VR profile",
+    "                              with robust z, and a categorical verdict. Complements compute_regime (which",
+    "                              classifies current state) by classifying which strategy class can have edge",
+    "                              on this instrument at all.",
     "",
     "IMPORTANT: discipline_audit and adherence_report respect startTime+endTime",
     "ISO strings. When the operator asks for 'last 24h' or 'today', YOU must",
@@ -784,6 +818,7 @@ export const computeMicrostructureTool = createTool({
       adherence_report: legacyAdherenceReport,
       monte_carlo_path: legacyMonteCarloPath,
       kelly_size: legacyKellySize,
+      market_memory: legacyMarketMemory,
     };
     try {
       const handler = dispatchTable[args.operation];
