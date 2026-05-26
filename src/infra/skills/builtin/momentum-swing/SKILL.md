@@ -61,6 +61,19 @@ Keep candidates with:
 
 This is the highest-conviction subset. If none qualify, the operator should wait for setups to develop — don't fish in the next-best names.
 
+For the surviving candidates, validate the breakout level has actually rejected before — the article emphasizes that meaningful breakouts come from levels sellers defended multiple times:
+
+```
+compute_indicator({
+  indicator: "resistance_tests",
+  symbol: <ticker>,
+  timeframe: "1d",
+  params: { level: <breakoutLevel from tight_consolidation>, windowBars: 60 }
+})
+```
+
+A single test (`confidence < 0.5`) means the level is fresh — the breakout is more "noise filter" than "buyer-overpowers-seller." Prefer levels with `testCount >= 2` for higher-conviction entries.
+
 ## Step 4: Wait for the trigger, then enter
 
 Two entry styles, both built on a clear breakout level (the `breakoutLevel` from step 3).
@@ -113,15 +126,14 @@ Risk on this style is materially tighter than a clean breakout — operator size
 
 Don't sell the full position at the first target. The point of swing-trading momentum is that a small fraction of trades produce most of the year's P&L — you need to hold winners.
 
-The exit policy is operator-discretion today (no automated exit-policy on Plan yet). Coach the operator through:
+The exit policy is operator-discretion today (no automated exit-policy on Plan yet). The trim ladder:
 
 1. **First trim — 25% at first resistance**. Move stop to breakeven on the remaining 75%.
-   ```
-   cancel({ target: 'partial', id: '<tradeId>', percentPct: 25, reason: 'Trim 25% at first resistance, finance the risk' })
-   ```
-2. **Second trim — 25% on close below 8 EMA**. Track `compute_indicator({ indicator: 'ema', period: 8 })` on the daily.
+2. **Second trim — 25% on close below 8 EMA**.
 3. **Third trim — 25% on close below 21 EMA**.
 4. **Final 25% — trail the 50 EMA**. Exit on close below.
+
+For active checks of "is a trim due right now?", invoke [[trim-check]] — it runs `compute_indicator({ indicator: "trim_state" })` and maps the result to the operator's recorded stage. Coaching only — never auto-executes.
 
 Why moving averages: as the operator pointed out, in a strong trend the moving averages bring fresh demand higher — they're a better trail than fixed levels because they adapt. "No one is smarter than the moving averages."
 
