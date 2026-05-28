@@ -67,6 +67,7 @@ import {
   computeSignalPoolTool as implSignalPool,
   computePortfolioCombineTool as implPortfolioCombine,
   computeSyntheticAugmentTool as implSyntheticAugment,
+  computeHmmRegimeTool as implHmmRegime,
 } from "../runtime/microstructure.ts";
 import {
   detectCorrelationBreakdownTool as implCorrelationBreakdown,
@@ -799,6 +800,7 @@ const MICROSTRUCTURE_OPS = [
   "signal_pool",
   "portfolio_combine",
   "synthetic_augment",
+  "hmm_regime",
 ] as const;
 
 export const computeMicrostructureTool = createTool({
@@ -871,6 +873,12 @@ export const computeMicrostructureTool = createTool({
     "                              Generate alternate-reality candle series for backtest robustness. Distinct from",
     "                              monte_carlo_path which produces FORWARD paths; this one augments HISTORICAL data.",
     "",
+    "    - 'hmm_regime'         — params: { observations: number[], nStates?, nRestarts?, maxIterations?, tolerance?, seed? }",
+    "                              Hidden Markov Model regime classifier (Baum-Welch EM + Viterbi). Returns",
+    "                              transitions / means / variances / state sequence / labels (bear/sideways/bull for n=3).",
+    "                              Descriptive primitive — use HMM labels as a feature inside richer strategies, not as",
+    "                              a standalone signal.",
+    "",
     "    - 'market_memory'      — direct: { prices[], nSurrogates?, minWindow?, vrHorizons?, pValueCutoff? }",
     "                              shortcut: { symbol, timeframe?, lookbackBars?, nSurrogates?, vrHorizons? }",
     "                              Diagnoses what KIND of memory the series has on this horizon: 'trending',",
@@ -920,6 +928,7 @@ export const computeMicrostructureTool = createTool({
       signal_pool: implSignalPool,
       portfolio_combine: implPortfolioCombine,
       synthetic_augment: implSyntheticAugment,
+      hmm_regime: implHmmRegime,
     };
     try {
       const handler = dispatchTable[args.operation];

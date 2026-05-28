@@ -31,6 +31,7 @@ import { monteCarloPath, summarizeMonteCarloPath } from "../../../../core/alpha/
 import { kellySize } from "../../../../core/alpha/kellySize.ts";
 import { computeMarketMemory } from "../../../../core/alpha/marketMemory.ts";
 import { computeDcf } from "../../../../core/alpha/dcf.ts";
+import { fitHmmRegime } from "../../../../core/alpha/hmmRegime.ts";
 import { computeVsRandom } from "../../../../core/alpha/vsRandom.ts";
 import { computeSignalPool } from "../../../../core/alpha/signalPool.ts";
 import { computePortfolioCombine } from "../../../../core/alpha/portfolioCombine.ts";
@@ -674,6 +675,51 @@ export const computeSyntheticAugmentTool = createTool({
   },
 });
 
+// ============================================================================
+// compute_hmm_regime
+// ============================================================================
+
+export const computeHmmRegimeTool = createTool({
+  id: "compute_hmm_regime",
+  description: [
+    "Hidden Markov Model regime classifier (Baum-Welch EM + Viterbi).",
+    "Gaussian emissions. Fits a transition matrix + per-state mean/",
+    "variance from observed returns, then Viterbi-decodes the most-",
+    "likely hidden state sequence.",
+    "",
+    "Honest scope: descriptive, not edge-generating. The reference",
+    "article's own conclusion was 'Sharpe 0.2-0.5 after costs, often",
+    "below buy-and-hold.' Use HMM labels as a feature inside a richer",
+    "strategy (regime-conditioned sizing, regime-filtered entries),",
+    "not as a standalone signal.",
+    "",
+    "Multiple random restarts because Baum-Welch finds a LOCAL",
+    "maximum. States are sorted ascending by mean so labels are",
+    "stable across runs (3 states: bear/sideways/bull).",
+  ].join("\n"),
+  inputSchema: z.object({
+    observations: z.array(z.number()).min(4),
+    nStates: z.number().int().min(2).optional(),
+    nRestarts: z.number().int().positive().optional(),
+    maxIterations: z.number().int().positive().optional(),
+    tolerance: z.number().positive().optional(),
+    seed: z.number().int().optional(),
+  }),
+  outputSchema: z.object({
+    initialProbs: z.array(z.number()),
+    transitions: z.array(z.array(z.number())),
+    means: z.array(z.number()),
+    variances: z.array(z.number()),
+    stateSequence: z.array(z.number()),
+    logLikelihood: z.number(),
+    convergedRestarts: z.number(),
+    iterations: z.number(),
+    stationaryDistribution: z.array(z.number()),
+    stateLabels: z.array(z.string()),
+  }),
+  execute: async (input) => fitHmmRegime(input),
+});
+
 export const microstructureTools = {
   compute_microprice: computeMicropriceTool,
   compute_inventory_adjusted_price: computeInventoryAdjustedPriceTool,
@@ -685,4 +731,5 @@ export const microstructureTools = {
   compute_signal_pool: computeSignalPoolTool,
   compute_portfolio_combine: computePortfolioCombineTool,
   compute_synthetic_augment: computeSyntheticAugmentTool,
+  compute_hmm_regime: computeHmmRegimeTool,
 };
