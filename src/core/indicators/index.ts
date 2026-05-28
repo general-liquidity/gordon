@@ -191,3 +191,10 @@ export type {
   StandardErrorBandsParams,
   SebTrendVerdict,
 } from "./standardErrorBands.ts";
+
+// Highest Volume Ever — institutional-urgency volume-record detector
+export { calculateHighestVolumeEver } from "./highestVolumeEver.ts";
+export type {
+  HighestVolumeEverResult,
+  HighestVolumeEverParams,
+} from "./highestVolumeEver.ts";

@@ -52,6 +52,7 @@ import {
   detectCandlestickPatterns,
   linearRegression,
   calculateStandardErrorBands,
+  calculateHighestVolumeEver,
   type CandlestickPatternName,
   type Candle as IndicatorCandle,
 } from "../../../../core/indicators/index.ts";
@@ -363,6 +364,7 @@ const INDICATOR_NAMES = [
   "candlestick_patterns",
   "linear_regression",
   "standard_error_bands",
+  "highest_volume_ever",
 ] as const;
 
 function dispatchIndicator(
@@ -492,6 +494,11 @@ function dispatchIndicator(
         ...(typeof params.slopeThreshold === "number" && { slopeThreshold: params.slopeThreshold }),
         ...(typeof params.rSquaredThreshold === "number" && { rSquaredThreshold: params.rSquaredThreshold }),
       });
+    case "highest_volume_ever":
+      return calculateHighestVolumeEver(candles, {
+        ...(typeof params.lookbackBars === "number" && { lookbackBars: params.lookbackBars }),
+        ...(typeof params.minBarsBeforeDetection === "number" && { minBarsBeforeDetection: params.minBarsBeforeDetection }),
+      });
     default:
       return { error: `Unknown indicator: ${indicator}` };
   }
@@ -513,6 +520,7 @@ export const computeIndicatorTool = createTool({
     "Exit coaching: trim_state (momentum-swing 8/21/50 EMA trail ladder), resistance_tests (count level rejections + confidence)",
     "Candlestick patterns: candlestick_patterns (harami / engulfing / hammer / shooting_star / doji / morning_star / evening_star / piercing_line / dark_cloud_cover / inside_bar)",
     "Regression-based: linear_regression (slope + R² + standard error of fit), standard_error_bands (regression-line centerline + ± k × SE — distinct from Bollinger which uses SMA + price stddev; SEB is trend-focused vs BB which is mean-reversion focused)",
+    "Volume-record: highest_volume_ever (HVE — bars whose volume exceeds all prior bars within a lookback window; institutional-urgency signal used by the /hve-pullback skill; pass lookbackBars omitted for true HVE, or e.g. 252 for 'highest in the last year')",
     "Advanced: elliott_wave, delta_ladder, flowscope",
     "",
     "Internally fetches candles via the connected exchange. Pass `bars` to",
