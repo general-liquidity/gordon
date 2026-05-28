@@ -50,6 +50,8 @@ import {
   calculateTrimState,
   calculateResistanceTests,
   detectCandlestickPatterns,
+  linearRegression,
+  calculateStandardErrorBands,
   type CandlestickPatternName,
   type Candle as IndicatorCandle,
 } from "../../../../core/indicators/index.ts";
@@ -358,6 +360,8 @@ const INDICATOR_NAMES = [
   "trim_state",
   "resistance_tests",
   "candlestick_patterns",
+  "linear_regression",
+  "standard_error_bands",
 ] as const;
 
 function dispatchIndicator(
@@ -475,6 +479,18 @@ function dispatchIndicator(
         ...(typeof params.dojiBodyThresholdPct === "number" && { dojiBodyThresholdPct: params.dojiBodyThresholdPct }),
         ...(typeof params.shadowToBodyRatio === "number" && { shadowToBodyRatio: params.shadowToBodyRatio }),
       });
+    case "linear_regression":
+      // Single least-squares fit over the full closes series. Pass a
+      // `bars` param upstream to control the lookback. Returns slope,
+      // intercept, R², standard error, last-bar projection.
+      return linearRegression(closes);
+    case "standard_error_bands":
+      return calculateStandardErrorBands(closes, {
+        ...(typeof params.period === "number" && { period: params.period }),
+        ...(typeof params.multiplier === "number" && { multiplier: params.multiplier }),
+        ...(typeof params.slopeThreshold === "number" && { slopeThreshold: params.slopeThreshold }),
+        ...(typeof params.rSquaredThreshold === "number" && { rSquaredThreshold: params.rSquaredThreshold }),
+      });
     default:
       return { error: `Unknown indicator: ${indicator}` };
   }
@@ -495,6 +511,7 @@ export const computeIndicatorTool = createTool({
     "Setup detection: tight_consolidation (bull-flag / pennant scorer), undercut_rally (shakeout-and-reclaim)",
     "Exit coaching: trim_state (momentum-swing 8/21/50 EMA trail ladder), resistance_tests (count level rejections + confidence)",
     "Candlestick patterns: candlestick_patterns (harami / engulfing / hammer / shooting_star / doji / morning_star / evening_star / piercing_line / dark_cloud_cover / inside_bar)",
+    "Regression-based: linear_regression (slope + R² + standard error of fit), standard_error_bands (regression-line centerline + ± k × SE — distinct from Bollinger which uses SMA + price stddev; SEB is trend-focused vs BB which is mean-reversion focused)",
     "Advanced: elliott_wave, delta_ladder, flowscope",
     "",
     "Internally fetches candles via the connected exchange. Pass `bars` to",

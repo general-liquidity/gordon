@@ -176,3 +176,18 @@ export type {
   CandlestickPatternsResult,
   CandlestickPatternsParams,
 } from "./candlestick-patterns.ts";
+
+// Linear regression — least-squares fit (single + rolling)
+export { linearRegression, rollingLinearRegression } from "./linearRegression.ts";
+export type {
+  LinearRegressionResult,
+  RollingLinearRegressionResult,
+} from "./linearRegression.ts";
+
+// Standard Error Bands — regression centerline + ± k × SE
+export { calculateStandardErrorBands } from "./standardErrorBands.ts";
+export type {
+  StandardErrorBandsResult,
+  StandardErrorBandsParams,
+  SebTrendVerdict,
+} from "./standardErrorBands.ts";
