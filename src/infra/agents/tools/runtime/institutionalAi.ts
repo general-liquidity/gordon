@@ -38,6 +38,7 @@ import {
   getDisciplineAudit,
   summarizeDisciplineAudit,
 } from "../../../platform/audit/disciplineAudit.ts";
+import { computeDisciplineTrajectory } from "../../../platform/audit/disciplineTrajectory.ts";
 import {
   computeCrowdPositioningVerdict,
   summarizeCrowdPositioning,
@@ -224,6 +225,140 @@ export const getDisciplineAuditTool = createTool({
       windowStart: report.windowStart,
       windowEnd: report.windowEnd,
       modes: report.modes,
+    };
+  },
+});
+
+// ============================================================================
+// get_discipline_trajectory
+// ============================================================================
+
+export const getDisciplineTrajectoryTool = createTool({
+  id: "get_discipline_trajectory",
+  description: [
+    "Longitudinal projection of operator discipline over N rolling windows —",
+    "the 'Hockey Stick Growth Curve' read. Runs the discipline audit across",
+    "consecutive windows (oldest → newest), then classifies the operator's",
+    "stage on the four-stage curve:",
+    "",
+    "  1 Tinkering      — chaos; many modes firing; low score",
+    "  2 Blade Years    — internal alignment; score improving; not ready to scale",
+    "  3 Inflection     — clean repeatable execution; high stable score",
+    "  4 Surging Growth — elite; multi-window low variance; scalable",
+    "",
+    "Returns the discipline-score slope, which failure modes resolved vs",
+    "regressed vs persisted across the span, the stage estimate + confidence,",
+    "and the article's 'what moves you forward' guidance for that stage.",
+    "",
+    "Stage is a TREND read, not a snapshot — higher stages require more than a",
+    "clean window. Stage 4 specifically requires multi-window low return",
+    "dispersion, so pass `consistencyScores` and `returnDispersions` (one value",
+    "per window, oldest first) for a high-confidence classification. Without",
+    "them the stage is inferred from discipline alone at lower confidence.",
+    "",
+    "Used by the /trader-stage skill. Default: 4 windows of 7 days each.",
+  ].join("\n"),
+  inputSchema: z.object({
+    windowCount: z
+      .number()
+      .int()
+      .min(1)
+      .max(52)
+      .optional()
+      .describe("Number of consecutive windows to audit. Default 4."),
+    windowDays: z
+      .number()
+      .positive()
+      .optional()
+      .describe("Length of each window in days. Default 7."),
+    endTime: z
+      .string()
+      .optional()
+      .describe("ISO timestamp for the end of the most recent window. Default: now."),
+    userId: z.string().optional().describe("Filter to one operator. Default: all."),
+    maxTradesPerDay: z.number().int().positive().optional(),
+    maxDistinctSlots: z.number().int().positive().optional(),
+    emotionalProximityMs: z.number().positive().optional(),
+    consistencyScores: z
+      .array(z.number())
+      .optional()
+      .describe("Trade-consistency composite per window ([0..1]), oldest first."),
+    returnDispersions: z
+      .array(z.number())
+      .optional()
+      .describe("Return dispersion per window (e.g. stddev of daily returns), oldest first."),
+  }),
+  outputSchema: z.object({
+    summary: z.string(),
+    stage: z.number(),
+    stageName: z.string(),
+    stageConfidence: z.number(),
+    whatMovesYouForward: z.string(),
+    disciplineSlope: z.number(),
+    disciplineDirection: z.string(),
+    latestScore: z.number(),
+    disciplineScores: z.array(z.number()),
+    resolvedModes: z.array(z.string()),
+    regressedModes: z.array(z.string()),
+    persistentModes: z.array(z.string()),
+    windowCount: z.number(),
+    interpretation: z.string(),
+  }),
+  execute: async (input: {
+    windowCount?: number;
+    windowDays?: number;
+    endTime?: string;
+    userId?: string;
+    maxTradesPerDay?: number;
+    maxDistinctSlots?: number;
+    emotionalProximityMs?: number;
+    consistencyScores?: number[];
+    returnDispersions?: number[];
+  }) => {
+    const windowCount = input.windowCount ?? 4;
+    const windowDays = input.windowDays ?? 7;
+    const windowMs = windowDays * 86_400_000;
+    const endMs = input.endTime ? Date.parse(input.endTime) : Date.now();
+
+    // Build windows oldest → newest. Window i ends `(windowCount-1-i)`
+    // windows before the most recent endTime.
+    const reports = [];
+    for (let i = 0; i < windowCount; i++) {
+      const wEnd = endMs - (windowCount - 1 - i) * windowMs;
+      const wStart = wEnd - windowMs;
+      reports.push(
+        getDisciplineAudit({
+          startTime: new Date(wStart).toISOString(),
+          endTime: new Date(wEnd).toISOString(),
+          ...(input.userId !== undefined && { userId: input.userId }),
+          ...(input.maxTradesPerDay !== undefined && { maxTradesPerDay: input.maxTradesPerDay }),
+          ...(input.maxDistinctSlots !== undefined && { maxDistinctSlots: input.maxDistinctSlots }),
+          ...(input.emotionalProximityMs !== undefined && { emotionalProximityMs: input.emotionalProximityMs }),
+        }),
+      );
+    }
+
+    const trajectory = computeDisciplineTrajectory({
+      reports,
+      ...(input.consistencyScores !== undefined && { consistencyScores: input.consistencyScores }),
+      ...(input.returnDispersions !== undefined && { returnDispersions: input.returnDispersions }),
+    });
+
+    return {
+      summary: trajectory.interpretation,
+      stage: trajectory.stage,
+      stageName: trajectory.stageName,
+      stageConfidence: trajectory.stageConfidence,
+      whatMovesYouForward: trajectory.whatMovesYouForward,
+      disciplineSlope: trajectory.disciplineSlope,
+      disciplineDirection: trajectory.disciplineDirection,
+      latestScore: trajectory.latestScore,
+      disciplineScores: trajectory.disciplineScores,
+      resolvedModes: trajectory.resolvedModes,
+      regressedModes: trajectory.regressedModes,
+      persistentModes: trajectory.persistentModes,
+      windowCount: trajectory.windowCount,
+      interpretation: trajectory.interpretation,
     };
   },
 });

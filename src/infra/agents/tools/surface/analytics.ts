@@ -83,6 +83,7 @@ import {
 import {
   validateEarningsSignalTool as implEarningsSignal,
   getDisciplineAuditTool as implDisciplineAudit,
+  getDisciplineTrajectoryTool as implDisciplineTrajectory,
   computeCrowdPositioningVerdictTool as implCrowdPositioning,
 } from "../runtime/institutionalAi.ts";
 import { getAdherenceReportTool as implAdherenceReport } from "../runtime/adherence.ts";
@@ -819,6 +820,7 @@ const MICROSTRUCTURE_OPS = [
   "crowd_positioning",
   "earnings_signal",
   "discipline_audit",
+  "discipline_trajectory",
   "adherence_report",
   "monte_carlo_path",
   "kelly_size",
@@ -871,6 +873,11 @@ export const computeMicrostructureTool = createTool({
     "",
     "  Self-contained (LLM can invoke directly):",
     "    - 'discipline_audit'   — params: { startTime?, endTime?, userId?, maxTradesPerDay?, maxDistinctSlots?, emotionalProximityMs? }",
+    "    - 'discipline_trajectory' — params: { windowCount?, windowDays?, endTime?, userId?, consistencyScores?: number[], returnDispersions?: number[], maxTradesPerDay?, maxDistinctSlots?, emotionalProximityMs? }",
+    "                              Longitudinal 'Hockey Stick' read: runs discipline_audit over N rolling windows and",
+    "                              classifies the operator's stage (1 Tinkering / 2 Blade Years / 3 Inflection / 4 Surging).",
+    "                              Pass consistencyScores + returnDispersions (one per window, oldest first) for a",
+    "                              high-confidence Stage-4 call. Used by /trader-stage. Default 4 windows of 7 days.",
     "    - 'adherence_report'   — params: { startTime?, endTime?, userId? }",
     "    - 'kelly_size'         — params: { winProbability, bankrollUsd, payoutRatio, mode?: 'rr'|'binary', fractionMultiplier? }",
     "                              Pure math, default quarter-Kelly. Returns fullKelly%, recommended%, positionUsd, edgeBps.",
@@ -967,6 +974,7 @@ export const computeMicrostructureTool = createTool({
       crowd_positioning: implCrowdPositioning,
       earnings_signal: implEarningsSignal,
       discipline_audit: implDisciplineAudit,
+      discipline_trajectory: implDisciplineTrajectory,
       adherence_report: implAdherenceReport,
       monte_carlo_path: implMonteCarloPath,
       kelly_size: implKellySize,
