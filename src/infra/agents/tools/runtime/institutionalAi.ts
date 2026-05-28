@@ -39,6 +39,7 @@ import {
   summarizeDisciplineAudit,
 } from "../../../platform/audit/disciplineAudit.ts";
 import { computeDisciplineTrajectory } from "../../../platform/audit/disciplineTrajectory.ts";
+import { interpretRiskRatioTriple } from "../../../../core/alpha/risk-ratio-triple.ts";
 import {
   computeCrowdPositioningVerdict,
   summarizeCrowdPositioning,
@@ -359,6 +360,73 @@ export const getDisciplineTrajectoryTool = createTool({
       persistentModes: trajectory.persistentModes,
       windowCount: trajectory.windowCount,
       interpretation: trajectory.interpretation,
+    };
+  },
+});
+
+// ============================================================================
+// interpret_risk_ratio_triple
+// ============================================================================
+
+export const interpretRiskRatioTripleTool = createTool({
+  id: "interpret_risk_ratio_triple",
+  description: [
+    "Skew read from the Sharpe / Sortino / Calmar triple ('Is Your Sharpe",
+    "Lying?'). For a symmetric return distribution Sortino ≈ √2 × Sharpe; the",
+    "divergence from that identity classifies the skew using the ratios ALONE",
+    "(no return series needed):",
+    "",
+    "  Sortino > √2×Sharpe → positive skew (Sharpe UNDERRATES the strategy)",
+    "  Sortino ≈ √2×Sharpe → symmetric",
+    "  Sortino < √2×Sharpe → negative skew (tail risk NOT priced into the",
+    "                         ratios — vol-selling / short-gamma signature)",
+    "",
+    "Also checks allocator floors (default Calmar > 1.0, Sortino > 2.0).",
+    "",
+    "This is the ratios-only path — use it when reading a tearsheet that lists",
+    "only the ratios. When you HAVE the return series, prefer skew from the",
+    "third moment via the strategy-claim-verifier diagnostic, which is exact.",
+  ].join("\n"),
+  inputSchema: z.object({
+    sharpe: z.number().describe("Sharpe ratio (excess return / total volatility)."),
+    sortino: z.number().describe("Sortino ratio (excess return / downside deviation)."),
+    calmar: z.number().optional().describe("Calmar ratio (return / max drawdown). Optional."),
+    symmetricTolerance: z
+      .number()
+      .positive()
+      .optional()
+      .describe("Fractional band around √2×Sharpe called symmetric. Default 0.10."),
+    calmarFloor: z.number().optional().describe("Allocator floor on Calmar. Default 1.0."),
+    sortinoFloor: z.number().optional().describe("Allocator floor on Sortino. Default 2.0."),
+  }),
+  outputSchema: z.object({
+    skew: z.enum(["positive", "symmetric", "negative", "indeterminate"]),
+    expectedSortino: z.number(),
+    divergenceRatio: z.number().nullable(),
+    tailRiskUnpriced: z.boolean(),
+    underratedBySharpe: z.boolean(),
+    calmarPassesFloor: z.boolean().nullable(),
+    sortinoPassesFloor: z.boolean(),
+    interpretation: z.string(),
+  }),
+  execute: async (input: {
+    sharpe: number;
+    sortino: number;
+    calmar?: number;
+    symmetricTolerance?: number;
+    calmarFloor?: number;
+    sortinoFloor?: number;
+  }) => {
+    const r = interpretRiskRatioTriple(input);
+    return {
+      skew: r.skew,
+      expectedSortino: r.expectedSortino,
+      divergenceRatio: r.divergenceRatio,
+      tailRiskUnpriced: r.tailRiskUnpriced,
+      underratedBySharpe: r.underratedBySharpe,
+      calmarPassesFloor: r.calmarPassesFloor,
+      sortinoPassesFloor: r.sortinoPassesFloor,
+      interpretation: r.interpretation,
     };
   },
 });
