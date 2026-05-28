@@ -32,6 +32,8 @@ import { kellySize } from "../../../../core/alpha/kellySize.ts";
 import { computeMarketMemory } from "../../../../core/alpha/marketMemory.ts";
 import { computeDcf } from "../../../../core/alpha/dcf.ts";
 import { fitHmmRegime } from "../../../../core/alpha/hmmRegime.ts";
+import { computePriceImpliedExpectations } from "../../../../core/alpha/priceImpliedExpectations.ts";
+import { computeFundamentalRatios } from "../../../../core/alpha/fundamentalRatios.ts";
 import { computeVsRandom } from "../../../../core/alpha/vsRandom.ts";
 import { computeSignalPool } from "../../../../core/alpha/signalPool.ts";
 import { computePortfolioCombine } from "../../../../core/alpha/portfolioCombine.ts";
@@ -720,6 +722,100 @@ export const computeHmmRegimeTool = createTool({
   execute: async (input) => fitHmmRegime(input),
 });
 
+// ============================================================================
+// compute_pie (Price-Implied Expectations)
+// ============================================================================
+
+export const computePieTool = createTool({
+  id: "compute_pie",
+  description: [
+    "Price-Implied Expectations (Mauboussin reverse DCF). Given the",
+    "current enterprise value + base FCF + WACC + terminal growth,",
+    "solves for one of: explicit-period growth rate, competitive",
+    "advantage period (years of supranormal growth), or implied WACC.",
+    "",
+    "Use BEFORE taking a variant view on a stock — knowing what the",
+    "market already implies lets you size the variance honestly.",
+    "Consensus 8% + market implies 12% means even a bullish-on-",
+    "consensus view loses money.",
+    "",
+    "Bisection search. Reports 'converged: false' when the implied",
+    "value falls outside sensible bands (likely operator misspec).",
+  ].join("\n"),
+  inputSchema: z.object({
+    enterpriseValue: z.number().positive(),
+    baseFcf: z.number().positive(),
+    wacc: z.number().positive().optional(),
+    terminalGrowthPct: z.number(),
+    horizonYears: z.number().int().positive().optional(),
+    growthRate: z.number().optional(),
+    solveFor: z.enum(["growth_rate", "competitive_advantage", "wacc"]),
+  }),
+  outputSchema: z.object({
+    solvedValue: z.number(),
+    solveFor: z.string(),
+    derivedEnterpriseValue: z.number(),
+    residualError: z.number(),
+    iterations: z.number(),
+    converged: z.boolean(),
+    interpretation: z.string(),
+  }),
+  execute: async (input) => computePriceImpliedExpectations(input),
+});
+
+// ============================================================================
+// compute_fundamental_ratios
+// ============================================================================
+
+export const computeFundamentalRatiosTool = createTool({
+  id: "compute_fundamental_ratios",
+  description: [
+    "Typed wrapper for fundamental valuation ratios — NOPAT, ROIC,",
+    "ROIIC, ROE, P/E, EV/EBITDA, FCF yield, plus enterprise value",
+    "and net cash derivations. Math is trivial; the value is having",
+    "one tool the LLM can call without mis-remembering formulas.",
+    "",
+    "Missing inputs produce null outputs (not zero, not Infinity) so",
+    "partial ratio sheets render honestly. The interpretation field",
+    "lists every ratio that was computable.",
+    "",
+    "Common gotchas this primitive handles:",
+    "  - ROIC numerator is NOPAT (EBIT × (1 - taxRate)), not net income",
+    "  - EV = marketCap + totalDebt - cash, not just marketCap",
+    "  - FCF yield is FCF/marketCap (not FCF/EV — that's owner's yield)",
+  ].join("\n"),
+  inputSchema: z.object({
+    ebit: z.number().optional(),
+    taxRate: z.number().optional(),
+    investedCapital: z.number().optional(),
+    deltaNopat: z.number().optional(),
+    deltaInvestedCapital: z.number().optional(),
+    price: z.number().optional(),
+    sharesOutstanding: z.number().optional(),
+    eps: z.number().optional(),
+    ebitda: z.number().optional(),
+    fcf: z.number().optional(),
+    bookEquity: z.number().optional(),
+    netIncome: z.number().optional(),
+    totalDebt: z.number().optional(),
+    cashAndEquivalents: z.number().optional(),
+  }),
+  outputSchema: z.object({
+    netCash: z.number().nullable(),
+    marketCap: z.number().nullable(),
+    enterpriseValue: z.number().nullable(),
+    nopat: z.number().nullable(),
+    roic: z.number().nullable(),
+    roiic: z.number().nullable(),
+    roe: z.number().nullable(),
+    peRatio: z.number().nullable(),
+    evToEbitda: z.number().nullable(),
+    fcfYield: z.number().nullable(),
+    interpretation: z.string(),
+  }),
+  execute: async (input) => computeFundamentalRatios(input),
+});
+
 export const microstructureTools = {
   compute_microprice: computeMicropriceTool,
   compute_inventory_adjusted_price: computeInventoryAdjustedPriceTool,
@@ -732,4 +828,6 @@ export const microstructureTools = {
   compute_portfolio_combine: computePortfolioCombineTool,
   compute_synthetic_augment: computeSyntheticAugmentTool,
   compute_hmm_regime: computeHmmRegimeTool,
+  compute_pie: computePieTool,
+  compute_fundamental_ratios: computeFundamentalRatiosTool,
 };

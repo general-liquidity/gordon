@@ -68,6 +68,8 @@ import {
   computePortfolioCombineTool as implPortfolioCombine,
   computeSyntheticAugmentTool as implSyntheticAugment,
   computeHmmRegimeTool as implHmmRegime,
+  computePieTool as implPie,
+  computeFundamentalRatiosTool as implFundamentalRatios,
 } from "../runtime/microstructure.ts";
 import {
   detectCorrelationBreakdownTool as implCorrelationBreakdown,
@@ -801,6 +803,8 @@ const MICROSTRUCTURE_OPS = [
   "portfolio_combine",
   "synthetic_augment",
   "hmm_regime",
+  "pie",
+  "fundamental_ratios",
 ] as const;
 
 export const computeMicrostructureTool = createTool({
@@ -879,6 +883,17 @@ export const computeMicrostructureTool = createTool({
     "                              Descriptive primitive — use HMM labels as a feature inside richer strategies, not as",
     "                              a standalone signal.",
     "",
+    "    - 'pie'                — params: { enterpriseValue, baseFcf, wacc?, terminalGrowthPct, horizonYears?, growthRate?, solveFor: 'growth_rate'|'competitive_advantage'|'wacc' }",
+    "                              Price-Implied Expectations (Mauboussin reverse DCF). Solves for the variable that",
+    "                              makes the DCF-derived EV match the market. Use BEFORE taking a variant view —",
+    "                              know what the market already implies. Bisection search; converged=false signals",
+    "                              the operator's inputs likely need a sanity check.",
+    "",
+    "    - 'fundamental_ratios' — params: { ebit?, taxRate?, investedCapital?, deltaNopat?, deltaInvestedCapital?, price?, sharesOutstanding?, eps?, ebitda?, fcf?, bookEquity?, netIncome?, totalDebt?, cashAndEquivalents? }",
+    "                              Typed wrapper for ROIC / ROIIC / ROE / P/E / EV/EBITDA / FCF yield + EV + net cash.",
+    "                              Missing inputs → null outputs (no false zeros, no Infinity). The interpretation",
+    "                              field lists every ratio that was computable. Use for /memo and post-trade reviews.",
+    "",
     "    - 'market_memory'      — direct: { prices[], nSurrogates?, minWindow?, vrHorizons?, pValueCutoff? }",
     "                              shortcut: { symbol, timeframe?, lookbackBars?, nSurrogates?, vrHorizons? }",
     "                              Diagnoses what KIND of memory the series has on this horizon: 'trending',",
@@ -929,6 +944,8 @@ export const computeMicrostructureTool = createTool({
       portfolio_combine: implPortfolioCombine,
       synthetic_augment: implSyntheticAugment,
       hmm_regime: implHmmRegime,
+      pie: implPie,
+      fundamental_ratios: implFundamentalRatios,
     };
     try {
       const handler = dispatchTable[args.operation];
