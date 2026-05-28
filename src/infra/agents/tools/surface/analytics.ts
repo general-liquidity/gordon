@@ -72,6 +72,7 @@ import {
   computeHmmRegimeTool as implHmmRegime,
   computePieTool as implPie,
   computeFundamentalRatiosTool as implFundamentalRatios,
+  computeRuinProbabilityTool as implRuinProbability,
 } from "../runtime/microstructure.ts";
 import {
   detectCorrelationBreakdownTool as implCorrelationBreakdown,
@@ -822,6 +823,7 @@ const MICROSTRUCTURE_OPS = [
   "hmm_regime",
   "pie",
   "fundamental_ratios",
+  "ruin_probability",
 ] as const;
 
 export const computeMicrostructureTool = createTool({
@@ -911,6 +913,12 @@ export const computeMicrostructureTool = createTool({
     "                              Missing inputs → null outputs (no false zeros, no Infinity). The interpretation",
     "                              field lists every ratio that was computable. Use for /memo and post-trade reviews.",
     "",
+    "    - 'ruin_probability'   — params: { winProbability, payoutRatio, riskFraction, horizonTrades, ruinThresholdPct?, nTrials?, seed? }",
+    "                              Monte Carlo gambler's-ruin survival math. Returns probability of breaching a",
+    "                              drawdown threshold over a finite horizon + verdict (safe/cautious/risky/ruinous).",
+    "                              Complements compute_kelly_size: Kelly is OPTIMAL sizing for log-growth; this is",
+    "                              SURVIVAL risk at a CHOSEN sizing over a finite horizon.",
+    "",
     "    - 'market_memory'      — direct: { prices[], nSurrogates?, minWindow?, vrHorizons?, pValueCutoff? }",
     "                              shortcut: { symbol, timeframe?, lookbackBars?, nSurrogates?, vrHorizons? }",
     "                              Diagnoses what KIND of memory the series has on this horizon: 'trending',",
@@ -963,6 +971,7 @@ export const computeMicrostructureTool = createTool({
       hmm_regime: implHmmRegime,
       pie: implPie,
       fundamental_ratios: implFundamentalRatios,
+      ruin_probability: implRuinProbability,
     };
     try {
       const handler = dispatchTable[args.operation];

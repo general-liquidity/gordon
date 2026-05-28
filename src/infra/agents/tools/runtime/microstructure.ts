@@ -34,6 +34,7 @@ import { computeDcf } from "../../../../core/alpha/dcf.ts";
 import { fitHmmRegime } from "../../../../core/alpha/hmmRegime.ts";
 import { computePriceImpliedExpectations } from "../../../../core/alpha/priceImpliedExpectations.ts";
 import { computeFundamentalRatios } from "../../../../core/alpha/fundamentalRatios.ts";
+import { computeRuinProbability } from "../../../../core/alpha/ruinProbability.ts";
 import { computeVsRandom } from "../../../../core/alpha/vsRandom.ts";
 import { computeSignalPool } from "../../../../core/alpha/signalPool.ts";
 import { computePortfolioCombine } from "../../../../core/alpha/portfolioCombine.ts";
@@ -767,6 +768,53 @@ export const computePieTool = createTool({
 // compute_fundamental_ratios
 // ============================================================================
 
+// ============================================================================
+// compute_ruin_probability
+// ============================================================================
+
+export const computeRuinProbabilityTool = createTool({
+  id: "compute_ruin_probability",
+  description: [
+    "Gambler's-ruin Monte Carlo for fixed-fractional position sizing.",
+    "Given win probability + payout ratio + per-trade risk fraction +",
+    "horizon, simulates portfolios and reports probability of breaching",
+    "a ruin threshold (default 50% drawdown).",
+    "",
+    "Distinct from compute_kelly_size: Kelly returns the OPTIMAL",
+    "fraction for log-growth; this primitive quantifies SURVIVAL risk",
+    "at a CHOSEN fraction over a FINITE horizon. Even Kelly-optimal",
+    "sizing has non-zero ruin probability over a short horizon.",
+    "",
+    "Verdict bands: safe (<1%) / cautious (1-5%) / risky (5-20%) /",
+    "ruinous (>20%). Calibrated operationally, not academically.",
+  ].join("\n"),
+  inputSchema: z.object({
+    winProbability: z.number().min(0).max(1),
+    payoutRatio: z.number().positive(),
+    riskFraction: z.number(),
+    horizonTrades: z.number().int().positive(),
+    ruinThresholdPct: z.number().optional(),
+    nTrials: z.number().int().positive().optional(),
+    seed: z.number().int().optional(),
+  }),
+  outputSchema: z.object({
+    ruinProbability: z.number(),
+    medianFinalCapital: z.number(),
+    p05FinalCapital: z.number(),
+    p95FinalCapital: z.number(),
+    expectedLogReturn: z.number(),
+    verdict: z.enum(["safe", "cautious", "risky", "ruinous"]),
+    nTrials: z.number(),
+    horizonTrades: z.number(),
+    interpretation: z.string(),
+  }),
+  execute: async (input) => computeRuinProbability(input),
+});
+
+// ============================================================================
+// compute_fundamental_ratios
+// ============================================================================
+
 export const computeFundamentalRatiosTool = createTool({
   id: "compute_fundamental_ratios",
   description: [
@@ -830,4 +878,5 @@ export const microstructureTools = {
   compute_hmm_regime: computeHmmRegimeTool,
   compute_pie: computePieTool,
   compute_fundamental_ratios: computeFundamentalRatiosTool,
+  compute_ruin_probability: computeRuinProbabilityTool,
 };
