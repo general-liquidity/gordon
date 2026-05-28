@@ -15,6 +15,7 @@ import {
   registerPlanningArtifactFromResult,
   resetLoopSignals,
 } from "../harness/runtimeHarness.ts";
+import { recordToolCallForFriction } from "../harness/toolFrictionTracker.ts";
 import { runLifecycleHooks } from "../harness/lifecycleHooks.ts";
 import { compileSubagentProfiles, isToolAllowedForAgent } from "../harness/subagentProfiles.ts";
 import { defaultHandoffCoordinator } from "./HandoffCoordinator.ts";
@@ -118,6 +119,15 @@ export async function validateToolCall(
 ): Promise<ToolCallValidationResult> {
   // 1. Loop detection
   const loopState = recordToolCallFingerprint(context, toolName, toolArgs ?? {});
+  // Per-turn tool-friction telemetry — distinct from loop detection:
+  // counts *different* tool calls in the same turn so the operator can
+  // see which questions cost too many tools. Fires once per turn when
+  // the threshold (default 5) is crossed.
+  try {
+    recordToolCallForFriction(context, toolName);
+  } catch {
+    // Telemetry must never block tool dispatch.
+  }
   if (loopState.blocked) {
     resetLoopSignals(context);
     // Recovery-tier escalation: Notify → Redirect → ForceStop.
