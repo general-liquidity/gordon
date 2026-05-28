@@ -555,3 +555,127 @@ export function _applyPatternRulesForTest(
   }
   return out;
 }
+
+// ============================================================================
+// Multi-pass consolidation (CMU/UMD "sleep consolidation" pattern)
+// ============================================================================
+//
+// The base runReflector already does two passes: per-entry pattern
+// matching, then aggregate rules over the full entry array. The
+// "multi-pass" extension below adds a THIRD type of pass: meta-pattern
+// synthesis over the CANDIDATE OUTPUT itself, not the raw log.
+//
+// The point of multi-pass (per the paper's empirical finding): each
+// additional pass operates on the prior pass's output, deepening the
+// representation. In Gordon's setting:
+//   - Pass 1: raw entries → low-level lesson candidates
+//   - Pass 2: full entry array → aggregate candidates
+//   - Pass 3: candidate set → meta-candidates (cluster patterns, e.g.
+//             "execution_failure is the dominant failure mode this
+//             session")
+//
+// Honest scope: this adds CONSOLIDATION CAPACITY, not proven edge. The
+// paper's evidence is from synthetic-task experiments on a different
+// architecture; whether multi-pass helps Gordon in production needs
+// eval-harness validation. Default `passes: 1` preserves the existing
+// single-pass behavior so callers opt in explicitly.
+
+export interface MultiPassReflectorOptions {
+  /** Number of consolidation passes. 1 = current behavior (no
+   *  synthesis). 2+ runs meta-pattern passes over the candidate
+   *  output. Default 1. */
+  passes?: number;
+  /** Minimum number of candidates in a category to trigger a
+   *  category-cluster meta-candidate. Default 5. */
+  clusterThreshold?: number;
+}
+
+export interface MultiPassReflectorOutput extends ReflectorOutput {
+  /** Number of passes that actually ran (capped by available data). */
+  passesRun: number;
+  /** Candidates introduced by passes >= 2 (meta-candidates over the
+   *  base output). Included in `candidates` as well; this is a
+   *  convenience accessor for inspection. */
+  metaCandidates: ACELessonCandidate[];
+}
+
+/** Synthesize meta-candidates by clustering existing candidates on
+ *  shared category. When N or more candidates share a category, emit
+ *  one meta-candidate that summarizes the cluster. */
+export function _synthesizeCategoryClustersForTest(
+  candidates: ACELessonCandidate[],
+  clusterThreshold: number,
+): ACELessonCandidate[] {
+  const byCategory = new Map<string, ACELessonCandidate[]>();
+  for (const c of candidates) {
+    const arr = byCategory.get(c.category);
+    if (arr) arr.push(c);
+    else byCategory.set(c.category, [c]);
+  }
+  const meta: ACELessonCandidate[] = [];
+  for (const [category, group] of byCategory) {
+    if (group.length < clusterThreshold) continue;
+    // Aggregate stats across the cluster.
+    const totalEvidence = group.reduce((acc, c) => acc + c.evidenceCount, 0);
+    const firstSeenAt = group.reduce((acc, c) => Math.min(acc, c.firstSeenAt), Number.POSITIVE_INFINITY);
+    const lastSeenAt = group.reduce((acc, c) => Math.max(acc, c.lastSeenAt), 0);
+    const ids = group.flatMap((c) => c.evidenceEntryIds);
+    // De-dup ids while preserving order, then cap at MAX_EVIDENCE_IDS.
+    const seen = new Set<string>();
+    const dedupedIds: string[] = [];
+    for (const id of ids) {
+      if (!seen.has(id)) {
+        seen.add(id);
+        dedupedIds.push(id);
+        if (dedupedIds.length >= MAX_EVIDENCE_IDS) break;
+      }
+    }
+    meta.push({
+      text: `Category cluster: ${group.length} distinct ${category} lessons (${totalEvidence} total evidence events). This pattern is the dominant theme — review the underlying workflow.`,
+      category: "aggregate_pattern",
+      evidenceCount: totalEvidence,
+      firstSeenAt: Number.isFinite(firstSeenAt) ? firstSeenAt : Date.now(),
+      lastSeenAt: lastSeenAt > 0 ? lastSeenAt : Date.now(),
+      evidenceEntryIds: dedupedIds,
+    });
+  }
+  return meta;
+}
+
+/** Run the Reflector with N consolidation passes. Pass 1 is the
+ *  existing runReflector (per-entry + aggregate). Passes 2+ synthesize
+ *  meta-candidates over the prior pass's output. */
+export function runMultiPassReflector(
+  input: ReflectorInput = {},
+  options: MultiPassReflectorOptions = {},
+): MultiPassReflectorOutput {
+  const passes = options.passes ?? 1;
+  const clusterThreshold = options.clusterThreshold ?? 5;
+  if (!Number.isInteger(passes) || passes < 1) {
+    throw new Error("runMultiPassReflector: passes must be a positive integer");
+  }
+  const base = runReflector(input);
+  if (passes < 2 || base.candidates.length === 0) {
+    return { ...base, passesRun: 1, metaCandidates: [] };
+  }
+  // For passes 2..N, each pass synthesizes meta-candidates over the
+  // accumulated output. Subsequent passes can promote meta-candidates
+  // into higher-order clusters when categories repeat (e.g. multiple
+  // 'aggregate_pattern' candidates triggering a meta-meta).
+  let current = base.candidates;
+  const metaCandidates: ACELessonCandidate[] = [];
+  let passesRun = 1;
+  for (let p = 2; p <= passes; p++) {
+    const meta = _synthesizeCategoryClustersForTest(current, clusterThreshold);
+    if (meta.length === 0) break;
+    metaCandidates.push(...meta);
+    current = [...current, ...meta];
+    passesRun = p;
+  }
+  return {
+    ...base,
+    candidates: current.sort((a, b) => b.evidenceCount - a.evidenceCount),
+    passesRun,
+    metaCandidates,
+  };
+}
