@@ -40,6 +40,7 @@ import {
 } from "../../../platform/audit/disciplineAudit.ts";
 import { computeDisciplineTrajectory } from "../../../platform/audit/disciplineTrajectory.ts";
 import { interpretRiskRatioTriple } from "../../../../core/alpha/risk-ratio-triple.ts";
+import { computeOrchestrationLoad } from "../../../../core/runtime/orchestrationLoad.ts";
 import {
   computeCrowdPositioningVerdict,
   summarizeCrowdPositioning,
@@ -426,6 +427,68 @@ export const interpretRiskRatioTripleTool = createTool({
       underratedBySharpe: r.underratedBySharpe,
       calmarPassesFloor: r.calmarPassesFloor,
       sortinoPassesFloor: r.sortinoPassesFloor,
+      interpretation: r.interpretation,
+    };
+  },
+});
+
+// ============================================================================
+// compute_orchestration_load
+// ============================================================================
+
+export const computeOrchestrationLoadTool = createTool({
+  id: "compute_orchestration_load",
+  description: [
+    "Quantify the operator's serial-review bottleneck — 'The Orchestration",
+    "Tax'. The operator is the single-threaded reviewer (the GIL); producing",
+    "proposals is cheap but reviewing them acquires one lock held by one",
+    "person. Given items pending the operator's review and their sustainable",
+    "review throughput, returns the backlog in hours, a load tier (slack /",
+    "saturated / overloaded), and a backpressure recommendation.",
+    "",
+    "Use when the operator asks 'am I overloaded?', before spawning more",
+    "autonomous work, or to decide whether to defer non-critical proactive",
+    "cards. Read-only diagnostic. Used by /orchestration-load.",
+  ].join("\n"),
+  inputSchema: z.object({
+    pendingReviewItems: z
+      .number()
+      .min(0)
+      .describe("Items awaiting the operator's review (pending approvals + unacked cards)."),
+    reviewCapacityPerHour: z
+      .number()
+      .positive()
+      .describe("Operator's sustainable review throughput, items per hour."),
+    producedLastHour: z
+      .number()
+      .min(0)
+      .optional()
+      .describe("Items produced in the last hour — surfaces producer-outpacing-consumer."),
+    saturatedThreshold: z.number().positive().optional().describe("Backlog hours → saturated. Default 0.75."),
+    overloadedThreshold: z.number().positive().optional().describe("Backlog hours → overloaded. Default 1.0."),
+  }),
+  outputSchema: z.object({
+    backlogHours: z.number(),
+    tier: z.enum(["slack", "saturated", "overloaded"]),
+    producerOutpacingConsumer: z.boolean().nullable(),
+    shouldApplyBackpressure: z.boolean(),
+    deferNonCritical: z.boolean(),
+    interpretation: z.string(),
+  }),
+  execute: async (input: {
+    pendingReviewItems: number;
+    reviewCapacityPerHour: number;
+    producedLastHour?: number;
+    saturatedThreshold?: number;
+    overloadedThreshold?: number;
+  }) => {
+    const r = computeOrchestrationLoad(input);
+    return {
+      backlogHours: r.backlogHours,
+      tier: r.tier,
+      producerOutpacingConsumer: r.producerOutpacingConsumer,
+      shouldApplyBackpressure: r.shouldApplyBackpressure,
+      deferNonCritical: r.deferNonCritical,
       interpretation: r.interpretation,
     };
   },
