@@ -23,6 +23,38 @@
 import type { ProactiveSuggestion, ProactiveCategory } from "../types.ts";
 import { getCategoryPolicy } from "./categoryPolicy.ts";
 import { getSuggestionStore } from "../storage/suggestionStore.ts";
+import { computeOrchestrationLoad } from "../../../core/runtime/orchestrationLoad.ts";
+
+// ============================================================================
+// Orchestration backpressure (opt-in) — "The Orchestration Tax"
+// ============================================================================
+//
+// The operator is the single serial reviewer. When the pending-review queue
+// is overloaded relative to their review throughput, defer non-safety-critical
+// cards so the producer slows to match the consumer. Capital-protective
+// categories ALWAYS pass — mirrors the deny-list-bypasses-trust pattern: a
+// stop-loss warning is never withheld because the queue is deep.
+
+export const ORCHESTRATION_BACKPRESSURE_ENV = "GORDON_ORCHESTRATION_BACKPRESSURE";
+export const REVIEW_CAPACITY_ENV = "GORDON_REVIEW_CAPACITY_PER_HOUR";
+const DEFAULT_REVIEW_CAPACITY_PER_HOUR = 6;
+
+/** Categories exempt from backpressure — they protect capital and must reach
+ *  the operator regardless of queue depth. */
+const BACKPRESSURE_EXEMPT: ReadonlySet<ProactiveCategory> = new Set<ProactiveCategory>([
+  "risk_warning",
+  "stop_loss_tighten",
+]);
+
+function isOrchestrationBackpressureEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+  return env[ORCHESTRATION_BACKPRESSURE_ENV] === "1" || env[ORCHESTRATION_BACKPRESSURE_ENV] === "true";
+}
+
+function readReviewCapacityPerHour(env: NodeJS.ProcessEnv = process.env): number {
+  const raw = env[REVIEW_CAPACITY_ENV];
+  const n = raw ? Number(raw) : NaN;
+  return Number.isFinite(n) && n > 0 ? n : DEFAULT_REVIEW_CAPACITY_PER_HOUR;
+}
 
 // ============================================================================
 // Judge interface
@@ -78,6 +110,22 @@ export class HeuristicJudge implements ProposalJudge {
     const relevanceCheck = this.checkRelevance(candidate);
     if (!relevanceCheck.ok) {
       rejections.push(`relevance: ${relevanceCheck.reason}`);
+    }
+
+    // 4. Orchestration backpressure (opt-in). When the operator's review
+    //    queue is overloaded, defer non-safety-critical cards. Exempt
+    //    categories (risk_warning, stop_loss_tighten) always pass.
+    if (isOrchestrationBackpressureEnabled() && !BACKPRESSURE_EXEMPT.has(candidate.category)) {
+      const pending = store.counts().pending;
+      const load = computeOrchestrationLoad({
+        pendingReviewItems: pending,
+        reviewCapacityPerHour: readReviewCapacityPerHour(),
+      });
+      if (load.deferNonCritical) {
+        rejections.push(
+          `orchestration backpressure: ${load.tier} (${pending} pending, ${load.backlogHours.toFixed(1)}h backlog)`,
+        );
+      }
     }
 
     const shouldFire = rejections.length === 0;
