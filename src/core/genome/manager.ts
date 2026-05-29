@@ -29,6 +29,7 @@ import {
   initGenomeTables,
 } from "./store.ts";
 import type { Genome, Experiment, Mutation } from "./types.ts";
+import { deriveRejectedMutations, type RejectedMutation } from "./mutationRejection.ts";
 
 const logger = createModuleLogger("genome-manager");
 
@@ -466,6 +467,18 @@ export class GenomeManager {
    */
   getBestGenome(playbookName: string): Genome | null {
     return getBestGenome(playbookName);
+  }
+
+  /**
+   * Derive the net-regressive mutations this playbook's lineage has learned
+   * to avoid — the genome-level analogue of ACE's rejected lessons, ported
+   * from SIA's "don't repeat failed approaches". Computed purely from stored
+   * genome fitness deltas; no separate persistence.
+   */
+  getRejectedMutations(playbookName: string, minFitnessDrop?: number): RejectedMutation[] {
+    return deriveRejectedMutations(getGenomesByPlaybook(playbookName), {
+      ...(typeof minFitnessDrop === "number" && { minFitnessDrop }),
+    });
   }
 
   /**

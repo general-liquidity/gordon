@@ -431,6 +431,18 @@ export const getPlaybookLineageTool = createTool({
       )
       .optional(),
     lineage_tree: z.string().optional(),
+    rejected_mutations: z
+      .array(
+        z.object({
+          field_path: z.string(),
+          direction: z.string(),
+          net_fitness_drop: z.number(),
+          observations: z.number(),
+          reason: z.string(),
+        })
+      )
+      .optional()
+      .describe("Mutations this lineage has learned to avoid (net-regressive across forks)."),
     error: z.string().optional(),
   }),
   execute: async ({ playbook_name }) => {
@@ -474,6 +486,13 @@ export const getPlaybookLineageTool = createTool({
           parent_genome_id: g.parent_genome_id,
         })),
         lineage_tree: lineageTree,
+        rejected_mutations: manager.getRejectedMutations(playbook_name).map((r) => ({
+          field_path: r.fieldPath,
+          direction: r.direction,
+          net_fitness_drop: r.netFitnessDrop,
+          observations: r.observations,
+          reason: r.reason,
+        })),
       };
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);

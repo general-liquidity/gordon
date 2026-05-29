@@ -24,9 +24,27 @@ import { getRecurringInsights } from "../learning/insight-store.ts";
 import { playbookRegistry } from "../playbooks/registry.ts";
 import { playbookToProtocol } from "../playbooks/converter.ts";
 import type { Mutation } from "./types.ts";
+import {
+  deriveRejectedMutations,
+  filterRejectedMutations,
+  DEFAULT_MIN_FITNESS_DROP,
+} from "./mutationRejection.ts";
 import { v4 as uuidv4 } from "uuid";
 
 const logger = createModuleLogger("evolution-loop");
+
+/** Failed-mutation suppression is on unless explicitly disabled. */
+function isGenomeRejectionEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+  const raw = env.GORDON_GENOME_REJECTION;
+  return raw !== "0" && raw !== "false";
+}
+
+/** Net composite-fitness-drop threshold for treating a mutation as failed. */
+function genomeRejectionMinDrop(env: NodeJS.ProcessEnv = process.env): number {
+  const raw = env.GORDON_GENOME_REJECTION_MIN_DROP;
+  const n = raw ? Number(raw) : NaN;
+  return Number.isFinite(n) && n > 0 ? n : DEFAULT_MIN_FITNESS_DROP;
+}
 
 // ============================================================================
 // Types
@@ -346,6 +364,35 @@ export class EvolutionLoop {
         }
 
         if (mutations.length === 0) continue;
+
+        // Don't repeat failed approaches (SIA). Suppress candidate mutations
+        // this lineage has already learned are net-regressive. Default-on;
+        // disable with GORDON_GENOME_REJECTION=0, tune via *_MIN_DROP.
+        if (isGenomeRejectionEnabled()) {
+          const rejections = deriveRejectedMutations(manager.getGenomes(slot.playbook_name), {
+            minFitnessDrop: genomeRejectionMinDrop(),
+          });
+          if (rejections.length > 0) {
+            const { kept, suppressed } = filterRejectedMutations(mutations, rejections);
+            if (suppressed.length > 0) {
+              logger.info("Suppressed known-regressive mutations", {
+                playbook: slot.playbook_name,
+                suppressed: suppressed.map((s) => `${s.mutation.field_path}:${s.rejection.direction}`),
+              });
+            }
+            mutations.length = 0;
+            mutations.push(...kept);
+          }
+        }
+
+        // If every candidate was a known-bad mutation, skip this fork tick —
+        // the loop will retry next tick with fresh regime/insight signals.
+        if (mutations.length === 0) {
+          logger.info("All candidate mutations suppressed by rejection memory — skipping fork", {
+            playbook: slot.playbook_name,
+          });
+          continue;
+        }
 
         // Fork the variant
         const { genome: variant } = manager.forkWithMutations(
