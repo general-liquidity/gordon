@@ -41,6 +41,7 @@ import {
 import { computeDisciplineTrajectory } from "../../../platform/audit/disciplineTrajectory.ts";
 import { interpretRiskRatioTriple } from "../../../../core/alpha/risk-ratio-triple.ts";
 import { computeOrchestrationLoad } from "../../../../core/runtime/orchestrationLoad.ts";
+import { classifySurvivorshipRisk } from "../../../../core/alpha/survivorshipRisk.ts";
 import {
   computeCrowdPositioningVerdict,
   summarizeCrowdPositioning,
@@ -489,6 +490,61 @@ export const computeOrchestrationLoadTool = createTool({
       producerOutpacingConsumer: r.producerOutpacingConsumer,
       shouldApplyBackpressure: r.shouldApplyBackpressure,
       deferNonCritical: r.deferNonCritical,
+      interpretation: r.interpretation,
+    };
+  },
+});
+
+// ============================================================================
+// classify_survivorship_risk
+// ============================================================================
+
+export const classifySurvivorshipRiskTool = createTool({
+  id: "classify_survivorship_risk",
+  description: [
+    "Classify a backtest's survivorship-bias risk from how its universe was",
+    "constructed. A strategy that selects instruments from TODAY's universe",
+    "across a historical window is tilted toward winners — failed/delisted",
+    "names are silently excluded. Returns a risk tier + a suggested return",
+    "haircut + the confirm-before-trusting checklist.",
+    "",
+    "Immune: single-instrument, broad-liquid (SPY/QQQ), point-in-time universes.",
+    "Biased: cross-sectional selection from a current snapshot — risk grows with",
+    "window length, universe breadth, and delisting intensity (crypto > equity).",
+    "",
+    "This is a RISK FLAG, not a correction — Gordon has no delisting feed, so the",
+    "true survivorship-free result requires re-running on a point-in-time universe.",
+    "Use before trusting any cross-sectional momentum / trend backtest.",
+  ].join("\n"),
+  inputSchema: z.object({
+    crossSectional: z.boolean().describe("Does the strategy select among multiple instruments?"),
+    universeConstruction: z
+      .enum(["single_symbol", "liquid_broad", "current_snapshot", "point_in_time"])
+      .describe("How the backtest universe was assembled."),
+    universeSize: z.number().int().min(1).optional().describe("Number of instruments selected among. Default 1."),
+    windowDays: z.number().min(0).optional().describe("Backtest window length in days. Default 0."),
+    assetClass: z.enum(["crypto", "equity", "other"]).optional().describe("Default 'other'."),
+  }),
+  outputSchema: z.object({
+    tier: z.enum(["none", "low", "medium", "high"]),
+    returnHaircut: z.number(),
+    reasons: z.array(z.string()),
+    checklist: z.array(z.string()),
+    interpretation: z.string(),
+  }),
+  execute: async (input: {
+    crossSectional: boolean;
+    universeConstruction: "single_symbol" | "liquid_broad" | "current_snapshot" | "point_in_time";
+    universeSize?: number;
+    windowDays?: number;
+    assetClass?: "crypto" | "equity" | "other";
+  }) => {
+    const r = classifySurvivorshipRisk(input);
+    return {
+      tier: r.tier,
+      returnHaircut: r.returnHaircut,
+      reasons: r.reasons,
+      checklist: r.checklist,
       interpretation: r.interpretation,
     };
   },
