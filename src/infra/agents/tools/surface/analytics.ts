@@ -61,6 +61,9 @@ import { conditionalDistributionTest } from "../../../../core/alpha/conditional-
 import { runPortfolioEnsemble } from "../../../../core/alpha/pc-method-ensemble.ts";
 import { runRegimeAllocationPolicy } from "../../../../core/alpha/regime-policy.ts";
 import { computeForensicScores } from "../../../../core/alpha/forensic-accounting.ts";
+import { diffFilingSections, diffNamedSection } from "../../../../core/alpha/filing-section-diff.ts";
+import { computeTokenUnlockRisk } from "../../../../core/alpha/token-unlock-risk.ts";
+import { computeHolderConcentration } from "../../../../core/alpha/holder-concentration.ts";
 import { RegimeDetector } from "../../../../core/regime/index.ts";
 import { checkRiskTool as implCheckRisk } from "../trading/risk-gate.ts";
 import { recordSymbolObservation } from "../../observation/symbolObservationTracker.ts";
@@ -907,6 +910,9 @@ const MICROSTRUCTURE_OPS = [
   "portfolio_ensemble",
   "regime_policy",
   "forensic_screen",
+  "filing_diff",
+  "token_unlock_risk",
+  "holder_concentration",
 ] as const;
 
 export const computeMicrostructureTool = createTool({
@@ -1057,6 +1063,22 @@ export const computeMicrostructureTool = createTool({
     "                              (no false flags). Verdict INVESTIGATE/CLEAN/INSUFFICIENT. PROBABILITY FLAGS, NOT PROOF —",
     "                              a bad score means open the filing, never short on the number alone. Source line items via",
     "                              get_fundamentals / Finnhub fundamentals (equities).",
+    "    - 'filing_diff'         — params: { prior: string, current: string, section?: 'risk_factors'|'mdna', similarityThreshold? }",
+    "                              Year-over-year filing-section diff (equities): surfaces only the NEW and REMOVED",
+    "                              language between two filings' sections, ignoring carried-over boilerplate. Pass the",
+    "                              two sections' text directly, OR pass full 10-K text + section to auto-extract. 'The",
+    "                              single best read' — a quietly-added customer-concentration paragraph or a deleted",
+    "                              key-supplier line. Returns {added[], removed[], unchangedCount}; YOU summarize the delta.",
+    "    - 'token_unlock_risk'   — params: { events: [{date, amount, recipient?}], circulatingSupply, totalSupply?, now?, cliffThresholdPct? }",
+    "                              Crypto supply-schedule risk: classifies shape (cliff/linear/mixed), flags any single",
+    "                              unlock > ~5% of circulating, measures overhang + next unlock, weights cliffs into",
+    "                              team/investor wallets. Verdict high_risk/moderate/low. recipient ∈ team|investor|",
+    "                              community|ecosystem|foundation|public. now injected for the next-unlock read.",
+    "    - 'holder_concentration'— params: { holders: [{address, balance, label?}], totalSupply, topN?, insiderFlagPct? }",
+    "                              Crypto ownership risk: top-1 / top-N concentration, HHI + effective number of holders,",
+    "                              insider-controlled % (team+investor+foundation), exchange %. Flags 'you're the exit",
+    "                              liquidity' when insiders dominate. label ∈ team|investor|foundation|exchange|contract|",
+    "                              community|unknown. HHI is over the supplied holders (lower bound with only top-N).",
     "",
     "IMPORTANT: discipline_audit and adherence_report respect startTime+endTime",
     "ISO strings. When the operator asks for 'last 24h' or 'today', YOU must",
@@ -1124,6 +1146,25 @@ export const computeMicrostructureTool = createTool({
       forensic_screen: {
         execute: async (p: Record<string, unknown>) =>
           computeForensicScores(p as unknown as Parameters<typeof computeForensicScores>[0]),
+      },
+      filing_diff: {
+        execute: async (p: Record<string, unknown>) => {
+          const prior = typeof p.prior === "string" ? p.prior : "";
+          const current = typeof p.current === "string" ? p.current : "";
+          const sim = typeof p.similarityThreshold === "number" ? p.similarityThreshold : undefined;
+          if (p.section === "risk_factors" || p.section === "mdna") {
+            return diffNamedSection(prior, current, p.section, sim);
+          }
+          return diffFilingSections({ prior, current, ...(sim !== undefined && { similarityThreshold: sim }) });
+        },
+      },
+      token_unlock_risk: {
+        execute: async (p: Record<string, unknown>) =>
+          computeTokenUnlockRisk(p as unknown as Parameters<typeof computeTokenUnlockRisk>[0]),
+      },
+      holder_concentration: {
+        execute: async (p: Record<string, unknown>) =>
+          computeHolderConcentration(p as unknown as Parameters<typeof computeHolderConcentration>[0]),
       },
     };
     try {
