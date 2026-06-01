@@ -31,6 +31,109 @@ export interface LinearRegressionResult {
   projectionAtLast: number;
   /** Number of points used in the fit. */
   n: number;
+  /** Standard error of the slope estimate. Null when n <= 2 (no residual df). */
+  slopeStdError: number | null;
+  /** Standard error of the intercept estimate. Null when n <= 2. */
+  interceptStdError: number | null;
+  /** t-statistic of the slope (slope / slopeStdError). Null when undefined. */
+  slopeTStat: number | null;
+  /** Two-sided p-value of the slope under H0: slope = 0. Null when undefined. */
+  slopePValue: number | null;
+  /** t-statistic of the intercept. Null when undefined. */
+  interceptTStat: number | null;
+  /** Two-sided p-value of the intercept under H0: intercept = 0. Null when undefined. */
+  interceptPValue: number | null;
+  /** Residual degrees of freedom (n - 2). Null when n <= 2. */
+  degreesOfFreedom: number | null;
+  /** Durbin-Watson statistic on residuals (~2 = no autocorrelation). Null when n < 3. */
+  durbinWatson: number | null;
+  /** Lag-1 autocorrelation of residuals, -1..1. Null when n < 3. */
+  residualAutocorrelation: number | null;
+  /** Human-readable significance + autocorrelation note. */
+  interpretation: string;
+}
+
+// ---------------------------------------------------------------------------
+// Student-t CDF — self-contained, numerically-stable. No repo helper existed
+// (grepped: gammaln/gammaP/chiSquareSf live in conditional-distribution-test
+//  but no incomplete-beta / t-CDF), so implemented here and exported for reuse
+//  by hedgeFundReplication.ts. Standard Numerical-Recipes algorithms.
+// ---------------------------------------------------------------------------
+
+/** Log Γ(x) via the Lanczos approximation. */
+function gammaln(x: number): number {
+  const cof = [
+    76.18009172947146, -86.50532032941677, 24.01409824083091,
+    -1.231739572450155, 0.1208650973866179e-2, -0.5395239384953e-5,
+  ];
+  let y = x;
+  let tmp = x + 5.5;
+  tmp -= (x + 0.5) * Math.log(tmp);
+  let ser = 1.000000000190015;
+  for (let j = 0; j < 6; j++) {
+    y += 1;
+    ser += cof[j]! / y;
+  }
+  return -tmp + Math.log((2.5066282746310005 * ser) / x);
+}
+
+/** Continued-fraction expansion for the incomplete beta (Lentz's method). */
+function betacf(a: number, b: number, x: number): number {
+  const MAXIT = 200;
+  const EPS = 3e-14;
+  const FPMIN = 1e-300;
+  const qab = a + b;
+  const qap = a + 1;
+  const qam = a - 1;
+  let c = 1;
+  let d = 1 - (qab * x) / qap;
+  if (Math.abs(d) < FPMIN) d = FPMIN;
+  d = 1 / d;
+  let h = d;
+  for (let m = 1; m <= MAXIT; m++) {
+    const m2 = 2 * m;
+    let aa = (m * (b - m) * x) / ((qam + m2) * (a + m2));
+    d = 1 + aa * d;
+    if (Math.abs(d) < FPMIN) d = FPMIN;
+    c = 1 + aa / c;
+    if (Math.abs(c) < FPMIN) c = FPMIN;
+    d = 1 / d;
+    h *= d * c;
+    aa = (-(a + m) * (qab + m) * x) / ((a + m2) * (qap + m2));
+    d = 1 + aa * d;
+    if (Math.abs(d) < FPMIN) d = FPMIN;
+    c = 1 + aa / c;
+    if (Math.abs(c) < FPMIN) c = FPMIN;
+    d = 1 / d;
+    const del = d * c;
+    h *= del;
+    if (Math.abs(del - 1) < EPS) break;
+  }
+  return h;
+}
+
+/** Regularized incomplete beta I_x(a, b). */
+function incompleteBeta(a: number, b: number, x: number): number {
+  if (x <= 0) return 0;
+  if (x >= 1) return 1;
+  const bt = Math.exp(
+    gammaln(a + b) - gammaln(a) - gammaln(b) + a * Math.log(x) + b * Math.log(1 - x),
+  );
+  if (x < (a + 1) / (a + b + 2)) {
+    return (bt * betacf(a, b, x)) / a;
+  }
+  return 1 - (bt * betacf(b, a, 1 - x)) / b;
+}
+
+/**
+ * Two-sided p-value for a t-statistic with `df` degrees of freedom:
+ *   p = I_{df/(df+t²)}(df/2, 1/2).
+ * Returns null for non-positive df or non-finite t.
+ */
+export function studentTTwoSidedPValue(t: number, df: number): number | null {
+  if (!Number.isFinite(t) || !Number.isFinite(df) || df <= 0) return null;
+  const x = df / (df + t * t);
+  return incompleteBeta(df / 2, 0.5, x);
 }
 
 export interface RollingLinearRegressionResult {
@@ -83,11 +186,13 @@ export function linearRegression(values: number[]): LinearRegressionResult {
   const intercept = meanY - slope * meanX;
 
   // Compute residuals + sum-squared-error and total-sum-of-squares.
+  const residuals: number[] = new Array(n);
   let sse = 0;
   let sst = 0;
   for (let i = 0; i < n; i++) {
     const yHat = slope * i + intercept;
     const resid = values[i]! - yHat;
+    residuals[i] = resid;
     sse += resid * resid;
     const dev = values[i]! - meanY;
     sst += dev * dev;
@@ -97,7 +202,89 @@ export function linearRegression(values: number[]): LinearRegressionResult {
   const standardError = n > 2 ? Math.sqrt(sse / (n - 2)) : 0;
   const projectionAtLast = slope * (n - 1) + intercept;
 
-  return { slope, intercept, rSquared, standardError, projectionAtLast, n };
+  // --- Coefficient inference (only meaningful with residual df). ---
+  let slopeStdError: number | null = null;
+  let interceptStdError: number | null = null;
+  let slopeTStat: number | null = null;
+  let slopePValue: number | null = null;
+  let interceptTStat: number | null = null;
+  let interceptPValue: number | null = null;
+  let degreesOfFreedom: number | null = null;
+
+  if (n > 2 && ssXX > 0) {
+    const df = n - 2;
+    degreesOfFreedom = df;
+    const sigma2 = sse / df;
+    // Var(slope) = σ² / Sxx; Var(intercept) = σ² (1/n + meanX²/Sxx).
+    const seSlope = Math.sqrt(sigma2 / ssXX);
+    const seIntercept = Math.sqrt(sigma2 * (1 / n + (meanX * meanX) / ssXX));
+    slopeStdError = parseFloat(seSlope.toFixed(6));
+    interceptStdError = parseFloat(seIntercept.toFixed(6));
+    if (seSlope > 0) {
+      slopeTStat = parseFloat((slope / seSlope).toFixed(4));
+      const p = studentTTwoSidedPValue(slope / seSlope, df);
+      slopePValue = p === null ? null : parseFloat(p.toFixed(6));
+    }
+    if (seIntercept > 0) {
+      interceptTStat = parseFloat((intercept / seIntercept).toFixed(4));
+      const p = studentTTwoSidedPValue(intercept / seIntercept, df);
+      interceptPValue = p === null ? null : parseFloat(p.toFixed(6));
+    }
+  }
+
+  // --- Residual diagnostics: Durbin-Watson + lag-1 autocorrelation. ---
+  let durbinWatson: number | null = null;
+  let residualAutocorrelation: number | null = null;
+  if (n >= 3) {
+    let dwNum = 0;
+    let lagCross = 0;
+    for (let i = 1; i < n; i++) {
+      const diff = residuals[i]! - residuals[i - 1]!;
+      dwNum += diff * diff;
+      lagCross += residuals[i]! * residuals[i - 1]!;
+    }
+    let dwDen = 0;
+    for (let i = 0; i < n; i++) dwDen += residuals[i]! * residuals[i]!;
+    if (dwDen > 0) {
+      durbinWatson = parseFloat((dwNum / dwDen).toFixed(4));
+      residualAutocorrelation = parseFloat((lagCross / dwDen).toFixed(4));
+    }
+  }
+
+  const slopeSig = slopePValue !== null && slopePValue < 0.05;
+  const autocorr = durbinWatson !== null && (durbinWatson < 1.5 || durbinWatson > 2.5);
+  const sigPart =
+    slopePValue === null
+      ? "slope significance undetermined (insufficient residual df)"
+      : slopeSig
+        ? `slope significant (|t|=${Math.abs(slopeTStat!).toFixed(2)}, p=${slopePValue.toFixed(4)})`
+        : `slope NOT significant (|t|=${Math.abs(slopeTStat!).toFixed(2)}, p=${slopePValue.toFixed(4)})`;
+  const acPart =
+    durbinWatson === null
+      ? "residual autocorrelation undetermined"
+      : autocorr
+        ? `residuals show autocorrelation (DW=${durbinWatson.toFixed(2)}, far from 2)`
+        : `residuals show no strong autocorrelation (DW=${durbinWatson.toFixed(2)})`;
+  const interpretation = `${sigPart}; ${acPart}.`;
+
+  return {
+    slope,
+    intercept,
+    rSquared,
+    standardError,
+    projectionAtLast,
+    n,
+    slopeStdError,
+    interceptStdError,
+    slopeTStat,
+    slopePValue,
+    interceptTStat,
+    interceptPValue,
+    degreesOfFreedom,
+    durbinWatson,
+    residualAutocorrelation,
+    interpretation,
+  };
 }
 
 /** Rolling per-bar regression. Bars before the first full window

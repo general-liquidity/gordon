@@ -5,7 +5,7 @@
  * return metrics, risk metrics, and trade statistics.
  */
 
-import type { EquityPoint, ClosedTrade, BacktestMetrics } from "./types.ts";
+import type { EquityPoint, ClosedTrade, BacktestMetrics, DrawdownPeriod } from "./types.ts";
 
 // ============================================================================
 // Constants
@@ -451,6 +451,206 @@ export function calculateMaxConsecutiveLosses(trades: ClosedTrade[]): number {
 }
 
 // ============================================================================
+// Extended Reporting Metrics
+// ============================================================================
+
+/** Minimum return observations required for a meaningful tail ratio. */
+const MIN_TAIL_RATIO_OBS = 20;
+
+/** Default rolling-window length (periods) for rolling Sharpe/beta. */
+const DEFAULT_ROLLING_WINDOW = 63;
+
+/**
+ * Linear-interpolated percentile of a numeric array.
+ *
+ * @param sorted - array sorted ascending
+ * @param p - percentile in [0, 1]
+ * @returns interpolated value, or null when the array is empty
+ */
+function percentile(sorted: number[], p: number): number | null {
+  const n = sorted.length;
+  if (n === 0) return null;
+  if (n === 1) return sorted[0] ?? null;
+
+  const rank = p * (n - 1);
+  const lo = Math.floor(rank);
+  const hi = Math.ceil(rank);
+  const loVal = sorted[lo];
+  const hiVal = sorted[hi];
+  if (loVal === undefined || hiVal === undefined) return null;
+  if (lo === hi) return loVal;
+  const frac = rank - lo;
+  return loVal + (hiVal - loVal) * frac;
+}
+
+/**
+ * Tail ratio = 95th-percentile return / |5th-percentile return|.
+ *
+ * A value > 1 means the upside tail is fatter than the downside tail.
+ * Returns null when there are too few observations or the 5th percentile is
+ * zero (undefined ratio) — never fabricates a value.
+ *
+ * @param returns - periodic returns (decimals)
+ * @param minObs - minimum observations required (default 20)
+ * @returns tail ratio, or null when insufficient/undefined
+ */
+export function calculateTailRatio(
+  returns: number[],
+  minObs: number = MIN_TAIL_RATIO_OBS,
+): number | null {
+  if (returns.length < minObs) return null;
+  const sorted = [...returns].sort((a, b) => a - b);
+  const p95 = percentile(sorted, 0.95);
+  const p05 = percentile(sorted, 0.05);
+  if (p95 === null || p05 === null) return null;
+  const denom = Math.abs(p05);
+  if (denom === 0) return null;
+  return parseFloat((p95 / denom).toFixed(4));
+}
+
+/**
+ * Rolling annualized Sharpe over a fixed window.
+ *
+ * For each window of `window` consecutive returns, computes
+ * mean/std × √TRADING_DAYS_PER_YEAR. Length = returns.length - window + 1.
+ * Returns an empty array when the series is shorter than the window.
+ *
+ * @param returns - periodic returns (decimals)
+ * @param window - window length in periods (default 63)
+ * @returns array of rolling annualized Sharpe values
+ */
+export function calculateRollingSharpe(
+  returns: number[],
+  window: number = DEFAULT_ROLLING_WINDOW,
+): number[] {
+  if (window < 2 || returns.length < window) return [];
+  const out: number[] = [];
+  for (let end = window; end <= returns.length; end++) {
+    const slice = returns.slice(end - window, end);
+    const sharpe = calculateSharpeRatio(slice);
+    out.push(parseFloat((Number.isFinite(sharpe) ? sharpe : 0).toFixed(4)));
+  }
+  return out;
+}
+
+/**
+ * Rolling beta of strategy returns against a benchmark return series.
+ *
+ * beta = cov(strategy, benchmark) / var(benchmark) over each window.
+ * Returns null when no benchmark is provided. Returns an empty array when the
+ * series is too short or the lengths don't align.
+ *
+ * @param returns - strategy periodic returns (decimals)
+ * @param benchmark - benchmark periodic returns, same indexing as `returns`
+ * @param window - window length in periods (default 63)
+ * @returns array of rolling betas, or null when no benchmark
+ */
+export function calculateRollingBeta(
+  returns: number[],
+  benchmark: number[] | null | undefined,
+  window: number = DEFAULT_ROLLING_WINDOW,
+): number[] | null {
+  if (!benchmark) return null;
+  if (benchmark.length !== returns.length) return [];
+  if (window < 2 || returns.length < window) return [];
+
+  const out: number[] = [];
+  for (let end = window; end <= returns.length; end++) {
+    const r = returns.slice(end - window, end);
+    const b = benchmark.slice(end - window, end);
+    const meanR = r.reduce((s, x) => s + x, 0) / window;
+    const meanB = b.reduce((s, x) => s + x, 0) / window;
+    let cov = 0;
+    let varB = 0;
+    for (let i = 0; i < window; i++) {
+      const dr = (r[i] ?? 0) - meanR;
+      const db = (b[i] ?? 0) - meanB;
+      cov = cov + dr * db;
+      varB = varB + db * db;
+    }
+    const beta = varB === 0 ? 0 : cov / varB;
+    out.push(parseFloat(beta.toFixed(4)));
+  }
+  return out;
+}
+
+/**
+ * Extract the top-N discrete drawdown episodes from an equity curve.
+ *
+ * An episode runs from a peak, through the trough, to the point where equity
+ * recovers to (or exceeds) the prior peak. An unrecovered final episode ends
+ * at the last index. Episodes are ranked by depth (deepest first).
+ *
+ * @param equityCurve - array of equity points (chronological)
+ * @param topN - maximum number of episodes to return (default 5)
+ * @returns drawdown periods sorted deepest-first (empty when no drawdown)
+ */
+export function extractDrawdownPeriods(
+  equityCurve: EquityPoint[],
+  topN: number = 5,
+): DrawdownPeriod[] {
+  if (equityCurve.length < 2) return [];
+
+  const episodes: DrawdownPeriod[] = [];
+  const first = equityCurve[0];
+  if (!first) return [];
+
+  let peak = first.equity;
+  let peakIdx = 0;
+  let troughEquity = first.equity;
+  let troughIdx = 0;
+  let inDrawdown = false;
+
+  for (let i = 1; i < equityCurve.length; i++) {
+    const point = equityCurve[i];
+    if (!point) continue;
+    const eq = point.equity;
+
+    if (eq >= peak) {
+      // Recovery (or new peak). Close any open episode here.
+      if (inDrawdown && peak > 0) {
+        const depth = ((peak - troughEquity) / peak) * 100;
+        episodes.push({
+          startIdx: peakIdx,
+          troughIdx,
+          endIdx: i,
+          depth: parseFloat(depth.toFixed(4)),
+          lengthBars: i - peakIdx,
+        });
+        inDrawdown = false;
+      }
+      peak = eq;
+      peakIdx = i;
+      troughEquity = eq;
+      troughIdx = i;
+    } else {
+      // Below peak — in a drawdown.
+      inDrawdown = true;
+      if (eq < troughEquity) {
+        troughEquity = eq;
+        troughIdx = i;
+      }
+    }
+  }
+
+  // Close an unrecovered final episode at the last index.
+  if (inDrawdown && peak > 0) {
+    const lastIdx = equityCurve.length - 1;
+    const depth = ((peak - troughEquity) / peak) * 100;
+    episodes.push({
+      startIdx: peakIdx,
+      troughIdx,
+      endIdx: lastIdx,
+      depth: parseFloat(depth.toFixed(4)),
+      lengthBars: lastIdx - peakIdx,
+    });
+  }
+
+  episodes.sort((a, b) => b.depth - a.depth);
+  return episodes.slice(0, topN);
+}
+
+// ============================================================================
 // Aggregate Function
 // ============================================================================
 
@@ -716,8 +916,35 @@ export function calculateMetricsFromTrades(
   const winningTrades = trades.filter(t => t.netPnL > 0);
   const losingTrades = trades.filter(t => t.netPnL < 0);
 
+  // Extended reporting metrics — computed from the equity-curve return series
+  // and the trade record. All null/empty when inputs are insufficient.
+  const periodReturns = calculateDailyReturns(basicEquityCurve);
+  const tailRatio = calculateTailRatio(periodReturns) ?? undefined;
+  const rollingSharpe = calculateRollingSharpe(periodReturns);
+  // Engine has no benchmark series — beta is null unless a caller wires one in.
+  const rollingBeta = calculateRollingBeta(periodReturns, null);
+  const drawdownPeriods = extractDrawdownPeriods(basicEquityCurve);
+  // Engine tracks positions only at trade boundaries, not per bar, so realized
+  // turnover is derived from traded notional. Each round-trip trades entry +
+  // exit notional ≈ 2 × entry value; normalize by initial capital, per trade.
+  const realizedTurnover = trades.length > 0
+    ? parseFloat(
+        (
+          trades.reduce(
+            (sum, t) => sum + (Math.abs(t.entryPrice * t.quantity) * 2) / initialCapital,
+            0,
+          ) / trades.length
+        ).toFixed(6),
+      )
+    : undefined;
+
   return {
     ...baseMetrics,
+    tailRatio,
+    realizedTurnover,
+    rollingSharpe,
+    rollingBeta,
+    drawdownPeriods,
     // Override with more precise calculations from Trade type
     grossProfit: winningTrades.reduce((sum, t) => sum + t.grossPnL, 0),
     grossLoss: Math.abs(losingTrades.reduce((sum, t) => sum + t.grossPnL, 0)),

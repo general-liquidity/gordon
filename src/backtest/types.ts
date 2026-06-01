@@ -261,6 +261,56 @@ export interface BacktestMetrics {
   totalCommission?: number;
   /** Commission as percentage of initial capital */
   commissionPct?: number;
+
+  // Extended reporting metrics (optional, backward-compatible)
+  /**
+   * Tail ratio = 95th-percentile return / |5th-percentile return|. A value > 1
+   * means the right tail (upside) is fatter than the left tail. Null/absent
+   * when fewer than ~20 return observations.
+   */
+  tailRatio?: number;
+  /**
+   * Realized turnover. Average traded notional / equity per period (one-way).
+   * Surfaced from the engine's position/trade record. Absent when positions
+   * are not tracked per bar.
+   */
+  realizedTurnover?: number;
+  /**
+   * Rolling annualized Sharpe over a fixed window (default 63 periods).
+   * Length = returns.length - window + 1. Empty when the series is shorter
+   * than the window.
+   */
+  rollingSharpe?: number[];
+  /**
+   * Rolling beta of strategy returns against a benchmark return series, same
+   * window as rollingSharpe. Null when no benchmark was provided.
+   */
+  rollingBeta?: number[] | null;
+  /**
+   * Top-N discrete drawdown episodes extracted from the equity curve, ranked
+   * by depth (deepest first).
+   */
+  drawdownPeriods?: DrawdownPeriod[];
+}
+
+/**
+ * A discrete drawdown episode on the equity curve: from a peak, down to a
+ * trough, and back up to (or above) the prior peak (or end of series).
+ */
+export interface DrawdownPeriod {
+  /** Index of the peak that started the drawdown. */
+  startIdx: number;
+  /** Index of the lowest equity point within the episode. */
+  troughIdx: number;
+  /**
+   * Index at which equity recovered to the prior peak. Equals the last index
+   * of the series when the episode never fully recovered.
+   */
+  endIdx: number;
+  /** Drawdown depth as a positive percentage (peak-to-trough). */
+  depth: number;
+  /** Episode length in bars (endIdx - startIdx). */
+  lengthBars: number;
 }
 
 // ============================================================================

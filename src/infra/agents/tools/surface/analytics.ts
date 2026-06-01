@@ -54,6 +54,23 @@ import {
   calculateStandardErrorBands,
   calculateHighestVolumeEver,
   detectLmwPatterns,
+  calculateCCI,
+  calculateWilliamsR,
+  calculateUltimateOscillator,
+  calculateAroon,
+  calculateADXR,
+  calculateNATR,
+  calculateCMO,
+  calculateAPO,
+  calculatePPO,
+  calculateChaikinAD,
+  calculateChaikinOscillator,
+  calculateWMA,
+  calculateDEMA,
+  calculateTEMA,
+  calculateTRIMA,
+  buildInformationBars,
+  buildInformationBarsFromOHLCV,
   type CandlestickPatternName,
   type Candle as IndicatorCandle,
 } from "../../../../core/indicators/index.ts";
@@ -64,6 +81,18 @@ import { computeForensicScores } from "../../../../core/alpha/forensic-accountin
 import { diffFilingSections, diffNamedSection } from "../../../../core/alpha/filing-section-diff.ts";
 import { computeTokenUnlockRisk } from "../../../../core/alpha/token-unlock-risk.ts";
 import { computeHolderConcentration } from "../../../../core/alpha/holder-concentration.ts";
+import { fitGarch } from "../../../../core/alpha/garch.ts";
+import { hierarchicalRiskParity } from "../../../../core/alpha/hierarchical-risk-parity.ts";
+import {
+  computeFormulaicAlpha,
+  IMPLEMENTED_ALPHAS,
+  type AlphaInputs,
+} from "../../../../core/alpha/formulaic-alphas.ts";
+import { makePanel, type Cell } from "../../../../core/alpha/formulaic-alpha-operators.ts";
+import { runAdfTest, adfToPayload } from "../../../trading/quant/stationarityTest.ts";
+import { runKpssTest, kpssToPayload } from "../../../trading/quant/kpssTest.ts";
+import { runJohansenTest, johansenToPayload } from "../../../trading/quant/johansenCointegration.ts";
+import { acf, pacf } from "../../../trading/quant/autocorrelation.ts";
 import { RegimeDetector } from "../../../../core/regime/index.ts";
 import { checkRiskTool as implCheckRisk } from "../trading/risk-gate.ts";
 import { recordSymbolObservation } from "../../observation/symbolObservationTracker.ts";
@@ -417,6 +446,22 @@ const INDICATOR_NAMES = [
   "standard_error_bands",
   "highest_volume_ever",
   "lmw_patterns",
+  "cci",
+  "williams_r",
+  "ultosc",
+  "aroon",
+  "adxr",
+  "natr",
+  "cmo",
+  "apo",
+  "ppo",
+  "chaikin_ad",
+  "chaikin_osc",
+  "wma",
+  "dema",
+  "tema",
+  "trima",
+  "garch_forecast",
 ] as const;
 
 function dispatchIndicator(
@@ -568,6 +613,75 @@ function dispatchIndicator(
         interpretation: r.interpretation,
       };
     }
+    case "cci":
+      return calculateCCI(candles, (params.period as number) ?? 20);
+    case "williams_r":
+      return calculateWilliamsR(candles, (params.period as number) ?? 14);
+    case "ultosc":
+      return calculateUltimateOscillator(
+        candles,
+        (params.short as number) ?? 7,
+        (params.medium as number) ?? 14,
+        (params.long as number) ?? 28,
+      );
+    case "aroon":
+      return calculateAroon(candles, (params.period as number) ?? 25);
+    case "adxr":
+      return calculateADXR(candles, (params.period as number) ?? 14);
+    case "natr":
+      return calculateNATR(candles, (params.period as number) ?? 14);
+    case "cmo":
+      return calculateCMO(closes, (params.period as number) ?? 14);
+    case "apo":
+      return calculateAPO(closes, (params.fast as number) ?? 12, (params.slow as number) ?? 26);
+    case "ppo":
+      return calculatePPO(closes, (params.fast as number) ?? 12, (params.slow as number) ?? 26);
+    case "chaikin_ad":
+      return calculateChaikinAD(candles);
+    case "chaikin_osc":
+      return calculateChaikinOscillator(candles, (params.fast as number) ?? 3, (params.slow as number) ?? 10);
+    case "wma":
+    case "dema":
+    case "tema":
+    case "trima": {
+      const period = (params.period as number) ?? 14;
+      const fn =
+        indicator === "wma"
+          ? calculateWMA
+          : indicator === "dema"
+            ? calculateDEMA
+            : indicator === "tema"
+              ? calculateTEMA
+              : calculateTRIMA;
+      const values = fn(closes, period);
+      // The MA family returns a bare aligned (number|null)[]; box it to match
+      // the object-result shape of the other indicator ops.
+      let current: number | null = null;
+      for (let i = values.length - 1; i >= 0; i--) {
+        if (values[i] !== null) {
+          current = values[i]!;
+          break;
+        }
+      }
+      return { values, current, period, indicator };
+    }
+    case "garch_forecast": {
+      // Fit GARCH(1,1) on log-returns derived from the fetched closes, then
+      // emit the conditional-vol fit + a multi-step variance forecast.
+      const returns: number[] = [];
+      for (let i = 1; i < closes.length; i++) {
+        const prev = closes[i - 1]!;
+        const curr = closes[i]!;
+        if (prev > 0 && curr > 0) returns.push(Math.log(curr / prev));
+      }
+      const r = fitGarch(returns, {
+        ...(typeof params.demean === "boolean" && { demean: params.demean }),
+      });
+      if (!r) return { error: "garch_forecast: insufficient returns (need ≥ ~50 bars)" };
+      const horizon = typeof params.horizon === "number" ? params.horizon : 10;
+      const { forecast, ...rest } = r;
+      return { ...rest, horizon, varianceForecast: forecast(horizon) };
+    }
     default:
       return { error: `Unknown indicator: ${indicator}` };
   }
@@ -592,6 +706,10 @@ export const computeIndicatorTool = createTool({
     "Regression-based: linear_regression (slope + R² + standard error of fit), standard_error_bands (regression-line centerline + ± k × SE — distinct from Bollinger which uses SMA + price stddev; SEB is trend-focused vs BB which is mean-reversion focused)",
     "Volume-record: highest_volume_ever (HVE — bars whose volume exceeds all prior bars within a lookback window; institutional-urgency signal used by the /hve-pullback skill; pass lookbackBars omitted for true HVE, or e.g. 252 for 'highest in the last year')",
     "Advanced: elliott_wave, delta_ladder, flowscope",
+    "TA-Lib momentum/oscillators: cci, williams_r, ultosc (Ultimate Osc 7/14/28), aroon (+ oscillator), cmo (Chande), apo / ppo (abs / pct price osc)",
+    "TA-Lib trend/volatility: adxr (ADX rating), natr (normalized ATR), chaikin_ad (A/D line), chaikin_osc",
+    "Moving averages: wma (weighted), dema (double EMA), tema (triple EMA), trima (triangular) — return { values, current }",
+    "Volatility forecast: garch_forecast (GARCH(1,1) MLE fit on log-returns → params, persistence, long-run vol, multi-step varianceForecast; params { horizon?, demean? })",
     "",
     "Internally fetches candles via the connected exchange. Pass `bars` to",
     "control the lookback window (default 200).",
@@ -913,6 +1031,13 @@ const MICROSTRUCTURE_OPS = [
   "filing_diff",
   "token_unlock_risk",
   "holder_concentration",
+  "formulaic_alpha",
+  "hrp_allocation",
+  "adf_test",
+  "kpss_test",
+  "acf_pacf",
+  "johansen_cointegration",
+  "information_bars",
 ] as const;
 
 export const computeMicrostructureTool = createTool({
@@ -1079,6 +1204,30 @@ export const computeMicrostructureTool = createTool({
     "                              insider-controlled % (team+investor+foundation), exchange %. Flags 'you're the exit",
     "                              liquidity' when insiders dominate. label ∈ team|investor|foundation|exchange|contract|",
     "                              community|unknown. HHI is over the supplied holders (lower bound with only top-N).",
+    "    - 'formulaic_alpha'     — params: { name: 'alpha001'|…, close: number[][], open?, high?, low?, volume?, returns?, tickers: string[], dates: string[] }",
+    "                              WorldQuant-101 cross-sectional formulaic alpha (Kakushadze) over a date×ticker OHLCV panel.",
+    "                              Matrices are row-major [dateIdx][tickerIdx]; cells may be null. 11 alphas implemented",
+    "                              (OHLCV/returns only — no vwap/cap/sector/adv). Returns the signal Panel + the latest",
+    "                              cross-section. Unknown name → error listing the implemented set.",
+    "    - 'hrp_allocation'      — params: { covariance?: number[][], returns?: number[][], correlation?: number[][], labels?: string[] }",
+    "                              Hierarchical Risk Parity (López de Prado): correlation-tree single-linkage clustering +",
+    "                              quasi-diagonal seriation + recursive bisection by inverse cluster-variance. No matrix",
+    "                              inversion (robust to noisy covariance). Sibling of portfolio_ensemble. One of returns/covariance required.",
+    "    - 'adf_test'            — params: { series: number[], lagOrder?, alpha?: 0.01|0.05|0.1, regression?: 'c'|'ct' }",
+    "                              Augmented Dickey-Fuller unit-root test (null = unit root / non-stationary). 'ct' adds a",
+    "                              deterministic trend regressor. Use to confirm a spread / residual is mean-reverting.",
+    "    - 'kpss_test'           — params: { series: number[], regression?: 'c'|'ct', lags?, alpha?: 0.1|0.05|0.025|0.01 }",
+    "                              KPSS stationarity test — COMPLEMENT to ADF (null = STATIONARY; reject → non-stationary).",
+    "                              Run alongside adf_test: both agree → confident; disagree → inconclusive.",
+    "    - 'acf_pacf'            — params: { series: number[], maxLag? }",
+    "                              Autocorrelation + partial-autocorrelation (Durbin-Levinson) with ±1.96/√n bands. Box-Jenkins",
+    "                              lag-order identification for AR/MA structure.",
+    "    - 'johansen_cointegration' — params: { series: number[][] /* columns = variables, level prices */, lagOrder?, alpha?: 0.1|0.05|0.01 }",
+    "                              Johansen trace test for cointegration RANK across a system of ≥2 series (multivariate —",
+    "                              goes beyond pairwise Engle-Granger). Returns eigenvalues, per-rank trace stats, inferred rank.",
+    "    - 'information_bars'    — params: { kind: 'volume'|'dollar'|'tick', threshold: number, ticks?: {price,volume,timestamp}[], ohlcv?: {close,volume}[] }",
+    "                              López-de-Prado information-driven bars: close a bar when cumulative volume / dollar-value /",
+    "                              tick-count crosses the threshold. Better statistical properties than time bars. Prefer ticks; ohlcv is a coarse fallback.",
     "",
     "IMPORTANT: discipline_audit and adherence_report respect startTime+endTime",
     "ISO strings. When the operator asks for 'last 24h' or 'today', YOU must",
@@ -1165,6 +1314,102 @@ export const computeMicrostructureTool = createTool({
       holder_concentration: {
         execute: async (p: Record<string, unknown>) =>
           computeHolderConcentration(p as unknown as Parameters<typeof computeHolderConcentration>[0]),
+      },
+      hrp_allocation: {
+        execute: async (p: Record<string, unknown>) => {
+          const r = hierarchicalRiskParity(p as unknown as Parameters<typeof hierarchicalRiskParity>[0]);
+          return r ?? { error: "hrp_allocation: insufficient input — need a returns matrix or a covariance matrix (≥ 2 assets)" };
+        },
+      },
+      formulaic_alpha: {
+        execute: async (p: Record<string, unknown>) => {
+          const name = typeof p.name === "string" ? p.name : "";
+          const dates = Array.isArray(p.dates) ? (p.dates as string[]) : [];
+          const tickers = Array.isArray(p.tickers) ? (p.tickers as string[]) : [];
+          if (!Array.isArray(p.close)) {
+            return { error: "formulaic_alpha: `close` (a date × ticker matrix) is required, alongside `dates` and `tickers`." };
+          }
+          const toPanel = (m: unknown) =>
+            Array.isArray(m) ? makePanel(dates, tickers, m as Cell[][]) : undefined;
+          const inputs: AlphaInputs = {
+            close: makePanel(dates, tickers, p.close as Cell[][]),
+            ...(Array.isArray(p.open) && { open: toPanel(p.open) }),
+            ...(Array.isArray(p.high) && { high: toPanel(p.high) }),
+            ...(Array.isArray(p.low) && { low: toPanel(p.low) }),
+            ...(Array.isArray(p.volume) && { volume: toPanel(p.volume) }),
+            ...(Array.isArray(p.returns) && { returns: toPanel(p.returns) }),
+          };
+          const r = computeFormulaicAlpha(name, inputs);
+          if (!r) {
+            return {
+              error: `formulaic_alpha: unknown/unimplemented alpha '${name}'. Implemented: ${IMPLEMENTED_ALPHAS.join(", ")}`,
+            };
+          }
+          return {
+            name,
+            dates: r.dates,
+            tickers: r.tickers,
+            values: r.values,
+            latest: r.values[r.values.length - 1] ?? null,
+          };
+        },
+      },
+      adf_test: {
+        execute: async (p: Record<string, unknown>) =>
+          adfToPayload(runAdfTest(p as unknown as Parameters<typeof runAdfTest>[0])),
+      },
+      kpss_test: {
+        execute: async (p: Record<string, unknown>) =>
+          kpssToPayload(runKpssTest(p as unknown as Parameters<typeof runKpssTest>[0])),
+      },
+      johansen_cointegration: {
+        execute: async (p: Record<string, unknown>) =>
+          johansenToPayload(runJohansenTest(p as unknown as Parameters<typeof runJohansenTest>[0])),
+      },
+      acf_pacf: {
+        execute: async (p: Record<string, unknown>) => {
+          const series = Array.isArray(p.series) ? (p.series as number[]) : [];
+          const maxLag = typeof p.maxLag === "number" ? p.maxLag : 20;
+          const a = acf(series, maxLag);
+          const pa = pacf(series, maxLag);
+          if (!a || !pa) {
+            return { error: `acf_pacf: insufficient series — need n ≥ maxLag + 2 (maxLag=${maxLag})` };
+          }
+          return {
+            acf: a.acf,
+            pacf: pa.pacf,
+            confidenceBand: a.confidenceBand,
+            maxLag,
+            sampleSize: a.sampleSize,
+          };
+        },
+      },
+      information_bars: {
+        execute: async (p: Record<string, unknown>) => {
+          const kind = (p.kind === "dollar" || p.kind === "tick" ? p.kind : "volume") as
+            | "volume"
+            | "dollar"
+            | "tick";
+          const threshold = typeof p.threshold === "number" ? p.threshold : 0;
+          if (!(threshold > 0)) {
+            return { error: "information_bars: `threshold` must be a positive number." };
+          }
+          if (Array.isArray(p.ticks)) {
+            return buildInformationBars(
+              p.ticks as Parameters<typeof buildInformationBars>[0],
+              kind,
+              threshold,
+            );
+          }
+          if (Array.isArray(p.ohlcv)) {
+            return buildInformationBarsFromOHLCV(
+              p.ohlcv as Parameters<typeof buildInformationBarsFromOHLCV>[0],
+              kind,
+              threshold,
+            );
+          }
+          return { error: "information_bars: pass either `ticks` ({price,volume,timestamp}[]) or `ohlcv` ({close,volume}[])." };
+        },
       },
     };
     try {

@@ -1,6 +1,7 @@
 import { describe, it, expect } from "bun:test";
 import {
   pearsonCorrelation,
+  spearmanCorrelation,
   sampleStd,
   trendSlope,
   ci95HalfWidth,
@@ -38,6 +39,49 @@ describe("pearsonCorrelation", () => {
   it("returns null for non-finite values", () => {
     expect(pearsonCorrelation([1, NaN, 3], [4, 5, 6])).toBeNull();
     expect(pearsonCorrelation([1, 2, 3], [Infinity, 5, 6])).toBeNull();
+  });
+});
+
+describe("spearmanCorrelation", () => {
+  it("returns 1 for a strictly monotonic non-linear pair (y = x³)", () => {
+    const xs = [1, 2, 3, 4, 5, 6];
+    const ys = xs.map((x) => x ** 3);
+    // Spearman is exactly 1 (rank-monotonic); Pearson is < 1 due to curvature.
+    expect(spearmanCorrelation(xs, ys)!).toBeCloseTo(1, 10);
+    expect(pearsonCorrelation(xs, ys)!).toBeLessThan(1);
+  });
+
+  it("returns -1 for a strictly decreasing monotonic pair", () => {
+    const xs = [1, 2, 3, 4, 5];
+    const ys = xs.map((x) => -(x ** 3));
+    expect(spearmanCorrelation(xs, ys)!).toBeCloseTo(-1, 10);
+  });
+
+  it("handles ties via average ranks (hand-checked)", () => {
+    // xs ranks: [10,20,20,30,40] → [1, 2.5, 2.5, 4, 5]
+    // ys ranks: [ 5, 5, 6, 7, 8] → [1.5, 1.5, 3, 4, 5]
+    // Pearson of these rank vectors = 0.921053 (hand calc):
+    //   rankXs=[1,2.5,2.5,4,5] mean 3 → dx=[-2,-0.5,-0.5,1,2]
+    //   rankYs=[1.5,1.5,3,4,5] mean 3 → dy=[-1.5,-1.5,0,1,2]
+    //   num=Σ(dx·dy)=3+0.75+0+1+4=8.75; Σdx²=9.5; Σdy²=9.5
+    //   r = 8.75/√(9.5·9.5) = 8.75/9.5 = 0.921053
+    const xs = [10, 20, 20, 30, 40];
+    const ys = [5, 5, 6, 7, 8];
+    const rankXs = [1, 2.5, 2.5, 4, 5];
+    const rankYs = [1.5, 1.5, 3, 4, 5];
+    const expected = pearsonCorrelation(rankXs, rankYs)!;
+    expect(spearmanCorrelation(xs, ys)!).toBeCloseTo(expected, 10);
+    expect(spearmanCorrelation(xs, ys)!).toBeCloseTo(0.921053, 5);
+  });
+
+  it("returns null on length mismatch, n < 3, and non-finite input", () => {
+    expect(spearmanCorrelation([1, 2, 3], [1, 2])).toBeNull();
+    expect(spearmanCorrelation([1, 2], [3, 4])).toBeNull();
+    expect(spearmanCorrelation([1, NaN, 3], [4, 5, 6])).toBeNull();
+  });
+
+  it("returns null for a constant series (zero rank variance)", () => {
+    expect(spearmanCorrelation([5, 5, 5, 5], [1, 2, 3, 4])).toBeNull();
   });
 });
 

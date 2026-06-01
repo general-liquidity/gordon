@@ -159,6 +159,62 @@ describe("walkForwardIc — cost-surviving fraction", () => {
   });
 });
 
+describe("walkForwardIc — purge/embargo", () => {
+  it("purgeBars trims each window's last bars (endIdx reflects the purge)", () => {
+    const { sig, ret } = makeSignal(300, () => 0.03);
+    const purgeBars = 5;
+    const base = walkForwardIc("base", sig, ret, { windowSize: 60, stepSize: 20 });
+    const purged = walkForwardIc("purged", sig, ret, {
+      windowSize: 60,
+      stepSize: 20,
+      purgeBars,
+    });
+    // First window: start 0, base end index 59, purged end index 59-5=54.
+    expect(base.windows[0]!.endIdx).toBe(59);
+    expect(purged.windows[0]!.endIdx).toBe(59 - purgeBars);
+    expect(purged.windows[0]!.startIdx).toBe(0);
+  });
+
+  it("embargoBars widens the stride between window starts", () => {
+    const { sig, ret } = makeSignal(300, () => 0.03);
+    const base = walkForwardIc("base", sig, ret, { windowSize: 60, stepSize: 20 });
+    const embargoed = walkForwardIc("embargoed", sig, ret, {
+      windowSize: 60,
+      stepSize: 20,
+      embargoBars: 10,
+    });
+    // Stride becomes 20 + 10 = 30; second window starts at 30 not 20.
+    expect(base.windows[1]!.startIdx).toBe(20);
+    expect(embargoed.windows[1]!.startIdx).toBe(30);
+  });
+
+  it("default (purge=0, embargo=0) is unchanged", () => {
+    const { sig, ret } = makeSignal(300, () => 0.03);
+    const a = walkForwardIc("a", sig, ret, { windowSize: 60, stepSize: 20 });
+    const b = walkForwardIc("b", sig, ret, {
+      windowSize: 60,
+      stepSize: 20,
+      purgeBars: 0,
+      embargoBars: 0,
+    });
+    expect(b.windows.length).toBe(a.windows.length);
+    expect(b.windows[0]!.endIdx).toBe(a.windows[0]!.endIdx);
+  });
+
+  it("rank-IC flows through via icOptions.method", () => {
+    const { sig, ret } = makeSignal(300, () => 0.03);
+    const result = walkForwardIc("rank", sig, ret, {
+      windowSize: 60,
+      stepSize: 20,
+      icOptions: { method: "spearman" },
+    });
+    expect(result.validWindowCount).toBeGreaterThanOrEqual(5);
+    // Per-window snapshots used spearman; sanity-check the result is well-formed.
+    expect(result.positiveFraction).toBeGreaterThanOrEqual(0);
+    expect(result.positiveFraction).toBeLessThanOrEqual(1);
+  });
+});
+
 describe("walkForwardIc — summary text", () => {
   it("summary includes verdict + window count + mean IC", () => {
     const { sig, ret } = makeSignal(300, () => 0.03);

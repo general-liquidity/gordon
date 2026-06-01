@@ -27,12 +27,20 @@
 
 import {
   pearsonCorrelation,
+  spearmanCorrelation,
   sampleStd,
   trendSlope,
   ci95HalfWidth,
   coefficientOfVariation,
   mean,
 } from "./helpers.ts";
+
+/**
+ * Correlation method backing the IC estimate. `pearson` (default) is the
+ * classic linear IC; `spearman` is rank-IC, robust to non-linear monotonic
+ * signal→return relationships and to outliers.
+ */
+export type IcMethod = "pearson" | "spearman";
 
 /**
  * Implied-edge breakdown from a measured IC + transaction-cost
@@ -101,11 +109,19 @@ export interface IcOptions {
    * edge surface, not a re-correlated IC.
    */
   transactionCostBps?: number;
+  /**
+   * Correlation method for the IC estimate. Default `pearson` (linear IC).
+   * Set `spearman` for rank-IC (robust to non-linear monotonic relationships
+   * and outliers). Affects both the point IC and the sub-window stability ICs.
+   */
+  method?: IcMethod;
 }
 
 export interface IcSnapshot {
   signalName: string;
-  /** Overall Pearson IC across all samples. Null when computation failed (constant signal, insufficient sample). */
+  /** Correlation method used for the IC estimate. */
+  method: IcMethod;
+  /** Overall IC across all samples (Pearson or Spearman per `method`). Null when computation failed (constant signal, insufficient sample). */
   ic: number | null;
   /** Sample size used. */
   sampleSize: number;
@@ -141,19 +157,23 @@ const DEFAULT_OPTIONS: Required<IcOptions> = {
   instabilityCvThreshold: 1.0,
   decaySlopeThreshold: -0.005,
   transactionCostBps: 0,
+  method: "pearson",
 };
 
 /**
- * Compute a point-estimate IC for a single signal — Pearson correlation
- * between signal values and matched-index forward returns. Returns null
- * for invalid input (lengths mismatch, constant series, insufficient n,
- * non-finite values).
+ * Compute a point-estimate IC for a single signal — correlation between
+ * signal values and matched-index forward returns. `method` selects Pearson
+ * (default, linear IC) or Spearman (rank-IC). Returns null for invalid input
+ * (lengths mismatch, constant series, insufficient n, non-finite values).
  */
 export function computeIc(
   signalValues: number[],
   forwardReturns: number[],
+  method: IcMethod = "pearson",
 ): number | null {
-  return pearsonCorrelation(signalValues, forwardReturns);
+  return method === "spearman"
+    ? spearmanCorrelation(signalValues, forwardReturns)
+    : pearsonCorrelation(signalValues, forwardReturns);
 }
 
 /**
@@ -203,6 +223,7 @@ export function trackIc(
   const opts = { ...DEFAULT_OPTIONS, ...options };
   const baseSnapshot = {
     signalName,
+    method: opts.method,
     ic: null,
     sampleSize: signalValues.length,
     subWindowsUsed: 0,
@@ -224,7 +245,7 @@ export function trackIc(
     };
   }
 
-  const overallIc = computeIc(signalValues, forwardReturns);
+  const overallIc = computeIc(signalValues, forwardReturns, opts.method);
   if (overallIc === null) {
     return {
       ...baseSnapshot,
@@ -237,7 +258,7 @@ export function trackIc(
   const slices = sliceSubWindows(signalValues, forwardReturns, opts.subWindowCount);
   const subIcs: number[] = [];
   for (const slice of slices) {
-    const ic = computeIc(slice.signal, slice.ret);
+    const ic = computeIc(slice.signal, slice.ret, opts.method);
     if (ic !== null) subIcs.push(ic);
   }
 
@@ -310,6 +331,7 @@ export function trackIc(
 
   return {
     signalName,
+    method: opts.method,
     ic: overallIc,
     sampleSize: signalValues.length,
     subWindowsUsed: subIcs.length,

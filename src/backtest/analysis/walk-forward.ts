@@ -43,6 +43,22 @@ export interface WalkForwardConfig {
   /** Backtest parameters */
   backtestParams?: Partial<BacktestParams>;
 
+  /**
+   * Purge bars (López de Prado): label horizon / forward-return lookahead.
+   * Drops the last `purgeBars` observations from each TRAIN window — the ones
+   * whose forward-return label overlaps the immediately-following test window,
+   * preventing label leakage from train into test. Default 0 (no purge).
+   */
+  purgeBars?: number;
+
+  /**
+   * Embargo bars (López de Prado): a gap of bars skipped immediately AFTER
+   * each test window before subsequent observations may be reused, blocking
+   * serial-correlation leakage from test back into the next train window.
+   * Default 0 (no embargo).
+   */
+  embargoBars?: number;
+
   /** Optional callback for progress updates */
   onProgress?: (progress: WalkForwardProgress) => void;
 }
@@ -54,6 +70,8 @@ export const DEFAULT_WALK_FORWARD_CONFIG: Omit<WalkForwardConfig, "parameterRang
   trainRatio: 0.7,
   numWindows: 3,
   optimizeFor: "sharpeRatio",
+  purgeBars: 0,
+  embargoBars: 0,
 };
 
 /**
@@ -262,6 +280,15 @@ export async function walkForwardTest(
     );
   }
 
+  const purgeBars = Math.max(0, Math.floor(fullConfig.purgeBars ?? 0));
+  const embargoBars = Math.max(0, Math.floor(fullConfig.embargoBars ?? 0));
+
+  if (purgeBars >= trainSize) {
+    throw new Error(
+      `purgeBars (${purgeBars}) must be smaller than the train window size (${trainSize}).`
+    );
+  }
+
   const windows: WalkForwardWindow[] = [];
   const warnings: string[] = [];
   const backtestParams = {
@@ -269,13 +296,24 @@ export async function walkForwardTest(
     ...fullConfig.backtestParams,
   };
 
-  // Process each walk-forward window
+  // Process each walk-forward window. Each window is shifted forward by a
+  // cumulative embargo offset so window i begins `embargoBars` after the
+  // previous test window ends (López de Prado embargo).
   for (let i = 0; i < fullConfig.numWindows; i++) {
-    const windowStart = i * windowSize;
+    const windowStart = i * windowSize + i * embargoBars;
     const trainStart = windowStart;
     const trainEnd = windowStart + trainSize;
     const testStart = trainEnd;
     const testEnd = Math.min(windowStart + windowSize, totalPoints);
+
+    // Purge: drop the last `purgeBars` observations from the train window —
+    // their forward-return labels overlap the test window.
+    const purgedTrainEnd = trainEnd - purgeBars;
+
+    if (testStart >= totalPoints || testEnd <= testStart) {
+      // Embargo offset pushed this window past the available data.
+      break;
+    }
 
     // Report progress
     if (fullConfig.onProgress) {
@@ -290,13 +328,15 @@ export async function walkForwardTest(
     logger.debug("Processing window", {
       window: String(i + 1),
       trainStart: String(trainStart),
-      trainEnd: String(trainEnd),
+      trainEnd: String(purgedTrainEnd),
+      purgeBars: String(purgeBars),
+      embargoBars: String(embargoBars),
       testStart: String(testStart),
       testEnd: String(testEnd),
     });
 
-    // Extract train and test data
-    const trainData = data.slice(trainStart, trainEnd);
+    // Extract train and test data (train is purged of the last `purgeBars`)
+    const trainData = data.slice(trainStart, purgedTrainEnd);
     const testData = data.slice(testStart, testEnd);
 
     // Optimize on training data

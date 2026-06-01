@@ -202,3 +202,60 @@ export type {
   HighestVolumeEverResult,
   HighestVolumeEverParams,
 } from "./highestVolumeEver.ts";
+
+// CCI (Commodity Channel Index)
+export { calculateCCI } from "./cci.ts";
+export type { CCIResult } from "./cci.ts";
+
+// Williams %R
+export { calculateWilliamsR } from "./williams-r.ts";
+export type { WilliamsRResult } from "./williams-r.ts";
+
+// Ultimate Oscillator
+export { calculateUltimateOscillator } from "./ultimate-oscillator.ts";
+export type { UltimateOscResult } from "./ultimate-oscillator.ts";
+
+// Aroon + Aroon Oscillator
+export { calculateAroon } from "./aroon.ts";
+export type { AroonResult } from "./aroon.ts";
+
+// ADXR (ADX Rating)
+export { calculateADXR } from "./adxr.ts";
+export type { ADXRResult } from "./adxr.ts";
+
+// NATR (Normalized ATR)
+export { calculateNATR } from "./natr.ts";
+export type { NATRResult } from "./natr.ts";
+
+// CMO (Chande Momentum Oscillator)
+export { calculateCMO } from "./cmo.ts";
+export type { CMOResult } from "./cmo.ts";
+
+// APO / PPO (Absolute / Percentage Price Oscillator)
+export { calculateAPO, calculatePPO } from "./price-oscillator.ts";
+export type { PriceOscResult } from "./price-oscillator.ts";
+
+// Chaikin A/D line + Chaikin Oscillator
+export { calculateChaikinAD, calculateChaikinOscillator } from "./chaikin.ts";
+export type { ChaikinADResult, ChaikinOscResult } from "./chaikin.ts";
+
+// Moving-average family: WMA / DEMA / TEMA / TRIMA
+export {
+  calculateWMA,
+  calculateDEMA,
+  calculateTEMA,
+  calculateTRIMA,
+} from "./moving-averages.ts";
+
+// Information-driven bars (volume / dollar / tick)
+export {
+  buildInformationBars,
+  buildInformationBarsFromOHLCV,
+} from "./information-bars.ts";
+export type {
+  Tick,
+  InformationBar,
+  InformationBarKind,
+  InformationBarsResult,
+  OHLCVInput,
+} from "./information-bars.ts";

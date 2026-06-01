@@ -26,6 +26,39 @@ describe("computeIc", () => {
   });
 });
 
+describe("computeIc — rank-IC (spearman)", () => {
+  it("rank-IC = 1 for a strictly monotonic non-linear pair where Pearson < 1", () => {
+    const signals = Array.from({ length: 40 }, (_, i) => i + 1);
+    const returns = signals.map((s) => s ** 3);
+    expect(computeIc(signals, returns, "spearman")!).toBeCloseTo(1, 10);
+    expect(computeIc(signals, returns, "pearson")!).toBeLessThan(1);
+  });
+
+  it("defaults to pearson when method omitted", () => {
+    const { signals, returns } = makePairs(50, (s) => s * 0.5);
+    expect(computeIc(signals, returns)).toBe(computeIc(signals, returns, "pearson"));
+  });
+});
+
+describe("trackIc — method option", () => {
+  it("reports method=pearson by default and tags the snapshot", () => {
+    const { signals, returns } = makePairs(60, (s) => s * 0.4 - 0.01);
+    const snap = trackIc("default-method", signals, returns);
+    expect(snap.method).toBe("pearson");
+  });
+
+  it("computes rank-IC when method=spearman is passed", () => {
+    // Monotonic non-linear: rank-IC should exceed linear IC in magnitude.
+    const signals = Array.from({ length: 60 }, (_, i) => Math.sin(i / 7));
+    const returns = signals.map((s) => Math.sign(s) * s * s); // monotone in s but curved
+    const pearson = trackIc("p", signals, returns, { method: "pearson" });
+    const spearman = trackIc("s", signals, returns, { method: "spearman" });
+    expect(spearman.method).toBe("spearman");
+    expect(spearman.ic).not.toBeNull();
+    expect(pearson.ic).not.toBeNull();
+  });
+});
+
 describe("trackIc — verdicts", () => {
   it("returns insufficient_data when sample size is too small", () => {
     const snap = trackIc("tiny-signal", [1, 2, 3, 4, 5], [1, 2, 3, 4, 5]);

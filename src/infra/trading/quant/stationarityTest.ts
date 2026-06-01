@@ -13,10 +13,15 @@
  *   H₀:         γ = 0  (series has a unit root → non-stationary)
  *   Reject H₀  when test stat is more negative than the critical value.
  *
- * Critical values are MacKinnon approximations for the "with constant"
- * variant. We do not include a deterministic trend term — most price
- * series Gordon touches don't have a deterministic linear trend, and
- * including one when there isn't one weakens the test.
+ * Critical values are MacKinnon approximations. Two deterministic
+ * specifications are supported via `regression`:
+ *   - 'c'  (default): constant, no trend. Most price series Gordon touches
+ *     don't have a deterministic linear trend, and including one when there
+ *     isn't one weakens the test — so this stays the default.
+ *   - 'ct': constant + deterministic linear time trend. Use when the series
+ *     has a clear secular drift you want to remove before testing the
+ *     stochastic part (e.g. a trending index level). The 'ct' regression
+ *     adds a β·t regressor and uses the more-negative 'ct' critical values.
  *
  * Use cases:
  *   - Before fitting any ARMA-family model to a series, run ADF on the
@@ -35,12 +40,19 @@ export function isStationarityTestEnabled(env: NodeJS.ProcessEnv = process.env):
   return env[STATIONARITY_TEST_FLAG_ENV] === "1" || env[STATIONARITY_TEST_FLAG_ENV] === "true";
 }
 
+export type AdfRegression = "c" | "ct";
+
 export interface AdfInput {
   series: ReadonlyArray<number>;
   /** Number of lagged-difference terms (sets autoregressive lag p). Default 1. */
   lagOrder?: number;
   /** Confidence level for the verdict. Default 0.05 (95% confidence). */
   alpha?: 0.01 | 0.05 | 0.1;
+  /**
+   * Deterministic specification: 'c' = constant only (default, backward
+   * compatible); 'ct' = constant + linear time trend.
+   */
+  regression?: AdfRegression;
 }
 
 export type AdfVerdict = "stationary" | "non_stationary" | "insufficient_data";
@@ -53,20 +65,30 @@ export interface AdfResult {
   approximatePValue: number;
   lagOrder: number;
   sampleSize: number;
+  regression: AdfRegression;
   reasoning: string;
 }
 
 const DEFAULT_LAG = 1;
 const DEFAULT_ALPHA = 0.05 as const;
+const DEFAULT_REGRESSION: AdfRegression = "c";
 
 /**
- * MacKinnon (1996) asymptotic critical values for the "with constant, no
- * trend" ADF specification. Sufficient accuracy for n ≥ 100.
+ * MacKinnon (1996) asymptotic critical values. Sufficient accuracy for
+ * n ≥ 100. 'c' = constant only; 'ct' = constant + linear trend (the trend
+ * regressor pushes the critical values more negative).
  */
-const CRITICAL_VALUES: Record<0.01 | 0.05 | 0.1, number> = {
-  0.01: -3.43,
-  0.05: -2.86,
-  0.1: -2.57,
+const CRITICAL_VALUES_BY_REGRESSION: Record<AdfRegression, Record<0.01 | 0.05 | 0.1, number>> = {
+  c: {
+    0.01: -3.43,
+    0.05: -2.86,
+    0.1: -2.57,
+  },
+  ct: {
+    0.01: -3.96,
+    0.05: -3.41,
+    0.1: -3.12,
+  },
 };
 
 /**
@@ -74,19 +96,19 @@ const CRITICAL_VALUES: Record<0.01 | 0.05 | 0.1, number> = {
  * lattice. Out-of-table stats clamp to {0.01, 0.99}; this is an
  * approximation, not a calibrated p-value.
  */
-function approximatePValue(testStat: number): number {
-  if (testStat <= CRITICAL_VALUES[0.01]) return 0.01;
-  if (testStat <= CRITICAL_VALUES[0.05]) {
-    const span = CRITICAL_VALUES[0.05] - CRITICAL_VALUES[0.01];
-    const frac = (testStat - CRITICAL_VALUES[0.01]) / span;
+function approximatePValue(testStat: number, table: Record<0.01 | 0.05 | 0.1, number>): number {
+  if (testStat <= table[0.01]) return 0.01;
+  if (testStat <= table[0.05]) {
+    const span = table[0.05] - table[0.01];
+    const frac = (testStat - table[0.01]) / span;
     return 0.01 + frac * (0.05 - 0.01);
   }
-  if (testStat <= CRITICAL_VALUES[0.1]) {
-    const span = CRITICAL_VALUES[0.1] - CRITICAL_VALUES[0.05];
-    const frac = (testStat - CRITICAL_VALUES[0.05]) / span;
+  if (testStat <= table[0.1]) {
+    const span = table[0.1] - table[0.05];
+    const frac = (testStat - table[0.05]) / span;
     return 0.05 + frac * (0.1 - 0.05);
   }
-  return 0.5 + 0.49 * Math.min(1, Math.max(0, (testStat - CRITICAL_VALUES[0.1]) / Math.max(0.5, Math.abs(CRITICAL_VALUES[0.1]))));
+  return 0.5 + 0.49 * Math.min(1, Math.max(0, (testStat - table[0.1]) / Math.max(0.5, Math.abs(table[0.1]))));
 }
 
 interface OlsResult {
@@ -168,18 +190,21 @@ function invertSymmetric(a: number[][]): number[][] | null {
 export function runAdfTest(input: AdfInput): AdfResult {
   const lag = Math.max(1, input.lagOrder ?? DEFAULT_LAG);
   const alpha = input.alpha ?? DEFAULT_ALPHA;
+  const regression = input.regression ?? DEFAULT_REGRESSION;
+  const criticalTable = CRITICAL_VALUES_BY_REGRESSION[regression];
   const y = Array.from(input.series);
   const n = y.length;
 
-  const minRequired = lag + 4;
+  const minRequired = lag + (regression === "ct" ? 5 : 4);
   if (n < minRequired) {
     return {
       verdict: "insufficient_data",
       testStatistic: Number.NaN,
-      criticalValue: CRITICAL_VALUES[alpha],
+      criticalValue: criticalTable[alpha],
       approximatePValue: Number.NaN,
       lagOrder: lag,
       sampleSize: n,
+      regression,
       reasoning: `need at least ${minRequired} observations, got ${n}`,
     };
   }
@@ -188,7 +213,9 @@ export function runAdfTest(input: AdfInput): AdfResult {
   const dy: number[] = new Array(n - 1);
   for (let i = 1; i < n; i++) dy[i - 1] = y[i]! - y[i - 1]!;
 
-  // Build regressor matrix: [1, y_{t-1}, Δy_{t-1}, ..., Δy_{t-lag}]
+  // Build regressor matrix: [1, y_{t-1}, Δy_{t-1}, ..., Δy_{t-lag}, (t)]
+  // The trend column (regression='ct') is appended LAST so the coefficient
+  // on y_{t-1} stays at index 1 — the ADF stat extraction is unchanged.
   // Response: Δy_t starting at index `lag` of dy (so we have `lag` prior differences).
   const startIdx = lag; // Index into dy.
   const Xrows: number[][] = [];
@@ -198,6 +225,7 @@ export function runAdfTest(input: AdfInput): AdfResult {
     const yLag = y[t]!;
     const row: number[] = [1, yLag];
     for (let k = 1; k <= lag; k++) row.push(dy[t - k]!);
+    if (regression === "ct") row.push(t); // deterministic linear trend
     Xrows.push(row);
     yhat.push(dy[t]!);
   }
@@ -207,10 +235,11 @@ export function runAdfTest(input: AdfInput): AdfResult {
     return {
       verdict: "insufficient_data",
       testStatistic: Number.NaN,
-      criticalValue: CRITICAL_VALUES[alpha],
+      criticalValue: criticalTable[alpha],
       approximatePValue: Number.NaN,
       lagOrder: lag,
       sampleSize: n,
+      regression,
       reasoning: "regressor matrix singular — series is degenerate (constant or near-constant)",
     };
   }
@@ -219,8 +248,8 @@ export function runAdfTest(input: AdfInput): AdfResult {
   const gammaHat = fit.beta[1]!;
   const gammaSe = fit.se[1]!;
   const testStat = gammaSe > 0 ? gammaHat / gammaSe : Number.NaN;
-  const criticalValue = CRITICAL_VALUES[alpha];
-  const approxP = Number.isFinite(testStat) ? approximatePValue(testStat) : Number.NaN;
+  const criticalValue = criticalTable[alpha];
+  const approxP = Number.isFinite(testStat) ? approximatePValue(testStat, criticalTable) : Number.NaN;
 
   let verdict: AdfVerdict;
   let reasoning: string;
@@ -242,6 +271,7 @@ export function runAdfTest(input: AdfInput): AdfResult {
     approximatePValue: approxP,
     lagOrder: lag,
     sampleSize: n,
+    regression,
     reasoning,
   };
 }

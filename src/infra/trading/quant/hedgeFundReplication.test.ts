@@ -104,6 +104,71 @@ describe("computeHedgeFundReplication — recovery", () => {
   });
 });
 
+describe("computeHedgeFundReplication — factor inference (MATH-ANCHOR)", () => {
+  it("dominant factor has a large t-stat; irrelevant factor small + insignificant", () => {
+    // target ≈ 2·f1 + tiny noise; f2 is unrelated. scipy reference on the
+    // same construction: t(f1)≈307, t(f2)≈-0.98, p(f2)≈0.33.
+    const T = 40;
+    let s1 = 7;
+    let s2 = 991;
+    const gauss = (seed: () => number) => {
+      // Box-Muller from two uniforms.
+      const u1 = Math.max(seed(), 1e-12);
+      const u2 = seed();
+      return Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+    };
+    const r1 = () => {
+      s1 = (s1 * 1664525 + 1013904223) >>> 0;
+      return s1 / 0x100000000;
+    };
+    const r2 = () => {
+      s2 = (s2 * 22695477 + 1) >>> 0;
+      return s2 / 0x100000000;
+    };
+    const f1 = Array.from({ length: T }, () => gauss(r1));
+    const f2 = Array.from({ length: T }, () => gauss(r2));
+    const noise = Array.from({ length: T }, () => gauss(r1) * 0.02);
+    const target = f1.map((v, i) => 2 * v + noise[i]!);
+
+    const r = computeHedgeFundReplication({
+      targetReturns: target,
+      factors: [
+        { id: "F1", returns: f1 },
+        { id: "F2", returns: f2 },
+      ],
+    });
+
+    const byId = Object.fromEntries(r.weights.map((w) => [w.id, w]));
+    expect(r.degreesOfFreedom).toBe(T - 2);
+    // Dominant factor: loading ~2, huge t, p ~ 0.
+    expect(byId.F1!.weight).toBeCloseTo(2, 1);
+    expect(Math.abs(byId.F1!.tStat!)).toBeGreaterThan(20);
+    expect(byId.F1!.pValue!).toBeLessThan(0.001);
+    // Irrelevant factor: small t, not significant.
+    expect(Math.abs(byId.F2!.tStat!)).toBeLessThan(3);
+    expect(byId.F2!.pValue!).toBeGreaterThan(0.05);
+    // Interpretation flags F1 but not F2.
+    expect(r.interpretation).toContain("F1");
+    expect(r.interpretation).not.toContain("F2");
+  });
+
+  it("inference fields are null when df is insufficient", () => {
+    const r = computeHedgeFundReplication({
+      targetReturns: [0.01, 0.02],
+      factors: [
+        { id: "A", returns: [0.01, 0.02] },
+        { id: "B", returns: [0.005, 0.01] },
+      ],
+    });
+    expect(r.degreesOfFreedom).toBeNull();
+    for (const w of r.weights) {
+      expect(w.stdError).toBeNull();
+      expect(w.tStat).toBeNull();
+      expect(w.pValue).toBeNull();
+    }
+  });
+});
+
 describe("replicationToPayload", () => {
   it("emits a stable shape", () => {
     // Independent factor B so the OLS system is not singular.

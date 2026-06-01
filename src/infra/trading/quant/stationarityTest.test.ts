@@ -109,6 +109,44 @@ describe("runAdfTest — lag-order sensitivity", () => {
   });
 });
 
+describe("runAdfTest — regression option ('c' vs 'ct')", () => {
+  it("defaults to constant-only ('c') — backward compatible", () => {
+    const series = whiteNoise(200, 5);
+    const r = runAdfTest({ series });
+    expect(r.regression).toBe("c");
+    expect(r.criticalValue).toBe(-2.86); // 'c' at α=0.05
+  });
+
+  it("MATH-ANCHOR: 'ct' uses the more-negative trend critical values", () => {
+    const series = whiteNoise(200, 5);
+    const r = runAdfTest({ series, regression: "ct" });
+    expect(r.regression).toBe("ct");
+    expect(r.criticalValue).toBe(-3.41); // 'ct' at α=0.05
+  });
+
+  it("'ct': trend-stationary series (deterministic drift + stationary noise) → stationary", () => {
+    // Linear trend plus tight white noise. Under 'ct' the trend regressor
+    // absorbs the drift and the stochastic part is stationary.
+    const noise = whiteNoise(300, 29, 0.5);
+    const series = noise.map((e, i) => 0.2 * i + e);
+    const r = runAdfTest({ series, regression: "ct" });
+    expect(r.verdict).toBe("stationary");
+    expect(r.testStatistic).toBeLessThan(r.criticalValue);
+  });
+
+  it("'ct': random walk with drift stays non-stationary", () => {
+    const series = randomWalk(300, 41, 0.1);
+    const r = runAdfTest({ series, regression: "ct" });
+    expect(r.verdict).toBe("non_stationary");
+  });
+
+  it("'ct' requires one more observation than 'c' (extra trend regressor)", () => {
+    // lag default 1 → 'ct' minRequired = 1 + 5 = 6.
+    const r = runAdfTest({ series: [1, 2, 3, 4, 5], regression: "ct" });
+    expect(r.verdict).toBe("insufficient_data");
+  });
+});
+
 describe("adfToPayload", () => {
   it("emits stable shape", () => {
     const series = whiteNoise(200, 5);

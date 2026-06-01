@@ -48,6 +48,50 @@ export function pearsonCorrelation(xs: number[], ys: number[]): number | null {
 }
 
 /**
+ * Average ranks of `values` (1-based), assigning the mean rank to ties.
+ * e.g. [10, 20, 20, 30] → [1, 2.5, 2.5, 4].
+ */
+function averageRanks(values: number[]): number[] {
+  const n = values.length;
+  const indexed = values.map((v, i) => ({ v, i }));
+  indexed.sort((a, b) => a.v - b.v);
+
+  const ranks = new Array<number>(n);
+  let i = 0;
+  while (i < n) {
+    let j = i;
+    while (j + 1 < n && indexed[j + 1]!.v === indexed[i]!.v) {
+      j += 1;
+    }
+    // Tied block spans indexed[i..j]; average of 1-based ranks (i+1)..(j+1).
+    const avgRank = (i + 1 + (j + 1)) / 2;
+    for (let k = i; k <= j; k++) {
+      ranks[indexed[k]!.i] = avgRank;
+    }
+    i = j + 1;
+  }
+  return ranks;
+}
+
+/**
+ * Spearman rank correlation coefficient — Pearson correlation computed on
+ * the average-rank transform of both series. Captures monotonic (including
+ * non-linear monotonic) association where Pearson would understate it.
+ *
+ * Returns null under the same conditions as `pearsonCorrelation` (length
+ * mismatch, n < 3, constant series after ranking, non-finite input).
+ */
+export function spearmanCorrelation(xs: number[], ys: number[]): number | null {
+  if (xs.length !== ys.length) return null;
+  const n = xs.length;
+  if (n < 3) return null;
+  for (let i = 0; i < n; i++) {
+    if (!Number.isFinite(xs[i]!) || !Number.isFinite(ys[i]!)) return null;
+  }
+  return pearsonCorrelation(averageRanks(xs), averageRanks(ys));
+}
+
+/**
  * Sample standard deviation (Bessel-corrected, divisor n-1).
  * Returns 0 for arrays of length < 2.
  */

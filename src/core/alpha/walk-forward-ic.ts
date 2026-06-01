@@ -62,7 +62,20 @@ export interface WalkForwardIcOptions {
   windowSize?: number;
   /** Step size between window starts. Default = windowSize / 4 (75% overlap). */
   stepSize?: number;
-  /** IC-tracker options to pass to each window (excluding minSampleSize, which is enforced per-window). */
+  /**
+   * Purge bars (López de Prado): label horizon / forward-return lookahead.
+   * Drops the last `purgeBars` observations from EACH window before computing
+   * its IC — those observations' forward-return labels extend past the window
+   * edge and overlap subsequent (overlapping) windows. Default 0 (no purge).
+   */
+  purgeBars?: number;
+  /**
+   * Embargo bars (López de Prado): additional gap added between consecutive
+   * window starts (on top of `stepSize`) to skip serially-correlated bars
+   * shared by overlapping windows. Default 0 (no embargo).
+   */
+  embargoBars?: number;
+  /** IC-tracker options to pass to each window (excluding minSampleSize, which is enforced per-window). Set `icOptions.method = "spearman"` for rank-IC. */
   icOptions?: Omit<IcOptions, "minSampleSize">;
   /** Minimum samples required per window. Default 30. */
   minSampleSize?: number;
@@ -116,6 +129,8 @@ export interface WalkForwardIcResult {
 const DEFAULT_OPTIONS: Required<Omit<WalkForwardIcOptions, "icOptions">> = {
   windowSize: 60,
   stepSize: 15, // 1/4 of windowSize
+  purgeBars: 0,
+  embargoBars: 0,
   minSampleSize: 30,
   instabilityStdThreshold: 0.2,
   fragilityStdThreshold: 0.1,
@@ -197,12 +212,19 @@ export function walkForwardIc(
   const validIcs: number[] = [];
   const validNetEdgesBps: number[] = [];
 
+  const purgeBars = Math.max(0, Math.floor(opts.purgeBars));
+  const embargoBars = Math.max(0, Math.floor(opts.embargoBars));
+  const stride = opts.stepSize + embargoBars;
+
   let windowIndex = 0;
-  for (let start = 0; start + opts.windowSize <= n; start += opts.stepSize) {
+  for (let start = 0; start + opts.windowSize <= n; start += stride) {
     const end = start + opts.windowSize;
-    const winSignal = signalValues.slice(start, end);
-    const winReturn = forwardReturns.slice(start, end);
-    const snap = trackIc(`${signalName}@${start}-${end}`, winSignal, winReturn, {
+    // Purge: drop the last `purgeBars` observations of the window — their
+    // forward-return labels extend past the window edge.
+    const purgedEnd = end - purgeBars;
+    const winSignal = signalValues.slice(start, purgedEnd);
+    const winReturn = forwardReturns.slice(start, purgedEnd);
+    const snap = trackIc(`${signalName}@${start}-${purgedEnd}`, winSignal, winReturn, {
       ...icOpts,
       minSampleSize: opts.minSampleSize,
     });
@@ -210,7 +232,7 @@ export function walkForwardIc(
     windows.push({
       windowIndex,
       startIdx: start,
-      endIdx: end - 1,
+      endIdx: purgedEnd - 1,
       ic,
       verdict: snap.verdict,
     });

@@ -1,5 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { linearRegression, rollingLinearRegression } from "./linearRegression.ts";
+import {
+  linearRegression,
+  rollingLinearRegression,
+  studentTTwoSidedPValue,
+} from "./linearRegression.ts";
 
 describe("linearRegression — single fit", () => {
   test("perfect line recovers slope + intercept exactly", () => {
@@ -124,5 +128,87 @@ describe("rollingLinearRegression", () => {
     // Bar 6's window is [5, 6, 7] — clean, should have a fit.
     expect(r.slopes[3]).toBeNull();
     expect(r.slopes[6]).not.toBeNull();
+  });
+});
+
+describe("linearRegression inference (MATH-ANCHOR vs numpy/scipy)", () => {
+  // y = [1,3,2,5,4] over x = [0,1,2,3,4]. numpy/scipy reference:
+  //   intercept=1.4, slope=0.8
+  //   slopeSE=0.34641016, interceptSE=0.84852814
+  //   slope t=2.30940108, p=0.10408804
+  //   intercept t=1.64991582, p=0.19752339
+  //   residual stderr=1.0954451, R²=0.64
+  //   Durbin-Watson=3.54444, lag-1 autocorr=-0.84444
+  const r = linearRegression([1, 3, 2, 5, 4]);
+
+  test("existing fields stay backward-compatible", () => {
+    expect(r.slope).toBeCloseTo(0.8, 6);
+    expect(r.intercept).toBeCloseTo(1.4, 6);
+    expect(r.rSquared).toBeCloseTo(0.64, 6);
+    expect(r.standardError).toBeCloseTo(1.0954451, 5);
+    expect(r.n).toBe(5);
+  });
+
+  test("coefficient standard errors match reference", () => {
+    expect(r.slopeStdError).toBeCloseTo(0.34641016, 5);
+    expect(r.interceptStdError).toBeCloseTo(0.84852814, 5);
+  });
+
+  test("t-statistics + df match reference", () => {
+    expect(r.slopeTStat).toBeCloseTo(2.30940108, 4);
+    expect(r.interceptTStat).toBeCloseTo(1.64991582, 4);
+    expect(r.degreesOfFreedom).toBe(3);
+  });
+
+  test("two-sided p-values match reference", () => {
+    expect(r.slopePValue).toBeCloseTo(0.10408804, 4);
+    expect(r.interceptPValue).toBeCloseTo(0.19752339, 4);
+  });
+
+  test("Durbin-Watson + lag-1 autocorrelation match reference", () => {
+    expect(r.durbinWatson).toBeCloseTo(3.5444, 3);
+    expect(r.residualAutocorrelation).toBeCloseTo(-0.8444, 3);
+  });
+
+  test("interpretation flags non-significant slope + autocorrelation", () => {
+    expect(r.interpretation).toContain("NOT significant");
+    expect(r.interpretation).toContain("autocorrelation");
+  });
+});
+
+describe("linearRegression inference — significant slope case", () => {
+  test("near-linear trend flags slope significant, no strong autocorrelation", () => {
+    const r = linearRegression([1.0, 2.1, 2.9, 4.05, 5.0, 6.02, 6.98, 8.1]);
+    expect(r.slopeTStat).not.toBeNull();
+    expect(Math.abs(r.slopeTStat!)).toBeGreaterThan(20);
+    expect(r.slopePValue!).toBeLessThan(0.001);
+    expect(r.interpretation).toContain("slope significant");
+    expect(r.interpretation).not.toContain("NOT significant");
+  });
+});
+
+describe("linearRegression null-on-insufficient-df", () => {
+  test("n=2 collapses inference + diagnostics to null", () => {
+    const r = linearRegression([1, 2]);
+    expect(r.slopeStdError).toBeNull();
+    expect(r.slopeTStat).toBeNull();
+    expect(r.slopePValue).toBeNull();
+    expect(r.degreesOfFreedom).toBeNull();
+    expect(r.durbinWatson).toBeNull();
+    expect(r.residualAutocorrelation).toBeNull();
+    expect(r.interpretation).toContain("undetermined");
+  });
+});
+
+describe("studentTTwoSidedPValue (MATH-ANCHOR vs scipy)", () => {
+  test("matches scipy reference points", () => {
+    expect(studentTTwoSidedPValue(2.0, 10)).toBeCloseTo(0.07338803, 5);
+    expect(studentTTwoSidedPValue(0, 5)).toBeCloseTo(1.0, 6);
+    expect(studentTTwoSidedPValue(10, 20)!).toBeCloseTo(3.1637817e-9, 12);
+  });
+
+  test("returns null on invalid df / non-finite t", () => {
+    expect(studentTTwoSidedPValue(2, 0)).toBeNull();
+    expect(studentTTwoSidedPValue(NaN, 5)).toBeNull();
   });
 });

@@ -11,6 +11,7 @@ function snap(
   return {
     signalName: name,
     ic,
+    method: "pearson",
     sampleSize: 100,
     subWindowsUsed: 5,
     subWindowMeanIc: ic,
