@@ -3,6 +3,7 @@ import {
   stateConditionalReturns,
   defaultDiscreteActions,
   regimePolicyIteration,
+  runRegimeAllocationPolicy,
 } from "./regime-policy.ts";
 
 describe("stateConditionalReturns", () => {
@@ -131,5 +132,52 @@ describe("regimePolicyIteration", () => {
     const r = regimePolicyIteration({ transitions: [], actions: [], expectedReturns: [] });
     expect(r.policy).toEqual([]);
     expect(r.converged).toBe(true);
+  });
+});
+
+describe("runRegimeAllocationPolicy (full pipeline)", () => {
+  // Two clean regimes: a calm/positive segment then a stressed/negative one.
+  // asset 0 (risky) tracks the driver; asset 1 (safe) is flat-positive and
+  // wins in the stressed regime.
+  function buildReturns(): number[][] {
+    const driver: number[] = [];
+    const risky: number[] = [];
+    const safe: number[] = [];
+    for (let i = 0; i < 80; i++) {
+      // calm regime: small positive, low vol
+      const d = 0.010 + (i % 2 === 0 ? 0.002 : -0.002);
+      driver.push(d);
+      risky.push(d);
+      safe.push(0.001 + (i % 2 === 0 ? 0.0005 : -0.0005));
+    }
+    for (let i = 0; i < 80; i++) {
+      // stressed regime: negative mean, high vol
+      const d = -0.020 + (i % 2 === 0 ? 0.030 : -0.030);
+      driver.push(d);
+      risky.push(d);
+      safe.push(0.004 + (i % 2 === 0 ? 0.001 : -0.001)); // safe haven: positive in stress
+    }
+    return [risky, safe];
+  }
+
+  test("fits regimes and assigns different allocations across regimes", () => {
+    const r = runRegimeAllocationPolicy({
+      returns: buildReturns(),
+      driverIndex: 0,
+      nStates: 2,
+      seed: 7,
+      assetNames: ["RISKY", "SAFE"],
+    });
+    expect(r.policy.converged).toBe(true);
+    expect(r.transitions.length).toBe(2);
+    expect(r.stateConditionalReturns.length).toBe(2);
+    expect(r.regimeCounts.reduce((s, c) => s + c, 0)).toBe(160);
+    // Each regime's policy is a valid simplex weight vector.
+    for (const w of r.policy.policyWeights) {
+      expect(w.reduce((s, x) => s + x, 0)).toBeCloseTo(1, 6);
+    }
+    // The two regimes should not get the identical allocation — the safe asset
+    // dominates the stressed regime, the risky asset the calm one.
+    expect(r.policy.policy[0]).not.toBe(r.policy.policy[1]);
   });
 });

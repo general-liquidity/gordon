@@ -32,6 +32,8 @@
  * Pure functions.
  */
 
+import { fitHmmRegime } from "./hmmRegime.ts";
+
 // ---------------------------------------------------------------------------
 // State-conditional returns (the paper's Table 3 builder)
 // ---------------------------------------------------------------------------
@@ -297,6 +299,95 @@ export function regimePolicyIteration(input: RegimeMdpInput): RegimeMdpResult {
     qValues: qValues.map((row) => row.map((q) => parseFloat(q.toFixed(8)))),
     iterations,
     converged,
+    summary,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// One-shot pipeline: fit HMM → state-conditional returns → policy iteration
+// ---------------------------------------------------------------------------
+
+export interface RegimeAllocationInput {
+  /** Per-asset return series, returns[asset][t], all aligned to the same length. */
+  returns: number[][];
+  /** Which asset's series drives the HMM regime fit (the "market proxy"). Default 0. */
+  driverIndex?: number;
+  /** Number of HMM regimes. Default 3. */
+  nStates?: number;
+  /** Discrete actions (weight vectors over nAssets). Default single-asset + equal-weight. */
+  actions?: number[][];
+  rewardModel?: RewardModel;
+  discount?: number;
+  /** HMM fit controls (passed to fitHmmRegime). */
+  nRestarts?: number;
+  seed?: number;
+  /** Optional asset names for the summary. */
+  assetNames?: string[];
+}
+
+export interface RegimeAllocationResult {
+  policy: RegimeMdpResult;
+  /** HMM regime labels (bear/sideways/bull for 3 states). */
+  stateLabels: string[];
+  /** Regime transition matrix from the HMM fit. */
+  transitions: number[][];
+  /** Per-regime per-asset expected returns (the paper's Table 3). */
+  stateConditionalReturns: number[][];
+  /** Observation count assigned to each regime. */
+  regimeCounts: number[];
+  summary: string;
+}
+
+/**
+ * The full paper pipeline: fit a Gaussian HMM on the driver return series to
+ * get the regime transition matrix + Viterbi path, group every asset's returns
+ * by regime (Table 3), then solve the regime→allocation MDP. Returns π* plus
+ * the intermediate regime structure for transparency.
+ */
+export function runRegimeAllocationPolicy(input: RegimeAllocationInput): RegimeAllocationResult {
+  const returns = input.returns;
+  const nAssets = returns.length;
+  const nStates = input.nStates ?? 3;
+  const driverIndex = input.driverIndex ?? 0;
+  const driver = returns[driverIndex] ?? [];
+
+  const hmm = fitHmmRegime({
+    observations: driver,
+    nStates,
+    ...(input.nRestarts !== undefined && { nRestarts: input.nRestarts }),
+    ...(input.seed !== undefined && { seed: input.seed }),
+  });
+
+  const scr = stateConditionalReturns(hmm.stateSequence, returns, nStates);
+  const actions = input.actions ?? defaultDiscreteActions(nAssets);
+
+  const policy = regimePolicyIteration({
+    transitions: hmm.transitions,
+    actions,
+    expectedReturns: scr.meanReturns,
+    ...(input.rewardModel !== undefined && { rewardModel: input.rewardModel }),
+    ...(input.discount !== undefined && { discount: input.discount }),
+  });
+
+  const names = input.assetNames;
+  const describe = (w: number[]): string => {
+    if (!names) return `[${w.map((x) => x.toFixed(2)).join(",")}]`;
+    const top = w.reduce((bi, x, i) => (x > w[bi]! ? i : bi), 0);
+    return names[top] ?? `asset${top}`;
+  };
+  const summary =
+    `Regime allocation over ${nAssets} assets, ${nStates} HMM regimes: ` +
+    policy.policy
+      .map((a, s) => `${hmm.stateLabels[s] ?? `S${s}`}→${describe(actions[a]!)}`)
+      .join("  ") +
+    `.`;
+
+  return {
+    policy,
+    stateLabels: hmm.stateLabels,
+    transitions: hmm.transitions,
+    stateConditionalReturns: scr.meanReturns,
+    regimeCounts: scr.counts,
     summary,
   };
 }

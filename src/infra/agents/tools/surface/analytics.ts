@@ -59,6 +59,7 @@ import {
 } from "../../../../core/indicators/index.ts";
 import { conditionalDistributionTest } from "../../../../core/alpha/conditional-distribution-test.ts";
 import { runPortfolioEnsemble } from "../../../../core/alpha/pc-method-ensemble.ts";
+import { runRegimeAllocationPolicy } from "../../../../core/alpha/regime-policy.ts";
 import { RegimeDetector } from "../../../../core/regime/index.ts";
 import { checkRiskTool as implCheckRisk } from "../trading/risk-gate.ts";
 import { recordSymbolObservation } from "../../observation/symbolObservationTracker.ts";
@@ -252,6 +253,45 @@ async function maybeAutoCollect(
       series: aligned,
       ...(typeof params.tailWindow === "number" && { tailWindow: params.tailWindow }),
       ...(typeof params.baselineWindow === "number" && { baselineWindow: params.baselineWindow }),
+    };
+  }
+
+  if (operation === "regime_policy") {
+    if (Array.isArray(params.returns)) return params;
+    const symbols = Array.isArray(params.symbols)
+      ? (params.symbols.filter((s) => typeof s === "string") as string[])
+      : null;
+    if (!symbols || symbols.length < 2) return params;
+    if (!exchange) return { error: "auto-collect regime_policy: no exchange connected" };
+    const timeframe = (typeof params.timeframe === "string" ? params.timeframe : "1d") as string;
+    const lookbackBars = typeof params.lookbackBars === "number" ? params.lookbackBars : 400;
+    const seriesEntries = await Promise.all(
+      symbols.map(async (symbol) => {
+        const candles = await exchange.getCandles(symbol, timeframe, lookbackBars);
+        const closes = candles.map((c) => c.close);
+        const returns: number[] = [];
+        for (let i = 1; i < closes.length; i++) {
+          const prev = closes[i - 1]!;
+          const curr = closes[i]!;
+          if (prev > 0 && curr > 0) returns.push(Math.log(curr / prev));
+        }
+        return { symbol, returns };
+      }),
+    );
+    const minLen = Math.min(...seriesEntries.map((s) => s.returns.length));
+    if (minLen < 60) {
+      return { error: `auto-collect regime_policy: only ${minLen} aligned returns — need ≥ 60 for a stable HMM fit` };
+    }
+    // Align to common tail length; returns[asset][t].
+    const aligned = seriesEntries.map((s) => s.returns.slice(s.returns.length - minLen));
+    return {
+      returns: aligned,
+      assetNames: symbols,
+      ...(typeof params.driverIndex === "number" && { driverIndex: params.driverIndex }),
+      ...(typeof params.nStates === "number" && { nStates: params.nStates }),
+      ...(typeof params.discount === "number" && { discount: params.discount }),
+      ...(typeof params.rewardModel === "string" && { rewardModel: params.rewardModel }),
+      ...(typeof params.seed === "number" && { seed: params.seed }),
     };
   }
 
@@ -864,6 +904,7 @@ const MICROSTRUCTURE_OPS = [
   "ruin_probability",
   "signal_informativeness",
   "portfolio_ensemble",
+  "regime_policy",
 ] as const;
 
 export const computeMicrostructureTool = createTool({
@@ -996,6 +1037,14 @@ export const computeMicrostructureTool = createTool({
     "                              risk-parity/ERC, max-diversification) + adversarial diversifier (most orthogonal to consensus",
     "                              under a Sharpe floor) + CIO combine (average / inverse_tracking_error / trimmed_mean). Read-only",
     "                              proposal — does NOT allocate capital. Complements optimize_portfolio (return-optimized family).",
+    "    - 'regime_policy'       — direct: { returns: number[][], driverIndex?, nStates?, actions?, rewardModel?, discount? }",
+    "                              shortcut: { symbols: string[], timeframe?, lookbackBars?, driverIndex?, nStates?, discount? }",
+    "                              Regime→allocation policy (HMM-RL paper): fits a Gaussian HMM on the driver asset's",
+    "                              returns, groups every asset's returns by regime, then solves the MDP (state=regime,",
+    "                              actions=discrete weight vectors, dynamics=HMM transitions, rewards=state-conditional",
+    "                              returns) by policy iteration → π*, an interpretable regime→weights lookup. Shortcut",
+    "                              fetches aligned log-returns for the symbols (driverIndex picks the market-proxy, default 0).",
+    "                              Returns the policy + regime labels + transition matrix + state-conditional returns.",
     "",
     "IMPORTANT: discipline_audit and adherence_report respect startTime+endTime",
     "ISO strings. When the operator asks for 'last 24h' or 'today', YOU must",
@@ -1055,6 +1104,10 @@ export const computeMicrostructureTool = createTool({
       portfolio_ensemble: {
         execute: async (p: Record<string, unknown>) =>
           runPortfolioEnsemble(p as unknown as Parameters<typeof runPortfolioEnsemble>[0]),
+      },
+      regime_policy: {
+        execute: async (p: Record<string, unknown>) =>
+          runRegimeAllocationPolicy(p as unknown as Parameters<typeof runRegimeAllocationPolicy>[0]),
       },
     };
     try {
