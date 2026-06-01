@@ -14,6 +14,8 @@ const logger = createModuleLogger("sec-filings");
 
 const EFTS_BASE = "https://efts.sec.gov/LATEST";
 const SEC_ARCHIVES = "https://www.sec.gov/Archives/edgar/data";
+const SUBMISSIONS_BASE = "https://data.sec.gov/submissions";
+const COMPANY_TICKERS_URL = "https://www.sec.gov/files/company_tickers.json";
 const USER_AGENT = "Gordon-CLI/0.8 (trading terminal; contact@gordon-cli.dev)";
 
 // Rate-limiting: track last request time, enforce 100ms minimum gap
@@ -21,6 +23,9 @@ let lastRequestTime = 0;
 
 const searchCache = new Cache<Filing[]>({ defaultTtl: 5 * 60 * 1000 });
 const filingCache = new Cache<FilingDetail>({ defaultTtl: 10 * 60 * 1000 });
+const documentCache = new Cache<FilingDocument>({ defaultTtl: 30 * 60 * 1000 });
+// ticker (upper) -> 10-digit zero-padded CIK; loaded once per process.
+let tickerCikMap: Map<string, string> | null = null;
 
 // ============================================================================
 // Types
@@ -39,6 +44,34 @@ export interface Filing {
 export interface FilingDetail extends Filing {
   /** First 5000 characters of the filing full text (for LLM context) */
   fullText: string;
+}
+
+/** A resolved primary filing document with its full plain-text body. */
+export interface FilingDocument {
+  ticker: string;
+  cik: string;
+  form: string;
+  accessionNumber: string;
+  filingDate: string;
+  primaryDocument: string;
+  url: string;
+  /** Full plain-text body of the primary document (entities decoded, tags stripped). */
+  text: string;
+}
+
+/** Subset of the EDGAR submissions `filings.recent` arrays we read. */
+export interface RecentFilings {
+  form?: string[];
+  accessionNumber?: string[];
+  primaryDocument?: string[];
+  filingDate?: string[];
+}
+
+export interface FilingRef {
+  accessionNumber: string;
+  primaryDocument: string;
+  filingDate: string;
+  form: string;
 }
 
 /** Raw EFTS search hit shape */
@@ -68,7 +101,7 @@ interface EFTSResponse {
 // Internal helpers
 // ============================================================================
 
-async function rateLimitedFetch(url: string): Promise<Response> {
+async function rateLimitedFetch(url: string, accept = "application/json"): Promise<Response> {
   const now = Date.now();
   const gap = now - lastRequestTime;
   if (gap < 100) {
@@ -77,8 +110,8 @@ async function rateLimitedFetch(url: string): Promise<Response> {
   lastRequestTime = Date.now();
 
   const res = await fetch(url, {
-    headers: { "User-Agent": USER_AGENT, Accept: "application/json" },
-    signal: AbortSignal.timeout(15_000),
+    headers: { "User-Agent": USER_AGENT, Accept: accept },
+    signal: AbortSignal.timeout(20_000),
   });
 
   if (!res.ok) {
@@ -86,6 +119,84 @@ async function rateLimitedFetch(url: string): Promise<Response> {
   }
 
   return res;
+}
+
+function codePointToChar(cp: number): string {
+  if (!Number.isFinite(cp) || cp <= 0 || cp > 0x10ffff) return " ";
+  try {
+    return String.fromCodePoint(cp);
+  } catch {
+    return " ";
+  }
+}
+
+/** Decode the HTML entities that actually appear in EDGAR primary documents. */
+function decodeEntities(s: string): string {
+  return s
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, h) => codePointToChar(parseInt(h, 16)))
+    .replace(/&#(\d+);/g, (_, d) => codePointToChar(parseInt(d, 10)))
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&(?:apos|#39);/gi, "'");
+}
+
+/**
+ * Strip an EDGAR filing's HTML to plain text. Decodes numeric + named entities
+ * and normalizes smart punctuation to ASCII so the Item-marker regexes in
+ * filing-section-diff (which use straight quotes/dashes) match — the live
+ * EDGAR pull showed Apple's "Management’s Discussion" carried a curly
+ * apostrophe (&#8217;) that broke a naive matcher. Pure; exported for tests.
+ */
+export function stripFilingHtml(html: string): string {
+  const noTags = html
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<[^>]+>/g, " ");
+  return decodeEntities(noTags)
+    .replace(/[‘’‚‛]/g, "'")
+    .replace(/[“”]/g, '"')
+    .replace(/[–—]/g, "-")
+    .replace(/[   ]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** Build the archive URL for a filing's primary document. */
+function archiveDocUrl(cik: string, accessionNumber: string, primaryDocument: string): string {
+  const cikNum = String(parseInt(cik, 10)); // archive path uses the CIK without leading zeros
+  const accND = accessionNumber.replace(/-/g, "");
+  return `${SEC_ARCHIVES}/${cikNum}/${accND}/${primaryDocument}`;
+}
+
+/**
+ * Pick the (skip)-th most recent filing of a given form from the submissions
+ * `filings.recent` arrays (which EDGAR returns newest-first). skip=0 is the
+ * latest, skip=1 the prior one (for a year-over-year diff). Pure; exported for
+ * tests. Returns null if no such filing or it lacks a primary document.
+ */
+export function pickFiling(recent: RecentFilings, form: string, skip = 0): FilingRef | null {
+  const forms = recent.form ?? [];
+  let seen = 0;
+  for (let i = 0; i < forms.length; i++) {
+    if (forms[i] !== form) continue;
+    const accessionNumber = recent.accessionNumber?.[i];
+    const primaryDocument = recent.primaryDocument?.[i];
+    if (!accessionNumber || !primaryDocument) continue;
+    if (seen < skip) {
+      seen++;
+      continue;
+    }
+    return {
+      accessionNumber,
+      primaryDocument,
+      filingDate: recent.filingDate?.[i] ?? "",
+      form,
+    };
+  }
+  return null;
 }
 
 function accessionToPath(accession: string): string {
@@ -246,6 +357,79 @@ export class SECFilingsClient {
     const filings = await this.searchFilings(ticker, "10-Q", 1);
     if (filings.length === 0) return null;
     return this.getFiling(filings[0]!.accessionNumber);
+  }
+
+  /**
+   * Resolve a ticker to its zero-padded 10-digit CIK via EDGAR's authoritative
+   * company_tickers.json map (loaded once per process). Returns null if the
+   * ticker isn't a registered SEC filer.
+   */
+  async resolveCik(ticker: string): Promise<string | null> {
+    const t = ticker.trim().toUpperCase();
+    if (!tickerCikMap) {
+      const res = await rateLimitedFetch(COMPANY_TICKERS_URL);
+      const json = (await res.json()) as Record<string, { cik_str?: number; ticker?: string }>;
+      const map = new Map<string, string>();
+      for (const v of Object.values(json)) {
+        if (v && typeof v.ticker === "string" && typeof v.cik_str === "number") {
+          map.set(v.ticker.toUpperCase(), String(v.cik_str).padStart(10, "0"));
+        }
+      }
+      tickerCikMap = map;
+    }
+    return tickerCikMap.get(t) ?? null;
+  }
+
+  /**
+   * Resolve and fetch the actual primary document of a company's filing as
+   * clean plain text — the correct path the old `getFiling` lacked (it fetched
+   * the index page and truncated to 5KB). Pipeline: ticker → CIK
+   * (company_tickers.json) → submissions API → primary document URL → strip.
+   *
+   * @param ticker - US ticker (SEC registrants only)
+   * @param form   - "10-K" | "10-Q" | "8-K" (default "10-K")
+   * @param skip   - 0 = latest, 1 = prior filing of the same form (YoY diff)
+   */
+  async getFilingDocument(
+    ticker: string,
+    form: "10-K" | "10-Q" | "8-K" = "10-K",
+    skip = 0,
+  ): Promise<FilingDocument | null> {
+    const cacheKey = `${ticker.toUpperCase()}:${form}:${skip}`;
+    const cached = documentCache.get(cacheKey);
+    if (cached) return cached;
+
+    const cik = await this.resolveCik(ticker);
+    if (!cik) {
+      logger.warn("CIK not found for ticker", { ticker });
+      return null;
+    }
+
+    const subRes = await rateLimitedFetch(`${SUBMISSIONS_BASE}/CIK${cik}.json`);
+    const sub = (await subRes.json()) as { filings?: { recent?: RecentFilings } };
+    const recent = sub.filings?.recent;
+    if (!recent) return null;
+
+    const ref = pickFiling(recent, form, skip);
+    if (!ref) return null;
+
+    const url = archiveDocUrl(cik, ref.accessionNumber, ref.primaryDocument);
+    const docRes = await rateLimitedFetch(url, "text/html,application/xhtml+xml,*/*");
+    const html = await docRes.text();
+    const text = stripFilingHtml(html);
+
+    const doc: FilingDocument = {
+      ticker: ticker.toUpperCase(),
+      cik,
+      form,
+      accessionNumber: ref.accessionNumber,
+      filingDate: ref.filingDate,
+      primaryDocument: ref.primaryDocument,
+      url,
+      text,
+    };
+    documentCache.set(cacheKey, doc);
+    return doc;
   }
 }
 

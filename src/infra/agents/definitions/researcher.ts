@@ -27,6 +27,7 @@ import {
   instrumentedFinnhubTools,
   instrumentedFinnhubFundamentalsTools,
   instrumentedFinnhubMarketsTools,
+  instrumentedSecFilingTools,
   gordonInputGuard,
   gordonOutputSanitizer,
   gordonToolCallReconciler,
@@ -57,6 +58,11 @@ while the user continues chatting with Gordon.
 4. Include specific numbers, levels, and actionable conclusions
 5. If the task is a backtest, include key metrics (return %, win rate, max drawdown)
 6. If the task is multi-symbol analysis, rank results by opportunity quality`;
+
+/** Cold-tier gate — excluded when the operator pins GORDON_TOOL_TIER=hot. */
+function isHotTierOnly(): boolean {
+  return process.env.GORDON_TOOL_TIER === "hot";
+}
 
 export function getResearcher(): Agent {
   const agent = new Agent({
@@ -96,6 +102,7 @@ export function getResearcher(): Agent {
       ...instrumentedFinnhubTools,
       ...instrumentedFinnhubFundamentalsTools,
       ...instrumentedFinnhubMarketsTools,
+      ...(isHotTierOnly() ? {} : instrumentedSecFilingTools),
 
       // Canonical 22-tool agent surface.
       ...agentTools,

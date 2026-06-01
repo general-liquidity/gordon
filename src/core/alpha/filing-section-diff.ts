@@ -52,30 +52,67 @@ function segment(text: string): Segment[] {
     .filter((s) => s.tokens.size >= MIN_TOKENS);
 }
 
+/** All start-marker match positions, scanned globally. */
+function allStartMatches(text: string, start: RegExp): Array<{ index: number; length: number }> {
+  const g = new RegExp(start.source, start.flags.includes("g") ? start.flags : start.flags + "g");
+  const out: Array<{ index: number; length: number }> = [];
+  let m: RegExpExecArray | null;
+  while ((m = g.exec(text)) !== null) {
+    out.push({ index: m.index, length: m[0].length });
+    if (m[0].length === 0) g.lastIndex++; // guard against zero-width loops
+  }
+  return out;
+}
+
 /**
- * Extract a named section from a full filing by start/end markers. Returns the
- * text between the first start-marker match and the next end-marker match (or
- * end of document). Heuristic — robust enough for the common Item-delimited
- * 10-K layout; returns "" if the start marker isn't found.
+ * Extract a named section from a full filing by start/end markers.
+ *
+ * TOC-aware: a real 10-K names every Item twice — once in the table of
+ * contents ("Item 1A. Risk Factors 5 Item 1B. …") and once at the actual
+ * section body. A first-match extractor grabs the TOC fragment. So we collect
+ * EVERY start-marker match, slice each to its next end-marker, and return the
+ * LONGEST slice — the body always dwarfs the one-line TOC entry. Returns "" if
+ * the start marker isn't found.
  */
 export function extractSection(
   filingText: string,
   start: RegExp,
   end?: RegExp,
 ): string {
-  const startMatch = start.exec(filingText);
-  if (!startMatch) return "";
-  const from = startMatch.index + startMatch[0].length;
-  if (!end) return filingText.slice(from).trim();
-  const rest = filingText.slice(from);
-  const endMatch = end.exec(rest);
-  return (endMatch ? rest.slice(0, endMatch.index) : rest).trim();
+  const starts = allStartMatches(filingText, start);
+  if (starts.length === 0) return "";
+  let best = "";
+  for (const s of starts) {
+    const from = s.index + s.length;
+    const rest = filingText.slice(from);
+    let slice = rest;
+    if (end) {
+      end.lastIndex = 0; // defensive: in case a global end regex was passed
+      const endMatch = end.exec(rest);
+      slice = endMatch ? rest.slice(0, endMatch.index) : rest;
+    }
+    slice = slice.trim();
+    if (slice.length > best.length) best = slice;
+  }
+  return best;
 }
 
-/** Common 10-K section markers. */
+/**
+ * Common 10-K section markers. End patterns match the NEXT section's HEADER
+ * (Item number + its standardized Regulation S-K title), not a bare "Item N"
+ * — real filings cross-reference other items mid-paragraph ("…see Part II,
+ * Item 8…"), and a bare end marker truncates the section at the first such
+ * mention. The live Apple 10-K pull surfaced exactly this on MD&A.
+ */
 export const SECTION_MARKERS = {
-  risk_factors: { start: /item\s*1a\.?\s*risk\s*factors/i, end: /item\s*1b\b|item\s*2\b/i },
-  mdna: { start: /item\s*7\.?\s*management'?s\s*discussion/i, end: /item\s*7a\b|item\s*8\b/i },
+  risk_factors: {
+    start: /item\s*1a\.?\s*risk\s*factors/i,
+    end: /item\s*1b\.?\s*unresolved\s*staff|item\s*2\.?\s*properties/i,
+  },
+  mdna: {
+    start: /item\s*7\.?\s*management'?s\s*discussion/i,
+    end: /item\s*7a\.?\s*quantitative|item\s*8\.?\s*financial\s*statements/i,
+  },
 } as const;
 
 export interface FilingDiffInput {

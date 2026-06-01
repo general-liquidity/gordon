@@ -37,6 +37,7 @@ import {
   instrumentedFinnhubTools,
   instrumentedFinnhubFundamentalsTools,
   instrumentedFinnhubMarketsTools,
+  instrumentedSecFilingTools,
   instrumentedDefillamaYieldTools,
   instrumentedChainlinkStreamsTools,
   instrumentedChainlinkFeedsTools,
@@ -422,6 +423,7 @@ export function getGordon(): Agent {
       // Finnhub — INTEGRATION tier.
       ...instrumentedFinnhubTools,
       ...(isHotTierOnly() ? {} : instrumentedFinnhubFundamentalsTools),
+      ...(isHotTierOnly() ? {} : instrumentedSecFilingTools),
       ...instrumentedFinnhubMarketsTools,
 
       // DefiLlama / Chainlink — INTEGRATION tier. Cold-gated.

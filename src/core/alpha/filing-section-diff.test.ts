@@ -17,6 +17,35 @@ describe("extractSection", () => {
   test("returns empty when the section marker is absent", () => {
     expect(extractSection("no items here", SECTION_MARKERS.risk_factors.start)).toBe("");
   });
+
+  test("picks the body section, not the table-of-contents entry (TOC-aware)", () => {
+    // Real 10-Ks name every Item twice: once in the TOC, once at the body.
+    const filing =
+      "TABLE OF CONTENTS Item 1. Business 1 Item 1A. Risk Factors 5 " +
+      "Item 1B. Unresolved Staff Comments 17 Item 2. Properties 18 " +
+      "PART I Item 1. Business We make widgets. " +
+      "Item 1A. Risk Factors We face intense competition and customer-concentration risk that could materially harm our results. " +
+      "Item 1B. Unresolved Staff Comments None.";
+    const rf = extractSection(filing, SECTION_MARKERS.risk_factors.start, SECTION_MARKERS.risk_factors.end);
+    expect(rf).toContain("intense competition");
+    expect(rf).toContain("customer-concentration");
+    expect(rf).not.toContain("Unresolved");
+    // The short TOC fragment ("5 Item 1B…") must not win.
+    expect(rf.length).toBeGreaterThan(30);
+  });
+
+  test("end marker matches the next section header, not an in-text cross-reference", () => {
+    // MD&A bodies routinely say "…see Part II, Item 8…"; a bare Item-8 end
+    // marker would truncate there. The header-anchored marker must not.
+    const filing =
+      "Item 7. Management's Discussion and Analysis " +
+      "This discussion should be read with the statements in Item 8 of this Form 10-K. " +
+      "Revenue grew on strong demand across all segments during the year. " +
+      "Item 8. Financial Statements and Supplementary Data See the consolidated statements.";
+    const md = extractSection(filing, SECTION_MARKERS.mdna.start, SECTION_MARKERS.mdna.end);
+    expect(md).toContain("Revenue grew");
+    expect(md).not.toContain("consolidated statements");
+  });
 });
 
 describe("diffFilingSections", () => {

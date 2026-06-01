@@ -87,6 +87,8 @@ const TOOL_RESULT_LIMITS: Record<string, number> = {
   analysis: 4000,
   plan: 4000,
   backtest: 4000,
+  filing: 12000, // SEC filing text (get_filing_text) — section bodies are long; let the model read a real chunk before spill
+
   // Raw/noisy protocol outputs — keep small
   raw: 800,
   log: 800,
