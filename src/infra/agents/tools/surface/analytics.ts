@@ -60,6 +60,7 @@ import {
 import { conditionalDistributionTest } from "../../../../core/alpha/conditional-distribution-test.ts";
 import { runPortfolioEnsemble } from "../../../../core/alpha/pc-method-ensemble.ts";
 import { runRegimeAllocationPolicy } from "../../../../core/alpha/regime-policy.ts";
+import { computeForensicScores } from "../../../../core/alpha/forensic-accounting.ts";
 import { RegimeDetector } from "../../../../core/regime/index.ts";
 import { checkRiskTool as implCheckRisk } from "../trading/risk-gate.ts";
 import { recordSymbolObservation } from "../../observation/symbolObservationTracker.ts";
@@ -905,6 +906,7 @@ const MICROSTRUCTURE_OPS = [
   "signal_informativeness",
   "portfolio_ensemble",
   "regime_policy",
+  "forensic_screen",
 ] as const;
 
 export const computeMicrostructureTool = createTool({
@@ -1045,6 +1047,16 @@ export const computeMicrostructureTool = createTool({
     "                              returns) by policy iteration → π*, an interpretable regime→weights lookup. Shortcut",
     "                              fetches aligned log-returns for the symbols (driverIndex picks the market-proxy, default 0).",
     "                              Returns the policy + regime labels + transition matrix + state-conditional returns.",
+    "    - 'forensic_screen'     — params: { current: {sales, cogs, sga, netIncome, cfo, receivables, currentAssets,",
+    "                                currentLiabilities, ppeNet, depreciation, totalAssets, totalLiabilities, longTermDebt,",
+    "                                retainedEarnings, ebit, marketCap, sharesOutstanding}, prior?: {same fields} }",
+    "                              Forensic accounting screen on raw financial-statement line items: Beneish M-Score",
+    "                              (earnings-manipulation, >-2.22 flags), Altman Z (distress, <1.81), Piotroski F (strength,",
+    "                              0-9, <6 flags), Sloan accruals (earnings quality, |x|>25% flags). Beneish+Piotroski need",
+    "                              `prior` (year-over-year); Altman+Sloan need only `current`. Missing inputs → null score",
+    "                              (no false flags). Verdict INVESTIGATE/CLEAN/INSUFFICIENT. PROBABILITY FLAGS, NOT PROOF —",
+    "                              a bad score means open the filing, never short on the number alone. Source line items via",
+    "                              get_fundamentals / Finnhub fundamentals (equities).",
     "",
     "IMPORTANT: discipline_audit and adherence_report respect startTime+endTime",
     "ISO strings. When the operator asks for 'last 24h' or 'today', YOU must",
@@ -1108,6 +1120,10 @@ export const computeMicrostructureTool = createTool({
       regime_policy: {
         execute: async (p: Record<string, unknown>) =>
           runRegimeAllocationPolicy(p as unknown as Parameters<typeof runRegimeAllocationPolicy>[0]),
+      },
+      forensic_screen: {
+        execute: async (p: Record<string, unknown>) =>
+          computeForensicScores(p as unknown as Parameters<typeof computeForensicScores>[0]),
       },
     };
     try {
