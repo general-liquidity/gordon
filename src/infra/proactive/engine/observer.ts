@@ -61,6 +61,7 @@ const TICK_INTERVALS = {
   journal_prompt: 60 * 60 * 1000,   // 1 hour — checks time of day
   portfolio_drift: 30 * 60 * 1000,  // 30 min — position drift check
   regime_flip: 15 * 60 * 1000,      // 15 min — per-symbol regime polling
+  chart_pattern: 15 * 60 * 1000,    // 15 min — per-symbol LMW chart-pattern scan
   volatility: 10 * 60 * 1000,       // 10 min — ATR expansion check
   funding: 30 * 60 * 1000,          // 30 min — perp funding scan
   news_event: 10 * 60 * 1000,       // 10 min — RSS headline polling

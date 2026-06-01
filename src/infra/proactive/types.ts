@@ -22,6 +22,7 @@
  */
 export type ProactiveCategory =
   | "regime_flip"          // Market regime changed — suggest matching playbook
+  | "chart_pattern"        // Geometric chart pattern (LMW) completed on a watched symbol
   | "whale_alert"          // Whale transfer/accumulation on a held or watched token
   | "volatility_spike"     // Sudden volatility increase — suggest stop tightening
   | "stop_loss_tighten"    // Price pushed — suggest trailing stop
@@ -41,6 +42,7 @@ export type ProactiveCategory =
 
 export const ALL_CATEGORIES: ProactiveCategory[] = [
   "regime_flip",
+  "chart_pattern",
   "whale_alert",
   "volatility_spike",
   "stop_loss_tighten",

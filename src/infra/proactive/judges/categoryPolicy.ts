@@ -28,6 +28,7 @@ const DEFAULT_POLICIES: Record<ProactiveCategory, {
   maxPerHour: number;
 }> = {
   regime_flip:          { cooldownMs: 30 * MIN, minConfidence: 0.70, maxPerHour: 2 },
+  chart_pattern:        { cooldownMs: 30 * MIN, minConfidence: 0.55, maxPerHour: 2 },
   whale_alert:          { cooldownMs: 5 * MIN,  minConfidence: 0.65, maxPerHour: 12 },
   volatility_spike:     { cooldownMs: 10 * MIN, minConfidence: 0.70, maxPerHour: 6 },
   stop_loss_tighten:    { cooldownMs: 15 * MIN, minConfidence: 0.75, maxPerHour: 4 },

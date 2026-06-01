@@ -16,6 +16,7 @@ import { stopProducer } from "./risk/stopProducer.ts";
 import { periodicProducer, resetPeriodicProducerState } from "./periodicProducer.ts";
 import { portfolioDriftProducer } from "./risk/portfolioDriftProducer.ts";
 import { regimeFlipProducer, resetRegimeFlipProducerState } from "./signals/regimeFlipProducer.ts";
+import { chartPatternProducer, resetChartPatternProducerState } from "./signals/chartPatternProducer.ts";
 import { volatilitySpikeProducer, resetVolatilitySpikeProducerState } from "./signals/volatilitySpikeProducer.ts";
 import { fundingAlertProducer, resetFundingAlertProducerState } from "./signals/fundingAlertProducer.ts";
 import { newsEventProducer, resetNewsEventProducerState } from "./events/newsEventProducer.ts";
@@ -39,6 +40,7 @@ export {
   periodicProducer,
   portfolioDriftProducer,
   regimeFlipProducer,
+  chartPatternProducer,
   volatilitySpikeProducer,
   fundingAlertProducer,
   newsEventProducer,
@@ -120,6 +122,7 @@ export function registerAllProducers(engine: ProactiveEngine): () => void {
     engine.registerProducer(withHealthTracking("periodic", periodicProducer)),
     engine.registerProducer(withHealthTracking("portfolioDrift", portfolioDriftProducer)),
     engine.registerProducer(withHealthTracking("regimeFlip", regimeFlipProducer)),
+    engine.registerProducer(withHealthTracking("chartPattern", chartPatternProducer)),
     engine.registerProducer(withHealthTracking("volatilitySpike", volatilitySpikeProducer)),
     engine.registerProducer(withHealthTracking("fundingAlert", fundingAlertProducer)),
     engine.registerProducer(withHealthTracking("newsEvent", newsEventProducer)),
@@ -135,6 +138,7 @@ export function registerAllProducers(engine: ProactiveEngine): () => void {
     resetTradeEventProducerState();
     resetPeriodicProducerState();
     resetRegimeFlipProducerState();
+    resetChartPatternProducerState();
     resetVolatilitySpikeProducerState();
     resetFundingAlertProducerState();
     resetNewsEventProducerState();
