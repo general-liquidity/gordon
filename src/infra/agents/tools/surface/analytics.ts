@@ -71,6 +71,7 @@ import {
   calculateTRIMA,
   buildInformationBars,
   buildInformationBarsFromOHLCV,
+  calculateVolumeSignature,
   type CandlestickPatternName,
   type Candle as IndicatorCandle,
 } from "../../../../core/indicators/index.ts";
@@ -93,6 +94,8 @@ import { runAdfTest, adfToPayload } from "../../../trading/quant/stationarityTes
 import { runKpssTest, kpssToPayload } from "../../../trading/quant/kpssTest.ts";
 import { runJohansenTest, johansenToPayload } from "../../../trading/quant/johansenCointegration.ts";
 import { acf, pacf } from "../../../trading/quant/autocorrelation.ts";
+import { computeRobustnessMetrics } from "../../../../core/alpha/robustness-metrics.ts";
+import { runFeeSensitivitySweep } from "../../../../backtest/analysis/fee-sensitivity.ts";
 import { RegimeDetector } from "../../../../core/regime/index.ts";
 import { checkRiskTool as implCheckRisk } from "../trading/risk-gate.ts";
 import { recordSymbolObservation } from "../../observation/symbolObservationTracker.ts";
@@ -462,6 +465,7 @@ const INDICATOR_NAMES = [
   "tema",
   "trima",
   "garch_forecast",
+  "volume_signature",
 ] as const;
 
 function dispatchIndicator(
@@ -682,6 +686,21 @@ function dispatchIndicator(
       const { forecast, ...rest } = r;
       return { ...rest, horizon, varianceForecast: forecast(horizon) };
     }
+    case "volume_signature":
+      return calculateVolumeSignature(candles, {
+        ...(typeof params.avgPeriod === "number" && { avgPeriod: params.avgPeriod }),
+        ...(typeof params.ppLong === "number" && { ppLong: params.ppLong }),
+        ...(typeof params.ppShort === "number" && { ppShort: params.ppShort }),
+        ...(typeof params.dryUp1Pct === "number" && { dryUp1Pct: params.dryUp1Pct }),
+        ...(typeof params.dryUp2Pct === "number" && { dryUp2Pct: params.dryUp2Pct }),
+        ...(typeof params.closeUpperPct === "number" && { closeUpperPct: params.closeUpperPct }),
+        ...(typeof params.accVolMult === "number" && { accVolMult: params.accVolMult }),
+        ...(typeof params.distVolMult === "number" && { distVolMult: params.distVolMult }),
+        ...(typeof params.distCountWindow === "number" && { distCountWindow: params.distCountWindow }),
+        ...(typeof params.churnVolMult === "number" && { churnVolMult: params.churnVolMult }),
+        ...(typeof params.atrPeriod === "number" && { atrPeriod: params.atrPeriod }),
+        ...(typeof params.maxProgressVsAtr === "number" && { maxProgressVsAtr: params.maxProgressVsAtr }),
+      });
     default:
       return { error: `Unknown indicator: ${indicator}` };
   }
@@ -710,6 +729,7 @@ export const computeIndicatorTool = createTool({
     "TA-Lib trend/volatility: adxr (ADX rating), natr (normalized ATR), chaikin_ad (A/D line), chaikin_osc",
     "Moving averages: wma (weighted), dema (double EMA), tema (triple EMA), trima (triangular) — return { values, current }",
     "Volatility forecast: garch_forecast (GARCH(1,1) MLE fit on log-returns → params, persistence, long-run vol, multi-step varianceForecast; params { horizon?, demean? })",
+    "Volume signature: volume_signature (Morales-Kacher / CAN SLIM pocket-pivot family — per-bar pocket pivots PP10/PP5, volume dry-up (2 levels), accumulation/distribution days + trailing distribution count & health verdict, churn/stalling; one op over an SMA-volume baseline; pairs with highest_volume_ever / undercut_rally / tight_consolidation for base-building reads)",
     "",
     "Internally fetches candles via the connected exchange. Pass `bars` to",
     "control the lookback window (default 200).",
@@ -1038,6 +1058,8 @@ const MICROSTRUCTURE_OPS = [
   "acf_pacf",
   "johansen_cointegration",
   "information_bars",
+  "robustness_metrics",
+  "fee_sensitivity",
 ] as const;
 
 export const computeMicrostructureTool = createTool({
@@ -1228,6 +1250,15 @@ export const computeMicrostructureTool = createTool({
     "    - 'information_bars'    — params: { kind: 'volume'|'dollar'|'tick', threshold: number, ticks?: {price,volume,timestamp}[], ohlcv?: {close,volume}[] }",
     "                              López-de-Prado information-driven bars: close a bar when cumulative volume / dollar-value /",
     "                              tick-count crosses the threshold. Better statistical properties than time bars. Prefer ticks; ohlcv is a coarse fallback.",
+    "    - 'robustness_metrics'  — params: { outcomes: number[], higherIsBetter?: boolean, eps? }",
+    "                              Taguchi-style robustness scoring over a DISTRIBUTION of stress outcomes (Sharpe / net-return",
+    "                              across parameter sweeps, walk-forward windows, or synthetic_augment runs): normalized percentile",
+    "                              spread, downside-robustness loss, survival ratio + robust/moderate/fragile verdict. Complements the",
+    "                              best/median overfit score. Needs ≥5 outcomes. Scores a distribution YOU supply — does not run the stress tests.",
+    "    - 'fee_sensitivity'     — params: { grossReturns: number[] /* per-round-trip gross return fraction, pre-fee */, schedules: [{ label, roundTripBps? | makerBps?+takerBps? }], periodsPerYear? }",
+    "                              Re-score a strategy's per-trade gross returns under multiple fee tiers; flags which schedules flip it",
+    "                              from profit to loss + the break-even round-trip bps (= gross mean edge). The Minara/Lighter finding:",
+    "                              fee drag, not signal, kills high-frequency strategies. Complement to marketImpact (which sweeps order size).",
     "",
     "IMPORTANT: discipline_audit and adherence_report respect startTime+endTime",
     "ISO strings. When the operator asks for 'last 24h' or 'today', YOU must",
@@ -1409,6 +1440,22 @@ export const computeMicrostructureTool = createTool({
             );
           }
           return { error: "information_bars: pass either `ticks` ({price,volume,timestamp}[]) or `ohlcv` ({close,volume}[])." };
+        },
+      },
+      robustness_metrics: {
+        execute: async (p: Record<string, unknown>) => {
+          const outcomes = Array.isArray(p.outcomes) ? (p.outcomes as number[]) : [];
+          const r = computeRobustnessMetrics(outcomes, {
+            ...(typeof p.higherIsBetter === "boolean" && { higherIsBetter: p.higherIsBetter }),
+            ...(typeof p.eps === "number" && { eps: p.eps }),
+          });
+          return r ?? { error: "robustness_metrics: need ≥ 5 finite outcomes (a distribution of stress-test results)." };
+        },
+      },
+      fee_sensitivity: {
+        execute: async (p: Record<string, unknown>) => {
+          const r = runFeeSensitivitySweep(p as unknown as Parameters<typeof runFeeSensitivitySweep>[0]);
+          return r ?? { error: "fee_sensitivity: need `grossReturns` (per-round-trip gross return fractions) and at least one fee `schedule`." };
         },
       },
     };

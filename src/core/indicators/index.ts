@@ -259,3 +259,11 @@ export type {
   InformationBarsResult,
   OHLCVInput,
 } from "./information-bars.ts";
+
+// Volume-signature suite (Morales-Kacher / CAN SLIM pocket-pivot family)
+export { calculateVolumeSignature } from "./volume-signature.ts";
+export type {
+  VolumeSignatureParams,
+  VolumeSignatureResult,
+  VolumeSignatureLatest,
+} from "./volume-signature.ts";
