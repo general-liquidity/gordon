@@ -9,6 +9,7 @@ import {
   bordaCount,
   adversarialDiversifier,
   combineEnsemble,
+  runPortfolioEnsemble,
 } from "./pc-method-ensemble.ts";
 
 const sums1 = (w: number[]) => expect(w.reduce((s, x) => s + x, 0)).toBeCloseTo(1, 6);
@@ -154,5 +155,26 @@ describe("combineEnsemble", () => {
   test("empty candidate set falls back to equal weight", () => {
     const r = combineEnsemble({ candidateWeights: [], cov });
     expect(r.weights).toEqual([0.5, 0.5]);
+  });
+});
+
+describe("runPortfolioEnsemble", () => {
+  const cov = [
+    [0.04, 0.01, 0.0],
+    [0.01, 0.02, 0.005],
+    [0.0, 0.005, 0.03],
+  ];
+
+  test("returns the full bench + adversarial + combined ensemble", () => {
+    const r = runPortfolioEnsemble({ covariance: cov, means: [0.02, 0.01, 0.008] });
+    expect(r.methods.length).toBe(5);
+    for (const m of r.methods) {
+      expect(m.weights.length).toBe(3);
+      expect(m.weights.reduce((s, x) => s + x, 0)).toBeCloseTo(1, 4);
+      expect(m.variance).toBeGreaterThanOrEqual(0);
+    }
+    expect(r.adversarial.weights.length).toBe(3);
+    expect(r.ensemble.weights.reduce((s, x) => s + x, 0)).toBeCloseTo(1, 4);
+    expect(r.summary).toContain("ensemble");
   });
 });

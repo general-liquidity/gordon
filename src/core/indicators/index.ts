@@ -70,6 +70,10 @@ export { calculateKalmanFilter } from "./kalman.ts";
 // Nadaraya-Watson Envelope
 export { calculateNadarayaWatson } from "./nadaraya-watson.ts";
 
+// LMW geometric chart patterns (kernel-extrema HS/triangle/rectangle/double)
+export { detectLmwPatterns, detectLmwPatternsFromCandles } from "./lmw-patterns.ts";
+export type { LmwPattern, PatternMatch, LmwPatternResult } from "./lmw-patterns.ts";
+
 // Camarilla Pivot Points
 export { calculateCamarillaPivots } from "./camarilla.ts";
 

@@ -427,3 +427,65 @@ export function combineEnsemble(input: EnsembleCombineInput): EnsembleCombineRes
     summary: `Combined ${k} candidate portfolio(s) over ${n} assets via ${scheme}.`,
   };
 }
+
+// ---------------------------------------------------------------------------
+// One-shot composition: bench → adversarial diversifier → CIO combine
+// ---------------------------------------------------------------------------
+
+export interface PortfolioEnsembleInput {
+  covariance: number[][];
+  means?: number[];
+  riskFreeRate?: number;
+  sharpeFloorFraction?: number;
+  combineScheme?: EnsembleScheme;
+}
+
+export interface PortfolioEnsembleResult {
+  methods: Array<{ method: PcMethodId; weights: number[]; variance: number; sharpe: number }>;
+  adversarial: AdversarialDiversifierResult;
+  ensemble: { weights: number[]; scheme: EnsembleScheme };
+  summary: string;
+}
+
+/**
+ * Run the whole risk-structured pipeline in one call: the five-method bench,
+ * the adversarial diversifier over the bench, and a CIO combine of the bench.
+ * The actionable read-only proposal the `construct_portfolio_ensemble` /
+ * `portfolio_ensemble` surface op returns.
+ */
+export function runPortfolioEnsemble(input: PortfolioEnsembleInput): PortfolioEnsembleResult {
+  const cov = input.covariance;
+  const n = cov.length;
+  const means = input.means ?? new Array(n).fill(0);
+  const rf = input.riskFreeRate ?? 0;
+
+  const bench = runRiskStructuredBench(cov);
+  const candidateWeights = bench.map((p) => p.weights);
+
+  const adversarial = adversarialDiversifier({
+    candidateWeights,
+    cov,
+    means: input.means,
+    sharpeFloorFraction: input.sharpeFloorFraction,
+    riskFreeRate: rf,
+  });
+
+  const combined = combineEnsemble({ candidateWeights, cov, scheme: input.combineScheme });
+
+  const methods = bench.map((p) => ({
+    method: p.method,
+    weights: p.weights.map((w) => parseFloat(w.toFixed(6))),
+    variance: parseFloat(portfolioVariance(p.weights, cov).toFixed(10)),
+    sharpe: parseFloat(sharpe(p.weights, cov, means, rf).toFixed(6)),
+  }));
+
+  return {
+    methods,
+    adversarial,
+    ensemble: { weights: combined.weights.map((w) => parseFloat(w.toFixed(6))), scheme: combined.scheme },
+    summary:
+      `Risk-structured ensemble over ${n} assets: ${methods.length} methods + adversarial diversifier ` +
+      `(tracking-var ${adversarial.trackingVariance.toFixed(6)}, ${adversarial.feasible ? "feasible" : "infeasible"}), ` +
+      `combined via ${combined.scheme}.`,
+  };
+}

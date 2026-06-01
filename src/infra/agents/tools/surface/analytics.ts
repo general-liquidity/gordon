@@ -53,9 +53,12 @@ import {
   linearRegression,
   calculateStandardErrorBands,
   calculateHighestVolumeEver,
+  detectLmwPatterns,
   type CandlestickPatternName,
   type Candle as IndicatorCandle,
 } from "../../../../core/indicators/index.ts";
+import { conditionalDistributionTest } from "../../../../core/alpha/conditional-distribution-test.ts";
+import { runPortfolioEnsemble } from "../../../../core/alpha/pc-method-ensemble.ts";
 import { RegimeDetector } from "../../../../core/regime/index.ts";
 import { checkRiskTool as implCheckRisk } from "../trading/risk-gate.ts";
 import { recordSymbolObservation } from "../../observation/symbolObservationTracker.ts";
@@ -369,6 +372,7 @@ const INDICATOR_NAMES = [
   "linear_regression",
   "standard_error_bands",
   "highest_volume_ever",
+  "lmw_patterns",
 ] as const;
 
 function dispatchIndicator(
@@ -503,6 +507,23 @@ function dispatchIndicator(
         ...(typeof params.lookbackBars === "number" && { lookbackBars: params.lookbackBars }),
         ...(typeof params.minBarsBeforeDetection === "number" && { minBarsBeforeDetection: params.minBarsBeforeDetection }),
       });
+    case "lmw_patterns": {
+      // Lo-Mamaysky-Wang kernel-extrema geometric patterns. Omit the full
+      // smoothed series from the result to keep the tool payload tight.
+      const r = detectLmwPatterns(closes, {
+        ...(typeof params.bandwidth === "number" && { bandwidth: params.bandwidth }),
+        ...(typeof params.doubleMinSeparation === "number" && {
+          doubleMinSeparation: params.doubleMinSeparation,
+        }),
+      });
+      return {
+        matches: r.matches,
+        matchCount: r.matches.length,
+        extremaCount: r.extrema.length,
+        bandwidth: r.bandwidth,
+        interpretation: r.interpretation,
+      };
+    }
     default:
       return { error: `Unknown indicator: ${indicator}` };
   }
@@ -520,6 +541,7 @@ export const computeIndicatorTool = createTool({
     "Trend systems: ichimoku, supertrend, parabolic_sar",
     "Stats: kalman, nadaraya_watson, markov_regime",
     "SMC patterns: divergence, false_breakout, squeeze_momentum, angled_market_structure",
+    "Geometric chart patterns: lmw_patterns (Lo-Mamaysky-Wang kernel-extrema detector — head-and-shoulders/inverse, broadening top/bottom, triangle top/bottom, rectangle top/bottom, double top/bottom; params { bandwidth?, doubleMinSeparation? }; pair with compute_microstructure signal_informativeness to test whether a pattern moves returns)",
     "Setup detection: tight_consolidation (bull-flag / pennant scorer), undercut_rally (shakeout-and-reclaim)",
     "Exit coaching: trim_state (momentum-swing 8/21/50 EMA trail ladder), resistance_tests (count level rejections + confidence)",
     "Candlestick patterns: candlestick_patterns (harami / engulfing / hammer / shooting_star / doji / morning_star / evening_star / piercing_line / dark_cloud_cover / inside_bar)",
@@ -840,6 +862,8 @@ const MICROSTRUCTURE_OPS = [
   "pie",
   "fundamental_ratios",
   "ruin_probability",
+  "signal_informativeness",
+  "portfolio_ensemble",
 ] as const;
 
 export const computeMicrostructureTool = createTool({
@@ -962,6 +986,17 @@ export const computeMicrostructureTool = createTool({
     "                              classifies current state) by classifying which strategy class can have edge",
     "                              on this instrument at all.",
     "",
+    "    - 'signal_informativeness' — params: { conditionalReturns: number[], unconditionalReturns: number[], normalize?, alpha? }",
+    "                              Lo-Mamaysky-Wang test: does conditioning on a signal/pattern shift the return",
+    "                              distribution? Decile χ² + two-sample Kolmogorov-Smirnov. Feed returns realized AFTER",
+    "                              the signal fires (conditional) vs the baseline (unconditional), ≥10 each. Returns",
+    "                              {informative, χ² Q+p, KS γ+p}. Informativeness ≠ profitability — the cleaner weak test.",
+    "    - 'portfolio_ensemble'  — params: { covariance: number[][], means?: number[], riskFreeRate?, sharpeFloorFraction?, combineScheme? }",
+    "                              Self-Driving-Portfolio risk-structured bench (equal-weight, inverse-vol, inverse-variance,",
+    "                              risk-parity/ERC, max-diversification) + adversarial diversifier (most orthogonal to consensus",
+    "                              under a Sharpe floor) + CIO combine (average / inverse_tracking_error / trimmed_mean). Read-only",
+    "                              proposal — does NOT allocate capital. Complements optimize_portfolio (return-optimized family).",
+    "",
     "IMPORTANT: discipline_audit and adherence_report respect startTime+endTime",
     "ISO strings. When the operator asks for 'last 24h' or 'today', YOU must",
     "convert that to absolute ISO timestamps and pass them in params — the tool",
@@ -1010,6 +1045,17 @@ export const computeMicrostructureTool = createTool({
       pie: implPie,
       fundamental_ratios: implFundamentalRatios,
       ruin_probability: implRuinProbability,
+      // Direct-input analytics (pure functions — no exchange auto-collect).
+      signal_informativeness: {
+        execute: async (p: Record<string, unknown>) =>
+          conditionalDistributionTest(
+            p as unknown as Parameters<typeof conditionalDistributionTest>[0],
+          ),
+      },
+      portfolio_ensemble: {
+        execute: async (p: Record<string, unknown>) =>
+          runPortfolioEnsemble(p as unknown as Parameters<typeof runPortfolioEnsemble>[0]),
+      },
     };
     try {
       const handler = dispatchTable[args.operation];
