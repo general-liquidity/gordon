@@ -79,6 +79,9 @@ import {
   calculateROC,
   calculateSupertrendChannel,
   calculateCboeOdds,
+  calculateHarrisPattern,
+  calculateStochastic,
+  calculateCMF,
   type CandlestickPatternName,
   type Candle as IndicatorCandle,
 } from "../../../../core/indicators/index.ts";
@@ -113,6 +116,7 @@ import { computeOptionsPayoff } from "../../../../core/alpha/options-payoff.ts";
 import { twoSamplePnlTest } from "../../../trading/quant/twoSampleTest.ts";
 import { computeOmegaRatio } from "../../../../core/alpha/omega-ratio.ts";
 import { optimizePortfolio } from "../../../../core/alpha/portfolio-optimizer.ts";
+import { checkPriceDeviation } from "../../../../core/alpha/price-deviation-guard.ts";
 import {
   injectGaps,
   injectCrashBlocks,
@@ -498,6 +502,9 @@ const INDICATOR_NAMES = [
   "roc",
   "supertrend_channel",
   "cboe_odds",
+  "harris_pattern",
+  "stochastic",
+  "cmf",
 ] as const;
 
 /** Last non-null value of an aligned indicator series (for boxing bare arrays). */
@@ -759,6 +766,16 @@ function dispatchIndicator(
         ...(typeof params.rsiPeriod === "number" && { rsiPeriod: params.rsiPeriod }),
         ...(typeof params.stochPeriod === "number" && { stochPeriod: params.stochPeriod }),
       });
+    case "harris_pattern":
+      return calculateHarrisPattern(candles);
+    case "stochastic":
+      return calculateStochastic(candles, {
+        ...(typeof params.kPeriod === "number" && { kPeriod: params.kPeriod }),
+        ...(typeof params.kSmooth === "number" && { kSmooth: params.kSmooth }),
+        ...(typeof params.dPeriod === "number" && { dPeriod: params.dPeriod }),
+      });
+    case "cmf":
+      return calculateCMF(candles, (params.period as number) ?? 20);
     case "volume_signature":
       return calculateVolumeSignature(candles, {
         ...(typeof params.avgPeriod === "number" && { avgPeriod: params.avgPeriod }),
@@ -806,6 +823,8 @@ export const computeIndicatorTool = createTool({
     "Channels / MAs: donchian (rolling high/low breakout envelope), hull_ma (low-lag Hull MA), vwma (volume-weighted MA), supertrend_channel (Supertrend-pivot running-extreme envelope + midline target, resets on trend flip)",
     "Momentum: momentum (absolute Δ vs N bars ago), roc (percent change vs N bars ago)",
     "Flow regime: cboe_odds (volume-weighted three-state bull/bear/STAGNANT odds oscillator — MFI-style money-flow index re-weighted by Stoch-RSI momentum; the stagnant leg quantifies chop/indecision)",
+    "More: stochastic (classic price %K/%D — locates close in the recent high-low range; >80 overbought / <20 oversold; distinct from stochastic-rsi), cmf (Chaikin Money Flow, windowed money-flow-volume/volume in [−1,1]; >0.05 accumulation / <−0.05 distribution)",
+    "Patterns: harris_pattern (Michael Harris DAX 4-bar overlapping-extension price pattern — per-bar 0 none / 2 buy / 1 sell from a strict interleaved high/low chain)",
     "",
     "Internally fetches candles via the connected exchange. Pass `bars` to",
     "control the lookback window (default 200).",
@@ -1142,6 +1161,7 @@ const MICROSTRUCTURE_OPS = [
   "pnl_significance",
   "omega_ratio",
   "optimize_portfolio",
+  "price_deviation_guard",
 ] as const;
 
 export const computeMicrostructureTool = createTool({
@@ -1362,6 +1382,10 @@ export const computeMicrostructureTool = createTool({
     "                              Markowitz optimizer over strategy/asset return series: min-variance / max-Sharpe / target-return, long-only + max-weight",
     "                              cap + Ledoit-Wolf shrinkage, equal-weight fallback (converged flag). marketNeutral:true → dollar-neutral long-short",
     "                              (net Σw=0, gross Σ|w|=1). Return-optimized family; complement to portfolio_ensemble (risk-structured) and hrp_allocation.",
+    "    - 'price_deviation_guard' — params: { orderPrice, referencePrice, thresholdPct?, side? }",
+    "                              Fat-finger / stale-quote check: % deviation of an intended order price from the live reference (mid/last/mark). Breach in the",
+    "                              dangerous direction (buy ABOVE / sell BELOW) → block; benign → warn. Default threshold 2%. Pre-trade sanity gate; also runs",
+    "                              automatically as a PreOrderPlacement hook on LIMIT orders. Distinct from slippage (which models market-order cost).",
     "",
     "IMPORTANT: discipline_audit and adherence_report respect startTime+endTime",
     "ISO strings. When the operator asks for 'last 24h' or 'today', YOU must",
@@ -1681,6 +1705,12 @@ export const computeMicrostructureTool = createTool({
       optimize_portfolio: {
         execute: async (p: Record<string, unknown>) =>
           optimizePortfolio(p as unknown as Parameters<typeof optimizePortfolio>[0]),
+      },
+      price_deviation_guard: {
+        execute: async (p: Record<string, unknown>) => {
+          const r = checkPriceDeviation(p as unknown as Parameters<typeof checkPriceDeviation>[0]);
+          return r ?? { error: "price_deviation_guard: orderPrice and referencePrice must be positive finite numbers." };
+        },
       },
     };
     try {

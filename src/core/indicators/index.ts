@@ -288,3 +288,15 @@ export type { SupertrendChannelResult } from "./supertrend-channel.ts";
 // CBOE volume-weighted bull/bear/stagnant odds oscillator
 export { calculateCboeOdds } from "./cboe-odds-oscillator.ts";
 export type { CboeOddsResult } from "./cboe-odds-oscillator.ts";
+
+// Michael Harris DAX 4-bar overlapping-extension pattern
+export { calculateHarrisPattern } from "./harris-pattern.ts";
+export type { HarrisPatternResult } from "./harris-pattern.ts";
+
+// Classic price-based Stochastic Oscillator (%K/%D)
+export { calculateStochastic } from "./stochastic.ts";
+export type { StochasticResult } from "./stochastic.ts";
+
+// Chaikin Money Flow (standalone)
+export { calculateCMF } from "./cmf.ts";
+export type { CMFResult } from "./cmf.ts";

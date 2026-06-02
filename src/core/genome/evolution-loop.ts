@@ -29,6 +29,10 @@ import {
   filterRejectedMutations,
   DEFAULT_MIN_FITNESS_DROP,
 } from "./mutationRejection.ts";
+import {
+  selectOptimizationTier,
+  filterMutationsByTier,
+} from "./optimization-tier.ts";
 import { v4 as uuidv4 } from "uuid";
 
 const logger = createModuleLogger("evolution-loop");
@@ -310,6 +314,26 @@ export class EvolutionLoop {
 
         // Collect insight-driven mutations
         const insights = getRecurringInsights(`plan_${slot.playbook_name.slice(0, 8)}`, 3);
+
+        // Severity signals for the TiMi optimization-tier router (computed from
+        // data already in scope; falls back to parameter-tier when absent).
+        // Stability errors ≈ recurring insights whose optimal differs adversely
+        // from actual (a systematic mistake repeating across trades).
+        const stabilityErrors = insights.filter((i) => i.avgPnlDelta > 0).length;
+        // Param-level mutations this lineage has already tried (nudge/shift).
+        const lineage = manager.getGenomes(slot.playbook_name);
+        const paramChangesTried = lineage.reduce(
+          (acc, g) =>
+            acc +
+            g.mutations_from_parent.filter(
+              (m) => m.mutation_type === "nudge" || m.mutation_type === "shift",
+            ).length,
+          0,
+        );
+        const fitnessHistory = lineage
+          .filter((g) => typeof g.fitness_score === "number")
+          .sort((a, b) => a.generation - b.generation)
+          .map((g) => g.fitness_score as number);
         for (const insight of insights.slice(0, 2)) {
           if (insight.category === "stop_loss" && insight.direction === "decrease") {
             const currentSL = protocol.exit.stop_loss.value;
@@ -393,6 +417,34 @@ export class EvolutionLoop {
           });
           continue;
         }
+
+        // TiMi optimization-tier router: route the mutation pool by feedback
+        // SEVERITY (critical-risk / stability-errors → structure; params
+        // exhausted → function; else parameter) rather than purely by tick.
+        // The breakout regime (highest-energy / most volatile of the five)
+        // counts as critical risk. Filtering falls back to the originals if it
+        // would empty the pool, so this is a strictly additive, no-regression
+        // gate (default-on parameter tier).
+        const criticalRisk = currentRegime?.regime === "breakout";
+        const tier = selectOptimizationTier({
+          criticalRisk,
+          stabilityErrors,
+          paramChangesTried,
+          fitnessHistory,
+        });
+        const beforeTier = mutations.length;
+        const tiered = filterMutationsByTier(mutations, tier);
+        if (tiered.length !== beforeTier) {
+          logger.info("Optimization-tier gated mutation pool", {
+            playbook: slot.playbook_name,
+            tier: tier.tier,
+            reason: tier.reason,
+            kept: tiered.length,
+            from: beforeTier,
+          });
+        }
+        mutations.length = 0;
+        mutations.push(...tiered);
 
         // Fork the variant
         const { genome: variant } = manager.forkWithMutations(

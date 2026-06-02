@@ -152,6 +152,10 @@ export interface PreOrderPlacementPayload {
   notionalUsd: number;
   brokerId?: string;
   exchangeId?: string;
+  /** Intended limit price for the order (omit for pure market orders). */
+  limitPrice?: number;
+  /** Live reference price (mid / last / mark) to sanity-check limitPrice against. */
+  referencePrice?: number;
 }
 
 export interface PostOrderPlacementPayload {

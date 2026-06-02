@@ -16,7 +16,14 @@ import { z } from "zod";
 
 import { generatePlan } from "../../../../core/pipeline/planner.ts";
 import { executePlan, closeTrade, closePartialPosition } from "../../../../core/pipeline/executor.ts";
-import { runHooks } from "../../../hooks/engine.ts";
+import { runHooks, registerHook } from "../../../hooks/engine.ts";
+import { createPriceDeviationHookDefinition } from "../../../hooks/priceDeviationHook.ts";
+
+// Register the fat-finger / price-deviation guard once at module load. It runs
+// on PreOrderPlacement and no-ops unless a LIMIT order carries both a limitPrice
+// and a live referencePrice (populated below); a >threshold deviation in the
+// dangerous direction (buy above / sell below the mark) blocks the order.
+registerHook(createPriceDeviationHookDefinition());
 import { analyze } from "../../../../core/pipeline/analyzer.ts";
 import { calculateGridLevels } from "../../../../core/orders/grid-calculator.ts";
 import {
@@ -657,6 +664,15 @@ export const executePlanTool = createTool({
       );
     }
 
+    // Live mark for the fat-finger / price-deviation guard. Best-effort —
+    // if it can't be fetched, the guard simply no-ops (allows).
+    let referencePrice: number | undefined;
+    try {
+      referencePrice = await ctx.exchange?.getPrice(plan.symbol);
+    } catch {
+      referencePrice = undefined;
+    }
+
     // PreOrderPlacement hook — can block or modify the order
     const preOrderHook = await runHooks("PreOrderPlacement", {
       symbol: plan.symbol,
@@ -665,6 +681,10 @@ export const executePlanTool = createTool({
       orderType: plan.entry.type === "market" ? "MARKET" : "LIMIT",
       notionalUsd: plan.allocation.amount,
       exchangeId: ctx.exchange?.exchangeId,
+      // Fat-finger guard inputs: only meaningful for LIMIT orders.
+      ...(plan.entry.type !== "market" &&
+        typeof plan.entry.price === "number" && { limitPrice: plan.entry.price }),
+      ...(typeof referencePrice === "number" && { referencePrice }),
     });
     if (preOrderHook.action === "block") {
       return validateToolOutput(executePlanOutputSchema, {
