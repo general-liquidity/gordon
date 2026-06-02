@@ -65,8 +65,15 @@ export interface PortfolioOptimizerInput {
   riskFreeRate?: number;
   /** Constrain weights to ≥ 0 (no shorts). Default true. */
   longOnly?: boolean;
-  /** Per-strategy max weight cap. Default 1.0. */
+  /** Per-strategy max weight cap. Default 1.0. Ignored in market-neutral mode. */
   maxWeight?: number;
+  /**
+   * Dollar-neutral long-short mode: net exposure Σw = 0, gross exposure Σ|w| = 1.
+   * Overrides `longOnly` (a neutral book must short) and `maxWeight`. Sizes the
+   * long/short tilt from the return signal via the Σw=0-projected tangency
+   * direction: w ∝ Σ⁻¹(μ − λ1), λ = (1ᵀΣ⁻¹μ)/(1ᵀΣ⁻¹1), gross-normalized.
+   */
+  marketNeutral?: boolean;
   /**
    * Ledoit-Wolf-style shrinkage toward the diagonal (0..1). Default 0.0.
    * Useful when N is close to T and the sample covariance is unstable.
@@ -77,7 +84,7 @@ export interface PortfolioOptimizerInput {
 }
 
 export interface OptimalPortfolio {
-  /** Weight per strategy id. Sums to 1. */
+  /** Weight per strategy id. Sums to 1 (net ≈ 0 / gross = 1 in market-neutral mode). */
   weights: Record<string, number>;
   /** Expected portfolio return per period (μ_p = w ⋅ μ). */
   expectedReturn: number;
@@ -102,6 +109,12 @@ export interface OptimalPortfolio {
     fallbackReason: string | null;
     /** Strategies dropped during long-only projection (weight forced to 0). */
     droppedStrategies: string[];
+    /** True when solved as a dollar-neutral long-short book. */
+    marketNeutral: boolean;
+    /** Net exposure Σw (≈ 0 in market-neutral mode, 1 otherwise). */
+    netExposure: number;
+    /** Gross exposure Σ|w| (= 1 in market-neutral mode). */
+    grossExposure: number;
   };
   summary: string;
 }
@@ -186,6 +199,28 @@ function maxSharpeWeights(cov: number[][], means: number[], riskFreeRate: number
   const sum = raw.reduce((s, v) => s + v, 0);
   if (Math.abs(sum) < 1e-12) return null;
   return raw.map((v) => v / sum);
+}
+
+/**
+ * Dollar-neutral long-short weights: the tangency direction projected onto the
+ * net-zero hyperplane, gross-normalized.
+ *   w ∝ Σ⁻¹(μ − λ1),  λ = (1ᵀΣ⁻¹μ)/(1ᵀΣ⁻¹1),  then w /= Σ|w|.
+ * Guarantees Σw = 0 (net-neutral) and Σ|w| = 1 (unit gross). Returns null on a
+ * singular Σ or when the return spread is degenerate (no long/short tilt).
+ */
+function marketNeutralWeights(cov: number[][], means: number[]): number[] | null {
+  const inv = invert(cov);
+  if (inv === null) return null;
+  const ones = new Array(cov.length).fill(1);
+  const invOnes = multiplyVector(inv, ones);
+  const invMu = multiplyVector(inv, means);
+  const denom = dot(ones, invOnes);
+  if (Math.abs(denom) < 1e-12) return null;
+  const lambda = dot(ones, invMu) / denom;
+  const raw = invMu.map((v, i) => v - lambda * invOnes[i]!);
+  const gross = raw.reduce((s, v) => s + Math.abs(v), 0);
+  if (gross < 1e-12) return null;
+  return raw.map((v) => v / gross);
 }
 
 /**
@@ -313,6 +348,7 @@ export function optimizePortfolio(input: PortfolioOptimizerInput): OptimalPortfo
   const maxWeight = input.maxWeight ?? DEFAULTS.maxWeight;
   const shrinkage = input.shrinkage ?? DEFAULTS.shrinkage;
   const iterationCap = input.iterationCap ?? DEFAULTS.iterationCap;
+  const marketNeutral = input.marketNeutral ?? false;
 
   const ids = Object.keys(input.strategyReturns);
   const n = ids.length;
@@ -326,6 +362,7 @@ export function optimizePortfolio(input: PortfolioOptimizerInput): OptimalPortfo
     iterations: number,
     fallbackReason: string | null,
     droppedIdx: number[],
+    marketNeutralFlag = false,
   ): OptimalPortfolio {
     const weights: Record<string, number> = {};
     for (let i = 0; i < ids.length; i++) weights[ids[i]!] = weightsArr[i]!;
@@ -340,13 +377,17 @@ export function optimizePortfolio(input: PortfolioOptimizerInput): OptimalPortfo
     const sharpe = stdev === 0 ? 0 : (expectedReturn - riskFreeRate) / stdev;
     const effN = computeEffectiveN(input.strategyReturns).effectiveN;
 
+    const netExposure = weightsArr.reduce((s, w) => s + w, 0);
+    const grossExposure = weightsArr.reduce((s, w) => s + Math.abs(w), 0);
+
     const droppedStrategies = droppedIdx.map((i) => ids[i]!);
     const summary =
       `${objective} over ${n} strategies (T=${T})${shrinkage > 0 ? `, shrinkage=${shrinkage.toFixed(2)}` : ""}: ` +
       `μ=${expectedReturn.toFixed(5)}, σ=${stdev.toFixed(5)}, Sharpe=${sharpe.toFixed(3)}, ` +
       `effective N=${effN.toFixed(2)}` +
       (converged ? "" : ` [fallback: ${fallbackReason}]`) +
-      (droppedStrategies.length > 0 ? ` [dropped: ${droppedStrategies.join(", ")}]` : "");
+      (droppedStrategies.length > 0 ? ` [dropped: ${droppedStrategies.join(", ")}]` : "") +
+      (marketNeutralFlag ? ` [market-neutral: net=${netExposure.toFixed(4)}, gross=${grossExposure.toFixed(4)}]` : "");
 
     return {
       weights,
@@ -364,9 +405,27 @@ export function optimizePortfolio(input: PortfolioOptimizerInput): OptimalPortfo
         iterations,
         fallbackReason,
         droppedStrategies,
+        marketNeutral: marketNeutralFlag,
+        netExposure: parseFloat(netExposure.toFixed(6)),
+        grossExposure: parseFloat(grossExposure.toFixed(6)),
       },
       summary,
     };
+  }
+
+  // A dollar-neutral long-short book needs ≥ 2 legs.
+  if (marketNeutral && n < 2) {
+    const mn = n === 1 ? computeMeanReturns([input.strategyReturns[ids[0]!]!]) : [];
+    return buildResult(
+      n === 1 ? [0] : [],
+      n === 1 ? [[0]] : [],
+      mn,
+      false,
+      0,
+      "market-neutral requires ≥ 2 strategies",
+      [],
+      true,
+    );
   }
 
   // Edge cases
@@ -391,6 +450,25 @@ export function optimizePortfolio(input: PortfolioOptimizerInput): OptimalPortfo
   if (shrinkage > 0) cov = shrinkToDiagonal(cov, shrinkage);
 
   const means = computeMeanReturns(returnSeries);
+
+  // Dollar-neutral long-short: bypass the long-only projection + sum-to-1
+  // normalization; size the tilt from the net-zero-projected tangency.
+  if (marketNeutral) {
+    const w = marketNeutralWeights(cov, means);
+    if (w === null) {
+      return buildResult(
+        equalWeightVector(n),
+        cov,
+        means,
+        false,
+        0,
+        "market-neutral solve failed (singular Σ or no return spread)",
+        [],
+        true,
+      );
+    }
+    return buildResult(w, cov, means, true, 0, null, [], true);
+  }
 
   const solveResult = solveWithLongOnly(
     cov,

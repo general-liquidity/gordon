@@ -236,3 +236,52 @@ describe("optimizePortfolio — collinear strategies", () => {
     expect(sum).toBeCloseTo(1, 4);
   });
 });
+
+describe("optimizePortfolio — market-neutral", () => {
+  it("produces a dollar-neutral book: net ≈ 0, gross = 1", () => {
+    const result = optimizePortfolio({
+      strategyReturns: {
+        good: returns(200, 0.003, 0.02, 1), // high mean
+        bad: returns(200, -0.001, 0.02, 999), // negative mean
+      },
+      marketNeutral: true,
+    });
+    expect(result.diagnostics.converged).toBe(true);
+    expect(result.diagnostics.marketNeutral).toBe(true);
+    const net = Object.values(result.weights).reduce((s, w) => s + w, 0);
+    const gross = Object.values(result.weights).reduce((s, w) => s + Math.abs(w), 0);
+    expect(net).toBeCloseTo(0, 6); // net-neutral
+    expect(gross).toBeCloseTo(1, 6); // unit gross
+    expect(result.diagnostics.netExposure).toBeCloseTo(0, 5);
+    expect(result.diagnostics.grossExposure).toBeCloseTo(1, 5);
+    // Longs the high-mean leg, shorts the low-mean leg.
+    expect(result.weights.good!).toBeGreaterThan(0);
+    expect(result.weights.bad!).toBeLessThan(0);
+    expect(result.summary).toContain("market-neutral");
+  });
+
+  it("holds net = 0 / gross = 1 across three legs", () => {
+    const result = optimizePortfolio({
+      strategyReturns: {
+        a: returns(200, 0.003, 0.02, 1),
+        b: returns(200, 0.0, 0.02, 50),
+        c: returns(200, -0.002, 0.02, 999),
+      },
+      marketNeutral: true,
+    });
+    expect(result.diagnostics.converged).toBe(true);
+    const net = Object.values(result.weights).reduce((s, w) => s + w, 0);
+    const gross = Object.values(result.weights).reduce((s, w) => s + Math.abs(w), 0);
+    expect(net).toBeCloseTo(0, 6);
+    expect(gross).toBeCloseTo(1, 6);
+  });
+
+  it("requires ≥ 2 strategies — single-leg falls back", () => {
+    const result = optimizePortfolio({
+      strategyReturns: { only: returns(50, 0.001, 0.01, 1) },
+      marketNeutral: true,
+    });
+    expect(result.diagnostics.converged).toBe(false);
+    expect(result.diagnostics.fallbackReason).toContain("market-neutral requires");
+  });
+});

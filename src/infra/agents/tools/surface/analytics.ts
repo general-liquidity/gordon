@@ -112,6 +112,7 @@ import {
 import { computeOptionsPayoff } from "../../../../core/alpha/options-payoff.ts";
 import { twoSamplePnlTest } from "../../../trading/quant/twoSampleTest.ts";
 import { computeOmegaRatio } from "../../../../core/alpha/omega-ratio.ts";
+import { optimizePortfolio } from "../../../../core/alpha/portfolio-optimizer.ts";
 import {
   injectGaps,
   injectCrashBlocks,
@@ -1140,6 +1141,7 @@ const MICROSTRUCTURE_OPS = [
   "stress_inject",
   "pnl_significance",
   "omega_ratio",
+  "optimize_portfolio",
 ] as const;
 
 export const computeMicrostructureTool = createTool({
@@ -1356,6 +1358,10 @@ export const computeMicrostructureTool = createTool({
     "    - 'omega_ratio'         — params: { returns: number[], threshold? }",
     "                              Omega ratio = Σ gains-above-threshold / Σ losses-below-threshold. Probability-weighted up/down capture; complements the",
     "                              Sharpe/Sortino/Calmar triple (risk_ratio_triple). threshold default 0.",
+    "    - 'optimize_portfolio'  — params: { strategyReturns: Record<string, number[]>, objective?: 'min_variance'|'max_sharpe'|'target_return', targetReturn?, riskFreeRate?, longOnly?, maxWeight?, shrinkage?, marketNeutral? }",
+    "                              Markowitz optimizer over strategy/asset return series: min-variance / max-Sharpe / target-return, long-only + max-weight",
+    "                              cap + Ledoit-Wolf shrinkage, equal-weight fallback (converged flag). marketNeutral:true → dollar-neutral long-short",
+    "                              (net Σw=0, gross Σ|w|=1). Return-optimized family; complement to portfolio_ensemble (risk-structured) and hrp_allocation.",
     "",
     "IMPORTANT: discipline_audit and adherence_report respect startTime+endTime",
     "ISO strings. When the operator asks for 'last 24h' or 'today', YOU must",
@@ -1671,6 +1677,10 @@ export const computeMicrostructureTool = createTool({
           const r = computeOmegaRatio(returns, threshold);
           return r ?? { error: "omega_ratio: need ≥ 2 returns." };
         },
+      },
+      optimize_portfolio: {
+        execute: async (p: Record<string, unknown>) =>
+          optimizePortfolio(p as unknown as Parameters<typeof optimizePortfolio>[0]),
       },
     };
     try {
