@@ -72,6 +72,13 @@ import {
   buildInformationBars,
   buildInformationBarsFromOHLCV,
   calculateVolumeSignature,
+  calculateDonchian,
+  calculateHMA,
+  calculateVWMA,
+  calculateMomentum,
+  calculateROC,
+  calculateSupertrendChannel,
+  calculateCboeOdds,
   type CandlestickPatternName,
   type Candle as IndicatorCandle,
 } from "../../../../core/indicators/index.ts";
@@ -96,6 +103,23 @@ import { runJohansenTest, johansenToPayload } from "../../../trading/quant/johan
 import { acf, pacf } from "../../../trading/quant/autocorrelation.ts";
 import { computeRobustnessMetrics } from "../../../../core/alpha/robustness-metrics.ts";
 import { runFeeSensitivitySweep } from "../../../../backtest/analysis/fee-sensitivity.ts";
+import {
+  computeBlackScholesGreeks,
+  blackScholesGreeksToPayload,
+  impliedVolatility,
+  isBlackScholesGreeksEnabled,
+} from "../../../trading/quant/blackScholesGreeks.ts";
+import { computeOptionsPayoff } from "../../../../core/alpha/options-payoff.ts";
+import { twoSamplePnlTest } from "../../../trading/quant/twoSampleTest.ts";
+import { computeOmegaRatio } from "../../../../core/alpha/omega-ratio.ts";
+import {
+  injectGaps,
+  injectCrashBlocks,
+  injectFlatlineBlocks,
+  stretchVolatility,
+  reversePath,
+  invertTrendWindows,
+} from "../../../../core/alpha/syntheticAugmentation.ts";
 import { RegimeDetector } from "../../../../core/regime/index.ts";
 import { checkRiskTool as implCheckRisk } from "../trading/risk-gate.ts";
 import { recordSymbolObservation } from "../../observation/symbolObservationTracker.ts";
@@ -466,7 +490,22 @@ const INDICATOR_NAMES = [
   "trima",
   "garch_forecast",
   "volume_signature",
+  "donchian",
+  "hull_ma",
+  "vwma",
+  "momentum",
+  "roc",
+  "supertrend_channel",
+  "cboe_odds",
 ] as const;
+
+/** Last non-null value of an aligned indicator series (for boxing bare arrays). */
+function lastDefined(values: (number | null)[]): number | null {
+  for (let i = values.length - 1; i >= 0; i--) {
+    if (values[i] != null) return values[i]!;
+  }
+  return null;
+}
 
 function dispatchIndicator(
   indicator: string,
@@ -686,6 +725,39 @@ function dispatchIndicator(
       const { forecast, ...rest } = r;
       return { ...rest, horizon, varianceForecast: forecast(horizon) };
     }
+    case "donchian":
+      return calculateDonchian(candles, (params.period as number) ?? 20);
+    case "hull_ma": {
+      const period = (params.period as number) ?? 16;
+      const values = calculateHMA(closes, period);
+      return { values, current: lastDefined(values), period };
+    }
+    case "vwma": {
+      const period = (params.period as number) ?? 20;
+      const values = calculateVWMA(candles, period);
+      return { values, current: lastDefined(values), period };
+    }
+    case "momentum": {
+      const period = (params.period as number) ?? 10;
+      const values = calculateMomentum(closes, period);
+      return { values, current: lastDefined(values), period };
+    }
+    case "roc": {
+      const period = (params.period as number) ?? 10;
+      const values = calculateROC(closes, period);
+      return { values, current: lastDefined(values), period };
+    }
+    case "supertrend_channel":
+      return calculateSupertrendChannel(candles, {
+        ...(typeof params.atrPeriod === "number" && { atrPeriod: params.atrPeriod }),
+        ...(typeof params.multiplier === "number" && { multiplier: params.multiplier }),
+      });
+    case "cboe_odds":
+      return calculateCboeOdds(candles, {
+        ...(typeof params.length === "number" && { length: params.length }),
+        ...(typeof params.rsiPeriod === "number" && { rsiPeriod: params.rsiPeriod }),
+        ...(typeof params.stochPeriod === "number" && { stochPeriod: params.stochPeriod }),
+      });
     case "volume_signature":
       return calculateVolumeSignature(candles, {
         ...(typeof params.avgPeriod === "number" && { avgPeriod: params.avgPeriod }),
@@ -730,6 +802,9 @@ export const computeIndicatorTool = createTool({
     "Moving averages: wma (weighted), dema (double EMA), tema (triple EMA), trima (triangular) — return { values, current }",
     "Volatility forecast: garch_forecast (GARCH(1,1) MLE fit on log-returns → params, persistence, long-run vol, multi-step varianceForecast; params { horizon?, demean? })",
     "Volume signature: volume_signature (Morales-Kacher / CAN SLIM pocket-pivot family — per-bar pocket pivots PP10/PP5, volume dry-up (2 levels), accumulation/distribution days + trailing distribution count & health verdict, churn/stalling; one op over an SMA-volume baseline; pairs with highest_volume_ever / undercut_rally / tight_consolidation for base-building reads)",
+    "Channels / MAs: donchian (rolling high/low breakout envelope), hull_ma (low-lag Hull MA), vwma (volume-weighted MA), supertrend_channel (Supertrend-pivot running-extreme envelope + midline target, resets on trend flip)",
+    "Momentum: momentum (absolute Δ vs N bars ago), roc (percent change vs N bars ago)",
+    "Flow regime: cboe_odds (volume-weighted three-state bull/bear/STAGNANT odds oscillator — MFI-style money-flow index re-weighted by Stoch-RSI momentum; the stagnant leg quantifies chop/indecision)",
     "",
     "Internally fetches candles via the connected exchange. Pass `bars` to",
     "control the lookback window (default 200).",
@@ -1060,6 +1135,11 @@ const MICROSTRUCTURE_OPS = [
   "information_bars",
   "robustness_metrics",
   "fee_sensitivity",
+  "black_scholes",
+  "options_payoff",
+  "stress_inject",
+  "pnl_significance",
+  "omega_ratio",
 ] as const;
 
 export const computeMicrostructureTool = createTool({
@@ -1259,6 +1339,23 @@ export const computeMicrostructureTool = createTool({
     "                              Re-score a strategy's per-trade gross returns under multiple fee tiers; flags which schedules flip it",
     "                              from profit to loss + the break-even round-trip bps (= gross mean edge). The Minara/Lighter finding:",
     "                              fee drag, not signal, kills high-frequency strategies. Complement to marketImpact (which sweeps order size).",
+    "    - 'black_scholes'       — params: { spot, strike, timeToExpiry (years), riskFreeRate, dividendYield?, optionType: 'call'|'put', sigma?, marketPrice? }",
+    "                              European option pricing (Merton continuous-dividend). Pass `sigma` → fair value + full Greeks (delta/gamma/vega/theta/rho).",
+    "                              Pass `marketPrice` instead → IMPLIED VOLATILITY (Newton-Raphson + bisection inversion). Gated behind GORDON_BLACK_SCHOLES_GREEKS.",
+    "    - 'options_payoff'      — params: { legs: [{ type:'call'|'put', side:'long'|'short', strike, premium, quantity? }], spot?, priceGrid? }",
+    "                              Multi-leg expiry payoff: net debit/credit, breakeven(s), max profit, max loss (null=unbounded), downsampled payoff curve.",
+    "                              Build straddle/strangle/spread legs directly. Equities options (US side).",
+    "    - 'stress_inject'       — params: { method: 'gaps'|'crash_blocks'|'flatline_blocks'|'vol_stretch'|'reverse_path'|'trend_invert', candles: Candle[], params: {…method-specific} }",
+    "                              Inject a NAMED market pathology into a historical candle series, then re-run `backtest` on the returned candles and feed both",
+    "                              trade-PnL vectors to pnl_significance. A robustness axis distinct from MCPT/vs_random (which test edge-vs-noise): does the",
+    "                              strategy SURVIVE structured pathologies? Deterministic (seedable). gaps={magnitudePct,atIndices?|everyN?,direction?};",
+    "                              crash_blocks={dropPct,lengthBars,count?}; flatline_blocks={lengthBars,count?}; vol_stretch={factor}; trend_invert={window}.",
+    "    - 'pnl_significance'    — params: { baseline: number[], scenario: number[], alpha? }",
+    "                              Two-sample test (Mann-Whitney U always + paired t when lengths match) for whether scenario PnL differs from baseline PnL.",
+    "                              The verdict layer for stress_inject. Distinct from MCPT (permutation-null) — this is baseline-vs-scenario. Needs ≥5 each.",
+    "    - 'omega_ratio'         — params: { returns: number[], threshold? }",
+    "                              Omega ratio = Σ gains-above-threshold / Σ losses-below-threshold. Probability-weighted up/down capture; complements the",
+    "                              Sharpe/Sortino/Calmar triple (risk_ratio_triple). threshold default 0.",
     "",
     "IMPORTANT: discipline_audit and adherence_report respect startTime+endTime",
     "ISO strings. When the operator asks for 'last 24h' or 'today', YOU must",
@@ -1456,6 +1553,123 @@ export const computeMicrostructureTool = createTool({
         execute: async (p: Record<string, unknown>) => {
           const r = runFeeSensitivitySweep(p as unknown as Parameters<typeof runFeeSensitivitySweep>[0]);
           return r ?? { error: "fee_sensitivity: need `grossReturns` (per-round-trip gross return fractions) and at least one fee `schedule`." };
+        },
+      },
+      black_scholes: {
+        execute: async (p: Record<string, unknown>) => {
+          if (!isBlackScholesGreeksEnabled()) {
+            return { error: "black_scholes: module disabled. Set GORDON_BLACK_SCHOLES_GREEKS=1 to enable." };
+          }
+          const num = (k: string): number | null => (typeof p[k] === "number" ? (p[k] as number) : null);
+          const spot = num("spot");
+          const strike = num("strike");
+          const timeToExpiry = num("timeToExpiry");
+          const riskFreeRate = num("riskFreeRate");
+          if (spot == null || strike == null || timeToExpiry == null || riskFreeRate == null) {
+            return { error: "black_scholes: spot, strike, timeToExpiry (years), riskFreeRate are required numbers." };
+          }
+          const optionType = p.optionType === "put" ? ("put" as const) : ("call" as const);
+          const q = num("dividendYield");
+          const marketPrice = num("marketPrice");
+          const sigma = num("sigma");
+          if (marketPrice != null) {
+            return impliedVolatility({
+              marketPrice,
+              spot,
+              strike,
+              timeToExpiry,
+              riskFreeRate,
+              ...(q != null && { dividendYield: q }),
+              optionType,
+            });
+          }
+          if (sigma != null) {
+            return blackScholesGreeksToPayload(
+              computeBlackScholesGreeks({
+                spot,
+                strike,
+                timeYears: timeToExpiry,
+                rate: riskFreeRate,
+                volatility: sigma,
+                ...(q != null && { dividendYield: q }),
+                optionType,
+              }),
+              optionType,
+            );
+          }
+          return { error: "black_scholes: provide `sigma` (→ price + Greeks) or `marketPrice` (→ implied volatility)." };
+        },
+      },
+      options_payoff: {
+        execute: async (p: Record<string, unknown>) => {
+          const r = computeOptionsPayoff(p as unknown as Parameters<typeof computeOptionsPayoff>[0]);
+          // Downsample the (potentially ~200-point) payoff curve; the model
+          // wants breakevens / max-P / max-L, not the raw grid.
+          const { payoffCurve, ...rest } = r;
+          const step = payoffCurve.length > 40 ? Math.ceil(payoffCurve.length / 40) : 1;
+          return {
+            ...rest,
+            payoffCurve: payoffCurve.filter((_, i) => i % step === 0),
+            payoffCurvePoints: payoffCurve.length,
+          };
+        },
+      },
+      stress_inject: {
+        execute: async (p: Record<string, unknown>) => {
+          const candles = Array.isArray(p.candles)
+            ? (p.candles as Parameters<typeof injectGaps>[0])
+            : null;
+          if (!candles) return { error: "stress_inject: `candles` array required." };
+          const sp = (typeof p.params === "object" && p.params !== null ? p.params : {}) as Record<string, unknown>;
+          let perturbed: typeof candles;
+          switch (p.method) {
+            case "gaps":
+              perturbed = injectGaps(candles, sp as unknown as Parameters<typeof injectGaps>[1]);
+              break;
+            case "crash_blocks":
+              perturbed = injectCrashBlocks(candles, sp as unknown as Parameters<typeof injectCrashBlocks>[1]);
+              break;
+            case "flatline_blocks":
+              perturbed = injectFlatlineBlocks(candles, sp as unknown as Parameters<typeof injectFlatlineBlocks>[1]);
+              break;
+            case "vol_stretch":
+              perturbed = stretchVolatility(candles, sp as unknown as Parameters<typeof stretchVolatility>[1]);
+              break;
+            case "reverse_path":
+              perturbed = reversePath(candles);
+              break;
+            case "trend_invert":
+              perturbed = invertTrendWindows(candles, sp as unknown as Parameters<typeof invertTrendWindows>[1]);
+              break;
+            default:
+              return { error: `stress_inject: unknown method '${String(p.method)}'. Use gaps | crash_blocks | flatline_blocks | vol_stretch | reverse_path | trend_invert.` };
+          }
+          return {
+            method: p.method,
+            barCount: perturbed.length,
+            candles: perturbed,
+            summary: `Injected '${String(p.method)}' pathology over ${perturbed.length} bars. Re-run backtest on these candles, then pnl_significance vs the baseline trade-PnL.`,
+          };
+        },
+      },
+      pnl_significance: {
+        execute: async (p: Record<string, unknown>) => {
+          const baseline = Array.isArray(p.baseline) ? (p.baseline as number[]) : [];
+          const scenario = Array.isArray(p.scenario) ? (p.scenario as number[]) : [];
+          const r = twoSamplePnlTest({
+            baseline,
+            scenario,
+            ...(typeof p.alpha === "number" && { alpha: p.alpha }),
+          });
+          return r ?? { error: "pnl_significance: need ≥ 5 finite values in each of `baseline` and `scenario`." };
+        },
+      },
+      omega_ratio: {
+        execute: async (p: Record<string, unknown>) => {
+          const returns = Array.isArray(p.returns) ? (p.returns as number[]) : [];
+          const threshold = typeof p.threshold === "number" ? p.threshold : 0;
+          const r = computeOmegaRatio(returns, threshold);
+          return r ?? { error: "omega_ratio: need ≥ 2 returns." };
         },
       },
     };

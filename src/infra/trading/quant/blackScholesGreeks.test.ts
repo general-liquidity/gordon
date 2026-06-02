@@ -271,3 +271,145 @@ describe("blackScholesGreeksToPayload", () => {
     expect(p.delta).toBeNull();
   });
 });
+
+// ----------------------------------------------------------------------------
+// Implied-volatility inversion
+// ----------------------------------------------------------------------------
+import { impliedVolatility } from "./blackScholesGreeks.ts";
+
+describe("impliedVolatility — round-trip recovery", () => {
+  it("recovers a known call sigma within 1e-4", () => {
+    const knownSigma = 0.27;
+    const params = {
+      spot: 100,
+      strike: 105,
+      timeYears: 0.5,
+      rate: 0.03,
+      volatility: knownSigma,
+      dividendYield: 0.01,
+      optionType: "call" as const,
+    };
+    const priced = computeBlackScholesGreeks(params);
+    const r = impliedVolatility({
+      marketPrice: priced.price,
+      spot: 100,
+      strike: 105,
+      timeToExpiry: 0.5,
+      riskFreeRate: 0.03,
+      dividendYield: 0.01,
+      optionType: "call",
+    });
+    expect(r.iv).not.toBeNull();
+    expect(r.iv!).toBeCloseTo(knownSigma, 4);
+    expect(r.method).toBe("newton");
+  });
+
+  it("recovers a known put sigma within 1e-4", () => {
+    const knownSigma = 0.42;
+    const priced = computeBlackScholesGreeks({
+      spot: 80,
+      strike: 75,
+      timeYears: 1.25,
+      rate: 0.05,
+      volatility: knownSigma,
+      optionType: "put",
+    });
+    const r = impliedVolatility({
+      marketPrice: priced.price,
+      spot: 80,
+      strike: 75,
+      timeToExpiry: 1.25,
+      riskFreeRate: 0.05,
+      optionType: "put",
+    });
+    expect(r.iv).not.toBeNull();
+    expect(r.iv!).toBeCloseTo(knownSigma, 4);
+  });
+
+  it("ATM call converges", () => {
+    const known = 0.2;
+    const priced = computeBlackScholesGreeks({
+      spot: 100,
+      strike: 100,
+      timeYears: 1,
+      rate: 0.04,
+      volatility: known,
+      optionType: "call",
+    });
+    const r = impliedVolatility({
+      marketPrice: priced.price,
+      spot: 100,
+      strike: 100,
+      timeToExpiry: 1,
+      riskFreeRate: 0.04,
+      optionType: "call",
+    });
+    expect(r.iv).not.toBeNull();
+    expect(r.iv!).toBeCloseTo(known, 4);
+  });
+
+  it("deep-ITM call converges (vega tiny -> bisection still recovers)", () => {
+    const known = 0.35;
+    const priced = computeBlackScholesGreeks({
+      spot: 200,
+      strike: 100,
+      timeYears: 0.25,
+      rate: 0.05,
+      volatility: known,
+      optionType: "call",
+    });
+    const r = impliedVolatility({
+      marketPrice: priced.price,
+      spot: 200,
+      strike: 100,
+      timeToExpiry: 0.25,
+      riskFreeRate: 0.05,
+      optionType: "call",
+    });
+    expect(r.iv).not.toBeNull();
+    expect(r.iv!).toBeCloseTo(known, 4);
+    expect(["newton", "bisection"]).toContain(r.method);
+  });
+});
+
+describe("impliedVolatility — failure modes", () => {
+  it("below-intrinsic price returns null/failed", () => {
+    // Intrinsic-ish lower bound for this ITM call is well above 1.0
+    const r = impliedVolatility({
+      marketPrice: 1.0,
+      spot: 200,
+      strike: 100,
+      timeToExpiry: 0.25,
+      riskFreeRate: 0.05,
+      optionType: "call",
+    });
+    expect(r.iv).toBeNull();
+    expect(r.method).toBe("failed");
+  });
+
+  it("non-positive spot returns null/failed", () => {
+    const r = impliedVolatility({
+      marketPrice: 5,
+      spot: 0,
+      strike: 100,
+      timeToExpiry: 0.5,
+      riskFreeRate: 0.03,
+      optionType: "call",
+    });
+    expect(r.iv).toBeNull();
+    expect(r.method).toBe("failed");
+  });
+
+  it("zero time-to-expiry returns null/failed", () => {
+    const r = impliedVolatility({
+      marketPrice: 5,
+      spot: 100,
+      strike: 100,
+      timeToExpiry: 0,
+      riskFreeRate: 0.03,
+      optionType: "call",
+    });
+    expect(r.iv).toBeNull();
+    expect(r.method).toBe("failed");
+  });
+});

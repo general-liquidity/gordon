@@ -1,5 +1,16 @@
 import { describe, expect, test } from "bun:test";
-import { shiftBars, mcpPermute, addNoiseBands, type Candle } from "./syntheticAugmentation.ts";
+import {
+  shiftBars,
+  mcpPermute,
+  addNoiseBands,
+  injectGaps,
+  injectCrashBlocks,
+  injectFlatlineBlocks,
+  stretchVolatility,
+  reversePath,
+  invertTrendWindows,
+  type Candle,
+} from "./syntheticAugmentation.ts";
 
 function bar(open: number, high: number, low: number, close: number, volume = 1_000): Candle {
   return { open, high, low, close, volume };
@@ -154,5 +165,193 @@ describe("addNoiseBands", () => {
 
   test("empty input returns empty output", () => {
     expect(addNoiseBands([], 0.1, 1)).toEqual([]);
+  });
+});
+
+function flatCandles(n: number, price = 100): Candle[] {
+  const out: Candle[] = [];
+  for (let i = 0; i < n; i++) out.push(bar(price, price, price, price));
+  return out;
+}
+
+describe("injectGaps", () => {
+  test("exact +2% jump at atIndices=[2] on a flat series", () => {
+    const candles = flatCandles(5, 100);
+    const out = injectGaps(candles, { magnitudePct: 2, atIndices: [2] });
+    expect(out[2]!.open).toBeCloseTo(102, 8);
+    expect(out[2]!.high).toBeCloseTo(102, 8);
+    expect(out[2]!.close).toBeCloseTo(102, 8);
+    // Other bars untouched.
+    expect(out[1]!.open).toBe(100);
+    expect(out[3]!.open).toBe(100);
+  });
+
+  test("down direction drops the bar", () => {
+    const out = injectGaps(flatCandles(5), { magnitudePct: 2, atIndices: [1], direction: "down" });
+    expect(out[1]!.open).toBeCloseTo(98, 8);
+  });
+
+  test("alternate direction flips sign across targets", () => {
+    const out = injectGaps(flatCandles(6), {
+      magnitudePct: 10,
+      atIndices: [1, 2, 3],
+      direction: "alternate",
+    });
+    expect(out[1]!.open).toBeCloseTo(110, 8); // +
+    expect(out[2]!.open).toBeCloseTo(90, 8); // −
+    expect(out[3]!.open).toBeCloseTo(110, 8); // +
+  });
+
+  test("everyN stride hits the expected bars", () => {
+    const out = injectGaps(flatCandles(7), { magnitudePct: 5, everyN: 3 });
+    expect(out[3]!.open).toBeCloseTo(105, 8);
+    expect(out[6]!.open).toBeCloseTo(105, 8);
+    expect(out[1]!.open).toBe(100);
+  });
+
+  test("zero magnitude returns copy unchanged", () => {
+    const candles = flatCandles(4);
+    const out = injectGaps(candles, { magnitudePct: 0, atIndices: [1] });
+    expect(out.map((c) => c.open)).toEqual(candles.map((c) => c.open));
+  });
+
+  test("empty input returns empty", () => {
+    expect(injectGaps([], { magnitudePct: 2, atIndices: [0] })).toEqual([]);
+  });
+});
+
+describe("injectCrashBlocks", () => {
+  test("3-bar block, 9% drop → close at block end ≈ start × 0.91", () => {
+    const candles = flatCandles(8, 100);
+    const out = injectCrashBlocks(candles, { dropPct: 9, lengthBars: 3, startIndices: [2] });
+    // Block spans bars 2,3,4. Close at bar 4 ≈ 91.
+    expect(out[4]!.close).toBeCloseTo(91, 6);
+    // Pre-block bar untouched.
+    expect(out[1]!.close).toBe(100);
+    // Crash persists after the block.
+    expect(out[5]!.close).toBeCloseTo(91, 6);
+  });
+
+  test("invalid lengthBars returns copy unchanged", () => {
+    const candles = flatCandles(5);
+    expect(injectCrashBlocks(candles, { dropPct: 9, lengthBars: 0 }).map((c) => c.close)).toEqual(
+      candles.map((c) => c.close),
+    );
+  });
+
+  test("seeded count is deterministic", () => {
+    const candles = flatCandles(40);
+    const a = injectCrashBlocks(candles, { dropPct: 10, lengthBars: 3, count: 2, seed: 7 });
+    const b = injectCrashBlocks(candles, { dropPct: 10, lengthBars: 3, count: 2, seed: 7 });
+    expect(a.map((c) => c.close)).toEqual(b.map((c) => c.close));
+  });
+
+  test("empty input returns empty", () => {
+    expect(injectCrashBlocks([], { dropPct: 9, lengthBars: 3 })).toEqual([]);
+  });
+});
+
+describe("injectFlatlineBlocks", () => {
+  test("O==H==L==C across the block", () => {
+    const candles = flatCandles(8, 100).map((_, i) => bar(100 + i, 101 + i, 99 + i, 100 + i));
+    const out = injectFlatlineBlocks(candles, { lengthBars: 3, startIndices: [3] });
+    for (let i = 3; i < 6; i++) {
+      expect(out[i]!.open).toBe(out[i]!.high);
+      expect(out[i]!.high).toBe(out[i]!.low);
+      expect(out[i]!.low).toBe(out[i]!.close);
+      expect(out[i]!.volume).toBe(0);
+    }
+  });
+
+  test("freezes at the pre-block close", () => {
+    const candles = [
+      bar(100, 101, 99, 105),
+      bar(105, 106, 104, 110),
+      bar(110, 111, 109, 115),
+      bar(115, 116, 114, 120),
+    ];
+    const out = injectFlatlineBlocks(candles, { lengthBars: 2, startIndices: [2] });
+    // Frozen at bar 1's close = 110.
+    expect(out[2]!.close).toBe(110);
+    expect(out[3]!.close).toBe(110);
+  });
+
+  test("empty input returns empty", () => {
+    expect(injectFlatlineBlocks([], { lengthBars: 2 })).toEqual([]);
+  });
+});
+
+describe("stretchVolatility", () => {
+  test("factor 2 doubles the range, close unchanged", () => {
+    const candles = [bar(98, 104, 96, 100)];
+    const out = stretchVolatility(candles, { factor: 2 });
+    const origRange = 104 - 96;
+    const newRange = out[0]!.high - out[0]!.low;
+    expect(newRange).toBeCloseTo(origRange * 2, 6);
+    expect(out[0]!.close).toBeCloseTo(100, 8);
+  });
+
+  test("factor <= 0 returns copy unchanged", () => {
+    const candles = [bar(98, 104, 96, 100)];
+    expect(stretchVolatility(candles, { factor: 0 })[0]!.high).toBe(104);
+  });
+
+  test("empty input returns empty", () => {
+    expect(stretchVolatility([], { factor: 2 })).toEqual([]);
+  });
+});
+
+describe("reversePath", () => {
+  test("output[0] OHLC equals original last bar", () => {
+    const candles = [bar(100, 102, 99, 101), bar(101, 103, 100, 102), bar(102, 104, 101, 103)];
+    const out = reversePath(candles);
+    const last = candles[candles.length - 1]!;
+    expect(out[0]!.open).toBe(last.open);
+    expect(out[0]!.high).toBe(last.high);
+    expect(out[0]!.low).toBe(last.low);
+    expect(out[0]!.close).toBe(last.close);
+  });
+
+  test("preserves length and monotonic time axis", () => {
+    const candles = trendingCandles(10).map((c, i) => ({ ...c, openTime: i * 1000 }));
+    const out = reversePath(candles);
+    expect(out).toHaveLength(10);
+    for (let i = 1; i < out.length; i++) {
+      expect(out[i]!.openTime!).toBeGreaterThan(out[i - 1]!.openTime!);
+    }
+  });
+
+  test("empty input returns empty", () => {
+    expect(reversePath([])).toEqual([]);
+  });
+});
+
+describe("invertTrendWindows", () => {
+  test("trending window flattened to O=H=L=C at first open", () => {
+    const candles = trendingCandles(8, 100, 0.02); // strong uptrend
+    const out = invertTrendWindows(candles, { window: 4 });
+    // First window [0..3] should be flattened.
+    const frozen = candles[0]!.open;
+    for (let i = 0; i < 4; i++) {
+      expect(out[i]!.open).toBeCloseTo(frozen, 8);
+      expect(out[i]!.open).toBe(out[i]!.close);
+    }
+  });
+
+  test("flat window left unchanged", () => {
+    const candles = flatCandles(8, 100);
+    const out = invertTrendWindows(candles, { window: 4 });
+    expect(out.map((c) => c.close)).toEqual(candles.map((c) => c.close));
+  });
+
+  test("too-short / invalid window returns copy", () => {
+    const candles = trendingCandles(3);
+    expect(invertTrendWindows(candles, { window: 4 }).map((c) => c.close)).toEqual(
+      candles.map((c) => c.close),
+    );
+  });
+
+  test("empty input returns empty", () => {
+    expect(invertTrendWindows([], { window: 4 })).toEqual([]);
   });
 });

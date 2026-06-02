@@ -31,6 +31,12 @@
  * augments HISTORICAL data for in-sample/walk-forward robustness.
  *
  * All functions pure. Caller seeds the RNG for reproducibility.
+ *
+ * Named-pathology stress injectors (injectGaps / injectCrashBlocks /
+ * injectFlatlineBlocks / stretchVolatility / reversePath /
+ * invertTrendWindows) live below the three core generators — a robustness
+ * axis distinct from permutation: inject SPECIFIC failure modes, re-backtest,
+ * then two-sample test scenario PnL vs baseline (twoSampleTest.ts).
  */
 
 export interface Candle {
@@ -189,6 +195,296 @@ export function addNoiseBands(candles: Candle[], volPct: number, seed: number): 
       openTime: c.openTime,
       closeTime: c.closeTime,
     });
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// Named-pathology stress injection. Rather than asking "would noise look this
+// good?", these inject SPECIFIC market failure modes (gaps, crashes,
+// illiquidity flatlines, vol regime shifts, path reversal) into a real series
+// so the caller can re-backtest and two-sample test scenario PnL vs baseline.
+// All deterministic: index-driven or seeded via the shared makeRng LCG.
+// ---------------------------------------------------------------------------
+
+/** Resolve targets from explicit `atIndices` (wins) or an `everyN` stride. */
+function resolveTargetIndices(
+  length: number,
+  atIndices: number[] | undefined,
+  everyN: number | undefined,
+): number[] {
+  const set = new Set<number>();
+  if (Array.isArray(atIndices)) {
+    for (const i of atIndices) {
+      if (Number.isInteger(i) && i >= 0 && i < length) set.add(i);
+    }
+  } else if (Number.isInteger(everyN) && everyN! >= 1) {
+    for (let i = everyN!; i < length; i += everyN!) set.add(i);
+  }
+  return [...set].sort((a, b) => a - b);
+}
+
+/** Deterministic block-start indices via the shared LCG (mcpPermute pattern). */
+function seededStartIndices(
+  length: number,
+  lengthBars: number,
+  count: number,
+  seed: number,
+): number[] {
+  const maxStart = length - lengthBars;
+  if (maxStart < 0 || count < 1) return [];
+  const rng = makeRng(seed);
+  const set = new Set<number>();
+  const maxAttempts = count * 20 + 50;
+  for (let a = 0; a < maxAttempts && set.size < count; a++) {
+    set.add(Math.floor(rng() * (maxStart + 1)));
+  }
+  return [...set].sort((a, b) => a - b);
+}
+
+function cleanStarts(length: number, startIndices: number[]): number[] {
+  return [
+    ...new Set(startIndices.filter((i) => Number.isInteger(i) && i >= 0 && i < length)),
+  ].sort((a, b) => a - b);
+}
+
+function rounded(x: number): number {
+  return parseFloat(x.toFixed(8));
+}
+
+/**
+ * Inject discrete price gaps: at each target bar, shift that bar's whole OHLC
+ * by a ±magnitudePct multiplicative factor (internal shape preserved, level
+ * jumps). Gaps are local discontinuities — subsequent bars are NOT cascaded.
+ *
+ *   direction "up" → +magnitudePct; "down" → −magnitudePct;
+ *   "alternate" → +,−,+,− across the target sequence.
+ *
+ * Anchor: flat series, atIndices=[2], magnitudePct=2 → bar 2 open = orig×1.02.
+ */
+export function injectGaps(
+  candles: Candle[],
+  opts: {
+    magnitudePct: number;
+    atIndices?: number[];
+    everyN?: number;
+    direction?: "up" | "down" | "alternate";
+    seed?: number;
+  },
+): Candle[] {
+  if (!Array.isArray(candles) || candles.length === 0) return [];
+  if (!Number.isFinite(opts?.magnitudePct) || opts.magnitudePct === 0) {
+    return candles.map((c) => ({ ...c }));
+  }
+  const targets = resolveTargetIndices(candles.length, opts.atIndices, opts.everyN);
+  const dir = opts.direction ?? "up";
+  const mag = Math.abs(opts.magnitudePct) / 100;
+  const factorByIndex = new Map<number, number>();
+  targets.forEach((idx, k) => {
+    let sign: number;
+    if (dir === "up") sign = 1;
+    else if (dir === "down") sign = -1;
+    else sign = k % 2 === 0 ? 1 : -1;
+    factorByIndex.set(idx, 1 + sign * mag);
+  });
+  return candles.map((c, i) => {
+    const factor = factorByIndex.get(i);
+    if (factor == null) return { ...c };
+    return {
+      open: rounded(c.open * factor),
+      high: rounded(c.high * factor),
+      low: rounded(c.low * factor),
+      close: rounded(c.close * factor),
+      volume: c.volume,
+      openTime: c.openTime,
+      closeTime: c.closeTime,
+    };
+  });
+}
+
+/**
+ * Inject multi-bar crash blocks: a cumulative drawdown of `dropPct` spread
+ * geometrically over `lengthBars` bars (per-bar factor f, f^lengthBars =
+ * 1−dropPct/100). Post-block bars stay level-shifted by the block's total
+ * factor so the crash persists.
+ *
+ * Anchor: lengthBars=3, dropPct=9 → close at block end ≈ start × 0.91.
+ */
+export function injectCrashBlocks(
+  candles: Candle[],
+  opts: {
+    dropPct: number;
+    lengthBars: number;
+    startIndices?: number[];
+    count?: number;
+    seed?: number;
+  },
+): Candle[] {
+  if (!Array.isArray(candles) || candles.length === 0) return [];
+  const len = opts?.lengthBars;
+  if (!Number.isInteger(len) || len < 1) return candles.map((c) => ({ ...c }));
+  if (!Number.isFinite(opts?.dropPct) || opts.dropPct <= 0 || opts.dropPct >= 100) {
+    return candles.map((c) => ({ ...c }));
+  }
+  const starts = Array.isArray(opts.startIndices)
+    ? cleanStarts(candles.length, opts.startIndices)
+    : seededStartIndices(candles.length, len, opts.count ?? 1, opts.seed ?? 0);
+  if (starts.length === 0) return candles.map((c) => ({ ...c }));
+
+  const perBar = Math.pow(1 - opts.dropPct / 100, 1 / len);
+  const out: Candle[] = candles.map((c) => ({ ...c }));
+  const startSet = new Set<number>(starts);
+
+  let cum = 1;
+  let barsLeft = 0;
+  for (let i = 0; i < out.length; i++) {
+    if (startSet.has(i)) barsLeft = len;
+    if (barsLeft > 0) {
+      cum *= perBar;
+      barsLeft--;
+    }
+    const c = out[i]!;
+    out[i] = {
+      open: rounded(c.open * cum),
+      high: rounded(c.high * cum),
+      low: rounded(c.low * cum),
+      close: rounded(c.close * cum),
+      volume: c.volume,
+      openTime: c.openTime,
+      closeTime: c.closeTime,
+    };
+  }
+  return out;
+}
+
+/**
+ * Inject flatline (frozen / illiquidity) blocks: across each block the bar
+ * collapses to O=H=L=C frozen at the pre-block close (or the block's own first
+ * open when it starts at bar 0). Volume zeroed across the block. Models a
+ * venue halt / dead-book period.
+ *
+ * Anchor: O==H==L==C across every bar of the block.
+ */
+export function injectFlatlineBlocks(
+  candles: Candle[],
+  opts: { lengthBars: number; startIndices?: number[]; count?: number; seed?: number },
+): Candle[] {
+  if (!Array.isArray(candles) || candles.length === 0) return [];
+  const len = opts?.lengthBars;
+  if (!Number.isInteger(len) || len < 1) return candles.map((c) => ({ ...c }));
+  const starts = Array.isArray(opts.startIndices)
+    ? cleanStarts(candles.length, opts.startIndices)
+    : seededStartIndices(candles.length, len, opts.count ?? 1, opts.seed ?? 0);
+  if (starts.length === 0) return candles.map((c) => ({ ...c }));
+
+  const out: Candle[] = candles.map((c) => ({ ...c }));
+  for (const s of starts) {
+    const frozen = s > 0 ? out[s - 1]!.close : out[s]!.open;
+    for (let i = s; i < Math.min(s + len, out.length); i++) {
+      const c = out[i]!;
+      out[i] = {
+        open: rounded(frozen),
+        high: rounded(frozen),
+        low: rounded(frozen),
+        close: rounded(frozen),
+        volume: 0,
+        openTime: c.openTime,
+        closeTime: c.closeTime,
+      };
+    }
+  }
+  return out;
+}
+
+/**
+ * Deterministic uniform volatility stretch: widen each bar's H–L range by
+ * ×factor around its CLOSE (close held fixed); open/high/low repositioned by
+ * scaling their distance from the close. Vol-regime shift without changing the
+ * close-to-close path.
+ *
+ * Anchor: factor=2 → (high − low) doubles, close unchanged.
+ */
+export function stretchVolatility(candles: Candle[], opts: { factor: number }): Candle[] {
+  if (!Array.isArray(candles) || candles.length === 0) return [];
+  const f = opts?.factor;
+  if (!Number.isFinite(f) || f <= 0) return candles.map((c) => ({ ...c }));
+  return candles.map((c) => {
+    const close = c.close;
+    return {
+      open: rounded(close + (c.open - close) * f),
+      high: rounded(close + (c.high - close) * f),
+      low: rounded(close + (c.low - close) * f),
+      close: rounded(close),
+      volume: c.volume,
+      openTime: c.openTime,
+      closeTime: c.closeTime,
+    };
+  });
+}
+
+/**
+ * Reverse chronological order (each bar's OHLC shape preserved) to test
+ * directional dependence. The original time axis is reassigned in forward
+ * order so timestamps stay monotonic; only the bar SHAPES are reversed.
+ *
+ * Anchor: output[0]'s OHLC equals the original last bar's OHLC.
+ */
+export function reversePath(candles: Candle[]): Candle[] {
+  if (!Array.isArray(candles) || candles.length === 0) return [];
+  const n = candles.length;
+  const out: Candle[] = new Array(n);
+  for (let i = 0; i < n; i++) {
+    const src = candles[n - 1 - i]!;
+    const axis = candles[i]!;
+    out[i] = {
+      open: src.open,
+      high: src.high,
+      low: src.low,
+      close: src.close,
+      volume: src.volume,
+      openTime: axis.openTime,
+      closeTime: axis.closeTime,
+    };
+  }
+  return out;
+}
+
+/**
+ * Invert trending windows into flat segments: scan non-overlapping windows of
+ * `window` bars; any window whose net close-to-close move exceeds 1% is
+ * replaced by a flat segment frozen at the window's first open (O=H=L=C).
+ * Tests dependence on trend persistence. `seed` is accepted for signature
+ * symmetry but detection is deterministic (threshold-driven, no randomness).
+ */
+export function invertTrendWindows(
+  candles: Candle[],
+  opts: { window: number; seed?: number },
+): Candle[] {
+  if (!Array.isArray(candles) || candles.length === 0) return [];
+  const w = opts?.window;
+  if (!Number.isInteger(w) || w < 2 || candles.length < w) {
+    return candles.map((c) => ({ ...c }));
+  }
+  const out: Candle[] = candles.map((c) => ({ ...c }));
+  for (let start = 0; start + w <= out.length; start += w) {
+    const first = out[start]!;
+    const last = out[start + w - 1]!;
+    if (first.open <= 0) continue;
+    const netMove = Math.abs(last.close / first.open - 1);
+    if (netMove <= 0.01) continue;
+    const frozen = first.open;
+    for (let i = start; i < start + w; i++) {
+      const c = out[i]!;
+      out[i] = {
+        open: rounded(frozen),
+        high: rounded(frozen),
+        low: rounded(frozen),
+        close: rounded(frozen),
+        volume: c.volume,
+        openTime: c.openTime,
+        closeTime: c.closeTime,
+      };
+    }
   }
   return out;
 }

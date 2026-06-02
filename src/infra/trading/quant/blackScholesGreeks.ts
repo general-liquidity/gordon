@@ -246,3 +246,167 @@ export function blackScholesGreeksToPayload(
     d2: finite(result.d2, 6),
   };
 }
+
+// ============================================================================
+// Implied-volatility inversion
+// ============================================================================
+
+export interface ImpliedVolInput {
+  /** Observed option premium to invert. */
+  marketPrice: number;
+  /** Spot price of underlying. */
+  spot: number;
+  /** Strike price. */
+  strike: number;
+  /** Time to expiry in years. */
+  timeToExpiry: number;
+  /** Continuously-compounded risk-free rate. e.g. 0.05 = 5%. */
+  riskFreeRate: number;
+  /** Continuous dividend yield (q). Default 0. */
+  dividendYield?: number;
+  /** "call" or "put". */
+  optionType: OptionType;
+}
+
+export interface ImpliedVolResult {
+  /** Recovered annualized volatility, or null if not invertible. */
+  iv: number | null;
+  /** Which solver succeeded (or "failed"). */
+  method: "newton" | "bisection" | "failed";
+  /** Total iterations consumed across the solve. */
+  iterations: number;
+  interpretation: string;
+}
+
+const IV_SIGMA_MIN = 1e-6;
+const IV_SIGMA_MAX = 5.0;
+const IV_TOL = 1e-8;
+const IV_MAX_ITERS = 100;
+
+function clampSigma(s: number): number {
+  if (s < IV_SIGMA_MIN) return IV_SIGMA_MIN;
+  if (s > IV_SIGMA_MAX) return IV_SIGMA_MAX;
+  return s;
+}
+
+/**
+ * Invert an observed option price to its Black-Scholes implied volatility.
+ *
+ * Newton-Raphson on price(sigma) - marketPrice using the module's own pricer
+ * + vega, with a bisection fallback bracketing sigma in [1e-6, 5.0]. Returns
+ * iv=null / method "failed" when the price is below intrinsic value, any
+ * input is non-positive/non-finite, or neither solver converges.
+ *
+ * Boundary-only validation: never throws. Reuses computeBlackScholesGreeks
+ * for both price and vega (no reimplementation of pricing math).
+ */
+export function impliedVolatility(input: ImpliedVolInput): ImpliedVolResult {
+  const S = input.spot;
+  const K = input.strike;
+  const T = input.timeToExpiry;
+  const r = input.riskFreeRate;
+  const q = input.dividendYield ?? 0;
+  const target = input.marketPrice;
+  const optionType = input.optionType;
+
+  const fail = (why: string, iters = 0): ImpliedVolResult => ({
+    iv: null,
+    method: "failed",
+    iterations: iters,
+    interpretation: `IV inversion failed: ${why}`,
+  });
+
+  if (!Number.isFinite(target) || target < 0) return fail("non-finite or negative market price");
+  if (!Number.isFinite(S) || S <= 0) return fail("spot must be positive and finite");
+  if (!Number.isFinite(K) || K <= 0) return fail("strike must be positive and finite");
+  if (!Number.isFinite(T) || T <= 0) return fail("timeToExpiry must be positive and finite");
+  if (!Number.isFinite(r)) return fail("riskFreeRate must be finite");
+  if (!Number.isFinite(q)) return fail("dividendYield must be finite");
+
+  // No-arbitrage lower bound. Below the discounted intrinsic the price is
+  // not attainable by any sigma >= 0 - inversion has no solution.
+  const eqT = Math.exp(-q * T);
+  const erT = Math.exp(-r * T);
+  const lowerBound =
+    optionType === "call"
+      ? Math.max(S * eqT - K * erT, 0)
+      : Math.max(K * erT - S * eqT, 0);
+  if (target < lowerBound - 1e-9) {
+    return fail(
+      `market price ${target.toFixed(6)} below intrinsic lower bound ${lowerBound.toFixed(6)}`,
+    );
+  }
+
+  const greeksAt = (sigma: number): { price: number; vega: number } => {
+    const g = computeBlackScholesGreeks({
+      spot: S,
+      strike: K,
+      timeYears: T,
+      rate: r,
+      volatility: sigma,
+      dividendYield: q,
+      optionType,
+    });
+    return { price: g.price, vega: g.vega };
+  };
+  const priceAt = (sigma: number): number => greeksAt(sigma).price;
+
+  let iterations = 0;
+
+  // Newton-Raphson. Seed near a typical vol; clamp each step into the band.
+  let sigma = 0.2;
+  for (let i = 0; i < IV_MAX_ITERS; i++) {
+    iterations++;
+    const { price, vega } = greeksAt(sigma);
+    const diff = price - target;
+    if (Math.abs(diff) < IV_TOL) {
+      const iv = parseFloat(clampSigma(sigma).toFixed(8));
+      return {
+        iv,
+        method: "newton",
+        iterations,
+        interpretation: `Implied vol ${(iv * 100).toFixed(2)}% (Newton, ${iterations} iters) for ${optionType} @ K=${K}, T=${T.toFixed(4)}`,
+      };
+    }
+    if (!Number.isFinite(vega) || vega < 1e-12) break; // vega vanished - hand off to bisection
+    const next = clampSigma(sigma - diff / vega);
+    if (!Number.isFinite(next)) break;
+    sigma = next;
+  }
+
+  // Bisection fallback over the full band. f(sigma) = price(sigma) - target is
+  // monotone increasing in sigma, so a sign change brackets the root.
+  let lo = IV_SIGMA_MIN;
+  let hi = IV_SIGMA_MAX;
+  let fLo = priceAt(lo) - target;
+  const fHi = priceAt(hi) - target;
+  if (!Number.isFinite(fLo) || !Number.isFinite(fHi) || fLo * fHi > 0) {
+    return fail(
+      `target price not bracketed by sigma in [${IV_SIGMA_MIN}, ${IV_SIGMA_MAX}] (no convergence)`,
+      iterations,
+    );
+  }
+
+  for (let i = 0; i < IV_MAX_ITERS; i++) {
+    iterations++;
+    const mid = 0.5 * (lo + hi);
+    const fMid = priceAt(mid) - target;
+    if (Math.abs(fMid) < IV_TOL || (hi - lo) * 0.5 < IV_TOL) {
+      const iv = parseFloat(clampSigma(mid).toFixed(8));
+      return {
+        iv,
+        method: "bisection",
+        iterations,
+        interpretation: `Implied vol ${(iv * 100).toFixed(2)}% (bisection, ${iterations} iters) for ${optionType} @ K=${K}, T=${T.toFixed(4)}`,
+      };
+    }
+    if (fLo * fMid < 0) {
+      hi = mid;
+    } else {
+      lo = mid;
+      fLo = fMid;
+    }
+  }
+
+  return fail(`no convergence within ${IV_MAX_ITERS} bisection iterations`, iterations);
+}

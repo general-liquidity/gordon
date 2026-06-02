@@ -267,3 +267,24 @@ export type {
   VolumeSignatureResult,
   VolumeSignatureLatest,
 } from "./volume-signature.ts";
+
+// Donchian Channel
+export { calculateDonchian } from "./donchian.ts";
+export type { DonchianResult } from "./donchian.ts";
+
+// Hull Moving Average
+export { calculateHMA } from "./hull-ma.ts";
+
+// Volume-Weighted Moving Average
+export { calculateVWMA } from "./vwma.ts";
+
+// Momentum + Rate of Change
+export { calculateMomentum, calculateROC } from "./momentum-roc.ts";
+
+// Supertrend channel envelope
+export { calculateSupertrendChannel } from "./supertrend-channel.ts";
+export type { SupertrendChannelResult } from "./supertrend-channel.ts";
+
+// CBOE volume-weighted bull/bear/stagnant odds oscillator
+export { calculateCboeOdds } from "./cboe-odds-oscillator.ts";
+export type { CboeOddsResult } from "./cboe-odds-oscillator.ts";
