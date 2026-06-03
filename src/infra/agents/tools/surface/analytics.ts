@@ -91,6 +91,7 @@ import {
   calculateIntradayMomentum,
   calculateDisplacementBreak,
   calculateCandleContinuity,
+  calculateVpin,
   type CandlestickPatternName,
   type Candle as IndicatorCandle,
 } from "../../../../core/indicators/index.ts";
@@ -524,6 +525,7 @@ const INDICATOR_NAMES = [
   "intraday_momentum",
   "displacement_break",
   "candle_continuity",
+  "vpin",
 ] as const;
 
 /** Last non-null value of an aligned indicator series (for boxing bare arrays). */
@@ -843,6 +845,13 @@ function dispatchIndicator(
       return calculateCandleContinuity(candles, {
         ...(typeof params.historyBars === "number" && { historyBars: params.historyBars }),
       });
+    case "vpin":
+      return calculateVpin(candles, {
+        ...(typeof params.bucketVolume === "number" && { bucketVolume: params.bucketVolume }),
+        ...(typeof params.numBuckets === "number" && { numBuckets: params.numBuckets }),
+        ...(typeof params.window === "number" && { window: params.window }),
+        ...(typeof params.sigmaWindow === "number" && { sigmaWindow: params.sigmaWindow }),
+      });
     case "volume_signature":
       return calculateVolumeSignature(candles, {
         ...(typeof params.avgPeriod === "number" && { avgPeriod: params.avgPeriod }),
@@ -896,6 +905,7 @@ export const computeIndicatorTool = createTool({
     "Ichimoku discrete signals: ichimoku_signals (the five signals beyond ichimoku's TK-cross + cloud-position: kijun cross, kijun bounce/position (dynamic S/R), kumo twist (future-cloud color flip), edge-to-edge (flat-Kumo → opposite-edge target), and TK disequilibrium (tenkan-kijun stretch as an overextension gauge))",
     "Open-based: open_pivot (session open as a dynamic S/R pivot + reclaim/lose bias, plus wickless candle-open drive → mean-reversion-to-open target; distinct from opening-range-breakout and central-pivot-range), intraday_momentum (Gao-Han-Li-Zhou JFE 2018 — sign of the first-window return predicts the last-window return; params { firstWindowBars?, predictWindowBars?, barsPerDay? }; with barsPerDay it reports cross-day hitRate + the live signal; a directional predictor, distinct from the opening-range breakout)",
     "Structure quality: displacement_break (break-of-structure gated on displacement magnitude — the breaking leg must be ≥ minRatio×(default 1.5) the prior swing leg; flags weak one-candle pokes as valid=false; distinct from smc change-of-character/liquidity-sweep which have no leg-ratio gate), candle_continuity (CCT — next-candle bias from the prior↔current two-candle relationship: how the current candle opened vs the prior + whether it closed with strength beyond the prior range → continuation/reversal/neutral; distinct from candlestick_patterns and open_pivot)",
+    "Order-flow toxicity: vpin (Volume-Synchronized Probability of Informed Trading, Easley-López de Prado-O'Hara 2012 — volume-clock buckets + bulk-volume classification of buy/sell, then the rolling average bucket order-imbalance ∈ [0,1]; high VPIN = one-sided/informed flow that makes market-makers widen/pull quotes and has historically preceded volatility events; params { bucketVolume?, numBuckets?, window?, sigmaWindow? }; computes from OHLCV — distinct from the depth-snapshot microstructure-toxicity and fill-based adverse-selection detectors)",
     "",
     "Internally fetches candles via the connected exchange. Pass `bars` to",
     "control the lookback window (default 200).",

@@ -336,3 +336,7 @@ export type { DisplacementBreakResult } from "./displacement-break.ts";
 // Candle Continuity Theory (next-candle bias from the prior↔current two-candle relationship)
 export { calculateCandleContinuity } from "./candle-continuity.ts";
 export type { CandleContinuityResult } from "./candle-continuity.ts";
+
+// VPIN — Volume-Synchronized Probability of Informed Trading (order-flow toxicity; Easley-López de Prado-O'Hara 2012)
+export { calculateVpin } from "./vpin.ts";
+export type { VpinResult } from "./vpin.ts";
