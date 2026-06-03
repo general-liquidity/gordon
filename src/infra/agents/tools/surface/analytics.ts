@@ -108,6 +108,8 @@ import { conditionalDistributionTest } from "../../../../core/alpha/conditional-
 import { runPortfolioEnsemble } from "../../../../core/alpha/pc-method-ensemble.ts";
 import { runRegimeAllocationPolicy } from "../../../../core/alpha/regime-policy.ts";
 import { computeForensicScores } from "../../../../core/alpha/forensic-accounting.ts";
+import { computeDupont } from "../../../../core/alpha/dupont.ts";
+import { computeWeightedBookImbalance } from "../../../../core/microstructure/weighted-book-imbalance.ts";
 import { computeTimeUnderWater } from "../../../../core/alpha/time-under-water.ts";
 import { computeVolResidualCorrelation } from "../../../../core/alpha/vol-residual-correlation.ts";
 import { computeTripleBarrier } from "../../../../core/alpha/triple-barrier.ts";
@@ -1313,6 +1315,8 @@ const MICROSTRUCTURE_OPS = [
   "portfolio_ensemble",
   "regime_policy",
   "forensic_screen",
+  "dupont",
+  "weighted_book_imbalance",
   "filing_diff",
   "token_unlock_risk",
   "holder_concentration",
@@ -1510,6 +1514,17 @@ export const computeMicrostructureTool = createTool({
     "                              (no false flags). Verdict INVESTIGATE/CLEAN/INSUFFICIENT. PROBABILITY FLAGS, NOT PROOF —",
     "                              a bad score means open the filing, never short on the number alone. Source line items via",
     "                              get_fundamentals / Finnhub fundamentals (equities).",
+    "    - 'dupont'              — params: { revenue, netIncome, totalAssets, equity, pretaxIncome?, ebit? }. DuPont ROE",
+    "                              decomposition: 3-way (netMargin × assetTurnover × equityMultiplier) always; 5-way",
+    "                              (taxBurden × interestBurden × operatingMargin × turnover × leverage) when pretaxIncome+ebit",
+    "                              given — isolates OPERATING ROE from financing/tax/leverage. Log-additive driver attribution",
+    "                              (% of ln-ROE per factor) when ROE+factors>0; self-consistency drift check. Distinct from",
+    "                              forensic_screen (which flags manipulation/distress) — this attributes the return to its sources.",
+    "    - 'weighted_book_imbalance' — params: { snapshot: {bids[], asks[]}, depthLevels?, moderateThreshold?, strongThreshold? }.",
+    "                              Level-weighted (1/(level+1)) order-book imbalance (WDI) vs flat OBI: weights the touch over",
+    "                              deep size. Comparing the two locates WHERE pressure sits — at_touch (|WDI|>|flat|, actionable),",
+    "                              in_depth (deep wall, possible spoof), or touch_vs_depth_conflict. Distinct from microprice",
+    "                              (touch-only fair price) and flat order-book imbalance (equal-weight depth).",
     "    - 'filing_diff'         — params: { prior: string, current: string, section?: 'risk_factors'|'mdna', similarityThreshold? }",
     "                              Year-over-year filing-section diff (equities): surfaces only the NEW and REMOVED",
     "                              language between two filings' sections, ignoring carried-over boilerplate. Pass the",
@@ -1653,6 +1668,17 @@ export const computeMicrostructureTool = createTool({
       forensic_screen: {
         execute: async (p: Record<string, unknown>) =>
           computeForensicScores(p as unknown as Parameters<typeof computeForensicScores>[0]),
+      },
+      dupont: {
+        execute: async (p: Record<string, unknown>) =>
+          computeDupont(p as unknown as Parameters<typeof computeDupont>[0]),
+      },
+      weighted_book_imbalance: {
+        execute: async (p: Record<string, unknown>) =>
+          computeWeightedBookImbalance(
+            (p.snapshot ?? p) as Parameters<typeof computeWeightedBookImbalance>[0],
+            p as Parameters<typeof computeWeightedBookImbalance>[1],
+          ),
       },
       time_under_water: {
         execute: async (p: Record<string, unknown>) =>
