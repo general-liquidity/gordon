@@ -328,3 +328,11 @@ export type { OpenPivotResult } from "./open-pivot.ts";
 // Market intraday momentum (Gao-Han-Li-Zhou JFE 2018 — first-window return predicts last-window return)
 export { calculateIntradayMomentum } from "./intraday-momentum.ts";
 export type { IntradayMomentumResult } from "./intraday-momentum.ts";
+
+// Displacement-validated break of structure (break leg must be ≥ minRatio × the prior swing leg)
+export { calculateDisplacementBreak } from "./displacement-break.ts";
+export type { DisplacementBreakResult } from "./displacement-break.ts";
+
+// Candle Continuity Theory (next-candle bias from the prior↔current two-candle relationship)
+export { calculateCandleContinuity } from "./candle-continuity.ts";
+export type { CandleContinuityResult } from "./candle-continuity.ts";

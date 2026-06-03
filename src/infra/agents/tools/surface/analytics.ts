@@ -89,6 +89,8 @@ import {
   calculateRsiTrendline,
   calculateOpenPivot,
   calculateIntradayMomentum,
+  calculateDisplacementBreak,
+  calculateCandleContinuity,
   type CandlestickPatternName,
   type Candle as IndicatorCandle,
 } from "../../../../core/indicators/index.ts";
@@ -520,6 +522,8 @@ const INDICATOR_NAMES = [
   "rsi_trendline",
   "open_pivot",
   "intraday_momentum",
+  "displacement_break",
+  "candle_continuity",
 ] as const;
 
 /** Last non-null value of an aligned indicator series (for boxing bare arrays). */
@@ -830,6 +834,15 @@ function dispatchIndicator(
         ...(typeof params.predictWindowBars === "number" && { predictWindowBars: params.predictWindowBars }),
         ...(typeof params.barsPerDay === "number" && { barsPerDay: params.barsPerDay }),
       });
+    case "displacement_break":
+      return calculateDisplacementBreak(candles, {
+        ...(typeof params.pivotWindow === "number" && { pivotWindow: params.pivotWindow }),
+        ...(typeof params.minRatio === "number" && { minRatio: params.minRatio }),
+      });
+    case "candle_continuity":
+      return calculateCandleContinuity(candles, {
+        ...(typeof params.historyBars === "number" && { historyBars: params.historyBars }),
+      });
     case "volume_signature":
       return calculateVolumeSignature(candles, {
         ...(typeof params.avgPeriod === "number" && { avgPeriod: params.avgPeriod }),
@@ -882,6 +895,7 @@ export const computeIndicatorTool = createTool({
     "RSI suite (beyond plain rsi 70/30): rsi_failure_swing (Welles Wilder top/bottom failure swing — a reversal pivot pattern on the RSI line itself: OB peak → lower peak → break of the intervening trough (and mirror at OS); distinct from divergence), rsi_midpoint (the 50-line as regime gauge — bias from %-of-RSI-above-50, the 50 line as dynamic support/resistance, and consolidation/chop detection; distinct from overbought/oversold), hidden_divergence (continuation counterpart to divergence: hidden bullish = price higher-low while RSI lower-low; hidden bearish = price lower-high while RSI higher-high), rsi_trendline (AMS-style pivot trendlines drawn on the RSI series + break detection — distinct from price trendlines and from divergence)",
     "Ichimoku discrete signals: ichimoku_signals (the five signals beyond ichimoku's TK-cross + cloud-position: kijun cross, kijun bounce/position (dynamic S/R), kumo twist (future-cloud color flip), edge-to-edge (flat-Kumo → opposite-edge target), and TK disequilibrium (tenkan-kijun stretch as an overextension gauge))",
     "Open-based: open_pivot (session open as a dynamic S/R pivot + reclaim/lose bias, plus wickless candle-open drive → mean-reversion-to-open target; distinct from opening-range-breakout and central-pivot-range), intraday_momentum (Gao-Han-Li-Zhou JFE 2018 — sign of the first-window return predicts the last-window return; params { firstWindowBars?, predictWindowBars?, barsPerDay? }; with barsPerDay it reports cross-day hitRate + the live signal; a directional predictor, distinct from the opening-range breakout)",
+    "Structure quality: displacement_break (break-of-structure gated on displacement magnitude — the breaking leg must be ≥ minRatio×(default 1.5) the prior swing leg; flags weak one-candle pokes as valid=false; distinct from smc change-of-character/liquidity-sweep which have no leg-ratio gate), candle_continuity (CCT — next-candle bias from the prior↔current two-candle relationship: how the current candle opened vs the prior + whether it closed with strength beyond the prior range → continuation/reversal/neutral; distinct from candlestick_patterns and open_pivot)",
     "",
     "Internally fetches candles via the connected exchange. Pass `bars` to",
     "control the lookback window (default 200).",
