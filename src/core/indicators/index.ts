@@ -312,3 +312,15 @@ export type { RsiMidpointResult } from "./rsi-midpoint.ts";
 // Hidden divergence (continuation counterpart to regular RSI divergence)
 export { calculateHiddenDivergence } from "./hidden-divergence.ts";
 export type { HiddenDivergenceSignal, HiddenDivergenceResult } from "./hidden-divergence.ts";
+
+// Ichimoku discrete signals (edge-to-edge / kijun bounce+cross / kumo twist / TK disequilibrium — complements ichimoku.ts)
+export { calculateIchimokuSignals } from "./ichimoku-signals.ts";
+export type { IchimokuSignalsResult } from "./ichimoku-signals.ts";
+
+// RSI trendlines (AMS-style pivot trendlines + breaks on the RSI series)
+export { calculateRsiTrendline } from "./rsi-trendline.ts";
+export type { RsiTrendlineResult } from "./rsi-trendline.ts";
+
+// Session-open pivot + wickless candle-open drive (mean-reversion-to-open)
+export { calculateOpenPivot } from "./open-pivot.ts";
+export type { OpenPivotResult } from "./open-pivot.ts";

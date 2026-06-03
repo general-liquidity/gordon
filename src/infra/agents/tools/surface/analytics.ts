@@ -85,6 +85,9 @@ import {
   calculateRsiFailureSwing,
   calculateRsiMidpoint,
   calculateHiddenDivergence,
+  calculateIchimokuSignals,
+  calculateRsiTrendline,
+  calculateOpenPivot,
   type CandlestickPatternName,
   type Candle as IndicatorCandle,
 } from "../../../../core/indicators/index.ts";
@@ -121,6 +124,7 @@ import { computeOmegaRatio } from "../../../../core/alpha/omega-ratio.ts";
 import { optimizePortfolio } from "../../../../core/alpha/portfolio-optimizer.ts";
 import { checkPriceDeviation } from "../../../../core/alpha/price-deviation-guard.ts";
 import { computeEvolvingR } from "../../../../core/alpha/evolving-r.ts";
+import { computeOverthrowStop } from "../../../../core/alpha/overthrow-stop.ts";
 import {
   injectGaps,
   injectCrashBlocks,
@@ -511,6 +515,9 @@ const INDICATOR_NAMES = [
   "rsi_failure_swing",
   "rsi_midpoint",
   "hidden_divergence",
+  "ichimoku_signals",
+  "rsi_trendline",
+  "open_pivot",
 ] as const;
 
 /** Last non-null value of an aligned indicator series (for boxing bare arrays). */
@@ -799,6 +806,22 @@ function dispatchIndicator(
         ...(typeof params.priceTolerance === "number" && { priceTolerance: params.priceTolerance }),
         ...(typeof params.rsiTolerance === "number" && { rsiTolerance: params.rsiTolerance }),
       });
+    case "ichimoku_signals":
+      return calculateIchimokuSignals(candles, {
+        ...(typeof params.tenkanPeriod === "number" && { tenkanPeriod: params.tenkanPeriod }),
+        ...(typeof params.kijunPeriod === "number" && { kijunPeriod: params.kijunPeriod }),
+        ...(typeof params.senkouBPeriod === "number" && { senkouBPeriod: params.senkouBPeriod }),
+        ...(typeof params.displacement === "number" && { displacement: params.displacement }),
+      });
+    case "rsi_trendline":
+      return calculateRsiTrendline(closes, {
+        ...(typeof params.rsiPeriod === "number" && { rsiPeriod: params.rsiPeriod }),
+        ...(typeof params.pivotWindow === "number" && { pivotWindow: params.pivotWindow }),
+      });
+    case "open_pivot":
+      return calculateOpenPivot(candles, {
+        ...(typeof params.wickFracThreshold === "number" && { wickFracThreshold: params.wickFracThreshold }),
+      });
     case "volume_signature":
       return calculateVolumeSignature(candles, {
         ...(typeof params.avgPeriod === "number" && { avgPeriod: params.avgPeriod }),
@@ -848,7 +871,9 @@ export const computeIndicatorTool = createTool({
     "Flow regime: cboe_odds (volume-weighted three-state bull/bear/STAGNANT odds oscillator — MFI-style money-flow index re-weighted by Stoch-RSI momentum; the stagnant leg quantifies chop/indecision)",
     "More: stochastic (classic price %K/%D — locates close in the recent high-low range; >80 overbought / <20 oversold; distinct from stochastic-rsi), cmf (Chaikin Money Flow, windowed money-flow-volume/volume in [−1,1]; >0.05 accumulation / <−0.05 distribution)",
     "Patterns: harris_pattern (Michael Harris DAX 4-bar overlapping-extension price pattern — per-bar 0 none / 2 buy / 1 sell from a strict interleaved high/low chain)",
-    "RSI suite (beyond plain rsi 70/30): rsi_failure_swing (Welles Wilder top/bottom failure swing — a reversal pivot pattern on the RSI line itself: OB peak → lower peak → break of the intervening trough (and mirror at OS); distinct from divergence), rsi_midpoint (the 50-line as regime gauge — bias from %-of-RSI-above-50, the 50 line as dynamic support/resistance, and consolidation/chop detection; distinct from overbought/oversold), hidden_divergence (continuation counterpart to divergence: hidden bullish = price higher-low while RSI lower-low; hidden bearish = price lower-high while RSI higher-high)",
+    "RSI suite (beyond plain rsi 70/30): rsi_failure_swing (Welles Wilder top/bottom failure swing — a reversal pivot pattern on the RSI line itself: OB peak → lower peak → break of the intervening trough (and mirror at OS); distinct from divergence), rsi_midpoint (the 50-line as regime gauge — bias from %-of-RSI-above-50, the 50 line as dynamic support/resistance, and consolidation/chop detection; distinct from overbought/oversold), hidden_divergence (continuation counterpart to divergence: hidden bullish = price higher-low while RSI lower-low; hidden bearish = price lower-high while RSI higher-high), rsi_trendline (AMS-style pivot trendlines drawn on the RSI series + break detection — distinct from price trendlines and from divergence)",
+    "Ichimoku discrete signals: ichimoku_signals (the five signals beyond ichimoku's TK-cross + cloud-position: kijun cross, kijun bounce/position (dynamic S/R), kumo twist (future-cloud color flip), edge-to-edge (flat-Kumo → opposite-edge target), and TK disequilibrium (tenkan-kijun stretch as an overextension gauge))",
+    "Open-based: open_pivot (session open as a dynamic S/R pivot + reclaim/lose bias, plus wickless candle-open drive → mean-reversion-to-open target; distinct from opening-range-breakout and central-pivot-range)",
     "",
     "Internally fetches candles via the connected exchange. Pass `bars` to",
     "control the lookback window (default 200).",
@@ -1187,6 +1212,7 @@ const MICROSTRUCTURE_OPS = [
   "optimize_portfolio",
   "price_deviation_guard",
   "evolving_r",
+  "overthrow_stop",
 ] as const;
 
 export const computeMicrostructureTool = createTool({
@@ -1409,6 +1435,7 @@ export const computeMicrostructureTool = createTool({
     "                              (net Σw=0, gross Σ|w|=1). Return-optimized family; complement to portfolio_ensemble (risk-structured) and hrp_allocation.",
     "    - 'price_deviation_guard' — params: { orderPrice, referencePrice, thresholdPct?, side? }",
     "    - 'evolving_r' — params: { entry, stop, target, currentPrice, side: 'long'|'short' } — dynamic risk-reward (Tom Dante): recomputes RR from the CURRENT price (remaining reward vs risk back to stop), not just at entry; verdict hold|manage|target_reached|stopped",
+    "    - 'overthrow_stop' — params: { candles[], brokenLevel, side: 'long'|'short', lookback? } — stop placement from an overthrow/reclaim of a level: returns the furthermost-deviation stop (overshoot extreme, conservative) and the thrust-candle stop (reclaim-bar extreme, tighter) + a caution if the tight stop sits on the level",
     "                              Fat-finger / stale-quote check: % deviation of an intended order price from the live reference (mid/last/mark). Breach in the",
     "                              dangerous direction (buy ABOVE / sell BELOW) → block; benign → warn. Default threshold 2%. Pre-trade sanity gate; also runs",
     "                              automatically as a PreOrderPlacement hook on LIMIT orders. Distinct from slippage (which models market-order cost).",
@@ -1742,6 +1769,12 @@ export const computeMicrostructureTool = createTool({
         execute: async (p: Record<string, unknown>) => {
           const r = computeEvolvingR(p as unknown as Parameters<typeof computeEvolvingR>[0]);
           return r ?? { error: "evolving_r: need finite entry/stop/target/currentPrice and valid geometry (long: stop<entry<target; short: target<entry<stop)." };
+        },
+      },
+      overthrow_stop: {
+        execute: async (p: Record<string, unknown>) => {
+          const r = computeOverthrowStop(p as unknown as Parameters<typeof computeOverthrowStop>[0]);
+          return r ?? { error: "overthrow_stop: need candles[], a finite positive brokenLevel, side long|short, and a detectable overshoot+reclaim of the level." };
         },
       },
     };
