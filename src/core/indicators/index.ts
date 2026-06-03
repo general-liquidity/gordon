@@ -340,3 +340,11 @@ export type { CandleContinuityResult } from "./candle-continuity.ts";
 // VPIN — Volume-Synchronized Probability of Informed Trading (order-flow toxicity; Easley-López de Prado-O'Hara 2012)
 export { calculateVpin } from "./vpin.ts";
 export type { VpinResult } from "./vpin.ts";
+
+// Volume Imbalance (ICT — 2-candle body gap with overlapping ranges; distinct from the 3-candle FVG)
+export { calculateVolumeImbalance } from "./volume-imbalance.ts";
+export type { VolumeImbalance, VolumeImbalanceResult } from "./volume-imbalance.ts";
+
+// Breaker Block (ICT — failed/flipped order block confirming a market-structure shift)
+export { calculateBreakerBlock } from "./breaker-block.ts";
+export type { BreakerBlockResult } from "./breaker-block.ts";

@@ -92,6 +92,8 @@ import {
   calculateDisplacementBreak,
   calculateCandleContinuity,
   calculateVpin,
+  calculateVolumeImbalance,
+  calculateBreakerBlock,
   type CandlestickPatternName,
   type Candle as IndicatorCandle,
 } from "../../../../core/indicators/index.ts";
@@ -526,6 +528,8 @@ const INDICATOR_NAMES = [
   "displacement_break",
   "candle_continuity",
   "vpin",
+  "volume_imbalance",
+  "breaker_block",
 ] as const;
 
 /** Last non-null value of an aligned indicator series (for boxing bare arrays). */
@@ -852,6 +856,14 @@ function dispatchIndicator(
         ...(typeof params.window === "number" && { window: params.window }),
         ...(typeof params.sigmaWindow === "number" && { sigmaWindow: params.sigmaWindow }),
       });
+    case "volume_imbalance":
+      return calculateVolumeImbalance(candles, {
+        ...(typeof params.lookback === "number" && { lookback: params.lookback }),
+      });
+    case "breaker_block":
+      return calculateBreakerBlock(candles, {
+        ...(typeof params.pivotWindow === "number" && { pivotWindow: params.pivotWindow }),
+      });
     case "volume_signature":
       return calculateVolumeSignature(candles, {
         ...(typeof params.avgPeriod === "number" && { avgPeriod: params.avgPeriod }),
@@ -906,6 +918,7 @@ export const computeIndicatorTool = createTool({
     "Open-based: open_pivot (session open as a dynamic S/R pivot + reclaim/lose bias, plus wickless candle-open drive → mean-reversion-to-open target; distinct from opening-range-breakout and central-pivot-range), intraday_momentum (Gao-Han-Li-Zhou JFE 2018 — sign of the first-window return predicts the last-window return; params { firstWindowBars?, predictWindowBars?, barsPerDay? }; with barsPerDay it reports cross-day hitRate + the live signal; a directional predictor, distinct from the opening-range breakout)",
     "Structure quality: displacement_break (break-of-structure gated on displacement magnitude — the breaking leg must be ≥ minRatio×(default 1.5) the prior swing leg; flags weak one-candle pokes as valid=false; distinct from smc change-of-character/liquidity-sweep which have no leg-ratio gate), candle_continuity (CCT — next-candle bias from the prior↔current two-candle relationship: how the current candle opened vs the prior + whether it closed with strength beyond the prior range → continuation/reversal/neutral; distinct from candlestick_patterns and open_pivot)",
     "Order-flow toxicity: vpin (Volume-Synchronized Probability of Informed Trading, Easley-López de Prado-O'Hara 2012 — volume-clock buckets + bulk-volume classification of buy/sell, then the rolling average bucket order-imbalance ∈ [0,1]; high VPIN = one-sided/informed flow that makes market-makers widen/pull quotes and has historically preceded volatility events; params { bucketVolume?, numBuckets?, window?, sigmaWindow? }; computes from OHLCV — distinct from the depth-snapshot microstructure-toxicity and fill-based adverse-selection detectors)",
+    "ICT PD arrays (complement order_blocks / fvg / smc-patterns): volume_imbalance (2-candle BODY gap with overlapping ranges — open[i] vs close[i-1] gap, ranges still overlap; distinct from the 3-candle-wick fvg; returns unfilled VI zones price tends to rebalance), breaker_block (a FAILED/flipped order block confirming a market-structure shift — bullish: SH→SL then close above SH, zone = last down-candle body, acts as support on return; bearish mirror; distinct from plain order_blocks which hold in their original direction)",
     "",
     "Internally fetches candles via the connected exchange. Pass `bars` to",
     "control the lookback window (default 200).",
