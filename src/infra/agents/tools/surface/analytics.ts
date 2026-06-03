@@ -112,6 +112,8 @@ import { computeTimeUnderWater } from "../../../../core/alpha/time-under-water.t
 import { computeVolResidualCorrelation } from "../../../../core/alpha/vol-residual-correlation.ts";
 import { computeTripleBarrier } from "../../../../core/alpha/triple-barrier.ts";
 import { computeCodependence } from "../../../../core/alpha/codependence.ts";
+import { computeInventoryOrderSize } from "../../../../core/alpha/inventory-order-size.ts";
+import { computeMarketMakingMarkov } from "../../../trading/quant/marketMakingMarkov.ts";
 import { computeTlsHedgeRatio } from "../../../trading/quant/tlsHedgeRatio.ts";
 import { computeBoxTiaoHedgeRatio } from "../../../trading/quant/boxTiaoHedgeRatio.ts";
 import { fitOU } from "../../../trading/quant/ouParameterFit.ts";
@@ -1303,6 +1305,8 @@ const MICROSTRUCTURE_OPS = [
   "ou_optimal_thresholds",
   "triple_barrier",
   "codependence",
+  "inventory_order_size",
+  "mm_markov",
   "signal_informativeness",
   "portfolio_ensemble",
   "regime_policy",
@@ -1461,6 +1465,10 @@ export const computeMicrostructureTool = createTool({
     "    - 'ou_optimal_thresholds' — params: { theta, mu, sigma, transactionCost? }. Bertram (2010) optimal symmetric entry/exit for OU mean-reversion maximizing expected return per unit time net of cost (pair with ou_fit). Distinct from the Cartea-Jaimungal optimalPairsTrading op.",
     "    - 'triple_barrier'     — params: { prices[], entries[], ptPct, slPct, verticalBars, side? }. López de Prado triple-barrier OUTCOME labeler: per entry, which barrier (profit-take / stop-loss / vertical-time) hits first → label +1/−1/0 + touch + return. Pure labeler (NOT ML meta-labeling). Useful for backtest/journal/eval outcome classification.",
     "    - 'codependence'       — params: { x[], y[] } (or { seriesBySymbol } via the matrix helper). Non-linear dependence for pair selection: mutual information + distance correlation (Székely) — catch y=f(x) links Pearson misses (e.g. y=x², pearson≈0 but distanceCorr>0).",
+    "",
+    "    Market-making (Avellaneda-Stoikov family) — direct-input:",
+    "    - 'inventory_order_size' — params: { inventory, maxSize, shape? }. Dynamic order-SIZE inventory control (Fushimi et al.): shrinks the side that would grow |inventory| by exp(−shape·|inventory|), keeps the reducing side at maxSize. Complements inventory_adjusted_price (which skews the quote PRICE) — this scales the SIZE.",
+    "    - 'mm_markov'          — params: { transitionMatrix?[3][3] | states?[], waitingPeriods? }. Market-making quote-efficiency metrics from the {Quoting,Waiting,Spread} 3-state Markov chain: pMakeSpread + pOneSideFill (inventory-risk path) over a waiting horizon (default 5). Pass a transition matrix or a state sequence (estimated by counts).",
     "",
     "    - 'market_memory'      — direct: { prices[], nSurrogates?, minWindow?, vrHorizons?, pValueCutoff? }",
     "                              shortcut: { symbol, timeframe?, lookbackBars?, nSurrogates?, vrHorizons? }",
@@ -1688,6 +1696,14 @@ export const computeMicrostructureTool = createTool({
       codependence: {
         execute: async (p: Record<string, unknown>) =>
           computeCodependence(p as unknown as Parameters<typeof computeCodependence>[0]),
+      },
+      inventory_order_size: {
+        execute: async (p: Record<string, unknown>) =>
+          computeInventoryOrderSize(p as unknown as Parameters<typeof computeInventoryOrderSize>[0]),
+      },
+      mm_markov: {
+        execute: async (p: Record<string, unknown>) =>
+          computeMarketMakingMarkov(p as unknown as Parameters<typeof computeMarketMakingMarkov>[0]),
       },
       filing_diff: {
         execute: async (p: Record<string, unknown>) => {
