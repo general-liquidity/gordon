@@ -356,3 +356,15 @@ export type { StructureBreakConvictionResult } from "./structure-break-convictio
 // FVG Sweep Context (grades fair-value gaps by pre-sweep vs post-sweep quality)
 export { calculateFvgSweepContext } from "./fvg-sweep-context.ts";
 export type { FvgSweepContextResult, ClassifiedFvg, FvgQuality } from "./fvg-sweep-context.ts";
+
+// AFML feature primitives (López de Prado, via mlfinlab parity scan)
+export { calculateFracDiff } from "./frac-diff.ts";
+export type { FracDiffResult } from "./frac-diff.ts";
+export { calculateCusumFilter } from "./cusum-filter.ts";
+export type { CusumFilterResult } from "./cusum-filter.ts";
+export { calculateSadf } from "./sadf.ts";
+export type { SadfResult } from "./sadf.ts";
+export { calculateRollSpread } from "./roll-spread.ts";
+export type { RollSpreadResult } from "./roll-spread.ts";
+export { calculateAmihud } from "./amihud-illiquidity.ts";
+export type { AmihudResult } from "./amihud-illiquidity.ts";

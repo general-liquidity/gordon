@@ -96,6 +96,11 @@ import {
   calculateBreakerBlock,
   calculateStructureBreakConviction,
   calculateFvgSweepContext,
+  calculateFracDiff,
+  calculateCusumFilter,
+  calculateSadf,
+  calculateRollSpread,
+  calculateAmihud,
   type CandlestickPatternName,
   type Candle as IndicatorCandle,
 } from "../../../../core/indicators/index.ts";
@@ -105,6 +110,14 @@ import { runRegimeAllocationPolicy } from "../../../../core/alpha/regime-policy.
 import { computeForensicScores } from "../../../../core/alpha/forensic-accounting.ts";
 import { computeTimeUnderWater } from "../../../../core/alpha/time-under-water.ts";
 import { computeVolResidualCorrelation } from "../../../../core/alpha/vol-residual-correlation.ts";
+import { computeTripleBarrier } from "../../../../core/alpha/triple-barrier.ts";
+import { computeCodependence } from "../../../../core/alpha/codependence.ts";
+import { computeTlsHedgeRatio } from "../../../trading/quant/tlsHedgeRatio.ts";
+import { computeBoxTiaoHedgeRatio } from "../../../trading/quant/boxTiaoHedgeRatio.ts";
+import { fitOU } from "../../../trading/quant/ouParameterFit.ts";
+import { computeMinHalfLifeHedgeRatio } from "../../../trading/quant/minHalfLifeHedgeRatio.ts";
+import { computeAdfOptimalHedgeRatio } from "../../../trading/quant/adfOptimalHedgeRatio.ts";
+import { computeOuOptimalThresholds } from "../../../trading/quant/ouOptimalThresholds.ts";
 import { diffFilingSections, diffNamedSection } from "../../../../core/alpha/filing-section-diff.ts";
 import { computeTokenUnlockRisk } from "../../../../core/alpha/token-unlock-risk.ts";
 import { computeHolderConcentration } from "../../../../core/alpha/holder-concentration.ts";
@@ -536,6 +549,11 @@ const INDICATOR_NAMES = [
   "breaker_block",
   "structure_break_conviction",
   "fvg_sweep_context",
+  "frac_diff",
+  "cusum_filter",
+  "sadf",
+  "roll_spread",
+  "amihud",
 ] as const;
 
 /** Last non-null value of an aligned indicator series (for boxing bare arrays). */
@@ -880,6 +898,28 @@ function dispatchIndicator(
         ...(typeof params.pivotWindow === "number" && { pivotWindow: params.pivotWindow }),
         ...(typeof params.lookback === "number" && { lookback: params.lookback }),
       });
+    case "frac_diff":
+      return calculateFracDiff(candles, {
+        ...(typeof params.d === "number" && { d: params.d }),
+        ...(typeof params.threshold === "number" && { threshold: params.threshold }),
+      });
+    case "cusum_filter":
+      return calculateCusumFilter(candles, {
+        ...(typeof params.threshold === "number" && { threshold: params.threshold }),
+      });
+    case "sadf":
+      return calculateSadf(candles, {
+        ...(typeof params.minWindow === "number" && { minWindow: params.minWindow }),
+        ...(typeof params.lags === "number" && { lags: params.lags }),
+      });
+    case "roll_spread":
+      return calculateRollSpread(candles, {
+        ...(typeof params.window === "number" && { window: params.window }),
+      });
+    case "amihud":
+      return calculateAmihud(candles, {
+        ...(typeof params.window === "number" && { window: params.window }),
+      });
     case "volume_signature":
       return calculateVolumeSignature(candles, {
         ...(typeof params.avgPeriod === "number" && { avgPeriod: params.avgPeriod }),
@@ -937,6 +977,8 @@ export const computeIndicatorTool = createTool({
     "ICT PD arrays (complement order_blocks / fvg / smc-patterns): volume_imbalance (2-candle BODY gap with overlapping ranges — open[i] vs close[i-1] gap, ranges still overlap; distinct from the 3-candle-wick fvg; returns unfilled VI zones price tends to rebalance), breaker_block (a FAILED/flipped order block confirming a market-structure shift — bullish: SH→SL then close above SH, zone = last down-candle body, acts as support on return; bearish mirror; distinct from plain order_blocks which hold in their original direction)",
     "Structure-break conviction: structure_break_conviction (the 'two-breaker-structure' / MSS-trap filter — a real reversal must close through ≥ minLevels (default 2) significant structure-making swing levels: the prevailing uptrend's HIGHER LOWS for a bearish break, the downtrend's LOWER HIGHS for a bullish break; breaking only the most recent/nearest level is flagged conviction='trap' (usually just a retracement to a key level before the trend continues); params { pivotWindow?, minLevels? }; gates on the COUNT of levels taken out — distinct from displacement_break (single break gated on leg magnitude) and smc change-of-character (single close-through))",
     "FVG quality: fvg_sweep_context (grades each unfilled fair-value gap by its liquidity-sweep context — a gap whose displacement came straight out of taking a prior swing low/high is quality='post_sweep' (high-probability, mostly respected); a gap formed in open space with no preceding sweep is quality='pre_sweep' (lower-probability, prone to being disrespected/inverted); params { pivotWindow?, lookback? }; links fvg-detection to liquidity sweeps — distinct from fvg (gap + midpoint-fill state only, no sweep context) and detectLiquiditySweeps (sweep events not tied to a gap))",
+    "AFML feature engineering (López de Prado): frac_diff (fixed-width fractional differentiation — stationarity-preserving memory; params { d?, threshold? }; d=1≈first-difference, d=0≈identity, 0<d<1 keeps memory while flattening trend), cusum_filter (symmetric CUSUM event sampler on log-returns — flags change-point bars where cumulative move exceeds a threshold; params { threshold? } default = returns stdev), sadf (supremum ADF — rolling explosiveness/BUBBLE test, right-tailed; distinct from KPSS/Johansen stationarity; params { minWindow?, lags? }; isExplosive flag)",
+    "Microstructure liquidity from OHLC (no quotes/tick): roll_spread (Roll 1984 effective spread = 2·sqrt(−serial-cov of price changes) + Corwin-Schultz 2012 high-low spread estimator; params { window? }), amihud (Amihud 2002 illiquidity = mean |return|/dollar-volume; higher = more price impact per dollar; params { window? }; distinct from VPIN/transient-impact)",
     "",
     "Internally fetches candles via the connected exchange. Pass `bars` to",
     "control the lookback window (default 200).",
@@ -1253,6 +1295,14 @@ const MICROSTRUCTURE_OPS = [
   "ruin_probability",
   "time_under_water",
   "vol_residual_correlation",
+  "tls_hedge_ratio",
+  "box_tiao_hedge_ratio",
+  "ou_fit",
+  "min_half_life_hedge_ratio",
+  "adf_optimal_hedge_ratio",
+  "ou_optimal_thresholds",
+  "triple_barrier",
+  "codependence",
   "signal_informativeness",
   "portfolio_ensemble",
   "regime_policy",
@@ -1401,6 +1451,16 @@ export const computeMicrostructureTool = createTool({
     "                              The correlation raw matrices HIDE: strips a common vol factor (provided, or a mean-|return|",
     "                              proxy) from each series and correlates the residuals. Flags 'hidden' pairs where shared",
     "                              vol-timing made raw returns look uncorrelated. Size for the residual matrix, not the raw one.",
+    "",
+    "    Statistical-arbitrage (pairs / mean-reversion, via arbitragelab scan) — all direct-input:",
+    "    - 'tls_hedge_ratio'    — params: { pricesY[], pricesX[] }. Total-least-squares (orthogonal/Deming) hedge ratio — errors-in-variables alternative to OLS; returns both. Use when X has measurement noise.",
+    "    - 'box_tiao_hedge_ratio' — params: { pricesBySymbol{} }. Canonical decomposition: the linear combo of N series that is MOST mean-reverting (VAR(1) + smallest-eigenvalue portfolio); returns weights + predictability + halfLife.",
+    "    - 'ou_fit'             — params: { series[], dt? }. Fit Ornstein-Uhlenbeck via AR(1): returns theta (speed), mu (mean), sigma, halfLife, isMeanReverting. (optimalPairsTrading ASSUMES these — this estimates them.)",
+    "    - 'min_half_life_hedge_ratio' — params: { pricesY[], pricesX[] }. Hedge ratio minimizing the spread's OU half-life (fastest mean reversion) — ranks by speed, not just stationarity.",
+    "    - 'adf_optimal_hedge_ratio' — params: { pricesY[], pricesX[], lags? }. Hedge ratio minimizing the spread's ADF stat (max stationarity); reports adfStat vs the ~−2.86 5% level.",
+    "    - 'ou_optimal_thresholds' — params: { theta, mu, sigma, transactionCost? }. Bertram (2010) optimal symmetric entry/exit for OU mean-reversion maximizing expected return per unit time net of cost (pair with ou_fit). Distinct from the Cartea-Jaimungal optimalPairsTrading op.",
+    "    - 'triple_barrier'     — params: { prices[], entries[], ptPct, slPct, verticalBars, side? }. López de Prado triple-barrier OUTCOME labeler: per entry, which barrier (profit-take / stop-loss / vertical-time) hits first → label +1/−1/0 + touch + return. Pure labeler (NOT ML meta-labeling). Useful for backtest/journal/eval outcome classification.",
+    "    - 'codependence'       — params: { x[], y[] } (or { seriesBySymbol } via the matrix helper). Non-linear dependence for pair selection: mutual information + distance correlation (Székely) — catch y=f(x) links Pearson misses (e.g. y=x², pearson≈0 but distanceCorr>0).",
     "",
     "    - 'market_memory'      — direct: { prices[], nSurrogates?, minWindow?, vrHorizons?, pValueCutoff? }",
     "                              shortcut: { symbol, timeframe?, lookbackBars?, nSurrogates?, vrHorizons? }",
@@ -1592,6 +1652,42 @@ export const computeMicrostructureTool = createTool({
           computeVolResidualCorrelation(
             p as unknown as Parameters<typeof computeVolResidualCorrelation>[0],
           ),
+      },
+      tls_hedge_ratio: {
+        execute: async (p: Record<string, unknown>) =>
+          computeTlsHedgeRatio(p as unknown as Parameters<typeof computeTlsHedgeRatio>[0]),
+      },
+      box_tiao_hedge_ratio: {
+        execute: async (p: Record<string, unknown>) =>
+          computeBoxTiaoHedgeRatio(p as unknown as Parameters<typeof computeBoxTiaoHedgeRatio>[0]),
+      },
+      ou_fit: {
+        execute: async (p: Record<string, unknown>) =>
+          fitOU(p as unknown as Parameters<typeof fitOU>[0]),
+      },
+      min_half_life_hedge_ratio: {
+        execute: async (p: Record<string, unknown>) =>
+          computeMinHalfLifeHedgeRatio(
+            p as unknown as Parameters<typeof computeMinHalfLifeHedgeRatio>[0],
+          ),
+      },
+      adf_optimal_hedge_ratio: {
+        execute: async (p: Record<string, unknown>) =>
+          computeAdfOptimalHedgeRatio(
+            p as unknown as Parameters<typeof computeAdfOptimalHedgeRatio>[0],
+          ),
+      },
+      ou_optimal_thresholds: {
+        execute: async (p: Record<string, unknown>) =>
+          computeOuOptimalThresholds(p as unknown as Parameters<typeof computeOuOptimalThresholds>[0]),
+      },
+      triple_barrier: {
+        execute: async (p: Record<string, unknown>) =>
+          computeTripleBarrier(p as unknown as Parameters<typeof computeTripleBarrier>[0]),
+      },
+      codependence: {
+        execute: async (p: Record<string, unknown>) =>
+          computeCodependence(p as unknown as Parameters<typeof computeCodependence>[0]),
       },
       filing_diff: {
         execute: async (p: Record<string, unknown>) => {
