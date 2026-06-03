@@ -300,3 +300,15 @@ export type { StochasticResult } from "./stochastic.ts";
 // Chaikin Money Flow (standalone)
 export { calculateCMF } from "./cmf.ts";
 export type { CMFResult } from "./cmf.ts";
+
+// RSI failure swing (Welles Wilder — pivot pattern on the RSI line; distinct from divergence)
+export { calculateRsiFailureSwing } from "./rsi-failure-swing.ts";
+export type { RsiFailureSwingResult } from "./rsi-failure-swing.ts";
+
+// RSI 50-midpoint regime suite (bias / dynamic S-R / consolidation-chop)
+export { calculateRsiMidpoint } from "./rsi-midpoint.ts";
+export type { RsiMidpointResult } from "./rsi-midpoint.ts";
+
+// Hidden divergence (continuation counterpart to regular RSI divergence)
+export { calculateHiddenDivergence } from "./hidden-divergence.ts";
+export type { HiddenDivergenceSignal, HiddenDivergenceResult } from "./hidden-divergence.ts";
