@@ -352,6 +352,8 @@ export type { BreakerBlockResult } from "./breaker-block.ts";
 // Structure-Break Conviction (two-breaker-structure / MSS-trap filter)
 export { calculateStructureBreakConviction } from "./structure-break-conviction.ts";
 export type { StructureBreakConvictionResult } from "./structure-break-conviction.ts";
+export { calculateRsrs } from "./rsrs.ts";
+export type { RsrsResult } from "./rsrs.ts";
 
 // FVG Sweep Context (grades fair-value gaps by pre-sweep vs post-sweep quality)
 export { calculateFvgSweepContext } from "./fvg-sweep-context.ts";

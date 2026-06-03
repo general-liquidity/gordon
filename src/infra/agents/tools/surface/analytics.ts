@@ -95,6 +95,7 @@ import {
   calculateVolumeImbalance,
   calculateBreakerBlock,
   calculateStructureBreakConviction,
+  calculateRsrs,
   calculateFvgSweepContext,
   calculateFracDiff,
   calculateCusumFilter,
@@ -549,6 +550,7 @@ const INDICATOR_NAMES = [
   "intraday_momentum",
   "displacement_break",
   "candle_continuity",
+  "rsrs",
   "vpin",
   "volume_imbalance",
   "breaker_block",
@@ -878,6 +880,13 @@ function dispatchIndicator(
       return calculateCandleContinuity(candles, {
         ...(typeof params.historyBars === "number" && { historyBars: params.historyBars }),
       });
+    case "rsrs":
+      return calculateRsrs(candles, {
+        ...(typeof params.slopeWindow === "number" && { slopeWindow: params.slopeWindow }),
+        ...(typeof params.zWindow === "number" && { zWindow: params.zWindow }),
+        ...(typeof params.buyThreshold === "number" && { buyThreshold: params.buyThreshold }),
+        ...(typeof params.sellThreshold === "number" && { sellThreshold: params.sellThreshold }),
+      });
     case "vpin":
       return calculateVpin(candles, {
         ...(typeof params.bucketVolume === "number" && { bucketVolume: params.bucketVolume }),
@@ -980,6 +989,7 @@ export const computeIndicatorTool = createTool({
     "Structure quality: displacement_break (break-of-structure gated on displacement magnitude — the breaking leg must be ≥ minRatio×(default 1.5) the prior swing leg; flags weak one-candle pokes as valid=false; distinct from smc change-of-character/liquidity-sweep which have no leg-ratio gate), candle_continuity (CCT — next-candle bias from the prior↔current two-candle relationship: how the current candle opened vs the prior + whether it closed with strength beyond the prior range → continuation/reversal/neutral; distinct from candlestick_patterns and open_pivot)",
     "Order-flow toxicity: vpin (Volume-Synchronized Probability of Informed Trading, Easley-López de Prado-O'Hara 2012 — volume-clock buckets + bulk-volume classification of buy/sell, then the rolling average bucket order-imbalance ∈ [0,1]; high VPIN = one-sided/informed flow that makes market-makers widen/pull quotes and has historically preceded volatility events; params { bucketVolume?, numBuckets?, window?, sigmaWindow? }; computes from OHLCV — distinct from the depth-snapshot microstructure-toxicity and fill-based adverse-selection detectors)",
     "ICT PD arrays (complement order_blocks / fvg / smc-patterns): volume_imbalance (2-candle BODY gap with overlapping ranges — open[i] vs close[i-1] gap, ranges still overlap; distinct from the 3-candle-wick fvg; returns unfilled VI zones price tends to rebalance), breaker_block (a FAILED/flipped order block confirming a market-structure shift — bullish: SH→SL then close above SH, zone = last down-candle body, acts as support on return; bearish mirror; distinct from plain order_blocks which hold in their original direction)",
+    "Regime/timing: rsrs (Resistance-Support Relative Strength — rolling OLS slope β of high-on-low over slopeWindow (default 18); when demand dominates highs extend faster than lows fall so β rises. Standardized = z-score of β over zWindow (default 250) = the canonical timing line (≥+0.7 demand/long, ≤−0.7 supply/exit); modified = standardized×R² (discounts weak-fit windows); right = modified×β. params { slopeWindow?, zWindow?, buyThreshold?, sellThreshold? }. Reads the support/resistance balance from intrabar high-low geometry — distinct from ADX (strength, no direction), efficiency_ratio (path efficiency), and the regime classifier (state labels))",
     "Structure-break conviction: structure_break_conviction (the 'two-breaker-structure' / MSS-trap filter — a real reversal must close through ≥ minLevels (default 2) significant structure-making swing levels: the prevailing uptrend's HIGHER LOWS for a bearish break, the downtrend's LOWER HIGHS for a bullish break; breaking only the most recent/nearest level is flagged conviction='trap' (usually just a retracement to a key level before the trend continues); params { pivotWindow?, minLevels? }; gates on the COUNT of levels taken out — distinct from displacement_break (single break gated on leg magnitude) and smc change-of-character (single close-through))",
     "FVG quality: fvg_sweep_context (grades each unfilled fair-value gap by its liquidity-sweep context — a gap whose displacement came straight out of taking a prior swing low/high is quality='post_sweep' (high-probability, mostly respected); a gap formed in open space with no preceding sweep is quality='pre_sweep' (lower-probability, prone to being disrespected/inverted); params { pivotWindow?, lookback? }; links fvg-detection to liquidity sweeps — distinct from fvg (gap + midpoint-fill state only, no sweep context) and detectLiquiditySweeps (sweep events not tied to a gap))",
     "AFML feature engineering (López de Prado): frac_diff (fixed-width fractional differentiation — stationarity-preserving memory; params { d?, threshold? }; d=1≈first-difference, d=0≈identity, 0<d<1 keeps memory while flattening trend), cusum_filter (symmetric CUSUM event sampler on log-returns — flags change-point bars where cumulative move exceeds a threshold; params { threshold? } default = returns stdev), sadf (supremum ADF — rolling explosiveness/BUBBLE test, right-tailed; distinct from KPSS/Johansen stationarity; params { minWindow?, lags? }; isExplosive flag)",
