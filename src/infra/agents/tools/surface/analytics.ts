@@ -94,6 +94,7 @@ import {
   calculateVpin,
   calculateVolumeImbalance,
   calculateBreakerBlock,
+  calculateStructureBreakConviction,
   type CandlestickPatternName,
   type Candle as IndicatorCandle,
 } from "../../../../core/indicators/index.ts";
@@ -530,6 +531,7 @@ const INDICATOR_NAMES = [
   "vpin",
   "volume_imbalance",
   "breaker_block",
+  "structure_break_conviction",
 ] as const;
 
 /** Last non-null value of an aligned indicator series (for boxing bare arrays). */
@@ -864,6 +866,11 @@ function dispatchIndicator(
       return calculateBreakerBlock(candles, {
         ...(typeof params.pivotWindow === "number" && { pivotWindow: params.pivotWindow }),
       });
+    case "structure_break_conviction":
+      return calculateStructureBreakConviction(candles, {
+        ...(typeof params.pivotWindow === "number" && { pivotWindow: params.pivotWindow }),
+        ...(typeof params.minLevels === "number" && { minLevels: params.minLevels }),
+      });
     case "volume_signature":
       return calculateVolumeSignature(candles, {
         ...(typeof params.avgPeriod === "number" && { avgPeriod: params.avgPeriod }),
@@ -919,6 +926,7 @@ export const computeIndicatorTool = createTool({
     "Structure quality: displacement_break (break-of-structure gated on displacement magnitude — the breaking leg must be ≥ minRatio×(default 1.5) the prior swing leg; flags weak one-candle pokes as valid=false; distinct from smc change-of-character/liquidity-sweep which have no leg-ratio gate), candle_continuity (CCT — next-candle bias from the prior↔current two-candle relationship: how the current candle opened vs the prior + whether it closed with strength beyond the prior range → continuation/reversal/neutral; distinct from candlestick_patterns and open_pivot)",
     "Order-flow toxicity: vpin (Volume-Synchronized Probability of Informed Trading, Easley-López de Prado-O'Hara 2012 — volume-clock buckets + bulk-volume classification of buy/sell, then the rolling average bucket order-imbalance ∈ [0,1]; high VPIN = one-sided/informed flow that makes market-makers widen/pull quotes and has historically preceded volatility events; params { bucketVolume?, numBuckets?, window?, sigmaWindow? }; computes from OHLCV — distinct from the depth-snapshot microstructure-toxicity and fill-based adverse-selection detectors)",
     "ICT PD arrays (complement order_blocks / fvg / smc-patterns): volume_imbalance (2-candle BODY gap with overlapping ranges — open[i] vs close[i-1] gap, ranges still overlap; distinct from the 3-candle-wick fvg; returns unfilled VI zones price tends to rebalance), breaker_block (a FAILED/flipped order block confirming a market-structure shift — bullish: SH→SL then close above SH, zone = last down-candle body, acts as support on return; bearish mirror; distinct from plain order_blocks which hold in their original direction)",
+    "Structure-break conviction: structure_break_conviction (the 'two-breaker-structure' / MSS-trap filter — a real reversal must close through ≥ minLevels (default 2) significant structure-making swing levels: the prevailing uptrend's HIGHER LOWS for a bearish break, the downtrend's LOWER HIGHS for a bullish break; breaking only the most recent/nearest level is flagged conviction='trap' (usually just a retracement to a key level before the trend continues); params { pivotWindow?, minLevels? }; gates on the COUNT of levels taken out — distinct from displacement_break (single break gated on leg magnitude) and smc change-of-character (single close-through))",
     "",
     "Internally fetches candles via the connected exchange. Pass `bars` to",
     "control the lookback window (default 200).",

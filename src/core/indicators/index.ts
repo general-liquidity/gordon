@@ -348,3 +348,7 @@ export type { VolumeImbalance, VolumeImbalanceResult } from "./volume-imbalance.
 // Breaker Block (ICT — failed/flipped order block confirming a market-structure shift)
 export { calculateBreakerBlock } from "./breaker-block.ts";
 export type { BreakerBlockResult } from "./breaker-block.ts";
+
+// Structure-Break Conviction (two-breaker-structure / MSS-trap filter)
+export { calculateStructureBreakConviction } from "./structure-break-conviction.ts";
+export type { StructureBreakConvictionResult } from "./structure-break-conviction.ts";
