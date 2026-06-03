@@ -112,6 +112,7 @@ import { computeTimeUnderWater } from "../../../../core/alpha/time-under-water.t
 import { computeVolResidualCorrelation } from "../../../../core/alpha/vol-residual-correlation.ts";
 import { computeTripleBarrier } from "../../../../core/alpha/triple-barrier.ts";
 import { computeCodependence } from "../../../../core/alpha/codependence.ts";
+import { computeControlChart } from "../../../../core/alpha/control-chart.ts";
 import { computeInventoryOrderSize } from "../../../../core/alpha/inventory-order-size.ts";
 import { computeMarketMakingMarkov } from "../../../trading/quant/marketMakingMarkov.ts";
 import { computeTlsHedgeRatio } from "../../../trading/quant/tlsHedgeRatio.ts";
@@ -1305,6 +1306,7 @@ const MICROSTRUCTURE_OPS = [
   "ou_optimal_thresholds",
   "triple_barrier",
   "codependence",
+  "control_chart",
   "inventory_order_size",
   "mm_markov",
   "signal_informativeness",
@@ -1467,6 +1469,7 @@ export const computeMicrostructureTool = createTool({
     "    - 'codependence'       — params: { x[], y[] } (or { seriesBySymbol } via the matrix helper). Non-linear dependence for pair selection: mutual information + distance correlation (Székely) — catch y=f(x) links Pearson misses (e.g. y=x², pearson≈0 but distanceCorr>0).",
     "",
     "    Market-making (Avellaneda-Stoikov family) — direct-input:",
+    "    - 'control_chart'       — params: { values[], baseline? }. Shewhart/Western-Electric statistical process control on a metric stream (R-multiples, slippage, daily PnL, eval scores): separates Deming common-cause noise from assignable SPECIAL-cause breaks. σ via avg moving range (R̄/1.128, outlier-robust). Flags 4 rules (1pt>3σ, 2-of-3>2σ, 4-of-5>1σ, run-of-8 one side). Use to decide whether the latest deviation is noise (don't tamper) or a break to investigate.",
     "    - 'inventory_order_size' — params: { inventory, maxSize, shape? }. Dynamic order-SIZE inventory control (Fushimi et al.): shrinks the side that would grow |inventory| by exp(−shape·|inventory|), keeps the reducing side at maxSize. Complements inventory_adjusted_price (which skews the quote PRICE) — this scales the SIZE.",
     "    - 'mm_markov'          — params: { transitionMatrix?[3][3] | states?[], waitingPeriods? }. Market-making quote-efficiency metrics from the {Quoting,Waiting,Spread} 3-state Markov chain: pMakeSpread + pOneSideFill (inventory-risk path) over a waiting horizon (default 5). Pass a transition matrix or a state sequence (estimated by counts).",
     "",
@@ -1696,6 +1699,10 @@ export const computeMicrostructureTool = createTool({
       codependence: {
         execute: async (p: Record<string, unknown>) =>
           computeCodependence(p as unknown as Parameters<typeof computeCodependence>[0]),
+      },
+      control_chart: {
+        execute: async (p: Record<string, unknown>) =>
+          computeControlChart(p as unknown as Parameters<typeof computeControlChart>[0]),
       },
       inventory_order_size: {
         execute: async (p: Record<string, unknown>) =>
