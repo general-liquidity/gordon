@@ -1,0 +1,120 @@
+import { describe, it, expect } from "bun:test";
+import { checkTrajectory, type NormalizedTrace } from "./processChecks.ts";
+import { computePassK, passKFromChecks } from "./passK.ts";
+
+function trace(
+  calls: Array<{ name: string; ok?: boolean }>,
+  extra: Partial<NormalizedTrace> = {},
+): NormalizedTrace {
+  return {
+    toolCalls: calls.map((c, i) => ({ name: c.name, ok: c.ok ?? true, order: i })),
+    ...extra,
+  };
+}
+
+describe("checkTrajectory", () => {
+  it("passes an empty trajectory", () => {
+    const r = checkTrajectory(trace([]));
+    expect(r.passed).toBe(true);
+    expect(r.violations).toEqual([]);
+  });
+
+  it("BLOCKS an order with no preceding risk gate", () => {
+    const r = checkTrajectory(trace([{ name: "get_market_data" }, { name: "place_market_order" }]));
+    expect(r.passed).toBe(false);
+    expect(r.violations.some((v) => v.rule === "risk_gate_before_order" && v.severity === "block")).toBe(true);
+  });
+
+  it("passes an order preceded by classify_trade_risk", () => {
+    const r = checkTrajectory(trace([{ name: "classify_trade_risk" }, { name: "place_market_order" }]));
+    expect(r.passed).toBe(true);
+  });
+
+  it("passes an order when a risk_check_id is linked even without a risk tool call", () => {
+    const r = checkTrajectory(trace([{ name: "place_market_order" }], { riskCheckId: "rc-123" }));
+    expect(r.passed).toBe(true);
+  });
+
+  it("WARNS (not blocks) when execute_plan has no preceding approve_plan", () => {
+    const r = checkTrajectory(
+      trace([{ name: "classify_trade_risk" }, { name: "execute_plan" }]),
+    );
+    // risk gate present → not blocked; but approval missing → warn.
+    expect(r.passed).toBe(true);
+    expect(r.violations.some((v) => v.rule === "approval_before_execute_plan" && v.severity === "warn")).toBe(true);
+  });
+
+  it("passes execute_plan with both approve_plan and risk gate", () => {
+    const r = checkTrajectory(
+      trace([{ name: "classify_trade_risk" }, { name: "approve_plan" }, { name: "execute_plan" }]),
+    );
+    expect(r.passed).toBe(true);
+    expect(r.violations.length).toBe(0);
+  });
+
+  it("BLOCKS a fund transfer executed with no approval and no risk gate", () => {
+    const r = checkTrajectory(trace([{ name: "wallet_transfer" }]));
+    expect(r.passed).toBe(false);
+    expect(r.violations.some((v) => v.rule === "denylist_without_approval" && v.severity === "block")).toBe(true);
+  });
+
+  it("WARNS on a doom loop (same tool fails 3x)", () => {
+    const r = checkTrajectory(
+      trace([
+        { name: "get_news", ok: false },
+        { name: "get_news", ok: false },
+        { name: "get_news", ok: false },
+      ]),
+    );
+    expect(r.violations.some((v) => v.rule === "no_doom_loop" && v.severity === "warn")).toBe(true);
+    expect(r.passed).toBe(true); // warn only
+  });
+
+  it("WARNS when outcome is trade_executed but no order tool ran", () => {
+    const r = checkTrajectory(trace([{ name: "get_market_data" }], { outcomeType: "trade_executed" }));
+    expect(r.violations.some((v) => v.rule === "outcome_consistency")).toBe(true);
+  });
+
+  it("does not flag a clean analysis trajectory", () => {
+    const r = checkTrajectory(
+      trace([{ name: "get_market_data" }, { name: "compute_indicator" }], { outcomeType: "analysis_complete" }),
+    );
+    expect(r.passed).toBe(true);
+    expect(r.violations.length).toBe(0);
+  });
+});
+
+describe("computePassK", () => {
+  it("'all' mode meets only when every run passes", () => {
+    expect(computePassK([true, true, true]).meets).toBe(true);
+    expect(computePassK([true, true, false]).meets).toBe(false);
+    expect(computePassK([true, true, true]).allPass).toBe(true);
+  });
+
+  it("'majority' mode meets when more than half pass", () => {
+    expect(computePassK([true, true, false], { mode: "majority" }).meets).toBe(true);
+    expect(computePassK([true, false, false], { mode: "majority" }).meets).toBe(false);
+  });
+
+  it("'rate' mode meets at/above threshold", () => {
+    const r = computePassK([true, true, true, true, false], { mode: "rate", threshold: 0.8 });
+    expect(r.passRate).toBe(0.8);
+    expect(r.meets).toBe(true);
+    expect(computePassK([true, false], { mode: "rate", threshold: 0.8 }).meets).toBe(false);
+  });
+
+  it("reports passes / k / passRate", () => {
+    const r = computePassK([true, false, true, true]);
+    expect(r.k).toBe(4);
+    expect(r.passes).toBe(3);
+    expect(r.passRate).toBe(0.75);
+  });
+
+  it("passKFromChecks treats a block-violation run as a fail", () => {
+    const good = checkTrajectory(trace([{ name: "classify_trade_risk" }, { name: "place_market_order" }]));
+    const bad = checkTrajectory(trace([{ name: "place_market_order" }]));
+    const r = passKFromChecks([good, good, bad]); // default "all"
+    expect(r.passes).toBe(2);
+    expect(r.meets).toBe(false);
+  });
+});

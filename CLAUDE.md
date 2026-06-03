@@ -96,6 +96,12 @@ The harness is **trajectory-agnostic** — caller supplies pre-recorded trajecto
 
 **Review queue.** When `detectRegressions(..., { writeReviewQueue: true })` is set, regressions append as JSONL to `~/.gordon/eval-failures.jsonl` (override via `GORDON_EVAL_REVIEW_QUEUE_PATH`). Local fail-bucket: grep / promote into the gold scenario set. The "a score with no ticket is a dashboard" principle, scaled down for single-operator use.
 
+**Process checks + pass^k (`harness/process/`).** The judge scores final text; `checkTrajectory(NormalizedTrace)` scores *process* deterministically over the audit trace's tool-call sequence — block-severity rules for `risk_gate_before_order` and `denylist_without_approval` (the catastrophic money-agent failures), warns for missing `approve_plan`, doom-loops, outcome inconsistency. No PRM needed — it's assertions over the recorded sequence. `computePassK` / `passKFromChecks` aggregate k runs (Sierra τ²-bench reliability metric); safety scenarios use mode `"all"` (safe on every run, not on average). pass^k consumes injected trajectories — the k-run producer is the Phase-4 live runner (not built).
+
+**Production-trace → eval loop (`harness/traces/`).** SOTA continuous-eval, fed from REAL paper-mode captures (not LLM-simulated users — unreliable proxies per "Lost in Simulation" 2026). `traceAdapter.ts` converts a `core/audit` `AuditTrace` → NormalizedTrace (process checks) + EvalTrajectory (judge) + `promoteTraceToScenario` (freeze a flagged trace as a permanent `derivedFrom:"trace:<id>"` scenario). `traceScorer.scoreRecentTraces` samples traces, runs process checks, appends flagged ones to the promotion queue (`~/.gordon/eval-promotions.jsonl`, sibling of the review queue) for operator silver→gold triage.
+
+**CI gate (`scripts/dev/eval-gate.ts` + `.github/workflows/eval-gate.yml`).** Blocks PRs on three deterministic legs (structural suite integrity, gold-trace process checks via `GORDON_EVAL_GOLD_TRACES`, eval unit suite) + an opt-in LLM-judge regression leg that activates when `GORDON_EVAL_BASELINE`/`GORDON_EVAL_CANDIDATE` trajectory fixtures + keys are present. A prompt-drift guard (`generator/prompt-drift.test.ts`) cross-checks the generator's restated role prompts against the live `roles.ts` invariants.
+
 ## Tool tier convention (MANDATORY for new tools)
 
 Every new `instrumentedXTools` registration added to `gordon.ts`, `executor.ts`, or `researcher.ts` MUST declare its tier. Three options:

@@ -102,3 +102,31 @@ export type {
 // Structured category-rubric data (consumed by the rubric source).
 export { CATEGORY_RUBRIC_DATA, renderCategoryRubric } from "./categoryRubrics.ts";
 export type { CategoryRubricData } from "./categoryRubrics.ts";
+
+// Process-level trajectory checks + pass^k reliability (Phase 3).
+export { checkTrajectory } from "./process/processChecks.ts";
+export type {
+  NormalizedTrace,
+  NormalizedToolCall,
+  ProcessViolation,
+  ProcessSeverity,
+  ProcessCheckResult,
+} from "./process/processChecks.ts";
+export { computePassK, passKFromChecks } from "./process/passK.ts";
+export type { PassKResult, PassKMode, PassKOptions } from "./process/passK.ts";
+
+// Production-trace → eval loop (Phase 1).
+export {
+  auditTraceToNormalized,
+  auditTraceToTrajectory,
+  promoteTraceToScenario,
+} from "./traces/traceAdapter.ts";
+export type { PromoteOptions } from "./traces/traceAdapter.ts";
+export { scoreTrace, scoreRecentTraces } from "./traces/traceScorer.ts";
+export type { TraceScore, ScoreTracesOptions, ScoreTracesResult } from "./traces/traceScorer.ts";
+export {
+  appendToPromotionQueue,
+  readPromotionQueue,
+  defaultPromotionQueuePath,
+} from "./traces/promotionQueue.ts";
+export type { PromotionEntry } from "./traces/promotionQueue.ts";

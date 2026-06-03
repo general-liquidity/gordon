@@ -1,0 +1,46 @@
+name: eval-gate
+
+# Blocks a PR when the eval harness regresses. Three deterministic legs run
+# with no API keys; the optional LLM-judge regression leg activates only when
+# trajectory fixtures + provider keys are present (post paper-mode capture).
+on:
+  pull_request:
+    paths:
+      - "src/infra/domain/evals/**"
+      - "src/infra/safety/defense/tradingConstitution.ts"
+      - "src/runtime/permissions/trustTrajectory.ts"
+      - "src/infra/agents/prompt-sections/**"
+      - "scripts/dev/eval-gate.ts"
+  workflow_dispatch: {}
+
+jobs:
+  eval-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Typecheck
+        run: bun tsc --noEmit -p tsconfig.json
+
+      # Leg 1: eval unit suite (generator, judge, process checks, drift guard).
+      - name: Eval unit suite
+        run: bun test src/infra/domain/evals
+
+      # Legs 2+3: structural + gold-trace process checks (+ opt-in judge
+      # regression when fixtures/keys exist). Blocks merge on non-zero exit.
+      - name: Eval gate
+        run: bun run scripts/dev/eval-gate.ts
+        env:
+          GORDON_EVAL_GOLD_TRACES: ${{ vars.GORDON_EVAL_GOLD_TRACES }}
+          GORDON_EVAL_BASELINE: ${{ vars.GORDON_EVAL_BASELINE }}
+          GORDON_EVAL_CANDIDATE: ${{ vars.GORDON_EVAL_CANDIDATE }}
+          DEDALUS_API_KEY: ${{ secrets.DEDALUS_API_KEY }}
