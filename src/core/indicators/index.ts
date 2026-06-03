@@ -324,3 +324,7 @@ export type { RsiTrendlineResult } from "./rsi-trendline.ts";
 // Session-open pivot + wickless candle-open drive (mean-reversion-to-open)
 export { calculateOpenPivot } from "./open-pivot.ts";
 export type { OpenPivotResult } from "./open-pivot.ts";
+
+// Market intraday momentum (Gao-Han-Li-Zhou JFE 2018 — first-window return predicts last-window return)
+export { calculateIntradayMomentum } from "./intraday-momentum.ts";
+export type { IntradayMomentumResult } from "./intraday-momentum.ts";
