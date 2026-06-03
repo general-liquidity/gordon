@@ -6,6 +6,7 @@ import {
   ALL_CATEGORIES,
   ALL_SCENARIOS,
   ALL_SCENARIO_IDS,
+  ADVERSARIAL_SCENARIOS,
   appendToReviewQueue,
   buildJudgePrompt,
   buildMockJudgeClient,
@@ -13,16 +14,15 @@ import {
   DEFAULT_PANEL,
   detectRegressions,
   formatRegressionReport,
+  generateScenarios,
   getCategoryRubric,
   getScenarioById,
   judgeTrajectories,
   judgeTrajectoriesPanel,
-  planCardBtc,
   readReviewQueue,
-  regimeFlip,
-  riskGate,
   runEvalSuite,
   scenariosByTag,
+  scenariosByProvenance,
   type EvalScenario,
   type EvalTrajectory,
   type RunVariantInput,
@@ -40,44 +40,71 @@ function makeTraj(id: string, content: string): EvalTrajectory {
   };
 }
 
-describe("scenarios catalog", () => {
-  it("ships the expected scenario set (4 core + 5 adversarial + 6 session)", () => {
-    // 15 = 4 core (plan-card-btc, regime-flip, risk-gate, ace-recall) +
-    //      5 adversarial (cred-leak, perm-bypass, denylist, cross-agent, injection) +
-    //      6 session primitives (synthesis-manifest, trim-coach,
-    //      reluctance-flag, dcf-usage, asof-replay, memo-render).
-    // Bump this assertion when adding scenarios so silent additions
-    // get a deliberate code review.
-    expect(ALL_SCENARIOS.length).toBe(15);
-    expect(ALL_SCENARIO_IDS).toContain("plan-card-btc");
-    expect(ALL_SCENARIO_IDS).toContain("regime-flip");
-    expect(ALL_SCENARIO_IDS).toContain("risk-gate");
-    expect(ALL_SCENARIO_IDS).toContain("ace-recall");
-    expect(ALL_SCENARIO_IDS).toContain("synthesis-manifest-capture");
-    expect(ALL_SCENARIO_IDS).toContain("trim-coach");
-    expect(ALL_SCENARIO_IDS).toContain("memo-render");
+// First 4 generated ids (sorted, deterministic) — used to drive the
+// runner tests without pinning to any hand-authored scenario.
+const SAMPLE_IDS: string[] = ALL_SCENARIO_IDS.slice(0, 4);
+
+describe("scenario catalog (generated)", () => {
+  it("is non-empty and produced by the generator", () => {
+    expect(ALL_SCENARIOS.length).toBeGreaterThan(0);
+    // The catalog is exactly the deterministic generator output.
+    expect(ALL_SCENARIO_IDS).toEqual(generateScenarios().map((s) => s.id));
   });
 
-  it("each scenario has the required fields", () => {
+  it("is deterministic across calls", () => {
+    const a = generateScenarios();
+    const b = generateScenarios();
+    expect(a.map((s) => s.id)).toEqual(b.map((s) => s.id));
+    expect(a.map((s) => s.userInput)).toEqual(b.map((s) => s.userInput));
+  });
+
+  it("has unique ids", () => {
+    expect(new Set(ALL_SCENARIO_IDS).size).toBe(ALL_SCENARIO_IDS.length);
+  });
+
+  it("every scenario has the required fields + provenance + category", () => {
     for (const s of ALL_SCENARIOS) {
       expect(typeof s.id).toBe("string");
       expect(s.id.length).toBeGreaterThan(0);
       expect(s.tags.length).toBeGreaterThan(0);
       expect(s.systemPrompt.length).toBeGreaterThan(50);
       expect(s.userInput.length).toBeGreaterThan(10);
+      // Every generated scenario is traceable to a spec...
+      expect(typeof s.derivedFrom).toBe("string");
+      expect(s.derivedFrom!.length).toBeGreaterThan(0);
+      // ...and declares a category (drives the category rubric).
+      expect(s.category).toBeDefined();
+      expect(ALL_CATEGORIES).toContain(s.category!);
     }
   });
 
+  it("covers all four spec sources via provenance", () => {
+    expect(scenariosByProvenance("constitution:").length).toBeGreaterThan(0);
+    expect(scenariosByProvenance("riskClassifier:").length).toBeGreaterThan(0);
+    expect(scenariosByProvenance("denylist:").length).toBeGreaterThan(0);
+    expect(scenariosByProvenance("categoryRubric:").length).toBe(ALL_CATEGORIES.length);
+  });
+
+  it("ships an adversarial subset for security gating", () => {
+    expect(ADVERSARIAL_SCENARIOS.length).toBeGreaterThan(0);
+    expect(ADVERSARIAL_SCENARIOS.every((s) => s.tags.includes("adversarial"))).toBe(true);
+  });
+
+  it("source filtering narrows the suite", () => {
+    const onlyConstitution = generateScenarios({ sources: ["constitution"] });
+    expect(onlyConstitution.length).toBeGreaterThan(0);
+    expect(onlyConstitution.every((s) => s.derivedFrom!.startsWith("constitution:"))).toBe(true);
+    expect(onlyConstitution.length).toBeLessThan(ALL_SCENARIOS.length);
+  });
+
   it("scenariosByTag filters correctly", () => {
-    expect(scenariosByTag("plan-card").length).toBe(1);
-    expect(scenariosByTag("plan-card")[0]?.id).toBe("plan-card-btc");
+    expect(scenariosByTag("constitution").length).toBeGreaterThan(0);
     expect(scenariosByTag("nonexistent-tag")).toEqual([]);
   });
 
-  it("getScenarioById resolves known scenarios", () => {
-    expect(getScenarioById("regime-flip")).toBe(regimeFlip);
-    expect(getScenarioById("plan-card-btc")).toBe(planCardBtc);
-    expect(getScenarioById("risk-gate")).toBe(riskGate);
+  it("getScenarioById resolves a known generated scenario", () => {
+    const first = ALL_SCENARIOS[0]!;
+    expect(getScenarioById(first.id)).toBe(first);
     expect(getScenarioById("ghost")).toBeUndefined();
   });
 });
@@ -194,21 +221,19 @@ describe("judgeTrajectories", () => {
 });
 
 describe("runEvalSuite", () => {
-  const scenarios: ReadonlyArray<EvalScenario> = ALL_SCENARIOS;
-
-  function buildVariant(label: string, scoreBias: number): RunVariantInput {
+  function buildVariant(label: string, ids: ReadonlyArray<string>): RunVariantInput {
     const map = new Map<string, EvalTrajectory>();
-    for (const s of scenarios) {
-      map.set(s.id, makeTraj(label, `response from ${label} for ${s.id} (bias=${scoreBias})`));
+    for (const id of ids) {
+      map.set(id, makeTraj(label, `response from ${label} for ${id}`));
     }
     return { variantLabel: label, trajectoriesByScenario: map };
   }
 
   it("requires at least 2 variants", async () => {
-    const single = buildVariant("solo", 0);
+    const single = buildVariant("solo", SAMPLE_IDS);
     let caught: unknown;
     try {
-      await runEvalSuite({ scenarios, variants: [single] });
+      await runEvalSuite({ scenarios: ALL_SCENARIOS, variants: [single] });
     } catch (err) {
       caught = err;
     }
@@ -216,80 +241,52 @@ describe("runEvalSuite", () => {
   });
 
   it("scores every scenario for every variant", async () => {
-    // Pin to the 4 scenarios the mock provides explicit responses for —
-    // ALL_SCENARIOS has grown to 15 (4 core + 5 adversarial + 6 session
-    // primitives) and the mock would have to enumerate every one. The
-    // test's actual subject is the suite-runner shape, not the full
-    // catalog; the catalog count is asserted separately above.
-    const pinnedIds = ["plan-card-btc", "regime-flip", "risk-gate", "ace-recall"];
-    const pinnedScenarios = ALL_SCENARIOS.filter((s) => pinnedIds.includes(s.id));
-    const buildPinnedVariant = (label: string): RunVariantInput => {
-      const map = new Map<string, EvalTrajectory>();
-      for (const s of pinnedScenarios) {
-        map.set(s.id, makeTraj(label, `response from ${label} for ${s.id}`));
-      }
-      return { variantLabel: label, trajectoriesByScenario: map };
-    };
-    const client = buildMockJudgeClient({
-      responses: {
-        "plan-card-btc": [
-          { id: "good", score: 0.9 },
-          { id: "bad", score: 0.2 },
-        ],
-        "regime-flip": [
-          { id: "good", score: 0.85 },
-          { id: "bad", score: 0.3 },
-        ],
-        "risk-gate": [
-          { id: "good", score: 0.95 },
-          { id: "bad", score: 0.15 },
-        ],
-        "ace-recall": [
-          { id: "good", score: 0.88 },
-          { id: "bad", score: 0.25 },
-        ],
-      },
+    // Pin to the first 4 generated scenarios so the mock can enumerate
+    // explicit per-scenario responses. The runner shape is the subject;
+    // the full catalog is asserted separately above.
+    const pinned = ALL_SCENARIOS.filter((s) => SAMPLE_IDS.includes(s.id));
+    const responses: Record<string, Array<{ id: string; score: number }>> = {};
+    SAMPLE_IDS.forEach((id, i) => {
+      responses[id] = [
+        { id: "good", score: 0.9 - i * 0.01 },
+        { id: "bad", score: 0.2 + i * 0.01 },
+      ];
     });
+    const client = buildMockJudgeClient({ responses });
     const result = await runEvalSuite({
-      scenarios: pinnedScenarios,
-      variants: [buildPinnedVariant("good"), buildPinnedVariant("bad")],
+      scenarios: pinned,
+      variants: [buildVariant("good", SAMPLE_IDS), buildVariant("bad", SAMPLE_IDS)],
       judgeOptions: { client },
     });
     expect(result.results.length).toBe(2);
     const good = result.results.find((r) => r.variantLabel === "good")!;
     const bad = result.results.find((r) => r.variantLabel === "bad")!;
     expect(good.aggregate).toBeGreaterThan(bad.aggregate);
-    expect(good.winCount).toBe(4);
+    expect(good.winCount).toBe(SAMPLE_IDS.length);
     expect(bad.winCount).toBe(0);
-    expect(good.scenarioCount).toBe(4);
+    expect(good.scenarioCount).toBe(SAMPLE_IDS.length);
   });
 
   it("skips scenarios where any variant is missing a trajectory", async () => {
-    const partial = buildVariant("partial", 0);
-    (partial.trajectoriesByScenario as Map<string, EvalTrajectory>).delete("regime-flip");
-    const client = buildMockJudgeClient({
-      responses: {
-        "plan-card-btc": [
-          { id: "partial", score: 0.5 },
-          { id: "full", score: 0.6 },
-        ],
-        "risk-gate": [
-          { id: "partial", score: 0.5 },
-          { id: "full", score: 0.6 },
-        ],
-        "ace-recall": [
-          { id: "partial", score: 0.5 },
-          { id: "full", score: 0.6 },
-        ],
-      },
-    });
+    const missingId = SAMPLE_IDS[1]!;
+    const presentIds = SAMPLE_IDS.filter((id) => id !== missingId);
+    const partial = buildVariant("partial", presentIds); // missing one
+    const full = buildVariant("full", SAMPLE_IDS);
+    const responses: Record<string, Array<{ id: string; score: number }>> = {};
+    for (const id of presentIds) {
+      responses[id] = [
+        { id: "partial", score: 0.5 },
+        { id: "full", score: 0.6 },
+      ];
+    }
+    const client = buildMockJudgeClient({ responses });
     const result = await runEvalSuite({
-      scenarios,
-      variants: [partial, buildVariant("full", 0)],
+      scenarios: ALL_SCENARIOS.filter((s) => SAMPLE_IDS.includes(s.id)),
+      variants: [partial, full],
       judgeOptions: { client },
     });
     expect(result.skippedScenarios.length).toBe(1);
-    expect(result.skippedScenarios[0]?.scenarioId).toBe("regime-flip");
+    expect(result.skippedScenarios[0]?.scenarioId).toBe(missingId);
   });
 });
 
@@ -416,7 +413,7 @@ describe("category rubrics", () => {
     expect(getCategoryRubric(undefined)).toBeUndefined();
   });
 
-  it("each shipped scenario declares a category", () => {
+  it("every generated scenario declares a category", () => {
     for (const s of ALL_SCENARIOS) {
       expect(s.category).toBeDefined();
       expect(ALL_CATEGORIES).toContain(s.category!);
@@ -494,8 +491,6 @@ describe("judgeTrajectoriesPanel", () => {
   });
 
   it("averages scores across surviving judges", async () => {
-    // Same response per judge — verifies the averaging mechanic returns
-    // the expected mean (which equals the single-judge value here).
     const client = buildMockJudgeClient({
       responses: {
         "panel-test": [
@@ -550,7 +545,6 @@ describe("judgeTrajectoriesPanel", () => {
     expect(bRow.score).toBeCloseTo((0.2 + 0.3 + 0.4) / 3, 3);
     expect(aRow.rank).toBe(1);
     expect(bRow.rank).toBe(2);
-    // Explanation should mention each judge model.
     expect(aRow.explanation).toContain("anthropic/test");
     expect(aRow.explanation).toContain("openai/test");
   });
@@ -573,7 +567,6 @@ describe("judgeTrajectoriesPanel", () => {
     expect(result.panel.length).toBe(3);
     const failedEntry = result.panel.find((p) => p.judgeModel === "openai/test")!;
     expect(failedEntry.failed).toBeDefined();
-    // Consensus still produced.
     const aRow = result.consensus.find((c) => c.id === "a")!;
     expect(aRow.score).toBeCloseTo(0.7, 3);
   });
@@ -605,38 +598,27 @@ describe("judgeTrajectoriesPanel", () => {
   });
 
   it("runEvalSuite routes through panel when panelOptions is set", async () => {
-    const client = buildMockJudgeClient({
-      responses: {
-        "plan-card-btc": [
-          { id: "good", score: 0.9 },
-          { id: "bad", score: 0.2 },
-        ],
-        "regime-flip": [
-          { id: "good", score: 0.85 },
-          { id: "bad", score: 0.3 },
-        ],
-        "risk-gate": [
-          { id: "good", score: 0.95 },
-          { id: "bad", score: 0.15 },
-        ],
-        "ace-recall": [
-          { id: "good", score: 0.88 },
-          { id: "bad", score: 0.25 },
-        ],
-      },
+    const responses: Record<string, Array<{ id: string; score: number }>> = {};
+    SAMPLE_IDS.forEach((id) => {
+      responses[id] = [
+        { id: "good", score: 0.9 },
+        { id: "bad", score: 0.2 },
+      ];
     });
+    const client = buildMockJudgeClient({ responses });
     function buildVariant(label: string): RunVariantInput {
       const map = new Map<string, EvalTrajectory>();
-      for (const s of ALL_SCENARIOS) {
-        map.set(s.id, {
+      for (const id of SAMPLE_IDS) {
+        map.set(id, {
           id: label,
-          messages: [{ role: "assistant", content: `${label} for ${s.id}` }],
+          messages: [{ role: "assistant", content: `${label} for ${id}` }],
         });
       }
       return { variantLabel: label, trajectoriesByScenario: map };
     }
+    const pinned = ALL_SCENARIOS.filter((s) => SAMPLE_IDS.includes(s.id));
     const result = await runEvalSuite({
-      scenarios: ALL_SCENARIOS,
+      scenarios: pinned,
       variants: [buildVariant("good"), buildVariant("bad")],
       panelOptions: { client, panel: ["a/1", "a/2"] },
     });
@@ -718,7 +700,6 @@ describe("review queue", () => {
     );
     const back = readReviewQueue(path);
     expect(back.length).toBe(2);
-    // readReviewQueue returns newest-first.
     expect(back[0]?.scenarioId).toBe("y");
     expect(back[1]?.scenarioId).toBe("x");
   });

@@ -54,6 +54,14 @@ export interface EvalScenario {
   extraRubric?: string;
   /** Optional eval category — drives category-conditioned rubric. */
   category?: EvalCategory;
+  /**
+   * Provenance — which authoritative spec this scenario was DERIVED from,
+   * e.g. "constitution:MAX_POSITION_SIZE_PCT", "riskClassifier:Tail Risk",
+   * "denylist:wallet_transfer", "categoryRubric:planning". Empty for
+   * hand-authored scenarios. Lets a failure point straight back at the
+   * spec line that motivated the test (ASSERT-style traceability).
+   */
+  derivedFrom?: string;
 }
 
 /**

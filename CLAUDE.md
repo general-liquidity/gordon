@@ -71,7 +71,9 @@ Why: the "Reverse-Engineering Memory" pattern survey identifies "always-inject" 
 
 ## Eval harness
 
-`src/infra/domain/evals/harness/` — RULER-pattern LLM-as-judge for agent quality. Three hand-curated scenarios shipped (plan-card-btc / regime-flip / risk-gate); grow as production traces surface failure modes. Distinct from `evals/tradeEvaluator.ts` which scores realized PnL after-the-fact.
+`src/infra/domain/evals/harness/` — RULER-pattern LLM-as-judge for agent quality. Distinct from `evals/tradeEvaluator.ts` which scores realized PnL after-the-fact.
+
+**Scenarios are GENERATED, not hand-authored** (the hand-curated fixtures were deleted — they encoded one author's assumptions and drifted from the specs). `ALL_SCENARIOS = generateScenarios()` (`harness/generator/`) derives every scenario from an authoritative spec and stamps `derivedFrom` provenance on each, so a failure points straight back at the spec line and the suite auto-updates when a spec changes (ASSERT-style spec→eval, but deterministic — Gordon's "systematize/taxonomize" stages already live in code as typed tables). Four sources: the trading constitution (`constitution:<RULE>` → refuse/downsize breach scenarios, breach magnitude computed from the live limit), risk-classifier dimensions (`riskClassifier:<Dim>`), the safety-critical deny-list (`denylist:<pattern>`, imported from `trustTrajectory.ts` so it stays synced) + agent boundaries + injection, and the category rubrics (`categoryRubric:<cat>`, driven by the structured `CATEGORY_RUBRIC_DATA`). Add coverage by editing a spec source, not by writing fixtures. Optional opt-in LLM-paraphrase pass (`generator/paraphrase.ts`) naturalizes the user-inputs and caches to a committed artifact; the deterministic core stays the stable regression gate. Filter by `generateScenarios({ sources })` or `scenariosByProvenance(prefix)`.
 
 ```ts
 import { runEvalSuite, detectRegressions, ALL_SCENARIOS } from "./infra/domain/evals/harness";

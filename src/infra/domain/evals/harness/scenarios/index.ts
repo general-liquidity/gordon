@@ -1,93 +1,30 @@
 /**
- * Golden scenarios — version-controlled, hand-curated.
+ * Scenario catalog — DERIVED, not hand-authored.
  *
- * Initial set is small (3 scenarios). Grow this list as production
- * traces surface failure modes worth regression-protecting. Per the
- * eval-discipline guidance: "the first fifty examples can be hand-
- * labeled in an afternoon, there is no excuse." We're at three.
+ * Hand-curated scenarios encoded one author's assumptions and drifted
+ * from the specs they were meant to protect. They have been removed.
+ * `ALL_SCENARIOS` is now produced by the deterministic generator
+ * (../generator), which derives every scenario from an authoritative
+ * spec: the trading constitution, the risk-classifier dimensions, the
+ * safety-critical deny-list, and the category rubrics. Each scenario
+ * carries a `derivedFrom` pointer back to its source.
  *
- * To add a scenario:
- *   1. Create a new file alongside this one (kebab-case-id.ts)
- *   2. Export a const of type `EvalScenario` with id, tags, systemPrompt, userInput, notes
- *   3. Re-export from this barrel
- *   4. Add the id to ALL_SCENARIO_IDS for the runner
+ * To change coverage, edit the spec sources under ../generator — not a
+ * pile of fixtures. To naturalize phrasing, run the opt-in paraphrase
+ * pass and commit its cache (see ../generator/paraphrase.ts).
  */
 
-import { planCardBtc } from "./plan-card-btc.ts";
-import { regimeFlip } from "./regime-flip.ts";
-import { riskGate } from "./risk-gate.ts";
-import { aceRecall } from "./ace-recall.ts";
-import { adversarialCredentialLeak } from "./adversarial-credential-leak.ts";
-import { adversarialPermissionBypass } from "./adversarial-permission-bypass.ts";
-import { adversarialDenylistCircumvention } from "./adversarial-denylist-circumvention.ts";
-import { adversarialCrossAgentBoundary } from "./adversarial-cross-agent-boundary.ts";
-import { adversarialInjectionResilience } from "./adversarial-injection-resilience.ts";
-// Primitives shipped in the meta-tools-v4 session — verify tool routing,
-// provenance, replay fidelity. Added together so the harness has
-// coverage for the void-replay + provenance work that landed without
-// scenarios.
-import { synthesisManifestCapture } from "./synthesis-manifest-capture.ts";
-import { trimCoach } from "./trim-coach.ts";
-import { reluctanceFlag } from "./reluctance-flag.ts";
-import { dcfUsage } from "./dcf-usage.ts";
-import { asofReplay } from "./asof-replay.ts";
-import { memoRender } from "./memo-render.ts";
+import { generateScenarios } from "../generator/index.ts";
 import type { EvalScenario } from "../types.ts";
 
-export {
-  planCardBtc,
-  regimeFlip,
-  riskGate,
-  aceRecall,
-  adversarialCredentialLeak,
-  adversarialPermissionBypass,
-  adversarialDenylistCircumvention,
-  adversarialCrossAgentBoundary,
-  adversarialInjectionResilience,
-  synthesisManifestCapture,
-  trimCoach,
-  reluctanceFlag,
-  dcfUsage,
-  asofReplay,
-  memoRender,
-};
+export const ALL_SCENARIOS: ReadonlyArray<EvalScenario> = generateScenarios();
 
-export const ALL_SCENARIOS: ReadonlyArray<EvalScenario> = [
-  planCardBtc,
-  regimeFlip,
-  riskGate,
-  aceRecall,
-  // Adversarial security scenarios (5 axes: credential-leak,
-  // permission-bypass, denylist-circumvention, cross-agent-boundary,
-  // injection-resilience). Designed in project_queued_adversarial_security_evals.md.
-  adversarialCredentialLeak,
-  adversarialPermissionBypass,
-  adversarialDenylistCircumvention,
-  adversarialCrossAgentBoundary,
-  adversarialInjectionResilience,
-  // Session primitives — synthesis-manifest, trim-coach, reluctance-
-  // flag, dcf-usage, asof-replay, memo-render. Test that Gordon
-  // chooses the right tool variant + handles missing data honestly.
-  synthesisManifestCapture,
-  trimCoach,
-  reluctanceFlag,
-  dcfUsage,
-  asofReplay,
-  memoRender,
-];
-
-/** Adversarial scenarios as a filtered set (security regression gating). */
-export const ADVERSARIAL_SCENARIOS: ReadonlyArray<EvalScenario> = [
-  adversarialCredentialLeak,
-  adversarialPermissionBypass,
-  adversarialDenylistCircumvention,
-  adversarialCrossAgentBoundary,
-  adversarialInjectionResilience,
-];
-
-export const ALL_SCENARIO_IDS: ReadonlyArray<string> = ALL_SCENARIOS.map(
-  (s) => s.id,
+/** Adversarial subset (security regression gating) — tagged "adversarial". */
+export const ADVERSARIAL_SCENARIOS: ReadonlyArray<EvalScenario> = ALL_SCENARIOS.filter(
+  (s) => s.tags.includes("adversarial"),
 );
+
+export const ALL_SCENARIO_IDS: ReadonlyArray<string> = ALL_SCENARIOS.map((s) => s.id);
 
 /** Filter scenarios by tag. */
 export function scenariosByTag(tag: string): ReadonlyArray<EvalScenario> {
@@ -97,4 +34,9 @@ export function scenariosByTag(tag: string): ReadonlyArray<EvalScenario> {
 /** Look up a scenario by id. */
 export function getScenarioById(id: string): EvalScenario | undefined {
   return ALL_SCENARIOS.find((s) => s.id === id);
+}
+
+/** Filter scenarios by provenance prefix, e.g. "constitution:" or "denylist:". */
+export function scenariosByProvenance(prefix: string): ReadonlyArray<EvalScenario> {
+  return ALL_SCENARIOS.filter((s) => (s.derivedFrom ?? "").startsWith(prefix));
 }

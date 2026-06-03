@@ -68,10 +68,37 @@ export type { ReviewQueueEntry } from "./reviewQueue.ts";
 export {
   ALL_SCENARIOS,
   ALL_SCENARIO_IDS,
-  planCardBtc,
-  regimeFlip,
-  riskGate,
-  aceRecall,
+  ADVERSARIAL_SCENARIOS,
   scenariosByTag,
   getScenarioById,
+  scenariosByProvenance,
 } from "./scenarios/index.ts";
+
+// Scenario generator — derives the suite from the trading constitution,
+// risk-classifier dimensions, the safety-critical deny-list, and the
+// category rubrics. Replaces the hand-authored scenario fixtures.
+export {
+  generateScenarios,
+  ALL_GENERATOR_SOURCES,
+  constitutionScenarios,
+  riskDimensionScenarios,
+  denylistScenarios,
+  rubricRedFlagScenarios,
+  paraphraseScenarios,
+  mergeParaphrased,
+  loadScenariosWithParaphrase,
+  writeParaphraseCache,
+  readParaphraseCache,
+  defaultParaphraseCachePath,
+  buildMockParaphraseClient,
+} from "./generator/index.ts";
+export type {
+  GeneratorSource,
+  GenerateOptions,
+  ParaphraseOptions,
+  MockParaphraseOptions,
+} from "./generator/index.ts";
+
+// Structured category-rubric data (consumed by the rubric source).
+export { CATEGORY_RUBRIC_DATA, renderCategoryRubric } from "./categoryRubrics.ts";
+export type { CategoryRubricData } from "./categoryRubrics.ts";

@@ -72,7 +72,7 @@ export interface TrustTrajectoryOptions {
  * these instead. Patterns are matched as case-insensitive
  * `String.prototype.includes` on the tool name.
  */
-const SAFETY_CRITICAL_PATTERNS: readonly string[] = [
+export const SAFETY_CRITICAL_PATTERNS: readonly string[] = [
   "place_order",
   "execute_trade",
   "cancel_order",
