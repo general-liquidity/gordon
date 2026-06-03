@@ -103,6 +103,8 @@ import { conditionalDistributionTest } from "../../../../core/alpha/conditional-
 import { runPortfolioEnsemble } from "../../../../core/alpha/pc-method-ensemble.ts";
 import { runRegimeAllocationPolicy } from "../../../../core/alpha/regime-policy.ts";
 import { computeForensicScores } from "../../../../core/alpha/forensic-accounting.ts";
+import { computeTimeUnderWater } from "../../../../core/alpha/time-under-water.ts";
+import { computeVolResidualCorrelation } from "../../../../core/alpha/vol-residual-correlation.ts";
 import { diffFilingSections, diffNamedSection } from "../../../../core/alpha/filing-section-diff.ts";
 import { computeTokenUnlockRisk } from "../../../../core/alpha/token-unlock-risk.ts";
 import { computeHolderConcentration } from "../../../../core/alpha/holder-concentration.ts";
@@ -1249,6 +1251,8 @@ const MICROSTRUCTURE_OPS = [
   "pie",
   "fundamental_ratios",
   "ruin_probability",
+  "time_under_water",
+  "vol_residual_correlation",
   "signal_informativeness",
   "portfolio_ensemble",
   "regime_policy",
@@ -1386,6 +1390,17 @@ export const computeMicrostructureTool = createTool({
     "                              drawdown threshold over a finite horizon + verdict (safe/cautious/risky/ruinous).",
     "                              Complements compute_kelly_size: Kelly is OPTIMAL sizing for log-growth; this is",
     "                              SURVIVAL risk at a CHOSEN sizing over a finite horizon.",
+    "",
+    "    - 'time_under_water'   — params: { returns[], initialEquity?, compoundMode?, periodsPerYear? }",
+    "                              The drawdown metric backtests ignore: DURATION below a prior peak, not just depth.",
+    "                              Returns longest/current underwater spell (periods), % time underwater, episode count,",
+    "                              max drawdown, and MAR (CAGR/maxDD when periodsPerYear given). Two equal-depth drawdowns",
+    "                              differ by recovery time — this measures it. Distinct from recovery_factor (depth-only).",
+    "",
+    "    - 'vol_residual_correlation' — params: { returnsBySymbol{}, volFactor?[], highCorrThreshold?, hiddenDelta? }",
+    "                              The correlation raw matrices HIDE: strips a common vol factor (provided, or a mean-|return|",
+    "                              proxy) from each series and correlates the residuals. Flags 'hidden' pairs where shared",
+    "                              vol-timing made raw returns look uncorrelated. Size for the residual matrix, not the raw one.",
     "",
     "    - 'market_memory'      — direct: { prices[], nSurrogates?, minWindow?, vrHorizons?, pValueCutoff? }",
     "                              shortcut: { symbol, timeframe?, lookbackBars?, nSurrogates?, vrHorizons? }",
@@ -1567,6 +1582,16 @@ export const computeMicrostructureTool = createTool({
       forensic_screen: {
         execute: async (p: Record<string, unknown>) =>
           computeForensicScores(p as unknown as Parameters<typeof computeForensicScores>[0]),
+      },
+      time_under_water: {
+        execute: async (p: Record<string, unknown>) =>
+          computeTimeUnderWater(p as unknown as Parameters<typeof computeTimeUnderWater>[0]),
+      },
+      vol_residual_correlation: {
+        execute: async (p: Record<string, unknown>) =>
+          computeVolResidualCorrelation(
+            p as unknown as Parameters<typeof computeVolResidualCorrelation>[0],
+          ),
       },
       filing_diff: {
         execute: async (p: Record<string, unknown>) => {
