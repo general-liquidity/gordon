@@ -108,6 +108,7 @@ import {
 import { conditionalDistributionTest } from "../../../../core/alpha/conditional-distribution-test.ts";
 import { runPortfolioEnsemble } from "../../../../core/alpha/pc-method-ensemble.ts";
 import { runRegimeAllocationPolicy } from "../../../../core/alpha/regime-policy.ts";
+import { computeRegimeFilterValue } from "../../../../core/alpha/regime-filter-value.ts";
 import { computeForensicScores } from "../../../../core/alpha/forensic-accounting.ts";
 import { computeDupont } from "../../../../core/alpha/dupont.ts";
 import { computeWeightedBookImbalance } from "../../../../core/microstructure/weighted-book-imbalance.ts";
@@ -1324,6 +1325,7 @@ const MICROSTRUCTURE_OPS = [
   "signal_informativeness",
   "portfolio_ensemble",
   "regime_policy",
+  "regime_filter_value",
   "forensic_screen",
   "dupont",
   "weighted_book_imbalance",
@@ -1514,6 +1516,14 @@ export const computeMicrostructureTool = createTool({
     "                              returns) by policy iteration → π*, an interpretable regime→weights lookup. Shortcut",
     "                              fetches aligned log-returns for the symbols (driverIndex picks the market-proxy, default 0).",
     "                              Returns the policy + regime labels + transition matrix + state-conditional returns.",
+    "    - 'regime_filter_value' — direct: { returns: number[], regimeLabels: string[], options?: { hostileRegimes?, detectionLagBars?(2), flipFraction?(0.15) } }",
+    "                              'The Regime Filter Trap': BEFORE building a regime filter for a strategy, price what a wrong",
+    "                              switch costs. (1) per-regime expectancy attribution on the strategy's realized returns (is it",
+    "                              even regime-sensitive?); (2) re-run with the filter DEGRADED — every switch lagged + a share of",
+    "                              calls flipped — and compare degraded-filtered vs unfiltered. Verdict: build_filter (losses",
+    "                              concentrate AND edge survives the lag) / complexity_tax (lag+error eat the edge) / regime_insensitive",
+    "                              (mushy attribution → filtering is pure cost). Strategy-level. Distinct from regime_policy (allocation)",
+    "                              and the regime-detection-lag eval metric (classifier responsiveness vs ground truth).",
     "    - 'forensic_screen'     — params: { current: {sales, cogs, sga, netIncome, cfo, receivables, currentAssets,",
     "                                currentLiabilities, ppeNet, depreciation, totalAssets, totalLiabilities, longTermDebt,",
     "                                retainedEarnings, ebit, marketCap, sharesOutstanding}, prior?: {same fields} }",
@@ -1674,6 +1684,10 @@ export const computeMicrostructureTool = createTool({
       regime_policy: {
         execute: async (p: Record<string, unknown>) =>
           runRegimeAllocationPolicy(p as unknown as Parameters<typeof runRegimeAllocationPolicy>[0]),
+      },
+      regime_filter_value: {
+        execute: async (p: Record<string, unknown>) =>
+          computeRegimeFilterValue(p as unknown as Parameters<typeof computeRegimeFilterValue>[0]),
       },
       forensic_screen: {
         execute: async (p: Record<string, unknown>) =>
