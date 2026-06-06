@@ -109,6 +109,7 @@ import { conditionalDistributionTest } from "../../../../core/alpha/conditional-
 import { runPortfolioEnsemble } from "../../../../core/alpha/pc-method-ensemble.ts";
 import { runRegimeAllocationPolicy } from "../../../../core/alpha/regime-policy.ts";
 import { computeRegimeFilterValue } from "../../../../core/alpha/regime-filter-value.ts";
+import { computeDampedCycleDecomposition } from "../../../trading/quant/dampedCycleDecomposition.ts";
 import { computeForensicScores } from "../../../../core/alpha/forensic-accounting.ts";
 import { computeDupont } from "../../../../core/alpha/dupont.ts";
 import { computeWeightedBookImbalance } from "../../../../core/microstructure/weighted-book-imbalance.ts";
@@ -1326,6 +1327,7 @@ const MICROSTRUCTURE_OPS = [
   "portfolio_ensemble",
   "regime_policy",
   "regime_filter_value",
+  "damped_cycle",
   "forensic_screen",
   "dupont",
   "weighted_book_imbalance",
@@ -1516,6 +1518,13 @@ export const computeMicrostructureTool = createTool({
     "                              returns) by policy iteration → π*, an interpretable regime→weights lookup. Shortcut",
     "                              fetches aligned log-returns for the symbols (driverIndex picks the market-proxy, default 0).",
     "                              Returns the policy + regime labels + transition matrix + state-conditional returns.",
+    "    - 'damped_cycle'        — direct: { values: number[], options?: { order?(6), minAmplitudeFraction?(0.05), persistenceTolerance?(0.01) } }",
+    "                              Prony damped-harmonic decomposition: fits x[n]≈Σ A_k·r_k^n·cos(ω_k n+φ_k) (the e^(λτ)·R(ωτ) family).",
+    "                              Per cycle returns period (2π/ω), decay-rate λ=ln|r| and a persistence verdict: PERSISTENT (λ≈0,",
+    "                              standing/exploitable cycle), DECAYING (λ<0, dying — reports amplitude half-life, don't fade into it),",
+    "                              or GROWING (λ>0, unstable). Plus amplitude, phase, varianceExplained. The per-cycle PERSISTENCE is what",
+    "                              MESA (power spectrum) and the Hilbert transform (instantaneous phase) don't give. Noise-sensitive —",
+    "                              feed a detrended/lightly-smoothed series; keep order ≈ 2× the cycles you expect to resolve.",
     "    - 'regime_filter_value' — direct: { returns: number[], regimeLabels: string[], options?: { hostileRegimes?, detectionLagBars?(2), flipFraction?(0.15) } }",
     "                              'The Regime Filter Trap': BEFORE building a regime filter for a strategy, price what a wrong",
     "                              switch costs. (1) per-regime expectancy attribution on the strategy's realized returns (is it",
@@ -1688,6 +1697,10 @@ export const computeMicrostructureTool = createTool({
       regime_filter_value: {
         execute: async (p: Record<string, unknown>) =>
           computeRegimeFilterValue(p as unknown as Parameters<typeof computeRegimeFilterValue>[0]),
+      },
+      damped_cycle: {
+        execute: async (p: Record<string, unknown>) =>
+          computeDampedCycleDecomposition(p as unknown as Parameters<typeof computeDampedCycleDecomposition>[0]),
       },
       forensic_screen: {
         execute: async (p: Record<string, unknown>) =>
