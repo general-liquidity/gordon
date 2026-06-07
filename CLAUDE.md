@@ -125,6 +125,7 @@ Most behavior primitives are now defaults-on as part of the core architecture. T
 | `GORDON_DEFER_WORKING_MEMORY=1` | Buffer mid-session working-memory writes to preserve prompt-cache stability; flush at session boundaries. Performance trade-off — see Hot-tier discipline section. |
 | `GORDON_SUPERVISION_RUST_RATE` | Periodic flawed-plan injection rate (0–1). Calibrated threshold; default off, operators set their own cadence. |
 | `GORDON_COMPACTION_STAGE` | Force a specific compaction stage during debugging. Read-only override; not a feature gate. |
+| `GORDON_MEMORY_WRITE_GUARD=1` | Enforce (not just log) the working-memory sensitive-field guard: an untrusted-source write that changes a sensitive field (risk limits, venue, account type, base currency) is **blocked**, prior value preserved. Trusted paths (`recordTrustedProvenance`) pass; non-sensitive untrusted writes are unaffected. Default off — opt-in because aggressive enforcement could surprise flows that legitimately update profile via the LLM. |
 
 Use `/flags` in the TUI to see the current state of these and toggle them at runtime.
 
