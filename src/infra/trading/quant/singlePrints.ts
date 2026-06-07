@@ -6,13 +6,15 @@
  * the *structural* features traders act on:
  *
  *   - Single print: a price level the auction touched in only ONE time-bracket
- *     (TPO count == 1) — a fast, one-sided move with no two-sided trade.
- *   - Buying / selling tail: a contiguous run of single prints at the LOW / HIGH
- *     extreme — responsive rejection of price away from the extreme (a "finished"
- *     auction). The longer the tail, the stronger the rejection.
- *   - Mid-range single-print zone: a single-print run NOT at an extreme — a
- *     vertical move that left "unfair" prices behind. These tend to get revisited
- *     ("filled") on a later rotation, so they act as magnet targets.
+ *     (TPO count == 1) with multi-TPO prices both ABOVE and BELOW it — a vertical
+ *     move through "unfair" prices. Per the canonical definition (mypivots),
+ *     single-TPO levels at the profile EXTREMES are NOT single prints — they are
+ *     tails (below). `totalSinglePrints` therefore counts mid-range levels only.
+ *     Single prints tend to get revisited ("filled") on a later rotation, so the
+ *     mid-range zones act as magnet targets.
+ *   - Buying / selling tail: a contiguous run of single-TPO levels at the LOW /
+ *     HIGH extreme — responsive rejection of price away from the extreme (a
+ *     "finished" auction). The longer the tail, the stronger the rejection.
  *   - Poor high / poor low: the extreme bin touched by 2+ TPOs (no tail) —
  *     "unfinished" business at the extreme, prone to being exceeded/revisited.
  *
@@ -54,6 +56,7 @@ export interface SinglePrintsResult {
   pointOfControl: number | null;
   valueAreaHigh: number | null;
   valueAreaLow: number | null;
+  /** Count of TRUE (mid-range) single-print levels — excludes tail levels. */
   totalSinglePrints: number;
   interpretation: string;
 }
@@ -99,12 +102,16 @@ export function computeSinglePrints(input: SinglePrintsInput): SinglePrintsResul
     const priceLow = sortedPrices[i]!;
     const priceHigh = sortedPrices[j]!;
     const length = j - i + 1;
-    totalSinglePrints += length;
     const location: SinglePrintLocation =
       i === 0 ? "buying_tail" : j === n - 1 ? "selling_tail" : "mid_range";
     const midpoint = round((priceLow + priceHigh) / 2);
     zones.push({ priceLow: round(priceLow), priceHigh: round(priceHigh), midpoint, length, location });
-    if (location === "mid_range") midRangeTargets.push(midpoint);
+    // Per the canonical definition, only mid-range runs are "single prints";
+    // extreme runs are tails (captured by buying/sellingTailLength).
+    if (location === "mid_range") {
+      midRangeTargets.push(midpoint);
+      totalSinglePrints += length;
+    }
     i = j + 1;
   }
 

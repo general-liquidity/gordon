@@ -28,7 +28,9 @@ describe("computeSinglePrints", () => {
     expect(r.poorLow).toBe(false);
     expect(r.poorHigh).toBe(false);
     expect(r.midRangeTargets).toEqual([103]);
-    expect(r.totalSinglePrints).toBe(3);
+    // canonical: only the mid-range level (103) is a "single print"; the two
+    // extreme levels (100, 106) are tails, not single prints.
+    expect(r.totalSinglePrints).toBe(1);
 
     const locations = r.zones.map((z) => z.location).sort();
     expect(locations).toEqual(["buying_tail", "mid_range", "selling_tail"]);
