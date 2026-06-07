@@ -14,7 +14,20 @@ import type { EquityPoint, ClosedTrade, BacktestMetrics, DrawdownPeriod } from "
 /** Default risk-free rate for Sharpe/Sortino calculations (2% annual) */
 const DEFAULT_RISK_FREE_RATE = 0.02;
 
-/** Trading days per year (crypto markets trade 365 days) */
+/**
+ * Default periods-per-year for annualizing per-bar return statistics
+ * (volatility, Sharpe, Sortino). 365 assumes 24/7 daily crypto bars.
+ *
+ * This is asset- AND bar-frequency-dependent — it must equal the number of
+ * BARS per year for the series being scored. Override via the `periodsPerYear`
+ * argument on the risk functions:
+ *   - crypto daily (24/7):     365
+ *   - equity/FX daily:         252
+ *   - hourly crypto:           365 × 24 = 8760
+ *   - 4h crypto:               365 × 6  = 2190
+ * Annualizing on the wrong calendar (e.g. 365 for an FX daily series, or a
+ * daily figure for intraday bars) distorts Sharpe — the headline judged metric.
+ */
 const TRADING_DAYS_PER_YEAR = 365;
 
 // ============================================================================
@@ -155,9 +168,13 @@ export function calculateMaxDrawdown(equityCurve: EquityPoint[]): number {
  * for risk-adjusted metrics like the Sharpe ratio.
  *
  * @param returns - Array of periodic returns (as decimals, e.g., 0.05 for 5%)
+ * @param periodsPerYear - Bars per year for this series (default 365, crypto-daily)
  * @returns Annualized volatility as a decimal (e.g., 0.15 for 15% volatility)
  */
-export function calculateVolatility(returns: number[]): number {
+export function calculateVolatility(
+  returns: number[],
+  periodsPerYear: number = TRADING_DAYS_PER_YEAR,
+): number {
   if (returns.length < 2) {
     return 0;
   }
@@ -165,10 +182,10 @@ export function calculateVolatility(returns: number[]): number {
   const mean = returns.reduce((sum, r) => sum + r, 0) / returns.length;
   const squaredDiffs = returns.map((r) => Math.pow(r - mean, 2));
   const variance = squaredDiffs.reduce((sum, d) => sum + d, 0) / (returns.length - 1);
-  const dailyStdDev = Math.sqrt(variance);
+  const perBarStdDev = Math.sqrt(variance);
 
-  // Annualize the daily standard deviation
-  return dailyStdDev * Math.sqrt(TRADING_DAYS_PER_YEAR);
+  // Annualize the per-bar standard deviation.
+  return perBarStdDev * Math.sqrt(periodsPerYear);
 }
 
 /**
@@ -185,19 +202,21 @@ export function calculateVolatility(returns: number[]): number {
  *
  * @param returns - Array of periodic returns (as decimals)
  * @param riskFreeRate - Annual risk-free rate (default: 0.02 for 2%)
+ * @param periodsPerYear - Bars per year for this series (default 365, crypto-daily)
  * @returns Sharpe ratio (can be negative)
  */
 export function calculateSharpeRatio(
   returns: number[],
-  riskFreeRate: number = DEFAULT_RISK_FREE_RATE
+  riskFreeRate: number = DEFAULT_RISK_FREE_RATE,
+  periodsPerYear: number = TRADING_DAYS_PER_YEAR,
 ): number {
   if (returns.length < 2) {
     return 0;
   }
 
   const meanReturn = returns.reduce((sum, r) => sum + r, 0) / returns.length;
-  const annualizedMeanReturn = meanReturn * TRADING_DAYS_PER_YEAR;
-  const volatility = calculateVolatility(returns);
+  const annualizedMeanReturn = meanReturn * periodsPerYear;
+  const volatility = calculateVolatility(returns, periodsPerYear);
 
   if (volatility === 0) {
     return 0;
@@ -217,18 +236,20 @@ export function calculateSharpeRatio(
  *
  * @param returns - Array of periodic returns (as decimals)
  * @param riskFreeRate - Annual risk-free rate (default: 0.02 for 2%)
+ * @param periodsPerYear - Bars per year for this series (default 365, crypto-daily)
  * @returns Sortino ratio (can be negative)
  */
 export function calculateSortinoRatio(
   returns: number[],
-  riskFreeRate: number = DEFAULT_RISK_FREE_RATE
+  riskFreeRate: number = DEFAULT_RISK_FREE_RATE,
+  periodsPerYear: number = TRADING_DAYS_PER_YEAR,
 ): number {
   if (returns.length < 2) {
     return 0;
   }
 
   const meanReturn = returns.reduce((sum, r) => sum + r, 0) / returns.length;
-  const annualizedMeanReturn = meanReturn * TRADING_DAYS_PER_YEAR;
+  const annualizedMeanReturn = meanReturn * periodsPerYear;
 
   // Calculate downside deviation (only negative returns)
   const negativeReturns = returns.filter((r) => r < 0);
@@ -241,9 +262,9 @@ export function calculateSortinoRatio(
   const squaredNegativeReturns = negativeReturns.map((r) => Math.pow(r, 2));
   const downsideVariance =
     squaredNegativeReturns.reduce((sum, d) => sum + d, 0) / returns.length;
-  const dailyDownsideDeviation = Math.sqrt(downsideVariance);
+  const perBarDownsideDeviation = Math.sqrt(downsideVariance);
   const annualizedDownsideDeviation =
-    dailyDownsideDeviation * Math.sqrt(TRADING_DAYS_PER_YEAR);
+    perBarDownsideDeviation * Math.sqrt(periodsPerYear);
 
   if (annualizedDownsideDeviation === 0) {
     return 0;
@@ -517,17 +538,19 @@ export function calculateTailRatio(
  *
  * @param returns - periodic returns (decimals)
  * @param window - window length in periods (default 63)
+ * @param periodsPerYear - Bars per year for this series (default 365, crypto-daily)
  * @returns array of rolling annualized Sharpe values
  */
 export function calculateRollingSharpe(
   returns: number[],
   window: number = DEFAULT_ROLLING_WINDOW,
+  periodsPerYear: number = TRADING_DAYS_PER_YEAR,
 ): number[] {
   if (window < 2 || returns.length < window) return [];
   const out: number[] = [];
   for (let end = window; end <= returns.length; end++) {
     const slice = returns.slice(end - window, end);
-    const sharpe = calculateSharpeRatio(slice);
+    const sharpe = calculateSharpeRatio(slice, DEFAULT_RISK_FREE_RATE, periodsPerYear);
     out.push(parseFloat((Number.isFinite(sharpe) ? sharpe : 0).toFixed(4)));
   }
   return out;
@@ -665,6 +688,9 @@ export function extractDrawdownPeriods(
  * @param equityCurve - Array of equity points over time
  * @param trades - Array of closed trades
  * @param days - Number of days in the backtest period
+ * @param periodsPerYear - Bars per year for the equity curve (default 365,
+ *   crypto-daily). Set to 252 for equity/FX daily, or bars-per-year for
+ *   intraday, so Sharpe/Sortino/volatility annualize on the right calendar.
  * @returns Complete BacktestMetrics object
  */
 export function calculateAllMetrics(
@@ -672,7 +698,8 @@ export function calculateAllMetrics(
   finalCapital: number,
   equityCurve: EquityPoint[],
   trades: ClosedTrade[],
-  days: number
+  days: number,
+  periodsPerYear: number = TRADING_DAYS_PER_YEAR,
 ): BacktestMetrics {
   // Calculate return metrics
   const totalReturn = calculateTotalReturn(initialCapital, finalCapital);
@@ -685,9 +712,9 @@ export function calculateAllMetrics(
 
   // Calculate daily returns from equity curve for Sharpe/Sortino
   const dailyReturns = calculateDailyReturns(equityCurve);
-  const volatility = calculateVolatility(dailyReturns);
-  const sharpeRatio = calculateSharpeRatio(dailyReturns);
-  const sortinoRatio = calculateSortinoRatio(dailyReturns);
+  const volatility = calculateVolatility(dailyReturns, periodsPerYear);
+  const sharpeRatio = calculateSharpeRatio(dailyReturns, DEFAULT_RISK_FREE_RATE, periodsPerYear);
+  const sortinoRatio = calculateSortinoRatio(dailyReturns, DEFAULT_RISK_FREE_RATE, periodsPerYear);
   const calmarRatio = calculateCalmarRatio(annualizedReturn, maxDrawdown);
 
   // Calculate trade metrics
@@ -870,7 +897,8 @@ import type { Trade, EquityPointExtended, BacktestParams } from "./types.ts";
 export function calculateMetricsFromTrades(
   trades: Trade[],
   equityCurve: EquityPointExtended[],
-  params: BacktestParams
+  params: BacktestParams,
+  periodsPerYear: number = TRADING_DAYS_PER_YEAR,
 ): BacktestMetrics {
   const initialCapital = params.initialCapital;
   const lastEquityPoint = equityCurve[equityCurve.length - 1];
@@ -909,7 +937,8 @@ export function calculateMetricsFromTrades(
     finalCapital,
     basicEquityCurve,
     closedTrades,
-    days
+    days,
+    periodsPerYear,
   );
 
   // Add engine-specific metrics
@@ -920,7 +949,7 @@ export function calculateMetricsFromTrades(
   // and the trade record. All null/empty when inputs are insufficient.
   const periodReturns = calculateDailyReturns(basicEquityCurve);
   const tailRatio = calculateTailRatio(periodReturns) ?? undefined;
-  const rollingSharpe = calculateRollingSharpe(periodReturns);
+  const rollingSharpe = calculateRollingSharpe(periodReturns, DEFAULT_ROLLING_WINDOW, periodsPerYear);
   // Engine has no benchmark series — beta is null unless a caller wires one in.
   const rollingBeta = calculateRollingBeta(periodReturns, null);
   const drawdownPeriods = extractDrawdownPeriods(basicEquityCurve);
