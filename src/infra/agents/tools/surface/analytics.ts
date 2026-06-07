@@ -127,6 +127,7 @@ import {
 import { computeSinglePrints } from "../../../trading/quant/singlePrints.ts";
 import { computeMAMA } from "../../../trading/quant/mamaMovingAverage.ts";
 import { computeInverseConvexity } from "../../../trading/quant/inverseConvexity.ts";
+import { computePriceDiscovery } from "../../../trading/quant/priceDiscovery.ts";
 import { constructRotationBars } from "../../../../core/indicators/rotation-bars.ts";
 import { computeVZO } from "../../../../core/indicators/vzo.ts";
 import { computeInventoryOrderSize } from "../../../../core/alpha/inventory-order-size.ts";
@@ -1391,6 +1392,7 @@ const MICROSTRUCTURE_OPS = [
   "single_prints",
   "rotation_bars",
   "inverse_convexity",
+  "price_discovery",
 ] as const;
 
 export const computeMicrostructureTool = createTool({
@@ -1689,6 +1691,11 @@ export const computeMicrostructureTool = createTool({
     "                              Inverse/coin-margined perp (XBTUSD-style) BTC-PnL convexity: PnL ∝ (1/entry−1/exit), so a LONG loses MORE BTC on a −x% move",
     "                              than it gains on +x% (negative convexity; asymmetryRatio>1) → longs liquidate faster, inverse-dominated markets dump deeper",
     "                              than they pump. Shorts get the mirror (positive). Quantifies the asymmetry for a ±movePct shock vs a symmetric linear contract.",
+    "    - 'price_discovery' — params: { series1: number[], series2: number[], label1?, label2?, applyLog? } (two cointegrated price series of the same asset)",
+    "                              Which market LEADS price discovery (two venues, or perp vs spot): Engle-Granger spread → error-correction speeds α → Gonzalo-",
+    "                              Granger component share (the market that adjusts LESS leads) + Hasbrouck Information Share with Cholesky upper/lower bounds.",
+    "                              Returns leader + componentShare1/2 + hasbrouckIS1/2 {lower,upper,mid} + confidence. ONLY valid if cointegrated — verify with",
+    "                              adf_test / johansen_cointegration first; pass log prices. (Hu-Hou-Oxley 2020; static, not the time-varying SPH/Park-Hahn version.)",
     "",
     "IMPORTANT: discipline_audit and adherence_report respect startTime+endTime",
     "ISO strings. When the operator asks for 'last 24h' or 'today', YOU must",
@@ -1858,6 +1865,14 @@ export const computeMicrostructureTool = createTool({
       inverse_convexity: {
         execute: async (p: Record<string, unknown>) =>
           computeInverseConvexity(p as unknown as Parameters<typeof computeInverseConvexity>[0]),
+      },
+      price_discovery: {
+        execute: async (p: Record<string, unknown>) => {
+          if (!Array.isArray(p.series1) || !Array.isArray(p.series2)) {
+            return { error: "price_discovery: `series1` and `series2` (aligned number[] price series) are required" };
+          }
+          return computePriceDiscovery(p as unknown as Parameters<typeof computePriceDiscovery>[0]);
+        },
       },
       inventory_order_size: {
         execute: async (p: Record<string, unknown>) =>
