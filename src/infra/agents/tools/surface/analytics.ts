@@ -134,6 +134,8 @@ import { computePriceDiscovery } from "../../../trading/quant/priceDiscovery.ts"
 import { computeGeneralizedImpulse } from "../../../trading/quant/generalizedImpulse.ts";
 import { computeFootprintImbalance } from "../../../../core/indicators/footprint-imbalance.ts";
 import { computeNakedPoc } from "../../../../core/indicators/naked-poc.ts";
+import { computeASIntensityCalibration, computeASStationaryReservation } from "../../../../core/alpha/as-market-making.ts";
+import { computeAsymmetricBeta } from "../../../../core/alpha/asymmetric-beta.ts";
 import { constructRotationBars } from "../../../../core/indicators/rotation-bars.ts";
 import { computeVZO } from "../../../../core/indicators/vzo.ts";
 import { computeInventoryOrderSize } from "../../../../core/alpha/inventory-order-size.ts";
@@ -1422,6 +1424,9 @@ const MICROSTRUCTURE_OPS = [
   "generalized_impulse",
   "footprint_imbalance",
   "naked_poc",
+  "as_intensity",
+  "as_stationary_reservation",
+  "asymmetric_beta",
 ] as const;
 
 export const computeMicrostructureTool = createTool({
@@ -1736,6 +1741,15 @@ export const computeMicrostructureTool = createTool({
     "    - 'naked_poc' — params: { candles[], periodBars? (24), numBins? (24) }",
     "                              Naked/virgin volume-POC tracking: each period's POC that price has NOT traded back through = an unfilled magnet level. Returns nakedPocs +",
     "                              nearestNakedAbove/Below the last close + filledCount. Distinct from single_prints (TPO gaps) — this tracks per-period volume-POC revisits.",
+    "    - 'asymmetric_beta' — params: { strategyReturns: number[], benchmarkReturns: number[], tThreshold? (2) }",
+    "                              Up/down-market beta (Andrew Lo) — 'fake market-neutral' detector: regress R = α + β⁺·max(Λ,0) + β⁻·min(Λ,0) + ε and test β⁺=β⁻. A significant",
+    "                              β⁻ > β⁺ with near-zero β⁺ = looks neutral up, heavy beta in selloffs. Returns betaUp/betaDown + betaDiff t-stat + verdict + fakeMarketNeutral flag.",
+    "    - 'as_intensity' — params: { dailyVolume, avgOrderSize, sizeExponentAlpha (α≈1.5), impactCoef (κ in Δp=κ·ln(Q)) }",
+    "                              Avellaneda-Stoikov fill-intensity calibration: derives A=Λ/α and k=α/κ of λ(δ)=A·exp(−kδ) from order-flow stats (Λ=vol/avg-order-size) so the",
+    "                              MM spread runs on measured params, not guesses. Feed A,k into inventory_adjusted_spread / optimalLimitDepth.",
+    "    - 'as_stationary_reservation' — params: { midPrice, inventory(q), gamma, sigma, qMax }",
+    "                              Avellaneda-Stoikov INFINITE-HORIZON (no terminal T) stationary reservation prices for always-on market-making: r̃ᵃ/ᵇ = s + (1/γ)ln(1 + (±1−2q)γ²σ²/",
+    "                              (2ω−γ²σ²q²)), ω=½γ²σ²(qMax+1)². Long q>0 → both quotes shift DOWN to sell; one side diverges (returns null + atCap) at the inventory cap.",
     "",
     "IMPORTANT: discipline_audit and adherence_report respect startTime+endTime",
     "ISO strings. When the operator asks for 'last 24h' or 'today', YOU must",
@@ -1936,6 +1950,22 @@ export const computeMicrostructureTool = createTool({
             return { error: "naked_poc: `candles` ([{open,high,low,close,volume}]) is required" };
           }
           return computeNakedPoc(p as unknown as Parameters<typeof computeNakedPoc>[0]);
+        },
+      },
+      as_intensity: {
+        execute: async (p: Record<string, unknown>) =>
+          computeASIntensityCalibration(p as unknown as Parameters<typeof computeASIntensityCalibration>[0]),
+      },
+      as_stationary_reservation: {
+        execute: async (p: Record<string, unknown>) =>
+          computeASStationaryReservation(p as unknown as Parameters<typeof computeASStationaryReservation>[0]),
+      },
+      asymmetric_beta: {
+        execute: async (p: Record<string, unknown>) => {
+          if (!Array.isArray(p.strategyReturns) || !Array.isArray(p.benchmarkReturns)) {
+            return { error: "asymmetric_beta: `strategyReturns` and `benchmarkReturns` (aligned number[]) are required" };
+          }
+          return computeAsymmetricBeta(p as unknown as Parameters<typeof computeAsymmetricBeta>[0]);
         },
       },
       inventory_order_size: {
