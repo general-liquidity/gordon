@@ -37,6 +37,18 @@ describe("computePriceDiscovery", () => {
     expect(r.hasbrouckIS1.mid).toBeGreaterThan(r.hasbrouckIS2.mid);
   });
 
+  it("Generalized Information Share (order-invariant) leans to the leader and sums to 1", () => {
+    const { s1, s2 } = build(0.05, 0.45); // market1 leads
+    const r = computePriceDiscovery({ series1: s1, series2: s2 });
+    expect(r.generalizedIS1 + r.generalizedIS2).toBeCloseTo(1, 3);
+    expect(r.generalizedIS1).toBeGreaterThan(0.5); // leader's share dominates
+    expect(r.generalizedIS1).toBeGreaterThanOrEqual(0);
+    expect(r.generalizedIS1).toBeLessThanOrEqual(1);
+    // GIS is a single order-invariant share inside the Hasbrouck bound range.
+    expect(r.generalizedIS1).toBeGreaterThanOrEqual(r.hasbrouckIS1.lower - 0.02);
+    expect(r.generalizedIS1).toBeLessThanOrEqual(r.hasbrouckIS1.upper + 0.02);
+  });
+
   it("identifies market2 as leader in the mirror case", () => {
     const { s1, s2 } = build(0.45, 0.05);
     const r = computePriceDiscovery({ series1: s1, series2: s2 });

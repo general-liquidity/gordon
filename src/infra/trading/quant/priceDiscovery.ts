@@ -48,6 +48,9 @@ export interface PriceDiscoveryResult {
   componentShare2: number;
   hasbrouckIS1: ISBounds;
   hasbrouckIS2: ISBounds;
+  /** Generalized Information Share (Lien-Shrestha) — order-invariant single share, sums to 1. */
+  generalizedIS1: number;
+  generalizedIS2: number;
   leader: string;
   confidence: "high" | "low";
   sampleSize: number;
@@ -120,6 +123,8 @@ export function computePriceDiscovery(input: PriceDiscoveryInput): PriceDiscover
     componentShare2: 0.5,
     hasbrouckIS1: { lower: 0, upper: 0, mid: 0 },
     hasbrouckIS2: { lower: 0, upper: 0, mid: 0 },
+    generalizedIS1: 0.5,
+    generalizedIS2: 0.5,
     leader: "indeterminate",
     confidence: "low",
     sampleSize: n,
@@ -168,9 +173,23 @@ export function computePriceDiscovery(input: PriceDiscoveryInput): PriceDiscover
   const D = psi1 * psi1 * s1 * s1 + 2 * psi1 * psi2 * rho * s1 * s2 + psi2 * psi2 * s2 * s2;
   let is1Upper = 0;
   let is1Lower = 0;
+  // Generalized Information Share (Lien-Shrestha): order-INVARIANT. Replaces the
+  // Cholesky factor with the symmetric square root of the residual correlation
+  // matrix [[1,ρ],[ρ,1]] = [[a,b],[b,a]], collapsing the IS range to one share.
+  let gis1 = 0.5;
+  let gis2 = 0.5;
   if (D > 0) {
     is1Upper = Math.pow(psi1 * s1 + psi2 * rho * s2, 2) / D; // market1 ordered first
     is1Lower = (psi1 * psi1 * s1 * s1 * (1 - rho * rho)) / D; // market1 ordered second
+
+    const rc = Math.max(-1, Math.min(1, rho));
+    const a = (Math.sqrt(1 + rc) + Math.sqrt(1 - rc)) / 2;
+    const b = (Math.sqrt(1 + rc) - Math.sqrt(1 - rc)) / 2;
+    // F = diag(s1,s2)·[[a,b],[b,a]]; the ψF components, GISᵢ = ([ψF]ᵢ)²/D.
+    const f1 = psi1 * s1 * a + psi2 * s2 * b;
+    const f2 = psi1 * s1 * b + psi2 * s2 * a;
+    gis1 = (f1 * f1) / D;
+    gis2 = (f2 * f2) / D;
   }
 
   // Confidence: a meaningful decomposition needs real error correction (at least
@@ -209,8 +228,9 @@ export function computePriceDiscovery(input: PriceDiscoveryInput): PriceDiscover
       ? `price-discovery decomposition unreliable (αs same-signed or degenerate) — verify the series are cointegrated (adf_test / johansen_cointegration) first`
       : `${leader === "indeterminate" ? "no clear leader (balanced)" : `${leader} leads price discovery`}: ` +
         `Gonzalo-Granger share ${label1} ${round(cs1 * 100, 1)}% / ${label2} ${round(cs2 * 100, 1)}%, ` +
-        `Hasbrouck IS ${label1} mid ${round(is1.mid * 100, 1)}% [${round(is1.lower * 100, 1)}–${round(is1.upper * 100, 1)}]` +
-        (Math.abs(rho) > 0.7 ? ` (ρ=${round(rho, 2)} high → wide IS bounds)` : "");
+        `Hasbrouck IS ${label1} mid ${round(is1.mid * 100, 1)}% [${round(is1.lower * 100, 1)}–${round(is1.upper * 100, 1)}], ` +
+        `GIS ${label1} ${round(gis1 * 100, 1)}%` +
+        (Math.abs(rho) > 0.7 ? ` (ρ=${round(rho, 2)} high → wide IS bounds; GIS→50/50)` : "");
 
   return {
     label1,
@@ -223,6 +243,8 @@ export function computePriceDiscovery(input: PriceDiscoveryInput): PriceDiscover
     componentShare2: round(cs2),
     hasbrouckIS1: is1,
     hasbrouckIS2: is2,
+    generalizedIS1: round(gis1),
+    generalizedIS2: round(gis2),
     leader,
     confidence,
     sampleSize: n,
