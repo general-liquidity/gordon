@@ -333,4 +333,59 @@ describe("memoryGate", () => {
       _resetMemoryGateForTests(memory);
     });
   });
+
+  describe("write guard enforcement (GORDON_MEMORY_WRITE_GUARD)", () => {
+    const SENSITIVE = "Max Risk Per Trade: 50%";
+    const wm = (p: { threadId: string; resourceId: string; workingMemory: string }) =>
+      (m: Memory) =>
+        (m as unknown as { updateWorkingMemory: (x: FakeMemoryRecord) => Promise<void> })
+          .updateWorkingMemory(p);
+
+    it("blocks an UNTRUSTED write that changes a sensitive field when enforcing", async () => {
+      const { memory, writes } = makeFakeMemory();
+      wrapMemoryWithGate(memory, { enforce: true });
+      // default provenance = llm_assertion (untrusted), value changes a sensitive field
+      await wm({ threadId: "t", resourceId: "r", workingMemory: SENSITIVE })(memory);
+      expect(writes.length).toBe(0); // blocked — not written through
+      _resetMemoryGateForTests(memory);
+    });
+
+    it("ALLOWS the same sensitive change from a TRUSTED source", async () => {
+      const { memory, writes } = makeFakeMemory();
+      wrapMemoryWithGate(memory, { enforce: true });
+      recordTrustedProvenance(memory, "t", "r", "explicit_command");
+      await wm({ threadId: "t", resourceId: "r", workingMemory: SENSITIVE })(memory);
+      expect(writes.length).toBe(1);
+      _resetMemoryGateForTests(memory);
+    });
+
+    it("ALLOWS an untrusted NON-sensitive write while enforcing", async () => {
+      const { memory, writes } = makeFakeMemory();
+      wrapMemoryWithGate(memory, { enforce: true });
+      await wm({ threadId: "t", resourceId: "r", workingMemory: "just some notes" })(memory);
+      expect(writes.length).toBe(1);
+      _resetMemoryGateForTests(memory);
+    });
+
+    it("does NOT block when enforcement is off (back-compat default)", async () => {
+      const { memory, writes } = makeFakeMemory();
+      wrapMemoryWithGate(memory); // enforce defaults to false
+      await wm({ threadId: "t", resourceId: "r", workingMemory: SENSITIVE })(memory);
+      expect(writes.length).toBe(1);
+      _resetMemoryGateForTests(memory);
+    });
+
+    it("preserves the prior value on block (does not advance last-seen state)", async () => {
+      const { memory, writes } = makeFakeMemory();
+      wrapMemoryWithGate(memory, { enforce: true });
+      // trusted baseline write establishes the prior value
+      recordTrustedProvenance(memory, "t", "r", "setup_wizard");
+      await wm({ threadId: "t", resourceId: "r", workingMemory: "Max Risk Per Trade: 2%" })(memory);
+      expect(writes.length).toBe(1);
+      // untrusted attempt to raise the limit → blocked, prior value intact
+      await wm({ threadId: "t", resourceId: "r", workingMemory: "Max Risk Per Trade: 90%" })(memory);
+      expect(writes.length).toBe(1); // no second write got through
+      _resetMemoryGateForTests(memory);
+    });
+  });
 });

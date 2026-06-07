@@ -39,6 +39,18 @@ const TRUNCATION_MARKER = "\n[...truncated to hot-tier cap]";
 const DEFER_FLAG_ENV = "GORDON_DEFER_WORKING_MEMORY";
 
 /**
+ * Opt-in write guard. When set, an UNTRUSTED-source write that would change a
+ * sensitive field is BLOCKED (not just logged). Default off for back-compat —
+ * the sensitive-field detection above is detection-only by design; this flag
+ * turns detection into enforcement for operators who want it.
+ */
+const WRITE_GUARD_FLAG_ENV = "GORDON_MEMORY_WRITE_GUARD";
+
+export function isWriteGuardEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+  return env[WRITE_GUARD_FLAG_ENV] === "1";
+}
+
+/**
  * Sensitive working-memory field markers. When a write changes content under
  * any of these field labels, we log a structured warning so the user can
  * audit whether the change was intentional. This is detection, not
@@ -234,6 +246,8 @@ function bufferKey(params: UpdateWorkingMemoryParams): string {
 export interface MemoryGateOptions {
   /** Override the env-driven defer mode (mainly for tests). */
   defer?: boolean;
+  /** Override the env-driven write guard (mainly for tests). */
+  enforce?: boolean;
 }
 
 /**
@@ -308,6 +322,26 @@ export function wrapMemoryWithGate<M extends Memory>(
         flagSuffix,
       });
     }
+
+    // Enforcement (opt-in via GORDON_MEMORY_WRITE_GUARD or options.enforce):
+    // an UNTRUSTED-source write may not silently change a sensitive field.
+    // gstack's profile-poisoning defense — the threat is ingested content
+    // (news / EDGAR / MCP output) driving the LLM's auto-updateWorkingMemory
+    // tool to rewrite a risk limit, venue, or account type. Trusted paths
+    // (setup wizard, explicit user command) pre-register provenance via
+    // recordTrustedProvenance() and pass through. Block = no write, the prior
+    // value is preserved (lastByKey is NOT advanced). Non-sensitive untrusted
+    // updates are never blocked.
+    const enforce = options.enforce ?? isWriteGuardEnabled();
+    if (enforce && !isTrustedSource(source) && sensitiveChanges.length > 0) {
+      logger.warn("BLOCKED untrusted working-memory write to sensitive field(s)", {
+        threadId: finalParams.threadId,
+        fields: sensitiveChanges.map((c) => c.field),
+        source,
+      });
+      return; // do not write; previous value preserved
+    }
+
     lastByKey.set(memKey, truncatedValue);
 
     const defer = options.defer ?? isDeferralEnabled();
