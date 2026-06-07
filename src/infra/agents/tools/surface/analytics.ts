@@ -75,6 +75,9 @@ import {
   calculateVolumeSignature,
   calculateDonchian,
   calculateHMA,
+  calculateEHMA,
+  calculateTHMA,
+  computeLeledcExhaustion,
   calculateVWMA,
   calculateMomentum,
   calculateROC,
@@ -578,6 +581,7 @@ const INDICATOR_NAMES = [
   "rolling_vwap",
   "mama",
   "vzo",
+  "leledc_exhaustion",
 ] as const;
 
 /** Last non-null value of an aligned indicator series (for boxing bare arrays). */
@@ -828,9 +832,23 @@ function dispatchIndicator(
       return calculateDonchian(candles, (params.period as number) ?? 20);
     case "hull_ma": {
       const period = (params.period as number) ?? 16;
-      const values = calculateHMA(closes, period);
-      return { values, current: lastDefined(values), period };
+      const variant = (params.variant as string) ?? "hma";
+      const values =
+        variant === "ehma"
+          ? calculateEHMA(closes, period)
+          : variant === "thma"
+            ? calculateTHMA(closes, period)
+            : calculateHMA(closes, period);
+      return { values, current: lastDefined(values), period, variant };
     }
+    case "leledc_exhaustion":
+      return computeLeledcExhaustion({
+        candles: candles.map((c) => ({ open: c.open, high: c.high, low: c.low, close: c.close })),
+        ...(typeof params.majQual === "number" && { majQual: params.majQual }),
+        ...(typeof params.majLen === "number" && { majLen: params.majLen }),
+        ...(typeof params.minQual === "number" && { minQual: params.minQual }),
+        ...(typeof params.minLen === "number" && { minLen: params.minLen }),
+      });
     case "vwma": {
       const period = (params.period as number) ?? 20;
       const values = calculateVWMA(candles, period);
@@ -1013,7 +1031,7 @@ export const computeIndicatorTool = createTool({
     "Moving averages: wma (weighted), dema (double EMA), tema (triple EMA), trima (triangular) — return { values, current }",
     "Volatility forecast: garch_forecast (GARCH(1,1) MLE fit on log-returns → params, persistence, long-run vol, multi-step varianceForecast; params { horizon?, demean? })",
     "Volume signature: volume_signature (Morales-Kacher / CAN SLIM pocket-pivot family — per-bar pocket pivots PP10/PP5, volume dry-up (2 levels), accumulation/distribution days + trailing distribution count & health verdict, churn/stalling; one op over an SMA-volume baseline; pairs with highest_volume_ever / undercut_rally / tight_consolidation for base-building reads)",
-    "Channels / MAs: donchian (rolling high/low breakout envelope), hull_ma (low-lag Hull MA), vwma (volume-weighted MA), supertrend_channel (Supertrend-pivot running-extreme envelope + midline target, resets on trend flip)",
+    "Channels / MAs: donchian (rolling high/low breakout envelope), hull_ma (low-lag Hull MA; params { period? 16, variant?: 'hma'|'ehma'|'thma' } — ehma=exponential Hull, thma=triple Hull, the Hull Suite variants), vwma (volume-weighted MA), supertrend_channel (Supertrend-pivot running-extreme envelope + midline target, resets on trend flip)",
     "Momentum: momentum (absolute Δ vs N bars ago), roc (percent change vs N bars ago)",
     "Flow regime: cboe_odds (volume-weighted three-state bull/bear/STAGNANT odds oscillator — MFI-style money-flow index re-weighted by Stoch-RSI momentum; the stagnant leg quantifies chop/indecision)",
     "More: stochastic (classic price %K/%D — locates close in the recent high-low range; >80 overbought / <20 oversold; distinct from stochastic-rsi), cmf (Chaikin Money Flow, windowed money-flow-volume/volume in [−1,1]; >0.05 accumulation / <−0.05 distribution)",
@@ -1032,6 +1050,7 @@ export const computeIndicatorTool = createTool({
     "Rolling VWAP: rolling_vwap (windowed VWAP over the trailing `window` bars — a moving fair-value / mean-reversion anchor that DROPS old bars, unlike vwap which accumulates from the first bar and never resets; params { window? default 20, stdDevMultiplier? default 1 }; returns the aligned series + current + price position + ±σ value-area bands (upper≈VAH, lower≈VAL); for higher-timeframe S/R use a larger window e.g. 90)",
     "Ehlers adaptive: mama (MESA Adaptive Moving Average + FAMA companion — Hilbert homodyne discriminator measures the dominant cycle period and sets an adaptive alpha between slowLimit/fastLimit; params { fastLimit? 0.5, slowLimit? 0.05 }; MAMA above FAMA = bullish, crossover = signal. Distinct from KAMA (efficiency-ratio) / VIDYA (CMO-vol) — alpha here is cycle-phase driven)",
     "Volume momentum: vzo (Volume Zone Oscillator, Waxman — 100×EMA(signed volume)/EMA(volume); whether volume accumulates on up- vs down-closes, ±60 range; params { period? 14 }; ≥40 overbought / ≤−40 oversold. Distinct from MFI/CMF; classic use is RSI-vs-VZO divergence — a 'scam pump' spikes RSI while VZO stays flat)",
+    "Exhaustion S/R: leledc_exhaustion (Leledc exhaustion bars → support/resistance — price-action bar-counter: momentum counter (close vs close[4]) + a reversal candle AT a range extreme marks an exhaustion bar whose high=resistance / low=support; params { majQual? 6, majLen? 30, minQual? 5, minLen? 5 } for major/minor tiers. Returns the exhaustion signals + active major/minor S/R levels + whether THIS bar is an exhaustion. Distinct from volume/orderflow/streak exhaustion — pure price action)",
     "",
     "Internally fetches candles via the connected exchange. Pass `bars` to",
     "control the lookback window (default 200).",

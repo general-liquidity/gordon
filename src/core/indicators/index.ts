@@ -273,8 +273,10 @@ export type {
 export { calculateDonchian } from "./donchian.ts";
 export type { DonchianResult } from "./donchian.ts";
 
-// Hull Moving Average
-export { calculateHMA } from "./hull-ma.ts";
+// Hull Moving Average (+ Hull Suite variants: EHMA, THMA)
+export { calculateHMA, calculateEHMA, calculateTHMA } from "./hull-ma.ts";
+// Leledc exhaustion bars → S/R levels
+export { computeLeledcExhaustion } from "./leledc-exhaustion.ts";
 
 // Volume-Weighted Moving Average
 export { calculateVWMA } from "./vwma.ts";
