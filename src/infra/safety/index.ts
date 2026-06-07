@@ -82,7 +82,11 @@ export {
 export type { ProviderHealth, FallbackEnvelope } from "./anti-trap/localFallback.ts";
 
 // Asset-class inference helper (shared by anti-rot gates)
-export { inferAssetClassFromVenue } from "./assetClassInference.ts";
+export {
+  inferAssetClassFromVenue,
+  inferAssetClassFromSymbol,
+  inferAssetClass,
+} from "./assetClassInference.ts";
 export type { InferredAssetClass } from "./assetClassInference.ts";
 
 // Trading universe scope sentinel

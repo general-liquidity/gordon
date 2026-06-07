@@ -55,7 +55,7 @@ import {
   checkUniverse,
   gateCoherence,
   gateAgainstMandate,
-  inferAssetClassFromVenue,
+  inferAssetClass,
 } from "../../../safety/index.ts";
 import { classifyBlockedStatus } from "../../../observability/blockedClassification.ts";
 
@@ -446,7 +446,9 @@ export const executePlanTool = createTool({
     // "I'm going back to writing code by hand" — universe scope sentinel,
     // thesis coherence, per-strategy mandate). All inert without flags.
     const venue = ctx.exchange?.exchangeId;
-    const inferredAssetClass = inferAssetClassFromVenue(venue);
+    // Symbol-aware: on multi-asset venues (FX/metals/crypto side by side) the
+    // symbol disambiguates the class where the venue can't (e.g. XAUUSD, EURUSD).
+    const inferredAssetClass = inferAssetClass(venue, plan.symbol);
 
     // (a) Trading universe scope sentinel
     const universeResult = checkUniverse({
