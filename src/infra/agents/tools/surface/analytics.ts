@@ -131,6 +131,9 @@ import { computeSinglePrints } from "../../../trading/quant/singlePrints.ts";
 import { computeMAMA } from "../../../trading/quant/mamaMovingAverage.ts";
 import { computeInverseConvexity } from "../../../trading/quant/inverseConvexity.ts";
 import { computePriceDiscovery } from "../../../trading/quant/priceDiscovery.ts";
+import { computeGeneralizedImpulse } from "../../../trading/quant/generalizedImpulse.ts";
+import { computeFootprintImbalance } from "../../../../core/indicators/footprint-imbalance.ts";
+import { computeNakedPoc } from "../../../../core/indicators/naked-poc.ts";
 import { constructRotationBars } from "../../../../core/indicators/rotation-bars.ts";
 import { computeVZO } from "../../../../core/indicators/vzo.ts";
 import { computeInventoryOrderSize } from "../../../../core/alpha/inventory-order-size.ts";
@@ -637,7 +640,11 @@ function dispatchIndicator(
       );
     case "mama":
       return computeMAMA({
-        values: closes,
+        // Ehlers' MAMA defaults Price = (H+L)/2 (hl2); allow source: 'close'.
+        values:
+          (params.source as string) === "close"
+            ? closes
+            : candles.map((c) => (c.high + c.low) / 2),
         ...(typeof params.fastLimit === "number" && { fastLimit: params.fastLimit }),
         ...(typeof params.slowLimit === "number" && { slowLimit: params.slowLimit }),
       });
@@ -1048,7 +1055,7 @@ export const computeIndicatorTool = createTool({
     "AFML feature engineering (López de Prado): frac_diff (fixed-width fractional differentiation — stationarity-preserving memory; params { d?, threshold? }; d=1≈first-difference, d=0≈identity, 0<d<1 keeps memory while flattening trend), cusum_filter (symmetric CUSUM event sampler on log-returns — flags change-point bars where cumulative move exceeds a threshold; params { threshold? } default = returns stdev), sadf (supremum ADF — rolling explosiveness/BUBBLE test, right-tailed; distinct from KPSS/Johansen stationarity; params { minWindow?, lags? }; isExplosive flag)",
     "Microstructure liquidity from OHLC (no quotes/tick): roll_spread (Roll 1984 effective spread = 2·sqrt(−serial-cov of price changes) + Corwin-Schultz 2012 high-low spread estimator; params { window? }), amihud (Amihud 2002 illiquidity = mean |return|/dollar-volume; higher = more price impact per dollar; params { window? }; distinct from VPIN/transient-impact)",
     "Rolling VWAP: rolling_vwap (windowed VWAP over the trailing `window` bars — a moving fair-value / mean-reversion anchor that DROPS old bars, unlike vwap which accumulates from the first bar and never resets; params { window? default 20, stdDevMultiplier? default 1 }; returns the aligned series + current + price position + ±σ value-area bands (upper≈VAH, lower≈VAL); for higher-timeframe S/R use a larger window e.g. 90)",
-    "Ehlers adaptive: mama (MESA Adaptive Moving Average + FAMA companion — Hilbert homodyne discriminator measures the dominant cycle period and sets an adaptive alpha between slowLimit/fastLimit; params { fastLimit? 0.5, slowLimit? 0.05 }; MAMA above FAMA = bullish, crossover = signal. Distinct from KAMA (efficiency-ratio) / VIDYA (CMO-vol) — alpha here is cycle-phase driven)",
+    "Ehlers adaptive: mama (MESA Adaptive Moving Average + FAMA companion — Hilbert homodyne discriminator measures the dominant cycle period and sets an adaptive alpha between slowLimit/fastLimit; params { fastLimit? 0.5, slowLimit? 0.05, source?: 'hl2'|'close' default hl2 per Ehlers }; MAMA above FAMA = bullish, crossover = signal. Distinct from KAMA (efficiency-ratio) / VIDYA (CMO-vol) — alpha here is cycle-phase driven)",
     "Volume momentum: vzo (Volume Zone Oscillator, Waxman — 100×EMA(signed volume)/EMA(volume); whether volume accumulates on up- vs down-closes, ±60 range; params { period? 14 }; ≥40 overbought / ≤−40 oversold. Distinct from MFI/CMF; classic use is RSI-vs-VZO divergence — a 'scam pump' spikes RSI while VZO stays flat)",
     "Exhaustion S/R: leledc_exhaustion (Leledc exhaustion bars → support/resistance — price-action bar-counter: momentum counter (close vs close[4]) + a reversal candle AT a range extreme marks an exhaustion bar whose high=resistance / low=support; params { majQual? 6, majLen? 30, minQual? 5, minLen? 5 } for major/minor tiers. Returns the exhaustion signals + active major/minor S/R levels + whether THIS bar is an exhaustion. Distinct from volume/orderflow/streak exhaustion — pure price action)",
     "",
@@ -1412,6 +1419,9 @@ const MICROSTRUCTURE_OPS = [
   "rotation_bars",
   "inverse_convexity",
   "price_discovery",
+  "generalized_impulse",
+  "footprint_imbalance",
+  "naked_poc",
 ] as const;
 
 export const computeMicrostructureTool = createTool({
@@ -1716,6 +1726,16 @@ export const computeMicrostructureTool = createTool({
     "                              + Generalized Information Share (Lien-Shrestha, order-INVARIANT single share that collapses the Cholesky bound range; →50/50 as ρ→1).",
     "                              Returns leader + componentShare1/2 + hasbrouckIS1/2 {lower,upper,mid} + generalizedIS1/2 + confidence. ONLY valid if cointegrated — verify with",
     "                              adf_test / johansen_cointegration first; pass log prices. (Hu-Hou-Oxley 2020; static, not the time-varying SPH/Park-Hahn version.)",
+    "    - 'generalized_impulse' — params: { series1, series2, label1?, label2?, convergenceFrac? (0.1), maxHorizon? (60), applyLog? } (two cointegrated series)",
+    "                              Speed-of-adjustment / lead-lag (Pesaran-Shin GIRF, Alexander-Heck 2020): fits a bivariate VECM(1), traces the order-invariant 1σ shock to",
+    "                              each market, and measures bars for the cointegration SPREAD to re-converge. Returns barsToConverge1/2 + fasterAbsorbed (the shock the",
+    "                              system absorbs quicker — a directional read complementing price_discovery). Only valid if cointegrated.",
+    "    - 'footprint_imbalance' — params: { levels: [{priceLevel, buyVolume, sellVolume}], threshold? (3), minStacked? (3) }",
+    "                              DIAGONAL footprint imbalance: buy@P vs sell@(P−1 tick) and sell@P vs buy@(P+1 tick); ≥ threshold× = imbalance; runs of ≥ minStacked",
+    "                              consecutive same-side = stacked zone (momentum / reactive shelf). Distinct from delta-ladder (same-level delta). Direct-input footprint.",
+    "    - 'naked_poc' — params: { candles[], periodBars? (24), numBins? (24) }",
+    "                              Naked/virgin volume-POC tracking: each period's POC that price has NOT traded back through = an unfilled magnet level. Returns nakedPocs +",
+    "                              nearestNakedAbove/Below the last close + filledCount. Distinct from single_prints (TPO gaps) — this tracks per-period volume-POC revisits.",
     "",
     "IMPORTANT: discipline_audit and adherence_report respect startTime+endTime",
     "ISO strings. When the operator asks for 'last 24h' or 'today', YOU must",
@@ -1892,6 +1912,30 @@ export const computeMicrostructureTool = createTool({
             return { error: "price_discovery: `series1` and `series2` (aligned number[] price series) are required" };
           }
           return computePriceDiscovery(p as unknown as Parameters<typeof computePriceDiscovery>[0]);
+        },
+      },
+      generalized_impulse: {
+        execute: async (p: Record<string, unknown>) => {
+          if (!Array.isArray(p.series1) || !Array.isArray(p.series2)) {
+            return { error: "generalized_impulse: `series1` and `series2` (aligned number[] price series) are required" };
+          }
+          return computeGeneralizedImpulse(p as unknown as Parameters<typeof computeGeneralizedImpulse>[0]);
+        },
+      },
+      footprint_imbalance: {
+        execute: async (p: Record<string, unknown>) => {
+          if (!Array.isArray(p.levels)) {
+            return { error: "footprint_imbalance: `levels` ([{priceLevel, buyVolume, sellVolume}]) is required" };
+          }
+          return computeFootprintImbalance(p as unknown as Parameters<typeof computeFootprintImbalance>[0]);
+        },
+      },
+      naked_poc: {
+        execute: async (p: Record<string, unknown>) => {
+          if (!Array.isArray(p.candles)) {
+            return { error: "naked_poc: `candles` ([{open,high,low,close,volume}]) is required" };
+          }
+          return computeNakedPoc(p as unknown as Parameters<typeof computeNakedPoc>[0]);
         },
       },
       inventory_order_size: {
