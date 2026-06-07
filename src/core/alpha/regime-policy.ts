@@ -114,8 +114,9 @@ export interface RegimeMdpInput {
    * Reward model. "current" = reward from the current regime's returns;
    * "lookahead" = transition-weighted next-period return (you set weights in
    * regime s, the return realizes in the regime you transition into). The
-   * lookahead model is the more faithful one for a 1-period-lag allocation.
-   * Default "current".
+   * lookahead model is the more faithful one for a 1-period-lag allocation and
+   * matches the paper's R(s,a) (next-period return). Low-level default "current";
+   * the `runRegimeAllocationPolicy` pipeline defaults to "lookahead" (the paper).
    */
   rewardModel?: RewardModel;
   /**
@@ -365,7 +366,10 @@ export function runRegimeAllocationPolicy(input: RegimeAllocationInput): RegimeA
     transitions: hmm.transitions,
     actions,
     expectedReturns: scr.meanReturns,
-    ...(input.rewardModel !== undefined && { rewardModel: input.rewardModel }),
+    // Paper (arXiv 2605.27848) defines R(s,a) as the NEXT-period transition-
+    // weighted return, so this pipeline defaults to "lookahead" to match it;
+    // callers can still pass "current" explicitly.
+    rewardModel: input.rewardModel ?? "lookahead",
     ...(input.discount !== undefined && { discount: input.discount }),
   });
 

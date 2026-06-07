@@ -180,4 +180,13 @@ describe("runRegimeAllocationPolicy (full pipeline)", () => {
     // dominates the stressed regime, the risky asset the calm one.
     expect(r.policy.policy[0]).not.toBe(r.policy.policy[1]);
   });
+
+  test("defaults to the paper's lookahead reward (R(s,a) = next-period return)", () => {
+    const base = { returns: buildReturns(), driverIndex: 0, nStates: 2, seed: 7 };
+    const def = runRegimeAllocationPolicy({ ...base });
+    const lookahead = runRegimeAllocationPolicy({ ...base, rewardModel: "lookahead" as const });
+    // The default pipeline must reproduce the paper's lookahead reward exactly.
+    expect(def.policy.policy).toEqual(lookahead.policy.policy);
+    expect(def.policy.policyWeights).toEqual(lookahead.policy.policyWeights);
+  });
 });
