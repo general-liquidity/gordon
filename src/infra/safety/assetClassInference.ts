@@ -71,23 +71,24 @@ const FIAT_CODES = new Set([
   "MXN", "ZAR", "TRY", "HUF", "CZK", "ILS", "INR", "KRW", "THB",
 ]);
 
-// Metals / precious commodities (symbol tokens). XAU=gold, XAG=silver,
+// Precious-metal ISO-4217 codes (X-prefixed): XAU=gold, XAG=silver,
 // XPT=platinum, XPD=palladium. (GLD/SLV ETFs are deliberately NOT here —
-// those are us_equity and classified by venue.)
-const METAL_TOKENS = ["XAU", "XAG", "XPT", "XPD", "GOLD", "SILVER", "PLATINUM", "PALLADIUM"];
-
-// Crypto bases / stable quotes for symbol-level detection on multi-asset venues.
-const CRYPTO_QUOTES = ["USDT", "USDC", "BUSD", "DAI", "TUSD", "USDD"];
-const CRYPTO_BASES = new Set([
-  "BTC", "XBT", "ETH", "SOL", "XRP", "DOGE", "ADA", "BNB", "AVAX",
-  "MATIC", "LTC", "DOT", "LINK", "TRX", "TON", "SUI", "ARB", "OP", "PEPE", "SHIB",
-]);
+// those are us_equity and classified by venue/catalog.)
+const METAL_CODES = ["XAU", "XAG", "XPT", "XPD"];
+const METAL_WORDS = ["GOLD", "SILVER", "PLATINUM", "PALLADIUM"];
 
 /**
- * Infer asset class from a SYMBOL. Needed for multi-asset venues (e.g. a single
- * sim/broker that quotes EURUSD, XAUUSD and BTCUSD side by side) where the venue
- * name can't disambiguate. Returns fx / commodity / crypto, or "unknown" when the
- * symbol doesn't clearly match (e.g. a bare equity ticker — defer to venue).
+ * Infer asset class from a SYMBOL using only STRUCTURAL rules — definitional
+ * shapes that don't go stale, NOT an enumerated membership list:
+ *   - FX:        two ISO-4217 fiat codes (EURUSD, GBP/JPY).
+ *   - commodity: a precious-metal ISO code (XAU/XAG/XPT/XPD) or metal word.
+ *
+ * It deliberately does NOT try to recognize CRYPTO or EQUITY from the symbol:
+ * those universes are open and ever-growing, so the source of truth is the
+ * venue's own symbol catalog (each integration already pulls the full tradable
+ * list + instrument type from the API). For those, pass the API's classification
+ * as `explicit` to `inferAssetClass`, or rely on the venue. Returns "unknown"
+ * when the symbol isn't a definitional FX/metal shape.
  */
 export function inferAssetClassFromSymbol(
   symbol: string | undefined | null,
@@ -97,18 +98,12 @@ export function inferAssetClassFromSymbol(
   if (!s) return "unknown";
 
   // Metals first (XAUUSD normalizes to 6 chars but isn't an FX pair).
-  if (METAL_TOKENS.some((t) => s.includes(t))) return "commodity";
-
-  // Crypto: a stable quote as the SUFFIX (quote currency), or a known crypto
-  // base prefix. endsWith (not includes) so FX pairs like USDCHF/USDCAD — which
-  // contain "USDC" as a prefix — aren't mis-tagged as crypto.
-  if (CRYPTO_QUOTES.some((q) => s.endsWith(q))) return "crypto";
-  for (const base of CRYPTO_BASES) {
-    if (s.startsWith(base)) return "crypto";
+  if (METAL_CODES.some((c) => s.startsWith(c)) || METAL_WORDS.some((w) => s.includes(w))) {
+    return "commodity";
   }
 
-  // FX: exactly two ISO-4217 codes (EURUSD, GBPJPY), optionally with a separator
-  // (already stripped). Reject crypto-looking 6-letter strings via the fiat check.
+  // FX: exactly two ISO-4217 fiat codes (EURUSD, GBPJPY). The fiat check rejects
+  // crypto-looking 6-letter strings (BTC/ETH/etc. aren't fiat codes).
   if (s.length === 6 && FIAT_CODES.has(s.slice(0, 3)) && FIAT_CODES.has(s.slice(3, 6))) {
     return "fx";
   }
@@ -116,15 +111,35 @@ export function inferAssetClassFromSymbol(
   return "unknown";
 }
 
+/** Map an API-supplied instrument category/type to an InferredAssetClass (or unknown). */
+function normalizeExplicit(explicit: string | undefined | null): InferredAssetClass {
+  if (!explicit) return "unknown";
+  const e = explicit.toLowerCase().trim();
+  if (e === "crypto" || e === "cryptocurrency" || e === "digital") return "crypto";
+  if (e === "fx" || e === "forex" || e === "currency") return "fx";
+  if (e === "commodity" || e === "commodities" || e === "metal" || e === "metals") return "commodity";
+  if (e === "us_equity" || e === "equity" || e === "equities" || e === "stock" || e === "stocks") {
+    return "us_equity";
+  }
+  if (e === "defi") return "defi";
+  return "unknown";
+}
+
 /**
- * Combined inference: the symbol is more specific than the venue on multi-asset
- * venues, so prefer a definite symbol-level class (fx/commodity/crypto) and fall
- * back to the venue (crypto/us_equity/defi) otherwise.
+ * Combined asset-class resolution, most-authoritative first:
+ *   1. `explicit` — the venue/API's own instrument category (the source of truth
+ *      for crypto/equity, whose symbol universes are pulled from the API catalog).
+ *   2. structural symbol shape (fx / commodity) — definitional, never enumerated.
+ *   3. the venue (crypto / us_equity / defi).
+ * Returns "unknown" when none is informative.
  */
 export function inferAssetClass(
   venue: string | undefined | null,
   symbol: string | undefined | null,
+  explicit?: string | undefined | null,
 ): InferredAssetClass {
+  const byExplicit = normalizeExplicit(explicit);
+  if (byExplicit !== "unknown") return byExplicit;
   const bySymbol = inferAssetClassFromSymbol(symbol);
   if (bySymbol !== "unknown") return bySymbol;
   return inferAssetClassFromVenue(venue);

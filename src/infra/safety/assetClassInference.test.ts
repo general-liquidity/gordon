@@ -56,16 +56,17 @@ describe("inferAssetClassFromSymbol", () => {
     expect(inferAssetClassFromSymbol("SILVER")).toBe("commodity");
   });
 
-  it("classifies crypto by stable quote or known base", () => {
-    expect(inferAssetClassFromSymbol("BTCUSDT")).toBe("crypto");
-    expect(inferAssetClassFromSymbol("ETH/USDC")).toBe("crypto");
-    expect(inferAssetClassFromSymbol("BTCUSD")).toBe("crypto");
-    expect(inferAssetClassFromSymbol("SOLUSD")).toBe("crypto");
+  it("does NOT infer crypto from the symbol (open universe → venue/API catalog owns it)", () => {
+    // Structural inference is FX/metal only; crypto symbols return unknown here
+    // and are classified by the venue or the API-supplied `explicit` category.
+    expect(inferAssetClassFromSymbol("BTCUSDT")).toBe("unknown");
+    expect(inferAssetClassFromSymbol("ETH/USDC")).toBe("unknown");
+    expect(inferAssetClassFromSymbol("SOLUSD")).toBe("unknown");
   });
 
   it("does NOT mistake a crypto pair (BTCUSD) for FX", () => {
-    // 6 letters but BTC is not a fiat code → not fx; the crypto-base check wins.
-    expect(inferAssetClassFromSymbol("BTCUSD")).not.toBe("fx");
+    // 6 letters but BTC is not a fiat code → not fx (and not structurally crypto).
+    expect(inferAssetClassFromSymbol("BTCUSD")).toBe("unknown");
   });
 
   it("does NOT classify metal ETFs as commodity (they're equities by venue)", () => {
@@ -80,25 +81,34 @@ describe("inferAssetClassFromSymbol", () => {
   });
 });
 
-describe("inferAssetClass (combined: symbol over venue)", () => {
-  it("uses the symbol to disambiguate on a multi-asset / unknown venue", () => {
-    expect(inferAssetClass("syphonix", "EURUSD")).toBe("fx");
-    expect(inferAssetClass("syphonix", "XAUUSD")).toBe("commodity");
-    expect(inferAssetClass("syphonix", "BTCUSD")).toBe("crypto");
+describe("inferAssetClass (explicit > structural symbol > venue)", () => {
+  it("the API-supplied explicit category wins (the source of truth for crypto/equity)", () => {
+    expect(inferAssetClass("syphonix", "BTCUSD", "crypto")).toBe("crypto");
+    expect(inferAssetClass(undefined, "AAPL", "equity")).toBe("us_equity");
+    expect(inferAssetClass("syphonix", "WHATEVER", "forex")).toBe("fx");
+    expect(inferAssetClass("syphonix", "XYZ", "metal")).toBe("commodity");
   });
 
-  it("falls back to venue when the symbol is unclassifiable", () => {
+  it("uses the structural symbol shape (fx/commodity) when no explicit category", () => {
+    expect(inferAssetClass("syphonix", "EURUSD")).toBe("fx");
+    expect(inferAssetClass("syphonix", "XAUUSD")).toBe("commodity");
+  });
+
+  it("falls back to venue for crypto/equity (whose symbols come from the catalog)", () => {
     expect(inferAssetClass("alpaca", "AAPL")).toBe("us_equity");
-    expect(inferAssetClass("binance", "FOO")).toBe("crypto");
+    expect(inferAssetClass("binance", "BTCUSD")).toBe("crypto"); // crypto via venue, not symbol
     expect(inferAssetClass("uniswap", "WETH")).toBe("defi");
   });
 
-  it("symbol signal overrides a generic venue", () => {
-    // An FX symbol on an equity venue still reads as fx (symbol is more specific).
+  it("structural symbol shape overrides a generic venue", () => {
+    // An FX symbol on an equity venue still reads as fx (more specific than venue).
     expect(inferAssetClass("ibkr", "EURUSD")).toBe("fx");
   });
 
-  it("returns unknown when neither symbol nor venue is informative", () => {
+  it("returns unknown when symbol is non-structural and venue is multi-asset/unknown", () => {
+    // A crypto symbol on an unknown multi-asset venue with no explicit category
+    // can't be resolved by guessing — the API catalog must supply it.
+    expect(inferAssetClass("syphonix", "BTCUSD")).toBe("unknown");
     expect(inferAssetClass("paperhand-broker-9000", "AAPL")).toBe("unknown");
     expect(inferAssetClass(undefined, undefined)).toBe("unknown");
   });
