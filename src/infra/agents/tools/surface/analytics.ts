@@ -119,6 +119,11 @@ import { computeVolResidualCorrelation } from "../../../../core/alpha/vol-residu
 import { computeTripleBarrier } from "../../../../core/alpha/triple-barrier.ts";
 import { computeCodependence } from "../../../../core/alpha/codependence.ts";
 import { computeControlChart } from "../../../../core/alpha/control-chart.ts";
+import {
+  selectByScoreDiscontinuity,
+  type AutocutItem,
+  type AutocutOptions,
+} from "../../../../core/alpha/score-autocut.ts";
 import { computeInventoryOrderSize } from "../../../../core/alpha/inventory-order-size.ts";
 import { computeMarketMakingMarkov } from "../../../trading/quant/marketMakingMarkov.ts";
 import { computeTlsHedgeRatio } from "../../../trading/quant/tlsHedgeRatio.ts";
@@ -1361,6 +1366,7 @@ const MICROSTRUCTURE_OPS = [
   "price_deviation_guard",
   "evolving_r",
   "overthrow_stop",
+  "score_autocut",
 ] as const;
 
 export const computeMicrostructureTool = createTool({
@@ -1639,6 +1645,11 @@ export const computeMicrostructureTool = createTool({
     "                              Fat-finger / stale-quote check: % deviation of an intended order price from the live reference (mid/last/mark). Breach in the",
     "                              dangerous direction (buy ABOVE / sell BELOW) → block; benign → warn. Default threshold 2%. Pre-trade sanity gate; also runs",
     "                              automatically as a PreOrderPlacement hook on LIMIT orders. Distinct from slippage (which models market-order cost).",
+    "    - 'score_autocut' — params: { items: [{id?, score}] OR scores: number[], jumpRatio? (0.20), dominanceRatio? (1.5), minKeep? (1), maxKeep? }",
+    "                              Score-discontinuity selection: cut a ranked list at the largest score CLIFF and return the LEADING CLUSTER (1 candidate when",
+    "                              one dominates, several when comparable) instead of an arbitrary top-K. Cuts only when the top gap is ≥ jumpRatio of the spread",
+    "                              AND ≥ dominanceRatio× the next gap, else fails OPEN (keeps all, up to maxKeep). Feed a TRUSTWORTHY score (expected edge /",
+    "                              calibrated conviction), NOT a mechanical rank. Use for scan / signal / trade-candidate shortlists.",
     "",
     "IMPORTANT: discipline_audit and adherence_report respect startTime+endTime",
     "ISO strings. When the operator asks for 'last 24h' or 'today', YOU must",
@@ -1775,6 +1786,19 @@ export const computeMicrostructureTool = createTool({
       control_chart: {
         execute: async (p: Record<string, unknown>) =>
           computeControlChart(p as unknown as Parameters<typeof computeControlChart>[0]),
+      },
+      score_autocut: {
+        execute: async (p: Record<string, unknown>) => {
+          const items: AutocutItem[] = Array.isArray(p.items)
+            ? (p.items as AutocutItem[])
+            : Array.isArray(p.scores)
+              ? (p.scores as number[]).map((score) => ({ score }))
+              : [];
+          if (items.length === 0) {
+            return { error: "score_autocut: pass `items` ([{id?, score}]) or `scores` (number[])" };
+          }
+          return selectByScoreDiscontinuity(items, p as unknown as AutocutOptions);
+        },
       },
       inventory_order_size: {
         execute: async (p: Record<string, unknown>) =>
