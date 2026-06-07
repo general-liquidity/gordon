@@ -124,6 +124,7 @@ import {
   type AutocutItem,
   type AutocutOptions,
 } from "../../../../core/alpha/score-autocut.ts";
+import { computeSinglePrints } from "../../../trading/quant/singlePrints.ts";
 import { computeInventoryOrderSize } from "../../../../core/alpha/inventory-order-size.ts";
 import { computeMarketMakingMarkov } from "../../../trading/quant/marketMakingMarkov.ts";
 import { computeTlsHedgeRatio } from "../../../trading/quant/tlsHedgeRatio.ts";
@@ -1367,6 +1368,7 @@ const MICROSTRUCTURE_OPS = [
   "evolving_r",
   "overthrow_stop",
   "score_autocut",
+  "single_prints",
 ] as const;
 
 export const computeMicrostructureTool = createTool({
@@ -1650,6 +1652,12 @@ export const computeMicrostructureTool = createTool({
     "                              one dominates, several when comparable) instead of an arbitrary top-K. Cuts only when the top gap is ≥ jumpRatio of the spread",
     "                              AND ≥ dominanceRatio× the next gap, else fails OPEN (keeps all, up to maxKeep). Feed a TRUSTWORTHY score (expected edge /",
     "                              calibrated conviction), NOT a mechanical rank. Use for scan / signal / trade-candidate shortlists.",
+    "    - 'single_prints' — params: { bars: [{high, low, timestamp}], tpoBlockMs? (30min), tickSize?, valueAreaFraction? (0.7), poorThreshold? (2) }",
+    "                              Steidlmayer TPO structure the marketProfile/POC view doesn't surface: SINGLE PRINTS (price levels touched in only one",
+    "                              time-bracket — fast one-sided moves). Returns buying/selling TAILS (single-print runs at the low/high = responsive rejection,",
+    "                              longer = stronger), mid-range single-print zones (fast-move gaps that tend to get revisited/'filled' → magnet targets), and",
+    "                              POOR high/low (extreme touched by ≥ poorThreshold TPOs = unfinished, prone to being exceeded). Pairs with the volume/market",
+    "                              profile POC/value-area. Pass intraday bars for one session.",
     "",
     "IMPORTANT: discipline_audit and adherence_report respect startTime+endTime",
     "ISO strings. When the operator asks for 'last 24h' or 'today', YOU must",
@@ -1798,6 +1806,14 @@ export const computeMicrostructureTool = createTool({
             return { error: "score_autocut: pass `items` ([{id?, score}]) or `scores` (number[])" };
           }
           return selectByScoreDiscontinuity(items, p as unknown as AutocutOptions);
+        },
+      },
+      single_prints: {
+        execute: async (p: Record<string, unknown>) => {
+          if (!Array.isArray(p.bars)) {
+            return { error: "single_prints: `bars` ([{high, low, timestamp}]) is required" };
+          }
+          return computeSinglePrints(p as unknown as Parameters<typeof computeSinglePrints>[0]);
         },
       },
       inventory_order_size: {
