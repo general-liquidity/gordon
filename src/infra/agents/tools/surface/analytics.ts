@@ -125,6 +125,10 @@ import {
   type AutocutOptions,
 } from "../../../../core/alpha/score-autocut.ts";
 import { computeSinglePrints } from "../../../trading/quant/singlePrints.ts";
+import { computeMAMA } from "../../../trading/quant/mamaMovingAverage.ts";
+import { computeInverseConvexity } from "../../../trading/quant/inverseConvexity.ts";
+import { constructRotationBars } from "../../../../core/indicators/rotation-bars.ts";
+import { computeVZO } from "../../../../core/indicators/vzo.ts";
 import { computeInventoryOrderSize } from "../../../../core/alpha/inventory-order-size.ts";
 import { computeMarketMakingMarkov } from "../../../trading/quant/marketMakingMarkov.ts";
 import { computeTlsHedgeRatio } from "../../../trading/quant/tlsHedgeRatio.ts";
@@ -571,6 +575,8 @@ const INDICATOR_NAMES = [
   "roll_spread",
   "amihud",
   "rolling_vwap",
+  "mama",
+  "vzo",
 ] as const;
 
 /** Last non-null value of an aligned indicator series (for boxing bare arrays). */
@@ -624,6 +630,18 @@ function dispatchIndicator(
         (params.window as number) ?? 20,
         (params.stdDevMultiplier as number) ?? 1,
       );
+    case "mama":
+      return computeMAMA({
+        values: closes,
+        ...(typeof params.fastLimit === "number" && { fastLimit: params.fastLimit }),
+        ...(typeof params.slowLimit === "number" && { slowLimit: params.slowLimit }),
+      });
+    case "vzo":
+      return computeVZO({
+        closes,
+        volumes: candles.map((c) => c.volume),
+        ...(typeof params.period === "number" && { period: params.period }),
+      });
     case "mfi":
       return calculateMFI(candles, (params.period as number) ?? 14);
     case "stochastic":
@@ -1011,6 +1029,8 @@ export const computeIndicatorTool = createTool({
     "AFML feature engineering (López de Prado): frac_diff (fixed-width fractional differentiation — stationarity-preserving memory; params { d?, threshold? }; d=1≈first-difference, d=0≈identity, 0<d<1 keeps memory while flattening trend), cusum_filter (symmetric CUSUM event sampler on log-returns — flags change-point bars where cumulative move exceeds a threshold; params { threshold? } default = returns stdev), sadf (supremum ADF — rolling explosiveness/BUBBLE test, right-tailed; distinct from KPSS/Johansen stationarity; params { minWindow?, lags? }; isExplosive flag)",
     "Microstructure liquidity from OHLC (no quotes/tick): roll_spread (Roll 1984 effective spread = 2·sqrt(−serial-cov of price changes) + Corwin-Schultz 2012 high-low spread estimator; params { window? }), amihud (Amihud 2002 illiquidity = mean |return|/dollar-volume; higher = more price impact per dollar; params { window? }; distinct from VPIN/transient-impact)",
     "Rolling VWAP: rolling_vwap (windowed VWAP over the trailing `window` bars — a moving fair-value / mean-reversion anchor that DROPS old bars, unlike vwap which accumulates from the first bar and never resets; params { window? default 20, stdDevMultiplier? default 1 }; returns the aligned series + current + price position + ±σ value-area bands (upper≈VAH, lower≈VAL); for higher-timeframe S/R use a larger window e.g. 90)",
+    "Ehlers adaptive: mama (MESA Adaptive Moving Average + FAMA companion — Hilbert homodyne discriminator measures the dominant cycle period and sets an adaptive alpha between slowLimit/fastLimit; params { fastLimit? 0.5, slowLimit? 0.05 }; MAMA above FAMA = bullish, crossover = signal. Distinct from KAMA (efficiency-ratio) / VIDYA (CMO-vol) — alpha here is cycle-phase driven)",
+    "Volume momentum: vzo (Volume Zone Oscillator, Waxman — 100×EMA(signed volume)/EMA(volume); whether volume accumulates on up- vs down-closes, ±60 range; params { period? 14 }; ≥40 overbought / ≤−40 oversold. Distinct from MFI/CMF; classic use is RSI-vs-VZO divergence — a 'scam pump' spikes RSI while VZO stays flat)",
     "",
     "Internally fetches candles via the connected exchange. Pass `bars` to",
     "control the lookback window (default 200).",
@@ -1369,6 +1389,8 @@ const MICROSTRUCTURE_OPS = [
   "overthrow_stop",
   "score_autocut",
   "single_prints",
+  "rotation_bars",
+  "inverse_convexity",
 ] as const;
 
 export const computeMicrostructureTool = createTool({
@@ -1658,6 +1680,15 @@ export const computeMicrostructureTool = createTool({
     "                              longer = stronger), mid-range single-print zones (fast-move gaps that tend to get revisited/'filled' → magnet targets), and",
     "                              POOR high/low (extreme touched by ≥ poorThreshold TPOs = unfinished, prone to being exceeded). Pairs with the volume/market",
     "                              profile POC/value-area. Pass intraday bars for one session.",
+    "    - 'rotation_bars' — params: { values: number[], method?: 'range'|'renko' (range), size: >0, maxBars? (5000) }",
+    "                              DISTANCE-based bars (vs information_bars which SAMPLES by tick/volume/dollar count): a new bar forms only after price travels",
+    "                              `size`, so time/observation-count are irrelevant and sub-size noise is filtered out. `values` can be closes OR a cumulative",
+    "                              signal like delta ('delta rotations'). Returns the constructed bars + travelRatio (bars/obs = volatility). Feed the bars into",
+    "                              other indicators for noise-suppressed signals.",
+    "    - 'inverse_convexity' — params: { entryPrice, movePct (0..1), side?: 'long'|'short', contractsUsd? (1) }",
+    "                              Inverse/coin-margined perp (XBTUSD-style) BTC-PnL convexity: PnL ∝ (1/entry−1/exit), so a LONG loses MORE BTC on a −x% move",
+    "                              than it gains on +x% (negative convexity; asymmetryRatio>1) → longs liquidate faster, inverse-dominated markets dump deeper",
+    "                              than they pump. Shorts get the mirror (positive). Quantifies the asymmetry for a ±movePct shock vs a symmetric linear contract.",
     "",
     "IMPORTANT: discipline_audit and adherence_report respect startTime+endTime",
     "ISO strings. When the operator asks for 'last 24h' or 'today', YOU must",
@@ -1815,6 +1846,18 @@ export const computeMicrostructureTool = createTool({
           }
           return computeSinglePrints(p as unknown as Parameters<typeof computeSinglePrints>[0]);
         },
+      },
+      rotation_bars: {
+        execute: async (p: Record<string, unknown>) => {
+          if (!Array.isArray(p.values)) {
+            return { error: "rotation_bars: `values` (number[]) and `size` (>0) are required" };
+          }
+          return constructRotationBars(p as unknown as Parameters<typeof constructRotationBars>[0]);
+        },
+      },
+      inverse_convexity: {
+        execute: async (p: Record<string, unknown>) =>
+          computeInverseConvexity(p as unknown as Parameters<typeof computeInverseConvexity>[0]),
       },
       inventory_order_size: {
         execute: async (p: Record<string, unknown>) =>
