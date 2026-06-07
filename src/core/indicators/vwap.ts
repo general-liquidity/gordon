@@ -109,6 +109,120 @@ export function calculateVWAP(
   };
 }
 
+export interface RollingVWAPResult {
+  /** Rolling VWAP aligned 1:1 with candles; null for the first window-1 bars. */
+  values: (number | null)[];
+  current: number | null;
+  pricePosition: "above" | "below" | "at";
+  /** Price distance from current rolling VWAP, as a percentage. */
+  deviation: number | null;
+  /** Current rolling VWAP + stdDevMultiplier·σ over the trailing window (VAH). */
+  upperBand: number | null;
+  /** Current rolling VWAP − stdDevMultiplier·σ over the trailing window (VAL). */
+  lowerBand: number | null;
+  window: number;
+  interpretation: string;
+}
+
+/**
+ * Rolling (windowed) VWAP — a continuous VWAP over the trailing `window` bars.
+ *
+ * Unlike `calculateVWAP` (which accumulates from the first bar and never drops
+ * data), this drops bars older than the window, so it acts as a moving fair-value
+ * line: a higher-timeframe mean-reversion anchor (e.g. 30/90-bar) rather than a
+ * session reset. Optional ±σ bands over the same window frame the value area
+ * (upper ≈ VAH, lower ≈ VAL).
+ *
+ * RVWAP[i] = Σ_{j=i-window+1..i}(typicalPrice[j]·volume[j]) / Σ volume[j],
+ * where typicalPrice = (high + low + close) / 3.
+ *
+ * @param candles - OHLCV candles, oldest-first
+ * @param window - trailing window length in bars (default 20)
+ * @param stdDevMultiplier - σ-band width; 0 disables bands (default 1)
+ * @param currentPrice - price for position calc (defaults to last close)
+ */
+export function calculateRollingVWAP(
+  candles: Candle[],
+  window: number = 20,
+  stdDevMultiplier: number = 1,
+  currentPrice?: number,
+): RollingVWAPResult {
+  const w = Math.max(1, Math.floor(window));
+  const n = candles.length;
+  if (n < 1) {
+    return {
+      values: [],
+      current: null,
+      pricePosition: "at",
+      deviation: null,
+      upperBand: null,
+      lowerBand: null,
+      window: w,
+      interpretation: "Insufficient data for rolling VWAP",
+    };
+  }
+
+  const tp = candles.map((c) => (c.high + c.low + c.close) / 3);
+  const vol = candles.map((c) => c.volume);
+
+  const values: (number | null)[] = [];
+  let sumTPV = 0;
+  let sumVol = 0;
+  for (let i = 0; i < n; i++) {
+    sumTPV += tp[i]! * vol[i]!;
+    sumVol += vol[i]!;
+    if (i >= w) {
+      sumTPV -= tp[i - w]! * vol[i - w]!;
+      sumVol -= vol[i - w]!;
+    }
+    values.push(i >= w - 1 && sumVol > 0 ? sumTPV / sumVol : null);
+  }
+
+  const current = values[n - 1] ?? null;
+  const lastCandle = candles[n - 1];
+  const price = currentPrice ?? (lastCandle?.close ?? 0);
+
+  let pricePosition: "above" | "below" | "at" = "at";
+  let deviation: number | null = null;
+  let upperBand: number | null = null;
+  let lowerBand: number | null = null;
+
+  if (current !== null) {
+    deviation = ((price - current) / current) * 100;
+    if (Math.abs(deviation) < 0.1) pricePosition = "at";
+    else pricePosition = price > current ? "above" : "below";
+
+    if (stdDevMultiplier > 0 && w >= 2) {
+      const lo = Math.max(0, n - w);
+      let sumSq = 0;
+      let count = 0;
+      for (let j = lo; j < n; j++) {
+        const d = tp[j]! - current;
+        sumSq += d * d;
+        count++;
+      }
+      if (count > 0) {
+        const stdDev = Math.sqrt(sumSq / count);
+        upperBand = current + stdDev * stdDevMultiplier;
+        lowerBand = current - stdDev * stdDevMultiplier;
+      }
+    }
+  }
+
+  let interpretation: string;
+  if (current === null) {
+    interpretation = `Insufficient data — need ${w} bars for rolling VWAP, got ${n}`;
+  } else if (pricePosition === "above") {
+    interpretation = `Price ${deviation!.toFixed(2)}% above ${w}-bar rolling VWAP — bullish bias`;
+  } else if (pricePosition === "below") {
+    interpretation = `Price ${Math.abs(deviation!).toFixed(2)}% below ${w}-bar rolling VWAP — bearish bias`;
+  } else {
+    interpretation = `Price at ${w}-bar rolling VWAP — fair value, watch for direction`;
+  }
+
+  return { values, current, pricePosition, deviation, upperBand, lowerBand, window: w, interpretation };
+}
+
 /**
  * Calculate VWAP with standard deviation bands
  * Similar to Bollinger Bands but anchored to VWAP

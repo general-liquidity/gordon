@@ -26,6 +26,7 @@ import {
   calculateSupertrend,
   calculateADX,
   calculateVWAP,
+  calculateRollingVWAP,
   calculateMFI,
   calculateStochasticRSI,
   calculateFibonacci,
@@ -563,6 +564,7 @@ const INDICATOR_NAMES = [
   "sadf",
   "roll_spread",
   "amihud",
+  "rolling_vwap",
 ] as const;
 
 /** Last non-null value of an aligned indicator series (for boxing bare arrays). */
@@ -610,6 +612,12 @@ function dispatchIndicator(
       return calculateADX(candles, (params.period as number) ?? 14);
     case "vwap":
       return calculateVWAP(candles);
+    case "rolling_vwap":
+      return calculateRollingVWAP(
+        candles,
+        (params.window as number) ?? 20,
+        (params.stdDevMultiplier as number) ?? 1,
+      );
     case "mfi":
       return calculateMFI(candles, (params.period as number) ?? 14);
     case "stochastic":
@@ -996,6 +1004,7 @@ export const computeIndicatorTool = createTool({
     "FVG quality: fvg_sweep_context (grades each unfilled fair-value gap by its liquidity-sweep context — a gap whose displacement came straight out of taking a prior swing low/high is quality='post_sweep' (high-probability, mostly respected); a gap formed in open space with no preceding sweep is quality='pre_sweep' (lower-probability, prone to being disrespected/inverted); params { pivotWindow?, lookback? }; links fvg-detection to liquidity sweeps — distinct from fvg (gap + midpoint-fill state only, no sweep context) and detectLiquiditySweeps (sweep events not tied to a gap))",
     "AFML feature engineering (López de Prado): frac_diff (fixed-width fractional differentiation — stationarity-preserving memory; params { d?, threshold? }; d=1≈first-difference, d=0≈identity, 0<d<1 keeps memory while flattening trend), cusum_filter (symmetric CUSUM event sampler on log-returns — flags change-point bars where cumulative move exceeds a threshold; params { threshold? } default = returns stdev), sadf (supremum ADF — rolling explosiveness/BUBBLE test, right-tailed; distinct from KPSS/Johansen stationarity; params { minWindow?, lags? }; isExplosive flag)",
     "Microstructure liquidity from OHLC (no quotes/tick): roll_spread (Roll 1984 effective spread = 2·sqrt(−serial-cov of price changes) + Corwin-Schultz 2012 high-low spread estimator; params { window? }), amihud (Amihud 2002 illiquidity = mean |return|/dollar-volume; higher = more price impact per dollar; params { window? }; distinct from VPIN/transient-impact)",
+    "Rolling VWAP: rolling_vwap (windowed VWAP over the trailing `window` bars — a moving fair-value / mean-reversion anchor that DROPS old bars, unlike vwap which accumulates from the first bar and never resets; params { window? default 20, stdDevMultiplier? default 1 }; returns the aligned series + current + price position + ±σ value-area bands (upper≈VAH, lower≈VAL); for higher-timeframe S/R use a larger window e.g. 90)",
     "",
     "Internally fetches candles via the connected exchange. Pass `bars` to",
     "control the lookback window (default 200).",

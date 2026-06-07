@@ -53,7 +53,8 @@ export {
 } from "./analysis.ts";
 
 // VWAP
-export { calculateVWAP, calculateVWAPBands } from "./vwap.ts";
+export { calculateVWAP, calculateVWAPBands, calculateRollingVWAP } from "./vwap.ts";
+export type { RollingVWAPResult } from "./vwap.ts";
 
 // Stochastic RSI
 export { calculateStochasticRSI } from "./stochastic-rsi.ts";
