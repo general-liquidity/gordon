@@ -67,6 +67,18 @@ const PLANNING_ARTIFACT_TTL_MS = 15 * 60 * 1000;
 const LOOP_WINDOW_MS = 30_000;
 const LOOP_WINDOW_CALL_COUNT = 20; // sliding window of last N tool call fingerprints
 const LOOP_BLOCK_THRESHOLD = 3;
+/** Longest repeating tool-call cycle (A-B-A-B…) to scan for. */
+const CYCLE_MAX_LEN = 5;
+/**
+ * A cycle block must recur at least this many times to count as a doom-loop.
+ * 2 (not 3) is deliberate: a cycle that repeats 3× makes each member appear 3×,
+ * which the identical-count check (threshold 3) already catches — so the cycle
+ * detector only adds value at 2 round trips (A-B-A-B), where each member appears
+ * just twice and the count-based check misses it. The recovery escalation
+ * (notify→redirect→force_stop) cushions any false positive on read-only tools;
+ * safety-critical tools fast-track to force_stop regardless.
+ */
+const CYCLE_MIN_REPEATS = 2;
 /** @deprecated use per-tool-family limits via getToolFamilyLimit() */
 export const TOOL_RESULT_INLINE_LIMIT = 2500;
 const TOOL_RESULT_PREVIEW_LIMIT = 600;
@@ -394,6 +406,11 @@ export function buildEventDrivenReminders(
       reminders.push("Repeated identical tool invocations detected. Change approach, venue, or scope before retrying the same action.");
       markReminderFired(state, "repeated_loop");
     }
+    const cycle = detectFingerprintCycle(callLog);
+    if (cycle && !reminders.some((r) => r.includes("cycle")) && canFireReminder(state, "repeated_cycle", 2)) {
+      reminders.push(`Repeating ${cycle.cycleLen}-step tool cycle detected (${cycle.repeats}× round trips of the same action sequence). You're looping between the same calls without making progress — change approach or scope, or stop and summarize what you have.`);
+      markReminderFired(state, "repeated_cycle");
+    }
   }
 
   const recentEntries = context.threadId
@@ -476,19 +493,60 @@ export function resetLoopSignals(context: GordonContext): void {
 }
 
 /**
+ * Detect a repeating multi-step cycle (A-B-A-B…) at the tail of a fingerprint
+ * window. The identical-repeat count catches one tool hammered N times; this
+ * catches the "different-but-coherent amplification" loop the count-based check
+ * misses — e.g. place_order → check_balance → place_order → check_balance …
+ * Returns the SHORTEST cycle whose block recurs ≥ minRepeats times, or null.
+ * Degenerate single-fingerprint blocks are left to the identical-count check
+ * (we require ≥ 2 distinct fingerprints in the block), so the two detectors
+ * don't double-count the same loop.
+ */
+export function detectFingerprintCycle(
+  fingerprints: readonly string[],
+  maxCycleLen: number = CYCLE_MAX_LEN,
+  minRepeats: number = CYCLE_MIN_REPEATS,
+): { cycleLen: number; repeats: number } | null {
+  const n = fingerprints.length;
+  for (let len = 2; len <= maxCycleLen; len++) {
+    if (n < len * minRepeats) continue;
+    const block = fingerprints.slice(n - len);
+    if (new Set(block).size < 2) continue; // single-fp loop → identical check owns it
+    let repeats = 1;
+    let pos = n - len;
+    while (pos - len >= 0) {
+      let same = true;
+      for (let i = 0; i < len; i++) {
+        if (fingerprints[pos - len + i] !== block[i]) {
+          same = false;
+          break;
+        }
+      }
+      if (!same) break;
+      repeats += 1;
+      pos -= len;
+    }
+    if (repeats >= minRepeats) return { cycleLen: len, repeats };
+  }
+  return null;
+}
+
+/**
  * Record a tool call fingerprint and detect doom-loops using a sliding call-count window.
  * More reliable than time-based windowing for detecting repeated identical calls.
+ * Flags BOTH identical-repeat loops (same call ≥ threshold) and repeating
+ * multi-step cycles (A-B-A-B…) via `detectFingerprintCycle`.
  *
  * @param context  - Gordon context (for thread key)
  * @param toolName - Name of the tool being called
  * @param args     - Tool arguments (JSON-serialized for fingerprinting)
- * @returns { blocked, count, fingerprint }
+ * @returns { blocked, count, fingerprint, cycle }
  */
 export function recordToolCallFingerprint(
   context: GordonContext,
   toolName: string,
   args: unknown,
-): { blocked: boolean; count: number; fingerprint: string } {
+): { blocked: boolean; count: number; fingerprint: string; cycle: { cycleLen: number; repeats: number } | null } {
   const fingerprint = createHash("md5")
     .update(toolName + ":" + JSON.stringify(args ?? {}))
     .digest("hex")
@@ -500,10 +558,12 @@ export function recordToolCallFingerprint(
   loopCallLogs.set(threadKey, updated);
 
   const count = updated.filter((f) => f === fingerprint).length;
+  const cycle = detectFingerprintCycle(updated);
   return {
-    blocked: count >= LOOP_BLOCK_THRESHOLD,
+    blocked: count >= LOOP_BLOCK_THRESHOLD || cycle !== null,
     count,
     fingerprint,
+    cycle,
   };
 }
 

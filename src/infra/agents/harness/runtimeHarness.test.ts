@@ -15,6 +15,7 @@ import {
   optimizeToolResultForContext,
   recordLoopSignal,
   recordToolCallFingerprint,
+  detectFingerprintCycle,
   recordVenueFailure,
   registerPlanningArtifact,
   resetLoopSignals,
@@ -122,5 +123,67 @@ describe("runtimeHarness", () => {
     expect(reminders.some((line) => line.includes("rate-limit window"))).toBeTrue();
     expect(reminders.some((line) => line.includes("live market data"))).toBeTrue();
     expect(reminders.length).toBeLessThanOrEqual(8);
+  });
+});
+
+describe("detectFingerprintCycle", () => {
+  it("detects an A-B-A-B repeating cycle at 2 round trips", () => {
+    const cyc = detectFingerprintCycle(["A", "B", "A", "B"]);
+    expect(cyc).not.toBeNull();
+    expect(cyc!.cycleLen).toBe(2);
+    expect(cyc!.repeats).toBe(2);
+  });
+
+  it("detects a 3-step A-B-C cycle", () => {
+    const cyc = detectFingerprintCycle(["A", "B", "C", "A", "B", "C"]);
+    expect(cyc?.cycleLen).toBe(3);
+    expect(cyc?.repeats).toBe(2);
+  });
+
+  it("returns the SHORTEST cycle length (A-B-A-B is a 2-cycle, not 4)", () => {
+    expect(detectFingerprintCycle(["A", "B", "A", "B", "A", "B"])?.cycleLen).toBe(2);
+  });
+
+  it("ignores a single-fingerprint repeat — the identical-count check owns that", () => {
+    expect(detectFingerprintCycle(["A", "A", "A", "A"])).toBeNull();
+  });
+
+  it("returns null for a single occurrence of a pattern", () => {
+    expect(detectFingerprintCycle(["A", "B"])).toBeNull();
+  });
+
+  it("returns null when there is no cycle", () => {
+    expect(detectFingerprintCycle(["A", "B", "C", "D", "E", "F"])).toBeNull();
+  });
+});
+
+describe("recordToolCallFingerprint — multi-step cycle blocking", () => {
+  it("blocks an alternating two-tool loop the identical-count check misses", () => {
+    const context = createContext({ threadId: "cycle-thread" });
+    resetLoopSignals(context);
+    // x, then [check_balance, place_order] twice. Each of cb/po appears only
+    // 2× (below the identical threshold of 3), but the [cb, po] cycle recurs 2×.
+    recordToolCallFingerprint(context, "x", { a: 1 });
+    recordToolCallFingerprint(context, "check_balance", {});
+    recordToolCallFingerprint(context, "place_order", { sym: "BTC" });
+    recordToolCallFingerprint(context, "check_balance", {});
+    const last = recordToolCallFingerprint(context, "place_order", { sym: "BTC" });
+    expect(last.count).toBeLessThan(3); // identical-count check would NOT block
+    expect(last.cycle).not.toBeNull(); // ...but the cycle detector catches it
+    expect(last.cycle!.cycleLen).toBe(2);
+    expect(last.blocked).toBeTrue();
+    resetLoopSignals(context);
+  });
+
+  it("does not flag a varied, progressing tool sequence", () => {
+    const context = createContext({ threadId: "varied-thread" });
+    resetLoopSignals(context);
+    recordToolCallFingerprint(context, "get_market_data", { sym: "BTC" });
+    recordToolCallFingerprint(context, "compute_indicator", { ind: "rsi" });
+    recordToolCallFingerprint(context, "get_news", { sym: "BTC" });
+    const last = recordToolCallFingerprint(context, "compute_risk", { sym: "BTC" });
+    expect(last.cycle).toBeNull();
+    expect(last.blocked).toBeFalse();
+    resetLoopSignals(context);
   });
 });
