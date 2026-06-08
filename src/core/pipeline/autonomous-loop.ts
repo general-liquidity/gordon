@@ -25,6 +25,7 @@ import {
   type SprintContract,
 } from "../../infra/safety/sprintContract.ts";
 import { tickAndCollectReminders } from "../../infra/agents/wiring/reminderWiring.ts";
+import { detectGoalStall } from "./goal-progress-stall.ts";
 import {
   isGoalModeEnabled,
   loadActiveGoal,
@@ -105,6 +106,8 @@ interface LoopState {
   sprintContract: SprintContract | null;
   /** Symbols actually scanned/touched during this loop run (for contract diff). */
   symbolsTouched: Set<string>;
+  /** Per-cycle goal progressPct history, for no-progress stall detection. */
+  goalProgressHistory: number[];
 }
 
 let loopState: LoopState = {
@@ -120,6 +123,7 @@ let loopState: LoopState = {
   totalOpportunities: 0,
   sprintContract: null,
   symbolsTouched: new Set<string>(),
+  goalProgressHistory: [],
 };
 let cycleInFlight: Promise<CycleReport | null> | null = null;
 
@@ -339,6 +343,24 @@ async function runCycle(): Promise<CycleReport | null> {
               progressPct: score.progressPct,
             });
             loopState.isRunning = false;
+          } else {
+            // No-progress stall guard: halt a loop that keeps making varied moves
+            // without advancing the goal (the gap fingerprint doom-loops + budget
+            // caps miss). Patience tunable via GORDON_GOAL_STALL_PATIENCE.
+            loopState.goalProgressHistory.push(score.progressPct);
+            const patienceEnv = Number(process.env.GORDON_GOAL_STALL_PATIENCE);
+            const stall = detectGoalStall(loopState.goalProgressHistory, {
+              ...(Number.isFinite(patienceEnv) && patienceEnv >= 2 && { patience: patienceEnv }),
+            });
+            if (stall.recommendation === "halt") {
+              logger.warn("Goal stalled — stopping autonomous loop (no progress)", {
+                goalId: next.id,
+                progressPct: score.progressPct,
+                cyclesSinceImprovement: stall.cyclesSinceImprovement,
+                windowGain: stall.windowGain,
+              });
+              stopAutonomousLoop("no progress — goal stalled");
+            }
           }
         }
       } catch (goalError) {
@@ -409,6 +431,7 @@ export function startAutonomousLoop(config: AutonomousLoopConfig): { success: bo
   loopState.totalOpportunities = 0;
   loopState.symbolsTouched = new Set<string>();
   loopState.sprintContract = null;
+  loopState.goalProgressHistory = [];
 
   // Sprint contract: when GORDON_SPRINT_CONTRACT=1, record the loop's
   // scope (mandate symbols + venues) and verification standards
