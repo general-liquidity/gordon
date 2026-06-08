@@ -134,6 +134,7 @@ import { computeInverseConvexity } from "../../../trading/quant/inverseConvexity
 import { computePriceDiscovery } from "../../../trading/quant/priceDiscovery.ts";
 import { computeGeneralizedImpulse } from "../../../trading/quant/generalizedImpulse.ts";
 import { computeGeneralizedVariance } from "../../../trading/quant/generalizedVariance.ts";
+import { computePopulationStability, computeVaRBacktest } from "../../../trading/quant/riskModelValidation.ts";
 import { computeFootprintImbalance } from "../../../../core/indicators/footprint-imbalance.ts";
 import { computeNakedPoc } from "../../../../core/indicators/naked-poc.ts";
 import { computeASIntensityCalibration, computeASStationaryReservation } from "../../../../core/alpha/as-market-making.ts";
@@ -1438,6 +1439,8 @@ const MICROSTRUCTURE_OPS = [
   "as_stationary_reservation",
   "asymmetric_beta",
   "generalized_variance",
+  "population_stability",
+  "var_backtest",
 ] as const;
 
 export const computeMicrostructureTool = createTool({
@@ -1752,6 +1755,12 @@ export const computeMicrostructureTool = createTool({
     "    - 'naked_poc' — params: { candles[], periodBars? (24), numBins? (24) }",
     "                              Naked/virgin volume-POC tracking: each period's POC that price has NOT traded back through = an unfilled magnet level. Returns nakedPocs +",
     "                              nearestNakedAbove/Below the last close + filledCount. Distinct from single_prints (TPO gaps) — this tracks per-period volume-POC revisits.",
+    "    - 'population_stability' — params: { expected: number[] (reference sample), actual: number[] (current sample), bins? (10) }",
+    "                              PSI population-stability index: distribution-DRIFT monitor for a deployed signal/feature/model output. PSI=Σ(aᵢ−eᵢ)·ln(aᵢ/eᵢ) over reference",
+    "                              quantile bins; <0.1 stable, 0.1-0.25 moderate, >0.25 significant shift. Live-drift detector — distinct from backtest-time overfitting/MCPT/walk-forward.",
+    "    - 'var_backtest' — params: { returns: number[] (realized), varForecasts: number[] (positive loss magnitudes, aligned), confidence? (0.99) }",
+    "                              VaR model-calibration backtest: Kupiec POF LR (is the violation RATE right?) + Christoffersen LR (are violations INDEPENDENT, not clustered?) +",
+    "                              conditional coverage. Returns violations + the 3 LR stats/p-values/reject flags + verdict (well_calibrated/rate_miscalibrated/violations_clustered). Validates a VaR model.",
     "    - 'generalized_variance' — params: { returns: number[][] (≥2 aligned return series, e.g. sectors/assets), window? (60) }",
     "                              Gram-volume crash detector (Sudjianto 'geometry of a market crash'): rolling √det(correlation matrix) ∈ [0,1] = ∏λ (generalized variance);",
     "                              →0 = correlations collapse to 1 / rank collapse / crash, →1 = diversified. Catches single-near-dependency rank collapse that avg-ρ (correlation_breakdown),",
@@ -1989,6 +1998,22 @@ export const computeMicrostructureTool = createTool({
             return { error: "generalized_variance: `returns` (≥2 aligned number[][] return series) is required" };
           }
           return computeGeneralizedVariance(p as unknown as Parameters<typeof computeGeneralizedVariance>[0]);
+        },
+      },
+      population_stability: {
+        execute: async (p: Record<string, unknown>) => {
+          if (!Array.isArray(p.expected) || !Array.isArray(p.actual)) {
+            return { error: "population_stability: `expected` (reference number[]) and `actual` (current number[]) are required" };
+          }
+          return computePopulationStability(p as unknown as Parameters<typeof computePopulationStability>[0]);
+        },
+      },
+      var_backtest: {
+        execute: async (p: Record<string, unknown>) => {
+          if (!Array.isArray(p.returns) || !Array.isArray(p.varForecasts)) {
+            return { error: "var_backtest: `returns` (realized number[]) and `varForecasts` (positive loss magnitudes, aligned) are required" };
+          }
+          return computeVaRBacktest(p as unknown as Parameters<typeof computeVaRBacktest>[0]);
         },
       },
       inventory_order_size: {
