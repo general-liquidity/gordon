@@ -57,6 +57,8 @@ export { calculateVWAP, calculateVWAPBands, calculateRollingVWAP, calculateAncho
 export type { RollingVWAPResult, AnchoredVWAPResult } from "./vwap.ts";
 export { calculateGMMA } from "./gmma.ts";
 export type { GmmaResult } from "./gmma.ts";
+export { calculateTSI } from "./tsi.ts";
+export type { TSIResult } from "./tsi.ts";
 
 // Stochastic RSI
 export { calculateStochasticRSI } from "./stochastic-rsi.ts";
