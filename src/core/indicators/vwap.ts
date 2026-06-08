@@ -223,6 +223,154 @@ export function calculateRollingVWAP(
   return { values, current, pricePosition, deviation, upperBand, lowerBand, window: w, interpretation };
 }
 
+export interface AnchoredVWAPResult {
+  /** AVWAP aligned 1:1 with candles; null before the anchor bar. */
+  values: (number | null)[];
+  current: number | null;
+  /** Resolved anchor bar index. */
+  anchorIndex: number;
+  pricePosition: "above" | "below" | "at";
+  deviation: number | null;
+  /** Current AVWAP ± stdDevMultiplier·σ (volume-weighted) since the anchor. */
+  upperBand: number | null;
+  lowerBand: number | null;
+  /** AVWAP direction since a few bars back — rising AVWAP acts as support, falling as resistance. */
+  slope: "rising" | "falling" | "flat";
+  /** Reclaim/reject of the AVWAP line on the last bar, else support/resistance/neutral. */
+  signal: "reclaim" | "reject" | "support" | "resistance" | "neutral";
+  interpretation: string;
+}
+
+/**
+ * Anchored VWAP (Brian Shannon) — VWAP accumulated from a fixed EVENT anchor
+ * (a swing low, gap, or cycle top) with NO session reset and NO trailing window.
+ *
+ * Distinct from `calculateVWAP` (anchors at bar 0) and `calculateRollingVWAP`
+ * (drops old bars). The anchor is the point traders agree to measure cost-basis
+ * from, so a rising AVWAP off a swing low acts as dynamic support and a falling
+ * AVWAP off a high as resistance; reclaim/reject of the line is the trade trigger.
+ *
+ * AVWAP[i] = Σ_{j=anchor..i}(tp[j]·vol[j]) / Σ vol[j],  tp = (high+low+close)/3,
+ * for i ≥ anchor (null before). σ bands use the volume-weighted std of tp about
+ * the running AVWAP.
+ *
+ * @param candles - OHLCV, oldest-first
+ * @param anchor - bar index, or "low"/"high" (auto-anchor to the lowest-low /
+ *   highest-high bar), or "first" (= bar 0). Default "low".
+ * @param stdDevMultiplier - σ-band width; 0 disables bands (default 1)
+ * @param currentPrice - price for position calc (defaults to last close)
+ */
+export function calculateAnchoredVWAP(
+  candles: Candle[],
+  anchor: number | "low" | "high" | "first" = "low",
+  stdDevMultiplier: number = 1,
+  currentPrice?: number,
+): AnchoredVWAPResult {
+  const n = candles.length;
+  const empty: AnchoredVWAPResult = {
+    values: [],
+    current: null,
+    anchorIndex: 0,
+    pricePosition: "at",
+    deviation: null,
+    upperBand: null,
+    lowerBand: null,
+    slope: "flat",
+    signal: "neutral",
+    interpretation: "Insufficient data for anchored VWAP",
+  };
+  if (n < 1) return empty;
+
+  // Resolve the anchor bar.
+  let anchorIndex: number;
+  if (typeof anchor === "number") {
+    anchorIndex = Math.max(0, Math.min(n - 1, Math.floor(anchor)));
+  } else if (anchor === "first") {
+    anchorIndex = 0;
+  } else {
+    anchorIndex = 0;
+    for (let i = 1; i < n; i++) {
+      if (anchor === "low" && candles[i]!.low < candles[anchorIndex]!.low) anchorIndex = i;
+      if (anchor === "high" && candles[i]!.high > candles[anchorIndex]!.high) anchorIndex = i;
+    }
+  }
+
+  const tp = candles.map((c) => (c.high + c.low + c.close) / 3);
+  const vol = candles.map((c) => c.volume);
+
+  const values: (number | null)[] = new Array(n).fill(null);
+  let sumTPV = 0;
+  let sumVol = 0;
+  for (let i = anchorIndex; i < n; i++) {
+    sumTPV += tp[i]! * vol[i]!;
+    sumVol += vol[i]!;
+    values[i] = sumVol > 0 ? sumTPV / sumVol : null;
+  }
+
+  const current = values[n - 1] ?? null;
+  const price = currentPrice ?? (candles[n - 1]?.close ?? 0);
+  if (current === null) return { ...empty, values, anchorIndex };
+
+  const deviation = ((price - current) / current) * 100;
+  const pricePosition: "above" | "below" | "at" =
+    Math.abs(deviation) < 0.1 ? "at" : price > current ? "above" : "below";
+
+  // Volume-weighted σ of typical price about the running AVWAP, since the anchor.
+  let upperBand: number | null = null;
+  let lowerBand: number | null = null;
+  if (stdDevMultiplier > 0 && n - anchorIndex >= 2) {
+    let wSumSq = 0;
+    let wSum = 0;
+    for (let i = anchorIndex; i < n; i++) {
+      const d = tp[i]! - values[i]!;
+      wSumSq += vol[i]! * d * d;
+      wSum += vol[i]!;
+    }
+    if (wSum > 0) {
+      const sigma = Math.sqrt(wSumSq / wSum);
+      upperBand = current + sigma * stdDevMultiplier;
+      lowerBand = current - sigma * stdDevMultiplier;
+    }
+  }
+
+  // Slope over the lesser of 5 bars / bars-since-anchor.
+  const back = Math.min(5, n - 1 - anchorIndex);
+  let slope: "rising" | "falling" | "flat" = "flat";
+  if (back >= 1) {
+    const prev = values[n - 1 - back]!;
+    const chg = (current - prev) / Math.abs(prev || 1);
+    slope = chg > 0.0005 ? "rising" : chg < -0.0005 ? "falling" : "flat";
+  }
+
+  // Reclaim/reject on the last bar; else support/resistance from slope + position.
+  let signal: AnchoredVWAPResult["signal"] = "neutral";
+  if (n - anchorIndex >= 2) {
+    const prevClose = candles[n - 2]!.close;
+    const prevVwap = values[n - 2]!;
+    const wasBelow = prevVwap !== null && prevClose < prevVwap;
+    const wasAbove = prevVwap !== null && prevClose > prevVwap;
+    if (wasBelow && price > current) signal = "reclaim";
+    else if (wasAbove && price < current) signal = "reject";
+    else if (pricePosition === "above" && slope === "rising") signal = "support";
+    else if (pricePosition === "below" && slope === "falling") signal = "resistance";
+  }
+
+  const anchorDesc =
+    anchor === "low" ? "swing-low" : anchor === "high" ? "swing-high" : anchor === "first" ? "start" : `bar ${anchorIndex}`;
+  const interpretation =
+    signal === "reclaim"
+      ? `price reclaimed the ${anchorDesc} AVWAP from below — bullish trigger`
+      : signal === "reject"
+        ? `price rejected the ${anchorDesc} AVWAP from above — bearish trigger`
+        : signal === "support"
+          ? `price ${deviation.toFixed(2)}% above a rising ${anchorDesc} AVWAP — dynamic support`
+          : signal === "resistance"
+            ? `price ${Math.abs(deviation).toFixed(2)}% below a falling ${anchorDesc} AVWAP — dynamic resistance`
+            : `price ${deviation.toFixed(2)}% vs ${anchorDesc} AVWAP (${slope})`;
+
+  return { values, current, anchorIndex, pricePosition, deviation, upperBand, lowerBand, slope, signal, interpretation };
+}
+
 /**
  * Calculate VWAP with standard deviation bands
  * Similar to Bollinger Bands but anchored to VWAP

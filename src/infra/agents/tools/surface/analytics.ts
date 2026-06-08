@@ -27,6 +27,7 @@ import {
   calculateADX,
   calculateVWAP,
   calculateRollingVWAP,
+  calculateAnchoredVWAP,
   calculateMFI,
   calculateStochasticRSI,
   calculateFibonacci,
@@ -584,6 +585,7 @@ const INDICATOR_NAMES = [
   "roll_spread",
   "amihud",
   "rolling_vwap",
+  "anchored_vwap",
   "mama",
   "vzo",
   "leledc_exhaustion",
@@ -638,6 +640,12 @@ function dispatchIndicator(
       return calculateRollingVWAP(
         candles,
         (params.window as number) ?? 20,
+        (params.stdDevMultiplier as number) ?? 1,
+      );
+    case "anchored_vwap":
+      return calculateAnchoredVWAP(
+        candles,
+        (params.anchor as number | "low" | "high" | "first") ?? "low",
         (params.stdDevMultiplier as number) ?? 1,
       );
     case "mama":
@@ -1057,6 +1065,7 @@ export const computeIndicatorTool = createTool({
     "AFML feature engineering (López de Prado): frac_diff (fixed-width fractional differentiation — stationarity-preserving memory; params { d?, threshold? }; d=1≈first-difference, d=0≈identity, 0<d<1 keeps memory while flattening trend), cusum_filter (symmetric CUSUM event sampler on log-returns — flags change-point bars where cumulative move exceeds a threshold; params { threshold? } default = returns stdev), sadf (supremum ADF — rolling explosiveness/BUBBLE test, right-tailed; distinct from KPSS/Johansen stationarity; params { minWindow?, lags? }; isExplosive flag)",
     "Microstructure liquidity from OHLC (no quotes/tick): roll_spread (Roll 1984 effective spread = 2·sqrt(−serial-cov of price changes) + Corwin-Schultz 2012 high-low spread estimator; params { window? }), amihud (Amihud 2002 illiquidity = mean |return|/dollar-volume; higher = more price impact per dollar; params { window? }; distinct from VPIN/transient-impact)",
     "Rolling VWAP: rolling_vwap (windowed VWAP over the trailing `window` bars — a moving fair-value / mean-reversion anchor that DROPS old bars, unlike vwap which accumulates from the first bar and never resets; params { window? default 20, stdDevMultiplier? default 1 }; returns the aligned series + current + price position + ±σ value-area bands (upper≈VAH, lower≈VAL); for higher-timeframe S/R use a larger window e.g. 90)",
+    "Anchored VWAP: anchored_vwap (Brian Shannon — VWAP accumulated from a fixed EVENT anchor with NO reset/window; distinct from vwap (anchors at bar 0) and rolling_vwap (drops old bars). params { anchor? 'low'|'high'|'first'|<barIndex> default 'low' auto-anchors to the swing low/high, stdDevMultiplier? default 1 }; returns series (null before anchor) + current + slope (rising AVWAP=dynamic support, falling=resistance) + signal (reclaim/reject/support/resistance) + volume-weighted ±σ bands. Use an anchor at a swing low/high/gap/cycle-top as a cost-basis line)",
     "Ehlers adaptive: mama (MESA Adaptive Moving Average + FAMA companion — Hilbert homodyne discriminator measures the dominant cycle period and sets an adaptive alpha between slowLimit/fastLimit; params { fastLimit? 0.5, slowLimit? 0.05, source?: 'hl2'|'close' default hl2 per Ehlers }; MAMA above FAMA = bullish, crossover = signal. Distinct from KAMA (efficiency-ratio) / VIDYA (CMO-vol) — alpha here is cycle-phase driven)",
     "Volume momentum: vzo (Volume Zone Oscillator, Waxman — 100×EMA(signed volume)/EMA(volume); whether volume accumulates on up- vs down-closes, ±60 range; params { period? 14 }; ≥40 overbought / ≤−40 oversold. Distinct from MFI/CMF; classic use is RSI-vs-VZO divergence — a 'scam pump' spikes RSI while VZO stays flat)",
     "Exhaustion S/R: leledc_exhaustion (Leledc exhaustion bars → support/resistance — price-action bar-counter: momentum counter (close vs close[4]) + a reversal candle AT a range extreme marks an exhaustion bar whose high=resistance / low=support; params { majQual? 6, majLen? 30, minQual? 5, minLen? 5 } for major/minor tiers. Returns the exhaustion signals + active major/minor S/R levels + whether THIS bar is an exhaustion. Distinct from volume/orderflow/streak exhaustion — pure price action)",
