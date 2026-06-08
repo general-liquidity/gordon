@@ -137,6 +137,7 @@ import { computeGeneralizedImpulse } from "../../../trading/quant/generalizedImp
 import { computeGeneralizedVariance } from "../../../trading/quant/generalizedVariance.ts";
 import { computePopulationStability, computeVaRBacktest } from "../../../trading/quant/riskModelValidation.ts";
 import { computeJensensAlpha } from "../../../trading/quant/jensensAlpha.ts";
+import { computeFundamentalQuality, computeWACC } from "../../../../core/alpha/fundamental-quality.ts";
 import { computeFootprintImbalance } from "../../../../core/indicators/footprint-imbalance.ts";
 import { computeNakedPoc } from "../../../../core/indicators/naked-poc.ts";
 import { computeASIntensityCalibration, computeASStationaryReservation } from "../../../../core/alpha/as-market-making.ts";
@@ -1450,6 +1451,8 @@ const MICROSTRUCTURE_OPS = [
   "population_stability",
   "var_backtest",
   "jensens_alpha",
+  "fundamental_quality",
+  "wacc",
 ] as const;
 
 export const computeMicrostructureTool = createTool({
@@ -1764,6 +1767,11 @@ export const computeMicrostructureTool = createTool({
     "    - 'naked_poc' — params: { candles[], periodBars? (24), numBins? (24) }",
     "                              Naked/virgin volume-POC tracking: each period's POC that price has NOT traded back through = an unfilled magnet level. Returns nakedPocs +",
     "                              nearestNakedAbove/Below the last close + filledCount. Distinct from single_prints (TPO gaps) — this tracks per-period volume-POC revisits.",
+    "    - 'fundamental_quality' — params: { revenue, + optional revenueGrowthPct|priorRevenue, freeCashFlow, operatingCashFlow, netIncome, cogs, accountsReceivable, inventory, accountsPayable, daysInPeriod? (365) }",
+    "                              Equity quality screen: Rule-of-40 (growth%+FCF-margin%), FCF conversion (FCF/NI) + FCF/OCF, and DSO/DIO/DPO + cash-conversion-cycle. Missing inputs →",
+    "                              null (no wrong numbers). Complements forensic_screen (Beneish/Altman/Piotroski/Sloan) + DCF. Equities-only.",
+    "    - 'wacc' — params: { riskFreeRate, beta, equityRiskPremium, marketCapEquity, marketValueDebt, costOfDebt, taxRate, additionalPremium? }",
+    "                              CAPM cost-of-equity (Ke=rf+β·ERP+premium) + after-tax cost of debt, market-weighted into WACC — the discount-rate input to dcf.",
     "    - 'jensens_alpha' — params: { returns: number[] (strategy), factors: number[][] (≥1 aligned factor series), factorNames?, lags? }",
     "                              Jensen's alpha + Newey-West (HAC) significance: regress returns on factors, test whether the INTERCEPT α survives. Returns α + HAC t-stat/p-value",
     "                              (+ raw OLS p for contrast), factor betas w/ HAC significance, R²/adjR², verdict (significant_alpha=real edge / insignificant=disguised beta / negative).",
@@ -2035,6 +2043,23 @@ export const computeMicrostructureTool = createTool({
             return { error: "jensens_alpha: `returns` (number[]) and `factors` (number[][], ≥1 aligned factor series) are required" };
           }
           return computeJensensAlpha(p as unknown as Parameters<typeof computeJensensAlpha>[0]);
+        },
+      },
+      fundamental_quality: {
+        execute: async (p: Record<string, unknown>) => {
+          if (typeof p.revenue !== "number") {
+            return { error: "fundamental_quality: `revenue` (number) is required; optional: revenueGrowthPct|priorRevenue, freeCashFlow, operatingCashFlow, netIncome, cogs, accountsReceivable, inventory, accountsPayable, daysInPeriod" };
+          }
+          return computeFundamentalQuality(p as unknown as Parameters<typeof computeFundamentalQuality>[0]);
+        },
+      },
+      wacc: {
+        execute: async (p: Record<string, unknown>) => {
+          const req = ["riskFreeRate", "beta", "equityRiskPremium", "marketCapEquity", "marketValueDebt", "costOfDebt", "taxRate"];
+          if (req.some((k) => typeof p[k] !== "number")) {
+            return { error: `wacc: requires numbers for ${req.join(", ")} (+ optional additionalPremium)` };
+          }
+          return computeWACC(p as unknown as Parameters<typeof computeWACC>[0]);
         },
       },
       inventory_order_size: {
