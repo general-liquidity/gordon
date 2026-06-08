@@ -136,6 +136,7 @@ import { computePriceDiscovery } from "../../../trading/quant/priceDiscovery.ts"
 import { computeGeneralizedImpulse } from "../../../trading/quant/generalizedImpulse.ts";
 import { computeGeneralizedVariance } from "../../../trading/quant/generalizedVariance.ts";
 import { computePopulationStability, computeVaRBacktest } from "../../../trading/quant/riskModelValidation.ts";
+import { computeJensensAlpha } from "../../../trading/quant/jensensAlpha.ts";
 import { computeFootprintImbalance } from "../../../../core/indicators/footprint-imbalance.ts";
 import { computeNakedPoc } from "../../../../core/indicators/naked-poc.ts";
 import { computeASIntensityCalibration, computeASStationaryReservation } from "../../../../core/alpha/as-market-making.ts";
@@ -1448,6 +1449,7 @@ const MICROSTRUCTURE_OPS = [
   "generalized_variance",
   "population_stability",
   "var_backtest",
+  "jensens_alpha",
 ] as const;
 
 export const computeMicrostructureTool = createTool({
@@ -1762,6 +1764,10 @@ export const computeMicrostructureTool = createTool({
     "    - 'naked_poc' — params: { candles[], periodBars? (24), numBins? (24) }",
     "                              Naked/virgin volume-POC tracking: each period's POC that price has NOT traded back through = an unfilled magnet level. Returns nakedPocs +",
     "                              nearestNakedAbove/Below the last close + filledCount. Distinct from single_prints (TPO gaps) — this tracks per-period volume-POC revisits.",
+    "    - 'jensens_alpha' — params: { returns: number[] (strategy), factors: number[][] (≥1 aligned factor series), factorNames?, lags? }",
+    "                              Jensen's alpha + Newey-West (HAC) significance: regress returns on factors, test whether the INTERCEPT α survives. Returns α + HAC t-stat/p-value",
+    "                              (+ raw OLS p for contrast), factor betas w/ HAC significance, R²/adjR², verdict (significant_alpha=real edge / insignificant=disguised beta / negative).",
+    "                              HAC = autocorrelation-robust SEs (raw OLS p-values flatter autocorrelated returns). The core 'is this signal real after the known factors' test.",
     "    - 'population_stability' — params: { expected: number[] (reference sample), actual: number[] (current sample), bins? (10) }",
     "                              PSI population-stability index: distribution-DRIFT monitor for a deployed signal/feature/model output. PSI=Σ(aᵢ−eᵢ)·ln(aᵢ/eᵢ) over reference",
     "                              quantile bins; <0.1 stable, 0.1-0.25 moderate, >0.25 significant shift. Live-drift detector — distinct from backtest-time overfitting/MCPT/walk-forward.",
@@ -2021,6 +2027,14 @@ export const computeMicrostructureTool = createTool({
             return { error: "var_backtest: `returns` (realized number[]) and `varForecasts` (positive loss magnitudes, aligned) are required" };
           }
           return computeVaRBacktest(p as unknown as Parameters<typeof computeVaRBacktest>[0]);
+        },
+      },
+      jensens_alpha: {
+        execute: async (p: Record<string, unknown>) => {
+          if (!Array.isArray(p.returns) || !Array.isArray(p.factors) || !Array.isArray(p.factors[0])) {
+            return { error: "jensens_alpha: `returns` (number[]) and `factors` (number[][], ≥1 aligned factor series) are required" };
+          }
+          return computeJensensAlpha(p as unknown as Parameters<typeof computeJensensAlpha>[0]);
         },
       },
       inventory_order_size: {
