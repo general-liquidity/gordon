@@ -1,19 +1,25 @@
 # Syphonix Integration Runbook (execute on June 15, after the API spec lands)
 
-The Syphonix adapter is the **one gating item** for the competition and is *blocked on the API spec* (released at the kickoff, 15 June). It is deliberately **not pre-built** — `rest-base.ts` is endpoint-path-driven, and stubbing unknown paths/auth/order-shape would only be rewritten. This runbook makes June 15 mechanical instead of exploratory.
+The Syphonix adapter is the **one gating item** for the competition and the wire-level HTTP is *blocked on the API spec* (released at the kickoff, 15 June). The non-speculative parts are now **built as a gated-off scaffold** (commit f4e45cdd); this runbook makes June 15 mechanical.
 
-## Pre-confirmed (done now, zero rework)
+## Scaffold already in place (done now, zero rework)
 
-- **Adapter pattern is ready.** New venues are config objects over `src/infra/broker/adapters/rest-base.ts` (`RestBrokerAdapterConfig`: `authStyle`, base URLs, and path arrays for account/clock/positions/orders/quotes) + registration in `src/infra/broker/factory.ts` (`SUPPORTED_BROKERS` + `BrokerId`).
-- **Paper trading is first-class** (`brokerPaperSupport.ts`) — matches the competition's paper sim.
-- **Competition runner has the slot:** `buildCompetitionRunConfig({ venue: "syphonix" })` (`core/pipeline/competition-runner.ts`).
-- **No MT5 path needed** — we trade via the **API** (correct for an agent).
+- **`adapters/syphonix.ts`** — `SyphonixAdapter implements BrokerAdapter`, FX/metals/crypto+leverage+paper capabilities, env/cred config, `clientOrderId` idempotency. Live methods throw a clear spec-pending error (not silent stubs).
+- **Registered everywhere the type system requires:** `BrokerId` + `BrokerTypeSchema` + factory `switch` case + all `Record<BrokerId>` sites (env map `GORDON_SYPHONIX_*`, paper-support, setup instructions, mock).
+- **Inclusion gate entry = `approved:false`** (`documentedExecutionEndpoints:false`) → the gate blocks live use until the spec is wired.
+- **Deliberately NOT in `SUPPORTED_BROKERS`** → `BrokerFactory.create("syphonix")` throws until June 15 (preserves "everything creatable passes the gate").
+- **Competition runner slot:** `buildCompetitionRunConfig({ venue: "syphonix" })`.
+- **No MT5 path** — we trade via the **API**.
+
+## DECISION 0 (settle first, June 15): BrokerAdapter vs Exchange
+
+Gordon has **two venue abstractions** — `BrokerAdapter` (equity, retail-B2C-stock-broker-shaped: `rest-base.ts` + the inclusion gate's retail criteria) and `Exchange` (`src/infra/exchange/adapters/`: binance/coinbase/kraken/okx/hyperliquid — crypto, leverage/perps). Syphonix does FX + metals + **crypto with leverage**. The scaffold implements `BrokerAdapter` because account/positions/orders maps cleanly — **but if the spec exposes an order-book / leverage / perps surface, re-home it to the `Exchange` interface.** It's gated-off + untested, so moving it is cheap. Make this call against the actual API before wiring endpoints.
 
 ## Step-by-step (June 15)
 
 1. **Read the spec + run the Syphonix system demo** at the kickoff. Capture: base URL(s), auth style (bearer/key/OAuth), order endpoint + body shape, positions/account/equity endpoints, the **market-data feed** for FX/metals/crypto (REST snapshot and/or WS), rate limits, and the **instrument catalog** endpoint.
-2. **Add the venue id:** extend `BrokerId` (`broker/types.ts`) with `"syphonix"`; add to `SUPPORTED_BROKERS` in `factory.ts`; import + instantiate in `BrokerFactory.create`.
-3. **Author `adapters/syphonix.ts`** as a `RestBrokerAdapter` config (or a thin custom adapter if FX/metals/crypto don't fit the stock-broker shape — confirm against the spec). Implement against the `BrokerAdapter` contract: `getAccount` (equity), `getPositions`, `placeOrder`, `cancelOrder`, `listOrders`, `getQuote`/historical bars. Reuse `clientOrderId` idempotency (already in the execution algos).
+2. **Activate the venue:** `BrokerId` / `BrokerTypeSchema` / factory case already exist — just add `"syphonix"` to `SUPPORTED_BROKERS` in `factory.ts` and flip the inclusion-gate entry to `approved:true` + `documentedExecutionEndpoints:true` (`retailB2COnboarding` too if treating it via the broker path).
+3. **Fill `adapters/syphonix.ts`** — replace the `pending()` throws with real calls: `getAccount` (equity), `getPositions`, `placeOrder` (attach `nextClientOrderId()` for idempotency — helper already present), `cancelOrder`, `listOrders`, `getLatestQuote`, `getHistoricalBars`. (Or move to the `Exchange` interface per DECISION 0.)
 4. **Map the instrument catalog → asset classes** (`fx | metals | crypto`) at runtime — **do not hardcode symbol lists** (FX = ISO-4217 pairs, metals = XAU/XAG are structural; crypto bases come from the catalog).
 5. **Wire market data** into Gordon's data layer so `compute_indicator` / `compute_regime` / `compute_risk` consume the Syphonix feed. WS for live, REST snapshot fallback on disconnect.
 6. **Config/env:** `GORDON_SYPHONIX_API_KEY`, `GORDON_SYPHONIX_BASE_URL`, paper flag (default paper).
