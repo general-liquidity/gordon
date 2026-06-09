@@ -243,15 +243,6 @@ export class ExchangeFactory {
   }
 
   /**
-   * Check if an exchange uses a native (hand-tuned) adapter. CCXT-routed
-   * IDs return false — they're handled via the CcxtAdapter unified path.
-   */
-  static hasNativeAdapter(exchangeId: ExchangeId): boolean {
-    if (isCcxtExchangeId(exchangeId)) return false;
-    return SUPPORTED_EXCHANGES.includes(exchangeId as NativeExchangeId);
-  }
-
-  /**
    * Clear the instance cache
    * Useful for testing or when credentials change
    */

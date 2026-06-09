@@ -132,7 +132,6 @@ export async function exchangeAdd(exchangeType: string, sandbox = false): Promis
     const existingOfType = config.exchanges.filter((ex) => ex.type === type);
     const needsPassphrase = type === 'coinbase' || ccxtExchangeRequiresPassphrase(type);
     const needsWallet = isWalletBasedExchange(type) || ccxtExchangeRequiresWallet(type);
-    const hasNativeAdapter = ExchangeFactory.hasNativeAdapter(type);
 
     const requiredFields = needsWallet
       ? ['walletPrivateKey']
@@ -153,7 +152,6 @@ export async function exchangeAdd(exchangeType: string, sandbox = false): Promis
         existingCount: existingOfType.length,
         needsPassphrase,
         needsWallet,
-        hasNativeAdapter,
         requiredFields,
         optionalFields: needsWallet ? [] : (sandbox ? [] : ['sandbox']),
         instructions: getExchangeSetupInstructions(type, sandbox),
