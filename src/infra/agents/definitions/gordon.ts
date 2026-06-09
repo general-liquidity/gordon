@@ -20,23 +20,13 @@ import {
   instrumentedMultiModalChartTools,
   instrumentedQuoteVerifyTools,
   instrumentedProducerHealthTools,
-  // Integration tier — venue feeds + on-chain reads. Coexist with the
-  // canonical surface; not covered by it.
-  instrumentedBaseOnchainTools,
-  instrumentedBaseSignalTools,
-  instrumentedBaseIndexerTools,
+  // Integration tier — venue feeds + social. Coexist with the canonical
+  // surface; not covered by it.
   instrumentedXSocialTools,
-  instrumentedCdpWebhookTools,
-  instrumentedCdpSqlTools,
-  instrumentedCdpPolicyTools,
-  instrumentedCdpOnrampTools,
-  instrumentedCdpEvmMultichainTools,
-  instrumentedCdpWebhookReceiverTools,
   instrumentedFinnhubTools,
   instrumentedFinnhubFundamentalsTools,
   instrumentedFinnhubMarketsTools,
   instrumentedSecFilingTools,
-  instrumentedAgentKitOnchainTools,
   gordonInputGuard,
   gordonToolCallReconciler,
   gordonOutputSanitizer,
@@ -394,30 +384,14 @@ export function getGordon(): Agent {
       // Producer health — observability, no surface tool.
       ...instrumentedProducerHealthTools,
 
-      // On-chain reads — INTEGRATION tier. Always on.
-      ...instrumentedBaseOnchainTools,
-      ...instrumentedBaseSignalTools,
-      ...instrumentedBaseIndexerTools,
+      // Social sentiment — INTEGRATION tier. Always on.
       ...instrumentedXSocialTools,
-
-      // CDP integration — INTEGRATION tier. Cold-gated.
-      ...(isHotTierOnly() ? {} : instrumentedCdpWebhookTools),
-      ...(isHotTierOnly() ? {} : instrumentedCdpSqlTools),
-      ...(isHotTierOnly() ? {} : instrumentedCdpPolicyTools),
-      ...(isHotTierOnly() ? {} : instrumentedCdpOnrampTools),
-      ...(isHotTierOnly() ? {} : instrumentedCdpEvmMultichainTools),
-      ...(isHotTierOnly() ? {} : instrumentedCdpWebhookReceiverTools),
 
       // Finnhub — INTEGRATION tier.
       ...instrumentedFinnhubTools,
       ...(isHotTierOnly() ? {} : instrumentedFinnhubFundamentalsTools),
       ...(isHotTierOnly() ? {} : instrumentedSecFilingTools),
       ...instrumentedFinnhubMarketsTools,
-
-      // AgentKit reads — INTEGRATION tier.
-      agentkit_get_balance: instrumentedAgentKitOnchainTools.agentkit_get_balance,
-      agentkit_get_wallet: instrumentedAgentKitOnchainTools.agentkit_get_wallet,
-      agentkit_get_swap_price: instrumentedAgentKitOnchainTools.agentkit_get_swap_price,
 
       // MCP plugin tools — external, never gated.
       ...getScopedMCPTools({

@@ -289,29 +289,12 @@ function getRailStatuses(
 }
 
 function getDataAndAutomationStatuses(
-  envKeys: EnvMapRecord,
-  keyringKeys: Set<string>,
+  _envKeys: EnvMapRecord,
+  _keyringKeys: Set<string>,
 ): ProviderCredentialStatus[] {
-  return [
-    buildStatus(
-      "thegraph",
-      "data",
-      getIntegrationSurfaceMetadata("thegraph").displayName,
-      "ops",
-      "api_key",
-      "static",
-      [resolveFieldStatus("THEGRAPH_API_KEY", "The Graph API key", true, { envKeys, keyringKeys })],
-    ),
-    buildStatus(
-      "basescan",
-      "data",
-      getIntegrationSurfaceMetadata("basescan").displayName,
-      "ops",
-      "api_key",
-      "static",
-      [resolveFieldStatus("BASESCAN_API_KEY", "Basescan API key", true, { envKeys, keyringKeys })],
-    ),
-  ];
+  // The Graph + Basescan data/automation surfaces were removed with the
+  // Base/CDP stack. Crypto data now comes through CCXT; no separate keys here.
+  return [];
 }
 
 async function getMcpStatuses(): Promise<ProviderCredentialStatus[]> {

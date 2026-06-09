@@ -70,18 +70,7 @@ export { marketDataTools } from "./market/market-data.ts";
 export { liquidationIntelligenceTools } from "./trading/liquidation-intelligence.ts";
 export { pairAnalysisTools } from "./market/pair-analysis.ts";
 export { autonomousTools } from "./runtime/meta/autonomous.ts";
-export { baseOnchainTools } from "./onchain/base/base-onchain.ts";
-export { agentKitOnchainTools } from "./onchain/agentkit/agentkit-onchain.ts";
-export { agentKitDefiTools } from "./onchain/agentkit/agentkit-defi.ts";
-export { baseSignalTools } from "./onchain/base/base-signals.ts";
-export { baseIndexerTools } from "./onchain/base/base-indexers.ts";
 export { xSocialTools } from "./news/x-social.ts";
-export { cdpWebhookTools } from "./onchain/cdp/cdp-webhooks.ts";
-export { cdpSqlTools } from "./onchain/cdp/cdp-sql.ts";
-export { cdpPolicyTools } from "./onchain/cdp/cdp-policy.ts";
-export { cdpOnrampTools } from "./onchain/cdp/cdp-onramp.ts";
-export { cdpEvmMultichainTools } from "./onchain/cdp/cdp-evm-multichain.ts";
-export { cdpWebhookReceiverTools } from "./onchain/cdp/cdp-webhook-receiver.ts";
 export { proactiveModeTools } from "./runtime/flow/proactive-mode.ts";
 export { backtestVerdictTools } from "./strategy/backtest/backtest-verdict.ts";
 export { finnhubTools } from "./providers/finnhub-tools.ts";
@@ -621,18 +610,7 @@ import { marketDataTools } from "./market/market-data.ts";
 import { liquidationIntelligenceTools } from "./trading/liquidation-intelligence.ts";
 import { pairAnalysisTools } from "./market/pair-analysis.ts";
 import { autonomousTools } from "./runtime/meta/autonomous.ts";
-import { baseOnchainTools } from "./onchain/base/base-onchain.ts";
-import { agentKitOnchainTools } from "./onchain/agentkit/agentkit-onchain.ts";
-import { agentKitDefiTools } from "./onchain/agentkit/agentkit-defi.ts";
-import { baseSignalTools } from "./onchain/base/base-signals.ts";
-import { baseIndexerTools } from "./onchain/base/base-indexers.ts";
 import { xSocialTools } from "./news/x-social.ts";
-import { cdpWebhookTools } from "./onchain/cdp/cdp-webhooks.ts";
-import { cdpSqlTools } from "./onchain/cdp/cdp-sql.ts";
-import { cdpPolicyTools } from "./onchain/cdp/cdp-policy.ts";
-import { cdpOnrampTools } from "./onchain/cdp/cdp-onramp.ts";
-import { cdpEvmMultichainTools } from "./onchain/cdp/cdp-evm-multichain.ts";
-import { cdpWebhookReceiverTools } from "./onchain/cdp/cdp-webhook-receiver.ts";
 import { proactiveModeTools } from "./runtime/flow/proactive-mode.ts";
 import { backtestVerdictTools } from "./strategy/backtest/backtest-verdict.ts";
 import { finnhubTools } from "./providers/finnhub-tools.ts";
@@ -776,18 +754,7 @@ const _rawAllTools = {
   ...liquidationIntelligenceTools,
   ...pairAnalysisTools,
   ...autonomousTools,
-  ...baseOnchainTools,
-  ...agentKitOnchainTools,
-  ...agentKitDefiTools,
-  ...baseSignalTools,
-  ...baseIndexerTools,
   ...xSocialTools,
-  ...cdpWebhookTools,
-  ...cdpSqlTools,
-  ...cdpPolicyTools,
-  ...cdpOnrampTools,
-  ...cdpEvmMultichainTools,
-  ...cdpWebhookReceiverTools,
   ...proactiveModeTools,
   ...backtestVerdictTools,
   ...finnhubTools,
@@ -931,18 +898,7 @@ export const toolCounts = {
   liquidationIntelligence: Object.keys(liquidationIntelligenceTools).length,
   pairAnalysis: Object.keys(pairAnalysisTools).length,
   autonomous: Object.keys(autonomousTools).length,
-  baseOnchain: Object.keys(baseOnchainTools).length,
-  agentKitOnchain: Object.keys(agentKitOnchainTools).length,
-  agentKitDefi: Object.keys(agentKitDefiTools).length,
-  baseSignals: Object.keys(baseSignalTools).length,
-  baseIndexers: Object.keys(baseIndexerTools).length,
   xSocial: Object.keys(xSocialTools).length,
-  cdpWebhooks: Object.keys(cdpWebhookTools).length,
-  cdpSql: Object.keys(cdpSqlTools).length,
-  cdpPolicy: Object.keys(cdpPolicyTools).length,
-  cdpOnramp: Object.keys(cdpOnrampTools).length,
-  cdpEvmMultichain: Object.keys(cdpEvmMultichainTools).length,
-  cdpWebhookReceiver: Object.keys(cdpWebhookReceiverTools).length,
   proactiveMode: Object.keys(proactiveModeTools).length,
   backtestVerdict: Object.keys(backtestVerdictTools).length,
   finnhub: Object.keys(finnhubTools).length,

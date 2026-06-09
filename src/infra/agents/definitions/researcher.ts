@@ -18,12 +18,6 @@ import {
   instrumentedQuoteVerifyTools,
   instrumentedProducerHealthTools,
   instrumentedXSocialTools,
-  instrumentedCdpWebhookTools,
-  instrumentedCdpSqlTools,
-  instrumentedCdpPolicyTools,
-  instrumentedCdpOnrampTools,
-  instrumentedCdpEvmMultichainTools,
-  instrumentedCdpWebhookReceiverTools,
   instrumentedFinnhubTools,
   instrumentedFinnhubFundamentalsTools,
   instrumentedFinnhubMarketsTools,
@@ -91,14 +85,8 @@ export function getResearcher(): Agent {
       // Producer health observability.
       ...instrumentedProducerHealthTools,
 
-      // INTEGRATION tier — venue + on-chain feeds.
+      // INTEGRATION tier — venue + social + research feeds.
       ...instrumentedXSocialTools,
-      ...instrumentedCdpWebhookTools,
-      ...instrumentedCdpSqlTools,
-      ...instrumentedCdpPolicyTools,
-      ...instrumentedCdpOnrampTools,
-      ...instrumentedCdpEvmMultichainTools,
-      ...instrumentedCdpWebhookReceiverTools,
       ...instrumentedFinnhubTools,
       ...instrumentedFinnhubFundamentalsTools,
       ...instrumentedFinnhubMarketsTools,

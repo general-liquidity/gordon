@@ -37,8 +37,8 @@ describe("integration taxonomy", () => {
     expect(routed.gatewayParent).toBe("dedalus");
   });
 
-  it("classifies Base RPC and Flashblocks as chain infrastructure surfaces", () => {
-    expect(getIntegrationSurfaceMetadata("base_rpc").infraKind).toBe("chain_ecosystem");
-    expect(getIntegrationSurfaceMetadata("base_flashblocks").infraKind).toBe("chain_ecosystem");
+  it("classifies the model gateway + providers (non-crypto surfaces retained)", () => {
+    expect(getIntegrationSurfaceMetadata("openai").integrationDomain).toBe("model_provider");
+    expect(getIntegrationSurfaceMetadata("axiom").integrationDomain).toBe("observability_provider");
   });
 });

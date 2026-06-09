@@ -5,10 +5,6 @@
 // Each protocol provides data feeds, trading, or yield capabilities.
 // ============================================================================
 
-// Protocol re-exports
-export * as base from "./base/index.ts";
-export * as agentkit from "./agentkit/index.ts";
-
 // Protocol registry for discovery and health monitoring
 export interface ProtocolInfo {
   id: string;
@@ -19,10 +15,10 @@ export interface ProtocolInfo {
   healthEndpoint?: string;
 }
 
-export const PROTOCOL_REGISTRY: ProtocolInfo[] = [
-  { id: "base", name: "Base", category: "chain", chains: ["base"], capabilities: ["indexers", "onchain", "signals", "dex-screener"] },
-  { id: "agentkit", name: "CDP AgentKit", category: "wallet", chains: ["ethereum", "base"], capabilities: ["onchain", "defi"] },
-];
+// Empty: all onchain protocol integrations (Base/AgentKit + earlier
+// Solana/Polkadot/Uniswap/Chainlink) were removed — Gordon trades via CCXT
+// (CEX) + Hyperliquid (DEX); onchain/DeFi/wallet surfaces live in OpenSolvency.
+export const PROTOCOL_REGISTRY: ProtocolInfo[] = [];
 
 export function getProtocol(id: string): ProtocolInfo | undefined {
   return PROTOCOL_REGISTRY.find((p) => p.id === id);

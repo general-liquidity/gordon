@@ -22,7 +22,6 @@
 import type { CandidateProducer } from "../engine/proactiveEngine.ts";
 import { buildCandidate } from "../engine/proactiveEngine.ts";
 import type { ProactiveSuggestion } from "../types.ts";
-import { getCdpWebhookReceiver } from "../../data/providers/cdp/cdpWebhookReceiver.ts";
 
 export const periodicProducer: CandidateProducer = async (obs): Promise<ProactiveSuggestion[]> => {
   if (obs.source !== "monitor_loop") return [];
@@ -35,10 +34,6 @@ export const periodicProducer: CandidateProducer = async (obs): Promise<Proactiv
 
     case "tick_journal_prompt":
       candidates.push(...buildJournalPrompt(obs.timestamp));
-      break;
-
-    case "tick_whale_drain":
-      candidates.push(...drainWhaleBuffer());
       break;
 
     // tick_portfolio_drift, tick_regime_flip, tick_volatility, tick_funding
@@ -105,91 +100,10 @@ function buildJournalPrompt(nowMs: number): ProactiveSuggestion[] {
 }
 
 // ============================================================================
-// Whale alert drain — pulls verified large transfers from CDP webhook receiver
-// ============================================================================
-
-// Track last processed webhook event id so we don't re-fire on the same event.
-let lastProcessedWebhookEventId = 0;
-const WHALE_VALUE_THRESHOLD_USD = 100_000;
-
-function drainWhaleBuffer(): ProactiveSuggestion[] {
-  const receiver = getCdpWebhookReceiver();
-  if (!receiver.isRunning()) return [];
-
-  // Pull the newest events, filter to verified ones we haven't processed yet
-  const recent = receiver.getRecentEvents(50, true);
-  const candidates: ProactiveSuggestion[] = [];
-
-  for (const event of recent) {
-    if (event.id <= lastProcessedWebhookEventId) continue;
-    lastProcessedWebhookEventId = Math.max(lastProcessedWebhookEventId, event.id);
-
-    // Extract value from ERC20 transfer events — CDP webhook payloads include
-    // eventType and value in the payload object. Shape varies by event_type.
-    const payload = event.payload as Record<string, unknown> | undefined;
-    if (!payload) continue;
-    const eventType = payload.eventType as string | undefined;
-    if (eventType && !/(transfer|wallet_activity)/i.test(eventType)) continue;
-
-    // Try to extract a rough USD value estimate from the payload
-    const valueUsd = estimateValueUsd(payload);
-    if (valueUsd < WHALE_VALUE_THRESHOLD_USD) continue;
-
-    const fromAddress = (payload.from as string | undefined) ?? "unknown";
-    const toAddress = (payload.to as string | undefined) ?? "unknown";
-    const tokenSymbol = (payload.symbol as string | undefined) ?? "unknown token";
-
-    candidates.push(
-      buildCandidate(
-        "whale_alert",
-        `Whale transfer: ~$${(valueUsd / 1000).toFixed(0)}k ${tokenSymbol}`,
-        `A verified CDP webhook event flagged a transfer of ~$${valueUsd.toLocaleString()} in ${tokenSymbol} ` +
-          `from ${shortAddr(fromAddress)} to ${shortAddr(toAddress)}. ` +
-          `Worth checking whether the destination is a known exchange or accumulation address.`,
-        {
-          confidence: valueUsd > 1_000_000 ? 0.88 : 0.72,
-          action: `Inspect the addresses or query recent flows for ${tokenSymbol}`,
-          triggers: {
-            source: "webhook",
-            eventType: "erc20_transfer",
-            symbol: tokenSymbol,
-            metadata: {
-              from: fromAddress,
-              to: toAddress,
-              valueUsd,
-              webhookEventId: event.eventId,
-            },
-          },
-        },
-      ),
-    );
-  }
-
-  return candidates;
-}
-
-function estimateValueUsd(payload: Record<string, unknown>): number {
-  // Best-effort extraction. Webhook payloads can have valueUsd, value + price,
-  // or raw on-chain value — each shape is handled.
-  if (typeof payload.valueUsd === "number") return payload.valueUsd;
-  const value = typeof payload.value === "number" ? payload.value : Number(payload.value);
-  const price = typeof payload.price === "number" ? payload.price : 0;
-  if (Number.isFinite(value) && Number.isFinite(price) && price > 0) {
-    return value * price;
-  }
-  if (Number.isFinite(value)) return value;
-  return 0;
-}
-
-function shortAddr(addr: string): string {
-  if (!addr || addr.length < 12) return addr;
-  return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
-}
-
-// ============================================================================
 // Reset — called on engine stop to clear internal state
 // ============================================================================
 
 export function resetPeriodicProducerState(): void {
-  lastProcessedWebhookEventId = 0;
+  // No internal state to reset (the CDP-webhook whale-drain buffer was removed
+  // with the Base/CDP stack). Kept for API stability with the engine lifecycle.
 }

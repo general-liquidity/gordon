@@ -57,16 +57,6 @@ export const TOOL_AGENT_MAP: Record<string, string> = {
   stop_strategy: "Executor",
   rebalance_portfolio: "Executor",
 
-  // ── AgentKit mutations (EVM) ──
-  agentkit_native_transfer: "Executor",
-  agentkit_erc20_transfer: "Executor",
-  agentkit_wrap_eth: "Executor",
-  agentkit_request_faucet: "Executor",
-  agentkit_swap: "Executor",
-  moonwell_deposit: "Executor",
-  moonwell_withdraw: "Executor",
-  basenames_register: "Executor",
-
   // ── Polkadot mutations ──
   polkadot_transfer_native: "Executor",
   polkadot_xcm_transfer: "Executor",

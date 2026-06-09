@@ -83,47 +83,6 @@ export async function discoverProviderCapabilities(config: GordonConfig): Promis
     });
   }
 
-  for (const dataSourceId of [
-    "thegraph",
-    "basescan",
-    "base_registry",
-  ] as const) {
-    snapshots.push({
-      providerId: dataSourceId,
-      providerKind: "data",
-      label: getIntegrationSurfaceMetadata(dataSourceId).displayName,
-      supportsExecution: false,
-      capabilities: actionCapabilitiesForKind("data"),
-      notes: ["Read-only market data surface."],
-      integration: getIntegrationSurfaceMetadata(dataSourceId),
-    });
-  }
-
-  for (const toolkitId of ["agentkit", "solanakit", "polkadotkit"] as const) {
-    snapshots.push({
-      providerId: toolkitId,
-      providerKind: "system",
-      label: getIntegrationSurfaceMetadata(toolkitId).displayName,
-      supportsExecution: false,
-      capabilities: [],
-      notes: ["Agent toolkit surface with domain-specific tool wrappers."],
-      integration: getIntegrationSurfaceMetadata(toolkitId),
-    });
-  }
-
-  for (const nestedSurfaceId of ["jupiter", "drift", "pumpfun"] as const) {
-    const integration = getIntegrationSurfaceMetadata(nestedSurfaceId);
-    snapshots.push({
-      providerId: nestedSurfaceId,
-      providerKind: "system",
-      label: integration.displayName,
-      supportsExecution: false,
-      capabilities: [],
-      notes: [`Nested dependency under ${getIntegrationSurfaceMetadata(integration.parentSurfaceId ?? "solanakit").displayName}.`],
-      integration,
-    });
-  }
-
   for (const observabilityId of ["axiom", "opentelemetry"] as const) {
     snapshots.push({
       providerId: observabilityId,

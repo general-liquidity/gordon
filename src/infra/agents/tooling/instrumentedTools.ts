@@ -38,18 +38,7 @@ import {
   liquidationIntelligenceTools,
   pairAnalysisTools,
   autonomousTools,
-  baseOnchainTools,
-  agentKitOnchainTools,
-  agentKitDefiTools,
-  baseSignalTools,
-  baseIndexerTools,
   xSocialTools,
-  cdpWebhookTools,
-  cdpSqlTools,
-  cdpPolicyTools,
-  cdpOnrampTools,
-  cdpEvmMultichainTools,
-  cdpWebhookReceiverTools,
   proactiveModeTools,
   backtestVerdictTools,
   finnhubTools,
@@ -132,18 +121,7 @@ export const instrumentedMultiModalChartTools = withToolsMetrics(multiModalChart
 export const instrumentedMarketDataTools = withToolsMetrics(marketDataTools);
 export const instrumentedPairAnalysisTools = withToolsMetrics(pairAnalysisTools);
 export const instrumentedAutonomousTools = withToolsMetrics(autonomousTools);
-export const instrumentedBaseOnchainTools = withToolsMetrics(baseOnchainTools);
-export const instrumentedAgentKitOnchainTools = withToolsMetrics(agentKitOnchainTools);
-export const instrumentedAgentKitDefiTools = withToolsMetrics(agentKitDefiTools);
-export const instrumentedBaseSignalTools = withToolsMetrics(baseSignalTools);
-export const instrumentedBaseIndexerTools = withToolsMetrics(baseIndexerTools);
 export const instrumentedXSocialTools = withToolsMetrics(xSocialTools);
-export const instrumentedCdpWebhookTools = withToolsMetrics(cdpWebhookTools);
-export const instrumentedCdpSqlTools = withToolsMetrics(cdpSqlTools);
-export const instrumentedCdpPolicyTools = withToolsMetrics(cdpPolicyTools);
-export const instrumentedCdpOnrampTools = withToolsMetrics(cdpOnrampTools);
-export const instrumentedCdpEvmMultichainTools = withToolsMetrics(cdpEvmMultichainTools);
-export const instrumentedCdpWebhookReceiverTools = withToolsMetrics(cdpWebhookReceiverTools);
 export const instrumentedProactiveModeTools = withToolsMetrics(proactiveModeTools);
 export const instrumentedBacktestVerdictTools = withToolsMetrics(backtestVerdictTools);
 export const instrumentedFinnhubTools = withToolsMetrics(finnhubTools);
