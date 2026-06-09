@@ -9,6 +9,7 @@
  */
 
 import type { Exchange, OrderParams } from "../../infra/exchange/index.ts";
+import { ccxtIdToNativeVenue } from "../../infra/exchange/types.ts";
 import { listTrades, updateTrade } from "../../infra/storage/entities/trades.ts";
 import { logEvent } from "../../infra/storage/entities/events.ts";
 import { getPlan } from "../../infra/storage/entities/plans.ts";
@@ -1732,7 +1733,7 @@ function checkFlashCrash(
  * Only connects if there are active trades to monitor
  */
 export async function initializeRealtimeMonitor(exchangeId: string = "binance"): Promise<void> {
-  if (exchangeId !== "binance") {
+  if (ccxtIdToNativeVenue(exchangeId) !== "binance") {
     logger.debug("Real-time monitor skipped for non-Binance exchange", { exchangeId });
     return;
   }

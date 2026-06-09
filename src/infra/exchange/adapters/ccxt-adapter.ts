@@ -89,6 +89,7 @@ import type {
 } from "../types.ts";
 import type { Candle } from "../../../types/index.ts";
 import { CcxtWebSocketImpl } from "./ccxt-websocket.ts";
+import { SandboxNotSupportedError } from "../sandboxSupport.ts";
 
 // ---------------------------------------------------------------------------
 // Symbol normalization
@@ -355,14 +356,6 @@ export class CcxtAdapter
     ccxtSubId: string,
     credentials: CcxtAdapterCredentials,
     sandbox?: boolean,
-    /**
-     * Canonical exchange id this adapter reports as `exchangeId`. The factory
-     * passes the first-class venue id (e.g. "binance") so the instance keeps
-     * reporting "binance" — venue-specific code paths (and the kept native
-     * BinanceClient features) gate on `exchangeId === "binance"`. Omitted on
-     * the `ccxt:*` path, where it defaults to `ccxt:<subId>`.
-     */
-    exchangeId?: ExchangeId,
   ) {
     const Klass = resolveCcxtClass(ccxtSubId);
 
@@ -378,20 +371,23 @@ export class CcxtAdapter
 
     this.client = new Klass(config);
     this.ccxtSubId = ccxtSubId;
-    this.exchangeId = exchangeId ?? (`ccxt:${ccxtSubId}` as ExchangeId);
-    this.displayName = exchangeId ? `${exchangeId} (via CCXT)` : `${ccxtSubId} (via CCXT)`;
+    this.exchangeId = `ccxt:${ccxtSubId}` as ExchangeId;
+    this.displayName = `${ccxtSubId} (via CCXT)`;
     this.isSandbox = Boolean(sandbox);
 
     if (sandbox) {
       try {
         this.client.setSandboxMode(true);
       } catch (err) {
-        // Many CCXT exchanges throw NotSupported for sandbox; we surface
-        // the failure but don't break adapter construction — the caller
-        // can read `isSandbox` and decide whether to proceed.
-        if (!(err instanceof NotSupported)) {
-          throw err;
+        // CAPITAL-SAFETY: if CCXT cannot switch this venue to sandbox, REFUSE
+        // to construct rather than silently run against LIVE while isSandbox is
+        // true. (CCXT throws NotSupported for venues without a sandbox — e.g.
+        // coinbase. Failing loud here is the authoritative guard; the factory's
+        // static matrix is only an early, friendlier check.)
+        if (err instanceof NotSupported) {
+          throw new SandboxNotSupportedError(this.exchangeId);
         }
+        throw err;
       }
     }
   }

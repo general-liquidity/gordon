@@ -4,18 +4,17 @@
  */
 
 import type { Exchange, ExchangeId, NativeExchangeId, ExchangeCredentials } from "./types.ts";
-import { isCcxtExchangeId, extractCcxtSubId } from "./types.ts";
+import { isCcxtExchangeId, extractCcxtSubId, normalizeExchangeId, ccxtIdToNativeVenue } from "./types.ts";
 import { CcxtAdapter } from "./adapters/ccxt-adapter.ts";
 import { loadOAuthExchangeCredentials, exchangeSupportsOAuth } from "./oauth-bridge.ts";
 import { assertSandboxSupported } from "./sandboxSupport.ts";
 
 /**
- * All native exchange IDs with hand-tuned adapters. CCXT-routed exchange
- * IDs (`ccxt:*`) are NOT listed here — they're handled separately by
- * branching on `isCcxtExchangeId()` before the switch statement below.
- * Per operator spec: CCXT is an *alternative* to natives, not a fallback.
- * Both can be active for the same underlying exchange (e.g. `binance`
- * vs `ccxt:binance`).
+ * First-class venue ids — popular venues that carry curated env-var names,
+ * sandbox-support metadata, and (binance) a separate BinanceClient. They are
+ * accepted as input but normalized to their canonical `ccxt:<subId>` form;
+ * every venue routes through the single CcxtAdapter. The long-tail `ccxt:*`
+ * venues are not enumerable at compile time.
  */
 const SUPPORTED_EXCHANGES: NativeExchangeId[] = [
   "binance",
@@ -30,29 +29,13 @@ const SUPPORTED_EXCHANGES: NativeExchangeId[] = [
 ];
 
 /**
- * Maps each first-class venue id to its CCXT sub-id. All venues are backed
- * by CCXT (single unified adapter); the only id that differs from its CCXT
- * sub-id is binance_us → `binanceus`.
- */
-const NATIVE_TO_CCXT_SUBID: Record<NativeExchangeId, string> = {
-  binance: "binance",
-  binance_us: "binanceus",
-  coinbase: "coinbase",
-  kraken: "kraken",
-  bitfinex: "bitfinex",
-  hyperliquid: "hyperliquid",
-  robinhood: "robinhood",
-  okx: "okx",
-  gemini: "gemini",
-};
-
-/**
- * Cache key generator for exchange instances
+ * Cache key generator for exchange instances. Operates on the canonical
+ * (`ccxt:*`) id so the same venue caches once regardless of input form.
  */
 function getCacheKey(exchangeId: ExchangeId, credentials: ExchangeCredentials): string {
-  // Use first 8 characters of key as identifier to avoid storing full key
-  // For wallet-based exchanges, use wallet key; for others, use API key
-  const key = exchangeId === "hyperliquid"
+  // Use first 8 characters of key as identifier to avoid storing full key.
+  // For wallet-based venues (hyperliquid), use the wallet key; else the API key.
+  const key = ccxtIdToNativeVenue(exchangeId) === "hyperliquid"
     ? credentials.walletPrivateKey || credentials.apiKey
     : credentials.apiKey;
   const keyPrefix = key.substring(0, 8);
@@ -120,67 +103,32 @@ export class ExchangeFactory {
    * @throws Error if exchange is not supported
    */
   static create(exchangeId: ExchangeId, credentials: ExchangeCredentials): Exchange {
-    // CCXT-routed exchange — alternative path covering 107 exchanges via
-    // a single unified adapter. Always tried BEFORE the native switch so
-    // operators who explicitly choose `ccxt:*` get that adapter even
-    // when the underlying exchange (e.g. binance) has a native option.
-    if (isCcxtExchangeId(exchangeId)) {
-      assertSandboxSupported(exchangeId, Boolean(credentials.sandbox));
-      const cacheKey = getCacheKey(exchangeId, credentials);
-      const cached = this.instanceCache.get(cacheKey);
-      if (cached) return cached;
-      const subId = extractCcxtSubId(exchangeId);
-      const exchange = new CcxtAdapter(
-        subId,
-        {
-          apiKey: credentials.apiKey,
-          apiSecret: credentials.apiSecret,
-          passphrase: credentials.passphrase,
-          walletPrivateKey: credentials.walletPrivateKey,
-          walletAddress: credentials.walletAddress,
-        },
-        credentials.sandbox,
-      );
-      this.instanceCache.set(cacheKey, exchange);
-      return exchange;
-    }
+    // Every venue routes through the single CCXT adapter. Normalize the id to
+    // its canonical `ccxt:<subId>` form first — bare first-class ids (e.g.
+    // "binance" from older configs) become "ccxt:binance" — so there is one
+    // canonical shape everywhere (cache, audit, exchangeId-keyed paths).
+    const canonical = normalizeExchangeId(exchangeId);
+    const subId = extractCcxtSubId(canonical);
 
-    // Native adapter path
-    if (!SUPPORTED_EXCHANGES.includes(exchangeId as NativeExchangeId)) {
-      throw new Error(
-        `Unsupported exchange: ${exchangeId}. Supported natives: ${SUPPORTED_EXCHANGES.join(", ")}. Or use ccxt:<sub-id> for any of CCXT's 107 exchanges.`
-      );
-    }
+    // Guard: refuse to construct a sandbox adapter for a first-class venue that
+    // doesn't offer one (resolves the underlying venue behind ccxt:*). Long-tail
+    // CCXT venues defer to CCXT's own detection at construct time.
+    assertSandboxSupported(canonical, Boolean(credentials.sandbox));
 
-    // Guard: refuse to construct a sandbox adapter for a venue that doesn't
-    // offer sandbox/paper trading. Fails fast with a clear hint rather than
-    // silently routing to production.
-    assertSandboxSupported(exchangeId, Boolean(credentials.sandbox));
-
-    // Check cache
-    const cacheKey = getCacheKey(exchangeId, credentials);
+    const cacheKey = getCacheKey(canonical, credentials);
     const cached = this.instanceCache.get(cacheKey);
-    if (cached) {
-      return cached;
-    }
+    if (cached) return cached;
 
-    // All venues route through the single CCXT adapter. The venue ids stay
-    // first-class (and resolve from their existing native env vars via
-    // resolveExchangeCredentials) but are backed by CCXT under the hood —
-    // CCXT keeps every exchange's spec current, so there are no hand-tuned
-    // native adapters left to rot. Per-venue auth requirements (passphrase,
-    // wallet) are still enforced here before construction.
-    const nativeId = exchangeId as NativeExchangeId;
-    if ((nativeId === "coinbase" || nativeId === "okx") && !credentials.passphrase) {
-      throw new Error(`${nativeId} requires a passphrase in addition to API key and secret`);
+    // Per-venue auth requirements, still enforced before construction.
+    if ((subId === "coinbase" || subId === "okx") && !credentials.passphrase) {
+      throw new Error(`${subId} requires a passphrase in addition to API key and secret`);
     }
-    if (nativeId === "hyperliquid" && !credentials.walletPrivateKey) {
+    if (subId === "hyperliquid" && !credentials.walletPrivateKey) {
       throw new Error("Hyperliquid requires a wallet private key for authentication");
     }
 
-    const ccxtSubId = NATIVE_TO_CCXT_SUBID[nativeId];
     const exchange = new CcxtAdapter(
-      ccxtSubId,
+      subId,
       {
         apiKey: credentials.apiKey,
         apiSecret: credentials.apiSecret,
@@ -189,15 +137,9 @@ export class ExchangeFactory {
         walletAddress: credentials.walletAddress,
       },
       credentials.sandbox,
-      // Report the first-class venue id (e.g. "binance"), not "ccxt:binance",
-      // so exchangeId-keyed code paths + the native BinanceClient features
-      // still recognise the venue.
-      nativeId,
     );
 
-    // Cache the instance
     this.instanceCache.set(cacheKey, exchange);
-
     return exchange;
   }
 

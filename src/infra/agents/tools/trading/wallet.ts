@@ -17,7 +17,7 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
-import { getGordonContext, isBinanceFamily, type MastraExecutionContext } from "../types.ts";
+import { getGordonContext, isBinanceFamily, isBinanceVenue, type MastraExecutionContext } from "../types.ts";
 import { checkTradingPermission } from "../runtime/permissionHelpers.ts";
 import type { ExchangeExtended } from "../../../exchange/types.ts";
 
@@ -60,7 +60,7 @@ export const getDustableAssetsTool = createTool({
     if (!ctx?.exchange) {
       return errors.noExchange;
     }
-    if (!ctx.binance || ctx.exchange.exchangeId != "binance") {
+    if (!ctx.binance || !isBinanceVenue(ctx.exchange.exchangeId)) {
       return errors.binanceOnly;
     }
 
@@ -121,7 +121,7 @@ export const convertDustTool = createTool({
     if (!ctx?.exchange) {
       return errors.noExchange;
     }
-    if (!ctx.binance || ctx.exchange.exchangeId != "binance") {
+    if (!ctx.binance || !isBinanceVenue(ctx.exchange.exchangeId)) {
       return errors.binanceOnly;
     }
 
@@ -191,7 +191,7 @@ export const transferFundsTool = createTool({
     if (!ctx?.exchange) {
       return errors.noExchange;
     }
-    if (!ctx.binance || ctx.exchange.exchangeId != "binance") {
+    if (!ctx.binance || !isBinanceVenue(ctx.exchange.exchangeId)) {
       return errors.binanceOnly;
     }
 
@@ -326,7 +326,7 @@ export const getTradeFeesTool = createTool({
     if (!ctx?.exchange) {
       return errors.noExchange;
     }
-    if (!ctx.binance || ctx.exchange.exchangeId != "binance") {
+    if (!ctx.binance || !isBinanceVenue(ctx.exchange.exchangeId)) {
       return errors.binanceOnly;
     }
 
@@ -397,7 +397,7 @@ export const getAssetDividendsTool = createTool({
     if (!ctx?.exchange) {
       return errors.noExchange;
     }
-    if (!ctx.binance || ctx.exchange.exchangeId != "binance") {
+    if (!ctx.binance || !isBinanceVenue(ctx.exchange.exchangeId)) {
       return errors.binanceOnly;
     }
 
@@ -448,7 +448,7 @@ export const getDepositAddressTool = createTool({
     if (!ctx?.exchange) {
       return errors.noExchange;
     }
-    if (!ctx.binance || ctx.exchange.exchangeId != "binance") {
+    if (!ctx.binance || !isBinanceVenue(ctx.exchange.exchangeId)) {
       return errors.binanceOnly;
     }
 

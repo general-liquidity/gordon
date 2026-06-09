@@ -7,6 +7,7 @@ import {
   ccxtEnvNames,
   isCcxtExchangeId,
   extractCcxtSubId,
+  ccxtIdToNativeVenue,
   type ExchangeId,
   type CcxtExchangeId,
   type NativeExchangeId,
@@ -164,7 +165,7 @@ function getLlmStatuses(envKeys: EnvMapRecord, keyringKeys: Set<string>): Provid
 }
 
 function getExchangeSessionMode(exchangeId: ExchangeId): ProviderCredentialStatus["sessionMode"] {
-  return exchangeId === "coinbase" ? "hybrid" : "static";
+  return ccxtIdToNativeVenue(exchangeId) === "coinbase" ? "hybrid" : "static";
 }
 
 function getBrokerSessionMode(brokerId: BrokerId): ProviderCredentialStatus["sessionMode"] {
@@ -224,7 +225,7 @@ function getExchangeStatuses(
       "exchange",
       getExecutionVenueMetadata(exchange.type as ExchangeId).displayName,
       "default",
-      exchange.type === "hyperliquid" ? "wallet" : "api_key",
+      ccxtIdToNativeVenue(exchange.type) === "hyperliquid" ? "wallet" : "api_key",
       getExchangeSessionMode(exchange.type as ExchangeId),
       fields,
       exchange.isDefault ? ["active_exchange"] : [],

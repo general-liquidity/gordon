@@ -6,6 +6,7 @@
  */
 
 import type { Exchange } from "../../exchange/types.ts";
+import { ccxtIdToNativeVenue } from "../../exchange/types.ts";
 import type { Candle } from "../../../types/index.ts";
 import type { DataSource, DataSourceCapabilities, OHLCParams } from "./types.ts";
 import type { Timeframe } from "../../../types/timeframes.ts";
@@ -232,7 +233,7 @@ export class ExchangeDataSource implements DataSource {
     // So we'll make a direct API call
     const exchangeId = this.exchange.exchangeId;
 
-    if (exchangeId === "binance") {
+    if (ccxtIdToNativeVenue(exchangeId) === "binance") {
       return this.fetchBinanceKlines(symbol, interval, startTime, endTime, limit);
     }
 

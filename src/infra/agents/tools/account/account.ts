@@ -14,7 +14,7 @@ import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
 import { listTrades } from "../../../storage/entities/trades.ts";
-import { getGordonContext, isBinanceFamily, type MastraExecutionContext } from "../types.ts";
+import { getGordonContext, isBinanceFamily, isBinanceVenue, type MastraExecutionContext } from "../types.ts";
 
 // ============================================================================
 // Error Messages
@@ -451,7 +451,7 @@ export const getAccountSnapshotTool = createTool({
   ) => {
     const ctx = getGordonContext(execContext);
     if (!ctx?.exchange) return errors.noExchange;
-    if (!ctx.binance || ctx.exchange.exchangeId !== "binance") {
+    if (!ctx.binance || !isBinanceVenue(ctx.exchange.exchangeId)) {
       return { error: "Account snapshots are currently supported only on Binance." };
     }
 

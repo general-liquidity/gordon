@@ -13,7 +13,7 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
-import { getGordonContext, type MastraExecutionContext } from "../types.ts";
+import { getGordonContext, isBinanceVenue, type MastraExecutionContext } from "../types.ts";
 
 // ============================================================================
 // Error Messages
@@ -59,7 +59,7 @@ export const getFlexibleProductsTool = createTool({
     if (!ctx?.exchange) {
       return errors.noExchange;
     }
-    if (!ctx.binance || ctx.exchange.exchangeId != "binance") {
+    if (!ctx.binance || !isBinanceVenue(ctx.exchange.exchangeId)) {
       return errors.binanceOnly;
     }
 
@@ -122,7 +122,7 @@ export const getLockedProductsTool = createTool({
     if (!ctx?.exchange) {
       return errors.noExchange;
     }
-    if (!ctx.binance || ctx.exchange.exchangeId != "binance") {
+    if (!ctx.binance || !isBinanceVenue(ctx.exchange.exchangeId)) {
       return errors.binanceOnly;
     }
 
@@ -204,7 +204,7 @@ export const getAllEarnPositionsTool = createTool({
     if (!ctx?.exchange) {
       return errors.noExchange;
     }
-    if (!ctx.binance || ctx.exchange.exchangeId != "binance") {
+    if (!ctx.binance || !isBinanceVenue(ctx.exchange.exchangeId)) {
       return errors.binanceOnly;
     }
 
@@ -283,7 +283,7 @@ export const subscribeFlexibleTool = createTool({
     if (!ctx?.exchange) {
       return errors.noExchange;
     }
-    if (!ctx.binance || ctx.exchange.exchangeId != "binance") {
+    if (!ctx.binance || !isBinanceVenue(ctx.exchange.exchangeId)) {
       return errors.binanceOnly;
     }
 
@@ -333,7 +333,7 @@ export const redeemFlexibleTool = createTool({
     if (!ctx?.exchange) {
       return errors.noExchange;
     }
-    if (!ctx.binance || ctx.exchange.exchangeId != "binance") {
+    if (!ctx.binance || !isBinanceVenue(ctx.exchange.exchangeId)) {
       return errors.binanceOnly;
     }
 
@@ -385,7 +385,7 @@ export const subscribeLockedTool = createTool({
     if (!ctx?.exchange) {
       return errors.noExchange;
     }
-    if (!ctx.binance || ctx.exchange.exchangeId != "binance") {
+    if (!ctx.binance || !isBinanceVenue(ctx.exchange.exchangeId)) {
       return errors.binanceOnly;
     }
 
@@ -472,7 +472,7 @@ export const getEarnHistoryTool = createTool({
     if (!ctx?.exchange) {
       return errors.noExchange;
     }
-    if (!ctx.binance || ctx.exchange.exchangeId !== "binance") {
+    if (!ctx.binance || !isBinanceVenue(ctx.exchange.exchangeId)) {
       return errors.binanceOnly;
     }
 

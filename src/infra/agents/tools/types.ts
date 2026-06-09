@@ -9,6 +9,7 @@ import type { GordonContext } from "../types.ts";
 import type { ActionTaskScope, CredentialProfile } from "../../runtime/actions/types.ts";
 import type { BinanceClient } from "../../venues/exchange/clients/binance/index.ts";
 import type { Exchange } from "../../exchange/index.ts";
+import { ccxtIdToNativeVenue } from "../../exchange/types.ts";
 import type { BrokerAdapter } from "../../broker/index.ts";
 import type { LLMClient } from "../../ai/llm/index.ts";
 import type { GordonConfig } from "../../../types/index.ts";
@@ -301,10 +302,24 @@ export function getRecoverySteps(response: ToolErrorResponse): RecoveryStep[] {
 /**
  * Check if an exchange ID belongs to the Binance family (Global or US).
  * Use this for tools that rely on /api/v3 endpoints which work on both.
- * Do NOT use this for /sapi/* tools (earn, dust, wallet details) — those are Binance Global only.
+ * Do NOT use this for /sapi/* tools (earn, dust, wallet details) — those are
+ * Binance Global only; use {@link isBinanceVenue} for those.
+ *
+ * Form-agnostic: resolves both the canonical `ccxt:binance`/`ccxt:binanceus`
+ * ids and any legacy bare ids.
  */
 export function isBinanceFamily(id: string | undefined): boolean {
-  return id === "binance" || id === "binance_us";
+  const venue = ccxtIdToNativeVenue(id ?? "");
+  return venue === "binance" || venue === "binance_us";
+}
+
+/**
+ * Check if an exchange ID is Binance Global specifically (NOT Binance US).
+ * Use for /sapi/* features (earn, savings, wallet details) that exist only on
+ * Binance Global. Form-agnostic (resolves `ccxt:binance` + legacy `binance`).
+ */
+export function isBinanceVenue(id: string | undefined): boolean {
+  return ccxtIdToNativeVenue(id ?? "") === "binance";
 }
 
 // Re-export error context types for convenience

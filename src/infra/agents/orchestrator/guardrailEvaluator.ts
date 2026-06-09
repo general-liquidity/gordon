@@ -12,6 +12,7 @@ import {
 import { auditLog } from "../../platform/audit/index.ts";
 import { checkPermissionsOnInit } from "../../venues/exchange/clients/binance/permissions.ts";
 import { evaluateRuntimeToolPolicy } from "../../../runtime/tools/ToolPolicy.ts";
+import { ccxtIdToNativeVenue } from "../../exchange/types.ts";
 import type { GordonContext } from "../types.ts";
 import type { ToolSecurityCheckResult } from "./types.ts";
 
@@ -100,7 +101,7 @@ export async function initializeWithPermissionCheck(context: GordonContext): Pro
     };
   }
 
-  if (!context.binance || context.exchange.exchangeId !== "binance") {
+  if (!context.binance || ccxtIdToNativeVenue(context.exchange.exchangeId) !== "binance") {
     return {
       success: true,
       warnings: ["Permission check is currently available only for Binance."],

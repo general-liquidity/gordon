@@ -63,10 +63,11 @@ describe("CcxtAdapter construction", () => {
     expect(adapter.isSandbox).toBe(true);
   });
 
-  it("doesn't throw for sandbox on a no-sandbox exchange (gracefully degrades)", () => {
-    // Many CCXT exchanges throw NotSupported on setSandboxMode — adapter
-    // catches that and continues. Live behavior is opt-in via construction.
-    expect(() => new CcxtAdapter("kraken", { apiKey: "x", apiSecret: "x" }, true)).not.toThrow();
+  it("FAILS LOUD for sandbox on a no-sandbox exchange (no silent live)", () => {
+    // CAPITAL-SAFETY: CCXT throws NotSupported on setSandboxMode for venues
+    // without a sandbox (e.g. kraken). The adapter must REFUSE to construct
+    // rather than silently run against LIVE while isSandbox=true.
+    expect(() => new CcxtAdapter("kraken", { apiKey: "x", apiSecret: "x" }, true)).toThrow();
   });
 });
 

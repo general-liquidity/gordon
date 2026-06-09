@@ -129,24 +129,83 @@ export function ccxtEnvNames(ccxtSubId: string): {
   };
 }
 
+/**
+ * Each first-class venue id → its CCXT sub-id. The canonical venue id form is
+ * `ccxt:<subId>`; these 9 venues additionally carry curated env-var names
+ * (EXCHANGE_ENV_MAP), sandbox-support metadata, and — for binance — a separate
+ * BinanceClient. Only binance_us's sub-id differs from its venue id.
+ */
+export const NATIVE_TO_CCXT_SUBID: Record<NativeExchangeId, string> = {
+  binance: "binance",
+  binance_us: "binanceus",
+  coinbase: "coinbase",
+  kraken: "kraken",
+  bitfinex: "bitfinex",
+  hyperliquid: "hyperliquid",
+  robinhood: "robinhood",
+  okx: "okx",
+  gemini: "gemini",
+};
+
+const CCXT_SUBID_TO_NATIVE: Record<string, NativeExchangeId> = Object.fromEntries(
+  (Object.entries(NATIVE_TO_CCXT_SUBID) as [NativeExchangeId, string][]).map(
+    ([native, subId]) => [subId, native],
+  ),
+);
+
+/**
+ * Normalize any accepted venue id to its canonical `ccxt:<subId>` form. Bare
+ * first-class ids (e.g. "binance", saved in older configs) map to their CCXT
+ * sub-id ("ccxt:binance"); ids already in `ccxt:*` form pass through. Every
+ * venue routes through CcxtAdapter, so this is the single canonical shape.
+ */
+export function normalizeExchangeId(id: string): CcxtExchangeId {
+  if (isCcxtExchangeId(id)) return id;
+  const subId = NATIVE_TO_CCXT_SUBID[id as NativeExchangeId] ?? id;
+  return `ccxt:${subId}` as CcxtExchangeId;
+}
+
+/**
+ * Resolve a venue id (canonical `ccxt:<subId>` or a bare first-class id) back
+ * to its first-class NativeExchangeId, if it is one. Returns undefined for the
+ * long-tail CCXT venues. Used to recover curated env-var names + sandbox
+ * support metadata after normalization to the `ccxt:*` form.
+ */
+export function ccxtIdToNativeVenue(id: string): NativeExchangeId | undefined {
+  if (!isCcxtExchangeId(id)) {
+    return id in NATIVE_TO_CCXT_SUBID ? (id as NativeExchangeId) : undefined;
+  }
+  return CCXT_SUBID_TO_NATIVE[extractCcxtSubId(id as CcxtExchangeId)];
+}
+
 export function resolveExchangeCredentials(
   config: { type: string; apiKey: string; apiSecret: string; passphrase?: string; walletPrivateKey?: string; sandbox?: boolean },
 ): ExchangeCredentials {
-  // CCXT exchanges use their own env var pattern (CCXT_<UPPER>_*) instead
-  // of the per-exchange EXCHANGE_ENV_MAP.
+  // CCXT exchanges use their own env var pattern (CCXT_<UPPER>_*). For the
+  // first-class venues (ccxt:binance, …) we ALSO fall back to their curated
+  // native env names (BINANCE_API_KEY, …) so existing operator keys keep
+  // working without re-provisioning after the all-`ccxt:` normalization.
   if (isCcxtExchangeId(config.type as ExchangeId)) {
     const subId = extractCcxtSubId(config.type as CcxtExchangeId);
     const envs = ccxtEnvNames(subId);
+    const nativeVenue = ccxtIdToNativeVenue(config.type);
+    const legacy = nativeVenue ? EXCHANGE_ENV_MAP[nativeVenue] : undefined;
     const isRedacted = (v: string | undefined) => !v || v === "***";
+    const fromEnv = (...names: (string | undefined)[]) => {
+      for (const name of names) {
+        if (name && process.env[name]) return process.env[name];
+      }
+      return undefined;
+    };
     let apiKey = config.apiKey;
     let apiSecret = config.apiSecret;
     let passphrase = config.passphrase;
     let walletPrivateKey = config.walletPrivateKey;
-    if (isRedacted(apiKey)) apiKey = process.env[envs.key] || "";
-    if (isRedacted(apiSecret)) apiSecret = process.env[envs.secret] || "";
-    if (isRedacted(passphrase)) passphrase = process.env[envs.passphrase] || undefined;
-    if (isRedacted(walletPrivateKey)) walletPrivateKey = process.env[envs.walletKey] || undefined;
-    const walletAddress = process.env[envs.walletAddress] || undefined;
+    if (isRedacted(apiKey)) apiKey = fromEnv(envs.key, legacy?.key) || "";
+    if (isRedacted(apiSecret)) apiSecret = fromEnv(envs.secret, legacy?.secret) || "";
+    if (isRedacted(passphrase)) passphrase = fromEnv(envs.passphrase, legacy?.passphrase);
+    if (isRedacted(walletPrivateKey)) walletPrivateKey = fromEnv(envs.walletKey, legacy?.wallet);
+    const walletAddress = fromEnv(envs.walletAddress, legacy?.walletAddress);
     return { apiKey, apiSecret, passphrase, sandbox: config.sandbox, walletPrivateKey, walletAddress };
   }
 

@@ -78,7 +78,7 @@ export function createPublicExchange(exchangeId: ExchangeId): Exchange {
   if (!subId) {
     throw new PublicExchangeNotSupportedError(exchangeId);
   }
-  return new CcxtAdapter(subId, { apiKey: "", apiSecret: "" }, undefined, exchangeId);
+  return new CcxtAdapter(subId, { apiKey: "", apiSecret: "" });
 }
 
 /**

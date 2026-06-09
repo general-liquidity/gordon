@@ -23,7 +23,7 @@
  */
 
 import type { ExchangeId, NativeExchangeId } from "./types.ts";
-import { isCcxtExchangeId } from "./types.ts";
+import { ccxtIdToNativeVenue } from "./types.ts";
 
 export type SandboxKind = "testnet_url" | "demo_header" | "credential" | "unsupported";
 
@@ -45,8 +45,8 @@ export const EXCHANGE_SANDBOX_SUPPORT: Record<NativeExchangeId, SandboxSupportEn
     notSupportedHint: "Binance US does not offer a public testnet. Use live mode with small amounts or switch to Binance (com) testnet.",
   },
   coinbase: {
-    kind: "testnet_url",
-    docs: "https://api-sandbox.coinbase.com — separate CDP sandbox keys required",
+    kind: "unsupported",
+    notSupportedHint: "CCXT's coinbase (Advanced Trade) has no sandbox — the old native api-sandbox.coinbase.com path is gone. Use binance or okx for sandbox/paper, or run live deliberately.",
   },
   kraken: {
     kind: "unsupported",
@@ -98,11 +98,14 @@ export class SandboxNotSupportedError extends Error {
  */
 export function assertSandboxSupported(exchangeId: ExchangeId, sandboxRequested: boolean): void {
   if (!sandboxRequested) return;
-  // CCXT-routed exchanges defer to CCXT's own per-exchange sandbox capability
-  // detection at adapter construct time — we don't precheck here because the
-  // matrix is large + maintained upstream.
-  if (isCcxtExchangeId(exchangeId)) return;
-  const entry = EXCHANGE_SANDBOX_SUPPORT[exchangeId as NativeExchangeId];
+  // Resolve the first-class venue behind the id (covers both bare and the
+  // canonical `ccxt:*` form). Long-tail CCXT venues (no first-class entry)
+  // defer to CCXT's own per-exchange sandbox detection at construct time.
+  // First-class venues with a KNOWN-unsupported sandbox are still hard-blocked
+  // here — e.g. ccxt:coinbase must not silently route to live.
+  const native = ccxtIdToNativeVenue(exchangeId);
+  if (!native) return;
+  const entry = EXCHANGE_SANDBOX_SUPPORT[native];
   if (entry.kind === "unsupported") {
     throw new SandboxNotSupportedError(exchangeId, entry.notSupportedHint);
   }
@@ -117,8 +120,9 @@ export function assertSandboxSupported(exchangeId: ExchangeId, sandboxRequested:
  * exchanges silently no-op on `setSandboxMode(true)` rather than throwing.
  */
 export function isSandboxSupported(exchangeId: ExchangeId): boolean {
-  if (isCcxtExchangeId(exchangeId)) return true;
-  return EXCHANGE_SANDBOX_SUPPORT[exchangeId as NativeExchangeId].kind !== "unsupported";
+  const native = ccxtIdToNativeVenue(exchangeId);
+  if (!native) return true;
+  return EXCHANGE_SANDBOX_SUPPORT[native].kind !== "unsupported";
 }
 
 /**

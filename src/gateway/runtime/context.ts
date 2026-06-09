@@ -5,6 +5,7 @@ import { getCurrentSession } from "../../infra/storage/entities/session.ts";
 import { createLLMClientFromEnv } from "../../infra/ai/llm/index.ts";
 import { BinanceClient } from "../../infra/venues/exchange/clients/binance/index.ts";
 import { ExchangeFactory, type Exchange } from "../../infra/exchange/index.ts";
+import { ccxtIdToNativeVenue } from "../../infra/exchange/types.ts";
 import { BrokerFactory } from "../../infra/broker/factory.ts";
 import { BROKER_ENV_MAP, type BrokerId } from "../../infra/broker/types.ts";
 import { isBrokerPaperSupported } from "../../infra/broker/brokerPaperSupport.ts";
@@ -105,8 +106,9 @@ export class GatewayContextResolver {
             walletPrivateKey: active.walletPrivateKey,
           });
 
-          if (active.type === "binance" || active.type === "binance_us") {
-            const baseUrl = active.type === "binance_us" ? "https://api.binance.us" : undefined;
+          const nativeVenue = ccxtIdToNativeVenue(active.type);
+          if (nativeVenue === "binance" || nativeVenue === "binance_us") {
+            const baseUrl = nativeVenue === "binance_us" ? "https://api.binance.us" : undefined;
             binance = new BinanceClient(active.apiKey, active.apiSecret, baseUrl);
           }
         } catch (error) {
