@@ -189,6 +189,10 @@ export class ExchangeFactory {
         walletAddress: credentials.walletAddress,
       },
       credentials.sandbox,
+      // Report the first-class venue id (e.g. "binance"), not "ccxt:binance",
+      // so exchangeId-keyed code paths + the native BinanceClient features
+      // still recognise the venue.
+      nativeId,
     );
 
     // Cache the instance

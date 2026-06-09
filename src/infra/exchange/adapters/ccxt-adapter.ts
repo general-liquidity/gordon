@@ -355,6 +355,14 @@ export class CcxtAdapter
     ccxtSubId: string,
     credentials: CcxtAdapterCredentials,
     sandbox?: boolean,
+    /**
+     * Canonical exchange id this adapter reports as `exchangeId`. The factory
+     * passes the first-class venue id (e.g. "binance") so the instance keeps
+     * reporting "binance" — venue-specific code paths (and the kept native
+     * BinanceClient features) gate on `exchangeId === "binance"`. Omitted on
+     * the `ccxt:*` path, where it defaults to `ccxt:<subId>`.
+     */
+    exchangeId?: ExchangeId,
   ) {
     const Klass = resolveCcxtClass(ccxtSubId);
 
@@ -370,8 +378,8 @@ export class CcxtAdapter
 
     this.client = new Klass(config);
     this.ccxtSubId = ccxtSubId;
-    this.exchangeId = `ccxt:${ccxtSubId}` as ExchangeId;
-    this.displayName = `${ccxtSubId} (via CCXT)`;
+    this.exchangeId = exchangeId ?? (`ccxt:${ccxtSubId}` as ExchangeId);
+    this.displayName = exchangeId ? `${exchangeId} (via CCXT)` : `${ccxtSubId} (via CCXT)`;
     this.isSandbox = Boolean(sandbox);
 
     if (sandbox) {
