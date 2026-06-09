@@ -30,6 +30,7 @@ import {
   calculateAnchoredVWAP,
   calculateGMMA,
   calculateTSI,
+  calculateOvernightIntraday,
   calculateMFI,
   calculateStochasticRSI,
   calculateFibonacci,
@@ -592,6 +593,7 @@ const INDICATOR_NAMES = [
   "amihud",
   "rolling_vwap",
   "anchored_vwap",
+  "overnight_intraday",
   "gmma",
   "tsi",
   "mama",
@@ -656,6 +658,10 @@ function dispatchIndicator(
         (params.anchor as number | "low" | "high" | "first") ?? "low",
         (params.stdDevMultiplier as number) ?? 1,
       );
+    case "overnight_intraday":
+      return calculateOvernightIntraday(candles, {
+        ...(typeof params.suspiciousThresholdPct === "number" && { suspiciousThresholdPct: params.suspiciousThresholdPct }),
+      });
     case "gmma":
       return calculateGMMA(closes, {
         ...(typeof params.lookback === "number" && { lookback: params.lookback }),
@@ -1083,6 +1089,7 @@ export const computeIndicatorTool = createTool({
     "AFML feature engineering (López de Prado): frac_diff (fixed-width fractional differentiation — stationarity-preserving memory; params { d?, threshold? }; d=1≈first-difference, d=0≈identity, 0<d<1 keeps memory while flattening trend), cusum_filter (symmetric CUSUM event sampler on log-returns — flags change-point bars where cumulative move exceeds a threshold; params { threshold? } default = returns stdev), sadf (supremum ADF — rolling explosiveness/BUBBLE test, right-tailed; distinct from KPSS/Johansen stationarity; params { minWindow?, lags? }; isExplosive flag)",
     "Microstructure liquidity from OHLC (no quotes/tick): roll_spread (Roll 1984 effective spread = 2·sqrt(−serial-cov of price changes) + Corwin-Schultz 2012 high-low spread estimator; params { window? }), amihud (Amihud 2002 illiquidity = mean |return|/dollar-volume; higher = more price impact per dollar; params { window? }; distinct from VPIN/transient-impact)",
     "Rolling VWAP: rolling_vwap (windowed VWAP over the trailing `window` bars — a moving fair-value / mean-reversion anchor that DROPS old bars, unlike vwap which accumulates from the first bar and never resets; params { window? default 20, stdDevMultiplier? default 1 }; returns the aligned series + current + price position + ±σ value-area bands (upper≈VAH, lower≈VAL); for higher-timeframe S/R use a larger window e.g. 90)",
+    "OVERNIGHT/INTRADAY: overnight_intraday (candles) — splits returns into overnight (open/prevClose) vs intraday (close/open) legs, cumulates each; flags overnight-premium anomaly + the Knuteson buy-high-sell-low manipulation signature (overnight strongly + AND intraday strongly −). params { suspiciousThresholdPct? 10 }",
     "TSI: tsi (True Strength Index — William Blau double-smoothed momentum oscillator: 100·EMA_s(EMA_r(Δclose))/EMA_s(EMA_r(|Δclose|)); params { longPeriod? 25, shortPeriod? 13, signalPeriod? 13 }; bounded [-100,100], >0 bullish momentum, TSI/signal crossover = MACD-like trigger. Returns line + signal + zeroLine + crossover. Distinct from RSI (avg gain/loss); works on any series incl. FX/metals/crypto)",
     "GMMA: gmma (Guppy Multiple Moving Average — trader-EMA bundle {3,5,8,10,12,15} vs investor-EMA bundle {30,35,40,45,50,60}; params { lookback? 20 }; trader above investor = uptrend, investor-band compression→expansion = breakout/regime-shift, trader bundle stretched far above = exhaustion. Returns both bundles + separationPct + spreads + trend + compression + signal. Grouped-ribbon read, distinct from single MAs)",
     "Anchored VWAP: anchored_vwap (Brian Shannon — VWAP accumulated from a fixed EVENT anchor with NO reset/window; distinct from vwap (anchors at bar 0) and rolling_vwap (drops old bars). params { anchor? 'low'|'high'|'first'|<barIndex> default 'low' auto-anchors to the swing low/high, stdDevMultiplier? default 1 }; returns series (null before anchor) + current + slope (rising AVWAP=dynamic support, falling=resistance) + signal (reclaim/reject/support/resistance) + volume-weighted ±σ bands. Use an anchor at a swing low/high/gap/cycle-top as a cost-basis line)",

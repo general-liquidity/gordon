@@ -59,6 +59,8 @@ export { calculateGMMA } from "./gmma.ts";
 export type { GmmaResult } from "./gmma.ts";
 export { calculateTSI } from "./tsi.ts";
 export type { TSIResult } from "./tsi.ts";
+export { calculateOvernightIntraday } from "./overnight-intraday.ts";
+export type { OvernightIntradayResult } from "./overnight-intraday.ts";
 
 // Stochastic RSI
 export { calculateStochasticRSI } from "./stochastic-rsi.ts";

@@ -222,3 +222,94 @@ export function paretoFrontierToPayload(result: ParetoFrontierResult): Record<st
     frontierIds: result.frontier.map((c) => c.id),
   };
 }
+
+/**
+ * Per-task Pareto frontier (GEPA, arXiv:2507.19457) — SPECIALIST PRESERVATION.
+ *
+ * Standard `computeParetoFrontier` ranks candidates on K shared OBJECTIVES and
+ * drops anything aggregate-dominated — which throws away a strategy that is the
+ * *sole winner* in one regime/task but mediocre on average. GEPA's per-TASK
+ * frontier keeps it: a candidate survives if it wins ≥1 task, and is pruned only
+ * by set-cover dominance (another candidate wins a strict superset of its tasks).
+ *
+ * Trading use: score candidate strategies across a panel of tasks (regimes /
+ * symbols / horizons); the frontier is the minimal set that covers every task's
+ * winner — the regime specialists aggregate Sharpe would have hidden. Pure;
+ * deterministic (no stochastic exploration sampling — Gordon wants the set, not
+ * the next-explore pick).
+ */
+
+export interface PerTaskCandidate {
+  id: string;
+  /** Score per task; higher is better unless direction = "minimize". */
+  taskScores: Record<string, number>;
+}
+
+export interface ParetoPerTaskResult {
+  /** Specialist-preserving frontier (candidate ids), after set-cover pruning. */
+  frontier: string[];
+  /** task -> winner candidate ids (ties kept). */
+  perTaskWinners: Record<string, string[]>;
+  /** frontier candidate id -> tasks it wins. */
+  wonTasks: Record<string, string[]>;
+  /** candidates that win no task or are set-cover-dominated. */
+  dropped: string[];
+  nCandidates: number;
+  nFrontier: number;
+}
+
+const PARETO_TASK_EPS = 1e-9;
+
+export function computeParetoPerTask(
+  candidates: PerTaskCandidate[],
+  opts: { direction?: ObjectiveDirection; tasks?: string[] } = {},
+): ParetoPerTaskResult {
+  const direction = opts.direction ?? "maximize";
+  const tasks =
+    opts.tasks ?? Array.from(new Set(candidates.flatMap((c) => Object.keys(c.taskScores))));
+
+  const better = (a: number, b: number): boolean => (direction === "maximize" ? a > b : a < b);
+
+  // Per-task winners (ties within EPS all count).
+  const perTaskWinners: Record<string, string[]> = {};
+  for (const task of tasks) {
+    let best: number | null = null;
+    for (const c of candidates) {
+      const v = c.taskScores[task];
+      if (v === undefined) continue;
+      if (best === null || better(v, best)) best = v;
+    }
+    perTaskWinners[task] =
+      best === null ? [] : candidates.filter((c) => c.taskScores[task] !== undefined && Math.abs(c.taskScores[task]! - best!) <= PARETO_TASK_EPS).map((c) => c.id);
+  }
+
+  // wins[id] = set of tasks this candidate wins.
+  const wins = new Map<string, Set<string>>();
+  for (const c of candidates) wins.set(c.id, new Set());
+  for (const task of tasks) for (const id of perTaskWinners[task]!) wins.get(id)!.add(task);
+
+  const winners = candidates.filter((c) => wins.get(c.id)!.size > 0);
+
+  // Set-cover dominance: drop C if some other winner D wins a STRICT superset of C's tasks.
+  const isStrictSuperset = (sup: Set<string>, sub: Set<string>): boolean => {
+    if (sup.size <= sub.size) return false;
+    for (const t of sub) if (!sup.has(t)) return false;
+    return true;
+  };
+  const frontier = winners.filter(
+    (c) => !winners.some((d) => d.id !== c.id && isStrictSuperset(wins.get(d.id)!, wins.get(c.id)!)),
+  );
+
+  const frontierIds = new Set(frontier.map((c) => c.id));
+  const wonTasks: Record<string, string[]> = {};
+  for (const c of frontier) wonTasks[c.id] = Array.from(wins.get(c.id)!).sort();
+
+  return {
+    frontier: frontier.map((c) => c.id),
+    perTaskWinners,
+    wonTasks,
+    dropped: candidates.filter((c) => !frontierIds.has(c.id)).map((c) => c.id),
+    nCandidates: candidates.length,
+    nFrontier: frontier.length,
+  };
+}
