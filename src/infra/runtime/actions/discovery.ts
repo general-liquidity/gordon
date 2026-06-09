@@ -85,13 +85,8 @@ export async function discoverProviderCapabilities(config: GordonConfig): Promis
 
   for (const dataSourceId of [
     "thegraph",
-    "synthdata",
-    "dexscreener",
-    "defillama",
     "basescan",
     "base_registry",
-    "chainlink_data_streams",
-    "chainlink_data_feeds",
   ] as const) {
     snapshots.push({
       providerId: dataSourceId,
@@ -99,9 +94,7 @@ export async function discoverProviderCapabilities(config: GordonConfig): Promis
       label: getIntegrationSurfaceMetadata(dataSourceId).displayName,
       supportsExecution: false,
       capabilities: actionCapabilitiesForKind("data"),
-      notes: dataSourceId === "synthdata"
-        ? ["Research analytics and probabilistic forecasting surface."]
-        : ["Read-only market data surface."],
+      notes: ["Read-only market data surface."],
       integration: getIntegrationSurfaceMetadata(dataSourceId),
     });
   }

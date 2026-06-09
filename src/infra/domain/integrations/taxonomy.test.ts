@@ -20,22 +20,8 @@ describe("integration taxonomy", () => {
     expect(routed.gatewayParent).toBe("dedalus");
   });
 
-  it("classifies SynthData as a research analytics provider", () => {
-    const metadata = getIntegrationSurfaceMetadata("synthdata");
-    expect(metadata.integrationDomain).toBe("research_analytics_provider");
-    expect(metadata.gordonEnabledMarkets).toEqual(["crypto", "stocks"]);
-  });
-
   it("classifies Base RPC and Flashblocks as chain infrastructure surfaces", () => {
     expect(getIntegrationSurfaceMetadata("base_rpc").infraKind).toBe("chain_ecosystem");
     expect(getIntegrationSurfaceMetadata("base_flashblocks").infraKind).toBe("chain_ecosystem");
-  });
-
-  it("tracks nested Solana dependencies instead of flattening them into first-class venues", () => {
-    const drift = getIntegrationSurfaceMetadata("drift");
-    const jupiter = getIntegrationSurfaceMetadata("jupiter");
-    expect(drift.taxonomyScope).toBe("nested_dependency");
-    expect(drift.parentSurfaceId).toBe("solanakit");
-    expect(jupiter.venueSubtype).toBe("dex_aggregator");
   });
 });

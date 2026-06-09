@@ -28,23 +28,24 @@ function createContext(overrides: Partial<GordonContext> = {}): GordonContext {
 describe("integration glossary grounding", () => {
   it("builds canonical glossary entries from taxonomy/discovery metadata", async () => {
     const glossary = await getCanonicalIntegrationGlossary(GordonConfigSchema.parse({}));
-    const synthData = glossary.find((entry) => entry.id === "synthdata");
+    const hyperliquid = glossary.find((entry) => entry.id === "hyperliquid");
     const dedalus = glossary.find((entry) => entry.id === "dedalus");
 
-    expect(synthData?.summary.toLowerCase()).toContain("probabilistic");
+    expect(hyperliquid).toBeDefined();
+    expect((hyperliquid?.summary.length ?? 0)).toBeGreaterThan(0);
     expect(dedalus?.summary.toLowerCase()).toContain("gateway");
   });
 
   it("retrieves a selective glossary slice for explicitly mentioned integrations", async () => {
     const selection = await selectRelevantIntegrationGlossary(
-      "What does SynthData do for Gordon and how does Dedalus route?",
+      "What does Hyperliquid do for Gordon and how does Dedalus route?",
       createContext(),
     );
 
-    expect(selection.matchedIds).toContain("synthdata");
+    expect(selection.matchedIds).toContain("hyperliquid");
     expect(selection.matchedIds).toContain("dedalus");
     expect(selection.entries.length).toBeLessThanOrEqual(10);
-    expect(formatIntegrationGlossary(selection.entries)).toContain("SynthData");
+    expect(formatIntegrationGlossary(selection.entries)).toContain("Hyperliquid");
   });
 
   it("builds a stable prompt envelope with only the relevant glossary slice", async () => {
@@ -52,9 +53,9 @@ describe("integration glossary grounding", () => {
     const context = createContext({
       requestedTaskScope: "analysis",
     });
-    const selection = await selectRelevantIntegrationGlossary("Use SynthData for probabilistic research", context);
+    const selection = await selectRelevantIntegrationGlossary("Use Hyperliquid for perps trading", context);
     const envelope = buildPromptEnvelope(
-      "Use SynthData for probabilistic research",
+      "Use Hyperliquid for perps trading",
       context,
       selection,
       formatIntegrationGlossary(selection.entries),
@@ -63,7 +64,7 @@ describe("integration glossary grounding", () => {
     expect(envelope.prompt).toContain("[GORDON_PROJECT_TRUTH]");
     expect(envelope.prompt).toContain("[GORDON_INTEGRATION_GLOSSARY]");
     expect(envelope.prompt).toContain("[GORDON_PHASE_GUIDANCE]");
-    expect(envelope.prompt).toContain("SynthData");
+    expect(envelope.prompt).toContain("Hyperliquid");
     expect(envelope.report.cache.supported).toBe(false);
     expect(envelope.report.workflowPhase).toBe("analysis");
     expect(envelope.report.sectionBudget.totalEstimated).toBeGreaterThan(0);

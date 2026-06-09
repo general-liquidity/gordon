@@ -302,15 +302,6 @@ function getDataAndAutomationStatuses(
       [resolveFieldStatus("THEGRAPH_API_KEY", "The Graph API key", true, { envKeys, keyringKeys })],
     ),
     buildStatus(
-      "synthdata",
-      "data",
-      getIntegrationSurfaceMetadata("synthdata").displayName,
-      "ops",
-      "api_key",
-      "static",
-      [resolveFieldStatus("SYNTHDATA_API_KEY", "SynthData API key", true, { envKeys, keyringKeys })],
-    ),
-    buildStatus(
       "basescan",
       "data",
       getIntegrationSurfaceMetadata("basescan").displayName,
@@ -318,18 +309,6 @@ function getDataAndAutomationStatuses(
       "api_key",
       "static",
       [resolveFieldStatus("BASESCAN_API_KEY", "Basescan API key", true, { envKeys, keyringKeys })],
-    ),
-    buildStatus(
-      "chainlink_data_streams",
-      "data",
-      getIntegrationSurfaceMetadata("chainlink_data_streams").displayName,
-      "ops",
-      "api_key",
-      "static",
-      [
-        resolveFieldStatus("CHAINLINK_API_KEY", "Chainlink API key", true, { envKeys, keyringKeys }),
-        resolveFieldStatus("CHAINLINK_API_SECRET", "Chainlink API secret", true, { envKeys, keyringKeys }),
-      ],
     ),
   ];
 }
