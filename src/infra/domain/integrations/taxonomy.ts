@@ -1,5 +1,6 @@
 import type { BrokerId } from "../../broker/types.ts";
 import type { ExchangeId } from "../../exchange/types.ts";
+import { isCcxtExchangeId, extractCcxtSubId, NATIVE_TO_CCXT_SUBID } from "../../exchange/types.ts";
 
 export type IntegrationDomain =
   | "model_provider"
@@ -70,82 +71,21 @@ export interface IntegrationSurfaceMetadata {
 
 const EXECUTION_SURFACES: IntegrationSurfaceMetadata[] = [
   {
-    id: "binance",
-    displayName: "Binance",
+    // Crypto execution is a SINGLE unified surface — CCXT. Individual venues
+    // are not enumerated here (the live set is ccxt.exchanges, ~100+, maintained
+    // upstream — hardcoding a subset would under-represent reach and drift).
+    // Per-venue metadata is DERIVED from the canonical `ccxt:<subId>` id by
+    // getExecutionVenueMetadata(); the first-class venues additionally carry
+    // curated env-var names (EXCHANGE_ENV_MAP) + sandbox metadata
+    // (EXCHANGE_SANDBOX_SUPPORT) outside this registry.
+    id: "ccxt",
+    displayName: "CCXT (unified crypto)",
     integrationDomain: "execution_venue",
     marketFamily: "crypto",
     venueKind: "cex",
-    venueSubtype: "spot_cex",
     executionModel: "centralized",
-    vendorSupportedMarkets: ["spot", "margin", "perps"],
     gordonEnabledMarkets: ["crypto"],
-  },
-  {
-    id: "binance_us",
-    displayName: "Binance US",
-    integrationDomain: "execution_venue",
-    marketFamily: "crypto",
-    venueKind: "cex",
-    venueSubtype: "spot_cex",
-    executionModel: "centralized",
-    vendorSupportedMarkets: ["spot"],
-    gordonEnabledMarkets: ["crypto"],
-  },
-  {
-    id: "coinbase",
-    displayName: "Coinbase Advanced Trade",
-    integrationDomain: "execution_venue",
-    marketFamily: "crypto",
-    venueKind: "cex",
-    venueSubtype: "spot_cex",
-    executionModel: "centralized",
-    vendorSupportedMarkets: ["spot"],
-    gordonEnabledMarkets: ["crypto"],
-  },
-  {
-    id: "kraken",
-    displayName: "Kraken",
-    integrationDomain: "execution_venue",
-    marketFamily: "crypto",
-    venueKind: "cex",
-    venueSubtype: "spot_cex",
-    executionModel: "centralized",
-    vendorSupportedMarkets: ["spot", "margin"],
-    gordonEnabledMarkets: ["crypto"],
-  },
-  {
-    id: "bitfinex",
-    displayName: "Bitfinex",
-    integrationDomain: "execution_venue",
-    marketFamily: "crypto",
-    venueKind: "cex",
-    venueSubtype: "spot_cex",
-    executionModel: "centralized",
-    vendorSupportedMarkets: ["spot", "margin", "derivatives"],
-    gordonEnabledMarkets: ["crypto"],
-  },
-  {
-    id: "hyperliquid",
-    displayName: "Hyperliquid",
-    integrationDomain: "execution_venue",
-    marketFamily: "crypto",
-    venueKind: "dex",
-    venueSubtype: "perps_dex",
-    executionModel: "decentralized",
-    vendorSupportedMarkets: ["perpetuals"],
-    gordonEnabledMarkets: ["crypto"],
-    notes: ["Onchain perpetuals venue with DEX semantics."],
-  },
-  {
-    id: "robinhood",
-    displayName: "Robinhood Crypto",
-    integrationDomain: "execution_venue",
-    marketFamily: "crypto",
-    venueKind: "broker",
-    venueSubtype: "crypto_broker",
-    executionModel: "brokerage",
-    vendorSupportedMarkets: ["crypto"],
-    gordonEnabledMarkets: ["crypto"],
+    notes: ["Single adapter over ~100+ CEX/DEX venues; address any as `ccxt:<sub-id>` (e.g. ccxt:binance, ccxt:bybit, ccxt:hyperliquid)."],
   },
   {
     id: "alpaca",
@@ -399,10 +339,52 @@ const INTEGRATION_SURFACE_MAP = new Map<string, IntegrationSurfaceMetadata>(
   [...EXECUTION_SURFACES, ...NON_EXECUTION_SURFACES].map((surface) => [surface.id, surface]),
 );
 
+/**
+ * CCXT sub-ids that are decentralized venues (DEX/onchain). CCXT does not
+ * expose a reliable CEX-vs-DEX flag, and the distinction drives the risk
+ * layer's executionModel + MEV-exposure handling — so this small structural
+ * classifier is curated. Everything else defaults to a centralized CEX.
+ */
+const CCXT_DEX_SUBIDS = new Set<string>([
+  "hyperliquid", "dydx", "vertex", "paradex", "apex",
+  "derive", "pacifica", "lighter", "hibachi", "woofipro",
+]);
+
+/**
+ * Derive metadata for a CCXT-routed crypto venue from its sub-id. Avoids
+ * hardcoding the ~100+ venue catalog: marketFamily is always crypto, and
+ * CEX/DEX is resolved from the curated DEX set (default CEX).
+ */
+function deriveCcxtVenueMetadata(subId: string, venueId: string): IntegrationSurfaceMetadata {
+  const isDex = CCXT_DEX_SUBIDS.has(subId);
+  const titled = subId.charAt(0).toUpperCase() + subId.slice(1);
+  return {
+    id: venueId,
+    displayName: `${titled} (via CCXT)`,
+    integrationDomain: "execution_venue",
+    marketFamily: "crypto",
+    venueKind: isDex ? "dex" : "cex",
+    executionModel: isDex ? "decentralized" : "centralized",
+    gordonEnabledMarkets: ["crypto"],
+    notes: ["CCXT-routed crypto venue (metadata derived from the sub-id)."],
+  };
+}
+
 export function getExecutionVenueMetadata(
   venueId: ExchangeId | BrokerId,
 ): IntegrationSurfaceMetadata {
-  return INTEGRATION_SURFACE_MAP.get(venueId) ?? {
+  const direct = INTEGRATION_SURFACE_MAP.get(venueId);
+  if (direct) return direct;
+  // Crypto venues are not enumerated — derive from the CCXT id (canonical
+  // `ccxt:<subId>` or a legacy bare first-class id). Brokers/providers live in
+  // the map above, so they never reach here.
+  if (isCcxtExchangeId(venueId)) {
+    return deriveCcxtVenueMetadata(extractCcxtSubId(venueId), venueId);
+  }
+  if (venueId in NATIVE_TO_CCXT_SUBID) {
+    return deriveCcxtVenueMetadata(NATIVE_TO_CCXT_SUBID[venueId as keyof typeof NATIVE_TO_CCXT_SUBID], venueId);
+  }
+  return {
     id: venueId,
     displayName: venueId,
     integrationDomain: "execution_venue",
