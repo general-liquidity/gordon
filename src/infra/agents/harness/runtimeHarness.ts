@@ -6,6 +6,7 @@ import { listActionLogEntries } from "../../action-log/store.ts";
 import type { GordonContext } from "../types.ts";
 import { determineWorkflowPhase, getPhasePromptGuidance, isExecutionPhase, type WorkflowPhase } from "../cognition/workflowPhase.ts";
 import { shouldEmitTraderReminders } from "../reminders/traderReminders.ts";
+import { dedupeParallelTasks } from "../../../core/pipeline/parallel-task-dedup.ts";
 
 interface PlanningArtifact {
   symbol?: string;
@@ -62,11 +63,34 @@ const planningArtifacts = new Map<string, PlanningArtifact>();
 const loopSignals = new Map<string, Map<string, LoopSignal>>();
 /** Sliding call-count window for fingerprint-based doom-loop detection */
 const loopCallLogs = new Map<string, string[]>();
+/**
+ * Parallel sliding window of decision-SURFACE tokens per call (or null for
+ * non-trading calls). Lets the assignment-axis "coherent amplification" check
+ * catch many same-symbol/action calls with VARIED args — which the identical-
+ * fingerprint doom-loop above misses by construction. See parallel-task-dedup.ts.
+ */
+const loopSurfaceLogs = new Map<string, (string[] | null)[]>();
 
 const PLANNING_ARTIFACT_TTL_MS = 15 * 60 * 1000;
 const LOOP_WINDOW_MS = 30_000;
 const LOOP_WINDOW_CALL_COUNT = 20; // sliding window of last N tool call fingerprints
 const LOOP_BLOCK_THRESHOLD = 3;
+/** Min surfaced (trading) calls in-window before the coherent-amplification check runs. */
+const COHERENT_AMP_MIN_CALLS = 4;
+/** Redundant calls (collapsed by dedup) at/above which amplification is flagged. */
+const COHERENT_AMP_DROP_THRESHOLD = 3;
+
+/** Extract a decision surface (symbol + action) from a tool call, or null if non-trading. */
+function extractCallSurface(toolName: string, args: unknown): string[] | null {
+  if (!args || typeof args !== "object") return null;
+  const a = args as Record<string, unknown>;
+  const symbol = a.symbol ?? a.ticker ?? a.pair ?? a.instrument;
+  if (typeof symbol !== "string" || symbol.length === 0) return null;
+  const surface = [`tool:${toolName.toLowerCase()}`, `sym:${symbol.toLowerCase()}`];
+  const action = a.action ?? a.side ?? a.direction;
+  if (typeof action === "string" && action.length > 0) surface.push(`act:${action.toLowerCase()}`);
+  return surface;
+}
 /** Longest repeating tool-call cycle (A-B-A-B…) to scan for. */
 const CYCLE_MAX_LEN = 5;
 /**
@@ -411,6 +435,27 @@ export function buildEventDrivenReminders(
       reminders.push(`Repeating ${cycle.cycleLen}-step tool cycle detected (${cycle.repeats}× round trips of the same action sequence). You're looping between the same calls without making progress — change approach or scope, or stop and summarize what you have.`);
       markReminderFired(state, "repeated_cycle");
     }
+
+    // Assignment-axis amplification: many trading calls on the SAME decision surface
+    // (symbol/action) with varied args — coherent-but-distinct, so the identical-
+    // fingerprint/cycle checks above miss it. (goal-blast-radius assignment axis.)
+    const surfaceLog = loopSurfaceLogs.get(threadKey) ?? [];
+    const surfacedTasks = surfaceLog
+      .map((s, i) => (s ? { id: String(i), surface: s } : null))
+      .filter((t): t is { id: string; surface: string[] } => t !== null);
+    if (
+      surfacedTasks.length >= COHERENT_AMP_MIN_CALLS &&
+      !reminders.some((r) => r.includes("identical") || r.includes("cycle")) &&
+      canFireReminder(state, "coherent_amplification", 2)
+    ) {
+      const dedupe = dedupeParallelTasks(surfacedTasks);
+      if (dedupe.dropped.length >= COHERENT_AMP_DROP_THRESHOLD) {
+        reminders.push(
+          `Coherent-action amplification: ${surfacedTasks.length} recent trading calls collapse to ${dedupe.reducedTo} distinct decision surface(s) (same symbol/action, varied args). You may be amplifying one decision across many calls — consolidate, size once, or stop.`,
+        );
+        markReminderFired(state, "coherent_amplification");
+      }
+    }
   }
 
   const recentEntries = context.threadId
@@ -490,6 +535,7 @@ export function resetLoopSignals(context: GordonContext): void {
   const key = getThreadKey(context);
   loopSignals.delete(key);
   loopCallLogs.delete(key);
+  loopSurfaceLogs.delete(key);
 }
 
 /**
@@ -556,6 +602,10 @@ export function recordToolCallFingerprint(
   const existing = loopCallLogs.get(threadKey) ?? [];
   const updated = [...existing, fingerprint].slice(-LOOP_WINDOW_CALL_COUNT);
   loopCallLogs.set(threadKey, updated);
+
+  const surface = extractCallSurface(toolName, args);
+  const existingSurfaces = loopSurfaceLogs.get(threadKey) ?? [];
+  loopSurfaceLogs.set(threadKey, [...existingSurfaces, surface].slice(-LOOP_WINDOW_CALL_COUNT));
 
   const count = updated.filter((f) => f === fingerprint).length;
   const cycle = detectFingerprintCycle(updated);

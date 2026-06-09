@@ -124,6 +124,26 @@ describe("runtimeHarness", () => {
     expect(reminders.some((line) => line.includes("live market data"))).toBeTrue();
     expect(reminders.length).toBeLessThanOrEqual(8);
   });
+
+  it("flags coherent-action amplification: many same-surface trading calls with varied args", () => {
+    const context = createContext({ threadId: "thread-amp-coherent" });
+    // Same decision surface (BTCUSDT buy), varied args → 20 DISTINCT fingerprints
+    // (the identical-fingerprint doom-loop misses this), one decision surface.
+    for (let i = 0; i < 20; i++) {
+      recordToolCallFingerprint(context, "preview_market_order", { symbol: "BTCUSDT", action: "buy", note: i });
+    }
+    const reminders = buildEventDrivenReminders(context, "execution");
+    expect(reminders.some((line) => line.includes("amplification"))).toBeTrue();
+  });
+
+  it("does not flag amplification when surfaces are genuinely distinct", () => {
+    const context = createContext({ threadId: "thread-amp-distinct" });
+    for (let i = 0; i < 20; i++) {
+      recordToolCallFingerprint(context, "preview_market_order", { symbol: `SYM${i}`, action: "buy" });
+    }
+    const reminders = buildEventDrivenReminders(context, "execution");
+    expect(reminders.some((line) => line.includes("amplification"))).toBeFalse();
+  });
 });
 
 describe("detectFingerprintCycle", () => {
