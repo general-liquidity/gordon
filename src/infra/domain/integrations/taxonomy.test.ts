@@ -6,13 +6,6 @@ import {
 } from "./taxonomy.ts";
 
 describe("integration taxonomy", () => {
-  it("classifies Uniswap as an amm_dex", () => {
-    const metadata = getExecutionVenueMetadata("uniswap");
-    expect(metadata.venueKind).toBe("dex");
-    expect(metadata.venueSubtype).toBe("amm_dex");
-    expect(metadata.executionModel).toBe("decentralized");
-  });
-
   it("classifies Hyperliquid as a perps_dex", () => {
     const metadata = getExecutionVenueMetadata("hyperliquid");
     expect(metadata.venueKind).toBe("dex");

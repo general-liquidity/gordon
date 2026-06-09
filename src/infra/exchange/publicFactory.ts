@@ -40,7 +40,6 @@ export const SUPPORTS_PUBLIC_MODE: Partial<Record<ExchangeId, boolean>> = {
   bitfinex: true,
   // Require wallet / passphrase / auth for basic calls — not pure public:
   hyperliquid: false,
-  uniswap: false,
   robinhood: false,
   okx: false,
   gemini: false,

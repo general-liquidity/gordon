@@ -27,7 +27,6 @@ function createContext(overrides: Partial<GordonContext> = {}): GordonContext {
       getPrice: async () => 50000,
     } as unknown as GordonContext["exchange"],
     broker: null,
-    agentRails: null,
     llm: {} as GordonContext["llm"],
     config: createConfig(),
     portfolioValue: 10000,

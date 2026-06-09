@@ -11,7 +11,6 @@ function createContext(permissionMode: "auto" | "ask" | "strict" | "paper" | "ob
     binance: null,
     exchange: null,
     broker: null,
-    agentRails: null,
     llm: {} as GordonContext["llm"],
     config,
     portfolioValue: 10_000,

@@ -1513,7 +1513,7 @@ function AppInner() {
                   }
                   config.exchanges.push({
                     id: exchangeId,
-                    type: exchangeType as "binance" | "binance_us" | "coinbase" | "kraken" | "bitfinex" | "hyperliquid" | "uniswap" | "robinhood" | "okx" | "gemini",
+                    type: exchangeType as "binance" | "binance_us" | "coinbase" | "kraken" | "bitfinex" | "hyperliquid" | "robinhood" | "okx" | "gemini",
                     apiKey: isWalletBased ? "" : apiKey,
                     apiSecret: isWalletBased ? "" : apiSecret,
                     sandbox: isSandboxSetup,

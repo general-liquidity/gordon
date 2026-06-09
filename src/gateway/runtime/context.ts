@@ -9,7 +9,6 @@ import { BrokerFactory } from "../../infra/broker/factory.ts";
 import { BROKER_ENV_MAP, type BrokerId } from "../../infra/broker/types.ts";
 import { isBrokerPaperSupported } from "../../infra/broker/brokerPaperSupport.ts";
 import { getSandboxOverride } from "../../infra/runtime/sandboxOverride.ts";
-import { createAgentRailsRegistry } from "../../infra/runtime/rails/index.ts";
 import type { LLMClient } from "../../infra/ai/llm/index.ts";
 import type { GordonContext } from "../../infra/agents/types.ts";
 import type { BrokerAdapter } from "../../infra/broker/types.ts";
@@ -43,7 +42,6 @@ export class GatewayContextResolver {
       binance,
       exchange,
       broker,
-      agentRails: createAgentRailsRegistry(config),
       llm: (llm ?? ({} as LLMClient)),
       config,
       portfolioValue,

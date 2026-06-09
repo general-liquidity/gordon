@@ -3,7 +3,6 @@ import type { BinanceClient } from "../../infra/venues/exchange/clients/binance/
 import type { Exchange } from "../../infra/exchange/index.ts";
 import type { BrokerAdapter } from "../../infra/broker/index.ts";
 import type { LLMClient } from "../../infra/ai/llm/index.ts";
-import { createAgentRailsRegistry, type AgentRailsRegistry } from "../../infra/runtime/rails/index.ts";
 import type { ActionTaskScope, CredentialProfile } from "../../infra/runtime/actions/types.ts";
 import type { GordonConfig } from "../../types/index.ts";
 
@@ -15,7 +14,6 @@ export interface AppContextInput {
   config: GordonConfig;
   portfolioValue: number;
   availableCash: number;
-  agentRails?: AgentRailsRegistry | null;
   userId?: string;
   threadId?: string;
   requestedActionId?: string;
@@ -28,7 +26,6 @@ export function buildAppGordonContext(input: AppContextInput): GordonContext {
     binance: input.binance,
     exchange: input.exchange,
     broker: input.broker,
-    agentRails: input.agentRails ?? createAgentRailsRegistry(input.config),
     llm: input.llm,
     config: input.config,
     portfolioValue: input.portfolioValue,

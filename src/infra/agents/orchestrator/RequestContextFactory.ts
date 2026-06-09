@@ -13,7 +13,6 @@ export function createAgentRequestContext(
   requestContext.set("binance", context.binance);
   requestContext.set("exchange", context.exchange);
   requestContext.set("broker", context.broker);
-  requestContext.set("agentRails", context.agentRails);
   requestContext.set("config", context.config);
   requestContext.set("llm", context.llm);
   requestContext.set("userId", context.userId || "default");

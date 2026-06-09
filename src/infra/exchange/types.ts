@@ -19,7 +19,6 @@ export type NativeExchangeId =
   | "kraken"
   | "bitfinex"
   | "hyperliquid"
-  | "uniswap"
   | "robinhood"
   | "okx"
   | "gemini";
@@ -58,7 +57,7 @@ export function isCcxtExchangeId(id: string): id is CcxtExchangeId {
  */
 export const EXCHANGE_IDS = [
   "binance", "binance_us", "coinbase", "kraken", "bitfinex",
-  "hyperliquid", "uniswap", "robinhood", "okx", "gemini",
+  "hyperliquid", "robinhood", "okx", "gemini",
 ] as const satisfies readonly NativeExchangeId[];
 
 /**
@@ -97,7 +96,6 @@ export const EXCHANGE_ENV_MAP: Record<NativeExchangeId, { key?: string; secret?:
   kraken:      { key: "KRAKEN_API_KEY",       secret: "KRAKEN_API_SECRET" },
   bitfinex:    { key: "BITFINEX_API_KEY",     secret: "BITFINEX_API_SECRET" },
   hyperliquid: { wallet: "HYPERLIQUID_PRIVATE_KEY" },
-  uniswap:     { key: "UNISWAP_API_KEY" },
   robinhood:   { key: "ROBINHOOD_API_KEY",    secret: "ROBINHOOD_API_SECRET" },
   okx:         { key: "OKX_API_KEY",          secret: "OKX_API_SECRET",       passphrase: "OKX_PASSPHRASE" },
   gemini:      { key: "GEMINI_API_KEY",       secret: "GEMINI_API_SECRET" },

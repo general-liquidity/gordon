@@ -77,7 +77,6 @@ export const DEFAULT_TAKER_FEE_BPS: Partial<Record<ExchangeId, number>> = {
   kraken: 26,
   bitfinex: 20,
   hyperliquid: 3,   // perps — maker 1 / taker 3.5 default
-  uniswap: 30,      // LP fee on v3 0.3% tier
   robinhood: 0,
   okx: 10,
   gemini: 40,

@@ -9,7 +9,6 @@ function createContext(overrides: Partial<GordonContext> = {}): GordonContext {
     binance: null,
     exchange: null,
     broker: null,
-    agentRails: null,
     llm: {} as GordonContext["llm"],
     config: GordonConfigSchema.parse({}),
     portfolioValue: 0,

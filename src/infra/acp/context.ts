@@ -38,7 +38,6 @@ export async function getAcpGordonContext(force = false): Promise<GordonContext>
     binance: null,
     exchange: null,
     broker: null,
-    agentRails: null,
     llm,
     config,
     portfolioValue: 0,

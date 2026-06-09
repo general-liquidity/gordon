@@ -41,23 +41,8 @@ import {
   baseOnchainTools,
   agentKitOnchainTools,
   agentKitDefiTools,
-  polkadotKitAssetTools,
-  polkadotKitStakingTools,
-  polkadotKitDefiTools,
-  solanaKitWalletTools,
-  solanaKitTradingTools,
-  solanaKitDefiPerpsTools,
-  solanaKitDefiLendingTools,
-  solanaKitDefiPoolsTools,
-  solanaKitDefiBridgeTools,
-  chainlinkStreamsTools,
-  chainlinkFeedsTools,
-  chainlinkCCIPTools,
-  synthDataTools,
   baseSignalTools,
   baseIndexerTools,
-  uniswapDataTools,
-  dexSearchTools,
   xSocialTools,
   cdpWebhookTools,
   cdpSqlTools,
@@ -79,7 +64,6 @@ import {
   microstructureTools,
   institutionalAiTools,
   producerHealthTools,
-  defillamaYieldTools,
   newsTools,
   stockNewsTools,
   strategyRecipeTools,
@@ -151,23 +135,8 @@ export const instrumentedAutonomousTools = withToolsMetrics(autonomousTools);
 export const instrumentedBaseOnchainTools = withToolsMetrics(baseOnchainTools);
 export const instrumentedAgentKitOnchainTools = withToolsMetrics(agentKitOnchainTools);
 export const instrumentedAgentKitDefiTools = withToolsMetrics(agentKitDefiTools);
-export const instrumentedPolkadotKitAssetTools = withToolsMetrics(polkadotKitAssetTools);
-export const instrumentedPolkadotKitStakingTools = withToolsMetrics(polkadotKitStakingTools);
-export const instrumentedPolkadotKitDefiTools = withToolsMetrics(polkadotKitDefiTools);
-export const instrumentedSolanaKitWalletTools = withToolsMetrics(solanaKitWalletTools);
-export const instrumentedSolanaKitTradingTools = withToolsMetrics(solanaKitTradingTools);
-export const instrumentedSolanaKitDefiPerpsTools = withToolsMetrics(solanaKitDefiPerpsTools);
-export const instrumentedSolanaKitDefiLendingTools = withToolsMetrics(solanaKitDefiLendingTools);
-export const instrumentedSolanaKitDefiPoolsTools = withToolsMetrics(solanaKitDefiPoolsTools);
-export const instrumentedSolanaKitDefiBridgeTools = withToolsMetrics(solanaKitDefiBridgeTools);
-export const instrumentedChainlinkStreamsTools = withToolsMetrics(chainlinkStreamsTools);
-export const instrumentedChainlinkFeedsTools = withToolsMetrics(chainlinkFeedsTools);
-export const instrumentedChainlinkCCIPTools = withToolsMetrics(chainlinkCCIPTools);
-export const instrumentedSynthDataTools = withToolsMetrics(synthDataTools);
 export const instrumentedBaseSignalTools = withToolsMetrics(baseSignalTools);
 export const instrumentedBaseIndexerTools = withToolsMetrics(baseIndexerTools);
-export const instrumentedUniswapDataTools = withToolsMetrics(uniswapDataTools);
-export const instrumentedDexSearchTools = withToolsMetrics(dexSearchTools);
 export const instrumentedXSocialTools = withToolsMetrics(xSocialTools);
 export const instrumentedCdpWebhookTools = withToolsMetrics(cdpWebhookTools);
 export const instrumentedCdpSqlTools = withToolsMetrics(cdpSqlTools);
@@ -190,7 +159,6 @@ export const instrumentedDiagnosticTools = withToolsMetrics(diagnosticTools);
 export const instrumentedMicrostructureTools = withToolsMetrics(microstructureTools);
 export const instrumentedInstitutionalAiTools = withToolsMetrics(institutionalAiTools);
 export const instrumentedProducerHealthTools = withToolsMetrics(producerHealthTools);
-export const instrumentedDefillamaYieldTools = withToolsMetrics(defillamaYieldTools);
 export const instrumentedNewsTools = withToolsMetrics(newsTools);
 export const instrumentedStockNewsTools = withToolsMetrics(stockNewsTools);
 export const instrumentedStrategyRecipeTools = withToolsMetrics(strategyRecipeTools);

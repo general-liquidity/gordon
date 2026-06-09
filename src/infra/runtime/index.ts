@@ -9,5 +9,4 @@
 
 export * from "./actions/index.ts";
 export * from "./routing/index.ts";
-export * from "./rails/index.ts";
 export * from "./providers/index.ts";

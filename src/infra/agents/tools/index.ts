@@ -73,19 +73,8 @@ export { autonomousTools } from "./runtime/meta/autonomous.ts";
 export { baseOnchainTools } from "./onchain/base/base-onchain.ts";
 export { agentKitOnchainTools } from "./onchain/agentkit/agentkit-onchain.ts";
 export { agentKitDefiTools } from "./onchain/agentkit/agentkit-defi.ts";
-export { polkadotKitAssetTools } from "./onchain/polkadotkit/polkadotkit-assets.ts";
-export { polkadotKitStakingTools } from "./onchain/polkadotkit/polkadotkit-staking.ts";
-export { polkadotKitDefiTools } from "./onchain/polkadotkit/polkadotkit-defi.ts";
-export { solanaKitWalletTools } from "./onchain/solanakit/solanakit-wallet.ts";
-export { solanaKitTradingTools } from "./onchain/solanakit/solanakit-trading.ts";
-export { solanaKitDefiPerpsTools } from "./onchain/solanakit/solanakit-defi-perps.ts";
-export { solanaKitDefiLendingTools } from "./onchain/solanakit/solanakit-defi-lending.ts";
-export { solanaKitDefiPoolsTools } from "./onchain/solanakit/solanakit-defi-pools.ts";
-export { solanaKitDefiBridgeTools } from "./onchain/solanakit/solanakit-defi-bridge.ts";
 export { baseSignalTools } from "./onchain/base/base-signals.ts";
 export { baseIndexerTools } from "./onchain/base/base-indexers.ts";
-export { uniswapDataTools } from "./onchain/dex/uniswap-data.ts";
-export { dexSearchTools } from "./news/dex-search.ts";
 export { xSocialTools } from "./news/x-social.ts";
 export { cdpWebhookTools } from "./onchain/cdp/cdp-webhooks.ts";
 export { cdpSqlTools } from "./onchain/cdp/cdp-sql.ts";
@@ -107,15 +96,9 @@ export { diagnosticTools } from "./runtime/diagnostics.ts";
 export { microstructureTools } from "./runtime/microstructure.ts";
 export { institutionalAiTools } from "./runtime/institutionalAi.ts";
 export { producerHealthTools } from "./runtime/lifecycle/producer-health-tool.ts";
-export { defillamaYieldTools } from "./onchain/dex/defillama-yields.ts";
 export { newsTools } from "./news/news.ts";
 export { stockNewsTools } from "./news/stockNews.ts";
 export { strategyRecipeTools } from "./strategy/generation/strategy-recipes.ts";
-export { chainlinkStreamsTools } from "./onchain/chainlink/chainlink-streams.ts";
-export { chainlinkFeedsTools } from "./onchain/chainlink/chainlink-feeds.ts";
-export { chainlinkCCIPTools } from "./onchain/chainlink/chainlink-ccip.ts";
-export { synthDataTools } from "./providers/synthdata.ts";
-export { agentRailsTools } from "./runtime/meta/agent-rails.ts";
 
 // Position tracking tools (v0.7)
 export { positionTrackingTools } from "./account/position-tracking.ts";
@@ -641,19 +624,8 @@ import { autonomousTools } from "./runtime/meta/autonomous.ts";
 import { baseOnchainTools } from "./onchain/base/base-onchain.ts";
 import { agentKitOnchainTools } from "./onchain/agentkit/agentkit-onchain.ts";
 import { agentKitDefiTools } from "./onchain/agentkit/agentkit-defi.ts";
-import { polkadotKitAssetTools } from "./onchain/polkadotkit/polkadotkit-assets.ts";
-import { polkadotKitStakingTools } from "./onchain/polkadotkit/polkadotkit-staking.ts";
-import { polkadotKitDefiTools } from "./onchain/polkadotkit/polkadotkit-defi.ts";
-import { solanaKitWalletTools } from "./onchain/solanakit/solanakit-wallet.ts";
-import { solanaKitTradingTools } from "./onchain/solanakit/solanakit-trading.ts";
-import { solanaKitDefiPerpsTools } from "./onchain/solanakit/solanakit-defi-perps.ts";
-import { solanaKitDefiLendingTools } from "./onchain/solanakit/solanakit-defi-lending.ts";
-import { solanaKitDefiPoolsTools } from "./onchain/solanakit/solanakit-defi-pools.ts";
-import { solanaKitDefiBridgeTools } from "./onchain/solanakit/solanakit-defi-bridge.ts";
 import { baseSignalTools } from "./onchain/base/base-signals.ts";
 import { baseIndexerTools } from "./onchain/base/base-indexers.ts";
-import { uniswapDataTools } from "./onchain/dex/uniswap-data.ts";
-import { dexSearchTools } from "./news/dex-search.ts";
 import { xSocialTools } from "./news/x-social.ts";
 import { cdpWebhookTools } from "./onchain/cdp/cdp-webhooks.ts";
 import { cdpSqlTools } from "./onchain/cdp/cdp-sql.ts";
@@ -670,15 +642,9 @@ import { smcPatternTools } from "./market/smc-pattern-tools.ts";
 import { calibrationTools } from "./runtime/meta/calibration-tools.ts";
 import { skillLoaderTools } from "./runtime/lifecycle/skill-loader.ts";
 import { producerHealthTools } from "./runtime/lifecycle/producer-health-tool.ts";
-import { defillamaYieldTools } from "./onchain/dex/defillama-yields.ts";
 import { newsTools } from "./news/news.ts";
 import { stockNewsTools } from "./news/stockNews.ts";
 import { strategyRecipeTools } from "./strategy/generation/strategy-recipes.ts";
-import { chainlinkStreamsTools } from "./onchain/chainlink/chainlink-streams.ts";
-import { chainlinkFeedsTools } from "./onchain/chainlink/chainlink-feeds.ts";
-import { chainlinkCCIPTools } from "./onchain/chainlink/chainlink-ccip.ts";
-import { synthDataTools } from "./providers/synthdata.ts";
-import { agentRailsTools } from "./runtime/meta/agent-rails.ts";
 import { positionTrackingTools } from "./account/position-tracking.ts";
 import { checkRiskTool } from "./trading/risk-gate.ts";
 import { memoryTools } from "./runtime/meta/memory-tools.ts";
@@ -813,19 +779,8 @@ const _rawAllTools = {
   ...baseOnchainTools,
   ...agentKitOnchainTools,
   ...agentKitDefiTools,
-  ...polkadotKitAssetTools,
-  ...polkadotKitStakingTools,
-  ...polkadotKitDefiTools,
-  ...solanaKitWalletTools,
-  ...solanaKitTradingTools,
-  ...solanaKitDefiPerpsTools,
-  ...solanaKitDefiLendingTools,
-  ...solanaKitDefiPoolsTools,
-  ...solanaKitDefiBridgeTools,
   ...baseSignalTools,
   ...baseIndexerTools,
-  ...uniswapDataTools,
-  ...dexSearchTools,
   ...xSocialTools,
   ...cdpWebhookTools,
   ...cdpSqlTools,
@@ -842,15 +797,9 @@ const _rawAllTools = {
   ...calibrationTools,
   ...skillLoaderTools,
   ...producerHealthTools,
-  ...defillamaYieldTools,
   ...newsTools,
   ...stockNewsTools,
   ...strategyRecipeTools,
-  ...chainlinkStreamsTools,
-  ...chainlinkFeedsTools,
-  ...chainlinkCCIPTools,
-  ...synthDataTools,
-  ...agentRailsTools,
   ...multiModalChartTools,
   ...evalTools,
   ...positionTrackingTools,
@@ -985,19 +934,8 @@ export const toolCounts = {
   baseOnchain: Object.keys(baseOnchainTools).length,
   agentKitOnchain: Object.keys(agentKitOnchainTools).length,
   agentKitDefi: Object.keys(agentKitDefiTools).length,
-  polkadotKitAssets: Object.keys(polkadotKitAssetTools).length,
-  polkadotKitStaking: Object.keys(polkadotKitStakingTools).length,
-  polkadotKitDefi: Object.keys(polkadotKitDefiTools).length,
-  solanaKitWallet: Object.keys(solanaKitWalletTools).length,
-  solanaKitTrading: Object.keys(solanaKitTradingTools).length,
-  solanaKitDefiPerps: Object.keys(solanaKitDefiPerpsTools).length,
-  solanaKitDefiLending: Object.keys(solanaKitDefiLendingTools).length,
-  solanaKitDefiPools: Object.keys(solanaKitDefiPoolsTools).length,
-  solanaKitDefiBridge: Object.keys(solanaKitDefiBridgeTools).length,
   baseSignals: Object.keys(baseSignalTools).length,
   baseIndexers: Object.keys(baseIndexerTools).length,
-  uniswapData: Object.keys(uniswapDataTools).length,
-  dexSearch: Object.keys(dexSearchTools).length,
   xSocial: Object.keys(xSocialTools).length,
   cdpWebhooks: Object.keys(cdpWebhookTools).length,
   cdpSql: Object.keys(cdpSqlTools).length,
@@ -1014,15 +952,9 @@ export const toolCounts = {
   calibration: Object.keys(calibrationTools).length,
   skillLoader: Object.keys(skillLoaderTools).length,
   producerHealth: Object.keys(producerHealthTools).length,
-  defillamaYields: Object.keys(defillamaYieldTools).length,
   news: Object.keys(newsTools).length,
   stockNews: Object.keys(stockNewsTools).length,
   strategyRecipes: Object.keys(strategyRecipeTools).length,
-  chainlinkStreams: Object.keys(chainlinkStreamsTools).length,
-  chainlinkFeeds: Object.keys(chainlinkFeedsTools).length,
-  chainlinkCCIP: Object.keys(chainlinkCCIPTools).length,
-  synthData: Object.keys(synthDataTools).length,
-  agentRails: Object.keys(agentRailsTools).length,
   multiModalCharts: Object.keys(multiModalChartTools).length,
   evals: Object.keys(evalTools).length,
   positionTracking: Object.keys(positionTrackingTools).length,

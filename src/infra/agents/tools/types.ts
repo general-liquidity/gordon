@@ -11,7 +11,6 @@ import type { BinanceClient } from "../../venues/exchange/clients/binance/index.
 import type { Exchange } from "../../exchange/index.ts";
 import type { BrokerAdapter } from "../../broker/index.ts";
 import type { LLMClient } from "../../ai/llm/index.ts";
-import type { AgentRailsRegistry } from "../../runtime/rails/index.ts";
 import type { GordonConfig } from "../../../types/index.ts";
 import { normalizeCryptoSymbol } from "../../domain/markets/instruments.ts";
 import {
@@ -45,13 +44,11 @@ export function getGordonContext(execContext?: MastraExecutionContext): GordonCo
   const exchange = rc.get("exchange") as Exchange | undefined;
   const binance = rc.get("binance") as BinanceClient | undefined;
   const broker = rc.get("broker") as BrokerAdapter | undefined;
-  const agentRails = rc.get("agentRails") as AgentRailsRegistry | undefined;
 
   return {
     binance: binance,
     exchange: exchange ?? null,
     broker: broker ?? null,
-    agentRails: agentRails ?? null,
     llm: rc.get("llm") as LLMClient | undefined,
     config: rc.get("config") as GordonConfig | undefined,
     portfolioValue: (rc.get("portfolioValue") as number | undefined) ?? 0,

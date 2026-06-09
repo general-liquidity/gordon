@@ -60,10 +60,6 @@ export const EXCHANGE_SANDBOX_SUPPORT: Record<NativeExchangeId, SandboxSupportEn
     kind: "testnet_url",
     docs: "https://api.hyperliquid-testnet.xyz — same wallet private key works, just a different chain state",
   },
-  uniswap: {
-    kind: "unsupported",
-    notSupportedHint: "Uniswap is on-chain. 'Paper trading' would mean switching to a testnet chain (e.g. Sepolia) which requires a separate RPC + subgraph integration, not a URL override.",
-  },
   robinhood: {
     kind: "unsupported",
     notSupportedHint: "Robinhood does not expose a paper trading API to developers.",

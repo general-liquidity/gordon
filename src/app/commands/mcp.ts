@@ -11,7 +11,6 @@ import {
 } from '../../infra/ai/mcp/marketplace';
 import { credentialManager } from '../../infra/ai/mcp/credentials';
 import type { MCPCategory, MCPToolDefinition } from '../../infra/ai/mcp/types';
-import { getBuiltInAgentRailListings } from '../../infra/runtime/rails/index.ts';
 import { refreshRuntimeCredentials } from '../../infra/runtime/credentialRefresh.ts';
 
 // ============================================================================
@@ -105,13 +104,11 @@ const PLUGIN_SUGGESTIONS: PluginSuggestion[] = [
   { keywords: ['tradingview', 'signal', 'webhook'], pluginId: 'tradingview-signals', reason: 'integrates TradingView alerts' },
   { keywords: ['historical', 'history', 'ohlc', 'altcoin', 'market cap'], pluginId: 'coingecko', reason: 'provides historical price data for thousands of coins' },
   { keywords: ['portfolio', 'pnl', 'profit', 'loss', 'tax'], pluginId: 'portfolio-tracker', reason: 'tracks portfolio and generates tax reports' },
-  { keywords: ['solana', 'sol', 'jupiter', 'raydium', 'spl', 'phantom'], pluginId: 'solana-agent-kit', reason: 'provides Solana trading, swaps, transfers, and NFT minting via Jupiter' },
-  { keywords: ['helius', 'das', 'solana wallet', 'solana transactions', 'solana portfolio'], pluginId: 'helius', reason: 'provides Solana wallet, transaction, and asset tooling through Helius MCP' },
-  { keywords: ['moonpay', 'fund wallet', 'onramp', 'offramp', 'buy crypto', 'cash out'], pluginId: 'moonpay', reason: 'provides wallet funding, hosted swaps, and fiat on/off-ramp flows via MoonPay MCP' },
 ];
 
-function getBuiltInListing(pluginId: string): MarketplaceListing | null {
-  return getBuiltInAgentRailListings().find((listing) => listing.id === pluginId) ?? null;
+function getBuiltInListing(_pluginId: string): MarketplaceListing | null {
+  // Agent-rail (Helius/MoonPay/x402) built-in MCP listings removed.
+  return null;
 }
 
 function mergeListings(primary: MarketplaceListing[], secondary: MarketplaceListing[]): MarketplaceListing[] {
@@ -241,17 +238,7 @@ export async function mcpSearch(query: string): Promise<MCPCommandResult> {
       query: searchQuery || undefined,
     }));
 
-    const builtIns = getBuiltInAgentRailListings().filter((listing) => {
-      if (category && listing.manifest.category !== category) return false;
-      if (!searchQuery) return true;
-      const haystack = [
-        listing.id,
-        listing.manifest.name,
-        listing.manifest.description,
-        listing.manifest.author,
-      ].join(' ').toLowerCase();
-      return haystack.includes(searchQuery.toLowerCase());
-    });
+    const builtIns: MarketplaceListing[] = [];
     const combinedListings = mergeListings(results.plugins, builtIns);
 
     if (combinedListings.length === 0) {

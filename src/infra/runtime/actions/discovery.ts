@@ -6,7 +6,6 @@ import {
   getIntegrationSurfaceMetadata,
 } from "../../domain/integrations/taxonomy.ts";
 import { pluginInstaller } from "../../ai/mcp/marketplace/installer.ts";
-import { createAgentRailsRegistry } from "../rails/registry.ts";
 import { getCanonicalActions } from "./registry.ts";
 import type { CapabilitySnapshot } from "./types.ts";
 
@@ -72,32 +71,6 @@ export async function discoverProviderCapabilities(config: GordonConfig): Promis
     });
   }
 
-  const rails = createAgentRailsRegistry(config);
-  for (const provider of rails.walletProviders) {
-    const integration = getIntegrationSurfaceMetadata(provider.config.type);
-    snapshots.push({
-      providerId: provider.config.id,
-      providerKind: "wallet",
-      label: integration.displayName,
-      supportsExecution: false,
-      capabilities: actionCapabilitiesForKind("wallet"),
-      notes: [`authMode=${provider.config.authMode}`],
-      integration,
-    });
-  }
-  for (const provider of rails.chainProviders) {
-    const integration = getIntegrationSurfaceMetadata(provider.config.type);
-    snapshots.push({
-      providerId: provider.config.id,
-      providerKind: "chain",
-      label: integration.displayName,
-      supportsExecution: false,
-      capabilities: actionCapabilitiesForKind("chain"),
-      notes: [`network=${provider.config.network}`],
-      integration,
-    });
-  }
-
   for (const chainSurfaceId of ["base_rpc", "base_flashblocks"] as const) {
     snapshots.push({
       providerId: chainSurfaceId,
@@ -107,18 +80,6 @@ export async function discoverProviderCapabilities(config: GordonConfig): Promis
       capabilities: [],
       notes: ["Chain infrastructure surface available for routing and observability only."],
       integration: getIntegrationSurfaceMetadata(chainSurfaceId),
-    });
-  }
-  for (const provider of rails.paymentProviders) {
-    const integration = getIntegrationSurfaceMetadata(provider.config.type);
-    snapshots.push({
-      providerId: provider.config.id,
-      providerKind: "payments",
-      label: integration.displayName,
-      supportsExecution: false,
-      capabilities: actionCapabilitiesForKind("payments"),
-      notes: [`network=${provider.config.network}`],
-      integration,
     });
   }
 

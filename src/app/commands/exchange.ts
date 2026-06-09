@@ -490,7 +490,7 @@ export async function exchangeCompare(symbol: string): Promise<ExchangeCommandRe
  */
 function isWalletBasedExchange(type: ExchangeId): boolean {
   if (isCcxtExchangeId(type)) return ccxtExchangeRequiresWallet(type);
-  return type === 'hyperliquid' || type === 'uniswap';
+  return type === 'hyperliquid';
 }
 
 function getExchangeSetupInstructions(type: ExchangeId, sandbox = false): string {
@@ -582,11 +582,6 @@ KRAKEN DEMO (Beta)
 3. IMPORTANT: Use a DEDICATED trading wallet with limited funds
 4. Fund your Hyperliquid account by depositing USDC on Arbitrum
 5. Note: Hyperliquid uses wallet-based auth (no API key needed)`,
-    uniswap: `
-1. Get an API key from developers.uniswap.org
-2. Provide your wallet address (the address that will execute swaps)
-3. Ensure your wallet has ETH for gas and tokens to trade
-4. Supports 15+ chains: Ethereum, Base, Arbitrum, Polygon, Optimism, etc.`,
     robinhood: `
 1. Open Robinhood Crypto API settings and create API credentials
 2. Copy your API key and private signing key

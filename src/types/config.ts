@@ -29,11 +29,11 @@ export const ExchangeConfigSchema = z.object({
  * inferred type to `string`, losing the literal-narrowing that downstream
  * consumers depend on.
  */
-const NATIVE_EXCHANGE_TYPES = ["binance", "binance_us", "coinbase", "kraken", "bitfinex", "hyperliquid", "uniswap", "robinhood", "okx", "gemini"] as const;
+const NATIVE_EXCHANGE_TYPES = ["binance", "binance_us", "coinbase", "kraken", "bitfinex", "hyperliquid", "robinhood", "okx", "gemini"] as const;
 const CCXT_TYPE_PATTERN = /^ccxt:[a-z0-9_]+$/;
 export const ExchangeTypeSchema = z.custom<
   | "binance" | "binance_us" | "coinbase" | "kraken" | "bitfinex"
-  | "hyperliquid" | "uniswap" | "robinhood" | "okx" | "gemini"
+  | "hyperliquid" | "robinhood" | "okx" | "gemini"
   | `ccxt:${string}`
 >((val) => {
   if (typeof val !== "string") return false;

@@ -17,7 +17,6 @@ import {
 } from "../../domain/integrations/taxonomy.ts";
 import { credentialManager } from "../../ai/mcp/credentials.ts";
 import { pluginInstaller } from "../../ai/mcp/marketplace/installer.ts";
-import { createAgentRailsRegistry } from "../rails/registry.ts";
 import { createKeyringProvider } from "../../storage/keyring.ts";
 import type {
   CredentialFieldStatus,
@@ -281,58 +280,11 @@ function getRailStatuses(
   envKeys: EnvMapRecord,
   keyringKeys: Set<string>,
 ): ProviderCredentialStatus[] {
-  const rails = createAgentRailsRegistry(config);
-  const statuses: ProviderCredentialStatus[] = [];
-
-  for (const provider of rails.walletProviders) {
-    statuses.push(buildStatus(
-      provider.config.id,
-      "wallet",
-      getIntegrationSurfaceMetadata(provider.config.type).displayName,
-      "ops",
-      provider.config.authMode,
-      provider.config.authMode === "mcp" ? "mcp" : provider.config.authMode === "hybrid" ? "hybrid" : "static",
-      [
-        resolveFieldStatus("MOONPAY_API_KEY", "MoonPay API key", true, { envKeys, keyringKeys }),
-        resolveFieldStatus("MOONPAY_SECRET_KEY", "MoonPay secret key", true, { envKeys, keyringKeys }),
-      ],
-      [provider.config.isDefault ? "active_wallet_provider" : ""].filter(Boolean),
-      provider.config.type,
-    ));
-  }
-
-  for (const provider of rails.chainProviders) {
-    statuses.push(buildStatus(
-      provider.config.id,
-      "chain",
-      getIntegrationSurfaceMetadata(provider.config.type).displayName,
-      "ops",
-      provider.config.authMode,
-      provider.config.authMode === "mcp" ? "mcp" : provider.config.authMode === "hybrid" ? "hybrid" : "static",
-      [resolveFieldStatus("HELIUS_API_KEY", "Helius API key", true, { envKeys, keyringKeys })],
-      [provider.config.isDefault ? "active_chain_provider" : ""].filter(Boolean),
-      provider.config.type,
-    ));
-  }
-
-  for (const provider of rails.paymentProviders) {
-    statuses.push(buildStatus(
-      provider.config.id,
-      "payments",
-      getIntegrationSurfaceMetadata(provider.config.type).displayName,
-      "ops",
-      provider.config.authMode,
-      provider.config.authMode === "mcp" ? "mcp" : provider.config.authMode === "hybrid" ? "hybrid" : "static",
-      [
-        resolveFieldStatus("POLYGON_X402_PRIVATE_KEY", "Polygon x402 private key", true, { envKeys, keyringKeys }),
-        resolveFieldStatus("POLYGON_X402_RECIPIENT", "Polygon x402 recipient", false, { envKeys, keyringKeys }),
-      ],
-      [provider.config.isDefault ? "active_payment_provider" : ""].filter(Boolean),
-      provider.config.type,
-    ));
-  }
-
-  return statuses;
+  // Agent rails (Helius/MoonPay/Polygon-x402) removed — no rail credential statuses.
+  void config;
+  void envKeys;
+  void keyringKeys;
+  return [];
 }
 
 function getDataAndAutomationStatuses(

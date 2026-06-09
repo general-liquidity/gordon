@@ -25,8 +25,6 @@ import {
   instrumentedBaseOnchainTools,
   instrumentedBaseSignalTools,
   instrumentedBaseIndexerTools,
-  instrumentedUniswapDataTools,
-  instrumentedDexSearchTools,
   instrumentedXSocialTools,
   instrumentedCdpWebhookTools,
   instrumentedCdpSqlTools,
@@ -38,15 +36,7 @@ import {
   instrumentedFinnhubFundamentalsTools,
   instrumentedFinnhubMarketsTools,
   instrumentedSecFilingTools,
-  instrumentedDefillamaYieldTools,
-  instrumentedChainlinkStreamsTools,
-  instrumentedChainlinkFeedsTools,
-  instrumentedSynthDataTools,
   instrumentedAgentKitOnchainTools,
-  instrumentedSolanaKitWalletTools,
-  instrumentedPolkadotKitAssetTools,
-  instrumentedPolkadotKitStakingTools,
-  instrumentedPolkadotKitDefiTools,
   gordonInputGuard,
   gordonToolCallReconciler,
   gordonOutputSanitizer,
@@ -408,8 +398,6 @@ export function getGordon(): Agent {
       ...instrumentedBaseOnchainTools,
       ...instrumentedBaseSignalTools,
       ...instrumentedBaseIndexerTools,
-      ...instrumentedUniswapDataTools,
-      ...instrumentedDexSearchTools,
       ...instrumentedXSocialTools,
 
       // CDP integration — INTEGRATION tier. Cold-gated.
@@ -426,26 +414,10 @@ export function getGordon(): Agent {
       ...(isHotTierOnly() ? {} : instrumentedSecFilingTools),
       ...instrumentedFinnhubMarketsTools,
 
-      // DefiLlama / Chainlink — INTEGRATION tier. Cold-gated.
-      ...(isHotTierOnly() ? {} : instrumentedDefillamaYieldTools),
-      ...(isHotTierOnly() ? {} : instrumentedChainlinkStreamsTools),
-      ...(isHotTierOnly() ? {} : instrumentedChainlinkFeedsTools),
-      ...instrumentedSynthDataTools,
-
       // AgentKit reads — INTEGRATION tier.
       agentkit_get_balance: instrumentedAgentKitOnchainTools.agentkit_get_balance,
       agentkit_get_wallet: instrumentedAgentKitOnchainTools.agentkit_get_wallet,
       agentkit_get_swap_price: instrumentedAgentKitOnchainTools.agentkit_get_swap_price,
-
-      // Solana / Polkadot — INTEGRATION tier. Cold-gated.
-      ...(isHotTierOnly() ? {} : instrumentedSolanaKitWalletTools),
-      ...(isHotTierOnly()
-        ? {}
-        : {
-            polkadot_check_balance: instrumentedPolkadotKitAssetTools.polkadot_check_balance,
-            polkadot_get_pool_info: instrumentedPolkadotKitStakingTools.polkadot_get_pool_info,
-            polkadot_initialize_chain: instrumentedPolkadotKitDefiTools.polkadot_initialize_chain,
-          }),
 
       // MCP plugin tools — external, never gated.
       ...getScopedMCPTools({

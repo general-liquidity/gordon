@@ -88,7 +88,6 @@ const NATIVE_VENUE_TIERS: Record<NativeExchangeId, VenueMevTier> = {
   gemini: "low",
   robinhood: "low",
   hyperliquid: "medium",
-  uniswap: "high",
 };
 
 const TIER_REASONS: Record<VenueMevTier, string> = {
