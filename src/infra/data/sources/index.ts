@@ -44,6 +44,18 @@ export { HistoricalDataCache } from "./cache.ts";
 export { ExchangeDataSource } from "./exchange-source.ts";
 export { BrokerDataSource } from "./broker-source.ts";
 
+// Onchain DEX/pool price sources (read-only, no wallet) + registration helper
+export {
+  onchainDataSources,
+  registerOnchainDataSources,
+  CoinGeckoOnchainDataSource,
+  BirdeyeDataSource,
+  CodexDataSource,
+  DefiLlamaDataSource,
+  DexScreenerDataSource,
+  OneInchDataSource,
+} from "./onchain.ts";
+
 // Manager
 export {
   DataSourceManager,

@@ -15,6 +15,7 @@ import {
   DataSourceManager,
   ExchangeDataSource,
   BrokerDataSource,
+  registerOnchainDataSources,
 } from "../../infra/data/sources/index.ts";
 
 const logger = createModuleLogger("historical-data");
@@ -107,6 +108,10 @@ function buildManager(client: HistoricalDataClient): {
   }
 
   manager.register(new ExchangeDataSource(client));
+  // Onchain DEX/pool sources as lower-priority fallbacks — they answer only
+  // for chain+token-addressed OHLC requests (else return [] and the exchange
+  // source serves the query). Auth-gated ones self-skip without their key.
+  registerOnchainDataSources(manager);
   return {
     manager,
     sourceKind: "exchange",

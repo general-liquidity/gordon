@@ -25,6 +25,19 @@ export interface OHLCParams {
   endTime: number;
   /** Optional exchange filter for multi-exchange data */
   exchange?: string;
+  /**
+   * Onchain addressing — used by onchain DEX/pool data sources, ignored by
+   * symbol-based (CEX/broker) sources. Onchain sources answer ONLY when a
+   * chain + a token or pool address is supplied; otherwise they return [] so
+   * the manager falls through to a symbol-based source.
+   */
+  chain?: string;
+  /** Base token contract / mint address (onchain sources). */
+  tokenAddress?: string;
+  /** Quote token contract / mint address (defaults to the chain's USD stable when omitted). */
+  quoteTokenAddress?: string;
+  /** Specific pool / pair address to read OHLCV from (onchain sources). */
+  poolAddress?: string;
 }
 
 // ============================================================================
