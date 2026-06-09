@@ -358,6 +358,13 @@ function getBrokerSetupInstructions(type: BrokerId): string {
 3. Use /setup to store IBKR_API_KEY, IBKR_API_SECRET, IBKR_PAPER
 4. Optional: set IBKR_ACCOUNT_ID to pin account routing
 5. Validate paper account order flow before live`,
+    syphonix: `
+1. Model to Market competition venue — adapter is gated OFF until the API spec
+   drops at the 2026-06-15 kickoff (see docs/model-to-market/SYPHONIX_INTEGRATION.md)
+2. After the kickoff: fill the endpoint/auth in adapters/syphonix.ts
+3. Set GORDON_SYPHONIX_API_KEY, GORDON_SYPHONIX_BASE_URL, GORDON_SYPHONIX_PAPER=true
+4. Flip the inclusion-gate entry to approved + documentedExecutionEndpoints:true
+5. Smoke-test auth/quote/order/cancel on FX/metals/crypto before the live week`,
   };
   return instructions[type];
 }

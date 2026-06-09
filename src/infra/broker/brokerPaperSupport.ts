@@ -70,6 +70,10 @@ export const BROKER_PAPER_SUPPORT: Record<BrokerId, BrokerPaperSupportEntry> = {
     kind: "account",
     docs: "IBKR paper trading runs through the same Client Portal Gateway on a different port (typically 5001 vs 5000). Set IBKR_PAPER=true and point IBKR_GATEWAY_URL to your paper gateway.",
   },
+  syphonix: {
+    kind: "sim_url",
+    docs: "Model to Market competition runs on Syphonix's paper sim. Base URL + auth come from the API spec at the 2026-06-15 kickoff; set GORDON_SYPHONIX_PAPER=true. See docs/model-to-market/SYPHONIX_INTEGRATION.md.",
+  },
 };
 
 export class BrokerPaperNotSupportedError extends Error {

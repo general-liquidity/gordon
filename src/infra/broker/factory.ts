@@ -12,6 +12,7 @@ import { TastytradeAdapter } from "./adapters/tastytrade.ts";
 import { Trading212Adapter } from "./adapters/trading212.ts";
 import { EtradeAdapter } from "./adapters/etrade.ts";
 import { IbkrAdapter } from "./adapters/ibkr.ts";
+import { SyphonixAdapter } from "./adapters/syphonix.ts";
 import {
   assertBrokerPassesInclusionGate,
   getBrokerInclusionDecision,
@@ -30,6 +31,10 @@ const SUPPORTED_BROKERS: BrokerId[] = [
   "trading212",
   "etrade",
   "ibkr",
+  // "syphonix" is intentionally NOT listed until the API spec is wired + the
+  // inclusion gate flips to approved (2026-06-15). The adapter + factory case
+  // exist; SUPPORTED_BROKERS stays the approved-and-creatable set, preserving
+  // the invariant that everything here passes the B2C inclusion gate.
 ];
 
 function getCacheKey(brokerId: BrokerId, credentials: BrokerCredentials): string {
@@ -84,6 +89,9 @@ export class BrokerFactory {
         break;
       case "ibkr":
         broker = new IbkrAdapter(credentials);
+        break;
+      case "syphonix":
+        broker = new SyphonixAdapter(credentials);
         break;
       default:
         throw new Error(`No adapter available for broker: ${brokerId}`);

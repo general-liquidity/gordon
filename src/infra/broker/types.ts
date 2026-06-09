@@ -22,7 +22,8 @@ export type BrokerId =
   | "tastytrade"
   | "trading212"
   | "etrade"
-  | "ibkr";
+  | "ibkr"
+  | "syphonix";
 
 /**
  * Runtime array of all supported broker IDs. Kept in sync with BrokerId via
@@ -100,6 +101,12 @@ export const BROKER_ENV_MAP: Record<BrokerId, { key: string; secret: string; pap
     secret: "IBKR_API_SECRET",
     paper: "IBKR_PAPER",
     accountId: "IBKR_ACCOUNT_ID",
+  },
+  syphonix: {
+    key: "GORDON_SYPHONIX_API_KEY",
+    secret: "GORDON_SYPHONIX_API_SECRET",
+    paper: "GORDON_SYPHONIX_PAPER",
+    accountId: "GORDON_SYPHONIX_ACCOUNT_ID",
   },
 };
 
