@@ -4,7 +4,7 @@ import { checkEnvStatus, loadEnvFile } from "../../infra/storage/config/env.ts";
 import { getCurrentSession } from "../../infra/storage/entities/session.ts";
 import { createLLMClientFromEnv } from "../../infra/ai/llm/index.ts";
 import { BinanceClient } from "../../infra/venues/exchange/clients/binance/index.ts";
-import { BinanceAdapter, ExchangeFactory, type Exchange } from "../../infra/exchange/index.ts";
+import { ExchangeFactory, type Exchange } from "../../infra/exchange/index.ts";
 import { BrokerFactory } from "../../infra/broker/factory.ts";
 import { BROKER_ENV_MAP, type BrokerId } from "../../infra/broker/types.ts";
 import { isBrokerPaperSupported } from "../../infra/broker/brokerPaperSupport.ts";
@@ -121,7 +121,10 @@ export class GatewayContextResolver {
     if (!exchange && env.hasBinanceKeys && env.keys.BINANCE_API_KEY && env.keys.BINANCE_API_SECRET) {
       try {
         binance = new BinanceClient(env.keys.BINANCE_API_KEY, env.keys.BINANCE_API_SECRET);
-        exchange = new BinanceAdapter(env.keys.BINANCE_API_KEY, env.keys.BINANCE_API_SECRET);
+        exchange = ExchangeFactory.create("binance", {
+          apiKey: env.keys.BINANCE_API_KEY,
+          apiSecret: env.keys.BINANCE_API_SECRET,
+        });
       } catch (error) {
         logger.warn("Failed to initialize Binance fallback exchange for gateway", {
           error: error instanceof Error ? error.message : String(error),

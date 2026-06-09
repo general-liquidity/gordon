@@ -22,10 +22,7 @@
  */
 
 import type { Exchange, ExchangeId } from "./types.ts";
-import { BinanceAdapter } from "./adapters/binance.ts";
-import { KrakenAdapter } from "./adapters/kraken.ts";
-import { CoinbaseAdapter } from "./adapters/coinbase.ts";
-import { BitfinexAdapter } from "./adapters/bitfinex.ts";
+import { CcxtAdapter } from "./adapters/ccxt-adapter.ts";
 
 /**
  * Which exchange IDs can be safely instantiated in public-only mode (empty
@@ -69,22 +66,19 @@ export function createPublicExchange(exchangeId: ExchangeId): Exchange {
     throw new PublicExchangeNotSupportedError(exchangeId);
   }
 
-  switch (exchangeId) {
-    case "binance":
-      return new BinanceAdapter("", "");
-    case "binance_us":
-      // BinanceAdapter supports the US endpoint via its internal BinanceClient
-      // constructor; wrap explicitly to keep behavior consistent.
-      return new BinanceAdapter("", "");
-    case "coinbase":
-      return new CoinbaseAdapter("", "", "");
-    case "kraken":
-      return new KrakenAdapter("", "");
-    case "bitfinex":
-      return new BitfinexAdapter("", "");
-    default:
-      throw new PublicExchangeNotSupportedError(exchangeId);
+  // All public venues route through the CCXT-backed adapter (no credentials).
+  const publicSubId: Partial<Record<ExchangeId, string>> = {
+    binance: "binance",
+    binance_us: "binanceus",
+    coinbase: "coinbase",
+    kraken: "kraken",
+    bitfinex: "bitfinex",
+  };
+  const subId = publicSubId[exchangeId];
+  if (!subId) {
+    throw new PublicExchangeNotSupportedError(exchangeId);
   }
+  return new CcxtAdapter(subId, { apiKey: "", apiSecret: "" });
 }
 
 /**

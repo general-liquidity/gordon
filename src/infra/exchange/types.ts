@@ -80,6 +80,8 @@ export interface ExchangeCredentials {
   sandbox?: boolean;
   /** Wallet private key for DEX exchanges (e.g., Hyperliquid) */
   walletPrivateKey?: string;
+  /** Wallet/main-account address for DEX exchanges (Hyperliquid via CCXT — read endpoints key off the address, which CCXT does not derive from the private key) */
+  walletAddress?: string;
   /** OAuth 2.0 bearer access token (e.g., Gemini) — takes precedence over apiKey/apiSecret */
   accessToken?: string;
 }
@@ -89,13 +91,13 @@ export interface ExchangeCredentials {
  * Used by saveConfiguration to persist all exchange keys to .env,
  * and by resolveExchangeCredentials to restore them from process.env.
  */
-export const EXCHANGE_ENV_MAP: Record<NativeExchangeId, { key?: string; secret?: string; passphrase?: string; wallet?: string }> = {
+export const EXCHANGE_ENV_MAP: Record<NativeExchangeId, { key?: string; secret?: string; passphrase?: string; wallet?: string; walletAddress?: string }> = {
   binance:     { key: "BINANCE_API_KEY",     secret: "BINANCE_API_SECRET" },
   binance_us:  { key: "BINANCE_US_API_KEY",  secret: "BINANCE_US_API_SECRET" },
   coinbase:    { key: "COINBASE_API_KEY",     secret: "COINBASE_API_SECRET",   passphrase: "COINBASE_PASSPHRASE" },
   kraken:      { key: "KRAKEN_API_KEY",       secret: "KRAKEN_API_SECRET" },
   bitfinex:    { key: "BITFINEX_API_KEY",     secret: "BITFINEX_API_SECRET" },
-  hyperliquid: { wallet: "HYPERLIQUID_PRIVATE_KEY" },
+  hyperliquid: { wallet: "HYPERLIQUID_PRIVATE_KEY", walletAddress: "HYPERLIQUID_WALLET_ADDRESS" },
   robinhood:   { key: "ROBINHOOD_API_KEY",    secret: "ROBINHOOD_API_SECRET" },
   okx:         { key: "OKX_API_KEY",          secret: "OKX_API_SECRET",       passphrase: "OKX_PASSPHRASE" },
   gemini:      { key: "GEMINI_API_KEY",       secret: "GEMINI_API_SECRET" },
@@ -144,7 +146,8 @@ export function resolveExchangeCredentials(
     if (isRedacted(apiSecret)) apiSecret = process.env[envs.secret] || "";
     if (isRedacted(passphrase)) passphrase = process.env[envs.passphrase] || undefined;
     if (isRedacted(walletPrivateKey)) walletPrivateKey = process.env[envs.walletKey] || undefined;
-    return { apiKey, apiSecret, passphrase, sandbox: config.sandbox, walletPrivateKey };
+    const walletAddress = process.env[envs.walletAddress] || undefined;
+    return { apiKey, apiSecret, passphrase, sandbox: config.sandbox, walletPrivateKey, walletAddress };
   }
 
   const envMap = config.type in EXCHANGE_ENV_MAP
@@ -156,12 +159,14 @@ export function resolveExchangeCredentials(
   let apiSecret = config.apiSecret;
   let passphrase = config.passphrase;
   let walletPrivateKey = config.walletPrivateKey;
+  let walletAddress: string | undefined;
 
   if (envMap) {
     if (isRedacted(apiKey) && envMap.key) apiKey = process.env[envMap.key] || "";
     if (isRedacted(apiSecret) && envMap.secret) apiSecret = process.env[envMap.secret] || "";
     if (isRedacted(passphrase) && envMap.passphrase) passphrase = process.env[envMap.passphrase] || undefined;
     if (isRedacted(walletPrivateKey) && envMap.wallet) walletPrivateKey = process.env[envMap.wallet] || undefined;
+    if (envMap.walletAddress) walletAddress = process.env[envMap.walletAddress] || undefined;
   }
 
   // Final fallback: clear any remaining redacted placeholders
@@ -170,7 +175,7 @@ export function resolveExchangeCredentials(
   if (isRedacted(passphrase)) passphrase = undefined;
   if (isRedacted(walletPrivateKey)) walletPrivateKey = undefined;
 
-  return { apiKey, apiSecret, passphrase, sandbox: config.sandbox, walletPrivateKey };
+  return { apiKey, apiSecret, passphrase, sandbox: config.sandbox, walletPrivateKey, walletAddress };
 }
 
 // ============================================================================

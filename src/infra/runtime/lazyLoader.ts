@@ -33,9 +33,9 @@ export interface LazyModule<T> {
  *
  * @example
  * ```ts
- * const geminiAdapter = lazy(() => import("../exchange/adapters/gemini.ts"));
+ * const oauthFlow = lazy(() => import("../auth/oauth-flow.ts"));
  * // ... later, on first use:
- * const { GeminiAdapter } = await geminiAdapter.get();
+ * const { startOAuth } = await oauthFlow.get();
  * ```
  */
 export function lazy<T>(importer: () => Promise<T>): LazyModule<T> {
@@ -133,9 +133,6 @@ export function featureModule<T>(flag: string, importer: () => Promise<T>): Lazy
 // ============================================================================
 // Pre-Built Lazy Modules for Gordon
 // ============================================================================
-
-/** Lazy Gemini exchange adapter. */
-export const lazyGemini = lazy(() => import("../exchange/adapters/gemini.ts"));
 
 /** Lazy OAuth flow. */
 export const lazyOAuth = lazy(() => import("../auth/oauth-flow.ts"));

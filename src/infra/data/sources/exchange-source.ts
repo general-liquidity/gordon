@@ -58,9 +58,9 @@ const DEFAULT_TIMEFRAMES = [
  *
  * @example
  * ```typescript
- * import { BinanceAdapter } from "../../exchange";
+ * import { ExchangeFactory } from "../../exchange";
  *
- * const exchange = new BinanceAdapter(apiKey, apiSecret);
+ * const exchange = ExchangeFactory.create("binance", { apiKey, apiSecret });
  * const source = new ExchangeDataSource(exchange);
  *
  * const candles = await source.fetchOHLC({

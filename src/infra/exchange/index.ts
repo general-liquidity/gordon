@@ -40,15 +40,8 @@ export * from "./types.ts";
 // Factory (recommended entry point)
 export { ExchangeFactory } from "./factory.ts";
 
-// Adapters
-export { BinanceAdapter } from "./adapters/binance.ts";
-export { BinanceUSAdapter } from "./adapters/binance-us.ts";
-export { CoinbaseAdapter } from "./adapters/coinbase.ts";
-export { KrakenAdapter } from "./adapters/kraken.ts";
-export { BitfinexAdapter } from "./adapters/bitfinex.ts";
-export { HyperliquidAdapter } from "./adapters/hyperliquid.ts";
-export { RobinhoodAdapter } from "./adapters/robinhood.ts";
-export { OkxAdapter } from "./adapters/okx.ts";
+// Adapters — all venues route through the single CCXT-backed adapter.
+export { CcxtAdapter } from "./adapters/ccxt-adapter.ts";
 
 // Type aliases for convenience
 export type {

@@ -12,7 +12,6 @@
  */
 
 import type { Exchange, Order, OrderParams, ExchangeExtended, OCOOrderParams } from "../../infra/exchange/index.ts";
-import { BinanceAdapter } from "../../infra/exchange/index.ts";
 import { validatePlan } from "./validator.ts";
 import { createTrade, updateTrade, getTrade, listTrades } from "../../infra/storage/entities/trades.ts";
 import { updatePlan, listPlans, getPlan } from "../../infra/storage/entities/plans.ts";
@@ -25,7 +24,6 @@ import {
   isGordonError,
 } from "../../errors/index.ts";
 import { auditLog } from "../../infra/platform/audit/index.ts";
-import { validateOperation } from "../../infra/venues/exchange/clients/binance/permissions.ts";
 import type {
   Plan,
   Trade,
@@ -180,10 +178,9 @@ export function roundPrice(price: number, precision: number = 8): number {
 }
 
 async function validateTradePermissions(exchange: Exchange): Promise<{ allowed: boolean; error?: string }> {
-  if (exchange instanceof BinanceAdapter) {
-    return validateOperation(exchange.getUnderlyingClient(), "trade");
-  }
-
+  // Interface-based permission check — every venue is now backed by CcxtAdapter,
+  // which reports canTrade via the unified getAccountInfo(). (Previously a
+  // Binance-specific branch reached into the raw client; that adapter is gone.)
   try {
     const accountInfo = await exchange.getAccountInfo();
     if (!accountInfo.canTrade) {

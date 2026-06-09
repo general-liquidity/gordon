@@ -4,7 +4,7 @@
  */
 
 import { BinanceClient } from "../infra/venues/exchange/clients/binance/index.ts";
-import { BinanceAdapter, type Exchange } from "../infra/exchange/index.ts";
+import { ExchangeFactory, type Exchange } from "../infra/exchange/index.ts";
 import { LLMClient, type LLMProvider } from "../infra/ai/llm/index.ts";
 import { PriceCache } from "../infra/platform/cache/index.ts";
 import { EventBus } from "../events/index.ts";
@@ -92,12 +92,11 @@ export class ServiceContainer {
 
     // Create exchange client if credentials provided
     if (config.binance?.apiKey && config.binance?.apiSecret) {
-      // Create BinanceAdapter (implements Exchange interface)
-      const binanceAdapter = new BinanceAdapter(
-        config.binance.apiKey,
-        config.binance.apiSecret
-      );
-      this.services.exchange = binanceAdapter;
+      // CCXT-backed Binance adapter (implements Exchange interface)
+      this.services.exchange = ExchangeFactory.create("binance", {
+        apiKey: config.binance.apiKey,
+        apiSecret: config.binance.apiSecret,
+      });
 
       // Also create raw BinanceClient for backward compatibility
       // TODO: Remove in v2.0 when all code uses Exchange interface

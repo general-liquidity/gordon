@@ -6,15 +6,6 @@
 import type { Exchange, ExchangeId, NativeExchangeId, ExchangeCredentials } from "./types.ts";
 import { isCcxtExchangeId, extractCcxtSubId } from "./types.ts";
 import { CcxtAdapter } from "./adapters/ccxt-adapter.ts";
-import { BinanceAdapter } from "./adapters/binance.ts";
-import { BinanceUSAdapter } from "./adapters/binance-us.ts";
-import { CoinbaseAdapter } from "./adapters/coinbase.ts";
-import { KrakenAdapter } from "./adapters/kraken.ts";
-import { BitfinexAdapter } from "./adapters/bitfinex.ts";
-import { HyperliquidAdapter } from "./adapters/hyperliquid.ts";
-import { RobinhoodAdapter } from "./adapters/robinhood.ts";
-import { OkxAdapter } from "./adapters/okx.ts";
-import { GeminiAdapter } from "./adapters/gemini.ts";
 import { loadOAuthExchangeCredentials, exchangeSupportsOAuth } from "./oauth-bridge.ts";
 import { assertSandboxSupported } from "./sandboxSupport.ts";
 
@@ -37,6 +28,23 @@ const SUPPORTED_EXCHANGES: NativeExchangeId[] = [
   "okx",
   "gemini",
 ];
+
+/**
+ * Maps each first-class venue id to its CCXT sub-id. All venues are backed
+ * by CCXT (single unified adapter); the only id that differs from its CCXT
+ * sub-id is binance_us → `binanceus`.
+ */
+const NATIVE_TO_CCXT_SUBID: Record<NativeExchangeId, string> = {
+  binance: "binance",
+  binance_us: "binanceus",
+  coinbase: "coinbase",
+  kraken: "kraken",
+  bitfinex: "bitfinex",
+  hyperliquid: "hyperliquid",
+  robinhood: "robinhood",
+  okx: "okx",
+  gemini: "gemini",
+};
 
 /**
  * Cache key generator for exchange instances
@@ -129,6 +137,7 @@ export class ExchangeFactory {
           apiSecret: credentials.apiSecret,
           passphrase: credentials.passphrase,
           walletPrivateKey: credentials.walletPrivateKey,
+          walletAddress: credentials.walletAddress,
         },
         credentials.sandbox,
       );
@@ -155,64 +164,32 @@ export class ExchangeFactory {
       return cached;
     }
 
-    // Create appropriate adapter
-    let exchange: Exchange;
-
-    switch (exchangeId as NativeExchangeId) {
-      case "binance":
-        exchange = new BinanceAdapter(credentials.apiKey, credentials.apiSecret, credentials.sandbox);
-        break;
-      case "binance_us":
-        exchange = new BinanceUSAdapter(credentials.apiKey, credentials.apiSecret);
-        break;
-      case "coinbase":
-        if (!credentials.passphrase) {
-          throw new Error("Coinbase requires a passphrase in addition to API key and secret");
-        }
-        exchange = new CoinbaseAdapter(
-          credentials.apiKey,
-          credentials.apiSecret,
-          credentials.passphrase,
-          credentials.sandbox,
-        );
-        break;
-      case "kraken":
-        exchange = new KrakenAdapter(credentials.apiKey, credentials.apiSecret);
-        break;
-      case "bitfinex":
-        exchange = new BitfinexAdapter(credentials.apiKey, credentials.apiSecret, credentials.sandbox);
-        break;
-      case "hyperliquid":
-        if (!credentials.walletPrivateKey) {
-          throw new Error("Hyperliquid requires a wallet private key for authentication");
-        }
-        exchange = new HyperliquidAdapter(credentials.walletPrivateKey, credentials.sandbox);
-        break;
-      case "robinhood":
-        exchange = new RobinhoodAdapter(credentials.apiKey, credentials.apiSecret);
-        break;
-      case "gemini":
-        exchange = new GeminiAdapter({
-          accessToken: credentials.accessToken,
-          apiKey: credentials.apiKey,
-          apiSecret: credentials.apiSecret,
-          sandbox: credentials.sandbox,
-        });
-        break;
-      case "okx":
-        if (!credentials.passphrase) {
-          throw new Error("OKX requires a passphrase in addition to API key and secret");
-        }
-        exchange = new OkxAdapter(
-          credentials.apiKey,
-          credentials.apiSecret,
-          credentials.passphrase,
-          credentials.sandbox,
-        );
-        break;
-      default:
-        throw new Error(`No adapter available for exchange: ${exchangeId}`);
+    // All venues route through the single CCXT adapter. The venue ids stay
+    // first-class (and resolve from their existing native env vars via
+    // resolveExchangeCredentials) but are backed by CCXT under the hood —
+    // CCXT keeps every exchange's spec current, so there are no hand-tuned
+    // native adapters left to rot. Per-venue auth requirements (passphrase,
+    // wallet) are still enforced here before construction.
+    const nativeId = exchangeId as NativeExchangeId;
+    if ((nativeId === "coinbase" || nativeId === "okx") && !credentials.passphrase) {
+      throw new Error(`${nativeId} requires a passphrase in addition to API key and secret`);
     }
+    if (nativeId === "hyperliquid" && !credentials.walletPrivateKey) {
+      throw new Error("Hyperliquid requires a wallet private key for authentication");
+    }
+
+    const ccxtSubId = NATIVE_TO_CCXT_SUBID[nativeId];
+    const exchange = new CcxtAdapter(
+      ccxtSubId,
+      {
+        apiKey: credentials.apiKey,
+        apiSecret: credentials.apiSecret,
+        passphrase: credentials.passphrase,
+        walletPrivateKey: credentials.walletPrivateKey,
+        walletAddress: credentials.walletAddress,
+      },
+      credentials.sandbox,
+    );
 
     // Cache the instance
     this.instanceCache.set(cacheKey, exchange);

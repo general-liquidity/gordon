@@ -11,11 +11,11 @@
  *   ExchangeDataSource,
  *   getDataSourceManager,
  * } from "./";
- * import { BinanceAdapter } from "../../exchange";
+ * import { ExchangeFactory } from "../../exchange";
  *
  * // Setup
  * const manager = getDataSourceManager();
- * const exchange = new BinanceAdapter(apiKey, apiSecret);
+ * const exchange = ExchangeFactory.create("binance", { apiKey, apiSecret });
  * manager.register(new ExchangeDataSource(exchange));
  *
  * // Fetch data
