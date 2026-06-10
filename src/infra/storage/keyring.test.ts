@@ -123,13 +123,6 @@ describe("KEYRING_SUPPORTED_KEYS", () => {
     expect(KEYRING_SUPPORTED_KEYS).toContain("ANTHROPIC_API_KEY");
   });
 
-  test("contains expected agent rail keys", () => {
-    expect(KEYRING_SUPPORTED_KEYS).toContain("MOONPAY_API_KEY");
-    expect(KEYRING_SUPPORTED_KEYS).toContain("MOONPAY_WEBHOOK_API_KEY");
-    expect(KEYRING_SUPPORTED_KEYS).toContain("MOONPAY_VIRTUAL_ACCOUNTS_PRIVATE_KEY");
-    expect(KEYRING_SUPPORTED_KEYS).toContain("POLYGON_X402_PRIVATE_KEY");
-  });
-
   test("all keys are uppercase with underscores", () => {
     for (const key of KEYRING_SUPPORTED_KEYS) {
       expect(key).toMatch(/^[A-Z][A-Z0-9_]+$/);

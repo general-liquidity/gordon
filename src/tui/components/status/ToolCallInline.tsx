@@ -231,8 +231,7 @@ function getToolLabel(toolName: string): string {
   if (/debank/i.test(toolName)) return "DeBank";
   if (/token_holder|wallet_intel|smart_money/i.test(toolName)) return "Wallet Intel";
 
-  // MoonPay
-  if (/moonpay/i.test(toolName)) return "MoonPay";
+
 
   // SynthData
   if (/synthdata/i.test(toolName)) return "SynthData";

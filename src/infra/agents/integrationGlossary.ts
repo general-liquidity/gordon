@@ -69,9 +69,6 @@ function fingerprintConfig(config: GordonConfig): string {
     brokers: config.brokers.map((broker) => `${broker.id}:${broker.type}:${broker.isDefault ? "1" : "0"}`).sort(),
     modelProvider: config.modelConfig?.provider ?? "default",
     modelId: config.modelConfig?.model ?? "",
-    walletProviders: config.agentRails.walletProviders.map((provider) => `${provider.id}:${provider.type}:${provider.enabled ? "1" : "0"}`).sort(),
-    chainProviders: config.agentRails.chainProviders.map((provider) => `${provider.id}:${provider.type}:${provider.enabled ? "1" : "0"}`).sort(),
-    paymentProviders: config.agentRails.paymentProviders.map((provider) => `${provider.id}:${provider.type}:${provider.enabled ? "1" : "0"}`).sort(),
   });
 }
 
@@ -220,15 +217,6 @@ function collectActiveIntegrationIds(context: GordonContext): string[] {
         ids.add(`dedalus/${routedProvider}`);
       }
     }
-  }
-  for (const wallet of context.config.agentRails.walletProviders) {
-    if (wallet.enabled) ids.add(wallet.type);
-  }
-  for (const chain of context.config.agentRails.chainProviders) {
-    if (chain.enabled) ids.add(chain.type);
-  }
-  for (const payment of context.config.agentRails.paymentProviders) {
-    if (payment.enabled) ids.add(payment.type);
   }
   return [...ids];
 }

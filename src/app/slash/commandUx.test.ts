@@ -35,7 +35,6 @@ describe("command UX model", () => {
       setupComplete: false,
       hasExchange: false,
       hasBroker: false,
-      hasWalletRails: false,
     });
 
     expect(actions.map((entry) => entry.command)).toEqual([
@@ -47,20 +46,6 @@ describe("command UX model", () => {
     ]);
   });
 
-  it("surfaces funding when rails are configured and the system is ready", () => {
-    const actions = getQuickActionItems({
-      permissionMode: "ask",
-      workspace: "desk",
-      setupComplete: true,
-      hasExchange: true,
-      hasBroker: false,
-      hasWalletRails: true,
-    });
-
-    expect(actions.map((entry) => entry.command)).toContain("/fund quote");
-    expect(actions.map((entry) => entry.command)).toContain("/preview-order");
-  });
-
   it("switches suggested quick actions with the active workspace", () => {
     const actions = getQuickActionItems({
       permissionMode: "ask",
@@ -68,7 +53,6 @@ describe("command UX model", () => {
       setupComplete: true,
       hasExchange: true,
       hasBroker: false,
-      hasWalletRails: false,
     });
 
     expect(actions.map((entry) => entry.command)).toEqual([
@@ -86,14 +70,12 @@ describe("command UX model", () => {
       setupComplete: false,
       hasExchange: false,
       hasBroker: false,
-      hasWalletRails: false,
     });
     const readyRecommendations = buildQuickStartRecommendedOptions({
       permissionMode: "auto",
       setupComplete: true,
       hasExchange: true,
       hasBroker: false,
-      hasWalletRails: false,
     });
 
     expect(setupRecommendations[0]).toBe("chat");

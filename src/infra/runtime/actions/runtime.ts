@@ -40,8 +40,6 @@ const REQUEST_ACTION_SUPPORT: Record<string, string[]> = {
     "account.portfolio",
   ],
   "account.portfolio": ["account.portfolio"],
-  "wallet.fund": ["wallet.fund", "account.portfolio"],
-  "payments.intent": ["payments.intent"],
   "system.set_auto": ["system.set_auto"],
   "system.set_ask": ["system.set_ask"],
   "system.set_strict": ["system.set_strict"],

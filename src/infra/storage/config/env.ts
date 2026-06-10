@@ -107,15 +107,6 @@ export interface EnvKeys {
   OTEL_EXPORTER_OTLP_ENDPOINT?: string;
   OTEL_EXPORTER_OTLP_HEADERS?: string;
   SYNTHDATA_API_KEY?: string;
-  MOONPAY_API_KEY?: string;
-  MOONPAY_SECRET_KEY?: string;
-  MOONPAY_WIDGET_URL?: string;
-  MOONPAY_WEBHOOK_API_KEY?: string;
-  MOONPAY_VIRTUAL_ACCOUNTS_PRIVATE_KEY?: string;
-  POLYGON_X402_PRIVATE_KEY?: string;
-  POLYGON_X402_RECIPIENT?: string;
-  POLYGON_X402_CHAIN_ID?: string;
-  POLYGON_X402_FACILITATOR_URL?: string;
 }
 
 export interface EnvStatus {
@@ -139,8 +130,6 @@ export interface EnvStatus {
   tracingRequested: boolean;
   tracingReviewed: boolean;
   hasSynthDataKey: boolean;
-  hasMoonPayKeys: boolean;
-  hasPolygonX402Key: boolean;
   keys: EnvKeys;
 }
 
@@ -242,8 +231,6 @@ const ENV_KEY_NAMES: (keyof EnvKeys)[] = [
   "GORDON_AXIOM_BASE_URL", "GORDON_AXIOM_EVENTS_DATASET", "GORDON_AXIOM_AUDIT_DATASET",
   "OTEL_TRACING_ENABLED", "GORDON_TRACING_REVIEWED", "OTEL_EXPORTER_OTLP_ENDPOINT", "OTEL_EXPORTER_OTLP_HEADERS",
   "SYNTHDATA_API_KEY",
-  "MOONPAY_API_KEY", "MOONPAY_SECRET_KEY", "MOONPAY_WIDGET_URL", "MOONPAY_WEBHOOK_API_KEY", "MOONPAY_VIRTUAL_ACCOUNTS_PRIVATE_KEY",
-  "POLYGON_X402_PRIVATE_KEY", "POLYGON_X402_RECIPIENT", "POLYGON_X402_CHAIN_ID", "POLYGON_X402_FACILITATOR_URL",
 ];
 
 /** Build EnvStatus flags from resolved keys */
@@ -276,14 +263,6 @@ function buildEnvStatus(keys: EnvKeys, fileExists: boolean): EnvStatus {
     tracingRequested: keys.OTEL_TRACING_ENABLED === "true",
     tracingReviewed: keys.GORDON_TRACING_REVIEWED === "true",
     hasSynthDataKey: !!keys.SYNTHDATA_API_KEY,
-    hasMoonPayKeys: !!(
-      keys.MOONPAY_API_KEY
-      || keys.MOONPAY_SECRET_KEY
-      || keys.MOONPAY_WIDGET_URL
-      || keys.MOONPAY_WEBHOOK_API_KEY
-      || keys.MOONPAY_VIRTUAL_ACCOUNTS_PRIVATE_KEY
-    ),
-    hasPolygonX402Key: !!(keys.POLYGON_X402_PRIVATE_KEY || keys.POLYGON_X402_RECIPIENT),
     keys,
   };
 }
@@ -631,57 +610,6 @@ export async function createEnvFile(keys: Partial<EnvKeys>): Promise<void> {
     lines.push(formatEnvLine("SYNTHDATA_API_KEY", keys.SYNTHDATA_API_KEY));
   } else {
     lines.push("# SYNTHDATA_API_KEY=");
-  }
-
-  lines.push("");
-  lines.push("# MoonPay (wallet funding, swaps, on/off-ramp)");
-  if (keys.MOONPAY_API_KEY) {
-    lines.push(formatEnvLine("MOONPAY_API_KEY", keys.MOONPAY_API_KEY));
-  } else {
-    lines.push("# MOONPAY_API_KEY=");
-  }
-  if (keys.MOONPAY_SECRET_KEY) {
-    lines.push(formatEnvLine("MOONPAY_SECRET_KEY", keys.MOONPAY_SECRET_KEY));
-  } else {
-    lines.push("# MOONPAY_SECRET_KEY=");
-  }
-  if (keys.MOONPAY_WIDGET_URL) {
-    lines.push(formatEnvLine("MOONPAY_WIDGET_URL", keys.MOONPAY_WIDGET_URL));
-  } else {
-    lines.push("# MOONPAY_WIDGET_URL=");
-  }
-  if (keys.MOONPAY_WEBHOOK_API_KEY) {
-    lines.push(formatEnvLine("MOONPAY_WEBHOOK_API_KEY", keys.MOONPAY_WEBHOOK_API_KEY));
-  } else {
-    lines.push("# MOONPAY_WEBHOOK_API_KEY=");
-  }
-  if (keys.MOONPAY_VIRTUAL_ACCOUNTS_PRIVATE_KEY) {
-    lines.push(formatEnvLine("MOONPAY_VIRTUAL_ACCOUNTS_PRIVATE_KEY", keys.MOONPAY_VIRTUAL_ACCOUNTS_PRIVATE_KEY));
-  } else {
-    lines.push("# MOONPAY_VIRTUAL_ACCOUNTS_PRIVATE_KEY=-----BEGIN PRIVATE KEY-----...");
-  }
-
-  lines.push("");
-  lines.push("# Polygon x402 (agent payments and paid API access)");
-  if (keys.POLYGON_X402_PRIVATE_KEY) {
-    lines.push(formatEnvLine("POLYGON_X402_PRIVATE_KEY", keys.POLYGON_X402_PRIVATE_KEY));
-  } else {
-    lines.push("# POLYGON_X402_PRIVATE_KEY=0x...");
-  }
-  if (keys.POLYGON_X402_RECIPIENT) {
-    lines.push(formatEnvLine("POLYGON_X402_RECIPIENT", keys.POLYGON_X402_RECIPIENT));
-  } else {
-    lines.push("# POLYGON_X402_RECIPIENT=");
-  }
-  if (keys.POLYGON_X402_CHAIN_ID) {
-    lines.push(formatEnvLine("POLYGON_X402_CHAIN_ID", keys.POLYGON_X402_CHAIN_ID));
-  } else {
-    lines.push("# POLYGON_X402_CHAIN_ID=polygon");
-  }
-  if (keys.POLYGON_X402_FACILITATOR_URL) {
-    lines.push(formatEnvLine("POLYGON_X402_FACILITATOR_URL", keys.POLYGON_X402_FACILITATOR_URL));
-  } else {
-    lines.push("# POLYGON_X402_FACILITATOR_URL=");
   }
 
   // ---- Gordon LLM Provider ----

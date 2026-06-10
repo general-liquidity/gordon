@@ -117,10 +117,6 @@ export const TOOL_AGENT_MAP: Record<string, string> = {
   solana_debridge_execute: "Executor",
   solana_okx_swap: "Executor",
 
-  // ── Payment/funding mutations ──
-  moonpay_funding_link: "Executor",
-  moonpay_swap_link: "Executor",
-  polygon_payment_intent: "Executor",
   chainlink_ccip_transfer: "Executor",
 
   // ── Everything else is Gordon (unmapped = stays with current agent) ──

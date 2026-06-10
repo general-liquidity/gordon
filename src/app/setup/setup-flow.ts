@@ -4,7 +4,6 @@ export type SetupWizardSection =
   | "exchange"
   | "broker"
   | "chains"
-  | "rails"
   | "mcp"
   | "llm"
   | "preferences";
@@ -17,7 +16,6 @@ export const SETUP_WIZARD_SECTIONS: SetupWizardSection[] = [
   "exchange",
   "broker",
   "chains",
-  "rails",
   "mcp",
   "llm",
   "preferences",
@@ -47,8 +45,6 @@ export function getSetupSectionLabel(section: SetupWizardSection): string {
       return "Broker";
     case "chains":
       return "Chains";
-    case "rails":
-      return "Agent rails";
     case "mcp":
       return "MCP plugins";
     case "llm":

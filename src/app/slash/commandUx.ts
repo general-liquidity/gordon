@@ -38,7 +38,6 @@ export interface QuickActionContext {
   setupComplete: boolean;
   hasExchange: boolean;
   hasBroker: boolean;
-  hasWalletRails: boolean;
 }
 
 export interface QuickActionItem {
@@ -67,7 +66,7 @@ export const WORKFLOW_CONFIG: Record<WorkflowGroup, WorkflowConfigEntry> = {
   trade: {
     label: "Trade",
     shortLabel: "Trade",
-    description: "Plan, preview, fund, execute.",
+    description: "Plan, preview, execute.",
     icon: "▲",
     order: 2,
     helpAliases: ["trade", "trading", "execution"],
@@ -83,7 +82,7 @@ export const WORKFLOW_CONFIG: Record<WorkflowGroup, WorkflowConfigEntry> = {
   accounts: {
     label: "Accounts",
     shortLabel: "Accounts",
-    description: "Portfolio, venues, rails.",
+    description: "Portfolio and venues.",
     icon: "■",
     order: 4,
     helpAliases: ["accounts", "account", "portfolio", "wallet"],
@@ -340,9 +339,7 @@ export function getQuickActionItems(context: QuickActionContext): QuickActionIte
         { label: "Preview", command: "/preview-order", workflow: "trade" },
         { label: "Orders", command: "/orders", workflow: "accounts" },
         { label: "Positions", command: "/positions", workflow: "accounts" },
-        context.hasWalletRails
-          ? { label: "Fund", command: "/fund quote", workflow: "trade" }
-          : { label: "Portfolio", command: "/portfolio", workflow: "accounts" },
+        { label: "Portfolio", command: "/portfolio", workflow: "accounts" },
       ];
     case "lab":
       return [
@@ -372,9 +369,7 @@ export function getQuickActionItems(context: QuickActionContext): QuickActionIte
     { label: "Preview", command: "/preview-order", workflow: "trade" },
   ];
 
-  if (context.hasWalletRails) {
-    actions.push({ label: "Fund", command: "/fund quote", workflow: "trade" });
-  } else if (context.permissionMode === "auto") {
+  if (context.permissionMode === "auto") {
     actions.push({ label: "Orders", command: "/orders", workflow: "accounts" });
   } else {
     actions.push({ label: "Doctor", command: "/doctor", workflow: "operate" });

@@ -8,13 +8,6 @@ function createConfig(permissionMode: "auto" | "ask" | "strict" = "ask"): Gordon
     version: "1.0.0",
     exchanges: [],
     brokers: [],
-    agentRails: {
-      walletProviders: [],
-      chainProviders: [],
-      paymentProviders: [],
-      autoSyncMcpPlugins: true,
-      requireApprovalForExternalActions: true,
-    },
     mcpServers: [],
     preferences: {
       cashReservePercent: 0.2,

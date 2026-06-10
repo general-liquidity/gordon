@@ -276,18 +276,6 @@ function getBrokerStatuses(
   });
 }
 
-function getRailStatuses(
-  config: GordonConfig,
-  envKeys: EnvMapRecord,
-  keyringKeys: Set<string>,
-): ProviderCredentialStatus[] {
-  // Agent rails (Helius/MoonPay/Polygon-x402) removed — no rail credential statuses.
-  void config;
-  void envKeys;
-  void keyringKeys;
-  return [];
-}
-
 function getDataAndAutomationStatuses(
   _envKeys: EnvMapRecord,
   _keyringKeys: Set<string>,
@@ -355,7 +343,6 @@ export async function getProviderCredentialStatuses(config: GordonConfig): Promi
     ...getLlmStatuses(envKeys, keyringKeys),
     ...getExchangeStatuses(config, envKeys, keyringKeys),
     ...getBrokerStatuses(config, envKeys, keyringKeys),
-    ...getRailStatuses(config, envKeys, keyringKeys),
     ...getDataAndAutomationStatuses(envKeys, keyringKeys),
     ...await getMcpStatuses(),
   ];

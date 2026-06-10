@@ -139,36 +139,6 @@ export const InceptionKeySchema = z
   .trim()
   .min(1, "Inception API key cannot be empty");
 
-export const HeliusKeySchema = z
-  .string()
-  .trim()
-  .min(1, "Helius API key cannot be empty");
-
-export const MoonPayKeySchema = z
-  .string()
-  .trim()
-  .min(1, "MoonPay API key cannot be empty");
-
-export const MoonPaySecretSchema = z
-  .string()
-  .trim()
-  .min(1, "MoonPay secret key cannot be empty");
-
-export const MoonPayWebhookApiKeySchema = z
-  .string()
-  .trim()
-  .min(1, "MoonPay webhook API key cannot be empty");
-
-export const MoonPayVirtualAccountsPrivateKeySchema = z
-  .string()
-  .trim()
-  .min(1, "MoonPay virtual accounts private key cannot be empty");
-
-export const PolygonX402PrivateKeySchema = z
-  .string()
-  .trim()
-  .min(1, "Polygon x402 private key cannot be empty");
-
 export const AlpacaKeySchema = z
   .string()
   .trim()
@@ -337,11 +307,6 @@ export const EnvKeysSchema = z.object({
   BITFINEX_API_KEY: BitfinexKeySchema.optional(),
   BITFINEX_API_SECRET: BitfinexSecretSchema.optional(),
   HYPERLIQUID_PRIVATE_KEY: HyperliquidKeySchema.optional(),
-  MOONPAY_API_KEY: MoonPayKeySchema.optional(),
-  MOONPAY_SECRET_KEY: MoonPaySecretSchema.optional(),
-  MOONPAY_WEBHOOK_API_KEY: MoonPayWebhookApiKeySchema.optional(),
-  MOONPAY_VIRTUAL_ACCOUNTS_PRIVATE_KEY: MoonPayVirtualAccountsPrivateKeySchema.optional(),
-  POLYGON_X402_PRIVATE_KEY: PolygonX402PrivateKeySchema.optional(),
 });
 
 export type ValidatedEnvKeys = z.infer<typeof EnvKeysSchema>;
@@ -705,55 +670,6 @@ export function validateEnvKeys(keys: Record<string, string | undefined>): Valid
   // Validate Hyperliquid private key (single key, hex format)
   if (keys.HYPERLIQUID_PRIVATE_KEY) {
     validateApiKeyWarn("HYPERLIQUID_PRIVATE_KEY", keys.HYPERLIQUID_PRIVATE_KEY, HyperliquidKeySchema, warnings, validated);
-  }
-
-  if (keys.MOONPAY_API_KEY) {
-    const result = validateApiKey("MOONPAY_API_KEY", keys.MOONPAY_API_KEY, MoonPayKeySchema);
-    if (!result.valid) {
-      errors.push({ key: "MOONPAY_API_KEY", message: result.error! });
-    } else {
-      validated.MOONPAY_API_KEY = keys.MOONPAY_API_KEY.trim();
-    }
-  }
-
-  if (keys.MOONPAY_SECRET_KEY) {
-    const result = validateApiKey("MOONPAY_SECRET_KEY", keys.MOONPAY_SECRET_KEY, MoonPaySecretSchema);
-    if (!result.valid) {
-      errors.push({ key: "MOONPAY_SECRET_KEY", message: result.error! });
-    } else {
-      validated.MOONPAY_SECRET_KEY = keys.MOONPAY_SECRET_KEY.trim();
-    }
-  }
-
-  if (keys.MOONPAY_WEBHOOK_API_KEY) {
-    const result = validateApiKey("MOONPAY_WEBHOOK_API_KEY", keys.MOONPAY_WEBHOOK_API_KEY, MoonPayWebhookApiKeySchema);
-    if (!result.valid) {
-      errors.push({ key: "MOONPAY_WEBHOOK_API_KEY", message: result.error! });
-    } else {
-      validated.MOONPAY_WEBHOOK_API_KEY = keys.MOONPAY_WEBHOOK_API_KEY.trim();
-    }
-  }
-
-  if (keys.MOONPAY_VIRTUAL_ACCOUNTS_PRIVATE_KEY) {
-    const result = validateApiKey(
-      "MOONPAY_VIRTUAL_ACCOUNTS_PRIVATE_KEY",
-      keys.MOONPAY_VIRTUAL_ACCOUNTS_PRIVATE_KEY,
-      MoonPayVirtualAccountsPrivateKeySchema,
-    );
-    if (!result.valid) {
-      errors.push({ key: "MOONPAY_VIRTUAL_ACCOUNTS_PRIVATE_KEY", message: result.error! });
-    } else {
-      validated.MOONPAY_VIRTUAL_ACCOUNTS_PRIVATE_KEY = keys.MOONPAY_VIRTUAL_ACCOUNTS_PRIVATE_KEY.trim();
-    }
-  }
-
-  if (keys.POLYGON_X402_PRIVATE_KEY) {
-    const result = validateApiKey("POLYGON_X402_PRIVATE_KEY", keys.POLYGON_X402_PRIVATE_KEY, PolygonX402PrivateKeySchema);
-    if (!result.valid) {
-      errors.push({ key: "POLYGON_X402_PRIVATE_KEY", message: result.error! });
-    } else {
-      validated.POLYGON_X402_PRIVATE_KEY = keys.POLYGON_X402_PRIVATE_KEY.trim();
-    }
   }
 
   // Check if at least one LLM key is present

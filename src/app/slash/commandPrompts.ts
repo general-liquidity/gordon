@@ -822,66 +822,8 @@ export function commandToPrompt(command: SlashCommand, args: string): string {
     // Health command
     case "health":
       return "Run a portfolio health check. Show risk status, strategy health, and any warnings.";
-    case "wallet": {
-      if (!args || args === "status") {
-        return "Show Gordon wallet rails status. Include native providers, MCP fast paths, active wallet provider, and any configuration gaps.";
-      }
-      const walletSubcmd = args.split(/\s+/)[0]?.toLowerCase();
-      const walletArgs = args.split(/\s+/).slice(1).join(" ");
-      switch (walletSubcmd) {
-        case "fund":
-          return walletArgs
-            ? `Help me fund a wallet using Gordon's wallet rails: ${walletArgs}`
-            : "Show my wallet funding options, including MoonPay buy, sell, swap, quote, and limit flows.";
-        case "history":
-          return walletArgs
-            ? `Show recent wallet activity for ${walletArgs}, including MoonPay transaction history if relevant.`
-            : "Show recent wallet activity for my configured wallets, including MoonPay transaction history if available.";
-        case "virtual":
-          return walletArgs
-            ? `Show MoonPay virtual account state and transactions for ${walletArgs}`
-            : "Show MoonPay virtual account state, account details, and recent virtual-account transactions.";
-        default:
-          return `Wallet workflow: ${args}`;
-      }
-    }
-    case "fund": {
-      if (!args) {
-        return "Show MoonPay funding flows for buy, sell, swap, live quotes, limits, and history. Ask which asset, amount, and wallet should be used.";
-      }
-      const fundSubcmd = args.split(/\s+/)[0]?.toLowerCase();
-      const fundArgs = args.split(/\s+/).slice(1).join(" ");
-      switch (fundSubcmd) {
-        case "buy":
-          return fundArgs ? `Create a MoonPay buy link: ${fundArgs}` : "Create a MoonPay buy link. Which fiat currency, crypto asset, and wallet address?";
-        case "sell":
-          return fundArgs ? `Create a MoonPay sell link: ${fundArgs}` : "Create a MoonPay sell link. Which crypto asset, payout currency, and refund wallet?";
-        case "swap":
-          return fundArgs ? `Create a MoonPay swap link: ${fundArgs}` : "Create a MoonPay swap link. Which asset pair and wallet address?";
-        case "quote":
-          return fundArgs
-            ? `Get a live MoonPay quote for this request: ${fundArgs}`
-            : "Get a live MoonPay quote. Which mode (buy, sell, or swap), asset, amount, and fiat currency should be used?";
-        case "limits":
-          return fundArgs
-            ? `Get MoonPay currency limits for: ${fundArgs}`
-            : "Get MoonPay currency limits. Which crypto asset and optional payment method should be checked?";
-        case "history":
-          return fundArgs
-            ? `Show MoonPay transaction history for: ${fundArgs}`
-            : "Show MoonPay transaction history. Which customer, transaction id, or external transaction id should be used?";
-        default:
-          return `Wallet funding workflow: ${args}`;
-      }
-    }
-    case "pay":
-      return args
-        ? `Prepare a Polygon x402 payment intent for this request: ${args}. Show the headers and require approval before signing.`
-        : "Prepare a Polygon x402 payment intent for a paid API or agent-to-agent request. Ask which resource and amount should be used.";
     case "chains":
       return "Show configured onchain data sources (DexScreener, DefiLlama, CoinGecko-onchain, Birdeye, Codex, 1inch) and wallet-intelligence providers (Nansen, Arkham, Covalent, Moralis, Zerion, DeBank). For each, show availability and missing API keys.";
-    case "rails":
-      return "Show Gordon payment rails: MoonPay funding flows and Polygon x402 payment status. Include configured credentials and any gaps.";
     // SynthData commands
     case "synth": {
       if (!args) return "Show me SynthData advanced capabilities (volatility, options, LP, liquidation, miners). For price forecasts use /predict. Assets: BTC, ETH, SOL, XAU, SPYX, NVDAX, TSLAX, AAPLX, GOOGLX";

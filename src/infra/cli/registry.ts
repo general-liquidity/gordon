@@ -55,39 +55,6 @@ export interface CLICommand {
 
 export const CLI_REGISTRY: CLIEntry[] = [
   {
-    id: "moonpay",
-    name: "MoonPay CLI",
-    description: "Wallet funding, onramp/offramp, swaps, bridges, DCA, limit orders. Agent-native crypto payments.",
-    npmPackage: "@moonpay/cli",
-    bin: "mp",
-    commands: [
-      { command: "mp buy", description: "Buy crypto with fiat", example: "mp buy --currency eth --amount 100 --fiat usd" },
-      { command: "mp sell", description: "Sell crypto to fiat", example: "mp sell --currency eth --amount 0.1" },
-      { command: "mp swap", description: "Swap tokens", example: "mp swap --from eth --to usdc --amount 0.5" },
-      { command: "mp bridge", description: "Cross-chain bridge", example: "mp bridge --from ethereum --to base --token usdc --amount 100" },
-      { command: "mp wallet", description: "Wallet management", example: "mp wallet create" },
-      { command: "mp quote", description: "Get live quote", example: "mp quote --mode buy --currency eth --amount 100" },
-      { command: "mp limits", description: "Check currency limits", example: "mp limits --currency eth" },
-      { command: "mp history", description: "Transaction history", example: "mp history --limit 10" },
-      { command: "mp mcp", description: "Start MCP server mode", example: "mp mcp" },
-    ],
-    nativeCoverage: "full",
-    nativeTools: [
-      "moonpay_funding_link", "moonpay_swap_link", "moonpay_quote",
-      "moonpay_currency_limits", "moonpay_transactions", "moonpay_customer_limits",
-      "moonpay_swap_pairs", "moonpay_virtual_accounts",
-    ],
-    credentials: [
-      { env: "MOONPAY_API_KEY", required: true },
-      { env: "MOONPAY_SECRET_KEY", required: false, description: "For server-side signing" },
-    ],
-    docsUrl: "https://www.moonpay.com/agents",
-    markets: ["crypto"],
-    hasMCP: true,
-    pricing: "free",
-    pricingNote: "Zero-fee stablecoin onramp. Standard fees for other assets.",
-  },
-  {
     id: "boba",
     name: "Boba CLI",
     description: "AI agent trading toolkit — DEX swaps, limit orders, DCA, TWAP, perps, prediction markets, portfolio tracking, copy trading, honeypot detection.",

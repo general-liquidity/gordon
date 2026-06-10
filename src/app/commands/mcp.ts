@@ -65,13 +65,6 @@ const PLUGIN_SHOWCASE: ShowcaseCategory[] = [
     ],
   },
   {
-    title: 'For Wallet Funding',
-    description: 'Fund wallets, off-ramp, and move between fiat and crypto',
-    plugins: [
-      { id: 'moonpay', summary: 'Wallet funding, swaps, bridges, on/off-ramp' },
-    ],
-  },
-  {
     title: 'For Sentiment',
     description: 'Social metrics and market sentiment',
     plugins: [

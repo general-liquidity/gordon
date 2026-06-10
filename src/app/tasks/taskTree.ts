@@ -105,18 +105,6 @@ const TOOL_FAMILY_PATTERNS: Array<{ family: TaskFamily; patterns: RegExp[] }> = 
     ],
   },
   {
-    family: { key: "rails-payments", label: "Rails and payments" },
-    patterns: [
-      /moonpay/i,
-      /polygon/i,
-      /helius/i,
-      /fund/i,
-      /payment/i,
-      /rail/i,
-      /x402/i,
-    ],
-  },
-  {
     family: { key: "onchain-data", label: "Onchain data" },
     patterns: [
       /dexscreener/i,
@@ -147,8 +135,6 @@ const ACTION_FAMILIES: Record<string, TaskFamily> = {
   "trading.preview_market_order": { key: "trading-execution", label: "Order preview" },
   "trading.place_market_order": { key: "trading-execution", label: "Trade execution" },
   "account.portfolio": { key: "trading-execution", label: "Portfolio and account" },
-  "rails.fund": { key: "rails-payments", label: "Funding and wallet rails" },
-  "rails.pay": { key: "rails-payments", label: "Payments" },
 };
 
 function shorten(text: string, maxLength: number = MAX_PREVIEW_LENGTH): string {

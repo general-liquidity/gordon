@@ -287,8 +287,7 @@ function getToolVerb(toolName: string): string | null {
   if (/debank/i.test(toolName)) return "Querying DeBank";
   if (/token_holder|wallet_intel|smart_money/i.test(toolName)) return "Fetching wallet intel";
 
-  // MoonPay
-  if (/moonpay/i.test(toolName)) return "Using MoonPay";
+
 
   // Memory & system
   if (/memory|record_insight|record_observation|search_memory/i.test(toolName)) return "Searching memory";

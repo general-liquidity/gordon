@@ -13,8 +13,6 @@ export type MenuOption =
   | "plan"
   | "positions"
   | "orders"
-  | "wallet"
-  | "fund"
   | "strategies-live"
   | "regime"
   | "bridge"
@@ -25,7 +23,6 @@ export function buildQuickStartRecommendedOptions(input: {
   setupComplete: boolean;
   hasExchange: boolean;
   hasBroker: boolean;
-  hasWalletRails: boolean;
 }): MenuOption[] {
   if (!input.setupComplete || (!input.hasExchange && !input.hasBroker)) {
     return ["chat", "setup", "doctor", "help", "scan", "portfolio"];
@@ -39,6 +36,6 @@ export function buildQuickStartRecommendedOptions(input: {
     "portfolio",
     "plan",
     "orders",
-    input.hasWalletRails ? "fund" : "strategies-live",
+    "strategies-live",
   ];
 }

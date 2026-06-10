@@ -87,23 +87,6 @@ const setPermissionModeOutputSchema = z.object({
   mode: z.enum(["auto", "ask", "strict", "paper", "observe", "plan"]),
 });
 
-const fundInputSchema = z.object({
-  intent: z.enum(["buy", "sell", "swap", "quote", "limits", "history"]).default("quote"),
-});
-
-const fundOutputSchema = z.object({
-  summary: z.string().optional(),
-});
-
-const payInputSchema = z.object({
-  resource: z.string(),
-  amount: z.number().positive(),
-});
-
-const payOutputSchema = z.object({
-  summary: z.string().optional(),
-});
-
 function createSlash(
   surface: SlashActionSurface,
   tool?: ActionToolSurface,
@@ -329,72 +312,6 @@ export const CANONICAL_ACTIONS: ActionDefinition[] = [
       ? "Show my stock broker account summary"
       : "Show my portfolio",
     tags: ["portfolio", "account"],
-  },
-  {
-    id: "wallet.fund",
-    title: "Wallet Funding",
-    description: "Fund wallets or fetch MoonPay funding flows and quotes.",
-    domain: "wallet",
-    capability: "plan",
-    taskScope: "funding",
-    sideEffectLevel: "preview",
-    approvalPolicy: "external",
-    dryRunSupported: true,
-    providerRequirements: [{ kind: "wallet" }],
-    rateLimitBudget: "ops",
-    visibility: ["interactive", "json", "agent", "mcp"],
-    inputSchema: fundInputSchema,
-    outputSchema: fundOutputSchema,
-    ...createSlash({
-      name: "fund",
-      aliases: ["onramp", "offramp"],
-      description: "Create MoonPay flows or fetch quotes and limits",
-      usage: "/fund [buy|sell|swap|quote|limits|history] ...",
-      category: "trading",
-      level: 2,
-      workflow: "trade",
-      audience: "advanced",
-      action: "agent",
-      target: "executor",
-      whenToUse: "Fund a wallet, off-ramp, create a hosted swap flow, or inspect live MoonPay pricing and limits",
-    }),
-    prompt: ({ args }) => args
-      ? `Handle a MoonPay wallet funding workflow: ${args}`
-      : "Show wallet funding, quotes, or MoonPay history flows",
-    tags: ["wallet", "funding", "moonpay"],
-  },
-  {
-    id: "payments.intent",
-    title: "Prepare Payment Intent",
-    description: "Prepare a Polygon x402 payment intent for a paid API or agent payment.",
-    domain: "payments",
-    capability: "plan",
-    taskScope: "funding",
-    sideEffectLevel: "preview",
-    approvalPolicy: "external",
-    dryRunSupported: true,
-    providerRequirements: [{ kind: "payments" }],
-    rateLimitBudget: "ops",
-    visibility: ["interactive", "json", "agent"],
-    inputSchema: payInputSchema,
-    outputSchema: payOutputSchema,
-    ...createSlash({
-      name: "pay",
-      aliases: ["x402", "payments"],
-      description: "Prepare Polygon x402 payment intents for paid APIs or agent payments",
-      usage: "/pay <resource> <amount>",
-      category: "trading",
-      level: 2,
-      workflow: "trade",
-      audience: "advanced",
-      action: "agent",
-      target: "executor",
-      whenToUse: "Prepare Gordon-native payment headers for external services",
-    }),
-    prompt: ({ args }) => args
-      ? `Prepare a Polygon x402 payment intent: ${args}`
-      : "What resource and amount should I prepare a payment for?",
-    tags: ["payments", "polygon", "x402"],
   },
   {
     id: "system.set_auto",

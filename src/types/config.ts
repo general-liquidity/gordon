@@ -61,8 +61,9 @@ export function migrateExchangeConfigTypes(raw: Record<string, unknown>): Record
     migrated = rest;
   }
 
+  const { agentRails: _removedAgentRails, ...withoutRails } = migrated;
   return {
-    ...migrated,
+    ...withoutRails,
     exchanges: exchanges.map(rewriteExchangeEntry),
   };
 }
@@ -82,15 +83,6 @@ export const BrokerTypeSchema = z.enum([
   "ibkr",
   "syphonix",
 ]);
-
-/**
- * Agent rails provider types
- * Native wallet, chain-data, and payments rails that sit alongside exchanges/brokers.
- */
-export const RailAuthModeSchema = z.enum(["native", "mcp", "hybrid"]);
-export const WalletProviderTypeSchema = z.enum(["moonpay"]);
-export const ChainProviderTypeSchema = z.enum(["helius"]);
-export const PaymentProviderTypeSchema = z.enum(["polygon"]);
 
 /**
  * Multi-exchange configuration schema
@@ -138,56 +130,6 @@ export const MultiBrokerConfigSchema = z.object({
   baseUrl: z.string().url().optional(),
   /** Optional override for market data API host */
   dataBaseUrl: z.string().url().optional(),
-});
-
-export const WalletProviderConfigSchema = z.object({
-  id: z.string(),
-  type: WalletProviderTypeSchema,
-  authMode: RailAuthModeSchema.default("native"),
-  enabled: z.boolean().default(true),
-  isDefault: z.boolean().default(false),
-  walletAddress: z.string().optional(),
-  customerId: z.string().optional(),
-  externalCustomerId: z.string().optional(),
-  email: z.string().email().optional(),
-  network: z.string().optional(),
-  redirectUrl: z.string().url().optional(),
-  apiBaseUrl: z.string().url().optional(),
-  mcpServerId: z.string().optional(),
-});
-
-export const ChainProviderConfigSchema = z.object({
-  id: z.string(),
-  type: ChainProviderTypeSchema,
-  authMode: RailAuthModeSchema.default("native"),
-  enabled: z.boolean().default(true),
-  isDefault: z.boolean().default(false),
-  network: z.string().default("solana"),
-  apiBaseUrl: z.string().url().optional(),
-  mcpServerId: z.string().optional(),
-});
-
-export const PaymentProviderConfigSchema = z.object({
-  id: z.string(),
-  type: PaymentProviderTypeSchema,
-  authMode: RailAuthModeSchema.default("native"),
-  enabled: z.boolean().default(true),
-  isDefault: z.boolean().default(false),
-  network: z.string().default("polygon"),
-  facilitatorUrl: z.string().url().optional(),
-  recipient: z.string().optional(),
-  mcpServerId: z.string().optional(),
-});
-
-export const AgentRailsConfigSchema = z.object({
-  walletProviders: z.array(WalletProviderConfigSchema).default([]),
-  activeWalletProviderId: z.string().optional(),
-  chainProviders: z.array(ChainProviderConfigSchema).default([]),
-  activeChainProviderId: z.string().optional(),
-  paymentProviders: z.array(PaymentProviderConfigSchema).default([]),
-  activePaymentProviderId: z.string().optional(),
-  autoSyncMcpPlugins: z.boolean().default(true),
-  requireApprovalForExternalActions: z.boolean().default(true),
 });
 
 export const PreferencesSchema = z.object({
@@ -324,14 +266,6 @@ export const GordonConfigSchema = z.object({
   brokers: z.array(MultiBrokerConfigSchema).default([]),
   /** ID of the currently active broker from the brokers array */
   activeBrokerId: z.string().optional(),
-  /** Wallet, chain-data, and payment rails used alongside exchanges/brokers */
-  agentRails: AgentRailsConfigSchema.default({
-    walletProviders: [],
-    chainProviders: [],
-    paymentProviders: [],
-    autoSyncMcpPlugins: true,
-    requireApprovalForExternalActions: true,
-  }),
   /** Enable OS keyring for secure API key storage (opt-in) */
   useKeyring: z.boolean().default(false),
   preferences: PreferencesSchema.default({
@@ -421,14 +355,6 @@ export type ExchangeType = z.infer<typeof ExchangeTypeSchema>;
 export type MultiExchangeConfig = z.infer<typeof MultiExchangeConfigSchema>;
 export type BrokerType = z.infer<typeof BrokerTypeSchema>;
 export type MultiBrokerConfig = z.infer<typeof MultiBrokerConfigSchema>;
-export type RailAuthMode = z.infer<typeof RailAuthModeSchema>;
-export type WalletProviderType = z.infer<typeof WalletProviderTypeSchema>;
-export type ChainProviderType = z.infer<typeof ChainProviderTypeSchema>;
-export type PaymentProviderType = z.infer<typeof PaymentProviderTypeSchema>;
-export type WalletProviderConfig = z.infer<typeof WalletProviderConfigSchema>;
-export type ChainProviderConfig = z.infer<typeof ChainProviderConfigSchema>;
-export type PaymentProviderConfig = z.infer<typeof PaymentProviderConfigSchema>;
-export type AgentRailsConfig = z.infer<typeof AgentRailsConfigSchema>;
 export type Preferences = z.infer<typeof PreferencesSchema>;
 export type ProviderName = z.infer<typeof ProviderSchema>;
 export type ModelConfig = z.infer<typeof ModelConfigSchema>;

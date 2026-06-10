@@ -74,15 +74,6 @@ export const CAPABILITY_TRUTH_MATRIX: CapabilityTruthEntry[] = [
       "Keep this explicitly crypto and onchain. Do not blend it into stock-facing copy.",
   },
   {
-    id: "wallet.rails",
-    label: "Wallet rails, funding, payments, and transfers",
-    scope: "crypto-only",
-    supportedMarkets: ["crypto"],
-    venueDependency: "configured wallet, chain, or payment rail provider",
-    phrasingRule:
-      "Describe as rails or wallet workflows, not as generic trading features or brokerage features.",
-  },
-  {
     id: "stocks.broker",
     label: "Broker-linked stock workflows",
     scope: "stocks-only",

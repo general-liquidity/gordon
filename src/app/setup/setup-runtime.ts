@@ -78,10 +78,6 @@ export interface BootstrapOptions {
   brokerPaper?: boolean;
   brokerAccountId?: string;
   synthDataApiKey?: string;
-  moonpayApiKey?: string;
-  moonpaySecretKey?: string;
-  polygonRecipient?: string;
-  polygonPrivateKey?: string;
   cashReservePercent?: number;
   useKeyring?: boolean;
   json?: boolean;
@@ -174,10 +170,6 @@ export function parseBootstrapArgs(args: string[]): BootstrapOptions {
     brokerPaper: parseBoolean(parsed["broker-paper"]),
     brokerAccountId: typeof parsed["broker-account-id"] === "string" ? parsed["broker-account-id"] : undefined,
     synthDataApiKey: typeof parsed["synthdata-api-key"] === "string" ? parsed["synthdata-api-key"] : undefined,
-    moonpayApiKey: typeof parsed["moonpay-api-key"] === "string" ? parsed["moonpay-api-key"] : undefined,
-    moonpaySecretKey: typeof parsed["moonpay-secret-key"] === "string" ? parsed["moonpay-secret-key"] : undefined,
-    polygonRecipient: typeof parsed["polygon-recipient"] === "string" ? parsed["polygon-recipient"] : undefined,
-    polygonPrivateKey: typeof parsed["polygon-private-key"] === "string" ? parsed["polygon-private-key"] : undefined,
     cashReservePercent: parseDecimalPercent(
       typeof parsed["cash-reserve-percent"] === "string" ? parsed["cash-reserve-percent"] : undefined,
     ),
@@ -259,56 +251,6 @@ function upsertBroker(
       next,
     ],
     activeBrokerId: id,
-  };
-}
-
-function withAgentRails(config: GordonConfig, options: BootstrapOptions): GordonConfig {
-  const agentRails = {
-    ...config.agentRails,
-    walletProviders: [...config.agentRails.walletProviders],
-    chainProviders: [...config.agentRails.chainProviders],
-    paymentProviders: [...config.agentRails.paymentProviders],
-  };
-
-  if (options.moonpayApiKey || options.moonpaySecretKey) {
-    agentRails.walletProviders = [
-      ...agentRails.walletProviders.filter((provider) => provider.type !== "moonpay").map((provider) => ({
-        ...provider,
-        isDefault: false,
-      })),
-      {
-        id: "moonpay",
-        type: "moonpay",
-        authMode: "native",
-        enabled: true,
-        isDefault: true,
-      },
-    ];
-    agentRails.activeWalletProviderId = "moonpay";
-  }
-
-  if (options.polygonRecipient || options.polygonPrivateKey) {
-    agentRails.paymentProviders = [
-      ...agentRails.paymentProviders.filter((provider) => provider.type !== "polygon").map((provider) => ({
-        ...provider,
-        isDefault: false,
-      })),
-      {
-        id: "polygon",
-        type: "polygon",
-        authMode: "native",
-        enabled: true,
-        isDefault: true,
-        network: "polygon",
-        recipient: options.polygonRecipient,
-      },
-    ];
-    agentRails.activePaymentProviderId = "polygon";
-  }
-
-  return {
-    ...config,
-    agentRails,
   };
 }
 
@@ -460,9 +402,6 @@ export async function collectDoctorReport(configInput?: GordonConfig): Promise<D
   if (!activeExchange) nextActions.push("Run `gordon configure exchange` to add a primary trading venue.");
   if (config.useKeyring && !keyringAvailable) nextActions.push("Disable keyring or install a supported OS keyring backend.");
   if (!config.onboardingComplete) nextActions.push("Finish QuickStart or Advanced onboarding so Gordon can skip first-run setup next time.");
-  if (config.agentRails.walletProviders.length === 0 && config.agentRails.chainProviders.length === 0 && config.agentRails.paymentProviders.length === 0) {
-    nextActions.push("Use `gordon configure rails` if you want MoonPay, Helius, or Polygon x402 integrated natively.");
-  }
   if (structuredEnabled && !structuredHashSaltConfigured) {
     nextActions.push("Set `GORDON_AXIOM_HASH_SALT` before collecting structured Axiom telemetry from external testers.");
   }
@@ -684,10 +623,6 @@ export async function applyBootstrap(options: BootstrapOptions): Promise<Bootstr
   }
 
   if (options.synthDataApiKey) envKeys.SYNTHDATA_API_KEY = options.synthDataApiKey;
-  if (options.moonpayApiKey) envKeys.MOONPAY_API_KEY = options.moonpayApiKey;
-  if (options.moonpaySecretKey) envKeys.MOONPAY_SECRET_KEY = options.moonpaySecretKey;
-  if (options.polygonPrivateKey) envKeys.POLYGON_X402_PRIVATE_KEY = options.polygonPrivateKey;
-  if (options.polygonRecipient) envKeys.POLYGON_X402_RECIPIENT = options.polygonRecipient;
 
   if (options.cashReservePercent !== undefined) {
     const nextPreferences: Preferences = {
@@ -701,7 +636,6 @@ export async function applyBootstrap(options: BootstrapOptions): Promise<Bootstr
     config = { ...config, useKeyring: options.useKeyring };
   }
 
-  config = withAgentRails(config, options);
   config = {
     ...config,
     onboardingComplete: true,
