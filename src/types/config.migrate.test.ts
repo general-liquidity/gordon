@@ -22,9 +22,9 @@ describe("migrateExchangeConfigTypes", () => {
     expect((migrated.exchanges as Array<{ type: string }>)[0]!.type).toBe("ccxt:binanceus");
   });
 
-  it("strips removed agentRails field on migrate", () => {
+  it("strips removed legacy agentRails field on migrate", () => {
     const migrated = migrateExchangeConfigTypes({
-      agentRails: { moonpay: { enabled: true } },
+      agentRails: { legacyProvider: { enabled: true } },
       exchanges: [],
     });
     expect(migrated.agentRails).toBeUndefined();

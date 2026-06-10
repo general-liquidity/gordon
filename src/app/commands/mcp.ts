@@ -101,7 +101,7 @@ const PLUGIN_SUGGESTIONS: PluginSuggestion[] = [
 ];
 
 function getBuiltInListing(_pluginId: string): MarketplaceListing | null {
-  // Agent-rail (Helius/MoonPay/x402) built-in MCP listings removed.
+
   return null;
 }
 

@@ -204,3 +204,16 @@ export function registerObservability(agent: Agent): void {
     }
   }
 }
+
+/** Re-wire all lazy agents after tracing initializes mid-session. */
+export async function registerAllAgentsForTracing(): Promise<void> {
+  if (!getMastraInstance()) return;
+  try {
+    const { getGordon, getExecutor, getResearcher } = await import("./definitions/index.ts");
+    for (const getter of [getGordon, getExecutor, getResearcher]) {
+      registerObservability(getter());
+    }
+  } catch {
+    // Agents may not be loadable in headless/test contexts
+  }
+}

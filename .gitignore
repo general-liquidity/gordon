@@ -71,8 +71,8 @@ gordon-spot-1-main
 hanabi-1-main
 misc
 
-# Reference repos (not part of Gordon source)
-agents/
+# Reference repos (not part of Gordon source) — anchor to repo root only
+/agents/
 opensolvency/
 claude-code-meta/
 claude-code-meta-2/

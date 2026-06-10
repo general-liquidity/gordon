@@ -343,9 +343,9 @@ export async function initializeTracing(): Promise<void> {
     // "Configure a storage provider on your Mastra instance or you'll see
     // a 'snapshot not found' error").
     // Agents are registered later via getMastraInstance().addAgent().
-    let storageProvider: any;
+    let storageProvider: import("@mastra/core/storage").MastraCompositeStore | undefined;
     try {
-      const { createMastraStorageConfig } = require("../../agents/mastraStorage.ts");
+      const { createMastraStorageConfig } = await import("../../agents/memory/mastraStorage.ts");
       const dbUrl = process.env.DATABASE_URL || "file:gordon.db";
       const config = createMastraStorageConfig({ storeId: "gordon-mastra", dbUrl, enableVector: false });
       storageProvider = config.storage;
@@ -356,6 +356,13 @@ export async function initializeTracing(): Promise<void> {
       observability,
       ...(storageProvider ? { storage: storageProvider } : {}),
     });
+
+    try {
+      const { registerAllAgentsForTracing } = await import("../../agents/agentHelpers.ts");
+      await registerAllAgentsForTracing();
+    } catch {
+      // Agent registration is best-effort when tracing starts before agents load
+    }
 
     tracingInitialized = true;
     logger.info("Mastra observability tracing initialized");

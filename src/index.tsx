@@ -140,7 +140,9 @@ import { emitEvent } from "./events/index.ts";
 import { loadConfig } from "./infra/storage/config/config.ts";
 import {
   initializeStructuredAxiom,
+  initializeTracing,
   shutdownStructuredAxiom,
+  shutdownTracing,
 } from "./infra/platform/observability/index.ts";
 import * as telemetry from "./infra/platform/telemetry/index.ts";
 import { disconnectMCP } from "./infra/ai/mcp/client.ts";
@@ -182,6 +184,12 @@ async function gracefulShutdown(signal: string, code: number = 0): Promise<void>
 
   try {
     await shutdownStructuredAxiom();
+  } catch {
+    // Non-critical
+  }
+
+  try {
+    await shutdownTracing();
   } catch {
     // Non-critical
   }
@@ -236,6 +244,7 @@ process.on("unhandledRejection", (reason, promise) => {
 // Initialize telemetry (no-op if not opted in)
 telemetry.init();
 initializeStructuredAxiom();
+void initializeTracing().catch(() => {});
 
 // Initialize multi-sink event router
 try {

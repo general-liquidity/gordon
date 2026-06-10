@@ -174,7 +174,7 @@ const INJECTION_PATTERNS: PatternDef[] = [
     description: "Attempt to extract sensitive credentials",
   },
   {
-    regex: /(what\s+is|show)\s+(the\s+)?(MOONPAY|BINANCE|COINBASE|ALPACA|SCHWAB|KRAKEN|SOLANA|ETHEREUM|HYPERLIQUID)_(API_KEY|SECRET|PRIVATE|PASSWORD)/i,
+    regex: /(what\s+is|show)\s+(the\s+)?(BINANCE|COINBASE|ALPACA|SCHWAB|KRAKEN|SOLANA|ETHEREUM|HYPERLIQUID)_(API_KEY|SECRET|PRIVATE|PASSWORD)/i,
     category: "data_exfiltration",
     severity: "critical",
     description: "Attempt to extract specific API keys",
