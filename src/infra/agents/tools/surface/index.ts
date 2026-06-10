@@ -4,9 +4,9 @@
  * 22 tools = 20 explicit + 2 meta-dispatchers (compute_indicator,
  * compute_microstructure). This is the surface Gordon's orchestrator
  * and researcher present to the LLM for generalized trading infra.
- * Integration tools (Solana / Polkadot / Finnhub fundamentals / CDP /
- * Chainlink / AgentKit / Base / MCP) coexist as separate spreads —
- * those are venue-specific and aren't covered by the canonical surface.
+ * Integration tools (Finnhub fundamentals / X-social / Defillama / MCP /
+ * onchain read modules) coexist as separate spreads — venue-specific and
+ * not covered by the canonical surface.
  *
  * Layout:
  *   - data.ts        — 5 read tools (market/account/portfolio/news/fundamentals)

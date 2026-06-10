@@ -125,13 +125,6 @@ export const ENDPOINT_RATE_LIMITS: Record<string, EndpointRateLimitConfig> = {
     windowMs: 60_000,
     rateLimitMessage: "Hyperliquid public info rate limit.",
   },
-  // CDP platform API: conservative shared bucket
-  "cdp:*": {
-    cooldownMs: 100,
-    maxCallsPerWindow: 50,
-    windowMs: 60_000,
-    rateLimitMessage: "CDP API rate limit.",
-  },
 };
 
 /**

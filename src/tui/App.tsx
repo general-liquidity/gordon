@@ -35,6 +35,7 @@ import { saveEnvKeys } from "../infra/storage/config/env.ts";
 import { providerRegistry } from "../infra/runtime/providers/registry.js";
 import { loadConfig, saveConfig } from "../infra/storage/config/config.js";
 import { normalizeExchangeId, ccxtEnvNames, extractCcxtSubId, ccxtIdToNativeVenue } from "../infra/exchange/types.ts";
+import { checkForInjection } from "../infra/safety/defense/injectionDefense.ts";
 import type { ExchangeType } from "../types/config.ts";
 import { refreshRuntimeCredentials } from "./bridge/runtime.js";
 import { VirtualMessageList } from "./components/display/VirtualMessageList.tsx";
@@ -961,23 +962,20 @@ function AppInner() {
       dispatch({ type: "SET_SHOW_HELP", show: false });
 
       // ─��� Injection defense: check input BEFORE it reaches the agent ──
-      try {
-        const { checkForInjection } = require("../infra/safety/injectionDefense.js") as typeof import("../infra/safety/defense/injectionDefense.ts");
-        const injectionCheck = checkForInjection(trimmed);
-        if (injectionCheck.shouldBlock) {
-          dispatch({
-            type: "ADD_MESSAGE",
-            message: {
-              id: `injection-block-${Date.now()}`,
-              role: "system",
-              variant: "error" as any,
-              content: `\u26D4 Input blocked: ${injectionCheck.reason}`,
-              timestamp: new Date().toISOString(),
-            },
-          });
-          return;
-        }
-      } catch { /* non-critical — if defense module fails, let input through */ }
+      const injectionCheck = checkForInjection(trimmed);
+      if (injectionCheck.shouldBlock) {
+        dispatch({
+          type: "ADD_MESSAGE",
+          message: {
+            id: `injection-block-${Date.now()}`,
+            role: "system",
+            variant: "error" as any,
+            content: `\u26D4 Input blocked: ${injectionCheck.reason}`,
+            timestamp: new Date().toISOString(),
+          },
+        });
+        return;
+      }
 
       // ── Phase 15-18 slash commands ──
       if (trimmed === "/model" || trimmed === "/m" || trimmed === "/provider") {

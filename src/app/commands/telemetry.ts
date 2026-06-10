@@ -79,7 +79,7 @@ function formatTracingSummary(): string[] {
     } else if (!config.consentEnabled) {
       summary = "Reviewed but blocked by telemetry consent";
     } else {
-      summary = status.mastraWired ? "Enabled" : "Enabled (runtime not yet wired)";
+      summary = status.mastraWired ? "Enabled" : "Configured (Mastra trace export pending)";
     }
   }
 

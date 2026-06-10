@@ -7,8 +7,8 @@
  *
  * Design lineage: ProactiveAgent-main's observation→propose→execute→feedback
  * loop, adapted for vibe trading. Instead of "user typed in VS Code" events,
- * Gordon watches market state, portfolio state, and event bus signals (CDP
- * webhooks, regime flips, whale alerts). Instead of coding-assistant actions,
+ * Gordon watches market state, portfolio state, and event bus signals (regime
+ * flips, funding anomalies, news). Instead of coding-assistant actions,
  * Gordon surfaces trading-relevant suggestions with an accept/dismiss UX.
  */
 
@@ -39,6 +39,12 @@ export type ProactiveCategory =
   | "insider_flow_alert"   // Cluster of insider buys/sells on watchlist
   | "analyst_upgrade"      // Analyst consensus rating shift
   | "congressional_trade"; // STOCK Act disclosure on held or watched symbol
+
+/** Categories in schema/UI but with no producer wired yet. */
+export const INACTIVE_PROACTIVE_CATEGORIES: ReadonlySet<ProactiveCategory> = new Set([
+  "whale_alert",
+  "playbook_suggest",
+]);
 
 export const ALL_CATEGORIES: ProactiveCategory[] = [
   "regime_flip",

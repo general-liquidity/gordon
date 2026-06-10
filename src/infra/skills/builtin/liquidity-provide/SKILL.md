@@ -60,12 +60,11 @@ For concentrated-liquidity AMMs (V3-style / Whirlpool-style):
 - Factor in IL as additional risk
 - Recommended: start with 50% of calculated size, add more after 1 week if fees meet expectations
 
-## Step 6: Deposit
-Execute the deposit:
-- Approve token spending (if EVM)
-- Deposit equal value of both tokens
-- For concentrated: set price range
-- Confirm transaction
+## Step 6: Deposit (external only)
+Gordon has no native on-chain LP execution kit. If the operator wants to deposit:
+- Use an external wallet, MCP plugin, or CLI from `/marketplace` or `/cli`
+- Document the intended range, size, and both token amounts in the plan
+- Do not call nonexistent Gordon tools to approve or confirm chain transactions
 
 ## Step 7: Monitoring
 Track ongoing performance:

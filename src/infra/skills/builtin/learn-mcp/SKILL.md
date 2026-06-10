@@ -19,7 +19,7 @@ Explain each category with examples:
 - **data-provider** (25 plugins): Market data, on-chain analytics, financial data
   Examples: CoinGecko, Glassnode, Nansen, Alpha Vantage, Twelve Data
 - **execution** (10 plugins): Trading, bridges, order management
-  Examples: Alpaca, Tradier, Polymarket, deBridge, Solana Agent Kit
+  Examples: Alpaca, Tradier, Polymarket, deBridge (install from marketplace)
 - **research** (2 plugins): Deep analytics and research
   Examples: Nansen, Messari
 - **infrastructure** (5 plugins): Blockchain nodes, custody, dev platforms
@@ -50,7 +50,7 @@ Highlight the freebies:
 - **Crypto.com** — public market data, zero auth
 - **DexPaprika** — DEX data across 33 chains, no key
 - **deBridge** — cross-chain bridges, no key
-- **Solana Agent Kit** — 60+ Solana actions, open source
+- **Glassnode** — on-chain analytics (API key required)
 
 ## CLI Tools Too
 

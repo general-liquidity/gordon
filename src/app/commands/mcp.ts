@@ -61,7 +61,7 @@ const PLUGIN_SHOWCASE: ShowcaseCategory[] = [
     plugins: [
       { id: 'dexscreener', summary: 'DEX pair discovery and volume' },
       { id: 'nansen', summary: 'Smart-money labels and flows' },
-      { id: 'helius', summary: 'Solana RPC / wallet MCP (optional third-party)' },
+      { id: 'glassnode', summary: 'On-chain analytics and whale flows' },
     ],
   },
   {
