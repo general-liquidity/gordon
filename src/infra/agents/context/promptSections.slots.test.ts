@@ -5,29 +5,29 @@ import {
   resetPromptSectionCache,
 } from "./promptSections.ts";
 
-describe("composeAgentInstructionsWithSlots — behavior parity with legacy", () => {
-  test("USER-only call equals legacy composeAgentInstructions output", () => {
+describe("composeAgentInstructionsWithSlots — behavior parity with composeAgentInstructions", () => {
+  test("USER-only call equals composeAgentInstructions output", () => {
     resetPromptSectionCache();
     const userBody = "You are the test agent. Be concise.";
-    const legacy = composeAgentInstructions("executor", userBody);
+    const baseline = composeAgentInstructions("executor", userBody);
     resetPromptSectionCache();
     const slotted = composeAgentInstructionsWithSlots("executor", {
       user: userBody,
     });
-    expect(slotted).toBe(legacy);
+    expect(slotted).toBe(baseline);
   });
 
-  test("USER-only call across all 3 agent roles matches legacy", () => {
+  test("USER-only call across all 3 agent roles matches composeAgentInstructions", () => {
     const userBody = "agent body content here";
     const roles = ["gordon", "executor", "researcher"] as const;
     for (const role of roles) {
       resetPromptSectionCache();
-      const legacy = composeAgentInstructions(role, userBody);
+      const baseline = composeAgentInstructions(role, userBody);
       resetPromptSectionCache();
       const slotted = composeAgentInstructionsWithSlots(role, {
         user: userBody,
       });
-      expect(slotted).toBe(legacy);
+      expect(slotted).toBe(baseline);
     }
   });
 });
@@ -100,24 +100,24 @@ describe("composeAgentInstructionsWithSlots — CUSTOM", () => {
 
   test("empty CUSTOM falls back to BASE registry", () => {
     resetPromptSectionCache();
-    const legacy = composeAgentInstructions("executor", "USER");
+    const baseline = composeAgentInstructions("executor", "USER");
     resetPromptSectionCache();
     const withEmptyCustom = composeAgentInstructionsWithSlots("executor", {
       user: "USER",
       custom: "",
     });
-    expect(withEmptyCustom).toBe(legacy);
+    expect(withEmptyCustom).toBe(baseline);
   });
 
   test("whitespace-only CUSTOM falls back to BASE registry", () => {
     resetPromptSectionCache();
-    const legacy = composeAgentInstructions("executor", "USER");
+    const baseline = composeAgentInstructions("executor", "USER");
     resetPromptSectionCache();
     const wsCustom = composeAgentInstructionsWithSlots("executor", {
       user: "USER",
       custom: "   \n  ",
     });
-    expect(wsCustom).toBe(legacy);
+    expect(wsCustom).toBe(baseline);
   });
 });
 

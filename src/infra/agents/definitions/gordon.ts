@@ -55,7 +55,7 @@ const logger = createModuleLogger("agents");
  * Mastra has no native `defer_loading` (Claude Code's pattern). Instead we
  * conditionally include or strip these groups at agent-creation time based
  * on `GORDON_TOOL_TIER`:
- *   - "all"  (default) — keep every tool group registered (legacy behavior).
+ *   - "all"  (default) — keep every tool group registered.
  *   - "hot"            — strip the cold tier; users access these flows via
  *                        the Researcher sub-agent transfer or by switching
  *                        to GORDON_TOOL_TIER=all explicitly.
@@ -395,7 +395,7 @@ export function getGordon(): Agent {
 
       // FW7 — operator-authored subagent delegation. Surface-level
       // delegate_subagent calls dispatchSubagentTask directly with an
-      // empty parent-tool registry; the legacy `delegate_to_subagent`
+      // empty parent-tool registry; the full-registry `delegate_to_subagent`
       // tool kept here has full passthrough to Gordon's live registry.
       ...buildTaskDispatchToolIfEnabled(),
 

@@ -49,6 +49,8 @@ const KNOWN_HOT_TIER_TOOL_FAMILIES = new Set<string>([
   "instrumentedAdherenceTools",
   "instrumentedAdvancedTools",
   "instrumentedAgentFeedbackTools",
+  // Canonical 22-tool surface — always hot on gordon + researcher.
+  "instrumentedAgentTools",
   "instrumentedAgentKitDefiTools",
   "instrumentedAgentKitOnchainTools",
   "instrumentedAskUserTools",

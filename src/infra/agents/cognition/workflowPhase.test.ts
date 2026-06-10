@@ -33,7 +33,7 @@ describe("workflowPhase", () => {
     expect(isExecutionPhase("analysis")).toBeFalse();
   });
 
-  it("returns a legacy route for compaction", () => {
+  it("returns a compaction-phase model route", () => {
     const route = resolveWorkflowPhaseModelRoute("compaction");
     expect(route.provider).toBeDefined();
     expect(route.model.length).toBeGreaterThan(0);

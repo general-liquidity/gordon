@@ -18,12 +18,12 @@ export function getGeneratedSlashCommands(): SlashActionSurface[] {
 
 export function mergeSlashCommands<T extends { name: string; aliases: string[] }>(
   generated: T[],
-  legacy: T[],
+  coreCommands: T[],
 ): T[] {
   const merged: T[] = [];
   const seen = new Set<string>();
 
-  for (const command of [...generated, ...legacy]) {
+  for (const command of [...generated, ...coreCommands]) {
     const primary = command.name.toLowerCase();
     if (seen.has(primary)) {
       continue;

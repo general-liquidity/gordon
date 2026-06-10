@@ -8,7 +8,6 @@ describe("withToolMetrics", () => {
     const requestContext = new RequestContext();
     requestContext.set("exchange", null);
     requestContext.set("broker", null);
-    requestContext.set("agentRails", null);
     requestContext.set("llm", {});
     requestContext.set("config", { permissionMode: "ask" });
     requestContext.set("runtime", {

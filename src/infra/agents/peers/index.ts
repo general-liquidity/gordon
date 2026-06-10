@@ -51,7 +51,7 @@ export function isPeerDelegationEnabled(
   env: NodeJS.ProcessEnv = process.env,
 ): boolean {
   // Default-on. Operators disable via env=0 / env=false. Cold-toggleable
-  // matches the pattern of evidenceBundle / tradeLedger / withResultSanitizer.
+  // matches the pattern of tradeLedger / withResultSanitizer.
   const raw = env[PEER_DELEGATION_FLAG_ENV];
   return raw !== "0" && raw !== "false";
 }

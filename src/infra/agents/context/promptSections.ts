@@ -263,14 +263,14 @@ function getSectionsForMount(mount: PromptSectionMount, options: PromptSectionRe
 
 export function composeAgentInstructions(
   role: PromptAgentRole,
-  legacyInstructions: string,
+  userInstructions: string,
   options: PromptSectionRenderOptions = {},
 ): string {
   const sections = getSectionsForMount("instructions", { ...options, role })
     .map((record) => loadSectionContent(record, { ...options, role }))
     .filter(Boolean);
 
-  return [...sections, legacyInstructions.trim()].join("\n\n");
+  return [...sections, userInstructions.trim()].join("\n\n");
 }
 
 /**
@@ -279,8 +279,8 @@ export function composeAgentInstructions(
  * Explicit four-slot model for callers who want full control over the
  * prompt structure:
  *
- *   - USER   : caller-supplied instructions (the existing legacy
- *               instructions block; e.g. EXECUTOR_INSTRUCTIONS body)
+ *   - USER   : caller-supplied instructions (the agent role body;
+ *               e.g. EXECUTOR_INSTRUCTIONS)
  *   - BASE   : registry-driven sections rendered for the role/context
  *               (workflow-phase, provider, exchange-specific, etc.)
  *               This is the existing templated registry — unchanged.
@@ -301,7 +301,7 @@ export function composeAgentInstructions(
  *
  * Note: Deep Agents puts USER first ("caller text precedes SDK/profile
  * content"). Gordon's long-standing convention is registry sections
- * FIRST (they establish role + context invariants), then legacy/user
+ * FIRST (they establish role + context invariants), then user
  * instructions. Keeping Gordon's order avoids invalidating eval-harness
  * baselines and KV-cache hit rates. Callers who want USER-first can
  * supply CUSTOM to bypass BASE and prepend USER explicitly.

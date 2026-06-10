@@ -6,14 +6,10 @@
  * Researcher:  On-demand parallel work (spawned, not permanent)
  * Critic:      Risk check built into Executor's pipeline (not a routed agent)
  *
- * Legacy agents (Scanner, Analyst, Planner, Monitor, Teacher, Backtester,
- * Auditor) are retired — their tools are merged into Gordon directly.
- * Files kept for reference but no longer imported.
+ * Retired single-purpose agents (Scanner, Analyst, Planner, Monitor,
+ * Teacher, Backtester, Auditor) had their tools merged into Gordon.
  */
 
 export { getGordon } from "./gordon.ts";
 export { getExecutor } from "./executor.ts";
 export { getResearcher } from "./researcher.ts";
-
-// Legacy agent files deleted. All tools merged into Gordon.
-// If any code still imports these, it should use getGordon() instead.

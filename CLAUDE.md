@@ -129,6 +129,8 @@ Most behavior primitives are now defaults-on as part of the core architecture. T
 | `GORDON_SUPERVISION_RUST_RATE` | Periodic flawed-plan injection rate (0–1). Calibrated threshold; default off, operators set their own cadence. |
 | `GORDON_COMPACTION_STAGE` | Force a specific compaction stage during debugging. Read-only override; not a feature gate. |
 | `GORDON_MEMORY_WRITE_GUARD=1` | Enforce (not just log) the working-memory sensitive-field guard: an untrusted-source write that changes a sensitive field (risk limits, venue, account type, base currency) is **blocked**, prior value preserved. Trusted paths (`recordTrustedProvenance`) pass; non-sensitive untrusted writes are unaffected. Default off — opt-in because aggressive enforcement could surprise flows that legitimately update profile via the LLM. |
+| `GORDON_SPRINT_CONTRACT=1` | Record scope/actuals for autonomous-loop sessions (`infra/safety/sprintContract.ts`); inspect via `/sprint-status`. |
+| `GORDON_AGENT_READINESS_GATE=1` | Boot-time readiness checks before agent spawn (`infra/diagnostics/agentReadiness.ts`). Override with `GORDON_AGENT_READINESS_OVERRIDE=1`. |
 
 Use `/flags` in the TUI to see the current state of these and toggle them at runtime.
 
@@ -136,7 +138,9 @@ Defaults-on (previously flagged, now part of the architecture): result-cache del
 
 **LLM provider resilience:** `src/infra/ai/llm/providerCaching.ts` (Anthropic prompt-cache breakpoints) and `providerFailover.ts` (`executeWithFailover`) compose with the settings-layer priority chain — env keys → `settings.json` provider order → per-call overrides.
 
-Deleted features (their gates were never validated and the modules are gone): tool deferral, evidence bundle, sprint contract / negotiation, context-anxiety detector, cold-start audit, agent readiness gate, quality document, recitation checkpoint, initializer agent, harness evolution, claude-md linter, tool-design linter, memory bullets, agent-list attachment, permission bubble.
+Deleted features (modules removed; config migration may still strip stale fields): tool deferral, evidence bundle, context-anxiety detector, cold-start audit, quality document, recitation checkpoint, initializer agent, harness evolution, claude-md linter, tool-design linter, agent-list attachment, permission bubble.
+
+ACE memory bullets (`reflectOnMessages` / `curateMemoryBullets` in `summarizer.ts`) are **not** deleted — they power `/reflect` when `GORDON_ACE_ENABLED=true`.
 
 ## Agent tool surface
 

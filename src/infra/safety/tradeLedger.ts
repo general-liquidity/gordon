@@ -15,8 +15,6 @@
  *   - stateBefore     : account snapshot before execution (optional —
  *                       caller fills what it can capture)
  *   - stateAfter      : account snapshot after execution (optional)
- *   - evidenceBundles : optional verification envelopes from
- *                       `infra/safety/evidenceBundle.ts` (one per op)
  *
  * Why not git? Trading is append-only with one timeline, no branches, no
  * merges, no undo (money moved). Borrowing git's metaphor implies
@@ -32,10 +30,8 @@
  *   - `lastRecordId`             : convenience for chain-link continuity
  *   - `appendExecutionRecordFresh`: build + chain + append in one call
  *
- * Composes with `evidenceBundle.ts`: an execution record can carry one
- * or more evidence bundles, one per operation. Together they answer:
- * "What did we do, why, what passed our checks, and what state did
- * the account end up in?"
+ * Together with the signed audit log, each record answers: what did we do,
+ * why, and what state did the account end up in?
  *
  * Pure compute for the builders. File I/O isolated in the persistence
  * helpers, which use the same `~/.gordon/` storage path convention as

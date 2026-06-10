@@ -666,7 +666,7 @@ export class ProviderRegistry {
     }
 
     throw new Error(
-      `Legacy LLM client cannot route provider "${route.provider}" directly. ` +
+      `Direct LLM client cannot route provider "${route.provider}" directly. ` +
       `Configure DEDALUS_API_KEY or switch Gordon to OpenAI/Inception.`
     );
   }
