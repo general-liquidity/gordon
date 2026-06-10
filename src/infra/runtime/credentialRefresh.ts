@@ -103,4 +103,12 @@ export async function refreshRuntimeCredentials(
       // Non-critical — MCP will reconnect on next tool call or restart
     }
   }
+
+  // 7. Re-wire market stream + emitter against the active exchange
+  try {
+    const { syncExchangeMarketFeeds } = await import("../exchange/marketStreamLifecycle.ts");
+    await syncExchangeMarketFeeds();
+  } catch {
+    // Non-critical — proactive feeds resume on next session start
+  }
 }

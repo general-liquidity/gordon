@@ -5,28 +5,22 @@
  * cryptocurrency exchanges. The Exchange interface abstracts away exchange-specific
  * details, allowing the rest of the application to work with any supported exchange.
  *
- * Supported exchanges (all with native adapters):
- * - Binance
- * - Binance US
- * - Coinbase
- * - Kraken
- * - Bitfinex
- * - Hyperliquid
- * - Robinhood Crypto
- * - OKX
+ * Supported exchanges (all routed through CCXT via `ccxt:<sub-id>`):
+ * - Binance, Binance US, Coinbase, Kraken, OKX, Bitfinex, Hyperliquid, …
+ * - 90+ additional venues via CCXT (Bybit, KuCoin, MEXC, Gate, …)
  *
  * @example
  * ```typescript
  * import { ExchangeFactory, type Exchange } from './';
  *
  * // Create exchange instance using factory (recommended)
- * const exchange: Exchange = ExchangeFactory.create('binance', {
+ * const exchange: Exchange = ExchangeFactory.create('ccxt:binance', {
  *   apiKey: 'your-api-key',
  *   apiSecret: 'your-api-secret'
  * });
  *
  * // Or create a different exchange
- * const kraken: Exchange = ExchangeFactory.create('kraken', credentials);
+ * const kraken: Exchange = ExchangeFactory.create('ccxt:kraken', credentials);
  *
  * // Use through abstract interface
  * const price = await exchange.getPrice('BTCUSDT');

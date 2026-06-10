@@ -5,7 +5,7 @@ import { loadConfig, saveConfig } from "../../../infra/storage/config/config.ts"
 import { exchangeSwitch } from "../../../app/commands/exchange.ts";
 import { ExchangeFactory } from "../../../infra/exchange/factory.ts";
 import { refreshRuntimeCredentials } from "../../../infra/runtime/credentialRefresh.ts";
-import { normalizeExchangeId, type ExchangeId } from "../../../infra/exchange/types.ts";
+import { ccxtIdToNativeVenue, normalizeExchangeId, type ExchangeId } from "../../../infra/exchange/types.ts";
 import type { ExchangeType } from "../../../types/config.ts";
 import type { MultiExchangeConfig } from "../../../types/index.ts";
 
@@ -50,6 +50,10 @@ const SANDBOX_EXCHANGES = [
 
 const WALLET_BASED = new Set(["ccxt:hyperliquid", "ccxt:uniswap"]);
 const NEEDS_PASSPHRASE = new Set(["ccxt:coinbase", "ccxt:okx"]);
+
+function nativeVenueId(exchangeType: string): string {
+  return ccxtIdToNativeVenue(normalizeExchangeId(exchangeType as ExchangeId)) ?? exchangeType;
+}
 
 type Step =
   | "loading"
@@ -345,9 +349,9 @@ export function ExchangePicker({ onComplete, onCancel }: Props) {
         <Text bold>API Key — {add.exchangeType}{add.isSandbox ? " (testnet)" : ""}</Text>
         <Text dimColor>
           {add.isSandbox
-            ? add.exchangeType === "binance"
+            ? nativeVenueId(add.exchangeType) === "binance"
               ? "Get from testnet.binance.vision > API Management"
-              : add.exchangeType === "coinbase"
+              : nativeVenueId(add.exchangeType) === "coinbase"
               ? "Get from cdp.coinbase.com > API Keys (sandbox env)"
               : "Get from your exchange's sandbox/demo account"
             : "Paste your exchange API key:"}
@@ -366,7 +370,7 @@ export function ExchangePicker({ onComplete, onCancel }: Props) {
         {header}
         <Text bold>API Secret — {add.exchangeType}{add.isSandbox ? " (testnet)" : ""}</Text>
         <Text dimColor>
-          {add.exchangeType === "coinbase"
+          {nativeVenueId(add.exchangeType) === "coinbase"
             ? "For CDP keys: paste the full EC private key (-----BEGIN EC PRIVATE KEY-----…)"
             : "Paste your exchange API secret:"}
         </Text>
@@ -383,7 +387,7 @@ export function ExchangePicker({ onComplete, onCancel }: Props) {
       <Box flexDirection="column" paddingX={1} paddingY={1}>
         {header}
         <Text bold>Passphrase — {add.exchangeType}</Text>
-        <Text dimColor>{add.exchangeType === "coinbase" ? "Coinbase" : "OKX"} requires a passphrase in addition to key + secret.</Text>
+        <Text dimColor>{nativeVenueId(add.exchangeType) === "coinbase" ? "Coinbase" : "OKX"} requires a passphrase in addition to key + secret.</Text>
         <Box marginTop={1}>
           <TextInput placeholder="Passphrase…" onSubmit={handlePassphrase} />
         </Box>

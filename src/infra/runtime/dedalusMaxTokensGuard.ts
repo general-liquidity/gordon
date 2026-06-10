@@ -116,16 +116,16 @@ function capForUrl(url: string): number | undefined {
  *
  * Two opt-out env knobs:
  *   GORDON_SHOW_DEDALUS_ERRORS=1   — show LLM provider errors again
- *   GORDON_SHOW_BINANCE_ERRORS=1   — show Binance / exchange errors again
+ *   GORDON_SHOW_BINANCE_ERRORS=1   — show exchange REST/WS errors again
  *
  * Categories (independently togglable):
  *  - DEDALUS: 'Upstream LLM API error from dedalus', api.dedaluslabs.ai,
  *    AI_APICallError trace blocks naming the same provider.
- *  - BINANCE: '[time] ERROR/WARN' lines from the Binance client logger
+ *  - EXCHANGE: REST/WS noise from CCXT and market-stream clients
  *    (endpoint URLs containing api.binance.com / fapi.binance.com /
- *    testnet.binance.vision, the literal 'Public API request failed' /
- *    'Signed API request failed' / 'WebSocket' / 'Rate limit' verbs the
- *    binance client emits, and Binance error codes -10xx/-11xx/-20xx).
+ *    testnet.binance.vision, 'Public API request failed' /
+ *    'Signed API request failed' / WebSocket reconnect churn, and
+ *    exchange error codes -10xx/-11xx/-20xx).
  */
 const DEDALUS_NOISE_PATTERNS = [
   /Upstream LLM API error from dedalus/,
@@ -133,7 +133,7 @@ const DEDALUS_NOISE_PATTERNS = [
   /AI_APICallError\b[\s\S]{0,200}dedalus/i,
 ];
 
-const BINANCE_NOISE_PATTERNS = [
+const EXCHANGE_NOISE_PATTERNS = [
   /api\.binance\.com|fapi\.binance\.com|testnet\.binance\.vision/i,
   /Public API request failed|Signed API request failed/,
   /Failed to get spot balances|Failed to get funding balances|Test order failed/,
@@ -142,7 +142,7 @@ const BINANCE_NOISE_PATTERNS = [
   // insufficient balance, etc.). Match in JSON-context contexts emitted
   // by our logger ("code":-1003) to avoid false-positives in prose.
   /"code":-1\d{3}|"code":-2\d{3}|"msg":"[^"]*Binance/i,
-  // WebSocket noise from the binance client.
+  // WebSocket noise from market-stream clients.
   /WebSocket connection failed|WebSocket disconnected|Reconnect attempt failed|Pong timeout/,
 ];
 
@@ -153,7 +153,7 @@ function isUpstreamNoise(line: string): boolean {
     if (DEDALUS_NOISE_PATTERNS.some((re) => re.test(line))) return true;
   }
   if (process.env.GORDON_SHOW_BINANCE_ERRORS !== "1") {
-    if (BINANCE_NOISE_PATTERNS.some((re) => re.test(line))) return true;
+    if (EXCHANGE_NOISE_PATTERNS.some((re) => re.test(line))) return true;
   }
   return false;
 }

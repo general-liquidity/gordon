@@ -826,11 +826,20 @@ function AppInner() {
 
   useEffect(() => {
     if (!runtimeReady) return;
-    void loadConfig().then((config) => {
+    void loadConfig().then(async (config) => {
+      const hasExchange = (config.exchanges?.length ?? 0) > 0 || !!config.activeExchangeId;
       setConnectivityHints({
-        hasExchange: (config.exchanges?.length ?? 0) > 0 || !!config.activeExchangeId,
+        hasExchange,
         hasBroker: (config.brokers?.length ?? 0) > 0 || !!config.activeBrokerId,
       });
+      if (hasExchange) {
+        try {
+          const { syncExchangeMarketFeeds } = await import("../infra/exchange/marketStreamLifecycle.ts");
+          await syncExchangeMarketFeeds();
+        } catch {
+          // Non-critical — feeds also restart on credential refresh
+        }
+      }
     });
   }, [runtimeReady]);
 

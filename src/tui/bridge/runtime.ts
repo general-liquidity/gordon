@@ -67,11 +67,11 @@ import { routeToolCommand } from "./toolHandlers.js";
 let runtimeFactory: SessionRuntimeFactory | null = null;
 let activeRuntime: SessionRuntime | null = null;
 /**
- * Shared context resolver — builds exchange, broker, binance, LLM, rails,
+ * Shared context resolver — builds exchange, broker, LLM, rails,
  * and portfolio clients from config + env. Used by every GordonContext
  * request in the TUI path so tools see the same live clients the daemon
  * would. Previously the TUI returned a stub context with no exchange,
- * which broke every venue-dependent tool ("Binance connected: no" even
+ * which broke every venue-dependent tool ("exchange connected: no" even
  * with valid keys).
  *
  * invalidate() is exported separately so exchange/broker commands and the
@@ -146,7 +146,7 @@ export async function initializeRuntime(setState: StateUpdater): Promise<Session
   runtimeFactory = new SessionRuntimeFactory({
     resolveContext: (async (options: { session: { threadId: string; resourceId: string } }) => {
       // Use the shared GatewayContextResolver so the TUI gets the same
-      // live exchange / broker / binance / LLM / rails clients the daemon
+      // live exchange / broker / LLM / rails clients the daemon
       // path does. Without this, context.exchange is always undefined and
       // every venue-dependent tool silently returns "not connected".
       const base = await tuiContextResolver.resolve(options.session.threadId ?? "tui");

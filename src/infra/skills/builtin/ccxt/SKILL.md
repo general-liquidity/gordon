@@ -1,24 +1,23 @@
 ---
 name: ccxt
-description: Use CCXT-routed exchange adapters when the operator picks a `ccxt:<sub-id>` exchange or asks about CCXT-specific capabilities — derivatives (funding rates, positions, leverage, margin mode), margin trading (borrow/repay), inter-account transfers, batch order ops, or any exchange not in Gordon's 10 native adapters. Use when symbols are passed as `BTC/USDT` (CCXT format), when the operator mentions Bybit / KuCoin / MEXC / Crypto.com / HTX / Gate / Bitget / BingX or any of the 90+ exchanges CCXT covers beyond Gordon's natives, or when the operator wants the same unified API across multiple exchanges.
+description: Use CCXT-routed exchange adapters when the operator picks a `ccxt:<sub-id>` exchange or asks about CCXT-specific capabilities — derivatives (funding rates, positions, leverage, margin mode), margin trading (borrow/repay), inter-account transfers, batch order ops, or any of the 90+ exchanges CCXT covers. Use when symbols are passed as `BTC/USDT` (CCXT format), when the operator mentions Bybit / KuCoin / MEXC / Crypto.com / HTX / Gate / Bitget / BingX or any CCXT venue, or when the operator wants the same unified API across multiple exchanges.
 license: MIT
 compatibility: Requires `ccxt` npm package (v4.5+) and operator-configured `CCXT_<EXCHANGE_UPPER>_API_KEY` / `_API_SECRET` env vars.
 metadata:
   author: Gordon
-  version: "1.0"
+  version: "1.1"
   upstream: https://docs.ccxt.com/
 status: active
-last-reviewed: 2026-05-23
+last-reviewed: 2026-06-10
 ---
 
 # CCXT Skill
 
-When the active exchange is CCXT-routed (id starts with `ccxt:`), use the unified CCXT API. This skill captures the patterns Gordon's `CcxtAdapter` exposes and the gotchas that make CCXT calls fail.
+Gordon routes every crypto exchange through `ccxt:<sub-id>` and the `CcxtAdapter`. First-class venues (binance, coinbase, kraken, okx, …) and the long-tail (bybit, kucoin, mexc, …) all use the same adapter.
 
 ## When to use
 
-- Operator picked an exchange not in Gordon's 10 natives (Bybit, KuCoin, MEXC, Crypto.com, HTX, Gate, BitMart, Bitstamp, Bitget, BingX, Phemex, and ~80 more)
-- Operator explicitly picks `ccxt:binance` etc. (alternative path to the native adapter for the same exchange)
+- Operator picked any crypto exchange (all are `ccxt:<sub-id>`)
 - Need derivatives surface: funding rates, positions, leverage configuration, margin-mode switch
 - Need margin trading: borrow/repay/add-margin
 - Need inter-account transfers (spot ↔ futures, main ↔ subaccount)
@@ -35,7 +34,7 @@ When the active exchange is CCXT-routed (id starts with `ccxt:`), use the unifie
 
 The `CcxtAdapter` class implements everything:
 
-Base `Exchange` interface (32 methods): `getPrice`, `getCandles`, `getOrderBook`, `placeOrder`, `cancelOrder`, `getAccountInfo`, etc. Same calls as native adapters, returns Gordon-shaped types.
+Base `Exchange` interface (32 methods): `getPrice`, `getCandles`, `getOrderBook`, `placeOrder`, `cancelOrder`, `getAccountInfo`, etc. Returns Gordon-shaped types.
 
 `ExchangeDerivatives` (perps/futures):
 - `fetchFundingRate(symbol)` — current funding rate
@@ -75,11 +74,11 @@ Capability introspection (before calling derivatives/margin/etc.):
 ```typescript
 const exchange = ExchangeFactory.create("ccxt:bybit", credentials);
 
-// Spot — same as native
+// Spot
 const price = await exchange.getPrice("BTCUSDT");  // "BTC/USDT" also accepted
 const ob = await exchange.getOrderBook("BTCUSDT", 50);
 
-// Derivatives — only on CCXT-routed adapters
+// Derivatives
 if ("fetchPosition" in exchange) {
   const ccxt = exchange as CcxtAdapter;
   if (ccxt.supports("fetchPositions")) {
@@ -105,11 +104,9 @@ if ("fetchPosition" in exchange) {
 
 5. Not every CCXT exchange supports every method. Before calling derivatives/margin methods, check `adapter.supports("methodName")`. Calling an unsupported method throws `NotSupported`.
 
-6. CCXT vs native: same exchange, different adapters. `ccxt:binance` is a different adapter than `binance`. They don't share rate-limit budget, cache, or auth state. Pick one per session.
+6. Implicit methods exist for exchange-specific endpoints CCXT hasn't unified (`exchange.publicGetXxx`, `exchange.privatePostYyy`). These bypass `CcxtAdapter`'s type safety; access via `(exchange as CcxtAdapter).client.publicGetXxx({...})`. Use only when the unified API doesn't expose what you need.
 
-7. Implicit methods exist for exchange-specific endpoints CCXT hasn't unified (`exchange.publicGetXxx`, `exchange.privatePostYyy`). These bypass `CcxtAdapter`'s type safety; access via `(exchange as CcxtAdapter).client.publicGetXxx({...})`. Use only when the unified API doesn't expose what you need.
-
-8. CCXT Pro WebSocket is bundled free (73/107 exchanges support it). Get the WebSocket via `await adapter.getWebSocket()`. Subscribes via `subscribeTicker(symbol, cb)` / `subscribeOrderBook(symbol, cb)`.
+7. CCXT Pro WebSocket is bundled free (73/107 exchanges support it). Get the WebSocket via `await adapter.getWebSocket()`. Subscribes via `subscribeTicker(symbol, cb)` / `subscribeOrderBook(symbol, cb)`.
 
 ## Verification
 
@@ -121,6 +118,6 @@ Before recommending CCXT-routed paths, verify:
 
 ## When NOT to use
 
-- Operator picked a Gordon native adapter (no `ccxt:` prefix) — use the native adapter's tighter integration with riskClassifier / evidenceBundle / tradeLedger
-- The task is spot-only on one of Gordon's 10 natives — natives have lower latency + tighter typing
-- Wallet operations on Hyperliquid / Uniswap — natives handle wallet auth + on-chain settlement; CCXT's DEX support is thinner
+- Equity broker operations (IB, Alpaca, Trading 212) — use broker tools, not CCXT
+- Wallet operations on Hyperliquid / Uniswap — use chain-specific tools; CCXT's DEX support is thinner
+- Robinhood Crypto — not CCXT-routed; use the dedicated Robinhood integration

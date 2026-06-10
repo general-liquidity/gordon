@@ -38,7 +38,7 @@ export const SUPPORTS_PUBLIC_MODE: Partial<Record<ExchangeId, boolean>> = {
   // Require wallet / passphrase / auth for basic calls — not pure public:
   hyperliquid: false,
   robinhood: false,
-  okx: false,
+  okx: true,
   gemini: false,
 };
 
@@ -73,6 +73,7 @@ export function createPublicExchange(exchangeId: ExchangeId): Exchange {
     coinbase: "coinbase",
     kraken: "kraken",
     bitfinex: "bitfinex",
+    okx: "okx",
   };
   const subId = publicSubId[exchangeId];
   if (!subId) {

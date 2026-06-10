@@ -2,24 +2,13 @@
  * Public order-book fetchers — credential-free read-only access to the
  * top crypto venues for pre-trade cost comparison.
  *
- * All four venues expose a public depth/book endpoint that doesn't
- * require auth. We hit them in parallel and normalize to our internal
- * OrderBook shape so compareVenues() can rank apples to apples.
- *
- * Per-venue notes:
- *   - Binance: /api/v3/depth?symbol=BTCUSDT&limit=100
- *   - Coinbase: /products/BTC-USD/book?level=2 (top 50 levels both sides)
- *   - Kraken: /0/public/Depth?pair=XBTUSD&count=100
- *   - OKX: /api/v5/market/books?instId=BTC-USDT&sz=100
- *
- * Fee rates are public-knowledge taker baselines (no auth needed to
- * look them up either). Real users with VIP tiers / token discounts
- * will pay less; surfacing the baseline as a CONSERVATIVE upper bound
- * is the right tradeoff.
+ * All venues route through `createPublicExchange()` (CCXT, no auth).
+ * Fee rates are public-knowledge taker baselines.
  */
 
-import type { OrderBook, OrderBookEntry } from "../types.ts";
+import type { OrderBook } from "../types.ts";
 import { createPublicExchange } from "../publicFactory.ts";
+import type { ExchangeId } from "../types.ts";
 
 export type PublicVenue = "binance" | "coinbase" | "kraken" | "okx";
 
@@ -39,64 +28,32 @@ export interface PublicVenueConfig {
   fetchBook(symbol: string, levels: number, signal?: AbortSignal): Promise<OrderBook | null>;
 }
 
-const FETCH_TIMEOUT_MS = 4_000;
-
-/** Wrap fetch with an abort timeout so a stuck venue doesn't block the
- *  whole comparison. */
-async function fetchJson(url: string, externalSignal?: AbortSignal): Promise<unknown> {
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
-  const onAbort = () => ctrl.abort();
-  externalSignal?.addEventListener("abort", onAbort);
+async function fetchBookViaCcxt(
+  venue: ExchangeId,
+  symbol: string,
+  levels: number,
+  signal?: AbortSignal,
+): Promise<OrderBook | null> {
+  if (signal?.aborted) return null;
   try {
-    const res = await fetch(url, { signal: ctrl.signal });
-    if (!res.ok) {
-      // 404 typically means the venue doesn't list the symbol — treat as
-      // "not available" rather than a transport error.
-      if (res.status === 404) return null;
-      throw new Error(`HTTP ${res.status} from ${new URL(url).host}`);
-    }
-    return res.json();
-  } finally {
-    clearTimeout(timer);
-    externalSignal?.removeEventListener("abort", onAbort);
+    const exchange = createPublicExchange(venue);
+    const book = await exchange.getOrderBook(symbol, levels);
+    return {
+      lastUpdateId: book.lastUpdateId,
+      bids: book.bids,
+      asks: book.asks,
+    };
+  } catch {
+    return null;
   }
 }
-
-function toEntries(rows: Array<[string | number, string | number]> | undefined): OrderBookEntry[] {
-  if (!rows) return [];
-  const out: OrderBookEntry[] = [];
-  for (const r of rows) {
-    const price = Number(r[0]);
-    const quantity = Number(r[1]);
-    if (Number.isFinite(price) && Number.isFinite(quantity) && price > 0 && quantity > 0) {
-      out.push({ price, quantity });
-    }
-  }
-  return out;
-}
-
-// ---------- Binance --------------------------------------------------------
 
 const binance: PublicVenueConfig = {
   label: "Binance",
-  takerBps: 10, // 0.10% spot baseline
+  takerBps: 10,
   makerBps: 10,
   toNativeSymbol: (s) => s.toUpperCase().replace(/[\-_/]/g, ""),
-  async fetchBook(symbol, levels, signal) {
-    if (signal?.aborted) return null;
-    try {
-      const exchange = createPublicExchange("binance");
-      const book = await exchange.getOrderBook(symbol, levels);
-      return {
-        lastUpdateId: book.lastUpdateId,
-        bids: book.bids,
-        asks: book.asks,
-      };
-    } catch {
-      return null;
-    }
-  },
+  fetchBook: (symbol, levels, signal) => fetchBookViaCcxt("binance", symbol, levels, signal),
 };
 
 // ---------- Coinbase --------------------------------------------------------
@@ -119,18 +76,7 @@ const coinbase: PublicVenueConfig = {
     }
     return upper;
   },
-  async fetchBook(symbol, _levels, signal) {
-    const native = this.toNativeSymbol(symbol);
-    const data = (await fetchJson(
-      `https://api.exchange.coinbase.com/products/${encodeURIComponent(native)}/book?level=2`,
-      signal,
-    )) as { bids?: [string, string, number][]; asks?: [string, string, number][] } | null;
-    if (!data) return null;
-    // Coinbase rows are [price, size, num_orders] — first two columns match.
-    const bids = toEntries(data.bids?.map((r) => [r[0], r[1]] as [string, string]));
-    const asks = toEntries(data.asks?.map((r) => [r[0], r[1]] as [string, string]));
-    return { lastUpdateId: 0, bids, asks };
-  },
+  fetchBook: (symbol, levels, signal) => fetchBookViaCcxt("coinbase", symbol, levels, signal),
 };
 
 // ---------- Kraken ----------------------------------------------------------
@@ -149,28 +95,7 @@ const kraken: PublicVenueConfig = {
     if (upper.endsWith("USDT")) upper = upper.slice(0, -4) + "USDT";
     return upper;
   },
-  async fetchBook(symbol, levels, signal) {
-    const native = this.toNativeSymbol(symbol);
-    const data = (await fetchJson(
-      `https://api.kraken.com/0/public/Depth?pair=${encodeURIComponent(native)}&count=${Math.min(levels, 500)}`,
-      signal,
-    )) as { result?: Record<string, { bids: [string, string, number][]; asks: [string, string, number][] }>; error?: string[] } | null;
-    if (!data) return null;
-    if (data.error && data.error.length > 0) {
-      // Kraken signals "unknown asset pair" via an error array, not a 404.
-      if (data.error.some((e) => e.includes("Unknown asset pair"))) return null;
-      throw new Error(`Kraken: ${data.error.join("; ")}`);
-    }
-    const result = data.result;
-    if (!result) return null;
-    const firstKey = Object.keys(result)[0];
-    if (!firstKey) return null;
-    const book = result[firstKey];
-    if (!book) return null;
-    const bids = toEntries(book.bids.map((r) => [r[0], r[1]] as [string, string]));
-    const asks = toEntries(book.asks.map((r) => [r[0], r[1]] as [string, string]));
-    return { lastUpdateId: 0, bids, asks };
-  },
+  fetchBook: (symbol, levels, signal) => fetchBookViaCcxt("kraken", symbol, levels, signal),
 };
 
 // ---------- OKX -------------------------------------------------------------
@@ -189,19 +114,7 @@ const okx: PublicVenueConfig = {
     }
     return upper;
   },
-  async fetchBook(symbol, levels, signal) {
-    const native = this.toNativeSymbol(symbol);
-    const data = (await fetchJson(
-      `https://www.okx.com/api/v5/market/books?instId=${encodeURIComponent(native)}&sz=${Math.min(levels, 400)}`,
-      signal,
-    )) as { code?: string; data?: Array<{ bids: [string, string, string, string][]; asks: [string, string, string, string][] }> } | null;
-    if (!data || data.code !== "0") return null;
-    const top = data.data?.[0];
-    if (!top) return null;
-    const bids = toEntries(top.bids.map((r) => [r[0], r[1]] as [string, string]));
-    const asks = toEntries(top.asks.map((r) => [r[0], r[1]] as [string, string]));
-    return { lastUpdateId: 0, bids, asks };
-  },
+  fetchBook: (symbol, levels, signal) => fetchBookViaCcxt("okx", symbol, levels, signal),
 };
 
 export const PUBLIC_VENUES: Record<PublicVenue, PublicVenueConfig> = {

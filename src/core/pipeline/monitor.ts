@@ -17,7 +17,6 @@ import { createModuleLogger } from "../../infra/logger/index.ts";
 import { emitEvent } from "../../events/index.ts";
 import type { Trade, Plan, ExitFill, EntryFill } from "../../types/index.ts";
 import {
-  createMarketStream,
   type MarketStream,
   type MarketStreamTickerUpdate as TickerUpdate,
 } from "../../infra/exchange/marketStream.ts";
@@ -31,6 +30,50 @@ const realtimePriceCache: Map<string, { price: number; timestamp: number }> = ne
 
 // WebSocket instance for real-time monitoring
 let wsClient: MarketStream | null = null;
+let monitorHandlersWired = false;
+
+export function setMonitorMarketStream(stream: MarketStream | null): void {
+  wsClient = stream;
+}
+
+export function getMonitorMarketStream(): MarketStream | null {
+  return wsClient;
+}
+
+export function wireMonitorTickerHandlers(stream: MarketStream): void {
+  if (monitorHandlersWired) return;
+  monitorHandlersWired = true;
+
+  stream.on("ticker", (update: TickerUpdate) => {
+    realtimePriceCache.set(update.symbol, {
+      price: update.price,
+      timestamp: update.timestamp,
+    });
+    checkRealtimePriceAlert(update.symbol, update.price);
+  });
+
+  stream.on("connected", () => {
+    logger.info("Market stream connected for real-time monitoring");
+  });
+
+  stream.on("disconnected", (reason) => {
+    logger.warn("Market stream disconnected", { reason });
+  });
+
+  stream.on("error", (error) => {
+    logger.error("Market stream error", error);
+  });
+}
+
+export async function subscribeMonitorTradeSymbols(): Promise<void> {
+  if (!wsClient) return;
+  const openTrades = listTrades({ status: "OPEN" });
+  const partialTrades = listTrades({ status: "PARTIAL" });
+  const symbols = new Set([...openTrades, ...partialTrades].map((t) => t.symbol));
+  for (const symbol of symbols) {
+    wsClient.subscribeTicker(symbol);
+  }
+}
 
 // ============================================================================
 // Types
@@ -1733,59 +1776,9 @@ function checkFlashCrash(
  * This enables faster detection of stop-loss and take-profit triggers
  * Only connects if there are active trades to monitor
  */
-export async function initializeRealtimeMonitor(exchangeId: string = "ccxt:binance"): Promise<void> {
-  if (wsClient) {
-    logger.debug("WebSocket already initialized");
-    return;
-  }
-
-  // Check if there are any trades to monitor BEFORE connecting
-  const openTrades = listTrades({ status: "OPEN" });
-  const partialTrades = listTrades({ status: "PARTIAL" });
-  const symbols = new Set([...openTrades, ...partialTrades].map((t) => t.symbol));
-
-  if (symbols.size === 0) {
-    logger.debug("No active trades to monitor - skipping WebSocket initialization");
-    return;
-  }
-
-  wsClient = createMarketStream(exchangeId);
-
-  wsClient.on("ticker", (update: TickerUpdate) => {
-    // Update real-time price cache
-    realtimePriceCache.set(update.symbol, {
-      price: update.price,
-      timestamp: update.timestamp,
-    });
-
-    // Check for critical price movements on open trades
-    checkRealtimePriceAlert(update.symbol, update.price);
-  });
-
-  wsClient.on("connected", () => {
-    logger.info("WebSocket connected for real-time monitoring");
-  });
-
-  wsClient.on("disconnected", (reason) => {
-    logger.warn("WebSocket disconnected", { reason });
-  });
-
-  wsClient.on("error", (error) => {
-    logger.error("WebSocket error", error);
-  });
-
-  // Pre-register subscriptions before connecting
-  for (const symbol of symbols) {
-    wsClient.subscribeTicker(symbol);
-  }
-
-  try {
-    await wsClient.connect();
-    logger.debug("Subscribed to real-time tickers", { symbols: Array.from(symbols) });
-  } catch (error) {
-    logger.error("Failed to initialize WebSocket", error instanceof Error ? error : undefined);
-    wsClient = null;
-  }
+export async function initializeRealtimeMonitor(_exchangeId: string = "ccxt:binance"): Promise<void> {
+  const { syncExchangeMarketFeeds } = await import("../../infra/exchange/marketStreamLifecycle.ts");
+  await syncExchangeMarketFeeds();
 }
 
 /**
@@ -1824,6 +1817,7 @@ export function shutdownRealtimeMonitor(): void {
     wsClient.disconnect();
     wsClient = null;
     realtimePriceCache.clear();
+    monitorHandlersWired = false;
     logger.info("Real-time monitor shutdown");
   }
 }

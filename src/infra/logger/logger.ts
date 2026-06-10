@@ -47,7 +47,8 @@ export interface LogTransport {
  */
 const DEDALUS_NOISE_RE =
   /Upstream LLM API error from dedalus|api\.dedaluslabs\.ai|AI_APICallError\b[\s\S]{0,200}dedalus/i;
-const BINANCE_NOISE_RE =
+// Exchange REST/WS noise (Binance URLs are the most common match).
+const EXCHANGE_NOISE_RE =
   /api\.binance\.com|fapi\.binance\.com|testnet\.binance\.vision|Public API request failed|Signed API request failed|Failed to get spot balances|Failed to get funding balances|Test order failed|Rate limit critical - approaching Binance limit|WebSocket connection failed|WebSocket disconnected|Reconnect attempt failed|Pong timeout/i;
 
 function isCloakedNoise(entry: LogEntry): boolean {
@@ -56,7 +57,7 @@ function isCloakedNoise(entry: LogEntry): boolean {
     (entry.context ? " " + JSON.stringify(entry.context) : "") +
     (entry.error ? " " + entry.error.name + ": " + entry.error.message : "");
   if (process.env.GORDON_SHOW_DEDALUS_ERRORS !== "1" && DEDALUS_NOISE_RE.test(haystack)) return true;
-  if (process.env.GORDON_SHOW_BINANCE_ERRORS !== "1" && BINANCE_NOISE_RE.test(haystack)) return true;
+  if (process.env.GORDON_SHOW_BINANCE_ERRORS !== "1" && EXCHANGE_NOISE_RE.test(haystack)) return true;
   return false;
 }
 

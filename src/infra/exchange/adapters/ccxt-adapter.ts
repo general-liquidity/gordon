@@ -28,7 +28,7 @@
  * Rate limiting: CCXT's `enableRateLimit: true` handles per-exchange
  * throttling internally. Gordon's `RateLimitStatus` is synthesized from
  * CCXT's `rateLimit` (ms between calls) + an estimate of recent traffic;
- * not as precise as native adapters that track weights, but functionally
+ * not as precise as exchange-native weight trackers, but functionally
  * adequate for "is the adapter currently throttling?" queries.
  */
 
