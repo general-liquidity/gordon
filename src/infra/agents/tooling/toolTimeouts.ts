@@ -119,7 +119,6 @@ export async function runWithToolTimeout<T>(
       ctrl.abort();
       reject(new ToolTimeoutError(toolName, timeoutMs, family));
     }, timeoutMs);
-    if (timer.unref) timer.unref();
   });
 
   try {

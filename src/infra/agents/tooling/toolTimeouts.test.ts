@@ -5,6 +5,10 @@ import {
   runWithToolTimeout,
 } from "./toolTimeouts.ts";
 
+function neverSettles(_signal: AbortSignal): Promise<unknown> {
+  return new Promise(() => {});
+}
+
 describe("getTimeoutForToolName", () => {
   it("classifies market reads under 'market' family", () => {
     expect(getTimeoutForToolName("get_price").family).toBe("market");
@@ -49,7 +53,7 @@ describe("runWithToolTimeout", () => {
     try {
       await runWithToolTimeout(
         "get_price",
-        () => new Promise<unknown>(() => {/* never resolves */}),
+        neverSettles,
         { override: 30 },
       );
     } catch (err) {
@@ -101,7 +105,7 @@ describe("runWithToolTimeout", () => {
     try {
       await runWithToolTimeout(
         "place_order",
-        () => new Promise<unknown>(() => {/* never resolves */}),
+        neverSettles,
         { override: 20 },
       );
     } catch (err) {
