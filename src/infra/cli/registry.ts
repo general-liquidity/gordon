@@ -322,12 +322,10 @@ export const CLI_REGISTRY: CLIEntry[] = [
       { command: "jup predict buy", description: "Buy prediction market shares" },
       { command: "jup vrfd check", description: "Check token verification status" },
     ],
-    nativeCoverage: "partial",
-    nativeTools: [
-      "solana_trade", "solana_fetch_price", "solana_get_token_data",
-    ],
+    nativeCoverage: "none",
+    nativeTools: [],
     credentials: [
-      { env: "SOLANA_PRIVATE_KEY", required: true, description: "Solana wallet for execution" },
+      { env: "SOLANA_PRIVATE_KEY", required: true, description: "External Jupiter CLI wallet (not Gordon native)" },
       { env: "RPC_URL", required: false, description: "Custom Solana RPC endpoint" },
     ],
     docsUrl: "https://github.com/jup-ag/cli",

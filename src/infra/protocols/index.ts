@@ -15,10 +15,10 @@ export interface ProtocolInfo {
   healthEndpoint?: string;
 }
 
-// PROTOCOL_REGISTRY is intentionally empty post-onchain-removal.
-// All onchain protocol integrations (Base/AgentKit + earlier
-// Solana/Polkadot/Uniswap/Chainlink) were removed — Gordon trades via CCXT
-// (CEX) + Hyperliquid (DEX); onchain/DeFi/wallet surfaces live in OpenSolvency.
+// PROTOCOL_REGISTRY is intentionally empty — chain-specific execution kits
+// (AgentKit, SolanaKit, PolkadotKit, Uniswap, Chainlink CCIP) were removed.
+// Gordon trades crypto via CCXT; onchain reads use infra/data/sources/onchain.ts
+// and wallet intelligence uses infra/data/wallet/.
 export const PROTOCOL_REGISTRY: ProtocolInfo[] = [];
 
 export function getProtocol(id: string): ProtocolInfo | undefined {

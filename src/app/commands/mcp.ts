@@ -56,11 +56,12 @@ const PLUGIN_SHOWCASE: ShowcaseCategory[] = [
     ],
   },
   {
-    title: 'For Solana',
-    description: 'Trade, swap, and manage assets on Solana',
+    title: 'For onchain data',
+    description: 'DEX pools, wallet labels, and multichain analytics (read-only)',
     plugins: [
-      { id: 'solana-agent-kit', summary: 'Jupiter swaps, transfers, NFTs, token deploy' },
-      { id: 'helius', summary: 'Solana wallet, transaction, and asset MCP' },
+      { id: 'dexscreener', summary: 'DEX pair discovery and volume' },
+      { id: 'nansen', summary: 'Smart-money labels and flows' },
+      { id: 'helius', summary: 'Solana RPC / wallet MCP (optional third-party)' },
     ],
   },
   {

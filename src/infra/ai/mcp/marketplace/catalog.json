@@ -898,7 +898,7 @@
     {
       "id": "uniswap-mcp",
       "name": "Uniswap MCP",
-      "description": "Uniswap V3 on Ethereum — swap execution, real-time prices, new pool tracking across 8+ chains. Complements native Uniswap tools.",
+      "description": "Third-party Uniswap V3 trader MCP — swap execution and pool tracking. Gordon does not ship a native Uniswap venue; use CCXT for CEX execution or this MCP for optional DEX ops.",
       "category": "execution",
       "transport": "stdio",
       "install": "npx -y uniswap-trader-mcp",

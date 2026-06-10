@@ -337,7 +337,6 @@ export const EnvKeysSchema = z.object({
   BITFINEX_API_KEY: BitfinexKeySchema.optional(),
   BITFINEX_API_SECRET: BitfinexSecretSchema.optional(),
   HYPERLIQUID_PRIVATE_KEY: HyperliquidKeySchema.optional(),
-  HELIUS_API_KEY: HeliusKeySchema.optional(),
   MOONPAY_API_KEY: MoonPayKeySchema.optional(),
   MOONPAY_SECRET_KEY: MoonPaySecretSchema.optional(),
   MOONPAY_WEBHOOK_API_KEY: MoonPayWebhookApiKeySchema.optional(),
@@ -454,15 +453,6 @@ export function validateEnvKeys(keys: Record<string, string | undefined>): Valid
       errors.push({ key: "INCEPTION_API_KEY", message: result.error! });
     } else {
       validated.INCEPTION_API_KEY = keys.INCEPTION_API_KEY.trim();
-    }
-  }
-
-  if (keys.HELIUS_API_KEY) {
-    const result = validateApiKey("HELIUS_API_KEY", keys.HELIUS_API_KEY, HeliusKeySchema);
-    if (!result.valid) {
-      errors.push({ key: "HELIUS_API_KEY", message: result.error! });
-    } else {
-      validated.HELIUS_API_KEY = keys.HELIUS_API_KEY.trim();
     }
   }
 

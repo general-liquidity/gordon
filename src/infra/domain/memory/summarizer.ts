@@ -1083,7 +1083,7 @@ const CATEGORY_PATTERNS: Array<{ category: ReflectorBullet["category"]; patterns
   },
   {
     category: "venue",
-    patterns: [/\b(binance|coinbase|hyperliquid|bybit|kraken|uniswap|alpaca|robinhood|ibkr|schwab)\b/i],
+    patterns: [/\b(binance|coinbase|hyperliquid|bybit|kraken|alpaca|robinhood|ibkr|schwab)\b/i],
   },
   {
     category: "strategy",

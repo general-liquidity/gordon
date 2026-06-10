@@ -20,9 +20,8 @@ describe("inferAssetClassFromVenue", () => {
     expect(inferAssetClassFromVenue("trading212")).toBe("us_equity");
   });
 
-  it("maps defi venues", () => {
-    expect(inferAssetClassFromVenue("uniswap")).toBe("defi");
-    expect(inferAssetClassFromVenue("agentkit")).toBe("defi");
+  it("maps hyperliquid as crypto", () => {
+    expect(inferAssetClassFromVenue("hyperliquid")).toBe("crypto");
   });
 
   it("uses heuristic fallback for unknown venues with defi hints", () => {
@@ -97,7 +96,7 @@ describe("inferAssetClass (explicit > structural symbol > venue)", () => {
   it("falls back to venue for crypto/equity (whose symbols come from the catalog)", () => {
     expect(inferAssetClass("alpaca", "AAPL")).toBe("us_equity");
     expect(inferAssetClass("binance", "BTCUSD")).toBe("crypto"); // crypto via venue, not symbol
-    expect(inferAssetClass("uniswap", "WETH")).toBe("defi");
+    expect(inferAssetClass("hyperliquid", "ETH")).toBe("crypto");
   });
 
   it("structural symbol shape overrides a generic venue", () => {

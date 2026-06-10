@@ -17,9 +17,7 @@
  *                      subaccount issued from the venue's UI; adapter
  *                      just surfaces the flag (Bitfinex)
  *  - "unsupported"   — venue doesn't offer any paper/sandbox path Gordon
- *                      can route to (Binance US, Kraken spot, Robinhood,
- *                      Uniswap — latter would need a separate Sepolia
- *                      integration that isn't a URL swap)
+ *                      can route to (Binance US, Kraken spot, Robinhood)
  */
 
 import type { ExchangeId, NativeExchangeId } from "./types.ts";

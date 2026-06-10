@@ -6,8 +6,8 @@
  * when disabled.
  *
  * For Gordon:
- *   - Exchange adapters (Gemini, Polkadot, etc.) loaded on first trade
- *   - Agent toolkits (SolanaKit, PolkadotKit) loaded on first DeFi request
+ *   - Exchange adapters (CCXT venues) loaded on first trade
+ *   - Onchain data / wallet-intel sources loaded on first query
  *   - Data sources (SEC, X Search) loaded on first query
  *   - OAuth flow loaded only when user runs /oauth
  *

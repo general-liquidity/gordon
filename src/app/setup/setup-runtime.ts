@@ -77,18 +77,7 @@ export interface BootstrapOptions {
   brokerSecret?: string;
   brokerPaper?: boolean;
   brokerAccountId?: string;
-  solanaPrivateKey?: string;
-  solanaRpcUrl?: string;
-  polkadotMnemonic?: string;
-  polkadotPrivateKey?: string;
-  chainlinkApiKey?: string;
-  chainlinkApiSecret?: string;
-  evmPrivateKey?: string;
-  cdpApiKeyId?: string;
-  cdpApiKeySecret?: string;
-  cdpWalletSecret?: string;
   synthDataApiKey?: string;
-  heliusApiKey?: string;
   moonpayApiKey?: string;
   moonpaySecretKey?: string;
   polygonRecipient?: string;
@@ -184,18 +173,7 @@ export function parseBootstrapArgs(args: string[]): BootstrapOptions {
     brokerSecret: typeof parsed["broker-secret"] === "string" ? parsed["broker-secret"] : undefined,
     brokerPaper: parseBoolean(parsed["broker-paper"]),
     brokerAccountId: typeof parsed["broker-account-id"] === "string" ? parsed["broker-account-id"] : undefined,
-    solanaPrivateKey: typeof parsed["solana-private-key"] === "string" ? parsed["solana-private-key"] : undefined,
-    solanaRpcUrl: typeof parsed["solana-rpc-url"] === "string" ? parsed["solana-rpc-url"] : undefined,
-    polkadotMnemonic: typeof parsed["polkadot-mnemonic"] === "string" ? parsed["polkadot-mnemonic"] : undefined,
-    polkadotPrivateKey: typeof parsed["polkadot-private-key"] === "string" ? parsed["polkadot-private-key"] : undefined,
-    chainlinkApiKey: typeof parsed["chainlink-api-key"] === "string" ? parsed["chainlink-api-key"] : undefined,
-    chainlinkApiSecret: typeof parsed["chainlink-api-secret"] === "string" ? parsed["chainlink-api-secret"] : undefined,
-    evmPrivateKey: typeof parsed["evm-private-key"] === "string" ? parsed["evm-private-key"] : undefined,
-    cdpApiKeyId: typeof parsed["cdp-api-key-id"] === "string" ? parsed["cdp-api-key-id"] : undefined,
-    cdpApiKeySecret: typeof parsed["cdp-api-key-secret"] === "string" ? parsed["cdp-api-key-secret"] : undefined,
-    cdpWalletSecret: typeof parsed["cdp-wallet-secret"] === "string" ? parsed["cdp-wallet-secret"] : undefined,
     synthDataApiKey: typeof parsed["synthdata-api-key"] === "string" ? parsed["synthdata-api-key"] : undefined,
-    heliusApiKey: typeof parsed["helius-api-key"] === "string" ? parsed["helius-api-key"] : undefined,
     moonpayApiKey: typeof parsed["moonpay-api-key"] === "string" ? parsed["moonpay-api-key"] : undefined,
     moonpaySecretKey: typeof parsed["moonpay-secret-key"] === "string" ? parsed["moonpay-secret-key"] : undefined,
     polygonRecipient: typeof parsed["polygon-recipient"] === "string" ? parsed["polygon-recipient"] : undefined,
@@ -307,24 +285,6 @@ function withAgentRails(config: GordonConfig, options: BootstrapOptions): Gordon
       },
     ];
     agentRails.activeWalletProviderId = "moonpay";
-  }
-
-  if (options.heliusApiKey) {
-    agentRails.chainProviders = [
-      ...agentRails.chainProviders.filter((provider) => provider.type !== "helius").map((provider) => ({
-        ...provider,
-        isDefault: false,
-      })),
-      {
-        id: "helius",
-        type: "helius",
-        authMode: "native",
-        enabled: true,
-        isDefault: true,
-        network: "solana",
-      },
-    ];
-    agentRails.activeChainProviderId = "helius";
   }
 
   if (options.polygonRecipient || options.polygonPrivateKey) {
@@ -688,8 +648,8 @@ export async function applyBootstrap(options: BootstrapOptions): Promise<Bootstr
     }
     // Both CCXT and native exchanges that use API keys store "***" placeholders
     // here; the credential resolver swaps them out for the real values from env
-    // at adapter construct time. Wallet-only natives (hyperliquid, uniswap)
-    // store "" instead — checked against the native env map.
+    // at adapter construct time. Wallet-only venues (hyperliquid) store ""
+    // instead — checked against the native env map.
     const usesApiKey = isCcxtExchangeId(options.exchange)
       ? Boolean(options.exchangeKey)
       : Boolean(EXCHANGE_ENV_MAP[options.exchange as NativeExchangeId].key);
@@ -723,18 +683,7 @@ export async function applyBootstrap(options: BootstrapOptions): Promise<Bootstr
     });
   }
 
-  if (options.solanaPrivateKey) envKeys.SOLANA_PRIVATE_KEY = options.solanaPrivateKey;
-  if (options.solanaRpcUrl) envKeys.SOLANA_RPC_URL = options.solanaRpcUrl;
-  if (options.polkadotMnemonic) envKeys.POLKADOT_MNEMONIC = options.polkadotMnemonic;
-  if (options.polkadotPrivateKey) envKeys.POLKADOT_PRIVATE_KEY = options.polkadotPrivateKey;
-  if (options.chainlinkApiKey) envKeys.CHAINLINK_API_KEY = options.chainlinkApiKey;
-  if (options.chainlinkApiSecret) envKeys.CHAINLINK_API_SECRET = options.chainlinkApiSecret;
-  if (options.evmPrivateKey) envKeys.EVM_PRIVATE_KEY = options.evmPrivateKey;
-  if (options.cdpApiKeyId) envKeys.CDP_API_KEY_ID = options.cdpApiKeyId;
-  if (options.cdpApiKeySecret) envKeys.CDP_API_KEY_SECRET = options.cdpApiKeySecret;
-  if (options.cdpWalletSecret) envKeys.CDP_WALLET_SECRET = options.cdpWalletSecret;
   if (options.synthDataApiKey) envKeys.SYNTHDATA_API_KEY = options.synthDataApiKey;
-  if (options.heliusApiKey) envKeys.HELIUS_API_KEY = options.heliusApiKey;
   if (options.moonpayApiKey) envKeys.MOONPAY_API_KEY = options.moonpayApiKey;
   if (options.moonpaySecretKey) envKeys.MOONPAY_SECRET_KEY = options.moonpaySecretKey;
   if (options.polygonPrivateKey) envKeys.POLYGON_X402_PRIVATE_KEY = options.polygonPrivateKey;
@@ -793,14 +742,7 @@ export async function applyBootstrap(options: BootstrapOptions): Promise<Bootstr
     exchange: options.exchange,
     broker: options.broker,
     provider: options.llmProvider,
-    selectedCount: [
-      options.solanaPrivateKey || options.solanaRpcUrl,
-      options.polkadotMnemonic || options.polkadotPrivateKey,
-      options.chainlinkApiKey || options.chainlinkApiSecret,
-      options.evmPrivateKey,
-      options.cdpApiKeyId || options.cdpApiKeySecret || options.cdpWalletSecret,
-      options.synthDataApiKey,
-    ].filter(Boolean).length,
+    selectedCount: [options.synthDataApiKey].filter(Boolean).length,
     details: {
       profile: options.profile,
       runDoctor: Boolean(options.runDoctor),

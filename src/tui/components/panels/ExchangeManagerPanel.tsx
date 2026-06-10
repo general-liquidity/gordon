@@ -1,5 +1,5 @@
 /**
- * ExchangeManagerPanel — All 8 exchanges with health
+ * ExchangeManagerPanel — CCXT venues with health
  *
  * Shows name, connection status, latency, rate limit usage,
  * and supported features. Enter to connect/disconnect.
@@ -46,7 +46,6 @@ export const DEFAULT_EXCHANGES: ExchangeInfo[] = [
   { id: "hyperliquid", name: "Hyperliquid", connected: false, apiKeySet: false, latencyMs: 0, rateLimitUsed: 0, rateLimitMax: 1000, features: ["perps"] },
   { id: "bitfinex", name: "Bitfinex", connected: false, apiKeySet: false, latencyMs: 0, rateLimitUsed: 0, rateLimitMax: 900, features: ["spot", "margin"] },
   { id: "robinhood", name: "Robinhood", connected: false, apiKeySet: false, latencyMs: 0, rateLimitUsed: 0, rateLimitMax: 300, features: ["crypto", "stocks"] },
-  { id: "uniswap", name: "Uniswap", connected: false, apiKeySet: false, latencyMs: 0, rateLimitUsed: 0, rateLimitMax: 0, features: ["dex", "swap"] },
 ];
 
 // ============================================================================

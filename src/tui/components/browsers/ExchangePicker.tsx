@@ -35,7 +35,6 @@ const LIVE_EXCHANGES = [
   { label: "Gemini", value: "ccxt:gemini" },
   { label: "OKX", value: "ccxt:okx" },
   { label: "Hyperliquid (wallet-based)", value: "ccxt:hyperliquid" },
-  { label: "Uniswap (wallet-based)", value: "ccxt:uniswap" },
   { label: "Robinhood Crypto", value: "ccxt:robinhood" },
 ];
 
@@ -48,7 +47,7 @@ const SANDBOX_EXCHANGES = [
   { label: "Kraken Demo  (demo.kraken.com)", value: "ccxt:kraken", sandboxId: "kraken-demo" },
 ];
 
-const WALLET_BASED = new Set(["ccxt:hyperliquid", "ccxt:uniswap"]);
+const WALLET_BASED = new Set(["ccxt:hyperliquid"]);
 const NEEDS_PASSPHRASE = new Set(["ccxt:coinbase", "ccxt:okx"]);
 
 function nativeVenueId(exchangeType: string): string {

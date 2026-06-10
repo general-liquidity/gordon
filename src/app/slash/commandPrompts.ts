@@ -184,7 +184,7 @@ export function commandToPrompt(command: SlashCommand, args: string): string {
         case "new":
           return exArgs
             ? `Add a new ${exArgs} crypto venue configuration`
-            : "Which crypto execution venue would you like to add? (binance, coinbase, kraken, bitfinex, hyperliquid, uniswap, robinhood, okx, gemini)";
+            : "Which crypto execution venue would you like to add? (binance, coinbase, kraken, bitfinex, hyperliquid, robinhood, okx, gemini)";
         case "switch":
         case "use":
           return exArgs
@@ -829,10 +829,6 @@ export function commandToPrompt(command: SlashCommand, args: string): string {
       const walletSubcmd = args.split(/\s+/)[0]?.toLowerCase();
       const walletArgs = args.split(/\s+/).slice(1).join(" ");
       switch (walletSubcmd) {
-        case "solana":
-          return walletArgs
-            ? `Inspect this Solana wallet using the native Helius provider: ${walletArgs}`
-            : "Inspect my configured Solana wallet and show balances, assets, and recent activity.";
         case "fund":
           return walletArgs
             ? `Help me fund a wallet using Gordon's wallet rails: ${walletArgs}`
@@ -882,56 +878,10 @@ export function commandToPrompt(command: SlashCommand, args: string): string {
       return args
         ? `Prepare a Polygon x402 payment intent for this request: ${args}. Show the headers and require approval before signing.`
         : "Prepare a Polygon x402 payment intent for a paid API or agent-to-agent request. Ask which resource and amount should be used.";
-    // Blockchain Network commands
     case "chains":
-      return "Show me which blockchain networks are configured and available. For each configured chain, show the available tools and capabilities. For unconfigured chains, show what keys are needed.";
+      return "Show configured onchain data sources (DexScreener, DefiLlama, CoinGecko-onchain, Birdeye, Codex, 1inch) and wallet-intelligence providers (Nansen, Arkham, Covalent, Moralis, Zerion, DeBank). For each, show availability and missing API keys.";
     case "rails":
-      return "Show Gordon's native wallet, chain-data, and payment rails. Include Helius, MoonPay, and Polygon x402 status, active providers, auth modes, MCP fast paths, and any missing credentials.";
-    case "bridge":
-      if (args) {
-        return `Help me bridge tokens cross-chain using Chainlink CCIP: ${args}. Show me the fee estimate before executing.`;
-      }
-      return "Help me bridge tokens cross-chain using Chainlink CCIP. Show me supported chains and tokens.";
-    case "solana": {
-      if (!args) return "Show me Solana DeFi options — what can I do on Solana? Show my Solana balance if configured.";
-      const solSubcmd = args.split(/\s+/)[0]?.toLowerCase();
-      const solArgs = args.split(/\s+/).slice(1).join(" ");
-      switch (solSubcmd) {
-        case "swap": return solArgs ? `Swap tokens on Solana: ${solArgs}` : "Help me swap tokens on Solana. What pair?";
-        case "stake": return solArgs ? `Stake SOL: ${solArgs}` : "Help me stake SOL. Show me staking options.";
-        case "lend": return solArgs ? `Lend on Solana: ${solArgs}` : "Show me Solana lending options.";
-        case "launch": return solArgs ? `Launch a token on Solana: ${solArgs}` : "Help me launch a token on Solana.";
-        case "balance": return "Show my Solana wallet balance and token holdings.";
-        default: return `Solana action: ${args}`;
-      }
-    }
-    case "polkadot": {
-      if (!args) return "Show me Polkadot ecosystem options — what can I do on Polkadot/HydraDX? Show my balance if configured.";
-      const dotSubcmd = args.split(/\s+/)[0]?.toLowerCase();
-      const dotArgs = args.split(/\s+/).slice(1).join(" ");
-      switch (dotSubcmd) {
-        case "swap": return dotArgs ? `Swap on HydraDX: ${dotArgs}` : "Help me swap on HydraDX.";
-        case "stake": return dotArgs ? `Stake DOT: ${dotArgs}` : "Help me stake DOT. Show staking options.";
-        case "transfer": return dotArgs ? `Transfer on Polkadot: ${dotArgs}` : "Help me transfer tokens on Polkadot.";
-        case "balance": return "Show my Polkadot wallet balance.";
-        default: return `Polkadot action: ${args}`;
-      }
-    }
-    case "prices":
-      if (args) {
-        const pairs = args.split(/\s+/).map((s) => s.toUpperCase());
-        return `Get real-time Chainlink Data Streams prices for: ${pairs.join(", ")}. Show bid, ask, and timestamp.`;
-      }
-      return "Get real-time Chainlink Data Streams prices for major crypto pairs (BTC, ETH, SOL, LINK, etc.)";
-    case "base": {
-      const sub = args?.trim().toLowerCase();
-      if (sub === "trending") return "Show me trending dApps and featured projects on Base L2 from the Onchain Registry";
-      if (sub === "signals") return "Detect trading signals on Base: whale transfers, volume spikes, new listings, and DEX pressure";
-      if (sub === "whales") return "Show recent whale transfers on Base L2 using Basescan data";
-      if (sub === "dex") return "Show Base DEX analytics: top pairs by volume, new token listings, and boosted tokens from DexScreener";
-      if (sub) return `Explore Base L2: ${args}`;
-      return "Show me an overview of the Base L2 ecosystem: trending apps, recent signals, and DEX activity";
-    }
+      return "Show Gordon payment rails: MoonPay funding flows and Polygon x402 payment status. Include configured credentials and any gaps.";
     // SynthData commands
     case "synth": {
       if (!args) return "Show me SynthData advanced capabilities (volatility, options, LP, liquidation, miners). For price forecasts use /predict. Assets: BTC, ETH, SOL, XAU, SPYX, NVDAX, TSLAX, AAPLX, GOOGLX";
@@ -956,7 +906,7 @@ export function commandToPrompt(command: SlashCommand, args: string): string {
         case "lp":
         case "lp-range":
           return synthAsset
-            ? `Get optimal LP range for ${synthAsset} from SynthData. Show Uniswap V3 bounds, IL estimates, and probability distribution.`
+            ? `Get optimal LP range for ${synthAsset} from SynthData. Show concentrated-liquidity bounds, IL estimates, and probability distribution.`
             : "Which asset? Supported: BTC, ETH, SOL, XAU, SPYX, NVDAX, TSLAX, AAPLX, GOOGLX";
         case "liquidation":
         case "liq":

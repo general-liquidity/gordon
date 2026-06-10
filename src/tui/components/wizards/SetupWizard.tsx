@@ -111,7 +111,6 @@ const EXCHANGE_STEP: StepConfig = {
       { label: "Gemini", value: "gemini" },
       { label: "OKX", value: "okx" },
       { label: "Hyperliquid (wallet-based)", value: "hyperliquid" },
-      { label: "Uniswap (wallet-based)", value: "uniswap" },
       { label: "Robinhood Crypto", value: "robinhood" },
     ].map((opt) => ({
       ...opt,
@@ -185,7 +184,7 @@ const EXCHANGE_API_KEY_STEP: StepConfig = {
   show: (d, p) => {
     if (!exchangeCredsNeeded(d, p)) return false;
     const base = baseExchangeType(d);
-    return base !== "hyperliquid" && base !== "uniswap";
+    return base !== "hyperliquid";
   },
 };
 
@@ -200,7 +199,7 @@ const EXCHANGE_API_SECRET_STEP: StepConfig = {
   show: (d, p) => {
     if (!exchangeCredsNeeded(d, p)) return false;
     const base = baseExchangeType(d);
-    return base !== "hyperliquid" && base !== "uniswap";
+    return base !== "hyperliquid";
   },
 };
 
@@ -231,7 +230,7 @@ const EXCHANGE_WALLET_STEP: StepConfig = {
   show: (d, p) => {
     if (!exchangeCredsNeeded(d, p)) return false;
     const base = baseExchangeType(d);
-    return base === "hyperliquid" || base === "uniswap";
+    return base === "hyperliquid";
   },
 };
 

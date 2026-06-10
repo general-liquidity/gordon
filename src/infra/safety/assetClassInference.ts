@@ -20,6 +20,7 @@ const CRYPTO_VENUES = new Set([
   "gate",
   "huobi",
   "bitstamp",
+  "hyperliquid",
 ]);
 
 const US_EQUITY_VENUES = new Set([
@@ -34,14 +35,7 @@ const US_EQUITY_VENUES = new Set([
   "etrade",
 ]);
 
-const DEFI_VENUES = new Set([
-  "uniswap",
-  "agentkit",
-  "solanakit",
-  "polkadotkit",
-  "base_onchain",
-  "cdp",
-]);
+const DEFI_VENUES = new Set<string>();
 
 export type InferredAssetClass =
   | "crypto"

@@ -19,7 +19,6 @@ export const EXCHANGE_LIMITS: Record<string, RateLimiterConfig> = {
   hyperliquid:  { maxRequests: 1200, windowMs: 60_000, burstLimit: 50 },
   bitfinex:     { maxRequests: 90,   windowMs: 60_000, burstLimit: 20 },
   robinhood:    { maxRequests: 1,    windowMs: 1_000,  burstLimit: 1 },
-  uniswap:      { maxRequests: 30,   windowMs: 60_000, burstLimit: 10 },
 };
 
 interface QueuedRequest {

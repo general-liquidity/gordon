@@ -1511,7 +1511,7 @@ function AppInner() {
                 const apiSecret = data.exchangeApiSecret?.trim() ?? "";
                 const passphrase = data.exchangePassphrase?.trim();
                 const walletKey = data.exchangeWalletKey?.trim();
-                const isWalletBased = exchangeType === "ccxt:hyperliquid" || exchangeType === "ccxt:uniswap";
+                const isWalletBased = exchangeType === "ccxt:hyperliquid";
 
                 // Conflict resolution: update existing entry in place when
                 // the user asked to update, rather than creating a duplicate.

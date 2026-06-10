@@ -17,10 +17,6 @@ describe("classifyNativeVenue", () => {
     expect(classifyNativeVenue("hyperliquid").tier).toBe("medium");
   });
 
-  it("classifies uniswap as high", () => {
-    expect(classifyNativeVenue("uniswap").tier).toBe("high");
-  });
-
   it("returns unknown for unrecognized venue ids", () => {
     expect(classifyNativeVenue("madeup_venue").tier).toBe("unknown");
   });
@@ -28,13 +24,11 @@ describe("classifyNativeVenue", () => {
   it("assigns expected scores per tier", () => {
     expect(classifyNativeVenue("binance").score).toBe(0);
     expect(classifyNativeVenue("hyperliquid").score).toBe(25);
-    expect(classifyNativeVenue("uniswap").score).toBe(60);
     expect(classifyNativeVenue("madeup").score).toBe(30);
   });
 
   it("populates a reason string", () => {
     expect(classifyNativeVenue("binance").reason).toContain("CEX");
-    expect(classifyNativeVenue("uniswap").reason).toContain("Public mempool");
   });
 });
 
@@ -53,7 +47,7 @@ describe("classifyCcxtVenue", () => {
 describe("classifyVenue — dispatch on prefix", () => {
   it("dispatches to native classifier for non-prefixed ids", () => {
     expect(classifyVenue("binance").tier).toBe("low");
-    expect(classifyVenue("uniswap").tier).toBe("high");
+    expect(classifyVenue("removed_venue").tier).toBe("unknown");
   });
 
   it("dispatches to CCXT classifier for ccxt: prefixed ids", () => {

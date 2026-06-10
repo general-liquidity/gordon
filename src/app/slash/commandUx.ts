@@ -140,8 +140,6 @@ const ANALYZE_COMMANDS = new Set([
   "fast-deep",
   "mtf",
   "pair-analysis",
-  "chainlink",
-  "base",
   "synthdata",
   "forecast",
   "liquidation",

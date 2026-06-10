@@ -12,7 +12,7 @@ Analyze and manage a liquidity provision for {pool}.
 
 ## Step 1: Pool Analysis
 Get pool details:
-- DEX and chain (Uniswap, Orca, Raydium, Meteora, etc.)
+- DEX and chain (any AMM — fetch pool metadata via onchain data sources)
 - Token pair and current prices
 - Pool TVL (total value locked)
 - 24h volume and fees generated
@@ -36,7 +36,7 @@ Check correlation between the two tokens:
 - Stablecoin pair → minimal IL
 
 ## Step 3: Concentration Assessment (if concentrated liquidity)
-For Uniswap V3 / Orca Whirlpool style:
+For concentrated-liquidity AMMs (V3-style / Whirlpool-style):
 - Current price vs your range
 - What price range to set?
   - Narrow range: higher fees per dollar, but more IL and frequent rebalancing

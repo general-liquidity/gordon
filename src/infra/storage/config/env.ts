@@ -80,8 +80,20 @@ export interface EnvKeys {
   BITFINEX_API_KEY?: string;
   BITFINEX_API_SECRET?: string;
   HYPERLIQUID_PRIVATE_KEY?: string;
-  UNISWAP_API_KEY?: string;
-  THEGRAPH_API_KEY?: string;
+  // Onchain data sources (read-only)
+  BIRDEYE_API_KEY?: string;
+  CODEX_API_KEY?: string;
+  DEFINED_API_KEY?: string;
+  ONEINCH_API_KEY?: string;
+  COINGECKO_API_KEY?: string;
+  // Wallet intelligence (read-only)
+  NANSEN_API_KEY?: string;
+  MORALIS_API_KEY?: string;
+  ARKHAM_API_KEY?: string;
+  DEBANK_ACCESS_KEY?: string;
+  ZERION_API_KEY?: string;
+  GOLDRUSH_API_KEY?: string;
+  COVALENT_API_KEY?: string;
   GORDON_PROVIDER?: string;
   GORDON_MODEL?: string;
   GORDON_AXIOM_STRUCTURED_ENABLED?: string;
@@ -94,22 +106,6 @@ export interface EnvKeys {
   GORDON_TRACING_REVIEWED?: string;
   OTEL_EXPORTER_OTLP_ENDPOINT?: string;
   OTEL_EXPORTER_OTLP_HEADERS?: string;
-  // Chain provider keys
-  SOLANA_PRIVATE_KEY?: string;
-  SOLANA_RPC_URL?: string;
-  HELIUS_API_KEY?: string;
-  JUPITER_REFERRAL_ACCOUNT?: string;
-  JUPITER_FEE_BPS?: string;
-  POLKADOT_MNEMONIC?: string;
-  POLKADOT_PRIVATE_KEY?: string;
-  CHAINLINK_API_KEY?: string;
-  CHAINLINK_API_SECRET?: string;
-  EVM_PRIVATE_KEY?: string;
-  CDP_API_KEY_ID?: string;
-  CDP_API_KEY_SECRET?: string;
-  CDP_WALLET_SECRET?: string;
-  CDP_NETWORK_ID?: string;
-  BASESCAN_API_KEY?: string;
   SYNTHDATA_API_KEY?: string;
   MOONPAY_API_KEY?: string;
   MOONPAY_SECRET_KEY?: string;
@@ -135,21 +131,13 @@ export interface EnvStatus {
   hasKrakenKeys: boolean;
   hasBitfinexKeys: boolean;
   hasHyperliquidKey: boolean;
-  hasUniswapKey: boolean;
-  hasGraphKey: boolean;
+  hasOnchainDataKey: boolean;
+  hasWalletIntelKey: boolean;
   hasStructuredAxiomEnabled: boolean;
   hasAxiomToken: boolean;
   hasAxiomHashSalt: boolean;
   tracingRequested: boolean;
   tracingReviewed: boolean;
-  // Chain provider status
-  hasSolanaKey: boolean;
-  hasHeliusKey: boolean;
-  hasPolkadotKey: boolean;
-  hasChainlinkStreamsKeys: boolean;
-  hasChainlinkCCIPKey: boolean;
-  hasCDPKeys: boolean;
-  hasBasescanKey: boolean;
   hasSynthDataKey: boolean;
   hasMoonPayKeys: boolean;
   hasPolygonX402Key: boolean;
@@ -246,15 +234,13 @@ const ENV_KEY_NAMES: (keyof EnvKeys)[] = [
   "COINBASE_API_KEY", "COINBASE_API_SECRET", "COINBASE_PASSPHRASE",
   "KRAKEN_API_KEY", "KRAKEN_API_SECRET",
   "BITFINEX_API_KEY", "BITFINEX_API_SECRET",
-  "HYPERLIQUID_PRIVATE_KEY", "UNISWAP_API_KEY", "THEGRAPH_API_KEY", "GORDON_PROVIDER", "GORDON_MODEL",
+  "HYPERLIQUID_PRIVATE_KEY", "GORDON_PROVIDER", "GORDON_MODEL",
+  "BIRDEYE_API_KEY", "CODEX_API_KEY", "DEFINED_API_KEY", "ONEINCH_API_KEY", "COINGECKO_API_KEY",
+  "NANSEN_API_KEY", "MORALIS_API_KEY", "ARKHAM_API_KEY", "DEBANK_ACCESS_KEY", "ZERION_API_KEY",
+  "GOLDRUSH_API_KEY", "COVALENT_API_KEY",
   "GORDON_AXIOM_STRUCTURED_ENABLED", "GORDON_AXIOM_TOKEN", "GORDON_AXIOM_HASH_SALT",
   "GORDON_AXIOM_BASE_URL", "GORDON_AXIOM_EVENTS_DATASET", "GORDON_AXIOM_AUDIT_DATASET",
   "OTEL_TRACING_ENABLED", "GORDON_TRACING_REVIEWED", "OTEL_EXPORTER_OTLP_ENDPOINT", "OTEL_EXPORTER_OTLP_HEADERS",
-  "SOLANA_PRIVATE_KEY", "SOLANA_RPC_URL", "HELIUS_API_KEY", "JUPITER_REFERRAL_ACCOUNT", "JUPITER_FEE_BPS",
-  "POLKADOT_MNEMONIC", "POLKADOT_PRIVATE_KEY",
-  "CHAINLINK_API_KEY", "CHAINLINK_API_SECRET", "EVM_PRIVATE_KEY",
-  "CDP_API_KEY_ID", "CDP_API_KEY_SECRET", "CDP_WALLET_SECRET", "CDP_NETWORK_ID",
-  "BASESCAN_API_KEY",
   "SYNTHDATA_API_KEY",
   "MOONPAY_API_KEY", "MOONPAY_SECRET_KEY", "MOONPAY_WIDGET_URL", "MOONPAY_WEBHOOK_API_KEY", "MOONPAY_VIRTUAL_ACCOUNTS_PRIVATE_KEY",
   "POLYGON_X402_PRIVATE_KEY", "POLYGON_X402_RECIPIENT", "POLYGON_X402_CHAIN_ID", "POLYGON_X402_FACILITATOR_URL",
@@ -275,20 +261,20 @@ function buildEnvStatus(keys: EnvKeys, fileExists: boolean): EnvStatus {
     hasKrakenKeys: !!(keys.KRAKEN_API_KEY && keys.KRAKEN_API_SECRET),
     hasBitfinexKeys: !!(keys.BITFINEX_API_KEY && keys.BITFINEX_API_SECRET),
     hasHyperliquidKey: !!keys.HYPERLIQUID_PRIVATE_KEY,
-    hasUniswapKey: !!keys.UNISWAP_API_KEY,
-    hasGraphKey: !!keys.THEGRAPH_API_KEY,
+    hasOnchainDataKey: !!(
+      keys.BIRDEYE_API_KEY || keys.CODEX_API_KEY || keys.DEFINED_API_KEY
+      || keys.ONEINCH_API_KEY || keys.COINGECKO_API_KEY
+    ),
+    hasWalletIntelKey: !!(
+      keys.NANSEN_API_KEY || keys.MORALIS_API_KEY || keys.ARKHAM_API_KEY
+      || keys.DEBANK_ACCESS_KEY || keys.ZERION_API_KEY
+      || keys.GOLDRUSH_API_KEY || keys.COVALENT_API_KEY
+    ),
     hasStructuredAxiomEnabled: keys.GORDON_AXIOM_STRUCTURED_ENABLED === "true",
     hasAxiomToken: !!keys.GORDON_AXIOM_TOKEN,
     hasAxiomHashSalt: !!keys.GORDON_AXIOM_HASH_SALT,
     tracingRequested: keys.OTEL_TRACING_ENABLED === "true",
     tracingReviewed: keys.GORDON_TRACING_REVIEWED === "true",
-    hasSolanaKey: !!keys.SOLANA_PRIVATE_KEY,
-    hasHeliusKey: !!keys.HELIUS_API_KEY,
-    hasPolkadotKey: !!(keys.POLKADOT_MNEMONIC || keys.POLKADOT_PRIVATE_KEY),
-    hasChainlinkStreamsKeys: !!(keys.CHAINLINK_API_KEY && keys.CHAINLINK_API_SECRET),
-    hasChainlinkCCIPKey: !!keys.EVM_PRIVATE_KEY,
-    hasCDPKeys: !!(keys.CDP_API_KEY_ID && keys.CDP_API_KEY_SECRET && keys.CDP_WALLET_SECRET),
-    hasBasescanKey: !!keys.BASESCAN_API_KEY,
     hasSynthDataKey: !!keys.SYNTHDATA_API_KEY,
     hasMoonPayKeys: !!(
       keys.MOONPAY_API_KEY
@@ -606,118 +592,33 @@ export async function createEnvFile(keys: Partial<EnvKeys>): Promise<void> {
   }
 
   lines.push("");
-  lines.push("# Uniswap");
-
-  if (keys.UNISWAP_API_KEY) {
-    lines.push(formatEnvLine("UNISWAP_API_KEY", keys.UNISWAP_API_KEY));
-  } else {
-    lines.push("# UNISWAP_API_KEY=");
+  lines.push("# ---- Onchain data (read-only; DexScreener/DefiLlama work keyless) ----");
+  for (const [key, comment] of [
+    ["BIRDEYE_API_KEY", "Birdeye multichain OHLCV"],
+    ["CODEX_API_KEY", "Codex / Defined.fi onchain charts"],
+    ["DEFINED_API_KEY", "Alias for Codex API key"],
+    ["ONEINCH_API_KEY", "1inch onchain charts"],
+    ["COINGECKO_API_KEY", "CoinGecko onchain pool OHLCV (optional)"],
+  ] as const) {
+    const val = keys[key as keyof EnvKeys];
+    if (val) lines.push(formatEnvLine(key, val));
+    else lines.push(`# ${key}=  # ${comment}`);
   }
 
   lines.push("");
-  lines.push("# The Graph (subgraph queries for DeFi protocols)");
-
-  if (keys.THEGRAPH_API_KEY) {
-    lines.push(formatEnvLine("THEGRAPH_API_KEY", keys.THEGRAPH_API_KEY));
-  } else {
-    lines.push("# THEGRAPH_API_KEY=");
-  }
-
-  // ---- Blockchain Network Keys ----
-  lines.push("");
-  lines.push("# ---- Blockchain Networks ----");
-
-  lines.push("");
-  lines.push("# Solana (DeFi, token swaps, staking, lending — 60+ tools)");
-  if (keys.SOLANA_PRIVATE_KEY) {
-    lines.push(formatEnvLine("SOLANA_PRIVATE_KEY", keys.SOLANA_PRIVATE_KEY));
-  } else {
-    lines.push("# SOLANA_PRIVATE_KEY=");
-  }
-  if (keys.SOLANA_RPC_URL) {
-    lines.push(formatEnvLine("SOLANA_RPC_URL", keys.SOLANA_RPC_URL));
-  } else {
-    lines.push("# SOLANA_RPC_URL=https://api.mainnet-beta.solana.com");
-  }
-  if (keys.HELIUS_API_KEY) {
-    lines.push(formatEnvLine("HELIUS_API_KEY", keys.HELIUS_API_KEY));
-  } else {
-    lines.push("# HELIUS_API_KEY=");
-  }
-  if (keys.JUPITER_REFERRAL_ACCOUNT) {
-    lines.push(formatEnvLine("JUPITER_REFERRAL_ACCOUNT", keys.JUPITER_REFERRAL_ACCOUNT));
-  } else {
-    lines.push("# JUPITER_REFERRAL_ACCOUNT=");
-  }
-  if (keys.JUPITER_FEE_BPS) {
-    lines.push(formatEnvLine("JUPITER_FEE_BPS", keys.JUPITER_FEE_BPS));
-  } else {
-    lines.push("# JUPITER_FEE_BPS=");
-  }
-
-  lines.push("");
-  lines.push("# Polkadot (cross-chain swaps, staking, governance)");
-  if (keys.POLKADOT_MNEMONIC) {
-    lines.push(formatEnvLine("POLKADOT_MNEMONIC", keys.POLKADOT_MNEMONIC));
-  } else {
-    lines.push("# POLKADOT_MNEMONIC=");
-  }
-  if (keys.POLKADOT_PRIVATE_KEY) {
-    lines.push(formatEnvLine("POLKADOT_PRIVATE_KEY", keys.POLKADOT_PRIVATE_KEY));
-  } else {
-    lines.push("# POLKADOT_PRIVATE_KEY=");
-  }
-
-  lines.push("");
-  lines.push("# Chainlink Data Streams (real-time institutional-grade price feeds)");
-  if (keys.CHAINLINK_API_KEY) {
-    lines.push(formatEnvLine("CHAINLINK_API_KEY", keys.CHAINLINK_API_KEY));
-  } else {
-    lines.push("# CHAINLINK_API_KEY=");
-  }
-  if (keys.CHAINLINK_API_SECRET) {
-    lines.push(formatEnvLine("CHAINLINK_API_SECRET", keys.CHAINLINK_API_SECRET));
-  } else {
-    lines.push("# CHAINLINK_API_SECRET=");
-  }
-
-  lines.push("");
-  lines.push("# EVM Private Key (Chainlink CCIP cross-chain bridging)");
-  if (keys.EVM_PRIVATE_KEY) {
-    lines.push(formatEnvLine("EVM_PRIVATE_KEY", keys.EVM_PRIVATE_KEY));
-  } else {
-    lines.push("# EVM_PRIVATE_KEY=0x...");
-  }
-
-  lines.push("");
-  lines.push("# Coinbase CDP (Base smart wallets, onchain actions)");
-  if (keys.CDP_API_KEY_ID) {
-    lines.push(formatEnvLine("CDP_API_KEY_ID", keys.CDP_API_KEY_ID));
-  } else {
-    lines.push("# CDP_API_KEY_ID=");
-  }
-  if (keys.CDP_API_KEY_SECRET) {
-    lines.push(formatEnvLine("CDP_API_KEY_SECRET", keys.CDP_API_KEY_SECRET));
-  } else {
-    lines.push("# CDP_API_KEY_SECRET=");
-  }
-  if (keys.CDP_WALLET_SECRET) {
-    lines.push(formatEnvLine("CDP_WALLET_SECRET", keys.CDP_WALLET_SECRET));
-  } else {
-    lines.push("# CDP_WALLET_SECRET=");
-  }
-  if (keys.CDP_NETWORK_ID) {
-    lines.push(formatEnvLine("CDP_NETWORK_ID", keys.CDP_NETWORK_ID));
-  } else {
-    lines.push("# CDP_NETWORK_ID=base-mainnet");
-  }
-
-  lines.push("");
-  lines.push("# Basescan (optional — enables Base L2 whale detection, holder queries)");
-  if (keys.BASESCAN_API_KEY) {
-    lines.push(formatEnvLine("BASESCAN_API_KEY", keys.BASESCAN_API_KEY));
-  } else {
-    lines.push("# BASESCAN_API_KEY=");
+  lines.push("# ---- Wallet intelligence (read-only address/portfolio data) ----");
+  for (const [key, comment] of [
+    ["NANSEN_API_KEY", "Nansen smart-money labels + flows"],
+    ["ARKHAM_API_KEY", "Arkham entity labels"],
+    ["MORALIS_API_KEY", "Moralis wallet balances + history"],
+    ["DEBANK_ACCESS_KEY", "DeBank portfolio snapshots"],
+    ["ZERION_API_KEY", "Zerion portfolio API"],
+    ["GOLDRUSH_API_KEY", "Covalent/GoldRush token holders + balances"],
+    ["COVALENT_API_KEY", "Alias for GoldRush API key"],
+  ] as const) {
+    const val = keys[key as keyof EnvKeys];
+    if (val) lines.push(formatEnvLine(key, val));
+    else lines.push(`# ${key}=  # ${comment}`);
   }
 
   // ---- Data Providers ----

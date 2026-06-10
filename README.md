@@ -67,7 +67,7 @@ gordon › BTC/USDT · $67,420 · 1H consolidation coiling on declining vol
 - **Market-wide scanners** — trending, top movers, breakouts, regime classification, whale alerts, new listings.
 - **Deep-dive workflows** — `/dd`, `/research`, `/morning-brief`, `/radar`, `/quick-scan` — each wired to a curated tool chain and a domain skill.
 - **Multi-timeframe TA** — RSI, MACD, Bollinger, ATR, VWAP, Stochastic RSI, EMA/SMA, volume profile, support/resistance auto-detection.
-- **Onchain and DEX** — Solana Agent Kit, Coinbase AgentKit EVM, Polkadot SDK, Chainlink Data Streams, Uniswap subgraph, DefiLlama yields.
+- **Onchain data (read-only)** — DexScreener, DefiLlama, CoinGecko-onchain, Birdeye, Codex, 1inch price sources plus wallet-intelligence providers (Nansen, Arkham, Covalent, Moralis, Zerion, DeBank).
 - **Fundamentals** — Finnhub stocks/ETFs/indices/bonds/crypto/macro, SEC filings, LLM-enriched quotes, news entity extraction.
 
 ### Plans and execution
@@ -88,8 +88,8 @@ gordon › BTC/USDT · $67,420 · 1H consolidation coiling on declining vol
 | CEX (spot) | Binance, Coinbase, Kraken, Bitfinex, Gemini, OKX |
 | CEX (perp) | Hyperliquid |
 | Brokers    | Alpaca, Schwab, Interactive Brokers, E*TRADE, Tastytrade, TradeStation, Tradier, Trading 212, Webull |
-| Onchain    | Solana, EVM (via Coinbase AgentKit + ethers), Polkadot, Base, Uniswap |
-| Rails      | Helius (Solana), MoonPay, Polygon, Chainlink CCIP, OKX OnchainOS |
+| Onchain data | DexScreener, DefiLlama, Birdeye, Codex, 1inch, wallet intel (Nansen, Arkham, …) |
+| Rails      | MoonPay, Polygon x402 |
 
 Adapters conform to a shared contract and pass an inclusion gate and conformance matrix in CI — broker quality is measured, not assumed.
 
@@ -221,7 +221,7 @@ Gordon enforces the same truth table everywhere — in the static preflight, in 
 | Memory         | [LibSQL](https://turso.tech/libsql) (SQL + vector) + SQLite (audit)    |
 | LLM providers  | OpenAI, Anthropic, Google Gemini, Dedalus (OpenAI-compatible router)   |
 | Venues         | Native clients (Binance, Hyperliquid) + [ccxt](https://ccxt.com) fleet + broker REST adapters |
-| Onchain        | `ethers` v6, Coinbase AgentKit, Solana Agent Kit, Polkadot SDK         |
+| Onchain data   | DexScreener, DefiLlama, Birdeye, Codex, 1inch, wallet-intel adapters |
 | Schemas        | [Zod](https://zod.dev) 4 for every tool input/output and config        |
 | Observability  | OpenTelemetry traces + metrics, Mastra observability export            |
 
@@ -258,7 +258,7 @@ Gordon enforces the same truth table everywhere — in the static preflight, in 
 ┌─────────────────────────────────────────────────────────────────────┐
 │                          tools  ·  ~90 modules                      │
 │  discovery · analysis · plans · execution · backtest · portfolio    │
-│  onchain · CDP · Finnhub · Chainlink · Helius · MoonPay · ccxt      │
+│  onchain data · wallet intel · Finnhub · MoonPay · ccxt             │
 └─────────────────────────────────────────────────────────────────────┘
                                │ adapter contracts
                                ▼

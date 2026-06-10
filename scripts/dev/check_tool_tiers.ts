@@ -104,11 +104,6 @@ const KNOWN_HOT_TIER_TOOL_FAMILIES = new Set<string>([
   "instrumentedSharedContextTools",
   "instrumentedSkillLoaderTools",
   "instrumentedSmcPatternTools",
-  "instrumentedSolanaKitDefiBridgeTools",
-  "instrumentedSolanaKitDefiLendingTools",
-  "instrumentedSolanaKitDefiPerpsTools",
-  "instrumentedSolanaKitDefiPoolsTools",
-  "instrumentedSolanaKitTradingTools",
   "instrumentedStockNewsTools",
   "instrumentedStrategyGenerationTools",
   "instrumentedStrategyRecipeTools",
@@ -117,24 +112,8 @@ const KNOWN_HOT_TIER_TOOL_FAMILIES = new Set<string>([
   "instrumentedSystematicTools",
   "instrumentedSystemTools",
   "instrumentedTradingTools",
-  "instrumentedUniswapDataTools",
   "instrumentedWalletTools",
   "instrumentedXSocialTools",
-  // -------------------------------------------------------------------
-  // FOLLOW-UP: the following 7 families are registered hot-tier on the
-  // Researcher but isHotTierOnly()-gated to cold on Gordon. The lint
-  // currently accepts them as a snapshot of the pre-Phase-1 state, but
-  // the right cleanup is to mirror Gordon's gating pattern in
-  // researcher.ts (deep-research workflows are the right activation
-  // surface for these). Tracked as a Phase-2-or-later cleanup; do NOT
-  // expand this list further.
-  // -------------------------------------------------------------------
-  "instrumentedCdpWebhookTools",
-  "instrumentedCdpSqlTools",
-  "instrumentedCdpPolicyTools",
-  "instrumentedCdpOnrampTools",
-  "instrumentedCdpEvmMultichainTools",
-  "instrumentedCdpWebhookReceiverTools",
   "instrumentedFinnhubFundamentalsTools",
 ]);
 

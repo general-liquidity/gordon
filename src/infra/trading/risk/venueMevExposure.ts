@@ -75,7 +75,7 @@ const TIER_SCORES: Record<VenueMevTier, number> = {
 /**
  * Default classification for Gordon's native venue ids. Operators can
  * override per-trade via the riskClassifier `venueMevExposure` input
- * (e.g., when routing a uniswap trade through Flashbots Protect, pass
+ * (e.g., when routing a DEX trade through Flashbots Protect, pass
  * `protected` explicitly).
  */
 const NATIVE_VENUE_TIERS: Record<NativeExchangeId, VenueMevTier> = {

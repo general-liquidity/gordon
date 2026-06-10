@@ -119,5 +119,5 @@ Before recommending CCXT-routed paths, verify:
 ## When NOT to use
 
 - Equity broker operations (IB, Alpaca, Trading 212) — use broker tools, not CCXT
-- Wallet operations on Hyperliquid / Uniswap — use chain-specific tools; CCXT's DEX support is thinner
+- Onchain wallet/portfolio reads — use wallet-intelligence providers (Nansen, Arkham, Covalent, …); CCXT only covers CEX account state
 - Robinhood Crypto — not CCXT-routed; use the dedicated Robinhood integration

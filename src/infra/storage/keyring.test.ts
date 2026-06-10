@@ -124,7 +124,6 @@ describe("KEYRING_SUPPORTED_KEYS", () => {
   });
 
   test("contains expected agent rail keys", () => {
-    expect(KEYRING_SUPPORTED_KEYS).toContain("HELIUS_API_KEY");
     expect(KEYRING_SUPPORTED_KEYS).toContain("MOONPAY_API_KEY");
     expect(KEYRING_SUPPORTED_KEYS).toContain("MOONPAY_WEBHOOK_API_KEY");
     expect(KEYRING_SUPPORTED_KEYS).toContain("MOONPAY_VIRTUAL_ACCOUNTS_PRIVATE_KEY");

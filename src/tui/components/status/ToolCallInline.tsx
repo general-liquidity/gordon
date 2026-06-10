@@ -122,28 +122,6 @@ function getToolLabel(toolName: string): string {
   if (/search_x_by_entity/i.test(toolName)) return "X Entity";
   if (/list_x_trading_entities/i.test(toolName)) return "X Entities";
 
-  // CDP (Coinbase Developer Platform)
-  if (/list_cdp_webhooks/i.test(toolName)) return "CDP Webhooks";
-  if (/create_cdp_webhook/i.test(toolName)) return "CDP Webhook Create";
-  if (/delete_cdp_webhook/i.test(toolName)) return "CDP Webhook Delete";
-  if (/describe_cdp_webhook_setup/i.test(toolName)) return "Webhook Setup";
-  if (/query_base_sql/i.test(toolName)) return "Base SQL";
-  if (/get_base_top_holders/i.test(toolName)) return "Top Holders";
-  if (/get_base_whale_accumulation/i.test(toolName)) return "Whale Accumulation";
-  if (/describe_base_sql_schema/i.test(toolName)) return "SQL Schema";
-  if (/list_cdp_policies|get_cdp_policy|create_cdp_policy|delete_cdp_policy/i.test(toolName)) return "CDP Policy";
-  if (/get_onramp_config|get_onramp_options/i.test(toolName)) return "Onramp Config";
-  if (/get_onramp_quote/i.test(toolName)) return "Onramp Quote";
-  if (/create_onramp_session_url/i.test(toolName)) return "Onramp Session";
-  if (/get_onramp_transactions/i.test(toolName)) return "Onramp History";
-  if (/list_cdp_evm_accounts|list_cdp_smart_accounts/i.test(toolName)) return "CDP Accounts";
-  if (/create_cdp_evm_account|create_cdp_smart_account/i.test(toolName)) return "CDP Account Create";
-  if (/list_cdp_token_balances/i.test(toolName)) return "CDP Balances";
-  if (/get_cdp_swap_price/i.test(toolName)) return "CDP Swap Quote";
-  if (/start_cdp_webhook_listener|stop_cdp_webhook_listener|get_cdp_webhook_listener_status/i.test(toolName)) return "Webhook Listener";
-  if (/get_recent_cdp_webhook_events/i.test(toolName)) return "Webhook Events";
-  if (/clear_cdp_webhook_buffer/i.test(toolName)) return "Webhook Buffer";
-
   // Proactive mode
   if (/start_proactive_mode|stop_proactive_mode|get_proactive_status/i.test(toolName)) return "Proactive Mode";
   if (/list_proactive_suggestions/i.test(toolName)) return "Suggestions";
@@ -238,42 +216,20 @@ function getToolLabel(toolName: string): string {
   // Producer health
   if (/get_producer_health/i.test(toolName)) return "Producer Health";
 
-  // DeFi
+  // Onchain data + wallet intel (read-only)
   if (/defillama/i.test(toolName)) return "DeFi Llama";
-  if (/chainlink/i.test(toolName)) return "Chainlink";
-  if (/uniswap/i.test(toolName)) return "Uniswap";
-  if (/moonwell/i.test(toolName)) return "Moonwell";
-  if (/dex_pair|search_dex/i.test(toolName)) return "DEX Search";
-  if (/defi_yield|top_defi/i.test(toolName)) return "DeFi Yields";
-  if (/lp_position|fee_collection/i.test(toolName)) return "LP Position";
-
-  // Solana protocols
-  if (/solana_drift/i.test(toolName)) return "Drift";
-  if (/solana_orca/i.test(toolName)) return "Orca";
-  if (/solana_raydium/i.test(toolName)) return "Raydium";
-  if (/solana_meteora/i.test(toolName)) return "Meteora";
-  if (/solana_sanctum/i.test(toolName)) return "Sanctum";
-  if (/solana_adrena/i.test(toolName)) return "Adrena";
-  if (/solana_lulo/i.test(toolName)) return "Lulo";
-  if (/solana_debridge/i.test(toolName)) return "deBridge";
-  if (/solana_flash/i.test(toolName)) return "Flash Trade";
-  if (/solana_manifest/i.test(toolName)) return "Manifest";
-  if (/solana_voltr/i.test(toolName)) return "Voltr";
-  if (/solana_rugcheck/i.test(toolName)) return "Rug Check";
-  if (/solana_pumpfun/i.test(toolName)) return "PumpFun";
-  if (/solana_trade|solana_swap|solana_okx/i.test(toolName)) return "Solana Swap";
-  if (/solana_balance|solana_wallet|solana_token/i.test(toolName)) return "Solana Wallet";
-  if (/solana_stake|solana_solayer/i.test(toolName)) return "SOL Staking";
-  if (/solana/i.test(toolName)) return "Solana";
-
-  // Polkadot
-  if (/polkadot/i.test(toolName)) return "Polkadot";
-
-  // AgentKit
-  if (/agentkit_swap/i.test(toolName)) return "On-chain Swap";
-  if (/agentkit.*transfer/i.test(toolName)) return "Transfer";
-  if (/agentkit.*balance|agentkit.*wallet/i.test(toolName)) return "On-chain Wallet";
-  if (/agentkit/i.test(toolName)) return "AgentKit";
+  if (/dexscreener|dex_pair|search_dex/i.test(toolName)) return "DEX Search";
+  if (/birdeye/i.test(toolName)) return "Birdeye";
+  if (/codex|defined/i.test(toolName)) return "Codex";
+  if (/oneinch|1inch/i.test(toolName)) return "1inch";
+  if (/coingecko.?onchain/i.test(toolName)) return "Onchain OHLCV";
+  if (/nansen/i.test(toolName)) return "Nansen";
+  if (/arkham/i.test(toolName)) return "Arkham";
+  if (/covalent|goldrush/i.test(toolName)) return "Covalent";
+  if (/moralis/i.test(toolName)) return "Moralis";
+  if (/zerion/i.test(toolName)) return "Zerion";
+  if (/debank/i.test(toolName)) return "DeBank";
+  if (/token_holder|wallet_intel|smart_money/i.test(toolName)) return "Wallet Intel";
 
   // MoonPay
   if (/moonpay/i.test(toolName)) return "MoonPay";

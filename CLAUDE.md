@@ -140,7 +140,7 @@ Deleted features (their gates were never validated and the modules are gone): to
 
 ## Agent tool surface
 
-Gordon's orchestrator + researcher expose a canonical 22-tool surface for generalized trading infra (data, analytics, plan/exec, memory, workflow). Source: `src/infra/agents/tools/surface/` — 5 files grouped by domain plus `index.ts` registry + `surface.test.ts`. Integration tools (Base / CDP / Solana / Polkadot / Finnhub / Chainlink / Defillama / AgentKit / MCP / X-social) coexist as separate spreads since they cover venue-specific data feeds.
+Gordon's orchestrator + researcher expose a canonical 22-tool surface for generalized trading infra (data, analytics, plan/exec, memory, workflow). Source: `src/infra/agents/tools/surface/` — 5 files grouped by domain plus `index.ts` registry + `surface.test.ts`. Integration tools (Finnhub fundamentals, MCP marketplace, X-social, …) coexist as separate spreads where they cover venue-specific data feeds. Onchain price data and wallet intelligence live in `infra/data/sources/onchain.ts` and `infra/data/wallet/` — not as execution venues.
 
 Tool layout (22 total):
 - **data (5)**: `get_market_data`, `get_account_state`, `get_portfolio`, `get_news`, `get_fundamentals`
