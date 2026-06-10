@@ -28,11 +28,12 @@ A TypeScript trading agent on Bun + Mastra. Connects to crypto exchanges (Binanc
 | Orchestrator | `src/infra/agents/orchestrator.ts` |
 | Hooks | `src/infra/hooks/` (asyncRewake + statusMessage supported) |
 | Permissions | `src/runtime/permissions/PermissionEngine.ts` + `trustTrajectory.ts` |
-| Risk classifier | `src/infra/trading/riskClassifier.ts` (11-dimension pre-trade gate) |
-| Compaction | `src/infra/domain/memory/summarizer.ts` (4 stages) + `contextCollapse.ts` (5th) |
+| Risk classifier | `src/infra/trading/risk/riskClassifier.ts` (15-dimension pre-trade gate) |
+| Compaction | `src/infra/domain/memory/summarizer.ts` (5 stages at 70/80/90/94/99%) + `contextCollapse.ts` |
 | Strategy recipes | `src/core/strategies/recipes/` |
 | Audit log | `src/infra/platform/audit/audit-log.ts` (HMAC-signed) |
-| Slash commands | `src/app/slashCommands.ts` |
+| Slash commands | `src/app/slash/slashCommands.ts` |
+| Proactive radar | `src/infra/proactive/engine/observer.ts` + `producers/` |
 | Memory | `~/.claude/projects/C--Users-adria-Downloads-gordon-cli-alpha/memory/` |
 
 For the full doc with conventions, key invariants, and reference grid, see `CLAUDE.md`.

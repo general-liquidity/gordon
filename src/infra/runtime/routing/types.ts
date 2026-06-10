@@ -13,7 +13,7 @@ export type AgentAffinity =
   | "Gordon"
   | "Executor"
   | "Researcher"
-  // Legacy names — kept for backward compat with existing routing configs
+  // Retired agent names — kept for backward compat with existing routing configs
   | "Scanner"
   | "Analyst"
   | "Planner"

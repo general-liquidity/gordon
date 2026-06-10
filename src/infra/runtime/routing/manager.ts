@@ -48,10 +48,10 @@ async function loadRoutingManifest(
     const content = await fs.readFile(routingPath, "utf-8");
     return JSON.parse(content) as RoutingManifest;
   } catch {
-    // Fall through to legacy name
+    // Fall through to alternate filename
   }
 
-  // Fallback: try skill.json (legacy name)
+  // Fallback: try skill.json (older plugin routing filename)
   const skillPath = path.join(pluginDir, pluginId, "skill.json");
   try {
     const content = await fs.readFile(skillPath, "utf-8");

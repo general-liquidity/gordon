@@ -1554,8 +1554,8 @@ function AppInner() {
                   envUpdates[ccxtEnv.key] = apiKey;
                   envUpdates[ccxtEnv.secret] = apiSecret;
                   if (nativeVenue) {
-                    const legacy = { binance: "BINANCE", binance_us: "BINANCE_US", coinbase: "COINBASE", kraken: "KRAKEN", bitfinex: "BITFINEX", hyperliquid: "HYPERLIQUID", robinhood: "ROBINHOOD", okx: "OKX", gemini: "GEMINI" } as const;
-                    const prefix = legacy[nativeVenue];
+                    const venueEnvPrefix = { binance: "BINANCE", binance_us: "BINANCE_US", coinbase: "COINBASE", kraken: "KRAKEN", bitfinex: "BITFINEX", hyperliquid: "HYPERLIQUID", robinhood: "ROBINHOOD", okx: "OKX", gemini: "GEMINI" } as const;
+                    const prefix = venueEnvPrefix[nativeVenue];
                     envUpdates[`${prefix}_API_KEY`] = apiKey;
                     envUpdates[`${prefix}_API_SECRET`] = apiSecret;
                   }

@@ -3,9 +3,9 @@
  * so re-runs can be audited for data + strategy drift.
  *
  * Pattern adapted from ArcticDB's versioned-write model (Man Group, BSL).
- * Gordon's variant is narrower: the legacy backtest tool fetches its
- * own candles, so we cannot guarantee identical-inputs replay without
- * restructuring legacy. What we CAN guarantee:
+ * Gordon's variant is narrower: the implementation-module backtest path
+ * fetches its own candles, so we cannot guarantee identical-inputs replay
+ * without restructuring that fetch layer. What we CAN guarantee:
  *
  *   - Every run gets a hash of (strategy, symbol, timeframe, window,
  *     params). Re-running with replayRunId pins those inputs and
@@ -41,7 +41,7 @@ export interface BacktestSnapshotInput {
   /** Strategy params + commission + initialCapital etc — anything that
    *  affects the result. Must serialize to deterministic JSON. */
   params: Record<string, unknown>;
-  /** Result returned by the legacy runBacktestTool. Opaque blob; the
+  /** Result returned by the backtest implementation tool. Opaque blob; the
    *  consumer is responsible for normalizing if downstream comparison
    *  is needed. */
   result: unknown;
@@ -294,9 +294,9 @@ function pickNumber(obj: unknown, key: string): number | null {
 }
 
 /** Extract a normalized metric tuple from the opaque backtest result.
- *  Tolerant of missing fields — the legacy result shape varies. */
+ *  Tolerant of missing fields — the stored result shape varies. */
 export function extractComparableMetrics(result: unknown): ComparableMetrics {
-  // Most legacy backtests wrap metrics one level deep. Probe both top
+  // Most backtest implementations wrap metrics one level deep. Probe both top
   // level + .metrics / .result for compatibility.
   const candidates = [result];
   if (result && typeof result === "object") {

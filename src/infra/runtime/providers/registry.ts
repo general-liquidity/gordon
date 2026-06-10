@@ -67,7 +67,7 @@ export interface MastraOpenAICompatibleModelConfig {
  * MastraModelConfig can be:
  * - A string like "openai/gpt-5.4" (Mastra's model router resolves it)
  * - A LanguageModelV2 instance from createOpenAI() (for custom endpoints like Dedalus/Inception)
- * - A legacy object config (kept for backward compat)
+ * - A deprecated object config shape (kept for backward compat)
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type MastraModelConfig = ModelString | MastraOpenAICompatibleModelConfig | any;
