@@ -158,6 +158,8 @@ export {
   compareWithActuals,
   contractToPayload,
   diffToPayload,
+  formatSprintContract,
+  formatContractDiff,
 } from "./sprintContract.ts";
 export type {
   SprintContract,
@@ -176,6 +178,8 @@ export {
   emptyRubric,
   rubricToPayload,
   formatRubric,
+  scorePlanRubric,
+  runCritiqueWithRubric,
   RUBRIC_DIMENSIONS,
 } from "./planRubric.ts";
 export type {

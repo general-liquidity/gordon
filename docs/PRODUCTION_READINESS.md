@@ -54,7 +54,7 @@ Burn-down convention: check items off as they land, append the commit hash. Re-v
 - [x] **35. CI cross-check: recovery commands vs slash registry** (S) — `errorContext.test.ts`
 - [x] **36. Write the export-graduation convention** (S) — paragraph in `CLAUDE.md` + `infra/trading/index.ts` header
 - [x] **37. Consolidate thinking-depth resolution** (S) — single `resolveThinkingDepth()` order in `thinkingPhase.ts`
-- [ ] **38. Eval Phase 4: sandboxed live runner + k-run producer** (L) — *conscious deferral*; pass^k consumes injected trajectories only
+- [x] **38. Eval Phase 4: sandboxed live runner + k-run producer** (L) — `harness/live/` sandbox + `produceKRuns` + `runLiveEvalSuite`; `GORDON_EVAL_DRY_RUN=1` for CI (synthesized trajectories), live mode calls `processMessage` with isolated `GORDON_HOME`/DB paths
 
 ## P4 — Delete or archive (apply the deleted-features discipline)
 

@@ -9,6 +9,8 @@ import {
   emptyRubric,
   rubricToPayload,
   formatRubric,
+  scorePlanRubric,
+  runCritiqueWithRubric,
   type PlanRubric,
 } from "./planRubric.ts";
 
@@ -172,6 +174,43 @@ describe("rubricToPayload", () => {
     expect(p.verdict).toBe("block");
     expect(p.total).toBe(10);
     expect(p.blockingDimensions).toEqual(["correctness"]);
+  });
+});
+
+describe("scorePlanRubric", () => {
+  it("scores a valid reflected plan as accept", () => {
+    const result = runCritiqueWithRubric({
+      plan: {
+        id: "pln_1",
+        symbol: "BTCUSDT",
+        strategy: "support_bounce",
+        reasoning: "A".repeat(120),
+        stopLoss: { price: 90_000 },
+        takeProfit: [{ price: 100_000 }],
+        entry: { type: "limit", price: 95_000 },
+        allocation: { percentOfPortfolio: 0.1 },
+      },
+      reflection: { isValid: true, issues: [], confidence: 0.9 },
+    });
+    expect(result.verdict).toBe("accept");
+    expect(result.total).toBeGreaterThanOrEqual(10);
+  });
+
+  it("blocks when reflection is invalid with many issues", () => {
+    const rubric = scorePlanRubric({
+      plan: {
+        id: "pln_2",
+        symbol: "ETHUSDT",
+        strategy: "volume_surge",
+        reasoning: "short",
+        stopLoss: { price: 0 },
+        takeProfit: [],
+        entry: { type: "market", price: null },
+        allocation: { percentOfPortfolio: 0.1 },
+      },
+      reflection: { isValid: false, issues: ["a", "b", "c"], confidence: 0.2 },
+    });
+    expect(rubricVerdict(rubric)).toBe("block");
   });
 });
 

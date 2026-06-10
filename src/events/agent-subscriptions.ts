@@ -18,6 +18,9 @@ import type { EventType } from "./types.ts";
 
 const logger = createModuleLogger("agent-subscriptions");
 
+/** Dedup guard — shadowMode storage is append-only and does not dedupe planIds. */
+const shadowedPlanIds = new Set<string>();
+
 // ============================================================================
 // Types
 // ============================================================================
@@ -479,16 +482,19 @@ export function createDefaultSubscriptions(
             "../infra/trading/ops/shadowMode.ts"
           );
           if (isShadowModeEnabled()) {
-            recordShadowOpen({
-              planId: e.planId,
-              symbol: e.symbol,
-              side: e.direction,
-              entryPrice: e.entry,
-              intendedSize: e.positionSizePct > 0 ? e.positionSizePct / 100 : 0.01,
-              strategy: e.strategy,
-              stopLoss: e.stopLoss,
-              takeProfit: e.takeProfits[0] ?? null,
-            });
+            if (!shadowedPlanIds.has(e.planId)) {
+              shadowedPlanIds.add(e.planId);
+              recordShadowOpen({
+                planId: e.planId,
+                symbol: e.symbol,
+                side: e.direction,
+                entryPrice: e.entry,
+                intendedSize: e.positionSizePct > 0 ? e.positionSizePct / 100 : 0.01,
+                strategy: e.strategy,
+                stopLoss: e.stopLoss,
+                takeProfit: e.takeProfits[0] ?? null,
+              });
+            }
           }
         } catch (err) {
           logger.warn("shadow-mode wire failed", { error: (err as Error).message });
@@ -680,10 +686,10 @@ export function createDefaultSubscriptions(
                 if (!line.trim()) continue;
                 try {
                   const row = JSON.parse(line) as {
-                    context?: { convictionRating?: number; rMultiple?: number };
+                    metadata?: { convictionRating?: number; rMultiple?: number };
                   };
-                  const conviction = row.context?.convictionRating;
-                  const r = row.context?.rMultiple;
+                  const conviction = row.metadata?.convictionRating;
+                  const r = row.metadata?.rMultiple;
                   if (typeof conviction === "number" && typeof r === "number") {
                     trades.push({ convictionRating: conviction, rMultiple: r });
                   }

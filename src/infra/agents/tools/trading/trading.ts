@@ -59,6 +59,24 @@ import {
   inferAssetClass,
 } from "../../../safety/index.ts";
 import { classifyBlockedStatus } from "../../../observability/blockedClassification.ts";
+import { recordDecision } from "../../memory/decisionLog.ts";
+import {
+  isConfluenceScorerEnabled,
+  scoreConfluences,
+  scoreToPayload,
+} from "../../../trading/ops/confluenceScorer.ts";
+import {
+  isExecutionPlaybookEnabled,
+  selectPlaybookForStrategy,
+  attachExecution,
+  planToPayload,
+} from "../../../trading/ops/executionPlaybook.ts";
+import {
+  isTerminationLayersEnabled,
+  runTerminationLayers,
+  terminationToPayload,
+} from "../../../trading/ops/terminationLayers.ts";
+import { selectMandateForPlan } from "../../../safety/anti-rot/strategyMandates.ts";
 
 // ============================================================================
 // Error Messages
@@ -319,6 +337,86 @@ export const createPlanTool = createTool({
       },
       warnings: reflectionResult.issues.length > 0 ? reflectionResult.issues : undefined,
     };
+
+    recordDecision({
+      threadId: execContext?.requestContext?.get?.("threadId") as string | undefined,
+      category: "plan",
+      stage: "planning",
+      summary: `Created ${savedPlan.strategy} plan for ${savedPlan.symbol}`,
+      symbol: savedPlan.symbol,
+      selected: savedPlan.strategy,
+      alternatives: strategyId ? [strategyId].filter((s) => s !== savedPlan.strategy) : [],
+      rationale: savedPlan.reasoning,
+      evidence: reflectionResult.issues.length > 0 ? reflectionResult.issues : undefined,
+      refs: { planId: savedPlan.id },
+    });
+
+    const venue = ctx.exchange?.exchangeId;
+    const inferredAssetClass = inferAssetClass(venue, savedPlan.symbol);
+    const mandate = selectMandateForPlan({
+      assetClass: inferredAssetClass !== "unknown" ? inferredAssetClass : undefined,
+      venue,
+      strategyTag: savedPlan.strategy,
+    });
+    if (mandate) {
+      recordDecision({
+        threadId: execContext?.requestContext?.get?.("threadId") as string | undefined,
+        category: "mandate",
+        stage: "planning",
+        summary: `Mandate selection for ${savedPlan.symbol}`,
+        symbol: savedPlan.symbol,
+        selected: mandate.id,
+        rationale: `Matched mandate ${mandate.name} for ${savedPlan.strategy}`,
+        refs: { planId: savedPlan.id, mandateId: mandate.id },
+      });
+    }
+
+    if (isConfluenceScorerEnabled()) {
+      const confluence = scoreConfluences({
+        observations: [
+          { kind: "regime_fit", present: reflectionResult.isValid, evidence: savedPlan.strategy },
+          { kind: "key_level_proximity", present: savedPlan.stopLoss.price > 0 },
+          { kind: "volume_confirmation", present: savedPlan.takeProfit.length > 0 },
+          { kind: "thesis_coherence", present: (savedPlan.reasoning?.length ?? 0) > 20 },
+        ],
+      });
+      recordStructuredObservation({
+        eventType: "plan.confluence_scored",
+        workflow: "planning",
+        source: "agent_tool",
+        component: "create_plan",
+        toolName: "create_plan",
+        outcome: "info",
+        planId: savedPlan.id,
+        symbol: savedPlan.symbol,
+        details: scoreToPayload(confluence),
+      });
+    }
+
+    if (isExecutionPlaybookEnabled()) {
+      const playbook = selectPlaybookForStrategy(savedPlan.strategy);
+      const entryPrice = savedPlan.entry.price ?? analysis.price ?? 0;
+      if (entryPrice > 0) {
+        const executionPlan = attachExecution({
+          planId: savedPlan.id,
+          playbookId: playbook.id,
+          entryPrice,
+          stopPrice: savedPlan.stopLoss.price,
+          direction: savedPlan.direction,
+        });
+        recordStructuredObservation({
+          eventType: "plan.execution_playbook_attached",
+          workflow: "planning",
+          source: "agent_tool",
+          component: "create_plan",
+          toolName: "create_plan",
+          outcome: "info",
+          planId: savedPlan.id,
+          symbol: savedPlan.symbol,
+          details: planToPayload(executionPlan),
+        });
+      }
+    }
 
     return validateToolOutput(createPlanOutputSchema, result, { toolName: "create_plan" });
   },
@@ -755,11 +853,79 @@ export const executePlanTool = createTool({
       }, { toolName: "execute_plan" });
     }
 
+    const terminationPreTrade = {
+      riskTier: "medium" as const,
+      riskClassifierVerdict: "auto_approve" as const,
+      constitutionViolations: [] as string[],
+      mandateScopeOk: mandateResult.mandate ? mandateResult.ok : null,
+      thesisCoherenceOk: coherenceResult.ok,
+    };
+
+    if (isTerminationLayersEnabled()) {
+      const l1Observation = runTerminationLayers({
+        preTrade: terminationPreTrade,
+        runtime: null,
+        system: null,
+      });
+      recordStructuredObservation({
+        eventType: "execution.termination_layers_shadow",
+        workflow: "execution",
+        source: "agent_tool",
+        component: "execute_plan",
+        toolName: "execute_plan",
+        outcome: "info",
+        planId,
+        symbol: plan.symbol,
+        details: terminationToPayload(l1Observation),
+      });
+    }
+
     const result = await executePlan(ctx.exchange, plan, ctx.config, {
       totalValue: ctx.portfolioValue,
       availableCash: ctx.availableCash,
       openPositions: getActiveTrades().length,
     });
+
+    if (isTerminationLayersEnabled()) {
+      const firstOrderId =
+        result.orders[0]?.orderId ??
+        result.trade?.entries[0]?.orderId ??
+        null;
+      const expectedQty = plan.allocation.amount / (plan.entry.price || 1);
+      const termination = runTerminationLayers({
+        preTrade: terminationPreTrade,
+        runtime: {
+          orderId: firstOrderId,
+          ackReceived: result.success,
+          ackLatencyMs: result.success ? 0 : null,
+          ackTimeoutMs: 30_000,
+          brokerRejectReason: result.success ? null : (result.error ?? "execution failed"),
+        },
+        system:
+          result.success && result.trade
+            ? {
+                expectedFillPrice: plan.entry.price,
+                actualFillPrice: result.trade.averageEntry,
+                maxSlippageFraction: 0.005,
+                expectedSize: expectedQty,
+                actualSize: result.trade.entries[0]?.quantity ?? expectedQty,
+                auditLogEntryId: planId,
+              }
+            : null,
+      });
+      recordStructuredObservation({
+        eventType: "execution.termination_layers_shadow",
+        workflow: "execution",
+        source: "agent_tool",
+        component: "execute_plan",
+        toolName: "execute_plan",
+        outcome: termination.verdict === "pass" ? "success" : "info",
+        planId,
+        symbol: plan.symbol,
+        tradeId: result.trade?.id,
+        details: terminationToPayload(termination),
+      });
+    }
 
     // PostOrderPlacement hook — fires after execution regardless of success
     if (result.success && result.trade) {

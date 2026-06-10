@@ -216,3 +216,64 @@ export function diffToPayload(diff: ContractDiff): Record<string, unknown> {
 function dedupe<T>(xs: T[]): T[] {
   return Array.from(new Set(xs));
 }
+
+/** Human-readable contract summary for /sprint-status and TUI surfaces. */
+export function formatSprintContract(contract: SprintContract): string {
+  const lines: string[] = [];
+  lines.push(`Contract ${contract.contractId}`);
+  if (contract.intent) lines.push(`Intent: ${contract.intent}`);
+  if (contract.scope.symbols.length > 0) {
+    lines.push(`Symbols: ${contract.scope.symbols.join(", ")}`);
+  }
+  if (contract.scope.venues.length > 0) {
+    lines.push(`Venues: ${contract.scope.venues.join(", ")}`);
+  }
+  if (contract.scope.strategies.length > 0) {
+    lines.push(`Strategies: ${contract.scope.strategies.join(", ")}`);
+  }
+  if (contract.verificationStandards.length > 0) {
+    lines.push(`Verification standards (${contract.verificationStandards.length}):`);
+    for (const s of contract.verificationStandards) {
+      lines.push(`  • ${s}`);
+    }
+  }
+  if (contract.exclusions.length > 0) {
+    lines.push(`Exclusions (${contract.exclusions.length}):`);
+    for (const e of contract.exclusions) {
+      lines.push(`  • ${e}`);
+    }
+  }
+  lines.push(`Created: ${contract.createdAt}`);
+  return lines.join("\n");
+}
+
+/** Format a contract diff for operator-facing slash-command output. */
+export function formatContractDiff(diff: ContractDiff): string {
+  const lines: string[] = [];
+  lines.push(`Verdict: ${diff.verdict.toUpperCase()}`);
+  if (diff.outOfScopeSymbols.length > 0) {
+    lines.push(`Out-of-scope symbols: ${diff.outOfScopeSymbols.join(", ")}`);
+  }
+  if (diff.outOfScopeVenues.length > 0) {
+    lines.push(`Out-of-scope venues: ${diff.outOfScopeVenues.join(", ")}`);
+  }
+  if (diff.outOfScopeStrategies.length > 0) {
+    lines.push(`Out-of-scope strategies: ${diff.outOfScopeStrategies.join(", ")}`);
+  }
+  if (diff.unmetStandards.length > 0) {
+    lines.push(`Unmet standards: ${diff.unmetStandards.join("; ")}`);
+  }
+  if (diff.violatedExclusions.length > 0) {
+    lines.push(`Violated exclusions: ${diff.violatedExclusions.join("; ")}`);
+  }
+  if (
+    diff.outOfScopeSymbols.length === 0 &&
+    diff.outOfScopeVenues.length === 0 &&
+    diff.outOfScopeStrategies.length === 0 &&
+    diff.unmetStandards.length === 0 &&
+    diff.violatedExclusions.length === 0
+  ) {
+    lines.push("No scope drift or exclusion violations detected.");
+  }
+  return lines.join("\n");
+}

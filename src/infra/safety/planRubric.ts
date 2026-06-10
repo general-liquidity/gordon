@@ -160,3 +160,71 @@ function shortName(dim: RubricDimension): string {
     case "handoffReadiness": return "hand";
   }
 }
+
+/** Minimal plan shape for heuristic rubric scoring at approval time. */
+export interface ScorePlanRubricInput {
+  plan: {
+    id: string;
+    symbol: string;
+    strategy: string;
+    reasoning?: string;
+    stopLoss: { price: number };
+    takeProfit: Array<{ price: number }>;
+    entry: { type: string; price: number | null };
+    allocation: { percentOfPortfolio: number };
+  };
+  reflection?: {
+    isValid: boolean;
+    issues: string[];
+    confidence: number;
+  };
+}
+
+export interface CritiqueWithRubricResult {
+  rubric: PlanRubric;
+  verdict: RubricVerdict;
+  total: number;
+  blockingDimensions: RubricDimension[];
+}
+
+/**
+ * Heuristic 6-dimension rubric from plan + reflection signals.
+ * Cheap enough to run in-band at plan-approval time when the flag is on.
+ */
+export function scorePlanRubric(input: ScorePlanRubricInput): PlanRubric {
+  const rubric = emptyRubric();
+  const reflection = input.reflection;
+
+  if (reflection?.isValid) rubric.correctness = 2;
+  else if (reflection && reflection.issues.length <= 2) rubric.correctness = 1;
+
+  if (!reflection) rubric.verification = 0;
+  else if (reflection.issues.length === 0) rubric.verification = 2;
+  else rubric.verification = 1;
+
+  rubric.scopeDiscipline =
+    input.plan.stopLoss.price > 0 && input.plan.takeProfit.length > 0 ? 2 : 1;
+
+  rubric.reliability =
+    input.plan.id && input.plan.entry.type ? 2 : input.plan.id ? 1 : 0;
+
+  const reasoningLen = input.plan.reasoning?.length ?? 0;
+  rubric.maintainability =
+    reasoningLen > 100 ? 2 : reasoningLen > 20 ? 1 : 0;
+
+  rubric.handoffReadiness =
+    input.plan.id && input.plan.reasoning ? 2 : input.plan.id ? 1 : 0;
+
+  return rubric;
+}
+
+/** Score + aggregate verdict for plan-card rendering. */
+export function runCritiqueWithRubric(input: ScorePlanRubricInput): CritiqueWithRubricResult {
+  const rubric = scorePlanRubric(input);
+  return {
+    rubric,
+    verdict: rubricVerdict(rubric),
+    total: rubricTotal(rubric),
+    blockingDimensions: blockingDimensions(rubric),
+  };
+}

@@ -7,6 +7,7 @@ import {
   isDecisionsLogEnabled,
   recordDecision,
   readDecisions,
+  readRecentDecisions,
   summarizeDecisionsForResume,
   defaultDecisionsLogPath,
 } from "./decisionLog.ts";
@@ -67,6 +68,24 @@ describe("recordDecision", () => {
     expect(parsed.category).toBe("plan");
     expect(parsed.selected).toBe("regime-rsi");
     expect(parsed.alternatives).toEqual(["smc", "bounce"]);
+  });
+
+  it("accepts summary/symbol/evidence shorthand fields", () => {
+    const env = enabledEnv(logPath);
+    const entry = recordDecision({
+      category: "plan",
+      summary: "Created support_bounce plan for BTCUSDT",
+      symbol: "BTCUSDT",
+      alternatives: ["bollinger_bounce"],
+      evidence: ["reflection:valid"],
+      metadata: { convictionRating: 4, rMultiple: 1.2 },
+      threadId: "t1",
+      stage: "planning",
+    }, env, logPath);
+    expect(entry?.summary).toBe("Created support_bounce plan for BTCUSDT");
+    expect(entry?.symbols).toEqual(["BTCUSDT"]);
+    expect(entry?.evidence).toEqual(["reflection:valid"]);
+    expect(entry?.metadata?.convictionRating).toBe(4);
   });
 
   it("creates the parent directory if missing", () => {
@@ -164,6 +183,21 @@ describe("readDecisions", () => {
     const decisions = readDecisions({}, {}, logPath);
     expect(decisions).toHaveLength(1);
     expect(decisions[0]?.selected).toBe("good");
+  });
+});
+
+describe("readRecentDecisions", () => {
+  it("returns the most recent entries up to limit", () => {
+    const env = enabledEnv(logPath);
+    for (let i = 0; i < 5; i++) {
+      recordDecision({
+        category: "plan",
+        context: `ctx-${i}`,
+        selected: `sel-${i}`,
+        rationale: "r",
+      }, env, logPath);
+    }
+    expect(readRecentDecisions(3, env, logPath)).toHaveLength(3);
   });
 });
 

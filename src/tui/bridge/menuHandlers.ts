@@ -11,7 +11,14 @@ import {
   pauseAutonomousLoop,
   resumeAutonomousLoop,
   getAutonomousLoopStatus,
+  getCurrentSprintContractView,
 } from "../../core/pipeline/autonomous-loop.ts";
+import {
+  compareWithActuals,
+  formatSprintContract,
+  formatContractDiff,
+  diffToPayload,
+} from "../../infra/safety/sprintContract.ts";
 import {
   createGoalState,
   loadActiveGoal,
@@ -1004,6 +1011,49 @@ export async function handleAutonomousMenuCommand(
       return true;
     }
   }
+}
+
+// ============================================================================
+// Sprint contract: /sprint-status
+// ============================================================================
+
+export async function handleSprintStatusMenuCommand(
+  target: string,
+  _args: string,
+  setState: StateUpdater,
+): Promise<boolean> {
+  if (target !== "sprint-status") return false;
+
+  const view = getCurrentSprintContractView();
+  if (!view) {
+    addMessage(
+      setState,
+      "system",
+      "No active sprint contract. Start the autonomous loop with GORDON_SPRINT_CONTRACT=1.",
+    );
+    return true;
+  }
+
+  const diff = compareWithActuals(view.contract, {
+    symbolsTouched: view.symbolsTouched,
+    venuesUsed: [],
+    strategiesInvoked: [],
+    verificationOutcomes: [],
+    detectedViolations: [],
+  });
+
+  addMessage(
+    setState,
+    "gordon",
+    "◈ Sprint status\n\n" +
+      formatSprintContract(view.contract) +
+      `\n\nCycle count: ${view.cycleCount}` +
+      `\nSymbols touched: ${view.symbolsTouched.length > 0 ? view.symbolsTouched.join(", ") : "(none yet)"}` +
+      "\n\nDiff:\n" +
+      formatContractDiff(diff) +
+      `\n\n(payload: ${JSON.stringify(diffToPayload(diff))})`,
+  );
+  return true;
 }
 
 // ============================================================================

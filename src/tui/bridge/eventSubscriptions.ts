@@ -8,6 +8,11 @@ import { getEventBus } from "../../events/index.ts";
 import type { EventType, EventData } from "../../events/index.ts";
 import type { Dispatch, TuiNotification } from "../state/types.ts";
 import { getNotificationFolder } from "../notifications/notificationFolder.js";
+import type { Message } from "../components/messages/MessageBubble.tsx";
+import {
+  isPlanRubricEnabled,
+  runCritiqueWithRubric,
+} from "../../infra/safety/planRubric.ts";
 
 // ============================================================================
 // Helpers
@@ -271,6 +276,47 @@ export function subscribeToEvents(dispatch: Dispatch): () => void {
       notify(dispatch, "plan:created", "info",
         `Plan created: ${event.plan.symbol ?? event.plan.id ?? "unknown"} — ${event.plan.direction ?? ""}`.trim(),
       );
+
+      const plan = event.plan;
+      const content =
+        `${plan.direction?.toUpperCase() ?? "LONG"} ${plan.symbol} — ${plan.strategy}\n` +
+        `Entry: ${plan.entry?.price ?? "market"} | Stop: ${plan.stopLoss?.price ?? "—"} | ` +
+        `Allocation: ${plan.allocation?.amount ?? "—"} USDT\n` +
+        (plan.reasoning ? `Reasoning: ${plan.reasoning}` : "");
+
+      const planRubric = isPlanRubricEnabled()
+        ? runCritiqueWithRubric({
+            plan: {
+              id: plan.id,
+              symbol: plan.symbol,
+              strategy: plan.strategy,
+              reasoning: plan.reasoning,
+              stopLoss: plan.stopLoss,
+              takeProfit: plan.takeProfit,
+              entry: plan.entry,
+              allocation: plan.allocation,
+            },
+          })
+        : undefined;
+
+      const message: Message = {
+        id: `plan-approval-${plan.id}`,
+        role: "gordon",
+        content,
+        timestamp: new Date().toISOString(),
+        variant: "plan_approval",
+        ...(planRubric
+          ? {
+              planRubric: {
+                rubric: planRubric.rubric,
+                verdict: planRubric.verdict,
+                total: planRubric.total,
+                blockingDimensions: planRubric.blockingDimensions,
+              },
+            }
+          : {}),
+      };
+      dispatch({ type: "ADD_MESSAGE", message });
     }),
   );
 

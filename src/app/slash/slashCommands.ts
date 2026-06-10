@@ -126,6 +126,7 @@ export const DIRECT_MENU_TARGETS = new Set([
   "goal-status",
   "pause-goal",
   "goal-clear",
+  "sprint-status",
   "features",
   "features-next",
   "pending",
@@ -1997,6 +1998,17 @@ const LEGACY_SLASH_COMMANDS: SlashCommandSeed[] = [
     action: "menu",
     target: "goal-clear",
     hideFromTypeahead: true,
+  },
+  {
+    name: "sprint-status",
+    aliases: ["sprint"],
+    description: "Show active sprint contract scope, actuals, and diff",
+    usage: "/sprint-status",
+    category: "trading",
+    level: 2,
+    action: "menu",
+    target: "sprint-status",
+    whenToUse: "During an autonomous-loop session with GORDON_SPRINT_CONTRACT enabled",
   },
 
   // Trading feature list (Anthropic effective-harnesses port — A1)

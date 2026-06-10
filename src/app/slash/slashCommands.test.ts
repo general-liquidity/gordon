@@ -128,7 +128,9 @@ describe("slash command UX formatting", () => {
     const telemetry = SLASH_COMMANDS.find((command) => command.name === "telemetry");
     const context = SLASH_COMMANDS.find((command) => command.name === "context");
     const portfolio = SLASH_COMMANDS.find((command) => command.name === "portfolio");
-    const status = SLASH_COMMANDS.find((command) => command.name === "status");
+    const status = SLASH_COMMANDS.find(
+      (command) => command.name === "status" && command.target === "status_overview",
+    );
     const keyring = SLASH_COMMANDS.find((command) => command.name === "keyring");
     const orders = SLASH_COMMANDS.find((command) => command.name === "orders");
     const positions = SLASH_COMMANDS.find((command) => command.name === "positions");
@@ -136,7 +138,8 @@ describe("slash command UX formatting", () => {
     expect(telemetry?.action).toBe("menu");
     expect(context?.action).toBe("menu");
     expect(portfolio?.action).toBe("menu");
-    expect(status?.action).toBe("tool");
+    // status_overview is not a direct tool target — normalizeSlashCommandRuntime routes to agent
+    expect(status?.action).toBe("agent");
     expect(keyring?.action).toBe("tool");
     expect(orders?.action).toBe("tool");
     expect(positions?.action).toBe("tool");
@@ -165,6 +168,14 @@ describe("slash command UX formatting", () => {
     expect(context?.aliases).toContain("cost");
     expect(context?.target).toBe("context");
     expect(context && isRuntimeHandledSlashCommand(context)).toBe(true);
+  });
+
+  it("includes sprint-status for autonomous sprint contract inspection", () => {
+    const sprintStatus = SLASH_COMMANDS.find((command) => command.name === "sprint-status");
+
+    expect(sprintStatus?.action).toBe("menu");
+    expect(sprintStatus?.target).toBe("sprint-status");
+    expect(sprintStatus && isRuntimeHandledSlashCommand(sprintStatus)).toBe(true);
   });
 
   it("wires runtime inspection commands directly", () => {

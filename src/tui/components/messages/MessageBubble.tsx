@@ -54,6 +54,13 @@ export type MessageVariant =
   | "tool_success" | "tool_error" | "tool_canceled" | "tool_reject"
   | "rejected_plan" | "task_assignment" | "plan_approval" | "advisor";
 
+export interface PlanRubricPayload {
+  rubric: import("../../../infra/safety/planRubric.ts").PlanRubric;
+  verdict: import("../../../infra/safety/planRubric.ts").RubricVerdict;
+  total: number;
+  blockingDimensions: import("../../../infra/safety/planRubric.ts").RubricDimension[];
+}
+
 export interface Message {
   id: string;
   role: "user" | "gordon" | "assistant" | "system";
@@ -62,6 +69,8 @@ export interface Message {
   variant?: MessageVariant;
   agent?: string;
   badge?: string;
+  /** Optional 6-dimension plan rubric when GORDON_PLAN_RUBRIC is on. */
+  planRubric?: PlanRubricPayload;
   /** When true, this message is still being streamed — renders with cursor */
   streaming?: boolean;
 }

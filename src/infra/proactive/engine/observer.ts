@@ -58,6 +58,7 @@ let producerUnregister: (() => void) | null = null;
 const TICK_INTERVALS = {
   producer_health: 5 * 60 * 1000,   // 5 min — producer liveness alerting
   kill_switch: 60 * 1000,           // 1 min — tripped kill switch alerting
+  shadow_close: 60 * 1000,          // 1 min — shadow fill close reconciliation
   session_review: 60 * 60 * 1000,   // 1 hour — checks time of week
   journal_prompt: 60 * 60 * 1000,   // 1 hour — checks time of day
   portfolio_drift: 30 * 60 * 1000,  // 30 min — position drift check
@@ -169,6 +170,22 @@ export function startProactiveObserver(): { started: boolean; subscriptions: num
         const last = lastTickAt[key] ?? 0;
         if (now - last < interval) continue;
         lastTickAt[key] = now;
+        if (key === "shadow_close") {
+          void Promise.all([
+            import("../../trading/ops/shadowMode.ts"),
+            import("../../trading/ops/shadowCloseWorker.ts"),
+          ])
+            .then(async ([{ isShadowModeEnabled }, { tickShadowCloseWorker }]) => {
+              if (isShadowModeEnabled()) {
+                await tickShadowCloseWorker();
+              }
+            })
+            .catch((err) => {
+              logger.warn("shadow-close tick failed", { err: String(err) });
+            });
+          continue;
+        }
+
         const obs: ProactiveObservation = {
           source: "monitor_loop",
           eventType: `tick_${key}`,

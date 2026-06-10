@@ -130,3 +130,23 @@ export {
   defaultPromotionQueuePath,
 } from "./traces/promotionQueue.ts";
 export type { PromotionEntry } from "./traces/promotionQueue.ts";
+
+// Sandboxed live runner + k-run producer (Phase 4).
+export {
+  EvalSandbox,
+  createEvalSandbox,
+  withEvalSandbox,
+  buildPaperContext,
+  EVAL_SANDBOX_MARKER_ENV,
+  EVAL_DRY_RUN_ENV,
+} from "./live/sandbox.ts";
+export type { EvalSandboxOptions, EvalSandboxPaths } from "./live/sandbox.ts";
+export { runScenarioLive, runVariantLive, runLiveEvalSuite } from "./live/runner.ts";
+export type {
+  RunScenarioLiveOptions,
+  ScenarioLiveResult,
+  LiveVariantInput,
+  RunLiveEvalSuiteInput,
+} from "./live/runner.ts";
+export { produceKRuns } from "./live/kRunProducer.ts";
+export type { ProduceKRunsInput, ProduceKRunsResult } from "./live/kRunProducer.ts";

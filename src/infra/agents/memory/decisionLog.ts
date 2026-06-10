@@ -63,6 +63,8 @@ export interface DecisionEntry {
   stage?: TradeLifecycleStage;
   /** Brief context — what was being decided about. */
   context: string;
+  /** One-line summary (alias stored alongside context for readers that expect it). */
+  summary?: string;
   /** Selected choice. */
   selected: string;
   /** Alternatives the agent considered. Free-text labels. */
@@ -71,6 +73,10 @@ export interface DecisionEntry {
   rationale: string;
   /** Optional symbol(s) this decision is scoped to. */
   symbols?: string[];
+  /** Evidence references supporting the decision. */
+  evidence?: string[];
+  /** Structured metadata (convictionRating, rMultiple, etc.). */
+  metadata?: Record<string, unknown>;
   /** Optional reference to a related plan / position / action-log entry. */
   refs?: Record<string, string>;
 }
@@ -78,13 +84,19 @@ export interface DecisionEntry {
 export interface RecordDecisionInput {
   category: DecisionCategory;
   stage?: TradeLifecycleStage;
-  context: string;
-  selected: string;
+  /** Human-readable summary of what was decided (alias for `context`). */
+  summary?: string;
+  context?: string;
+  selected?: string;
   alternatives?: string[];
-  rationale: string;
+  rationale?: string;
   threadId?: string;
   sessionId?: string;
+  /** Single-symbol shorthand — stored as `symbols: [symbol]`. */
+  symbol?: string;
   symbols?: string[];
+  evidence?: string[];
+  metadata?: Record<string, unknown>;
   refs?: Record<string, string>;
 }
 
@@ -109,12 +121,28 @@ function newDecisionId(): string {
  * Returns the recorded entry (or null when disabled) so callers can
  * include the ID in their own observations.
  */
+function normalizeRecordInput(input: RecordDecisionInput): {
+  context: string;
+  selected: string;
+  rationale: string;
+  symbols?: string[];
+} {
+  const context = (input.context ?? input.summary ?? "").trim();
+  const selected = (input.selected ?? input.summary ?? context).trim();
+  const rationale = (input.rationale ?? input.summary ?? selected).trim();
+  const symbols =
+    input.symbols ??
+    (input.symbol ? [input.symbol] : undefined);
+  return { context, selected, rationale, symbols };
+}
+
 export function recordDecision(
   input: RecordDecisionInput,
   env: NodeJS.ProcessEnv = process.env,
   path: string = defaultDecisionsLogPath(env),
 ): DecisionEntry | null {
   if (!isDecisionsLogEnabled(env)) return null;
+  const normalized = normalizeRecordInput(input);
   const entry: DecisionEntry = {
     id: newDecisionId(),
     recordedAt: new Date().toISOString(),
@@ -122,11 +150,14 @@ export function recordDecision(
     sessionId: input.sessionId,
     category: input.category,
     stage: input.stage,
-    context: input.context,
-    selected: input.selected,
+    context: normalized.context,
+    summary: input.summary ?? normalized.context,
+    selected: normalized.selected,
     alternatives: input.alternatives ?? [],
-    rationale: input.rationale,
-    symbols: input.symbols,
+    rationale: normalized.rationale,
+    symbols: normalized.symbols,
+    evidence: input.evidence,
+    metadata: input.metadata,
     refs: input.refs,
   };
   try {
@@ -194,6 +225,17 @@ export function readDecisions(
   out.sort((a, b) => b.recordedAt.localeCompare(a.recordedAt));
   if (options.limit && out.length > options.limit) return out.slice(0, options.limit);
   return out;
+}
+
+/**
+ * Convenience alias — most-recent decisions, default limit 50.
+ */
+export function readRecentDecisions(
+  limit = 50,
+  env: NodeJS.ProcessEnv = process.env,
+  path: string = defaultDecisionsLogPath(env),
+): DecisionEntry[] {
+  return readDecisions({ limit }, env, path);
 }
 
 /**

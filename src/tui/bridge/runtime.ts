@@ -47,6 +47,7 @@ import {
   handleSessionMenuCommand,
   handleThreadMenuCommand,
   handleGoalMenuCommand,
+  handleSprintStatusMenuCommand,
   handleFeatureListMenuCommand,
   handleHumanInputMenuCommand,
   handleRuntimeMenuCommand,
@@ -342,6 +343,7 @@ async function handleMenuCommand(
   if (await handleSystemMenuCommand(resolved, args, setState, runtime)) return;
   if (await handleAutonomousMenuCommand(resolved, args, setState, runtime, command, streamResponse)) return;
   if (await handleGoalMenuCommand(resolved, args, setState)) return;
+  if (await handleSprintStatusMenuCommand(resolved, args, setState)) return;
   if (await handleFeatureListMenuCommand(resolved, args, setState)) return;
   if (await handleHumanInputMenuCommand(resolved, args, setState)) return;
 

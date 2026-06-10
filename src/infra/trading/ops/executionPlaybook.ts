@@ -330,3 +330,25 @@ export function planToPayload(plan: ExecutionPlan): Record<string, unknown> {
     createdAt: plan.createdAt,
   };
 }
+
+const STRATEGY_PLAYBOOK_MAP: Record<string, string> = {
+  support_bounce: "scaled-thirds",
+  bollinger_bounce: "scaled-thirds",
+  vwap_bounce: "scaled-thirds",
+  sma_crossover: "scaled-thirds",
+  consolidation_pop: "breakout-confirm",
+  adx_trend: "breakout-confirm",
+  volume_surge: "breakout-confirm",
+  engulfing_pattern: "breakout-confirm",
+  ema_rsi_crossover: "breakout-confirm",
+  relative_strength: "breakout-confirm",
+  grid_entry: "single-shot",
+};
+
+/**
+ * Pick a built-in execution playbook for a trading strategy tag.
+ */
+export function selectPlaybookForStrategy(strategy: string): ExecutionPlaybook {
+  const id = STRATEGY_PLAYBOOK_MAP[strategy] ?? "single-shot";
+  return getPlaybook(id) ?? getPlaybook("single-shot") ?? SINGLE_SHOT;
+}
