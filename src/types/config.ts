@@ -1,25 +1,5 @@
 import { z } from "zod";
 
-export const ExchangePermissionsSchema = z.object({
-  read: z.boolean(),
-  spotTrade: z.boolean(),
-  withdraw: z.boolean(),
-});
-
-/**
- * Legacy exchange config schema (for backwards compatibility)
- * @deprecated Use MultiExchangeConfigSchema for new code
- */
-export const ExchangeConfigSchema = z.object({
-  name: z.literal("binance"),
-  apiKey: z.string(),
-  apiSecret: z.string(),
-  permissions: ExchangePermissionsSchema,
-});
-
-/**
- * Supported exchange types for multi-exchange configuration
- */
 /**
  * Canonical exchange type — always `ccxt:<sub-id>`. Bare first-class ids
  * (e.g. "binance") are migrated on config load via `migrateExchangeConfigTypes`.
@@ -30,22 +10,60 @@ export const ExchangeTypeSchema = z.custom<`ccxt:${string}`>((val) => {
   return CCXT_TYPE_PATTERN.test(val);
 }, "Must be 'ccxt:<lowercase-sub-id>' (e.g. 'ccxt:binance', 'ccxt:bybit')");
 
+function isConfigRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function rewriteExchangeEntry(entry: unknown): unknown {
+  if (!isConfigRecord(entry)) return entry;
+  if (typeof entry.type !== "string") return entry;
+  if (CCXT_TYPE_PATTERN.test(entry.type)) return entry;
+  const subId = entry.type === "binance_us" ? "binanceus" : entry.type;
+  return { ...entry, type: `ccxt:${subId}` };
+}
+
 /**
- * Rewrite legacy bare exchange ids to canonical `ccxt:<subId>` before parse.
+ * Rewrite legacy config shapes before parse:
+ * - singleton `exchange` → `exchanges[]` entry
+ * - bare exchange `type` values → `ccxt:<subId>`
  */
 export function migrateExchangeConfigTypes(raw: Record<string, unknown>): Record<string, unknown> {
-  if (!Array.isArray(raw.exchanges)) return raw;
+  let migrated: Record<string, unknown> = { ...raw };
+  const exchanges = Array.isArray(migrated.exchanges)
+    ? [...migrated.exchanges]
+    : [];
+
+  if (isConfigRecord(migrated.exchange)) {
+    const legacy = migrated.exchange;
+    const apiKey = legacy.apiKey;
+    const apiSecret = legacy.apiSecret;
+    const alreadyPresent = exchanges.some(
+      (entry) => isConfigRecord(entry)
+        && (entry.type === "ccxt:binance" || entry.type === "binance" || entry.id === "binance"),
+    );
+    if (
+      !alreadyPresent
+      && typeof apiKey === "string"
+      && typeof apiSecret === "string"
+    ) {
+      exchanges.push({
+        id: "binance",
+        type: "ccxt:binance",
+        apiKey,
+        apiSecret,
+        isDefault: exchanges.length === 0,
+      });
+      if (typeof migrated.activeExchangeId !== "string") {
+        migrated.activeExchangeId = "binance";
+      }
+    }
+    const { exchange: _legacy, ...rest } = migrated;
+    migrated = rest;
+  }
 
   return {
-    ...raw,
-    exchanges: raw.exchanges.map((entry) => {
-      if (typeof entry !== "object" || entry === null || Array.isArray(entry)) return entry;
-      const ex = entry as Record<string, unknown>;
-      if (typeof ex.type !== "string") return entry;
-      if (CCXT_TYPE_PATTERN.test(ex.type)) return entry;
-      const subId = ex.type === "binance_us" ? "binanceus" : ex.type;
-      return { ...ex, type: `ccxt:${subId}` };
-    }),
+    ...migrated,
+    exchanges: exchanges.map(rewriteExchangeEntry),
   };
 }
 
@@ -298,9 +316,7 @@ export const SystematicTradingConfigSchema = z.object({
 export const GordonConfigSchema = z.object({
   version: z.string().default("1.0.0"),
   activeProfile: z.string().min(1).optional(),
-  /** @deprecated Use `exchanges` array instead */
-  exchange: ExchangeConfigSchema.optional(),
-  /** Multi-exchange configuration (Phase 2+) */
+  /** Multi-exchange configuration */
   exchanges: z.array(MultiExchangeConfigSchema).default([]),
   /** ID of the currently active exchange from the exchanges array */
   activeExchangeId: z.string().optional(),
@@ -401,9 +417,6 @@ export const GordonConfigSchema = z.object({
   }),
 });
 
-export type ExchangePermissions = z.infer<typeof ExchangePermissionsSchema>;
-/** @deprecated Use MultiExchangeConfig instead */
-export type ExchangeConfig = z.infer<typeof ExchangeConfigSchema>;
 export type ExchangeType = z.infer<typeof ExchangeTypeSchema>;
 export type MultiExchangeConfig = z.infer<typeof MultiExchangeConfigSchema>;
 export type BrokerType = z.infer<typeof BrokerTypeSchema>;

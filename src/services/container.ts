@@ -4,6 +4,7 @@
  */
 
 import { ExchangeFactory, type Exchange } from "../infra/exchange/index.ts";
+import type { ExchangeId } from "../infra/exchange/types.ts";
 import { LLMClient, type LLMProvider } from "../infra/ai/llm/index.ts";
 import { PriceCache } from "../infra/platform/cache/index.ts";
 import { EventBus } from "../events/index.ts";
@@ -16,7 +17,8 @@ import type { GordonConfig } from "../types/index.ts";
  * Service container configuration
  */
 export interface ContainerConfig {
-  binance?: {
+  exchange?: {
+    type?: string;
     apiKey: string;
     apiSecret: string;
   };
@@ -87,12 +89,13 @@ export class ServiceContainer {
     // Create price cache
     this.services.priceCache = new PriceCache();
 
-    if (config.binance?.apiKey && config.binance?.apiSecret) {
-      this.services.exchange = ExchangeFactory.create("ccxt:binance", {
-        apiKey: config.binance.apiKey,
-        apiSecret: config.binance.apiSecret,
+    if (config.exchange?.apiKey && config.exchange?.apiSecret) {
+      const exchangeType = (config.exchange.type ?? "ccxt:binance") as ExchangeId;
+      this.services.exchange = ExchangeFactory.create(exchangeType, {
+        apiKey: config.exchange.apiKey,
+        apiSecret: config.exchange.apiSecret,
       });
-      this.services.logger.info("Exchange client initialized (ccxt:binance)");
+      this.services.logger.info(`Exchange client initialized (${exchangeType})`);
     } else {
       this.services.exchange = null;
       this.services.logger.warn("Exchange client not initialized - no credentials");

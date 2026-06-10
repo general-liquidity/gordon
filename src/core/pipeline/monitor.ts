@@ -9,7 +9,7 @@
  */
 
 import type { Exchange, OrderParams } from "../../infra/exchange/index.ts";
-import { ccxtIdToNativeVenue } from "../../infra/exchange/types.ts";
+
 import { listTrades, updateTrade } from "../../infra/storage/entities/trades.ts";
 import { logEvent } from "../../infra/storage/entities/events.ts";
 import { getPlan } from "../../infra/storage/entities/plans.ts";
@@ -17,9 +17,10 @@ import { createModuleLogger } from "../../infra/logger/index.ts";
 import { emitEvent } from "../../events/index.ts";
 import type { Trade, Plan, ExitFill, EntryFill } from "../../types/index.ts";
 import {
-  BinanceWebSocket,
-  type TickerUpdate,
-} from "../../infra/venues/exchange/clients/binance/websocket.ts";
+  createMarketStream,
+  type MarketStream,
+  type MarketStreamTickerUpdate as TickerUpdate,
+} from "../../infra/exchange/marketStream.ts";
 import { cleanupExpiredPlans } from "./executor.ts";
 import { getTrailingStopTracker } from "../orders/trailing-stop.ts";
 
@@ -29,7 +30,7 @@ const logger = createModuleLogger("monitor");
 const realtimePriceCache: Map<string, { price: number; timestamp: number }> = new Map();
 
 // WebSocket instance for real-time monitoring
-let wsClient: BinanceWebSocket | null = null;
+let wsClient: MarketStream | null = null;
 
 // ============================================================================
 // Types
@@ -1062,12 +1063,12 @@ interface GridLevelStatus {
  * - Handling partial fills of grid entries
  *
  * @param trade - The trade to place TPs for
- * @param binance - Authenticated Binance client
+ * @param exchange - Authenticated exchange adapter
  * @returns GridTPPlacementResult with status and any alerts generated
  */
 export async function placeGridTakeProfits(
   trade: Trade,
-  binance: Exchange
+  exchange: Exchange
 ): Promise<GridTPPlacementResult> {
   const alerts: Alert[] = [];
 
@@ -1120,8 +1121,8 @@ export async function placeGridTakeProfits(
 
   try {
     // Get current price and open orders
-    const currentPrice = await binance.getPrice(trade.symbol);
-    const openOrders = await binance.getOpenOrders(trade.symbol);
+    const currentPrice = await exchange.getPrice(trade.symbol);
+    const openOrders = await exchange.getOpenOrders(trade.symbol);
 
     // Check if TP orders already exist
     const existingTpOrders = openOrders.filter(o =>
@@ -1281,7 +1282,7 @@ export async function placeGridTakeProfits(
       };
 
       try {
-        const tpOrder = await binance.placeOrder(tpOrderParams);
+        const tpOrder = await exchange.placeOrder(tpOrderParams);
         placedCount++;
 
         logger.info("Grid TP order placed", {
@@ -1732,11 +1733,7 @@ function checkFlashCrash(
  * This enables faster detection of stop-loss and take-profit triggers
  * Only connects if there are active trades to monitor
  */
-export async function initializeRealtimeMonitor(exchangeId: string = "binance"): Promise<void> {
-  if (ccxtIdToNativeVenue(exchangeId) !== "binance") {
-    logger.debug("Real-time monitor skipped for non-Binance exchange", { exchangeId });
-    return;
-  }
+export async function initializeRealtimeMonitor(exchangeId: string = "ccxt:binance"): Promise<void> {
   if (wsClient) {
     logger.debug("WebSocket already initialized");
     return;
@@ -1752,7 +1749,7 @@ export async function initializeRealtimeMonitor(exchangeId: string = "binance"):
     return;
   }
 
-  wsClient = new BinanceWebSocket();
+  wsClient = createMarketStream(exchangeId);
 
   wsClient.on("ticker", (update: TickerUpdate) => {
     // Update real-time price cache

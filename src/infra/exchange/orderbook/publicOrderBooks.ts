@@ -19,6 +19,7 @@
  */
 
 import type { OrderBook, OrderBookEntry } from "../types.ts";
+import { createPublicExchange } from "../publicFactory.ts";
 
 export type PublicVenue = "binance" | "coinbase" | "kraken" | "okx";
 
@@ -83,14 +84,18 @@ const binance: PublicVenueConfig = {
   makerBps: 10,
   toNativeSymbol: (s) => s.toUpperCase().replace(/[\-_/]/g, ""),
   async fetchBook(symbol, levels, signal) {
-    const native = this.toNativeSymbol(symbol);
-    const safeLevels = [5, 10, 20, 50, 100, 500, 1000, 5000].find((n) => n >= levels) ?? 100;
-    const data = (await fetchJson(
-      `https://api.binance.com/api/v3/depth?symbol=${encodeURIComponent(native)}&limit=${safeLevels}`,
-      signal,
-    )) as { bids?: [string, string][]; asks?: [string, string][] } | null;
-    if (!data) return null;
-    return { lastUpdateId: 0, bids: toEntries(data.bids), asks: toEntries(data.asks) };
+    if (signal?.aborted) return null;
+    try {
+      const exchange = createPublicExchange("binance");
+      const book = await exchange.getOrderBook(symbol, levels);
+      return {
+        lastUpdateId: book.lastUpdateId,
+        bids: book.bids,
+        asks: book.asks,
+      };
+    } catch {
+      return null;
+    }
   },
 };
 

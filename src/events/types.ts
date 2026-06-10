@@ -43,19 +43,22 @@ export interface SystemErrorEvent extends BaseEvent {
 }
 
 /**
- * Connection events
+ * Exchange connection events
  */
-export interface BinanceConnectedEvent extends BaseEvent {
-  type: "binance:connected";
+export interface ExchangeConnectedEvent extends BaseEvent {
+  type: "exchange:connected";
+  exchangeId: string;
 }
 
-export interface BinanceDisconnectedEvent extends BaseEvent {
-  type: "binance:disconnected";
+export interface ExchangeDisconnectedEvent extends BaseEvent {
+  type: "exchange:disconnected";
+  exchangeId: string;
   reason?: string;
 }
 
-export interface BinanceRateLimitEvent extends BaseEvent {
-  type: "binance:rate_limit";
+export interface ExchangeRateLimitEvent extends BaseEvent {
+  type: "exchange:rate_limit";
+  exchangeId: string;
   weight: number;
   limit: number;
 }
@@ -651,9 +654,9 @@ export type GordonEvent =
   | SystemStartedEvent
   | SystemPermissionModeChangedEvent
   | SystemErrorEvent
-  | BinanceConnectedEvent
-  | BinanceDisconnectedEvent
-  | BinanceRateLimitEvent
+  | ExchangeConnectedEvent
+  | ExchangeDisconnectedEvent
+  | ExchangeRateLimitEvent
   | PlanCreatedEvent
   | PlanApprovedEvent
   | PlanRejectedEvent

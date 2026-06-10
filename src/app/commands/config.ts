@@ -246,15 +246,12 @@ export async function configView(): Promise<ConfigCommandResult> {
     // Build API Status section
     const apiLines = ['', '=== API Status ==='];
 
-    // Check legacy exchange status
-    const hasLegacyExchange = !!config.exchange?.apiKey;
-    const hasMultiExchange = config.exchanges && config.exchanges.length > 0;
+    const hasExchange = config.exchanges && config.exchanges.length > 0;
 
-    if (hasLegacyExchange && config.exchange) {
-      const perms = config.exchange.permissions;
-      apiLines.push(`Binance (legacy): Connected (permissions: ${formatPermissions(perms.read, perms.spotTrade)})`);
-    } else if (hasMultiExchange) {
-      const activeExchange = config.exchanges.find(e => e.isDefault) || config.exchanges[0];
+    if (hasExchange) {
+      const activeExchange = config.exchanges.find((e) => e.id === config.activeExchangeId)
+        || config.exchanges.find((e) => e.isDefault)
+        || config.exchanges[0];
       if (activeExchange) {
         apiLines.push(`${activeExchange.type}: Connected`);
       }
@@ -273,15 +270,12 @@ export async function configView(): Promise<ConfigCommandResult> {
 
     // Build Exchanges section
     const exchangeLines = ['', '=== Exchanges ==='];
-    if (hasMultiExchange && config.exchanges.length > 0) {
+    if (hasExchange && config.exchanges.length > 0) {
       const activeId = config.activeExchangeId || config.exchanges.find(e => e.isDefault)?.id;
       const activeType = config.exchanges.find(e => e.id === activeId)?.type || 'none';
       const configuredTypes = [...new Set(config.exchanges.map(e => e.type))];
       exchangeLines.push(`Active: ${activeType}`);
       exchangeLines.push(`Configured: ${configuredTypes.join(', ')}`);
-    } else if (hasLegacyExchange) {
-      exchangeLines.push('Active: binance');
-      exchangeLines.push('Configured: binance');
     } else {
       exchangeLines.push('Active: none');
       exchangeLines.push('Configured: none');

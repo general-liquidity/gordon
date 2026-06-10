@@ -504,10 +504,10 @@ export class CcxtAdapter
     });
   }
 
-  async getCandles(symbol: string, interval: string, limit = 100): Promise<Candle[]> {
+  async getCandles(symbol: string, interval: string, limit = 100, since?: number): Promise<Candle[]> {
     return this.withCallTracking(async () => {
       const ccxtInterval = interval;
-      const ohlcv = await this.client.fetchOHLCV(toCcxtSymbol(symbol), ccxtInterval, undefined, limit);
+      const ohlcv = await this.client.fetchOHLCV(toCcxtSymbol(symbol), ccxtInterval, since, limit);
       const durationMs = intervalDurationMs(interval);
       return ohlcv.map((row: unknown) => {
         const r = row as unknown[];

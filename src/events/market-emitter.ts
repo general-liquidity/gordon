@@ -20,10 +20,10 @@ import type {
   MarketEventType,
 } from "./market-events.ts";
 import type {
-  BinanceWebSocket,
-  KlineUpdate,
-  TickerUpdate,
-} from "../infra/venues/exchange/clients/binance/websocket.ts";
+  MarketStream,
+  MarketStreamKlineUpdate as KlineUpdate,
+  MarketStreamTickerUpdate as TickerUpdate,
+} from "../infra/exchange/marketStream.ts";
 
 const logger = createModuleLogger("market-emitter");
 
@@ -83,7 +83,7 @@ const DEFAULT_CONFIG: MarketEmitterConfig = {
  * Usage:
  * ```ts
  * const emitter = new MarketEventEmitter(getEventBus());
- * emitter.attachWebSocket(binanceWs);
+ * emitter.attachMarketStream(stream);
  * emitter.watchCandles("BTCUSDT", "1h");
  * emitter.watchPrice("ETHUSDT");
  * emitter.watchVolume("SOLUSDT", 4.0);
@@ -93,7 +93,7 @@ export class MarketEventEmitter {
   private bus: EventBus;
   private config: MarketEmitterConfig;
   private watched: Map<string, WatchedSymbol> = new Map();
-  private ws: BinanceWebSocket | null = null;
+  private ws: MarketStream | null = null;
   private pollingIntervals: Map<string, ReturnType<typeof setInterval>> = new Map();
   private running: boolean = false;
 
@@ -103,10 +103,9 @@ export class MarketEventEmitter {
   }
 
   /**
-   * Attach a BinanceWebSocket instance for real-time data.
-   * The emitter will subscribe to kline and ticker streams as needed.
+   * Attach a market stream for real-time data (native WS or polling).
    */
-  attachWebSocket(ws: BinanceWebSocket): void {
+  attachMarketStream(ws: MarketStream): void {
     this.ws = ws;
 
     // Listen for kline (candle) updates
@@ -120,13 +119,13 @@ export class MarketEventEmitter {
     });
 
     this.running = true;
-    logger.info("WebSocket attached to MarketEventEmitter");
+    logger.info("Market stream attached to MarketEventEmitter");
   }
 
   /**
-   * Detach WebSocket and stop all watching
+   * Detach market stream and stop all watching
    */
-  detachWebSocket(): void {
+  detachMarketStream(): void {
     if (this.ws) {
       // Unsubscribe all watched symbols from WebSocket
       const allWatched = Array.from(this.watched.values());
@@ -136,7 +135,7 @@ export class MarketEventEmitter {
       this.ws = null;
     }
     this.running = false;
-    logger.info("WebSocket detached from MarketEventEmitter");
+    logger.info("Market stream detached from MarketEventEmitter");
   }
 
   // ============================================================================

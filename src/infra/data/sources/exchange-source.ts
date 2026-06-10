@@ -6,7 +6,6 @@
  */
 
 import type { Exchange } from "../../exchange/types.ts";
-import { ccxtIdToNativeVenue } from "../../exchange/types.ts";
 import type { Candle } from "../../../types/index.ts";
 import type { DataSource, DataSourceCapabilities, OHLCParams } from "./types.ts";
 import type { Timeframe } from "../../../types/timeframes.ts";
@@ -228,73 +227,14 @@ export class ExchangeDataSource implements DataSource {
     endTime: number,
     limit: number
   ): Promise<Candle[]> {
-    // For Binance, we need to use the klines endpoint with startTime/endTime
-    // The Exchange.getCandles method only supports limit parameter
-    // So we'll make a direct API call
-    const exchangeId = this.exchange.exchangeId;
+    const candles = await this.exchange.getCandles(
+      symbol,
+      interval,
+      Math.min(limit, MAX_CANDLES_PER_REQUEST),
+      startTime,
+    );
 
-    if (ccxtIdToNativeVenue(exchangeId) === "binance") {
-      return this.fetchBinanceKlines(symbol, interval, startTime, endTime, limit);
-    }
-
-    // For other exchanges, fall back to using getCandles
-    // This may not respect startTime exactly, but it's a reasonable fallback
-    const candles = await this.exchange.getCandles(symbol, interval, limit);
-
-    // Filter to only candles within our time range
     return candles.filter((c) => c.openTime >= startTime && c.openTime <= endTime);
-  }
-
-  /**
-   * Fetch klines directly from Binance API with time range support.
-   */
-  private async fetchBinanceKlines(
-    symbol: string,
-    interval: string,
-    startTime: number,
-    endTime: number,
-    limit: number
-  ): Promise<Candle[]> {
-    const url = new URL("https://api.binance.com/api/v3/klines");
-    url.searchParams.set("symbol", symbol.toUpperCase());
-    url.searchParams.set("interval", interval);
-    url.searchParams.set("startTime", startTime.toString());
-    url.searchParams.set("endTime", endTime.toString());
-    url.searchParams.set("limit", Math.min(limit, MAX_CANDLES_PER_REQUEST).toString());
-
-    const response = await fetch(url.toString());
-
-    if (!response.ok) {
-      const error = (await response.json()) as { msg?: string };
-      throw new Error(`Binance API error: ${error.msg || response.statusText}`);
-    }
-
-    const klines = (await response.json()) as Array<
-      [
-        number, // Open time
-        string, // Open
-        string, // High
-        string, // Low
-        string, // Close
-        string, // Volume
-        number, // Close time
-        string, // Quote asset volume
-        number, // Number of trades
-        string, // Taker buy base asset volume
-        string, // Taker buy quote asset volume
-        string // Ignore
-      ]
-    >;
-
-    return klines.map((kline) => ({
-      openTime: kline[0],
-      open: parseFloat(kline[1]),
-      high: parseFloat(kline[2]),
-      low: parseFloat(kline[3]),
-      close: parseFloat(kline[4]),
-      volume: parseFloat(kline[5]),
-      closeTime: kline[6],
-    }));
   }
 
   /**

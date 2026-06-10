@@ -276,7 +276,7 @@ function AppInner() {
   // queue. Info → info variant; warning → alert variant; critical → error.
   useAlertSubscription();
 
-  // Rate limit notification — records binance:rate_limit and surfaces a
+  // Rate limit notification — records exchange:rate_limit and surfaces a
   // dismissible inline banner while throttled.
   const rateLimit = useRateLimitNotification();
   React.useEffect(() => {
@@ -288,8 +288,8 @@ function AppInner() {
     let unsubElicit: (() => void) | undefined;
     void import("../events/index.ts").then((m) => {
       const bus = m.getEventBus();
-      unsubRate = bus.on("binance:rate_limit", (event) => {
-        rateLimit.recordRateLimit("binance", event.weight, event.limit, 60_000);
+      unsubRate = bus.on("exchange:rate_limit", (event) => {
+        rateLimit.recordRateLimit(event.exchangeId, event.weight, event.limit, 60_000);
       });
       // Wire PlanDiff: diff successive plan:created for same symbol
       unsubPlan = bus.on("plan:created", (event) => {

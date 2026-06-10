@@ -439,11 +439,11 @@ export function startAutonomousLoop(config: AutonomousLoopConfig): { success: bo
   // pre-session statement of intent; the actuals at stopAutonomousLoop
   // are emitted alongside so an operator can compute the diff
   // post-hoc via `compareWithActuals`.
-  const exchangeId = (config.exchange as { id?: string } | undefined)?.id;
+  const venue = config.exchange.exchangeId;
   loopState.sprintContract = createSprintContract({
     scope: {
       symbols: config.mandate.symbols ?? [],
-      venues: exchangeId ? [exchangeId] : [],
+      venues: venue ? [venue] : [],
       strategies: [],
     },
     verificationStandards: [

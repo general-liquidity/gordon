@@ -538,27 +538,27 @@ export function subscribeToEvents(dispatch: Dispatch): () => void {
   // Exchange (3 events)
   // ────────────────────────────────────────────────────────────────────────
 
-  // 43. binance:connected — silent, feed status shows in footer
+  // 43. exchange:connected — silent, feed status shows in footer
   unsubs.push(
-    bus.on("binance:connected", (_event: EventData<"binance:connected">) => {
+    bus.on("exchange:connected", (_event: EventData<"exchange:connected">) => {
       // Silent — MarketDataStatus footer shows feed status
     }),
   );
 
-  // 44. binance:disconnected
+  // 44. exchange:disconnected
   unsubs.push(
-    bus.on("binance:disconnected", (event: EventData<"binance:disconnected">) => {
-      notify(dispatch, "binance:disconnected", "alert",
-        `\u26A0 Binance disconnected${event.reason ? `: ${event.reason}` : ""}`,
+    bus.on("exchange:disconnected", (event: EventData<"exchange:disconnected">) => {
+      notify(dispatch, "exchange:disconnected", "alert",
+        `\u26A0 ${event.exchangeId} disconnected${event.reason ? `: ${event.reason}` : ""}`,
       );
     }),
   );
 
-  // 45. binance:rate_limit
+  // 45. exchange:rate_limit
   unsubs.push(
-    bus.on("binance:rate_limit", (event: EventData<"binance:rate_limit">) => {
-      notify(dispatch, "binance:rate_limit", "alert",
-        `\u26A0 Binance rate limit: ${event.weight}/${event.limit} weight used`,
+    bus.on("exchange:rate_limit", (event: EventData<"exchange:rate_limit">) => {
+      notify(dispatch, "exchange:rate_limit", "alert",
+        `\u26A0 ${event.exchangeId} rate limit: ${event.weight}/${event.limit} weight used`,
       );
     }),
   );

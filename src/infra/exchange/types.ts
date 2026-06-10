@@ -603,7 +603,7 @@ export interface Exchange {
   getPrice(symbol: string): Promise<number>;
 
   /** Get candlestick/kline data */
-  getCandles(symbol: string, interval: string, limit?: number): Promise<Candle[]>;
+  getCandles(symbol: string, interval: string, limit?: number, since?: number): Promise<Candle[]>;
 
   /** Get 24hr ticker data for all symbols */
   get24hrTickers(): Promise<Ticker24hr[]>;
@@ -759,8 +759,7 @@ export interface FundingHistoryEntry {
 
 // ============================================================================
 // Optional capability interfaces — implemented by exchanges that support them.
-// Gordon's native adapters may opt into these as separate work; CCXT-routed
-// adapters cover all 107 exchanges' worth of these surfaces via the unified API.
+// CCXT-routed adapters cover these optional surfaces via the unified API.
 // ============================================================================
 
 /**

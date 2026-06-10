@@ -21,4 +21,23 @@ describe("migrateExchangeConfigTypes", () => {
     });
     expect((migrated.exchanges as Array<{ type: string }>)[0]!.type).toBe("ccxt:binanceus");
   });
+
+  it("migrates legacy singleton exchange into exchanges[]", () => {
+    const migrated = migrateExchangeConfigTypes({
+      exchange: {
+        name: "binance",
+        apiKey: "legacy-key",
+        apiSecret: "legacy-secret",
+        permissions: { read: true, spotTrade: true, withdraw: false },
+      },
+    });
+
+    expect(migrated.exchange).toBeUndefined();
+    const exchanges = migrated.exchanges as Array<{ id: string; type: string; apiKey: string }>;
+    expect(exchanges).toHaveLength(1);
+    expect(exchanges[0]!.id).toBe("binance");
+    expect(exchanges[0]!.type).toBe("ccxt:binance");
+    expect(exchanges[0]!.apiKey).toBe("legacy-key");
+    expect(migrated.activeExchangeId).toBe("binance");
+  });
 });
