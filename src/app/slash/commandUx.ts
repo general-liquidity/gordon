@@ -2,7 +2,7 @@ import type { PermissionMode } from "../../types/index.ts";
 
 export type WorkspaceId = "desk" | "market" | "plan" | "lab" | "monitor";
 
-export type LegacyCommandCategory = "trading" | "market" | "account" | "system" | "strategy";
+export type SlashCommandCategory = "trading" | "market" | "account" | "system" | "strategy";
 export type CommandLevel = 1 | 2 | 3;
 export type WorkflowGroup = "discover" | "analyze" | "trade" | "run" | "accounts" | "monitor" | "build" | "operate";
 export type CommandAudience = "core" | "advanced" | "operator";
@@ -18,7 +18,7 @@ export interface WorkflowConfigEntry {
 
 export interface CommandUxShape {
   name: string;
-  category: LegacyCommandCategory;
+  category: SlashCommandCategory;
   level: CommandLevel;
 }
 
@@ -240,7 +240,7 @@ const SYSTEM_COMMANDS = new Set([
   "config",
 ]);
 
-const CATEGORY_DEFAULT_WORKFLOW: Record<LegacyCommandCategory, WorkflowGroup> = {
+const CATEGORY_DEFAULT_WORKFLOW: Record<SlashCommandCategory, WorkflowGroup> = {
   market: "discover",
   trading: "trade",
   strategy: "run",

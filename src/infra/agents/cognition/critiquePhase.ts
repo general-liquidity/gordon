@@ -9,7 +9,7 @@
  */
 
 import type { GordonContext } from "../types.ts";
-import { resolveLegacyModelRouteForWorkflowPhase } from "./workflowPhase.ts";
+import { resolveWorkflowPhaseModelRoute } from "./workflowPhase.ts";
 import { createModuleLogger } from "../../logger/index.ts";
 import { recordPhaseLLMCost } from "../../platform/costTracker.ts";
 import {
@@ -90,7 +90,7 @@ async function runCritiquePhaseInner(
     // the writer. Clean context alone isn't enough — capable + clean.
     // Critique only fires when thinkingDepth === "high" (explicit opt-in
     // for high-stakes work), so the cost increase is gated.
-    const route = resolveLegacyModelRouteForWorkflowPhase("critique");
+    const route = resolveWorkflowPhaseModelRoute("critique");
 
     const userContent = `Thinking trace:\n${thinkingTrace}\n\nUser request: ${userMessage.slice(0, 300)}`;
 
@@ -166,7 +166,7 @@ export async function runCritiqueWithRubric(
   }
 
   try {
-    const route = resolveLegacyModelRouteForWorkflowPhase("critique");
+    const route = resolveWorkflowPhaseModelRoute("critique");
     const userContent = `Thinking trace:\n${thinkingTrace}\n\nUser request: ${userMessage.slice(0, 300)}`;
     const response = await context.llm.chatWithConfig(
       [

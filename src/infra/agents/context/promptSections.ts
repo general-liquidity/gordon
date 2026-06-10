@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { formatCapabilityTruthSummary, GORDON_PRODUCT_TRUTH } from "../capabilityTruth.ts";
 import { ROLE_PROMPT_SECTIONS, type PromptAgentRole } from "../prompt-sections/roles.ts";
-import { SHARED_PROMPT_SECTIONS, type PromptSectionDefinition as LegacyPromptSectionDefinition } from "../prompt-sections/shared.ts";
+import { SHARED_PROMPT_SECTIONS } from "../prompt-sections/shared.ts";
 import type { GordonContext } from "../types.ts";
 import { determineWorkflowPhase } from "../cognition/workflowPhase.ts";
 import { getThinkingDepthFromContext } from "../cognition/thinkingPhase.ts";
@@ -125,7 +125,7 @@ function loadRegistry(): PromptSectionRegistryRecord[] {
   return registryCache;
 }
 
-function renderLegacySection(section: string | (() => string)): string {
+function renderStaticPromptSection(section: string | (() => string)): string {
   const content = typeof section === "function" ? section() : section;
   return content.trim();
 }
@@ -189,7 +189,7 @@ function loadSectionContent(record: PromptSectionRegistryRecord, options: Prompt
   } else {
     const fallback = fallbackSectionContent.get(record.id);
     if (fallback) {
-      template = renderLegacySection(fallback);
+      template = renderStaticPromptSection(fallback);
     }
   }
 

@@ -1104,7 +1104,7 @@ export const computeIndicatorTool = createTool({
     "Levels: fibonacci, camarilla_pivots, supply_demand_zones, order_blocks, fvg",
     "Trend systems: ichimoku, supertrend, parabolic_sar",
     "Stats: kalman, nadaraya_watson, markov_regime",
-    "SMC patterns: smc_patterns (combined), smc_order_blocks, smc_fvg, smc_choch, smc_liquidity_sweeps, smc_premium_discount; legacy ops: order_blocks, fvg, divergence, false_breakout, squeeze_momentum, angled_market_structure",
+    "SMC patterns: smc_patterns (combined), smc_order_blocks, smc_fvg, smc_choch, smc_liquidity_sweeps, smc_premium_discount; alternate ops: order_blocks, fvg, divergence, false_breakout, squeeze_momentum, angled_market_structure",
     "Geometric chart patterns: lmw_patterns (Lo-Mamaysky-Wang kernel-extrema detector — head-and-shoulders/inverse, broadening top/bottom, triangle top/bottom, rectangle top/bottom, double top/bottom; params { bandwidth?, doubleMinSeparation? }; pair with compute_microstructure signal_informativeness to test whether a pattern moves returns)",
     "Setup detection: tight_consolidation (bull-flag / pennant scorer), undercut_rally (shakeout-and-reclaim)",
     "Exit coaching: trim_state (momentum-swing 8/21/50 EMA trail ladder), resistance_tests (count level rejections + confidence)",
@@ -1370,7 +1370,7 @@ export const computeRiskTool = createTool({
 
     // Synthetic RequestContext: when portfolioOverrideUsd is set, build a
     // shallow proxy that returns the override for portfolioValue/availableCash
-    // so the legacy classifier evaluates against the hypothetical, not the
+    // so the risk classifier evaluates against the hypothetical, not the
     // live exchange balance.
     const proxiedExecContext = args.portfolioOverrideUsd
       ? withPortfolioOverride(execContext, args.portfolioOverrideUsd)

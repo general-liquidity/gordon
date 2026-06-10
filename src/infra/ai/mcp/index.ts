@@ -62,9 +62,4 @@ export {
 
 export { MCPCredentialManager, credentialManager } from './credentials';
 
-// ============================================================================
-// Legacy Exports (deprecated — use client.ts instead)
-// ============================================================================
 
-export { MCPServerRegistry, mcpRegistry } from './registry';
-export { LocalMCPServerInstance, createServerInstance } from './server-instance';

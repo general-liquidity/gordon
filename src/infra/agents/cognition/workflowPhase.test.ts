@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 
 import { GordonConfigSchema } from "../../../types/config.ts";
-import { determineWorkflowPhase, isExecutionPhase, resolveLegacyModelRouteForWorkflowPhase } from "./workflowPhase.ts";
+import { determineWorkflowPhase, isExecutionPhase, resolveWorkflowPhaseModelRoute } from "./workflowPhase.ts";
 import type { GordonContext } from "../types.ts";
 
 function createContext(overrides: Partial<GordonContext> = {}): GordonContext {
@@ -34,7 +34,7 @@ describe("workflowPhase", () => {
   });
 
   it("returns a legacy route for compaction", () => {
-    const route = resolveLegacyModelRouteForWorkflowPhase("compaction");
+    const route = resolveWorkflowPhaseModelRoute("compaction");
     expect(route.provider).toBeDefined();
     expect(route.model.length).toBeGreaterThan(0);
   });

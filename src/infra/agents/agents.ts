@@ -254,19 +254,6 @@ export const executorAgent = { get agent() { return getExecutorAgent(); } };
 export const researcherAgent = { get agent() { return getResearcherAgent(); } };
 
 /**
- * Legacy aliases — point to Gordon since their tools are merged into Gordon.
- * Allows old code referencing these agents to still compile.
- */
-export const scannerAgent = { get agent() { return getGordonAgent(); } };
-export const analystAgent = { get agent() { return getGordonAgent(); } };
-export const plannerAgent = { get agent() { return getGordonAgent(); } };
-export const monitorAgent = { get agent() { return getGordonAgent(); } };
-export const teacherAgent = { get agent() { return getGordonAgent(); } };
-export const backtesterAgent = { get agent() { return getGordonAgent(); } };
-export const criticAgent = { get agent() { return getGordonAgent(); } };
-export const auditorAgent = { get agent() { return getGordonAgent(); } };
-
-/**
  * Get all agents (4-agent architecture)
  */
 export function getAllAgents() {

@@ -823,8 +823,8 @@ function checkCritiquePhaseRouting(
   }
   try {
     const src = readFileSync(critiquePhasePath, "utf8");
-    const usesCritique = src.includes('resolveLegacyModelRouteForWorkflowPhase("critique")');
-    const usesCompaction = src.includes('resolveLegacyModelRouteForWorkflowPhase("compaction")');
+    const usesCritique = src.includes('resolveWorkflowPhaseModelRoute("critique")');
+    const usesCompaction = src.includes('resolveWorkflowPhaseModelRoute("compaction")');
     if (usesCompaction && !usesCritique) {
       return {
         id: "critique-routing",
@@ -838,7 +838,7 @@ function checkCritiquePhaseRouting(
         id: "critique-routing",
         label: "Critique-phase model routing",
         status: "warn",
-        message: "critiquePhase.ts doesn't reference resolveLegacyModelRouteForWorkflowPhase('critique') — file may have been refactored. Verify routing manually.",
+        message: "critiquePhase.ts doesn't reference resolveWorkflowPhaseModelRoute('critique') — file may have been refactored. Verify routing manually.",
       };
     }
     return {

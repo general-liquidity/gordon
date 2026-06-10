@@ -13,7 +13,7 @@ export {
   getModelRoute,
   getActiveRoute,
   resetProviderRegistry,
-  getLegacyClientRoute,
+  getDirectClientRoute,
   getDedalusModels,
   refreshDedalusModels,
   ProviderRegistry,

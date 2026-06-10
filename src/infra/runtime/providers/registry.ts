@@ -650,7 +650,7 @@ export class ProviderRegistry {
     return this.getDefaultRoute();
   }
 
-  getLegacyClientRoute(provider?: DirectProviderName | string, modelId?: string): ModelRoute {
+  getDirectClientRoute(provider?: DirectProviderName | string, modelId?: string): ModelRoute {
     this.initializeFromEnv();
 
     const route = provider && modelId
@@ -893,7 +893,7 @@ export class ProviderRegistry {
   }
 
   syncActiveProviderEnvironment(provider?: DirectProviderName | string, modelId?: string): ModelRoute {
-    return this.getLegacyClientRoute(provider, modelId);
+    return this.getDirectClientRoute(provider, modelId);
   }
 }
 
@@ -946,8 +946,8 @@ export function refreshDedalusModels(force = false): Promise<readonly ModelMetad
   return providerRegistry.refreshDedalusModels(force);
 }
 
-export function getLegacyClientRoute(provider?: DirectProviderName | string, modelId?: string): ModelRoute {
-  return providerRegistry.getLegacyClientRoute(provider, modelId);
+export function getDirectClientRoute(provider?: DirectProviderName | string, modelId?: string): ModelRoute {
+  return providerRegistry.getDirectClientRoute(provider, modelId);
 }
 
 export function syncActiveProviderEnvironment(provider?: DirectProviderName | string, modelId?: string): ModelRoute {

@@ -11,7 +11,7 @@
 import type { GordonContext } from "../types.ts";
 import type { Message } from "../../ai/llm/types.ts";
 import {
-  resolveLegacyModelRouteForWorkflowPhase,
+  resolveWorkflowPhaseModelRoute,
   determineWorkflowPhase,
 } from "./workflowPhase.ts";
 import { createModuleLogger } from "../../logger/index.ts";
@@ -271,7 +271,7 @@ async function runThinkingPhaseInner(
 
   const callStart = Date.now();
   try {
-    const route = resolveLegacyModelRouteForWorkflowPhase("compaction"); // fast model
+    const route = resolveWorkflowPhaseModelRoute("compaction"); // fast model
 
     // Build a compact context snapshot (avoid token explosion)
     const contextSnapshot = JSON.stringify(

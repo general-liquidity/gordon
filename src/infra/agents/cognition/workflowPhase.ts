@@ -84,7 +84,7 @@ export function resolveModelForWorkflowPhase(
   }
 }
 
-export function resolveLegacyModelRouteForWorkflowPhase(phase: WorkflowPhase): { provider: LLMProvider; model: string } {
+export function resolveWorkflowPhaseModelRoute(phase: WorkflowPhase): { provider: LLMProvider; model: string } {
   switch (phase) {
     case "compaction":
     case "scan":

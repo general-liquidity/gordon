@@ -31,7 +31,7 @@ import { appendFileSync, existsSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { GORDON_DIR } from "../../../../storage/paths.ts";
 import { getGordonContext, type MastraExecutionContext } from "../../types.ts";
-import { resolveLegacyModelRouteForWorkflowPhase } from "../../../cognition/workflowPhase.ts";
+import { resolveWorkflowPhaseModelRoute } from "../../../cognition/workflowPhase.ts";
 import {
   runInvestigation,
   type InvestigationResult,
@@ -109,7 +109,7 @@ export const investigateTool = createTool({
     const ctx = getGordonContext(execContext);
     if (!ctx?.llm) return errors.noLlm;
 
-    const route = resolveLegacyModelRouteForWorkflowPhase("compaction");
+    const route = resolveWorkflowPhaseModelRoute("compaction");
     const agentStep = createSynthesisAgentStepFromChatWithConfig(
       ctx.llm.chatWithConfig.bind(ctx.llm),
       {
@@ -206,7 +206,7 @@ export const forkContextTool = createTool({
     if (!ctx?.llm) return forkErrors.noLlm;
     if (!parentMessages || parentMessages.length === 0) return forkErrors.noHistory;
 
-    const route = resolveLegacyModelRouteForWorkflowPhase("compaction");
+    const route = resolveWorkflowPhaseModelRoute("compaction");
     const agentStep = createSynthesisAgentStepFromChatWithConfig(
       ctx.llm.chatWithConfig.bind(ctx.llm),
       {

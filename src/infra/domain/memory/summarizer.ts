@@ -11,7 +11,7 @@
 import type { Message, MessageRole } from "../../ai/llm/types.ts";
 import type { LLMClient } from "../../ai/llm/client.ts";
 import { createModuleLogger } from "../../logger/index.ts";
-import { resolveLegacyModelRouteForWorkflowPhase } from "../../agents/cognition/workflowPhase.ts";
+import { resolveWorkflowPhaseModelRoute } from "../../agents/cognition/workflowPhase.ts";
 import { recordPhaseLLMCost } from "../../platform/costTracker.ts";
 import {
   INTEGRATION_GLOSSARY_MARKER,
@@ -717,7 +717,7 @@ export class ConversationSummarizer {
     const userPrompt = UPDATE_SUMMARIZATION_USER_PROMPT
       .replace("{priorSummary}", priorSummary)
       .replace("{conversation}", conversationText || "(no new messages since prior summary — just restate)");
-    const route = resolveLegacyModelRouteForWorkflowPhase("compaction");
+    const route = resolveWorkflowPhaseModelRoute("compaction");
 
     const response = await this.llm.chatWithConfig([
       { role: "system", content: UPDATE_SUMMARIZATION_SYSTEM_PROMPT },
@@ -913,7 +913,7 @@ export class ConversationSummarizer {
    */
   private async generateSummary(conversationText: string): Promise<string> {
     const userPrompt = SUMMARIZATION_USER_PROMPT.replace("{conversation}", conversationText);
-    const route = resolveLegacyModelRouteForWorkflowPhase("compaction");
+    const route = resolveWorkflowPhaseModelRoute("compaction");
 
     const response = await this.llm.chatWithConfig([
       { role: "system", content: SUMMARIZATION_SYSTEM_PROMPT },

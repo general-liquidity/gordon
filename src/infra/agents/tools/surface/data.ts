@@ -3,7 +3,7 @@
  *
  * Funnels each read domain through one named tool with a tight zod
  * schema and typed result. Dispatches internally to existing handler
- * logic (legacy tool modules remain as implementation; this surface
+ * logic (implementation modules remain private; this surface
  * is the agent-facing facade).
  *
  * Tools:

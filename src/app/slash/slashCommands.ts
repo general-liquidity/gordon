@@ -10,7 +10,7 @@ import {
 import { getSkillSlashCommands } from "../../infra/skills/slashCommands.ts";
 import {
   type CommandAudience,
-  type LegacyCommandCategory,
+  type SlashCommandCategory,
   type WorkflowGroup,
   getAudienceFromLevel,
   getAudienceLabel,
@@ -26,7 +26,7 @@ export interface SlashCommand {
   aliases: string[];
   description: string;
   usage: string;
-  category: LegacyCommandCategory;
+  category: SlashCommandCategory;
   level: CommandLevel;
   workflow: WorkflowGroup;
   workflowLabel: string;
@@ -163,7 +163,7 @@ export const DIRECT_TOOL_TARGETS = new Set([
 ]);
 
 
-const LEGACY_SLASH_COMMANDS: SlashCommandSeed[] = [
+const CORE_SLASH_COMMANDS: SlashCommandSeed[] = [
   // Market Discovery
   {
     name: "scan",
@@ -2369,18 +2369,18 @@ function normalizeSlashCommandRuntime(command: SlashCommand): SlashCommand {
   return command;
 }
 
-// Skill-derived slash commands are appended LAST in the legacy bucket so any
-// explicitly-defined legacy command with the same name wins (mergeSlashCommands
+// Skill-derived slash commands are appended LAST in the core bucket so any
+// explicitly-defined core command with the same name wins (mergeSlashCommands
 // is "first seen wins" within each bucket).
-const LEGACY_PLUS_SKILLS: SlashCommandSeed[] = [
-  ...LEGACY_SLASH_COMMANDS,
+const CORE_PLUS_SKILL_COMMANDS: SlashCommandSeed[] = [
+  ...CORE_SLASH_COMMANDS,
   ...(getSkillSlashCommands() as SlashCommandSeed[]),
 ];
 
 export const SLASH_COMMANDS: SlashCommand[] = sortCommandsForPresentation(
   mergeSlashCommands(
     getGeneratedSlashCommands() as SlashCommandSeed[],
-    LEGACY_PLUS_SKILLS,
+    CORE_PLUS_SKILL_COMMANDS,
   )
     .map((command) => normalizeCommandUx(command))
     .map((command) => normalizeSlashCommandRuntime(command))

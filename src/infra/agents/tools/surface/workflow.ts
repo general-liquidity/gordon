@@ -141,7 +141,7 @@ export const delegateSubagentTool = createTool({
     }
     // Empty readOnlyToolRegistry — V4 subagent dispatch runs the profile's
     // intrinsic tool set without parent-tool passthrough. The full passthrough
-    // path lives in the legacy `delegate_to_subagent` tool, which has closure
+    // path lives in the full-registry `delegate_to_subagent` tool, which has closure
     // over the live tool registry at construction time.
     const result = await dispatchSubagentTask(profile, args.task, {});
     return {

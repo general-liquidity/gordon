@@ -36,13 +36,9 @@ export {
 
 // Specialized Agents
 export {
-  scannerAgent,
-  analystAgent,
-  plannerAgent,
   executorAgent,
-  monitorAgent,
-  teacherAgent,
   gordonAgent,
+  researcherAgent,
   getAllAgents,
   resetAgents,
 } from "./agents.ts";

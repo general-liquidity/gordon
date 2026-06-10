@@ -290,14 +290,14 @@ describe("doctor — critique-phase routing check", () => {
 
   it("passes when source uses 'critique' phase", () => {
     const path = join(tempDir, "critiquePhase.ts");
-    writeFileSync(path, `const route = resolveLegacyModelRouteForWorkflowPhase("critique");`);
+    writeFileSync(path, `const route = resolveWorkflowPhaseModelRoute("critique");`);
     const check = _internal.checkCritiquePhaseRouting(path);
     expect(check.status).toBe("pass");
   });
 
   it("fails when source reverted to 'compaction' phase", () => {
     const path = join(tempDir, "critiquePhase.ts");
-    writeFileSync(path, `const route = resolveLegacyModelRouteForWorkflowPhase("compaction");`);
+    writeFileSync(path, `const route = resolveWorkflowPhaseModelRoute("compaction");`);
     const check = _internal.checkCritiquePhaseRouting(path);
     expect(check.status).toBe("fail");
     expect(check.message).toContain("compaction");

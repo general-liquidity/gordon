@@ -362,10 +362,9 @@ export function getGordon(): Agent {
     //   + always-on system / observability / vision / quote-verify tools
     //   + integration tools (Finnhub / X-social / Defillama / MCP / onchain reads)
     //   + FW7 task-dispatch
-    // The legacy 405-tool surface lives on as implementation modules
-    // that agentTools delegates into — they're not exposed to the LLM
-    // directly. If you ever need to surface a legacy tool by name,
-    // re-spread it here explicitly with a justification comment.
+    // The full implementation-module catalog lives behind agentTools —
+    // not exposed to the LLM directly. If you ever need to surface an
+    // implementation tool by name, re-spread it here with a justification comment.
     tools: {
       // System info + agent self-feedback (no generalized-surface equivalent)
       ...instrumentedSystemTools,

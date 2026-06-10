@@ -157,6 +157,6 @@ export const instrumentedAdvancedTools = withToolsMetrics(advancedTools);
 export const instrumentedSystematicTools = withToolsMetrics(systematicTools);
 export const instrumentedCheckRiskTool = withToolsMetrics({ check_risk: checkRiskTool });
 export const instrumentedExecutionCostTools = withToolsMetrics(executionCostTools);
-/** Canonical 22-tool surface — must go through metrics + permission gate like legacy tools. */
+/** Canonical 22-tool surface — must go through metrics + permission gate like implementation tools. */
 export const instrumentedAgentTools = withToolsMetrics(agentTools);
 export const instrumentedTradingInfraTools = withToolsMetrics(tradingInfraTools);

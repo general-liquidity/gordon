@@ -15,7 +15,7 @@ import type {
   OpenAIErrorResponse,
 } from "./types.ts";
 import { API_ENDPOINTS, GORDON_MODELS } from "./types.ts";
-import { getLegacyClientRoute } from "../../runtime/providers/registry.ts";
+import { getDirectClientRoute } from "../../runtime/providers/registry.ts";
 
 // Default configuration values
 const DEFAULT_PROVIDER: LLMProvider = "dedalus";
@@ -521,7 +521,7 @@ export class LLMClient {
 export function createLLMClientFromEnv(): LLMClient {
   const configuredProvider = process.env.GORDON_PROVIDER;
   const configuredModel = process.env.GORDON_MODEL ?? process.env.LLM_DEFAULT_MODEL;
-  const route = getLegacyClientRoute(configuredProvider, configuredModel);
+  const route = getDirectClientRoute(configuredProvider, configuredModel);
 
   const defaultProvider: LLMProvider =
     route.provider === "dedalus" || route.provider === "inception" || route.provider === "openai"
