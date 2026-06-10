@@ -178,6 +178,16 @@ describe("slash command UX formatting", () => {
     expect(sprintStatus && isRuntimeHandledSlashCommand(sprintStatus)).toBe(true);
   });
 
+  it("includes wip-status and shadow-divergence harness commands", () => {
+    const wip = SLASH_COMMANDS.find((command) => command.name === "wip-status");
+    const shadow = SLASH_COMMANDS.find((command) => command.name === "shadow-divergence");
+
+    expect(wip?.target).toBe("wip-status");
+    expect(shadow?.target).toBe("shadow-divergence");
+    expect(wip && isRuntimeHandledSlashCommand(wip)).toBe(true);
+    expect(shadow && isRuntimeHandledSlashCommand(shadow)).toBe(true);
+  });
+
   it("wires runtime inspection commands directly", () => {
     const runtimeState = SLASH_COMMANDS.find((command) => command.name === "runtime-state");
     const runtimeTranscript = SLASH_COMMANDS.find((command) => command.name === "runtime-transcript");

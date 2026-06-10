@@ -99,6 +99,12 @@ export {
   summarizeShadowFills,
   compareShadowVsReal,
 } from "./ops/shadowMode.ts";
+export {
+  buildShadowDivergenceReport,
+  formatShadowDivergenceReport,
+  shadowDivergenceToPayload,
+} from "./ops/shadowDivergenceReport.ts";
+export type { ShadowDivergenceReport } from "./ops/shadowDivergenceReport.ts";
 export type {
   ShadowStatus,
   ShadowSide,

@@ -1014,6 +1014,78 @@ export async function handleAutonomousMenuCommand(
 }
 
 // ============================================================================
+// WIP limit: /wip-status
+// ============================================================================
+
+export async function handleWipStatusMenuCommand(
+  target: string,
+  _args: string,
+  setState: StateUpdater,
+): Promise<boolean> {
+  if (target !== "wip-status") return false;
+
+  const { sessionWipSnapshot } = await import("../../infra/safety/wipSessionRegistry.ts");
+  const snap = sessionWipSnapshot();
+
+  if (!snap.enabled) {
+    addMessage(
+      setState,
+      "system",
+      "WIP limit is off. Set GORDON_WIP_LIMIT_ENABLED=1 to gate concurrent plans per symbol.",
+    );
+    return true;
+  }
+
+  const activeLines =
+    snap.active.length > 0
+      ? snap.active
+          .map(
+            (p) =>
+              `  • ${p.planId} — ${p.symbol} / ${p.strategy} (since ${new Date(p.activeSinceMs).toISOString()})`,
+          )
+          .join("\n")
+      : "  (none)";
+
+  addMessage(
+    setState,
+    "gordon",
+    "◈ WIP status\n\n" +
+      `Per-symbol: ${snap.limits.perSymbol} | per-strategy: ${snap.limits.perStrategy === Infinity ? "∞" : snap.limits.perStrategy} | global: ${snap.limits.global === Infinity ? "∞" : snap.limits.global}\n\n` +
+      `Active plans (${snap.active.length}):\n${activeLines}`,
+  );
+  return true;
+}
+
+// ============================================================================
+// Shadow divergence: /shadow-divergence
+// ============================================================================
+
+export async function handleShadowDivergenceMenuCommand(
+  target: string,
+  _args: string,
+  setState: StateUpdater,
+): Promise<boolean> {
+  if (target !== "shadow-divergence") return false;
+
+  const { isShadowModeEnabled } = await import("../../infra/trading/ops/shadowMode.ts");
+  if (!isShadowModeEnabled()) {
+    addMessage(
+      setState,
+      "system",
+      "Shadow mode is off. Set GORDON_SHADOW_MODE=1 to record ghost fills.",
+    );
+    return true;
+  }
+
+  const { buildShadowDivergenceReport, formatShadowDivergenceReport } = await import(
+    "../../infra/trading/ops/shadowDivergenceReport.ts"
+  );
+  const report = buildShadowDivergenceReport();
+  addMessage(setState, "gordon", formatShadowDivergenceReport(report));
+  return true;
+}
+
+// ============================================================================
 // Sprint contract: /sprint-status
 // ============================================================================
 

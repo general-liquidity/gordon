@@ -48,6 +48,8 @@ import {
   handleThreadMenuCommand,
   handleGoalMenuCommand,
   handleSprintStatusMenuCommand,
+  handleWipStatusMenuCommand,
+  handleShadowDivergenceMenuCommand,
   handleFeatureListMenuCommand,
   handleHumanInputMenuCommand,
   handleRuntimeMenuCommand,
@@ -344,6 +346,8 @@ async function handleMenuCommand(
   if (await handleAutonomousMenuCommand(resolved, args, setState, runtime, command, streamResponse)) return;
   if (await handleGoalMenuCommand(resolved, args, setState)) return;
   if (await handleSprintStatusMenuCommand(resolved, args, setState)) return;
+  if (await handleWipStatusMenuCommand(resolved, args, setState)) return;
+  if (await handleShadowDivergenceMenuCommand(resolved, args, setState)) return;
   if (await handleFeatureListMenuCommand(resolved, args, setState)) return;
   if (await handleHumanInputMenuCommand(resolved, args, setState)) return;
 

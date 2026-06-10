@@ -59,6 +59,7 @@ const TICK_INTERVALS = {
   producer_health: 5 * 60 * 1000,   // 5 min — producer liveness alerting
   kill_switch: 60 * 1000,           // 1 min — tripped kill switch alerting
   shadow_close: 60 * 1000,          // 1 min — shadow fill close reconciliation
+  shadow_divergence: 24 * 60 * 60 * 1000, // 24h — shadow vs realized PnL divergence
   session_review: 60 * 60 * 1000,   // 1 hour — checks time of week
   journal_prompt: 60 * 60 * 1000,   // 1 hour — checks time of day
   portfolio_drift: 30 * 60 * 1000,  // 30 min — position drift check
@@ -182,6 +183,30 @@ export function startProactiveObserver(): { started: boolean; subscriptions: num
             })
             .catch((err) => {
               logger.warn("shadow-close tick failed", { err: String(err) });
+            });
+          continue;
+        }
+        if (key === "shadow_divergence") {
+          void import("../../trading/ops/shadowDivergenceReport.ts")
+            .then(async ({ buildShadowDivergenceReport, shadowDivergenceToPayload }) => {
+              const { isShadowModeEnabled } = await import("../../trading/ops/shadowMode.ts");
+              if (!isShadowModeEnabled()) return;
+              const report = buildShadowDivergenceReport();
+              if (report.shadowFillCount === 0 && report.realOutcomeCount === 0) return;
+              const { recordStructuredObservation } = await import(
+                "../../platform/observability/index.ts"
+              );
+              recordStructuredObservation({
+                eventType: "shadow.divergence_tick",
+                workflow: "monitoring",
+                source: "proactive_observer",
+                component: "shadow_divergence",
+                outcome: "info",
+                details: shadowDivergenceToPayload(report),
+              });
+            })
+            .catch((err) => {
+              logger.warn("shadow-divergence tick failed", { err: String(err) });
             });
           continue;
         }

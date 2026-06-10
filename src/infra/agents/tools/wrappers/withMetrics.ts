@@ -7,7 +7,8 @@
  */
 
 import { recordToolCall } from "../../../platform/observability/metrics.ts";
-import { getGordonContext, type MastraExecutionContext } from "../types.ts";
+import { withSpan } from "../../../observability/otel.ts";
+import { getGordonContext, type GordonContext, type MastraExecutionContext } from "../types.ts";
 import { withResultSanitizer } from "./withResultSanitizer.ts";
 
 function getMastraExecutionContext(args: unknown[]): MastraExecutionContext | undefined {
@@ -45,6 +46,42 @@ function createRuntimeAccessError(
   };
 }
 
+type ToolAccessDecision = {
+  status: "allowed" | "blocked" | "pending";
+  reason?: string;
+  requestId?: string;
+};
+
+async function evaluateToolAccess(
+  toolId: string,
+  gordonContext: GordonContext | undefined,
+): Promise<ToolAccessDecision> {
+  if (gordonContext?.runtime?.evaluateToolAccess) {
+    return gordonContext.runtime.evaluateToolAccess(toolId, gordonContext);
+  }
+  if (!gordonContext) {
+    return { status: "allowed" };
+  }
+
+  const [{ getDefaultPermissionEngine }, { evaluateRuntimeToolPolicy }] = await Promise.all([
+    import("../../../../runtime/permissions/defaultPermissionEngine.ts"),
+    import("../../../../runtime/tools/ToolPolicy.ts"),
+  ]);
+  const policy = await evaluateRuntimeToolPolicy(toolId, gordonContext);
+  if (!policy.allowed) {
+    return { status: "blocked", reason: policy.reason };
+  }
+  const permission = await getDefaultPermissionEngine().evaluate(toolId, gordonContext, policy);
+  if (permission.status === "allowed") {
+    return { status: "allowed", reason: permission.reason };
+  }
+  return {
+    status: permission.status,
+    reason: permission.reason,
+    requestId: permission.request?.id,
+  };
+}
+
 /**
  * Wraps a single tool to record metrics on each execution.
  *
@@ -68,38 +105,51 @@ export function withToolMetrics<T extends { id: string; execute?: unknown }>(too
 
   // Create a wrapped execute function that records metrics
   const wrappedExecute = async (...args: unknown[]): Promise<unknown> => {
-    try {
-      const execContext = getMastraExecutionContext(args);
-      const gordonContext = getGordonContext(execContext);
-      if (gordonContext?.runtime?.evaluateToolAccess) {
-        const runtimeDecision = await gordonContext.runtime.evaluateToolAccess(tool.id, gordonContext);
-        if (runtimeDecision.status !== "allowed") {
+    const execContext = getMastraExecutionContext(args);
+    const gordonContext = getGordonContext(execContext) ?? undefined;
+    const threadId = gordonContext?.threadId ?? "unknown";
+
+    return withSpan(
+      `tool.${tool.id}`,
+      { toolName: tool.id, threadId },
+      async (span) => {
+        try {
+          const access = await evaluateToolAccess(tool.id, gordonContext);
+          span.setAttribute("permissionStatus", access.status);
+          if (access.status !== "allowed") {
+            recordToolCall(tool.id, false);
+            span.setStatus("error", access.reason ?? access.status);
+            return createRuntimeAccessError(
+              tool.id,
+              access.status,
+              access.reason,
+              access.requestId,
+            );
+          }
+
+          const result = await originalExecute.apply(tool, args);
+
+          const isError =
+            result &&
+            typeof result === "object" &&
+            result !== null &&
+            "error" in result &&
+            typeof (result as Record<string, unknown>).error === "string";
+
+          recordToolCall(tool.id, !isError);
+          span.setAttribute("success", !isError);
+          if (isError) {
+            span.setStatus("error", String((result as Record<string, unknown>).error));
+          }
+
+          return result;
+        } catch (err) {
           recordToolCall(tool.id, false);
-          return createRuntimeAccessError(
-            tool.id,
-            runtimeDecision.status,
-            runtimeDecision.reason,
-            runtimeDecision.requestId,
-          );
+          span.recordError(err);
+          throw err;
         }
-      }
-
-      const result = await originalExecute.apply(tool, args);
-
-      // Check if result indicates an error (tools often return { error: string })
-      const isError = result &&
-        typeof result === "object" &&
-        result !== null &&
-        "error" in result &&
-        typeof (result as Record<string, unknown>).error === "string";
-
-      recordToolCall(tool.id, !isError);
-
-      return result;
-    } catch (err) {
-      recordToolCall(tool.id, false);
-      throw err;
-    }
+      },
+    );
   };
 
   // Return a new tool with the wrapped execute function

@@ -79,6 +79,12 @@ import {
   type PreTradeInput,
 } from "../../../trading/ops/terminationLayers.ts";
 import { selectMandateForPlan } from "../../../safety/anti-rot/strategyMandates.ts";
+import {
+  activateSessionPlan,
+  deactivateSessionPlan,
+  gateSessionPlan,
+} from "../../../safety/wipSessionRegistry.ts";
+import { isWipLimitEnabled, wipResultToPayload } from "../../../safety/wipLimit.ts";
 
 // ============================================================================
 // Error Messages
@@ -547,6 +553,30 @@ export const executePlanTool = createTool({
       }, { toolName: "execute_plan" });
     }
 
+    if (isWipLimitEnabled()) {
+      const wipGate = gateSessionPlan(plan.symbol, plan.strategy);
+      if (!wipGate.allowed) {
+        recordStructuredObservation({
+          eventType: "execution.blocked",
+          workflow: "execution",
+          source: "agent_tool",
+          component: "execute_plan",
+          toolName: "execute_plan",
+          outcome: "failure",
+          status: "wip_limit",
+          controllability: classifyBlockedStatus("wip_limit"),
+          planId,
+          symbol: plan.symbol,
+          reason: wipGate.message,
+          details: wipResultToPayload(wipGate),
+        });
+        return validateToolOutput(executePlanOutputSchema, {
+          success: false,
+          error: wipGate.message,
+        }, { toolName: "execute_plan" });
+      }
+    }
+
     recordStructuredObservation({
       eventType: "execution.rationale_recorded",
       workflow: "execution",
@@ -901,6 +931,10 @@ export const executePlanTool = createTool({
       openPositions: getActiveTrades().length,
     });
 
+    if (result.success) {
+      activateSessionPlan(planId, plan.symbol, plan.strategy);
+    }
+
     if (isTerminationLayersEnabled()) {
       const firstOrderId =
         result.orders[0]?.orderId ??
@@ -928,18 +962,45 @@ export const executePlanTool = createTool({
               }
             : null,
       });
+      const enforce = isTerminationLayersEnforceEnabled();
+      const l2Failed = termination.layers[1]?.status === "fail";
+      const l3Failed = termination.layers[2]?.status === "fail";
       recordStructuredObservation({
-        eventType: "execution.termination_layers_shadow",
+        eventType: enforce ? "execution.termination_layers" : "execution.termination_layers_shadow",
         workflow: "execution",
         source: "agent_tool",
         component: "execute_plan",
         toolName: "execute_plan",
-        outcome: termination.verdict === "pass" ? "success" : "info",
+        outcome: termination.verdict === "pass" ? "success" : l3Failed ? "failure" : "info",
         planId,
         symbol: plan.symbol,
         tradeId: result.trade?.id,
         details: terminationToPayload(termination),
       });
+      if (enforce && l2Failed && result.success) {
+        return validateToolOutput(executePlanOutputSchema, {
+          success: false,
+          error:
+            termination.blockingFixInstruction ??
+            "Termination layer 2 failed — do not retry blindly.",
+          tradeId: result.trade?.id,
+        }, { toolName: "execute_plan" });
+      }
+      if (enforce && l3Failed && result.success) {
+        recordStructuredObservation({
+          eventType: "execution.reconciliation_alert",
+          workflow: "execution",
+          source: "agent_tool",
+          component: "execute_plan",
+          toolName: "execute_plan",
+          outcome: "failure",
+          planId,
+          symbol: plan.symbol,
+          tradeId: result.trade?.id,
+          reason: termination.blockingFixInstruction,
+          details: terminationToPayload(termination),
+        });
+      }
     }
 
     // PostOrderPlacement hook — fires after execution regardless of success
@@ -1079,6 +1140,10 @@ export const closeTradeTool = createTool({
 
     const result = await closeTrade(ctx.exchange, trade, reason ?? "MANUAL");
 
+    if (result.success && trade.planId) {
+      deactivateSessionPlan(trade.planId);
+    }
+
     return validateToolOutput(closeTradeOutputSchema, {
       success: result.success,
       pnl: result.pnl,
@@ -1178,6 +1243,29 @@ export const approvePlanTool = createTool({
         },
       });
       return validateToolOutput(approvePlanOutputSchema, { success: false, error: `Plan is not in DRAFT status, current status: ${plan.status}` }, { toolName: "approve_plan" });
+    }
+
+    if (isWipLimitEnabled()) {
+      const wipGate = gateSessionPlan(plan.symbol, plan.strategy);
+      if (!wipGate.allowed) {
+        recordStructuredObservation({
+          eventType: "plan.approval_failed",
+          workflow: "execution",
+          source: "agent_tool",
+          component: "approve_plan",
+          toolName: "approve_plan",
+          outcome: "failure",
+          status: "wip_limit",
+          planId,
+          symbol: plan.symbol,
+          reason: wipGate.message,
+          details: wipResultToPayload(wipGate),
+        });
+        return validateToolOutput(approvePlanOutputSchema, {
+          success: false,
+          error: wipGate.message,
+        }, { toolName: "approve_plan" });
+      }
     }
 
     updatePlan(planId, { status: "APPROVED" });
