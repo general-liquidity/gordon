@@ -659,10 +659,10 @@ const LEGACY_SLASH_COMMANDS: SlashCommandSeed[] = [
   },
 
   // New Trading Commands
-  { name: "cancel", aliases: [], description: "Cancel open orders by ID or symbol", usage: "/cancel <symbol|orderId>", category: "trading", level: 1, action: "tool", target: "cancel_order", whenToUse: "Cancel pending orders" },
-  { name: "close", aliases: [], description: "Close an open position", usage: "/close <symbol> [market|limit <price>]", category: "trading", level: 1, action: "tool", target: "close_position", whenToUse: "Close a position at market or limit price" },
-  { name: "stop-loss", aliases: ["sl"], description: "Set stop-loss on a position", usage: "/stop-loss <symbol> <price>", category: "trading", level: 2, action: "tool", target: "set_stop_loss", whenToUse: "Protect position with stop-loss" },
-  { name: "take-profit", aliases: ["tp"], description: "Set take-profit on a position", usage: "/take-profit <symbol> <price>", category: "trading", level: 2, action: "tool", target: "set_take_profit", whenToUse: "Set profit target" },
+  { name: "cancel", aliases: [], description: "Cancel open orders by ID or symbol", usage: "/cancel <symbol|orderId>", category: "trading", level: 1, action: "agent", target: "gordon", whenToUse: "Cancel pending orders via permission-gated agent tools" },
+  { name: "close", aliases: [], description: "Close an open position", usage: "/close <symbol> [market|limit <price>]", category: "trading", level: 1, action: "agent", target: "gordon", whenToUse: "Close a position through the full risk + permission stack" },
+  { name: "stop-loss", aliases: ["sl"], description: "Set stop-loss on a position", usage: "/stop-loss <symbol> <price>", category: "trading", level: 2, action: "agent", target: "gordon", whenToUse: "Protect position with stop-loss via agent tools" },
+  { name: "take-profit", aliases: ["tp"], description: "Set take-profit on a position", usage: "/take-profit <symbol> <price>", category: "trading", level: 2, action: "agent", target: "gordon", whenToUse: "Set profit target via agent tools" },
   { name: "watch", aliases: ["w"], description: "Watch symbol prices live", usage: "/watch <symbol> [interval]", category: "market", level: 1, action: "menu", target: "watch-panel", whenToUse: "Monitor price changes in real-time" },
   { name: "alerts", aliases: ["alert"], description: "Manage price alerts", usage: "/alerts [set|list|delete] <symbol> [price]", category: "market", level: 1, action: "tool", target: "handle_alerts_command", whenToUse: "Get notified when price hits target" },
 

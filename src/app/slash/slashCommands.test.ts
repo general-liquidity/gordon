@@ -162,6 +162,19 @@ describe("slash command UX formatting", () => {
     expect(ta?.action).toBe("agent");
   });
 
+  it("routes trading execution slash commands through the agent stack", () => {
+    const cancel = SLASH_COMMANDS.find((command) => command.name === "cancel");
+    const close = SLASH_COMMANDS.find((command) => command.name === "close");
+    const stopLoss = SLASH_COMMANDS.find((command) => command.name === "stop-loss");
+    const takeProfit = SLASH_COMMANDS.find((command) => command.name === "take-profit");
+
+    for (const command of [cancel, close, stopLoss, takeProfit]) {
+      expect(command?.action).toBe("agent");
+      expect(command?.target).toBe("gordon");
+      expect(command && isRuntimeHandledSlashCommand(command)).toBe(true);
+    }
+  });
+
   it("adds a direct context diagnostics command with a short alias", () => {
     const context = SLASH_COMMANDS.find((command) => command.name === "context");
 
