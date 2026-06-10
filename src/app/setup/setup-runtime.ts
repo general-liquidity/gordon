@@ -8,6 +8,7 @@ import {
   ccxtEnvNames,
   isCcxtExchangeId,
   extractCcxtSubId,
+  normalizeExchangeId,
   type ExchangeId,
   type NativeExchangeId,
 } from "../../infra/exchange/types.ts";
@@ -224,11 +225,12 @@ function upsertExchange(
   exchangeType: ExchangeId,
   payload: Partial<MultiExchangeConfig>,
 ): GordonConfig {
-  const existing = config.exchanges.find((exchange) => exchange.type === exchangeType);
-  const id = existing?.id ?? exchangeType;
+  const canonicalType = normalizeExchangeId(exchangeType);
+  const existing = config.exchanges.find((exchange) => exchange.type === canonicalType);
+  const id = existing?.id ?? canonicalType;
   const next: MultiExchangeConfig = {
     id,
-    type: exchangeType,
+    type: canonicalType,
     apiKey: payload.apiKey ?? existing?.apiKey ?? "***",
     apiSecret: payload.apiSecret ?? existing?.apiSecret ?? "***",
     passphrase: payload.passphrase ?? existing?.passphrase,
@@ -240,7 +242,7 @@ function upsertExchange(
   return {
     ...config,
     exchanges: [
-      ...config.exchanges.filter((exchange) => exchange.type !== exchangeType).map((exchange) => ({
+      ...config.exchanges.filter((exchange) => exchange.type !== canonicalType).map((exchange) => ({
         ...exchange,
         isDefault: false,
       })),

@@ -55,7 +55,6 @@ export async function getMcpGordonExecContext(
   }
 
   const context: GordonContext = {
-    binance: resolved.binance,
     exchange: resolved.exchange,
     broker: resolved.broker,
     llm: llm ?? ({} as GordonContext["llm"]),
@@ -69,7 +68,6 @@ export async function getMcpGordonExecContext(
   };
 
   const requestContext = new RequestContext();
-  requestContext.set("binance", context.binance);
   requestContext.set("exchange", context.exchange);
   requestContext.set("broker", context.broker);
   requestContext.set("config", context.config);

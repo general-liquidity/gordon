@@ -21,26 +21,33 @@ export const ExchangeConfigSchema = z.object({
  * Supported exchange types for multi-exchange configuration
  */
 /**
- * Exchange type schema. Accepts the 10 native exchanges OR a `ccxt:<sub-id>`
- * pattern routed through the CCXT unified adapter.
- *
- * Uses `z.custom<>` to preserve the precise type union at z.infer level — a
- * naive `z.union([z.enum([...]), z.string().regex(...)])` would collapse the
- * inferred type to `string`, losing the literal-narrowing that downstream
- * consumers depend on.
+ * Canonical exchange type — always `ccxt:<sub-id>`. Bare first-class ids
+ * (e.g. "binance") are migrated on config load via `migrateExchangeConfigTypes`.
  */
-const NATIVE_EXCHANGE_TYPES = ["binance", "binance_us", "coinbase", "kraken", "bitfinex", "hyperliquid", "robinhood", "okx", "gemini"] as const;
-const CCXT_TYPE_PATTERN = /^ccxt:[a-z0-9_]+$/;
-export const ExchangeTypeSchema = z.custom<
-  | "binance" | "binance_us" | "coinbase" | "kraken" | "bitfinex"
-  | "hyperliquid" | "robinhood" | "okx" | "gemini"
-  | `ccxt:${string}`
->((val) => {
+export const CCXT_TYPE_PATTERN = /^ccxt:[a-z0-9_]+$/;
+export const ExchangeTypeSchema = z.custom<`ccxt:${string}`>((val) => {
   if (typeof val !== "string") return false;
-  if ((NATIVE_EXCHANGE_TYPES as readonly string[]).includes(val)) return true;
-  if (CCXT_TYPE_PATTERN.test(val)) return true;
-  return false;
-}, "Must be a native exchange id or 'ccxt:<lowercase-sub-id>' (e.g. 'ccxt:bybit', 'ccxt:kucoin')");
+  return CCXT_TYPE_PATTERN.test(val);
+}, "Must be 'ccxt:<lowercase-sub-id>' (e.g. 'ccxt:binance', 'ccxt:bybit')");
+
+/**
+ * Rewrite legacy bare exchange ids to canonical `ccxt:<subId>` before parse.
+ */
+export function migrateExchangeConfigTypes(raw: Record<string, unknown>): Record<string, unknown> {
+  if (!Array.isArray(raw.exchanges)) return raw;
+
+  return {
+    ...raw,
+    exchanges: raw.exchanges.map((entry) => {
+      if (typeof entry !== "object" || entry === null || Array.isArray(entry)) return entry;
+      const ex = entry as Record<string, unknown>;
+      if (typeof ex.type !== "string") return entry;
+      if (CCXT_TYPE_PATTERN.test(ex.type)) return entry;
+      const subId = ex.type === "binance_us" ? "binanceus" : ex.type;
+      return { ...ex, type: `ccxt:${subId}` };
+    }),
+  };
+}
 
 /**
  * Supported stock broker types

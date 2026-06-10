@@ -141,14 +141,14 @@ export class PortfolioService {
     usdValue: number;
   }> {
     const container = getContainer();
-    const binance = container.binance;
+    const exchange = container.exchange;
     const priceCache = container.priceCache;
 
-    if (!binance) {
+    if (!exchange) {
       return { free: 0, locked: 0, total: 0, usdValue: 0 };
     }
 
-    const balance = await binance.getBalance(asset);
+    const balance = await exchange.getBalance(asset);
     let usdValue = 0;
 
     if (STABLECOINS.includes(asset.toUpperCase())) {
@@ -157,7 +157,7 @@ export class PortfolioService {
       try {
         const price = await priceCache.getOrFetch(
           `${asset}USDT`,
-          () => binance.getPrice(`${asset}USDT`)
+          () => exchange.getPrice(`${asset}USDT`)
         );
         usdValue = balance * price;
       } catch {
@@ -167,7 +167,7 @@ export class PortfolioService {
 
     return {
       free: balance,
-      locked: 0, // getBalance returns total, we'd need getAccountInfo for locked
+      locked: 0,
       total: balance,
       usdValue,
     };

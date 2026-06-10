@@ -63,7 +63,7 @@ const INVALIDATION_BUFFER_PERCENT = 1; // 1% below support is invalidation
 /**
  * Perform deep analysis on a single coin
  *
- * @param client - BinanceClient instance for fetching market data
+ * @param client - Exchange adapter for fetching market data
  * @param symbol - Trading pair symbol (e.g., "BTCUSDT")
  * @param options - Analysis options (timeframes, candle limit)
  * @returns Detailed analysis with supports, resistances, and setup details

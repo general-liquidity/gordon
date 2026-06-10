@@ -513,7 +513,6 @@ export function createDefaultSubscriptions(
             const plan = getPlan(e.planId);
             const config = await loadConfig();
             const ctx = {
-              binance: null,
               exchange: null,
               broker: null,
               llm: {} as import("../infra/agents/types.ts").GordonContext["llm"],

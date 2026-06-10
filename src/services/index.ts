@@ -28,6 +28,6 @@ export {
 
 // Reconciliation service
 export {
-  reconcileWithBinance,
+  reconcileWithExchange,
   type ReconciliationResult,
-} from "./reconciliation.service.ts";
+} from "./reconciliation-exchange.service.ts";

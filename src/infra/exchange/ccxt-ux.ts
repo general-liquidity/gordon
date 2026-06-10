@@ -2,9 +2,9 @@
  * CCXT UX helpers — exchange-type detection + setup guidance for
  * operators adding `ccxt:<sub-id>` exchanges via `/exchange add`.
  *
- * Gordon's native adapters have hand-coded passphrase / wallet
- * detection (coinbase needs passphrase, hyperliquid uses wallet, etc.).
- * For CCXT-routed exchanges we don't enumerate 107 entries — instead
+ * First-class venues have curated passphrase / wallet detection
+ * (coinbase needs passphrase, hyperliquid uses wallet, etc.).
+ * For the long-tail we don't enumerate 107 entries — instead
  * we maintain compact "known passphrase/wallet" sets and fall through
  * to a sensible default for the long tail (apiKey + apiSecret).
  *

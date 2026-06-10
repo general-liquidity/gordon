@@ -7,7 +7,6 @@ describe("withToolMetrics", () => {
   it("enforces runtime approvals at actual tool execution time", async () => {
     const requestContext = new RequestContext();
     requestContext.set("exchange", null);
-    requestContext.set("binance", null);
     requestContext.set("broker", null);
     requestContext.set("agentRails", null);
     requestContext.set("llm", {});

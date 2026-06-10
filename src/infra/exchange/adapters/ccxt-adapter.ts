@@ -1,18 +1,9 @@
 /**
  * CCXT Adapter — full Exchange + ExchangeExtended impl over CCXT v4.
  *
- * Positioning per operator request: CCXT is an ALTERNATIVE to Gordon's
- * native adapters, not a fallback. The factory routes any `ccxt:<sub-id>`
- * exchange id to this adapter. Operators can choose:
- *
- *   - `binance` (native, hand-tuned, tighter integration with riskClassifier/
- *     evidenceBundle, exchange-specific quirk handling)
- *   - `ccxt:binance` (CCXT-routed, unified API across all 107 CCXT venues,
- *     CCXT Pro WebSocket support free for 73 of them)
- *
- * Both options coexist for the 10 natives; CCXT exclusively covers the
- * other 90+ exchanges (Bybit, KuCoin, MEXC, Crypto.com, HTX, Gate, BitMart,
- * Bitstamp, Bitget, BingX, Phemex, etc.).
+ * Gordon's sole authenticated crypto exchange adapter. The factory routes
+ * every venue through `ccxt:<sub-id>` to this class — first-class venues
+ * (binance, coinbase, …) and the long-tail (bybit, kucoin, mexc, …).
  *
  * Authentication: CCXT exchanges read credentials from a uniform env
  * pattern — `CCXT_<UPPER_SUB_ID>_API_KEY` / `CCXT_<UPPER_SUB_ID>_API_SECRET`

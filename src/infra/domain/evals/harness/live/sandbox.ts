@@ -147,9 +147,7 @@ export function buildPaperContext(
 ): GordonContext {
   const config = GordonConfigSchema.parse({ permissionMode: "paper" });
   void sandbox;
-  return {
-    binance: null,
-    exchange: null,
+  return {    exchange: null,
     broker: null,
     llm: {} as GordonContext["llm"],
     config,

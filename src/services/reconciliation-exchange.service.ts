@@ -19,9 +19,15 @@ import type { Trade, EntryFill, ExitFill } from "../types/index.ts";
 import { extractOrderOwnerKey } from "../core/orders/order-recovery.ts";
 import { StrategyRuntime } from "../core/runtime/engine.ts";
 import { FeedbackLoop } from "../core/learning/feedback-loop.ts";
-import type { ReconciliationResult } from "./reconciliation.service.ts";
-
 const logger = createModuleLogger("reconciliation-exchange");
+
+export interface ReconciliationResult {
+  success: boolean;
+  tradesReconciled: number;
+  ordersUpdated: number;
+  errors: string[];
+  warnings: string[];
+}
 
 function getIdSuffix(id: string): string {
   const separatorIndex = id.indexOf("_");

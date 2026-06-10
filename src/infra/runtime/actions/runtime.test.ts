@@ -9,7 +9,7 @@ function createConfig(permissionMode: "auto" | "ask" | "strict" | "paper" | "obs
     permissionMode,
     exchanges: [{
       id: "binance-default",
-      type: "binance",
+      type: "ccxt:binance",
       apiKey: "key",
       apiSecret: "secret",
       isDefault: true,
@@ -19,9 +19,7 @@ function createConfig(permissionMode: "auto" | "ask" | "strict" | "paper" | "obs
 }
 
 function createContext(overrides: Partial<GordonContext> = {}): GordonContext {
-  return {
-    binance: null,
-    exchange: {
+  return {    exchange: {
       exchangeId: "binance",
       displayName: "Binance",
       getPrice: async () => 50000,

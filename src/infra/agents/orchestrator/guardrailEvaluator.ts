@@ -10,9 +10,7 @@ import {
   type RateLimitResult,
 } from "../../platform/observability/index.ts";
 import { auditLog } from "../../platform/audit/index.ts";
-import { checkPermissionsOnInit } from "../../venues/exchange/clients/binance/permissions.ts";
 import { evaluateRuntimeToolPolicy } from "../../../runtime/tools/ToolPolicy.ts";
-import { ccxtIdToNativeVenue } from "../../exchange/types.ts";
 import type { GordonContext } from "../types.ts";
 import type { ToolSecurityCheckResult } from "./types.ts";
 
@@ -101,42 +99,33 @@ export async function initializeWithPermissionCheck(context: GordonContext): Pro
     };
   }
 
-  if (!context.binance || ccxtIdToNativeVenue(context.exchange.exchangeId) !== "binance") {
-    return {
-      success: true,
-      warnings: ["Permission check is currently available only for Binance."],
-      errors: [],
-      isReadOnly: false,
-    };
-  }
-
-  const result = await checkPermissionsOnInit(context.binance);
-
-  // Audit log the permission check
-  if (result.success) {
+  try {
+    const details = await context.exchange.getFullAccountDetails();
+    const isReadOnly = !details.accountInfo.canTrade;
     auditLog.success(
       context.userId || "system",
       "PERMISSION_CHECK",
       {
-        read: result.permissions.read,
-        spotTrade: result.permissions.spotTrade,
-        withdraw: result.permissions.withdraw,
+        read: true,
+        spotTrade: details.accountInfo.canTrade,
+        withdraw: details.accountInfo.canWithdraw,
       },
-      { resultDetails: result.isReadOnly ? "Read-only mode" : "Full access" }
+      { resultDetails: isReadOnly ? "Read-only mode" : "Full access" },
     );
-  } else {
-    auditLog.failure(
-      context.userId || "system",
-      "PERMISSION_CHECK",
-      {},
-      result.errors.join("; ")
-    );
+    return {
+      success: true,
+      warnings: ["API key permission introspection is limited under CCXT; using exchange account flags."],
+      errors: [],
+      isReadOnly,
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Permission check failed";
+    auditLog.failure(context.userId || "system", "PERMISSION_CHECK", {}, message);
+    return {
+      success: false,
+      warnings: [],
+      errors: [message],
+      isReadOnly: true,
+    };
   }
-
-  return {
-    success: result.success,
-    warnings: result.warnings,
-    errors: result.errors,
-    isReadOnly: result.isReadOnly,
-  };
 }

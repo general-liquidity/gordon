@@ -3,7 +3,6 @@
  * Dependency injection container for Gordon services
  */
 
-import { BinanceClient } from "../infra/venues/exchange/clients/binance/index.ts";
 import { ExchangeFactory, type Exchange } from "../infra/exchange/index.ts";
 import { LLMClient, type LLMProvider } from "../infra/ai/llm/index.ts";
 import { PriceCache } from "../infra/platform/cache/index.ts";
@@ -46,9 +45,7 @@ export interface Services {
   priceCache: PriceCache;
 
   // External APIs
-  /** @deprecated Use `exchange` instead for multi-exchange support */
-  binance: BinanceClient | null;
-  /** Abstract exchange interface - supports multiple exchanges */
+  /** CCXT-backed exchange adapter */
   exchange: Exchange | null;
   llm: LLMClient | null;
 
@@ -90,25 +87,14 @@ export class ServiceContainer {
     // Create price cache
     this.services.priceCache = new PriceCache();
 
-    // Create exchange client if credentials provided
     if (config.binance?.apiKey && config.binance?.apiSecret) {
-      // CCXT-backed Binance adapter (implements Exchange interface)
-      this.services.exchange = ExchangeFactory.create("binance", {
+      this.services.exchange = ExchangeFactory.create("ccxt:binance", {
         apiKey: config.binance.apiKey,
         apiSecret: config.binance.apiSecret,
       });
-
-      // Also create raw BinanceClient for backward compatibility
-      // TODO: Remove in v2.0 when all code uses Exchange interface
-      this.services.binance = new BinanceClient(
-        config.binance.apiKey,
-        config.binance.apiSecret
-      );
-
-      this.services.logger.info("Exchange client initialized (Binance)");
+      this.services.logger.info("Exchange client initialized (ccxt:binance)");
     } else {
       this.services.exchange = null;
-      this.services.binance = null;
       this.services.logger.warn("Exchange client not initialized - no credentials");
     }
 
@@ -191,16 +177,7 @@ export class ServiceContainer {
   }
 
   /**
-   * Get the Binance client
-   * @deprecated Use `exchange` instead for multi-exchange support
-   */
-  get binance(): BinanceClient | null {
-    return this.get("binance");
-  }
-
-  /**
-   * Get the exchange client (abstract interface)
-   * Supports multiple exchanges through the Exchange interface
+   * Get the exchange client (CCXT adapter)
    */
   get exchange(): Exchange | null {
     return this.get("exchange");

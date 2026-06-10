@@ -41,9 +41,7 @@ afterEach(() => {
 });
 
 function createContext(overrides: Partial<GordonContext> = {}): GordonContext {
-  return {
-    binance: null,
-    exchange: null,
+  return {    exchange: null,
     broker: null,
     llm: {} as GordonContext["llm"],
     config: GordonConfigSchema.parse({

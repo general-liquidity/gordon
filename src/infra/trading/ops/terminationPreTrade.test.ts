@@ -22,9 +22,7 @@ function minimalPlan(overrides: Partial<Plan> = {}): Plan {
   };
 }
 
-const ctx: GordonContext = {
-  binance: null,
-  exchange: null,
+const ctx: GordonContext = {  exchange: null,
   broker: null,
   llm: {} as GordonContext["llm"],
   config: { permissionMode: "ask" } as GordonContext["config"],

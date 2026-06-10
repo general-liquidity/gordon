@@ -113,7 +113,6 @@ export async function runHeadless(options: HeadlessOptions): Promise<HeadlessRes
     const userId = options.userId ?? "headless";
 
     const context = buildAppGordonContext({
-      binance: null,
       exchange: null,
       broker: null,
       llm,

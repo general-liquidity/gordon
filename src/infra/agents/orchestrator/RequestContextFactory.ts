@@ -10,7 +10,6 @@ export function createAgentRequestContext(
   const requestContext = new RequestContext();
   const workflowPhase = determineWorkflowPhase(context);
   const executionReadiness = getExecutionReadiness(context);
-  requestContext.set("binance", context.binance);
   requestContext.set("exchange", context.exchange);
   requestContext.set("broker", context.broker);
   requestContext.set("config", context.config);

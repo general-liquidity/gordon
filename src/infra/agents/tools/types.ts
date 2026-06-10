@@ -7,7 +7,6 @@ import type { z, ZodType } from "zod";
 
 import type { GordonContext } from "../types.ts";
 import type { ActionTaskScope, CredentialProfile } from "../../runtime/actions/types.ts";
-import type { BinanceClient } from "../../venues/exchange/clients/binance/index.ts";
 import type { Exchange } from "../../exchange/index.ts";
 import { ccxtIdToNativeVenue } from "../../exchange/types.ts";
 import type { BrokerAdapter } from "../../broker/index.ts";
@@ -41,13 +40,10 @@ export function getGordonContext(execContext?: MastraExecutionContext): GordonCo
   const rc = execContext?.requestContext;
   if (!rc) return null;
 
-  // Get exchange (new abstract interface) or fall back to binance
   const exchange = rc.get("exchange") as Exchange | undefined;
-  const binance = rc.get("binance") as BinanceClient | undefined;
   const broker = rc.get("broker") as BrokerAdapter | undefined;
 
   return {
-    binance: binance,
     exchange: exchange ?? null,
     broker: broker ?? null,
     llm: rc.get("llm") as LLMClient | undefined,

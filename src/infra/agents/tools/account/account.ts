@@ -14,7 +14,7 @@ import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
 import { listTrades } from "../../../storage/entities/trades.ts";
-import { getGordonContext, isBinanceFamily, isBinanceVenue, type MastraExecutionContext } from "../types.ts";
+import { getGordonContext, type MastraExecutionContext } from "../types.ts";
 
 // ============================================================================
 // Error Messages
@@ -291,117 +291,22 @@ export const getAccountDetailsTool = createTool({
     }
 
     try {
-      if (!ctx.binance || !isBinanceFamily(ctx.exchange.exchangeId)) {
-        const details = await ctx.exchange.getFullAccountDetails();
-        return {
-          accountType: details.accountInfo.accountType,
-          permissions: {
-            canTrade: details.accountInfo.canTrade,
-            canWithdraw: details.accountInfo.canWithdraw,
-            canDeposit: details.accountInfo.canDeposit,
-            accountPermissions: [],
-          },
-          summary: {
-            totalDeposits: 0,
-            totalWithdrawals: 0,
-            totalRecentTrades: 0,
-            earnPositionsCount: 0,
-          },
-        };
-      }
-
-      const fullDetails = await ctx.binance.getFullAccountDetails();
-      const { account, apiRestrictions, recentTrades, deposits, withdrawals, earnPositions } = fullDetails;
-
-      const response: Record<string, unknown> = {
-        accountType: account.accountType,
-        uid: account.uid,
-        commissionRates: {
-          maker: `${(parseFloat(account.commissionRates.maker) * 100).toFixed(3)}%`,
-          taker: `${(parseFloat(account.commissionRates.taker) * 100).toFixed(3)}%`,
-        },
+      const details = await ctx.exchange.getFullAccountDetails();
+      return {
+        accountType: details.accountInfo.accountType,
         permissions: {
-          canTrade: account.canTrade,
-          canWithdraw: account.canWithdraw,
-          canDeposit: account.canDeposit,
-          accountPermissions: account.permissions,
+          canTrade: details.accountInfo.canTrade,
+          canWithdraw: details.accountInfo.canWithdraw,
+          canDeposit: details.accountInfo.canDeposit,
+          accountPermissions: [],
+        },
+        summary: {
+          totalDeposits: 0,
+          totalWithdrawals: 0,
+          totalRecentTrades: 0,
+          earnPositionsCount: 0,
         },
       };
-
-      if (apiRestrictions) {
-        response.apiKeyPermissions = {
-          ipRestrict: apiRestrictions.ipRestrict,
-          enableReading: apiRestrictions.enableReading,
-          enableSpotTrading: apiRestrictions.enableSpotAndMarginTrading,
-          enableWithdrawals: apiRestrictions.enableWithdrawals,
-          enableFutures: apiRestrictions.enableFutures,
-          enableMargin: apiRestrictions.enableMargin,
-          createdAt: new Date(apiRestrictions.createTime).toISOString(),
-        };
-      }
-
-      if (includeTradeHistory && recentTrades.length > 0) {
-        response.recentTrades = recentTrades.slice(0, 10).map((t) => ({
-          symbol: t.symbol,
-          side: t.isBuyer ? "BUY" : "SELL",
-          price: parseFloat(t.price),
-          quantity: parseFloat(t.qty),
-          quoteQty: parseFloat(t.quoteQty),
-          commission: `${parseFloat(t.commission)} ${t.commissionAsset}`,
-          time: new Date(t.time).toISOString(),
-          isMaker: t.isMaker,
-        }));
-        response.totalTradesReturned = recentTrades.length;
-      }
-
-      if (includeDepositHistory && deposits.length > 0) {
-        const statusMap: Record<number, string> = { 0: "pending", 1: "success", 6: "credited" };
-        response.deposits = deposits.slice(0, 10).map((d) => ({
-          coin: d.coin,
-          amount: parseFloat(d.amount),
-          network: d.network,
-          status: statusMap[d.status] || `status_${d.status}`,
-          txId: d.txId ? `${d.txId.slice(0, 10)}...` : null,
-          time: new Date(d.insertTime).toISOString(),
-        }));
-      }
-
-      if (includeWithdrawalHistory && withdrawals.length > 0) {
-        const wStatusMap: Record<number, string> = {
-          0: "email_sent", 1: "cancelled", 2: "awaiting_approval",
-          3: "rejected", 4: "processing", 5: "failure", 6: "completed",
-        };
-        response.withdrawals = withdrawals.slice(0, 10).map((w) => ({
-          coin: w.coin,
-          amount: parseFloat(w.amount),
-          fee: parseFloat(w.transactionFee),
-          network: w.network,
-          status: wStatusMap[w.status] || `status_${w.status}`,
-          address: `${w.address.slice(0, 10)}...${w.address.slice(-6)}`,
-          applyTime: w.applyTime,
-          completeTime: w.completeTime || null,
-        }));
-      }
-
-      if (includeEarnPositions && earnPositions.length > 0) {
-        response.earnPositions = earnPositions.map((e) => ({
-          asset: e.asset,
-          totalAmount: parseFloat(e.totalAmount),
-          freeAmount: parseFloat(e.freeAmount),
-          lockedAmount: parseFloat(e.lockedAmount),
-          apy: `${parseFloat(e.apy)}%`,
-          productName: e.productName,
-        }));
-      }
-
-      response.summary = {
-        totalDeposits: deposits.length,
-        totalWithdrawals: withdrawals.length,
-        totalRecentTrades: recentTrades.length,
-        earnPositionsCount: earnPositions.length,
-      };
-
-      return response;
     } catch (error) {
       return {
         error: error instanceof Error ? error.message : "Failed to fetch account details",
@@ -451,47 +356,9 @@ export const getAccountSnapshotTool = createTool({
   ) => {
     const ctx = getGordonContext(execContext);
     if (!ctx?.exchange) return errors.noExchange;
-    if (!ctx.binance || !isBinanceVenue(ctx.exchange.exchangeId)) {
-      return { error: "Account snapshots are currently supported only on Binance." };
-    }
-
-    try {
-      const snapshot = await ctx.binance.getAccountSnapshot(type, days);
-
-      if (snapshot.code !== 200) {
-        return { error: `Binance API error: ${snapshot.msg}` };
-      }
-
-      const snapshots = snapshot.snapshotVos.map((s) => {
-        const activeBalances = s.data.balances
-          .filter((b) => parseFloat(b.free) > 0 || parseFloat(b.locked) > 0)
-          .sort((a, b) =>
-            (parseFloat(b.free) + parseFloat(b.locked)) -
-            (parseFloat(a.free) + parseFloat(a.locked))
-          )
-          .slice(0, 10)
-          .map((b) => ({
-            asset: b.asset,
-            free: b.free,
-            locked: b.locked,
-          }));
-
-        return {
-          date: new Date(s.updateTime).toISOString(),
-          totalBtcValue: s.data.totalAssetOfBtc,
-          topAssets: activeBalances,
-        };
-      });
-
-      return {
-        snapshots,
-        count: snapshots.length,
-      };
-    } catch (error) {
-      return {
-        error: error instanceof Error ? error.message : "Failed to fetch account snapshots",
-      };
-    }
+    return {
+      error: "Account snapshots require Binance SAPI; not available via CCXT adapter.",
+    };
   },
 });
 

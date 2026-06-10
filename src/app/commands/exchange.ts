@@ -13,8 +13,8 @@
 
 import { loadConfig, saveConfig } from '../../infra/storage/config/config.ts';
 import { ExchangeFactory } from '../../infra/exchange/factory.ts';
-import type { ExchangeId, Exchange } from '../../infra/exchange/types.ts';
-import { isCcxtExchangeId } from '../../infra/exchange/types.ts';
+import type { ExchangeId, Exchange, NativeExchangeId, CcxtExchangeId } from '../../infra/exchange/types.ts';
+import { isCcxtExchangeId, normalizeExchangeId, ccxtIdToNativeVenue } from '../../infra/exchange/types.ts';
 import {
   ccxtExchangeRequiresPassphrase,
   ccxtExchangeRequiresWallet,
@@ -65,7 +65,7 @@ export async function exchangeList(): Promise<ExchangeCommandResult> {
     }
 
     const exchangeList = exchanges.map((ex) => {
-      const isWallet = isWalletBasedExchange(ex.type);
+      const isWallet = ccxtExchangeRequiresWallet(ex.type);
       return {
         id: ex.id,
         type: ex.type,
@@ -117,10 +117,9 @@ export async function exchangeAdd(exchangeType: string, sandbox = false): Promis
       };
     }
 
-    const type = exchangeType as ExchangeId;
+    const type = normalizeExchangeId(exchangeType);
     const config = await loadConfig();
 
-    // Generate a unique ID — append -testnet / -sandbox suffix for paper accounts
     const baseId = sandbox ? `${type}-testnet` : type;
     let id = baseId;
     let counter = 1;
@@ -130,8 +129,8 @@ export async function exchangeAdd(exchangeType: string, sandbox = false): Promis
     }
 
     const existingOfType = config.exchanges.filter((ex) => ex.type === type);
-    const needsPassphrase = type === 'coinbase' || ccxtExchangeRequiresPassphrase(type);
-    const needsWallet = isWalletBasedExchange(type) || ccxtExchangeRequiresWallet(type);
+    const needsPassphrase = ccxtExchangeRequiresPassphrase(type);
+    const needsWallet = ccxtExchangeRequiresWallet(type);
 
     const requiredFields = needsWallet
       ? ['walletPrivateKey']
@@ -486,18 +485,12 @@ export async function exchangeCompare(symbol: string): Promise<ExchangeCommandRe
 /**
  * Check if an exchange uses wallet-based authentication
  */
-function isWalletBasedExchange(type: ExchangeId): boolean {
-  if (isCcxtExchangeId(type)) return ccxtExchangeRequiresWallet(type);
-  return type === 'hyperliquid';
-}
-
 function getExchangeSetupInstructions(type: ExchangeId, sandbox = false): string {
-  // CCXT-routed exchanges have a generic instruction template (107
-  // exchanges, can't hand-roll a block per venue).
-  if (isCcxtExchangeId(type)) {
-    return getCcxtSetupInstructions(type, sandbox);
+  const native = ccxtIdToNativeVenue(type);
+  if (!native) {
+    return getCcxtSetupInstructions(type as CcxtExchangeId, sandbox);
   }
-  const sandboxInstructions: Partial<Record<ExchangeId, string>> = {
+  const sandboxInstructions: Partial<Record<NativeExchangeId, string>> = {
     binance: `
 BINANCE TESTNET (paper trading, no real money)
 1. Go to testnet.binance.vision and register/log in
@@ -548,7 +541,7 @@ KRAKEN DEMO (Beta)
 4. Note: Kraken demo is not available in all regions`,
   };
 
-  const liveInstructions: Record<ExchangeId, string> = {
+  const liveInstructions: Partial<Record<NativeExchangeId, string>> = {
     binance: `
 1. Log in to Binance and go to API Management
 2. Create a new API key with "Enable Reading" and optionally "Enable Spot Trading"
@@ -604,9 +597,9 @@ Or HMAC API keys:
   };
 
   if (sandbox) {
-    return sandboxInstructions[type] ?? `No dedicated testnet for ${type}. Check the exchange docs for a sandbox or demo environment.`;
+    return sandboxInstructions[native] ?? `No dedicated testnet for ${type}. Check the exchange docs for a sandbox or demo environment.`;
   }
-  return liveInstructions[type] ?? 'Follow the exchange documentation to create API keys.';
+  return liveInstructions[native] ?? 'Follow the exchange documentation to create API keys.';
 }
 
 // ============================================================================
@@ -703,7 +696,7 @@ export async function handleExchangeCommand(args: string): Promise<string> {
       if (!sandboxType) {
         result = {
           success: true,
-          message: `Paper/Testnet Setup — which exchange?\n\nSupported sandbox venues:\n  binance   → Binance Testnet (testnet.binance.vision)\n  coinbase  → Coinbase Advanced Trade Sandbox (cdp.coinbase.com)\n  okx       → OKX Demo Account\n  gemini    → Gemini Sandbox\n  hyperliquid → Hyperliquid Testnet\n  kraken    → Kraken Demo\n  ccxt:<sub-id> → CCXT setSandboxMode(true) — works on ~30 of CCXT's 107 exchanges; others silently no-op\n\nUsage: /exchange setup <type>\nExample: /exchange setup binance  OR  /exchange setup ccxt:bybit`,
+          message: `Paper/Testnet Setup — which exchange?\n\nSupported sandbox venues:\n  ccxt:binance     → Binance Testnet (testnet.binance.vision)\n  ccxt:coinbase    → Coinbase Advanced Trade Sandbox\n  ccxt:okx         → OKX Demo Account\n  ccxt:gemini      → Gemini Sandbox\n  ccxt:hyperliquid → Hyperliquid Testnet\n  ccxt:kraken      → Kraken Demo\n  ccxt:<sub-id>    → CCXT setSandboxMode(true) — ~30 of 107 exchanges; others no-op\n\nUsage: /exchange setup <type>\nExample: /exchange setup ccxt:binance  OR  /exchange setup ccxt:bybit\n(Bare ids like "binance" are accepted as aliases and saved as ccxt:*)`,
         };
       } else {
         result = await exchangeAdd(sandboxType, true);

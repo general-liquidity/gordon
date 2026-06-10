@@ -8,16 +8,18 @@
  * - withdraw_to_external: Execute withdrawal to external address
  * - get_withdrawal_status: Check recent withdrawal status
  *
- * Binance-only tools (use Binance-specific APIs):
+ * Binance SAPI-only tools (stubbed under CCXT adapter):
  * - get_dustable_assets, convert_dust, transfer_funds
- * - get_trade_fees, get_asset_dividends, get_deposit_address
- * - get_user_assets, get_wallet_balances, get_dust_log
+ * - get_trade_fees, get_asset_dividends, get_deposit_address, get_dust_log
+ *
+ * CCXT-backed balance tools:
+ * - get_user_assets, get_wallet_balances
  */
 
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
-import { getGordonContext, isBinanceFamily, isBinanceVenue, type MastraExecutionContext } from "../types.ts";
+import { getGordonContext, type MastraExecutionContext } from "../types.ts";
 import { checkTradingPermission } from "../runtime/permissionHelpers.ts";
 import type { ExchangeExtended } from "../../../exchange/types.ts";
 
@@ -27,11 +29,17 @@ import type { ExchangeExtended } from "../../../exchange/types.ts";
 
 const errors = {
   noExchange: { error: "Exchange client not connected. Please run setup first." },
-  binanceOnly: { error: "Wallet operations are currently supported only on Binance." },
+  binanceSapi: { error: "This operation requires Binance SAPI; not available via CCXT adapter." },
   notArmed: (action: string) => ({
     error: `permissionMode must not be 'strict' to ${action}. Use /auto or /ask.`,
   }),
 };
+
+function binanceSapiUnavailable(execContext: MastraExecutionContext) {
+  const ctx = getGordonContext(execContext);
+  if (!ctx?.exchange) return errors.noExchange;
+  return errors.binanceSapi;
+}
 
 // ============================================================================
 // Dust Management
@@ -55,38 +63,7 @@ export const getDustableAssetsTool = createTool({
     ).optional(),
     error: z.string().optional(),
   }),
-  execute: async (_input, execContext: MastraExecutionContext) => {
-    const ctx = getGordonContext(execContext);
-    if (!ctx?.exchange) {
-      return errors.noExchange;
-    }
-    if (!ctx.binance || !isBinanceVenue(ctx.exchange.exchangeId)) {
-      return errors.binanceOnly;
-    }
-
-    try {
-      const result = await ctx.binance.getDustableAssets();
-
-      if (result.details.length === 0) {
-        return {
-          message: "No dustable assets found. All your balances are above the minimum threshold.",
-          assets: [],
-        };
-      }
-
-      return {
-        message: `Found ${result.details.length} assets that can be converted to BNB.`,
-        totalBNB: result.totalTransferBNB,
-        assets: result.details.map((a) => ({
-          asset: a.asset,
-          amount: a.amountFree,
-          bnbValue: a.toBNB,
-        })),
-      };
-    } catch (error) {
-      return { error: `Failed to get dustable assets: ${(error as Error).message}` };
-    }
-  },
+  execute: async (_input, execContext: MastraExecutionContext) => binanceSapiUnavailable(execContext),
 });
 
 export const convertDustTool = createTool({
@@ -117,37 +94,9 @@ export const convertDustTool = createTool({
     assets: z.array(z.string()).optional(),
   }),
   execute: async ({ assets }, execContext: MastraExecutionContext) => {
-    const ctx = getGordonContext(execContext);
-    if (!ctx?.exchange) {
-      return errors.noExchange;
-    }
-    if (!ctx.binance || !isBinanceVenue(ctx.exchange.exchangeId)) {
-      return errors.binanceOnly;
-    }
-
-    {
-      const check = checkTradingPermission(ctx.config?.permissionMode, "state_mutation", { sandboxActive: ctx.exchange?.isSandbox ?? ctx.broker?.isPaper });
-      if (!check.allowed) {
-        return { error: check.reason ?? "Dust conversion not permitted under current mode", assets };
-      }
-    }
-
-    try {
-      const result = await ctx.binance.convertDust(assets);
-
-      return {
-        success: true,
-        totalTransferred: result.totalTransfered + " BNB",
-        fee: result.totalServiceCharge + " BNB",
-        conversions: result.transferResult.map((r) => ({
-          from: r.fromAsset,
-          amount: r.amount,
-          receivedBNB: r.transferedAmount,
-        })),
-      };
-    } catch (error) {
-      return { error: `Failed to convert dust: ${(error as Error).message}` };
-    }
+    const blocked = binanceSapiUnavailable(execContext);
+    if ("error" in blocked) return { ...blocked, assets };
+    return blocked;
   },
 });
 
@@ -187,41 +136,9 @@ export const transferFundsTool = createTool({
     amount: z.number().optional(),
   }),
   execute: async ({ type, asset, amount }, execContext: MastraExecutionContext) => {
-    const ctx = getGordonContext(execContext);
-    if (!ctx?.exchange) {
-      return errors.noExchange;
-    }
-    if (!ctx.binance || !isBinanceVenue(ctx.exchange.exchangeId)) {
-      return errors.binanceOnly;
-    }
-
-    {
-      const check = checkTradingPermission(ctx.config?.permissionMode, "transfer", { sandboxActive: ctx.exchange?.isSandbox ?? ctx.broker?.isPaper });
-      if (!check.allowed) {
-        return { error: check.reason ?? "Fund transfer not permitted under current mode", type, asset, amount };
-      }
-    }
-
-    try {
-      const result = await ctx.binance.universalTransfer(type, asset, amount);
-
-      const typeDescriptions: Record<string, string> = {
-        MAIN_FUNDING: "Spot -> Funding",
-        FUNDING_MAIN: "Funding -> Spot",
-        MAIN_UMFUTURE: "Spot -> USD-M Futures",
-        UMFUTURE_MAIN: "USD-M Futures -> Spot",
-        MAIN_MARGIN: "Spot -> Cross Margin",
-        MARGIN_MAIN: "Cross Margin -> Spot",
-      };
-
-      return {
-        success: true,
-        message: `Transferred ${amount} ${asset} (${typeDescriptions[type]})`,
-        transactionId: result.tranId,
-      };
-    } catch (error) {
-      return { error: `Transfer failed: ${(error as Error).message}` };
-    }
+    const blocked = binanceSapiUnavailable(execContext);
+    if ("error" in blocked) return { ...blocked, type, asset, amount };
+    return blocked;
   },
 });
 
@@ -321,43 +238,7 @@ export const getTradeFeesTool = createTool({
       .optional(),
     error: z.string().optional(),
   }),
-  execute: async ({ symbol }, execContext: MastraExecutionContext) => {
-    const ctx = getGordonContext(execContext);
-    if (!ctx?.exchange) {
-      return errors.noExchange;
-    }
-    if (!ctx.binance || !isBinanceVenue(ctx.exchange.exchangeId)) {
-      return errors.binanceOnly;
-    }
-
-    try {
-      const fees = await ctx.binance.getTradeFees(symbol);
-
-      if (fees.length === 0) {
-        return { message: "No fee information available." };
-      }
-
-      if (symbol) {
-        const fee = fees[0];
-        return {
-          symbol: fee?.symbol,
-          makerFee: (parseFloat(fee?.makerCommission ?? "0") * 100).toFixed(4) + "%",
-          takerFee: (parseFloat(fee?.takerCommission ?? "0") * 100).toFixed(4) + "%",
-        };
-      }
-
-      return {
-        message: `Fee information for ${fees.length} trading pairs.`,
-        fees: fees.slice(0, 20).map((f) => ({
-          symbol: f.symbol,
-          maker: (parseFloat(f.makerCommission) * 100).toFixed(4) + "%",
-          taker: (parseFloat(f.takerCommission) * 100).toFixed(4) + "%",
-        })),
-      };
-    } catch (error) {
-      return { error: `Failed to get trade fees: ${(error as Error).message}` };
-    }
-  },
+  execute: async (_input, execContext: MastraExecutionContext) => binanceSapiUnavailable(execContext),
 });
 
 export const getAssetDividendsTool = createTool({
@@ -392,35 +273,7 @@ export const getAssetDividendsTool = createTool({
       .optional(),
     error: z.string().optional(),
   }),
-  execute: async ({ asset, limit }, execContext: MastraExecutionContext) => {
-    const ctx = getGordonContext(execContext);
-    if (!ctx?.exchange) {
-      return errors.noExchange;
-    }
-    if (!ctx.binance || !isBinanceVenue(ctx.exchange.exchangeId)) {
-      return errors.binanceOnly;
-    }
-
-    try {
-      const result = await ctx.binance.getAssetDividends({ asset, limit });
-
-      if (result.rows.length === 0) {
-        return { message: "No dividend records found." };
-      }
-
-      return {
-        total: result.total,
-        dividends: result.rows.map((d) => ({
-          asset: d.asset,
-          amount: d.amount,
-          description: d.enInfo,
-          time: new Date(d.divTime).toISOString(),
-        })),
-      };
-    } catch (error) {
-      return { error: `Failed to get dividends: ${(error as Error).message}` };
-    }
-  },
+  execute: async (_input, execContext: MastraExecutionContext) => binanceSapiUnavailable(execContext),
 });
 
 export const getDepositAddressTool = createTool({
@@ -443,31 +296,7 @@ export const getDepositAddressTool = createTool({
     warning: z.string().nullable().optional(),
     error: z.string().optional(),
   }),
-  execute: async ({ coin, network }, execContext: MastraExecutionContext) => {
-    const ctx = getGordonContext(execContext);
-    if (!ctx?.exchange) {
-      return errors.noExchange;
-    }
-    if (!ctx.binance || !isBinanceVenue(ctx.exchange.exchangeId)) {
-      return errors.binanceOnly;
-    }
-
-    try {
-      const address = await ctx.binance.getDepositAddress(coin, network);
-
-      return {
-        coin: address.coin,
-        address: address.address,
-        tag: address.tag || null,
-        network: network || "default",
-        warning: address.tag
-          ? "IMPORTANT: You must include the tag/memo when depositing!"
-          : null,
-      };
-    } catch (error) {
-      return { error: `Failed to get deposit address: ${(error as Error).message}` };
-    }
-  },
+  execute: async (_input, execContext: MastraExecutionContext) => binanceSapiUnavailable(execContext),
 });
 
 // ============================================================================
@@ -507,33 +336,6 @@ export const getUserAssetsTool = createTool({
     }
 
     try {
-      // Use Binance-specific getUserAssets if available (includes BTC valuation)
-      if (isBinanceFamily(ctx.exchange.exchangeId) && ctx.binance) {
-        const userAssets = await ctx.binance.getUserAssets(true);
-
-        const filtered = showAll
-          ? userAssets
-          : userAssets.filter(
-              (a) => parseFloat(a.free) > 0 || parseFloat(a.locked) > 0
-            );
-
-        const totalBtcValuation = userAssets
-          .reduce((sum, a) => sum + parseFloat(a.btcValuation), 0)
-          .toFixed(8);
-
-        return {
-          count: filtered.length,
-          totalBtcValuation,
-          assets: filtered.map((a) => ({
-            asset: a.asset,
-            free: a.free,
-            locked: a.locked,
-            btcValuation: a.btcValuation,
-          })),
-        };
-      }
-
-      // Fallback: use Exchange interface getAllBalances()
       const balances = await ctx.exchange.getAllBalances();
       const filtered = showAll
         ? balances
@@ -580,25 +382,6 @@ export const getWalletBalancesTool = createTool({
     }
 
     try {
-      // Use Binance-specific getWalletBalances if available (multi-wallet breakdown)
-      if (isBinanceFamily(ctx.exchange.exchangeId) && ctx.binance) {
-        const walletBalances = await ctx.binance.getWalletBalances();
-
-        const totalBalance = walletBalances
-          .reduce((sum, w) => sum + parseFloat(w.balance), 0)
-          .toFixed(8);
-
-        return {
-          wallets: walletBalances.map((w) => ({
-            walletName: w.walletName,
-            balance: w.balance,
-            active: w.activate,
-          })),
-          totalBalance,
-        };
-      }
-
-      // Fallback: use Exchange interface getAllBalances() as single "Spot" wallet
       const balances = await ctx.exchange.getAllBalances();
       const totalBalance = balances
         .reduce((sum, b) => sum + b.total, 0)
@@ -651,37 +434,7 @@ export const getDustLogTool = createTool({
       .optional(),
     error: z.string().optional(),
   }),
-  execute: async ({ limit }, execContext: MastraExecutionContext) => {
-    const ctx = getGordonContext(execContext);
-    if (!ctx?.exchange) {
-      return errors.noExchange;
-    }
-    if (!isBinanceFamily(ctx.exchange.exchangeId) || !ctx.binance) {
-      return errors.binanceOnly;
-    }
-
-    try {
-      const result = await ctx.binance.getDustLog();
-
-      const dribblets = result.userAssetDribblets.slice(0, limit);
-
-      return {
-        total: result.total,
-        conversions: dribblets.map((d) => ({
-          time: new Date(d.operateTime).toISOString(),
-          totalBnbReceived: d.totalTransferedAmount,
-          serviceFee: d.totalServiceChargeAmount,
-          assets: d.userAssetDribbletDetails.map((detail) => ({
-            fromAsset: detail.fromAsset,
-            amount: detail.amount,
-            bnbReceived: detail.transferedAmount,
-          })),
-        })),
-      };
-    } catch (error) {
-      return { error: `Failed to get dust log: ${(error as Error).message}` };
-    }
-  },
+  execute: async (_input, execContext: MastraExecutionContext) => binanceSapiUnavailable(execContext),
 });
 
 // ============================================================================

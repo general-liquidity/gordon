@@ -1,6 +1,6 @@
 import { mkdir, readdir } from "node:fs/promises";
 import { join } from "node:path";
-import { GordonConfigSchema, type GordonConfig } from "../../../types/index.ts";
+import { GordonConfigSchema, migrateExchangeConfigTypes, type GordonConfig } from "../../../types/index.ts";
 import { GORDON_DIR } from "../paths.ts";
 export const CONFIG_PATH = join(GORDON_DIR, "config.json");
 export const PROFILES_DIR = join(GORDON_DIR, "profiles");
@@ -184,7 +184,7 @@ export async function loadConfigBundle(): Promise<ResolvedConfigResult> {
     try {
       const content = await globalFile.text();
       const parsed = JSON.parse(content);
-      globalConfig = GordonConfigSchema.parse(parsed);
+      globalConfig = GordonConfigSchema.parse(migrateExchangeConfigTypes(parsed));
     } catch (error) {
       if (error instanceof SyntaxError) {
         throw new Error(`Invalid JSON in config file: ${CONFIG_PATH}`);
@@ -209,10 +209,10 @@ export async function loadConfigBundle(): Promise<ResolvedConfigResult> {
     ? mergeConfigRecords(mergedWithProfile, workspaceConfig.overrides)
     : mergedWithProfile;
 
-  const config = GordonConfigSchema.parse({
+  const config = GordonConfigSchema.parse(migrateExchangeConfigTypes({
     ...merged,
     activeProfile: activeProfile ?? undefined,
-  });
+  }));
 
   const layers: ConfigLayers = {
     activeProfile,

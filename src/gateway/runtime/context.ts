@@ -3,9 +3,7 @@ import { loadConfig } from "../../infra/storage/config/config.ts";
 import { checkEnvStatus, loadEnvFile } from "../../infra/storage/config/env.ts";
 import { getCurrentSession } from "../../infra/storage/entities/session.ts";
 import { createLLMClientFromEnv } from "../../infra/ai/llm/index.ts";
-import { BinanceClient } from "../../infra/venues/exchange/clients/binance/index.ts";
 import { ExchangeFactory, type Exchange } from "../../infra/exchange/index.ts";
-import { ccxtIdToNativeVenue } from "../../infra/exchange/types.ts";
 import { BrokerFactory } from "../../infra/broker/factory.ts";
 import { BROKER_ENV_MAP, type BrokerId } from "../../infra/broker/types.ts";
 import { isBrokerPaperSupported } from "../../infra/broker/brokerPaperSupport.ts";
@@ -18,7 +16,6 @@ const logger = createModuleLogger("gateway-context");
 
 interface CachedContext {
   exchange: Exchange | null;
-  binance: BinanceClient | null;
   broker: BrokerAdapter | null;
   llm: LLMClient | null;
   portfolioValue: number;
@@ -36,11 +33,10 @@ export class GatewayContextResolver {
 
   async resolve(sessionId: string): Promise<GordonContext> {
     const config = await loadConfig();
-    const { exchange, binance, broker, llm, portfolioValue, availableCash } = await this.resolveClients(config);
+    const { exchange, broker, llm, portfolioValue, availableCash } = await this.resolveClients(config);
     const session = await getCurrentSession();
 
     return {
-      binance,
       exchange,
       broker,
       llm: (llm ?? ({} as LLMClient)),
@@ -58,7 +54,6 @@ export class GatewayContextResolver {
 
   private async resolveClients(config: Awaited<ReturnType<typeof loadConfig>>): Promise<{
     exchange: Exchange | null;
-    binance: BinanceClient | null;
     broker: BrokerAdapter | null;
     llm: LLMClient | null;
     portfolioValue: number;
@@ -67,7 +62,6 @@ export class GatewayContextResolver {
     if (this.cache && Date.now() - this.cache.updatedAt < this.ttlMs) {
       return {
         exchange: this.cache.exchange,
-        binance: this.cache.binance,
         broker: this.cache.broker,
         llm: this.cache.llm,
         portfolioValue: this.cache.portfolioValue,
@@ -90,7 +84,6 @@ export class GatewayContextResolver {
     const sandboxOverride = getSandboxOverride();
 
     let exchange: Exchange | null = null;
-    let binance: BinanceClient | null = null;
 
     if (config.exchanges.length > 0) {
       const activeId = config.activeExchangeId || config.exchanges.find((ex) => ex.isDefault)?.id;
@@ -105,12 +98,6 @@ export class GatewayContextResolver {
             sandbox: useSandbox,
             walletPrivateKey: active.walletPrivateKey,
           });
-
-          const nativeVenue = ccxtIdToNativeVenue(active.type);
-          if (nativeVenue === "binance" || nativeVenue === "binance_us") {
-            const baseUrl = nativeVenue === "binance_us" ? "https://api.binance.us" : undefined;
-            binance = new BinanceClient(active.apiKey, active.apiSecret, baseUrl);
-          }
         } catch (error) {
           logger.warn("Failed to initialize configured exchange for gateway", {
             error: error instanceof Error ? error.message : String(error),
@@ -122,8 +109,7 @@ export class GatewayContextResolver {
 
     if (!exchange && env.hasBinanceKeys && env.keys.BINANCE_API_KEY && env.keys.BINANCE_API_SECRET) {
       try {
-        binance = new BinanceClient(env.keys.BINANCE_API_KEY, env.keys.BINANCE_API_SECRET);
-        exchange = ExchangeFactory.create("binance", {
+        exchange = ExchangeFactory.create("ccxt:binance", {
           apiKey: env.keys.BINANCE_API_KEY,
           apiSecret: env.keys.BINANCE_API_SECRET,
         });
@@ -136,7 +122,7 @@ export class GatewayContextResolver {
 
     if (!exchange && env.hasRobinhoodKeys && env.keys.ROBINHOOD_API_KEY && env.keys.ROBINHOOD_API_SECRET) {
       try {
-        exchange = ExchangeFactory.create("robinhood", {
+        exchange = ExchangeFactory.create("ccxt:robinhood", {
           apiKey: env.keys.ROBINHOOD_API_KEY,
           apiSecret: env.keys.ROBINHOOD_API_SECRET,
         });
@@ -147,7 +133,6 @@ export class GatewayContextResolver {
       }
     }
 
-    // Resolve the first broker that has env-var credentials configured.
     let broker: BrokerAdapter | null = null;
     for (const brokerId of Object.keys(BROKER_ENV_MAP) as BrokerId[]) {
       const envEntry = BROKER_ENV_MAP[brokerId];
@@ -155,7 +140,6 @@ export class GatewayContextResolver {
       const apiSecret = process.env[envEntry.secret] || "";
       if (!apiKey || !apiSecret) continue;
 
-      // Determine paper mode: sandboxOverride wins, then env var, then false.
       const paperFromEnv = envEntry.paper
         ? parseBoolEnv(process.env[envEntry.paper])
         : false;
@@ -178,7 +162,6 @@ export class GatewayContextResolver {
       }
     }
 
-    // Fetch live portfolio data from exchange
     let portfolioValue = 0;
     let availableCash = 0;
 
@@ -204,7 +187,6 @@ export class GatewayContextResolver {
 
     this.cache = {
       exchange,
-      binance,
       broker,
       llm,
       portfolioValue,
@@ -212,7 +194,7 @@ export class GatewayContextResolver {
       updatedAt: Date.now(),
     };
 
-    return { exchange, binance, broker, llm, portfolioValue, availableCash };
+    return { exchange, broker, llm, portfolioValue, availableCash };
   }
 }
 
@@ -222,8 +204,6 @@ function parseBoolEnv(value: string | undefined): boolean {
   return ["1", "true", "yes", "on", "paper"].includes(v);
 }
 
-// Singleton — allows tools to toggle sandbox mode and bust the cache
-// without restarting the daemon.
 let _instance: GatewayContextResolver | null = null;
 
 export function getGatewayContextResolver(): GatewayContextResolver {

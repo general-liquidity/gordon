@@ -64,7 +64,6 @@ export async function getAcpGordonContext(
   }
 
   cached = {
-    binance: resolved.binance,
     exchange: resolved.exchange,
     broker: resolved.broker,
     llm: llm ?? ({} as GordonContext["llm"]),

@@ -5,9 +5,7 @@ import { determineWorkflowPhase, isExecutionPhase, resolveLegacyModelRouteForWor
 import type { GordonContext } from "../types.ts";
 
 function createContext(overrides: Partial<GordonContext> = {}): GordonContext {
-  return {
-    binance: null,
-    exchange: null,
+  return {    exchange: null,
     broker: null,
     llm: {} as GordonContext["llm"],
     config: GordonConfigSchema.parse({}),

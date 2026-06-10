@@ -7,9 +7,7 @@ function createContext(permissionMode: "auto" | "ask" | "strict" | "paper" | "ob
   const config = GordonConfigSchema.parse({
     permissionMode,
   });
-  return {
-    binance: null,
-    exchange: null,
+  return {    exchange: null,
     broker: null,
     llm: {} as GordonContext["llm"],
     config,

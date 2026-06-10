@@ -34,6 +34,8 @@ import { defaultMessageQueue } from "../infra/runtime/messageQueue.js";
 import { saveEnvKeys } from "../infra/storage/config/env.ts";
 import { providerRegistry } from "../infra/runtime/providers/registry.js";
 import { loadConfig, saveConfig } from "../infra/storage/config/config.js";
+import { normalizeExchangeId, ccxtEnvNames, extractCcxtSubId, ccxtIdToNativeVenue } from "../infra/exchange/types.ts";
+import type { ExchangeType } from "../types/config.ts";
 import { refreshRuntimeCredentials } from "./bridge/runtime.js";
 import { VirtualMessageList } from "./components/display/VirtualMessageList.tsx";
 import { CostDisplay } from "./components/status/CostDisplay.tsx";
@@ -1489,9 +1491,9 @@ function AppInner() {
                 exchangeRaw.includes("-testnet") ||
                 exchangeRaw.includes("-sandbox") ||
                 exchangeRaw.includes("-demo");
-              const exchangeType = isSandboxSetup
-                ? exchangeRaw.split("-")[0]! // "binance-testnet" → "binance"
-                : exchangeRaw;
+              const exchangeType = normalizeExchangeId(
+                isSandboxSetup ? exchangeRaw.split("-")[0]! : exchangeRaw,
+              );
               const suggestedId = isSandboxSetup ? exchangeRaw : exchangeType;
 
               try {
@@ -1500,7 +1502,7 @@ function AppInner() {
                 const apiSecret = data.exchangeApiSecret?.trim() ?? "";
                 const passphrase = data.exchangePassphrase?.trim();
                 const walletKey = data.exchangeWalletKey?.trim();
-                const isWalletBased = exchangeType === "hyperliquid" || exchangeType === "uniswap";
+                const isWalletBased = exchangeType === "ccxt:hyperliquid" || exchangeType === "ccxt:uniswap";
 
                 // Conflict resolution: update existing entry in place when
                 // the user asked to update, rather than creating a duplicate.
@@ -1522,7 +1524,7 @@ function AppInner() {
                   }
                   config.exchanges.push({
                     id: exchangeId,
-                    type: exchangeType as "binance" | "binance_us" | "coinbase" | "kraken" | "bitfinex" | "hyperliquid" | "robinhood" | "okx" | "gemini",
+                    type: exchangeType as ExchangeType,
                     apiKey: isWalletBased ? "" : apiKey,
                     apiSecret: isWalletBased ? "" : apiSecret,
                     sandbox: isSandboxSetup,
@@ -1538,13 +1540,21 @@ function AppInner() {
                 // Also write the credentials to ~/.gordon/.env so the
                 // exchange client factories can restore them from env.
                 const envUpdates: Record<string, string> = {};
-                const upperType = exchangeType.toUpperCase();
+                const subId = extractCcxtSubId(exchangeType);
+                const ccxtEnv = ccxtEnvNames(subId);
+                const nativeVenue = ccxtIdToNativeVenue(exchangeType);
                 if (!isWalletBased) {
-                  envUpdates[`${upperType}_API_KEY`] = apiKey;
-                  envUpdates[`${upperType}_API_SECRET`] = apiSecret;
+                  envUpdates[ccxtEnv.key] = apiKey;
+                  envUpdates[ccxtEnv.secret] = apiSecret;
+                  if (nativeVenue) {
+                    const legacy = { binance: "BINANCE", binance_us: "BINANCE_US", coinbase: "COINBASE", kraken: "KRAKEN", bitfinex: "BITFINEX", hyperliquid: "HYPERLIQUID", robinhood: "ROBINHOOD", okx: "OKX", gemini: "GEMINI" } as const;
+                    const prefix = legacy[nativeVenue];
+                    envUpdates[`${prefix}_API_KEY`] = apiKey;
+                    envUpdates[`${prefix}_API_SECRET`] = apiSecret;
+                  }
                 }
-                if (passphrase) envUpdates[`${upperType}_PASSPHRASE`] = passphrase;
-                if (walletKey) envUpdates[`${upperType}_PRIVATE_KEY`] = walletKey;
+                if (passphrase) envUpdates[ccxtEnv.passphrase] = passphrase;
+                if (walletKey) envUpdates[ccxtEnv.walletKey] = walletKey;
                 if (Object.keys(envUpdates).length > 0) {
                   await saveEnvKeys(envUpdates as Record<string, string>);
                   for (const [k, v] of Object.entries(envUpdates)) process.env[k] = v;

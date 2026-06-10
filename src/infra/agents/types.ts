@@ -3,7 +3,6 @@
  * Shared types for Gordon's agent infrastructure
  */
 
-import type { BinanceClient } from "../venues/exchange/clients/binance/index.ts";
 import type { Exchange } from "../exchange/index.ts";
 import type { BrokerAdapter } from "../broker/index.ts";
 import type { LLMClient } from "../ai/llm/index.ts";
@@ -40,14 +39,7 @@ export interface GordonRuntimeAccess {
  * Context passed to all tools and agents
  */
 export interface GordonContext {
-  /**
-   * @deprecated Use `exchange` instead for multi-exchange support
-   */
-  binance: BinanceClient | null;
-  /**
-   * Abstract exchange interface - supports multiple exchanges
-   * Prefer using this over `binance` for forward compatibility
-   */
+  /** CCXT-backed exchange adapter for the active crypto venue */
   exchange: Exchange | null;
   /**
    * Abstract stock/options broker interface (Alpaca first)

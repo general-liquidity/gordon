@@ -16,9 +16,7 @@ class MockSessionController extends SessionController {
 }
 
 function createMockContext(): GordonContext {
-  return {
-    binance: null,
-    exchange: null,
+  return {    exchange: null,
     broker: null,
     llm: {} as GordonContext["llm"],
     config: {

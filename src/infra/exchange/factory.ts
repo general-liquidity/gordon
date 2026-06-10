@@ -10,11 +10,9 @@ import { loadOAuthExchangeCredentials, exchangeSupportsOAuth } from "./oauth-bri
 import { assertSandboxSupported } from "./sandboxSupport.ts";
 
 /**
- * First-class venue ids — popular venues that carry curated env-var names,
- * sandbox-support metadata, and (binance) a separate BinanceClient. They are
- * accepted as input but normalized to their canonical `ccxt:<subId>` form;
- * every venue routes through the single CcxtAdapter. The long-tail `ccxt:*`
- * venues are not enumerable at compile time.
+ * First-class venue ids — popular venues with curated env-var names and
+ * sandbox metadata. Accepted as factory input aliases but normalized to
+ * canonical `ccxt:<subId>`; every venue routes through CcxtAdapter.
  */
 const SUPPORTED_EXCHANGES: NativeExchangeId[] = [
   "binance",
@@ -47,7 +45,7 @@ function getCacheKey(exchangeId: ExchangeId, credentials: ExchangeCredentials): 
  *
  * Features:
  * - Singleton pattern for exchange instances (cached by exchange + credentials)
- * - Native adapters for all supported exchanges (Binance, Coinbase, Kraken, Bitfinex, Hyperliquid, Robinhood)
+   * - CCXT adapter for all supported exchanges
  *
  * @example
  * ```typescript
@@ -174,7 +172,7 @@ export class ExchangeFactory {
    * @returns Array of supported exchange IDs
    */
   static getSupportedExchanges(): ExchangeId[] {
-    return [...SUPPORTED_EXCHANGES];
+    return SUPPORTED_EXCHANGES.map((id) => normalizeExchangeId(id));
   }
 
   /**

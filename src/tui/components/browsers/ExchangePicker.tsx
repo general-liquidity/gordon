@@ -5,7 +5,8 @@ import { loadConfig, saveConfig } from "../../../infra/storage/config/config.ts"
 import { exchangeSwitch } from "../../../app/commands/exchange.ts";
 import { ExchangeFactory } from "../../../infra/exchange/factory.ts";
 import { refreshRuntimeCredentials } from "../../../infra/runtime/credentialRefresh.ts";
-import type { ExchangeId } from "../../../infra/exchange/types.ts";
+import { normalizeExchangeId, type ExchangeId } from "../../../infra/exchange/types.ts";
+import type { ExchangeType } from "../../../types/config.ts";
 import type { MultiExchangeConfig } from "../../../types/index.ts";
 
 /**
@@ -26,29 +27,29 @@ interface Props {
 // ── Exchange type definitions ────────────────────────────────────────────────
 
 const LIVE_EXCHANGES = [
-  { label: "Binance", value: "binance" },
-  { label: "Binance US", value: "binance_us" },
-  { label: "Coinbase", value: "coinbase" },
-  { label: "Kraken", value: "kraken" },
-  { label: "Bitfinex", value: "bitfinex" },
-  { label: "Gemini", value: "gemini" },
-  { label: "OKX", value: "okx" },
-  { label: "Hyperliquid (wallet-based)", value: "hyperliquid" },
-  { label: "Uniswap (wallet-based)", value: "uniswap" },
-  { label: "Robinhood Crypto", value: "robinhood" },
+  { label: "Binance", value: "ccxt:binance" },
+  { label: "Binance US", value: "ccxt:binanceus" },
+  { label: "Coinbase", value: "ccxt:coinbase" },
+  { label: "Kraken", value: "ccxt:kraken" },
+  { label: "Bitfinex", value: "ccxt:bitfinex" },
+  { label: "Gemini", value: "ccxt:gemini" },
+  { label: "OKX", value: "ccxt:okx" },
+  { label: "Hyperliquid (wallet-based)", value: "ccxt:hyperliquid" },
+  { label: "Uniswap (wallet-based)", value: "ccxt:uniswap" },
+  { label: "Robinhood Crypto", value: "ccxt:robinhood" },
 ];
 
 const SANDBOX_EXCHANGES = [
-  { label: "Binance Testnet  (testnet.binance.vision)", value: "binance", sandboxId: "binance-testnet" },
-  { label: "Coinbase Sandbox  (cdp.coinbase.com sandbox)", value: "coinbase", sandboxId: "coinbase-sandbox" },
-  { label: "OKX Demo  (simulated trading, x-simulated-trading: 1)", value: "okx", sandboxId: "okx-demo" },
-  { label: "Gemini Sandbox  (exchange.sandbox.gemini.com)", value: "gemini", sandboxId: "gemini-sandbox" },
-  { label: "Hyperliquid Testnet  (testnet.hyperliquid.xyz)", value: "hyperliquid", sandboxId: "hyperliquid-testnet" },
-  { label: "Kraken Demo  (demo.kraken.com)", value: "kraken", sandboxId: "kraken-demo" },
+  { label: "Binance Testnet  (testnet.binance.vision)", value: "ccxt:binance", sandboxId: "binance-testnet" },
+  { label: "Coinbase Sandbox  (cdp.coinbase.com sandbox)", value: "ccxt:coinbase", sandboxId: "coinbase-sandbox" },
+  { label: "OKX Demo  (simulated trading, x-simulated-trading: 1)", value: "ccxt:okx", sandboxId: "okx-demo" },
+  { label: "Gemini Sandbox  (exchange.sandbox.gemini.com)", value: "ccxt:gemini", sandboxId: "gemini-sandbox" },
+  { label: "Hyperliquid Testnet  (testnet.hyperliquid.xyz)", value: "ccxt:hyperliquid", sandboxId: "hyperliquid-testnet" },
+  { label: "Kraken Demo  (demo.kraken.com)", value: "ccxt:kraken", sandboxId: "kraken-demo" },
 ];
 
-const WALLET_BASED = new Set(["hyperliquid", "uniswap"]);
-const NEEDS_PASSPHRASE = new Set(["coinbase", "okx"]);
+const WALLET_BASED = new Set(["ccxt:hyperliquid", "ccxt:uniswap"]);
+const NEEDS_PASSPHRASE = new Set(["ccxt:coinbase", "ccxt:okx"]);
 
 type Step =
   | "loading"
@@ -188,7 +189,7 @@ export function ExchangePicker({ onComplete, onCancel }: Props) {
   const finishAdd = useCallback(async (state: AddState) => {
     try {
       const cfg = await loadConfig();
-      const type = state.exchangeType as ExchangeId;
+      const type = normalizeExchangeId(state.exchangeType as ExchangeId) as ExchangeType;
       const isWallet = WALLET_BASED.has(type);
 
       // Generate unique ID

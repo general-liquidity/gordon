@@ -93,18 +93,6 @@ export const getTradeHistoryTool = createTool({
           time: t.time,
           isMaker: t.isMaker,
         }));
-      } else if (ctx.binance && isBinanceFamily(ctx.exchange.exchangeId)) {
-        const exchangeTrades = await ctx.binance.getAllTradeHistory(limit);
-        trades = exchangeTrades.map((t) => ({
-          symbol: t.symbol,
-          side: t.isBuyer ? "BUY" : "SELL",
-          price: parseFloat(t.price),
-          quantity: parseFloat(t.qty),
-          commission: parseFloat(t.commission),
-          commissionAsset: t.commissionAsset,
-          time: t.time,
-          isMaker: t.isMaker,
-        }));
       } else {
         return { error: "This exchange requires a symbol to fetch trade history." };
       }

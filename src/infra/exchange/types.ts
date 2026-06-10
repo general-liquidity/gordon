@@ -10,7 +10,8 @@ import type { Candle } from "../../types/index.ts";
 // ============================================================================
 
 /**
- * Native exchange identifiers — exchanges Gordon has hand-tuned adapters for.
+ * First-class venue ids — curated env-var names, sandbox metadata, OAuth.
+ * Runtime adapter is always CcxtAdapter (`ccxt:<subId>`).
  */
 export type NativeExchangeId =
   | "binance"
@@ -24,10 +25,9 @@ export type NativeExchangeId =
   | "gemini";
 
 /**
- * CCXT-routed exchange identifiers — `ccxt:<ccxt-sub-id>` for any of the
- * 107 exchanges CCXT supports. Operators choose this when they want the
- * CCXT unified API instead of a hand-tuned native adapter (including for
- * the 10 natives — both options coexist).
+ * Canonical exchange identifiers — `ccxt:<ccxt-sub-id>` for any of the
+ * 107 exchanges CCXT supports. Config stores only this form; bare first-class
+ * ids are migrated on load.
  *
  * Examples: `"ccxt:binance"`, `"ccxt:bybit"`, `"ccxt:kucoin"`, `"ccxt:mexc"`.
  *
@@ -43,7 +43,7 @@ export type CcxtExchangeId = `ccxt:${string}`;
 export type ExchangeId = NativeExchangeId | CcxtExchangeId;
 
 /**
- * Type guard: native (hand-tuned) vs CCXT-routed.
+ * Type guard: canonical CCXT-routed id.
  */
 export function isCcxtExchangeId(id: string): id is CcxtExchangeId {
   return id.startsWith("ccxt:");
@@ -131,9 +131,9 @@ export function ccxtEnvNames(ccxtSubId: string): {
 
 /**
  * Each first-class venue id → its CCXT sub-id. The canonical venue id form is
- * `ccxt:<subId>`; these 9 venues additionally carry curated env-var names
- * (EXCHANGE_ENV_MAP), sandbox-support metadata, and — for binance — a separate
- * BinanceClient. Only binance_us's sub-id differs from its venue id.
+ * `ccxt:<subId>`; first-class venues carry curated env-var names
+ * (EXCHANGE_ENV_MAP) and sandbox-support metadata.
+ * Only binance_us's sub-id differs from its venue id.
  */
 export const NATIVE_TO_CCXT_SUBID: Record<NativeExchangeId, string> = {
   binance: "binance",

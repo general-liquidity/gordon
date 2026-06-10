@@ -14,16 +14,13 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
-import { getGordonContext, isBinanceFamily, normalizeSymbol, type MastraExecutionContext } from "../types.ts";
+import { getGordonContext, normalizeSymbol, type MastraExecutionContext } from "../types.ts";
 import { checkTradingPermission } from "../runtime/permissionHelpers.ts";
 import { runHooks } from "../../../hooks/engine.ts";
 import { recordStructuredObservation } from "../../../platform/observability/index.ts";
 import { appendActionLogEntry } from "../../../action-log/index.ts";
-import {
-  resilientGetOrderBook,
-  resilientGetSpread,
-} from "../../../platform/resilience/index.ts";
-import type { OrderBookEntry, ExchangeExtended } from "../../../exchange/types.ts";
+
+import type { OrderBookEntry } from "../../../exchange/types.ts";
 import { createCachedTool, TOOL_CACHE_CONFIG } from "../runtime/cache.ts";
 import { placeOCOOrders } from "../../../../core/pipeline/executor.ts";
 import { resolveInstrument } from "../../../domain/markets/instruments.ts";
@@ -157,9 +154,7 @@ export const getOrderBookTool = createTool({
     }
 
     try {
-      const orderBook = ctx.binance && isBinanceFamily(ctx.exchange.exchangeId)
-        ? (await resilientGetOrderBook(ctx.binance, normalizedSymbol, limit)).data
-        : await ctx.exchange.getOrderBook(normalizedSymbol, limit);
+      const orderBook = await ctx.exchange.getOrderBook(normalizedSymbol, limit);
 
       // Calculate totals and find walls
       let bidTotal = 0;
@@ -283,9 +278,7 @@ export const getSpreadTool = createTool({
         return { error: "No active crypto execution venue is connected." };
       }
 
-      const spread = ctx.binance && isBinanceFamily(ctx.exchange.exchangeId)
-        ? (await resilientGetSpread(ctx.binance, normalizedSymbol)).data
-        : await ctx.exchange.getSpread(normalizedSymbol);
+      const spread = await ctx.exchange.getSpread(normalizedSymbol);
 
       let assessment: string;
       if (spread.spreadPercent < 0.05) {
@@ -345,50 +338,21 @@ export const getRecentTradesTool = createTool({
   }),
   execute: async ({ symbol, limit }, execContext: MastraExecutionContext) => {
     const ctx = getGordonContext(execContext);
-    if (!ctx?.exchange) {
-      return errors.noExchange;
-    }
-    if (!ctx.binance || !isBinanceFamily(ctx.exchange.exchangeId)) {
-      return { error: "Recent trades are not supported on this exchange yet." };
-    }
-
     const normalizedSymbol = normalizeSymbol(symbol);
-
-    try {
-      const trades = await ctx.binance.getRecentTrades(normalizedSymbol, limit);
-
-      // Analyze trade flow
-      let buyVolume = 0;
-      let sellVolume = 0;
-
-      for (const trade of trades) {
-        const qty = parseFloat(trade.qty);
-        if (trade.isBuyerMaker) {
-          sellVolume += qty; // Taker was seller
-        } else {
-          buyVolume += qty; // Taker was buyer
-        }
-      }
-
+    if (!ctx?.exchange) {
       return {
         symbol: normalizedSymbol,
-        analysis: {
-          buyVolume: buyVolume.toFixed(4),
-          sellVolume: sellVolume.toFixed(4),
-          ratio: (buyVolume / sellVolume).toFixed(2),
-          dominance: buyVolume > sellVolume ? "Buyers dominating" : "Sellers dominating",
-        },
-        trades: trades.slice(0, 10).map((t) => ({
-          price: t.price,
-          quantity: t.qty,
-          value: (parseFloat(t.price) * parseFloat(t.qty)).toFixed(2) + " USDT",
-          side: t.isBuyerMaker ? "SELL" as const : "BUY" as const,
-          time: new Date(t.time).toISOString(),
-        })),
+        analysis: { buyVolume: "0", sellVolume: "0", ratio: "0", dominance: "N/A" },
+        trades: [],
+        error: errors.noExchange.error,
       };
-    } catch (error) {
-      return { error: `Failed to get recent trades: ${(error as Error).message}` };
     }
+    return {
+      symbol: normalizedSymbol,
+      analysis: { buyVolume: "0", sellVolume: "0", ratio: "0", dominance: "N/A" },
+      trades: [],
+      error: "Public recent trades require exchange-native market data; not available via CCXT adapter.",
+    };
   },
 });
 
@@ -1186,88 +1150,7 @@ export const cancelReplaceOrderTool = createTool({
       }
     }
 
-    if (!ctx.binance || !isBinanceFamily(ctx.exchange.exchangeId)) {
-      return { error: "This feature is currently supported only on Binance." };
-    }
-
-    const normalizedSymbol = normalizeSymbol(symbol);
-
-    recordStructuredObservation({
-      eventType: "cancel_replace.rationale_recorded",
-      workflow: "execution",
-      source: "agent_tool",
-      component: "cancel_replace_order",
-      toolName: "cancel_replace_order",
-      outcome: "info",
-      symbol: normalizedSymbol,
-      details: { rationale, cancelOrderId, side, type },
-    });
-    try {
-      appendActionLogEntry({
-        entryType: "execution_result",
-        title: `Cancel/replace ${normalizedSymbol} #${cancelOrderId}`,
-        content: `Cancellation rationale: ${rationale}`,
-        payload: { kind: "cancel", tool: "cancel_replace_order", symbol: normalizedSymbol, cancelOrderId, side, type, rationale },
-      });
-    } catch {
-      // Storage failures must not block the cancellation itself.
-    }
-
-    // Risk gate: evaluate the replacement order before placement
-    try {
-      const { evaluateOrderRisk } = await import("../trading/risk-gate.ts");
-      const riskResult = await evaluateOrderRisk(
-        { symbol: normalizedSymbol, side, type, quantity, price },
-        ctx,
-        "executor"
-      );
-      if (!riskResult.approved) {
-        return { error: `Risk check rejected: ${riskResult.reason}` };
-      }
-      // Use risk-adjusted quantity if modified
-      if (riskResult.quantity !== quantity) {
-        quantity = riskResult.quantity;
-      }
-    } catch (riskErr) {
-      return {
-        error: `Risk check failed for cancel-replace order: ${riskErr instanceof Error ? riskErr.message : String(riskErr)}`,
-      };
-    }
-
-    try {
-      const newOrderParams: Record<string, unknown> = {
-        side,
-        type,
-        quantity,
-        timeInForce,
-      };
-      if (price !== undefined) {
-        newOrderParams.price = price;
-      }
-
-      const result = await ctx.binance.cancelReplaceOrder(normalizedSymbol, cancelOrderId, newOrderParams as never);
-
-      const newOrder = result.newOrderResponse;
-      return {
-        success: true,
-        message: `Cancelled order #${cancelOrderId} and placed new ${type} ${side} ${quantity} ${normalizedSymbol}`,
-        cancelResult: result.cancelResult,
-        newOrderResult: result.newOrderResult,
-        newOrder: newOrder
-          ? {
-              orderId: newOrder.orderId,
-              symbol: newOrder.symbol,
-              side: newOrder.side,
-              type: newOrder.type,
-              status: newOrder.status,
-              price: newOrder.price,
-              quantity: newOrder.origQty,
-            }
-          : undefined,
-      };
-    } catch (error) {
-      return { error: `Failed to cancel and replace order: ${(error as Error).message}` };
-    }
+    return { error: "Cancel-replace requires Binance SAPI; not available via CCXT adapter." };
   },
 });
 
@@ -1318,49 +1201,7 @@ export const cancelOrderListTool = createTool({
       }
     }
 
-    if (!ctx.binance || !isBinanceFamily(ctx.exchange.exchangeId)) {
-      return { error: "This feature is currently supported only on Binance." };
-    }
-
-    const normalizedSymbol = normalizeSymbol(symbol);
-
-    recordStructuredObservation({
-      eventType: "cancel.rationale_recorded",
-      workflow: "execution",
-      source: "agent_tool",
-      component: "cancel_order_list",
-      toolName: "cancel_order_list",
-      outcome: "info",
-      symbol: normalizedSymbol,
-      details: { rationale, orderListId },
-    });
-    try {
-      appendActionLogEntry({
-        entryType: "execution_result",
-        title: `Cancel order list ${normalizedSymbol} #${orderListId}`,
-        content: `Cancellation rationale: ${rationale}`,
-        payload: { kind: "cancel", tool: "cancel_order_list", symbol: normalizedSymbol, orderListId, rationale },
-      });
-    } catch {
-      // Storage failures must not block the cancellation itself.
-    }
-
-    try {
-      const result = await ctx.binance.cancelOrderList(normalizedSymbol, orderListId);
-
-      return {
-        success: true,
-        message: `Cancelled order list #${orderListId} on ${normalizedSymbol}`,
-        orderListId: result.orderListId,
-        status: result.listOrderStatus,
-        cancelledOrders: result.orders.map((o) => ({
-          orderId: o.orderId,
-          symbol: o.symbol,
-        })),
-      };
-    } catch (error) {
-      return { error: `Failed to cancel order list: ${(error as Error).message}` };
-    }
+    return { error: "OCO/OTO order-list cancel requires Binance SAPI; not available via CCXT adapter." };
   },
 });
 
@@ -1393,36 +1234,7 @@ export const getOpenOrderListsTool = createTool({
       return errors.noExchange;
     }
 
-    if (!ctx.binance || !isBinanceFamily(ctx.exchange.exchangeId)) {
-      return { error: "This feature is currently supported only on Binance." };
-    }
-
-    try {
-      const orderLists = await ctx.binance.getOpenOrderLists();
-
-      if (orderLists.length === 0) {
-        return {
-          count: 0,
-          orderLists: [],
-          message: "No open OCO/OTO order lists",
-        };
-      }
-
-      return {
-        count: orderLists.length,
-        orderLists: orderLists.map((ol) => ({
-          orderListId: ol.orderListId,
-          symbol: ol.symbol,
-          status: ol.listOrderStatus,
-          orders: ol.orders.map((o) => ({
-            orderId: o.orderId,
-          })),
-        })),
-        message: `Found ${orderLists.length} open order list(s)`,
-      };
-    } catch (error) {
-      return { error: `Failed to get open order lists: ${(error as Error).message}` };
-    }
+    return { error: "Open OCO/OTO order lists require Binance SAPI; not available via CCXT adapter." };
   },
 });
 
