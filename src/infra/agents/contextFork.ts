@@ -109,7 +109,6 @@ const SAFETY_MARKERS: readonly string[] = [
   '"permission_granted"',
   "PermissionEngine",
   "[GORDON_SAFETY]",
-  "evidence_bundle",
 ];
 
 function containsSafetyMarker(message: InvestigationMessage): boolean {

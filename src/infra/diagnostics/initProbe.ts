@@ -13,8 +13,8 @@
  *
  * Probes are caller-supplied. The module orchestrates them, captures
  * timing + error context, aggregates verdicts, and returns a structured
- * report. Mirrors `harnessEvolution`'s pluggable-hooks design — the
- * primitive stays decoupled from any specific Gordon subsystem.
+ * report. Pluggable probe design — the primitive stays decoupled from
+ * any specific Gordon subsystem.
  *
  * Default probe families (suggested, not enforced):
  *   - venue connectivity   — open a market-data stream, get 1 candle

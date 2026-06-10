@@ -17,7 +17,7 @@
  *
  * Generalizes Gordon's single-objective best-selection. Plausible
  * consumers:
- *   - harnessEvolution multi-objective selection: rank by (Sharpe,
+ *   - eval-harness multi-objective selection: rank by (Sharpe,
  *     max-DD, latency, token-cost) rather than collapsing to one
  *     score
  *   - ACE lesson scoring: lessons compared on (score, context-cost)

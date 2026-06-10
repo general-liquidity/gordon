@@ -164,7 +164,7 @@ export async function validateToolCall(
         },
       };
     }
-    // ForceStop (default tier-3 OR legacy block when wiring disabled).
+    // ForceStop (default tier-3 block when recovery wiring is disabled).
     return {
       allowed: false,
       shouldReturn: true,

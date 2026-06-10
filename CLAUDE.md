@@ -183,7 +183,7 @@ The legacy generalized-trading tool modules (calculate_rsi, getCandles, etc.) re
 | How a slash command works | `src/app/slash/slashCommands.ts` |
 | Permission / approval flow | `src/runtime/permissions/PermissionEngine.ts` + `src/infra/trading/risk/riskClassifier.ts` |
 | Hook lifecycle | `src/infra/hooks/types.ts` + `engine.ts` |
-| The proactive radar | `src/infra/proactive/observer.ts` (tick intervals) + `producers/` |
+| The proactive radar | `src/infra/proactive/engine/observer.ts` (tick intervals) + `producers/` |
 | Memory / compaction | `src/infra/domain/memory/summarizer.ts` (5 stages at 70/80/90/94/99) + `contextCollapse.ts` |
 | Gateway / SDK / ACP surfaces | `src/gateway/` + `src/core-sdk/` + `src/app/acp-entry.ts` (`bun acp`) |
 | Stock headlines (Yahoo + EDGAR) | `src/infra/news/stockHeadlines.ts` |

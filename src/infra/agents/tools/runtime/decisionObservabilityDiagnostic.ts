@@ -5,7 +5,7 @@
  *   - stamp_edit_prediction: produce a stamped record at edit-time
  *   - verify_edit_prediction: compare predicted vs realized after the window
  *
- * The caller (ACE Curator, harnessEvolution loop, operator) persists the
+ * The caller (ACE Curator, eval harness, operator) persists the
  * stamped record however it wants. This tool surface does not write to
  * disk — it only computes the verdict.
  */

@@ -381,7 +381,7 @@ export { decisionObservabilityTools } from "./runtime/decisionObservabilityDiagn
 
 // PF1 — Pareto frontier tracker. Multi-objective non-dominated set
 // computation. Generalizes single-objective best-selection. Pairs with
-// DEC1 vector predictions, harnessEvolution multi-objective selection.
+// DEC1 vector predictions, eval-harness multi-objective selection.
 export { paretoFrontierTools } from "./runtime/paretoFrontierDiagnostic.ts";
 // Trendline detection diagnostic (TL1) — peel-off envelope or OLS best-fit
 // trendlines for upper/lower price series. Returns slope/intercept/r²/touches/

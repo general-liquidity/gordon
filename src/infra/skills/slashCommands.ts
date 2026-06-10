@@ -5,9 +5,9 @@
  * automatically. The command name matches the skill ID; invoking it
  * tells the agent to load and follow the skill's recipe.
  *
- * Categories are inferred from skill tags. Legacy slash commands
+ * Categories are inferred from skill tags. Core slash commands
  * defined explicitly in slashCommands.ts win on name collisions
- * (e.g. /learn-finnhub stays the legacy entry, not the skill-derived
+ * (e.g. /learn-finnhub stays the hand-authored entry, not the skill-derived
  * one), so this is gap-filling, not override.
  */
 

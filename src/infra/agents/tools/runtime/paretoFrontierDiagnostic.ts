@@ -33,7 +33,7 @@ export const paretoFrontierDiagnosticTool = createTool({
     "A dominates B iff A is ≥ B on every objective AND > B on at least one (using each objective's " +
     "maximize/minimize direction). Returns frontier + dominated lists + dominationMap. " +
     "Use for multi-objective comparison: strategy evaluation (Sharpe vs drawdown), edit verification " +
-    "(predicted vector vs realized), harnessEvolution multi-objective selection, ACE lesson scoring " +
+    "(predicted vector vs realized), eval-harness multi-objective selection, ACE lesson scoring " +
     "(score vs context-cost).",
   inputSchema: z.object({
     candidates: z

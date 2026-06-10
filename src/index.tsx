@@ -251,7 +251,7 @@ try {
   const { initSinks } = await import("./infra/platform/telemetry/sinks.ts");
   initSinks();
 } catch {
-  // Non-fatal — telemetry already runs through legacy path
+  // Non-fatal — telemetry already runs through the default sink path
 }
 
 // Run data retention sweep at startup (best-effort, fire-and-forget)

@@ -166,7 +166,7 @@ export const forkContextTool = createTool({
   description:
     "Fork the current conversation context into an isolated sub-agent that performs a synthesis task. " +
     "The fork inherits the orchestrator's recent message history (with safety-sensitive content stripped " +
-    "by default — rationale entries, permission grants, evidence bundles, execution records). " +
+    "by default — rationale entries, permission grants, execution records, audit markers). " +
     "Returns ONLY the synthesis; the fork's intermediate work doesn't pollute the main context. " +
     "Logs to ~/.gordon/fork-audit.jsonl. Examples: 'take everything we've said about BTCUSDT and " +
     "produce a structured pros/cons list', 'deepen the analysis we started on the regime transition'.",
