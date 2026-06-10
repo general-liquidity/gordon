@@ -5,7 +5,7 @@
  * `core` (always sent to the model in every request) or `deferred`
  * (omitted from the schema until the model explicitly searches for and
  * activates them via a meta-tool). For Gordon's tool surface (~100+
- * tools across crypto / equities / Solana / Polkadot / DeFi / news /
+ * tools across crypto / equities / DeFi / news /
  * memory / ops), this can cut schema-token cost meaningfully — paper
  * cites 13K → 6K tokens per request.
  *
@@ -228,12 +228,8 @@ export function classifyToolNames(allToolNames: Iterable<string>): DeferralEntry
 }
 
 function inferFamily(name: string): string {
-  if (name.startsWith("agentkit_")) return "evm";
-  if (name.startsWith("solana_")) return "solana";
-  if (name.startsWith("polkadot_")) return "polkadot";
-  if (name.startsWith("uniswap_")) return "defi";
-  if (name.startsWith("chainlink_")) return "oracle";
-  if (name.startsWith("cdp_")) return "cdp";
+  if (name.startsWith("defillama_")) return "defi";
+  if (name.startsWith("finnhub_")) return "finnhub";
   if (name.startsWith("get_") || name.includes("scan") || name.includes("ticker")) return "market";
   if (name.includes("order") || name.includes("trade") || name.includes("close")) return "trading";
   if (name.includes("backtest")) return "backtest";

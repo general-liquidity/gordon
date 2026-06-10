@@ -35,7 +35,7 @@ BTC dominance, total market cap move, BTC/ETH price + volume context, Fear & Gre
 Outperformers/underperformers vs the market, broken out by the operator's sectors (L1/L2/DeFi/AI/RWA/infra/memecoin/etc.). Flag unusual volume spikes that may precede catalysts. Use `get_market_data` for movers; `compute_regime` for the prevailing tape.
 
 ## Section 3: On-chain signals
-Whale moves, exchange net flows (inflow = sell pressure, outflow = accumulation), stablecoin mint/burn, DEX volume spikes, protocol TVL moves. Source: Gordon's Defillama / Base / CDP / Solana / Chainlink integrations. Lead with flows that contradict the price tape (the most informative case).
+Whale moves, exchange net flows (inflow = sell pressure, outflow = accumulation), stablecoin mint/burn, DEX volume spikes, protocol TVL moves. Source: Gordon's onchain data modules, wallet intelligence, and DefiLlama integrations. Lead with flows that contradict the price tape (the most informative case).
 
 ## Section 4: DeFi monitor
 TVL changes on watchlist protocols, notable yield shifts above the operator's threshold, new incentive programs, and **risk events** — depeg alerts, liquidation cascades, exploit reports. Source: Defillama protocol/fees + news exploit filter.

@@ -39,8 +39,6 @@ Commands that execute or manage trades:
 - `/positions` — open positions
 - `/orders` — open orders
 - `/history` — trade history
-- `/wallet` — wallet management
-- `/fund` — funding flows (buy/sell/swap)
 
 ### Strategy & Analysis
 - `/backtest <strategy> <symbol>` — run a backtest

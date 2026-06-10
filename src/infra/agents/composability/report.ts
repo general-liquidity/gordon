@@ -19,6 +19,7 @@
 import { readFileSync, existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { discoverSkills } from "../../skills/index.ts";
+import { EXCHANGE_IDS } from "../../exchange/types.ts";
 
 export type ComponentAxis =
   | "llm_provider"
@@ -74,18 +75,7 @@ export interface ComposabilityProbes {
 
 const LLM_PROVIDERS = ["openai", "dedalus", "inception"] as const;
 
-const NATIVE_EXCHANGES = [
-  "binance",
-  "binance_us",
-  "coinbase",
-  "kraken",
-  "bitfinex",
-  "hyperliquid",
-  "uniswap",
-  "robinhood",
-  "okx",
-  "gemini",
-] as const;
+const NATIVE_EXCHANGES = EXCHANGE_IDS;
 
 const BROKERS = ["ibkr", "alpaca", "trading212", "schwab"] as const;
 
@@ -207,7 +197,7 @@ export function captureComposabilityReport(
       availableCount: NATIVE_EXCHANGES.length + 90, // native + CCXT-covered
       sample: [...NATIVE_EXCHANGES, "ccxt:<any of 90+ exchanges>"],
       pluggable: true,
-      description: "10 native adapters + 90+ via CCXT. Native + CCXT can coexist; operator switches per session or per trade.",
+      description: "First-class native venues + 100+ via CCXT. Operator switches per session or per trade.",
     },
     {
       axis: "broker",

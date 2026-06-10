@@ -22,10 +22,10 @@ describe("getTimeoutForToolName", () => {
     expect(getTimeoutForToolName("backtest_strategy").timeoutMs).toBe(120_000);
   });
 
-  it("classifies on-chain reads via prefix family", () => {
-    expect(getTimeoutForToolName("solana_get_balance").family).toBe("solana");
-    expect(getTimeoutForToolName("polkadot_get_staking_info").family).toBe("polkadot");
-    expect(getTimeoutForToolName("agentkit_get_balance").family).toBe("evm");
+  it("classifies account reads via prefix family", () => {
+    expect(getTimeoutForToolName("get_balance").family).toBe("account");
+    expect(getTimeoutForToolName("get_portfolio").family).toBe("account");
+    expect(getTimeoutForToolName("get_account_snapshot").family).toBe("account");
   });
 
   it("falls back to 'default' for unknown tools", () => {

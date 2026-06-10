@@ -76,7 +76,7 @@ export const CLI_REGISTRY: CLIEntry[] = [
     ],
     nativeCoverage: "partial",
     nativeTools: [
-      "solana_trade", "place_market_order", "place_limit_order",
+      "place_market_order", "place_limit_order",
       "get_portfolio", "scan_market",
     ],
     credentials: [

@@ -52,11 +52,6 @@ const CONCURRENT_SAFE_TOOLS = new Set([
   "search_x", "get_sec_filings", "get_news",
   // Preview (no side effects)
   "preview_market_order", "preview_withdrawal",
-  // Solana reads
-  "solana_get_balance", "solana_get_tps", "solana_get_token_data",
-  "solana_price", "solana_token_data_by_ticker",
-  // Polkadot reads
-  "polkadot_get_balance", "polkadot_get_staking_info",
 ]);
 
 /**

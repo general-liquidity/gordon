@@ -131,7 +131,7 @@ function getToolVerb(toolName: string): string | null {
 
   // Portfolio & account
   if (/get_portfolio|portfolio_state/i.test(toolName)) return "Loading portfolio";
-  if (/get_balance|get_base_balance|get_user_assets/i.test(toolName)) return "Checking balance";
+  if (/get_balance|get_user_assets/i.test(toolName)) return "Checking balance";
   if (/get_account|account_details|account_snapshot/i.test(toolName)) return "Loading account";
   if (/get_positions|list_active_positions|check_positions/i.test(toolName)) return "Loading positions";
   if (/trade_history|order_history/i.test(toolName)) return "Loading history";
@@ -310,7 +310,6 @@ function getToolVerb(toolName: string): string | null {
 
   // Earn & staking
   if (/earn|subscribe_.*earn|redeem_.*earn/i.test(toolName)) return "Managing earn positions";
-  if (/basenames_register/i.test(toolName)) return "Registering basename";
 
   // Plans & approvals
   if (/create_plan|list_plans/i.test(toolName)) return "Managing plan";

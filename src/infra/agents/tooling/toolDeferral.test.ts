@@ -137,15 +137,15 @@ describe("classifyToolNames", () => {
 
   it("infers family from prefixes", () => {
     const families = classifyToolNames([
-      "solana_balance", "polkadot_stake", "agentkit_swap", "uniswap_quote",
-      "chainlink_feed", "cdp_webhook",
+      "get_ticker", "place_limit_order", "defillama_yields", "finnhub_news",
+      "backtest_strategy", "search_memory",
     ]);
-    expect(families.find((e) => e.toolName === "solana_balance")?.family).toBe("solana");
-    expect(families.find((e) => e.toolName === "polkadot_stake")?.family).toBe("polkadot");
-    expect(families.find((e) => e.toolName === "agentkit_swap")?.family).toBe("evm");
-    expect(families.find((e) => e.toolName === "uniswap_quote")?.family).toBe("defi");
-    expect(families.find((e) => e.toolName === "chainlink_feed")?.family).toBe("oracle");
-    expect(families.find((e) => e.toolName === "cdp_webhook")?.family).toBe("cdp");
+    expect(families.find((e) => e.toolName === "get_ticker")?.family).toBe("market");
+    expect(families.find((e) => e.toolName === "place_limit_order")?.family).toBe("trading");
+    expect(families.find((e) => e.toolName === "defillama_yields")?.family).toBe("defi");
+    expect(families.find((e) => e.toolName === "finnhub_news")?.family).toBe("finnhub");
+    expect(families.find((e) => e.toolName === "backtest_strategy")?.family).toBe("backtest");
+    expect(families.find((e) => e.toolName === "search_memory")?.family).toBe("memory");
   });
 
   it("DEFAULT_CORE_TOOL_NAMES contains the workhorses", () => {

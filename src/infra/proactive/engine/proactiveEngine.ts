@@ -6,7 +6,7 @@
  * (ask / auto / strict). When enabled, the engine:
  *
  *   1. Observes events from the Gordon event bus (trade fills, position
- *      updates, regime flips, whale alerts via CDP webhooks, etc.)
+ *      updates, regime flips, whale alerts, etc.)
  *   2. Constructs candidate suggestions via pluggable producers
  *   3. Submits each candidate to the judge (heuristic or LLM)
  *   4. Fires the suggestion (stores it + emits a proactive event) if the

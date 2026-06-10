@@ -71,18 +71,6 @@ export async function discoverProviderCapabilities(config: GordonConfig): Promis
     });
   }
 
-  for (const chainSurfaceId of ["base_rpc", "base_flashblocks"] as const) {
-    snapshots.push({
-      providerId: chainSurfaceId,
-      providerKind: "chain",
-      label: getIntegrationSurfaceMetadata(chainSurfaceId).displayName,
-      supportsExecution: false,
-      capabilities: [],
-      notes: ["Chain infrastructure surface available for routing and observability only."],
-      integration: getIntegrationSurfaceMetadata(chainSurfaceId),
-    });
-  }
-
   for (const observabilityId of ["axiom", "opentelemetry"] as const) {
     snapshots.push({
       providerId: observabilityId,

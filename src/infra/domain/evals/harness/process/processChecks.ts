@@ -66,7 +66,6 @@ const ORDER_EXEC_SUBSTRINGS = [
   "submit_order",
   "execute_plan",
   "close_trade",
-  "solana_trade",
 ];
 
 /** A pre-trade risk gate having run (tool call form). */

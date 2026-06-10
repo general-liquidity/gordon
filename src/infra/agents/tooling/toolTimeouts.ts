@@ -7,7 +7,6 @@
  *   - order placement / cancellation should complete in <10s, but
  *     can stretch on busy venues
  *   - backtests can take 30-120s depending on dataset
- *   - on-chain reads (Solana / Polkadot RPC) sometimes >5s tail
  *
  * A single global timeout would either kill backtests or let a
  * hanging price call burn the whole turn. This module declares
@@ -37,12 +36,6 @@ const TOOL_TIMEOUT_FAMILIES: ReadonlyArray<{ pattern: string; timeoutMs: number;
   { pattern: "execute_trade", timeoutMs: 15_000, family: "trading" },
   { pattern: "cancel_order", timeoutMs: 10_000, family: "trading" },
   { pattern: "close_trade", timeoutMs: 15_000, family: "trading" },
-  // On-chain RPC reads — tail-heavy.
-  { pattern: "solana_", timeoutMs: 12_000, family: "solana" },
-  { pattern: "polkadot_", timeoutMs: 12_000, family: "polkadot" },
-  { pattern: "agentkit_", timeoutMs: 12_000, family: "evm" },
-  { pattern: "uniswap_", timeoutMs: 12_000, family: "defi" },
-  { pattern: "chainlink_", timeoutMs: 10_000, family: "oracle" },
   // News fetch — single-flight TTL'd cache, but the underlying RSS
   // pulls can stall.
   { pattern: "get_crypto_news_headlines", timeoutMs: 15_000, family: "news" },

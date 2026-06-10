@@ -26,7 +26,7 @@ export type ToolFamily =
   | "risk_read"       // Risk classification, check_risk (non-mutating)
   | "memory_read"     // Search memory, get lessons, shared context reads
   | "discovery"       // Trending, volume movers, DEX search
-  | "defi_read"       // DeFi Llama yields, Uniswap data, on-chain reads
+  | "defi_read"       // DeFi Llama yields and on-chain reads
   | "social"          // X social, news sentiment, social sentiment
   | "regime"          // Regime detection, Hurst, efficiency
   | "backtest"        // Backtests, walk-forward, Monte Carlo
@@ -80,8 +80,7 @@ const FAMILY_DEFAULTS: Record<ToolFamily, Omit<ToolClassification, "family">> = 
 const PREFIX_FAMILY_MAP: Array<[string | RegExp, ToolFamily]> = [
   // Trade execution (write-serial)
   [/^(execute_plan|place_|cancel_order|close_trade|approve_strategy)/, "trade_execution"],
-  [/^(agentkit_(?!get_)|polkadot_(?:transfer|stake|unstake|swap|bridge))/, "transfer"],
-  [/^(solana_(?:trade|swap|okx_swap|drift_(?:open|close|cancel)|orca_(?:open|close)))/, "trade_execution"],
+  [/^(transfer_funds|withdraw_to_external|convert_dust)/, "transfer"],
   [/^(arm_|disarm_|start_autonomous|stop_autonomous|pause_autonomous|resume_autonomous)/, "system"],
 
   // Finnhub (all read-safe)
@@ -100,7 +99,6 @@ const PREFIX_FAMILY_MAP: Array<[string | RegExp, ToolFamily]> = [
   // Portfolio reads
   [/^(get_(?:account|positions|balances|portfolio|balance|wallet_address))/, "portfolio_read"],
   [/^(get_trade_history|get_transfer_history|get_historical)/, "portfolio_read"],
-  [/^(polkadot_check_balance|solana_balance|agentkit_get_)/, "portfolio_read"],
 
   // Risk
   [/^(check_risk|classify_trade_risk|calculate_position_size)/, "risk_read"],
@@ -111,7 +109,7 @@ const PREFIX_FAMILY_MAP: Array<[string | RegExp, ToolFamily]> = [
   [/^(list_recent_decisions|get_calibration_stats)/, "memory_read"],
 
   // DeFi reads
-  [/^(defillama_|chainlink_|uniswap_|get_defi_|base_)/, "defi_read"],
+  [/^(defillama_|get_defi_)/, "defi_read"],
 
   // Social
   [/^(x_|get_social_|get_news_)/, "social"],

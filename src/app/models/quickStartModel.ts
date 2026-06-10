@@ -15,7 +15,6 @@ export type MenuOption =
   | "orders"
   | "strategies-live"
   | "regime"
-  | "bridge"
   | "chains";
 
 export function buildQuickStartRecommendedOptions(input: {

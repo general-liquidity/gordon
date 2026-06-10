@@ -29,9 +29,6 @@ export type ActionApprovalPolicy = "none" | "confirm" | "trade_permission" | "ex
 export type ActionProviderKind =
   | "exchange"
   | "broker"
-  | "wallet"
-  | "chain"
-  | "payments"
   | "llm"
   | "data"
   | "automation"

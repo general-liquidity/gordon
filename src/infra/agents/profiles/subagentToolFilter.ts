@@ -49,16 +49,8 @@ const EXECUTION_TOOL_DENY_PATTERNS: ReadonlyArray<string | RegExp> = [
   // Wallet / fund movement
   "wallet_transfer",
   "transfer_between_accounts",
-  /^agentkit_.*transfer$/,
-  /^agentkit_swap/,
-  /^agentkit_wrap/,
-  /^agentkit_request_faucet/,
-  /^moonwell_(deposit|withdraw)$/,
-  /^basenames_/,
-  // Chain-specific writes
-  /^polkadot_(transfer|swap|join|bond|unbond|withdraw|claim|mint|register)/,
-  /^solana_(trade|transfer|create_limit_order|stake_jup|launch|adrena_|flash_|drift_|lulo_|sanctum_|solayer_|voltr_|orca_|raydium_|meteora_|manifest_|debridge_|okx_)/,
-  /^chainlink_ccip_/,
+  "transfer_funds",
+  "withdraw_to_external",
   // Shared-context mutations
   "write_shared_context",
   // Test-order utilities (still touch venue API)

@@ -61,12 +61,12 @@ describe("FW7 — isExecutionTool", () => {
     expect(isExecutionTool("read_shared_context")).toBe(false);
   });
 
-  test("solana_trade is execution", () => {
-    expect(isExecutionTool("solana_trade")).toBe(true);
+  test("transfer_funds is execution", () => {
+    expect(isExecutionTool("transfer_funds")).toBe(true);
   });
 
-  test("polkadot_transfer_native is execution", () => {
-    expect(isExecutionTool("polkadot_transfer_native")).toBe(true);
+  test("withdraw_to_external is execution", () => {
+    expect(isExecutionTool("withdraw_to_external")).toBe(true);
   });
 
   test("preview_market_order is execution (touches venue API)", () => {

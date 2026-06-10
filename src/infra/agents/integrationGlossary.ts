@@ -27,9 +27,6 @@ const glossaryCache = new Map<string, Promise<IntegrationGlossaryEntry[]>>();
 const ACTION_PROVIDER_KIND_TO_DOMAINS: Partial<Record<ActionProviderKind, string[]>> = {
   exchange: ["execution_venue"],
   broker: ["execution_venue"],
-  wallet: ["wallet_rail"],
-  chain: ["chain_infrastructure"],
-  payments: ["payment_rail"],
   llm: ["model_provider", "model_gateway"],
   data: ["market_data_source", "research_analytics_provider"],
   automation: ["automation_provider"],
@@ -42,10 +39,10 @@ const TASK_SCOPE_FALLBACK_DOMAINS: Partial<Record<ActionTaskScope, string[]>> = 
   scan: ["execution_venue", "market_data_source"],
   analysis: ["execution_venue", "market_data_source", "research_analytics_provider"],
   planning: ["execution_venue", "market_data_source"],
-  execution: ["execution_venue", "wallet_rail", "payment_rail"],
-  funding: ["wallet_rail", "payment_rail", "chain_infrastructure"],
+  execution: ["execution_venue"],
+  funding: ["execution_venue"],
   ops: ["observability_provider", "service_backend", "plugin_runtime"],
-  setup: ["model_provider", "model_gateway", "execution_venue", "wallet_rail", "payment_rail", "chain_infrastructure"],
+  setup: ["model_provider", "model_gateway", "execution_venue"],
   system: ["service_backend", "system", "observability_provider"],
 };
 
@@ -55,9 +52,6 @@ const DOMAIN_TOOL_HINTS: Partial<Record<string, string>> = {
   research_analytics_provider: "Use research analytics providers for forecasting, option-pricing, and probabilistic context rather than treating them as raw feeds.",
   model_provider: "Provider/model identity should come from grounded runtime metadata, not general model priors.",
   model_gateway: "Gateway-routed models inherit the gateway parent and should not be described as native providers.",
-  wallet_rail: "Wallet rails are funding and transfer surfaces, not generic execution venues.",
-  payment_rail: "Payment rails handle transfers and agentic payments, not general market data or execution.",
-  chain_infrastructure: "Chain infrastructure surfaces provide RPC, indexing, or protocol plumbing rather than generic venue semantics.",
   automation_provider: "Automation providers are browser/web operators, not market-data vendors or execution venues.",
   observability_provider: "Observability surfaces are for tracing, telemetry, and diagnostics rather than trading decisions.",
   plugin_runtime: "Plugin runtime surfaces expose installable tools and should be described as extensions, not native provider capabilities.",
@@ -119,12 +113,6 @@ function defaultSummary(snapshot: CapabilitySnapshot): string {
       return `${integration.displayName} is a routed model gateway that fronts multiple provider catalogs.`;
     case "model_provider":
       return `${integration.displayName} is a model-provider surface used by Gordon for inference.`;
-    case "wallet_rail":
-      return `${integration.displayName} is a wallet and funding rail, not a general execution venue.`;
-    case "payment_rail":
-      return `${integration.displayName} is a payments rail used for transfers and agentic payments.`;
-    case "chain_infrastructure":
-      return `${integration.displayName} is chain infrastructure used for RPC, indexing, or protocol connectivity.`;
     case "agent_toolkit":
       return `${integration.displayName} is an agent toolkit surface that wraps domain-specific tools.`;
     case "observability_provider":

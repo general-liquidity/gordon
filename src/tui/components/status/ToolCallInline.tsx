@@ -85,7 +85,7 @@ function getToolLabel(toolName: string): string {
 
   // Portfolio
   if (/get_portfolio|portfolio_state/i.test(toolName)) return "Portfolio";
-  if (/get_balance|get_base_balance|get_user_assets/i.test(toolName)) return "Balance";
+  if (/get_balance|get_user_assets/i.test(toolName)) return "Balance";
   if (/get_account/i.test(toolName)) return "Account";
   if (/get_positions|list_active_positions|check_positions/i.test(toolName)) return "Positions";
   if (/trade_history|order_history/i.test(toolName)) return "History";

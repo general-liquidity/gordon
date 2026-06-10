@@ -66,10 +66,10 @@ export const CAPABILITY_TRUTH_MATRIX: CapabilityTruthEntry[] = [
   },
   {
     id: "onchain.protocols",
-    label: "Onchain protocols, Base, DEX, and chain tooling",
+    label: "Onchain price data and wallet intelligence",
     scope: "crypto-only",
     supportedMarkets: ["crypto"],
-    venueDependency: "configured chain infra, wallet, or protocol integrations",
+    venueDependency: "onchain data sources and wallet-intel modules",
     phrasingRule:
       "Keep this explicitly crypto and onchain. Do not blend it into stock-facing copy.",
   },
@@ -88,7 +88,7 @@ export const GORDON_PRODUCT_TRUTH = {
   headline: "Gordon is a chat-first trading agent for crypto and stocks.",
   summaryLines: [
     "Gordon supports both crypto and stocks.",
-    "Crypto currently has the broadest market-wide discovery, onchain, DEX, and venue coverage.",
+    "Crypto currently has the broadest market-wide discovery and venue coverage via CCXT.",
     "Stocks currently support broker-linked quotes, analysis, plans, positions, orders, portfolio checks, and backtests.",
     "Some workflows are cross-market, while others remain market-specific by capability.",
   ],

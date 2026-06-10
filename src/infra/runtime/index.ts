@@ -1,9 +1,8 @@
 // ============================================================================
-// Runtime — Action registry, routing, rails, and providers
+// Runtime — Action registry, routing, and providers
 //
 // Actions: canonical action definitions, surfaces, and runtime policy
 // Routing: MCP tool-to-agent routing manifests
-// Rails: agent rails registry and built-in rail listings
 // Providers: credential and data providers
 // ============================================================================
 

@@ -109,7 +109,7 @@ export const classify_trade_risk = createTool({
     "Score a proposed trade across 13 risk dimensions and return a risk tier. " +
     "Use BEFORE placing any trade to assess position size, concentration, " +
     "drawdown proximity, volatility, regime transition, venue MEV exposure, and more. " +
-    "Returns auto_approve/prompt_user/block. Pass venue (e.g. 'binance', 'uniswap', " +
+    "Returns auto_approve/prompt_user/block. Pass venue (e.g. 'binance', 'ccxt:hyperliquid', " +
     "'ccxt:bybit', 'cow_swap') to surface venue-specific MEV/sniping exposure.",
   inputSchema: z.object({
     symbol: z.string(),
@@ -122,7 +122,7 @@ export const classify_trade_risk = createTool({
       .string()
       .optional()
       .describe(
-        "Venue id (native: 'binance', 'uniswap', 'hyperliquid', etc.; CCXT: 'ccxt:bybit'; " +
+        "Venue id (native: 'binance', 'hyperliquid', etc.; CCXT: 'ccxt:bybit'; " +
           "MEV-protected: 'cow_swap'). When supplied, the 13th risk dimension (Venue MEV " +
           "Exposure) is included in the verdict.",
       ),
