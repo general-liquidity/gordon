@@ -13,6 +13,7 @@
 
 import { createModuleLogger } from "../../logger/index.ts";
 import { emitEvent } from "../../../events/index.ts";
+import { checkForInjection } from "../../safety/defense/injectionDefense.ts";
 
 const logger = createModuleLogger("guardrails");
 
@@ -91,6 +92,24 @@ export async function checkInputGuardrails(input: string): Promise<{
   sanitized?: string;
   severity?: "high" | "medium";
 }> {
+  const injection = checkForInjection(input);
+  if (injection.shouldBlock) {
+    logger.warn("Input blocked by injection defense", {
+      riskLevel: injection.riskLevel,
+      categories: injection.matches.map((m) => m.category),
+    });
+    await emitEvent("guardrail:input_blocked", {
+      reason: "injection_defense",
+      description: injection.reason ?? "Prompt injection detected",
+      severity: "high",
+    });
+    return {
+      allowed: false,
+      reason: injection.reason ?? "Security violation: prompt injection detected",
+      severity: "high",
+    };
+  }
+
   // First check if input contains a whitelisted phrase
   if (containsWhitelistedPhrase(input)) {
     logger.debug("Input contains whitelisted phrase, skipping pattern check");

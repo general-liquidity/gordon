@@ -716,7 +716,7 @@ const LEGACY_SLASH_COMMANDS: SlashCommandSeed[] = [
     level: 1,
     action: "tool",
     target: "suppress_proactive_category",
-    whenToUse: "Silence an entire category (e.g. 'whale_alert' for 120 minutes) when you need quiet focus",
+    whenToUse: "Silence an entire category (e.g. 'funding_alert' for 120 minutes) when you need quiet focus",
   },
   // Research — backtest research mode (verdict-driven auto-optimizer loop)
   // Named /research (not /lab, which is an existing workspace menu command)

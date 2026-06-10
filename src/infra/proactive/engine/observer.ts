@@ -12,8 +12,8 @@
  *      to all registered producers.
  *   2. Periodic tick loop — a setInterval that emits synthetic observations
  *      every 60 seconds with different eventTypes (tick_session_review,
- *      tick_journal_prompt, tick_whale_drain, etc.) so periodic producers
- *      have something to react to.
+ *      tick_journal_prompt, tick_whale_alert, tick_playbook_suggest, etc.)
+ *      so periodic producers have something to react to.
  *
  * `startProactiveObserver()` is idempotent — calling it twice returns the
  * same teardown function. `stopProactiveObserver()` cleanly unsubscribes
@@ -68,6 +68,8 @@ const TICK_INTERVALS = {
   volatility: 10 * 60 * 1000,       // 10 min — ATR expansion check
   funding: 30 * 60 * 1000,          // 30 min — perp funding scan
   news_event: 10 * 60 * 1000,       // 10 min — RSS headline polling
+  whale_alert: 15 * 60 * 1000,      // 15 min — whale-flow headline scan
+  playbook_suggest: 30 * 60 * 1000, // 30 min — regime-matched playbook nudge
   stock_news_event: 15 * 60 * 1000, // 15 min — stock RSS + EDGAR + Finnhub
   // Stock event ticks (Finnhub-driven)
   earnings: 2 * 60 * 60 * 1000,     // 2 hours — upcoming earnings calendar

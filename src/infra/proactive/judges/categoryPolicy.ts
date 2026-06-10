@@ -12,7 +12,7 @@
  */
 
 import type { CategoryPolicyState, ProactiveCategory } from "../types.ts";
-import { ALL_CATEGORIES } from "../types.ts";
+import { ALL_CATEGORIES, INACTIVE_PROACTIVE_CATEGORIES } from "../types.ts";
 import { getSuggestionStore } from "../storage/suggestionStore.ts";
 
 // ============================================================================
@@ -97,6 +97,10 @@ export class CategoryPolicyManager {
   ): { allowed: boolean; reason?: string } {
     const s = this.state.get(category);
     if (!s) return { allowed: false, reason: `unknown category: ${category}` };
+
+    if (INACTIVE_PROACTIVE_CATEGORIES.has(category)) {
+      return { allowed: false, reason: "category has no producer wired" };
+    }
 
     // Explicit suppression (user or auto)
     if (s.suppressedUntil && s.suppressedUntil > Date.now()) {

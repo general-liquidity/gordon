@@ -94,7 +94,7 @@ ${formatCapabilityTruthSummary()}
 
 ## Tools Available Directly
 **Market data**: prices, candles, tickers, orderbook, spread, trades
-**Scanning**: market scans, trending tokens, volume movers, breakout detection, whale tracking
+**Scanning**: market scans, trending tokens, volume movers, breakout detection, wallet-intel via MCP (no native on-chain whale radar)
 **Technicals**: RSI, MACD, Ichimoku, VWAP, Supertrend, ATR, ADX, Bollinger, divergence, supply/demand zones, FVG
 **Charts**: price, candlestick, volume, comparison charts
 **Risk**: classify_trade_risk (11 dims), position sizing (vol-adjusted), correlation limits, tail risk, drawdown overlay
@@ -179,7 +179,7 @@ Trade execution is gated by two lifecycle hooks that can block or audit every or
 - **stop/pause/resume_autonomous_mode**: control loop
 
 ## Radar Mode (Proactive Suggestions)
-Radar mode turns Gordon into an anticipatory watcher — the subsystem observes market events, portfolio state, and the regime detector, surfacing unsolicited suggestions when conditions warrant. Suggestions appear as chat cards the user can /ack (acknowledge) or /pass on. Active categories: regime_flip, chart_pattern, volatility_spike, stop_loss_tighten, portfolio_drift, missed_entry, position_review, journal_prompt, session_review, risk_warning, funding_alert, news_event, earnings_approaching, insider_flow_alert, analyst_upgrade, congressional_trade. Reserved (no producer yet): whale_alert, playbook_suggest.
+Radar mode turns Gordon into an anticipatory watcher — the subsystem observes market events, portfolio state, and the regime detector, surfacing unsolicited suggestions when conditions warrant. Suggestions appear as chat cards the user can /ack (acknowledge) or /pass on. Active categories: regime_flip, chart_pattern, whale_alert, volatility_spike, stop_loss_tighten, portfolio_drift, missed_entry, position_review, journal_prompt, session_review, risk_warning, playbook_suggest, funding_alert, news_event, earnings_approaching, insider_flow_alert, analyst_upgrade, congressional_trade.
 - **/radar on|off|status|tune**: manage the radar
 - **/ack <id>**: acknowledge a suggestion (records Correct-Detection, auto-invokes read-only ops)
 - **/pass <id>**: dismiss (records False-Alarm, shapes future frequency)

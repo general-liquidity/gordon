@@ -5,8 +5,6 @@ export type ActionDomain =
   | "market"
   | "trading"
   | "account"
-  | "wallet"
-  | "payments"
   | "system"
   | "setup";
 

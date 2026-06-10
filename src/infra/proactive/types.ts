@@ -41,10 +41,7 @@ export type ProactiveCategory =
   | "congressional_trade"; // STOCK Act disclosure on held or watched symbol
 
 /** Categories in schema/UI but with no producer wired yet. */
-export const INACTIVE_PROACTIVE_CATEGORIES: ReadonlySet<ProactiveCategory> = new Set([
-  "whale_alert",
-  "playbook_suggest",
-]);
+export const INACTIVE_PROACTIVE_CATEGORIES: ReadonlySet<ProactiveCategory> = new Set();
 
 export const ALL_CATEGORIES: ProactiveCategory[] = [
   "regime_flip",
@@ -66,6 +63,11 @@ export const ALL_CATEGORIES: ProactiveCategory[] = [
   "analyst_upgrade",
   "congressional_trade",
 ];
+
+/** Categories with an active producer — ALL minus inactive. */
+export const ACTIVE_CATEGORIES: ProactiveCategory[] = ALL_CATEGORIES.filter(
+  (c) => !INACTIVE_PROACTIVE_CATEGORIES.has(c),
+);
 
 // ============================================================================
 // Suggestion lifecycle status

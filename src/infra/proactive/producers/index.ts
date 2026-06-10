@@ -22,7 +22,9 @@ import { chartPatternProducer, resetChartPatternProducerState } from "./signals/
 import { volatilitySpikeProducer, resetVolatilitySpikeProducerState } from "./signals/volatilitySpikeProducer.ts";
 import { fundingAlertProducer, resetFundingAlertProducerState } from "./signals/fundingAlertProducer.ts";
 import { newsEventProducer, resetNewsEventProducerState } from "./events/newsEventProducer.ts";
+import { whaleAlertProducer, resetWhaleAlertProducerState } from "./events/whaleAlertProducer.ts";
 import { stockNewsEventProducer, resetStockNewsEventProducerState } from "./events/stockNewsEventProducer.ts";
+import { playbookSuggestProducer, resetPlaybookSuggestProducerState } from "./signals/playbookSuggestProducer.ts";
 import {
   earningsApproachingProducer,
   insiderFlowProducer,
@@ -48,7 +50,9 @@ export {
   volatilitySpikeProducer,
   fundingAlertProducer,
   newsEventProducer,
+  whaleAlertProducer,
   stockNewsEventProducer,
+  playbookSuggestProducer,
   earningsApproachingProducer,
   insiderFlowProducer,
   analystUpgradeProducer,
@@ -132,7 +136,9 @@ export function registerAllProducers(engine: ProactiveEngine): () => void {
     engine.registerProducer(withHealthTracking("volatilitySpike", volatilitySpikeProducer)),
     engine.registerProducer(withHealthTracking("fundingAlert", fundingAlertProducer)),
     engine.registerProducer(withHealthTracking("newsEvent", newsEventProducer)),
+    engine.registerProducer(withHealthTracking("whaleAlert", whaleAlertProducer)),
     engine.registerProducer(withHealthTracking("stockNewsEvent", stockNewsEventProducer)),
+    engine.registerProducer(withHealthTracking("playbookSuggest", playbookSuggestProducer)),
     engine.registerProducer(withHealthTracking("earningsApproaching", earningsApproachingProducer)),
     engine.registerProducer(withHealthTracking("insiderFlow", insiderFlowProducer)),
     engine.registerProducer(withHealthTracking("analystUpgrade", analystUpgradeProducer)),
@@ -150,7 +156,9 @@ export function registerAllProducers(engine: ProactiveEngine): () => void {
     resetVolatilitySpikeProducerState();
     resetFundingAlertProducerState();
     resetNewsEventProducerState();
+    resetWhaleAlertProducerState();
     resetStockNewsEventProducerState();
+    resetPlaybookSuggestProducerState();
     resetStockEventsProducerState();
     getProducerHealthTracker().stop();
   };
