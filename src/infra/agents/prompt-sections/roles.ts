@@ -1,12 +1,12 @@
 import type { PromptSectionDefinition } from "./shared.ts";
 
 // 3-agent architecture: Gordon (orchestrator), Executor (trades), Researcher (parallel work)
-// Legacy roles kept as aliases pointing to Gordon's tool categories for backward compat.
+// Workflow-category aliases — Gordon tool categories, not separate agents (backward compat).
 export type PromptAgentRole =
   | "gordon"
   | "executor"
   | "researcher"
-  // Legacy aliases — these are tool categories within Gordon, not separate agents
+  // Workflow-category aliases — tool categories within Gordon, not separate agents
   | "scanner"
   | "analyst"
   | "planner"
@@ -92,7 +92,7 @@ If you can say it in one sentence, don't use three. Prefer short, direct sentenc
 - Prioritize thoroughness over speed. Return structured results.`,
     },
   ],
-  // Legacy aliases — all point to Gordon's tool categories
+  // Workflow-category aliases — all point to Gordon's tool categories
   scanner: [
     {
       id: "role.scanner.discovery",
