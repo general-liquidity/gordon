@@ -391,6 +391,33 @@ export const executePlanTool = createTool({
       return validateToolOutput(executePlanOutputSchema, { success: false, error: `Plan not found: ${planId}` }, { toolName: "execute_plan" });
     }
 
+    // Plan-state gate: a plan must be APPROVED to execute. This enforces the
+    // documented contract (approve_plan first, capturing rationale + audit) AND
+    // makes re-execution structurally impossible — a successful execution
+    // transitions the plan to EXECUTING, so EXECUTING/CLOSED/CANCELLED are
+    // rejected here, preventing a duplicate position from a re-issued call.
+    // (A failed attempt leaves the plan APPROVED, so a legitimate retry is
+    // still allowed; entry/stop/tp placement is idempotent, see executor.ts.)
+    if (plan.status !== "APPROVED") {
+      recordStructuredObservation({
+        eventType: "execution.blocked",
+        workflow: "execution",
+        source: "agent_tool",
+        component: "execute_plan",
+        toolName: "execute_plan",
+        outcome: "failure",
+        status: "invalid_plan_status",
+        controllability: classifyBlockedStatus("invalid_plan_status"),
+        planId,
+        reason: `Plan ${planId} is ${plan.status}, not APPROVED.`,
+        details: { rationale, currentStatus: plan.status },
+      });
+      const hint = plan.status === "DRAFT"
+        ? "Call approve_plan first."
+        : "A plan that is already EXECUTING/CLOSED/CANCELLED cannot be re-executed.";
+      return validateToolOutput(executePlanOutputSchema, { success: false, error: `Plan ${planId} is in ${plan.status} status, not APPROVED. ${hint}` }, { toolName: "execute_plan" });
+    }
+
     recordStructuredObservation({
       eventType: "execution.rationale_recorded",
       workflow: "execution",

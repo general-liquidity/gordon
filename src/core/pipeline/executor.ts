@@ -161,6 +161,22 @@ export function generateClientOrderId(planId: string, type: string): string {
 }
 
 /**
+ * Deterministic client order ID for plan-scoped orders (entry/stop/tp/grid),
+ * each placed exactly once per execution. Same (planId, type) always yields
+ * the same id — so a retry of executePlan (e.g. after a partial failure or a
+ * network timeout that left the plan APPROVED) is idempotent: the exchange
+ * dedupes on the stable clientOrderId and placeOrderIdempotent finds the prior
+ * order in history instead of placing a duplicate. Keeps the exact
+ * `gordon_<planFragment>_<type>` prefix so order-recovery + reconciliation
+ * matching are unaffected; only the entropy suffix of generateClientOrderId is
+ * dropped (that suffix is retained for orders that legitimately repeat, e.g.
+ * partial closes / OCO re-arms).
+ */
+export function generateDeterministicClientOrderId(planId: string, type: string): string {
+  return `gordon_${planId.slice(4, 12)}_${type}`;
+}
+
+/**
  * Round quantity to appropriate precision for exchange orders
  * Default to 8 decimal places, which is safe for most pairs
  */
@@ -394,7 +410,7 @@ export async function executePlan(
       side: entrySide,
       type: plan.entry.type === "market" ? "MARKET" : "LIMIT",
       quantity: totalQuantity,
-      newClientOrderId: generateClientOrderId(plan.id, "entry"),
+      newClientOrderId: generateDeterministicClientOrderId(plan.id, "entry"),
     };
 
     if (plan.entry.type === "limit" && plan.entry.price !== null) {
@@ -404,7 +420,7 @@ export async function executePlan(
 
     let entryOrder: Order;
     try {
-      entryOrder = await client.placeOrder(entryOrderParams);
+      entryOrder = await placeOrderIdempotent(client, entryOrderParams);
       logger.info("Entry order placed", {
         orderId: entryOrder.orderId,
         symbol: plan.symbol,
@@ -551,12 +567,12 @@ export async function executePlan(
         price: roundPrice(plan.stopLoss.price * 0.995),
         stopPrice: roundPrice(plan.stopLoss.price),
         timeInForce: "GTC",
-        newClientOrderId: generateClientOrderId(plan.id, "stop"),
+        newClientOrderId: generateDeterministicClientOrderId(plan.id, "stop"),
       };
 
       let stopOrder: Order;
       try {
-        stopOrder = await client.placeOrder(stopOrderParams);
+        stopOrder = await placeOrderIdempotent(client, stopOrderParams);
         logger.info("Stop order placed", {
           orderId: stopOrder.orderId,
           stopPrice: plan.stopLoss.price,
@@ -635,12 +651,12 @@ export async function executePlan(
           quantity: tpQuantity,
           price: roundPrice(tp.price),
           timeInForce: "GTC",
-          newClientOrderId: generateClientOrderId(plan.id, `tp${i + 1}`),
+          newClientOrderId: generateDeterministicClientOrderId(plan.id, `tp${i + 1}`),
         };
 
         let tpOrder: Order;
         try {
-          tpOrder = await client.placeOrder(tpOrderParams);
+          tpOrder = await placeOrderIdempotent(client, tpOrderParams);
           logger.info("Take profit order placed", {
             level: i + 1,
             orderId: tpOrder.orderId,
@@ -866,12 +882,12 @@ async function executeGridPlan(
         quantity: gridOrder.quantity,
         price: roundPrice(gridOrder.price),
         timeInForce: "GTC",
-        newClientOrderId: generateClientOrderId(plan.id, `grid${gridOrder.levelIndex}`),
+        newClientOrderId: generateDeterministicClientOrderId(plan.id, `grid${gridOrder.levelIndex}`),
       };
 
       let order: Order;
       try {
-        order = await client.placeOrder(orderParams);
+        order = await placeOrderIdempotent(client, orderParams);
         logger.info("Grid level order placed", {
           level: gridOrder.levelIndex,
           orderId: order.orderId,
@@ -941,12 +957,12 @@ async function executeGridPlan(
       price: roundPrice(plan.stopLoss.price * 0.995), // Limit price slightly below stop
       stopPrice: roundPrice(plan.stopLoss.price),
       timeInForce: "GTC",
-      newClientOrderId: generateClientOrderId(plan.id, "stop"),
+      newClientOrderId: generateDeterministicClientOrderId(plan.id, "stop"),
     };
 
     let stopOrder: Order;
     try {
-      stopOrder = await client.placeOrder(stopOrderParams);
+      stopOrder = await placeOrderIdempotent(client, stopOrderParams);
       logger.info("Grid stop loss placed", {
         orderId: stopOrder.orderId,
         stopPrice: plan.stopLoss.price,
