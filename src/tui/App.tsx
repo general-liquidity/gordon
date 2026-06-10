@@ -451,6 +451,7 @@ function AppInner() {
   const showPalette = useAppState((s) => s.showPalette);
   const showHelp = useAppState((s) => s.showHelp);
   const permissionMode = useAppState((s) => s.permissionMode);
+  const [connectivityHints, setConnectivityHints] = useState({ hasExchange: false, hasBroker: false });
   const messages = useAppState((s) => s.messages);
   const isStreaming = useAppState((s) => s.isStreaming);
   const streamBuffer = useAppState((s) => s.streamBuffer);
@@ -657,7 +658,7 @@ function AppInner() {
     !!counterfactual || !!debateView || !!elicitationRequest;
 
   // ── Prompt suggestions based on conversation context ──
-  const promptSuggestions = usePromptSuggestions(messages, isStreaming, !!false /* hasExchange */);
+  const promptSuggestions = usePromptSuggestions(messages, isStreaming, connectivityHints.hasExchange);
 
   // ── Queued message count ──
   const queuedCount = defaultMessageQueue.length?.() ?? 0;
@@ -821,6 +822,16 @@ function AppInner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bootPhase]);
 
+  useEffect(() => {
+    if (!runtimeReady) return;
+    void loadConfig().then((config) => {
+      setConnectivityHints({
+        hasExchange: (config.exchanges?.length ?? 0) > 0 || !!config.activeExchangeId,
+        hasBroker: (config.brokers?.length ?? 0) > 0 || !!config.activeBrokerId,
+      });
+    });
+  }, [runtimeReady]);
+
   // ── Progressive inline hints (shown on first few sessions, then hidden) ──
   useEffect(() => {
     if (!runtimeReady) return;
@@ -829,8 +840,8 @@ function AppInner() {
     const hintContext: HintContext = {
       sessionCount: 0, // Loaded from state inside getNextHint
       onboardingComplete: true,
-      hasExchange: false, // TODO: pull from config
-      hasBroker: false,
+      hasExchange: connectivityHints.hasExchange,
+      hasBroker: connectivityHints.hasBroker,
       hasGordonMd: false,
       permissionMode: permissionMode ?? "ask",
     };
@@ -849,7 +860,7 @@ function AppInner() {
       });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [runtimeReady]);
+  }, [runtimeReady, connectivityHints.hasExchange, connectivityHints.hasBroker]);
 
   // ── Ctrl+C double-press exit ──
   useEffect(() => {

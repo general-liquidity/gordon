@@ -74,15 +74,16 @@ let toolRegistry: Record<string, MastraTool> | null = null;
 async function getToolRegistry(): Promise<Record<string, MastraTool>> {
   if (toolRegistry) return toolRegistry;
 
-  // Import tools dynamically to avoid circular dependencies
-  const { indicatorTools } = await import("../../market/indicators.ts");
-  const { marketAnalysisTools } = await import("../../market/market-analysis.ts");
-  const { orderbookTools } = await import("../../market/orderbook.ts");
+  const {
+    instrumentedIndicatorTools,
+    instrumentedMarketAnalysisTools,
+    instrumentedOrderbookTools,
+  } = await import("../../../tooling/instrumentedTools.ts");
 
   toolRegistry = {
-    ...indicatorTools,
-    ...marketAnalysisTools,
-    ...orderbookTools,
+    ...instrumentedIndicatorTools,
+    ...instrumentedMarketAnalysisTools,
+    ...instrumentedOrderbookTools,
   } as Record<string, MastraTool>;
 
   return toolRegistry;

@@ -162,6 +162,13 @@ describe("slash command UX formatting", () => {
     expect(ta?.action).toBe("agent");
   });
 
+  it("keeps stocks read commands direct while buy/sell route via toolHandlers", () => {
+    const stocks = SLASH_COMMANDS.find((command) => command.name === "stocks");
+    expect(stocks?.action).toBe("tool");
+    expect(stocks?.target).toBe("handle_stocks_command");
+    expect(stocks && isRuntimeHandledSlashCommand(stocks)).toBe(true);
+  });
+
   it("routes trading execution slash commands through the agent stack", () => {
     const cancel = SLASH_COMMANDS.find((command) => command.name === "cancel");
     const close = SLASH_COMMANDS.find((command) => command.name === "close");

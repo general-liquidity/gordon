@@ -19,11 +19,11 @@ import {
   instrumentedMemoryTools,
   instrumentedRuntimeTools,
   instrumentedAdvancedTools,
+  instrumentedTradingInfraTools,
   gordonInputGuard,
   gordonOutputSanitizer,
   gordonToolCallReconciler,
 } from "../tooling/instrumentedTools.ts";
-import { tradingInfraTools } from "../tools/runtime/tradingInfra.ts";
 import { createSubAgentMemory } from "../memory/memoryFactory.ts";
 import { createModelResolver, registerObservability, resolveRuntimeModel } from "../agentHelpers.ts";
 import {
@@ -157,7 +157,7 @@ export function getExecutor(): Agent {
       ...instrumentedSharedContextTools,
       ...instrumentedCheckRiskTool,
       // Critic (risk classifier) — MANDATORY pre-execution check
-      classify_trade_risk: tradingInfraTools.classify_trade_risk,
+      classify_trade_risk: instrumentedTradingInfraTools.classify_trade_risk,
       // Gap 1 — per-trade rule-override emit. Executor calls this
       // whenever it proceeds with an order despite classify_trade_risk
       // returning recommendation !== 'auto_approve' AND the operator

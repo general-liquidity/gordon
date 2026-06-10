@@ -43,6 +43,7 @@ import {
 } from "./discoveryCache.ts";
 import { wrapUntrustedContent } from "../../security/untrustedContent.ts";
 import { sanitizeToolDescription } from "../../safety/defense/injectionDefense.ts";
+import { withToolMetrics } from "../../agents/tools/wrappers/withMetrics.ts";
 
 // ============================================================================
 // MCP output wrapping
@@ -438,7 +439,9 @@ export async function ensureMCPToolsDiscovered(serverIds?: string[]): Promise<Re
     // time signatures but not runtime output content).
     const wrappedTools: Record<string, Tool> = {};
     for (const [name, tool] of Object.entries(discoveredTools)) {
-      wrappedTools[name] = wrapMCPToolForUntrustedContent(tool, name);
+      const sanitized = wrapMCPToolForUntrustedContent(tool, name);
+      const toolId = (sanitized as { id?: string }).id ?? name;
+      wrappedTools[name] = withToolMetrics({ ...sanitized, id: toolId } as { id: string; execute?: unknown }) as Tool;
     }
     _mcpTools = {
       ...(_mcpTools ?? {}),

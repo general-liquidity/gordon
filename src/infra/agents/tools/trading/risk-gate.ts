@@ -60,19 +60,28 @@ export async function evaluateOrderRisk(
     try {
       portfolioContext = await builder.buildFromExchange(ctx.exchange);
     } catch (err) {
-      logger.warn("Could not build portfolio context from exchange, rejecting by fail-closed policy", {
+      logger.warn("Could not build portfolio context from exchange", {
+        error: (err as Error).message,
+      });
+    }
+  }
+
+  if (!portfolioContext && ctx.broker) {
+    try {
+      portfolioContext = await builder.buildFromBroker(ctx.broker);
+    } catch (err) {
+      logger.warn("Could not build portfolio context from broker", {
         error: (err as Error).message,
       });
     }
   }
 
   if (!portfolioContext) {
-    // Fail-closed: do not allow execution when portfolio context is unavailable
     return {
       approved: false,
       quantity: order.quantity,
       reason: "Rejected: portfolio context unavailable, risk checks could not be completed.",
-      warnings: ["No exchange adapter available. Risk kernel evaluation blocked."],
+      warnings: ["No exchange or broker adapter available. Risk kernel evaluation blocked."],
     };
   }
 

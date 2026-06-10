@@ -198,7 +198,7 @@ Risk Debate:
 Final verdict: approve, modify (with changes), or reject.
 Respond in JSON: { "verdict": "approve|modify|reject", "reasoning": "...", "modifications": [...] }`;
 
-// Stub orchestrator - actual LLM calls would be wired through existing agent infrastructure
+// LLM calls are injected via runAgentPrompt — callers wire their own agent backend.
 export async function runDebate(
   symbol: string,
   context: string,

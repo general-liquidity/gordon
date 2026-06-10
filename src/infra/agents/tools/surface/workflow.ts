@@ -6,10 +6,8 @@
  *   - ask_user           → operator elicitation
  *   - schedule_task      → autonomous-loop / proactive radar / cron mandates
  *
- * Wires `skill` and `ask_user` through existing handlers. `delegate_subagent`
- * and `schedule_task` defer to runtime-resolved dispatchers — those exist
- * but are constructed conditionally per agent, so we leave shape-faithful
- * stubs here pending dedicated wiring.
+ * Wires `skill`, `ask_user`, `delegate_subagent`, and `schedule_task`
+ * through existing runtime dispatchers (subagent profiles + autonomous loop).
  */
 
 import { createTool } from "@mastra/core/tools";

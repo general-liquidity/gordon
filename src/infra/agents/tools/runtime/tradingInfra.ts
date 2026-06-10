@@ -25,6 +25,7 @@ import {
   listCheckpoints,
   getLatestCheckpoint,
   formatCheckpoint,
+  type PortfolioCheckpoint,
 } from "../../../trading/ops/strategyCheckpoint.ts";
 import {
   createRebalanceCycle,
@@ -183,14 +184,63 @@ export const save_checkpoint = createTool({
     label: z.string().describe("Human-readable label (e.g., 'Before BTC rebalance')"),
     reason: z.enum(["manual", "pre_rebalance", "pre_strategy_change", "pre_execution"]).default("manual"),
   }),
-  execute: async ({ label, reason }) => {
+  execute: async ({ label, reason }, execContext) => {
+    const ctx = getGordonContext(execContext);
+    let totalValueUsd = ctx?.portfolioValue ?? 0;
+    let cashUsd = ctx?.availableCash ?? 0;
+    const positions: PortfolioCheckpoint["portfolio"]["positions"] = [];
+
+    if (ctx?.broker) {
+      try {
+        const [account, brokerPositions] = await Promise.all([
+          ctx.broker.getAccount(),
+          ctx.broker.getPositions(),
+        ]);
+        totalValueUsd = account.portfolioValue;
+        cashUsd = account.cash;
+        for (const pos of brokerPositions) {
+          const currentPrice = pos.qty > 0 ? pos.marketValue / pos.qty : pos.avgEntryPrice;
+          positions.push({
+            symbol: pos.symbol,
+            side: pos.side,
+            quantity: pos.qty,
+            avgPrice: pos.avgEntryPrice,
+            currentPrice,
+            notionalUsd: pos.marketValue,
+          });
+        }
+      } catch {
+        // Fall back to context hints when broker snapshot fails.
+      }
+    } else if (ctx?.exchange) {
+      try {
+        const { PortfolioContextBuilder } = await import("../../../../core/risk-kernel/portfolio-context.ts");
+        const portfolio = await new PortfolioContextBuilder().buildFromExchange(ctx.exchange);
+        totalValueUsd = portfolio.totalEquity;
+        cashUsd = portfolio.availableBalance;
+        for (const pos of portfolio.openPositions) {
+          const notionalUsd = Math.abs(pos.size * pos.currentPrice);
+          positions.push({
+            symbol: pos.symbol,
+            side: pos.side,
+            quantity: Math.abs(pos.size),
+            avgPrice: pos.entryPrice,
+            currentPrice: pos.currentPrice,
+            notionalUsd,
+          });
+        }
+      } catch {
+        // Fall back to context hints when exchange snapshot fails.
+      }
+    }
+
     const cp = saveCheckpoint({
       label,
       reason,
       portfolio: {
-        totalValueUsd: 0, // TODO: populate from real portfolio
-        cashUsd: 0,
-        positions: [],
+        totalValueUsd,
+        cashUsd,
+        positions,
         pendingOrders: [],
       },
     });

@@ -49,7 +49,11 @@ export async function routeToolCommand(
     case "config":   return handleConfigCommand(args);
     case "exchange": return handleExchangeCommand(args);
     case "broker":   return handleBrokerCommand(args);
-    case "stocks":   return handleStocksCommand(args);
+    case "stocks": {
+      const sub = args.trim().split(/\s+/)[0]?.toLowerCase();
+      if (sub === "buy" || sub === "sell") return null;
+      return handleStocksCommand(args);
+    }
     case "keyring":  return handleKeyringCommand(args);
     case "telemetry": return handleTelemetryCommand(args);
     case "killswitch": return (await handleKillSwitchCommand(args)).message;

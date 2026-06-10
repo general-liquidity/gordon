@@ -7,10 +7,13 @@ on:
   pull_request:
     paths:
       - "src/infra/domain/evals/**"
-      - "src/infra/safety/defense/tradingConstitution.ts"
-      - "src/runtime/permissions/trustTrajectory.ts"
+      - "src/infra/safety/**"
+      - "src/runtime/permissions/**"
       - "src/infra/agents/prompt-sections/**"
+      - "src/infra/agents/tools/**"
+      - "src/app/**"
       - "scripts/dev/eval-gate.ts"
+      - "scripts/dev/eval-live-runner.ts"
   workflow_dispatch: {}
 
 jobs:

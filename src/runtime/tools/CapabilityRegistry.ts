@@ -220,6 +220,7 @@ const STATIC_TOOL_OVERRIDES: Record<string, Partial<RuntimeToolSpec>> = {
     riskClass: "medium",
     sideEffectLevel: "read",
     workerRole: "Monitor",
+    // buy/sell subcommands fall through to the agent in toolHandlers.ts
   },
   handle_config_command: {
     category: "system",

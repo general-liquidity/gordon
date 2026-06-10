@@ -7,8 +7,7 @@
  * - /stocks quote <symbol>
  * - /stocks positions
  * - /stocks orders [open|closed|all] [limit]
- * - /stocks buy <symbol> <qty|$notional> [market|limit <price>] [day|gtc|ioc|fok]
- * - /stocks sell <symbol> <qty> [market|limit <price>] [day|gtc|ioc|fok]
+ * - /stocks buy|sell — routed through the agent (risk classifier + permissions)
  */
 
 import { loadConfig } from "../../infra/storage/config/config.ts";
@@ -366,48 +365,12 @@ async function stocksOrders(statusArg: string | undefined, limitArg: string | un
   }
 }
 
-async function stocksPlace(side: "buy" | "sell", args: string[]): Promise<StocksCommandResult> {
-  try {
-    const config = await loadConfig();
-    if (config.permissionMode === "strict") {
-      return {
-        success: false,
-        message: "permissionMode is 'strict' (read-only). Use /auto or /ask to enable trading.",
-      };
-    }
+const STOCKS_EXECUTION_REDIRECT =
+  "Stock buy/sell must go through the agent so orders pass classify_trade_risk, kill switches, and permission gates. " +
+  "Re-run as /stocks buy <symbol> <qty> (or sell) — Gordon will route it through the full safety stack.";
 
-    const parsed = parseOrderArgs(args);
-    if ("error" in parsed) {
-      return { success: false, message: parsed.error };
-    }
-
-    const { broker, brokerId, paper } = await resolveActiveBroker();
-    const order = await broker.placeOrder({
-      symbol: parsed.symbol,
-      side,
-      type: parsed.type,
-      timeInForce: parsed.timeInForce,
-      qty: parsed.qty,
-      notional: parsed.notional,
-      limitPrice: parsed.limitPrice,
-      extendedHours: false,
-    });
-
-    return {
-      success: true,
-      message:
-        `Order placed (${brokerId}, ${paper ? "PAPER" : "LIVE"}):\n` +
-        `  ${order.side.toUpperCase()} ${order.symbol}\n` +
-        `  Type: ${order.type.toUpperCase()} | TIF: ${order.timeInForce.toUpperCase()}\n` +
-        `  Qty: ${order.qty} | Filled: ${order.filledQty}\n` +
-        `  Status: ${order.status} | Order ID: ${order.id}`,
-    };
-  } catch (error) {
-    return {
-      success: false,
-      message: `Failed to place ${side} order: ${error instanceof Error ? error.message : String(error)}`,
-    };
-  }
+async function stocksPlace(_side: "buy" | "sell", _args: string[]): Promise<StocksCommandResult> {
+  return { success: false, message: STOCKS_EXECUTION_REDIRECT };
 }
 
 export async function handleStocksCommand(args: string): Promise<string> {
@@ -447,12 +410,11 @@ export async function handleStocksCommand(args: string): Promise<string> {
           `  /stocks quote <symbol>\n` +
           `  /stocks positions\n` +
           `  /stocks orders [open|closed|all] [limit]\n` +
-          `  /stocks buy <symbol> <qty|$notional> [market|limit <price>] [day|gtc|ioc|fok]\n` +
-          `  /stocks sell <symbol> <qty> [market|limit <price>] [day|gtc|ioc|fok]\n\n` +
+          `  /stocks buy <symbol> <qty>  (agent-routed — full safety stack)\n` +
+          `  /stocks sell <symbol> <qty> (agent-routed — full safety stack)\n\n` +
           `Examples:\n` +
           `  /stocks quote AAPL\n` +
           `  /stocks buy AAPL 5\n` +
-          `  /stocks buy NVDA $500 limit 870 gtc\n` +
           `  /stocks orders open 20`,
       };
       break;

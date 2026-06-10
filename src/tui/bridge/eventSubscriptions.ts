@@ -167,7 +167,12 @@ export function subscribeToEvents(dispatch: Dispatch): () => void {
           result: event.pnl > 0 ? "win" : event.pnl < 0 ? "loss" : "breakeven",
           pnlUsd: event.pnl,
           pnlPct: event.pnlPercent,
-          holdDurationMs: 0, // TODO: compute from open/close timestamps
+          holdDurationMs: (() => {
+            const openedAt = event.trade.openedAt;
+            const closedAt = event.trade.closedAt ?? event.timestamp;
+            if (!openedAt) return 0;
+            return Math.max(0, new Date(closedAt).getTime() - new Date(openedAt).getTime());
+          })(),
           closedAt: new Date().toISOString(),
           strategy: (event.trade as any).strategy,
         });
