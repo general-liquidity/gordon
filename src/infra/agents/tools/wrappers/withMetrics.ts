@@ -52,7 +52,7 @@ type ToolAccessDecision = {
   requestId?: string;
 };
 
-async function evaluateToolAccess(
+export async function evaluateGordonToolAccess(
   toolId: string,
   gordonContext: GordonContext | undefined,
 ): Promise<ToolAccessDecision> {
@@ -60,6 +60,13 @@ async function evaluateToolAccess(
     return gordonContext.runtime.evaluateToolAccess(toolId, gordonContext);
   }
   if (!gordonContext) {
+    const { isSafetyCritical } = await import("../../../../runtime/permissions/trustTrajectory.ts");
+    if (isSafetyCritical(toolId)) {
+      return {
+        status: "blocked",
+        reason: "No Gordon context available — safety-critical tool blocked (fail-closed).",
+      };
+    }
     return { status: "allowed" };
   }
 
@@ -114,7 +121,7 @@ export function withToolMetrics<T extends { id: string; execute?: unknown }>(too
       { toolName: tool.id, threadId },
       async (span) => {
         try {
-          const access = await evaluateToolAccess(tool.id, gordonContext);
+          const access = await evaluateGordonToolAccess(tool.id, gordonContext);
           span.setAttribute("permissionStatus", access.status);
           if (access.status !== "allowed") {
             recordToolCall(tool.id, false);

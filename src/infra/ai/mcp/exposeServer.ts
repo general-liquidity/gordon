@@ -53,6 +53,8 @@ import { registerGordonResources } from "./resources.ts";
 import { registerGordonPrompts } from "./prompts.ts";
 import { buildTaskAnnotations } from "./tasks.ts";
 import type { ZodObject, ZodRawShape } from "zod";
+import { evaluateGordonToolAccess } from "../../agents/tools/wrappers/withMetrics.ts";
+import { getGordonContext, type MastraExecutionContext } from "../../agents/tools/types.ts";
 
 export const MCP_EXPOSE_FLAG_ENV = "GORDON_MCP_EXPOSE_SERVER";
 export const MCP_ALLOW_EXECUTION_ENV = "GORDON_MCP_ALLOW_EXECUTION";
@@ -100,6 +102,11 @@ export const EXECUTION_DENY_LIST: ReadonlySet<string> = new Set([
   "update_trailing_stop",
   "wallet_transfer",
   "set_permission_mode",
+  "cancel",
+  "place_market_order",
+  "place_limit_order",
+  "place_bracket_order",
+  "place_oco_order",
 ]);
 
 // -------------------- structural tool types --------------------
@@ -187,6 +194,26 @@ async function invokeAndAdapt(
   execContext: unknown,
 ): Promise<{ content: { type: "text"; text: string }[]; isError?: boolean }> {
   try {
+    const gordonContext = getGordonContext(execContext as MastraExecutionContext) ?? undefined;
+    const access = await evaluateGordonToolAccess(tool.id, gordonContext);
+    if (access.status !== "allowed") {
+      const suffix = access.requestId
+        ? ` Approval id: ${access.requestId}.`
+        : "";
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify({
+            error: `${access.reason ?? `Tool ${tool.id} ${access.status}.`}${suffix}`,
+            runtimeStatus: access.status,
+            toolId: tool.id,
+            approvalRequestId: access.requestId,
+          }, null, 2),
+        }],
+        isError: true,
+      };
+    }
+
     const result = await tool.execute(input, execContext);
     const text =
       typeof result === "string"

@@ -72,6 +72,7 @@ import {
   withToolsMetrics,
   peerTools,
 } from "../tools/index.ts";
+import { agentTools } from "../tools/surface/index.ts";
 import { evalTools } from "../../domain/evals/index.ts";
 import { executionCostTools } from "../tools/trading/execution-cost.ts";
 import { secFilingTools } from "../tools/providers/sec-filing-tools.ts";
@@ -155,3 +156,5 @@ export const instrumentedAdvancedTools = withToolsMetrics(advancedTools);
 export const instrumentedSystematicTools = withToolsMetrics(systematicTools);
 export const instrumentedCheckRiskTool = withToolsMetrics({ check_risk: checkRiskTool });
 export const instrumentedExecutionCostTools = withToolsMetrics(executionCostTools);
+/** Canonical 22-tool surface — must go through metrics + permission gate like legacy tools. */
+export const instrumentedAgentTools = withToolsMetrics(agentTools);

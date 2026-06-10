@@ -28,7 +28,7 @@ import {
 } from "../tooling/instrumentedTools.ts";
 import { createSubAgentMemory } from "../memory/memoryFactory.ts";
 import { createModelResolver, registerObservability, resolveRuntimeModel } from "../agentHelpers.ts";
-import { agentTools } from "../tools/surface/index.ts";
+import { instrumentedAgentTools } from "../tooling/instrumentedTools.ts";
 import {
   getHarnessSuffixForModel,
   isHarnessProfilesEnabled,
@@ -93,7 +93,7 @@ export function getResearcher(): Agent {
       ...(isHotTierOnly() ? {} : instrumentedSecFilingTools),
 
       // Canonical 22-tool agent surface.
-      ...agentTools,
+      ...instrumentedAgentTools,
     },
     memory: createSubAgentMemory("researcher"),
     inputProcessors: [gordonToolCallReconciler, gordonInputGuard, new TokenLimiterProcessor({ limit: 32000 })],

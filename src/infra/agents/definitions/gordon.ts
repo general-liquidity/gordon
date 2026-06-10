@@ -44,7 +44,7 @@ import {
 } from "../tools/runtime/lifecycle/task-dispatch.ts";
 import { getExecutor } from "./executor.ts";
 import { getResearcher } from "./researcher.ts";
-import { agentTools } from "../tools/surface/index.ts";
+import { instrumentedAgentTools } from "../tooling/instrumentedTools.ts";
 
 const logger = createModuleLogger("agents");
 
@@ -406,7 +406,7 @@ export function getGordon(): Agent {
 
       // Canonical 22-tool agent surface — spread last so its tool IDs
       // win on any collision with integration spreads above.
-      ...agentTools,
+      ...instrumentedAgentTools,
     },
 
     // Memory for full conversation context

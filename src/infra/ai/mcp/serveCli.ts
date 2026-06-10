@@ -38,11 +38,14 @@
 
 import { installProductionGuards } from "../../safety/installProductionGuards.ts";
 import { connectStdio, type ToolRegistry } from "./exposeServer.ts";
-import { tradingTools } from "../../agents/tools/trading/trading.ts";
-import { marketTools } from "../../agents/tools/market/market.ts";
-import { marketAnalysisTools } from "../../agents/tools/market/market-analysis.ts";
-import { indicatorTools } from "../../agents/tools/market/indicators.ts";
-import { chartTools } from "../../agents/tools/market/charts.ts";
+import {
+  instrumentedTradingTools,
+  instrumentedMarketTools,
+  instrumentedMarketAnalysisTools,
+  instrumentedIndicatorTools,
+  instrumentedChartTools,
+} from "../../agents/tooling/instrumentedTools.ts";
+import { getMcpGordonExecContext } from "./mcpContext.ts";
 
 function parseAllowList(): string[] | undefined {
   const raw = process.env.GORDON_MCP_TOOL_ALLOWLIST;
@@ -67,12 +70,13 @@ async function main(): Promise<void> {
   // same {id, description, inputSchema, execute} runtime contract, so the
   // structural cast is correct and the exposeServer wrapper validates
   // shape via Zod at call time.
+  const { execContext } = await getMcpGordonExecContext();
   const registry = {
-    ...tradingTools,        // get_trade_history is safe; execute_plan etc. denied by default
-    ...marketTools,
-    ...marketAnalysisTools,
-    ...indicatorTools,
-    ...chartTools,
+    ...instrumentedTradingTools,
+    ...instrumentedMarketTools,
+    ...instrumentedMarketAnalysisTools,
+    ...instrumentedIndicatorTools,
+    ...instrumentedChartTools,
   } as unknown as ToolRegistry;
 
   const allowList = parseAllowList();
@@ -81,6 +85,7 @@ async function main(): Promise<void> {
     name: "gordon",
     version: "0.1.0",
     allowList,
+    execContext,
   });
 
   console.error(
