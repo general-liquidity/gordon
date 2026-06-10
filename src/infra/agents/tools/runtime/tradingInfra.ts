@@ -18,6 +18,8 @@ import {
   classifyTradeRisk,
   DEFAULT_CLASSIFIER_CONFIG,
 } from "../../../trading/risk/riskClassifier.ts";
+import { buildClassifierPortfolioContext } from "../../../trading/risk/classifierPortfolio.ts";
+import { getGordonContext } from "../types.ts";
 import {
   saveCheckpoint,
   listCheckpoints,
@@ -129,22 +131,11 @@ export const classify_trade_risk = createTool({
       "../../../trading/risk/venueMevExposure.ts"
     );
 
-    // Build a minimal portfolio context from available data
-    const portfolioContext: Parameters<typeof classifyTradeRisk>[1] = {
-      totalValueUsd: 100_000, // TODO: pull from real portfolio
-      cashUsd: 50_000,
-      positions: [],
-      dailyPnlUsd: 0,
-      dailyLossLimitUsd: 2_000,
-      maxDrawdownPct: 10,
-      currentDrawdownPct: 0,
-      recentTradeCount: 0,
-      tradedSymbols: new Set<string>(),
-      // Auto-populate venue MEV exposure when venue supplied — Budish
-      // market-design discipline: surface the structural sniping/MEV
-      // tax baked into the chosen venue.
-      ...(trade.venue && { venueMevExposure: classifyVenue(trade.venue) }),
-    };
+    const ctx = getGordonContext(execContext);
+    const portfolioContext = await buildClassifierPortfolioContext(ctx ?? undefined);
+    if (trade.venue) {
+      portfolioContext.venueMevExposure = classifyVenue(trade.venue);
+    }
 
     const assessment = classifyTradeRisk(trade, portfolioContext, DEFAULT_CLASSIFIER_CONFIG);
 

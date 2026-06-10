@@ -85,7 +85,12 @@ export interface TrustTrajectoryOptions {
  * `String.prototype.includes` on the tool name.
  */
 export const SAFETY_CRITICAL_PATTERNS: readonly string[] = [
+  "execute_plan",
   "place_order",
+  "place_market_order",
+  "place_bracket_order",
+  "place_limit_order",
+  "place_oco_order",
   "execute_trade",
   "cancel_order",
   "cancel_all",

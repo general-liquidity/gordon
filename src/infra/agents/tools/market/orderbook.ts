@@ -27,6 +27,16 @@ import type { OrderBookEntry, ExchangeExtended } from "../../../exchange/types.t
 import { createCachedTool, TOOL_CACHE_CONFIG } from "../runtime/cache.ts";
 import { placeOCOOrders } from "../../../../core/pipeline/executor.ts";
 import { resolveInstrument } from "../../../domain/markets/instruments.ts";
+import { checkKillSwitchForOrder } from "../../../safety/killSwitchGate.ts";
+
+function killSwitchOrderError(
+  ctx: ReturnType<typeof getGordonContext>,
+  symbol: string,
+): string | null {
+  if (!ctx) return null;
+  const block = checkKillSwitchForOrder(ctx, { instrument: symbol });
+  return block.blocked ? block.error : null;
+}
 
 // ============================================================================
 // Error Messages
@@ -423,6 +433,8 @@ export const placeOCOOrderTool = createTool({
     }
 
     {
+      const killErr = killSwitchOrderError(ctx, symbol);
+      if (killErr) return { error: killErr, symbol, side, quantity, takeProfitPrice, stopPrice };
       const check = checkTradingPermission(ctx.config?.permissionMode, "execute", { sandboxActive: ctx.exchange?.isSandbox ?? ctx.broker?.isPaper });
       if (!check.allowed) {
         return {
@@ -772,6 +784,8 @@ export const placeLimitOrderTool = createTool({
     }
 
     {
+      const killErr = killSwitchOrderError(ctx, symbol);
+      if (killErr) return { error: killErr };
       const check = checkTradingPermission(ctx.config?.permissionMode, "execute", { sandboxActive: ctx.exchange?.isSandbox ?? ctx.broker?.isPaper });
       if (!check.allowed) {
         return { error: check.reason ?? "Placing limit orders not permitted under current mode" };

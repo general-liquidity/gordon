@@ -12,7 +12,12 @@
  * Diagnostic output goes to stderr (stdout is reserved for ACP frames).
  */
 
+import { installProductionGuards } from "../infra/safety/installProductionGuards.ts";
+import { getDefaultPermissionEngine } from "../runtime/permissions/defaultPermissionEngine.ts";
 import { startAcpServerOnStdio } from "../infra/acp/server.ts";
+
+installProductionGuards();
+getDefaultPermissionEngine();
 
 // Surface fatal errors on stderr — keeps stdout clean for ACP traffic.
 process.on("uncaughtException", (err) => {

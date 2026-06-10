@@ -282,7 +282,9 @@ function checkSafetyDenyList(): DiagnosticCheck {
   // If isSafetyCritical() returns false for any of them, a refactor has
   // accidentally weakened the safety boundary.
   const expected = [
+    "execute_plan",
     "place_order",
+    "place_market_order",
     "execute_trade",
     "cancel_order",
     "wallet_transfer",

@@ -22,6 +22,7 @@ import { recordStructuredObservation } from "../../../platform/observability/ind
 import { registerSymbols } from "../../../../tui/components/messages/markdownPalette.ts";
 import { getGordonContext, type MastraExecutionContext } from "../types.ts";
 import type { ExchangeExtended } from "../../../exchange/types.ts";
+import { checkKillSwitchForOrder } from "../../../safety/killSwitchGate.ts";
 
 // ============================================================================
 // Error Messages
@@ -493,6 +494,17 @@ export const placeBracketOrderTool = createTool({
     }
 
     {
+      const killBlock = checkKillSwitchForOrder(ctx, { instrument: symbol });
+      if (killBlock.blocked) {
+        return {
+          error: killBlock.error,
+          symbol,
+          side,
+          quantity,
+          stopLossPrice,
+          takeProfitPrice,
+        };
+      }
       const check = checkTradingPermission(ctx.config?.permissionMode, "execute", { sandboxActive: ctx.exchange?.isSandbox ?? ctx.broker?.isPaper });
       if (!check.allowed) {
         return {
@@ -672,6 +684,8 @@ export const placeMarketOrderTool = createTool({
 
     // Permission gate — blocks strict/observe/plan/paper for real execution
     {
+      const killBlock = checkKillSwitchForOrder(ctx, { instrument: normalizedSymbol });
+      if (killBlock.blocked) return { error: killBlock.error };
       const check = checkTradingPermission(ctx.config?.permissionMode, "execute", { sandboxActive: ctx.exchange?.isSandbox ?? ctx.broker?.isPaper });
       if (!check.allowed) {
         return { error: check.reason ?? "Market order not permitted under current mode" };

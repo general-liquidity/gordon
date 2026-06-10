@@ -14,6 +14,8 @@ const DAY = 24 * 60 * 60 * 1000;
 
 describe("isSafetyCritical", () => {
   it("flags trade-execution tool names", () => {
+    expect(isSafetyCritical("execute_plan")).toBe(true);
+    expect(isSafetyCritical("place_market_order")).toBe(true);
     expect(isSafetyCritical("place_order")).toBe(true);
     expect(isSafetyCritical("execute_trade")).toBe(true);
     expect(isSafetyCritical("cancel_order")).toBe(true);

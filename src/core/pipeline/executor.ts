@@ -24,6 +24,7 @@ import {
   isGordonError,
 } from "../../errors/index.ts";
 import { auditLog } from "../../infra/platform/audit/index.ts";
+import { checkKillSwitchForOrder } from "../../infra/safety/killSwitchGate.ts";
 import type {
   Plan,
   Trade,
@@ -290,6 +291,20 @@ export async function executePlan(
   const placedOrders: PlacedOrder[] = [];
 
   logger.info("Executing plan", { planId: plan.id, symbol: plan.symbol });
+
+  const killBlock = checkKillSwitchForOrder(
+    { userId, exchange: client },
+    { instrument: plan.symbol, strategyId: plan.strategy, venue: client.exchangeId },
+  );
+  if (killBlock.blocked) {
+    auditLog.blocked(userId, "EXECUTE_PLAN", { planId: plan.id }, killBlock.error, { planId: plan.id });
+    return {
+      success: false,
+      error: killBlock.error,
+      orders: [],
+      trade: undefined,
+    };
+  }
 
   // Audit: Record execution attempt
   auditLog.record(userId, "EXECUTE_PLAN", {

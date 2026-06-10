@@ -24,6 +24,10 @@ export { TranscriptProjector } from "./transcript/TranscriptProjector.ts";
 export { RuntimePersistence } from "./persistence/RuntimePersistence.ts";
 export { RuntimeHistoryManager } from "./history/RuntimeHistoryManager.ts";
 export { PermissionEngine, ToolApprovalRequiredError } from "./permissions/PermissionEngine.ts";
+export {
+  getDefaultPermissionEngine,
+  registerPermissionEngine,
+} from "./permissions/defaultPermissionEngine.ts";
 export { RuntimePluginManager } from "./plugins/RuntimePluginManager.ts";
 export { RuntimeBridge } from "./bridge/RuntimeBridge.ts";
 export { RuntimeStore } from "./state/RuntimeStore.ts";

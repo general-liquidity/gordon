@@ -382,9 +382,8 @@ export class GordonAcpAgent implements Agent {
     // finally to avoid leaking across sessions.
     let uninstallPermissionHook: (() => void) | null = null;
     try {
-      const mod = await import("../../runtime/permissions/PermissionEngine.ts");
-      const engine = (mod as { getDefaultPermissionEngine?: () => unknown })
-        .getDefaultPermissionEngine?.();
+      const mod = await import("../../runtime/permissions/defaultPermissionEngine.ts");
+      const engine = mod.getDefaultPermissionEngine();
       if (engine && typeof (engine as { prependHook?: unknown }).prependHook === "function") {
         uninstallPermissionHook = installAcpPermissionHook(
           engine as Parameters<typeof installAcpPermissionHook>[0],

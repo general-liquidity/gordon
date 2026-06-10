@@ -64,6 +64,15 @@ export function isTerminationLayersEnabled(
   );
 }
 
+export function isTerminationLayersEnforceEnabled(
+  env: NodeJS.ProcessEnv = process.env,
+): boolean {
+  return (
+    env.GORDON_TERMINATION_LAYERS_ENFORCE === "1" ||
+    env.GORDON_TERMINATION_LAYERS_ENFORCE === "true"
+  );
+}
+
 // ============================================================================
 // Layer 1 — pre-trade syntax/static
 // ============================================================================

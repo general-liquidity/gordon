@@ -36,6 +36,7 @@
  * stderr. The startup banner uses `console.error` deliberately.
  */
 
+import { installProductionGuards } from "../../safety/installProductionGuards.ts";
 import { connectStdio, type ToolRegistry } from "./exposeServer.ts";
 import { tradingTools } from "../../agents/tools/trading/trading.ts";
 import { marketTools } from "../../agents/tools/market/market.ts";
@@ -54,6 +55,7 @@ function parseAllowList(): string[] | undefined {
 }
 
 async function main(): Promise<void> {
+  installProductionGuards();
   // Compose the read-mostly exposed registry. The deny-list inside
   // exposeServer still gates execution tools even from this superset.
   // Adding more tool buckets here (e.g. newsTools, scannerTools) widens

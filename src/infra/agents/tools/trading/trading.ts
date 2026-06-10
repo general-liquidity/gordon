@@ -36,7 +36,7 @@ import { emitEvent } from "../../../../events/index.ts";
 import { recordStructuredObservation } from "../../../platform/observability/index.ts";
 import { appendActionLogEntry } from "../../../action-log/index.ts";
 import { appendExecutionRecordFresh, isTradeLedgerEnabled, readExecutionRecords, getExecutionRecord, executionRecordToPayload } from "../../../safety/tradeLedger.ts";
-import { isExecutionAllowed, isKillSwitchesEnabled, killSwitchesToPayload } from "../../../safety/killSwitches.ts";
+import { checkKillSwitchForOrder } from "../../../safety/killSwitchGate.ts";
 import { loadConfigBundle, saveResolvedConfig } from "../../../storage/config/config.ts";
 import { listPlans, getPlan, updatePlan, createPlan } from "../../../storage/entities/plans.ts";
 import { listTrades, getTrade } from "../../../storage/entities/trades.ts";
@@ -73,8 +73,10 @@ import {
 } from "../../../trading/ops/executionPlaybook.ts";
 import {
   isTerminationLayersEnabled,
+  isTerminationLayersEnforceEnabled,
   runTerminationLayers,
   terminationToPayload,
+  type PreTradeInput,
 } from "../../../trading/ops/terminationLayers.ts";
 import { selectMandateForPlan } from "../../../safety/anti-rot/strategyMandates.ts";
 
@@ -517,36 +519,32 @@ export const executePlanTool = createTool({
       return validateToolOutput(executePlanOutputSchema, { success: false, error: `Plan ${planId} is in ${plan.status} status, not APPROVED. ${hint}` }, { toolName: "execute_plan" });
     }
 
-    if (isKillSwitchesEnabled()) {
-      const killSwitchDecision = isExecutionAllowed({
-        strategyId: plan.strategy,
-        traderId: ctx.userId,
-        instrument: plan.symbol,
-        venue: ctx.exchange.exchangeId,
+    const killBlock = checkKillSwitchForOrder(ctx, {
+      instrument: plan.symbol,
+      strategyId: plan.strategy,
+    });
+    if (killBlock.blocked) {
+      recordStructuredObservation({
+        eventType: "execution.blocked",
+        workflow: "execution",
+        source: "agent_tool",
+        component: "execute_plan",
+        toolName: "execute_plan",
+        outcome: "failure",
+        status: "kill_switch_tripped",
+        controllability: classifyBlockedStatus("kill_switch_tripped"),
+        planId,
+        symbol: plan.symbol,
+        reason: killBlock.decision.reason,
+        details: {
+          rationale,
+          ...killBlock.payload,
+        },
       });
-      if (!killSwitchDecision.allowed) {
-        recordStructuredObservation({
-          eventType: "execution.blocked",
-          workflow: "execution",
-          source: "agent_tool",
-          component: "execute_plan",
-          toolName: "execute_plan",
-          outcome: "failure",
-          status: "kill_switch_tripped",
-          controllability: classifyBlockedStatus("kill_switch_tripped"),
-          planId,
-          symbol: plan.symbol,
-          reason: killSwitchDecision.reason,
-          details: {
-            rationale,
-            ...killSwitchesToPayload(killSwitchDecision),
-          },
-        });
-        return validateToolOutput(executePlanOutputSchema, {
-          success: false,
-          error: `${killSwitchDecision.reason}. Reset the relevant kill switch before executing this plan.`,
-        }, { toolName: "execute_plan" });
-      }
+      return validateToolOutput(executePlanOutputSchema, {
+        success: false,
+        error: killBlock.error,
+      }, { toolName: "execute_plan" });
     }
 
     recordStructuredObservation({
@@ -730,6 +728,9 @@ export const executePlanTool = createTool({
       }
     }
 
+    let terminationRiskTier: PreTradeInput["riskTier"] = "low";
+    let terminationRiskVerdict: PreTradeInput["riskClassifierVerdict"] = "auto_approve";
+
     // Risk gate: evaluate the plan's order against risk kernel
     try {
       const { evaluateOrderRisk } = await import("./risk-gate.ts");
@@ -798,6 +799,10 @@ export const executePlanTool = createTool({
           error: ackResult.reason ?? "Risk acknowledgement insufficient.",
         }, { toolName: "execute_plan" });
       }
+
+      terminationRiskTier =
+        riskResult.warnings.length > 2 ? "high" : riskResult.warnings.length > 0 ? "medium" : "low";
+      terminationRiskVerdict = "auto_approve";
     } catch (riskErr) {
       const message = riskErr instanceof Error ? riskErr.message : String(riskErr);
       recordStructuredObservation({
@@ -853,10 +858,10 @@ export const executePlanTool = createTool({
       }, { toolName: "execute_plan" });
     }
 
-    const terminationPreTrade = {
-      riskTier: "medium" as const,
-      riskClassifierVerdict: "auto_approve" as const,
-      constitutionViolations: [] as string[],
+    const terminationPreTrade: PreTradeInput = {
+      riskTier: terminationRiskTier,
+      riskClassifierVerdict: terminationRiskVerdict,
+      constitutionViolations: [],
       mandateScopeOk: mandateResult.mandate ? mandateResult.ok : null,
       thesisCoherenceOk: coherenceResult.ok,
     };
@@ -868,16 +873,26 @@ export const executePlanTool = createTool({
         system: null,
       });
       recordStructuredObservation({
-        eventType: "execution.termination_layers_shadow",
+        eventType: isTerminationLayersEnforceEnabled()
+          ? "execution.termination_layers"
+          : "execution.termination_layers_shadow",
         workflow: "execution",
         source: "agent_tool",
         component: "execute_plan",
         toolName: "execute_plan",
-        outcome: "info",
+        outcome: l1Observation.verdict === "pass" ? "info" : "failure",
         planId,
         symbol: plan.symbol,
         details: terminationToPayload(l1Observation),
       });
+      if (isTerminationLayersEnforceEnabled() && l1Observation.verdict === "fail") {
+        return validateToolOutput(executePlanOutputSchema, {
+          success: false,
+          error:
+            l1Observation.blockingFixInstruction ??
+            "Termination layer 1 blocked execution.",
+        }, { toolName: "execute_plan" });
+      }
     }
 
     const result = await executePlan(ctx.exchange, plan, ctx.config, {
