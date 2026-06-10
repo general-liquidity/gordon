@@ -8,12 +8,13 @@ const DEFAULT_CASH = 50_000;
 /** Build classifier portfolio context from live exchange data or GordonContext fallbacks. */
 export async function buildClassifierPortfolioContext(
   ctx: GordonContext | undefined,
-): Promise<PortfolioContext> {
+): Promise<PortfolioContext & { usingDegradedDefaults?: boolean }> {
   if (ctx?.exchange) {
     try {
       const live = await new PortfolioContextBuilder().buildFromExchange(ctx.exchange);
       const total = live.totalEquity;
       return {
+        usingDegradedDefaults: false,
         totalValueUsd: total,
         cashUsd: live.availableBalance,
         positions: live.openPositions.map((p) => {
@@ -41,7 +42,9 @@ export async function buildClassifierPortfolioContext(
 
   const total = ctx?.portfolioValue ?? DEFAULT_TOTAL;
   const cash = ctx?.availableCash ?? DEFAULT_CASH;
+  const usingDefaults = !ctx?.exchange || total === DEFAULT_TOTAL;
   return {
+    usingDegradedDefaults: usingDefaults,
     totalValueUsd: total,
     cashUsd: cash,
     positions: [],

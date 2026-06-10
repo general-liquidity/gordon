@@ -1,4 +1,5 @@
 import { createModuleLogger } from "../../infra/logger/index.ts";
+import { installProductionGuards } from "../../infra/safety/installProductionGuards.ts";
 import { bootstrapV07 } from "../../core/lifecycle/bootstrap.ts";
 import { createEnvelopeMeta, type GatewayCommandType } from "../protocol/index.ts";
 import { safeAppendAudit } from "../store/audit-log-store.ts";
@@ -21,6 +22,7 @@ export interface GatewayDaemonHandle {
 }
 
 export async function startGatewayDaemonProcess(): Promise<GatewayDaemonHandle> {
+  installProductionGuards();
   await bootstrapV07();
   await initMCPTools().catch((err) => {
     logger.warn("MCP tools initialization failed — MCP tools will be unavailable", { error: err instanceof Error ? err.message : String(err) });

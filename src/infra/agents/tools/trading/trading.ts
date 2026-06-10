@@ -76,8 +76,13 @@ import {
   isTerminationLayersEnforceEnabled,
   runTerminationLayers,
   terminationToPayload,
-  type PreTradeInput,
 } from "../../../trading/ops/terminationLayers.ts";
+import { buildTerminationPreTradeFromPlan } from "../../../trading/ops/terminationPreTrade.ts";
+import { recordExecutedPlanPosition } from "../../../../core/positions/executionSync.ts";
+import {
+  isFrictionTrackerEnabled,
+  recordFriction,
+} from "../../../trading/ops/frictionTracker.ts";
 import { selectMandateForPlan } from "../../../safety/anti-rot/strategyMandates.ts";
 import {
   activateSessionPlan,
@@ -758,8 +763,8 @@ export const executePlanTool = createTool({
       }
     }
 
-    let terminationRiskTier: PreTradeInput["riskTier"] = "low";
-    let terminationRiskVerdict: PreTradeInput["riskClassifierVerdict"] = "auto_approve";
+    const planSide = plan.direction === "short" ? "SELL" : "BUY";
+    const planOrderSide = plan.direction === "short" ? "sell" : "buy";
 
     // Risk gate: evaluate the plan's order against risk kernel
     try {
@@ -767,7 +772,7 @@ export const executePlanTool = createTool({
       const riskResult = await evaluateOrderRisk(
         {
           symbol: plan.symbol,
-          side: "BUY", // Plans are typically buy entries
+          side: planSide,
           type: plan.entry.type === "market" ? "MARKET" : "LIMIT",
           quantity: plan.allocation.amount / (plan.entry.price || 1),
           price: plan.entry.price ?? undefined,
@@ -830,9 +835,6 @@ export const executePlanTool = createTool({
         }, { toolName: "execute_plan" });
       }
 
-      terminationRiskTier =
-        riskResult.warnings.length > 2 ? "high" : riskResult.warnings.length > 0 ? "medium" : "low";
-      terminationRiskVerdict = "auto_approve";
     } catch (riskErr) {
       const message = riskErr instanceof Error ? riskErr.message : String(riskErr);
       recordStructuredObservation({
@@ -871,7 +873,7 @@ export const executePlanTool = createTool({
     // PreOrderPlacement hook — can block or modify the order
     const preOrderHook = await runHooks("PreOrderPlacement", {
       symbol: plan.symbol,
-      side: "buy" as const,
+      side: planOrderSide,
       quantity: plan.allocation.amount / (plan.entry.price || 1),
       orderType: plan.entry.type === "market" ? "MARKET" : "LIMIT",
       notionalUsd: plan.allocation.amount,
@@ -888,13 +890,9 @@ export const executePlanTool = createTool({
       }, { toolName: "execute_plan" });
     }
 
-    const terminationPreTrade: PreTradeInput = {
-      riskTier: terminationRiskTier,
-      riskClassifierVerdict: terminationRiskVerdict,
+    const terminationPreTrade = await buildTerminationPreTradeFromPlan(plan, ctx, {
       constitutionViolations: [],
-      mandateScopeOk: mandateResult.mandate ? mandateResult.ok : null,
-      thesisCoherenceOk: coherenceResult.ok,
-    };
+    });
 
     if (isTerminationLayersEnabled()) {
       const l1Observation = runTerminationLayers({
@@ -931,7 +929,9 @@ export const executePlanTool = createTool({
       openPositions: getActiveTrades().length,
     });
 
-    if (result.success) {
+    if (!result.success) {
+      deactivateSessionPlan(planId);
+    } else {
       activateSessionPlan(planId, plan.symbol, plan.strategy);
     }
 
@@ -1008,7 +1008,7 @@ export const executePlanTool = createTool({
       runHooks("PostOrderPlacement", {
         orderId: result.trade.id,
         symbol: result.trade.symbol,
-        side: "buy" as const,
+        side: planOrderSide,
         status: "filled",
         filledQty: plan.allocation.amount / (plan.entry.price || 1),
         notionalUsd: plan.allocation.amount,
@@ -1016,6 +1016,21 @@ export const executePlanTool = createTool({
     }
 
     if (result.success && result.trade) {
+      const exchangeId = ctx.exchange?.exchangeId ?? "unknown";
+      void recordExecutedPlanPosition(plan, result.trade, exchangeId);
+
+      if (isFrictionTrackerEnabled()) {
+        const fillPrice = result.trade.averageEntry ?? plan.entry.price ?? 0;
+        const refPrice = referencePrice ?? fillPrice;
+        const slipBps =
+          refPrice > 0 ? Math.abs((fillPrice - refPrice) / refPrice) * 10_000 : 0;
+        recordFriction({
+          tradeId: result.trade.id,
+          kind: "slippage",
+          costUsd: (slipBps / 10_000) * plan.allocation.amount,
+          meta: { planId, slipBps, symbol: plan.symbol },
+        });
+      }
       recordStructuredObservation({
         eventType: "execution.completed",
         workflow: "execution",
@@ -1707,6 +1722,10 @@ Use when:
     );
 
     if (closeResult.success) {
+      const trade = getTrade(tradeId);
+      if (trade?.planId && closeResult.remainingQuantity <= 1e-8) {
+        deactivateSessionPlan(trade.planId);
+      }
       const result = {
         success: true,
         closedQuantity: closeResult.closedQuantity,

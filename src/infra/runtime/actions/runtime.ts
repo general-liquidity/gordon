@@ -287,6 +287,56 @@ async function buildMarketOrderPlan(
     }
   }
 
+  if (
+    action.id === "trading.market_order" &&
+    blockers.length === 0 &&
+    (input.quantity || input.quoteOrderQty)
+  ) {
+    try {
+      const { evaluateOrderRisk } = await import("../../agents/tools/trading/risk-gate.ts");
+      const price = Number(preview.estimatedPrice ?? 1);
+      const quantity = input.quantity
+        ?? (input.quoteOrderQty && price > 0 ? input.quoteOrderQty / price : 0);
+      if (quantity > 0) {
+        const risk = await evaluateOrderRisk(
+          {
+            symbol: normalizedSymbol,
+            side: input.side,
+            type: "MARKET",
+            quantity,
+            price: Number.isFinite(price) ? price : undefined,
+          },
+          context,
+          "runtime.market_order",
+        );
+        if (!risk.approved) {
+          blockers.push(`Risk kernel rejected: ${risk.reason}`);
+          steps.push({
+            id: "risk_gate",
+            title: "Risk kernel",
+            status: "blocked",
+            detail: risk.reason,
+          });
+        } else if (risk.warnings.length > 0) {
+          steps.push({
+            id: "risk_gate",
+            title: "Risk kernel",
+            status: "informational",
+            detail: risk.warnings.join("; "),
+          });
+        }
+      }
+    } catch (error) {
+      blockers.push("Risk kernel evaluation failed.");
+      steps.push({
+        id: "risk_gate",
+        title: "Risk kernel",
+        status: "blocked",
+        detail: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
   const ready = blockers.length === 0;
   const summary = ready
     ? `${action.title} is ready.`

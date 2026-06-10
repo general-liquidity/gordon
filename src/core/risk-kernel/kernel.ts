@@ -80,7 +80,11 @@ export class RiskKernel {
    * @param context - Current portfolio state
    * @returns RiskDecision with approval status, checks, and optional modifications
    */
-  async evaluate(order: OrderRequest, context: PortfolioContext): Promise<RiskDecision> {
+  async evaluate(
+    order: OrderRequest,
+    context: PortfolioContext,
+    opts?: { modeOverride?: RiskKernelConfig["mode"] },
+  ): Promise<RiskDecision> {
     const startTime = performance.now();
 
     logger.debug("Evaluating order", {
@@ -109,7 +113,9 @@ export class RiskKernel {
 
     let decision: RiskDecision;
 
-    if (this.config.mode === "paper") {
+    const effectiveMode = opts?.modeOverride ?? this.config.mode;
+
+    if (effectiveMode === "paper") {
       // Paper mode: always approve
       decision = {
         approved: true,
@@ -130,7 +136,7 @@ export class RiskKernel {
         timestamp: new Date().toISOString(),
       };
     } else if (criticalFailures.length > 0) {
-      if (this.config.mode === "warn") {
+      if (effectiveMode === "warn") {
         // Warn mode: log but allow
         decision = {
           approved: true,

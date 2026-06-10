@@ -523,13 +523,15 @@ export async function collectDoctorReport(configInput?: GordonConfig): Promise<D
       collectSandboxChecks,
       collectKvCacheCheck,
       collectClaudeMdLintChecks,
+      collectAgentReadinessChecks,
     } = await import("./harness-checks.ts");
     const probeChecks = await collectInitProbeChecks();
     const safetyChecks = collectSafetyBaselineChecks({});
     const sandboxChecks = collectSandboxChecks();
     const kvCacheChecks = collectKvCacheCheck();
     const claudeMdChecks = collectClaudeMdLintChecks();
-    checks.push(...probeChecks, ...safetyChecks, ...sandboxChecks, ...kvCacheChecks, ...claudeMdChecks);
+    const readinessChecks = await collectAgentReadinessChecks();
+    checks.push(...probeChecks, ...safetyChecks, ...sandboxChecks, ...kvCacheChecks, ...claudeMdChecks, ...readinessChecks);
   } catch {
     // harness-checks failures must not break the doctor report
   }

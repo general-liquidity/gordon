@@ -117,8 +117,14 @@ export async function evaluateOrderRisk(
     };
   }
 
+  const sandboxActive =
+    (ctx.exchange as { isSandbox?: boolean } | null)?.isSandbox ?? ctx.broker?.isPaper ?? false;
+  const envRiskMode = process.env.GORDON_RISK_MODE;
+  const modeOverride =
+    envRiskMode === "paper" && !sandboxActive ? ("paper" as const) : undefined;
+
   // -- Evaluate ----------------------------------------------------------
-  const decision = await riskKernel.evaluate(orderRequest, portfolioContext);
+  const decision = await riskKernel.evaluate(orderRequest, portfolioContext, { modeOverride });
 
   // Collect warning-level checks
   for (const check of decision.checks) {

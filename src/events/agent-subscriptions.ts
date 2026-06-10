@@ -504,14 +504,33 @@ export function createDefaultSubscriptions(
           const { isTerminationLayersEnabled, checkPreTrade } = await import(
             "../infra/trading/ops/terminationLayers.ts"
           );
+          const { buildTerminationPreTradeFromPlan } = await import(
+            "../infra/trading/ops/terminationPreTrade.ts"
+          );
+          const { loadConfig } = await import("../infra/storage/config/config.ts");
+          const { getPlan } = await import("../infra/storage/entities/plans.ts");
           if (isTerminationLayersEnabled()) {
-            const verdict = checkPreTrade({
-              riskTier: "medium",
-              riskClassifierVerdict: "auto_approve",
-              constitutionViolations: [],
-              mandateScopeOk: true,
-              thesisCoherenceOk: null,
-            });
+            const plan = getPlan(e.planId);
+            const config = await loadConfig();
+            const ctx = {
+              binance: null,
+              exchange: null,
+              broker: null,
+              llm: {} as import("../infra/agents/types.ts").GordonContext["llm"],
+              config,
+              portfolioValue: Number(process.env.GORDON_CURRENT_EQUITY_USD ?? 0) || 100_000,
+              availableCash: 50_000,
+            };
+            const preTrade = plan
+              ? await buildTerminationPreTradeFromPlan(plan, ctx)
+              : {
+                  riskTier: "medium" as const,
+                  riskClassifierVerdict: "prompt_user" as const,
+                  constitutionViolations: [] as string[],
+                  mandateScopeOk: true,
+                  thesisCoherenceOk: null,
+                };
+            const verdict = checkPreTrade(preTrade);
             shadowVerdict(
               "termination_layer_1",
               "trading.termination_l1.shadow",

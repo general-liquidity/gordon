@@ -8,13 +8,13 @@
  * shadow mode is enabled. Observation-only — does not block execution.
  */
 
-import { createPublicExchange } from "../../exchange/publicFactory.ts";
 import {
   isShadowModeEnabled,
   readShadowFills,
   recordShadowClose,
   type ShadowFill,
 } from "./shadowMode.ts";
+import { fetchShadowMarketPrice } from "./shadowPriceFetcher.ts";
 
 export const SHADOW_MAX_HOLD_MS_ENV = "GORDON_SHADOW_MAX_HOLD_MS";
 export const DEFAULT_SHADOW_MAX_HOLD_MS = 24 * 60 * 60 * 1000;
@@ -81,17 +81,9 @@ export function resolveShadowFill(
   return { shouldClose: false };
 }
 
-/**
- * Best-effort public price fetch for shadow reconciliation.
- */
+/** CCXT public venues + onchain fallbacks (DefiLlama, DexScreener). */
 export async function defaultShadowPriceFetcher(symbol: string): Promise<number | null> {
-  try {
-    const exchange = createPublicExchange("binance");
-    const price = await exchange.getPrice(symbol);
-    return Number.isFinite(price) && price > 0 ? price : null;
-  } catch {
-    return null;
-  }
+  return fetchShadowMarketPrice(symbol);
 }
 
 /**

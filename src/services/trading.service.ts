@@ -130,6 +130,13 @@ export class TradingService {
 
     const cancelled = container.plansRepo.updateStatus(planId, "CANCELLED");
 
+    try {
+      const { deactivateSessionPlan } = await import("../infra/safety/wipSessionRegistry.ts");
+      deactivateSessionPlan(planId);
+    } catch {
+      // WIP registry is best-effort
+    }
+
     await emitEvent("plan:cancelled", { planId, reason });
     logger.info("Plan cancelled", { planId, reason });
 

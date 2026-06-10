@@ -193,7 +193,7 @@ function defaultPromptHandler(): PromptHandler {
     signal,
     connection,
   }): Promise<PromptHandlerResult> {
-    const context = await getAcpGordonContext();
+    const context = await getAcpGordonContext(false, sessionId);
     // Use the ACP sessionId as the Mastra threadId so conversations
     // resume correctly when loadSession is honored.
     const threadId = `acp-${sessionId}`;

@@ -44,3 +44,6 @@ jobs:
           GORDON_EVAL_BASELINE: ${{ vars.GORDON_EVAL_BASELINE }}
           GORDON_EVAL_CANDIDATE: ${{ vars.GORDON_EVAL_CANDIDATE }}
           DEDALUS_API_KEY: ${{ secrets.DEDALUS_API_KEY }}
+
+      - name: Eval live runner dry-run (Phase 4)
+        run: GORDON_EVAL_DRY_RUN=1 bun run scripts/dev/eval-live-runner.ts --k 1

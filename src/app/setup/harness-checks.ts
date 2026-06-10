@@ -45,6 +45,12 @@ import {
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import type { DoctorCheck } from "./setup-runtime.ts";
+import {
+  checkAgentReadiness,
+  isAgentReadinessEnabled,
+  isAgentReadinessOverridden,
+} from "../../infra/diagnostics/agentReadiness.ts";
+import { checkEnvStatus } from "../../infra/storage/config/env.ts";
 
 // --- A2 ----------------------------------------------------------------------
 
@@ -280,4 +286,38 @@ export function collectClaudeMdLintChecks(_repoRoot: string = process.cwd()): Do
   // claudeMdLinter feature deleted — return no checks. Doctor still surfaces
   // file existence via other probes.
   return [];
+}
+
+// --- Agent readiness gate ----------------------------------------------------
+
+export async function collectAgentReadinessChecks(): Promise<DoctorCheck[]> {
+  if (!isAgentReadinessEnabled() || isAgentReadinessOverridden()) return [];
+  const env = await checkEnvStatus();
+  const result = checkAgentReadiness({ hasLlmKey: env.hasLLMKey });
+  if (result.ready) {
+    return [
+      {
+        id: "agent_readiness",
+        ok: true,
+        severity: "info",
+        message: "Agent readiness gate passed.",
+      },
+    ];
+  }
+  return [
+    {
+      id: "agent_readiness",
+      ok: false,
+      severity: "error",
+      message: result.blockingMessage ?? "Agent readiness gate failed.",
+    },
+    ...result.conditions
+      .filter((c) => !c.ok)
+      .map((c) => ({
+        id: `agent_readiness.${c.id}`,
+        ok: false,
+        severity: "error" as const,
+        message: c.message,
+      })),
+  ];
 }

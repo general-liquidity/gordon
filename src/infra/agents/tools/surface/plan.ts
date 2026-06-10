@@ -37,6 +37,18 @@ import { getMemoryManager } from "../../../../core/memory/index.ts";
 import { hasRecentSymbolObservation } from "../../observation/symbolObservationTracker.ts";
 import { buildSynthesisManifest, summarizeManifest } from "../../observation/synthesisManifest.ts";
 import { withPortfolioOverride } from "./portfolioOverride.ts";
+import { recordStructuredObservation } from "../../../platform/observability/index.ts";
+import {
+  isConfluenceScorerEnabled,
+  scoreConfluences,
+  scoreToPayload,
+} from "../../../trading/ops/confluenceScorer.ts";
+import {
+  isExecutionPlaybookEnabled,
+  selectPlaybookForStrategy,
+  attachExecution,
+  planToPayload,
+} from "../../../trading/ops/executionPlaybook.ts";
 
 // ============================================================================
 // create_plan
@@ -227,6 +239,53 @@ export const createPlanTool = createTool({
           .catch(() => {
             // Journal mirroring is best-effort; never propagate.
           });
+      }
+
+      if (isConfluenceScorerEnabled()) {
+        const confluence = scoreConfluences({
+          observations: [
+            { kind: "regime_fit", present: true, evidence: plan.strategy },
+            { kind: "key_level_proximity", present: plan.stopLoss.price > 0 },
+            { kind: "volume_confirmation", present: plan.takeProfit.length > 0 },
+            { kind: "thesis_coherence", present: (plan.reasoning?.length ?? 0) > 20 },
+          ],
+        });
+        recordStructuredObservation({
+          eventType: "plan.confluence_scored",
+          workflow: "planning",
+          source: "agent_tool",
+          component: "create_plan",
+          toolName: "create_plan",
+          outcome: "info",
+          planId: plan.id,
+          symbol: plan.symbol,
+          details: scoreToPayload(confluence),
+        });
+      }
+
+      if (isExecutionPlaybookEnabled()) {
+        const playbook = selectPlaybookForStrategy(plan.strategy);
+        const entryPrice = plan.entry.price ?? args.entryPrice ?? 0;
+        if (entryPrice > 0) {
+          const executionPlan = attachExecution({
+            planId: plan.id,
+            playbookId: playbook.id,
+            entryPrice,
+            stopPrice: plan.stopLoss.price,
+            direction: plan.direction,
+          });
+          recordStructuredObservation({
+            eventType: "plan.execution_playbook_attached",
+            workflow: "planning",
+            source: "agent_tool",
+            component: "create_plan",
+            toolName: "create_plan",
+            outcome: "info",
+            planId: plan.id,
+            symbol: plan.symbol,
+            details: planToPayload(executionPlan),
+          });
+        }
       }
 
       return { success: true, planId: plan.id, plan };

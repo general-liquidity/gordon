@@ -1,56 +1,90 @@
 /**
  * GordonContext builder for ACP mode.
  *
- * processMessageStream (orchestrator.ts) needs a GordonContext with the
- * LLM client, config, optional exchange/broker, and a few session
- * descriptors. This builder constructs a sensible default for
- * Gordon-running-as-an-ACP-subprocess:
- *
- *   - llm:      createLLMClientFromEnv() — provider keys from env
- *   - config:   loadConfig() — operator's persisted config from disk
- *   - exchange: null in v2 — operators wanting trading-from-Zed wire
- *               their own adapter via env (deferred follow-up)
- *   - broker:   null in v2
- *   - portfolioValue / availableCash: 0 — no live values; tools that
- *     need them surface an empty-portfolio result instead of crashing
- *
- * Cached per-process — every ACP session shares the same context
- * (matches the TUI's "one config, one config-derived state" model).
+ * Resolves exchange/broker clients like the gateway daemon and attaches
+ * a lightweight runtime with evaluateToolAccess for permission gating.
  */
 
 import { createLLMClientFromEnv } from "../ai/llm/index.ts";
 import { loadConfig } from "../storage/config/config.ts";
-import type { GordonContext } from "../agents/types.ts";
+import { checkEnvStatus } from "../storage/config/env.ts";
+import type { GordonContext, GordonRuntimeAccess } from "../agents/types.ts";
+import { getGatewayContextResolver } from "../../gateway/runtime/context.ts";
+import { getDefaultPermissionEngine } from "../../runtime/permissions/defaultPermissionEngine.ts";
+import { evaluateRuntimeToolPolicy } from "../../runtime/tools/ToolPolicy.ts";
 
 let cached: GordonContext | null = null;
 
-/**
- * Build (or return cached) GordonContext for the ACP subprocess.
- *
- * Idempotent. The first call loads config + LLM; subsequent calls
- * return the cached instance unless `force` is true.
- */
-export async function getAcpGordonContext(force = false): Promise<GordonContext> {
-  if (cached && !force) return cached;
-  const llm = createLLMClientFromEnv();
-  const config = await loadConfig();
-  cached = {
-    binance: null,
-    exchange: null,
-    broker: null,
-    llm,
-    config,
-    portfolioValue: 0,
-    availableCash: 0,
-    credentialProfile: "paper",
+function createAcpRuntimeAccess(sessionId: string): GordonRuntimeAccess {
+  const engine = getDefaultPermissionEngine();
+  return {
+    runtimeId: `acp-${sessionId}`,
+    sessionId,
+    threadId: `acp-${sessionId}`,
+    resourceId: `acp-${sessionId}`,
+    evaluateToolAccess: async (toolName, context) => {
+      const policy = await evaluateRuntimeToolPolicy(toolName, context);
+      if (!policy.allowed) {
+        return { status: "blocked", reason: policy.reason };
+      }
+      const permission = await engine.evaluate(toolName, context, policy);
+      if (permission.status === "allowed") {
+        return { status: "allowed", reason: permission.reason };
+      }
+      return {
+        status: permission.status,
+        reason: permission.reason,
+        requestId: permission.request?.id,
+      };
+    },
   };
-  return cached;
 }
 
 /**
- * Drop the cached context — used when config changes mid-session
- * (rare in ACP mode; included for completeness).
+ * Build (or return cached) GordonContext for the ACP subprocess.
  */
+export async function getAcpGordonContext(
+  force = false,
+  sessionId = "default",
+): Promise<GordonContext> {
+  if (cached && !force) return cached;
+
+  const config = await loadConfig();
+  const env = await checkEnvStatus();
+  const resolver = getGatewayContextResolver();
+  const resolved = await resolver.resolve(`acp-${sessionId}`);
+
+  let llm = resolved.llm;
+  if (!llm) {
+    try {
+      llm = createLLMClientFromEnv();
+    } catch {
+      llm = resolved.llm;
+    }
+  }
+
+  cached = {
+    binance: resolved.binance,
+    exchange: resolved.exchange,
+    broker: resolved.broker,
+    llm: llm ?? ({} as GordonContext["llm"]),
+    config,
+    portfolioValue: resolved.portfolioValue,
+    availableCash: resolved.availableCash,
+    credentialProfile: resolved.exchange?.isSandbox || resolved.broker?.isPaper ? "paper" : "live",
+    runtime: createAcpRuntimeAccess(sessionId),
+    userId: `acp-${sessionId}`,
+    threadId: `acp-${sessionId}`,
+  };
+
+  if (!env.hasLLMKey) {
+    cached.portfolioValue = cached.portfolioValue || 0;
+  }
+
+  return cached;
+}
+
 export function resetAcpGordonContext(): void {
   cached = null;
+  getGatewayContextResolver().invalidate();
 }

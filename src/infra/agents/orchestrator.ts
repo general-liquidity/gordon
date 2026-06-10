@@ -602,6 +602,21 @@ export async function* processMessageStream(
       if (compactionDecision.action === "warn" || compactionDecision.action === "microcompact" || compactionDecision.action === "compact") {
         logger.info("Compaction trigger fired", { action: compactionDecision.action, stage: compactionDecision.stage, tokens: inputToks });
       }
+      if (compactionDecision.action === "microcompact" || compactionDecision.action === "compact") {
+        const { applyCompactionIfNeeded } = await import("../domain/memory/compactionHandler.ts");
+        const compacted = await applyCompactionIfNeeded({
+          action: compactionDecision.action,
+          messages: groundedMessages.map((m) => ({
+            role: m.role,
+            content: typeof m.content === "string" ? m.content : JSON.stringify(m.content),
+          })),
+          llm: context.llm,
+        });
+        if (compacted.applied) {
+          groundedMessages = compacted.messages as typeof groundedMessages;
+          logger.info("Compaction applied post-turn", { detail: compacted.detail });
+        }
+      }
     } catch { /* non-critical */ }
 
     // Wire: per-model cost tracking

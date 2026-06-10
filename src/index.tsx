@@ -315,6 +315,16 @@ try {
   }
 }
 
+// Opt-in proactive radar auto-start (GORDON_PROACTIVE_AUTO_START=1)
+if (process.env.GORDON_PROACTIVE_AUTO_START === "1" || process.env.GORDON_PROACTIVE_AUTO_START === "true") {
+  try {
+    const { startProactiveObserver } = await import("./infra/proactive/engine/observer.ts");
+    startProactiveObserver();
+  } catch {
+    // Non-fatal — radar is optional
+  }
+}
+
 // Launch the rebuilt cockpit shell
 process.env.GORDON_APP_READY = "1";
 
