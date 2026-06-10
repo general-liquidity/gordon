@@ -9,9 +9,12 @@
  * many times.
  *
  * This module tracks every approval decision (approved / rejected) per
- * tool name in an append-only ledger, then exposes a trust score the
- * PermissionEngine can use to short-circuit the human-required queue
- * for tools the user has consistently approved.
+ * (toolName, permissionScope) in an append-only ledger, then exposes a
+ * trust score the PermissionEngine can use to short-circuit the
+ * human-required queue for tools the user has consistently approved.
+ * Keying by scope as well as name means a paper-mode approval
+ * (`papertrade.execute`) never credits trust toward the same tool in
+ * live mode (`livetrade.execute`).
  *
  * Design constraints (Gordon-specific):
  *   - Safety-critical tools NEVER auto-approve, regardless of trust
@@ -28,6 +31,9 @@
 import { appendFileSync, existsSync, readFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { mkdirSync } from "node:fs";
+import { createModuleLogger } from "../../infra/logger/index.ts";
+
+const logger = createModuleLogger("trust-trajectory");
 
 export type TrustDecision = "approved" | "rejected";
 
@@ -35,6 +41,12 @@ export interface TrustEvent {
   toolName: string;
   decision: TrustDecision;
   timestamp: number;
+  /**
+   * Runtime permission scope the decision was made under (e.g.
+   * `papertrade.execute`). Legacy ledger rows predate this field;
+   * they are treated as global-scope and never credit a scoped lookup.
+   */
+  permissionScope?: string;
   /** Optional context — usually the actor that made the call. */
   actor?: string;
 }
@@ -139,10 +151,13 @@ export class TrustTrajectory {
   }
 
   /**
-   * Compute the trust score for a tool. Returns `eligible: false` for
-   * safety-critical tools regardless of history.
+   * Compute the trust score for a tool under a specific permission
+   * scope. Returns `eligible: false` for safety-critical tools
+   * regardless of history. Only events recorded under the exact same
+   * scope count — legacy scope-less events count only toward
+   * scope-less lookups, never toward a scoped one.
    */
-  scoreFor(toolName: string, now: number = Date.now()): TrustScore {
+  scoreFor(toolName: string, permissionScope?: string, now: number = Date.now()): TrustScore {
     if (isSafetyCritical(toolName)) {
       return {
         score: 0,
@@ -163,6 +178,7 @@ export class TrustTrajectory {
 
     for (const e of this.events) {
       if (e.toolName !== toolName) continue;
+      if (e.permissionScope !== permissionScope) continue;
       if (e.timestamp < cutoff) continue;
       if (e.decision === "approved") approvals++;
       else {
@@ -214,21 +230,34 @@ export class TrustTrajectory {
   private loadFromDisk(path: string): void {
     try {
       const raw = readFileSync(path, "utf8");
+      let lineNumber = 0;
       for (const line of raw.split("\n")) {
+        lineNumber++;
         const trimmed = line.trim();
         if (!trimmed) continue;
         try {
           const ev = JSON.parse(trimmed) as TrustEvent;
           if (ev.toolName && (ev.decision === "approved" || ev.decision === "rejected") && typeof ev.timestamp === "number") {
             this.events.push(ev);
+          } else {
+            this.warnMalformedRow(path, lineNumber, "invalid trust event shape");
           }
-        } catch {
-          // Skip malformed rows.
+        } catch (err) {
+          this.warnMalformedRow(path, lineNumber, err instanceof Error ? err.message : String(err));
         }
       }
     } catch {
       // No file / unreadable — start empty.
     }
+  }
+
+  private warnMalformedRow(path: string, lineNumber: number, reason: string): void {
+    logger.warn("Skipped malformed trust trajectory ledger row", {
+      component: "trustTrajectory",
+      path,
+      lineNumber,
+      reason,
+    });
   }
 }
 
@@ -263,11 +292,13 @@ export function buildTrustTrajectoryHook(
   options: { now?: () => number } = {},
 ): (input: {
   toolName: string;
-  policy: { approvalClass?: string };
+  permissionScope?: string;
+  policy: { approvalClass?: string; tool?: { permissionScope?: string } };
 }) => { decision: "allow" | "abstain"; actor?: string; reason?: string } {
   const now = options.now ?? Date.now;
   return (input) => {
-    const score = trajectory.scoreFor(input.toolName, now());
+    const permissionScope = input.permissionScope ?? input.policy.tool?.permissionScope;
+    const score = trajectory.scoreFor(input.toolName, permissionScope, now());
     if (!score.eligible) return { decision: "abstain" };
 
     // Belt-and-braces: even if scoreFor missed the safety-critical
@@ -291,11 +322,12 @@ export function recordPermissionEvaluation(
   toolName: string,
   status: "allowed" | "blocked" | "pending",
   decidedAt: number = Date.now(),
+  permissionScope?: string,
 ): void {
   if (status === "allowed") {
-    trajectory.record({ toolName, decision: "approved", timestamp: decidedAt });
+    trajectory.record({ toolName, permissionScope, decision: "approved", timestamp: decidedAt });
   } else if (status === "blocked") {
-    trajectory.record({ toolName, decision: "rejected", timestamp: decidedAt });
+    trajectory.record({ toolName, permissionScope, decision: "rejected", timestamp: decidedAt });
   }
   // "pending" doesn't yield a decision yet.
 }

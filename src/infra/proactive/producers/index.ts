@@ -13,6 +13,8 @@ import { tradeEventProducer, resetTradeEventProducerState } from "./events/trade
 import { scanOpportunityProducer } from "./signals/scanOpportunityProducer.ts";
 import { riskProducer } from "./risk/riskProducer.ts";
 import { stopProducer } from "./risk/stopProducer.ts";
+import { producerHealthAlertProducer, resetProducerHealthAlertProducerState } from "./risk/producerHealthAlertProducer.ts";
+import { killSwitchAlertProducer, resetKillSwitchAlertProducerState } from "./risk/killSwitchAlertProducer.ts";
 import { periodicProducer, resetPeriodicProducerState } from "./periodicProducer.ts";
 import { portfolioDriftProducer } from "./risk/portfolioDriftProducer.ts";
 import { regimeFlipProducer, resetRegimeFlipProducerState } from "./signals/regimeFlipProducer.ts";
@@ -37,6 +39,8 @@ export {
   scanOpportunityProducer,
   riskProducer,
   stopProducer,
+  producerHealthAlertProducer,
+  killSwitchAlertProducer,
   periodicProducer,
   portfolioDriftProducer,
   regimeFlipProducer,
@@ -119,6 +123,8 @@ export function registerAllProducers(engine: ProactiveEngine): () => void {
     engine.registerProducer(withHealthTracking("scanOpportunity", scanOpportunityProducer)),
     engine.registerProducer(withHealthTracking("risk", riskProducer)),
     engine.registerProducer(withHealthTracking("stop", stopProducer)),
+    engine.registerProducer(withHealthTracking("producerHealthAlert", producerHealthAlertProducer)),
+    engine.registerProducer(withHealthTracking("killSwitchAlert", killSwitchAlertProducer)),
     engine.registerProducer(withHealthTracking("periodic", periodicProducer)),
     engine.registerProducer(withHealthTracking("portfolioDrift", portfolioDriftProducer)),
     engine.registerProducer(withHealthTracking("regimeFlip", regimeFlipProducer)),
@@ -136,6 +142,8 @@ export function registerAllProducers(engine: ProactiveEngine): () => void {
   return () => {
     for (const fn of unregisterFns) fn();
     resetTradeEventProducerState();
+    resetProducerHealthAlertProducerState();
+    resetKillSwitchAlertProducerState();
     resetPeriodicProducerState();
     resetRegimeFlipProducerState();
     resetChartPatternProducerState();

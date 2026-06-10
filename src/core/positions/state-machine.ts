@@ -15,6 +15,7 @@ import { InvalidStateError, NotFoundError } from "../../errors/index.ts";
 import type { EventBus } from "../../events/bus.ts";
 import { PositionStore } from "./store.ts";
 import {
+  PositionRecordSchema,
   VALID_TRANSITIONS,
   TERMINAL_STATES,
   type PositionState,
@@ -24,6 +25,22 @@ import {
 } from "./types.ts";
 
 const logger = createModuleLogger("position-state-machine");
+
+function validateMergedPosition(record: PositionRecord, currentState: PositionState): PositionRecord {
+  const parsed = PositionRecordSchema.safeParse(record);
+  if (!parsed.success) {
+    const issues = parsed.error.issues
+      .map((issue) => `${issue.path.join(".") || "<root>"}: ${issue.message}`)
+      .join("; ");
+    throw new InvalidStateError(
+      `Invalid position data merge: ${issues}`,
+      currentState,
+      undefined,
+      { issues },
+    );
+  }
+  return parsed.data;
+}
 
 /**
  * Generate a unique position ID with the pos_ prefix.
@@ -148,7 +165,7 @@ export class PositionStateMachine {
     };
 
     // Merge data, update state, append history
-    const updated: PositionRecord = {
+    let updated: PositionRecord = {
       ...existing,
       ...(data || {}),
       state: toState,
@@ -160,6 +177,7 @@ export class PositionStateMachine {
     if (toState === "closed" && !updated.closedAt) {
       updated.closedAt = now;
     }
+    updated = validateMergedPosition(updated, fromState);
 
     // Persist
     await this.store.save(updated);
@@ -240,13 +258,13 @@ export class PositionStateMachine {
     }
 
     const now = new Date().toISOString();
-    const updated: PositionRecord = {
+    const updated = validateMergedPosition({
       ...existing,
       ...data,
       state: existing.state, // preserve state
       id: existing.id,       // preserve id
       updatedAt: now,
-    };
+    }, existing.state);
 
     await this.store.save(updated);
 

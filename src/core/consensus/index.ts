@@ -11,6 +11,7 @@ export type {
   VoteDecision,
   AgentVote,
   ConsensusResult,
+  ConsensusOptions,
 } from "./protocol.ts";
 
 export {

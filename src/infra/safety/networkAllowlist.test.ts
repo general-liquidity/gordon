@@ -20,10 +20,12 @@ beforeEach(() => {
 });
 
 describe("isNetworkAllowlistEnabled", () => {
-  it("respects the flag", () => {
-    expect(isNetworkAllowlistEnabled({})).toBe(false);
+  it("defaults on and supports explicit disable", () => {
+    expect(isNetworkAllowlistEnabled({})).toBe(true);
     expect(isNetworkAllowlistEnabled({ [NETWORK_ALLOWLIST_FLAG_ENV]: "1" })).toBe(true);
     expect(isNetworkAllowlistEnabled({ [NETWORK_ALLOWLIST_FLAG_ENV]: "true" })).toBe(true);
+    expect(isNetworkAllowlistEnabled({ [NETWORK_ALLOWLIST_FLAG_ENV]: "0" })).toBe(false);
+    expect(isNetworkAllowlistEnabled({ [NETWORK_ALLOWLIST_FLAG_ENV]: "false" })).toBe(false);
   });
 });
 

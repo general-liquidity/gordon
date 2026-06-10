@@ -6,7 +6,8 @@
  */
 
 import type { Exchange } from "../../infra/exchange/index.ts";
-import { calculateIndicators, detectLevels } from "../../indicators/index.ts";
+import { calculateIndicators } from "../indicators/scanner-bundle.ts";
+import { detectLevels } from "../indicators/price-levels.ts";
 import { createModuleLogger } from "../../infra/logger/index.ts";
 import { emitEvent } from "../../events/index.ts";
 import { logScanOpportunity } from "../../infra/storage/entities/events.ts";

@@ -6,6 +6,7 @@ import { RuntimePersistence } from "../persistence/RuntimePersistence.ts";
 import { RuntimeBridge } from "../bridge/RuntimeBridge.ts";
 import { RuntimeHistoryManager } from "../history/RuntimeHistoryManager.ts";
 import { PermissionEngine } from "../permissions/PermissionEngine.ts";
+import { buildTrustTrajectoryHook, getDefaultTrustTrajectory } from "../permissions/trustTrajectory.ts";
 import { RuntimePluginManager } from "../plugins/RuntimePluginManager.ts";
 import { CompactionManager } from "../transcript/CompactionManager.ts";
 import { ReplayManager } from "../transcript/ReplayManager.ts";
@@ -124,6 +125,7 @@ export class SessionRuntimeFactory {
     const scratchpadStore = new ScratchpadStore();
     const toolRegistry = new ToolRegistry(this.capabilityRegistry);
     const permissionEngine = new PermissionEngine(runtimeStore);
+    permissionEngine.prependHook(buildTrustTrajectoryHook(getDefaultTrustTrajectory()));
     const bridge = new RuntimeBridge(runtimeStore);
     const historyManager = new RuntimeHistoryManager(this.persistence);
     const runtime = new SessionRuntime({

@@ -24,8 +24,8 @@ const DEFAULT_TEMPERATURE = 0.7;
 const DEFAULT_MAX_TOKENS = 2000;
 
 // Retry configuration
-const MAX_RETRIES = 3;
-const INITIAL_RETRY_DELAY_MS = 1000;
+const DEFAULT_MAX_RETRIES = 3;
+const DEFAULT_INITIAL_RETRY_DELAY_MS = 1000;
 const MAX_RETRY_DELAY_MS = 32000;
 
 /**
@@ -56,6 +56,37 @@ export class LLMError extends Error {
 }
 
 /**
+ * Structured "this provider is done for this request" signal.
+ *
+ * Thrown by the client's retry loop when same-provider retries terminate:
+ * immediately for non-retryable statuses (400/401/403, …) and after the
+ * retry budget for retryable ones (429/5xx, network errors). Carries the
+ * provider, the number of attempts made, and the final HTTP status so a
+ * failover layer (`executeWithFailover`) can move to the next provider
+ * without re-waiting any backoff.
+ */
+export class ProviderExhaustedError extends LLMError {
+  public attempts: number;
+
+  constructor(
+    message: string,
+    statusCode: number,
+    errorType: string,
+    provider: LLMProvider,
+    attempts: number
+  ) {
+    super(
+      `[${provider}] provider exhausted after ${attempts} attempt(s) (status ${statusCode}): ${message}`,
+      statusCode,
+      errorType,
+      provider
+    );
+    this.name = "ProviderExhaustedError";
+    this.attempts = attempts;
+  }
+}
+
+/**
  * Sleep for a given number of milliseconds
  */
 function sleep(ms: number): Promise<void> {
@@ -65,8 +96,8 @@ function sleep(ms: number): Promise<void> {
 /**
  * Calculate exponential backoff delay
  */
-function getBackoffDelay(attempt: number): number {
-  const delay = INITIAL_RETRY_DELAY_MS * Math.pow(2, attempt);
+function getBackoffDelay(attempt: number, initialDelayMs: number): number {
+  const delay = initialDelayMs * Math.pow(2, attempt);
   const jitter = Math.random() * 0.3 * delay;
   return Math.min(delay + jitter, MAX_RETRY_DELAY_MS);
 }
@@ -87,6 +118,8 @@ export class LLMClient {
   private defaultModel: string;
   private defaultTemperature: number;
   private defaultMaxTokens: number;
+  private maxRetries: number;
+  private retryDelayMs: number;
 
   constructor(config: LLMClientConfig) {
     if (!config.openaiApiKey && !config.dedalusApiKey && !config.inceptionApiKey) {
@@ -100,6 +133,8 @@ export class LLMClient {
     this.defaultModel = config.defaultModel ?? DEFAULT_MODEL;
     this.defaultTemperature = config.temperature ?? DEFAULT_TEMPERATURE;
     this.defaultMaxTokens = config.maxTokens ?? DEFAULT_MAX_TOKENS;
+    this.maxRetries = config.maxRetries ?? DEFAULT_MAX_RETRIES;
+    this.retryDelayMs = config.retryDelayMs ?? DEFAULT_INITIAL_RETRY_DELAY_MS;
 
     // Validate that the default provider has an API key
     if (this.defaultProvider === "openai" && !this.openaiApiKey) {
@@ -221,8 +256,8 @@ export class LLMClient {
         const error = new LLMError(errorMessage, response.status, errorType, provider);
 
         // Retry on rate limits or server errors
-        if (error.isRetryable && attempt < MAX_RETRIES) {
-          const delay = getBackoffDelay(attempt);
+        if (error.isRetryable && attempt < this.maxRetries) {
+          const delay = getBackoffDelay(attempt, this.retryDelayMs);
           console.warn(
             `[${provider}] LLM request failed (${response.status}), retrying in ${Math.round(delay)}ms...`
           );
@@ -230,7 +265,13 @@ export class LLMClient {
           return this.makeRequest(provider, body, attempt + 1);
         }
 
-        throw error;
+        throw new ProviderExhaustedError(
+          error.message,
+          error.statusCode,
+          error.errorType,
+          provider,
+          attempt + 1,
+        );
       }
 
       return (await response.json()) as OpenAIResponse;
@@ -240,19 +281,34 @@ export class LLMClient {
         error instanceof TypeError &&
         error.message.includes("fetch failed")
       ) {
-        if (attempt < MAX_RETRIES) {
-          const delay = getBackoffDelay(attempt);
+        if (attempt < this.maxRetries) {
+          const delay = getBackoffDelay(attempt, this.retryDelayMs);
           console.warn(
             `[${provider}] Network error, retrying in ${Math.round(delay)}ms...`
           );
           await sleep(delay);
           return this.makeRequest(provider, body, attempt + 1);
         }
-        throw new LLMError(
+        throw new ProviderExhaustedError(
           `Network error: Unable to reach ${provider} API`,
           0,
           "network_error",
-          provider
+          provider,
+          attempt + 1,
+        );
+      }
+
+      if (error instanceof ProviderExhaustedError) {
+        throw error;
+      }
+
+      if (error instanceof LLMError) {
+        throw new ProviderExhaustedError(
+          error.message,
+          error.statusCode,
+          error.errorType,
+          provider,
+          attempt + 1,
         );
       }
 

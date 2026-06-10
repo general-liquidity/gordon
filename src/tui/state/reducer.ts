@@ -5,6 +5,7 @@
  */
 
 import type { AppState, Action } from "./types.js";
+import { appendNotificationCapped } from "./notificationRetention.ts";
 
 export function appReducer(state: AppState, action: Action): AppState {
   switch (action.type) {
@@ -137,7 +138,7 @@ export function appReducer(state: AppState, action: Action): AppState {
     case "INJECT_NOTIFICATION":
       return {
         ...state,
-        notifications: [...state.notifications, action.notification].slice(-50), // cap at 50
+        notifications: appendNotificationCapped(state.notifications, action.notification),
       };
 
     case "DISMISS_NOTIFICATION":

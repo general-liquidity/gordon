@@ -36,6 +36,7 @@ import { emitEvent } from "../../../../events/index.ts";
 import { recordStructuredObservation } from "../../../platform/observability/index.ts";
 import { appendActionLogEntry } from "../../../action-log/index.ts";
 import { appendExecutionRecordFresh, isTradeLedgerEnabled, readExecutionRecords, getExecutionRecord, executionRecordToPayload } from "../../../safety/tradeLedger.ts";
+import { isExecutionAllowed, isKillSwitchesEnabled, killSwitchesToPayload } from "../../../safety/killSwitches.ts";
 import { loadConfigBundle, saveResolvedConfig } from "../../../storage/config/config.ts";
 import { listPlans, getPlan, updatePlan, createPlan } from "../../../storage/entities/plans.ts";
 import { listTrades, getTrade } from "../../../storage/entities/trades.ts";
@@ -416,6 +417,38 @@ export const executePlanTool = createTool({
         ? "Call approve_plan first."
         : "A plan that is already EXECUTING/CLOSED/CANCELLED cannot be re-executed.";
       return validateToolOutput(executePlanOutputSchema, { success: false, error: `Plan ${planId} is in ${plan.status} status, not APPROVED. ${hint}` }, { toolName: "execute_plan" });
+    }
+
+    if (isKillSwitchesEnabled()) {
+      const killSwitchDecision = isExecutionAllowed({
+        strategyId: plan.strategy,
+        traderId: ctx.userId,
+        instrument: plan.symbol,
+        venue: ctx.exchange.exchangeId,
+      });
+      if (!killSwitchDecision.allowed) {
+        recordStructuredObservation({
+          eventType: "execution.blocked",
+          workflow: "execution",
+          source: "agent_tool",
+          component: "execute_plan",
+          toolName: "execute_plan",
+          outcome: "failure",
+          status: "kill_switch_tripped",
+          controllability: classifyBlockedStatus("kill_switch_tripped"),
+          planId,
+          symbol: plan.symbol,
+          reason: killSwitchDecision.reason,
+          details: {
+            rationale,
+            ...killSwitchesToPayload(killSwitchDecision),
+          },
+        });
+        return validateToolOutput(executePlanOutputSchema, {
+          success: false,
+          error: `${killSwitchDecision.reason}. Reset the relevant kill switch before executing this plan.`,
+        }, { toolName: "execute_plan" });
+      }
     }
 
     recordStructuredObservation({

@@ -64,7 +64,7 @@ Planning only — can create plans but cannot execute them. Use for:
 Content-scoped rules that auto-approve or auto-deny based on conditions:
 - "Allow place_order when notionalUsd < $100" → small trades auto-approved
 - "Deny place_order when symbol contains DOGE" → specific assets blocked
-- Rules checked via racing: if a rule matches, dialog never shows
+- Rules checked via permission racing (`quickPermissionCheck` in `src/tui/bridge/runtime.ts`): if a rule matches, dialog never shows
 
 ### Layer 3: Hooks (PreToolUse)
 Custom code that runs before every tool:
@@ -72,9 +72,9 @@ Custom code that runs before every tool:
 - Can modify ("Reduce size to half")
 - Can allow (skip to next layer)
 
-### Layer 4: Risk Classifier (11 dimensions)
-Mandatory pre-execution check:
-- Scores 0-100 across 11 risk dimensions
+### Layer 4: Risk Classifier (15 dimensions — 8 base + 7 optional)
+Mandatory pre-execution check (`src/infra/trading/risk/riskClassifier.ts`):
+- Scores 0-100 across up to 15 risk dimensions (8 always-on + 7 when hedge-fund data is available)
 - Low (0-25): proceed
 - Medium (25-50): warn user
 - High (50-75): require explicit confirmation

@@ -57,9 +57,31 @@ export function installAcpPermissionHook(
 ): () => void {
   const trajectory = getDefaultTrustTrajectory();
 
-  const uninstall = engine.prependHook(async ({ toolName }) => {
+  const uninstall = engine.prependHook(async ({ toolName, policy }) => {
+    const permissionScope = policy.tool.permissionScope;
+
     // Safety-critical bypass — editor approval is too thin for these.
     if (isSafetyCritical(toolName)) {
+      return { decision: "abstain" };
+    }
+
+    const score = trajectory.scoreFor(toolName, permissionScope);
+    if (score.eligible && policy.approvalClass !== "always_require_human") {
+      return {
+        decision: "allow",
+        actor: "classifier:trust-trajectory",
+        reason: `${score.approvals} prior scoped ACP approvals (score ${score.score.toFixed(2)})`,
+      };
+    }
+
+    if (
+      policy.approvalClass === "none" ||
+      (
+        policy.tool.sideEffectLevel === "read" &&
+        policy.tool.riskClass === "low" &&
+        policy.approvalClass !== "always_require_human"
+      )
+    ) {
       return { decision: "abstain" };
     }
 
@@ -77,14 +99,14 @@ export function installAcpPermissionHook(
 
       if (verdict.kind === "cancelled") {
         // Operator dismissed — treat as deny for this call, no persistence.
-        return { decision: "deny", source: "acp-cancelled" };
+        return { decision: "deny", actor: "acp-cancelled" };
       }
 
-      // v3.5: trust-trajectory persistence for allow_always / reject_always
       if (verdict.persist) {
         try {
           trajectory.record({
             toolName,
+            permissionScope,
             decision: verdict.kind === "approve" ? "approved" : "rejected",
             timestamp: Date.now(),
           });
@@ -97,8 +119,18 @@ export function installAcpPermissionHook(
       }
 
       return verdict.kind === "approve"
-        ? { decision: "allow", source: "acp-editor" }
-        : { decision: "deny", source: "acp-editor" };
+        ? {
+          decision: "allow",
+          actor: "acp-editor",
+          persist: verdict.persist,
+          scope: verdict.persist ? "persistent" : undefined,
+        }
+        : {
+          decision: "deny",
+          actor: "acp-editor",
+          persist: verdict.persist,
+          scope: verdict.persist ? "persistent" : undefined,
+        };
     } catch (err) {
       logger.warn("ACP permission hook failed — falling through to default policy", {
         toolName,

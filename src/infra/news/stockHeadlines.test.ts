@@ -127,6 +127,20 @@ describe("fetchStockHeadlines", () => {
     expect(out.length).toBe(4);
   });
 
+  it("dedupes by link when the same story is tagged for multiple tickers", async () => {
+    mockFetchByUrl([
+      { match: (u) => u.includes("finance.yahoo.com/rss/headline"), body: YAHOO_RSS_AAPL },
+    ]);
+    const out = await fetchStockHeadlines({
+      tickers: ["AAPL", "MSFT"],
+      sources: ["yahoo"],
+      hoursBack: 24,
+    });
+    expect(out.length).toBe(2);
+    const links = out.map((h) => h.link);
+    expect(new Set(links).size).toBe(links.length);
+  });
+
   it("normalises ticker case (lowercase input still matches uppercase map)", async () => {
     mockFetchByUrl([
       { match: (u) => u.includes("AAPL"), body: YAHOO_RSS_AAPL },

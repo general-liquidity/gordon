@@ -157,8 +157,6 @@ import { TrailingStopDisplay } from "./components/status/TrailingStopDisplay.tsx
 import { OrderRecoveryNotice } from "./components/notices/OrderRecoveryNotice.tsx";
 import { MarketDataStatus } from "./components/status/MarketDataStatus.tsx";
 
-import { AlternateScreen } from "./components/layout/AlternateScreen.tsx";
-
 // ── Hooks ──
 import { useDoublePress } from "./hooks/input/useDoublePress.ts";
 import { useElapsedTime, formatElapsed } from "./hooks/animation/useElapsedTime.ts";

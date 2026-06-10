@@ -10,6 +10,10 @@
 import { installDedalusMaxTokensGuard, cloakDedalusErrors } from "./infra/runtime/dedalusMaxTokensGuard.ts";
 installDedalusMaxTokensGuard();
 cloakDedalusErrors();
+import { installOutboundFetchGuard } from "./infra/safety/outboundFetchGuard.ts";
+import { installFilesystemWriteGuard } from "./infra/safety/filesystemWriteGuardInstaller.ts";
+installOutboundFetchGuard();
+installFilesystemWriteGuard();
 
 import {
   parseCommand,

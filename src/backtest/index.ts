@@ -124,6 +124,22 @@ export * from "./prerun/filters.ts";
 export * from "./analysis/alpha-decay.ts";
 export * from "./plotting.ts";
 
+export {
+  computeVerdict,
+  formatVerdictSummary,
+  DEFAULT_VERDICT_THRESHOLDS,
+  STRICT_VERDICT_THRESHOLDS,
+  type BacktestVerdict,
+  type VerdictThresholds,
+  type VerdictResult,
+} from "./analysis/verdict.ts";
+
+export {
+  enrichBacktestResult,
+  type EnrichBacktestOptions,
+  type BacktestEnrichment,
+} from "./enrichment.ts";
+
 // Capacity sweep + realistic cost model
 export {
   realisticCostBps,
@@ -159,12 +175,6 @@ export {
   exportResultsCsv,
   generateHtmlReport,
 } from "./reporting/export.ts";
-
-// ============================================================================
-// Feature Pipeline (leakage-proof feature builder)
-// ============================================================================
-
-export * from "./features/index.ts";
 
 // ============================================================================
 // Walk-Forward Testing Exports

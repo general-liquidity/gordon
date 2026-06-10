@@ -66,7 +66,7 @@ export const startProactiveModeTool = createTool({
     "proactive suggestions flowing. Wires the producer registry and the " +
     "event-bus observer, so suggestions start firing automatically as Gordon " +
     "events land. Also starts a 60-second internal tick loop for time-based " +
-    "producers (session review, end-of-day journal, whale buffer drain).",
+    "producers (producer health, session review, journal, portfolio drift, regime, chart, volatility, funding, news, and stock events).",
   inputSchema: z.object({}),
   outputSchema: z.object({
     started: z.boolean(),

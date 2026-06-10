@@ -55,13 +55,42 @@ export interface AtomicGroup {
   label: string;
   legs: OrderLeg[];
   results: LegResult[];
-  status: "pending" | "executing" | "completed" | "rolled_back" | "partial_orphan";
+  status: "pending" | "executing" | "completed" | "rolled_back" | "partial_orphan" | "rejected";
   createdAt: string;
   completedAt?: string;
 }
 
 export type OrderSubmitter = (leg: OrderLeg) => Promise<{ orderId: string; fillPrice?: number; fillQuantity?: number }>;
 export type OrderCanceller = (orderId: string, venue: string) => Promise<boolean>;
+
+// ============================================================================
+// Leg validation — bounds-check before any capital is touched
+// ============================================================================
+
+export function validateOrderLeg(leg: OrderLeg): string[] {
+  const errors: string[] = [];
+  if (!leg.legId || leg.legId.trim() === "") errors.push("legId is empty");
+  if (!leg.symbol || leg.symbol.trim() === "") errors.push("symbol is empty");
+  if (!leg.venue || leg.venue.trim() === "") errors.push("venue is empty");
+  if (!Number.isFinite(leg.quantity) || leg.quantity <= 0) {
+    errors.push(`quantity must be a finite positive number (got ${leg.quantity})`);
+  }
+  const needsPrice = leg.type === "LIMIT" || leg.type === "STOP_LIMIT";
+  if (needsPrice && leg.price === undefined) {
+    errors.push(`${leg.type} order requires a price`);
+  }
+  if (leg.price !== undefined && (!Number.isFinite(leg.price) || leg.price <= 0)) {
+    errors.push(`price must be a finite positive number (got ${leg.price})`);
+  }
+  const needsStopPrice = leg.type === "STOP" || leg.type === "STOP_LIMIT";
+  if (needsStopPrice && leg.stopPrice === undefined) {
+    errors.push(`${leg.type} order requires a stopPrice`);
+  }
+  if (leg.stopPrice !== undefined && (!Number.isFinite(leg.stopPrice) || leg.stopPrice <= 0)) {
+    errors.push(`stopPrice must be a finite positive number (got ${leg.stopPrice})`);
+  }
+  return errors;
+}
 
 // ============================================================================
 // Execution Engine
@@ -95,6 +124,35 @@ export async function executeAtomicGroup(
     status: "executing",
     createdAt: new Date().toISOString(),
   };
+
+  // Validate ALL legs before submitting ANY — an atomic group with one
+  // malformed leg must be rejected whole, not fail mid-way and roll back.
+  const legErrors = new Map<number, string[]>();
+  for (let i = 0; i < legs.length; i++) {
+    const errors = validateOrderLeg(legs[i]!);
+    if (errors.length > 0) legErrors.set(i, errors);
+  }
+  if (legErrors.size > 0) {
+    for (let i = 0; i < group.results.length; i++) {
+      const result = group.results[i]!;
+      const errors = legErrors.get(i);
+      if (errors) {
+        result.status = "failed";
+        result.error = `Validation failed: ${errors.join("; ")}`;
+      } else {
+        result.status = "cancelled";
+        result.error = "Group rejected: invalid sibling leg";
+      }
+      result.completedAt = new Date().toISOString();
+    }
+    group.status = "rejected";
+    group.completedAt = new Date().toISOString();
+    emitAgentEvent(createEvent("error", 0, {
+      message: `Atomic group rejected before submission: ${legErrors.size} invalid leg(s)`,
+      recoverable: true,
+    }));
+    return group;
+  }
 
   const submittedOrderIds: Array<{ orderId: string; venue: string; legId: string }> = [];
 

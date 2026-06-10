@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "bun:test";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -36,7 +36,7 @@ describe("TrustTrajectory.scoreFor", () => {
   });
 
   it("returns ineligible with no history", () => {
-    const s = t.scoreFor("get_chart", NOW);
+    const s = t.scoreFor("get_chart", undefined, NOW);
     expect(s.eligible).toBe(false);
     expect(s.totalDecisions).toBe(0);
   });
@@ -45,7 +45,7 @@ describe("TrustTrajectory.scoreFor", () => {
     for (let i = 0; i < 4; i++) {
       t.record({ toolName: "get_chart", decision: "approved", timestamp: NOW - i * DAY });
     }
-    const s = t.scoreFor("get_chart", NOW);
+    const s = t.scoreFor("get_chart", undefined, NOW);
     expect(s.approvals).toBe(4);
     expect(s.score).toBe(1);
     expect(s.eligible).toBe(true);
@@ -56,7 +56,7 @@ describe("TrustTrajectory.scoreFor", () => {
       t.record({ toolName: "get_chart", decision: "approved", timestamp: NOW - (i + 5) * DAY });
     }
     t.record({ toolName: "get_chart", decision: "rejected", timestamp: NOW - 1 * DAY });
-    const s = t.scoreFor("get_chart", NOW);
+    const s = t.scoreFor("get_chart", undefined, NOW);
     expect(s.approvals).toBe(10);
     expect(s.rejections).toBe(1);
     expect(s.eligible).toBe(false);
@@ -69,7 +69,7 @@ describe("TrustTrajectory.scoreFor", () => {
     }
     // Rejection 14 days ago, default cooldown is 7 days
     t.record({ toolName: "get_chart", decision: "rejected", timestamp: NOW - 14 * DAY });
-    const s = t.scoreFor("get_chart", NOW);
+    const s = t.scoreFor("get_chart", undefined, NOW);
     expect(s.eligible).toBe(true);
   });
 
@@ -78,7 +78,7 @@ describe("TrustTrajectory.scoreFor", () => {
     for (let i = 0; i < 5; i++) {
       t.record({ toolName: "get_chart", decision: "approved", timestamp: NOW - 90 * DAY - i * DAY });
     }
-    const s = t.scoreFor("get_chart", NOW);
+    const s = t.scoreFor("get_chart", undefined, NOW);
     expect(s.approvals).toBe(0);
     expect(s.eligible).toBe(false);
   });
@@ -88,7 +88,7 @@ describe("TrustTrajectory.scoreFor", () => {
     for (let i = 0; i < 50; i++) {
       trusty.record({ toolName: "place_order", decision: "approved", timestamp: NOW - i });
     }
-    const s = trusty.scoreFor("place_order", NOW);
+    const s = trusty.scoreFor("place_order", undefined, NOW);
     expect(s.eligible).toBe(false);
     expect(s.reason).toContain("safety-critical");
   });
@@ -100,9 +100,24 @@ describe("TrustTrajectory.scoreFor", () => {
     }
     // 90% score, but threshold is 95%
     strict.record({ toolName: "get_chart", decision: "rejected", timestamp: NOW - 30 * DAY });
-    const s = strict.scoreFor("get_chart", NOW);
+    const s = strict.scoreFor("get_chart", undefined, NOW);
     expect(s.score).toBeCloseTo(0.9, 5);
     expect(s.eligible).toBe(false);
+  });
+
+  it("keys trust by tool name and permission scope", () => {
+    for (let i = 0; i < 4; i++) {
+      t.record({
+        toolName: "rebalance_portfolio",
+        permissionScope: "papertrade.execute",
+        decision: "approved",
+        timestamp: NOW - i,
+      });
+    }
+    expect(t.scoreFor("rebalance_portfolio", "papertrade.execute", NOW).eligible).toBe(true);
+    const live = t.scoreFor("rebalance_portfolio", "livetrade.execute", NOW);
+    expect(live.eligible).toBe(false);
+    expect(live.totalDecisions).toBe(0);
   });
 });
 
@@ -130,7 +145,7 @@ describe("TrustTrajectory persistence", () => {
     }
     const reader = new TrustTrajectory({ persistPath: path, minApprovals: 3, scoreThreshold: 0.9 });
     expect(reader.listEvents().length).toBe(4);
-    expect(reader.scoreFor("get_chart", NOW).eligible).toBe(true);
+    expect(reader.scoreFor("get_chart", undefined, NOW).eligible).toBe(true);
   });
 
   it("hook auto-approves trusted tools and abstains otherwise", () => {
@@ -149,6 +164,28 @@ describe("TrustTrajectory persistence", () => {
     expect(result.actor).toBe("classifier:trust-trajectory");
   });
 
+  it("hook requires the same permission scope before auto-approving", () => {
+    const t = new TrustTrajectory({ minApprovals: 3, scoreThreshold: 0.9 });
+    const hook = buildTrustTrajectoryHook(t, { now: () => NOW });
+    for (let i = 0; i < 4; i++) {
+      t.record({
+        toolName: "rebalance_portfolio",
+        permissionScope: "papertrade.execute",
+        decision: "approved",
+        timestamp: NOW - i,
+      });
+    }
+
+    expect(hook({
+      toolName: "rebalance_portfolio",
+      policy: { tool: { permissionScope: "livetrade.execute" } },
+    }).decision).toBe("abstain");
+    expect(hook({
+      toolName: "rebalance_portfolio",
+      policy: { tool: { permissionScope: "papertrade.execute" } },
+    }).decision).toBe("allow");
+  });
+
   it("hook refuses to auto-approve when policy says always_require_human", () => {
     const t = new TrustTrajectory({ minApprovals: 1, scoreThreshold: 0.5 });
     for (let i = 0; i < 10; i++) t.record({ toolName: "get_chart", decision: "approved", timestamp: NOW - i });
@@ -159,13 +196,14 @@ describe("TrustTrajectory persistence", () => {
 
   it("recordPermissionEvaluation maps statuses to decisions", () => {
     const t = new TrustTrajectory();
-    recordPermissionEvaluation(t, "get_chart", "allowed", NOW);
-    recordPermissionEvaluation(t, "get_chart", "blocked", NOW + 1);
-    recordPermissionEvaluation(t, "get_chart", "pending", NOW + 2); // no-op
+    recordPermissionEvaluation(t, "get_chart", "allowed", NOW, "market.read");
+    recordPermissionEvaluation(t, "get_chart", "blocked", NOW + 1, "market.read");
+    recordPermissionEvaluation(t, "get_chart", "pending", NOW + 2, "market.read"); // no-op
     const events = t.listEvents();
     expect(events.length).toBe(2);
     expect(events[0]?.decision).toBe("approved");
     expect(events[1]?.decision).toBe("rejected");
+    expect(events[0]?.permissionScope).toBe("market.read");
   });
 
   it("survives malformed rows in the ledger file", () => {
@@ -174,7 +212,7 @@ describe("TrustTrajectory persistence", () => {
     writer.record({ toolName: "get_chart", decision: "approved", timestamp: NOW });
     // Append junk by hand to simulate corruption
     const raw = readFileSync(path, "utf8");
-    require("node:fs").writeFileSync(path, raw + "not-json\n{}\n");
+    writeFileSync(path, raw + "not-json\n{}\n");
     const reader = new TrustTrajectory({ persistPath: path });
     expect(reader.listEvents().length).toBe(1);
     rmSync(dir, { recursive: true, force: true });

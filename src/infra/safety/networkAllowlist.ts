@@ -90,12 +90,29 @@ export const GORDON_DEFAULT_ALLOWLIST: readonly AllowlistRule[] = [
   // Data / news (passive read-only)
   { hostPattern: "finnhub.io", reason: "Finnhub" },
   { hostPattern: "*.finnhub.io", reason: "Finnhub" },
+  { hostPattern: "finance.yahoo.com", reason: "Yahoo Finance headlines" },
+  { hostPattern: "www.sec.gov", reason: "SEC EDGAR" },
+  { hostPattern: "data.sec.gov", reason: "SEC EDGAR" },
+  { hostPattern: "api.coingecko.com", reason: "CoinGecko" },
+  { hostPattern: "api.dexscreener.com", reason: "DexScreener" },
+  { hostPattern: "api.1inch.dev", reason: "1inch" },
+  { hostPattern: "api.zerion.io", reason: "Zerion" },
+  { hostPattern: "pro-openapi.debank.com", reason: "DeBank" },
+  { hostPattern: "api.nansen.ai", reason: "Nansen" },
+  { hostPattern: "api.arkm.com", reason: "Arkham" },
+  { hostPattern: "api.covalenthq.com", reason: "Covalent" },
+  { hostPattern: "api.santiment.net", reason: "Santiment" },
+  { hostPattern: "api.glassnode.com", reason: "Glassnode" },
+  { hostPattern: "api.cryptoquant.com", reason: "CryptoQuant" },
+  { hostPattern: "api.intotheblock.com", reason: "IntoTheBlock" },
+  { hostPattern: "api.messari.io", reason: "Messari" },
   // On-chain / EVM
   { hostPattern: "*.alchemy.com", reason: "Alchemy RPC" },
   { hostPattern: "*.helius.dev", reason: "Helius Solana" },
-  { hostPattern: "*.coinbase.com", reason: "Coinbase Developer Platform" },
   // Observability
   { hostPattern: "*.axiom.co", reason: "Axiom telemetry" },
+  // License / hosted services
+  { hostPattern: "*.supabase.co", reason: "Gordon license service" },
   // Localhost (development)
   { hostPattern: "localhost", reason: "local dev" },
   { hostPattern: "127.0.0.1", reason: "local dev" },
@@ -104,10 +121,8 @@ export const GORDON_DEFAULT_ALLOWLIST: readonly AllowlistRule[] = [
 const _registry: AllowlistRule[] = [...GORDON_DEFAULT_ALLOWLIST];
 
 export function isNetworkAllowlistEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return (
-    env[NETWORK_ALLOWLIST_FLAG_ENV] === "1" ||
-    env[NETWORK_ALLOWLIST_FLAG_ENV] === "true"
-  );
+  const raw = env[NETWORK_ALLOWLIST_FLAG_ENV];
+  return raw !== "0" && raw !== "false";
 }
 
 export function getAllowlistMode(env: NodeJS.ProcessEnv = process.env): AllowlistMode {

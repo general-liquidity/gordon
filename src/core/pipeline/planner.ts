@@ -5,11 +5,16 @@
  * The planner is the brain that turns analysis into actionable plans.
  */
 
-import { LLMClient, loadPrompt, buildMessages } from "../../infra/ai/llm/index.ts";
+import { LLMClient, loadPrompt, buildMessages, executeWithFailover } from "../../infra/ai/llm/index.ts";
 import { PlanSchema, type Plan, type GordonConfig } from "../../types/index.ts";
 import type { DetailedAnalysis } from "./analyzer.ts";
 import { createModuleLogger } from "../../infra/logger/index.ts";
 import { emitEvent } from "../../events/index.ts";
+import {
+  buildFailoverModelChain,
+  describeFailoverChain,
+  formatFailoverErrors,
+} from "./llmFailover.ts";
 
 const logger = createModuleLogger("planner");
 
@@ -375,7 +380,24 @@ Respond with a JSON object containing the plan. Follow all the rules in the syst
     status: true,
   });
 
-  const llmResponse = await client.chatWithJSON(messages, LLMResponseSchema);
+  const failover = await executeWithFailover({
+    chain: buildFailoverModelChain(client, "planGeneration"),
+    idOf: describeFailoverChain,
+    call: async (config) => client.chatWithJSON(messages, LLMResponseSchema, config),
+  });
+
+  if (!failover.ok || !failover.result) {
+    throw new Error(`Plan generation failed across all LLM providers: ${formatFailoverErrors(failover.errors)}`);
+  }
+
+  if (failover.degraded) {
+    logger.warn("Plan generation used fallback LLM provider", {
+      provider: failover.usedId,
+      attempts: failover.attempts,
+    });
+  }
+
+  const llmResponse = failover.result;
 
   // Step 5: Validate basic structure
   const validationErrors = validatePlanStructure(llmResponse as LLMPlanResponse, input);

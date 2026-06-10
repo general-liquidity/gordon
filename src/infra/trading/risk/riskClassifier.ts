@@ -17,6 +17,15 @@
  *   8. Asset familiarity (traded before vs new)
  */
 
+import {
+  buildVolDistribution,
+  computeAnnualizedVol,
+  computeVolatilityProfile,
+  pricesToReturns,
+} from "./volatilityPositionSizing.ts";
+import { checkCorrelationRisk } from "./correlationLimits.ts";
+import { computeTailRisk } from "./tailRisk.ts";
+
 // ============================================================================
 // Types
 // ============================================================================
@@ -181,6 +190,69 @@ export const DEFAULT_CLASSIFIER_CONFIG: ClassifierConfig = {
 };
 
 // ============================================================================
+// Input validation — trade boundary guards
+// ============================================================================
+
+export function validateTradeProposal(trade: TradeProposal): string[] {
+  const errors: string[] = [];
+  if (!trade.symbol || trade.symbol.trim() === "") {
+    errors.push("symbol is empty");
+  }
+  if (!Number.isFinite(trade.quantity) || trade.quantity <= 0) {
+    errors.push(`quantity must be a finite positive number (got ${trade.quantity})`);
+  }
+  if (!Number.isFinite(trade.price) || trade.price < 0) {
+    errors.push(`price must be a finite non-negative number (got ${trade.price})`);
+  }
+  if (!Number.isFinite(trade.notionalUsd) || trade.notionalUsd <= 0) {
+    errors.push(`notionalUsd must be a finite positive number (got ${trade.notionalUsd})`);
+  }
+  return errors;
+}
+
+export function validatePortfolioContext(portfolio: PortfolioContext): string[] {
+  const errors: string[] = [];
+  if (!Number.isFinite(portfolio.totalValueUsd) || portfolio.totalValueUsd <= 0) {
+    errors.push(`totalValueUsd must be a finite positive number (got ${portfolio.totalValueUsd})`);
+  }
+  if (!Number.isFinite(portfolio.cashUsd)) {
+    errors.push(`cashUsd must be a finite number (got ${portfolio.cashUsd})`);
+  }
+  if (!Number.isFinite(portfolio.dailyPnlUsd)) {
+    errors.push(`dailyPnlUsd must be a finite number (got ${portfolio.dailyPnlUsd})`);
+  }
+  if (!Number.isFinite(portfolio.dailyLossLimitUsd) || portfolio.dailyLossLimitUsd < 0) {
+    errors.push(`dailyLossLimitUsd must be a finite non-negative number (got ${portfolio.dailyLossLimitUsd})`);
+  }
+  if (!Number.isFinite(portfolio.maxDrawdownPct) || portfolio.maxDrawdownPct <= 0 || portfolio.maxDrawdownPct > 100) {
+    errors.push(`maxDrawdownPct must be in (0, 100] (got ${portfolio.maxDrawdownPct})`);
+  }
+  if (!Number.isFinite(portfolio.currentDrawdownPct) || portfolio.currentDrawdownPct < 0 || portfolio.currentDrawdownPct > 100) {
+    errors.push(`currentDrawdownPct must be in [0, 100] (got ${portfolio.currentDrawdownPct})`);
+  }
+  if (!Number.isFinite(portfolio.recentTradeCount) || portfolio.recentTradeCount < 0) {
+    errors.push(`recentTradeCount must be a finite non-negative number (got ${portfolio.recentTradeCount})`);
+  }
+  return errors;
+}
+
+function invalidInputAssessment(errors: string[]): RiskAssessment {
+  return {
+    compositeScore: 100,
+    tier: "critical",
+    dimensions: [{
+      name: "Input Validation",
+      score: 100,
+      weight: 1,
+      reason: errors.join("; "),
+    }],
+    topFactors: errors.slice(0, 3),
+    recommendation: "block",
+    summary: `BLOCKED — invalid trade input: ${errors[0]}`,
+  };
+}
+
+// ============================================================================
 // Classifier
 // ============================================================================
 
@@ -189,6 +261,14 @@ export function classifyTradeRisk(
   portfolio: PortfolioContext,
   config: ClassifierConfig = DEFAULT_CLASSIFIER_CONFIG,
 ): RiskAssessment {
+  const validationErrors = [
+    ...validateTradeProposal(trade),
+    ...validatePortfolioContext(portfolio),
+  ];
+  if (validationErrors.length > 0) {
+    return invalidInputAssessment(validationErrors);
+  }
+
   const dimensions: RiskDimension[] = [];
 
   // 1. Position size
@@ -276,47 +356,63 @@ export function classifyTradeRisk(
 
   // 9. Volatility-percentile position sizing
   if (portfolio.targetPriceHistory && portfolio.targetPriceHistory.length >= 60) {
-    const { computeVolatilityProfile, computeAnnualizedVol, pricesToReturns, buildVolDistribution } = require("./volatilityPositionSizing.ts") as typeof import("./volatilityPositionSizing.ts");
-    const isCrypto = portfolio.isCrypto ?? true;
-    const tradingDays = isCrypto ? 365 : 252;
-    const returns = pricesToReturns(portfolio.targetPriceHistory);
-    const currentVol = computeAnnualizedVol(returns.slice(-60), tradingDays);
-    const volDist = buildVolDistribution(portfolio.targetPriceHistory, 60, tradingDays);
-    const volProfile = computeVolatilityProfile(currentVol, volDist, config.maxPositionPct);
+    try {
+      const isCrypto = portfolio.isCrypto ?? true;
+      const tradingDays = isCrypto ? 365 : 252;
+      const returns = pricesToReturns(portfolio.targetPriceHistory);
+      const currentVol = computeAnnualizedVol(returns.slice(-60), tradingDays);
+      const volDist = buildVolDistribution(portfolio.targetPriceHistory, 60, tradingDays);
+      const volProfile = computeVolatilityProfile(currentVol, volDist, config.maxPositionPct);
 
-    // Score: if proposed size exceeds vol-adjusted limit, escalate
-    const proposedPct = (trade.notionalUsd / portfolio.totalValueUsd) * 100;
-    const overageRatio = proposedPct / Math.max(1, volProfile.recommendedSizePct);
-    const volSizeScore = overageRatio > 2 ? 90 : overageRatio > 1.5 ? 70 : overageRatio > 1 ? 40 : 0;
-    dimensions.push({
-      name: "Vol-Adjusted Sizing",
-      score: volSizeScore,
-      weight: 1.6,
-      reason: `Vol regime: ${volProfile.regime} (${(currentVol * 100).toFixed(0)}% annualized). ` +
-        `Recommended max: ${volProfile.recommendedSizePct.toFixed(1)}%, proposed: ${proposedPct.toFixed(1)}%`,
-    });
+      // Score: if proposed size exceeds vol-adjusted limit, escalate
+      const proposedPct = (trade.notionalUsd / portfolio.totalValueUsd) * 100;
+      const overageRatio = proposedPct / Math.max(1, volProfile.recommendedSizePct);
+      const volSizeScore = overageRatio > 2 ? 90 : overageRatio > 1.5 ? 70 : overageRatio > 1 ? 40 : 0;
+      dimensions.push({
+        name: "Vol-Adjusted Sizing",
+        score: volSizeScore,
+        weight: 1.6,
+        reason: `Vol regime: ${volProfile.regime} (${(currentVol * 100).toFixed(0)}% annualized). ` +
+          `Recommended max: ${volProfile.recommendedSizePct.toFixed(1)}%, proposed: ${proposedPct.toFixed(1)}%`,
+      });
+    } catch (err) {
+      dimensions.push({
+        name: "Vol-Adjusted Sizing",
+        score: 50,
+        weight: 1.6,
+        reason: `Dimension computation failed (${err instanceof Error ? err.message : String(err)}) — scored conservatively`,
+      });
+    }
   }
 
   // 10. Correlation with existing positions
   if (portfolio.targetReturns && portfolio.positionReturns && Object.keys(portfolio.positionReturns).length > 0) {
-    const { checkCorrelationRisk } = require("./correlationLimits.ts") as typeof import("./correlationLimits.ts");
-    const corrCheck = checkCorrelationRisk(
-      trade.symbol,
-      portfolio.targetReturns,
-      portfolio.positionReturns,
-      (trade.notionalUsd / portfolio.totalValueUsd) * 100,
-    );
-    const corrScore = corrCheck.maxCorrelation > 0.8 ? 80
-      : corrCheck.maxCorrelation > 0.6 ? 50
-      : corrCheck.maxCorrelation > 0.4 ? 20
-      : 0;
-    dimensions.push({
-      name: "Correlation Risk",
-      score: corrScore,
-      weight: 1.4,
-      reason: `Max correlation: ${(corrCheck.maxCorrelation * 100).toFixed(0)}% with ${corrCheck.mostCorrelatedWith}` +
-        (corrCheck.concentrationWarning ? " — CONCENTRATION WARNING" : ""),
-    });
+    try {
+      const corrCheck = checkCorrelationRisk(
+        trade.symbol,
+        portfolio.targetReturns,
+        portfolio.positionReturns,
+        (trade.notionalUsd / portfolio.totalValueUsd) * 100,
+      );
+      const corrScore = corrCheck.maxCorrelation > 0.8 ? 80
+        : corrCheck.maxCorrelation > 0.6 ? 50
+        : corrCheck.maxCorrelation > 0.4 ? 20
+        : 0;
+      dimensions.push({
+        name: "Correlation Risk",
+        score: corrScore,
+        weight: 1.4,
+        reason: `Max correlation: ${(corrCheck.maxCorrelation * 100).toFixed(0)}% with ${corrCheck.mostCorrelatedWith}` +
+          (corrCheck.concentrationWarning ? " — CONCENTRATION WARNING" : ""),
+      });
+    } catch (err) {
+      dimensions.push({
+        name: "Correlation Risk",
+        score: 50,
+        weight: 1.4,
+        reason: `Dimension computation failed (${err instanceof Error ? err.message : String(err)}) — scored conservatively`,
+      });
+    }
   }
 
   // 13. Venue MEV exposure — surface the structural sniping/MEV tax
@@ -420,19 +516,27 @@ export function classifyTradeRisk(
 
   // 11. Tail risk
   if (portfolio.targetPriceHistory && portfolio.targetPriceHistory.length >= 60) {
-    const { computeTailRisk } = require("./tailRisk.ts") as typeof import("./tailRisk.ts");
-    const tailProfile = computeTailRisk(portfolio.targetPriceHistory);
-    const tailScore = tailProfile.classification === "highly_fragile" ? 90
-      : tailProfile.classification === "fragile" ? 60
-      : tailProfile.classification === "robust" ? 20
-      : 0; // antifragile = bonus
-    dimensions.push({
-      name: "Tail Risk",
-      score: tailScore,
-      weight: 1.3,
-      reason: `${tailProfile.classification} (score: ${tailProfile.tailRiskScore.toFixed(0)}/100, ` +
-        `skew: ${tailProfile.skewness.toFixed(2)}, max DD: ${(tailProfile.maxDrawdown * 100).toFixed(0)}%)`,
-    });
+    try {
+      const tailProfile = computeTailRisk(portfolio.targetPriceHistory);
+      const tailScore = tailProfile.classification === "highly_fragile" ? 90
+        : tailProfile.classification === "fragile" ? 60
+        : tailProfile.classification === "robust" ? 20
+        : 0; // antifragile = bonus
+      dimensions.push({
+        name: "Tail Risk",
+        score: tailScore,
+        weight: 1.3,
+        reason: `${tailProfile.classification} (score: ${tailProfile.tailRiskScore.toFixed(0)}/100, ` +
+          `skew: ${tailProfile.skewness.toFixed(2)}, max DD: ${(tailProfile.maxDrawdown * 100).toFixed(0)}%)`,
+      });
+    } catch (err) {
+      dimensions.push({
+        name: "Tail Risk",
+        score: 50,
+        weight: 1.3,
+        reason: `Dimension computation failed (${err instanceof Error ? err.message : String(err)}) — scored conservatively`,
+      });
+    }
   }
 
   // Compute weighted composite

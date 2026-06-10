@@ -32,6 +32,11 @@ import { getOutcomeTracker, autoRecordFromStore } from "../judges/outcomeEvals.t
 import { judgeCandidate } from "../judges/proposalJudge.ts";
 import { getEventBus } from "../../../events/index.ts";
 import { saveProactiveStateDebounced } from "../storage/persistence.ts";
+import {
+  recordDecision as recordCalibrationDecision,
+  recordOutcome as recordCalibrationOutcome,
+  type OutcomeResult,
+} from "../../calibration/confidenceStore.ts";
 
 const logger = createModuleLogger("proactive-engine");
 
@@ -161,6 +166,7 @@ export class ProactiveEngine {
 
     getCategoryPolicy().markFired(candidate.category);
     getSuggestionStore().add(full);
+    this.recordCalibrationDecision(full);
 
     logger.info("Proactive suggestion fired", {
       id: full.id,
@@ -168,25 +174,8 @@ export class ProactiveEngine {
       confidence: full.confidence,
     });
 
-    // Emit on the Gordon event bus so TUI chat subscribers (and anything
-    // else that wants to react) can surface the suggestion to the user.
-    // Awaited so that any synchronous subscribers (the TUI chat hook) have
-    // observed the event before fireCandidate returns — prevents races in
-    // tests and ensures the chat message lands before the next tool call.
-    try {
-      await getEventBus().send("proactive:suggestion_fired", {
-        suggestionId: full.id,
-        category: full.category,
-        title: full.title,
-        body: full.body,
-        confidence: full.confidence,
-        action: full.action,
-        operation: full.operation,
-        triggers: full.triggers as unknown as Record<string, unknown>,
-      });
-    } catch (err) {
-      logger.debug("Failed to emit proactive:suggestion_fired", { err: String(err) });
-    }
+    await this.emitSuggestionFired(full);
+    this.schedulePersist();
 
     return { fired: true, suggestion: full };
   }
@@ -198,6 +187,7 @@ export class ProactiveEngine {
     if (!updated) return { ok: false, error: `suggestion ${id} not found` };
     const category = store.get(id)!.category;
     getOutcomeTracker().record(id, category, "CD");
+    this.recordCalibrationOutcome(store.get(id)!, "CD");
     await this.emitResolved(id, category, "accepted");
     this.schedulePersist();
     return { ok: true };
@@ -210,6 +200,7 @@ export class ProactiveEngine {
     if (!s) return { ok: false, error: `suggestion ${id} not found` };
     store.updateStatus(id, "dismissed", "FA");
     getOutcomeTracker().record(id, s.category, "FA");
+    this.recordCalibrationOutcome(s, "FA");
     await this.emitResolved(id, s.category, "dismissed");
     this.schedulePersist();
     return { ok: true };
@@ -248,6 +239,7 @@ export class ProactiveEngine {
     if (!s) return { ok: false, error: `suggestion ${id} not found` };
     s.outcome = outcome;
     getOutcomeTracker().record(id, s.category, outcome);
+    this.recordCalibrationOutcome(s, outcome);
     return { ok: true };
   }
 
@@ -281,10 +273,13 @@ export class ProactiveEngine {
           if (verdict.shouldFire) {
             getCategoryPolicy().markFired(candidate.category);
             getSuggestionStore().add(candidate);
+            this.recordCalibrationDecision(candidate);
             logger.info("Proactive suggestion fired from producer", {
               id: candidate.id,
               category: candidate.category,
             });
+            await this.emitSuggestionFired(candidate);
+            this.schedulePersist();
           } else {
             candidate.status = "suppressed";
             getSuggestionStore().add(candidate);
@@ -297,6 +292,51 @@ export class ProactiveEngine {
         });
       }
     }
+  }
+
+  private async emitSuggestionFired(suggestion: ProactiveSuggestion): Promise<void> {
+    // Emit on the Gordon event bus so TUI chat subscribers (and anything
+    // else that wants to react) can surface the suggestion to the user.
+    // Awaited so synchronous subscribers observe the event before the caller
+    // returns — prevents races in tests and keeps chat/cards in order.
+    try {
+      await getEventBus().send("proactive:suggestion_fired", {
+        suggestionId: suggestion.id,
+        category: suggestion.category,
+        title: suggestion.title,
+        body: suggestion.body,
+        confidence: suggestion.confidence,
+        action: suggestion.action,
+        operation: suggestion.operation,
+        triggers: suggestion.triggers as unknown as Record<string, unknown>,
+      });
+    } catch (err) {
+      logger.debug("Failed to emit proactive:suggestion_fired", { err: String(err) });
+    }
+  }
+
+  private recordCalibrationDecision(suggestion: ProactiveSuggestion): void {
+    recordCalibrationDecision({
+      decisionId: suggestion.id,
+      domain: "proactive_suggestion",
+      confidence: suggestion.confidence,
+      decision: `${suggestion.category}: ${suggestion.title}`,
+      reasoning: suggestion.judgeReasoning ?? suggestion.observationSummary,
+      tags: {
+        category: suggestion.category,
+        source: suggestion.triggers.source,
+        ...(suggestion.triggers.eventType ? { eventType: suggestion.triggers.eventType } : {}),
+        ...(suggestion.triggers.symbol ? { symbol: suggestion.triggers.symbol } : {}),
+      },
+    });
+  }
+
+  private recordCalibrationOutcome(suggestion: ProactiveSuggestion, outcome: SuggestionOutcome): void {
+    recordCalibrationOutcome({
+      decisionId: suggestion.id,
+      result: proactiveOutcomeToCalibrationResult(outcome),
+      notes: `proactive outcome=${outcome}; status=${suggestion.status}`,
+    });
   }
 }
 
@@ -344,4 +384,17 @@ function generateId(): string {
   const ts = Date.now().toString(36);
   const rand = Math.random().toString(36).slice(2, 8);
   return `ps_${ts}_${rand}`;
+}
+
+function proactiveOutcomeToCalibrationResult(outcome: SuggestionOutcome): OutcomeResult {
+  switch (outcome) {
+    case "CD":
+    case "NR":
+      return "correct";
+    case "FA":
+    case "MN":
+      return "wrong";
+    default:
+      return "unknown";
+  }
 }

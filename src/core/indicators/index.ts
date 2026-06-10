@@ -379,3 +379,21 @@ export { calculateRollSpread } from "./roll-spread.ts";
 export type { RollSpreadResult } from "./roll-spread.ts";
 export { calculateAmihud } from "./amihud-illiquidity.ts";
 export type { AmihudResult } from "./amihud-illiquidity.ts";
+
+export {
+  analyzeSmcPatterns,
+  detectChangeOfCharacter,
+  detectFairValueGaps,
+  detectLiquiditySweeps,
+  detectOrderBlocks as detectSmcOrderBlocks,
+  detectPremiumDiscountZones,
+} from "./smc-patterns.ts";
+export type {
+  ChangeOfCharacter,
+  FairValueGap,
+  LiquiditySweep,
+  OHLC as SmcOHLC,
+  OrderBlock as SmcOrderBlock,
+  PremiumDiscountZones,
+  SmcAnalysis,
+} from "./smc-patterns.ts";

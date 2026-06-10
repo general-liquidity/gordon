@@ -21,10 +21,12 @@ beforeEach(() => {
 });
 
 describe("isFilesystemWriteGuardEnabled", () => {
-  it("respects the flag", () => {
-    expect(isFilesystemWriteGuardEnabled({})).toBe(false);
+  it("defaults on and supports explicit disable", () => {
+    expect(isFilesystemWriteGuardEnabled({})).toBe(true);
     expect(isFilesystemWriteGuardEnabled({ [FILESYSTEM_WRITE_GUARD_FLAG_ENV]: "1" })).toBe(true);
     expect(isFilesystemWriteGuardEnabled({ [FILESYSTEM_WRITE_GUARD_FLAG_ENV]: "true" })).toBe(true);
+    expect(isFilesystemWriteGuardEnabled({ [FILESYSTEM_WRITE_GUARD_FLAG_ENV]: "0" })).toBe(false);
+    expect(isFilesystemWriteGuardEnabled({ [FILESYSTEM_WRITE_GUARD_FLAG_ENV]: "false" })).toBe(false);
   });
 });
 

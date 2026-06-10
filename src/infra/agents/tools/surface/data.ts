@@ -22,6 +22,9 @@ import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 import { getGordonContext, type MastraExecutionContext } from "../types.ts";
 import { recordSymbolObservation } from "../../observation/symbolObservationTracker.ts";
+import { createModuleLogger } from "../../../logger/index.ts";
+import { getEventBus } from "../../../../events/index.ts";
+import { getPositionManager, type PositionRecord } from "../../../../core/positions/index.ts";
 import { getCryptoNewsHeadlinesTool as implCryptoNews } from "../news/news.ts";
 import { getStockNewsHeadlinesTool as implStockNews } from "../news/stockNews.ts";
 import { filterByAsOf } from "./retrieval-helpers.ts";
@@ -40,6 +43,53 @@ import {
   getUpgradeDowngradeTool as implUpgradeDowngrade,
   getInsiderSentimentTool as implInsiderSentiment,
 } from "../providers/finnhub-fundamentals-tools.ts";
+
+const logger = createModuleLogger("surface-data-tools");
+const cacheWriteWarningKeys = new Set<string>();
+const LIVE_PORTFOLIO_STATES = new Set(["filled", "monitoring", "closing"]);
+
+function warnCacheWriteFailureOnce(
+  kind: "candles" | "orderbook",
+  venue: string,
+  symbol: string,
+  error: unknown,
+): void {
+  const key = `${kind}:${venue}:${symbol}`;
+  if (cacheWriteWarningKeys.has(key)) return;
+  cacheWriteWarningKeys.add(key);
+  logger.warn("Market data cache write failed; live read returned without cache persistence", {
+    kind,
+    venue,
+    symbol,
+    error: error instanceof Error ? error.message : String(error),
+  });
+}
+
+function isClosedToday(position: PositionRecord, dayStartMs: number): boolean {
+  const closedAt = position.closedAt ? Date.parse(position.closedAt) : NaN;
+  return Number.isFinite(closedAt) && closedAt >= dayStartMs;
+}
+
+function positionMarketValue(position: PositionRecord): number {
+  const quantity = Math.abs(position.quantity ?? 0);
+  const price = position.currentPrice ?? position.entryPrice ?? 0;
+  return quantity * price;
+}
+
+function positionHighWaterValue(position: PositionRecord): number {
+  const quantity = Math.abs(position.quantity ?? 0);
+  const highWater = position.highWaterMark ?? position.currentPrice ?? position.entryPrice ?? 0;
+  return quantity * highWater;
+}
+
+function positionUnrealizedPnl(position: PositionRecord): number {
+  if (typeof position.unrealizedPnL === "number") return position.unrealizedPnL;
+  const quantity = position.quantity ?? 0;
+  const entry = position.entryPrice ?? 0;
+  const current = position.currentPrice ?? entry;
+  const sideSign = position.side === "short" ? -1 : 1;
+  return (current - entry) * quantity * sideSign;
+}
 
 // ============================================================================
 // get_market_data
@@ -171,9 +221,8 @@ export const getMarketDataTool = createTool({
           // break the live read. Wrapped in try/catch — never throws.
           try {
             upsertCandles(venue, args.symbol, tf, candles as unknown as CachedCandle[]);
-          } catch {
-            // Cache write failure is acceptable; the live data has
-            // already been returned upstream.
+          } catch (error) {
+            warnCacheWriteFailureOnce("candles", venue, args.symbol, error);
           }
           return {
             dataType: "candles",
@@ -201,8 +250,8 @@ export const getMarketDataTool = createTool({
               bids: (book?.bids ?? []) as OrderbookLevel[],
               asks: (book?.asks ?? []) as OrderbookLevel[],
             });
-          } catch {
-            // Cache write failure is acceptable.
+          } catch (error) {
+            warnCacheWriteFailureOnce("orderbook", venue, args.symbol, error);
           }
           return {
             dataType: "orderbook",
@@ -300,8 +349,12 @@ export const getPortfolioTool = createTool({
     venue: z.string().optional(),
     positions: z.array(z.unknown()),
     totalValueUsd: z.number().optional(),
+    totalExposureUsd: z.number().optional(),
+    unrealizedPnlUsd: z.number().optional(),
+    realizedPnlUsd: z.number().optional(),
     dailyPnlUsd: z.number().optional(),
     drawdownPct: z.number().optional(),
+    source: z.enum(["position_tracking", "exchange_balances"]).optional(),
     fetchedAt: z.string(),
   }),
   execute: async (
@@ -311,28 +364,69 @@ export const getPortfolioTool = createTool({
     const ctx = getGordonContext(execContext);
     const exchange = ctx?.exchange;
     const fetchedAt = new Date().toISOString();
-    if (!exchange) {
-      return { positions: [], fetchedAt };
-    }
     try {
-      // Exchange interface doesn't expose positions directly — derive from
-      // open orders + balances. Proper wiring: route to position-tracking
-      // tools (src/infra/agents/tools/positionTracking.ts) for the
-      // aggregated PortfolioSnapshot.
-      const balances = await exchange.getAllBalances();
-      return {
-        venue: exchange.exchangeId,
-        positions: balances.filter((b) => b.free > 0 || b.locked > 0),
-        fetchedAt,
-      };
+      const manager = await getPositionManager(getEventBus());
+      const activeRecords = await manager.getActivePositions();
+      const livePositions = activeRecords.filter((position) => LIVE_PORTFOLIO_STATES.has(position.state));
+      const dayStart = new Date();
+      dayStart.setUTCHours(0, 0, 0, 0);
+      const dayStartMs = dayStart.getTime();
+      const closedToday = _args.includeClosedToday
+        ? (await manager.getTradeHistory({ since: dayStart.toISOString() })).filter((position) =>
+            (position.state === "closed" || position.state === "reviewed") &&
+            isClosedToday(position, dayStartMs)
+          )
+        : [];
+
+      if (livePositions.length > 0 || closedToday.length > 0) {
+        const totalExposureUsd = livePositions.reduce((sum, position) => sum + positionMarketValue(position), 0);
+        const highWaterUsd = livePositions.reduce((sum, position) => sum + positionHighWaterValue(position), 0);
+        const unrealizedPnlUsd = livePositions.reduce((sum, position) => sum + positionUnrealizedPnl(position), 0);
+        const realizedPnlUsd = closedToday.reduce((sum, position) => sum + (position.realizedPnL ?? 0), 0);
+        const drawdownPct = highWaterUsd > 0
+          ? Math.max(0, ((highWaterUsd - totalExposureUsd) / highWaterUsd) * 100)
+          : 0;
+
+        return {
+          venue: exchange?.exchangeId,
+          positions: [...livePositions, ...closedToday],
+          totalValueUsd: ctx?.portfolioValue && ctx.portfolioValue > 0 ? ctx.portfolioValue : totalExposureUsd,
+          totalExposureUsd,
+          unrealizedPnlUsd,
+          realizedPnlUsd,
+          dailyPnlUsd: unrealizedPnlUsd + realizedPnlUsd,
+          drawdownPct,
+          source: "position_tracking" as const,
+          fetchedAt,
+        };
+      }
     } catch (err) {
-      return {
-        positions: [],
-        fetchedAt,
-        // include an error marker via the existing field; downstream code
-        // can detect empty positions + recent timestamp as "fetch failed"
-      };
+      logger.warn("Position-tracking portfolio snapshot failed; falling back to exchange balances", {
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
+
+    if (exchange) {
+      try {
+        const balances = await exchange.getAllBalances();
+        return {
+          venue: exchange.exchangeId,
+          positions: balances.filter((b) => b.free > 0 || b.locked > 0),
+          source: "exchange_balances" as const,
+          fetchedAt,
+        };
+      } catch {
+        return {
+          positions: [],
+          fetchedAt,
+        };
+      }
+    }
+
+    return {
+      positions: [],
+      fetchedAt,
+    };
   },
 });
 

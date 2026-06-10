@@ -9,6 +9,17 @@
  *   - Auto-Rebalance:       auto-fix PR → detect drift → rebalance → execute
  *   - Atomic Execution:     multi-edit atomic → all-or-nothing order groups
  *   - Prefetch Pipeline:    speculation → pre-fetch data for likely next action
+ *   - Shadow Mode:          ghost-fill recording for paper/shadow execution parity
+ *   - Auto-Optimizer:       hill-climbing strategy parameter search (internal ops API)
+ */
+
+/**
+ * Export graduation convention:
+ * modules start private while experimental; graduate to this barrel only when
+ * they have tests, stable typed inputs/outputs, and a caller-facing lifecycle
+ * (tool, producer, skill, or documented internal ops API). Staging modules stay
+ * unexported until they meet that bar; exported modules are safe for agent/tool
+ * wiring and should preserve API compatibility or get an explicit migration.
  */
 
 // Strategy Sandbox
@@ -75,6 +86,29 @@ export {
   formatAtomicGroup,
 } from "./ops/atomicExecution.ts";
 export type { OrderLeg, LegResult, AtomicGroup, OrderSubmitter, OrderCanceller } from "./ops/atomicExecution.ts";
+
+// Shadow Mode (Paper/Ghost Fill Tracking)
+export {
+  SHADOW_FLAG_ENV,
+  SHADOW_PATH_ENV,
+  isShadowModeEnabled,
+  defaultShadowFillsPath,
+  recordShadowOpen,
+  recordShadowClose,
+  readShadowFills,
+  summarizeShadowFills,
+  compareShadowVsReal,
+} from "./ops/shadowMode.ts";
+export type {
+  ShadowStatus,
+  ShadowSide,
+  ShadowFill,
+  OpenShadowInput,
+  CloseShadowInput,
+  ShadowReadOptions,
+  ShadowSummary,
+  ShadowVsRealComparison,
+} from "./ops/shadowMode.ts";
 
 // Prefetch Pipeline
 export {

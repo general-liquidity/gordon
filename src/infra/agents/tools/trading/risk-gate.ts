@@ -20,7 +20,7 @@ import { createModuleLogger } from "../../../logger/index.ts";
 import { evaluateBaselineCircuitBreakers } from "../../../../gateway/circuit-breakers/index.ts";
 import { computeCircuitBreakerLiveData } from "../../../../gateway/circuit-breakers/data-provider.ts";
 import { evaluateConsensus } from "../../../../core/consensus/protocol.ts";
-import type { TradeProposal, ConsensusResult } from "../../../../core/consensus/protocol.ts";
+import type { TradeProposal, ConsensusResult, AgentVote } from "../../../../core/consensus/protocol.ts";
 
 const logger = createModuleLogger("risk-gate");
 
@@ -198,7 +198,14 @@ export const checkRiskTool = createTool({
             stop_loss: input.stopLoss ?? input.price * 0.95,
             take_profit: input.takeProfit ?? [],
           };
-          consensus = await evaluateConsensus(proposal, ctx);
+          const riskVote: AgentVote = {
+            agent: "risk",
+            decision: result.approved ? "APPROVE" : "REJECT",
+            confidence: result.approved ? 0.8 : 0.9,
+            weight: 0.3,
+            reason: result.reason,
+          };
+          consensus = await evaluateConsensus(proposal, { riskVote });
         } catch (consensusErr) {
           logger.debug("Consensus evaluation skipped", {
             error: (consensusErr as Error).message,

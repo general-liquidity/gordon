@@ -67,7 +67,8 @@ async function loadTickerMap(signal?: AbortSignal): Promise<Map<string, TickerMa
 
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
-  signal?.addEventListener("abort", () => ctrl.abort());
+  const onAbort = () => ctrl.abort();
+  signal?.addEventListener("abort", onAbort);
   try {
     const res = await fetch("https://www.sec.gov/files/company_tickers.json", {
       signal: ctrl.signal,
@@ -84,6 +85,7 @@ async function loadTickerMap(signal?: AbortSignal): Promise<Map<string, TickerMa
     return map;
   } finally {
     clearTimeout(timer);
+    signal?.removeEventListener("abort", onAbort);
   }
 }
 
@@ -159,7 +161,8 @@ function toIso(raw: string): string {
 async function fetchYahoo(ticker: string, signal?: AbortSignal): Promise<StockHeadline[]> {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
-  signal?.addEventListener("abort", () => ctrl.abort());
+  const onAbort = () => ctrl.abort();
+  signal?.addEventListener("abort", onAbort);
   try {
     const url = `https://finance.yahoo.com/rss/headline?s=${encodeURIComponent(ticker)}`;
     const res = await fetch(url, {
@@ -179,6 +182,7 @@ async function fetchYahoo(ticker: string, signal?: AbortSignal): Promise<StockHe
       }));
   } finally {
     clearTimeout(timer);
+    signal?.removeEventListener("abort", onAbort);
   }
 }
 
@@ -189,7 +193,8 @@ async function fetchEdgar8k(ticker: string, signal?: AbortSignal): Promise<Stock
 
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
-  signal?.addEventListener("abort", () => ctrl.abort());
+  const onAbort = () => ctrl.abort();
+  signal?.addEventListener("abort", onAbort);
   try {
     const url =
       `https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=${entry.cik}` +
@@ -211,6 +216,7 @@ async function fetchEdgar8k(ticker: string, signal?: AbortSignal): Promise<Stock
       }));
   } finally {
     clearTimeout(timer);
+    signal?.removeEventListener("abort", onAbort);
   }
 }
 
@@ -255,8 +261,18 @@ export async function fetchStockHeadlines(
   }
 
   const settled = await Promise.allSettled(tasks);
+  // Dedupe by link — Yahoo tags one story with several tickers, so a
+  // multi-ticker fetch returns the same article once per ticker.
+  const seen = new Set<string>();
   const all: StockHeadline[] = [];
-  for (const r of settled) if (r.status === "fulfilled") all.push(...r.value);
+  for (const r of settled) {
+    if (r.status !== "fulfilled") continue;
+    for (const h of r.value) {
+      if (seen.has(h.link)) continue;
+      seen.add(h.link);
+      all.push(h);
+    }
+  }
 
   const filtered = all.filter((h) => {
     if (!h.publishedAt) return true;

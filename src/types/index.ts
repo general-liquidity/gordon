@@ -4,4 +4,3 @@ export * from "./plan.ts";
 export * from "./trade.ts";
 export * from "./intent.ts";
 export * from "./market.ts";
-export * from "./event.ts";

@@ -72,6 +72,8 @@ hanabi-1-main
 misc
 
 # Reference repos (not part of Gordon source)
+agents/
+opensolvency/
 claude-code-meta/
 claude-code-meta-2/
 claude-code-best-practice-main/

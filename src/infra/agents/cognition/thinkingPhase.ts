@@ -29,6 +29,13 @@ const logger = createModuleLogger("thinking-phase");
 // ============================================================================
 
 export type ThinkingDepth = "off" | "low" | "medium" | "high";
+export type ThinkingDepthSource = "override" | "config" | "env" | "phase" | "default";
+
+export interface ThinkingDepthResolution {
+  depth: ThinkingDepth;
+  source: ThinkingDepthSource;
+  reason: string;
+}
 
 export interface ThinkingResult {
   trace: string;
@@ -40,6 +47,64 @@ export interface ThinkingResult {
   thinkingDurationMs?: number;
   /** Wall-clock duration of the gate evaluation (ms). */
   gateDurationMs?: number;
+}
+
+const THINKING_DEPTHS = new Set<ThinkingDepth>(["off", "low", "medium", "high"]);
+
+function normalizeThinkingDepth(value: unknown): ThinkingDepth | null {
+  return typeof value === "string" && THINKING_DEPTHS.has(value as ThinkingDepth)
+    ? value as ThinkingDepth
+    : null;
+}
+
+export function thinkingDepthForPhase(phase: ReturnType<typeof determineWorkflowPhase>): ThinkingDepth {
+  switch (phase) {
+    case "scan":
+    case "ops":
+    case "compaction":
+      return "off";
+    case "analysis":
+      return "low";
+    case "planning":
+    case "execution":
+      return "medium";
+    case "critique":
+      return "high";
+    default:
+      return "off";
+  }
+}
+
+export function resolveThinkingDepth(
+  options: {
+    context?: Pick<GordonContext, "config">;
+    phase?: ReturnType<typeof determineWorkflowPhase>;
+    overrideDepth?: ThinkingDepth;
+  },
+): ThinkingDepthResolution {
+  const overrideDepth = normalizeThinkingDepth(options.overrideDepth);
+  if (overrideDepth) {
+    return { depth: overrideDepth, source: "override", reason: `overrideDepth=${overrideDepth}` };
+  }
+
+  const configDepth = normalizeThinkingDepth(
+    (options.context?.config as Record<string, unknown> | undefined)?.thinkingDepth,
+  );
+  if (configDepth) {
+    return { depth: configDepth, source: "config", reason: `config.thinkingDepth=${configDepth}` };
+  }
+
+  const envDepth = normalizeThinkingDepth(process.env.GORDON_THINKING_DEPTH);
+  if (envDepth) {
+    return { depth: envDepth, source: "env", reason: `GORDON_THINKING_DEPTH=${envDepth}` };
+  }
+
+  if (options.phase) {
+    const depth = thinkingDepthForPhase(options.phase);
+    return { depth, source: "phase", reason: `phase=${options.phase}` };
+  }
+
+  return { depth: "off", source: "default", reason: "default=off" };
 }
 
 /**
@@ -61,15 +126,23 @@ export function shouldRunToolFreeThinking(
   if (!flag) {
     return { run: false, reason: "GORDON_TOOL_FREE_THINKING flag not enabled" };
   }
+  const phase = determineWorkflowPhase(context);
+  const resolution = resolveThinkingDepth({ context, phase });
+  if (
+    (resolution.source === "config" || resolution.source === "env" || resolution.source === "override") &&
+    resolution.depth === "off"
+  ) {
+    return { run: false, reason: `${resolution.reason} disables tool-free thinking` };
+  }
   if (typeof userMessage === "string" && userMessage.length > 200) {
     return { run: true, reason: "user message > 200 chars" };
   }
-  const depth = (context.config as Record<string, unknown>).thinkingDepth as ThinkingDepth | undefined
-    ?? (process.env.GORDON_THINKING_DEPTH as ThinkingDepth | undefined);
-  if (depth === "medium" || depth === "high") {
-    return { run: true, reason: `thinkingDepth=${depth}` };
+  if (
+    (resolution.source === "config" || resolution.source === "env" || resolution.source === "override") &&
+    (resolution.depth === "medium" || resolution.depth === "high")
+  ) {
+    return { run: true, reason: `thinkingDepth=${resolution.depth}` };
   }
-  const phase = determineWorkflowPhase(context);
   if (phase === "planning" || phase === "execution" || phase === "critique") {
     return { run: true, reason: `phase=${phase}` };
   }
@@ -133,16 +206,10 @@ const SKIP_PHASES = new Set(["scan", "ops", "compaction"]);
  * or `thinkingDepth` in config for complex analysis/planning sessions.
  */
 export function getThinkingDepthFromContext(context: GordonContext): ThinkingDepth {
-  // Explicit config override
-  const configDepth = (context.config as Record<string, unknown>).thinkingDepth as ThinkingDepth | undefined;
-  const envDepth = process.env.GORDON_THINKING_DEPTH as ThinkingDepth | undefined;
-  const requested = configDepth ?? envDepth;
-
-  if (requested && ["off", "low", "medium", "high"].includes(requested)) {
-    return requested;
-  }
-
-  return "off";
+  return resolveThinkingDepth({
+    context,
+    phase: determineWorkflowPhase(context),
+  }).depth;
 }
 
 /**

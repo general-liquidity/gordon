@@ -30,6 +30,17 @@ describe("extendedThinkingWiring", () => {
     const opts = providerOptionsForPhase("planning", { overrideDepth: "off" });
     expect(opts).toEqual({});
   });
+
+  it("lets GORDON_THINKING_DEPTH override phase defaults", () => {
+    const previous = process.env.GORDON_THINKING_DEPTH;
+    try {
+      process.env.GORDON_THINKING_DEPTH = "off";
+      expect(providerOptionsForPhase("planning")).toEqual({});
+    } finally {
+      if (previous === undefined) delete process.env.GORDON_THINKING_DEPTH;
+      else process.env.GORDON_THINKING_DEPTH = previous;
+    }
+  });
 });
 
 describe("runtimeRecoveryWiring", () => {

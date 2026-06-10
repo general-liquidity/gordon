@@ -8,6 +8,7 @@ import type {
 } from "../contracts/types.ts";
 import { RuntimeStore } from "../state/RuntimeStore.ts";
 import type { RuntimeToolPolicyDecision } from "../tools/ToolPolicy.ts";
+import { getDefaultTrustTrajectory, recordPermissionEvaluation } from "./trustTrajectory.ts";
 
 export interface PermissionHookInput {
   policy: RuntimeToolPolicyDecision;
@@ -113,6 +114,16 @@ function ruleSpecificity(rule: RuntimeApprovalRule): number {
   if (rule.toolName) return 2;
   if (rule.toolNamePattern) return 1;
   return 0; // scope-only or catch-all
+}
+
+function sameRuleIdentity(a: RuntimeApprovalRule, b: RuntimeApprovalRule): boolean {
+  return (
+    a.toolName === b.toolName &&
+    a.toolNamePattern === b.toolNamePattern &&
+    a.permissionScope === b.permissionScope &&
+    a.decision === b.decision &&
+    a.scope === b.scope
+  );
 }
 
 function buildFingerprint(tool: RuntimeToolSpec, context: GordonContext, runtimeState: ReturnType<RuntimeStore["getState"]>): string {
@@ -404,6 +415,13 @@ export class PermissionEngine {
       });
     }
 
+    recordPermissionEvaluation(
+      getDefaultTrustTrajectory(),
+      approved.toolName,
+      "allowed",
+      Date.now(),
+      approved.permissionScope,
+    );
     this.resolvePendingRequest(approved);
     return approved;
   }
@@ -451,6 +469,13 @@ export class PermissionEngine {
       });
     }
 
+    recordPermissionEvaluation(
+      getDefaultTrustTrajectory(),
+      denied.toolName,
+      "blocked",
+      Date.now(),
+      denied.permissionScope,
+    );
     this.resolvePendingRequest(denied);
 
     if (options.cascade) {
@@ -469,6 +494,13 @@ export class PermissionEngine {
           reason: `Cascaded from ${requestId}: ${options.reason ?? pending.reason ?? "denied"}`,
           decidedAt: new Date().toISOString(),
         };
+        recordPermissionEvaluation(
+          getDefaultTrustTrajectory(),
+          cascaded.toolName,
+          "blocked",
+          Date.now(),
+          cascaded.permissionScope,
+        );
         this.resolvePendingRequest(cascaded);
       }
     }
@@ -557,9 +589,7 @@ export class PermissionEngine {
     const state = this.runtimeStore.getState();
     const rules = [
       rule,
-      ...state.approvals.rules.filter((existing) =>
-        !(existing.toolName === rule.toolName && existing.permissionScope === rule.permissionScope && existing.decision === rule.decision)
-      ),
+      ...state.approvals.rules.filter((existing) => !sameRuleIdentity(existing, rule)),
     ].slice(0, 100);
     this.runtimeStore.setApprovalState({ rules });
   }

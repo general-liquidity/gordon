@@ -32,7 +32,7 @@ import {
   type VWAPResult,
   type StochasticRSIResult,
 } from "../core/indicators/index.ts";
-import { detectLevels } from "../indicators/index.ts";
+import { detectLevels } from "../core/indicators/price-levels.ts";
 import type { Level } from "../types/index.ts";
 
 // ============================================================================

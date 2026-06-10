@@ -21,6 +21,7 @@ import type {
   BacktestTrade,
 } from "../../../../../backtest/types.ts";
 import { runBacktest } from "../../../../../backtest/engine.ts";
+import { enrichBacktestResult } from "../../../../../backtest/enrichment.ts";
 import { formatBacktestSummary } from "../../../../../backtest/reporting/formatter.ts";
 import type {
   HistoricalDataClient,
@@ -473,6 +474,7 @@ export const runBacktestTool = createTool({
       const engineParams = buildEngineParams(initialCapital, commission, realism);
 
       const engineResult = runBacktest(strategy, ohlcData, engineParams);
+      const enrichment = await enrichBacktestResult(engineResult);
       const executionTime = Date.now() - executionStart;
 
       const result = buildBacktestResult(strategy, backtestConfig, engineResult, executionTime);
@@ -510,7 +512,10 @@ export const runBacktestTool = createTool({
           datasetId: systematic.dataset.datasetId,
         },
       });
-      const summary = formatBacktestSummary(result);
+      const summary = [
+        formatBacktestSummary(result),
+        ...enrichment.summaryLines,
+      ].join("\n");
       const operatorReport = buildBacktestOperatorReport({
         strategyName: strategy.name,
         symbol: metadata.symbol,

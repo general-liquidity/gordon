@@ -22,7 +22,8 @@ import {
   type MastraExecutionContext,
 } from "../types.ts";
 import { createCachedTool, TOOL_CACHE_CONFIG } from "../runtime/cache.ts";
-import { calculateIndicators, detectLevels } from "../../../../indicators/index.ts";
+import { calculateIndicators } from "../../../../core/indicators/scanner-bundle.ts";
+import { detectLevels } from "../../../../core/indicators/price-levels.ts";
 import { detectSupportBounce, determineTrend } from "../../../../core/pipeline/scanner.ts";
 import { resolveInstrument } from "../../../domain/markets/instruments.ts";
 import {

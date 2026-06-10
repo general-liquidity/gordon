@@ -38,6 +38,9 @@ import type { ApprovalRequest } from "../components/dialogs/ApprovalDialog.tsx";
 import { getRuntimeApprovalShortId } from "../../app/runtime/runtimeApprovalId.ts";
 import { subscribeToEvents } from "./eventSubscriptions.js";
 import type { Action, TuiNotification } from "../state/types.js";
+import { appendNotificationCapped } from "../state/notificationRetention.ts";
+import { noteRiskKernelFailure, resetRiskKernelHealth } from "./riskKernelHealth.ts";
+import { recordTurn, resetTurnSummaries, formatTurnsView } from "./turnSummaries.ts";
 
 // ── Extracted handlers ──
 import {
@@ -216,6 +219,9 @@ export async function initializeRuntime(setState: StateUpdater): Promise<Session
     threadId: runtimeState.session.threadId ?? null,
   }));
 
+  resetRiskKernelHealth();
+  resetTurnSummaries();
+
   // Start background monitoring
   startBackgroundMonitoring(setState);
 
@@ -274,6 +280,12 @@ async function handleSlashCommand(
   setState: StateUpdater,
   runtime: SessionRuntime,
 ): Promise<void> {
+  // TUI-local view — renders the turn-summary ring buffer; never hits the agent.
+  if (input === "/turns" || input.startsWith("/turns ")) {
+    addMessage(setState, "system", formatTurnsView(input.slice("/turns".length)), "system");
+    return;
+  }
+
   const parsed = parseSlashCommand(input);
 
   if (!parsed) {
@@ -556,6 +568,8 @@ async function streamResponse(
             streaming: false,
           };
 
+          recordTurn(userMessage, responseContent);
+
           // ── Phase 5: Risk kernel pre-check on pending approvals ──
           // Evaluate each pending approval through evaluateToolAccess.
           // Auto-deny blocked, auto-approve allowed, only show dialog for pending.
@@ -633,8 +647,19 @@ async function streamResponse(
                 // "pending" — needs human approval via dialog
                 stillPending.push(approval);
               }
-            } catch {
-              // If evaluateToolAccess fails, fall through to manual approval
+            } catch (err) {
+              // Fall through to manual approval, but tell the operator the
+              // risk kernel is down — once per session, not per approval.
+              const warning = noteRiskKernelFailure(err);
+              if (warning) {
+                riskMessages.push({
+                  id: `risk-health-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                  role: "system",
+                  variant: "approval" as const,
+                  content: warning,
+                  timestamp: new Date().toISOString(),
+                });
+              }
               stillPending.push(approval);
             }
           }
@@ -897,7 +922,7 @@ function createDispatchAdapter(setState: StateUpdater): (action: Action) => void
       case "INJECT_NOTIFICATION":
         setState((prev: any) => ({
           ...prev,
-          notifications: [...(prev.notifications ?? []), action.notification],
+          notifications: appendNotificationCapped(prev.notifications, action.notification),
         }));
         // Only surface critical trading events as conversation messages.
         // fill = position/trade fills, alert = price/stop/guardrail, error = failures.

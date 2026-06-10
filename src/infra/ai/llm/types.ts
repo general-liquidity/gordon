@@ -151,6 +151,8 @@ export interface LLMClientConfig {
   defaultModel?: string;
   temperature?: number;
   maxTokens?: number;
+  maxRetries?: number;
+  retryDelayMs?: number;
 }
 
 /**

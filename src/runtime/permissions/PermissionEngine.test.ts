@@ -1,9 +1,13 @@
-import { describe, expect, it } from "bun:test";
+import { beforeEach, describe, expect, it } from "bun:test";
 
 import type { RuntimeToolPolicyDecision } from "../tools/ToolPolicy.ts";
 import { PermissionEngine } from "./PermissionEngine.ts";
 import { RuntimeStore } from "../state/RuntimeStore.ts";
 import { createDefaultRuntimeSessionState } from "../state/SessionState.ts";
+import {
+  _resetDefaultTrustTrajectoryForTests,
+  getDefaultTrustTrajectory,
+} from "./trustTrajectory.ts";
 
 function createPolicy(overrides: Partial<RuntimeToolPolicyDecision> = {}): RuntimeToolPolicyDecision {
   return {
@@ -35,6 +39,10 @@ const context = {
 } as any;
 
 describe("PermissionEngine", () => {
+  beforeEach(() => {
+    _resetDefaultTrustTrajectoryForTests();
+  });
+
   it("queues high-risk approvals and resolves them via explicit approval", async () => {
     const store = new RuntimeStore(createDefaultRuntimeSessionState("app"));
     store.setSession({ runtimeId: "app", sessionId: "app", resourceId: "user-1", threadId: "thread-1" });
@@ -52,6 +60,29 @@ describe("PermissionEngine", () => {
     const followUp = await engine.evaluate("place_market_order", context, createPolicy());
     expect(followUp.status).toBe("allowed");
     expect(followUp.source).toBe("rule");
+  });
+
+  it("records human decisions into trust trajectory with permission scope", async () => {
+    const store = new RuntimeStore(createDefaultRuntimeSessionState("app"));
+    store.setSession({ runtimeId: "app", sessionId: "app", resourceId: "user-1", threadId: "thread-1" });
+    const engine = new PermissionEngine(store);
+
+    const evaluation = await engine.evaluate("rebalance_portfolio", context, createPolicy({
+      tool: {
+        ...createPolicy().tool,
+        id: "rebalance_portfolio",
+        permissionScope: "papertrade.execute",
+      },
+    }));
+    expect(evaluation.status).toBe("pending");
+
+    engine.approve(evaluation.request!.id, { actor: "operator" });
+
+    expect(getDefaultTrustTrajectory().listEvents()).toMatchObject([{
+      toolName: "rebalance_portfolio",
+      permissionScope: "papertrade.execute",
+      decision: "approved",
+    }]);
   });
 
   it("auto-allows low-risk read-only actions via the classifier", async () => {

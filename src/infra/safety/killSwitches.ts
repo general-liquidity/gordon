@@ -17,10 +17,8 @@
 export const KILL_SWITCHES_FLAG_ENV = "GORDON_KILL_SWITCHES";
 
 export function isKillSwitchesEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return (
-    env[KILL_SWITCHES_FLAG_ENV] === "1" ||
-    env[KILL_SWITCHES_FLAG_ENV] === "true"
-  );
+  const raw = env[KILL_SWITCHES_FLAG_ENV];
+  return raw !== "0" && raw !== "false";
 }
 
 export type KillSwitchScope =

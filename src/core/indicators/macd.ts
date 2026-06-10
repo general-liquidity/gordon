@@ -6,6 +6,22 @@
 import { calculateEMA } from "./ema.ts";
 import type { MACDResult } from "./types.ts";
 
+function assertPrefixOnlyNulls(values: readonly (number | null)[], label: string): void {
+  let seenValue = false;
+  for (let i = 0; i < values.length; i++) {
+    const value = values[i];
+    if (value === null) {
+      if (seenValue) {
+        throw new Error(
+          `${label} contains a mid-series null at index ${i}; signal-line alignment requires nulls to be prefix-only`,
+        );
+      }
+      continue;
+    }
+    seenValue = true;
+  }
+}
+
 /**
  * Calculate MACD (Moving Average Convergence Divergence)
  *
@@ -58,6 +74,7 @@ export function calculateMACD(
   }
 
   // Calculate signal line (EMA of MACD line)
+  assertPrefixOnlyNulls(macdLine, "MACD line");
   const validMacd = macdLine.filter((v): v is number => v !== null);
   const signalEMA = calculateEMA(validMacd, signalPeriod);
 
@@ -71,6 +88,11 @@ export function calculateMACD(
       signalLine.push(signalEMA.values[signalIndex] ?? null);
       signalIndex++;
     }
+  }
+  if (signalIndex !== validMacd.length) {
+    throw new Error(
+      `MACD signal-line alignment mismatch: consumed ${signalIndex} values for ${validMacd.length} MACD points`,
+    );
   }
 
   // Calculate histogram (MACD - Signal)

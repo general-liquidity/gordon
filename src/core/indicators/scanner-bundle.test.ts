@@ -1,15 +1,14 @@
 /**
- * Tests for indicator modules
+ * Tests for scanner indicator bundle
  *
  * Tests RSI, MACD, and support/resistance level detection
  */
 
 import { describe, test, expect } from "bun:test";
-import { calculateRSI, calculateSMA, calculateEMA } from "./rsi.ts";
-import { calculateMACD } from "./macd.ts";
-import { detectLevels, findNearestLevels } from "./levels.ts";
-import { createMockCandle, createMockCandles, createMockLevel } from "../test-utils/mocks.ts";
-import type { Candle, Level } from "../types/index.ts";
+import { calculateRSI, calculateSMA, calculateEMA, calculateMACD } from "./scanner-bundle.ts";
+import { detectLevels, findNearestLevels } from "./price-levels.ts";
+import { createMockCandle, createMockCandles, createMockLevel } from "../../test-utils/mocks.ts";
+import type { Candle, Level } from "../../types/market.ts";
 
 describe("calculateSMA", () => {
   test("returns 0 for empty array", () => {
@@ -42,14 +41,14 @@ describe("calculateEMA", () => {
   test("returns SMA when data length equals period", () => {
     const values = [10, 20, 30, 40, 50];
     const result = calculateEMA(values, 5);
-    expect(result).toBe(30); // SMA of the values
+    expect(result).toBe(30);
   });
 
   test("calculates EMA for longer series", () => {
     const values = [10, 20, 30, 40, 50, 60];
     const result = calculateEMA(values, 5);
     expect(result).not.toBeNull();
-    expect(result).toBeGreaterThan(30); // Should be pulled toward 60
+    expect(result).toBeGreaterThan(30);
   });
 
   test("EMA reacts to recent values", () => {
@@ -90,7 +89,7 @@ describe("calculateRSI", () => {
       candles.push(
         createMockCandle({
           open: 100 + i,
-          close: 101 + i, // Always gains
+          close: 101 + i,
           high: 102 + i,
           low: 100 + i,
         })
@@ -106,7 +105,7 @@ describe("calculateRSI", () => {
       candles.push(
         createMockCandle({
           open: 200 - i,
-          close: 199 - i, // Always losses
+          close: 199 - i,
           high: 200 - i,
           low: 198 - i,
         })
@@ -140,7 +139,6 @@ describe("calculateRSI", () => {
 
     expect(rsi7).not.toBeNull();
     expect(rsi14).not.toBeNull();
-    // Different periods should generally give different results
   });
 });
 
@@ -152,7 +150,6 @@ describe("calculateMACD", () => {
   });
 
   test("returns null when exactly at minimum required", () => {
-    // Minimum: slowPeriod + signalPeriod - 1 = 26 + 9 - 1 = 34
     const candles = createMockCandles(33);
     const result = calculateMACD(candles);
     expect(result).toBeNull();
@@ -181,7 +178,6 @@ describe("calculateMACD", () => {
     const result = calculateMACD(candles);
 
     expect(result).not.toBeNull();
-    // In uptrend, fast EMA > slow EMA, so MACD should be positive
     expect(result!.macd).toBeGreaterThan(0);
   });
 
@@ -190,7 +186,6 @@ describe("calculateMACD", () => {
     const result = calculateMACD(candles);
 
     expect(result).not.toBeNull();
-    // In downtrend, fast EMA < slow EMA, so MACD should be negative
     expect(result!.macd).toBeLessThan(0);
   });
 
@@ -201,7 +196,6 @@ describe("calculateMACD", () => {
 
     expect(defaultMACD).not.toBeNull();
     expect(customMACD).not.toBeNull();
-    // Different periods will give different values
     expect(defaultMACD!.macd).not.toBe(customMACD!.macd);
   });
 });
@@ -214,7 +208,6 @@ describe("detectLevels", () => {
   });
 
   test("returns empty array for exactly minimum required candles", () => {
-    // Minimum: sensitivity * 2 + 1 = 3 * 2 + 1 = 7
     const candles = createMockCandles(6);
     const result = detectLevels(candles, 3);
     expect(result).toHaveLength(0);
@@ -225,7 +218,6 @@ describe("detectLevels", () => {
     const result = detectLevels(candles);
 
     expect(Array.isArray(result)).toBe(true);
-    // May or may not find levels depending on random data
   });
 
   test("levels have required properties", () => {
@@ -254,11 +246,9 @@ describe("detectLevels", () => {
   });
 
   test("detects swing highs as resistance levels", () => {
-    // Create candles with a clear swing high
     const candles: Candle[] = [];
     const baseTime = Date.now();
 
-    // Rising prices to peak
     for (let i = 0; i < 5; i++) {
       candles.push(
         createMockCandle({
@@ -270,17 +260,15 @@ describe("detectLevels", () => {
       );
     }
 
-    // Peak candle
     candles.push(
       createMockCandle({
         openTime: baseTime + 5 * 3600000,
-        high: 115, // Clear swing high
+        high: 115,
         low: 108,
         close: 110,
       })
     );
 
-    // Falling prices from peak
     for (let i = 0; i < 5; i++) {
       candles.push(
         createMockCandle({
@@ -304,8 +292,6 @@ describe("detectLevels", () => {
     const lowSensitivity = detectLevels(candles, 2);
     const highSensitivity = detectLevels(candles, 5);
 
-    // Higher sensitivity (more lookback) typically finds fewer levels
-    // This is not always guaranteed with random data, so we just check they work
     expect(Array.isArray(lowSensitivity)).toBe(true);
     expect(Array.isArray(highSensitivity)).toBe(true);
   });
@@ -322,7 +308,7 @@ describe("findNearestLevels", () => {
     const levels: Level[] = [
       createMockLevel({ price: 80, type: "support" }),
       createMockLevel({ price: 90, type: "support" }),
-      createMockLevel({ price: 95, type: "support" }), // Nearest
+      createMockLevel({ price: 95, type: "support" }),
     ];
 
     const result = findNearestLevels(levels, 100);
@@ -331,7 +317,7 @@ describe("findNearestLevels", () => {
 
   test("finds nearest resistance above current price", () => {
     const levels: Level[] = [
-      createMockLevel({ price: 105, type: "resistance" }), // Nearest
+      createMockLevel({ price: 105, type: "resistance" }),
       createMockLevel({ price: 110, type: "resistance" }),
       createMockLevel({ price: 120, type: "resistance" }),
     ];
@@ -342,8 +328,8 @@ describe("findNearestLevels", () => {
 
   test("ignores levels at exact current price", () => {
     const levels: Level[] = [
-      createMockLevel({ price: 100, type: "support" }), // At current price
-      createMockLevel({ price: 95, type: "support" }), // Below
+      createMockLevel({ price: 100, type: "support" }),
+      createMockLevel({ price: 95, type: "support" }),
     ];
 
     const result = findNearestLevels(levels, 100);
@@ -375,17 +361,15 @@ describe("findNearestLevels", () => {
   test("handles mixed support and resistance levels", () => {
     const levels: Level[] = [
       createMockLevel({ price: 120, type: "resistance" }),
-      createMockLevel({ price: 110, type: "support" }), // Above price but type is support
-      createMockLevel({ price: 105, type: "resistance" }), // Nearest resistance
-      createMockLevel({ price: 95, type: "support" }), // Nearest support
-      createMockLevel({ price: 90, type: "resistance" }), // Below price but type is resistance
+      createMockLevel({ price: 110, type: "support" }),
+      createMockLevel({ price: 105, type: "resistance" }),
+      createMockLevel({ price: 95, type: "support" }),
+      createMockLevel({ price: 90, type: "resistance" }),
       createMockLevel({ price: 80, type: "support" }),
     ];
 
     const result = findNearestLevels(levels, 100);
-    // Should find nearest below price regardless of type
     expect(result.support?.price).toBe(95);
-    // Should find nearest above price regardless of type
     expect(result.resistance?.price).toBe(105);
   });
 });

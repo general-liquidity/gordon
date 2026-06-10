@@ -27,7 +27,9 @@ export type {
 export { API_ENDPOINTS, GORDON_MODELS } from "./types.ts";
 
 // Client
-export { LLMClient, LLMError, createLLMClientFromEnv } from "./client.ts";
+export { LLMClient, LLMError, ProviderExhaustedError, createLLMClientFromEnv } from "./client.ts";
+export { executeWithFailover } from "./providerFailover.ts";
+export type { FailoverOptions, FailoverResult } from "./providerFailover.ts";
 
 // Prompts
 export {

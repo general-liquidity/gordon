@@ -21,16 +21,14 @@
  *   ACP outcome                    Gordon verdict      Persist as trust?
  *   ──────────────────────────     ────────────────    ─────────────────
  *   selected: allow_once           approve             no
- *   selected: allow_always         approve             yes (future)
+ *   selected: allow_always         approve             yes
  *   selected: reject_once          reject              no
- *   selected: reject_always        reject              yes (future)
+ *   selected: reject_always        reject              yes
  *   cancelled                      cancelled           no
  *
- * The "persist as trust" column is a v3.5 extension — wiring into
- * Gordon's trustTrajectory module so allow_always decisions add the
- * tool to the operator's auto-approve set. v3 stores the intent in the
- * structured observation log; the actual trust-update path lives in a
- * follow-up commit.
+ * The ACP hook records persisted decisions into Gordon's trustTrajectory
+ * under the tool's runtime permission scope, so a paper-mode editor
+ * approval never grants live-trading trust.
  */
 
 import type {

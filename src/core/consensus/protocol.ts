@@ -15,8 +15,6 @@
 
 import { RegimeDetector } from "../regime/detector.ts";
 import { StrategyRuntime } from "../runtime/engine.ts";
-import { evaluateOrderRisk } from "../../infra/agents/tools/trading/risk-gate.ts";
-import type { GordonContext } from "../../infra/agents/types.ts";
 import { createModuleLogger } from "../../infra/logger/index.ts";
 import { saveConsensusResult } from "./store.ts";
 
@@ -57,43 +55,23 @@ export interface ConsensusResult {
   timestamp: string;
 }
 
+export interface ConsensusOptions {
+  /** Risk vote supplied by the caller after running its own risk kernel. */
+  riskVote?: AgentVote;
+}
+
 // ============================================================================
 // Evaluators
 // ============================================================================
 
-async function evaluateRisk(
-  proposal: TradeProposal,
-  ctx: GordonContext,
-): Promise<AgentVote> {
-  try {
-    const result = await evaluateOrderRisk(
-      {
-        symbol: proposal.symbol,
-        side: proposal.side === "long" ? "BUY" : "SELL",
-        type: "MARKET",
-        quantity: proposal.size_usd / proposal.entry_price,
-        price: proposal.entry_price,
-      },
-      ctx,
-      "consensus-risk",
-    );
-
-    return {
-      agent: "risk",
-      decision: result.approved ? "APPROVE" : "REJECT",
-      confidence: result.approved ? 0.8 : 0.9,
-      weight: 0.3,
-      reason: result.reason,
-    };
-  } catch (error) {
-    return {
-      agent: "risk",
-      decision: "REJECT",
-      confidence: 1.0,
-      weight: 0.3,
-      reason: `Risk evaluation failed: ${(error as Error).message}`,
-    };
-  }
+function evaluateRisk(options: ConsensusOptions): AgentVote {
+  return options.riskVote ?? {
+    agent: "risk",
+    decision: "ABSTAIN",
+    confidence: 0,
+    weight: 0.3,
+    reason: "Risk vote not supplied by caller",
+  };
 }
 
 function evaluateRegime(
@@ -268,14 +246,11 @@ function evaluateHistorical(
  */
 export async function evaluateConsensus(
   proposal: TradeProposal,
-  ctx: GordonContext,
+  options: ConsensusOptions = {},
 ): Promise<ConsensusResult> {
   const votes: AgentVote[] = [];
 
-  // Run evaluators (risk is async, others are sync)
-  const [riskVote] = await Promise.all([evaluateRisk(proposal, ctx)]);
-
-  votes.push(riskVote);
+  votes.push(evaluateRisk(options));
   votes.push(evaluateRegime(proposal));
   votes.push(evaluatePortfolio(proposal));
   votes.push(evaluateTechnical(proposal));

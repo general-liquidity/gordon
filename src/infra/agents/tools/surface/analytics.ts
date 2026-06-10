@@ -15,6 +15,7 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 import { getGordonContext, type MastraExecutionContext } from "../types.ts";
+import { withPortfolioOverride } from "./portfolioOverride.ts";
 import {
   calculateRSI,
   calculateMACD,
@@ -110,8 +111,15 @@ import {
   calculateSadf,
   calculateRollSpread,
   calculateAmihud,
+  analyzeSmcPatterns,
+  detectChangeOfCharacter,
+  detectFairValueGaps,
+  detectLiquiditySweeps,
+  detectSmcOrderBlocks,
+  detectPremiumDiscountZones,
   type CandlestickPatternName,
   type Candle as IndicatorCandle,
+  type SmcOHLC,
 } from "../../../../core/indicators/index.ts";
 import { conditionalDistributionTest } from "../../../../core/alpha/conditional-distribution-test.ts";
 import { runPortfolioEnsemble } from "../../../../core/alpha/pc-method-ensemble.ts";
@@ -478,30 +486,6 @@ async function maybeAutoCollect(
   return params;
 }
 
-/** Wrap an execution context's RequestContext so reads of portfolioValue
- *  / availableCash return the operator-supplied override instead of the
- *  live exchange balance. Used by compute_risk + verify_plan to support
- *  hypothetical-portfolio reasoning without flipping into paper mode. */
-function withPortfolioOverride(
-  execContext: MastraExecutionContext | undefined,
-  overrideUsd: number,
-): MastraExecutionContext | undefined {
-  if (!execContext?.requestContext) return execContext;
-  const original = execContext.requestContext;
-  const proxied = new Proxy(original, {
-    get(target, prop, receiver) {
-      if (prop === "get") {
-        return (key: string) => {
-          if (key === "portfolioValue" || key === "availableCash") return overrideUsd;
-          return Reflect.get(target, "get").call(target, key);
-        };
-      }
-      return Reflect.get(target, prop, receiver);
-    },
-  });
-  return { ...execContext, requestContext: proxied };
-}
-
 // ============================================================================
 // compute_indicator
 // ============================================================================
@@ -519,6 +503,7 @@ const INDICATOR_NAMES = [
   "vwap",
   "mfi",
   "stochastic",
+  "stochastic_rsi",
   "fibonacci",
   "camarilla_pivots",
   "parabolic_sar",
@@ -586,6 +571,12 @@ const INDICATOR_NAMES = [
   "breaker_block",
   "structure_break_conviction",
   "fvg_sweep_context",
+  "smc_patterns",
+  "smc_order_blocks",
+  "smc_fvg",
+  "smc_choch",
+  "smc_liquidity_sweeps",
+  "smc_premium_discount",
   "frac_diff",
   "cusum_filter",
   "sadf",
@@ -601,6 +592,12 @@ const INDICATOR_NAMES = [
   "leledc_exhaustion",
 ] as const;
 
+type IndicatorName = typeof INDICATOR_NAMES[number];
+
+const _INDICATOR_EXHAUSTIVE: Record<IndicatorName, true> = Object.fromEntries(
+  INDICATOR_NAMES.map((n) => [n, true]),
+) as Record<IndicatorName, true>;
+
 /** Last non-null value of an aligned indicator series (for boxing bare arrays). */
 function lastDefined(values: (number | null)[]): number | null {
   for (let i = values.length - 1; i >= 0; i--) {
@@ -609,8 +606,19 @@ function lastDefined(values: (number | null)[]): number | null {
   return null;
 }
 
+function toSmcBars(candles: IndicatorCandle[]): SmcOHLC[] {
+  return candles.map((c, index) => ({
+    timestamp: c.openTime ?? c.closeTime ?? index,
+    open: c.open,
+    high: c.high,
+    low: c.low,
+    close: c.close,
+    volume: c.volume,
+  }));
+}
+
 function dispatchIndicator(
-  indicator: string,
+  indicator: IndicatorName,
   candles: IndicatorCandle[],
   params: Record<string, unknown> = {},
 ): unknown {
@@ -690,8 +698,14 @@ function dispatchIndicator(
       });
     case "mfi":
       return calculateMFI(candles, (params.period as number) ?? 14);
-    case "stochastic":
-      return calculateStochasticRSI(closes);
+    case "stochastic_rsi":
+      return calculateStochasticRSI(
+        closes,
+        (params.rsiPeriod as number) ?? 14,
+        (params.stochPeriod as number) ?? 14,
+        (params.smoothK as number) ?? 3,
+        (params.smoothD as number) ?? 3,
+      );
     case "fibonacci":
       return calculateFibonacci(candles);
     case "camarilla_pivots":
@@ -1006,6 +1020,35 @@ function dispatchIndicator(
         ...(typeof params.pivotWindow === "number" && { pivotWindow: params.pivotWindow }),
         ...(typeof params.lookback === "number" && { lookback: params.lookback }),
       });
+    case "smc_patterns":
+      return analyzeSmcPatterns(toSmcBars(candles), {
+        ...(typeof params.swingLookback === "number" && { swingLookback: params.swingLookback }),
+      });
+    case "smc_order_blocks":
+      return detectSmcOrderBlocks(
+        toSmcBars(candles),
+        (params.swingLookback as number) ?? 5,
+      );
+    case "smc_fvg":
+      return detectFairValueGaps(toSmcBars(candles), {
+        ...(typeof params.minGapPct === "number" && { minGapPct: params.minGapPct }),
+        ...(typeof params.checkFilled === "boolean" && { checkFilled: params.checkFilled }),
+      });
+    case "smc_choch":
+      return detectChangeOfCharacter(
+        toSmcBars(candles),
+        (params.swingLookback as number) ?? 5,
+      );
+    case "smc_liquidity_sweeps":
+      return detectLiquiditySweeps(toSmcBars(candles), {
+        ...(typeof params.swingLookback === "number" && { swingLookback: params.swingLookback }),
+        ...(typeof params.minRangeMultiple === "number" && { minRangeMultiple: params.minRangeMultiple }),
+      });
+    case "smc_premium_discount":
+      return detectPremiumDiscountZones(
+        toSmcBars(candles),
+        (params.swingLookback as number) ?? 5,
+      );
     case "frac_diff":
       return calculateFracDiff(candles, {
         ...(typeof params.d === "number" && { d: params.d }),
@@ -1043,8 +1086,10 @@ function dispatchIndicator(
         ...(typeof params.atrPeriod === "number" && { atrPeriod: params.atrPeriod }),
         ...(typeof params.maxProgressVsAtr === "number" && { maxProgressVsAtr: params.maxProgressVsAtr }),
       });
-    default:
-      return { error: `Unknown indicator: ${indicator}` };
+    default: {
+      const _exhaustive: never = indicator;
+      throw new Error(`Unknown indicator: ${_exhaustive}`);
+    }
   }
 }
 
@@ -1055,11 +1100,11 @@ export const computeIndicatorTool = createTool({
     "indicators; pick via the `indicator` field.",
     "",
     "Standard momentum/trend: rsi, macd, bollinger, atr, ema, sma, adx, vwap",
-    "Oscillators: stochastic, mfi, awesome_oscillator",
+    "Oscillators: stochastic, stochastic_rsi, mfi, awesome_oscillator",
     "Levels: fibonacci, camarilla_pivots, supply_demand_zones, order_blocks, fvg",
     "Trend systems: ichimoku, supertrend, parabolic_sar",
     "Stats: kalman, nadaraya_watson, markov_regime",
-    "SMC patterns: divergence, false_breakout, squeeze_momentum, angled_market_structure",
+    "SMC patterns: smc_patterns (combined), smc_order_blocks, smc_fvg, smc_choch, smc_liquidity_sweeps, smc_premium_discount; legacy ops: order_blocks, fvg, divergence, false_breakout, squeeze_momentum, angled_market_structure",
     "Geometric chart patterns: lmw_patterns (Lo-Mamaysky-Wang kernel-extrema detector — head-and-shoulders/inverse, broadening top/bottom, triangle top/bottom, rectangle top/bottom, double top/bottom; params { bandwidth?, doubleMinSeparation? }; pair with compute_microstructure signal_informativeness to test whether a pattern moves returns)",
     "Setup detection: tight_consolidation (bull-flag / pennant scorer), undercut_rally (shakeout-and-reclaim)",
     "Exit coaching: trim_state (momentum-swing 8/21/50 EMA trail ladder), resistance_tests (count level rejections + confidence)",
@@ -1075,7 +1120,7 @@ export const computeIndicatorTool = createTool({
     "Channels / MAs: donchian (rolling high/low breakout envelope), hull_ma (low-lag Hull MA; params { period? 16, variant?: 'hma'|'ehma'|'thma' } — ehma=exponential Hull, thma=triple Hull, the Hull Suite variants), vwma (volume-weighted MA), supertrend_channel (Supertrend-pivot running-extreme envelope + midline target, resets on trend flip)",
     "Momentum: momentum (absolute Δ vs N bars ago), roc (percent change vs N bars ago)",
     "Flow regime: cboe_odds (volume-weighted three-state bull/bear/STAGNANT odds oscillator — MFI-style money-flow index re-weighted by Stoch-RSI momentum; the stagnant leg quantifies chop/indecision)",
-    "More: stochastic (classic price %K/%D — locates close in the recent high-low range; >80 overbought / <20 oversold; distinct from stochastic-rsi), cmf (Chaikin Money Flow, windowed money-flow-volume/volume in [−1,1]; >0.05 accumulation / <−0.05 distribution)",
+    "More: stochastic (classic price %K/%D — locates close in the recent high-low range; >80 overbought / <20 oversold; distinct from stochastic_rsi), cmf (Chaikin Money Flow, windowed money-flow-volume/volume in [−1,1]; >0.05 accumulation / <−0.05 distribution)",
     "Patterns: harris_pattern (Michael Harris DAX 4-bar overlapping-extension price pattern — per-bar 0 none / 2 buy / 1 sell from a strict interleaved high/low chain)",
     "RSI suite (beyond plain rsi 70/30): rsi_failure_swing (Welles Wilder top/bottom failure swing — a reversal pivot pattern on the RSI line itself: OB peak → lower peak → break of the intervening trough (and mirror at OS); distinct from divergence), rsi_midpoint (the 50-line as regime gauge — bias from %-of-RSI-above-50, the 50 line as dynamic support/resistance, and consolidation/chop detection; distinct from overbought/oversold), hidden_divergence (continuation counterpart to divergence: hidden bullish = price higher-low while RSI lower-low; hidden bearish = price lower-high while RSI higher-high), rsi_trendline (AMS-style pivot trendlines drawn on the RSI series + break detection — distinct from price trendlines and from divergence)",
     "Ichimoku discrete signals: ichimoku_signals (the five signals beyond ichimoku's TK-cross + cloud-position: kijun cross, kijun bounce/position (dynamic S/R), kumo twist (future-cloud color flip), edge-to-edge (flat-Kumo → opposite-edge target), and TK disequilibrium (tenkan-kijun stretch as an overextension gauge))",
@@ -1135,7 +1180,7 @@ export const computeIndicatorTool = createTool({
   }),
   execute: async (
     args: {
-      indicator: string;
+      indicator: IndicatorName;
       symbol: string;
       timeframe?: string;
       params?: Record<string, unknown>;

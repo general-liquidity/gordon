@@ -5,6 +5,7 @@ import {
   shouldRunToolFreeThinking,
   prependThinkingTrace,
   getThinkingDepthFromContext,
+  resolveThinkingDepth,
 } from "./thinkingPhase.ts";
 import type { GordonContext } from "../types.ts";
 
@@ -91,6 +92,15 @@ describe("shouldRunToolFreeThinking gate", () => {
     expect(decision.run).toBe(true);
     expect(decision.reason).toBe("phase=execution");
   });
+
+  it("lets explicit off disable tool-free thinking even in planning phase", () => {
+    process.env.GORDON_TOOL_FREE_THINKING = "true";
+    process.env.GORDON_THINKING_DEPTH = "off";
+    const ctx = createContext({ requestedTaskScope: "planning" });
+    const decision = shouldRunToolFreeThinking("plan trade", ctx);
+    expect(decision.run).toBe(false);
+    expect(decision.reason).toContain("disables");
+  });
 });
 
 describe("prependThinkingTrace", () => {
@@ -137,14 +147,21 @@ describe("prependThinkingTrace", () => {
 });
 
 describe("getThinkingDepthFromContext", () => {
-  it("defaults to off when neither config nor env is set", () => {
+  it("defaults from workflow phase when neither config nor env is set", () => {
     const ctx = createContext();
-    expect(getThinkingDepthFromContext(ctx)).toBe("off");
+    expect(getThinkingDepthFromContext(ctx)).toBe("low");
   });
 
   it("respects env override", () => {
     process.env.GORDON_THINKING_DEPTH = "low";
-    const ctx = createContext();
+    const ctx = createContext({ requestedTaskScope: "execution" });
     expect(getThinkingDepthFromContext(ctx)).toBe("low");
+  });
+
+  it("reports the source used by the shared resolver", () => {
+    const ctx = createContext({ requestedTaskScope: "execution" });
+    const resolution = resolveThinkingDepth({ context: ctx, phase: "execution" });
+    expect(resolution.depth).toBe("medium");
+    expect(resolution.source).toBe("phase");
   });
 });

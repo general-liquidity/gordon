@@ -9,14 +9,10 @@
  * Covered ticks:
  *   - tick_session_review  → session_review (end of day / end of week)
  *   - tick_journal_prompt  → journal_prompt (end of day)
- *   - tick_whale_drain     → whale_alert  (processes CDP webhook buffer)
  *
- * Producers for tick_portfolio_drift, tick_regime_flip, tick_volatility,
- * and tick_funding are scaffolded but not implemented in v1 because they
- * need access to modules (position tracker, regime detector, price feed,
- * perp funding) that aren't uniformly available as cheap synchronous
- * reads. They'll log "not yet wired" and return no candidates — future
- * work can fill them in.
+ * Portfolio drift, regime flip, volatility, funding, chart-pattern, news,
+ * and stock-event ticks are handled by dedicated producers registered from
+ * `producers/index.ts`. This producer stays scoped to simple clock prompts.
  */
 
 import type { CandidateProducer } from "../engine/proactiveEngine.ts";

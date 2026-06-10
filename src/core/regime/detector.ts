@@ -14,6 +14,13 @@ import { playbookRegistry } from "../playbooks/registry.ts";
 import { createModuleLogger } from "../../infra/logger/index.ts";
 
 const logger = createModuleLogger("regime-detector");
+const REGIME_CACHE_TTL_MS = 60 * 60 * 1000;
+const MAX_REGIME_CACHE_ENTRIES = 500;
+
+interface CachedRegimeSignal {
+  signal: RegimeSignal;
+  cachedAtMs: number;
+}
 
 // ============================================================================
 // Regime-to-Playbook Tag Mapping
@@ -66,7 +73,7 @@ export class RegimeDetector {
   private static instance: RegimeDetector;
 
   private classifier = new RegimeClassifier();
-  private cache = new Map<string, RegimeSignal>();
+  private cache = new Map<string, CachedRegimeSignal>();
   private initialized = false;
 
   private constructor() {}
@@ -112,7 +119,8 @@ export class RegimeDetector {
     const signal = this.classifier.classify(candles, symbol, timeframe);
 
     // Update cache
-    this.cache.set(`${symbol}:${timeframe}`, signal);
+    this.cache.set(`${symbol}:${timeframe}`, { signal, cachedAtMs: Date.now() });
+    this.pruneCache();
 
     // Persist to DB (non-blocking — don't let DB errors break detection)
     try {
@@ -141,7 +149,35 @@ export class RegimeDetector {
    * Returns null if no regime has been detected yet for this symbol.
    */
   getCurrentRegime(symbol: string, timeframe = "1h"): RegimeSignal | null {
-    return this.cache.get(`${symbol}:${timeframe}`) ?? null;
+    const key = `${symbol}:${timeframe}`;
+    const entry = this.cache.get(key);
+    if (!entry) return null;
+    if (Date.now() - entry.cachedAtMs > REGIME_CACHE_TTL_MS) {
+      this.cache.delete(key);
+      return null;
+    }
+    return entry.signal;
+  }
+
+  private pruneCache(): void {
+    const now = Date.now();
+    for (const [key, entry] of this.cache) {
+      if (now - entry.cachedAtMs > REGIME_CACHE_TTL_MS) {
+        this.cache.delete(key);
+      }
+    }
+
+    if (this.cache.size <= MAX_REGIME_CACHE_ENTRIES) return;
+
+    const excess = this.cache.size - MAX_REGIME_CACHE_ENTRIES;
+    const oldestKeys = [...this.cache.entries()]
+      .sort(([, a], [, b]) => a.cachedAtMs - b.cachedAtMs)
+      .slice(0, excess)
+      .map(([key]) => key);
+
+    for (const key of oldestKeys) {
+      this.cache.delete(key);
+    }
   }
 
   // ---------- Persistence ----------

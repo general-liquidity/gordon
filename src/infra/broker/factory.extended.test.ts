@@ -1,5 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import { BrokerFactory } from "./factory.ts";
+import {
+  BROKER_PAPER_SUPPORT,
+  BrokerPaperNotSupportedError,
+  type BrokerPaperSupportEntry,
+} from "./brokerPaperSupport.ts";
 
 describe("BrokerFactory extended broker support", () => {
   test("lists all supported B2C stock brokers", () => {
@@ -36,5 +41,62 @@ describe("BrokerFactory extended broker support", () => {
         paper: true,
       })
     ).toThrow("Unsupported broker");
+  });
+});
+
+describe("BrokerFactory paper-mode fail-fast", () => {
+  // No broker in BROKER_PAPER_SUPPORT is currently "unsupported", so the
+  // fail-fast path is proven by temporarily flipping one entry.
+  function withUnsupportedPaper(brokerId: "alpaca", fn: () => void): void {
+    const original: BrokerPaperSupportEntry = BROKER_PAPER_SUPPORT[brokerId];
+    BROKER_PAPER_SUPPORT[brokerId] = {
+      kind: "unsupported",
+      notSupportedHint: "Use live credentials.",
+    };
+    try {
+      fn();
+    } finally {
+      BROKER_PAPER_SUPPORT[brokerId] = original;
+    }
+  }
+
+  test("create() throws BrokerPaperNotSupportedError when paper requested on an unsupported broker", () => {
+    withUnsupportedPaper("alpaca", () => {
+      expect(() =>
+        BrokerFactory.create("alpaca", {
+          apiKey: "k-paper-check",
+          apiSecret: "s",
+          paper: true,
+        })
+      ).toThrow(BrokerPaperNotSupportedError);
+    });
+  });
+
+  test("create() fails fast even for a previously cached instance", () => {
+    const credentials = { apiKey: "k-cached-paper", apiSecret: "s", paper: true };
+    const adapter = BrokerFactory.create("alpaca", credentials);
+    expect(adapter.brokerId).toBe("alpaca");
+    withUnsupportedPaper("alpaca", () => {
+      expect(() => BrokerFactory.create("alpaca", credentials)).toThrow(
+        BrokerPaperNotSupportedError
+      );
+    });
+    BrokerFactory.removeFromCache("alpaca", credentials);
+  });
+
+  test("create() allows live mode regardless of paper support", () => {
+    withUnsupportedPaper("alpaca", () => {
+      const adapter = BrokerFactory.create("alpaca", {
+        apiKey: "k-live-check",
+        apiSecret: "s",
+        paper: false,
+      });
+      expect(adapter.brokerId).toBe("alpaca");
+      BrokerFactory.removeFromCache("alpaca", {
+        apiKey: "k-live-check",
+        apiSecret: "s",
+        paper: false,
+      });
+    });
   });
 });

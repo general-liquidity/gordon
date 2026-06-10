@@ -28,6 +28,7 @@ import {
 } from "./algorithms/types.ts";
 
 const logger = createModuleLogger("execution-session-manager");
+const MAX_COMPLETED_SESSIONS = 100;
 
 export class ExecutionSessionManager {
   private static instance: ExecutionSessionManager;
@@ -45,6 +46,13 @@ export class ExecutionSessionManager {
       ExecutionSessionManager.instance = new ExecutionSessionManager();
     }
     return ExecutionSessionManager.instance;
+  }
+
+  private recordCompletedSession(session: ExecutionSession): void {
+    this.completedSessions.push(session);
+    if (this.completedSessions.length > MAX_COMPLETED_SESSIONS) {
+      this.completedSessions = this.completedSessions.slice(-MAX_COMPLETED_SESSIONS);
+    }
   }
 
   /**
@@ -72,11 +80,7 @@ export class ExecutionSessionManager {
 
     const onComplete = (completed: ExecutionSession) => {
       this.activeSessions.delete(sessionId);
-      this.completedSessions.push(completed);
-      // Keep last 100 completed sessions
-      if (this.completedSessions.length > 100) {
-        this.completedSessions = this.completedSessions.slice(-100);
-      }
+      this.recordCompletedSession(completed);
     };
 
     let executor: TWAPExecutor | VWAPExecutor | IcebergExecutor | POVExecutor;
@@ -112,7 +116,7 @@ export class ExecutionSessionManager {
       session.error = (error as Error).message;
       session.updatedAt = new Date().toISOString();
       this.activeSessions.delete(sessionId);
-      this.completedSessions.push(session);
+      this.recordCompletedSession(session);
       logger.error("Execution session failed to start", error as Error, { sessionId });
     });
 

@@ -56,7 +56,8 @@ let producerUnregister: (() => void) | null = null;
 
 // Tick cadences in ms — each producer gets its own schedule
 const TICK_INTERVALS = {
-  whale_drain: 5 * 60 * 1000,       // 5 min — poll CDP webhook buffer
+  producer_health: 5 * 60 * 1000,   // 5 min — producer liveness alerting
+  kill_switch: 60 * 1000,           // 1 min — tripped kill switch alerting
   session_review: 60 * 60 * 1000,   // 1 hour — checks time of week
   journal_prompt: 60 * 60 * 1000,   // 1 hour — checks time of day
   portfolio_drift: 30 * 60 * 1000,  // 30 min — position drift check

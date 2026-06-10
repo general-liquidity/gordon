@@ -5,9 +5,14 @@
  * decisions, and plans in plain language.
  */
 
-import { LLMClient, loadPrompt, buildMessages } from "../../infra/ai/llm/index.ts";
+import { LLMClient, loadPrompt, buildMessages, executeWithFailover } from "../../infra/ai/llm/index.ts";
 import type { Plan, Trade, CoinAnalysis } from "../../types/index.ts";
 import { createModuleLogger } from "../../infra/logger/index.ts";
+import {
+  buildFailoverModelChain,
+  describeFailoverChain,
+  formatFailoverErrors,
+} from "./llmFailover.ts";
 
 const logger = createModuleLogger("explainer");
 
@@ -571,7 +576,24 @@ export async function explain(
   const messages = buildMessages(systemPrompt, userMessage);
 
   // Call the LLM (natural language mode, not JSON)
-  const response = await client.chat(messages);
+  const failover = await executeWithFailover({
+    chain: buildFailoverModelChain(client, "explanations"),
+    idOf: describeFailoverChain,
+    call: async (config) => client.chatWithConfig(messages, config),
+  });
+
+  if (!failover.ok || !failover.result) {
+    throw new Error(`Explanation failed across all LLM providers: ${formatFailoverErrors(failover.errors)}`);
+  }
+
+  if (failover.degraded) {
+    logger.warn("Explanation used fallback LLM provider", {
+      provider: failover.usedId,
+      attempts: failover.attempts,
+    });
+  }
+
+  const response = failover.result;
 
   return response.content.trim();
 }

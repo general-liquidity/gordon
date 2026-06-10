@@ -16,9 +16,11 @@ beforeEach(() => {
 });
 
 describe("isKillSwitchesEnabled", () => {
-  it("respects the flag", () => {
-    expect(isKillSwitchesEnabled({})).toBe(false);
+  it("defaults on and supports explicit disable", () => {
+    expect(isKillSwitchesEnabled({})).toBe(true);
     expect(isKillSwitchesEnabled({ [KILL_SWITCHES_FLAG_ENV]: "1" })).toBe(true);
+    expect(isKillSwitchesEnabled({ [KILL_SWITCHES_FLAG_ENV]: "0" })).toBe(false);
+    expect(isKillSwitchesEnabled({ [KILL_SWITCHES_FLAG_ENV]: "false" })).toBe(false);
   });
 });
 

@@ -19,6 +19,7 @@ import {
   validateBrokerInclusionGate,
 } from "./quality/inclusion-gate.ts";
 import { loadOAuthBrokerCredentials, brokerSupportsOAuth } from "./auth/oauth-bridge.ts";
+import { assertBrokerPaperSupported } from "./brokerPaperSupport.ts";
 import type { BrokerAdapter, BrokerCredentials, BrokerId } from "./types.ts";
 
 const SUPPORTED_BROKERS: BrokerId[] = [
@@ -56,6 +57,8 @@ export class BrokerFactory {
       );
     }
     assertBrokerPassesInclusionGate(brokerId);
+    // Fail fast at construction instead of on the first paper-routed method call.
+    assertBrokerPaperSupported(brokerId, credentials.paper === true);
 
     const cacheKey = getCacheKey(brokerId, credentials);
     const cached = this.instanceCache.get(cacheKey);

@@ -74,10 +74,8 @@ function ensureInitialized(): void {
 }
 
 export function isFilesystemWriteGuardEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return (
-    env[FILESYSTEM_WRITE_GUARD_FLAG_ENV] === "1" ||
-    env[FILESYSTEM_WRITE_GUARD_FLAG_ENV] === "true"
-  );
+  const raw = env[FILESYSTEM_WRITE_GUARD_FLAG_ENV];
+  return raw !== "0" && raw !== "false";
 }
 
 export function getGuardMode(env: NodeJS.ProcessEnv = process.env): GuardMode {

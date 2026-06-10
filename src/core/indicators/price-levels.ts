@@ -5,7 +5,7 @@
  * Resistance: Price levels where selling pressure historically overcomes buying
  */
 
-import type { Candle, Level } from "../types/index.ts";
+import type { Candle, Level } from "../../types/market.ts";
 
 /** Price tolerance for clustering nearby levels (0.5%) */
 const CLUSTER_TOLERANCE = 0.005;

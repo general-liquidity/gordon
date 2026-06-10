@@ -121,6 +121,12 @@ export {
   type TelemetryCommandResult,
 } from './telemetry';
 
+// Kill-switch commands
+export {
+  handleKillSwitchCommand,
+  type KillSwitchCommandResult,
+} from './killswitch.ts';
+
 // Context / cost diagnostics commands
 export {
   handleContextCommand,

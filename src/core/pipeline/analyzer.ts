@@ -6,7 +6,8 @@
  */
 
 import type { Exchange } from "../../infra/exchange/index.ts";
-import { calculateIndicators, detectLevels } from "../../indicators/index.ts";
+import { calculateIndicators } from "../indicators/scanner-bundle.ts";
+import { detectLevels } from "../indicators/price-levels.ts";
 import type { CoinAnalysis, Level, Candle, Indicators, Trend, Bias, Risk } from "../../types/index.ts";
 import { createModuleLogger } from "../../infra/logger/index.ts";
 

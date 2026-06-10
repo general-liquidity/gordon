@@ -52,7 +52,7 @@ import { determineWorkflowPhase } from "./cognition/workflowPhase.ts";
 import { providerOptionsForPhase } from "./wiring/extendedThinkingWiring.ts";
 import {
   runThinkingPhase,
-  getThinkingDepthFromContext,
+  resolveThinkingDepth,
   shouldRunToolFreeThinking,
   prependThinkingTrace,
   type ThinkingResult,
@@ -423,17 +423,20 @@ export async function* processMessageStream(
     reactStage = advanceReActStage(reactStage, "interrupt_checked_before_thinking");
 
     // ── Thinking phase ──────────────────────────────────────────────────────
-    // Two activation paths:
-    //   1. thinkingDepth (legacy, in-config) — runs at any depth ≥ low
-    //   2. GORDON_TOOL_FREE_THINKING flag — runs only above complexity threshold
-    // Both end up calling runThinkingPhase; the flag path additionally prepends
-    // the trace to the action-phase messages so the tool-enabled call sees the
-    // reasoning verbatim instead of just emitting a thinking_delta event.
+    // Thinking depth uses one resolution order shared by tool-free and
+    // in-band extended thinking. Phase-default depth alone does not force the
+    // extra tool-free network call; config/env/override or the explicit gate do.
     let _thinkingResult: ThinkingResult | null = null;
-    const _thinkingDepth = getThinkingDepthFromContext(context);
+    const _thinkingResolution = resolveThinkingDepth({ context, phase: workflowPhase });
+    const _thinkingDepth = _thinkingResolution.depth;
     const _toolFreeGate = shouldRunToolFreeThinking(userMessage, context);
+    const _explicitThinking =
+      (_thinkingResolution.source === "config" ||
+        _thinkingResolution.source === "env" ||
+        _thinkingResolution.source === "override") &&
+      _thinkingDepth !== "off";
     const _depthForRun: typeof _thinkingDepth =
-      _thinkingDepth !== "off" ? _thinkingDepth : (_toolFreeGate.run ? "medium" : "off");
+      _explicitThinking ? _thinkingDepth : (_toolFreeGate.run ? (_thinkingDepth === "off" ? "medium" : _thinkingDepth) : "off");
     if (_depthForRun !== "off") {
       _thinkingResult = await runThinkingPhase(userMessage, [], context, _depthForRun);
       if (_depthForRun === "high" && _thinkingResult && !_thinkingResult.skipped && _thinkingResult.trace) {
@@ -479,6 +482,7 @@ export async function* processMessageStream(
     // is set; returns {} otherwise so the call shape is identical when off.
     const extendedThinkingOpts = providerOptionsForPhase(workflowPhase, {
       maxTokens: MAX_OUTPUT_TOKENS_STREAM,
+      context,
     });
     const streamObj = await awaitWithAbort(
       gordonAgent().stream(groundedMessages, ({

@@ -15,25 +15,28 @@ It is **not** a coding agent. Most patterns from Claude Code's coding-agent desi
 | `src/infra/agents/definitions/` | The 3 actual agents — `gordon.ts` (orchestrator/router), `executor.ts`, `researcher.ts` |
 | `src/infra/agents/tools/` | All Mastra tools, organized by domain (market, account, trading, news, …) |
 | `src/infra/agents/instrumentedTools.ts` | Single registration point — wraps every tool with metrics + spill |
-| `src/infra/agents/orchestrator.ts` | Stream processing, handoff tracking, TOOL_AGENT_MAP |
+| `src/infra/agents/orchestrator.ts` | Orchestrator entry — stream processing re-exported from `orchestrator/` modules |
+| `src/infra/agents/orchestrator/` | Split orchestrator internals — `streamProcessor.ts`, `HandoffCoordinator.ts`, `toolAgentMap.ts`, `guardrailEvaluator.ts`, … |
 | `src/infra/agents/context/sharedPrefixCache.ts` | Anthropic prompt-cache reuse across sub-agents (see also `context/promptCacheAudit.ts`, `ai/llm/providerCaching.ts`, `runtime/kvCacheHitMetric.ts`) |
 | `src/infra/agents/thinkingPhase.ts` | Tool-free pre-action reasoning pass (separate LLM call) |
 | `src/infra/agents/extendedThinking.ts` | In-band Anthropic native `budget_tokens` helper |
 | `src/infra/agents/critiquePhase.ts` | Critique/refine pass at HIGH thinking depth |
 | `src/infra/agents/runtimeHarness.ts` | Doom-loop detection, tool-result limits, fingerprinting |
-| `src/infra/domain/memory/summarizer.ts` | 4-stage compaction (masking / pruning / aggressive / full) |
-| `src/infra/domain/memory/contextCollapse.ts` | 5th compaction stage — non-destructive read-time projection |
+| `src/infra/domain/memory/summarizer.ts` | 5-stage compaction at 70/80/90/94/99% pressure (masking / pruning / aggressive / collapse / full) |
+| `src/infra/domain/memory/contextCollapse.ts` | Collapse-stage implementation — non-destructive read-time projection of stale tool results |
 | `src/infra/hooks/` | Hook engine + lifecycle types (PreToolUse, PreOrderPlacement, …) with `asyncRewake` and `statusMessage` |
 | `src/infra/news/` | RSS headline fetcher (12 crypto + Yahoo + EDGAR) + sentiment classifier |
 | `src/infra/proactive/producers/` | Radar producers (news, regime, volatility, funding, stock events, …) |
-| `src/infra/trading/riskClassifier.ts` | Pre-trade risk classifier — 11 dimensions including vol-adjusted sizing, tail risk, correlation |
+| `src/infra/trading/risk/riskClassifier.ts` | Pre-trade risk classifier — 15 dimensions (8 base + 7 optional hedge-fund-grade) including vol-adjusted sizing, tail risk, correlation |
 | `src/runtime/permissions/PermissionEngine.ts` | Deny-first permission gate; exposes `registerHook` / `prependHook` |
 | `src/runtime/permissions/trustTrajectory.ts` | Adaptive auto-approval with safety-critical deny-list |
 | `src/core/strategies/recipes/` | Pure signal-processing primitives (regime-RSI, bounce counter, signal gate, max-exposure timeout) |
 | `src/core/regime/` | Market regime detector + classifier |
 | `src/core/playbooks/builtin/` | Built-in trading playbooks (markdown) |
 | `src/core/risk-kernel/` | Risk audit trail |
-| `src/app/slashCommands.ts` | Slash command definitions (programmatic, not markdown) |
+| `src/app/slash/slashCommands.ts` | Slash command definitions (programmatic, not markdown) |
+| `src/gateway/` + `src/core-sdk/` | Gateway daemon, protocol envelopes, scheduler — headless/SDK surface alongside TUI |
+| `src/app/acp-entry.ts` | ACP (Agent Client Protocol) entry — `bun acp` for editor/IDE integration |
 | `src/tui/` | Ink-based custom TUI with framebuffer + vim mode |
 | `src/events/market-events.ts` | Event bus types — `strategy:plan_ready` lives here |
 | `scripts/patches/patch-mastra.cjs` | Postinstall patch for Mastra `lastMessages` cap on sub-agents |
@@ -61,7 +64,7 @@ Why: the "Reverse-Engineering Memory" pattern survey identifies "always-inject" 
 - **Typecheck:** `bun tsc --noEmit -p tsconfig.json`. Must be clean before commit.
 - **Tool offload limit:** 1800 chars per result by default; per-family overrides in `runtimeHarness.ts` (market/account/order tools get higher limits).
 - **Doom-loop detection:** Sliding 20-call window, threshold 3 identical fingerprints — see `recordToolCallFingerprint` in `runtimeHarness.ts`.
-- **Compaction thresholds:** 70/80/90/99% pressure → masking / pruning / aggressive / full summary. Recent observations preserved 6/6/3/3.
+- **Compaction thresholds:** 70/80/90/94/99% pressure → masking / pruning / aggressive / collapse / full summary. Recent observations preserved 6/6/3/3.
 - **Permissions:** Never restored on resume — trust is re-established per session. `riskClassifier` returns `auto_approve | prompt_user | require_confirmation | block`. Trust-trajectory hook short-circuits the human-required queue for tools the user has approved consistently, but a hard deny-list (`place_order`, `execute_trade`, `cancel_order`, `wallet_transfer`, …) bypasses trust scoring.
 - **Rationale on safety-critical tools:** `execute_plan` and all `cancel_*` order tools (`cancel_order`, `cancel_all_orders`, `cancel_replace_order`, `cancel_order_list`) take a required `rationale: string (min 10)` field. Logged via `recordStructuredObservation` with `eventType: "*.rationale_recorded"`. Borrowed from Ramp's MCP pattern — the audit log captures intent, not just the call. New cancel/execute tools should follow the same shape.
 - **Agent self-feedback:** `report_blocked` tool (`agent-feedback.ts`) lets the agent proactively signal stuck-ness with structured intent + attempts + blocker BEFORE the doom-loop detector trips. Persists to `~/.gordon/agent-feedback.jsonl` (override `GORDON_AGENT_FEEDBACK_PATH`).
@@ -129,7 +132,9 @@ Most behavior primitives are now defaults-on as part of the core architecture. T
 
 Use `/flags` in the TUI to see the current state of these and toggle them at runtime.
 
-Defaults-on (previously flagged, now part of the architecture): result-cache delta envelopes, semantic output filtering, extended thinking by workflow phase, recovery-tier escalation, autonomous-loop reminders, kill switches, network allowlist (warn mode), filesystem write guard (warn mode), trade ledger, plan rubric, bar-permutation test, WIP-limit gate, boundary check, clean-state gate, init probe, lifecycle reconstruction, family-diversity detector, all microstructure detectors (touch dynamics, microstructure toxicity, MEV detection, manufactured imbalance, manipulation context, cross-venue divergence, ATR progression), session memory, artifact index, tool context, risk-ack, explain-first.
+Defaults-on (previously flagged, now part of the architecture): result-cache delta envelopes, semantic output filtering, extended thinking by workflow phase, recovery-tier escalation, autonomous-loop reminders, kill switches (checked in `execute_plan` via `isExecutionAllowed`), network allowlist (warn mode, wired via `installOutboundFetchGuard` in `src/index.tsx`), filesystem write guard (warn mode, wired via `installFilesystemWriteGuard` in `src/index.tsx`), trade ledger, plan rubric, bar-permutation test, WIP-limit gate, boundary check, clean-state gate, init probe, lifecycle reconstruction, family-diversity detector, all microstructure detectors (touch dynamics, microstructure toxicity, MEV detection, manufactured imbalance, manipulation context, cross-venue divergence, ATR progression), session memory, artifact index, tool context, risk-ack, explain-first.
+
+**LLM provider resilience:** `src/infra/ai/llm/providerCaching.ts` (Anthropic prompt-cache breakpoints) and `providerFailover.ts` (`executeWithFailover`) compose with the settings-layer priority chain — env keys → `settings.json` provider order → per-call overrides.
 
 Deleted features (their gates were never validated and the modules are gone): tool deferral, evidence bundle, sprint contract / negotiation, context-anxiety detector, cold-start audit, agent readiness gate, quality document, recitation checkpoint, initializer agent, harness evolution, claude-md linter, tool-design linter, memory bullets, agent-list attachment, permission bubble.
 
@@ -139,18 +144,20 @@ Gordon's orchestrator + researcher expose a canonical 22-tool surface for genera
 
 Tool layout (22 total):
 - **data (5)**: `get_market_data`, `get_account_state`, `get_portfolio`, `get_news`, `get_fundamentals`
-- **analytics (4)**: `compute_indicator` (~30 indicators via enum), `compute_regime`, `compute_risk`, `compute_microstructure` (9 ops via enum)
+- **analytics (4)**: `compute_indicator` (80+ ops via enum), `compute_regime`, `compute_risk`, `compute_microstructure` (9 ops via enum)
 - **plan / exec (6)**: `create_plan`, `verify_plan`, `approve_plan`, `execute_plan`, `cancel`, `backtest`
 - **memory (3)**: `memory_search`, `memory_write`, `audit_event`
 - **workflow (4)**: `skill`, `delegate_subagent`, `ask_user`, `schedule_task`
 
 Only 2 meta-dispatchers (`compute_indicator`, `compute_microstructure`) — everything else is a single-purpose typed tool per the Dexter/Claude-Code preference for explicit-over-meta on safety-critical surfaces.
 
-Safety semantics: surface tools don't re-implement risk classifier / signed audit / deny-list / trading constitution. Each tool calls into the existing handler module — rationale-required on `create_plan` / `approve_plan` / `execute_plan` / `cancel`, full 11-dim risk gate inside `verify_plan`, signed audit log on every write.
+Safety semantics: surface tools don't re-implement risk classifier / signed audit / deny-list / trading constitution. Each tool calls into the existing handler module — rationale-required on `create_plan` / `approve_plan` / `execute_plan` / `cancel`, full 15-dim risk gate inside `verify_plan`, signed audit log on every write.
 
 Skills aligned with the surface: `backtest-validate`, `strategy-build`, `regime-shift`, `microstructure-dive`, `crowd-trapped`, `filing-analysis`, `recovery-trade` are authored against surface tool names. Existing 35+ skills are mostly natural-language workflows; `learn-*` documentation skills intentionally retain legacy tool names since they explain the broader implementation modules.
 
 The legacy generalized-trading tool modules (calculate_rsi, getCandles, etc.) remain in the codebase as implementation; the surface delegates into them via thin wrappers. If you ever need to surface a legacy tool by name on the agent, re-spread it explicitly in `gordon.ts` with a justification comment.
+
+**Export-graduation convention:** `infra/trading` modules start private while experimental. Graduate to `src/infra/trading/index.ts` only when they have tests, stable typed I/O, and a caller-facing lifecycle (agent tool, producer, skill, or documented internal-ops API such as `shadowMode` / `autoOptimizer`). Unexported modules stay internal until promoted; exported modules should preserve API compatibility or ship an explicit migration.
 
 ## Ground rules for changes
 
@@ -169,11 +176,13 @@ The legacy generalized-trading tool modules (calculate_rsi, getCandles, etc.) re
 |---|---|
 | A specific tool implementation | `src/infra/agents/tools/<domain>.ts` |
 | What tools an agent has | `src/infra/agents/definitions/<agent>.ts` (look for `instrumented*Tools` spreads) |
-| How a slash command works | `src/app/slashCommands.ts` |
-| Permission / approval flow | `src/runtime/permissions/PermissionEngine.ts` + `riskClassifier.ts` |
+| How a slash command works | `src/app/slash/slashCommands.ts` |
+| Permission / approval flow | `src/runtime/permissions/PermissionEngine.ts` + `src/infra/trading/risk/riskClassifier.ts` |
 | Hook lifecycle | `src/infra/hooks/types.ts` + `engine.ts` |
 | The proactive radar | `src/infra/proactive/observer.ts` (tick intervals) + `producers/` |
-| Memory / compaction | `src/infra/domain/memory/summarizer.ts` (4 stages) + `contextCollapse.ts` (5th) |
+| Memory / compaction | `src/infra/domain/memory/summarizer.ts` (5 stages at 70/80/90/94/99) + `contextCollapse.ts` |
+| Gateway / SDK / ACP surfaces | `src/gateway/` + `src/core-sdk/` + `src/app/acp-entry.ts` (`bun acp`) |
+| Stock headlines (Yahoo + EDGAR) | `src/infra/news/stockHeadlines.ts` |
 | Strategy backtests | `src/backtest/` |
 
 ## When in doubt

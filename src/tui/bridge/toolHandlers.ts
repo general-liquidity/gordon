@@ -13,6 +13,7 @@ import {
   handleTelemetryCommand,
   handleContextCommand,
   handleCacheAuditCommand,
+  handleKillSwitchCommand,
 } from "../../app/commands/index.ts";
 import { handlePermissionModeCommand } from "../../app/commands/permissionMode.ts";
 
@@ -51,6 +52,7 @@ export async function routeToolCommand(
     case "stocks":   return handleStocksCommand(args);
     case "keyring":  return handleKeyringCommand(args);
     case "telemetry": return handleTelemetryCommand(args);
+    case "killswitch": return (await handleKillSwitchCommand(args)).message;
     case "context":  return handleContextCommand(args);
     case "cache-audit": return handleCacheAuditCommand(args);
 

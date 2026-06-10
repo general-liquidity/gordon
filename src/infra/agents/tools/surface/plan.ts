@@ -24,6 +24,9 @@ import {
 } from "../trading/trading.ts";
 import { checkRiskTool as implCheckRisk } from "../trading/risk-gate.ts";
 import { runBacktestTool as implRunBacktest } from "../strategy/backtest/backtest.ts";
+import type { BacktestResult } from "../../../../backtest/types.ts";
+import { analyzeBacktestResult } from "../../../../backtest/analysis/analysis.ts";
+import { computeVerdict } from "../../../../backtest/analysis/verdict.ts";
 import {
   recordBacktestRun,
   getBacktestRun,
@@ -33,31 +36,7 @@ import { auditLog } from "../../../platform/audit/index.ts";
 import { getMemoryManager } from "../../../../core/memory/index.ts";
 import { hasRecentSymbolObservation } from "../../observation/symbolObservationTracker.ts";
 import { buildSynthesisManifest, summarizeManifest } from "../../observation/synthesisManifest.ts";
-
-/** Same shape as analytics.ts withPortfolioOverride — wrap the
- *  RequestContext so reads of portfolioValue / availableCash return the
- *  override. Duplicated here to keep V4 files self-contained; the
- *  alternative is a shared utility, which we'll extract if a third
- *  caller appears. */
-function verifyPlanPortfolioProxy(
-  execContext: MastraExecutionContext | undefined,
-  overrideUsd: number,
-): MastraExecutionContext | undefined {
-  if (!execContext?.requestContext) return execContext;
-  const original = execContext.requestContext;
-  const proxied = new Proxy(original, {
-    get(target, prop, receiver) {
-      if (prop === "get") {
-        return (key: string) => {
-          if (key === "portfolioValue" || key === "availableCash") return overrideUsd;
-          return Reflect.get(target, "get").call(target, key);
-        };
-      }
-      return Reflect.get(target, prop, receiver);
-    },
-  });
-  return { ...execContext, requestContext: proxied };
-}
+import { withPortfolioOverride } from "./portfolioOverride.ts";
 
 // ============================================================================
 // create_plan
@@ -315,7 +294,7 @@ export const verifyPlanTool = createTool({
     // shadow the live ctx.portfolioValue / availableCash via the same
     // proxy compute_risk uses.
     const proxiedExecContext = args.portfolioOverrideUsd
-      ? verifyPlanPortfolioProxy(execContext, args.portfolioOverrideUsd)
+      ? withPortfolioOverride(execContext, args.portfolioOverrideUsd)
       : execContext;
     const result = (await (implCheckRisk.execute as any)(
       {
@@ -710,6 +689,8 @@ export const backtestTool = createTool({
     runId: z.string(),
     inputsHash: z.string(),
     metrics: z.unknown(),
+    analysis: z.unknown().optional(),
+    verdict: z.unknown().optional(),
     equityCurve: z.array(z.number()).optional(),
     trades: z.array(z.unknown()).optional(),
     summary: z.string(),
@@ -807,6 +788,7 @@ export const backtestTool = createTool({
       formattedSummary?: string;
       error?: string;
     };
+    const backtestResult = isBacktestResult(result.result) ? result.result : null;
 
     // Resolve the actual ms-epoch window used for the snapshot.
     const fromTs = hasCalendarRange
@@ -839,6 +821,8 @@ export const backtestTool = createTool({
       runId: string;
       inputsHash: string;
       metrics: unknown;
+      analysis?: unknown;
+      verdict?: unknown;
       summary: string;
       drift?: {
         hasDrift: boolean;
@@ -851,6 +835,11 @@ export const backtestTool = createTool({
       metrics: result.result ?? {},
       summary: result.summary ?? result.formattedSummary ?? result.error ?? "Backtest complete.",
     };
+
+    if (backtestResult) {
+      out.analysis = analyzeBacktestResult(backtestResult);
+      out.verdict = computeVerdict(backtestResult.metrics, undefined, hasCalendarRange ? undefined : days ?? 90);
+    }
 
     if (storedSnapshotResult !== null) {
       const drift = detectDrift(storedSnapshotResult, result.result ?? {});
@@ -866,6 +855,16 @@ export const backtestTool = createTool({
     return out;
   },
 });
+
+function isBacktestResult(value: unknown): value is BacktestResult {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as Partial<BacktestResult>;
+  return Boolean(
+    candidate.metrics &&
+      typeof candidate.metrics === "object" &&
+      Array.isArray(candidate.trades),
+  );
+}
 
 export const planTools = {
   create_plan: createPlanTool,
