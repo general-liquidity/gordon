@@ -57,6 +57,7 @@ describe("doctor.runDoctorChecks", () => {
     expect(ids).toContain("outbound-fetch-guard");
     expect(ids).toContain("filesystem-write-guard");
     expect(ids).toContain("kill-switches");
+    expect(ids).toContain("audit-chain");
   },
   // Same budget as the stable-order test below — runDoctorChecks shells
   // out to `bun audit --json`, which can take 10-15s on a cold cache.
@@ -188,6 +189,7 @@ describe("doctor — kill-switch state check", () => {
     expect(check.message).toContain("2 kill switch(es) tripped");
     expect(check.message).toContain("venue:binance (API instability)");
     expect(check.message).toContain("firm (manual halt)");
+    expect(check.fixCommand).toBe("/killswitch");
   });
 
   it("truncates the trip list past five entries", () => {
@@ -199,6 +201,14 @@ describe("doctor — kill-switch state check", () => {
     const check = _internal.checkKillSwitchState(true, trips);
     expect(check.status).toBe("warn");
     expect(check.message).toContain("(+2 more)");
+  });
+});
+
+describe("doctor — audit chain check", () => {
+  it("returns info when no signed traces exist yet", () => {
+    const check = _internal.checkAuditChainIntegrity();
+    expect(check.id).toBe("audit-chain");
+    expect(["info", "pass"]).toContain(check.status);
   });
 });
 

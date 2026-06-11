@@ -7,7 +7,7 @@ import type { Plan } from "../../../types/plan.ts";
 import { classifyTradeRisk, type TradeProposal } from "../risk/riskClassifier.ts";
 import { buildClassifierPortfolioContext } from "../risk/classifierPortfolio.ts";
 import { gateAgainstMandate, gateCoherence, inferAssetClass } from "../../safety/index.ts";
-import { checkConstitution } from "../../safety/defense/tradingConstitution.ts";
+import { passesConstitution } from "../../safety/defense/tradingConstitution.ts";
 import type { PreTradeInput } from "./terminationLayers.ts";
 
 export interface TerminationPreTradeOptions {
@@ -37,7 +37,7 @@ export async function buildTerminationPreTradeFromPlan(
 
   let constitutionViolations = opts.constitutionViolations ?? [];
   if (constitutionViolations.length === 0 && portfolio.totalValueUsd > 0) {
-    const violations = checkConstitution({
+    const constitutionResult = passesConstitution({
       positionSizePct: (notionalUsd / portfolio.totalValueUsd) * 100,
       riskPerTradePct: assessment.compositeScore > 50 ? 3 : 1,
       currentDrawdownPct: portfolio.currentDrawdownPct,
@@ -49,7 +49,7 @@ export async function buildTerminationPreTradeFromPlan(
       hasStopLoss: plan.stopLoss.price > 0,
       isCrypto: inferAssetClass(ctx.exchange?.exchangeId, plan.symbol) === "crypto",
     });
-    constitutionViolations = violations.map((v) => v.message);
+    constitutionViolations = constitutionResult.violations.map((v) => v.message);
   }
 
   const assetClass = inferAssetClass(ctx.exchange?.exchangeId, plan.symbol);

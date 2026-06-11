@@ -206,17 +206,31 @@ export async function initializeRuntime(setState: StateUpdater): Promise<Session
 
   // Subscribe to state changes
   activeRuntime.subscribe((state) => {
-    // Map pending approvals to TUI format
-    const pendingApprovals: ApprovalRequest[] = state.approvals.pending.map(mapApproval);
+    setState((prev: any) => {
+      const pendingApprovals: ApprovalRequest[] = state.approvals.pending.map((approval) => {
+        const mapped = mapApproval(approval);
+        const enriched = (prev.pendingApprovals as ApprovalRequest[] | undefined)?.find(
+          (p) => p.id === mapped.id,
+        );
+        if (enriched?.riskReasons || enriched?.counterOffer) {
+          return {
+            ...mapped,
+            riskReasons: enriched.riskReasons ?? mapped.riskReasons,
+            counterOffer: enriched.counterOffer ?? mapped.counterOffer,
+          };
+        }
+        return mapped;
+      });
 
-    setState((prev: any) => ({
-      ...prev,
-      permissionMode: prev.permissionMode, // preserve user's choice
-      sessionId: state.session.sessionId ?? prev.sessionId,
-      threadId: state.session.threadId ?? prev.threadId,
-      pendingApprovals,
-      backgroundTasks: state.background.tasks ?? [],
-    }));
+      return {
+        ...prev,
+        permissionMode: prev.permissionMode,
+        sessionId: state.session.sessionId ?? prev.sessionId,
+        threadId: state.session.threadId ?? prev.threadId,
+        pendingApprovals,
+        backgroundTasks: state.background.tasks ?? [],
+      };
+    });
   });
 
   // Parallel initialization — session + tooling run concurrently (Claude Code pattern)

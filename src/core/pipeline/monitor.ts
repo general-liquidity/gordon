@@ -20,7 +20,11 @@ import {
   type MarketStream,
   type MarketStreamTickerUpdate as TickerUpdate,
 } from "../../infra/exchange/marketStream.ts";
-import { cleanupExpiredPlans } from "./executor.ts";
+import {
+  cleanupExpiredPlans,
+  generateDeterministicClientOrderId,
+  repairProtectiveOrders,
+} from "./executor.ts";
 import { getTrailingStopTracker } from "../orders/trailing-stop.ts";
 
 const logger = createModuleLogger("monitor");
@@ -727,78 +731,110 @@ async function checkGridFills(
     let tradeUpdated = false;
     const updatedTrade = { ...trade };
 
-    // Track which grid levels have filled based on entries
-    const filledLevelPrices = new Set(trade.entries.map(e => e.price));
+    const knownEntryOrderIds = new Set(trade.entries.map((e) => e.orderId));
     const gridLevels = plan.grid.levels;
 
-    // Check each grid level for fills (price <= level price means fill)
+    let orderHistory: Awaited<ReturnType<Exchange["getOrderHistory"]>> = [];
+    try {
+      orderHistory = await client.getOrderHistory(trade.symbol, 200);
+    } catch (historyError) {
+      logger.warn("Failed to load order history for grid fill detection", {
+        tradeId: trade.id,
+        symbol: trade.symbol,
+        error: historyError instanceof Error ? historyError.message : String(historyError),
+      });
+    }
+
+    const ordersByClientId = new Map<string, (typeof orderHistory)[number]>();
+    for (const order of [...orderHistory, ...openOrders]) {
+      if (order.clientOrderId) {
+        ordersByClientId.set(order.clientOrderId, order);
+      }
+    }
+
     for (let i = 0; i < gridLevels.length; i++) {
       const level = gridLevels[i]!;
       const levelLabel = `GRID_${i + 1}`;
+      const clientOrderId = generateDeterministicClientOrderId(trade.planId, `grid${i + 1}`);
+      const exchangeOrder = ordersByClientId.get(clientOrderId);
 
-      // Skip if already filled
-      if (filledLevelPrices.has(level.price)) {
+      if (!exchangeOrder) {
         continue;
       }
 
-      // Check if current price has crossed below this grid level
-      if (currentPrice <= level.price) {
-        // Calculate quantity for this level
-        const levelQuantity = roundQuantity(
-          (plan.allocation.amount * level.percentOfAllocation) / level.price
-        );
-
-        // Create entry fill for this grid level
-        const gridFill: EntryFill = {
-          orderId: `grid_${i + 1}_${trade.id}`,
-          price: level.price,
-          quantity: levelQuantity,
-          filledAt: new Date().toISOString(),
-        };
-
-        updatedTrade.entries = [...updatedTrade.entries, gridFill];
-        tradeUpdated = true;
-
-        // Recalculate weighted average entry
-        const newAvgEntry = calculateWeightedAverageEntry(updatedTrade.entries);
-        updatedTrade.averageEntry = newAvgEntry;
-
-        alerts.push({
-          type: "order_filled",
-          tradeId: trade.id,
-          message: `${trade.symbol}: Grid level ${i + 1} filled at ${level.price}`,
-          severity: "info",
-          data: {
-            orderType: levelLabel,
-            fillPrice: level.price,
-            quantity: levelQuantity,
-            newAverageEntry: newAvgEntry,
-            gridLevelsFilled: updatedTrade.entries.length,
-            totalGridLevels: gridLevels.length,
-          },
-        });
-
-        logger.info("Grid level filled", {
-          tradeId: trade.id,
-          symbol: trade.symbol,
-          level: i + 1,
-          price: level.price,
-          quantity: levelQuantity,
-          newAvgEntry,
-        });
-
-        logEvent({
-          type: "ORDER_FILLED",
-          data: {
-            orderType: levelLabel,
-            fillPrice: level.price,
-            quantity: levelQuantity,
-            newAverageEntry: newAvgEntry,
-          },
-          tradeId: trade.id,
-          planId: trade.planId,
-        });
+      const orderId = exchangeOrder.orderId.toString();
+      if (knownEntryOrderIds.has(orderId)) {
+        continue;
       }
+
+      const isFilled =
+        exchangeOrder.status === "FILLED" || exchangeOrder.status === "PARTIALLY_FILLED";
+      if (!isFilled || exchangeOrder.executedQty <= 0) {
+        continue;
+      }
+
+      const fillPrice =
+        exchangeOrder.executedQty > 0 && exchangeOrder.cummulativeQuoteQty > 0
+          ? exchangeOrder.cummulativeQuoteQty / exchangeOrder.executedQty
+          : level.price;
+      const levelQuantity = roundQuantity(exchangeOrder.executedQty);
+
+      const gridFill: EntryFill = {
+        orderId,
+        price: fillPrice,
+        quantity: levelQuantity,
+        filledAt: exchangeOrder.updateTime
+          ? new Date(exchangeOrder.updateTime).toISOString()
+          : new Date().toISOString(),
+      };
+
+      updatedTrade.entries = [...updatedTrade.entries, gridFill];
+      knownEntryOrderIds.add(orderId);
+      tradeUpdated = true;
+
+      const newAvgEntry = calculateWeightedAverageEntry(updatedTrade.entries);
+      updatedTrade.averageEntry = newAvgEntry;
+
+      alerts.push({
+        type: "order_filled",
+        tradeId: trade.id,
+        message: `${trade.symbol}: Grid level ${i + 1} filled at ${fillPrice}`,
+        severity: "info",
+        data: {
+          orderType: levelLabel,
+          fillPrice,
+          quantity: levelQuantity,
+          newAverageEntry: newAvgEntry,
+          gridLevelsFilled: updatedTrade.entries.length,
+          totalGridLevels: gridLevels.length,
+          clientOrderId,
+        },
+      });
+
+      logger.info("Grid level filled (exchange-confirmed)", {
+        tradeId: trade.id,
+        symbol: trade.symbol,
+        level: i + 1,
+        orderId,
+        price: fillPrice,
+        quantity: levelQuantity,
+        newAvgEntry,
+        status: exchangeOrder.status,
+      });
+
+      logEvent({
+        type: "ORDER_FILLED",
+        data: {
+          orderType: levelLabel,
+          fillPrice,
+          quantity: levelQuantity,
+          newAverageEntry: newAvgEntry,
+          orderId,
+          clientOrderId,
+        },
+        tradeId: trade.id,
+        planId: trade.planId,
+      });
     }
 
     // Check if stop loss has been hit
@@ -909,6 +945,22 @@ async function checkGridFills(
 
     if (tradeUpdated) {
       updateTrade(trade.id, updatedTrade);
+      try {
+        const repair = await repairProtectiveOrders(trade.planId, client);
+        if (repair.repaired) {
+          logger.info("Protective orders repaired after grid fill", {
+            tradeId: trade.id,
+            planId: trade.planId,
+            placed: repair.placed,
+          });
+        }
+      } catch (repairError) {
+        logger.warn("Protective repair after grid fill failed", {
+          tradeId: trade.id,
+          planId: trade.planId,
+          error: repairError instanceof Error ? repairError.message : String(repairError),
+        });
+      }
     }
   } catch (error) {
     logger.error("Error checking grid fills", error as Error, {

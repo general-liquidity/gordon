@@ -139,6 +139,23 @@ const EXCHANGE_STEP: StepConfig = {
 };
 
 /** Asks what to do when the user picks an exchange that's already configured. */
+const EXCHANGE_LIVE_CONFIRM_STEP: StepConfig = {
+  id: "exchange-live-confirm",
+  section: "exchange",
+  title: "Live exchange confirmation",
+  description:
+    "You selected a live venue — real money will move on this exchange.\n" +
+    "Paper/testnet venues are recommended for first use.\n\n" +
+    "Confirm to continue with live credentials:",
+  inputType: "select",
+  key: "exchangeLiveConfirmed",
+  options: [
+    { label: "I understand — this is real money, continue", value: "confirmed" },
+    { label: "Go back — I'll pick a paper venue instead", value: "back" },
+  ],
+  show: (d) => !!d.exchange && d.exchange !== "skip" && !isSandboxExchange(d),
+};
+
 const EXCHANGE_CONFLICT_STEP: StepConfig = {
   id: "exchange-conflict",
   section: "exchange",
@@ -397,6 +414,7 @@ export const ALL_STEPS: StepConfig[] = [
   LLM_PROVIDER_STEP,
   LLM_KEY_STEP,
   EXCHANGE_STEP,
+  EXCHANGE_LIVE_CONFIRM_STEP,
   EXCHANGE_CONFLICT_STEP,
   EXCHANGE_API_KEY_STEP,
   EXCHANGE_API_SECRET_STEP,
@@ -446,6 +464,16 @@ export function SetupWizard({ onComplete, onSkip, preflight }: Props) {
 
   const handleValue = useCallback(
     (value: string) => {
+      if (step.id === "exchange-live-confirm" && value === "back") {
+        const { exchangeLiveConfirmed: _dropped, ...rest } = data;
+        const resetData = { ...rest, exchange: "skip" };
+        setData(resetData);
+        const nextActive = ALL_STEPS.filter((s) => !s.show || s.show(resetData, pre));
+        const exchangeIdx = nextActive.findIndex((s) => s.id === "exchange");
+        setStepIndex(exchangeIdx >= 0 ? exchangeIdx : 0);
+        return;
+      }
+
       const newData = { ...data, [step.key]: value };
       setData(newData);
 

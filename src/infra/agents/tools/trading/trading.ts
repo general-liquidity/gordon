@@ -37,6 +37,16 @@ import { recordStructuredObservation } from "../../../platform/observability/ind
 import { appendActionLogEntry } from "../../../action-log/index.ts";
 import { appendExecutionRecordFresh, isTradeLedgerEnabled, readExecutionRecords, getExecutionRecord, executionRecordToPayload } from "../../../safety/tradeLedger.ts";
 import { checkKillSwitchForOrder } from "../../../safety/killSwitchGate.ts";
+import {
+  activeConstitutionHalt,
+  passesConstitution,
+} from "../../../safety/defense/tradingConstitution.ts";
+import { buildClassifierPortfolioContext } from "../../../trading/risk/classifierPortfolio.ts";
+import { classifyTradeRisk } from "../../../trading/risk/riskClassifier.ts";
+import {
+  MultiSourceQuoteService,
+  QuoteUnavailableError,
+} from "../../../data/providers/multiSourceQuote.ts";
 import { loadConfigBundle, saveResolvedConfig } from "../../../storage/config/config.ts";
 import {
   listPlans,
@@ -597,6 +607,30 @@ export const executePlanTool = createTool({
       }, { toolName: "execute_plan" });
     }
 
+    const constitutionHalt = activeConstitutionHalt();
+    if (constitutionHalt) {
+      const reason =
+        `Trading constitution halt active (${constitutionHalt.rule}): ${constitutionHalt.message}`;
+      recordStructuredObservation({
+        eventType: "execution.blocked",
+        workflow: "execution",
+        source: "agent_tool",
+        component: "execute_plan",
+        toolName: "execute_plan",
+        outcome: "failure",
+        status: "constitution_halt",
+        controllability: classifyBlockedStatus("constitution_halt"),
+        planId,
+        symbol: plan.symbol,
+        reason,
+        details: { rationale, rule: constitutionHalt.rule },
+      });
+      return validateToolOutput(executePlanOutputSchema, {
+        success: false,
+        error: reason,
+      }, { toolName: "execute_plan" });
+    }
+
     if (isWipLimitEnabled()) {
       const wipGate = gateSessionPlan(plan.symbol, plan.strategy);
       if (!wipGate.allowed) {
@@ -806,14 +840,29 @@ export const executePlanTool = createTool({
     const planOrderSide = plan.direction === "short" ? "sell" : "buy";
 
     // Live mark for the order-construction price gate and the fat-finger /
-    // price-deviation guard below. Fetch failure stays best-effort (the
-    // deviation guard no-ops without it) — but a venue that RETURNS a value
-    // that is not a finite positive number is a degraded quote and blocks.
+    // price-deviation guard below. Multi-source quote first, then venue
+    // getPrice. Market entries fail closed when no usable quote exists.
     let referencePrice: number | undefined;
-    try {
-      referencePrice = await ctx.exchange?.getPrice(plan.symbol);
-    } catch {
-      referencePrice = undefined;
+    let exchangePrice: number | undefined;
+    let quoteSourcesFailed: string[] = [];
+    if (ctx.exchange) {
+      try {
+        const quoteSvc = new MultiSourceQuoteService([ctx.exchange], ctx.llm);
+        const enriched = await quoteSvc.getQuote(plan.symbol);
+        referencePrice = enriched.price;
+      } catch (quoteErr) {
+        if (quoteErr instanceof QuoteUnavailableError) {
+          quoteSourcesFailed = quoteErr.sourcesFailed;
+        }
+      }
+      try {
+        exchangePrice = await ctx.exchange.getPrice(plan.symbol);
+      } catch {
+        exchangePrice = undefined;
+      }
+      if (referencePrice === undefined) {
+        referencePrice = exchangePrice;
+      }
     }
 
     // Order-construction price gate: every number an order would be built
@@ -840,9 +889,18 @@ export const executePlanTool = createTool({
     if (!isUsablePrice(plan.allocation.amount)) {
       priceFaults.push(`allocation amount (${plan.allocation.amount}) is not a finite number > 0`);
     }
-    if (referencePrice !== undefined && !isUsablePrice(referencePrice)) {
+    if (exchangePrice !== undefined && !isUsablePrice(exchangePrice)) {
       priceFaults.push(
-        `live quote for ${plan.symbol} (${referencePrice}) is degraded — venue returned a non-positive or non-finite price; refusing to trade against a bad quote`,
+        `live quote for ${plan.symbol} (${exchangePrice}) is degraded — venue returned a non-positive or non-finite price; refusing to trade against a bad quote`,
+      );
+    }
+    if (plan.entry.type === "market" && !isUsablePrice(exchangePrice)) {
+      const sourceDetail =
+        quoteSourcesFailed.length > 0
+          ? ` (sources failed: ${quoteSourcesFailed.join(", ")})`
+          : "";
+      priceFaults.push(
+        `market entry requires a live reference price for ${plan.symbol} but none is available${sourceDetail}`,
       );
     }
     if (priceFaults.length > 0) {
@@ -896,6 +954,63 @@ export const executePlanTool = createTool({
           rationale,
           errors: tradeValidation.errors,
           warnings: tradeValidation.warnings,
+        },
+      });
+      return validateToolOutput(executePlanOutputSchema, {
+        success: false,
+        error: reason,
+      }, { toolName: "execute_plan" });
+    }
+
+    const portfolioCtx = await buildClassifierPortfolioContext(ctx);
+    const constitutionEntryPrice = plan.entry.price ?? referencePrice ?? 1;
+    const constitutionNotional = plan.allocation.amount;
+    const constitutionProposal = {
+      symbol: plan.symbol,
+      side: planSide as "BUY" | "SELL",
+      quantity: constitutionNotional / constitutionEntryPrice,
+      price: constitutionEntryPrice,
+      notionalUsd: constitutionNotional,
+      orderType: plan.entry.type === "market" ? "MARKET" as const : "LIMIT" as const,
+      venue: ctx.exchange?.exchangeId,
+    };
+    const constitutionRisk = classifyTradeRisk(constitutionProposal, portfolioCtx);
+    const constitutionCheck = passesConstitution({
+      positionSizePct:
+        portfolioCtx.totalValueUsd > 0
+          ? (constitutionNotional / portfolioCtx.totalValueUsd) * 100
+          : (constitutionNotional / Math.max(ctx.portfolioValue, 1)) * 100,
+      riskPerTradePct: constitutionRisk.compositeScore > 50 ? 3 : 1,
+      currentDrawdownPct: portfolioCtx.currentDrawdownPct,
+      dailyLossPct:
+        Math.abs(portfolioCtx.dailyPnlUsd / Math.max(portfolioCtx.totalValueUsd, 1)) * 100,
+      openPositionCount: portfolioCtx.positions.length,
+      tradesThisHour: portfolioCtx.recentTradeCount,
+      tradesThisDay: portfolioCtx.recentTradeCount * 3,
+      consecutiveLosses: 0,
+      hasStopLoss: plan.stopLoss.price > 0,
+      isCrypto: inferredAssetClass === "crypto",
+    });
+    if (!constitutionCheck.passes) {
+      const reason = `Trading constitution blocked execution: ${
+        constitutionCheck.violations.map((v) => v.message).join("; ")
+      }`;
+      recordStructuredObservation({
+        eventType: "execution.blocked",
+        workflow: "execution",
+        source: "agent_tool",
+        component: "execute_plan",
+        toolName: "execute_plan",
+        outcome: "failure",
+        status: "constitution_violation",
+        controllability: classifyBlockedStatus("constitution_violation"),
+        planId,
+        symbol: plan.symbol,
+        reason,
+        details: {
+          rationale,
+          worstSeverity: constitutionCheck.worstSeverity,
+          violations: constitutionCheck.violations.map((v) => v.message),
         },
       });
       return validateToolOutput(executePlanOutputSchema, {

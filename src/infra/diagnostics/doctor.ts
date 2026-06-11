@@ -48,6 +48,7 @@ import {
   isFilesystemWriteGuardInstalled,
   type FilesystemWriteGuardStatus,
 } from "../safety/filesystemWriteGuardInstaller.ts";
+import { verifyStoredAuditChain } from "../../core/audit/store.ts";
 
 export interface DiagnosticCheck {
   id: string;
@@ -467,7 +468,47 @@ function checkKillSwitchState(
     label,
     status: "warn",
     message: `${trips.length} kill switch(es) tripped — matching executions are blocked: ${detail}${extra}. Reset deliberately once the underlying issue is resolved.`,
+    fixCommand: "/killswitch",
+    fixLabel: "Inspect and reset kill switches",
   };
+}
+
+function checkAuditChainIntegrity(): DiagnosticCheck {
+  const id = "audit-chain";
+  const label = "Audit chain integrity";
+  try {
+    const result = verifyStoredAuditChain();
+    if (result.valid) {
+      if (result.checked === 0) {
+        return {
+          id,
+          label,
+          status: "info",
+          message: "No signed audit traces stored yet — chain verification will run once traces exist.",
+        };
+      }
+      return {
+        id,
+        label,
+        status: "pass",
+        message: `HMAC audit chain verified (${result.checked} trace${result.checked === 1 ? "" : "s"}).`,
+      };
+    }
+    const brk = result.firstBreak;
+    return {
+      id,
+      label,
+      status: "fail",
+      message: `Audit chain broken at trace ${brk.traceId} (${brk.reason}): ${brk.detail}`,
+    };
+  } catch (err) {
+    return {
+      id,
+      label,
+      status: "warn",
+      message: `Could not verify audit chain: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
 }
 
 function checkGordonHomeDir(): DiagnosticCheck {
@@ -1036,6 +1077,7 @@ export function runDoctorChecks(): DiagnosticCheck[] {
     checkOutboundFetchGuard(),
     checkFilesystemWriteGuard(),
     checkKillSwitchState(),
+    checkAuditChainIntegrity(),
     checkHotTierCap(),
     checkMastraPatchApplied(),
     checkMcpMarketplaceCatalog(),
@@ -1409,6 +1451,7 @@ export const _internal = {
   checkOutboundFetchGuard,
   checkFilesystemWriteGuard,
   checkKillSwitchState,
+  checkAuditChainIntegrity,
   checkHotTierCap,
   checkGordonHomeDir,
   checkMastraPatchApplied,

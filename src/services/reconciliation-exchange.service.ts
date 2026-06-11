@@ -17,7 +17,8 @@ import { logEvent } from "../infra/storage/entities/events.ts";
 import { createModuleLogger } from "../infra/logger/index.ts";
 import type { Trade, EntryFill, ExitFill } from "../types/index.ts";
 import { extractOrderOwnerKey } from "../core/orders/order-recovery.ts";
-import { cleanupExpiredPlans } from "../core/pipeline/executor.ts";
+import { cleanupExpiredPlans, repairProtectiveOrders } from "../core/pipeline/executor.ts";
+import { listPlans } from "../infra/storage/entities/plans.ts";
 import { StrategyRuntime } from "../core/runtime/engine.ts";
 import { FeedbackLoop } from "../core/learning/feedback-loop.ts";
 const logger = createModuleLogger("reconciliation-exchange");
@@ -122,6 +123,24 @@ export async function reconcileWithExchange(
 
     await checkOrphanedOrders(exchange, activeTrades, result);
 
+    const executingPlans = listPlans({ status: "EXECUTING" });
+    for (const plan of executingPlans) {
+      try {
+        const repair = await repairProtectiveOrders(plan.id, exchange);
+        if (repair.repaired) {
+          result.warnings.push(
+            `Protective orders repaired for plan ${plan.id}: ${repair.placed.join(", ")}`,
+          );
+        }
+      } catch (repairError) {
+        const repairMessage =
+          repairError instanceof Error ? repairError.message : "Unknown error";
+        result.warnings.push(
+          `Protective repair failed for plan ${plan.id}: ${repairMessage}`,
+        );
+      }
+    }
+
     logger.info("Reconciliation complete", {
       exchange: exchange.exchangeId,
       tradesReconciled: result.tradesReconciled,
@@ -198,16 +217,15 @@ async function reconcileTrade(
 
     // Entry orders
     if (clientOrderId.includes("entry") || clientOrderId.includes("grid")) {
-      if (orderStatus === "FILLED") {
+      if (orderStatus === "FILLED" || orderStatus === "PARTIALLY_FILLED") {
+        const fillPrice =
+          order.executedQty > 0
+            ? order.cummulativeQuoteQty / order.executedQty
+            : order.price;
+        const fillQuantity = order.executedQty;
         const existingFill = trade.entries.find((e) => e.orderId === orderId);
 
-        if (!existingFill) {
-          const fillPrice =
-            order.executedQty > 0
-              ? order.cummulativeQuoteQty / order.executedQty
-              : order.price;
-          const fillQuantity = order.executedQty;
-
+        if (!existingFill && fillQuantity > 0) {
           const newFill: EntryFill = {
             orderId,
             price: fillPrice,
@@ -226,17 +244,34 @@ async function reconcileTrade(
             orderId,
             price: fillPrice,
             quantity: fillQuantity,
+            status: orderStatus,
           });
+        } else if (
+          existingFill &&
+          fillQuantity > existingFill.quantity &&
+          orderStatus === "PARTIALLY_FILLED"
+        ) {
+          updatedTrade.entries = updatedTrade.entries.map((e) =>
+            e.orderId === orderId
+              ? { ...e, quantity: fillQuantity, price: fillPrice }
+              : e,
+          );
+          needsUpdate = true;
+          result.ordersUpdated++;
         }
       }
     }
 
     // Exit orders (stop or take-profit)
     if (clientOrderId.includes("stop") || clientOrderId.includes("tp")) {
-      if (orderStatus === "FILLED") {
+      if (orderStatus === "FILLED" || orderStatus === "PARTIALLY_FILLED") {
         const existingExit = trade.exits.find((e) => e.orderId === orderId);
+        const exitPrice =
+          order.executedQty > 0
+            ? order.cummulativeQuoteQty / order.executedQty
+            : order.price;
 
-        if (!existingExit) {
+        if (!existingExit && order.executedQty > 0) {
           let reason: "STOP" | "TP1" | "TP2" | "TP3" | "MANUAL" = "MANUAL";
           if (clientOrderId.includes("stop")) {
             reason = "STOP";
@@ -248,10 +283,6 @@ async function reconcileTrade(
             reason = "TP3";
           }
 
-          const exitPrice =
-            order.executedQty > 0
-              ? order.cummulativeQuoteQty / order.executedQty
-              : order.price;
           const exitQuantity = order.executedQty;
 
           const newExit: ExitFill = {
@@ -274,7 +305,20 @@ async function reconcileTrade(
             reason,
             price: exitPrice,
             quantity: exitQuantity,
+            status: orderStatus,
           });
+        } else if (
+          existingExit &&
+          order.executedQty > existingExit.quantity &&
+          orderStatus === "PARTIALLY_FILLED"
+        ) {
+          updatedTrade.exits = updatedTrade.exits.map((e) =>
+            e.orderId === orderId
+              ? { ...e, quantity: order.executedQty, price: exitPrice }
+              : e,
+          );
+          needsUpdate = true;
+          result.ordersUpdated++;
         }
       }
     }

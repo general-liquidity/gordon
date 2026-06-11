@@ -194,6 +194,25 @@ export function roundPrice(price: number, precision: number = 8): number {
   return Math.round(price * multiplier) / multiplier;
 }
 
+/** Stop-limit price for exit orders: below trigger for SELL exits, above for BUY exits (shorts). */
+export function stopLimitPriceForExit(stopPrice: number, exitSide: "BUY" | "SELL"): number {
+  return exitSide === "SELL"
+    ? roundPrice(stopPrice * 0.995)
+    : roundPrice(stopPrice * 1.005);
+}
+
+export function exitSideForPlan(plan: Pick<Plan, "direction">): "BUY" | "SELL" {
+  return plan.direction === "short" ? "BUY" : "SELL";
+}
+
+export function entrySideForPlan(plan: Pick<Plan, "direction">): "BUY" | "SELL" {
+  return plan.direction === "short" ? "SELL" : "BUY";
+}
+
+export function pnlMultiplierForPlan(plan: Pick<Plan, "direction"> | null | undefined): number {
+  return plan?.direction === "short" ? -1 : 1;
+}
+
 async function validateTradePermissions(exchange: Exchange): Promise<{ allowed: boolean; error?: string }> {
   // Interface-based permission check — every venue is now backed by CcxtAdapter,
   // which reports canTrade via the unified getAccountInfo(). (Previously a
@@ -416,9 +435,8 @@ export async function executePlan(
   // Step 6: Place orders in sequence
   try {
     // 6a. Place entry order
-    const isShort = plan.direction === "short";
-    const entrySide = isShort ? "SELL" : "BUY";
-    const exitSide = isShort ? "BUY" : "SELL";
+    const entrySide = entrySideForPlan(plan);
+    const exitSide = exitSideForPlan(plan);
 
     const entryOrderParams: OrderParams = {
       symbol: plan.symbol,
@@ -466,17 +484,61 @@ export async function executePlan(
       };
     }
 
+    if (plan.entry.type === "limit") {
+      const needsWait =
+        entryOrder.status !== "FILLED" && entryOrder.executedQty <= 0;
+
+      if (needsWait) {
+        const fillResult = await waitForFill(
+          client,
+          plan.symbol,
+          entryOrder.orderId.toString(),
+          { onPartialFill: "continue" },
+        );
+
+        if (fillResult.fillStatus.filledQuantity <= 0) {
+          await safelyCancelOrder(
+            client,
+            plan.symbol,
+            entryOrder.orderId.toString(),
+            plan.id,
+          );
+          return {
+            success: false,
+            error:
+              fillResult.error ??
+              "Limit entry did not fill within the wait window — protective orders not placed.",
+            orders: placedOrders,
+          };
+        }
+      }
+
+      entryOrder = await client.getOrderStatus(plan.symbol, entryOrder.orderId);
+    }
+
     const entryPrice =
       plan.entry.type === "market"
         ? (entryOrder.executedQty > 0
           ? entryOrder.cummulativeQuoteQty / entryOrder.executedQty
           : currentPrice)
-        : plan.entry.price ?? currentPrice;
+        : (entryOrder.executedQty > 0 && entryOrder.cummulativeQuoteQty > 0
+          ? entryOrder.cummulativeQuoteQty / entryOrder.executedQty
+          : plan.entry.price ?? currentPrice);
 
     const exitQuantity =
       entryOrder.executedQty > 0
         ? roundQuantity(entryOrder.executedQty)
-        : totalQuantity;
+        : plan.entry.type === "limit"
+          ? 0
+          : totalQuantity;
+
+    if (exitQuantity <= 0) {
+      return {
+        success: false,
+        error: "Entry order has no filled quantity — cannot place protective exits.",
+        orders: placedOrders,
+      };
+    }
 
     placedOrders.push({
       type: "entry",
@@ -491,13 +553,15 @@ export async function executePlan(
         action: "ENTRY",
         orderId: entryOrder.orderId.toString(),
         symbol: plan.symbol,
-        side: "BUY",
+        side: entrySide,
         type: entryOrderParams.type,
         price: entryPrice,
-        quantity: totalQuantity,
+        quantity: exitQuantity,
       },
       planId: plan.id,
     });
+
+    const stopLimitPrice = stopLimitPriceForExit(plan.stopLoss.price, exitSide);
 
     // 6b + 6c. Place exit orders (stop-loss + take-profit)
     //
@@ -523,7 +587,7 @@ export async function executePlan(
         exitSide,
         exitQuantity,
         plan.stopLoss.price,
-        roundPrice(plan.stopLoss.price * 0.995),
+        stopLimitPrice,
         tp.price,
         plan.id,
         userId
@@ -584,7 +648,7 @@ export async function executePlan(
         side: exitSide,
         type: "STOP_LOSS_LIMIT",
         quantity: exitQuantity,
-        price: roundPrice(plan.stopLoss.price * 0.995),
+        price: stopLimitPrice,
         stopPrice: roundPrice(plan.stopLoss.price),
         timeInForce: "GTC",
         newClientOrderId: generateDeterministicClientOrderId(plan.id, "stop"),
@@ -723,7 +787,7 @@ export async function executePlan(
             action: `TAKE_PROFIT_${i + 1}`,
             orderId: tpOrder.orderId.toString(),
             symbol: plan.symbol,
-            side: "SELL",
+            side: exitSide,
             type: "LIMIT",
             price: tp.price,
             quantity: tpQuantity,
@@ -978,73 +1042,11 @@ async function executeGridPlan(
       });
     }
 
-    // Step 3: Place single stop loss for total quantity
-    const stopOrderParams: OrderParams = {
-      symbol: plan.symbol,
-      side: "SELL",
-      type: "STOP_LOSS_LIMIT",
-      quantity: roundQuantity(totalQuantity),
-      price: roundPrice(plan.stopLoss.price * 0.995), // Limit price slightly below stop
-      stopPrice: roundPrice(plan.stopLoss.price),
-      timeInForce: "GTC",
-      newClientOrderId: generateDeterministicClientOrderId(plan.id, "stop"),
-    };
-
-    let stopOrder: Order;
-    try {
-      stopOrder = await placeOrderIdempotent(client, stopOrderParams);
-      logger.info("Grid stop loss placed", {
-        orderId: stopOrder.orderId,
-        stopPrice: plan.stopLoss.price,
-        quantity: totalQuantity,
-      });
-    } catch (error) {
-      // Rollback all grid orders
-      await rollbackOrders(client, plan.symbol, placedOrders, plan.id);
-
-      const errorMessage = isGordonError(error)
-        ? error.message
-        : error instanceof Error
-          ? error.message
-          : "Unknown error";
-
-      logger.error("Grid stop order failed", error as Error, { params: stopOrderParams });
-      logEvent({
-        type: "ERROR",
-        data: {
-          action: "GRID_STOP_ORDER_FAILED",
-          params: stopOrderParams,
-          error: errorMessage,
-        },
-        planId: plan.id,
-      });
-
-      return {
-        success: false,
-        error: `Failed to place stop-loss order: ${errorMessage}. All grid orders rolled back.`,
-        orders: placedOrders,
-      };
-    }
-
-    placedOrders.push({
-      type: "stop",
-      orderId: stopOrder.orderId.toString(),
-      price: plan.stopLoss.price,
-      quantity: totalQuantity,
-    });
-
-    logEvent({
-      type: "ORDER_PLACED",
-      data: {
-        action: "STOP_LOSS",
-        orderId: stopOrder.orderId.toString(),
-        symbol: plan.symbol,
-        side: "SELL",
-        type: "STOP_LOSS_LIMIT",
-        stopPrice: plan.stopLoss.price,
-        quantity: totalQuantity,
-      },
+    // Step 3: Stop-loss is deferred until grid levels fill — repairProtectiveOrders
+    // and the monitor place/resize the stop from exchange-reported fill qty.
+    logger.info("Grid stop deferred until fills", {
       planId: plan.id,
+      plannedQuantity: totalQuantity,
     });
 
     // Step 4: Create Trade record with PARTIAL status (no fills yet)
@@ -1323,18 +1325,21 @@ export async function closeTrade(
       };
     }
 
-    // Place market sell order for remaining quantity
-    const sellOrderParams: OrderParams = {
+    const plan = getPlan(trade.planId);
+    const exitSide = exitSideForPlan(plan ?? { direction: "long" });
+    const pnlMult = pnlMultiplierForPlan(plan);
+
+    const closeOrderParams: OrderParams = {
       symbol: trade.symbol,
-      side: "SELL",
+      side: exitSide,
       type: "MARKET",
       quantity: remainingQuantity,
-      newClientOrderId: generateClientOrderId(trade.planId, "close"),
+      newClientOrderId: generateDeterministicClientOrderId(trade.planId, "close"),
     };
 
     let sellOrder: Order;
     try {
-      sellOrder = await client.placeOrder(sellOrderParams);
+      sellOrder = await placeOrderIdempotent(client, closeOrderParams);
       logger.info("Close order placed", { orderId: sellOrder.orderId, quantity: remainingQuantity });
     } catch (error) {
       const errorMessage = isGordonError(error)
@@ -1343,12 +1348,12 @@ export async function closeTrade(
           ? error.message
           : "Unknown error";
 
-      logger.error("Close order failed", error as Error, { params: sellOrderParams });
+      logger.error("Close order failed", error as Error, { params: closeOrderParams });
       logEvent({
         type: "ERROR",
         data: {
           action: "CLOSE_ORDER_FAILED",
-          params: sellOrderParams,
+          params: closeOrderParams,
           error: errorMessage,
         },
         tradeId: trade.id,
@@ -1376,10 +1381,9 @@ export async function closeTrade(
       reason,
     };
 
-    // Calculate PnL
     const exitValue = exitPrice * executedQuantity;
     const entryValue = trade.averageEntry * executedQuantity;
-    const pnlFromThisExit = exitValue - entryValue;
+    const pnlFromThisExit = pnlMult * (exitValue - entryValue);
     const totalRealizedPnl = trade.realizedPnl + pnlFromThisExit;
 
     const totalInvested = trade.averageEntry * totalEntryQuantity;
@@ -1647,6 +1651,8 @@ export async function waitForFill(
  * @param clientOrderId - The client order ID to check
  * @returns The existing order if found, null otherwise
  */
+const TERMINAL_ORDER_STATUSES = new Set(["CANCELED", "EXPIRED", "REJECTED"]);
+
 export async function getExistingOrder(
   client: Exchange,
   symbol: string,
@@ -1656,7 +1662,9 @@ export async function getExistingOrder(
     // Get all orders for the symbol and find by clientOrderId
     const orders = await client.getOrderHistory(symbol, 100);
     const existingOrder = orders.find(
-      (order) => order.clientOrderId === clientOrderId
+      (order) =>
+        order.clientOrderId === clientOrderId &&
+        !TERMINAL_ORDER_STATUSES.has(order.status),
     );
 
     if (existingOrder) {
@@ -1814,31 +1822,37 @@ export async function closePartialPosition(
     };
   }
 
-  // Place market sell order
-  const sellOrderParams: OrderParams = {
+  const plan = getPlan(trade.planId);
+  const exitSide = exitSideForPlan(plan ?? { direction: "long" });
+  const pnlMult = pnlMultiplierForPlan(plan);
+
+  const closeOrderParams: OrderParams = {
     symbol: trade.symbol,
-    side: "SELL",
+    side: exitSide,
     type: "MARKET",
     quantity: quantityToClose,
-    newClientOrderId: generateClientOrderId(trade.planId, `partial_${reason.toLowerCase()}`),
+    newClientOrderId: generateDeterministicClientOrderId(
+      trade.planId,
+      `partial_${reason.toLowerCase()}`,
+    ),
   };
 
   let sellOrder: Order;
   try {
-    sellOrder = await placeOrderIdempotent(client, sellOrderParams);
+    sellOrder = await placeOrderIdempotent(client, closeOrderParams);
     logger.info("Partial close order placed", {
       orderId: sellOrder.orderId,
       quantity: quantityToClose,
     });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
-    logger.error("Partial close order failed", error as Error, { params: sellOrderParams });
+    logger.error("Partial close order failed", error as Error, { params: closeOrderParams });
 
     logEvent({
       type: "ERROR",
       data: {
         action: "PARTIAL_CLOSE_FAILED",
-        params: sellOrderParams,
+        params: closeOrderParams,
         error: errorMessage,
       },
       tradeId: trade.id,
@@ -1865,7 +1879,7 @@ export async function closePartialPosition(
   // Calculate PnL for this partial close
   const exitValue = exitPrice * executedQuantity;
   const entryValue = trade.averageEntry * executedQuantity;
-  const pnl = exitValue - entryValue;
+  const pnl = pnlMult * (exitValue - entryValue);
 
   // Create exit fill record
   const exitFill: ExitFill = {
@@ -2051,6 +2065,13 @@ export async function placeOCOOrders(
         stopPrice: roundPrice(stopPrice),
         stopLimitPrice: roundPrice(stopLimitPrice),
         stopLimitTimeInForce: "GTC",
+        ...(planId
+          ? {
+              listClientOrderId: generateDeterministicClientOrderId(planId, "oco"),
+              stopClientOrderId: generateDeterministicClientOrderId(planId, "oco_stop"),
+              limitClientOrderId: generateDeterministicClientOrderId(planId, "oco_tp"),
+            }
+          : {}),
       };
 
       const result = await ocoExchange.placeOCOOrder!(ocoParams);
@@ -2131,10 +2152,14 @@ export async function placeOCOOrders(
       price: roundPrice(stopLimitPrice),
       stopPrice: roundPrice(stopPrice),
       timeInForce: "GTC",
-      newClientOrderId: planId ? generateClientOrderId(planId, "oco_stop") : undefined,
+      newClientOrderId: planId
+        ? generateDeterministicClientOrderId(planId, "oco_stop")
+        : undefined,
     };
 
-    const stopOrder = await client.placeOrder(stopParams);
+    const stopOrder = planId
+      ? await placeOrderIdempotent(client, stopParams)
+      : await client.placeOrder(stopParams);
     placedOrderIds.push(stopOrder.orderId.toString());
 
     logger.info(`${logPrefix}OCO stop-loss leg placed`, {
@@ -2150,12 +2175,16 @@ export async function placeOCOOrders(
       quantity: roundQuantity(quantity),
       price: roundPrice(takeProfitPrice),
       timeInForce: "GTC",
-      newClientOrderId: planId ? generateClientOrderId(planId, "oco_tp") : undefined,
+      newClientOrderId: planId
+        ? generateDeterministicClientOrderId(planId, "oco_tp")
+        : undefined,
     };
 
     let tpOrder: Order;
     try {
-      tpOrder = await client.placeOrder(tpParams);
+      tpOrder = planId
+        ? await placeOrderIdempotent(client, tpParams)
+        : await client.placeOrder(tpParams);
       placedOrderIds.push(tpOrder.orderId.toString());
 
       logger.info(`${logPrefix}OCO take-profit leg placed`, {
@@ -2346,13 +2375,24 @@ function resolvePositionQuantity(
   return 0;
 }
 
-function hasActiveStopLeg(planOrders: Order[]): boolean {
-  return planOrders.some(
+function findActiveStopLeg(planOrders: Order[]): Order | undefined {
+  return planOrders.find(
     (o) =>
       isActiveProtectiveOrder(o) &&
       (o.clientOrderId?.includes("stop") ?? false) &&
-      !(o.clientOrderId?.includes("tp") ?? false),
+      !(o.clientOrderId?.includes("tp") ?? false) &&
+      !(o.clientOrderId?.includes("oco") ?? false),
   );
+}
+
+function hasActiveStopLeg(planOrders: Order[]): boolean {
+  return findActiveStopLeg(planOrders) !== undefined;
+}
+
+const QTY_MISMATCH_EPSILON = 1e-8;
+
+function stopQuantityMismatch(orderQty: number, positionQty: number): boolean {
+  return Math.abs(roundQuantity(orderQty) - roundQuantity(positionQty)) > QTY_MISMATCH_EPSILON;
 }
 
 function hasActiveTakeProfitLeg(planOrders: Order[], tpIndex: number): boolean {
@@ -2389,17 +2429,40 @@ export async function repairProtectiveOrders(
     return { repaired: false, placed: [], reason: "no_open_position" };
   }
 
-  const isShort = plan.direction === "short";
-  const exitSide: "BUY" | "SELL" = isShort ? "BUY" : "SELL";
+  const exitSide = exitSideForPlan(plan);
+  const stopLimitPrice = stopLimitPriceForExit(plan.stopLoss.price, exitSide);
   const placed: string[] = [];
 
-  if (!hasActiveStopLeg(planOrders)) {
+  const activeStop = findActiveStopLeg(planOrders);
+  let stopNeedsPlacement = !hasActiveStopLeg(planOrders);
+  if (activeStop && stopQuantityMismatch(activeStop.quantity, positionQty)) {
+    try {
+      await safelyCancelOrder(client, plan.symbol, activeStop.orderId.toString(), planId);
+      stopNeedsPlacement = true;
+      logger.info("Cancelled undersized/oversized stop for protective resize", {
+        planId,
+        orderId: activeStop.orderId,
+        orderQty: activeStop.quantity,
+        positionQty,
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      logger.error("Failed to cancel stop for protective resize", error as Error, { planId });
+      return {
+        repaired: false,
+        placed,
+        reason: `stop_resize_cancel_failed: ${errorMessage}`,
+      };
+    }
+  }
+
+  if (stopNeedsPlacement) {
     const stopParams: OrderParams = {
       symbol: plan.symbol,
       side: exitSide,
       type: "STOP_LOSS_LIMIT",
       quantity: positionQty,
-      price: roundPrice(plan.stopLoss.price * 0.995),
+      price: stopLimitPrice,
       stopPrice: roundPrice(plan.stopLoss.price),
       timeInForce: "GTC",
       newClientOrderId: generateDeterministicClientOrderId(planId, "stop"),

@@ -848,6 +848,10 @@ export interface OCOOrderParams {
   stopPrice: number;
   stopLimitPrice?: number;
   stopLimitTimeInForce?: TimeInForce;
+  /** Binance-family OCO list + leg client order IDs for idempotent repair. */
+  listClientOrderId?: string;
+  stopClientOrderId?: string;
+  limitClientOrderId?: string;
 }
 
 export interface OCOOrder {
