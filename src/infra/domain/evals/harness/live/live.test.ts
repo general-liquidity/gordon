@@ -1,16 +1,21 @@
 import { afterEach, describe, expect, it } from "bun:test";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 
+import { RiskKernel } from "../../../../../core/risk-kernel/kernel.ts";
+import { loadConfigFromEnv } from "../../../../../core/risk-kernel/config.ts";
+import { getDefaultTrustTrajectory } from "../../../../../runtime/permissions/trustTrajectory.ts";
 import { GordonConfigSchema } from "../../../../../types/index.ts";
 import { getDatabasePath } from "../../../../storage/database.ts";
 import { ADVERSARIAL_SCENARIOS, buildMockJudgeClient } from "../index.ts";
 import type { EvalScenario } from "../types.ts";
 import { produceKRuns } from "./kRunProducer.ts";
-import { runLiveEvalSuite } from "./runner.ts";
+import { runLiveEvalSuite, runScenarioLive } from "./runner.ts";
 import {
   buildPaperContext,
   createEvalSandbox,
   EVAL_SANDBOX_MARKER_ENV,
+  RISK_MODE_ENV,
+  TRUST_LEDGER_PATH_ENV,
   withEvalSandbox,
   type EvalSandbox,
 } from "./sandbox.ts";
@@ -58,6 +63,101 @@ describe("EvalSandbox", () => {
     expect(GordonConfigSchema.parse(ctx.config).permissionMode).toBe("paper");
     expect(ctx.threadId).toBe("t-1");
     expect(ctx.exchange).toBeNull();
+  });
+
+  it("buildPaperContext throws when the sandbox is not installed", () => {
+    const sandbox = createEvalSandbox({ dryRun: true });
+    sandbox.cleanup();
+    expect(() => buildPaperContext(sandbox)).toThrow(/sandbox/i);
+  });
+
+  it("runScenarioLive in live mode refuses a disposed sandbox", async () => {
+    const sandbox = createEvalSandbox();
+    sandbox.cleanup();
+    await expect(
+      runScenarioLive(SAMPLE_SCENARIO, { dryRun: false, sandbox }),
+    ).rejects.toThrow(/sandbox/i);
+  });
+});
+
+describe("EvalSandbox risk-kernel isolation", () => {
+  it("forces GORDON_RISK_MODE=paper while applied and restores the prior value", async () => {
+    const prev = process.env[RISK_MODE_ENV];
+    process.env[RISK_MODE_ENV] = "enforce";
+
+    await withEvalSandbox(async () => {
+      expect(process.env[RISK_MODE_ENV]).toBe("paper");
+    });
+    expect(process.env[RISK_MODE_ENV]).toBe("enforce");
+
+    if (prev === undefined) delete process.env[RISK_MODE_ENV];
+    else process.env[RISK_MODE_ENV] = prev;
+  });
+
+  it("kernel evaluation inside the sandbox approves in paper mode even for violating orders", async () => {
+    await withEvalSandbox(async () => {
+      const kernel = new RiskKernel(loadConfigFromEnv());
+      const decision = await kernel.evaluate(
+        {
+          symbol: "BTCUSDT",
+          side: "buy",
+          type: "market",
+          quantity: 1_000_000,
+          price: 50_000,
+          exchangeId: "eval-stub",
+          agentId: "eval-test",
+        },
+        {
+          totalEquity: 10_000,
+          availableBalance: 5_000,
+          openPositions: [],
+          todayPnL: 0,
+          todayTradeCount: 0,
+          currentDrawdown: 0,
+          peakEquity: 10_000,
+        },
+      );
+      expect(decision.approved).toBe(true);
+      expect(decision.reason).toContain("Paper mode");
+      // Let the kernel's fire-and-forget audit write into the sandbox DB
+      // settle before cleanup removes the sandbox directory.
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    });
+  });
+});
+
+describe("EvalSandbox trust-ledger isolation", () => {
+  it("persists sandbox trust writes to the sandbox ledger path", async () => {
+    await withEvalSandbox(async (sandbox) => {
+      expect(process.env[TRUST_LEDGER_PATH_ENV]).toBe(sandbox.paths.trustLedger);
+      sandbox.trustTrajectory.record({
+        toolName: "get_market_data",
+        decision: "approved",
+        timestamp: Date.now(),
+        permissionScope: "papertrade.read",
+      });
+      expect(existsSync(sandbox.paths.trustLedger)).toBe(true);
+      const rows = readFileSync(sandbox.paths.trustLedger, "utf8").trim().split("\n");
+      expect(rows.length).toBe(1);
+      expect(JSON.parse(rows[0]!).toolName).toBe("get_market_data");
+    });
+  });
+
+  it("resets the default trust trajectory at both sandbox boundaries", async () => {
+    const before = getDefaultTrustTrajectory();
+    before.record({ toolName: "operator_tool", decision: "approved", timestamp: Date.now() });
+
+    let inside: ReturnType<typeof getDefaultTrustTrajectory> | undefined;
+    await withEvalSandbox(async () => {
+      inside = getDefaultTrustTrajectory();
+      expect(inside).not.toBe(before);
+      expect(inside.listEvents().length).toBe(0);
+      inside.record({ toolName: "eval_tool", decision: "approved", timestamp: Date.now() });
+    });
+
+    const after = getDefaultTrustTrajectory();
+    expect(after).not.toBe(inside);
+    expect(after.listEvents().length).toBe(0);
   });
 });
 

@@ -2,7 +2,12 @@ import { beforeEach, describe, it, expect } from "bun:test";
 import { installAcpPermissionHook } from "./permission-hook.ts";
 import type { AgentSideConnection } from "@agentclientprotocol/sdk";
 import type { PermissionEngine } from "../../runtime/permissions/PermissionEngine.ts";
-import { _resetDefaultTrustTrajectoryForTests } from "../../runtime/permissions/trustTrajectory.ts";
+import {
+  _resetDefaultTrustTrajectoryForTests,
+  buildTrustTrajectoryHook,
+  evaluateTrustEligibility,
+  getDefaultTrustTrajectory,
+} from "../../runtime/permissions/trustTrajectory.ts";
 
 // Mock PermissionEngine that records prepended hooks
 class FakePermissionEngine {
@@ -173,6 +178,43 @@ describe("installAcpPermissionHook", () => {
     });
     const result = await engine.invokeHook("get_market_data");
     expect(result).toEqual({ decision: "abstain" });
+  });
+
+  it("ACP hook and buildTrustTrajectoryHook agree on eligibility for the same ledger", async () => {
+    const trajectory = getDefaultTrustTrajectory();
+    const now = Date.now();
+    for (let i = 0; i < 6; i++) {
+      trajectory.record({
+        toolName: "get_market_data",
+        permissionScope: "market.read",
+        decision: "approved",
+        timestamp: now - i,
+      });
+    }
+
+    const engine = new FakePermissionEngine();
+    const { connection, calls } = fakeConnection(() => ({
+      outcome: { outcome: "selected", optionId: "reject_once" },
+    }));
+    installAcpPermissionHook(engine as unknown as PermissionEngine, {
+      sessionId: "parity",
+      connection,
+    });
+    const acpResult = await engine.invokeHook("get_market_data");
+
+    const trustHook = buildTrustTrajectoryHook(trajectory, { now: () => now });
+    const hookResult = trustHook({ toolName: "get_market_data", policy: defaultPolicy() });
+
+    const verdict = evaluateTrustEligibility(trajectory, "get_market_data", "market.read", {
+      approvalClass: "per_action",
+      now,
+    });
+    expect(verdict.eligible).toBe(true);
+    expect((acpResult as { decision: string }).decision).toBe("allow");
+    expect(hookResult.decision).toBe("allow");
+    expect((acpResult as { actor?: string }).actor).toBe("classifier:trust-trajectory");
+    expect(hookResult.actor).toBe("classifier:trust-trajectory");
+    expect(calls).toHaveLength(0);
   });
 
   it("uninstaller removes the hook", async () => {

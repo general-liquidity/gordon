@@ -1,9 +1,10 @@
 import type { StreamEvent } from "../../infra/agents/orchestrator.ts";
 import type { SessionRuntime } from "../../runtime/session/SessionRuntime.ts";
 import { SessionRuntimeFactory } from "../../runtime/session/SessionRuntimeFactory.ts";
-import type { RuntimeApprovalRequest } from "../../runtime/contracts/types.ts";
+import type { RuntimeApprovalRequest, RuntimeApprovalRule } from "../../runtime/contracts/types.ts";
 import type { GordonRuntimeToolAccessResult } from "../../infra/agents/types.ts";
 import { quickPermissionCheck } from "../../infra/permissions/racing.ts";
+import type { PermissionRule } from "../../infra/permissions/rules.ts";
 import { getConversationBudget } from "../../infra/context/budgeting/conversationBudget.ts";
 import { normalizeChatMessage, type ChatMessage } from "../../app/chat/chatTypes.ts";
 import { buildPendingApprovalMessages } from "../../app/chat/chatFlow.ts";
@@ -88,6 +89,46 @@ export function invalidateTuiContext(): void {
 }
 
 export type StateUpdater = (fn: (prev: any) => any) => void;
+
+/**
+ * Project the PermissionEngine's RuntimeApprovalRule[] onto the racing
+ * module's PermissionRule[] shape so quickPermissionCheck can short-circuit
+ * on previously-approved/denied rules. Conservative by design: any rule the
+ * projection cannot express exactly is dropped, so the approval falls
+ * through to the risk-kernel + dialog path instead of fast-deciding wrong.
+ */
+export function approvalRulesToQuickCheckRules(
+  rules: RuntimeApprovalRule[],
+  approvalScope: RuntimeApprovalRequest["permissionScope"],
+  now: number = Date.now(),
+): PermissionRule[] {
+  const specificity = (rule: RuntimeApprovalRule): number =>
+    rule.toolName ? 2 : rule.toolNamePattern ? 1 : 0;
+  return rules
+    .filter((rule) => {
+      if (rule.expiresAt && new Date(rule.expiresAt).getTime() <= now) return false;
+      if (rule.permissionScope && rule.permissionScope !== approvalScope) return false;
+      // Engine semantics require BOTH to match when both are set — not
+      // expressible as a single toolPattern, so defer to the kernel path.
+      if (rule.toolName && rule.toolNamePattern) return false;
+      return true;
+    })
+    // Mirror PermissionEngine tie-breaking: exact toolName beats pattern
+    // beats catch-all; within a tier the most recent rule wins.
+    .sort((a, b) => {
+      const bySpecificity = specificity(b) - specificity(a);
+      if (bySpecificity !== 0) return bySpecificity;
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    })
+    .map((rule, index) => ({
+      id: rule.id,
+      source: "session" as const,
+      toolPattern: rule.toolName ?? rule.toolNamePattern ?? "*",
+      behavior: rule.decision,
+      priority: index,
+      reason: `Previously ${rule.decision === "allow" ? "approved" : "denied"} (${rule.scope} rule by ${rule.createdBy})`,
+    }));
+}
 
 // ============================================================================
 // Initialize
@@ -593,8 +634,14 @@ async function streamResponse(
 
           for (const approval of rawPending) {
             try {
-              // Wire: quick permission check via racing module (fast-path before risk kernel)
-              const quickResult = quickPermissionCheck([], approval.toolName, (approval as any).args);
+              // Fast-path before the risk kernel: the engine's live approval
+              // rules short-circuit the dialog for previously-approved/denied
+              // tools. Scope filtering is per-approval, hence inside the loop.
+              const quickResult = quickPermissionCheck(
+                approvalRulesToQuickCheckRules(runtime.listApprovalRules(), approval.permissionScope),
+                approval.toolName,
+                (approval as any).args,
+              );
               if (quickResult?.decision === "allow") {
                 runtime.approvePendingRequest(approval.id, { persist: false, actor: "permission-rule" });
                 riskMessages.push({

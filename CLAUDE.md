@@ -138,7 +138,7 @@ Defaults-on (previously flagged, now part of the architecture): result-cache del
 
 **LLM provider resilience:** `src/infra/ai/llm/providerCaching.ts` (Anthropic prompt-cache breakpoints) and `providerFailover.ts` (`executeWithFailover`) compose with the settings-layer priority chain — env keys → `settings.json` provider order → per-call overrides.
 
-Deleted features (modules removed; config migration may still strip stale fields): tool deferral, evidence bundle, context-anxiety detector, cold-start audit, quality document, recitation checkpoint, initializer agent, harness evolution, claude-md linter, tool-design linter, agent-list attachment, permission bubble.
+Deleted features (modules removed; config migration may still strip stale fields): tool deferral, evidence bundle, context-anxiety detector, cold-start audit, quality document, recitation checkpoint, initializer agent, harness evolution, claude-md linter, tool-design linter, agent-list attachment, permission bubble, query harness (unified agent loop wrapper — superseded by agents/harness modules).
 
 ACE memory bullets (`reflectOnMessages` / `curateMemoryBullets` in `summarizer.ts`) are **not** deleted — they power `/reflect` when `GORDON_ACE_ENABLED=true`.
 

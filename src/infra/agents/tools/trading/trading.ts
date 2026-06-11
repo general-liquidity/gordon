@@ -1153,6 +1153,7 @@ export const closeTradeTool = createTool({
       return validateToolOutput(closeTradeOutputSchema, { success: false, error: `Trade not found: ${tradeId}` }, { toolName: "close_trade" });
     }
 
+    // Deliberately no kill-switch check: kill switches gate NEW exposure, not exits — closing a position reduces risk.
     const result = await closeTrade(ctx.exchange, trade, reason ?? "MANUAL");
 
     if (result.success && trade.planId) {

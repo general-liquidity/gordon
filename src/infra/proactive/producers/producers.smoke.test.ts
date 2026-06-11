@@ -21,6 +21,8 @@ import { volatilitySpikeProducer } from "./signals/volatilitySpikeProducer.ts";
 import { fundingAlertProducer } from "./signals/fundingAlertProducer.ts";
 import { newsEventProducer } from "./events/newsEventProducer.ts";
 import { stockNewsEventProducer } from "./events/stockNewsEventProducer.ts";
+import { whaleAlertProducer } from "./events/whaleAlertProducer.ts";
+import { playbookSuggestProducer } from "./signals/playbookSuggestProducer.ts";
 import {
   earningsApproachingProducer,
   insiderFlowProducer,
@@ -191,6 +193,8 @@ describe("proactive producers — smoke coverage", () => {
       { name: "insiderFlow", fn: insiderFlowProducer },
       { name: "analystUpgrade", fn: analystUpgradeProducer },
       { name: "congressionalTrade", fn: congressionalTradeProducer },
+      { name: "whaleAlert", fn: whaleAlertProducer },
+      { name: "playbookSuggest", fn: playbookSuggestProducer },
     ];
 
     for (const { name, fn } of asyncProducers) {

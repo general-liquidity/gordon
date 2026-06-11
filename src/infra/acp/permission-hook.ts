@@ -27,7 +27,11 @@
 
 import type { AgentSideConnection } from "@agentclientprotocol/sdk";
 import type { PermissionEngine } from "../../runtime/permissions/PermissionEngine.ts";
-import { isSafetyCritical, getDefaultTrustTrajectory } from "../../runtime/permissions/trustTrajectory.ts";
+import {
+  isSafetyCritical,
+  getDefaultTrustTrajectory,
+  evaluateTrustEligibility,
+} from "../../runtime/permissions/trustTrajectory.ts";
 import { requestAcpPermission } from "./permission-bridge.ts";
 import { createModuleLogger } from "../logger/index.ts";
 
@@ -65,12 +69,14 @@ export function installAcpPermissionHook(
       return { decision: "abstain" };
     }
 
-    const score = trajectory.scoreFor(toolName, permissionScope);
-    if (score.eligible && policy.approvalClass !== "always_require_human") {
+    const trust = evaluateTrustEligibility(trajectory, toolName, permissionScope, {
+      approvalClass: policy.approvalClass,
+    });
+    if (trust.eligible) {
       return {
         decision: "allow",
         actor: "classifier:trust-trajectory",
-        reason: `${score.approvals} prior scoped ACP approvals (score ${score.score.toFixed(2)})`,
+        reason: `${trust.score.approvals} prior scoped ACP approvals (score ${trust.score.score.toFixed(2)})`,
       };
     }
 

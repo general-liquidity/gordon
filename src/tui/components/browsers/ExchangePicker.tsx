@@ -38,13 +38,13 @@ const LIVE_EXCHANGES = [
   { label: "Robinhood Crypto", value: "ccxt:robinhood" },
 ];
 
+// Entries must stay in sync with EXCHANGE_SANDBOX_SUPPORT (sandboxSupport.ts) —
+// the factory's assertSandboxSupported throws on venues declared unsupported.
 const SANDBOX_EXCHANGES = [
   { label: "Binance Testnet  (testnet.binance.vision)", value: "ccxt:binance", sandboxId: "binance-testnet" },
-  { label: "Coinbase Sandbox  (cdp.coinbase.com sandbox)", value: "ccxt:coinbase", sandboxId: "coinbase-sandbox" },
   { label: "OKX Demo  (simulated trading, x-simulated-trading: 1)", value: "ccxt:okx", sandboxId: "okx-demo" },
   { label: "Gemini Sandbox  (exchange.sandbox.gemini.com)", value: "ccxt:gemini", sandboxId: "gemini-sandbox" },
   { label: "Hyperliquid Testnet  (testnet.hyperliquid.xyz)", value: "ccxt:hyperliquid", sandboxId: "hyperliquid-testnet" },
-  { label: "Kraken Demo  (demo.kraken.com)", value: "ccxt:kraken", sandboxId: "kraken-demo" },
 ];
 
 const WALLET_BASED = new Set(["ccxt:hyperliquid"]);

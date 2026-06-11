@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach } from "bun:test";
+import { describe, expect, it, beforeEach, afterEach } from "bun:test";
 import {
   installProductionGuards,
   PRODUCTION_FLAG_ENV,
@@ -13,13 +13,18 @@ import {
 } from "./networkAllowlist.ts";
 
 describe("installProductionGuards", () => {
-  beforeEach(() => {
+  const clearGuardEnv = () => {
     delete process.env[PRODUCTION_FLAG_ENV];
     delete process.env[NETWORK_ALLOWLIST_FLAG_ENV];
     delete process.env[NETWORK_ALLOWLIST_MODE_ENV];
     delete process.env[FILESYSTEM_WRITE_GUARD_FLAG_ENV];
     delete process.env[FILESYSTEM_WRITE_GUARD_MODE_ENV];
-  });
+  };
+
+  beforeEach(clearGuardEnv);
+  // The guards read mode env vars per-call; leaking block-mode flags here
+  // fails unrelated later test files that write outside the allowlist.
+  afterEach(clearGuardEnv);
 
   it("sets block-mode defaults when GORDON_PRODUCTION=1", () => {
     process.env[PRODUCTION_FLAG_ENV] = "1";

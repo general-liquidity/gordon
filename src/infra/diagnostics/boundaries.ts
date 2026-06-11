@@ -92,11 +92,6 @@ export const GORDON_DEFAULT_RULES: readonly BoundaryRule[] = [
     forbidden: ["src/app/setup", "src/runtime/permissions", "src/infra/exchange", "src/infra/broker"],
     why: "tui/ renders state — must not reach into runtime/permission or broker wiring directly",
   },
-  {
-    from: "src/indicators",
-    forbidden: ["src/infra", "src/app", "src/tui", "src/runtime"],
-    why: "indicators/ is pure math — no infra/UI/runtime deps",
-  },
 ] as const;
 
 function shouldSkipDir(name: string, skipDirs: string[]): boolean {

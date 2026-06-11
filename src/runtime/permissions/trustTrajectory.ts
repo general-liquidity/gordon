@@ -271,7 +271,12 @@ export class TrustTrajectory {
 // their own.
 let defaultInstance: TrustTrajectory | undefined;
 export function getDefaultTrustTrajectory(): TrustTrajectory {
-  if (!defaultInstance) defaultInstance = new TrustTrajectory();
+  if (!defaultInstance) {
+    // GORDON_TRUST_LEDGER_PATH lets the eval sandbox redirect default-instance
+    // trust persistence to its isolated ledger (see evals/harness/live/sandbox.ts).
+    const persistPath = process.env.GORDON_TRUST_LEDGER_PATH;
+    defaultInstance = new TrustTrajectory(persistPath ? { persistPath } : {});
+  }
   return defaultInstance;
 }
 
@@ -282,6 +287,42 @@ export function _resetDefaultTrustTrajectoryForTests(): void {
 // ============================================================================
 // PermissionEngine integration
 // ============================================================================
+
+export interface TrustEligibility {
+  score: TrustScore;
+  eligible: boolean;
+  reason: string;
+}
+
+/**
+ * Single source of truth for "would trust auto-approve this call right
+ * now?" — used by both `buildTrustTrajectoryHook` and the ACP
+ * permission hook so the eligibility semantics can never drift apart.
+ *
+ * Safety-critical tools are handled inside `scoreFor` (always
+ * ineligible). The `approvalClass` check is belt-and-braces: even if
+ * the score is eligible, refuse to auto-approve when the policy itself
+ * flags human-required.
+ */
+export function evaluateTrustEligibility(
+  trajectory: TrustTrajectory,
+  toolName: string,
+  permissionScope?: string,
+  options: { approvalClass?: string; now?: number } = {},
+): TrustEligibility {
+  const score = trajectory.scoreFor(toolName, permissionScope, options.now ?? Date.now());
+  if (!score.eligible) {
+    return { score, eligible: false, reason: score.reason };
+  }
+  if (options.approvalClass === "always_require_human") {
+    return {
+      score,
+      eligible: false,
+      reason: "Policy requires human approval — trust auto-approval skipped",
+    };
+  }
+  return { score, eligible: true, reason: score.reason };
+}
 
 /**
  * Build a permission hook that auto-approves tools the user has
@@ -303,20 +344,16 @@ export function buildTrustTrajectoryHook(
   const now = options.now ?? Date.now;
   return (input) => {
     const permissionScope = input.permissionScope ?? input.policy.tool?.permissionScope;
-    const score = trajectory.scoreFor(input.toolName, permissionScope, now());
-    if (!score.eligible) return { decision: "abstain" };
-
-    // Belt-and-braces: even if scoreFor missed the safety-critical
-    // pattern, refuse to auto-approve when the policy itself flags
-    // human-required.
-    if (input.policy.approvalClass === "always_require_human") {
-      return { decision: "abstain" };
-    }
+    const trust = evaluateTrustEligibility(trajectory, input.toolName, permissionScope, {
+      approvalClass: input.policy.approvalClass,
+      now: now(),
+    });
+    if (!trust.eligible) return { decision: "abstain" };
 
     return {
       decision: "allow",
       actor: "classifier:trust-trajectory",
-      reason: `${score.approvals} prior approvals (score ${score.score.toFixed(2)})`,
+      reason: `${trust.score.approvals} prior approvals (score ${trust.score.score.toFixed(2)})`,
     };
   };
 }

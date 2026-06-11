@@ -1236,6 +1236,9 @@ export async function cancelTrade(
  * @param trade - The trade to close
  * @param reason - Reason for closing (MANUAL, STOP, TP1, TP2, TP3)
  * @returns CloseResult with success status and PnL
+ *
+ * Deliberately skips kill-switch checks: kill switches gate NEW exposure,
+ * not exits — closing a position reduces risk, by design.
  */
 export async function closeTrade(
   client: Exchange,

@@ -16,7 +16,7 @@ export {
   mcpUpdate,
   mcpInfo,
   type MCPCommandResult,
-} from './mcp';
+} from './mcp.ts';
 
 // Routing Management Commands
 export {
@@ -26,7 +26,7 @@ export {
   routingUninstall,
   routingRoute,
   type RoutingCommandResult,
-} from './routing';
+} from './routing.ts';
 
 // Config Commands
 export {
@@ -35,7 +35,7 @@ export {
   configSet,
   configReset,
   type ConfigCommandResult,
-} from './config';
+} from './config.ts';
 
 // Exchange Management Commands
 export {
@@ -47,7 +47,7 @@ export {
   exchangeStatus,
   exchangeCompare,
   type ExchangeCommandResult,
-} from './exchange';
+} from './exchange.ts';
 
 // Broker Management Commands
 export {
@@ -58,12 +58,12 @@ export {
   brokerRemove,
   brokerStatus,
   type BrokerCommandResult,
-} from './broker';
+} from './broker.ts';
 
 // Stocks Commands
 export {
   handleStocksCommand,
-} from './stocks';
+} from './stocks.ts';
 
 // Strategy Management Commands
 export {
@@ -75,7 +75,7 @@ export {
   strategyBacktest,
   strategyCompare,
   type StrategyCommandResult,
-} from './strategy';
+} from './strategy.ts';
 
 // Workflow Commands
 export {
@@ -85,13 +85,13 @@ export {
   type WorkflowContext,
   type WorkflowResult,
   type WorkflowStep,
-} from './workflow';
+} from './workflow.ts';
 
 // Export Commands
 export {
   handleExportCommand,
   type ExportCommandResult,
-} from './export';
+} from './export.ts';
 
 // Keyring Commands
 export {
@@ -102,7 +102,7 @@ export {
   keyringStore,
   keyringClear,
   type KeyringCommandResult,
-} from './keyring';
+} from './keyring.ts';
 
 // OAuth Commands
 export {
@@ -113,13 +113,13 @@ export {
   oauthPasteToken,
   oauthRemove,
   type OAuthCommandResult,
-} from './oauth';
+} from './oauth.ts';
 
 // Telemetry Commands
 export {
   handleTelemetryCommand,
   type TelemetryCommandResult,
-} from './telemetry';
+} from './telemetry.ts';
 
 // Kill-switch commands
 export {
@@ -131,10 +131,10 @@ export {
 export {
   handleContextCommand,
   type ContextCommandResult,
-} from './context';
+} from './context.ts';
 
 // Cache audit diagnostic command
 export {
   handleCacheAuditCommand,
   type CacheAuditCommandResult,
-} from './cacheAudit';
+} from './cacheAudit.ts';
