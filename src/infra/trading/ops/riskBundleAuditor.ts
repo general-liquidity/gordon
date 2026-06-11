@@ -14,8 +14,9 @@
  * + correlation when everyone needed to descend at once + gap risk
  * from the storm). The bundle determines whether you get out.
  *
- * Distinct from `riskClassifier.ts` (11-dimension quantitative scoring
- * → auto_approve/prompt/require_confirmation/block) — that's a safety
+ * Distinct from `riskClassifier.ts` (15-dimension quantitative scoring —
+ * 8 base + 7 optional hedge-fund-grade dimensions when inputs exist →
+ * auto_approve/prompt/require_confirmation/block) — that's a safety
  * gate. This is a *categorical* pre-trade audit forcing the operator
  * to confront every risk type and unbundle the ones they aren't paid
  * for. Pre-trade verdict gates the trade when any required category is

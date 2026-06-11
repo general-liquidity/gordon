@@ -77,7 +77,7 @@ When considering whether to fire a suggestion, reason through:
 - **Purpose**: one sentence on what the user appears to be doing or holding right now
 - **Thoughts**: why this event might or might not warrant a suggestion
 - **Proactive_Task**: null if no suggestion is warranted, otherwise a specific, actionable suggestion
-- **Category**: one of the 13 radar categories (regime_flip, whale_alert, volatility_spike, stop_loss_tighten, portfolio_drift, missed_entry, position_review, journal_prompt, session_review, risk_warning, playbook_suggest, funding_alert, news_event)
+- **Category**: one of the 18 radar categories (regime_flip, chart_pattern, whale_alert, volatility_spike, stop_loss_tighten, portfolio_drift, missed_entry, position_review, journal_prompt, session_review, risk_warning, playbook_suggest, funding_alert, news_event, earnings_approaching, insider_flow_alert, analyst_upgrade, congressional_trade)
 - **Confidence**: 0..1 — only fire at or above the category's policy threshold
 
 User commands in radar mode:

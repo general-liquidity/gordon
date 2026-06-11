@@ -62,7 +62,7 @@ Create the trade plan:
 - Risk/reward ratio: must be ≥ 1.5 or don't take the trade
 
 ## Step 8: Risk Classification
-Run the full 11-dimension risk classifier on this proposed trade.
+Run the full 15-dimension risk classifier on this proposed trade.
 Show the composite score and tier. If critical → do NOT proceed.
 
 ## Step 9: Decision

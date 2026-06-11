@@ -46,7 +46,7 @@ Determine the parameters:
 - Recommended: 30s for CEX, 2min for DEX
 
 ## Step 3: Risk Checks
-- Run the 11-dimension risk classifier on the proposed strategy
+- Run the 15-dimension risk classifier on the proposed strategy
 - Check correlation with existing positions
 - Verify trading constitution limits (max trades/hour, max position size)
 - Set a kill switch: if P&L drops below -1% of allocated capital, stop the strategy

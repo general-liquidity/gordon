@@ -22,8 +22,8 @@ Executor verifies:
 
 ### Step 3: Risk Classification (MANDATORY)
 Executor calls `classify_trade_risk` with the proposed trade:
-- 11 dimensions scored (position size, concentration, drawdown, etc.)
-- If data available: vol-percentile sizing, correlation check, tail risk
+- Up to 15 dimensions scored (8 base: position size, concentration, drawdown, daily loss budget, frequency, volatility, market hours, asset familiarity)
+- When data available, 7 optional: vol-adjusted sizing, correlation, venue MEV, regime transition, fake liquidity, margin of error, tail risk
 - Returns a tier: low / medium / high / critical
 
 **Critical tier → REFUSED. Executor will NOT proceed. Tells you why and suggests alternatives.**

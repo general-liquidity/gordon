@@ -1,6 +1,6 @@
 # Risk Check
 
-Run a risk assessment on the user's current portfolio or a proposed trade idea. Grounds every decision against the trading constitution's 11-dimension risk classifier.
+Run a risk assessment on the user's current portfolio or a proposed trade idea. Grounds every decision against the trading constitution's 15-dimension risk classifier (8 base + 7 optional).
 
 ## When to use
 
@@ -12,14 +12,14 @@ Run a risk assessment on the user's current portfolio or a proposed trade idea. 
 ## The flow
 
 1. **Gather context** — current positions via `get_portfolio`, recent trades via `get_trade_history`, session P&L
-2. **Classify the trade or portfolio** — call `classify_trade_risk` (11 dimensions: concentration, correlation, drawdown sensitivity, liquidity, tail risk, leverage, cascade risk, regime fit, time-of-day, news risk, technical fit)
+2. **Classify the trade or portfolio** — call `classify_trade_risk` (15 dimensions: 8 base — position size, concentration, drawdown proximity, daily loss budget, trade frequency, volatility, market hours, asset familiarity; 7 optional when data supplied — vol-adjusted sizing, correlation risk, venue MEV exposure, regime transition risk, fake liquidity, margin of error, tail risk)
 3. **Check hard limits** — per the constitution: daily loss cap, max drawdown, max open positions, max position size
 4. **Check soft warnings** — circuit breakers approaching, consecutive losses, correlation clusters
 5. **Return a verdict** — PASS / WARN / BLOCK with specific dimensions that failed
 
 ## Tools used
 
-- `classify_trade_risk` — 11-dimension risk classifier
+- `classify_trade_risk` — 15-dimension pre-trade risk classifier
 - `check_risk` — enforce constitution rules
 - `check_daily_limit`
 - `check_positions`

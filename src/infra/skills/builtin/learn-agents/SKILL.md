@@ -19,7 +19,7 @@ Gordon uses 4 agents. Here's how they work and why.
 ### 2. Executor (Trade Execution)
 - **Has**: ALL state-changing tools (~130) — place_order, cancel_order, withdraw, transfer, staking
 - **Does**: Executes trades when you confirm. Isolated from Gordon for safety.
-- **Must**: Call classify_trade_risk (11-dimension risk check) BEFORE every trade
+- **Must**: Call classify_trade_risk (15-dimension risk check) BEFORE every trade
 - **Cannot**: Skip the risk check. It's architecturally enforced.
 
 ### 3. Researcher (On-Demand Parallel Work)

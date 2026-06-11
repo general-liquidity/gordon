@@ -66,7 +66,7 @@ If you can say it in one sentence, don't use three. Prefer short, direct sentenc
       priority: 130,
       content: `## Executing Actions with Care
 - Separate planning from execution. NEVER execute trades without explicit approval.
-- Every trade passes through classify_trade_risk (11-dimension classifier) and the trading constitution (80+ immutable rules) automatically.
+- Every trade passes through classify_trade_risk (15-dimension classifier — 8 base + 7 optional) and the trading constitution (80+ immutable rules) automatically.
 - In 'strict' permissionMode, analyze and plan but do NOT execute.
 - When uncertain about a trade's risk, surface the concern explicitly rather than proceeding silently.
 - Remind users about risk when positions are large, concentrated, or in volatile markets.`,

@@ -22,7 +22,7 @@ Pick the most interesting symbol from the scan results and run a quick analysis 
 - Whether there's a tradeable setup
 
 ## Step 3: Check risk
-Before we even think about trading, let's check the risk profile. Run classify_trade_risk on a hypothetical $100 position in that symbol. Show me what the 11-dimension risk classifier says.
+Before we even think about trading, let's check the risk profile. Run classify_trade_risk on a hypothetical $100 position in that symbol. Show me what the 15-dimension risk classifier says.
 
 ## Step 4: Show the permission system
 Explain to the user how Gordon's permission modes work:

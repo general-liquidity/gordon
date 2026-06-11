@@ -46,8 +46,9 @@ Gordon has many quantitative modules. Here's what the main ones do and when to u
 - Skewness, kurtosis, max drawdown, VaR, convexity score
 - Classification: antifragile / robust / fragile / highly fragile
 
-### Risk Classifier (11 dimensions)
-- Position size, concentration, drawdown, daily loss, frequency, volatility, market hours, familiarity, vol-percentile, correlation, tail risk
+### Risk Classifier (15 dimensions — 8 base + 7 optional)
+- Base: position size, concentration, drawdown proximity, daily loss budget, trade frequency, volatility, market hours, asset familiarity
+- Optional when data supplied: vol-adjusted sizing, correlation risk, venue MEV exposure, regime transition risk, fake liquidity, margin of error, tail risk
 - Mandatory before EVERY trade via Executor
 
 ## Position Sizing (How much?)

@@ -1,6 +1,6 @@
 # Radar (Proactive Mode)
 
-Proactive suggestion mode — Gordon watches market events, portfolio state, regime detector, CDP webhooks, and periodic ticks, and surfaces unsolicited suggestions when conditions warrant. Default posture is silence; only propose when confident the suggestion is worth interrupting the user.
+Proactive suggestion mode — Gordon watches market events, portfolio state, the regime detector, RSS/news headlines, and periodic ticks, and surfaces unsolicited suggestions when conditions warrant. Default posture is silence; only propose when confident the suggestion is worth interrupting the user.
 
 ## When to use
 
@@ -13,7 +13,7 @@ Proactive suggestion mode — Gordon watches market events, portfolio state, reg
 
 When radar is active and a producer fires a candidate:
 1. **Observation lands** — event bus emits trade:closed, scan:opportunity, risk:rejected, regime tick, etc.
-2. **Producer generates candidate** — 9 producers match observations to categories (regime_flip, whale_alert, volatility_spike, stop_loss_tighten, portfolio_drift, missed_entry, position_review, journal_prompt, session_review, risk_warning, playbook_suggest, funding_alert, news_event, earnings_approaching, insider_flow_alert, analyst_upgrade, congressional_trade)
+2. **Producer generates candidate** — 20 registered producers match observations to categories (regime_flip, chart_pattern, whale_alert, volatility_spike, stop_loss_tighten, portfolio_drift, missed_entry, position_review, journal_prompt, session_review, risk_warning, playbook_suggest, funding_alert, news_event, earnings_approaching, insider_flow_alert, analyst_upgrade, congressional_trade)
 3. **Judge evaluates** — heuristic (default) or LLM judge checks policy, cooldowns, duplicates, relevance, confidence threshold
 4. **Fire or drop** — passing candidates land in the store, event bus emits proactive:suggestion_fired, TUI chat shows the card
 5. **User responds** — /ack (Correct-Detection), /pass (False-Alarm), /snooze <category> [minutes]
@@ -34,15 +34,16 @@ When radar is active and a producer fires a candidate:
 
 Crypto-focused:
 - `regime_flip` — BTC/ETH/SOL regime transition detected
-- `whale_alert` — verified CDP webhook large transfer
+- `chart_pattern` — geometric chart pattern (LMW) completed on a watched symbol
+- `whale_alert` — RSS headline keywords for whale-scale flows (large transfers, accumulation, dormant-wallet moves) on monitored symbols
 - `volatility_spike` — ATR expansion > 1.5x baseline
 - `stop_loss_tighten` — price approaching stop < 2%
 - `portfolio_drift` — single position > 40% or top-2 > 70% of portfolio
 - `missed_entry` — scanner found high-confidence setup (> 0.70)
 - `position_review` — long-held position flagged for review
-- `funding_alert` — Hyperliquid funding > |20%| annualized
+- `funding_alert` — perp funding rate anomaly
 
-Stock-focused (new):
+Stock-focused:
 - `earnings_approaching` — upcoming earnings within N days
 - `insider_flow_alert` — cluster of insider transactions
 - `analyst_upgrade` — consensus rating shift toward bullish
@@ -53,7 +54,7 @@ General:
 - `session_review` — end of day / end of week
 - `risk_warning` — risk_rejected event or mandate breached
 - `playbook_suggest` — new regime-matched playbook available
-- `news_event` — significant news on held positions
+- `news_event` — significant news on held positions (crypto RSS or stock RSS/EDGAR via stockNewsEvent producer)
 
 ## Category policy
 

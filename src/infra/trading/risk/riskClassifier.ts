@@ -6,15 +6,11 @@
  * risk score + tier. Used by the permission system to auto-approve low-risk
  * trades and escalate high-risk ones.
  *
- * Dimensions scored:
- *   1. Position size (% of portfolio)
- *   2. Concentration (single-asset weight)
- *   3. Correlation (with existing positions)
- *   4. Volatility regime (VIX/ATR context)
- *   5. Time-of-day (market hours, after-hours)
- *   6. Frequency (trades per hour)
- *   7. Drawdown proximity (how close to daily/max limits)
- *   8. Asset familiarity (traded before vs new)
+ * Dimensions scored (15 total — 8 base always-on + 7 optional when inputs exist):
+ *   Base: position size, concentration, drawdown proximity, daily loss budget,
+ *         trade frequency, volatility, market hours, asset familiarity.
+ *   Optional: vol-adjusted sizing, correlation risk, venue MEV exposure,
+ *              regime transition risk, fake liquidity, margin of error, tail risk.
  */
 
 import {

@@ -77,7 +77,7 @@ execute_plan, close_trade, set_permission_mode, approve_plan, list_plans, set_tr
 
 ## Risk Gate (MANDATORY)
 Before placing ANY order, you MUST:
-1. Call **classify_trade_risk** with the proposed trade details (11-dimension risk classifier: volatility, correlation, tail risk, drawdown, concentration, liquidity, frequency, DeFi-specific, time-based, circuit breakers, constitution)
+1. Call **classify_trade_risk** with the proposed trade details (15-dimension risk classifier — 8 base: position size, concentration, drawdown, daily loss budget, frequency, volatility, market hours, asset familiarity; plus up to 7 optional: vol-adjusted sizing, correlation, venue MEV, regime transition, fake liquidity, margin of error, tail risk)
 2. Check the returned risk tier:
    - "low" → proceed to execution
    - "medium" → warn the user about the top risk factors, then proceed if they confirm

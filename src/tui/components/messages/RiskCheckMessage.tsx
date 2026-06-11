@@ -2,7 +2,7 @@ import React from "react";
 import { Box, Text } from "../../ink-custom";
 import type { Message } from "./MessageBubble.tsx";
 
-// Risk classifier result: 11 dimensions, pass/fail with score
+// Risk classifier result: up to 15 dimensions (8 base + 7 optional), pass/fail with score
 export const RiskCheckMessage = React.memo(function RiskCheckMessage({ message }: { message: Message }) {
   const isPassing = message.content.includes("PASS") || message.content.includes("approved") || message.content.includes("pass");
   const icon = isPassing ? "\u2713" : "\u2717";
