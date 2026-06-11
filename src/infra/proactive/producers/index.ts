@@ -17,6 +17,10 @@ import { producerHealthAlertProducer, resetProducerHealthAlertProducerState } fr
 import { killSwitchAlertProducer, resetKillSwitchAlertProducerState } from "./risk/killSwitchAlertProducer.ts";
 import { periodicProducer, resetPeriodicProducerState } from "./periodicProducer.ts";
 import { portfolioDriftProducer } from "./risk/portfolioDriftProducer.ts";
+import {
+  positionReviewProducer,
+  resetPositionReviewProducerState,
+} from "./risk/positionReviewProducer.ts";
 import { regimeFlipProducer, resetRegimeFlipProducerState } from "./signals/regimeFlipProducer.ts";
 import { chartPatternProducer, resetChartPatternProducerState } from "./signals/chartPatternProducer.ts";
 import { volatilitySpikeProducer, resetVolatilitySpikeProducerState } from "./signals/volatilitySpikeProducer.ts";
@@ -45,6 +49,7 @@ export {
   killSwitchAlertProducer,
   periodicProducer,
   portfolioDriftProducer,
+  positionReviewProducer,
   regimeFlipProducer,
   chartPatternProducer,
   volatilitySpikeProducer,
@@ -131,6 +136,7 @@ export function registerAllProducers(engine: ProactiveEngine): () => void {
     engine.registerProducer(withHealthTracking("killSwitchAlert", killSwitchAlertProducer)),
     engine.registerProducer(withHealthTracking("periodic", periodicProducer)),
     engine.registerProducer(withHealthTracking("portfolioDrift", portfolioDriftProducer)),
+    engine.registerProducer(withHealthTracking("positionReview", positionReviewProducer)),
     engine.registerProducer(withHealthTracking("regimeFlip", regimeFlipProducer)),
     engine.registerProducer(withHealthTracking("chartPattern", chartPatternProducer)),
     engine.registerProducer(withHealthTracking("volatilitySpike", volatilitySpikeProducer)),
@@ -150,6 +156,7 @@ export function registerAllProducers(engine: ProactiveEngine): () => void {
     resetTradeEventProducerState();
     resetProducerHealthAlertProducerState();
     resetKillSwitchAlertProducerState();
+    resetPositionReviewProducerState();
     resetPeriodicProducerState();
     resetRegimeFlipProducerState();
     resetChartPatternProducerState();

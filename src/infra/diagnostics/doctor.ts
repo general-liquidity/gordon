@@ -811,7 +811,7 @@ function checkSupplyChainIocs(
  * before the next high-stakes critique misses regressions.
  */
 function checkCritiquePhaseRouting(
-  critiquePhasePath: string = resolve(process.cwd(), "src", "infra", "agents", "critiquePhase.ts"),
+  critiquePhasePath: string = resolve(process.cwd(), "src", "infra", "agents", "cognition", "critiquePhase.ts"),
 ): DiagnosticCheck {
   if (!existsSync(critiquePhasePath)) {
     return {

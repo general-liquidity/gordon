@@ -31,7 +31,7 @@ Counts from `src/` (production code, test files excluded unless noted):
 | **TraderMorin port** | confluenceScorer (A*/A/B/C tier), executionPlaybook (scaled clips + ATR offsets), decisionLog lifecycle stages |
 | **Anti-rot** | thesisCoherence, tradingUniverse, traderBehaviorPatterns, strategyMandates |
 | **Quant primitives** | cointegration, grangerCausality, hurstExponent (separate from ops), kalmanFilter, marketEfficiency, markovRegime, reflexivity, scenarioValuation |
-| **Risk surfaces** | correlationLimits, drawdownOverlay, riskClassifier (11 dimensions), tailRisk, volatilityPositionSizing |
+| **Risk surfaces** | correlationLimits, drawdownOverlay, riskClassifier (15 dimensions — 8 base + 7 optional), tailRisk, volatilityPositionSizing |
 | **Portfolio** | autoOptimizer, autoRebalance, blackLitterman, metaWeighting, optimizerEnhancements, portfolioDiff |
 | **Signals** | marketContext, orderflowDelta, syntheticFutures |
 | **Regime** | classifier, detector, indicators, watcher, types |
@@ -44,9 +44,9 @@ Counts from `src/` (production code, test files excluded unless noted):
 
 | Sub-area | Modules |
 |---|---|
-| **Runtime harness** | contextAnxietyDetector, lifecycleHooks, recitationCheckpoint, runtimeHarness (doom-loop detection w/ MD5 fingerprinting + sliding window), runtimeRecovery (tiered: Notify → Redirect → ForceStop), subagentCoordination, subagentProfiles |
+| **Runtime harness** | lifecycleHooks, runtimeHarness (doom-loop detection w/ MD5 fingerprinting + sliding window), runtimeRecovery (tiered: Notify → Redirect → ForceStop), subagentCoordination, subagentProfiles |
 | **Cognition** | adversarialEvaluator (hostile critic), citationAgent (evidence trail), critiquePhase (HIGH thinking pass), effortCalibration (match effort to complexity), evaluatorCalibration (anti-drift), extendedThinking (Anthropic budget_tokens), reflection, thinkingPhase (tool-free pre-pass), transcriptValidator, workflowPhase |
-| **Tool plumbing** | instrumentedTools (single registration point — wraps every tool with metrics + spill), toolDeferral (hide tools from schema until activated; ~50% schema-token savings), toolErrorNormalizer, toolResultCache (delta envelope on hit), toolTimeouts |
+| **Tool plumbing** | instrumentedTools (single registration point — wraps every tool with metrics + spill), toolResultCache (delta envelope on hit) |
 | **Tool output filters** | getCandles, getOrderbook, scanMarket — semantic compression of noisy market-data tool outputs |
 | **Lifecycle hooks** | engine (PreToolUse, PostToolUse, UserPromptSubmit, SessionEnd, PreOrderPlacement, etc), externalHookRunner (shell scripts at lifecycle points) |
 | **Middleware** | access-control, guardrails |
@@ -60,7 +60,7 @@ Counts from `src/` (production code, test files excluded unless noted):
 
 | Sub-area | Modules |
 |---|---|
-| **Permissions** | PermissionEngine (deny-first; exposes registerHook / prependHook), trustTrajectory (adaptive auto-approval with safety-critical deny-list), permissionBubble (fork-originated tag) |
+| **Permissions** | PermissionEngine (deny-first; exposes registerHook / prependHook), trustTrajectory (adaptive auto-approval with safety-critical deny-list) |
 | **Safety primitives** | absorbingBarrier (three-barrier model: broker / prop-firm trailing / psychological), assetClassInference, cleanStateGate, filesystemWriteGuard, networkAllowlist, planRubric, safetyConfigGuard, sprintContract, sprintContractNegotiation, wipLimit |
 | **Anti-trap defense** | anti-trap/ (record_user_thesis, record_supervision_outcome, set_trading_universe, set_running_thesis, set_strategy_mandate) |
 | **Trading-specific gates** | terminationLayers (3-layer: pre-trade / runtime ack / post-fill reconciliation), riskBundleAuditor (8-category Yes/No/Neutral audit), strategyCodeValidator, tradingFeatureList (edit-only-passes enforcement) |
@@ -115,11 +115,7 @@ Counts from `src/` (production code, test files excluded unless noted):
 | `doctor.ts` | Surfaces all wired safety/diagnostics primitives in one snapshot |
 | `agentReadiness.ts` | Session-start gate: are tools, memory, permissions, hooks all green? |
 | `boundaries.ts` | Architectural boundary check (CI hook) |
-| `claudeMdLinter.ts` | Static analysis on agent-instruction markdown |
-| `coldStartAudit.ts` | Audit at first-run setup |
 | `initProbe.ts` | E2E boot probe exercising Gordon's runtime |
-| `qualityDocument.ts` | Per-feature quality status doc |
-| `toolDesignLinter.ts` | Static analysis on the tool registry (well-named, well-typed, well-described) |
 
 ### Layer 8 — Backtest credibility (filter the lies before they become strategies)
 
@@ -156,8 +152,8 @@ Pear is explicit about three pillars. Gordon has them all:
 
 | Pear's pillar | Gordon's implementation |
 |---|---|
-| **Identity & authorization frameworks** | PermissionEngine (deny-first), trustTrajectory (adaptive auto-approval with safety-critical deny-list bypass), permissionBubble (fork tagging), per-tool `requiresApproval` flags |
-| **Compliance enforcement** | Anti-rot trio (thesis coherence + universe scope + behavior patterns), terminationLayers (3-layer), riskBundleAuditor (8-category yes/no/neutral), riskClassifier (11-dim), rationale-required safety-critical tools, planRubric, safetyConfigGuard |
+| **Identity & authorization frameworks** | PermissionEngine (deny-first), trustTrajectory (adaptive auto-approval with safety-critical deny-list bypass), per-tool `requiresApproval` flags |
+| **Compliance enforcement** | Anti-rot trio (thesis coherence + universe scope + behavior patterns), terminationLayers (3-layer), riskBundleAuditor (8-category yes/no/neutral), riskClassifier (15-dim — 8 base + 7 optional), rationale-required safety-critical tools, planRubric, safetyConfigGuard |
 | **Audit trails for irreversible actions** | recordStructuredObservation → Axiom for every gate verdict; decisionLog JSONL with lifecycle stages; citationAgent evidence manifests per plan; risk-kernel audit; alertAuditMirror; the rationale field on cancel/execute is logged with `*.rationale_recorded` event type |
 
 ---

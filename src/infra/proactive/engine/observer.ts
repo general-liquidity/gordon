@@ -12,7 +12,8 @@
  *      to all registered producers.
  *   2. Periodic tick loop — a setInterval that emits synthetic observations
  *      every 60 seconds with different eventTypes (tick_session_review,
- *      tick_journal_prompt, tick_whale_alert, tick_playbook_suggest, etc.)
+ *      tick_journal_prompt, tick_position_review, tick_whale_alert,
+ *      tick_playbook_suggest, etc.)
  *      so periodic producers have something to react to.
  *
  * `startProactiveObserver()` is idempotent — calling it twice returns the
@@ -63,6 +64,7 @@ const TICK_INTERVALS = {
   session_review: 60 * 60 * 1000,   // 1 hour — checks time of week
   journal_prompt: 60 * 60 * 1000,   // 1 hour — checks time of day
   portfolio_drift: 30 * 60 * 1000,  // 30 min — position drift check
+  position_review: 4 * 60 * 60 * 1000, // 4 hours — long-held open position review
   regime_flip: 15 * 60 * 1000,      // 15 min — per-symbol regime polling
   chart_pattern: 15 * 60 * 1000,    // 15 min — per-symbol LMW chart-pattern scan
   volatility: 10 * 60 * 1000,       // 10 min — ATR expansion check

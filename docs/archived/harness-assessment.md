@@ -58,7 +58,7 @@ Gordon has approximately **60 trading-domain primitives** drawn from the major t
 
 Of the ~60 trading-domain primitives, ~40 are wired into call sites today. Of those wired, **almost all are shadow-mode** — they log verdicts to the structured-observation stream and the application logger, but their verdicts do not gate behavior.
 
-The hard gating today is done by the older infrastructure: `riskClassifier.ts` (11-dimension scoring), the deny-list of safety-critical tools, the permission engine, and Gordon's daily-loss cap (`GORDON_RISK_DAILY_LOSS_USD`). Everything that came in via the Wright port and the harness-engineering ports is informational.
+The hard gating today is done by the older infrastructure: `riskClassifier.ts` (15-dimension scoring — 8 base + 7 optional), the deny-list of safety-critical tools, the permission engine, and Gordon's daily-loss cap (`GORDON_RISK_DAILY_LOSS_USD`). Everything that came in via the Wright port and the harness-engineering ports is informational.
 
 ---
 

@@ -15,6 +15,7 @@ import {
 } from "./risk/producerHealthAlertProducer.ts";
 import { periodicProducer } from "./periodicProducer.ts";
 import { portfolioDriftProducer } from "./risk/portfolioDriftProducer.ts";
+import { positionReviewProducer } from "./risk/positionReviewProducer.ts";
 import { regimeFlipProducer } from "./signals/regimeFlipProducer.ts";
 import { volatilitySpikeProducer } from "./signals/volatilitySpikeProducer.ts";
 import { fundingAlertProducer } from "./signals/fundingAlertProducer.ts";
@@ -180,6 +181,7 @@ describe("proactive producers — smoke coverage", () => {
   describe("async tick producers — wrong observation guard", () => {
     const asyncProducers: Array<{ name: string; fn: CandidateProducer }> = [
       { name: "portfolioDrift", fn: portfolioDriftProducer },
+      { name: "positionReview", fn: positionReviewProducer },
       { name: "regimeFlip", fn: regimeFlipProducer },
       { name: "volatilitySpike", fn: volatilitySpikeProducer },
       { name: "fundingAlert", fn: fundingAlertProducer },

@@ -6,7 +6,7 @@ Review exit decisions on recent trades — was the exit early, late, or right on
 
 - After closing a position that either left money on the table or went against you
 - Weekly as part of `/weekend-review`
-- Fired by radar's `position_review` category on long-held closes
+- Fired by radar's `position_review` category on positions open 7+ days or after take-profit hits
 - User asks "should I have held longer?" or "did I cut too late?"
 
 ## The flow

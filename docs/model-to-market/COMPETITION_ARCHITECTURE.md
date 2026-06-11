@@ -16,7 +16,7 @@ The format rewards exactly what Gordon is built for: **survive-and-compound, rob
 `gordon` (orchestrator/router) → `executor` (has execution permissions) + `researcher` (does not) + bounded `delegate_subagent`. The split is a **security boundary**, not an efficiency choice: only the executor can touch capital, and every handoff is tracked. Tool surface is a deliberate **22-tool typed surface** (data / analytics / plan-exec / memory / workflow) plus two meta-dispatchers (`compute_indicator`, `compute_microstructure`) exposing ~60 quant ops — *explicit-over-meta on the safety-critical surface*. No code-execution tool by design: an LLM writing arbitrary code dissolves the per-action money-gate.
 
 ### 2. Capital-safety plane (the moat)
-- **11-dimension pre-trade risk classifier** → `auto_approve | prompt_user | require_confirmation | block` (vol-adjusted sizing, tail risk, correlation, venue MEV, …).
+- **15-dimension pre-trade risk classifier** (8 base + 7 optional) → `auto_approve | prompt_user | require_confirmation | block` (vol-adjusted sizing, tail risk, correlation, venue MEV, …).
 - **Deny-first permission engine** with a hard deny-list (`place_order`, `execute_trade`, `cancel_*`, `wallet_transfer`) that bypasses trust scoring.
 - **Trading constitution** + **signed audit log** on every state-changing action (rationale required on `create/approve/execute_plan` and all `cancel_*`).
 - **Idempotent execution** — `clientOrderId` on every slice (TWAP/VWAP/POV/iceberg), so a retried order never double-fills.

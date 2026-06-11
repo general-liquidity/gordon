@@ -14,14 +14,14 @@ It is **not** a coding agent. Most patterns from Claude Code's coding-agent desi
 |---|---|
 | `src/infra/agents/definitions/` | The 3 actual agents — `gordon.ts` (orchestrator/router), `executor.ts`, `researcher.ts` |
 | `src/infra/agents/tools/` | All Mastra tools, organized by domain (market, account, trading, news, …) |
-| `src/infra/agents/instrumentedTools.ts` | Single registration point — wraps every tool with metrics + spill |
+| `src/infra/agents/tooling/instrumentedTools.ts` | Single registration point — wraps every tool with metrics + spill |
 | `src/infra/agents/orchestrator.ts` | Orchestrator entry — stream processing re-exported from `orchestrator/` modules |
 | `src/infra/agents/orchestrator/` | Split orchestrator internals — `streamProcessor.ts`, `HandoffCoordinator.ts`, `toolAgentMap.ts`, `guardrailEvaluator.ts`, … |
 | `src/infra/agents/context/sharedPrefixCache.ts` | Anthropic prompt-cache reuse across sub-agents (see also `context/promptCacheAudit.ts`, `ai/llm/providerCaching.ts`, `runtime/kvCacheHitMetric.ts`) |
-| `src/infra/agents/thinkingPhase.ts` | Tool-free pre-action reasoning pass (separate LLM call) |
-| `src/infra/agents/extendedThinking.ts` | In-band Anthropic native `budget_tokens` helper |
-| `src/infra/agents/critiquePhase.ts` | Critique/refine pass at HIGH thinking depth |
-| `src/infra/agents/runtimeHarness.ts` | Doom-loop detection, tool-result limits, fingerprinting |
+| `src/infra/agents/cognition/thinkingPhase.ts` | Tool-free pre-action reasoning pass (separate LLM call) |
+| `src/infra/agents/cognition/extendedThinking.ts` | In-band Anthropic native `budget_tokens` helper |
+| `src/infra/agents/cognition/critiquePhase.ts` | Critique/refine pass at HIGH thinking depth |
+| `src/infra/agents/harness/runtimeHarness.ts` | Doom-loop detection, tool-result limits, fingerprinting |
 | `src/infra/domain/memory/summarizer.ts` | 5-stage compaction at 70/80/90/94/99% pressure (masking / pruning / aggressive / collapse / full) |
 | `src/infra/domain/memory/contextCollapse.ts` | Collapse-stage implementation — non-destructive read-time projection of stale tool results |
 | `src/infra/hooks/` | Hook engine + lifecycle types (PreToolUse, PreOrderPlacement, …) with `asyncRewake` and `statusMessage` |

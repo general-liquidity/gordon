@@ -13,7 +13,7 @@ Proactive suggestion mode — Gordon watches market events, portfolio state, the
 
 When radar is active and a producer fires a candidate:
 1. **Observation lands** — event bus emits trade:closed, scan:opportunity, risk:rejected, regime tick, etc.
-2. **Producer generates candidate** — 20 registered producers match observations to categories (regime_flip, chart_pattern, whale_alert, volatility_spike, stop_loss_tighten, portfolio_drift, missed_entry, position_review, journal_prompt, session_review, risk_warning, playbook_suggest, funding_alert, news_event, earnings_approaching, insider_flow_alert, analyst_upgrade, congressional_trade)
+2. **Producer generates candidate** — 21 registered producers match observations to categories (regime_flip, chart_pattern, whale_alert, volatility_spike, stop_loss_tighten, portfolio_drift, missed_entry, position_review, journal_prompt, session_review, risk_warning, playbook_suggest, funding_alert, news_event, earnings_approaching, insider_flow_alert, analyst_upgrade, congressional_trade)
 3. **Judge evaluates** — heuristic (default) or LLM judge checks policy, cooldowns, duplicates, relevance, confidence threshold
 4. **Fire or drop** — passing candidates land in the store, event bus emits proactive:suggestion_fired, TUI chat shows the card
 5. **User responds** — /ack (Correct-Detection), /pass (False-Alarm), /snooze <category> [minutes]
@@ -40,7 +40,7 @@ Crypto-focused:
 - `stop_loss_tighten` — price approaching stop < 2%
 - `portfolio_drift` — single position > 40% or top-2 > 70% of portfolio
 - `missed_entry` — scanner found high-confidence setup (> 0.70)
-- `position_review` — long-held position flagged for review
+- `position_review` — position open 7+ days, or take-profit hit (runner management)
 - `funding_alert` — perp funding rate anomaly
 
 Stock-focused:

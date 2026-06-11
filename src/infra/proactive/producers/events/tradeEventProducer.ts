@@ -6,7 +6,8 @@
  * user knows they just filled an order. We debounce to only fire:
  *
  *   - journal_prompt: every 5 closed trades or at end of trading day
- *   - position_review: when a trade has been open for 7+ days
+ *   - position_review: handled by positionReviewProducer (7+ day open scan)
+ *     and stopProducer (take-profit hit)
  *
  * The `trade:opened` event is currently informational only (no candidate
  * fires) — opening a position is already explicit user action. Could be
@@ -53,8 +54,7 @@ export const tradeEventProducer: CandidateProducer = (obs): ProactiveSuggestion[
     }
   }
 
-  // position_review — fired by periodic producer instead (needs position age).
-  // We keep this producer scoped to pure event reactions.
+  // position_review — see positionReviewProducer (tick) + stopProducer (TP hit).
   return candidates;
 };
 
