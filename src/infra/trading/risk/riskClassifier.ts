@@ -197,8 +197,10 @@ export function validateTradeProposal(trade: TradeProposal): string[] {
   if (!Number.isFinite(trade.quantity) || trade.quantity <= 0) {
     errors.push(`quantity must be a finite positive number (got ${trade.quantity})`);
   }
-  if (!Number.isFinite(trade.price) || trade.price < 0) {
-    errors.push(`price must be a finite non-negative number (got ${trade.price})`);
+  // price === 0 is a known failure sentinel from upstream data layers
+  // (e.g. all quote sources down) — fail closed, never size against it.
+  if (!Number.isFinite(trade.price) || trade.price <= 0) {
+    errors.push(`price must be a finite positive number (got ${trade.price})`);
   }
   if (!Number.isFinite(trade.notionalUsd) || trade.notionalUsd <= 0) {
     errors.push(`notionalUsd must be a finite positive number (got ${trade.notionalUsd})`);

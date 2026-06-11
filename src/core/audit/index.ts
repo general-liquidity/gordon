@@ -40,7 +40,24 @@ export {
   getRecentTraces,
   getTraceStats,
   pruneOldTraces,
+  verifyStoredAuditChain,
 } from "./store.ts";
+
+// Signing (tamper-evidence — see signing.ts for scope)
+export {
+  computeTraceContentHash,
+  signTrace,
+  verifyAuditChain,
+  resolveAuditHmacKey,
+  GENESIS_SIGNATURE,
+  AUDIT_HMAC_KEY_ENV,
+  AUDIT_HMAC_KEY_PATH_ENV,
+} from "./signing.ts";
+export type {
+  AuditChainVerification,
+  AuditChainBreak,
+  AuditChainBreakReason,
+} from "./signing.ts";
 
 // Chain (singleton facade)
 export { AuditChain } from "./chain.ts";

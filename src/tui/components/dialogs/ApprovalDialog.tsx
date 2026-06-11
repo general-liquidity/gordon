@@ -11,6 +11,20 @@ import { Divider } from "../layout/Divider.tsx";
 // Critical: Bordered + 3-second countdown
 // ============================================================================
 
+/** Risk-kernel size-adjusted alternative to the original order. */
+export interface ApprovalCounterOffer {
+  symbol: string;
+  side: "buy" | "sell";
+  originalQuantity: number;
+  adjustedQuantity: number;
+}
+
+/** Risk-kernel verdict details threaded into the approval payload. */
+export interface ApprovalRiskDetails {
+  riskReasons: string[];
+  counterOffer?: ApprovalCounterOffer;
+}
+
 export interface ApprovalRequest {
   id: string;
   shortId: string;
@@ -19,11 +33,63 @@ export interface ApprovalRequest {
   riskClass: "low" | "medium" | "high" | "critical";
   sideEffectLevel: string;
   reason?: string;
+  /** Plain-language reasons from the risk kernel (top 3, pre-truncated). */
+  riskReasons?: string[];
+  counterOffer?: ApprovalCounterOffer;
 }
+
+export type ApprovalDecision = "always" | "once" | "deny" | "modify";
 
 interface Props {
   approval: ApprovalRequest;
-  onDecision: (decision: "always" | "once" | "deny", approvalId: string) => void;
+  onDecision: (decision: ApprovalDecision, approvalId: string) => void;
+}
+
+const MAX_VISIBLE_REASONS = 3;
+
+/**
+ * Build the decision options for an approval. Counter-offer (when the risk
+ * kernel computed a size that fits limits) is listed FIRST — it is the safe
+ * default. Approving the original stays available because the request is
+ * still in "pending" (not blocked) state. Critical approvals never offer
+ * "always".
+ */
+export function buildApprovalOptions(
+  approval: Pick<ApprovalRequest, "counterOffer">,
+  opts: { critical?: boolean } = {},
+): Array<{ label: string; value: ApprovalDecision }> {
+  const options: Array<{ label: string; value: ApprovalDecision }> = [];
+  if (approval.counterOffer) {
+    options.push({
+      label: `Reduce to ${approval.counterOffer.adjustedQuantity} ${approval.counterOffer.symbol} to fit your limits`,
+      value: "modify",
+    });
+  }
+  if (opts.critical) {
+    options.push({ label: approval.counterOffer ? "CONFIRM ORIGINAL SIZE (CRITICAL)" : "CONFIRM (CRITICAL)", value: "once" });
+    options.push({ label: "DENY", value: "deny" });
+    return options;
+  }
+  options.push({
+    label: approval.counterOffer ? "Allow original size this time" : "Allow this time",
+    value: "once",
+  });
+  options.push({ label: "Always allow this tool", value: "always" });
+  options.push({ label: "Deny", value: "deny" });
+  return options;
+}
+
+/** "Why this needs approval" block — top reasons from the risk kernel. */
+function RiskReasons({ reasons }: { reasons?: string[] }) {
+  if (!reasons || reasons.length === 0) return null;
+  return (
+    <>
+      <Text color="yellow">  Why this needs approval:</Text>
+      {reasons.slice(0, MAX_VISIBLE_REASONS).map((reason, i) => (
+        <Text key={i} dimColor>    {"•"} {reason}</Text>
+      ))}
+    </>
+  );
 }
 
 export function ApprovalDialog({ approval, onDecision }: Props) {
@@ -54,15 +120,12 @@ function StandardApproval({ approval, onDecision }: Props) {
             Risk: {approval.riskClass.toUpperCase()}
           </Text>
         </Box>
+        <RiskReasons reasons={approval.riskReasons} />
         <Text> </Text>
         <Box paddingLeft={2}>
           <Select
-            options={[
-              { label: "Allow this time", value: "once" },
-              { label: "Always allow this tool", value: "always" },
-              { label: "Deny", value: "deny" },
-            ]}
-            onChange={(v) => onDecision(v as "always" | "once" | "deny", approval.id)}
+            options={buildApprovalOptions(approval)}
+            onChange={(v) => onDecision(v as ApprovalDecision, approval.id)}
           />
         </Box>
       </Box>
@@ -91,17 +154,14 @@ function HighApproval({ approval, onDecision }: Props) {
         <Text>  Scope: <Text dimColor>{approval.permissionScope}</Text></Text>
         <Text>  Effect: <Text color="yellow">{approval.sideEffectLevel}</Text></Text>
         {approval.reason && <Text dimColor>  {approval.reason}</Text>}
+        <RiskReasons reasons={approval.riskReasons} />
         <Text> </Text>
         <Text color="red">  This action has significant side effects. Review carefully.</Text>
         <Text> </Text>
         <Box paddingLeft={2}>
           <Select
-            options={[
-              { label: "Allow this time", value: "once" },
-              { label: "Always allow this tool", value: "always" },
-              { label: "Deny", value: "deny" },
-            ]}
-            onChange={(v) => onDecision(v as "always" | "once" | "deny", approval.id)}
+            options={buildApprovalOptions(approval)}
+            onChange={(v) => onDecision(v as ApprovalDecision, approval.id)}
           />
         </Box>
       </Box>
@@ -143,6 +203,7 @@ function CriticalApproval({ approval, onDecision }: Props) {
         <Text>  Scope: <Text dimColor>{approval.permissionScope}</Text></Text>
         <Text>  Effect: <Text color="red" bold>{approval.sideEffectLevel}</Text></Text>
         {approval.reason && <Text dimColor>  {approval.reason}</Text>}
+        <RiskReasons reasons={approval.riskReasons} />
         <Text> </Text>
         <Text color="red" bold>  {"\u26A0"} CRITICAL — This action may be irreversible.</Text>
         <Text> </Text>
@@ -151,11 +212,8 @@ function CriticalApproval({ approval, onDecision }: Props) {
         ) : (
           <Box paddingLeft={2}>
             <Select
-              options={[
-                { label: "CONFIRM (CRITICAL)", value: "once" },
-                { label: "DENY", value: "deny" },
-              ]}
-              onChange={(v) => onDecision(v as "once" | "deny", approval.id)}
+              options={buildApprovalOptions(approval, { critical: true })}
+              onChange={(v) => onDecision(v as ApprovalDecision, approval.id)}
             />
           </Box>
         )}

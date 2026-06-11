@@ -27,16 +27,16 @@ import {
   GORDON_DEFAULT_BASELINE,
   type SafetyConfig,
 } from "../../infra/safety/safetyConfigGuard.ts";
+import { listAllowedHosts } from "../../infra/safety/networkAllowlist.ts";
+import { listAllowedPaths } from "../../infra/safety/filesystemWriteGuard.ts";
 import {
-  isNetworkAllowlistEnabled,
-  listAllowedHosts,
-  getAllowlistMode,
-} from "../../infra/safety/networkAllowlist.ts";
+  isOutboundFetchGuardInstalled,
+  type OutboundFetchGuardStatus,
+} from "../../infra/safety/outboundFetchGuard.ts";
 import {
-  isFilesystemWriteGuardEnabled,
-  listAllowedPaths,
-  getGuardMode,
-} from "../../infra/safety/filesystemWriteGuard.ts";
+  isFilesystemWriteGuardInstalled,
+  type FilesystemWriteGuardStatus,
+} from "../../infra/safety/filesystemWriteGuardInstaller.ts";
 import {
   isKvCacheMetricEnabled,
   readCacheCalls,
@@ -211,33 +211,73 @@ export function collectSafetyBaselineChecks(input: CurrentSafetyConfigInput): Do
 // --- Network allowlist + filesystem write guard (sandbox-style checks) ------
 
 /**
- * Surface the network-allowlist + filesystem-write-guard configurations
- * in the doctor report when the corresponding flags are on. Observation
- * only — these primitives are caller-invoked at runtime; doctor just
- * reports that the policy is active.
+ * Surface the live state of the outbound-fetch + filesystem-write
+ * guards in the doctor report. Reads the installer status accessors so
+ * the operator sees not just policy config but whether the guard is
+ * actually patched in (enabled-but-not-installed = silently inert
+ * policy → error) and how many warn-mode violations it has observed.
+ * Observation only — never mutates guard state.
  */
-export function collectSandboxChecks(): DoctorCheck[] {
+export function collectSandboxChecks(
+  fetchGuard: OutboundFetchGuardStatus = isOutboundFetchGuardInstalled(),
+  fsGuard: FilesystemWriteGuardStatus = isFilesystemWriteGuardInstalled(),
+): DoctorCheck[] {
   const checks: DoctorCheck[] = [];
-  if (isNetworkAllowlistEnabled()) {
+
+  if (!fetchGuard.enabled) {
+    checks.push({
+      id: "sandbox.network_allowlist",
+      ok: false,
+      severity: "warn",
+      message: "Network allowlist disabled via GORDON_NETWORK_ALLOWLIST — outbound fetches are unguarded.",
+    });
+  } else if (!fetchGuard.installed) {
+    checks.push({
+      id: "sandbox.network_allowlist",
+      ok: false,
+      severity: "error",
+      message: "Network allowlist enabled but the outbound fetch guard is NOT installed — the policy is inert. installProductionGuards() should run at process entry.",
+    });
+  } else {
     const hosts = listAllowedHosts().length;
-    const mode = getAllowlistMode();
+    const violations = fetchGuard.warnViolations > 0
+      ? ` ${fetchGuard.warnViolations} warn-mode violation(s) this session; recent hosts: ${fetchGuard.recentViolations.slice(-3).join(", ")}.`
+      : "";
     checks.push({
       id: "sandbox.network_allowlist",
       ok: true,
-      severity: "info",
-      message: `Network allowlist active in ${mode} mode (${hosts} hosts).`,
+      severity: fetchGuard.warnViolations > 0 ? "warn" : "info",
+      message: `Outbound fetch guard installed in ${fetchGuard.mode} mode (${hosts} hosts).${violations}`,
     });
   }
-  if (isFilesystemWriteGuardEnabled()) {
+
+  if (!fsGuard.enabled) {
+    checks.push({
+      id: "sandbox.filesystem_write_guard",
+      ok: false,
+      severity: "warn",
+      message: "Filesystem write guard disabled via GORDON_FILESYSTEM_WRITE_GUARD — writes are unguarded.",
+    });
+  } else if (!fsGuard.installed) {
+    checks.push({
+      id: "sandbox.filesystem_write_guard",
+      ok: false,
+      severity: "error",
+      message: "Filesystem write guard enabled but NOT installed — the policy is inert. installProductionGuards() should run at process entry.",
+    });
+  } else {
     const paths = listAllowedPaths().length;
-    const mode = getGuardMode();
+    const violations = fsGuard.warnViolations > 0
+      ? ` ${fsGuard.warnViolations} warn-mode violation(s) this session; recent paths: ${fsGuard.recentViolations.slice(-3).join(", ")}.`
+      : "";
     checks.push({
       id: "sandbox.filesystem_write_guard",
       ok: true,
-      severity: "info",
-      message: `Filesystem write guard active in ${mode} mode (${paths} allowed path prefixes).`,
+      severity: fsGuard.warnViolations > 0 ? "warn" : "info",
+      message: `Filesystem write guard installed in ${fsGuard.mode} mode (${paths} allowed path prefixes).${violations}`,
     });
   }
+
   return checks;
 }
 

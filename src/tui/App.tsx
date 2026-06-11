@@ -1351,10 +1351,15 @@ function AppInner() {
   );
 
   const handleApproval = useCallback(
-    (decision: "always" | "once" | "deny", id: string) => {
-      handleApprovalDecision(decision, id, stateUpdater);
+    (decision: "always" | "once" | "deny" | "modify", id: string) => {
+      handleApprovalDecision(
+        decision,
+        id,
+        stateUpdater,
+        pendingApprovals.find((a) => a.id === id),
+      );
     },
-    [stateUpdater],
+    [stateUpdater, pendingApprovals],
   );
 
   // ── Emergency halt confirm ──

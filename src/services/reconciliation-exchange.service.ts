@@ -17,6 +17,7 @@ import { logEvent } from "../infra/storage/entities/events.ts";
 import { createModuleLogger } from "../infra/logger/index.ts";
 import type { Trade, EntryFill, ExitFill } from "../types/index.ts";
 import { extractOrderOwnerKey } from "../core/orders/order-recovery.ts";
+import { cleanupExpiredPlans } from "../core/pipeline/executor.ts";
 import { StrategyRuntime } from "../core/runtime/engine.ts";
 import { FeedbackLoop } from "../core/learning/feedback-loop.ts";
 const logger = createModuleLogger("reconciliation-exchange");
@@ -25,6 +26,7 @@ export interface ReconciliationResult {
   success: boolean;
   tradesReconciled: number;
   ordersUpdated: number;
+  plansExpired: number;
   errors: string[];
   warnings: string[];
 }
@@ -70,6 +72,7 @@ export async function reconcileWithExchange(
     success: true,
     tradesReconciled: 0,
     ordersUpdated: 0,
+    plansExpired: 0,
     errors: [],
     warnings: [],
   };
@@ -77,6 +80,19 @@ export async function reconcileWithExchange(
   logger.info("Starting reconciliation", { exchange: exchange.exchangeId });
 
   try {
+    // Prune expired plans every cycle so they can't accumulate forever.
+    // cleanupExpiredPlans only touches DRAFT/APPROVED — EXECUTING plans are
+    // never auto-cancelled on expiry because their live trades are
+    // reconciled below; the transition is to CANCELLED (PLAN_EXPIRED event),
+    // never a hard delete, so the audit trail survives.
+    try {
+      result.plansExpired = cleanupExpiredPlans();
+    } catch (pruneError) {
+      result.warnings.push(
+        `Expired-plan prune failed: ${pruneError instanceof Error ? pruneError.message : "Unknown error"}`,
+      );
+    }
+
     const openTrades = listTrades({ status: "OPEN" });
     const partialTrades = listTrades({ status: "PARTIAL" });
     const activeTrades = [...openTrades, ...partialTrades];
@@ -110,6 +126,7 @@ export async function reconcileWithExchange(
       exchange: exchange.exchangeId,
       tradesReconciled: result.tradesReconciled,
       ordersUpdated: result.ordersUpdated,
+      plansExpired: result.plansExpired,
       errors: result.errors.length,
       warnings: result.warnings.length,
     });
@@ -121,6 +138,7 @@ export async function reconcileWithExchange(
         exchange: exchange.exchangeId,
         tradesReconciled: result.tradesReconciled,
         ordersUpdated: result.ordersUpdated,
+        plansExpired: result.plansExpired,
         errors: result.errors,
         warnings: result.warnings,
       },

@@ -10,6 +10,11 @@ mock.module("../../../storage/entities/plans.ts", () => ({
   listPlans: () => [],
   updatePlan: () => {},
   createPlan: () => ({}),
+  // Consistent hash pair so the approval content-binding gate passes and
+  // these tests keep exercising the gates they target (status, kill switch).
+  computePlanContentHash: () => "test-content-hash",
+  getApprovedContentHash: () => "test-content-hash",
+  setApprovedContentHash: () => {},
 }));
 
 import { executePlanTool } from "./trading.ts";

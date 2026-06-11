@@ -92,6 +92,21 @@ function kurtosis(arr: number[]): number {
     - (3 * (n - 1) ** 2) / ((n - 2) * (n - 3)) + 3;
 }
 
+/**
+ * Float-precision zero-variance guard. A constant return series (e.g. fifty
+ * 0.01s) accumulates rounding noise in mean/stddev, producing s ~1e-18 instead
+ * of exactly 0 — which defeats `s === 0` checks and turns a degenerate series
+ * into an astronomical Sharpe. Treat s as zero when it is vanishingly small
+ * relative to the mean (a real per-period Sharpe above 1e12 is not a strategy,
+ * it is float noise). NaN stddev also counts as degenerate — fail closed.
+ */
+const ZERO_VARIANCE_REL_EPS = 1e-12;
+
+function isEffectivelyZeroStddev(s: number, m: number): boolean {
+  if (!Number.isFinite(s) || s === 0) return true;
+  return s <= ZERO_VARIANCE_REL_EPS * Math.abs(m);
+}
+
 function normalCDF(x: number): number {
   const a1 = 0.254829592, a2 = -0.284496736, a3 = 1.421413741;
   const a4 = -1.453152027, a5 = 1.061405429, p = 0.3275911;
@@ -138,7 +153,7 @@ export function probabilisticSharpeRatio(
 
   const m = mean(returns);
   const s = stddev(returns);
-  if (s === 0) return { psr: 0.5, observedSharpe: 0, significant: false };
+  if (isEffectivelyZeroStddev(s, m)) return { psr: 0.5, observedSharpe: 0, significant: false };
 
   const observedSharpe = (m / s) * Math.sqrt(periodsPerYear);
   const skew = skewness(returns);
@@ -152,7 +167,8 @@ export function probabilisticSharpeRatio(
     (1 - skew * srStar + ((kurt - 1) / 4) * srStar * srStar) / n
   );
 
-  if (seSharpe === 0) return { psr: 0.5, observedSharpe, significant: false };
+  // !(x > 0) also catches NaN (negative sqrt argument from extreme skew/kurtosis) — fail closed.
+  if (!(seSharpe > 0)) return { psr: 0.5, observedSharpe, significant: false };
 
   const z = (srStar - benchStar) / seSharpe;
   const psr = normalCDF(z);
@@ -199,7 +215,7 @@ export function deflatedSharpeRatio(
 
   const m = mean(returns);
   const s = stddev(returns);
-  if (s === 0) return { dsr: 0.5, observedSharpe: 0, expectedMaxSharpeUnderNull: 0, significant: false };
+  if (isEffectivelyZeroStddev(s, m)) return { dsr: 0.5, observedSharpe: 0, expectedMaxSharpeUnderNull: 0, significant: false };
 
   const observedSharpe = (m / s) * Math.sqrt(periodsPerYear);
   const skew = skewness(returns);
@@ -218,7 +234,8 @@ export function deflatedSharpeRatio(
     (1 - skew * srStar + ((kurt - 1) / 4) * srStar * srStar) / n
   );
 
-  if (seSharpe === 0) return { dsr: 0.5, observedSharpe, expectedMaxSharpeUnderNull: annualizedESharpeMax, significant: false };
+  // !(x > 0) also catches NaN (negative sqrt argument from extreme skew/kurtosis) — fail closed.
+  if (!(seSharpe > 0)) return { dsr: 0.5, observedSharpe, expectedMaxSharpeUnderNull: annualizedESharpeMax, significant: false };
 
   const z = (srStar - benchStar) / seSharpe;
   const dsr = normalCDF(z);
@@ -254,7 +271,7 @@ export function minimumTrackRecordLength(
 
   const m = mean(returns);
   const s = stddev(returns);
-  if (s === 0 || m <= 0) return { minTRL: Infinity, actualLength: n, sufficient: false, observedSharpe: 0 };
+  if (isEffectivelyZeroStddev(s, m) || m <= 0) return { minTRL: Infinity, actualLength: n, sufficient: false, observedSharpe: 0 };
 
   const sr = m / s; // Per-period Sharpe
   const observedSharpe = sr * Math.sqrt(periodsPerYear);
@@ -338,7 +355,9 @@ export function combinatorialPurgedCV(
     const signalReturns = testReturns.map((r) => r * signal);
     const testMean = mean(signalReturns);
     const testStd = stddev(signalReturns);
-    const testSharpe = testStd > 0 ? (testMean / testStd) * Math.sqrt(periodsPerYear) : 0;
+    const testSharpe = isEffectivelyZeroStddev(testStd, testMean)
+      ? 0
+      : (testMean / testStd) * Math.sqrt(periodsPerYear);
 
     oosSharpesPerFold.push(testSharpe);
   }

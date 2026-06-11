@@ -190,6 +190,105 @@ export function markQueueCommandFailed(id: number, error: string, retryDelayMs: 
   );
 }
 
+/**
+ * Commands safe to re-run after a daemon crash interrupted them mid-execution.
+ * Fail-closed allow-list: any command type NOT listed here (including future
+ * additions) is marked failed instead of requeued, because a crash
+ * mid-execution may already have produced side effects (orders placed, agent
+ * actions taken) that a blind retry would duplicate.
+ *
+ * Deliberately excluded: chat.send_message (an agent turn can place orders
+ * before the crash), execution.start_intent (starts an order-placing
+ * execution session), autonomous.run_cycle (full trading cycle),
+ * daemon.shutdown (moot after restart).
+ */
+const CRASH_RETRY_SAFE_COMMANDS = new Set<string>([
+  "runtime.background_status",
+  "runtime.health_check",
+  "scheduler.list_tasks",
+  "reconcile.run",
+  "capital.refresh",
+  "regime.check",
+  "circuit_breaker.evaluate",
+  "scan.run",
+  "monitor.run_cycle",
+  "learning.analyze_trade",
+  "evolution.tick",
+  "plugin.reload",
+  "scheduler.create_task",
+  "scheduler.delete_task",
+  "system.set_permission_mode",
+]);
+
+export interface OrphanedCommandResetResult {
+  requeued: number;
+  failed: number;
+  entries: Array<{ id: number; commandType: string; outcome: "pending" | "failed"; reason: string }>;
+}
+
+/**
+ * Recover queue entries left in 'running' by a previous daemon process that
+ * died mid-execution. Without this, those entries block their session
+ * forever. Call once at daemon startup, before any command processing.
+ */
+export function resetOrphanedRunningCommands(): OrphanedCommandResetResult {
+  const db = getDatabase();
+  const now = new Date().toISOString();
+
+  const rows = executeWithLogging(
+    () =>
+      db
+        .query(
+          `SELECT id, commandType, attempts, maxAttempts
+           FROM gateway_command_queue
+           WHERE status = 'running'`,
+        )
+        .all() as Array<{ id: number; commandType: string; attempts: number; maxAttempts: number }>,
+    "SELECT gateway_command_queue orphaned-running",
+  );
+
+  const result: OrphanedCommandResetResult = { requeued: 0, failed: 0, entries: [] };
+
+  for (const row of rows) {
+    const retrySafe = CRASH_RETRY_SAFE_COMMANDS.has(row.commandType);
+    if (retrySafe && row.attempts < row.maxAttempts) {
+      const reason = "orphaned running entry from previous daemon process; requeued";
+      executeWithLogging(
+        () =>
+          db
+            .query(
+              `UPDATE gateway_command_queue
+               SET status = 'pending', availableAt = ?, lastError = ?, startedAt = NULL, updatedAt = ?
+               WHERE id = ?`,
+            )
+            .run(now, reason, now, row.id),
+        "UPDATE gateway_command_queue orphan-requeue",
+      );
+      result.requeued++;
+      result.entries.push({ id: row.id, commandType: row.commandType, outcome: "pending", reason });
+    } else {
+      const reason = retrySafe
+        ? "orphaned running entry from previous daemon process; attempts exhausted"
+        : `orphaned running entry from previous daemon process; '${row.commandType}' is not crash-retry-safe (may have had side effects before the crash)`;
+      executeWithLogging(
+        () =>
+          db
+            .query(
+              `UPDATE gateway_command_queue
+               SET status = 'failed', lastError = ?, finishedAt = ?, updatedAt = ?
+               WHERE id = ?`,
+            )
+            .run(reason, now, now, row.id),
+        "UPDATE gateway_command_queue orphan-fail",
+      );
+      result.failed++;
+      result.entries.push({ id: row.id, commandType: row.commandType, outcome: "failed", reason });
+    }
+  }
+
+  return result;
+}
+
 export function getQueueDepth(sessionId: string): {
   pending: number;
   running: number;

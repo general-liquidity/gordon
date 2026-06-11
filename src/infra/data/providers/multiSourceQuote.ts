@@ -38,11 +38,45 @@ export interface EnrichedQuote {
   low24h: number;
   sources: string[];
   timestamp: number;
+  /** ms epoch when source data was fetched. Cache hits keep the
+   *  original value, so this is the staleness anchor for consumers. */
+  fetchedAt: number;
+  /** True when this quote should not be trusted for sizing/execution
+   *  decisions (source disagreement, enrichment outage, …). */
+  degraded: boolean;
+  /** Machine-readable reasons behind `degraded`. */
+  degradedReasons: string[];
+  /** Sources attempted but yielding no usable price. */
+  sourcesFailed: string[];
   // LLM enrichment (optional)
   trendDirection?: TrendDirection;
   momentum?: Momentum;
   volumeAssessment?: VolumeAssessment;
   summary?: string;
+}
+
+/** Max (max-min)/median spread across surviving sources before the
+ *  quote is flagged degraded with "source disagreement". */
+export const SOURCE_DISAGREEMENT_THRESHOLD = 0.05;
+
+/**
+ * Thrown when no source produced a usable (finite, positive) price.
+ * Replaces the old price=0 sentinel quote, which silently flowed into
+ * downstream sizing decisions. Fail closed: no price, no quote.
+ */
+export class QuoteUnavailableError extends Error {
+  readonly symbol: string;
+  readonly sourcesFailed: string[];
+
+  constructor(symbol: string, sourcesFailed: string[]) {
+    super(
+      `No price source returned a usable quote for ${symbol}` +
+        (sourcesFailed.length > 0 ? ` (failed: ${sourcesFailed.join(", ")})` : ""),
+    );
+    this.name = "QuoteUnavailableError";
+    this.symbol = symbol;
+    this.sourcesFailed = sourcesFailed;
+  }
 }
 
 interface SourceQuote {
@@ -188,9 +222,26 @@ async function fetchFromCoinGecko(
 // Merge Logic
 // ============================================================================
 
-function mergeQuotes(symbol: string, quotes: SourceQuote[]): EnrichedQuote {
-  const prices = quotes.map((q) => q.price).filter((p) => p > 0);
+/** Callers must pre-filter `quotes` to usable prices (finite, > 0). */
+function mergeQuotes(
+  symbol: string,
+  quotes: SourceQuote[],
+  sourcesFailed: string[]
+): EnrichedQuote {
+  const prices = quotes.map((q) => q.price);
   const mergedPrice = median(prices);
+
+  // Cross-venue consensus check: surviving sources that disagree beyond
+  // the threshold mean at least one of them is wrong — and the median
+  // can't tell which. Flag instead of guessing.
+  const degradedReasons: string[] = [];
+  if (
+    prices.length > 1 &&
+    (Math.max(...prices) - Math.min(...prices)) / mergedPrice >
+      SOURCE_DISAGREEMENT_THRESHOLD
+  ) {
+    degradedReasons.push("source disagreement");
+  }
 
   // For percentage change, take median of non-zero values
   const changePercents = quotes
@@ -214,6 +265,7 @@ function mergeQuotes(symbol: string, quotes: SourceQuote[]): EnrichedQuote {
   const mergedLow =
     lows.length > 0 ? Math.min(...lows) : mergedPrice;
 
+  const now = Date.now();
   return {
     symbol: baseSymbol(symbol),
     price: mergedPrice,
@@ -223,7 +275,11 @@ function mergeQuotes(symbol: string, quotes: SourceQuote[]): EnrichedQuote {
     high24h: mergedHigh,
     low24h: mergedLow,
     sources: quotes.map((q) => q.source),
-    timestamp: Date.now(),
+    timestamp: now,
+    fetchedAt: now,
+    degraded: degradedReasons.length > 0,
+    degradedReasons,
+    sourcesFailed,
   };
 }
 
@@ -255,6 +311,9 @@ export class MultiSourceQuoteService {
 
   /**
    * Get an enriched quote for a symbol, aggregating from all available sources.
+   *
+   * @throws QuoteUnavailableError when no source produced a usable
+   *   (finite, positive) price. Never returns a price=0 sentinel.
    */
   async getQuote(symbol: string): Promise<EnrichedQuote> {
     const cacheKey = `quote:${baseSymbol(symbol)}`;
@@ -275,40 +334,37 @@ export class MultiSourceQuoteService {
     // CoinGecko (always attempted — free, no key)
     fetchPromises.push(fetchFromCoinGecko(this.coinGecko, symbol));
 
+    // Index-aligned with fetchPromises so failures can be attributed.
+    const sourceNames = [
+      ...this.exchanges.map((e) => e.displayName),
+      "CoinGecko",
+    ];
+
     // Fetch all in parallel
     const results = await Promise.allSettled(fetchPromises);
 
     const quotes: SourceQuote[] = [];
-    for (const result of results) {
-      if (result.status === "fulfilled" && result.value) {
-        quotes.push(result.value);
+    const sourcesFailed: string[] = [];
+    for (let i = 0; i < results.length; i++) {
+      const result = results[i]!;
+      const quote = result.status === "fulfilled" ? result.value : null;
+      if (quote && Number.isFinite(quote.price) && quote.price > 0) {
+        quotes.push(quote);
+      } else {
+        sourcesFailed.push(sourceNames[i]!);
       }
     }
 
     if (quotes.length === 0) {
-      logger.warn("No sources returned data", { symbol });
-      return {
-        symbol: baseSymbol(symbol),
-        price: 0,
-        change24h: 0,
-        changePercent24h: 0,
-        volume24h: 0,
-        high24h: 0,
-        low24h: 0,
-        sources: [],
-        timestamp: Date.now(),
-      };
+      logger.warn("No sources returned data", { symbol, sourcesFailed });
+      throw new QuoteUnavailableError(baseSymbol(symbol), sourcesFailed);
     }
 
     // Merge
-    const merged = mergeQuotes(symbol, quotes);
+    const merged = mergeQuotes(symbol, quotes, sourcesFailed);
 
     // LLM enrichment
-    if (
-      this.config.enableLLMEnrichment &&
-      this.llmClient &&
-      merged.price > 0
-    ) {
+    if (this.config.enableLLMEnrichment && this.llmClient) {
       const baseQuote: BaseQuote = {
         symbol: merged.symbol,
         price: merged.price,
@@ -336,6 +392,11 @@ export class MultiSourceQuoteService {
         merged.momentum = enrichment.momentum;
         merged.volumeAssessment = enrichment.volumeAssessment;
         merged.summary = enrichment.summary;
+      } else {
+        // Enrichment was requested but unavailable — surface a
+        // machine-readable flag instead of only logging.
+        merged.degraded = true;
+        merged.degradedReasons.push("enrichment unavailable");
       }
     }
 
@@ -344,7 +405,9 @@ export class MultiSourceQuoteService {
   }
 
   /**
-   * Get quotes for multiple symbols.
+   * Get quotes for multiple symbols. Symbols whose quote is unavailable
+   * (QuoteUnavailableError) are omitted from the result map — absence is
+   * the failure signal, never a zero-price entry.
    */
   async getQuotes(symbols: string[]): Promise<Map<string, EnrichedQuote>> {
     const results = new Map<string, EnrichedQuote>();

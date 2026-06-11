@@ -51,7 +51,16 @@ describe("doctor.runDoctorChecks", () => {
       expect(["pass", "warn", "fail", "info"]).toContain(check.status);
       expect(typeof check.message).toBe("string");
     }
-  });
+    // Guard + kill-switch state must be part of the doctor report —
+    // production-readiness finding: switch/guard state was invisible.
+    const ids = results.map((c) => c.id);
+    expect(ids).toContain("outbound-fetch-guard");
+    expect(ids).toContain("filesystem-write-guard");
+    expect(ids).toContain("kill-switches");
+  },
+  // Same budget as the stable-order test below — runDoctorChecks shells
+  // out to `bun audit --json`, which can take 10-15s on a cold cache.
+  60_000);
 
   it(
     "returns results in a stable order",
@@ -74,6 +83,122 @@ describe("doctor — safety deny-list check", () => {
     const check = _internal.checkSafetyDenyList();
     expect(check.id).toBe("safety-deny-list");
     expect(check.status).toBe("pass");
+  });
+});
+
+describe("doctor — outbound fetch guard check", () => {
+  const base = {
+    installed: true,
+    enabled: true,
+    mode: "warn" as const,
+    warnViolations: 0,
+    recentViolations: [] as readonly string[],
+  };
+
+  it("passes when installed with no violations", () => {
+    const check = _internal.checkOutboundFetchGuard({ ...base });
+    expect(check.id).toBe("outbound-fetch-guard");
+    expect(check.status).toBe("pass");
+    expect(check.message).toContain("warn mode");
+  });
+
+  it("fails when enabled but not installed (inert policy)", () => {
+    const check = _internal.checkOutboundFetchGuard({ ...base, installed: false });
+    expect(check.status).toBe("fail");
+    expect(check.message).toContain("NOT installed");
+  });
+
+  it("warns with count and recent hosts when warn-mode violations recorded", () => {
+    const check = _internal.checkOutboundFetchGuard({
+      ...base,
+      warnViolations: 3,
+      recentViolations: ["x.example.com", "y.example.com"],
+    });
+    expect(check.status).toBe("warn");
+    expect(check.message).toContain("3 allowlist miss(es)");
+    expect(check.message).toContain("y.example.com");
+  });
+
+  it("warns when disabled via env", () => {
+    const check = _internal.checkOutboundFetchGuard({ ...base, enabled: false, installed: false });
+    expect(check.status).toBe("warn");
+    expect(check.message).toContain("GORDON_NETWORK_ALLOWLIST");
+  });
+});
+
+describe("doctor — filesystem write guard check", () => {
+  const base = {
+    installed: true,
+    enabled: true,
+    mode: "warn" as const,
+    warnViolations: 0,
+    recentViolations: [] as readonly string[],
+  };
+
+  it("passes when installed with no violations", () => {
+    const check = _internal.checkFilesystemWriteGuard({ ...base });
+    expect(check.id).toBe("filesystem-write-guard");
+    expect(check.status).toBe("pass");
+  });
+
+  it("fails when enabled but not installed (inert policy)", () => {
+    const check = _internal.checkFilesystemWriteGuard({ ...base, installed: false });
+    expect(check.status).toBe("fail");
+    expect(check.message).toContain("inert");
+  });
+
+  it("warns with count and recent paths when warn-mode violations recorded", () => {
+    const check = _internal.checkFilesystemWriteGuard({
+      ...base,
+      warnViolations: 5,
+      recentViolations: ["C:/outside/a.txt"],
+    });
+    expect(check.status).toBe("warn");
+    expect(check.message).toContain("5 allowlist miss(es)");
+    expect(check.message).toContain("C:/outside/a.txt");
+  });
+
+  it("warns when disabled via env", () => {
+    const check = _internal.checkFilesystemWriteGuard({ ...base, enabled: false, installed: false });
+    expect(check.status).toBe("warn");
+    expect(check.message).toContain("GORDON_FILESYSTEM_WRITE_GUARD");
+  });
+});
+
+describe("doctor — kill-switch state check", () => {
+  it("passes when enabled with no trips", () => {
+    const check = _internal.checkKillSwitchState(true, []);
+    expect(check.id).toBe("kill-switches");
+    expect(check.status).toBe("pass");
+    expect(check.message).toContain("No kill switches tripped");
+  });
+
+  it("fails when kill switches are disabled via env", () => {
+    const check = _internal.checkKillSwitchState(false, []);
+    expect(check.status).toBe("fail");
+    expect(check.message).toContain("GORDON_KILL_SWITCHES");
+  });
+
+  it("warns listing scope, id, and reason for each active trip", () => {
+    const check = _internal.checkKillSwitchState(true, [
+      { key: { scope: "venue", id: "binance" }, reason: "API instability", trippedAt: 1 },
+      { key: { scope: "firm" }, reason: "manual halt", trippedAt: 2 },
+    ]);
+    expect(check.status).toBe("warn");
+    expect(check.message).toContain("2 kill switch(es) tripped");
+    expect(check.message).toContain("venue:binance (API instability)");
+    expect(check.message).toContain("firm (manual halt)");
+  });
+
+  it("truncates the trip list past five entries", () => {
+    const trips = Array.from({ length: 7 }, (_, i) => ({
+      key: { scope: "strategy" as const, id: `s${i}` },
+      reason: "loss limit",
+      trippedAt: i,
+    }));
+    const check = _internal.checkKillSwitchState(true, trips);
+    expect(check.status).toBe("warn");
+    expect(check.message).toContain("(+2 more)");
   });
 });
 

@@ -97,6 +97,12 @@ export const AuditTraceSchema = z.object({
   duration_ms: z.number().optional(),
 
   risk_check_id: z.string().optional(),
+
+  // Tamper-evidence chain (see signing.ts). Optional so traces recorded
+  // before signing shipped still parse — verification treats them as broken.
+  content_hash: z.string().optional(),
+  prev_signature: z.string().optional(),
+  signature: z.string().optional(),
 });
 
 export type AuditTrace = z.infer<typeof AuditTraceSchema>;

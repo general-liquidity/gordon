@@ -98,6 +98,13 @@ export function initDatabase(): Database {
     // Column already exists, ignore error
   }
 
+  // Migration: approve→execute content binding hash (verdict-audit FSM gate)
+  try {
+    db.run(`ALTER TABLE plans ADD COLUMN approvedContentHash TEXT`);
+  } catch {
+    // Column already exists, ignore error
+  }
+
   // Create trades table
   db.run(`
     CREATE TABLE IF NOT EXISTS trades (

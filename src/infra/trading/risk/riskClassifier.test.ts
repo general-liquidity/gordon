@@ -59,9 +59,17 @@ describe("validateTradeProposal", () => {
     expect(validateTradeProposal(baseTrade({ quantity: Number.NaN })).length).toBeGreaterThan(0);
   });
 
-  it("rejects negative and non-finite price", () => {
+  it("rejects zero, negative, and non-finite price", () => {
+    expect(validateTradeProposal(baseTrade({ price: 0 })).length).toBeGreaterThan(0);
     expect(validateTradeProposal(baseTrade({ price: -1 })).length).toBeGreaterThan(0);
+    expect(validateTradeProposal(baseTrade({ price: Number.NaN })).length).toBeGreaterThan(0);
     expect(validateTradeProposal(baseTrade({ price: Number.POSITIVE_INFINITY })).length).toBeGreaterThan(0);
+  });
+
+  it("blocks classification outright on a zero-price sentinel", () => {
+    const assessment = classifyTradeRisk(baseTrade({ price: 0 }), baseContext());
+    expect(assessment.recommendation).toBe("block");
+    expect(assessment.tier).toBe("critical");
   });
 
   it("rejects empty symbol", () => {

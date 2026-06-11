@@ -72,6 +72,8 @@ export interface BootstrapOptions {
   exchangeSecret?: string;
   exchangePassphrase?: string;
   exchangeWallet?: string;
+  /** Explicit live opt-out of the paper-first default (`--exchange-live`). */
+  exchangeLive?: boolean;
   broker?: BrokerId;
   brokerKey?: string;
   brokerSecret?: string;
@@ -164,6 +166,7 @@ export function parseBootstrapArgs(args: string[]): BootstrapOptions {
     exchangeSecret: typeof parsed["exchange-secret"] === "string" ? parsed["exchange-secret"] : undefined,
     exchangePassphrase: typeof parsed["exchange-passphrase"] === "string" ? parsed["exchange-passphrase"] : undefined,
     exchangeWallet: typeof parsed["exchange-wallet"] === "string" ? parsed["exchange-wallet"] : undefined,
+    exchangeLive: parsed["exchange-live"] === true || parseBoolean(parsed["exchange-live"]) === true,
     broker: typeof parsed.broker === "string" ? parsed.broker as BrokerId : undefined,
     brokerKey: typeof parsed["broker-key"] === "string" ? parsed["broker-key"] : undefined,
     brokerSecret: typeof parsed["broker-secret"] === "string" ? parsed["broker-secret"] : undefined,
@@ -177,6 +180,19 @@ export function parseBootstrapArgs(args: string[]): BootstrapOptions {
     json: Boolean(parsed.json),
     runDoctor: Boolean(parsed.doctor),
   };
+}
+
+/**
+ * Paper-first ramp: a NEW exchange entry defaults to sandbox/paper unless the
+ * operator explicitly opts into live (`--exchange-live`). Existing entries
+ * keep their configured mode (undefined → `upsertExchange` preserves it).
+ */
+export function resolveBootstrapExchangeSandbox(
+  exchangeLive: boolean | undefined,
+  hasExistingEntry: boolean,
+): boolean | undefined {
+  if (exchangeLive) return false;
+  return hasExistingEntry ? undefined : true;
 }
 
 function getProviderDefaultModel(provider: "openai" | "inception" | "dedalus"): string {
@@ -595,12 +611,15 @@ export async function applyBootstrap(options: BootstrapOptions): Promise<Bootstr
     const usesApiSecret = isCcxtExchangeId(options.exchange)
       ? Boolean(options.exchangeSecret)
       : Boolean(EXCHANGE_ENV_MAP[options.exchange as NativeExchangeId].secret);
+    const hasExistingEntry = config.exchanges.some(
+      (exchange) => exchange.type === normalizeExchangeId(options.exchange!),
+    );
     config = upsertExchange(config, options.exchange, {
       apiKey: usesApiKey ? "***" : "",
       apiSecret: usesApiSecret ? "***" : "",
       passphrase: options.exchangePassphrase ? "***" : undefined,
       walletPrivateKey: options.exchangeWallet ? "***" : undefined,
-      sandbox: false,
+      sandbox: resolveBootstrapExchangeSandbox(options.exchangeLive, hasExistingEntry),
     });
   }
 
@@ -645,11 +664,17 @@ export async function applyBootstrap(options: BootstrapOptions): Promise<Bootstr
   const keyringStoredKeys = await persistKeysToKeyring(config.useKeyring, envKeys);
   await saveConfig(config);
 
+  const exchangeSummary = options.exchange
+    ? config.exchanges.find((exchange) => exchange.type === normalizeExchangeId(options.exchange!))?.sandbox
+      ? `${options.exchange} (sandbox/paper — pass --exchange-live to trade real money)`
+      : `${options.exchange} (live)`
+    : "unchanged";
+
   const summary = [
     `Bootstrap profile: ${options.profile}`,
     `Onboarding complete: yes`,
     `LLM provider: ${options.llmProvider ?? "unchanged"}`,
-    `Exchange: ${options.exchange ?? "unchanged"}`,
+    `Exchange: ${exchangeSummary}`,
     `Broker: ${options.broker ?? "unchanged"}`,
     `Saved env keys: ${Object.keys(envKeys).length}`,
     `Stored in keyring: ${keyringStoredKeys.length}`,

@@ -18,6 +18,7 @@ import {
   getRecentTraces,
   getTraceStats,
   pruneOldTraces,
+  verifyStoredAuditChain,
 } from "./store.ts";
 import type {
   AuditTrace,
@@ -68,10 +69,10 @@ export class AuditChain {
 
   /**
    * Finish a trace builder and persist the completed trace.
+   * Returns the trace as persisted, including its tamper-evidence signature.
    */
   finishAndSave(builder: TraceBuilder): AuditTrace {
-    const trace = builder.finish();
-    saveTrace(trace);
+    const trace = saveTrace(builder.finish());
     logger.debug("Audit trace finished and saved", {
       trace_id: trace.trace_id,
       outcome: trace.outcome.type,
@@ -148,6 +149,14 @@ export class AuditChain {
    */
   prune(olderThanDays: number): number {
     return pruneOldTraces(olderThanDays);
+  }
+
+  /**
+   * Verify the tamper-evidence chain over every stored trace.
+   * Returns the first broken link, if any (see signing.ts for scope).
+   */
+  verifyChain(): ReturnType<typeof verifyStoredAuditChain> {
+    return verifyStoredAuditChain();
   }
 
   // --------------------------------------------------------------------------

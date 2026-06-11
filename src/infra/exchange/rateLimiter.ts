@@ -26,6 +26,15 @@ interface QueuedRequest {
   weight: number;
 }
 
+export interface ThrottleSignal {
+  /** True when a new request would have to wait right now. */
+  throttled: boolean;
+  /** Requests already waiting in the queue. */
+  queueDepth: number;
+  /** Estimated wait for a new request, 0 when not throttled. */
+  estimatedWaitMs: number;
+}
+
 export class RateLimiter {
   private tokens: number;
   private readonly maxTokens: number;
@@ -84,6 +93,24 @@ export class RateLimiter {
     return this.tokens < 1;
   }
 
+  /**
+   * Machine-readable throttle state for data-layer degradation flags.
+   * Accounts for already-queued requests, so `throttled: true` means a
+   * new request right now would wait — callers should mark dependent
+   * data as degraded rather than treating it as fresh.
+   */
+  getThrottleSignal(weight = 1): ThrottleSignal {
+    this.refill();
+    const queuedWeight = this.queue.reduce((sum, q) => sum + q.weight, 0);
+    const deficit = queuedWeight + weight - this.tokens;
+    const throttled = deficit > 0;
+    return {
+      throttled,
+      queueDepth: this.queue.length,
+      estimatedWaitMs: throttled ? Math.ceil(deficit / this.refillRate) : 0,
+    };
+  }
+
   getStatus(): { used: number; limit: number; remaining: number; resetMs: number } {
     this.refill();
     return {
@@ -138,4 +165,12 @@ export function createExchangeRateLimiter(exchangeId: string): RateLimiter {
   const limiter = new RateLimiter(config);
   limiters.set(exchangeId, limiter);
   return limiter;
+}
+
+/**
+ * Read-only throttle view for an exchange's limiter. Returns null when
+ * no limiter has been created for the exchange — never fabricates state.
+ */
+export function getExchangeThrottleSignal(exchangeId: string): ThrottleSignal | null {
+  return limiters.get(exchangeId)?.getThrottleSignal() ?? null;
 }

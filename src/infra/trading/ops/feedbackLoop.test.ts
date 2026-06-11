@@ -1,21 +1,26 @@
-import { afterAll, describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { TradeOutcome } from "./feedbackLoop.ts";
-
-// GORDON_DIR is resolved at module load — point it at a temp dir BEFORE importing.
-const tmpHome = mkdtempSync(join(tmpdir(), "gordon-feedback-test-"));
-const prevHome = process.env.GORDON_HOME;
-process.env.GORDON_HOME = tmpHome;
-
-const {
-  recordTradeOutcome,
+import {
+  formatFeedbackForPrompt,
+  getAllPatternStats,
   getPatternConfidence,
   getPatternStats,
-  getAllPatternStats,
-  formatFeedbackForPrompt,
-} = await import("./feedbackLoop.ts");
+  recordTradeOutcome,
+  type TradeOutcome,
+} from "./feedbackLoop.ts";
+
+// feedbackLoop resolves its storage paths lazily from GORDON_HOME on every
+// call (not at module load), so pointing the env at a fresh temp dir for the
+// duration of this file fully isolates feedback state from the real ~/.gordon
+// and from other test files — regardless of module-load order in the suite.
+const tmpHome = mkdtempSync(join(tmpdir(), "gordon-feedback-test-"));
+const prevHome = process.env.GORDON_HOME;
+
+beforeAll(() => {
+  process.env.GORDON_HOME = tmpHome;
+});
 
 afterAll(() => {
   if (prevHome !== undefined) process.env.GORDON_HOME = prevHome;

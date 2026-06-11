@@ -11,7 +11,11 @@ import { getOrCreateDaemonToken } from "../security/index.ts";
 import { initMCPTools, enableMCPHotReload, disableMCPHotReload } from "../../infra/ai/mcp/client.ts";
 import { StrategyRuntime } from "../../core/runtime/engine.ts";
 import { upsertSchedulerTask } from "../store/scheduler-store.ts";
+import { resetOrphanedRunningCommands } from "../store/command-queue-store.ts";
 import { appendActionLogEntry } from "../../infra/action-log/index.ts";
+import { reconcileWithExchange } from "../../services/reconciliation-exchange.service.ts";
+import { repairProtectiveOrders } from "../../core/pipeline/executor.ts";
+import { listPlans } from "../../infra/storage/entities/plans.ts";
 
 const logger = createModuleLogger("gateway-daemon");
 
@@ -28,6 +32,27 @@ export async function startGatewayDaemonProcess(): Promise<GatewayDaemonHandle> 
     logger.warn("MCP tools initialization failed — MCP tools will be unavailable", { error: err instanceof Error ? err.message : String(err) });
   });
   enableMCPHotReload(5000);
+
+  // A previous daemon process that crashed mid-execution leaves queue entries
+  // stuck in 'running', blocking that session forever. Recover them before
+  // any command processing can start.
+  const orphanReset = resetOrphanedRunningCommands();
+  if (orphanReset.requeued > 0 || orphanReset.failed > 0) {
+    logger.warn("Recovered orphaned running queue entries from previous daemon process", {
+      requeued: orphanReset.requeued,
+      failed: orphanReset.failed,
+      entries: orphanReset.entries,
+    });
+    safeAppendAudit({
+      eventType: "daemon.queue_orphans_reset",
+      actor: "daemon",
+      payload: {
+        requeued: orphanReset.requeued,
+        failed: orphanReset.failed,
+        entries: orphanReset.entries,
+      },
+    });
+  }
 
   const contextResolver = getGatewayContextResolver();
   let stopSelf: (() => Promise<void>) | null = null;
@@ -70,6 +95,63 @@ export async function startGatewayDaemonProcess(): Promise<GatewayDaemonHandle> 
   } catch (error) {
     logger.warn("Could not sync initial capital from exchange", {
       error: error instanceof Error ? error.message : String(error),
+    });
+  }
+
+  // Synchronous startup reconciliation: positions/orders state must be
+  // trusted before the IPC server or scheduler can run any new commands.
+  // After reconciling, repair protective orders (stops/TPs) for every plan
+  // that was mid-execution when the previous process died.
+  try {
+    const startupCtx = await contextResolver.resolve("daemon");
+    if (startupCtx.exchange) {
+      const reconciliation = await reconcileWithExchange(startupCtx.exchange);
+      logger.info("Startup reconciliation complete", {
+        success: reconciliation.success,
+        tradesReconciled: reconciliation.tradesReconciled,
+        ordersUpdated: reconciliation.ordersUpdated,
+        errors: reconciliation.errors.length,
+        warnings: reconciliation.warnings.length,
+      });
+      safeAppendAudit({
+        eventType: "daemon.startup_reconciliation",
+        actor: "daemon",
+        payload: {
+          success: reconciliation.success,
+          tradesReconciled: reconciliation.tradesReconciled,
+          ordersUpdated: reconciliation.ordersUpdated,
+          errors: reconciliation.errors,
+          warnings: reconciliation.warnings,
+        },
+      });
+
+      for (const plan of listPlans({ status: "EXECUTING" })) {
+        try {
+          const repair = await repairProtectiveOrders(plan.id, startupCtx.exchange);
+          logger.info("Protective-order repair after restart", {
+            planId: plan.id,
+            repaired: repair.repaired,
+            placed: repair.placed,
+            reason: repair.reason,
+          });
+          safeAppendAudit({
+            eventType: "daemon.protective_orders_repaired",
+            actor: "daemon",
+            payload: { planId: plan.id, ...repair },
+          });
+        } catch (error) {
+          logger.error("Protective-order repair failed", error as Error, { planId: plan.id });
+        }
+      }
+    } else {
+      logger.warn("Startup reconciliation skipped — no exchange configured");
+    }
+  } catch (error) {
+    logger.error("Startup reconciliation failed — local state may be stale until the next reconciliation cycle", error as Error);
+    safeAppendAudit({
+      eventType: "daemon.startup_reconciliation_failed",
+      actor: "daemon",
+      payload: { error: error instanceof Error ? error.message : String(error) },
     });
   }
 

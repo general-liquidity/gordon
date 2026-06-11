@@ -28,7 +28,12 @@ export type { XTweet, XSearchOptions, XSearchSummary } from "./providers/social/
 export { FundamentalsClient, getFundamentalsClient } from "./providers/fundamentals.ts";
 export { AlphaVantageClient, getAlphaVantageClient } from "./providers/alphaVantage.ts";
 export { enrichQuoteWithLLM } from "./enrichment/llmEnrichment.ts";
-export { MultiSourceQuoteService } from "./providers/multiSourceQuote.ts";
+export {
+  MultiSourceQuoteService,
+  QuoteUnavailableError,
+  SOURCE_DISAGREEMENT_THRESHOLD,
+} from "./providers/multiSourceQuote.ts";
+export type { EnrichedQuote } from "./providers/multiSourceQuote.ts";
 
 // Data source registry for discovery and health monitoring
 export interface DataSourceInfo {

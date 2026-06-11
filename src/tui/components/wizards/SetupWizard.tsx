@@ -33,7 +33,7 @@ interface Props {
   preflight?: SetupPreflight;
 }
 
-interface StepConfig {
+export interface StepConfig {
   id: string;
   section: SetupWizardSection;
   title: string;
@@ -96,11 +96,14 @@ const EXCHANGE_STEP: StepConfig = {
   id: "exchange",
   section: "exchange",
   title: "Crypto Exchange",
-  description: "Connect a crypto exchange? (skip if stocks-only)",
+  description:
+    "Connect a crypto exchange? Start in paper — you can go live anytime. (skip if stocks-only)",
   inputType: "select",
   key: "exchange",
-  // Dynamic options: label already-configured exchanges with a marker and
-  // surface a "Keep existing" default at the top when any are set.
+  // Dynamic options: paper/testnet venues lead (paper-first ramp for new
+  // users); live venues sit behind explicit "I understand, go live" copy.
+  // Already-configured exchanges get a marker and a "Keep existing" default
+  // at the top when any are set.
   dynamicOptions: (_d, p) => {
     const live = [
       { label: "Binance", value: "binance" },
@@ -117,18 +120,21 @@ const EXCHANGE_STEP: StepConfig = {
       label: p.exchanges.includes(opt.value) ? `${opt.label} (configured)` : opt.label,
     }));
     const sandbox = [
-      { label: "─── Testnet / Paper Trading ───────────────", value: "skip" },
+      { label: "─── Recommended: paper trading, no real money ───", value: "skip" },
       { label: "Binance Testnet  (paper, no real money)", value: "binance-testnet" },
       { label: "Coinbase Sandbox  (paper, no real money)", value: "coinbase-sandbox" },
       { label: "OKX Demo  (paper, no real money)", value: "okx-demo" },
       { label: "Gemini Sandbox  (paper, no real money)", value: "gemini-sandbox" },
       { label: "Hyperliquid Testnet  (paper, no real money)", value: "hyperliquid-testnet" },
     ];
+    const liveHeader = [
+      { label: "─── Live venues — real money. I understand, go live ───", value: "skip" },
+    ];
     const prefix = p.exchanges.length > 0
       ? [{ label: "Keep existing — don't touch exchanges", value: "skip" }]
       : [];
     const suffix = p.exchanges.length === 0 ? [{ label: "Skip", value: "skip" }] : [];
-    return [...prefix, ...live, ...sandbox, ...suffix];
+    return [...prefix, ...sandbox, ...liveHeader, ...live, ...suffix];
   },
 };
 
@@ -339,12 +345,14 @@ const PERMISSION_MODE_STEP: StepConfig = {
   id: "permission-mode",
   section: "preferences",
   title: "Permission Mode",
-  description: "How should Gordon handle trade execution?",
+  description:
+    "How should Gordon handle trade execution? Paper mode is the recommended first-run ramp — switch to live later with /mode.",
   inputType: "select",
   key: "permissionMode",
   options: [
-    { label: "Ask — approve each trade via dialog (recommended)", value: "ask" },
-    { label: "Auto — execute trades without asking", value: "auto" },
+    { label: "Paper — simulated orders only, no real money (recommended to start)", value: "paper" },
+    { label: "Ask — approve each trade via dialog", value: "ask" },
+    { label: "Auto — execute trades without asking (real money moves — I understand, go live)", value: "auto" },
     { label: "Strict — read-only, never trade", value: "strict" },
   ],
   // Skip if the user already has a non-default permissionMode set.
@@ -383,7 +391,9 @@ const KEYBINDINGS_STEP: StepConfig = {
   options: [{ label: "Let's go!", value: "ready" }],
 };
 
-const ALL_STEPS: StepConfig[] = [
+// Exported for tests — the paper-first ordering of the exchange and
+// permission-mode steps is a safety default that must not regress silently.
+export const ALL_STEPS: StepConfig[] = [
   LLM_PROVIDER_STEP,
   LLM_KEY_STEP,
   EXCHANGE_STEP,

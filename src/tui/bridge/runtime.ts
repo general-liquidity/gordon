@@ -41,6 +41,7 @@ import { subscribeToEvents } from "./eventSubscriptions.js";
 import type { Action, TuiNotification } from "../state/types.js";
 import { appendNotificationCapped } from "../state/notificationRetention.ts";
 import { noteRiskKernelFailure, resetRiskKernelHealth } from "./riskKernelHealth.ts";
+import { fetchApprovalRiskDetails, buildCounterOfferDenialReason } from "./approvalRiskDetails.ts";
 import { recordTurn, resetTurnSummaries, formatTurnsView } from "./turnSummaries.ts";
 
 // ── Extracted handlers ──
@@ -722,6 +723,16 @@ async function streamResponse(
             ...m,
           })) as Message[];
 
+          // Thread the risk kernel's actual rejection reasons + size-adjusted
+          // counter-offer into each dialog payload. Display-only — failures
+          // fall back to the un-enriched approval.
+          const enrichedPending: ApprovalRequest[] = await Promise.all(
+            stillPending.map(async (approval) => ({
+              ...mapApproval(approval),
+              ...((await fetchApprovalRiskDetails(approval)) ?? {}),
+            })),
+          );
+
           setState((prev: any) => {
             // Persist tool call results as messages (Claude Code: tool results stay inline)
             const calls = prev.activeToolCalls ?? [];
@@ -766,7 +777,7 @@ async function streamResponse(
             contextTokens: inputTokens > 0 ? inputTokens : (prev.contextTokens ?? 0) + totalTokens,
             lastTurnDurationMs: Date.now() - chainStartTime,
             lastTurnTokens: totalTokens,
-            pendingApprovals: stillPending.map(mapApproval),
+            pendingApprovals: enrichedPending,
           };});
           break;
         }
@@ -880,14 +891,33 @@ async function handleApproval(
 
 // Handle approval from ApprovalDialog component
 export function handleApprovalDecision(
-  decision: "always" | "once" | "deny",
+  decision: "always" | "once" | "deny" | "modify",
   approvalId: string,
   setState: StateUpdater,
+  approval?: ApprovalRequest,
 ): void {
   const runtime = activeRuntime;
   if (!runtime) return;
 
-  if (decision === "deny") {
+  if (decision === "modify") {
+    // Counter-offer accepted: the original (oversized) order must NOT run.
+    // Fail closed \u2014 deny through the existing plumbing with a structured
+    // reason so the agent resubmits at the kernel-adjusted size, which then
+    // re-passes the full risk gate like any other order.
+    const counterOffer = approval?.counterOffer;
+    runtime.denyPendingRequest(approvalId, {
+      actor: "user",
+      reason: buildCounterOfferDenialReason(counterOffer),
+    });
+    addMessage(
+      setState,
+      "gordon",
+      counterOffer
+        ? `\u2713 Counter-offer accepted \u2014 resubmitting at ${counterOffer.adjustedQuantity} ${counterOffer.symbol}.`
+        : "\u2713 Counter-offer accepted \u2014 resubmitting at the reduced size.",
+      "approval",
+    );
+  } else if (decision === "deny") {
     runtime.denyPendingRequest(approvalId, { actor: "user" });
     addMessage(setState, "gordon", "\u2717 Denied.", "approval");
   } else {
@@ -895,6 +925,15 @@ export function handleApprovalDecision(
     runtime.approvePendingRequest(approvalId, { persist, actor: "user", scope: persist ? "session" : undefined });
     addMessage(setState, "gordon", `\u2713 Approved${persist ? " (always for this tool)" : ""}.`, "approval");
   }
+
+  // The request is resolved in the engine \u2014 drop it from the dialog queue
+  // immediately instead of waiting for the next stream `done` refresh.
+  setState((prev: any) => ({
+    ...prev,
+    pendingApprovals: (prev.pendingApprovals ?? []).filter(
+      (entry: ApprovalRequest) => entry.id !== approvalId,
+    ),
+  }));
 }
 
 // ============================================================================

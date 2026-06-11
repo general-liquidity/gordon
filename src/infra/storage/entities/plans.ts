@@ -1,4 +1,8 @@
+import { createHash } from "node:crypto";
 import { getDatabase } from "../database.ts";
+// Imported from structured.ts directly (not the observability barrel) because
+// the barrel re-exports metrics.ts, which imports this module — a cycle.
+import { recordStructuredObservation } from "../../platform/observability/structured.ts";
 import type { Plan, PlanStatus } from "../../../types/index.ts";
 
 /**
@@ -7,6 +11,84 @@ import type { Plan, PlanStatus } from "../../../types/index.ts";
 function generatePlanId(): string {
   const random = Math.random().toString(36).substring(2, 10);
   return `pln_${random}`;
+}
+
+// Migration: approvedContentHash column (approve→execute content binding).
+// Lazy + idempotent so pre-existing databases pick it up on first use.
+let approvedContentHashColumnEnsured = false;
+
+function getPlansDb(): ReturnType<typeof getDatabase> {
+  const db = getDatabase();
+  if (!approvedContentHashColumnEnsured) {
+    try {
+      db.run("ALTER TABLE plans ADD COLUMN approvedContentHash TEXT");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (!/duplicate column/i.test(msg)) {
+        throw err;
+      }
+    }
+    approvedContentHashColumnEnsured = true;
+  }
+  return db;
+}
+
+/**
+ * Canonical content hash over the trade-relevant plan fields ONLY (what would
+ * actually be traded: instrument, side, entry, size, stop, TPs, routing).
+ * Timestamps, status, reasoning and other metadata are deliberately excluded
+ * so an approval binds to trade content, not bookkeeping. Fields are projected
+ * explicitly to fix key order, making the hash stable across JSON round-trips.
+ */
+export function computePlanContentHash(plan: Plan): string {
+  const content = {
+    symbol: plan.symbol,
+    direction: plan.direction,
+    strategy: plan.strategy,
+    allocation: {
+      currency: plan.allocation.currency,
+      amount: plan.allocation.amount,
+      percentOfPortfolio: plan.allocation.percentOfPortfolio,
+    },
+    entry: { type: plan.entry.type, price: plan.entry.price },
+    dca: plan.dca
+      ? plan.dca.map((l) => ({ price: l.price, percentOfAllocation: l.percentOfAllocation }))
+      : null,
+    grid: plan.grid
+      ? {
+          levels: plan.grid.levels.map((l) => ({
+            price: l.price,
+            percentOfAllocation: l.percentOfAllocation,
+          })),
+          distribution: plan.grid.distribution,
+          priceRange: { high: plan.grid.priceRange.high, low: plan.grid.priceRange.low },
+        }
+      : null,
+    stopLoss: { price: plan.stopLoss.price },
+    takeProfit: plan.takeProfit.map((tp) => ({
+      price: tp.price,
+      percentToSell: tp.percentToSell,
+    })),
+    routingPolicy: plan.routingPolicy ?? null,
+  };
+  return createHash("sha256").update(JSON.stringify(content)).digest("hex");
+}
+
+/**
+ * Stores the content hash captured at approval time. execute_plan recomputes
+ * and compares — a mismatch means the plan was mutated after approval.
+ */
+export function setApprovedContentHash(id: string, hash: string): void {
+  const db = getPlansDb();
+  db.prepare("UPDATE plans SET approvedContentHash = ? WHERE id = ?").run(hash, id);
+}
+
+export function getApprovedContentHash(id: string): string | null {
+  const db = getPlansDb();
+  const row = db.prepare("SELECT approvedContentHash FROM plans WHERE id = ?").get(id) as
+    | { approvedContentHash?: string | null }
+    | null;
+  return row?.approvedContentHash ?? null;
 }
 
 /**
@@ -37,7 +119,7 @@ function rowToPlan(row: Record<string, unknown>): Plan {
 export function createPlan(
   plan: Omit<Plan, "id" | "createdAt">
 ): Plan {
-  const db = getDatabase();
+  const db = getPlansDb();
 
   const id = generatePlanId();
   const createdAt = new Date().toISOString();
@@ -78,7 +160,7 @@ export function createPlan(
  * Gets a plan by ID
  */
 export function getPlan(id: string): Plan | null {
-  const db = getDatabase();
+  const db = getPlansDb();
 
   const stmt = db.prepare("SELECT * FROM plans WHERE id = ?");
   const row = stmt.get(id) as Record<string, unknown> | null;
@@ -94,7 +176,7 @@ export function getPlan(id: string): Plan | null {
  * Updates a plan with partial data
  */
 export function updatePlan(id: string, updates: Partial<Plan>): Plan {
-  const db = getDatabase();
+  const db = getPlansDb();
 
   const existing = getPlan(id);
   if (!existing) {
@@ -102,6 +184,17 @@ export function updatePlan(id: string, updates: Partial<Plan>): Plan {
   }
 
   const updated: Plan = { ...existing, ...updates };
+
+  // Approval content binding: changing any trade-relevant field on an
+  // APPROVED plan voids the approval. Demote to DRAFT (re-approval required)
+  // and clear the stored approval hash — fail closed even if the caller
+  // tried to set a status of its own in the same update.
+  const demoted =
+    existing.status === "APPROVED" &&
+    computePlanContentHash(existing) !== computePlanContentHash(updated);
+  if (demoted) {
+    updated.status = "DRAFT";
+  }
 
   const stmt = db.prepare(`
     UPDATE plans
@@ -125,6 +218,22 @@ export function updatePlan(id: string, updates: Partial<Plan>): Plan {
     id
   );
 
+  if (demoted) {
+    db.prepare("UPDATE plans SET approvedContentHash = NULL WHERE id = ?").run(id);
+    recordStructuredObservation({
+      eventType: "plan.approval_demoted",
+      workflow: "execution",
+      source: "storage",
+      component: "plans_store",
+      outcome: "info",
+      status: "content_changed_after_approval",
+      planId: id,
+      symbol: updated.symbol,
+      reason:
+        "Trade-relevant plan fields changed after approval — demoted to DRAFT; re-approval required before execution.",
+    });
+  }
+
   return updated;
 }
 
@@ -132,7 +241,7 @@ export function updatePlan(id: string, updates: Partial<Plan>): Plan {
  * Lists plans with optional status filter
  */
 export function listPlans(filter?: { status?: PlanStatus }): Plan[] {
-  const db = getDatabase();
+  const db = getPlansDb();
 
   let query = "SELECT * FROM plans";
   const params: string[] = [];

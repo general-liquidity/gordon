@@ -1,8 +1,10 @@
 name: eval-gate
 
-# Blocks a PR when the eval harness regresses. Three deterministic legs run
-# with no API keys; the optional LLM-judge regression leg activates only when
-# trajectory fixtures + provider keys are present (post paper-mode capture).
+# Blocks a PR when the eval harness regresses. Deterministic legs run with no
+# API keys: the eval unit suite, the structural suite check, the committed-
+# fixture coverage check, and the gold-trace process checks (against the
+# committed src/infra/domain/evals/fixtures/gold-traces.json by default).
+# The optional LLM-judge regression leg is key-gated — see "Eval gate" below.
 on:
   pull_request:
     paths:
@@ -38,8 +40,19 @@ jobs:
       - name: Eval unit suite
         run: bun test src/infra/domain/evals
 
-      # Legs 2+3: structural + gold-trace process checks (+ opt-in judge
-      # regression when fixtures/keys exist). Blocks merge on non-zero exit.
+      # Structural + committed-fixture coverage + gold-trace process checks.
+      # All deterministic, no API keys: the gold-trace leg runs against the
+      # committed src/infra/domain/evals/fixtures/gold-traces.json unless
+      # GORDON_EVAL_GOLD_TRACES overrides it (paper-mode captures; a set but
+      # missing path FAILS the gate). Blocks merge on non-zero exit.
+      #
+      # LLM-judge regression leg (opt-in, key-gated). Activates when ALL of:
+      #   - repo var GORDON_EVAL_CANDIDATE: path to a candidate trajectory
+      #     fixture (paper-mode capture in the committed fixture format)
+      #   - secret DEDALUS_API_KEY (or OPENAI_API_KEY / INCEPTION_API_KEY)
+      # Baseline defaults to the committed fixtures/baseline-trajectories.json;
+      # repo var GORDON_EVAL_BASELINE overrides. Activating without a key
+      # fails the gate (no silent judge-fallback pass).
       - name: Eval gate
         run: bun run scripts/dev/eval-gate.ts
         env:

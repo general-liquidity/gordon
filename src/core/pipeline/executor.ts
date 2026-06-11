@@ -473,11 +473,16 @@ export async function executePlan(
           : currentPrice)
         : plan.entry.price ?? currentPrice;
 
+    const exitQuantity =
+      entryOrder.executedQty > 0
+        ? roundQuantity(entryOrder.executedQty)
+        : totalQuantity;
+
     placedOrders.push({
       type: "entry",
       orderId: entryOrder.orderId.toString(),
       price: entryPrice,
-      quantity: totalQuantity,
+      quantity: exitQuantity,
     });
 
     logEvent({
@@ -515,8 +520,8 @@ export async function executePlan(
       const ocoResult = await placeOCOOrders(
         client,
         plan.symbol,
-        "SELL",
-        totalQuantity,
+        exitSide,
+        exitQuantity,
         plan.stopLoss.price,
         roundPrice(plan.stopLoss.price * 0.995),
         tp.price,
@@ -544,7 +549,7 @@ export async function executePlan(
           type: "stop",
           orderId: ocoResult.orderIds[0],
           price: plan.stopLoss.price,
-          quantity: totalQuantity,
+          quantity: exitQuantity,
         });
       }
       if (ocoResult.orderIds[1]) {
@@ -552,7 +557,7 @@ export async function executePlan(
           type: "take_profit",
           orderId: ocoResult.orderIds[1],
           price: tp.price,
-          quantity: totalQuantity,
+          quantity: exitQuantity,
         });
       }
 
@@ -565,7 +570,7 @@ export async function executePlan(
           symbol: plan.symbol,
           stopPrice: plan.stopLoss.price,
           takeProfitPrice: tp.price,
-          quantity: totalQuantity,
+          quantity: exitQuantity,
           orderIds: ocoResult.orderIds,
         },
         planId: plan.id,
@@ -578,7 +583,7 @@ export async function executePlan(
         symbol: plan.symbol,
         side: exitSide,
         type: "STOP_LOSS_LIMIT",
-        quantity: totalQuantity,
+        quantity: exitQuantity,
         price: roundPrice(plan.stopLoss.price * 0.995),
         stopPrice: roundPrice(plan.stopLoss.price),
         timeInForce: "GTC",
@@ -623,7 +628,7 @@ export async function executePlan(
         type: "stop",
         orderId: stopOrder.orderId.toString(),
         price: plan.stopLoss.price,
-        quantity: totalQuantity,
+        quantity: exitQuantity,
       });
 
       logEvent({
@@ -632,16 +637,16 @@ export async function executePlan(
           action: "STOP_LOSS",
           orderId: stopOrder.orderId.toString(),
           symbol: plan.symbol,
-          side: "SELL",
+          side: exitSide,
           type: "STOP_LOSS_LIMIT",
           stopPrice: plan.stopLoss.price,
-          quantity: totalQuantity,
+          quantity: exitQuantity,
         },
         planId: plan.id,
       });
 
       // 6c. Place take-profit orders
-      let remainingQuantity = totalQuantity;
+      let remainingQuantity = exitQuantity;
       for (let i = 0; i < plan.takeProfit.length; i++) {
         const tp = plan.takeProfit[i];
         if (!tp) {
@@ -651,7 +656,7 @@ export async function executePlan(
 
         const tpQuantity = isLastTP
           ? remainingQuantity
-          : roundQuantity(totalQuantity * tp.percentToSell);
+          : roundQuantity(exitQuantity * tp.percentToSell);
 
         remainingQuantity = roundQuantity(remainingQuantity - tpQuantity);
 
@@ -732,10 +737,15 @@ export async function executePlan(
     const entryFill: EntryFill = {
       orderId: entryOrder.orderId.toString(),
       price: entryPrice,
-      quantity: totalQuantity,
+      quantity: exitQuantity,
       filledAt:
         plan.entry.type === "market" ? new Date().toISOString() : "",
     };
+
+    const entryFilled =
+      plan.entry.type === "market" ||
+      entryOrder.status === "FILLED" ||
+      entryOrder.status === "PARTIALLY_FILLED";
 
     const trade = createTrade({
       planId: plan.id,
@@ -747,7 +757,12 @@ export async function executePlan(
       averageEntry: entryPrice,
       realizedPnl: 0,
       realizedPnlPercent: 0,
-      status: plan.entry.type === "market" ? "OPEN" : "PARTIAL",
+      status: entryFilled
+        ? entryOrder.status === "PARTIALLY_FILLED" ||
+          (entryOrder.executedQty > 0 && entryOrder.executedQty < totalQuantity)
+          ? "PARTIAL"
+          : "OPEN"
+        : "PARTIAL",
     });
 
     // Emit trade opened event
@@ -2148,18 +2163,39 @@ export async function placeOCOOrders(
         takeProfitPrice,
       });
     } catch (error) {
-      // TP leg failed — roll back the stop leg
-      logger.warn(`${logPrefix}OCO TP leg failed, rolling back stop leg`, { stopOrderId: placedOrderIds[0] });
-      await safelyCancelOrder(client, symbol, placedOrderIds[0]!, planId ?? "");
+      const stopOrderId = placedOrderIds[0]!;
+      let skipStopRollback = false;
+      try {
+        const stopStatus = await client.getOrderStatus(symbol, stopOrderId);
+        if (stopStatus.status === "FILLED" || stopStatus.status === "PARTIALLY_FILLED") {
+          skipStopRollback = true;
+          logger.warn(`${logPrefix}OCO TP leg failed but stop already filled — skipping rollback`, {
+            stopOrderId,
+            stopStatus: stopStatus.status,
+          });
+        }
+      } catch (statusError) {
+        logger.warn(`${logPrefix}Could not verify stop status before OCO rollback`, {
+          stopOrderId,
+          error: statusError instanceof Error ? statusError.message : String(statusError),
+        });
+      }
+
+      if (!skipStopRollback) {
+        logger.warn(`${logPrefix}OCO TP leg failed, rolling back stop leg`, { stopOrderId });
+        await safelyCancelOrder(client, symbol, stopOrderId, planId ?? "");
+      }
 
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
       auditLog.failure(userId, "PLACE_OCO_ORDER", { symbol, native: false }, errorMessage, planId ? { planId } : undefined);
 
       return {
         success: false,
-        orderIds: [],
+        orderIds: skipStopRollback ? [stopOrderId] : [],
         native: false,
-        error: `OCO take-profit leg failed: ${errorMessage}. Stop leg rolled back.`,
+        error: skipStopRollback
+          ? `OCO take-profit leg failed: ${errorMessage}. Stop leg already filled — rollback skipped.`
+          : `OCO take-profit leg failed: ${errorMessage}. Stop leg rolled back.`,
       };
     }
 
@@ -2207,6 +2243,268 @@ export async function placeOCOOrders(
       error: `OCO fallback failed: ${errorMessage}`,
     };
   }
+}
+
+// ============================================================================
+// Protective Order Repair (daemon startup)
+// ============================================================================
+
+export interface ProtectiveOrderRepairResult {
+  repaired: boolean;
+  placed: string[];
+  reason: string;
+}
+
+const ACTIVE_ORDER_STATUSES = new Set(["NEW", "PARTIALLY_FILLED"]);
+
+function isActiveProtectiveOrder(order: Order): boolean {
+  return ACTIVE_ORDER_STATUSES.has(order.status);
+}
+
+async function findPlanScopedOrders(
+  client: Exchange,
+  symbol: string,
+  planId: string,
+): Promise<Order[]> {
+  const prefix = `gordon_${planId.slice(4, 12)}_`;
+  const byOrderId = new Map<string, Order>();
+
+  try {
+    const history = await client.getOrderHistory(symbol, 200);
+    for (const order of history) {
+      if (order.clientOrderId?.startsWith(prefix)) {
+        byOrderId.set(order.orderId.toString(), order);
+      }
+    }
+  } catch (error) {
+    logger.warn("Failed to load order history for protective repair", {
+      planId,
+      symbol,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+
+  try {
+    const openOrders = await client.getOpenOrders(symbol);
+    for (const order of openOrders) {
+      if (order.clientOrderId?.startsWith(prefix)) {
+        byOrderId.set(order.orderId.toString(), order);
+      }
+    }
+  } catch (error) {
+    logger.warn("Failed to load open orders for protective repair", {
+      planId,
+      symbol,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+
+  return [...byOrderId.values()];
+}
+
+function resolvePositionQuantity(
+  plan: Plan,
+  planOrders: Order[],
+  trades: Trade[],
+): number {
+  const activeTrade = trades.find(
+    (t) => t.planId === plan.id && (t.status === "OPEN" || t.status === "PARTIAL"),
+  );
+
+  if (activeTrade && activeTrade.entries.length > 0) {
+    const fromEntries = activeTrade.entries.reduce((sum, e) => sum + e.quantity, 0);
+    if (fromEntries > 0) {
+      return roundQuantity(fromEntries);
+    }
+  }
+
+  if (plan.strategy === "grid_entry") {
+    const filledGridQty = planOrders
+      .filter(
+        (o) =>
+          o.clientOrderId?.includes("grid") &&
+          (o.status === "FILLED" || o.status === "PARTIALLY_FILLED"),
+      )
+      .reduce((sum, o) => sum + o.executedQty, 0);
+    if (filledGridQty > 0) {
+      return roundQuantity(filledGridQty);
+    }
+  }
+
+  const entryOrder =
+    planOrders.find((o) => o.clientOrderId?.endsWith("_entry")) ??
+    planOrders.find((o) => o.clientOrderId?.includes("entry"));
+
+  if (
+    entryOrder &&
+    (entryOrder.status === "FILLED" || entryOrder.status === "PARTIALLY_FILLED") &&
+    entryOrder.executedQty > 0
+  ) {
+    return roundQuantity(entryOrder.executedQty);
+  }
+
+  return 0;
+}
+
+function hasActiveStopLeg(planOrders: Order[]): boolean {
+  return planOrders.some(
+    (o) =>
+      isActiveProtectiveOrder(o) &&
+      (o.clientOrderId?.includes("stop") ?? false) &&
+      !(o.clientOrderId?.includes("tp") ?? false),
+  );
+}
+
+function hasActiveTakeProfitLeg(planOrders: Order[], tpIndex: number): boolean {
+  const tag = `tp${tpIndex}`;
+  return planOrders.some(
+    (o) => isActiveProtectiveOrder(o) && (o.clientOrderId?.includes(tag) ?? false),
+  );
+}
+
+/**
+ * After a daemon crash mid-execution, re-place any missing stop/TP orders for
+ * EXECUTING plans that still have open exposure. Idempotent via deterministic
+ * client order IDs + placeOrderIdempotent.
+ */
+export async function repairProtectiveOrders(
+  planId: string,
+  client: Exchange,
+): Promise<ProtectiveOrderRepairResult> {
+  const plan = getPlan(planId);
+  if (!plan) {
+    return { repaired: false, placed: [], reason: "plan_not_found" };
+  }
+  if (plan.status !== "EXECUTING") {
+    return { repaired: false, placed: [], reason: "plan_not_executing" };
+  }
+
+  const planOrders = await findPlanScopedOrders(client, plan.symbol, planId);
+  const activeTrades = listTrades().filter(
+    (t) => t.planId === planId && (t.status === "OPEN" || t.status === "PARTIAL"),
+  );
+
+  const positionQty = resolvePositionQuantity(plan, planOrders, activeTrades);
+  if (positionQty <= 0) {
+    return { repaired: false, placed: [], reason: "no_open_position" };
+  }
+
+  const isShort = plan.direction === "short";
+  const exitSide: "BUY" | "SELL" = isShort ? "BUY" : "SELL";
+  const placed: string[] = [];
+
+  if (!hasActiveStopLeg(planOrders)) {
+    const stopParams: OrderParams = {
+      symbol: plan.symbol,
+      side: exitSide,
+      type: "STOP_LOSS_LIMIT",
+      quantity: positionQty,
+      price: roundPrice(plan.stopLoss.price * 0.995),
+      stopPrice: roundPrice(plan.stopLoss.price),
+      timeInForce: "GTC",
+      newClientOrderId: generateDeterministicClientOrderId(planId, "stop"),
+    };
+
+    try {
+      const stopOrder = await placeOrderIdempotent(client, stopParams);
+      placed.push("stop");
+      logger.info("Repaired missing stop-loss", {
+        planId,
+        orderId: stopOrder.orderId,
+        quantity: positionQty,
+      });
+      logEvent({
+        type: "ORDER_PLACED",
+        data: {
+          action: "PROTECTIVE_REPAIR_STOP",
+          orderId: stopOrder.orderId.toString(),
+          quantity: positionQty,
+        },
+        planId,
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      logger.error("Failed to repair stop-loss", error as Error, { planId });
+      return {
+        repaired: placed.length > 0,
+        placed,
+        reason: `stop_repair_failed: ${errorMessage}`,
+      };
+    }
+  }
+
+  if (plan.strategy !== "grid_entry") {
+    let remainingQuantity = positionQty;
+    for (let i = 0; i < plan.takeProfit.length; i++) {
+      const tp = plan.takeProfit[i];
+      if (!tp) {
+        continue;
+      }
+
+      if (hasActiveTakeProfitLeg(planOrders, i + 1)) {
+        const isLastTP = i === plan.takeProfit.length - 1;
+        if (!isLastTP) {
+          const tpQuantity = roundQuantity(positionQty * tp.percentToSell);
+          remainingQuantity = roundQuantity(remainingQuantity - tpQuantity);
+        }
+        continue;
+      }
+
+      const isLastTP = i === plan.takeProfit.length - 1;
+      const tpQuantity = isLastTP
+        ? remainingQuantity
+        : roundQuantity(positionQty * tp.percentToSell);
+      remainingQuantity = roundQuantity(remainingQuantity - tpQuantity);
+
+      if (tpQuantity <= 0) {
+        continue;
+      }
+
+      const tpParams: OrderParams = {
+        symbol: plan.symbol,
+        side: exitSide,
+        type: "LIMIT",
+        quantity: tpQuantity,
+        price: roundPrice(tp.price),
+        timeInForce: "GTC",
+        newClientOrderId: generateDeterministicClientOrderId(planId, `tp${i + 1}`),
+      };
+
+      try {
+        const tpOrder = await placeOrderIdempotent(client, tpParams);
+        placed.push(`tp${i + 1}`);
+        logger.info("Repaired missing take-profit", {
+          planId,
+          level: i + 1,
+          orderId: tpOrder.orderId,
+          quantity: tpQuantity,
+        });
+        logEvent({
+          type: "ORDER_PLACED",
+          data: {
+            action: `PROTECTIVE_REPAIR_TP_${i + 1}`,
+            orderId: tpOrder.orderId.toString(),
+            quantity: tpQuantity,
+          },
+          planId,
+        });
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error";
+        logger.error("Failed to repair take-profit", error as Error, { planId, level: i + 1 });
+        return {
+          repaired: placed.length > 0,
+          placed,
+          reason: `tp${i + 1}_repair_failed: ${errorMessage}`,
+        };
+      }
+    }
+  }
+
+  if (placed.length === 0) {
+    return { repaired: false, placed: [], reason: "protective_orders_intact" };
+  }
+
+  return { repaired: true, placed, reason: "protective_orders_repaired" };
 }
 
 // ============================================================================

@@ -39,11 +39,13 @@ describe("probabilisticSharpeRatio", () => {
     expect(r.significant).toBe(false);
   });
 
-  test("KNOWN BUG: float noise defeats the s===0 guard for constant 0.01 returns → NaN psr", () => {
-    // sum(50 × 0.01)/50 !== 0.01 exactly, so stddev ~1e-18 instead of 0;
-    // the huge Sharpe then drives the seSharpe sqrt negative → NaN.
+  test("float noise from constant 0.01 returns is caught by the zero-variance guard", () => {
+    // sum(50 × 0.01)/50 !== 0.01 exactly, so stddev is ~1e-18 instead of 0.
+    // The relative-epsilon guard must treat that as zero variance, not as an
+    // astronomical Sharpe.
     const r = probabilisticSharpeRatio(new Array(50).fill(0.01));
-    expect(Number.isNaN(r.psr)).toBe(true);
+    expect(r.psr).toBe(0.5);
+    expect(r.observedSharpe).toBe(0);
     expect(r.significant).toBe(false);
   });
 
@@ -84,6 +86,13 @@ describe("deflatedSharpeRatio", () => {
     expect(r.dsr).toBe(0.5);
     expect(r.significant).toBe(false);
     expect(r.expectedMaxSharpeUnderNull).toBe(0);
+  });
+
+  test("constant returns (float-noise variance) yield neutral, non-significant DSR", () => {
+    const r = deflatedSharpeRatio(new Array(50).fill(0.01), 10);
+    expect(r.dsr).toBe(0.5);
+    expect(r.observedSharpe).toBe(0);
+    expect(r.significant).toBe(false);
   });
 
   test("with a single trial the null benchmark is zero and DSR equals PSR", () => {
@@ -188,6 +197,12 @@ describe("combinatorialPurgedCV", () => {
     expect(r.likelyOverfit).toBe(false);
     expect(r.meanOOSSharpe).toBeGreaterThan(0);
     expect(r.summary).toContain("CREDIBLE");
+  });
+
+  test("constant returns (float-noise variance) do not produce inflated fold Sharpes", () => {
+    const r = combinatorialPurgedCV(new Array(240).fill(0.01));
+    expect(r.oosSharpesPerFold.every((s) => s === 0)).toBe(true);
+    expect(r.likelyOverfit).toBe(true);
   });
 
   test("pure noise (balanced alternating returns) is flagged as overfit", () => {

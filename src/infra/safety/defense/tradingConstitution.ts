@@ -13,6 +13,13 @@
  * Sources: See commit message for full bibliography.
  */
 
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { createModuleLogger } from "../../logger/index.ts";
+import { getGordonDir } from "../../storage/paths.ts";
+
+const logger = createModuleLogger("trading-constitution");
+
 // ============================================================================
 // The Constitution (IMMUTABLE — do not add config overrides)
 // ============================================================================
@@ -212,9 +219,132 @@ export type ConstitutionViolation = {
   message: string;
 };
 
+// ============================================================================
+// Halt State — makes HALT_REQUIRES_MANUAL_RESET real
+//
+// A halt/emergency-severity violation trips a halt that is persisted to
+// disk (atomic write) and reloaded on startup, so a restart cannot silently
+// resume trading. The only way out is resetConstitutionHalt() with an
+// explicit rationale, which is logged.
+// ============================================================================
+
+export const CONSTITUTION_HALT_PATH_ENV = "GORDON_CONSTITUTION_HALT_PATH";
+export const MIN_HALT_RESET_RATIONALE_CHARS = 10;
+
+export interface ConstitutionHalt {
+  rule: string;
+  message: string;
+  haltedAt: string;
+}
+
+interface HaltFileState {
+  halt: ConstitutionHalt | null;
+  lastReset?: { rule: string; rationale: string; at: string };
+}
+
+let haltState: HaltFileState = { halt: null };
+
+function haltStatePath(): string | null {
+  const override = process.env[CONSTITUTION_HALT_PATH_ENV];
+  if (override) return override;
+  // Tests must never read or clobber the operator's real halt state —
+  // persistence is in-memory-only under bun test unless the path env is set.
+  if (process.env.NODE_ENV === "test") return null;
+  return join(getGordonDir(), "constitution-halt.json");
+}
+
+function persistHaltState(): void {
+  const path = haltStatePath();
+  if (!path) return;
+  try {
+    mkdirSync(dirname(path), { recursive: true });
+    const tmp = `${path}.tmp`;
+    writeFileSync(tmp, JSON.stringify(haltState, null, 2));
+    renameSync(tmp, path);
+  } catch (error) {
+    // The in-memory halt still gates this session; durability failure is loud.
+    logger.error("Failed to persist constitution halt state", error as Error);
+  }
+}
+
+/** Reload halt state from disk. Called at module init (startup). */
+export function reloadConstitutionHaltState(): void {
+  const path = haltStatePath();
+  if (!path || !existsSync(path)) {
+    haltState = { halt: null };
+    return;
+  }
+  try {
+    const parsed = JSON.parse(readFileSync(path, "utf8")) as HaltFileState;
+    haltState = { halt: parsed.halt ?? null, lastReset: parsed.lastReset };
+  } catch (error) {
+    // Fail closed: an unreadable halt file may be hiding an active halt.
+    haltState = {
+      halt: {
+        rule: "HALT_STATE_UNREADABLE",
+        message: `Halt state file at ${path} could not be parsed (${String(error)}). Treating as halted.`,
+        haltedAt: new Date().toISOString(),
+      },
+    };
+    logger.error("Constitution halt state unreadable — failing closed to halted", error as Error);
+  }
+}
+
+reloadConstitutionHaltState();
+
+/** Trip the persistent halt from a halt/emergency-severity violation. */
+export function recordConstitutionHalt(violation: ConstitutionViolation): void {
+  if (violation.severity !== "halt" && violation.severity !== "emergency") return;
+  if (haltState.halt) return; // first halt wins; reset is the only way out
+  haltState = {
+    ...haltState,
+    halt: {
+      rule: violation.rule,
+      message: violation.message,
+      haltedAt: new Date().toISOString(),
+    },
+  };
+  persistHaltState();
+  logger.warn("Trading constitution halt recorded", {
+    rule: violation.rule,
+    message: violation.message,
+  });
+}
+
+export function activeConstitutionHalt(): ConstitutionHalt | null {
+  return haltState.halt;
+}
+
+/**
+ * Clear an active halt. Requires an explicit rationale (min 10 chars),
+ * which is logged and persisted alongside the cleared state.
+ */
+export function resetConstitutionHalt(rationale: string): { ok: boolean; error?: string } {
+  const trimmed = rationale?.trim() ?? "";
+  if (trimmed.length < MIN_HALT_RESET_RATIONALE_CHARS) {
+    return {
+      ok: false,
+      error: `Halt reset requires a rationale of at least ${MIN_HALT_RESET_RATIONALE_CHARS} characters.`,
+    };
+  }
+  if (!haltState.halt) return { ok: true };
+  const rule = haltState.halt.rule;
+  haltState = {
+    halt: null,
+    lastReset: { rule, rationale: trimmed, at: new Date().toISOString() },
+  };
+  persistHaltState();
+  logger.info("Trading constitution halt reset", { rule, rationale: trimmed });
+  return { ok: true };
+}
+
 /**
  * Check a proposed trade against the Trading Constitution.
  * Returns ALL violations (not just the first one).
+ *
+ * While a recorded halt is active (including one reloaded from a previous
+ * session), every check reports a halt-severity HALT_REQUIRES_MANUAL_RESET
+ * violation — trading does not auto-resume.
  */
 export function checkConstitution(params: {
   positionSizePct: number;
@@ -239,6 +369,18 @@ export function checkConstitution(params: {
 }): ConstitutionViolation[] {
   const C = TRADING_CONSTITUTION;
   const violations: ConstitutionViolation[] = [];
+
+  // Active (possibly reloaded-from-disk) halt gates everything
+  const halt = activeConstitutionHalt();
+  if (halt) {
+    violations.push({
+      rule: "HALT_REQUIRES_MANUAL_RESET",
+      limit: true,
+      actual: true,
+      severity: "halt",
+      message: `Trading is halted (${halt.rule} at ${halt.haltedAt}): ${halt.message} Manual reset with rationale required.`,
+    });
+  }
 
   // Position size
   if (params.positionSizePct > C.ABSOLUTE_MAX_POSITION_PCT) {
@@ -459,6 +601,11 @@ export function checkConstitution(params: {
 
 /**
  * Quick check: does this trade pass the constitution?
+ *
+ * This is the gate entry: a halt/emergency-severity violation observed here
+ * trips the persistent halt (recordConstitutionHalt), so it survives restart
+ * and requires a manual rationale-bearing reset. checkConstitution stays
+ * side-effect free for speculative/what-if evaluation.
  */
 export function passesConstitution(params: Parameters<typeof checkConstitution>[0]): {
   passes: boolean;
@@ -469,10 +616,14 @@ export function passesConstitution(params: Parameters<typeof checkConstitution>[
   if (violations.length === 0) return { passes: true, worstSeverity: "none", violations: [] };
 
   const severityOrder = { warning: 1, block: 2, halt: 3, emergency: 4 };
-  const worstSeverity = violations.reduce((worst, v) =>
-    severityOrder[v.severity] > severityOrder[worst] ? v.severity : worst,
-    "warning" as ConstitutionViolation["severity"],
+  const worstViolation = violations.reduce((worst, v) =>
+    severityOrder[v.severity] > severityOrder[worst.severity] ? v : worst
   );
+  const worstSeverity = worstViolation.severity;
+
+  if (worstSeverity === "halt" || worstSeverity === "emergency") {
+    recordConstitutionHalt(worstViolation);
+  }
 
   const passes = worstSeverity === "warning"; // Only warnings pass — blocks/halts/emergencies don't
 

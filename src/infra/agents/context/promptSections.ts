@@ -47,8 +47,11 @@ export interface ConditionalPromptSection {
   content: string;
 }
 
-const registryPath = new URL("./prompt-sections/registry.json", import.meta.url);
-const templateDir = new URL("./prompt-sections/templates/", import.meta.url);
+// prompt-sections/ is a sibling of context/ (same root as the roles.ts /
+// shared.ts imports above). A `./` path here silently misses the registry
+// and templates, dropping every "context"-mount section from prompts.
+const registryPath = new URL("../prompt-sections/registry.json", import.meta.url);
+const templateDir = new URL("../prompt-sections/templates/", import.meta.url);
 const sectionCache = new Map<string, string>();
 let registryCache: PromptSectionRegistryRecord[] | null = null;
 
@@ -183,7 +186,7 @@ function loadSectionContent(record: PromptSectionRegistryRecord, options: Prompt
   }
 
   let template = "";
-  const fileUrl = new URL(`./prompt-sections/templates/${record.file}`, import.meta.url);
+  const fileUrl = new URL(record.file, templateDir);
   if (existsSync(fileUrl)) {
     template = readFileSync(fileUrl, "utf8");
   } else {

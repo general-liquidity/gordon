@@ -35,6 +35,19 @@ import { isSafetyCritical } from "../../runtime/permissions/trustTrajectory.ts";
 import { getACELessonsPath } from "../agents/ace/index.ts";
 import { defaultReviewQueuePath } from "../domain/evals/harness/reviewQueue.ts";
 import { defaultAgentFeedbackPath } from "../agents/tools/runtime/meta/agent-feedback.ts";
+import {
+  isKillSwitchesEnabled,
+  listTrippedSwitches,
+  KILL_SWITCHES_FLAG_ENV,
+} from "../safety/killSwitches.ts";
+import {
+  isOutboundFetchGuardInstalled,
+  type OutboundFetchGuardStatus,
+} from "../safety/outboundFetchGuard.ts";
+import {
+  isFilesystemWriteGuardInstalled,
+  type FilesystemWriteGuardStatus,
+} from "../safety/filesystemWriteGuardInstaller.ts";
 
 export interface DiagnosticCheck {
   id: string;
@@ -326,6 +339,134 @@ function checkHotTierCap(): DiagnosticCheck {
     label: "Working-memory hot-tier cap",
     status: "pass",
     message: `${MAX_WORKING_MEMORY_CHARS} chars (Hermes default)`,
+  };
+}
+
+/**
+ * Outbound fetch guard runtime state. Three failure modes worth
+ * distinguishing: disabled via env (operator choice, but outbound
+ * traffic is unguarded), enabled-but-not-installed (the policy exists
+ * but the fetch patch never ran — silently inert, the worst state),
+ * and warn-mode violations accumulating (the allowlist is missing
+ * hosts the agent actually needs, or something is reaching out where
+ * it shouldn't).
+ */
+function checkOutboundFetchGuard(
+  status: OutboundFetchGuardStatus = isOutboundFetchGuardInstalled(),
+): DiagnosticCheck {
+  const id = "outbound-fetch-guard";
+  const label = "Outbound fetch guard";
+  if (!status.enabled) {
+    return {
+      id,
+      label,
+      status: "warn",
+      message: "Network allowlist disabled via GORDON_NETWORK_ALLOWLIST — outbound fetches are unguarded.",
+    };
+  }
+  if (!status.installed) {
+    return {
+      id,
+      label,
+      status: "fail",
+      message: "Network allowlist enabled but the fetch guard is NOT installed — the policy is inert. installProductionGuards() should run at process entry (src/index.tsx).",
+    };
+  }
+  if (status.warnViolations > 0) {
+    const recent = status.recentViolations.slice(-3).join(", ");
+    return {
+      id,
+      label,
+      status: "warn",
+      message: `Installed in ${status.mode} mode; ${status.warnViolations} allowlist miss(es) logged-and-allowed this session. Recent hosts: ${recent}.`,
+    };
+  }
+  return {
+    id,
+    label,
+    status: "pass",
+    message: `Installed in ${status.mode} mode; no allowlist misses recorded this session.`,
+  };
+}
+
+/** Filesystem write guard runtime state — same lens as the fetch guard. */
+function checkFilesystemWriteGuard(
+  status: FilesystemWriteGuardStatus = isFilesystemWriteGuardInstalled(),
+): DiagnosticCheck {
+  const id = "filesystem-write-guard";
+  const label = "Filesystem write guard";
+  if (!status.enabled) {
+    return {
+      id,
+      label,
+      status: "warn",
+      message: "Filesystem write guard disabled via GORDON_FILESYSTEM_WRITE_GUARD — writes are unguarded.",
+    };
+  }
+  if (!status.installed) {
+    return {
+      id,
+      label,
+      status: "fail",
+      message: "Filesystem write guard enabled but NOT installed — the policy is inert. installProductionGuards() should run at process entry (src/index.tsx).",
+    };
+  }
+  if (status.warnViolations > 0) {
+    const recent = status.recentViolations.slice(-3).join(", ");
+    return {
+      id,
+      label,
+      status: "warn",
+      message: `Installed in ${status.mode} mode; ${status.warnViolations} allowlist miss(es) logged-and-allowed this session. Recent paths: ${recent}.`,
+    };
+  }
+  return {
+    id,
+    label,
+    status: "pass",
+    message: `Installed in ${status.mode} mode; no allowlist misses recorded this session.`,
+  };
+}
+
+/**
+ * Kill-switch state. Active trips block matching executions through
+ * `checkKillSwitchForOrder` / `isExecutionAllowed` — they are a
+ * deliberate protective state, but an operator who can't see them gets
+ * unexplained order rejections. Disabling the whole subsystem via env
+ * bypasses the execution gate entirely, so that surfaces as a fail.
+ */
+function checkKillSwitchState(
+  enabled: boolean = isKillSwitchesEnabled(),
+  trips: ReturnType<typeof listTrippedSwitches> = listTrippedSwitches(),
+): DiagnosticCheck {
+  const id = "kill-switches";
+  const label = "Kill-switch state";
+  if (!enabled) {
+    return {
+      id,
+      label,
+      status: "fail",
+      message: `Kill switches disabled via ${KILL_SWITCHES_FLAG_ENV} — checkKillSwitchForOrder bypasses the execution gate entirely. Unset the flag unless this is a deliberate test environment.`,
+    };
+  }
+  if (trips.length === 0) {
+    return {
+      id,
+      label,
+      status: "pass",
+      message: "No kill switches tripped — execution gate clear at all scopes.",
+    };
+  }
+  const detail = trips
+    .slice(0, 5)
+    .map((t) => `${t.key.scope}${t.key.id ? `:${t.key.id}` : ""} (${t.reason})`)
+    .join("; ");
+  const extra = trips.length > 5 ? ` (+${trips.length - 5} more)` : "";
+  return {
+    id,
+    label,
+    status: "warn",
+    message: `${trips.length} kill switch(es) tripped — matching executions are blocked: ${detail}${extra}. Reset deliberately once the underlying issue is resolved.`,
   };
 }
 
@@ -892,6 +1033,9 @@ export function runDoctorChecks(): DiagnosticCheck[] {
     checkCostHaltState(),
     checkCacheReadPressure(),
     checkSafetyDenyList(),
+    checkOutboundFetchGuard(),
+    checkFilesystemWriteGuard(),
+    checkKillSwitchState(),
     checkHotTierCap(),
     checkMastraPatchApplied(),
     checkMcpMarketplaceCatalog(),
@@ -1262,6 +1406,9 @@ export const _internal = {
   checkAceLessonsFile,
   checkJsonlIntegrity,
   checkSafetyDenyList,
+  checkOutboundFetchGuard,
+  checkFilesystemWriteGuard,
+  checkKillSwitchState,
   checkHotTierCap,
   checkGordonHomeDir,
   checkMastraPatchApplied,

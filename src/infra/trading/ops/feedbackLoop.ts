@@ -15,7 +15,7 @@
 
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
-import { GORDON_DIR } from "../../storage/paths.ts";
+import { getGordonDir } from "../../storage/paths.ts";
 
 // ============================================================================
 // Types
@@ -64,34 +64,51 @@ export interface PatternStats {
 // Storage
 // ============================================================================
 
-const FEEDBACK_DIR = join(GORDON_DIR, "feedback");
-const OUTCOMES_FILE = join(FEEDBACK_DIR, "outcomes.json");
-const STATS_FILE = join(FEEDBACK_DIR, "pattern-stats.json");
+// Paths are resolved lazily (per call) rather than at module load: the
+// pre-resolved GORDON_DIR const freezes whatever GORDON_HOME was when
+// storage/paths.ts FIRST loaded, so a test (or operator) that overrides
+// GORDON_HOME after any other module touched paths.ts would silently
+// read/write the REAL ~/.gordon — persistent feedback state leaking across
+// test runs.
+function feedbackDir(): string {
+  return join(getGordonDir(), "feedback");
+}
+
+function outcomesFile(): string {
+  return join(feedbackDir(), "outcomes.json");
+}
+
+function statsFile(): string {
+  return join(feedbackDir(), "pattern-stats.json");
+}
 
 function ensureDir(): void {
-  if (!existsSync(FEEDBACK_DIR)) mkdirSync(FEEDBACK_DIR, { recursive: true });
+  const dir = feedbackDir();
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
 }
 
 function loadOutcomes(): TradeOutcome[] {
-  if (!existsSync(OUTCOMES_FILE)) return [];
-  try { return JSON.parse(readFileSync(OUTCOMES_FILE, "utf-8")); } catch { return []; }
+  const file = outcomesFile();
+  if (!existsSync(file)) return [];
+  try { return JSON.parse(readFileSync(file, "utf-8")); } catch { return []; }
 }
 
 function saveOutcomes(outcomes: TradeOutcome[]): void {
   ensureDir();
   // Keep last 500 outcomes
   const trimmed = outcomes.slice(-500);
-  writeFileSync(OUTCOMES_FILE, JSON.stringify(trimmed, null, 2), { encoding: "utf-8", mode: 0o600 });
+  writeFileSync(outcomesFile(), JSON.stringify(trimmed, null, 2), { encoding: "utf-8", mode: 0o600 });
 }
 
 function loadPatternStats(): Record<string, PatternStats> {
-  if (!existsSync(STATS_FILE)) return {};
-  try { return JSON.parse(readFileSync(STATS_FILE, "utf-8")); } catch { return {}; }
+  const file = statsFile();
+  if (!existsSync(file)) return {};
+  try { return JSON.parse(readFileSync(file, "utf-8")); } catch { return {}; }
 }
 
 function savePatternStats(stats: Record<string, PatternStats>): void {
   ensureDir();
-  writeFileSync(STATS_FILE, JSON.stringify(stats, null, 2), { encoding: "utf-8", mode: 0o600 });
+  writeFileSync(statsFile(), JSON.stringify(stats, null, 2), { encoding: "utf-8", mode: 0o600 });
 }
 
 // ============================================================================

@@ -38,7 +38,16 @@ import { appendActionLogEntry } from "../../../action-log/index.ts";
 import { appendExecutionRecordFresh, isTradeLedgerEnabled, readExecutionRecords, getExecutionRecord, executionRecordToPayload } from "../../../safety/tradeLedger.ts";
 import { checkKillSwitchForOrder } from "../../../safety/killSwitchGate.ts";
 import { loadConfigBundle, saveResolvedConfig } from "../../../storage/config/config.ts";
-import { listPlans, getPlan, updatePlan, createPlan } from "../../../storage/entities/plans.ts";
+import {
+  listPlans,
+  getPlan,
+  updatePlan,
+  createPlan,
+  computePlanContentHash,
+  setApprovedContentHash,
+  getApprovedContentHash,
+} from "../../../storage/entities/plans.ts";
+import { validateTrade } from "../../middleware/guardrails.ts";
 import { listTrades, getTrade } from "../../../storage/entities/trades.ts";
 import { getGordonContext, normalizeSymbol, validateToolOutput, type MastraExecutionContext } from "../types.ts";
 import { checkTradingPermission } from "../runtime/permissionHelpers.ts";
@@ -530,6 +539,36 @@ export const executePlanTool = createTool({
       return validateToolOutput(executePlanOutputSchema, { success: false, error: `Plan ${planId} is in ${plan.status} status, not APPROVED. ${hint}` }, { toolName: "execute_plan" });
     }
 
+    // Approval content binding: approve_plan stored a hash over the
+    // trade-relevant fields (symbol, side, entry, size, stop, TPs). If the
+    // plan was mutated after approval — or carries no recorded hash at all —
+    // the approval does not cover this content. Fail closed: re-approve.
+    const approvedContentHash = getApprovedContentHash(planId);
+    const currentContentHash = computePlanContentHash(plan);
+    if (approvedContentHash !== currentContentHash) {
+      const reason = approvedContentHash
+        ? `Plan ${planId} was modified after approval — re-approve before executing.`
+        : `Plan ${planId} has no recorded approval content hash — re-approve before executing.`;
+      recordStructuredObservation({
+        eventType: "execution.blocked",
+        workflow: "execution",
+        source: "agent_tool",
+        component: "execute_plan",
+        toolName: "execute_plan",
+        outcome: "failure",
+        status: "plan_modified_after_approval",
+        controllability: classifyBlockedStatus("plan_modified_after_approval"),
+        planId,
+        symbol: plan.symbol,
+        reason,
+        details: { rationale, approvedContentHash, currentContentHash },
+      });
+      return validateToolOutput(executePlanOutputSchema, {
+        success: false,
+        error: reason,
+      }, { toolName: "execute_plan" });
+    }
+
     const killBlock = checkKillSwitchForOrder(ctx, {
       instrument: plan.symbol,
       strategyId: plan.strategy,
@@ -766,6 +805,105 @@ export const executePlanTool = createTool({
     const planSide = plan.direction === "short" ? "SELL" : "BUY";
     const planOrderSide = plan.direction === "short" ? "sell" : "buy";
 
+    // Live mark for the order-construction price gate and the fat-finger /
+    // price-deviation guard below. Fetch failure stays best-effort (the
+    // deviation guard no-ops without it) — but a venue that RETURNS a value
+    // that is not a finite positive number is a degraded quote and blocks.
+    let referencePrice: number | undefined;
+    try {
+      referencePrice = await ctx.exchange?.getPrice(plan.symbol);
+    } catch {
+      referencePrice = undefined;
+    }
+
+    // Order-construction price gate: every number an order would be built
+    // from must be finite and > 0. A NaN entry from a failed quote, a zero
+    // stop from a malformed plan, or a degraded venue quote must never reach
+    // order placement.
+    const isUsablePrice = (v: unknown): v is number =>
+      typeof v === "number" && Number.isFinite(v) && v > 0;
+    const priceFaults: string[] = [];
+    if (plan.entry.type !== "market" && !isUsablePrice(plan.entry.price)) {
+      priceFaults.push(`limit entry price (${plan.entry.price}) is not a finite number > 0`);
+    }
+    if (plan.entry.type === "market" && plan.entry.price !== null && !isUsablePrice(plan.entry.price)) {
+      priceFaults.push(`entry reference price (${plan.entry.price}) is not a finite number > 0`);
+    }
+    if (!isUsablePrice(plan.stopLoss.price)) {
+      priceFaults.push(`stop-loss price (${plan.stopLoss.price}) is not a finite number > 0`);
+    }
+    for (const tp of plan.takeProfit) {
+      if (!isUsablePrice(tp.price)) {
+        priceFaults.push(`take-profit price (${tp.price}) is not a finite number > 0`);
+      }
+    }
+    if (!isUsablePrice(plan.allocation.amount)) {
+      priceFaults.push(`allocation amount (${plan.allocation.amount}) is not a finite number > 0`);
+    }
+    if (referencePrice !== undefined && !isUsablePrice(referencePrice)) {
+      priceFaults.push(
+        `live quote for ${plan.symbol} (${referencePrice}) is degraded — venue returned a non-positive or non-finite price; refusing to trade against a bad quote`,
+      );
+    }
+    if (priceFaults.length > 0) {
+      const reason = `Order construction rejected — invalid price data: ${priceFaults.join("; ")}`;
+      recordStructuredObservation({
+        eventType: "execution.blocked",
+        workflow: "execution",
+        source: "agent_tool",
+        component: "execute_plan",
+        toolName: "execute_plan",
+        outcome: "failure",
+        status: "invalid_price_data",
+        controllability: classifyBlockedStatus("invalid_price_data"),
+        planId,
+        symbol: plan.symbol,
+        reason,
+        details: { rationale, priceFaults, referencePrice },
+      });
+      return validateToolOutput(executePlanOutputSchema, {
+        success: false,
+        error: reason,
+      }, { toolName: "execute_plan" });
+    }
+
+    // Guardrails trade validation at the order-construction boundary
+    // (allocation cap + quantity/price sanity from middleware/guardrails.ts).
+    const constructionPriceBasis = plan.entry.price ?? referencePrice;
+    const tradeValidation = validateTrade({
+      symbol: plan.symbol,
+      side: planSide,
+      quantity: plan.allocation.amount / (constructionPriceBasis ?? 1),
+      price: constructionPriceBasis,
+      portfolioValue: ctx.portfolioValue,
+      maxAllocationPercent: ctx.config?.preferences?.maxAllocationPerTrade ?? 1,
+    });
+    if (!tradeValidation.valid) {
+      const reason = `Trade validation failed: ${tradeValidation.errors.join("; ")}`;
+      recordStructuredObservation({
+        eventType: "execution.blocked",
+        workflow: "execution",
+        source: "agent_tool",
+        component: "execute_plan",
+        toolName: "execute_plan",
+        outcome: "failure",
+        status: "trade_validation_failed",
+        controllability: classifyBlockedStatus("trade_validation_failed"),
+        planId,
+        symbol: plan.symbol,
+        reason,
+        details: {
+          rationale,
+          errors: tradeValidation.errors,
+          warnings: tradeValidation.warnings,
+        },
+      });
+      return validateToolOutput(executePlanOutputSchema, {
+        success: false,
+        error: reason,
+      }, { toolName: "execute_plan" });
+    }
+
     // Risk gate: evaluate the plan's order against risk kernel
     try {
       const { evaluateOrderRisk } = await import("./risk-gate.ts");
@@ -861,16 +999,9 @@ export const executePlanTool = createTool({
       );
     }
 
-    // Live mark for the fat-finger / price-deviation guard. Best-effort —
-    // if it can't be fetched, the guard simply no-ops (allows).
-    let referencePrice: number | undefined;
-    try {
-      referencePrice = await ctx.exchange?.getPrice(plan.symbol);
-    } catch {
-      referencePrice = undefined;
-    }
-
     // PreOrderPlacement hook — can block or modify the order
+    // (referencePrice was fetched and validated at the order-construction
+    // gate above; reused here for the fat-finger / price-deviation guard.)
     const preOrderHook = await runHooks("PreOrderPlacement", {
       symbol: plan.symbol,
       side: planOrderSide,
@@ -1285,6 +1416,11 @@ export const approvePlanTool = createTool({
     }
 
     updatePlan(planId, { status: "APPROVED" });
+    // Bind the approval to the trade content as it exists right now. Any
+    // later mutation of trade-relevant fields voids this hash (updatePlan
+    // demotes + clears it) and execute_plan rejects on mismatch.
+    const approvedContentHash = computePlanContentHash(plan);
+    setApprovedContentHash(planId, approvedContentHash);
     await emitEvent("plan:approved", { planId });
     recordStructuredObservation({
       eventType: "plan.approved",
@@ -1298,6 +1434,7 @@ export const approvePlanTool = createTool({
       symbol: plan.symbol,
       details: {
         previousStatus: plan.status,
+        approvedContentHash,
       },
     });
 
@@ -1796,6 +1933,13 @@ export const executeWithAlgorithmTool = createTool({
           error: check.reason ?? "Algorithmic execution not permitted under current mode.",
         }, { toolName: "execute_with_algorithm" });
       }
+    }
+
+    if (!Number.isFinite(quantity) || quantity <= 0) {
+      return validateToolOutput(executeWithAlgorithmOutputSchema, {
+        success: false,
+        error: `Order construction rejected — quantity (${quantity}) is not a finite number > 0.`,
+      }, { toolName: "execute_with_algorithm" });
     }
 
     // Normalize symbol

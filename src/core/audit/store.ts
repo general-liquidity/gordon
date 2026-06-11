@@ -17,6 +17,13 @@ import {
   executeWithLogging,
   withTransaction,
 } from "../../infra/storage/database.ts";
+import {
+  GENESIS_SIGNATURE,
+  resolveAuditHmacKey,
+  signTrace,
+  verifyAuditChain,
+  type AuditChainVerification,
+} from "./signing.ts";
 import type {
   AuditTrace,
   AuditAgentStep,
@@ -58,11 +65,19 @@ export function initAuditTables(): void {
           started_at TEXT NOT NULL,
           ended_at TEXT,
           duration_ms REAL,
-          risk_check_id TEXT
+          risk_check_id TEXT,
+          content_hash TEXT,
+          prev_signature TEXT,
+          signature TEXT
         )
       `),
     "CREATE TABLE audit_traces"
   );
+
+  // Migration for databases created before signing shipped.
+  addTraceColumnIfMissing(db, "content_hash", "content_hash TEXT");
+  addTraceColumnIfMissing(db, "prev_signature", "prev_signature TEXT");
+  addTraceColumnIfMissing(db, "signature", "signature TEXT");
 
   executeWithLogging(
     () =>
@@ -174,6 +189,21 @@ export function initAuditTables(): void {
   logger.debug("Audit tables initialized");
 }
 
+function addTraceColumnIfMissing(
+  db: ReturnType<typeof getDatabase>,
+  column: string,
+  columnDef: string
+): void {
+  const cols = db
+    .prepare("PRAGMA table_info(audit_traces)")
+    .all() as { name: string }[];
+  if (cols.some((c) => c.name === column)) return;
+  executeWithLogging(
+    () => db.run(`ALTER TABLE audit_traces ADD COLUMN ${columnDef}`),
+    `ALTER TABLE audit_traces ADD ${column}`
+  );
+}
+
 // ============================================================================
 // Raw Row Types
 // ============================================================================
@@ -192,6 +222,9 @@ interface RawTraceRow {
   ended_at: string | null;
   duration_ms: number | null;
   risk_check_id: string | null;
+  content_hash: string | null;
+  prev_signature: string | null;
+  signature: string | null;
 }
 
 interface RawStepRow {
@@ -269,6 +302,9 @@ function rowToTrace(
     ended_at: row.ended_at ?? undefined,
     duration_ms: row.duration_ms ?? undefined,
     risk_check_id: row.risk_check_id ?? undefined,
+    content_hash: row.content_hash ?? undefined,
+    prev_signature: row.prev_signature ?? undefined,
+    signature: row.signature ?? undefined,
   };
 }
 
@@ -279,20 +315,32 @@ function rowToTrace(
 /**
  * Save a complete trace to the database (trace + steps + tool calls).
  * Uses a transaction for atomicity.
+ *
+ * Unsigned traces are signed here, chained onto the most recently stored
+ * signature (see signing.ts). Returns the signed trace as persisted, or the
+ * input trace unchanged if persistence failed (audit logging never throws).
  */
-export function saveTrace(trace: AuditTrace): void {
+export function saveTrace(inputTrace: AuditTrace): AuditTrace {
   try {
     ensureTable();
     const db = getDatabase();
+    // Resolve key outside the transaction — it may touch the filesystem.
+    const key = inputTrace.signature ? null : resolveAuditHmacKey();
+    let trace = inputTrace;
 
     withTransaction(() => {
+      if (!trace.signature) {
+        trace = signTrace(trace, getLastChainSignature(db) ?? GENESIS_SIGNATURE, key!);
+      }
+
       // Insert the trace row
       const traceStmt = db.prepare(`
         INSERT OR REPLACE INTO audit_traces
           (trace_id, parent_trace_id, trigger_type, trigger_event_type, trigger_source,
            trigger_payload_summary, outcome_type, outcome_position_id, outcome_details,
-           started_at, ended_at, duration_ms, risk_check_id)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           started_at, ended_at, duration_ms, risk_check_id,
+           content_hash, prev_signature, signature)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
 
       executeWithLogging(
@@ -310,7 +358,10 @@ export function saveTrace(trace: AuditTrace): void {
             trace.started_at,
             trace.ended_at ?? null,
             trace.duration_ms ?? null,
-            trace.risk_check_id ?? null
+            trace.risk_check_id ?? null,
+            trace.content_hash ?? null,
+            trace.prev_signature ?? null,
+            trace.signature ?? null
           ),
         "INSERT audit_trace"
       );
@@ -370,10 +421,49 @@ export function saveTrace(trace: AuditTrace): void {
     }, { mode: "IMMEDIATE" });
 
     logger.debug("Audit trace saved", { trace_id: trace.trace_id });
+    return trace;
   } catch (error) {
     // Audit logging should never crash the caller
     logger.error("Failed to save audit trace", error as Error);
+    return inputTrace;
   }
+}
+
+/**
+ * Signature of the most recently stored trace (insertion order), or null
+ * when the chain is empty. The next saved trace links onto this.
+ */
+function getLastChainSignature(db: ReturnType<typeof getDatabase>): string | null {
+  const row = executeWithLogging(
+    () =>
+      db
+        .prepare(
+          "SELECT signature FROM audit_traces WHERE signature IS NOT NULL ORDER BY rowid DESC LIMIT 1"
+        )
+        .get() as { signature: string } | null,
+    "SELECT last audit chain signature"
+  );
+  return row?.signature ?? null;
+}
+
+/**
+ * Load every trace in chain (insertion) order and verify the tamper-evidence
+ * chain. Returns the first broken link, if any.
+ */
+export function verifyStoredAuditChain(): AuditChainVerification {
+  ensureTable();
+  const db = getDatabase();
+
+  const rows = executeWithLogging(
+    () =>
+      db
+        .prepare("SELECT * FROM audit_traces ORDER BY rowid ASC")
+        .all() as RawTraceRow[],
+    "SELECT audit_traces in chain order"
+  );
+
+  const traces = rows.map((row) => rowToTrace(row, loadStepsForTrace(db, row.trace_id)));
+  return verifyAuditChain(traces);
 }
 
 /**

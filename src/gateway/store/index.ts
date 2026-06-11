@@ -13,6 +13,8 @@ export {
   markQueueCommandCompleted,
   markQueueCommandFailed,
   getQueueDepth,
+  resetOrphanedRunningCommands,
+  type OrphanedCommandResetResult,
   type QueueEntry,
   type QueueStatus,
 } from "./command-queue-store.ts";
