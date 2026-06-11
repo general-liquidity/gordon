@@ -849,11 +849,22 @@ export const executePlanTool = createTool({
     let referencePrice: number | undefined;
     let exchangePrice: number | undefined;
     let quoteSourcesFailed: string[] = [];
+    let quoteDegradedReasons: string[] = [];
     if (ctx.exchange) {
       try {
         const quoteSvc = new MultiSourceQuoteService([ctx.exchange], ctx.llm);
         const enriched = await quoteSvc.getQuote(plan.symbol);
-        referencePrice = enriched.price;
+        // Price-integrity degradation (source disagreement / rate limiting)
+        // means the merged price is disputed — never build orders from it.
+        // Enrichment-only degradation leaves the price itself trustworthy.
+        const priceIntegrityDegraded =
+          enriched.degraded &&
+          enriched.degradedReasons.some((r) => r !== "enrichment unavailable");
+        if (priceIntegrityDegraded) {
+          quoteDegradedReasons = enriched.degradedReasons;
+        } else {
+          referencePrice = enriched.price;
+        }
       } catch (quoteErr) {
         if (quoteErr instanceof QuoteUnavailableError) {
           quoteSourcesFailed = quoteErr.sourcesFailed;
@@ -899,12 +910,18 @@ export const executePlanTool = createTool({
       );
     }
     if (plan.entry.type === "market" && !isUsablePrice(exchangePrice)) {
-      const sourceDetail =
-        quoteSourcesFailed.length > 0
-          ? ` (sources failed: ${quoteSourcesFailed.join(", ")})`
-          : "";
+      const details = [
+        quoteSourcesFailed.length > 0 ? `sources failed: ${quoteSourcesFailed.join(", ")}` : "",
+        quoteDegradedReasons.length > 0 ? `quote degraded: ${quoteDegradedReasons.join(", ")}` : "",
+      ].filter(Boolean);
+      const sourceDetail = details.length > 0 ? ` (${details.join("; ")})` : "";
       priceFaults.push(
         `market entry requires a live reference price for ${plan.symbol} but none is available${sourceDetail}`,
+      );
+    }
+    if (quoteDegradedReasons.length > 0 && !isUsablePrice(exchangePrice)) {
+      priceFaults.push(
+        `multi-source quote for ${plan.symbol} is degraded (${quoteDegradedReasons.join(", ")}) and no independent venue price is available to cross-check — refusing to trade on a disputed quote`,
       );
     }
     if (priceFaults.length > 0) {

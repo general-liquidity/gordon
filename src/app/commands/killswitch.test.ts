@@ -4,7 +4,7 @@ import { isExecutionAllowed, resetAllKillSwitches } from "../../infra/safety/kil
 import { getSuggestionStore } from "../../infra/proactive/index.ts";
 
 beforeEach(() => {
-  resetAllKillSwitches();
+  resetAllKillSwitches("test isolation reset");
   getSuggestionStore().clear();
 });
 
@@ -18,7 +18,12 @@ describe("handleKillSwitchCommand", () => {
     expect(list.message).toContain("firm");
     expect(list.message).toContain("manual halt");
 
-    const reset = await handleKillSwitchCommand("reset firm");
+    const noRationale = await handleKillSwitchCommand("reset firm");
+    expect(noRationale.success).toBe(false);
+    expect(noRationale.message).toContain("rationale");
+    expect(isExecutionAllowed({ venue: "binance" }).allowed).toBe(false);
+
+    const reset = await handleKillSwitchCommand("reset firm drill complete, resuming");
     expect(reset.success).toBe(true);
     expect(isExecutionAllowed({ venue: "binance" }).allowed).toBe(true);
   });

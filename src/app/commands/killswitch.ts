@@ -1,5 +1,6 @@
 import {
   listTrippedSwitches,
+  MIN_KILL_SWITCH_RESET_RATIONALE_CHARS,
   resetAllKillSwitches,
   resetKillSwitch,
   tripKillSwitch,
@@ -38,9 +39,9 @@ function usage(): string {
     "  /killswitch list",
     "  /killswitch trip firm <reason>",
     "  /killswitch trip venue <id> <reason>",
-    "  /killswitch reset firm",
-    "  /killswitch reset venue <id>",
-    "  /killswitch reset-all",
+    "  /killswitch reset firm <rationale>",
+    "  /killswitch reset venue <id> <rationale>",
+    "  /killswitch reset-all <rationale>",
     `Scopes: ${VALID_SCOPES.join(", ")}`,
   ].join("\n");
 }
@@ -98,7 +99,14 @@ export async function handleKillSwitchCommand(args: string): Promise<KillSwitchC
   }
 
   if (subcommand === "reset-all") {
-    resetAllKillSwitches();
+    const rationale = parts.slice(1).join(" ").trim();
+    if (rationale.length < MIN_KILL_SWITCH_RESET_RATIONALE_CHARS) {
+      return {
+        success: false,
+        message: `Reset rationale is required (min ${MIN_KILL_SWITCH_RESET_RATIONALE_CHARS} chars) — it is recorded in the audit log.\n${usage()}`,
+      };
+    }
+    resetAllKillSwitches(rationale);
     await fireKillSwitchCard(
       "All kill switches reset",
       "Operator reset every kill switch. Execution gates are clear unless another switch is tripped.",
@@ -127,7 +135,14 @@ export async function handleKillSwitchCommand(args: string): Promise<KillSwitchC
     if (!parsed.key) {
       return { success: false, message: parsed.error ?? usage() };
     }
-    const existed = resetKillSwitch(parsed.key);
+    const rationale = parts.slice(parsed.restOffset).join(" ").trim();
+    if (rationale.length < MIN_KILL_SWITCH_RESET_RATIONALE_CHARS) {
+      return {
+        success: false,
+        message: `Reset rationale is required (min ${MIN_KILL_SWITCH_RESET_RATIONALE_CHARS} chars) — it is recorded in the audit log.\n${usage()}`,
+      };
+    }
+    const existed = resetKillSwitch(parsed.key, rationale);
     const label = keyLabel(parsed.key);
     const message = existed
       ? `Kill switch reset: ${label}`

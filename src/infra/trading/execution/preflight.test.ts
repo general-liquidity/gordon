@@ -1,8 +1,15 @@
-import { describe, expect, it } from "bun:test";
+import { beforeEach, describe, expect, it } from "bun:test";
 
 import type { GordonContext } from "../../agents/types.ts";
 import type { Exchange, OrderParams } from "../../exchange/types.ts";
+import { resetAllKillSwitches } from "../../safety/killSwitches.ts";
 import { createSafeOrderSubmitter, runExecutionPreflight } from "./preflight.ts";
+
+// Kill-switch state is process-global and persisted; a switch tripped by
+// another test file would otherwise fail these preflight assertions.
+beforeEach(() => {
+  resetAllKillSwitches("test isolation reset");
+});
 
 function mockContext(onPlace?: (order: OrderParams) => void): GordonContext {
   const exchange = {

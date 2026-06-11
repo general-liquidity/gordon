@@ -43,8 +43,15 @@ async function fetchBookViaCcxt(
       bids: book.bids,
       asks: book.asks,
     };
-  } catch {
-    return null;
+  } catch (e) {
+    // fetchBook contract: null is reserved for "venue doesn't list this
+    // pair"; transport/venue failures must throw so cost previews report
+    // an outage instead of "not listed".
+    const msg = e instanceof Error ? e.message : String(e);
+    if (/bad.?symbol|does not have market|invalid symbol|unknown symbol|symbol not (found|listed|supported)/i.test(msg)) {
+      return null;
+    }
+    throw new Error(`${venue} order book unavailable: ${msg}`);
   }
 }
 

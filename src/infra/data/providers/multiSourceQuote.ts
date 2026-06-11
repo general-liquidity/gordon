@@ -7,6 +7,7 @@
  */
 
 import type { Exchange, Ticker24hr } from "../../exchange/types.ts";
+import { getExchangeThrottleSignal } from "../../exchange/rateLimiter.ts";
 import { CoinGeckoClient, getCoinGeckoClient } from "./coingecko.ts";
 import type { CoinGeckoPrice } from "./coingecko.ts";
 import {
@@ -362,6 +363,17 @@ export class MultiSourceQuoteService {
 
     // Merge
     const merged = mergeQuotes(symbol, quotes, sourcesFailed);
+
+    // A quote assembled while a venue limiter is throttling may be built
+    // from delayed fetches — flag it so sizing/execution treats the price
+    // as disputed rather than fresh.
+    for (const exchange of this.exchanges) {
+      const throttle = getExchangeThrottleSignal(exchange.exchangeId);
+      if (throttle?.throttled) {
+        merged.degraded = true;
+        merged.degradedReasons.push(`rate limited: ${exchange.exchangeId}`);
+      }
+    }
 
     // LLM enrichment
     if (this.config.enableLLMEnrichment && this.llmClient) {
