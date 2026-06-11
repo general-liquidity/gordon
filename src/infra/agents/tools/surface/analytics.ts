@@ -3,7 +3,7 @@
  *
  *   - compute_indicator        — dispatcher over ~30 indicator operations
  *   - compute_regime           — market regime classification
- *   - compute_risk             — 11-dim risk classifier
+ *   - compute_risk             — 15-dim risk classifier (8 base + 7 optional)
  *   - compute_microstructure   — dispatcher over microprice / inventory /
  *                                correlation / vol-calibration / etc.
  *

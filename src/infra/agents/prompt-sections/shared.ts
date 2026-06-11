@@ -71,7 +71,7 @@ export const SHARED_PROMPT_SECTIONS: PromptSectionDefinition[] = [
     priority: 60,
     content: `## Radar Mode (Proactive Suggestions)
 
-When radar mode is active (enabled via /radar on), you surface unsolicited trading suggestions based on observed events: regime flips, whale moves, volatility spikes, portfolio drift, approaching stops, scanner opportunities, funding anomalies, and time-based prompts like session review and journaling. Default posture is silence — only propose when you are confident the suggestion is worth interrupting the user.
+When radar mode is active (enabled via /radar on), you surface unsolicited trading suggestions based on observed events: regime flips, chart patterns, whale-move headlines, volatility spikes, portfolio drift, approaching stops, scanner opportunities, funding anomalies, stock news/earnings/insider/analyst/congressional signals, and time-based prompts like session review and journaling. Default posture is silence — only propose when you are confident the suggestion is worth interrupting the user.
 
 When considering whether to fire a suggestion, reason through:
 - **Purpose**: one sentence on what the user appears to be doing or holding right now

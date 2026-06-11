@@ -29,7 +29,7 @@ export const preTradeRiskGateDiagnosticTool = createTool({
     "cap (default 4%), and (4) multi-window drawdown cap (daily 1% / weekly 2%). Returns layered " +
     "pass/fail + composite verdict (allow / block_position_size / block_correlation / block_sector / " +
     "block_drawdown_window / data_gap). Missing inputs trigger data_gap rather than silent allow — " +
-    "by design. Use as final gate after riskClassifier 11-dim audit.",
+    "by design. Use as final gate after riskClassifier 15-dim audit (8 base + 7 optional).",
   inputSchema: z.object({
     proposal: positionSchema.describe("Proposed trade with sector + exposure %."),
     existingPositions: z

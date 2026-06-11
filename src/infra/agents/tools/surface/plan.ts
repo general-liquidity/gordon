@@ -305,7 +305,7 @@ export const createPlanTool = createTool({
 export const verifyPlanTool = createTool({
   id: "verify_plan",
   description: [
-    "Run the safety stack on a Plan: 11-dim risk classifier + permission",
+    "Run the safety stack on a Plan: 15-dim risk classifier (8 base + 7 optional) + permission",
     "engine + venue/account feasibility. Returns approve / conditional /",
     "reject + structured reasons.",
     "",

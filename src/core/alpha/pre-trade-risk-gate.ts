@@ -25,9 +25,9 @@
  * is precisely the failure mode this primitive prevents.
  *
  * Distinct from:
- *   - `infra/trading/risk/riskClassifier.ts` (11-dim pre-trade audit:
- *     vol-adjusted sizing, tail risk, regime — different axes; doesn't
- *     compose the institutional 4-layer cap stack)
+ *   - `infra/trading/risk/riskClassifier.ts` (15-dim pre-trade audit —
+ *     8 base + 7 optional: vol-adjusted sizing, tail risk, regime, etc.;
+ *     different axes; doesn't compose the institutional 4-layer cap stack)
  *   - `infra/trading/risk/correlationLimits.ts` (pairwise correlation
  *     multiplier for sizing — this primitive REUSES `pearsonCorrelation`
  *     but applies cluster cap not size multiplier)
@@ -37,7 +37,7 @@
  *     to portfolio-level caps)
  *
  * Composes with:
- *   - `riskClassifier` (use this AFTER the 11-dim audit as the final
+ *   - `riskClassifier` (use this AFTER the 15-dim audit as the final
  *     pre-trade gate)
  *   - `mae-stop-calibrator` (LV33) (calibrates the per-trade stop;
  *     this gate then enforces the portfolio caps)

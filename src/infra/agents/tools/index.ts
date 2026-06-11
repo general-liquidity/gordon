@@ -303,7 +303,7 @@ export { maeStopCalibratorTools } from "./runtime/maeStopCalibratorDiagnostic.ts
 // (position size / correlation cluster / sector aggregate / multi-window
 // drawdown) enforced BEFORE every trade. Returns layered pass/fail +
 // composite verdict; data_gap supersedes silent allow. Companion to
-// riskClassifier (11-dim audit) and correlationLimits (pairwise multiplier).
+// riskClassifier (15-dim audit — 8 base + 7 optional) and correlationLimits (pairwise multiplier).
 // Pedigree: institutional hedge-fund risk practice (2026 essay).
 export { preTradeRiskGateTools } from "./runtime/preTradeRiskGateDiagnostic.ts";
 

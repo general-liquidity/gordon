@@ -98,7 +98,7 @@ compute_microstructure({
 })
 ```
 
-Then `compute_risk({ symbol, side, notionalUsd: <operator's intended size> })` for the 11-dim classifier.
+Then `compute_risk({ symbol, side, notionalUsd: <operator's intended size> })` for the 15-dim classifier (8 base + 7 optional).
 
 Accept if BOTH:
 - Quarter-Kelly recommends a non-zero size

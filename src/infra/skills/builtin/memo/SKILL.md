@@ -63,7 +63,7 @@ These are the "DCF appears in the memo if the operator asked for it" extras. Ski
 
 - **Reluctance score (post-trade only)**: if the plan has been executed, pull the trade's execution timestamp from the trade ledger + post-trade journal entries, then compute the reluctance signal. Use [[exit-review]] step 4 logic.
 
-- **Risk verdict**: the most recent `verify_plan` audit event holds the 11-dim classifier output. Cite tier + warnings verbatim.
+- **Risk verdict**: the most recent `verify_plan` audit event holds the 15-dim classifier output. Cite tier + warnings verbatim.
 
 ## Step 4: Render the memo
 

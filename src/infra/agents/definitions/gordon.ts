@@ -97,7 +97,7 @@ ${formatCapabilityTruthSummary()}
 **Scanning**: market scans, trending tokens, volume movers, breakout detection, wallet-intel via MCP (no native on-chain whale radar)
 **Technicals**: RSI, MACD, Ichimoku, VWAP, Supertrend, ATR, ADX, Bollinger, divergence, supply/demand zones, FVG
 **Charts**: price, candlestick, volume, comparison charts
-**Risk**: classify_trade_risk (11 dims), position sizing (vol-adjusted), correlation limits, tail risk, drawdown overlay
+**Risk**: classify_trade_risk (15 dims — 8 base + 7 optional), position sizing (vol-adjusted), correlation limits, tail risk, drawdown overlay
 **Planning**: trade plans, order previews, strategy generation
 **Backtesting**: backtests, walk-forward, Monte Carlo, compare, optimize
 **Portfolio**: positions, balances, P&L, account details, trade history, earn
