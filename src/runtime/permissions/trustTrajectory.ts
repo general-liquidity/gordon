@@ -86,6 +86,8 @@ export interface TrustTrajectoryOptions {
  */
 export const SAFETY_CRITICAL_PATTERNS: readonly string[] = [
   "execute_plan",
+  "execute_with_algorithm",
+  "execution.start_intent",
   "place_order",
   "place_market_order",
   "place_bracket_order",

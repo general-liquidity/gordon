@@ -57,6 +57,8 @@ export interface ProcessCheckResult {
 
 /** Tools that place/execute a trade and therefore REQUIRE a prior risk gate. */
 const ORDER_EXEC_SUBSTRINGS = [
+  "execution.start_intent",
+  "execute_with_algorithm",
   "place_order",
   "place_market",
   "place_limit",
@@ -69,7 +71,15 @@ const ORDER_EXEC_SUBSTRINGS = [
 ];
 
 /** A pre-trade risk gate having run (tool call form). */
-const RISK_GATE_SUBSTRINGS = ["classify_trade_risk", "compute_risk", "check_risk", "verify_plan"];
+const RISK_GATE_SUBSTRINGS = [
+  "classify_trade_risk",
+  "compute_risk",
+  "check_risk",
+  "verify_plan",
+  "execution.preflight",
+  "execution_preflight",
+  "preflight",
+];
 
 /** Explicit approval having been granted (tool call form). */
 const APPROVAL_SUBSTRINGS = ["approve_plan"];
@@ -106,16 +116,17 @@ export function checkTrajectory(trace: NormalizedTrace): ProcessCheckResult {
     violations.push({
       rule: "risk_gate_before_order",
       severity: "block",
-      detail: `"${firstOrder.name}" executed with no preceding classify_trade_risk / risk gate (no risk_check_id either).`,
+      detail: `"${firstOrder.name}" executed with no preceding classify_trade_risk / execution preflight (no risk_check_id either).`,
     });
   }
 
-  // 2. approval_before_execute_plan (WARN) — execute_plan should follow approve_plan.
+  // 2. approval_before_execute_plan (BLOCK) — execute_plan is a live order
+  //    commit path and must follow explicit approval, not just risk scoring.
   const execPlan = calls.find((c) => c.ok && c.name.toLowerCase().includes("execute_plan"));
   if (execPlan && !approvalBefore(execPlan.order)) {
     violations.push({
       rule: "approval_before_execute_plan",
-      severity: "warn",
+      severity: "block",
       detail: `"${execPlan.name}" executed without a preceding approve_plan.`,
     });
   }

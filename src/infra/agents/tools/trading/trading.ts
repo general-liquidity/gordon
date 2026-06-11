@@ -102,6 +102,10 @@ import {
   isFrictionTrackerEnabled,
   recordFriction,
 } from "../../../trading/ops/frictionTracker.ts";
+import {
+  createSafeOrderSubmitter,
+  runExecutionPreflight,
+} from "../../../trading/execution/preflight.ts";
 import { selectMandateForPlan } from "../../../safety/anti-rot/strategyMandates.ts";
 import {
   activateSessionPlan,
@@ -2059,13 +2063,32 @@ export const executeWithAlgorithmTool = createTool({
 
     // Normalize symbol
     const normalizedSymbol = normalizeSymbol(symbol);
+    const rationale = description?.trim() || `Algorithmic ${side} execution requested for ${quantity} ${normalizedSymbol}.`;
+
+    const aggregatePreflight = await runExecutionPreflight({
+      ctx,
+      source: "execute_with_algorithm",
+      rationale,
+      order: {
+        symbol: normalizedSymbol,
+        side,
+        type: "MARKET",
+        quantity,
+      },
+    });
+    if (!aggregatePreflight.ok) {
+      return validateToolOutput(executeWithAlgorithmOutputSchema, {
+        success: false,
+        error: `Algorithmic execution preflight blocked: ${aggregatePreflight.reason}`,
+      }, { toolName: "execute_with_algorithm" });
+    }
 
     // Build execution intent
     const intent = parseExecutionIntent(
       description ?? algorithm ?? "slowly",
       normalizedSymbol,
       side,
-      quantity,
+      aggregatePreflight.order.quantity ?? quantity,
     );
 
     // Override algorithm if explicitly specified
@@ -2082,7 +2105,15 @@ export const executeWithAlgorithmTool = createTool({
 
     try {
       const manager = ExecutionSessionManager.getInstance();
-      const session = await manager.startSession(intent, ctx.exchange);
+      const session = await manager.startSession(
+        intent,
+        ctx.exchange,
+        createSafeOrderSubmitter({
+          ctx,
+          source: "execute_with_algorithm.slice",
+          rationale,
+        }),
+      );
 
       const desc = describeIntent(intent);
       const durationHours = "durationMs" in intent.config

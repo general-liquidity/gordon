@@ -11,6 +11,7 @@ import type {
   TWAPConfig,
   ExecutionSession,
   ExecutionSlice,
+  OrderSubmitter,
 } from "./types.ts";
 
 const logger = createModuleLogger("twap-executor");
@@ -23,17 +24,20 @@ export class TWAPExecutor {
   private timer: ReturnType<typeof setTimeout> | null = null;
   private currentSliceIndex = 0;
   private onComplete?: (session: ExecutionSession) => void;
+  private submitOrder: OrderSubmitter;
 
   constructor(
     session: ExecutionSession,
     exchange: Exchange,
     config: TWAPConfig,
     onComplete?: (session: ExecutionSession) => void,
+    submitOrder?: OrderSubmitter,
   ) {
     this.session = session;
     this.exchange = exchange;
     this.config = config;
     this.onComplete = onComplete;
+    this.submitOrder = submitOrder ?? ((params) => this.exchange.placeOrder(params));
     this.initializeSlices();
   }
 
@@ -177,7 +181,7 @@ export class TWAPExecutor {
     const { symbol, side } = this.session.intent;
 
     if (this.config.orderType === "MARKET") {
-      const result = await this.exchange.placeOrder({
+      const result = await this.submitOrder({
         symbol,
         side,
         type: "MARKET",
@@ -205,7 +209,7 @@ export class TWAPExecutor {
       const offsetPrice =
         midPrice * (1 + offsetMultiplier * (this.config.limitOffsetBps ?? 5) / 10000);
 
-      const result = await this.exchange.placeOrder({
+      const result = await this.submitOrder({
         symbol,
         side,
         type: "LIMIT",

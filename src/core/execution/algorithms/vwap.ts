@@ -12,6 +12,7 @@ import type {
   VWAPConfig,
   ExecutionSession,
   ExecutionSlice,
+  OrderSubmitter,
 } from "./types.ts";
 
 const logger = createModuleLogger("vwap-executor");
@@ -24,17 +25,20 @@ export class VWAPExecutor {
   private timer: ReturnType<typeof setTimeout> | null = null;
   private currentSliceIndex = 0;
   private onComplete?: (session: ExecutionSession) => void;
+  private submitOrder: OrderSubmitter;
 
   constructor(
     session: ExecutionSession,
     exchange: Exchange,
     config: VWAPConfig,
     onComplete?: (session: ExecutionSession) => void,
+    submitOrder?: OrderSubmitter,
   ) {
     this.session = session;
     this.exchange = exchange;
     this.config = config;
     this.onComplete = onComplete;
+    this.submitOrder = submitOrder ?? ((params) => this.exchange.placeOrder(params));
   }
 
   async start(): Promise<void> {
@@ -164,7 +168,7 @@ export class VWAPExecutor {
       // Apply participation rate cap
       const effectiveQty = slice.quantity;
 
-      const result = await this.exchange.placeOrder({
+      const result = await this.submitOrder({
         symbol,
         side,
         type: "MARKET",

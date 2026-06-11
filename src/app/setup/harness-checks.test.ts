@@ -32,12 +32,16 @@ describe("collectSandboxChecks — guard status surfacing", () => {
     expect(checks.map((c) => c.id)).toEqual([
       "sandbox.network_allowlist",
       "sandbox.filesystem_write_guard",
+      "sandbox.transport_guard_coverage",
     ]);
-    for (const check of checks) {
+    for (const check of checks.slice(0, 2)) {
       expect(check.ok).toBe(true);
       expect(check.severity).toBe("info");
       expect(check.message).toContain("installed in warn mode");
     }
+    const coverage = checks.find((c) => c.id === "sandbox.transport_guard_coverage");
+    expect(coverage?.ok).toBe(true);
+    expect(coverage?.message).toContain("No direct native HTTP/socket transports found");
   });
 
   it("errors when network allowlist is enabled but the fetch guard is not installed", () => {
@@ -85,14 +89,17 @@ describe("collectSandboxChecks — guard status surfacing", () => {
       fetchStatus({ enabled: false, installed: false }),
       fsStatus({ enabled: false, installed: false }),
     );
-    expect(checks).toHaveLength(2);
-    for (const check of checks) {
+    expect(checks).toHaveLength(3);
+    for (const check of checks.slice(0, 2)) {
       expect(check.ok).toBe(false);
       expect(check.severity).toBe("warn");
       expect(check.message).toContain("disabled");
     }
     expect(checks[0]?.message).toContain("GORDON_NETWORK_ALLOWLIST");
     expect(checks[1]?.message).toContain("GORDON_FILESYSTEM_WRITE_GUARD");
+    const coverage = checks.find((c) => c.id === "sandbox.transport_guard_coverage");
+    expect(coverage?.ok).toBe(false);
+    expect(coverage?.severity).toBe("error");
   });
 
   it("reflects block mode in the message", () => {

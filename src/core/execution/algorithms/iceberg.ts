@@ -12,6 +12,7 @@ import type {
   IcebergConfig,
   ExecutionSession,
   ExecutionSlice,
+  OrderSubmitter,
 } from "./types.ts";
 
 const logger = createModuleLogger("iceberg-executor");
@@ -24,17 +25,20 @@ export class IcebergExecutor {
   private pollTimer: ReturnType<typeof setTimeout> | null = null;
   private sliceCounter = 0;
   private onComplete?: (session: ExecutionSession) => void;
+  private submitOrder: OrderSubmitter;
 
   constructor(
     session: ExecutionSession,
     exchange: Exchange,
     config: IcebergConfig,
     onComplete?: (session: ExecutionSession) => void,
+    submitOrder?: OrderSubmitter,
   ) {
     this.session = session;
     this.exchange = exchange;
     this.config = config;
     this.onComplete = onComplete;
+    this.submitOrder = submitOrder ?? ((params) => this.exchange.placeOrder(params));
   }
 
   async start(): Promise<void> {
@@ -125,7 +129,7 @@ export class IcebergExecutor {
       const { symbol, side } = this.session.intent;
 
       if (this.config.priceType === "MARKET") {
-        const result = await this.exchange.placeOrder({
+        const result = await this.submitOrder({
           symbol,
           side,
           type: "MARKET",
@@ -167,7 +171,7 @@ export class IcebergExecutor {
           (spread.bidPrice + spread.askPrice) / 2 *
           (1 + offsetMultiplier * (this.config.limitOffsetBps ?? 5) / 10000);
 
-        const result = await this.exchange.placeOrder({
+        const result = await this.submitOrder({
           symbol,
           side,
           type: "LIMIT",

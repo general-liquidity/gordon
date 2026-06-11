@@ -19,6 +19,7 @@ import type {
   VWAPConfig,
   IcebergConfig,
   POVConfig,
+  OrderSubmitter,
 } from "./algorithms/types.ts";
 import {
   DEFAULT_TWAP_CONFIG,
@@ -61,6 +62,7 @@ export class ExecutionSessionManager {
   async startSession(
     intent: ExecutionIntent,
     exchange: Exchange,
+    submitOrder?: OrderSubmitter,
   ): Promise<ExecutionSession> {
     const sessionId = crypto.randomUUID();
 
@@ -88,22 +90,22 @@ export class ExecutionSessionManager {
     switch (intent.algorithm) {
       case "TWAP": {
         const config: TWAPConfig = { ...DEFAULT_TWAP_CONFIG, ...intent.config as Partial<TWAPConfig> };
-        executor = new TWAPExecutor(session, exchange, config, onComplete);
+        executor = new TWAPExecutor(session, exchange, config, onComplete, submitOrder);
         break;
       }
       case "VWAP": {
         const config: VWAPConfig = { ...DEFAULT_VWAP_CONFIG, ...intent.config as Partial<VWAPConfig> };
-        executor = new VWAPExecutor(session, exchange, config, onComplete);
+        executor = new VWAPExecutor(session, exchange, config, onComplete, submitOrder);
         break;
       }
       case "ICEBERG": {
         const config: IcebergConfig = { ...DEFAULT_ICEBERG_CONFIG, ...intent.config as Partial<IcebergConfig> };
-        executor = new IcebergExecutor(session, exchange, config, onComplete);
+        executor = new IcebergExecutor(session, exchange, config, onComplete, submitOrder);
         break;
       }
       case "POV": {
         const config: POVConfig = { ...DEFAULT_POV_CONFIG, ...intent.config as Partial<POVConfig> };
-        executor = new POVExecutor(session, exchange, config, onComplete);
+        executor = new POVExecutor(session, exchange, config, onComplete, submitOrder);
         break;
       }
     }

@@ -93,6 +93,7 @@ describe("resetOrphanedRunningCommands", () => {
         side: "BUY",
         totalQuantity: 1,
         algorithm: "TWAP",
+        rationale: "Test unsafe algorithmic execution command.",
         config: {},
       }),
     });

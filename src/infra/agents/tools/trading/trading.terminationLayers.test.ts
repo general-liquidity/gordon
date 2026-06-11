@@ -35,6 +35,9 @@ mock.module("../../../storage/entities/plans.ts", () => ({
   listPlans: () => [],
   updatePlan: () => {},
   createPlan: () => ({}),
+  computePlanContentHash: () => "approved-hash",
+  getApprovedContentHash: () => "approved-hash",
+  setApprovedContentHash: () => {},
 }));
 
 mock.module("../../../storage/entities/trades.ts", () => ({
@@ -55,13 +58,14 @@ mock.module("./risk-gate.ts", () => ({
 import { executePlanTool } from "./trading.ts";
 
 const PLAN_ID = "pln_term";
+const PLAN_SYMBOL = "GORDONTESTUSDT";
 const RATIONALE = "User confirmed plan, valid termination layers test rationale";
 
 function makePlan(status: PlanStatus): Plan {
   return {
     id: PLAN_ID,
     createdAt: new Date().toISOString(),
-    symbol: "BTCUSDT",
+    symbol: PLAN_SYMBOL,
     direction: "long",
     strategy: "support_bounce",
     allocation: { currency: "USDT", amount: 1000, percentOfPortfolio: 0.1 },
@@ -81,10 +85,30 @@ function makeExecContext(): { requestContext: RequestContext } {
     exchangeId: "binance",
     isSandbox: true,
     getPrice: async () => 100_000,
+    getBalance: async (asset: string) => asset === "USDT" ? 100_000 : 0,
+    getFullAccountDetails: async () => ({
+      accountInfo: {
+        canTrade: true,
+        canWithdraw: false,
+        canDeposit: true,
+        accountType: "SPOT",
+        balances: [],
+        updateTime: Date.now(),
+      },
+      totalUsdtValue: 100_000,
+      nonZeroBalances: [],
+    }),
+    get24hrTickers: async () => [],
+    getSpread: async () => ({
+      spread: 1,
+      spreadPercent: 0.001,
+      bidPrice: 99_999,
+      askPrice: 100_000,
+    }),
   });
   requestContext.set("config", { permissionMode: "auto", preferences: { maxAllocationPerTrade: 0.1, cashReservePercent: 0.1 } });
-  requestContext.set("portfolioValue", 10_000);
-  requestContext.set("availableCash", 10_000);
+  requestContext.set("portfolioValue", 100_000);
+  requestContext.set("availableCash", 100_000);
   return { requestContext };
 }
 

@@ -5,6 +5,7 @@
  */
 
 import { z } from "zod";
+import type { Order, OrderParams } from "../../../infra/exchange/types.ts";
 
 // ============================================================================
 // Algorithm Enum
@@ -67,6 +68,8 @@ export interface ExecutionIntent {
   totalQuantity: number;
   config: TWAPConfig | VWAPConfig | IcebergConfig | POVConfig;
 }
+
+export type OrderSubmitter = (params: OrderParams) => Promise<Order>;
 
 // ============================================================================
 // Execution Session

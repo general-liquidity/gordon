@@ -37,6 +37,7 @@ import {
   isFilesystemWriteGuardInstalled,
   type FilesystemWriteGuardStatus,
 } from "../../infra/safety/filesystemWriteGuardInstaller.ts";
+import { buildTransportGuardCoverageReport } from "../../infra/safety/transportGuardCoverage.ts";
 import {
   isKvCacheMetricEnabled,
   readCacheCalls,
@@ -277,6 +278,16 @@ export function collectSandboxChecks(
       message: `Filesystem write guard installed in ${fsGuard.mode} mode (${paths} allowed path prefixes).${violations}`,
     });
   }
+
+  const coverage = buildTransportGuardCoverageReport({ fetchGuard, fsGuard });
+  checks.push({
+    id: "sandbox.transport_guard_coverage",
+    ok: coverage.ok,
+    severity: coverage.ok ? "info" : "error",
+    message: coverage.ok
+      ? coverage.summary
+      : `${coverage.summary} Fetch guard installed=${coverage.fetchGuardInstalled}; filesystem guard installed=${coverage.filesystemGuardInstalled}.`,
+  });
 
   return checks;
 }

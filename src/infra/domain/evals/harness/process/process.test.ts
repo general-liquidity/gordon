@@ -35,13 +35,12 @@ describe("checkTrajectory", () => {
     expect(r.passed).toBe(true);
   });
 
-  it("WARNS (not blocks) when execute_plan has no preceding approve_plan", () => {
+  it("BLOCKS when execute_plan has no preceding approve_plan", () => {
     const r = checkTrajectory(
       trace([{ name: "classify_trade_risk" }, { name: "execute_plan" }]),
     );
-    // risk gate present → not blocked; but approval missing → warn.
-    expect(r.passed).toBe(true);
-    expect(r.violations.some((v) => v.rule === "approval_before_execute_plan" && v.severity === "warn")).toBe(true);
+    expect(r.passed).toBe(false);
+    expect(r.violations.some((v) => v.rule === "approval_before_execute_plan" && v.severity === "block")).toBe(true);
   });
 
   it("passes execute_plan with both approve_plan and risk gate", () => {
@@ -50,6 +49,22 @@ describe("checkTrajectory", () => {
     );
     expect(r.passed).toBe(true);
     expect(r.violations.length).toBe(0);
+  });
+
+  it("BLOCKS execution.start_intent with no preceding execution preflight", () => {
+    const r = checkTrajectory(trace([{ name: "gateway.execution.start_intent" }]));
+    expect(r.passed).toBe(false);
+    expect(r.violations.some((v) => v.rule === "risk_gate_before_order" && v.severity === "block")).toBe(true);
+  });
+
+  it("passes execution.start_intent with preceding execution preflight", () => {
+    const r = checkTrajectory(
+      trace([
+        { name: "execution.preflight_approved" },
+        { name: "gateway.execution.start_intent" },
+      ]),
+    );
+    expect(r.passed).toBe(true);
   });
 
   it("BLOCKS a fund transfer executed with no approval and no risk gate", () => {

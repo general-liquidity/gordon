@@ -56,8 +56,29 @@ function makeExecContext(options: { quote?: number; portfolioValue?: number; max
   const requestContext = new RequestContext();
   requestContext.set("exchange", {
     exchangeId: "binance",
+    displayName: "Mock Binance",
     isSandbox: true,
     getPrice: async () => options.quote ?? 50_000,
+    getBalance: async (asset: string) => asset === "USDT" ? 50_000 : 0,
+    getFullAccountDetails: async () => ({
+      accountInfo: {
+        canTrade: true,
+        canWithdraw: false,
+        canDeposit: true,
+        accountType: "SPOT",
+        balances: [],
+        updateTime: Date.now(),
+      },
+      totalUsdtValue: options.portfolioValue ?? 100_000,
+      nonZeroBalances: [],
+    }),
+    get24hrTickers: async () => [],
+    getSpread: async () => ({
+      spread: 1,
+      spreadPercent: 0.001,
+      bidPrice: (options.quote ?? 50_000) - 0.5,
+      askPrice: (options.quote ?? 50_000) + 0.5,
+    }),
   });
   requestContext.set("config", {
     permissionMode: "ask",

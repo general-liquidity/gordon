@@ -41,6 +41,10 @@ import { EvolutionLoop } from "../../core/genome/evolution-loop.ts";
 import { FeedbackLoop } from "../../core/learning/feedback-loop.ts";
 import { ExecutionSessionManager } from "../../core/execution/session-manager.ts";
 import { parseExecutionIntent } from "../../core/execution/intent-parser.ts";
+import {
+  createSafeOrderSubmitter,
+  runExecutionPreflight,
+} from "../../infra/trading/execution/preflight.ts";
 import { getTrade } from "../../infra/storage/entities/trades.ts";
 import { executeEmergencyLiquidation } from "../../core/safety/emergency-liquidation.ts";
 import { cleanupStalePositions } from "../../core/positions/cleanup.ts";
@@ -563,21 +567,46 @@ export class GatewayRuntime {
       if (!payload.totalQuantity || typeof payload.totalQuantity !== "number" || payload.totalQuantity <= 0) {
         return { started: false, reason: "Missing or invalid 'totalQuantity' (must be positive number)" };
       }
-      if (!payload.algorithm || !["TWAP", "VWAP", "ICEBERG"].includes(payload.algorithm as string)) {
-        return { started: false, reason: "Missing or invalid 'algorithm' (must be TWAP, VWAP, or ICEBERG)" };
+      if (!payload.algorithm || !["TWAP", "VWAP", "ICEBERG", "POV"].includes(payload.algorithm as string)) {
+        return { started: false, reason: "Missing or invalid 'algorithm' (must be TWAP, VWAP, ICEBERG, or POV)" };
+      }
+      if (!payload.rationale || typeof payload.rationale !== "string" || payload.rationale.trim().length < 10) {
+        return { started: false, reason: "Missing or invalid 'rationale' (must describe why execution is warranted)" };
       }
 
       const symbol = payload.symbol as string;
       const side = payload.side as "BUY" | "SELL";
       const totalQuantity = payload.totalQuantity as number;
-      const algorithm = payload.algorithm as "TWAP" | "VWAP" | "ICEBERG";
+      const algorithm = payload.algorithm as "TWAP" | "VWAP" | "ICEBERG" | "POV";
+      const rationale = payload.rationale.trim();
       const config = (payload.config ?? {}) as Record<string, unknown>;
+
+      const aggregatePreflight = await runExecutionPreflight({
+        ctx: context,
+        source: "gateway.execution.start_intent",
+        rationale,
+        order: {
+          symbol,
+          side,
+          type: "MARKET",
+          quantity: totalQuantity,
+        },
+      });
+      if (!aggregatePreflight.ok) {
+        return {
+          started: false,
+          reason: aggregatePreflight.reason,
+          status: aggregatePreflight.status,
+          preflightId: aggregatePreflight.preflightId,
+          warnings: aggregatePreflight.warnings,
+        };
+      }
 
       const intent = parseExecutionIntent(
         `Execute ${algorithm} for ${symbol}`,
         symbol,
         side,
-        totalQuantity,
+        aggregatePreflight.order.quantity ?? totalQuantity,
       );
       // Override parsed algorithm with explicit one
       intent.algorithm = algorithm;
@@ -585,8 +614,22 @@ export class GatewayRuntime {
       Object.assign(intent.config, config);
 
       const sessionManager = ExecutionSessionManager.getInstance();
-      const session = await sessionManager.startSession(intent, context.exchange);
-      return { started: true, sessionId: session.sessionId, intent: session.intent };
+      const session = await sessionManager.startSession(
+        intent,
+        context.exchange,
+        createSafeOrderSubmitter({
+          ctx: context,
+          source: "gateway.execution.slice",
+          rationale,
+        }),
+      );
+      return {
+        started: true,
+        sessionId: session.sessionId,
+        intent: session.intent,
+        preflightId: aggregatePreflight.preflightId,
+        warnings: aggregatePreflight.warnings,
+      };
     });
 
     // ---- Capital Refresh (Task #85) ----

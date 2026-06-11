@@ -94,7 +94,8 @@ export const ExecutionStartIntentPayloadSchema = z.object({
   symbol: z.string().min(1),
   side: z.enum(["BUY", "SELL"]),
   totalQuantity: z.number().positive(),
-  algorithm: z.enum(["TWAP", "VWAP", "ICEBERG"]),
+  algorithm: z.enum(["TWAP", "VWAP", "ICEBERG", "POV"]),
+  rationale: z.string().min(10).max(1_000),
   config: z.record(z.string(), z.unknown()).default({}),
 });
 

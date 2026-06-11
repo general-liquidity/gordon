@@ -21,6 +21,7 @@ import type {
   POVConfig,
   ExecutionSession,
   ExecutionSlice,
+  OrderSubmitter,
 } from "./types.ts";
 
 const logger = createModuleLogger("pov-executor");
@@ -37,18 +38,21 @@ export class POVExecutor {
   private lastObservedCloseTime: number | null = null;
   private onComplete?: (session: ExecutionSession) => void;
   private startTimeMs: number;
+  private submitOrder: OrderSubmitter;
 
   constructor(
     session: ExecutionSession,
     exchange: Exchange,
     config: POVConfig,
     onComplete?: (session: ExecutionSession) => void,
+    submitOrder?: OrderSubmitter,
   ) {
     this.session = session;
     this.exchange = exchange;
     this.config = config;
     this.onComplete = onComplete;
     this.startTimeMs = Date.now();
+    this.submitOrder = submitOrder ?? ((params) => this.exchange.placeOrder(params));
   }
 
   async start(): Promise<void> {
@@ -172,7 +176,7 @@ export class POVExecutor {
     this.session.slicesTotal = this.slices.length;
 
     try {
-      const result = await this.exchange.placeOrder({
+      const result = await this.submitOrder({
         symbol,
         side,
         type: this.config.orderType,
