@@ -8,6 +8,32 @@ on:
       - v*
 
 jobs:
+  safety-harness:
+    name: Safety Harness
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install dependencies
+        run: bun ci
+
+      - name: Typecheck
+        run: bun tsc --noEmit -p tsconfig.json
+
+      - name: Focused safety and execution tests
+        run: >
+          bun test
+          src/infra/domain/evals/harness/process
+          src/infra/trading/execution/preflight.test.ts
+          src/infra/safety/transportGuardCoverage.test.ts
+          src/app/setup/harness-checks.test.ts
+          src/runtime/permissions
+          src/gateway/store/command-queue-store.test.ts
+
   npm-wrapper:
     name: npm Wrapper (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
