@@ -71,7 +71,7 @@ export function WalkForwardResults({ windows, overallScore, onClose }: Props) {
   });
 
   return (
-    <Pane title="WALK-FORWARD ANALYSIS" color="cyan">
+    <Pane title="WALK-FORWARD ANALYSIS">
       {/* Overall robustness */}
       <Box>
         <Box width={14}>

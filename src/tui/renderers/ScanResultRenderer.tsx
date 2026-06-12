@@ -3,9 +3,10 @@ import {
   DataTable,
   fmtNum,
   fmtPct,
-  changeColor,
   type Column,
 } from "../components/charts/DataTable.tsx";
+import { getMoneyColor } from "../design-system/colorMap.ts";
+import { useTheme } from "../themes/ThemeProvider.tsx";
 
 /**
  * ScanResultRenderer -- Market scan results table
@@ -24,37 +25,38 @@ interface Props {
   data: ScanRow[];
 }
 
-const COLUMNS: Column<ScanRow>[] = [
-  { key: "symbol", header: "SYM", width: 8, align: "left" },
-  {
-    key: "price",
-    header: "LAST",
-    width: 10,
-    align: "right",
-    format: (v) => fmtNum(Number(v)),
-  },
-  {
-    key: "changePct",
-    header: "CHG%",
-    width: 8,
-    align: "right",
-    format: (v) => fmtPct(Number(v)),
-    color: (v) => changeColor(Number(v)),
-  },
-  {
-    key: "volume",
-    header: "VOL",
-    width: 10,
-    align: "right",
-    format: (v) => fmtNum(Number(v)),
-  },
-  { key: "signal", header: "SIGNAL", width: 12, align: "left" },
-];
-
 export function ScanResultRenderer({ data }: Props) {
+  const theme = useTheme();
+  const columns: Column<ScanRow>[] = [
+    { key: "symbol", header: "SYM", width: 8, align: "left" },
+    {
+      key: "price",
+      header: "LAST",
+      width: 10,
+      align: "right",
+      format: (v) => fmtNum(Number(v)),
+    },
+    {
+      key: "changePct",
+      header: "CHG%",
+      width: 8,
+      align: "right",
+      format: (v) => fmtPct(Number(v)),
+      color: (v) => getMoneyColor(Number(v), theme),
+    },
+    {
+      key: "volume",
+      header: "VOL",
+      width: 10,
+      align: "right",
+      format: (v) => fmtNum(Number(v)),
+    },
+    { key: "signal", header: "SIGNAL", width: 12, align: "left" },
+  ];
+
   return (
     <DataTable
-      columns={COLUMNS as unknown as Column<Record<string, unknown>>[]}
+      columns={columns as unknown as Column<Record<string, unknown>>[]}
       data={data as unknown as Record<string, unknown>[]}
     />
   );

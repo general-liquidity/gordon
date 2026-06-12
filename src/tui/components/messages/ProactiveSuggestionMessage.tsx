@@ -52,11 +52,9 @@ export const ProactiveSuggestionMessage = React.memo(function ProactiveSuggestio
         <RichContent content={message.content} />
       </Box>
       <Box marginTop={1}>
-        <Text dimColor>/ack {id.slice(0, 10)}</Text>
+        <Text dimColor>Ctrl+G focus · then a ack / p pass / d snooze</Text>
         <Text dimColor>  {"\u00b7"}  </Text>
-        <Text dimColor>/pass {id.slice(0, 10)}</Text>
-        <Text dimColor>  {"\u00b7"}  </Text>
-        <Text dimColor>/snooze {category}</Text>
+        <Text dimColor>/ack {id.slice(0, 10)} · /pass {id.slice(0, 10)} · /snooze {category}</Text>
       </Box>
     </Box>
   );

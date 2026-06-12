@@ -160,7 +160,7 @@ export function BacktestWizard({ strategies, onRun, onCancel }: Props) {
     <Dialog
       title="BACKTEST WIZARD"
       subtitle={`Step ${step + 1} of ${STEPS.length}: ${STEPS[step]}`}
-      color="cyan"
+      tone="brand"
       onClose={onCancel}
     >
       {/* Progress dots */}

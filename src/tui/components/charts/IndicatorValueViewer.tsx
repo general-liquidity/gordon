@@ -86,7 +86,7 @@ function padLeft(s: string, w: number): string {
 
 export function IndicatorValueViewer({ symbol, indicators, onClose }: Props) {
   return (
-    <Pane title={`INDICATORS \u00b7 ${symbol}`} color="cyan">
+    <Pane title={`INDICATORS \u00b7 ${symbol}`}>
       {/* Header */}
       <Box>
         <Box width={20}><Text bold dimColor>INDICATOR</Text></Box>

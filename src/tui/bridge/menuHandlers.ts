@@ -2,6 +2,7 @@ import type { SessionRuntime } from "../../runtime/session/SessionRuntime.ts";
 import type { SlashCommand } from "../../app/slash/slashCommands.ts";
 import {
   formatPaginatedCommandHelp,
+  formatTradingModesHelp,
   commandToPrompt,
 } from "../../app/slash/slashCommands.ts";
 import { loadConfig, saveConfig } from "../../infra/storage/config/config.ts";
@@ -69,6 +70,26 @@ function addMessage(
     ...prev,
     messages: [...prev.messages, msg],
   }));
+}
+
+const PAGER_LINE_THRESHOLD = 60;
+
+function addMessageOrPager(
+  setState: StateUpdater,
+  role: Message["role"],
+  title: string,
+  content: string,
+): void {
+  if (content.split("\n").length <= PAGER_LINE_THRESHOLD) {
+    addMessage(setState, role, content);
+    return;
+  }
+
+  setState((prev: any) => ({
+    ...prev,
+    pager: { title, content },
+  }));
+  addMessage(setState, "system", `${title} opened in pager. Use Ctrl+O later to reopen the latest long message.`);
 }
 
 // ============================================================================
@@ -359,7 +380,7 @@ export async function handleRuntimeMenuCommand(
       const limit = parseInt(args) || 10;
       const transcript = runtime.getTranscript().slice(-limit);
       const lines = transcript.map((e) => `[${e.role}] ${e.content.slice(0, 100)}`);
-      addMessage(setState, "gordon", lines.join("\n") || "Empty transcript.");
+      addMessageOrPager(setState, "gordon", "Runtime Transcript", lines.join("\n") || "Empty transcript.");
       return true;
     }
     case "runtime-scratchpad": {
@@ -433,7 +454,7 @@ export async function handleRuntimeMenuCommand(
       for (const a of [...bridgeRecent, ...bridgeActive].slice(-10)) {
         lines.push(`  [${a.status}] ${a.source} \u2192 ${a.commandType}`);
       }
-      addMessage(setState, "gordon", lines.length > 1 ? lines.join("\n") : "No actions recorded.");
+      addMessageOrPager(setState, "gordon", "Action Log", lines.length > 1 ? lines.join("\n") : "No actions recorded.");
       return true;
     }
     case "bugreport": {
@@ -567,6 +588,14 @@ export function handleUIMenuCommand(
       setState((prev: any) => ({ ...prev, showPalette: true }));
       return true;
     }
+    case "trade-queue": {
+      setState((prev: any) => ({ ...prev, activeOverlayView: "tradeQueue" }));
+      return true;
+    }
+    case "safety": {
+      setState((prev: any) => ({ ...prev, activeOverlayView: "safety" }));
+      return true;
+    }
     case "auto": {
       setState((prev: any) => ({ ...prev, permissionMode: "auto" }));
       addMessage(setState, "system", "Permission mode: auto \u2014 trades execute without per-action approval. Use /ask to return to default.");
@@ -629,6 +658,10 @@ export async function handleSystemMenuCommand(
     case "help": {
       const helpText = formatPaginatedCommandHelp(args || undefined);
       addMessage(setState, "gordon", helpText);
+      return true;
+    }
+    case "modes": {
+      addMessage(setState, "gordon", formatTradingModesHelp());
       return true;
     }
     case "doctor":
@@ -753,14 +786,7 @@ export async function handleSystemMenuCommand(
     }
 
     case "clear": {
-      // Clear conversation within same session
-      setState((prev: any) => ({
-        ...prev,
-        messages: [],
-        streamBuffer: "",
-        completedMessageCount: 0,
-      }));
-      addMessage(setState, "system", "Conversation cleared. Session preserved — use /new-session for a fresh start.");
+      setState((prev: any) => ({ ...prev, showResetConfirm: true }));
       return true;
     }
 
@@ -905,7 +931,7 @@ export async function handleSystemMenuCommand(
           const lines = tradeEntries.map((e, i) =>
             `${i + 1}. [${e.role}] ${e.content.slice(0, 120)}${e.content.length > 120 ? "..." : ""}`
           );
-          addMessage(setState, "gordon", `TRADE JOURNAL (last ${tradeEntries.length}):\n${lines.join("\n")}`);
+          addMessageOrPager(setState, "gordon", "Trade Journal", `TRADE JOURNAL (last ${tradeEntries.length}):\n${lines.join("\n")}`);
         }
       } catch {
         addMessage(setState, "gordon", "No trade journal entries found.");

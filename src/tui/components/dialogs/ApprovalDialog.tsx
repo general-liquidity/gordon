@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { Box, Text, useInput } from "../../ink-custom";
 import { GordonSelect as Select } from "../../design-system/GordonSelect.js";
+import { getRiskColor, type RiskLevel } from "../../design-system/colorMap.ts";
+import { useTheme } from "../../themes/ThemeProvider.tsx";
 import { Divider } from "../layout/Divider.tsx";
 
 // ============================================================================
@@ -81,10 +83,11 @@ export function buildApprovalOptions(
 
 /** "Why this needs approval" block — top reasons from the risk kernel. */
 function RiskReasons({ reasons }: { reasons?: string[] }) {
+  const theme = useTheme();
   if (!reasons || reasons.length === 0) return null;
   return (
     <>
-      <Text color="yellow">  Why this needs approval:</Text>
+      <Text color={theme.riskWarning}>  Why this needs approval:</Text>
       {reasons.slice(0, MAX_VISIBLE_REASONS).map((reason, i) => (
         <Text key={i} dimColor>    {"•"} {reason}</Text>
       ))}
@@ -105,18 +108,21 @@ export function ApprovalDialog({ approval, onDecision }: Props) {
 // ── Standard (low/medium) — dividers, no borders ──
 
 function StandardApproval({ approval, onDecision }: Props) {
+  const theme = useTheme();
+  const riskTone = getRiskColor(approval.riskClass as RiskLevel, theme);
+
   return (
     <Box flexDirection="column" marginTop={1}>
       <Divider />
       <Box paddingX={2} flexDirection="column">
         <Box>
-          <Text color="yellow" bold>{"\u26A0"} APPROVAL [{approval.shortId}]</Text>
+          <Text color={theme.riskWarning} bold>{"\u26A0"} APPROVAL [{approval.shortId}]</Text>
         </Box>
-        <Text>  Gordon wants to use <Text bold color="cyanBright">`{approval.toolName}`</Text></Text>
+        <Text>  Gordon wants to use <Text bold color={theme.uiBrand}>`{approval.toolName}`</Text></Text>
         <Box>
           <Text dimColor>  Scope: {approval.permissionScope}</Text>
           <Text dimColor> {"\u00b7"} </Text>
-          <Text color={approval.riskClass === "medium" ? "yellow" : "green"} bold>
+          <Text color={riskTone} bold>
             Risk: {approval.riskClass.toUpperCase()}
           </Text>
         </Box>
@@ -137,26 +143,29 @@ function StandardApproval({ approval, onDecision }: Props) {
 // ── High risk — bordered box ──
 
 function HighApproval({ approval, onDecision }: Props) {
+  const theme = useTheme();
+  const riskTone = getRiskColor("high", theme);
+
   return (
     <Box flexDirection="column" marginTop={1}>
       <Box
         flexDirection="column"
         borderStyle="round"
-        borderColor="red"
+        borderColor={riskTone}
         paddingX={2}
         paddingY={1}
       >
         <Box>
-          <Text color="red" bold>{"\u26A0"} HIGH RISK APPROVAL [{approval.shortId}]</Text>
+          <Text color={riskTone} bold>{"\u26A0"} HIGH RISK APPROVAL [{approval.shortId}]</Text>
         </Box>
         <Text> </Text>
-        <Text>  Tool: <Text bold color="cyanBright">{approval.toolName}</Text></Text>
+        <Text>  Tool: <Text bold color={theme.uiBrand}>{approval.toolName}</Text></Text>
         <Text>  Scope: <Text dimColor>{approval.permissionScope}</Text></Text>
-        <Text>  Effect: <Text color="yellow">{approval.sideEffectLevel}</Text></Text>
+        <Text>  Effect: <Text color={theme.riskWarning}>{approval.sideEffectLevel}</Text></Text>
         {approval.reason && <Text dimColor>  {approval.reason}</Text>}
         <RiskReasons reasons={approval.riskReasons} />
         <Text> </Text>
-        <Text color="red">  This action has significant side effects. Review carefully.</Text>
+        <Text color={riskTone}>  This action has significant side effects. Review carefully.</Text>
         <Text> </Text>
         <Box paddingLeft={2}>
           <Select
@@ -174,6 +183,8 @@ function HighApproval({ approval, onDecision }: Props) {
 function CriticalApproval({ approval, onDecision }: Props) {
   const [countdown, setCountdown] = useState(3);
   const [unlocked, setUnlocked] = useState(false);
+  const theme = useTheme();
+  const riskTone = getRiskColor("critical", theme);
 
   useEffect(() => {
     if (countdown <= 0) { setUnlocked(true); return; }
@@ -190,22 +201,22 @@ function CriticalApproval({ approval, onDecision }: Props) {
       <Box
         flexDirection="column"
         borderStyle="double"
-        borderColor="red"
+        borderColor={riskTone}
         paddingX={2}
         paddingY={1}
       >
         <Box>
-          <Text color="red" bold inverse>{" CRITICAL "}</Text>
-          <Text color="red" bold> APPROVAL [{approval.shortId}]</Text>
+          <Text color={riskTone} bold inverse>{" CRITICAL "}</Text>
+          <Text color={riskTone} bold> APPROVAL [{approval.shortId}]</Text>
         </Box>
         <Text> </Text>
-        <Text>  Tool: <Text bold color="cyanBright">{approval.toolName}</Text></Text>
+        <Text>  Tool: <Text bold color={theme.uiBrand}>{approval.toolName}</Text></Text>
         <Text>  Scope: <Text dimColor>{approval.permissionScope}</Text></Text>
-        <Text>  Effect: <Text color="red" bold>{approval.sideEffectLevel}</Text></Text>
+        <Text>  Effect: <Text color={riskTone} bold>{approval.sideEffectLevel}</Text></Text>
         {approval.reason && <Text dimColor>  {approval.reason}</Text>}
         <RiskReasons reasons={approval.riskReasons} />
         <Text> </Text>
-        <Text color="red" bold>  {"\u26A0"} CRITICAL — This action may be irreversible.</Text>
+        <Text color={riskTone} bold>  {"\u26A0"} CRITICAL — This action may be irreversible.</Text>
         <Text> </Text>
         {!unlocked ? (
           <Text dimColor>  Confirm available in {countdown}s... (Esc to deny)</Text>

@@ -101,7 +101,7 @@ export function BrokerManagerPanel({
   const connectedCount = brokers.filter((b) => b.connected).length;
 
   return (
-    <Pane title="BROKERS" color="cyan">
+    <Pane title="BROKERS">
       <Box>
         <Text dimColor>
           {brokers.length} brokers {"\u00b7"}{" "}

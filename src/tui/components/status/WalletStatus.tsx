@@ -72,7 +72,7 @@ function fmtAmount(n: number): string {
 export function WalletStatus({ wallets }: Props) {
   if (wallets.length === 0) {
     return (
-      <Pane title="WALLETS" color="cyan">
+      <Pane title="WALLETS">
         <Text dimColor>No wallets connected.</Text>
       </Pane>
     );
@@ -81,7 +81,7 @@ export function WalletStatus({ wallets }: Props) {
   const totalAll = wallets.reduce((sum, w) => sum + w.totalUSD, 0);
 
   return (
-    <Pane title="WALLETS" color="cyan">
+    <Pane title="WALLETS">
       {wallets.map((wallet, i) => (
         <Box key={`${wallet.chain}-${wallet.address}`} flexDirection="column" marginTop={i > 0 ? 1 : 0}>
           {/* Wallet header */}

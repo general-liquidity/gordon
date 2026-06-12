@@ -119,6 +119,7 @@ function runHandlerProcess(
       child = spawn(handlerPath, [...args], {
         stdio: ["pipe", "pipe", "pipe"],
         env: { ...process.env, ...(extraEnv ?? {}) },
+        detached: process.platform !== "win32",
       });
     } catch (err) {
       resolvePromise({
@@ -157,9 +158,17 @@ function runHandlerProcess(
     timeoutHandle = setTimeout(() => {
       timedOut = true;
       try {
-        child.kill("SIGTERM");
+        if (process.platform !== "win32" && child.pid) {
+          process.kill(-child.pid, "SIGTERM");
+        } else {
+          child.kill("SIGTERM");
+        }
       } catch {
-        // ignore
+        try {
+          child.kill("SIGTERM");
+        } catch {
+          // ignore
+        }
       }
     }, timeoutMs);
 

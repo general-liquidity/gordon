@@ -112,7 +112,7 @@ export function TaskDependencyView({ tasks, onStart, onCancel, onClose }: Props)
 
   if (tasks.length === 0) {
     return (
-      <Pane title="TASK PIPELINE" color="cyan">
+      <Pane title="TASK PIPELINE">
         <Text dimColor>No tasks in pipeline.</Text>
         {onClose && (
           <Text dimColor>Esc close</Text>
@@ -127,7 +127,7 @@ export function TaskDependencyView({ tasks, onStart, onCancel, onClose }: Props)
   const inProgress = tasks.filter((t) => t.status === "in_progress").length;
 
   return (
-    <Pane title="TASK PIPELINE" color="cyan">
+    <Pane title="TASK PIPELINE">
       <Box>
         <Text dimColor>
           {tasks.length} tasks {"\u00b7"} {completed} done

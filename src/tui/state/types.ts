@@ -7,6 +7,8 @@
 import type { Message } from "../components/messages/MessageBubble.tsx";
 import type { AgentChain, HandoffEvent } from "../components/status/AgentProgress.tsx";
 import type { ApprovalRequest } from "../components/dialogs/ApprovalDialog.tsx";
+import type { ToolCallState } from "../components/status/ToolCallInline.tsx";
+import type { KillSwitchStatus } from "./killSwitchStatus.ts";
 
 // ============================================================================
 // Notification (Phase 4 — event-driven updates)
@@ -43,6 +45,13 @@ export type PermissionMode =
 
 export type BootPhase = "boot" | "ready";
 
+export interface ModeBannerState {
+  mode: PermissionMode;
+  liveCapable: boolean;
+  shownAt: number;
+  dismissed: boolean;
+}
+
 // ============================================================================
 // Background Task
 // ============================================================================
@@ -51,6 +60,19 @@ export interface BackgroundTask {
   id: string;
   label: string;
   status: string;
+}
+
+export interface RadarFocus {
+  id: string;
+  category: string;
+  title: string;
+}
+
+export type OverlayViewId = "tradeQueue" | "safety";
+
+export interface PagerContent {
+  title: string;
+  content: string;
 }
 
 // ============================================================================
@@ -69,6 +91,7 @@ export interface AppState {
   streamBuffer: string;
   isStreaming: boolean;
   activeThinking: string;
+  activeToolCalls: ToolCallState[];
 
   // Agents
   activeAgents: AgentChain[];
@@ -112,9 +135,16 @@ export interface AppState {
   ctrlCPressed: boolean;
   showPalette: boolean;
   showSetup: boolean;
+  showFirstTradeTour: boolean;
   showHelp: boolean;
+  showResetConfirm: boolean;
   runtimeReady: boolean;
   bootPhase: BootPhase;
+  modeBanner: ModeBannerState | null;
+  killSwitches: KillSwitchStatus | null;
+  activeOverlayView: OverlayViewId | null;
+  pager: PagerContent | null;
+  radarFocus: RadarFocus | null;
 
   // Phase 15-18 panels
   showSettings: boolean;
@@ -136,6 +166,7 @@ export const INITIAL_STATE: AppState = {
   streamBuffer: "",
   isStreaming: false,
   activeThinking: "",
+  activeToolCalls: [],
   activeAgents: [],
   swarmMode: false,
   handoffHistory: [],
@@ -155,9 +186,16 @@ export const INITIAL_STATE: AppState = {
   ctrlCPressed: false,
   showPalette: false,
   showSetup: false,
+  showFirstTradeTour: false,
   showHelp: false,
+  showResetConfirm: false,
   runtimeReady: false,
   bootPhase: "boot",
+  modeBanner: null,
+  killSwitches: null,
+  activeOverlayView: null,
+  pager: null,
+  radarFocus: null,
   showSettings: false,
   showExport: false,
   showEmergency: false,
@@ -182,6 +220,9 @@ export type Action =
   | { type: "START_STREAMING" }
   | { type: "STOP_STREAMING" }
   | { type: "SET_STREAM_BUFFER"; buffer: string }
+  | { type: "SET_ACTIVE_THINKING"; thinking: string }
+  | { type: "SET_ACTIVE_TOOL_CALLS"; calls: ToolCallState[] }
+  | { type: "UPDATE_STREAMING_MESSAGE"; id: string; content: string; streamBuffer: string }
   | { type: "SET_ACTIVE_AGENTS"; agents: AgentChain[] }
   | { type: "ADD_AGENT_CHAIN"; chain: AgentChain }
   | { type: "COMPLETE_AGENT_CHAINS" }
@@ -196,11 +237,22 @@ export type Action =
   | { type: "TOGGLE_PALETTE" }
   | { type: "SET_SHOW_PALETTE"; show: boolean }
   | { type: "SET_SHOW_SETUP"; show: boolean }
+  | { type: "SET_SHOW_FIRST_TRADE_TOUR"; show: boolean }
   | { type: "SET_SHOW_HELP"; show: boolean }
+  | { type: "SET_SHOW_RESET_CONFIRM"; show: boolean }
   | { type: "SET_CTRL_C_PRESSED"; pressed: boolean }
   | { type: "SET_SWARM_MODE"; enabled: boolean }
   | { type: "SET_ACTIVE_WORKSPACE"; workspace: string | null }
   | { type: "RESET_STREAM_STATE" }
+  | { type: "RESET_SESSION" }
+  | { type: "SHOW_MODE_BANNER"; banner: ModeBannerState }
+  | { type: "DISMISS_MODE_BANNER" }
+  | { type: "SET_KILL_SWITCH_STATUS"; status: KillSwitchStatus }
+  | { type: "OPEN_OVERLAY_VIEW"; view: OverlayViewId }
+  | { type: "CLOSE_OVERLAY_VIEW" }
+  | { type: "OPEN_PAGER"; pager: PagerContent }
+  | { type: "CLOSE_PAGER" }
+  | { type: "SET_RADAR_FOCUS"; focus: RadarFocus | null }
   // Phase 4 — Event-driven notifications
   | { type: "INJECT_NOTIFICATION"; notification: TuiNotification }
   | { type: "DISMISS_NOTIFICATION"; id: string }

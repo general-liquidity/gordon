@@ -1,6 +1,5 @@
 import React, { useState, useMemo, useRef } from "react";
 import { Box, Text, useInput, useStdout } from "../../ink-custom";
-import { FooterHints } from "./FooterHints.js";
 import { useSlashCommandTypeahead, type TypeaheadMatch } from "../../hooks/useSlashCommandTypeahead.js";
 import { useInputHistory } from "../../hooks/input/useInputHistory.js";
 import { useImagePaste } from "../../hooks/input/useImagePaste.js";
@@ -15,6 +14,8 @@ import {
   applyOperator as vimApplyOperator,
   type VimState,
 } from "../../vim/index.js";
+import { useTheme } from "../../themes/ThemeProvider.tsx";
+import { markInteraction } from "../../diagnostics/performanceMonitor.ts";
 
 // ============================================================================
 // PromptInput — Claude Code-style compact slash command picker
@@ -79,6 +80,9 @@ interface Props {
   autonomousActive?: boolean;
   autonomousStrategyCount?: number;
   vimMode?: boolean;
+  locked?: boolean;
+  onShowShortcuts?: () => void;
+  onVimModeChange?: (mode: "insert" | "normal" | "visual") => void;
   effortLevel?: "low" | "medium" | "high" | "auto";
   tokenBudgetRatio?: number;
 }
@@ -96,10 +100,14 @@ export function PromptInput({
   autonomousActive = false,
   autonomousStrategyCount = 0,
   vimMode = false,
+  locked = false,
+  onShowShortcuts,
+  onVimModeChange,
   effortLevel,
   tokenBudgetRatio,
 }: Props) {
   const { stdout } = useStdout();
+  const theme = useTheme();
   const termRows = stdout?.rows ?? 24;
   const termCols = stdout?.columns ?? 80;
   const [value, setValue] = useState("");
@@ -165,6 +173,13 @@ export function PromptInput({
   const maxVisible = Math.min(Math.max(10, Math.floor(termRows * 0.6)), 30);
 
   useInput((input, key) => {
+    if (locked) return;
+    markInteraction("keystroke");
+    if (value === "" && input === "?" && onShowShortcuts && !key.ctrl && !key.meta) {
+      onShowShortcuts();
+      return;
+    }
+
     // Vim mode routing — intercept keys when vim is enabled and we're not in Insert mode.
     // Enter/Ctrl+C always pass through (REPL convention: Enter submits in any mode).
     if (vimMode && vimState.mode !== VimMode.Insert && !key.return && !key.ctrl) {
@@ -183,6 +198,7 @@ export function PromptInput({
           setCursorPos(r.newCursor);
         }
       }
+      if (result.newState.mode !== vimState.mode) onVimModeChange?.(vimModeName(result.newState.mode));
       setVimState(result.newState);
       return;
     }
@@ -190,6 +206,7 @@ export function PromptInput({
     // Insert-mode Escape: transition to Normal without clearing the buffer
     if (vimMode && vimState.mode === VimMode.Insert && key.escape) {
       setVimState({ ...vimState, mode: VimMode.Normal, count: null, pendingOperator: null });
+      onVimModeChange?.("normal");
       // Keep cursor inside the buffer in Normal mode (cursor lives on a
       // grapheme, not past end). graphemeCount handles CJK / emoji correctly.
       const gLen = graphemeCount(value);
@@ -438,11 +455,31 @@ export function PromptInput({
           ) : (
             <Text dimColor>{placeholder}</Text>
           )}
-        </Box>
+      </Box>
+        {vimMode && (
+          <Text
+            color={isVimNormal ? theme.riskWarning : isVimVisual ? theme.variantAdvisor : theme.uiMuted}
+            bold={isVimNormal || isVimVisual}
+          >
+            {isVimNormal ? "[VIM NORMAL]" : isVimVisual ? "[VIM VISUAL]" : "[VIM]"}
+          </Text>
+        )}
         {/* Footer hints moved above input box — status bar handles mode/cost/shortcuts */}
       </Box>
     </Box>
   );
+}
+
+function vimModeName(mode: VimMode): "insert" | "normal" | "visual" {
+  switch (mode) {
+    case VimMode.Normal:
+      return "normal";
+    case VimMode.Visual:
+      return "visual";
+    case VimMode.Insert:
+    default:
+      return "insert";
+  }
 }
 
 // ----------------------------------------------------------------------------

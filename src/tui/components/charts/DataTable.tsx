@@ -50,20 +50,7 @@ export function DataTable<T extends Record<string, unknown>>({
 
       {/* Data rows */}
       {data.map((row, rowIdx) => (
-        <Box key={rowIdx}>
-          {columns.map((col) => {
-            const raw = row[col.key];
-            const formatted = col.format ? col.format(raw, row) : formatValue(raw);
-            const cellColor = col.color ? col.color(raw, row) : undefined;
-            const aligned = col.align === "right" ? padLeft(formatted, col.width) : padRight(formatted, col.width);
-
-            return (
-              <Box key={col.key} width={col.width}>
-                <Text color={cellColor}>{aligned}</Text>
-              </Box>
-            );
-          })}
-        </Box>
+        <DataTableRow key={rowIdx} row={row} columns={columns} />
       ))}
 
       {/* Summary row */}
@@ -92,6 +79,33 @@ export function DataTable<T extends Record<string, unknown>>({
     </Box>
   );
 }
+
+const DataTableRowInner = function DataTableRow<T extends Record<string, unknown>>({
+  row,
+  columns,
+}: {
+  row: T;
+  columns: Column<T>[];
+}) {
+  return (
+    <Box>
+      {columns.map((col) => {
+        const raw = row[col.key];
+        const formatted = col.format ? col.format(raw, row) : formatValue(raw);
+        const cellColor = col.color ? col.color(raw, row) : undefined;
+        const aligned = col.align === "right" ? padLeft(formatted, col.width) : padRight(formatted, col.width);
+
+        return (
+          <Box key={col.key} width={col.width}>
+            <Text color={cellColor}>{aligned}</Text>
+          </Box>
+        );
+      })}
+    </Box>
+  );
+};
+
+const DataTableRow = React.memo(DataTableRowInner) as typeof DataTableRowInner;
 
 // ============================================================================
 // Formatting helpers
@@ -127,12 +141,6 @@ export function fmtNum(n: number): string {
 
 export function fmtPct(n: number): string {
   return `${n >= 0 ? "+" : ""}${n.toFixed(2)}%`;
-}
-
-export function changeColor(n: number): string | undefined {
-  if (n > 0) return "green";
-  if (n < 0) return "red";
-  return undefined;
 }
 
 export function timeAgo(ts: string): string {

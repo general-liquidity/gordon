@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { Box, Text, useInput } from "../../ink-custom";
 import { GordonSelect as Select } from "../../design-system/GordonSelect.js";
+import { getRiskColor, getSignalColor } from "../../design-system/colorMap.ts";
+import { useTheme } from "../../themes/ThemeProvider.tsx";
 import { Divider } from "../layout/Divider.tsx";
 
 // ============================================================================
@@ -39,18 +41,16 @@ export function TradeExecutionPermissionRequest({ tradeDetails, reason, onDecisi
 
 function TradeBody({ tradeDetails, reason }: { tradeDetails: TradeDetails; reason?: string }) {
   const { side, symbol, quantity, orderType, price, estimatedValue, riskClass } = tradeDetails;
+  const theme = useTheme();
   const priceStr = price != null ? ` @ $${price.toLocaleString()}` : ` @ ${orderType}`;
-  const riskColor =
-    riskClass === "critical" ? "red"
-    : riskClass === "high" ? "red"
-    : riskClass === "medium" ? "yellow"
-    : "green";
+  const riskTone = getRiskColor(riskClass, theme);
+  const sideColor = getSignalColor(side === "BUY" ? "buy" : "sell", theme);
 
   return (
     <>
       <Text>
         {"  "}Gordon wants to place:{" "}
-        <Text bold color={side === "BUY" ? "green" : "red"}>
+        <Text bold color={sideColor}>
           {side} {quantity} {symbol}
         </Text>
         <Text dimColor>{priceStr}</Text>
@@ -60,7 +60,7 @@ function TradeBody({ tradeDetails, reason }: { tradeDetails: TradeDetails; reaso
       )}
       <Box>
         <Text dimColor>{"  "}Risk class: </Text>
-        <Text color={riskColor} bold>
+        <Text color={riskTone} bold>
           {riskClass.toUpperCase()}
         </Text>
       </Box>
@@ -76,11 +76,13 @@ const TRADE_OPTIONS = [
 ] as const;
 
 function StandardTrade({ tradeDetails, reason, onDecision }: Props) {
+  const theme = useTheme();
+
   return (
     <Box flexDirection="column" marginTop={1}>
       <Divider />
       <Box paddingX={2} flexDirection="column">
-        <Text color="yellow" bold>
+        <Text color={theme.riskWarning} bold>
           {"⚠"} TRADE EXECUTION REQUEST
         </Text>
         <Text> </Text>
@@ -99,22 +101,25 @@ function StandardTrade({ tradeDetails, reason, onDecision }: Props) {
 }
 
 function HighTrade({ tradeDetails, reason, onDecision }: Props) {
+  const theme = useTheme();
+  const riskTone = getRiskColor("high", theme);
+
   return (
     <Box flexDirection="column" marginTop={1}>
       <Box
         flexDirection="column"
         borderStyle="round"
-        borderColor="red"
+        borderColor={riskTone}
         paddingX={2}
         paddingY={1}
       >
-        <Text color="red" bold>
+        <Text color={riskTone} bold>
           {"⚠"} TRADE EXECUTION REQUEST
         </Text>
         <Text> </Text>
         <TradeBody tradeDetails={tradeDetails} reason={reason} />
         <Text> </Text>
-        <Text color="red">{"  "}High risk trade — review carefully before approving.</Text>
+        <Text color={riskTone}>{"  "}High risk trade — review carefully before approving.</Text>
         <Text> </Text>
         <Box paddingLeft={2}>
           <Select
@@ -130,6 +135,8 @@ function HighTrade({ tradeDetails, reason, onDecision }: Props) {
 function CriticalTrade({ tradeDetails, reason, onDecision }: Props) {
   const [countdown, setCountdown] = useState(3);
   const [unlocked, setUnlocked] = useState(false);
+  const theme = useTheme();
+  const riskTone = getRiskColor("critical", theme);
 
   useEffect(() => {
     if (countdown <= 0) { setUnlocked(true); return; }
@@ -146,18 +153,18 @@ function CriticalTrade({ tradeDetails, reason, onDecision }: Props) {
       <Box
         flexDirection="column"
         borderStyle="double"
-        borderColor="red"
+        borderColor={riskTone}
         paddingX={2}
         paddingY={1}
       >
         <Box>
-          <Text color="red" bold inverse>{" CRITICAL "}</Text>
-          <Text color="red" bold> TRADE EXECUTION REQUEST</Text>
+          <Text color={riskTone} bold inverse>{" CRITICAL "}</Text>
+          <Text color={riskTone} bold> TRADE EXECUTION REQUEST</Text>
         </Box>
         <Text> </Text>
         <TradeBody tradeDetails={tradeDetails} reason={reason} />
         <Text> </Text>
-        <Text color="red" bold>
+        <Text color={riskTone} bold>
           {"  "}{"⚠"} CRITICAL — This trade may be irreversible.
         </Text>
         <Text> </Text>

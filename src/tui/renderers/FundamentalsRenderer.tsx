@@ -41,7 +41,7 @@ export function FundamentalsRenderer({ data }: Props) {
   const growthColor = data.revenueGrowth > 0.1 ? "green" : data.revenueGrowth > 0 ? "yellow" : "red";
 
   return (
-    <Pane title={`${data.symbol} — ${data.companyName}`} color="cyan">
+    <Pane title={`${data.symbol} — ${data.companyName}`}>
       <Box flexDirection="column">
         <Text dimColor>{data.sector} · {data.industry}</Text>
         <Text dimColor>Market Cap: {fmtBillions(data.marketCap)}</Text>

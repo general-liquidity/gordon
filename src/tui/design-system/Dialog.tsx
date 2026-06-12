@@ -1,5 +1,7 @@
 import React, { type ReactNode } from "react";
 import { Box, Text, useInput, useStdout } from "../ink-custom";
+import type { GordonTheme } from "../themes/themes.ts";
+import { useTheme } from "../themes/ThemeProvider.tsx";
 
 // ============================================================================
 // Dialog — Modal dialog wrapper with border, title, and key handling
@@ -15,15 +17,30 @@ import { Box, Text, useInput, useStdout } from "../ink-custom";
 interface Props {
   title: string;
   subtitle?: string;
-  color?: string;
+  tone?: "warning" | "danger" | "brand" | "info";
   onClose: () => void;
   onConfirm?: () => void;
   children: ReactNode;
 }
 
-export function Dialog({ title, subtitle, color = "yellow", onClose, onConfirm, children }: Props) {
+function dialogToneColor(tone: NonNullable<Props["tone"]>, theme: GordonTheme): string {
+  switch (tone) {
+    case "warning":
+      return theme.riskWarning;
+    case "danger":
+      return theme.riskDanger;
+    case "brand":
+      return theme.uiBrand;
+    case "info":
+      return theme.uiInfo;
+  }
+}
+
+export function Dialog({ title, subtitle, tone = "warning", onClose, onConfirm, children }: Props) {
   const { stdout } = useStdout();
+  const theme = useTheme();
   const width = Math.min(stdout?.columns ?? 80, 60);
+  const color = dialogToneColor(tone, theme);
 
   useInput((input, key) => {
     if (key.escape) {

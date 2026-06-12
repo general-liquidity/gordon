@@ -14,6 +14,9 @@
 
 import React from "react";
 import { Box, Text } from "../ink-custom";
+import type { GordonTheme } from "../themes/themes.ts";
+import { useTheme } from "../themes/ThemeProvider.tsx";
+import { getMoneyColor, getSignalColor } from "../design-system/colorMap.ts";
 
 // ============================================================================
 // Types
@@ -67,16 +70,10 @@ function trendArrow(dir: string | undefined): string {
   return "\u2194";
 }
 
-function trendColor(dir: string | undefined): string {
-  if (dir === "up") return "green";
-  if (dir === "down") return "red";
-  return "yellow";
-}
-
-function changeColor(n: number): string {
-  if (n > 0) return "green";
-  if (n < 0) return "red";
-  return "white";
+function trendColor(dir: string | undefined, theme: GordonTheme): string {
+  if (dir === "up") return getSignalColor("buy", theme);
+  if (dir === "down") return getSignalColor("sell", theme);
+  return getSignalColor("neutral", theme);
 }
 
 function volumeLabel(assessment: string | undefined): string {
@@ -90,17 +87,19 @@ function volumeLabel(assessment: string | undefined): string {
 // ============================================================================
 
 export function EnrichedQuoteRenderer({ data }: Props) {
+  const theme = useTheme();
   const hasEnrichment = data.trendDirection || data.momentum || data.summary;
+  const priceChangeTone = getMoneyColor(data.changePercent24h, theme);
 
   return (
     <Box flexDirection="column" paddingLeft={2} marginTop={1}>
       {/* Line 1: Symbol  Price  Change  Volume */}
       <Box gap={2}>
         <Text bold>{data.symbol}/USDT</Text>
-        <Text bold color={changeColor(data.changePercent24h)}>
+        <Text bold color={priceChangeTone}>
           {fmtPrice(data.price)}
         </Text>
-        <Text color={changeColor(data.changePercent24h)}>
+        <Text color={priceChangeTone}>
           {fmtPct(data.changePercent24h)}
         </Text>
         <Text dimColor>Vol: {fmtVol(data.volume24h)}</Text>
@@ -127,7 +126,7 @@ export function EnrichedQuoteRenderer({ data }: Props) {
         <Box gap={2}>
           <Text>
             <Text>Trend: </Text>
-            <Text color={trendColor(data.trendDirection)}>
+            <Text color={trendColor(data.trendDirection, theme)}>
               {trendArrow(data.trendDirection)} {(data.trendDirection ?? "sideways").toUpperCase()}
             </Text>
             {data.momentum && (

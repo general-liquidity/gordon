@@ -41,7 +41,7 @@ export const HINTS: InlineHint[] = [
   },
   {
     id: "permission_mode",
-    message: "Tip: Use /auto for hands-free trading, /ask for per-trade approval (default), or /strict for read-only mode.",
+    message: "Tip: Use /auto for hands-free trading, /ask for per-trade approval (default), or /strict for read-only mode. /modes shows the full matrix.",
     maxShows: 3,
     condition: (ctx) => ctx.sessionCount <= 5,
   },
@@ -50,6 +50,12 @@ export const HINTS: InlineHint[] = [
     message: "Tip: Type / to see all commands, or press Ctrl+P to open the command palette.",
     maxShows: 3,
     condition: (ctx) => ctx.sessionCount <= 3,
+  },
+  {
+    id: "radar_cards",
+    message: "Tip: Radar cards are unsolicited heads-ups from Gordon's market observer — news, regime shifts, volatility spikes. They show up inline in chat, marked as suggestions. Turn on with /radar on, inspect with /radar status.",
+    maxShows: 3,
+    condition: (ctx) => ctx.sessionCount >= 2 && ctx.sessionCount <= 12,
   },
   {
     id: "keybindings",

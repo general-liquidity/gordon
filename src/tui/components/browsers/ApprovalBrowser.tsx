@@ -1,6 +1,8 @@
 import React, { useState } from "react";
 import { Box, Text, useInput } from "../../ink-custom";
 import { GordonSelect as Select } from "../../design-system/GordonSelect.js";
+import { getRiskColor, type RiskLevel } from "../../design-system/colorMap.ts";
+import { useTheme } from "../../themes/ThemeProvider.tsx";
 
 /**
  * ApprovalBrowser — Interactive approval manager
@@ -30,6 +32,7 @@ export function ApprovalBrowser({ pending, recent, onApprove, onDeny, onCancel }
   const [view, setView] = useState<"pending" | "recent">("pending");
   const [selectedIdx, setSelectedIdx] = useState(0);
   const [decidingId, setDecidingId] = useState<string | null>(null);
+  const theme = useTheme();
 
   const items = view === "pending" ? pending : recent;
 
@@ -50,16 +53,18 @@ export function ApprovalBrowser({ pending, recent, onApprove, onDeny, onCancel }
     }
   });
 
-  const riskColor = (level: string) => level === "critical" ? "red" : level === "high" ? "yellow" : "green";
+  const riskTone = (level: ApprovalItem["riskLevel"]) => (
+    getRiskColor(level === "standard" ? "low" : level as RiskLevel, theme)
+  );
 
   if (decidingId) {
     const item = pending.find((p) => p.id === decidingId);
     if (!item) { setDecidingId(null); return null; }
     return (
       <Box flexDirection="column" paddingX={1} paddingY={1}>
-        <Text bold color="cyanBright">DECIDE: {item.toolName}</Text>
+        <Text bold color={theme.uiBrand}>DECIDE: {item.toolName}</Text>
         <Text dimColor>{item.summary}</Text>
-        <Text>Risk: <Text color={riskColor(item.riskLevel)}>{item.riskLevel}</Text></Text>
+        <Text>Risk: <Text color={riskTone(item.riskLevel)}>{item.riskLevel}</Text></Text>
         <Box marginTop={1}>
           <Select
             options={[
@@ -83,13 +88,13 @@ export function ApprovalBrowser({ pending, recent, onApprove, onDeny, onCancel }
   return (
     <Box flexDirection="column" paddingX={1} paddingY={1}>
       <Box marginBottom={1}>
-        <Text bold color="cyanBright">APPROVALS</Text>
+        <Text bold color={theme.uiBrand}>APPROVALS</Text>
         <Text dimColor>  ({pending.length} pending)</Text>
       </Box>
 
       <Box>
-        <Text color={view === "pending" ? "cyanBright" : undefined} dimColor={view !== "pending"}> pending </Text>
-        <Text color={view === "recent" ? "cyanBright" : undefined} dimColor={view !== "recent"}> recent </Text>
+        <Text color={view === "pending" ? theme.uiBrand : undefined} dimColor={view !== "pending"}> pending </Text>
+        <Text color={view === "recent" ? theme.uiBrand : undefined} dimColor={view !== "recent"}> recent </Text>
       </Box>
 
       <Box flexDirection="column" marginTop={1}>
@@ -98,11 +103,11 @@ export function ApprovalBrowser({ pending, recent, onApprove, onDeny, onCancel }
           const isFocused = i === selectedIdx;
           return (
             <Box key={item.id}>
-              <Text color={isFocused ? "cyanBright" : undefined}>{isFocused ? " \u25B8" : "  "}</Text>
-              <Text color={riskColor(item.riskLevel)}> [{item.riskLevel[0]!.toUpperCase()}] </Text>
+              <Text color={isFocused ? theme.uiBrand : undefined}>{isFocused ? " \u25B8" : "  "}</Text>
+              <Text color={riskTone(item.riskLevel)}> [{item.riskLevel[0]!.toUpperCase()}] </Text>
               <Text bold={isFocused}>{item.toolName.padEnd(20)}</Text>
               <Text dimColor={!isFocused} wrap="truncate-end">{item.summary}</Text>
-              {"decision" in item && <Text color={(item as any).decision === "approved" ? "green" : "red"}> {(item as any).decision}</Text>}
+              {"decision" in item && <Text color={(item as any).decision === "approved" ? theme.riskSafe : theme.riskDanger}> {(item as any).decision}</Text>}
             </Box>
           );
         })}

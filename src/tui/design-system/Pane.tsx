@@ -1,5 +1,6 @@
 import React, { type ReactNode } from "react";
 import { Box, Text, useStdout } from "../ink-custom";
+import { useTheme } from "../themes/ThemeProvider.tsx";
 
 // ============================================================================
 // Pane — Bordered section container with colored top-line
@@ -14,19 +15,29 @@ import { Box, Text, useStdout } from "../ink-custom";
 interface Props {
   title?: string;
   color?: string;
+  tone?: "brand" | "warning" | "danger" | "success" | "muted" | "info";
   modal?: boolean;
   children: ReactNode;
 }
 
-export function Pane({ title, color = "cyan", modal = false, children }: Props) {
+export function Pane({ title, color, tone = "brand", modal = false, children }: Props) {
   const { stdout } = useStdout();
+  const theme = useTheme();
   const width = stdout?.columns ?? 80;
+  const resolvedColor = color ?? (
+    tone === "warning" ? theme.riskWarning
+    : tone === "danger" ? theme.riskDanger
+    : tone === "success" ? theme.riskSafe
+    : tone === "muted" ? theme.uiMuted
+    : tone === "info" ? theme.uiInfo
+    : theme.uiBrand
+  );
 
   if (modal) {
     return (
       <Box flexDirection="column" paddingX={1}>
         {title ? (
-          <Text color={color} bold>
+          <Text color={resolvedColor} bold>
             {title}
           </Text>
         ) : null}
@@ -46,7 +57,7 @@ export function Pane({ title, color = "cyan", modal = false, children }: Props) 
   return (
     <Box flexDirection="column">
       <Box>
-        <Text color={color}>
+        <Text color={resolvedColor}>
           {titleStr
             ? `${prefix}${titleStr}${suffix}${"\u2500".repeat(lineChars)}`
             : "\u2500".repeat(width - 2)}

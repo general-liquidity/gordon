@@ -52,7 +52,7 @@ export function OrderbookView({ symbol, bids, asks, spread, spreadPercent, onClo
   const rows = Math.max(bids.length, asks.length, 1);
 
   return (
-    <Pane title={`ORDERBOOK ${symbol}`} color="cyan">
+    <Pane title={`ORDERBOOK ${symbol}`}>
       {/* Header */}
       <Box>
         <Box width={12}><Text bold dimColor>QTY</Text></Box>

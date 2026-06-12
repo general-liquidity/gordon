@@ -60,7 +60,7 @@ export function DebateViewer({ data }: { data: DebateViewerData }) {
         : "gray";
 
   return (
-    <Pane title={`DEBATE — ${data.symbol}`} color="cyan">
+    <Pane title={`DEBATE — ${data.symbol}`}>
       <Box flexDirection="column">
         <Text dimColor bold>INVESTMENT DEBATE</Text>
         {data.investmentRounds.map((r, i) => (

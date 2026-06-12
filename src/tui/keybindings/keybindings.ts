@@ -40,6 +40,10 @@ export type BindableAction =
   | "toggleEmergencyHalt"
   | "toggleContextView"
   | "togglePrivacy"
+  | "toggleTradeQueue"
+  | "toggleSafetyDashboard"
+  | "focusRadar"
+  | "openPager"
   // Trading
   | "quickApprove"
   | "quickDeny"
@@ -73,11 +77,22 @@ export interface KeybindingsConfig {
   bindings?: KeyBinding[];
 }
 
+export interface KeybindingConflict {
+  /** Normalized key combo, e.g. "ctrl+shift+s". */
+  key: string;
+  /** The overlapping activation scopes. */
+  when: string;
+  /** All conflicting actions in resolution order. */
+  actions: BindableAction[];
+  /** The first action in resolution order. */
+  winner: BindableAction;
+}
+
 // ============================================================================
 // Defaults
 // ============================================================================
 
-const DEFAULT_BINDINGS: KeyBinding[] = [
+export const DEFAULT_BINDINGS: KeyBinding[] = [
   // Core
   { key: "return", action: "submit" },
   { key: "escape", action: "cancel" },
@@ -96,6 +111,10 @@ const DEFAULT_BINDINGS: KeyBinding[] = [
   { key: "ctrl+shift+x", action: "toggleEmergencyHalt" },
   { key: "ctrl+shift+v", action: "toggleContextView" },
   { key: "ctrl+shift+p", action: "togglePrivacy" },
+  { key: "ctrl+t", action: "toggleTradeQueue" },
+  { key: "ctrl+shift+d", action: "toggleSafetyDashboard" },
+  { key: "ctrl+g", action: "focusRadar" },
+  { key: "ctrl+o", action: "openPager" },
 
   // Trading shortcuts
   { key: "ctrl+y", action: "quickApprove" },
@@ -185,6 +204,72 @@ export function getResolvedBindings(): KeyBinding[] {
   return cachedBindings;
 }
 
+export function validateKeybindings(
+  bindings: KeyBinding[] = getResolvedBindings(),
+): KeybindingConflict[] {
+  const groups = new Map<string, Array<{ binding: KeyBinding; index: number; scope: NonNullable<KeyBinding["when"]> }>>();
+
+  bindings.forEach((binding, index) => {
+    const key = normalizeBindingKey(binding);
+    const scope = binding.when ?? "always";
+    const group = groups.get(key) ?? [];
+    group.push({ binding, index, scope });
+    groups.set(key, group);
+  });
+
+  const conflicts: KeybindingConflict[] = [];
+  for (const [key, group] of groups.entries()) {
+    const edges = new Map<number, Set<number>>();
+    const visited = new Set<number>();
+
+    for (let i = 0; i < group.length; i++) edges.set(i, new Set());
+
+    for (let i = 0; i < group.length; i++) {
+      for (let j = i + 1; j < group.length; j++) {
+        const left = group[i]!;
+        const right = group[j]!;
+        if (left.binding.action === right.binding.action) continue;
+        if (!scopesIntersect(left.scope, right.scope)) continue;
+        edges.get(i)!.add(j);
+        edges.get(j)!.add(i);
+      }
+    }
+
+    for (let i = 0; i < group.length; i++) {
+      if (visited.has(i) || (edges.get(i)?.size ?? 0) === 0) continue;
+
+      const component: number[] = [];
+      const stack = [i];
+      visited.add(i);
+
+      while (stack.length > 0) {
+        const next = stack.pop()!;
+        component.push(next);
+        for (const neighbor of edges.get(next) ?? []) {
+          if (visited.has(neighbor)) continue;
+          visited.add(neighbor);
+          stack.push(neighbor);
+        }
+      }
+
+      const ordered = component
+        .map((componentIndex) => group[componentIndex]!)
+        .sort((a, b) => a.index - b.index);
+      const actions = uniqueActions(ordered.map((entry) => entry.binding.action));
+      if (actions.length < 2) continue;
+
+      conflicts.push({
+        key,
+        when: Array.from(new Set(ordered.map((entry) => entry.scope))).join(","),
+        actions,
+        winner: actions[0]!,
+      });
+    }
+  }
+
+  return conflicts;
+}
+
 /**
  * Check if Vim mode is enabled.
  */
@@ -226,4 +311,55 @@ export function formatKeybindingHelp(): string {
   }
 
   return lines.join("\n");
+}
+
+const MODIFIER_ORDER = ["ctrl", "shift", "alt", "meta"] as const;
+const MODIFIER_ALIASES: Record<string, string> = {
+  control: "ctrl",
+  option: "alt",
+  cmd: "meta",
+  command: "meta",
+};
+
+function normalizeBindingKey(binding: KeyBinding): string {
+  const primary = normalizeKeyCombo(binding.key);
+  if (!binding.chord) return primary;
+  return `${primary} ${normalizeKeyCombo(binding.chord)}`;
+}
+
+function normalizeKeyCombo(key: string): string {
+  const rawParts = key.split("+").map((part) => part.trim()).filter(Boolean);
+  const modifiers = new Set<string>();
+  let base = "";
+
+  for (const rawPart of rawParts) {
+    const canonical = MODIFIER_ALIASES[rawPart.toLowerCase()] ?? rawPart.toLowerCase();
+    if ((MODIFIER_ORDER as readonly string[]).includes(canonical)) {
+      modifiers.add(canonical);
+      continue;
+    }
+    if (/^[A-Z]$/.test(rawPart)) modifiers.add("shift");
+    base = canonical;
+  }
+
+  const orderedModifiers = MODIFIER_ORDER.filter((modifier) => modifiers.has(modifier));
+  return [...orderedModifiers, base].filter(Boolean).join("+");
+}
+
+function scopesIntersect(
+  left: NonNullable<KeyBinding["when"]>,
+  right: NonNullable<KeyBinding["when"]>,
+): boolean {
+  return left === "always" || right === "always" || left === right;
+}
+
+function uniqueActions(actions: BindableAction[]): BindableAction[] {
+  const seen = new Set<BindableAction>();
+  const unique: BindableAction[] = [];
+  for (const action of actions) {
+    if (seen.has(action)) continue;
+    seen.add(action);
+    unique.push(action);
+  }
+  return unique;
 }

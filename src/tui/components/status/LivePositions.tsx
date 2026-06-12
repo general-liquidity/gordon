@@ -12,13 +12,20 @@
  * TOTAL (2)                                       +823.00
  */
 
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { Box, Text } from "../../ink-custom";
-import { DataTable, fmtNum, changeColor, type Column } from "../charts/DataTable.tsx";
+import { DataTable, fmtNum, type Column } from "../charts/DataTable.tsx";
 import {
   useEventBusSubscriptions,
 } from "../../hooks/useEventBusSubscription.js";
 import type { EventType, EventData } from "../../../events/index.ts";
+import { getMoneyColor, getSignalColor } from "../../design-system/colorMap.ts";
+import { useTheme } from "../../themes/ThemeProvider.tsx";
+import { stopDistancePct, accountPctAtRisk } from "./positionRisk.ts";
+import { useAccountEquity } from "../../hooks/useAccountEquity.ts";
+import { createCoalescer, type Coalescer } from "../../utils/coalescer.ts";
+import { getPositionStore } from "../../../core/positions/store.ts";
+import type { PositionRecord } from "../../../core/positions/types.ts";
 
 // ============================================================================
 // Types
@@ -41,74 +48,16 @@ interface Props {
   initialPositions?: Position[];
 }
 
-// ============================================================================
-// Column definitions
-// ============================================================================
+const EMPTY_POSITIONS: Position[] = [];
 
-const COLUMNS: Column<Position>[] = [
-  {
-    key: "symbol",
-    header: "SYM",
-    width: 8,
-    format: (v) => String(v),
-  },
-  {
-    key: "side",
-    header: "SIDE",
-    width: 6,
-    format: (v) => String(v).toUpperCase(),
-    color: (v) => (v === "long" ? "green" : "red"),
-  },
-  {
-    key: "quantity",
-    header: "QTY",
-    width: 8,
-    align: "right",
-    format: (v) => fmtNum(Number(v)),
-  },
-  {
-    key: "entryPrice",
-    header: "ENTRY",
-    width: 10,
-    align: "right",
-    format: (v) => fmtNum(Number(v)),
-  },
-  {
-    key: "lastPrice",
-    header: "LAST",
-    width: 10,
-    align: "right",
-    format: (v) => fmtNum(Number(v)),
-  },
-  {
-    key: "pnl",
-    header: "PNL",
-    width: 10,
-    align: "right",
-    format: (v) => {
-      const n = Number(v);
-      return `${n >= 0 ? "+" : ""}${fmtNum(n)}`;
-    },
-    color: (v) => changeColor(Number(v)),
-  },
-  {
-    key: "stopPrice",
-    header: "STOP",
-    width: 10,
-    align: "right",
-    format: (v) => (v != null ? fmtNum(Number(v)) : "\u2014"),
-  },
-  {
-    key: "openedAt",
-    header: "DURATION",
-    width: 8,
-    format: (v) => formatDuration(String(v)),
-  },
-];
+export type PositionEvent =
+  | { kind: "update"; positionId: string; updates: Partial<Position> }
+  | { kind: "close"; positionId: string };
 
-// ============================================================================
-// Helpers
-// ============================================================================
+type PositionRow = Position & {
+  riskPct: number | null;
+  acctPct: number | null;
+};
 
 function formatDuration(iso: string): string {
   try {
@@ -130,8 +79,125 @@ function formatDuration(iso: string): string {
 // Component
 // ============================================================================
 
-export function LivePositions({ initialPositions = [] }: Props) {
+export function LivePositions({ initialPositions = EMPTY_POSITIONS }: Props) {
   const [positions, setPositions] = useState<Position[]>(initialPositions);
+  const theme = useTheme();
+  const accountEquity = useAccountEquity();
+  const coalescerRef = useRef<Coalescer<PositionEvent> | null>(null);
+  const rows = useMemo<PositionRow[]>(
+    () => positions.map((position) => ({
+      ...position,
+      riskPct: stopDistancePct(position),
+      acctPct: accountPctAtRisk(position, accountEquity),
+    })),
+    [positions, accountEquity],
+  );
+  const columns = useMemo<Column<PositionRow>[]>(() => [
+    {
+      key: "symbol",
+      header: "SYM",
+      width: 8,
+      format: (v) => String(v),
+    },
+    {
+      key: "side",
+      header: "SIDE",
+      width: 6,
+      format: (v) => String(v).toUpperCase(),
+      color: (v) => getSignalColor(v === "long" ? "long" : "short", theme),
+    },
+    {
+      key: "quantity",
+      header: "QTY",
+      width: 8,
+      align: "right",
+      format: (v) => fmtNum(Number(v)),
+    },
+    {
+      key: "entryPrice",
+      header: "ENTRY",
+      width: 10,
+      align: "right",
+      format: (v) => fmtNum(Number(v)),
+    },
+    {
+      key: "lastPrice",
+      header: "LAST",
+      width: 10,
+      align: "right",
+      format: (v) => fmtNum(Number(v)),
+    },
+    {
+      key: "pnl",
+      header: "PNL",
+      width: 10,
+      align: "right",
+      format: (v) => {
+        const n = Number(v);
+        return `${n >= 0 ? "+" : ""}${fmtNum(n)}`;
+      },
+      color: (v) => getMoneyColor(Number(v), theme),
+    },
+    {
+      key: "stopPrice",
+      header: "STOP",
+      width: 10,
+      align: "right",
+      format: (v) => (v != null ? fmtNum(Number(v)) : "\u2014"),
+    },
+    {
+      key: "riskPct",
+      header: "RISK",
+      width: 8,
+      align: "right",
+      format: (v) => {
+        if (v == null) return "NO STOP";
+        const n = Number(v);
+        if (n <= 0) return "BREACH";
+        return `${(n * 100).toFixed(1)}%`;
+      },
+      color: (v) => v == null || Number(v) <= 0 ? theme.riskDanger : undefined,
+    },
+    {
+      key: "acctPct",
+      header: "ACCT%",
+      width: 6,
+      align: "right",
+      format: (v) => v == null ? "\u2014" : `${(Number(v) * 100).toFixed(1)}%`,
+      color: (v) => v != null && Number(v) >= 0.02 ? theme.riskDanger : undefined,
+    },
+    {
+      key: "openedAt",
+      header: "DURATION",
+      width: 8,
+      format: (v) => formatDuration(String(v)),
+    },
+  ], [theme]);
+
+  useEffect(() => {
+    let disposed = false;
+    void getPositionStore()
+      .then((store) => store.getActive())
+      .then((records) => {
+        if (!disposed) setPositions(records.map(positionRecordToPosition));
+      })
+      .catch(() => {
+        if (!disposed) setPositions(initialPositions);
+      });
+    return () => {
+      disposed = true;
+    };
+  }, [initialPositions]);
+
+  useEffect(() => {
+    coalescerRef.current = createCoalescer<PositionEvent>((events) => {
+      setPositions((prev) => applyPositionEvents(prev, events));
+    });
+    return () => {
+      coalescerRef.current?.dispose();
+      coalescerRef.current = null;
+    };
+  }, []);
 
   // Handle position:updated — upsert position in list
   const handleEvent = useCallback(
@@ -140,21 +206,12 @@ export function LivePositions({ initialPositions = [] }: Props) {
 
       if (eventType === "position:updated") {
         const ev = event as unknown as { positionId: string; updates: Partial<Position> };
-        const posId = ev.positionId;
-        const updates = ev.updates ?? {};
-        setPositions((prev) => {
-          const idx = prev.findIndex((p) => p.id === posId);
-          if (idx === -1) return prev;
-          const updated = [...prev];
-          updated[idx] = { ...updated[idx]!, ...updates };
-          return updated;
-        });
+        coalescerRef.current?.push({ kind: "update", positionId: ev.positionId, updates: ev.updates ?? {} });
       }
 
       if (eventType === "position:closed") {
         const ev = event as unknown as { positionId: string };
-        const posId = ev.positionId;
-        setPositions((prev) => prev.filter((p) => p.id !== posId));
+        coalescerRef.current?.push({ kind: "close", positionId: ev.positionId });
       }
     },
     [],
@@ -172,19 +229,52 @@ export function LivePositions({ initialPositions = [] }: Props) {
     pnl: `${totalPnl >= 0 ? "+" : ""}${fmtNum(totalPnl)}`,
   };
 
+  if (positions.length === 0) return null;
+
   return (
     <Box flexDirection="column">
       <Box paddingLeft={2}>
-        <Text bold color="cyanBright">OPEN POSITIONS</Text>
+        <Text bold color={theme.uiBrand}>OPEN POSITIONS</Text>
         {positions.length > 0 && (
           <Text dimColor> ({positions.length})</Text>
         )}
       </Box>
       <DataTable
-        columns={COLUMNS as unknown as Column[]}
-        data={positions as unknown as Record<string, unknown>[]}
+        columns={columns as unknown as Column[]}
+        data={rows as unknown as Record<string, unknown>[]}
         summaryRow={positions.length > 0 ? summaryRow : undefined}
       />
     </Box>
   );
+}
+
+export function applyPositionEvents(prev: Position[], events: PositionEvent[]): Position[] {
+  let next = prev;
+  for (const event of events) {
+    if (event.kind === "close") {
+      const filtered = next.filter((position) => position.id !== event.positionId);
+      if (filtered.length !== next.length) next = filtered;
+      continue;
+    }
+    const idx = next.findIndex((position) => position.id === event.positionId);
+    if (idx === -1) continue;
+    const updated = [...next];
+    updated[idx] = { ...updated[idx]!, ...event.updates };
+    next = updated;
+  }
+  return next;
+}
+
+function positionRecordToPosition(record: PositionRecord): Position {
+  return {
+    id: record.id,
+    symbol: record.symbol,
+    side: record.side,
+    quantity: Number(record.quantity ?? 0),
+    entryPrice: Number(record.entryPrice ?? 0),
+    lastPrice: Number(record.currentPrice ?? record.entryPrice ?? 0),
+    pnl: Number(record.unrealizedPnL ?? record.realizedPnL ?? 0),
+    stopPrice: record.stopLoss,
+    openedAt: record.createdAt,
+  };
 }

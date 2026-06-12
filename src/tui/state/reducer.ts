@@ -6,6 +6,18 @@
 
 import type { AppState, Action } from "./types.js";
 import { appendNotificationCapped } from "./notificationRetention.ts";
+import { evaluatePermissionModeTransition, isLiveCapable } from "./permissionModeFsm.ts";
+import type { Message } from "../components/messages/MessageBubble.tsx";
+
+function systemMessage(content: string, variant: Message["variant"] = "system"): Message {
+  return {
+    id: `system-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    role: "system",
+    variant,
+    content,
+    timestamp: new Date().toISOString(),
+  };
+}
 
 export function appReducer(state: AppState, action: Action): AppState {
   switch (action.type) {
@@ -15,8 +27,40 @@ export function appReducer(state: AppState, action: Action): AppState {
     case "SET_RUNTIME_READY":
       return { ...state, runtimeReady: action.ready };
 
-    case "SET_PERMISSION_MODE":
-      return { ...state, permissionMode: action.mode };
+    case "SET_PERMISSION_MODE": {
+      if (state.permissionMode === action.mode) return state;
+      const transition = evaluatePermissionModeTransition({
+        from: state.permissionMode,
+        to: action.mode,
+        pendingApprovals: state.pendingApprovals.length,
+        isStreaming: state.isStreaming,
+      });
+      if (!transition.allowed) {
+        return {
+          ...state,
+          messages: [
+            ...state.messages,
+            systemMessage(transition.reason ?? `Cannot switch permission mode to ${action.mode}.`),
+          ],
+        };
+      }
+      const crossesLiveBoundary =
+        isLiveCapable(state.permissionMode) !== isLiveCapable(action.mode) ||
+        state.permissionMode === "paper" ||
+        action.mode === "paper";
+      return {
+        ...state,
+        permissionMode: action.mode,
+        modeBanner: crossesLiveBoundary
+          ? {
+              mode: action.mode,
+              liveCapable: isLiveCapable(action.mode),
+              shownAt: Date.now(),
+              dismissed: false,
+            }
+          : state.modeBanner,
+      };
+    }
 
     case "ADD_MESSAGE":
       return {
@@ -35,8 +79,11 @@ export function appReducer(state: AppState, action: Action): AppState {
         ...state,
         isStreaming: true,
         streamBuffer: "",
+        activeThinking: "",
+        activeToolCalls: [],
         activeAgents: [],
         handoffHistory: state.handoffHistory,
+        radarFocus: null,
       };
 
     case "STOP_STREAMING":
@@ -44,11 +91,31 @@ export function appReducer(state: AppState, action: Action): AppState {
         ...state,
         isStreaming: false,
         streamBuffer: "",
+        activeThinking: "",
+        activeToolCalls: [],
         activeAgents: [],
       };
 
     case "SET_STREAM_BUFFER":
       return { ...state, streamBuffer: action.buffer };
+
+    case "SET_ACTIVE_THINKING":
+      return state.activeThinking === action.thinking ? state : { ...state, activeThinking: action.thinking };
+
+    case "SET_ACTIVE_TOOL_CALLS":
+      return state.activeToolCalls === action.calls ? state : { ...state, activeToolCalls: action.calls };
+
+    case "UPDATE_STREAMING_MESSAGE": {
+      const index = state.messages.findIndex((message) => message.id === action.id);
+      if (index === -1) return state;
+      const current = state.messages[index]!;
+      if (current.content === action.content && state.streamBuffer === action.streamBuffer) {
+        return state;
+      }
+      const messages = [...state.messages];
+      messages[index] = { ...current, content: action.content };
+      return { ...state, messages, streamBuffer: action.streamBuffer };
+    }
 
     case "SET_ACTIVE_AGENTS":
       return { ...state, activeAgents: action.agents };
@@ -113,8 +180,14 @@ export function appReducer(state: AppState, action: Action): AppState {
     case "SET_SHOW_SETUP":
       return { ...state, showSetup: action.show };
 
+    case "SET_SHOW_FIRST_TRADE_TOUR":
+      return { ...state, showFirstTradeTour: action.show };
+
     case "SET_SHOW_HELP":
       return { ...state, showHelp: action.show };
+
+    case "SET_SHOW_RESET_CONFIRM":
+      return { ...state, showResetConfirm: action.show };
 
     case "SET_CTRL_C_PRESSED":
       return { ...state, ctrlCPressed: action.pressed };
@@ -130,9 +203,55 @@ export function appReducer(state: AppState, action: Action): AppState {
         ...state,
         isStreaming: false,
         streamBuffer: "",
+        activeThinking: "",
+        activeToolCalls: [],
         activeAgents: [],
         handoffHistory: [],
       };
+
+    case "RESET_SESSION":
+      return {
+        ...state,
+        messages: [],
+        completedMessageCount: 0,
+        streamBuffer: "",
+        isStreaming: false,
+        activeThinking: "",
+        activeToolCalls: [],
+        activeAgents: [],
+        handoffHistory: [],
+        pendingApprovals: [],
+        showResetConfirm: false,
+        showHelp: false,
+        pager: null,
+        radarFocus: null,
+      };
+
+    case "SHOW_MODE_BANNER":
+      return { ...state, modeBanner: action.banner };
+
+    case "DISMISS_MODE_BANNER":
+      return state.modeBanner ? { ...state, modeBanner: { ...state.modeBanner, dismissed: true } } : state;
+
+    case "SET_KILL_SWITCH_STATUS":
+      return state.killSwitches?.signature === action.status.signature
+        ? state
+        : { ...state, killSwitches: action.status };
+
+    case "OPEN_OVERLAY_VIEW":
+      return { ...state, activeOverlayView: action.view, showPalette: false };
+
+    case "CLOSE_OVERLAY_VIEW":
+      return state.activeOverlayView === null ? state : { ...state, activeOverlayView: null };
+
+    case "OPEN_PAGER":
+      return { ...state, pager: action.pager, showPalette: false };
+
+    case "CLOSE_PAGER":
+      return state.pager === null ? state : { ...state, pager: null };
+
+    case "SET_RADAR_FOCUS":
+      return state.radarFocus === action.focus ? state : { ...state, radarFocus: action.focus };
 
     // Phase 4 — Event-driven notifications
     case "INJECT_NOTIFICATION":

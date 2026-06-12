@@ -1,7 +1,9 @@
 import { useMemo } from "react";
 import { SLASH_COMMANDS } from "../../app/slash/slashCommands.ts";
+import { paletteWorkflowFor } from "../../app/slash/commandUx.ts";
 import type { PaletteItem } from "../components/CommandPalette.js";
 import { getRuntime } from "../bridge/runtime.js";
+import { getBinding, type BindableAction } from "../keybindings/keybindings.ts";
 
 // ============================================================================
 // useMergedCommands — Unified command list for CommandPalette
@@ -17,6 +19,15 @@ export interface MergedCommand extends PaletteItem {
   badge?: string;
 }
 
+const KEY_HINT_ACTIONS: Record<string, BindableAction> = {
+  emergency: "toggleEmergencyHalt",
+  menu: "togglePalette",
+  "settings-panel": "toggleSettings",
+  "export-panel": "toggleExport",
+  privacy: "togglePrivacy",
+  "context-viz": "toggleContextView",
+};
+
 export function useMergedCommands(): MergedCommand[] {
   return useMemo(() => {
     const merged: MergedCommand[] = [];
@@ -28,6 +39,8 @@ export function useMergedCommands(): MergedCommand[] {
         label: `/${cmd.name}`,
         description: cmd.description,
         category: cmd.workflow,
+        workflowId: paletteWorkflowFor(cmd),
+        keyHint: formatBinding(KEY_HINT_ACTIONS[cmd.name]),
         source: "builtin",
       });
     }
@@ -49,6 +62,7 @@ export function useMergedCommands(): MergedCommand[] {
               label: `/${cmd.name}`,
               description: cmd.description ?? `[${plugin.name}]`,
               category: "Plugins",
+              workflowId: "system",
               source: "plugin",
               badge: `PLG:${plugin.name}`,
             });
@@ -65,6 +79,7 @@ export function useMergedCommands(): MergedCommand[] {
               label: `/${cmd.name}`,
               description: cmd.description ?? `[MCP:${server.name}]`,
               category: "MCP",
+              workflowId: "system",
               source: "mcp",
               badge: `MCP:${server.name}`,
             });
@@ -77,6 +92,16 @@ export function useMergedCommands(): MergedCommand[] {
 
     return merged;
   }, []);
+}
+
+function formatBinding(action: BindableAction | undefined): string | undefined {
+  if (!action) return undefined;
+  const binding = getBinding(action);
+  if (!binding) return undefined;
+  return binding.key
+    .split("+")
+    .map((part) => part.length === 1 ? part.toUpperCase() : part[0]!.toUpperCase() + part.slice(1))
+    .join("+");
 }
 
 /**

@@ -68,6 +68,9 @@ export interface MemoryEvent {
 }
 
 export type MetricEvent = FrameEvent | RenderEvent | MemoryEvent;
+export type InteractionKind = "keystroke" | "stream";
+export type AttributedFrameKind = InteractionKind | "other";
+export type AttributedFrameCallback = (kind: AttributedFrameKind, durationMs: number) => void;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Snapshot shape
@@ -236,6 +239,8 @@ export class PerformanceMonitor {
   private totalRenders = 0;
   private totalFrames = 0;
   private rendersByLabel: Record<string, number> = {};
+  private interactionMark: { kind: InteractionKind; atMs: number } | null = null;
+  private attributedFrameCallbacks = new Set<AttributedFrameCallback>();
 
   private memoryTimer: ReturnType<typeof setInterval> | null = null;
   private flushTimer: ReturnType<typeof setInterval> | null = null;
@@ -340,6 +345,14 @@ export class PerformanceMonitor {
     const ts = atMs ?? this.hrNow() - this.startHrMs;
     const delta = this.lastFrameTs === null ? 0 : ts - this.lastFrameTs;
     this.record({ kind: "frame", ts, bytes, writeMs });
+    const mark = this.interactionMark;
+    if (mark) {
+      this.interactionMark = null;
+      const durationMs = Math.max(0, ts - mark.atMs + writeMs);
+      for (const cb of this.attributedFrameCallbacks) cb(mark.kind, durationMs);
+    } else {
+      for (const cb of this.attributedFrameCallbacks) cb("other", delta);
+    }
     return delta;
   }
 
@@ -347,6 +360,23 @@ export class PerformanceMonitor {
   recordRender(messageCount: number, label?: string, atMs?: number): void {
     const ts = atMs ?? this.hrNow() - this.startHrMs;
     this.record({ kind: "render", ts, messageCount, label });
+  }
+
+  markInteraction(kind: InteractionKind, atMs?: number): void {
+    this.interactionMark = { kind, atMs: atMs ?? this.hrNow() - this.startHrMs };
+  }
+
+  takeInteractionMark(): { kind: InteractionKind; atMs: number } | null {
+    const mark = this.interactionMark;
+    this.interactionMark = null;
+    return mark;
+  }
+
+  onAttributedFrame(cb: AttributedFrameCallback): () => void {
+    this.attributedFrameCallbacks.add(cb);
+    return () => {
+      this.attributedFrameCallbacks.delete(cb);
+    };
   }
 
   /** Return a computed snapshot over the current ring buffer contents. */
@@ -557,6 +587,14 @@ export function resetPerformanceMonitor(): void {
     instance.stop();
   }
   instance = null;
+}
+
+export function markInteraction(kind: InteractionKind): void {
+  getPerformanceMonitor().markInteraction(kind);
+}
+
+export function takeInteractionMark(): { kind: InteractionKind; atMs: number } | null {
+  return getPerformanceMonitor().takeInteractionMark();
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

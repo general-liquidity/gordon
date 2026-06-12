@@ -95,7 +95,7 @@ export function RiskAuditLog({ entries, onClose }: Props) {
 
   if (entries.length === 0) {
     return (
-      <Pane title="RISK AUDIT" color="cyan">
+      <Pane title="RISK AUDIT">
         <Text dimColor>No audit entries recorded.</Text>
         <Text> </Text>
         <Text dimColor>Esc close</Text>
@@ -104,7 +104,7 @@ export function RiskAuditLog({ entries, onClose }: Props) {
   }
 
   return (
-    <Pane title="RISK AUDIT" color="cyan">
+    <Pane title="RISK AUDIT">
       <Box>
         <Text dimColor>({entries.length} entries)</Text>
       </Box>

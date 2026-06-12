@@ -116,7 +116,7 @@ export function DeFiOverviewPanel({
   }
 
   return (
-    <Pane title="ONCHAIN DATA" color="cyan">
+    <Pane title="ONCHAIN DATA">
       <Tabs tabs={TABS} activeKey={activeTab} onChange={setActiveTab}>
         <Box marginTop={1}>{renderTabContent()}</Box>
       </Tabs>

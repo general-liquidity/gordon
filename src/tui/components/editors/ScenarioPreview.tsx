@@ -60,7 +60,7 @@ export function ScenarioPreview({ scenarios: t }: { scenarios: TradeScenarios })
   const rr = Math.abs(stopPnl) > 0 ? Math.abs(targetPnl / stopPnl) : 0;
 
   return (
-    <Pane title="SCENARIO PREVIEW" color="cyan">
+    <Pane title="SCENARIO PREVIEW">
       <Box flexDirection="column">
         <Box>
           <Text dimColor bold>{"OUTCOME".padEnd(14)}</Text>

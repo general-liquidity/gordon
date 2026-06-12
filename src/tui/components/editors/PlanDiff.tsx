@@ -45,14 +45,14 @@ export function PlanDiff({ previous, current }: Props) {
 
   if (changed.length === 0) {
     return (
-      <Pane title={`PLAN v${previous.version} → v${current.version}`} color="gray">
+      <Pane title={`PLAN v${previous.version} → v${current.version}`} tone="muted">
         <Text dimColor italic>No changes from previous version</Text>
       </Pane>
     );
   }
 
   return (
-    <Pane title={`PLAN v${previous.version} → v${current.version}`} color="cyan">
+    <Pane title={`PLAN v${previous.version} → v${current.version}`}>
       <Box flexDirection="column">
         {changed.map((d) => {
           const arrow = d.direction === "up" ? "↑" : "↓";

@@ -3,9 +3,10 @@ import {
   DataTable,
   fmtNum,
   fmtPct,
-  changeColor,
   type Column,
 } from "../components/charts/DataTable.tsx";
+import { getMoneyColor, getSignalColor } from "../design-system/colorMap.ts";
+import { useTheme } from "../themes/ThemeProvider.tsx";
 
 /**
  * PositionRenderer -- Open positions table with colored PNL + summary row
@@ -26,59 +27,62 @@ interface Props {
   data: PositionRow[];
 }
 
-const COLUMNS: Column<PositionRow>[] = [
-  { key: "symbol", header: "SYM", width: 8, align: "left" },
-  {
-    key: "side",
-    header: "SIDE",
-    width: 6,
-    align: "left",
-    color: (v) =>
-      String(v).toLowerCase().includes("long") ||
-      String(v).toLowerCase().includes("buy")
-        ? "green"
-        : "red",
-  },
-  {
-    key: "qty",
-    header: "QTY",
-    width: 10,
-    align: "right",
-    format: (v) => fmtNum(Number(v)),
-  },
-  {
-    key: "entry",
-    header: "ENTRY",
-    width: 10,
-    align: "right",
-    format: (v) => fmtNum(Number(v)),
-  },
-  {
-    key: "last",
-    header: "LAST",
-    width: 10,
-    align: "right",
-    format: (v) => fmtNum(Number(v)),
-  },
-  {
-    key: "pnl",
-    header: "PNL",
-    width: 10,
-    align: "right",
-    format: (v) => fmtNum(Number(v)),
-    color: (v) => changeColor(Number(v)),
-  },
-  {
-    key: "pnlPct",
-    header: "PNL%",
-    width: 8,
-    align: "right",
-    format: (v) => fmtPct(Number(v)),
-    color: (v) => changeColor(Number(v)),
-  },
-];
-
 export function PositionRenderer({ data }: Props) {
+  const theme = useTheme();
+  const columns: Column<PositionRow>[] = [
+    { key: "symbol", header: "SYM", width: 8, align: "left" },
+    {
+      key: "side",
+      header: "SIDE",
+      width: 6,
+      align: "left",
+      color: (v) =>
+        getSignalColor(
+          String(v).toLowerCase().includes("long") ||
+          String(v).toLowerCase().includes("buy")
+            ? "long"
+            : "short",
+          theme,
+        ),
+    },
+    {
+      key: "qty",
+      header: "QTY",
+      width: 10,
+      align: "right",
+      format: (v) => fmtNum(Number(v)),
+    },
+    {
+      key: "entry",
+      header: "ENTRY",
+      width: 10,
+      align: "right",
+      format: (v) => fmtNum(Number(v)),
+    },
+    {
+      key: "last",
+      header: "LAST",
+      width: 10,
+      align: "right",
+      format: (v) => fmtNum(Number(v)),
+    },
+    {
+      key: "pnl",
+      header: "PNL",
+      width: 10,
+      align: "right",
+      format: (v) => fmtNum(Number(v)),
+      color: (v) => getMoneyColor(Number(v), theme),
+    },
+    {
+      key: "pnlPct",
+      header: "PNL%",
+      width: 8,
+      align: "right",
+      format: (v) => fmtPct(Number(v)),
+      color: (v) => getMoneyColor(Number(v), theme),
+    },
+  ];
   const totalPnl = data.reduce((sum, r) => sum + r.pnl, 0);
   const summaryRow: Record<string, string> = {
     symbol: "TOTAL",
@@ -87,7 +91,7 @@ export function PositionRenderer({ data }: Props) {
 
   return (
     <DataTable
-      columns={COLUMNS as unknown as Column<Record<string, unknown>>[]}
+      columns={columns as unknown as Column<Record<string, unknown>>[]}
       data={data as unknown as Record<string, unknown>[]}
       summaryRow={summaryRow}
     />

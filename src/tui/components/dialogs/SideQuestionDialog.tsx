@@ -49,7 +49,7 @@ export function SideQuestionDialog({ question, onAnswer, onDismiss }: Props) {
   });
 
   return (
-    <Dialog title="Agent Question" color="cyan" onClose={onDismiss}>
+    <Dialog title="Agent Question" tone="brand" onClose={onDismiss}>
       {question.context ? (
         <Text dimColor>While {question.context}, the agent needs to know:</Text>
       ) : null}

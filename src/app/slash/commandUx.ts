@@ -6,6 +6,7 @@ export type SlashCommandCategory = "trading" | "market" | "account" | "system" |
 export type CommandLevel = 1 | 2 | 3;
 export type WorkflowGroup = "discover" | "analyze" | "trade" | "run" | "accounts" | "monitor" | "build" | "operate";
 export type CommandAudience = "core" | "advanced" | "operator";
+export type PaletteWorkflowId = "discover" | "plan" | "execute" | "monitor" | "safety" | "system";
 
 export interface WorkflowConfigEntry {
   label: string;
@@ -38,6 +39,13 @@ export interface QuickActionContext {
   setupComplete: boolean;
   hasExchange: boolean;
   hasBroker: boolean;
+}
+
+export interface PaletteWorkflowConfigEntry {
+  label: string;
+  icon: string;
+  order: number;
+  colorToken: "agentScanner" | "agentPlanner" | "agentExecutor" | "agentMonitor" | "riskDanger" | "uiMuted";
 }
 
 export interface QuickActionItem {
@@ -111,6 +119,15 @@ export const WORKFLOW_CONFIG: Record<WorkflowGroup, WorkflowConfigEntry> = {
     order: 7,
     helpAliases: ["system", "operate", "ops", "config", "configure", "setup"],
   },
+};
+
+export const PALETTE_WORKFLOW_CONFIG: Record<PaletteWorkflowId, PaletteWorkflowConfigEntry> = {
+  discover: { label: "DISCOVER", icon: "◆", order: 0, colorToken: "agentScanner" },
+  plan: { label: "PLAN", icon: "▲", order: 1, colorToken: "agentPlanner" },
+  execute: { label: "EXECUTE", icon: "≫", order: 2, colorToken: "agentExecutor" },
+  monitor: { label: "MONITOR", icon: "○", order: 3, colorToken: "agentMonitor" },
+  safety: { label: "SAFETY", icon: "⛨", order: 4, colorToken: "riskDanger" },
+  system: { label: "SYSTEM", icon: "●", order: 5, colorToken: "uiMuted" },
 };
 
 const AUDIENCE_LABELS: Record<CommandAudience, string> = {
@@ -239,6 +256,51 @@ const SYSTEM_COMMANDS = new Set([
   "thread",
   "config",
 ]);
+
+export const PALETTE_SAFETY_COMMANDS: ReadonlySet<string> = new Set([
+  "killswitch", "emergency", "risk", "rules", "deny-all",
+  "runtime-approvals", "runtime-approve", "runtime-deny",
+  "auto", "ask", "strict", "paper", "live", "observe", "planmode",
+]);
+
+export const PALETTE_PLAN_COMMANDS: ReadonlySet<string> = new Set([
+  "plan", "plans", "simulate",
+]);
+
+export const PALETTE_EXECUTE_COMMANDS: ReadonlySet<string> = new Set([
+  "deploy", "rebalance", "withdraw",
+]);
+
+export const PALETTE_MONITOR_COMMANDS: ReadonlySet<string> = new Set([
+  "strategies-live", "pause", "resume-strategy", "stop",
+  "radar", "ack", "pass", "snooze",
+  "goal-status", "sprint-status", "wip-status", "shadow-divergence",
+  "perf", "journal",
+]);
+
+export function paletteWorkflowFor(cmd: { name: string; workflow?: WorkflowGroup }): PaletteWorkflowId {
+  if (PALETTE_SAFETY_COMMANDS.has(cmd.name)) return "safety";
+  if (PALETTE_PLAN_COMMANDS.has(cmd.name)) return "plan";
+  if (PALETTE_EXECUTE_COMMANDS.has(cmd.name)) return "execute";
+  if (PALETTE_MONITOR_COMMANDS.has(cmd.name)) return "monitor";
+
+  switch (cmd.workflow) {
+    case "discover":
+    case "analyze":
+      return "discover";
+    case "trade":
+      return "execute";
+    case "run":
+      return "plan";
+    case "accounts":
+    case "monitor":
+      return "monitor";
+    case "build":
+    case "operate":
+    default:
+      return "system";
+  }
+}
 
 const CATEGORY_DEFAULT_WORKFLOW: Record<SlashCommandCategory, WorkflowGroup> = {
   market: "discover",

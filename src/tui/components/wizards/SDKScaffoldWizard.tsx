@@ -115,7 +115,7 @@ export function SDKScaffoldWizard({ onComplete, onCancel }: Props) {
     <Dialog
       title="SDK SCAFFOLD"
       subtitle={`Step ${step + 1} of ${STEPS.length}: ${STEPS[step]}`}
-      color="cyan"
+      tone="brand"
       onClose={onCancel}
     >
       {/* Progress */}

@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Box, Text, useInput } from "../ink-custom";
+import { useTheme } from "../themes/ThemeProvider.tsx";
 
 // ============================================================================
 // GordonSelect — Branded select menu matching Gordon's cyan theme
@@ -19,8 +20,10 @@ interface Props {
   focusColor?: string;
 }
 
-export function GordonSelect({ options, onChange, focusColor = "rgb(52,238,176)" }: Props) {
+export function GordonSelect({ options, onChange, focusColor }: Props) {
   const [focusIdx, setFocusIdx] = useState(0);
+  const theme = useTheme();
+  const resolvedFocusColor = focusColor ?? theme.uiBrand;
   // Guard against double-fire when multiple Selects mount simultaneously
   // (every mounted useInput listener responds to a single Enter keypress).
   // Once a decision is dispatched, freeze this listener so subsequent
@@ -48,10 +51,10 @@ export function GordonSelect({ options, onChange, focusColor = "rgb(52,238,176)"
         const isFocused = i === focusIdx;
         return (
           <Box key={opt.value}>
-            <Text color={isFocused ? focusColor : undefined}>
+            <Text color={isFocused ? resolvedFocusColor : undefined}>
               {isFocused ? "\u25B8 " : "  "}
             </Text>
-            <Text color={isFocused ? focusColor : undefined} bold={isFocused}>
+            <Text color={isFocused ? resolvedFocusColor : undefined} bold={isFocused}>
               {opt.label}
             </Text>
           </Box>

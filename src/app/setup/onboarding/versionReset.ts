@@ -10,9 +10,11 @@
 
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
-import { GORDON_DIR } from "../../../infra/storage/paths.ts";
+import { getGordonDir } from "../../../infra/storage/paths.ts";
 
-const ONBOARDING_STATE_FILE = join(GORDON_DIR, "onboarding-state.json");
+function getOnboardingStateFile(): string {
+  return join(getGordonDir(), "onboarding-state.json");
+}
 
 /**
  * Minimum version that requires re-showing onboarding highlights.
@@ -29,6 +31,8 @@ export interface OnboardingState {
   sessionCount: number;
   /** Whether "what's new" was shown for the current version. */
   whatsNewAcknowledged: boolean;
+  /** Whether the first-trade safety tour has been completed or skipped. */
+  firstTradeTourDone: boolean;
   /** Inline hints: how many times each hint has been shown. */
   hintShowCounts: Record<string, number>;
 }
@@ -38,21 +42,24 @@ const DEFAULT_STATE: OnboardingState = {
   lastOnboardingVersion: null,
   sessionCount: 0,
   whatsNewAcknowledged: false,
+  firstTradeTourDone: false,
   hintShowCounts: {},
 };
 
 export function loadOnboardingState(): OnboardingState {
-  if (!existsSync(ONBOARDING_STATE_FILE)) return { ...DEFAULT_STATE };
+  const stateFile = getOnboardingStateFile();
+  if (!existsSync(stateFile)) return { ...DEFAULT_STATE };
   try {
-    return { ...DEFAULT_STATE, ...JSON.parse(readFileSync(ONBOARDING_STATE_FILE, "utf-8")) };
+    return { ...DEFAULT_STATE, ...JSON.parse(readFileSync(stateFile, "utf-8")) };
   } catch {
     return { ...DEFAULT_STATE };
   }
 }
 
 export function saveOnboardingState(state: OnboardingState): void {
-  if (!existsSync(GORDON_DIR)) mkdirSync(GORDON_DIR, { recursive: true });
-  writeFileSync(ONBOARDING_STATE_FILE, JSON.stringify(state, null, 2), { encoding: "utf-8", mode: 0o600 });
+  const gordonDir = getGordonDir();
+  if (!existsSync(gordonDir)) mkdirSync(gordonDir, { recursive: true });
+  writeFileSync(getOnboardingStateFile(), JSON.stringify(state, null, 2), { encoding: "utf-8", mode: 0o600 });
 }
 
 /**
@@ -99,10 +106,11 @@ export function markOnboardingComplete(currentVersion: string): void {
 /**
  * Increment session count (call on each app start).
  */
-export function incrementSessionCount(): void {
+export function incrementSessionCount(): number {
   const state = loadOnboardingState();
   state.sessionCount++;
   saveOnboardingState(state);
+  return state.sessionCount;
 }
 
 /**

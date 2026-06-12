@@ -12,7 +12,17 @@
  * Phase 2 of the 100% parity plan.
  */
 
-import type { AppState, PermissionMode, BootPhase, BackgroundTask, TuiNotification } from "./types.js";
+import type {
+  AppState,
+  PermissionMode,
+  BootPhase,
+  BackgroundTask,
+  TuiNotification,
+  ModeBannerState,
+  OverlayViewId,
+  PagerContent,
+  RadarFocus,
+} from "./types.js";
 import type { Message } from "../components/messages/MessageBubble.tsx";
 import type { AgentChain, HandoffEvent } from "../components/status/AgentProgress.tsx";
 import type { ApprovalRequest } from "../components/dialogs/ApprovalDialog.tsx";
@@ -128,6 +138,16 @@ export function selectIsStreaming(state: AppState): boolean {
 /** Current stream buffer content */
 export function selectStreamBuffer(state: AppState): string {
   return state.streamBuffer;
+}
+
+/** Live extended-thinking text for the current turn */
+export function selectActiveThinking(state: AppState): string {
+  return state.activeThinking;
+}
+
+/** Live tool calls for the current turn */
+export function selectActiveToolCalls(state: AppState) {
+  return state.activeToolCalls;
 }
 
 /** Whether there is active output being generated */
@@ -287,9 +307,19 @@ export function selectShowSetup(state: AppState): boolean {
   return state.showSetup;
 }
 
+/** Whether the first-trade tour is open */
+export function selectShowFirstTradeTour(state: AppState): boolean {
+  return state.showFirstTradeTour;
+}
+
 /** Whether inline help is shown */
 export function selectShowHelp(state: AppState): boolean {
   return state.showHelp;
+}
+
+/** Whether reset confirmation is open */
+export function selectShowResetConfirm(state: AppState): boolean {
+  return state.showResetConfirm;
 }
 
 /** Whether Ctrl+C was recently pressed (for double-press exit) */
@@ -302,13 +332,33 @@ export function selectActiveWorkspace(state: AppState): string | null {
   return state.activeWorkspace;
 }
 
+export function selectModeBanner(state: AppState): ModeBannerState | null {
+  return state.modeBanner;
+}
+
+export function selectKillSwitchStatus(state: AppState) {
+  return state.killSwitches;
+}
+
+export function selectActiveOverlayView(state: AppState): OverlayViewId | null {
+  return state.activeOverlayView;
+}
+
+export function selectPager(state: AppState): PagerContent | null {
+  return state.pager;
+}
+
+export function selectRadarFocus(state: AppState): RadarFocus | null {
+  return state.radarFocus;
+}
+
 // ============================================================================
 // 13. Composite / derived selectors
 // ============================================================================
 
 /** Whether any modal overlay is active (palette, setup, help) */
 export function selectHasActiveOverlay(state: AppState): boolean {
-  return state.showPalette || state.showSetup || state.showHelp;
+  return state.showPalette || state.showSetup || state.showHelp || state.showResetConfirm || state.pager !== null || state.activeOverlayView !== null;
 }
 
 /** Summary object for the footer/status bar */

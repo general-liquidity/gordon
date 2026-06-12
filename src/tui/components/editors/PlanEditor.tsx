@@ -70,7 +70,7 @@ export function PlanEditor({ plan, onSave, onCancel, onApprove }: Props) {
   const rr = riskAmount > 0 ? rewardAmount / riskAmount : 0;
 
   return (
-    <Pane title={`EDIT PLAN — ${draft.symbol} ${draft.side}`} color="yellow">
+    <Pane title={`EDIT PLAN — ${draft.symbol} ${draft.side}`} tone="warning">
       <Box flexDirection="column">
         {fields.map((f) => {
           const isFocused = f.key === focused;

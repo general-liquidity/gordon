@@ -140,13 +140,13 @@ export function MCPSettings({ server, onSave, onClose }: Props) {
           label="Save"
           onPress={() => onSave({ enabled } as Partial<MCPServer>)}
           focused={focusedField === "save"}
-          color="green"
+          variant="success"
         />
         <Button
           label="Cancel"
           onPress={onClose}
           focused={focusedField === "cancel"}
-          color="red"
+          variant="danger"
         />
       </Box>
 

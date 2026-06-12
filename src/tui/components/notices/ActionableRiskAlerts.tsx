@@ -43,14 +43,14 @@ export function ActionableRiskAlerts({ alerts, onFix, onIgnore }: Props) {
 
   if (alerts.length === 0) {
     return (
-      <Pane title="RISK CHECKS" color="green">
+      <Pane title="RISK CHECKS" tone="success">
         <Text color="green">✓ All risk checks passed</Text>
       </Pane>
     );
   }
 
   return (
-    <Pane title="RISK ALERTS" color="yellow">
+    <Pane title="RISK ALERTS" tone="warning">
       <Box flexDirection="column">
         {alerts.map((alert) => {
           const color = SEVERITY_COLORS[alert.severity];

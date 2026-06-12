@@ -55,7 +55,7 @@ export function AlphaDecayChart({ months, decayPoint, onClose }: Props) {
 
   if (months.length === 0) {
     return (
-      <Pane title="ALPHA DECAY" color="cyan">
+      <Pane title="ALPHA DECAY">
         <Text dimColor>No alpha data available.</Text>
         <Text> </Text>
         <Text dimColor>Esc close</Text>
@@ -97,7 +97,7 @@ export function AlphaDecayChart({ months, decayPoint, onClose }: Props) {
   const zeroRow = Math.round((maxAlpha / (2 * maxAlpha)) * chartHeight);
 
   return (
-    <Pane title="ALPHA DECAY" color="cyan">
+    <Pane title="ALPHA DECAY">
       {/* Chart */}
       <Box flexDirection="column" paddingLeft={2}>
         {chartRows.map((row, rowIdx) => {

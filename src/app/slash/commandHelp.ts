@@ -114,6 +114,24 @@ export function formatAnalysisCommandsHelp(): string {
   return lines.join("\n");
 }
 
+export function formatTradingModesHelp(): string {
+  return [
+    "**Trading Modes** — how much Gordon may do without you",
+    "",
+    "| Mode | Command | What it does | When to use it | Risk |",
+    "|---|---|---|---|---|",
+    "| auto | /auto | Trades execute without per-action approval; only your risk rules and the trading constitution block | You trust the setup and want hands-free execution | Highest — real orders fire without a dialog |",
+    "| ask | /ask | Every trade pauses for your approval dialog (default) | Day-to-day trading; you keep the final say | Guarded — nothing fires without you |",
+    "| plan | /planmode | Plans can be created but never executed | Drafting trades to review later | None — execution blocked |",
+    "| paper | /paper | Real orders blocked; fills simulated against live prices | Practice, strategy testing, onboarding | None to capital — simulated only |",
+    "| strict | /strict | Read-only — all trades blocked, analysis and planning only | Audits and research sessions | None — read-only |",
+    "| observe | /observe | No execution of any kind, not even paper trades | Pure market watching | None — fully inert |",
+    "",
+    "Switch anytime by typing the command. `/live` returns from paper to live trading (approval required).",
+    "Your current mode is shown in the header. `/help` lists everything else.",
+  ].join("\n");
+}
+
 // ============================================================================
 // ACCESSIBILITY: Paginated Help Functions
 // Shows 15 commands per page instead of overwhelming users with 50+ at once
@@ -181,6 +199,7 @@ function formatHelpSummaryView(): string {
     lines.push(`  /${cmd.name} - ${cmd.description}`);
   }
 
+  lines.push("\n**New to Gordon?** `/modes` explains the 6 trading modes.");
   lines.push("\n---");
   lines.push("**Browse:** `/help <workflow>` | `/help advanced` | `/help all` | `/help page 1`");
   return lines.join("\n");

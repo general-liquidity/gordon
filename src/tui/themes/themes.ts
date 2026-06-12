@@ -19,7 +19,7 @@ export interface GordonTheme {
   agentPlanner: string; agentExecutor: string; agentMonitor: string;
   agentTeacher: string; agentBacktester: string; agentCritic: string; agentAuditor: string;
   // UI Chrome
-  uiBrand: string; uiMuted: string; uiBorder: string; uiFocus: string; uiSelection: string;
+  uiBrand: string; uiMuted: string; uiBorder: string; uiFocus: string; uiSelection: string; uiInfo: string;
   // Diff
   diffAdded: string; diffRemoved: string; diffAddedWord: string; diffRemovedWord: string;
   diffAddedDimmed: string; diffRemovedDimmed: string;
@@ -58,7 +58,7 @@ export const DARK_THEME: GordonTheme = {
   moneyProfit: "rgb(78,186,101)", moneyLoss: "rgb(255,107,128)", moneyNeutral: "rgb(255,255,255)",
   riskSafe: "rgb(78,186,101)", riskWarning: "rgb(255,193,7)", riskDanger: "rgb(255,107,128)", riskCritical: "rgb(255,60,80)",
   signalBuy: "rgb(100,220,120)", signalSell: "rgb(255,80,100)", signalNeutral: "rgb(150,150,150)",
-  uiBrand: "rgb(52,238,176)", uiMuted: "rgb(150,150,150)", uiBorder: "rgb(100,100,100)", uiFocus: "rgb(52,238,176)", uiSelection: "rgb(80,200,160)",
+  uiBrand: "rgb(52,238,176)", uiMuted: "rgb(150,150,150)", uiBorder: "rgb(100,100,100)", uiFocus: "rgb(52,238,176)", uiSelection: "rgb(80,200,160)", uiInfo: "rgb(0,180,220)",
   diffAdded: "rgb(78,186,101)", diffRemoved: "rgb(255,107,128)", diffAddedWord: "rgb(100,220,120)", diffRemovedWord: "rgb(255,80,100)",
   diffAddedDimmed: "rgb(40,80,50)", diffRemovedDimmed: "rgb(80,40,50)",
   chartUp: "rgb(78,186,101)", chartDown: "rgb(255,107,128)", chartVolume: "rgb(0,180,220)", chartGrid: "rgb(80,80,80)",
@@ -78,7 +78,7 @@ export const LIGHT_THEME: GordonTheme = {
   moneyProfit: "rgb(44,122,57)", moneyLoss: "rgb(171,43,63)", moneyNeutral: "rgb(0,0,0)",
   riskSafe: "rgb(44,122,57)", riskWarning: "rgb(150,108,30)", riskDanger: "rgb(171,43,63)", riskCritical: "rgb(200,20,40)",
   signalBuy: "rgb(44,122,57)", signalSell: "rgb(171,43,63)", signalNeutral: "rgb(100,100,100)",
-  uiBrand: "rgb(0,160,200)", uiMuted: "rgb(100,100,100)", uiBorder: "rgb(180,180,180)", uiFocus: "rgb(0,160,200)", uiSelection: "rgb(50,100,200)",
+  uiBrand: "rgb(0,160,200)", uiMuted: "rgb(100,100,100)", uiBorder: "rgb(180,180,180)", uiFocus: "rgb(0,160,200)", uiSelection: "rgb(50,100,200)", uiInfo: "rgb(0,130,170)",
   diffAdded: "rgb(44,122,57)", diffRemoved: "rgb(171,43,63)", diffAddedWord: "rgb(60,160,80)", diffRemovedWord: "rgb(200,50,70)",
   diffAddedDimmed: "rgb(200,240,210)", diffRemovedDimmed: "rgb(240,210,210)",
   chartUp: "rgb(44,122,57)", chartDown: "rgb(171,43,63)", chartVolume: "rgb(0,130,170)", chartGrid: "rgb(200,200,200)",

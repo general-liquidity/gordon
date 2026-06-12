@@ -13,8 +13,6 @@ interface Props {
   activeAgentName: string | null;
   autonomousActive?: boolean;
   autonomousStrategyCount?: number;
-  /** Vim mode active */
-  vimMode?: boolean;
   /** Effort/fast mode level */
   effortLevel?: "low" | "medium" | "high" | "auto";
   /** Token budget remaining (0-1 ratio) */
@@ -28,7 +26,6 @@ export function FooterHints({
   activeAgentName,
   autonomousActive = false,
   autonomousStrategyCount = 0,
-  vimMode = false,
   effortLevel,
   tokenBudgetRatio,
 }: Props) {
@@ -39,14 +36,6 @@ export function FooterHints({
       <Spacer />
       {/* Mode */}
       <Text color={modeColor}>{permissionMode}</Text>
-
-      {/* Vim mode indicator */}
-      {vimMode && (
-        <>
-          <Text dimColor> {"\u00b7"} </Text>
-          <Text color="magenta">[VIM]</Text>
-        </>
-      )}
 
       {/* Effort/fast mode indicator */}
       {effortLevel && effortLevel !== "auto" && (

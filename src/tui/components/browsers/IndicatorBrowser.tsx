@@ -155,7 +155,7 @@ export function IndicatorBrowser({ onSelect, onClose }: Props) {
   const focusedIndicator = selectedFlatIdx >= 0 ? flatList[selectedFlatIdx]?.indicator : undefined;
 
   return (
-    <Pane title="INDICATOR BROWSER" color="cyan">
+    <Pane title="INDICATOR BROWSER">
       <Box>
         <Text dimColor>({INDICATORS.length} indicators)</Text>
       </Box>

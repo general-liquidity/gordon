@@ -90,7 +90,7 @@ export function InsightBrowser({ insights, onClose }: Props) {
   });
 
   return (
-    <Pane title="TRADING INSIGHTS" color="cyan">
+    <Pane title="TRADING INSIGHTS">
       <Tabs tabs={CATEGORY_TABS} activeKey={activeTab} onChange={(key) => { setActiveTab(key); setCursor(0); }}>
         <Box>
           <Text dimColor>({filtered.length} insights)</Text>

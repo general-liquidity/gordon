@@ -94,7 +94,7 @@ export function RiskConfigPanel({
   const activeMode = MODES[modeIndex] ?? mode;
 
   return (
-    <Pane title="RISK CONFIGURATION" color="red">
+    <Pane title="RISK CONFIGURATION" tone="danger">
       {/* Mode selector */}
       <Box>
         <Text dimColor>Mode: </Text>

@@ -22,7 +22,7 @@ import { SwarmTree } from "./components/charts/SwarmTree.tsx";
 import { ApprovalDialog } from "./components/dialogs/ApprovalDialog.tsx";
 import { WorkerBadge } from "./components/status/WorkerBadge.tsx";
 import { InlineHelp } from "./components/InlineHelp.js";
-import { CommandPalette, type PaletteItem } from "./components/CommandPalette.js";
+import { CommandPalette, type PaletteItem, type PaletteWorkspaceSection } from "./components/CommandPalette.js";
 import { BootScreen } from "./components/layout/BootScreen.tsx";
 import { SetupWizard, type SetupPreflight } from "./components/wizards/SetupWizard.tsx";
 import { PrivacyConsent, type PrivacyChoices } from "./components/editors/PrivacyConsent.tsx";
@@ -30,6 +30,8 @@ import { PrivacyConsent, type PrivacyChoices } from "./components/editors/Privac
 // import out so we don't carry dead deps.
 // import { HandoffArrow } from "./components/status/HandoffArrow.tsx";
 import { PromptInput } from "./components/layout/PromptInput.tsx";
+import { BootLivePanel } from "./components/layout/BootLivePanel.tsx";
+import { EmptyChatHint } from "./components/layout/EmptyChatHint.tsx";
 import { defaultMessageQueue } from "../infra/runtime/messageQueue.js";
 import { saveEnvKeys } from "../infra/storage/config/env.ts";
 import { providerRegistry } from "../infra/runtime/providers/registry.js";
@@ -41,7 +43,7 @@ import { refreshRuntimeCredentials } from "./bridge/runtime.js";
 import { VirtualMessageList } from "./components/display/VirtualMessageList.tsx";
 import { CostDisplay } from "./components/status/CostDisplay.tsx";
 import { updateTerminalTab, resetTerminalTab } from "./terminalTab.js";
-import { getActionsForKey, isVimModeEnabled } from "./keybindings/keybindings.js";
+import { getActionsForKey, isVimModeEnabled, validateKeybindings } from "./keybindings/keybindings.js";
 import { getNotificationFolder } from "./notifications/notificationFolder.js";
 import { useFpsTracker } from "./hooks/animation/useFpsTracker.ts";
 import {
@@ -53,7 +55,16 @@ import { useAnimationPause } from "./hooks/animation/useAnimationClock.ts";
 import { useProactiveChatSubscription } from "./hooks/useProactiveChatSubscription.js";
 import { useRateLimitNotification } from "./hooks/useRateLimitNotification.js";
 import { useAlertSubscription } from "./state/useAlertSubscription.js";
-import { getNextHint, recordHintShown, incrementSessionCount, type HintContext } from "../app/setup/onboarding/index.ts";
+import {
+  getNextHint,
+  recordHintShown,
+  incrementSessionCount,
+  loadOnboardingState,
+  shouldShowFirstTradeTour,
+  markFirstTradeTourDone,
+  type HintContext,
+} from "../app/setup/onboarding/index.ts";
+import { getQuickActionItems, type WorkspaceId } from "../app/slash/commandUx.ts";
 
 // ── Phase 15-18 Components ──
 import { SettingsDialog } from "./components/dialogs/SettingsDialog.tsx";
@@ -85,7 +96,7 @@ import { FeedbackSurvey } from "./components/status/FeedbackSurvey.tsx";
 import { ThinkStep } from "./components/status/ThinkStep.tsx";
 import { TradingSpinner } from "./components/spinners/TradingSpinner.tsx";
 import { GlimmerMessage } from "./components/spinners/GlimmerMessage.tsx";
-import { ToolCallInline, type ToolCallState } from "./components/status/ToolCallInline.tsx";
+import { ToolCallInline } from "./components/status/ToolCallInline.tsx";
 import { StreamingMarkdown } from "./components/messages/StreamingMarkdown.tsx";
 import { NoSelect } from "./components/layout/NoSelect.tsx";
 import { QueuedCommandsNotice } from "./components/notices/QueuedCommandsNotice.tsx";
@@ -107,6 +118,8 @@ import { MarketOverviewPanel } from "./components/panels/MarketOverviewPanel.tsx
 import { RegimeStatusPanel } from "./components/panels/RegimeStatusPanel.tsx";
 import { StatsDialog } from "./components/dialogs/StatsDialog.tsx";
 import { GlobalSearchDialog } from "./components/dialogs/GlobalSearchDialog.tsx";
+import { ResetSessionDialog } from "./components/dialogs/ResetSessionDialog.tsx";
+import { PagerDialog, PAGER_LINE_THRESHOLD, findLastLongMessage } from "./components/dialogs/PagerDialog.tsx";
 
 // ── Previously unwired components ──
 import { ActionableRiskAlerts } from "./components/notices/ActionableRiskAlerts.tsx";
@@ -145,7 +158,14 @@ import { ElicitationDialog, type FormField } from "./components/dialogs/Elicitat
 import type { SideQuestion } from "./services/suggestions/sideQuestion.ts";
 
 // ── Backend Module UI Components ──
-import { LivePositions, type Position } from "./components/status/LivePositions.tsx";
+import { LivePositions } from "./components/status/LivePositions.tsx";
+import { TradingModeBadge } from "./components/status/TradingModeBadge.tsx";
+import { TradingModeBanner } from "./components/status/TradingModeBanner.tsx";
+import { KillSwitchBadge } from "./components/status/KillSwitchBadge.tsx";
+import { RadarFocusBar } from "./components/status/RadarFocusBar.tsx";
+import { FirstTradeTour } from "./components/wizards/FirstTradeTour.tsx";
+import { TradeQueueView } from "./components/views/TradeQueueView.tsx";
+import { SafetyDashboardView } from "./components/views/SafetyDashboardView.tsx";
 import type { MutationResult } from "./components/charts/GenomeDiffViewer.tsx";
 import { AuditBrowser } from "./components/browsers/AuditBrowser.tsx";
 import { SchedulerPanel } from "./components/panels/SchedulerPanel.tsx";
@@ -179,9 +199,15 @@ function formatTokenCount(n: number): string {
 import { useTerminalSize } from "./hooks/scroll/useTerminalSize.ts";
 import { useMergedCommands } from "./hooks/useMergedCommands.js";
 import { useScreenReader } from "./hooks/useScreenReader.js";
+import { useKillSwitchStatus } from "./hooks/useKillSwitchStatus.ts";
+import { getSessionTip } from "./boot/tips.ts";
+import { installRenderBudget, isRenderBudgetEnabled, isRenderBudgetStrict, getRenderBudgetBreachCount } from "./diagnostics/renderBudget.ts";
+import { enterAltScreen, leaveAltScreen } from "./utils/altScreen.ts";
+import { radarQuickKeyCommand } from "./input/radarQuickKeys.ts";
+import { getSuggestionStore } from "../infra/proactive/storage/suggestionStore.ts";
 
 // ── Bridge ──
-import { initializeRuntime, handleInput, handleApprovalDecision } from "./bridge/runtime.js";
+import { initializeRuntime, handleInput, handleApprovalDecision, performSessionReset } from "./bridge/runtime.js";
 
 // ============================================================================
 // Gordon App — Claude Code for Vibe Trading
@@ -227,6 +253,7 @@ function formatPerfSnapshot(
   snap: ReturnType<ReturnType<typeof getPerformanceMonitor>["snapshot"]>,
   flushPath: string | null,
   status: "running" | "idle" | "stopped",
+  budgetBreaches = 0,
 ): string {
   const h = snap.frameHistogram;
   const fmt = (n: number) => (n >= 10 ? n.toFixed(1) : n.toFixed(2));
@@ -242,6 +269,9 @@ function formatPerfSnapshot(
     lines.push(`  Memory:      (no samples yet)`);
   }
   lines.push(`  Renders:     ${snap.totalRenders} total  /  ${snap.totalFrames} frames`);
+  if (isRenderBudgetEnabled()) {
+    lines.push(`  Budget:      ${budgetBreaches} breach${budgetBreaches === 1 ? "" : "es"} recorded`);
+  }
   lines.push(`  Log:         ${flushPath ?? "(no flush path; use /perf start <path>)"}`);
   return lines.join("\n");
 }
@@ -257,6 +287,7 @@ function AppInner() {
   // the destructure above (which is read throughout the component).
   const perfStore = useAppStore();
   const { exit } = useApp();
+  useKillSwitchStatus(dispatch);
 
   // Boot-time config error: render a dialog instead of crashing the process.
   const configErrorType = process.env.GORDON_CONFIG_ERROR_TYPE;
@@ -453,6 +484,14 @@ function AppInner() {
   }, []);
   const showPalette = useAppState((s) => s.showPalette);
   const showHelp = useAppState((s) => s.showHelp);
+  const showFirstTradeTour = useAppState((s) => s.showFirstTradeTour);
+  const showResetConfirm = useAppState((s) => s.showResetConfirm);
+  const modeBanner = useAppState((s) => s.modeBanner);
+  const killSwitches = useAppState((s) => s.killSwitches);
+  const activeOverlayView = useAppState((s) => s.activeOverlayView);
+  const pager = useAppState((s) => s.pager);
+  const radarFocus = useAppState((s) => s.radarFocus);
+  const activeWorkspace = useAppState((s) => s.activeWorkspace);
   const permissionMode = useAppState((s) => s.permissionMode);
   const [connectivityHints, setConnectivityHints] = useState({ hasExchange: false, hasBroker: false });
   const messages = useAppState((s) => s.messages);
@@ -469,18 +508,46 @@ function AppInner() {
   const fpsMetrics = useFpsTracker(2000); // Report every 2s
   const { pause: pauseAnimations, resume: resumeAnimations } = useAnimationPause();
 
-  // ── Phase 5 reconciler baseline — opt-in only when GORDON_PERF_LOG is set ──
+  // ── Phase 5 reconciler baseline — opt-in only when perf diagnostics are enabled ──
   // Subscribes to the underlying store (bypassing the React render loop) and
   // taps `process.stdout.write` to record frame-time + cell-churn for the
   // custom reconciler comparison. Zero-cost when the env var is unset: the
   // early return fires once at mount and nothing downstream runs.
   useEffect(() => {
     const flushPath = process.env.GORDON_PERF_LOG;
-    if (!flushPath) return; // zero-cost path
+    const budgetEnabled = isRenderBudgetEnabled();
+    if (!flushPath && !budgetEnabled) return; // zero-cost path
 
     const monitor = getPerformanceMonitor();
-    monitor.start({ flushPath });
+    monitor.start({ flushPath: flushPath ?? undefined });
     const uninstallTap = installStdoutTap(monitor);
+    let budgetNotified = false;
+    const uninstallBudget = budgetEnabled
+      ? installRenderBudget({
+          sink: (breach) => {
+            const message = `[render-budget] ${breach.kind} frame ${breach.observedMs.toFixed(1)}ms > ${breach.budgetMs}ms budget (${breach.consecutive} consecutive)`;
+            console.error(message);
+            if (!budgetNotified) {
+              budgetNotified = true;
+              dispatch({
+                type: "INJECT_NOTIFICATION",
+                notification: {
+                  id: `render-budget-${breach.at}`,
+                  type: "tui:render_budget",
+                  variant: "alert",
+                  message,
+                  timestamp: new Date(breach.at).toISOString(),
+                },
+              });
+            }
+            if (isRenderBudgetStrict()) {
+              setTimeout(() => {
+                throw new Error(`render budget breached: ${breach.kind}`);
+              }, 0);
+            }
+          },
+        })
+      : () => {};
 
     // Track message-count deltas via the store's native subscribe() so the
     // perf counter reflects real dispatches, not just React commits.
@@ -495,14 +562,16 @@ function AppInner() {
 
     return () => {
       unsubscribe();
+      uninstallBudget();
       uninstallTap();
       monitor.stop();
       resetPerformanceMonitor();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [dispatch]);
   const isScreenReaderActive = useScreenReader();
   const vimModeActive = isVimModeEnabled();
+  const vimModeRef = React.useRef<"insert" | "normal" | "visual">("insert");
   const useAltScreen = process.env.GORDON_ALT_SCREEN !== "false";
   const threadId = useAppState((s) => s.threadId);
   const isResumedSession = useAppState((s) => s.isResumedSession);
@@ -604,7 +673,6 @@ function AppInner() {
   const [showReconciliation, setShowReconciliation] = useState(false);
   const [showTaskDeps, setShowTaskDeps] = useState(false);
   const [showWalkForward, setShowWalkForward] = useState(false);
-  const [livePositions, setLivePositions] = useState<Position[]>([]);
   const [orderRecovery, setOrderRecovery] = useState<{
     orderId: string; symbol: string; reason: string; attempt: number; maxAttempts: number;
   } | null>(null);
@@ -624,6 +692,25 @@ function AppInner() {
   const ctrlC = useDoublePress(2000);
   const { elapsed: elapsedSeconds } = useElapsedTime(isStreaming);
   const paletteItems = useMergedCommands();
+
+  useEffect(() => {
+    const conflicts = validateKeybindings();
+    if (conflicts.length === 0) return;
+    const preview = conflicts
+      .slice(0, 3)
+      .map((conflict) => `${conflict.key} -> ${conflict.winner} wins over ${conflict.actions.filter((action) => action !== conflict.winner).join(", ")}`)
+      .join("\n");
+    dispatch({
+      type: "INJECT_NOTIFICATION",
+      notification: {
+        id: `keybinding-conflict-${Date.now()}`,
+        type: "tui:keybinding_conflict",
+        variant: "alert",
+        message: `Keybinding conflicts detected:\n${preview}`,
+        timestamp: new Date().toISOString(),
+      },
+    });
+  }, [dispatch]);
 
   // ── Derived: memoize all activeAgents derivations in one pass ──
   // Previously the root filtered/mapped activeAgents 3 times per render
@@ -658,10 +745,42 @@ function AppInner() {
     showHistorySearch || showIndicatorValue || showInsights || showMarketPulse ||
     showMessageSelector || showOptimization || showPlanEditor || showPlugins ||
     showQuickOpen || showReconciliation || showTaskDeps || showWalkForward ||
+    showResetConfirm || !!pager || activeOverlayView !== null ||
     !!counterfactual || !!debateView || !!elicitationRequest;
 
   // ── Prompt suggestions based on conversation context ──
   const promptSuggestions = usePromptSuggestions(messages, isStreaming, connectivityHints.hasExchange);
+
+  const paletteWorkspaceSection = React.useMemo<PaletteWorkspaceSection>(() => {
+    const workspace = coerceWorkspace(activeWorkspace);
+    const items = getQuickActionItems({
+      permissionMode: permissionMode ?? "ask",
+      workspace,
+      setupComplete: !showSetup,
+      hasExchange: connectivityHints.hasExchange,
+      hasBroker: connectivityHints.hasBroker,
+    }).map((item) => ({
+      id: `workspace-${workspace}-${item.command}`,
+      label: item.command,
+      description: item.label,
+      category: "workspace",
+      workflowId: item.workflow ? ({
+        discover: "discover",
+        analyze: "discover",
+        trade: "execute",
+        run: "plan",
+        accounts: "monitor",
+        monitor: "monitor",
+        build: "system",
+        operate: "system",
+      } as const)[item.workflow] : "system",
+    }));
+    return {
+      label: `${workspace.toUpperCase()} QUICK ACTIONS`,
+      items,
+      colorToken: "uiFocus",
+    };
+  }, [activeWorkspace, permissionMode, showSetup, connectivityHints.hasExchange, connectivityHints.hasBroker]);
 
   // ── Queued message count ──
   const queuedCount = defaultMessageQueue.length?.() ?? 0;
@@ -682,7 +801,7 @@ function AppInner() {
   const isThinking = isStreaming && thinkingAgent != null && !streamBuffer;
 
   // ── Track active tool calls for inline display ──
-  const [activeToolCalls, setActiveToolCalls] = useState<ToolCallState[]>([]);
+  const activeToolCalls = useAppState((s) => s.activeToolCalls);
   // ── Track last user input for contextual spinner verb ──
   const [lastUserInput, setLastUserInput] = useState("");
 
@@ -698,14 +817,38 @@ function AppInner() {
       if (!next || next === prev) return;
 
       // Diff and dispatch granular actions
-      if (next.messages !== prev.messages) {
+      const nextLast = next.messages?.[next.messages.length - 1];
+      const prevLast = prev.messages?.[prev.messages.length - 1];
+      const streamingMessageOnly =
+        next.messages !== prev.messages &&
+        next.streamBuffer !== prev.streamBuffer &&
+        next.messages.length === prev.messages.length &&
+        nextLast?.id != null &&
+        prevLast?.id != null &&
+        nextLast.id === prevLast.id &&
+        nextLast.content !== prevLast.content;
+
+      if (streamingMessageOnly) {
+        dispatch({
+          type: "UPDATE_STREAMING_MESSAGE",
+          id: nextLast.id,
+          content: nextLast.content,
+          streamBuffer: next.streamBuffer,
+        });
+      } else if (next.messages !== prev.messages) {
         dispatch({ type: "SET_MESSAGES", messages: next.messages });
       }
       if (next.isStreaming !== prev.isStreaming) {
         dispatch(next.isStreaming ? { type: "START_STREAMING" } : { type: "STOP_STREAMING" });
       }
-      if (next.streamBuffer !== prev.streamBuffer) {
+      if (!streamingMessageOnly && next.streamBuffer !== prev.streamBuffer) {
         dispatch({ type: "SET_STREAM_BUFFER", buffer: next.streamBuffer });
+      }
+      if (next.activeThinking !== prev.activeThinking) {
+        dispatch({ type: "SET_ACTIVE_THINKING", thinking: next.activeThinking });
+      }
+      if (next.activeToolCalls !== prev.activeToolCalls) {
+        dispatch({ type: "SET_ACTIVE_TOOL_CALLS", calls: next.activeToolCalls });
       }
       if (next.activeAgents !== prev.activeAgents) {
         dispatch({ type: "SET_ACTIVE_AGENTS", agents: next.activeAgents });
@@ -737,11 +880,17 @@ function AppInner() {
       if (next.showSetup !== prev.showSetup) {
         dispatch({ type: "SET_SHOW_SETUP", show: next.showSetup });
       }
+      if (next.showFirstTradeTour !== prev.showFirstTradeTour) {
+        dispatch({ type: "SET_SHOW_FIRST_TRADE_TOUR", show: next.showFirstTradeTour });
+      }
       if (next.showPalette !== prev.showPalette) {
         dispatch({ type: "SET_SHOW_PALETTE", show: next.showPalette });
       }
       if (next.showHelp !== prev.showHelp) {
         dispatch({ type: "SET_SHOW_HELP", show: next.showHelp });
+      }
+      if (next.showResetConfirm !== prev.showResetConfirm) {
+        dispatch({ type: "SET_SHOW_RESET_CONFIRM", show: next.showResetConfirm });
       }
       if (next.backgroundTasks !== prev.backgroundTasks) {
         dispatch({ type: "SET_BACKGROUND_TASKS", tasks: next.backgroundTasks });
@@ -755,6 +904,20 @@ function AppInner() {
       }
       if (next.activeWorkspace !== prev.activeWorkspace) {
         dispatch({ type: "SET_ACTIVE_WORKSPACE", workspace: next.activeWorkspace });
+      }
+      if (next.activeOverlayView !== prev.activeOverlayView) {
+        dispatch(next.activeOverlayView
+          ? { type: "OPEN_OVERLAY_VIEW", view: next.activeOverlayView }
+          : { type: "CLOSE_OVERLAY_VIEW" });
+      }
+      if (next.pager !== prev.pager) {
+        dispatch(next.pager ? { type: "OPEN_PAGER", pager: next.pager } : { type: "CLOSE_PAGER" });
+      }
+      if (next.radarFocus !== prev.radarFocus) {
+        dispatch({ type: "SET_RADAR_FOCUS", focus: next.radarFocus });
+      }
+      if (next.__resetSession) {
+        dispatch({ type: "RESET_SESSION" });
       }
     },
     [dispatch, getState],
@@ -847,10 +1010,10 @@ function AppInner() {
   // ── Progressive inline hints (shown on first few sessions, then hidden) ──
   useEffect(() => {
     if (!runtimeReady) return;
-    incrementSessionCount();
+    const sessionCount = incrementSessionCount();
 
     const hintContext: HintContext = {
-      sessionCount: 0, // Loaded from state inside getNextHint
+      sessionCount,
       onboardingComplete: true,
       hasExchange: connectivityHints.hasExchange,
       hasBroker: connectivityHints.hasBroker,
@@ -874,6 +1037,15 @@ function AppInner() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [runtimeReady, connectivityHints.hasExchange, connectivityHints.hasBroker]);
 
+  useEffect(() => {
+    if (!runtimeReady || showSetup) return;
+    if (shouldShowFirstTradeTour(loadOnboardingState(), showSetup)) {
+      dispatch({ type: "SET_SHOW_FIRST_TRADE_TOUR", show: true });
+    }
+  }, [runtimeReady, showSetup, dispatch]);
+
+  const submitRef = React.useRef<(value: string) => void>(() => {});
+
   // ── Ctrl+C double-press exit ──
   useEffect(() => {
     if (ctrlC.isDoublePressed) {
@@ -893,8 +1065,25 @@ function AppInner() {
     parts.push(keyName);
     const keyCombo = parts.join("+");
 
+    if (radarFocus && !key.ctrl && !key.meta) {
+      if (key.escape) {
+        dispatch({ type: "SET_RADAR_FOCUS", focus: null });
+        return;
+      }
+      const command = radarQuickKeyCommand(input, radarFocus);
+      if (command) {
+        dispatch({ type: "SET_RADAR_FOCUS", focus: null });
+        submitRef.current(command);
+        return;
+      }
+    }
+
+    if (anyDialogOpen) return;
+
     // Resolve actions via keybinding system
-    const vimMode = isVimModeEnabled() ? "normalMode" : "always";
+    const vimMode = isVimModeEnabled()
+      ? vimModeRef.current === "insert" ? "insertMode" : "normalMode"
+      : "always";
     const actions = getActionsForKey(keyCombo, vimMode);
 
     for (const action of actions) {
@@ -920,6 +1109,69 @@ function AppInner() {
         case "toggleContextView":
           setShowContext((prev) => !prev);
           return;
+        case "toggleTradeQueue":
+          dispatch(activeOverlayView === "tradeQueue"
+            ? { type: "CLOSE_OVERLAY_VIEW" }
+            : { type: "OPEN_OVERLAY_VIEW", view: "tradeQueue" });
+          return;
+        case "toggleSafetyDashboard":
+          dispatch(activeOverlayView === "safety"
+            ? { type: "CLOSE_OVERLAY_VIEW" }
+            : { type: "OPEN_OVERLAY_VIEW", view: "safety" });
+          return;
+        case "focusRadar": {
+          if (radarFocus) {
+            dispatch({ type: "SET_RADAR_FOCUS", focus: null });
+            return;
+          }
+          const suggestion = getSuggestionStore().getRecent(1, { status: "pending" })[0];
+          if (!suggestion) {
+            dispatch({
+              type: "INJECT_NOTIFICATION",
+              notification: {
+                id: `radar-focus-empty-${Date.now()}`,
+                type: "tui:radar_focus",
+                variant: "info",
+                message: "No pending radar card to focus.",
+                timestamp: new Date().toISOString(),
+              },
+            });
+            return;
+          }
+          dispatch({
+            type: "SET_RADAR_FOCUS",
+            focus: {
+              id: suggestion.id,
+              category: suggestion.category,
+              title: suggestion.title,
+            },
+          });
+          return;
+        }
+        case "openPager": {
+          const longMessage = findLastLongMessage(messages, PAGER_LINE_THRESHOLD);
+          if (!longMessage) {
+            dispatch({
+              type: "INJECT_NOTIFICATION",
+              notification: {
+                id: `pager-empty-${Date.now()}`,
+                type: "tui:pager",
+                variant: "info",
+                message: "No long message available for pager.",
+                timestamp: new Date().toISOString(),
+              },
+            });
+            return;
+          }
+          dispatch({
+            type: "OPEN_PAGER",
+            pager: {
+              title: longMessage.role === "gordon" ? "Gordon Response" : "Conversation Message",
+              content: longMessage.content,
+            },
+          });
+          return;
+        }
         case "toggleAutoMode":
           dispatch({ type: "SET_PERMISSION_MODE", mode: "auto" });
           return;
@@ -1264,11 +1516,11 @@ function AppInner() {
             const snap = monitor.snapshot();
             const flushPath = monitor.getFlushPath();
             monitor.stop();
-            body = formatPerfSnapshot(snap, flushPath, "stopped");
+            body = formatPerfSnapshot(snap, flushPath, "stopped", getRenderBudgetBreachCount());
           }
         } else if (sub === "report") {
           const snap = monitor.snapshot();
-          body = formatPerfSnapshot(snap, monitor.getFlushPath(), monitor.isRunning() ? "running" : "idle");
+          body = formatPerfSnapshot(snap, monitor.getFlushPath(), monitor.isRunning() ? "running" : "idle", getRenderBudgetBreachCount());
         } else {
           body = "Usage: /perf [start [path] | stop | report]";
         }
@@ -1306,6 +1558,7 @@ function AppInner() {
     },
     [isStreaming, dispatch, stateUpdater],
   );
+  submitRef.current = handleSubmit;
 
   // Drain queued user inputs when Gordon transitions from busy → idle.
   // Messages typed while streaming get batched and re-submitted here.
@@ -1328,6 +1581,14 @@ function AppInner() {
     });
     return () => { resetTerminalTab(); };
   }, [isStreaming, permissionMode]);
+
+  useEffect(() => {
+    if (!useAltScreen || activeOverlayView === null) return;
+    enterAltScreen();
+    return () => {
+      leaveAltScreen();
+    };
+  }, [useAltScreen, activeOverlayView]);
 
   // Wire: pause animations when not streaming (user is reading, save CPU).
   useEffect(() => {
@@ -1670,6 +1931,39 @@ function AppInner() {
     );
   }
 
+  if (showFirstTradeTour) {
+    return (
+      <FirstTradeTour
+        permissionMode={permissionMode ?? "ask"}
+        onDone={() => {
+          markFirstTradeTourDone();
+          dispatch({ type: "SET_SHOW_FIRST_TRADE_TOUR", show: false });
+        }}
+      />
+    );
+  }
+
+  if (activeOverlayView === "tradeQueue") {
+    return (
+      <TradeQueueView
+        pendingApprovals={pendingApprovals}
+        permissionMode={permissionMode ?? "ask"}
+        onApprovalDecision={handleApproval}
+        onRadarAction={handleSubmit}
+        onClose={() => dispatch({ type: "CLOSE_OVERLAY_VIEW" })}
+      />
+    );
+  }
+
+  if (activeOverlayView === "safety") {
+    return (
+      <SafetyDashboardView
+        permissionMode={permissionMode ?? "ask"}
+        onClose={() => dispatch({ type: "CLOSE_OVERLAY_VIEW" })}
+      />
+    );
+  }
+
   // ── Model picker (interactive provider → model selector) ──
   if (showModelPicker) {
     return (
@@ -1844,8 +2138,19 @@ function AppInner() {
       {/* ── Conversation — wrapped in PrivacyScreen ── */}
       <PrivacyScreen active={privacyMode}>
         <Box flexDirection="column" paddingX={1}>
-          {/* Empty state — header box handles the branding, just show hint text */}
-          {messages.length > 0 && (
+          {modeBanner && !modeBanner.dismissed && (
+            <TradingModeBanner
+              banner={modeBanner}
+              onDismiss={() => dispatch({ type: "DISMISS_MODE_BANNER" })}
+            />
+          )}
+
+          {messages.length === 0 ? (
+            <>
+              <BootLivePanel hint={getSessionTip()} />
+              <EmptyChatHint hasExchange={connectivityHints.hasExchange} />
+            </>
+          ) : (
             <VirtualMessageList
               messages={messages}
               scrollEnabled={!showPalette && !anyDialogOpen}
@@ -1938,10 +2243,8 @@ function AppInner() {
             </Box>
           )}
 
-          {/* ── LivePositions — always visible when positions exist ── */}
-          {livePositions.length > 0 && (
-            <LivePositions initialPositions={livePositions} />
-          )}
+          {/* ── LivePositions — always mounted; self-hides when empty ── */}
+          <LivePositions />
 
           {/* ── Order recovery notice ── */}
           {orderRecovery && (
@@ -1977,8 +2280,24 @@ function AppInner() {
       {showPalette && (
         <CommandPalette
           items={paletteItems}
+          workspaceSection={paletteWorkspaceSection}
           onSelect={handlePaletteSelect}
           onClose={() => dispatch({ type: "SET_SHOW_PALETTE", show: false })}
+        />
+      )}
+
+      {showResetConfirm && (
+        <ResetSessionDialog
+          onConfirm={() => performSessionReset(stateUpdater)}
+          onCancel={() => dispatch({ type: "SET_SHOW_RESET_CONFIRM", show: false })}
+        />
+      )}
+
+      {pager && (
+        <PagerDialog
+          title={pager.title}
+          content={pager.content}
+          onClose={() => dispatch({ type: "CLOSE_PAGER" })}
         />
       )}
 
@@ -2315,12 +2634,6 @@ function AppInner() {
               <Text color="magenta">{"\u25CF"} autonomous</Text>
             </>
           )}
-          {livePositions.length > 0 && (
-            <>
-              <Text dimColor>{"\u00b7"}</Text>
-              <Text>{livePositions.length} position{livePositions.length !== 1 ? "s" : ""}</Text>
-            </>
-          )}
           {memoryUsageRatio > 0.7 && (
             <>
               <Text dimColor>{"\u00b7"}</Text>
@@ -2329,10 +2642,14 @@ function AppInner() {
           )}
         </Box>
         <Box gap={1}>
+          <TradingModeBadge mode={permissionMode ?? "ask"} />
+          <KillSwitchBadge status={killSwitches} />
           <CostDisplay />
           <Text dimColor>{"\u00b7"} Ctrl+P {"\u00b7"} ? help</Text>
         </Box>
       </Box>
+
+      <RadarFocusBar focus={radarFocus} />
 
       {/* ── Input area — clean, just the prompt ── */}
       <Box
@@ -2350,10 +2667,28 @@ function AppInner() {
           autonomousActive={autonomousActive}
           autonomousStrategyCount={autonomousStrategyCount}
           vimMode={vimModeActive}
+          locked={radarFocus !== null}
+          onShowShortcuts={() => setShowShortcuts(true)}
+          onVimModeChange={(mode) => {
+            vimModeRef.current = mode;
+          }}
         />
       </Box>
     </Box>
   );
+}
+
+function coerceWorkspace(value: string | null): WorkspaceId {
+  switch (value) {
+    case "market":
+    case "plan":
+    case "lab":
+    case "monitor":
+    case "desk":
+      return value;
+    default:
+      return "desk";
+  }
 }
 
 // ============================================================================

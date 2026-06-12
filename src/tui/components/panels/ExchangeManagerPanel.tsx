@@ -102,7 +102,7 @@ export function ExchangeManagerPanel({
   const connectedCount = exchanges.filter((e) => e.connected).length;
 
   return (
-    <Pane title="EXCHANGES" color="cyan">
+    <Pane title="EXCHANGES">
       <Box>
         <Text dimColor>
           {exchanges.length} exchanges {"\u00b7"}{" "}

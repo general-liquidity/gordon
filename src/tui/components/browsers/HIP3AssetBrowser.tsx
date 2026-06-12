@@ -192,7 +192,7 @@ export function HIP3AssetBrowser({ onSelect, onClose }: Props) {
   const totalAssets = HIP3_ASSETS.size;
 
   return (
-    <Pane title="HIP-3 ASSET BROWSER" color="yellow">
+    <Pane title="HIP-3 ASSET BROWSER" tone="warning">
       <Box>
         <Text dimColor>
           ({totalAssets} assets{" "}

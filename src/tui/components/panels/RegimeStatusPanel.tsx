@@ -78,7 +78,7 @@ export function RegimeStatusPanel({ regimes, onClose }: Props) {
 
   if (regimes.length === 0) {
     return (
-      <Pane title="MARKET REGIMES" color="cyan">
+      <Pane title="MARKET REGIMES">
         <Text dimColor>No regime data available.</Text>
         <Text> </Text>
         <Text dimColor>Esc close</Text>
@@ -87,7 +87,7 @@ export function RegimeStatusPanel({ regimes, onClose }: Props) {
   }
 
   return (
-    <Pane title="MARKET REGIMES" color="cyan">
+    <Pane title="MARKET REGIMES">
       {/* Column headers */}
       <Box paddingLeft={2}>
         <Box width={10}><Text bold dimColor>SYMBOL</Text></Box>

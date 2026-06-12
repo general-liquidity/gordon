@@ -1,29 +1,40 @@
 import React from "react";
 import { Text, type TextProps } from "../ink-custom";
+import type { GordonTheme } from "../themes/themes.ts";
+import { useTheme } from "../themes/ThemeProvider.tsx";
 
 // ============================================================================
 // ThemedText — Text with semantic tone colours
 //
-// Maps tone names to terminal-safe ANSI colours.
+// Maps tone names to active theme tokens.
 // ============================================================================
 
-type Tone = "brand" | "success" | "error" | "warning" | "info" | "muted";
+export type TextTone = "brand" | "success" | "error" | "warning" | "info" | "muted";
 
 interface Props extends TextProps {
-  tone?: Tone;
+  tone?: TextTone;
 }
 
-const toneMap: Record<Tone, Partial<TextProps>> = {
-  brand: { color: "cyanBright" },
-  success: { color: "green" },
-  error: { color: "red" },
-  warning: { color: "yellow" },
-  info: { color: "cyan" },
-  muted: { dimColor: true },
-};
+export function toneColor(tone: TextTone, theme: GordonTheme): { color?: string; dimColor?: boolean } {
+  switch (tone) {
+    case "brand":
+      return { color: theme.uiBrand };
+    case "success":
+      return { color: theme.riskSafe };
+    case "error":
+      return { color: theme.variantError };
+    case "warning":
+      return { color: theme.riskWarning };
+    case "info":
+      return { color: theme.uiInfo };
+    case "muted":
+      return { dimColor: true };
+  }
+}
 
 export function ThemedText({ tone, children, ...rest }: Props) {
-  const toneProps = tone ? toneMap[tone] : {};
+  const theme = useTheme();
+  const toneProps = tone ? toneColor(tone, theme) : {};
   return (
     <Text {...toneProps} {...rest}>
       {children}

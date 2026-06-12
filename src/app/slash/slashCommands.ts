@@ -64,6 +64,7 @@ export const DIRECT_MENU_TARGETS = new Set([
   "configure",
   "doctor",
   "model",
+  "modes",
   "shortcuts",
   "theme",
   "resume",
@@ -116,6 +117,9 @@ export const DIRECT_MENU_TARGETS = new Set([
   "session-browser",
   "memory-panel",
   "privacy",
+  "queue",
+  "trade-queue",
+  "safety",
   "marketplace",
   "hip3",
   "review-trade",
@@ -657,6 +661,17 @@ const CORE_SLASH_COMMANDS: SlashCommandSeed[] = [
     target: "set_permission_mode",
     whenToUse: "Build trade plans to review later without risk of accidental execution",
   },
+  {
+    name: "modes",
+    aliases: ["mode"],
+    description: "Explain the 6 trading modes and when to use each",
+    usage: "/modes",
+    category: "system",
+    level: 1,
+    action: "menu",
+    target: "modes",
+    whenToUse: "You're not sure which permission mode fits — see the full matrix",
+  },
 
   // New Trading Commands
   { name: "cancel", aliases: [], description: "Cancel open orders by ID or symbol", usage: "/cancel <symbol|orderId>", category: "trading", level: 1, action: "agent", target: "gordon", whenToUse: "Cancel pending orders via permission-gated agent tools" },
@@ -665,6 +680,8 @@ const CORE_SLASH_COMMANDS: SlashCommandSeed[] = [
   { name: "take-profit", aliases: ["tp"], description: "Set take-profit on a position", usage: "/take-profit <symbol> <price>", category: "trading", level: 2, action: "agent", target: "gordon", whenToUse: "Set profit target via agent tools" },
   { name: "watch", aliases: ["w"], description: "Watch symbol prices live", usage: "/watch <symbol> [interval]", category: "market", level: 1, action: "menu", target: "watch-panel", whenToUse: "Monitor price changes in real-time" },
   { name: "alerts", aliases: ["alert"], description: "Manage price alerts", usage: "/alerts [set|list|delete] <symbol> [price]", category: "market", level: 1, action: "tool", target: "handle_alerts_command", whenToUse: "Get notified when price hits target" },
+  { name: "queue", aliases: ["tq", "trade-queue"], description: "Trade queue — pending approvals, open positions, radar", usage: "/queue", category: "system", level: 1, action: "menu", target: "trade-queue", whenToUse: "See what needs attention right now across approvals, positions, and radar" },
+  { name: "safety", aliases: ["safety-dashboard"], description: "Safety dashboard — kill switches, approval rules, recent denials", usage: "/safety", category: "system", level: 1, action: "menu", target: "safety", whenToUse: "Inspect armed safety controls before trusting auto or live trading" },
 
   // Radar — proactive mode (unsolicited suggestions from Gordon's observer loop)
   {
@@ -2555,4 +2572,4 @@ export function getSlashCommandSuggestions(
 // ============================================================================
 
 export { commandToPrompt } from "./commandPrompts.ts";
-export { formatCommandHelp, formatAnalysisCommandsHelp, formatPaginatedCommandHelp } from "./commandHelp.ts";
+export { formatCommandHelp, formatAnalysisCommandsHelp, formatPaginatedCommandHelp, formatTradingModesHelp } from "./commandHelp.ts";

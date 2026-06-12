@@ -1,5 +1,7 @@
 import React from "react";
 import { Box, Text, useInput } from "../../ink-custom";
+import { getRiskColor, type RiskLevel } from "../../design-system/colorMap.ts";
+import { useTheme } from "../../themes/ThemeProvider.tsx";
 
 // Press Enter to continue — for critical trading confirmations
 // Used before: emergency halt execution, large order confirmation, session exit
@@ -11,7 +13,9 @@ interface Props {
 }
 
 export function PressEnterToContinue({ message, severity = "info", onConfirm, onCancel }: Props) {
-  const color = severity === "critical" ? "red" : severity === "warning" ? "yellow" : "gray";
+  const theme = useTheme();
+  const riskLevel: RiskLevel = severity === "critical" ? "critical" : severity === "warning" ? "medium" : "low";
+  const color = severity === "info" ? theme.uiMuted : getRiskColor(riskLevel, theme);
 
   useInput((_input, key) => {
     if (key.return) onConfirm();

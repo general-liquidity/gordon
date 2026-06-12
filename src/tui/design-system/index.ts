@@ -4,7 +4,8 @@
 
 export { Pane } from "./Pane.js";
 export { ThemedBox } from "./ThemedBox.js";
-export { ThemedText } from "./ThemedText.js";
+export { ThemedText, toneColor } from "./ThemedText.js";
+export type { TextTone } from "./ThemedText.js";
 export { StatusIcon } from "./StatusIcon.js";
 export { LoadingState } from "./LoadingState.js";
 export { Tabs } from "./Tabs.js";
@@ -14,8 +15,20 @@ export { Dialog } from "./Dialog.js";
 export { FuzzyPicker } from "./FuzzyPicker.js";
 export type { PickerItem } from "./FuzzyPicker.js";
 export { KeyboardShortcutHint } from "./KeyboardShortcutHint.js";
-export { Button } from "./Button.js";
+export { Button, buttonVariantColor } from "./Button.js";
+export type { ButtonVariant } from "./Button.js";
 export { SearchBox } from "./SearchBox.js";
+export {
+  getAgentColor,
+  getMoneyColor,
+  getRiskColor,
+  getSignalColor,
+  useAgentColor,
+  useMoneyColor,
+  useRiskColor,
+  useSignalColor,
+} from "./colorMap.js";
+export type { RiskLevel, SignalSide } from "./colorMap.js";
 
 // Composable select primitives
 export { Select } from "./select.js";

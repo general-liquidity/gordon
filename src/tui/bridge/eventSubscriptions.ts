@@ -13,6 +13,7 @@ import {
   isPlanRubricEnabled,
   runCritiqueWithRubric,
 } from "../../infra/safety/planRubric.ts";
+import { createCoalescer } from "../utils/coalescer.ts";
 
 // ============================================================================
 // Helpers
@@ -65,6 +66,17 @@ function notify(
 export function subscribeToEvents(dispatch: Dispatch): () => void {
   const bus = getEventBus();
   const unsubs: Array<() => void> = [];
+  const positionUpdateCoalescer = createCoalescer<EventData<"position:updated">>((events) => {
+    const symbols = Array.from(new Set(events.map((event) => event.symbol).filter(Boolean)));
+    const display = symbols.slice(0, 5);
+    const more = symbols.length > display.length ? `, +${symbols.length - display.length} more` : "";
+    notify(
+      dispatch,
+      "position:updated",
+      "info",
+      `\u25C8 ${events.length} position update${events.length === 1 ? "" : "s"}: ${display.join(", ")}${more}`,
+    );
+  });
 
   // ────────────────────────────────────────────────────────────────────────
   // Position Lifecycle (7 events)
@@ -129,9 +141,7 @@ export function subscribeToEvents(dispatch: Dispatch): () => void {
   // 7. position:updated
   unsubs.push(
     bus.on("position:updated", (event: EventData<"position:updated">) => {
-      notify(dispatch, "position:updated", "info",
-        `\u25C8 Position updated: ${event.symbol} [${event.positionId}]`,
-      );
+      positionUpdateCoalescer.push(event);
     }),
   );
 
@@ -736,6 +746,7 @@ export function subscribeToEvents(dispatch: Dispatch): () => void {
   // ────────────────────────────────────────────────────────────────────────
 
   return () => {
+    positionUpdateCoalescer.dispose();
     for (const unsub of unsubs) {
       unsub();
     }

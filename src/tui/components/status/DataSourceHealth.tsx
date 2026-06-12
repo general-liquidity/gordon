@@ -84,7 +84,7 @@ export function DataSourceHealth({ sources, onClose }: Props) {
   const downCount = sources.filter((s) => s.status === "disconnected").length;
 
   return (
-    <Pane title="DATA SOURCES" color="cyan">
+    <Pane title="DATA SOURCES">
       {/* Summary */}
       <Box>
         <Text color="green">{liveCount} live</Text>

@@ -75,7 +75,7 @@ export function CounterfactualPanel({ trade, scenarios, onClose }: Props) {
   });
 
   return (
-    <Pane title="WHAT IF ANALYSIS" color="yellow">
+    <Pane title="WHAT IF ANALYSIS" tone="warning">
       {/* Actual trade */}
       <Box flexDirection="column">
         <Text bold>ACTUAL TRADE</Text>

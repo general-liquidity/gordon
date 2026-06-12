@@ -28,7 +28,7 @@ export function DryRunPreview({ order }: Props) {
   const sideColor = p.side === "buy" ? "green" : "red";
 
   return (
-    <Pane title="DRY RUN — ORDER PREVIEW" color="yellow">
+    <Pane title="DRY RUN — ORDER PREVIEW" tone="warning">
       <Box flexDirection="column">
         <Box><Text dimColor>Exchange:    </Text><Text bold>{order.exchange}</Text></Box>
         <Box><Text dimColor>Endpoint:    </Text><Text>{order.method} {order.endpoint}</Text></Box>

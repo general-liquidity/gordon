@@ -83,7 +83,7 @@ export function OptimizationResults({ results, param1Name, param2Name, onClose }
   }, [results]);
 
   return (
-    <Pane title="OPTIMIZATION RESULTS" color="cyan">
+    <Pane title="OPTIMIZATION RESULTS">
       <Box>
         <Text dimColor>
           {results.length} combinations {"\u00b7"} {param1Name} x {param2Name}

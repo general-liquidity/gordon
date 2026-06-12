@@ -1,9 +1,12 @@
 import React from "react";
 import { Box, Text } from "../../ink-custom";
-import { DataTable, fmtNum, fmtPct, changeColor, type Column } from "../charts/DataTable.tsx";
+import { DataTable, fmtNum, fmtPct, type Column } from "../charts/DataTable.tsx";
 import { InlineChart } from "../charts/InlineChart.tsx";
 import { MarkdownRenderer } from "./MarkdownRenderer.js";
 import { getRenderer } from "../../renderers/index.js";
+import type { GordonTheme } from "../../themes/themes.ts";
+import { useTheme } from "../../themes/ThemeProvider.tsx";
+import { getMoneyColor, getSignalColor } from "../../design-system/colorMap.ts";
 
 // ============================================================================
 // RichContent — Renders message content with rich formatting
@@ -20,8 +23,10 @@ interface Props {
 }
 
 export function RichContent({ content }: Props) {
+  const theme = useTheme();
+
   // Try to detect and render structured JSON data
-  const structured = tryParseStructuredData(content);
+  const structured = tryParseStructuredData(content, theme);
   if (structured) {
     return <>{structured}</>;
   }
@@ -34,13 +39,13 @@ export function RichContent({ content }: Props) {
 // Structured data detection — JSON tables, price arrays
 // ============================================================================
 
-function tryParseStructuredData(content: string): React.ReactNode | null {
+function tryParseStructuredData(content: string, theme: GordonTheme): React.ReactNode | null {
   // Look for JSON blocks in the content
   const jsonMatch = content.match(/```json\s*\n([\s\S]*?)\n```/);
   if (jsonMatch) {
     try {
       const data = JSON.parse(jsonMatch[1]!);
-      return renderStructuredJson(data, content.replace(jsonMatch[0], "").trim());
+      return renderStructuredJson(data, content.replace(jsonMatch[0], "").trim(), theme);
     } catch {
       // Not valid JSON, fall through
     }
@@ -51,7 +56,7 @@ function tryParseStructuredData(content: string): React.ReactNode | null {
   if (trimmed.startsWith("[") || trimmed.startsWith("{")) {
     try {
       const data = JSON.parse(trimmed);
-      return renderStructuredJson(data, "");
+      return renderStructuredJson(data, "", theme);
     } catch {
       // Not JSON
     }
@@ -60,7 +65,7 @@ function tryParseStructuredData(content: string): React.ReactNode | null {
   return null;
 }
 
-function renderStructuredJson(data: unknown, surroundingText: string): React.ReactNode {
+function renderStructuredJson(data: unknown, surroundingText: string, theme: GordonTheme): React.ReactNode {
   const elements: React.ReactNode[] = [];
 
   // Surrounding text before the data
@@ -68,7 +73,7 @@ function renderStructuredJson(data: unknown, surroundingText: string): React.Rea
     elements.push(
       <Box key="text" flexDirection="column">
         {surroundingText.split("\n").map((line, i) => (
-          <RichLine key={i} line={line} />
+          <RichLine key={i} line={line} theme={theme} />
         ))}
       </Box>
     );
@@ -88,7 +93,7 @@ function renderStructuredJson(data: unknown, surroundingText: string): React.Rea
   if (Array.isArray(data) && data.length > 0 && typeof data[0] === "object" && data[0] !== null) {
     const rows = data as Record<string, unknown>[];
     const keys = Object.keys(rows[0]!);
-    const columns = inferColumns(keys, rows);
+    const columns = inferColumns(keys, rows, theme);
 
     // Check for price history in any row
     const priceKey = keys.find((k) => k.toLowerCase().includes("sparkline") || k.toLowerCase().includes("history"));
@@ -232,7 +237,7 @@ function detectRenderer(data: unknown): { name: string; props: Record<string, un
 // Infer DataTable columns from data shape
 // ============================================================================
 
-function inferColumns(keys: string[], rows: Record<string, unknown>[]): Column<Record<string, unknown>>[] {
+function inferColumns(keys: string[], rows: Record<string, unknown>[], theme: GordonTheme): Column<Record<string, unknown>>[] {
   return keys.map((key) => {
     const lower = key.toLowerCase();
     const isNumeric = rows.every((r) => typeof r[key] === "number" || r[key] == null);
@@ -259,15 +264,20 @@ function inferColumns(keys: string[], rows: Record<string, unknown>[]): Column<R
 
     // Color function
     const color = isPct
-      ? (val: unknown) => changeColor(Number(val))
+      ? (val: unknown) => getMoneyColor(Number(val), theme)
       : isSide
-      ? (val: unknown) => String(val).toLowerCase().includes("long") || String(val).toLowerCase().includes("buy") ? "green" : "red"
+      ? (val: unknown) => getSignalColor(
+          String(val).toLowerCase().includes("long") || String(val).toLowerCase().includes("buy")
+            ? "long"
+            : "short",
+          theme,
+        )
       : isStatus
       ? (val: unknown) => {
           const s = String(val).toLowerCase();
-          return s.includes("active") || s.includes("filled") || s.includes("ok") ? "green"
-            : s.includes("paused") || s.includes("partial") || s.includes("pending") ? "yellow"
-            : s.includes("error") || s.includes("fail") || s.includes("cancelled") ? "red"
+          return s.includes("active") || s.includes("filled") || s.includes("ok") ? theme.riskSafe
+            : s.includes("paused") || s.includes("partial") || s.includes("pending") ? theme.riskWarning
+            : s.includes("error") || s.includes("fail") || s.includes("cancelled") ? theme.riskDanger
             : undefined;
         }
       : undefined;
@@ -318,12 +328,12 @@ const HEADER_MAP: Record<string, string> = {
 // Line-level rendering (markdown-aware)
 // ============================================================================
 
-function RichLine({ line }: { line: string }) {
+function RichLine({ line, theme }: { line: string; theme: GordonTheme }) {
   if (line.trim() === "") return <Text> </Text>;
 
   if (line.startsWith("### ")) return <Text bold>  {line.slice(4)}</Text>;
   if (line.startsWith("## ")) return <Text bold>  {line.slice(3)}</Text>;
-  if (line.startsWith("# ")) return <Text bold color="yellow">  {line.slice(2)}</Text>;
+  if (line.startsWith("# ")) return <Text bold color={theme.riskWarning}>  {line.slice(2)}</Text>;
 
   if (line.startsWith("```")) return <Text dimColor>  {"\u2500".repeat(30)}</Text>;
 

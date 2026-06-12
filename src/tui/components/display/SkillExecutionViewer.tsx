@@ -69,7 +69,7 @@ export function SkillExecutionViewer({ runs, onCancel, onClose }: Props) {
 
   if (runs.length === 0) {
     return (
-      <Pane title="SKILL EXECUTION" color="cyan">
+      <Pane title="SKILL EXECUTION">
         <Text dimColor>No active skill runs. Use /loop or /batch to start.</Text>
         <Text> </Text>
         <Text dimColor>Esc close</Text>
@@ -78,7 +78,7 @@ export function SkillExecutionViewer({ runs, onCancel, onClose }: Props) {
   }
 
   return (
-    <Pane title="SKILL EXECUTION" color="cyan">
+    <Pane title="SKILL EXECUTION">
       {runs.map((run, i) => {
         const cfg = STATUS_CONFIG[run.status];
         const isSelected = i === selectedIdx;

@@ -31,6 +31,8 @@ import {
   registerContextInvalidator,
   refreshRuntimeCredentials,
 } from "../../infra/runtime/credentialRefresh.ts";
+import { defaultMessageQueue } from "../../infra/runtime/messageQueue.ts";
+import { portfolioContextBuilder } from "../../core/risk-kernel/portfolio-context.ts";
 export { refreshRuntimeCredentials } from "../../infra/runtime/credentialRefresh.ts";
 import { collectDoctorReport, formatDoctorReport } from "../../app/setup/setup-runtime.ts";
 import type { Message } from "../components/messages/MessageBubble.tsx";
@@ -43,6 +45,9 @@ import { appendNotificationCapped } from "../state/notificationRetention.ts";
 import { noteRiskKernelFailure, resetRiskKernelHealth } from "./riskKernelHealth.ts";
 import { fetchApprovalRiskDetails, buildCounterOfferDenialReason } from "./approvalRiskDetails.ts";
 import { recordTurn, resetTurnSummaries, formatTurnsView } from "./turnSummaries.ts";
+import { createStreamFlusher } from "./streamFlusher.ts";
+import { completeFirstRunningCall } from "./toolCallTracking.ts";
+import { markInteraction } from "../diagnostics/performanceMonitor.ts";
 
 // ── Extracted handlers ──
 import {
@@ -87,6 +92,30 @@ registerContextInvalidator(() => tuiContextResolver.invalidate());
 
 export function invalidateTuiContext(): void {
   tuiContextResolver.invalidate();
+  equityCache = null;
+}
+
+let equityCache: { value: number | null; at: number } | null = null;
+
+export async function getTuiAccountEquity(): Promise<number | null> {
+  const now = Date.now();
+  if (equityCache && now - equityCache.at < 60_000) return equityCache.value;
+  try {
+    const ctx = await tuiContextResolver.resolve("tui");
+    const direct = Number((ctx as any).portfolioValue);
+    let value: number | null = Number.isFinite(direct) && direct > 0 ? direct : null;
+    if (value === null && (ctx as any).exchange) {
+      value = (await portfolioContextBuilder.buildFromExchange((ctx as any).exchange)).totalEquity;
+    }
+    if (value === null && (ctx as any).broker) {
+      value = (await portfolioContextBuilder.buildFromBroker((ctx as any).broker)).totalEquity;
+    }
+    equityCache = { value: value && value > 0 ? value : null, at: now };
+    return equityCache.value;
+  } catch {
+    equityCache = { value: null, at: now };
+    return null;
+  }
 }
 
 export type StateUpdater = (fn: (prev: any) => any) => void;
@@ -295,6 +324,35 @@ export function getRuntime(): SessionRuntime | null {
   return activeRuntime;
 }
 
+export function performSessionReset(setState: StateUpdater): void {
+  const runtime = activeRuntime;
+  try {
+    runtime?.denyAllPending({ reason: "Session reset by operator" });
+  } catch {
+    // Reset should still clear local UI even if approval denial fails.
+  }
+  try {
+    runtime?.getTranscriptStore().replace([]);
+  } catch {
+    // Transcript reset is best effort for runtimes not fully initialized.
+  }
+  defaultMessageQueue.clear();
+  resetTurnSummaries();
+  setState((prev: any) => ({
+    ...prev,
+    __resetSession: true,
+    messages: [],
+    completedMessageCount: 0,
+    streamBuffer: "",
+    isStreaming: false,
+    activeThinking: "",
+    activeToolCalls: [],
+    activeAgents: [],
+    handoffHistory: [],
+    pendingApprovals: [],
+  }));
+}
+
 // ============================================================================
 // Handle user input — dispatch commands or stream agent response
 // ============================================================================
@@ -428,15 +486,28 @@ async function streamResponse(
   runtime: SessionRuntime,
 ): Promise<void> {
   let taskTree = createTaskTree({ input: userMessage });
-  let responseContent = "";
-  let lastFlushTime = 0;
-  let flushPending = false;
   let totalTokens = 0;
   let inputTokens = 0;
   let currentAgentName: string | null = null;
   let chainStartTime = Date.now();
   let lastEventWasToolEnd = false;
   const streamingMsgId = `streaming-${Date.now()}`;
+  const flushStreamingMessage = (content: string): void => {
+    markInteraction("stream");
+    setState((prev: any) => {
+      const msgs = [...prev.messages];
+      const idx = msgs.length - 1;
+      if (idx >= 0 && msgs[idx]?.id === streamingMsgId) {
+        msgs[idx] = { ...msgs[idx], content };
+      }
+      return { ...prev, streamBuffer: content, messages: msgs };
+    });
+  };
+  const textFlusher = createStreamFlusher(flushStreamingMessage);
+  const thinkingFlusher = createStreamFlusher((thinking) => {
+    markInteraction("stream");
+    setState((prev: any) => ({ ...prev, activeThinking: thinking }));
+  });
 
   setState((prev: any) => ({
     ...prev,
@@ -462,41 +533,11 @@ async function streamResponse(
         case "text_delta": {
           const chunk = event.content ?? "";
           if (chunk) {
-            if (lastEventWasToolEnd && responseContent.length > 0 && !responseContent.endsWith("\n")) {
-              responseContent += "\n\n";
+            if (lastEventWasToolEnd && textFlusher.buffer.length > 0 && !textFlusher.buffer.endsWith("\n")) {
+              textFlusher.push("\n\n");
             }
             lastEventWasToolEnd = false;
-            responseContent += chunk;
-            // 100ms matches Claude Code's STREAM_EVENT_FLUSH_INTERVAL_MS
-            // Debounce setState to at most one Ink redraw per 100ms batch.
-            // Accumulate chunks in responseContent; a scheduled flush picks up
-            // the latest value so no content is lost between commits.
-            const now = Date.now();
-            if (now - lastFlushTime >= 100) {
-              setState((prev: any) => {
-                const msgs = [...prev.messages];
-                const idx = msgs.length - 1;
-                if (idx >= 0 && msgs[idx]?.id === streamingMsgId) {
-                  msgs[idx] = { ...msgs[idx], content: responseContent };
-                }
-                return { ...prev, streamBuffer: responseContent, messages: msgs };
-              });
-              lastFlushTime = now;
-            } else if (!flushPending) {
-              flushPending = true;
-              setTimeout(() => {
-                flushPending = false;
-                lastFlushTime = Date.now();
-                setState((prev: any) => {
-                  const msgs = [...prev.messages];
-                  const idx = msgs.length - 1;
-                  if (idx >= 0 && msgs[idx]?.id === streamingMsgId) {
-                    msgs[idx] = { ...msgs[idx], content: responseContent };
-                  }
-                  return { ...prev, streamBuffer: responseContent, messages: msgs };
-                });
-              }, 100 - (now - lastFlushTime));
-            }
+            textFlusher.push(chunk);
           }
           break;
         }
@@ -504,23 +545,12 @@ async function streamResponse(
         case "step_complete":
           // Final commit — ensures message content is fully in sync after
           // the step completes (handles edge cases where last delta missed).
-          if (responseContent.length > 0) {
-            setState((prev: any) => {
-              const msgs = [...prev.messages];
-              const idx = msgs.length - 1;
-              if (idx >= 0 && msgs[idx]?.id === streamingMsgId) {
-                msgs[idx] = { ...msgs[idx], content: responseContent };
-              }
-              return { ...prev, streamBuffer: responseContent, messages: msgs };
-            });
-          }
+          textFlusher.flushNow();
+          thinkingFlusher.flushNow();
           break;
 
         case "thinking_delta":
-          setState((prev: any) => ({
-            ...prev,
-            activeThinking: (prev.activeThinking ?? "") + (event.content ?? ""),
-          }));
+          thinkingFlusher.push(event.content ?? "");
           break;
 
         case "agent_switch":
@@ -589,22 +619,19 @@ async function streamResponse(
             const last = chains[chains.length - 1];
             if (last) chains[chains.length - 1] = { ...last, nodes: taskTreeToNodes(taskTree) };
             // Update tool call status
-            const updatedCalls = (prev.activeToolCalls ?? []).map((tc: any) =>
-              tc.toolName === event.toolName && tc.status === "running"
-                ? {
-                    ...tc,
-                    status: event.error ? "error" : "success",
-                    result: event.toolResult ? String(event.toolResult).slice(0, 200) : undefined,
-                    duration: Date.now() - tc.startedAt,
-                  }
-                : tc,
-            );
+            const updatedCalls = completeFirstRunningCall(prev.activeToolCalls ?? [], event.toolName, {
+              status: event.error ? "error" : "success",
+              result: event.toolResult ? String(event.toolResult).slice(0, 200) : undefined,
+              duration: Date.now() - ((prev.activeToolCalls ?? []).find((tc: any) => tc.toolName === event.toolName && tc.status === "running")?.startedAt ?? Date.now()),
+            });
             return { ...prev, activeAgents: chains, activeToolCalls: updatedCalls };
           });
           break;
 
         case "done": {
           taskTree = completeTaskTree(taskTree) ?? taskTree;
+          textFlusher.flushNow();
+          thinkingFlusher.flushNow();
           if (event.usage) {
             totalTokens = event.usage.totalTokens ?? 0;
             // Tokens currently sitting in the context window — what
@@ -624,13 +651,13 @@ async function streamResponse(
           const gordonMsg: Message = {
             id: streamingMsgId,
             role: "gordon",
-            content: responseContent,
+            content: textFlusher.buffer,
             timestamp: new Date().toISOString(),
             agent: taskTree?.currentAgentName,
             streaming: false,
           };
 
-          recordTurn(userMessage, responseContent);
+          recordTurn(userMessage, textFlusher.buffer);
 
           // ── Phase 5: Risk kernel pre-check on pending approvals ──
           // Evaluate each pending approval through evaluateToolAccess.
@@ -834,6 +861,9 @@ async function streamResponse(
       isStreaming: false,
       activeAgents: [],
     }));
+  } finally {
+    textFlusher.dispose();
+    thinkingFlusher.dispose();
   }
 }
 

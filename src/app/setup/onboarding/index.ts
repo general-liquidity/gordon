@@ -17,6 +17,11 @@ export {
 export type { OnboardingState } from "./versionReset.ts";
 
 export {
+  shouldShowFirstTradeTour,
+  markFirstTradeTourDone,
+} from "./firstTradeTour.ts";
+
+export {
   getNextHint,
   recordHintShown,
   resetHintCounters,

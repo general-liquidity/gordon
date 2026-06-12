@@ -86,7 +86,7 @@ export function MarketOverviewPanel({
   onClose,
 }: Props) {
   return (
-    <Pane title="MARKET OVERVIEW" color="cyan">
+    <Pane title="MARKET OVERVIEW">
       {/* Market Score */}
       <Box>
         <Box width={14}>
