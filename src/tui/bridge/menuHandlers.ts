@@ -769,7 +769,7 @@ export async function handleSystemMenuCommand(
       const newProvider = modelParts[0]?.toLowerCase();
       const newModel = modelParts.slice(1).join(" ") || undefined;
 
-      const validProviders = ["openai", "anthropic", "google", "inception", "dedalus"];
+      const validProviders = ["openai", "anthropic", "google", "dedalus"];
       if (!validProviders.includes(newProvider ?? "")) {
         // Not a known alias or provider — show help
         const { formatAliasHelp } = await import("../../app/models/modelAliases.ts");

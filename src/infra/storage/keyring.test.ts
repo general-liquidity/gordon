@@ -119,7 +119,6 @@ describe("KEYRING_SUPPORTED_KEYS", () => {
   test("contains expected LLM keys", () => {
     expect(KEYRING_SUPPORTED_KEYS).toContain("OPENAI_API_KEY");
     expect(KEYRING_SUPPORTED_KEYS).toContain("DEDALUS_API_KEY");
-    expect(KEYRING_SUPPORTED_KEYS).toContain("INCEPTION_API_KEY");
     expect(KEYRING_SUPPORTED_KEYS).toContain("ANTHROPIC_API_KEY");
   });
 

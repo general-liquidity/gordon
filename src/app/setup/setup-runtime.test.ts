@@ -6,7 +6,7 @@ describe("setup runtime helpers", () => {
   test("parses bootstrap flags into structured options", () => {
     const parsed = parseBootstrapArgs([
       "--profile", "advanced",
-      "--llm-provider", "inception",
+      "--llm-provider", "dedalus",
       "--llm-key", "test-key",
       "--exchange", "binance",
       "--exchange-key", "key",
@@ -19,7 +19,7 @@ describe("setup runtime helpers", () => {
     ]);
 
     expect(parsed.profile).toBe("advanced");
-    expect(parsed.llmProvider).toBe("inception");
+    expect(parsed.llmProvider).toBe("dedalus");
     expect(parsed.exchange).toBe("binance");
     expect(parsed.broker).toBe("alpaca");
     expect(parsed.brokerPaper).toBe(false);

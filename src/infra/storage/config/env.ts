@@ -30,7 +30,6 @@ const ENV_FILE_PATH = GORDON_ENV_PATH;
 export interface EnvKeys {
   OPENAI_API_KEY?: string;
   DEDALUS_API_KEY?: string;
-  INCEPTION_API_KEY?: string;
   ALPACA_API_KEY?: string;
   ALPACA_API_SECRET?: string;
   ALPACA_PAPER?: string;
@@ -112,7 +111,6 @@ export interface EnvKeys {
 export interface EnvStatus {
   fileExists: boolean;
   hasLLMKey: boolean;
-  hasInceptionKey: boolean;
   hasAlpacaKeys: boolean;
   hasRobinhoodKeys: boolean;
   hasWebullKeys: boolean;
@@ -208,7 +206,7 @@ function findEnvFilePath(): string | null {
 
 /** All tracked env key names (single source of truth) */
 const ENV_KEY_NAMES: (keyof EnvKeys)[] = [
-  "OPENAI_API_KEY", "DEDALUS_API_KEY", "INCEPTION_API_KEY",
+  "OPENAI_API_KEY", "DEDALUS_API_KEY",
   "ALPACA_API_KEY", "ALPACA_API_SECRET", "ALPACA_PAPER",
   "SCHWAB_API_KEY", "SCHWAB_API_SECRET", "SCHWAB_PAPER", "SCHWAB_ACCOUNT_ID",
   "TRADIER_API_KEY", "TRADIER_API_SECRET", "TRADIER_PAPER", "TRADIER_ACCOUNT_ID",
@@ -237,8 +235,7 @@ const ENV_KEY_NAMES: (keyof EnvKeys)[] = [
 function buildEnvStatus(keys: EnvKeys, fileExists: boolean): EnvStatus {
   return {
     fileExists,
-    hasLLMKey: !!(keys.OPENAI_API_KEY || keys.DEDALUS_API_KEY || keys.INCEPTION_API_KEY),
-    hasInceptionKey: !!keys.INCEPTION_API_KEY,
+    hasLLMKey: !!(keys.OPENAI_API_KEY || keys.DEDALUS_API_KEY),
     hasAlpacaKeys: !!(keys.ALPACA_API_KEY && keys.ALPACA_API_SECRET),
     hasRobinhoodKeys: !!(keys.ROBINHOOD_API_KEY && keys.ROBINHOOD_API_SECRET),
     hasWebullKeys: !!(keys.WEBULL_API_KEY && keys.WEBULL_API_SECRET),
@@ -474,12 +471,6 @@ export async function createEnvFile(keys: Partial<EnvKeys>): Promise<void> {
     lines.push("# DEDALUS_API_KEY=dd-...");
   }
 
-  if (keys.INCEPTION_API_KEY) {
-    lines.push(formatEnvLine("INCEPTION_API_KEY", keys.INCEPTION_API_KEY));
-  } else {
-    lines.push("# INCEPTION_API_KEY=...");
-  }
-
   lines.push("");
   lines.push("# Binance (required for trading)");
 
@@ -708,10 +699,10 @@ export async function isReadyForTrading(): Promise<{ ready: boolean; reason?: st
 export async function isReadyForLLM(): Promise<{ ready: boolean; reason?: string }> {
   const validation = await validateEnv();
 
-  if (!validation.keys.OPENAI_API_KEY && !validation.keys.DEDALUS_API_KEY && !validation.keys.INCEPTION_API_KEY) {
+  if (!validation.keys.OPENAI_API_KEY && !validation.keys.DEDALUS_API_KEY) {
     return {
       ready: false,
-      reason: "No LLM API key configured. Set OPENAI_API_KEY, INCEPTION_API_KEY, or DEDALUS_API_KEY.",
+      reason: "No LLM API key configured. Set OPENAI_API_KEY or DEDALUS_API_KEY.",
     };
   }
 

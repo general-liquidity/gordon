@@ -48,11 +48,6 @@ const ALIASES: Record<string, ResolvedModel> = {
   "gemma-31b":        { provider: "google", model: "gemma-4-31b-it",                      displayName: "Gemma 4 31B" },
   gemma:              { provider: "google", model: "gemma-4-31b-it",                      displayName: "Gemma 4 31B" },
 
-  // ── Inception ──
-  mercury:      { provider: "inception", model: "mercury-2",      displayName: "Mercury 2 (128K ctx, $0.25/$0.75)" },
-  "mercury-2":  { provider: "inception", model: "mercury-2",      displayName: "Mercury 2" },
-  "mercury-edit": { provider: "inception", model: "mercury-edit-2", displayName: "Mercury Edit 2 (code editing)" },
-
   // ── Dedalus (OpenAI-compatible router) ──
   "dedalus-gpt":    { provider: "dedalus", model: "openai/gpt-5.2",                              displayName: "GPT-5.2 via Dedalus" },
   "dedalus-opus":   { provider: "dedalus", model: "anthropic/claude-opus-4-6",             displayName: "Opus 4.6 via Dedalus" },

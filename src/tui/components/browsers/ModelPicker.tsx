@@ -6,7 +6,7 @@ import { MultiStepPicker, type PickerStep } from "../../design-system/MultiStepP
 /**
  * ModelPicker — Interactive 2-step model selector (Claude Code style)
  *
- * Step 1: Pick provider (openai, anthropic, google, inception, dedalus)
+ * Step 1: Pick provider (openai, anthropic, google, dedalus)
  * Step 2: Pick or type model name
  *
  * Esc at any point cancels. Selection saves to config immediately.
@@ -28,7 +28,6 @@ const PROVIDERS: ModelOption[] = [
   { label: "OpenAI", value: "openai" },
   { label: "Anthropic (Claude)", value: "anthropic" },
   { label: "Google (Gemini)", value: "google" },
-  { label: "Inception (Mercury)", value: "inception" },
   { label: "Dedalus (OpenAI-compatible router)", value: "dedalus" },
 ];
 
@@ -52,11 +51,6 @@ const MODEL_OPTIONS: Record<string, ModelOption[]> = {
     { label: "Gemini 3.1 Flash Lite", value: "gemini-3.1-flash-lite-preview" },
     { label: "Gemma 4 31B", value: "gemma-4-31b-it" },
     { label: "Gemma 4 26B", value: "gemma-4-26b-it" },
-    { label: "Provider default", value: "__default__" },
-  ],
-  inception: [
-    { label: "Mercury 2 (fastest reasoning, 128K ctx — $0.25/$0.75)", value: "mercury-2" },
-    { label: "Mercury Edit 2 (code editing, 32K ctx — $0.25/$0.75)", value: "mercury-edit-2" },
     { label: "Provider default", value: "__default__" },
   ],
   dedalus: [

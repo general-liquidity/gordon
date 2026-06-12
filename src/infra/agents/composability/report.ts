@@ -73,7 +73,7 @@ export interface ComposabilityProbes {
 // Static catalogs
 // ============================================================================
 
-const LLM_PROVIDERS = ["openai", "dedalus", "inception"] as const;
+const LLM_PROVIDERS = ["openai", "dedalus"] as const;
 
 const NATIVE_EXCHANGES = EXCHANGE_IDS;
 

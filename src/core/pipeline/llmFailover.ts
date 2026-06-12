@@ -6,7 +6,6 @@ type PipelinePreset = "planGeneration" | "explanations";
 const FALLBACK_MODEL_BY_PROVIDER: Record<LLMProvider, ModelConfig["model"]> = {
   dedalus: "openai/gpt-5.2",
   openai: "gpt-5.4",
-  inception: "mercury-2",
 };
 
 export function buildFailoverModelChain(

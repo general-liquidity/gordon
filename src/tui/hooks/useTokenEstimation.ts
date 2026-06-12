@@ -21,7 +21,6 @@ const COST_PER_1K: Record<string, number> = {
   "anthropic": 0.008,
   "google": 0.003,
   "dedalus": 0.006,
-  "inception": 0.002,
 };
 
 export function useTokenEstimation() {

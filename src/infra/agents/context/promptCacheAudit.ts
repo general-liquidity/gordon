@@ -15,8 +15,6 @@
  *                   and ≥1024 tokens. No markers required. Audit only verifies
  *                   the prefix shape is byte-identical between turns.
  *
- *   - Inception     OpenAI-compatible — same automatic prefix caching.
- *
  *   - Dedalus       OpenAI-compatible gateway — passes through `extra_body`,
  *                   so when the upstream is Anthropic, the gateway forwards
  *                   `system_blocks` with `cache_control` markers.
@@ -35,7 +33,6 @@ import type { GroundedPromptMessage } from "./contextBudget.ts";
 export type AuditProviderType =
   | "anthropic"
   | "openai"
-  | "inception"
   | "dedalus"
   | "google"
   | "unknown";
@@ -111,7 +108,6 @@ function inferProviderType(provider: string | undefined): AuditProviderType {
   const lower = provider.toLowerCase();
   if (lower.includes("anthropic") || lower === "claude") return "anthropic";
   if (lower === "openai") return "openai";
-  if (lower === "inception") return "inception";
   if (lower === "dedalus") return "dedalus";
   if (lower === "google" || lower.includes("gemini")) return "google";
   return "unknown";
@@ -139,7 +135,6 @@ export function auditCacheBlocks(
   const provider = typeof providerType === "string" && (
     providerType === "anthropic" ||
     providerType === "openai" ||
-    providerType === "inception" ||
     providerType === "dedalus" ||
     providerType === "google" ||
     providerType === "unknown"
@@ -182,7 +177,7 @@ export function auditCacheBlocks(
       `Provider "${provider}" does not require cache_control markers — they will be ignored downstream.`,
     );
   }
-  if (provider === "openai" || provider === "inception") {
+  if (provider === "openai") {
     notes.push(
       "Caching is automatic for this provider; verify prefix stability across requests by comparing stablePrefixHash.",
     );

@@ -134,11 +134,6 @@ export const BitfinexSecretSchema = z
     "Bitfinex API secret must be at least 10 alphanumeric/dash/underscore characters"
   );
 
-export const InceptionKeySchema = z
-  .string()
-  .trim()
-  .min(1, "Inception API key cannot be empty");
-
 export const AlpacaKeySchema = z
   .string()
   .trim()
@@ -276,7 +271,6 @@ export const WebullSecretSchema = z
 export const EnvKeysSchema = z.object({
   OPENAI_API_KEY: OpenAIKeySchema.optional(),
   DEDALUS_API_KEY: DedalusKeySchema.optional(),
-  INCEPTION_API_KEY: InceptionKeySchema.optional(),
   ALPACA_API_KEY: AlpacaKeySchema.optional(),
   ALPACA_API_SECRET: AlpacaSecretSchema.optional(),
   SCHWAB_API_KEY: SchwabKeySchema.optional(),
@@ -409,15 +403,6 @@ export function validateEnvKeys(keys: Record<string, string | undefined>): Valid
       errors.push({ key: "DEDALUS_API_KEY", message: result.error! });
     } else {
       validated.DEDALUS_API_KEY = keys.DEDALUS_API_KEY.trim();
-    }
-  }
-
-  if (keys.INCEPTION_API_KEY) {
-    const result = validateApiKey("INCEPTION_API_KEY", keys.INCEPTION_API_KEY, InceptionKeySchema);
-    if (!result.valid) {
-      errors.push({ key: "INCEPTION_API_KEY", message: result.error! });
-    } else {
-      validated.INCEPTION_API_KEY = keys.INCEPTION_API_KEY.trim();
     }
   }
 
@@ -673,14 +658,14 @@ export function validateEnvKeys(keys: Record<string, string | undefined>): Valid
   }
 
   // Check if at least one LLM key is present
-  if (!keys.OPENAI_API_KEY && !keys.DEDALUS_API_KEY && !keys.INCEPTION_API_KEY) {
+  if (!keys.OPENAI_API_KEY && !keys.DEDALUS_API_KEY) {
     warnings.push({
       key: "LLM",
-      message: "No LLM API key configured. Set OPENAI_API_KEY, INCEPTION_API_KEY, or DEDALUS_API_KEY.",
+      message: "No LLM API key configured. Set OPENAI_API_KEY or DEDALUS_API_KEY.",
     });
   }
 
-  const configuredLLMKeys = [keys.OPENAI_API_KEY, keys.INCEPTION_API_KEY, keys.DEDALUS_API_KEY].filter(Boolean).length;
+  const configuredLLMKeys = [keys.OPENAI_API_KEY, keys.DEDALUS_API_KEY].filter(Boolean).length;
   if (configuredLLMKeys > 1) {
     warnings.push({
       key: "LLM",
@@ -710,7 +695,6 @@ export function isPlaceholderKey(value: string | undefined): boolean {
     lower.includes("example") ||
     lower === "sk-..." ||
     lower === "dd-..." ||
-    lower === "icl-..." ||
     lower === ""
   );
 }

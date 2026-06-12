@@ -45,7 +45,7 @@ export async function discoverProviderCapabilities(config: GordonConfig): Promis
     });
   }
 
-  for (const providerId of ["openai", "anthropic", "google", "inception", "dedalus"] as const) {
+  for (const providerId of ["openai", "anthropic", "google", "dedalus"] as const) {
     snapshots.push({
       providerId,
       providerKind: "llm",

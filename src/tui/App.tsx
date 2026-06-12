@@ -1890,7 +1890,6 @@ function AppInner() {
                 openai: "OPENAI_API_KEY",
                 anthropic: "ANTHROPIC_API_KEY",
                 google: "GOOGLE_API_KEY",
-                inception: "INCEPTION_API_KEY",
                 dedalus: "DEDALUS_API_KEY",
                 groq: "GROQ_API_KEY",
               };

@@ -27,11 +27,9 @@ const DEDALUS_HOSTS = new Set(["api.dedaluslabs.ai"]);
  *  model's catalog max (100K for Haiku, etc.) which exceeds what some
  *  upstream providers accept. Clamp at the host boundary.
  *
- *  - dedaluslabs: 16384 for non-streaming (Anthropic backend rejects > ~21333)
- *  - inceptionlabs: 50000 (Mercury API hard cap; rejects > 50000) */
+ *  - dedaluslabs: 16384 for non-streaming (Anthropic backend rejects > ~21333) */
 const HOST_CAPS: Record<string, number> = {
   "api.dedaluslabs.ai": 16384,
-  "api.inceptionlabs.ai": 50000,
 };
 
 const KNOWN_HOSTS = new Set(Object.keys(HOST_CAPS));
@@ -59,10 +57,9 @@ export function installDedalusMaxTokensGuard(): void {
       if (cap !== undefined && init?.body && (!init.method || init.method.toUpperCase() === "POST")) {
         const body = init.body;
         if (typeof body === "string") {
-          // Dedalus only enforces the cap on NON-streaming calls; Inception
-          // enforces it always. Pass exemption flag accordingly.
-          const isDedalus = url!.includes("dedaluslabs.ai");
-          const clamped = clampMaxTokensInBody(body, cap, isDedalus);
+          // Dedalus only enforces the cap on NON-streaming calls; streaming
+          // requests are exempt.
+          const clamped = clampMaxTokensInBody(body, cap, true);
           const finalBody = clamped !== null ? clamped : body;
           // Layer the anthropic-beta header on top so the API itself
           // strips old tool_result and thinking blocks in-band before the
@@ -89,8 +86,8 @@ function shouldClamp(url: string): boolean {
 }
 
 /** Return the per-host max_tokens cap for a given completion URL, or
- *  undefined if the host isn't tracked. Both Dedalus and Inception use
- *  OpenAI-compatible `/v1/chat/completions` paths. */
+ *  undefined if the host isn't tracked. Dedalus uses an
+ *  OpenAI-compatible `/v1/chat/completions` path. */
 function capForUrl(url: string): number | undefined {
   try {
     const u = new URL(url);
@@ -258,8 +255,7 @@ function clampMaxTokensInBody(
   if (!parsed || typeof parsed !== "object") return null;
   const obj = parsed as Record<string, unknown>;
 
-  // Dedalus only applies the cap to non-streaming calls; Inception
-  // enforces it for both. Caller decides via exemptStreaming.
+  // Dedalus only applies the cap to non-streaming calls.
   if (exemptStreaming && obj.stream === true) return null;
 
   const max = obj.max_tokens;

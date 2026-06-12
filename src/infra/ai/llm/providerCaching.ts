@@ -26,9 +26,6 @@
  *                and reference it on subsequent requests. Out of scope for
  *                this helper — different control flow.
  *
- *  Inception   — OpenAI-compatible. Inherits OpenAI semantics (automatic
- *                prefix caching when supported by the upstream model).
- *
  * For the Dedalus path, see `extra_body.system_blocks` wired in client.ts
  * — that's the OpenAI-compatible gateway pass-through.
  *
@@ -113,7 +110,6 @@ export function providerCacheHints(
       return { anthropic: { cacheControl } };
     }
     case "openai":
-    case "inception":
       // Automatic — stable prefix is cached transparently when ≥1024 tokens.
       return undefined;
     case "google":
@@ -131,7 +127,7 @@ export function providerCacheHints(
  * wrap the system message with `withProviderCacheHints(msg, provider)`
  * so the active provider sees it as a cache breakpoint.
  *
- * For providers without explicit caching (openai, inception, google),
+ * For providers without explicit caching (openai, google),
  * the message is returned unchanged — callers don't need to branch.
  */
 export function withProviderCacheHints<T extends Record<string, unknown>>(
@@ -175,10 +171,6 @@ export const PROVIDER_CACHING_MODEL: Record<DirectProviderName, {
   openai: {
     model: "automatic",
     notes: "prefix cached transparently when ≥1024 tokens (no markers)",
-  },
-  inception: {
-    model: "automatic",
-    notes: "OpenAI-compatible; same automatic prefix caching",
   },
   google: {
     model: "separate_api",

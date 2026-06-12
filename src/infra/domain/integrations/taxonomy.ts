@@ -208,13 +208,6 @@ const NON_EXECUTION_SURFACES: IntegrationSurfaceMetadata[] = [
     accessPath: "native",
   },
   {
-    id: "inception",
-    displayName: "Inception Labs",
-    integrationDomain: "model_provider",
-    providerKind: "native",
-    accessPath: "direct_openai_compatible",
-  },
-  {
     id: "dedalus",
     displayName: "Dedalus",
     integrationDomain: "model_gateway",

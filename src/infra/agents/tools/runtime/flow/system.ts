@@ -172,7 +172,7 @@ export const getModelInfoTool = createTool({
       await refreshDedalusModels().catch(() => undefined);
     }
 
-    const directProviders = (["openai", "anthropic", "google", "inception"] as DirectProviderName[]).map((name) => ({
+    const directProviders = (["openai", "anthropic", "google"] as DirectProviderName[]).map((name) => ({
       name,
       configured: availableProviders.includes(name),
       models: DIRECT_MODEL_TIERS[name],
@@ -193,8 +193,8 @@ export const getModelInfoTool = createTool({
       directProviders,
       dedalusModels,
       tip: hasDedalus
-        ? "Use /model to select from direct providers, Inception Mercury, or Dedalus models (xAI, Moonshot, etc.)"
-        : "Set INCEPTION_API_KEY for Mercury 2 or DEDALUS_API_KEY for a multi-provider gateway",
+        ? "Use /model to select from direct providers or Dedalus models (xAI, Moonshot, etc.)"
+        : "Set DEDALUS_API_KEY for a multi-provider gateway",
     };
   },
 });

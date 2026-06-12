@@ -1,6 +1,6 @@
 /**
  * LLM Client
- * Multi-provider support for OpenAI, Inception Labs, and Dedalus Labs.
+ * Multi-provider support for OpenAI and Dedalus Labs.
  */
 
 import { z } from "zod";
@@ -107,13 +107,11 @@ function getBackoffDelay(attempt: number, initialDelayMs: number): number {
  *
  * Supports:
  * - OpenAI direct (GPT-5.2 variants)
- * - Inception Labs Mercury 2
  * - Dedalus Labs (multi-provider orchestration)
  */
 export class LLMClient {
   private openaiApiKey?: string;
   private dedalusApiKey?: string;
-  private inceptionApiKey?: string;
   private defaultProvider: LLMProvider;
   private defaultModel: string;
   private defaultTemperature: number;
@@ -122,13 +120,12 @@ export class LLMClient {
   private retryDelayMs: number;
 
   constructor(config: LLMClientConfig) {
-    if (!config.openaiApiKey && !config.dedalusApiKey && !config.inceptionApiKey) {
-      throw new Error("LLMClient requires at least one API key (openaiApiKey, inceptionApiKey, or dedalusApiKey)");
+    if (!config.openaiApiKey && !config.dedalusApiKey) {
+      throw new Error("LLMClient requires at least one API key (openaiApiKey or dedalusApiKey)");
     }
 
     this.openaiApiKey = config.openaiApiKey;
     this.dedalusApiKey = config.dedalusApiKey;
-    this.inceptionApiKey = config.inceptionApiKey;
     this.defaultProvider = config.defaultProvider ?? DEFAULT_PROVIDER;
     this.defaultModel = config.defaultModel ?? DEFAULT_MODEL;
     this.defaultTemperature = config.temperature ?? DEFAULT_TEMPERATURE;
@@ -143,9 +140,6 @@ export class LLMClient {
     if (this.defaultProvider === "dedalus" && !this.dedalusApiKey) {
       throw new Error("Dedalus API key required when defaultProvider is 'dedalus'");
     }
-    if (this.defaultProvider === "inception" && !this.inceptionApiKey) {
-      throw new Error("Inception API key required when defaultProvider is 'inception'");
-    }
   }
 
   /**
@@ -157,13 +151,6 @@ export class LLMClient {
         throw new LLMError("OpenAI API key not configured", 401, "auth_error", provider);
       }
       return this.openaiApiKey;
-    }
-
-    if (provider === "inception") {
-      if (!this.inceptionApiKey) {
-        throw new LLMError("Inception API key not configured", 401, "auth_error", provider);
-      }
-      return this.inceptionApiKey;
     }
 
     if (!this.dedalusApiKey) {
@@ -498,7 +485,6 @@ export class LLMClient {
    */
   hasProvider(provider: LLMProvider): boolean {
     if (provider === "openai") return !!this.openaiApiKey;
-    if (provider === "inception") return !!this.inceptionApiKey;
     if (provider === "dedalus") return !!this.dedalusApiKey;
     return false;
   }
@@ -509,7 +495,6 @@ export class LLMClient {
   getAvailableProviders(): LLMProvider[] {
     const providers: LLMProvider[] = [];
     if (this.openaiApiKey) providers.push("openai");
-    if (this.inceptionApiKey) providers.push("inception");
     if (this.dedalusApiKey) providers.push("dedalus");
     return providers;
   }
@@ -524,14 +509,13 @@ export function createLLMClientFromEnv(): LLMClient {
   const route = getDirectClientRoute(configuredProvider, configuredModel);
 
   const defaultProvider: LLMProvider =
-    route.provider === "dedalus" || route.provider === "inception" || route.provider === "openai"
+    route.provider === "dedalus" || route.provider === "openai"
       ? route.provider
       : "dedalus";
 
   return new LLMClient({
     openaiApiKey: process.env.OPENAI_API_KEY,
     dedalusApiKey: process.env.DEDALUS_API_KEY,
-    inceptionApiKey: process.env.INCEPTION_API_KEY,
     defaultProvider,
     defaultModel: route.transportModelId,
   });

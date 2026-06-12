@@ -71,7 +71,6 @@ export const GORDON_DEFAULT_ALLOWLIST: readonly AllowlistRule[] = [
   { hostPattern: "api.anthropic.com", reason: "Anthropic LLM" },
   { hostPattern: "api.openai.com", reason: "OpenAI / Dedalus router" },
   { hostPattern: "api.dedalus.ai", reason: "Dedalus router" },
-  { hostPattern: "api.inceptionlabs.ai", reason: "Inception (Mercury) provider" },
   // Crypto exchanges
   { hostPattern: "*.binance.com", reason: "Binance" },
   { hostPattern: "*.binance.us", reason: "Binance US" },

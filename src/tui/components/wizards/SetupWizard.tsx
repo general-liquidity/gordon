@@ -75,7 +75,6 @@ const LLM_PROVIDER_STEP: StepConfig = {
     { label: "Anthropic — Claude", value: "anthropic" },
     { label: "Google — Gemini", value: "google" },
     { label: "Groq — LLaMA / Mixtral (fast)", value: "groq" },
-    { label: "Inception — Mercury", value: "inception" },
     { label: "Dedalus — multi-provider gateway", value: "dedalus" },
   ],
 };

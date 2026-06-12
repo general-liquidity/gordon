@@ -65,7 +65,7 @@ export interface DoctorReport {
 
 export interface BootstrapOptions {
   profile: SetupWizardMode;
-  llmProvider?: "openai" | "inception" | "dedalus";
+  llmProvider?: "openai" | "dedalus";
   llmKey?: string;
   exchange?: ExchangeId;
   exchangeKey?: string;
@@ -156,7 +156,6 @@ export function parseBootstrapArgs(args: string[]): BootstrapOptions {
     profile,
     llmProvider:
       parsed["llm-provider"] === "openai"
-      || parsed["llm-provider"] === "inception"
       || parsed["llm-provider"] === "dedalus"
         ? parsed["llm-provider"]
         : undefined,
@@ -195,12 +194,10 @@ export function resolveBootstrapExchangeSandbox(
   return hasExistingEntry ? undefined : true;
 }
 
-function getProviderDefaultModel(provider: "openai" | "inception" | "dedalus"): string {
+function getProviderDefaultModel(provider: "openai" | "dedalus"): string {
   switch (provider) {
     case "openai":
       return "openai/gpt-5.4";
-    case "inception":
-      return "mercury-2";
     case "dedalus":
       return "openai/gpt-5.2";
   }
@@ -576,7 +573,6 @@ export async function applyBootstrap(options: BootstrapOptions): Promise<Bootstr
 
   if (options.llmProvider && options.llmKey) {
     if (options.llmProvider === "openai") envKeys.OPENAI_API_KEY = options.llmKey;
-    if (options.llmProvider === "inception") envKeys.INCEPTION_API_KEY = options.llmKey;
     if (options.llmProvider === "dedalus") envKeys.DEDALUS_API_KEY = options.llmKey;
     envKeys.GORDON_PROVIDER = options.llmProvider;
     envKeys.GORDON_MODEL = getProviderDefaultModel(options.llmProvider);

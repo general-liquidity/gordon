@@ -8,7 +8,6 @@
  * - Google
  *
  * OpenAI-compatible providers:
- * - Inception Labs (Mercury 2)
  * - Dedalus Labs (meta-provider for OpenAI, Anthropic, Google, xAI, Moonshot)
  *
  * Returns model strings in "provider/model" format for Gordon config, then
@@ -20,7 +19,7 @@
 // ============================================================================
 
 /** Providers Gordon can select directly in config/UI */
-export type DirectProviderName = "anthropic" | "openai" | "google" | "inception";
+export type DirectProviderName = "anthropic" | "openai" | "google";
 
 /** Provider prefixes that can appear inside stored model IDs */
 export type ProviderPrefix = DirectProviderName | "xai" | "moonshot";
@@ -37,7 +36,7 @@ export interface ProviderConfig {
 
 /**
  * Model string type stored in Gordon config/env.
- * Format: "provider/model" (e.g. "openai/gpt-5.4" or "inception/mercury-2")
+ * Format: "provider/model" (e.g. "openai/gpt-5.4" or "dedalus/anthropic/claude-opus-4-6")
  */
 export type ModelString = `${string}/${string}`;
 
@@ -66,14 +65,14 @@ export interface MastraOpenAICompatibleModelConfig {
 /**
  * MastraModelConfig can be:
  * - A string like "openai/gpt-5.4" (Mastra's model router resolves it)
- * - A LanguageModelV2 instance from createOpenAI() (for custom endpoints like Dedalus/Inception)
+ * - A LanguageModelV2 instance from createOpenAI() (for custom endpoints like Dedalus)
  * - A deprecated object config shape (kept for backward compat)
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type MastraModelConfig = ModelString | MastraOpenAICompatibleModelConfig | any;
 
 interface OpenAICompatibleProviderConfig {
-  apiKeyEnvVar: "DEDALUS_API_KEY" | "INCEPTION_API_KEY";
+  apiKeyEnvVar: "DEDALUS_API_KEY";
   baseUrl: string;
 }
 
@@ -112,21 +111,7 @@ export const DIRECT_MODELS = {
     balanced: "gemini-3-pro-preview",
     fast: "gemini-3.1-flash-lite-preview",
   },
-  inception: {
-    flagship: "mercury-2",
-    balanced: "mercury-2",
-    fast: "mercury-2",
-  },
 } as const satisfies Record<DirectProviderName, { flagship: string; balanced: string; fast: string }>;
-
-/**
- * Inception-supported chat models via the OpenAI-compatible API.
- * Mercury Edit uses separate edit/FIM endpoints and is intentionally excluded
- * from the Mastra chat selector for now.
- */
-export const INCEPTION_MODELS = [
-  { id: "inception/mercury-2", provider: "inception" as const, name: "Mercury 2", tier: "flagship" as const },
-] as const satisfies ReadonlyArray<ModelMetadata>;
 
 /**
  * Dedalus-supported chat models via the OpenAI-compatible API.
@@ -148,25 +133,20 @@ const DEDALUS_MODEL_ID_SET = new Set<ModelString>(DEDALUS_MODELS.map((model) => 
 
 /** OpenAI-compatible provider base URLs */
 export const DEDALUS_BASE_URL = "https://api.dedaluslabs.ai/v1";
-export const INCEPTION_BASE_URL = "https://api.inceptionlabs.ai/v1";
 
 const OPENAI_COMPATIBLE_PROVIDERS = {
   dedalus: {
     apiKeyEnvVar: "DEDALUS_API_KEY",
     baseUrl: DEDALUS_BASE_URL,
   },
-  inception: {
-    apiKeyEnvVar: "INCEPTION_API_KEY",
-    baseUrl: INCEPTION_BASE_URL,
-  },
-} as const satisfies Record<"dedalus" | "inception", OpenAICompatibleProviderConfig>;
+} as const satisfies Record<"dedalus", OpenAICompatibleProviderConfig>;
 
 // ============================================================================
 // Helpers
 // ============================================================================
 
 function isDirectProviderName(value: string): value is DirectProviderName {
-  return value === "openai" || value === "anthropic" || value === "google" || value === "inception";
+  return value === "openai" || value === "anthropic" || value === "google";
 }
 
 function isProviderName(value: string): value is ProviderName {
@@ -230,10 +210,6 @@ export class ProviderRegistry {
 
     if (process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GOOGLE_API_KEY) {
       this.availableDirectProviders.add("google");
-    }
-
-    if (process.env.INCEPTION_API_KEY) {
-      this.availableDirectProviders.add("inception");
     }
 
     if (process.env.DEDALUS_API_KEY) {
@@ -398,42 +374,12 @@ export class ProviderRegistry {
       };
     }
 
-    if (resolved.provider === "inception") {
-      if (!this.availableDirectProviders.has("inception")) {
-        throw new Error(
-          `Provider "inception" selected but INCEPTION_API_KEY not configured.\n` +
-          `Set INCEPTION_API_KEY in your .env file or switch provider.`
-        );
-      }
-
-      if (!INCEPTION_MODELS.some((model) => model.id === resolved.fullModelId)) {
-        throw new Error(
-          `Model "${resolved.fullModelId}" is not supported by Inception.`
-        );
-      }
-
-      return {
-        modelString: resolved.fullModelId,
-        resolvedModelString: `openai/${resolved.rawModelId}` as ModelString,
-        provider: "inception",
-        transportProvider: "openai",
-        transportModelId: resolved.rawModelId,
-        viaOpenAICompatibleProvider: true,
-        baseUrl: INCEPTION_BASE_URL,
-        apiKeyEnvVar: "INCEPTION_API_KEY",
-      };
-    }
-
     if (isDirectProviderName(resolved.provider) && this.availableDirectProviders.has(resolved.provider)) {
-      const envVarMap: Record<Exclude<DirectProviderName, "inception">, string> = {
+      const envVarMap: Record<DirectProviderName, string> = {
         openai: "OPENAI_API_KEY",
         anthropic: "ANTHROPIC_API_KEY",
         google: "GOOGLE_GENERATIVE_AI_API_KEY",
       };
-
-      if (resolved.provider === "inception") {
-        throw new Error(`Unexpected provider routing state for "${resolved.fullModelId}".`);
-      }
 
       return {
         modelString: resolved.fullModelId,
@@ -479,14 +425,6 @@ export class ProviderRegistry {
       return { provider, fullModelId, rawModelId };
     }
 
-    if (provider === "inception") {
-      return {
-        provider,
-        fullModelId: `inception/${rawModelId}` as ModelString,
-        rawModelId,
-      };
-    }
-
     if (isDirectProviderName(provider)) {
       return {
         provider,
@@ -513,11 +451,6 @@ export class ProviderRegistry {
     const { prefix } = splitModelString(modelId);
     if (!prefix) return false;
 
-    if (prefix === "inception") {
-      return this.availableDirectProviders.has("inception") &&
-        INCEPTION_MODELS.some((model) => model.id === modelId);
-    }
-
     if (isDirectProviderName(prefix) && this.availableDirectProviders.has(prefix)) {
       return true;
     }
@@ -537,33 +470,12 @@ export class ProviderRegistry {
       throw new Error(`Invalid model string "${modelId}". Expected "provider/model".`);
     }
 
-    if (prefix === "inception") {
-      if (!this.availableDirectProviders.has("inception")) {
-        throw new Error(`Model "${modelId}" not available. Set INCEPTION_API_KEY in your .env file.`);
-      }
-
-      return {
-        modelString: modelId,
-        resolvedModelString: `openai/${rawModelId}` as ModelString,
-        provider: "inception",
-        transportProvider: "openai",
-        transportModelId: rawModelId,
-        viaOpenAICompatibleProvider: true,
-        baseUrl: INCEPTION_BASE_URL,
-        apiKeyEnvVar: "INCEPTION_API_KEY",
-      };
-    }
-
     if (isDirectProviderName(prefix) && this.availableDirectProviders.has(prefix)) {
-      const envVarMap: Record<Exclude<DirectProviderName, "inception">, string> = {
+      const envVarMap: Record<DirectProviderName, string> = {
         openai: "OPENAI_API_KEY",
         anthropic: "ANTHROPIC_API_KEY",
         google: "GOOGLE_GENERATIVE_AI_API_KEY",
       };
-
-      if (prefix === "inception") {
-        throw new Error(`Unexpected provider routing state for "${modelId}".`);
-      }
 
       return {
         modelString: modelId,
@@ -610,11 +522,6 @@ export class ProviderRegistry {
       return this.getRouteForSelection("dedalus", model);
     }
 
-    if (rawProvider === "inception") {
-      const model = process.env.GORDON_MODEL || INCEPTION_MODELS[0].id;
-      return this.getRouteForSelection("inception", model);
-    }
-
     let provider = rawProvider && isDirectProviderName(rawProvider)
       ? rawProvider
       : undefined;
@@ -626,7 +533,7 @@ export class ProviderRegistry {
         return this.getRouteForSelection("dedalus", dedalusDefault);
       }
 
-      const preferredOrder: DirectProviderName[] = ["openai", "anthropic", "google", "inception"];
+      const preferredOrder: DirectProviderName[] = ["openai", "anthropic", "google"];
       const available = this.getAvailableProviders();
       provider = preferredOrder.find((candidate) => available.includes(candidate)) || available[0];
 
@@ -634,7 +541,6 @@ export class ProviderRegistry {
         throw new Error(
           "No LLM provider configured. Set one of these API keys in your .env file:\n" +
           "  DEDALUS_API_KEY   - Dedalus Labs (access to many providers)\n" +
-          "  INCEPTION_API_KEY - Inception Labs Mercury 2\n" +
           "  OPENAI_API_KEY    - OpenAI GPT-5.4\n" +
           "  ANTHROPIC_API_KEY - Anthropic Claude Opus 4.6\n" +
           "  GOOGLE_GENERATIVE_AI_API_KEY - Google Gemini 3 Pro"
@@ -657,7 +563,7 @@ export class ProviderRegistry {
       ? this.getRouteForSelection(provider, modelId)
       : this.getDefaultRoute();
 
-    if (route.provider === "openai" || route.provider === "dedalus" || route.provider === "inception") {
+    if (route.provider === "openai" || route.provider === "dedalus") {
       return route;
     }
 
@@ -667,7 +573,7 @@ export class ProviderRegistry {
 
     throw new Error(
       `Direct LLM client cannot route provider "${route.provider}" directly. ` +
-      `Configure DEDALUS_API_KEY or switch Gordon to OpenAI/Inception.`
+      `Configure DEDALUS_API_KEY or switch Gordon to OpenAI.`
     );
   }
 
@@ -687,7 +593,7 @@ export class ProviderRegistry {
       return route.resolvedModelString;
     }
 
-    // OpenAI-compatible providers (Dedalus, Inception) → use Mastra's object format
+    // OpenAI-compatible providers (Dedalus) → use Mastra's object format
     // Per Mastra docs on gateway format:
     //   Use gateway/provider/model when the remote behaves like a model gateway
     //   and the upstream model namespace includes the provider.
@@ -718,17 +624,12 @@ export class ProviderRegistry {
       return this.getDefaultModel();
     }
 
-    if (rawProvider === "inception") {
-      const model = process.env.GORDON_FAST_MODEL || INCEPTION_MODELS[0].id;
-      return this.getModel("inception", model);
-    }
-
     let provider = rawProvider && isDirectProviderName(rawProvider)
       ? rawProvider
       : undefined;
 
     if (!provider) {
-      const preferredOrder: DirectProviderName[] = ["openai", "google", "anthropic", "inception"];
+      const preferredOrder: DirectProviderName[] = ["openai", "google", "anthropic"];
       const available = this.getAvailableProviders();
       provider = preferredOrder.find((candidate) => available.includes(candidate)) || available[0];
 
@@ -757,16 +658,12 @@ export class ProviderRegistry {
       return this.getDefaultModel();
     }
 
-    if (rawProvider === "inception") {
-      return this.getModel("inception", process.env.GORDON_MODEL || INCEPTION_MODELS[0].id);
-    }
-
     let provider = rawProvider && isDirectProviderName(rawProvider)
       ? rawProvider
       : undefined;
 
     if (!provider) {
-      const preferredOrder: DirectProviderName[] = ["openai", "anthropic", "google", "inception"];
+      const preferredOrder: DirectProviderName[] = ["openai", "anthropic", "google"];
       const available = this.getAvailableProviders();
       provider = preferredOrder.find((candidate) => available.includes(candidate)) || available[0];
 
@@ -796,11 +693,6 @@ export class ProviderRegistry {
       return this.getMastraModel();
     }
 
-    if (rawProvider === "inception") {
-      const model = process.env.GORDON_FAST_MODEL || INCEPTION_MODELS[0].id;
-      return this.getMastraModel("inception", model);
-    }
-
     let provider = rawProvider && isDirectProviderName(rawProvider)
       ? rawProvider
       : undefined;
@@ -812,7 +704,7 @@ export class ProviderRegistry {
         if (fastModel) return this.getMastraModel("dedalus", fastModel.id);
       }
 
-      const preferredOrder: DirectProviderName[] = ["openai", "google", "anthropic", "inception"];
+      const preferredOrder: DirectProviderName[] = ["openai", "google", "anthropic"];
       const available = this.getAvailableProviders();
       provider = preferredOrder.find((candidate) => available.includes(candidate)) || available[0];
 
@@ -836,18 +728,6 @@ export class ProviderRegistry {
     const models: Array<{ id: string; name: string; provider: string; viaDedalus: boolean }> = [];
 
     for (const provider of this.availableDirectProviders) {
-      if (provider === "inception") {
-        for (const model of INCEPTION_MODELS) {
-          models.push({
-            id: model.id,
-            name: model.name,
-            provider,
-            viaDedalus: false,
-          });
-        }
-        continue;
-      }
-
       const providerModels = DIRECT_MODELS[provider];
       for (const [tier, modelId] of Object.entries(providerModels)) {
         const fullId = `${provider}/${modelId}`;

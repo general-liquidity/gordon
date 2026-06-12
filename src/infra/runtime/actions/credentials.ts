@@ -148,7 +148,6 @@ function getLlmStatuses(envKeys: EnvMapRecord, keyringKeys: Set<string>): Provid
   const providers = [
     { id: "openai", key: "OPENAI_API_KEY", label: "OpenAI", authMode: "api_key" },
     { id: "dedalus", key: "DEDALUS_API_KEY", label: "Dedalus", authMode: "api_key" },
-    { id: "inception", key: "INCEPTION_API_KEY", label: "Inception", authMode: "api_key" },
     { id: "anthropic", key: "ANTHROPIC_API_KEY", label: "Anthropic", authMode: "api_key" },
     { id: "google", key: "GOOGLE_API_KEY", label: "Google", authMode: "api_key" },
   ];

@@ -45,11 +45,6 @@ describe("providerCacheHints — TTL passthrough", () => {
     expect(providerCacheHints("openai", "1h")).toBeUndefined();
   });
 
-  it("inception returns undefined regardless of TTL", () => {
-    expect(providerCacheHints("inception", "5m")).toBeUndefined();
-    expect(providerCacheHints("inception", "1h")).toBeUndefined();
-  });
-
   it("google returns undefined regardless of TTL (separate CachedContent API)", () => {
     expect(providerCacheHints("google", "5m")).toBeUndefined();
     expect(providerCacheHints("google", "1h")).toBeUndefined();

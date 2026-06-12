@@ -1320,7 +1320,7 @@ const CORE_SLASH_COMMANDS: SlashCommandSeed[] = [
     level: 1,
     action: "menu",
     target: "model",
-    whenToUse: "Switch between AI providers (openai, anthropic, google, inception, dedalus) or specific models",
+    whenToUse: "Switch between AI providers (openai, anthropic, google, dedalus) or specific models",
   },
   {
     name: "mcp",
