@@ -23,7 +23,7 @@ export function useKillSwitchStatus(dispatch: Dispatch): void {
         dispatch({
           type: "ADD_MESSAGE",
           message: {
-            id: `kill-switch-${Date.now()}`,
+            id: `kill-switch-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
             role: "system",
             variant: "error",
             content: status.summary,

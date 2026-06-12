@@ -44,15 +44,20 @@ interface UseInputOptions {
 
 const useInput = (inputHandler: InputHandler, options: UseInputOptions = {}): void => {
   // eslint-disable-next-line @typescript-eslint/naming-convention
-  const { stdin, setRawMode, internal_exitOnCtrlC, internal_eventEmitter } = useStdin();
+  const { stdin, setRawMode, isRawModeSupported, internal_exitOnCtrlC, internal_eventEmitter } = useStdin();
 
   useEffect(() => {
-    if (options.isActive === false) return;
+    // Guard on raw-mode support: with a non-TTY stdin (piped/redirected
+    // boot), App.handleSetRawMode throws, the error boundary mounts
+    // ErrorOverview, and ink's ErrorOverview keys stack rows by line text
+    // — recursive reconciler frames repeat, producing a duplicate-key
+    // warning loop. Headless boots simply skip raw mode instead.
+    if (options.isActive === false || !isRawModeSupported) return;
     setRawMode(true);
     return () => {
       setRawMode(false);
     };
-  }, [options.isActive, setRawMode]);
+  }, [options.isActive, setRawMode, isRawModeSupported]);
 
   useEffect(() => {
     if (options.isActive === false) return;

@@ -794,7 +794,7 @@ function AppInner() {
     dispatch({
       type: "INJECT_NOTIFICATION",
       notification: {
-        id: `keybinding-conflict-${Date.now()}`,
+        id: `keybinding-conflict-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
         type: "tui:keybinding_conflict",
         variant: "alert",
         message: `Keybinding conflicts detected:\n${preview}`,
@@ -1132,7 +1132,7 @@ function AppInner() {
       dispatch({
         type: "ADD_MESSAGE",
         message: {
-          id: `hint-${hint.id}-${Date.now()}`,
+          id: `hint-${hint.id}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
           role: "system" as const,
           content: `\u2139 ${hint.message}`,
           timestamp: new Date().toISOString(),
@@ -1255,7 +1255,7 @@ function AppInner() {
             dispatch({
               type: "INJECT_NOTIFICATION",
               notification: {
-                id: `radar-focus-empty-${Date.now()}`,
+                id: `radar-focus-empty-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
                 type: "tui:radar_focus",
                 variant: "info",
                 message: "No pending radar card to focus.",
@@ -1280,7 +1280,7 @@ function AppInner() {
             dispatch({
               type: "INJECT_NOTIFICATION",
               notification: {
-                id: `pager-empty-${Date.now()}`,
+                id: `pager-empty-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
                 type: "tui:pager",
                 variant: "info",
                 message: "No long message available for pager.",
@@ -1314,7 +1314,7 @@ function AppInner() {
             dispatch({
               type: "ADD_MESSAGE",
               message: {
-                id: `mode-blocked-${Date.now()}`,
+                id: `mode-blocked-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
                 role: "system" as const,
                 variant: "error" as const,
                 content: verdict.reason ?? `Cannot switch permission mode to ${mode}.`,
@@ -1368,7 +1368,7 @@ function AppInner() {
         dispatch({
           type: "ADD_MESSAGE",
           message: {
-            id: `injection-block-${Date.now()}`,
+            id: `injection-block-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
             role: "system",
             variant: "error" as any,
             content: `\u26D4 Input blocked: ${injectionCheck.reason}`,
@@ -1613,7 +1613,7 @@ function AppInner() {
           dispatch({
             type: "ADD_MESSAGE",
             message: {
-              id: `review-trade-${Date.now()}`,
+              id: `review-trade-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
               role: "system",
               content: "No closed trade observed this session. Run a trade first, or close one to see what-if analysis.",
               timestamp: new Date().toISOString(),
@@ -1631,7 +1631,7 @@ function AppInner() {
           dispatch({
             type: "ADD_MESSAGE",
             message: {
-              id: `debate-${Date.now()}`,
+              id: `debate-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
               role: "system",
               content: "No debate captured yet. Debate view will populate once a multi-agent deliberation runs.",
               timestamp: new Date().toISOString(),
@@ -1676,7 +1676,7 @@ function AppInner() {
         dispatch({
           type: "ADD_MESSAGE",
           message: {
-            id: `perf-${Date.now()}`,
+            id: `perf-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
             role: "system",
             content: body,
             timestamp: new Date().toISOString(),
@@ -1692,7 +1692,7 @@ function AppInner() {
       }
 
       const userMsg: Message = {
-        id: `user-${Date.now()}`,
+        id: `user-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
         role: "user",
         content: trimmed,
         timestamp: new Date().toISOString(),
@@ -1778,7 +1778,7 @@ function AppInner() {
     dispatch({
       type: "ADD_MESSAGE",
       message: {
-        id: `emergency-${Date.now()}`,
+        id: `emergency-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
         role: "system",
         variant: "error" as MessageVariant,
         content: "EMERGENCY HALT executed. All positions closed, all orders cancelled.",
@@ -1794,7 +1794,7 @@ function AppInner() {
       dispatch({
         type: "ADD_MESSAGE",
         message: {
-          id: `session-resume-${Date.now()}`,
+          id: `session-resume-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
           role: "system",
           content: `Resuming session ${selectedSessionId}...`,
           timestamp: new Date().toISOString(),
@@ -1809,6 +1809,22 @@ function AppInner() {
     setShowFeedback(false);
     setFeedbackTradeData(null);
   }, []);
+
+  // Must precede every conditional return below — a hook after an early
+  // return crashes React ("rendered more hooks") when the condition flips.
+  const placeholder = React.useMemo(() => (
+    isStreaming
+      ? ""
+      : ctrlC.isPending
+        ? "Press Ctrl+C again to exit"
+        : !runtimeReady
+          ? "Initializing..."
+          : pendingApprovals.length > 0
+            ? `${pendingApprovals.length} approval(s) pending — approve <id> or deny <id>`
+            : messages.length === 0
+              ? EXAMPLE_PROMPTS[exampleIdx % EXAMPLE_PROMPTS.length]!
+              : ""
+  ), [isStreaming, ctrlC.isPending, runtimeReady, pendingApprovals.length, messages.length, exampleIdx]);
 
   // ── Skip boot screen — go straight to chat ──
   if (bootPhase === "boot") {
@@ -2067,7 +2083,7 @@ function AppInner() {
             dispatch({
               type: "ADD_MESSAGE",
               message: {
-                id: `setup-${Date.now()}`,
+                id: `setup-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
                 role: "system",
                 content,
                 timestamp: new Date().toISOString(),
@@ -2134,7 +2150,7 @@ function AppInner() {
           dispatch({
             type: "ADD_MESSAGE",
             message: {
-              id: `model-${Date.now()}`,
+              id: `model-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
               role: "system",
               content: `Model changed to ${provider}${model ? ` / ${model}` : " (default)"}. Takes effect on next message.`,
               timestamp: new Date().toISOString(),
@@ -2152,28 +2168,28 @@ function AppInner() {
   if (showThemePicker) {
     return <ThemePicker onSelect={async (theme: string) => {
       try { const { loadConfig: lc, saveConfig: sc } = await import("../infra/storage/config/config.ts"); const cfg = await lc(); await sc({ ...cfg, theme } as any); } catch {}
-      dispatch({ type: "ADD_MESSAGE", message: { id: `theme-${Date.now()}`, role: "system", content: `Theme changed to ${theme}. Restart for full effect.`, timestamp: new Date().toISOString() } });
+      dispatch({ type: "ADD_MESSAGE", message: { id: `theme-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, role: "system", content: `Theme changed to ${theme}. Restart for full effect.`, timestamp: new Date().toISOString() } });
       setShowThemePicker(false);
     }} onClose={() => setShowThemePicker(false)} />;
   }
 
   if (showExchangePicker) {
     return <ExchangePicker onComplete={(msg) => {
-      dispatch({ type: "ADD_MESSAGE", message: { id: `exchange-${Date.now()}`, role: "system", content: msg, timestamp: new Date().toISOString() } });
+      dispatch({ type: "ADD_MESSAGE", message: { id: `exchange-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, role: "system", content: msg, timestamp: new Date().toISOString() } });
       setShowExchangePicker(false);
     }} onCancel={() => setShowExchangePicker(false)} />;
   }
 
   if (showLabs) {
     return <LabsPanel onComplete={(msg) => {
-      dispatch({ type: "ADD_MESSAGE", message: { id: `labs-${Date.now()}`, role: "system", content: msg, timestamp: new Date().toISOString() } });
+      dispatch({ type: "ADD_MESSAGE", message: { id: `labs-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, role: "system", content: msg, timestamp: new Date().toISOString() } });
       setShowLabs(false);
     }} onCancel={() => setShowLabs(false)} />;
   }
 
   if (showBrokerPicker) {
     return <BrokerPicker activeBroker={null} configuredBrokers={[]} onComplete={(action, broker, creds) => {
-      dispatch({ type: "ADD_MESSAGE", message: { id: `broker-${Date.now()}`, role: "system", content: `Broker ${action}: ${broker}${creds ? " (credentials saved)" : ""}`, timestamp: new Date().toISOString() } });
+      dispatch({ type: "ADD_MESSAGE", message: { id: `broker-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, role: "system", content: `Broker ${action}: ${broker}${creds ? " (credentials saved)" : ""}`, timestamp: new Date().toISOString() } });
       setShowBrokerPicker(false);
     }} onCancel={() => setShowBrokerPicker(false)} />;
   }
@@ -2193,16 +2209,16 @@ function AppInner() {
       { key: "useKeyring", label: "Use Keyring", category: "Security", currentValue: "false", type: "boolean", description: "Store credentials in OS keyring" },
     ]} onSave={async (key, value) => {
       try { const { loadConfig: lc, saveConfig: sc } = await import("../infra/storage/config/config.ts"); const cfg = await lc(); await sc({ ...cfg, [key]: value }); } catch {}
-      dispatch({ type: "ADD_MESSAGE", message: { id: `config-${Date.now()}`, role: "system", content: `Config updated: ${key} = ${value}`, timestamp: new Date().toISOString() } });
+      dispatch({ type: "ADD_MESSAGE", message: { id: `config-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, role: "system", content: `Config updated: ${key} = ${value}`, timestamp: new Date().toISOString() } });
     }} onCancel={() => setShowConfigEditor(false)} />;
   }
 
   if (showThreadBrowser) {
     return <ThreadBrowser threads={[]} activeThreadId={threadId} onSwitch={(id) => {
-      dispatch({ type: "ADD_MESSAGE", message: { id: `thread-${Date.now()}`, role: "system", content: `Switched to thread ${id}`, timestamp: new Date().toISOString() } });
+      dispatch({ type: "ADD_MESSAGE", message: { id: `thread-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, role: "system", content: `Switched to thread ${id}`, timestamp: new Date().toISOString() } });
       setShowThreadBrowser(false);
     }} onDelete={(id) => {
-      dispatch({ type: "ADD_MESSAGE", message: { id: `thread-del-${Date.now()}`, role: "system", content: `Deleted thread ${id}`, timestamp: new Date().toISOString() } });
+      dispatch({ type: "ADD_MESSAGE", message: { id: `thread-del-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, role: "system", content: `Deleted thread ${id}`, timestamp: new Date().toISOString() } });
     }} onCancel={() => setShowThreadBrowser(false)} />;
   }
 
@@ -2226,25 +2242,25 @@ function AppInner() {
 
   if (showMCPManager) {
     return <MCPManager servers={[]} onAdd={(config) => {
-      dispatch({ type: "ADD_MESSAGE", message: { id: `mcp-add-${Date.now()}`, role: "system", content: `MCP server added: ${config.name} (${config.transport})`, timestamp: new Date().toISOString() } });
+      dispatch({ type: "ADD_MESSAGE", message: { id: `mcp-add-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, role: "system", content: `MCP server added: ${config.name} (${config.transport})`, timestamp: new Date().toISOString() } });
       setShowMCPManager(false);
     }} onRemove={(id) => {
-      dispatch({ type: "ADD_MESSAGE", message: { id: `mcp-rm-${Date.now()}`, role: "system", content: `MCP server removed: ${id}`, timestamp: new Date().toISOString() } });
+      dispatch({ type: "ADD_MESSAGE", message: { id: `mcp-rm-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, role: "system", content: `MCP server removed: ${id}`, timestamp: new Date().toISOString() } });
     }} onReconnect={(id) => {
-      dispatch({ type: "ADD_MESSAGE", message: { id: `mcp-rc-${Date.now()}`, role: "system", content: `Reconnecting MCP server: ${id}`, timestamp: new Date().toISOString() } });
+      dispatch({ type: "ADD_MESSAGE", message: { id: `mcp-rc-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, role: "system", content: `Reconnecting MCP server: ${id}`, timestamp: new Date().toISOString() } });
     }} onCancel={() => setShowMCPManager(false)} />;
   }
 
   if (showMarketplace) {
     return <MarketplaceBrowser plugins={[]} onInstall={(pluginId, cmd) => {
-      dispatch({ type: "ADD_MESSAGE", message: { id: `mkt-${Date.now()}`, role: "system", content: `Installing ${pluginId}...\nRun: ${cmd}`, timestamp: new Date().toISOString() } });
+      dispatch({ type: "ADD_MESSAGE", message: { id: `mkt-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, role: "system", content: `Installing ${pluginId}...\nRun: ${cmd}`, timestamp: new Date().toISOString() } });
       setShowMarketplace(false);
     }} onCancel={() => setShowMarketplace(false)} />;
   }
 
   if (showCLIBrowser) {
     return <CLIBrowser tools={[]} onInstall={(toolId, cmd) => {
-      dispatch({ type: "ADD_MESSAGE", message: { id: `cli-${Date.now()}`, role: "system", content: `Install ${toolId}:\n${cmd}`, timestamp: new Date().toISOString() } });
+      dispatch({ type: "ADD_MESSAGE", message: { id: `cli-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, role: "system", content: `Install ${toolId}:\n${cmd}`, timestamp: new Date().toISOString() } });
       setShowCLIBrowser(false);
     }} onCancel={() => setShowCLIBrowser(false)} />;
   }
@@ -2253,7 +2269,7 @@ function AppInner() {
   if (showHIP3) {
     return <HIP3AssetBrowser
       onSelect={(req) => {
-        dispatch({ type: "ADD_MESSAGE", message: { id: `hip3-${Date.now()}`, role: "system", content: `HIP-3 selected: ${req.symbol} @ $${req.price.toFixed(2)} · ${req.builder}/${req.collateral} · ${req.maxLeverage}x`, timestamp: new Date().toISOString() } });
+        dispatch({ type: "ADD_MESSAGE", message: { id: `hip3-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, role: "system", content: `HIP-3 selected: ${req.symbol} @ $${req.price.toFixed(2)} · ${req.builder}/${req.collateral} · ${req.maxLeverage}x`, timestamp: new Date().toISOString() } });
         setShowHIP3(false);
       }}
       onClose={() => setShowHIP3(false)}
@@ -2261,20 +2277,6 @@ function AppInner() {
   }
 
   // ── Placeholder text for PromptInput (Claude Code: rotating example commands) ──
-  const placeholder = React.useMemo(() => (
-    isStreaming
-      ? ""
-      : ctrlC.isPending
-        ? "Press Ctrl+C again to exit"
-        : !runtimeReady
-          ? "Initializing..."
-          : pendingApprovals.length > 0
-            ? `${pendingApprovals.length} approval(s) pending \u2014 approve <id> or deny <id>`
-            : messages.length === 0
-              ? EXAMPLE_PROMPTS[exampleIdx % EXAMPLE_PROMPTS.length]!
-              : ""
-  ), [isStreaming, ctrlC.isPending, runtimeReady, pendingApprovals.length, messages.length, exampleIdx]);
-
   return (
     <Box flexDirection="column">
       {/* ── Conversation — wrapped in PrivacyScreen ── */}

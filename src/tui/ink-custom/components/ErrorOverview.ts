@@ -133,7 +133,9 @@ export default function ErrorOverview({ error }: Props): React.JSX.Element {
         error.stack
           .split("\n")
           .slice(1)
-          .map((line) => {
+          // Key by position, not line text — recursive frames (e.g. React's
+          // commit-phase traversal) repeat verbatim and would collide.
+          .map((line, index) => {
             const parsedLine: ParsedStackLine | undefined =
               stackUtils.parseLine(line);
             // If the line from the stack cannot be parsed, we print out the
@@ -141,7 +143,7 @@ export default function ErrorOverview({ error }: Props): React.JSX.Element {
             if (!parsedLine) {
               return React.createElement(
                 Box,
-                { key: line },
+                { key: index },
                 React.createElement(Text, { dimColor: true }, "- "),
                 React.createElement(
                   Text,
@@ -154,7 +156,7 @@ export default function ErrorOverview({ error }: Props): React.JSX.Element {
             }
             return React.createElement(
               Box,
-              { key: line },
+              { key: index },
               React.createElement(Text, { dimColor: true }, "- "),
               React.createElement(
                 Text,

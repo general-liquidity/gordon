@@ -230,7 +230,7 @@ export async function initializeRuntime(setState: StateUpdater): Promise<Session
     }) as any,
   });
 
-  const runtimeId = `tui-${Date.now()}`;
+  const runtimeId = `tui-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
   activeRuntime = runtimeFactory.get(runtimeId, { sessionId: "tui" });
 
   // Subscribe to state changes
@@ -491,7 +491,7 @@ async function streamResponse(
   let currentAgentName: string | null = null;
   let chainStartTime = Date.now();
   let lastEventWasToolEnd = false;
-  const streamingMsgId = `streaming-${Date.now()}`;
+  const streamingMsgId = `streaming-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
   const flushStreamingMessage = (content: string): void => {
     markInteraction("stream");
     setState((prev: any) => {
@@ -566,7 +566,7 @@ async function streamResponse(
               );
               // Add new chain
               const newChain = {
-                id: `chain-${Date.now()}`,
+                id: `chain-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
                 agentName: event.agentName,
                 status: "running",
                 startedAt: Date.now(),
@@ -825,7 +825,7 @@ async function streamResponse(
 
         case "error": {
           const errorMsg: Message = {
-            id: `error-${Date.now()}`,
+            id: `error-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
             role: "system",
             variant: "error" as const,
             content: `Error: ${event.error ?? "Unknown error"}`,
