@@ -262,6 +262,8 @@ export const UIConfigSchema = z.object({
   /**
    * Symbols shown in the boot-panel live ticker. Unset → venue-class-aware
    * default (crypto venue → BTC/ETH, broker-only → SPY/QQQ, both → BTC/ETH/SPY).
+   * Optional prefixes disambiguate long-tail assets:
+   *   crypto:PEPE, equity:AAPL, onchain:base:0xToken:DEGEN, onchain:base:pool:0xPool:DEGEN.
    */
   tickerSymbols: z.array(z.string().min(1)).max(12).optional(),
 });

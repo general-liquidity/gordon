@@ -1,6 +1,11 @@
 import React from "react";
 import { Box, Text, useStdout } from "../../ink-custom/index.ts";
-import { loadBootLiveData, type BootLiveData } from "../../boot/bootLiveData.ts";
+import {
+  BOOT_TICKER_REFRESH_MS,
+  loadBootLiveData,
+  refreshBootTicker,
+  type BootLiveData,
+} from "../../boot/bootLiveData.ts";
 
 interface Props {
   hint: string;
@@ -103,11 +108,34 @@ export function BootLivePanel({ hint }: Props): React.JSX.Element | null {
 
   React.useEffect(() => {
     let mounted = true;
+    let tickerTimer: ReturnType<typeof setInterval> | undefined;
+    let tickerRefreshInFlight = false;
+
+    const refreshTicker = async (symbols: BootLiveData["tickerSymbols"]) => {
+      if (tickerRefreshInFlight || symbols.length === 0) return;
+      tickerRefreshInFlight = true;
+      try {
+        const ticker = await refreshBootTicker(symbols);
+        if (mounted && ticker) {
+          setData((previous) => previous ? { ...previous, ticker } : previous);
+        }
+      } finally {
+        tickerRefreshInFlight = false;
+      }
+    };
+
     void loadBootLiveData().then((loaded) => {
-      if (mounted) setData(loaded);
+      if (!mounted) return;
+      setData(loaded);
+      if (loaded.tickerSymbols.length > 0) {
+        tickerTimer = setInterval(() => {
+          void refreshTicker(loaded.tickerSymbols);
+        }, BOOT_TICKER_REFRESH_MS);
+      }
     });
     return () => {
       mounted = false;
+      if (tickerTimer) clearInterval(tickerTimer);
     };
   }, []);
 

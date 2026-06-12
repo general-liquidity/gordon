@@ -1,5 +1,12 @@
 import { describe, expect, test } from "bun:test";
-import { loadBootLiveData, type BootLiveDeps } from "./bootLiveData.ts";
+import {
+  buildTickerSymbolPlan,
+  loadBootLiveData,
+  parseTickerSymbol,
+  refreshBootTicker,
+  type BootLiveDeps,
+  type TickerSymbol,
+} from "./bootLiveData.ts";
 import type { GordonConfig } from "../../types/index.ts";
 
 const baseConfig = {
@@ -123,5 +130,83 @@ describe("loadBootLiveData", () => {
       ],
       tickerExtra: 0,
     });
+  });
+
+  test("passes the loaded config into the ticker fetcher", async () => {
+    let seenConfig: GordonConfig | null | undefined;
+    await loadBootLiveData(deps({
+      fetchTicker: async (_symbols, config) => {
+        seenConfig = config;
+        return [];
+      },
+    }));
+    expect(seenConfig?.activeExchangeId).toBe("binance");
+  });
+});
+
+describe("ticker symbol planning", () => {
+  test("supports explicit crypto, equity, and onchain ticker symbols", () => {
+    const config = {
+      ...baseConfig,
+      ui: {
+        tickerSymbols: [
+          "crypto:PEPE",
+          "equity:AAPL",
+          "onchain:base:0xabc:DEGEN",
+          "onchain:ethereum:pool:0xpool:UNI",
+        ],
+      },
+    } as unknown as GordonConfig;
+
+    expect(buildTickerSymbolPlan(config).display).toEqual([
+      { symbol: "PEPE", kind: "crypto" },
+      { symbol: "AAPL", kind: "equity" },
+      { symbol: "DEGEN", kind: "crypto", chain: "base", tokenAddress: "0xabc" },
+      { symbol: "UNI", kind: "crypto", chain: "ethereum", poolAddress: "0xpool" },
+    ]);
+  });
+
+  test("infers common quoted crypto pairs without requiring a prefix", () => {
+    expect(parseTickerSymbol("BTCUSDT")).toEqual({ symbol: "BTCUSDT", kind: "crypto" });
+    expect(parseTickerSymbol("AAPL")).toEqual({ symbol: "AAPL", kind: "equity" });
+  });
+});
+
+describe("refreshBootTicker", () => {
+  test("re-fetches the displayed symbols through the ticker dependency", async () => {
+    const symbols: TickerSymbol[] = [{ symbol: "BTC", kind: "crypto" }];
+    let calls = 0;
+    const refreshDeps = deps({
+      fetchTicker: async (receivedSymbols) => {
+        calls += 1;
+        expect(receivedSymbols).toEqual(symbols);
+        return [
+          {
+            symbol: "BTC",
+            kind: "crypto",
+            priceUsd: 60_000 + calls,
+            changePercent24h: 1.2,
+          },
+        ];
+      },
+    });
+
+    await expect(refreshBootTicker(symbols, refreshDeps)).resolves.toEqual([
+      { symbol: "BTC", kind: "crypto", priceUsd: 60_001, changePercent24h: 1.2 },
+    ]);
+    await expect(refreshBootTicker(symbols, refreshDeps)).resolves.toEqual([
+      { symbol: "BTC", kind: "crypto", priceUsd: 60_002, changePercent24h: 1.2 },
+    ]);
+    expect(calls).toBe(2);
+  });
+
+  test("times out a hanging ticker refresh", async () => {
+    await expect(refreshBootTicker(
+      [{ symbol: "BTC", kind: "crypto" }],
+      deps({
+        fetchTicker: () => new Promise(() => {}),
+        timeoutMs: 20,
+      }),
+    )).resolves.toBeNull();
   });
 });

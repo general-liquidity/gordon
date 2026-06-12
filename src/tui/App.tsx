@@ -13,7 +13,7 @@ import {
   useAppStore,
 } from "./state/AppStateProvider.js";
 import type { DialogId } from "./state/types.ts";
-import { evaluatePermissionModeTransition, isLiveCapable } from "./state/permissionModeFsm.ts";
+import { evaluatePermissionModeTransition } from "./state/permissionModeFsm.ts";
 
 // ── Components ──
 import { type Message, type MessageVariant } from "./components/messages/MessageBubble.tsx";
@@ -1147,26 +1147,8 @@ function AppInner() {
     }
   }, [runtimeReady, showSetup, dispatch]);
 
-  // ── Startup mode banner (p0-safety Item 4) ──
-  // One-shot at boot: the user must see their capital posture (LIVE/paper)
-  // on entry. strict/observe/plan get no banner — nothing can execute.
-  const startupModeBannerFired = React.useRef(false);
-  useEffect(() => {
-    if (!runtimeReady || startupModeBannerFired.current) return;
-    startupModeBannerFired.current = true;
-    const mode = getState().permissionMode;
-    if (isLiveCapable(mode) || mode === "paper") {
-      dispatch({
-        type: "SHOW_MODE_BANNER",
-        banner: {
-          mode,
-          liveCapable: isLiveCapable(mode),
-          shownAt: Date.now(),
-          dismissed: false,
-        },
-      });
-    }
-  }, [runtimeReady, dispatch, getState]);
+  // Startup mode banner intentionally disabled for now. Mode-change banners
+  // still fire from the reducer when crossing the paper/live boundary.
 
   const submitRef = React.useRef<(value: string) => void>(() => {});
 

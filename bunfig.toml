@@ -49,6 +49,9 @@ minimumReleaseAgeExcludes = [
 
 # Run-time configuration applied to `bun run` / `bun script.ts` invocations.
 [run]
+# Don't echo the resolved script command (`$ bun --watch run src/index.tsx`)
+# above the GORDON banner on `bun run dev` — the banner is the boot identity.
+silent = true
 # Kill all child processes when Bun exits — including when the parent
 # Bun process is SIGKILL'd. Linux/macOS only (no-op on Windows). This
 # matters for Gordon because the TUI may spawn long-lived processes
