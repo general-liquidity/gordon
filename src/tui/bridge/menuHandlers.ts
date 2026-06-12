@@ -48,6 +48,8 @@ import { handleTelemetryCommand, handleContextCommand } from "../../app/commands
 import { getRuntimeApprovalShortId } from "../../app/runtime/runtimeApprovalId.ts";
 import type { Message } from "../components/messages/MessageBubble.tsx";
 import type { StateUpdater } from "./runtime.js";
+import type { PermissionMode } from "../state/types.ts";
+import { evaluatePermissionModeTransition } from "../state/permissionModeFsm.ts";
 
 // ============================================================================
 // Shared helper — addMessage (duplicated to avoid circular imports)
@@ -70,6 +72,40 @@ function addMessage(
     ...prev,
     messages: [...prev.messages, msg],
   }));
+}
+
+/**
+ * Mode changes from the bridge go through the same FSM the reducer enforces,
+ * so the success copy never lies: on a denied escalation (pending approvals /
+ * mid-stream) the mode is left unchanged and only the rejection is printed.
+ * Verdict + message are computed inside one updater so the transition is atomic.
+ */
+function applyPermissionModeChange(
+  setState: StateUpdater,
+  mode: PermissionMode,
+  successText: string,
+): void {
+  setState((prev: any) => {
+    const verdict = evaluatePermissionModeTransition({
+      from: prev.permissionMode,
+      to: mode,
+      pendingApprovals: prev.pendingApprovals?.length ?? 0,
+      isStreaming: !!prev.isStreaming,
+    });
+    const msg: Message = {
+      id: `system-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      role: "system",
+      content: verdict.allowed
+        ? successText
+        : verdict.reason ?? `Cannot switch permission mode to ${mode}.`,
+      timestamp: new Date().toISOString(),
+    };
+    return {
+      ...prev,
+      ...(verdict.allowed ? { permissionMode: mode } : {}),
+      messages: [...prev.messages, msg],
+    };
+  });
 }
 
 const PAGER_LINE_THRESHOLD = 60;
@@ -597,19 +633,16 @@ export function handleUIMenuCommand(
       return true;
     }
     case "auto": {
-      setState((prev: any) => ({ ...prev, permissionMode: "auto" }));
-      addMessage(setState, "system", "Permission mode: auto \u2014 trades execute without per-action approval. Use /ask to return to default.");
+      applyPermissionModeChange(setState, "auto", "Permission mode: auto \u2014 trades execute without per-action approval. Use /ask to return to default.");
       return true;
     }
     case "ask": {
-      setState((prev: any) => ({ ...prev, permissionMode: "ask" }));
-      addMessage(setState, "system", "Permission mode: ask \u2014 each trade requires approval via dialog (default).");
+      applyPermissionModeChange(setState, "ask", "Permission mode: ask \u2014 each trade requires approval via dialog (default).");
       return true;
     }
     case "strict":
     case "readonly": {
-      setState((prev: any) => ({ ...prev, permissionMode: "strict" }));
-      addMessage(setState, "system", "Permission mode: strict \u2014 read-only, all trades blocked.");
+      applyPermissionModeChange(setState, "strict", "Permission mode: strict \u2014 read-only, all trades blocked.");
       return true;
     }
     case "setup":

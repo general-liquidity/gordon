@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { Box, Text, useInput } from "../ink-custom";
+import { Box, Text } from "../ink-custom";
 import {
   PALETTE_WORKFLOW_CONFIG,
   type PaletteWorkflowId,
@@ -7,6 +7,7 @@ import {
 import type { GordonTheme } from "../themes/themes.ts";
 import { useTheme } from "../themes/ThemeProvider.tsx";
 import { fuzzyMatch } from "../utils/fuzzy.ts";
+import { useRoutedInput, FOCUS_PRIORITY } from "../input/InputRouterContext.tsx";
 
 export interface PaletteItem {
   id: string;
@@ -84,7 +85,7 @@ export function CommandPalette({ items, onSelect, onClose, workspaceSection }: P
   );
   const totalShown = flat.length;
 
-  useInput((input, key) => {
+  useRoutedInput((input, key) => {
     if (key.escape) {
       onClose();
       return;
@@ -110,8 +111,10 @@ export function CommandPalette({ items, onSelect, onClose, workspaceSection }: P
     if (input && !key.ctrl && !key.meta) {
       setQuery((q) => q + input);
       setSelectedIndex(0);
+      return;
     }
-  });
+    return false;
+  }, { id: "command-palette", priority: FOCUS_PRIORITY.OVERLAY });
 
   let cursor = 0;
   const renderRow = (item: PaletteItem, color: string): React.ReactElement => {

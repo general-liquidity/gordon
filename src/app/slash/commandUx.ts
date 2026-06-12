@@ -261,6 +261,7 @@ export const PALETTE_SAFETY_COMMANDS: ReadonlySet<string> = new Set([
   "killswitch", "emergency", "risk", "rules", "deny-all",
   "runtime-approvals", "runtime-approve", "runtime-deny",
   "auto", "ask", "strict", "paper", "live", "observe", "planmode",
+  "safety",
 ]);
 
 export const PALETTE_PLAN_COMMANDS: ReadonlySet<string> = new Set([
@@ -275,7 +276,7 @@ export const PALETTE_MONITOR_COMMANDS: ReadonlySet<string> = new Set([
   "strategies-live", "pause", "resume-strategy", "stop",
   "radar", "ack", "pass", "snooze",
   "goal-status", "sprint-status", "wip-status", "shadow-divergence",
-  "perf", "journal",
+  "perf", "journal", "queue",
 ]);
 
 export function paletteWorkflowFor(cmd: { name: string; workflow?: WorkflowGroup }): PaletteWorkflowId {

@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Box, Text, useInput } from "../../ink-custom";
 import { THEME_NAMES, THEMES } from "../../themes/themes.js";
+import { KeyboardHints } from "../../design-system/KeyboardHints.tsx";
 
 // ============================================================================
 // ThemePicker — Interactive theme selector with color preview swatches
@@ -36,7 +37,13 @@ export function ThemePicker({ onSelect, onClose }: Props) {
           </Box>
         );
       })}
-      <Text dimColor>Enter to apply {"\u00B7"} Esc to cancel</Text>
+      <KeyboardHints
+        hints={[
+          { keys: "↑↓", label: "navigate" },
+          { keys: "enter", label: "apply" },
+          { keys: "esc", label: "cancel" },
+        ]}
+      />
     </Box>
   );
 }

@@ -75,6 +75,26 @@ export interface PagerContent {
   content: string;
 }
 
+export type DialogId =
+  | "settings" | "export" | "emergency" | "context" | "sessions" | "memory"
+  | "feedback" | "audit" | "scheduler" | "playbooks" | "strategies" | "genome"
+  | "indicators" | "consensus" | "orderbook" | "autonomous" | "skills"
+  | "constitution" | "injectionDefense" | "dataHealth" | "riskConfig" | "defi"
+  | "marketOverview" | "regime" | "stats" | "globalSearch" | "exitFlow"
+  | "backtestWizard" | "brokerManager" | "exchangeManager" | "genomeEvolution"
+  | "historySearch" | "indicatorValue" | "insights" | "marketPulse"
+  | "messageSelector" | "optimization" | "planEditor" | "plugins" | "quickOpen"
+  | "reconciliation" | "taskDeps" | "walkForward" | "hip3"
+  | "modelPicker" | "mcpManager" | "marketplace" | "cliBrowser" | "themePicker"
+  | "exchangePicker" | "brokerPicker" | "doctor" | "helpBrowser" | "configEditor"
+  | "threadBrowser" | "journal" | "shortcuts" | "approvalBrowser" | "labs"
+  | "planDiff" | "postTradeFeedback" | "counterfactual" | "debateView" | "elicitation";
+
+export interface OpenDialog {
+  id: DialogId;
+  payload?: unknown;
+}
+
 // ============================================================================
 // AppState
 // ============================================================================
@@ -145,14 +165,8 @@ export interface AppState {
   activeOverlayView: OverlayViewId | null;
   pager: PagerContent | null;
   radarFocus: RadarFocus | null;
+  openDialogs: OpenDialog[];
 
-  // Phase 15-18 panels
-  showSettings: boolean;
-  showExport: boolean;
-  showEmergency: boolean;
-  showContext: boolean;
-  showSessions: boolean;
-  showMemory: boolean;
   privacyMode: boolean;
 
   // Workspace (legacy lens system)
@@ -196,12 +210,7 @@ export const INITIAL_STATE: AppState = {
   activeOverlayView: null,
   pager: null,
   radarFocus: null,
-  showSettings: false,
-  showExport: false,
-  showEmergency: false,
-  showContext: false,
-  showSessions: false,
-  showMemory: false,
+  openDialogs: [],
   privacyMode: false,
   activeWorkspace: null,
 };
@@ -253,6 +262,9 @@ export type Action =
   | { type: "OPEN_PAGER"; pager: PagerContent }
   | { type: "CLOSE_PAGER" }
   | { type: "SET_RADAR_FOCUS"; focus: RadarFocus | null }
+  | { type: "OPEN_DIALOG"; id: DialogId; payload?: unknown }
+  | { type: "CLOSE_DIALOG"; id: DialogId }
+  | { type: "CLOSE_TOP_DIALOG" }
   // Phase 4 — Event-driven notifications
   | { type: "INJECT_NOTIFICATION"; notification: TuiNotification }
   | { type: "DISMISS_NOTIFICATION"; id: string }
@@ -261,13 +273,6 @@ export type Action =
   | { type: "UPDATE_COST"; pnl: number; pnlPercent: number }
   // Phase 6 — Autonomous loop
   | { type: "SET_AUTONOMOUS_ACTIVE"; active: boolean; strategyCount?: number }
-  // Phase 15-18 — Panel toggles
-  | { type: "SET_SHOW_SETTINGS"; show: boolean }
-  | { type: "SET_SHOW_EXPORT"; show: boolean }
-  | { type: "SET_SHOW_EMERGENCY"; show: boolean }
-  | { type: "SET_SHOW_CONTEXT"; show: boolean }
-  | { type: "SET_SHOW_SESSIONS"; show: boolean }
-  | { type: "SET_SHOW_MEMORY"; show: boolean }
   | { type: "SET_PRIVACY_MODE"; enabled: boolean };
 
 // ============================================================================

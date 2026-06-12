@@ -15,7 +15,7 @@ interface Props {
 
 const IS_MAC = process.platform === "darwin";
 
-function formatKeys(raw: string): string {
+export function formatKeys(raw: string): string {
   return raw
     .split("+")
     .map((part) => {
@@ -29,6 +29,7 @@ function formatKeys(raw: string): string {
       if (lower === "tab") return "Tab";
       if (lower === "backspace") return "\u232B";
       if (lower === "space") return "Space";
+      if (lower === "type") return "type";
       return part.toUpperCase();
     })
     .join(IS_MAC ? "" : "+");

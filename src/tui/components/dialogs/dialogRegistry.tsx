@@ -1,0 +1,33 @@
+import type { DialogId } from "../../state/types.ts";
+
+export interface DialogEntry {
+  mode: "overlay" | "replace";
+}
+
+export const DIALOG_IDS = [
+  "settings", "export", "emergency", "context", "sessions", "memory",
+  "feedback", "audit", "scheduler", "playbooks", "strategies", "genome",
+  "indicators", "consensus", "orderbook", "autonomous", "skills",
+  "constitution", "injectionDefense", "dataHealth", "riskConfig", "defi",
+  "marketOverview", "regime", "stats", "globalSearch", "exitFlow",
+  "backtestWizard", "brokerManager", "exchangeManager", "genomeEvolution",
+  "historySearch", "indicatorValue", "insights", "marketPulse",
+  "messageSelector", "optimization", "planEditor", "plugins", "quickOpen",
+  "reconciliation", "taskDeps", "walkForward", "hip3",
+  "modelPicker", "mcpManager", "marketplace", "cliBrowser", "themePicker",
+  "exchangePicker", "brokerPicker", "doctor", "helpBrowser", "configEditor",
+  "threadBrowser", "journal", "shortcuts", "approvalBrowser", "labs",
+  "planDiff", "postTradeFeedback", "counterfactual", "debateView", "elicitation",
+] as const satisfies readonly DialogId[];
+
+const REPLACE_DIALOGS = new Set<DialogId>([
+  "modelPicker",
+  "mcpManager",
+  "marketplace",
+  "cliBrowser",
+  "hip3",
+]);
+
+export const DIALOG_REGISTRY: Record<DialogId, DialogEntry> = Object.fromEntries(
+  DIALOG_IDS.map((id) => [id, { mode: REPLACE_DIALOGS.has(id) ? "replace" : "overlay" }]),
+) as Record<DialogId, DialogEntry>;

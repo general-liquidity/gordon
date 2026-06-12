@@ -295,8 +295,8 @@ export function formatKeybindingHelp(): string {
 
   const groups: Record<string, KeyBinding[]> = {};
   for (const b of bindings) {
-    const group = b.when === "normalMode" ? "Vim Normal Mode"
-      : b.when === "insertMode" ? "Vim Insert Mode"
+    const group = b.when === "normalMode" ? "Vim — prompt input (Normal mode)"
+      : b.when === "insertMode" ? "Vim — prompt input (Insert mode)"
       : "Global";
     (groups[group] ??= []).push(b);
   }

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { Box, Text, Spacer, useInput, useApp } from "./ink-custom";
+import { Box, Text, Spacer, useApp } from "./ink-custom";
 
 // ── Providers ──
 import { SettingsProvider } from "./state/SettingsProvider.js";
@@ -12,6 +12,8 @@ import {
   useDispatch,
   useAppStore,
 } from "./state/AppStateProvider.js";
+import type { DialogId } from "./state/types.ts";
+import { evaluatePermissionModeTransition, isLiveCapable } from "./state/permissionModeFsm.ts";
 
 // ── Components ──
 import { GordonHeader } from "./components/layout/GordonHeader.tsx";
@@ -30,6 +32,7 @@ import { PrivacyConsent, type PrivacyChoices } from "./components/editors/Privac
 // import out so we don't carry dead deps.
 // import { HandoffArrow } from "./components/status/HandoffArrow.tsx";
 import { PromptInput } from "./components/layout/PromptInput.tsx";
+import { StatusLine } from "./components/layout/StatusLine.tsx";
 import { BootLivePanel } from "./components/layout/BootLivePanel.tsx";
 import { EmptyChatHint } from "./components/layout/EmptyChatHint.tsx";
 import { defaultMessageQueue } from "../infra/runtime/messageQueue.js";
@@ -120,6 +123,7 @@ import { StatsDialog } from "./components/dialogs/StatsDialog.tsx";
 import { GlobalSearchDialog } from "./components/dialogs/GlobalSearchDialog.tsx";
 import { ResetSessionDialog } from "./components/dialogs/ResetSessionDialog.tsx";
 import { PagerDialog, PAGER_LINE_THRESHOLD, findLastLongMessage } from "./components/dialogs/PagerDialog.tsx";
+import { DialogHost } from "./components/dialogs/DialogHost.tsx";
 
 // ── Previously unwired components ──
 import { ActionableRiskAlerts } from "./components/notices/ActionableRiskAlerts.tsx";
@@ -204,6 +208,7 @@ import { getSessionTip } from "./boot/tips.ts";
 import { installRenderBudget, isRenderBudgetEnabled, isRenderBudgetStrict, getRenderBudgetBreachCount } from "./diagnostics/renderBudget.ts";
 import { enterAltScreen, leaveAltScreen } from "./utils/altScreen.ts";
 import { radarQuickKeyCommand } from "./input/radarQuickKeys.ts";
+import { InputRouterProvider, useRoutedInput, FOCUS_PRIORITY } from "./input/InputRouterContext.tsx";
 import { getSuggestionStore } from "../infra/proactive/storage/suggestionStore.ts";
 
 // ── Bridge ──
@@ -231,12 +236,25 @@ interface FeedbackTradeData {
   pnlPercent?: number;
 }
 
+const EXAMPLE_PROMPTS = [
+  'Try "what\'s BTC doing?"',
+  'Try "scan for opportunities"',
+  'Try "check my portfolio risk"',
+  'Try "/morning-brief"',
+  'Try "analyze ETH setup"',
+  'Try "what\'s trending today?"',
+  'Try "/dd BTC"',
+] as const;
+
 /**
  * DebateViewerOverlay — wraps DebateViewer with Esc-dismiss.
  * DebateViewer has no onClose prop, so we attach key handling here.
  */
 function DebateViewerOverlay({ data, onClose }: { data: DebateViewerData; onClose: () => void }) {
-  useInput((_input, key) => { if (key.escape) onClose(); });
+  useRoutedInput((_input, key) => {
+    if (!key.escape) return false;
+    onClose();
+  }, { id: "dialog:debate-view", priority: FOCUS_PRIORITY.DIALOG });
   return (
     <Box flexDirection="column">
       <DebateViewer data={data} />
@@ -492,6 +510,7 @@ function AppInner() {
   const pager = useAppState((s) => s.pager);
   const radarFocus = useAppState((s) => s.radarFocus);
   const activeWorkspace = useAppState((s) => s.activeWorkspace);
+  const openDialogs = useAppState((s) => s.openDialogs);
   const permissionMode = useAppState((s) => s.permissionMode);
   const [connectivityHints, setConnectivityHints] = useState({ hasExchange: false, hasBroker: false });
   const messages = useAppState((s) => s.messages);
@@ -582,15 +601,35 @@ function AppInner() {
   const autonomousActive = useAppState((s) => s.autonomousActive);
   const autonomousStrategyCount = useAppState((s) => s.autonomousStrategyCount);
 
-  // ── Phase 15-18 local state ──
-  const [showSettings, setShowSettings] = useState(false);
-  const [showExport, setShowExport] = useState(false);
-  const [showEmergency, setShowEmergency] = useState(false);
-  const [showContext, setShowContext] = useState(false);
-  const [showSessions, setShowSessions] = useState(false);
-  const [showMemory, setShowMemory] = useState(false);
+  const isDialogOpen = React.useCallback(
+    (id: DialogId) => openDialogs.some((dialog) => dialog.id === id),
+    [openDialogs],
+  );
+  const dialogSetter = React.useCallback(
+    (id: DialogId) => (next: boolean | ((prev: boolean) => boolean)) => {
+      const current = openDialogs.some((dialog) => dialog.id === id);
+      const show = typeof next === "function" ? next(current) : next;
+      dispatch(show ? { type: "OPEN_DIALOG", id } : { type: "CLOSE_DIALOG", id });
+    },
+    [dispatch, openDialogs],
+  );
+
+  // ── Phase 15-18 reducer-backed dialog state ──
+  const showSettings = isDialogOpen("settings");
+  const setShowSettings = dialogSetter("settings");
+  const showExport = isDialogOpen("export");
+  const setShowExport = dialogSetter("export");
+  const showEmergency = isDialogOpen("emergency");
+  const setShowEmergency = dialogSetter("emergency");
+  const showContext = isDialogOpen("context");
+  const setShowContext = dialogSetter("context");
+  const showSessions = isDialogOpen("sessions");
+  const setShowSessions = dialogSetter("sessions");
+  const showMemory = isDialogOpen("memory");
+  const setShowMemory = dialogSetter("memory");
   const [privacyMode, setPrivacyMode] = useState(false);
-  const [showFeedback, setShowFeedback] = useState(false);
+  const showFeedback = isDialogOpen("feedback");
+  const setShowFeedback = dialogSetter("feedback");
   const [feedbackTradeData, setFeedbackTradeData] = useState<FeedbackTradeData | null>(null);
 
   // PlanDiff overlay — auto-shown when a second plan:created fires for the
@@ -602,7 +641,8 @@ function AppInner() {
   const [postTradeFeedback, setPostTradeFeedback] = useState<string | null>(null);
 
   // HIP3AssetBrowser overlay — opened via /hip3 slash command.
-  const [showHIP3, setShowHIP3] = useState(false);
+  const showHIP3 = isDialogOpen("hip3");
+  const setShowHIP3 = dialogSetter("hip3");
 
   // CounterfactualPanel overlay — auto-shown on trade:closed (or /review-trade fallback).
   const [counterfactual, setCounterfactual] = useState<{ trade: TradeOutcome; scenarios: Scenario[] } | null>(null);
@@ -619,60 +659,111 @@ function AppInner() {
     kind: "choice" | "text" | "confirm";
   } | null>(null);
 
-  const [showModelPicker, setShowModelPicker] = useState(false);
-  const [showMCPManager, setShowMCPManager] = useState(false);
-  const [showMarketplace, setShowMarketplace] = useState(false);
-  const [showCLIBrowser, setShowCLIBrowser] = useState(false);
-  const [showThemePicker, setShowThemePicker] = useState(false);
-  const [showExchangePicker, setShowExchangePicker] = useState(false);
-  const [showBrokerPicker, setShowBrokerPicker] = useState(false);
-  const [showDoctor, setShowDoctor] = useState(false);
-  const [showHelpBrowser, setShowHelpBrowser] = useState(false);
-  const [showConfigEditor, setShowConfigEditor] = useState(false);
-  const [showThreadBrowser, setShowThreadBrowser] = useState(false);
-  const [showJournal, setShowJournal] = useState(false);
-  const [showShortcuts, setShowShortcuts] = useState(false);
-  const [showApprovalBrowser, setShowApprovalBrowser] = useState(false);
-  const [showLabs, setShowLabs] = useState(false);
+  const showModelPicker = isDialogOpen("modelPicker");
+  const setShowModelPicker = dialogSetter("modelPicker");
+  const showMCPManager = isDialogOpen("mcpManager");
+  const setShowMCPManager = dialogSetter("mcpManager");
+  const showMarketplace = isDialogOpen("marketplace");
+  const setShowMarketplace = dialogSetter("marketplace");
+  const showCLIBrowser = isDialogOpen("cliBrowser");
+  const setShowCLIBrowser = dialogSetter("cliBrowser");
+  const showThemePicker = isDialogOpen("themePicker");
+  const setShowThemePicker = dialogSetter("themePicker");
+  const showExchangePicker = isDialogOpen("exchangePicker");
+  const setShowExchangePicker = dialogSetter("exchangePicker");
+  const showBrokerPicker = isDialogOpen("brokerPicker");
+  const setShowBrokerPicker = dialogSetter("brokerPicker");
+  const showDoctor = isDialogOpen("doctor");
+  const setShowDoctor = dialogSetter("doctor");
+  const showHelpBrowser = isDialogOpen("helpBrowser");
+  const setShowHelpBrowser = dialogSetter("helpBrowser");
+  const showConfigEditor = isDialogOpen("configEditor");
+  const setShowConfigEditor = dialogSetter("configEditor");
+  const showThreadBrowser = isDialogOpen("threadBrowser");
+  const setShowThreadBrowser = dialogSetter("threadBrowser");
+  const showJournal = isDialogOpen("journal");
+  const setShowJournal = dialogSetter("journal");
+  const showShortcuts = isDialogOpen("shortcuts");
+  const setShowShortcuts = dialogSetter("shortcuts");
+  const showApprovalBrowser = isDialogOpen("approvalBrowser");
+  const setShowApprovalBrowser = dialogSetter("approvalBrowser");
+  const showLabs = isDialogOpen("labs");
+  const setShowLabs = dialogSetter("labs");
 
   // ── Backend module UI toggles ──
-  const [showAudit, setShowAudit] = useState(false);
-  const [showScheduler, setShowScheduler] = useState(false);
-  const [showPlaybooks, setShowPlaybooks] = useState(false);
-  const [showStrategies, setShowStrategies] = useState(false);
-  const [showGenome, setShowGenome] = useState(false);
-  const [showIndicators, setShowIndicators] = useState(false);
-  const [showConsensus, setShowConsensus] = useState(false);
-  const [showOrderbook, setShowOrderbook] = useState(false);
-  const [showAutonomous, setShowAutonomous] = useState(false);
-  const [showSkills, setShowSkills] = useState(false);
-  const [showConstitution, setShowConstitution] = useState(false);
-  const [showInjectionDefense, setShowInjectionDefense] = useState(false);
-  const [showDataHealth, setShowDataHealth] = useState(false);
-  const [showRiskConfig, setShowRiskConfig] = useState(false);
-  const [showDefi, setShowDefi] = useState(false);
-  const [showMarketOverview, setShowMarketOverview] = useState(false);
-  const [showRegime, setShowRegime] = useState(false);
-  const [showStats, setShowStats] = useState(false);
-  const [showGlobalSearch, setShowGlobalSearch] = useState(false);
-  const [showExitFlow, setShowExitFlow] = useState(false);
+  const showAudit = isDialogOpen("audit");
+  const setShowAudit = dialogSetter("audit");
+  const showScheduler = isDialogOpen("scheduler");
+  const setShowScheduler = dialogSetter("scheduler");
+  const showPlaybooks = isDialogOpen("playbooks");
+  const setShowPlaybooks = dialogSetter("playbooks");
+  const showStrategies = isDialogOpen("strategies");
+  const setShowStrategies = dialogSetter("strategies");
+  const showGenome = isDialogOpen("genome");
+  const setShowGenome = dialogSetter("genome");
+  const showIndicators = isDialogOpen("indicators");
+  const setShowIndicators = dialogSetter("indicators");
+  const showConsensus = isDialogOpen("consensus");
+  const setShowConsensus = dialogSetter("consensus");
+  const showOrderbook = isDialogOpen("orderbook");
+  const setShowOrderbook = dialogSetter("orderbook");
+  const showAutonomous = isDialogOpen("autonomous");
+  const setShowAutonomous = dialogSetter("autonomous");
+  const showSkills = isDialogOpen("skills");
+  const setShowSkills = dialogSetter("skills");
+  const showConstitution = isDialogOpen("constitution");
+  const setShowConstitution = dialogSetter("constitution");
+  const showInjectionDefense = isDialogOpen("injectionDefense");
+  const setShowInjectionDefense = dialogSetter("injectionDefense");
+  const showDataHealth = isDialogOpen("dataHealth");
+  const setShowDataHealth = dialogSetter("dataHealth");
+  const showRiskConfig = isDialogOpen("riskConfig");
+  const setShowRiskConfig = dialogSetter("riskConfig");
+  const showDefi = isDialogOpen("defi");
+  const setShowDefi = dialogSetter("defi");
+  const showMarketOverview = isDialogOpen("marketOverview");
+  const setShowMarketOverview = dialogSetter("marketOverview");
+  const showRegime = isDialogOpen("regime");
+  const setShowRegime = dialogSetter("regime");
+  const showStats = isDialogOpen("stats");
+  const setShowStats = dialogSetter("stats");
+  const showGlobalSearch = isDialogOpen("globalSearch");
+  const setShowGlobalSearch = dialogSetter("globalSearch");
+  const showExitFlow = isDialogOpen("exitFlow");
+  const setShowExitFlow = dialogSetter("exitFlow");
   const [exampleIdx] = useState(() => Math.floor(Math.random() * 7));
-  const [showBacktestWizard, setShowBacktestWizard] = useState(false);
-  const [showBrokerManager, setShowBrokerManager] = useState(false);
-  const [showExchangeManager, setShowExchangeManager] = useState(false);
-  const [showGenomeEvolution, setShowGenomeEvolution] = useState(false);
-  const [showHistorySearch, setShowHistorySearch] = useState(false);
-  const [showIndicatorValue, setShowIndicatorValue] = useState(false);
-  const [showInsights, setShowInsights] = useState(false);
-  const [showMarketPulse, setShowMarketPulse] = useState(false);
-  const [showMessageSelector, setShowMessageSelector] = useState(false);
-  const [showOptimization, setShowOptimization] = useState(false);
-  const [showPlanEditor, setShowPlanEditor] = useState(false);
-  const [showPlugins, setShowPlugins] = useState(false);
-  const [showQuickOpen, setShowQuickOpen] = useState(false);
-  const [showReconciliation, setShowReconciliation] = useState(false);
-  const [showTaskDeps, setShowTaskDeps] = useState(false);
-  const [showWalkForward, setShowWalkForward] = useState(false);
+  const showBacktestWizard = isDialogOpen("backtestWizard");
+  const setShowBacktestWizard = dialogSetter("backtestWizard");
+  const showBrokerManager = isDialogOpen("brokerManager");
+  const setShowBrokerManager = dialogSetter("brokerManager");
+  const showExchangeManager = isDialogOpen("exchangeManager");
+  const setShowExchangeManager = dialogSetter("exchangeManager");
+  const showGenomeEvolution = isDialogOpen("genomeEvolution");
+  const setShowGenomeEvolution = dialogSetter("genomeEvolution");
+  const showHistorySearch = isDialogOpen("historySearch");
+  const setShowHistorySearch = dialogSetter("historySearch");
+  const showIndicatorValue = isDialogOpen("indicatorValue");
+  const setShowIndicatorValue = dialogSetter("indicatorValue");
+  const showInsights = isDialogOpen("insights");
+  const setShowInsights = dialogSetter("insights");
+  const showMarketPulse = isDialogOpen("marketPulse");
+  const setShowMarketPulse = dialogSetter("marketPulse");
+  const showMessageSelector = isDialogOpen("messageSelector");
+  const setShowMessageSelector = dialogSetter("messageSelector");
+  const showOptimization = isDialogOpen("optimization");
+  const setShowOptimization = dialogSetter("optimization");
+  const showPlanEditor = isDialogOpen("planEditor");
+  const setShowPlanEditor = dialogSetter("planEditor");
+  const showPlugins = isDialogOpen("plugins");
+  const setShowPlugins = dialogSetter("plugins");
+  const showQuickOpen = isDialogOpen("quickOpen");
+  const setShowQuickOpen = dialogSetter("quickOpen");
+  const showReconciliation = isDialogOpen("reconciliation");
+  const setShowReconciliation = dialogSetter("reconciliation");
+  const showTaskDeps = isDialogOpen("taskDeps");
+  const setShowTaskDeps = dialogSetter("taskDeps");
+  const showWalkForward = isDialogOpen("walkForward");
+  const setShowWalkForward = dialogSetter("walkForward");
   const [orderRecovery, setOrderRecovery] = useState<{
     orderId: string; symbol: string; reason: string; attempt: number; maxAttempts: number;
   } | null>(null);
@@ -916,6 +1007,20 @@ function AppInner() {
       if (next.radarFocus !== prev.radarFocus) {
         dispatch({ type: "SET_RADAR_FOCUS", focus: next.radarFocus });
       }
+      const legacyDialogs: Array<[keyof typeof next, DialogId]> = [
+        ["showSettings", "settings"],
+        ["showExport", "export"],
+        ["showEmergency", "emergency"],
+        ["showContext", "context"],
+        ["showSessions", "sessions"],
+        ["showMemory", "memory"],
+      ];
+      for (const [field, id] of legacyDialogs) {
+        if (next[field] === undefined) continue;
+        dispatch(next[field]
+          ? { type: "OPEN_DIALOG", id }
+          : { type: "CLOSE_DIALOG", id });
+      }
       if (next.__resetSession) {
         dispatch({ type: "RESET_SESSION" });
       }
@@ -1044,6 +1149,27 @@ function AppInner() {
     }
   }, [runtimeReady, showSetup, dispatch]);
 
+  // ── Startup mode banner (p0-safety Item 4) ──
+  // One-shot at boot: the user must see their capital posture (LIVE/paper)
+  // on entry. strict/observe/plan get no banner — nothing can execute.
+  const startupModeBannerFired = React.useRef(false);
+  useEffect(() => {
+    if (!runtimeReady || startupModeBannerFired.current) return;
+    startupModeBannerFired.current = true;
+    const mode = getState().permissionMode;
+    if (isLiveCapable(mode) || mode === "paper") {
+      dispatch({
+        type: "SHOW_MODE_BANNER",
+        banner: {
+          mode,
+          liveCapable: isLiveCapable(mode),
+          shownAt: Date.now(),
+          dismissed: false,
+        },
+      });
+    }
+  }, [runtimeReady, dispatch, getState]);
+
   const submitRef = React.useRef<(value: string) => void>(() => {});
 
   // ── Ctrl+C double-press exit ──
@@ -1054,7 +1180,7 @@ function AppInner() {
   }, [ctrlC.isDoublePressed, exit]);
 
   // ── Global keybindings (dynamic via keybindings.json) ──
-  useInput((input, key) => {
+  useRoutedInput((input, key) => {
     // Build key string from Ink's key object
     const parts: string[] = [];
     if (key.ctrl) parts.push("ctrl");
@@ -1078,7 +1204,7 @@ function AppInner() {
       }
     }
 
-    if (anyDialogOpen) return;
+    if (anyDialogOpen) return false;
 
     // Resolve actions via keybinding system
     const vimMode = isVimModeEnabled()
@@ -1173,11 +1299,33 @@ function AppInner() {
           return;
         }
         case "toggleAutoMode":
-          dispatch({ type: "SET_PERMISSION_MODE", mode: "auto" });
+        case "toggleStrictMode": {
+          const mode = action === "toggleAutoMode" ? ("auto" as const) : ("strict" as const);
+          // FSM verdict at the call site so the rejection message renders even
+          // though the reducer backstop would also block the transition.
+          const snapshot = getState();
+          const verdict = evaluatePermissionModeTransition({
+            from: snapshot.permissionMode,
+            to: mode,
+            pendingApprovals: snapshot.pendingApprovals.length,
+            isStreaming: snapshot.isStreaming,
+          });
+          if (!verdict.allowed) {
+            dispatch({
+              type: "ADD_MESSAGE",
+              message: {
+                id: `mode-blocked-${Date.now()}`,
+                role: "system" as const,
+                variant: "error" as const,
+                content: verdict.reason ?? `Cannot switch permission mode to ${mode}.`,
+                timestamp: new Date().toISOString(),
+              },
+            });
+            return;
+          }
+          dispatch({ type: "SET_PERMISSION_MODE", mode });
           return;
-        case "toggleStrictMode":
-          dispatch({ type: "SET_PERMISSION_MODE", mode: "strict" });
-          return;
+        }
         case "exit":
           exit();
           return;
@@ -1192,7 +1340,8 @@ function AppInner() {
       ctrlC.onPress();
       return;
     }
-  });
+    return false;
+  }, { id: "global-keys", priority: FOCUS_PRIORITY.GLOBAL_GUARD });
 
   // ── Handlers ──
   const handleSubmit = useCallback(
@@ -2112,26 +2261,19 @@ function AppInner() {
   }
 
   // ── Placeholder text for PromptInput (Claude Code: rotating example commands) ──
-  const EXAMPLE_PROMPTS = [
-    'Try "what\'s BTC doing?"',
-    'Try "scan for opportunities"',
-    'Try "check my portfolio risk"',
-    'Try "/morning-brief"',
-    'Try "analyze ETH setup"',
-    'Try "what\'s trending today?"',
-    'Try "/dd BTC"',
-  ];
-  const placeholder = isStreaming
-    ? ""
-    : ctrlC.isPending
-      ? "Press Ctrl+C again to exit"
-      : !runtimeReady
-        ? "Initializing..."
-        : pendingApprovals.length > 0
-          ? `${pendingApprovals.length} approval(s) pending \u2014 approve <id> or deny <id>`
-          : messages.length === 0
-            ? EXAMPLE_PROMPTS[exampleIdx % EXAMPLE_PROMPTS.length]!
-            : "";
+  const placeholder = React.useMemo(() => (
+    isStreaming
+      ? ""
+      : ctrlC.isPending
+        ? "Press Ctrl+C again to exit"
+        : !runtimeReady
+          ? "Initializing..."
+          : pendingApprovals.length > 0
+            ? `${pendingApprovals.length} approval(s) pending \u2014 approve <id> or deny <id>`
+            : messages.length === 0
+              ? EXAMPLE_PROMPTS[exampleIdx % EXAMPLE_PROMPTS.length]!
+              : ""
+  ), [isStreaming, ctrlC.isPending, runtimeReady, pendingApprovals.length, messages.length, exampleIdx]);
 
   return (
     <Box flexDirection="column">
@@ -2148,7 +2290,11 @@ function AppInner() {
           {messages.length === 0 ? (
             <>
               <BootLivePanel hint={getSessionTip()} />
-              <EmptyChatHint hasExchange={connectivityHints.hasExchange} />
+              {/* Gated on runtimeReady/!isStreaming so the hint can't flash
+                  during boot or while a response is streaming (p0-safety). */}
+              {runtimeReady && !isStreaming && (
+                <EmptyChatHint hasExchange={connectivityHints.hasExchange} />
+              )}
             </>
           ) : (
             <VirtualMessageList
@@ -2300,6 +2446,8 @@ function AppInner() {
           onClose={() => dispatch({ type: "CLOSE_PAGER" })}
         />
       )}
+
+      <DialogHost />
 
       {/* ── Phase 15-18 dialog overlays ── */}
       {showSettings && (
@@ -2606,48 +2754,16 @@ function AppInner() {
         <QueuedCommandsNotice count={queuedCount} />
       )}
 
-      {/* ── Status bar above input (Codex pattern: model · % left · trading status) ── */}
-      <Box paddingX={2} marginY={1} justifyContent="space-between">
-        <Box gap={1}>
-          <Text color={memoryUsageRatio > 0.9 ? "red" : memoryUsageRatio > 0.7 ? "yellow" : undefined} dimColor={memoryUsageRatio <= 0.7}>{Math.round((1 - memoryUsageRatio) * 100)}% left</Text>
-          {liveContextTokens > 0 && (
-            <>
-              <Text dimColor>{"·"}</Text>
-              <Text dimColor>{formatTokenCount(liveContextTokens)} ctx</Text>
-            </>
-          )}
-          {lastTurnDurationMs > 0 && (
-            <>
-              <Text dimColor>{"·"}</Text>
-              <Text dimColor>{formatElapsedMs(lastTurnDurationMs)}</Text>
-              {lastTurnTokens > 0 && (
-                <>
-                  <Text dimColor>{"·"}</Text>
-                  <Text dimColor>{formatTokenCount(lastTurnTokens)} tok</Text>
-                </>
-              )}
-            </>
-          )}
-          {autonomousActive && (
-            <>
-              <Text dimColor>{"\u00b7"}</Text>
-              <Text color="magenta">{"\u25CF"} autonomous</Text>
-            </>
-          )}
-          {memoryUsageRatio > 0.7 && (
-            <>
-              <Text dimColor>{"\u00b7"}</Text>
-              <MemoryUsageIndicator usageRatio={memoryUsageRatio} tokenLimit={contextLimit} />
-            </>
-          )}
-        </Box>
-        <Box gap={1}>
-          <TradingModeBadge mode={permissionMode ?? "ask"} />
-          <KillSwitchBadge status={killSwitches} />
-          <CostDisplay />
-          <Text dimColor>{"\u00b7"} Ctrl+P {"\u00b7"} ? help</Text>
-        </Box>
-      </Box>
+      <StatusLine
+        memoryUsageRatio={memoryUsageRatio}
+        liveContextTokens={liveContextTokens}
+        lastTurnDurationMs={lastTurnDurationMs}
+        lastTurnTokens={lastTurnTokens}
+        autonomousActive={autonomousActive}
+        contextLimit={contextLimit}
+        permissionMode={permissionMode ?? "ask"}
+        killSwitches={killSwitches}
+      />
 
       <RadarFocusBar focus={radarFocus} />
 
@@ -2668,7 +2784,7 @@ function AppInner() {
           autonomousStrategyCount={autonomousStrategyCount}
           vimMode={vimModeActive}
           locked={radarFocus !== null}
-          onShowShortcuts={() => setShowShortcuts(true)}
+          onShowShortcuts={pendingApprovals.length === 0 ? () => setShowShortcuts(true) : undefined}
           onVimModeChange={(mode) => {
             vimModeRef.current = mode;
           }}
@@ -2708,7 +2824,9 @@ export function App() {
         <StatsProvider>
           <NotificationsProvider>
             <AppStateProvider>
-              <AppInner />
+              <InputRouterProvider>
+                <AppInner />
+              </InputRouterProvider>
             </AppStateProvider>
           </NotificationsProvider>
         </StatsProvider>

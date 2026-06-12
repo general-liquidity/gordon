@@ -19,15 +19,27 @@ export function TradingModeBanner({
   const live = banner.liveCapable;
   const color = live ? theme.riskDanger : theme.riskWarning;
   return (
-    <Box borderStyle="round" borderColor={color} paddingX={1}>
-      <Text color={color} bold>
-        {live
-          ? `LIVE TRADING CAPABLE - mode ${banner.mode}. Real orders may execute under risk rules.`
-          : banner.mode === "paper"
-            ? "PAPER MODE - simulated fills only."
-            : `Execution constrained - mode ${banner.mode}.`}
-      </Text>
-      <Text dimColor> Esc/d dismiss</Text>
+    <Box borderStyle="round" borderColor={color} paddingX={1} flexDirection="column">
+      {live ? (
+        <>
+          <Text color={color} bold>{"⚠"} LIVE TRADING — real money at risk</Text>
+          <Text>
+            {banner.mode === "auto"
+              ? "mode: auto — approved orders reach the venue."
+              : `mode: ${banner.mode} — each order still needs your approval.`}
+          </Text>
+          <Text>/paper to switch to simulated fills.</Text>
+        </>
+      ) : banner.mode === "paper" ? (
+        <>
+          <Text color={color} bold>{"▮"} PAPER TRADING — simulated fills only</Text>
+          <Text>No order will reach a real venue.</Text>
+          <Text>/ask or /auto to trade for real.</Text>
+        </>
+      ) : (
+        <Text color={color} bold>Execution constrained — mode {banner.mode}.</Text>
+      )}
+      <Text dimColor>Esc/d dismiss</Text>
     </Box>
   );
 }

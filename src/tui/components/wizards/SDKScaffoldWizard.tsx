@@ -1,19 +1,13 @@
 /**
- * SDKScaffoldWizard — Interactive project scaffolding
+ * SDKScaffoldWizard — Interactive project scaffolding.
  *
  * 4 steps: template, project name, output directory, confirm.
- * Uses Dialog wrapper.
- *
- * Pattern: Claude Code project creation wizard.
  */
 
-import React, { useState } from "react";
+import React, { useState, type Dispatch, type SetStateAction } from "react";
 import { Box, Text, useInput } from "../../ink-custom";
-import { Dialog } from "../../design-system/Dialog.js";
-
-// ============================================================================
-// Types
-// ============================================================================
+import { MultiStepPicker, type PickerStep } from "../../design-system/MultiStepPicker.tsx";
+import { useTheme } from "../../themes/ThemeProvider.tsx";
 
 export type TemplateType = "agent-ts" | "strategy-ts";
 
@@ -28,179 +22,197 @@ interface Props {
   onCancel: () => void;
 }
 
-// ============================================================================
-// Constants
-// ============================================================================
-
 const TEMPLATES: { type: TemplateType; name: string; description: string }[] = [
   { type: "agent-ts", name: "Agent (TypeScript)", description: "Trading agent with event loop and strategy hooks" },
   { type: "strategy-ts", name: "Strategy (TypeScript)", description: "Custom strategy with backtest harness" },
 ];
 
-const STEPS = ["Template", "Project Name", "Output Dir", "Confirm"];
+interface TemplateStepProps {
+  cursor: number;
+  setCursor: Dispatch<SetStateAction<number>>;
+  onNext: () => void;
+}
 
-// ============================================================================
-// Component
-// ============================================================================
+function TemplateStep({ cursor, setCursor, onNext }: TemplateStepProps): React.ReactElement {
+  const theme = useTheme();
 
-export function SDKScaffoldWizard({ onComplete, onCancel }: Props) {
-  const [step, setStep] = useState(0);
-  const [templateIdx, setTemplateIdx] = useState(0);
-  const [projectName, setProjectName] = useState("");
-  const [outputDir, setOutputDir] = useState("./");
+  useInput((_input, key) => {
+    if (key.upArrow) setCursor((current) => Math.max(0, current - 1));
+    if (key.downArrow) setCursor((current) => Math.min(TEMPLATES.length - 1, current + 1));
+    if (key.return) onNext();
+  });
+
+  return (
+    <Box flexDirection="column">
+      <Text bold>Select Template:</Text>
+      {TEMPLATES.map((template, index) => {
+        const isFocused = index === cursor;
+        return (
+          <Box key={template.type} paddingLeft={2} flexDirection="column">
+            <Box>
+              <Text color={isFocused ? theme.uiBrand : undefined}>
+                {isFocused ? "\u25B8 " : "  "}{template.name}
+              </Text>
+            </Box>
+            {isFocused ? (
+              <Box paddingLeft={4}>
+                <Text dimColor>{template.description}</Text>
+              </Box>
+            ) : null}
+          </Box>
+        );
+      })}
+      <Text> </Text>
+      <Text dimColor>{"\u2191\u2193"} select {"\u00b7"} Enter next</Text>
+    </Box>
+  );
+}
+
+interface TextFieldStepProps {
+  label: string;
+  value: string;
+  setValue: Dispatch<SetStateAction<string>>;
+  placeholder: string;
+  allowEmpty?: boolean;
+  hint: string;
+  onNext: () => void;
+}
+
+function TextFieldStep({
+  label,
+  value,
+  setValue,
+  placeholder,
+  allowEmpty = true,
+  hint,
+  onNext,
+}: TextFieldStepProps): React.ReactElement {
+  const theme = useTheme();
 
   useInput((input, key) => {
-    if (key.escape) {
-      if (step > 0) {
-        setStep((s) => s - 1);
-      } else {
-        onCancel();
-      }
+    if (key.return && (allowEmpty || value.length > 0)) {
+      onNext();
       return;
     }
-
-    // Step 0: Template
-    if (step === 0) {
-      if (key.upArrow) setTemplateIdx((c) => Math.max(0, c - 1));
-      if (key.downArrow) setTemplateIdx((c) => Math.min(TEMPLATES.length - 1, c + 1));
-      if (key.return) setStep(1);
+    if (key.backspace || key.delete) {
+      setValue((current) => current.slice(0, -1));
       return;
     }
-
-    // Step 1: Project name
-    if (step === 1) {
-      if (key.return && projectName.length > 0) {
-        setStep(2);
-        return;
-      }
-      if (key.backspace || key.delete) {
-        setProjectName((s) => s.slice(0, -1));
-        return;
-      }
-      if (input && !key.upArrow && !key.downArrow) {
-        setProjectName((s) => s + input);
-      }
-      return;
-    }
-
-    // Step 2: Output dir
-    if (step === 2) {
-      if (key.return) {
-        setStep(3);
-        return;
-      }
-      if (key.backspace || key.delete) {
-        setOutputDir((s) => s.slice(0, -1));
-        return;
-      }
-      if (input && !key.upArrow && !key.downArrow) {
-        setOutputDir((s) => s + input);
-      }
-      return;
-    }
-
-    // Step 3: Confirm
-    if (step === 3) {
-      if (key.return) {
-        onComplete({
-          template: TEMPLATES[templateIdx]!.type,
-          projectName: projectName || "my-project",
-          outputDir: outputDir || "./",
-        });
-      }
+    if (input && !key.upArrow && !key.downArrow) {
+      setValue((current) => current + input);
     }
   });
 
   return (
-    <Dialog
-      title="SDK SCAFFOLD"
-      subtitle={`Step ${step + 1} of ${STEPS.length}: ${STEPS[step]}`}
-      tone="brand"
-      onClose={onCancel}
-    >
-      {/* Progress */}
+    <Box flexDirection="column">
       <Box>
-        {STEPS.map((s, i) => (
-          <React.Fragment key={s}>
-            {i > 0 && <Text dimColor> {"\u2500"} </Text>}
-            <Text
-              color={i === step ? "cyanBright" : i < step ? "green" : undefined}
-              dimColor={i > step}
-            >
-              {i < step ? "\u25CF" : i === step ? "\u25C9" : "\u25CB"} {s}
-            </Text>
-          </React.Fragment>
-        ))}
+        <Text bold>{label}: </Text>
+        <Text>{value || placeholder}</Text>
+        <Text color={theme.uiBrand}>{"\u2588"}</Text>
       </Box>
       <Text> </Text>
+      <Text dimColor>{hint} {"\u00b7"} Enter next</Text>
+    </Box>
+  );
+}
 
-      {/* Step 0: Template */}
-      {step === 0 && (
-        <Box flexDirection="column">
-          <Text bold>Select Template:</Text>
-          {TEMPLATES.map((t, i) => {
-            const isFocused = i === templateIdx;
-            return (
-              <Box key={t.type} paddingLeft={2} flexDirection="column">
-                <Box>
-                  <Text color={isFocused ? "cyanBright" : undefined}>
-                    {isFocused ? "\u25B8 " : "  "}{t.name}
-                  </Text>
-                </Box>
-                {isFocused && (
-                  <Box paddingLeft={4}>
-                    <Text dimColor>{t.description}</Text>
-                  </Box>
-                )}
-              </Box>
-            );
-          })}
-          <Text> </Text>
-          <Text dimColor>{"\u2191\u2193"} select {"\u00b7"} Enter next</Text>
-        </Box>
-      )}
+interface ConfirmStepProps {
+  config: ScaffoldConfig;
+  templateName: string;
+  onComplete: () => void;
+}
 
-      {/* Step 1: Project name */}
-      {step === 1 && (
-        <Box flexDirection="column">
-          <Box>
-            <Text bold>Project Name: </Text>
-            <Text>{projectName || "..."}</Text>
-            <Text color="cyanBright">{"\u2588"}</Text>
-          </Box>
-          <Text> </Text>
-          <Text dimColor>Type project name {"\u00b7"} Enter next {"\u00b7"} Esc back</Text>
-        </Box>
-      )}
+function ConfirmStep({ config, templateName, onComplete }: ConfirmStepProps): React.ReactElement {
+  const theme = useTheme();
 
-      {/* Step 2: Output dir */}
-      {step === 2 && (
-        <Box flexDirection="column">
-          <Box>
-            <Text bold>Output Directory: </Text>
-            <Text>{outputDir}</Text>
-            <Text color="cyanBright">{"\u2588"}</Text>
-          </Box>
-          <Text> </Text>
-          <Text dimColor>Type directory {"\u00b7"} Enter next {"\u00b7"} Esc back</Text>
-        </Box>
-      )}
+  useInput((_input, key) => {
+    if (key.return) onComplete();
+  });
 
-      {/* Step 3: Confirm */}
-      {step === 3 && (
-        <Box flexDirection="column">
-          <Text bold>Confirm Scaffold:</Text>
-          <Text> </Text>
-          <Box paddingLeft={2} flexDirection="column">
-            <Box><Text dimColor>Template:  </Text><Text bold>{TEMPLATES[templateIdx]!.name}</Text></Box>
-            <Box><Text dimColor>Project:   </Text><Text bold>{projectName || "my-project"}</Text></Box>
-            <Box><Text dimColor>Directory: </Text><Text>{outputDir || "./"}</Text></Box>
-          </Box>
-          <Text> </Text>
-          <Text bold color="green">Press Enter to scaffold</Text>
-          <Text dimColor>Esc go back</Text>
-        </Box>
-      )}
-    </Dialog>
+  return (
+    <Box flexDirection="column">
+      <Text bold>Confirm Scaffold:</Text>
+      <Text> </Text>
+      <Box paddingLeft={2} flexDirection="column">
+        <Box><Text dimColor>Template:  </Text><Text bold>{templateName}</Text></Box>
+        <Box><Text dimColor>Project:   </Text><Text bold>{config.projectName}</Text></Box>
+        <Box><Text dimColor>Directory: </Text><Text>{config.outputDir}</Text></Box>
+      </Box>
+      <Text> </Text>
+      <Text bold color={theme.riskSafe}>Press Enter to scaffold</Text>
+    </Box>
+  );
+}
+
+export function SDKScaffoldWizard({ onComplete, onCancel }: Props) {
+  const [templateIdx, setTemplateIdx] = useState(0);
+  const [projectName, setProjectName] = useState("");
+  const [outputDir, setOutputDir] = useState("./");
+
+  const config: ScaffoldConfig = {
+    template: TEMPLATES[templateIdx]!.type,
+    projectName: projectName || "my-project",
+    outputDir: outputDir || "./",
+  };
+
+  const steps: Record<string, PickerStep<ScaffoldConfig>> = {
+    template: {
+      title: "Step 1: Template",
+      render: (ctx) => (
+        <TemplateStep
+          cursor={templateIdx}
+          setCursor={setTemplateIdx}
+          onNext={() => ctx.go("project-name")}
+        />
+      ),
+    },
+    "project-name": {
+      title: "Step 2: Project name",
+      render: (ctx) => (
+        <TextFieldStep
+          label="Project Name"
+          value={projectName}
+          setValue={setProjectName}
+          placeholder="..."
+          allowEmpty={false}
+          hint="Type project name"
+          onNext={() => ctx.go("output-dir")}
+        />
+      ),
+    },
+    "output-dir": {
+      title: "Step 3: Output directory",
+      render: (ctx) => (
+        <TextFieldStep
+          label="Output Directory"
+          value={outputDir}
+          setValue={setOutputDir}
+          placeholder="./"
+          hint="Type directory"
+          onNext={() => ctx.go("confirm")}
+        />
+      ),
+    },
+    confirm: {
+      title: "Step 4: Confirm",
+      render: () => (
+        <ConfirmStep
+          config={config}
+          templateName={TEMPLATES[templateIdx]!.name}
+          onComplete={() => onComplete(config)}
+        />
+      ),
+    },
+  };
+
+  return (
+    <MultiStepPicker<ScaffoldConfig>
+      title="SDK SCAFFOLD"
+      steps={steps}
+      initialStep="template"
+      onComplete={onComplete}
+      onCancel={onCancel}
+      showProgress
+    />
   );
 }

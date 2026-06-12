@@ -14,9 +14,19 @@ export { ListItem } from "./ListItem.js";
 export { Dialog } from "./Dialog.js";
 export { FuzzyPicker } from "./FuzzyPicker.js";
 export type { PickerItem } from "./FuzzyPicker.js";
-export { KeyboardShortcutHint } from "./KeyboardShortcutHint.js";
+export { KeyboardShortcutHint, formatKeys } from "./KeyboardShortcutHint.js";
+export { KeyboardHints } from "./KeyboardHints.js";
+export type { KeyHint } from "./KeyboardHints.js";
 export { Button, buttonVariantColor } from "./Button.js";
 export type { ButtonVariant } from "./Button.js";
+export { MultiStepPicker, pickerTransition } from "./MultiStepPicker.js";
+export type {
+  MultiStepPickerProps,
+  PickerMachineEvent,
+  PickerMachineState,
+  PickerStep,
+  PickerStepContext,
+} from "./MultiStepPicker.js";
 export { SearchBox } from "./SearchBox.js";
 export {
   getAgentColor,

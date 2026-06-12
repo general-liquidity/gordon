@@ -90,3 +90,10 @@ TUI*.txt
 docs/pitch/
 general-liquidity-web-v2/
 general-liquidity-website/
+
+# Vendored reference repos + AI-session scratch (never commit; contains personal files)
+agents/
+opensolvency/
+agent-tools/
+mcps/
+terminals/

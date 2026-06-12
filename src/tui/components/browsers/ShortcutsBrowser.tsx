@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Box, Text, useInput } from "../../ink-custom";
-import { getResolvedBindings, type KeyBinding } from "../../keybindings/keybindings.js";
+import { getResolvedBindings, validateKeybindings, type KeyBinding } from "../../keybindings/keybindings.js";
+import { KeyboardHints, KeybindingWarnings } from "../../design-system/index.ts";
 
 /**
  * ShortcutsBrowser — Searchable keybinding reference
@@ -25,9 +26,10 @@ export function ShortcutsBrowser({ onCancel }: Props) {
   // Group by when
   const groups: Record<string, KeyBinding[]> = {};
   for (const b of filtered) {
-    const group = b.when === "normalMode" ? "Vim Normal" : b.when === "insertMode" ? "Vim Insert" : "Global";
+    const group = b.when === "normalMode" ? "Vim — prompt (Normal)" : b.when === "insertMode" ? "Vim — prompt (Insert)" : "Global";
     (groups[group] ??= []).push(b);
   }
+  const conflicts = validateKeybindings(allBindings);
 
   useInput((input, key) => {
     if (key.escape) { if (query) { setQuery(""); setSelectedIdx(0); } else onCancel(); return; }
@@ -50,6 +52,7 @@ export function ShortcutsBrowser({ onCancel }: Props) {
         <Text color="cyanBright">{"\uD83D\uDD0D"} </Text>
         {query ? <Text>{query}<Text color="cyanBright">{"\u2588"}</Text></Text> : <Text dimColor>Type to search...</Text>}
       </Box>
+      <KeybindingWarnings conflicts={conflicts} />
 
       <Box flexDirection="column" marginTop={1}>
         {Object.entries(groups).map(([group, bindings]) => (
@@ -73,7 +76,13 @@ export function ShortcutsBrowser({ onCancel }: Props) {
 
       <Text dimColor>Customize in ~/.gordon/keybindings.json</Text>
       <Box marginTop={1}>
-        <Text dimColor>{"\u2191\u2193"} scroll {"\u00B7"} Esc {query ? "clear" : "close"}</Text>
+        <KeyboardHints
+          hints={[
+            { keys: "type", label: "to filter" },
+            { keys: "↑↓", label: "navigate" },
+            { keys: "esc", label: query ? "clear" : "close" },
+          ]}
+        />
       </Box>
     </Box>
   );

@@ -221,10 +221,18 @@ export function appReducer(state: AppState, action: Action): AppState {
         activeAgents: [],
         handoffHistory: [],
         pendingApprovals: [],
+        notifications: [],
+        backgroundTasks: [],
+        contextTokens: 0,
+        lastTurnDurationMs: 0,
+        lastTurnTokens: 0,
+        ctrlCPressed: false,
+        showPalette: false,
         showResetConfirm: false,
         showHelp: false,
         pager: null,
         radarFocus: null,
+        openDialogs: [],
       };
 
     case "SHOW_MODE_BANNER":
@@ -252,6 +260,22 @@ export function appReducer(state: AppState, action: Action): AppState {
 
     case "SET_RADAR_FOCUS":
       return state.radarFocus === action.focus ? state : { ...state, radarFocus: action.focus };
+
+    case "OPEN_DIALOG": {
+      const next = state.openDialogs.filter((dialog) => dialog.id !== action.id);
+      next.push({ id: action.id, payload: action.payload });
+      return { ...state, openDialogs: next };
+    }
+
+    case "CLOSE_DIALOG": {
+      const next = state.openDialogs.filter((dialog) => dialog.id !== action.id);
+      return next.length === state.openDialogs.length ? state : { ...state, openDialogs: next };
+    }
+
+    case "CLOSE_TOP_DIALOG":
+      return state.openDialogs.length === 0
+        ? state
+        : { ...state, openDialogs: state.openDialogs.slice(0, -1) };
 
     // Phase 4 — Event-driven notifications
     case "INJECT_NOTIFICATION":
@@ -293,25 +317,6 @@ export function appReducer(state: AppState, action: Action): AppState {
         autonomousActive: action.active,
         autonomousStrategyCount: action.strategyCount ?? (action.active ? 1 : 0),
       };
-
-    // Phase 15-18 — Panel toggles
-    case "SET_SHOW_SETTINGS":
-      return { ...state, showSettings: action.show };
-
-    case "SET_SHOW_EXPORT":
-      return { ...state, showExport: action.show };
-
-    case "SET_SHOW_EMERGENCY":
-      return { ...state, showEmergency: action.show };
-
-    case "SET_SHOW_CONTEXT":
-      return { ...state, showContext: action.show };
-
-    case "SET_SHOW_SESSIONS":
-      return { ...state, showSessions: action.show };
-
-    case "SET_SHOW_MEMORY":
-      return { ...state, showMemory: action.show };
 
     case "SET_PRIVACY_MODE":
       return { ...state, privacyMode: action.enabled };

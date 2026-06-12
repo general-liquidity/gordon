@@ -1,6 +1,7 @@
-import React, { useState, useCallback } from "react";
-import { Box, Text, useInput } from "../../ink-custom";
+import React from "react";
+import { Box, Text } from "../../ink-custom";
 import { GordonSelect } from "../../design-system/GordonSelect.js";
+import { MultiStepPicker, type PickerStep } from "../../design-system/MultiStepPicker.tsx";
 
 /**
  * ModelPicker — Interactive 2-step model selector (Claude Code style)
@@ -72,67 +73,51 @@ const MODEL_OPTIONS: Record<string, ModelOption[]> = {
 };
 
 export function ModelPicker({ currentProvider, currentModel, onSelect, onCancel }: Props) {
-  const [step, setStep] = useState<"provider" | "model">("provider");
-  const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
-
-  useInput((_input, key) => {
-    if (key.escape) {
-      if (step === "model") {
-        setStep("provider");
-        setSelectedProvider(null);
-      } else {
-        onCancel();
-      }
-    }
-  });
-
-  const handleProviderSelect = useCallback((value: string) => {
-    setSelectedProvider(value);
-    setStep("model");
-  }, []);
-
-  const handleModelSelect = useCallback((value: string) => {
-    if (!selectedProvider) return;
-    const model = value === "__default__" ? undefined : value;
-    onSelect(selectedProvider, model);
-  }, [selectedProvider, onSelect]);
-
-  const providerLabel = selectedProvider
-    ? PROVIDERS.find((p) => p.value === selectedProvider)?.label ?? selectedProvider
-    : "";
+  type ModelPickerData = { provider: string };
+  const steps: Record<string, PickerStep<ModelPickerData>> = {
+    provider: {
+      title: "Step 1: Choose provider",
+      hint: "Which AI provider should Gordon use?",
+      render: (ctx) => (
+        <Box marginTop={1}>
+          <GordonSelect
+            options={PROVIDERS}
+            onChange={(value) => {
+              ctx.set("provider", value);
+              ctx.go("model");
+            }}
+          />
+        </Box>
+      ),
+    },
+    model: {
+      title: "Step 2: Choose model",
+      render: (ctx) => {
+        const provider = ctx.data.provider ?? currentProvider;
+        const providerLabel = PROVIDERS.find((p) => p.value === provider)?.label ?? provider;
+        return (
+          <>
+            <Text dimColor>Provider: {providerLabel}</Text>
+            <Box marginTop={1}>
+              <GordonSelect
+                options={MODEL_OPTIONS[provider] ?? MODEL_OPTIONS.openai!}
+                onChange={(value) => onSelect(provider, value === "__default__" ? undefined : value)}
+              />
+            </Box>
+          </>
+        );
+      },
+    },
+  };
 
   return (
-    <Box flexDirection="column" paddingX={1} paddingY={1}>
-      {/* Header */}
-      <Box marginBottom={1}>
-        <Text bold color="cyanBright">MODEL SELECTION</Text>
-        <Text dimColor>  (current: {currentProvider}/{currentModel})</Text>
-      </Box>
-
-      {step === "provider" ? (
-        <>
-          <Text bold>Step 1: Choose provider</Text>
-          <Text dimColor>Which AI provider should Gordon use?</Text>
-          <Box marginTop={1}>
-            <GordonSelect options={PROVIDERS} onChange={handleProviderSelect} />
-          </Box>
-        </>
-      ) : (
-        <>
-          <Text bold>Step 2: Choose model</Text>
-          <Text dimColor>Provider: {providerLabel}</Text>
-          <Box marginTop={1}>
-            <GordonSelect
-              options={MODEL_OPTIONS[selectedProvider ?? "openai"] ?? MODEL_OPTIONS.openai!}
-              onChange={handleModelSelect}
-            />
-          </Box>
-        </>
-      )}
-
-      <Box marginTop={1}>
-        <Text dimColor>Esc {step === "model" ? "to go back" : "to cancel"} {"\u00B7"} Enter to select</Text>
-      </Box>
-    </Box>
+    <MultiStepPicker<ModelPickerData>
+      title="MODEL SELECTION"
+      titleNote={`(current: ${currentProvider}/${currentModel})`}
+      steps={steps}
+      initialStep="provider"
+      onComplete={() => {}}
+      onCancel={onCancel}
+    />
   );
 }

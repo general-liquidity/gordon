@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { Box, Text, useInput } from "../../ink-custom";
+import { Box, Text } from "../../ink-custom";
 import { useAnimationClock } from "../../hooks/animation/useAnimationClock.js";
 import { ToolExecutionDetailDialog } from "../dialogs/ToolExecutionDetailDialog.tsx";
+import { useRoutedInput, FOCUS_PRIORITY } from "../../input/InputRouterContext.tsx";
 
 // ============================================================================
 // ToolCallInline — Inline tool execution display (Claude Code pattern)
@@ -277,6 +278,14 @@ const BlinkingDot = React.memo(function BlinkingDot({ active }: { active: boolea
   return <Text color="cyanBright">{visible ? "\u25CF" : " "}</Text>;
 });
 
+const RunningElapsed = React.memo(function RunningElapsed({ startedAt }: { startedAt: number }) {
+  // 1s clock, mounted only while the call is running — completed rows never
+  // subscribe, so the ticker cannot re-render them (Rules of Hooks safe).
+  useAnimationClock(1000);
+  const elapsedS = Math.max(0, Math.floor((Date.now() - startedAt) / 1000));
+  return <Text dimColor> {elapsedS}s</Text>;
+});
+
 // Cache tool labels — regex only runs once per unique tool name
 const _toolLabelCache = new Map<string, string>();
 function getCachedToolLabel(toolName: string): string {
@@ -303,6 +312,7 @@ const ToolCallRow = React.memo(function ToolCallRow({ call }: { call: ToolCallSt
           {" "}{getCachedToolLabel(call.toolName)}
         </Text>
         <Text dimColor>{getToolArgs(call.args)}</Text>
+        {call.status === "running" && <RunningElapsed startedAt={call.startedAt} />}
         {call.duration != null && (
           <Text dimColor> {call.duration < 1000 ? `${call.duration}ms` : `${(call.duration / 1000).toFixed(1)}s`}</Text>
         )}
@@ -330,15 +340,17 @@ export const ToolCallInline = React.memo(function ToolCallInline({ calls }: Prop
   const shouldCollapse = completed.length >= 4 && !expanded;
   const latest = calls[calls.length - 1];
 
-  useInput((input, key) => {
+  useRoutedInput((input, key) => {
     if (key.ctrl && input === "o" && completed.length >= 4) {
       setExpanded((e) => !e);
       return;
     }
     if ((input === "d" || input === "D") && latest && !showDetail) {
       setShowDetail(true);
+      return;
     }
-  });
+    return false;
+  }, { id: "tool-call-inline", priority: FOCUS_PRIORITY.OVERLAY, isActive: calls.length > 0 });
 
   if (calls.length === 0) return null;
 

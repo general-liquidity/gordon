@@ -1,5 +1,6 @@
 import React from "react";
 import { Box, Text } from "../ink-custom";
+import type { KeybindingConflict } from "../keybindings/keybindings.ts";
 
 // ============================================================================
 // KeybindingWarnings — Display keybinding conflict warnings
@@ -10,14 +11,8 @@ import { Box, Text } from "../ink-custom";
 // Yellow color. Returns null when conflicts array is empty.
 // ============================================================================
 
-interface Conflict {
-  action1: string;
-  action2: string;
-  key: string;
-}
-
 interface Props {
-  conflicts: Conflict[];
+  conflicts: KeybindingConflict[];
 }
 
 export function KeybindingWarnings({ conflicts }: Props) {
@@ -31,7 +26,7 @@ export function KeybindingWarnings({ conflicts }: Props) {
           <Text color="yellow" bold>
             [{conflict.key}]
           </Text>
-          {` bound to both "${conflict.action1}" and "${conflict.action2}"`}
+          {` → "${conflict.winner}" wins over ${conflict.actions.slice(1).map((action) => `"${action}"`).join(", ")}`}
         </Text>
       ))}
     </Box>

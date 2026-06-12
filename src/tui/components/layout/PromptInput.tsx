@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef } from "react";
-import { Box, Text, useInput, useStdout } from "../../ink-custom";
+import { Box, Text, useStdout } from "../../ink-custom";
 import { useSlashCommandTypeahead, type TypeaheadMatch } from "../../hooks/useSlashCommandTypeahead.js";
 import { useInputHistory } from "../../hooks/input/useInputHistory.js";
 import { useImagePaste } from "../../hooks/input/useImagePaste.js";
@@ -16,6 +16,7 @@ import {
 } from "../../vim/index.js";
 import { useTheme } from "../../themes/ThemeProvider.tsx";
 import { markInteraction } from "../../diagnostics/performanceMonitor.ts";
+import { useRoutedInput, FOCUS_PRIORITY } from "../../input/InputRouterContext.tsx";
 
 // ============================================================================
 // PromptInput — Claude Code-style compact slash command picker
@@ -90,7 +91,7 @@ interface Props {
 // Fixed width for command name column — keeps descriptions aligned
 const CMD_COL_WIDTH = 18;
 
-export function PromptInput({
+export const PromptInput = React.memo(function PromptInput({
   onSubmit,
   placeholder = "",
   permissionMode,
@@ -172,7 +173,7 @@ export function PromptInput({
   // User scrolls with arrow keys — all commands accessible.
   const maxVisible = Math.min(Math.max(10, Math.floor(termRows * 0.6)), 30);
 
-  useInput((input, key) => {
+  useRoutedInput((input, key) => {
     if (locked) return;
     markInteraction("keystroke");
     if (value === "" && input === "?" && onShowShortcuts && !key.ctrl && !key.meta) {
@@ -333,7 +334,7 @@ export function PromptInput({
       setCursorPos((p) => p + inputGraphemes);
       setSelectedIdx(0);
     }
-  });
+  }, { id: "prompt-input", priority: FOCUS_PRIORITY.CHAT });
 
   // Build flat row list with headers interleaved
   const allRows: Array<
@@ -468,7 +469,7 @@ export function PromptInput({
       </Box>
     </Box>
   );
-}
+});
 
 function vimModeName(mode: VimMode): "insert" | "normal" | "visual" {
   switch (mode) {

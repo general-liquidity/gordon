@@ -17,7 +17,7 @@ const TIPS: Tip[] = [
   { id: "compact", text: "Run /compact when context gets large to free memory", category: "performance" },
   { id: "privacy", text: "Press Ctrl+Shift+P to toggle privacy screen", category: "privacy" },
   { id: "defi", text: "/defi opens the DeFi dashboard with yield comparison", category: "defi" },
-  { id: "vim", text: "Enable vim mode for power-user input editing", category: "input" },
+  { id: "vim", text: 'Vim mode edits the prompt input. Enable it in ~/.gordon/keybindings.json ("vimMode": true).', category: "input" },
   { id: "indicators", text: "/indicators lets you browse all 32 technical indicators", category: "analysis" },
   { id: "consensus", text: "/consensus shows the multi-evaluator trade voting system", category: "analysis" },
   { id: "evolve", text: "/evolve launches genetic strategy optimization", category: "strategy" },

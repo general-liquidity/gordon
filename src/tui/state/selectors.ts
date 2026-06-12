@@ -22,6 +22,8 @@ import type {
   OverlayViewId,
   PagerContent,
   RadarFocus,
+  DialogId,
+  OpenDialog,
 } from "./types.js";
 import type { Message } from "../components/messages/MessageBubble.tsx";
 import type { AgentChain, HandoffEvent } from "../components/status/AgentProgress.tsx";
@@ -350,6 +352,22 @@ export function selectPager(state: AppState): PagerContent | null {
 
 export function selectRadarFocus(state: AppState): RadarFocus | null {
   return state.radarFocus;
+}
+
+export function selectOpenDialogs(state: AppState): OpenDialog[] {
+  return state.openDialogs;
+}
+
+export function selectAnyDialogOpen(state: AppState): boolean {
+  return state.openDialogs.length > 0;
+}
+
+export function selectTopDialog(state: AppState): OpenDialog | null {
+  return state.openDialogs[state.openDialogs.length - 1] ?? null;
+}
+
+export function selectDialogPayload<T>(state: AppState, id: DialogId): T | undefined {
+  return state.openDialogs.find((dialog) => dialog.id === id)?.payload as T | undefined;
 }
 
 // ============================================================================

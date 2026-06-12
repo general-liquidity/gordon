@@ -1,6 +1,7 @@
-import React, { useState, useCallback } from "react";
-import { Box, Text, useInput } from "../../ink-custom";
+import React from "react";
+import { Box, Text } from "../../ink-custom";
 import { Select, TextInput } from "@inkjs/ui";
+import { MultiStepPicker, type PickerStep } from "../../design-system/MultiStepPicker.tsx";
 
 /**
  * BrokerPicker — Interactive broker selector + setup wizard
@@ -33,73 +34,80 @@ const ACTIONS = [
   { label: "Connect via OAuth", value: "oauth" },
 ];
 
-type Step = "action" | "broker" | "apiKey" | "apiSecret";
+interface BrokerPickerData {
+  action: string;
+  broker: string;
+  apiKey: string;
+  apiSecret: string;
+}
 
 export function BrokerPicker({ activeBroker, configuredBrokers, onComplete, onCancel }: Props) {
-  const [step, setStep] = useState<Step>("action");
-  const [action, setAction] = useState("");
-  const [broker, setBroker] = useState("");
-  const [apiKey, setApiKey] = useState("");
-
-  useInput((_input, key) => {
-    if (key.escape) {
-      if (step === "action") onCancel();
-      else setStep("action");
-    }
-  });
-
-  const handleAction = useCallback((value: string) => {
-    setAction(value);
-    if (value === "status") {
-      onComplete("status", activeBroker ?? "none");
-    } else {
-      setStep("broker");
-    }
-  }, [activeBroker, onComplete]);
-
-  const handleBroker = useCallback((value: string) => {
-    setBroker(value);
-    if (action === "add") setStep("apiKey");
-    else onComplete(action, value);
-  }, [action, onComplete]);
-
-  const handleApiKey = useCallback((value: string) => {
-    setApiKey(value);
-    setStep("apiSecret");
-  }, []);
-
-  const handleApiSecret = useCallback((value: string) => {
-    onComplete(action, broker, { apiKey, apiSecret: value });
-  }, [action, broker, apiKey, onComplete]);
+  const steps: Record<string, PickerStep<BrokerPickerData>> = {
+    action: {
+      hint: configuredBrokers.length > 0 ? `Configured: ${configuredBrokers.join(", ")}` : undefined,
+      render: (ctx) => (
+        <Select
+          options={ACTIONS}
+          onChange={(value) => {
+            ctx.set("action", value);
+            if (value === "status") onComplete("status", activeBroker ?? "none");
+            else ctx.go("broker");
+          }}
+        />
+      ),
+    },
+    broker: {
+      render: (ctx) => (
+        <Select
+          options={BROKERS}
+          onChange={(value) => {
+            ctx.set("broker", value);
+            if (ctx.data.action === "add") ctx.go("apiKey");
+            else onComplete(ctx.data.action ?? "", value);
+          }}
+        />
+      ),
+    },
+    apiKey: {
+      render: (ctx) => (
+        <>
+          <Text bold>Enter {ctx.data.broker} API key:</Text>
+          <TextInput
+            placeholder="API key..."
+            onSubmit={(value) => {
+              ctx.set("apiKey", value);
+              ctx.go("apiSecret");
+            }}
+          />
+        </>
+      ),
+    },
+    apiSecret: {
+      render: (ctx) => (
+        <>
+          <Text bold>Enter {ctx.data.broker} API secret:</Text>
+          <TextInput
+            placeholder="API secret..."
+            onSubmit={(value) => {
+              onComplete(ctx.data.action ?? "", ctx.data.broker ?? "", {
+                apiKey: ctx.data.apiKey ?? "",
+                apiSecret: value,
+              });
+            }}
+          />
+        </>
+      ),
+    },
+  };
 
   return (
-    <Box flexDirection="column" paddingX={1} paddingY={1}>
-      <Box marginBottom={1}>
-        <Text bold color="cyanBright">BROKER SETUP</Text>
-        {activeBroker && <Text dimColor>  (active: {activeBroker})</Text>}
-      </Box>
-      {configuredBrokers.length > 0 && step === "action" && (
-        <Text dimColor>Configured: {configuredBrokers.join(", ")}</Text>
-      )}
-      <Box marginTop={1}>
-        {step === "action" && <Select options={ACTIONS} onChange={handleAction} />}
-        {step === "broker" && <Select options={BROKERS} onChange={handleBroker} />}
-        {step === "apiKey" && (
-          <>
-            <Text bold>Enter {broker} API key:</Text>
-            <TextInput placeholder="API key..." onSubmit={handleApiKey} />
-          </>
-        )}
-        {step === "apiSecret" && (
-          <>
-            <Text bold>Enter {broker} API secret:</Text>
-            <TextInput placeholder="API secret..." onSubmit={handleApiSecret} />
-          </>
-        )}
-      </Box>
-      <Box marginTop={1}>
-        <Text dimColor>Esc {step !== "action" ? "to go back" : "to cancel"} {"\u00B7"} Enter to continue</Text>
-      </Box>
-    </Box>
+    <MultiStepPicker<BrokerPickerData>
+      title="BROKER SETUP"
+      titleNote={activeBroker ? `(active: ${activeBroker})` : undefined}
+      steps={steps}
+      initialStep="action"
+      onComplete={(data) => onComplete(data.action, data.broker, data.apiKey ? { apiKey: data.apiKey, apiSecret: data.apiSecret } : undefined)}
+      onCancel={onCancel}
+    />
   );
 }

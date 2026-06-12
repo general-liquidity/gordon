@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Box, Text, useInput } from "../../ink-custom";
 import { StructuredDiff, type DiffHunk } from "../editors/StructuredDiff.tsx";
+import { KeyboardHints } from "../../design-system/KeyboardHints.tsx";
 
 // ============================================================================
 // DiffDialog — Browse diffs per trading session with file list and detail view
@@ -25,7 +26,7 @@ export function DiffDialog({ diffs, onClose }: Props) {
       <Box flexDirection="column" borderStyle="round" borderColor="cyan" paddingX={1}>
         <Text bold color="cyanBright">DIFF: {diffs[selected]!.path}</Text>
         <StructuredDiff hunks={diffs[selected]!.hunks} filePath={diffs[selected]!.path} />
-        <Text dimColor>Esc to go back</Text>
+        <KeyboardHints hints={[{ keys: "esc", label: "back" }]} />
       </Box>
     );
   }
@@ -41,7 +42,13 @@ export function DiffDialog({ diffs, onClose }: Props) {
           <Text color="red"> -{diff.deletions}</Text>
         </Box>
       ))}
-      <Text dimColor>{diffs.length} files {"\u00B7"} Enter to view {"\u00B7"} Esc to close</Text>
+      <KeyboardHints
+        hints={[
+          { keys: "↑↓", label: "navigate" },
+          { keys: "enter", label: "view" },
+          { keys: "esc", label: "close" },
+        ]}
+      />
     </Box>
   );
 }

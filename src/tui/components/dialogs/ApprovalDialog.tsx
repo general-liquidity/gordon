@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from "react";
-import { Box, Text, useInput } from "../../ink-custom";
+import { Box, Text } from "../../ink-custom";
 import { GordonSelect as Select } from "../../design-system/GordonSelect.js";
+import { KeyboardHints } from "../../design-system/KeyboardHints.tsx";
 import { getRiskColor, type RiskLevel } from "../../design-system/colorMap.ts";
 import { useTheme } from "../../themes/ThemeProvider.tsx";
 import { Divider } from "../layout/Divider.tsx";
+import { useRoutedInput, FOCUS_PRIORITY } from "../../input/InputRouterContext.tsx";
 
 // ============================================================================
 // ApprovalDialog — Per-action approval (Claude Code permission dialog style)
@@ -110,6 +112,9 @@ export function ApprovalDialog({ approval, onDecision }: Props) {
 function StandardApproval({ approval, onDecision }: Props) {
   const theme = useTheme();
   const riskTone = getRiskColor(approval.riskClass as RiskLevel, theme);
+  const [showKeys, setShowKeys] = useState(false);
+
+  useApprovalKeyHelp(showKeys, setShowKeys);
 
   return (
     <Box flexDirection="column" marginTop={1}>
@@ -134,6 +139,7 @@ function StandardApproval({ approval, onDecision }: Props) {
             onChange={(v) => onDecision(v as ApprovalDecision, approval.id)}
           />
         </Box>
+        <ApprovalKeyHints expanded={showKeys} />
       </Box>
       <Divider />
     </Box>
@@ -145,6 +151,9 @@ function StandardApproval({ approval, onDecision }: Props) {
 function HighApproval({ approval, onDecision }: Props) {
   const theme = useTheme();
   const riskTone = getRiskColor("high", theme);
+  const [showKeys, setShowKeys] = useState(false);
+
+  useApprovalKeyHelp(showKeys, setShowKeys);
 
   return (
     <Box flexDirection="column" marginTop={1}>
@@ -173,6 +182,7 @@ function HighApproval({ approval, onDecision }: Props) {
             onChange={(v) => onDecision(v as ApprovalDecision, approval.id)}
           />
         </Box>
+        <ApprovalKeyHints expanded={showKeys} />
       </Box>
     </Box>
   );
@@ -183,6 +193,7 @@ function HighApproval({ approval, onDecision }: Props) {
 function CriticalApproval({ approval, onDecision }: Props) {
   const [countdown, setCountdown] = useState(3);
   const [unlocked, setUnlocked] = useState(false);
+  const [showKeys, setShowKeys] = useState(false);
   const theme = useTheme();
   const riskTone = getRiskColor("critical", theme);
 
@@ -192,9 +203,14 @@ function CriticalApproval({ approval, onDecision }: Props) {
     return () => clearTimeout(t);
   }, [countdown]);
 
-  useInput((_, key) => {
-    if (key.escape) onDecision("deny", approval.id);
-  });
+  useRoutedInput((input, key) => {
+    if (input === "?") {
+      setShowKeys((show) => !show);
+      return;
+    }
+    if (!key.escape) return false;
+    onDecision("deny", approval.id);
+  }, { id: `approval:${approval.id}`, priority: FOCUS_PRIORITY.DIALOG + 10 });
 
   return (
     <Box flexDirection="column" marginTop={1}>
@@ -228,7 +244,37 @@ function CriticalApproval({ approval, onDecision }: Props) {
             />
           </Box>
         )}
+        <ApprovalKeyHints expanded={showKeys} />
       </Box>
+    </Box>
+  );
+}
+
+function useApprovalKeyHelp(showKeys: boolean, setShowKeys: (updater: (show: boolean) => boolean) => void): void {
+  useRoutedInput((input) => {
+    if (input !== "?") return false;
+    setShowKeys(() => !showKeys);
+  }, { id: "approval-keys", priority: FOCUS_PRIORITY.DIALOG + 10 });
+}
+
+function ApprovalKeyHints({ expanded }: { expanded: boolean }): React.ReactElement {
+  return (
+    <Box flexDirection="column" marginTop={1}>
+      <KeyboardHints
+        hints={[
+          { keys: "↑↓", label: "choose" },
+          { keys: "enter", label: "confirm" },
+          { keys: "?", label: "keys" },
+        ]}
+      />
+      {expanded && (
+        <Box flexDirection="column" paddingLeft={2}>
+          <Text dimColor>? keys —</Text>
+          <Text dimColor>  ↑↓        choose an option</Text>
+          <Text dimColor>  Enter     confirm selection</Text>
+          <Text dimColor>  Esc       cancels stream, not this approval</Text>
+        </Box>
+      )}
     </Box>
   );
 }

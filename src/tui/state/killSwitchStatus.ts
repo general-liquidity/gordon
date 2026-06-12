@@ -18,6 +18,25 @@ export function formatKillSwitchKey(key: KillSwitchKey): string {
   return key.id ? `${key.scope}:${key.id}` : key.scope;
 }
 
+export type KillSwitchBadgeSeverity = "off" | "armed" | "halted";
+
+export interface KillSwitchBadge {
+  text: string;
+  severity: KillSwitchBadgeSeverity;
+}
+
+export function formatKillSwitchBadge(status: KillSwitchStatus): KillSwitchBadge {
+  if (!status.enabled) return { text: "⛉ halt off", severity: "off" };
+  if (status.trips.length === 0) return { text: "⛉ halt armed", severity: "armed" };
+  // A firm-scope trip halts everything — lead with it over narrower scopes.
+  const lead = status.trips.find((trip) => trip.key.scope === "firm") ?? status.trips[0]!;
+  const extra = status.trips.length - 1;
+  return {
+    text: `⛔ HALTED: ${formatKillSwitchKey(lead.key)}${extra > 0 ? ` +${extra}` : ""}`,
+    severity: "halted",
+  };
+}
+
 export function buildKillSwitchStatus(input: {
   enabled: boolean;
   trips: KillSwitchTrip[];

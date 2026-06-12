@@ -1,8 +1,9 @@
 import React, { useState } from "react";
-import { Box, useInput } from "../ink-custom";
+import { Box } from "../ink-custom";
 import { SearchBox } from "../design-system/SearchBox.js";
 import type { ScrollBoxHandle } from "./layout/ScrollBox.tsx";
 import { useOverlayState } from "../context/overlayContext.js";
+import { useRoutedInput, FOCUS_PRIORITY } from "../input/InputRouterContext.tsx";
 
 // ============================================================================
 // ScrollKeybindingHandler — Vim-style scroll navigation
@@ -32,15 +33,15 @@ export function ScrollKeybindingHandler({
   const [searchQuery, setSearchQuery] = useState("");
   const { hasModalOverlay } = useOverlayState();
 
-  useInput(
+  useRoutedInput(
     (input, key) => {
-      if (!enabled || hasModalOverlay) return;
+      if (!enabled || hasModalOverlay) return false;
       const handle = scrollRef.current;
-      if (!handle) return;
+      if (!handle) return false;
 
       if (searchActive) {
         // Search mode handled by SearchBox
-        return;
+        return false;
       }
 
       if (input === "j" || key.downArrow) {
@@ -62,8 +63,11 @@ export function ScrollKeybindingHandler({
         onNextMatch();
       } else if (input === "N" && onPrevMatch) {
         onPrevMatch();
+      } else {
+        return false;
       }
     },
+    { id: "scroll-keys", priority: FOCUS_PRIORITY.OVERLAY, isActive: enabled && !hasModalOverlay },
   );
 
   if (!searchActive) return null;

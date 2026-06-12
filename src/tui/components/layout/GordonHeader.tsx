@@ -1,10 +1,19 @@
 import React from "react";
 import { Box, Text } from "../../ink-custom";
 import type { PermissionMode } from "../../state/types.js";
+import type { GordonTheme } from "../../themes/themes.ts";
+import { useTheme } from "../../themes/ThemeProvider.tsx";
 
 // ============================================================================
 // GordonHeader — Codex-style info box
 // ============================================================================
+
+export const WORKSPACE_TINT: Record<string, keyof GordonTheme> = {
+  market: "agentScanner",
+  plan: "agentPlanner",
+  lab: "agentBacktester",
+  monitor: "agentMonitor",
+};
 
 interface Props {
   permissionMode: PermissionMode;
@@ -20,6 +29,8 @@ interface Props {
   mcpWarnings?: string[];
   /** When true, render a compact 1-line status bar instead of the full card. */
   compact?: boolean;
+  /** Active workspace id (market/plan/lab/monitor) — tints the chip + card border. */
+  workspace?: string | null;
 }
 
 const MODE_COLOR: Record<PermissionMode, string> = {
@@ -41,7 +52,12 @@ export function GordonHeader({
   exchangeStatus,
   mcpWarnings = [],
   compact = false,
+  workspace = null,
 }: Props) {
+  const theme = useTheme();
+  const workspaceTint = workspace
+    ? (theme[WORKSPACE_TINT[workspace] ?? "uiBrand"] as string)
+    : null;
   const modeColor = MODE_COLOR[permissionMode] ?? "rgb(52,238,176)";
   const rawVersion = process.env.npm_package_version ?? process.env.GORDON_VERSION ?? "0.9";
   const version = rawVersion.split("-")[0]!;
@@ -62,6 +78,9 @@ export function GordonHeader({
       <Box paddingX={1} marginBottom={1}>
         <Text color="rgb(52,238,176)" bold>{"≫"} </Text>
         <Text dimColor>Gordon</Text>
+        {workspace && workspaceTint && (
+          <Text color={workspaceTint} bold> [{workspace}]</Text>
+        )}
         <Text dimColor>  ·  </Text>
         <Text color={modeColor}>{permissionMode}</Text>
         {isPaper && <Text color="yellow" bold> [PAPER]</Text>}
@@ -82,9 +101,10 @@ export function GordonHeader({
   // Full card — empty state only
   return (
     <Box flexDirection="column" marginBottom={1}>
+      {/* Paper mode's yellow border outranks workspace decoration (PAPER visibility wins). */}
       <Box
         borderStyle="round"
-        borderColor={isPaper ? "yellow" : "gray"}
+        borderColor={isPaper ? "yellow" : workspaceTint ?? "gray"}
         paddingX={2}
         paddingY={0}
         flexDirection="column"

@@ -77,20 +77,108 @@ describe("appReducer", () => {
   });
 
   it("resets session-visible state", () => {
+    // Fully-populated state: every field in the RESET_SESSION contract is non-default.
     const next = appReducer(
       state({
         messages: [{ id: "m", role: "user", content: "hi", timestamp: "t" }],
-        pendingApprovals: [{ id: "approval-1" } as never],
+        completedMessageCount: 3,
         streamBuffer: "x",
         isStreaming: true,
+        activeThinking: "thinking...",
+        activeToolCalls: [{ id: "tc-1", toolName: "get_price", status: "running", startedAt: 1 } as never],
+        activeAgents: [{ id: "chain-1" } as never],
+        handoffHistory: [{ from: "gordon", to: "executor", timestamp: 1 } as never],
+        pendingApprovals: [{ id: "approval-1" } as never],
+        notifications: [{ id: "n1", type: "trade:opened", variant: "fill", message: "filled", timestamp: "t" }],
+        backgroundTasks: [{ id: "bt-1", label: "scan", status: "running" }],
+        contextTokens: 1234,
+        lastTurnDurationMs: 8200,
+        lastTurnTokens: 567,
+        ctrlCPressed: true,
+        showPalette: true,
+        showHelp: true,
         showResetConfirm: true,
+        pager: { title: "p", content: "c" },
+        radarFocus: { id: "r1", category: "volatility", title: "BTC" },
+        openDialogs: [{ id: "settings" }],
+        // Survivors — must NOT be reset.
+        permissionMode: "paper",
+        sessionId: "sess-1",
+        threadId: "thread-1",
+        isResumedSession: true,
+        tokenCount: 9999,
+        cost: 1.23,
+        runtimeReady: true,
+        bootPhase: "ready",
+        swarmMode: true,
+        autonomousActive: true,
+        autonomousStrategyCount: 2,
+        privacyMode: true,
+        activeWorkspace: "trading",
+        showSetup: true,
       }),
       { type: "RESET_SESSION" },
     );
+
+    // Reset to []
     expect(next.messages).toEqual([]);
+    expect(next.activeAgents).toEqual([]);
+    expect(next.handoffHistory).toEqual([]);
     expect(next.pendingApprovals).toEqual([]);
+    expect(next.notifications).toEqual([]);
+    expect(next.backgroundTasks).toEqual([]);
+    expect(next.activeToolCalls).toEqual([]);
+    expect(next.openDialogs).toEqual([]);
+    // Reset to ""
+    expect(next.streamBuffer).toBe("");
+    expect(next.activeThinking).toBe("");
+    // Reset to false
     expect(next.isStreaming).toBe(false);
+    expect(next.ctrlCPressed).toBe(false);
+    expect(next.showPalette).toBe(false);
+    expect(next.showHelp).toBe(false);
     expect(next.showResetConfirm).toBe(false);
+    // Reset to 0
+    expect(next.completedMessageCount).toBe(0);
+    expect(next.contextTokens).toBe(0);
+    expect(next.lastTurnDurationMs).toBe(0);
+    expect(next.lastTurnTokens).toBe(0);
+    // Reset to null
+    expect(next.pager).toBeNull();
+    expect(next.radarFocus).toBeNull();
+
+    // Preserved
+    expect(next.permissionMode).toBe("paper");
+    expect(next.sessionId).toBe("sess-1");
+    expect(next.threadId).toBe("thread-1");
+    expect(next.isResumedSession).toBe(true);
+    expect(next.tokenCount).toBe(9999);
+    expect(next.cost).toBe(1.23);
+    expect(next.runtimeReady).toBe(true);
+    expect(next.bootPhase).toBe("ready");
+    expect(next.swarmMode).toBe(true);
+    expect(next.autonomousActive).toBe(true);
+    expect(next.autonomousStrategyCount).toBe(2);
+    expect(next.privacyMode).toBe(true);
+    expect(next.activeWorkspace).toBe("trading");
+    expect(next.showSetup).toBe(true);
+  });
+
+  it("maintains a dialog stack", () => {
+    const settings = appReducer(state(), { type: "OPEN_DIALOG", id: "settings" });
+    const theme = appReducer(settings, { type: "OPEN_DIALOG", id: "themePicker", payload: { source: "settings" } });
+    expect(theme.openDialogs.map((dialog) => dialog.id)).toEqual(["settings", "themePicker"]);
+    expect(theme.openDialogs[1]?.payload).toEqual({ source: "settings" });
+
+    const reopened = appReducer(theme, { type: "OPEN_DIALOG", id: "settings", payload: { tab: "general" } });
+    expect(reopened.openDialogs.map((dialog) => dialog.id)).toEqual(["themePicker", "settings"]);
+    expect(reopened.openDialogs[1]?.payload).toEqual({ tab: "general" });
+
+    const closedTop = appReducer(reopened, { type: "CLOSE_TOP_DIALOG" });
+    expect(closedTop.openDialogs.map((dialog) => dialog.id)).toEqual(["themePicker"]);
+    const closed = appReducer(closedTop, { type: "CLOSE_DIALOG", id: "themePicker" });
+    expect(closed.openDialogs).toEqual([]);
+    expect(appReducer(closed, { type: "CLOSE_DIALOG", id: "themePicker" })).toBe(closed);
   });
 
   it("opens overlay views and closes the palette", () => {
