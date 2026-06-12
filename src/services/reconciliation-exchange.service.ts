@@ -17,6 +17,7 @@ import { logEvent } from "../infra/storage/entities/events.ts";
 import { createModuleLogger } from "../infra/logger/index.ts";
 import type { Trade, EntryFill, ExitFill } from "../types/index.ts";
 import { extractOrderOwnerKey } from "../core/orders/order-recovery.ts";
+import { archivePhantomPositions } from "../core/positions/cleanup.ts";
 import { cleanupExpiredPlans, repairProtectiveOrders } from "../core/pipeline/executor.ts";
 import { listPlans } from "../infra/storage/entities/plans.ts";
 import { StrategyRuntime } from "../core/runtime/engine.ts";
@@ -28,6 +29,7 @@ export interface ReconciliationResult {
   tradesReconciled: number;
   ordersUpdated: number;
   plansExpired: number;
+  phantomPositionsArchived: number;
   errors: string[];
   warnings: string[];
 }
@@ -74,6 +76,7 @@ export async function reconcileWithExchange(
     tradesReconciled: 0,
     ordersUpdated: 0,
     plansExpired: 0,
+    phantomPositionsArchived: 0,
     errors: [],
     warnings: [],
   };
@@ -91,6 +94,37 @@ export async function reconcileWithExchange(
     } catch (pruneError) {
       result.warnings.push(
         `Expired-plan prune failed: ${pruneError instanceof Error ? pruneError.message : "Unknown error"}`,
+      );
+    }
+
+    // Archive phantom position rows (zero qty + zero entry + no entry order,
+    // past grace, no matching exchange order). Must run BEFORE the
+    // no-active-trades early return — debris exists precisely when there is
+    // nothing real to reconcile. Terminal 'cancelled' state, never deleted.
+    try {
+      const phantom = await archivePhantomPositions(async (symbol) => {
+        try {
+          return (await exchange.getOpenOrders(symbol)).length > 0;
+        } catch (err) {
+          // A symbol the venue doesn't know (e.g. test debris like
+          // GORDONTESTUSDT) trivially has no open orders. Anything else
+          // (network, auth) rethrows so the sweep fail-safes to skip.
+          const message = err instanceof Error ? err.message : String(err);
+          if (/invalid symbol|bad ?symbol|unknown symbol|does not have market/i.test(message)) {
+            return false;
+          }
+          throw err;
+        }
+      });
+      result.phantomPositionsArchived = phantom.archived;
+      if (phantom.archived > 0) {
+        result.warnings.push(
+          `Archived ${phantom.archived} phantom position(s) (zero quantity, no exchange order)`,
+        );
+      }
+    } catch (phantomError) {
+      result.warnings.push(
+        `Phantom-position sweep failed: ${phantomError instanceof Error ? phantomError.message : "Unknown error"}`,
       );
     }
 
@@ -146,6 +180,7 @@ export async function reconcileWithExchange(
       tradesReconciled: result.tradesReconciled,
       ordersUpdated: result.ordersUpdated,
       plansExpired: result.plansExpired,
+      phantomPositionsArchived: result.phantomPositionsArchived,
       errors: result.errors.length,
       warnings: result.warnings.length,
     });
@@ -158,6 +193,7 @@ export async function reconcileWithExchange(
         tradesReconciled: result.tradesReconciled,
         ordersUpdated: result.ordersUpdated,
         plansExpired: result.plansExpired,
+        phantomPositionsArchived: result.phantomPositionsArchived,
         errors: result.errors,
         warnings: result.warnings,
       },

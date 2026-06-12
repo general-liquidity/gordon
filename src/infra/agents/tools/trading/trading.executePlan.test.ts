@@ -2,6 +2,11 @@ import { describe, expect, test, mock, beforeEach } from "bun:test";
 import { RequestContext } from "@mastra/core/request-context";
 import type { Plan, PlanStatus } from "../../../../types/plan.ts";
 import { resetAllKillSwitches, tripKillSwitch } from "../../../safety/killSwitches.ts";
+import { installTempGordonHome } from "../../../../test-utils/tempGordonHome.ts";
+
+// execute_plan reaches the real executor / risk gate / event log on the
+// APPROVED path — keep every store write inside a temp GORDON_HOME.
+installTempGordonHome("gordon-execplan-test-");
 
 const mockGetPlan = mock((_id: string) => null as Plan | null);
 

@@ -4,6 +4,11 @@ import type { Exchange } from "../../infra/exchange/index.ts";
 import type { GordonConfig, Plan } from "../../types/index.ts";
 import type { PortfolioState } from "./validator.ts";
 import { resetAllKillSwitches, tripKillSwitch } from "../../infra/safety/killSwitches.ts";
+import { installTempGordonHome } from "../../test-utils/tempGordonHome.ts";
+
+// executePlan logs gate-block events to the SQLite event store even on
+// rejected paths — keep them out of the operator's real ~/.gordon DB.
+installTempGordonHome("gordon-executor-int-test-");
 
 function makePlan(): Plan {
   return {

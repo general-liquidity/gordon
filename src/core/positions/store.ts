@@ -21,6 +21,17 @@ const logger = createModuleLogger("position-store");
 // ============================================================================
 
 /**
+ * SQLite returns NULL columns as JS null, but PositionRecord optionals (and
+ * the zod schema validating every state transition) only accept undefined.
+ * Without this conversion, any position reloaded from the DB failed
+ * validateMergedPosition on its next transition — the failure was swallowed
+ * upstream and left phantom rows stuck in pre-fill states.
+ */
+function optScalar<T>(value: unknown): T | undefined {
+  return value === null || value === undefined ? undefined : (value as T);
+}
+
+/**
  * Converts a database row to a PositionRecord.
  * JSON fields are parsed from their string representation.
  */
@@ -41,35 +52,35 @@ function rowToPosition(row: Record<string, unknown>): PositionRecord {
 
     // Execution phase
     entryOrder: safeJsonParseOptional(row.entryOrder as string | null),
-    entryPrice: row.entryPrice as number | undefined,
-    quantity: row.quantity as number | undefined,
+    entryPrice: optScalar<number>(row.entryPrice),
+    quantity: optScalar<number>(row.quantity),
 
     // Management phase
-    stopLoss: row.stopLoss as number | undefined,
-    takeProfit: row.takeProfit as number | undefined,
+    stopLoss: optScalar<number>(row.stopLoss),
+    takeProfit: optScalar<number>(row.takeProfit),
     trailingStop: safeJsonParseOptional(row.trailingStop as string | null),
-    currentPrice: row.currentPrice as number | undefined,
-    unrealizedPnL: row.unrealizedPnL as number | undefined,
-    highWaterMark: row.highWaterMark as number | undefined,
+    currentPrice: optScalar<number>(row.currentPrice),
+    unrealizedPnL: optScalar<number>(row.unrealizedPnL),
+    highWaterMark: optScalar<number>(row.highWaterMark),
 
     // Close phase
     exitOrder: safeJsonParseOptional(row.exitOrder as string | null),
-    exitPrice: row.exitPrice as number | undefined,
-    realizedPnL: row.realizedPnL as number | undefined,
+    exitPrice: optScalar<number>(row.exitPrice),
+    realizedPnL: optScalar<number>(row.realizedPnL),
 
     // Review phase
     review: safeJsonParseOptional(row.review as string | null),
 
     // Metadata
-    strategyId: row.strategyId as string | undefined,
-    playbookId: row.playbookId as string | undefined,
+    strategyId: optScalar<string>(row.strategyId),
+    playbookId: optScalar<string>(row.playbookId),
     tags: safeJsonParseOptional(row.tags as string | null),
-    cancelReason: row.cancelReason as string | undefined,
-    rejectReason: row.rejectReason as string | undefined,
-    closeReason: row.closeReason as string | undefined,
+    cancelReason: optScalar<string>(row.cancelReason),
+    rejectReason: optScalar<string>(row.rejectReason),
+    closeReason: optScalar<string>(row.closeReason),
     createdAt: row.createdAt as string,
     updatedAt: row.updatedAt as string,
-    closedAt: row.closedAt as string | undefined,
+    closedAt: optScalar<string>(row.closedAt),
   };
 }
 
@@ -89,6 +100,27 @@ function safeJsonParseOptional<T>(value: string | null | undefined): T | undefin
   } catch {
     return undefined;
   }
+}
+
+// ============================================================================
+// Phantom Positions
+// ============================================================================
+
+/**
+ * A position claiming zero (or explicitly non-positive) quantity/entryPrice
+ * is not a position. NULL quantity/entry is legitimate only for fresh
+ * pre-fill records; once a record is older than the grace window and has no
+ * entry order either, it is debris (typically left behind by interrupted
+ * lifecycle syncs).
+ */
+export const PHANTOM_GRACE_MS = 60 * 60 * 1000;
+
+/** SQL predicate matching phantom rows. Takes one bound param: createdAt cutoff (ISO). */
+const PHANTOM_PREDICATE_SQL =
+  "(IFNULL(quantity, 0) = 0 AND IFNULL(entryPrice, 0) = 0 AND entryOrder IS NULL AND createdAt < ?)";
+
+function phantomCutoffIso(): string {
+  return new Date(Date.now() - PHANTOM_GRACE_MS).toISOString();
 }
 
 // ============================================================================
@@ -193,8 +225,22 @@ export class PositionStore {
 
   /**
    * Save a position record (insert or replace).
+   * Rejects explicit zero/negative quantity or entryPrice — a position with
+   * qty 0 and entry 0 is not a position. Absent (undefined) values stay legal
+   * for pre-fill lifecycle states.
    */
   async save(position: PositionRecord): Promise<void> {
+    for (const [field, value] of [
+      ["quantity", position.quantity],
+      ["entryPrice", position.entryPrice],
+    ] as const) {
+      if (typeof value === "number" && !(value > 0)) {
+        throw new Error(
+          `Phantom position rejected: ${field}=${value} for ${position.symbol} (${position.id}). ` +
+            `Positions must have positive quantity and entryPrice, or omit them pre-fill.`,
+        );
+      }
+    }
     withTransaction(() => {
       const stmt = this.db.prepare(`
         INSERT OR REPLACE INTO positions (
@@ -294,17 +340,41 @@ export class PositionStore {
 
   /**
    * Get all active (non-terminal) positions.
+   * Legacy phantom rows (zero qty + zero entry + no entry order, past the
+   * grace window) are excluded at read — they are not open positions.
    */
   async getActive(): Promise<PositionRecord[]> {
     const terminalList = Array.from(TERMINAL_STATES)
       .map((s) => `'${s}'`)
       .join(", ");
 
-    const query = `SELECT * FROM positions WHERE state NOT IN (${terminalList}) ORDER BY updatedAt DESC`;
+    const query =
+      `SELECT * FROM positions WHERE state NOT IN (${terminalList}) ` +
+      `AND NOT ${PHANTOM_PREDICATE_SQL} ORDER BY updatedAt DESC`;
     const stmt = this.db.prepare(query);
     const rows = executeWithLogging(
-      () => stmt.all() as Record<string, unknown>[],
+      () => stmt.all(phantomCutoffIso()) as Record<string, unknown>[],
       "SELECT active positions"
+    );
+    return rows.map(rowToPosition);
+  }
+
+  /**
+   * Get active phantom rows (the complement of the getActive filter) so the
+   * reconciliation cycle can archive them.
+   */
+  async getPhantoms(): Promise<PositionRecord[]> {
+    const terminalList = Array.from(TERMINAL_STATES)
+      .map((s) => `'${s}'`)
+      .join(", ");
+
+    const query =
+      `SELECT * FROM positions WHERE state NOT IN (${terminalList}) ` +
+      `AND ${PHANTOM_PREDICATE_SQL} ORDER BY createdAt ASC`;
+    const stmt = this.db.prepare(query);
+    const rows = executeWithLogging(
+      () => stmt.all(phantomCutoffIso()) as Record<string, unknown>[],
+      "SELECT phantom positions"
     );
     return rows.map(rowToPosition);
   }
@@ -434,4 +504,14 @@ export async function getPositionStore(): Promise<PositionStore> {
     _initialized = true;
   }
   return _store;
+}
+
+/**
+ * Reset the singleton. Required by test isolation: the store caches a
+ * Database handle, so after setDatabasePathForTesting() switches (and
+ * closes) the underlying DB, a cached store would hold a dead handle.
+ */
+export function _resetPositionStoreForTests(): void {
+  _store = null;
+  _initialized = false;
 }

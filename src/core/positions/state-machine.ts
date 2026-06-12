@@ -177,6 +177,21 @@ export class PositionStateMachine {
     if (toState === "closed" && !updated.closedAt) {
       updated.closedAt = now;
     }
+
+    // Phantom guard: a fill without positive entry data is not a position.
+    // The schema enforces positivity when present; this enforces presence.
+    if (toState === "filled") {
+      if (!(typeof updated.entryPrice === "number" && updated.entryPrice > 0) ||
+          !(typeof updated.quantity === "number" && updated.quantity > 0)) {
+        throw new InvalidStateError(
+          `Cannot transition position ${positionId} to 'filled' without positive ` +
+            `entryPrice/quantity (got entryPrice=${updated.entryPrice}, quantity=${updated.quantity})`,
+          fromState,
+          toState
+        );
+      }
+    }
+
     updated = validateMergedPosition(updated, fromState);
 
     // Persist

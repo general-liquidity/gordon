@@ -5,6 +5,13 @@ import { tmpdir } from "node:os";
 
 import { getDatabase, setDatabasePathForTesting } from "../infra/storage/database.ts";
 import { createPlan, getPlan } from "../infra/storage/entities/plans.ts";
+import {
+  getPositionStore,
+  PHANTOM_GRACE_MS,
+  _resetPositionStoreForTests,
+} from "../core/positions/store.ts";
+import { PHANTOM_ARCHIVE_REASON } from "../core/positions/cleanup.ts";
+import type { PositionRecord } from "../core/positions/types.ts";
 import type { Exchange } from "../infra/exchange/types.ts";
 import type { Plan, PlanStatus } from "../types/index.ts";
 import { reconcileWithExchange } from "./reconciliation-exchange.service.ts";
@@ -41,10 +48,12 @@ describe("reconcileWithExchange expired-plan prune", () => {
   beforeAll(() => {
     dir = mkdtempSync(join(tmpdir(), "gordon-reconcile-svc-"));
     setDatabasePathForTesting(join(dir, "gordon.db"));
+    _resetPositionStoreForTests();
   });
 
   afterAll(() => {
     setDatabasePathForTesting(null);
+    _resetPositionStoreForTests();
     try {
       rmSync(dir, { recursive: true, force: true });
     } catch {
@@ -83,5 +92,100 @@ describe("reconcileWithExchange expired-plan prune", () => {
   it("prunes again on subsequent cycles without double-counting", async () => {
     const result = await reconcileWithExchange(fakeExchange);
     expect(result.plansExpired).toBe(0);
+  });
+});
+
+describe("reconcileWithExchange phantom-position sweep", () => {
+  let dir: string;
+
+  function positionRecord(id: string, symbol: string, overrides: Partial<PositionRecord> = {}): PositionRecord {
+    const stale = new Date(Date.now() - PHANTOM_GRACE_MS - 60_000).toISOString();
+    return {
+      id,
+      symbol,
+      exchangeId: "default",
+      side: "long",
+      state: "idea",
+      stateHistory: [],
+      createdAt: stale,
+      updatedAt: stale,
+      ...overrides,
+    };
+  }
+
+  beforeAll(() => {
+    dir = mkdtempSync(join(tmpdir(), "gordon-reconcile-phantom-"));
+    setDatabasePathForTesting(join(dir, "gordon.db"));
+    _resetPositionStoreForTests();
+  });
+
+  afterAll(() => {
+    setDatabasePathForTesting(null);
+    _resetPositionStoreForTests();
+    try {
+      rmSync(dir, { recursive: true, force: true });
+    } catch {
+      // see WAL note above
+    }
+  });
+
+  it("archives aged zero-qty phantoms even when there are no active trades", async () => {
+    const store = await getPositionStore();
+    await store.save(positionRecord("pos_phantom_btc", "BTCUSDT"));
+    await store.save(positionRecord("pos_phantom_test", "GORDONTESTUSDT"));
+    await store.save(positionRecord("pos_real", "ETHUSDT", {
+      state: "filled",
+      entryPrice: 3_000,
+      quantity: 0.5,
+    }));
+
+    // No trades/plans seeded: the sweep must run before the
+    // no-active-trades early return.
+    const result = await reconcileWithExchange(fakeExchange);
+
+    expect(result.success).toBe(true);
+    expect(result.phantomPositionsArchived).toBe(2);
+
+    expect((await store.get("pos_phantom_btc"))?.state).toBe("cancelled");
+    expect((await store.get("pos_phantom_btc"))?.cancelReason).toBe(PHANTOM_ARCHIVE_REASON);
+    expect((await store.get("pos_phantom_test"))?.state).toBe("cancelled");
+    expect((await store.get("pos_real"))?.state).toBe("filled");
+
+    // Archived, never deleted.
+    expect(await store.get("pos_phantom_btc")).not.toBeNull();
+
+    // The open-positions view is clean.
+    const active = await store.getActive();
+    expect(active.map((p) => p.id)).toEqual(["pos_real"]);
+  });
+
+  it("treats a venue-unknown symbol as having no orders (test debris like GORDONTESTUSDT)", async () => {
+    const store = await getPositionStore();
+    await store.save(positionRecord("pos_phantom_unknown_sym", "GORDONFAKEUSDT"));
+
+    const exchangeRejectingSymbol = {
+      ...fakeExchange,
+      getOpenOrders: async () => {
+        throw new Error("Invalid symbol.");
+      },
+    } as unknown as Exchange;
+
+    const result = await reconcileWithExchange(exchangeRejectingSymbol);
+    expect(result.phantomPositionsArchived).toBe(1);
+    expect((await store.get("pos_phantom_unknown_sym"))?.state).toBe("cancelled");
+  });
+
+  it("does not archive phantoms whose symbol still has open exchange orders", async () => {
+    const store = await getPositionStore();
+    await store.save(positionRecord("pos_phantom_pending", "SOLUSDT"));
+
+    const exchangeWithOrders = {
+      ...fakeExchange,
+      getOpenOrders: async () => [{ orderId: 1, clientOrderId: "gordon_x" }],
+    } as unknown as Exchange;
+
+    const result = await reconcileWithExchange(exchangeWithOrders);
+    expect(result.phantomPositionsArchived).toBe(0);
+    expect((await store.get("pos_phantom_pending"))?.state).toBe("idea");
   });
 });

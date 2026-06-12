@@ -15,6 +15,97 @@ import type { PositionState } from "./types.ts";
 
 const logger = createModuleLogger("position-cleanup");
 
+/** Terminal-state reason stamped on archived phantom rows. */
+export const PHANTOM_ARCHIVE_REASON = "phantom — zero quantity";
+
+export interface PhantomArchiveResult {
+  archived: number;
+  skipped: number;
+}
+
+/**
+ * Archive phantom positions: active rows with zero quantity + zero entry
+ * price, no recorded entry order, past the store's grace window, and no
+ * matching open order on the exchange. Archived = transitioned to the
+ * terminal 'cancelled' state with PHANTOM_ARCHIVE_REASON — never hard-deleted,
+ * so the audit trail survives.
+ *
+ * Called from the exchange reconciliation cycle (daemon + TUI).
+ *
+ * @param hasOpenExchangeOrders symbol → whether the exchange has open orders.
+ *        If the check throws, the row is skipped (fail-safe: never archive
+ *        when exchange state is unknown).
+ */
+export async function archivePhantomPositions(
+  hasOpenExchangeOrders: (symbol: string) => Promise<boolean>,
+): Promise<PhantomArchiveResult> {
+  const result: PhantomArchiveResult = { archived: 0, skipped: 0 };
+
+  const store = await getPositionStore();
+  const phantoms = await store.getPhantoms();
+  if (phantoms.length === 0) return result;
+
+  const orderCheckBySymbol = new Map<string, boolean | null>();
+  for (const pos of phantoms) {
+    let hasOrders = orderCheckBySymbol.get(pos.symbol);
+    if (hasOrders === undefined) {
+      try {
+        hasOrders = await hasOpenExchangeOrders(pos.symbol);
+      } catch (err) {
+        hasOrders = null;
+        logger.warn("Phantom sweep: exchange order check failed — skipping symbol", {
+          symbol: pos.symbol,
+          error: (err as Error).message,
+        });
+      }
+      orderCheckBySymbol.set(pos.symbol, hasOrders);
+    }
+
+    if (hasOrders !== false) {
+      result.skipped++;
+      continue;
+    }
+
+    try {
+      await store.update(pos.id, {
+        state: "cancelled" as PositionState,
+        cancelReason: PHANTOM_ARCHIVE_REASON,
+        // Scrub explicit zeros so the store's phantom write guard accepts
+        // the archival save for legacy rows that stored 0 instead of NULL.
+        quantity: undefined,
+        entryPrice: undefined,
+      });
+      result.archived++;
+      logger.info("Archived phantom position", {
+        positionId: pos.id,
+        symbol: pos.symbol,
+        state: pos.state,
+        createdAt: pos.createdAt,
+      });
+    } catch (err) {
+      result.skipped++;
+      logger.warn("Could not archive phantom position", {
+        positionId: pos.id,
+        error: (err as Error).message,
+      });
+    }
+  }
+
+  if (result.archived > 0) {
+    logEvent({
+      type: "SYSTEM",
+      data: {
+        action: "PHANTOM_POSITIONS_ARCHIVED",
+        archived: result.archived,
+        skipped: result.skipped,
+        reason: PHANTOM_ARCHIVE_REASON,
+      },
+    });
+  }
+
+  return result;
+}
+
 /** Max age (in hours) before a position in a given state is considered stale */
 const STALE_THRESHOLDS: Partial<Record<PositionState, number>> = {
   idea: 24,

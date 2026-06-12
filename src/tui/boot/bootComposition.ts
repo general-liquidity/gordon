@@ -13,6 +13,7 @@ const BOLD = "\x1b[1m";
 const DIM = "\x1b[2m";
 const YELLOW = "\x1b[33m";
 const RED = "\x1b[31m";
+const GRAY = "\x1b[90m";
 const RESET = "\x1b[0m";
 
 const LABEL_WIDTH = 10;
@@ -227,43 +228,70 @@ function renderRadar(info: BootStaticInfo): string {
   return `${radar.producerCount} producers · last card ${formatAge(radar.lastCardAgeMs)} ago`;
 }
 
-function renderRow(label: string, value: string, columns: number, hint?: string): string {
-  const maxVisible = Math.max(0, columns - 1);
+function renderRow(label: string, value: string, budget: number, columns: number, hint?: string): string {
   const labelCell = `  ${DIM}${label.padEnd(LABEL_WIDTH)}${RESET}`;
-  const valueBudget = maxVisible - INDENT_WIDTH - LABEL_WIDTH;
-  if (valueBudget <= 0) return truncateAnsi(labelCell, maxVisible);
+  const valueBudget = budget - INDENT_WIDTH - LABEL_WIDTH;
+  if (valueBudget <= 0) return truncateAnsi(labelCell, budget);
 
   const hintSuffix = hint && columns >= 70 ? `  ${DIM}${hint}${RESET}` : "";
   const reservedForHint = visibleLength(hintSuffix);
   const valueMax = Math.max(0, valueBudget - reservedForHint);
   const shownValue = truncateAnsi(value, valueMax);
-  const maybeHint = hintSuffix && visibleLength(labelCell + shownValue + hintSuffix) <= maxVisible ? hintSuffix : "";
+  const maybeHint = hintSuffix && visibleLength(labelCell + shownValue + hintSuffix) <= budget ? hintSuffix : "";
   const row = `${labelCell}${shownValue}${maybeHint}`;
-  return visibleLength(row) <= maxVisible ? row : truncateAnsi(row, maxVisible);
+  return visibleLength(row) <= budget ? row : truncateAnsi(row, budget);
 }
 
-/** Raw-ANSI lines for the static rows (banner NOT included — caller composes). */
+/**
+ * Wrap rows in a titled box (`┌─ title ─…┐`). Width adapts to the widest row,
+ * capped at the terminal — the printBootCard pattern. Falls back to unboxed
+ * rows when the terminal can't even fit the title in the top border.
+ */
+function boxSection(title: string, rows: string[], maxTotal: number): string[] {
+  const innerMax = maxTotal - 2;
+  const titleMin = title.length + 3;
+  if (innerMax < titleMin) return rows.map((row) => truncateAnsi(row, maxTotal));
+
+  const inner = Math.min(innerMax, Math.max(titleMin, ...rows.map(visibleLength)));
+  const fill = "─".repeat(Math.max(0, inner - title.length - 3));
+  const body = rows.map((row) => {
+    const shown = truncateAnsi(row, inner);
+    const pad = " ".repeat(Math.max(0, inner - visibleLength(shown)));
+    return `${GRAY}│${RESET}${shown}${pad}${GRAY}│${RESET}`;
+  });
+  return [
+    `${GRAY}┌─ ${RESET}${DIM}${title}${RESET}${GRAY} ${fill}┐${RESET}`,
+    ...body,
+    `${GRAY}└${"─".repeat(inner)}┘${RESET}`,
+  ];
+}
+
+/** Raw-ANSI lines for the boxed `session` section (banner NOT included — caller composes). */
 export function renderBootStaticRows(info: BootStaticInfo, columns: number): string[] {
   if (columns <= 0) return [];
 
+  // -1 terminal safety margin, -2 box borders: rows are built to the inner budget.
+  const maxTotal = Math.max(0, columns - 1);
+  const rowBudget = Math.max(0, maxTotal - 2);
   const modelValue = `${info.model}${info.effort ? ` ${info.effort}` : ""}`;
   const modeColor = MODE_ANSI[info.permissionMode] ?? TEAL;
   const isPaper = info.permissionMode === "paper";
   const modeValue = `${modeColor}${info.permissionMode}${RESET}${isPaper ? ` ${BOLD}${YELLOW}[PAPER]${RESET}` : ""}`;
-  const bodyBudget = Math.max(0, columns - 1 - INDENT_WIDTH - LABEL_WIDTH);
+  const bodyBudget = Math.max(0, rowBudget - INDENT_WIDTH - LABEL_WIDTH);
   const cwdValue = truncateStart(info.cwd, bodyBudget);
   const guardValue = [
     renderGuard("fetch", info.fetchGuard),
     renderGuard("fs", info.fsGuard),
   ].join(` ${DIM}·${RESET} `);
 
-  return [
-    renderRow("model", modelValue, columns, "/model to change"),
-    renderRow("mode", modeValue, columns, isPaper ? "/live to exit" : "/auto to change"),
-    renderRow("thread", info.threadDisplay, columns),
-    renderRow("cwd", cwdValue, columns),
-    renderRow("guards", guardValue, columns),
-    renderRow("switches", renderSwitches(info, bodyBudget), columns),
-    renderRow("radar", renderRadar(info), columns),
+  const rows = [
+    renderRow("model", modelValue, rowBudget, columns, "/model to change"),
+    renderRow("mode", modeValue, rowBudget, columns, isPaper ? "/live to exit" : "/auto to change"),
+    renderRow("thread", info.threadDisplay, rowBudget, columns),
+    renderRow("cwd", cwdValue, rowBudget, columns),
+    renderRow("guards", guardValue, rowBudget, columns),
+    renderRow("switches", renderSwitches(info, bodyBudget), rowBudget, columns),
+    renderRow("radar", renderRadar(info), rowBudget, columns),
   ];
+  return boxSection("session", rows, maxTotal);
 }

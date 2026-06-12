@@ -2,6 +2,14 @@ import { describe, expect, test, mock, beforeEach, afterEach } from "bun:test";
 import { RequestContext } from "@mastra/core/request-context";
 import type { Plan, PlanStatus } from "../../../../types/plan.ts";
 import { resetAllKillSwitches } from "../../../safety/killSwitches.ts";
+import { installTempGordonHome } from "../../../../test-utils/tempGordonHome.ts";
+import { getPositionStore } from "../../../../core/positions/store.ts";
+import type { PositionRecord } from "../../../../core/positions/types.ts";
+
+// execute_plan's position-FSM sync (recordExecutedPlanPosition) is real and
+// fire-and-forget — without isolation this file wrote GORDONTESTUSDT phantom
+// rows into the operator's ~/.gordon/gordon.db.
+installTempGordonHome("gordon-termlayers-test-");
 
 const observations: Array<{ eventType?: string; details?: Record<string, unknown> }> = [];
 
@@ -112,6 +120,17 @@ function makeExecContext(): { requestContext: RequestContext } {
   return { requestContext };
 }
 
+async function waitForSyncedPosition(symbol: string): Promise<PositionRecord | null> {
+  const store = await getPositionStore();
+  for (let i = 0; i < 100; i++) {
+    const positions = await store.getBySymbol(symbol);
+    const filled = positions.find((p) => p.state === "filled");
+    if (filled) return filled;
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  return null;
+}
+
 describe("execute_plan — termination layers shadow", () => {
   const prevFlag = process.env.GORDON_TERMINATION_LAYERS;
 
@@ -139,6 +158,15 @@ describe("execute_plan — termination layers shadow", () => {
     const payload = terminationObs[terminationObs.length - 1]?.details;
     expect(payload?.kind).toBe("termination.layers_recorded");
     expect(payload?.verdict).toBeDefined();
+
+    // The fire-and-forget position sync must land in the ISOLATED store —
+    // wait for it so it cannot trail past this file's teardown, and verify
+    // it records real fill data (not a phantom row).
+    const synced = await waitForSyncedPosition(PLAN_SYMBOL);
+    expect(synced).not.toBeNull();
+    expect(synced?.state).toBe("filled");
+    expect(synced?.entryPrice).toBe(100_000);
+    expect(synced?.quantity).toBe(0.01);
   });
 
   afterEach(() => {

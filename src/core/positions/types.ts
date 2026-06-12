@@ -195,8 +195,10 @@ export const PositionRecordSchema = z.object({
 
   // Execution phase
   entryOrder: OrderRecordSchema.optional(),
-  entryPrice: z.number().optional(),
-  quantity: z.number().optional(),
+  // Positive when present: a position with qty 0 / entry 0 is not a position
+  // (phantom-row guard — pre-fill states simply omit these fields).
+  entryPrice: z.number().positive().optional(),
+  quantity: z.number().positive().optional(),
 
   // Management phase
   stopLoss: z.number().optional(),

@@ -104,30 +104,49 @@ export function BootLivePanel({ hint }: Props): React.JSX.Element | null {
 
   if (!columns) return null;
 
-  const dividerWidth = Math.min(columns, 60);
+  const title = "trading preflight";
+  // -1 terminal safety margin, capped so the box matches the session box scale.
+  const boxWidth = Math.min(columns - 1, 64);
+  // Top border is drawn manually so the section title sits in it
+  // (`┌─ trading preflight ─…┐`) — ink boxes have no title support.
+  const topFill = "─".repeat(Math.max(0, boxWidth - title.length - 5));
+  const dividerWidth = Math.max(0, boxWidth - 4);
   const showEquity = !data || data.venue.connectivity !== "none";
 
   return (
     <Box flexDirection="column" marginBottom={1}>
-      <Row label="venue">
-        <VenueValue data={data} />
-      </Row>
-      {showEquity && (
-        <Row label="equity">
-          {data?.equityUsd != null ? <Text>{formatCurrency(data.equityUsd)}</Text> : <Text dimColor>—</Text>}
+      <Box>
+        <Text color="gray">{"┌─ "}</Text>
+        <Text dimColor>{title}</Text>
+        <Text color="gray">{` ${topFill}┐`}</Text>
+      </Box>
+      <Box
+        flexDirection="column"
+        width={boxWidth}
+        borderStyle="single"
+        borderColor="gray"
+        borderTop={false}
+      >
+        <Row label="venue">
+          <VenueValue data={data} />
         </Row>
-      )}
-      <Row label="audit">
-        <AuditValue data={data} />
-      </Row>
-      <Box paddingLeft={2}>
-        <Text dimColor>{"─".repeat(dividerWidth)}</Text>
-      </Box>
-      <Box paddingLeft={2}>
-        <TickerLine data={data} />
-      </Box>
-      <Box paddingLeft={2}>
-        <Text dimColor>Tip: {hint}</Text>
+        {showEquity && (
+          <Row label="equity">
+            {data?.equityUsd != null ? <Text>{formatCurrency(data.equityUsd)}</Text> : <Text dimColor>—</Text>}
+          </Row>
+        )}
+        <Row label="audit">
+          <AuditValue data={data} />
+        </Row>
+        <Box paddingLeft={2}>
+          <Text dimColor>{"─".repeat(dividerWidth)}</Text>
+        </Box>
+        <Box paddingLeft={2}>
+          <TickerLine data={data} />
+        </Box>
+        <Box paddingLeft={2}>
+          <Text dimColor>Tip: {hint}</Text>
+        </Box>
       </Box>
     </Box>
   );

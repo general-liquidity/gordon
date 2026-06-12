@@ -2756,6 +2756,20 @@ function AppInner() {
         <QueuedCommandsNotice count={queuedCount} />
       )}
 
+      {/* Persistent identity line — the block banner scrolls away with chat
+          (hybrid screen model), so the compact wordmark keeps GORDON +
+          workspace context visible above the input. Compact ONLY: the full
+          bordered card stays unmounted. Uses selectors declared above the
+          early-return chain — no hooks added here. */}
+      <GordonHeader
+        compact
+        permissionMode={permissionMode ?? "ask"}
+        sessionId={sessionId}
+        threadId={threadId}
+        isResumedSession={isResumedSession}
+        workspace={activeWorkspace}
+      />
+
       <StatusLine
         memoryUsageRatio={memoryUsageRatio}
         liveContextTokens={liveContextTokens}
