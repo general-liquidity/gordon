@@ -16,8 +16,8 @@ export const TOUR_MOCK_STANDARD: ApprovalRequest = {
   riskClass: "medium",
   sideEffectLevel: "order placement",
   riskReasons: [
-    "Position size 2.1% of equity - inside your 3% limit",
-    "Paper venue - no real capital at risk",
+    "Position size 2.1% of equity — inside your 3% limit",
+    "Paper venue — no real capital at risk",
   ],
 };
 
@@ -27,9 +27,9 @@ export const TOUR_MOCK_CRITICAL: ApprovalRequest = {
   toolName: "execute_plan",
   permissionScope: "trading:execute",
   riskClass: "critical",
-  sideEffectLevel: "live order - real capital",
+  sideEffectLevel: "live order — real capital",
   riskReasons: [
-    "Order size 12% of equity - exceeds your 3% limit",
+    "Order size 12% of equity — exceeds your 3% limit",
     "No stop-loss attached to the plan",
   ],
   counterOffer: { symbol: "BTC", side: "buy", originalQuantity: 0.5, adjustedQuantity: 0.12 },

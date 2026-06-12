@@ -4,11 +4,33 @@ import {
   SLASH_COMMANDS,
   formatCommandHelp,
   formatPaginatedCommandHelp,
+  formatTradingModesHelp,
   getSlashCommandSuggestions,
   getSlashCommandRuntimeDrift,
   isRuntimeHandledSlashCommand,
   parseHelpArg,
 } from "./slashCommands.ts";
+
+describe("/modes help page", () => {
+  it("registers the modes command as a runtime-handled menu target with the mode alias", () => {
+    const modes = SLASH_COMMANDS.find((command) => command.name === "modes");
+    expect(modes?.action).toBe("menu");
+    expect(modes?.target).toBe("modes");
+    expect(modes?.aliases).toContain("mode");
+    expect(modes && isRuntimeHandledSlashCommand(modes)).toBe(true);
+  });
+
+  it("renders all six permission modes plus the /live exit row", () => {
+    const help = formatTradingModesHelp();
+    for (const cmd of ["/auto", "/ask", "/planmode", "/paper", "/strict", "/observe", "/live"]) {
+      expect(help).toContain(cmd);
+    }
+  });
+
+  it("links /modes from the paginated help summary", () => {
+    expect(formatPaginatedCommandHelp()).toContain("/modes");
+  });
+});
 
 describe("slash command UX formatting", () => {
   it("formats default help around workflows instead of legacy categories", () => {
