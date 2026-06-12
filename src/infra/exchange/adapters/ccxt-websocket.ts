@@ -19,9 +19,11 @@
  *                          `client.close()` to release the underlying
  *                          WebSocket connection.
  *
- * Error handling: in-loop errors are caught and logged, the loop
- * continues running. The supervising agent surfaces persistent failures
- * via Gordon's existing circuit-breaker pattern at the adapter level.
+ * Error handling: in-loop errors are caught and classified by
+ * `isPermanentSubscribeError`. Transient errors retry with capped
+ * exponential backoff (1s→30s); permanent errors (bad symbol, auth,
+ * unsupported) abort the subscription so a junk symbol can't spin the
+ * loop forever and trigger the exchange to close the shared WS.
  */
 
 import ccxt, { type Exchange as CcxtBase } from "ccxt";
@@ -40,6 +42,44 @@ type CcxtProClass = new (config: Record<string, unknown>) => CcxtBase & {
   watchOrderBook(symbol: string, limit?: number): Promise<unknown>;
   close?(): Promise<void>;
 };
+
+/**
+ * Classify a subscribe-loop error as permanent (non-retryable) or transient.
+ *
+ * Permanent errors — bad symbol, malformed request, auth/permission failures,
+ * unsupported operations — will NEVER succeed on retry, so the loop must stop
+ * rather than hammer the exchange every second (which contributes to Binance
+ * closing the shared WS with code 1008 and killing valid subscriptions too).
+ *
+ * Transient errors — network drops, timeouts, exchange-unavailable, generic
+ * ExchangeError, and anything unrecognized — default to retryable so an
+ * unknown-but-recoverable error never silently stops the stream.
+ *
+ * Detection is by CCXT error class NAME (`err.constructor.name`, e.g.
+ * "BadSymbol") plus message matching, so we don't import the full CCXT error
+ * hierarchy.
+ */
+export function isPermanentSubscribeError(err: unknown): boolean {
+  const permanentNames = new Set([
+    "BadSymbol",
+    "BadRequest",
+    "ArgumentsRequired",
+    "AuthenticationError",
+    "PermissionDenied",
+    "NotSupported",
+  ]);
+
+  const name = (err as { constructor?: { name?: string } } | null | undefined)
+    ?.constructor?.name;
+  if (name && permanentNames.has(name)) return true;
+
+  const message = err instanceof Error ? err.message : String(err ?? "");
+  if (/does not have market|invalid symbol|symbol .* not found/i.test(message)) {
+    return true;
+  }
+
+  return false;
+}
 
 function resolveCcxtProClass(subId: string): CcxtProClass {
   const pro = (ccxt as unknown as { pro?: Record<string, unknown> }).pro;
@@ -117,19 +157,33 @@ export class CcxtWebSocketImpl implements ExchangeWebSocket {
     const ccxtSymbol = toCcxtSymbol(symbol);
 
     (async () => {
+      let backoffMs = 1000;
       while (!ctrl.signal.aborted) {
         try {
           const t = await this.client.watchTicker(ccxtSymbol);
           if (ctrl.signal.aborted) break;
+          backoffMs = 1000;
           callback(normalizeTicker(t));
         } catch (err) {
           if (ctrl.signal.aborted) break;
+          const reason = err instanceof Error ? err.message : String(err);
+          if (isPermanentSubscribeError(err)) {
+            logger.warn("CCXT watchTicker permanent error — stopping subscription", {
+              peer: this.ccxtSubId,
+              symbol,
+              reason,
+            });
+            ctrl.abort();
+            this.subscriptions.delete(key);
+            break;
+          }
           logger.debug("CCXT watchTicker error — looping", {
             peer: this.ccxtSubId,
             symbol,
-            err: err instanceof Error ? err.message : String(err),
+            err: reason,
           });
-          await new Promise((r) => setTimeout(r, 1000)); // backoff
+          await new Promise((r) => setTimeout(r, backoffMs));
+          backoffMs = Math.min(backoffMs * 2, 30000);
         }
       }
     })();
@@ -145,19 +199,33 @@ export class CcxtWebSocketImpl implements ExchangeWebSocket {
     const ccxtSymbol = toCcxtSymbol(symbol);
 
     (async () => {
+      let backoffMs = 1000;
       while (!ctrl.signal.aborted) {
         try {
           const ob = await this.client.watchOrderBook(ccxtSymbol);
           if (ctrl.signal.aborted) break;
+          backoffMs = 1000;
           callback(normalizeOrderBook(ob));
         } catch (err) {
           if (ctrl.signal.aborted) break;
+          const reason = err instanceof Error ? err.message : String(err);
+          if (isPermanentSubscribeError(err)) {
+            logger.warn("CCXT watchOrderBook permanent error — stopping subscription", {
+              peer: this.ccxtSubId,
+              symbol,
+              reason,
+            });
+            ctrl.abort();
+            this.subscriptions.delete(key);
+            break;
+          }
           logger.debug("CCXT watchOrderBook error — looping", {
             peer: this.ccxtSubId,
             symbol,
-            err: err instanceof Error ? err.message : String(err),
+            err: reason,
           });
-          await new Promise((r) => setTimeout(r, 1000));
+          await new Promise((r) => setTimeout(r, backoffMs));
+          backoffMs = Math.min(backoffMs * 2, 30000);
         }
       }
     })();

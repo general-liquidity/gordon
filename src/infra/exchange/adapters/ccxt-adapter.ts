@@ -78,6 +78,7 @@ import type {
   FundingRate,
   FundingHistoryEntry,
 } from "../types.ts";
+import { normalizePemSecret } from "../types.ts";
 import type { Candle } from "../../../types/index.ts";
 import { CcxtWebSocketImpl } from "./ccxt-websocket.ts";
 import { SandboxNotSupportedError } from "../sandboxSupport.ts";
@@ -354,7 +355,11 @@ export class CcxtAdapter
       enableRateLimit: true,
     };
     if (credentials.apiKey) config.apiKey = credentials.apiKey;
-    if (credentials.apiSecret) config.secret = credentials.apiSecret;
+    // Coinbase CDP / Advanced Trade secrets are EC PEM keys; normalize literal
+    // `\n` escapes back to real newlines so CCXT's PEM parser accepts them. No-op
+    // for HMAC secrets. Only set `password` when a non-empty passphrase exists —
+    // an empty string breaks CDP auth (legacy Coinbase Pro / OKX still pass one).
+    if (credentials.apiSecret) config.secret = normalizePemSecret(credentials.apiSecret);
     if (credentials.passphrase) config.password = credentials.passphrase;
     if (credentials.walletAddress) config.walletAddress = credentials.walletAddress;
     if (credentials.walletPrivateKey) config.privateKey = credentials.walletPrivateKey;

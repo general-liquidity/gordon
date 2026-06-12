@@ -108,6 +108,34 @@ export const EXCHANGE_ENV_MAP: Record<NativeExchangeId, { key?: string; secret?:
  * Config may store "***" placeholders; this resolves them from env.
  */
 /**
+ * Normalize a secret that is a PEM private key (Coinbase CDP / Advanced Trade
+ * keys ship an EC PRIVATE KEY as the secret, no passphrase). Operators paste
+ * these into `.env` where the newlines survive as the literal two-character
+ * sequence `\n` rather than real line breaks; CCXT's PEM parser then fails with
+ * "Illegal character at offset 30". This converts the escapes back to real
+ * newlines and strips any surrounding quotes/whitespace so CCXT receives a
+ * valid multi-line PEM.
+ *
+ * No-op for non-PEM secrets (legacy HMAC keys) — they pass through unchanged.
+ */
+export function normalizePemSecret(secret: string): string {
+  let s = secret.trim();
+  if (
+    (s.startsWith('"') && s.endsWith('"')) ||
+    (s.startsWith("'") && s.endsWith("'"))
+  ) {
+    s = s.slice(1, -1);
+  }
+  if (s.includes("BEGIN") && s.includes("PRIVATE KEY")) {
+    s = s
+      .replace(/\\r\\n/g, "\n")
+      .replace(/\\n/g, "\n")
+      .replace(/\r\n/g, "\n");
+  }
+  return s;
+}
+
+/**
  * Build CCXT-side env var names for a given ccxt sub-id. Operators set
  * `CCXT_<UPPER>_API_KEY`, `CCXT_<UPPER>_API_SECRET`, etc. per exchange.
  * Adopting a uniform pattern avoids exploding `EXCHANGE_ENV_MAP` to 107 entries.
@@ -206,6 +234,8 @@ export function resolveExchangeCredentials(
     if (isRedacted(passphrase)) passphrase = fromEnv(envs.passphrase, legacy?.passphrase);
     if (isRedacted(walletPrivateKey)) walletPrivateKey = fromEnv(envs.walletKey, legacy?.wallet);
     const walletAddress = fromEnv(envs.walletAddress, legacy?.walletAddress);
+    apiSecret = normalizePemSecret(apiSecret);
+    if (!passphrase) passphrase = undefined;
     return { apiKey, apiSecret, passphrase, sandbox: config.sandbox, walletPrivateKey, walletAddress };
   }
 
@@ -233,6 +263,9 @@ export function resolveExchangeCredentials(
   if (isRedacted(apiSecret)) apiSecret = "";
   if (isRedacted(passphrase)) passphrase = undefined;
   if (isRedacted(walletPrivateKey)) walletPrivateKey = undefined;
+
+  apiSecret = normalizePemSecret(apiSecret);
+  if (!passphrase) passphrase = undefined;
 
   return { apiKey, apiSecret, passphrase, sandbox: config.sandbox, walletPrivateKey, walletAddress };
 }
