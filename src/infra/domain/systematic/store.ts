@@ -138,6 +138,13 @@ export function initSystematicTables(): void {
   logger.info("Systematic trading tables initialized");
 }
 
+/** Clear the init-once latch so the next call re-creates tables on a fresh
+ *  (swapped) DB. Tests rotate the DB path between cases; without this the
+ *  latch would skip table creation on the new database. */
+export function _resetSystematicTablesForTests(): void {
+  initialized = false;
+}
+
 export function saveDatasetRecord(record: DatasetRecord): void {
   initSystematicTables();
   const db = getDatabase();

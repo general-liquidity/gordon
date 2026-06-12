@@ -7,6 +7,9 @@ import { detectOverfitting, type OptimizationEntry } from "../../../backtest/opt
 import type { BacktestMetrics, BacktestResult, OHLC, Trade } from "../../../backtest/types.ts";
 import { walkForwardTest } from "../../../backtest/analysis/walk-forward.ts";
 import type { Strategy } from "../../../strategies/types.ts";
+import type { Exchange } from "../../exchange/types.ts";
+import { backfillOHLCV } from "../../data/backfill.ts";
+import { readCandles, type CachedCandle } from "../../data/ohlcvCache.ts";
 import { createModuleLogger } from "../../logger/index.ts";
 import {
   getDatasetRecord,
@@ -164,6 +167,80 @@ export function scoreDatasetQuality(
     stale,
     warnings,
   };
+}
+
+export interface EnsureDatasetOptions {
+  exchange: Exchange;
+  symbol: string;
+  timeframe: string;
+  /** Range start, ms epoch (inclusive). */
+  since: number;
+  /** Range end, ms epoch (inclusive). Defaults to now. */
+  until?: number;
+}
+
+/**
+ * Dataset-first read: return the full [since..until] candle range from the
+ * local ohlcvCache, backfilling ONLY the missing sub-range(s) via
+ * backfillOHLCV. Already-cached bars are never re-fetched.
+ *
+ * Gap-fill strategy: the cache is contiguous-or-empty for most operational
+ * ranges, so we locate the cached window [min..max], then backfill the head
+ * (since..firstCached) and tail (lastCached..until) sub-ranges if they're
+ * larger than one bar. Interior gaps are covered by a final full-range
+ * backfill ONLY when the cached coverage is materially short of expected —
+ * cheaper than per-gap probing and crash-safe (upsert is first-writer-wins).
+ */
+export async function ensureDataset(opts: EnsureDatasetOptions): Promise<CachedCandle[]> {
+  const venue = opts.exchange.exchangeId;
+  const symbol = opts.symbol.trim();
+  const timeframe = opts.timeframe.trim();
+  const tfMs = timeframeMs(timeframe);
+  const until = opts.until ?? Date.now();
+  const since = opts.since;
+
+  const expected = Math.max(1, Math.floor((until - since) / tfMs));
+  let cached = readCandles(venue, symbol, timeframe, { fromTs: since, toTs: until });
+
+  const firstCached = cached.length > 0 ? cached[0]!.openTime : undefined;
+  const lastCached = cached.length > 0 ? cached[cached.length - 1]!.openTime : undefined;
+
+  const subRanges: Array<{ since: number; until: number }> = [];
+  if (cached.length === 0) {
+    subRanges.push({ since, until });
+  } else {
+    // Head gap: requested start precedes the earliest cached bar.
+    if (firstCached !== undefined && firstCached - since >= tfMs * 2) {
+      subRanges.push({ since, until: firstCached - 1 });
+    }
+    // Tail gap: requested end follows the latest cached bar.
+    if (lastCached !== undefined && until - lastCached >= tfMs * 2) {
+      subRanges.push({ since: lastCached + tfMs, until });
+    }
+    // Interior gaps: if cached coverage is short of expected even after the
+    // head/tail are accounted for, run a single covering backfill. upsert
+    // dedupes, so re-walking already-cached interior bars is a no-op write.
+    const coverage = cached.length / expected;
+    if (coverage < 0.98 && subRanges.length === 0) {
+      subRanges.push({ since, until });
+    }
+  }
+
+  for (const range of subRanges) {
+    if (range.until - range.since < tfMs) continue;
+    await backfillOHLCV({
+      exchange: opts.exchange,
+      symbol,
+      timeframe,
+      since: range.since,
+      until: range.until,
+    });
+  }
+
+  if (subRanges.length > 0) {
+    cached = readCandles(venue, symbol, timeframe, { fromTs: since, toTs: until });
+  }
+  return cached;
 }
 
 function inferReturnDriver(strategyId: string, strategyName: string): string {

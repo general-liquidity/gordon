@@ -71,9 +71,14 @@ gordon-spot-1-main
 hanabi-1-main
 misc
 
-# Reference repos (not part of Gordon source) — anchor to repo root only
+# Reference repos + AI-session scratch (not part of Gordon source).
+# MUST stay anchored with a leading slash — an unanchored `agents/` would
+# also match src/infra/agents and silently drop real source from commits.
 /agents/
-opensolvency/
+/opensolvency/
+/agent-tools/
+/mcps/
+/terminals/
 claude-code-meta/
 claude-code-meta-2/
 claude-code-best-practice-main/
@@ -90,10 +95,3 @@ TUI*.txt
 docs/pitch/
 general-liquidity-web-v2/
 general-liquidity-website/
-
-# Vendored reference repos + AI-session scratch (never commit; contains personal files)
-agents/
-opensolvency/
-agent-tools/
-mcps/
-terminals/

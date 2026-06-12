@@ -1,10 +1,19 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Box, Text } from "../../ink-custom";
 import { Select, TextInput } from "@inkjs/ui";
 import { loadConfig, saveConfig } from "../../../infra/storage/config/config.ts";
+import { saveEnvKeys } from "../../../infra/storage/config/env.ts";
 import { exchangeSwitch } from "../../../app/commands/exchange.ts";
 import { refreshRuntimeCredentials } from "../../../infra/runtime/credentialRefresh.ts";
-import { ccxtIdToNativeVenue, normalizeExchangeId, type ExchangeId } from "../../../infra/exchange/types.ts";
+import {
+  ccxtIdToNativeVenue,
+  extractCcxtSubId,
+  genericEnvNames,
+  normalizeExchangeId,
+  type CcxtExchangeId,
+  type ExchangeId,
+} from "../../../infra/exchange/types.ts";
+import { listCcxtExchanges, getExchangeCapabilities } from "../../../infra/exchange/ccxtCatalog.ts";
 import type { ExchangeType } from "../../../types/config.ts";
 import type { MultiExchangeConfig } from "../../../types/index.ts";
 import { MultiStepPicker, type PickerStep } from "../../design-system/MultiStepPicker.tsx";
@@ -14,8 +23,15 @@ import { useTheme } from "../../themes/ThemeProvider.tsx";
  * ExchangePicker — Interactive exchange selector + setup wizard.
  *
  * Switch flow: shows configured exchange IDs from config (including sandbox ones).
- * Add live flow: pick from supported exchange types.
+ * Add live flow: TIERED picker — a VERIFIED section (Gordon-tested venues) plus a
+ *   searchable COMMUNITY section spanning every CCXT venue (~111). Community
+ *   venues route end-to-end (the factory defers long-tail venues to CCXT) but
+ *   are untested against Gordon's order/risk/WS path, so they carry a warning.
  * Add sandbox flow: pick from testnet-capable exchanges with sandbox=true credentials.
+ *
+ * Credential steps are CAPABILITY-DRIVEN: getExchangeCapabilities() reads the
+ * venue's CCXT metadata to decide which fields to prompt (apiKey/secret always;
+ * passphrase only when required; wallet key/address only for DEX venues).
  */
 
 interface Props {
@@ -23,20 +39,10 @@ interface Props {
   onCancel: () => void;
 }
 
-const LIVE_EXCHANGES = [
-  { label: "Binance", value: "ccxt:binance" },
-  { label: "Binance US", value: "ccxt:binanceus" },
-  { label: "Coinbase", value: "ccxt:coinbase" },
-  { label: "Kraken", value: "ccxt:kraken" },
-  { label: "Bitfinex", value: "ccxt:bitfinex" },
-  { label: "Gemini", value: "ccxt:gemini" },
-  { label: "OKX", value: "ccxt:okx" },
-  { label: "Hyperliquid (wallet-based)", value: "ccxt:hyperliquid" },
-  { label: "Robinhood Crypto", value: "ccxt:robinhood" },
-];
+// Number of community matches shown at once — the full ~102 non-verified list is
+// too long to scroll, so the search box narrows it before it reaches Select.
+const COMMUNITY_RESULT_LIMIT = 12;
 
-// Entries must stay in sync with EXCHANGE_SANDBOX_SUPPORT (sandboxSupport.ts) —
-// the factory's assertSandboxSupported throws on venues declared unsupported.
 const SANDBOX_EXCHANGES = [
   { label: "Binance Testnet  (testnet.binance.vision)", value: "ccxt:binance", sandboxId: "binance-testnet" },
   { label: "OKX Demo  (simulated trading, x-simulated-trading: 1)", value: "ccxt:okx", sandboxId: "okx-demo" },
@@ -52,8 +58,15 @@ const ACTIONS = [
   { label: "Check status", value: "status" },
 ];
 
-const WALLET_BASED = new Set(["ccxt:hyperliquid"]);
-const NEEDS_PASSPHRASE = new Set(["ccxt:coinbase", "ccxt:okx"]);
+function ccxtValue(id: string): string {
+  return `ccxt:${id}`;
+}
+
+/** Capabilities for a `ccxt:<id>` value (or a bare sub-id). */
+function capsFor(value: string): ReturnType<typeof getExchangeCapabilities> {
+  const subId = value.startsWith("ccxt:") ? extractCcxtSubId(value as CcxtExchangeId) : value;
+  return getExchangeCapabilities(subId);
+}
 
 function nativeVenueId(exchangeType: string): string {
   return ccxtIdToNativeVenue(normalizeExchangeId(exchangeType as ExchangeId)) ?? exchangeType;
@@ -78,6 +91,7 @@ export function ExchangePicker({ onComplete, onCancel }: Props) {
   const [loading, setLoading] = useState(true);
   const [configuredExchanges, setConfiguredExchanges] = useState<MultiExchangeConfig[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [communityQuery, setCommunityQuery] = useState("");
   const [add, setAdd] = useState<AddState>({
     exchangeType: "",
     sandboxId: undefined,
@@ -87,6 +101,18 @@ export function ExchangePicker({ onComplete, onCancel }: Props) {
     passphrase: "",
     walletKey: "",
   });
+
+  const catalog = useMemo(() => listCcxtExchanges(), []);
+  const verified = useMemo(() => catalog.filter((e) => e.verified), [catalog]);
+  const community = useMemo(() => catalog.filter((e) => !e.verified), [catalog]);
+
+  const communityMatches = useMemo(() => {
+    const q = communityQuery.trim().toLowerCase();
+    const pool = q
+      ? community.filter((e) => e.id.toLowerCase().includes(q) || e.name.toLowerCase().includes(q))
+      : community;
+    return pool.slice(0, COMMUNITY_RESULT_LIMIT);
+  }, [community, communityQuery]);
 
   useEffect(() => {
     loadConfig()
@@ -116,9 +142,9 @@ export function ExchangePicker({ onComplete, onCancel }: Props) {
     try {
       const cfg = await loadConfig();
       const type = normalizeExchangeId(state.exchangeType as ExchangeId) as ExchangeType;
-      const isWallet = WALLET_BASED.has(type);
+      const caps = capsFor(type);
 
-      const baseId = state.sandboxId ?? type;
+      const baseId = state.sandboxId ?? extractCcxtSubId(type as CcxtExchangeId);
       let id = baseId;
       let n = 1;
       while (cfg.exchanges.some((exchange) => exchange.id === id)) {
@@ -128,8 +154,8 @@ export function ExchangePicker({ onComplete, onCancel }: Props) {
       const entry: MultiExchangeConfig = {
         id,
         type,
-        apiKey: isWallet ? "" : state.apiKey,
-        apiSecret: isWallet ? "" : state.apiSecret,
+        apiKey: caps.isDex ? "" : state.apiKey,
+        apiSecret: caps.isDex ? "" : state.apiSecret,
         sandbox: state.isSandbox,
         isDefault: cfg.exchanges.length === 0,
         ...(state.passphrase ? { passphrase: state.passphrase } : {}),
@@ -139,9 +165,25 @@ export function ExchangePicker({ onComplete, onCancel }: Props) {
       cfg.exchanges.push(entry);
       if (!cfg.activeExchangeId) cfg.activeExchangeId = id;
       await saveConfig(cfg);
+
+      // Persist credentials to .env under the generic <UPPER(subId)>_* names so
+      // resolveExchangeCredentials picks them up for any (incl. uncurated) venue.
+      const subId = extractCcxtSubId(type as CcxtExchangeId);
+      const names = genericEnvNames(subId);
+      const envWrite: Record<string, string> = {};
+      if (caps.isDex) {
+        if (state.walletKey) envWrite[names.walletKey] = state.walletKey;
+      } else {
+        if (state.apiKey) envWrite[names.key] = state.apiKey;
+        if (state.apiSecret) envWrite[names.secret] = state.apiSecret;
+        if (state.passphrase) envWrite[names.passphrase] = state.passphrase;
+      }
+      if (Object.keys(envWrite).length > 0) {
+        await saveEnvKeys(envWrite as Parameters<typeof saveEnvKeys>[0]);
+      }
       await refreshRuntimeCredentials();
 
-      const label = state.isSandbox ? `${type} (sandbox)` : type;
+      const label = state.isSandbox ? `${subId} (sandbox)` : subId;
       onComplete(`Added ${label} as '${id}'.${cfg.exchanges.length === 1 ? " Set as active exchange." : " Use /exchange switch to activate."}`);
     } catch (err) {
       onComplete(`Error saving exchange: ${err instanceof Error ? err.message : String(err)}`);
@@ -165,6 +207,22 @@ export function ExchangePicker({ onComplete, onCancel }: Props) {
     }
   }, [onComplete]);
 
+  // Route a freshly-picked exchange to the right first credential step based on
+  // its CCXT capabilities (DEX → wallet key; everything else → api key).
+  const beginCredentials = useCallback(
+    (
+      value: string,
+      isSandbox: boolean,
+      sandboxId: string | undefined,
+      go: (stepId: string) => void,
+    ) => {
+      const caps = capsFor(value);
+      setAdd((prev) => ({ ...prev, exchangeType: value, isSandbox, sandboxId }));
+      go(caps.isDex ? "cred-walletkey" : "cred-apikey");
+    },
+    [],
+  );
+
   if (loading) {
     return (
       <Box flexDirection="column" paddingX={1} paddingY={1}>
@@ -185,7 +243,7 @@ export function ExchangePicker({ onComplete, onCancel }: Props) {
           onChange={(value) => {
             ctx.set("action", value);
             if (value === "switch") ctx.go("switch-pick");
-            else if (value === "add-live") ctx.go("add-live-pick");
+            else if (value === "add-live") ctx.go("add-live-verified");
             else if (value === "add-sandbox") ctx.go("add-sandbox-pick");
             else if (value === "remove") ctx.go("remove-pick");
             else if (value === "status") {
@@ -213,18 +271,52 @@ export function ExchangePicker({ onComplete, onCancel }: Props) {
         return <Select options={switchOptions} onChange={handleSwitch} />;
       },
     },
-    "add-live-pick": {
-      title: "Select exchange to add (live / real money):",
+    "add-live-verified": {
+      title: "VERIFIED — Gordon-tested exchanges (live / real money):",
+      hint: "Enter to pick a verified venue, or ↓ then 'search community' for the full CCXT list.",
       render: (ctx) => (
-        <Select
-          options={LIVE_EXCHANGES}
-          onChange={(value) => {
-            setAdd((prev) => ({ ...prev, exchangeType: value, isSandbox: false, sandboxId: undefined }));
-            ctx.set("exchangeType", value);
-            ctx.set("isSandbox", false);
-            ctx.go(WALLET_BASED.has(value) ? "cred-walletkey" : "cred-apikey");
-          }}
-        />
+        <Box flexDirection="column">
+          <Select
+            options={[
+              ...verified.map((e) => ({ label: e.name, value: ccxtValue(e.id) })),
+              { label: "› Search community exchanges (full CCXT list)…", value: "__community__" },
+            ]}
+            onChange={(value) => {
+              if (value === "__community__") {
+                ctx.go("add-live-community");
+                return;
+              }
+              beginCredentials(value, false, undefined, ctx.go);
+            }}
+          />
+        </Box>
+      ),
+    },
+    "add-live-community": {
+      title: `COMMUNITY (search ${community.length})`,
+      hint: "Type to filter the full CCXT venue list by id or name.",
+      render: (ctx) => (
+        <Box flexDirection="column">
+          <Box>
+            <Text color={theme.uiInfo}>search: </Text>
+            <TextInput placeholder="bybit, kucoin, mexc…" onChange={setCommunityQuery} />
+          </Box>
+          <Box marginTop={1}>
+            <Text bold color={theme.riskWarning}>
+              ⚠ Community venues are untested with Gordon's order/risk/WS path.
+            </Text>
+          </Box>
+          <Box marginTop={1}>
+            {communityMatches.length === 0 ? (
+              <Text dimColor>No matches. Refine your search.</Text>
+            ) : (
+              <Select
+                options={communityMatches.map((e) => ({ label: `${e.name}  (${e.id})`, value: ccxtValue(e.id) }))}
+                onChange={(value) => beginCredentials(value, false, undefined, ctx.go)}
+              />
+            )}
+          </Box>
+        </Box>
       ),
     },
     "add-sandbox-pick": {
@@ -236,11 +328,10 @@ export function ExchangePicker({ onComplete, onCancel }: Props) {
           onChange={(value) => {
             const entry = SANDBOX_EXCHANGES.find((exchange) => exchange.sandboxId === value);
             if (!entry) return;
-            setAdd((prev) => ({ ...prev, exchangeType: entry.value, isSandbox: true, sandboxId: entry.sandboxId }));
             ctx.set("exchangeType", entry.value);
             ctx.set("isSandbox", true);
             ctx.set("sandboxId", entry.sandboxId);
-            ctx.go(WALLET_BASED.has(entry.value) ? "cred-walletkey" : "cred-apikey");
+            beginCredentials(entry.value, true, entry.sandboxId, ctx.go);
           }}
         />
       ),
@@ -277,15 +368,20 @@ export function ExchangePicker({ onComplete, onCancel }: Props) {
             const next = { ...add, apiSecret: value };
             setAdd(next);
             ctx.set("apiSecret", value);
-            if (NEEDS_PASSPHRASE.has(next.exchangeType)) ctx.go("cred-passphrase");
-            else void finishAdd(next);
+            // Capability-driven: prompt for a passphrase only when the venue
+            // actually requires one (CCXT `password` credential field).
+            if (capsFor(next.exchangeType).requiredCredentials.includes("password")) {
+              ctx.go("cred-passphrase");
+            } else {
+              void finishAdd(next);
+            }
           }}
         />
       ),
     },
     "cred-passphrase": {
       title: `Passphrase - ${add.exchangeType}`,
-      hint: `${nativeVenueId(add.exchangeType) === "coinbase" ? "Coinbase" : "OKX"} requires a passphrase in addition to key + secret.`,
+      hint: "This venue requires a passphrase in addition to key + secret.",
       render: (ctx) => (
         <TextInput
           placeholder="Passphrase..."

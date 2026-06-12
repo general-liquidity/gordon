@@ -134,3 +134,47 @@ describe("resolveExchangeCredentials — passphrase handling", () => {
     expect(creds.apiSecret).toBe("plainHmacSecret123");
   });
 });
+
+describe("resolveExchangeCredentials — generic env fallback for long-tail venues", () => {
+  const NAMES = ["BYBIT_API_KEY", "BYBIT_API_SECRET", "CCXT_BYBIT_API_KEY", "CCXT_BYBIT_API_SECRET"];
+  const SAVED: Record<string, string | undefined> = {};
+
+  afterEach(() => {
+    for (const name of NAMES) {
+      if (SAVED[name] === undefined) delete process.env[name];
+      else process.env[name] = SAVED[name];
+    }
+  });
+
+  it("falls back to <UPPER>_API_KEY / _API_SECRET for an uncurated venue (bybit)", () => {
+    for (const n of NAMES) SAVED[n] = process.env[n];
+    delete process.env.CCXT_BYBIT_API_KEY;
+    delete process.env.CCXT_BYBIT_API_SECRET;
+    process.env.BYBIT_API_KEY = "generic-key";
+    process.env.BYBIT_API_SECRET = "generic-secret";
+
+    const creds = resolveExchangeCredentials({
+      type: "ccxt:bybit",
+      apiKey: "***",
+      apiSecret: "***",
+    });
+    expect(creds.apiKey).toBe("generic-key");
+    expect(creds.apiSecret).toBe("generic-secret");
+  });
+
+  it("CCXT_<UPPER>_* wins over the generic fallback when both are present", () => {
+    for (const n of NAMES) SAVED[n] = process.env[n];
+    process.env.CCXT_BYBIT_API_KEY = "ccxt-key";
+    process.env.BYBIT_API_KEY = "generic-key";
+    process.env.CCXT_BYBIT_API_SECRET = "ccxt-secret";
+    process.env.BYBIT_API_SECRET = "generic-secret";
+
+    const creds = resolveExchangeCredentials({
+      type: "ccxt:bybit",
+      apiKey: "***",
+      apiSecret: "***",
+    });
+    expect(creds.apiKey).toBe("ccxt-key");
+    expect(creds.apiSecret).toBe("ccxt-secret");
+  });
+});

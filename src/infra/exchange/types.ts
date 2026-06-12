@@ -158,6 +158,31 @@ export function ccxtEnvNames(ccxtSubId: string): {
 }
 
 /**
+ * Generic per-venue env var names for an arbitrary ccxt sub-id, keyed off the
+ * UPPERCASED sub-id WITHOUT the `CCXT_` prefix (e.g. bybit → `BYBIT_API_KEY`,
+ * `BYBIT_API_SECRET`, `BYBIT_PASSPHRASE`). This is the lowest-priority fallback
+ * for long-tail venues that have no curated EXCHANGE_ENV_MAP entry and that the
+ * operator hasn't provisioned under the `CCXT_<UPPER>_*` pattern. Curated and
+ * `CCXT_*` names still win when present.
+ */
+export function genericEnvNames(ccxtSubId: string): {
+  key: string;
+  secret: string;
+  passphrase: string;
+  walletKey: string;
+  walletAddress: string;
+} {
+  const upper = ccxtSubId.toUpperCase().replace(/[^A-Z0-9]/g, "_");
+  return {
+    key: `${upper}_API_KEY`,
+    secret: `${upper}_API_SECRET`,
+    passphrase: `${upper}_PASSPHRASE`,
+    walletKey: `${upper}_WALLET_PRIVATE_KEY`,
+    walletAddress: `${upper}_WALLET_ADDRESS`,
+  };
+}
+
+/**
  * Each first-class venue id → its CCXT sub-id. The canonical venue id form is
  * `ccxt:<subId>`; first-class venues carry curated env-var names
  * (EXCHANGE_ENV_MAP) and sandbox-support metadata.
@@ -216,9 +241,13 @@ export function resolveExchangeCredentials(
   if (isCcxtExchangeId(config.type as ExchangeId)) {
     const subId = extractCcxtSubId(config.type as CcxtExchangeId);
     const envs = ccxtEnvNames(subId);
+    const generic = genericEnvNames(subId);
     const nativeVenue = ccxtIdToNativeVenue(config.type);
     const legacy = nativeVenue ? EXCHANGE_ENV_MAP[nativeVenue] : undefined;
     const isRedacted = (v: string | undefined) => !v || v === "***";
+    // Priority: curated native names → CCXT_<UPPER>_* → generic <UPPER>_*.
+    // Curated wins so existing operator keys keep working; the generic tier
+    // gives long-tail venues a usable env-var convention.
     const fromEnv = (...names: (string | undefined)[]) => {
       for (const name of names) {
         if (name && process.env[name]) return process.env[name];
@@ -229,11 +258,11 @@ export function resolveExchangeCredentials(
     let apiSecret = config.apiSecret;
     let passphrase = config.passphrase;
     let walletPrivateKey = config.walletPrivateKey;
-    if (isRedacted(apiKey)) apiKey = fromEnv(envs.key, legacy?.key) || "";
-    if (isRedacted(apiSecret)) apiSecret = fromEnv(envs.secret, legacy?.secret) || "";
-    if (isRedacted(passphrase)) passphrase = fromEnv(envs.passphrase, legacy?.passphrase);
-    if (isRedacted(walletPrivateKey)) walletPrivateKey = fromEnv(envs.walletKey, legacy?.wallet);
-    const walletAddress = fromEnv(envs.walletAddress, legacy?.walletAddress);
+    if (isRedacted(apiKey)) apiKey = fromEnv(legacy?.key, envs.key, generic.key) || "";
+    if (isRedacted(apiSecret)) apiSecret = fromEnv(legacy?.secret, envs.secret, generic.secret) || "";
+    if (isRedacted(passphrase)) passphrase = fromEnv(legacy?.passphrase, envs.passphrase, generic.passphrase);
+    if (isRedacted(walletPrivateKey)) walletPrivateKey = fromEnv(legacy?.wallet, envs.walletKey, generic.walletKey);
+    const walletAddress = fromEnv(legacy?.walletAddress, envs.walletAddress, generic.walletAddress);
     apiSecret = normalizePemSecret(apiSecret);
     if (!passphrase) passphrase = undefined;
     return { apiKey, apiSecret, passphrase, sandbox: config.sandbox, walletPrivateKey, walletAddress };

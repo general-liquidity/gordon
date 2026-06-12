@@ -19,6 +19,7 @@ import type {
   BacktestMetrics,
   BacktestResult,
   BacktestTrade,
+  OHLC,
 } from "../../../../../backtest/types.ts";
 import { runBacktest } from "../../../../../backtest/engine.ts";
 import { enrichBacktestResult } from "../../../../../backtest/enrichment.ts";
@@ -66,6 +67,8 @@ import {
 } from "../../../../domain/systematic/index.ts";
 import { getGordonContext, type MastraExecutionContext } from "../../types.ts";
 import { normalizeCryptoSymbol, normalizeStockSymbol, resolveInstrument } from "../../../../domain/markets/instruments.ts";
+import { ensureDataset } from "../../../../domain/systematic/service.ts";
+import type { Exchange } from "../../../../exchange/types.ts";
 
 // ============================================================================
 // Helper Functions
@@ -157,6 +160,53 @@ async function resolveHistoricalClient(
   throw new Error(errors.noDataClient.error);
 }
 
+async function fetchRangeViaDataset(
+  exchange: Exchange,
+  normalizedSymbol: string,
+  timeframe: string,
+  startTime: number,
+  endTime: number,
+): Promise<{ data: OHLC[]; metadata: HistoricalFetchMetadata } | null> {
+  const fetchStart = Date.now();
+  try {
+    const candles = await ensureDataset({
+      exchange,
+      symbol: normalizedSymbol,
+      timeframe,
+      since: startTime,
+      until: endTime,
+    });
+    if (candles.length === 0) return null;
+    const data: OHLC[] = candles.map((c) => ({
+      timestamp: c.openTime,
+      open: c.open,
+      high: c.high,
+      low: c.low,
+      close: c.close,
+      volume: c.volume,
+    }));
+    return {
+      data,
+      metadata: {
+        symbol: normalizedSymbol,
+        timeframe,
+        startTime,
+        endTime,
+        candleCount: data.length,
+        sourceId: exchange.exchangeId,
+        sourceKind: "cache",
+        marketFamily: "crypto",
+        fetchTimeMs: Date.now() - fetchStart,
+        fromCache: true,
+      },
+    };
+  } catch {
+    // Deep-history backfill failed (network, venue cap) — let the caller
+    // fall back to the legacy DataSourceManager shallow-window path.
+    return null;
+  }
+}
+
 async function fetchHistoricalSeries(
   ctx: ReturnType<typeof getGordonContext>,
   params: {
@@ -171,6 +221,24 @@ async function fetchHistoricalSeries(
   const selection = await resolveHistoricalClient(ctx, params.symbol, params.market);
 
   if (params.startTime !== undefined && params.endTime !== undefined) {
+    // Dataset-first: for a crypto exchange + calendar range, read what's
+    // already persisted in the ohlcvCache and backfill ONLY the missing
+    // sub-range(s) via the paginated deep-history ingester — instead of a
+    // shallow getCandles(limit) window. Falls back to the legacy
+    // DataSourceManager path if the cache yields nothing (e.g. an exchange
+    // whose deep history is unavailable).
+    if (selection.marketFamily === "crypto") {
+      const datasetResult = await fetchRangeViaDataset(
+        selection.client as Exchange,
+        selection.normalizedSymbol,
+        params.timeframe,
+        params.startTime,
+        params.endTime,
+      );
+      if (datasetResult && datasetResult.data.length > 0) {
+        return datasetResult;
+      }
+    }
     const result = await fetchHistoricalDataRangeWithMetadata(
       selection.client,
       selection.normalizedSymbol,
