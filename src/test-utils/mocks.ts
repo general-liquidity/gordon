@@ -212,6 +212,7 @@ export function createMockConfig(overrides: Partial<GordonConfig> = {}): GordonC
     regimeDetection: {
       autoRegime: true,
     },
+    ui: {},
     systematic: {
       executionMode: "assisted",
       minTradesForPromotion: 30,

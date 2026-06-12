@@ -26,7 +26,8 @@ function formatCurrency(value: number): string {
   }).format(value);
 }
 
-function formatTickerPrice(value: number): string {
+function formatTickerPrice(value: number | null): string {
+  if (value === null) return "—";
   return `$${new Intl.NumberFormat("en-US", {
     maximumFractionDigits: value >= 1_000 ? 0 : 2,
   }).format(value)}`;
@@ -73,16 +74,24 @@ function TickerLine({ data }: { data: BootLiveData | null }): React.JSX.Element 
   return (
     <Box>
       {data.ticker.map((item, index) => {
-        const change = `${item.changePercent24h >= 0 ? "+" : ""}${item.changePercent24h.toFixed(1)}%`;
+        const change = item.changePercent24h === null
+          ? "—"
+          : `${item.changePercent24h >= 0 ? "+" : ""}${item.changePercent24h.toFixed(1)}%`;
+        const changeColor = item.changePercent24h === null
+          ? undefined
+          : item.changePercent24h >= 0
+            ? "green"
+            : "red";
         return (
-          <React.Fragment key={item.symbol}>
+          <React.Fragment key={`${item.kind}:${item.symbol}`}>
             {index > 0 && <Text>    </Text>}
             <Text bold>{item.symbol}</Text>
             <Text> {formatTickerPrice(item.priceUsd)} </Text>
-            <Text color={item.changePercent24h >= 0 ? "green" : "red"}>{change}</Text>
+            {changeColor ? <Text color={changeColor}>{change}</Text> : <Text dimColor>{change}</Text>}
           </React.Fragment>
         );
       })}
+      {data.tickerExtra > 0 ? <Text dimColor> +{data.tickerExtra}</Text> : null}
     </Box>
   );
 }

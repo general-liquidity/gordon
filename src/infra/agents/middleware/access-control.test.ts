@@ -39,6 +39,7 @@ function createConfig(permissionMode: "auto" | "ask" | "strict" = "ask"): Gordon
     regimeDetection: {
       autoRegime: true,
     },
+    ui: {},
     costBudget: {
       action: "warn",
       warnThresholds: [0.5, 0.75, 0.9],

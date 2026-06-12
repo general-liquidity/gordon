@@ -60,6 +60,7 @@ function createMockContext(): GordonContext {
       regimeDetection: {
         autoRegime: true,
       },
+      ui: {},
       systematic: {
         executionMode: "assisted",
         minTradesForPromotion: 30,

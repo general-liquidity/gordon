@@ -255,6 +255,17 @@ export const SystematicTradingConfigSchema = z.object({
   }),
 });
 
+/**
+ * TUI configuration (boot panel, ticker, etc.)
+ */
+export const UIConfigSchema = z.object({
+  /**
+   * Symbols shown in the boot-panel live ticker. Unset → venue-class-aware
+   * default (crypto venue → BTC/ETH, broker-only → SPY/QQQ, both → BTC/ETH/SPY).
+   */
+  tickerSymbols: z.array(z.string().min(1)).max(12).optional(),
+});
+
 export const GordonConfigSchema = z.object({
   version: z.string().default("1.0.0"),
   activeProfile: z.string().min(1).optional(),
@@ -327,6 +338,8 @@ export const GordonConfigSchema = z.object({
   regimeDetection: RegimeDetectionConfigSchema.default({
     autoRegime: true,
   }),
+  /** TUI configuration */
+  ui: UIConfigSchema.default({}),
   /** Systematic trading research and promotion controls */
   systematic: SystematicTradingConfigSchema.default({
     executionMode: "assisted",
@@ -364,6 +377,7 @@ export type TelemetryConfig = z.infer<typeof TelemetryConfigSchema>;
 export type RiskManagementConfig = z.infer<typeof RiskManagementConfigSchema>;
 export type StrategyRuntimeConfig = z.infer<typeof StrategyRuntimeConfigSchema>;
 export type RegimeDetectionConfig = z.infer<typeof RegimeDetectionConfigSchema>;
+export type UIConfig = z.infer<typeof UIConfigSchema>;
 export type SystematicTradingConfig = z.infer<typeof SystematicTradingConfigSchema>;
 export type GordonConfig = z.infer<typeof GordonConfigSchema>;
 export type PermissionMode = GordonConfig["permissionMode"];

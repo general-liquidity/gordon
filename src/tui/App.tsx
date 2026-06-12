@@ -16,7 +16,6 @@ import type { DialogId } from "./state/types.ts";
 import { evaluatePermissionModeTransition, isLiveCapable } from "./state/permissionModeFsm.ts";
 
 // ── Components ──
-import { GordonHeader } from "./components/layout/GordonHeader.tsx";
 import { type Message, type MessageVariant } from "./components/messages/MessageBubble.tsx";
 import { StreamingText } from "./components/messages/StreamingText.tsx";
 import { AgentProgress } from "./components/status/AgentProgress.tsx";
@@ -34,7 +33,6 @@ import { PrivacyConsent, type PrivacyChoices } from "./components/editors/Privac
 import { PromptInput } from "./components/layout/PromptInput.tsx";
 import { StatusLine } from "./components/layout/StatusLine.tsx";
 import { BootLivePanel } from "./components/layout/BootLivePanel.tsx";
-import { EmptyChatHint } from "./components/layout/EmptyChatHint.tsx";
 import { defaultMessageQueue } from "../infra/runtime/messageQueue.js";
 import { saveEnvKeys } from "../infra/storage/config/env.ts";
 import { providerRegistry } from "../infra/runtime/providers/registry.js";
@@ -2290,14 +2288,7 @@ function AppInner() {
           )}
 
           {messages.length === 0 ? (
-            <>
-              <BootLivePanel hint={getSessionTip()} />
-              {/* Gated on runtimeReady/!isStreaming so the hint can't flash
-                  during boot or while a response is streaming (p0-safety). */}
-              {runtimeReady && !isStreaming && (
-                <EmptyChatHint hasExchange={connectivityHints.hasExchange} />
-              )}
-            </>
+            <BootLivePanel hint={getSessionTip()} />
           ) : (
             <VirtualMessageList
               messages={messages}
@@ -2755,20 +2746,6 @@ function AppInner() {
       {isStreaming && queuedCount > 0 && (
         <QueuedCommandsNotice count={queuedCount} />
       )}
-
-      {/* Persistent identity line — the block banner scrolls away with chat
-          (hybrid screen model), so the compact wordmark keeps GORDON +
-          workspace context visible above the input. Compact ONLY: the full
-          bordered card stays unmounted. Uses selectors declared above the
-          early-return chain — no hooks added here. */}
-      <GordonHeader
-        compact
-        permissionMode={permissionMode ?? "ask"}
-        sessionId={sessionId}
-        threadId={threadId}
-        isResumedSession={isResumedSession}
-        workspace={activeWorkspace}
-      />
 
       <StatusLine
         memoryUsageRatio={memoryUsageRatio}

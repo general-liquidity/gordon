@@ -24,8 +24,8 @@ function deps(overrides: Partial<BootLiveDeps> = {}): BootLiveDeps {
     fetchEquity: async () => 12_408.32,
     verifyAudit: () => ({ valid: true, checked: 1_204 }),
     fetchTicker: async () => [
-      { symbol: "BTC", priceUsd: 67_432, changePercent24h: 2.3 },
-      { symbol: "ETH", priceUsd: 3_521, changePercent24h: -0.8 },
+      { symbol: "BTC", kind: "crypto", priceUsd: 67_432, changePercent24h: 2.3 },
+      { symbol: "ETH", kind: "crypto", priceUsd: 3_521, changePercent24h: -0.8 },
     ],
     timeoutMs: 50,
     ...overrides,
@@ -40,9 +40,14 @@ describe("loadBootLiveData", () => {
       equityUsd: 12_408.32,
       audit: { state: "ok", checked: 1_204 },
       ticker: [
-        { symbol: "BTC", priceUsd: 67_432, changePercent24h: 2.3 },
-        { symbol: "ETH", priceUsd: 3_521, changePercent24h: -0.8 },
+        { symbol: "BTC", kind: "crypto", priceUsd: 67_432, changePercent24h: 2.3 },
+        { symbol: "ETH", kind: "crypto", priceUsd: 3_521, changePercent24h: -0.8 },
       ],
+      tickerSymbols: [
+        { symbol: "BTC", kind: "crypto" },
+        { symbol: "ETH", kind: "crypto" },
+      ],
+      tickerExtra: 0,
     });
   });
 
@@ -112,6 +117,11 @@ describe("loadBootLiveData", () => {
       equityUsd: null,
       audit: { state: "unavailable", checked: 0 },
       ticker: null,
+      tickerSymbols: [
+        { symbol: "BTC", kind: "crypto" },
+        { symbol: "ETH", kind: "crypto" },
+      ],
+      tickerExtra: 0,
     });
   });
 });
