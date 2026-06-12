@@ -205,6 +205,8 @@ import { useKillSwitchStatus } from "./hooks/useKillSwitchStatus.ts";
 import { getSessionTip } from "./boot/tips.ts";
 import { installRenderBudget, isRenderBudgetEnabled, isRenderBudgetStrict, getRenderBudgetBreachCount } from "./diagnostics/renderBudget.ts";
 import { enterAltScreen, leaveAltScreen } from "./utils/altScreen.ts";
+import { resolveScreenMode } from "./screenMode.ts";
+import { FullscreenHeader, estimateHeaderRows, resolveHeaderVariant } from "./components/layout/FullscreenHeader.tsx";
 import { radarQuickKeyCommand } from "./input/radarQuickKeys.ts";
 import { InputRouterProvider, useRoutedInput, FOCUS_PRIORITY } from "./input/InputRouterContext.tsx";
 import { getSuggestionStore } from "../infra/proactive/storage/suggestionStore.ts";
@@ -233,6 +235,14 @@ interface FeedbackTradeData {
   pnl?: number;
   pnlPercent?: number;
 }
+
+// Screen model is resolved ONCE at module load — the alt screen is entered
+// before Ink renders (tui/index.tsx) and <Static> usage is decided at mount,
+// so it cannot change mid-session. A module-level const means no extra hook
+// is needed to gate the fullscreen vs inline layout. GORDON_SCREEN=inline is
+// the operator escape hatch (see screenMode.ts).
+const SCREEN_MODE = resolveScreenMode();
+const IS_FULLSCREEN = SCREEN_MODE === "fullscreen";
 
 const EXAMPLE_PROMPTS = [
   'Try "what\'s BTC doing?"',
@@ -777,7 +787,9 @@ function AppInner() {
   } | null>(null);
 
   // ── Custom hooks ──
-  useTerminalSize();
+  // Terminal size drives the fullscreen root Box height and the chat viewport
+  // window; the hook re-renders on resize. Captured (not bare) for fullscreen.
+  const termSize = useTerminalSize();
   const ctrlC = useDoublePress(2000);
   const { elapsed: elapsedSeconds } = useElapsedTime(isStreaming);
   const paletteItems = useMergedCommands();
@@ -2257,27 +2269,21 @@ function AppInner() {
   }
 
   // ── Placeholder text for PromptInput (Claude Code: rotating example commands) ──
-  return (
-    <Box flexDirection="column">
-      {/* ── Conversation — wrapped in PrivacyScreen ── */}
-      <PrivacyScreen active={privacyMode}>
-        <Box flexDirection="column" paddingX={1}>
-          {modeBanner && !modeBanner.dismissed && (
-            <TradingModeBanner
-              banner={modeBanner}
-              onDismiss={() => dispatch({ type: "DISMISS_MODE_BANNER" })}
-            />
-          )}
+  // The main tree is split into shared fragments so the fullscreen
+  // (alt-screen) and inline (hybrid) layouts compose the SAME children in
+  // the same order — only the surrounding frame differs.
+  const modeBannerNode = modeBanner && !modeBanner.dismissed && (
+    <TradingModeBanner
+      banner={modeBanner}
+      onDismiss={() => dispatch({ type: "DISMISS_MODE_BANNER" })}
+    />
+  );
 
-          {messages.length === 0 ? (
-            <BootLivePanel hint={getSessionTip()} />
-          ) : (
-            <VirtualMessageList
-              messages={messages}
-              scrollEnabled={!showPalette && !anyDialogOpen}
-            />
-          )}
-
+  // Everything that renders below the transcript in the chat column —
+  // approvals, agent progress, spinners, live positions. Shared verbatim by
+  // the inline chat column and the fullscreen bottom chrome.
+  const chatCompanions = (
+    <>
           {/* Pending approvals — render only the first one to avoid
               multiple useInput listeners catching the same Enter keypress.
               When the first is decided it leaves the list and the next
@@ -2394,9 +2400,12 @@ function AppInner() {
           {genomeMutation && (
             <GenomeDiffViewer mutation={genomeMutation} />
           )}
-        </Box>
-      </PrivacyScreen>
+    </>
+  );
 
+  // Overlay + dialog stack — identical in both layouts.
+  const dialogStack = (
+    <>
       {/* ── Command palette overlay ── */}
       {showPalette && (
         <CommandPalette
@@ -2728,7 +2737,12 @@ function AppInner() {
       {isStreaming && queuedCount > 0 && (
         <QueuedCommandsNotice count={queuedCount} />
       )}
+    </>
+  );
 
+  // Status line + radar focus + prompt input — the bottom bar in both layouts.
+  const bottomBar = (
+    <>
       <StatusLine
         memoryUsageRatio={memoryUsageRatio}
         liveContextTokens={liveContextTokens}
@@ -2765,6 +2779,91 @@ function AppInner() {
           }}
         />
       </Box>
+    </>
+  );
+
+  // ── Fullscreen (alt-screen) layout — banner as scroll-origin / chat
+  //    viewport / pinned bottom chrome ──
+  if (IS_FULLSCREEN) {
+    const headerVariant = resolveHeaderVariant(termSize.rows, termSize.columns);
+    const headerRows = estimateHeaderRows(headerVariant);
+    // Approximate rows the bottom chrome occupies (status + radar bar +
+    // input box, plus transient blocks). The viewport Box clips overflow,
+    // so an over-estimate costs blank rows, not corruption.
+    const bottomReserve =
+      6 +
+      (pendingApprovals.length > 0 ? 10 : 0) +
+      (isStreaming ? 3 : 0) +
+      (modeBannerNode ? 3 : 0);
+    const chatViewportRows = Math.max(4, termSize.rows - bottomReserve);
+    const fullscreenHeader = (
+      <FullscreenHeader
+        rows={termSize.rows}
+        columns={termSize.columns}
+        hint={getSessionTip()}
+      />
+    );
+
+    return (
+      <Box flexDirection="column" height={termSize.rows}>
+        {/* Chat viewport — windowed transcript with the banner + boxes as the
+            FIRST entry of scroll history. Default sticks to the bottom;
+            scrolling up reaches the banner at the session's scroll origin. */}
+        <Box flexDirection="column" flexGrow={1} overflow="hidden">
+          <PrivacyScreen active={privacyMode}>
+            <Box flexDirection="column" paddingX={1}>
+              {modeBannerNode}
+              <VirtualMessageList
+                messages={messages}
+                scrollEnabled={!showPalette && !anyDialogOpen}
+                fullscreen
+                viewportRows={chatViewportRows}
+                viewportWidth={Math.max(20, termSize.columns - 4)}
+                header={fullscreenHeader}
+                headerRows={headerRows}
+              />
+            </Box>
+          </PrivacyScreen>
+        </Box>
+
+        {/* Bottom chrome — approvals, dialogs, notifications, status, input */}
+        <Box flexDirection="column" flexShrink={0}>
+          <PrivacyScreen active={privacyMode}>
+            <Box flexDirection="column" paddingX={1}>
+              {chatCompanions}
+            </Box>
+          </PrivacyScreen>
+          {dialogStack}
+          {bottomBar}
+        </Box>
+      </Box>
+    );
+  }
+
+  // ── Inline (hybrid) layout — the pre-fullscreen tree, unchanged ──
+  return (
+    <Box flexDirection="column">
+      {/* ── Conversation — wrapped in PrivacyScreen ── */}
+      <PrivacyScreen active={privacyMode}>
+        <Box flexDirection="column" paddingX={1}>
+          {modeBannerNode}
+
+          {messages.length === 0 ? (
+            <BootLivePanel hint={getSessionTip()} />
+          ) : (
+            <VirtualMessageList
+              messages={messages}
+              scrollEnabled={!showPalette && !anyDialogOpen}
+            />
+          )}
+
+          {chatCompanions}
+        </Box>
+      </PrivacyScreen>
+
+      {dialogStack}
+
+      {bottomBar}
     </Box>
   );
 }

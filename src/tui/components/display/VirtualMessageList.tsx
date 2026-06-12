@@ -1,30 +1,57 @@
-import React, { useCallback, useRef, useMemo } from "react";
+import React, { useCallback, useRef, useMemo, useState } from "react";
 import { Box, Static, type DOMElement } from "../../ink-custom";
 import { MessageBubble, type Message } from "../messages/MessageBubble.tsx";
 import { OffscreenFreeze } from "../layout/OffscreenFreeze.tsx";
 import useMouse, { type MouseEvent } from "../../ink-custom/hooks/use-mouse.js";
 import { createScrollBox, type ScrollBox } from "../../ink-custom/scrollBox.js";
+import { computeChatWindow, estimateMessageLines } from "./chatWindowing.ts";
+import type { ScrollBoxHandle } from "../layout/ScrollBox.tsx";
+import { ScrollKeybindingHandler } from "../ScrollKeybindingHandler.tsx";
 
 /** Lines per wheel-tick. Matches the muscle memory of most pagers. */
 const WHEEL_STEP = 3;
 
 // ============================================================================
-// VirtualMessageList — Static scrollback + live tail
+// VirtualMessageList — Static scrollback + live tail (inline mode)
+//                       windowed in-app viewport (fullscreen mode)
 //
-// Past messages are committed to <Static> and written into the terminal's
-// scrollback buffer (rendered once by Ink, never touched again). Only the
-// last LIVE_TAIL stable messages plus any currently-streaming message live
-// in Ink's layout tree, keeping the Ink frame small enough to fit the
-// terminal without height estimation or overflow.
+// INLINE (hybrid screen model, the fallback): past messages are committed to
+// <Static> and written into the terminal's scrollback buffer (rendered once
+// by Ink, never touched again). Only the streaming message lives in Ink's
+// layout tree. History access: terminal scroll.
 //
-// History access: terminal scroll (mouse wheel / Shift+PgUp).
-// History access: terminal scroll only.
+// FULLSCREEN (alt-screen model): there IS no terminal scrollback inside the
+// alternate screen, so <Static> cannot work. Instead we render a windowed
+// slice of messages sized to the viewport (approximate line counting via
+// chatWindowing.ts) and scroll in-app: PgUp/PgDn + mouse wheel. Classic chat
+// stickiness — at the tail the window follows new content; scrolled up it
+// stays frozen until the user returns to the bottom (PgDn through the end).
+//
+// SCROLL ORIGIN: in fullscreen the GORDON banner + session box + trading
+// preflight (the `header` node) is the FIRST entry of the windowed content —
+// a synthetic message of `headerRows` rows at transcript index 0. It is part
+// of the scroll history (not pinned chrome): the default view sticks to the
+// bottom; scrolling up reaches the header at the very top of the session.
 // ============================================================================
 
 interface Props {
   messages: Message[];
   /** Reserved — currently unused since transcript search was removed. */
   scrollEnabled?: boolean;
+  /** Fullscreen screen model: window messages in-app, never use <Static>. */
+  fullscreen?: boolean;
+  /** Rows available to the chat viewport (fullscreen only). */
+  viewportRows?: number;
+  /** Columns available for wrapping estimation (fullscreen only). */
+  viewportWidth?: number;
+  /**
+   * Scroll-origin header (banner + session box + trading preflight). Rendered
+   * as the first entry of the windowed content in fullscreen mode so it sits
+   * at the top of scroll. Ignored in inline mode.
+   */
+  header?: React.ReactNode;
+  /** Estimated rows the `header` entry occupies — feeds the windowing math. */
+  headerRows?: number;
 }
 
 /**
@@ -49,7 +76,15 @@ interface Props {
  */
 const LIVE_TAIL = 0;
 
-export function VirtualMessageList({ messages, scrollEnabled = true }: Props) {
+export function VirtualMessageList({
+  messages,
+  scrollEnabled = true,
+  fullscreen = false,
+  viewportRows = 20,
+  viewportWidth = 80,
+  header,
+  headerRows = 0,
+}: Props) {
   const isStreaming = messages.some((m) => m.streaming);
 
   // Only show completed messages — streaming ones are invisible until done.
@@ -103,12 +138,74 @@ export function VirtualMessageList({ messages, scrollEnabled = true }: Props) {
   const firstStreamingIdx = collapsedMessages.findIndex((m) => m.streaming);
   const anchorIdx = firstStreamingIdx >= 0 ? firstStreamingIdx : collapsedMessages.length;
   const cutoff = Math.max(0, anchorIdx - LIVE_TAIL);
-  if (cutoff > commitCursorRef.current) {
+  if (!fullscreen && cutoff > commitCursorRef.current) {
     commitCursorRef.current = cutoff;
   }
   const commitCursor = commitCursorRef.current;
   const staticMessages = collapsedMessages.slice(0, commitCursor);
   const liveMessages = collapsedMessages.slice(commitCursor);
+
+  // ---------------------------------------------------------------------
+  // Fullscreen windowing state.
+  //
+  // The header (banner + boxes) is a synthetic entry at transcript index 0,
+  // so the windowing heights are [headerRows, ...messageHeights]. scrollTop
+  // === null means "stick to bottom" (follow new content); scrolling back to
+  // (or past) the bottom re-arms stickiness. Scrolling all the way up reaches
+  // line 0 — the top of the header.
+  // ---------------------------------------------------------------------
+  const [fsScrollTop, setFsScrollTop] = useState<number | null>(null);
+
+  const fsHeights = useMemo(
+    () =>
+      fullscreen
+        ? [
+            Math.max(0, headerRows),
+            ...collapsedMessages.map((m) => estimateMessageLines(m, viewportWidth)),
+          ]
+        : [],
+    [fullscreen, headerRows, collapsedMessages, viewportWidth],
+  );
+  // At boot (no messages yet) anchor the window to the top so the GORDON
+  // banner is what the user sees — not the bottom of the preflight box when
+  // the header is taller than a short terminal. Once any message exists, or
+  // the user scrolls, fall back to normal stick-to-bottom / explicit offset.
+  const fsEffectiveScrollTop =
+    fsScrollTop === null && collapsedMessages.length === 0 ? 0 : fsScrollTop;
+  const fsWindow = computeChatWindow(fsHeights, viewportRows, fsEffectiveScrollTop);
+
+  // Imperative scroll surface — consumed by ScrollKeybindingHandler and the
+  // wheel handler. Window math is recomputed per render, so the handle reads
+  // the latest values through a ref.
+  const fsWindowRef = useRef(fsWindow);
+  fsWindowRef.current = fsWindow;
+  const fsApplyScroll = useCallback((next: number | null) => {
+    setFsScrollTop((prev) => {
+      const max = fsWindowRef.current.maxScroll;
+      const resolved = next === null || next >= max ? null : Math.max(0, next);
+      if (resolved !== prev) {
+        // Full repaint on scroll — the marginTop shift confuses the
+        // incremental line-diff (same pattern as layout/ScrollBox.tsx).
+        (globalThis as { __inkClearIncrementalOutput?: () => void }).__inkClearIncrementalOutput?.();
+      }
+      return resolved;
+    });
+  }, []);
+  const fsScrollHandleRef = useRef<ScrollBoxHandle | null>(null);
+  fsScrollHandleRef.current = {
+    scrollTo: (y: number) => fsApplyScroll(y),
+    scrollBy: (delta: number) => fsApplyScroll(fsWindowRef.current.scrollTop + delta),
+    scrollToBottom: () => fsApplyScroll(null),
+    isAtBottom: () => fsWindowRef.current.atBottom,
+    getScrollTop: () => fsWindowRef.current.scrollTop,
+    getScrollHeight: () => fsWindowRef.current.totalLines,
+    getFreshScrollHeight: () => fsWindowRef.current.totalLines,
+    getViewportHeight: () => viewportRows,
+    getViewportTop: () => fsWindowRef.current.scrollTop,
+    subscribe: () => () => {},
+    setClampBounds: () => {},
+    scrollToElement: () => {},
+  };
 
   // ---------------------------------------------------------------------
   // Mouse-wheel scrolling.
@@ -142,16 +239,46 @@ export function VirtualMessageList({ messages, scrollEnabled = true }: Props) {
 
   useMouse(
     (event: MouseEvent) => {
-      if (event.button === "wheel-up") {
-        const box = getScrollBox();
-        if (box) box.scrollBy(-WHEEL_STEP);
-      } else if (event.button === "wheel-down") {
-        const box = getScrollBox();
-        if (box) box.scrollBy(WHEEL_STEP);
+      const delta =
+        event.button === "wheel-up" ? -WHEEL_STEP : event.button === "wheel-down" ? WHEEL_STEP : 0;
+      if (delta === 0) return;
+      if (fullscreen) {
+        fsScrollHandleRef.current?.scrollBy(delta);
+        return;
       }
+      const box = getScrollBox();
+      if (box) box.scrollBy(delta);
     },
     { isActive: scrollEnabled },
   );
+
+  if (fullscreen) {
+    // The header occupies synthetic index 0; messages are 1..N. The window
+    // returns start/end over that combined list, so the header is visible
+    // exactly when fsWindow.start === 0, and the visible message slice is
+    // [max(0, start-1), end-1).
+    const headerVisible = fsWindow.start === 0 && headerRows > 0;
+    const msgStart = Math.max(0, fsWindow.start - 1);
+    const msgEnd = Math.max(0, fsWindow.end - 1);
+    const visible = collapsedMessages.slice(msgStart, msgEnd);
+    return (
+      <Box flexDirection="column" height={viewportRows} overflow="hidden">
+        {/* PgUp/PgDn page through history in-app (no scrollback in the alt screen). */}
+        <ScrollKeybindingHandler
+          scrollRef={fsScrollHandleRef}
+          pageSize={Math.max(1, viewportRows - 1)}
+          enabled={scrollEnabled}
+          pageKeysOnly
+        />
+        <Box flexDirection="column" marginTop={-fsWindow.topClip}>
+          {headerVisible ? header : null}
+          {visible.map((msg) => (
+            <MessageBubble key={msg.id} message={msg} />
+          ))}
+        </Box>
+      </Box>
+    );
+  }
 
   return (
     <Box flexDirection="column" ref={scrollContainerRef}>

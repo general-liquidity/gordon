@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
-import { enterAltScreen, leaveAltScreen } from "./altScreen.ts";
+import { enterAltScreen, forceLeaveAltScreen, isAltScreenActive, leaveAltScreen } from "./altScreen.ts";
 
 class FakeTty {
   isTTY = true;
@@ -20,7 +20,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  leaveAltScreen();
+  forceLeaveAltScreen();
   if (previousTerm === undefined) delete process.env.TERM;
   else process.env.TERM = previousTerm;
 });
@@ -53,5 +53,53 @@ describe("altScreen", () => {
 
     expect(enterAltScreen(out as unknown as NodeJS.WriteStream)).toBe(false);
     expect(out.chunks).toEqual([]);
+  });
+
+  test("refcounts: nested overlay leave never restores the main buffer while the app owns the screen", () => {
+    const out = new FakeTty();
+    const tty = out as unknown as NodeJS.WriteStream;
+
+    // App owns the screen for the session (fullscreen mode).
+    expect(enterAltScreen(tty)).toBe(true);
+    // Overlay (TradeQueueView / SafetyDashboard / pager) nests on top.
+    expect(enterAltScreen(tty)).toBe(true);
+    // Overlay closes — must NOT write ALT_LEAVE.
+    leaveAltScreen(tty);
+    expect(out.chunks).toEqual(["\x1b[?1049h\x1b[H\x1b[2J"]);
+    expect(isAltScreenActive()).toBe(true);
+
+    // Re-open and close another overlay — still no restore.
+    expect(enterAltScreen(tty)).toBe(true);
+    leaveAltScreen(tty);
+    expect(out.chunks).toEqual(["\x1b[?1049h\x1b[H\x1b[2J"]);
+
+    // Final (app) leave restores exactly once.
+    leaveAltScreen(tty);
+    expect(out.chunks).toEqual(["\x1b[?1049h\x1b[H\x1b[2J", "\x1b[?1049l"]);
+    expect(isAltScreenActive()).toBe(false);
+  });
+
+  test("forceLeaveAltScreen restores regardless of depth, exactly once", () => {
+    const out = new FakeTty();
+    const tty = out as unknown as NodeJS.WriteStream;
+
+    enterAltScreen(tty);
+    enterAltScreen(tty);
+    enterAltScreen(tty);
+    forceLeaveAltScreen();
+    expect(out.chunks).toEqual(["\x1b[?1049h\x1b[H\x1b[2J", "\x1b[?1049l"]);
+    expect(isAltScreenActive()).toBe(false);
+
+    // Idempotent — no second restore write.
+    forceLeaveAltScreen();
+    leaveAltScreen(tty);
+    expect(out.chunks).toEqual(["\x1b[?1049h\x1b[H\x1b[2J", "\x1b[?1049l"]);
+  });
+
+  test("leave without enter is a no-op", () => {
+    const out = new FakeTty();
+    leaveAltScreen(out as unknown as NodeJS.WriteStream);
+    expect(out.chunks).toEqual([]);
+    expect(isAltScreenActive()).toBe(false);
   });
 });

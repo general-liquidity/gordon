@@ -146,12 +146,20 @@ import {
 } from "./infra/platform/observability/index.ts";
 import * as telemetry from "./infra/platform/telemetry/index.ts";
 import { disconnectMCP } from "./infra/ai/mcp/client.ts";
+import { forceLeaveAltScreen } from "./tui/utils/altScreen.ts";
 
 let isShuttingDown = false;
 
 async function gracefulShutdown(signal: string, code: number = 0): Promise<void> {
   if (isShuttingDown) return;
   isShuttingDown = true;
+
+  // Restore the main screen buffer FIRST (belt-and-suspenders alongside the
+  // process "exit" backstop and tui/index.tsx's post-unmount restore). A
+  // missed restore leaves the user's terminal trashed on the alt screen, so
+  // every shutdown path force-leaves before any other teardown. No-op when
+  // the alt screen was never entered (inline mode).
+  forceLeaveAltScreen();
 
   if (signal === "SIGINT") {
     // Warn about active positions on Ctrl-C
