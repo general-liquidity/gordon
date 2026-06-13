@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { Box, Text, useInput } from "../../ink-custom";
+import { Box, Text } from "../../ink-custom";
+import { useRoutedInput, FOCUS_PRIORITY } from "../../input/InputRouterContext.tsx";
 
 /**
  * ThreadBrowser — Searchable thread/session browser
@@ -35,7 +36,7 @@ export function ThreadBrowser({ threads, activeThreadId, onSwitch, onDelete, onC
       )
     : threads;
 
-  useInput((input, key) => {
+  useRoutedInput((input, key) => {
     if (key.escape) {
       if (query) { setQuery(""); setSelectedIdx(0); }
       else onCancel();
@@ -46,8 +47,8 @@ export function ThreadBrowser({ threads, activeThreadId, onSwitch, onDelete, onC
       if (thread && thread.id !== activeThreadId) onSwitch(thread.id);
       return;
     }
-    if (key.upArrow) setSelectedIdx((i) => Math.max(0, i - 1));
-    if (key.downArrow) setSelectedIdx((i) => Math.min(filtered.length - 1, i + 1));
+    if (key.upArrow) { setSelectedIdx((i) => Math.max(0, i - 1)); return; }
+    if (key.downArrow) { setSelectedIdx((i) => Math.min(filtered.length - 1, i + 1)); return; }
     if (key.delete && key.ctrl) {
       const thread = filtered[selectedIdx];
       if (thread && thread.id !== activeThreadId) onDelete(thread.id);
@@ -55,7 +56,7 @@ export function ThreadBrowser({ threads, activeThreadId, onSwitch, onDelete, onC
     }
     if (key.backspace) { setQuery((q) => q.slice(0, -1)); setSelectedIdx(0); return; }
     if (input && !key.ctrl && !key.meta) { setQuery((q) => q + input); setSelectedIdx(0); }
-  });
+  }, { id: "threadBrowser", priority: FOCUS_PRIORITY.DIALOG });
 
   return (
     <Box flexDirection="column" paddingX={1} paddingY={1}>
