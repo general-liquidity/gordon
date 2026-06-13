@@ -20,3 +20,12 @@ export {
   getInsightsForSymbol,
   getAnalysisSummary,
 } from "./insight-store.ts";
+
+export { scoreDeclinedDecision, aggregateInactionValue } from "./inaction-value.ts";
+export type {
+  DeclinedDecision,
+  DecisionSide,
+  WouldHaveOutcome,
+  InactionOutcome,
+  InactionValueReport,
+} from "./inaction-value.ts";
