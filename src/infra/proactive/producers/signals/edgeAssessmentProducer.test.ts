@@ -40,6 +40,14 @@ function candle(volume: number, close = 100): ProactiveCandle {
   return { timestamp: 0, open: close, high: close, low: close, close, volume };
 }
 
+// All measurable invariants hold, no kill fires — isolates the decay verdict.
+const HEALTHY: EdgeMetrics = { regime: "ranging", avgVol1mUsd: 250000, volumePattern: "flat" };
+// evaluateDecay windows: recent 20 / baseline 40.
+const STABLE_R = Array.from({ length: 60 }, () => 0.5); // ratio 1.0 → stable
+const DEGRADED_R = [...Array.from({ length: 20 }, () => 0.25), ...Array.from({ length: 40 }, () => 0.5)]; // 0.5 → degraded
+const DECAYED_R = [...Array.from({ length: 20 }, () => 0.1), ...Array.from({ length: 40 }, () => 0.5)]; // 0.2 → retire
+const rByStrategy = (rs: ReadonlyArray<number>) => new Map([["mean-reversion", rs]]);
+
 describe("normalizeInstrument", () => {
   test("maps pair/dash/bare forms to the candle-fetch key", () => {
     expect(normalizeInstrument("BTC/USDT")).toBe("BTCUSDT");
@@ -127,6 +135,46 @@ describe("computeEdgeAlerts", () => {
 
   test("skips instruments with no collected metrics", () => {
     expect(computeEdgeAlerts([LIVE_EDGE], new Map(), last)).toHaveLength(0);
+  });
+});
+
+describe("computeEdgeAlerts — decay composition (realized R)", () => {
+  let last: Map<string, EdgeHealth>;
+  beforeEach(() => {
+    last = new Map();
+  });
+
+  test("invariants healthy + decay stable → no card", () => {
+    expect(computeEdgeAlerts([LIVE_EDGE], metricsMap(HEALTHY), last, rByStrategy(STABLE_R))).toHaveLength(0);
+  });
+
+  test("invariants healthy + realized R collapsed → retire on decay alone", () => {
+    const cards = computeEdgeAlerts([LIVE_EDGE], metricsMap(HEALTHY), last, rByStrategy(DECAYED_R));
+    expect(cards).toHaveLength(1);
+    expect(cards[0]!.triggers.metadata?.health).toBe("retire");
+    expect(cards[0]!.triggers.metadata?.breaks).toContain("decay");
+    expect(cards[0]!.body).toContain("realized R decayed");
+  });
+
+  test("invariants healthy + realized R eroded → degraded with a scale-down multiplier", () => {
+    const cards = computeEdgeAlerts([LIVE_EDGE], metricsMap(HEALTHY), last, rByStrategy(DEGRADED_R));
+    expect(cards).toHaveLength(1);
+    expect(cards[0]!.severity).toBe("normal");
+    expect(cards[0]!.triggers.metadata?.health).toBe("degraded");
+    expect(Number(cards[0]!.triggers.metadata?.sizeMultiplier)).toBeLessThan(1);
+    expect(cards[0]!.body).toContain("Scale");
+  });
+
+  test("kill fired AND decay both → single retire card naming both drivers", () => {
+    const cards = computeEdgeAlerts([LIVE_EDGE], metricsMap({ regime: "trending_up", avgVol1mUsd: 250000 }), last, rByStrategy(DECAYED_R));
+    expect(cards).toHaveLength(1);
+    expect(cards[0]!.triggers.metadata?.health).toBe("retire");
+    expect(cards[0]!.triggers.metadata?.breaks).toEqual(expect.arrayContaining(["regime-flip", "decay"]));
+  });
+
+  test("no rMultiples for the strategy → behaves exactly as the invariant-only path", () => {
+    // Empty map (or unknown strategy) means no decay verdict; healthy market = no card.
+    expect(computeEdgeAlerts([LIVE_EDGE], metricsMap(HEALTHY), last, new Map())).toHaveLength(0);
   });
 });
 

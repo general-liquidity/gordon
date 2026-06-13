@@ -26,7 +26,7 @@ import type { ProactiveSuggestion } from "../../types.ts";
 import { createModuleLogger } from "../../../logger/index.ts";
 import { GORDON_DIR } from "../../../storage/paths.ts";
 import { fetchRecentCandles, type ProactiveCandle } from "../candleFetch.ts";
-import { loadLiveEdges, type EdgeHealth, type EdgeMetrics, type EdgeSpec } from "../../../../core/edge/index.ts";
+import { composeHealth, loadLiveEdges, type EdgeHealth, type EdgeMetrics, type EdgeSpec } from "../../../../core/edge/index.ts";
 import { assessEdge } from "../../../trading/ops/edgeStatus.ts";
 
 const logger = createModuleLogger("edge-assessment-producer");
@@ -56,6 +56,28 @@ async function loadRegimeDetector(): Promise<
   } catch (err) {
     logger.debug("RegimeDetector not accessible", { err: String(err) });
     return null;
+  }
+}
+
+/**
+ * Recent realized R-multiples for a playbook, most-recent-first (the order
+ * evaluateDecay wants). Reads the trade-outcome ledger; fails safe to [] if the
+ * ledger is unavailable, so a fresh edge with no trade history simply gets no
+ * decay verdict (invariants still gate it).
+ */
+async function loadRecentRMultiples(strategy: string): Promise<number[]> {
+  try {
+    const mod = (await import("../../../domain/evals/index.ts" as string)) as {
+      getTradeOutcomes?: (f: { strategy?: string; limit?: number }) => Array<{ riskRewardActual?: number }>;
+    };
+    if (typeof mod.getTradeOutcomes !== "function") return [];
+    return mod
+      .getTradeOutcomes({ strategy, limit: 70 })
+      .map((o) => o.riskRewardActual)
+      .filter((r): r is number => typeof r === "number" && Number.isFinite(r));
+  } catch (err) {
+    logger.debug("trade outcomes unavailable", { strategy, err: String(err) });
+    return [];
   }
 }
 
@@ -114,6 +136,7 @@ export function computeEdgeAlerts(
   edges: EdgeSpec[],
   metricsBySymbol: Map<string, EdgeMetrics>,
   lastLevel: Map<string, EdgeHealth>,
+  rMultiplesByStrategy: Map<string, ReadonlyArray<number>> = new Map(),
 ): ProactiveSuggestion[] {
   const cards: ProactiveSuggestion[] = [];
 
@@ -123,7 +146,11 @@ export function computeEdgeAlerts(
       const metrics = metricsBySymbol.get(symbol);
       if (!metrics) continue;
 
-      const assessment = assessEdge(edge, metrics);
+      // Realized R-multiples are tagged by playbook (strategy), so edges that
+      // share a playbook share a decay score — fine: decay is the playbook's
+      // realized performance. assessEdge folds decay in when R is present.
+      const rMultiples = rMultiplesByStrategy.get(edge.strategy);
+      const assessment = assessEdge(edge, metrics, rMultiples);
       const firedKills = assessment.invariants.firedKills;
       // Only invariants we could actually MEASURE (metric present) count as an
       // alertable break — a missing metric must never raise a card.
@@ -131,10 +158,13 @@ export function computeEdgeAlerts(
         (c) => c.value !== undefined,
       );
 
-      let level: EdgeHealth;
-      if (firedKills.length > 0) level = "retire";
-      else if (measurableViolations.length > 0) level = "degraded";
-      else level = "stable";
+      // Fold two independent verdicts: the market-observable invariant check and
+      // the statistical decay check (realized R, immune to missing market data).
+      let invariantLevel: EdgeHealth;
+      if (firedKills.length > 0) invariantLevel = "retire";
+      else if (measurableViolations.length > 0) invariantLevel = "degraded";
+      else invariantLevel = "stable";
+      const level = composeHealth(invariantLevel, assessment.decay?.state ?? "stable");
 
       const key = `${edge.name}::${symbol}`;
       const prev = lastLevel.get(key) ?? "stable";
@@ -143,7 +173,7 @@ export function computeEdgeAlerts(
       // Fire only when health worsened (transition-only, no improvement spam).
       if (SEVERITY[level] <= SEVERITY[prev] || level === "stable") continue;
 
-      cards.push(buildEdgeCard(edge, instrument, symbol, level, firedKills, measurableViolations, metrics));
+      cards.push(buildEdgeCard(edge, instrument, symbol, level, assessment, measurableViolations));
     }
   }
 
@@ -155,27 +185,47 @@ function buildEdgeCard(
   instrument: string,
   symbol: string,
   level: EdgeHealth,
-  firedKills: ReturnType<typeof assessEdge>["invariants"]["firedKills"],
-  violations: ReturnType<typeof assessEdge>["invariants"]["violatedInvariants"],
-  metrics: EdgeMetrics,
+  assessment: ReturnType<typeof assessEdge>,
+  measurableViolations: ReturnType<typeof assessEdge>["invariants"]["violatedInvariants"],
 ): ProactiveSuggestion {
-  const breaks = level === "retire" ? firedKills : violations;
-  const breakList = breaks
-    .map((c) => `${c.invariant.id} (${c.invariant.metric}=${String(c.value)} vs ${c.invariant.comparator} ${formatThreshold(c.invariant.threshold)})`)
-    .join("; ");
+  const firedKills = assessment.invariants.firedKills;
+  const decay = assessment.decay;
+
+  // An edge can die two ways at once — an invariant/kill on live market data
+  // AND realized-R decay. Name every driver that contributed to this verdict.
+  const drivers: string[] = [];
+  const breakIds: string[] = [];
+  for (const c of firedKills) {
+    drivers.push(`kill ${c.invariant.id} fired (${c.invariant.metric}=${String(c.value)})`);
+    breakIds.push(c.invariant.id);
+  }
+  for (const c of measurableViolations) {
+    drivers.push(`invariant ${c.invariant.id} broke (${c.invariant.metric}=${String(c.value)} not ${c.invariant.comparator} ${formatThreshold(c.invariant.threshold)})`);
+    breakIds.push(c.invariant.id);
+  }
+  if (decay && decay.state !== "stable") {
+    drivers.push(`realized R decayed to ${(decay.ratio * 100).toFixed(0)}% of baseline (recent ${decay.recentExpectancy.toFixed(2)}R vs ${decay.baselineExpectancy.toFixed(2)}R)`);
+    breakIds.push("decay");
+  }
+  const driverText = drivers.join("; ");
 
   const title =
     level === "retire"
       ? `Edge "${edge.name}" should RETIRE on ${instrument}`
       : `Edge "${edge.name}" degraded on ${instrument}`;
 
+  const sizeHint =
+    level !== "retire" && assessment.recommendedSizeMultiplier < 1
+      ? ` Scale ${edge.strategy} to ~${assessment.recommendedSizeMultiplier.toFixed(2)}× on ${instrument}.`
+      : "";
+
   const body =
     level === "retire"
-      ? `A kill condition fired on the live edge "${edge.name}" (playbook ${edge.strategy}) for ${instrument}. ` +
-        `Kill: ${breakList}. The thesis that justified capital here no longer holds — pull the edge, ` +
-        `flip it to status: retired, and stop sizing the ${edge.strategy} playbook on ${instrument} until it re-passes the gauntlet.`
-      : `An invariant broke on the live edge "${edge.name}" (playbook ${edge.strategy}) for ${instrument}. ` +
-        `Violated: ${breakList}. The edge is degraded, not dead — scale down the ${edge.strategy} playbook on ${instrument} and watch for a kill.`;
+      ? `The live edge "${edge.name}" (playbook ${edge.strategy}) should retire on ${instrument}: ${driverText}. ` +
+        `The thesis that justified capital here no longer holds — pull the edge, flip it to status: retired, ` +
+        `and stop sizing ${edge.strategy} on ${instrument} until it re-passes the gauntlet.`
+      : `The live edge "${edge.name}" (playbook ${edge.strategy}) degraded on ${instrument}: ${driverText}.${sizeHint} ` +
+        `Degraded, not dead — scale down and watch for a kill.`;
 
   return buildCandidate("edge_health", title, body, {
     confidence: level === "retire" ? 0.9 : 0.78,
@@ -183,7 +233,7 @@ function buildEdgeCard(
     action:
       level === "retire"
         ? `Retire edge "${edge.name}" — set status: retired and pull ${edge.strategy} on ${instrument}`
-        : `Scale down ${edge.strategy} on ${instrument}; re-check edge "${edge.name}" invariants`,
+        : `Scale down ${edge.strategy} on ${instrument}; re-check edge "${edge.name}"`,
     triggers: {
       source: "monitor_loop",
       eventType: "tick_edge_assessment",
@@ -192,9 +242,9 @@ function buildEdgeCard(
         edge: edge.name,
         strategy: edge.strategy,
         health: level,
-        breaks: breaks.map((c) => c.invariant.id),
-        regime: metrics.regime,
-        volumePattern: metrics.volumePattern,
+        breaks: breakIds,
+        decayRatio: decay?.ratio,
+        sizeMultiplier: assessment.recommendedSizeMultiplier,
       },
     },
     operation: {
@@ -221,15 +271,22 @@ export const edgeAssessmentProducer: CandidateProducer = async (obs): Promise<Pr
   // One fetch per distinct instrument across all live edges.
   const symbols = [...new Set(edges.flatMap((e) => e.instruments.map(normalizeInstrument)))];
   const metricsBySymbol = new Map<string, EdgeMetrics>();
-  await Promise.allSettled(
-    symbols.map(async (symbol) => {
+  // One realized-R lookup per distinct playbook (strategy) across all live edges.
+  const strategies = [...new Set(edges.map((e) => e.strategy).filter(Boolean))];
+  const rMultiplesByStrategy = new Map<string, ReadonlyArray<number>>();
+
+  await Promise.allSettled([
+    ...symbols.map(async (symbol) => {
       const candles = await fetchRecentCandles(symbol, TIMEFRAME, CANDLE_COUNT);
       if (candles.length < 24) return;
       metricsBySymbol.set(symbol, collectEdgeMetrics(symbol, candles, detector));
     }),
-  );
+    ...strategies.map(async (strategy) => {
+      rMultiplesByStrategy.set(strategy, await loadRecentRMultiples(strategy));
+    }),
+  ]);
 
-  return computeEdgeAlerts(edges, metricsBySymbol, lastLevelByKey);
+  return computeEdgeAlerts(edges, metricsBySymbol, lastLevelByKey, rMultiplesByStrategy);
 };
 
 /** Reset the per-edge health memory. Called on producer unregister. */
