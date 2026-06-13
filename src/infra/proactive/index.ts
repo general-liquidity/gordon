@@ -24,4 +24,13 @@ export {
   type ProactiveObservation,
   type CandidateProducer,
 } from "./engine/proactiveEngine.ts";
+export {
+  DeliveryPolicy,
+  BATCH_THRESHOLD,
+  defaultSeverityForCategory,
+  effectiveSeverity,
+  buildDedupeKey,
+  buildSummaryRollup,
+  type DeliveryDecision,
+} from "./engine/deliveryPolicy.ts";
 export { LlmJudge } from "./judges/llmJudge.ts";

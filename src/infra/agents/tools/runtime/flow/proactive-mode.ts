@@ -438,6 +438,9 @@ export const fireProactiveSuggestionTool = createTool({
       action: candidate.action,
       confidence: candidate.confidence,
       triggers: candidate.triggers,
+      // A manual/admin fire is an explicit intent to surface now — mark urgent
+      // so the new batch-rollup delivery tier renders it immediately, not held.
+      severity: "urgent",
     });
     return {
       fired: result.fired,

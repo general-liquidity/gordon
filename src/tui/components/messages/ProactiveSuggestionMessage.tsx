@@ -8,6 +8,13 @@ import type { Message } from "./MessageBubble.tsx";
 // advisory, not confirmations of fills. Accept / dismiss via tools or
 // slash commands.
 
+// Sentinel the delivery policy stamps on a summary-rollup card's title (kept
+// in sync with SUMMARY_ROLLUP_MARKER in infra/proactive/types.ts). When the
+// batch of normal/low suggestions crosses the threshold, the engine emits one
+// rollup through the same proactive:suggestion_fired path instead of flooding
+// individual cards; this marker tells the renderer to use the digest variant.
+const SUMMARY_ROLLUP_MARKER = "≡"; // ≡
+
 const CATEGORY_CONFIG: Record<string, { icon: string; color: string; label: string }> = {
   regime_flip:        { icon: "\u21C4", color: "magenta",    label: "REGIME FLIP" },
   whale_alert:        { icon: "\u25C9", color: "yellowBright", label: "WHALE MOVE" },
@@ -33,6 +40,15 @@ export const ProactiveSuggestionMessage = React.memo(function ProactiveSuggestio
   const category = message.badge?.split(":")[0] ?? "default";
   const id = message.badge?.split(":")[1] ?? "";
   const confidence = message.badge?.split(":")[2] ?? "";
+
+  // A summary-rollup collapses several batched cards into one digest. The
+  // engine marks it with SUMMARY_ROLLUP_MARKER at the head of the title
+  // (first line of content), so detect it there rather than via category.
+  const firstLine = message.content.split("\n", 1)[0] ?? "";
+  if (firstLine.trimStart().startsWith(SUMMARY_ROLLUP_MARKER)) {
+    return <ProactiveSummaryCard message={message} id={id} />;
+  }
+
   const config = CATEGORY_CONFIG[category] ?? CATEGORY_CONFIG.default!;
 
   return (
@@ -59,3 +75,62 @@ export const ProactiveSuggestionMessage = React.memo(function ProactiveSuggestio
     </Box>
   );
 });
+
+// ============================================================================
+// Summary-rollup card — one digest standing in for a batch of held cards
+// ============================================================================
+
+const ROLLUP_COLOR = "cyanBright";
+
+interface ProactiveSummaryProps {
+  message: Message;
+  id: string;
+}
+
+/**
+ * Render the batched summary rollup. Body arrives as
+ * `"8 pending · news:3 · regime:2 · funding:3"`; we surface the
+ * total prominently and chip out each category with its icon so the operator
+ * can scan what's queued at a glance. Distinct accent + label from a normal
+ * card.
+ */
+function ProactiveSummaryCard({ message, id }: ProactiveSummaryProps) {
+  const lines = message.content.split("\n").filter((l) => l.trim().length > 0);
+  // Body is the line after the title that carries the dot-joined breakdown.
+  const breakdownLine =
+    lines.find((l) => l.includes("·") && /\d/.test(l)) ?? lines[lines.length - 1] ?? "";
+  const segments = breakdownLine.split("·").map((s) => s.trim()).filter(Boolean);
+  const totalSeg = segments[0] ?? "";
+  const categorySegs = segments.slice(1);
+
+  return (
+    <Box flexDirection="column" marginTop={1} borderStyle="round" borderColor={ROLLUP_COLOR} paddingX={1}>
+      <Box>
+        <Text color={ROLLUP_COLOR}>{SUMMARY_ROLLUP_MARKER} </Text>
+        <Text bold color={ROLLUP_COLOR}>RADAR DIGEST</Text>
+        <Text dimColor> {"·"} proactive</Text>
+        {totalSeg && <Text dimColor> {"·"} {totalSeg}</Text>}
+      </Box>
+      <Box marginTop={1} flexWrap="wrap">
+        {categorySegs.map((seg, i) => {
+          const cat = seg.split(":")[0] ?? "";
+          const cfg = CATEGORY_CONFIG[cat] ?? CATEGORY_CONFIG.default!;
+          return (
+            <Box key={`${cat}-${i}`} marginRight={2}>
+              <Text color={cfg.color}>{cfg.icon} </Text>
+              <Text color={cfg.color}>{seg}</Text>
+            </Box>
+          );
+        })}
+      </Box>
+      <Box marginTop={1}>
+        <Text dimColor>Batched to avoid flooding {"·"} list_proactive_suggestions to expand</Text>
+      </Box>
+      {id && (
+        <Box>
+          <Text dimColor>Ctrl+G focus {"·"} /pass {id.slice(0, 10)}</Text>
+        </Box>
+      )}
+    </Box>
+  );
+}

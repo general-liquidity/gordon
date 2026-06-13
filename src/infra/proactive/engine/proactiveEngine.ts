@@ -30,6 +30,12 @@ import { getSuggestionStore } from "../storage/suggestionStore.ts";
 import { getCategoryPolicy } from "../judges/categoryPolicy.ts";
 import { getOutcomeTracker, autoRecordFromStore } from "../judges/outcomeEvals.ts";
 import { judgeCandidate } from "../judges/proposalJudge.ts";
+import {
+  DeliveryPolicy,
+  defaultSeverityForCategory,
+  buildDedupeKey,
+  type DeliveryDecision,
+} from "./deliveryPolicy.ts";
 import { getEventBus } from "../../../events/index.ts";
 import { saveProactiveStateDebounced } from "../storage/persistence.ts";
 import {
@@ -68,6 +74,7 @@ export class ProactiveEngine {
   private producers: CandidateProducer[] = [];
   private pendingEvents: ProactiveObservation[] = [];
   private processing = false;
+  private delivery = new DeliveryPolicy();
 
   start(): { started: boolean; alreadyRunning?: boolean } {
     if (this.running) {
@@ -84,6 +91,7 @@ export class ProactiveEngine {
     this.running = false;
     this.startedAt = null;
     this.pendingEvents = [];
+    this.delivery.reset();
     logger.info("Proactive engine stopped");
     return { stopped: wasRunning, wasRunning };
   }
@@ -168,16 +176,66 @@ export class ProactiveEngine {
     getSuggestionStore().add(full);
     this.recordCalibrationDecision(full);
 
-    logger.info("Proactive suggestion fired", {
-      id: full.id,
-      category: full.category,
-      confidence: full.confidence,
-    });
-
-    await this.emitSuggestionFired(full);
+    const decision = this.delivery.admit(full);
+    await this.applyDeliveryDecision(full, decision);
     this.schedulePersist();
 
+    if (decision.kind === "coalesce") {
+      return { fired: false, suggestion: full, reason: `coalesced into ${decision.existingId}` };
+    }
+    if (decision.kind === "hold") {
+      return { fired: false, suggestion: full, reason: "batched (held for summary rollup)" };
+    }
     return { fired: true, suggestion: full };
+  }
+
+  /**
+   * Act on a delivery-policy decision for a suggestion that passed the judge
+   * and is already stored. Centralizes the emit-vs-hold-vs-coalesce-vs-rollup
+   * branch shared by `fireCandidate` and `processObservation`.
+   */
+  private async applyDeliveryDecision(
+    suggestion: ProactiveSuggestion,
+    decision: DeliveryDecision,
+  ): Promise<void> {
+    switch (decision.kind) {
+      case "deliver":
+        logger.info("Proactive suggestion delivered", {
+          id: suggestion.id,
+          category: suggestion.category,
+          severity: decision.severity,
+        });
+        await this.emitSuggestionFired(suggestion);
+        return;
+      case "hold":
+        // Stored + queryable, but not rendered as a card yet. The next
+        // batchable card past BATCH_THRESHOLD flushes a summary rollup.
+        logger.debug("Proactive suggestion held for rollup", {
+          id: suggestion.id,
+          category: suggestion.category,
+        });
+        return;
+      case "coalesce":
+        // Same condition already pending-undelivered. Suppress the duplicate
+        // (kept for audit, but out of the pending queue and never re-batched)
+        // so it doesn't double-count against backpressure or render twice.
+        suggestion.status = "suppressed";
+        logger.debug("Proactive suggestion coalesced", {
+          id: suggestion.id,
+          into: decision.existingId,
+        });
+        return;
+      case "rollup":
+        // The synthetic digest is stored too, so /ack and /pass on the rollup
+        // card resolve against a real suggestion id.
+        getSuggestionStore().add(decision.rollup);
+        logger.info("Proactive summary rollup emitted", {
+          id: decision.rollup.id,
+          count: decision.rolledUpIds.length,
+        });
+        await this.emitSuggestionFired(decision.rollup);
+        return;
+    }
   }
 
   /** User accepts a pending suggestion. */
@@ -188,6 +246,7 @@ export class ProactiveEngine {
     const category = store.get(id)!.category;
     getOutcomeTracker().record(id, category, "CD");
     this.recordCalibrationOutcome(store.get(id)!, "CD");
+    this.delivery.onResolved(id);
     await this.emitResolved(id, category, "accepted");
     this.schedulePersist();
     return { ok: true };
@@ -201,6 +260,7 @@ export class ProactiveEngine {
     store.updateStatus(id, "dismissed", "FA");
     getOutcomeTracker().record(id, s.category, "FA");
     this.recordCalibrationOutcome(s, "FA");
+    this.delivery.onResolved(id);
     await this.emitResolved(id, s.category, "dismissed");
     this.schedulePersist();
     return { ok: true };
@@ -274,11 +334,8 @@ export class ProactiveEngine {
             getCategoryPolicy().markFired(candidate.category);
             getSuggestionStore().add(candidate);
             this.recordCalibrationDecision(candidate);
-            logger.info("Proactive suggestion fired from producer", {
-              id: candidate.id,
-              category: candidate.category,
-            });
-            await this.emitSuggestionFired(candidate);
+            const decision = this.delivery.admit(candidate);
+            await this.applyDeliveryDecision(candidate, decision);
             this.schedulePersist();
           } else {
             candidate.status = "suppressed";
@@ -360,7 +417,7 @@ export function buildCandidate(
   body: string,
   options: Partial<Omit<ProactiveSuggestion, "id" | "createdAt" | "status" | "category" | "title" | "body">> = {},
 ): ProactiveSuggestion {
-  return {
+  const suggestion: ProactiveSuggestion = {
     id: generateId(),
     category,
     title,
@@ -368,6 +425,7 @@ export function buildCandidate(
     action: options.action,
     operation: options.operation,
     confidence: options.confidence ?? 0.7,
+    severity: options.severity ?? defaultSeverityForCategory(category),
     createdAt: new Date().toISOString(),
     status: "pending" as ProactiveStatus,
     triggers: options.triggers ?? { source: "manual" },
@@ -375,6 +433,10 @@ export function buildCandidate(
     judgeReasoning: options.judgeReasoning,
     outcome: options.outcome,
   };
+  // Derive a coalescing key from the resolved triggers when the caller
+  // didn't supply one explicitly (category:symbol:trigger).
+  suggestion.dedupeKey = options.dedupeKey ?? buildDedupeKey(suggestion);
+  return suggestion;
 }
 
 // Re-export for convenience

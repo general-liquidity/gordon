@@ -70,6 +70,35 @@ export const ACTIVE_CATEGORIES: ProactiveCategory[] = ALL_CATEGORIES.filter(
 );
 
 // ============================================================================
+// Delivery severity
+// ============================================================================
+
+/**
+ * Delivery tier for a suggestion. Controls whether the card is shown the
+ * instant it fires or whether it's eligible to be batched into a summary
+ * rollup so the operator isn't flooded.
+ *
+ *   urgent — deliver immediately, never batched (risk / stop / kill-switch)
+ *   normal — default; eligible for batching
+ *   low    — eligible for batching; lowest-priority informational cards
+ */
+export type ProactiveSeverity = "urgent" | "normal" | "low";
+
+export const DEFAULT_SEVERITY: ProactiveSeverity = "normal";
+
+/**
+ * Sentinel prefix stamped on a summary-rollup suggestion's title so the TUI
+ * renderer can distinguish a rollup from an ordinary card without a schema
+ * change to the event bus or the chat-message shape. The engine emits the
+ * rollup through the normal `proactive:suggestion_fired` path; the renderer
+ * keys off this marker in the message content.
+ */
+export const SUMMARY_ROLLUP_MARKER = "≡"; // ≡ — "summary of summaries"
+
+/** Category used for the synthetic summary-rollup card. */
+export const SUMMARY_ROLLUP_CATEGORY: ProactiveCategory = "session_review";
+
+// ============================================================================
 // Suggestion lifecycle status
 // ============================================================================
 
@@ -150,6 +179,20 @@ export interface ProactiveSuggestion {
   operation?: ProactiveOperation;
   /** 0..1 confidence the suggestion is needed. Only fires above threshold. */
   confidence: number;
+  /**
+   * Delivery tier. `urgent` cards bypass batching and render immediately;
+   * `normal` / `low` are eligible for the summary-rollup. Optional on the
+   * wire — defaults to `DEFAULT_SEVERITY` ("normal") at construction and is
+   * normalized by the delivery policy before a card is shown.
+   */
+  severity?: ProactiveSeverity;
+  /**
+   * Coalescing key. Two pending-undelivered suggestions with the same
+   * `dedupeKey` collapse into one card (the later one is dropped, the
+   * existing one's timestamp refreshed). Built from `category:symbol:trigger`
+   * where available. Absent means "never coalesce".
+   */
+  dedupeKey?: string;
   /** ISO timestamp of creation. */
   createdAt: string;
   /** Current lifecycle status. */
