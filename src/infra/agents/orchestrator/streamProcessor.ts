@@ -31,6 +31,10 @@ import {
 } from "./toolAgentMap.ts";
 import type { StreamEvent } from "./types.ts";
 import type { GordonContext } from "../types.ts";
+import {
+  BackgroundDispatchManager,
+  type CompletedBackgroundTask,
+} from "../background/backgroundDispatch.ts";
 
 const logger = createModuleLogger("orchestrator-stream");
 
@@ -91,6 +95,29 @@ export interface StreamProcessingState {
     string,
     { toolName: string; startedAt: number; agent: string | undefined }
   >;
+  /**
+   * In-loop background tool dispatch manager. Optional + lazily created via
+   * `getBackgroundManager(state)` so existing `StreamProcessingState` literals
+   * (e.g. in the orchestrator) need no change. Holds in-flight
+   * `backgroundEligible` tool tasks; when one completes, its result is
+   * re-injected into the conversation via `drainBackgroundResults` so the loop
+   * continues and the model can react (Mastra "streamUntilIdle" pattern).
+   * Execution/money tools are never placed here — the deny-list in
+   * backgroundDispatch.ts forces them foreground.
+   */
+  background?: BackgroundDispatchManager;
+}
+
+/**
+ * Lazily get (and cache) the background-dispatch manager for a stream. Keeping
+ * it lazy means callers that never background a tool pay nothing, and
+ * pre-existing state literals stay valid without a `background` field.
+ */
+export function getBackgroundManager(state: StreamProcessingState): BackgroundDispatchManager {
+  if (!state.background) {
+    state.background = new BackgroundDispatchManager();
+  }
+  return state.background;
 }
 
 // ============================================================================
@@ -374,4 +401,85 @@ export async function processToolResult(
     toolResult: optimizedToolResult.result,
     agentName: state.currentAgent,
   };
+}
+
+// ============================================================================
+// Background Tool Result Re-injection
+// ============================================================================
+
+/**
+ * Re-inject one completed background tool result into the conversation by
+ * routing it through the SAME `processToolResult` path a synchronous tool
+ * result takes — so it lands in the conversation budget, registers any
+ * planning artifact, fires `tool_call_end` lifecycle hooks, and is captured in
+ * `state.lastSubAgentToolResult`. The returned `tool_call_end` event carries
+ * the (offloaded) result, which is what the loop injects into the message list.
+ *
+ * A failed background task is surfaced as `{ error }` so the model still gets
+ * attribution rather than a silently-dropped call.
+ */
+async function reinjectBackgroundResult(
+  task: CompletedBackgroundTask,
+  state: StreamProcessingState,
+  context: GordonContext,
+): Promise<StreamEvent> {
+  const payload = task.error ? { error: task.error } : task.result;
+  return processToolResult(task.toolName, payload, state, context);
+}
+
+/**
+ * Drain all *already-completed* background tasks and yield their re-injection
+ * events, WITHOUT awaiting any still-in-flight task. The orchestrator loop
+ * calls this between stream chunks: each yielded `tool_call_end` injects the
+ * background result into the message list, and the trailing `text_delta`
+ * continuation marker re-engages the model so it can react to the new result
+ * (the "streamUntilIdle" pattern). No-op (yields nothing) when there is no
+ * manager or nothing has completed, so the hot path stays free.
+ */
+export async function* drainBackgroundResults(
+  state: StreamProcessingState,
+  context: GordonContext,
+): AsyncGenerator<StreamEvent, void> {
+  const manager = state.background;
+  if (!manager || !manager.hasCompleted()) return;
+
+  for (const task of manager.takeCompleted()) {
+    logger.info("Re-injecting background tool result", {
+      toolName: task.toolName,
+      id: task.id,
+      durationMs: task.completedAt - task.startedAt,
+      failed: Boolean(task.error),
+    });
+    yield await reinjectBackgroundResult(task, state, context);
+    // Continuation marker — tells subscribers (and prompts the loop) that a
+    // background result just arrived and the agent should respond to it.
+    yield {
+      type: "text_delta",
+      content: `\n[background:${task.toolName} complete — re-engaging]\n`,
+      agentName: state.currentAgent,
+    };
+  }
+}
+
+/**
+ * Turn-end drain: await every in-flight background task, then re-inject all
+ * results. Called once before the stream closes so no backgrounded result is
+ * lost when the model's own output finishes first. No-op without a manager.
+ */
+export async function* settleBackgroundResults(
+  state: StreamProcessingState,
+  context: GordonContext,
+): AsyncGenerator<StreamEvent, void> {
+  const manager = state.background;
+  if (!manager) return;
+
+  const tasks = await manager.settleAll();
+  for (const task of tasks) {
+    logger.info("Re-injecting background tool result at turn end", {
+      toolName: task.toolName,
+      id: task.id,
+      failed: Boolean(task.error),
+    });
+    yield await reinjectBackgroundResult(task, state, context);
+  }
 }

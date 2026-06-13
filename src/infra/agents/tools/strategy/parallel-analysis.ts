@@ -24,6 +24,7 @@ import {
 import { getGordonContext, normalizeSymbol, validateToolOutput, type MastraExecutionContext } from "../types.ts";
 import { scan } from "../../../../core/pipeline/scanner.ts";
 import { analyze } from "../../../../core/pipeline/analyzer.ts";
+import type { BackgroundEligibleTool } from "../../background/backgroundDispatch.ts";
 
 // ============================================================================
 // Error Messages
@@ -506,6 +507,14 @@ export const parallelDeepAnalysisTool = createTool({
     });
   },
 });
+
+// `parallel_deep_analysis` (the `/deep` path) is a slow, READ-ONLY compute
+// tool: it fans out technical + whale + orderbook analysis concurrently and
+// only reads market data. Flag it background-eligible so the dispatcher MAY run
+// it off the agent's critical path. The flag rides as an extra own-property
+// (Mastra's createTool type is closed) and `withToolsMetrics` preserves it. The
+// safety-critical deny-list in backgroundDispatch.ts still wins unconditionally.
+(parallelDeepAnalysisTool as BackgroundEligibleTool).backgroundEligible = true;
 
 // ============================================================================
 // Parallel Multi-Timeframe Analysis Tool

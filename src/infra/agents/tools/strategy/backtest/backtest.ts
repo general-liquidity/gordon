@@ -69,6 +69,7 @@ import { getGordonContext, type MastraExecutionContext } from "../../types.ts";
 import { normalizeCryptoSymbol, normalizeStockSymbol, resolveInstrument } from "../../../../domain/markets/instruments.ts";
 import { ensureDataset } from "../../../../domain/systematic/service.ts";
 import type { Exchange } from "../../../../exchange/types.ts";
+import type { BackgroundEligibleTool } from "../../../background/backgroundDispatch.ts";
 
 // ============================================================================
 // Helper Functions
@@ -619,6 +620,14 @@ export const runBacktestTool = createTool({
     }
   },
 });
+
+// `run_backtest` is a genuinely-slow, READ-ONLY compute tool (fetches deep
+// history + runs the engine + validation). Flag it background-eligible so the
+// dispatcher MAY run it off the agent's critical path. Mastra's createTool type
+// is closed, so the flag rides as an extra own-property on the tool object;
+// `withToolsMetrics` preserves it. The deny-list in backgroundDispatch.ts still
+// wins — this flag never applies to execution/money tools.
+(runBacktestTool as BackgroundEligibleTool).backgroundEligible = true;
 
 // ============================================================================
 // Optimize Strategy Tool
