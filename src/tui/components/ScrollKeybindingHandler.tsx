@@ -19,11 +19,6 @@ interface Props {
   onNextMatch?: () => void;
   onPrevMatch?: () => void;
   enabled?: boolean;
-  /**
-   * Handle ONLY PgUp/PgDn (page scrolling). Used by the fullscreen chat
-   * viewport, where vim-style j/k/g/G must stay free for the prompt input.
-   */
-  pageKeysOnly?: boolean;
 }
 
 export function ScrollKeybindingHandler({
@@ -33,7 +28,6 @@ export function ScrollKeybindingHandler({
   onNextMatch,
   onPrevMatch,
   enabled = true,
-  pageKeysOnly = false,
 }: Props) {
   const [searchActive, setSearchActive] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -49,16 +43,6 @@ export function ScrollKeybindingHandler({
         // Search mode handled by SearchBox
         return false;
       }
-
-      if (key.pageUp) {
-        handle.scrollBy(-pageSize);
-        return;
-      }
-      if (key.pageDown) {
-        handle.scrollBy(pageSize);
-        return;
-      }
-      if (pageKeysOnly) return false;
 
       if (input === "j" || key.downArrow) {
         handle.scrollBy(1);
