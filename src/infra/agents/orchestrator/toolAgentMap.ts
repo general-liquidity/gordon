@@ -11,6 +11,13 @@ import { getDynamicToolAgentMap } from "../../runtime/routing/manager.ts";
 import { createModuleLogger } from "../../logger/index.ts";
 import { getExecutionReadiness } from "../harness/runtimeHarness.ts";
 import type { GordonContext } from "../types.ts";
+import {
+  defaultHandoffCoordinator,
+  type FilterableMessage,
+  type SubagentContextFilterResult,
+  type DelegationFeedbackNote,
+  HandoffCoordinator,
+} from "./HandoffCoordinator.ts";
 
 const logger = createModuleLogger("orchestrator-tool-map");
 
@@ -109,4 +116,71 @@ export function buildDefaultExecutorHandoffBudget(
     return { toolBudget: 0, maxSteps: 0 };
   }
   return { toolBudget: 5, maxSteps: 10 };
+}
+
+// ============================================================================
+// Subagent context assembly (least-context handoff + post-delegation feedback)
+// ============================================================================
+
+/**
+ * Assemble the context a subagent (agent-as-tool target) will see.
+ *
+ * This is the seam where a delegation's conversation context is scrubbed BEFORE
+ * the subagent receives it. Account state (balances / equity / positions) is
+ * stripped for least-context agents (researcher by default — it never trades);
+ * API-key-shaped strings and PEM blocks are stripped for every target. The
+ * input messages are never mutated.
+ *
+ * Loop-safety (`HandoffCoordinator.validate` / `track`) is unchanged and still
+ * runs at the handoff seam in the stream processor — this only narrows the
+ * context payload.
+ */
+export function assembleSubagentContext(
+  targetAgentId: string,
+  messages: FilterableMessage[],
+  coordinator: HandoffCoordinator = defaultHandoffCoordinator,
+): SubagentContextFilterResult {
+  const result = coordinator.filterContextForSubagent(targetAgentId, messages);
+  if (result.redacted) {
+    logger.info("Scrubbed sensitive state from subagent handoff context", {
+      targetAgentId,
+      filteredAgent: result.filteredAgent,
+      redactionCount: result.redactionCount,
+    });
+  }
+  return result;
+}
+
+/**
+ * Record a post-delegation feedback note for the supervisor's next iteration
+ * once a subagent returns (e.g. "researcher returned no risk section — revise").
+ * Surfaced here so the delegation-completion path has a single call site.
+ */
+export function recordSubagentFeedback(
+  supervisorAgent: string,
+  subagentAgent: string,
+  note: string,
+  metadata?: Record<string, unknown>,
+  coordinator: HandoffCoordinator = defaultHandoffCoordinator,
+): DelegationFeedbackNote {
+  return coordinator.recordDelegationFeedback(supervisorAgent, subagentAgent, note, metadata);
+}
+
+/**
+ * Drain pending post-delegation feedback for a supervisor so it can be injected
+ * into the next iteration's context exactly once. Returns the rendered notes
+ * plus the raw entries.
+ */
+export function collectSupervisorFeedback(
+  supervisorAgent: string,
+  coordinator: HandoffCoordinator = defaultHandoffCoordinator,
+): { notes: DelegationFeedbackNote[]; text: string | undefined } {
+  const notes = coordinator.consumeDelegationFeedback(supervisorAgent);
+  if (notes.length === 0) {
+    return { notes, text: undefined };
+  }
+  const text = notes
+    .map((n) => `- [delegation feedback · ${n.subagentAgent}] ${n.note}`)
+    .join("\n");
+  return { notes, text };
 }
