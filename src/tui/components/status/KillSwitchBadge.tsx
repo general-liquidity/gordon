@@ -10,5 +10,5 @@ export function KillSwitchBadge({ status }: { status: KillSwitchStatus | null })
   const badge = formatKillSwitchBadge(status);
   if (badge.severity === "off") return <Text color={theme.riskWarning} bold>{badge.text}</Text>;
   if (badge.severity === "halted") return <Text color={theme.riskDanger} bold>{badge.text}</Text>;
-  return <Text dimColor>{badge.text}</Text>;
+  return <Text color={theme.uiMuted}>{badge.text}</Text>;
 }

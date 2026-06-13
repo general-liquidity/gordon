@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Box, Text } from "../../ink-custom";
 import { useStats } from "../../state/StatsProvider.js";
+import { useTheme } from "../../themes/ThemeProvider.tsx";
 
 // ============================================================================
 // CostDisplay — Compact inline session stats
@@ -13,6 +14,8 @@ import { useStats } from "../../state/StatsProvider.js";
 
 export function CostDisplay() {
   const { stats } = useStats();
+  const theme = useTheme();
+  const muted = theme.uiMuted;
   const [elapsed, setElapsed] = useState("");
   const [displayTokenCost, setDisplayTokenCost] = useState(stats.tokenCostUsd);
 
@@ -51,13 +54,13 @@ export function CostDisplay() {
 
   return (
     <Box>
-      <Text dimColor>{costStr}</Text>
-      <Text dimColor> {"\u00b7"} </Text>
+      <Text color={muted}>{costStr}</Text>
+      <Text color={muted}> {"\u00b7"} </Text>
       <Text color={pnlColor}>{pnlStr}</Text>
-      <Text dimColor> {"\u00b7"} </Text>
-      <Text dimColor>{tradeStr}</Text>
-      <Text dimColor> {"\u00b7"} </Text>
-      <Text dimColor>{elapsed}</Text>
+      <Text color={muted}> {"\u00b7"} </Text>
+      <Text color={muted}>{tradeStr}</Text>
+      <Text color={muted}> {"\u00b7"} </Text>
+      <Text color={muted}>{elapsed}</Text>
     </Box>
   );
 }

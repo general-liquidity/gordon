@@ -454,7 +454,7 @@ export const PromptInput = React.memo(function PromptInput({
           ) : isStreaming ? (
             <Text color="rgb(52,238,176)">{"█"}</Text>
           ) : (
-            <Text dimColor>{placeholder}</Text>
+            <Text color={theme.uiMuted}>{placeholder}</Text>
           )}
       </Box>
         {vimMode && (
