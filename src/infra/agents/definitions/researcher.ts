@@ -26,6 +26,7 @@ import {
   gordonOutputSanitizer,
   gordonToolCallReconciler,
 } from "../tooling/instrumentedTools.ts";
+import { researcherContextFilter, isResearcherLeastContextEnabled } from "../processors/researcher-context-filter.ts";
 import { createSubAgentMemory } from "../memory/memoryFactory.ts";
 import { createModelResolver, registerObservability, resolveRuntimeModel } from "../agentHelpers.ts";
 import { instrumentedAgentTools } from "../tooling/instrumentedTools.ts";
@@ -96,7 +97,14 @@ export function getResearcher(): Agent {
       ...instrumentedAgentTools,
     },
     memory: createSubAgentMemory("researcher"),
-    inputProcessors: [gordonToolCallReconciler, gordonInputGuard, new TokenLimiterProcessor({ limit: 32000 })],
+    inputProcessors: [
+      gordonToolCallReconciler,
+      // Least-context: scrub account financials + secrets before the researcher
+      // (no execution perms) sees them. On by default; GORDON_LEAST_CONTEXT_RESEARCHER=0 to disable.
+      ...(isResearcherLeastContextEnabled() ? [researcherContextFilter] : []),
+      gordonInputGuard,
+      new TokenLimiterProcessor({ limit: 32000 }),
+    ],
     outputProcessors: [gordonOutputSanitizer],
   });
   registerObservability(agent);
