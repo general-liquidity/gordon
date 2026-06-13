@@ -203,6 +203,9 @@ import {
 import { RegimeDetector } from "../../../../core/regime/index.ts";
 import { checkRiskTool as implCheckRisk } from "../trading/risk-gate.ts";
 import { recordSymbolObservation } from "../../observation/symbolObservationTracker.ts";
+import { queuePositionSignal, spreadCrossingProbability } from "../../../../core/microstructure/queue-dynamics.ts";
+import { computeDealerGreeksExposure } from "../../../trading/quant/dealerGreeksExposure.ts";
+import { fetchOptionsChain } from "../../../data/options/index.ts";
 import {
   computeMicropriceTool as implMicroprice,
   computeInventoryAdjustedPriceTool as implInventoryAdjusted,
@@ -318,6 +321,19 @@ async function maybeAutoCollect(
       ...(typeof params.maxSpreadTicks === "number" && { maxSpreadTicks: params.maxSpreadTicks }),
       ...(typeof params.iterations === "number" && { iterations: params.iterations }),
     };
+  }
+
+  if (operation === "queue_dynamics") {
+    if (params.snapshot) return params;
+    const symbol = typeof params.symbol === "string" ? params.symbol : null;
+    if (!symbol) return params;
+    if (!exchange) return { error: "auto-collect queue_dynamics: no exchange connected" };
+    try {
+      const book = await exchange.getOrderBook(symbol, 5);
+      return { ...params, snapshot: { bids: book.bids ?? [], asks: book.asks ?? [] } };
+    } catch (e) {
+      return { error: `auto-collect queue_dynamics: ${e instanceof Error ? e.message : String(e)}` };
+    }
   }
 
   if (operation === "inventory_adjusted_price") {
@@ -1478,6 +1494,8 @@ const MICROSTRUCTURE_OPS = [
   "forensic_screen",
   "dupont",
   "weighted_book_imbalance",
+  "queue_dynamics",
+  "dealer_exposure",
   "filing_diff",
   "token_unlock_risk",
   "holder_concentration",
@@ -1532,6 +1550,8 @@ export const computeMicrostructureTool = createTool({
     "  With auto-collect shortcut (pass `symbol` and the tool will gather",
     "  required data from the live exchange before running the computation):",
     "    - 'microprice'                — direct: { snapshots[], tickSize }",
+    "    - 'queue_dynamics'            — params: { symbol } (auto-collects the book) or { snapshot: { bids[], asks[] } }; optional { bidFillRate, askFillRate, buyFlowRate, sellFlowRate, horizonSec }. Top-of-book queue imbalance + time-to-fill, plus (with flow rates) queue-aware spread-crossing probability. Execution-timing signal, not alpha.",
+    "    - 'dealer_exposure'           — params: { currency: 'BTC'|'ETH', rate?, callSign?, putSign? }. Fetches the live Deribit options chain and computes aggregate dealer GEX / vanna / charm exposure + the zero-gamma flip (the 'vanna chart' in aggregate). Dealer position is an explicit assumption (default long-call/short-put).",
     "                                    shortcut: { symbol, durationSec?, intervalMs?, tickSize? }",
     "                                    Shortcut polls the orderbook for ~durationSec",
     "                                    (default 30) at intervalMs cadence (default 250).",
@@ -1913,6 +1933,60 @@ export const computeMicrostructureTool = createTool({
           conditionalDistributionTest(
             p as unknown as Parameters<typeof conditionalDistributionTest>[0],
           ),
+      },
+      queue_dynamics: {
+        execute: async (p: Record<string, unknown>) => {
+          const snapshot = p.snapshot as
+            | { bids: Array<{ price: number; quantity: number }>; asks: Array<{ price: number; quantity: number }> }
+            | undefined;
+          if (!snapshot) {
+            return { error: "queue_dynamics: provide `symbol` (auto-collect) or a `snapshot` { bids[], asks[] }." };
+          }
+          const queue = queuePositionSignal({
+            snapshot,
+            ...(typeof p.bidFillRate === "number" && { bidFillRate: p.bidFillRate }),
+            ...(typeof p.askFillRate === "number" && { askFillRate: p.askFillRate }),
+          });
+          const crossing =
+            typeof p.buyFlowRate === "number" && typeof p.sellFlowRate === "number"
+              ? spreadCrossingProbability({
+                  snapshot,
+                  buyFlowRate: p.buyFlowRate,
+                  sellFlowRate: p.sellFlowRate,
+                  ...(typeof p.horizonSec === "number" && { horizonSec: p.horizonSec }),
+                })
+              : null;
+          return { kind: "queue_dynamics.computed", queue, crossing };
+        },
+      },
+      dealer_exposure: {
+        execute: async (p: Record<string, unknown>) => {
+          const currency = typeof p.currency === "string" ? p.currency.toUpperCase() : "BTC";
+          try {
+            const chain = await fetchOptionsChain(currency);
+            if (!chain.contracts.length) return { error: `dealer_exposure: empty options chain for ${currency}` };
+            const result = computeDealerGreeksExposure(chain.contracts, {
+              spot: chain.spotUsd,
+              rate: typeof p.rate === "number" ? p.rate : 0.04,
+              // Deribit crypto options are 1 contract = 1 unit of the underlying.
+              contractMultiplier: typeof p.contractMultiplier === "number" ? p.contractMultiplier : 1,
+              ...(typeof p.dividendYield === "number" && { dividendYield: p.dividendYield }),
+              ...(typeof p.callSign === "number" && { callSign: p.callSign as 1 | -1 }),
+              ...(typeof p.putSign === "number" && { putSign: p.putSign as 1 | -1 }),
+            });
+            return {
+              kind: "dealer_exposure.computed",
+              currency,
+              spot: chain.spotUsd,
+              contracts: chain.contracts.length,
+              gammaFlipPrice: result.gammaFlipPrice,
+              atSpot: result.atSpot,
+              interpretation: result.interpretation,
+            };
+          } catch (e) {
+            return { error: `dealer_exposure: ${e instanceof Error ? e.message : String(e)}` };
+          }
+        },
       },
       portfolio_ensemble: {
         execute: async (p: Record<string, unknown>) =>
