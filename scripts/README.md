@@ -46,7 +46,6 @@ Both run automatically via `npm install` → `package.json` postinstall hook.
 |---|---|
 | `broker-quality.ts` | Conformance + capability matrix audit across all broker adapters. CI runs `--ci` mode. |
 | `generate-action-docs.ts` | Generates `docs/generated/actions.md` from the canonical action registry. |
-| `sweep-react-compiler.ts` | Compiles every `.tsx` under `src/` through the React Compiler, reports bail-outs. Used to verify Phase 5 zero-bail-out invariant. |
 | `smoke-react-compiler.ts` | Tiny end-to-end Babel-pipeline check that the compiler emits its memoization fingerprint. |
 
 ## Conventions

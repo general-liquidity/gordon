@@ -31,22 +31,24 @@ For each queue: count entries in the window, cluster by repeated signature (same
 
 If a file is absent, say "no entries" and move on — absence is healthy, not an error.
 
-## Step 2: Run the staleness checkers
+## Step 2: Run the tier checker + eyeball staleness
 
-These are deterministic dev scripts. Run each and read the output (suggest the operator run them via `!` if the skill can't shell out):
+Run the deterministic checker and read the output (suggest the operator run it via `!` if the skill can't shell out):
 
 ```
-bun run scripts/dev/check_skill_staleness.ts        # skills past their last-reviewed horizon
-bun run scripts/dev/check_tool_descriptions.ts      # weak tool descriptions (bottom 15)
 bun run scripts/dev/check_tool_tiers.ts              # untiered hot-tier additions
 ```
+
+Then eyeball the two manual signals (their standalone audit scripts were retired):
+- **Skill staleness** — built-in `SKILL.md` files whose `last-reviewed` frontmatter is past ~90 days, or missing the field.
+- **Weak tool descriptions** — one-line / sub-80-char tool descriptions with no "use when" trigger conditions.
 
 Also check **MCP discovery cache age** — `src/infra/ai/mcp/discoveryCache.ts` carries a 24h TTL; descriptors older than that for a server still in use are a staleness signal after an MCP update.
 
 ## Step 3: Correlate friction with staleness
 
 The highest-value items appear in **both** a friction queue AND a staleness checker:
-- A tool that shows up in `tool-friction.jsonl` AND scores low in `check_tool_descriptions` → its weak description is actively hurting. Fix the description first (cheapest), re-measure.
+- A tool that shows up in `tool-friction.jsonl` AND has a weak / one-line description → its description is actively hurting. Fix the description first (cheapest), re-measure.
 - A skill that's stale AND whose tools moved (tier audit / surface changes since its `last-reviewed`) → re-review against the current surface before trusting it.
 - A blocker in `agent-feedback.jsonl` that recurs across windows AND maps to no existing tool → genuine missing-tool signal (#7's "missing tools").
 

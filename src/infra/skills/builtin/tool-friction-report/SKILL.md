@@ -59,7 +59,7 @@ If the sequence is deterministic (same calls, same shape, just different paramet
 If the sequence is workflow-like (each call depends on the previous result), a skill is better than a tool — the LLM still drives, but the skill teaches the chain shape so the model doesn't have to rediscover it on each turn. Surface the proposed skill name + steps.
 
 **(c) Is this a sign the wrong tool is being selected?**
-If the friction is from the agent picking the wrong tool first, then retrying — the fix is a better tool description on the *correct* tool, not a new tool. Surface which existing tool's description should be tightened. Cross-reference `scripts/dev/check_tool_descriptions.ts` if available.
+If the friction is from the agent picking the wrong tool first, then retrying — the fix is a better tool description on the *correct* tool, not a new tool. Surface which existing tool's description should be tightened.
 
 **(d) Is this a sign the question is genuinely complex?**
 Some questions legitimately need 5+ tools (multi-symbol portfolio review, cross-venue arbitrage check). Don't propose to compress these — flag them as "expected high-friction" and move on. The operator can decide whether to raise the threshold for that class of question.
@@ -93,4 +93,4 @@ Do NOT auto-promote any of the recommendations to actual tools or skills — tho
 - **The data depends on wire-up.** If `recordUserTurnStart` is not being called on user-message receipt, the heuristic 30s idle-reset substitutes. That's good enough for catching obvious friction but misses sub-30s "different question, same session" cases. Worth checking the orchestrator integration before drawing strong conclusions.
 - **Threshold tuning is the operator's job.** Default 5 is the article's number. Project-specific work (multi-leg backtests, portfolio review across 20 symbols) legitimately needs more tools. Calibrate per workflow if needed.
 - **Dedup is per-turn, not per-session.** A long session with many high-friction turns will produce many events. That's intentional — each turn is a separate signal.
-- Composes with [[exit-review]] (per-session retrospectives) and pairs with the tool-description audit script (`scripts/dev/check_tool_descriptions.ts`) — that script flags weak descriptions; this skill flags which weak descriptions are actually hurting in production.
+- Composes with [[exit-review]] (per-session retrospectives): a weak tool description flagged here is the one actually hurting in production — fix those first.
