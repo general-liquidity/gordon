@@ -84,6 +84,8 @@ interface Props {
   vimMode?: boolean;
   locked?: boolean;
   onShowShortcuts?: () => void;
+  /** Stop the in-flight agent turn (Esc while streaming). */
+  onStop?: () => void;
   onVimModeChange?: (mode: "insert" | "normal" | "visual") => void;
   effortLevel?: "low" | "medium" | "high" | "auto";
   tokenBudgetRatio?: number;
@@ -104,6 +106,7 @@ export const PromptInput = React.memo(function PromptInput({
   vimMode = false,
   locked = false,
   onShowShortcuts,
+  onStop,
   onVimModeChange,
   effortLevel,
   tokenBudgetRatio,
@@ -118,6 +121,9 @@ export const PromptInput = React.memo(function PromptInput({
   const [vimState, setVimState] = useState<VimState>(INITIAL_VIM_STATE);
   const history = useInputHistory();
   const stashedInputRef = useRef("");
+  // The last submitted input — restored to the composer if the user stops the
+  // turn with Esc, so they can edit and resend (Claude Code parity).
+  const lastSubmittedRef = useRef("");
 
   // Paste detection: rapid input within 10ms = paste
   const lastInputTimeRef = useRef(0);
@@ -255,6 +261,7 @@ export const PromptInput = React.memo(function PromptInput({
         const trimmed = value.trim();
         if (trimmed) {
           history.push(trimmed);
+          lastSubmittedRef.current = trimmed;
           onSubmit(trimmed);
           setValue("");
           setCursorPos(0);
@@ -265,6 +272,16 @@ export const PromptInput = React.memo(function PromptInput({
     }
 
     if (key.escape) {
+      // Esc while the agent is streaming → stop the turn and restore the last
+      // input for editing. Slash suggestions close first if they're open.
+      if (isStreaming && !showSuggestions) {
+        onStop?.();
+        if (lastSubmittedRef.current) {
+          setValue(lastSubmittedRef.current);
+          setCursorPos(graphemeCount(lastSubmittedRef.current));
+        }
+        return;
+      }
       setValue("");
       setCursorPos(0);
       setSelectedIdx(0);

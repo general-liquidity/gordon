@@ -213,7 +213,7 @@ import { InputRouterProvider, useRoutedInput, FOCUS_PRIORITY } from "./input/Inp
 import { getSuggestionStore } from "../infra/proactive/storage/suggestionStore.ts";
 
 // ── Bridge ──
-import { initializeRuntime, handleInput, handleApprovalDecision, performSessionReset, getRuntime } from "./bridge/runtime.js";
+import { initializeRuntime, handleInput, handleApprovalDecision, performSessionReset, getRuntime, abortActiveTurn } from "./bridge/runtime.js";
 
 // ============================================================================
 // Gordon App — Claude Code for Vibe Trading
@@ -2844,6 +2844,7 @@ function AppInner() {
       >
         <PromptInput
           onSubmit={handleSubmit}
+          onStop={abortActiveTurn}
           placeholder={placeholder}
           permissionMode={permissionMode ?? "ask"}
           activeAgentCount={activeAgentCount}

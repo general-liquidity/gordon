@@ -73,6 +73,9 @@ import { routeToolCommand } from "./toolHandlers.js";
 
 let runtimeFactory: SessionRuntimeFactory | null = null;
 let activeRuntime: SessionRuntime | null = null;
+// In-flight agent turn's abort controller — set when a stream starts, cleared
+// when it ends. Esc-to-stop calls abortActiveTurn() to cancel it.
+let activeStreamController: AbortController | null = null;
 /**
  * Shared context resolver — builds exchange, broker, LLM, rails,
  * and portfolio clients from config + env. Used by every GordonContext
@@ -324,6 +327,15 @@ export function getRuntime(): SessionRuntime | null {
   return activeRuntime;
 }
 
+/** Abort the in-flight agent turn (Esc-to-stop). Returns true if a turn was running. */
+export function abortActiveTurn(): boolean {
+  if (activeStreamController && !activeStreamController.signal.aborted) {
+    activeStreamController.abort();
+    return true;
+  }
+  return false;
+}
+
 export function performSessionReset(setState: StateUpdater): void {
   const runtime = activeRuntime;
   try {
@@ -527,8 +539,10 @@ async function streamResponse(
     }],
   }));
 
+  const streamController = new AbortController();
+  activeStreamController = streamController;
   try {
-    for await (const event of runtime.streamMessage(userMessage)) {
+    for await (const event of runtime.streamMessage(userMessage, { signal: streamController.signal })) {
       switch (event.type) {
         case "text_delta": {
           const chunk = event.content ?? "";
@@ -854,14 +868,30 @@ async function streamResponse(
       }
     }
   } catch (err) {
-    addMessage(setState, "system", `Stream error: ${err instanceof Error ? err.message : String(err)}`, "error");
-    setState((prev: any) => ({
-      ...prev,
-      streamBuffer: "",
-      isStreaming: false,
-      activeAgents: [],
-    }));
+    if (streamController.signal.aborted) {
+      // User stopped the turn (Esc) — keep the partial response, mark it done.
+      setState((prev: any) => ({
+        ...prev,
+        messages: prev.messages.map((m: any) =>
+          m.id === streamingMsgId ? { ...m, content: textFlusher.buffer, streaming: false } : m,
+        ),
+        streamBuffer: "",
+        isStreaming: false,
+        activeAgents: [],
+        activeToolCalls: [],
+      }));
+      addMessage(setState, "system", "⏹ Stopped", "system");
+    } else {
+      addMessage(setState, "system", `Stream error: ${err instanceof Error ? err.message : String(err)}`, "error");
+      setState((prev: any) => ({
+        ...prev,
+        streamBuffer: "",
+        isStreaming: false,
+        activeAgents: [],
+      }));
+    }
   } finally {
+    if (activeStreamController === streamController) activeStreamController = null;
     textFlusher.dispose();
     thinkingFlusher.dispose();
   }
