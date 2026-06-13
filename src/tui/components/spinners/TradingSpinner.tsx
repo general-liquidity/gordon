@@ -26,6 +26,19 @@ const TRADING_VERBS = [
   "Reviewing signals", "Processing data", "Synthesizing analysis",
 ];
 
+// Rotating hint shown under the spinner (Claude Code's `⎿ Tip:` line, adapted
+// to Gordon). Rotates every ROTATE_MS so it reads as ambient guidance, not
+// flicker. The interrupt path is included so users always have an out.
+const TRADING_TIPS = [
+  "positions stream live in the footer — keep typing to queue",
+  "Ctrl+C twice to interrupt the agent",
+  "/auto to auto-approve · /ask to confirm each trade",
+  "every order clears the risk gate before it places",
+  "esc clears the composer · ↑ recalls history",
+  "scroll up to read the full transcript",
+];
+const TIP_ROTATE_MS = 8000;
+
 const AGENT_VERBS: Record<string, string> = {
   gordon: "Analyzing",
   executor: "Executing order",
@@ -55,6 +68,8 @@ interface Props {
    * renders a TeammateSpinnerTree below the main spinner line.
    */
   agents?: AgentTask[];
+  /** Show the rotating `⎿ Tip:` hint line below the spinner. @default true */
+  showHint?: boolean;
 }
 
 // Infer verb from user input — what are they actually asking for?
@@ -319,7 +334,7 @@ function getToolVerb(toolName: string): string | null {
   return null;
 }
 
-export function TradingSpinner({ agentName, elapsedMs, streamLength = 0, userInput, activeToolName, contextBudgetRatio, agents }: Props) {
+export function TradingSpinner({ agentName, elapsedMs, streamLength = 0, userInput, activeToolName, contextBudgetRatio, agents, showHint = true }: Props) {
   // Progressive width gating: hide elements that don't fit
   const cols = process.stdout.columns ?? 80;
   // Token counter (smooth animation via ref)
@@ -386,8 +401,16 @@ export function TradingSpinner({ agentName, elapsedMs, streamLength = 0, userInp
   }
   const displayedTokens = displayedTokensRef.current;
   const tokenStr = displayedTokens > 0
-    ? displayedTokens >= 1000 ? `${(displayedTokens / 1000).toFixed(1)}K tok` : `${displayedTokens} tok`
+    ? displayedTokens >= 1000 ? `${(displayedTokens / 1000).toFixed(1)}k tok` : `${displayedTokens} tok`
     : "";
+
+  // Status phrase (Claude Code's "…with high effort" slot, trading-native):
+  // surface the tool actually running so the verb's friendly label is backed
+  // by the concrete call.
+  const statusPhrase = activeToolName ? `running ${activeToolName}` : "";
+
+  // Rotating tip — stable within each TIP_ROTATE_MS window (no per-frame churn).
+  const tip = TRADING_TIPS[Math.floor((elapsedMs ?? 0) / TIP_ROTATE_MS) % TRADING_TIPS.length]!;
 
   // Build the shimmer text: "verb..." with light trail
   const verbWithEllipsis = `${verb}\u2026`;
@@ -420,34 +443,45 @@ export function TradingSpinner({ agentName, elapsedMs, streamLength = 0, userInp
             charIndex={i}
           />
         ))}
-        {showElapsed && elapsedStr && (
-          <>
-            <Text dimColor> {"\u00b7"} </Text>
-            <Text dimColor>{elapsedStr}</Text>
-          </>
-        )}
-        {showTokens && tokenStr && (
-          <>
-            <Text dimColor> {"\u00b7"} </Text>
-            <Text dimColor>{tokenStr}</Text>
-          </>
-        )}
-        {showStall && isStalled && (
-          <>
-            <Text dimColor> {"\u00b7"} </Text>
-            <Text color="red" dimColor>slow response</Text>
-          </>
-        )}
-        {showContextBudget && (
-          <>
-            <Text dimColor> {"\u00b7"} </Text>
-            <Text color={ctxColor}>{ctxPct}% ctx</Text>
-          </>
-        )}
+        <SpinnerMeta
+          items={[
+            showElapsed && elapsedStr ? <Text key="el" dimColor>{elapsedStr}</Text> : null,
+            showTokens && tokenStr
+              ? <Text key="tok" dimColor>{"\u2193 "}{tokenStr}</Text>
+              : null,
+            statusPhrase ? <Text key="st" dimColor>{statusPhrase}</Text> : null,
+            showStall && isStalled ? <Text key="stall" color="red" dimColor>slow response</Text> : null,
+            showContextBudget ? <Text key="ctx" color={ctxColor}>{ctxPct}% ctx</Text> : null,
+          ]}
+        />
       </Box>
+      {showHint && (
+        <Box paddingLeft={2}>
+          <Text dimColor>{"\u23bf  "}Tip: {tip}</Text>
+        </Box>
+      )}
       {showAgentTree && agents && (
         <TeammateSpinnerTree agents={agents} />
       )}
     </Box>
+  );
+}
+
+// Renders the parenthesized metadata group: " (a \u00b7 b \u00b7 c)". Empty items are
+// dropped; nothing renders when every item is empty.
+function SpinnerMeta({ items }: { items: Array<React.ReactNode | null> }) {
+  const visible = items.filter((item): item is React.ReactElement => item != null);
+  if (visible.length === 0) return null;
+  return (
+    <>
+      <Text dimColor> (</Text>
+      {visible.map((item, i) => (
+        <React.Fragment key={i}>
+          {i > 0 && <Text dimColor> {"\u00b7"} </Text>}
+          {item}
+        </React.Fragment>
+      ))}
+      <Text dimColor>)</Text>
+    </>
   );
 }

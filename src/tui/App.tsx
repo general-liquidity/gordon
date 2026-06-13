@@ -2356,7 +2356,7 @@ function AppInner() {
           {isStreaming && !isThinking && (
             <TradingSpinner
               agentName={activeAgentName ?? undefined}
-              streamLength={0}
+              streamLength={streamBuffer?.length ?? 0}
               userInput={lastUserInput}
               activeToolName={activeToolCalls.find((t) => t.status === "running")?.toolName}
               elapsedMs={elapsedSeconds * 1000}
