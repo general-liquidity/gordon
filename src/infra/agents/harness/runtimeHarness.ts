@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import os from "node:os";
 import path from "node:path";
 import { listActionLogEntries } from "../../action-log/store.ts";
+import { digestLargeResult } from "./resultDigest.ts";
 import type { GordonContext } from "../types.ts";
 import { determineWorkflowPhase, getPhasePromptGuidance, isExecutionPhase, type WorkflowPhase } from "../cognition/workflowPhase.ts";
 import { shouldEmitTraderReminders } from "../reminders/traderReminders.ts";
@@ -720,9 +721,16 @@ export function formatRecoveryGuidance(guidance: RecoveryGuidance): string {
   return lines.join("\n");
 }
 
-function buildPreviewText(serialized: string): string {
+function buildPreviewText(serialized: string, result?: unknown): string {
   if (serialized.length <= TOOL_RESULT_PREVIEW_LIMIT) {
     return serialized;
+  }
+  // For a large tabular result, a sample-with-totals digest beats a blind
+  // head-slice — the model gets the row count + column aggregates + a sample
+  // instead of just the first N chars. Falls back to truncation otherwise.
+  if (result !== undefined) {
+    const digest = digestLargeResult(result, { sampleRows: 4, maxChars: TOOL_RESULT_PREVIEW_LIMIT * 2 });
+    if (digest) return digest;
   }
   return `${serialized.slice(0, TOOL_RESULT_PREVIEW_LIMIT)}…`;
 }
@@ -850,7 +858,7 @@ export async function optimizeToolResultForContext(
     return {
       result,
       offloaded: false,
-      previewText: buildPreviewText(serialized),
+      previewText: buildPreviewText(serialized, result),
       bytes,
     };
   }
@@ -865,7 +873,7 @@ export async function optimizeToolResultForContext(
     result: {
       offloaded: true,
       scratchFile,
-      preview: buildPreviewText(serialized),
+      preview: buildPreviewText(serialized, result),
       bytes,
       toolName,
     },
