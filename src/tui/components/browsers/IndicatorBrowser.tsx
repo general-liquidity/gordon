@@ -9,7 +9,8 @@
  */
 
 import React, { useState, useMemo } from "react";
-import { Box, Text, useInput } from "../../ink-custom";
+import { Box, Text } from "../../ink-custom";
+import { useRoutedInput, FOCUS_PRIORITY } from "../../input/InputRouterContext.tsx";
 import { Pane } from "../../design-system/Pane.js";
 
 // ============================================================================
@@ -130,7 +131,7 @@ export function IndicatorBrowser({ onSelect, onClose }: Props) {
   const selectable = useMemo(() => selectableIndices(flatList), [flatList]);
   const [cursor, setCursor] = useState(0);
 
-  useInput((input, key) => {
+  useRoutedInput((input, key) => {
     if (key.escape) {
       onClose();
       return;
@@ -149,7 +150,7 @@ export function IndicatorBrowser({ onSelect, onClose }: Props) {
       const entry = flatList[idx];
       if (entry?.indicator && onSelect) onSelect(entry.indicator);
     }
-  });
+  }, { id: "indicatorBrowser", priority: FOCUS_PRIORITY.DIALOG });
 
   const selectedFlatIdx = selectable[cursor] ?? -1;
   const focusedIndicator = selectedFlatIdx >= 0 ? flatList[selectedFlatIdx]?.indicator : undefined;

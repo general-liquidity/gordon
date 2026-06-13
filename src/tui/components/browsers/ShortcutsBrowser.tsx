@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { Box, Text, useInput } from "../../ink-custom";
+import { Box, Text } from "../../ink-custom";
+import { useRoutedInput, FOCUS_PRIORITY } from "../../input/InputRouterContext.tsx";
 import { getResolvedBindings, validateKeybindings, type KeyBinding } from "../../keybindings/keybindings.js";
 import { KeyboardHints, KeybindingWarnings } from "../../design-system/index.ts";
 
@@ -31,13 +32,13 @@ export function ShortcutsBrowser({ onCancel }: Props) {
   }
   const conflicts = validateKeybindings(allBindings);
 
-  useInput((input, key) => {
+  useRoutedInput((input, key) => {
     if (key.escape) { if (query) { setQuery(""); setSelectedIdx(0); } else onCancel(); return; }
     if (key.upArrow) setSelectedIdx((i) => Math.max(0, i - 1));
     if (key.downArrow) setSelectedIdx((i) => Math.min(filtered.length - 1, i + 1));
     if (key.backspace) { setQuery((q) => q.slice(0, -1)); setSelectedIdx(0); return; }
     if (input && !key.ctrl && !key.meta) { setQuery((q) => q + input); setSelectedIdx(0); }
-  });
+  }, { id: "shortcutsBrowser", priority: FOCUS_PRIORITY.DIALOG });
 
   let globalIdx = 0;
 

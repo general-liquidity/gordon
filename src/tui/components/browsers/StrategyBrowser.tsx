@@ -9,7 +9,8 @@
  */
 
 import React, { useState, useMemo } from "react";
-import { Box, Text, useInput } from "../../ink-custom";
+import { Box, Text } from "../../ink-custom";
+import { useRoutedInput, FOCUS_PRIORITY } from "../../input/InputRouterContext.tsx";
 
 // ============================================================================
 // Types
@@ -143,7 +144,7 @@ export function StrategyBrowser({
   const selectable = useMemo(() => selectableIndices(flatList), [flatList]);
   const [cursor, setCursor] = useState(0);
 
-  useInput((input, key) => {
+  useRoutedInput((input, key) => {
     if (key.escape) {
       onClose();
       return;
@@ -169,7 +170,7 @@ export function StrategyBrowser({
       const entry = flatList[idx];
       if (entry?.strategy) onSelect(entry.strategy);
     }
-  });
+  }, { id: "strategyBrowser", priority: FOCUS_PRIORITY.DIALOG });
 
   if (strategies.length === 0) {
     return (

@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from "react";
-import { Box, Text, useInput } from "../../ink-custom";
+import { Box, Text } from "../../ink-custom";
+import { useRoutedInput, FOCUS_PRIORITY } from "../../input/InputRouterContext.tsx";
 import { GordonSelect as Select } from "../../design-system/GordonSelect.js";
 
 /**
@@ -49,7 +50,7 @@ export function CLIBrowser({ tools, onInstall, onCancel }: Props) {
   const [selectedIdx, setSelectedIdx] = useState(0);
   const [detailTool, setDetailTool] = useState<CLITool | null>(null);
 
-  useInput((_input, key) => {
+  useRoutedInput((_input, key) => {
     if (key.escape) {
       if (detailTool) setDetailTool(null);
       else onCancel();
@@ -63,7 +64,7 @@ export function CLIBrowser({ tools, onInstall, onCancel }: Props) {
     }
     if (key.upArrow) setSelectedIdx((i) => Math.max(0, i - 1));
     if (key.downArrow) setSelectedIdx((i) => Math.min(tools.length - 1, i + 1));
-  });
+  }, { id: "cliBrowser", priority: FOCUS_PRIORITY.DIALOG });
 
   // ── Detail view ──
   if (detailTool) {

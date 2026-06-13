@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { Box, Text, useInput } from "../../ink-custom";
+import { Box, Text } from "../../ink-custom";
+import { useRoutedInput, FOCUS_PRIORITY } from "../../input/InputRouterContext.tsx";
 import { GordonSelect as Select } from "../../design-system/GordonSelect.js";
 import { getRiskColor, type RiskLevel } from "../../design-system/colorMap.ts";
 import { useTheme } from "../../themes/ThemeProvider.tsx";
@@ -36,7 +37,7 @@ export function ApprovalBrowser({ pending, recent, onApprove, onDeny, onCancel }
 
   const items = view === "pending" ? pending : recent;
 
-  useInput((_input, key) => {
+  useRoutedInput((_input, key) => {
     if (key.escape) {
       if (decidingId) setDecidingId(null);
       else onCancel();
@@ -51,7 +52,7 @@ export function ApprovalBrowser({ pending, recent, onApprove, onDeny, onCancel }
       setView((v) => v === "pending" ? "recent" : "pending");
       setSelectedIdx(0);
     }
-  });
+  }, { id: "approvalBrowser", priority: FOCUS_PRIORITY.DIALOG });
 
   const riskTone = (level: ApprovalItem["riskLevel"]) => (
     getRiskColor(level === "standard" ? "low" : level as RiskLevel, theme)

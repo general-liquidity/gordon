@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from "react";
-import { Box, Text, useInput } from "../../ink-custom";
+import { Box, Text } from "../../ink-custom";
+import { useRoutedInput, FOCUS_PRIORITY } from "../../input/InputRouterContext.tsx";
 import { GordonSelect as Select } from "../../design-system/GordonSelect.js";
 
 /**
@@ -57,7 +58,7 @@ export function MarketplaceBrowser({ plugins, onInstall, onCancel }: Props) {
     return list;
   }, [plugins, selectedCategory, query]);
 
-  useInput((input, key) => {
+  useRoutedInput((input, key) => {
     if (key.escape) {
       if (detailPlugin) setDetailPlugin(null);
       else if (query) { setQuery(""); setSelectedIdx(0); }
@@ -81,7 +82,7 @@ export function MarketplaceBrowser({ plugins, onInstall, onCancel }: Props) {
     }
     if (key.backspace) { setQuery((q) => q.slice(0, -1)); setSelectedIdx(0); return; }
     if (input && !key.ctrl && !key.meta) { setQuery((q) => q + input); setSelectedIdx(0); }
-  });
+  }, { id: "marketplaceBrowser", priority: FOCUS_PRIORITY.DIALOG });
 
   // ── Detail view ──
   if (detailPlugin) {

@@ -9,7 +9,8 @@
  */
 
 import React, { useState, useEffect, useMemo } from "react";
-import { Box, Text, useInput } from "../../ink-custom";
+import { Box, Text } from "../../ink-custom";
+import { useRoutedInput, FOCUS_PRIORITY } from "../../input/InputRouterContext.tsx";
 import { Pane } from "../../design-system/Pane.js";
 import {
   HIP3_ASSETS,
@@ -156,7 +157,7 @@ export function HIP3AssetBrowser({ onSelect, onClose }: Props) {
     };
   }, []);
 
-  useInput((input, key) => {
+  useRoutedInput((input, key) => {
     if (key.escape) {
       onClose();
       return;
@@ -184,7 +185,7 @@ export function HIP3AssetBrowser({ onSelect, onClose }: Props) {
         });
       }
     }
-  });
+  }, { id: "hip3AssetBrowser", priority: FOCUS_PRIORITY.DIALOG });
 
   const selectedFlatIdx = selectable[cursor] ?? -1;
   const focusedAsset = selectedFlatIdx >= 0 ? flatList[selectedFlatIdx]?.asset : undefined;

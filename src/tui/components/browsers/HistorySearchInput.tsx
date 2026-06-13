@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { Box, Text, useInput } from "../../ink-custom";
+import { Box, Text } from "../../ink-custom";
+import { useRoutedInput, FOCUS_PRIORITY } from "../../input/InputRouterContext.tsx";
 
 // ============================================================================
 // HistorySearchInput — Ctrl+R style history search overlay
@@ -29,7 +30,7 @@ export function HistorySearchInput({ history, onSelect, onClose }: Props) {
     query === "" ? true : entry.toLowerCase().includes(query.toLowerCase())
   ).slice(0, MAX_RESULTS);
 
-  useInput((input, key) => {
+  useRoutedInput((input, key) => {
     if (key.escape) {
       onClose();
       return;
@@ -65,7 +66,7 @@ export function HistorySearchInput({ history, onSelect, onClose }: Props) {
       setQuery((q) => q + input);
       setFocusIdx(0);
     }
-  });
+  }, { id: "historySearchInput", priority: FOCUS_PRIORITY.DIALOG });
 
   return (
     <Box

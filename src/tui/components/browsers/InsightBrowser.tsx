@@ -8,7 +8,8 @@
  */
 
 import React, { useState, useMemo } from "react";
-import { Box, Text, useInput } from "../../ink-custom";
+import { Box, Text } from "../../ink-custom";
+import { useRoutedInput, FOCUS_PRIORITY } from "../../input/InputRouterContext.tsx";
 import { Pane } from "../../design-system/Pane.js";
 import { Tabs } from "../../design-system/Tabs.js";
 import { ProgressBar } from "../../design-system/ProgressBar.js";
@@ -75,7 +76,7 @@ export function InsightBrowser({ insights, onClose }: Props) {
     return insights.filter((ins) => ins.category.toLowerCase() === activeTab);
   }, [insights, activeTab]);
 
-  useInput((_input, key) => {
+  useRoutedInput((_input, key) => {
     if (key.escape) {
       onClose();
       return;
@@ -87,7 +88,7 @@ export function InsightBrowser({ insights, onClose }: Props) {
     if (key.downArrow) {
       setCursor((c) => Math.min(filtered.length - 1, c + 1));
     }
-  });
+  }, { id: "insightBrowser", priority: FOCUS_PRIORITY.DIALOG });
 
   return (
     <Pane title="TRADING INSIGHTS">

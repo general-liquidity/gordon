@@ -7,7 +7,8 @@
  */
 
 import React from "react";
-import { Box, Text, useInput } from "../../ink-custom";
+import { Box, Text } from "../../ink-custom";
+import { useRoutedInput, FOCUS_PRIORITY } from "../../input/InputRouterContext.tsx";
 import { GordonSelect } from "../../design-system/GordonSelect.js";
 
 // ============================================================================
@@ -63,9 +64,9 @@ const SELECT_OPTIONS = STYLE_OPTIONS.map((o) => ({
 // ============================================================================
 
 export function OutputStylePicker({ current, onChange, onClose }: Props) {
-  useInput((_, key) => {
+  useRoutedInput((_, key) => {
     if (key.escape) onClose();
-  });
+  }, { id: "outputStylePicker", priority: FOCUS_PRIORITY.DIALOG });
 
   return (
     <Box

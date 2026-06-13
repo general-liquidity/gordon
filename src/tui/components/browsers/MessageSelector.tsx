@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { Box, Text, useInput } from "../../ink-custom";
+import { Box, Text } from "../../ink-custom";
+import { useRoutedInput, FOCUS_PRIORITY } from "../../input/InputRouterContext.tsx";
 
 // ============================================================================
 // MessageSelector — Visual message picker for rewind/branch operations
@@ -20,12 +21,12 @@ export function MessageSelector({ messages, onSelect, onClose }: Props) {
   const userMessages = messages.map((m, i) => ({ ...m, originalIndex: i })).filter((m) => m.role === "user");
   const [selected, setSelected] = useState(0);
 
-  useInput((_, key) => {
+  useRoutedInput((_, key) => {
     if (key.escape) onClose();
     else if (key.return && userMessages[selected]) onSelect(userMessages[selected]!.originalIndex);
     else if (key.upArrow) setSelected((p) => Math.max(0, p - 1));
     else if (key.downArrow) setSelected((p) => Math.min(userMessages.length - 1, p + 1));
-  });
+  }, { id: "messageSelector", priority: FOCUS_PRIORITY.DIALOG });
 
   return (
     <Box flexDirection="column" borderStyle="round" borderColor="yellow" paddingX={1}>

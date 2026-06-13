@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from "react";
-import { Box, Text, useInput } from "../../ink-custom";
+import { Box, Text } from "../../ink-custom";
+import { useRoutedInput, FOCUS_PRIORITY } from "../../input/InputRouterContext.tsx";
 import {
   SLASH_COMMANDS,
   type SlashCommand,
@@ -44,7 +45,7 @@ export function HelpBrowser({ onRunCommand, onCancel }: Props) {
     return cmds;
   }, [query, selectedCategory]);
 
-  useInput((input, key) => {
+  useRoutedInput((input, key) => {
     if (key.escape) {
       if (query) { setQuery(""); setSelectedIdx(0); }
       else if (selectedCategory) { setSelectedCategory(null); setSelectedIdx(0); }
@@ -80,7 +81,7 @@ export function HelpBrowser({ onRunCommand, onCancel }: Props) {
       setQuery((q) => q + input);
       setSelectedIdx(0);
     }
-  });
+  }, { id: "helpBrowser", priority: FOCUS_PRIORITY.DIALOG });
 
   const maxVisible = 15;
   const scrollStart = Math.max(0, selectedIdx - Math.floor(maxVisible / 2));

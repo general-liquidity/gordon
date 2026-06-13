@@ -18,7 +18,8 @@
  */
 
 import React, { useState } from "react";
-import { Box, Text, useInput } from "../../ink-custom";
+import { Box, Text } from "../../ink-custom";
+import { useRoutedInput, FOCUS_PRIORITY } from "../../input/InputRouterContext.tsx";
 import { WorkerBadge } from "../status/WorkerBadge.tsx";
 
 // ============================================================================
@@ -75,7 +76,7 @@ export function AuditBrowser({ entries, onClose }: Props) {
 
   const visibleEntries = sorted.slice(scrollOffset, scrollOffset + PAGE_SIZE);
 
-  useInput((input, key) => {
+  useRoutedInput((input, key) => {
     if (key.escape) {
       onClose();
       return;
@@ -120,7 +121,7 @@ export function AuditBrowser({ entries, onClose }: Props) {
         });
       }
     }
-  });
+  }, { id: "auditBrowser", priority: FOCUS_PRIORITY.DIALOG });
 
   if (sorted.length === 0) {
     return (

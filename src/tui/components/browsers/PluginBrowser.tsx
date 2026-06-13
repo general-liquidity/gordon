@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { Box, Text, useInput } from "../../ink-custom";
+import { Box, Text } from "../../ink-custom";
+import { useRoutedInput, FOCUS_PRIORITY } from "../../input/InputRouterContext.tsx";
 
 // ============================================================================
 // PluginBrowser — Browse, install, enable/disable trading plugins
@@ -11,7 +12,7 @@ interface Props { plugins: Plugin[]; onInstall?: (id: string) => void; onToggle?
 export function PluginBrowser({ plugins, onInstall, onToggle, onClose }: Props) {
   const [selected, setSelected] = useState(0);
 
-  useInput((input, key) => {
+  useRoutedInput((input, key) => {
     if (key.escape) onClose();
     else if (key.return && plugins[selected]) {
       if (plugins[selected]!.installed) onToggle?.(plugins[selected]!.id);
@@ -20,7 +21,7 @@ export function PluginBrowser({ plugins, onInstall, onToggle, onClose }: Props) 
     else if (input === "i" && plugins[selected] && !plugins[selected]!.installed) onInstall?.(plugins[selected]!.id);
     else if (key.upArrow) setSelected((p) => Math.max(0, p - 1));
     else if (key.downArrow) setSelected((p) => Math.min(plugins.length - 1, p + 1));
-  });
+  }, { id: "pluginBrowser", priority: FOCUS_PRIORITY.DIALOG });
 
   return (
     <Box flexDirection="column" borderStyle="round" borderColor="magenta" paddingX={1}>

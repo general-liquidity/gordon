@@ -9,7 +9,8 @@
  */
 
 import React, { useState, useMemo } from "react";
-import { Box, Text, useInput } from "../../ink-custom";
+import { Box, Text } from "../../ink-custom";
+import { useRoutedInput, FOCUS_PRIORITY } from "../../input/InputRouterContext.tsx";
 import { SessionPreview } from "../editors/SessionPreview.tsx";
 
 // ============================================================================
@@ -82,7 +83,7 @@ export function SessionBrowser({ sessions, onSelect, onClose }: Props) {
     [sessions],
   );
 
-  useInput((_, key) => {
+  useRoutedInput((_, key) => {
     if (key.escape) {
       onClose();
       return;
@@ -99,7 +100,7 @@ export function SessionBrowser({ sessions, onSelect, onClose }: Props) {
       const session = sorted[selectedIndex];
       if (session) onSelect(session.sessionId);
     }
-  });
+  }, { id: "sessionBrowser", priority: FOCUS_PRIORITY.DIALOG });
 
   if (sorted.length === 0) {
     return (
