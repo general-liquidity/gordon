@@ -29,6 +29,7 @@ import { newsEventProducer, resetNewsEventProducerState } from "./events/newsEve
 import { whaleAlertProducer, resetWhaleAlertProducerState } from "./events/whaleAlertProducer.ts";
 import { stockNewsEventProducer, resetStockNewsEventProducerState } from "./events/stockNewsEventProducer.ts";
 import { playbookSuggestProducer, resetPlaybookSuggestProducerState } from "./signals/playbookSuggestProducer.ts";
+import { edgeAssessmentProducer, resetEdgeAssessmentProducerState } from "./signals/edgeAssessmentProducer.ts";
 import {
   earningsApproachingProducer,
   insiderFlowProducer,
@@ -58,6 +59,7 @@ export {
   whaleAlertProducer,
   stockNewsEventProducer,
   playbookSuggestProducer,
+  edgeAssessmentProducer,
   earningsApproachingProducer,
   insiderFlowProducer,
   analystUpgradeProducer,
@@ -145,6 +147,7 @@ export function registerAllProducers(engine: ProactiveEngine): () => void {
     engine.registerProducer(withHealthTracking("whaleAlert", whaleAlertProducer)),
     engine.registerProducer(withHealthTracking("stockNewsEvent", stockNewsEventProducer)),
     engine.registerProducer(withHealthTracking("playbookSuggest", playbookSuggestProducer)),
+    engine.registerProducer(withHealthTracking("edgeAssessment", edgeAssessmentProducer)),
     engine.registerProducer(withHealthTracking("earningsApproaching", earningsApproachingProducer)),
     engine.registerProducer(withHealthTracking("insiderFlow", insiderFlowProducer)),
     engine.registerProducer(withHealthTracking("analystUpgrade", analystUpgradeProducer)),
@@ -166,6 +169,7 @@ export function registerAllProducers(engine: ProactiveEngine): () => void {
     resetWhaleAlertProducerState();
     resetStockNewsEventProducerState();
     resetPlaybookSuggestProducerState();
+    resetEdgeAssessmentProducerState();
     resetStockEventsProducerState();
     getProducerHealthTracker().stop();
   };

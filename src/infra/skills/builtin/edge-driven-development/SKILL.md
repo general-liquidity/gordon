@@ -80,7 +80,8 @@ Only a **verified** edge gets capital. `approve_plan` → `execute_plan`, gated 
 ### 5. Monitor invariants live
 The phase SDD has no analogue for, because **edges decay and code doesn't.** The `EDGE.md` invariants and kill conditions are not paperwork — they become **live monitors**.
 - `core/edge/monitor.ts` (`evaluateEdgeInvariants`) evaluates each invariant/kill-condition row against live metrics; `infra/trading/ops/edgeStatus.ts` (`assessEdge`) folds that verdict with the statistical `edgeDecayMonitor.ts` — the more severe of "invariant broke" and "realized R decayed" wins.
-- When a **kill condition fires**, the edge is **retired automatically** — `status: retired`, capital pulled. No human in the loop to rationalize "it'll come back."
+- This runs **on a cadence** via the `edge_assessment` radar producer (`infra/proactive/producers/signals/edgeAssessmentProducer.ts`, every 30 min): it loads every `status: live` EDGE.md (builtin + `~/.gordon/edges/`), re-checks invariants against current market metrics, and fires an `edge_health` card on a worsening transition — urgent when a kill fires, normal when an invariant degrades. Market-observable metrics (`regime`, `volumePattern`, `avgVol1mUsd`) are wired; trade-derived ones (`netEdgeBps`, `winRate`) fail safe (a missing metric never raises a card) until the realized-trade ledger is passed in.
+- When a **kill condition fires**, the card says **retire** — flip `status: retired`, pull capital. No human in the loop to rationalize "it'll come back."
 - **Dreaming parallel:** an overnight pass curates the *edge ledger* — retire decayed edges, promote robust ones from `verified` toward higher conviction. The ledger is the portfolio of live theses, kept honest while you sleep.
 
 ## The contrast to keep in mind

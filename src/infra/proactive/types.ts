@@ -38,7 +38,8 @@ export type ProactiveCategory =
   | "earnings_approaching" // Upcoming earnings on held or watched symbol
   | "insider_flow_alert"   // Cluster of insider buys/sells on watchlist
   | "analyst_upgrade"      // Analyst consensus rating shift
-  | "congressional_trade"; // STOCK Act disclosure on held or watched symbol
+  | "congressional_trade"  // STOCK Act disclosure on held or watched symbol
+  | "edge_health";         // A live EDGE.md edge degraded (invariant broke) or should retire (kill fired)
 
 /** Categories in schema/UI but with no producer wired yet. */
 export const INACTIVE_PROACTIVE_CATEGORIES: ReadonlySet<ProactiveCategory> = new Set();
@@ -62,6 +63,7 @@ export const ALL_CATEGORIES: ProactiveCategory[] = [
   "insider_flow_alert",
   "analyst_upgrade",
   "congressional_trade",
+  "edge_health",
 ];
 
 /** Categories with an active producer — ALL minus inactive. */

@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 import { readFileSync } from "fs";
 import { join } from "path";
 import { parseEdgeSpec } from "./parser.ts";
+import { loadEdgeSpecs, loadLiveEdges } from "./loader.ts";
 import {
   composeHealth,
   evaluateCondition,
@@ -136,6 +137,19 @@ describe("composeHealth", () => {
     expect(composeHealth("degraded", "retire")).toBe("retire");
     expect(composeHealth("stable", "stable")).toBe("stable");
     expect(composeHealth("retire", "degraded")).toBe("retire");
+  });
+});
+
+describe("loadEdgeSpecs", () => {
+  it("discovers the builtin edge from disk", () => {
+    const specs = loadEdgeSpecs();
+    expect(specs.find((s) => s.name === "mean-reversion-fade")).toBeDefined();
+  });
+
+  it("loadLiveEdges excludes the builtin example until it is promoted to live", () => {
+    // The committed example ships as status: verified — a dormant template, not
+    // a deployed edge — so the live-edge monitor must not pick it up by default.
+    expect(loadLiveEdges().find((s) => s.name === "mean-reversion-fade")).toBeUndefined();
   });
 });
 

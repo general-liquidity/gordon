@@ -72,6 +72,7 @@ const TICK_INTERVALS = {
   news_event: 10 * 60 * 1000,       // 10 min — RSS headline polling
   whale_alert: 15 * 60 * 1000,      // 15 min — whale-flow headline scan
   playbook_suggest: 30 * 60 * 1000, // 30 min — regime-matched playbook nudge
+  edge_assessment: 30 * 60 * 1000,  // 30 min — EDD Phase 5: re-verify live EDGE.md invariants
   stock_news_event: 15 * 60 * 1000, // 15 min — stock RSS + EDGAR + Finnhub
   // Stock event ticks (Finnhub-driven)
   earnings: 2 * 60 * 60 * 1000,     // 2 hours — upcoming earnings calendar

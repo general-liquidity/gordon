@@ -46,6 +46,9 @@ const DEFAULT_POLICIES: Record<ProactiveCategory, {
   insider_flow_alert:   { cooldownMs: 4 * HR,   minConfidence: 0.65, maxPerHour: 2 },
   analyst_upgrade:      { cooldownMs: 2 * HR,   minConfidence: 0.65, maxPerHour: 3 },
   congressional_trade:  { cooldownMs: 6 * HR,   minConfidence: 0.65, maxPerHour: 2 },
+  // A live edge degrading or retiring is capital-at-risk — fires only on a
+  // health transition (already self-throttled), so a tight cooldown is fine.
+  edge_health:          { cooldownMs: 15 * MIN, minConfidence: 0.75, maxPerHour: 4 },
 };
 
 // ============================================================================

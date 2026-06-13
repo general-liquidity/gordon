@@ -11,6 +11,7 @@
 
 export * from "./types.ts";
 export { parseEdgeSpec } from "./parser.ts";
+export { loadEdgeSpecs, loadLiveEdges } from "./loader.ts";
 export {
   type EdgeMetrics,
   composeHealth,

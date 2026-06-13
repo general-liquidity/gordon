@@ -2,7 +2,7 @@
 name: mean-reversion-fade
 strategy: mean-reversion
 status: verified
-regime: [ranging, chop]
+regime: [ranging, quiet]
 instruments: [BTC/USDT, ETH/USDT]
 ---
 
@@ -20,7 +20,7 @@ expanding (expansion means the breakout is real and the crowd is right).
 | id | metric | comparator | threshold | description |
 |---|---|---|---|---|
 | ev-net-positive | netEdgeBps | > | 0 | Edge survives the round-trip cost (fees + slippage) |
-| regime-ranging | regime | in | ranging,chop | Only valid in a range-bound regime |
+| regime-ranging | regime | in | ranging,quiet | Only valid in a range-bound regime |
 | volume-fading | volumePattern | in | flat,decreasing | Trapped-crowd thesis needs non-expanding volume |
 | liquidity-floor | avgVol1mUsd | >= | 100000 | Enough depth to exit the fade without self-impact |
 
@@ -29,7 +29,7 @@ expanding (expansion means the breakout is real and the crowd is right).
 | id | metric | comparator | threshold | description |
 |---|---|---|---|---|
 | ev-decayed | netEdgeBps | <= | 0 | Net edge has decayed to/through zero after costs |
-| regime-flip | regime | not-in | ranging,chop | Regime left the range — breakouts now run |
+| regime-flip | regime | not-in | ranging,quiet | Regime left the range — breakouts now run |
 | volume-expanding | volumePattern | == | increasing | Expanding volume = real breakout, crowd is right |
 | winrate-broke | winRate | < | 0.45 | Realized win rate fell below the fade's break-even |
 
