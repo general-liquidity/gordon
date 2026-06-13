@@ -46,7 +46,7 @@ import { noteRiskKernelFailure, resetRiskKernelHealth } from "./riskKernelHealth
 import { fetchApprovalRiskDetails, buildCounterOfferDenialReason } from "./approvalRiskDetails.ts";
 import { recordTurn, resetTurnSummaries, formatTurnsView } from "./turnSummaries.ts";
 import { createStreamFlusher } from "./streamFlusher.ts";
-import { completeFirstRunningCall } from "./toolCallTracking.ts";
+import { completeFirstRunningCall, stringifyToolResult } from "./toolCallTracking.ts";
 import { markInteraction } from "../diagnostics/performanceMonitor.ts";
 
 // ── Extracted handlers ──
@@ -621,7 +621,7 @@ async function streamResponse(
             // Update tool call status
             const updatedCalls = completeFirstRunningCall(prev.activeToolCalls ?? [], event.toolName, {
               status: event.error ? "error" : "success",
-              result: event.toolResult ? String(event.toolResult).slice(0, 200) : undefined,
+              result: stringifyToolResult(event.toolResult)?.slice(0, 2000),
               duration: Date.now() - ((prev.activeToolCalls ?? []).find((tc: any) => tc.toolName === event.toolName && tc.status === "running")?.startedAt ?? Date.now()),
             });
             return { ...prev, activeAgents: chains, activeToolCalls: updatedCalls };

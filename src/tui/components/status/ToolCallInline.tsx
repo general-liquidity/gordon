@@ -260,14 +260,25 @@ function getToolLabel(toolName: string): string {
   return toolName.replace(/^(get_|set_|list_|check_|create_|update_)/, "").replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-function getToolArgs(args?: Record<string, unknown>): string {
+// Secondary text — medium gray, brighter than faint dimColor (matches the
+// status row / spinner brightness).
+const MUTED = "rgb(150,150,150)";
+
+// Args in `(symbol · timeframe · …)` form — the algo-trading equivalent of
+// Claude Code's `Bash(<command>)`. Shows the call's identifying parameters so
+// repeated calls to the same tool are distinguishable.
+function formatToolArgs(args?: Record<string, unknown>): string {
   if (!args) return "";
-  // Show the most relevant arg (symbol, pair, etc.)
-  const symbol = args.symbol ?? args.pair ?? args.asset ?? args.coin;
-  if (symbol) return `  ${String(symbol)}`;
-  const query = args.query ?? args.input ?? args.prompt;
-  if (query) return `  ${String(query).slice(0, 30)}`;
-  return "";
+  const parts: string[] = [];
+  const symbol = args.symbol ?? args.pair ?? args.asset ?? args.coin ?? args.ticker ?? args.market;
+  if (symbol) parts.push(String(symbol));
+  const tf = args.timeframe ?? args.interval ?? args.tf ?? args.period;
+  if (tf) parts.push(String(tf));
+  if (parts.length === 0) {
+    const query = args.query ?? args.input ?? args.prompt ?? args.op ?? args.operation;
+    if (query) parts.push(String(query).slice(0, 30));
+  }
+  return parts.length > 0 ? `(${parts.join(" · ")})` : "";
 }
 
 const BlinkingDot = React.memo(function BlinkingDot({ active }: { active: boolean }) {
@@ -283,7 +294,7 @@ const RunningElapsed = React.memo(function RunningElapsed({ startedAt }: { start
   // subscribe, so the ticker cannot re-render them (Rules of Hooks safe).
   useAnimationClock(1000);
   const elapsedS = Math.max(0, Math.floor((Date.now() - startedAt) / 1000));
-  return <Text dimColor> {elapsedS}s</Text>;
+  return <Text color={MUTED}> {elapsedS}s</Text>;
 });
 
 // Cache tool labels — regex only runs once per unique tool name
@@ -298,6 +309,11 @@ function getCachedToolLabel(toolName: string): string {
 }
 
 const ToolCallRow = React.memo(function ToolCallRow({ call }: { call: ToolCallState }) {
+  const result = call.status !== "running" ? call.result : undefined;
+  const firstLine = result ? (result.split("\n")[0] ?? "") : "";
+  const preview = firstLine.length > 100 ? firstLine.slice(0, 100) + "\u2026" : firstLine;
+  // Truncated if we dropped chars on the first line or there are more lines.
+  const hasMore = result ? result.length > preview.length : false;
   return (
     <Box flexDirection="column">
       <Box paddingLeft={2}>
@@ -308,22 +324,21 @@ const ToolCallRow = React.memo(function ToolCallRow({ call }: { call: ToolCallSt
         ) : (
           <Text color="red">{"\u25CF"}</Text>
         )}
-        <Text bold dimColor={call.status !== "running"}>
-          {" "}{getCachedToolLabel(call.toolName)}
-        </Text>
-        <Text dimColor>{getToolArgs(call.args)}</Text>
+        {/* `Label(args)` \u2014 the trading equivalent of `Bash(command)`. */}
+        <Text bold>{" "}{getCachedToolLabel(call.toolName)}</Text>
+        <Text color={MUTED}>{formatToolArgs(call.args)}</Text>
         {call.status === "running" && <RunningElapsed startedAt={call.startedAt} />}
         {call.duration != null && (
-          <Text dimColor> {call.duration < 1000 ? `${call.duration}ms` : `${(call.duration / 1000).toFixed(1)}s`}</Text>
+          <Text color={MUTED}> {"\u00B7"} {call.duration < 1000 ? `${call.duration}ms` : `${(call.duration / 1000).toFixed(1)}s`}</Text>
         )}
       </Box>
-      {call.status !== "running" && call.result && (
+      {result && (
         <Box paddingLeft={2}>
-          <Text dimColor>{"\u231F  "}</Text>
-          <Text color={call.status === "error" ? "red" : undefined} dimColor={call.status === "success"}>
-            {call.status === "error" ? "\u2717 " : ""}
-            {call.result.length > 120 ? call.result.slice(0, 120) + "\u2026" : call.result}
+          <Text color={MUTED}>{"\u23BF  "}</Text>
+          <Text color={call.status === "error" ? "red" : MUTED}>
+            {call.status === "error" ? "\u2717 " : ""}{preview || "done"}
           </Text>
+          {hasMore && <Text color={MUTED}> {"\u00B7"} d for details</Text>}
         </Box>
       )}
     </Box>
@@ -379,10 +394,10 @@ export const ToolCallInline = React.memo(function ToolCallInline({ calls }: Prop
       <Box flexDirection="column">
         <Box paddingLeft={2}>
           <Text color={errors > 0 ? "yellow" : "green"}>●</Text>
-          <Text dimColor> {completed.length} tools completed</Text>
+          <Text color={MUTED}> {completed.length} tools completed</Text>
           {errors > 0 && <Text color="red"> ({errors} failed)</Text>}
-          <Text dimColor> · {totalDuration < 1000 ? `${totalDuration}ms` : `${(totalDuration / 1000).toFixed(1)}s`}</Text>
-          <Text dimColor> · Ctrl+O expand · d details</Text>
+          <Text color={MUTED}> · {totalDuration < 1000 ? `${totalDuration}ms` : `${(totalDuration / 1000).toFixed(1)}s`}</Text>
+          <Text color={MUTED}> · Ctrl+O expand · d details</Text>
         </Box>
         {running.map((call) => (
           <ToolCallRow key={call.id} call={call} />
@@ -396,11 +411,6 @@ export const ToolCallInline = React.memo(function ToolCallInline({ calls }: Prop
       {calls.map((call) => (
         <ToolCallRow key={call.id} call={call} />
       ))}
-      {latest && (
-        <Box paddingLeft={2}>
-          <Text dimColor>[press d for details]</Text>
-        </Box>
-      )}
     </Box>
   );
 });
