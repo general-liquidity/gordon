@@ -1704,16 +1704,24 @@ function AppInner() {
 
   // Drain queued user inputs when Gordon transitions from busy → idle.
   // Messages typed while streaming get batched and re-submitted here.
+  //
+  // The dequeue happens INSIDE the timer, and the effect depends only on
+  // isStreaming (re-submit goes through submitRef, not handleSubmit's identity).
+  // The previous version dequeued synchronously then deferred the submit 50ms
+  // with handleSubmit in the deps — any re-render in that window changed
+  // handleSubmit's identity, re-ran the effect, and its cleanup cleared the
+  // timer while the queue was already drained, silently dropping the message.
   useEffect(() => {
     if (isStreaming) return;
     if (defaultMessageQueue.isEmpty()) return;
-    const drained = defaultMessageQueue.dequeueAll();
-    // Combine into a single follow-up turn preserving order.
-    const combined = drained.map((m) => m.text).join("\n\n");
-    // Micro-delay so the streaming→idle state settles before re-submit.
-    const timer = setTimeout(() => handleSubmit(combined), 50);
+    const timer = setTimeout(() => {
+      if (defaultMessageQueue.isEmpty()) return;
+      const drained = defaultMessageQueue.dequeueAll();
+      const combined = drained.map((m) => m.text).join("\n\n");
+      submitRef.current(combined);
+    }, 50);
     return () => clearTimeout(timer);
-  }, [isStreaming, handleSubmit]);
+  }, [isStreaming]);
 
   // Wire: terminal tab — update tab title/badge/color based on Gordon state.
   useEffect(() => {
