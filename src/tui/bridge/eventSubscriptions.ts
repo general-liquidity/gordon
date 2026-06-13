@@ -555,12 +555,14 @@ export function subscribeToEvents(dispatch: Dispatch): () => void {
     }),
   );
 
-  // 44. exchange:disconnected
+  // 44. exchange:disconnected \u2014 silent, like exchange:connected. Feed status
+  // (incl. "disconnected"/"down") shows in the MarketDataStatus footer. Pushing
+  // a transcript message on every reconnect cycle spammed the chat and, at the
+  // empty boot state, hid the trading-preflight panel (any message flips
+  // messages.length>0). The footer is the right surface for ongoing feed state.
   unsubs.push(
-    bus.on("exchange:disconnected", (event: EventData<"exchange:disconnected">) => {
-      notify(dispatch, "exchange:disconnected", "alert",
-        `\u26A0 ${event.exchangeId} disconnected${event.reason ? `: ${event.reason}` : ""}`,
-      );
+    bus.on("exchange:disconnected", (_event: EventData<"exchange:disconnected">) => {
+      // Silent \u2014 MarketDataStatus footer shows feed status.
     }),
   );
 
