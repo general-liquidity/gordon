@@ -2,8 +2,6 @@ import React from "react";
 import { render } from "./ink-custom";
 import { App } from "./App.js";
 import { loadLabsFlagsIntoEnv } from "./ink-custom/loadLabsFlags.js";
-import { renderBanner } from "./boot/banner.ts";
-import { collectBootStaticInfo, renderBootStaticRows } from "./boot/bootComposition.ts";
 import { acquireInstanceLock, InstanceLockCollisionError } from "../infra/storage/instanceLock.ts";
 import { setInkInstance } from "./utils/inkInstance.ts";
 
@@ -14,17 +12,9 @@ export async function startGordonTUI(): Promise<void> {
   if (lock) process.once("exit", () => lock.release());
 
   if (process.stdout.isTTY) {
+    // Clean the screen; the banner + session box are now rendered inside Ink as
+    // the first item of the message-list <Static> (see App.tsx / BootHeader).
     process.stdout.write("\x1b[2J\x1b[H");
-    const columns = process.stdout.columns ?? 120;
-    const info = collectBootStaticInfo();
-    process.stdout.write(
-      [
-        ...renderBanner({ columns, version: info.version }),
-        "",
-        ...renderBootStaticRows(info, columns),
-        "",
-      ].join("\n") + "\n",
-    );
   }
 
   const instance = render(<App />, {

@@ -68,6 +68,7 @@ const ALLOWLIST = [
   "src/tui/components/editors/PrivacyConsent.tsx",
   "src/tui/components/editors/SessionPreview.tsx",
   "src/tui/components/editors/StructuredDiff.tsx",
+  "src/tui/components/layout/BootHeader.tsx",
   "src/tui/components/layout/BootLivePanel.tsx",
   "src/tui/components/layout/FooterHints.tsx",
   "src/tui/components/layout/GordonHeader.tsx",

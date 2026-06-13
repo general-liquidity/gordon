@@ -25,6 +25,14 @@ interface Props {
   messages: Message[];
   /** Reserved — currently unused since transcript search was removed. */
   scrollEnabled?: boolean;
+  /**
+   * Boot header (banner + session box) committed as the FIRST item of the
+   * single <Static>. Inline mode only allows one Static instance, so the
+   * header rides this one — that is what makes the banner survive scroll-up
+   * after the live region overflows (a tall slash menu) and Ink's clamped
+   * cursor-up redraw would otherwise clobber a raw-printed banner.
+   */
+  header?: React.ReactNode;
 }
 
 /**
@@ -49,8 +57,28 @@ interface Props {
  */
 const LIVE_TAIL = 0;
 
-export function VirtualMessageList({ messages, scrollEnabled = true }: Props) {
+type StaticItem = { kind: "header" } | { kind: "msg"; message: Message };
+
+// Boot header commits to scrollback exactly ONCE per process. VML can
+// unmount/remount (App early returns), and each fresh mount owns a new <Static>
+// instance that would re-commit the header → duplicate banners. This module
+// flag survives remounts so only the first instance emits the header.
+let bootHeaderEmitted = false;
+/** @internal test hook — reset the once-per-process boot-header guard. */
+export function __resetBootHeaderGuardForTests(): void {
+  bootHeaderEmitted = false;
+}
+
+export function VirtualMessageList({ messages, scrollEnabled = true, header }: Props) {
   const isStreaming = messages.some((m) => m.streaming);
+
+  // This instance owns the header only if it was the first to claim the flag.
+  const ownsHeaderRef = useRef(false);
+  if (header && !bootHeaderEmitted && !ownsHeaderRef.current) {
+    ownsHeaderRef.current = true;
+    bootHeaderEmitted = true;
+  }
+  const includeHeader = !!header && ownsHeaderRef.current;
 
   // Only show completed messages — streaming ones are invisible until done.
   // This gives "response appears all at once" rather than token-by-token drip.
@@ -110,6 +138,13 @@ export function VirtualMessageList({ messages, scrollEnabled = true }: Props) {
   const staticMessages = collapsedMessages.slice(0, commitCursor);
   const liveMessages = collapsedMessages.slice(commitCursor);
 
+  // Boot header rides index 0 of the Static so it commits to scrollback before
+  // any message and never moves (append-only thereafter).
+  const staticItems: StaticItem[] = [
+    ...(includeHeader ? [{ kind: "header" as const }] : []),
+    ...staticMessages.map((message) => ({ kind: "msg" as const, message })),
+  ];
+
   // ---------------------------------------------------------------------
   // Mouse-wheel scrolling.
   //
@@ -155,10 +190,15 @@ export function VirtualMessageList({ messages, scrollEnabled = true }: Props) {
 
   return (
     <Box flexDirection="column" ref={scrollContainerRef}>
-      {/* Past messages — written once into terminal scrollback, never re-rendered */}
-      {staticMessages.length > 0 && (
-        <Static items={staticMessages}>
-          {(msg) => <MessageBubble key={msg.id} message={msg} />}
+      {/* Boot header + past messages — written once into terminal scrollback,
+          never re-rendered. The header is item 0 so it stays at the top. */}
+      {staticItems.length > 0 && (
+        <Static items={staticItems}>
+          {(item) =>
+            item.kind === "header"
+              ? <Box key="__boot_header__">{header}</Box>
+              : <MessageBubble key={item.message.id} message={item.message} />
+          }
         </Static>
       )}
 

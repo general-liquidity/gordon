@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Box, Text, Spacer, useApp } from "./ink-custom";
 
 // ── Providers ──
@@ -33,6 +33,8 @@ import { PrivacyConsent, type PrivacyChoices } from "./components/editors/Privac
 import { PromptInput } from "./components/layout/PromptInput.tsx";
 import { StatusLine } from "./components/layout/StatusLine.tsx";
 import { BootLivePanel } from "./components/layout/BootLivePanel.tsx";
+import { BootHeader } from "./components/layout/BootHeader.tsx";
+import { collectBootStaticInfo } from "./boot/bootComposition.ts";
 import { defaultMessageQueue } from "../infra/runtime/messageQueue.js";
 import { saveEnvKeys } from "../infra/storage/config/env.ts";
 import { providerRegistry } from "../infra/runtime/providers/registry.js";
@@ -626,6 +628,17 @@ function AppInner() {
   const showMemory = isDialogOpen("memory");
   const setShowMemory = dialogSetter("memory");
   const [privacyMode, setPrivacyMode] = useState(false);
+  // Boot header (banner + session box) snapshot — captured once and committed
+  // to the message-list Static so it survives terminal scroll-up. Replaces the
+  // raw pre-Ink print in src/tui/index.tsx, which Ink could clobber on overflow.
+  const [bootHeaderData] = useState(() => ({
+    info: collectBootStaticInfo(),
+    columns: process.stdout.columns ?? 120,
+  }));
+  const bootHeaderNode = useMemo(
+    () => <BootHeader info={bootHeaderData.info} columns={bootHeaderData.columns} />,
+    [bootHeaderData],
+  );
   const showFeedback = isDialogOpen("feedback");
   const setShowFeedback = dialogSetter("feedback");
   const [feedbackTradeData, setFeedbackTradeData] = useState<FeedbackTradeData | null>(null);
@@ -2268,14 +2281,15 @@ function AppInner() {
             />
           )}
 
-          {messages.length === 0 ? (
-            <BootLivePanel hint={getSessionTip()} />
-          ) : (
-            <VirtualMessageList
-              messages={messages}
-              scrollEnabled={!showPalette && !anyDialogOpen}
-            />
-          )}
+          {/* VML always renders so the boot header (banner + session box) is
+              committed to the single Static and survives scroll-up. The live
+              preflight box shows below it only at the empty boot state. */}
+          <VirtualMessageList
+            messages={messages}
+            scrollEnabled={!showPalette && !anyDialogOpen}
+            header={bootHeaderNode}
+          />
+          {messages.length === 0 && <BootLivePanel hint={getSessionTip()} />}
 
           {/* Pending approvals — render only the first one to avoid
               multiple useInput listeners catching the same Enter keypress.
