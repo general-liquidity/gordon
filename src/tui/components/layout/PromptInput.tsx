@@ -1,5 +1,6 @@
-import React, { useState, useMemo, useRef } from "react";
+import React, { useState, useMemo, useRef, useEffect } from "react";
 import { Box, Text, useStdout } from "../../ink-custom";
+import { clearInkOutput } from "../../utils/inkInstance.ts";
 import { useSlashCommandTypeahead, type TypeaheadMatch } from "../../hooks/useSlashCommandTypeahead.js";
 import { useInputHistory } from "../../hooks/input/useInputHistory.js";
 import { useImagePaste } from "../../hooks/input/useImagePaste.js";
@@ -148,6 +149,18 @@ export const PromptInput = React.memo(function PromptInput({
   });
   const showSuggestions = isSlashMode && suggestions.length > 0;
 
+  // Force a clean repaint when the slash menu closes. Vanilla Ink's inline
+  // reflow can't fully erase the tall menu frame as it collapses, leaving a
+  // stale ghost of the input line; clearing forces Ink to redraw the live
+  // region from scratch. Fires only on the open→closed edge, not every render.
+  const prevShowSuggestionsRef = useRef(showSuggestions);
+  useEffect(() => {
+    if (prevShowSuggestionsRef.current && !showSuggestions) {
+      clearInkOutput();
+    }
+    prevShowSuggestionsRef.current = showSuggestions;
+  }, [showSuggestions]);
+
   // Group by workflow for visual sections
   const grouped = useMemo(() => {
     if (!showSuggestions) return [];
@@ -171,7 +184,15 @@ export const PromptInput = React.memo(function PromptInput({
 
   // Show as many suggestions as terminal allows (up to 60% of height).
   // User scrolls with arrow keys — all commands accessible.
-  const maxVisible = Math.min(Math.max(10, Math.floor(termRows * 0.6)), 30);
+  // Cap the menu so the live frame (menu + input + status + composer + a
+  // streaming spinner) stays within the terminal — an overflowing inline frame
+  // is what vanilla Ink can't cleanly reflow, producing the ghost. Reserve ~14
+  // rows for the rest of the bottom chrome.
+  const maxVisible = Math.min(
+    Math.max(8, Math.floor(termRows * 0.5)),
+    30,
+    Math.max(6, termRows - 14),
+  );
 
   useRoutedInput((input, key) => {
     if (locked) return;
