@@ -1723,6 +1723,33 @@ function AppInner() {
     return () => clearTimeout(timer);
   }, [isStreaming]);
 
+  // Leave a persistent "thought for Xs" marker when a turn completes — the live
+  // spinner shows the time while thinking, this preserves it in the transcript
+  // (mirrors Claude Code's "Baked for Xs"). Sub-2s turns are skipped to avoid
+  // clutter on quick replies.
+  const thinkStartRef = React.useRef<number | null>(null);
+  useEffect(() => {
+    if (isStreaming) {
+      thinkStartRef.current = Date.now();
+      return;
+    }
+    const startedAt = thinkStartRef.current;
+    thinkStartRef.current = null;
+    if (startedAt == null) return;
+    const durationSec = (Date.now() - startedAt) / 1000;
+    if (durationSec < 2) return;
+    dispatch({
+      type: "ADD_MESSAGE",
+      message: {
+        id: `thought-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        role: "system",
+        variant: "compact" as any,
+        content: `thought for ${formatElapsed(durationSec)}`,
+        timestamp: new Date().toISOString(),
+      },
+    });
+  }, [isStreaming, dispatch]);
+
   // Wire: terminal tab — update tab title/badge/color based on Gordon state.
   useEffect(() => {
     updateTerminalTab({
