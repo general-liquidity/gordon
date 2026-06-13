@@ -33,6 +33,14 @@
  *   ρ_call = K T e^(−rT) N(d2)                (per 1.0 rate change; ÷100 for 1%)
  *   ρ_put  = −K T e^(−rT) N(−d2)
  *
+ * Second-order cross-Greeks (the "vanna chart" family — how Δ is reshaped by
+ * vol and time, the forces behind dealer hedging flow):
+ *   Vanna  = ∂Δ/∂σ = ∂ν/∂S = −e^(−qT) φ(d1) d2/σ          (call = put)
+ *   Vomma  = ∂ν/∂σ = ν · d1 d2/σ                            (call = put)
+ *   Charm_call = q e^(−qT) N(d1)  − e^(−qT) φ(d1) [2(r−q)T − d2 σ√T]/(2 T σ√T)
+ *   Charm_put  = −q e^(−qT) N(−d1) − e^(−qT) φ(d1) [2(r−q)T − d2 σ√T]/(2 T σ√T)
+ *            (charm = ∂Δ/∂t, delta decay per YEAR of calendar time; ÷365 for day)
+ *
  * Where N(·) is the standard-normal CDF and φ(·) is the PDF.
  *
  * This primitive returns the full bundle in raw natural units (per 1.0
@@ -102,6 +110,12 @@ export interface BSResult {
   theta: number;
   /** Rho: ∂Price/∂r (per 1.0 rate change — divide by 100 for "per 1%"). */
   rho: number;
+  /** Vanna: ∂Δ/∂σ = ∂ν/∂S (per 1.0 vol change). Same for call/put. */
+  vanna: number;
+  /** Charm: ∂Δ/∂t — delta decay per YEAR of calendar time (÷365 for per day). */
+  charm: number;
+  /** Vomma (volga): ∂ν/∂σ — vega convexity (per 1.0 vol change). Same call/put. */
+  vomma: number;
   reasoning: string;
 }
 
@@ -170,6 +184,9 @@ export function computeBlackScholesGreeks(input: BSInput): BSResult {
       vega: NaN,
       theta: NaN,
       rho: NaN,
+      vanna: NaN,
+      charm: NaN,
+      vomma: NaN,
       reasoning: `T=0; intrinsic ${intrinsic.toFixed(4)}; Greeks undefined`,
     };
   }
@@ -214,13 +231,24 @@ export function computeBlackScholesGreeks(input: BSInput): BSResult {
   const gamma = (eqT * phid1) / (S * sigSqrtT);
   const vega = S * eqT * phid1 * sqrtT;
 
+  // Second-order cross-Greeks. vanna + vomma are call/put symmetric; charm
+  // carries the option-type carry term (q·N(±d1)).
+  const vanna = -eqT * phid1 * (d2 / sigma);
+  const vomma = vega * ((d1 * d2) / sigma);
+  // charm = ∂Δ/∂t (calendar time forward = −∂Δ/∂T), per year.
+  const charmCommon = (eqT * phid1 * (2 * (r - q) * T - d2 * sigSqrtT)) / (2 * T * sigSqrtT);
+  const charm =
+    input.optionType === "call"
+      ? q * eqT * Nd1 - charmCommon
+      : -q * eqT * NmD1 - charmCommon;
+
   const reasoning =
     `BS ${input.optionType.toUpperCase()}: S=${S}, K=${K}, T=${T.toFixed(4)}, ` +
     `r=${r.toFixed(4)}, σ=${sigma.toFixed(4)}, q=${q.toFixed(4)}; ` +
     `price=${price.toFixed(4)}, Δ=${delta.toFixed(4)}, Γ=${gamma.toFixed(6)}, ` +
     `ν=${vega.toFixed(4)}, Θ=${theta.toFixed(4)}/yr, ρ=${rho.toFixed(4)}`;
 
-  return { price, d1, d2, delta, gamma, vega, theta, rho, reasoning };
+  return { price, d1, d2, delta, gamma, vega, theta, rho, vanna, charm, vomma, reasoning };
 }
 
 export function blackScholesGreeksToPayload(
@@ -244,6 +272,11 @@ export function blackScholesGreeksToPayload(
     rhoPerPercent: finite(result.rho / 100, 6),
     d1: finite(result.d1, 6),
     d2: finite(result.d2, 6),
+    vannaPerOneVol: finite(result.vanna, 6),
+    vannaPerPercent: finite(result.vanna / 100, 8),
+    charmPerYear: finite(result.charm, 6),
+    charmPerDay: finite(result.charm / 365, 8),
+    vomma: finite(result.vomma, 6),
   };
 }
 

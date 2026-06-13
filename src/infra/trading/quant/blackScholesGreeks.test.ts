@@ -413,3 +413,55 @@ describe("impliedVolatility — failure modes", () => {
     expect(r.method).toBe("failed");
   });
 });
+
+describe("second-order Greeks — vanna / charm / vomma", () => {
+  const base = {
+    spot: 100, strike: 105, timeYears: 0.5, rate: 0.03,
+    volatility: 0.25, dividendYield: 0.01, optionType: "call" as const,
+  };
+  const h = 1e-5;
+  const bump = (k: "volatility" | "timeYears", dv: number) =>
+    computeBlackScholesGreeks({ ...base, [k]: base[k] + dv });
+
+  it("vanna matches ∂Δ/∂σ by finite difference", () => {
+    const g = computeBlackScholesGreeks(base);
+    const fd = (bump("volatility", h).delta - bump("volatility", -h).delta) / (2 * h);
+    expect(g.vanna).toBeCloseTo(fd, 4);
+  });
+
+  it("vomma matches ∂ν/∂σ by finite difference", () => {
+    const g = computeBlackScholesGreeks(base);
+    const fd = (bump("volatility", h).vega - bump("volatility", -h).vega) / (2 * h);
+    expect(g.vomma).toBeCloseTo(fd, 2);
+  });
+
+  it("charm matches −∂Δ/∂T (calendar-forward delta decay)", () => {
+    const g = computeBlackScholesGreeks(base);
+    const fd = -(bump("timeYears", h).delta - bump("timeYears", -h).delta) / (2 * h);
+    expect(g.charm).toBeCloseTo(fd, 4);
+  });
+
+  it("vanna and vomma are call/put symmetric; charm carries an option-type term", () => {
+    const call = computeBlackScholesGreeks(base);
+    const put = computeBlackScholesGreeks({ ...base, optionType: "put" });
+    expect(put.vanna).toBeCloseTo(call.vanna, 10);
+    expect(put.vomma).toBeCloseTo(call.vomma, 10);
+    expect(Math.abs(put.charm - call.charm)).toBeGreaterThan(1e-6);
+  });
+
+  it("payload surfaces vanna/charm/vomma in raw + conventional forms", () => {
+    const g = computeBlackScholesGreeks(base);
+    const p = blackScholesGreeksToPayload(g, "call") as Record<string, number>;
+    expect(p.vannaPerOneVol).toBeCloseTo(g.vanna, 5);
+    expect(p.vannaPerPercent).toBeCloseTo(g.vanna / 100, 8);
+    expect(p.charmPerDay).toBeCloseTo(g.charm / 365, 8);
+    expect(p.vomma).toBeCloseTo(g.vomma, 5);
+  });
+
+  it("returns NaN second-order Greeks at expiry", () => {
+    const g = computeBlackScholesGreeks({ ...base, timeYears: 0 });
+    expect(g.vanna).toBeNaN();
+    expect(g.charm).toBeNaN();
+    expect(g.vomma).toBeNaN();
+  });
+});
