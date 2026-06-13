@@ -67,7 +67,7 @@ export function calculateWMA(closes: number[], period: number = 14): (number | n
       weighted += closes[j]! * w;
       w += 1;
     }
-    out.push(parseFloat((weighted / denom).toFixed(4)));
+    out.push(weighted / denom);
   }
 
   return out;
