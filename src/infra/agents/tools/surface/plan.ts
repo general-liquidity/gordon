@@ -23,6 +23,7 @@ import {
   closePartialPositionTool as implClosePartial,
 } from "../trading/trading.ts";
 import { checkRiskTool as implCheckRisk } from "../trading/risk-gate.ts";
+import { triageExecution } from "../../../trading/execution/executionTriage.ts";
 import { runBacktestTool as implRunBacktest } from "../strategy/backtest/backtest.ts";
 import type { BacktestResult } from "../../../../backtest/types.ts";
 import { analyzeBacktestResult } from "../../../../backtest/analysis/analysis.ts";
@@ -522,6 +523,16 @@ export const executePlanTool = createTool({
     success: z.boolean(),
     planId: z.string(),
     orders: z.array(z.unknown()).optional(),
+    // Write-back triage: categorizes the placed orders so the model is handed
+    // "here's what changed, and here's the part you probably got wrong."
+    triage: z
+      .object({
+        summary: z.string(),
+        clean: z.array(z.unknown()),
+        needsReview: z.array(z.unknown()),
+        mustFix: z.array(z.unknown()),
+      })
+      .optional(),
     executionResult: z.unknown().optional(),
     error: z.string().optional(),
   }),
@@ -538,10 +549,12 @@ export const executePlanTool = createTool({
         error?: string;
         orders?: unknown[];
       };
+      const orders = result.orders ?? [];
       return {
         success: Boolean(result.success ?? !result.error),
         planId: args.planId,
-        orders: result.orders ?? [],
+        orders,
+        triage: triageExecution(orders),
         executionResult: result,
         error: result.error,
       };
