@@ -7,7 +7,7 @@ import { Box, Text, useInput } from "../../ink-custom";
  * Lists sessions with metadata. Search, switch, resume, delete.
  */
 
-interface ThreadInfo {
+export interface ThreadInfo {
   id: string;
   name?: string;
   createdAt: string;

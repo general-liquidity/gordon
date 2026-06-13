@@ -86,7 +86,8 @@ import { HelpBrowser } from "./components/browsers/HelpBrowser.tsx";
 import { ConfigEditor } from "./components/editors/ConfigEditor.tsx";
 import { InvalidConfigDialog } from "./components/dialogs/InvalidConfigDialog.tsx";
 import { InvalidSettingsDialog } from "./components/dialogs/InvalidSettingsDialog.tsx";
-import { ThreadBrowser } from "./components/browsers/ThreadBrowser.tsx";
+import { ThreadBrowser, type ThreadInfo } from "./components/browsers/ThreadBrowser.tsx";
+import { listThreads, switchThread } from "../infra/storage/entities/session.ts";
 import { JournalViewer } from "./components/charts/JournalViewer.tsx";
 import { ShortcutsBrowser } from "./components/browsers/ShortcutsBrowser.tsx";
 import { ApprovalBrowser } from "./components/browsers/ApprovalBrowser.tsx";
@@ -212,7 +213,7 @@ import { InputRouterProvider, useRoutedInput, FOCUS_PRIORITY } from "./input/Inp
 import { getSuggestionStore } from "../infra/proactive/storage/suggestionStore.ts";
 
 // ── Bridge ──
-import { initializeRuntime, handleInput, handleApprovalDecision, performSessionReset } from "./bridge/runtime.js";
+import { initializeRuntime, handleInput, handleApprovalDecision, performSessionReset, getRuntime } from "./bridge/runtime.js";
 
 // ============================================================================
 // Gordon App — Claude Code for Vibe Trading
@@ -692,6 +693,27 @@ function AppInner() {
   const setShowConfigEditor = dialogSetter("configEditor");
   const showThreadBrowser = isDialogOpen("threadBrowser");
   const setShowThreadBrowser = dialogSetter("threadBrowser");
+  // Conversation history for the thread browser — loaded when it opens so
+  // /resume + /threads show real past sessions instead of an empty menu.
+  const [threadList, setThreadList] = useState<ThreadInfo[]>([]);
+  useEffect(() => {
+    if (!showThreadBrowser) return;
+    let alive = true;
+    void listThreads()
+      .then((records) => {
+        if (!alive) return;
+        setThreadList(records.map((r) => ({
+          id: r.threadId,
+          name: r.title || undefined,
+          createdAt: r.startedAt,
+          messageCount: 0,
+          lastActivity: r.lastActiveAt,
+          isActive: r.threadId === threadId,
+        })));
+      })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [showThreadBrowser, threadId]);
   const showJournal = isDialogOpen("journal");
   const setShowJournal = dialogSetter("journal");
   const showShortcuts = isDialogOpen("shortcuts");
@@ -1400,7 +1422,7 @@ function AppInner() {
         setShowConfigEditor(true);
         return;
       }
-      if (trimmed === "/threads" || trimmed === "/sessions-list") {
+      if (trimmed === "/threads" || trimmed === "/sessions-list" || trimmed === "/resume") {
         setShowThreadBrowser(true);
         return;
       }
@@ -2241,11 +2263,32 @@ function AppInner() {
   }
 
   if (showThreadBrowser) {
-    return <ThreadBrowser threads={[]} activeThreadId={threadId} onSwitch={(id) => {
-      dispatch({ type: "ADD_MESSAGE", message: { id: `thread-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, role: "system", content: `Switched to thread ${id}`, timestamp: new Date().toISOString() } });
+    return <ThreadBrowser threads={threadList} activeThreadId={threadId} onSwitch={(id) => {
       setShowThreadBrowser(false);
+      void (async () => {
+        try {
+          await switchThread(id);
+          const rt = getRuntime();
+          if (rt) {
+            await rt.resumeSession();
+            const transcript = rt.getTranscript();
+            dispatch({
+              type: "SET_MESSAGES",
+              messages: transcript.map((entry, i) => ({
+                id: `resumed-${i}-${Date.now()}`,
+                role: entry.role === "user" ? "user" as const : "gordon" as const,
+                content: entry.content,
+                timestamp: entry.timestamp,
+              })),
+            });
+          }
+          dispatch({ type: "ADD_MESSAGE", message: { id: `thread-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, role: "system", content: `Resumed conversation ${id}`, timestamp: new Date().toISOString() } });
+        } catch {
+          dispatch({ type: "ADD_MESSAGE", message: { id: `thread-err-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, role: "system", content: `Could not resume thread ${id}`, timestamp: new Date().toISOString() } });
+        }
+      })();
     }} onDelete={(id) => {
-      dispatch({ type: "ADD_MESSAGE", message: { id: `thread-del-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, role: "system", content: `Deleted thread ${id}`, timestamp: new Date().toISOString() } });
+      dispatch({ type: "ADD_MESSAGE", message: { id: `thread-del-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, role: "system", content: `Thread delete isn't supported yet (${id})`, timestamp: new Date().toISOString() } });
     }} onCancel={() => setShowThreadBrowser(false)} />;
   }
 
