@@ -17,6 +17,11 @@ import type { AgentTask } from "./TeammateSpinnerTree.js";
 const FRAMES = ["\u00B7", "\u2722", "\u2733", "\u2736", "\u273B", "\u273D"];
 const ALL_FRAMES = [...FRAMES, ...[...FRAMES].reverse()];
 
+// Secondary text (metadata + tip). Medium gray \u2014 brighter than faint dimColor,
+// matching the StatusLine's theme.uiMuted so the pinned spinner and the status
+// row read at the same brightness.
+const MUTED = "rgb(150,150,150)";
+
 const TRADING_VERBS = [
   "Scanning markets", "Analyzing charts", "Computing risk",
   "Building position", "Checking correlation", "Running backtest",
@@ -445,19 +450,19 @@ export function TradingSpinner({ agentName, elapsedMs, streamLength = 0, userInp
         ))}
         <SpinnerMeta
           items={[
-            showElapsed && elapsedStr ? <Text key="el" dimColor>{elapsedStr}</Text> : null,
+            showElapsed && elapsedStr ? <Text key="el" color={MUTED}>{elapsedStr}</Text> : null,
             showTokens && tokenStr
-              ? <Text key="tok" dimColor>{"\u2193 "}{tokenStr}</Text>
+              ? <Text key="tok" color={MUTED}>{"\u2193 "}{tokenStr}</Text>
               : null,
-            statusPhrase ? <Text key="st" dimColor>{statusPhrase}</Text> : null,
-            showStall && isStalled ? <Text key="stall" color="red" dimColor>slow response</Text> : null,
+            statusPhrase ? <Text key="st" color={MUTED}>{statusPhrase}</Text> : null,
+            showStall && isStalled ? <Text key="stall" color="red">slow response</Text> : null,
             showContextBudget ? <Text key="ctx" color={ctxColor}>{ctxPct}% ctx</Text> : null,
           ]}
         />
       </Box>
       {showHint && (
         <Box paddingLeft={2}>
-          <Text dimColor>{"\u23bf  "}Tip: {tip}</Text>
+          <Text color={MUTED}>{"\u23bf  "}Tip: {tip}</Text>
         </Box>
       )}
       {showAgentTree && agents && (
@@ -474,14 +479,14 @@ function SpinnerMeta({ items }: { items: Array<React.ReactNode | null> }) {
   if (visible.length === 0) return null;
   return (
     <>
-      <Text dimColor> (</Text>
+      <Text color={MUTED}> (</Text>
       {visible.map((item, i) => (
         <React.Fragment key={i}>
-          {i > 0 && <Text dimColor> {"\u00b7"} </Text>}
+          {i > 0 && <Text color={MUTED}> {"\u00b7"} </Text>}
           {item}
         </React.Fragment>
       ))}
-      <Text dimColor>)</Text>
+      <Text color={MUTED}>)</Text>
     </>
   );
 }

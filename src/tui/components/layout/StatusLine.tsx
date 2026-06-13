@@ -35,39 +35,43 @@ export const StatusLine = React.memo(function StatusLine({
   killSwitches: KillSwitchStatus | null;
 }): React.ReactElement {
   const theme = useTheme();
+  // Brighter than faint `dimColor` (which renders too dark on most terminals):
+  // a medium gray that reads as secondary but stays legible, matching Claude
+  // Code's status row. `sep` is the same color for the `·` dividers.
+  const muted = theme.uiMuted;
   return (
     <Box paddingX={2} marginY={1} justifyContent="space-between">
       <Box gap={1}>
-        <Text color={memoryUsageRatio > 0.9 ? "red" : memoryUsageRatio > 0.7 ? "yellow" : undefined} dimColor={memoryUsageRatio <= 0.7}>
+        <Text color={memoryUsageRatio > 0.9 ? "red" : memoryUsageRatio > 0.7 ? "yellow" : muted}>
           {Math.round((1 - memoryUsageRatio) * 100)}% left
         </Text>
         {liveContextTokens > 0 && (
           <>
-            <Text dimColor>{"·"}</Text>
-            <Text dimColor>{formatStatusTokenCount(liveContextTokens)} ctx</Text>
+            <Text color={muted}>{"·"}</Text>
+            <Text color={muted}>{formatStatusTokenCount(liveContextTokens)} ctx</Text>
           </>
         )}
         {lastTurnDurationMs > 0 && (
           <>
-            <Text dimColor>{"·"}</Text>
-            <Text dimColor>{formatElapsed(lastTurnDurationMs / 1000)}</Text>
+            <Text color={muted}>{"·"}</Text>
+            <Text color={muted}>{formatElapsed(lastTurnDurationMs / 1000)}</Text>
             {lastTurnTokens > 0 && (
               <>
-                <Text dimColor>{"·"}</Text>
-                <Text dimColor>{formatStatusTokenCount(lastTurnTokens)} tok</Text>
+                <Text color={muted}>{"·"}</Text>
+                <Text color={muted}>{formatStatusTokenCount(lastTurnTokens)} tok</Text>
               </>
             )}
           </>
         )}
         {autonomousActive && (
           <>
-            <Text dimColor>{"·"}</Text>
+            <Text color={muted}>{"·"}</Text>
             <Text color={theme.variantAdvisor}>{"●"} autonomous</Text>
           </>
         )}
         {memoryUsageRatio > 0.7 && (
           <>
-            <Text dimColor>{"·"}</Text>
+            <Text color={muted}>{"·"}</Text>
             <MemoryUsageIndicator usageRatio={memoryUsageRatio} tokenLimit={contextLimit} />
           </>
         )}
@@ -76,7 +80,7 @@ export const StatusLine = React.memo(function StatusLine({
         <TradingModeBadge mode={permissionMode} />
         <KillSwitchBadge status={killSwitches} />
         <CostDisplay />
-        <Text dimColor>{"·"} Ctrl+P {"·"} ? help</Text>
+        <Text color={muted}>{"·"} Ctrl+P {"·"} ? help</Text>
       </Box>
     </Box>
   );

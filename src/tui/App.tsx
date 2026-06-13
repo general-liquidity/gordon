@@ -2350,18 +2350,8 @@ function AppInner() {
             <ToolCallInline calls={activeToolCalls} />
           )}
 
-          {/* Spinner — shown during all streaming. Carries the elapsed
-              timer so users see it ramp up next to the verb (Claude Code
-              pattern: 'Cogitating · 23s · 1.2K tok'). */}
-          {isStreaming && !isThinking && (
-            <TradingSpinner
-              agentName={activeAgentName ?? undefined}
-              streamLength={streamBuffer?.length ?? 0}
-              userInput={lastUserInput}
-              activeToolName={activeToolCalls.find((t) => t.status === "running")?.toolName}
-              elapsedMs={elapsedSeconds * 1000}
-            />
-          )}
+          {/* Spinner moved out of the conversation flow — it now renders pinned
+              just above the StatusLine / input (Claude Code pattern). */}
 
           {/* Inline help */}
           {showHelp && !isStreaming && <InlineHelp />}
@@ -2740,6 +2730,19 @@ function AppInner() {
       {/* ── Queued commands notice ── */}
       {isStreaming && queuedCount > 0 && (
         <QueuedCommandsNotice count={queuedCount} />
+      )}
+
+      {/* Thinking animation — pinned directly above the status line / input
+          (next to the context % readout), Claude Code style, instead of being
+          buried in the scrolling conversation. */}
+      {isStreaming && !isThinking && (
+        <TradingSpinner
+          agentName={activeAgentName ?? undefined}
+          streamLength={streamBuffer?.length ?? 0}
+          userInput={lastUserInput}
+          activeToolName={activeToolCalls.find((t) => t.status === "running")?.toolName}
+          elapsedMs={elapsedSeconds * 1000}
+        />
       )}
 
       <StatusLine
