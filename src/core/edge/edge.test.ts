@@ -167,3 +167,19 @@ describe("builtin mean-reversion.edge.md", () => {
     }
   });
 });
+
+describe("builtin turn-of-month-spy.edge.md", () => {
+  it("parses the seasonal example and shows EDD generalizes past microstructure", () => {
+    const md = readFileSync(join(import.meta.dir, "builtin", "turn-of-month-spy.edge.md"), "utf8");
+    const spec = parseEdgeSpec(md);
+    expect(spec.name).toBe("turn-of-month-spy");
+    expect(spec.instruments).toEqual(["SPY"]);
+    // The falsifiable core is a calendar segment, not an orderflow signal.
+    expect(spec.invariants.find((i) => i.metric === "tomEffectTStat")).toBeDefined();
+    expect(spec.killConditions.find((k) => k.metric === "tomEffectPValue")).toBeDefined();
+    // It still carries the ledger-derived invariants the live monitor evaluates.
+    expect(spec.invariants.find((i) => i.metric === "netEdgeBps")).toBeDefined();
+    expect(spec.invariants.find((i) => i.metric === "winRate")).toBeDefined();
+    expect(spec.verification).toContain("calendar-effect");
+  });
+});
