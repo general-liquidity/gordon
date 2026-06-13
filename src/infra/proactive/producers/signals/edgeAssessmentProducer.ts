@@ -59,25 +59,61 @@ async function loadRegimeDetector(): Promise<
   }
 }
 
+interface LedgerOutcome {
+  riskRewardActual?: number;
+  outcome?: "win" | "loss" | "breakeven";
+  profitLossPercent?: number;
+}
+
+export interface StrategyLedger {
+  /** Realized R-multiples, most-recent-first (the order evaluateDecay wants). */
+  rMultiples: number[];
+  /** Trade-derived invariant metrics, only when the sample is large enough to
+   *  be meaningful — so an edge can't retire on one or two trades. */
+  tradeMetrics: EdgeMetrics;
+}
+
+/** Below this many closed trades, trade-derived invariant metrics (winRate,
+ *  netEdgeBps) are too noisy to gate an edge on — omit them (fail safe). */
+const MIN_TRADES_FOR_METRICS = 10;
+
+const isFinite_ = (n: unknown): n is number => typeof n === "number" && Number.isFinite(n);
+
+/** Derive winRate + netEdgeBps from closed trades. Both are SIGN-robust for the
+ *  edge invariants (`netEdgeBps >0` / `<=0`, `winRate <0.45`), so the bps scaling
+ *  can't flip a verdict. netEdgeBps assumes profitLossPercent is net realized
+ *  P&L (percent units → ×100 = bps). winRate excludes breakeven trades. */
+export function tradeMetricsFromOutcomes(outcomes: LedgerOutcome[]): EdgeMetrics {
+  if (outcomes.length < MIN_TRADES_FOR_METRICS) return {};
+  const metrics: EdgeMetrics = {};
+  const wins = outcomes.filter((o) => o.outcome === "win").length;
+  const losses = outcomes.filter((o) => o.outcome === "loss").length;
+  if (wins + losses > 0) metrics.winRate = wins / (wins + losses);
+  const pnlPcts = outcomes.map((o) => o.profitLossPercent).filter(isFinite_);
+  if (pnlPcts.length > 0) metrics.netEdgeBps = (pnlPcts.reduce((a, b) => a + b, 0) / pnlPcts.length) * 100;
+  return metrics;
+}
+
 /**
- * Recent realized R-multiples for a playbook, most-recent-first (the order
- * evaluateDecay wants). Reads the trade-outcome ledger; fails safe to [] if the
- * ledger is unavailable, so a fresh edge with no trade history simply gets no
- * decay verdict (invariants still gate it).
+ * Read the trade-outcome ledger for one playbook: realized R-multiples (for the
+ * decay leg) plus the trade-derived invariant metrics (for the invariant leg).
+ * One ledger read serves both. Fails safe to empty if the ledger is unavailable,
+ * so a fresh edge with no trade history is gated by its market invariants alone.
  */
-async function loadRecentRMultiples(strategy: string): Promise<number[]> {
+async function loadStrategyLedger(strategy: string): Promise<StrategyLedger> {
   try {
     const mod = (await import("../../../domain/evals/index.ts" as string)) as {
-      getTradeOutcomes?: (f: { strategy?: string; limit?: number }) => Array<{ riskRewardActual?: number }>;
+      getTradeOutcomes?: (f: { strategy?: string; limit?: number }) => LedgerOutcome[];
     };
-    if (typeof mod.getTradeOutcomes !== "function") return [];
-    return mod
-      .getTradeOutcomes({ strategy, limit: 70 })
-      .map((o) => o.riskRewardActual)
-      .filter((r): r is number => typeof r === "number" && Number.isFinite(r));
+    if (typeof mod.getTradeOutcomes !== "function") return { rMultiples: [], tradeMetrics: {} };
+    const outcomes = mod.getTradeOutcomes({ strategy, limit: 70 });
+    return {
+      rMultiples: outcomes.map((o) => o.riskRewardActual).filter(isFinite_),
+      tradeMetrics: tradeMetricsFromOutcomes(outcomes),
+    };
   } catch (err) {
     logger.debug("trade outcomes unavailable", { strategy, err: String(err) });
-    return [];
+    return { rMultiples: [], tradeMetrics: {} };
   }
 }
 
@@ -137,14 +173,20 @@ export function computeEdgeAlerts(
   metricsBySymbol: Map<string, EdgeMetrics>,
   lastLevel: Map<string, EdgeHealth>,
   rMultiplesByStrategy: Map<string, ReadonlyArray<number>> = new Map(),
+  tradeMetricsByStrategy: Map<string, EdgeMetrics> = new Map(),
 ): ProactiveSuggestion[] {
   const cards: ProactiveSuggestion[] = [];
 
   for (const edge of edges) {
     for (const instrument of edge.instruments) {
       const symbol = normalizeInstrument(instrument);
-      const metrics = metricsBySymbol.get(symbol);
-      if (!metrics) continue;
+      // Market-observable metrics (per symbol) + trade-derived metrics (per
+      // playbook: winRate, netEdgeBps). Either alone is enough to assess —
+      // ev-net-positive / winrate-broke don't need market data.
+      const marketMetrics = metricsBySymbol.get(symbol);
+      const tradeMetrics = tradeMetricsByStrategy.get(edge.strategy);
+      if (!marketMetrics && !tradeMetrics) continue;
+      const metrics: EdgeMetrics = { ...marketMetrics, ...tradeMetrics };
 
       // Realized R-multiples are tagged by playbook (strategy), so edges that
       // share a playbook share a decay score — fine: decay is the playbook's
@@ -271,9 +313,11 @@ export const edgeAssessmentProducer: CandidateProducer = async (obs): Promise<Pr
   // One fetch per distinct instrument across all live edges.
   const symbols = [...new Set(edges.flatMap((e) => e.instruments.map(normalizeInstrument)))];
   const metricsBySymbol = new Map<string, EdgeMetrics>();
-  // One realized-R lookup per distinct playbook (strategy) across all live edges.
+  // One ledger lookup per distinct playbook (strategy) across all live edges —
+  // serves both the decay leg (rMultiples) and the trade-derived invariant leg.
   const strategies = [...new Set(edges.map((e) => e.strategy).filter(Boolean))];
   const rMultiplesByStrategy = new Map<string, ReadonlyArray<number>>();
+  const tradeMetricsByStrategy = new Map<string, EdgeMetrics>();
 
   await Promise.allSettled([
     ...symbols.map(async (symbol) => {
@@ -282,11 +326,13 @@ export const edgeAssessmentProducer: CandidateProducer = async (obs): Promise<Pr
       metricsBySymbol.set(symbol, collectEdgeMetrics(symbol, candles, detector));
     }),
     ...strategies.map(async (strategy) => {
-      rMultiplesByStrategy.set(strategy, await loadRecentRMultiples(strategy));
+      const ledger = await loadStrategyLedger(strategy);
+      rMultiplesByStrategy.set(strategy, ledger.rMultiples);
+      tradeMetricsByStrategy.set(strategy, ledger.tradeMetrics);
     }),
   ]);
 
-  return computeEdgeAlerts(edges, metricsBySymbol, lastLevelByKey, rMultiplesByStrategy);
+  return computeEdgeAlerts(edges, metricsBySymbol, lastLevelByKey, rMultiplesByStrategy, tradeMetricsByStrategy);
 };
 
 /** Reset the per-edge health memory. Called on producer unregister. */

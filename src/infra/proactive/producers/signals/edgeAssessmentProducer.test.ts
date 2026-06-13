@@ -8,6 +8,7 @@ import {
   computeVolumePattern,
   collectEdgeMetrics,
   normalizeInstrument,
+  tradeMetricsFromOutcomes,
   resetEdgeAssessmentProducerState,
 } from "./edgeAssessmentProducer.ts";
 
@@ -47,6 +48,31 @@ const STABLE_R = Array.from({ length: 60 }, () => 0.5); // ratio 1.0 → stable
 const DEGRADED_R = [...Array.from({ length: 20 }, () => 0.25), ...Array.from({ length: 40 }, () => 0.5)]; // 0.5 → degraded
 const DECAYED_R = [...Array.from({ length: 20 }, () => 0.1), ...Array.from({ length: 40 }, () => 0.5)]; // 0.2 → retire
 const rByStrategy = (rs: ReadonlyArray<number>) => new Map([["mean-reversion", rs]]);
+const tradeBy = (m: EdgeMetrics) => new Map([["mean-reversion", m]]);
+
+// Richer edge with trade-derived kills (ev-decayed, winrate-broke), like the builtin.
+const FULL_EDGE = parseEdgeSpec(`---
+name: full-live-fade
+strategy: mean-reversion
+status: live
+regime: [ranging, quiet]
+instruments: [BTC/USDT]
+---
+## Hypothesis
+Trapped buyers exit into the fade.
+## Invariants
+| id | metric | comparator | threshold | description |
+|---|---|---|---|---|
+| ev-net-positive | netEdgeBps | > | 0 | survives cost |
+| regime-ranging | regime | in | ranging,quiet | range-bound |
+| liquidity-floor | avgVol1mUsd | >= | 100000 | depth |
+## Kill Conditions
+| id | metric | comparator | threshold | description |
+|---|---|---|---|---|
+| regime-flip | regime | not-in | ranging,quiet | regime left range |
+| ev-decayed | netEdgeBps | <= | 0 | net edge gone |
+| winrate-broke | winRate | < | 0.45 | win rate below break-even |
+`);
 
 describe("normalizeInstrument", () => {
   test("maps pair/dash/bare forms to the candle-fetch key", () => {
@@ -175,6 +201,66 @@ describe("computeEdgeAlerts — decay composition (realized R)", () => {
   test("no rMultiples for the strategy → behaves exactly as the invariant-only path", () => {
     // Empty map (or unknown strategy) means no decay verdict; healthy market = no card.
     expect(computeEdgeAlerts([LIVE_EDGE], metricsMap(HEALTHY), last, new Map())).toHaveLength(0);
+  });
+});
+
+describe("tradeMetricsFromOutcomes", () => {
+  const mk = (outcome: "win" | "loss", pnlPct: number) => ({ outcome, profitLossPercent: pnlPct, riskRewardActual: pnlPct });
+
+  test("returns empty below the minimum sample (too noisy to gate on)", () => {
+    expect(tradeMetricsFromOutcomes(Array(5).fill(mk("win", 1)))).toEqual({});
+  });
+
+  test("computes winRate (excluding breakeven) and netEdgeBps (percent → bps)", () => {
+    const outcomes = [...Array(6).fill(mk("win", 1.0)), ...Array(4).fill(mk("loss", -0.5))];
+    const m = tradeMetricsFromOutcomes(outcomes);
+    expect(m.winRate).toBeCloseTo(0.6, 5); // 6 wins / 10 decided
+    expect(m.netEdgeBps).toBeCloseTo(40, 5); // mean pnl% 0.4 × 100
+  });
+
+  test("surfaces a sub-break-even win rate and a negative net edge", () => {
+    const outcomes = [...Array(3).fill(mk("win", 0.5)), ...Array(7).fill(mk("loss", -1.0))];
+    const m = tradeMetricsFromOutcomes(outcomes);
+    expect(m.winRate!).toBeLessThan(0.45);
+    expect(m.netEdgeBps!).toBeLessThan(0);
+  });
+});
+
+describe("computeEdgeAlerts — trade-derived invariant metrics", () => {
+  let last: Map<string, EdgeHealth>;
+  beforeEach(() => {
+    last = new Map();
+  });
+
+  test("healthy market + healthy trade metrics → stable, no card", () => {
+    const cards = computeEdgeAlerts([FULL_EDGE], metricsMap(HEALTHY), last, new Map(), tradeBy({ netEdgeBps: 40, winRate: 0.6 }));
+    expect(cards).toHaveLength(0);
+  });
+
+  test("net edge gone (netEdgeBps ≤ 0) → ev-decayed kill fires → retire", () => {
+    const cards = computeEdgeAlerts([FULL_EDGE], metricsMap(HEALTHY), last, new Map(), tradeBy({ netEdgeBps: -12, winRate: 0.6 }));
+    expect(cards).toHaveLength(1);
+    expect(cards[0]!.triggers.metadata?.health).toBe("retire");
+    expect(cards[0]!.triggers.metadata?.breaks).toContain("ev-decayed");
+  });
+
+  test("win rate below break-even (winRate < 0.45) → winrate-broke kill fires → retire", () => {
+    const cards = computeEdgeAlerts([FULL_EDGE], metricsMap(HEALTHY), last, new Map(), tradeBy({ netEdgeBps: 40, winRate: 0.3 }));
+    expect(cards).toHaveLength(1);
+    expect(cards[0]!.triggers.metadata?.health).toBe("retire");
+    expect(cards[0]!.triggers.metadata?.breaks).toContain("winrate-broke");
+  });
+
+  test("trade metrics drive a verdict even with no market metrics for the symbol", () => {
+    // metricsBySymbol empty → assessed on trade metrics alone (ev-net-positive etc).
+    const cards = computeEdgeAlerts([FULL_EDGE], new Map(), last, new Map(), tradeBy({ netEdgeBps: -5, winRate: 0.6 }));
+    expect(cards).toHaveLength(1);
+    expect(cards[0]!.triggers.metadata?.health).toBe("retire");
+  });
+
+  test("below-sample trade metrics (empty bag) never raise a card", () => {
+    const cards = computeEdgeAlerts([FULL_EDGE], metricsMap(HEALTHY), last, new Map(), tradeBy({}));
+    expect(cards).toHaveLength(0);
   });
 });
 
