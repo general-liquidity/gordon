@@ -43,6 +43,7 @@ import type {
   SkillValidationIssue,
 } from "./types.ts";
 import { createModuleLogger } from "../logger/index.ts";
+import { scanSkillSecurity } from "./skillSecurity.ts";
 
 const logger = createModuleLogger("skill-loader");
 
@@ -374,16 +375,44 @@ export function loadSkillFromFile(filePath: string, source: SkillSource): Skill 
       });
     }
 
+    // Prompt-injection scan (non-builtin skills only). A poisoned third-party
+    // SKILL.md reaches a money agent's reasoning the same way a poisoned tool
+    // description does — reuse the same guard. Warn-by-default; block under the
+    // guard when the body carries a blocking-level injection.
+    const { scan, block, sanitizedDescription } = scanSkillSecurity(
+      fm.description ?? "",
+      body,
+      source,
+    );
+    if (block) {
+      logger.warn("Blocked skill with prompt-injection in body (GORDON_SKILL_INJECTION_GUARD)", {
+        filePath,
+        source,
+        riskLevel: scan.riskLevel,
+        categories: scan.categories,
+      });
+      return null;
+    }
+    if (scan.injectionDetected) {
+      logger.warn("Skill tripped prompt-injection heuristics — loaded but flagged", {
+        filePath,
+        source,
+        riskLevel: scan.riskLevel,
+        categories: scan.categories,
+      });
+    }
+
     const id = fm.name ?? dirName;
     return {
       id,
       name: fm.name ?? dirName,
-      description: fm.description ?? "",
+      description: sanitizedDescription,
       body,
       frontmatter: fm,
       source,
       filePath,
       validationWarnings: warnings.length > 0 ? warnings : undefined,
+      ...(scan.injectionDetected ? { security: scan } : {}),
     };
   } catch (error) {
     logger.debug("Failed to load skill", {

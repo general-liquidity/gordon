@@ -92,6 +92,19 @@ export interface SkillValidationIssue {
   message: string;
 }
 
+/**
+ * Result of scanning a loaded skill's body/description for prompt injection.
+ * Present on a Skill only when injection heuristics fired (loaded-but-flagged);
+ * a skill blocked under the guard never becomes a Skill at all.
+ */
+export interface SkillSecurityScan {
+  injectionDetected: boolean;
+  riskLevel: "none" | "low" | "medium" | "high" | "critical";
+  /** Matched injection categories (from injectionDefense). */
+  categories: string[];
+  reason?: string;
+}
+
 export interface Skill {
   /** Unique skill ID (directory name). */
   id: string;
@@ -113,6 +126,13 @@ export interface Skill {
    * Empty array means fully compliant.
    */
   validationWarnings?: SkillValidationIssue[];
+  /**
+   * Prompt-injection scan result — present only on a non-builtin skill whose
+   * body or description tripped the injection heuristics. The skill was loaded
+   * anyway (warn mode); under GORDON_SKILL_INJECTION_GUARD a blocking match
+   * prevents loading entirely, so this never carries a blocked verdict.
+   */
+  security?: SkillSecurityScan;
 }
 
 export type SkillSource =
