@@ -129,9 +129,20 @@ export interface AgentCallRecord {
 // ============================================================================
 
 /**
- * Default rate limit: 10 calls per minute per tool per agent
+ * Default per-tool-per-agent rate limit (calls/min). Overridable via
+ * GORDON_TOOL_RATE_LIMIT; set it to 0 to disable rate limiting entirely.
+ *
+ * Raised from 10 → 60: a single market-status scan legitimately calls a tool
+ * like quick_ta once per pair (15+ symbols), so 10/min throttled normal
+ * analysis. The doom-loop detector (runtimeHarness) remains the real runaway
+ * guard; this is a coarse secondary ceiling, not the primary safety control.
  */
-const DEFAULT_RATE_LIMIT = 10;
+const DEFAULT_RATE_LIMIT = (() => {
+  const raw = process.env["GORDON_TOOL_RATE_LIMIT"];
+  if (raw == null || raw === "") return 60;
+  const n = Number(raw);
+  return Number.isFinite(n) && n >= 0 ? n : 60;
+})();
 const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute
 
 /**
@@ -429,6 +440,11 @@ export function checkRateLimit(
   toolName: string,
   limit: number = DEFAULT_RATE_LIMIT
 ): RateLimitResult {
+  // limit <= 0 disables rate limiting (GORDON_TOOL_RATE_LIMIT=0).
+  if (limit <= 0) {
+    return { allowed: true, remaining: Number.POSITIVE_INFINITY, resetInMs: 0 };
+  }
+
   const key = getRateLimitKey(agentName, toolName);
   const now = Date.now();
 

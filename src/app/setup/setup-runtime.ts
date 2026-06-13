@@ -199,7 +199,7 @@ function getProviderDefaultModel(provider: "openai" | "dedalus"): string {
     case "openai":
       return "openai/gpt-5.4";
     case "dedalus":
-      return "openai/gpt-5.2";
+      return "anthropic/claude-opus-4-6";
   }
 }
 
