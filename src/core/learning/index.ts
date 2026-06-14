@@ -29,3 +29,13 @@ export type {
   InactionOutcome,
   InactionValueReport,
 } from "./inaction-value.ts";
+
+export { analyzeLeverAttribution } from "./lever-attribution.ts";
+export type {
+  LeverTaggedTrade,
+  LeverRecommendation,
+  LeverBucketStats,
+  LeverDiagnostic,
+  LeverAttributionReport,
+  LeverAttributionOptions,
+} from "./lever-attribution.ts";
