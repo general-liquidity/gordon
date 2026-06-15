@@ -37,6 +37,16 @@ export {
 } from "./distribution-drift.ts";
 
 export {
+  classifyMarketBreadth,
+  type MarketBreadthInput,
+  type MarketBreadthBias,
+  type SymbolSnapshot,
+  type DirectionBias,
+  type StrategyBias,
+  type FavoredStrategy,
+} from "./market-breadth-bias.ts";
+
+export {
   computeEffectiveN,
   type EffectiveNResult,
   type EffectiveNOptions,
