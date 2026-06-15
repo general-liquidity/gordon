@@ -30,6 +30,13 @@ export {
 } from "./walk-forward-ic.ts";
 
 export {
+  computePSI,
+  type PSIResult,
+  type PSIBin,
+  type DriftVerdict,
+} from "./distribution-drift.ts";
+
+export {
   computeEffectiveN,
   type EffectiveNResult,
   type EffectiveNOptions,
