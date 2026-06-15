@@ -4,6 +4,7 @@ import { App } from "./App.js";
 import { loadLabsFlagsIntoEnv } from "./ink-custom/loadLabsFlags.js";
 import { acquireInstanceLock, InstanceLockCollisionError } from "../infra/storage/instanceLock.ts";
 import { setInkInstance } from "./utils/inkInstance.ts";
+import { initTerminalTab } from "./terminalTab.js";
 
 export async function startGordonTUI(): Promise<void> {
   loadLabsFlagsIntoEnv();
@@ -15,6 +16,9 @@ export async function startGordonTUI(): Promise<void> {
     // Clean the screen; the banner + session box are now rendered inside Ink as
     // the first item of the message-list <Static> (see App.tsx / BootHeader).
     process.stdout.write("\x1b[2J\x1b[H");
+    // Name the tab "gordon" right away (clearing the screen doesn't touch the
+    // window title) so it shows before the first React frame, like claude/codex.
+    initTerminalTab();
   }
 
   const instance = render(<App />, {

@@ -106,18 +106,30 @@ export interface TabState {
 }
 
 let terminal: TerminalType | null = null;
+let lastTitle = "";
+
+/**
+ * Name the terminal tab "gordon" immediately at startup — before the TUI
+ * renders its first frame — the way `claude`/`codex` name their tab the
+ * instant the process launches. `updateTerminalTab` then enriches it with
+ * live activity. Synchronous + idempotent; safe to call once on boot.
+ */
+export function initTerminalTab(): void {
+  if (!terminal) terminal = detectTerminal();
+  setTitle("gordon");
+  lastTitle = "gordon";
+}
 
 /**
  * Update the terminal tab to reflect Gordon's current state.
  * Safe to call frequently — only writes if state changed.
  */
-let lastTitle = "";
 
 export function updateTerminalTab(state: TabState): void {
   if (!terminal) terminal = detectTerminal();
 
   // Build title
-  const parts: string[] = ["Gordon"];
+  const parts: string[] = ["gordon"];
   if (state.model) parts.push(`(${state.model})`);
   if (state.agent && state.agent !== "Gordon") parts.push(`→ ${state.agent}`);
   if (state.symbol) parts.push(`[${state.symbol}]`);

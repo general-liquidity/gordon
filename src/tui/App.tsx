@@ -1778,8 +1778,11 @@ function AppInner() {
       activity: isStreaming ? "streaming" : "idle",
       permissionMode: permissionMode ?? "ask",
     });
-    return () => { resetTerminalTab(); };
   }, [isStreaming, permissionMode]);
+
+  // Restore the tab name only when the TUI actually exits — not on every
+  // activity/permission change, which flickered the title to "Terminal".
+  useEffect(() => () => { resetTerminalTab(); }, []);
 
   useEffect(() => {
     if (!useAltScreen || activeOverlayView === null) return;
