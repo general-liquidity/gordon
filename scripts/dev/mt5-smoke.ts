@@ -46,6 +46,10 @@ async function main(): Promise<void> {
   const quote = await client.quote(symbol);
   console.log("✓ quote");
   line("bid / ask", `${quote.bid} / ${quote.ask}`);
+  if (!quote.bid && !quote.ask) {
+    console.log("  ↳ live feed appears OFF (bid/ask 0) — expected before the live data turns on");
+    console.log("    (~18 Jun); historical bars above still work, so backtesting is unblocked now.");
+  }
 
   const depth = await client.depth(symbol).catch((e) => {
     console.log(`  (depth unavailable: ${(e as Error).message})`);

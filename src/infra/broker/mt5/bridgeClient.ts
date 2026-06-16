@@ -64,6 +64,8 @@ export interface Mt5Quote {
   last: number;
   /** Tick time, epoch seconds. */
   time: number;
+  /** False when bid/ask are 0 — the live feed isn't streaming (e.g. pre-competition). */
+  live?: boolean;
 }
 
 export interface Mt5DepthLevel {

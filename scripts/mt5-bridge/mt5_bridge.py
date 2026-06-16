@@ -21,6 +21,7 @@ misconfigured run can read state and price-check orders but cannot fire them.
 
 import json
 import os
+import time
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, parse_qs
@@ -115,14 +116,29 @@ def symbols(group):
     return [{k: getattr(s, k, None) for k in keep} for s in rows]
 
 
-def quote(symbol):
+def _tick(symbol, retries=15, delay=0.1):
+    """Select the symbol and fetch its latest tick. Right after selection the
+    terminal may not have pulled a quote yet, so poll briefly. If the live feed
+    is off (e.g. pre-competition), bid/ask stay 0 and we return that as-is —
+    a persistent 0 then cleanly signals 'feed not active', not a transient race."""
     if not mt5.symbol_select(symbol, True):
         raise BridgeError(f"symbol_select('{symbol}') failed — {_last_error()}", 404)
     tick = mt5.symbol_info_tick(symbol)
+    for _ in range(retries):
+        if tick is not None and (tick.bid or tick.ask):
+            break
+        time.sleep(delay)
+        tick = mt5.symbol_info_tick(symbol)
     if tick is None:
         raise BridgeError(f"no tick for '{symbol}' — {_last_error()}", 503)
+    return tick
+
+
+def quote(symbol):
+    tick = _tick(symbol)
     d = tick._asdict()
     d["symbol"] = symbol
+    d["live"] = bool(tick.bid or tick.ask)
     return d
 
 
@@ -180,11 +196,7 @@ def _build_order_request(body):
     side = body["side"]  # buy | sell
     otype = body.get("type", "market")  # market | limit
     volume = float(body["volume"])
-    if not mt5.symbol_select(symbol, True):
-        raise BridgeError(f"symbol_select('{symbol}') failed — {_last_error()}", 404)
-    tick = mt5.symbol_info_tick(symbol)
-    if tick is None:
-        raise BridgeError(f"no tick for '{symbol}' — {_last_error()}", 503)
+    tick = _tick(symbol)
 
     req = {
         "symbol": symbol,
