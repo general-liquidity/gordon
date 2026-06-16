@@ -23,7 +23,8 @@ export type BrokerId =
   | "trading212"
   | "etrade"
   | "ibkr"
-  | "syphonix";
+  | "syphonix"
+  | "mt5";
 
 /**
  * Runtime array of all supported broker IDs. Kept in sync with BrokerId via
@@ -107,6 +108,14 @@ export const BROKER_ENV_MAP: Record<BrokerId, { key: string; secret: string; pap
     secret: "GORDON_SYPHONIX_API_SECRET",
     paper: "GORDON_SYPHONIX_PAPER",
     accountId: "GORDON_SYPHONIX_ACCOUNT_ID",
+  },
+  // MT5 "credentials" describe the bridge sidecar (apiKey = bridge token); the
+  // MT5 account login/password/server live in the sidecar's own env.
+  mt5: {
+    key: "MT5_BRIDGE_TOKEN",
+    secret: "MT5_BRIDGE_TOKEN",
+    paper: "MT5_PAPER",
+    accountId: "MT5_LOGIN",
   },
 };
 

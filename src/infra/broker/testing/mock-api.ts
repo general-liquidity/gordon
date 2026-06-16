@@ -207,6 +207,20 @@ const BROKER_RULES: Record<BrokerId, BrokerPathRules> = {
     cancelAll: [],
     quote: [],
   },
+  // MT5 routes through the bridge sidecar (local HTTP), not this REST mock — the
+  // adapter is tested directly against a stubbed Mt5BridgeClient. Empty here.
+  mt5: {
+    accountDiscovery: [],
+    clock: [],
+    account: [],
+    positions: [],
+    listOrders: [],
+    getOrder: [],
+    placeOrder: [],
+    cancelOrder: [],
+    cancelAll: [],
+    quote: [],
+  },
 };
 
 function delay(ms: number): Promise<void> {

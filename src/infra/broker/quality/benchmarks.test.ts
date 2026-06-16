@@ -1,11 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import { BrokerFactory } from "../factory.ts";
-import { runBrokerBenchmarks, validateBenchmarkReport } from "./benchmarks.ts";
+import { getBenchmarkableBrokers, runBrokerBenchmarks, validateBenchmarkReport } from "./benchmarks.ts";
 
 describe("broker latency benchmarks and reliability scorecard", () => {
-  test("produces benchmark + scorecard for every supported broker", async () => {
+  test("produces benchmark + scorecard for every REST-benchmarkable broker", async () => {
     const reports = await runBrokerBenchmarks({ iterations: 4 });
-    const supported = BrokerFactory.getSupportedBrokers();
+    const supported = getBenchmarkableBrokers();
 
     expect(reports.length).toBe(supported.length);
 

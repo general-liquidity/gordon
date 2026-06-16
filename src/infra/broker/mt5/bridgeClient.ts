@@ -44,6 +44,19 @@ export interface Mt5Position {
   tp: number;
 }
 
+export interface Mt5Order {
+  ticket: number;
+  symbol: string;
+  /** MT5 ORDER_TYPE enum (2 = buy limit, 3 = sell limit, …). */
+  type: number;
+  volume_current: number;
+  price_open: number;
+  sl: number;
+  tp: number;
+  /** MT5 ORDER_STATE enum. */
+  state: number;
+}
+
 export interface Mt5Quote {
   symbol: string;
   bid: number;
@@ -179,7 +192,15 @@ export class Mt5BridgeClient {
     }
 
     const text = await res.text();
-    const json = text ? (JSON.parse(text) as unknown) : {};
+    let json: unknown = {};
+    try {
+      json = text ? (JSON.parse(text) as unknown) : {};
+    } catch {
+      throw new Mt5BridgeError(
+        `MT5 bridge returned a non-JSON ${res.status} response: ${text.slice(0, 120)}`,
+        res.status || 502,
+      );
+    }
     if (!res.ok) {
       const msg = (json as { error?: string }).error ?? `HTTP ${res.status}`;
       throw new Mt5BridgeError(msg, res.status);
@@ -202,6 +223,10 @@ export class Mt5BridgeClient {
 
   async positions(): Promise<Mt5Position[]> {
     return (await this.request<{ positions: Mt5Position[] }>("GET", "/positions")).positions;
+  }
+
+  async orders(): Promise<Mt5Order[]> {
+    return (await this.request<{ orders: Mt5Order[] }>("GET", "/orders")).orders;
   }
 
   symbols(group?: string): Promise<{ symbols: Mt5SymbolSpec[] }> {

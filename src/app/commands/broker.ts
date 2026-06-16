@@ -365,6 +365,13 @@ function getBrokerSetupInstructions(type: BrokerId): string {
 3. Set GORDON_SYPHONIX_API_KEY, GORDON_SYPHONIX_BASE_URL, GORDON_SYPHONIX_PAPER=true
 4. Flip the inclusion-gate entry to approved + documentedExecutionEndpoints:true
 5. Smoke-test auth/quote/order/cancel on FX/metals/crypto before the live week`,
+    mt5: `
+1. Model to Market execution path (Syphonix has no REST API — trading is via MetaTrader 5)
+2. Install the MT5 terminal (Windows) + log into your competition account
+3. Run the bridge sidecar: scripts/mt5-bridge (pip install -r requirements.txt; python mt5_bridge.py)
+   — set MT5_LOGIN/MT5_PASSWORD/MT5_SERVER, MT5_BRIDGE_TOKEN, MT5_BRIDGE_ALLOW_TRADING=1
+4. Point Gordon at the bridge: apiKey = MT5_BRIDGE_TOKEN, baseUrl = http://127.0.0.1:8788, MT5_PAPER=true
+5. Verify: bun run scripts/dev/mt5-smoke.ts (see docs/model-to-market/COMPETITION_BRIEF.md §7)`,
   };
   return instructions[type];
 }

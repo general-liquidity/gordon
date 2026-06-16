@@ -82,6 +82,7 @@ export const BrokerTypeSchema = z.enum([
   "etrade",
   "ibkr",
   "syphonix",
+  "mt5",
 ]);
 
 /**
