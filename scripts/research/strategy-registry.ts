@@ -71,22 +71,36 @@ export interface StrategyFactory {
 
 // ── Shared helpers ──────────────────────────────────────────────────────────
 
+/**
+ * Trailing-history cap for indicator inputs. Every indicator used here is either
+ * window-based (depends only on the last `period` bars → capping ≥ period is
+ * exact) or a forward-smoothing recursion (RSI/EMA/MACD/Supertrend) whose seed
+ * influence decays geometrically: for the slowest period in the grids (26), the
+ * residual after CAP bars is (25/27)^768 ≈ 1e-58, far below float64 epsilon
+ * (2^-53 ≈ 1.1e-16). So feeding only the last CAP bars is BIT-IDENTICAL to the
+ * full history while turning the per-bar O(N) indicator recompute (→ O(N²) over a
+ * run) into O(CAP) (→ O(N·CAP)). Verified by M15 verdict + marginal-list parity.
+ */
+const HISTORY_CAP = 768;
+
 function closesOf(history: ResearchBar[], bar: ResearchBar): number[] {
-  const out = new Array<number>(history.length + 1);
-  for (let i = 0; i < history.length; i++) out[i] = history[i]!.close;
-  out[history.length] = bar.close;
+  const start = Math.max(0, history.length - HISTORY_CAP);
+  const n = history.length - start;
+  const out = new Array<number>(n + 1);
+  for (let i = 0; i < n; i++) out[i] = history[start + i]!.close;
+  out[n] = bar.close;
   return out;
 }
 
 function candlesOf(history: ResearchBar[], bar: ResearchBar): Candle[] {
-  const all = [...history, bar];
-  return all.map((b) => ({
-    open: b.open,
-    high: b.high,
-    low: b.low,
-    close: b.close,
-    volume: 0,
-  }));
+  const start = Math.max(0, history.length - HISTORY_CAP);
+  const out: Candle[] = [];
+  for (let i = start; i < history.length; i++) {
+    const b = history[i]!;
+    out.push({ open: b.open, high: b.high, low: b.low, close: b.close, volume: 0 });
+  }
+  out.push({ open: bar.open, high: bar.high, low: bar.low, close: bar.close, volume: 0 });
+  return out;
 }
 
 /** Population stdev of consecutive-close returns over the last `n` closes. */
